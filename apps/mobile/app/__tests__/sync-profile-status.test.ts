@@ -100,4 +100,24 @@ describe('deriveSyncProfileStatus', () => {
     expect(result.errorMessage).toBe('Duplicate event_id with changed payload.');
     expect(result.retryHint).toContain('retry manually');
   });
+
+  it('prefers blocked delivery error over generic incomplete bootstrap error', () => {
+    const result = deriveSyncProfileStatus({
+      deliveryState: createDeliveryState({
+        lastErrorMessage: 'Projection apply failed: missing parent row.',
+        retryBlocked: true,
+      }),
+      isOnline: true,
+      isSignedIn: true,
+      pendingCount: 1,
+      runtimeState: createRuntimeState({
+        isEnabled: true,
+        lastBootstrapError: 'Bootstrap merge completed but convergence did not settle (failure_blocked).',
+      }),
+    });
+
+    expect(result.kind).toBe('action_required');
+    expect(result.statusLabel).toBe('Sync blocked');
+    expect(result.errorMessage).toBe('Projection apply failed: missing parent row.');
+  });
 });

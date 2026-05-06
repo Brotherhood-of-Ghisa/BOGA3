@@ -74,22 +74,6 @@ export const deriveSyncProfileStatus = (input: {
     };
   }
 
-  if (runtimeState.lastBootstrapError && runtimeState.bootstrapCompletedAt === null) {
-    return {
-      isEnabled: true,
-      kind: 'action_required',
-      statusLabel: 'Action required',
-      statusHint: 'Initial sync did not complete.',
-      pendingCount,
-      pendingCountCapped,
-      lastSuccessfulSyncAt: deliveryState.lastSuccessAt,
-      nextAttemptAt: null,
-      errorMessage: runtimeState.lastBootstrapError,
-      retryHint: 'Automatic retry is unavailable for this state. Toggle sync off and on to retry.',
-      isOnline: input.isOnline,
-    };
-  }
-
   if (deliveryState.retryBlocked) {
     return {
       isEnabled: true,
@@ -102,6 +86,22 @@ export const deriveSyncProfileStatus = (input: {
       nextAttemptAt: null,
       errorMessage: deliveryState.lastErrorMessage ?? 'Sync blocked by a non-retryable backend response.',
       retryHint: 'Fix the issue and retry manually by toggling sync off and on.',
+      isOnline: input.isOnline,
+    };
+  }
+
+  if (runtimeState.lastBootstrapError && runtimeState.bootstrapCompletedAt === null) {
+    return {
+      isEnabled: true,
+      kind: 'action_required',
+      statusLabel: 'Action required',
+      statusHint: 'Initial sync did not complete.',
+      pendingCount,
+      pendingCountCapped,
+      lastSuccessfulSyncAt: deliveryState.lastSuccessAt,
+      nextAttemptAt: null,
+      errorMessage: runtimeState.lastBootstrapError,
+      retryHint: 'Automatic retry is unavailable for this state. Toggle sync off and on to retry.',
       isOnline: input.isOnline,
     };
   }

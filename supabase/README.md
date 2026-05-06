@@ -135,7 +135,7 @@ Provision deterministic local auth fixtures (`user_a`, `user_b`) after local res
 ./supabase/scripts/auth-provision-local-fixtures.sh
 ```
 
-Provision or update one user (local or any environment where `API_URL` + `SERVICE_ROLE_KEY` are exported):
+Provision or update one user (local, or any environment where `API_URL` + `SERVICE_ROLE_KEY` or `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` are exported):
 
 ```bash
 ./supabase/scripts/auth-provision-user.sh \
@@ -146,6 +146,7 @@ Provision or update one user (local or any environment where `API_URL` + `SERVIC
 Notes:
 
 - Uses the Supabase Auth Admin API (service-role only).
+- Hosted provisioning requires the legacy JWT `service_role` key. Do not use a publishable key (`sb_publishable_...`) or secret key (`sb_secret_...`) for this script.
 - Local fixture provisioning also syncs `public.dev_fixture_principals` aliases (`user_a`, `user_b`) to the real local auth user UUIDs for deterministic ownership tests.
 
 ## Auth/authz contract tests (local Supabase)
@@ -202,6 +203,14 @@ Parallel-run note:
 
 - `Accept-Profile: app_public`
 - `Content-Profile: app_public` (writes)
+
+## Hosted sync bootstrap (manual Dashboard path)
+
+For ad-hoc hosted sync enablement before formal deployment automation exists, run `supabase/hosted-bootstrap-sync.sql` in the hosted Supabase Dashboard SQL Editor.
+
+The script creates the `app_public` sync projection tables and `sync_events_ingest` RPC from the local migration chain, but excludes local-only fixture setup. Keep `app_public` listed in Dashboard **Project Settings -> API -> Data API Settings -> Exposed schemas**.
+
+If hosted sync was bootstrapped before the session-exercise definition FK relaxation, run `supabase/hosted-hotfix-relax-session-exercise-definition-fk.sql` once from the Dashboard SQL Editor.
 
 ## Fixture baseline (deterministic)
 

@@ -7,6 +7,7 @@ const mockGetSupabaseMobileClient = jest.fn();
 const mockFlushSyncOutbox = jest.fn();
 const mockSetSyncIngestTransport = jest.fn();
 const mockRunSyncBootstrapMerge = jest.fn();
+const mockClearSyncRetryState = jest.fn();
 
 jest.mock('@/src/data/bootstrap', () => ({
   bootstrapLocalDataLayer: (...args: unknown[]) => mockBootstrapLocalDataLayer(...args),
@@ -28,6 +29,10 @@ jest.mock('@/src/sync/engine', () => ({
 
 jest.mock('@/src/sync/bootstrap', () => ({
   runSyncBootstrapMerge: (...args: unknown[]) => mockRunSyncBootstrapMerge(...args),
+}));
+
+jest.mock('@/src/sync/outbox', () => ({
+  clearSyncRetryState: (...args: unknown[]) => mockClearSyncRetryState(...args),
 }));
 
 import {
@@ -79,6 +84,7 @@ describe('sync runtime bootstrap trigger', () => {
     mockFlushSyncOutbox.mockReset();
     mockSetSyncIngestTransport.mockReset();
     mockRunSyncBootstrapMerge.mockReset();
+    mockClearSyncRetryState.mockReset();
 
     const tx = {
       select: jest.fn(() => ({
@@ -159,6 +165,7 @@ describe('sync runtime bootstrap trigger', () => {
       },
     });
     mockFlushSyncOutbox.mockResolvedValue({ status: 'idle' });
+    mockClearSyncRetryState.mockResolvedValue(undefined);
 
     await __resetSyncRuntimeForTests();
   });
@@ -183,6 +190,12 @@ describe('sync runtime bootstrap trigger', () => {
     expect(runtimeState.bootstrapUserId).toBe('user-a');
     expect(runtimeState.bootstrapCompletedAt).toBeInstanceOf(Date);
     expect(runtimeState.lastBootstrapError).toBeNull();
+  });
+
+  it('clears blocked retry state when sync is manually enabled', async () => {
+    await setSyncEnabled(true);
+
+    expect(mockClearSyncRetryState).toHaveBeenCalledTimes(1);
   });
 
   it('defers bootstrap until login when sync was enabled while logged out', async () => {

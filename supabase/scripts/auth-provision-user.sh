@@ -13,6 +13,19 @@ require_jq() {
   fi
 }
 
+normalize_supabase_admin_env() {
+  API_URL="${API_URL:-${SUPABASE_URL:-}}"
+  SERVICE_ROLE_KEY="${SERVICE_ROLE_KEY:-${SUPABASE_SERVICE_ROLE_KEY:-}}"
+}
+
+require_legacy_service_role_jwt() {
+  if [[ "${SERVICE_ROLE_KEY}" != *.*.* ]]; then
+    echo "SUPABASE_SERVICE_ROLE_KEY/SERVICE_ROLE_KEY must be the legacy JWT service_role key for Supabase Auth Admin API calls." >&2
+    echo "The configured value is not JWT-shaped; use the Dashboard API Keys legacy service_role key, not an sb_secret_... key." >&2
+    exit 1
+  fi
+}
+
 request_json() {
   local method="$1"
   local url="$2"
@@ -84,14 +97,19 @@ fi
 
 require_jq
 
+normalize_supabase_admin_env
+
 if [[ -z "${API_URL:-}" || -z "${SERVICE_ROLE_KEY:-}" ]]; then
   load_supabase_status_env
+  normalize_supabase_admin_env
 fi
 
 if [[ -z "${API_URL:-}" || -z "${SERVICE_ROLE_KEY:-}" ]]; then
-  echo "Missing API_URL or SERVICE_ROLE_KEY. Start local Supabase or export hosted credentials." >&2
+  echo "Missing Supabase admin credentials. Start local Supabase or export API_URL + SERVICE_ROLE_KEY / SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY." >&2
   exit 1
 fi
+
+require_legacy_service_role_jwt
 
 EMAIL_LOWER="$(printf '%s' "${EMAIL}" | tr '[:upper:]' '[:lower:]')"
 ADMIN_USERS_URL="${API_URL}/auth/v1/admin/users?page=1&per_page=200"
@@ -174,4 +192,3 @@ echo "[supabase] auth user ${ACTION}: ${EMAIL} (${USER_ID})"
 if [[ -n "${FIXTURE_KEY}" ]]; then
   echo "[supabase] fixture alias synced: ${FIXTURE_KEY}"
 fi
-

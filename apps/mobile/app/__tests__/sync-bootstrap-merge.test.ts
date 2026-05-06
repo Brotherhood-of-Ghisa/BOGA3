@@ -155,6 +155,11 @@ describe('sync bootstrap merge determinism', () => {
         }),
       ])
     );
+    expect(convergenceEvents.map((event) => event.entityType)).toEqual([
+      'exercise_definitions',
+      'exercise_muscle_mappings',
+      'gyms',
+    ]);
 
     expect(convergenceEvents).not.toEqual(
       expect.arrayContaining([

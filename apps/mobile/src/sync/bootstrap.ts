@@ -802,6 +802,74 @@ const buildMergePlan = (input: { local: ProjectionState; remote: ProjectionState
 const buildConvergenceEvents = (state: ProjectionState): QueuedSyncEventInput[] => {
   const events: QueuedSyncEventInput[] = [];
 
+  for (const row of state.exerciseDefinitions) {
+    events.push({
+      entityType: 'exercise_definitions',
+      entityId: row.id,
+      eventType: row.deletedAtMs === null ? 'upsert' : 'delete',
+      occurredAt: new Date(row.updatedAtMs),
+      payload:
+        row.deletedAtMs === null
+          ? {
+              id: row.id,
+              name: row.name,
+              deleted_at_ms: null,
+              created_at_ms: row.createdAtMs,
+              updated_at_ms: row.updatedAtMs,
+            }
+          : {
+              id: row.id,
+              deleted_at_ms: row.deletedAtMs,
+              updated_at_ms: row.updatedAtMs,
+            },
+    });
+  }
+
+  for (const row of state.exerciseMuscleMappings) {
+    const entityId = `${row.exerciseDefinitionId}:${row.muscleGroupId}`;
+    events.push({
+      entityType: 'exercise_muscle_mappings',
+      entityId,
+      eventType: 'attach',
+      occurredAt: new Date(row.updatedAtMs),
+      payload: {
+        id: entityId,
+        row_id: row.id,
+        exercise_definition_id: row.exerciseDefinitionId,
+        muscle_group_id: row.muscleGroupId,
+        weight: row.weight,
+        role: row.role,
+        created_at_ms: row.createdAtMs,
+        updated_at_ms: row.updatedAtMs,
+      },
+    });
+  }
+
+  for (const row of state.exerciseTagDefinitions) {
+    events.push({
+      entityType: 'exercise_tag_definitions',
+      entityId: row.id,
+      eventType: row.deletedAtMs === null ? 'upsert' : 'delete',
+      occurredAt: new Date(row.updatedAtMs),
+      payload:
+        row.deletedAtMs === null
+          ? {
+              id: row.id,
+              exercise_definition_id: row.exerciseDefinitionId,
+              name: row.name,
+              normalized_name: row.normalizedName,
+              deleted_at_ms: null,
+              created_at_ms: row.createdAtMs,
+              updated_at_ms: row.updatedAtMs,
+            }
+          : {
+              id: row.id,
+              deleted_at_ms: row.deletedAtMs,
+              updated_at_ms: row.updatedAtMs,
+            },
+    });
+  }
+
   for (const row of state.gyms) {
     events.push({
       entityType: 'gyms',
@@ -883,74 +951,6 @@ const buildConvergenceEvents = (state: ProjectionState): QueuedSyncEventInput[] 
         created_at_ms: row.createdAtMs,
         updated_at_ms: row.updatedAtMs,
       },
-    });
-  }
-
-  for (const row of state.exerciseDefinitions) {
-    events.push({
-      entityType: 'exercise_definitions',
-      entityId: row.id,
-      eventType: row.deletedAtMs === null ? 'upsert' : 'delete',
-      occurredAt: new Date(row.updatedAtMs),
-      payload:
-        row.deletedAtMs === null
-          ? {
-              id: row.id,
-              name: row.name,
-              deleted_at_ms: null,
-              created_at_ms: row.createdAtMs,
-              updated_at_ms: row.updatedAtMs,
-            }
-          : {
-              id: row.id,
-              deleted_at_ms: row.deletedAtMs,
-              updated_at_ms: row.updatedAtMs,
-            },
-    });
-  }
-
-  for (const row of state.exerciseMuscleMappings) {
-    const entityId = `${row.exerciseDefinitionId}:${row.muscleGroupId}`;
-    events.push({
-      entityType: 'exercise_muscle_mappings',
-      entityId,
-      eventType: 'attach',
-      occurredAt: new Date(row.updatedAtMs),
-      payload: {
-        id: entityId,
-        row_id: row.id,
-        exercise_definition_id: row.exerciseDefinitionId,
-        muscle_group_id: row.muscleGroupId,
-        weight: row.weight,
-        role: row.role,
-        created_at_ms: row.createdAtMs,
-        updated_at_ms: row.updatedAtMs,
-      },
-    });
-  }
-
-  for (const row of state.exerciseTagDefinitions) {
-    events.push({
-      entityType: 'exercise_tag_definitions',
-      entityId: row.id,
-      eventType: row.deletedAtMs === null ? 'upsert' : 'delete',
-      occurredAt: new Date(row.updatedAtMs),
-      payload:
-        row.deletedAtMs === null
-          ? {
-              id: row.id,
-              exercise_definition_id: row.exerciseDefinitionId,
-              name: row.name,
-              normalized_name: row.normalizedName,
-              deleted_at_ms: null,
-              created_at_ms: row.createdAtMs,
-              updated_at_ms: row.updatedAtMs,
-            }
-          : {
-              id: row.id,
-              deleted_at_ms: row.deletedAtMs,
-              updated_at_ms: row.updatedAtMs,
-            },
     });
   }
 

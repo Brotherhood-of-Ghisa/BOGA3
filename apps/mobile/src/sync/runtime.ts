@@ -8,6 +8,7 @@ import { syncRuntimeState } from '@/src/data/schema';
 
 import { flushSyncOutbox, setSyncIngestTransport, type SyncFlushResult, type SyncIngestTransport } from './engine';
 import { runSyncBootstrapMerge, type SyncBootstrapMergeResult } from './bootstrap';
+import { clearSyncRetryState } from './outbox';
 import type { SyncIngestResponse } from './types';
 
 type RuntimeStateTx = Pick<LocalDatabase, 'insert' | 'select' | 'update'>;
@@ -347,6 +348,10 @@ export const setSyncEnabled = async (
     now?: Date;
   } = {}
 ): Promise<SyncRuntimeStateSnapshot> => {
+  if (isEnabled) {
+    await clearSyncRetryState(options);
+  }
+
   const nextState = await updateRuntimeState(
     {
       isEnabled,
