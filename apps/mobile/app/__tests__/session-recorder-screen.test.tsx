@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
 import SessionRecorderScreen from '../session-recorder';
 
@@ -57,8 +57,9 @@ jest.mock('expo-router', () => ({
 }));
 
 describe('SessionRecorderScreen', () => {
-  it('renders the baseline session recorder shell', () => {
+  it('renders the baseline session recorder shell', async () => {
     render(<SessionRecorderScreen />);
+    await act(async () => {});
 
     expect(screen.getByText('Date and Time')).toBeTruthy();
     expect(screen.getByText('Gym')).toBeTruthy();
@@ -70,15 +71,17 @@ describe('SessionRecorderScreen', () => {
     expect(screen.queryByLabelText('Select gym Downtown Iron Temple')).toBeNull();
   });
 
-  it('prefills date and time with the current value pattern', () => {
+  it('prefills date and time with the current value pattern', async () => {
     render(<SessionRecorderScreen />);
+    await act(async () => {});
 
     expect(screen.getByText(/\d{4}-\d{2}-\d{2} \d{2}:\d{2}/)).toBeTruthy();
     expect(screen.queryByPlaceholderText('YYYY-MM-DD HH:mm')).toBeNull();
   });
 
-  it('supports picker selection and add new gym flow', () => {
+  it('supports picker selection and add new gym flow', async () => {
     render(<SessionRecorderScreen />);
+    await act(async () => {});
 
     fireEvent.press(screen.getByText('Choose gym'));
     expect(screen.getByText('Select Gym')).toBeTruthy();
@@ -102,8 +105,9 @@ describe('SessionRecorderScreen', () => {
     expect(screen.getByText('Southside Fitness Forge')).toBeTruthy();
   });
 
-  it('supports manage gyms edit/archive/filter/unarchive flow', () => {
+  it('supports manage gyms edit/archive/filter/unarchive flow', async () => {
     render(<SessionRecorderScreen />);
+    await act(async () => {});
 
     fireEvent.press(screen.getByText('Choose gym'));
     fireEvent.press(screen.getByText('Manage'));
@@ -130,8 +134,9 @@ describe('SessionRecorderScreen', () => {
     expect(screen.getByLabelText('Select gym Downtown Iron Works')).toBeTruthy();
   });
 
-  it('dismisses the gym modal when pressing outside', () => {
+  it('dismisses the gym modal when pressing outside', async () => {
     render(<SessionRecorderScreen />);
+    await act(async () => {});
 
     fireEvent.press(screen.getByText('Choose gym'));
     expect(screen.getByText('Select Gym')).toBeTruthy();

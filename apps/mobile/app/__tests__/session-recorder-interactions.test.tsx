@@ -416,6 +416,8 @@ describe('SessionRecorderScreen exercise interactions', () => {
 
     expect(screen.getByDisplayValue('225')).toBeTruthy();
     expect(screen.getByDisplayValue('5')).toBeTruthy();
+
+    await act(async () => {});
   });
 
   it('cycles set type from the row button and supports long-press selection modal', async () => {
@@ -442,6 +444,8 @@ describe('SessionRecorderScreen exercise interactions', () => {
     expect(screen.getByLabelText('Choose RIR 1 set type')).toBeTruthy();
     fireEvent.press(screen.getByLabelText('Choose RIR 1 set type'));
     expect(screen.getByText('R1')).toBeTruthy();
+
+    await act(async () => {});
   });
 
   it('constrains set inputs and uses visual-only invalid cues for non-positive values', async () => {
@@ -473,6 +477,8 @@ describe('SessionRecorderScreen exercise interactions', () => {
     const validRepsStyle = StyleSheet.flatten(screen.getByLabelText(repsInputLabel).props.style);
     expect(validWeightStyle.borderColor).toBe(uiColors.borderDefault);
     expect(validRepsStyle.borderColor).toBe(uiColors.borderDefault);
+
+    await act(async () => {});
   });
 
   it('filters exercise picker by all query words across names and primary muscles only', async () => {
@@ -560,6 +566,8 @@ describe('SessionRecorderScreen exercise interactions', () => {
     expect(screen.getByLabelText('Weight for exercise 1 set 1')).toBeTruthy();
     expect(screen.getByDisplayValue('10')).toBeTruthy();
     expect(screen.getByDisplayValue('70')).toBeTruthy();
+
+    await act(async () => {});
   });
 
   it('adds and removes assigned tags from a logged exercise card', async () => {
@@ -856,5 +864,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     expect(screen.getByLabelText('Exercise options 1')).toBeTruthy();
     expect(screen.queryByLabelText('Exercise options 2')).toBeNull();
     expect(screen.queryByText('Deadlift')).toBeNull();
+
+    await act(async () => {});
   });
 });
