@@ -164,6 +164,26 @@ Ensure shared baseline (non-destructive when already up, with fixture enforcemen
 ./supabase/scripts/ensure-local-runtime-baseline.sh
 ```
 
+### Switch mobile app between local and hosted Supabase
+
+Point the mobile app at hosted Supabase:
+
+```bash
+./supabase/scripts/use-hosted-mobile-env.sh
+```
+
+This reads `SUPABASE_URL` and `SUPABASE_ANON_KEY` from `supabase/.env.hosted` and updates only the Supabase entries in `apps/mobile/.env.local`.
+
+Point the mobile app back at local Docker Supabase:
+
+```bash
+./supabase/scripts/local-runtime-up.sh
+```
+
+This starts or reuses the local Docker Supabase stack and rewrites the mobile Supabase entries in `apps/mobile/.env.local` to the local API URL and anon key.
+
+After either switch, restart Expo/Metro so `EXPO_PUBLIC_*` values are rebundled.
+
 ### Test accounts (local fixtures)
 
 - `user_a.local@example.test` / `ScaffoldingUserA!234`
@@ -239,6 +259,24 @@ TASK_ID=ad-hoc npm run test:e2e:ios:auth-profile
 ./supabase/scripts/test-sync-api-contract.sh
 ./supabase/scripts/test-sync-events-ingest-contract.sh
 ```
+
+### Logger diagnostics smoke (Docker Supabase)
+
+Use the auth/authz contract suite as the canonical Docker-hosted local Supabase check for `public.app_logs`:
+
+```bash
+./supabase/scripts/test-auth-authz.sh
+```
+
+Notes:
+
+- `./supabase/scripts/ensure-local-runtime-baseline.sh` reuses an already-running local Supabase instance without resetting it.
+- The baseline helper still applies pending local migrations with `supabase db push --local --include-all --yes`.
+- `./supabase/scripts/local-runtime-up.sh` syncs `apps/mobile/.env.local` with the local Docker Supabase URL and anon key after startup.
+- The scripts invoke `npx -y supabase@${SUPABASE_CLI_VERSION}`, so first use may need network access to fetch the pinned Supabase CLI.
+- The expected `app_logs` client contract is authenticated insert-only. Anonymous insert must fail, authenticated insert must pass, cross-user `user_id` spoofing must fail, and authenticated select/update/delete must fail.
+- A mobile/Supabase JS smoke can validate insert success by checking that the insert returns no error. Reading the row back with an authenticated mobile client should be denied with `403` / `42501`.
+- Inspect inserted log rows through operator SQL/service-role access, not from the mobile client.
 
 ### Repo-level wrappers
 

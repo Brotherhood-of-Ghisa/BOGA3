@@ -6,6 +6,7 @@ const mockCreateClient = jest.fn();
 const mockSecureStoreGetItemAsync = jest.fn();
 const mockSecureStoreDeleteItemAsync = jest.fn();
 const mockSecureStoreSetItemAsync = jest.fn();
+const mockLogEvent = jest.fn();
 
 jest.mock('@supabase/supabase-js', () => ({
   createClient: (...args: unknown[]) => mockCreateClient(...args),
@@ -15,6 +16,10 @@ jest.mock('expo-secure-store', () => ({
   deleteItemAsync: (...args: unknown[]) => mockSecureStoreDeleteItemAsync(...args),
   getItemAsync: (...args: unknown[]) => mockSecureStoreGetItemAsync(...args),
   setItemAsync: (...args: unknown[]) => mockSecureStoreSetItemAsync(...args),
+}));
+
+jest.mock('@/src/logging', () => ({
+  logEvent: (...args: unknown[]) => mockLogEvent(...args),
 }));
 
 import {
@@ -79,6 +84,7 @@ describe('auth service bootstrap', () => {
     mockSignOut.mockReset();
     mockUpdateUser.mockReset();
     mockUnsubscribe.mockReset();
+    mockLogEvent.mockReset();
 
     mockOnAuthStateChange.mockReturnValue({
       data: {
@@ -248,6 +254,30 @@ describe('auth service bootstrap', () => {
     });
   });
 
+  it('logs successful sign-ins after the authenticated session is available', async () => {
+    const signedInSession = createMockSession();
+
+    mockSignInWithPassword.mockResolvedValue({
+      data: {
+        session: signedInSession,
+      },
+      error: null,
+    });
+
+    await signInWithPassword({
+      email: 'user@example.test',
+      password: 'CorrectPassword!123',
+    });
+
+    expect(mockLogEvent).toHaveBeenCalledWith({
+      level: 'info',
+      source: 'auth',
+      event: 'auth.sign_in_succeeded',
+      message: 'User authentication completed successfully.',
+      userId: 'user-1',
+    });
+  });
+
   it('signs out and clears the restored session snapshot', async () => {
     const storedSession = createMockSession();
 
@@ -266,6 +296,13 @@ describe('auth service bootstrap', () => {
 
     const snapshot = getAuthSnapshot();
 
+    expect(mockLogEvent).toHaveBeenCalledWith({
+      level: 'info',
+      source: 'auth',
+      event: 'auth.sign_out_requested',
+      message: 'User session termination was requested.',
+      userId: 'user-1',
+    });
     expect(mockSignOut).toHaveBeenCalledTimes(1);
     expect(snapshot.status).toBe('ready');
     expect(snapshot.session).toBeNull();

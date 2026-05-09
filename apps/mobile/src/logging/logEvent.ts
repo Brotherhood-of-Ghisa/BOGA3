@@ -114,7 +114,7 @@ export const logEvent = async ({
       return;
     }
 
-    await client.from('app_logs').insert({
+    const { error } = await client.from('app_logs').insert({
       level,
       source,
       event,
@@ -129,7 +129,14 @@ export const logEvent = async ({
       client_variant: readExpoConfigValue('env'),
       context: sanitizeContext(context),
     });
-  } catch {
+
+    if (error) {
+      throw error;
+    }
+  } catch (error) {
+    if (typeof __DEV__ !== 'undefined' && __DEV__) {
+      console.warn('[logging] app log insert failed', error);
+    }
     // Logging must never interrupt auth, sync, or local-first app flows.
   }
 };

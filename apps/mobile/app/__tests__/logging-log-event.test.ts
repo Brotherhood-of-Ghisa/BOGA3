@@ -112,4 +112,26 @@ describe('logEvent', () => {
       })
     ).resolves.toBeUndefined();
   });
+
+  it('never throws when Supabase returns an insert error', async () => {
+    mockGetSupabaseMobileClient.mockReturnValue({
+      from: jest.fn(() => ({
+        insert: mockInsert,
+      })),
+    });
+    mockInsert.mockResolvedValueOnce({
+      data: null,
+      error: {
+        message: 'permission denied for table app_logs',
+      },
+    });
+
+    await expect(
+      logEvent({
+        level: 'info',
+        source: 'auth',
+        event: 'auth.sign_in_succeeded',
+      })
+    ).resolves.toBeUndefined();
+  });
 });

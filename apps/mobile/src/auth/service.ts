@@ -224,6 +224,13 @@ export const signInWithPassword = async ({ email, password }: SignInWithPassword
 
   authSnapshot = createReadySnapshotFromSession(data.session);
   emitAuthSnapshot();
+  await logEvent({
+    level: 'info',
+    source: 'auth',
+    event: 'auth.sign_in_succeeded',
+    message: 'User authentication completed successfully.',
+    userId: data.session?.user?.id ?? null,
+  });
   return data;
 };
 
@@ -232,6 +239,14 @@ export const signOut = async () => {
 
   setAuthSnapshot({
     lastError: null,
+  });
+
+  await logEvent({
+    level: 'info',
+    source: 'auth',
+    event: 'auth.sign_out_requested',
+    message: 'User session termination was requested.',
+    userId: authSnapshot.user?.id ?? null,
   });
 
   const { error } = await client.auth.signOut();

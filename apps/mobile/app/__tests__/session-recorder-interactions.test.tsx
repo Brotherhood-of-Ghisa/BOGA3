@@ -5,8 +5,21 @@ import { uiColors } from '@/components/ui';
 import SessionRecorderScreen from '../session-recorder';
 
 const mockPush = jest.fn();
+const mockLogEvent = jest.fn();
 const mockFocusCallbacks = new Set<() => void | (() => void)>();
 let mockSearchParams: Record<string, string | undefined> = {};
+
+jest.mock('@/src/logging', () => ({
+  logEvent: (...args: unknown[]) => mockLogEvent(...args),
+}));
+
+jest.mock('@/src/auth', () => ({
+  getAuthSnapshot: () => ({
+    user: {
+      id: 'user-1',
+    },
+  }),
+}));
 
 jest.mock('@/src/data', () => {
   class ExerciseTagDomainError extends Error {
@@ -391,6 +404,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     mockLoadSessionSnapshotById.mockReset();
     mockLoadSessionSnapshotById.mockResolvedValue(null);
     mockSaveExerciseCatalogExercise.mockClear();
+    mockLogEvent.mockClear();
   });
 
   it('adds a preset exercise from the log flow and updates first set fields', async () => {
@@ -410,6 +424,17 @@ describe('SessionRecorderScreen exercise interactions', () => {
     expect(screen.getByText('Reps')).toBeTruthy();
     expect(screen.queryByText('No exercises logged yet.')).toBeNull();
     expect(screen.queryByText('No tags yet.')).toBeNull();
+    expect(mockLogEvent).toHaveBeenCalledWith({
+      level: 'info',
+      source: 'app',
+      event: 'session.exercise_added',
+      message: 'A session exercise was added to the active workout log.',
+      userId: 'user-1',
+      context: {
+        exerciseDefinitionId: 'sys_barbell_back_squat',
+        exerciseName: 'Barbell Squat',
+      },
+    });
 
     fireEvent.changeText(screen.getByLabelText('Weight for exercise 1 set 1'), '225');
     fireEvent.changeText(screen.getByLabelText('Reps for exercise 1 set 1'), '5');
