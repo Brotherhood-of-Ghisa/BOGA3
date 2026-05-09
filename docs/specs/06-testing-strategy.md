@@ -223,6 +223,7 @@ Reason: keeps FE/backend integration test expectations explicit without forcing 
     - run against local Supabase runtime and verify real auth context + `RLS` behavior.
     - cover success, validation failure, unauthorized, and cross-user denial paths.
     - for auth/profile tables keyed directly to `auth.users(id)` instead of `owner_user_id`, still cover owner success plus cross-user denial explicitly.
+    - for operational diagnostics tables such as `public.app_logs`, cover authenticated insert plus client-side read/update/delete denial.
   - Hosted/deployed smoke validation:
     - validates environment-specific behavior (secrets/bindings, ingress, hosted auth/provider config, migration execution on hosted instance).
     - manual by default until CI exists.

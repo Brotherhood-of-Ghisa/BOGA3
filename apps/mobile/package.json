@@ -25,6 +25,7 @@
     "@supabase/supabase-js": "^2.98.0",
     "drizzle-orm": "^0.44.6",
     "expo": "~54.0.33",
+    "expo-application": "~7.0.8",
     "expo-constants": "~18.0.13",
     "expo-dev-client": "~6.0.20",
     "expo-linking": "~8.0.11",

@@ -5,6 +5,7 @@ import { AppState, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, Vi
 import { ExerciseEditorModal } from '@/components/exercise-catalog/exercise-editor-modal';
 import { SessionContentLayout } from '@/components/session-recorder/session-content-layout';
 import { uiColors } from '@/components/ui';
+import { getAuthSnapshot } from '@/src/auth';
 import {
   SEEDED_LOCATIONS,
   Session,
@@ -47,6 +48,7 @@ import {
   filterExerciseCatalogExercises,
   indexExerciseCatalogMuscleGroupsById,
 } from '@/src/exercise-catalog/search';
+import { logEvent } from '@/src/logging';
 import { createDraftAutosaveController, type DraftAutosaveController } from '@/src/session-recorder/draft-autosave';
 import { createSessionRecorderLifecycleHelpers } from '@/src/session-recorder/lifecycle-helpers';
 
@@ -1157,6 +1159,8 @@ export default function SessionRecorderScreen() {
   };
 
   const applySelectedExerciseSelection = (exerciseDefinitionId: string, exerciseName: string) => {
+    const isNewSessionExercise = !state.exerciseSelectionTargetId;
+
     setState((current) => ({
       ...current,
       session: {
@@ -1174,6 +1178,20 @@ export default function SessionRecorderScreen() {
     }));
     clearSubmitFeedback();
     markSessionStructuralMutation();
+
+    if (isNewSessionExercise) {
+      void logEvent({
+        level: 'info',
+        source: 'app',
+        event: 'session.exercise_added',
+        message: 'A session exercise was added to the active workout log.',
+        userId: getAuthSnapshot().user?.id ?? null,
+        context: {
+          exerciseDefinitionId,
+          exerciseName,
+        },
+      });
+    }
   };
 
   const openExerciseCatalogFromRecorder = () => {

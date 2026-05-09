@@ -1,13 +1,13 @@
 ---
 task_id: M14-T01-minimal-supabase-app-logging
 milestone_id: "M14"
-status: planned
+status: completed
 ui_impact: "no"
 areas: "cross-stack"
 runtimes: "expo|supabase|sql"
 gates_fast: "./scripts/quality-fast.sh frontend"
 gates_slow: "N/A"
-docs_touched: "docs/specs/milestones/M14-observability-and-diagnostics.md, docs/specs/05-data-model.md, docs/specs/03-technical-architecture.md"
+docs_touched: "docs/specs/milestones/M14-observability-and-diagnostics.md, docs/specs/05-data-model.md, docs/specs/03-technical-architecture.md, docs/specs/06-testing-strategy.md, docs/specs/tech/client-sync-engine.md, RUNBOOK.md"
 ---
 
 # Task Card
@@ -16,7 +16,7 @@ docs_touched: "docs/specs/milestones/M14-observability-and-diagnostics.md, docs/
 
 - Task ID: `M14-T01-minimal-supabase-app-logging`
 - Title: Minimal Supabase-backed app logging
-- Status: `planned`
+- Status: `completed`
 - File location rule:
   - author active card in `docs/tasks/M14-T01-minimal-supabase-app-logging.md`
   - move the file to `docs/tasks/complete/M14-T01-minimal-supabase-app-logging.md` when `Status` becomes `completed` or `outdated`
@@ -35,27 +35,33 @@ docs_touched: "docs/specs/milestones/M14-observability-and-diagnostics.md, docs/
 
 ## Context Freshness (required at session start; update before edits)
 
-- Verified current branch + HEAD commit:
-- Start-of-session sync completed per `docs/specs/04-ai-development-playbook.md` git sync workflow?: `yes | no | N/A` (explain)
+- Verified current branch + HEAD commit: `main @ 2bc7a1e`
+- Start-of-session sync completed per `docs/specs/04-ai-development-playbook.md` git sync workflow?: `yes` (`git fetch origin main`; local `HEAD` matched `origin/main` at `2bc7a1e`; existing task-card edits were preserved)
 - Parent refs opened in this session:
   - `docs/specs/README.md`
-  - `docs/specs/milestones/M14-observability-and-diagnostics.md` or replacement milestone spec
+  - `docs/specs/milestones/M14-observability-and-diagnostics.md` (created before implementation)
   - `docs/specs/03-technical-architecture.md`
   - `docs/specs/05-data-model.md`
+  - `docs/specs/04-ai-development-playbook.md`
   - `docs/specs/06-testing-strategy.md`
   - `docs/specs/09-project-structure.md`
+  - `docs/specs/12-worktree-config-and-isolation.md`
+  - `docs/specs/08-ux-delivery-standard.md`
+  - `docs/specs/ui/README.md`
+  - `RUNBOOK.md`
 - Code/docs inventory freshness checks run:
-  - Confirm existing mobile Supabase client location: `apps/mobile/src/auth/supabase.ts`
+  - Confirm existing mobile Supabase client location: `apps/mobile/src/auth/supabase.ts` (`getSupabaseMobileClient()` is synchronous and returns client or `null`)
   - Confirm auth service location: `apps/mobile/src/auth/service.ts`
   - Confirm sync runtime/engine/bootstrap locations:
     - `apps/mobile/src/sync/runtime.ts`
     - `apps/mobile/src/sync/engine.ts`
     - `apps/mobile/src/sync/bootstrap.ts`
   - Confirm Supabase migration folder: `supabase/migrations/`
-  - Confirm whether `expo-constants` is already present in the mobile app dependencies.
+  - Confirm whether `expo-application` is already present in the mobile app dependencies: missing at start; added with `npx expo install expo-application` as `~7.0.8`.
+  - Confirm whether `expo-updates` is already present, or whether the project already uses EAS Update: `expo-updates` is not a direct dependency and is not configured in `app.config.ts`; no `expo-updates` dependency was added.
 - Known stale references or assumptions:
   - The backend for this task is assumed to be Supabase/Postgres/RPC, not a separate Node/Next.js service.
-  - Replace `M14` if the project already has a more appropriate milestone.
+  - `M14` was kept and `docs/specs/milestones/M14-observability-and-diagnostics.md` was created.
 - Optional helper command:
   - `./scripts/task-bootstrap.sh docs/tasks/M14-T01-minimal-supabase-app-logging.md`
 
@@ -83,7 +89,8 @@ The purpose is to capture basic production diagnostics such as failed auth resto
   - `apps/mobile/src/sync/runtime.ts`
   - `apps/mobile/src/sync/engine.ts`
   - `apps/mobile/src/sync/bootstrap.ts`
-- Add `expo-constants` to the mobile app dependencies if missing.
+- Add `expo-application` to the mobile app dependencies if missing.
+- Do not add `expo-updates` unless it is already present or the project already uses EAS Update.
 - Update relevant architecture/data-model docs if this logging table becomes part of the shared project contract.
 
 ### Out of scope
@@ -124,20 +131,24 @@ The purpose is to capture basic production diagnostics such as failed auth resto
 9. `logEvent()` returns immediately if `getSupabaseMobileClient()` returns `null`.
 10. `logEvent()` wraps its whole body in `try/catch` and never throws.
 11. `source` is optional in the TypeScript params but defaults to `'app'` before insert, because the database column is `NOT NULL`.
-12. `platform` is set from `Platform.OS` from `react-native`.
-13. `app_version` is set from `expo-constants`:
-    - `Constants.expoConfig?.version ?? Constants.nativeAppVersion ?? 'unknown'`
-14. If `expo-constants` is not already present in the mobile app dependencies, it is added to the mobile app.
-15. `context` uses `Record<string, unknown>`.
-16. No detailed context schema is enforced yet.
-17. Sensitive context keys are stripped before insert.
-18. Auth restore and sign-in failures are logged.
-19. Sync ingest RPC, sync bootstrap, sync flush transport, and sync bootstrap remote fetch failures are logged.
-20. No broad instrumentation sweep is performed.
-21. No external logging provider is introduced.
-22. No full auth objects, session objects, user objects, passwords, tokens, or large sync payloads are logged.
-23. Existing auth and sync behaviour is not changed except for non-blocking log attempts.
-24. Relevant docs are updated or explicit no-update rationale is recorded.
+12. `client_platform` is set from `Platform.OS` from `react-native`.
+13. `client_app_version` is set from `Application.nativeApplicationVersion` from `expo-application`, falling back only to config-ish metadata if the native value is unavailable.
+14. `client_build_number` is set from `Application.nativeBuildVersion` from `expo-application`.
+15. `client_runtime_version`, `client_update_id`, and `client_channel` are populated from `expo-updates` only when `expo-updates` is already present or the project already uses EAS Update; otherwise they are inserted as `null` or omitted according to the helper implementation.
+16. `client_variant` may come from config-ish metadata such as `Constants.expoConfig?.extra?.env`, because it is not the installed native app version/build source of truth.
+17. If `expo-application` is not already present in the mobile app dependencies, it is added to the mobile app.
+18. `expo-updates` is not added unless it is already present or EAS Update is already part of the project.
+19. `expo-constants` is not used as the primary source for installed native app version/build tracking.
+20. `context` uses `Record<string, unknown>`.
+21. No detailed context schema is enforced yet.
+22. Sensitive context keys are stripped before insert.
+23. Auth restore and sign-in failures are logged.
+24. Sync ingest RPC, sync bootstrap, sync flush transport, and sync bootstrap remote fetch failures are logged.
+25. No broad instrumentation sweep is performed.
+26. No external logging provider is introduced.
+27. No full auth objects, session objects, user objects, passwords, tokens, or large sync payloads are logged.
+28. Existing auth and sync behaviour is not changed except for non-blocking log attempts.
+29. Relevant docs are updated or explicit no-update rationale is recorded.
 
 ## Docs touched (required)
 
@@ -176,6 +187,32 @@ The purpose is to capture basic production diagnostics such as failed auth resto
   - Do not overbuild test scaffolding for this task.
   - Prefer small, focused tests around `logEvent()` if feasible.
 
+## Evidence
+
+- `npm test -- logging-log-event.test.ts --runInBand` failed before implementation because `apps/mobile/src/logging/logEvent.ts` did not exist.
+- `npm test -- logging-log-event.test.ts auth-service.test.ts sync-outbox-engine.test.ts sync-runtime-bootstrap.test.ts sync-bootstrap-merge.test.ts --runInBand` passed: 5 suites, 31 tests.
+- `npm run typecheck` passed.
+- `npm run lint` passed with existing warnings in unrelated tests.
+- `./scripts/quality-fast.sh frontend` passed on retry: lint, typecheck, and 35 Jest suites / 209 tests.
+- Initial `./scripts/quality-fast.sh frontend` run had two unrelated whole-suite test timeouts; rerunning the two failed suites in isolation passed: 2 suites, 35 tests.
+- `git diff --check` passed.
+- End-of-task sync check completed with `git fetch origin main`; local `HEAD` remained even with `origin/main`.
+- `bash -n supabase/tests/auth-authz-contract.sh` passed.
+- `./supabase/scripts/test-fast.sh` and `./supabase/scripts/test-auth-authz.sh` were attempted but blocked because Docker is unavailable: Docker daemon connection failed at `unix:///var/run/docker.sock`.
+
+## Completion note
+
+- What changed:
+  - Added `public.app_logs` migration with RLS, authenticated insert grant, no client read/update/delete grants, guarded policy creation, and inspection indexes.
+  - Added `apps/mobile/src/logging/logEvent.ts` plus tests for no-client no-op, metadata/default insert shape, sensitive context stripping, and never-throw behavior.
+  - Instrumented auth restore/sign-in failures and sync ingest RPC, bootstrap/convergence, flush transport, and bootstrap remote fetch failures with non-blocking log attempts.
+  - Added `expo-application`; did not add `expo-updates`.
+  - Updated M14 milestone, architecture, data model, testing strategy, sync tech notes, and runbook.
+- Sync impact decision:
+  - `public.app_logs` is `out of sync scope`; it is operational diagnostics data, not user-domain backup/restore state.
+- Remaining risk:
+  - Supabase local migration/RLS contract execution is still required on a machine with Docker available. Static shell checks and frontend checks passed in this session.
+
 ## Implementation notes
 
 ### Database migration
@@ -201,8 +238,13 @@ Columns:
 - `event text not null`
 - `message text null`
 - `user_id uuid null`
-- `app_version text null`
-- `platform text null`
+- `client_platform text null`
+- `client_app_version text null`
+- `client_build_number text null`
+- `client_runtime_version text null`
+- `client_update_id text null`
+- `client_channel text null`
+- `client_variant text null`
 - `context jsonb null`
 
 Enable RLS.
@@ -265,3 +307,18 @@ type LogEventParams = {
   userId?: string | null;
   context?: Record<string, unknown>;
 };
+```
+
+The helper should enrich each inserted row with client metadata without requiring callers to pass these fields:
+
+- `client_platform`: use `Platform.OS` from `react-native`.
+- `client_app_version`: use `Application.nativeApplicationVersion` from `expo-application`; fall back only to config-ish metadata when unavailable.
+- `client_build_number`: use `Application.nativeBuildVersion` from `expo-application`.
+- `client_runtime_version`, `client_update_id`, `client_channel`: use `expo-updates` only if `expo-updates` is already installed or EAS Update is already part of the project. Do not introduce `expo-updates` only for this logging task.
+- `client_variant`: use existing config-ish metadata when available, for example `Constants.expoConfig?.extra?.env`.
+
+Dependency guidance:
+
+- `expo-application` is the required source for installed native app version/build number; add it with the Expo-compatible install path if missing.
+- `expo-constants` is acceptable for config-ish metadata such as variant/environment, but not as the main source for installed native app version/build tracking.
+- `expo-updates` is optional for this task and should only be used when the project already has it or already uses EAS Update.

@@ -11,6 +11,7 @@ import {
   sessionExerciseTags,
   sessions,
 } from '@/src/data/schema';
+import { logEvent } from '@/src/logging';
 import { normalizeSessionSetType, type SessionSetTypeValue } from '@/src/data/set-types';
 
 import { enqueueSyncEventsTx, type QueuedSyncEventInput } from './outbox';
@@ -354,6 +355,75 @@ const selectExerciseSetRows = async (
 export const fetchRemoteSyncProjectionState = async (client: SupabaseClient): Promise<SyncBootstrapRemoteState> => {
   const appPublicClient = client.schema('app_public');
 
+  let remoteRows: [
+    Record<string, unknown>[],
+    Record<string, unknown>[],
+    Record<string, unknown>[],
+    Record<string, unknown>[],
+    Record<string, unknown>[],
+    Record<string, unknown>[],
+    Record<string, unknown>[],
+    Record<string, unknown>[],
+  ];
+
+  try {
+    remoteRows = await Promise.all([
+      selectRows(
+        appPublicClient
+          .from('gyms')
+          .select('id,name,origin_scope_id,origin_source_id,deleted_at,created_at,updated_at'),
+        'gyms'
+      ),
+      selectRows(
+        appPublicClient
+          .from('sessions')
+          .select('id,gym_id,status,started_at,completed_at,duration_sec,deleted_at,created_at,updated_at'),
+        'sessions'
+      ),
+      selectRows(
+        appPublicClient
+          .from('session_exercises')
+          .select(
+            'id,session_id,exercise_definition_id,order_index,name,machine_name,origin_scope_id,origin_source_id,deleted_at,created_at,updated_at'
+          ),
+        'session_exercises'
+      ),
+      selectExerciseSetRows(appPublicClient),
+      selectRows(
+        appPublicClient
+          .from('exercise_definitions')
+          .select('id,name,deleted_at,created_at,updated_at'),
+        'exercise_definitions'
+      ),
+      selectRows(
+        appPublicClient
+          .from('exercise_muscle_mappings')
+          .select('id,exercise_definition_id,muscle_group_id,weight,role,created_at,updated_at'),
+        'exercise_muscle_mappings'
+      ),
+      selectRows(
+        appPublicClient
+          .from('exercise_tag_definitions')
+          .select('id,exercise_definition_id,name,normalized_name,deleted_at,created_at,updated_at'),
+        'exercise_tag_definitions'
+      ),
+      selectRows(
+        appPublicClient
+          .from('session_exercise_tags')
+          .select('id,session_exercise_id,exercise_tag_definition_id,created_at'),
+        'session_exercise_tags'
+      ),
+    ]);
+  } catch (error) {
+    void logEvent({
+      level: 'error',
+      source: 'sync',
+      event: 'sync.bootstrap_remote_fetch_failed',
+      message: error instanceof Error ? error.message : 'Unable to fetch remote sync projection state.',
+    });
+    throw error;
+  }
+
   const [
     remoteGyms,
     remoteSessions,
@@ -363,53 +433,7 @@ export const fetchRemoteSyncProjectionState = async (client: SupabaseClient): Pr
     remoteExerciseMuscleMappings,
     remoteExerciseTagDefinitions,
     remoteSessionExerciseTags,
-  ] = await Promise.all([
-    selectRows(
-      appPublicClient
-        .from('gyms')
-        .select('id,name,origin_scope_id,origin_source_id,deleted_at,created_at,updated_at'),
-      'gyms'
-    ),
-    selectRows(
-      appPublicClient
-        .from('sessions')
-        .select('id,gym_id,status,started_at,completed_at,duration_sec,deleted_at,created_at,updated_at'),
-      'sessions'
-    ),
-    selectRows(
-      appPublicClient
-        .from('session_exercises')
-        .select(
-          'id,session_id,exercise_definition_id,order_index,name,machine_name,origin_scope_id,origin_source_id,deleted_at,created_at,updated_at'
-        ),
-      'session_exercises'
-    ),
-    selectExerciseSetRows(appPublicClient),
-    selectRows(
-      appPublicClient
-        .from('exercise_definitions')
-        .select('id,name,deleted_at,created_at,updated_at'),
-      'exercise_definitions'
-    ),
-    selectRows(
-      appPublicClient
-        .from('exercise_muscle_mappings')
-        .select('id,exercise_definition_id,muscle_group_id,weight,role,created_at,updated_at'),
-      'exercise_muscle_mappings'
-    ),
-    selectRows(
-      appPublicClient
-        .from('exercise_tag_definitions')
-        .select('id,exercise_definition_id,name,normalized_name,deleted_at,created_at,updated_at'),
-      'exercise_tag_definitions'
-    ),
-    selectRows(
-      appPublicClient
-        .from('session_exercise_tags')
-        .select('id,session_exercise_id,exercise_tag_definition_id,created_at'),
-      'session_exercise_tags'
-    ),
-  ]);
+  ] = remoteRows;
 
   return {
     gyms: remoteGyms.map(parseRemoteGym),

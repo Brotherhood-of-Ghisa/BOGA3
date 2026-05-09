@@ -10,6 +10,7 @@ import {
   recordSyncTransportFailure,
   SYNC_BATCH_MAX_SIZE,
 } from './outbox';
+import { logEvent } from '@/src/logging';
 import type { PendingSyncEvent } from './outbox';
 import type { SyncIngestRequest, SyncIngestResponse } from './types';
 
@@ -163,6 +164,16 @@ const runFlush = async (input: {
     return { status: 'failure_blocked', sentCount: pendingEvents.length };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown sync transport failure';
+    void logEvent({
+      level: 'error',
+      source: 'sync',
+      event: 'sync.flush_transport_failed',
+      message,
+      context: {
+        batchId,
+        pendingEventCount: pendingEvents.length,
+      },
+    });
     const nextAttemptAt = await recordSyncTransportFailure({
       message,
       now: input.now,

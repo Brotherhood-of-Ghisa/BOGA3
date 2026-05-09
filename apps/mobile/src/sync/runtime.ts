@@ -5,6 +5,7 @@ import { getAuthSnapshot, subscribeToAuthState } from '@/src/auth';
 import { getSupabaseMobileClient } from '@/src/auth/supabase';
 import { bootstrapLocalDataLayer, type LocalDatabase } from '@/src/data/bootstrap';
 import { syncRuntimeState } from '@/src/data/schema';
+import { logEvent } from '@/src/logging';
 
 import { flushSyncOutbox, setSyncIngestTransport, type SyncFlushResult, type SyncIngestTransport } from './engine';
 import { runSyncBootstrapMerge, type SyncBootstrapMergeResult } from './bootstrap';
@@ -167,6 +168,16 @@ const createSupabaseSyncIngestTransport = (client: SupabaseClient): SyncIngestTr
     const { data, error } = await client.schema('app_public').rpc('sync_events_ingest', request);
 
     if (error) {
+      void logEvent({
+        level: 'error',
+        source: 'sync',
+        event: 'sync.ingest_rpc_failed',
+        message: error.message,
+        context: {
+          batchId: request.batch_id,
+          eventCount: request.events.length,
+        },
+      });
       throw new Error(error.message);
     }
 
@@ -226,6 +237,18 @@ const runBootstrapForSession = async (client: SupabaseClient, session: Session):
         );
       } else {
         const failureMessage = convergenceResult.lastFlushResult.status;
+        void logEvent({
+          level: 'warn',
+          source: 'sync',
+          event: 'sync.bootstrap_convergence_failed',
+          message: `Bootstrap merge completed but convergence did not settle (${failureMessage}).`,
+          userId: session.user.id,
+          context: {
+            attempts: convergenceResult.attempts,
+            totalSentCount: convergenceResult.totalSentCount,
+            lastFlushStatus: convergenceResult.lastFlushResult.status,
+          },
+        });
         await updateRuntimeState(
           {
             lastBootstrapError: `Bootstrap merge completed but convergence did not settle (${failureMessage}).`,
@@ -240,6 +263,13 @@ const runBootstrapForSession = async (client: SupabaseClient, session: Session):
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Sync bootstrap failed.';
+      void logEvent({
+        level: 'error',
+        source: 'sync',
+        event: 'sync.bootstrap_failed',
+        message,
+        userId: session.user.id,
+      });
       await updateRuntimeState(
         {
           lastBootstrapError: message,

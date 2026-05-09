@@ -148,6 +148,72 @@ postgrest_select() {
   http_request GET "${API_URL}/rest/v1/${table}?${query}" "${token}" "${ANON_KEY}" "app_public"
 }
 
+public_postgrest_insert_minimal() {
+  local table="$1"
+  local token="$2"
+  local body="$3"
+  local response_file
+  response_file="$(mktemp)"
+  REQUEST_STATUS="$(curl --silent --show-error \
+    -X POST \
+    -H "apikey: ${ANON_KEY}" \
+    -H "Authorization: Bearer ${token}" \
+    -H "Content-Type: application/json" \
+    -H "Prefer: return=minimal" \
+    -o "${response_file}" \
+    -w "%{http_code}" \
+    --data "${body}" \
+    "${API_URL}/rest/v1/${table}")"
+  REQUEST_BODY="$(cat "${response_file}")"
+  rm -f "${response_file}"
+}
+
+public_postgrest_patch_minimal() {
+  local table="$1"
+  local query="$2"
+  local token="$3"
+  local body="$4"
+  local response_file
+  response_file="$(mktemp)"
+  REQUEST_STATUS="$(curl --silent --show-error \
+    -X PATCH \
+    -H "apikey: ${ANON_KEY}" \
+    -H "Authorization: Bearer ${token}" \
+    -H "Content-Type: application/json" \
+    -H "Prefer: return=minimal" \
+    -o "${response_file}" \
+    -w "%{http_code}" \
+    --data "${body}" \
+    "${API_URL}/rest/v1/${table}?${query}")"
+  REQUEST_BODY="$(cat "${response_file}")"
+  rm -f "${response_file}"
+}
+
+public_postgrest_delete_minimal() {
+  local table="$1"
+  local query="$2"
+  local token="$3"
+  local response_file
+  response_file="$(mktemp)"
+  REQUEST_STATUS="$(curl --silent --show-error \
+    -X DELETE \
+    -H "apikey: ${ANON_KEY}" \
+    -H "Authorization: Bearer ${token}" \
+    -H "Prefer: return=minimal" \
+    -o "${response_file}" \
+    -w "%{http_code}" \
+    "${API_URL}/rest/v1/${table}?${query}")"
+  REQUEST_BODY="$(cat "${response_file}")"
+  rm -f "${response_file}"
+}
+
+public_postgrest_select() {
+  local table="$1"
+  local query="$2"
+  local token="$3"
+  http_request GET "${API_URL}/rest/v1/${table}?${query}" "${token}" "${ANON_KEY}"
+}
+
 require_jq
 load_supabase_status_env
 
@@ -190,6 +256,34 @@ SET_A_ID="set-user-a-${RUN_TAG}"
 GYM_B_ID="gym-user-b-${RUN_TAG}"
 GYM_SPOOF_ID="gym-spoof-${RUN_TAG}"
 SX_CROSS_OWNER_ID="sx-user-b-cross-${RUN_TAG}"
+APP_LOG_EVENT="auth-test-${RUN_TAG}"
+
+echo "[auth-test] verifying app_logs insert-only diagnostics policy"
+public_postgrest_insert_minimal "app_logs" "${ANON_KEY}" "$(jq -nc \
+  --arg event "${APP_LOG_EVENT}-anon" \
+  '{level: "error", source: "app", event: $event}')"
+assert_non_2xx "anon insert app_logs"
+
+public_postgrest_insert_minimal "app_logs" "${USER_A_TOKEN}" "$(jq -nc \
+  --arg event "${APP_LOG_EVENT}" \
+  --arg user_id "${USER_A_UUID}" \
+  '{level: "error", source: "auth", event: $event, user_id: $user_id, context: {status: "probe"}}')"
+assert_status "201" "user_a insert own app_log"
+
+public_postgrest_insert_minimal "app_logs" "${USER_B_TOKEN}" "$(jq -nc \
+  --arg event "${APP_LOG_EVENT}-spoof" \
+  --arg user_id "${USER_A_UUID}" \
+  '{level: "error", source: "auth", event: $event, user_id: $user_id}')"
+assert_non_2xx "user_b spoof user_a app_log user_id"
+
+public_postgrest_select "app_logs" "event=eq.${APP_LOG_EVENT}&select=id,event" "${USER_A_TOKEN}"
+assert_non_2xx "authenticated select app_logs"
+
+public_postgrest_patch_minimal "app_logs" "event=eq.${APP_LOG_EVENT}" "${USER_A_TOKEN}" '{"message":"patched"}'
+assert_non_2xx "authenticated update app_logs"
+
+public_postgrest_delete_minimal "app_logs" "event=eq.${APP_LOG_EVENT}" "${USER_A_TOKEN}"
+assert_non_2xx "authenticated delete app_logs"
 
 echo "[auth-test] verifying user_profiles ownership and lazy creation path"
 postgrest_select "user_profiles" "id=eq.${USER_A_UUID}&select=id,username" "${USER_A_TOKEN}"

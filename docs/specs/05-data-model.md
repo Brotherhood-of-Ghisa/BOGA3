@@ -72,12 +72,21 @@ This document is project-level source of truth for what data exists and how it i
 - `app_public.sync_device_ingest_state`
 - `app_public.sync_ingested_events`
 
+### Diagnostics tables (M14 baseline)
+
+- `public.app_logs`
+  - minimal app diagnostics for auth/sync failure investigation.
+  - authenticated clients may insert only.
+  - client-side `SELECT`, `UPDATE`, and `DELETE` are intentionally unavailable.
+  - sync impact decision: `out of sync scope`; logs are operational diagnostics, not user-domain backup/restore data.
+
 ## Ownership and identity invariants
 
 1. User-owned backend rows are auth-scoped and backend-enforced (`RLS`/constraints).
 2. Mobile clients never use `service_role` credentials.
 3. Sync transport must be idempotent for repeated delivery attempts.
 4. Single-device assumptions are valid for M13; multi-device semantics are deferred.
+5. Diagnostic log rows are write-only from authenticated clients and are manually inspected through backend operator tooling.
 
 ## M13 sync data-model contract (implemented baseline)
 

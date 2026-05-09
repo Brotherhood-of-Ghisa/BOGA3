@@ -140,6 +140,7 @@ Source-of-truth implementation files:
 - prefix commit may be removed based on `error_index`.
 - failed suffix remains queued.
 - next eligible attempt scheduled via locked backoff policy.
+- M14 diagnostic logging records a small non-blocking `sync.flush_transport_failed` row for transport exceptions.
 
 5. Non-retryable failure (`should_retry=false`)
 - delivery state sets `retryBlocked=true`; queue remains for explicit follow-up handling.
@@ -154,6 +155,7 @@ Source-of-truth implementation files:
 8. Bootstrap fetch/merge failure
 - remote projection fetch/parse failures do not mutate local domain tables because merge apply is transactional.
 - runtime records inline bootstrap error metadata and keeps local-first usage unblocked.
+- M14 diagnostic logging records small non-blocking rows for remote fetch failures and bootstrap failures.
 
 9. App/process interruption during first-enable bootstrap fetch/merge (backend -> frontend)
 - bootstrap fetch (`fetchRemoteSyncProjectionState`) does not mutate local projection tables directly.
