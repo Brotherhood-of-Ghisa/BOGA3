@@ -126,6 +126,24 @@ TASK_ID=ad-hoc npm run test:e2e:ios:smoke
 
 ## Supabase: run locally and reset
 
+### Docker Desktop on WSL preflight
+
+When working from WSL, Docker Desktop must be reachable from this Linux distribution, not just running on Windows.
+
+Check from the repo shell before Supabase local commands:
+
+```bash
+docker info --format '{{.ServerVersion}} {{.OperatingSystem}}'
+```
+
+If Docker Desktop is running but the command fails with socket or daemon errors:
+
+- confirm Docker Desktop uses the WSL 2 based engine;
+- open Docker Desktop **Settings -> Resources -> WSL Integration** and enable integration for this WSL distribution;
+- apply the change, then reopen the repo shell and retry the check.
+
+Reference: https://docs.docker.com/desktop/features/wsl/
+
 ### Start/stop/reset
 
 Start runtime:
@@ -163,6 +181,60 @@ Ensure shared baseline (non-destructive when already up, with fixture enforcemen
 ```bash
 ./supabase/scripts/ensure-local-runtime-baseline.sh
 ```
+
+### Repair hosted Supabase migration drift
+
+Use this only when a hosted schema change was applied manually and the hosted migration history may not match checked-in migrations. The first repair was completed in `docs/tasks/complete/T-20260510-01-supabase-migration-history-repair.md`.
+
+Start with inspection:
+
+```bash
+supabase migration list --linked
+```
+
+Then inspect hosted schema for the specific migration effects. For the current repair, confirm:
+
+- migration versions `20260505213500` and `20260507120000` are recorded as applied;
+- `app_public.session_exercises` no longer has `session_exercises_exercise_definition_owner_fk`;
+- `public.app_logs` exists with RLS, authenticated insert-only access, and the expected indexes.
+
+Useful hosted SQL inspection query:
+
+```sql
+select
+  to_regclass('public.app_logs') as app_logs_table,
+  (
+    select count(*) = 0
+    from pg_constraint c
+    join pg_class t on t.oid = c.conrelid
+    join pg_namespace n on n.oid = t.relnamespace
+    where n.nspname = 'app_public'
+      and t.relname = 'session_exercises'
+      and c.conname = 'session_exercises_exercise_definition_owner_fk'
+  ) as session_exercise_definition_fk_absent,
+  (
+    select relrowsecurity
+    from pg_class t
+    join pg_namespace n on n.oid = t.relnamespace
+    where n.nspname = 'public'
+      and t.relname = 'app_logs'
+  ) as app_logs_rls_enabled,
+  (
+    select count(*) = 1
+    from pg_policies
+    where schemaname = 'public'
+      and tablename = 'app_logs'
+      and policyname = 'app_logs_authenticated_insert'
+  ) as app_logs_insert_policy_present;
+```
+
+Repair rule:
+
+- if migration effects are missing, apply checked-in migrations with `supabase db push --linked --include-all`;
+- if migration effects already exist but the version row is missing, use `supabase migration repair --status applied <version>`;
+- never mark a hosted migration as applied without first confirming its schema effects.
+
+Do not print hosted keys, connection strings, or database passwords in task notes.
 
 ### Switch mobile app between local and hosted Supabase
 

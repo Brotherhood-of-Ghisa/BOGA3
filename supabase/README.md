@@ -204,13 +204,25 @@ Parallel-run note:
 - `Accept-Profile: app_public`
 - `Content-Profile: app_public` (writes)
 
-## Hosted sync bootstrap (manual Dashboard path)
+## Hosted sync bootstrap and migration repair
 
 For ad-hoc hosted sync enablement before formal deployment automation exists, run `supabase/hosted-bootstrap-sync.sql` in the hosted Supabase Dashboard SQL Editor.
 
 The script creates the `app_public` sync projection tables and `sync_events_ingest` RPC from the local migration chain, but excludes local-only fixture setup. Keep `app_public` listed in Dashboard **Project Settings -> API -> Data API Settings -> Exposed schemas**.
 
-If hosted sync was bootstrapped before the session-exercise definition FK relaxation, run `supabase/hosted-hotfix-relax-session-exercise-definition-fk.sql` once from the Dashboard SQL Editor.
+Historical note: `supabase/hosted-hotfix-relax-session-exercise-definition-fk.sql` was used as a one-off hosted hotfix before the FK relaxation was reconciled with migration history. Do not use that file as the normal path for future hosted schema changes.
+
+Canonical repair path when hosted schema was changed manually:
+
+1. Inspect hosted migration history with `supabase migration list --linked`.
+2. Inspect hosted schema directly to confirm whether the migration effects already exist.
+3. If effects are missing, apply the checked-in migrations with `supabase db push --linked --include-all`.
+4. If effects already exist but migration history is missing, use `supabase migration repair --status applied <version>` for the exact checked-in migration version.
+5. Record the exact inspection and repair outcome in the active task card.
+
+For local parity before and after hosted repair, run `./supabase/scripts/reset-local.sh`, `./supabase/scripts/ensure-local-runtime-baseline.sh`, `./scripts/quality-fast.sh backend`, and `./scripts/quality-slow.sh backend`. On WSL, verify Docker Desktop integration from this distribution first with `docker info`.
+
+First repair task: `docs/tasks/complete/T-20260510-01-supabase-migration-history-repair.md`.
 
 ## Fixture baseline (deterministic)
 
