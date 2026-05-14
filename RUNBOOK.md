@@ -182,57 +182,24 @@ Ensure shared baseline (non-destructive when already up, with fixture enforcemen
 ./supabase/scripts/ensure-local-runtime-baseline.sh
 ```
 
-### Repair hosted Supabase migration drift
+### Reset hosted Supabase (clean slate)
 
-Use this only when a hosted schema change was applied manually and the hosted migration history may not match checked-in migrations. The first repair was completed in `docs/tasks/complete/T-20260510-01-supabase-migration-history-repair.md`.
+Canonical path for resetting the hosted database to match checked-in migrations. Use when the hosted schema is known-bad or has drifted, and there is no production data worth preserving.
 
-Start with inspection:
+Prerequisites: `supabase login` has been run and the project is linked (`supabase link --project-ref <ref>`).
+
+Two supported paths:
+
+1. Dashboard: Project -> Database -> Reset (the supported managed path).
+2. CLI: `supabase db reset --linked --yes`.
+
+Either path drops the hosted database and reapplies every `supabase/migrations/*.sql` in order on a fresh DB. Confirm afterwards:
 
 ```bash
 supabase migration list --linked
 ```
 
-Then inspect hosted schema for the specific migration effects. For the current repair, confirm:
-
-- migration versions `20260505213500` and `20260507120000` are recorded as applied;
-- `app_public.session_exercises` no longer has `session_exercises_exercise_definition_owner_fk`;
-- `public.app_logs` exists with RLS, authenticated insert-only access, and the expected indexes.
-
-Useful hosted SQL inspection query:
-
-```sql
-select
-  to_regclass('public.app_logs') as app_logs_table,
-  (
-    select count(*) = 0
-    from pg_constraint c
-    join pg_class t on t.oid = c.conrelid
-    join pg_namespace n on n.oid = t.relnamespace
-    where n.nspname = 'app_public'
-      and t.relname = 'session_exercises'
-      and c.conname = 'session_exercises_exercise_definition_owner_fk'
-  ) as session_exercise_definition_fk_absent,
-  (
-    select relrowsecurity
-    from pg_class t
-    join pg_namespace n on n.oid = t.relnamespace
-    where n.nspname = 'public'
-      and t.relname = 'app_logs'
-  ) as app_logs_rls_enabled,
-  (
-    select count(*) = 1
-    from pg_policies
-    where schemaname = 'public'
-      and tablename = 'app_logs'
-      and policyname = 'app_logs_authenticated_insert'
-  ) as app_logs_insert_policy_present;
-```
-
-Repair rule:
-
-- if migration effects are missing, apply checked-in migrations with `supabase db push --linked --include-all`;
-- if migration effects already exist but the version row is missing, use `supabase migration repair --status applied <version>`;
-- never mark a hosted migration as applied without first confirming its schema effects.
+All checked-in migration versions should be listed as applied with no extras.
 
 Do not print hosted keys, connection strings, or database passwords in task notes.
 

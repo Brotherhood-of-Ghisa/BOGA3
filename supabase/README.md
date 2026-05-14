@@ -204,25 +204,23 @@ Parallel-run note:
 - `Accept-Profile: app_public`
 - `Content-Profile: app_public` (writes)
 
-## Hosted sync bootstrap and migration repair
+## Hosted sync bootstrap and reset
 
-For ad-hoc hosted sync enablement before formal deployment automation exists, run `supabase/hosted-bootstrap-sync.sql` in the hosted Supabase Dashboard SQL Editor.
+Canonical hosted bootstrap is the checked-in migration chain (`supabase/migrations/*.sql`) applied via the Supabase CLI. The previous hand-curated bootstrap blob (`hosted-bootstrap-sync.sql`) was removed during the sync redesign clean-slate (`docs/tasks/fix-sync/plan.md`, T7) — it had drifted from the live schema and is not part of the supported path.
 
-The script creates the `app_public` sync projection tables and `sync_events_ingest` RPC from the local migration chain, but excludes local-only fixture setup. Keep `app_public` listed in Dashboard **Project Settings -> API -> Data API Settings -> Exposed schemas**.
+Standard hosted enablement on a fresh project:
 
-Historical note: `supabase/hosted-hotfix-relax-session-exercise-definition-fk.sql` was used as a one-off hosted hotfix before the FK relaxation was reconciled with migration history. Do not use that file as the normal path for future hosted schema changes.
+1. `supabase link --project-ref <ref>` (one-time).
+2. `supabase db push --linked --include-all` to apply every checked-in migration.
+3. Keep `app_public` listed in Dashboard **Project Settings -> API -> Data API Settings -> Exposed schemas**.
 
-Canonical repair path when hosted schema was changed manually:
+Reset hosted to a known-good clean slate (when there is no data worth preserving): use Dashboard **Database -> Reset**, or `supabase db reset --linked --yes`. Both reapply `supabase/migrations/*.sql` in order against a fresh DB. See `RUNBOOK.md` for the operator-facing checklist.
 
-1. Inspect hosted migration history with `supabase migration list --linked`.
-2. Inspect hosted schema directly to confirm whether the migration effects already exist.
-3. If effects are missing, apply the checked-in migrations with `supabase db push --linked --include-all`.
-4. If effects already exist but migration history is missing, use `supabase migration repair --status applied <version>` for the exact checked-in migration version.
-5. Record the exact inspection and repair outcome in the active task card.
+Historical note: `supabase/hosted-hotfix-relax-session-exercise-definition-fk.sql` was a one-off hotfix retained for archival. The FK it relaxed no longer exists after the sync redesign, so the file is inert against the current schema.
 
-For local parity before and after hosted repair, run `./supabase/scripts/reset-local.sh`, `./supabase/scripts/ensure-local-runtime-baseline.sh`, `./scripts/quality-fast.sh backend`, and `./scripts/quality-slow.sh backend`. On WSL, verify Docker Desktop integration from this distribution first with `docker info`.
+For local parity before and after a hosted reset, run `./supabase/scripts/reset-local.sh`, `./supabase/scripts/ensure-local-runtime-baseline.sh`, `./scripts/quality-fast.sh backend`, and `./scripts/quality-slow.sh backend`. On WSL, verify Docker Desktop integration from this distribution first with `docker info`.
 
-First repair task: `docs/tasks/complete/T-20260510-01-supabase-migration-history-repair.md`.
+First repair task (historical, pre-redesign): `docs/tasks/complete/T-20260510-01-supabase-migration-history-repair.md`.
 
 ## Fixture baseline (deterministic)
 
