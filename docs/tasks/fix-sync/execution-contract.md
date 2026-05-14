@@ -22,22 +22,38 @@ before spawning anything.
 - Receives: link to `plan.md`, task identifier (e.g. "T3"), worktree assignment.
 - Operates in its own git worktree per
   [docs/specs/12-worktree-config-and-isolation.md](../../specs/12-worktree-config-and-isolation.md).
+- **(0) Loads project rules first.** Reads `CLAUDE.md` and the docs it points at
+  (`AGENTS.md` and the spec docs listed there). Subagents do **not** auto-load these — the
+  builder must do it explicitly.
 - **(a) Refines the task** by reading the code firsthand (the plan task is a hint, not a
   contract; if the plan is wrong about a detail, the builder corrects it and notes the
   deviation).
 - **(b) Implements** the change.
-- **(c) Tests** — adds/updates tests; runs the relevant suite locally to green.
+- **(c) Runs the project quality gates** — **NOT** ad-hoc commands. Specifically:
+  - `./scripts/quality-fast.sh` for relevant area(s) (`frontend`, `backend`, or no arg for
+    both). This wraps lint + typecheck + tests + backend contract suites with the right
+    worktree validation.
+  - `./scripts/quality-slow.sh` when the change touches UI or e2e-relevant flows.
+  - `./scripts/task-closeout-check.sh <task-card-path>` if a task card exists.
+  - All gates must pass before opening the PR.
 - **(d) Opens a PR** against `main`. PR description must include:
   - Reference to the plan task (e.g. "Plan task T3 — runtime hardening").
   - **Deviations from plan** with reasons.
-  - **Tests executed** (suite name, command, pass/fail).
+  - **Quality gates run** — paste the exact commands and a one-line result for each. If a
+    gate was skipped, explain why.
 - Reports the PR URL back to the coordinator.
 - Responds to reviewer feedback by pushing commits + replying on PR until approved.
 
 ### Reviewer (one per PR; can re-spawn for re-review)
 - Invoked by the coordinator using the `pr-review-toolkit:review-pr` skill (or
   `pr-review-toolkit:code-reviewer` subagent for narrower passes).
+- **First**: load `CLAUDE.md` → `AGENTS.md` → the linked specs. Subagents do not auto-load
+  them.
 - Focus areas (specified by coordinator in the brief):
+  - **Project quality gates** — the PR description must include `quality-fast.sh` (and
+    `quality-slow.sh` / `task-closeout-check.sh` where relevant) results. If absent or
+    incomplete, the reviewer must `gh pr checkout <PR>` the branch and run the missing
+    gates themselves. Failing gates → `request-changes`.
   - **Testing** — adequate coverage, real assertions, no skipped/flaky tests.
   - **Completeness** — does the PR fully address the task it claims to address?
   - **Adherence to plan** — deviations are documented and reasonable; nothing snuck in
