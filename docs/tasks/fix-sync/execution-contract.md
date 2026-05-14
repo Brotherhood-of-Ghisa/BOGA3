@@ -29,13 +29,21 @@ before spawning anything.
   contract; if the plan is wrong about a detail, the builder corrects it and notes the
   deviation).
 - **(b) Implements** the change.
-- **(c) Runs the project quality gates** — **NOT** ad-hoc commands. Specifically:
+- **(c) Runs the project quality gates** — **NOT** ad-hoc commands. The split between
+  `fast` and `slow` is by **execution time, not importance** — the slow gate carries the
+  contract suites that actually exercise schema and sync semantics.
   - `./scripts/quality-fast.sh` for relevant area(s) (`frontend`, `backend`, or no arg for
-    both). This wraps lint + typecheck + tests + backend contract suites with the right
-    worktree validation.
-  - `./scripts/quality-slow.sh` when the change touches UI or e2e-relevant flows.
+    both). Frontend = lint + typecheck + jest. Backend = db lint + health smoke + seed
+    smoke. **Required for every change.**
+  - `./scripts/quality-slow.sh backend` — runs auth-authz + sync-api-contract +
+    sync-events-ingest-contract suites. **Required for every change touching backend
+    schema, the ingest function, or the sync wire contract** (i.e., anything in
+    `supabase/migrations/`, `supabase/functions/`, the sync engine/runtime/bootstrap, or
+    the contract doc).
+  - `./scripts/quality-slow.sh frontend` — Maestro e2e smoke. **Required when the change
+    touches UI flows.**
   - `./scripts/task-closeout-check.sh <task-card-path>` if a task card exists.
-  - All gates must pass before opening the PR.
+  - All gates required for the change must pass before opening the PR.
 - **(d) Opens a PR** against `main`. PR description must include:
   - Reference to the plan task (e.g. "Plan task T3 — runtime hardening").
   - **Deviations from plan** with reasons.
