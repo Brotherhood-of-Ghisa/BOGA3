@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { bootstrapLocalDataLayer, type LocalDatabase } from '@/src/data/bootstrap';
+import { seedSystemExerciseCatalog } from '@/src/data/exercise-catalog-seeds';
 import {
   exerciseDefinitions,
   exerciseMuscleMappings,
@@ -1173,7 +1174,7 @@ export const mergeRemoteProjectionIntoLocalState = async (input: {
 
   const database = await bootstrapLocalDataLayer();
 
-  return database.transaction((tx) => {
+  const result = database.transaction((tx) => {
     const localState = readLocalProjectionState(tx);
     const mergePlan = buildMergePlan({
       local: localState,
@@ -1185,6 +1186,16 @@ export const mergeRemoteProjectionIntoLocalState = async (input: {
       now,
     });
   });
+
+  // The merge transaction wipes the seeded exercise catalog tables (see
+  // applyMergePlanTx). Re-seed the system exercise catalog after the merge
+  // commits so a fresh user (with empty remote projection) does not end up
+  // with an empty catalog until the next app launch. The seeder is
+  // idempotent (uses onConflictDoUpdate) and opens its own transaction, so
+  // it must run outside the merge transaction.
+  seedSystemExerciseCatalog(database, now);
+
+  return result;
 };
 
 export const runSyncBootstrapMerge = async (input: {

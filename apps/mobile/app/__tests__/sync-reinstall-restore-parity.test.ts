@@ -1,9 +1,19 @@
 /* eslint-disable import/first */
 
 const mockBootstrapLocalDataLayer = jest.fn();
+const mockSeedSystemExerciseCatalog = jest.fn();
 
 jest.mock('@/src/data/bootstrap', () => ({
   bootstrapLocalDataLayer: (...args: unknown[]) => mockBootstrapLocalDataLayer(...args),
+}));
+
+// The sync bootstrap merge re-seeds the system exercise catalog after the
+// merge transaction commits (see fix-sync T4). The parity test focuses on
+// sync convergence parity rather than seed contents, so we no-op the seeder
+// here to avoid the verification step asserting against canonical seed counts
+// inside the in-memory fake data layer.
+jest.mock('@/src/data/exercise-catalog-seeds', () => ({
+  seedSystemExerciseCatalog: (...args: unknown[]) => mockSeedSystemExerciseCatalog(...args),
 }));
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
@@ -737,6 +747,7 @@ describe('sync reinstall restore-state parity (M13-T06)', () => {
     fakeDataLayer = createFakeDataLayer();
     mockBootstrapLocalDataLayer.mockReset();
     mockBootstrapLocalDataLayer.mockResolvedValue(fakeDataLayer.database);
+    mockSeedSystemExerciseCatalog.mockReset();
 
     __resetSyncEngineForTests();
     await __resetSyncStateForTests();
