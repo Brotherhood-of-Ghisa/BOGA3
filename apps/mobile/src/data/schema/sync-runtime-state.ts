@@ -10,6 +10,7 @@ export const syncRuntimeState = sqliteTable(
     bootstrapCompletedAt: integer('bootstrap_completed_at', { mode: 'timestamp_ms' }),
     lastBootstrapError: text('last_bootstrap_error'),
     lastBootstrapAttemptAt: integer('last_bootstrap_attempt_at', { mode: 'timestamp_ms' }),
+    seedsAppliedAt: integer('seeds_applied_at', { mode: 'timestamp_ms' }),
     updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
       .notNull()
       .default(sql`(unixepoch() * 1000)`),

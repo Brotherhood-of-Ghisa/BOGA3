@@ -1,7 +1,9 @@
-import { asc, inArray } from 'drizzle-orm';
+import { asc, eq, inArray } from 'drizzle-orm';
 
-import { exerciseDefinitions, exerciseMuscleMappings, muscleGroups } from './schema';
+import { exerciseDefinitions, exerciseMuscleMappings, muscleGroups, syncRuntimeState } from './schema';
 import type { LocalDatabase } from './bootstrap';
+
+const SEED_RUNTIME_STATE_ID = 'primary';
 
 export type MuscleGroupSeed = {
   id: string;
@@ -4092,7 +4094,69 @@ export const verifySeededSystemExerciseCatalog = (database: LocalDatabase): Syst
   };
 };
 
+/**
+ * Reads the singleton `seedsAppliedAt` marker from `sync_runtime_state`.
+ *
+ * Returns `null` when the row does not exist or the marker has not been set
+ * (the seeder has not run on this device yet).
+ */
+const readSeedsAppliedMarker = (database: LocalDatabase): Date | null => {
+  const row = database
+    .select({ seedsAppliedAt: syncRuntimeState.seedsAppliedAt })
+    .from(syncRuntimeState)
+    .where(eq(syncRuntimeState.id, SEED_RUNTIME_STATE_ID))
+    .get();
+
+  return row?.seedsAppliedAt ?? null;
+};
+
+/**
+ * Persists the `seedsAppliedAt` marker on the singleton `sync_runtime_state`
+ * row, creating the row if it does not exist yet. Subsequent seeder calls
+ * observe a non-null marker and short-circuit.
+ */
+const writeSeedsAppliedMarker = (database: LocalDatabase, now: Date) => {
+  database
+    .insert(syncRuntimeState)
+    .values({
+      id: SEED_RUNTIME_STATE_ID,
+      isEnabled: 0,
+      bootstrapUserId: null,
+      bootstrapCompletedAt: null,
+      lastBootstrapError: null,
+      lastBootstrapAttemptAt: null,
+      seedsAppliedAt: now,
+      updatedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: syncRuntimeState.id,
+      set: {
+        seedsAppliedAt: now,
+        updatedAt: now,
+      },
+    })
+    .run();
+};
+
+/**
+ * Seed the local muscle group / exercise definition / mapping tables exactly
+ * once per install. Subsequent calls (every app launch, every sync bootstrap)
+ * observe the `seedsAppliedAt` marker on `sync_runtime_state` and return
+ * early without touching seeded rows.
+ *
+ * This guard is what protects user edits to seeded rows (e.g. renaming
+ * "Bench Press" → "My Bench") from being overwritten and what stops the
+ * bootstrap merge from queueing spurious convergence events for unchanged
+ * seed rows on every launch.
+ *
+ * Use {@link resetLocalDataAndReseed} (dev-only) to clear the marker and
+ * force a re-seed.
+ */
 export const seedSystemExerciseCatalog = (database: LocalDatabase, now: Date = new Date()) => {
+  if (readSeedsAppliedMarker(database) !== null) {
+    return;
+  }
+
   assertValidSystemExerciseCatalogSeeds();
 
   database.transaction((tx) => {
@@ -4177,6 +4241,25 @@ export const seedSystemExerciseCatalog = (database: LocalDatabase, now: Date = n
       `System exercise catalog seed verification failed: exercises missing mappings: ${verification.exercisesMissingMappings.join(', ')}`
     );
   }
+
+  writeSeedsAppliedMarker(database, now);
+};
+
+/**
+ * Test/dev-only helper: clears the `seedsAppliedAt` marker so the next call
+ * to {@link seedSystemExerciseCatalog} performs a full re-seed. Used by
+ * `resetLocalDataAndReseed` and by tests that need to exercise the
+ * first-seed code path against a database whose marker has already been set.
+ */
+export const __clearSeedsAppliedMarkerForReset = (database: LocalDatabase, now: Date = new Date()) => {
+  database
+    .update(syncRuntimeState)
+    .set({
+      seedsAppliedAt: null,
+      updatedAt: now,
+    })
+    .where(eq(syncRuntimeState.id, SEED_RUNTIME_STATE_ID))
+    .run();
 };
 
 export type SeededSystemMuscleGroupRecord = {

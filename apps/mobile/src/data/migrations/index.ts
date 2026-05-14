@@ -78,6 +78,12 @@ export const localRuntimeMigrations: RuntimeMigrationConfig = {
         tag: '0011_drop_origin_columns',
         breakpoints: true,
       },
+      {
+        idx: 12,
+        when: 1779491400000,
+        tag: '0012_seeds_applied_at',
+        breakpoints: true,
+      },
     ],
   },
   migrations: {
@@ -310,5 +316,6 @@ ALTER TABLE \`gyms\` DROP COLUMN \`origin_scope_id\`;--> statement-breakpoint
 ALTER TABLE \`gyms\` DROP COLUMN \`origin_source_id\`;--> statement-breakpoint
 ALTER TABLE \`session_exercises\` DROP COLUMN \`origin_scope_id\`;--> statement-breakpoint
 ALTER TABLE \`session_exercises\` DROP COLUMN \`origin_source_id\`;`,
+    m0012: `ALTER TABLE \`sync_runtime_state\` ADD \`seeds_applied_at\` integer;`,
   },
 };

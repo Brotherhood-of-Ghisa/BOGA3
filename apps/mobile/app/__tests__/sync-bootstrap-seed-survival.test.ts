@@ -241,3 +241,47 @@ describe('sync bootstrap merge re-seeds the system exercise catalog (T4)', () =>
     expect(restored?.name).toBe(canonicalExercise.name);
   });
 });
+
+describe('sync bootstrap merge respects the seeded-once marker (T8)', () => {
+  beforeEach(() => {
+    mockBootstrapLocalDataLayer.mockReset();
+  });
+
+  it('does not re-seed catalog rows when the marker is already set on an empty-remote merge', async () => {
+    const fake = createFakeDataLayer();
+    mockBootstrapLocalDataLayer.mockResolvedValue(fake.database);
+
+    // Mark the catalog as already-seeded in a prior launch. The merge step
+    // wipes the catalog tables, so we cannot use the existing pre-seeded
+    // exercise rows as evidence; instead we assert the wipe is NOT followed
+    // by a re-seed because the marker is set.
+    const priorSeedAt = new Date('2026-03-01T00:00:00.000Z');
+    fake.state.syncRuntimeState.push({
+      id: 'primary',
+      isEnabled: 0,
+      bootstrapUserId: null,
+      bootstrapCompletedAt: null,
+      lastBootstrapError: null,
+      lastBootstrapAttemptAt: null,
+      seedsAppliedAt: priorSeedAt,
+      updatedAt: priorSeedAt,
+    });
+
+    await mergeRemoteProjectionIntoLocalState({
+      remoteState: emptyRemoteState(),
+      now: new Date('2026-03-07T12:00:00.000Z'),
+    });
+
+    // The merge wiped the catalog tables; the post-merge seeder observed
+    // the marker and returned early WITHOUT repopulating them. This is the
+    // critical guarantee: an already-seeded device hitting an empty remote
+    // does not generate spurious convergence churn from re-bumped
+    // updated_at fields on seed rows.
+    expect(fake.state.exerciseDefinitions.length).toBe(0);
+    expect(fake.state.exerciseMuscleMappings.length).toBe(0);
+
+    // Marker is preserved (not bumped to a fresh now) — proves the seeder
+    // really did short-circuit instead of running and re-stamping.
+    expect(fake.state.syncRuntimeState[0]?.seedsAppliedAt).toEqual(priorSeedAt);
+  });
+});

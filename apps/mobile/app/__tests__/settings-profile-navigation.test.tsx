@@ -6,6 +6,8 @@ const mockLoadUserProfile = jest.fn();
 const mockSaveUsername = jest.fn();
 const mockLoadSyncProfileStatus = jest.fn();
 const mockSetSyncEnabled = jest.fn();
+const mockResetLocalDataAndReseed = jest.fn();
+const mockAlert = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({
@@ -27,7 +29,12 @@ jest.mock('@/src/sync', () => ({
   setSyncEnabled: (...args: unknown[]) => mockSetSyncEnabled(...args),
 }));
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+jest.mock('@/src/data', () => ({
+  resetLocalDataAndReseed: (...args: unknown[]) => mockResetLocalDataAndReseed(...args),
+}));
+
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { Alert } from 'react-native';
 
 import ProfileRoute from '../profile';
 import SettingsRoute from '../settings';
@@ -125,6 +132,9 @@ describe('settings and profile routes', () => {
     mockSaveUsername.mockReset();
     mockLoadSyncProfileStatus.mockReset();
     mockSetSyncEnabled.mockReset();
+    mockResetLocalDataAndReseed.mockReset();
+    mockAlert.mockReset();
+    jest.spyOn(Alert, 'alert').mockImplementation((...args: unknown[]) => mockAlert(...args));
     mockSetSyncEnabled.mockResolvedValue({
       bootstrapCompletedAt: null,
       bootstrapUserId: null,
@@ -142,6 +152,51 @@ describe('settings and profile routes', () => {
     fireEvent.press(screen.getByTestId('settings-profile-row'));
 
     expect(mockPush).toHaveBeenCalledWith('/profile');
+  });
+
+  it('exposes the dev reset surface in development builds and invokes the reset helper after confirmation', async () => {
+    mockResetLocalDataAndReseed.mockResolvedValue({
+      database: { name: 'fake-db' },
+      resetAt: new Date('2026-05-14T12:00:00.000Z'),
+    });
+
+    render(<SettingsRoute />);
+
+    expect(screen.getByTestId('settings-dev-tools-card')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('settings-dev-reset-button'));
+
+    expect(mockAlert).toHaveBeenCalledTimes(1);
+    const [, , buttons] = mockAlert.mock.calls[0] as [string, string, { text: string; onPress?: () => void }[]];
+    const resetButton = buttons.find((button) => button.text === 'Reset');
+    expect(resetButton).toBeDefined();
+
+    await act(async () => {
+      resetButton?.onPress?.();
+    });
+
+    await waitFor(() => {
+      expect(mockResetLocalDataAndReseed).toHaveBeenCalledTimes(1);
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('settings-dev-reset-feedback')).toBeTruthy();
+    });
+    expect(screen.getByText('Local data wiped and the exercise catalog re-seeded.')).toBeTruthy();
+  });
+
+  it('surfaces dev reset failures inline without crashing the screen', async () => {
+    mockResetLocalDataAndReseed.mockRejectedValue(new Error('Cannot wipe local data right now.'));
+
+    render(<SettingsRoute />);
+
+    fireEvent.press(screen.getByTestId('settings-dev-reset-button'));
+    const [, , buttons] = mockAlert.mock.calls[0] as [string, string, { text: string; onPress?: () => void }[]];
+    await act(async () => {
+      buttons.find((button) => button.text === 'Reset')?.onPress?.();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Cannot wipe local data right now.')).toBeTruthy();
+    });
   });
 
   it('renders logged-out profile state and submits email/password sign in', async () => {

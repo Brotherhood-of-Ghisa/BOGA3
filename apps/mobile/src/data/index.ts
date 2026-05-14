@@ -6,6 +6,11 @@ export {
   type LocalDatabase,
 } from './bootstrap';
 export {
+  resetLocalDataAndReseed,
+  type ResetLocalDataAndReseedOptions,
+  type ResetLocalDataAndReseedResult,
+} from './dev-reset';
+export {
   attachExerciseTagToSessionExercise,
   createDrizzleExerciseTagStore,
   createExerciseTagDefinition,
