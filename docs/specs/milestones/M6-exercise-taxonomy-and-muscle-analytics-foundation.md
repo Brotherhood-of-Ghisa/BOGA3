@@ -131,7 +131,7 @@ This illustrates the intended `non-normalized` interpretation: contributions are
 - Whether to lock a standard preset ladder for weights (for example, `1.0`, `0.66`, `0.5`, `0.33`, `0.15`) vs free-form decimals only.
 - Whether to include additional v1 muscle groups such as `tibialis_anterior`, `hip_flexors`, `serratus_anterior`, or `rotator_cuff`.
 - Exercise origin/source model (for example `system`, `user`, imported providers) and whether it needs explicit local schema fields in M6 vs a later milestone.
-- Whether exercise editability needs an explicit flag in the local schema vs assuming all exercises are editable until system catalog behavior is implemented.
+- Whether exercise editability needs an explicit flag in the local schema (deferred per fix-sync plan: there is no shared/global catalog of exercises on the backend, so all exercise rows are per-user and editable; any future "do not overwrite seeded rows" guarantee is a local-only seeder behavior — see `docs/tasks/fix-sync/plan.md` task T8).
 
 ## Task breakdown
 

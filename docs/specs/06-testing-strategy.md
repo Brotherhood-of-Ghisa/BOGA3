@@ -102,6 +102,7 @@ Reason: keeps FE/backend integration test expectations explicit without forcing 
   - first-enable bootstrap pull + local merge + convergence flush,
   - event outbox ordering (`sequence_in_device`) and idempotency (`event_id`) behavior,
   - full M13 data-scope backup coverage across user-owned entities (not only session-core tables),
+  - per-user composite-PK positive case: two distinct users (`user_a`, `user_b`) ingesting rows with the same `id` (e.g. shared seeded `exercise_definitions.id`) both succeed and each owns their per-user copy on the backend (no cross-owner conflict path exists by construction),
   - cadence behavior by context (`60s` general, `10s` while on `session-recorder`),
   - already-logged-in journey: user starts session recording and sync eventually converges,
   - logged-out-then-login journey: user logs in, bootstrap/merge converges, starts session recording, and sync eventually converges,
