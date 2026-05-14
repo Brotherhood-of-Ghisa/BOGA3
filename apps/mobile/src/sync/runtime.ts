@@ -7,7 +7,13 @@ import { bootstrapLocalDataLayer, type LocalDatabase } from '@/src/data/bootstra
 import { syncRuntimeState } from '@/src/data/schema';
 import { logEvent } from '@/src/logging';
 
-import { flushSyncOutbox, setSyncIngestTransport, type SyncFlushResult, type SyncIngestTransport } from './engine';
+import {
+  flushSyncOutbox,
+  getInFlightFlushPromise,
+  setSyncIngestTransport,
+  type SyncFlushResult,
+  type SyncIngestTransport,
+} from './engine';
 import { runSyncBootstrapMerge, type SyncBootstrapMergeResult } from './bootstrap';
 import { clearSyncRetryState } from './outbox';
 import type { SyncIngestResponse } from './types';
@@ -22,8 +28,11 @@ export type SyncRuntimeStateSnapshot = {
   bootstrapUserId: string | null;
   bootstrapCompletedAt: Date | null;
   lastBootstrapError: string | null;
+  lastBootstrapAttemptAt: Date | null;
   updatedAt: Date;
 };
+
+export const BOOTSTRAP_COOLDOWN_MS = 30_000;
 
 export type SyncConvergenceResult = {
   status: 'converged' | 'not_converged';
@@ -45,6 +54,7 @@ const normalizeSyncRuntimeState = (
   bootstrapUserId: row.bootstrapUserId ?? null,
   bootstrapCompletedAt: row.bootstrapCompletedAt ?? null,
   lastBootstrapError: row.lastBootstrapError ?? null,
+  lastBootstrapAttemptAt: row.lastBootstrapAttemptAt ?? null,
   updatedAt: row.updatedAt,
 });
 
@@ -66,6 +76,7 @@ const ensureRuntimeStateTx = (tx: RuntimeStateTx, now: Date): SyncRuntimeStateSn
     bootstrapUserId: null,
     bootstrapCompletedAt: null,
     lastBootstrapError: null,
+    lastBootstrapAttemptAt: null,
     updatedAt: now,
   };
 
@@ -77,6 +88,7 @@ const ensureRuntimeStateTx = (tx: RuntimeStateTx, now: Date): SyncRuntimeStateSn
     bootstrapUserId: null,
     bootstrapCompletedAt: null,
     lastBootstrapError: null,
+    lastBootstrapAttemptAt: null,
     updatedAt: now,
   };
 };
@@ -87,7 +99,12 @@ const readRuntimeState = async (): Promise<SyncRuntimeStateSnapshot> => {
 };
 
 const updateRuntimeState = async (
-  update: Partial<Pick<SyncRuntimeStateSnapshot, 'isEnabled' | 'bootstrapUserId' | 'bootstrapCompletedAt' | 'lastBootstrapError'>>,
+  update: Partial<
+    Pick<
+      SyncRuntimeStateSnapshot,
+      'isEnabled' | 'bootstrapUserId' | 'bootstrapCompletedAt' | 'lastBootstrapError' | 'lastBootstrapAttemptAt'
+    >
+  >,
   options: { now?: Date } = {}
 ): Promise<SyncRuntimeStateSnapshot> => {
   const now = options.now ?? new Date();
@@ -103,6 +120,7 @@ const updateRuntimeState = async (
         bootstrapUserId: update.bootstrapUserId,
         bootstrapCompletedAt: update.bootstrapCompletedAt,
         lastBootstrapError: update.lastBootstrapError,
+        lastBootstrapAttemptAt: update.lastBootstrapAttemptAt,
         updatedAt: now,
       })
       .where(eq(syncRuntimeState.id, PRIMARY_RUNTIME_STATE_ID))
@@ -190,10 +208,12 @@ let runtimeStarted = false;
 let runtimeUnsubscribeAuth: (() => void) | null = null;
 let runtimeReconcilePromise: Promise<void> | null = null;
 let runtimeBootstrapPromise: Promise<SyncBootstrapRunResult | null> | null = null;
+let lastObservedAuthUserId: string | null | undefined = undefined;
 
-const shouldRunBootstrap = (
+export const shouldRunBootstrap = (
   runtimeState: SyncRuntimeStateSnapshot,
-  session: Session | null
+  session: Session | null,
+  options: { now?: Date } = {}
 ): session is Session => {
   if (!session?.user?.id) {
     return false;
@@ -203,11 +223,32 @@ const shouldRunBootstrap = (
     return false;
   }
 
+  const userChangedFromCompleted =
+    runtimeState.bootstrapCompletedAt !== null && runtimeState.bootstrapUserId !== session.user.id;
+
+  // A user transition from a completed bootstrap is always allowed to bypass
+  // cooldown (we need to swap which user owns the local layer immediately).
+  if (userChangedFromCompleted) {
+    return true;
+  }
+
+  // Honour the cooldown for any recent attempt regardless of whether the
+  // session user matches the previous attempt — this stops an indefinite retry
+  // loop on transient failures where bootstrapUserId never gets set.
+  if (runtimeState.lastBootstrapAttemptAt) {
+    const now = options.now ?? new Date();
+    const sinceLastAttempt = now.getTime() - runtimeState.lastBootstrapAttemptAt.getTime();
+    if (sinceLastAttempt < BOOTSTRAP_COOLDOWN_MS) {
+      return false;
+    }
+  }
+
   if (!runtimeState.bootstrapCompletedAt) {
     return true;
   }
 
-  return runtimeState.bootstrapUserId !== session.user.id;
+  // Already completed for the current user — nothing to do.
+  return false;
 };
 
 const runBootstrapForSession = async (client: SupabaseClient, session: Session): Promise<SyncBootstrapRunResult | null> => {
@@ -217,6 +258,10 @@ const runBootstrapForSession = async (client: SupabaseClient, session: Session):
 
   runtimeBootstrapPromise = (async () => {
     const now = new Date();
+
+    // Stamp the attempt timestamp up-front so the cooldown applies even if
+    // the merge throws synchronously.
+    await updateRuntimeState({ lastBootstrapAttemptAt: now }, { now });
 
     try {
       const mergeResult = await runSyncBootstrapMerge({
@@ -308,7 +353,7 @@ const reconcileRuntimeState = async () => {
 
   setSyncIngestTransport(createSupabaseSyncIngestTransport(client));
 
-  if (shouldRunBootstrap(runtimeState, authSnapshot.session)) {
+  if (shouldRunBootstrap(runtimeState, authSnapshot.session, { now: new Date() })) {
     await runBootstrapForSession(client, authSnapshot.session);
   }
 };
@@ -327,9 +372,11 @@ export const flushSyncOutboxUntilSettled = async (
   options: {
     maxAttempts?: number;
     flush?: () => Promise<SyncFlushResult>;
+    awaitInFlight?: () => Promise<SyncFlushResult> | null;
   } = {}
 ): Promise<SyncConvergenceResult> => {
   const flush = options.flush ?? (() => flushSyncOutbox());
+  const awaitInFlight = options.awaitInFlight ?? (() => getInFlightFlushPromise());
   const maxAttempts = Math.max(1, Math.floor(options.maxAttempts ?? 20));
 
   let totalSentCount = 0;
@@ -346,6 +393,37 @@ export const flushSyncOutboxUntilSettled = async (
     }
 
     if (lastFlushResult.status === 'idle') {
+      return {
+        status: 'converged',
+        attempts,
+        totalSentCount,
+        lastFlushResult,
+      };
+    }
+
+    // Bug 1 fix: when the engine reports an in-flight flush from a
+    // concurrent caller (e.g. the periodic scheduler), wait for it to
+    // settle and try again rather than bailing as not_converged.
+    if (lastFlushResult.status === 'in_flight') {
+      const pending = awaitInFlight();
+      if (pending) {
+        try {
+          await pending;
+        } catch {
+          // Ignore — we'll observe the outcome on the next flush attempt.
+        }
+      } else {
+        // The in-flight flush already resolved between the flush() call and
+        // our awaitInFlight() check; yield to let microtasks settle.
+        await Promise.resolve();
+      }
+      continue;
+    }
+
+    // Bug 1 fix: the engine deferred this flush to its own retry schedule
+    // (transport backoff). The outbox is now under the scheduler's control;
+    // bootstrap convergence is effectively settled from our perspective.
+    if (lastFlushResult.status === 'backoff') {
       return {
         status: 'converged',
         attempts,
@@ -399,13 +477,28 @@ export const setSyncEnabled = async (
   return nextState;
 };
 
+export const isBootstrapInProgress = (): boolean => runtimeBootstrapPromise !== null;
+
 export const startSyncRuntime = () => {
   if (runtimeStarted) {
     return;
   }
 
   runtimeStarted = true;
+  // Seed the user-id tracker from the current snapshot so the first auth event
+  // for the same already-restored user is treated as a no-op rather than a
+  // user transition.
+  lastObservedAuthUserId = getAuthSnapshot().session?.user?.id ?? null;
   runtimeUnsubscribeAuth = subscribeToAuthState(() => {
+    const currentUserId = getAuthSnapshot().session?.user?.id ?? null;
+    // Only react to auth events that change the active user (sign-in,
+    // sign-out, or user switch). Skip TOKEN_REFRESHED / USER_UPDATED events
+    // for the same user — they would otherwise re-fire bootstrap reconciles
+    // forever in the presence of a transient flush in-flight collision.
+    if (currentUserId === lastObservedAuthUserId) {
+      return;
+    }
+    lastObservedAuthUserId = currentUserId;
     queueRuntimeReconcile();
   });
 
@@ -416,6 +509,7 @@ export const stopSyncRuntime = () => {
   runtimeStarted = false;
   runtimeUnsubscribeAuth?.();
   runtimeUnsubscribeAuth = null;
+  lastObservedAuthUserId = undefined;
   setSyncIngestTransport(null);
 };
 
@@ -423,6 +517,7 @@ export const __resetSyncRuntimeForTests = async () => {
   stopSyncRuntime();
   runtimeReconcilePromise = null;
   runtimeBootstrapPromise = null;
+  lastObservedAuthUserId = undefined;
 
   const database = await bootstrapLocalDataLayer();
   database.transaction((tx) => {

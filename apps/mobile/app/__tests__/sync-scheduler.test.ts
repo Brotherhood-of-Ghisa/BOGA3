@@ -77,4 +77,43 @@ describe('sync scheduler cadence + context', () => {
     expect(syncCadenceContextFromPathname('/session-list')).toBe('general');
     expect(syncCadenceContextFromPathname(null)).toBe('general');
   });
+
+  it('skips the flush when bootstrap is in progress (bug 4)', async () => {
+    const flush = jest.fn(async () => ({ status: 'idle' as const }));
+    let bootstrapInProgress = true;
+    const scheduler = createSyncScheduler({
+      flush,
+      isBootstrapInProgress: () => bootstrapInProgress,
+    });
+
+    scheduler.start();
+
+    jest.advanceTimersByTime(SYNC_GENERAL_CADENCE_MS);
+    await flushAsync();
+    expect(flush).toHaveBeenCalledTimes(0);
+
+    bootstrapInProgress = false;
+    jest.advanceTimersByTime(SYNC_GENERAL_CADENCE_MS);
+    await flushAsync();
+    expect(flush).toHaveBeenCalledTimes(1);
+
+    scheduler.stop();
+  });
+
+  it('skips the offline->online recovery flush during bootstrap (bug 4)', async () => {
+    const flush = jest.fn(async () => ({ status: 'idle' as const }));
+    const scheduler = createSyncScheduler({
+      flush,
+      isBootstrapInProgress: () => true,
+    });
+
+    scheduler.start();
+    scheduler.setOnline(false);
+    scheduler.setOnline(true);
+    await flushAsync();
+
+    expect(flush).toHaveBeenCalledTimes(0);
+
+    scheduler.stop();
+  });
 });

@@ -1,4 +1,5 @@
 import { flushSyncOutbox, setSyncNetworkOnline, type SyncFlushResult } from './engine';
+import { isBootstrapInProgress as isRuntimeBootstrapInProgress } from './runtime';
 
 export const SYNC_GENERAL_CADENCE_MS = 60_000;
 export const SYNC_SESSION_RECORDER_CADENCE_MS = 10_000;
@@ -49,10 +50,12 @@ export const createSyncScheduler = (options: {
   flush?: () => Promise<SyncFlushResult>;
   setTimeoutFn?: (fn: () => void, delayMs: number) => TimerHandle;
   clearTimeoutFn?: (handle: TimerHandle) => void;
+  isBootstrapInProgress?: () => boolean;
 } = {}): SyncScheduler => {
   const flush = options.flush ?? (() => flushSyncOutbox());
   const setTimeoutFn = options.setTimeoutFn ?? ((fn, delayMs) => setTimeout(fn, delayMs));
   const clearTimeoutFn = options.clearTimeoutFn ?? ((handle) => clearTimeout(handle));
+  const isBootstrapInProgress = options.isBootstrapInProgress ?? isRuntimeBootstrapInProgress;
 
   let running = false;
   let context: SyncCadenceContext = 'general';
@@ -83,7 +86,13 @@ export const createSyncScheduler = (options: {
       return;
     }
 
-    await flush();
+    // Bug 4 fix: skip the flush while a bootstrap convergence loop is
+    // active. The bootstrap owns the engine's single in-flight slot and a
+    // scheduler tick during bootstrap would race for it, returning
+    // {status: 'in_flight'} to whichever loser ran second.
+    if (!isBootstrapInProgress()) {
+      await flush();
+    }
     scheduleNextTick();
   };
 
@@ -123,7 +132,7 @@ export const createSyncScheduler = (options: {
         return;
       }
 
-      if (!wasOnline && isOnline) {
+      if (!wasOnline && isOnline && !isBootstrapInProgress()) {
         void flush();
       }
 

@@ -1,7 +1,9 @@
 export {
   __resetSyncEngineForTests,
   flushSyncOutbox,
+  getInFlightFlushPromise,
   getSyncIngestTransport,
+  isFlushInFlight,
   isSyncNetworkOnline,
   setSyncIngestTransport,
   setSyncNetworkOnline,
@@ -40,9 +42,12 @@ export {
 } from './outbox';
 export {
   __resetSyncRuntimeForTests,
+  BOOTSTRAP_COOLDOWN_MS,
   flushSyncOutboxUntilSettled,
   getSyncRuntimeState,
+  isBootstrapInProgress,
   setSyncEnabled,
+  shouldRunBootstrap,
   startSyncRuntime,
   stopSyncRuntime,
   type SyncBootstrapRunResult,

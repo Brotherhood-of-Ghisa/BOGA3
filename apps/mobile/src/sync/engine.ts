@@ -110,6 +110,10 @@ export const setSyncNetworkOnline = (isOnline: boolean) => {
 
 export const isSyncNetworkOnline = () => networkOnline;
 
+export const isFlushInFlight = (): boolean => inFlightFlushPromise !== null;
+
+export const getInFlightFlushPromise = (): Promise<SyncFlushResult> | null => inFlightFlushPromise;
+
 const runFlush = async (input: {
   transport: SyncIngestTransport;
   now: Date;

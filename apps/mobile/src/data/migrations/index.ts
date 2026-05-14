@@ -66,6 +66,12 @@ export const localRuntimeMigrations: RuntimeMigrationConfig = {
         tag: '0009_set_type_metadata',
         breakpoints: true,
       },
+      {
+        idx: 10,
+        when: 1778799600000,
+        tag: '0010_sync_runtime_attempt',
+        breakpoints: true,
+      },
     ],
   },
   migrations: {
@@ -292,5 +298,6 @@ CREATE INDEX \`sync_outbox_events_created_at_idx\` ON \`sync_outbox_events\` (\`
 	CONSTRAINT "sync_runtime_state_is_enabled_boolean_guard" CHECK("sync_runtime_state"."is_enabled" in (0, 1))
 );`,
     m0009: `ALTER TABLE \`exercise_sets\` ADD \`set_type\` text;`,
+    m0010: `ALTER TABLE \`sync_runtime_state\` ADD \`last_bootstrap_attempt_at\` integer;`,
   },
 };

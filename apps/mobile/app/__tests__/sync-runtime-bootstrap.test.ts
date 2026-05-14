@@ -37,11 +37,16 @@ jest.mock('@/src/sync/outbox', () => ({
 
 import {
   __resetSyncRuntimeForTests,
+  BOOTSTRAP_COOLDOWN_MS,
+  flushSyncOutboxUntilSettled,
   getSyncRuntimeState,
   setSyncEnabled,
+  shouldRunBootstrap,
   startSyncRuntime,
   stopSyncRuntime,
+  type SyncRuntimeStateSnapshot,
 } from '@/src/sync/runtime';
+import type { SyncFlushResult } from '@/src/sync/engine';
 import { createSyncScheduler, SYNC_SESSION_RECORDER_CADENCE_MS } from '@/src/sync/scheduler';
 
 type RuntimeStateRow = {
@@ -50,13 +55,16 @@ type RuntimeStateRow = {
   bootstrapUserId: string | null;
   bootstrapCompletedAt: Date | null;
   lastBootstrapError: string | null;
+  lastBootstrapAttemptAt: Date | null;
   updatedAt: Date;
 };
 
 const flushAsync = async () => {
-  await Promise.resolve();
-  await Promise.resolve();
-  await Promise.resolve();
+  // Drain enough microtasks to settle nested awaits across reconcile,
+  // bootstrap, runtime-state writes, merge, and convergence.
+  for (let i = 0; i < 8; i += 1) {
+    await Promise.resolve();
+  }
 };
 
 describe('sync runtime bootstrap trigger', () => {
@@ -290,7 +298,10 @@ describe('sync runtime bootstrap trigger', () => {
     expect(mockRunSyncBootstrapMerge).toHaveBeenCalledTimes(1);
     expect(mockFlushSyncOutbox).toHaveBeenCalledTimes(1);
 
-    const scheduler = createSyncScheduler({ flush: recorderFlush });
+    const scheduler = createSyncScheduler({
+      flush: recorderFlush,
+      isBootstrapInProgress: () => false,
+    });
     scheduler.start();
     scheduler.setContext('session-recorder');
     jest.advanceTimersByTime(SYNC_SESSION_RECORDER_CADENCE_MS);
@@ -299,5 +310,135 @@ describe('sync runtime bootstrap trigger', () => {
     expect(recorderFlush).toHaveBeenCalledTimes(1);
 
     scheduler.stop();
+  });
+
+  it('does not re-run bootstrap on a same-user auth event (bug 2)', async () => {
+    startSyncRuntime();
+    await flushAsync();
+
+    await setSyncEnabled(true);
+    await flushAsync();
+
+    expect(mockRunSyncBootstrapMerge).toHaveBeenCalledTimes(1);
+
+    // Simulate two TOKEN_REFRESHED events for the same user.
+    authListener?.();
+    authListener?.();
+    await flushAsync();
+    await flushAsync();
+
+    // No additional bootstrap merge should have been triggered for these
+    // same-user auth events.
+    expect(mockRunSyncBootstrapMerge).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('flushSyncOutboxUntilSettled (bug 1)', () => {
+  it('handles in_flight followed by idle as converged', async () => {
+    let inFlightPromiseResolved = false;
+    const pending: Promise<SyncFlushResult> = Promise.resolve({ status: 'idle' as const }).then(
+      (result) => {
+        inFlightPromiseResolved = true;
+        return result;
+      }
+    );
+
+    const flush = jest
+      .fn<Promise<SyncFlushResult>, []>()
+      .mockResolvedValueOnce({ status: 'in_flight' })
+      .mockResolvedValueOnce({ status: 'idle' });
+
+    const awaitInFlight = jest
+      .fn<Promise<SyncFlushResult> | null, []>()
+      .mockReturnValueOnce(pending)
+      .mockReturnValue(null);
+
+    const result = await flushSyncOutboxUntilSettled({ flush, awaitInFlight });
+
+    expect(result.status).toBe('converged');
+    expect(flush).toHaveBeenCalledTimes(2);
+    expect(awaitInFlight).toHaveBeenCalledTimes(1);
+    expect(inFlightPromiseResolved).toBe(true);
+  });
+
+  it('treats backoff as converged (bug 1)', async () => {
+    const flush = jest
+      .fn<Promise<SyncFlushResult>, []>()
+      .mockResolvedValue({ status: 'backoff', nextAttemptAt: new Date() });
+
+    const result = await flushSyncOutboxUntilSettled({ flush, awaitInFlight: () => null });
+
+    expect(result.status).toBe('converged');
+    expect(flush).toHaveBeenCalledTimes(1);
+  });
+
+  it('still reports not_converged when the engine reports a transport failure', async () => {
+    const flush = jest
+      .fn<Promise<SyncFlushResult>, []>()
+      .mockResolvedValue({
+        status: 'transport_failure',
+        sentCount: 0,
+        nextAttemptAt: new Date(),
+        message: 'boom',
+      });
+
+    const result = await flushSyncOutboxUntilSettled({ flush, awaitInFlight: () => null });
+
+    expect(result.status).toBe('not_converged');
+  });
+});
+
+describe('shouldRunBootstrap cooldown (bug 3)', () => {
+  const session = { user: { id: 'user-cooldown' } } as unknown as Parameters<
+    typeof shouldRunBootstrap
+  >[1];
+
+  const baseSnapshot = (
+    overrides: Partial<SyncRuntimeStateSnapshot> = {}
+  ): SyncRuntimeStateSnapshot => ({
+    id: 'primary',
+    isEnabled: true,
+    bootstrapUserId: null,
+    bootstrapCompletedAt: null,
+    lastBootstrapError: null,
+    lastBootstrapAttemptAt: null,
+    updatedAt: new Date(0),
+    ...overrides,
+  });
+
+  it('returns false within the cooldown window after a failed attempt', () => {
+    const lastAttempt = new Date(1_000_000);
+    const snapshot = baseSnapshot({
+      lastBootstrapAttemptAt: lastAttempt,
+      bootstrapUserId: null,
+      lastBootstrapError: 'boom',
+    });
+
+    const within = new Date(lastAttempt.getTime() + BOOTSTRAP_COOLDOWN_MS - 1);
+    expect(shouldRunBootstrap(snapshot, session, { now: within })).toBe(false);
+  });
+
+  it('returns true once the cooldown elapses', () => {
+    const lastAttempt = new Date(1_000_000);
+    const snapshot = baseSnapshot({
+      lastBootstrapAttemptAt: lastAttempt,
+      bootstrapUserId: null,
+      lastBootstrapError: 'boom',
+    });
+
+    const after = new Date(lastAttempt.getTime() + BOOTSTRAP_COOLDOWN_MS + 1);
+    expect(shouldRunBootstrap(snapshot, session, { now: after })).toBe(true);
+  });
+
+  it('ignores cooldown when a different user previously completed bootstrap', () => {
+    const lastAttempt = new Date(1_000_000);
+    const snapshot = baseSnapshot({
+      lastBootstrapAttemptAt: lastAttempt,
+      bootstrapCompletedAt: new Date(500_000),
+      bootstrapUserId: 'someone-else',
+    });
+
+    const within = new Date(lastAttempt.getTime() + 1);
+    expect(shouldRunBootstrap(snapshot, session, { now: within })).toBe(true);
   });
 });
