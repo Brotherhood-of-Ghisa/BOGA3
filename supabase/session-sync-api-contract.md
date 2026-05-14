@@ -247,8 +247,6 @@ Field notes for current local/mobile parity:
 {
   "id": "gym_123",
   "name": "Downtown Gym",
-  "origin_scope_id": "private",
-  "origin_source_id": "local",
   "created_at": 1730000000000,
   "updated_at": 1730000001000
 }
@@ -280,8 +278,6 @@ Field notes for current local/mobile parity:
   "name": "Chest Press",
   "machine_name": "Plate Press",
   "exercise_definition_id": "exercise_chest_press",
-  "origin_scope_id": "private",
-  "origin_source_id": "local",
   "created_at": 1730000020000,
   "updated_at": 1730000020000
 }
@@ -318,8 +314,6 @@ Field notes for current local/mobile parity:
 {
   "id": "sync-gym-a-1",
   "name": "Warehouse Gym",
-  "origin_scope_id": "private",
-  "origin_source_id": "local",
   "created_at": 1730000000000,
   "updated_at": 1730000000000
 }

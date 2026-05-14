@@ -87,6 +87,7 @@ This document is project-level source of truth for what data exists and how it i
 3. Sync transport must be idempotent for repeated delivery attempts.
 4. Single-device assumptions are valid for M13; multi-device semantics are deferred.
 5. Diagnostic log rows are write-only from authenticated clients and are manually inspected through backend operator tooling.
+6. All eight sync-domain projection tables use composite primary key `(id, owner_user_id)`. Every user owns their own `id` keyspace, so two users may legitimately hold rows with the same `id` (for example, the same seeded `exercise_definitions.id`) without conflict. Cross-owner row-level conflicts are not possible by construction, and the backend has no cross-owner rejection path. Each user's seed catalog is per-user data from day one; no shared/global catalog of these entities exists on the backend.
 
 ## M13 sync data-model contract (implemented baseline)
 

@@ -60,6 +60,7 @@ Decision:
 6. First sync enable includes one-time remote bootstrap, then local merge, then upload of remaining local events/deltas.
 7. Post-bootstrap loop is push-dominant; periodic pull is not part of steady-state M13 behavior.
 8. Single-device assumptions are explicit; multi-device conflict detection/prevention is out of scope.
+9. All sync-domain projection tables are user-scoped from day one with composite primary key `(id, owner_user_id)`. Mobile-shipped seed catalog rows are inserted per-user at install and treated identically to user-created data; there is no shared/global catalog of these entities on the backend, so two users may legitimately hold rows with the same `id` without conflict.
 
 ## Data scope (locked for M13)
 
