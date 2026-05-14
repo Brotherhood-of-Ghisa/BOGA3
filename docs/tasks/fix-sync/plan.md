@@ -190,6 +190,92 @@ rejection test; verify M5 PostgREST baseline tests still green.
 **Acceptance:** `git grep -i 'belongs to a different owner\|origin_scope\|system catalog'`
 returns no hits in `docs/` or `supabase/session-sync-api-contract.md`.
 
+#### T8 — Seed once, never overwrite; dev reset path
+
+**Depends on:** T3 + T4 merged (touches the same files; cleaner to branch after).
+
+**Runs in parallel with:** T5, T6.
+
+**What problem this fixes.** The current seeder (`seedSystemExerciseCatalog`) runs at every
+app launch (via `apps/mobile/src/data/bootstrap.ts:59`) and again after every sync
+bootstrap (via T4's call inside `mergeRemoteProjectionIntoLocalState`). It uses
+`onConflictDoUpdate`, which:
+- Overwrites a user's local rename of a seeded exercise (e.g. user renames "Bench Press"
+  → "My Bench"; the next launch reverts it).
+- Bumps `updated_at` on every seeded row at every launch + every bootstrap, which
+  the next bootstrap merge sees as "local newer than remote" and queues spurious
+  convergence events for. Wasteful churn.
+
+The intended product behaviour is **seed once on a truly fresh install, never overwrite
+existing rows**. App launches do not re-seed. Bootstrap does not re-seed an
+already-populated catalog. Dev workflows get an explicit "reset and re-seed" escape hatch.
+
+**Fix.**
+
+1. **Add a singleton marker.** Add a `seedsAppliedAt: integer({ mode: 'timestamp_ms' })`
+   nullable column to `sync_runtime_state` (reuse the existing singleton — don't add a new
+   table). New Drizzle migration + bundle entry. Coordinate the migration sequence number
+   with whatever T2/T3 land on (currently `m0010`; T8's migration will likely be `m0011`
+   or `m0012` depending on merge order — builder picks the next available).
+
+2. **Refactor `seedSystemExerciseCatalog`** in `apps/mobile/src/data/exercise-catalog-seeds.ts`
+   into a one-shot:
+   - Read the marker first. If non-null, return early. Log nothing (this is the steady-state
+     path; not an error).
+   - If null, run the existing inserts (you may keep `onConflictDoUpdate` defensively, but
+     the marker check should mean conflicts never happen in practice). After successful
+     seeding, set `seedsAppliedAt = now` in the same transaction or immediately after.
+   - Keep the existing `verifySeededSystemExerciseCatalog` post-check; it now only runs on
+     the first-seed path.
+
+3. **Both call sites become idempotent automatically.** Both
+   `apps/mobile/src/data/bootstrap.ts:59` (launch-time) and the T4 post-merge call in
+   `apps/mobile/src/sync/bootstrap.ts` no longer need conditional logic — the gate inside
+   the seeder handles it.
+
+4. **Dev reset surface.** Add a `resetLocalDataAndReseed()` function under
+   `apps/mobile/src/data/` (e.g. `apps/mobile/src/data/dev-reset.ts`). It must:
+   - Wipe all data tables (gyms, sessions, session_exercises, exercise_sets,
+     exercise_definitions, exercise_muscle_mappings, exercise_tag_definitions,
+     session_exercise_tags, sync_outbox_events, sync_runtime_state, sync_delivery_state).
+   - Reset the `seedsAppliedAt` marker to null.
+   - Re-run `seedSystemExerciseCatalog` (which will now run because the marker is null).
+   - Be guarded by `__DEV__` (no-op in release builds; throw if called in prod).
+
+   Surface it in one place that's easy to invoke during development. Either:
+   - A button on a developer-only screen in the profile area, or
+   - A script under `apps/mobile/scripts/` that can be called from a dev tool, or
+   - Both.
+   Builder picks the simplest surface. Document the chosen surface in the PR body.
+
+5. **Convergence behaviour change.** With the seeder no longer bumping `updated_at` on
+   every launch, the merge will not queue spurious convergence events. Verify in tests.
+
+**Acceptance criteria:**
+- Test: first launch on empty DB → seeder runs, marker set, catalog populated.
+- Test: second launch (marker set) → seeder is a no-op; manual edit to a seeded row
+  persists across the launch.
+- Test: bootstrap merge with empty remote on an already-seeded local → no convergence
+  events queued for unchanged seeded rows.
+- Test: bootstrap merge with empty remote on a freshly-reset local (marker null) → seeder
+  runs, populates catalog, convergence events queued for the now-fresh seed rows. (T4's
+  call site path.)
+- Dev reset: smoke-tested manually; PR describes the chosen surface.
+- `npm --prefix apps/mobile test` passes.
+
+**Files:**
+- `apps/mobile/src/data/exercise-catalog-seeds.ts` — gate + marker write
+- `apps/mobile/src/data/schema/sync-runtime-state.ts` — add column
+- `apps/mobile/drizzle/<next>_seeds_applied_at.sql` — migration
+- `apps/mobile/src/data/migrations/index.ts` — bundle entry
+- `apps/mobile/src/data/dev-reset.ts` (new) — dev reset helper
+- Surface for dev reset (TBD by builder)
+- Tests: extend `local-data-bootstrap.test.ts`, `sync-bootstrap-seed-survival.test.ts`, and
+  add a new `seed-once.test.ts` if needed.
+
+**Reuse:** existing seeder body (just guard it), existing migration scaffolding, existing
+`bootstrapLocalDataLayer`.
+
 ### Wave 3 — sequential cleanup (after merge)
 
 #### T7 — Drop the hosted database, re-run migrations, fix the runbook
