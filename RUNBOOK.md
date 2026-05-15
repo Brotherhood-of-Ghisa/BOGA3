@@ -186,20 +186,30 @@ Ensure shared baseline (non-destructive when already up, with fixture enforcemen
 
 Canonical path for resetting the hosted database to match checked-in migrations. Use when the hosted schema is known-bad or has drifted, and there is no production data worth preserving.
 
+**Destructive: drops the hosted database. Back up anything worth keeping first.**
+
 Prerequisites: `supabase login` has been run and the project is linked (`supabase link --project-ref <ref>`).
 
-Two supported paths:
+Steps:
 
-1. Dashboard: Project -> Database -> Reset (the supported managed path).
-2. CLI: `supabase db reset --linked --yes`.
+1. **Reset and reapply migrations (CLI, canonical path):**
+   ```bash
+   supabase db reset --linked --yes
+   ```
+   Drops the hosted database and reapplies every `supabase/migrations/*.sql` in order on a fresh DB.
 
-Either path drops the hosted database and reapplies every `supabase/migrations/*.sql` in order on a fresh DB. Confirm afterwards:
+2. **Re-expose `app_public` on the Data API.** Easy to miss — the schema exists post-reset but PostgREST will not serve it until you toggle it back on:
+   - Supabase Dashboard → Project Settings → API → **Exposed schemas**
+   - Add `app_public` to the comma-separated list (alongside `public`, `graphql_public`).
+   - Save.
 
-```bash
-supabase migration list --linked
-```
+3. **Verify migrations applied:**
+   ```bash
+   supabase migration list --linked
+   ```
+   All checked-in migration versions should be listed as applied with no extras.
 
-All checked-in migration versions should be listed as applied with no extras.
+4. **Smoke check from the mobile app or `curl`:** confirm that an authenticated request to `app_public.<table>` returns rows / RLS-blocked rows (not a "schema not exposed" 404).
 
 Do not print hosted keys, connection strings, or database passwords in task notes.
 
