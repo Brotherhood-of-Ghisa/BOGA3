@@ -3,6 +3,34 @@
 Items uncovered during the redesign that are out of scope for the current task set but
 worth a future pass. Sorted by priority.
 
+## Manual hosted-DB reset checklist (one-time, post-redesign)
+
+The sync redesign concludes with a manual hosted Supabase reset that drops the hosted DB
+and reapplies all migrations from `main` (so the per-user composite-PK schema replaces the
+old broken one). The full canonical procedure now lives in
+[RUNBOOK.md → Reset hosted Supabase (clean slate)](../../../RUNBOOK.md). Quick reference:
+
+```bash
+# Prereqs (one-time)
+supabase login
+supabase link --project-ref <your-project-ref>
+
+# 1. Reset (DROPS HOSTED DATA)
+supabase db reset --linked --yes
+
+# 2. Re-expose app_public schema
+#    Dashboard → Project Settings → API → Exposed schemas
+#    Add `app_public` to the list. (NOT done automatically by the reset.)
+
+# 3. Verify
+supabase migration list --linked
+```
+
+After step 2, smoke-check by signing into the mobile app and confirming the catalog
+populates without "schema not exposed" errors.
+
+## Priorities
+
 ## P1 — quality gate enforcement
 
 **Question:** when and how do we enforce that all relevant quality gates run before merge?
@@ -67,9 +95,8 @@ bundle but not in local DB → insert (no overwrite)" check.
 
 ## P6 — `supabase/hosted-bootstrap-sync.sql` is stale
 
-T1 reviewer flagged: this file still has old PK definitions and "different owner" branches.
-The hosted DB will be reset in T7, which makes the file obsolete OR will need
-regeneration. Decide and act in T7.
+**Resolved by T7 (PR #17).** File deleted; no callers. README updated to point at
+`supabase db push --linked --include-all` as the canonical alternative.
 
 ## P7 — Add CI assertion for orphan Drizzle SQL files
 
