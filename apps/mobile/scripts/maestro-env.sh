@@ -88,6 +88,6 @@ maestro_trim() {
 maestro_current_dev_client_fingerprint() {
   (
     cd "$APP_DIR"
-    shasum -a 256 app.json eas.json package.json package-lock.json | shasum -a 256 | awk '{print $1}'
+    shasum -a 256 app.config.ts eas.json package.json package-lock.json | shasum -a 256 | awk '{print $1}'
   )
 }

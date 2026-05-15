@@ -3,6 +3,19 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react-nativ
 import SessionRecorderScreen from '../session-recorder';
 
 let mockSearchParams: Record<string, string | undefined> = {};
+const mockLogEvent = jest.fn();
+
+jest.mock('@/src/logging', () => ({
+  logEvent: (...args: unknown[]) => mockLogEvent(...args),
+}));
+
+jest.mock('@/src/auth', () => ({
+  getAuthSnapshot: () => ({
+    user: {
+      id: 'user-1',
+    },
+  }),
+}));
 
 jest.mock('@/src/data', () => ({
   attachExerciseTagToSessionExercise: jest.fn().mockResolvedValue(undefined),
@@ -127,18 +140,31 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
     mockDismissAll.mockClear();
   });
 
-  it('allows submit without gym selection', async () => {
+  it('allows submit without gym selection and preserves zero-weight sets', async () => {
     render(<SessionRecorderScreen />);
 
     fireEvent.press(screen.getByText('Log new exercise'));
     fireEvent.press(await screen.findByLabelText('Select exercise Barbell Squat'));
-    fireEvent.changeText(screen.getByLabelText('Weight for exercise 1 set 1'), '225');
+    fireEvent.changeText(screen.getByLabelText('Weight for exercise 1 set 1'), '0');
     fireEvent.changeText(screen.getByLabelText('Reps for exercise 1 set 1'), '5');
     fireEvent.press(screen.getByText('Submit Session'));
 
     expect(screen.queryByText('Session submitted (UI only)')).toBeNull();
     await waitFor(() => {
-      expect(mockPersistSessionDraftSnapshot).toHaveBeenCalled();
+      expect(mockPersistSessionDraftSnapshot).toHaveBeenCalledWith(
+        expect.objectContaining({
+          exercises: [
+            expect.objectContaining({
+              sets: [
+                expect.objectContaining({
+                  repsValue: '5',
+                  weightValue: '0',
+                }),
+              ],
+            }),
+          ],
+        })
+      );
       expect(mockCompleteSessionDraft).toHaveBeenCalledWith('test-session');
       expect(mockDismissTo).toHaveBeenCalledWith('/');
     });
@@ -173,6 +199,7 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
     fireEvent.changeText(screen.getByLabelText('Reps for exercise 1 set 1'), '5');
     fireEvent.press(screen.getByLabelText('Add set to exercise 1'));
     fireEvent.changeText(screen.getByLabelText('Weight for exercise 1 set 2'), '205');
+    fireEvent.changeText(screen.getByLabelText('Reps for exercise 1 set 2'), '');
 
     fireEvent.press(screen.getByText('Submit Session'));
     expect(screen.getByText('Remove incomplete sets and submit?')).toBeTruthy();
@@ -211,7 +238,7 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
     });
   });
 
-  it('keeps submit disabled when any set contains invalid numeric values', async () => {
+  it('keeps submit disabled when any set contains invalid reps values', async () => {
     render(<SessionRecorderScreen />);
 
     fireEvent.press(screen.getByText('Log new exercise'));
@@ -220,7 +247,7 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
     mockCompleteSessionDraft.mockClear();
 
     fireEvent.changeText(screen.getByLabelText('Weight for exercise 1 set 1'), '0');
-    fireEvent.changeText(screen.getByLabelText('Reps for exercise 1 set 1'), '5');
+    fireEvent.changeText(screen.getByLabelText('Reps for exercise 1 set 1'), '0');
 
     expect(screen.getByTestId('session-recorder-submit-button').props.accessibilityState?.disabled).toBe(true);
     fireEvent.press(screen.getByText('Submit Session'));
@@ -231,6 +258,53 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
       expect(mockCompleteSessionDraft).not.toHaveBeenCalled();
       expect(mockDismissTo).not.toHaveBeenCalled();
     });
+  });
+
+  it('saves completed-edit sessions with zero-weight sets', async () => {
+    mockSearchParams = { mode: 'completed-edit', sessionId: 'completed-edit-1' };
+    mockLoadSessionSnapshotById.mockResolvedValue(
+      buildCompletedEditSnapshot({
+        exercises: [
+          {
+            id: 'exercise-1',
+            exerciseDefinitionId: 'sys_barbell_bench_press',
+            name: 'Bench Press',
+            machineName: 'Flat Bench',
+            sets: [{ id: 'set-1', repsValue: '5', weightValue: '0' }],
+          },
+        ],
+      })
+    );
+
+    render(<SessionRecorderScreen />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Save Changes')).toBeTruthy();
+      expect(screen.getByLabelText('Weight for exercise 1 set 1').props.value).toBe('0');
+    });
+
+    fireEvent.press(screen.getByText('Save Changes'));
+
+    await waitFor(() => {
+      expect(mockPersistCompletedSessionSnapshot).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sessionId: 'completed-edit-1',
+          exercises: [
+            expect.objectContaining({
+              sets: [
+                expect.objectContaining({
+                  repsValue: '5',
+                  weightValue: '0',
+                }),
+              ],
+            }),
+          ],
+        })
+      );
+      expect(mockDismissTo).toHaveBeenCalledWith('/');
+    });
+    expect(screen.queryByText('Remove incomplete sets and submit?')).toBeNull();
+    expect(mockCompleteSessionDraft).not.toHaveBeenCalled();
   });
 
   it('loads completed-edit mode, validates end time, and saves changes back to the list', async () => {

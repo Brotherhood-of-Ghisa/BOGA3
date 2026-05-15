@@ -9,6 +9,7 @@ module.exports = defineConfig([
     settings: {
       'import/core-modules': [
         '@supabase/supabase-js',
+        'expo-application',
         'expo-secure-store',
         'react-native-url-polyfill/auto',
       ],

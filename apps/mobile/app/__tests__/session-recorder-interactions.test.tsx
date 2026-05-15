@@ -471,7 +471,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     await act(async () => {});
   });
 
-  it('constrains set inputs and uses visual-only invalid cues for non-positive values', async () => {
+  it('constrains set inputs and allows zero weight while keeping zero reps invalid', async () => {
     render(<SessionRecorderScreen />);
 
     fireEvent.press(screen.getByText('Log new exercise'));
@@ -488,9 +488,9 @@ describe('SessionRecorderScreen exercise interactions', () => {
     fireEvent.changeText(screen.getByLabelText(weightInputLabel), '0');
     fireEvent.changeText(screen.getByLabelText(repsInputLabel), '0');
 
-    const invalidWeightStyle = StyleSheet.flatten(screen.getByLabelText(weightInputLabel).props.style);
+    const zeroWeightStyle = StyleSheet.flatten(screen.getByLabelText(weightInputLabel).props.style);
     const invalidRepsStyle = StyleSheet.flatten(screen.getByLabelText(repsInputLabel).props.style);
-    expect(invalidWeightStyle.borderColor).toBe(uiColors.actionDangerSubtleBorder);
+    expect(zeroWeightStyle.borderColor).toBe(uiColors.borderDefault);
     expect(invalidRepsStyle.borderColor).toBe(uiColors.actionDangerSubtleBorder);
 
     fireEvent.changeText(screen.getByLabelText(weightInputLabel), '135.5');
@@ -500,6 +500,27 @@ describe('SessionRecorderScreen exercise interactions', () => {
     const validRepsStyle = StyleSheet.flatten(screen.getByLabelText(repsInputLabel).props.style);
     expect(validWeightStyle.borderColor).toBe(uiColors.borderDefault);
     expect(validRepsStyle.borderColor).toBe(uiColors.borderDefault);
+
+    await act(async () => {});
+  });
+
+  it('defaults a new set from the previous set in the same exercise', async () => {
+    render(<SessionRecorderScreen />);
+
+    fireEvent.press(screen.getByText('Log new exercise'));
+    fireEvent.press(await screen.findByLabelText('Select exercise Barbell Squat'));
+
+    const firstSetTypeButton = screen.getByTestId('set-type-button-1-1');
+    fireEvent.press(firstSetTypeButton);
+    fireEvent.press(firstSetTypeButton);
+    fireEvent.changeText(screen.getByLabelText('Weight for exercise 1 set 1'), '135.5');
+    fireEvent.changeText(screen.getByLabelText('Reps for exercise 1 set 1'), '8');
+
+    fireEvent.press(screen.getByLabelText('Add set to exercise 1'));
+
+    expect(screen.getByLabelText('Weight for exercise 1 set 2').props.value).toBe('135.5');
+    expect(screen.getByLabelText('Reps for exercise 1 set 2').props.value).toBe('8');
+    expect(screen.getAllByText('R0')).toHaveLength(2);
 
     await act(async () => {});
   });

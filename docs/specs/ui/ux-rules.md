@@ -92,8 +92,9 @@ Document app-specific UI semantics and guardrails for the current mobile app.
 11. In `session-recorder`, logged sets render as in-card rows with a header row (`Type`, `Weight`, `Reps`) instead of per-set subcards, and set numeric validation uses visual cues only (no inline validation text):
     - The left square `Type` button cycles set type on tap in this order: `None -> WU -> R0 -> R1 -> R2 -> None`.
     - Long-pressing the `Type` button opens an in-route modal picker with explicit options (`None`, `Warm-up`, `RIR 0`, `RIR 1`, `RIR 2`).
-    - `Weight` accepts decimal numeric input and must be a positive number.
+    - `Weight` accepts decimal numeric input and must be a non-negative number.
     - `Reps` accepts integer numeric input and must be a positive integer.
+    - Adding a set to an exercise copies the previous set's `Weight`, `Reps`, and `Type` values, while assigning the new row its own identity.
 
 ### 6. Loading, empty, error, and feedback state handling
 

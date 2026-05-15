@@ -275,6 +275,19 @@ function createEmptySet(): SessionSet {
   };
 }
 
+function createSetFromPrevious(previousSet: SessionSet | undefined): SessionSet {
+  if (!previousSet) {
+    return createEmptySet();
+  }
+
+  return {
+    id: createSetId(),
+    reps: previousSet.reps,
+    weight: previousSet.weight,
+    setType: normalizeSessionSetType(previousSet.setType),
+  };
+}
+
 const SET_TYPE_CYCLE_ORDER: SessionSetTypeValue[] = [null, ...SESSION_SET_TYPES];
 const SET_TYPE_SHORT_LABELS: Record<SessionSetType, string> = {
   warm_up: 'WU',
@@ -313,14 +326,14 @@ const constrainSetFieldInput = (field: SetFieldName, value: string): string | nu
   return REPS_INPUT_PATTERN.test(value) ? value : null;
 };
 
-const isPositiveDecimalInput = (value: string): boolean => {
+const isNonNegativeDecimalInput = (value: string): boolean => {
   const trimmed = value.trim();
   if (trimmed.length === 0) {
     return true;
   }
 
   const parsed = Number(trimmed);
-  return Number.isFinite(parsed) && parsed > 0;
+  return Number.isFinite(parsed) && parsed >= 0;
 };
 
 const isPositiveIntegerInput = (value: string): boolean => {
@@ -338,7 +351,7 @@ const isPositiveIntegerInput = (value: string): boolean => {
 };
 
 const hasSetFieldValidationError = (field: SetFieldName, value: string): boolean =>
-  field === 'weight' ? !isPositiveDecimalInput(value) : !isPositiveIntegerInput(value);
+  field === 'weight' ? !isNonNegativeDecimalInput(value) : !isPositiveIntegerInput(value);
 
 const sessionHasInvalidSetValues = (session: Session): boolean =>
   session.exercises.some((exercise) =>
@@ -1296,7 +1309,9 @@ export default function SessionRecorderScreen() {
       session: {
         ...current.session,
         exercises: current.session.exercises.map((exercise) =>
-          exercise.id === exerciseId ? { ...exercise, sets: [...exercise.sets, createEmptySet()] } : exercise
+          exercise.id === exerciseId
+            ? { ...exercise, sets: [...exercise.sets, createSetFromPrevious(exercise.sets[exercise.sets.length - 1])] }
+            : exercise
         ),
       },
     }));

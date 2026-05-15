@@ -17,7 +17,7 @@ export default ({ config }: { config: ExpoConfig }) => ({
         infoPlist: {
             ITSAppUsesNonExemptEncryption: false
         },
-        bundleIdentifier: process.env.IOS_BUNDLE_ID,
+        bundleIdentifier: process.env.IOS_BUNDLE_ID ?? "com.anonymous.boga3",
         buildNumber: process.env.IOS_BUILD_NUMBER ?? "1"
     },
 

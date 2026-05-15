@@ -67,17 +67,19 @@ maestro_runtime_artifact_root() {
 }
 
 maestro_current_app_scheme() {
-  node -e '
+  (
+    cd "$APP_DIR"
+    npx expo config --json
+  ) | node -e '
     const fs = require("fs");
-    const path = process.argv[1];
-    const config = JSON.parse(fs.readFileSync(path, "utf8"));
-    const scheme = config?.expo?.scheme;
+    const config = JSON.parse(fs.readFileSync(0, "utf8"));
+    const scheme = config?.scheme;
     if (Array.isArray(scheme)) {
       console.log(String(scheme[0] ?? ""));
       process.exit(0);
     }
     console.log(typeof scheme === "string" ? scheme : "");
-  ' "$APP_DIR/app.json"
+  '
 }
 
 maestro_urlencode() {
