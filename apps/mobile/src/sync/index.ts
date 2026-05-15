@@ -31,6 +31,7 @@ export {
   listPendingSyncEvents,
   markSyncAttemptStarted,
   recordSyncTransportFailure,
+  resetSyncStreamForBootstrap,
   SYNC_BACKOFF_INITIAL_DELAY_MS,
   SYNC_BACKOFF_JITTER_RATIO,
   SYNC_BACKOFF_MAX_DELAY_MS,

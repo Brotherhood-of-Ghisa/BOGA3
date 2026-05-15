@@ -8,6 +8,7 @@ const mockFlushSyncOutbox = jest.fn();
 const mockSetSyncIngestTransport = jest.fn();
 const mockRunSyncBootstrapMerge = jest.fn();
 const mockClearSyncRetryState = jest.fn();
+const mockResetSyncStreamForBootstrap = jest.fn();
 
 jest.mock('@/src/data/bootstrap', () => ({
   bootstrapLocalDataLayer: (...args: unknown[]) => mockBootstrapLocalDataLayer(...args),
@@ -33,11 +34,13 @@ jest.mock('@/src/sync/bootstrap', () => ({
 
 jest.mock('@/src/sync/outbox', () => ({
   clearSyncRetryState: (...args: unknown[]) => mockClearSyncRetryState(...args),
+  resetSyncStreamForBootstrap: (...args: unknown[]) => mockResetSyncStreamForBootstrap(...args),
 }));
 
 import {
   __resetSyncRuntimeForTests,
   BOOTSTRAP_COOLDOWN_MS,
+  BOOTSTRAP_CONVERGENCE_MAX_ATTEMPTS,
   flushSyncOutboxUntilSettled,
   getSyncRuntimeState,
   setSyncEnabled,
@@ -93,6 +96,7 @@ describe('sync runtime bootstrap trigger', () => {
     mockSetSyncIngestTransport.mockReset();
     mockRunSyncBootstrapMerge.mockReset();
     mockClearSyncRetryState.mockReset();
+    mockResetSyncStreamForBootstrap.mockReset();
 
     const tx = {
       select: jest.fn(() => ({
@@ -174,6 +178,7 @@ describe('sync runtime bootstrap trigger', () => {
     });
     mockFlushSyncOutbox.mockResolvedValue({ status: 'idle' });
     mockClearSyncRetryState.mockResolvedValue(undefined);
+    mockResetSyncStreamForBootstrap.mockResolvedValue(undefined);
 
     await __resetSyncRuntimeForTests();
   });
@@ -204,6 +209,19 @@ describe('sync runtime bootstrap trigger', () => {
     await setSyncEnabled(true);
 
     expect(mockClearSyncRetryState).toHaveBeenCalledTimes(1);
+  });
+
+  it('starts bootstrap convergence from a fresh local stream before queueing merge events', async () => {
+    startSyncRuntime();
+    await flushAsync();
+
+    await setSyncEnabled(true);
+    await flushAsync();
+
+    expect(mockResetSyncStreamForBootstrap).toHaveBeenCalledTimes(1);
+    expect(mockResetSyncStreamForBootstrap.mock.invocationCallOrder[0]).toBeLessThan(
+      mockRunSyncBootstrapMerge.mock.invocationCallOrder[0]
+    );
   });
 
   it('defers bootstrap until login when sync was enabled while logged out', async () => {
@@ -385,6 +403,21 @@ describe('flushSyncOutboxUntilSettled (bug 1)', () => {
     const result = await flushSyncOutboxUntilSettled({ flush, awaitInFlight: () => null });
 
     expect(result.status).toBe('not_converged');
+  });
+
+  it('has enough default attempts to drain a seeded catalog bootstrap', async () => {
+    const flush = jest
+      .fn<Promise<SyncFlushResult>, []>()
+      .mockImplementation(async () =>
+        flush.mock.calls.length <= 21 ? { status: 'success', sentCount: 100 } : { status: 'idle' }
+      );
+
+    const result = await flushSyncOutboxUntilSettled({ flush, awaitInFlight: () => null });
+
+    expect(BOOTSTRAP_CONVERGENCE_MAX_ATTEMPTS).toBeGreaterThanOrEqual(22);
+    expect(result.status).toBe('converged');
+    expect(result.totalSentCount).toBe(2100);
+    expect(flush).toHaveBeenCalledTimes(22);
   });
 });
 

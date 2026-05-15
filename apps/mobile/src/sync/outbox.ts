@@ -427,10 +427,14 @@ export const clearSyncRetryState = async (options: { now?: Date } = {}) => {
   });
 };
 
-export const __resetSyncStateForTests = async () => {
+export const resetSyncStreamForBootstrap = async () => {
   const database = await bootstrapLocalDataLayer();
   database.transaction((tx) => {
     tx.delete(syncOutboxEvents).run();
     tx.delete(syncDeliveryState).run();
   });
+};
+
+export const __resetSyncStateForTests = async () => {
+  await resetSyncStreamForBootstrap();
 };

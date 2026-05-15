@@ -15,7 +15,7 @@ import {
   type SyncIngestTransport,
 } from './engine';
 import { runSyncBootstrapMerge, type SyncBootstrapMergeResult } from './bootstrap';
-import { clearSyncRetryState } from './outbox';
+import { clearSyncRetryState, resetSyncStreamForBootstrap } from './outbox';
 import type { SyncIngestResponse } from './types';
 
 type RuntimeStateTx = Pick<LocalDatabase, 'insert' | 'select' | 'update'>;
@@ -45,6 +45,8 @@ export type SyncBootstrapRunResult = {
   mergeResult: SyncBootstrapMergeResult;
   convergenceResult: SyncConvergenceResult;
 };
+
+export const BOOTSTRAP_CONVERGENCE_MAX_ATTEMPTS = 50;
 
 const normalizeSyncRuntimeState = (
   row: typeof syncRuntimeState.$inferSelect
@@ -264,6 +266,8 @@ const runBootstrapForSession = async (client: SupabaseClient, session: Session):
     await updateRuntimeState({ lastBootstrapAttemptAt: now }, { now });
 
     try {
+      await resetSyncStreamForBootstrap();
+
       const mergeResult = await runSyncBootstrapMerge({
         client,
         now,
@@ -377,7 +381,7 @@ export const flushSyncOutboxUntilSettled = async (
 ): Promise<SyncConvergenceResult> => {
   const flush = options.flush ?? (() => flushSyncOutbox());
   const awaitInFlight = options.awaitInFlight ?? (() => getInFlightFlushPromise());
-  const maxAttempts = Math.max(1, Math.floor(options.maxAttempts ?? 20));
+  const maxAttempts = Math.max(1, Math.floor(options.maxAttempts ?? BOOTSTRAP_CONVERGENCE_MAX_ATTEMPTS));
 
   let totalSentCount = 0;
   let attempts = 0;

@@ -94,9 +94,10 @@ Source-of-truth implementation files:
 
 1. User enables sync (persisted in `sync_runtime_state`).
 2. Runtime checks auth session + enablement, configures ingest transport, and runs bootstrap when required for the current user.
-3. Bootstrap fetches remote projection state, merges with local state deterministically, and enqueues local convergence events for local winners.
-4. Runtime flushes until terminal state (`idle` = converged; non-idle terminal statuses remain retryable/non-blocking).
-5. On convergence success, runtime records bootstrap completion metadata for the authenticated user.
+3. Runtime resets the local outbox/delivery stream before the bootstrap merge so convergence starts from sequence `1` with a fresh `device_id`; this avoids leaking stale per-device sequence state across auth users or backend stream resets.
+4. Bootstrap fetches remote projection state, merges with local state deterministically, and enqueues local convergence events for local winners.
+5. Runtime flushes until terminal state (`idle` = converged; non-idle terminal statuses remain retryable/non-blocking). The default convergence loop allows enough batches to drain the seeded exercise catalog.
+6. On convergence success, runtime records bootstrap completion metadata for the authenticated user.
 
 ## 3) Interactions with the rest of the application
 
@@ -167,6 +168,7 @@ Source-of-truth implementation files:
 10. Repeat behavior after interrupted bootstrap
 - repeated bootstrap runs are expected and safe for convergence; merge selection is deterministic (`updated_at` winner with local tie-break).
 - M13 does not use a separate bootstrap-run idempotency token; safety is based on deterministic merge plus idempotent/overwrite-safe projection semantics for repeated equivalent events.
+- before enqueueing convergence events, the runtime resets the local outbox/delivery stream, creating a fresh per-device stream for the retry. This avoids stale local sequence numbers blocking a backend owner/device stream that expects sequence `1`.
 - a rerun can enqueue convergence events again if bootstrap had not been marked completed; this is acceptable under the at-least-once sync model.
 
 11. App/process interruption during post-bootstrap outbox flush
