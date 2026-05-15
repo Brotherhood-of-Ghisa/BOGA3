@@ -1,5 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 
 import { uiColors } from '@/components/ui';
 import {
@@ -310,7 +320,9 @@ export function ExerciseEditorModal({
 
   return (
     <Modal animationType="slide" transparent visible={visible} onRequestClose={closeEditorModal}>
-      <View style={styles.modalRoot}>
+      <KeyboardAvoidingView
+        style={styles.modalRoot}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <Pressable
           accessibilityLabel="Dismiss exercise editor overlay"
           style={styles.modalOverlay}
@@ -510,7 +522,7 @@ export function ExerciseEditorModal({
             </View>
           </View>
         ) : null}
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

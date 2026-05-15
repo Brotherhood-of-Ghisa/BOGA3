@@ -1,6 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
-import { AppState, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  AppState,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 
 import { ExerciseEditorModal } from '@/components/exercise-catalog/exercise-editor-modal';
 import { SessionContentLayout } from '@/components/session-recorder/session-content-layout';
@@ -1830,7 +1841,14 @@ export default function SessionRecorderScreen() {
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.content} testID="session-recorder-screen">
+    <KeyboardAvoidingView
+      style={styles.keyboardAvoidingRoot}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <ScrollView
+        automaticallyAdjustKeyboardInsets
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        testID="session-recorder-screen">
       {routeMode === 'completed-edit' ? (
         <View style={styles.completedEditMetadataCard}>
           <View style={styles.completedEditMetadataRow}>
@@ -2127,7 +2145,9 @@ export default function SessionRecorderScreen() {
         transparent
         visible={state.gymPickerVisible}
         onRequestClose={dismissGymModal}>
-        <View style={styles.modalContainer}>
+        <KeyboardAvoidingView
+          style={styles.modalContainer}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <Pressable
             accessibilityLabel="Dismiss gym modal overlay"
             style={styles.modalBackdrop}
@@ -2229,7 +2249,7 @@ export default function SessionRecorderScreen() {
               </>
             ) : null}
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       <Modal
@@ -2237,7 +2257,9 @@ export default function SessionRecorderScreen() {
         transparent
         visible={state.exercisePickerVisible}
         onRequestClose={dismissExerciseModal}>
-        <View style={styles.modalContainer}>
+        <KeyboardAvoidingView
+          style={styles.modalContainer}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <Pressable
             accessibilityLabel="Dismiss exercise modal overlay"
             style={styles.modalBackdrop}
@@ -2297,7 +2319,7 @@ export default function SessionRecorderScreen() {
             </ScrollView>
 
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       <ExerciseEditorModal
@@ -2314,7 +2336,9 @@ export default function SessionRecorderScreen() {
         transparent
         visible={isTagModalVisible}
         onRequestClose={dismissTagModal}>
-        <View style={styles.modalContainer}>
+        <KeyboardAvoidingView
+          style={styles.modalContainer}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <Pressable
             accessibilityLabel="Dismiss add tag modal overlay"
             style={styles.modalBackdrop}
@@ -2521,7 +2545,7 @@ export default function SessionRecorderScreen() {
               </>
             ) : null}
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       <Modal
@@ -2548,11 +2572,15 @@ export default function SessionRecorderScreen() {
           </View>
         </View>
       </Modal>
-    </ScrollView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
+  keyboardAvoidingRoot: {
+    flex: 1,
+  },
   content: {
     padding: 20,
     gap: 20,
