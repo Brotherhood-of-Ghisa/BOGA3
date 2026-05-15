@@ -125,6 +125,10 @@ Implementation note (`M13-T03`):
 | `exercise_tag_definitions` | `upsert`, `delete` | `delete` is soft-delete; undelete uses `upsert` |
 | `session_exercise_tags` | `attach`, `detach` | `attach` can recreate a previously detached edge |
 
+Projection note:
+
+- Soft-delete events for missing projection rows are idempotent no-ops for soft-deletable entities (`gyms`, `sessions`, `session_exercises`, `exercise_sets`, `exercise_definitions`, `exercise_tag_definitions`). This supports bootstrap/convergence retries against fresh or partially-cleared remote state.
+
 ### Canonical ingest response envelope
 
 Success response:

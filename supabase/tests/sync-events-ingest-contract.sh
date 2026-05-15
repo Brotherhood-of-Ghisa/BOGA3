@@ -179,6 +179,44 @@ BATCH_3="batch-${RUN_TAG}-3"
 BATCH_4="batch-${RUN_TAG}-4"
 BATCH_5="batch-${RUN_TAG}-5"
 
+MISSING_DELETE_DEVICE_ID="sync-device-missing-delete-${RUN_TAG}"
+MISSING_DELETE_SESSION_ID="sync-session-missing-delete-${RUN_TAG}"
+MISSING_DELETE_EVENT_ID="event-missing-delete-${RUN_TAG}-1"
+MISSING_DELETE_BATCH_ID="batch-missing-delete-${RUN_TAG}"
+
+MISSING_DELETE_EVENTS="$(jq -nc \
+  --arg event_id "${MISSING_DELETE_EVENT_ID}" \
+  --arg session_id "${MISSING_DELETE_SESSION_ID}" \
+  --argjson ts "$((BASE_MS + 50))" \
+  '[
+    {
+      event_id: $event_id,
+      sequence_in_device: 1,
+      occurred_at_ms: $ts,
+      entity_type: "sessions",
+      entity_id: $session_id,
+      event_type: "delete",
+      payload: {
+        id: $session_id,
+        deleted_at_ms: $ts,
+        updated_at_ms: $ts
+      }
+    }
+  ]')"
+MISSING_DELETE_REQUEST="$(jq -nc \
+  --arg device_id "${MISSING_DELETE_DEVICE_ID}" \
+  --arg batch_id "${MISSING_DELETE_BATCH_ID}" \
+  --argjson sent_at_ms "$((BASE_MS + 50))" \
+  --argjson events "${MISSING_DELETE_EVENTS}" \
+  '{device_id: $device_id, batch_id: $batch_id, sent_at_ms: $sent_at_ms, events: $events}')"
+rpc_sync_events_ingest "${USER_A_TOKEN}" "${MISSING_DELETE_REQUEST}"
+assert_status "200" "missing session delete ingest status"
+assert_json_expr '.status == "SUCCESS"' "missing session delete is idempotent success"
+
+postgrest_select "sync_ingested_events" "device_id=eq.${MISSING_DELETE_DEVICE_ID}&select=event_id,sequence_in_device" "${USER_A_TOKEN}"
+assert_status "200" "missing session delete metadata read"
+assert_json_expr --arg event_id "${MISSING_DELETE_EVENT_ID}" 'length == 1 and .[0].event_id == $event_id and .[0].sequence_in_device == 1' "missing session delete metadata persisted"
+
 EVENTS_SUCCESS="$(jq -nc \
   --arg event_1 "${EVENT_ID_1}" \
   --arg event_2 "${EVENT_ID_2}" \
