@@ -171,7 +171,7 @@ const createFakeDatabase = () => {
 };
 
 describe('resetLocalDataAndReseed (T8 — dev reset path)', () => {
-  it('refuses to run outside __DEV__', async () => {
+  it('refuses to run outside dev mode', async () => {
     const fake = createFakeDatabase();
 
     await expect(

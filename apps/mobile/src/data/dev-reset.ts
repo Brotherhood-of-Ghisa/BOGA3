@@ -1,3 +1,5 @@
+import { isDevMode } from '@/src/utils/isDevMode';
+
 import { bootstrapLocalDataLayer, type LocalDatabase } from './bootstrap';
 import {
   __clearSeedsAppliedMarkerForReset,
@@ -17,20 +19,8 @@ import {
   syncOutboxEvents,
 } from './schema';
 
-/**
- * Dev-only environment guard. We accept an explicit override for tests so
- * the helper can be exercised under Jest where `__DEV__` is typically true
- * anyway, but mobile callers must rely on `__DEV__`.
- */
-const isDevEnvironment = (): boolean => {
-  if (typeof __DEV__ === 'undefined') {
-    return false;
-  }
-  return __DEV__ === true;
-};
-
 export type ResetLocalDataAndReseedOptions = {
-  /** Override `__DEV__` for tests. Production callers must not pass this. */
+  /** Override the dev-mode check for tests. Production callers must not pass this. */
   isDev?: boolean;
   /** Override the bootstrap helper for tests. */
   bootstrap?: () => Promise<LocalDatabase>;
@@ -60,12 +50,12 @@ export type ResetLocalDataAndReseedResult = {
  * also want to clear sync runtime state should follow up with
  * `stopSyncRuntime()` / engine reset themselves.
  *
- * Throws synchronously when invoked outside `__DEV__`.
+ * Throws synchronously when invoked outside dev mode (see `isDevMode`).
  */
 export const resetLocalDataAndReseed = async (
   options: ResetLocalDataAndReseedOptions = {}
 ): Promise<ResetLocalDataAndReseedResult> => {
-  const isDev = options.isDev ?? isDevEnvironment();
+  const isDev = options.isDev ?? isDevMode();
   if (!isDev) {
     throw new Error(
       'resetLocalDataAndReseed is a developer-only helper and must not run in release builds.'

@@ -4,6 +4,11 @@ jest.mock('@/src/data', () => ({
   resetLocalAppData: jest.fn(),
 }));
 
+const mockIsDevMode = jest.fn<boolean, []>();
+jest.mock('@/src/utils/isDevMode', () => ({
+  isDevMode: () => mockIsDevMode(),
+}));
+
 import { ExecutionEnvironment } from 'expo-constants';
 
 import { resetLocalAppData } from '@/src/data';
@@ -22,6 +27,8 @@ describe('maestro harness helpers', () => {
   beforeEach(() => {
     mockResetLocalAppData.mockReset();
     mockResetLocalAppData.mockResolvedValue(undefined as never);
+    mockIsDevMode.mockReset();
+    mockIsDevMode.mockReturnValue(false);
   });
 
   it('allows the harness only in non-store-client development contexts', () => {
@@ -44,6 +51,18 @@ describe('maestro harness helpers', () => {
         isDev: false,
         executionEnvironment: ExecutionEnvironment.Standalone,
       })
+    ).toBe(false);
+  });
+
+  it('defaults the dev check to isDevMode() when isDev is omitted', () => {
+    mockIsDevMode.mockReturnValue(true);
+    expect(
+      isMaestroHarnessAllowed({ executionEnvironment: ExecutionEnvironment.Standalone })
+    ).toBe(true);
+
+    mockIsDevMode.mockReturnValue(false);
+    expect(
+      isMaestroHarnessAllowed({ executionEnvironment: ExecutionEnvironment.Standalone })
     ).toBe(false);
   });
 

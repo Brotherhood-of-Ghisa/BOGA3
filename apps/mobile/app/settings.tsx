@@ -4,8 +4,7 @@ import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { UiButton, UiSurface, UiText, uiBorder, uiColors, uiRadius, uiSpace } from '@/components/ui';
 import { resetLocalDataAndReseed } from '@/src/data';
-
-const isDevBuild = typeof __DEV__ !== 'undefined' && __DEV__;
+import { isDevMode } from '@/src/utils/isDevMode';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -81,7 +80,7 @@ export default function SettingsScreen() {
         </UiSurface>
       </Pressable>
 
-      {isDevBuild ? (
+      {isDevMode() ? (
         <UiSurface style={styles.devCard} testID="settings-dev-tools-card">
           <UiText selectable variant="labelStrong">
             Developer tools

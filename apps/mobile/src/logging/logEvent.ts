@@ -3,6 +3,7 @@ import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
 import { getSupabaseMobileClient } from '@/src/auth/supabase';
+import { isDevMode } from '@/src/utils/isDevMode';
 
 type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 type LogSource = 'app' | 'backend' | 'database' | 'sync' | 'auth';
@@ -134,7 +135,7 @@ export const logEvent = async ({
       throw error;
     }
   } catch (error) {
-    if (typeof __DEV__ !== 'undefined' && __DEV__) {
+    if (isDevMode()) {
       console.warn('[logging] app log insert failed', error);
     }
     // Logging must never interrupt auth, sync, or local-first app flows.

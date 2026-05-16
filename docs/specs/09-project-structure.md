@@ -108,6 +108,10 @@ Define the canonical repository structure, path ownership, and placement convent
 - `apps/mobile/src/auth/` (introduced in M11)
   - canonical location for shared mobile auth modules.
   - keep Supabase auth bootstrap/session/provider code here rather than scattering route-local client wiring under `app/**`.
+- `apps/mobile/src/utils/isDevMode.ts`
+  - canonical dev-mode guard for the mobile app.
+  - returns `true` for Metro dev bundles (`__DEV__`) **and** for the `com.phano.boga3.dev` EAS build (TestFlight dev), so developer-only UI / escape hatches (e.g. the local-data reset on the Settings screen, the Maestro harness route) stay available on internal builds.
+  - **Never use `__DEV__` directly** outside this file — production-bundled TestFlight builds set it to `false`, and a `no-restricted-syntax` ESLint rule will reject it. Import `isDevMode` from `@/src/utils/isDevMode` instead.
 - `e2e/` (reserved)
   - reserved for cross-stack orchestration/tests that span mobile + backend.
   - strategy may be documented before implementation exists.

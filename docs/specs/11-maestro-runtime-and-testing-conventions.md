@@ -379,7 +379,7 @@ Priority rule:
    - `reset=data` to perform app-owned persisted-data reset;
    - `teleport=session-list|session-recorder|exercise-catalog|completed-session` to land on the target screen;
    - optional `mode`, `intent`, and `sessionId` when the target route needs them.
-4. The route is guarded by `__DEV__ && Constants.executionEnvironment !== storeClient`; blocked contexts render an error state instead of executing reset/setup behavior.
+4. The route is guarded by `isDevMode() && Constants.executionEnvironment !== storeClient` (see `apps/mobile/src/utils/isDevMode.ts` — `isDevMode()` is `true` for Metro dev bundles **and** for the `com.phano.boga3.dev` build, i.e. TestFlight dev); blocked contexts render an error state instead of executing reset/setup behavior. Never reach for `__DEV__` directly — it is `false` on TestFlight, and the lint rule will reject it.
 5. Harness-driven setup is preferred to visible UI tapping whenever the flow is not explicitly testing that setup UI.
 
 ## Brainstorm adoption summary

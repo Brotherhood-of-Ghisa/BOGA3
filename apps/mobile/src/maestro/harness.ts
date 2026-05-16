@@ -2,6 +2,7 @@ import type { Href } from 'expo-router';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 
 import { resetLocalAppData } from '@/src/data';
+import { isDevMode } from '@/src/utils/isDevMode';
 
 export type MaestroHarnessResetMode = 'none' | 'data';
 export type MaestroHarnessTeleportTarget =
@@ -19,7 +20,7 @@ export const coerceMaestroHarnessQueryParam = (value: string | string[] | undefi
 };
 
 export const isMaestroHarnessAllowed = ({
-  isDev = __DEV__,
+  isDev = isDevMode(),
   executionEnvironment = Constants.executionEnvironment,
 }: {
   isDev?: boolean;
