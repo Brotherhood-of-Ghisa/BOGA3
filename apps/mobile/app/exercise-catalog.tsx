@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View, type ListRenderItem } from 'react-native';
 
 import { ExerciseEditorModal } from '@/components/exercise-catalog/exercise-editor-modal';
 import { TopLevelTabs } from '@/components/navigation/top-level-tabs';
@@ -64,6 +64,66 @@ const formatExerciseMuscleSummary = (
 
   return `${primaryLabel} · ${secondaryMappings.length} secondaries`;
 };
+
+const SEARCH_DEBOUNCE_MS = 150;
+
+const useDebouncedValue = <T,>(value: T, delayMs: number): T => {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedValue(value), delayMs);
+    return () => clearTimeout(handle);
+  }, [value, delayMs]);
+
+  return debouncedValue;
+};
+
+const ExerciseRowSeparator = () => <View style={styles.exerciseListRowSeparator} />;
+
+type ExerciseRowProps = {
+  exercise: ExerciseCatalogExercise;
+  muscleGroupById: Map<string, ExerciseCatalogMuscleGroup>;
+  onPressEdit: (exercise: ExerciseCatalogExercise) => void;
+  onPressActions: (exercise: ExerciseCatalogExercise) => void;
+};
+
+const ExerciseRow = memo(function ExerciseRow({
+  exercise,
+  muscleGroupById,
+  onPressEdit,
+  onPressActions,
+}: ExerciseRowProps) {
+  return (
+    <View style={styles.exerciseListRow}>
+      <Pressable
+        accessibilityLabel={`Edit exercise definition ${exercise.name}`}
+        style={styles.exerciseListRowMainPressable}
+        onPress={() => onPressEdit(exercise)}>
+        <View style={styles.exerciseListRowTextStack}>
+          <View style={styles.exerciseListRowTitleRow}>
+            <Text numberOfLines={1} style={styles.exerciseListRowTitle}>
+              {exercise.name}
+            </Text>
+            {exercise.deletedAt ? (
+              <Text selectable style={styles.deletedExerciseChip}>
+                Deleted
+              </Text>
+            ) : null}
+          </View>
+          <Text numberOfLines={1} style={styles.exerciseListRowMuscleSummary}>
+            {formatExerciseMuscleSummary(exercise, muscleGroupById)}
+          </Text>
+        </View>
+      </Pressable>
+      <Pressable
+        accessibilityLabel={`Exercise actions ${exercise.name}`}
+        style={styles.exerciseRowKebabButton}
+        onPress={() => onPressActions(exercise)}>
+        <Text style={styles.exerciseRowKebabText}>⋮</Text>
+      </Pressable>
+    </View>
+  );
+});
 
 export default function ExerciseCatalogScreen() {
   const router = useRouter();
@@ -144,14 +204,54 @@ export default function ExerciseCatalogScreen() {
     }, [showDeletedExercises])
   );
 
-  const muscleGroupById = new Map(muscleGroups.map((muscleGroup) => [muscleGroup.id, muscleGroup]));
-  const muscleGroupsByIdRecord = indexExerciseCatalogMuscleGroupsById(muscleGroups);
-  const filteredExercises = filterExerciseCatalogExercises(exercises, muscleGroupsByIdRecord, exerciseSearchValue);
-  const openEditorForExercise = (exercise: ExerciseCatalogExercise) => {
+  const debouncedExerciseSearchValue = useDebouncedValue(exerciseSearchValue, SEARCH_DEBOUNCE_MS);
+
+  const muscleGroupById = useMemo(
+    () => new Map(muscleGroups.map((muscleGroup) => [muscleGroup.id, muscleGroup])),
+    [muscleGroups]
+  );
+  const muscleGroupsByIdRecord = useMemo(
+    () => indexExerciseCatalogMuscleGroupsById(muscleGroups),
+    [muscleGroups]
+  );
+  const filteredExercises = useMemo(
+    () => filterExerciseCatalogExercises(exercises, muscleGroupsByIdRecord, debouncedExerciseSearchValue),
+    [exercises, muscleGroupsByIdRecord, debouncedExerciseSearchValue]
+  );
+
+  const openEditorForExercise = useCallback((exercise: ExerciseCatalogExercise) => {
     setEditorExerciseTarget(exercise);
     setSaveFeedback(null);
     setIsEditorModalVisible(true);
-  };
+  }, []);
+
+  const handlePressEditRow = useCallback(
+    (exercise: ExerciseCatalogExercise) => {
+      if (exercise.deletedAt) {
+        return;
+      }
+      openEditorForExercise(exercise);
+    },
+    [openEditorForExercise]
+  );
+
+  const handlePressRowActions = useCallback((exercise: ExerciseCatalogExercise) => {
+    setExerciseActionMenuTarget(exercise);
+  }, []);
+
+  const renderExerciseRow = useCallback<ListRenderItem<ExerciseCatalogExercise>>(
+    ({ item }) => (
+      <ExerciseRow
+        exercise={item}
+        muscleGroupById={muscleGroupById}
+        onPressEdit={handlePressEditRow}
+        onPressActions={handlePressRowActions}
+      />
+    ),
+    [muscleGroupById, handlePressEditRow, handlePressRowActions]
+  );
+
+  const keyExtractor = useCallback((item: ExerciseCatalogExercise) => item.id, []);
 
   const startNewExercise = () => {
     setEditorExerciseTarget(null);
@@ -312,58 +412,28 @@ export default function ExerciseCatalogScreen() {
         ) : null}
       </View>
 
-      <ScrollView
+      <FlatList
         style={styles.scroll}
+        data={filteredExercises}
+        keyExtractor={keyExtractor}
+        renderItem={renderExerciseRow}
+        ItemSeparatorComponent={ExerciseRowSeparator}
         contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={styles.content}>
-        <View style={styles.list}>
-          {filteredExercises.map((exercise) => (
-            <View key={exercise.id} style={styles.exerciseListRow}>
-              <Pressable
-                accessibilityLabel={`Edit exercise definition ${exercise.name}`}
-                style={styles.exerciseListRowMainPressable}
-                onPress={() => {
-                  if (exercise.deletedAt) {
-                    return;
-                  }
-                  openEditorForExercise(exercise);
-                }}>
-                <View style={styles.exerciseListRowTextStack}>
-                  <View style={styles.exerciseListRowTitleRow}>
-                    <Text numberOfLines={1} style={styles.exerciseListRowTitle}>
-                      {exercise.name}
-                    </Text>
-                    {exercise.deletedAt ? (
-                      <Text selectable style={styles.deletedExerciseChip}>
-                        Deleted
-                      </Text>
-                    ) : null}
-                  </View>
-                  <Text numberOfLines={1} style={styles.exerciseListRowMuscleSummary}>
-                    {formatExerciseMuscleSummary(exercise, muscleGroupById)}
-                  </Text>
-                </View>
-              </Pressable>
-              <Pressable
-                accessibilityLabel={`Exercise actions ${exercise.name}`}
-                style={styles.exerciseRowKebabButton}
-                onPress={() => setExerciseActionMenuTarget(exercise)}>
-                <Text style={styles.exerciseRowKebabText}>⋮</Text>
-              </Pressable>
-            </View>
-          ))}
-
-          {filteredExercises.length === 0 ? (
-            <Text selectable style={styles.helperText}>
-              {exercises.length === 0
-                ? showDeletedExercises
-                  ? 'No exercises found for this filter.'
-                  : 'No active exercises yet. Create one with the button above.'
-                : 'No exercises match that filter.'}
-            </Text>
-          ) : null}
-        </View>
-      </ScrollView>
+        contentContainerStyle={styles.content}
+        initialNumToRender={16}
+        maxToRenderPerBatch={16}
+        windowSize={9}
+        removeClippedSubviews
+        ListEmptyComponent={
+          <Text selectable style={styles.helperText}>
+            {exercises.length === 0
+              ? showDeletedExercises
+                ? 'No exercises found for this filter.'
+                : 'No active exercises yet. Create one with the button above.'
+              : 'No exercises match that filter.'}
+          </Text>
+        }
+      />
 
       <ExerciseEditorModal
         visible={isEditorModalVisible}
@@ -582,8 +652,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 8,
   },
-  list: {
-    gap: 8,
+  exerciseListRowSeparator: {
+    height: 8,
   },
   helperText: {
     fontSize: 13,
