@@ -5,11 +5,22 @@
   },
   "build": {
     "dev": {
+      "developmentClient": true,
       "autoIncrement": true,
       "environment": "development",
       "ios": {
         "distribution": "store"
       },
+      "env": {
+        "APP_ENV": "dev",
+        "APP_NAME": "Boga3 Dev",
+        "IOS_BUNDLE_ID": "com.phano.boga3.dev"
+      }
+    },
+    "dev-internal": {
+      "developmentClient": true,
+      "environment": "development",
+      "distribution": "internal",
       "env": {
         "APP_ENV": "dev",
         "APP_NAME": "Boga3 Dev",
