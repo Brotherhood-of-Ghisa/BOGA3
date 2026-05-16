@@ -143,6 +143,7 @@ Planned task cards for M6 are listed below.
 4. `docs/tasks/complete/T-20260224-04-m6-session-recorder-exercise-management-integration.md` - connect session recorder exercise manage/add flows to the persistent exercise catalog editor and refresh recorder selection behavior after return. (`completed`)
 5. `docs/tasks/complete/T-20260224-05-m6-historical-mapping-behavior-options.md` - define and narrow/lock the historical mapping behavior policy path before analytics implementation. (`completed`)
 6. `docs/tasks/complete/T-20260426-01-refined-exercise-search.md` - refine shared exercise search to match exercise names plus primary muscle display/family terms only, with all query words required. (`completed`)
+7. `docs/tasks/complete/T-20260516-02-exercise-editor-keyboard-muscle-selector.md` - post-completion UI fix for iOS keyboard overlap in the shared exercise editor muscle selector. (`completed`)
 
 ## Risks / dependencies
 
@@ -203,7 +204,7 @@ Planned task cards for M6 are listed below.
   - Added targeted seed validation tests and bootstrap seed integration tests; full `apps/mobile` Jest suite remains green after seed integration.
   - Added targeted repository + UI interaction tests for exercise muscle-link editing (`exercise-catalog-repository`, `exercise-catalog-screen`) and re-ran full `apps/mobile` Jest suite successfully after the new route/repository work.
 - What remains:
-  - No open M6 task-card items remain.
+  - No M6 task-specific follow-up remains. Post-completion task `T-20260516-02` captured native iOS selector evidence for catalog primary/secondary and recorder inline create after the exercise-name keyboard opened.
 
 ## Status update checklist (mandatory during task closeout)
 

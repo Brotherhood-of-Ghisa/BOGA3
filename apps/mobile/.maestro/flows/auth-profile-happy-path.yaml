@@ -1,6 +1,6 @@
 appId: com.dinoderek.mobile
 ---
-- openLink: "mobile://maestro-harness?reset=data&teleport=session-list"
+- openLink: "boga3://maestro-harness?reset=data&teleport=session-list"
 - tapOn:
     text: "Open"
     optional: true
@@ -10,8 +10,10 @@ appId: com.dinoderek.mobile
 - tapOn:
     text: "Close"
     optional: true
-- assertVisible:
-    id: "session-list-screen"
+- extendedWaitUntil:
+    visible:
+      id: "session-list-screen"
+    timeout: 30000
 - takeScreenshot: "05-auth-profile-logged-out-start"
 - tapOn:
     id: "top-level-settings-button"

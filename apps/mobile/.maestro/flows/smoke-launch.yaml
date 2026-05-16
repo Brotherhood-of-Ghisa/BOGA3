@@ -1,7 +1,7 @@
 appId: com.dinoderek.mobile
 ---
 - takeScreenshot: "01-app-launch"
-- openLink: "mobile://maestro-harness?teleport=session-list"
+- openLink: "boga3://maestro-harness?teleport=session-list"
 - tapOn:
     text: "Open"
     optional: true
@@ -11,11 +11,19 @@ appId: com.dinoderek.mobile
 - tapOn:
     text: "Close"
     optional: true
-- assertVisible:
-    id: "session-list-screen"
-- openLink: "mobile://maestro-harness?teleport=session-recorder"
+- extendedWaitUntil:
+    visible:
+      id: "session-list-screen"
+    timeout: 30000
+- openLink: "boga3://maestro-harness?teleport=session-recorder"
 - tapOn:
     text: "Open"
+    optional: true
+- tapOn:
+    text: "Continue"
+    optional: true
+- tapOn:
+    text: "Close"
     optional: true
 - assertVisible:
     id: "session-recorder-screen"

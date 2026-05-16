@@ -15,9 +15,15 @@ Human-operator guide for local development, runtime operations, logs, and tests 
 - Node.js + npm
 - Xcode + iOS Simulator (`xcrun simctl`)
 - CocoaPods (`pod`)
-- Maestro CLI (`maestro`)
+- Maestro CLI (`maestro`) plus a Java runtime
 - Docker (for local Supabase stack)
 - `jq` (required by backend contract test scripts)
+
+If Java is installed through Homebrew OpenJDK and Maestro cannot locate it, run Maestro/E2E commands with:
+
+```bash
+PATH="/opt/homebrew/opt/openjdk/bin:$HOME/.maestro/bin:$PATH" JAVA_HOME="/opt/homebrew/opt/openjdk" <command>
+```
 
 ## Worktree setup and isolation
 

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -180,6 +181,11 @@ export function ExerciseEditorModal({
   const selectorTitle = muscleSelectorMode === 'primary' ? 'Select primary muscle' : 'Add secondary muscle';
   const editorTitle = editingExercise ? 'Edit Exercise' : 'Create Exercise';
 
+  const openMuscleSelector = (mode: Exclude<MuscleSelectorMode, null>) => {
+    Keyboard.dismiss();
+    setMuscleSelectorMode(mode);
+  };
+
   const closeEditorModal = () => {
     if (isSaving) {
       return;
@@ -357,6 +363,7 @@ export function ExerciseEditorModal({
                 <Text style={styles.fieldLabel}>Exercise name</Text>
                 <TextInput
                   accessibilityLabel="Exercise definition name"
+                  testID="exercise-editor-name-input"
                   autoFocus
                   placeholder="Exercise name"
                   style={[styles.input, validation.nameError ? styles.inputError : null]}
@@ -378,8 +385,9 @@ export function ExerciseEditorModal({
                 <Text style={styles.fieldLabel}>Primary muscle</Text>
                 <Pressable
                   accessibilityLabel="Open primary muscle selector"
+                  testID="exercise-editor-primary-muscle-trigger"
                   style={[styles.pickerButton, validation.primaryMuscleError ? styles.inputError : null]}
-                  onPress={() => setMuscleSelectorMode('primary')}>
+                  onPress={() => openMuscleSelector('primary')}>
                   <Text
                     numberOfLines={1}
                     style={primaryMuscleGroupId ? styles.pickerButtonText : styles.pickerButtonPlaceholder}>
@@ -436,8 +444,9 @@ export function ExerciseEditorModal({
                 <View style={styles.addMuscleLinkRow}>
                   <Pressable
                     accessibilityLabel="Open secondary muscle selector"
+                    testID="exercise-editor-secondary-muscle-trigger"
                     style={styles.addMuscleLinkButton}
-                    onPress={() => setMuscleSelectorMode('secondary')}>
+                    onPress={() => openMuscleSelector('secondary')}>
                     <Text style={styles.addMuscleLinkButtonText}>Add secondary muscle</Text>
                   </Pressable>
                 </View>
@@ -475,10 +484,17 @@ export function ExerciseEditorModal({
                 </Text>
               </View>
 
-              <ScrollView contentContainerStyle={styles.selectorList} keyboardShouldPersistTaps="handled">
+              <ScrollView
+                testID="exercise-editor-muscle-selector-list"
+                automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
+                contentInsetAdjustmentBehavior="automatic"
+                contentContainerStyle={styles.selectorList}
+                keyboardDismissMode="on-drag"
+                keyboardShouldPersistTaps="handled">
                 {selectorOptions.map((muscleGroup) => (
                   <Pressable
                     key={muscleGroup.id}
+                    testID={`exercise-editor-muscle-option-${muscleGroup.id}`}
                     accessibilityLabel={`${
                       muscleSelectorMode === 'primary' ? 'Select primary muscle' : 'Select secondary muscle'
                     } ${muscleGroup.displayName}`}
@@ -730,7 +746,7 @@ const styles = StyleSheet.create({
   },
   selectorList: {
     gap: 8,
-    paddingBottom: 4,
+    paddingBottom: 24,
   },
   selectorListRow: {
     borderWidth: 1,

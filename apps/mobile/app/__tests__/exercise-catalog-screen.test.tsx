@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { Keyboard, Platform } from 'react-native';
 
 import ExerciseCatalogScreen from '../exercise-catalog';
 
@@ -51,6 +52,10 @@ describe('ExerciseCatalogScreen', () => {
       { id: 'quads', displayName: 'Quads', familyName: 'Legs', sortOrder: 3 },
       { id: 'back', displayName: 'Back', familyName: 'Back', sortOrder: 4 },
     ]);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   it('creates a new exercise with primary and secondary muscles', async () => {
@@ -173,6 +178,28 @@ describe('ExerciseCatalogScreen', () => {
 
     expect(screen.getByText('Select a primary muscle before saving.')).toBeTruthy();
     expect(mockSaveExercise).not.toHaveBeenCalled();
+  });
+
+  it('dismisses the keyboard and uses keyboard-aware scrolling for the muscle selector', async () => {
+    const dismissKeyboard = jest.spyOn(Keyboard, 'dismiss').mockImplementation(jest.fn());
+    mockListExercises.mockResolvedValue([]);
+
+    render(<ExerciseCatalogScreen />);
+
+    await screen.findByLabelText('Create new exercise');
+
+    fireEvent.press(screen.getByLabelText('Create new exercise'));
+    await screen.findByText('Create Exercise');
+    fireEvent.changeText(screen.getByLabelText('Exercise definition name'), 'Cable Row');
+    fireEvent.press(screen.getByLabelText('Open primary muscle selector'));
+
+    expect(dismissKeyboard).toHaveBeenCalledTimes(1);
+
+    const selectorList = await screen.findByTestId('exercise-editor-muscle-selector-list');
+    expect(selectorList.props.automaticallyAdjustKeyboardInsets).toBe(Platform.OS === 'ios');
+    expect(selectorList.props.contentInsetAdjustmentBehavior).toBe('automatic');
+    expect(selectorList.props.keyboardDismissMode).toBe('on-drag');
+    expect(selectorList.props.keyboardShouldPersistTaps).toBe('handled');
   });
 
   it('prevents duplicate secondary links and excludes the selected primary from secondary options', async () => {
