@@ -251,6 +251,33 @@ boga_registry_common_git_dir_from_file() {
   printf '%s\n' "$value"
 }
 
+boga_worktree_branch_name() {
+  local worktree_path="$1"
+  local branch
+
+  branch="$(git -C "$worktree_path" symbolic-ref --quiet --short HEAD 2>/dev/null)" || return 1
+  [[ -n "$branch" ]] || return 1
+  printf '%s\n' "$branch"
+}
+
+boga_worktree_head_merged_into() {
+  local worktree_path="$1"
+  local remote_ref="$2"
+  local head
+
+  head="$(git -C "$worktree_path" rev-parse --verify --quiet HEAD)" || return 1
+  git -C "$worktree_path" merge-base --is-ancestor "$head" "$remote_ref" 2>/dev/null
+}
+
+boga_worktree_branch_exists_on_remote() {
+  local worktree_path="$1"
+  local remote="$2"
+  local branch
+
+  branch="$(boga_worktree_branch_name "$worktree_path")" || return 2
+  git -C "$worktree_path" show-ref --verify --quiet "refs/remotes/$remote/$branch"
+}
+
 boga_file_mtime_epoch() {
   local path="$1"
 

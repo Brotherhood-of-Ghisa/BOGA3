@@ -239,7 +239,7 @@ Backend runtime for this worktree:
 
 ## Completed worktree cleanup
 
-For infrastructure cleanup, `completed` is a mechanical local-state definition. It does not mean branch merged, task accepted, PR closed, or agent finished.
+For infrastructure cleanup, `completed` is a mechanical local-state definition driven by the registry, on-disk worktree state, and the configured remote main branch.
 
 A registered worktree slot is completed when all of these are true:
 
@@ -249,9 +249,22 @@ A registered worktree slot is completed when all of these are true:
 4. One of these is true:
    - the registered path no longer exists;
    - the registered path exists but is no longer a BOGA repo root;
-   - the registry was created by the same shared git worktree group as the current checkout, and the registered path is no longer listed by `git worktree list --porcelain`.
+   - the registry was created by the same shared git worktree group as the current checkout, and the registered path is no longer listed by `git worktree list --porcelain`;
+   - the registered worktree's checked-out branch HEAD is reachable from the configured remote main (default `origin/main`);
+   - the registered worktree's checked-out branch no longer exists on the configured remote (default `origin`).
 
-If a registered path still exists and still looks like a valid BOGA checkout from another git clone/worktree group, the sweep keeps it. This prevents one checkout from destroying another still-existing checkout's local Supabase data.
+The last two signals are referred to as *merge detection*. They are on by default and can be disabled with `--no-merge-detection` (or `BOGA_WORKTREE_SWEEP_DETECT_MERGED=0`). To make them accurate, the sweep performs a single `git fetch --prune --quiet <remote> <main-branch>` at start-up (timeout `BOGA_WORKTREE_SWEEP_FETCH_TIMEOUT_SECONDS`, default `10`). Skip the fetch with `--no-fetch`; the sweep will then rely on cached remote-tracking refs. If the fetch fails or the remote main ref is missing afterwards, merge detection is disabled for that run only and the legacy on-disk signals still apply.
+
+Configurable knobs (env or flag):
+
+- remote name: `BOGA_WORKTREE_SWEEP_REMOTE` / `--remote` (default `origin`)
+- main branch: `BOGA_WORKTREE_SWEEP_MAIN_BRANCH` / `--main-branch` (default `main`)
+- enable / disable merge detection: `BOGA_WORKTREE_SWEEP_DETECT_MERGED` / `--no-merge-detection`
+- enable / disable pre-scan fetch: `BOGA_WORKTREE_SWEEP_FETCH` / `--no-fetch`
+
+If a registered path still exists and still looks like a valid BOGA checkout from another git clone/worktree group, and merge detection cannot confirm completion via the signals above, the sweep keeps it. This prevents one checkout from destroying another still-existing checkout's local Supabase data.
+
+Squash-merge note: with squash merges, the merged branch's original HEAD is no longer an ancestor of main, so `branch-merged-into-<remote>/<main>` will not fire. In that case the sweep relies on `branch-deleted-on-<remote>`, which requires the remote to delete merged branches automatically (e.g. GitHub's "Automatically delete head branches" repo setting).
 
 Cleanup scope:
 

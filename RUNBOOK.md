@@ -62,7 +62,7 @@ Rules:
 - do not symlink `apps/mobile/node_modules` between worktrees;
 - use a unique simulator target per concurrent worktree.
 
-`./supabase/scripts/local-runtime-up.sh` automatically runs a conservative Supabase cleanup sweep for completed worktree slots before starting the current slot. A slot is considered completed only when its registered path is gone/invalid, or when it belongs to this git worktree group and is no longer listed by `git worktree list`.
+`./supabase/scripts/local-runtime-up.sh` automatically runs a Supabase cleanup sweep for completed worktree slots before starting the current slot. A slot is considered completed when, after the grace period, ANY of: its registered path is gone/invalid; it belongs to this git worktree group and is no longer listed by `git worktree list`; its branch HEAD is reachable from the configured remote main (default `origin/main`); or its branch has been deleted on the configured remote. Merge detection performs a single `git fetch --prune` at start-up (10 s timeout); disable with `--no-merge-detection` or skip the fetch with `--no-fetch`. Full contract: `docs/specs/12-worktree-config-and-isolation.md`.
 
 ## Quick start (full local stack)
 

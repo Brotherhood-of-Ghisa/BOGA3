@@ -11,6 +11,11 @@ CURRENT_SLOT=""
 SUPABASE=1
 DRY_RUN=0
 GRACE_SECONDS="${BOGA_WORKTREE_SWEEP_GRACE_SECONDS:-600}"
+DETECT_MERGED="${BOGA_WORKTREE_SWEEP_DETECT_MERGED:-1}"
+FETCH="${BOGA_WORKTREE_SWEEP_FETCH:-1}"
+REMOTE="${BOGA_WORKTREE_SWEEP_REMOTE:-origin}"
+MAIN_BRANCH="${BOGA_WORKTREE_SWEEP_MAIN_BRANCH:-main}"
+FETCH_TIMEOUT_SECONDS="${BOGA_WORKTREE_SWEEP_FETCH_TIMEOUT_SECONDS:-10}"
 
 usage() {
   cat <<'EOF'
@@ -19,12 +24,22 @@ Usage: ./scripts/worktree-sweep.sh [options]
 Opportunistically cleans Supabase infrastructure for completed/orphaned BOGA
 worktree slots recorded in ~/.config/boga/worktrees/slots.
 
+A slot is considered completed when, after the grace period, ANY of these hold
+for its registered worktree: the path is gone / no longer a BOGA root; it was
+in this git worktree group and is no longer listed by `git worktree list`; its
+checked-out branch's HEAD is reachable from the configured remote main; or its
+checked-out branch no longer exists on the configured remote.
+
 Options:
-  --current-slot <n>  Slot that must never be cleaned (default: current worktree slot).
-  --no-supabase      Only report/prune logic; do not clean Supabase infra.
-  --dry-run          Print actions without removing containers/volumes/registry files.
-  --grace-seconds n  Minimum registry age before cleanup (default: 600).
-  -h, --help         Show this help text.
+  --current-slot <n>     Slot that must never be cleaned (default: current worktree slot).
+  --no-supabase          Only report/prune logic; do not clean Supabase infra.
+  --dry-run              Print actions without removing containers/volumes/registry files.
+  --grace-seconds n      Minimum registry age before cleanup (default: 600).
+  --no-merge-detection   Disable "branch merged / branch deleted on remote" completion signals.
+  --no-fetch             Skip the pre-scan `git fetch --prune` (uses cached remote-tracking refs).
+  --remote <name>        Remote to consult for merge detection (default: origin).
+  --main-branch <name>   Main branch to consult for merge detection (default: main).
+  -h, --help             Show this help text.
 EOF
 }
 
@@ -46,6 +61,24 @@ while [[ $# -gt 0 ]]; do
     --grace-seconds)
       GRACE_SECONDS="${2:-}"
       [[ -n "$GRACE_SECONDS" ]] || { echo "[worktree-sweep] --grace-seconds requires a value" >&2; exit 2; }
+      shift 2
+      ;;
+    --no-merge-detection)
+      DETECT_MERGED=0
+      shift
+      ;;
+    --no-fetch)
+      FETCH=0
+      shift
+      ;;
+    --remote)
+      REMOTE="${2:-}"
+      [[ -n "$REMOTE" ]] || { echo "[worktree-sweep] --remote requires a value" >&2; exit 2; }
+      shift 2
+      ;;
+    --main-branch)
+      MAIN_BRANCH="${2:-}"
+      [[ -n "$MAIN_BRANCH" ]] || { echo "[worktree-sweep] --main-branch requires a value" >&2; exit 2; }
       shift 2
       ;;
     -h|--help)
@@ -70,11 +103,44 @@ if ! boga_is_integer "$GRACE_SECONDS"; then
   exit 2
 fi
 
+if ! boga_is_integer "$FETCH_TIMEOUT_SECONDS"; then
+  echo "[worktree-sweep] invalid fetch timeout seconds: $FETCH_TIMEOUT_SECONDS" >&2
+  exit 2
+fi
+
 CONFIG_ROOT="$(boga_config_root)"
 REGISTRY_DIR="$CONFIG_ROOT/worktrees/slots"
 CURRENT_COMMON_GIT_DIR="$(boga_common_git_dir "$REPO_ROOT")"
+REMOTE_MAIN_REF="refs/remotes/$REMOTE/$MAIN_BRANCH"
 
 mkdir -p "$REGISTRY_DIR"
+
+maybe_fetch_for_merge_detection() {
+  if [[ "$DETECT_MERGED" != "1" || "$FETCH" != "1" ]]; then
+    return 0
+  fi
+
+  echo "[worktree-sweep] fetching $REMOTE (prune, timeout ${FETCH_TIMEOUT_SECONDS}s) for merge detection"
+  local fetch_status=0
+  if command -v timeout >/dev/null 2>&1; then
+    timeout "$FETCH_TIMEOUT_SECONDS" git -C "$REPO_ROOT" fetch --prune --quiet "$REMOTE" "$MAIN_BRANCH" >/dev/null 2>&1 || fetch_status=$?
+  else
+    git -C "$REPO_ROOT" fetch --prune --quiet "$REMOTE" "$MAIN_BRANCH" >/dev/null 2>&1 || fetch_status=$?
+  fi
+
+  if (( fetch_status != 0 )); then
+    echo "[worktree-sweep] warning: fetch failed (exit $fetch_status); disabling merge detection for this run" >&2
+    DETECT_MERGED=0
+    return 0
+  fi
+
+  if ! git -C "$REPO_ROOT" show-ref --verify --quiet "$REMOTE_MAIN_REF"; then
+    echo "[worktree-sweep] warning: $REMOTE_MAIN_REF not found after fetch; disabling merge detection for this run" >&2
+    DETECT_MERGED=0
+  fi
+}
+
+maybe_fetch_for_merge_detection
 
 active_path_is_current_worktree_group() {
   local candidate="$1"
@@ -135,6 +201,20 @@ completion_reason() {
     if ! active_path_is_current_worktree_group "$registered_abs"; then
       printf 'not-in-current-git-worktree-list\n'
       return 0
+    fi
+  fi
+
+  if [[ "$DETECT_MERGED" == "1" ]]; then
+    if boga_worktree_head_merged_into "$registered_abs" "$REMOTE_MAIN_REF"; then
+      printf 'branch-merged-into-%s/%s\n' "$REMOTE" "$MAIN_BRANCH"
+      return 0
+    fi
+
+    if boga_worktree_branch_name "$registered_abs" >/dev/null 2>&1; then
+      if ! boga_worktree_branch_exists_on_remote "$registered_abs" "$REMOTE"; then
+        printf 'branch-deleted-on-%s\n' "$REMOTE"
+        return 0
+      fi
     fi
   fi
 

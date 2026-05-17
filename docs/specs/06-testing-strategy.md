@@ -189,7 +189,8 @@ Reason: keeps FE/backend integration test expectations explicit without forcing 
 - Completed-worktree Supabase cleanup:
   - `./scripts/worktree-sweep.sh`
   - `./supabase/scripts/local-runtime-up.sh` runs this sweep opportunistically before starting the current slot.
-  - cleanup is limited to slots whose registered worktree path is gone/invalid or no longer active in the same git worktree group, never the current slot.
+  - cleanup is limited to slots that are not the current slot, are past the grace period, and match one of the completion signals enumerated in `docs/specs/12-worktree-config-and-isolation.md` (path gone / not a BOGA root / no longer listed by `git worktree list` / branch merged into configured remote main / branch deleted on configured remote).
+  - the merge-into-main and branch-deleted-on-remote signals are on by default; disable with `--no-merge-detection` or `BOGA_WORKTREE_SWEEP_DETECT_MERGED=0`.
 - Placement rule:
   - BOGA worktrees must not be nested inside another BOGA checkout.
   - quality wrappers and runtime helpers fail before starting services when nested placement is detected.
