@@ -2,12 +2,13 @@ import { StyleSheet, View } from 'react-native';
 
 import { UiButton, UiSurface, uiColors, uiRadius, uiSpace } from '@/components/ui';
 
-export type TopLevelTabKey = 'sessions' | 'exercises';
+export type TopLevelTabKey = 'sessions' | 'exercises' | 'stats';
 
 type TopLevelTabsProps = {
   activeTab: TopLevelTabKey;
   onPressSessions: () => void;
   onPressExercises: () => void;
+  onPressStats: () => void;
   onPressSettings: () => void;
 };
 
@@ -15,6 +16,7 @@ export function TopLevelTabs({
   activeTab,
   onPressSessions,
   onPressExercises,
+  onPressStats,
   onPressSettings,
 }: TopLevelTabsProps) {
   return (
@@ -34,6 +36,14 @@ export function TopLevelTabs({
           active={activeTab === 'exercises'}
           label="Exercises"
           onPress={onPressExercises}
+          variant="tab"
+        />
+        <UiButton
+          accessibilityLabel="Open Stats"
+          accessibilityRole="tab"
+          active={activeTab === 'stats'}
+          label="Stats"
+          onPress={onPressStats}
           variant="tab"
         />
       </View>

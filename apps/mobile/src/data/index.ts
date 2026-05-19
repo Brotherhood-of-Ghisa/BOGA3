@@ -85,3 +85,18 @@ export {
 export { normalizeSessionSetType, type SessionSetType, type SessionSetTypeValue } from './set-types';
 export { insertSmokeRecord, listSmokeRecords, type SmokeRecord } from './smoke-records';
 export { runLocalDataRuntimeSmoke, type LocalDataRuntimeSmokeResult } from './runtime-smoke';
+export {
+  aggregateStats,
+  computePeriodBounds,
+  computeStatsSummary,
+  createDrizzleStatsStore,
+  createStatsRepository,
+  type ComputeStatsSummaryOptions,
+  type StatsAggregationInput,
+  type StatsMuscleGroupScore,
+  type StatsPeriodBounds,
+  type StatsPeriodDays,
+  type StatsStore,
+  type StatsSummary,
+  type StatsTotals,
+} from './stats';

@@ -8,6 +8,7 @@ describe('UI primitives', () => {
   it('renders semantic tab buttons with selected accessibility state and press handling', () => {
     const onPressSessions = jest.fn();
     const onPressExercises = jest.fn();
+    const onPressStats = jest.fn();
     const onPressSettings = jest.fn();
 
     render(
@@ -15,20 +16,25 @@ describe('UI primitives', () => {
         activeTab="sessions"
         onPressExercises={onPressExercises}
         onPressSessions={onPressSessions}
+        onPressStats={onPressStats}
         onPressSettings={onPressSettings}
       />
     );
 
     const sessionsTab = screen.getByLabelText('Open Sessions');
     const exercisesTab = screen.getByLabelText('Open Exercises');
+    const statsTab = screen.getByLabelText('Open Stats');
     const settingsButton = screen.getByLabelText('Open Settings');
 
     expect(sessionsTab.props.accessibilityState.selected).toBe(true);
     expect(exercisesTab.props.accessibilityState.selected).toBe(false);
+    expect(statsTab.props.accessibilityState.selected).toBe(false);
 
     fireEvent.press(exercisesTab);
+    fireEvent.press(statsTab);
     fireEvent.press(settingsButton);
     expect(onPressExercises).toHaveBeenCalledTimes(1);
+    expect(onPressStats).toHaveBeenCalledTimes(1);
     expect(onPressSettings).toHaveBeenCalledTimes(1);
     expect(onPressSessions).not.toHaveBeenCalled();
   });
@@ -73,6 +79,7 @@ describe('UI primitives', () => {
         activeTab="exercises"
         onPressExercises={jest.fn()}
         onPressSessions={jest.fn()}
+        onPressStats={jest.fn()}
         onPressSettings={jest.fn()}
       />
     );

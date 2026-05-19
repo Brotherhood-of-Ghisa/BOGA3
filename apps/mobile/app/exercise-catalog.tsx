@@ -332,6 +332,7 @@ export default function ExerciseCatalogScreen() {
       activeTab="exercises"
       onPressSessions={() => router.push('/session-list')}
       onPressExercises={() => {}}
+      onPressStats={() => router.push('/stats')}
       onPressSettings={() => router.push('/settings')}
     />
   );
