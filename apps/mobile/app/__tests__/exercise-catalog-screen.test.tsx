@@ -17,10 +17,6 @@ import {
 } from '@/src/exercise-catalog/cache';
 
 jest.mock('expo-router', () => ({
-  useFocusEffect: (callback: () => void | (() => void)) => {
-    const React = require('react');
-    React.useEffect(() => callback(), [callback]);
-  },
   useLocalSearchParams: () => ({}),
   useRouter: () => ({
     push: jest.fn(),

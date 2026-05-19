@@ -114,6 +114,50 @@ describe('exercise catalog cache', () => {
     unsubscribe();
   });
 
+  it('never runs two reloads concurrently when invalidations land during an in-flight reload', async () => {
+    let inFlightCount = 0;
+    let maxInFlight = 0;
+    let resolveCurrent: ((value: ExerciseCatalogExercise[]) => void) | undefined;
+    let pendingResolvers: ((value: ExerciseCatalogExercise[]) => void)[] = [];
+
+    mockListExercises.mockImplementation(
+      () =>
+        new Promise<ExerciseCatalogExercise[]>((resolve) => {
+          inFlightCount += 1;
+          maxInFlight = Math.max(maxInFlight, inFlightCount);
+          resolveCurrent = (value) => {
+            inFlightCount -= 1;
+            resolve(value);
+          };
+          pendingResolvers.push(resolveCurrent);
+        })
+    );
+
+    void ensureExerciseCatalogLoaded();
+    await Promise.resolve();
+
+    // While the first reload is in flight, fire invalidations across
+    // several microtask boundaries to give a buggy drain a chance to
+    // schedule a concurrent reload.
+    invalidateExerciseCatalogCache();
+    await Promise.resolve();
+    invalidateExerciseCatalogCache();
+    await Promise.resolve();
+    invalidateExerciseCatalogCache();
+    await Promise.resolve();
+
+    // Drain the queue: resolve reloads one at a time and verify no overlap.
+    while (pendingResolvers.length > 0) {
+      const resolver = pendingResolvers.shift()!;
+      resolver([exerciseFixture()]);
+      await new Promise<void>((resolve) => setImmediate(resolve));
+    }
+
+    expect(maxInFlight).toBe(1);
+    // Initial load + at most one trailing reload coalesces the burst.
+    expect(mockListExercises.mock.calls.length).toBeLessThanOrEqual(2);
+  });
+
   it('surfaces a load error in the snapshot when the data layer throws', async () => {
     mockListExercises.mockRejectedValue(new Error('boom'));
 

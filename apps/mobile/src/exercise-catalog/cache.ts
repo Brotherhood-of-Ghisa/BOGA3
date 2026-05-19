@@ -90,15 +90,21 @@ const reload = async (): Promise<void> => {
 };
 
 const drain = async (): Promise<void> => {
-  drainScheduled = false;
-  while (pendingReload) {
-    pendingReload = false;
-    inFlightReload = reload();
-    try {
-      await inFlightReload;
-    } finally {
-      inFlightReload = null;
+  // Keep `drainScheduled` true while we own the reload loop so that
+  // invalidations arriving during an in-flight reload coalesce into the
+  // current drain's next iteration instead of spawning a concurrent drain.
+  try {
+    while (pendingReload) {
+      pendingReload = false;
+      inFlightReload = reload();
+      try {
+        await inFlightReload;
+      } finally {
+        inFlightReload = null;
+      }
     }
+  } finally {
+    drainScheduled = false;
   }
 };
 
