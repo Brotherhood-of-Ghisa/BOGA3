@@ -697,6 +697,7 @@ export function SessionListScreenShell({
           activeTab="sessions"
           onPressSessions={() => {}}
           onPressExercises={() => router.push('/exercise-catalog')}
+          onPressStats={() => router.push('/stats')}
           onPressSettings={() => router.push('/settings')}
         />
       </View>

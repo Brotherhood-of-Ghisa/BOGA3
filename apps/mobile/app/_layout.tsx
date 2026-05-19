@@ -39,6 +39,7 @@ export default function RootLayout() {
         <Stack.Screen name="session-list" options={{ title: 'Sessions' }} />
         <Stack.Screen name="session-recorder" options={{ title: 'Session Recorder' }} />
         <Stack.Screen name="exercise-catalog" options={{ title: 'Exercise Catalog' }} />
+        <Stack.Screen name="stats" options={{ title: 'Stats' }} />
         <Stack.Screen name="settings" options={{ title: 'Settings' }} />
         <Stack.Screen name="profile" options={{ title: 'Profile' }} />
         <Stack.Screen name="maestro-harness" options={{ headerShown: false }} />
