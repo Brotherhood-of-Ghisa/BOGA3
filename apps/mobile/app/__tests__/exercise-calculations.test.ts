@@ -28,9 +28,18 @@ describe('exercise calculations: parsing', () => {
       expect(parseSetWeight('')).toBeNull();
       expect(parseSetWeight('   ')).toBeNull();
       expect(parseSetWeight('abc')).toBeNull();
+      expect(parseSetWeight('NaN')).toBeNull();
       expect(parseSetWeight('-5')).toBeNull();
       expect(parseSetWeight(null)).toBeNull();
       expect(parseSetWeight(undefined)).toBeNull();
+    });
+
+    it('rejects scientific notation that the UI input pattern would reject', () => {
+      // WEIGHT_INPUT_PATTERN in session-recorder.tsx accepts only digits
+      // with an optional decimal point. `Number('1e3')` is 1000, so this
+      // pins the parser to reject inputs the UI itself wouldn't allow.
+      expect(parseSetWeight('1e3')).toBeNull();
+      expect(parseSetWeight('5E2')).toBeNull();
     });
   });
 
@@ -74,16 +83,16 @@ describe('exercise calculations: parsing', () => {
 describe('exercise calculations: estimateOneRepMax (Wathan)', () => {
   it('returns weight itself within ~1.5% at one rep', () => {
     const estimate = estimateOneRepMax(100, 1) as number;
-    expect(estimate).toBeCloseTo(101.32, 1);
+    expect(estimate).toBeCloseTo(101.305, 2);
     expect(estimate / 100).toBeGreaterThan(1.0);
     expect(estimate / 100).toBeLessThan(1.02);
   });
 
   it('matches Wathan values across a representative rep range', () => {
     // Reference: 1RM = 100·w / (48.8 + 53.8·e^(-0.075·r))
-    expect(estimateOneRepMax(100, 5)).toBeCloseTo(116.58, 1);
-    expect(estimateOneRepMax(100, 10)).toBeCloseTo(134.75, 1);
-    expect(estimateOneRepMax(100, 20)).toBeCloseTo(164.45, 1);
+    expect(estimateOneRepMax(100, 5)).toBeCloseTo(116.583, 2);
+    expect(estimateOneRepMax(100, 10)).toBeCloseTo(134.748, 2);
+    expect(estimateOneRepMax(100, 20)).toBeCloseTo(164.463, 2);
   });
 
   it('stays bounded as reps grow — does not balloon at high rep counts', () => {
@@ -101,11 +110,14 @@ describe('exercise calculations: estimateOneRepMax (Wathan)', () => {
     expect(estimateOneRepMax(100, 5)).toBeLessThan(estimateOneRepMax(110, 5) as number);
   });
 
-  it('returns 0 for zero weight and null for invalid inputs', () => {
-    expect(estimateOneRepMax(0, 5)).toBe(0);
+  it('returns null for zero weight, negative reps, infinity, and other invalid inputs', () => {
+    expect(estimateOneRepMax(0, 5)).toBeNull();
     expect(estimateOneRepMax(-1, 5)).toBeNull();
     expect(estimateOneRepMax(100, 0)).toBeNull();
+    expect(estimateOneRepMax(100, -1)).toBeNull();
     expect(estimateOneRepMax(100, 1.5)).toBeNull();
+    expect(estimateOneRepMax(100, Number.POSITIVE_INFINITY)).toBeNull();
+    expect(estimateOneRepMax(Number.POSITIVE_INFINITY, 5)).toBeNull();
     expect(estimateOneRepMax(Number.NaN, 5)).toBeNull();
   });
 });

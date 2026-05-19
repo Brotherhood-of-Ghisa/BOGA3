@@ -31,13 +31,18 @@ export type MaxRepsAtWeight = {
 
 /**
  * Weight is stored as text in the local schema but is logically a
- * non-negative number. Empty / whitespace / non-finite / negative values
- * produce `null` so downstream calculations can skip the set cleanly.
+ * non-negative number. The accepted shape mirrors the UI's
+ * `WEIGHT_INPUT_PATTERN` (digits with an optional decimal point) so the
+ * parser never accepts inputs that the UI itself would reject — for
+ * example `1e3` parses as `Number` but is not a legal weight entry here.
  */
+const WEIGHT_INPUT_PATTERN = /^\d*\.?\d*$/;
+
 export const parseSetWeight = (value: string | null | undefined): number | null => {
   if (typeof value !== 'string') return null;
   const trimmed = value.trim();
   if (trimmed.length === 0) return null;
+  if (!WEIGHT_INPUT_PATTERN.test(trimmed)) return null;
   const parsed = Number(trimmed);
   if (!Number.isFinite(parsed) || parsed < 0) return null;
   return parsed;
@@ -64,13 +69,11 @@ export const parseCalculationSet = (set: CalculationSetInput): ParsedCalculation
   return {
     weight,
     reps,
-    setType: typeof set.setType === 'string' ? set.setType : (set.setType ?? null),
+    setType: set.setType ?? null,
   };
 };
 
 const WARM_UP_SET_TYPE = 'warm_up';
-
-const isWorkingSet = (setType: string | null): boolean => setType !== WARM_UP_SET_TYPE;
 
 const collectParsedSets = (
   sets: CalculationSetInput[],
@@ -79,9 +82,9 @@ const collectParsedSets = (
   const includeWarmUps = options?.includeWarmUps ?? false;
   const parsed: ParsedCalculationSet[] = [];
   for (const raw of sets) {
+    if (!includeWarmUps && (raw.setType ?? null) === WARM_UP_SET_TYPE) continue;
     const parsedSet = parseCalculationSet(raw);
     if (parsedSet === null) continue;
-    if (!includeWarmUps && !isWorkingSet(parsedSet.setType)) continue;
     parsed.push(parsedSet);
   }
   return parsed;
@@ -100,9 +103,8 @@ const collectParsedSets = (
  * positive integer reps)` pair so callers can short-circuit cleanly.
  */
 export const estimateOneRepMax = (weight: number, reps: number): number | null => {
-  if (!Number.isFinite(weight) || weight < 0) return null;
+  if (!Number.isFinite(weight) || weight <= 0) return null;
   if (!Number.isInteger(reps) || reps <= 0) return null;
-  if (weight === 0) return 0;
   const denominator = 48.8 + 53.8 * Math.exp(-0.075 * reps);
   return (100 * weight) / denominator;
 };
@@ -140,7 +142,7 @@ export const computeExerciseVolume = (
   const parsed = collectParsedSets(sets, options);
   let total = 0;
   for (const set of parsed) {
-    total += set.weight * set.reps;
+    total += computeSetVolume(set.weight, set.reps);
   }
   return total;
 };
@@ -149,6 +151,9 @@ export const computeExerciseVolume = (
  * For each distinct weight present in the eligible sets, the maximum
  * rep count observed at that weight. Returned sorted by weight descending
  * so callers can render a PR-style table without further sorting.
+ *
+ * Weight equality is the parsed numeric value, so text-distinct entries
+ * like `'42.5'` and `'42.50'` collapse into a single row.
  */
 export const computeMaxRepsByWeight = (
   sets: CalculationSetInput[],
