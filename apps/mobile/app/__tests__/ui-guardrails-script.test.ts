@@ -8,11 +8,11 @@ const { findRawColorLiteralViolations } = guardrailScript as {
   findRawColorLiteralViolations: (options?: {
     rootDir?: string;
     includeAllowlisted?: boolean;
-    allowlistedFiles?: Array<{ path: string; reason: string }>;
+    allowlistedFiles?: { path: string; reason: string }[];
   }) => {
-    violations: Array<{ file: string; literal: string; allowlisted: boolean; reason: string | null }>;
-    blockingViolations: Array<{ file: string; literal: string; allowlisted: boolean }>;
-    skippedAllowlistedFiles: Array<{ path: string; reason: string }>;
+    violations: { file: string; literal: string; allowlisted: boolean; reason: string | null }[];
+    blockingViolations: { file: string; literal: string; allowlisted: boolean }[];
+    skippedAllowlistedFiles: { path: string; reason: string }[];
   };
 };
 

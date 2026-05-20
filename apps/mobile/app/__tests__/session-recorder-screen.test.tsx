@@ -48,7 +48,7 @@ jest.mock('@/src/data/exercise-catalog', () => ({
 
 jest.mock('expo-router', () => ({
   useFocusEffect: (callback: () => void | (() => void)) => {
-    const React = require('react');
+    const React = jest.requireActual('react');
     React.useEffect(() => callback(), [callback]);
   },
   useLocalSearchParams: () => ({}),

@@ -67,7 +67,7 @@ jest.mock('expo-router', () => {
   const mockDismissAll = jest.fn();
   return {
     useFocusEffect: (callback: () => void | (() => void)) => {
-      const React = require('react');
+      const React = jest.requireActual('react');
       React.useEffect(() => callback(), [callback]);
     },
     useLocalSearchParams: () => mockSearchParams,

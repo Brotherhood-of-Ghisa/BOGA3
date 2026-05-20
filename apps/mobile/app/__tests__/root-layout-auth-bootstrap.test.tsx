@@ -38,7 +38,7 @@ jest.mock('expo-status-bar', () => ({
 }));
 
 jest.mock('expo-router', () => {
-  const { View: MockView } = require('react-native');
+  const { View: MockView } = jest.requireActual('react-native');
   const Stack = ({ children }: { children: ReactNode }) => <MockView testID="root-stack">{children}</MockView>;
   const StackScreen = ({ name }: { name: string }) => <MockView testID={`screen-${name}`} />;
 
