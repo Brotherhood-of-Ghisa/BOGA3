@@ -510,6 +510,8 @@ export default function SessionRecorderScreen() {
   const [editingTagName, setEditingTagName] = useState('');
   const [isTagMutationInFlight, setIsTagMutationInFlight] = useState(false);
   const [activeSetTypePicker, setActiveSetTypePicker] = useState<SetTypePickerState | null>(null);
+  const [pendingFocusedWeightSetId, setPendingFocusedWeightSetId] = useState<string | null>(null);
+  const [focusedRepsSetId, setFocusedRepsSetId] = useState<string | null>(null);
   const stateRef = useRef(state);
   const completedEditEndDateTimeRef = useRef<string | null>(completedEditEndDateTime);
   const persistedSessionIdRef = useRef<string | null>(null);
@@ -1134,6 +1136,7 @@ export default function SessionRecorderScreen() {
 
   const applySelectedExerciseSelection = (exerciseDefinitionId: string, exerciseName: string) => {
     const isNewSessionExercise = !state.exerciseSelectionTargetId;
+    const newSessionExercise = isNewSessionExercise ? createExercise(exerciseDefinitionId, exerciseName) : null;
 
     setState((current) => ({
       ...current,
@@ -1145,11 +1148,12 @@ export default function SessionRecorderScreen() {
                 ? { ...exercise, exerciseDefinitionId, name: exerciseName, tags: [] }
                 : exercise
             )
-          : [...current.session.exercises, createExercise(exerciseDefinitionId, exerciseName)],
+          : [...current.session.exercises, newSessionExercise ?? createExercise(exerciseDefinitionId, exerciseName)],
       },
       exercisePickerVisible: false,
       exerciseSelectionTargetId: null,
     }));
+    setPendingFocusedWeightSetId(newSessionExercise?.sets[0]?.id ?? null);
     clearSubmitFeedback();
     markSessionStructuralMutation();
 
@@ -1261,17 +1265,21 @@ export default function SessionRecorderScreen() {
   };
 
   const addSetToExercise = (exerciseId: string) => {
+    const exercise = state.session.exercises.find((candidate) => candidate.id === exerciseId);
+    const newSet = createSetFromPrevious(exercise?.sets[exercise.sets.length - 1]);
+
     setState((current) => ({
       ...current,
       session: {
         ...current.session,
         exercises: current.session.exercises.map((exercise) =>
           exercise.id === exerciseId
-            ? { ...exercise, sets: [...exercise.sets, createSetFromPrevious(exercise.sets[exercise.sets.length - 1])] }
+            ? { ...exercise, sets: [...exercise.sets, newSet] }
             : exercise
         ),
       },
     }));
+    setPendingFocusedWeightSetId(newSet.id);
     clearSubmitFeedback();
     markSessionStructuralMutation();
   };
@@ -1907,27 +1915,55 @@ export default function SessionRecorderScreen() {
             </Pressable>
             <TextInput
               accessibilityLabel={`Weight for exercise ${exerciseIndex + 1} set ${setIndex + 1}`}
+              autoFocus={pendingFocusedWeightSetId === set.id}
               inputMode="decimal"
               keyboardType="decimal-pad"
+              selectTextOnFocus
+              selection={
+                pendingFocusedWeightSetId === set.id && set.weight.length > 0
+                  ? { start: 0, end: set.weight.length }
+                  : undefined
+              }
               style={[
                 styles.input,
                 styles.setRowInput,
                 hasSetFieldValidationError('weight', set.weight) ? styles.inputInvalid : null,
               ]}
               value={set.weight}
-              onChangeText={(value) => updateSetField(exercise.id, set.id, 'weight', value)}
+              onBlur={() => {
+                setPendingFocusedWeightSetId((currentSetId) => (currentSetId === set.id ? null : currentSetId));
+              }}
+              onChangeText={(value) => {
+                updateSetField(exercise.id, set.id, 'weight', value);
+                setPendingFocusedWeightSetId((currentSetId) => (currentSetId === set.id ? null : currentSetId));
+              }}
             />
             <TextInput
               accessibilityLabel={`Reps for exercise ${exerciseIndex + 1} set ${setIndex + 1}`}
               inputMode="numeric"
               keyboardType="number-pad"
+              selectTextOnFocus
+              selection={
+                focusedRepsSetId === set.id && set.reps.length > 0
+                  ? { start: 0, end: set.reps.length }
+                  : undefined
+              }
               style={[
                 styles.input,
                 styles.setRowInput,
                 hasSetFieldValidationError('reps', set.reps) ? styles.inputInvalid : null,
               ]}
               value={set.reps}
-              onChangeText={(value) => updateSetField(exercise.id, set.id, 'reps', value)}
+              onBlur={() => {
+                setFocusedRepsSetId((currentSetId) => (currentSetId === set.id ? null : currentSetId));
+              }}
+              onChangeText={(value) => {
+                updateSetField(exercise.id, set.id, 'reps', value);
+                setFocusedRepsSetId((currentSetId) => (currentSetId === set.id ? null : currentSetId));
+              }}
+              onFocus={() => {
+                setFocusedRepsSetId(set.id);
+              }}
             />
             <Pressable
               accessibilityLabel={`Remove set ${setIndex + 1} from exercise ${exerciseIndex + 1}`}

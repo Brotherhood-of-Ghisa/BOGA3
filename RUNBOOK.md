@@ -150,6 +150,30 @@ If Docker Desktop is running but the command fails with socket or daemon errors:
 
 Reference: https://docs.docker.com/desktop/features/wsl/
 
+### Colima on macOS preflight
+
+On macOS, Colima can provide the Docker-compatible daemon for local Supabase.
+
+Check the active Docker context:
+
+```bash
+docker context ls
+```
+
+If the active context is `colima` but Docker cannot connect, start Colima:
+
+```bash
+colima start
+```
+
+Then start or reuse local Supabase:
+
+```bash
+./supabase/scripts/local-runtime-up.sh
+```
+
+Maestro flows that require local Supabase depend on the same daemon.
+
 ### Start/stop/reset
 
 Start runtime:
@@ -221,21 +245,21 @@ Do not print hosted keys, connection strings, or database passwords in task note
 
 ### Switch mobile app between local and hosted Supabase
 
-Point the mobile app at hosted Supabase:
+Use the mode that matches where the app is running:
 
 ```bash
+# iOS Simulator -> local Docker/Colima Supabase
+./supabase/scripts/local-runtime-up.sh
+
+# Physical device -> local Docker/Colima Supabase over the Mac LAN IP
+./supabase/scripts/use-local-mobile-lan-env.sh
+
+# Physical device -> hosted Supabase
 ./supabase/scripts/use-hosted-mobile-env.sh
 ```
 
-This reads `SUPABASE_URL` and `SUPABASE_ANON_KEY` from `supabase/.env.hosted` and updates only the Supabase entries in `apps/mobile/.env.local`.
-
-Point the mobile app back at local Docker Supabase:
-
-```bash
-./supabase/scripts/local-runtime-up.sh
-```
-
-This starts or reuses the local Docker Supabase stack and rewrites the mobile Supabase entries in `apps/mobile/.env.local` to the local API URL and anon key.
+`use-local-mobile-lan-env.sh` auto-detects the Mac LAN IP; override with `BOGA_MOBILE_LAN_HOST=<ip>` if needed.
+`use-hosted-mobile-env.sh` reads `SUPABASE_URL` and `SUPABASE_ANON_KEY` from `supabase/.env.hosted`.
 
 After either switch, restart Expo/Metro so `EXPO_PUBLIC_*` values are rebundled.
 

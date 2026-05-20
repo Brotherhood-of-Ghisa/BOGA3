@@ -12,6 +12,7 @@ This folder is the backend root for M5 (`Supabase` local-first development and t
 ## Prerequisites
 
 - Docker-compatible container runtime (Docker Desktop verified in this repo session).
+- On macOS with Colima, see `RUNBOOK.md` for the local Supabase preflight.
 - `npx`/`npm` available (repo scripts use `npx supabase@2.76.15` by default).
 - Optional: install Supabase CLI globally (`supabase`) if preferred, but repo scripts do not require it.
 
@@ -32,7 +33,7 @@ This folder is the backend root for M5 (`Supabase` local-first development and t
 
 ## One-command local startup path
 
-Run from repo root:
+For an iOS Simulator, run from repo root:
 
 ```bash
 ./supabase/scripts/local-runtime-up.sh
@@ -44,6 +45,18 @@ What it does:
 2. Opportunistically sweeps completed worktree Supabase infra before startup.
 3. Starts the local Edge Function server for `health` (background process).
 4. Waits until `GET /functions/v1/health` responds.
+
+For a physical device pointed at local Supabase over the Mac LAN IP:
+
+```bash
+./supabase/scripts/use-local-mobile-lan-env.sh
+```
+
+For a physical device pointed at hosted Supabase:
+
+```bash
+./supabase/scripts/use-hosted-mobile-env.sh
+```
 
 Stop the local runtime:
 
