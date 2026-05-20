@@ -14,6 +14,11 @@ Brief entrypoint map of the current mobile screens.
 - `docs/specs/ui/ui-pattern-audit.md`
 - `docs/specs/ui/navigation-contract.md`
 
+## Status legend
+
+- `Current behavior (authoritative)`: verified against current app code.
+- `Pending / planned`: approved direction documented for `docs/plans/navigation-redesign/plan.md` task chain (t2–t8) but not yet implemented.
+
 ## User-facing route map (current)
 
 1. `/` (alias)
@@ -124,6 +129,87 @@ Brief entrypoint map of the current mobile screens.
   - static titles for main routes are declared here, including `settings` and `profile`
   - completed-session route sets its title inside the route file
   - exercise-history route also sets its title inside the route file (resolved exercise name)
+
+## Pending / planned (navigation-redesign target state)
+
+The `navigation-redesign` plan (`docs/plans/navigation-redesign/plan.md`, tasks t2–t8) reshapes the route map. None of the items below are live today; they describe the target screen layout that subsequent tasks will land.
+
+### Planned tab roots (inside the `(tabs)` route group)
+
+1. `/stats-history` (planned tab root)
+- File: `apps/mobile/app/(tabs)/stats-history.tsx` (introduced in t2; segmented body in t5)
+- Purpose:
+  - merged Stats and Session History tab, with a top segmented control toggling between `Stats` and `History` views
+- Key states (high level):
+  - `Stats` view (today's `stats.tsx` body, including period chips and per-exercise history picker)
+  - `History` view (completed-session list with deleted-visibility toggle and row action menus)
+  - per-view scroll position preserved when toggling between the two sub-views
+- Key exits:
+  - `/completed-session/<sessionId>` from a history row tap
+  - `/exercise-history?exerciseDefinitionId=<id>` from the Stats sub-view's per-exercise history picker
+  - `/settings` via the cog utility action in the bottom tray
+- Notes:
+  - `headerShown: false` at the tab root; detail screens reached from here keep their light back-affordance header
+  - tab root replaces today's `/session-list` and `/stats` entry points; `/session-list` becomes a redirect to `/stats-history` (history view) for compatibility with maestro flows until t8 retargets the harness
+
+2. `/session-recorder` (planned Log tab root)
+- File: `apps/mobile/app/(tabs)/session-recorder.tsx` (moved in t2; empty state in t6)
+- Purpose:
+  - the Log tab — the recorder when an active session exists, an empty state with a single primary `Start Session` CTA otherwise
+- Key states (high level):
+  - empty state (no active session, `mode !== 'completed-edit'`): renders the `Start Session` button which creates a session and reveals the recorder body in place
+  - active mode: same recorder body as today, with the active-session pinned row, complete (`✓`), and kebab/delete affordances rendered here
+  - completed-edit mode (`mode=completed-edit`): unchanged from today; dismisses to `/stats-history` after save
+- Key exits:
+  - `/exercise-catalog?source=session-recorder&intent=manage` (manage flow)
+  - dismisses to `/stats-history` on submit/save success
+- Notes:
+  - URL path `/session-recorder` is intentionally preserved so `apps/mobile/src/sync/scheduler.ts` (`SESSION_RECORDER_ROUTE_SEGMENT`) does not need to change and the recorder sync cadence still flips correctly
+  - `headerShown: false` at the tab root
+
+3. `/exercise-catalog` (planned Exercises tab root)
+- File: `apps/mobile/app/(tabs)/exercise-catalog.tsx` (moved in t2)
+- Purpose:
+  - same exercise catalog management as today, now mounted as the Exercises tab root
+- Notes:
+  - `headerShown: false` at the tab root
+  - sub-navigation inside the Exercises tab is explicitly out of scope for the navigation-redesign plan (future direction only)
+
+### Planned detail screens (outside the `(tabs)` group)
+
+The detail screens below remain pushed onto the root stack outside the `(tabs)` route group. They keep a light back-affordance header and continue to render the shared `BottomTray` component themselves rather than relying on inheritance from `(tabs)/_layout.tsx`.
+
+1. `/completed-session/[sessionId]` (unchanged route path)
+- File: `apps/mobile/app/completed-session/[sessionId].tsx`
+- Purpose:
+  - completed session detail viewer; reached from the History sub-view inside the Stats/History tab
+- Notes:
+  - dismisses to `/stats-history` after successful reopen (was `/`)
+
+2. `/exercise-history` (unchanged route path; detail screen, not a tab root)
+- File: `apps/mobile/app/exercise-history.tsx`
+- Purpose:
+  - per-exercise performance history; reached from the Stats sub-view inside the Stats/History tab via the per-exercise history picker
+- Notes:
+  - remains a detail screen outside the `(tabs)` group
+  - continues to render its own `BottomTray` in t1's documentation target; t7 reshapes the component to the new 3-tab + cog API but `exercise-history` keeps mounting it directly
+  - dismisses back via stack navigation; tab-tap from its bottom tray jumps to the relevant tab root
+
+3. `/profile`, `/session-recorder?mode=completed-edit`, `/maestro-harness`
+- Files: `apps/mobile/app/profile.tsx`, the completed-edit branch of the recorder, `apps/mobile/app/maestro-harness.tsx`
+- Notes:
+  - these keep their existing titled headers; the bottom tray remains visible (rendered by the screen)
+
+### Planned tray + header behavior
+
+1. Bottom tray (planned)
+- Rendered by `apps/mobile/app/(tabs)/_layout.tsx` for tab roots, and re-rendered by detail screens (`completed-session/[sessionId]`, `exercise-history`, `profile`) so it stays visible everywhere it does today.
+- Three tabs in order: `Stats/History → Log → Exercises`, with a Settings cog as a right-side utility action (not a tab).
+- Collapsible to a peek strip via a drag handle on top of the tab buttons; tap or upward swipe on the peek restores it. Visibility does not persist across app restarts.
+
+2. Native stack header (planned)
+- `headerShown: false` on every tab root.
+- Detail screens (`completed-session/[sessionId]`, `exercise-history`, `profile`, `session-recorder?mode=completed-edit`, `maestro-harness`) keep a light back-affordance header.
 
 ## Documentation boundary
 

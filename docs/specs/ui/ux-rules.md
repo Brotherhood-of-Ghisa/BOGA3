@@ -168,3 +168,24 @@ Guardrail command:
 1. Additional primitive extraction (for example state panels, modal surfaces, row cards, form fields) remains pending to reduce route-local style duplication beyond the token convergence completed in Task `T-20260226-06`.
 2. Additional primitives from the audit (for example `ScreenContainer`, `EmptyState`, `ModalSurface`) are candidates, not current required APIs.
 3. Temporary raw-color guardrail allowlist entries remain available only for future exceptional migrations; current route-screen exceptions were cleared in Task `T-20260226-06`.
+
+### Navigation-redesign target semantics (plan: `docs/plans/navigation-redesign/plan.md`, tasks t2–t8)
+
+The semantics below describe the target UX once the navigation-redesign plan lands. They are not authoritative for current behavior; the existing rules above remain authoritative until each task lands.
+
+1. Top-level navigation collapses from today's `Sessions / Exercises / Stats / ⚙` strip to three tabs plus a Settings cog, in tray order **Stats/History → Log → Exercises**.
+   - The Settings cog remains a utility action on the right of the tray (not a fourth tab) and keeps `Open Settings` accessibility labelling.
+   - Tab actions continue to use `accessibilityRole="tab"` / tablist semantics and active-state visuals.
+2. The Stats/History tab uses a top segmented control (built on the t3 `SegmentedChips` primitive) to toggle between `Stats` and `History` sub-views.
+   - Sub-view selection is in-route UI state (not a URL query param) and per-view scroll position is preserved when toggling.
+   - Row interactions inside the History sub-view keep today's split pattern (main row press opens the completed-session detail; trailing kebab exposes secondary actions including delete/undelete/edit).
+3. The Log tab IS the recorder route (`/session-recorder`). When no active session exists and `mode !== 'completed-edit'`, the tab renders an empty state with a single primary `Start Session` CTA that matches today's primary button styling.
+   - The active-session pinned row, the complete (`✓`) action, and the kebab/delete affordances move to the Log tab when an active session exists; they are no longer rendered inside the Stats/History tab.
+4. The bottom tray is hideable.
+   - A small drag handle sits on top of the tab buttons; dragging it down collapses the tray into a thin peek strip, and tapping or upward-swiping the peek restores the full tray.
+   - Tray visibility does not need to persist across app restarts.
+   - The tray remains visible by default on tab roots and on detail screens that render it directly (`completed-session/[sessionId]`, `exercise-history`, `profile`). Auto-hide on scroll is explicitly out of scope.
+5. The native stack header is hidden (`headerShown: false`) on every tab root. Detail screens (`completed-session/[sessionId]`, `exercise-history`, `profile`, `session-recorder?mode=completed-edit`, `maestro-harness`) keep their existing light back-affordance header.
+6. Recorder dismiss targets (`apps/mobile/app/session-recorder.tsx:1604,1619`) change from `dismissTo('/')` to `dismissTo('/stats-history')` so completing or saving a session lands on the Stats/History tab. The completed-edit dismiss target already targets `/stats-history` in the planned contract.
+7. The `/session-recorder` URL is preserved so `apps/mobile/src/sync/scheduler.ts` (`SESSION_RECORDER_ROUTE_SEGMENT`) needs no change; the recorder sync cadence still flips correctly on this route segment.
+8. Sub-navigation inside the Exercises tab is documented as future direction only; the navigation-redesign plan does not introduce it.

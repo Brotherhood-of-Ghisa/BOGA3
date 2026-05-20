@@ -13,6 +13,11 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 - `docs/specs/ui/repo-discovery-baseline.md`
 - Route files under `apps/mobile/app/**`
 
+## Status legend
+
+- `Current behavior (authoritative)`: verified against current app code.
+- `Pending / planned`: approved direction documented for `docs/plans/navigation-redesign/plan.md` task chain (t2–t8) but not yet implemented.
+
 ## Router baseline (current)
 
 - Router system: `expo-router` (file-based routes in `apps/mobile/app/`)
@@ -142,6 +147,93 @@ Note:
 - Static titles for `settings` and `profile` are also set in `apps/mobile/app/_layout.tsx`
 - `completed-session/[sessionId]` sets its title inside the route file (current title: `View Session`)
 - `exercise-history` sets its title inside the route file to the resolved exercise name (falls back to `Exercise History` when the summary is not yet available)
+
+## Pending / planned (navigation-redesign target state)
+
+The `navigation-redesign` plan (`docs/plans/navigation-redesign/plan.md`, tasks t2–t8) introduces a `(tabs)` route group, a redirect for `/session-list`, an updated recorder dismiss target, and a hideable bottom tray. None of the items below are live today; they describe the contract that subsequent tasks will land.
+
+### Planned router baseline
+
+- Router system: `expo-router` (unchanged).
+- A new route group `apps/mobile/app/(tabs)/` will host the three tab roots (`stats-history`, `session-recorder`, `exercise-catalog`) and `settings`. The group's `_layout.tsx` will own the shared bottom tray.
+- The root stack (`apps/mobile/app/_layout.tsx`) will declare the `(tabs)` group plus the detail screens (`completed-session/[sessionId]`, `exercise-history`, `profile`, `maestro-harness`) and a redirect stub for `session-list`.
+- Navigation remains string-path based; no typed route helper layer is introduced by this plan.
+
+### Planned route + param summary
+
+1. `/` (alias, planned)
+- File: `apps/mobile/app/index.tsx`
+- Behavior:
+  - redirects to `/stats-history` instead of `/session-list`
+
+2. `/session-list` (planned redirect stub)
+- File: `apps/mobile/app/session-list.tsx` (becomes a thin redirect; removed entirely in t8 if no external dependency surfaces)
+- Behavior:
+  - redirects to `/stats-history` (history view) so existing maestro flows and any deep links continue to land on the merged tab until t8 retargets the harness
+
+3. `/stats-history` (planned tab root)
+- File: `apps/mobile/app/(tabs)/stats-history.tsx`
+- Query params:
+  - none required at the route boundary; the segmented `Stats ↔ History` view selection is in-route UI state, not a URL query param
+- Behavior:
+  - default sub-view is `Stats`
+  - per-view scroll position is preserved when toggling between `Stats` and `History` within the tab
+
+4. `/session-recorder` (planned Log tab root; URL preserved)
+- File: `apps/mobile/app/(tabs)/session-recorder.tsx`
+- Query params:
+  - `mode` (optional; `completed-edit` enables completed-session edit flow, unchanged)
+  - `sessionId` (optional; used by completed-edit flow, unchanged)
+- Behavior:
+  - empty state (no active session, `mode !== 'completed-edit'`) renders a single primary `Start Session` CTA which creates a session via the existing data layer and reveals the recorder body in place
+  - dismiss targets for the active/save flow change from `dismissTo('/')` to `dismissTo('/stats-history')` (see `apps/mobile/app/session-recorder.tsx:1604,1619`)
+  - completed-edit mode (`mode=completed-edit`) is unchanged in behavior and continues to dismiss to `/stats-history` after save
+  - URL path `/session-recorder` is intentionally preserved so `apps/mobile/src/sync/scheduler.ts` (`SESSION_RECORDER_ROUTE_SEGMENT`) needs no change; the recorder sync cadence still flips correctly on this route segment
+  - maintenance rule (unchanged): if this route path/segment is renamed in a future change, update `apps/mobile/src/sync/scheduler.ts` in the same task/session
+
+5. `/exercise-catalog` (planned Exercises tab root)
+- File: `apps/mobile/app/(tabs)/exercise-catalog.tsx`
+- Query params:
+  - `source`, `intent` — unchanged from today's contract
+
+6. `/settings` (planned; path preserved)
+- File: `apps/mobile/app/(tabs)/settings.tsx`
+- Behavior:
+  - reached from the Settings cog utility action rendered inside the bottom tray (not a tab); the cog is available from every screen that renders the tray
+  - remains accessible while logged out
+
+7. `/exercise-history` (detail screen, planned to remain unchanged path-wise)
+- File: `apps/mobile/app/exercise-history.tsx`
+- Query params:
+  - `exerciseDefinitionId`, `period`, `tagDefinitionId` — unchanged from today's contract
+- Behavior:
+  - remains a detail screen pushed onto the root stack (outside the `(tabs)` group); not a tab root
+  - reached from the Stats sub-view inside the Stats/History tab via the per-exercise history picker
+  - continues to mount its own bottom tray (the t7-reshaped 3-tab + cog component) rather than inheriting it from `(tabs)/_layout.tsx`
+
+### Planned allowed route transitions (delta from current)
+
+The transitions below replace or augment the current list. Items not listed here are unchanged.
+
+1. `/` → `/stats-history` (replaces `/` → `/session-list`)
+2. `/session-list` → `/stats-history` (redirect stub; replaces today's `/session-list` as a real route)
+3. `/stats-history` → `/completed-session/<sessionId>` (history row tap; replaces `/session-list` → `/completed-session/<sessionId>`)
+4. `/stats-history` → `/session-recorder?mode=completed-edit&sessionId=<sessionId>` (edit completed session from history row actions; replaces the equivalent transition from `/session-list`)
+5. `/stats-history` → `/exercise-history?exerciseDefinitionId=<id>` (per-exercise history picker inside the Stats sub-view; replaces `/stats` → `/exercise-history`)
+6. `/session-recorder` (active or save) → `/stats-history` (replaces `dismissTo('/')` with `dismissTo('/stats-history')`)
+7. `/completed-session/<sessionId>` → `/stats-history` (replaces `dismissTo('/')` after successful reopen)
+8. `/stats-history` ↔ `/session-recorder` ↔ `/exercise-catalog` (tab switches via the bottom tray; no path-level redirects required, expo-router handles tab focus)
+9. Any screen that renders the bottom tray → `/settings` (cog utility action; the cog is not a tab)
+
+### Planned header titles
+
+- `headerShown: false` on every tab root (`stats-history`, `session-recorder`, `exercise-catalog`, and on `settings` while it lives under `(tabs)`).
+- Detail screens (`completed-session/[sessionId]`, `exercise-history`, `profile`, `session-recorder?mode=completed-edit`, `maestro-harness`) keep their existing titled headers.
+
+### Planned tray rendering rule
+
+- Tab roots inherit the tray from `apps/mobile/app/(tabs)/_layout.tsx`.
+- Detail screens that should keep the tray visible (`completed-session/[sessionId]`, `exercise-history`, `profile`) continue to mount the shared bottom-tray component themselves rather than relying on inheritance from `(tabs)/_layout.tsx`.
 
 ## Documentation boundary
 

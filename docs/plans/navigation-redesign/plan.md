@@ -15,6 +15,7 @@ Replace today's `Sessions / Exercises / Stats / ⚙` navigation in `apps/mobile`
 - `apps/mobile/src/maestro/harness.ts` `'session-list'` teleport target returns `/stats-history` (history view) and the existing maestro smoke + data-smoke flows pass.
 - `docs/specs/ui/screen-map.md`, `navigation-contract.md`, `ux-rules.md`, and `components-catalog.md` describe the new state and are consistent with the code.
 - `./scripts/quality-fast.sh` and `npm test --workspace apps/mobile` pass on the integration branch.
+> Updated from main-drift: The bottom tray remains visible on detail screens (`completed-session/[sessionId]`, `exercise-history`, `profile`); they continue to render the shared `BottomTray` component rather than relying on inheritance from `(tabs)/_layout.tsx`.
 
 ## Orchestration
 
@@ -62,6 +63,7 @@ graph TD
 - `navigation-contract.md` records the preserved `/session-recorder` URL and the updated dismiss target (`/stats-history`) for the recorder.
 - `components-catalog.md` adds entries for the planned `BottomTray` and `SegmentedChips` primitives and updates `TopLevelTabs` to the new three-tab + cog API.
 - PR lands docs-only with no code changes.
+> Updated from main-drift: `apps/mobile/app/exercise-history.tsx` is documented in `screen-map.md` and `navigation-contract.md` as a detail screen reached from the Stats sub-view inside the Stats/History tab (not a tab root).
 
 **Out of scope:** code edits anywhere under `apps/mobile/**`; any spec doc outside `docs/specs/ui/**`; introducing a sub-nav inside the Exercises tab (documented as future direction only).
 
@@ -76,6 +78,7 @@ graph TD
 - `apps/mobile/app/index.tsx` redirects to `/stats-history`.
 - The `/session-recorder` URL stays intact and `apps/mobile/src/sync/scheduler.ts` does not need changes.
 - Each tab screen no longer renders `<TopLevelTabs>` itself; the existing four-arg component continues to compile (renamed/reshaped in t7).
+> Updated from main-drift: `apps/mobile/app/exercise-history.tsx` is unchanged in this task — it remains a detail screen outside the `(tabs)` group and continues to mount its own tab bar (renamed in t7).
 
 **Out of scope:** the segmented `Stats` ↔ `History` toggle (t5); the History view body in the Stats/History tab (t5); the Log tab empty-state Start CTA (t6); the `BottomTray` drag-handle behavior (t7); the `SegmentedChips` primitive (t3); the `TopLevelTabs` shape change (t7); maestro/test refresh (t8).
 
@@ -140,6 +143,7 @@ graph TD
 - `useTrayVisibility()` context exposes the current visibility plus `expand()` / `collapse()` for screens that need to force a state (e.g., reveal on focus to the Log tab when a session starts is allowed but not required).
 - `(tabs)/_layout.tsx` renders `BottomTray` as its tab-bar override; tab screens no longer mount `TopLevelTabs` directly.
 - Tests cover the snap helper and collapse/expand transitions.
+> Updated from main-drift: Callers of `TopLevelTabs` outside the tab roots — namely `apps/mobile/app/exercise-history.tsx` — are updated to the new 3-tab + cog API.
 
 **Out of scope:** persisting tray visibility across app restarts; auto-hide on scroll; promoting Settings to a tab.
 
