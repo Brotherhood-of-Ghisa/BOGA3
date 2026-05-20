@@ -102,6 +102,19 @@ Brief entrypoint map of the current mobile screens.
   - `session-recorder` (edit)
   - dismisses to `/` after successful reopen
 
+8. `/exercise-history`
+- File: `apps/mobile/app/exercise-history.tsx`
+- Purpose:
+  - per-exercise performance history view (progression signals + per-tag drill-down for a single `exercise_definitions` row)
+- Key states (high level):
+  - loading / error / detail
+  - in-section empty state when no sessions match the active period/tag filter
+  - period chips (`7 / 30 / all`) and horizontal tag-filter chip strip
+  - dynamic stack title set inside the route file to the resolved exercise name (falls back to `Exercise History`)
+- Key exits:
+  - `/completed-session/<sessionId>` from session card tap or from the all-time-best card rows
+  - `session-list` / `exercise-catalog` / `stats` / `settings` via the shared bottom tab strip
+
 ## Route shell (not a user-facing screen)
 
 1. `apps/mobile/app/_layout.tsx`
@@ -110,6 +123,7 @@ Brief entrypoint map of the current mobile screens.
 - Notes:
   - static titles for main routes are declared here, including `settings` and `profile`
   - completed-session route sets its title inside the route file
+  - exercise-history route also sets its title inside the route file (resolved exercise name)
 
 ## Documentation boundary
 

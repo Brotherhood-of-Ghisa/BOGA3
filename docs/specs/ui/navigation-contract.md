@@ -84,6 +84,16 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 - Query params:
   - `intent` (optional; `edit` redirects to `session-recorder` completed-edit mode)
 
+8. `/exercise-history`
+- File: `apps/mobile/app/exercise-history.tsx`
+- Query params:
+  - `exerciseDefinitionId` (required; if missing, the screen renders an error state instead of crashing)
+  - `period` (optional; one of `7 | 30 | all`; defaults to `30` when absent/invalid)
+  - `tagDefinitionId` (optional; pre-applies a tag filter when present)
+- Behavior:
+  - period and tag chip changes reload the summary in place; the route does not update its URL query string when these change
+  - missing/invalid `exerciseDefinitionId` shows the in-screen error state and does not crash
+
 ## Allowed route transitions (current high-level flows)
 
 1. `/` -> `/session-list`
@@ -116,6 +126,10 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
    - settings destination row
 15. `/profile` -> `/profile`
    - in-place auth-state rerender on sign-in/sign-out; no route replacement
+16. `/stats` -> `/exercise-history?exerciseDefinitionId=<id>`
+   - "Per-exercise history" picker section opens the per-exercise history view
+17. `/exercise-history` -> `/completed-session/<sessionId>`
+   - session card tap or all-time-best row tap
 
 Note:
 
@@ -127,6 +141,7 @@ Note:
 - Static titles for `index`, `session-list`, `session-recorder`, `exercise-catalog` are set in `apps/mobile/app/_layout.tsx`
 - Static titles for `settings` and `profile` are also set in `apps/mobile/app/_layout.tsx`
 - `completed-session/[sessionId]` sets its title inside the route file (current title: `View Session`)
+- `exercise-history` sets its title inside the route file to the resolved exercise name (falls back to `Exercise History` when the summary is not yet available)
 
 ## Documentation boundary
 

@@ -1,10 +1,20 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 
 import { computeStatsSummary, type StatsPeriodDays, type StatsSummary } from '@/src/data';
 import { TopLevelTabs } from '@/components/navigation/top-level-tabs';
 import { uiColors } from '@/components/ui';
+import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
+import { filterIndexedExerciseCatalogExercises } from '@/src/exercise-catalog/search';
 
 const PERIOD_OPTIONS: { days: StatsPeriodDays; label: string }[] = [
   { days: 7, label: '7 days' },
@@ -67,6 +77,7 @@ export type StatsScreenShellProps = {
   onPressSessions: () => void;
   onPressExercises: () => void;
   onPressSettings: () => void;
+  onPressExerciseHistoryPicker: () => void;
   isLoading: boolean;
   errorMessage: string | null;
 };
@@ -78,6 +89,7 @@ export function StatsScreenShell({
   onPressSessions,
   onPressExercises,
   onPressSettings,
+  onPressExerciseHistoryPicker,
   isLoading,
   errorMessage,
 }: StatsScreenShellProps) {
@@ -154,6 +166,24 @@ export function StatsScreenShell({
                   value={formatNumber(summary.current.totals.totalSets)}
                   delta={setsDelta}
                 />
+              </View>
+
+              <View style={styles.exerciseHistorySection}>
+                <Text style={styles.sectionTitle}>Per-exercise history</Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Pick an exercise to view its history"
+                  onPress={onPressExerciseHistoryPicker}
+                  style={styles.exerciseHistoryRow}
+                  testID="stats-exercise-history-picker-button">
+                  <View style={styles.exerciseHistoryRowText}>
+                    <Text style={styles.exerciseHistoryRowTitle}>Pick an exercise…</Text>
+                    <Text style={styles.exerciseHistoryRowSubtitle}>
+                      Progression, top sets, and per-tag drill-down for one exercise.
+                    </Text>
+                  </View>
+                  <Text style={styles.exerciseHistoryRowChevron}>›</Text>
+                </Pressable>
               </View>
 
               <View style={styles.muscleSection}>
@@ -253,6 +283,8 @@ export default function StatsRoute() {
   const [summary, setSummary] = useState<StatsSummary | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isExercisePickerVisible, setIsExercisePickerVisible] = useState(false);
+  const [exercisePickerQuery, setExercisePickerQuery] = useState('');
 
   const loadSummary = useCallback(
     async (period: StatsPeriodDays) => {
@@ -284,17 +316,140 @@ export default function StatsRoute() {
     [loadSummary]
   );
 
+  const openExercisePicker = useCallback(() => {
+    setExercisePickerQuery('');
+    setIsExercisePickerVisible(true);
+  }, []);
+
+  const closeExercisePicker = useCallback(() => {
+    setIsExercisePickerVisible(false);
+  }, []);
+
+  const handleSelectExerciseHistoryTarget = useCallback(
+    (exerciseDefinitionId: string) => {
+      setIsExercisePickerVisible(false);
+      router.push(`/exercise-history?exerciseDefinitionId=${encodeURIComponent(exerciseDefinitionId)}`);
+    },
+    [router]
+  );
+
   return (
-    <StatsScreenShell
-      summary={summary}
-      periodDays={periodDays}
-      onSelectPeriod={handleSelectPeriod}
-      onPressSessions={() => router.push('/session-list')}
-      onPressExercises={() => router.push('/exercise-catalog')}
-      onPressSettings={() => router.push('/settings')}
-      isLoading={isLoading}
-      errorMessage={errorMessage}
-    />
+    <>
+      <StatsScreenShell
+        summary={summary}
+        periodDays={periodDays}
+        onSelectPeriod={handleSelectPeriod}
+        onPressSessions={() => router.push('/session-list')}
+        onPressExercises={() => router.push('/exercise-catalog')}
+        onPressSettings={() => router.push('/settings')}
+        onPressExerciseHistoryPicker={openExercisePicker}
+        isLoading={isLoading}
+        errorMessage={errorMessage}
+      />
+      <ExerciseHistoryPickerModal
+        visible={isExercisePickerVisible}
+        searchValue={exercisePickerQuery}
+        onChangeSearch={setExercisePickerQuery}
+        onRequestClose={closeExercisePicker}
+        onSelectExercise={handleSelectExerciseHistoryTarget}
+      />
+    </>
+  );
+}
+
+const PICKER_DEBOUNCE_MS = 150;
+
+function useDebouncedValue<T>(value: T, delayMs: number): T {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedValue(value), delayMs);
+    return () => clearTimeout(handle);
+  }, [value, delayMs]);
+  return debouncedValue;
+}
+
+function ExerciseHistoryPickerModal({
+  visible,
+  searchValue,
+  onChangeSearch,
+  onRequestClose,
+  onSelectExercise,
+}: {
+  visible: boolean;
+  searchValue: string;
+  onChangeSearch: (next: string) => void;
+  onRequestClose: () => void;
+  onSelectExercise: (exerciseDefinitionId: string) => void;
+}) {
+  const catalog = useExerciseCatalog();
+  const debouncedQuery = useDebouncedValue(searchValue, PICKER_DEBOUNCE_MS);
+  const activeExercises = useMemo(
+    () => catalog.exercises.filter((exercise) => !exercise.deletedAt),
+    [catalog.exercises]
+  );
+  const filteredExercises = useMemo(
+    () => filterIndexedExerciseCatalogExercises(activeExercises, debouncedQuery),
+    [activeExercises, debouncedQuery]
+  );
+  const isLoading = catalog.status === 'idle' || catalog.status === 'loading';
+  const loadError = catalog.status === 'error' ? catalog.lastError ?? 'Unable to load exercise catalog.' : null;
+
+  return (
+    <Modal animationType="fade" transparent visible={visible} onRequestClose={onRequestClose}>
+      <View style={styles.pickerRoot}>
+        <Pressable
+          accessibilityLabel="Dismiss exercise picker"
+          style={styles.pickerOverlay}
+          onPress={onRequestClose}
+        />
+        <View style={styles.pickerCard} testID="stats-exercise-history-picker-modal">
+          <Text style={styles.pickerTitle}>Pick an exercise</Text>
+          <TextInput
+            accessibilityLabel="Exercise picker filter input"
+            autoCapitalize="none"
+            autoCorrect={false}
+            placeholder="Filter by exercise or muscle group"
+            value={searchValue}
+            onChangeText={onChangeSearch}
+            style={styles.pickerSearchInput}
+          />
+          <ScrollView style={styles.pickerScroll} contentContainerStyle={styles.pickerScrollContent}>
+            {loadError ? (
+              <Text style={styles.pickerErrorText}>{loadError}</Text>
+            ) : isLoading && filteredExercises.length === 0 ? (
+              <Text style={styles.pickerHelperText}>Loading exercise catalog…</Text>
+            ) : filteredExercises.length === 0 ? (
+              <Text style={styles.pickerHelperText}>
+                {activeExercises.length === 0
+                  ? 'No active exercises yet. Create one from the Exercises tab first.'
+                  : 'No exercises match that filter.'}
+              </Text>
+            ) : (
+              filteredExercises.map((exercise) => (
+                <Pressable
+                  key={exercise.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Open history for ${exercise.name}`}
+                  onPress={() => onSelectExercise(exercise.id)}
+                  style={styles.pickerRow}
+                  testID={`stats-exercise-history-picker-row-${exercise.id}`}>
+                  <Text numberOfLines={1} style={styles.pickerRowText}>
+                    {exercise.name}
+                  </Text>
+                </Pressable>
+              ))
+            )}
+          </ScrollView>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Cancel exercise picker"
+            onPress={onRequestClose}
+            style={styles.pickerCancelButton}>
+            <Text style={styles.pickerCancelButtonText}>Cancel</Text>
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -472,5 +627,114 @@ const styles = StyleSheet.create({
   },
   deltaNew: {
     color: uiColors.actionPrimary,
+  },
+  exerciseHistorySection: {
+    gap: 8,
+  },
+  exerciseHistoryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: uiColors.borderMuted,
+    backgroundColor: uiColors.surfaceDefault,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+  exerciseHistoryRowText: {
+    flex: 1,
+    gap: 2,
+  },
+  exerciseHistoryRowTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: uiColors.textPrimary,
+  },
+  exerciseHistoryRowSubtitle: {
+    fontSize: 12,
+    color: uiColors.textSecondary,
+  },
+  exerciseHistoryRowChevron: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: uiColors.textSecondary,
+  },
+  pickerRoot: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: 16,
+  },
+  pickerOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: uiColors.overlayScrim,
+  },
+  pickerCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: uiColors.borderMuted,
+    backgroundColor: uiColors.surfaceDefault,
+    padding: 14,
+    gap: 10,
+    maxHeight: '85%',
+  },
+  pickerTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: uiColors.textPrimary,
+  },
+  pickerSearchInput: {
+    borderWidth: 1,
+    borderColor: uiColors.borderInputStrong,
+    borderRadius: 8,
+    backgroundColor: uiColors.surfaceDefault,
+    color: uiColors.textPrimary,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    minHeight: 42,
+  },
+  pickerScroll: {
+    maxHeight: 360,
+  },
+  pickerScrollContent: {
+    gap: 6,
+    paddingVertical: 4,
+  },
+  pickerRow: {
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: uiColors.borderMuted,
+    backgroundColor: uiColors.surfacePage,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  pickerRowText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: uiColors.textPrimary,
+  },
+  pickerHelperText: {
+    fontSize: 13,
+    color: uiColors.textSecondary,
+  },
+  pickerErrorText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: uiColors.actionDangerText,
+  },
+  pickerCancelButton: {
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: uiColors.borderMuted,
+    backgroundColor: uiColors.surfaceDefault,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 42,
+  },
+  pickerCancelButtonText: {
+    color: uiColors.textPrimary,
+    fontWeight: '700',
   },
 });

@@ -132,6 +132,7 @@ describe('StatsScreenShell', () => {
         onPressSessions={jest.fn()}
         onPressExercises={jest.fn()}
         onPressSettings={jest.fn()}
+        onPressExerciseHistoryPicker={jest.fn()}
         isLoading={false}
         errorMessage={null}
       />
@@ -165,6 +166,7 @@ describe('StatsScreenShell', () => {
         onPressSessions={jest.fn()}
         onPressExercises={jest.fn()}
         onPressSettings={jest.fn()}
+        onPressExerciseHistoryPicker={jest.fn()}
         isLoading={false}
         errorMessage={null}
       />
@@ -183,12 +185,33 @@ describe('StatsScreenShell', () => {
         onPressSessions={jest.fn()}
         onPressExercises={jest.fn()}
         onPressSettings={jest.fn()}
+        onPressExerciseHistoryPicker={jest.fn()}
         isLoading={false}
         errorMessage="Boom"
       />
     );
 
     expect(screen.getByTestId('stats-error-state')).toHaveTextContent(/Boom/);
+  });
+
+  it('invokes onPressExerciseHistoryPicker when the picker row is tapped', () => {
+    const onPress = jest.fn();
+    render(
+      <StatsScreenShell
+        summary={buildSummary()}
+        periodDays={7}
+        onSelectPeriod={jest.fn()}
+        onPressSessions={jest.fn()}
+        onPressExercises={jest.fn()}
+        onPressSettings={jest.fn()}
+        onPressExerciseHistoryPicker={onPress}
+        isLoading={false}
+        errorMessage={null}
+      />
+    );
+
+    fireEvent.press(screen.getByTestId('stats-exercise-history-picker-button'));
+    expect(onPress).toHaveBeenCalledTimes(1);
   });
 });
 
