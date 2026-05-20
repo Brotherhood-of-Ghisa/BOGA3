@@ -193,7 +193,6 @@ export function ExerciseHistoryScreenShell({
                 onPressSession={onPressSession}
               />
 
-
               {summary.sessions.length === 0 ? (
                 <View style={styles.statePanel} testID="exercise-history-empty-state">
                   <Text style={styles.stateTitle}>No sessions in this view</Text>
