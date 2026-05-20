@@ -4,16 +4,16 @@
     "appVersionSource": "remote"
   },
   "build": {
-    "dev": {
+    "preview": {
       "developmentClient": true,
       "autoIncrement": true,
-      "environment": "development",
+      "environment": "production",
       "ios": {
         "distribution": "store"
       },
       "env": {
-        "APP_ENV": "dev",
-        "APP_NAME": "Boga3 Dev",
+        "APP_ENV": "prod",
+        "APP_NAME": "Boga3 Preview",
         "IOS_BUNDLE_ID": "com.phano.boga3.dev"
       }
     },
@@ -41,7 +41,7 @@
     }
   },
   "submit": {
-    "dev": {
+    "previewv": {
       "ios": {
         "ascAppId": "6766332857",
         "bundleIdentifier": "com.phano.boga3.dev"
