@@ -81,9 +81,10 @@ Brief entrypoint inventory of the current reusable UI component set.
 
 ## Excluded from this catalog (document elsewhere)
 
-- Route-level screen shells (for example `SessionListScreenShell`, `CompletedSessionDetailScreenShell`)
+- Route-level screen shells (for example `SessionListScreenShell`, `CompletedSessionDetailScreenShell`, `ExerciseHistoryScreenShell`)
   - Document in `docs/specs/ui/screen-map.md` and `docs/specs/ui/navigation-contract.md`
   - Reason: they are route composition/test helpers, not reusable UI building blocks
+  - `ExerciseHistoryScreenShell` is exported separately from `apps/mobile/app/exercise-history.tsx` so the per-exercise history surface can be wired from any future route (currently entered from `/stats`); the component remains a route-level shell, not a reusable primitive
 
 ## Pending / planned (not current components)
 

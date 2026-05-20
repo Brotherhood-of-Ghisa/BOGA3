@@ -133,6 +133,7 @@ export type ExerciseHistoryStore = {
 
 export type LoadExercisePerformanceHistoryOptions = {
   exerciseDefinitionId: string;
+  /** Period window. Defaults to 30 days when omitted. */
   period?: ExerciseHistoryPeriod;
   tagDefinitionId?: string | null;
   now?: Date;

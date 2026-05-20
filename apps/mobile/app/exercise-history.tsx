@@ -40,7 +40,9 @@ const formatSessionDate = (value: Date): string => {
   const month = `${value.getMonth() + 1}`.padStart(2, '0');
   const day = `${value.getDate()}`.padStart(2, '0');
   const year = value.getFullYear();
-  return `${year}-${month}-${day}`;
+  const hours = `${value.getHours()}`.padStart(2, '0');
+  const minutes = `${value.getMinutes()}`.padStart(2, '0');
+  return `${year}-${month}-${day} ${hours}:${minutes}`;
 };
 
 const formatNumeric = (value: number, fractionDigits = 0): string => {
@@ -140,18 +142,22 @@ export function ExerciseHistoryScreenShell({
               selected={appliedTagDefinitionId === null}
               onPress={() => onSelectTag(null)}
             />
-            {tagOptions.map((option) => (
-              <TagChip
-                key={option.tagDefinitionId}
-                testID={`exercise-history-tag-chip-${option.tagDefinitionId}`}
-                label={`${option.deletedAt ? `${option.name} (deleted)` : option.name} · ${option.occurrenceCount}`}
-                selected={appliedTagDefinitionId === option.tagDefinitionId}
-                onPress={() =>
-                  onSelectTag(appliedTagDefinitionId === option.tagDefinitionId ? null : option.tagDefinitionId)
-                }
-                deleted={Boolean(option.deletedAt)}
-              />
-            ))}
+            {tagOptions.map((option) => {
+              const baseName = option.deletedAt ? `${option.name} (deleted)` : option.name;
+              return (
+                <TagChip
+                  key={option.tagDefinitionId}
+                  testID={`exercise-history-tag-chip-${option.tagDefinitionId}`}
+                  label={`${baseName} · ${option.occurrenceCount}`}
+                  accessibilityLabel={`Filter by tag ${baseName}, ${option.occurrenceCount} sessions`}
+                  selected={appliedTagDefinitionId === option.tagDefinitionId}
+                  onPress={() =>
+                    onSelectTag(appliedTagDefinitionId === option.tagDefinitionId ? null : option.tagDefinitionId)
+                  }
+                  deleted={Boolean(option.deletedAt)}
+                />
+              );
+            })}
           </ScrollView>
         ) : null}
 
@@ -182,39 +188,11 @@ export function ExerciseHistoryScreenShell({
                 </View>
               ) : null}
 
-              <View style={styles.bestCard} testID="exercise-history-best-card">
-                <Text style={styles.bestCardTitle}>All-time bests</Text>
-                <BestRow
-                  testID="exercise-history-best-est-1rm"
-                  label="Est. 1RM"
-                  primary={formatEstOneRm(summary.allTimeBest.estimatedOneRepMax?.value ?? null)}
-                  secondary={
-                    summary.allTimeBest.estimatedOneRepMax
-                      ? formatSessionDate(summary.allTimeBest.estimatedOneRepMax.completedAt)
-                      : null
-                  }
-                  onPress={
-                    summary.allTimeBest.estimatedOneRepMax
-                      ? () => onPressSession(summary.allTimeBest.estimatedOneRepMax!.sessionId)
-                      : undefined
-                  }
-                />
-                <BestRow
-                  testID="exercise-history-best-top-weight"
-                  label="Top weight"
-                  primary={formatTopWeight(summary.allTimeBest.topWeight)}
-                  secondary={
-                    summary.allTimeBest.topWeight
-                      ? formatSessionDate(summary.allTimeBest.topWeight.completedAt)
-                      : null
-                  }
-                  onPress={
-                    summary.allTimeBest.topWeight
-                      ? () => onPressSession(summary.allTimeBest.topWeight!.sessionId)
-                      : undefined
-                  }
-                />
-              </View>
+              <BestCard
+                best={summary.allTimeBest}
+                onPressSession={onPressSession}
+              />
+
 
               {summary.sessions.length === 0 ? (
                 <View style={styles.statePanel} testID="exercise-history-empty-state">
@@ -251,15 +229,47 @@ export function ExerciseHistoryScreenShell({
   );
 }
 
+function BestCard({
+  best,
+  onPressSession,
+}: {
+  best: ExerciseHistorySummary['allTimeBest'];
+  onPressSession: (sessionId: string) => void;
+}) {
+  const oneRm = best.estimatedOneRepMax;
+  const topWeight = best.topWeight;
+  return (
+    <View style={styles.bestCard} testID="exercise-history-best-card">
+      <Text style={styles.bestCardTitle}>All-time bests</Text>
+      <BestRow
+        testID="exercise-history-best-est-1rm"
+        label="Est. 1RM"
+        primary={formatEstOneRm(oneRm?.value ?? null)}
+        secondary={oneRm ? formatSessionDate(oneRm.completedAt) : null}
+        onPress={oneRm ? () => onPressSession(oneRm.sessionId) : undefined}
+      />
+      <BestRow
+        testID="exercise-history-best-top-weight"
+        label="Top weight"
+        primary={formatTopWeight(topWeight)}
+        secondary={topWeight ? formatSessionDate(topWeight.completedAt) : null}
+        onPress={topWeight ? () => onPressSession(topWeight.sessionId) : undefined}
+      />
+    </View>
+  );
+}
+
 function TagChip({
   testID,
   label,
+  accessibilityLabel,
   selected,
   deleted = false,
   onPress,
 }: {
   testID: string;
   label: string;
+  accessibilityLabel?: string;
   selected: boolean;
   deleted?: boolean;
   onPress: () => void;
@@ -267,6 +277,7 @@ function TagChip({
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
       accessibilityState={{ selected }}
       onPress={onPress}
       style={[
@@ -559,8 +570,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfaceDefault,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     maxWidth: 220,
   },
   tagChipSelected: {

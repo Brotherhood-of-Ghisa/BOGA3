@@ -325,4 +325,75 @@ describe('ExerciseHistoryRoute', () => {
       expect(screen.getByTestId('exercise-history-error-state')).toHaveTextContent(/Exercise not found/);
     });
   });
+
+  it('renders the missing-id error state when exerciseDefinitionId is absent from the route', async () => {
+    expoRouterMock.__setSearchParams({});
+    render(<ExerciseHistoryRoute />);
+
+    await act(async () => {
+      expoRouterMock.__triggerFocus();
+    });
+
+    expect(mockLoad).not.toHaveBeenCalled();
+    expect(screen.getByTestId('exercise-history-error-state')).toHaveTextContent(
+      /Missing exerciseDefinitionId/
+    );
+  });
+});
+
+describe('ExerciseHistoryScreenShell — deleted tag visibility', () => {
+  it('still renders a chip for a tag that was assigned in this period but later soft-deleted', () => {
+    const summary = buildSummary({
+      tagOptions: [
+        {
+          tagDefinitionId: 'tag-old',
+          name: 'Old grip',
+          deletedAt: new Date('2026-04-01T00:00:00.000Z'),
+          occurrenceCount: 1,
+        },
+      ],
+    });
+
+    render(
+      <ExerciseHistoryScreenShell
+        summary={summary}
+        period={30}
+        appliedTagDefinitionId={null}
+        isLoading={false}
+        errorMessage={null}
+        onSelectPeriod={jest.fn()}
+        onSelectTag={jest.fn()}
+        onPressSession={jest.fn()}
+        onPressSessions={jest.fn()}
+        onPressExercises={jest.fn()}
+        onPressStats={jest.fn()}
+        onPressSettings={jest.fn()}
+      />
+    );
+
+    expect(screen.getByTestId('exercise-history-tag-chip-tag-old')).toHaveTextContent(/deleted/);
+  });
+
+  it('shows the deleted-exercise banner when the exercise itself is soft-deleted', () => {
+    render(
+      <ExerciseHistoryScreenShell
+        summary={buildSummary({ exerciseDeletedAt: new Date('2026-05-01T00:00:00.000Z') })}
+        period={30}
+        appliedTagDefinitionId={null}
+        isLoading={false}
+        errorMessage={null}
+        onSelectPeriod={jest.fn()}
+        onSelectTag={jest.fn()}
+        onPressSession={jest.fn()}
+        onPressSessions={jest.fn()}
+        onPressExercises={jest.fn()}
+        onPressStats={jest.fn()}
+        onPressSettings={jest.fn()}
+      />
+    );
+
+    expect(screen.getByTestId('exercise-history-deleted-banner')).toHaveTextContent(
+      /has been deleted/
+    );
+  });
 });
