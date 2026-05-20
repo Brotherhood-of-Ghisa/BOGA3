@@ -95,7 +95,7 @@ Document app-specific UI semantics and guardrails for the current mobile app.
     - `Weight` accepts decimal numeric input and must be a non-negative number.
     - `Reps` accepts integer numeric input and must be a positive integer.
     - Adding a set to an exercise copies the previous set's `Weight`, `Reps`, and `Type` values, while assigning the new row its own identity.
-    - Logging a new exercise focuses its first `Weight` input, and adding a set focuses the new set's `Weight` input. Weight inputs select their current value on focus so copied/defaulted values can be overwritten quickly.
+    - Logging a new exercise focuses its first `Weight` input, and adding a set focuses the new set's `Weight` input. Weight and `Reps` inputs select their current value on focus so copied/defaulted values can be overwritten quickly.
 12. The shared exercise editor dismisses the text keyboard before opening primary/secondary muscle selectors, and selector lists remain keyboard-aware so all muscle-group options stay reachable on iOS.
 
 ### 6. Loading, empty, error, and feedback state handling

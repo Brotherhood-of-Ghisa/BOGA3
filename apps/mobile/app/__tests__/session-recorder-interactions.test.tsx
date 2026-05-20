@@ -422,6 +422,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     expect(screen.getByText('Reps')).toBeTruthy();
     expect(screen.getByLabelText('Weight for exercise 1 set 1').props.autoFocus).toBe(true);
     expect(screen.getByLabelText('Weight for exercise 1 set 1').props.selectTextOnFocus).toBe(true);
+    expect(screen.getByLabelText('Reps for exercise 1 set 1').props.selectTextOnFocus).toBe(true);
     expect(screen.queryByText('No exercises logged yet.')).toBeNull();
     expect(screen.queryByText('No tags yet.')).toBeNull();
     expect(mockLogEvent).toHaveBeenCalledWith({
@@ -530,6 +531,16 @@ describe('SessionRecorderScreen exercise interactions', () => {
     expect(screen.getByLabelText('Weight for exercise 1 set 2').props.value).toBe('135.5');
     expect(screen.getByLabelText('Reps for exercise 1 set 2').props.value).toBe('8');
     expect(screen.getAllByText('R0')).toHaveLength(2);
+
+    fireEvent(screen.getByLabelText('Reps for exercise 1 set 2'), 'focus');
+    expect(screen.getByLabelText('Reps for exercise 1 set 2').props.selection).toEqual({
+      start: 0,
+      end: 1,
+    });
+
+    fireEvent.changeText(screen.getByLabelText('Reps for exercise 1 set 2'), '10');
+    expect(screen.getByLabelText('Reps for exercise 1 set 2').props.value).toBe('10');
+    expect(screen.getByLabelText('Reps for exercise 1 set 2').props.selection).toBeUndefined();
 
     await act(async () => {});
   });

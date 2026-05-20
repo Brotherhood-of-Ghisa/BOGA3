@@ -511,6 +511,7 @@ export default function SessionRecorderScreen() {
   const [isTagMutationInFlight, setIsTagMutationInFlight] = useState(false);
   const [activeSetTypePicker, setActiveSetTypePicker] = useState<SetTypePickerState | null>(null);
   const [pendingFocusedWeightSetId, setPendingFocusedWeightSetId] = useState<string | null>(null);
+  const [focusedRepsSetId, setFocusedRepsSetId] = useState<string | null>(null);
   const stateRef = useRef(state);
   const completedEditEndDateTimeRef = useRef<string | null>(completedEditEndDateTime);
   const persistedSessionIdRef = useRef<string | null>(null);
@@ -1941,13 +1942,28 @@ export default function SessionRecorderScreen() {
               accessibilityLabel={`Reps for exercise ${exerciseIndex + 1} set ${setIndex + 1}`}
               inputMode="numeric"
               keyboardType="number-pad"
+              selectTextOnFocus
+              selection={
+                focusedRepsSetId === set.id && set.reps.length > 0
+                  ? { start: 0, end: set.reps.length }
+                  : undefined
+              }
               style={[
                 styles.input,
                 styles.setRowInput,
                 hasSetFieldValidationError('reps', set.reps) ? styles.inputInvalid : null,
               ]}
               value={set.reps}
-              onChangeText={(value) => updateSetField(exercise.id, set.id, 'reps', value)}
+              onBlur={() => {
+                setFocusedRepsSetId((currentSetId) => (currentSetId === set.id ? null : currentSetId));
+              }}
+              onChangeText={(value) => {
+                updateSetField(exercise.id, set.id, 'reps', value);
+                setFocusedRepsSetId((currentSetId) => (currentSetId === set.id ? null : currentSetId));
+              }}
+              onFocus={() => {
+                setFocusedRepsSetId(set.id);
+              }}
             />
             <Pressable
               accessibilityLabel={`Remove set ${setIndex + 1} from exercise ${exerciseIndex + 1}`}
