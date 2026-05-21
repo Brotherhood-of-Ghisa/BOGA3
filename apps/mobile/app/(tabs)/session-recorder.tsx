@@ -15,8 +15,6 @@ import {
 
 import { ExerciseEditorModal } from '@/components/exercise-catalog/exercise-editor-modal';
 import { SessionContentLayout } from '@/components/session-recorder/session-content-layout';
-import { ActiveSessionRow } from '@/components/session-list';
-import type { SessionListItem } from '@/components/session-list';
 import { uiColors } from '@/components/ui';
 import { getAuthSnapshot } from '@/src/auth';
 import {
@@ -43,7 +41,6 @@ import {
   persistSessionDraftSnapshot,
   removeExerciseTagFromSessionExercise,
   renameExerciseTagDefinition,
-  setSessionDeletedState,
   undeleteExerciseTagDefinition,
   upsertLocalGym,
   type ExerciseTagDefinitionRecord,
@@ -107,39 +104,6 @@ function parseSessionDateTime(dateTime: string): Date | null {
   }
 
   return parsed;
-}
-
-function mapDraftSnapshotToActiveSessionListItem(snapshot: SessionDraftSnapshot): SessionListItem {
-  const setCount = snapshot.exercises.reduce((accumulator, exercise) => accumulator + exercise.sets.length, 0);
-  return {
-    id: snapshot.sessionId,
-    startedAt: snapshot.startedAt.toISOString(),
-    status: 'active',
-    completedAt: null,
-    durationSec: null,
-    durationDisplay: '',
-    gymName: null,
-    exerciseCount: snapshot.exercises.length,
-    setCount,
-    totalWeight: 0,
-    deletedAt: null,
-  };
-}
-
-function buildLocalActiveSessionListItem(sessionId: string, startedAt: Date): SessionListItem {
-  return {
-    id: sessionId,
-    startedAt: startedAt.toISOString(),
-    status: 'active',
-    completedAt: null,
-    durationSec: null,
-    durationDisplay: '',
-    gymName: null,
-    exerciseCount: 0,
-    setCount: 0,
-    totalWeight: 0,
-    deletedAt: null,
-  };
 }
 
 function mapDraftSnapshotToSession(snapshot: SessionDraftSnapshot): Session {
@@ -514,11 +478,9 @@ export default function SessionRecorderScreen() {
 
   const [state, setState] = useState<SessionRecorderState>(createInitialState);
   const [submitCleanupPrompt, setSubmitCleanupPrompt] = useState<SubmitCleanupPrompt | null>(null);
-  const [activeSession, setActiveSession] = useState<SessionListItem | null>(null);
   const [hasActiveSession, setHasActiveSession] = useState<boolean>(false);
   const [isPersistenceHydrated, setIsPersistenceHydrated] = useState<boolean>(false);
   const [isStartingSession, setIsStartingSession] = useState<boolean>(false);
-  const [activeDurationNowMs, setActiveDurationNowMs] = useState<number>(() => Date.now());
   const [completedEditEndDateTime, setCompletedEditEndDateTime] = useState<string | null>(null);
   const [completedEditLoadError, setCompletedEditLoadError] = useState<string | null>(null);
   const [isCompletedEditLoading, setIsCompletedEditLoading] = useState(false);
@@ -754,7 +716,6 @@ export default function SessionRecorderScreen() {
 
         if (!snapshot) {
           setHasActiveSession(false);
-          setActiveSession(null);
           return;
         }
 
@@ -763,7 +724,6 @@ export default function SessionRecorderScreen() {
           ...current,
           session: mapDraftSnapshotToSession(snapshot),
         }));
-        setActiveSession(mapDraftSnapshotToActiveSessionListItem(snapshot));
         setHasActiveSession(true);
       })
       .catch(() => {
@@ -790,55 +750,6 @@ export default function SessionRecorderScreen() {
       subscription.remove();
     };
   }, [lifecycleHelpers]);
-
-  useEffect(() => {
-    if (!hasActiveSession || !activeSession) {
-      return;
-    }
-
-    const intervalId = setInterval(() => {
-      setActiveDurationNowMs(Date.now());
-    }, 30_000);
-
-    return () => {
-      clearInterval(intervalId);
-    };
-  }, [hasActiveSession, activeSession]);
-
-  useEffect(() => {
-    if (!hasActiveSession) {
-      return;
-    }
-
-    const exerciseCount = state.session.exercises.length;
-    const setCount = state.session.exercises.reduce(
-      (accumulator, exercise) => accumulator + exercise.sets.length,
-      0
-    );
-    const gymName =
-      state.session.locationId === null
-        ? null
-        : state.locations.find((location) => location.id === state.session.locationId)?.name ?? null;
-
-    setActiveSession((current) => {
-      if (!current) {
-        return current;
-      }
-      if (
-        current.exerciseCount === exerciseCount &&
-        current.setCount === setCount &&
-        current.gymName === gymName
-      ) {
-        return current;
-      }
-      return {
-        ...current,
-        exerciseCount,
-        setCount,
-        gymName,
-      };
-    });
-  }, [hasActiveSession, state.session.exercises, state.session.locationId, state.locations]);
 
   useEffect(() => {
     return () => {
@@ -1066,7 +977,6 @@ export default function SessionRecorderScreen() {
           exercises: [],
         },
       }));
-      setActiveSession(buildLocalActiveSessionListItem(persisted.sessionId, startedAt));
       setHasActiveSession(true);
     } catch {
       // Keep the empty state visible if the persistence call fails — user can retry.
@@ -1074,31 +984,6 @@ export default function SessionRecorderScreen() {
       setIsStartingSession(false);
     }
   }, [isStartingSession]);
-
-  const handleActiveSessionResume = useCallback(() => {
-    // The recorder body is already mounted below the pinned row; resuming is a no-op
-    // beyond bringing focus to the recorder, which the press itself accomplishes.
-  }, []);
-
-  const handleActiveSessionDelete = useCallback(async () => {
-    const sessionId = persistedSessionIdRef.current ?? activeSession?.id ?? null;
-    if (!sessionId) {
-      return;
-    }
-
-    try {
-      await autosaveController.dispose({ flushDirty: false });
-      await setSessionDeletedState(sessionId, true);
-    } catch {
-      // Even if persistence fails, surface the empty state locally; user can retry from Start CTA.
-    } finally {
-      persistedSessionIdRef.current = null;
-      hasSessionMutationRef.current = false;
-      setActiveSession(null);
-      setHasActiveSession(false);
-      setState(() => createInitialState());
-    }
-  }, [activeSession, autosaveController]);
 
   const openGymModal = () => {
     setState((current) => ({
@@ -1784,7 +1669,6 @@ export default function SessionRecorderScreen() {
       await completeSessionDraft(persisted.sessionId);
       persistedSessionIdRef.current = null;
       hasSessionMutationRef.current = false;
-      setActiveSession(null);
       setHasActiveSession(false);
       router.dismissTo('/stats-history');
     })().catch(() => {
@@ -1989,17 +1873,6 @@ export default function SessionRecorderScreen() {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
         testID="session-recorder-screen">
-      {routeMode !== 'completed-edit' && activeSession ? (
-        <ActiveSessionRow
-          session={activeSession}
-          nowMs={activeDurationNowMs}
-          onResume={handleActiveSessionResume}
-          onComplete={handleSubmit}
-          onDelete={() => {
-            void handleActiveSessionDelete();
-          }}
-        />
-      ) : null}
       {routeMode === 'completed-edit' ? (
         <View style={styles.completedEditMetadataCard}>
           <View style={styles.completedEditMetadataRow}>
