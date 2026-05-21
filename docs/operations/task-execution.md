@@ -163,7 +163,7 @@ This environment has **no `gh` CLI**. All GitHub interactions go through the Git
 
   ## Standard checklist
 
-  - [ ] `./scripts/quality-fast.sh` passes locally (per `docs/specs/04-ai-development-playbook.md`)
+  - [ ] `./scripts/quality-fast.sh` posture: builder's individual gates (`npm run lint` / `npm run typecheck` / `npm run test` in `apps/mobile/`) all pass — see "Quality gates" below for the coordinator-side run
   - [ ] `./scripts/quality-slow.sh <area>` posture declared (passed or `N/A`)
   - [ ] Tests added/updated per `docs/specs/06-testing-strategy.md`
   - [ ] UI docs maintenance rules followed per `docs/specs/ui/README.md` (UI tasks only; otherwise `N/A`)
@@ -187,6 +187,27 @@ This environment has **no `gh` CLI**. All GitHub interactions go through the Git
 - Builders: **≤ 4 in flight**. Coordinator queues excess.
 - Reviewers: **unbounded**.
 - Coordinator: **one** (Claude). Iterations sequential.
+
+## Quality gates
+
+The Claude Code `isolation: "worktree"` harness places builder worktrees at `<project>/.claude/worktrees/agent-<id>/`. That path is nested inside the BOGA checkout, which trips `boga_validate_worktree_placement` in `scripts/worktree-lib.sh` — so `./scripts/quality-fast.sh` refuses to run from inside a builder's auto-worktree. The harness's placement is fixed and not user-configurable, so we route around it:
+
+1. **Builders** run the three frontend gates individually inside their auto-worktree:
+   - `cd apps/mobile && npm run lint`
+   - `cd apps/mobile && npm run typecheck`
+   - `cd apps/mobile && npm run test`
+   That gives fast feedback during the builder's own work and lets it self-correct before opening a PR.
+
+2. **The coordinator** owns the canonical `./scripts/quality-fast.sh` run. The coordinator's main checkout (e.g. `/home/user/BOGA3/`) is a non-nested BOGA root and passes the placement guard. After each builder opens its PR (and before dispatching the reviewer), the coordinator:
+   - `git fetch origin <builder-branch>`
+   - `git checkout --detach <builder-branch>` from the coordinator's checkout
+   - `./scripts/quality-fast.sh frontend` (and `backend` if the PR's risk posture demands it)
+   - Posts the result as a `[coordinator]` comment on the PR (one short line: "gates pass — N tests" or the failing tail)
+   - `git checkout main` to restore the coordinator's working state
+
+3. **Builders do NOT** check the `quality-fast.sh` box on the PR's Standard checklist (the script doesn't run for them). They check the individual-gate posture instead. The coordinator's PR comment is the canonical gate signal for the reviewer and the human.
+
+The coordinator's main checkout needs `apps/mobile/node_modules` populated once (`cd apps/mobile && npm install`) so gate runs are fast. The coordinator does not commit or push from main; only fetch + detach for the gate run.
 
 ## Deviations
 
