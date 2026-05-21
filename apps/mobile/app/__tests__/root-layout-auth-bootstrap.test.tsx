@@ -48,7 +48,7 @@ jest.mock('expo-router', () => {
 
   return {
     Stack,
-    usePathname: () => '/session-list',
+    usePathname: () => '/stats-history',
   };
 });
 
@@ -78,7 +78,7 @@ describe('RootLayout auth bootstrap wiring', () => {
     expect(mockBootstrapAuthState).toHaveBeenCalledTimes(1);
     expect(mockStartSyncRuntime).toHaveBeenCalledTimes(1);
     expect(mockStartDefaultSyncScheduler).toHaveBeenCalledTimes(1);
-    expect(mockSetDefaultSyncCadenceContextFromPathname).toHaveBeenCalledWith('/session-list');
+    expect(mockSetDefaultSyncCadenceContextFromPathname).toHaveBeenCalledWith('/stats-history');
     expect(screen.getByTestId('root-stack')).toBeTruthy();
     // Tab roots (incl. settings) live in the `(tabs)` group registered as a single screen
     expect(screen.getByTestId('screen-(tabs)')).toBeTruthy();

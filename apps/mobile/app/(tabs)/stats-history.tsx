@@ -11,7 +11,6 @@ import {
 } from 'react-native';
 
 import { computeStatsSummary, reopenCompletedSessionDraft, type StatsPeriodDays, type StatsSummary } from '@/src/data';
-import { TopLevelTabs } from '@/components/navigation/top-level-tabs';
 import {
   ActiveSessionRow,
   DEFAULT_SESSION_LIST_DATA_CLIENT,
@@ -90,9 +89,6 @@ export type StatsScreenShellProps = {
   summary: StatsSummary | null;
   periodDays: StatsPeriodDays;
   onSelectPeriod: (period: StatsPeriodDays) => void;
-  onPressLog: () => void;
-  onPressExercises: () => void;
-  onPressSettings: () => void;
   onPressExerciseHistoryPicker: () => void;
   isLoading: boolean;
   errorMessage: string | null;
@@ -102,9 +98,6 @@ export function StatsScreenShell({
   summary,
   periodDays,
   onSelectPeriod,
-  onPressLog,
-  onPressExercises,
-  onPressSettings,
   onPressExerciseHistoryPicker,
   isLoading,
   errorMessage,
@@ -121,14 +114,6 @@ export function StatsScreenShell({
           errorMessage={errorMessage}
         />
       </View>
-
-      <TopLevelTabs
-        activeTab="stats-history"
-        onPressStatsHistory={() => {}}
-        onPressLog={onPressLog}
-        onPressExercises={onPressExercises}
-        onPressSettings={onPressSettings}
-      />
     </View>
   );
 }
@@ -498,10 +483,6 @@ export type StatsHistoryScreenShellProps = {
   onPressExerciseHistoryPicker: () => void;
   isLoading: boolean;
   errorMessage: string | null;
-  // Top-level navigation handlers
-  onPressLog: () => void;
-  onPressExercises: () => void;
-  onPressSettings: () => void;
   // History sub-view dependencies (optional so tests can omit them)
   historyDataClient?: SessionListDataClient;
   historyInitialSessions?: SessionListItem[];
@@ -518,9 +499,6 @@ export function StatsHistoryScreenShell({
   onPressExerciseHistoryPicker,
   isLoading,
   errorMessage,
-  onPressLog,
-  onPressExercises,
-  onPressSettings,
   historyDataClient,
   historyInitialSessions,
   historyReloadToken,
@@ -563,14 +541,6 @@ export function StatsHistoryScreenShell({
           />
         </View>
       </View>
-
-      <TopLevelTabs
-        activeTab="stats-history"
-        onPressStatsHistory={() => {}}
-        onPressLog={onPressLog}
-        onPressExercises={onPressExercises}
-        onPressSettings={onPressSettings}
-      />
     </View>
   );
 }
@@ -645,9 +615,6 @@ export default function StatsRoute() {
         onPressExerciseHistoryPicker={openExercisePicker}
         isLoading={isLoading}
         errorMessage={errorMessage}
-        onPressLog={() => router.push('/session-recorder')}
-        onPressExercises={() => router.push('/exercise-catalog')}
-        onPressSettings={() => router.push('/settings')}
         historyDataClient={DEFAULT_SESSION_LIST_DATA_CLIENT}
         historyReloadToken={historyReloadToken}
         activeView={activeView}

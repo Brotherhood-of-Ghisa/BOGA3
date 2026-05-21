@@ -73,7 +73,10 @@ export const resolveMaestroHarnessTeleportHref = ({
 }) => {
   switch (target) {
     case 'session-list':
-      return '/session-list' as Href;
+      // Post-redesign: the legacy `/session-list` route is gone; the merged
+      // Stats/History tab is the canonical landing target. Existing Maestro
+      // flow YAML keeps `teleport=session-list` so they don't need rewriting.
+      return '/stats-history' as Href;
     case 'session-recorder':
       return withQuery('/session-recorder', {
         mode: mode === 'completed-edit' ? mode : null,

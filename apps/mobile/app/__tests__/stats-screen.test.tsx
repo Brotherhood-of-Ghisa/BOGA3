@@ -161,9 +161,6 @@ describe('StatsScreenShell', () => {
         summary={buildSummary()}
         periodDays={7}
         onSelectPeriod={jest.fn()}
-        onPressLog={jest.fn()}
-        onPressExercises={jest.fn()}
-        onPressSettings={jest.fn()}
         onPressExerciseHistoryPicker={jest.fn()}
         isLoading={false}
         errorMessage={null}
@@ -195,9 +192,6 @@ describe('StatsScreenShell', () => {
         summary={buildSummary()}
         periodDays={7}
         onSelectPeriod={onSelectPeriod}
-        onPressLog={jest.fn()}
-        onPressExercises={jest.fn()}
-        onPressSettings={jest.fn()}
         onPressExerciseHistoryPicker={jest.fn()}
         isLoading={false}
         errorMessage={null}
@@ -214,9 +208,6 @@ describe('StatsScreenShell', () => {
         summary={null}
         periodDays={7}
         onSelectPeriod={jest.fn()}
-        onPressLog={jest.fn()}
-        onPressExercises={jest.fn()}
-        onPressSettings={jest.fn()}
         onPressExerciseHistoryPicker={jest.fn()}
         isLoading={false}
         errorMessage="Boom"
@@ -233,9 +224,6 @@ describe('StatsScreenShell', () => {
         summary={buildSummary()}
         periodDays={7}
         onSelectPeriod={jest.fn()}
-        onPressLog={jest.fn()}
-        onPressExercises={jest.fn()}
-        onPressSettings={jest.fn()}
         onPressExerciseHistoryPicker={onPress}
         isLoading={false}
         errorMessage={null}
@@ -255,9 +243,6 @@ describe('StatsHistoryScreenShell view toggle', () => {
     onPressExerciseHistoryPicker: jest.fn(),
     isLoading: false,
     errorMessage: null,
-    onPressLog: jest.fn(),
-    onPressExercises: jest.fn(),
-    onPressSettings: jest.fn(),
     activeView: 'stats' as const,
     onChangeView: jest.fn(),
     ...overrides,
