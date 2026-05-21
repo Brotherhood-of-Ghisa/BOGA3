@@ -1,0 +1,24 @@
+name: Preview Build and Submit
+
+on:
+  push:
+    tags:
+      - "preview-*"
+
+jobs:
+  build_ios:
+    name: Build iOS Preview
+    type: build
+    environment: preview
+    params:
+      platform: ios
+      profile: preview
+
+  submit:
+    name: Submit Preview to App Store Connect
+    type: submit
+    needs: [build_ios]
+    environment: preview
+    params:
+      build_id: ${{ needs.build_ios.outputs.build_id }}
+      profile: preview

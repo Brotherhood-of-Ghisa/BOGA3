@@ -5,7 +5,7 @@
   },
   "build": {
     "preview": {
-      "developmentClient": true,
+      "developmentClient": false,
       "autoIncrement": true,
       "environment": "production",
       "ios": {
@@ -41,7 +41,7 @@
     }
   },
   "submit": {
-    "previewv": {
+    "preview": {
       "ios": {
         "ascAppId": "6766332857",
         "bundleIdentifier": "com.phano.boga3.dev"
