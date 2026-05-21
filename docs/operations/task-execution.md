@@ -163,7 +163,7 @@ This environment has **no `gh` CLI**. All GitHub interactions go through the Git
 
   ## Standard checklist
 
-  - [ ] `./scripts/quality-fast.sh` posture: builder's individual gates (`npm run lint` / `npm run typecheck` / `npm run test` in `apps/mobile/`) all pass — see "Quality gates" below for the coordinator-side run
+  - [ ] `./scripts/quality-fast.sh` passes locally (per `docs/specs/04-ai-development-playbook.md`)
   - [ ] `./scripts/quality-slow.sh <area>` posture declared (passed or `N/A`)
   - [ ] Tests added/updated per `docs/specs/06-testing-strategy.md`
   - [ ] UI docs maintenance rules followed per `docs/specs/ui/README.md` (UI tasks only; otherwise `N/A`)
@@ -190,24 +190,13 @@ This environment has **no `gh` CLI**. All GitHub interactions go through the Git
 
 ## Quality gates
 
-The Claude Code `isolation: "worktree"` harness places builder worktrees at `<project>/.claude/worktrees/agent-<id>/`. That path is nested inside the BOGA checkout, which trips `boga_validate_worktree_placement` in `scripts/worktree-lib.sh` — so `./scripts/quality-fast.sh` refuses to run from inside a builder's auto-worktree. The harness's placement is fixed and not user-configurable, so we route around it:
+Builders run `./scripts/quality-fast.sh` directly inside their worktree before opening their PR. The PR's Standard checklist reflects that pass; a failed local gate run blocks the PR.
 
-1. **Builders** run the three frontend gates individually inside their auto-worktree:
-   - `cd apps/mobile && npm run lint`
-   - `cd apps/mobile && npm run typecheck`
-   - `cd apps/mobile && npm run test`
-   That gives fast feedback during the builder's own work and lets it self-correct before opening a PR.
+This is made possible by the `WorktreeCreate` hook at `.claude/hooks/create-worktree.sh`, which overrides the Claude Code Agent harness's default worktree placement. Without the hook, the harness places worktrees at `<project>/.claude/worktrees/agent-<id>/`, which is nested inside the BOGA checkout and trips `boga_validate_worktree_placement` in `scripts/worktree-lib.sh`. With the hook, worktrees land at `$HOME/.cache/boga-agent-worktrees/<branch>/` (override via `BOGA_AGENT_WORKTREE_ROOT`) — outside the BOGA checkout, with their own `.worktree-slot` and their own isolated `apps/mobile/node_modules` install. The hook contract follows https://code.claude.com/docs/en/hooks.md#worktreecreate: stdin receives the harness's JSON envelope (`session_id`, `cwd`, …) and stdout returns the absolute worktree path.
 
-2. **The coordinator** owns the canonical `./scripts/quality-fast.sh` run. The coordinator's main checkout (e.g. `/home/user/BOGA3/`) is a non-nested BOGA root and passes the placement guard. After each builder opens its PR (and before dispatching the reviewer), the coordinator:
-   - `git fetch origin <builder-branch>`
-   - `git checkout --detach <builder-branch>` from the coordinator's checkout
-   - `./scripts/quality-fast.sh frontend` (and `backend` if the PR's risk posture demands it)
-   - Posts the result as a `[coordinator]` comment on the PR (one short line: "gates pass — N tests" or the failing tail)
-   - `git checkout main` to restore the coordinator's working state
+The hook is registered in `.claude/settings.json` under `hooks.WorktreeCreate`. Setup is one-time per worktree; each builder dispatch incurs the `npm ci` cost (typically ~20s with a warm npm cache, up to ~90s cold) so dependencies are fully isolated per the "worktrees share nothing" contract.
 
-3. **Builders do NOT** check the `quality-fast.sh` box on the PR's Standard checklist (the script doesn't run for them). They check the individual-gate posture instead. The coordinator's PR comment is the canonical gate signal for the reviewer and the human.
-
-The coordinator's main checkout needs `apps/mobile/node_modules` populated once (`cd apps/mobile && npm install`) so gate runs are fast. The coordinator does not commit or push from main; only fetch + detach for the gate run.
+The coordinator does not need to mirror the gate run from `main`; the builder's PR body asserts the gates pass, and reviewers reject PRs whose CI fails.
 
 ## Deviations
 

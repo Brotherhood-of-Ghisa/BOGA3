@@ -1,4 +1,8 @@
 .worktree-slot
 .codex
-.claude
+.claude/*
+!.claude/settings.json
+!.claude/hooks/
+.claude/hooks/*
+!.claude/hooks/*.sh
 .DS_Store
