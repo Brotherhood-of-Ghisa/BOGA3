@@ -24,7 +24,7 @@ Brief entrypoint inventory of the current reusable UI component set.
 - `apps/mobile/components/session-recorder/`
   - shared session-recorder/session-detail UI composition components and supporting UI modules
 - `apps/mobile/components/session-list/`
-  - shared building blocks pulled out of the session-list screen (summary line, active-session row, history list, data hook)
+  - shared building blocks originally extracted from the retired session-list screen (summary line, active-session row, history list, data hook); now consumed by the `stats-history` History sub-view and the Log tab
 
 ## Current component set (authoritative)
 
@@ -93,12 +93,12 @@ Brief entrypoint inventory of the current reusable UI component set.
 6. `ActiveSessionRow`
 - File: `apps/mobile/components/session-list/active-session-row.tsx`
 - Purpose:
-  - active-session row plus its overflow menu (resume / complete / delete) for use by `session-list` and the future Log tab
+  - active-session row plus its overflow menu (resume / complete / delete) used by the Log tab
 
 7. `HistoryList`
 - File: `apps/mobile/components/session-list/history-list.tsx`
 - Purpose:
-  - completed-session history list with delete/undelete modal and deleted-visibility toggle, ready to be consumed by `session-list` and the future Stats/History tab
+  - completed-session history list with delete/undelete modal and deleted-visibility toggle, consumed by the `stats-history` History sub-view
 
 ### UI-supporting shared module (non-visual)
 
@@ -116,10 +116,10 @@ Brief entrypoint inventory of the current reusable UI component set.
 
 ## Excluded from this catalog (document elsewhere)
 
-- Route-level screen shells (for example `SessionListScreenShell`, `CompletedSessionDetailScreenShell`, `ExerciseHistoryScreenShell`)
+- Route-level screen shells (for example `CompletedSessionDetailScreenShell`, `ExerciseHistoryScreenShell`)
   - Document in `docs/specs/ui/screen-map.md` and `docs/specs/ui/navigation-contract.md`
   - Reason: they are route composition/test helpers, not reusable UI building blocks
-  - `ExerciseHistoryScreenShell` is exported separately from `apps/mobile/app/exercise-history.tsx` so the per-exercise history surface can be wired from any future route (currently entered from `/stats`); the component remains a route-level shell, not a reusable primitive
+  - `ExerciseHistoryScreenShell` is exported separately from `apps/mobile/app/exercise-history.tsx` so the per-exercise history surface can be wired from any future route (currently entered from `/stats-history`); the component remains a route-level shell, not a reusable primitive
 
 ## Pending / planned (not current components)
 

@@ -23,29 +23,12 @@ Brief entrypoint map of the current mobile screens.
 - Notes:
   - no unique UI; renders an `expo-router` `Redirect` to the merged Stats/History tab
 
-2. `/session-list`
-- File: `apps/mobile/app/session-list.tsx`
-- Purpose:
-  - legacy sessions home/history screen (active session entry, completed history, session actions); during the navigation redesign migration this route is still rendered as-is so the `session-list-decompose` task can extract pieces and Maestro can still reach it; final state will be reached once `maestro-and-tests` runs
-- Key states (high level):
-  - loading / error / empty / populated list
-  - in-route action modals
-- Key exits:
-  - `session-recorder`
-  - `completed-session/[sessionId]`
-  - `exercise-catalog`
-
-2a. `/stats-history`
+2. `/stats-history`
 - File: `apps/mobile/app/(tabs)/stats-history.tsx`
 - Purpose:
-  - merged Stats / History tab; currently renders the prior `/stats` body verbatim while the `stats-history-tab` task layers the Stats↔History segmented toggle on top
+  - merged Stats / History tab with a top Stats ↔ History segmented toggle; the History sub-view reuses the shared `HistoryList` building block, and the Stats sub-view hosts the period chips and per-exercise picker that link out to `/exercise-history`
 - Notes:
-  - tab root inside the `(tabs)` group with `headerShown: false`; the tab bar is now `BottomTray` (composing `TopLevelTabs`) supplied via the `tabBar` prop in `(tabs)/_layout.tsx`. The in-screen `<TopLevelTabs>` in this file is a transitional duplicate retained until the `stats-history-tab` task takes over; it shares the same component so the API stays uniform.
-
-2b. `/stats` (redirect)
-- File: `apps/mobile/app/stats.tsx`
-- Purpose:
-  - back-compat shim: renders an `expo-router` `Redirect` to `/stats-history` so existing callers (e.g. `TopLevelTabs`) keep working until `bottom-tray` updates them and `maestro-and-tests` retires this shim
+  - tab root inside the `(tabs)` group with `headerShown: false`; the tab bar is `BottomTray` (composing `TopLevelTabs`) supplied via the `tabBar` prop in `(tabs)/_layout.tsx`.
 
 3. `/session-recorder`
 - File: `apps/mobile/app/(tabs)/session-recorder.tsx`
@@ -71,7 +54,7 @@ Brief entrypoint map of the current mobile screens.
   - deleted visibility toggle (`Show deleted` / `Hide deleted`) via top-level options kebab menu
 - Key exits:
   - `session-recorder` after save when opened from recorder-origin manage flow
-  - `session-list` via top-level tabs
+  - `stats-history` / `session-recorder` via the shared bottom tray (`TopLevelTabs`)
 
 5. `/settings`
 - File: `apps/mobile/app/(tabs)/settings.tsx`
@@ -125,7 +108,7 @@ Brief entrypoint map of the current mobile screens.
   - dynamic stack title set inside the route file to the resolved exercise name (falls back to `Exercise History`)
 - Key exits:
   - `/completed-session/<sessionId>` from session card tap or from the all-time-best card rows
-  - `session-list` / `exercise-catalog` / `stats` / `settings` via the shared bottom tab strip
+  - `stats-history` / `session-recorder` / `exercise-catalog` / `settings` via the shared bottom tray (`TopLevelTabs` plus the Settings cog)
 
 ## Route shell (not a user-facing screen)
 
@@ -133,7 +116,7 @@ Brief entrypoint map of the current mobile screens.
 - Purpose:
   - root stack registration and local data bootstrap on app mount
 - Notes:
-  - tab roots live inside the `(tabs)` route group (`apps/mobile/app/(tabs)/_layout.tsx`) with `headerShown: false`; the root stack registers the `(tabs)` group itself plus the detail screens (`session-list`, `stats`, `exercise-history`, `profile`, `maestro-harness`, `completed-session/[sessionId]`)
+  - tab roots live inside the `(tabs)` route group (`apps/mobile/app/(tabs)/_layout.tsx`) with `headerShown: false`; the root stack registers the `(tabs)` group itself plus the detail screens (`exercise-history`, `profile`, `maestro-harness`, `completed-session/[sessionId]`)
   - completed-session route sets its title inside the route file
   - exercise-history route also sets its title inside the route file (resolved exercise name)
 
