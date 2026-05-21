@@ -58,6 +58,16 @@ boga_validate_worktree_placement() {
   root="$(boga_abs_dir "$1")"
 
   if parent="$(boga_parent_repo_root "$root")"; then
+    # Blessed-nesting allowlist: worktrees created by an AI agent harness
+    # (e.g. Claude Code's `isolation: "worktree"`) live at
+    # `<parent>/.claude/worktrees/<name>/`. That location is already
+    # `.gitignore`d and the worktrees there share nothing with the parent —
+    # each has its own `apps/mobile/node_modules`, and there is no
+    # `node_modules` at the BOGA root for tools to walk up into.
+    if [[ "$root" == "$parent/.claude/worktrees/"* ]]; then
+      return 0
+    fi
+
     if [[ "${BOGA_ALLOW_NESTED_WORKTREE:-0}" == "1" ]]; then
       echo "[worktree] warning: nested BOGA checkout allowed by BOGA_ALLOW_NESTED_WORKTREE=1" >&2
       echo "[worktree] parent: $parent" >&2
@@ -75,6 +85,7 @@ boga_validate_worktree_placement() {
 [worktree] preferably with:
 [worktree]   ./scripts/worktree-create.sh <branch-name>
 [worktree]
+[worktree] Agent worktrees under `<parent>/.claude/worktrees/` are exempt by design.
 [worktree] Override only for one-off diagnostics with BOGA_ALLOW_NESTED_WORKTREE=1.
 EOF
     return 1
@@ -295,6 +306,24 @@ boga_validate_runtime_worktree() {
   local repo_root="$1"
 
   boga_validate_worktree_placement "$repo_root" || return 1
+
+  # For blessed agent worktrees under `<parent>/.claude/worktrees/`, the slot
+  # file is not required — slots drive port allocation for supabase/expo
+  # metro, which agent worktrees don't run. They just need an isolated
+  # `apps/mobile/node_modules` to execute the frontend gates.
+  local parent
+  if parent="$(boga_parent_repo_root "$repo_root")" && [[ "$repo_root" == "$parent/.claude/worktrees/"* ]]; then
+    if ! boga_mobile_node_modules_is_isolated "$repo_root"; then
+      cat >&2 <<EOF
+[worktree] Refusing to use symlinked apps/mobile/node_modules in agent worktree.
+[worktree] Each worktree must own its own dependency install so agents do not share mutable builds.
+[worktree] Inside this worktree, run:
+[worktree]   cd apps/mobile && npm ci
+EOF
+      return 1
+    fi
+    return 0
+  fi
 
   if [[ -f "$repo_root/.worktree-slot" ]]; then
     boga_read_slot_file "$repo_root" >/dev/null || return 1
