@@ -12,7 +12,7 @@ appId: com.dinoderek.mobile
     optional: true
 - extendedWaitUntil:
     visible:
-      id: "session-list-screen"
+      id: "stats-history-screen"
     timeout: 30000
 - takeScreenshot: "03-data-runtime-smoke-start"
 - openLink: "boga3://maestro-harness?reset=data&teleport=session-recorder"
@@ -58,7 +58,7 @@ appId: com.dinoderek.mobile
     optional: true
 - extendedWaitUntil:
     visible:
-      id: "session-list-screen"
+      id: "stats-history-screen"
     timeout: 30000
 - tapOn:
     text: "Continue"
@@ -66,6 +66,8 @@ appId: com.dinoderek.mobile
 - tapOn:
     text: "Close"
     optional: true
+- tapOn:
+    id: "stats-history-view-chip-history"
 - assertVisible:
     id: "completed-history-scroll"
 - takeScreenshot: "04-data-runtime-smoke-success"

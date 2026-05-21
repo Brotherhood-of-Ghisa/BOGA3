@@ -81,7 +81,7 @@ describe('maestro harness helpers', () => {
       resolveMaestroHarnessTeleportHref({
         target: 'session-list',
       })
-    ).toBe('/session-list');
+    ).toBe('/stats-history');
 
     expect(
       resolveMaestroHarnessTeleportHref({

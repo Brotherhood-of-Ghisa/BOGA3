@@ -3,7 +3,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View, type ListRenderItem } from 'react-native';
 
 import { ExerciseEditorModal } from '@/components/exercise-catalog/exercise-editor-modal';
-import { TopLevelTabs } from '@/components/navigation/top-level-tabs';
 import { uiColors } from '@/components/ui';
 import {
   deleteExerciseCatalogExercise,
@@ -261,16 +260,6 @@ export default function ExerciseCatalogScreen() {
     setSaveFeedback(null);
   };
 
-  const bottomTabs = (
-    <TopLevelTabs
-      activeTab="exercises"
-      onPressStatsHistory={() => router.push('/stats-history')}
-      onPressLog={() => router.push('/session-recorder')}
-      onPressExercises={() => {}}
-      onPressSettings={() => router.push('/settings')}
-    />
-  );
-
   if (isLoading) {
     return (
       <View style={styles.screen}>
@@ -279,7 +268,6 @@ export default function ExerciseCatalogScreen() {
             Loading exercise catalog…
           </Text>
         </View>
-        {bottomTabs}
       </View>
     );
   }
@@ -292,7 +280,6 @@ export default function ExerciseCatalogScreen() {
             {loadError}
           </Text>
         </View>
-        {bottomTabs}
       </View>
     );
   }
@@ -462,8 +449,6 @@ export default function ExerciseCatalogScreen() {
           </View>
         </View>
       </Modal>
-
-      {bottomTabs}
     </View>
   );
 }

@@ -13,7 +13,7 @@ appId: com.dinoderek.mobile
     optional: true
 - extendedWaitUntil:
     visible:
-      id: "session-list-screen"
+      id: "stats-history-screen"
     timeout: 30000
 - openLink: "boga3://maestro-harness?teleport=session-recorder"
 - tapOn:

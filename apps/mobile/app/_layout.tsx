@@ -38,8 +38,6 @@ export default function RootLayout() {
     <AuthProvider>
       <Stack>
         <Stack.Screen name="index" options={{ headerShown: false }} />
-        <Stack.Screen name="session-list" options={{ title: 'Sessions' }} />
-        <Stack.Screen name="stats" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="exercise-history" />
         <Stack.Screen name="profile" options={{ title: 'Profile' }} />
