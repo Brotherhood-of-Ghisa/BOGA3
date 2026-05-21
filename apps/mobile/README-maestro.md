@@ -97,7 +97,7 @@ Force a rebuild:
 ./scripts/maestro-ios-dev-client-build.sh --force
 ```
 
-The build is refreshed when the `.app` or build metadata is missing, when the native-input fingerprint changes, or when `--force` is passed.
+The cached `.app` is reused whenever it exists. A rebuild only happens when the artifact is missing or when `--force` is passed — JS/config changes do not invalidate the cache.
 
 ## Main validation commands
 

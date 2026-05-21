@@ -13,7 +13,6 @@ BUILD_LOG_FILE="$BUILD_ROOT/build.log"
 TEMP_ROOT="$BUILD_ROOT/tmp-build"
 WORKSPACE_DIR="$TEMP_ROOT/workspace"
 DERIVED_DATA_DIR="$TEMP_ROOT/derived-data"
-SOURCE_FINGERPRINT=""
 STATUS="unknown"
 REASON="unknown"
 FORCE_REBUILD=0
@@ -24,10 +23,11 @@ usage() {
   cat <<'EOF'
 Usage: ./scripts/maestro-ios-dev-client-build.sh [options]
 
-Build or reuse the shared iOS simulator dev-client .app artifact for Maestro.
+Reuse the shared iOS simulator dev-client .app artifact for Maestro, building it
+only when missing or when --force is passed.
 
 Options:
-  --force            Rebuild even when the current fingerprint already matches.
+  --force            Force a rebuild even when a cached artifact exists.
   --print-app-path   Print the resolved .app path after ensuring the artifact exists.
   --status           Print build status without building.
   -h, --help         Show this help text.
@@ -57,28 +57,14 @@ read_metadata_value() {
 }
 
 resolve_status() {
-  SOURCE_FINGERPRINT="$(maestro_current_dev_client_fingerprint)"
-
   if [[ ! -d "$APP_PATH" || ! -f "$APP_PATH/Info.plist" ]]; then
     STATUS="missing"
     REASON="artifact-missing"
     return 0
   fi
 
-  if [[ ! -f "$METADATA_FILE" ]]; then
-    STATUS="stale"
-    REASON="metadata-missing"
-    return 0
-  fi
-
-  if [[ "$(read_metadata_value MAESTRO_IOS_DEV_CLIENT_FINGERPRINT)" != "$SOURCE_FINGERPRINT" ]]; then
-    STATUS="stale"
-    REASON="native-input-fingerprint-changed"
-    return 0
-  fi
-
   STATUS="ready"
-  REASON="fingerprint-match"
+  REASON="artifact-cached"
 }
 
 print_status() {
@@ -86,10 +72,8 @@ print_status() {
   echo "reason=$REASON"
   echo "build_root=$BUILD_ROOT"
   echo "app_path=$APP_PATH"
-  echo "source_fingerprint=$SOURCE_FINGERPRINT"
 
   if [[ -f "$METADATA_FILE" ]]; then
-    echo "built_fingerprint=$(read_metadata_value MAESTRO_IOS_DEV_CLIENT_FINGERPRINT)"
     echo "built_at=$(read_metadata_value MAESTRO_IOS_DEV_CLIENT_BUILT_AT)"
     echo "bundle_id=$(read_metadata_value MAESTRO_IOS_DEV_CLIENT_BUNDLE_ID)"
     echo "build_log=$BUILD_LOG_FILE"
@@ -140,7 +124,6 @@ build_dev_client() {
   {
     echo "[maestro-ios-dev-client-build] Shared build root: $BUILD_ROOT"
     echo "[maestro-ios-dev-client-build] App path: $APP_PATH"
-    echo "[maestro-ios-dev-client-build] Fingerprint: $SOURCE_FINGERPRINT"
     echo "[maestro-ios-dev-client-build] Preparing native project via expo prebuild"
   } | tee -a "$BUILD_LOG_FILE"
 
@@ -182,7 +165,6 @@ build_dev_client() {
   built_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
   {
-    printf 'MAESTRO_IOS_DEV_CLIENT_FINGERPRINT=%q\n' "$SOURCE_FINGERPRINT"
     printf 'MAESTRO_IOS_DEV_CLIENT_BUILT_AT=%q\n' "$built_at"
     printf 'MAESTRO_IOS_DEV_CLIENT_BUILD_METHOD=%q\n' "expo-prebuild+xcodebuild"
     printf 'MAESTRO_IOS_DEV_CLIENT_APP_PATH=%q\n' "$APP_PATH"
@@ -225,7 +207,7 @@ if [[ "$STATUS_ONLY" == "1" ]]; then
 fi
 
 if [[ "$FORCE_REBUILD" == "1" ]]; then
-  STATUS="stale"
+  STATUS="missing"
   REASON="forced-rebuild"
 fi
 
