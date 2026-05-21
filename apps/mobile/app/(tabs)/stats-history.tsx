@@ -98,11 +98,6 @@ export type StatsScreenShellProps = {
   errorMessage: string | null;
 };
 
-/**
- * Backwards-compatible shell that renders only the Stats sub-view plus the
- * shared bottom `TopLevelTabs`. Kept exported so existing tests that import it
- * from `app/(tabs)/stats-history` continue to compile.
- */
 export function StatsScreenShell({
   summary,
   periodDays,
@@ -322,11 +317,6 @@ export type HistorySubViewProps = {
   reloadToken?: number;
 };
 
-/**
- * History sub-view for the Stats/History tab. Wires the shared `HistoryList`
- * primitive to the same data hook the standalone session-list screen uses, so
- * deletion / edit / reopen flows stay identical.
- */
 export function HistorySubView({
   dataClient,
   initialSessions = DEFAULT_SESSION_LIST_ITEMS,
@@ -521,10 +511,6 @@ export type StatsHistoryScreenShellProps = {
   onChangeView: (next: StatsHistoryView) => void;
 };
 
-/**
- * Stats/History tab shell. Renders the top Stats ↔ History toggle and keeps
- * both sub-views mounted so per-view scroll state persists across toggling.
- */
 export function StatsHistoryScreenShell({
   summary,
   periodDays,
@@ -553,10 +539,6 @@ export function StatsHistoryScreenShell({
 
       <View style={styles.contentRegion}>
         <View
-          // Both sub-views stay mounted so per-view scroll/menu state survives
-          // toggling. The inactive slot is removed from layout via `display:
-          // 'none'` and from touch handling via `pointerEvents="none"` while
-          // remaining in the React tree.
           style={[styles.subViewSlot, activeView === 'stats' ? null : styles.subViewHidden]}
           pointerEvents={activeView === 'stats' ? 'auto' : 'none'}
           testID="stats-history-stats-slot">
@@ -793,8 +775,6 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
   },
   subViewHidden: {
-    // `display: 'none'` keeps the subtree mounted (preserving scroll position
-    // and component state) while removing it from layout and pointer events.
     display: 'none',
   },
   subViewRegion: {
