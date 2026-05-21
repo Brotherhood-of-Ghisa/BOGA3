@@ -23,6 +23,8 @@ Brief entrypoint inventory of the current reusable UI component set.
   - shared exercise-catalog editing UI reused across route and recorder flows
 - `apps/mobile/components/session-recorder/`
   - shared session-recorder/session-detail UI composition components and supporting UI modules
+- `apps/mobile/components/session-list/`
+  - shared building blocks pulled out of the session-list screen (summary line, active-session row, history list, data hook)
 
 ## Current component set (authoritative)
 
@@ -72,12 +74,34 @@ Brief entrypoint inventory of the current reusable UI component set.
   - shared layout scaffold for session exercise/set content used by `session-recorder` and completed-session detail screens
   - supports optional per-exercise metadata injection (`renderExerciseMeta`) so recorder mode can render tag chips/actions without duplicating card structure
 
+4. `SessionSummaryLine`
+- File: `apps/mobile/components/session-list/session-summary-line.tsx`
+- Purpose:
+  - shared two-line summary row (date/duration/gym + sets/exercises) reused by `ActiveSessionRow` and `HistoryList`, and available to the upcoming Stats/History and Log tabs
+
+5. `ActiveSessionRow`
+- File: `apps/mobile/components/session-list/active-session-row.tsx`
+- Purpose:
+  - active-session row plus its overflow menu (resume / complete / delete) for use by `session-list` and the future Log tab
+
+6. `HistoryList`
+- File: `apps/mobile/components/session-list/history-list.tsx`
+- Purpose:
+  - completed-session history list with delete/undelete modal and deleted-visibility toggle, ready to be consumed by `session-list` and the future Stats/History tab
+
 ### UI-supporting shared module (non-visual)
 
 1. `session-recorder/types.ts`
 - File: `apps/mobile/components/session-recorder/types.ts`
 - Purpose:
   - shared UI state/types/constants used by the session-recorder screen flow
+
+2. `session-list/types.ts` and `session-list/history-data.ts`
+- Files:
+  - `apps/mobile/components/session-list/types.ts` — `SessionListItem`, `SessionListDataClient`, `DEFAULT_SESSION_LIST_ITEMS`, and the `formatCompactDuration` re-export
+  - `apps/mobile/components/session-list/history-data.ts` — `DEFAULT_SESSION_LIST_DATA_CLIENT` and `useSessionListData` (loads/refreshes buckets via the data layer)
+- Purpose:
+  - shared data plumbing so any tab that needs the session list buckets (Stats/History, Log) can reuse the same hook and data client without re-implementing repository mapping
 
 ## Excluded from this catalog (document elsewhere)
 
