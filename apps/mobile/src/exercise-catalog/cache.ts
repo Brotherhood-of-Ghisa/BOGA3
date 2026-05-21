@@ -7,6 +7,7 @@ import {
   type ExerciseCatalogMuscleGroup,
 } from '@/src/data/exercise-catalog';
 
+import { subscribeToExerciseCatalogInvalidation } from './invalidation';
 import {
   buildExerciseCatalogSearchText,
   indexExerciseCatalogMuscleGroupsById,
@@ -136,10 +137,10 @@ export const ensureExerciseCatalogLoaded = async (): Promise<void> => {
   await ensureDrain();
 };
 
-export const invalidateExerciseCatalogCache = (): void => {
+subscribeToExerciseCatalogInvalidation(() => {
   pendingReload = true;
   void ensureDrain();
-};
+});
 
 export const __resetExerciseCatalogCacheForTests = (): void => {
   listeners.clear();

@@ -2,7 +2,7 @@ import { asc, eq, inArray, isNull } from 'drizzle-orm';
 
 import { bootstrapLocalDataLayer, type LocalDatabase } from './bootstrap';
 import { exerciseDefinitions, exerciseMuscleMappings, muscleGroups } from './schema';
-import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/cache';
+import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidation';
 import { enqueueSyncEventsTx } from '@/src/sync';
 
 export type ExerciseCatalogMuscleGroup = {

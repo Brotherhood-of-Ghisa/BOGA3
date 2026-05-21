@@ -2,9 +2,9 @@ import {
   __resetExerciseCatalogCacheForTests,
   ensureExerciseCatalogLoaded,
   getExerciseCatalogSnapshot,
-  invalidateExerciseCatalogCache,
   subscribeToExerciseCatalog,
 } from '@/src/exercise-catalog/cache';
+import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidation';
 import {
   listExerciseCatalogExercises,
   listExerciseCatalogMuscleGroups,

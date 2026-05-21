@@ -11,10 +11,8 @@ import {
   undeleteExerciseCatalogExercise,
   type ExerciseCatalogExercise,
 } from '@/src/data/exercise-catalog';
-import {
-  __resetExerciseCatalogCacheForTests,
-  invalidateExerciseCatalogCache,
-} from '@/src/exercise-catalog/cache';
+import { __resetExerciseCatalogCacheForTests } from '@/src/exercise-catalog/cache';
+import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidation';
 
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => ({}),

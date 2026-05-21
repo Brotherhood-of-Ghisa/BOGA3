@@ -17,7 +17,7 @@ import {
 import { runSyncBootstrapMerge, type SyncBootstrapMergeResult } from './bootstrap';
 import { clearSyncRetryState, resetSyncStreamForBootstrap } from './outbox';
 import type { SyncIngestResponse } from './types';
-import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/cache';
+import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidation';
 
 type RuntimeStateTx = Pick<LocalDatabase, 'insert' | 'select' | 'update'>;
 
