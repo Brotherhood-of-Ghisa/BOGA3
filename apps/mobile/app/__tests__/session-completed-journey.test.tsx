@@ -427,7 +427,7 @@ describe('completed session list/detail/edit/reopen journeys', () => {
     fireEvent.press(screen.getByText('Save Changes'));
 
     await waitFor(() => {
-      expect(mockDismissTo).toHaveBeenCalledWith('/');
+      expect(mockDismissTo).toHaveBeenCalledWith('/stats-history');
     });
 
     recorder.unmount();

@@ -14,6 +14,13 @@ jest.mock('@/src/data', () => ({
     updatedAt: new Date('2026-03-01T10:00:00.000Z'),
   }),
   deleteExerciseTagDefinition: jest.fn().mockResolvedValue(undefined),
+  formatSessionListCompactDuration: (durationSec: number | null) => {
+    if (!durationSec || durationSec <= 0) {
+      return '0m';
+    }
+    const totalMinutes = Math.floor(durationSec / 60);
+    return `${totalMinutes}m`;
+  },
   listExerciseTagDefinitions: jest.fn().mockResolvedValue([]),
   listSessionExerciseAssignedTags: jest.fn().mockResolvedValue([]),
   loadLocalGymById: jest.fn().mockResolvedValue(null),
@@ -27,6 +34,7 @@ jest.mock('@/src/data', () => ({
   persistSessionDraftSnapshot: jest.fn().mockResolvedValue({ sessionId: 'test-session' }),
   removeExerciseTagFromSessionExercise: jest.fn().mockResolvedValue(undefined),
   renameExerciseTagDefinition: jest.fn().mockResolvedValue(undefined),
+  setSessionDeletedState: jest.fn().mockResolvedValue(undefined),
   undeleteExerciseTagDefinition: jest.fn().mockResolvedValue(undefined),
   upsertLocalGym: jest.fn().mockResolvedValue(undefined),
   completeSessionDraft: jest.fn().mockResolvedValue({
@@ -56,10 +64,56 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ replace: jest.fn(), push: jest.fn() }),
 }));
 
+const dismissEmptyStateIfPresent = async () => {
+  await act(async () => {});
+  const startButton = screen.queryByTestId('start-session-button');
+  if (startButton) {
+    fireEvent.press(startButton);
+    await act(async () => {});
+  }
+};
+
 describe('SessionRecorderScreen', () => {
-  it('renders the baseline session recorder shell', async () => {
+  it('renders the empty-state Start CTA when no active session exists', async () => {
     render(<SessionRecorderScreen />);
     await act(async () => {});
+
+    expect(screen.getByTestId('session-recorder-empty-state')).toBeTruthy();
+    expect(screen.getByTestId('start-session-button')).toBeTruthy();
+    expect(screen.queryByText('Date and Time')).toBeNull();
+    expect(screen.queryByText('Log new exercise')).toBeNull();
+  });
+
+  it('reveals the recorder body after tapping Start Session and persists a new draft', async () => {
+    const dataMock = jest.requireMock('@/src/data') as {
+      persistSessionDraftSnapshot: jest.Mock;
+    };
+    dataMock.persistSessionDraftSnapshot.mockClear();
+    dataMock.persistSessionDraftSnapshot.mockResolvedValueOnce({ sessionId: 'new-draft-1' });
+
+    render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
+
+    expect(dataMock.persistSessionDraftSnapshot).toHaveBeenCalledWith(
+      expect.objectContaining({
+        gymId: null,
+        status: 'active',
+        exercises: [],
+      })
+    );
+
+    expect(screen.queryByTestId('session-recorder-empty-state')).toBeNull();
+    expect(screen.getByText('Date and Time')).toBeTruthy();
+    expect(screen.getByText('Gym')).toBeTruthy();
+    expect(screen.getByText('Choose gym')).toBeTruthy();
+    expect(screen.getByText('Log new exercise')).toBeTruthy();
+    expect(screen.getByText('No exercises logged yet.')).toBeTruthy();
+    expect(screen.getByText('Submit Session')).toBeTruthy();
+  });
+
+  it('renders the baseline session recorder shell', async () => {
+    render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
 
     expect(screen.getByText('Date and Time')).toBeTruthy();
     expect(screen.getByText('Gym')).toBeTruthy();
@@ -73,7 +127,7 @@ describe('SessionRecorderScreen', () => {
 
   it('prefills date and time with the current value pattern', async () => {
     render(<SessionRecorderScreen />);
-    await act(async () => {});
+    await dismissEmptyStateIfPresent();
 
     expect(screen.getByText(/\d{4}-\d{2}-\d{2} \d{2}:\d{2}/)).toBeTruthy();
     expect(screen.queryByPlaceholderText('YYYY-MM-DD HH:mm')).toBeNull();
@@ -81,7 +135,7 @@ describe('SessionRecorderScreen', () => {
 
   it('supports picker selection and add new gym flow', async () => {
     render(<SessionRecorderScreen />);
-    await act(async () => {});
+    await dismissEmptyStateIfPresent();
 
     fireEvent.press(screen.getByText('Choose gym'));
     expect(screen.getByText('Select Gym')).toBeTruthy();
@@ -91,9 +145,13 @@ describe('SessionRecorderScreen', () => {
     expect(screen.getByLabelText('Select gym North End Strength Lab')).toBeTruthy();
 
     fireEvent.press(screen.getByLabelText('Select gym Westside Barbell Club'));
-    expect(screen.getByText('Westside Barbell Club')).toBeTruthy();
+    expect(screen.getAllByText('Westside Barbell Club').length).toBeGreaterThanOrEqual(1);
 
-    fireEvent.press(screen.getByText('Westside Barbell Club'));
+    // Re-open the gym picker via the recorder body's gym button (the active-session
+    // row also renders the gym name now but is not pressable for re-opening).
+    const gymButtonTexts = screen.getAllByText('Westside Barbell Club');
+    const gymButtonText = gymButtonTexts[gymButtonTexts.length - 1];
+    fireEvent.press(gymButtonText);
     fireEvent.press(screen.getByText('Add new'));
     expect(screen.getByText('Add Gym')).toBeTruthy();
     expect(screen.queryByText('Manage')).toBeNull();
@@ -102,12 +160,12 @@ describe('SessionRecorderScreen', () => {
     fireEvent.changeText(screen.getByPlaceholderText('Gym name'), 'Southside Fitness Forge');
     fireEvent.press(screen.getByText('Add'));
 
-    expect(screen.getByText('Southside Fitness Forge')).toBeTruthy();
+    expect(screen.getAllByText('Southside Fitness Forge').length).toBeGreaterThanOrEqual(1);
   });
 
   it('supports manage gyms edit/archive/filter/unarchive flow', async () => {
     render(<SessionRecorderScreen />);
-    await act(async () => {});
+    await dismissEmptyStateIfPresent();
 
     fireEvent.press(screen.getByText('Choose gym'));
     fireEvent.press(screen.getByText('Manage'));
@@ -136,7 +194,7 @@ describe('SessionRecorderScreen', () => {
 
   it('dismisses the gym modal when pressing outside', async () => {
     render(<SessionRecorderScreen />);
-    await act(async () => {});
+    await dismissEmptyStateIfPresent();
 
     fireEvent.press(screen.getByText('Choose gym'));
     expect(screen.getByText('Select Gym')).toBeTruthy();

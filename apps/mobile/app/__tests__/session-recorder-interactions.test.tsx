@@ -256,6 +256,13 @@ jest.mock('@/src/data', () => {
     }),
     createExerciseTagDefinition: createTagDefinition,
     deleteExerciseTagDefinition: deleteTagDefinition,
+    formatSessionListCompactDuration: (durationSec: number | null) => {
+      if (!durationSec || durationSec <= 0) {
+        return '0m';
+      }
+      const totalMinutes = Math.floor(durationSec / 60);
+      return `${totalMinutes}m`;
+    },
     listExerciseTagDefinitions: listTagDefinitions,
     listSessionExerciseAssignedTags,
     loadLocalGymById: jest.fn().mockResolvedValue(null),
@@ -265,6 +272,7 @@ jest.mock('@/src/data', () => {
     persistSessionDraftSnapshot,
     removeExerciseTagFromSessionExercise,
     renameExerciseTagDefinition: renameTagDefinition,
+    setSessionDeletedState: jest.fn().mockResolvedValue(undefined),
     undeleteExerciseTagDefinition: undeleteTagDefinition,
     upsertLocalGym: jest.fn().mockResolvedValue(undefined),
   };
@@ -390,6 +398,15 @@ const buildCompletedEditSnapshot = (overrides: Partial<any> = {}) => ({
   ...overrides,
 });
 
+const dismissEmptyStateIfPresent = async () => {
+  await act(async () => {});
+  const startButton = screen.queryByTestId('start-session-button');
+  if (startButton) {
+    fireEvent.press(startButton);
+    await act(async () => {});
+  }
+};
+
 describe('SessionRecorderScreen exercise interactions', () => {
   beforeEach(() => {
     mockPush.mockReset();
@@ -407,6 +424,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
 
   it('adds a preset exercise from the log flow and updates first set fields', async () => {
     render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
 
     expect(screen.getByText('No exercises logged yet.')).toBeTruthy();
 
@@ -448,12 +466,13 @@ describe('SessionRecorderScreen exercise interactions', () => {
 
   it('cycles set type from the row button and supports long-press selection modal', async () => {
     render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
 
     fireEvent.press(screen.getByText('Log new exercise'));
     fireEvent.press(await screen.findByLabelText('Select exercise Barbell Squat'));
 
     const setTypeButton = screen.getByTestId('set-type-button-1-1');
-    expect(screen.getByText('•')).toBeTruthy();
+    expect(setTypeButton.findByType('Text').props.children).toBe('•');
 
     fireEvent.press(setTypeButton);
     expect(screen.getByText('WU')).toBeTruthy();
@@ -464,7 +483,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     fireEvent.press(setTypeButton);
     expect(screen.getByText('R2')).toBeTruthy();
     fireEvent.press(setTypeButton);
-    expect(screen.getByText('•')).toBeTruthy();
+    expect(setTypeButton.findByType('Text').props.children).toBe('•');
 
     fireEvent(setTypeButton, 'onLongPress');
     expect(screen.getByLabelText('Choose RIR 1 set type')).toBeTruthy();
@@ -476,6 +495,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
 
   it('constrains set inputs and allows zero weight while keeping zero reps invalid', async () => {
     render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
 
     fireEvent.press(screen.getByText('Log new exercise'));
     fireEvent.press(await screen.findByLabelText('Select exercise Barbell Squat'));
@@ -509,6 +529,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
 
   it('defaults a new set from the previous set in the same exercise', async () => {
     render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
 
     fireEvent.press(screen.getByText('Log new exercise'));
     fireEvent.press(await screen.findByLabelText('Select exercise Barbell Squat'));
@@ -547,6 +568,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
 
   it('filters exercise picker by all query words across names and primary muscles only', async () => {
     render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
 
     fireEvent.press(screen.getByText('Log new exercise'));
     expect(await screen.findByLabelText('Select exercise Barbell Squat')).toBeTruthy();
@@ -598,6 +620,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
 
   it('creates a new exercise inline from the picker and keeps set add/remove interactions intact', async () => {
     render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
 
     fireEvent.press(screen.getByText('Log new exercise'));
     fireEvent.press(screen.getByLabelText('Open inline exercise create'));
@@ -640,6 +663,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
 
   it('adds and removes assigned tags from a logged exercise card', async () => {
     render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
 
     fireEvent.press(screen.getByText('Log new exercise'));
     fireEvent.press(await screen.findByLabelText('Select exercise Barbell Squat'));
@@ -667,6 +691,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
 
   it('recovers when second tag attach hits a transient unique constraint', async () => {
     render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
 
     fireEvent.press(screen.getByText('Log new exercise'));
     fireEvent.press(await screen.findByLabelText('Select exercise Barbell Squat'));
@@ -700,6 +725,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
 
   it('creates, renames, deletes, undeletes, and assigns tags from manage flow', async () => {
     render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
 
     fireEvent.press(screen.getByText('Log new exercise'));
     fireEvent.press(await screen.findByLabelText('Select exercise Bench Press'));
@@ -753,6 +779,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
 
   it('creates and immediately assigns a new tag to the active exercise', async () => {
     render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
 
     fireEvent.press(screen.getByText('Log new exercise'));
     fireEvent.press(await screen.findByLabelText('Select exercise Deadlift'));
@@ -780,6 +807,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
 
   it('keeps add button disabled for empty or duplicate names', async () => {
     render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
 
     fireEvent.press(screen.getByText('Log new exercise'));
     fireEvent.press(await screen.findByLabelText('Select exercise Bench Press'));
@@ -803,6 +831,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
 
   it('routes Manage to exercise catalog', async () => {
     render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
 
     fireEvent.press(screen.getByText('Log new exercise'));
     expect(await screen.findByLabelText('Select exercise Barbell Squat')).toBeTruthy();
@@ -813,6 +842,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
 
   it('reopens the exercise picker on focus after routing to catalog', async () => {
     render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
 
     fireEvent.press(screen.getByText('Log new exercise'));
     expect(await screen.findByLabelText('Select exercise Barbell Squat')).toBeTruthy();
@@ -834,6 +864,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     mockLoadSessionSnapshotById.mockResolvedValue(buildCompletedEditSnapshot());
 
     render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
 
     await waitFor(() => {
       expect(screen.getByText('Save Changes')).toBeTruthy();
@@ -864,6 +895,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     mockLoadSessionSnapshotById.mockResolvedValue(buildCompletedEditSnapshot());
 
     render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
 
     await waitFor(() => {
       expect(screen.getByText('Save Changes')).toBeTruthy();
@@ -886,6 +918,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     mockLoadSessionSnapshotById.mockResolvedValue(buildCompletedEditSnapshot());
 
     render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
 
     await waitFor(() => {
       expect(screen.getByText('Save Changes')).toBeTruthy();
@@ -908,6 +941,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
 
   it('removes an exercise and updates nested set totals', async () => {
     render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
 
     fireEvent.press(screen.getByText('Log new exercise'));
     expect(await screen.findByLabelText('Select exercise Barbell Squat')).toBeTruthy();

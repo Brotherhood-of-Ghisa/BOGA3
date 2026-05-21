@@ -1,6 +1,15 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
 import SessionRecorderScreen from '../(tabs)/session-recorder';
+
+const dismissEmptyStateIfPresent = async () => {
+  await act(async () => {});
+  const startButton = screen.queryByTestId('start-session-button');
+  if (startButton) {
+    fireEvent.press(startButton);
+    await act(async () => {});
+  }
+};
 
 let mockSearchParams: Record<string, string | undefined> = {};
 const mockLogEvent = jest.fn();
@@ -29,6 +38,13 @@ jest.mock('@/src/data', () => ({
     updatedAt: new Date('2026-03-01T10:00:00.000Z'),
   }),
   deleteExerciseTagDefinition: jest.fn().mockResolvedValue(undefined),
+  formatSessionListCompactDuration: (durationSec: number | null) => {
+    if (!durationSec || durationSec <= 0) {
+      return '0m';
+    }
+    const totalMinutes = Math.floor(durationSec / 60);
+    return `${totalMinutes}m`;
+  },
   listExerciseTagDefinitions: jest.fn().mockResolvedValue([]),
   listSessionExerciseAssignedTags: jest.fn().mockResolvedValue([]),
   loadLocalGymById: jest.fn().mockResolvedValue(null),
@@ -42,6 +58,7 @@ jest.mock('@/src/data', () => ({
   persistSessionDraftSnapshot: jest.fn().mockResolvedValue({ sessionId: 'test-session' }),
   removeExerciseTagFromSessionExercise: jest.fn().mockResolvedValue(undefined),
   renameExerciseTagDefinition: jest.fn().mockResolvedValue(undefined),
+  setSessionDeletedState: jest.fn().mockResolvedValue(undefined),
   undeleteExerciseTagDefinition: jest.fn().mockResolvedValue(undefined),
   upsertLocalGym: jest.fn().mockResolvedValue(undefined),
   completeSessionDraft: jest.fn().mockResolvedValue({
@@ -142,6 +159,7 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
 
   it('allows submit without gym selection and preserves zero-weight sets', async () => {
     render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
 
     fireEvent.press(screen.getByText('Log new exercise'));
     fireEvent.press(await screen.findByLabelText('Select exercise Barbell Squat'));
@@ -166,12 +184,13 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
         })
       );
       expect(mockCompleteSessionDraft).toHaveBeenCalledWith('test-session');
-      expect(mockDismissTo).toHaveBeenCalledWith('/');
+      expect(mockDismissTo).toHaveBeenCalledWith('/stats-history');
     });
   });
 
   it('clears the stack back to the root list on submit so the list header has no back button', async () => {
     render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
 
     fireEvent.press(screen.getByText('Log new exercise'));
     fireEvent.press(await screen.findByLabelText('Select exercise Barbell Squat'));
@@ -184,12 +203,13 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
       expect(mockCompleteSessionDraft).toHaveBeenCalledWith('test-session');
     });
 
-    expect(mockDismissTo).toHaveBeenCalledWith('/');
+    expect(mockDismissTo).toHaveBeenCalledWith('/stats-history');
     expect(mockDismissAll).not.toHaveBeenCalled();
   });
 
   it('shows incomplete-set modal with go-back and remove-and-submit actions', async () => {
     render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
 
     fireEvent.press(screen.getByText('Choose gym'));
     fireEvent.press(screen.getByLabelText('Select gym Westside Barbell Club'));
@@ -215,12 +235,13 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
     await waitFor(() => {
       expect(mockPersistSessionDraftSnapshot).toHaveBeenCalled();
       expect(mockCompleteSessionDraft).toHaveBeenCalledWith('test-session');
-      expect(mockDismissTo).toHaveBeenCalledWith('/');
+      expect(mockDismissTo).toHaveBeenCalledWith('/stats-history');
     });
   });
 
   it('shows empty-exercise modal and can submit with empty exercises removed', async () => {
     render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
 
     fireEvent.press(screen.getByText('Log new exercise'));
     fireEvent.press(await screen.findByLabelText('Select exercise Bench Press'));
@@ -234,12 +255,13 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
     await waitFor(() => {
       expect(mockPersistSessionDraftSnapshot).toHaveBeenCalled();
       expect(mockCompleteSessionDraft).toHaveBeenCalledWith('test-session');
-      expect(mockDismissTo).toHaveBeenCalledWith('/');
+      expect(mockDismissTo).toHaveBeenCalledWith('/stats-history');
     });
   });
 
   it('keeps submit disabled when any set contains invalid reps values', async () => {
     render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
 
     fireEvent.press(screen.getByText('Log new exercise'));
     fireEvent.press(await screen.findByLabelText('Select exercise Barbell Squat'));
@@ -301,7 +323,7 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
           ],
         })
       );
-      expect(mockDismissTo).toHaveBeenCalledWith('/');
+      expect(mockDismissTo).toHaveBeenCalledWith('/stats-history');
     });
     expect(screen.queryByText('Remove incomplete sets and submit?')).toBeNull();
     expect(mockCompleteSessionDraft).not.toHaveBeenCalled();
@@ -349,7 +371,7 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
           completedAt: new Date(2026, 1, 25, 10, 50, 0, 0),
         })
       );
-      expect(mockDismissTo).toHaveBeenCalledWith('/');
+      expect(mockDismissTo).toHaveBeenCalledWith('/stats-history');
     });
 
     expect(mockCompleteSessionDraft).not.toHaveBeenCalled();
@@ -389,7 +411,7 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
 
     await waitFor(() => {
       expect(mockPersistCompletedSessionSnapshot).toHaveBeenCalled();
-      expect(mockDismissTo).toHaveBeenCalledWith('/');
+      expect(mockDismissTo).toHaveBeenCalledWith('/stats-history');
     });
     expect(mockCompleteSessionDraft).not.toHaveBeenCalled();
   });
@@ -414,7 +436,7 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
 
     await waitFor(() => {
       expect(mockPersistCompletedSessionSnapshot).toHaveBeenCalled();
-      expect(mockDismissTo).toHaveBeenCalledWith('/');
+      expect(mockDismissTo).toHaveBeenCalledWith('/stats-history');
     });
     expect(mockCompleteSessionDraft).not.toHaveBeenCalled();
   });

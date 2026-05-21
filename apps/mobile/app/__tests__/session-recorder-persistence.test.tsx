@@ -29,6 +29,13 @@ jest.mock('@/src/data', () => ({
     updatedAt: new Date('2026-03-01T10:00:00.000Z'),
   }),
   deleteExerciseTagDefinition: jest.fn().mockResolvedValue(undefined),
+  formatSessionListCompactDuration: (durationSec: number | null) => {
+    if (!durationSec || durationSec <= 0) {
+      return '0m';
+    }
+    const totalMinutes = Math.floor(durationSec / 60);
+    return `${totalMinutes}m`;
+  },
   listExerciseTagDefinitions: jest.fn().mockResolvedValue([]),
   listSessionExerciseAssignedTags: jest.fn().mockResolvedValue([]),
   loadLocalGymById: jest.fn().mockResolvedValue(null),
@@ -42,6 +49,7 @@ jest.mock('@/src/data', () => ({
   persistSessionDraftSnapshot: jest.fn().mockResolvedValue({ sessionId: 'persisted-session-1' }),
   removeExerciseTagFromSessionExercise: jest.fn().mockResolvedValue(undefined),
   renameExerciseTagDefinition: jest.fn().mockResolvedValue(undefined),
+  setSessionDeletedState: jest.fn().mockResolvedValue(undefined),
   undeleteExerciseTagDefinition: jest.fn().mockResolvedValue(undefined),
   upsertLocalGym: jest.fn().mockResolvedValue(undefined),
   completeSessionDraft: jest.fn().mockResolvedValue({
@@ -86,6 +94,19 @@ const {
 const flushMicrotasks = async () => {
   await Promise.resolve();
   await Promise.resolve();
+};
+
+const dismissEmptyStateIfPresent = async () => {
+  await act(async () => {
+    await flushMicrotasks();
+  });
+  const startButton = screen.queryByTestId('start-session-button');
+  if (startButton) {
+    fireEvent.press(startButton);
+    await act(async () => {
+      await flushMicrotasks();
+    });
+  }
 };
 
 const buildCompletedEditSnapshot = (overrides: Partial<any> = {}) => ({
@@ -142,9 +163,8 @@ describe('SessionRecorderScreen persistence wiring', () => {
     await waitFor(() => {
       expect(mockLoadLatestSessionDraftSnapshot).toHaveBeenCalledTimes(1);
     });
-    await act(async () => {
-      await flushMicrotasks();
-    });
+    await dismissEmptyStateIfPresent();
+    mockPersistSessionDraftSnapshot.mockClear();
 
     fireEvent.press(screen.getByText('Log new exercise'));
     fireEvent.press(await screen.findByLabelText('Select exercise Barbell Squat'));
@@ -219,9 +239,8 @@ describe('SessionRecorderScreen persistence wiring', () => {
     await waitFor(() => {
       expect(mockLoadLatestSessionDraftSnapshot).toHaveBeenCalledTimes(1);
     });
-    await act(async () => {
-      await flushMicrotasks();
-    });
+    await dismissEmptyStateIfPresent();
+    mockPersistSessionDraftSnapshot.mockClear();
 
     fireEvent.press(screen.getByText('Log new exercise'));
     fireEvent.press(await screen.findByLabelText('Select exercise Barbell Squat'));

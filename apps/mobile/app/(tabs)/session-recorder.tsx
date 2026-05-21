@@ -15,6 +15,8 @@ import {
 
 import { ExerciseEditorModal } from '@/components/exercise-catalog/exercise-editor-modal';
 import { SessionContentLayout } from '@/components/session-recorder/session-content-layout';
+import { ActiveSessionRow } from '@/components/session-list';
+import type { SessionListItem } from '@/components/session-list';
 import { uiColors } from '@/components/ui';
 import { getAuthSnapshot } from '@/src/auth';
 import {
@@ -41,6 +43,7 @@ import {
   persistSessionDraftSnapshot,
   removeExerciseTagFromSessionExercise,
   renameExerciseTagDefinition,
+  setSessionDeletedState,
   undeleteExerciseTagDefinition,
   upsertLocalGym,
   type ExerciseTagDefinitionRecord,
@@ -104,6 +107,39 @@ function parseSessionDateTime(dateTime: string): Date | null {
   }
 
   return parsed;
+}
+
+function mapDraftSnapshotToActiveSessionListItem(snapshot: SessionDraftSnapshot): SessionListItem {
+  const setCount = snapshot.exercises.reduce((accumulator, exercise) => accumulator + exercise.sets.length, 0);
+  return {
+    id: snapshot.sessionId,
+    startedAt: snapshot.startedAt.toISOString(),
+    status: 'active',
+    completedAt: null,
+    durationSec: null,
+    durationDisplay: '',
+    gymName: null,
+    exerciseCount: snapshot.exercises.length,
+    setCount,
+    totalWeight: 0,
+    deletedAt: null,
+  };
+}
+
+function buildLocalActiveSessionListItem(sessionId: string, startedAt: Date): SessionListItem {
+  return {
+    id: sessionId,
+    startedAt: startedAt.toISOString(),
+    status: 'active',
+    completedAt: null,
+    durationSec: null,
+    durationDisplay: '',
+    gymName: null,
+    exerciseCount: 0,
+    setCount: 0,
+    totalWeight: 0,
+    deletedAt: null,
+  };
 }
 
 function mapDraftSnapshotToSession(snapshot: SessionDraftSnapshot): Session {
@@ -478,6 +514,11 @@ export default function SessionRecorderScreen() {
 
   const [state, setState] = useState<SessionRecorderState>(createInitialState);
   const [submitCleanupPrompt, setSubmitCleanupPrompt] = useState<SubmitCleanupPrompt | null>(null);
+  const [activeSession, setActiveSession] = useState<SessionListItem | null>(null);
+  const [hasActiveSession, setHasActiveSession] = useState<boolean>(false);
+  const [isPersistenceHydrated, setIsPersistenceHydrated] = useState<boolean>(false);
+  const [isStartingSession, setIsStartingSession] = useState<boolean>(false);
+  const [activeDurationNowMs, setActiveDurationNowMs] = useState<number>(() => Date.now());
   const [completedEditEndDateTime, setCompletedEditEndDateTime] = useState<string | null>(null);
   const [completedEditLoadError, setCompletedEditLoadError] = useState<string | null>(null);
   const [isCompletedEditLoading, setIsCompletedEditLoading] = useState(false);
@@ -642,6 +683,7 @@ export default function SessionRecorderScreen() {
       if (!routeSessionId) {
         setCompletedEditLoadError('Missing completed session id');
         persistenceHydratedRef.current = true;
+        setIsPersistenceHydrated(true);
         return () => {
           cancelled = true;
         };
@@ -695,6 +737,7 @@ export default function SessionRecorderScreen() {
           if (!cancelled) {
             setIsCompletedEditLoading(false);
             persistenceHydratedRef.current = true;
+            setIsPersistenceHydrated(true);
           }
         });
 
@@ -705,7 +748,13 @@ export default function SessionRecorderScreen() {
 
     void loadLatestSessionDraftSnapshot()
       .then((snapshot) => {
-        if (cancelled || !snapshot || hasSessionMutationRef.current) {
+        if (cancelled || hasSessionMutationRef.current) {
+          return;
+        }
+
+        if (!snapshot) {
+          setHasActiveSession(false);
+          setActiveSession(null);
           return;
         }
 
@@ -714,6 +763,8 @@ export default function SessionRecorderScreen() {
           ...current,
           session: mapDraftSnapshotToSession(snapshot),
         }));
+        setActiveSession(mapDraftSnapshotToActiveSessionListItem(snapshot));
+        setHasActiveSession(true);
       })
       .catch(() => {
         // Keep the recorder usable even if local restore fails; autosave writes can still recreate state.
@@ -721,6 +772,7 @@ export default function SessionRecorderScreen() {
       .finally(() => {
         if (!cancelled) {
           persistenceHydratedRef.current = true;
+          setIsPersistenceHydrated(true);
         }
       });
 
@@ -738,6 +790,55 @@ export default function SessionRecorderScreen() {
       subscription.remove();
     };
   }, [lifecycleHelpers]);
+
+  useEffect(() => {
+    if (!hasActiveSession || !activeSession) {
+      return;
+    }
+
+    const intervalId = setInterval(() => {
+      setActiveDurationNowMs(Date.now());
+    }, 30_000);
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [hasActiveSession, activeSession]);
+
+  useEffect(() => {
+    if (!hasActiveSession) {
+      return;
+    }
+
+    const exerciseCount = state.session.exercises.length;
+    const setCount = state.session.exercises.reduce(
+      (accumulator, exercise) => accumulator + exercise.sets.length,
+      0
+    );
+    const gymName =
+      state.session.locationId === null
+        ? null
+        : state.locations.find((location) => location.id === state.session.locationId)?.name ?? null;
+
+    setActiveSession((current) => {
+      if (!current) {
+        return current;
+      }
+      if (
+        current.exerciseCount === exerciseCount &&
+        current.setCount === setCount &&
+        current.gymName === gymName
+      ) {
+        return current;
+      }
+      return {
+        ...current,
+        exerciseCount,
+        setCount,
+        gymName,
+      };
+    });
+  }, [hasActiveSession, state.session.exercises, state.session.locationId, state.locations]);
 
   useEffect(() => {
     return () => {
@@ -939,6 +1040,65 @@ export default function SessionRecorderScreen() {
   const clearSubmitFeedback = () => {
     setSubmitCleanupPrompt(null);
   };
+
+  const startSessionFromEmptyState = useCallback(async () => {
+    if (isStartingSession) {
+      return;
+    }
+
+    setIsStartingSession(true);
+    try {
+      const startedAt = new Date();
+      const persisted = await persistSessionDraftSnapshot({
+        gymId: null,
+        startedAt,
+        status: 'active',
+        exercises: [],
+      });
+      persistedSessionIdRef.current = persisted.sessionId;
+      hasSessionMutationRef.current = false;
+      setState((current) => ({
+        ...current,
+        session: {
+          ...current.session,
+          dateTime: formatCurrentDateTime(startedAt),
+          locationId: null,
+          exercises: [],
+        },
+      }));
+      setActiveSession(buildLocalActiveSessionListItem(persisted.sessionId, startedAt));
+      setHasActiveSession(true);
+    } catch {
+      // Keep the empty state visible if the persistence call fails — user can retry.
+    } finally {
+      setIsStartingSession(false);
+    }
+  }, [isStartingSession]);
+
+  const handleActiveSessionResume = useCallback(() => {
+    // The recorder body is already mounted below the pinned row; resuming is a no-op
+    // beyond bringing focus to the recorder, which the press itself accomplishes.
+  }, []);
+
+  const handleActiveSessionDelete = useCallback(async () => {
+    const sessionId = persistedSessionIdRef.current ?? activeSession?.id ?? null;
+    if (!sessionId) {
+      return;
+    }
+
+    try {
+      await autosaveController.dispose({ flushDirty: false });
+      await setSessionDeletedState(sessionId, true);
+    } catch {
+      // Even if persistence fails, surface the empty state locally; user can retry from Start CTA.
+    } finally {
+      persistedSessionIdRef.current = null;
+      hasSessionMutationRef.current = false;
+      setActiveSession(null);
+      setHasActiveSession(false);
+      setState(() => createInitialState());
+    }
+  }, [activeSession, autosaveController]);
 
   const openGymModal = () => {
     setState((current) => ({
@@ -1609,7 +1769,7 @@ export default function SessionRecorderScreen() {
         });
 
         hasSessionMutationRef.current = false;
-        router.dismissTo('/');
+        router.dismissTo('/stats-history');
         return;
       }
 
@@ -1624,7 +1784,9 @@ export default function SessionRecorderScreen() {
       await completeSessionDraft(persisted.sessionId);
       persistedSessionIdRef.current = null;
       hasSessionMutationRef.current = false;
-      router.dismissTo('/');
+      setActiveSession(null);
+      setHasActiveSession(false);
+      router.dismissTo('/stats-history');
     })().catch(() => {
       // Keep recorder screen state available for retry if persistence/complete/navigation fails.
     });
@@ -1794,6 +1956,30 @@ export default function SessionRecorderScreen() {
     );
   }
 
+  const showEmptyStartCta =
+    routeMode !== 'completed-edit' && isPersistenceHydrated && !hasActiveSession;
+
+  if (showEmptyStartCta) {
+    return (
+      <View style={styles.emptyStateScreen} testID="session-recorder-empty-state">
+        <Pressable
+          accessibilityLabel="Start session"
+          accessibilityRole="button"
+          disabled={isStartingSession}
+          onPress={() => {
+            void startSessionFromEmptyState();
+          }}
+          style={[
+            styles.startSessionButton,
+            isStartingSession ? styles.startSessionButtonDisabled : null,
+          ]}
+          testID="start-session-button">
+          <Text style={styles.startSessionButtonText}>Start Session</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
   return (
     <KeyboardAvoidingView
       style={styles.keyboardAvoidingRoot}
@@ -1803,6 +1989,17 @@ export default function SessionRecorderScreen() {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
         testID="session-recorder-screen">
+      {routeMode !== 'completed-edit' && activeSession ? (
+        <ActiveSessionRow
+          session={activeSession}
+          nowMs={activeDurationNowMs}
+          onResume={handleActiveSessionResume}
+          onComplete={handleSubmit}
+          onDelete={() => {
+            void handleActiveSessionDelete();
+          }}
+        />
+      ) : null}
       {routeMode === 'completed-edit' ? (
         <View style={styles.completedEditMetadataCard}>
           <View style={styles.completedEditMetadataRow}>
@@ -2574,6 +2771,27 @@ const styles = StyleSheet.create({
     padding: 20,
     gap: 8,
     backgroundColor: uiColors.surfacePage,
+  },
+  emptyStateScreen: {
+    flex: 1,
+    padding: 16,
+    gap: 16,
+    backgroundColor: uiColors.surfacePage,
+  },
+  startSessionButton: {
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: uiColors.actionPrimary,
+  },
+  startSessionButtonDisabled: {
+    backgroundColor: uiColors.actionPrimaryDisabled,
+  },
+  startSessionButtonText: {
+    color: uiColors.surfaceDefault,
+    fontWeight: '700',
   },
   loadingStateTitle: {
     fontSize: 16,
