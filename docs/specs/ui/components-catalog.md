@@ -51,7 +51,12 @@ Brief entrypoint inventory of the current reusable UI component set.
 - Purpose:
   - shared semantic button primitive (including tab-style usage for top-level navigation)
 
-5. `ui` barrel exports
+5. `SegmentedChips`
+- File: `apps/mobile/components/ui/segmented-chips.tsx`
+- Purpose:
+  - pill-style segmented chip row used by the Stats/History view toggle and the stats period selector
+
+6. `ui` barrel exports
 - File: `apps/mobile/components/ui/index.ts`
 - Purpose:
   - single import entrypoint for current tokens and UI primitives

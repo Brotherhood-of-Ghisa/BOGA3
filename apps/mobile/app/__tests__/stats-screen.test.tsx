@@ -1,7 +1,9 @@
+import type * as React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
 import {
   default as StatsRoute,
+  StatsHistoryScreenShell,
   StatsScreenShell,
   formatDelta,
 } from '../(tabs)/stats-history';
@@ -9,6 +11,36 @@ import type { StatsSummary } from '@/src/data';
 
 jest.mock('@/src/data', () => ({
   computeStatsSummary: jest.fn(),
+  // History sub-view (mounted in StatsRoute) pulls these in through the
+  // shared session-list data client.
+  formatSessionListCompactDuration: (durationSec: number | null) => {
+    if (!durationSec || durationSec <= 0) {
+      return '0m';
+    }
+    const totalMinutes = Math.floor(durationSec / 60);
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    if (hours <= 0) {
+      return `${totalMinutes}m`;
+    }
+    if (minutes <= 0) {
+      return `${hours}h`;
+    }
+    return `${hours}h ${minutes}m`;
+  },
+  listSessionListBuckets: jest.fn().mockResolvedValue({ active: null, completed: [] }),
+  completeSessionDraft: jest.fn(),
+  persistSessionDraftSnapshot: jest.fn(),
+  reopenCompletedSessionDraft: jest.fn(),
+  setSessionDeletedState: jest.fn(),
+}));
+
+jest.mock('@/src/exercise-catalog/cache', () => ({
+  useExerciseCatalog: () => ({ status: 'ready', exercises: [], lastError: null }),
+}));
+
+jest.mock('@/src/exercise-catalog/search', () => ({
+  filterIndexedExerciseCatalogExercises: (exercises: unknown[]) => exercises,
 }));
 
 jest.mock('expo-router', () => {
@@ -212,6 +244,59 @@ describe('StatsScreenShell', () => {
 
     fireEvent.press(screen.getByTestId('stats-exercise-history-picker-button'));
     expect(onPress).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('StatsHistoryScreenShell view toggle', () => {
+  const shellProps = (overrides: Partial<React.ComponentProps<typeof StatsHistoryScreenShell>> = {}) => ({
+    summary: buildSummary(),
+    periodDays: 7 as const,
+    onSelectPeriod: jest.fn(),
+    onPressExerciseHistoryPicker: jest.fn(),
+    isLoading: false,
+    errorMessage: null,
+    onPressSessions: jest.fn(),
+    onPressExercises: jest.fn(),
+    onPressSettings: jest.fn(),
+    activeView: 'stats' as const,
+    onChangeView: jest.fn(),
+    ...overrides,
+  });
+
+  it('renders the Stats ↔ History toggle row with both chips', () => {
+    render(<StatsHistoryScreenShell {...shellProps()} />);
+    expect(screen.getByTestId('stats-history-view-chip-stats')).toBeTruthy();
+    expect(screen.getByTestId('stats-history-view-chip-history')).toBeTruthy();
+  });
+
+  it('invokes onChangeView when the inactive chip is pressed', () => {
+    const onChangeView = jest.fn();
+    render(<StatsHistoryScreenShell {...shellProps({ onChangeView })} />);
+
+    fireEvent.press(screen.getByTestId('stats-history-view-chip-history'));
+    expect(onChangeView).toHaveBeenCalledWith('history');
+  });
+
+  it('keeps both sub-views mounted across toggling so scroll/menu state persists', () => {
+    // Use `includeHiddenElements` so we still see the inactive slot, which is
+    // marked `pointerEvents="none"` while inactive but stays in the React tree.
+    const { rerender } = render(<StatsHistoryScreenShell {...shellProps({ activeView: 'stats' })} />);
+
+    const statsSlot = screen.getByTestId('stats-history-stats-slot', { includeHiddenElements: true });
+    const historySlot = screen.getByTestId('stats-history-history-slot', { includeHiddenElements: true });
+    expect(statsSlot).toBeTruthy();
+    expect(historySlot).toBeTruthy();
+    expect(screen.getByTestId('stats-history-history-subview', { includeHiddenElements: true })).toBeTruthy();
+    expect(screen.getByTestId('stats-card-sessions')).toBeTruthy();
+
+    rerender(<StatsHistoryScreenShell {...shellProps({ activeView: 'history' })} />);
+
+    // After toggling, the same slot elements are still mounted (no remount).
+    expect(screen.getByTestId('stats-history-stats-slot', { includeHiddenElements: true })).toBe(statsSlot);
+    expect(screen.getByTestId('stats-history-history-slot')).toBe(historySlot);
+    // Stats sub-view content is also still in the tree (just hidden via styles).
+    expect(screen.getByTestId('stats-card-sessions', { includeHiddenElements: true })).toBeTruthy();
+    expect(screen.getByTestId('stats-history-history-subview')).toBeTruthy();
   });
 });
 

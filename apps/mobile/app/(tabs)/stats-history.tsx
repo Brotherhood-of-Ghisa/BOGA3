@@ -10,15 +10,31 @@ import {
   View,
 } from 'react-native';
 
-import { computeStatsSummary, type StatsPeriodDays, type StatsSummary } from '@/src/data';
+import { computeStatsSummary, reopenCompletedSessionDraft, type StatsPeriodDays, type StatsSummary } from '@/src/data';
 import { TopLevelTabs } from '@/components/navigation/top-level-tabs';
-import { uiColors } from '@/components/ui';
+import {
+  ActiveSessionRow,
+  DEFAULT_SESSION_LIST_DATA_CLIENT,
+  DEFAULT_SESSION_LIST_ITEMS,
+  HistoryList,
+  useSessionListData,
+  type SessionListDataClient,
+  type SessionListItem,
+} from '@/components/session-list';
+import { SegmentedChips, uiColors } from '@/components/ui';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import { filterIndexedExerciseCatalogExercises } from '@/src/exercise-catalog/search';
 
-const PERIOD_OPTIONS: { days: StatsPeriodDays; label: string }[] = [
-  { days: 7, label: '7 days' },
-  { days: 30, label: '30 days' },
+const PERIOD_OPTIONS = [
+  { value: 7 as StatsPeriodDays, label: 'Last 7 days' },
+  { value: 30 as StatsPeriodDays, label: 'Last 30 days' },
+] as const;
+
+export type StatsHistoryView = 'stats' | 'history';
+
+const VIEW_OPTIONS: readonly { value: StatsHistoryView; label: string }[] = [
+  { value: 'stats', label: 'Stats' },
+  { value: 'history', label: 'History' },
 ];
 
 type DeltaDisplay = {
@@ -93,6 +109,47 @@ export function StatsScreenShell({
   isLoading,
   errorMessage,
 }: StatsScreenShellProps) {
+  return (
+    <View style={styles.screen}>
+      <View style={styles.contentRegion}>
+        <StatsSubView
+          summary={summary}
+          periodDays={periodDays}
+          onSelectPeriod={onSelectPeriod}
+          onPressExerciseHistoryPicker={onPressExerciseHistoryPicker}
+          isLoading={isLoading}
+          errorMessage={errorMessage}
+        />
+      </View>
+
+      <TopLevelTabs
+        activeTab="stats"
+        onPressSessions={onPressSessions}
+        onPressExercises={onPressExercises}
+        onPressStats={() => {}}
+        onPressSettings={onPressSettings}
+      />
+    </View>
+  );
+}
+
+type StatsSubViewProps = {
+  summary: StatsSummary | null;
+  periodDays: StatsPeriodDays;
+  onSelectPeriod: (period: StatsPeriodDays) => void;
+  onPressExerciseHistoryPicker: () => void;
+  isLoading: boolean;
+  errorMessage: string | null;
+};
+
+function StatsSubView({
+  summary,
+  periodDays,
+  onSelectPeriod,
+  onPressExerciseHistoryPicker,
+  isLoading,
+  errorMessage,
+}: StatsSubViewProps) {
   const sessionDelta = summary
     ? formatDelta(summary.current.totals.sessionCount, summary.previous.totals.sessionCount)
     : null;
@@ -111,146 +168,123 @@ export function StatsScreenShell({
   }, [summary]);
 
   return (
-    <View style={styles.screen}>
-      <View style={styles.contentRegion}>
-        <View style={styles.periodChipsRow} accessibilityRole="tablist">
-          {PERIOD_OPTIONS.map((option) => {
-            const selected = option.days === periodDays;
-            return (
-              <Pressable
-                key={option.days}
-                accessibilityRole="tab"
-                accessibilityState={{ selected }}
-                accessibilityLabel={`Show stats for the last ${option.label}`}
-                onPress={() => onSelectPeriod(option.days)}
-                style={[styles.periodChip, selected && styles.periodChipSelected]}
-                testID={`stats-period-chip-${option.days}`}>
-                <Text
-                  style={[styles.periodChipText, selected && styles.periodChipTextSelected]}>
-                  {`Last ${option.label}`}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={styles.scrollContent}
-          testID="stats-scroll">
-          {errorMessage ? (
-            <View style={styles.statePanel} testID="stats-error-state">
-              <Text style={styles.stateTitle}>Could not load stats</Text>
-              <Text style={styles.stateBody}>{errorMessage}</Text>
-            </View>
-          ) : null}
-
-          {!errorMessage && isLoading && !summary ? (
-            <View style={styles.statePanel} testID="stats-loading-state">
-              <Text style={styles.stateBody}>Loading stats…</Text>
-            </View>
-          ) : null}
-
-          {summary ? (
-            <>
-              <View style={styles.summaryGrid}>
-                <SummaryCard
-                  testID="stats-card-sessions"
-                  label="Sessions"
-                  value={formatNumber(summary.current.totals.sessionCount)}
-                  delta={sessionDelta}
-                />
-                <SummaryCard
-                  testID="stats-card-sets"
-                  label="Working sets"
-                  value={formatNumber(summary.current.totals.totalSets)}
-                  delta={setsDelta}
-                />
-              </View>
-
-              <View style={styles.exerciseHistorySection}>
-                <Text style={styles.sectionTitle}>Per-exercise history</Text>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Pick an exercise to view its history"
-                  onPress={onPressExerciseHistoryPicker}
-                  style={styles.exerciseHistoryRow}
-                  testID="stats-exercise-history-picker-button">
-                  <View style={styles.exerciseHistoryRowText}>
-                    <Text style={styles.exerciseHistoryRowTitle}>Pick an exercise…</Text>
-                    <Text style={styles.exerciseHistoryRowSubtitle}>
-                      Progression, top sets, and per-tag drill-down for one exercise.
-                    </Text>
-                  </View>
-                  <Text style={styles.exerciseHistoryRowChevron}>›</Text>
-                </Pressable>
-              </View>
-
-              <View style={styles.muscleSection}>
-                <View style={styles.muscleSectionHeader}>
-                  <Text style={styles.sectionTitle}>Sets per muscle group</Text>
-                  <Text style={styles.sectionHint}>primary = 1.0 · secondary = 0.5</Text>
-                </View>
-
-                {summary.current.totals.setsByMuscleGroup.length === 0 ? (
-                  <View style={styles.statePanel} testID="stats-muscle-empty">
-                    <Text style={styles.stateBody}>
-                      No muscle taxonomy loaded yet. Add some exercises to see this section.
-                    </Text>
-                  </View>
-                ) : (
-                  <View style={styles.muscleList}>
-                    {summary.current.totals.setsByMuscleGroup.map((entry) => {
-                      const previousScore = previousByMuscleId.get(entry.muscleGroupId) ?? 0;
-                      const untrained = entry.score === 0;
-                      const delta = formatDelta(entry.score, previousScore);
-                      return (
-                        <View
-                          key={entry.muscleGroupId}
-                          style={[styles.muscleRow, untrained && styles.muscleRowUntrained]}
-                          testID={`stats-muscle-row-${entry.muscleGroupId}`}>
-                          <View style={styles.muscleLabelColumn}>
-                            <Text
-                              style={[
-                                styles.muscleName,
-                                untrained && styles.muscleNameUntrained,
-                              ]}>
-                              {entry.displayName}
-                            </Text>
-                            <Text style={styles.muscleFamily}>{entry.familyName}</Text>
-                          </View>
-                          <View style={styles.muscleScoreColumn}>
-                            <Text
-                              style={[
-                                styles.muscleScore,
-                                untrained && styles.muscleScoreUntrained,
-                              ]}>
-                              {untrained ? 'Not trained' : formatNumber(entry.score)}
-                            </Text>
-                            {!untrained || previousScore > 0 ? (
-                              <Text style={[styles.muscleDelta, deltaToneStyle(delta.tone)]}>
-                                {delta.text}
-                              </Text>
-                            ) : null}
-                          </View>
-                        </View>
-                      );
-                    })}
-                  </View>
-                )}
-              </View>
-            </>
-          ) : null}
-        </ScrollView>
-      </View>
-
-      <TopLevelTabs
-        activeTab="stats"
-        onPressSessions={onPressSessions}
-        onPressExercises={onPressExercises}
-        onPressStats={() => {}}
-        onPressSettings={onPressSettings}
+    <View style={styles.subViewRegion}>
+      <SegmentedChips
+        accessibilityLabel="Select stats period"
+        options={PERIOD_OPTIONS}
+        value={periodDays}
+        onChange={onSelectPeriod}
+        testIDPrefix="stats-period-chip"
       />
+
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        testID="stats-scroll">
+        {errorMessage ? (
+          <View style={styles.statePanel} testID="stats-error-state">
+            <Text style={styles.stateTitle}>Could not load stats</Text>
+            <Text style={styles.stateBody}>{errorMessage}</Text>
+          </View>
+        ) : null}
+
+        {!errorMessage && isLoading && !summary ? (
+          <View style={styles.statePanel} testID="stats-loading-state">
+            <Text style={styles.stateBody}>Loading stats…</Text>
+          </View>
+        ) : null}
+
+        {summary ? (
+          <>
+            <View style={styles.summaryGrid}>
+              <SummaryCard
+                testID="stats-card-sessions"
+                label="Sessions"
+                value={formatNumber(summary.current.totals.sessionCount)}
+                delta={sessionDelta}
+              />
+              <SummaryCard
+                testID="stats-card-sets"
+                label="Working sets"
+                value={formatNumber(summary.current.totals.totalSets)}
+                delta={setsDelta}
+              />
+            </View>
+
+            <View style={styles.exerciseHistorySection}>
+              <Text style={styles.sectionTitle}>Per-exercise history</Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Pick an exercise to view its history"
+                onPress={onPressExerciseHistoryPicker}
+                style={styles.exerciseHistoryRow}
+                testID="stats-exercise-history-picker-button">
+                <View style={styles.exerciseHistoryRowText}>
+                  <Text style={styles.exerciseHistoryRowTitle}>Pick an exercise…</Text>
+                  <Text style={styles.exerciseHistoryRowSubtitle}>
+                    Progression, top sets, and per-tag drill-down for one exercise.
+                  </Text>
+                </View>
+                <Text style={styles.exerciseHistoryRowChevron}>›</Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.muscleSection}>
+              <View style={styles.muscleSectionHeader}>
+                <Text style={styles.sectionTitle}>Sets per muscle group</Text>
+                <Text style={styles.sectionHint}>primary = 1.0 · secondary = 0.5</Text>
+              </View>
+
+              {summary.current.totals.setsByMuscleGroup.length === 0 ? (
+                <View style={styles.statePanel} testID="stats-muscle-empty">
+                  <Text style={styles.stateBody}>
+                    No muscle taxonomy loaded yet. Add some exercises to see this section.
+                  </Text>
+                </View>
+              ) : (
+                <View style={styles.muscleList}>
+                  {summary.current.totals.setsByMuscleGroup.map((entry) => {
+                    const previousScore = previousByMuscleId.get(entry.muscleGroupId) ?? 0;
+                    const untrained = entry.score === 0;
+                    const delta = formatDelta(entry.score, previousScore);
+                    return (
+                      <View
+                        key={entry.muscleGroupId}
+                        style={[styles.muscleRow, untrained && styles.muscleRowUntrained]}
+                        testID={`stats-muscle-row-${entry.muscleGroupId}`}>
+                        <View style={styles.muscleLabelColumn}>
+                          <Text
+                            style={[
+                              styles.muscleName,
+                              untrained && styles.muscleNameUntrained,
+                            ]}>
+                            {entry.displayName}
+                          </Text>
+                          <Text style={styles.muscleFamily}>{entry.familyName}</Text>
+                        </View>
+                        <View style={styles.muscleScoreColumn}>
+                          <Text
+                            style={[
+                              styles.muscleScore,
+                              untrained && styles.muscleScoreUntrained,
+                            ]}>
+                            {untrained ? 'Not trained' : formatNumber(entry.score)}
+                          </Text>
+                          {!untrained || previousScore > 0 ? (
+                            <Text style={[styles.muscleDelta, deltaToneStyle(delta.tone)]}>
+                              {delta.text}
+                            </Text>
+                          ) : null}
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
+            </View>
+          </>
+        ) : null}
+      </ScrollView>
     </View>
   );
 }
@@ -277,14 +311,280 @@ function SummaryCard({
   );
 }
 
+export type HistorySubViewProps = {
+  dataClient?: SessionListDataClient;
+  initialSessions?: SessionListItem[];
+  reloadToken?: number;
+};
+
+export function HistorySubView({
+  dataClient,
+  initialSessions = DEFAULT_SESSION_LIST_ITEMS,
+  reloadToken = 0,
+}: HistorySubViewProps) {
+  const router = useRouter();
+  const [showDeletedSessions, setShowDeletedSessions] = useState(false);
+  const [activeDurationNowMs, setActiveDurationNowMs] = useState(() => Date.now());
+
+  const { sessions, setSessions, isLoadingSessions, loadErrorMessage, reloadSessions } =
+    useSessionListData({
+      dataClient,
+      initialSessions,
+      showDeletedSessions,
+      reloadToken,
+    });
+
+  const activeSession = sessions.find(
+    (session) => session.status === 'active' && session.deletedAt === null
+  );
+  const completedSessions = sessions
+    .filter((session) => session.status === 'completed')
+    .filter((session) => showDeletedSessions || session.deletedAt === null)
+    .sort((left, right) => {
+      const leftTime = left.completedAt ? new Date(left.completedAt).getTime() : 0;
+      const rightTime = right.completedAt ? new Date(right.completedAt).getTime() : 0;
+      return rightTime - leftTime;
+    });
+
+  const showGlobalEmptyState =
+    !isLoadingSessions && !loadErrorMessage && !activeSession && completedSessions.length === 0;
+  const reopenDisabled = Boolean(activeSession);
+
+  useEffect(() => {
+    if (!activeSession) {
+      return;
+    }
+
+    const intervalId = setInterval(() => {
+      setActiveDurationNowMs(Date.now());
+    }, 30_000);
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [activeSession]);
+
+  const navigateToSessionRecorder = () => {
+    router.push('/session-recorder');
+  };
+
+  const completeActiveSession = () => {
+    if (dataClient && activeSession) {
+      return (async () => {
+        await dataClient.completeActiveSession(activeSession.id);
+        await reloadSessions();
+      })();
+    }
+
+    setSessions((currentSessions) =>
+      currentSessions.map((session) => {
+        if (session.status !== 'active' || session.deletedAt !== null) {
+          return session;
+        }
+
+        return {
+          ...session,
+          status: 'completed',
+          completedAt: '2026-02-20T18:15:00.000Z',
+        };
+      })
+    );
+  };
+
+  const discardActiveSession = () => {
+    if (dataClient && activeSession) {
+      return (async () => {
+        await dataClient.discardActiveSession(activeSession.id);
+        await reloadSessions();
+      })();
+    }
+
+    setSessions((currentSessions) =>
+      currentSessions.filter((session) => session.status !== 'active')
+    );
+  };
+
+  const setCompletedSessionDeleted = (sessionId: string, isDeleted: boolean) => {
+    if (dataClient) {
+      return (async () => {
+        await dataClient.setCompletedSessionDeletedState(sessionId, isDeleted);
+        await reloadSessions();
+      })();
+    }
+
+    setSessions((currentSessions) =>
+      currentSessions.map((session) => {
+        if (session.id !== sessionId) {
+          return session;
+        }
+
+        return {
+          ...session,
+          deletedAt: isDeleted ? '2026-02-23T12:00:00.000Z' : null,
+        };
+      })
+    );
+  };
+
+  const openCompletedSessionEdit = (sessionId: string) => {
+    router.push(`/session-recorder?mode=completed-edit&sessionId=${sessionId}`);
+  };
+
+  const reopenCompletedSession = (sessionId: string) => {
+    if (activeSession) {
+      return;
+    }
+    if (dataClient) {
+      return (async () => {
+        await dataClient.reopenCompletedSession(sessionId);
+        await reloadSessions();
+      })();
+    }
+    return (async () => {
+      await reopenCompletedSessionDraft(sessionId);
+      await reloadSessions();
+    })();
+  };
+
+  const navigateToCompletedSessionDetail = (sessionId: string) => {
+    router.push(`/completed-session/${sessionId}`);
+  };
+
+  return (
+    <View style={styles.subViewRegion} testID="stats-history-history-subview">
+      <View style={styles.pinnedTopRegion}>
+        {activeSession ? (
+          <View style={styles.sectionBlock}>
+            <Text selectable style={styles.historyActiveTitle}>
+              Active
+            </Text>
+            <ActiveSessionRow
+              session={activeSession}
+              nowMs={activeDurationNowMs}
+              onResume={navigateToSessionRecorder}
+              onComplete={() => {
+                void completeActiveSession();
+              }}
+              onDelete={() => {
+                void discardActiveSession();
+              }}
+            />
+          </View>
+        ) : null}
+      </View>
+
+      <HistoryList
+        sessions={completedSessions}
+        isLoading={isLoadingSessions}
+        loadErrorMessage={loadErrorMessage}
+        showDeletedSessions={showDeletedSessions}
+        onToggleShowDeletedSessions={() => setShowDeletedSessions((current) => !current)}
+        showGlobalEmptyState={showGlobalEmptyState}
+        onOpenCompletedSession={navigateToCompletedSessionDetail}
+        onSetCompletedSessionDeleted={setCompletedSessionDeleted}
+        onEditCompletedSession={openCompletedSessionEdit}
+        onReopenCompletedSession={reopenCompletedSession}
+        reopenDisabled={reopenDisabled}
+      />
+    </View>
+  );
+}
+
+export type StatsHistoryScreenShellProps = {
+  // Stats sub-view inputs
+  summary: StatsSummary | null;
+  periodDays: StatsPeriodDays;
+  onSelectPeriod: (period: StatsPeriodDays) => void;
+  onPressExerciseHistoryPicker: () => void;
+  isLoading: boolean;
+  errorMessage: string | null;
+  // Top-level navigation handlers
+  onPressSessions: () => void;
+  onPressExercises: () => void;
+  onPressSettings: () => void;
+  // History sub-view dependencies (optional so tests can omit them)
+  historyDataClient?: SessionListDataClient;
+  historyInitialSessions?: SessionListItem[];
+  historyReloadToken?: number;
+  // Toggle wiring
+  activeView: StatsHistoryView;
+  onChangeView: (next: StatsHistoryView) => void;
+};
+
+export function StatsHistoryScreenShell({
+  summary,
+  periodDays,
+  onSelectPeriod,
+  onPressExerciseHistoryPicker,
+  isLoading,
+  errorMessage,
+  onPressSessions,
+  onPressExercises,
+  onPressSettings,
+  historyDataClient,
+  historyInitialSessions,
+  historyReloadToken,
+  activeView,
+  onChangeView,
+}: StatsHistoryScreenShellProps) {
+  return (
+    <View style={styles.screen} testID="stats-history-screen">
+      <SegmentedChips
+        accessibilityLabel="Switch between Stats and History"
+        options={VIEW_OPTIONS}
+        value={activeView}
+        onChange={onChangeView}
+        testIDPrefix="stats-history-view-chip"
+      />
+
+      <View style={styles.contentRegion}>
+        <View
+          style={[styles.subViewSlot, activeView === 'stats' ? null : styles.subViewHidden]}
+          pointerEvents={activeView === 'stats' ? 'auto' : 'none'}
+          testID="stats-history-stats-slot">
+          <StatsSubView
+            summary={summary}
+            periodDays={periodDays}
+            onSelectPeriod={onSelectPeriod}
+            onPressExerciseHistoryPicker={onPressExerciseHistoryPicker}
+            isLoading={isLoading}
+            errorMessage={errorMessage}
+          />
+        </View>
+
+        <View
+          style={[styles.subViewSlot, activeView === 'history' ? null : styles.subViewHidden]}
+          pointerEvents={activeView === 'history' ? 'auto' : 'none'}
+          testID="stats-history-history-slot">
+          <HistorySubView
+            dataClient={historyDataClient}
+            initialSessions={historyInitialSessions}
+            reloadToken={historyReloadToken}
+          />
+        </View>
+      </View>
+
+      <TopLevelTabs
+        activeTab="stats"
+        onPressSessions={onPressSessions}
+        onPressExercises={onPressExercises}
+        onPressStats={() => {}}
+        onPressSettings={onPressSettings}
+      />
+    </View>
+  );
+}
+
 export default function StatsRoute() {
   const router = useRouter();
+  const [activeView, setActiveView] = useState<StatsHistoryView>('stats');
   const [periodDays, setPeriodDays] = useState<StatsPeriodDays>(7);
   const [summary, setSummary] = useState<StatsSummary | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isExercisePickerVisible, setIsExercisePickerVisible] = useState(false);
   const [exercisePickerQuery, setExercisePickerQuery] = useState('');
+  const [historyReloadToken, setHistoryReloadToken] = useState(0);
 
   const loadSummary = useCallback(
     async (period: StatsPeriodDays) => {
@@ -305,6 +605,9 @@ export default function StatsRoute() {
   useFocusEffect(
     useCallback(() => {
       void loadSummary(periodDays);
+      // Bump the history reload token on every focus so the History sub-view
+      // matches the standalone session-list screen's refresh-on-focus behavior.
+      setHistoryReloadToken((current) => current + 1);
     }, [loadSummary, periodDays])
   );
 
@@ -335,16 +638,20 @@ export default function StatsRoute() {
 
   return (
     <>
-      <StatsScreenShell
+      <StatsHistoryScreenShell
         summary={summary}
         periodDays={periodDays}
         onSelectPeriod={handleSelectPeriod}
-        onPressSessions={() => router.push('/session-list')}
-        onPressExercises={() => router.push('/exercise-catalog')}
-        onPressSettings={() => router.push('/settings')}
         onPressExerciseHistoryPicker={openExercisePicker}
         isLoading={isLoading}
         errorMessage={errorMessage}
+        onPressSessions={() => router.push('/session-list')}
+        onPressExercises={() => router.push('/exercise-catalog')}
+        onPressSettings={() => router.push('/settings')}
+        historyDataClient={DEFAULT_SESSION_LIST_DATA_CLIENT}
+        historyReloadToken={historyReloadToken}
+        activeView={activeView}
+        onChangeView={setActiveView}
       />
       <ExerciseHistoryPickerModal
         visible={isExercisePickerVisible}
@@ -458,36 +765,34 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: uiColors.surfacePage,
     padding: 16,
-    gap: 16,
+    gap: 12,
   },
   contentRegion: {
     flex: 1,
     minHeight: 0,
+  },
+  subViewSlot: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  subViewHidden: {
+    display: 'none',
+  },
+  subViewRegion: {
+    flex: 1,
+    minHeight: 0,
     gap: 12,
   },
-  periodChipsRow: {
-    flexDirection: 'row',
+  pinnedTopRegion: {
+    gap: 8,
+    flexShrink: 0,
+  },
+  sectionBlock: {
     gap: 8,
   },
-  periodChip: {
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: uiColors.borderMuted,
-    backgroundColor: uiColors.surfaceDefault,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  periodChipSelected: {
-    borderColor: uiColors.actionPrimary,
-    backgroundColor: uiColors.actionPrimarySubtleBg,
-  },
-  periodChipText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: uiColors.textSecondary,
-  },
-  periodChipTextSelected: {
-    color: uiColors.actionPrimary,
+  historyActiveTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: uiColors.textPrimary,
   },
   scroll: {
     flex: 1,
