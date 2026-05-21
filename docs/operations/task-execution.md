@@ -192,9 +192,13 @@ This environment has **no `gh` CLI**. All GitHub interactions go through the Git
 
 Builders run `./scripts/quality-fast.sh` directly inside their worktree before opening their PR. The PR's Standard checklist reflects that pass; a failed local gate run blocks the PR.
 
-This is made possible by the `WorktreeCreate` hook at `.claude/hooks/create-worktree.sh`, which overrides the Claude Code Agent harness's default worktree placement. Without the hook, the harness places worktrees at `<project>/.claude/worktrees/agent-<id>/`, which is nested inside the BOGA checkout and trips `boga_validate_worktree_placement` in `scripts/worktree-lib.sh`. With the hook, worktrees land at `$HOME/.cache/boga-agent-worktrees/<branch>/` (override via `BOGA_AGENT_WORKTREE_ROOT`) — outside the BOGA checkout, with their own `.worktree-slot` and their own isolated `apps/mobile/node_modules` install. The hook contract follows https://code.claude.com/docs/en/hooks.md#worktreecreate: stdin receives the harness's JSON envelope (`session_id`, `cwd`, …) and stdout returns the absolute worktree path.
+Worktrees live at `<project>/.claude/worktrees/agent-<id>/` (Claude Code's default placement). That's `.gitignore`d and the share-nothing requirements are enforced by:
 
-The hook is registered in `.claude/settings.json` under `hooks.WorktreeCreate`. Setup is one-time per worktree; each builder dispatch incurs the `npm ci` cost (typically ~20s with a warm npm cache, up to ~90s cold) so dependencies are fully isolated per the "worktrees share nothing" contract.
+- **No `node_modules` at any ancestor directory** of `<project>/.claude/worktrees/agent-<id>/apps/mobile/`. Node's upward module resolution can't accidentally pick up a parent install.
+- **Per-worktree `apps/mobile/node_modules`.** The first thing a builder does inside its worktree is `cd apps/mobile && npm ci --prefer-offline` so the install is real (not a symlink) and isolated. The `~/.npm` cache is shared but only as immutable metadata.
+- **Jest / TypeScript / lint configs resolve via `<rootDir>`** (each worktree resolves to its own root). No `modulePaths` / `watchFolders` / `rootDir` overrides that would leak across worktrees.
+
+`scripts/worktree-lib.sh` permits `<parent>/.claude/worktrees/*` as a blessed nested location specifically because the conditions above hold here. Accidental nesting elsewhere is still rejected by `boga_validate_worktree_placement`. The `.worktree-slot` requirement (used for supabase/expo port allocation) is also skipped for the blessed path since builder gates don't run servers.
 
 The coordinator does not need to mirror the gate run from `main`; the builder's PR body asserts the gates pass, and reviewers reject PRs whose CI fails.
 

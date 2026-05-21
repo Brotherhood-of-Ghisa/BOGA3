@@ -96,6 +96,19 @@ graph TD
 - Tests updated for the new `TopLevelTabs` and tab routes.
 - `apps/mobile/app/session-list.tsx` redirect stub removed if nothing else still hits it.
 
+### docs-route-retirement-cleanup: refresh UI contract docs to drop retired routes
+
+**Problem:** `maestro-and-tests` deleted `apps/mobile/app/session-list.tsx` and `apps/mobile/app/stats.tsx` but did not update the four UI contract docs in the same task. Audit (post-merge) flagged this as a violation of the route-change maintenance rule in `docs/specs/ui/README.md`: the docs still describe `/session-list` as a live detail screen and `/stats` as a redirect shim.
+
+**Outcomes:**
+- `docs/specs/ui/screen-map.md` no longer lists `/session-list` (section 2) or `/stats` (section 2b) as routes. Tab-destination notes from `/exercise-catalog` and `/exercise-history` name the current three tabs plus the Settings cog. Root-stack note no longer mentions `session-list` or `stats`.
+- `docs/specs/ui/navigation-contract.md` drops the `/session-list` and `/stats` route entries. All transitions involving those routes are either removed or rewritten to use `/stats-history`. Detail-screen lists no longer mention `session-list` or `stats`.
+- `docs/specs/ui/ux-rules.md` drops or rewrites the `session-list` mentions; the `/ → session-list` alias becomes `/ → stats-history`.
+- `docs/specs/ui/components-catalog.md` updates the "currently entered from `/stats`" reference to `/stats-history`.
+- Spot grep for `session-list` in those four docs returns only legitimate references (the `components/session-list/` folder name, the maestro `'session-list'` teleport enum). Spot grep for the standalone token `/stats` (not `/stats-history`) in the same four docs returns no hits.
+
+**Out of scope:** `docs/specs/ui/repo-discovery-baseline.md` and `docs/specs/ui/ui-pattern-audit.md` are point-in-time evidence snapshots — leave them. No code changes.
+
 ## Deviations log
 
-_(empty until first merge)_
+- audit (post-merge): outcomes 1-7 verified by direct inspection of merged code; gates pass (315 tests). Outcome 8 (docs coherence) failed — appended `docs-route-retirement-cleanup` task above.
