@@ -62,14 +62,14 @@ Document app-specific UI semantics and guardrails for the current mobile app.
 1. Current user-facing screens use vertical layouts with no horizontal scrolling on phone widths.
 2. Page backgrounds are muted light surfaces (`surfacePage`-like behavior), with card/panel surfaces layered on top.
 3. Spacing rhythm is already close to 8pt increments (common values cluster around `8/10/12/14/16/20`) and should remain consistent.
-4. Bottom tab navigation remains visible on `session-list` and `exercise-catalog` across primary states (including loading/error in `exercise-catalog`).
+4. Bottom tab navigation (`BottomTray` composing `TopLevelTabs`) remains visible on tab roots (`stats-history`, `session-recorder`, `exercise-catalog`) across primary states (including loading/error in `exercise-catalog`), and detail screens that still render `TopLevelTabs` directly (e.g. `exercise-history`) preserve the same strip.
 
 ### 4. List and row interaction conventions
 
 1. Pressable list rows commonly separate:
    - main row press target (open/edit primary action)
    - trailing kebab/icon action for secondary actions
-2. This split interaction pattern is used in both `session-list` and `exercise-catalog`, and should be preserved during refactors unless behavior intentionally changes.
+2. This split interaction pattern is used in `exercise-catalog` and in the shared `HistoryList` / `ActiveSessionRow` building blocks (consumed by the `stats-history` History sub-view and the Log tab), and should be preserved during refactors unless behavior intentionally changes.
 3. Deleted/archived visibility is controlled via toggles and state hints, not separate routes.
 4. In `exercise-catalog`, deleted exercises remain in list history when deleted visibility is enabled, show explicit `Deleted` state, and expose `Undelete` from row actions.
 5. `exercise-catalog` top actions use compact icon buttons (`+` create, kebab options), and deleted visibility toggle lives under the top-level options menu.
@@ -103,7 +103,7 @@ Document app-specific UI semantics and guardrails for the current mobile app.
 1. Whole-screen loading/error states are used when route data cannot render meaningful content yet.
    - `exercise-catalog`: centered state + bottom tabs remain visible
    - `completed-session/[sessionId]`: centered state variants with route title preserved
-2. In-section state panels are used inside `session-list` history region (loading/error/empty).
+2. In-section state panels are used inside the shared `HistoryList` (loading/error/empty) consumed by the `stats-history` History sub-view.
 3. Inline helper/success/error text is used for form feedback and post-action feedback (`exercise-catalog`, completed-session action bar).
 4. State presentation style varies by screen today; refactors may unify visuals, but the semantic distinction (whole-screen vs in-section vs inline) should remain explicit.
 5. The profile route uses:
@@ -132,7 +132,7 @@ Document app-specific UI semantics and guardrails for the current mobile app.
 ### 8. Navigation/query semantics (UI-facing rule)
 
 1. Route mode/state changes that affect screen behavior (for example `session-recorder` completed-edit mode) must be documented in `docs/specs/ui/navigation-contract.md`.
-2. Route alias behavior (`/` -> `session-list`) should be treated as a navigation entry alias, not a unique screen design.
+2. Route alias behavior (`/` -> `stats-history`) should be treated as a navigation entry alias, not a unique screen design.
 3. `exercise-catalog` supports recorder-entry query semantics (`source=session-recorder`, `intent=manage`) for the manage flow, while recorder `Add new` uses the same exercise editor inside the recorder route.
 
 ### 9. UI guardrail enforcement (current enforced rule)
@@ -140,7 +140,7 @@ Document app-specific UI semantics and guardrails for the current mobile app.
 1. Do not add raw color literals (`#hex`, `rgb(...)`, `rgba(...)`) directly in screen/component `.tsx` files.
 2. Use UI tokens from `apps/mobile/components/ui/tokens.ts` directly or through primitives in `apps/mobile/components/ui/`.
 3. Temporary exceptions require an explicit allowlist entry and rationale in `apps/mobile/scripts/ui-guardrails.config.js`.
-4. As of Task `T-20260226-06`, the current route screens (`session-list`, `session-recorder`, `exercise-catalog`, `completed-session/[sessionId]`) no longer require raw-color allowlist exceptions.
+4. As of Task `T-20260226-06`, the current route screens (`stats-history`, `session-recorder`, `exercise-catalog`, `completed-session/[sessionId]`) no longer require raw-color allowlist exceptions.
 
 Guardrail command:
 

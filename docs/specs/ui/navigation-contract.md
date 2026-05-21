@@ -18,7 +18,7 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 - Router system: `expo-router` (file-based routes in `apps/mobile/app/`)
 - Root stack/layout: `apps/mobile/app/_layout.tsx`
 - Tab roots live inside the `(tabs)` route group at `apps/mobile/app/(tabs)/` and share a tab layout at `apps/mobile/app/(tabs)/_layout.tsx`. The group name is parenthesised so it does not appear in URLs (e.g. `/session-recorder` resolves to `app/(tabs)/session-recorder.tsx`).
-- Tab roots have `headerShown: false`; detail screens (`session-list`, `exercise-history`, `profile`, `completed-session/[sessionId]`, `maestro-harness`) remain outside `(tabs)/` and keep their existing native header behavior.
+- Tab roots have `headerShown: false`; detail screens (`exercise-history`, `profile`, `completed-session/[sessionId]`, `maestro-harness`) remain outside `(tabs)/` and keep their existing native header behavior.
 - Navigation is currently string-path based (no centralized typed route helper layer)
 
 ## Route + param summary (current)
@@ -30,27 +30,12 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 - Behavior:
   - renders an `expo-router` `Redirect` to `/stats-history`
 
-2. `/session-list`
-- File: `apps/mobile/app/session-list.tsx`
-- Params:
-  - none
-- Behavior:
-  - focus refreshes data via local reload token
-  - this route is still live during the navigation redesign migration so the `session-list-decompose` task can extract reusable pieces; final retirement happens in `maestro-and-tests` once nothing still hits it
-
-2a. `/stats-history`
+2. `/stats-history`
 - File: `apps/mobile/app/(tabs)/stats-history.tsx`
 - Params:
   - none
 - Behavior:
-  - tab root inside the `(tabs)` group; renders the (legacy) Stats body verbatim until the `stats-history-tab` task layers the Stats↔History segmented toggle on top
-
-2b. `/stats` (redirect)
-- File: `apps/mobile/app/stats.tsx`
-- Params:
-  - none
-- Behavior:
-  - back-compat shim: renders an `expo-router` `Redirect` to `/stats-history`
+  - tab root inside the `(tabs)` group; renders the merged Stats / History view with a top Stats ↔ History segmented toggle (History sub-view reuses the shared `HistoryList`; Stats sub-view hosts the period chips and per-exercise picker that links out to `/exercise-history`)
 
 3. `/session-recorder`
 - File: `apps/mobile/app/(tabs)/session-recorder.tsx`
@@ -78,7 +63,7 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 - Params:
   - none
 - Behavior:
-  - reached from the shared top-level navigation utility action on `session-list` and `exercise-catalog`
+  - reached from the shared bottom-tray Settings cog (available from every tab root and the detail screens that still render `TopLevelTabs` directly)
   - remains accessible while logged out; it does not require an authenticated session before opening `/profile`
   - routes to `/profile` from the `Profile` destination row
 
@@ -114,38 +99,32 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 ## Allowed route transitions (current high-level flows)
 
 1. `/` -> `/stats-history`
-   - root redirect (renders `<Redirect />`); replaces the previous `/session-list` alias
-2. `/session-list` -> `/session-recorder`
-   - start/open active session
-3. `/session-list` -> `/completed-session/<sessionId>`
-   - open completed session detail
-4. `/session-list` -> `/session-recorder?mode=completed-edit&sessionId=<sessionId>`
-   - edit completed session from session actions
-5. `/session-list` <-> `/exercise-catalog`
-   - top-level tabs
-6. `/completed-session/<sessionId>` -> `/session-recorder?mode=completed-edit&sessionId=<sessionId>`
+   - root redirect (renders `<Redirect />`)
+2. `/stats-history` -> `/exercise-history?exerciseDefinitionId=<id>`
+   - Stats sub-view per-exercise picker opens the per-exercise history view
+3. `/stats-history` -> `/completed-session/<sessionId>`
+   - History sub-view row tap (via the shared `HistoryList`)
+4. `/session-recorder` <-> `/stats-history` / `/exercise-catalog`
+   - tab switching via the shared bottom tray (`BottomTray` -> `TopLevelTabs`)
+5. `/completed-session/<sessionId>` -> `/session-recorder?mode=completed-edit&sessionId=<sessionId>`
    - edit action
-7. `/completed-session/<sessionId>?intent=edit` -> `/session-recorder?mode=completed-edit&sessionId=<sessionId>`
+6. `/completed-session/<sessionId>?intent=edit` -> `/session-recorder?mode=completed-edit&sessionId=<sessionId>`
    - route-side redirect (`replace`)
-8. `/completed-session/<sessionId>` -> `/`
-   - successful reopen (`dismissTo('/')`)
-9. `/session-recorder...` -> `/`
-   - successful submit/save (`dismissTo('/')`)
-10. `/session-recorder` -> `/exercise-catalog?source=session-recorder&intent=manage`
+7. `/completed-session/<sessionId>` -> `/`
+   - successful reopen (`dismissTo('/')`, which the root alias forwards to `/stats-history`)
+8. `/session-recorder...` -> `/`
+   - successful submit/save (`dismissTo('/')`, forwarded to `/stats-history` by the root alias)
+9. `/session-recorder` -> `/exercise-catalog?source=session-recorder&intent=manage`
    - exercise picker `Manage` action
-11. `/exercise-catalog?source=session-recorder...` -> `/session-recorder`
+10. `/exercise-catalog?source=session-recorder...` -> `/session-recorder`
    - explicit back action or post-save return (`router.back()`)
-12. `/session-list` -> `/settings`
-   - shared top-level navigation utility action
-13. `/exercise-catalog` -> `/settings`
-   - shared top-level navigation utility action
-14. `/settings` -> `/profile`
+11. (any tab root or detail screen rendering `TopLevelTabs`) -> `/settings`
+   - shared Settings cog in the bottom tray / top-level tab strip
+12. `/settings` -> `/profile`
    - settings destination row
-15. `/profile` -> `/profile`
+13. `/profile` -> `/profile`
    - in-place auth-state rerender on sign-in/sign-out; no route replacement
-16. `/stats` -> `/exercise-history?exerciseDefinitionId=<id>`
-   - "Per-exercise history" picker section opens the per-exercise history view
-17. `/exercise-history` -> `/completed-session/<sessionId>`
+14. `/exercise-history` -> `/completed-session/<sessionId>`
    - session card tap or all-time-best row tap
 
 Note:
@@ -156,7 +135,7 @@ Note:
 ## Header titles (current, high level)
 
 - Tab roots inside the `(tabs)` group (`stats-history`, `session-recorder`, `exercise-catalog`, `settings`) all run with `headerShown: false`; per-screen titles in `apps/mobile/app/(tabs)/_layout.tsx` are still declared for completeness but the visible tab bar is now `BottomTray` (composing `TopLevelTabs`) supplied via the `tabBar` prop. Detail screens that haven't yet moved into `(tabs)` (notably `exercise-history`) still render `TopLevelTabs` directly until they migrate.
-- Detail screens registered in the root stack (`session-list`, `stats` redirect shim, `profile`, `maestro-harness`) keep their native stack header behavior; titles are declared in `apps/mobile/app/_layout.tsx`
+- Detail screens registered in the root stack (`exercise-history`, `profile`, `maestro-harness`, `completed-session/[sessionId]`) keep their native stack header behavior; titles are declared in `apps/mobile/app/_layout.tsx`
 - `completed-session/[sessionId]` sets its title inside the route file (current title: `View Session`)
 - `exercise-history` sets its title inside the route file to the resolved exercise name (falls back to `Exercise History` when the summary is not yet available)
 
