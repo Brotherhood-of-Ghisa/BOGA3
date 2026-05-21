@@ -110,7 +110,8 @@ describe('ExerciseCatalogScreen', () => {
     expect(screen.getByText('Exercise created.')).toBeTruthy();
     expect(screen.getByText('Incline Press')).toBeTruthy();
     expect(screen.getByText('Chest · Triceps (s)')).toBeTruthy();
-    expect(screen.getByRole('tab', { name: 'Open Sessions' })).toBeTruthy();
+    expect(screen.getByRole('tab', { name: 'Open Stats and History' })).toBeTruthy();
+    expect(screen.getByRole('tab', { name: 'Open Log' })).toBeTruthy();
     expect(screen.getByRole('tab', { name: 'Open Exercises' })).toBeTruthy();
   });
 

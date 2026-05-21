@@ -128,9 +128,9 @@ describe('ExerciseHistoryScreenShell', () => {
         onSelectPeriod={jest.fn()}
         onSelectTag={jest.fn()}
         onPressSession={jest.fn()}
-        onPressSessions={jest.fn()}
+        onPressStatsHistory={jest.fn()}
+        onPressLog={jest.fn()}
         onPressExercises={jest.fn()}
-        onPressStats={jest.fn()}
         onPressSettings={jest.fn()}
       />
     );
@@ -153,9 +153,9 @@ describe('ExerciseHistoryScreenShell', () => {
         onSelectPeriod={onSelectPeriod}
         onSelectTag={jest.fn()}
         onPressSession={jest.fn()}
-        onPressSessions={jest.fn()}
+        onPressStatsHistory={jest.fn()}
+        onPressLog={jest.fn()}
         onPressExercises={jest.fn()}
-        onPressStats={jest.fn()}
         onPressSettings={jest.fn()}
       />
     );
@@ -178,9 +178,9 @@ describe('ExerciseHistoryScreenShell', () => {
         onSelectPeriod={jest.fn()}
         onSelectTag={onSelectTag}
         onPressSession={jest.fn()}
-        onPressSessions={jest.fn()}
+        onPressStatsHistory={jest.fn()}
+        onPressLog={jest.fn()}
         onPressExercises={jest.fn()}
-        onPressStats={jest.fn()}
         onPressSettings={jest.fn()}
       />
     );
@@ -209,9 +209,9 @@ describe('ExerciseHistoryScreenShell', () => {
         onSelectPeriod={jest.fn()}
         onSelectTag={jest.fn()}
         onPressSession={jest.fn()}
-        onPressSessions={jest.fn()}
+        onPressStatsHistory={jest.fn()}
+        onPressLog={jest.fn()}
         onPressExercises={jest.fn()}
-        onPressStats={jest.fn()}
         onPressSettings={jest.fn()}
       />
     );
@@ -232,9 +232,9 @@ describe('ExerciseHistoryScreenShell', () => {
         onSelectPeriod={jest.fn()}
         onSelectTag={jest.fn()}
         onPressSession={jest.fn()}
-        onPressSessions={jest.fn()}
+        onPressStatsHistory={jest.fn()}
+        onPressLog={jest.fn()}
         onPressExercises={jest.fn()}
-        onPressStats={jest.fn()}
         onPressSettings={jest.fn()}
       />
     );
@@ -254,9 +254,9 @@ describe('ExerciseHistoryScreenShell', () => {
         onSelectPeriod={jest.fn()}
         onSelectTag={jest.fn()}
         onPressSession={onPressSession}
-        onPressSessions={jest.fn()}
+        onPressStatsHistory={jest.fn()}
+        onPressLog={jest.fn()}
         onPressExercises={jest.fn()}
-        onPressStats={jest.fn()}
         onPressSettings={jest.fn()}
       />
     );
@@ -364,9 +364,9 @@ describe('ExerciseHistoryScreenShell — deleted tag visibility', () => {
         onSelectPeriod={jest.fn()}
         onSelectTag={jest.fn()}
         onPressSession={jest.fn()}
-        onPressSessions={jest.fn()}
+        onPressStatsHistory={jest.fn()}
+        onPressLog={jest.fn()}
         onPressExercises={jest.fn()}
-        onPressStats={jest.fn()}
         onPressSettings={jest.fn()}
       />
     );
@@ -385,9 +385,9 @@ describe('ExerciseHistoryScreenShell — deleted tag visibility', () => {
         onSelectPeriod={jest.fn()}
         onSelectTag={jest.fn()}
         onPressSession={jest.fn()}
-        onPressSessions={jest.fn()}
+        onPressStatsHistory={jest.fn()}
+        onPressLog={jest.fn()}
         onPressExercises={jest.fn()}
-        onPressStats={jest.fn()}
         onPressSettings={jest.fn()}
       />
     );

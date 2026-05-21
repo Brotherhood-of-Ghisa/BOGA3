@@ -66,30 +66,36 @@ Brief entrypoint inventory of the current reusable UI component set.
 1. `TopLevelTabs`
 - File: `apps/mobile/components/navigation/top-level-tabs.tsx`
 - Purpose:
-  - app-specific top-level Sessions/Exercises tab strip with a right-side `Settings` utility action, used on `session-list` and `exercise-catalog`
+  - app-specific top-level `Stats/History`, `Log`, `Exercises` tab strip with a right-side `Settings` utility action; used as the body of `BottomTray` inside `(tabs)/_layout.tsx`, and rendered directly by detail screens (`exercise-history`) until they migrate into the tabs group
 
-2. `ExerciseEditorModal`
+2. `BottomTray`
+- File: `apps/mobile/components/navigation/bottom-tray.tsx`
+- Purpose:
+  - collapsible bottom navigation tray that wraps `TopLevelTabs`; exposes a drag handle (React Native `PanResponder` + `Animated`) to collapse to a peek strip and `useTrayVisibility()` hook plus `TrayVisibilityProvider` so screens can imperatively expand/collapse
+  - snap math lives in the pure helper `apps/mobile/src/navigation/tray-snap.ts` so it can be unit-tested without gesture plumbing
+
+3. `ExerciseEditorModal`
 - File: `apps/mobile/components/exercise-catalog/exercise-editor-modal.tsx`
 - Purpose:
   - shared create/edit exercise editor modal reused by `exercise-catalog` and `session-recorder` add-new flow
 
-3. `SessionContentLayout`
+4. `SessionContentLayout`
 - File: `apps/mobile/components/session-recorder/session-content-layout.tsx`
 - Purpose:
   - shared layout scaffold for session exercise/set content used by `session-recorder` and completed-session detail screens
   - supports optional per-exercise metadata injection (`renderExerciseMeta`) so recorder mode can render tag chips/actions without duplicating card structure
 
-4. `SessionSummaryLine`
+5. `SessionSummaryLine`
 - File: `apps/mobile/components/session-list/session-summary-line.tsx`
 - Purpose:
   - shared two-line summary row (date/duration/gym + sets/exercises) reused by `ActiveSessionRow` and `HistoryList`, and available to the upcoming Stats/History and Log tabs
 
-5. `ActiveSessionRow`
+6. `ActiveSessionRow`
 - File: `apps/mobile/components/session-list/active-session-row.tsx`
 - Purpose:
   - active-session row plus its overflow menu (resume / complete / delete) for use by `session-list` and the future Log tab
 
-6. `HistoryList`
+7. `HistoryList`
 - File: `apps/mobile/components/session-list/history-list.tsx`
 - Purpose:
   - completed-session history list with delete/undelete modal and deleted-visibility toggle, ready to be consumed by `session-list` and the future Stats/History tab
@@ -131,7 +137,7 @@ Reference: `docs/specs/ui/ui-pattern-audit.md`
 ## Refactor convergence notes (Task `T-20260226-06`)
 
 1. Current user-facing route screens now consume `uiTokens.colors` for route-level screen styles (including modal scrims and status surfaces) instead of screen-local raw color literals.
-2. No reusable primitives were removed in Task `T-20260226-06`; existing shared primitives/components (`UiButton`, `UiText`, `UiSurface`, `TopLevelTabs`, `SessionContentLayout`) remain the canonical reuse surface.
+2. No reusable primitives were removed in Task `T-20260226-06`; existing shared primitives/components (`UiButton`, `UiText`, `UiSurface`, `TopLevelTabs`, `BottomTray`, `SessionContentLayout`) remain the canonical reuse surface.
 3. Some repeated button/row/modal patterns remain route-local one-offs to avoid behavioral churn; they stay tracked as candidate primitives in the pending list above.
 
 ## Maintenance rule

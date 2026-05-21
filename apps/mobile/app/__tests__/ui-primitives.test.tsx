@@ -6,37 +6,37 @@ import { UiButton, UiSurface, UiText, uiColors, uiRadius } from '@/components/ui
 
 describe('UI primitives', () => {
   it('renders semantic tab buttons with selected accessibility state and press handling', () => {
-    const onPressSessions = jest.fn();
+    const onPressStatsHistory = jest.fn();
+    const onPressLog = jest.fn();
     const onPressExercises = jest.fn();
-    const onPressStats = jest.fn();
     const onPressSettings = jest.fn();
 
     render(
       <TopLevelTabs
-        activeTab="sessions"
+        activeTab="stats-history"
+        onPressStatsHistory={onPressStatsHistory}
+        onPressLog={onPressLog}
         onPressExercises={onPressExercises}
-        onPressSessions={onPressSessions}
-        onPressStats={onPressStats}
         onPressSettings={onPressSettings}
       />
     );
 
-    const sessionsTab = screen.getByLabelText('Open Sessions');
+    const statsHistoryTab = screen.getByLabelText('Open Stats and History');
+    const logTab = screen.getByLabelText('Open Log');
     const exercisesTab = screen.getByLabelText('Open Exercises');
-    const statsTab = screen.getByLabelText('Open Stats');
     const settingsButton = screen.getByLabelText('Open Settings');
 
-    expect(sessionsTab.props.accessibilityState.selected).toBe(true);
+    expect(statsHistoryTab.props.accessibilityState.selected).toBe(true);
+    expect(logTab.props.accessibilityState.selected).toBe(false);
     expect(exercisesTab.props.accessibilityState.selected).toBe(false);
-    expect(statsTab.props.accessibilityState.selected).toBe(false);
 
+    fireEvent.press(logTab);
     fireEvent.press(exercisesTab);
-    fireEvent.press(statsTab);
     fireEvent.press(settingsButton);
+    expect(onPressLog).toHaveBeenCalledTimes(1);
     expect(onPressExercises).toHaveBeenCalledTimes(1);
-    expect(onPressStats).toHaveBeenCalledTimes(1);
     expect(onPressSettings).toHaveBeenCalledTimes(1);
-    expect(onPressSessions).not.toHaveBeenCalled();
+    expect(onPressStatsHistory).not.toHaveBeenCalled();
   });
 
   it('does not fire onPress for disabled buttons', () => {
@@ -77,9 +77,9 @@ describe('UI primitives', () => {
     const { toJSON } = render(
       <TopLevelTabs
         activeTab="exercises"
+        onPressStatsHistory={jest.fn()}
+        onPressLog={jest.fn()}
         onPressExercises={jest.fn()}
-        onPressSessions={jest.fn()}
-        onPressStats={jest.fn()}
         onPressSettings={jest.fn()}
       />
     );

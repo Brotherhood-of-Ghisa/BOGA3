@@ -40,7 +40,7 @@ Brief entrypoint map of the current mobile screens.
 - Purpose:
   - merged Stats / History tab; currently renders the prior `/stats` body verbatim while the `stats-history-tab` task layers the Stats↔History segmented toggle on top
 - Notes:
-  - tab root inside the `(tabs)` group with `headerShown: false`; the in-screen `TopLevelTabs` continues to be the tab bar until the `bottom-tray` task replaces it
+  - tab root inside the `(tabs)` group with `headerShown: false`; the tab bar is now `BottomTray` (composing `TopLevelTabs`) supplied via the `tabBar` prop in `(tabs)/_layout.tsx`. The in-screen `<TopLevelTabs>` in this file is a transitional duplicate retained until the `stats-history-tab` task takes over; it shares the same component so the API stays uniform.
 
 2b. `/stats` (redirect)
 - File: `apps/mobile/app/stats.tsx`
@@ -142,7 +142,7 @@ Brief entrypoint map of the current mobile screens.
   - tab group layout that owns the tab roots (`stats-history`, `session-recorder`, `exercise-catalog`) plus `settings` (in-group but reached via the cog, not as a tab)
 - Notes:
   - all tab roots have `headerShown: false`
-  - the system tab bar is currently hidden (`tabBar={() => null}`) so the existing in-screen `TopLevelTabs` remains the sole tab bar until the `bottom-tray` task replaces it with `BottomTray`
+  - the system tab bar is supplied via `tabBar={() => <BottomTray>…</BottomTray>}`: the `BottomTray` component (from `apps/mobile/components/navigation/bottom-tray.tsx`) wraps `TopLevelTabs` and exposes a drag handle to collapse to a peek strip. Screens can imperatively expand/collapse via `useTrayVisibility()`; initial state is `expanded`. Snap math is unit-tested in `apps/mobile/src/navigation/tray-snap.ts`.
 
 ## Documentation boundary
 
