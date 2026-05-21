@@ -17,7 +17,7 @@
         "IOS_BUNDLE_ID": "com.phano.boga3.dev"
       }
     },
-    "dev-internal": {
+    "dev": {
       "developmentClient": true,
       "environment": "development",
       "distribution": "internal",
