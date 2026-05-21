@@ -264,9 +264,9 @@ export default function ExerciseCatalogScreen() {
   const bottomTabs = (
     <TopLevelTabs
       activeTab="exercises"
-      onPressSessions={() => router.push('/session-list')}
+      onPressStatsHistory={() => router.push('/stats-history')}
+      onPressLog={() => router.push('/session-recorder')}
       onPressExercises={() => {}}
-      onPressStats={() => router.push('/stats')}
       onPressSettings={() => router.push('/settings')}
     />
   );

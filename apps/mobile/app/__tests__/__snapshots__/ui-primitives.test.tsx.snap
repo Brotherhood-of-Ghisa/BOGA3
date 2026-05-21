@@ -36,7 +36,7 @@ exports[`UI primitives matches the current top-level tabs snapshot after primiti
     }
   >
     <View
-      accessibilityLabel="Open Sessions"
+      accessibilityLabel="Open Stats and History"
       accessibilityRole="tab"
       accessibilityState={
         {
@@ -89,6 +89,7 @@ exports[`UI primitives matches the current top-level tabs snapshot after primiti
           undefined,
         ]
       }
+      testID="top-level-tab-stats-history"
     >
       <Text
         selectable={false}
@@ -106,7 +107,82 @@ exports[`UI primitives matches the current top-level tabs snapshot after primiti
           ]
         }
       >
-        Sessions
+        Stats/History
+      </Text>
+    </View>
+    <View
+      accessibilityLabel="Open Log"
+      accessibilityRole="tab"
+      accessibilityState={
+        {
+          "busy": undefined,
+          "checked": undefined,
+          "disabled": false,
+          "expanded": undefined,
+          "selected": false,
+        }
+      }
+      accessibilityValue={
+        {
+          "max": undefined,
+          "min": undefined,
+          "now": undefined,
+          "text": undefined,
+        }
+      }
+      accessible={true}
+      collapsable={false}
+      focusable={true}
+      onBlur={[Function]}
+      onClick={[Function]}
+      onFocus={[Function]}
+      onResponderGrant={[Function]}
+      onResponderMove={[Function]}
+      onResponderRelease={[Function]}
+      onResponderTerminate={[Function]}
+      onResponderTerminationRequest={[Function]}
+      onStartShouldSetResponder={[Function]}
+      style={
+        [
+          {
+            "alignItems": "center",
+            "borderRadius": 8,
+            "justifyContent": "center",
+            "minHeight": 42,
+            "paddingHorizontal": 10,
+            "paddingVertical": 9,
+          },
+          {
+            "backgroundColor": "#f4f7fb",
+            "borderColor": "#dbe3ef",
+            "borderWidth": 1,
+            "flex": 1,
+          },
+          null,
+          null,
+          null,
+          undefined,
+        ]
+      }
+      testID="top-level-tab-log"
+    >
+      <Text
+        selectable={false}
+        style={
+          [
+            {
+              "color": "#122033",
+            },
+            {
+              "color": "#20324f",
+              "fontSize": 13,
+              "fontWeight": "600",
+            },
+            undefined,
+          ]
+        }
+      >
+        Log
       </Text>
     </View>
     <View
@@ -163,6 +239,7 @@ exports[`UI primitives matches the current top-level tabs snapshot after primiti
           undefined,
         ]
       }
+      testID="top-level-tab-exercises"
     >
       <Text
         selectable={false}
@@ -181,80 +258,6 @@ exports[`UI primitives matches the current top-level tabs snapshot after primiti
         }
       >
         Exercises
-      </Text>
-    </View>
-    <View
-      accessibilityLabel="Open Stats"
-      accessibilityRole="tab"
-      accessibilityState={
-        {
-          "busy": undefined,
-          "checked": undefined,
-          "disabled": false,
-          "expanded": undefined,
-          "selected": false,
-        }
-      }
-      accessibilityValue={
-        {
-          "max": undefined,
-          "min": undefined,
-          "now": undefined,
-          "text": undefined,
-        }
-      }
-      accessible={true}
-      collapsable={false}
-      focusable={true}
-      onBlur={[Function]}
-      onClick={[Function]}
-      onFocus={[Function]}
-      onResponderGrant={[Function]}
-      onResponderMove={[Function]}
-      onResponderRelease={[Function]}
-      onResponderTerminate={[Function]}
-      onResponderTerminationRequest={[Function]}
-      onStartShouldSetResponder={[Function]}
-      style={
-        [
-          {
-            "alignItems": "center",
-            "borderRadius": 8,
-            "justifyContent": "center",
-            "minHeight": 42,
-            "paddingHorizontal": 10,
-            "paddingVertical": 9,
-          },
-          {
-            "backgroundColor": "#f4f7fb",
-            "borderColor": "#dbe3ef",
-            "borderWidth": 1,
-            "flex": 1,
-          },
-          null,
-          null,
-          null,
-          undefined,
-        ]
-      }
-    >
-      <Text
-        selectable={false}
-        style={
-          [
-            {
-              "color": "#122033",
-            },
-            {
-              "color": "#20324f",
-              "fontSize": 13,
-              "fontWeight": "600",
-            },
-            undefined,
-          ]
-        }
-      >
-        Stats
       </Text>
     </View>
   </View>

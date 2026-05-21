@@ -226,10 +226,10 @@ export function SessionListScreenShell({
       />
 
       <TopLevelTabs
-        activeTab="sessions"
-        onPressSessions={() => {}}
+        activeTab="stats-history"
+        onPressStatsHistory={() => router.push('/stats-history')}
+        onPressLog={() => router.push('/session-recorder')}
         onPressExercises={() => router.push('/exercise-catalog')}
-        onPressStats={() => router.push('/stats')}
         onPressSettings={() => router.push('/settings')}
       />
     </View>

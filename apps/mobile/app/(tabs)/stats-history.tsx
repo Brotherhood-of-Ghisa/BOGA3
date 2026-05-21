@@ -90,7 +90,7 @@ export type StatsScreenShellProps = {
   summary: StatsSummary | null;
   periodDays: StatsPeriodDays;
   onSelectPeriod: (period: StatsPeriodDays) => void;
-  onPressSessions: () => void;
+  onPressLog: () => void;
   onPressExercises: () => void;
   onPressSettings: () => void;
   onPressExerciseHistoryPicker: () => void;
@@ -102,7 +102,7 @@ export function StatsScreenShell({
   summary,
   periodDays,
   onSelectPeriod,
-  onPressSessions,
+  onPressLog,
   onPressExercises,
   onPressSettings,
   onPressExerciseHistoryPicker,
@@ -123,10 +123,10 @@ export function StatsScreenShell({
       </View>
 
       <TopLevelTabs
-        activeTab="stats"
-        onPressSessions={onPressSessions}
+        activeTab="stats-history"
+        onPressStatsHistory={() => {}}
+        onPressLog={onPressLog}
         onPressExercises={onPressExercises}
-        onPressStats={() => {}}
         onPressSettings={onPressSettings}
       />
     </View>
@@ -499,7 +499,7 @@ export type StatsHistoryScreenShellProps = {
   isLoading: boolean;
   errorMessage: string | null;
   // Top-level navigation handlers
-  onPressSessions: () => void;
+  onPressLog: () => void;
   onPressExercises: () => void;
   onPressSettings: () => void;
   // History sub-view dependencies (optional so tests can omit them)
@@ -518,7 +518,7 @@ export function StatsHistoryScreenShell({
   onPressExerciseHistoryPicker,
   isLoading,
   errorMessage,
-  onPressSessions,
+  onPressLog,
   onPressExercises,
   onPressSettings,
   historyDataClient,
@@ -565,10 +565,10 @@ export function StatsHistoryScreenShell({
       </View>
 
       <TopLevelTabs
-        activeTab="stats"
-        onPressSessions={onPressSessions}
+        activeTab="stats-history"
+        onPressStatsHistory={() => {}}
+        onPressLog={onPressLog}
         onPressExercises={onPressExercises}
-        onPressStats={() => {}}
         onPressSettings={onPressSettings}
       />
     </View>
@@ -645,7 +645,7 @@ export default function StatsRoute() {
         onPressExerciseHistoryPicker={openExercisePicker}
         isLoading={isLoading}
         errorMessage={errorMessage}
-        onPressSessions={() => router.push('/session-list')}
+        onPressLog={() => router.push('/session-recorder')}
         onPressExercises={() => router.push('/exercise-catalog')}
         onPressSettings={() => router.push('/settings')}
         historyDataClient={DEFAULT_SESSION_LIST_DATA_CLIENT}

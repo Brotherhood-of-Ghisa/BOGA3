@@ -84,9 +84,9 @@ export type ExerciseHistoryScreenShellProps = {
   onSelectTag: (tagDefinitionId: string | null) => void;
   onPressSession: (sessionId: string) => void;
   activeTopTab?: TopLevelTabKey;
-  onPressSessions: () => void;
+  onPressStatsHistory: () => void;
+  onPressLog: () => void;
   onPressExercises: () => void;
-  onPressStats: () => void;
   onPressSettings: () => void;
 };
 
@@ -99,10 +99,10 @@ export function ExerciseHistoryScreenShell({
   onSelectPeriod,
   onSelectTag,
   onPressSession,
-  activeTopTab = 'stats',
-  onPressSessions,
+  activeTopTab = 'stats-history',
+  onPressStatsHistory,
+  onPressLog,
   onPressExercises,
-  onPressStats,
   onPressSettings,
 }: ExerciseHistoryScreenShellProps) {
   const tagOptions = summary?.tagOptions ?? [];
@@ -219,9 +219,9 @@ export function ExerciseHistoryScreenShell({
 
       <TopLevelTabs
         activeTab={activeTopTab}
-        onPressSessions={onPressSessions}
+        onPressStatsHistory={onPressStatsHistory}
+        onPressLog={onPressLog}
         onPressExercises={onPressExercises}
-        onPressStats={onPressStats}
         onPressSettings={onPressSettings}
       />
     </View>
@@ -514,9 +514,9 @@ export default function ExerciseHistoryRoute() {
         onSelectPeriod={handleSelectPeriod}
         onSelectTag={handleSelectTag}
         onPressSession={(sessionId) => router.push(`/completed-session/${sessionId}`)}
-        onPressSessions={() => router.push('/session-list')}
+        onPressStatsHistory={() => router.push('/stats-history')}
+        onPressLog={() => router.push('/session-recorder')}
         onPressExercises={() => router.push('/exercise-catalog')}
-        onPressStats={() => router.push('/stats')}
         onPressSettings={() => router.push('/settings')}
       />
     </>
