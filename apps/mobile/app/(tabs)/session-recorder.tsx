@@ -15,8 +15,6 @@ import {
 
 import { ExerciseEditorModal } from '@/components/exercise-catalog/exercise-editor-modal';
 import { SessionContentLayout } from '@/components/session-recorder/session-content-layout';
-import { ActiveSessionRow } from '@/components/session-list';
-import type { SessionListItem } from '@/components/session-list';
 import { uiColors } from '@/components/ui';
 import { getAuthSnapshot } from '@/src/auth';
 import {
@@ -107,39 +105,6 @@ function parseSessionDateTime(dateTime: string): Date | null {
   }
 
   return parsed;
-}
-
-function mapDraftSnapshotToActiveSessionListItem(snapshot: SessionDraftSnapshot): SessionListItem {
-  const setCount = snapshot.exercises.reduce((accumulator, exercise) => accumulator + exercise.sets.length, 0);
-  return {
-    id: snapshot.sessionId,
-    startedAt: snapshot.startedAt.toISOString(),
-    status: 'active',
-    completedAt: null,
-    durationSec: null,
-    durationDisplay: '',
-    gymName: null,
-    exerciseCount: snapshot.exercises.length,
-    setCount,
-    totalWeight: 0,
-    deletedAt: null,
-  };
-}
-
-function buildLocalActiveSessionListItem(sessionId: string, startedAt: Date): SessionListItem {
-  return {
-    id: sessionId,
-    startedAt: startedAt.toISOString(),
-    status: 'active',
-    completedAt: null,
-    durationSec: null,
-    durationDisplay: '',
-    gymName: null,
-    exerciseCount: 0,
-    setCount: 0,
-    totalWeight: 0,
-    deletedAt: null,
-  };
 }
 
 function mapDraftSnapshotToSession(snapshot: SessionDraftSnapshot): Session {
@@ -514,11 +479,9 @@ export default function SessionRecorderScreen() {
 
   const [state, setState] = useState<SessionRecorderState>(createInitialState);
   const [submitCleanupPrompt, setSubmitCleanupPrompt] = useState<SubmitCleanupPrompt | null>(null);
-  const [activeSession, setActiveSession] = useState<SessionListItem | null>(null);
   const [hasActiveSession, setHasActiveSession] = useState<boolean>(false);
   const [isPersistenceHydrated, setIsPersistenceHydrated] = useState<boolean>(false);
   const [isStartingSession, setIsStartingSession] = useState<boolean>(false);
-  const [activeDurationNowMs, setActiveDurationNowMs] = useState<number>(() => Date.now());
   const [completedEditEndDateTime, setCompletedEditEndDateTime] = useState<string | null>(null);
   const [completedEditLoadError, setCompletedEditLoadError] = useState<string | null>(null);
   const [isCompletedEditLoading, setIsCompletedEditLoading] = useState(false);
@@ -553,6 +516,7 @@ export default function SessionRecorderScreen() {
   const [activeSetTypePicker, setActiveSetTypePicker] = useState<SetTypePickerState | null>(null);
   const [pendingFocusedWeightSetId, setPendingFocusedWeightSetId] = useState<string | null>(null);
   const [focusedRepsSetId, setFocusedRepsSetId] = useState<string | null>(null);
+  const [isDeleteConfirmVisible, setIsDeleteConfirmVisible] = useState(false);
   const stateRef = useRef(state);
   const completedEditEndDateTimeRef = useRef<string | null>(completedEditEndDateTime);
   const persistedSessionIdRef = useRef<string | null>(null);
@@ -754,7 +718,6 @@ export default function SessionRecorderScreen() {
 
         if (!snapshot) {
           setHasActiveSession(false);
-          setActiveSession(null);
           return;
         }
 
@@ -763,7 +726,6 @@ export default function SessionRecorderScreen() {
           ...current,
           session: mapDraftSnapshotToSession(snapshot),
         }));
-        setActiveSession(mapDraftSnapshotToActiveSessionListItem(snapshot));
         setHasActiveSession(true);
       })
       .catch(() => {
@@ -790,55 +752,6 @@ export default function SessionRecorderScreen() {
       subscription.remove();
     };
   }, [lifecycleHelpers]);
-
-  useEffect(() => {
-    if (!hasActiveSession || !activeSession) {
-      return;
-    }
-
-    const intervalId = setInterval(() => {
-      setActiveDurationNowMs(Date.now());
-    }, 30_000);
-
-    return () => {
-      clearInterval(intervalId);
-    };
-  }, [hasActiveSession, activeSession]);
-
-  useEffect(() => {
-    if (!hasActiveSession) {
-      return;
-    }
-
-    const exerciseCount = state.session.exercises.length;
-    const setCount = state.session.exercises.reduce(
-      (accumulator, exercise) => accumulator + exercise.sets.length,
-      0
-    );
-    const gymName =
-      state.session.locationId === null
-        ? null
-        : state.locations.find((location) => location.id === state.session.locationId)?.name ?? null;
-
-    setActiveSession((current) => {
-      if (!current) {
-        return current;
-      }
-      if (
-        current.exerciseCount === exerciseCount &&
-        current.setCount === setCount &&
-        current.gymName === gymName
-      ) {
-        return current;
-      }
-      return {
-        ...current,
-        exerciseCount,
-        setCount,
-        gymName,
-      };
-    });
-  }, [hasActiveSession, state.session.exercises, state.session.locationId, state.locations]);
 
   useEffect(() => {
     return () => {
@@ -1066,7 +979,6 @@ export default function SessionRecorderScreen() {
           exercises: [],
         },
       }));
-      setActiveSession(buildLocalActiveSessionListItem(persisted.sessionId, startedAt));
       setHasActiveSession(true);
     } catch {
       // Keep the empty state visible if the persistence call fails — user can retry.
@@ -1074,31 +986,6 @@ export default function SessionRecorderScreen() {
       setIsStartingSession(false);
     }
   }, [isStartingSession]);
-
-  const handleActiveSessionResume = useCallback(() => {
-    // The recorder body is already mounted below the pinned row; resuming is a no-op
-    // beyond bringing focus to the recorder, which the press itself accomplishes.
-  }, []);
-
-  const handleActiveSessionDelete = useCallback(async () => {
-    const sessionId = persistedSessionIdRef.current ?? activeSession?.id ?? null;
-    if (!sessionId) {
-      return;
-    }
-
-    try {
-      await autosaveController.dispose({ flushDirty: false });
-      await setSessionDeletedState(sessionId, true);
-    } catch {
-      // Even if persistence fails, surface the empty state locally; user can retry from Start CTA.
-    } finally {
-      persistedSessionIdRef.current = null;
-      hasSessionMutationRef.current = false;
-      setActiveSession(null);
-      setHasActiveSession(false);
-      setState(() => createInitialState());
-    }
-  }, [activeSession, autosaveController]);
 
   const openGymModal = () => {
     setState((current) => ({
@@ -1784,7 +1671,6 @@ export default function SessionRecorderScreen() {
       await completeSessionDraft(persisted.sessionId);
       persistedSessionIdRef.current = null;
       hasSessionMutationRef.current = false;
-      setActiveSession(null);
       setHasActiveSession(false);
       router.dismissTo('/stats-history');
     })().catch(() => {
@@ -1846,6 +1732,34 @@ export default function SessionRecorderScreen() {
 
   const cancelSubmitCleanup = () => {
     setSubmitCleanupPrompt(null);
+  };
+
+  const openDeleteActiveSessionConfirm = () => {
+    setIsDeleteConfirmVisible(true);
+  };
+
+  const cancelDeleteActiveSession = () => {
+    setIsDeleteConfirmVisible(false);
+  };
+
+  const confirmDeleteActiveSession = async () => {
+    setIsDeleteConfirmVisible(false);
+    const sessionId = persistedSessionIdRef.current;
+    if (!sessionId) {
+      return;
+    }
+
+    try {
+      await autosaveController.dispose({ flushDirty: false });
+      await setSessionDeletedState(sessionId, true);
+    } catch {
+      // Even if persistence fails, reset the recorder locally so the user can start fresh.
+    } finally {
+      persistedSessionIdRef.current = null;
+      hasSessionMutationRef.current = false;
+      setHasActiveSession(false);
+      setState(() => createInitialState());
+    }
   };
 
   const gymEditorPrimaryLabel = state.editingLocationId ? 'Save' : 'Add';
@@ -1989,17 +1903,6 @@ export default function SessionRecorderScreen() {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
         testID="session-recorder-screen">
-      {routeMode !== 'completed-edit' && activeSession ? (
-        <ActiveSessionRow
-          session={activeSession}
-          nowMs={activeDurationNowMs}
-          onResume={handleActiveSessionResume}
-          onComplete={handleSubmit}
-          onDelete={() => {
-            void handleActiveSessionDelete();
-          }}
-        />
-      ) : null}
       {routeMode === 'completed-edit' ? (
         <View style={styles.completedEditMetadataCard}>
           <View style={styles.completedEditMetadataRow}>
@@ -2235,19 +2138,60 @@ export default function SessionRecorderScreen() {
         </View>
       ) : null}
 
-      <Pressable
-        accessibilityLabel={routeMode === 'completed-edit' ? 'Save changes' : 'Submit session'}
-        testID="session-recorder-submit-button"
-        style={[
-          styles.submitButton,
-          isSubmitDisabled ? styles.submitButtonDisabled : null,
-        ]}
-        disabled={isSubmitDisabled}
-        onPress={handleSubmit}>
-        <Text style={styles.submitButtonText}>
-          {routeMode === 'completed-edit' ? 'Save Changes' : 'Submit Session'}
-        </Text>
-      </Pressable>
+      <View style={styles.submitRow}>
+        <Pressable
+          accessibilityLabel={routeMode === 'completed-edit' ? 'Save changes' : 'Submit session'}
+          testID="session-recorder-submit-button"
+          style={[
+            styles.submitButton,
+            styles.submitRowPrimary,
+            isSubmitDisabled ? styles.submitButtonDisabled : null,
+          ]}
+          disabled={isSubmitDisabled}
+          onPress={handleSubmit}>
+          <Text style={styles.submitButtonText}>
+            {routeMode === 'completed-edit' ? 'Save Changes' : 'Submit Session'}
+          </Text>
+        </Pressable>
+        {routeMode !== 'completed-edit' && hasActiveSession ? (
+          <Pressable
+            accessibilityLabel="Delete active session"
+            testID="session-recorder-delete-button"
+            style={styles.deleteSessionButton}
+            onPress={openDeleteActiveSessionConfirm}>
+            <Text style={styles.deleteSessionButtonText}>🗑</Text>
+          </Pressable>
+        ) : null}
+      </View>
+
+      <Modal
+        animationType="fade"
+        transparent
+        visible={isDeleteConfirmVisible}
+        onRequestClose={cancelDeleteActiveSession}>
+        <View style={styles.modalContainer}>
+          <Pressable
+            accessibilityLabel="Dismiss delete session modal overlay"
+            style={styles.modalBackdrop}
+            onPress={cancelDeleteActiveSession}
+          />
+          <View style={styles.confirmationModalCard}>
+            <Text style={styles.confirmationTitle}>Delete this session?</Text>
+            <Text style={styles.confirmationBody}>
+              The in-progress session and all its sets will be discarded. This cannot be undone.
+            </Text>
+            <Pressable
+              accessibilityLabel="Confirm delete active session"
+              testID="session-recorder-delete-confirm-button"
+              style={styles.deleteSessionConfirmButton}
+              onPress={() => {
+                void confirmDeleteActiveSession();
+              }}>
+              <Text style={styles.deleteSessionConfirmButtonText}>Delete session</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
 
       <Modal
         animationType="fade"
@@ -3089,6 +3033,14 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 12,
   },
+  submitRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: 8,
+  },
+  submitRowPrimary: {
+    flex: 1,
+  },
   submitButton: {
     borderRadius: 10,
     paddingVertical: 14,
@@ -3099,6 +3051,27 @@ const styles = StyleSheet.create({
     backgroundColor: uiColors.actionPrimaryDisabled,
   },
   submitButtonText: {
+    color: uiColors.surfaceDefault,
+    fontWeight: '700',
+  },
+  deleteSessionButton: {
+    width: 48,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: uiColors.actionDanger,
+  },
+  deleteSessionButtonText: {
+    color: uiColors.surfaceDefault,
+    fontSize: 20,
+  },
+  deleteSessionConfirmButton: {
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: 'center',
+    backgroundColor: uiColors.actionDanger,
+  },
+  deleteSessionConfirmButtonText: {
     color: uiColors.surfaceDefault,
     fontWeight: '700',
   },
