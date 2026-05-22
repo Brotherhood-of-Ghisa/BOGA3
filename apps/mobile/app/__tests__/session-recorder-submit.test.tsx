@@ -184,7 +184,7 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
         })
       );
       expect(mockCompleteSessionDraft).toHaveBeenCalledWith('test-session');
-      expect(mockDismissTo).toHaveBeenCalledWith('/stats-history');
+      expect(mockReplace).toHaveBeenCalledWith('/stats-history');
     });
   });
 
@@ -203,7 +203,7 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
       expect(mockCompleteSessionDraft).toHaveBeenCalledWith('test-session');
     });
 
-    expect(mockDismissTo).toHaveBeenCalledWith('/stats-history');
+    expect(mockReplace).toHaveBeenCalledWith('/stats-history');
     expect(mockDismissAll).not.toHaveBeenCalled();
   });
 
@@ -235,7 +235,7 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
     await waitFor(() => {
       expect(mockPersistSessionDraftSnapshot).toHaveBeenCalled();
       expect(mockCompleteSessionDraft).toHaveBeenCalledWith('test-session');
-      expect(mockDismissTo).toHaveBeenCalledWith('/stats-history');
+      expect(mockReplace).toHaveBeenCalledWith('/stats-history');
     });
   });
 
@@ -255,7 +255,7 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
     await waitFor(() => {
       expect(mockPersistSessionDraftSnapshot).toHaveBeenCalled();
       expect(mockCompleteSessionDraft).toHaveBeenCalledWith('test-session');
-      expect(mockDismissTo).toHaveBeenCalledWith('/stats-history');
+      expect(mockReplace).toHaveBeenCalledWith('/stats-history');
     });
   });
 
@@ -278,7 +278,7 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
     await waitFor(() => {
       expect(mockPersistSessionDraftSnapshot).not.toHaveBeenCalled();
       expect(mockCompleteSessionDraft).not.toHaveBeenCalled();
-      expect(mockDismissTo).not.toHaveBeenCalled();
+      expect(mockReplace).not.toHaveBeenCalled();
     });
   });
 
@@ -323,7 +323,7 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
           ],
         })
       );
-      expect(mockDismissTo).toHaveBeenCalledWith('/stats-history');
+      expect(mockReplace).toHaveBeenCalledWith('/stats-history');
     });
     expect(screen.queryByText('Remove incomplete sets and submit?')).toBeNull();
     expect(mockCompleteSessionDraft).not.toHaveBeenCalled();
@@ -371,7 +371,7 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
           completedAt: new Date(2026, 1, 25, 10, 50, 0, 0),
         })
       );
-      expect(mockDismissTo).toHaveBeenCalledWith('/stats-history');
+      expect(mockReplace).toHaveBeenCalledWith('/stats-history');
     });
 
     expect(mockCompleteSessionDraft).not.toHaveBeenCalled();
@@ -411,7 +411,7 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
 
     await waitFor(() => {
       expect(mockPersistCompletedSessionSnapshot).toHaveBeenCalled();
-      expect(mockDismissTo).toHaveBeenCalledWith('/stats-history');
+      expect(mockReplace).toHaveBeenCalledWith('/stats-history');
     });
     expect(mockCompleteSessionDraft).not.toHaveBeenCalled();
   });
@@ -436,7 +436,7 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
 
     await waitFor(() => {
       expect(mockPersistCompletedSessionSnapshot).toHaveBeenCalled();
-      expect(mockDismissTo).toHaveBeenCalledWith('/stats-history');
+      expect(mockReplace).toHaveBeenCalledWith('/stats-history');
     });
     expect(mockCompleteSessionDraft).not.toHaveBeenCalled();
   });

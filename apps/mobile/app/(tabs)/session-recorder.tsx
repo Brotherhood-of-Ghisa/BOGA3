@@ -1656,7 +1656,9 @@ export default function SessionRecorderScreen() {
         });
 
         hasSessionMutationRef.current = false;
-        router.dismissTo('/stats-history');
+        // Both routes live in the same (tabs) Stack screen, so dismissTo finds nothing to pop;
+        // use replace to actually switch the active tab to Stats/History.
+        router.replace('/stats-history');
         return;
       }
 
@@ -1672,7 +1674,7 @@ export default function SessionRecorderScreen() {
       persistedSessionIdRef.current = null;
       hasSessionMutationRef.current = false;
       setHasActiveSession(false);
-      router.dismissTo('/stats-history');
+      router.replace('/stats-history');
     })().catch(() => {
       // Keep recorder screen state available for retry if persistence/complete/navigation fails.
     });
