@@ -25,8 +25,16 @@ appId: com.dinoderek.mobile
 - tapOn:
     text: "Close"
     optional: true
-- assertVisible:
-    id: "session-recorder-screen"
+- extendedWaitUntil:
+    visible:
+      id: "session-recorder-empty-state"
+    timeout: 30000
+- tapOn:
+    id: "start-session-button"
+- extendedWaitUntil:
+    visible:
+      id: "session-recorder-screen"
+    timeout: 30000
 - tapOn:
     text: "Continue"
     optional: true

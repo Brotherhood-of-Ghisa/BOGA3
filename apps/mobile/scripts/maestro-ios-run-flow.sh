@@ -97,6 +97,14 @@ maestro test "$MAESTRO_FLOW_FILE" \
 maestro_exit_code=$?
 set -e
 
+# Maestro 2.x exits 0 even when flows fail; fall back to JUnit inspection so quality-slow gates fail correctly.
+if (( maestro_exit_code == 0 )) && [[ -f "$MAESTRO_JUNIT_FILE" ]]; then
+  if grep -Eq '(failures|errors)="[1-9]' "$MAESTRO_JUNIT_FILE"; then
+    echo "[maestro-ios-run-flow] Detected flow failures in $MAESTRO_JUNIT_FILE despite maestro exit 0; treating as failure." >&2
+    maestro_exit_code=1
+  fi
+fi
+
 if [[ -n "${IOS_SIM_UDID:-}" ]]; then
   echo "[maestro-ios-run-flow] Capturing simulator system logs to $SIMULATOR_SYSTEM_LOG_FILE"
   maestro_capture_simulator_logs \
