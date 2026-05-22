@@ -75,7 +75,7 @@ appId: com.dinoderek.mobile
     text: "Close"
     optional: true
 - tapOn:
-    id: "stats-history-view-chip-history"
+    id: "stats-card-sessions"
 - assertVisible:
     id: "completed-history-scroll"
 - takeScreenshot: "04-data-runtime-smoke-success"

@@ -1,5 +1,7 @@
 import { and, asc, eq, gte, inArray, isNull, lt } from 'drizzle-orm';
 
+import { computeSetVolume, parseSetReps, parseSetWeight } from '@/src/exercise-calculations';
+
 import { bootstrapLocalDataLayer } from './bootstrap';
 import {
   exerciseMuscleMappings,
@@ -17,18 +19,27 @@ export type StatsPeriodBounds = {
   end: Date;
 };
 
-export type StatsMuscleGroupScore = {
+export type StatsMusclePerformance = {
   muscleGroupId: string;
   displayName: string;
   familyName: string;
   sortOrder: number;
-  score: number;
+  sessionCount: number;
+  totalWeight: number;
+};
+
+export type StatsMuscleFamilyPerformance = {
+  familyName: string;
+  sortOrder: number;
+  sessionCount: number;
+  totalWeight: number;
+  muscles: StatsMusclePerformance[];
 };
 
 export type StatsTotals = {
   sessionCount: number;
   totalSets: number;
-  setsByMuscleGroup: StatsMuscleGroupScore[];
+  muscleFamilies: StatsMuscleFamilyPerformance[];
 };
 
 export type StatsSummary = {
@@ -39,7 +50,12 @@ export type StatsSummary = {
 export type StatsAggregationInput = {
   sessions: { id: string; completedAt: Date }[];
   sessionExercises: { id: string; sessionId: string; exerciseDefinitionId: string | null }[];
-  exerciseSets: { sessionExerciseId: string; setType: string | null }[];
+  exerciseSets: {
+    sessionExerciseId: string;
+    setType: string | null;
+    weightValue: string;
+    repsValue: string;
+  }[];
   muscleMappings: {
     exerciseDefinitionId: string;
     muscleGroupId: string;
@@ -98,14 +114,17 @@ const computePreviousPeriodBounds = (current: StatsPeriodBounds): StatsPeriodBou
   return { days: current.days, start, end };
 };
 
+const parseSetVolume = (weightValue: string, repsValue: string): number => {
+  const weight = parseSetWeight(weightValue);
+  const reps = parseSetReps(repsValue);
+  if (weight === null || reps === null) return 0;
+  return computeSetVolume(weight, reps);
+};
+
 export const aggregateStats = (input: StatsAggregationInput): StatsTotals => {
-  const sessionExerciseBySessionId = new Map<string, typeof input.sessionExercises>();
   const sessionExerciseById = new Map<string, (typeof input.sessionExercises)[number]>();
   for (const exercise of input.sessionExercises) {
     sessionExerciseById.set(exercise.id, exercise);
-    const bucket = sessionExerciseBySessionId.get(exercise.sessionId) ?? [];
-    bucket.push(exercise);
-    sessionExerciseBySessionId.set(exercise.sessionId, bucket);
   }
 
   const sessionIds = new Set(input.sessions.map((session) => session.id));
@@ -127,39 +146,84 @@ export const aggregateStats = (input: StatsAggregationInput): StatsTotals => {
     mappingsByExerciseDefinitionId.set(mapping.exerciseDefinitionId, bucket);
   }
 
-  const scoreByMuscleGroupId = new Map<string, number>();
+  const totalWeightByMuscleId = new Map<string, number>();
+  const sessionsByMuscleId = new Map<string, Set<string>>();
+
   for (const set of workingSets) {
     const exercise = sessionExerciseById.get(set.sessionExerciseId);
     if (!exercise || exercise.exerciseDefinitionId === null) continue;
     const mappings = mappingsByExerciseDefinitionId.get(exercise.exerciseDefinitionId) ?? [];
+    if (mappings.length === 0) continue;
+
+    const volume = parseSetVolume(set.weightValue, set.repsValue);
+
     for (const mapping of mappings) {
-      const weight = muscleRoleWeight(mapping.role);
-      if (weight === 0) continue;
-      scoreByMuscleGroupId.set(
-        mapping.muscleGroupId,
-        (scoreByMuscleGroupId.get(mapping.muscleGroupId) ?? 0) + weight
-      );
+      const roleWeight = muscleRoleWeight(mapping.role);
+      if (roleWeight === 0) continue;
+
+      const weighted = volume * roleWeight;
+      if (weighted > 0) {
+        totalWeightByMuscleId.set(
+          mapping.muscleGroupId,
+          (totalWeightByMuscleId.get(mapping.muscleGroupId) ?? 0) + weighted
+        );
+      }
+
+      const sessionsForMuscle = sessionsByMuscleId.get(mapping.muscleGroupId) ?? new Set<string>();
+      sessionsForMuscle.add(exercise.sessionId);
+      sessionsByMuscleId.set(mapping.muscleGroupId, sessionsForMuscle);
     }
   }
 
-  const setsByMuscleGroup: StatsMuscleGroupScore[] = input.muscleGroups
-    .map((group) => ({
+  const musclesByFamily = new Map<string, StatsMusclePerformance[]>();
+  for (const group of input.muscleGroups) {
+    const muscle: StatsMusclePerformance = {
       muscleGroupId: group.id,
       displayName: group.displayName,
       familyName: group.familyName,
       sortOrder: group.sortOrder,
-      score: scoreByMuscleGroupId.get(group.id) ?? 0,
-    }))
+      sessionCount: sessionsByMuscleId.get(group.id)?.size ?? 0,
+      totalWeight: totalWeightByMuscleId.get(group.id) ?? 0,
+    };
+    const bucket = musclesByFamily.get(group.familyName) ?? [];
+    bucket.push(muscle);
+    musclesByFamily.set(group.familyName, bucket);
+  }
+
+  const muscleFamilies: StatsMuscleFamilyPerformance[] = Array.from(musclesByFamily.entries())
+    .map(([familyName, muscles]) => {
+      const familySessionIds = new Set<string>();
+      let familyTotalWeight = 0;
+      let familySortOrder = Number.POSITIVE_INFINITY;
+      for (const muscle of muscles) {
+        familyTotalWeight += muscle.totalWeight;
+        if (muscle.sortOrder < familySortOrder) familySortOrder = muscle.sortOrder;
+        const sessionIds = sessionsByMuscleId.get(muscle.muscleGroupId);
+        if (sessionIds) {
+          for (const id of sessionIds) familySessionIds.add(id);
+        }
+      }
+      const sortedMuscles = [...muscles].sort((left, right) => {
+        if (left.sortOrder !== right.sortOrder) return left.sortOrder - right.sortOrder;
+        return left.displayName.localeCompare(right.displayName);
+      });
+      return {
+        familyName,
+        sortOrder: Number.isFinite(familySortOrder) ? familySortOrder : 0,
+        sessionCount: familySessionIds.size,
+        totalWeight: familyTotalWeight,
+        muscles: sortedMuscles,
+      };
+    })
     .sort((left, right) => {
-      if (right.score !== left.score) return right.score - left.score;
       if (left.sortOrder !== right.sortOrder) return left.sortOrder - right.sortOrder;
-      return left.displayName.localeCompare(right.displayName);
+      return left.familyName.localeCompare(right.familyName);
     });
 
   return {
     sessionCount: input.sessions.length,
     totalSets: workingSets.length,
-    setsByMuscleGroup,
+    muscleFamilies,
   };
 };
 
@@ -216,6 +280,8 @@ export const createDrizzleStatsStore = (): StatsStore => ({
             .select({
               sessionExerciseId: exerciseSets.sessionExerciseId,
               setType: exerciseSets.setType,
+              weightValue: exerciseSets.weightValue,
+              repsValue: exerciseSets.repsValue,
             })
             .from(exerciseSets)
             .where(inArray(exerciseSets.sessionExerciseId, sessionExerciseIds))

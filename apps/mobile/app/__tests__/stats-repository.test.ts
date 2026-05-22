@@ -27,13 +27,13 @@ const buildAggregationInput = (
     { id: 'se-orphan', sessionId: 'session-2', exerciseDefinitionId: null },
   ],
   exerciseSets: [
-    { sessionExerciseId: 'se-1', setType: 'warm_up' },
-    { sessionExerciseId: 'se-1', setType: null },
-    { sessionExerciseId: 'se-1', setType: 'rir_2' },
-    { sessionExerciseId: 'se-2', setType: 'rir_1' },
-    { sessionExerciseId: 'se-2', setType: 'rir_0' },
-    { sessionExerciseId: 'se-3', setType: null },
-    { sessionExerciseId: 'se-orphan', setType: null },
+    { sessionExerciseId: 'se-1', setType: 'warm_up', weightValue: '100', repsValue: '5' },
+    { sessionExerciseId: 'se-1', setType: null, weightValue: '100', repsValue: '5' },
+    { sessionExerciseId: 'se-1', setType: 'rir_2', weightValue: '110', repsValue: '4' },
+    { sessionExerciseId: 'se-2', setType: 'rir_1', weightValue: '20', repsValue: '10' },
+    { sessionExerciseId: 'se-2', setType: 'rir_0', weightValue: '20', repsValue: '8' },
+    { sessionExerciseId: 'se-3', setType: null, weightValue: '120', repsValue: '3' },
+    { sessionExerciseId: 'se-orphan', setType: null, weightValue: '50', repsValue: '5' },
   ],
   muscleMappings: [
     { exerciseDefinitionId: 'ex-bench', muscleGroupId: 'chest_sternal', role: 'primary' },
@@ -45,6 +45,9 @@ const buildAggregationInput = (
   ...overrides,
 });
 
+const flattenMuscles = (totals: ReturnType<typeof aggregateStats>) =>
+  totals.muscleFamilies.flatMap((family) => family.muscles);
+
 describe('aggregateStats', () => {
   it('excludes warm-up sets from totals and counts orphan-exercise sets in total only', () => {
     const totals = aggregateStats(buildAggregationInput());
@@ -53,39 +56,67 @@ describe('aggregateStats', () => {
     expect(totals.totalSets).toBe(6);
   });
 
-  it('weights muscle groups by role (primary=1, secondary=0.5, stabilizer=0, null=0)', () => {
+  it('attributes total weight to muscles using role weights (primary=1, secondary=0.5, stabilizer=0)', () => {
     const totals = aggregateStats(buildAggregationInput());
 
-    const scoreById = new Map(
-      totals.setsByMuscleGroup.map((entry) => [entry.muscleGroupId, entry.score])
+    const byId = new Map(
+      flattenMuscles(totals).map((entry) => [entry.muscleGroupId, entry])
     );
 
-    expect(scoreById.get('chest_sternal')).toBe(3);
-    expect(scoreById.get('triceps')).toBe(1.5);
-    expect(scoreById.get('biceps')).toBe(2);
-    expect(scoreById.get('calves')).toBe(0);
+    // chest_sternal (primary): bench sets 100×5 + 110×4 + 120×3 = 1300
+    expect(byId.get('chest_sternal')?.totalWeight).toBe(1300);
+    // triceps (secondary on bench): 1300 × 0.5 = 650
+    expect(byId.get('triceps')?.totalWeight).toBe(650);
+    // biceps (primary on curl): 20×10 + 20×8 = 360
+    expect(byId.get('biceps')?.totalWeight).toBe(360);
+    // calves only stabilizer mapping → 0
+    expect(byId.get('calves')?.totalWeight).toBe(0);
   });
 
-  it('always returns the full muscle taxonomy, including untrained groups', () => {
+  it('counts distinct sessions per muscle (primary + secondary mappings)', () => {
     const totals = aggregateStats(buildAggregationInput());
 
-    const ids = totals.setsByMuscleGroup.map((entry) => entry.muscleGroupId);
-    expect(ids).toContain('calves');
-    expect(totals.setsByMuscleGroup).toHaveLength(4);
+    const byId = new Map(
+      flattenMuscles(totals).map((entry) => [entry.muscleGroupId, entry])
+    );
+
+    expect(byId.get('chest_sternal')?.sessionCount).toBe(2);
+    expect(byId.get('triceps')?.sessionCount).toBe(2);
+    expect(byId.get('biceps')?.sessionCount).toBe(1);
+    expect(byId.get('calves')?.sessionCount).toBe(0);
   });
 
-  it('sorts muscle groups by score desc, then taxonomy sortOrder, then displayName', () => {
+  it('rolls up family sessionCount and totalWeight from member muscles', () => {
     const totals = aggregateStats(buildAggregationInput());
 
-    expect(totals.setsByMuscleGroup.map((entry) => entry.muscleGroupId)).toEqual([
-      'chest_sternal',
-      'biceps',
-      'triceps',
-      'calves',
+    const familiesByName = new Map(totals.muscleFamilies.map((family) => [family.familyName, family]));
+
+    // Chest family: just chest_sternal so it inherits its totals.
+    expect(familiesByName.get('Chest')?.sessionCount).toBe(2);
+    expect(familiesByName.get('Chest')?.totalWeight).toBe(1300);
+
+    // Arms family: union of biceps (session-1) + triceps (session-1, session-2) = 2.
+    expect(familiesByName.get('Arms')?.sessionCount).toBe(2);
+    expect(familiesByName.get('Arms')?.totalWeight).toBe(360 + 650);
+
+    // Legs untrained.
+    expect(familiesByName.get('Legs')?.sessionCount).toBe(0);
+    expect(familiesByName.get('Legs')?.totalWeight).toBe(0);
+  });
+
+  it('always returns the full muscle taxonomy grouped by family', () => {
+    const totals = aggregateStats(buildAggregationInput());
+
+    const allIds = flattenMuscles(totals).map((entry) => entry.muscleGroupId);
+    expect(allIds).toEqual(expect.arrayContaining(['chest_sternal', 'triceps', 'biceps', 'calves']));
+    expect(totals.muscleFamilies.map((family) => family.familyName)).toEqual([
+      'Chest',
+      'Arms',
+      'Legs',
     ]);
   });
 
-  it('handles an empty period with zero scores across the full taxonomy', () => {
+  it('handles an empty period with zero totals across the full taxonomy', () => {
     const totals = aggregateStats(
       buildAggregationInput({
         sessions: [],
@@ -96,8 +127,8 @@ describe('aggregateStats', () => {
 
     expect(totals.sessionCount).toBe(0);
     expect(totals.totalSets).toBe(0);
-    expect(totals.setsByMuscleGroup.every((entry) => entry.score === 0)).toBe(true);
-    expect(totals.setsByMuscleGroup).toHaveLength(4);
+    expect(totals.muscleFamilies.every((family) => family.sessionCount === 0 && family.totalWeight === 0)).toBe(true);
+    expect(flattenMuscles(totals)).toHaveLength(4);
   });
 });
 
