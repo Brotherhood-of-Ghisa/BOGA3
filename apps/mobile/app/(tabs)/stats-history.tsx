@@ -1,40 +1,20 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { useCallback, useMemo, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { computeStatsSummary, reopenCompletedSessionDraft, type StatsPeriodDays, type StatsSummary } from '@/src/data';
 import {
-  ActiveSessionRow,
-  DEFAULT_SESSION_LIST_DATA_CLIENT,
-  DEFAULT_SESSION_LIST_ITEMS,
-  HistoryList,
-  useSessionListData,
-  type SessionListDataClient,
-  type SessionListItem,
-} from '@/components/session-list';
+  computeStatsSummary,
+  type StatsMuscleFamilyPerformance,
+  type StatsMusclePerformance,
+  type StatsPeriodDays,
+  type StatsSummary,
+} from '@/src/data';
 import { SegmentedChips, uiColors } from '@/components/ui';
-import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
-import { filterIndexedExerciseCatalogExercises } from '@/src/exercise-catalog/search';
 
 const PERIOD_OPTIONS = [
   { value: 7 as StatsPeriodDays, label: 'Last 7 days' },
   { value: 30 as StatsPeriodDays, label: 'Last 30 days' },
 ] as const;
-
-export type StatsHistoryView = 'stats' | 'history';
-
-const VIEW_OPTIONS: readonly { value: StatsHistoryView; label: string }[] = [
-  { value: 'stats', label: 'Stats' },
-  { value: 'history', label: 'History' },
-];
 
 type DeltaDisplay = {
   text: string;
@@ -71,6 +51,15 @@ const formatNumber = (value: number): string => {
   return value.toFixed(1).replace(/\.0$/, '');
 };
 
+const formatTotalWeight = (value: number): string => {
+  if (value === 0) return '0';
+  if (value >= 1000) {
+    const inK = value / 1000;
+    return `${inK.toFixed(inK >= 100 ? 0 : 1).replace(/\.0$/, '')}k`;
+  }
+  return formatNumber(Math.round(value));
+};
+
 const deltaToneStyle = (tone: DeltaDisplay['tone']) => {
   switch (tone) {
     case 'positive':
@@ -89,7 +78,7 @@ export type StatsScreenShellProps = {
   summary: StatsSummary | null;
   periodDays: StatsPeriodDays;
   onSelectPeriod: (period: StatsPeriodDays) => void;
-  onPressExerciseHistoryPicker: () => void;
+  onPressSessionsCard: () => void;
   isLoading: boolean;
   errorMessage: string | null;
 };
@@ -98,43 +87,10 @@ export function StatsScreenShell({
   summary,
   periodDays,
   onSelectPeriod,
-  onPressExerciseHistoryPicker,
+  onPressSessionsCard,
   isLoading,
   errorMessage,
 }: StatsScreenShellProps) {
-  return (
-    <View style={styles.screen}>
-      <View style={styles.contentRegion}>
-        <StatsSubView
-          summary={summary}
-          periodDays={periodDays}
-          onSelectPeriod={onSelectPeriod}
-          onPressExerciseHistoryPicker={onPressExerciseHistoryPicker}
-          isLoading={isLoading}
-          errorMessage={errorMessage}
-        />
-      </View>
-    </View>
-  );
-}
-
-type StatsSubViewProps = {
-  summary: StatsSummary | null;
-  periodDays: StatsPeriodDays;
-  onSelectPeriod: (period: StatsPeriodDays) => void;
-  onPressExerciseHistoryPicker: () => void;
-  isLoading: boolean;
-  errorMessage: string | null;
-};
-
-function StatsSubView({
-  summary,
-  periodDays,
-  onSelectPeriod,
-  onPressExerciseHistoryPicker,
-  isLoading,
-  errorMessage,
-}: StatsSubViewProps) {
   const sessionDelta = summary
     ? formatDelta(summary.current.totals.sessionCount, summary.previous.totals.sessionCount)
     : null;
@@ -142,18 +98,8 @@ function StatsSubView({
     ? formatDelta(summary.current.totals.totalSets, summary.previous.totals.totalSets)
     : null;
 
-  const previousByMuscleId = useMemo(() => {
-    const map = new Map<string, number>();
-    if (summary) {
-      for (const entry of summary.previous.totals.setsByMuscleGroup) {
-        map.set(entry.muscleGroupId, entry.score);
-      }
-    }
-    return map;
-  }, [summary]);
-
   return (
-    <View style={styles.subViewRegion}>
+    <View style={styles.screen} testID="stats-history-screen">
       <SegmentedChips
         accessibilityLabel="Select stats period"
         options={PERIOD_OPTIONS}
@@ -182,91 +128,40 @@ function StatsSubView({
         {summary ? (
           <>
             <View style={styles.summaryGrid}>
-              <SummaryCard
-                testID="stats-card-sessions"
-                label="Sessions"
-                value={formatNumber(summary.current.totals.sessionCount)}
-                delta={sessionDelta}
-              />
-              <SummaryCard
-                testID="stats-card-sets"
-                label="Working sets"
-                value={formatNumber(summary.current.totals.totalSets)}
-                delta={setsDelta}
-              />
-            </View>
-
-            <View style={styles.exerciseHistorySection}>
-              <Text style={styles.sectionTitle}>Per-exercise history</Text>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Pick an exercise to view its history"
-                onPress={onPressExerciseHistoryPicker}
-                style={styles.exerciseHistoryRow}
-                testID="stats-exercise-history-picker-button">
-                <View style={styles.exerciseHistoryRowText}>
-                  <Text style={styles.exerciseHistoryRowTitle}>Pick an exercise…</Text>
-                  <Text style={styles.exerciseHistoryRowSubtitle}>
-                    Progression, top sets, and per-tag drill-down for one exercise.
+                accessibilityLabel="Open sessions list"
+                onPress={onPressSessionsCard}
+                style={({ pressed }) => [styles.summaryCard, pressed && styles.summaryCardPressed]}
+                testID="stats-card-sessions">
+                <Text style={styles.summaryLabel}>Sessions</Text>
+                <Text style={styles.summaryValue}>
+                  {formatNumber(summary.current.totals.sessionCount)}
+                </Text>
+                {sessionDelta ? (
+                  <Text style={[styles.summaryDelta, deltaToneStyle(sessionDelta.tone)]}>
+                    {sessionDelta.text}
                   </Text>
-                </View>
-                <Text style={styles.exerciseHistoryRowChevron}>›</Text>
+                ) : null}
               </Pressable>
-            </View>
 
-            <View style={styles.muscleSection}>
-              <View style={styles.muscleSectionHeader}>
-                <Text style={styles.sectionTitle}>Sets per muscle group</Text>
-                <Text style={styles.sectionHint}>primary = 1.0 · secondary = 0.5</Text>
-              </View>
-
-              {summary.current.totals.setsByMuscleGroup.length === 0 ? (
-                <View style={styles.statePanel} testID="stats-muscle-empty">
-                  <Text style={styles.stateBody}>
-                    No muscle taxonomy loaded yet. Add some exercises to see this section.
+              <View style={styles.summaryCard} testID="stats-card-sets">
+                <Text style={styles.summaryLabel}>Working sets</Text>
+                <Text style={styles.summaryValue}>
+                  {formatNumber(summary.current.totals.totalSets)}
+                </Text>
+                {setsDelta ? (
+                  <Text style={[styles.summaryDelta, deltaToneStyle(setsDelta.tone)]}>
+                    {setsDelta.text}
                   </Text>
-                </View>
-              ) : (
-                <View style={styles.muscleList}>
-                  {summary.current.totals.setsByMuscleGroup.map((entry) => {
-                    const previousScore = previousByMuscleId.get(entry.muscleGroupId) ?? 0;
-                    const untrained = entry.score === 0;
-                    const delta = formatDelta(entry.score, previousScore);
-                    return (
-                      <View
-                        key={entry.muscleGroupId}
-                        style={[styles.muscleRow, untrained && styles.muscleRowUntrained]}
-                        testID={`stats-muscle-row-${entry.muscleGroupId}`}>
-                        <View style={styles.muscleLabelColumn}>
-                          <Text
-                            style={[
-                              styles.muscleName,
-                              untrained && styles.muscleNameUntrained,
-                            ]}>
-                            {entry.displayName}
-                          </Text>
-                          <Text style={styles.muscleFamily}>{entry.familyName}</Text>
-                        </View>
-                        <View style={styles.muscleScoreColumn}>
-                          <Text
-                            style={[
-                              styles.muscleScore,
-                              untrained && styles.muscleScoreUntrained,
-                            ]}>
-                            {untrained ? 'Not trained' : formatNumber(entry.score)}
-                          </Text>
-                          {!untrained || previousScore > 0 ? (
-                            <Text style={[styles.muscleDelta, deltaToneStyle(delta.tone)]}>
-                              {delta.text}
-                            </Text>
-                          ) : null}
-                        </View>
-                      </View>
-                    );
-                  })}
-                </View>
-              )}
+                ) : null}
+              </View>
             </View>
+
+            <MuscleFamilyList
+              families={summary.current.totals.muscleFamilies}
+              previousFamilies={summary.previous.totals.muscleFamilies}
+            />
           </>
         ) : null}
       </ScrollView>
@@ -274,310 +169,195 @@ function StatsSubView({
   );
 }
 
-function SummaryCard({
-  testID,
+function MuscleFamilyList({
+  families,
+  previousFamilies,
+}: {
+  families: StatsMuscleFamilyPerformance[];
+  previousFamilies: StatsMuscleFamilyPerformance[];
+}) {
+  if (families.length === 0) {
+    return (
+      <View style={styles.statePanel} testID="stats-muscle-empty">
+        <Text style={styles.stateBody}>
+          No muscle taxonomy loaded yet. Add some exercises to see this section.
+        </Text>
+      </View>
+    );
+  }
+
+  const previousByFamilyName = new Map(previousFamilies.map((family) => [family.familyName, family]));
+  const previousMusclesById = new Map<string, StatsMusclePerformance>();
+  for (const family of previousFamilies) {
+    for (const muscle of family.muscles) {
+      previousMusclesById.set(muscle.muscleGroupId, muscle);
+    }
+  }
+
+  return (
+    <View style={styles.familyList}>
+      {families.map((family) => (
+        <MuscleFamilyCard
+          key={family.familyName}
+          family={family}
+          previousFamily={previousByFamilyName.get(family.familyName) ?? null}
+          previousMusclesById={previousMusclesById}
+        />
+      ))}
+    </View>
+  );
+}
+
+function isFamilyCollapsible(family: StatsMuscleFamilyPerformance): boolean {
+  if (family.muscles.length !== 1) return false;
+  return family.muscles[0].displayName.trim().toLowerCase() === family.familyName.trim().toLowerCase();
+}
+
+function MuscleFamilyCard({
+  family,
+  previousFamily,
+  previousMusclesById,
+}: {
+  family: StatsMuscleFamilyPerformance;
+  previousFamily: StatsMuscleFamilyPerformance | null;
+  previousMusclesById: Map<string, StatsMusclePerformance>;
+}) {
+  const familyUntrained = family.sessionCount === 0 && family.totalWeight === 0;
+  const testIdSlug = family.familyName.toLowerCase().replace(/\s+/g, '-');
+  const sessionsDelta = formatDelta(family.sessionCount, previousFamily?.sessionCount ?? 0);
+  const weightDelta = formatDelta(family.totalWeight, previousFamily?.totalWeight ?? 0);
+  const collapsed = isFamilyCollapsible(family);
+
+  return (
+    <View style={styles.familyCard} testID={`stats-family-card-${testIdSlug}`}>
+      <View style={styles.familyHeader}>
+        <Text
+          style={[styles.familyName, familyUntrained && styles.muscleTextUntrained]}
+          testID={`stats-family-name-${testIdSlug}`}>
+          {family.familyName}
+        </Text>
+        <View style={styles.familyMetrics}>
+          <Metric
+            label="Sessions"
+            value={formatNumber(family.sessionCount)}
+            delta={sessionsDelta}
+            testID={`stats-family-sessions-${testIdSlug}`}
+            muted={familyUntrained}
+          />
+          <Metric
+            label="Total weight"
+            value={formatTotalWeight(family.totalWeight)}
+            delta={weightDelta}
+            testID={`stats-family-weight-${testIdSlug}`}
+            muted={familyUntrained}
+          />
+        </View>
+      </View>
+      {collapsed ? null : (
+        <View style={styles.muscleList}>
+          {family.muscles.map((muscle) => {
+            const muscleUntrained = muscle.sessionCount === 0 && muscle.totalWeight === 0;
+            const previousMuscle = previousMusclesById.get(muscle.muscleGroupId) ?? null;
+            const muscleSessionsDelta = formatDelta(
+              muscle.sessionCount,
+              previousMuscle?.sessionCount ?? 0
+            );
+            const muscleWeightDelta = formatDelta(
+              muscle.totalWeight,
+              previousMuscle?.totalWeight ?? 0
+            );
+            return (
+              <View
+                key={muscle.muscleGroupId}
+                style={styles.muscleRow}
+                testID={`stats-muscle-row-${muscle.muscleGroupId}`}>
+                <Text
+                  style={[styles.muscleName, muscleUntrained && styles.muscleTextUntrained]}
+                  numberOfLines={1}>
+                  {muscle.displayName}
+                </Text>
+                <View style={styles.muscleMetrics}>
+                  <Metric
+                    label="Sessions"
+                    value={formatNumber(muscle.sessionCount)}
+                    delta={muscleSessionsDelta}
+                    testID={`stats-muscle-sessions-${muscle.muscleGroupId}`}
+                    muted={muscleUntrained}
+                    small
+                  />
+                  <Metric
+                    label="Total weight"
+                    value={formatTotalWeight(muscle.totalWeight)}
+                    delta={muscleWeightDelta}
+                    testID={`stats-muscle-weight-${muscle.muscleGroupId}`}
+                    muted={muscleUntrained}
+                    small
+                  />
+                </View>
+              </View>
+            );
+          })}
+        </View>
+      )}
+    </View>
+  );
+}
+
+function Metric({
   label,
   value,
   delta,
+  testID,
+  muted,
+  small,
 }: {
-  testID: string;
   label: string;
   value: string;
-  delta: DeltaDisplay | null;
+  delta?: DeltaDisplay;
+  testID: string;
+  muted: boolean;
+  small?: boolean;
 }) {
   return (
-    <View style={styles.summaryCard} testID={testID}>
-      <Text style={styles.summaryLabel}>{label}</Text>
-      <Text style={styles.summaryValue}>{value}</Text>
+    <View style={styles.metric} testID={testID}>
+      <Text style={[small ? styles.metricLabelSmall : styles.metricLabel, muted && styles.metricLabelMuted]}>
+        {label}
+      </Text>
+      <Text style={[small ? styles.metricValueSmall : styles.metricValue, muted && styles.metricValueMuted]}>
+        {value}
+      </Text>
       {delta ? (
-        <Text style={[styles.summaryDelta, deltaToneStyle(delta.tone)]}>{delta.text}</Text>
+        <Text style={[small ? styles.metricDeltaSmall : styles.metricDelta, deltaToneStyle(delta.tone)]}>
+          {delta.text}
+        </Text>
       ) : null}
-    </View>
-  );
-}
-
-export type HistorySubViewProps = {
-  dataClient?: SessionListDataClient;
-  initialSessions?: SessionListItem[];
-  reloadToken?: number;
-};
-
-export function HistorySubView({
-  dataClient,
-  initialSessions = DEFAULT_SESSION_LIST_ITEMS,
-  reloadToken = 0,
-}: HistorySubViewProps) {
-  const router = useRouter();
-  const [showDeletedSessions, setShowDeletedSessions] = useState(false);
-  const [activeDurationNowMs, setActiveDurationNowMs] = useState(() => Date.now());
-
-  const { sessions, setSessions, isLoadingSessions, loadErrorMessage, reloadSessions } =
-    useSessionListData({
-      dataClient,
-      initialSessions,
-      showDeletedSessions,
-      reloadToken,
-    });
-
-  const activeSession = sessions.find(
-    (session) => session.status === 'active' && session.deletedAt === null
-  );
-  const completedSessions = sessions
-    .filter((session) => session.status === 'completed')
-    .filter((session) => showDeletedSessions || session.deletedAt === null)
-    .sort((left, right) => {
-      const leftTime = left.completedAt ? new Date(left.completedAt).getTime() : 0;
-      const rightTime = right.completedAt ? new Date(right.completedAt).getTime() : 0;
-      return rightTime - leftTime;
-    });
-
-  const showGlobalEmptyState =
-    !isLoadingSessions && !loadErrorMessage && !activeSession && completedSessions.length === 0;
-  const reopenDisabled = Boolean(activeSession);
-
-  useEffect(() => {
-    if (!activeSession) {
-      return;
-    }
-
-    const intervalId = setInterval(() => {
-      setActiveDurationNowMs(Date.now());
-    }, 30_000);
-
-    return () => {
-      clearInterval(intervalId);
-    };
-  }, [activeSession]);
-
-  const navigateToSessionRecorder = () => {
-    router.push('/session-recorder');
-  };
-
-  const completeActiveSession = () => {
-    if (dataClient && activeSession) {
-      return (async () => {
-        await dataClient.completeActiveSession(activeSession.id);
-        await reloadSessions();
-      })();
-    }
-
-    setSessions((currentSessions) =>
-      currentSessions.map((session) => {
-        if (session.status !== 'active' || session.deletedAt !== null) {
-          return session;
-        }
-
-        return {
-          ...session,
-          status: 'completed',
-          completedAt: '2026-02-20T18:15:00.000Z',
-        };
-      })
-    );
-  };
-
-  const discardActiveSession = () => {
-    if (dataClient && activeSession) {
-      return (async () => {
-        await dataClient.discardActiveSession(activeSession.id);
-        await reloadSessions();
-      })();
-    }
-
-    setSessions((currentSessions) =>
-      currentSessions.filter((session) => session.status !== 'active')
-    );
-  };
-
-  const setCompletedSessionDeleted = (sessionId: string, isDeleted: boolean) => {
-    if (dataClient) {
-      return (async () => {
-        await dataClient.setCompletedSessionDeletedState(sessionId, isDeleted);
-        await reloadSessions();
-      })();
-    }
-
-    setSessions((currentSessions) =>
-      currentSessions.map((session) => {
-        if (session.id !== sessionId) {
-          return session;
-        }
-
-        return {
-          ...session,
-          deletedAt: isDeleted ? '2026-02-23T12:00:00.000Z' : null,
-        };
-      })
-    );
-  };
-
-  const openCompletedSessionEdit = (sessionId: string) => {
-    router.push(`/session-recorder?mode=completed-edit&sessionId=${sessionId}`);
-  };
-
-  const reopenCompletedSession = (sessionId: string) => {
-    if (activeSession) {
-      return;
-    }
-    if (dataClient) {
-      return (async () => {
-        await dataClient.reopenCompletedSession(sessionId);
-        await reloadSessions();
-      })();
-    }
-    return (async () => {
-      await reopenCompletedSessionDraft(sessionId);
-      await reloadSessions();
-    })();
-  };
-
-  const navigateToCompletedSessionDetail = (sessionId: string) => {
-    router.push(`/completed-session/${sessionId}`);
-  };
-
-  return (
-    <View style={styles.subViewRegion} testID="stats-history-history-subview">
-      <View style={styles.pinnedTopRegion}>
-        {activeSession ? (
-          <View style={styles.sectionBlock}>
-            <Text selectable style={styles.historyActiveTitle}>
-              Active
-            </Text>
-            <ActiveSessionRow
-              session={activeSession}
-              nowMs={activeDurationNowMs}
-              onResume={navigateToSessionRecorder}
-              onComplete={() => {
-                void completeActiveSession();
-              }}
-              onDelete={() => {
-                void discardActiveSession();
-              }}
-            />
-          </View>
-        ) : null}
-      </View>
-
-      <HistoryList
-        sessions={completedSessions}
-        isLoading={isLoadingSessions}
-        loadErrorMessage={loadErrorMessage}
-        showDeletedSessions={showDeletedSessions}
-        onToggleShowDeletedSessions={() => setShowDeletedSessions((current) => !current)}
-        showGlobalEmptyState={showGlobalEmptyState}
-        onOpenCompletedSession={navigateToCompletedSessionDetail}
-        onSetCompletedSessionDeleted={setCompletedSessionDeleted}
-        onEditCompletedSession={openCompletedSessionEdit}
-        onReopenCompletedSession={reopenCompletedSession}
-        reopenDisabled={reopenDisabled}
-      />
-    </View>
-  );
-}
-
-export type StatsHistoryScreenShellProps = {
-  // Stats sub-view inputs
-  summary: StatsSummary | null;
-  periodDays: StatsPeriodDays;
-  onSelectPeriod: (period: StatsPeriodDays) => void;
-  onPressExerciseHistoryPicker: () => void;
-  isLoading: boolean;
-  errorMessage: string | null;
-  // History sub-view dependencies (optional so tests can omit them)
-  historyDataClient?: SessionListDataClient;
-  historyInitialSessions?: SessionListItem[];
-  historyReloadToken?: number;
-  // Toggle wiring
-  activeView: StatsHistoryView;
-  onChangeView: (next: StatsHistoryView) => void;
-};
-
-export function StatsHistoryScreenShell({
-  summary,
-  periodDays,
-  onSelectPeriod,
-  onPressExerciseHistoryPicker,
-  isLoading,
-  errorMessage,
-  historyDataClient,
-  historyInitialSessions,
-  historyReloadToken,
-  activeView,
-  onChangeView,
-}: StatsHistoryScreenShellProps) {
-  return (
-    <View style={styles.screen} testID="stats-history-screen">
-      <SegmentedChips
-        accessibilityLabel="Switch between Stats and History"
-        options={VIEW_OPTIONS}
-        value={activeView}
-        onChange={onChangeView}
-        testIDPrefix="stats-history-view-chip"
-      />
-
-      <View style={styles.contentRegion}>
-        <View
-          style={[styles.subViewSlot, activeView === 'stats' ? null : styles.subViewHidden]}
-          pointerEvents={activeView === 'stats' ? 'auto' : 'none'}
-          testID="stats-history-stats-slot">
-          <StatsSubView
-            summary={summary}
-            periodDays={periodDays}
-            onSelectPeriod={onSelectPeriod}
-            onPressExerciseHistoryPicker={onPressExerciseHistoryPicker}
-            isLoading={isLoading}
-            errorMessage={errorMessage}
-          />
-        </View>
-
-        <View
-          style={[styles.subViewSlot, activeView === 'history' ? null : styles.subViewHidden]}
-          pointerEvents={activeView === 'history' ? 'auto' : 'none'}
-          testID="stats-history-history-slot">
-          <HistorySubView
-            dataClient={historyDataClient}
-            initialSessions={historyInitialSessions}
-            reloadToken={historyReloadToken}
-          />
-        </View>
-      </View>
     </View>
   );
 }
 
 export default function StatsRoute() {
   const router = useRouter();
-  const [activeView, setActiveView] = useState<StatsHistoryView>('stats');
   const [periodDays, setPeriodDays] = useState<StatsPeriodDays>(7);
   const [summary, setSummary] = useState<StatsSummary | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isExercisePickerVisible, setIsExercisePickerVisible] = useState(false);
-  const [exercisePickerQuery, setExercisePickerQuery] = useState('');
-  const [historyReloadToken, setHistoryReloadToken] = useState(0);
 
-  const loadSummary = useCallback(
-    async (period: StatsPeriodDays) => {
-      setIsLoading(true);
-      setErrorMessage(null);
-      try {
-        const next = await computeStatsSummary({ periodDays: period });
-        setSummary(next);
-      } catch (error) {
-        setErrorMessage(error instanceof Error ? error.message : 'Unknown error');
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    []
-  );
+  const loadSummary = useCallback(async (period: StatsPeriodDays) => {
+    setIsLoading(true);
+    setErrorMessage(null);
+    try {
+      const next = await computeStatsSummary({ periodDays: period });
+      setSummary(next);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Unknown error');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
       void loadSummary(periodDays);
-      // Bump the history reload token on every focus so the History sub-view
-      // matches the standalone session-list screen's refresh-on-focus behavior.
-      setHistoryReloadToken((current) => current + 1);
     }, [loadSummary, periodDays])
   );
 
@@ -589,142 +369,24 @@ export default function StatsRoute() {
     [loadSummary]
   );
 
-  const openExercisePicker = useCallback(() => {
-    setExercisePickerQuery('');
-    setIsExercisePickerVisible(true);
-  }, []);
+  const handlePressSessionsCard = useCallback(() => {
+    router.push('/sessions');
+  }, [router]);
 
-  const closeExercisePicker = useCallback(() => {
-    setIsExercisePickerVisible(false);
-  }, []);
-
-  const handleSelectExerciseHistoryTarget = useCallback(
-    (exerciseDefinitionId: string) => {
-      setIsExercisePickerVisible(false);
-      router.push(`/exercise-history?exerciseDefinitionId=${encodeURIComponent(exerciseDefinitionId)}`);
-    },
-    [router]
+  // useMemo prevents unnecessary re-renders of the shell when the route re-renders.
+  const shellProps = useMemo<StatsScreenShellProps>(
+    () => ({
+      summary,
+      periodDays,
+      onSelectPeriod: handleSelectPeriod,
+      onPressSessionsCard: handlePressSessionsCard,
+      isLoading,
+      errorMessage,
+    }),
+    [summary, periodDays, handleSelectPeriod, handlePressSessionsCard, isLoading, errorMessage]
   );
 
-  return (
-    <>
-      <StatsHistoryScreenShell
-        summary={summary}
-        periodDays={periodDays}
-        onSelectPeriod={handleSelectPeriod}
-        onPressExerciseHistoryPicker={openExercisePicker}
-        isLoading={isLoading}
-        errorMessage={errorMessage}
-        historyDataClient={DEFAULT_SESSION_LIST_DATA_CLIENT}
-        historyReloadToken={historyReloadToken}
-        activeView={activeView}
-        onChangeView={setActiveView}
-      />
-      <ExerciseHistoryPickerModal
-        visible={isExercisePickerVisible}
-        searchValue={exercisePickerQuery}
-        onChangeSearch={setExercisePickerQuery}
-        onRequestClose={closeExercisePicker}
-        onSelectExercise={handleSelectExerciseHistoryTarget}
-      />
-    </>
-  );
-}
-
-const PICKER_DEBOUNCE_MS = 150;
-
-function useDebouncedValue<T>(value: T, delayMs: number): T {
-  const [debouncedValue, setDebouncedValue] = useState(value);
-  useEffect(() => {
-    const handle = setTimeout(() => setDebouncedValue(value), delayMs);
-    return () => clearTimeout(handle);
-  }, [value, delayMs]);
-  return debouncedValue;
-}
-
-function ExerciseHistoryPickerModal({
-  visible,
-  searchValue,
-  onChangeSearch,
-  onRequestClose,
-  onSelectExercise,
-}: {
-  visible: boolean;
-  searchValue: string;
-  onChangeSearch: (next: string) => void;
-  onRequestClose: () => void;
-  onSelectExercise: (exerciseDefinitionId: string) => void;
-}) {
-  const catalog = useExerciseCatalog();
-  const debouncedQuery = useDebouncedValue(searchValue, PICKER_DEBOUNCE_MS);
-  const activeExercises = useMemo(
-    () => catalog.exercises.filter((exercise) => !exercise.deletedAt),
-    [catalog.exercises]
-  );
-  const filteredExercises = useMemo(
-    () => filterIndexedExerciseCatalogExercises(activeExercises, debouncedQuery),
-    [activeExercises, debouncedQuery]
-  );
-  const isLoading = catalog.status === 'idle' || catalog.status === 'loading';
-  const loadError = catalog.status === 'error' ? catalog.lastError ?? 'Unable to load exercise catalog.' : null;
-
-  return (
-    <Modal animationType="fade" transparent visible={visible} onRequestClose={onRequestClose}>
-      <View style={styles.pickerRoot}>
-        <Pressable
-          accessibilityLabel="Dismiss exercise picker"
-          style={styles.pickerOverlay}
-          onPress={onRequestClose}
-        />
-        <View style={styles.pickerCard} testID="stats-exercise-history-picker-modal">
-          <Text style={styles.pickerTitle}>Pick an exercise</Text>
-          <TextInput
-            accessibilityLabel="Exercise picker filter input"
-            autoCapitalize="none"
-            autoCorrect={false}
-            placeholder="Filter by exercise or muscle group"
-            value={searchValue}
-            onChangeText={onChangeSearch}
-            style={styles.pickerSearchInput}
-          />
-          <ScrollView style={styles.pickerScroll} contentContainerStyle={styles.pickerScrollContent}>
-            {loadError ? (
-              <Text style={styles.pickerErrorText}>{loadError}</Text>
-            ) : isLoading && filteredExercises.length === 0 ? (
-              <Text style={styles.pickerHelperText}>Loading exercise catalog…</Text>
-            ) : filteredExercises.length === 0 ? (
-              <Text style={styles.pickerHelperText}>
-                {activeExercises.length === 0
-                  ? 'No active exercises yet. Create one from the Exercises tab first.'
-                  : 'No exercises match that filter.'}
-              </Text>
-            ) : (
-              filteredExercises.map((exercise) => (
-                <Pressable
-                  key={exercise.id}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Open history for ${exercise.name}`}
-                  onPress={() => onSelectExercise(exercise.id)}
-                  style={styles.pickerRow}
-                  testID={`stats-exercise-history-picker-row-${exercise.id}`}>
-                  <Text numberOfLines={1} style={styles.pickerRowText}>
-                    {exercise.name}
-                  </Text>
-                </Pressable>
-              ))
-            )}
-          </ScrollView>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Cancel exercise picker"
-            onPress={onRequestClose}
-            style={styles.pickerCancelButton}>
-            <Text style={styles.pickerCancelButtonText}>Cancel</Text>
-          </Pressable>
-        </View>
-      </View>
-    </Modal>
-  );
+  return <StatsScreenShell {...shellProps} />;
 }
 
 const styles = StyleSheet.create({
@@ -733,33 +395,6 @@ const styles = StyleSheet.create({
     backgroundColor: uiColors.surfacePage,
     padding: 16,
     gap: 12,
-  },
-  contentRegion: {
-    flex: 1,
-    minHeight: 0,
-  },
-  subViewSlot: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  subViewHidden: {
-    display: 'none',
-  },
-  subViewRegion: {
-    flex: 1,
-    minHeight: 0,
-    gap: 12,
-  },
-  pinnedTopRegion: {
-    gap: 8,
-    flexShrink: 0,
-  },
-  sectionBlock: {
-    gap: 8,
-  },
-  historyActiveTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: uiColors.textPrimary,
   },
   scroll: {
     flex: 1,
@@ -782,6 +417,9 @@ const styles = StyleSheet.create({
     padding: 12,
     gap: 4,
   },
+  summaryCardPressed: {
+    opacity: 0.7,
+  },
   summaryLabel: {
     fontSize: 12,
     fontWeight: '600',
@@ -798,78 +436,105 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
-  muscleSection: {
-    gap: 8,
+  familyList: {
+    gap: 12,
   },
-  muscleSectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
-    gap: 8,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: uiColors.textPrimary,
-  },
-  sectionHint: {
-    fontSize: 11,
-    color: uiColors.textSecondary,
-  },
-  muscleList: {
+  familyCard: {
     borderRadius: 12,
     borderWidth: 1,
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfaceDefault,
     overflow: 'hidden',
   },
-  muscleRow: {
+  familyHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 12,
+    gap: 12,
     borderBottomWidth: 1,
     borderBottomColor: uiColors.borderMuted,
+  },
+  familyName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: uiColors.textPrimary,
+    flexShrink: 1,
+  },
+  familyMetrics: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  muscleList: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+  },
+  muscleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
     gap: 12,
-  },
-  muscleRowUntrained: {
-    backgroundColor: uiColors.surfaceWarning,
-  },
-  muscleLabelColumn: {
-    flex: 1,
-    minWidth: 0,
   },
   muscleName: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '500',
     color: uiColors.textPrimary,
+    flexShrink: 1,
   },
-  muscleNameUntrained: {
-    color: uiColors.textWarning,
+  muscleMetrics: {
+    flexDirection: 'row',
+    gap: 12,
   },
-  muscleFamily: {
-    fontSize: 11,
+  muscleTextUntrained: {
     color: uiColors.textSecondary,
-    marginTop: 2,
   },
-  muscleScoreColumn: {
+  metric: {
     alignItems: 'flex-end',
-    gap: 2,
+    minWidth: 60,
   },
-  muscleScore: {
+  metricLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: uiColors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  metricLabelSmall: {
+    fontSize: 9,
+    fontWeight: '600',
+    color: uiColors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  metricLabelMuted: {
+    color: uiColors.textSecondary,
+  },
+  metricValue: {
     fontSize: 15,
     fontWeight: '700',
     color: uiColors.textPrimary,
+    marginTop: 2,
   },
-  muscleScoreUntrained: {
-    fontSize: 12,
+  metricValueSmall: {
+    fontSize: 13,
     fontWeight: '600',
-    color: uiColors.textWarning,
+    color: uiColors.textPrimary,
+    marginTop: 2,
   },
-  muscleDelta: {
+  metricValueMuted: {
+    color: uiColors.textSecondary,
+  },
+  metricDelta: {
     fontSize: 11,
     fontWeight: '600',
+    marginTop: 2,
+  },
+  metricDeltaSmall: {
+    fontSize: 10,
+    fontWeight: '600',
+    marginTop: 2,
   },
   statePanel: {
     borderRadius: 12,
@@ -899,114 +564,5 @@ const styles = StyleSheet.create({
   },
   deltaNew: {
     color: uiColors.actionPrimary,
-  },
-  exerciseHistorySection: {
-    gap: 8,
-  },
-  exerciseHistoryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: uiColors.borderMuted,
-    backgroundColor: uiColors.surfaceDefault,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-  },
-  exerciseHistoryRowText: {
-    flex: 1,
-    gap: 2,
-  },
-  exerciseHistoryRowTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: uiColors.textPrimary,
-  },
-  exerciseHistoryRowSubtitle: {
-    fontSize: 12,
-    color: uiColors.textSecondary,
-  },
-  exerciseHistoryRowChevron: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: uiColors.textSecondary,
-  },
-  pickerRoot: {
-    flex: 1,
-    justifyContent: 'center',
-    padding: 16,
-  },
-  pickerOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: uiColors.overlayScrim,
-  },
-  pickerCard: {
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: uiColors.borderMuted,
-    backgroundColor: uiColors.surfaceDefault,
-    padding: 14,
-    gap: 10,
-    maxHeight: '85%',
-  },
-  pickerTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: uiColors.textPrimary,
-  },
-  pickerSearchInput: {
-    borderWidth: 1,
-    borderColor: uiColors.borderInputStrong,
-    borderRadius: 8,
-    backgroundColor: uiColors.surfaceDefault,
-    color: uiColors.textPrimary,
-    paddingHorizontal: 10,
-    paddingVertical: 9,
-    minHeight: 42,
-  },
-  pickerScroll: {
-    maxHeight: 360,
-  },
-  pickerScrollContent: {
-    gap: 6,
-    paddingVertical: 4,
-  },
-  pickerRow: {
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: uiColors.borderMuted,
-    backgroundColor: uiColors.surfacePage,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  pickerRowText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: uiColors.textPrimary,
-  },
-  pickerHelperText: {
-    fontSize: 13,
-    color: uiColors.textSecondary,
-  },
-  pickerErrorText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: uiColors.actionDangerText,
-  },
-  pickerCancelButton: {
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: uiColors.borderMuted,
-    backgroundColor: uiColors.surfaceDefault,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 42,
-  },
-  pickerCancelButtonText: {
-    color: uiColors.textPrimary,
-    fontWeight: '700',
   },
 });
