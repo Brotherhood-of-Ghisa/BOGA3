@@ -99,6 +99,18 @@ Source-of-truth implementation files:
 5. Runtime flushes until terminal state (`idle` = converged; non-idle terminal statuses remain retryable/non-blocking). The default convergence loop allows enough batches to drain the seeded exercise catalog.
 6. On convergence success, runtime records bootstrap completion metadata for the authenticated user.
 
+### E. Dependency order contract
+
+Detailed table classification and dependency rationale lives in `docs/specs/tech/sync-schema-dependency-map.md`. The sync engine must preserve this practical order when applying or generating user-domain projection state:
+
+1. Local static references exist first (`muscle_groups` seed data).
+2. Exercise catalog parents sync before their children: `exercise_definitions`, then `exercise_muscle_mappings` and `exercise_tag_definitions`.
+3. Workout parents sync before logged children: `gyms`, `sessions`, `session_exercises`, then `exercise_sets`.
+4. Assignment edges sync after both sides exist: `session_exercise_tags`.
+5. Runtime tables (`sync_outbox_events`, `sync_delivery_state`, `sync_runtime_state`) and backend ingest metadata are never projection restore entities.
+
+Current convergence event generation follows: `exercise_definitions`, `exercise_muscle_mappings`, `exercise_tag_definitions`, `gyms`, `sessions`, `session_exercises`, `exercise_sets`, `session_exercise_tags`.
+
 ## 3) Interactions with the rest of the application
 
 1. Root layout (`apps/mobile/app/_layout.tsx`)

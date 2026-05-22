@@ -321,6 +321,8 @@ Restore-parity ownership note:
 4. `docs/tasks/complete/M13-T04-bootstrap-merge-and-convergence.md` - implement first-sync bootstrap/merge/outbox convergence flow and related coverage. (`completed`)
 5. `docs/tasks/complete/M13-T05-profile-sync-ui-and-end-to-end-verification.md` - finalize profile sync UX and journey-proof coverage for the two required user journeys. (`completed`)
 6. `docs/tasks/complete/M13-T06-reinstall-restore-state-parity.md` - add deterministic reinstall restore-parity verification (`Jest` + local `Supabase`) across all M13 data-scope entities. (`completed`)
+7. `docs/tasks/complete/T-20260522-01-issue-50-sync-schema-dependency-map.md` - post-M13 issue #50 schema dependency map and remaining rewrite split. (`completed`)
+8. `docs/tasks/T-20260522-02-local-tombstone-parity.md` - post-M13 local tombstone parity for `gyms`, `session_exercises`, and `exercise_sets`. (`planned`)
 
 Rule:
 
