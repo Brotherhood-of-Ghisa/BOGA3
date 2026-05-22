@@ -9,7 +9,7 @@ import {
   sessions,
 } from './schema';
 
-export type StatsPeriodDays = 7 | 30;
+export type StatsPeriodDays = 7 | 30 | 365;
 
 export type StatsPeriodBounds = {
   days: StatsPeriodDays;

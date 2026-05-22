@@ -101,6 +101,18 @@ export {
   type StatsTotals,
 } from './stats';
 export {
+  aggregateExerciseCatalogStats,
+  createDrizzleExerciseCatalogStatsStore,
+  createExerciseCatalogStatsRepository,
+  loadExerciseCatalogStats,
+  loadExerciseCatalogStatsRawHistory,
+  type ExerciseAggregate,
+  type ExerciseCatalogStats,
+  type ExerciseCatalogStatsPeriod,
+  type ExerciseCatalogStatsRawHistory,
+  type ExerciseCatalogStatsStore,
+} from './exercise-catalog-stats';
+export {
   aggregateExerciseHistory,
   createDrizzleExerciseHistoryStore,
   createExerciseHistoryRepository,

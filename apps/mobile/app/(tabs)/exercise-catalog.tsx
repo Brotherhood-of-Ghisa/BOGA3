@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View, type ListRenderItem } from 'react-native';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type ListRenderItem } from 'react-native';
 
 import { ExerciseEditorModal } from '@/components/exercise-catalog/exercise-editor-modal';
 import { uiColors } from '@/components/ui';
@@ -10,8 +10,13 @@ import {
   type ExerciseCatalogExercise,
   type ExerciseCatalogMuscleGroup,
 } from '@/src/data/exercise-catalog';
+import type {
+  ExerciseAggregate,
+  ExerciseCatalogStatsPeriod,
+} from '@/src/data/exercise-catalog-stats';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import { filterIndexedExerciseCatalogExercises } from '@/src/exercise-catalog/search';
+import { useExerciseCatalogStats } from '@/src/exercise-catalog/stats-cache';
 
 const coerceRouteParam = (value: string | string[] | undefined): string | null => {
   if (Array.isArray(value)) {
@@ -60,6 +65,54 @@ const formatExerciseMuscleSummary = (
   return `${primaryLabel} · ${secondaryMappings.length} secondaries`;
 };
 
+const formatVolume = (volume: number): string => {
+  if (volume <= 0) return '0';
+  if (volume >= 1000) return `${(volume / 1000).toFixed(1)}k`;
+  return `${Math.round(volume)}`;
+};
+
+const formatStatsSummary = (
+  aggregate: ExerciseAggregate | undefined,
+  hasAllTimeHistory: boolean
+): string => {
+  if (!hasAllTimeHistory) return 'Never done';
+  if (!aggregate) return 'No sets in range';
+  const parts: string[] = [`${aggregate.sessionCount} sessions`];
+  parts.push(`${formatVolume(aggregate.totalVolume)} vol`);
+  parts.push(
+    aggregate.estimatedOneRepMax !== null
+      ? `${Math.round(aggregate.estimatedOneRepMax)} 1RM`
+      : '— 1RM'
+  );
+  return parts.join(' · ');
+};
+
+type PeriodOption = { value: ExerciseCatalogStatsPeriod; label: string };
+
+const PERIOD_OPTIONS: PeriodOption[] = [
+  { value: 7, label: '7d' },
+  { value: 30, label: '30d' },
+  { value: 365, label: '1y' },
+  { value: 'all', label: 'All' },
+];
+
+const periodLabel = (period: ExerciseCatalogStatsPeriod): string =>
+  PERIOD_OPTIONS.find((option) => option.value === period)?.label ?? '30d';
+
+type CatalogFilters = {
+  period: ExerciseCatalogStatsPeriod;
+  muscleGroupIds: ReadonlySet<string>;
+  showDeleted: boolean;
+  showNeverDone: boolean;
+};
+
+const DEFAULT_FILTERS: CatalogFilters = {
+  period: 30,
+  muscleGroupIds: new Set<string>(),
+  showDeleted: false,
+  showNeverDone: true,
+};
+
 const SEARCH_DEBOUNCE_MS = 150;
 
 const useDebouncedValue = <T,>(value: T, delayMs: number): T => {
@@ -73,11 +126,11 @@ const useDebouncedValue = <T,>(value: T, delayMs: number): T => {
   return debouncedValue;
 };
 
-const ExerciseRowSeparator = () => <View style={styles.exerciseListRowSeparator} />;
-
 type ExerciseRowProps = {
   exercise: ExerciseCatalogExercise;
   muscleGroupById: Map<string, ExerciseCatalogMuscleGroup>;
+  aggregate: ExerciseAggregate | undefined;
+  hasAllTimeHistory: boolean;
   onPressEdit: (exercise: ExerciseCatalogExercise) => void;
   onPressActions: (exercise: ExerciseCatalogExercise) => void;
 };
@@ -85,6 +138,8 @@ type ExerciseRowProps = {
 const ExerciseRow = memo(function ExerciseRow({
   exercise,
   muscleGroupById,
+  aggregate,
+  hasAllTimeHistory,
   onPressEdit,
   onPressActions,
 }: ExerciseRowProps) {
@@ -108,6 +163,9 @@ const ExerciseRow = memo(function ExerciseRow({
           <Text numberOfLines={1} style={styles.exerciseListRowMuscleSummary}>
             {formatExerciseMuscleSummary(exercise, muscleGroupById)}
           </Text>
+          <Text numberOfLines={1} style={styles.exerciseListRowStats}>
+            {formatStatsSummary(aggregate, hasAllTimeHistory)}
+          </Text>
         </View>
       </Pressable>
       <Pressable
@@ -129,7 +187,7 @@ export default function ExerciseCatalogScreen() {
 
   const [isEditorModalVisible, setIsEditorModalVisible] = useState(false);
   const [isCatalogOptionsMenuVisible, setIsCatalogOptionsMenuVisible] = useState(false);
-  const [showDeletedExercises, setShowDeletedExercises] = useState(false);
+  const [filters, setFilters] = useState<CatalogFilters>(DEFAULT_FILTERS);
   const [didHandleInitialIntent, setDidHandleInitialIntent] = useState(false);
   const [exerciseActionMenuTarget, setExerciseActionMenuTarget] = useState<ExerciseCatalogExercise | null>(null);
   const [editorExerciseTarget, setEditorExerciseTarget] = useState<ExerciseCatalogExercise | null>(null);
@@ -143,16 +201,34 @@ export default function ExerciseCatalogScreen() {
   const exercises = catalog.exercises;
   const muscleGroups = catalog.muscleGroups;
 
+  const statsResult = useExerciseCatalogStats(filters.period);
+  const { stats, reload: reloadStats } = statsResult;
+
+  useFocusEffect(
+    useCallback(() => {
+      reloadStats();
+    }, [reloadStats])
+  );
+
   const debouncedExerciseSearchValue = useDebouncedValue(exerciseSearchValue, SEARCH_DEBOUNCE_MS);
 
   const muscleGroupById = useMemo(
     () => new Map(muscleGroups.map((muscleGroup) => [muscleGroup.id, muscleGroup])),
     [muscleGroups]
   );
-  const visibleExercises = useMemo(
-    () => (showDeletedExercises ? exercises : exercises.filter((exercise) => !exercise.deletedAt)),
-    [exercises, showDeletedExercises]
-  );
+  const visibleExercises = useMemo(() => {
+    const selectedMuscleIds = filters.muscleGroupIds;
+    const filterByMuscle = selectedMuscleIds.size > 0;
+    return exercises.filter((exercise) => {
+      if (!filters.showDeleted && exercise.deletedAt) return false;
+      if (!filters.showNeverDone && !stats.everDoneIds.has(exercise.id)) return false;
+      if (filterByMuscle) {
+        const primary = pickPrimaryMapping(exercise);
+        if (!primary || !selectedMuscleIds.has(primary.muscleGroupId)) return false;
+      }
+      return true;
+    });
+  }, [exercises, filters.showDeleted, filters.showNeverDone, filters.muscleGroupIds, stats.everDoneIds]);
   const filteredExercises = useMemo(
     () => filterIndexedExerciseCatalogExercises(visibleExercises, debouncedExerciseSearchValue),
     [visibleExercises, debouncedExerciseSearchValue]
@@ -183,11 +259,13 @@ export default function ExerciseCatalogScreen() {
       <ExerciseRow
         exercise={item}
         muscleGroupById={muscleGroupById}
+        aggregate={stats.aggregatesById.get(item.id)}
+        hasAllTimeHistory={stats.everDoneIds.has(item.id)}
         onPressEdit={handlePressEditRow}
         onPressActions={handlePressRowActions}
       />
     ),
-    [muscleGroupById, handlePressEditRow, handlePressRowActions]
+    [muscleGroupById, stats.aggregatesById, stats.everDoneIds, handlePressEditRow, handlePressRowActions]
   );
 
   const keyExtractor = useCallback((item: ExerciseCatalogExercise) => item.id, []);
@@ -253,12 +331,42 @@ export default function ExerciseCatalogScreen() {
     }
   };
 
-  const toggleShowDeletedExercises = () => {
-    setIsCatalogOptionsMenuVisible(false);
-    setShowDeletedExercises((current) => !current);
+  const setFilterPeriod = (period: ExerciseCatalogStatsPeriod) => {
+    setFilters((current) => ({ ...current, period }));
+  };
+  const toggleFilterMuscleGroup = (muscleGroupId: string) => {
+    setFilters((current) => {
+      const next = new Set(current.muscleGroupIds);
+      if (next.has(muscleGroupId)) {
+        next.delete(muscleGroupId);
+      } else {
+        next.add(muscleGroupId);
+      }
+      return { ...current, muscleGroupIds: next };
+    });
+  };
+  const clearFilterMuscleGroups = () => {
+    setFilters((current) => ({ ...current, muscleGroupIds: new Set<string>() }));
+  };
+  const toggleFilterShowDeleted = () => {
+    setFilters((current) => ({ ...current, showDeleted: !current.showDeleted }));
     setSaveError(null);
     setSaveFeedback(null);
   };
+  const toggleFilterShowNeverDone = () => {
+    setFilters((current) => ({ ...current, showNeverDone: !current.showNeverDone }));
+  };
+
+  const activeFilterChips = useMemo(() => {
+    const chips: { key: string; label: string }[] = [];
+    chips.push({ key: 'period', label: `Range: ${periodLabel(filters.period)}` });
+    if (filters.muscleGroupIds.size > 0) {
+      chips.push({ key: 'muscles', label: `Muscles: ${filters.muscleGroupIds.size}` });
+    }
+    if (!filters.showNeverDone) chips.push({ key: 'never-done', label: 'Hide never-done' });
+    if (filters.showDeleted) chips.push({ key: 'deleted', label: 'Deleted: On' });
+    return chips;
+  }, [filters]);
 
   if (isLoading) {
     return (
@@ -313,10 +421,19 @@ export default function ExerciseCatalogScreen() {
             </Pressable>
           </View>
         </View>
-        {showDeletedExercises ? (
-          <Text selectable style={styles.activeFilterChip}>
-            Deleted: On
-          </Text>
+        {activeFilterChips.length > 0 ? (
+          <View style={styles.activeFilterChipsRow}>
+            {activeFilterChips.map((chip) => (
+              <Pressable
+                key={chip.key}
+                accessibilityLabel={`Open filters (${chip.label})`}
+                onPress={() => setIsCatalogOptionsMenuVisible(true)}>
+                <Text selectable style={styles.activeFilterChip}>
+                  {chip.label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
         ) : null}
         {saveFeedback ? (
           <View style={styles.feedbackCard}>
@@ -339,7 +456,6 @@ export default function ExerciseCatalogScreen() {
         data={filteredExercises}
         keyExtractor={keyExtractor}
         renderItem={renderExerciseRow}
-        ItemSeparatorComponent={ExerciseRowSeparator}
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={styles.content}
         initialNumToRender={16}
@@ -349,10 +465,8 @@ export default function ExerciseCatalogScreen() {
         ListEmptyComponent={
           <Text selectable style={styles.helperText}>
             {exercises.length === 0
-              ? showDeletedExercises
-                ? 'No exercises found for this filter.'
-                : 'No active exercises yet. Create one with the button above.'
-              : 'No exercises match that filter.'}
+              ? 'No active exercises yet. Create one with the button above.'
+              : 'No exercises match the current filters.'}
           </Text>
         }
       />
@@ -375,16 +489,120 @@ export default function ExerciseCatalogScreen() {
             style={styles.modalOverlay}
             onPress={() => setIsCatalogOptionsMenuVisible(false)}
           />
-          <View style={styles.actionMenuCard}>
-            <Text selectable style={styles.modalTitle}>
-              Catalog Options
-            </Text>
-            <Pressable
-              accessibilityLabel={showDeletedExercises ? 'Hide deleted exercises' : 'Show deleted exercises'}
-              style={styles.actionMenuButton}
-              onPress={toggleShowDeletedExercises}>
-              <Text style={styles.actionMenuButtonText}>{showDeletedExercises ? 'Hide deleted' : 'Show deleted'}</Text>
-            </Pressable>
+          <View style={styles.filtersModalCard}>
+            <View style={styles.filtersModalHeader}>
+              <Text selectable style={styles.modalTitle}>
+                Filters
+              </Text>
+              <Pressable
+                accessibilityLabel="Close filters"
+                style={styles.filtersCloseButton}
+                onPress={() => setIsCatalogOptionsMenuVisible(false)}>
+                <Text style={styles.filtersCloseButtonText}>Done</Text>
+              </Pressable>
+            </View>
+
+            <ScrollView
+              style={styles.filtersScroll}
+              contentContainerStyle={styles.filtersScrollContent}
+              keyboardShouldPersistTaps="handled">
+              <Text selectable style={styles.filtersSectionLabel}>
+                Date range
+              </Text>
+              <View style={styles.filtersPillRow}>
+                {PERIOD_OPTIONS.map((option) => {
+                  const selected = filters.period === option.value;
+                  return (
+                    <Pressable
+                      key={String(option.value)}
+                      accessibilityLabel={`Date range ${option.label}`}
+                      style={[styles.filterPill, selected && styles.filterPillSelected]}
+                      onPress={() => setFilterPeriod(option.value)}>
+                      <Text
+                        style={[
+                          styles.filterPillText,
+                          selected && styles.filterPillTextSelected,
+                        ]}>
+                        {option.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+
+              <View style={styles.filtersSectionHeaderRow}>
+                <Text selectable style={styles.filtersSectionLabel}>
+                  Muscle groups
+                </Text>
+                {filters.muscleGroupIds.size > 0 ? (
+                  <Pressable
+                    accessibilityLabel="Clear muscle group selection"
+                    onPress={clearFilterMuscleGroups}>
+                    <Text style={styles.filtersClearLink}>Clear</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+              <View style={styles.filtersPillRow}>
+                {muscleGroups.length === 0 ? (
+                  <Text style={styles.helperText}>No muscle groups defined.</Text>
+                ) : (
+                  muscleGroups.map((group) => {
+                    const selected = filters.muscleGroupIds.has(group.id);
+                    return (
+                      <Pressable
+                        key={group.id}
+                        accessibilityLabel={`Toggle muscle group ${group.displayName}`}
+                        style={[styles.filterPill, selected && styles.filterPillSelected]}
+                        onPress={() => toggleFilterMuscleGroup(group.id)}>
+                        <Text
+                          style={[
+                            styles.filterPillText,
+                            selected && styles.filterPillTextSelected,
+                          ]}>
+                          {group.displayName}
+                        </Text>
+                      </Pressable>
+                    );
+                  })
+                )}
+              </View>
+
+              <Text selectable style={styles.filtersSectionLabel}>
+                Visibility
+              </Text>
+              <View style={styles.filtersPillRow}>
+                <Pressable
+                  accessibilityLabel={
+                    filters.showDeleted ? 'Hide deleted exercises' : 'Show deleted exercises'
+                  }
+                  style={[styles.filterPill, filters.showDeleted && styles.filterPillSelected]}
+                  onPress={toggleFilterShowDeleted}>
+                  <Text
+                    style={[
+                      styles.filterPillText,
+                      filters.showDeleted && styles.filterPillTextSelected,
+                    ]}>
+                    Show deleted
+                  </Text>
+                </Pressable>
+                <Pressable
+                  accessibilityLabel={
+                    filters.showNeverDone
+                      ? 'Hide exercises never done'
+                      : 'Show exercises never done'
+                  }
+                  style={[styles.filterPill, filters.showNeverDone && styles.filterPillSelected]}
+                  onPress={toggleFilterShowNeverDone}>
+                  <Text
+                    style={[
+                      styles.filterPillText,
+                      filters.showNeverDone && styles.filterPillTextSelected,
+                    ]}>
+                    Show never-done
+                  </Text>
+                </Pressable>
+              </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -464,7 +682,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    gap: 12,
+    gap: 6,
     paddingBottom: 12,
   },
   pinnedTopRegion: {
@@ -508,16 +726,22 @@ const styles = StyleSheet.create({
     color: uiColors.surfaceDefault,
     fontWeight: '700',
   },
+  activeFilterChipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
   activeFilterChip: {
     fontSize: 11,
     fontWeight: '700',
-    color: uiColors.textWarning,
+    color: uiColors.textAccentStrong,
     borderWidth: 1,
-    borderColor: uiColors.borderWarning,
-    backgroundColor: uiColors.surfaceWarning,
+    borderColor: uiColors.actionPrimarySubtleBorder,
+    backgroundColor: uiColors.actionPrimarySubtleBg,
     borderRadius: 999,
     paddingHorizontal: 8,
     paddingVertical: 4,
+    overflow: 'hidden',
   },
   filterInput: {
     borderWidth: 1,
@@ -571,9 +795,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 8,
   },
-  exerciseListRowSeparator: {
-    height: 8,
-  },
   helperText: {
     fontSize: 13,
     color: uiColors.textSecondary,
@@ -621,6 +842,12 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: uiColors.textSecondary,
     fontWeight: '600',
+  },
+  exerciseListRowStats: {
+    fontSize: 11,
+    color: uiColors.textAccentMuted,
+    fontWeight: '600',
+    marginTop: 2,
   },
   deletedExerciseChip: {
     fontSize: 9,
@@ -694,5 +921,83 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: uiColors.textPrimary,
+  },
+  filtersModalCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: uiColors.borderMuted,
+    backgroundColor: uiColors.surfaceDefault,
+    padding: 14,
+    gap: 8,
+    maxHeight: '85%',
+  },
+  filtersModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  filtersCloseButton: {
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: uiColors.borderMuted,
+    backgroundColor: uiColors.surfaceDefault,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  filtersCloseButtonText: {
+    color: uiColors.textPrimary,
+    fontWeight: '700',
+  },
+  filtersScroll: {
+    flexGrow: 0,
+  },
+  filtersScrollContent: {
+    gap: 8,
+    paddingBottom: 4,
+  },
+  filtersSectionLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: uiColors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    marginTop: 6,
+  },
+  filtersSectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 6,
+  },
+  filtersClearLink: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: uiColors.actionPrimary,
+  },
+  filtersPillRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  filterPill: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: uiColors.borderMuted,
+    backgroundColor: uiColors.surfaceDefault,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  filterPillSelected: {
+    backgroundColor: uiColors.actionPrimarySubtleBg,
+    borderColor: uiColors.actionPrimary,
+  },
+  filterPillText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: uiColors.textPrimary,
+  },
+  filterPillTextSelected: {
+    color: uiColors.actionPrimary,
+    fontWeight: '700',
   },
 });
