@@ -13,6 +13,8 @@ import {
 } from '@/src/data/exercise-catalog';
 import { __resetExerciseCatalogCacheForTests } from '@/src/exercise-catalog/cache';
 import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidation';
+import { loadExerciseCatalogStatsRawHistory } from '@/src/data/exercise-catalog-stats';
+import { __resetExerciseCatalogStatsCacheForTests } from '@/src/exercise-catalog/stats-cache';
 
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => ({}),
@@ -20,7 +22,19 @@ jest.mock('expo-router', () => ({
     push: jest.fn(),
     back: jest.fn(),
   }),
+  useFocusEffect: (_callback: () => void | (() => void)) => {
+    // no-op in tests; the focus effect only reloads stats which we already mock
+  },
 }));
+
+jest.mock('@/src/data/exercise-catalog-stats', () => ({
+  loadExerciseCatalogStatsRawHistory: jest.fn(),
+  aggregateExerciseCatalogStats: jest.requireActual(
+    '@/src/data/exercise-catalog-stats'
+  ).aggregateExerciseCatalogStats,
+}));
+
+const mockLoadRawHistory = jest.mocked(loadExerciseCatalogStatsRawHistory);
 
 jest.mock('@/src/data/exercise-catalog', () => ({
   listExerciseCatalogMuscleGroups: jest.fn(),
@@ -48,7 +62,14 @@ describe('ExerciseCatalogScreen', () => {
     mockSaveExercise.mockReset();
     mockDeleteExercise.mockReset();
     mockUndeleteExercise.mockReset();
+    mockLoadRawHistory.mockReset();
+    mockLoadRawHistory.mockResolvedValue({
+      sessions: [],
+      sessionExercises: [],
+      exerciseSets: [],
+    });
     __resetExerciseCatalogCacheForTests();
+    __resetExerciseCatalogStatsCacheForTests();
 
     mockListMuscleGroups.mockResolvedValue([
       { id: 'chest', displayName: 'Chest', familyName: 'Chest', sortOrder: 0 },
@@ -284,8 +305,9 @@ describe('ExerciseCatalogScreen', () => {
     expect(screen.queryByText('Old Fly')).toBeNull();
 
     fireEvent.press(screen.getByLabelText('Exercise catalog options'));
-    await screen.findByText('Catalog Options');
+    await screen.findByText('Filters');
     fireEvent.press(screen.getByLabelText('Show deleted exercises'));
+    fireEvent.press(screen.getByLabelText('Close filters'));
 
     await waitFor(() => {
       expect(screen.getByText('Old Fly')).toBeTruthy();
