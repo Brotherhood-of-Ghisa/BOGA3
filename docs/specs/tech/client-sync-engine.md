@@ -68,6 +68,10 @@ Source-of-truth implementation files:
 - `exercise-catalog.ts`
 - `exercise-tags.ts`
 
+Gym event note:
+
+- `local-gyms.ts` includes private nullable coordinate metadata in every mobile-emitted `gyms.upsert` payload. Clearing coordinates emits all four coordinate payload fields as `null`.
+
 ## 2) Typical flows
 
 ### A. Domain write -> queued event
@@ -96,6 +100,8 @@ Source-of-truth implementation files:
 2. Runtime checks auth session + enablement, configures ingest transport, and runs bootstrap when required for the current user.
 3. Runtime resets the local outbox/delivery stream before the bootstrap merge so convergence starts from sequence `1` with a fresh `device_id`; this avoids leaking stale per-device sequence state across auth users or backend stream resets.
 4. Bootstrap fetches remote projection state, merges with local state deterministically, and enqueues local convergence events for local winners.
+   - Gym rows include private coordinate metadata in the same `updated_at` winner rule as the rest of the row.
+   - Convergence events include the local winner's coordinate metadata so restore and first-enable sync keep saved gym coordinates.
 5. Runtime flushes until terminal state (`idle` = converged; non-idle terminal statuses remain retryable/non-blocking). The default convergence loop allows enough batches to drain the seeded exercise catalog.
 6. On convergence success, runtime records bootstrap completion metadata for the authenticated user.
 
@@ -220,6 +226,7 @@ Source-of-truth implementation files:
 - npm script: `npm run test:sync:reinstall-parity` (run from `apps/mobile`)
 - coverage: deterministic M13 full-scope fixture (`gyms`, `sessions`, `session_exercises`, `exercise_sets`, `exercise_definitions`, `exercise_muscle_mappings`, `exercise_tag_definitions`, `session_exercise_tags`), real outbox -> local Supabase ingest delivery, reinstall simulation (fresh local state + fresh sync device state), post-login bootstrap/merge + convergence, and scoped pre-sync vs post-restore parity assertion.
 - snapshot boundary rule in this lane: parity compares only M13 user-domain entities; auth/session credentials, smoke artifacts, and sync runtime/outbox metadata are intentionally excluded.
+- M15 coordinate extension: the gym snapshot includes `latitude`, `longitude`, `coordinate_accuracy_m`, and `coordinates_updated_at` so coordinate-bearing gyms are covered by the same restore-parity lane.
 
 ## Maintenance rule for follow-up tasks
 

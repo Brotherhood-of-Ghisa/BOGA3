@@ -1,7 +1,7 @@
 ---
 task_id: M15-T02-gym-coordinate-data-sync-contract
 milestone_id: "M15"
-status: planned
+status: completed
 ui_impact: "no"
 areas: "frontend|backend|cross-stack|docs"
 runtimes: "node|supabase|sql"
@@ -16,7 +16,7 @@ docs_touched: "docs/specs/03-technical-architecture.md,docs/specs/05-data-model.
 
 - Task ID: `M15-T02-gym-coordinate-data-sync-contract`
 - Title: Gym coordinate data model and sync contract
-- Status: `planned`
+- Status: `completed`
 - File location rule:
   - author active cards in `docs/tasks/<task-id>.md`
   - move the file to `docs/tasks/complete/<task-id>.md` when `Status` becomes `completed` or `outdated`
@@ -39,13 +39,31 @@ docs_touched: "docs/specs/03-technical-architecture.md,docs/specs/05-data-model.
 
 ## Context Freshness (required at session start; update before edits)
 
-- Verified current branch + HEAD commit:
-- Start-of-session sync completed per `docs/specs/04-ai-development-playbook.md` git sync workflow?: `yes | no | N/A` (explain)
+- Verified current branch + HEAD commit: `codex/m15-t02-gym-coordinates-sync` at `077d06d` before edits.
+- Start-of-session sync completed per `docs/specs/04-ai-development-playbook.md` git sync workflow?: `partial`
+  - Ran `git fetch origin main`.
+  - Did not switch to `origin/main` because the active M15 task/milestone docs exist on `codex/m15-t01-gps-gym-location-spec` while `origin/main` is still at `46f58ed`.
+  - Created `codex/m15-t02-gym-coordinates-sync` from the current M15 spec branch so the task card and milestone source existed locally.
 - Parent refs opened in this session:
+  - `docs/specs/README.md`
+  - `docs/specs/00-product.md`
+  - `docs/specs/03-technical-architecture.md`
+  - `docs/specs/04-ai-development-playbook.md`
+  - `docs/specs/05-data-model.md`
+  - `docs/specs/06-testing-strategy.md`
+  - `docs/specs/09-project-structure.md`
+  - `docs/specs/12-worktree-config-and-isolation.md`
   - `docs/specs/milestones/M15-gps-gym-location-support.md`
+  - `supabase/session-sync-api-contract.md`
+  - `docs/specs/tech/client-sync-engine.md`
+  - `RUNBOOK.md`
 - Code/docs inventory freshness checks run:
   - Re-check `docs/tasks/T-20260517-01-personal-gym-list-sync.md` status and current gym schema/repository behavior before edits.
-- Known stale references or assumptions: none
+  - `./scripts/task-bootstrap.sh docs/tasks/M15-T02-gym-coordinate-data-sync-contract.md`
+  - `docs/tasks/T-20260517-01-personal-gym-list-sync.md` is still `planned`, so this task adapted to the current minimal `local-gyms` repository shape.
+  - Current local `gyms` before edits had `id`, `name`, `created_at`, and `updated_at`; backend `app_public.gyms` had `deleted_at` but no coordinate fields.
+- Known stale references or assumptions:
+  - M15 task docs are ahead of `origin/main` in the local T01 branch lineage.
 - Optional helper command:
   - `./scripts/task-bootstrap.sh docs/tasks/M15-T02-gym-coordinate-data-sync-contract.md`
 
@@ -148,14 +166,42 @@ Add nullable user-owned gym coordinate metadata to local SQLite, backend project
 
 ## Evidence
 
-- Manual verification summary:
+- Manual verification summary (required when CI is absent/partial): local mobile, backend, and restore-parity gates passed.
+- `cd apps/mobile && npm test -- --runTestsByPath app/__tests__/sync-domain-event-emission.test.ts app/__tests__/sync-bootstrap-merge.test.ts --runInBand`
+- `cd apps/mobile && npm test -- --runTestsByPath app/__tests__/sync-domain-event-emission.test.ts --runInBand`
+- `cd apps/mobile && npm run typecheck`
+- `cd apps/mobile && npm run db:generate:canary`
+- `./scripts/quality-fast.sh frontend`
+- `./scripts/quality-fast.sh backend`
+- `./scripts/quality-slow.sh backend`
+- `cd apps/mobile && npm run test:sync:reinstall-parity`
+- `git diff --check`
+- `./scripts/task-closeout-check.sh docs/tasks/complete/M15-T02-gym-coordinate-data-sync-contract.md`
 - Deferred/manual hosted checks summary:
+  - Hosted schema deployment/smoke was not performed; this task validated the local Supabase migration and contract suites only.
 
 ## Completion note (fill at end per `docs/specs/04-ai-development-playbook.md`)
 
-- What changed:
-- What tests ran:
-- What remains:
+- What changed: added nullable private gym coordinate metadata to local SQLite, backend projection, sync payloads, bootstrap/convergence/restore parity, and source-of-truth docs.
+  - Added nullable private gym coordinate metadata locally and on backend projection tables.
+  - Extended `gyms.upsert`, bootstrap fetch/merge/convergence, and reinstall restore parity to carry coordinate metadata.
+  - Added local/backend coordinate range and all-null/all-present validation.
+  - Updated sync/data/architecture/testing docs and the session sync API contract.
+- What tests ran: targeted Jest, mobile typecheck, Drizzle generation canary, frontend/backend fast gates, backend slow gate, and reinstall restore parity.
+  - `cd apps/mobile && npm test -- --runTestsByPath app/__tests__/sync-domain-event-emission.test.ts app/__tests__/sync-bootstrap-merge.test.ts --runInBand`
+  - `cd apps/mobile && npm test -- --runTestsByPath app/__tests__/sync-domain-event-emission.test.ts --runInBand`
+  - `cd apps/mobile && npm run typecheck`
+  - `cd apps/mobile && npm run db:generate:canary`
+  - `./scripts/quality-fast.sh frontend`
+  - `./scripts/quality-fast.sh backend`
+  - `./scripts/quality-slow.sh backend`
+  - `cd apps/mobile && npm run test:sync:reinstall-parity`
+  - `git diff --check`
+  - `./scripts/task-closeout-check.sh docs/tasks/complete/M15-T02-gym-coordinate-data-sync-contract.md`
+- What remains: T03-T05 consume these fields for location service, matching, recorder suggestion UI, and gym coordinate controls; hosted deployment smoke is still required if this branch is deployed.
+  - T03-T05 still need to add location services, matching, and UI controls that consume these storage/sync fields.
+  - Hosted Supabase migration/smoke remains a release/deployment responsibility if this branch is deployed beyond local validation.
+  - `RUNBOOK.md` reviewed; no operator workflow changes required.
 
 ## Status update checklist (mandatory at closeout)
 

@@ -64,6 +64,13 @@
       "when": 1778790600000,
       "tag": "0011_drop_origin_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1779541826568,
+      "tag": "0012_hot_polaris",
+      "breakpoints": true
     }
   ]
 }

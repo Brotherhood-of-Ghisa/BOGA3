@@ -178,6 +178,11 @@ BATCH_2="batch-${RUN_TAG}-2"
 BATCH_3="batch-${RUN_TAG}-3"
 BATCH_4="batch-${RUN_TAG}-4"
 BATCH_5="batch-${RUN_TAG}-5"
+BATCH_INVALID_COORDINATES="batch-invalid-coordinates-${RUN_TAG}"
+
+INVALID_COORDINATES_DEVICE_ID="sync-device-invalid-coordinates-${RUN_TAG}"
+INVALID_COORDINATES_GYM_ID="sync-gym-invalid-coordinates-${RUN_TAG}"
+INVALID_COORDINATES_EVENT_ID="event-invalid-coordinates-${RUN_TAG}-1"
 
 MISSING_DELETE_DEVICE_ID="sync-device-missing-delete-${RUN_TAG}"
 MISSING_DELETE_SESSION_ID="sync-session-missing-delete-${RUN_TAG}"
@@ -272,6 +277,10 @@ EVENTS_SUCCESS="$(jq -nc \
         name: "Warehouse Gym",
         origin_scope_id: "private",
         origin_source_id: "local",
+        latitude: 51.5072,
+        longitude: -0.1276,
+        coordinate_accuracy_m: 12.5,
+        coordinates_updated_at_ms: $t2,
         created_at_ms: $t2,
         updated_at_ms: $t2
       }
@@ -396,9 +405,9 @@ rpc_sync_events_ingest "${USER_A_TOKEN}" "${REQUEST_1}"
 assert_status "200" "user_a ingest success"
 assert_json_expr '.status == "SUCCESS"' "user_a ingest success envelope"
 
-postgrest_select "gyms" "id=eq.${GYM_ID}&select=id,name,deleted_at" "${USER_A_TOKEN}"
+postgrest_select "gyms" "id=eq.${GYM_ID}&select=id,name,latitude,longitude,coordinate_accuracy_m,coordinates_updated_at,deleted_at" "${USER_A_TOKEN}"
 assert_status "200" "user_a projection gym read"
-assert_json_expr --arg id "${GYM_ID}" 'length == 1 and .[0].id == $id and .[0].deleted_at == null' "user_a projection gym state"
+assert_json_expr --arg id "${GYM_ID}" --argjson t "$((BASE_MS + 2))" 'length == 1 and .[0].id == $id and .[0].deleted_at == null and .[0].latitude == 51.5072 and .[0].longitude == -0.1276 and .[0].coordinate_accuracy_m == 12.5 and .[0].coordinates_updated_at == $t' "user_a projection gym state"
 
 postgrest_select "sessions" "id=eq.${SESSION_ID}&select=id,status,gym_id" "${USER_A_TOKEN}"
 assert_status "200" "user_a projection session read"
@@ -469,6 +478,45 @@ assert_json_expr --arg event_id "${EVENT_ID_2}" '.status == "FAILURE" and .error
 postgrest_select "gyms" "id=eq.${GYM_ID}&select=name" "${USER_A_TOKEN}"
 assert_status "200" "gym read after changed duplicate"
 assert_json_expr 'length == 1 and .[0].name == "Warehouse Gym"' "changed duplicate did not mutate projection"
+
+echo "[sync-ingest] invalid gym coordinates are rejected"
+INVALID_COORDINATES_EVENT="$(jq -nc \
+  --arg event_id "${INVALID_COORDINATES_EVENT_ID}" \
+  --arg gym_id "${INVALID_COORDINATES_GYM_ID}" \
+  --argjson t "$((BASE_MS + 130))" \
+  '[
+    {
+      event_id: $event_id,
+      sequence_in_device: 1,
+      occurred_at_ms: $t,
+      entity_type: "gyms",
+      entity_id: $gym_id,
+      event_type: "upsert",
+      payload: {
+        id: $gym_id,
+        name: "Invalid Coordinate Gym",
+        latitude: 91,
+        longitude: -0.1276,
+        coordinate_accuracy_m: 12.5,
+        coordinates_updated_at_ms: $t,
+        created_at_ms: $t,
+        updated_at_ms: $t
+      }
+    }
+  ]')"
+REQUEST_INVALID_COORDINATES="$(jq -nc \
+  --arg device_id "${INVALID_COORDINATES_DEVICE_ID}" \
+  --arg batch_id "${BATCH_INVALID_COORDINATES}" \
+  --argjson sent_at_ms "$((BASE_MS + 130))" \
+  --argjson events "${INVALID_COORDINATES_EVENT}" \
+  '{device_id: $device_id, batch_id: $batch_id, sent_at_ms: $sent_at_ms, events: $events}')"
+rpc_sync_events_ingest "${USER_A_TOKEN}" "${REQUEST_INVALID_COORDINATES}"
+assert_status "200" "invalid coordinate response status"
+assert_json_expr --arg event_id "${INVALID_COORDINATES_EVENT_ID}" '.status == "FAILURE" and .error_index == 0 and .should_retry == false and .error_event_id == $event_id and (.message | contains("latitude"))' "invalid coordinate response envelope"
+
+postgrest_select "gyms" "id=eq.${INVALID_COORDINATES_GYM_ID}&select=id" "${USER_A_TOKEN}"
+assert_status "200" "invalid coordinate gym read"
+assert_json_expr 'length == 0' "invalid coordinate gym was not projected"
 
 echo "[sync-ingest] ordering failure stops at first bad event with prefix commit"
 GYM_PREFIX_ID="sync-gym-prefix-${RUN_TAG}"

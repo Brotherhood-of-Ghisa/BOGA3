@@ -244,6 +244,7 @@ Field notes for current local/mobile parity:
 - `sessions.status`: clients should use `active`/`completed`; backend still accepts legacy `draft` rows for compatibility.
 - `session_exercises.exercise_definition_id`: optional text metadata for durable exercise-definition linkage.
 - `exercise_sets.set_type`: optional enum text (`warm_up`, `rir_0`, `rir_1`, `rir_2`).
+- `gyms` coordinate metadata is private, user-owned, and nullable as a group. Valid coordinate-bearing rows require all four fields; clearing coordinates sets all four fields to `null`.
 
 ### `GymRecord`
 
@@ -251,10 +252,23 @@ Field notes for current local/mobile parity:
 {
   "id": "gym_123",
   "name": "Downtown Gym",
+  "latitude": 51.5072,
+  "longitude": -0.1276,
+  "coordinate_accuracy_m": 12.5,
+  "coordinates_updated_at": 1730000000500,
   "created_at": 1730000000000,
   "updated_at": 1730000001000
 }
 ```
+
+Coordinate rules:
+
+- `latitude`: `number | null`, valid range `-90..90`.
+- `longitude`: `number | null`, valid range `-180..180`.
+- `coordinate_accuracy_m`: `number | null`, valid when `>= 0`.
+- `coordinates_updated_at`: epoch milliseconds `number | null`, valid when `>= 0`.
+- All four coordinate fields are either non-null or null.
+- `gyms.upsert` event payloads use the same field names except `coordinates_updated_at_ms` for the timestamp to match the existing event timestamp suffix convention.
 
 ### `SessionRecord`
 
@@ -318,6 +332,10 @@ Field notes for current local/mobile parity:
 {
   "id": "sync-gym-a-1",
   "name": "Warehouse Gym",
+  "latitude": null,
+  "longitude": null,
+  "coordinate_accuracy_m": null,
+  "coordinates_updated_at": null,
   "created_at": 1730000000000,
   "updated_at": 1730000000000
 }

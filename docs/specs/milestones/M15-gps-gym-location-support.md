@@ -223,7 +223,7 @@ UI docs:
 ## Task breakdown
 
 1. `docs/tasks/complete/M15-T01-gps-gym-location-mvp-spec.md` - create this milestone spec and the direct branch implementation flow. (`completed`)
-2. `docs/tasks/M15-T02-gym-coordinate-data-sync-contract.md` - add gym coordinate schema, sync contract, backend projection, and tests. (`planned`)
+2. `docs/tasks/complete/M15-T02-gym-coordinate-data-sync-contract.md` - add gym coordinate schema, sync contract, backend projection, and tests. (`completed`)
 3. `docs/tasks/M15-T03-mobile-location-service-and-matching.md` - add foreground location service and pure matching domain logic. (`planned`)
 4. `docs/tasks/M15-T04-recorder-gps-suggestion-ui.md` - add recorder detection/suggestion UI. (`planned`)
 5. `docs/tasks/M15-T05-gym-management-coordinate-controls.md` - add gym-management save/replace/clear coordinate controls. (`planned`)

@@ -22,6 +22,10 @@ describe('sync bootstrap merge determinism', () => {
       id: 'gym-local',
       name: 'Local Gym',
       deletedAtMs: null,
+      latitude: 51.5072,
+      longitude: -0.1276,
+      coordinateAccuracyM: 12.5,
+      coordinatesUpdatedAtMs: 8_500,
       createdAtMs: 1_000,
       updatedAtMs: 9_000,
     });
@@ -31,6 +35,10 @@ describe('sync bootstrap merge determinism', () => {
         id: 'gym-local',
         name: 'Remote Older Gym',
         deletedAtMs: null,
+        latitude: null,
+        longitude: null,
+        coordinateAccuracyM: null,
+        coordinatesUpdatedAtMs: null,
         createdAtMs: 1_000,
         updatedAtMs: 8_000,
       },
@@ -38,6 +46,10 @@ describe('sync bootstrap merge determinism', () => {
         id: 'gym-remote',
         name: 'Remote Gym',
         deletedAtMs: null,
+        latitude: 40.7128,
+        longitude: -74.006,
+        coordinateAccuracyM: 20,
+        coordinatesUpdatedAtMs: 1_050,
         createdAtMs: 1_100,
         updatedAtMs: 1_100,
       },
@@ -45,6 +57,10 @@ describe('sync bootstrap merge determinism', () => {
         id: 'gym-remote-deleted',
         name: 'Deleted Remote Gym',
         deletedAtMs: 2_000,
+        latitude: null,
+        longitude: null,
+        coordinateAccuracyM: null,
+        coordinatesUpdatedAtMs: null,
         createdAtMs: 1_200,
         updatedAtMs: 2_000,
       }
@@ -113,6 +129,14 @@ describe('sync bootstrap merge determinism', () => {
 
     expect(mergePlan.mergedState.gyms.map((row) => row.id)).toEqual(['gym-local', 'gym-remote']);
     expect(mergePlan.mergedState.gyms.find((row) => row.id === 'gym-local')?.name).toBe('Local Gym');
+    expect(mergePlan.mergedState.gyms.find((row) => row.id === 'gym-local')).toEqual(
+      expect.objectContaining({
+        latitude: 51.5072,
+        longitude: -0.1276,
+        coordinateAccuracyM: 12.5,
+        coordinatesUpdatedAtMs: 8_500,
+      })
+    );
 
     expect(mergePlan.mergedState.exerciseDefinitions.map((row) => row.id)).toEqual([
       'exercise-local',
@@ -134,6 +158,12 @@ describe('sync bootstrap merge determinism', () => {
           entityType: 'gyms',
           entityId: 'gym-local',
           eventType: 'upsert',
+          payload: expect.objectContaining({
+            latitude: 51.5072,
+            longitude: -0.1276,
+            coordinate_accuracy_m: 12.5,
+            coordinates_updated_at_ms: 8_500,
+          }),
         }),
         expect.objectContaining({
           entityType: 'exercise_definitions',
@@ -242,6 +272,19 @@ describe('sync bootstrap merge determinism', () => {
       updated_at: 2_000,
     };
     const emptyRows: Record<string, unknown>[] = [];
+    const gymRows = [
+      {
+        id: 'gym-remote-coordinate',
+        name: 'Remote Coordinate Gym',
+        latitude: '51.5072',
+        longitude: '-0.1276',
+        coordinate_accuracy_m: '12.5',
+        coordinates_updated_at: '1772794800000',
+        deleted_at: null,
+        created_at: 1_000,
+        updated_at: 2_000,
+      },
+    ];
 
     const selectCalls: string[] = [];
     const client = {
@@ -265,7 +308,7 @@ describe('sync bootstrap merge determinism', () => {
             }
 
             const dataByTable: Record<string, Record<string, unknown>[]> = {
-              gyms: emptyRows,
+              gyms: gymRows,
               sessions: emptyRows,
               session_exercises: emptyRows,
               exercise_definitions: emptyRows,
@@ -283,6 +326,19 @@ describe('sync bootstrap merge determinism', () => {
     };
 
     const remoteState = await fetchRemoteSyncProjectionState(client as never);
+    expect(remoteState.gyms).toEqual([
+      {
+        id: 'gym-remote-coordinate',
+        name: 'Remote Coordinate Gym',
+        latitude: 51.5072,
+        longitude: -0.1276,
+        coordinateAccuracyM: 12.5,
+        coordinatesUpdatedAtMs: 1772794800000,
+        deletedAtMs: null,
+        createdAtMs: 1_000,
+        updatedAtMs: 2_000,
+      },
+    ]);
     expect(remoteState.exerciseSets).toEqual([
       {
         id: 'set-legacy',
@@ -296,6 +352,9 @@ describe('sync bootstrap merge determinism', () => {
         updatedAtMs: 2_000,
       },
     ]);
+    expect(selectCalls).toContain(
+      'gyms:id,name,latitude,longitude,coordinate_accuracy_m,coordinates_updated_at,deleted_at,created_at,updated_at'
+    );
     expect(selectCalls).toContain(
       'exercise_sets:id,session_exercise_id,order_index,weight_value,reps_value,set_type,deleted_at,created_at,updated_at'
     );
