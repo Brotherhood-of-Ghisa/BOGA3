@@ -139,7 +139,7 @@ const styles = StyleSheet.create({
   topRow: {
     flexDirection: 'row',
     gap: uiSpace.md,
-    alignItems: 'flex-end',
+    alignItems: 'flex-start',
   },
   rowField: {
     flex: 1,

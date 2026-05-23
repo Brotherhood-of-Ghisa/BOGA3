@@ -97,6 +97,11 @@ Document app-specific UI semantics and guardrails for the current mobile app.
     - Adding a set to an exercise copies the previous set's `Weight`, `Reps`, and `Type` values, while assigning the new row its own identity.
     - Logging a new exercise focuses its first `Weight` input, and adding a set focuses the new set's `Weight` input. Weight and `Reps` inputs select their current value on focus so copied/defaulted values can be overwritten quickly.
 12. The shared exercise editor dismisses the text keyboard before opening primary/secondary muscle selectors, and selector lists remain keyboard-aware so all muscle-group options stay reachable on iOS.
+13. In `session-recorder`, GPS gym detection is advisory:
+    - the `Detect` affordance lives near the gym selector,
+    - permission denial, unavailable services, low accuracy, no match, ambiguous match, and read failures show inline feedback and do not change the selected gym,
+    - a matched gym is shown as a confirmable suggestion and only changes the session after `Use this gym`,
+    - manual gym selection stays available and clears any outstanding GPS suggestion.
 
 ### 6. Loading, empty, error, and feedback state handling
 

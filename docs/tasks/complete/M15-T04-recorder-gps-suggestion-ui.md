@@ -1,7 +1,7 @@
 ---
 task_id: M15-T04-recorder-gps-suggestion-ui
 milestone_id: "M15"
-status: planned
+status: completed
 ui_impact: "yes"
 areas: "frontend|docs"
 runtimes: "node|expo|maestro"
@@ -16,7 +16,7 @@ docs_touched: "docs/specs/ui/screen-map.md,docs/specs/ui/ux-rules.md,RUNBOOK.md"
 
 - Task ID: `M15-T04-recorder-gps-suggestion-ui`
 - Title: Session recorder GPS gym suggestion UI
-- Status: `planned`
+- Status: `completed`
 - File location rule:
   - author active cards in `docs/tasks/<task-id>.md`
   - move the file to `docs/tasks/complete/<task-id>.md` when `Status` becomes `completed` or `outdated`
@@ -39,16 +39,32 @@ docs_touched: "docs/specs/ui/screen-map.md,docs/specs/ui/ux-rules.md,RUNBOOK.md"
 
 ## Context Freshness (required at session start; update before edits)
 
-- Verified current branch + HEAD commit:
-- Start-of-session sync completed per `docs/specs/04-ai-development-playbook.md` git sync workflow?: `yes | no | N/A` (explain)
+- Verified current branch + HEAD commit: `codex/m15-t04-recorder-gps-suggestion @ 636bd21`
+- Start-of-session sync completed per `docs/specs/04-ai-development-playbook.md` git sync workflow?: `partial`
+  - Ran `git fetch origin --prune`, switched to `main`, and confirmed `git pull --ff-only origin main` was already up to date.
+  - Recreated this task branch from `codex/m15-t03-location-service-matching` because `main` does not yet contain the completed M15-T02/T03 task cards or GPS service implementation required by T04.
 - Parent refs opened in this session:
   - `docs/specs/milestones/M15-gps-gym-location-support.md`
+  - `docs/specs/03-technical-architecture.md`
+  - `docs/specs/05-data-model.md`
+  - `docs/specs/04-ai-development-playbook.md`
+  - `docs/specs/06-testing-strategy.md`
+  - `docs/specs/09-project-structure.md`
   - `docs/specs/08-ux-delivery-standard.md`
   - `docs/specs/ui/README.md`
+  - `docs/specs/ui/screen-map.md`
+  - `docs/specs/ui/ux-rules.md`
+  - `docs/specs/ui/components-catalog.md`
+  - `docs/specs/ui/navigation-contract.md`
+  - `docs/specs/12-worktree-config-and-isolation.md`
+  - `RUNBOOK.md`
 - Code/docs inventory freshness checks run:
-  - Confirm T02 and T03 status before edits.
-  - Re-check current recorder gym picker/personal gym state after `T-20260517-01-personal-gym-list-sync.md`.
-- Known stale references or assumptions: none
+  - Confirmed `docs/tasks/complete/M15-T02-gym-coordinate-data-sync-contract.md` and `docs/tasks/complete/M15-T03-mobile-location-service-and-matching.md` are completed on the active M15 branch lineage.
+  - Ran `./scripts/task-bootstrap.sh docs/tasks/M15-T04-recorder-gps-suggestion-ui.md`.
+  - Re-checked current recorder gym picker state after `T-20260517-01-personal-gym-list-sync.md`: that task card is still `planned`; the recorder still uses route-local `SEEDED_LOCATIONS`, while `local-gyms` only exposes `upsertLocalGym()` and `loadLocalGymById()`.
+- Known stale references or assumptions:
+  - `main` is behind the M15 dependency branch lineage; T04 is intentionally based on T03 until prerequisite branches land.
+  - Personal database-backed gym picker work is not present; GPS suggestion UI will consume nullable coordinate fields on the current `SessionLocation` shape and remain compatible with later persisted gym-list work.
 - Optional helper command:
   - `./scripts/task-bootstrap.sh docs/tasks/M15-T04-recorder-gps-suggestion-ui.md`
 
@@ -164,14 +180,37 @@ Add recorder UI that lets the user ask for a GPS gym suggestion and confirm it b
 ## Evidence
 
 - UI/UX task visual artifacts note:
-- Manual verification summary:
+  - Idle recorder state with the new Detect affordance: `apps/mobile/artifacts/maestro/ad-hoc/20260523-151328-47479/maestro-output/screenshots/02-session-recorder-visible.png`
+  - Edge-state inline feedback after tapping Detect on a stale dev client without `ExpoLocation`: `apps/mobile/artifacts/maestro/M15-T04-recorder-gps-suggestion-ui/20260523-150200-38785/maestro-output/screenshots/gps-read-failure-inline.png`
+  - Matched-confirmation success state is covered by RNTL interaction assertions with mocked location/matcher inputs; a native matched screenshot is deferred until T05 provides coordinate save/replace controls or seeded coordinate-bearing personal gyms.
+- Manual verification summary (required when CI is absent/partial): local frontend GPS suggestion tests and gates passed.
+  - Targeted red/green path: new recorder GPS suggestion tests failed on the missing detect affordance, then passed after implementation.
+  - `cd apps/mobile && npm test -- --runTestsByPath app/__tests__/session-recorder-screen.test.tsx --runInBand` passed.
+  - `./scripts/quality-fast.sh frontend` passed: lint, typecheck, and 49 Jest suites / 346 tests.
+  - Initial `./scripts/quality-slow.sh frontend` attempt failed because Maestro could not locate Java; reran with `PATH="/opt/homebrew/opt/openjdk/bin:$HOME/.maestro/bin:$PATH" JAVA_HOME="/opt/homebrew/opt/openjdk"`.
+  - During slow-gate evidence, the stale dev client exposed a missing `ExpoLocation` native module crash on Detect; added a lazy native-module guard so Detect degrades to inline read-failure feedback instead of redboxing.
+  - One repeat slow-gate attempt hit a transient Maestro keyboard-hide failure in data-smoke; rerunning the same gate passed.
+  - Final `./scripts/quality-slow.sh frontend` with the Java env prefix passed all lanes: smoke (`apps/mobile/artifacts/maestro/ad-hoc/20260523-151328-47479`), data-smoke (`apps/mobile/artifacts/maestro/ad-hoc/20260523-151431-48638`), and auth/profile (`apps/mobile/artifacts/maestro/ad-hoc/20260523-151609-49855`).
+  - Ad-hoc GPS edge evidence flow passed: `TASK_ID=M15-T04-recorder-gps-suggestion-ui MAESTRO_RESET_STRATEGY=full ./scripts/maestro-ios-run-flow.sh --flow <tmp-flow> --scenario gps-detect-edge`, artifacts under `apps/mobile/artifacts/maestro/M15-T04-recorder-gps-suggestion-ui/20260523-150200-38785`.
+  - `RUNBOOK.md` reviewed; no changes required.
 - Deferred/manual hosted checks summary: `N/A`
 
 ## Completion note (fill at end per `docs/specs/04-ai-development-playbook.md`)
 
-- What changed:
-- What tests ran:
-- What remains:
+- What changed: added confirmation-gated recorder GPS gym suggestion UI and lazy native-location loading.
+  - Added recorder GPS detection UI beside the gym selector, with loading, matched, permission-denied, unavailable, low-accuracy, no-match, ambiguous, and read-failure feedback states.
+  - Confirmation is required before a matched GPS suggestion updates `session.locationId`; manual gym selection remains available and clears any outstanding suggestion.
+  - Added a lazy foreground-location loader so stale dev clients without `ExpoLocation` keep the recorder usable and show inline read-failure feedback instead of crashing.
+  - Extended recorder `SessionLocation` with nullable coordinate fields and top-aligned the shared recorder metadata row for variable-height gym feedback.
+  - Updated UI docs for recorder GPS suggestion semantics.
+- What tests ran: targeted RNTL, frontend fast gate, frontend slow gate, and an ad-hoc Maestro GPS edge capture.
+  - `cd apps/mobile && npm test -- --runTestsByPath app/__tests__/session-recorder-screen.test.tsx --runInBand`
+  - `./scripts/quality-fast.sh frontend`
+  - `PATH="/opt/homebrew/opt/openjdk/bin:$HOME/.maestro/bin:$PATH" JAVA_HOME="/opt/homebrew/opt/openjdk" ./scripts/quality-slow.sh frontend`
+  - `TASK_ID=M15-T04-recorder-gps-suggestion-ui MAESTRO_RESET_STRATEGY=full ./scripts/maestro-ios-run-flow.sh --flow <tmp-flow> --scenario gps-detect-edge`
+- What remains: T05 still owns save/replace/clear gym coordinate controls and native matched-state visual proof with coordinate-bearing gyms.
+  - T05 still owns save/replace/clear gym coordinate controls; until then, matched native GPS screenshots require mocked RNTL coverage rather than an end-to-end coordinate-bearing gym path.
+  - This branch is based on `codex/m15-t03-location-service-matching` because prerequisite M15 branches are not yet on `main`.
 
 ## Status update checklist (mandatory at closeout)
 
