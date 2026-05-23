@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
 import SessionRecorderScreen from '../(tabs)/session-recorder';
 
@@ -67,6 +67,7 @@ jest.mock('@/src/location/foreground-location-lazy', () => ({
 }));
 
 jest.mock('@/src/location/gym-location-matcher', () => ({
+  DEFAULT_MAX_POSITION_ACCURACY_M: 100,
   matchNearestGymForPosition: jest.fn().mockReturnValue({
     status: 'no_match',
     radiusM: 150,
@@ -100,8 +101,14 @@ const locationMock = {
   matchNearestGymForPosition: jest.Mock;
 };
 
+const dataMock = jest.requireMock('@/src/data') as {
+  upsertLocalGym: jest.Mock;
+};
+
 describe('SessionRecorderScreen', () => {
   beforeEach(() => {
+    dataMock.upsertLocalGym.mockClear();
+    dataMock.upsertLocalGym.mockResolvedValue(undefined);
     locationMock.getCurrentForegroundPositionLazy.mockReset();
     locationMock.matchNearestGymForPosition.mockReset();
     locationMock.getCurrentForegroundPositionLazy.mockResolvedValue({
@@ -235,6 +242,172 @@ describe('SessionRecorderScreen', () => {
 
     fireEvent.press(screen.getByText('Choose gym'));
     expect(screen.getByLabelText('Select gym Downtown Iron Works')).toBeTruthy();
+  });
+
+  it('saves current coordinates for a gym from the manage modal', async () => {
+    render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
+
+    fireEvent.press(screen.getByText('Choose gym'));
+    fireEvent.press(screen.getByText('Manage'));
+    fireEvent.press(screen.getByLabelText('Save current location for gym Downtown Iron Temple'));
+
+    await waitFor(() => {
+      expect(dataMock.upsertLocalGym).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 'downtown-iron-temple',
+          name: 'Downtown Iron Temple',
+          coordinates: {
+            latitude: 51.501,
+            longitude: -0.141,
+            accuracyM: 20,
+            updatedAt: new Date('2026-05-23T10:00:00.000Z'),
+          },
+        })
+      );
+    });
+
+    expect(await screen.findByText('Coordinates saved from current location.')).toBeTruthy();
+    expect(screen.getAllByText('GPS saved').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('requires confirmation before replacing saved gym coordinates', async () => {
+    render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
+
+    fireEvent.press(screen.getByText('Choose gym'));
+    fireEvent.press(screen.getByText('Manage'));
+    fireEvent.press(screen.getByLabelText('Save current location for gym Downtown Iron Temple'));
+    await screen.findByText('Coordinates saved from current location.');
+
+    locationMock.getCurrentForegroundPositionLazy.mockResolvedValueOnce({
+      status: 'success',
+      position: {
+        latitude: 51.502,
+        longitude: -0.142,
+        accuracyM: 12,
+        capturedAt: new Date('2026-05-23T10:05:00.000Z'),
+      },
+    });
+
+    fireEvent.press(screen.getByLabelText('Replace coordinates for gym Downtown Iron Temple'));
+    expect(screen.getByText('Replace saved coordinates with your current location?')).toBeTruthy();
+    expect(dataMock.upsertLocalGym).toHaveBeenCalledTimes(1);
+
+    fireEvent.press(screen.getByLabelText('Confirm replace coordinates for gym Downtown Iron Temple'));
+
+    await waitFor(() => {
+      expect(dataMock.upsertLocalGym).toHaveBeenCalledTimes(2);
+    });
+    expect(dataMock.upsertLocalGym).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        id: 'downtown-iron-temple',
+        name: 'Downtown Iron Temple',
+        coordinates: {
+          latitude: 51.502,
+          longitude: -0.142,
+          accuracyM: 12,
+          updatedAt: new Date('2026-05-23T10:05:00.000Z'),
+        },
+      })
+    );
+    expect(await screen.findByText('Coordinates replaced from current location.')).toBeTruthy();
+  });
+
+  it('requires confirmation before clearing coordinates and excludes the gym from later GPS matching', async () => {
+    render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
+
+    fireEvent.press(screen.getByText('Choose gym'));
+    fireEvent.press(screen.getByText('Manage'));
+    fireEvent.press(screen.getByLabelText('Save current location for gym Downtown Iron Temple'));
+    await screen.findByText('Coordinates saved from current location.');
+
+    fireEvent.press(screen.getByLabelText('Clear coordinates for gym Downtown Iron Temple'));
+    expect(screen.getByText('Clear saved coordinates for this gym?')).toBeTruthy();
+
+    fireEvent.press(screen.getByLabelText('Cancel coordinate action for gym Downtown Iron Temple'));
+    expect(screen.queryByText('Clear saved coordinates for this gym?')).toBeNull();
+    expect(dataMock.upsertLocalGym).toHaveBeenCalledTimes(1);
+
+    fireEvent.press(screen.getByLabelText('Clear coordinates for gym Downtown Iron Temple'));
+    fireEvent.press(screen.getByLabelText('Confirm clear coordinates for gym Downtown Iron Temple'));
+
+    await waitFor(() => {
+      expect(dataMock.upsertLocalGym).toHaveBeenCalledTimes(2);
+    });
+    expect(dataMock.upsertLocalGym).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        id: 'downtown-iron-temple',
+        name: 'Downtown Iron Temple',
+        coordinates: null,
+      })
+    );
+    expect(await screen.findByText('Coordinates cleared. This gym will not be used for GPS matching.')).toBeTruthy();
+
+    fireEvent.press(screen.getByText('Back to picker'));
+    fireEvent.press(screen.getByLabelText('Dismiss gym modal overlay'));
+    fireEvent.press(screen.getByLabelText('Detect current gym'));
+
+    await waitFor(() => {
+      expect(locationMock.matchNearestGymForPosition).toHaveBeenCalledWith(
+        expect.objectContaining({ accuracyM: 20, latitude: 51.501, longitude: -0.141 }),
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: 'downtown-iron-temple',
+            latitude: null,
+            longitude: null,
+          }),
+        ])
+      );
+    });
+  });
+
+  it.each([
+    [
+      'permission denial',
+      { status: 'permission_denied', canAskAgain: false },
+      'Location permission was denied. Coordinates were not changed.',
+    ],
+    [
+      'low accuracy',
+      {
+        status: 'success',
+        position: { latitude: 51.501, longitude: -0.141, accuracyM: 140, capturedAt: new Date('2026-05-23T10:00:00.000Z') },
+      },
+      'Location accuracy is too low right now. Coordinates were not changed.',
+    ],
+    [
+      'unavailable services',
+      { status: 'unavailable', reason: 'services_disabled' },
+      'Location services are unavailable. Coordinates were not changed.',
+    ],
+  ])('shows inline coordinate feedback for %s without persisting coordinates', async (_caseName, locationResult, expectedMessage) => {
+    locationMock.getCurrentForegroundPositionLazy.mockResolvedValue(locationResult);
+
+    render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
+
+    fireEvent.press(screen.getByText('Choose gym'));
+    fireEvent.press(screen.getByText('Manage'));
+    fireEvent.press(screen.getByLabelText('Save current location for gym Downtown Iron Temple'));
+
+    expect(await screen.findByText(expectedMessage)).toBeTruthy();
+    expect(dataMock.upsertLocalGym).not.toHaveBeenCalled();
+  });
+
+  it('keeps coordinate persistence failures inline without marking coordinates saved', async () => {
+    dataMock.upsertLocalGym.mockRejectedValueOnce(new Error('database unavailable'));
+
+    render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
+
+    fireEvent.press(screen.getByText('Choose gym'));
+    fireEvent.press(screen.getByText('Manage'));
+    fireEvent.press(screen.getByLabelText('Save current location for gym Downtown Iron Temple'));
+
+    expect(await screen.findByText('Unable to update gym coordinates right now.')).toBeTruthy();
+    expect(screen.getAllByText('No GPS coordinates').length).toBeGreaterThanOrEqual(1);
   });
 
   it('dismisses the gym modal when pressing outside', async () => {

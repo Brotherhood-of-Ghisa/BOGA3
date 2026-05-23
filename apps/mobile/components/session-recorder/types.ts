@@ -36,6 +36,8 @@ export type SessionLocation = {
   archived: boolean;
   latitude?: number | null;
   longitude?: number | null;
+  coordinateAccuracyM?: number | null;
+  coordinatesUpdatedAt?: Date | null;
 };
 
 export type GymModalMode = 'picker' | 'manage' | 'editor';

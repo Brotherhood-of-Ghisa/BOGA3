@@ -226,7 +226,7 @@ UI docs:
 2. `docs/tasks/complete/M15-T02-gym-coordinate-data-sync-contract.md` - add gym coordinate schema, sync contract, backend projection, and tests. (`completed`)
 3. `docs/tasks/complete/M15-T03-mobile-location-service-and-matching.md` - add foreground location service and pure matching domain logic. (`completed`)
 4. `docs/tasks/complete/M15-T04-recorder-gps-suggestion-ui.md` - add recorder detection/suggestion UI. (`completed`)
-5. `docs/tasks/M15-T05-gym-management-coordinate-controls.md` - add gym-management save/replace/clear coordinate controls. (`planned`)
+5. `docs/tasks/complete/M15-T05-gym-management-coordinate-controls.md` - add gym-management save/replace/clear coordinate controls. (`completed`)
 6. `docs/tasks/M15-T06-gps-restore-evidence-and-docs-closeout.md` - prove restore parity/runtime behavior and close M15 docs. (`planned`)
 
 ## Risks / dependencies

@@ -102,6 +102,12 @@ Document app-specific UI semantics and guardrails for the current mobile app.
     - permission denial, unavailable services, low accuracy, no match, ambiguous match, and read failures show inline feedback and do not change the selected gym,
     - a matched gym is shown as a confirmable suggestion and only changes the session after `Use this gym`,
     - manual gym selection stays available and clears any outstanding GPS suggestion.
+14. In `session-recorder` gym management, private coordinate controls are explicit and confirmation-gated:
+    - each managed gym shows only coordinate presence (`GPS saved` / `No GPS coordinates`) rather than latitude/longitude precision,
+    - saving current location for a gym with no coordinates reads foreground location from an explicit button and persists only when accuracy is acceptable,
+    - replacing or clearing existing coordinates requires an inline confirmation,
+    - permission denial, unavailable services, low accuracy, and persistence failures stay inline on the affected gym row and leave existing coordinates unchanged,
+    - clearing coordinates removes the gym from GPS matching until coordinates are saved again.
 
 ### 6. Loading, empty, error, and feedback state handling
 
