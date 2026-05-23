@@ -1,7 +1,7 @@
 ---
 task_id: M15-T03-mobile-location-service-and-matching
 milestone_id: "M15"
-status: planned
+status: completed
 ui_impact: "no"
 areas: "frontend|docs"
 runtimes: "node|expo"
@@ -16,7 +16,7 @@ docs_touched: "docs/specs/03-technical-architecture.md,docs/specs/06-testing-str
 
 - Task ID: `M15-T03-mobile-location-service-and-matching`
 - Title: Mobile foreground location service and matching domain logic
-- Status: `planned`
+- Status: `completed`
 - File location rule:
   - author active cards in `docs/tasks/<task-id>.md`
   - move the file to `docs/tasks/complete/<task-id>.md` when `Status` becomes `completed` or `outdated`
@@ -37,13 +37,25 @@ docs_touched: "docs/specs/03-technical-architecture.md,docs/specs/06-testing-str
 
 ## Context Freshness (required at session start; update before edits)
 
-- Verified current branch + HEAD commit:
-- Start-of-session sync completed per `docs/specs/04-ai-development-playbook.md` git sync workflow?: `yes | no | N/A` (explain)
+- Verified current branch + HEAD commit: `codex/m15-t02-gym-coordinates-sync @ 92d6335ef323e9d9e6e01f9b29a2d9ca7d564b27`; created `codex/m15-t03-location-service-matching` from that clean prerequisite baseline.
+- Start-of-session sync completed per `docs/specs/04-ai-development-playbook.md` git sync workflow?: `partial` - ran `git fetch --prune origin`; did not switch to `main` because active M15 task docs and completed T02 coordinate implementation are present on the M15/T02 branch lineage.
 - Parent refs opened in this session:
+  - `docs/specs/README.md`
+  - `docs/specs/00-product.md`
+  - `docs/specs/03-technical-architecture.md`
+  - `docs/specs/05-data-model.md`
+  - `docs/specs/04-ai-development-playbook.md`
+  - `docs/specs/06-testing-strategy.md`
+  - `docs/specs/09-project-structure.md`
+  - `docs/specs/12-worktree-config-and-isolation.md`
+  - `docs/specs/08-ux-delivery-standard.md`
+  - `docs/specs/ui/README.md`
   - `docs/specs/milestones/M15-gps-gym-location-support.md`
+  - `RUNBOOK.md`
 - Code/docs inventory freshness checks run:
-  - Confirm whether `expo-location` is already installed.
-  - Re-check current Expo foreground location and config plugin documentation before dependency/config edits.
+  - Confirmed `expo-location` was not installed before edits.
+  - Re-checked Expo SDK 54 `expo-location` docs before dependency/config edits; SDK 54 bundled version is `~19.0.8`; foreground permission maps to iOS `When In Use`; config plugin supports `locationWhenInUsePermission` and background flags default/explicitly configurable.
+  - Ran `./scripts/task-bootstrap.sh docs/tasks/M15-T03-mobile-location-service-and-matching.md`.
 - Known stale references or assumptions: none
 - Optional helper command:
   - `./scripts/task-bootstrap.sh docs/tasks/M15-T03-mobile-location-service-and-matching.md`
@@ -130,14 +142,32 @@ Add the mobile foreground-location service boundary and pure nearest-gym matchin
 
 ## Evidence
 
-- Manual verification summary:
+- Manual verification summary (required when CI is absent/partial): local frontend GPS service/matcher gates passed.
+  - `npx expo install expo-location` installed SDK-compatible `expo-location@~19.0.8`.
+  - Targeted red/green path: initial new tests failed on missing modules, then passed after implementation.
+  - `npm test -- --runTestsByPath app/__tests__/gym-location-matcher.test.ts app/__tests__/foreground-location-service.test.ts --runInBand` passed.
+  - `npm run typecheck` passed.
+  - `./scripts/quality-fast.sh frontend` passed: lint, typecheck, and 49 Jest suites / 339 tests.
+  - `git diff --check` passed.
+  - `./scripts/task-closeout-check.sh docs/tasks/complete/M15-T03-mobile-location-service-and-matching.md` passed.
 - Deferred/manual hosted checks summary: `N/A`
 
 ## Completion note (fill at end per `docs/specs/04-ai-development-playbook.md`)
 
-- What changed:
-- What tests ran:
-- What remains:
+- What changed: added foreground-only `expo-location` service/config and pure nearest-gym matching.
+  - Added `expo-location` and foreground-only config-plugin settings.
+  - Added injectable foreground location service result normalization for granted, denied, unavailable, timeout, read failure, unexpected error, and success.
+  - Added pure Haversine nearest-gym matching with M15 defaults for accuracy, radius, and tie ambiguity.
+  - Updated architecture/testing/runbook docs for the new GPS service boundary and local native rebuild/simulator-location notes.
+- What tests ran: targeted Jest, mobile typecheck, frontend fast gate, and diff whitespace check.
+  - `npm test -- --runTestsByPath app/__tests__/gym-location-matcher.test.ts app/__tests__/foreground-location-service.test.ts --runInBand`
+  - `npm run typecheck`
+  - `./scripts/quality-fast.sh frontend`
+  - `git diff --check`
+  - `./scripts/task-closeout-check.sh docs/tasks/complete/M15-T03-mobile-location-service-and-matching.md`
+- What remains: T04/T05 UI tasks consume the service and matcher for recorder suggestions and gym coordinate controls.
+  - T04 wires recorder GPS suggestion UI to this service/matcher.
+  - T05 wires gym-management coordinate controls.
 
 ## Status update checklist (mandatory at closeout)
 

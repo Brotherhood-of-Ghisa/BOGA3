@@ -53,7 +53,17 @@ export default ({ config }: { config: ExpoConfig }) => ({
                 }
             }
         ],
-        "expo-secure-store"
+        "expo-secure-store",
+        [
+            "expo-location",
+            {
+                locationWhenInUsePermission:
+                    "Allow Boga3 to use your location while the app is open to suggest your current gym.",
+                isIosBackgroundLocationEnabled: false,
+                isAndroidBackgroundLocationEnabled: false,
+                isAndroidForegroundServiceEnabled: false
+            }
+        ]
     ],
 
     experiments: {

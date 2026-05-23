@@ -108,6 +108,16 @@ cd apps/mobile
 npm run start:ios:dev-client
 ```
 
+After native dependency or config-plugin changes, rebuild the dev client before retesting on simulator/device:
+
+```bash
+cd apps/mobile
+./scripts/maestro-ios-dev-client-build.sh
+```
+
+For GPS/location flows on iOS Simulator, choose a simulated location before testing:
+Simulator -> Features -> Location -> any option other than None.
+
 ### Uninstall and reinstall app on simulator
 
 1. Boot/open a simulator.

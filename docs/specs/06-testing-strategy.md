@@ -55,6 +55,15 @@ Reason: keeps FE/backend integration test expectations explicit without forcing 
 - During execution sessions, run a targeted test or gate after each meaningful change, then run `./scripts/quality-fast.sh` before task closeout.
 - Run `./scripts/quality-slow.sh <area>` when the task card's risk triggers require slower local runtime/contract checks.
 
+## GPS gym-location coverage policy (M15 onward)
+
+- Applies to foreground location service and gym-coordinate matching work.
+- Required coverage should include:
+  - foreground permission/service normalization for granted, denied, unavailable services, timeout, read failure, unexpected native errors, and successful position reads,
+  - pure matcher assertions for Haversine distance, missing/invalid/archived/deleted gym coordinate rejection, low-accuracy position rejection, no-match handling, and ambiguous tie handling,
+  - no use of background permission APIs, background tasks, geofencing, or continuous background updates for M15 GPS flows.
+- Use deterministic Jest coverage for service wrappers and matching logic. Add simulator/manual or Maestro evidence when UI permission flows are introduced or native permission behavior itself is being validated.
+
 ## Exercise-tag coverage policy (M12 onward)
 
 - Applies to exercise-tag schema/repository/UI work in the mobile local runtime.
