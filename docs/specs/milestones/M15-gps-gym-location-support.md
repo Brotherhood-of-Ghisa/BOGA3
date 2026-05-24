@@ -4,7 +4,7 @@
 
 - Milestone ID: `M15`
 - Title: GPS gym location support
-- Status: `in_progress`
+- Status: `completed`
 
 ## Parent references
 
@@ -117,11 +117,11 @@ Orchestration note:
   - clear existing coordinates after confirmation.
 - Failure/edge: denied permission, unavailable location, low accuracy, or persistence failure stays inline and does not corrupt the gym row.
 
-## Data model proposal
+## Implemented data model
 
 Coordinate metadata extends the existing user-owned `gyms` model. Do not create a separate check-in/location entity for M15.
 
-Proposed nullable fields:
+Implemented nullable fields:
 
 | Field | Local type | Backend type | Notes |
 | --- | --- | --- | --- |
@@ -134,7 +134,7 @@ Invariant:
 
 - `latitude` and `longitude` are both null or both non-null.
 - `coordinate_accuracy_m` and `coordinates_updated_at` may be null only when coordinates are null.
-- Clearing coordinates sets all four fields to null except `coordinates_updated_at` may be set to the clear timestamp only if the implementation needs explicit last-change conflict handling; the data/sync task must choose one behavior and test it.
+- Clearing coordinates sets all four coordinate fields to null.
 - Gym `updated_at` changes whenever coordinate metadata changes.
 
 Sync impact decision: `in sync scope`.
@@ -142,7 +142,7 @@ Sync impact decision: `in sync scope`.
 - Gym coordinates are user-owned backup/restore data.
 - `gyms.upsert` payloads must carry coordinate metadata.
 - Backend projection, bootstrap fetch, merge, convergence events, and reinstall restore parity must include coordinate metadata.
-- Project-level docs and sync contract updates are owned by the data/sync implementation task, not this planning task.
+- Project-level docs and sync contract updates are complete as of M15 closeout.
 
 ## Sync contract requirements
 
@@ -227,7 +227,7 @@ UI docs:
 3. `docs/tasks/complete/M15-T03-mobile-location-service-and-matching.md` - add foreground location service and pure matching domain logic. (`completed`)
 4. `docs/tasks/complete/M15-T04-recorder-gps-suggestion-ui.md` - add recorder detection/suggestion UI. (`completed`)
 5. `docs/tasks/complete/M15-T05-gym-management-coordinate-controls.md` - add gym-management save/replace/clear coordinate controls. (`completed`)
-6. `docs/tasks/M15-T06-gps-restore-evidence-and-docs-closeout.md` - prove restore parity/runtime behavior and close M15 docs. (`planned`)
+6. `docs/tasks/complete/M15-T06-gps-restore-evidence-and-docs-closeout.md` - prove restore parity/runtime behavior and close M15 docs. (`completed`)
 
 ## Risks / dependencies
 
@@ -239,7 +239,7 @@ UI docs:
 
 ## Project docs maintenance
 
-This planning task does not mark coordinate schema as implemented/adopted at the project level. Downstream implementation tasks must update:
+M15 closeout verified the following source-of-truth docs are aligned with the implemented foreground-only GPS, private gym-coordinate, sync/restore, and UI behavior:
 
 - `docs/specs/03-technical-architecture.md` when stable location-service/sync behavior lands.
 - `docs/specs/05-data-model.md` when gym coordinate fields are added.
@@ -249,11 +249,23 @@ This planning task does not mark coordinate schema as implemented/adopted at the
 - `docs/specs/ui/*.md` when UI behavior changes.
 - `RUNBOOK.md` if any local operator command or evidence workflow changes.
 
-## Completion note (fill when milestone closes)
+## Completion note
 
 - What changed:
+  - Added private nullable coordinate metadata to user-owned `gyms` locally and in Supabase projection, with `gyms.upsert` sync payloads, backend validation, bootstrap/merge/convergence handling, and reinstall restore parity.
+  - Added foreground-only location reads behind an injectable service, pure Haversine gym matching, confirmation-gated recorder GPS suggestions, and gym-management controls to save, replace, or clear coordinates.
+  - Kept GPS advisory/private for M15: no background location, no automatic check-ins, no maps/geocoding, and no social/shared location exposure.
 - Verification summary:
+  - Restore parity: `cd apps/mobile && npm run test:sync:reinstall-parity` passed with coordinate-bearing gyms in the normalized snapshot.
+  - Backend contracts: `./scripts/quality-fast.sh backend` and `./scripts/quality-slow.sh backend` passed, including coordinate projection and invalid-coordinate rejection in `sync_events_ingest`.
+  - Frontend/runtime: `./scripts/quality-fast.sh frontend` and `PATH="/opt/homebrew/opt/openjdk/bin:$HOME/.maestro/bin:$PATH" JAVA_HOME="/opt/homebrew/opt/openjdk" ./scripts/quality-slow.sh frontend` passed.
+  - Final frontend slow artifacts:
+    - smoke: `apps/mobile/artifacts/maestro/ad-hoc/20260524-081944-13493/`
+    - data smoke: `apps/mobile/artifacts/maestro/ad-hoc/20260524-082047-14652/`
+    - auth/profile: `apps/mobile/artifacts/maestro/ad-hoc/20260524-082225-15858/`
 - What remains:
+  - `docs/tasks/T-20260517-01-personal-gym-list-sync.md` remains planned; M15 adapted to the current route-local gym management state and does not claim full database-backed gym-list sync is complete.
+  - M15 branches are stacked on the T02-T05 lineage until those prerequisite branches land on `main`.
 
 ## Status update checklist (mandatory during task closeout)
 
