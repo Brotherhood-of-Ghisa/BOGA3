@@ -41,7 +41,8 @@ appId: com.dinoderek.mobile
 - tapOn: "Log new exercise"
 - tapOn: "Exercise filter input"
 - inputText: "squat"
-- hideKeyboard
+- hideKeyboard:
+    optional: true
 - tapOn:
     point: "50%,26%"
 - tapOn: "Weight for exercise 1 set 1"

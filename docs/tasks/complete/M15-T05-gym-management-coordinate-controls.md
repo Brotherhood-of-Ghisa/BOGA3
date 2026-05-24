@@ -1,7 +1,7 @@
 ---
 task_id: M15-T05-gym-management-coordinate-controls
 milestone_id: "M15"
-status: planned
+status: completed
 ui_impact: "yes"
 areas: "frontend|docs"
 runtimes: "node|expo|maestro"
@@ -16,7 +16,7 @@ docs_touched: "docs/specs/ui/screen-map.md,docs/specs/ui/ux-rules.md,RUNBOOK.md"
 
 - Task ID: `M15-T05-gym-management-coordinate-controls`
 - Title: Gym-management coordinate save, replace, and clear controls
-- Status: `planned`
+- Status: `completed`
 - File location rule:
   - author active cards in `docs/tasks/<task-id>.md`
   - move the file to `docs/tasks/complete/<task-id>.md` when `Status` becomes `completed` or `outdated`
@@ -39,16 +39,30 @@ docs_touched: "docs/specs/ui/screen-map.md,docs/specs/ui/ux-rules.md,RUNBOOK.md"
 
 ## Context Freshness (required at session start; update before edits)
 
-- Verified current branch + HEAD commit:
-- Start-of-session sync completed per `docs/specs/04-ai-development-playbook.md` git sync workflow?: `yes | no | N/A` (explain)
+- Verified current branch + HEAD commit: `codex/m15-t05-gym-coordinate-controls @ a9a6579`
+- Start-of-session sync completed per `docs/specs/04-ai-development-playbook.md` git sync workflow?: `N/A` - user explicitly requested continuing from `codex/m15-t04-recorder-gps-suggestion` because M15 prerequisites are not on `main` yet.
 - Parent refs opened in this session:
+  - `AGENTS.md`
+  - `docs/specs/README.md`
+  - `docs/specs/00-product.md`
+  - `docs/specs/03-technical-architecture.md`
+  - `docs/specs/05-data-model.md`
+  - `docs/specs/04-ai-development-playbook.md`
+  - `docs/specs/06-testing-strategy.md`
+  - `docs/specs/09-project-structure.md`
+  - `docs/specs/12-worktree-config-and-isolation.md`
   - `docs/specs/milestones/M15-gps-gym-location-support.md`
   - `docs/specs/08-ux-delivery-standard.md`
   - `docs/specs/ui/README.md`
+  - `docs/specs/ui/screen-map.md`
+  - `docs/specs/ui/ux-rules.md`
+  - `docs/specs/ui/components-catalog.md`
+  - `RUNBOOK.md`
 - Code/docs inventory freshness checks run:
-  - Confirm T02 and T03 status before edits.
-  - Re-check personal gym management UI after `T-20260517-01-personal-gym-list-sync.md`.
-- Known stale references or assumptions: none
+  - Confirmed T02/T03/M15 project-level coordinate data and foreground location/matcher surfaces exist.
+  - Re-checked personal gym management UI in `apps/mobile/app/(tabs)/session-recorder.tsx`; current gym management remains route-local/seed-backed with persistence through `upsertLocalGym` and selected-gym `loadLocalGymById`.
+  - Ran `./scripts/task-bootstrap.sh docs/tasks/M15-T05-gym-management-coordinate-controls.md`.
+- Known stale references or assumptions: `T-20260517-01-personal-gym-list-sync.md` is still planned, so this task does not introduce a full persisted gym-list loader.
 - Optional helper command:
   - `./scripts/task-bootstrap.sh docs/tasks/M15-T05-gym-management-coordinate-controls.md`
 
@@ -171,15 +185,29 @@ Let users save, replace, and clear private coordinates for their personal gyms f
 
 ## Evidence
 
-- UI/UX task visual artifacts note:
-- Manual verification summary:
+- UI/UX task visual artifacts note: RNTL equivalent interaction captures cover save, replace, clear/cancel, permission denied, unavailable services, low accuracy, and persistence failure states; final green slow-gate simulator artifacts are listed below.
+  - Slow-gate simulator artifacts from the final green wrapper:
+    - smoke: `apps/mobile/artifacts/maestro/ad-hoc/20260523-223727-17462/`
+    - data smoke: `apps/mobile/artifacts/maestro/ad-hoc/20260523-223830-18614/`
+    - auth/profile: `apps/mobile/artifacts/maestro/ad-hoc/20260523-224008-19914/`
+Manual verification summary: `RUNBOOK.md` reviewed with no coordinate-UI operator command changes required; `data-runtime-smoke` keyboard dismissal was made optional after repeated Maestro failures while the keyboard was already gone, then Colima was started so the full slow gate could complete against local Supabase.
 - Deferred/manual hosted checks summary: `N/A`
 
 ## Completion note (fill at end per `docs/specs/04-ai-development-playbook.md`)
 
-- What changed:
-- What tests ran:
-- What remains:
+- What changed: Added gym-management coordinate status and save/replace/clear controls in the existing `session-recorder` gym modal, using T04's lazy foreground-location guard, shared matcher accuracy threshold, inline confirmations, and `upsertLocalGym` persistence; updated UI docs and hardened the data-smoke keyboard dismiss step.
+- What tests ran: Targeted recorder UI tests, targeted gym outbox tests, lint/typecheck/UI-guardrails, `./scripts/quality-fast.sh frontend`, focused data-smoke/auth-profile reruns during diagnosis, final `./scripts/quality-slow.sh frontend`, and `git diff --check`.
+  - `cd apps/mobile && npm test -- --runTestsByPath app/__tests__/session-recorder-screen.test.tsx --runInBand`
+  - `cd apps/mobile && npm test -- --runTestsByPath app/__tests__/sync-domain-event-emission.test.ts --runInBand -t 'gym'`
+  - `cd apps/mobile && npm run typecheck`
+  - `cd apps/mobile && npm run lint:ui-guardrails`
+  - `cd apps/mobile && npm run lint`
+  - `./scripts/quality-fast.sh frontend`
+  - `cd apps/mobile && PATH="/opt/homebrew/opt/openjdk/bin:$HOME/.maestro/bin:$PATH" JAVA_HOME="/opt/homebrew/opt/openjdk" npm run test:e2e:ios:data-smoke`
+  - `cd apps/mobile && PATH="/opt/homebrew/opt/openjdk/bin:$HOME/.maestro/bin:$PATH" JAVA_HOME="/opt/homebrew/opt/openjdk" npm run test:e2e:ios:auth-profile`
+  - `PATH="/opt/homebrew/opt/openjdk/bin:$HOME/.maestro/bin:$PATH" JAVA_HOME="/opt/homebrew/opt/openjdk" ./scripts/quality-slow.sh frontend`
+  - `git diff --check`
+- What remains: M15 remains open for `M15-T06-gps-restore-evidence-and-docs-closeout`; full persisted gym-list sync remains deferred to `T-20260517-01-personal-gym-list-sync.md`.
 
 ## Status update checklist (mandatory at closeout)
 
