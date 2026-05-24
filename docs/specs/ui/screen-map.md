@@ -38,9 +38,10 @@ Brief entrypoint map of the current mobile screens.
   - active mode
   - completed-edit loading/error/content states
   - in-route picker/editor/action modals (exercise picker includes text filtering by exercise name + primary muscle display/family terms, with compact header icon actions for manage/add)
-  - in-route gym management modal with save-current-location, confirmation-gated replace, and confirmation-gated clear controls for private gym coordinates
+  - in-route gym picker includes `No gym` as the null session-gym option; gym Manage focuses on edit/archive/unarchive plus archived visibility
+  - in-route single gym editor owns private coordinate controls (`Save current location`, confirmation-gated replace, and confirmation-gated clear)
   - in-route exercise-tag add/manage modals (search/select/create, rename/delete/undelete, deleted-visibility toggle)
-  - foreground GPS gym suggestion states near the gym picker (detecting, matched-confirmable, permission denied, unavailable, low accuracy, no match, ambiguous), with manual gym selection always available
+  - foreground GPS gym assistance is hidden on the recorder surface: brand-new active-session start may preselect one confident saved-gym match, null state displays as `No gym`, and long-pressing the gym box explicitly retries detection without a persistent suggestion panel
 - Key exits:
   - `exercise-catalog` (`source=session-recorder&intent=manage` from exercise picker)
   - dismisses to `/` on submit/save success

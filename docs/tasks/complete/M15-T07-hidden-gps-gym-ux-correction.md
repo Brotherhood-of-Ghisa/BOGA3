@@ -1,7 +1,7 @@
 ---
 task_id: M15-T07-hidden-gps-gym-ux-correction
 milestone_id: "M15"
-status: planned
+status: completed
 ui_impact: "yes"
 areas: "frontend|docs"
 runtimes: "node|expo|maestro"
@@ -16,7 +16,7 @@ docs_touched: "docs/specs/milestones/M15-gps-gym-location-support.md,docs/specs/
 
 - Task ID: `M15-T07-hidden-gps-gym-ux-correction`
 - Title: Hide GPS gym UX behind quiet gym preselection and editor controls
-- Status: `planned`
+- Status: `completed`
 - File location rule:
   - author active cards in `docs/tasks/<task-id>.md`
   - move the file to `docs/tasks/complete/<task-id>.md` when `Status` becomes `completed` or `outdated`
@@ -39,8 +39,8 @@ docs_touched: "docs/specs/milestones/M15-gps-gym-location-support.md,docs/specs/
 
 ## Context Freshness (required at session start; update before edits)
 
-- Verified current branch + HEAD commit:
-- Start-of-session sync completed per `docs/specs/04-ai-development-playbook.md` git sync workflow?: `yes | no | N/A` (explain)
+- Verified current branch + HEAD commit: `codex/m15-t07-hidden-gps-gym-ux-correction` @ `a623e98`
+- Start-of-session sync completed per `docs/specs/04-ai-development-playbook.md` git sync workflow?: `yes` - fetched `origin/main` (`6fae7bb`) before edits; user had already created the task branch, so execution stays on the branch.
 - Parent refs opened in this planning session:
   - `docs/specs/README.md`
   - `docs/specs/00-product.md`
@@ -258,15 +258,37 @@ The recorder should try to preselect a gym only once when a brand-new session st
 
 ## Evidence
 
-- UI/UX task visual artifacts note: list screenshots/captures here at execution closeout.
+- UI/UX task visual artifacts note:
+  - Maestro smoke: `apps/mobile/artifacts/maestro/ad-hoc/20260524-141934-51434/`
+    - recorder screenshot: `apps/mobile/artifacts/maestro/ad-hoc/20260524-141934-51434/maestro-output/screenshots/02-session-recorder-visible.png`
+  - Maestro data smoke: `apps/mobile/artifacts/maestro/ad-hoc/20260524-142042-52619/`
+  - Maestro auth/profile: `apps/mobile/artifacts/maestro/ad-hoc/20260524-142222-53852/`
 - Manual verification summary:
+  - Focused RNTL assertions cover quiet startup GPS preselection, startup no-op/null gym, restored-draft no startup detection, `No gym`, long-press retry success/failure, and editor-owned coordinate controls.
+  - Runtime evidence came from the required frontend slow gate lanes above. No hosted/deployed smoke was in scope.
+- Manual verification summary (required when CI is absent/partial): focused RNTL coverage plus frontend fast/slow local gates passed; CI is `N/A` because the repo has no configured pipeline.
 - Deferred/manual hosted checks summary: `N/A`
 
 ## Completion note (fill at end per `docs/specs/04-ai-development-playbook.md`)
 
-- What changed:
-- What tests ran:
-- What remains:
+- What changed: recorder GPS is now quiet assistance with one-shot startup preselection, long-press retry, `No gym`, and editor-owned coordinate controls.
+  - Removed the recorder-visible GPS `Detect` button, matched suggestion panel, `Use this gym`, and `Ignore` controls.
+  - Added quiet one-shot startup gym preselection for brand-new active sessions and explicit long-press retry from the gym box.
+  - Added `No gym` picker/null-state semantics and kept `No gym` out of gym persistence/management.
+  - Moved coordinate mutation controls out of Manage and into the single gym editor, while keeping coordinate clearing confirmation-gated.
+  - Added opportunistic current-coordinate capture when adding a new gym without blocking gym creation/selection.
+  - Updated M15 and UI source-of-truth docs for the corrected GPS/gym UX. `RUNBOOK.md reviewed (no changes required)`.
+- What tests ran: focused recorder/submit Jest suites, UI guardrails, typecheck, frontend fast gate, frontend slow gate, and `git diff --check`.
+  - `cd apps/mobile && npm test -- --runTestsByPath app/__tests__/session-recorder-screen.test.tsx --runInBand`
+  - `cd apps/mobile && npm test -- --runTestsByPath app/__tests__/session-recorder-submit.test.tsx --runInBand`
+  - `cd apps/mobile && npm run lint:ui-guardrails`
+  - `cd apps/mobile && npm run typecheck`
+  - `./scripts/quality-fast.sh frontend`
+  - `PATH="/opt/homebrew/opt/openjdk/bin:$HOME/.maestro/bin:$PATH" JAVA_HOME="/opt/homebrew/opt/openjdk" ./scripts/quality-slow.sh frontend`
+  - `git diff --check`
+- What remains: personal database-backed gym-list sync is still a separate planned task; no hosted/deployed checks were required.
+  - `docs/tasks/T-20260517-01-personal-gym-list-sync.md` remains planned; this task adapted the current route-local gym list.
+  - No hosted/deployed checks were required for this frontend/docs correction.
 
 ## Status update checklist (mandatory at closeout)
 

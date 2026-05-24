@@ -97,16 +97,24 @@ Document app-specific UI semantics and guardrails for the current mobile app.
     - Adding a set to an exercise copies the previous set's `Weight`, `Reps`, and `Type` values, while assigning the new row its own identity.
     - Logging a new exercise focuses its first `Weight` input, and adding a set focuses the new set's `Weight` input. Weight and `Reps` inputs select their current value on focus so copied/defaulted values can be overwritten quickly.
 12. The shared exercise editor dismisses the text keyboard before opening primary/secondary muscle selectors, and selector lists remain keyboard-aware so all muscle-group options stay reachable on iOS.
-13. In `session-recorder`, GPS gym detection is advisory:
-    - the `Detect` affordance lives near the gym selector,
-    - permission denial, unavailable services, low accuracy, no match, ambiguous match, and read failures show inline feedback and do not change the selected gym,
-    - a matched gym is shown as a confirmable suggestion and only changes the session after `Use this gym`,
-    - manual gym selection stays available and clears any outstanding GPS suggestion.
-14. In `session-recorder` gym management, private coordinate controls are explicit and confirmation-gated:
+13. In `session-recorder`, GPS gym detection is quiet assistance:
+    - the default recorder surface shows only the gym box, with no visible Detect button or persistent GPS suggestion panel,
+    - brand-new active-session creation may run one foreground location read and preselect a gym only when exactly one saved gym confidently matches,
+    - restoring an active draft and completed-edit mode do not run startup GPS detection,
+    - short-pressing the gym box opens the picker, while long-pressing it explicitly retries GPS detection for the current active session,
+    - permission denial, unavailable services, low accuracy, no match, ambiguous match, and read failures leave the current gym unchanged,
+    - manual gym selection and `No gym` are always authoritative unless the user later long-presses to retry GPS detection.
+14. In `session-recorder`, the gym picker includes `No gym` as a null session-gym option:
+    - it maps to nullable `session.locationId` / persisted `gym_id`,
+    - it is not a `gyms` row and is not editable, archived, synced, or shown in Manage,
+    - active-session null gym state displays as `No gym`, not as an unresolved choose prompt.
+15. In `session-recorder` gym management, private coordinate controls live in the single gym editor:
     - each managed gym shows only coordinate presence (`GPS saved` / `No GPS coordinates`) rather than latitude/longitude precision,
-    - saving current location for a gym with no coordinates reads foreground location from an explicit button and persists only when accuracy is acceptable,
-    - replacing or clearing existing coordinates requires an inline confirmation,
-    - permission denial, unavailable services, low accuracy, and persistence failures stay inline on the affected gym row and leave existing coordinates unchanged,
+    - Manage rows expose list-management actions only (edit, archive/unarchive, archived visibility), not coordinate mutation actions,
+    - `Save current location` in the single gym editor reads foreground location and persists only when accuracy is acceptable,
+    - adding a new gym silently attempts to attach acceptable current coordinates without blocking gym creation or selection,
+    - replacing or clearing existing coordinates remains confirmation-gated in the single gym editor,
+    - permission denial, unavailable services, low accuracy, and persistence failures stay inline in the editor and leave existing coordinates unchanged,
     - clearing coordinates removes the gym from GPS matching until coordinates are saved again.
 
 ### 6. Loading, empty, error, and feedback state handling

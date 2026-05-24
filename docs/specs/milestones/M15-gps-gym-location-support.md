@@ -4,7 +4,7 @@
 
 - Milestone ID: `M15`
 - Title: GPS gym location support
-- Status: `reopened for planned corrective UX follow-up`
+- Status: `completed`
 
 ## Parent references
 
@@ -253,7 +253,7 @@ UI docs:
 4. `docs/tasks/complete/M15-T04-recorder-gps-suggestion-ui.md` - add recorder detection/suggestion UI. (`completed`)
 5. `docs/tasks/complete/M15-T05-gym-management-coordinate-controls.md` - add gym-management save/replace/clear coordinate controls. (`completed`)
 6. `docs/tasks/complete/M15-T06-gps-restore-evidence-and-docs-closeout.md` - prove restore parity/runtime behavior and close M15 docs. (`completed`)
-7. `docs/tasks/M15-T07-hidden-gps-gym-ux-correction.md` - correct GPS UX so detection is hidden, one-shot at new session start, retryable by gym-box long press, supports `No gym`, and moves coordinate actions to the single gym editor. (`planned`)
+7. `docs/tasks/complete/M15-T07-hidden-gps-gym-ux-correction.md` - correct GPS UX so detection is hidden, one-shot at new session start, retryable by gym-box long press, supports `No gym`, and moves coordinate actions to the single gym editor. (`completed`)
 
 ## Risks / dependencies
 
@@ -266,7 +266,7 @@ UI docs:
 
 ## Project docs maintenance
 
-Original M15 closeout verified the following source-of-truth docs were aligned with the implemented foreground-only GPS, private gym-coordinate, sync/restore, and UI behavior. The planned `M15-T07` corrective follow-up must update the UI docs again when it lands:
+Original M15 closeout verified the following source-of-truth docs were aligned with the implemented foreground-only GPS, private gym-coordinate, sync/restore, and UI behavior. The completed `M15-T07` corrective follow-up updated the UI docs for quiet GPS assistance and editor-owned coordinate controls:
 
 - `docs/specs/03-technical-architecture.md` when stable location-service/sync behavior lands.
 - `docs/specs/05-data-model.md` when gym coordinate fields are added.
@@ -280,7 +280,7 @@ Original M15 closeout verified the following source-of-truth docs were aligned w
 
 - What changed:
   - Added private nullable coordinate metadata to user-owned `gyms` locally and in Supabase projection, with `gyms.upsert` sync payloads, backend validation, bootstrap/merge/convergence handling, and reinstall restore parity.
-  - Added foreground-only location reads behind an injectable service, pure Haversine gym matching, confirmation-gated recorder GPS suggestions, and gym-management controls to save, replace, or clear coordinates.
+  - Added foreground-only location reads behind an injectable service, pure Haversine gym matching, quiet one-shot recorder gym preselection, explicit gym-box long-press retry, `No gym` picker semantics, and single-gym editor controls to save, replace, or clear coordinates.
   - Kept GPS advisory/private for M15: no background location, no automatic check-ins, no maps/geocoding, and no social/shared location exposure.
 - Verification summary:
   - Restore parity: `cd apps/mobile && npm run test:sync:reinstall-parity` passed with coordinate-bearing gyms in the normalized snapshot.
@@ -293,7 +293,6 @@ Original M15 closeout verified the following source-of-truth docs were aligned w
 - What remains:
   - `docs/tasks/T-20260517-01-personal-gym-list-sync.md` remains planned; M15 adapted to the current route-local gym management state and does not claim full database-backed gym-list sync is complete.
   - M15 branches are stacked on the T02-T05 lineage until those prerequisite branches land on `main`.
-  - `docs/tasks/M15-T07-hidden-gps-gym-ux-correction.md` is planned as a corrective UX follow-up to hide most GPS functionality from the default recorder UX.
 
 ## Status update checklist (mandatory during task closeout)
 

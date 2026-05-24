@@ -102,11 +102,20 @@ const locationMock = {
 };
 
 const dataMock = jest.requireMock('@/src/data') as {
+  loadLatestSessionDraftSnapshot: jest.Mock;
+  loadSessionSnapshotById: jest.Mock;
+  persistSessionDraftSnapshot: jest.Mock;
   upsertLocalGym: jest.Mock;
 };
 
 describe('SessionRecorderScreen', () => {
   beforeEach(() => {
+    dataMock.loadLatestSessionDraftSnapshot.mockReset();
+    dataMock.loadLatestSessionDraftSnapshot.mockResolvedValue(null);
+    dataMock.loadSessionSnapshotById.mockReset();
+    dataMock.loadSessionSnapshotById.mockResolvedValue(null);
+    dataMock.persistSessionDraftSnapshot.mockReset();
+    dataMock.persistSessionDraftSnapshot.mockResolvedValue({ sessionId: 'test-session' });
     dataMock.upsertLocalGym.mockClear();
     dataMock.upsertLocalGym.mockResolvedValue(undefined);
     locationMock.getCurrentForegroundPositionLazy.mockReset();
@@ -137,9 +146,6 @@ describe('SessionRecorderScreen', () => {
   });
 
   it('reveals the recorder body after tapping Start Session and persists a new draft', async () => {
-    const dataMock = jest.requireMock('@/src/data') as {
-      persistSessionDraftSnapshot: jest.Mock;
-    };
     dataMock.persistSessionDraftSnapshot.mockClear();
     dataMock.persistSessionDraftSnapshot.mockResolvedValueOnce({ sessionId: 'new-draft-1' });
 
@@ -157,10 +163,13 @@ describe('SessionRecorderScreen', () => {
     expect(screen.queryByTestId('session-recorder-empty-state')).toBeNull();
     expect(screen.getByText('Date and Time')).toBeTruthy();
     expect(screen.getByText('Gym')).toBeTruthy();
-    expect(screen.getByText('Choose gym')).toBeTruthy();
+    expect(screen.getByText('No gym')).toBeTruthy();
     expect(screen.getByText('Log new exercise')).toBeTruthy();
     expect(screen.getByText('No exercises logged yet.')).toBeTruthy();
     expect(screen.getByText('Submit Session')).toBeTruthy();
+    expect(screen.queryByLabelText('Detect current gym')).toBeNull();
+    expect(screen.queryByText('Use this gym')).toBeNull();
+    expect(screen.queryByText('Ignore')).toBeNull();
   });
 
   it('renders the baseline session recorder shell', async () => {
@@ -169,12 +178,56 @@ describe('SessionRecorderScreen', () => {
 
     expect(screen.getByText('Date and Time')).toBeTruthy();
     expect(screen.getByText('Gym')).toBeTruthy();
-    expect(screen.getByText('Choose gym')).toBeTruthy();
+    expect(screen.getByText('No gym')).toBeTruthy();
     expect(screen.getByText('Log new exercise')).toBeTruthy();
     expect(screen.getByText('No exercises logged yet.')).toBeTruthy();
     expect(screen.queryByText('Barbell Squat')).toBeNull();
     expect(screen.getByText('Submit Session')).toBeTruthy();
     expect(screen.queryByLabelText('Select gym Downtown Iron Temple')).toBeNull();
+    expect(screen.queryByTestId('detect-current-gym-button')).toBeNull();
+    expect(screen.queryByTestId('gps-gym-suggestion-feedback')).toBeNull();
+  });
+
+  it('quietly preselects one matched gym when starting a brand-new session', async () => {
+    locationMock.matchNearestGymForPosition.mockReturnValueOnce({
+      status: 'matched',
+      match: {
+        gym: { id: 'westside-barbell-club', name: 'Westside Barbell Club', latitude: 51.501, longitude: -0.141 },
+        distanceM: 18.4,
+      },
+    });
+
+    render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
+
+    expect(dataMock.persistSessionDraftSnapshot).toHaveBeenCalledWith(
+      expect.objectContaining({
+        gymId: 'westside-barbell-club',
+        status: 'active',
+        exercises: [],
+      })
+    );
+    expect(screen.getAllByText('Westside Barbell Club').length).toBeGreaterThanOrEqual(1);
+    expect(locationMock.getCurrentForegroundPositionLazy).toHaveBeenCalledTimes(1);
+    expect(locationMock.matchNearestGymForPosition).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId('gps-gym-suggestion-feedback')).toBeNull();
+  });
+
+  it('does not run startup GPS detection when restoring an existing active draft', async () => {
+    dataMock.loadLatestSessionDraftSnapshot.mockResolvedValueOnce({
+      sessionId: 'existing-draft',
+      gymId: null,
+      startedAt: new Date('2026-05-23T10:00:00.000Z'),
+      exercises: [],
+    });
+
+    render(<SessionRecorderScreen />);
+    await act(async () => {});
+
+    expect(screen.queryByTestId('session-recorder-empty-state')).toBeNull();
+    expect(screen.getByText('No gym')).toBeTruthy();
+    expect(locationMock.getCurrentForegroundPositionLazy).not.toHaveBeenCalled();
+    expect(locationMock.matchNearestGymForPosition).not.toHaveBeenCalled();
   });
 
   it('prefills date and time with the current value pattern', async () => {
@@ -189,9 +242,10 @@ describe('SessionRecorderScreen', () => {
     render(<SessionRecorderScreen />);
     await dismissEmptyStateIfPresent();
 
-    fireEvent.press(screen.getByText('Choose gym'));
+    fireEvent.press(screen.getByText('No gym'));
     expect(screen.getByText('Select Gym')).toBeTruthy();
 
+    expect(screen.getByLabelText('Select no gym')).toBeTruthy();
     expect(screen.getByLabelText('Select gym Downtown Iron Temple')).toBeTruthy();
     expect(screen.getByLabelText('Select gym Westside Barbell Club')).toBeTruthy();
     expect(screen.getByLabelText('Select gym North End Strength Lab')).toBeTruthy();
@@ -210,6 +264,10 @@ describe('SessionRecorderScreen', () => {
     expect(screen.queryByLabelText('Select gym Downtown Iron Temple')).toBeNull();
 
     fireEvent.changeText(screen.getByPlaceholderText('Gym name'), 'Southside Fitness Forge');
+    locationMock.getCurrentForegroundPositionLazy.mockResolvedValueOnce({
+      status: 'permission_denied',
+      canAskAgain: false,
+    });
     fireEvent.press(screen.getByText('Add'));
 
     expect(screen.getAllByText('Southside Fitness Forge').length).toBeGreaterThanOrEqual(1);
@@ -219,7 +277,7 @@ describe('SessionRecorderScreen', () => {
     render(<SessionRecorderScreen />);
     await dismissEmptyStateIfPresent();
 
-    fireEvent.press(screen.getByText('Choose gym'));
+    fireEvent.press(screen.getByText('No gym'));
     fireEvent.press(screen.getByText('Manage'));
     expect(screen.getByText('Manage Gyms')).toBeTruthy();
 
@@ -240,16 +298,38 @@ describe('SessionRecorderScreen', () => {
     fireEvent.press(screen.getByText('Back to picker'));
     expect(screen.getByText('Select Gym')).toBeTruthy();
 
-    fireEvent.press(screen.getByText('Choose gym'));
     expect(screen.getByLabelText('Select gym Downtown Iron Works')).toBeTruthy();
   });
 
-  it('saves current coordinates for a gym from the manage modal', async () => {
+  it('lets the picker set the active session back to No gym without creating a gym row', async () => {
     render(<SessionRecorderScreen />);
     await dismissEmptyStateIfPresent();
 
-    fireEvent.press(screen.getByText('Choose gym'));
+    fireEvent.press(screen.getByText('No gym'));
+    fireEvent.press(screen.getByLabelText('Select gym Westside Barbell Club'));
+    expect(screen.getAllByText('Westside Barbell Club').length).toBeGreaterThanOrEqual(1);
+
+    const gymButtonTexts = screen.getAllByText('Westside Barbell Club');
+    fireEvent.press(gymButtonTexts[gymButtonTexts.length - 1]);
+    fireEvent.press(screen.getByLabelText('Select no gym'));
+
+    expect(screen.getByText('No gym')).toBeTruthy();
+    expect(dataMock.upsertLocalGym).not.toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'no-gym' })
+    );
+  });
+
+  it('keeps coordinate actions out of Manage and saves current coordinates from the single gym editor', async () => {
+    render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
+
+    fireEvent.press(screen.getByText('No gym'));
     fireEvent.press(screen.getByText('Manage'));
+    expect(screen.queryByLabelText('Save current location for gym Downtown Iron Temple')).toBeNull();
+    expect(screen.queryByLabelText('Replace coordinates for gym Downtown Iron Temple')).toBeNull();
+    expect(screen.queryByLabelText('Clear coordinates for gym Downtown Iron Temple')).toBeNull();
+
+    fireEvent.press(screen.getByLabelText('Edit gym Downtown Iron Temple'));
     fireEvent.press(screen.getByLabelText('Save current location for gym Downtown Iron Temple'));
 
     await waitFor(() => {
@@ -268,15 +348,16 @@ describe('SessionRecorderScreen', () => {
     });
 
     expect(await screen.findByText('Coordinates saved from current location.')).toBeTruthy();
-    expect(screen.getAllByText('GPS saved').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('GPS saved')).toBeTruthy();
   });
 
-  it('requires confirmation before replacing saved gym coordinates', async () => {
+  it('requires confirmation before replacing saved gym coordinates in the editor', async () => {
     render(<SessionRecorderScreen />);
     await dismissEmptyStateIfPresent();
 
-    fireEvent.press(screen.getByText('Choose gym'));
+    fireEvent.press(screen.getByText('No gym'));
     fireEvent.press(screen.getByText('Manage'));
+    fireEvent.press(screen.getByLabelText('Edit gym Downtown Iron Temple'));
     fireEvent.press(screen.getByLabelText('Save current location for gym Downtown Iron Temple'));
     await screen.findByText('Coordinates saved from current location.');
 
@@ -290,7 +371,7 @@ describe('SessionRecorderScreen', () => {
       },
     });
 
-    fireEvent.press(screen.getByLabelText('Replace coordinates for gym Downtown Iron Temple'));
+    fireEvent.press(screen.getByLabelText('Save current location for gym Downtown Iron Temple'));
     expect(screen.getByText('Replace saved coordinates with your current location?')).toBeTruthy();
     expect(dataMock.upsertLocalGym).toHaveBeenCalledTimes(1);
 
@@ -314,12 +395,13 @@ describe('SessionRecorderScreen', () => {
     expect(await screen.findByText('Coordinates replaced from current location.')).toBeTruthy();
   });
 
-  it('requires confirmation before clearing coordinates and excludes the gym from later GPS matching', async () => {
+  it('requires confirmation before clearing coordinates in the editor and excludes the gym from later GPS matching', async () => {
     render(<SessionRecorderScreen />);
     await dismissEmptyStateIfPresent();
 
-    fireEvent.press(screen.getByText('Choose gym'));
+    fireEvent.press(screen.getByText('No gym'));
     fireEvent.press(screen.getByText('Manage'));
+    fireEvent.press(screen.getByLabelText('Edit gym Downtown Iron Temple'));
     fireEvent.press(screen.getByLabelText('Save current location for gym Downtown Iron Temple'));
     await screen.findByText('Coordinates saved from current location.');
 
@@ -345,9 +427,20 @@ describe('SessionRecorderScreen', () => {
     );
     expect(await screen.findByText('Coordinates cleared. This gym will not be used for GPS matching.')).toBeTruthy();
 
+    locationMock.getCurrentForegroundPositionLazy.mockClear();
+    locationMock.matchNearestGymForPosition.mockClear();
+    locationMock.matchNearestGymForPosition.mockReturnValueOnce({
+      status: 'matched',
+      match: {
+        gym: { id: 'downtown-iron-temple', name: 'Downtown Iron Temple', latitude: 51.501, longitude: -0.141 },
+        distanceM: 5,
+      },
+    });
+
+    fireEvent.press(screen.getByText('Back'));
     fireEvent.press(screen.getByText('Back to picker'));
     fireEvent.press(screen.getByLabelText('Dismiss gym modal overlay'));
-    fireEvent.press(screen.getByLabelText('Detect current gym'));
+    fireEvent(screen.getByText('No gym'), 'onLongPress');
 
     await waitFor(() => {
       expect(locationMock.matchNearestGymForPosition).toHaveBeenCalledWith(
@@ -361,6 +454,29 @@ describe('SessionRecorderScreen', () => {
         ])
       );
     });
+  });
+
+  it('automatically attempts coordinate capture when adding a gym but still selects it if GPS fails', async () => {
+    locationMock.getCurrentForegroundPositionLazy.mockResolvedValue({
+      status: 'permission_denied',
+      canAskAgain: false,
+    });
+
+    render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
+
+    fireEvent.press(screen.getByText('No gym'));
+    fireEvent.press(screen.getByText('Add new'));
+    fireEvent.changeText(screen.getByPlaceholderText('Gym name'), 'Southside Fitness Forge');
+    fireEvent.press(screen.getByText('Add'));
+
+    expect(screen.getAllByText('Southside Fitness Forge').length).toBeGreaterThanOrEqual(1);
+    expect(dataMock.upsertLocalGym).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: expect.stringContaining('southside-fitness-forge'),
+        coordinates: expect.anything(),
+      })
+    );
   });
 
   it.each([
@@ -388,8 +504,9 @@ describe('SessionRecorderScreen', () => {
     render(<SessionRecorderScreen />);
     await dismissEmptyStateIfPresent();
 
-    fireEvent.press(screen.getByText('Choose gym'));
+    fireEvent.press(screen.getByText('No gym'));
     fireEvent.press(screen.getByText('Manage'));
+    fireEvent.press(screen.getByLabelText('Edit gym Downtown Iron Temple'));
     fireEvent.press(screen.getByLabelText('Save current location for gym Downtown Iron Temple'));
 
     expect(await screen.findByText(expectedMessage)).toBeTruthy();
@@ -402,8 +519,9 @@ describe('SessionRecorderScreen', () => {
     render(<SessionRecorderScreen />);
     await dismissEmptyStateIfPresent();
 
-    fireEvent.press(screen.getByText('Choose gym'));
+    fireEvent.press(screen.getByText('No gym'));
     fireEvent.press(screen.getByText('Manage'));
+    fireEvent.press(screen.getByLabelText('Edit gym Downtown Iron Temple'));
     fireEvent.press(screen.getByLabelText('Save current location for gym Downtown Iron Temple'));
 
     expect(await screen.findByText('Unable to update gym coordinates right now.')).toBeTruthy();
@@ -414,14 +532,19 @@ describe('SessionRecorderScreen', () => {
     render(<SessionRecorderScreen />);
     await dismissEmptyStateIfPresent();
 
-    fireEvent.press(screen.getByText('Choose gym'));
+    fireEvent.press(screen.getByText('No gym'));
     expect(screen.getByText('Select Gym')).toBeTruthy();
 
     fireEvent.press(screen.getByLabelText('Dismiss gym modal overlay'));
     expect(screen.queryByText('Select Gym')).toBeNull();
   });
 
-  it('shows a matched GPS gym suggestion and applies it only after confirmation', async () => {
+  it('selects a single matched gym after an explicit long-press retry without showing a suggestion panel', async () => {
+    render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
+
+    locationMock.getCurrentForegroundPositionLazy.mockClear();
+    locationMock.matchNearestGymForPosition.mockClear();
     locationMock.matchNearestGymForPosition.mockReturnValueOnce({
       status: 'matched',
       match: {
@@ -430,18 +553,14 @@ describe('SessionRecorderScreen', () => {
       },
     });
 
-    render(<SessionRecorderScreen />);
-    await dismissEmptyStateIfPresent();
+    fireEvent(screen.getByText('No gym'), 'onLongPress');
 
-    fireEvent.press(screen.getByLabelText('Detect current gym'));
-
-    expect(await screen.findByText('Looks like Westside Barbell Club')).toBeTruthy();
-    expect(screen.getByText('Choose gym')).toBeTruthy();
-
-    fireEvent.press(screen.getByText('Use this gym'));
-
-    expect(screen.getAllByText('Westside Barbell Club').length).toBeGreaterThanOrEqual(1);
+    await waitFor(() => {
+      expect(screen.getAllByText('Westside Barbell Club').length).toBeGreaterThanOrEqual(1);
+    });
     expect(screen.queryByText('Looks like Westside Barbell Club')).toBeNull();
+    expect(screen.queryByText('Use this gym')).toBeNull();
+    expect(screen.queryByTestId('gps-gym-suggestion-feedback')).toBeNull();
     expect(locationMock.getCurrentForegroundPositionLazy).toHaveBeenCalledTimes(1);
     expect(locationMock.matchNearestGymForPosition).toHaveBeenCalledWith(
       expect.objectContaining({ accuracyM: 20, latitude: 51.501, longitude: -0.141 }),
@@ -452,6 +571,13 @@ describe('SessionRecorderScreen', () => {
   });
 
   it('keeps manual gym selection authoritative when a GPS suggestion is visible', async () => {
+    render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
+
+    fireEvent.press(screen.getByText('No gym'));
+    fireEvent.press(screen.getByLabelText('Select gym Downtown Iron Temple'));
+    locationMock.getCurrentForegroundPositionLazy.mockClear();
+    locationMock.matchNearestGymForPosition.mockClear();
     locationMock.matchNearestGymForPosition.mockReturnValueOnce({
       status: 'matched',
       match: {
@@ -459,18 +585,13 @@ describe('SessionRecorderScreen', () => {
         distanceM: 18.4,
       },
     });
+    const selectedGymTexts = screen.getAllByText('Downtown Iron Temple');
+    fireEvent(selectedGymTexts[selectedGymTexts.length - 1], 'onLongPress');
 
-    render(<SessionRecorderScreen />);
-    await dismissEmptyStateIfPresent();
-
-    fireEvent.press(screen.getByLabelText('Detect current gym'));
-    expect(await screen.findByText('Looks like Westside Barbell Club')).toBeTruthy();
-
-    fireEvent.press(screen.getByText('Choose gym'));
-    fireEvent.press(screen.getByLabelText('Select gym Downtown Iron Temple'));
-
-    expect(screen.getAllByText('Downtown Iron Temple').length).toBeGreaterThanOrEqual(1);
-    expect(screen.queryByText('Looks like Westside Barbell Club')).toBeNull();
+    await waitFor(() => {
+      expect(screen.getAllByText('Westside Barbell Club').length).toBeGreaterThanOrEqual(1);
+    });
+    expect(screen.queryByText('Use this gym')).toBeNull();
   });
 
   it.each([
@@ -521,18 +642,26 @@ describe('SessionRecorderScreen', () => {
       },
       'Multiple saved gyms are nearby. Choose a gym manually.',
     ],
-  ])('shows inline GPS feedback for %s without changing the selected gym', async (_caseName, locationResult, matchResult, expectedMessage) => {
+  ])('leaves the selected gym unchanged for failed long-press GPS retry: %s', async (_caseName, locationResult, matchResult, _expectedMessage) => {
+    render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
+
+    fireEvent.press(screen.getByText('No gym'));
+    fireEvent.press(screen.getByLabelText('Select gym Downtown Iron Temple'));
+    expect(screen.getAllByText('Downtown Iron Temple').length).toBeGreaterThanOrEqual(1);
+
+    locationMock.getCurrentForegroundPositionLazy.mockClear();
+    locationMock.matchNearestGymForPosition.mockClear();
     locationMock.getCurrentForegroundPositionLazy.mockResolvedValueOnce(locationResult);
     if (matchResult) {
       locationMock.matchNearestGymForPosition.mockReturnValueOnce(matchResult);
     }
 
-    render(<SessionRecorderScreen />);
-    await dismissEmptyStateIfPresent();
+    const selectedGymTexts = screen.getAllByText('Downtown Iron Temple');
+    fireEvent(selectedGymTexts[selectedGymTexts.length - 1], 'onLongPress');
 
-    fireEvent.press(screen.getByLabelText('Detect current gym'));
-
-    expect(await screen.findByText(expectedMessage)).toBeTruthy();
-    expect(screen.getByText('Choose gym')).toBeTruthy();
+    await act(async () => {});
+    expect(screen.getAllByText('Downtown Iron Temple').length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByTestId('gps-gym-suggestion-feedback')).toBeNull();
   });
 });
