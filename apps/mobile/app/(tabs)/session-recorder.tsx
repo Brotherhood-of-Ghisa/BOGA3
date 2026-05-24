@@ -53,6 +53,8 @@ import { SESSION_SET_TYPES, normalizeSessionSetType, type SessionSetType, type S
 import { type ExerciseCatalogExercise } from '@/src/data/exercise-catalog';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import { filterIndexedExerciseCatalogExercises } from '@/src/exercise-catalog/search';
+import { getCurrentForegroundPositionLazy } from '@/src/location/foreground-location-lazy';
+import { matchNearestGymForPosition, type GymLocationMatch } from '@/src/location/gym-location-matcher';
 import { logEvent } from '@/src/logging';
 import { createDraftAutosaveController, type DraftAutosaveController } from '@/src/session-recorder/draft-autosave';
 import { createSessionRecorderLifecycleHelpers } from '@/src/session-recorder/lifecycle-helpers';
@@ -390,6 +392,29 @@ type SetTypePickerState = {
   setIndex: number;
 };
 
+type GpsSuggestionState =
+  | { status: 'idle' }
+  | { status: 'loading' }
+  | { status: 'matched'; match: GymLocationMatch }
+  | {
+      status:
+        | 'permission_denied'
+        | 'unavailable'
+        | 'low_accuracy'
+        | 'no_match'
+        | 'ambiguous'
+        | 'read_failure';
+    };
+
+const GPS_SUGGESTION_MESSAGES: Record<Exclude<GpsSuggestionState['status'], 'idle' | 'loading' | 'matched'>, string> = {
+  permission_denied: 'Location permission was denied. Choose a gym manually.',
+  unavailable: 'Location services are unavailable. Choose a gym manually.',
+  low_accuracy: 'Location accuracy is too low right now. Choose a gym manually.',
+  no_match: 'No saved gym matched your current location.',
+  ambiguous: 'Multiple saved gyms are nearby. Choose a gym manually.',
+  read_failure: 'Unable to read current location. Choose a gym manually.',
+};
+
 const normalizeTagName = (value: string) => value.trim().toLowerCase();
 
 const mapAssignedTagsToExerciseTags = (assignedTags: SessionExerciseAssignedTag[]): SessionExerciseTag[] =>
@@ -517,6 +542,7 @@ export default function SessionRecorderScreen() {
   const [pendingFocusedWeightSetId, setPendingFocusedWeightSetId] = useState<string | null>(null);
   const [focusedRepsSetId, setFocusedRepsSetId] = useState<string | null>(null);
   const [isDeleteConfirmVisible, setIsDeleteConfirmVisible] = useState(false);
+  const [gpsSuggestion, setGpsSuggestion] = useState<GpsSuggestionState>({ status: 'idle' });
   const stateRef = useRef(state);
   const completedEditEndDateTimeRef = useRef<string | null>(completedEditEndDateTime);
   const persistedSessionIdRef = useRef<string | null>(null);
@@ -684,7 +710,16 @@ export default function SessionRecorderScreen() {
             ...current,
             locations:
               loadedGym && !current.locations.some((location) => location.id === loadedGym.id)
-                ? [...current.locations, { id: loadedGym.id, name: loadedGym.name, archived: false }]
+                ? [
+                    ...current.locations,
+                    {
+                      id: loadedGym.id,
+                      name: loadedGym.name,
+                      archived: false,
+                      latitude: loadedGym.latitude,
+                      longitude: loadedGym.longitude,
+                    },
+                  ]
                 : current.locations,
             session: mapSessionGraphSnapshotToSession(snapshot),
           }));
@@ -954,6 +989,66 @@ export default function SessionRecorderScreen() {
     setSubmitCleanupPrompt(null);
   };
 
+  const clearGpsSuggestion = useCallback(() => {
+    setGpsSuggestion({ status: 'idle' });
+  }, []);
+
+  const detectCurrentGym = useCallback(async () => {
+    setGpsSuggestion({ status: 'loading' });
+
+    const currentPositionResult = await getCurrentForegroundPositionLazy();
+
+    if (currentPositionResult.status !== 'success') {
+      setGpsSuggestion({
+        status:
+          currentPositionResult.status === 'permission_denied'
+            ? 'permission_denied'
+            : currentPositionResult.status === 'unavailable'
+              ? 'unavailable'
+              : 'read_failure',
+      });
+      return;
+    }
+
+    const matchResult = matchNearestGymForPosition(
+      {
+        latitude: currentPositionResult.position.latitude,
+        longitude: currentPositionResult.position.longitude,
+        accuracyM: currentPositionResult.position.accuracyM,
+      },
+      stateRef.current.locations.map((location) => ({
+        id: location.id,
+        name: location.name,
+        archived: location.archived,
+        latitude: location.latitude ?? null,
+        longitude: location.longitude ?? null,
+      }))
+    );
+
+    if (matchResult.status === 'matched') {
+      const currentGym = stateRef.current.locations.find((location) => location.id === matchResult.match.gym.id);
+      if (!currentGym || currentGym.archived) {
+        setGpsSuggestion({ status: 'no_match' });
+        return;
+      }
+
+      setGpsSuggestion({
+        status: 'matched',
+        match: {
+          ...matchResult.match,
+          gym: {
+            ...matchResult.match.gym,
+            id: currentGym.id,
+            name: currentGym.name,
+          },
+        },
+      });
+      return;
+    }
+
+    setGpsSuggestion({ status: matchResult.status });
+  }, []);
+
   const startSessionFromEmptyState = useCallback(async () => {
     if (isStartingSession) {
       return;
@@ -1024,8 +1119,17 @@ export default function SessionRecorderScreen() {
       editingLocationId: null,
       editingLocationName: '',
     }));
+    clearGpsSuggestion();
     clearSubmitFeedback();
     markSessionStructuralMutation();
+  };
+
+  const confirmGpsSuggestion = () => {
+    if (gpsSuggestion.status !== 'matched') {
+      return;
+    }
+
+    selectGym(gpsSuggestion.match.gym.id);
   };
 
   const openManageGyms = () => {
@@ -1854,6 +1958,63 @@ export default function SessionRecorderScreen() {
   const hasInvalidSetValues = useMemo(() => sessionHasInvalidSetValues(state.session), [state.session]);
   const isSubmitDisabled =
     (routeMode === 'completed-edit' && Boolean(completedEditTimeValidationMessage)) || hasInvalidSetValues;
+  const isGpsDetectionLoading = gpsSuggestion.status === 'loading';
+  const gpsFeedbackMessage =
+    gpsSuggestion.status === 'matched'
+      ? `Looks like ${gpsSuggestion.match.gym.name}`
+      : gpsSuggestion.status === 'loading'
+        ? 'Detecting current gym...'
+        : gpsSuggestion.status === 'idle'
+          ? null
+          : GPS_SUGGESTION_MESSAGES[gpsSuggestion.status];
+  const gymSelectionControl = (
+    <View style={styles.gymSelectionStack}>
+      <Pressable style={styles.gymButton} onPress={openGymModal}>
+        <Text numberOfLines={1} style={styles.gymButtonText}>
+          {selectedGym ? selectedGym.name : 'Choose gym'}
+        </Text>
+      </Pressable>
+      <View style={styles.gpsDetectionRow}>
+        <Pressable
+          accessibilityLabel="Detect current gym"
+          accessibilityRole="button"
+          disabled={isGpsDetectionLoading}
+          style={[styles.gpsDetectButton, isGpsDetectionLoading ? styles.gpsDetectButtonDisabled : null]}
+          testID="detect-current-gym-button"
+          onPress={() => {
+            void detectCurrentGym();
+          }}>
+          <Text style={styles.gpsDetectButtonText}>{isGpsDetectionLoading ? 'Detecting' : 'Detect'}</Text>
+        </Pressable>
+      </View>
+      {gpsFeedbackMessage ? (
+        <View
+          style={[
+            styles.gpsFeedbackPanel,
+            gpsSuggestion.status === 'matched' ? styles.gpsFeedbackPanelMatched : null,
+          ]}
+          testID="gps-gym-suggestion-feedback">
+          <Text
+            style={[
+              styles.gpsFeedbackText,
+              gpsSuggestion.status === 'matched' ? styles.gpsFeedbackTextMatched : null,
+            ]}>
+            {gpsFeedbackMessage}
+          </Text>
+          {gpsSuggestion.status === 'matched' ? (
+            <View style={styles.gpsSuggestionActionRow}>
+              <Pressable style={styles.gpsSuggestionPrimaryButton} onPress={confirmGpsSuggestion}>
+                <Text style={styles.gpsSuggestionPrimaryButtonText}>Use this gym</Text>
+              </Pressable>
+              <Pressable style={styles.gpsSuggestionSecondaryButton} onPress={clearGpsSuggestion}>
+                <Text style={styles.gpsSuggestionSecondaryButtonText}>Ignore</Text>
+              </Pressable>
+            </View>
+          ) : null}
+        </View>
+      ) : null}
+    </View>
+  );
 
   if (routeMode === 'completed-edit' && isCompletedEditLoading) {
     return (
@@ -1954,11 +2115,7 @@ export default function SessionRecorderScreen() {
 
           <View style={[styles.completedEditMetadataRow, styles.completedEditMetadataRowDivider]}>
             <Text style={styles.completedEditMetadataLabel}>Gym</Text>
-            <Pressable style={styles.gymButton} onPress={openGymModal}>
-              <Text numberOfLines={1} style={styles.gymButtonText}>
-                {selectedGym ? selectedGym.name : 'Choose gym'}
-              </Text>
-            </Pressable>
+            {gymSelectionControl}
           </View>
         </View>
       ) : null}
@@ -1971,11 +2128,7 @@ export default function SessionRecorderScreen() {
           </View>
         }
         gymValue={
-          <Pressable style={styles.gymButton} onPress={openGymModal}>
-            <Text numberOfLines={1} style={styles.gymButtonText}>
-              {selectedGym ? selectedGym.name : 'Choose gym'}
-            </Text>
-          </Pressable>
+          gymSelectionControl
         }
         exercises={state.session.exercises}
         renderSetHeader={({ exerciseIndex }) => (
@@ -2844,6 +2997,78 @@ const styles = StyleSheet.create({
   },
   gymButtonText: {
     color: uiColors.actionPrimary,
+    fontWeight: '600',
+  },
+  gymSelectionStack: {
+    gap: 8,
+  },
+  gpsDetectionRow: {
+    flexDirection: 'row',
+  },
+  gpsDetectButton: {
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: uiColors.actionPrimary,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    alignItems: 'center',
+    backgroundColor: uiColors.actionPrimarySubtleBg,
+  },
+  gpsDetectButtonDisabled: {
+    borderColor: uiColors.actionPrimaryDisabled,
+    backgroundColor: uiColors.surfaceDisabled,
+  },
+  gpsDetectButtonText: {
+    color: uiColors.actionPrimary,
+    fontWeight: '700',
+  },
+  gpsFeedbackPanel: {
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: uiColors.borderWarning,
+    backgroundColor: uiColors.surfaceWarning,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    gap: 8,
+  },
+  gpsFeedbackPanelMatched: {
+    borderColor: uiColors.borderSuccess,
+    backgroundColor: uiColors.surfaceSuccess,
+  },
+  gpsFeedbackText: {
+    fontSize: 12,
+    color: uiColors.textWarning,
+    fontWeight: '600',
+  },
+  gpsFeedbackTextMatched: {
+    color: uiColors.textSuccess,
+  },
+  gpsSuggestionActionRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  gpsSuggestionPrimaryButton: {
+    flex: 1,
+    borderRadius: 8,
+    paddingVertical: 8,
+    alignItems: 'center',
+    backgroundColor: uiColors.actionSuccess,
+  },
+  gpsSuggestionPrimaryButtonText: {
+    color: uiColors.surfaceDefault,
+    fontWeight: '700',
+  },
+  gpsSuggestionSecondaryButton: {
+    flex: 1,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: uiColors.borderStrong,
+    paddingVertical: 8,
+    alignItems: 'center',
+    backgroundColor: uiColors.surfaceDefault,
+  },
+  gpsSuggestionSecondaryButtonText: {
+    color: uiColors.textMuted,
     fontWeight: '600',
   },
   logExerciseButton: {

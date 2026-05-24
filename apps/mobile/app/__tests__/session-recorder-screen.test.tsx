@@ -54,6 +54,25 @@ jest.mock('@/src/data/exercise-catalog', () => ({
   listExerciseCatalogMuscleGroups: jest.fn().mockResolvedValue([]),
 }));
 
+jest.mock('@/src/location/foreground-location-lazy', () => ({
+  getCurrentForegroundPositionLazy: jest.fn().mockResolvedValue({
+    status: 'success',
+    position: {
+      latitude: 51.501,
+      longitude: -0.141,
+      accuracyM: 20,
+      capturedAt: new Date('2026-05-23T10:00:00.000Z'),
+    },
+  }),
+}));
+
+jest.mock('@/src/location/gym-location-matcher', () => ({
+  matchNearestGymForPosition: jest.fn().mockReturnValue({
+    status: 'no_match',
+    radiusM: 150,
+  }),
+}));
+
 jest.mock('expo-router', () => ({
   useFocusEffect: (callback: () => void | (() => void)) => {
     const React = jest.requireActual('react');
@@ -73,7 +92,33 @@ const dismissEmptyStateIfPresent = async () => {
   }
 };
 
+const locationMock = {
+  ...jest.requireMock('@/src/location/foreground-location-lazy'),
+  ...jest.requireMock('@/src/location/gym-location-matcher'),
+} as {
+  getCurrentForegroundPositionLazy: jest.Mock;
+  matchNearestGymForPosition: jest.Mock;
+};
+
 describe('SessionRecorderScreen', () => {
+  beforeEach(() => {
+    locationMock.getCurrentForegroundPositionLazy.mockReset();
+    locationMock.matchNearestGymForPosition.mockReset();
+    locationMock.getCurrentForegroundPositionLazy.mockResolvedValue({
+      status: 'success',
+      position: {
+        latitude: 51.501,
+        longitude: -0.141,
+        accuracyM: 20,
+        capturedAt: new Date('2026-05-23T10:00:00.000Z'),
+      },
+    });
+    locationMock.matchNearestGymForPosition.mockReturnValue({
+      status: 'no_match',
+      radiusM: 150,
+    });
+  });
+
   it('renders the empty-state Start CTA when no active session exists', async () => {
     render(<SessionRecorderScreen />);
     await act(async () => {});
@@ -201,5 +246,120 @@ describe('SessionRecorderScreen', () => {
 
     fireEvent.press(screen.getByLabelText('Dismiss gym modal overlay'));
     expect(screen.queryByText('Select Gym')).toBeNull();
+  });
+
+  it('shows a matched GPS gym suggestion and applies it only after confirmation', async () => {
+    locationMock.matchNearestGymForPosition.mockReturnValueOnce({
+      status: 'matched',
+      match: {
+        gym: { id: 'westside-barbell-club', name: 'Westside Barbell Club', latitude: 51.501, longitude: -0.141 },
+        distanceM: 18.4,
+      },
+    });
+
+    render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
+
+    fireEvent.press(screen.getByLabelText('Detect current gym'));
+
+    expect(await screen.findByText('Looks like Westside Barbell Club')).toBeTruthy();
+    expect(screen.getByText('Choose gym')).toBeTruthy();
+
+    fireEvent.press(screen.getByText('Use this gym'));
+
+    expect(screen.getAllByText('Westside Barbell Club').length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText('Looks like Westside Barbell Club')).toBeNull();
+    expect(locationMock.getCurrentForegroundPositionLazy).toHaveBeenCalledTimes(1);
+    expect(locationMock.matchNearestGymForPosition).toHaveBeenCalledWith(
+      expect.objectContaining({ accuracyM: 20, latitude: 51.501, longitude: -0.141 }),
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'westside-barbell-club', name: 'Westside Barbell Club' }),
+      ])
+    );
+  });
+
+  it('keeps manual gym selection authoritative when a GPS suggestion is visible', async () => {
+    locationMock.matchNearestGymForPosition.mockReturnValueOnce({
+      status: 'matched',
+      match: {
+        gym: { id: 'westside-barbell-club', name: 'Westside Barbell Club', latitude: 51.501, longitude: -0.141 },
+        distanceM: 18.4,
+      },
+    });
+
+    render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
+
+    fireEvent.press(screen.getByLabelText('Detect current gym'));
+    expect(await screen.findByText('Looks like Westside Barbell Club')).toBeTruthy();
+
+    fireEvent.press(screen.getByText('Choose gym'));
+    fireEvent.press(screen.getByLabelText('Select gym Downtown Iron Temple'));
+
+    expect(screen.getAllByText('Downtown Iron Temple').length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText('Looks like Westside Barbell Club')).toBeNull();
+  });
+
+  it.each([
+    [
+      'permission denial',
+      { status: 'permission_denied', canAskAgain: false },
+      null,
+      'Location permission was denied. Choose a gym manually.',
+    ],
+    [
+      'unavailable services',
+      { status: 'unavailable', reason: 'services_disabled' },
+      null,
+      'Location services are unavailable. Choose a gym manually.',
+    ],
+    [
+      'low accuracy',
+      {
+        status: 'success',
+        position: { latitude: 51.501, longitude: -0.141, accuracyM: 140, capturedAt: new Date('2026-05-23T10:00:00.000Z') },
+      },
+      { status: 'low_accuracy', accuracyM: 140, maxAccuracyM: 100 },
+      'Location accuracy is too low right now. Choose a gym manually.',
+    ],
+    [
+      'no match',
+      {
+        status: 'success',
+        position: { latitude: 51.501, longitude: -0.141, accuracyM: 20, capturedAt: new Date('2026-05-23T10:00:00.000Z') },
+      },
+      { status: 'no_match', radiusM: 150 },
+      'No saved gym matched your current location.',
+    ],
+    [
+      'ambiguous match',
+      {
+        status: 'success',
+        position: { latitude: 51.501, longitude: -0.141, accuracyM: 20, capturedAt: new Date('2026-05-23T10:00:00.000Z') },
+      },
+      {
+        status: 'ambiguous',
+        closestDistanceM: 12,
+        tieThresholdM: 25,
+        matches: [
+          { gym: { id: 'downtown-iron-temple', name: 'Downtown Iron Temple', latitude: 51.501, longitude: -0.141 }, distanceM: 12 },
+          { gym: { id: 'westside-barbell-club', name: 'Westside Barbell Club', latitude: 51.5011, longitude: -0.1411 }, distanceM: 18 },
+        ],
+      },
+      'Multiple saved gyms are nearby. Choose a gym manually.',
+    ],
+  ])('shows inline GPS feedback for %s without changing the selected gym', async (_caseName, locationResult, matchResult, expectedMessage) => {
+    locationMock.getCurrentForegroundPositionLazy.mockResolvedValueOnce(locationResult);
+    if (matchResult) {
+      locationMock.matchNearestGymForPosition.mockReturnValueOnce(matchResult);
+    }
+
+    render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
+
+    fireEvent.press(screen.getByLabelText('Detect current gym'));
+
+    expect(await screen.findByText(expectedMessage)).toBeTruthy();
+    expect(screen.getByText('Choose gym')).toBeTruthy();
   });
 });

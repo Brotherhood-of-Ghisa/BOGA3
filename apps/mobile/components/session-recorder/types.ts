@@ -34,6 +34,8 @@ export type SessionLocation = {
   id: string;
   name: string;
   archived: boolean;
+  latitude?: number | null;
+  longitude?: number | null;
 };
 
 export type GymModalMode = 'picker' | 'manage' | 'editor';

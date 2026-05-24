@@ -39,6 +39,7 @@ Brief entrypoint map of the current mobile screens.
   - completed-edit loading/error/content states
   - in-route picker/editor/action modals (exercise picker includes text filtering by exercise name + primary muscle display/family terms, with compact header icon actions for manage/add)
   - in-route exercise-tag add/manage modals (search/select/create, rename/delete/undelete, deleted-visibility toggle)
+  - foreground GPS gym suggestion states near the gym picker (detecting, matched-confirmable, permission denied, unavailable, low accuracy, no match, ambiguous), with manual gym selection always available
 - Key exits:
   - `exercise-catalog` (`source=session-recorder&intent=manage` from exercise picker)
   - dismisses to `/` on submit/save success
