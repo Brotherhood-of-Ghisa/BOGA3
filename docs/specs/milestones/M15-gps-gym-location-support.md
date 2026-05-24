@@ -4,7 +4,7 @@
 
 - Milestone ID: `M15`
 - Title: GPS gym location support
-- Status: `completed`
+- Status: `reopened for planned corrective UX follow-up`
 
 ## Parent references
 
@@ -23,9 +23,9 @@
 
 ## Milestone objective
 
-Ship foreground-only GPS, user-confirmed gym detection, user-owned synced gym coordinates, no social/location sharing yet.
+Ship foreground-only GPS, hidden gym detection assistance, user-owned synced gym coordinates, no social/location sharing yet.
 
-The MVP makes location advisory and private. The app may request current foreground location while the user is actively using the recorder or gym-management UI, but a GPS match is only a suggestion until the user confirms it. The only persisted location data is nullable coordinate metadata on the user's own `gyms` rows.
+The MVP makes location quiet and private. The app may request current foreground location while the user is actively using the recorder or single-gym editor UI, but GPS should not become a prominent recorder feature surface. A brand-new session may use one foreground location read to preselect a single matching saved gym. After that, manual selection wins unless the user explicitly long-presses the gym box to retry GPS detection. The only persisted location data is nullable coordinate metadata on the user's own `gyms` rows.
 
 ## Execution model
 
@@ -43,6 +43,7 @@ Direct branch flow:
    - `codex/m15-t04-recorder-gps-suggestion`
    - `codex/m15-t05-gym-coordinate-controls`
    - `codex/m15-t06-gps-restore-evidence-closeout`
+   - `codex/m15-t07-hidden-gps-gym-ux-correction`
 
 Orchestration note:
 
@@ -53,8 +54,9 @@ Orchestration note:
 
 - Foreground-only location permission and current-position reads.
 - User-owned nullable coordinate metadata on `gyms`.
-- GPS suggestion in the session recorder that can select a likely gym only after explicit user confirmation.
-- Gym-management controls to save, replace, or clear a gym's coordinates.
+- Quiet one-shot GPS gym preselection when a brand-new active session starts.
+- User-initiated long-press GPS retry from the recorder gym box.
+- Single gym editor controls to save, replace, or clear a gym's coordinates.
 - Pure, deterministic matching rules for nearest eligible gym.
 - Sync contract and restore parity for gym coordinates.
 - Cross-stack evidence that synced/restored coordinates preserve user-owned gym state.
@@ -64,6 +66,7 @@ Orchestration note:
 - Background location permission or background tasks.
 - Continuous tracking.
 - Automatic check-ins.
+- Repeated automatic gym detection after a session has started.
 - Anti-cheat enforcement.
 - Shared/public gym registry.
 - Maps, geocoding, address lookup, Places APIs, or public gym discovery.
@@ -72,45 +75,60 @@ Orchestration note:
 
 ## Product and privacy contract
 
-1. Location is requested only from a user action or foreground recorder/gym-management affordance.
+1. Location is requested only from brand-new session creation, a user action, or a foreground single-gym editor affordance.
 2. The app requests foreground permission only.
 3. Denied permission must keep the recorder usable through manual gym selection.
-4. A GPS match is presented as a suggestion, not applied silently.
-5. Confirming a suggestion may select the gym for the active session. Persisting or replacing a gym's coordinates is a separate explicit action unless the task card scopes a clearly labeled confirm-and-save flow.
-6. Stored coordinates belong to personal `gyms` rows and sync only for the authenticated owner.
-7. No coordinate data is shown to other users in M15.
+4. Brand-new session startup may silently preselect a gym only when exactly one eligible saved gym matches.
+5. Startup auto-detection runs at most once for a brand-new active session and never overwrites later manual selection.
+6. Long-pressing the recorder gym box is an explicit user action that may retry GPS detection and select one matched gym.
+7. `No gym` is represented by nullable session `gym_id`, not by a persisted gym row.
+8. Persisting or replacing a gym's coordinates belongs in the single gym editor.
+9. Stored coordinates belong to personal `gyms` rows and sync only for the authenticated owner.
+10. No coordinate data is shown to other users in M15.
 
 ## User flows
 
 ### Foreground permission
 
-- Trigger: user taps a GPS/current-location affordance in the recorder or gym-management UI.
+- Trigger: user starts a brand-new session, long-presses the recorder gym box, or taps a current-location affordance in the single gym editor.
 - Success: app receives a foreground position with accuracy metadata and evaluates local gym matches.
 - Denied: app shows inline feedback and leaves manual gym selection/editing available.
 - Unavailable: app shows inline feedback for device/service unavailability and does not alter session or gym rows.
 
-### Recorder GPS suggestion
+### Recorder quiet GPS preselection
 
-- Trigger: user asks to detect current gym from the session recorder.
+- Trigger: user starts a brand-new active session.
 - Steps:
   - request foreground location if not already granted,
   - read current position,
   - filter gyms to rows with valid coordinates,
   - reject low-accuracy positions,
   - compute nearest eligible gym,
-  - show suggestion with enough context to confirm or ignore.
-- Success: user confirms and the active session's `gym_id` changes to the suggested gym.
-- Failure/edge: no match, low accuracy, permission denial, unavailable location, or read timeout all leave existing session state unchanged.
+  - preselect the gym only if exactly one eligible gym matches.
+- Success: the new active session starts with the matched gym selected.
+- Failure/edge: no match, ambiguous match, low accuracy, permission denial, unavailable location, or read timeout all create the session with `gym_id = null` and show `No gym`.
+
+### Recorder explicit GPS retry
+
+- Trigger: user long-presses the recorder gym box in an active session.
+- Success: if exactly one eligible saved gym matches, the active session's `gym_id` changes to that gym.
+- Failure/edge: no match, ambiguous match, low accuracy, permission denial, unavailable location, or read timeout leave the existing gym selection unchanged.
 
 ### Manual override
 
-- Trigger: user picks a different gym after a GPS suggestion appears or is applied.
+- Trigger: user picks a different gym or `No gym` after startup preselection or a long-press retry.
 - Success: manual selection wins immediately for the active session.
 - Failure/edge: if the selected gym is archived/deleted by another flow, existing personal-gym rules decide whether the active draft clears or keeps historical display.
 
-### Gym coordinate management
+### No gym selection
 
-- Trigger: user opens gym management for a personal gym.
+- Trigger: user opens the gym picker and selects `No gym`.
+- Success: the active session stores `gym_id = null`; no gym row is created, synced, managed, archived, or shown in the gym list.
+- Failure/edge: a later explicit long-press GPS retry may select a matched gym, but the user can return to `No gym` manually.
+
+### Gym coordinate management in single gym editor
+
+- Trigger: user opens the editor for one personal gym.
 - Success cases:
   - save current location as the gym's coordinates,
   - replace existing coordinates after confirmation,
@@ -176,19 +194,25 @@ Rules:
 
 ## UI / UX requirements
 
-Recorder GPS suggestion:
+Recorder quiet GPS assistance:
 
-- Uses an explicit detect/current-location affordance near the gym picker area.
-- Shows loading, permission-denied, unavailable, low-accuracy, no-match, ambiguous, and matched states inline or in the existing recorder modal pattern.
-- Does not change `gym_id` until the user confirms the suggestion.
-- Manual gym selection remains available at all times.
+- Uses no visible detect/current-location button in the default recorder surface.
+- Brand-new session creation may preselect a gym from one automatic foreground detection attempt.
+- Startup auto-detection runs only once per brand-new active session and never re-runs for a restored active draft.
+- Short press on the gym box opens the manual picker.
+- Long press on the gym box explicitly retries GPS detection and may select one matched gym.
+- Permission-denied, unavailable, low-accuracy, no-match, ambiguous, and read-failure states do not force a visible GPS suggestion panel.
+- Manual gym selection remains available at all times and wins over startup detection.
+- The picker includes `No gym` as a null-gym option; it is not a database row.
 
-Gym management coordinate controls:
+Gym coordinate controls:
 
-- Reuse the existing in-route gym management pattern from the personal gym catalog work.
-- Show whether a gym has saved coordinates without exposing excessive precision in the primary row.
-- Provide explicit save/replace/clear actions and confirmation for replacing or clearing coordinates.
-- Keep errors near the control that produced them.
+- Reuse the existing in-route single gym editor pattern from the recorder.
+- Remove coordinate actions from the multi-gym Manage screen.
+- Provide `Save current location` in the single gym editor.
+- For a newly added gym, attempt to save current coordinates automatically when a usable foreground position is available; failure must not block gym creation.
+- Show whether a gym has saved coordinates without exposing excessive precision.
+- Keep errors near the editor control that produced them.
 
 UI docs:
 
@@ -200,25 +224,26 @@ UI docs:
 
 1. Data model, sync contract, backend projection, and migration support for gym coordinates.
 2. Mobile foreground location service wrapper and pure matching domain logic.
-3. Session recorder GPS suggestion UI.
-4. Gym-management coordinate controls.
+3. Hidden session-recorder GPS gym assistance.
+4. Single gym editor coordinate controls.
 5. Restore parity, runtime evidence, and final docs closeout.
 
 ## Acceptance criteria
 
 1. Foreground-only GPS is the only location mode used.
 2. Permission denial, unavailable service, low accuracy, no match, and ambiguous match do not mutate session or gym data.
-3. A recorder GPS match is only applied after user confirmation.
+3. A recorder GPS match is applied automatically only during brand-new session startup or after explicit gym-box long press.
 4. User-owned `gyms` rows can store nullable coordinate metadata.
 5. Gym coordinate metadata is in sync scope and survives first-enable bootstrap, convergence, and reinstall restore.
 6. Backend RLS and per-owner composite key semantics continue to prevent cross-user gym-coordinate reads/writes.
 7. The pure matcher uses Haversine distance, rejects invalid/missing coordinates, honors radius and accuracy thresholds, and handles ties deterministically.
-8. Gym-management UI can save, replace, and clear coordinates with clear feedback.
-9. Manual gym selection remains available and wins over any GPS suggestion.
+8. Single gym editor UI can save, replace, and clear coordinates with clear feedback.
+9. Manual gym selection and `No gym` remain available and win over startup GPS preselection.
 10. `docs/tasks/T-20260517-01-personal-gym-list-sync.md` is completed first or each GPS implementation task re-checks and adapts to its current state before editing gym UI/data code.
 11. `expo-location` and native permission config are added only in the mobile GPS service task after checking current Expo documentation.
 12. Local fast gates pass for every implementation branch; slow gates run when task risk triggers require real Supabase, SQLite, Maestro, or permission evidence.
 13. Final M15 closeout updates project-level source-of-truth docs so stable GPS behavior is not left only in task cards.
+14. Corrective task `M15-T07` removes the visible recorder GPS suggestion surface and preserves GPS as quiet assistance plus an explicit long-press retry.
 
 ## Task breakdown
 
@@ -228,6 +253,7 @@ UI docs:
 4. `docs/tasks/complete/M15-T04-recorder-gps-suggestion-ui.md` - add recorder detection/suggestion UI. (`completed`)
 5. `docs/tasks/complete/M15-T05-gym-management-coordinate-controls.md` - add gym-management save/replace/clear coordinate controls. (`completed`)
 6. `docs/tasks/complete/M15-T06-gps-restore-evidence-and-docs-closeout.md` - prove restore parity/runtime behavior and close M15 docs. (`completed`)
+7. `docs/tasks/M15-T07-hidden-gps-gym-ux-correction.md` - correct GPS UX so detection is hidden, one-shot at new session start, retryable by gym-box long press, supports `No gym`, and moves coordinate actions to the single gym editor. (`planned`)
 
 ## Risks / dependencies
 
@@ -236,10 +262,11 @@ UI docs:
 - Supabase schema/contract details must be re-checked against the current migrations before changing projection functions.
 - Native permission behavior is hard to fully prove in Jest; M15 needs at least one real iOS simulator/manual or Maestro evidence path for permission-aware UI states.
 - Coordinate precision has privacy implications; M15 keeps coordinates private and user-owned, with no social exposure.
+- Hidden GPS assistance must not make the app feel like it is fighting the user. Manual gym choice and `No gym` selection remain authoritative unless the user explicitly long-presses the gym box to retry GPS detection.
 
 ## Project docs maintenance
 
-M15 closeout verified the following source-of-truth docs are aligned with the implemented foreground-only GPS, private gym-coordinate, sync/restore, and UI behavior:
+Original M15 closeout verified the following source-of-truth docs were aligned with the implemented foreground-only GPS, private gym-coordinate, sync/restore, and UI behavior. The planned `M15-T07` corrective follow-up must update the UI docs again when it lands:
 
 - `docs/specs/03-technical-architecture.md` when stable location-service/sync behavior lands.
 - `docs/specs/05-data-model.md` when gym coordinate fields are added.
@@ -266,6 +293,7 @@ M15 closeout verified the following source-of-truth docs are aligned with the im
 - What remains:
   - `docs/tasks/T-20260517-01-personal-gym-list-sync.md` remains planned; M15 adapted to the current route-local gym management state and does not claim full database-backed gym-list sync is complete.
   - M15 branches are stacked on the T02-T05 lineage until those prerequisite branches land on `main`.
+  - `docs/tasks/M15-T07-hidden-gps-gym-ux-correction.md` is planned as a corrective UX follow-up to hide most GPS functionality from the default recorder UX.
 
 ## Status update checklist (mandatory during task closeout)
 
