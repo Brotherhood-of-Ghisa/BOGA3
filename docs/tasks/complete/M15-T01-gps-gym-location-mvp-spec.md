@@ -1,7 +1,7 @@
 ---
 task_id: M15-T01-gps-gym-location-mvp-spec
 milestone_id: "M15"
-status: planned
+status: completed
 ui_impact: "no"
 areas: "docs|cross-stack"
 runtimes: "docs"
@@ -16,7 +16,7 @@ docs_touched: "docs/specs/milestones/M15-gps-gym-location-support.md,docs/tasks/
 
 - Task ID: `M15-T01-gps-gym-location-mvp-spec`
 - Title: GPS gym location MVP spec and task breakdown
-- Status: `planned`
+- Status: `completed`
 - File location rule:
   - author active cards in `docs/tasks/<task-id>.md`
   - move the file to `docs/tasks/complete/<task-id>.md` when `Status` becomes `completed` or `outdated`
@@ -41,9 +41,9 @@ docs_touched: "docs/specs/milestones/M15-gps-gym-location-support.md,docs/tasks/
 
 ## Context Freshness (required at session start; update before edits)
 
-- Verified current branch + HEAD commit: `main` at `4904bf5`
+- Verified current branch + HEAD commit: `codex/m15-t01-gps-gym-location-spec` at `46f58ed`
 - Start-of-session sync completed per `docs/specs/04-ai-development-playbook.md` git sync workflow?: `yes`
-  - `git pull --ff-only` on `2026-05-23` reported `Already up to date`.
+  - `origin/main`, `main`, and the task branch all pointed at `46f58ed` at execution start.
 - Parent refs opened in this session:
   - `docs/specs/README.md`
   - `docs/specs/00-product.md`
@@ -62,6 +62,10 @@ docs_touched: "docs/specs/milestones/M15-gps-gym-location-support.md,docs/tasks/
   - `docs/plans/README.md`
   - `docs/operations/task-execution.md`
   - `RUNBOOK.md`
+  - `docs/specs/templates/milestone-spec-template.md`
+  - `docs/specs/templates/task-card-template.md`
+  - `docs/plans/README.md`
+  - `docs/operations/task-execution.md`
 - Code/docs inventory freshness checks run:
   - `apps/mobile/package.json` - `expo-location` is not currently listed.
   - `apps/mobile/src/data/schema/gyms.ts` - local `gyms` currently has `id`, `name`, `created_at`, and `updated_at`; no coordinate fields.
@@ -70,8 +74,8 @@ docs_touched: "docs/specs/milestones/M15-gps-gym-location-support.md,docs/tasks/
   - `apps/mobile/src/sync/bootstrap.ts` - gym bootstrap/parity currently parses and emits only name/timestamp/tombstone fields for gyms.
   - `docs/tasks/T-20260517-01-personal-gym-list-sync.md` - active planned task may change gym catalog/list/tombstone behavior before GPS implementation; M15 spec must treat it as a dependency.
 - Known stale references or assumptions:
-  - M15 milestone spec does not exist yet; this task creates it.
   - GPS implementation tasks must re-check the state of `T-20260517-01-personal-gym-list-sync.md` before editing gym UI/data code.
+  - The direct branch flow is selected for M15 per user request; orchestrator mode remains opt-in only.
 - Optional helper command (recommended at execution start):
   - `./scripts/task-bootstrap.sh docs/tasks/M15-T01-gps-gym-location-mvp-spec.md`
 
@@ -227,19 +231,37 @@ This task should make the later implementation work unambiguous across product b
 ## Evidence
 
 - Created/updated milestone spec:
+  - `docs/specs/milestones/M15-gps-gym-location-support.md`
 - Created downstream task cards:
+  - `docs/tasks/M15-T02-gym-coordinate-data-sync-contract.md`
+  - `docs/tasks/M15-T03-mobile-location-service-and-matching.md`
+  - `docs/tasks/M15-T04-recorder-gps-suggestion-ui.md`
+  - `docs/tasks/M15-T05-gym-management-coordinate-controls.md`
+  - `docs/tasks/M15-T06-gps-restore-evidence-and-docs-closeout.md`
 - Docs inventory check:
+  - `rg -n "gps|GPS|latitude|longitude|location" docs/specs docs/tasks supabase/session-sync-api-contract.md`
+  - `git diff --check`
 - Task closeout helper:
+  - `./scripts/task-closeout-check.sh docs/tasks/complete/M15-T01-gps-gym-location-mvp-spec.md`
 - RUNBOOK review:
-- Manual verification summary:
+  - `RUNBOOK.md reviewed (no changes required)`
+- Manual verification summary (required when CI is absent/partial): Docs-only task. Created the milestone spec, recorded direct branch flow, created downstream cards, and deferred implementation/source-of-truth adoption updates to the owning implementation tasks.
 - Deferred/manual hosted checks summary:
   - `N/A` for this docs-only task unless downstream backend work is moved into scope, which should not happen.
 
 ## Completion note (fill at end per `docs/specs/04-ai-development-playbook.md`)
 
-- What changed:
-- What tests ran:
-- What remains:
+- What changed: Created the M15 milestone spec and downstream direct-branch task cards.
+  - Created the M15 milestone spec for foreground-only, user-confirmed GPS gym location support.
+  - Added the requested direct branch flow and downstream task cards for data/sync, location service/matching, recorder UI, gym-management controls, and closeout evidence.
+  - Left project-level adopted docs updates to downstream implementation tasks because this task did not change runtime code, schemas, contracts, or operator workflows.
+- What tests ran: Bootstrap/context helper, docs inventory search, whitespace diff check, and task closeout helper.
+  - `./scripts/task-bootstrap.sh docs/tasks/M15-T01-gps-gym-location-mvp-spec.md` (expected failure before milestone spec creation because the parent spec did not exist yet)
+  - `rg -n "gps|GPS|latitude|longitude|location" docs/specs docs/tasks supabase/session-sync-api-contract.md`
+  - `git diff --check`
+  - `./scripts/task-closeout-check.sh docs/tasks/complete/M15-T01-gps-gym-location-mvp-spec.md`
+- What remains: Execute M15-T02 through M15-T06 on direct branches after the personal gym catalog dependency is resolved or re-checked.
+  - Execute M15-T02 through M15-T06 on direct branches after the personal gym catalog dependency is resolved or re-checked.
 
 ## Status update checklist (mandatory at closeout)
 
