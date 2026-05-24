@@ -57,7 +57,6 @@ import { getCurrentForegroundPositionLazy } from '@/src/location/foreground-loca
 import {
   DEFAULT_MAX_POSITION_ACCURACY_M,
   matchNearestGymForPosition,
-  type GymLocationMatch,
 } from '@/src/location/gym-location-matcher';
 import { logEvent } from '@/src/logging';
 import { createDraftAutosaveController, type DraftAutosaveController } from '@/src/session-recorder/draft-autosave';
@@ -396,29 +395,6 @@ type SetTypePickerState = {
   setIndex: number;
 };
 
-type GpsSuggestionState =
-  | { status: 'idle' }
-  | { status: 'loading' }
-  | { status: 'matched'; match: GymLocationMatch }
-  | {
-      status:
-        | 'permission_denied'
-        | 'unavailable'
-        | 'low_accuracy'
-        | 'no_match'
-        | 'ambiguous'
-        | 'read_failure';
-    };
-
-const GPS_SUGGESTION_MESSAGES: Record<Exclude<GpsSuggestionState['status'], 'idle' | 'loading' | 'matched'>, string> = {
-  permission_denied: 'Location permission was denied. Choose a gym manually.',
-  unavailable: 'Location services are unavailable. Choose a gym manually.',
-  low_accuracy: 'Location accuracy is too low right now. Choose a gym manually.',
-  no_match: 'No saved gym matched your current location.',
-  ambiguous: 'Multiple saved gyms are nearby. Choose a gym manually.',
-  read_failure: 'Unable to read current location. Choose a gym manually.',
-};
-
 type GymCoordinateAction = 'replace' | 'clear';
 type GymCoordinateFeedbackTone = 'success' | 'error';
 type GymCoordinateFeedback = {
@@ -426,6 +402,17 @@ type GymCoordinateFeedback = {
   tone: GymCoordinateFeedbackTone;
   message: string;
 };
+type GymCoordinateDraft = {
+  latitude: number;
+  longitude: number;
+  accuracyM: number;
+  updatedAt: Date;
+};
+type CurrentCoordinateReadResult =
+  | { status: 'success'; coordinates: GymCoordinateDraft }
+  | { status: 'error'; message: string };
+
+const NEW_GYM_COORDINATE_FEEDBACK_ID = '__new_gym__';
 
 const hasSavedGymCoordinates = (location: SessionLocation) =>
   typeof location.latitude === 'number' &&
@@ -444,6 +431,54 @@ const getCoordinateLocationFailureMessage = (status: string) => {
 
   return 'Unable to read current location. Coordinates were not changed.';
 };
+
+const coordinateDraftToLocationState = (coordinates: GymCoordinateDraft) => ({
+  latitude: coordinates.latitude,
+  longitude: coordinates.longitude,
+  coordinateAccuracyM: coordinates.accuracyM,
+  coordinatesUpdatedAt: coordinates.updatedAt,
+});
+
+const coordinateDraftToUpsertInput = (coordinates: GymCoordinateDraft) => ({
+  latitude: coordinates.latitude,
+  longitude: coordinates.longitude,
+  accuracyM: coordinates.accuracyM,
+  updatedAt: coordinates.updatedAt,
+});
+
+async function readCurrentCoordinatesForGym(): Promise<CurrentCoordinateReadResult> {
+  const currentPositionResult = await getCurrentForegroundPositionLazy();
+
+  if (currentPositionResult.status !== 'success') {
+    return {
+      status: 'error',
+      message: getCoordinateLocationFailureMessage(currentPositionResult.status),
+    };
+  }
+
+  const { position } = currentPositionResult;
+  if (
+    position.accuracyM === null ||
+    !Number.isFinite(position.accuracyM) ||
+    position.accuracyM < 0 ||
+    position.accuracyM > DEFAULT_MAX_POSITION_ACCURACY_M
+  ) {
+    return {
+      status: 'error',
+      message: 'Location accuracy is too low right now. Coordinates were not changed.',
+    };
+  }
+
+  return {
+    status: 'success',
+    coordinates: {
+      latitude: position.latitude,
+      longitude: position.longitude,
+      accuracyM: position.accuracyM,
+      updatedAt: position.capturedAt,
+    },
+  };
+}
 
 const normalizeTagName = (value: string) => value.trim().toLowerCase();
 
@@ -572,13 +607,14 @@ export default function SessionRecorderScreen() {
   const [pendingFocusedWeightSetId, setPendingFocusedWeightSetId] = useState<string | null>(null);
   const [focusedRepsSetId, setFocusedRepsSetId] = useState<string | null>(null);
   const [isDeleteConfirmVisible, setIsDeleteConfirmVisible] = useState(false);
-  const [gpsSuggestion, setGpsSuggestion] = useState<GpsSuggestionState>({ status: 'idle' });
+  const [isGpsDetectionInFlight, setIsGpsDetectionInFlight] = useState(false);
   const [pendingGymCoordinateAction, setPendingGymCoordinateAction] = useState<{
     gymId: string;
     action: GymCoordinateAction;
   } | null>(null);
   const [gymCoordinateFeedback, setGymCoordinateFeedback] = useState<GymCoordinateFeedback | null>(null);
   const [gymCoordinateLoadingId, setGymCoordinateLoadingId] = useState<string | null>(null);
+  const [pendingNewGymCoordinates, setPendingNewGymCoordinates] = useState<GymCoordinateDraft | null>(null);
   const stateRef = useRef(state);
   const completedEditEndDateTimeRef = useRef<string | null>(completedEditEndDateTime);
   const persistedSessionIdRef = useRef<string | null>(null);
@@ -1027,25 +1063,11 @@ export default function SessionRecorderScreen() {
     setSubmitCleanupPrompt(null);
   };
 
-  const clearGpsSuggestion = useCallback(() => {
-    setGpsSuggestion({ status: 'idle' });
-  }, []);
-
-  const detectCurrentGym = useCallback(async () => {
-    setGpsSuggestion({ status: 'loading' });
-
+  const findMatchedGymFromCurrentLocation = useCallback(async (): Promise<SessionLocation | null> => {
     const currentPositionResult = await getCurrentForegroundPositionLazy();
 
     if (currentPositionResult.status !== 'success') {
-      setGpsSuggestion({
-        status:
-          currentPositionResult.status === 'permission_denied'
-            ? 'permission_denied'
-            : currentPositionResult.status === 'unavailable'
-              ? 'unavailable'
-              : 'read_failure',
-      });
-      return;
+      return null;
     }
 
     const matchResult = matchNearestGymForPosition(
@@ -1066,25 +1088,13 @@ export default function SessionRecorderScreen() {
     if (matchResult.status === 'matched') {
       const currentGym = stateRef.current.locations.find((location) => location.id === matchResult.match.gym.id);
       if (!currentGym || currentGym.archived) {
-        setGpsSuggestion({ status: 'no_match' });
-        return;
+        return null;
       }
 
-      setGpsSuggestion({
-        status: 'matched',
-        match: {
-          ...matchResult.match,
-          gym: {
-            ...matchResult.match.gym,
-            id: currentGym.id,
-            name: currentGym.name,
-          },
-        },
-      });
-      return;
+      return currentGym;
     }
 
-    setGpsSuggestion({ status: matchResult.status });
+    return null;
   }, []);
 
   const startSessionFromEmptyState = useCallback(async () => {
@@ -1095,8 +1105,19 @@ export default function SessionRecorderScreen() {
     setIsStartingSession(true);
     try {
       const startedAt = new Date();
+      let detectedGym = await findMatchedGymFromCurrentLocation();
+      if (detectedGym) {
+        try {
+          await upsertLocalGym({
+            id: detectedGym.id,
+            name: detectedGym.name,
+          });
+        } catch {
+          detectedGym = null;
+        }
+      }
       const persisted = await persistSessionDraftSnapshot({
-        gymId: null,
+        gymId: detectedGym?.id ?? null,
         startedAt,
         status: 'active',
         exercises: [],
@@ -1108,7 +1129,7 @@ export default function SessionRecorderScreen() {
         session: {
           ...current.session,
           dateTime: formatCurrentDateTime(startedAt),
-          locationId: null,
+          locationId: detectedGym?.id ?? null,
           exercises: [],
         },
       }));
@@ -1118,11 +1139,44 @@ export default function SessionRecorderScreen() {
     } finally {
       setIsStartingSession(false);
     }
-  }, [isStartingSession]);
+  }, [findMatchedGymFromCurrentLocation, isStartingSession]);
+
+  const retryGpsGymSelection = useCallback(async () => {
+    if (isGpsDetectionInFlight) {
+      return;
+    }
+
+    setIsGpsDetectionInFlight(true);
+    try {
+      const matchedGym = await findMatchedGymFromCurrentLocation();
+      if (!matchedGym) {
+        return;
+      }
+
+      try {
+        await upsertLocalGym({
+          id: matchedGym.id,
+          name: matchedGym.name,
+        });
+      } catch {
+        return;
+      }
+
+      setState((current) => ({
+        ...current,
+        session: { ...current.session, locationId: matchedGym.id },
+      }));
+      clearSubmitFeedback();
+      markSessionStructuralMutation();
+    } finally {
+      setIsGpsDetectionInFlight(false);
+    }
+  }, [findMatchedGymFromCurrentLocation, isGpsDetectionInFlight, markSessionStructuralMutation]);
 
   const openGymModal = () => {
     setPendingGymCoordinateAction(null);
     setGymCoordinateFeedback(null);
+    setPendingNewGymCoordinates(null);
     setState((current) => ({
       ...current,
       gymPickerVisible: true,
@@ -1138,6 +1192,7 @@ export default function SessionRecorderScreen() {
   const dismissGymModal = () => {
     setPendingGymCoordinateAction(null);
     setGymCoordinateFeedback(null);
+    setPendingNewGymCoordinates(null);
     setState((current) => ({
       ...current,
       gymPickerVisible: false,
@@ -1150,7 +1205,7 @@ export default function SessionRecorderScreen() {
     }));
   };
 
-  const selectGym = (locationId: string) => {
+  const selectGym = (locationId: string | null) => {
     setState((current) => ({
       ...current,
       session: { ...current.session, locationId },
@@ -1161,17 +1216,8 @@ export default function SessionRecorderScreen() {
       editingLocationId: null,
       editingLocationName: '',
     }));
-    clearGpsSuggestion();
     clearSubmitFeedback();
     markSessionStructuralMutation();
-  };
-
-  const confirmGpsSuggestion = () => {
-    if (gpsSuggestion.status !== 'matched') {
-      return;
-    }
-
-    selectGym(gpsSuggestion.match.gym.id);
   };
 
   const openManageGyms = () => {
@@ -1186,6 +1232,9 @@ export default function SessionRecorderScreen() {
   };
 
   const openAddGymEditor = () => {
+    setPendingNewGymCoordinates(null);
+    setGymCoordinateFeedback(null);
+    setPendingGymCoordinateAction(null);
     setState((current) => ({
       ...current,
       gymModalMode: 'editor',
@@ -1197,6 +1246,9 @@ export default function SessionRecorderScreen() {
   };
 
   const openEditGymEditor = (location: SessionLocation) => {
+    setPendingNewGymCoordinates(null);
+    setGymCoordinateFeedback(null);
+    setPendingGymCoordinateAction(null);
     setState((current) => ({
       ...current,
       gymModalMode: 'editor',
@@ -1209,6 +1261,9 @@ export default function SessionRecorderScreen() {
   };
 
   const returnFromEditor = () => {
+    setPendingNewGymCoordinates(null);
+    setGymCoordinateFeedback(null);
+    setPendingGymCoordinateAction(null);
     setState((current) => ({
       ...current,
       gymModalMode: current.editorReturnMode,
@@ -1248,13 +1303,16 @@ export default function SessionRecorderScreen() {
         editingLocationId: null,
         editingLocationName: '',
       }));
+      markSessionStructuralMutation();
       return;
     }
 
+    const stagedCoordinates = pendingNewGymCoordinates;
     const newLocation: SessionLocation = {
       id: createLocationId(draftName),
       name: draftName,
       archived: false,
+      ...(stagedCoordinates ? coordinateDraftToLocationState(stagedCoordinates) : {}),
     };
 
     setState((current) => ({
@@ -1266,6 +1324,32 @@ export default function SessionRecorderScreen() {
       editorReturnMode: 'picker',
       pendingLocationName: '',
     }));
+    setPendingNewGymCoordinates(null);
+    setGymCoordinateFeedback(null);
+    markSessionStructuralMutation();
+
+    void (async () => {
+      let coordinates = stagedCoordinates;
+      if (!coordinates) {
+        const coordinateRead = await readCurrentCoordinatesForGym();
+        coordinates = coordinateRead.status === 'success' ? coordinateRead.coordinates : null;
+      }
+
+      if (!coordinates) {
+        return;
+      }
+
+      try {
+        await upsertLocalGym({
+          id: newLocation.id,
+          name: newLocation.name,
+          coordinates: coordinateDraftToUpsertInput(coordinates),
+        });
+        updateGymCoordinateState(newLocation.id, coordinateDraftToLocationState(coordinates));
+      } catch {
+        // Coordinate capture is opportunistic during gym creation; the selected gym remains usable.
+      }
+    })();
   };
 
   const returnToPickerFromManage = () => {
@@ -1337,49 +1421,25 @@ export default function SessionRecorderScreen() {
     setGymCoordinateFeedback(null);
 
     try {
-      const currentPositionResult = await getCurrentForegroundPositionLazy();
+      const coordinateRead = await readCurrentCoordinatesForGym();
 
-      if (currentPositionResult.status !== 'success') {
+      if (coordinateRead.status === 'error') {
         showGymCoordinateFeedback({
           gymId: location.id,
           tone: 'error',
-          message: getCoordinateLocationFailureMessage(currentPositionResult.status),
+          message: coordinateRead.message,
         });
         return;
       }
 
-      const { position } = currentPositionResult;
-      if (
-        position.accuracyM === null ||
-        !Number.isFinite(position.accuracyM) ||
-        position.accuracyM < 0 ||
-        position.accuracyM > DEFAULT_MAX_POSITION_ACCURACY_M
-      ) {
-        showGymCoordinateFeedback({
-          gymId: location.id,
-          tone: 'error',
-          message: 'Location accuracy is too low right now. Coordinates were not changed.',
-        });
-        return;
-      }
-
+      const { coordinates } = coordinateRead;
       await upsertLocalGym({
         id: location.id,
         name: location.name,
-        coordinates: {
-          latitude: position.latitude,
-          longitude: position.longitude,
-          accuracyM: position.accuracyM,
-          updatedAt: position.capturedAt,
-        },
+        coordinates: coordinateDraftToUpsertInput(coordinates),
       });
 
-      updateGymCoordinateState(location.id, {
-        latitude: position.latitude,
-        longitude: position.longitude,
-        coordinateAccuracyM: position.accuracyM,
-        coordinatesUpdatedAt: position.capturedAt,
-      });
+      updateGymCoordinateState(location.id, coordinateDraftToLocationState(coordinates));
       showGymCoordinateFeedback({
         gymId: location.id,
         tone: 'success',
@@ -1390,6 +1450,33 @@ export default function SessionRecorderScreen() {
         gymId: location.id,
         tone: 'error',
         message: 'Unable to update gym coordinates right now.',
+      });
+    } finally {
+      setGymCoordinateLoadingId(null);
+    }
+  };
+
+  const savePendingNewGymCoordinatesFromCurrentLocation = async () => {
+    setPendingGymCoordinateAction(null);
+    setGymCoordinateLoadingId(NEW_GYM_COORDINATE_FEEDBACK_ID);
+    setGymCoordinateFeedback(null);
+
+    try {
+      const coordinateRead = await readCurrentCoordinatesForGym();
+      if (coordinateRead.status === 'error') {
+        showGymCoordinateFeedback({
+          gymId: NEW_GYM_COORDINATE_FEEDBACK_ID,
+          tone: 'error',
+          message: coordinateRead.message,
+        });
+        return;
+      }
+
+      setPendingNewGymCoordinates(coordinateRead.coordinates);
+      showGymCoordinateFeedback({
+        gymId: NEW_GYM_COORDINATE_FEEDBACK_ID,
+        tone: 'success',
+        message: 'Current location ready. Add the gym to save it.',
       });
     } finally {
       setGymCoordinateLoadingId(null);
@@ -2062,6 +2149,16 @@ export default function SessionRecorderScreen() {
   const gymEditorPrimaryLabel = state.editingLocationId ? 'Save' : 'Add';
   const gymEditorTitle = state.editingLocationId ? 'Edit Gym' : 'Add Gym';
   const gymEditorInputValue = state.editingLocationId ? state.editingLocationName : state.pendingLocationName;
+  const editingGym = state.editingLocationId
+    ? state.locations.find((location) => location.id === state.editingLocationId) ?? null
+    : null;
+  const editorCoordinateFeedbackId = editingGym?.id ?? NEW_GYM_COORDINATE_FEEDBACK_ID;
+  const editorCoordinateFeedback =
+    gymCoordinateFeedback?.gymId === editorCoordinateFeedbackId ? gymCoordinateFeedback : null;
+  const isEditorCoordinateLoading = gymCoordinateLoadingId === editorCoordinateFeedbackId;
+  const editingGymHasCoordinates = editingGym ? hasSavedGymCoordinates(editingGym) : false;
+  const pendingEditorCoordinateAction =
+    editingGym && pendingGymCoordinateAction?.gymId === editingGym.id ? pendingGymCoordinateAction.action : null;
   const activeTagExercise =
     activeTagExerciseId === null
       ? null
@@ -2149,61 +2246,29 @@ export default function SessionRecorderScreen() {
   const hasInvalidSetValues = useMemo(() => sessionHasInvalidSetValues(state.session), [state.session]);
   const isSubmitDisabled =
     (routeMode === 'completed-edit' && Boolean(completedEditTimeValidationMessage)) || hasInvalidSetValues;
-  const isGpsDetectionLoading = gpsSuggestion.status === 'loading';
-  const gpsFeedbackMessage =
-    gpsSuggestion.status === 'matched'
-      ? `Looks like ${gpsSuggestion.match.gym.name}`
-      : gpsSuggestion.status === 'loading'
-        ? 'Detecting current gym...'
-        : gpsSuggestion.status === 'idle'
-          ? null
-          : GPS_SUGGESTION_MESSAGES[gpsSuggestion.status];
+  const gymButtonLabel = selectedGym ? selectedGym.name : 'No gym';
+  const canLongPressRetryGymDetection = routeMode !== 'completed-edit' && hasActiveSession;
   const gymSelectionControl = (
     <View style={styles.gymSelectionStack}>
-      <Pressable style={styles.gymButton} onPress={openGymModal}>
+      <Pressable
+        accessibilityHint={
+          canLongPressRetryGymDetection
+            ? 'Long press to retry current-location gym detection.'
+            : undefined
+        }
+        accessibilityState={{ busy: isGpsDetectionInFlight }}
+        style={styles.gymButton}
+        onPress={openGymModal}
+        onLongPress={() => {
+          if (!canLongPressRetryGymDetection) {
+            return;
+          }
+          void retryGpsGymSelection();
+        }}>
         <Text numberOfLines={1} style={styles.gymButtonText}>
-          {selectedGym ? selectedGym.name : 'Choose gym'}
+          {gymButtonLabel}
         </Text>
       </Pressable>
-      <View style={styles.gpsDetectionRow}>
-        <Pressable
-          accessibilityLabel="Detect current gym"
-          accessibilityRole="button"
-          disabled={isGpsDetectionLoading}
-          style={[styles.gpsDetectButton, isGpsDetectionLoading ? styles.gpsDetectButtonDisabled : null]}
-          testID="detect-current-gym-button"
-          onPress={() => {
-            void detectCurrentGym();
-          }}>
-          <Text style={styles.gpsDetectButtonText}>{isGpsDetectionLoading ? 'Detecting' : 'Detect'}</Text>
-        </Pressable>
-      </View>
-      {gpsFeedbackMessage ? (
-        <View
-          style={[
-            styles.gpsFeedbackPanel,
-            gpsSuggestion.status === 'matched' ? styles.gpsFeedbackPanelMatched : null,
-          ]}
-          testID="gps-gym-suggestion-feedback">
-          <Text
-            style={[
-              styles.gpsFeedbackText,
-              gpsSuggestion.status === 'matched' ? styles.gpsFeedbackTextMatched : null,
-            ]}>
-            {gpsFeedbackMessage}
-          </Text>
-          {gpsSuggestion.status === 'matched' ? (
-            <View style={styles.gpsSuggestionActionRow}>
-              <Pressable style={styles.gpsSuggestionPrimaryButton} onPress={confirmGpsSuggestion}>
-                <Text style={styles.gpsSuggestionPrimaryButtonText}>Use this gym</Text>
-              </Pressable>
-              <Pressable style={styles.gpsSuggestionSecondaryButton} onPress={clearGpsSuggestion}>
-                <Text style={styles.gpsSuggestionSecondaryButtonText}>Ignore</Text>
-              </Pressable>
-            </View>
-          ) : null}
-        </View>
-      ) : null}
     </View>
   );
 
@@ -2628,6 +2693,12 @@ export default function SessionRecorderScreen() {
               <>
                 <Text style={styles.modalTitle}>Select Gym</Text>
                 <ScrollView contentContainerStyle={styles.modalList}>
+                  <Pressable
+                    accessibilityLabel="Select no gym"
+                    style={styles.pickerOption}
+                    onPress={() => selectGym(null)}>
+                    <Text style={styles.pickerOptionText}>No gym</Text>
+                  </Pressable>
                   {activeGyms.map((location) => (
                     <Pressable
                       key={location.id}
@@ -2668,11 +2739,6 @@ export default function SessionRecorderScreen() {
                 <ScrollView contentContainerStyle={styles.modalList}>
                   {managedGyms.map((location) => {
                     const locationHasCoordinates = hasSavedGymCoordinates(location);
-                    const pendingCoordinateAction =
-                      pendingGymCoordinateAction?.gymId === location.id ? pendingGymCoordinateAction.action : null;
-                    const coordinateFeedback =
-                      gymCoordinateFeedback?.gymId === location.id ? gymCoordinateFeedback : null;
-                    const isCoordinateLoading = gymCoordinateLoadingId === location.id;
 
                     return (
                       <View key={location.id} style={styles.manageGymRow}>
@@ -2703,106 +2769,6 @@ export default function SessionRecorderScreen() {
                             </Text>
                           </Pressable>
                         </View>
-
-                        {coordinateFeedback ? (
-                          <Text
-                            style={[
-                              styles.gymCoordinateFeedback,
-                              coordinateFeedback.tone === 'success'
-                                ? styles.gymCoordinateFeedbackSuccess
-                                : styles.gymCoordinateFeedbackError,
-                            ]}>
-                            {coordinateFeedback.message}
-                          </Text>
-                        ) : null}
-
-                        {pendingCoordinateAction ? (
-                          <View style={styles.gymCoordinateConfirmPanel}>
-                            <Text style={styles.gymCoordinateConfirmText}>
-                              {pendingCoordinateAction === 'replace'
-                                ? 'Replace saved coordinates with your current location?'
-                                : 'Clear saved coordinates for this gym?'}
-                            </Text>
-                            <View style={styles.gymCoordinateActionRow}>
-                              <Pressable
-                                accessibilityLabel={`Cancel coordinate action for gym ${location.name}`}
-                                style={styles.gymCoordinateSecondaryButton}
-                                onPress={() => cancelGymCoordinateAction(location.id)}>
-                                <Text style={styles.gymCoordinateSecondaryButtonText}>Cancel</Text>
-                              </Pressable>
-                              <Pressable
-                                accessibilityLabel={
-                                  pendingCoordinateAction === 'replace'
-                                    ? `Confirm replace coordinates for gym ${location.name}`
-                                    : `Confirm clear coordinates for gym ${location.name}`
-                                }
-                                accessibilityState={{ disabled: isCoordinateLoading }}
-                                disabled={isCoordinateLoading}
-                                style={[
-                                  pendingCoordinateAction === 'replace'
-                                    ? styles.gymCoordinatePrimaryButton
-                                    : styles.gymCoordinateDangerButton,
-                                  isCoordinateLoading ? styles.gymCoordinateButtonDisabled : null,
-                                ]}
-                                onPress={() =>
-                                  pendingCoordinateAction === 'replace'
-                                    ? confirmReplaceGymCoordinates(location)
-                                    : confirmClearGymCoordinates(location)
-                                }>
-                                <Text style={styles.gymCoordinatePrimaryButtonText}>
-                                  {isCoordinateLoading
-                                    ? 'Saving...'
-                                    : pendingCoordinateAction === 'replace'
-                                      ? 'Confirm replace'
-                                      : 'Clear coordinates'}
-                                </Text>
-                              </Pressable>
-                            </View>
-                          </View>
-                        ) : (
-                          <View style={styles.gymCoordinateActionRow}>
-                            {locationHasCoordinates ? (
-                              <>
-                                <Pressable
-                                  accessibilityLabel={`Replace coordinates for gym ${location.name}`}
-                                  accessibilityState={{ disabled: isCoordinateLoading }}
-                                  disabled={isCoordinateLoading}
-                                  style={[
-                                    styles.gymCoordinateSecondaryButton,
-                                    isCoordinateLoading ? styles.gymCoordinateButtonDisabled : null,
-                                  ]}
-                                  onPress={() => requestReplaceGymCoordinates(location.id)}>
-                                  <Text style={styles.gymCoordinateSecondaryButtonText}>Replace</Text>
-                                </Pressable>
-                                <Pressable
-                                  accessibilityLabel={`Clear coordinates for gym ${location.name}`}
-                                  accessibilityState={{ disabled: isCoordinateLoading }}
-                                  disabled={isCoordinateLoading}
-                                  style={[
-                                    styles.gymCoordinateDangerOutlineButton,
-                                    isCoordinateLoading ? styles.gymCoordinateButtonDisabled : null,
-                                  ]}
-                                  onPress={() => requestClearGymCoordinates(location.id)}>
-                                  <Text style={styles.gymCoordinateDangerOutlineButtonText}>Clear</Text>
-                                </Pressable>
-                              </>
-                            ) : (
-                              <Pressable
-                                accessibilityLabel={`Save current location for gym ${location.name}`}
-                                accessibilityState={{ disabled: isCoordinateLoading }}
-                                disabled={isCoordinateLoading}
-                                style={[
-                                  styles.gymCoordinatePrimaryButton,
-                                  isCoordinateLoading ? styles.gymCoordinateButtonDisabled : null,
-                                ]}
-                                onPress={() => saveGymCoordinatesFromCurrentLocation(location)}>
-                                <Text style={styles.gymCoordinatePrimaryButtonText}>
-                                  {isCoordinateLoading ? 'Saving...' : 'Save current location'}
-                                </Text>
-                              </Pressable>
-                            )}
-                          </View>
-                        )}
                       </View>
                     );
                   })}
@@ -2823,6 +2789,117 @@ export default function SessionRecorderScreen() {
                   value={gymEditorInputValue}
                   onChangeText={state.editingLocationId ? handleEditingLocationNameChange : handlePendingLocationNameChange}
                 />
+                <View style={styles.gymCoordinateEditorPanel}>
+                  <Text style={styles.gymCoordinateStatus}>
+                    {editingGym
+                      ? editingGymHasCoordinates
+                        ? 'GPS saved'
+                        : 'No GPS coordinates'
+                      : pendingNewGymCoordinates
+                        ? 'GPS ready'
+                        : 'No GPS coordinates'}
+                  </Text>
+
+                  {editorCoordinateFeedback ? (
+                    <Text
+                      style={[
+                        styles.gymCoordinateFeedback,
+                        editorCoordinateFeedback.tone === 'success'
+                          ? styles.gymCoordinateFeedbackSuccess
+                          : styles.gymCoordinateFeedbackError,
+                      ]}>
+                      {editorCoordinateFeedback.message}
+                    </Text>
+                  ) : null}
+
+                  {editingGym && pendingEditorCoordinateAction ? (
+                    <View style={styles.gymCoordinateConfirmPanel}>
+                      <Text style={styles.gymCoordinateConfirmText}>
+                        {pendingEditorCoordinateAction === 'replace'
+                          ? 'Replace saved coordinates with your current location?'
+                          : 'Clear saved coordinates for this gym?'}
+                      </Text>
+                      <View style={styles.gymCoordinateActionRow}>
+                        <Pressable
+                          accessibilityLabel={`Cancel coordinate action for gym ${editingGym.name}`}
+                          style={styles.gymCoordinateSecondaryButton}
+                          onPress={() => cancelGymCoordinateAction(editingGym.id)}>
+                          <Text style={styles.gymCoordinateSecondaryButtonText}>Cancel</Text>
+                        </Pressable>
+                        <Pressable
+                          accessibilityLabel={
+                            pendingEditorCoordinateAction === 'replace'
+                              ? `Confirm replace coordinates for gym ${editingGym.name}`
+                              : `Confirm clear coordinates for gym ${editingGym.name}`
+                          }
+                          accessibilityState={{ disabled: isEditorCoordinateLoading }}
+                          disabled={isEditorCoordinateLoading}
+                          style={[
+                            pendingEditorCoordinateAction === 'replace'
+                              ? styles.gymCoordinatePrimaryButton
+                              : styles.gymCoordinateDangerButton,
+                            isEditorCoordinateLoading ? styles.gymCoordinateButtonDisabled : null,
+                          ]}
+                          onPress={() =>
+                            pendingEditorCoordinateAction === 'replace'
+                              ? confirmReplaceGymCoordinates(editingGym)
+                              : confirmClearGymCoordinates(editingGym)
+                          }>
+                          <Text style={styles.gymCoordinatePrimaryButtonText}>
+                            {isEditorCoordinateLoading
+                              ? 'Saving...'
+                              : pendingEditorCoordinateAction === 'replace'
+                                ? 'Confirm replace'
+                                : 'Clear coordinates'}
+                          </Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  ) : (
+                    <View style={styles.gymCoordinateActionRow}>
+                      <Pressable
+                        accessibilityLabel={
+                          editingGym ? `Save current location for gym ${editingGym.name}` : 'Save current location for new gym'
+                        }
+                        accessibilityState={{ disabled: isEditorCoordinateLoading }}
+                        disabled={isEditorCoordinateLoading}
+                        style={[
+                          styles.gymCoordinatePrimaryButton,
+                          isEditorCoordinateLoading ? styles.gymCoordinateButtonDisabled : null,
+                        ]}
+                        onPress={() => {
+                          if (editingGym) {
+                            if (editingGymHasCoordinates) {
+                              requestReplaceGymCoordinates(editingGym.id);
+                            } else {
+                              void saveGymCoordinatesFromCurrentLocation(editingGym);
+                            }
+                            return;
+                          }
+
+                          void savePendingNewGymCoordinatesFromCurrentLocation();
+                        }}>
+                        <Text style={styles.gymCoordinatePrimaryButtonText}>
+                          {isEditorCoordinateLoading ? 'Saving...' : 'Save current location'}
+                        </Text>
+                      </Pressable>
+
+                      {editingGym && editingGymHasCoordinates ? (
+                        <Pressable
+                          accessibilityLabel={`Clear coordinates for gym ${editingGym.name}`}
+                          accessibilityState={{ disabled: isEditorCoordinateLoading }}
+                          disabled={isEditorCoordinateLoading}
+                          style={[
+                            styles.gymCoordinateDangerOutlineButton,
+                            isEditorCoordinateLoading ? styles.gymCoordinateButtonDisabled : null,
+                          ]}
+                          onPress={() => requestClearGymCoordinates(editingGym.id)}>
+                          <Text style={styles.gymCoordinateDangerOutlineButtonText}>Clear</Text>
+                        </Pressable>
+                      ) : null}
+                    </View>
+                  )}
+                </View>
                 <View style={styles.equalButtonRow}>
                   <Pressable style={styles.secondaryActionButton} onPress={returnFromEditor}>
                     <Text style={styles.secondaryActionButtonText}>Back</Text>
@@ -3308,75 +3385,6 @@ const styles = StyleSheet.create({
   },
   gymSelectionStack: {
     gap: 8,
-  },
-  gpsDetectionRow: {
-    flexDirection: 'row',
-  },
-  gpsDetectButton: {
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: uiColors.actionPrimary,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    alignItems: 'center',
-    backgroundColor: uiColors.actionPrimarySubtleBg,
-  },
-  gpsDetectButtonDisabled: {
-    borderColor: uiColors.actionPrimaryDisabled,
-    backgroundColor: uiColors.surfaceDisabled,
-  },
-  gpsDetectButtonText: {
-    color: uiColors.actionPrimary,
-    fontWeight: '700',
-  },
-  gpsFeedbackPanel: {
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: uiColors.borderWarning,
-    backgroundColor: uiColors.surfaceWarning,
-    paddingHorizontal: 10,
-    paddingVertical: 9,
-    gap: 8,
-  },
-  gpsFeedbackPanelMatched: {
-    borderColor: uiColors.borderSuccess,
-    backgroundColor: uiColors.surfaceSuccess,
-  },
-  gpsFeedbackText: {
-    fontSize: 12,
-    color: uiColors.textWarning,
-    fontWeight: '600',
-  },
-  gpsFeedbackTextMatched: {
-    color: uiColors.textSuccess,
-  },
-  gpsSuggestionActionRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  gpsSuggestionPrimaryButton: {
-    flex: 1,
-    borderRadius: 8,
-    paddingVertical: 8,
-    alignItems: 'center',
-    backgroundColor: uiColors.actionSuccess,
-  },
-  gpsSuggestionPrimaryButtonText: {
-    color: uiColors.surfaceDefault,
-    fontWeight: '700',
-  },
-  gpsSuggestionSecondaryButton: {
-    flex: 1,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: uiColors.borderStrong,
-    paddingVertical: 8,
-    alignItems: 'center',
-    backgroundColor: uiColors.surfaceDefault,
-  },
-  gpsSuggestionSecondaryButtonText: {
-    color: uiColors.textMuted,
-    fontWeight: '600',
   },
   logExerciseButton: {
     borderRadius: 8,
@@ -3981,6 +3989,15 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: uiColors.textMuted,
     fontWeight: '600',
+  },
+  gymCoordinateEditorPanel: {
+    gap: 8,
+    borderWidth: 1,
+    borderColor: uiColors.borderDefault,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    backgroundColor: uiColors.surfaceMuted,
   },
   gymCoordinateFeedback: {
     fontSize: 12,

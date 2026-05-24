@@ -211,7 +211,7 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
     render(<SessionRecorderScreen />);
     await dismissEmptyStateIfPresent();
 
-    fireEvent.press(screen.getByText('Choose gym'));
+    fireEvent.press(screen.getByText('No gym'));
     fireEvent.press(screen.getByLabelText('Select gym Westside Barbell Club'));
     fireEvent.press(screen.getByText('Log new exercise'));
     fireEvent.press(await screen.findByLabelText('Select exercise Barbell Squat'));
