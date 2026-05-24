@@ -70,9 +70,156 @@ describe('sync domain event emission', () => {
           entityType: 'gyms',
           entityId: 'gym-1',
           eventType: 'upsert',
+          payload: expect.objectContaining({
+            latitude: null,
+            longitude: null,
+            coordinate_accuracy_m: null,
+            coordinates_updated_at_ms: null,
+          }),
         }),
       ])
     );
+  });
+
+  it('emits gym coordinate metadata in upsert payloads', async () => {
+    const run = jest.fn();
+    const tx = {
+      select: jest.fn(() => ({
+        from: jest.fn(() => ({
+          where: jest.fn(() => ({
+            get: jest.fn(() => ({
+              id: 'gym-1',
+              name: 'Downtown',
+              latitude: null,
+              longitude: null,
+              coordinateAccuracyM: null,
+              coordinatesUpdatedAt: null,
+              createdAt: new Date('2026-03-06T10:00:00.000Z'),
+              updatedAt: new Date('2026-03-06T10:00:00.000Z'),
+            })),
+          })),
+        })),
+      })),
+      insert: jest.fn(() => ({
+        values: jest.fn(() => ({ run })),
+      })),
+      update: jest.fn(() => ({
+        set: jest.fn(() => ({
+          where: jest.fn(() => ({ run })),
+        })),
+      })),
+    };
+
+    mockBootstrapLocalDataLayer.mockResolvedValue({
+      transaction: (callback: (input: typeof tx) => void) => callback(tx),
+    });
+
+    await upsertLocalGym({
+      id: 'gym-1',
+      name: 'Downtown',
+      coordinates: {
+        latitude: 51.5072,
+        longitude: -0.1276,
+        accuracyM: 12.5,
+        updatedAt: new Date('2026-03-06T11:00:00.000Z'),
+      },
+      now: new Date('2026-03-06T11:00:00.000Z'),
+    });
+
+    const events = mockEnqueueSyncEventsTx.mock.calls[0]?.[1];
+    expect(events).toEqual([
+      expect.objectContaining({
+        entityType: 'gyms',
+        entityId: 'gym-1',
+        eventType: 'upsert',
+        payload: expect.objectContaining({
+          id: 'gym-1',
+          name: 'Downtown',
+          latitude: 51.5072,
+          longitude: -0.1276,
+          coordinate_accuracy_m: 12.5,
+          coordinates_updated_at_ms: Date.parse('2026-03-06T11:00:00.000Z'),
+        }),
+      }),
+    ]);
+  });
+
+  it('rejects invalid local gym coordinate ranges before enqueueing sync', async () => {
+    mockBootstrapLocalDataLayer.mockResolvedValue({
+      transaction: jest.fn(),
+    });
+
+    await expect(
+      upsertLocalGym({
+        id: 'gym-1',
+        name: 'Downtown',
+        coordinates: {
+          latitude: 91,
+          longitude: -0.1276,
+          accuracyM: 12.5,
+          updatedAt: new Date('2026-03-06T11:00:00.000Z'),
+        },
+        now: new Date('2026-03-06T11:00:00.000Z'),
+      })
+    ).rejects.toThrow('latitude must be between -90 and 90');
+
+    expect(mockEnqueueSyncEventsTx).not.toHaveBeenCalled();
+  });
+
+  it('emits null coordinate metadata when clearing saved gym coordinates', async () => {
+    const run = jest.fn();
+    const tx = {
+      select: jest.fn(() => ({
+        from: jest.fn(() => ({
+          where: jest.fn(() => ({
+            get: jest.fn(() => ({
+              id: 'gym-1',
+              name: 'Downtown',
+              latitude: 51.5072,
+              longitude: -0.1276,
+              coordinateAccuracyM: 12.5,
+              coordinatesUpdatedAt: new Date('2026-03-06T10:00:00.000Z'),
+              createdAt: new Date('2026-03-06T09:00:00.000Z'),
+              updatedAt: new Date('2026-03-06T10:00:00.000Z'),
+            })),
+          })),
+        })),
+      })),
+      insert: jest.fn(() => ({
+        values: jest.fn(() => ({ run })),
+      })),
+      update: jest.fn(() => ({
+        set: jest.fn(() => ({
+          where: jest.fn(() => ({ run })),
+        })),
+      })),
+    };
+
+    mockBootstrapLocalDataLayer.mockResolvedValue({
+      transaction: (callback: (input: typeof tx) => void) => callback(tx),
+    });
+
+    await upsertLocalGym({
+      id: 'gym-1',
+      name: 'Downtown',
+      coordinates: null,
+      now: new Date('2026-03-06T11:00:00.000Z'),
+    });
+
+    const events = mockEnqueueSyncEventsTx.mock.calls[0]?.[1];
+    expect(events).toEqual([
+      expect.objectContaining({
+        entityType: 'gyms',
+        entityId: 'gym-1',
+        eventType: 'upsert',
+        payload: expect.objectContaining({
+          latitude: null,
+          longitude: null,
+          coordinate_accuracy_m: null,
+          coordinates_updated_at_ms: null,
+        }),
+      }),
+    ]);
   });
 
   it('emits sessions delete/upsert events from session deleted-state writes', async () => {

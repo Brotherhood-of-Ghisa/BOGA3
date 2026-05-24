@@ -52,6 +52,10 @@ type ScopedSnapshot = {
   gyms: {
     id: string;
     name: string;
+    latitude: number | null;
+    longitude: number | null;
+    coordinateAccuracyM: number | null;
+    coordinatesUpdatedAtMs: number | null;
     createdAtMs: number;
     updatedAtMs: number;
   }[];
@@ -185,6 +189,10 @@ const captureScopedSnapshot = (state: FakeState): ScopedSnapshot => ({
     state.gyms.map((row) => ({
       id: row.id,
       name: row.name,
+      latitude: row.latitude,
+      longitude: row.longitude,
+      coordinateAccuracyM: row.coordinateAccuracyM,
+      coordinatesUpdatedAtMs: normalizeMs(row.coordinatesUpdatedAt),
       createdAtMs: row.createdAt.getTime(),
       updatedAtMs: row.updatedAt.getTime(),
     }))
@@ -498,6 +506,10 @@ const seedFixtureState = async (state: FakeState, runTag: string, now: Date): Pr
   state.gyms.push({
     id: gymId,
     name: `${runTag} Gym`,
+    latitude: 51.5072,
+    longitude: -0.1276,
+    coordinateAccuracyM: 12.5,
+    coordinatesUpdatedAt: now,
     createdAt: now,
     updatedAt: now,
   });
@@ -588,6 +600,10 @@ const seedFixtureState = async (state: FakeState, runTag: string, now: Date): Pr
       payload: {
         id: gymId,
         name: `${runTag} Gym`,
+        latitude: 51.5072,
+        longitude: -0.1276,
+        coordinate_accuracy_m: 12.5,
+        coordinates_updated_at_ms: baseMs,
         created_at_ms: baseMs,
         updated_at_ms: baseMs,
       },

@@ -188,6 +188,7 @@ SX_A_ID="sync-sx-a-${RUN_TAG}"
 SET_A_ID="sync-set-a-${RUN_TAG}"
 ANON_GYM_ID="sync-gym-anon-${RUN_TAG}"
 GYM_INVALID_ID="sync-gym-a-invalid-${RUN_TAG}"
+GYM_INVALID_COORDINATE_ID="sync-gym-a-invalid-coordinate-${RUN_TAG}"
 SESSION_INVALID_STATUS_ID="sync-session-a-invalid-status-${RUN_TAG}"
 SX_INVALID_ID="sync-sx-a-invalid-${RUN_TAG}"
 SX_CROSS_OWNER_ID="sync-sx-cross-owner-${RUN_TAG}"
@@ -225,9 +226,9 @@ assert_json_expr --arg owner "${USER_A_UUID}" 'length == 1 and .[0].owner_user_i
 postgrest_patch "gyms" "id=eq.${GYM_A_ID}" "${USER_A_TOKEN}" "$(jq -nc \
   --arg name "Warehouse Gym (Renamed)" \
   --argjson updated_at "$((BASE_MS + 1))" \
-  '{name: $name, updated_at: $updated_at}')"
+  '{name: $name, latitude: 51.5072, longitude: -0.1276, coordinate_accuracy_m: 12.5, coordinates_updated_at: $updated_at, updated_at: $updated_at}')"
 assert_status "200" "user_a update gym"
-assert_json_expr 'length == 1 and .[0].name == "Warehouse Gym (Renamed)"' "user_a update gym result"
+assert_json_expr 'length == 1 and .[0].name == "Warehouse Gym (Renamed)" and .[0].latitude == 51.5072 and .[0].longitude == -0.1276 and .[0].coordinate_accuracy_m == 12.5' "user_a update gym result"
 
 postgrest_select "gyms" "select=id,name,updated_at&updated_at=gte.$((BASE_MS))&order=updated_at.asc" "${USER_A_TOKEN}"
 assert_status "200" "user_a list gyms by updated_at"
@@ -240,6 +241,13 @@ postgrest_insert "gyms" "${USER_A_TOKEN}" "$(jq -nc \
   '{id: $id, name: "   ", created_at: $now, updated_at: $now}')"
 assert_non_2xx "gym blank name validation"
 assert_body_contains "23514" "gym blank name validation code"
+
+postgrest_insert "gyms" "${USER_A_TOKEN}" "$(jq -nc \
+  --arg id "${GYM_INVALID_COORDINATE_ID}" \
+  --argjson now "$((BASE_MS + 3))" \
+  '{id: $id, name: "Bad Coordinates", latitude: 91, longitude: -0.1276, coordinate_accuracy_m: 12.5, coordinates_updated_at: $now, created_at: $now, updated_at: $now}')"
+assert_non_2xx "gym latitude validation"
+assert_body_contains "23514" "gym latitude validation code"
 
 postgrest_select "gyms" "id=eq.${GYM_A_ID}&select=id" "${USER_B_TOKEN}"
 assert_status "200" "user_b cross-user gym read"

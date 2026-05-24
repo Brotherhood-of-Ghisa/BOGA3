@@ -111,6 +111,7 @@ Reason: keeps FE/backend integration test expectations explicit without forcing 
   - batch-order semantics (strict request-order processing, stop-on-first-failure, and prefix-commit behavior),
   - response contract semantics (`SUCCESS | FAILURE`, failure `error_index`, `should_retry`, free-text `message`, optional `error_event_id`),
   - projection/read-model correctness after event ingest/replay.
+  - GPS gym coordinate sync coverage for `gyms`: local range/shape validation, backend range/shape rejection, coordinate-bearing `gyms.upsert` payloads, bootstrap fetch/merge/convergence, and reinstall restore parity.
 - Use mocks/fakes for broad scenario coverage, then require at least one real cross-stack proof path with local `Supabase` validating event ingest, idempotent retries, and restorable projection state.
 - Backend-first M13 ingest/projection tasks should include the real local contract suite `./supabase/scripts/test-sync-events-ingest-contract.sh`.
 - Current frontend baseline suites for this policy include:

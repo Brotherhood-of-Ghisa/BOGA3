@@ -24,6 +24,10 @@ type GymRow = {
   id: string;
   name: string;
   deletedAtMs: number | null;
+  latitude: number | null;
+  longitude: number | null;
+  coordinateAccuracyM: number | null;
+  coordinatesUpdatedAtMs: number | null;
   createdAtMs: number;
   updatedAtMs: number;
 };
@@ -163,6 +167,56 @@ const normalizeOptionalEpochMs = (value: unknown, label: string): number | null 
   return normalizeEpochMs(value, label);
 };
 
+const normalizeOptionalFiniteNumber = (value: unknown, label: string): number | null => {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  const numeric = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(numeric)) {
+    throw new Error(`${label} must be a finite number`);
+  }
+  return numeric;
+};
+
+const normalizeGymCoordinateFields = (row: Record<string, unknown>) => {
+  const latitude = normalizeOptionalFiniteNumber(row.latitude, 'gyms.latitude');
+  const longitude = normalizeOptionalFiniteNumber(row.longitude, 'gyms.longitude');
+  const coordinateAccuracyM = normalizeOptionalFiniteNumber(
+    row.coordinate_accuracy_m,
+    'gyms.coordinate_accuracy_m'
+  );
+  const coordinatesUpdatedAtMs = normalizeOptionalEpochMs(
+    row.coordinates_updated_at,
+    'gyms.coordinates_updated_at'
+  );
+
+  const allMissing =
+    latitude === null && longitude === null && coordinateAccuracyM === null && coordinatesUpdatedAtMs === null;
+  const allPresent =
+    latitude !== null && longitude !== null && coordinateAccuracyM !== null && coordinatesUpdatedAtMs !== null;
+
+  if (!allMissing && !allPresent) {
+    throw new Error('gym coordinate fields must be all null or all non-null');
+  }
+  if (latitude !== null && (latitude < -90 || latitude > 90)) {
+    throw new Error('gyms.latitude must be between -90 and 90');
+  }
+  if (longitude !== null && (longitude < -180 || longitude > 180)) {
+    throw new Error('gyms.longitude must be between -180 and 180');
+  }
+  if (coordinateAccuracyM !== null && coordinateAccuracyM < 0) {
+    throw new Error('gyms.coordinate_accuracy_m must be non-negative');
+  }
+
+  return {
+    latitude,
+    longitude,
+    coordinateAccuracyM,
+    coordinatesUpdatedAtMs,
+  };
+};
+
 const normalizeString = (value: unknown, label: string): string => {
   if (typeof value !== 'string') {
     throw new Error(`${label} must be a string`);
@@ -215,6 +269,7 @@ const normalizeDurationSec = (value: unknown): number | null => {
 const parseRemoteGym = (row: Record<string, unknown>): GymRow => ({
   id: normalizeString(row.id, 'gyms.id'),
   name: normalizeString(row.name, 'gyms.name'),
+  ...normalizeGymCoordinateFields(row),
   deletedAtMs: normalizeOptionalEpochMs(row.deleted_at, 'gyms.deleted_at'),
   createdAtMs: normalizeEpochMs(row.created_at, 'gyms.created_at'),
   updatedAtMs: normalizeEpochMs(row.updated_at, 'gyms.updated_at'),
@@ -364,7 +419,7 @@ export const fetchRemoteSyncProjectionState = async (client: SupabaseClient): Pr
       selectRows(
         appPublicClient
           .from('gyms')
-          .select('id,name,deleted_at,created_at,updated_at'),
+          .select('id,name,latitude,longitude,coordinate_accuracy_m,coordinates_updated_at,deleted_at,created_at,updated_at'),
         'gyms'
       ),
       selectRows(
@@ -449,6 +504,10 @@ const readLocalProjectionState = (tx: MergeReadTx): ProjectionState => ({
       id: row.id,
       name: row.name,
       deletedAtMs: null,
+      latitude: row.latitude,
+      longitude: row.longitude,
+      coordinateAccuracyM: row.coordinateAccuracyM,
+      coordinatesUpdatedAtMs: row.coordinatesUpdatedAt ? row.coordinatesUpdatedAt.getTime() : null,
       createdAtMs: row.createdAt.getTime(),
       updatedAtMs: row.updatedAt.getTime(),
     })),
@@ -892,6 +951,10 @@ const buildConvergenceEvents = (state: ProjectionState): QueuedSyncEventInput[] 
       payload: {
         id: row.id,
         name: row.name,
+        latitude: row.latitude,
+        longitude: row.longitude,
+        coordinate_accuracy_m: row.coordinateAccuracyM,
+        coordinates_updated_at_ms: row.coordinatesUpdatedAtMs,
         created_at_ms: row.createdAtMs,
         updated_at_ms: row.updatedAtMs,
       },
@@ -1001,6 +1064,10 @@ const applyMergePlanTx = (tx: MergeWriteTx, input: { mergePlan: MergePlan; now: 
         mergedState.gyms.map((row) => ({
           id: row.id,
           name: row.name,
+          latitude: row.latitude,
+          longitude: row.longitude,
+          coordinateAccuracyM: row.coordinateAccuracyM,
+          coordinatesUpdatedAt: row.coordinatesUpdatedAtMs === null ? null : new Date(row.coordinatesUpdatedAtMs),
           createdAt: new Date(row.createdAtMs),
           updatedAt: new Date(row.updatedAtMs),
         }))

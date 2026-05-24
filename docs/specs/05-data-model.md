@@ -29,7 +29,7 @@ This document is project-level source of truth for what data exists and how it i
 
 ### User-owned domain data (sync/backups expected)
 
-- `gyms`
+- `gyms` (user-owned personal gym rows; nullable private coordinate metadata is in sync scope)
 - `sessions`
 - `session_exercises`
 - `exercise_sets` (optional `set_type` metadata: `warm_up | rir_0 | rir_1 | rir_2 | null`)
@@ -58,7 +58,7 @@ This document is project-level source of truth for what data exists and how it i
 
 ### Sync-domain projection tables (M13 backend baseline)
 
-- `app_public.gyms` (`deleted_at` projection support)
+- `app_public.gyms` (`deleted_at` projection support plus nullable private coordinate metadata)
 - `app_public.sessions`
 - `app_public.session_exercises` (`exercise_definition_id` + `deleted_at` projection support)
 - `app_public.exercise_sets` (`deleted_at` projection support; optional `set_type` metadata projection)
@@ -88,6 +88,7 @@ This document is project-level source of truth for what data exists and how it i
 4. Single-device assumptions are valid for M13; multi-device semantics are deferred.
 5. Diagnostic log rows are write-only from authenticated clients and are manually inspected through backend operator tooling.
 6. All eight sync-domain projection tables use composite primary key `(id, owner_user_id)`. Every user owns their own `id` keyspace, so two users may legitimately hold rows with the same `id` (for example, the same seeded `exercise_definitions.id`) without conflict. Cross-owner row-level conflicts are not possible by construction, and the backend has no cross-owner rejection path. Each user's seed catalog is per-user data from day one; no shared/global catalog of these entities exists on the backend.
+7. Gym coordinate metadata is private, user-owned data stored on `gyms`, not a shared/public location entity.
 
 ## M13 sync data-model contract (implemented baseline)
 
@@ -96,6 +97,8 @@ This document is project-level source of truth for what data exists and how it i
 3. Backend projects applied events into restorable user-state models.
 4. Restore/bootstrap must be coherent across all user-owned entities listed in this document.
 5. `exercise_sets` metadata includes optional `set_type` (`warm_up | rir_0 | rir_1 | rir_2 | null`) and remains nullable for legacy/unspecified sets.
+6. `gyms` may include nullable coordinate metadata: `latitude`, `longitude`, `coordinate_accuracy_m`, and `coordinates_updated_at`. The sync impact decision is `in sync scope`; these fields are carried by `gyms.upsert`, bootstrap fetch/merge, convergence events, and reinstall restore parity.
+7. Gym coordinate fields are either all null or all non-null. Valid ranges are latitude `-90..90`, longitude `-180..180`, accuracy `>= 0`, and non-negative `coordinates_updated_at` epoch milliseconds. Clearing saved coordinates sets all four coordinate fields to null.
 
 ### Canonical event envelope invariants
 
