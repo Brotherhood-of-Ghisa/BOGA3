@@ -256,6 +256,28 @@ Builders and reviewers don't see the chat history. The coordinator's `Agent` pro
 - For reviewers: pass the PR number, the card id, and the verdict-format requirement.
 - Tell the subagent which `mcp__github__*` tools to use; they may need to load schemas via `ToolSearch` first (these tools are typically deferred at session start).
 
+## Agent invocation settings
+
+The coordinator MUST pass `model: "opus"` on every `Agent` tool call. The Agent tool's `model` parameter accepts `sonnet | opus | haiku`; if omitted, the subagent falls back to either the agent definition's model frontmatter or inherits from the parent — both ambiguous in practice and observed to silently downgrade subagents to a weaker model. Always specify explicitly.
+
+Reasoning depth matters disproportionately for subagents because they start cold (no shared cache, no chat history) and must internalise the plan, the task card, the relevant source, and the protocol on every dispatch. Weaker reasoning produces "looks-correct-on-surface" artifacts that fail under adversarial review (e.g., load-bearing invariants that don't survive a counterexample).
+
+Effort/thinking level is not currently a parameter on the Agent tool schema. The coordinator-session's effort setting (e.g., `xhigh`) does not propagate to subagents. If a future schema revision adds an effort knob, the coordinator sets it to the highest available level for every dispatch.
+
+Example dispatch:
+
+```
+Agent({
+  subagent_type: "general-purpose",
+  model: "opus",                     // REQUIRED — never omit
+  isolation: "worktree",
+  description: "<task-id>: <short>",
+  prompt: "..."
+})
+```
+
+Applies uniformly to builders, reviewers, audit, and ad-hoc design/research spawns. The coordinator never spawns at sonnet/haiku to "save tokens" — a re-dispatch after a failed review costs strictly more than the initial Opus dispatch would have.
+
 ## Invocation
 
 The coordinator enters orchestrator mode only on an explicit user message:
