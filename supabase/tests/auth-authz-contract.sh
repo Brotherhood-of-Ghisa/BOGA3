@@ -337,11 +337,15 @@ fi
 
 echo "[auth-test] creating user-scoped records for user_a"
 NOW_MS="$(($(date +%s) * 1000))"
+# v2 schema (designs/sync-v2/t1.md §2): every entity table requires
+# client_updated_at_ms NOT NULL. Direct PostgREST inserts in this auth/RLS
+# contract must supply it; the sync push RPC (t3) will close over the same
+# rule on the wire-level path.
 postgrest_insert "gyms" "${USER_A_TOKEN}" "$(jq -nc \
   --arg id "${GYM_A_ID}" \
   --arg name "Garage A" \
   --argjson now "${NOW_MS}" \
-  '{id: $id, name: $name, created_at: $now, updated_at: $now}')"
+  '{id: $id, name: $name, created_at: $now, updated_at: $now, client_updated_at_ms: $now}')"
 assert_status "201" "user_a insert gym"
 printf '%s' "${REQUEST_BODY}" | jq -e --arg owner "${USER_A_UUID}" '.[0].owner_user_id == $owner' >/dev/null
 
@@ -349,8 +353,8 @@ postgrest_insert "sessions" "${USER_A_TOKEN}" "$(jq -nc \
   --arg id "${SESSION_A_ID}" \
   --arg gym_id "${GYM_A_ID}" \
   --argjson now "${NOW_MS}" \
-  --arg status "draft" \
-  '{id: $id, gym_id: $gym_id, status: $status, started_at: $now, created_at: $now, updated_at: $now}')"
+  --arg status "active" \
+  '{id: $id, gym_id: $gym_id, status: $status, started_at: $now, created_at: $now, updated_at: $now, client_updated_at_ms: $now}')"
 assert_status "201" "user_a insert session"
 
 postgrest_insert "session_exercises" "${USER_A_TOKEN}" "$(jq -nc \
@@ -358,14 +362,14 @@ postgrest_insert "session_exercises" "${USER_A_TOKEN}" "$(jq -nc \
   --arg session_id "${SESSION_A_ID}" \
   --arg name "Chest Press" \
   --argjson now "${NOW_MS}" \
-  '{id: $id, session_id: $session_id, order_index: 0, name: $name, created_at: $now, updated_at: $now}')"
+  '{id: $id, session_id: $session_id, order_index: 0, name: $name, created_at: $now, updated_at: $now, client_updated_at_ms: $now}')"
 assert_status "201" "user_a insert session_exercise"
 
 postgrest_insert "exercise_sets" "${USER_A_TOKEN}" "$(jq -nc \
   --arg id "${SET_A_ID}" \
   --arg session_exercise_id "${SX_A_ID}" \
   --argjson now "${NOW_MS}" \
-  '{id: $id, session_exercise_id: $session_exercise_id, order_index: 0, weight_value: "120", reps_value: "10", created_at: $now, updated_at: $now}')"
+  '{id: $id, session_exercise_id: $session_exercise_id, order_index: 0, weight_value: "120", reps_value: "10", created_at: $now, updated_at: $now, client_updated_at_ms: $now}')"
 assert_status "201" "user_a insert exercise_set"
 
 echo "[auth-test] verifying unauthenticated access is denied for protected app tables"
@@ -387,7 +391,7 @@ postgrest_insert "gyms" "${USER_B_TOKEN}" "$(jq -nc \
   --arg name "Spoof Gym" \
   --arg owner "${USER_A_UUID}" \
   --argjson now "${NOW_MS}" \
-  '{id: $id, owner_user_id: $owner, name: $name, created_at: $now, updated_at: $now}')"
+  '{id: $id, owner_user_id: $owner, name: $name, created_at: $now, updated_at: $now, client_updated_at_ms: $now}')"
 assert_non_2xx "user_b spoof owner_user_id on gym insert"
 
 echo "[auth-test] verifying cross-user parent/child mismatch is rejected"
@@ -396,7 +400,7 @@ postgrest_insert "session_exercises" "${USER_B_TOKEN}" "$(jq -nc \
   --arg session_id "${SESSION_A_ID}" \
   --arg name "Bad Link" \
   --argjson now "${NOW_MS}" \
-  '{id: $id, session_id: $session_id, order_index: 1, name: $name, created_at: $now, updated_at: $now}')"
+  '{id: $id, session_id: $session_id, order_index: 1, name: $name, created_at: $now, updated_at: $now, client_updated_at_ms: $now}')"
 assert_non_2xx "cross-user session_exercise parent link"
 assert_body_contains "foreign key" "cross-user session_exercise parent link"
 
@@ -405,7 +409,7 @@ postgrest_insert "gyms" "${USER_B_TOKEN}" "$(jq -nc \
   --arg id "${GYM_B_ID}" \
   --arg name "Garage B" \
   --argjson now "${NOW_MS}" \
-  '{id: $id, name: $name, created_at: $now, updated_at: $now}')"
+  '{id: $id, name: $name, created_at: $now, updated_at: $now, client_updated_at_ms: $now}')"
 assert_status "201" "user_b insert own gym"
 
 echo "[auth-test] auth/authz contract checks passed"
