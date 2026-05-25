@@ -34,15 +34,21 @@ When v2 is done (across this plan and any follow-up build plans), all of these a
   (`sync_apply_projection_event`, `sync_events_ingest`, `sync_device_ingest_state`,
   `sync_ingested_events`) are deleted, not coexisting.
 - New `app_public.<entity>` server tables (one per client entity) exist with composite
-  PK `(owner_user_id, id)`, RLS on `owner_user_id = auth.uid()`, deferrable FKs, and
-  `extras jsonb` for forward-compat.
+  PK `(owner_user_id, id)`, RLS on `owner_user_id = auth.uid()`, and deferrable FKs.
+  Typed columns only — no `extras jsonb` blob; deletion is expressed via `deleted_at`.
 - Drift between client and server schemas is caught automatically by a quality gate
-  that fails CI when a Drizzle column has no server-side counterpart (or isn't declared
-  as extras-only).
+  that fails CI when a Drizzle column has no server-side counterpart (or isn't
+  registered as a local-only sync column). See designs/t1.md §7 for the live spec.
 - Wipe-local and wipe-remote-for-me affordances exist behind a dev gate.
 
 This plan (the **first wave**) does *not* build any of that. It produces four design
 documents that resolve open questions so that the subsequent build plan is unambiguous.
+
+**Status (live, this wave):** t1 and t2 design docs are merged and are the
+authoritative specs. t3 is deferred pending restart against merged t1+t2;
+t4 is post-review, awaiting merge. Future agents touching any task in this
+wave consume the merged design docs as the source of truth, not the task-
+card bullets below (which describe the *original* ask).
 
 ## Orchestration
 
@@ -62,64 +68,62 @@ documents that resolve open questions so that the subsequent build plan is unamb
 
 ```mermaid
 graph TD
-  t1[t1: Server schema & drift control]
-  t2[t2: Sync protocol detail]
-  t3[t3: Seeded entities & edits]
-  t4[t4: iOS sync trigger reliability]
+  t1[t1: Server schema & drift control — merged]
+  t2[t2: Sync protocol detail — merged]
+  t3[t3: Seeded entities & edits — deferred]
+  t4[t4: iOS sync trigger reliability — open]
 
-  t1 -.independent.-> done
-  t2 -.independent.-> done
-  t3 -.independent.-> done
-  t4 -.independent.-> done
+  t1 --> t3
+  t2 --> t3
+  t1 -.context.-> t4
+  t2 -.context.-> t4
 ```
 
-All four design tasks are independent and run in parallel. A follow-up plan (out of
-scope here) will consume the four design docs and produce the build wave.
+The original wave fanned all four out in parallel. After review rounds it
+became clear t3 depends on t1+t2 decisions (LWW semantics, `deleted_at`
+column, dirty-bit lifecycle, server-first deploy), so t3 was deferred and
+will restart against the merged t1+t2 docs. t4's design is independent in
+shape but consumes t1+t2 as context for its constraint indexes.
+
+A follow-up plan (out of scope here) will consume the four design docs
+and produce the build wave.
 
 ## Tasks
 
 ### t1: Server schema & drift control
 
-**Problem:** v2 commits to a typed server schema mirroring the client Drizzle schemas
-(per [brainstorm.md](brainstorm.md) discussion outcomes). Two failure modes need a
-solved design before we build: (a) the initial migration must map 8 client tables to
-their server equivalents correctly, including types, nullability, indexes, RLS, and
-deferrable FKs; (b) over time, client fields will be added without server updates
-unless drift detection is automatic and a future agent is reminded by the rules. The
-v1 sync failed in part because nothing forced consistency between layers.
+> **Status: merged.** The live spec is `designs/t1.md`. The task description
+> below is the original ask. Where the original ask and the merged design
+> doc disagree, **the design doc wins** — notably, the `extras jsonb` blob
+> was dropped during t2 reconciliation; deletion uses `deleted_at` only
+> with no `deleted boolean` flag; the drift checker introspects a live
+> Postgres reset, not a SQL-parser diff; and the local-only sync columns
+> (`local_dirty`, `local_updated_at_ms`) are owned by t2's design, not t1.
 
-**Outcomes:**
+**Problem (as originally framed):** v2 commits to a typed server schema mirroring
+the client Drizzle schemas. Two failure modes need a solved design before we
+build: (a) the initial migration must map 8 client tables to their server
+equivalents correctly, including types, nullability, indexes, RLS, and deferrable
+FKs; (b) over time, client fields will be added without server updates unless
+drift detection is automatic and a future agent is reminded by the rules.
 
-- A design doc at `designs/t1.md` covering:
-  - Per-entity mapping table: client Drizzle column → server Postgres column (type,
-    nullable, default, indexed, FK target if any). All eight entities:
-    `gyms`, `sessions`, `session_exercises`, `exercise_sets`, `exercise_definitions`,
-    `exercise_muscle_mappings`, `exercise_tag_definitions`, `session_exercise_tags`.
-  - The `extras jsonb` column convention: when client writes a known field vs an
-    unknown field, how server reads it, how it gets promoted to a real column later.
-  - The two new local columns (`local_dirty boolean`, `local_updated_at_ms bigint`) on
-    each client table — purpose, defaults, where they're set and cleared.
-  - Local schema additions for entities that currently lack a `deletedAt` column
-    (`gyms`, `session_exercises`, `exercise_sets` per fix-sync follow-up P4).
-  - Deferrable FK declarations: which FKs, what `INITIALLY DEFERRED` means in practice
-    for push transactions, what happens when a child row arrives with no parent.
-  - RLS policy text for each table.
-  - Drift-detection mechanism: a runnable check (script or test) that diffs the client
-    Drizzle schema against the server migration tree and fails if a typed client column
-    has neither a typed server column nor an `extras_only` allowlist entry. Specify
-    where it lives, what command runs it, and how it wires into
-    `scripts/quality-slow.sh backend` (or fast, justify).
-  - Agent-reminder mechanism: which AGENTS.md / spec file gets an instruction that
-    "modifying any file under `apps/mobile/src/data/schema/` requires a paired server
-    migration or extras-only registration." Write the exact wording.
-  - One worked example: walking through "developer adds `notes text` to
-    `exercise_sets`" and what the workflow looks like from the developer's
-    perspective.
+**Outcomes (as landed in `designs/t1.md`):**
+
+- Per-entity mapping table for all eight entities (§2).
+- Universal typed columns: `owner_user_id`, `client_updated_at_ms`,
+  `server_received_at`, plus per-entity `deleted_at`. **No `extras jsonb`.**
+- Deferrable FK declarations (§5).
+- RLS policy text + immutability trigger with NULL-safe guard (§6).
+- Live-DB drift checker introspecting a `supabase db reset --local` (§7), wired
+  into `scripts/quality-slow.sh backend`, with trigger/policy body hashing
+  (§7.3 step 4f) and topological FK order assertion (§7.7).
+- Agent-reminder in `docs/specs/05-data-model.md` (§8).
+- Worked example: developer adds `notes text` to `exercise_sets` (§9).
 
 **Out of scope:** writing the migration, writing the drift-check code, editing
 AGENTS.md. Only the design doc.
 
-**Builder brief:**
+**Builder brief (historical):**
 
 > You are landing a design doc, not code. Read `docs/plans/sync-v2/plan.md` and
 > `docs/plans/sync-v2/brainstorm.md` first for context, then survey the current state:
@@ -150,49 +154,47 @@ AGENTS.md. Only the design doc.
 
 ### t2: Sync protocol detail
 
-**Problem:** The brainstorm sketched push/pull/snapshot at one paragraph each. Before we
-build, we need every wire-level decision pinned down: payload shape, batching rules,
-ordering inside a push (so deferrable FKs commit cleanly), pagination on pull, cursor
-semantics, error handling per row vs per batch, what "initial sync" looks like for a
-user who already has both local and remote data, and how the client decides when local
-counts as "has edits." This is the doc the build task literally implements.
+> **Status: merged.** The live spec is `designs/t2.md`. The task description
+> below is the original ask. Several original bullets were explicitly
+> overridden during review and **the design doc wins**:
+>
+> - **No initial-sync state machine** — no modal, no "keep local vs replace
+>   local" branch. The runtime starts the scheduler on sign-in and lets
+>   LWW reconcile (§5).
+> - **No retry/backoff schedule** — on error the cycle returns; the next
+>   scheduler tick retries naturally (§2.2 INTERNAL row).
+> - **No top-level `deleted` flag on the wire** — deletion is
+>   `fields.deleted_at != null`; there is no special server path (§2.1).
+> - **No per-row outcomes on push success** — the response is `{ ok: true,
+>   server_received_at }`; the client clears dirty for the whole sent batch
+>   (§3.5).
+> - **No sequence diagrams** — protocol semantics are pinned in §3, §4, §6.
 
-**Outcomes:**
+**Problem (as originally framed):** The brainstorm sketched push/pull/snapshot
+at one paragraph each. Before we build, every wire-level decision needs to be
+pinned down: payload shape, batching rules, ordering inside a push, pagination
+on pull, cursor semantics, error handling, initial sync, dirty-bit lifecycle.
 
-- A design doc at `designs/t2.md` covering:
-  - Exact request/response shapes for `sync.push` and `sync.pull` (JSON schemas).
-  - Whether push entities go in topological order or arbitrary order, and what the
-    server does to make deferrable FKs commit (single transaction per request, FKs
-    deferred, commit at end). Specify what happens when a single bad row would fail
-    the batch — whole-batch reject or partial accept.
-  - Aggregate grouping rule: does a push batch need to include a Session's children to
-    succeed, or are detached children acceptable (e.g., set written while session not
-    yet pushed)?
-  - Per-row outcome reporting: what the response says so the client knows which dirty
-    bits to clear.
-  - Pull pagination: cursor semantics (`server_received_at` monotonicity, how to handle
-    same-millisecond rows, tiebreak with `(owner, type, id)`).
-  - Initial-sync state machine — three branches (local empty / remote empty,
-    local-only, remote-only, both-have-data) and what the client does in each. Spell
-    out the UX modal copy for "Keep local and merge with cloud" vs "Replace local with
-    cloud." Define "has local data" precisely (is it `count(*) > 0` per table, is it
-    a `dirty=true` row, is it a profile flag?).
-  - Dirty-bit lifecycle in detail: when set by repos (every write path), when cleared
-    (after acked push), what happens when a row is mutated while a push for it is
-    in flight.
-  - Clock-monotonicity guard: `local_updated_at_ms = max(Date.now(), last_emitted + 1)`
-    — where it lives, how it's persisted across app restarts.
-  - Retry / backoff: exponential schedule (initial, multiplier, cap), what resets it,
-    what happens if the device goes offline mid-push.
-  - Tombstone handling: what `deleted=true` means on the wire, what pull returns for
-    deleted rows, how the client applies tombstones.
-  - Concrete sequence diagrams for: (a) device-reinstall login, (b) two devices both
-    online editing same row.
+**Outcomes (as landed in `designs/t2.md`):**
 
-**Out of scope:** implementing any of this, writing the RPC functions, drawing UI
-mocks for the modal beyond copy.
+- Request/response JSON shapes for `sync_push` and `sync_pull` (§3.1, §4.1).
+- Push topological batch builder (§3.4 — Layer 0..3 walk; single transaction
+  with deferrable FKs at COMMIT).
+- Pull layer-by-layer drain (§4.4 — four cursors, one per topological layer).
+- "First sign-in" minimal flow (§5): scheduler starts; LWW reconciles; no
+  modal, no user choice; `bootstrap_completed_at` set after all four layers
+  drain.
+- Dirty-bit lifecycle including push-in-flight race resolution (§7).
+- Clock-monotonicity guard with synchronous-persist semantics (§8).
+- Local-only sync columns: two per-entity (`local_dirty`,
+  `local_updated_at_ms`) plus three singletons on `sync_runtime_state`
+  (`pull_cursor`, `last_emitted_ms`, `bootstrap_completed_at`) (§9).
+- Constraint reconciliation against t1 §11 and t4 §11 (§10).
 
-**Builder brief:**
+**Out of scope:** implementing any of this, writing the RPC functions, UI
+mocks.
+
+**Builder brief (historical):**
 
 > You are landing a design doc, not code. Read `docs/plans/sync-v2/plan.md` and
 > `docs/plans/sync-v2/brainstorm.md` first.
@@ -224,79 +226,150 @@ mocks for the modal beyond copy.
 
 ### t3: Seeded entities & user edits
 
-**Problem:** The brainstorm settled on fixed slug IDs (`seed:bench-press`) and an
-idempotent loader. But the genuinely hard case wasn't worked through: **what happens
-when a user edits a seeded exercise?** Examples to resolve: user renames "Bench Press"
-to "My Bench" — does the rename roundtrip through sync correctly? Two devices each
-rename the same seed differently — does LWW pick the right one? User deletes a seeded
-exercise — does it stay deleted across reinstall, or does the seed loader resurrect
-it? Seeded exercise gets new fields in an app update (e.g., a `defaultRestSec`) — do
-they reach existing users who already own that seed?
+> **Status: deferred — needs restart against merged t1+t2.** A draft
+> exists at PR #57 (closed/draft) from before t1+t2 settled; that draft is
+> a *reference*, not a starting point. The direction below incorporates
+> reviewer-flagged simplifications since the original draft.
+
+**Problem:** When a user edits a seeded exercise, what happens? Rename, delete,
+two-device LWW race, app-upgrade adding new fields to seeds — all need a
+worked-through answer. The mechanism must compose with t1's typed schema,
+t2's wire shape, and the dirty-bit lifecycle without making the seed loader
+its own special case in sync.
+
+**Direction (as instructed during review of the original draft):**
+
+1. **The seeder runs AFTER every sync cycle, not before.** Sequence:
+   user logs in → wait for sync → apply seeder → app is ready. After
+   each subsequent sync cycle the seeder re-applies so any
+   server-pulled overrides stay reconciled.
+2. **The seeder NEVER writes sync-relevant columns.** It does not touch
+   `local_dirty` or `local_updated_at_ms`. Seed writes are
+   sync-invisible.
+3. **Sync ALWAYS overwrites seed data.** Server is authoritative; the
+   seeder is a re-apply pass that fills in anything sync did not
+   provide.
+4. **All deletes are soft.** No hard-delete path; deletion sets
+   `deleted_at`, period (consistent with t1's universal `deleted_at`
+   column on all eight entity tables).
+5. **`seed_origin` is a boolean, not a text enum.** A single bit on
+   the local row distinguishes seed-origin from user-created. No
+   server presence (per t1's typed-columns-only rule, this is a
+   client-only column registered via `exemptions.local_only_columns`).
+6. **Two-device LWW for seed renames is acceptable.** Eventually all
+   devices converge on the last-writer-wins value. We do not
+   encourage two-device editing as a primary use case.
 
 **Outcomes:**
 
 - A design doc at `designs/t3.md` covering:
-  - The full lifecycle of a seeded entity: install → user edit → sync → reinstall →
-    re-seed attempt → conflict resolution. State machine or sequence diagrams.
-  - Decision tree the seed loader uses: for each seed in the bundled list, given local
-    state (present / absent / soft-deleted / present-but-modified), what does it do?
-  - Whether seed *deletion* is preserved across reinstall. Specifically: if the seed
-    loader sees `seed:bench-press` is absent locally because the user deleted it, does
-    it re-seed (no), and how does it know the difference between "deleted by user" and
-    "fresh install"? Likely answer: re-seeding only happens when the local DB is empty
-    of all entities (true fresh install); after first sync the loader trusts that any
-    absent seed was deleted intentionally. Confirm or override.
-  - How new fields on existing seeds reach existing users. Two candidate approaches:
-    (a) seed loader merges new bundled fields into existing local rows on app upgrade,
-    (b) new fields only apply to fresh installs and existing users keep their pre-
-    upgrade values. Pick one with reasoning. Whatever the choice, it must not silently
-    overwrite a user's customisation (renamed "My Bench").
-  - Seed *removal* in a future app version: if v3 ships without `seed:bench-press` but
-    the user has it locally, what happens? Likely: nothing — bundled list is additive
-    only; removal is a no-op. Confirm.
-  - The `default_seed_version` integer or similar marker stored locally to track which
-    bundle version was last applied — schema, where it lives, when it's bumped.
-  - How seeded vs user-created is distinguished (or not) in the data model. Per the
-    brainstorm: not at all on the server, and locally only via the slug prefix. Confirm
-    or propose a `seed_origin text` column on the local table (no server presence).
-  - Worked examples (sequence diagrams or numbered steps):
-    1. User installs app, renames Bench Press, syncs, reinstalls — what they see.
-    2. User installs app, deletes Bench Press, syncs, reinstalls — what they see.
-    3. Two devices both rename the same seed within the same minute — LWW outcome.
-    4. App upgrade adds `defaultRestSec` to all seeds — what existing user sees.
+  - The full lifecycle, expressed against t2's cycle model: sync runs;
+    seeder re-applies; sync runs; etc. Show how this composes with t2's
+    pull/push interleave (t2 §6).
+  - Decision tree the seeder uses: for each seed in the bundled list,
+    given local state (absent / present unmodified / present user-
+    modified / soft-deleted via `deleted_at`), what does it write?
+    Soft-deleted seeds must NOT be resurrected.
+  - How new fields on existing seeds reach existing users: per the
+    additive-merge approach, the seeder fills in any unset columns on
+    existing local rows on app upgrade. It does not overwrite columns
+    the user has touched (detected via dirty-bit history or
+    `seed_origin = false` post-edit; pick one with reasoning).
+  - Seed *removal* in a future app version: confirmed no-op (the
+    bundled list is additive; absent seeds stay absent locally if they
+    were already there, and don't get re-seeded if they were never
+    there).
+  - The `local_seed_version` integer marker — schema (singleton column
+    on `sync_runtime_state` or per-entity column; pick one), when it
+    is bumped, and how it gates re-application of new bundled fields.
+  - The local-only `seed_origin boolean` — declared in t3's design as a
+    local column with no server counterpart; registered via t1's
+    `exemptions.local_only_columns` mechanism (t1 §4.1). Confirm
+    placement.
+  - Worked examples:
+    1. User renames "Bench Press" to "My Bench", syncs, reinstalls.
+    2. User deletes "Bench Press", syncs, reinstalls — stays deleted
+       (the tombstone is on the server and pulls back as
+       `deleted_at != null`).
+    3. Two devices rename the same seed within the same minute —
+       LWW picks the later `client_updated_at_ms`. Both devices
+       converge.
+    4. App v3 upgrade adds `default_rest_sec` to all seeds — existing
+       users see the new field on their seeded rows after the next
+       seeder pass, but customised seeds keep their renamed `name`.
 
-**Out of scope:** building the loader, writing the seed bundle, implementing the
-state machine.
+**Out of scope:** building the loader, writing the seed bundle, implementing
+the state machine.
 
 **Builder brief:**
 
-> You are landing a design doc, not code. Read `docs/plans/sync-v2/plan.md` and
-> `docs/plans/sync-v2/brainstorm.md` first.
+> You are landing a design doc, not code. **Read these in order before
+> writing anything:**
 >
-> Survey current state:
+> 1. `docs/plans/sync-v2/plan.md` — this file. The t3 task description
+>    above is your spec, including the six numbered "Direction" points
+>    and the Outcomes list.
+> 2. `docs/plans/sync-v2/designs/t1.md` — **merged. This is authoritative**
+>    for: server schema, universal `deleted_at` column, RLS, deferrable
+>    FKs, drift checker, the topological FK order (§3.4.1 of t2, asserted
+>    by t1 §7.7), and the `exemptions.local_only_columns` mechanism (§4.1)
+>    that `seed_origin` will use.
+> 3. `docs/plans/sync-v2/designs/t2.md` — **merged. This is authoritative**
+>    for: the wire envelope (§2.1), push/pull RPCs (§3, §4), the
+>    layer-by-layer pull (§4.4), the cycle interface (§6), the dirty-bit
+>    lifecycle (§7), and the local-only column inventory (§9). t3's design
+>    composes against these; it does not redefine them.
+> 4. `docs/plans/sync-v2/brainstorm.md` — original positions. Confirm or
+>    override explicitly.
+> 5. `docs/plans/sync-v2/designs/t4.md` — the iOS trigger design.
+>    Relevant for understanding *when* sync cycles fire (and therefore
+>    *when* the seeder gets to re-apply).
 >
-> - The current seed loader (renamed to `seedExerciseCatalog` per fix-sync T6 / `seedSystemExerciseCatalog`
->   pre-rename). Find it under `apps/mobile/src/` and read it end-to-end.
-> - The current seed list / bundled definitions — find where the seed data lives.
-> - `docs/tasks/fix-sync/follow-ups.md` P5 (seed version drift) and the seed-survival
->   work in T4 of fix-sync, for current thinking.
+> Then survey current state:
 >
-> Produce `docs/plans/sync-v2/designs/t3.md` covering every bullet under t3 Outcomes
-> in `plan.md`. Build the decision tree explicitly: a table or flowchart with one row
-> per (local-state, seed-loader-result) pair. The four worked examples are mandatory
-> — walk through them step by step, including which entities are written/updated and
-> what `local_dirty` / `local_updated_at_ms` end up as.
+> - The current seed loader (`seedExerciseCatalog`) and the bundled seed
+>   list under `apps/mobile/src/`.
+> - `docs/tasks/fix-sync/follow-ups.md` P5 (seed version drift) for prior
+>   thinking.
+> - PR #57 — the deferred prior draft. Use as a reference for what was
+>   considered; do not copy it. It pre-dates many of the t1/t2 decisions
+>   you are now bound by.
 >
-> Where the brainstorm took a position (fixed slug IDs, idempotent loader), confirm
-> or override it with reasoning. The interesting case the user explicitly flagged is
-> user-edited seeds — give that case extra weight in the design.
+> Produce `docs/plans/sync-v2/designs/t3.md`. Build the decision tree
+> explicitly. The four worked examples are mandatory — walk each through
+> showing every column write, including `deleted_at`, `seed_origin`, and
+> (for sync-relevant rows) `local_dirty` / `local_updated_at_ms`.
 >
-> Ship a PR titled `[t3] Sync v2 — seeded entities & edits design`. Only files
-> changed: `docs/plans/sync-v2/designs/t3.md`.
+> **Constraints emitted by t1 and t2 you MUST honour:**
+>
+> - All deletion is `deleted_at != null` (t1 §1.1). No `deleted boolean`
+>   flag anywhere.
+> - Any local-only column you introduce (e.g. `seed_origin`,
+>   `local_seed_version`) must be registered in
+>   `apps/mobile/src/data/schema/sync-extras.json` under
+>   `exemptions.local_only_columns` (t1 §4.1).
+> - The seeder MUST NOT mutate `local_dirty` or `local_updated_at_ms`
+>   on any row (Direction #2; required so the dirty-bit lifecycle in
+>   t2 §7 remains the sync engine's exclusive domain).
+> - Seed rows that the seeder creates on a fresh install MUST eventually
+>   reach the server. They are normal rows: the *first* seeder pass
+>   on a fresh install dirties them like any other write; subsequent
+>   seeder re-applications do not. Pick the mechanism (e.g. the seeder
+>   uses the normal repo path the first time and a direct sync-invisible
+>   write thereafter, gated by `seed_origin = true && local_seed_version =
+>   current_bundle_version`) and document it.
+>
+> Ship a PR titled `[t3] Sync v2 — seeded entities & edits design`. Only
+> files changed: `docs/plans/sync-v2/designs/t3.md`.
 
 ---
 
 ### t4: iOS sync trigger reliability
+
+> **Status: open (PR #59), post-review, awaiting merge.** The live spec is
+> `designs/t4.md`. Future revisions consume t1 and t2 as authoritative
+> inputs (notably the cycle interface in t2 §6 and the constraint indexes
+> in t1 §11 / t2 §10 / t4 §11).
 
 **Problem:** "Frequent and reliable" syncing is platform-specific on iOS. The brainstorm
 listed trigger types (debounced mutation, foreground, online event, safety interval)
@@ -344,35 +417,76 @@ about what happens in each lifecycle state.
 
 **Builder brief:**
 
-> You are landing a design doc, not code. Read `docs/plans/sync-v2/plan.md` and
-> `docs/plans/sync-v2/brainstorm.md` first.
+> You are landing a design doc, not code. **Read these in order before
+> writing anything:**
 >
-> Survey:
+> 1. `docs/plans/sync-v2/plan.md` — this file.
+> 2. `docs/plans/sync-v2/designs/t1.md` — **merged. Authoritative** for
+>    server schema and the drift contract t4's BG-task config must
+>    honour (notably the migration-in-flight contract in §1).
+> 3. `docs/plans/sync-v2/designs/t2.md` — **merged. Authoritative** for
+>    the cycle interface t4's scheduler invokes (§6), the surviving-
+>    state contract (§7, §9), and the constraint index t4's §11 walks
+>    against.
+> 4. `docs/plans/sync-v2/brainstorm.md`.
+>
+> Then survey:
 >
 > - Current scheduler at `apps/mobile/src/sync/scheduler.ts` (foreground cadence, online
->   toggling). Understand what it does today.
+>   toggling).
 > - Current sync status surface at `apps/mobile/src/sync/profile-status.ts` and
 >   wherever Settings consumes it.
-> - `apps/mobile/app.config.ts` and any `app.json` — what background modes are
->   declared, what Expo plugins are active.
-> - Expo / React Native documentation for `BGTaskScheduler` integration. Use the
+> - `apps/mobile/app.config.ts` — what background modes are declared, what
+>   Expo plugins are active.
+> - Expo / React Native documentation for `BGTaskScheduler`. Use the
 >   context7 MCP for current Expo docs rather than relying on training data.
 >
-> Produce `docs/plans/sync-v2/designs/t4.md` covering every bullet under t4 Outcomes
-> in `plan.md`. Be specific about iOS budgets and constraints — quote Apple's posted
-> rules where relevant.
+> Produce `docs/plans/sync-v2/designs/t4.md` covering every bullet under
+> t4 Outcomes. Be specific about iOS budgets and constraints — quote
+> Apple's posted rules where relevant.
 >
-> Pick exactly one background sync mechanism and justify the choice; do not present
-> alternatives without picking. Include the literal `app.config.ts` plugin block (or
-> JSON snippet) a future builder will copy.
+> Pick exactly one background sync mechanism and justify the choice; do
+> not present alternatives without picking. Include the literal
+> `app.config.ts` plugin block (or JSON snippet) a future builder will
+> copy.
 >
-> Note the project rules: no `__DEV__` global per the user's memory, and dev-only
-> behaviour must be gated by `isDevMode()` so it survives the TestFlight dev build.
-> Any dev-only sync affordances (like a tight 5s safety interval) should follow this.
+> Note the project rules: no `__DEV__` global per the user's memory, and
+> dev-only behaviour must be gated by `isDevMode()` so it survives the
+> TestFlight dev build. Any dev-only sync affordances should follow this.
 >
-> Ship a PR titled `[t4] Sync v2 — iOS trigger reliability design`. Only files
-> changed: `docs/plans/sync-v2/designs/t4.md`.
+> Ship a PR titled `[t4] Sync v2 — iOS trigger reliability design`. Only
+> files changed: `docs/plans/sync-v2/designs/t4.md`.
 
 ## Deviations log
 
-_(empty until first merge)_
+- **t1 (PR #58, merged):** `extras jsonb` universal column dropped during
+  review rounds. The original ask in this plan referenced an `extras`
+  forward-compat hatch (Outcomes section + t1 Outcomes bullets); the
+  design landed without it. Server-first deploy is now the unconditional
+  rule. Downstream: t2's wire envelope dropped `extras`, t3's seeded-
+  entity design now uses local-only columns via the same `local_only`
+  exemption mechanism.
+- **t1 (PR #63, merged):** reconciliation with t2 added `deleted_at` to
+  the two join tables (`exercise_muscle_mappings`,
+  `session_exercise_tags`), so all eight entity tables now carry a
+  uniform tombstone marker. The `deleted boolean` universal column was
+  dropped. Drift checker (§7.7) extended to assert the topological FK
+  order t2's push batch builder depends on.
+- **t2 (PR #60, merged):** several original Outcomes bullets explicitly
+  overridden — initial-sync state machine dropped (no modal, no "keep
+  local vs replace local" branch); retry/backoff schedule dropped (on
+  error the cycle returns and the next scheduler tick retries); top-
+  level `deleted` flag never landed (deletion is `deleted_at != null`);
+  per-row push outcomes collapsed to a single `{ ok: true }` ack;
+  sequence diagrams dropped. The merged `designs/t2.md` is the live
+  spec.
+- **t3 (PR #57, deferred):** the original draft pre-dated t1/t2's
+  settling. Deferred for restart against merged t1+t2; the t3 task
+  card in this plan was rewritten with the user-instructed direction
+  changes (seeder runs after sync, sync overwrites seed data, soft-
+  delete only, `seed_origin` as boolean, two-device LWW acceptable).
+- **t4 (PR #59, open):** went through two review rounds. The original
+  Outcomes bullet about retry/backoff was dropped (matches t2's
+  no-backoff posture); the sync cycle interface (§6 of t2) is now the
+  authoritative contract t4's scheduler invokes; battery quantification
+  flagged a follow-up to collapse idle pulls.
