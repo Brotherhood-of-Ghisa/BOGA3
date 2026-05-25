@@ -1,5 +1,13 @@
 # tFINAL: server end-to-end verification
 
+> Updated from t1 (PR #69, merged 2026-05-25): retired v1 contract suites
+> (`session-sync-api-contract.sh`, `sync-events-ingest-contract.sh`) have
+> been removed from `scripts/quality-slow.sh run_backend()`; this card's
+> "full slow gate exits 0" assertion stays valid. The as-built `gyms` table
+> carries `latitude` / `longitude` — include those columns in any
+> push-roundtrip / pull-drain projection assertion that touches `gyms`.
+> See plan.md `## Deviations log`.
+
 **Type:** build (final test card)
 
 **Problem:** Verify that the plan's outcomes hold end-to-end on a freshly

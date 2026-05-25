@@ -162,4 +162,4 @@ by t1 and can ship in parallel afterwards.
 
 ## Deviations log
 
-<empty until first merge>
+- t1 (PR #69, merged 2026-05-25): ships clean-room migration + smoke test + slow-gate skip-block per spec. Three honest deviations from the card: (a) preserved `gyms.latitude` / `gyms.longitude` columns despite their omission from t1 §2.1 (the client `apps/mobile/src/data/schema/gyms.ts` references them, so dropping would have desynced the v2 contract); (b) retired the v1 `session-sync-api-contract.sh` and `sync-events-ingest-contract.sh` invocations from `scripts/quality-slow.sh run_backend()` because v1 objects no longer exist; (c) patched `supabase/tests/auth-authz-contract.sh` to supply the new NOT NULL `client_updated_at_ms` column and switch a v1 status literal `'draft'` → v2 `'active'`. None of these alter downstream task contracts.
