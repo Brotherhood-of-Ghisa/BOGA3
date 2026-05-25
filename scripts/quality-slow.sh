@@ -53,18 +53,27 @@ run_backend() {
     "${REPO_ROOT}/supabase/scripts/test-auth-authz.sh"
   fi
 
-  if [[ ! -x "${REPO_ROOT}/supabase/scripts/test-sync-api-contract.sh" ]]; then
-    echo "[quality-slow] skipping backend sync-api-contract: wrapper not found or not executable"
+  # Sync v2 schema smoke (replaces the retired v1 sync-api / sync-events-ingest
+  # contract suites — those targeted the M13/M14 projection RPC family that the
+  # 20260525120000_sync_v2_clean_room migration drops). The v2 push/pull RPC
+  # contract suites land alongside t3 (sync_push) and t4 (sync_pull); this
+  # smoke test covers the schema shape t1 ships.
+  if [[ ! -x "${REPO_ROOT}/supabase/scripts/test-sync-v2-schema-smoke.sh" ]]; then
+    echo "[quality-slow] skipping backend sync-v2-schema-smoke: wrapper not found or not executable"
   else
-    echo "[quality-slow] backend: test-sync-api-contract"
-    "${REPO_ROOT}/supabase/scripts/test-sync-api-contract.sh"
+    echo "[quality-slow] backend: test-sync-v2-schema-smoke"
+    "${REPO_ROOT}/supabase/scripts/test-sync-v2-schema-smoke.sh"
   fi
 
-  if [[ ! -x "${REPO_ROOT}/supabase/scripts/test-sync-events-ingest-contract.sh" ]]; then
-    echo "[quality-slow] skipping backend sync-events-ingest-contract: wrapper not found or not executable"
+  # Sync v2 drift checker — per designs/t1.md §7.5. The TypeScript script
+  # lands in t2; until then this block skips with a notice so the slow gate
+  # stays green. t2's PR will not need to re-touch this file: when the script
+  # exists, the else branch invokes `npm run check:sync-drift -- --strict`.
+  if [[ ! -f "${REPO_ROOT}/apps/mobile/scripts/check-sync-schema-drift.ts" ]]; then
+    echo "[quality-slow] skipping backend sync-schema-drift: script not found (lands in t2)"
   else
-    echo "[quality-slow] backend: test-sync-events-ingest-contract"
-    "${REPO_ROOT}/supabase/scripts/test-sync-events-ingest-contract.sh"
+    echo "[quality-slow] backend: sync-schema-drift (boots local supabase + introspects)"
+    (cd "${REPO_ROOT}/apps/mobile" && npm run check:sync-drift -- --strict)
   fi
 }
 
