@@ -46,9 +46,10 @@ documents that resolve open questions so that the subsequent build plan is unamb
 
 **Status (live, this wave):** t1 and t2 design docs are merged and are the
 authoritative specs. t3 is deferred pending restart against merged t1+t2;
-t4 is post-review, awaiting merge. Future agents touching any task in this
-wave consume the merged design docs as the source of truth, not the task-
-card bullets below (which describe the *original* ask).
+t4 is open as a restart at PR #65 (supersedes PR #59) — the simpler
+scheduler model the user landed on post-t1/t2. Future agents touching any
+task in this wave consume the merged design docs as the source of truth,
+not the task-card bullets below (which describe the *original* ask).
 
 ## Orchestration
 
@@ -366,10 +367,19 @@ the state machine.
 
 ### t4: iOS sync trigger reliability
 
-> **Status: open (PR #59), post-review, awaiting merge.** The live spec is
+> **Status: open as a restart at PR #65, superseding PR #59.** The live spec is
 > `designs/t4.md`. Future revisions consume t1 and t2 as authoritative
 > inputs (notably the cycle interface in t2 §6 and the constraint indexes
 > in t1 §11 / t2 §10 / t4 §11).
+>
+> The restart collapses the scheduler to one entry point (`requestSync()`,
+> no `reason` parameter), two scheduling rules (1s debounce + 60s safety),
+> and one authority on `online` state (NetInfo). Transport-error backoff,
+> the v1 `outbox.calculateBackoffDelayMs` / `retry_blocked` path, and the
+> separate immediate-cycle branches for foreground / online edges are all
+> dropped. Reconnect is treated like an edit. Cycles are cheap when there's
+> nothing to do, which is what justifies the simpler gating — see the
+> design doc TL;DR.
 
 **Problem:** "Frequent and reliable" syncing is platform-specific on iOS. The brainstorm
 listed trigger types (debounced mutation, foreground, online event, safety interval)
@@ -485,8 +495,19 @@ about what happens in each lifecycle state.
   card in this plan was rewritten with the user-instructed direction
   changes (seeder runs after sync, sync overwrites seed data, soft-
   delete only, `seed_origin` as boolean, two-device LWW acceptable).
-- **t4 (PR #59, open):** went through two review rounds. The original
+- **t4 (PR #59, superseded):** went through two review rounds. The original
   Outcomes bullet about retry/backoff was dropped (matches t2's
   no-backoff posture); the sync cycle interface (§6 of t2) is now the
   authoritative contract t4's scheduler invokes; battery quantification
-  flagged a follow-up to collapse idle pulls.
+  flagged a follow-up to collapse idle pulls. PR #59 is now superseded
+  by the PR #65 restart and will be closed when #65 merges.
+- **t4 (PR #65, open):** restart against the simpler scheduler model the
+  user landed on after t1+t2 settled. Single `requestSync()` entry point
+  (no `reason` parameter); two scheduling rules (1s debounce + 60s
+  safety); the foreground / online / manual triggers all take the
+  debounce path (no special "immediate cycle" branches); transport-error
+  backoff / `retry_blocked` / `nextAttemptAt` bookkeeping all dropped;
+  NetInfo is the sole authority on `online` state. The four t2 constraints
+  in §11 are unchanged from PR #59 and remain honoured by merged t2
+  §6/§7/§9. The `profile-status.ts` diff now drops the `retry_scheduled`
+  kind (no backoff state surface to render).
