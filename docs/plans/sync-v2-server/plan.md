@@ -69,6 +69,19 @@ When this plan is done end-to-end, all of these are true:
   has_more}` per t2 §4.2. An automated test drains a multi-page layer with
   a cap of `limit=2` and observes every committed row exactly once across
   pages, in cursor order.
+- **Layer→type mapping integrity and client-FK closure.** The server's
+  layer→types mapping matches t2 §4.4 exactly: every one of the eight
+  entity types appears in exactly one layer (Layer 0: `gyms`,
+  `exercise_definitions`, `exercise_tag_definitions`; Layer 1: `sessions`,
+  `exercise_muscle_mappings`; Layer 2: `session_exercises`; Layer 3:
+  `exercise_sets`, `session_exercise_tags`). An automated test pushes a
+  fully-connected dataset (rows in every layer with the FK chain
+  populated), drains layers 0→3 in order, and asserts the FK-closure
+  invariant: for every row in the layer-N response, all of its FK parents
+  appear either in a previously-drained layer's response or in the same
+  layer-N response. This is the load-bearing property that lets a client
+  inserting layer-by-layer never see an FK violation against its local
+  SQLite.
 - A drift checker at `apps/mobile/scripts/check-sync-schema-drift.ts`
   implements the t1 §7 algorithm: it spins up the local Supabase, runs
   `supabase db reset --local --yes`, materialises the Drizzle schema into

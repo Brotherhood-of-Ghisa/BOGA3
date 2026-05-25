@@ -93,6 +93,29 @@ case, the layered push→pull round-trip).
      pushes a batch as user A, then pulls every layer as A — every
      pushed row reappears in pull responses with identical
      `fields`. Pulling as user B returns zero of A's rows.
+  8a. **Layered drain preserves client-FK closure (plan outcome
+      "Layer→type mapping integrity").** Test
+      `supabase/tests/sync-v2-pull-fk-closure.sh` pushes a
+      fully-connected dataset as user A with the FK chain populated
+      (at minimum: 1 `gyms`, 1 `exercise_definitions`, 1
+      `exercise_tag_definitions`, 1 `sessions` referencing the gym, 1
+      `exercise_muscle_mappings`, 1 `session_exercises` referencing
+      the session + exercise_definition, 1 `exercise_sets`
+      referencing the session_exercise, 1 `session_exercise_tags`
+      referencing the session_exercise + exercise_tag_definition).
+      Drains layers 0→3 sequentially. For every row in the layer-N
+      response, asserts that *every* foreign-key reference resolves
+      to a row that appeared in a layer-M response with M ≤ N (or in
+      the same layer-N response if siblings reference each other,
+      though the t1 §5 FK graph has no intra-layer references).
+      Equivalently: simulate a client SQLite by maintaining a running
+      `seen_ids: Set<(type, id)>` across layer responses and assert
+      every FK column value in every row is in `seen_ids` by the time
+      that row is inserted, with no forward references. Also asserts
+      via Layer 0..3 type-set assertions (matching t4 "Layer→type
+      mapping integrity") that the eight entity types partition
+      exactly across the four layers. Failure of this test means a
+      client drain would FK-fail on insert.
   9. **Drift checker rejects synthetic drift (plan outcome #8 and
      outcome #9 negative case).** Test
      `supabase/tests/sync-v2-drift-synthetic.sh` saves the current
@@ -134,6 +157,8 @@ case, the layered push→pull round-trip).
 - `supabase/tests/sync-v2-rls-cross-owner.sh` (outcome 5)
 - `supabase/tests/sync-v2-push-roundtrip.sh` (outcome 6)
 - `supabase/tests/sync-v2-pull-drain.sh` (outcomes 7, 8)
+- `supabase/tests/sync-v2-pull-fk-closure.sh` (outcome 8a — layered
+  drain FK closure)
 - `supabase/tests/sync-v2-drift-synthetic.sh` (outcome 9 negative case)
 - `supabase/tests/sync-v2-drift-asbuilt.sh` (outcome 9 positive case) —
   or fold into the synthetic script as a second test case
