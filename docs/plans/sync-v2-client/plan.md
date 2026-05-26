@@ -177,6 +177,26 @@ When this plan is done end-to-end, all of these are true:
   sections AND that no in-app marker module was silently
   re-introduced under `apps/mobile/src/data/`.
 
+## What is and isn't wired after plan 2
+
+**Wired by plan 2** (mechanical / non-UX):
+
+- `_layout.tsx` calls `startSyncScheduler()` at boot (t7).
+- Scheduler invokes the cycle on NetInfo `online`, on `AppState background → active`, and on cold launch via a single `requestSync()` (t7).
+- BG-task runs one cycle from iOS `BGAppRefreshTask` (t8).
+- Every repo write flips `local_dirty = 1` and `local_updated_at_ms = nowMonotonic()` (t5a + t5b).
+- Dev-only `wipe-local` and `wipe-remote-for-me` affordances live behind `isDevMode()` on the existing Settings screen (t9).
+
+**Not wired by plan 2** (deferred to plan 3 — `docs/plans/sync-v2-launch/`):
+
+- Login-on-start enforcement / redirect to sign-in (plan 3 t1).
+- Sync gate full-screen UI blocking app usage until `bootstrap_completed_at` is non-null (plan 3 t2).
+- Settings sync-status surface — last successful sync time, dirty count, error, network state (plan 3 t9). Plan 2's t1 deletes the v1 "Backup sync" card from `profile.tsx`; plan 3 adds the new Settings surface.
+- Soft-delete-everywhere — every hard-delete path becomes a soft-delete and readers filter `WHERE deleted_at IS NULL` (plan 3 t7).
+- Sign-out / account-switch wipe (plan 3 t8).
+
+After plan 2 alone, the app boots, sync runs in the background, repos mark rows dirty correctly, but the user sees no UX feedback about sync state. The v1 "Backup sync" card is gone (t1 deletes it). Plan 3 lands the new UX surface.
+
 ## Orchestration
 
 - Status: enabled
@@ -220,14 +240,16 @@ When this plan is done end-to-end, all of these are true:
     cycle round-trip test, declared in this Orchestration block so it
     is not a surprise. The tFINAL card lists the deployment as an
     explicit precondition. Plan 1's tFINAL used the same pattern.
-  - The user's `isDevMode()` rule (memory file `feedback_no_dev_global.md`)
-    binds t9; `__DEV__` must not appear in any new client UI gate.
-    Reviewers must reject `__DEV__` literals in t9's diff.
-  - The user's "run sim gates by default" rule (memory file
-    `feedback_run_sim_gates.md`) binds t7 / t8 / t9 (UI-touching
-    tasks) and tFINAL — each PR body must assert
-    `test:e2e:ios:smoke` and `test:e2e:ios:data-smoke` pass locally,
-    in addition to the fast gate.
+  - **Sim-smoke per task.** Every task PR — t1, t2, t3, t4, t5a,
+    t5b, t6, t7, t8, t9, tFINAL — must assert
+    `test:e2e:ios:smoke` and `test:e2e:ios:data-smoke` pass locally
+    in addition to the fast gate, per the user's "app must ALWAYS
+    be in working state" directive (broader than the per-memory
+    rule that only binds UI-touching tasks). The PR body's Standard
+    checklist line must read
+    `sim-smoke + data-smoke pass: YES (built rev: <git sha>)`. The
+    user's `feedback_no_dev_global.md` rule (no `__DEV__` literals)
+    still applies to t9.
 
 ## DAG
 

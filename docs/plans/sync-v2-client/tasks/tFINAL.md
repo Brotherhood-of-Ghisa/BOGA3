@@ -151,6 +151,11 @@ audit-friendliness.
     documents the requirement in a comment and the PR body
     asserts the gate ran locally).
 
+Plus: `test:e2e:ios:smoke` and `test:e2e:ios:data-smoke` pass locally
+on the merged-to-`main`-equivalent state; the PR body's Standard
+checklist asserts both with the built git sha (per the
+Orchestration block's "Sim-smoke per task" deviation).
+
 **Output artifact:**
 
 - New directory `apps/mobile/app/__tests__/sync-v2-final/`
@@ -167,9 +172,9 @@ audit-friendliness.
 - PR body explicitly notes:
   - The Supabase branch URL used for test 5 (and the branch
     teardown cleanup line).
-  - Per the Orchestration deviations, both
-    `test:e2e:ios:smoke` and `test:e2e:ios:data-smoke` pass
-    locally.
+  - Per the Orchestration block's "Sim-smoke per task" deviation,
+    the Standard checklist line
+    `sim-smoke + data-smoke pass: YES (built rev: <git sha>)`.
 
 **Out of scope:**
 

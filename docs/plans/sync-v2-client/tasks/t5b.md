@@ -62,6 +62,9 @@ t6 (cycle) can rely on the dirty stream being authoritative.
 - `npm run lint && npm run typecheck && npm run test` passes from
   `apps/mobile/`.
 - `npm run check:sync-drift -- --strict` continues to exit zero.
+- `test:e2e:ios:smoke` and `test:e2e:ios:data-smoke` pass locally;
+  the PR body's Standard checklist asserts both with the built
+  git sha.
 
 **Output artifact:**
 

@@ -83,6 +83,9 @@ Layer 2 / 3.
   `apps/mobile/`.
 - `npm run check:sync-drift -- --strict` continues to exit zero
   (no new exemptions added).
+- `test:e2e:ios:smoke` and `test:e2e:ios:data-smoke` pass locally;
+  the PR body's Standard checklist asserts both with the built
+  git sha.
 
 **Output artifact:**
 
