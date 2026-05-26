@@ -140,6 +140,7 @@ graph TD
   t2 --> tFINAL
   t3 --> tFINAL
   t4 --> tFINAL
+  tFINAL --> t99[t99: merge orchestrator plan-tracking commits — audit remediation]
 ```
 
 t1 is a single migration task that handles both the v1 drop and the v2
@@ -159,7 +160,12 @@ by t1 and can ship in parallel afterwards.
 - [t3: sync_push RPC](tasks/t3.md) — build
 - [t4: sync_pull RPC](tasks/t4.md) — build
 - [tFINAL: server end-to-end verification](tasks/tFINAL.md) — build (final test card)
+- [t99: merge orchestrator plan-tracking commits](tasks/t99.md) — build (audit remediation, doc-only)
 
 ## Deviations log
 
 <empty until first merge>
+
+(Audit note 2026-05-26: the deviations-log content + a `status.md` with
+nine iterations exist on `origin/claude/pensive-hoover-44a409` but never
+merged. Remediation lives in `tasks/t99.md`. See audit comment on PR #74.)
