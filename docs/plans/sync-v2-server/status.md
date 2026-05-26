@@ -77,3 +77,16 @@ Orchestrator log. Append one entry per iteration. Reverse-chronological.
 - Surfaced merge asks for all three PRs. Coordinator does not merge.
 
 **Next:** once all three merge, iteration 7 will verify hand-offs (TS checker on `main`, both RPC migrations applied, layer partition in `topo-order.ts` matching the sync_pull SQL), append three deviation entries to `plan.md ## Deviations log`, propagate any remaining pointer markers to `tasks/tFINAL.md`, then dispatch the tFINAL builder.
+
+## Iteration 7 — 2026-05-26
+
+**State snapshot:**
+- t2 PR [#72](https://github.com/Brotherhood-of-Ghisa/BOGA3/pull/72) merged at `8d7be1b`.
+- t3 PR [#71](https://github.com/Brotherhood-of-Ghisa/BOGA3/pull/71) merged at `cd8703e`.
+- t4 PR [#73](https://github.com/Brotherhood-of-Ghisa/BOGA3/pull/73) still OPEN (APPROVED, awaiting merge).
+- Hand-off verified on `origin/main`: drift checker (`apps/mobile/scripts/check-sync-schema-drift.{ts,fixtures.json}`), `topo-order.ts`, `sync-extras.json`, sync_push migration `20260525130000_sync_v2_push_rpc.sql`, spec edit (`Client schema drift rule` subsection in `docs/specs/05-data-model.md`).
+
+**Actions:**
+- Appended t2 (final) and t3 deviation entries to `plan.md ## Deviations log`.
+
+**Next:** wait for t4 merge. Then iteration 8: verify sync_pull migration on main, confirm SQL `case` matches `topo-order.ts` layer mapping (cross-cutting consistency check), dispatch tFINAL builder with the tFINAL pointer markers already in place.
