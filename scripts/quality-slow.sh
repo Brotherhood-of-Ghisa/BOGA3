@@ -96,6 +96,18 @@ run_backend() {
     echo "[quality-slow] backend: sync-schema-drift (boots local supabase + introspects)"
     (cd "${REPO_ROOT}/apps/mobile" && npm run check:sync-drift -- --strict)
   fi
+
+  # Sync v2 end-to-end (tFINAL). Runs the integration test suite under
+  # supabase/tests/sync-v2-*.sh that asserts each plan outcome end-to-end
+  # against the as-built stack. Placed after the per-task wrappers above so
+  # a per-feature regression surfaces with its targeted failure before the
+  # broader integration assertions trip.
+  if [[ ! -x "${REPO_ROOT}/supabase/scripts/test-sync-v2-e2e.sh" ]]; then
+    echo "[quality-slow] skipping backend sync-v2-e2e: wrapper not found or not executable"
+  else
+    echo "[quality-slow] backend: test-sync-v2-e2e (integration-level plan outcome assertions)"
+    "${REPO_ROOT}/supabase/scripts/test-sync-v2-e2e.sh"
+  fi
 }
 
 case "${area}" in
