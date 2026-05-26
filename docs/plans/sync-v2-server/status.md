@@ -90,3 +90,17 @@ Orchestrator log. Append one entry per iteration. Reverse-chronological.
 - Appended t2 (final) and t3 deviation entries to `plan.md ## Deviations log`.
 
 **Next:** wait for t4 merge. Then iteration 8: verify sync_pull migration on main, confirm SQL `case` matches `topo-order.ts` layer mapping (cross-cutting consistency check), dispatch tFINAL builder with the tFINAL pointer markers already in place.
+
+## Iteration 8 — 2026-05-26
+
+**State snapshot:**
+- t4 PR [#73](https://github.com/Brotherhood-of-Ghisa/BOGA3/pull/73) merged at `71f6930` (post-rebase head `36602d5`).
+- Hand-off verified on `origin/main`: pull migration `20260525130100_sync_v2_pull_rpc.sql`, contract test `supabase/tests/sync-pull-contract.sh`, wrapper `supabase/scripts/test-sync-pull-contract.sh`, slow-gate wiring in `scripts/quality-slow.sh run_backend()`.
+- Cross-cutting consistency check: `apps/mobile/src/sync/topo-order.ts` `TOPO_LAYERS` and the sync_pull SQL `case` mapping agree on the corrected partition (Layer 0: gyms, exercise_definitions; Layer 1: sessions, exercise_muscle_mappings, exercise_tag_definitions; Layer 2: session_exercises; Layer 3: exercise_sets, session_exercise_tags).
+- DAG: t1, t2, t3, t4 all merged. Only tFINAL remaining.
+
+**Actions:**
+- Appended t4 deviation entry to `plan.md ## Deviations log`.
+- Dispatching `mao-builder` for tFINAL (final test card — integration-level E2E verification of each plan-level outcome).
+
+**Next:** await tFINAL PR; review; merge; run `mao-audit` for end-of-plan verification.
