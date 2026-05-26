@@ -158,3 +158,38 @@ Sync impact gate (mandatory for every data-model change):
   - `in sync scope` (with contract/mapping + implementation/test updates), or
   - `out of sync scope` (with explicit rationale and guardrails).
 - Do not leave new/changed data-model elements with undefined sync behavior.
+
+## Client schema drift rule (Sync v2)
+
+Modifying any file under `apps/mobile/src/data/schema/` for the eight user-owned
+entities (`gyms`, `sessions`, `session_exercises`, `exercise_sets`,
+`exercise_definitions`, `exercise_muscle_mappings`, `exercise_tag_definitions`,
+`session_exercise_tags`) to add a domain column requires a paired server
+migration under `supabase/migrations/` that adds the matching
+`app_public.<entity>` column with a compatible Postgres type, **and the server
+migration must be deployed to production before the client change ships**.
+
+Why "server first": a client that depends on a typed server column not yet
+deployed will fail to round-trip that column; the server has nowhere typed to
+store it. Server-ahead-of-client is always safe (the column sits unwritten
+until the client catches up).
+
+The drift checker (`apps/mobile/scripts/check-sync-schema-drift.ts`, invoked via
+`npm run check:sync-drift` and gated by `./scripts/quality-slow.sh backend`)
+enforces the rule by booting a local Postgres, applying every migration, and
+introspecting the live schema. PRs failing the gate cannot merge. The checker
+also asserts the hardcoded topological table order in
+`apps/mobile/src/sync/topo-order.ts` against the live FK graph (see
+`designs/t1.md` §7.7) — adding a new entity table or FK without updating that
+list also fails the gate.
+
+This rule does NOT apply to: `muscle_groups` (client-only taxonomy),
+`smoke_records`, `sync_outbox_events`, `sync_delivery_state`,
+`sync_runtime_state` (test/runtime scaffolding), or the two local-only
+sync-bookkeeping columns (`local_dirty`, `local_updated_at_ms`) on each entity
+table. All of these are listed under `exemptions` in `sync-extras.json`.
+
+If your client change adds a value to an existing column (e.g., a new enum literal),
+the rule does not apply because the column already exists on both sides; the client
+is free to validate the enum and the server stores arbitrary text per the v2
+no-server-validation policy in `docs/plans/sync-v2/designs/t1.md` §1.

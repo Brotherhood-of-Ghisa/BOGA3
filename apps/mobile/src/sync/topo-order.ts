@@ -17,9 +17,18 @@
 // To add a new entity table, add it to its correct layer here AND add the
 // matching `app_public.<entity>` migration; the drift checker fails the slow
 // gate if the two diverge.
+//
+// NOTE — deviation from t1 §7.7 sketch: the design's example layering placed
+// `exercise_tag_definitions` in Layer 0, but t1 §2.7 declares a FK
+// `exercise_tag_definitions(owner_user_id, exercise_definition_id) →
+// exercise_definitions(owner_user_id, id)`. The §7.7 rule itself ("every FK
+// points to a strictly earlier layer or is a self-edge") forbids that
+// placement. The Layer 0/1 split below puts `exercise_tag_definitions` next
+// to `exercise_muscle_mappings` and `sessions` in Layer 1, which is the only
+// placement that satisfies §7.7's invariant against the live FK graph.
 export const TOPO_LAYERS: readonly (readonly string[])[] = [
-  ['gyms', 'exercise_definitions', 'exercise_tag_definitions'], // Layer 0
-  ['sessions', 'exercise_muscle_mappings'], // Layer 1
+  ['gyms', 'exercise_definitions'], // Layer 0
+  ['sessions', 'exercise_muscle_mappings', 'exercise_tag_definitions'], // Layer 1
   ['session_exercises'], // Layer 2
   ['exercise_sets', 'session_exercise_tags'], // Layer 3
 ] as const;

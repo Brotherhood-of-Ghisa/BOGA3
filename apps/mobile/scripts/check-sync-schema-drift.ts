@@ -131,6 +131,17 @@ interface SupabaseStatusEnv {
 }
 
 function loadSupabaseStatusEnv(): SupabaseStatusEnv {
+  // Env override: if the caller has already exported DB_URL (CI, test
+  // harnesses, or a developer pointing at a non-default stack), skip the
+  // `supabase status` invocation. The `npm run check:sync-drift -- --strict`
+  // slow-gate invocation does not set this, so the default path remains
+  // "read from `supabase status -o env`".
+  if (process.env.DB_URL) {
+    return {
+      DB_URL: process.env.DB_URL,
+      SERVICE_ROLE_KEY: process.env.SERVICE_ROLE_KEY,
+    };
+  }
   const r = spawnSync('bash', ['-c', 'source supabase/scripts/_common.sh && load_supabase_status_env && env'], {
     cwd: REPO_ROOT,
     encoding: 'utf8',
@@ -609,6 +620,10 @@ async function main(): Promise<number> {
     const extras = JSON.parse(readFileSync(SYNC_EXTRAS_PATH, 'utf8')) as {
       exemptions: {
         local_only_columns: string[];
+        // Server-side columns we tolerate as having no client counterpart
+        // (typically because plan-2 hasn't shipped the matching client column
+        // yet — see sync-extras.json rationale per entry).
+        server_only_columns?: { column: string; rationale?: string }[];
         untyped_text_references: { entity: string; column: string }[];
       };
     };
@@ -702,6 +717,7 @@ interface EntityContext {
   extras: {
     exemptions: {
       local_only_columns: string[];
+      server_only_columns?: { column: string; rationale?: string }[];
       untyped_text_references: { entity: string; column: string }[];
     };
   };
@@ -871,9 +887,13 @@ async function checkEntity(ctx: EntityContext): Promise<void> {
 
   // ---- 4e: server column has a client counterpart (warn-only) -----------
   const clientWireNames = new Set(sqliteCols.map((c) => c.name));
+  const serverOnlyExempt = new Set(
+    (extras.exemptions.server_only_columns ?? []).map((r) => r.column)
+  );
   for (const pgCol of pgCols) {
     if (WIRE_ENVELOPE_COLUMNS.has(pgCol.column_name)) continue;
     if (clientWireNames.has(pgCol.column_name)) continue;
+    if (serverOnlyExempt.has(pgCol.column_name)) continue;
     addWarning(
       findings,
       `${entity}.${pgCol.column_name}: server has a typed column with no client counterpart. ` +

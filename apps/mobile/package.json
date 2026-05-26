@@ -15,6 +15,7 @@
     "test": "jest",
     "db:generate": "drizzle-kit generate --config=drizzle.config.ts",
     "db:generate:canary": "npm run db:generate",
+    "check:sync-drift": "tsx scripts/check-sync-schema-drift.ts",
     "test:sync:reinstall-parity": "./scripts/test-sync-reinstall-restore-parity.sh",
     "test:e2e:ios:smoke": "./scripts/maestro-ios-smoke.sh",
     "test:e2e:ios:data-smoke": "./scripts/maestro-ios-data-smoke.sh",

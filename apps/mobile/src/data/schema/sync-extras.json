@@ -1,6 +1,12 @@
 {
   "exemptions": {
     "local_only_columns": ["local_dirty", "local_updated_at_ms"],
+    "server_only_columns": [
+      {
+        "column": "deleted_at",
+        "rationale": "Server-side soft-delete cursor column added by the sync v2 clean-room migration (designs/t1.md §1, §4.2). Plan-2 (sync-v2-client) ships the matching client column; until then the server has it and the client doesn't, which would otherwise fire the §7.3 step 4e warn-line and break --strict invocations."
+      }
+    ],
     "untyped_text_references": [
       {
         "entity": "exercise_muscle_mappings",
