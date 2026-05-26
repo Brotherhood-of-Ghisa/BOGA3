@@ -145,6 +145,7 @@ graph TD
   t2 --> tFINAL
   t3 --> tFINAL
   t4 --> tFINAL
+  tFINAL --> t99[t99: merge orchestrator plan-tracking commits — audit remediation]
 ```
 
 t1 is a single migration task that handles both the v1 drop and the v2
@@ -164,6 +165,7 @@ by t1 and can ship in parallel afterwards.
 - [t3: sync_push RPC](tasks/t3.md) — build
 - [t4: sync_pull RPC](tasks/t4.md) — build
 - [tFINAL: server end-to-end verification](tasks/tFINAL.md) — build (final test card)
+- [t99: merge orchestrator plan-tracking commits](tasks/t99.md) — build (audit remediation, doc-only)
 
 ## Deviations log
 
@@ -172,3 +174,4 @@ by t1 and can ship in parallel afterwards.
 - t3 (PR #71, merged 2026-05-26): ships `sync_push` RPC migration + 13-scenario contract test + wrapper + slow-gate wiring. Two card deviations: (a) function signature `sync_push(entities jsonb default '[]'::jsonb)` instead of card's `sync_push(payload jsonb)` — PostgREST's named-parameter dispatch maps the wire body `{"entities": [...]}` directly to a param named `entities`. (b) `grant execute … to anon` so the function's own `AUTH_REQUIRED` envelope surfaces instead of PostgREST 42501; the `auth.uid() IS NULL` guard is the first statement so anonymous callers never reach state-mutating code. Gyms dispatch correctly includes the four M15 carry-over columns (latitude, longitude, coordinate_accuracy_m, coordinates_updated_at).
 - t4 (PR #73, merged 2026-05-26): ships `sync_pull` RPC migration + 10-scenario contract test + wrapper + slow-gate wiring. Four card deviations: (a) function signature `sync_pull(jsonb)` (unnamed param) instead of named — PostgREST's single-jsonb fallback maps the raw POST body to the unnamed param; pull's wire body has multiple top-level keys (`layer`, `cursor`, `limit`) so the unnamed pattern was preferred over named-per-key dispatch. (b) `grant execute … to anon` mirroring t3 for the AUTH_REQUIRED envelope. (c) `row_to_jsonb` → `to_jsonb` fix discovered while running the contract test. (d) Gyms projection extended to the same four M15 carry-over columns for round-trip symmetry with t3. Layer→type partition adopts the corrected mapping per t2's deviation entry (Layer 1 placement of `exercise_tag_definitions`); SQL `case` and contract-test partition assertion both encode the corrected sets. Final commit `36602d5` is a rebase merge on top of t2 + t3 with the `scripts/quality-slow.sh run_backend()` conflict resolved by keeping all wrappers (auth/authz → sync-v2 schema smoke → sync-push contract → sync-pull contract → drift checker).
 - tFINAL (PR #74, merged 2026-05-26): ships nine E2E test scripts + wrapper + slow-gate wiring asserting each plan-level outcome end-to-end. Test files: `sync-v2-clean-room.sh` (outcomes 1/2/3), `sync-v2-deferrable-fk.sh` (4), `sync-v2-rls-cross-owner.sh` (5), `sync-v2-push-roundtrip.sh` (6), `sync-v2-pull-drain.sh` (7/8), `sync-v2-pull-fk-closure.sh` (8a), `sync-v2-drift-synthetic.sh` (9 negative) + `sync-v2-drift-asbuilt.sh` (9 positive), `sync-v2-spec-rule.sh` (10). Wrapper at `supabase/scripts/test-sync-v2-e2e.sh`, wired into `scripts/quality-slow.sh run_backend()` after per-task wrappers. Two card deviations: (a) The FK assertion in `sync-v2-deferrable-fk.sh` joins `information_schema.referential_constraints` with `information_schema.table_constraints` because PG v17's `referential_constraints` view doesn't expose `is_deferrable` / `initially_deferred`; the card's intent (use information_schema, not pg_catalog) is preserved. (b) Size budget soft overage at ~2491 lines (24% over the 2000-line target) — acknowledged as appropriate for nine integration test scripts averaging ~275 lines each, consistent with existing per-task contract suites.
+- t99 (audit remediation, this PR): lands the orchestrator's plan-tracking commits (deviations log + status.md + tasks/t4.md card update + downstream design/plan annotations) that were written to the orchestrator's session branch during execution but never propagated to `main`. Doc-only. No code, migrations, RPCs, tests, or quality-gate behavior affected. The five upstream code-level deviations are unchanged; this entry exists for traceability.
