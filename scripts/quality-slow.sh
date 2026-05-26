@@ -65,6 +65,16 @@ run_backend() {
     "${REPO_ROOT}/supabase/scripts/test-sync-v2-schema-smoke.sh"
   fi
 
+  # Sync v2 push RPC contract — exercises designs/t1.md §1 (LWW, clamp,
+  # undelete) and designs/t2.md §3 (envelope, batch caps, FK closure,
+  # auth/RLS). Lands with t3.
+  if [[ ! -x "${REPO_ROOT}/supabase/scripts/test-sync-push-contract.sh" ]]; then
+    echo "[quality-slow] skipping backend sync-push-contract: wrapper not found or not executable"
+  else
+    echo "[quality-slow] backend: test-sync-push-contract"
+    "${REPO_ROOT}/supabase/scripts/test-sync-push-contract.sh"
+  fi
+
   # Sync v2 drift checker — per designs/t1.md §7.5. The TypeScript script
   # lands in t2; until then this block skips with a notice so the slow gate
   # stays green. t2's PR will not need to re-touch this file: when the script
