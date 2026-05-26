@@ -240,6 +240,11 @@ jest.mock('@/src/data', () => {
       };
     });
   });
+  const loadRecentExerciseBlocks = jest.fn().mockImplementation(async ({ exerciseDefinitionId }: { exerciseDefinitionId: string }) => ({
+    exerciseDefinitionId,
+    limit: 5,
+    blocks: [],
+  }));
 
   return {
     ExerciseTagDomainError,
@@ -265,6 +270,7 @@ jest.mock('@/src/data', () => {
     },
     listExerciseTagDefinitions: listTagDefinitions,
     listSessionExerciseAssignedTags,
+    loadRecentExerciseBlocks,
     loadLocalGymById: jest.fn().mockResolvedValue(null),
     loadLatestSessionDraftSnapshot: jest.fn().mockResolvedValue(null),
     loadSessionSnapshotById: jest.fn().mockResolvedValue(null),
@@ -361,12 +367,14 @@ const {
   __setListAssignedTagsFailureCount: mockSetListAssignedTagsFailureCount,
   attachExerciseTagToSessionExercise: mockAttachExerciseTagToSessionExercise,
   createExerciseTagDefinition: mockCreateExerciseTagDefinition,
+  loadRecentExerciseBlocks: mockLoadRecentExerciseBlocks,
   loadSessionSnapshotById: mockLoadSessionSnapshotById,
 } = jest.requireMock('@/src/data') as {
   __resetTagStore: () => void;
   __setListAssignedTagsFailureCount: (count: number) => void;
   attachExerciseTagToSessionExercise: jest.Mock;
   createExerciseTagDefinition: jest.Mock;
+  loadRecentExerciseBlocks: jest.Mock;
   loadSessionSnapshotById: jest.Mock;
 };
 
@@ -416,6 +424,12 @@ describe('SessionRecorderScreen exercise interactions', () => {
     mockSetListAssignedTagsFailureCount(0);
     mockAttachExerciseTagToSessionExercise.mockClear();
     mockCreateExerciseTagDefinition.mockClear();
+    mockLoadRecentExerciseBlocks.mockReset();
+    mockLoadRecentExerciseBlocks.mockImplementation(async ({ exerciseDefinitionId }: { exerciseDefinitionId: string }) => ({
+      exerciseDefinitionId,
+      limit: 5,
+      blocks: [],
+    }));
     mockLoadSessionSnapshotById.mockReset();
     mockLoadSessionSnapshotById.mockResolvedValue(null);
     mockSaveExerciseCatalogExercise.mockClear();
@@ -462,6 +476,148 @@ describe('SessionRecorderScreen exercise interactions', () => {
     expect(screen.getByDisplayValue('5')).toBeTruthy();
 
     await act(async () => {});
+  });
+
+  it('shows recent exercise block stats and navigates older/newer in place', async () => {
+    mockLoadRecentExerciseBlocks.mockResolvedValueOnce({
+      exerciseDefinitionId: 'sys_barbell_back_squat',
+      limit: 5,
+      blocks: [
+        {
+          sessionId: 'session-new',
+          completedAt: new Date('2026-05-24T10:00:00.000Z'),
+          daysAgo: 2,
+          sessionExerciseIds: ['se-new'],
+          estimatedOneRepMax: 250.5,
+          totalVolume: 1500,
+          highestWeight: 205,
+          rirAtMostTwoSetCount: 3,
+        },
+        {
+          sessionId: 'session-old',
+          completedAt: new Date('2026-05-17T10:00:00.000Z'),
+          daysAgo: 9,
+          sessionExerciseIds: ['se-old'],
+          estimatedOneRepMax: 235,
+          totalVolume: 1325,
+          highestWeight: 195,
+          rirAtMostTwoSetCount: 1,
+        },
+      ],
+    });
+
+    render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
+
+    fireEvent.press(screen.getByText('Log new exercise'));
+    fireEvent.press(await screen.findByLabelText('Select exercise Barbell Squat'));
+
+    const panel = await screen.findByTestId('exercise-block-history-panel-1');
+    expect(panel).toBeTruthy();
+    expect(screen.getByText('2d ago')).toBeTruthy();
+    expect(screen.getByTestId('exercise-block-history-panel-1-est-1rm')).toHaveTextContent('250.5');
+    expect(screen.getByTestId('exercise-block-history-panel-1-volume')).toHaveTextContent('1500');
+    expect(screen.getByTestId('exercise-block-history-panel-1-highest')).toHaveTextContent('205');
+    expect(screen.getByTestId('exercise-block-history-panel-1-rir-count')).toHaveTextContent('3');
+    expect(screen.getByTestId('exercise-block-history-panel-1-newer').props.accessibilityState.disabled).toBe(true);
+    expect(screen.getByTestId('exercise-block-history-panel-1-older').props.accessibilityState.disabled).toBe(false);
+
+    fireEvent.press(screen.getByTestId('exercise-block-history-panel-1-older'));
+    expect(screen.getByText('9d ago')).toBeTruthy();
+    expect(screen.getByTestId('exercise-block-history-panel-1-est-1rm')).toHaveTextContent('235');
+    expect(screen.getByTestId('exercise-block-history-panel-1-newer').props.accessibilityState.disabled).toBe(false);
+    expect(screen.getByTestId('exercise-block-history-panel-1-older').props.accessibilityState.disabled).toBe(true);
+
+    fireEvent.press(screen.getByTestId('exercise-block-history-panel-1-newer'));
+    expect(screen.getByText('2d ago')).toBeTruthy();
+  });
+
+  it('keeps set entry usable when exercise block history is empty or unavailable', async () => {
+    mockLoadRecentExerciseBlocks.mockResolvedValueOnce({
+      exerciseDefinitionId: 'sys_barbell_back_squat',
+      limit: 5,
+      blocks: [],
+    });
+
+    render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
+
+    fireEvent.press(screen.getByText('Log new exercise'));
+    fireEvent.press(await screen.findByLabelText('Select exercise Barbell Squat'));
+
+    expect(await screen.findByTestId('exercise-block-history-panel-1-empty')).toHaveTextContent(
+      'No previous blocks'
+    );
+    fireEvent.changeText(screen.getByLabelText('Weight for exercise 1 set 1'), '135');
+    fireEvent.changeText(screen.getByLabelText('Reps for exercise 1 set 1'), '8');
+    expect(screen.getByDisplayValue('135')).toBeTruthy();
+    expect(screen.getByDisplayValue('8')).toBeTruthy();
+
+    mockLoadRecentExerciseBlocks.mockRejectedValueOnce(new Error('history unavailable'));
+    fireEvent.press(screen.getByText('Log new exercise'));
+    fireEvent.press(await screen.findByLabelText('Select exercise Bench Press'));
+
+    expect(await screen.findByTestId('exercise-block-history-panel-2-error')).toHaveTextContent(
+      'Previous blocks unavailable'
+    );
+    fireEvent.press(screen.getByLabelText('Add set to exercise 2'));
+    expect(screen.getByLabelText('Weight for exercise 2 set 2')).toBeTruthy();
+  });
+
+  it('resets the block navigator when an exercise card changes exercise definition', async () => {
+    mockLoadRecentExerciseBlocks
+      .mockResolvedValueOnce({
+        exerciseDefinitionId: 'sys_barbell_back_squat',
+        limit: 5,
+        blocks: [
+          {
+            sessionId: 'squat-history',
+            completedAt: new Date('2026-05-24T10:00:00.000Z'),
+            daysAgo: 2,
+            sessionExerciseIds: ['se-squat'],
+            estimatedOneRepMax: 250,
+            totalVolume: 1500,
+            highestWeight: 205,
+            rirAtMostTwoSetCount: 3,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        exerciseDefinitionId: 'sys_barbell_bench_press',
+        limit: 5,
+        blocks: [
+          {
+            sessionId: 'bench-history',
+            completedAt: new Date('2026-05-21T10:00:00.000Z'),
+            daysAgo: 5,
+            sessionExerciseIds: ['se-bench'],
+            estimatedOneRepMax: 190,
+            totalVolume: 980,
+            highestWeight: 165,
+            rirAtMostTwoSetCount: 2,
+          },
+        ],
+      });
+
+    render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
+
+    fireEvent.press(screen.getByText('Log new exercise'));
+    fireEvent.press(await screen.findByLabelText('Select exercise Barbell Squat'));
+    expect(await screen.findByTestId('exercise-block-history-panel-1')).toHaveTextContent(/2d ago/);
+
+    fireEvent.press(screen.getByLabelText('Exercise options 1'));
+    fireEvent.press(screen.getByLabelText('Change exercise'));
+    fireEvent.press(await screen.findByLabelText('Select exercise Bench Press'));
+
+    await waitFor(() => {
+      expect(mockLoadRecentExerciseBlocks).toHaveBeenLastCalledWith({
+        exerciseDefinitionId: 'sys_barbell_bench_press',
+      });
+    });
+    expect(await screen.findByTestId('exercise-block-history-panel-1')).toHaveTextContent(/5d ago/);
+    expect(screen.getByText('Bench Press')).toBeTruthy();
+    expect(screen.queryByText('Barbell Squat')).toBeNull();
   });
 
   it('cycles set type from the row button and supports long-press selection modal', async () => {

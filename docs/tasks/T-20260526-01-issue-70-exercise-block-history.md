@@ -22,12 +22,12 @@ docs_touched: "docs/specs/ui/ux-rules.md, docs/specs/ui/screen-map.md, docs/spec
   - move the file to `docs/tasks/complete/<task-id>.md` when `Status` becomes `completed` or `outdated`
 - Session date: `2026-05-26`
 - Session interaction mode: `interactive (default)`
-- Implementation/review branch:
-  - Use one integration branch: `codex/issue-70-exercise-block-history`.
-  - Agent 2A (service/data implementation) should create/switch to that branch from fresh `main`, implement the background-service/data layer slice, run its targeted numeric tests, and hand off with a clean working tree or clearly documented partial state.
-  - Agent 2B (UX implementation) should continue from the Agent 2A branch state, wire the recorder UI, update UI docs, run targeted UX tests, and hand off to testing/review.
-  - Agent 3A (numeric/service reviewer) should test/review the data/service layer for query correctness and metric accuracy.
-  - Agent 3B (UX quality reviewer) should test/review the recorder interaction and visual quality, apply small verification fixes on the same branch when appropriate, and otherwise leave actionable findings in the task completion/review notes.
+- Implementation/review branches:
+  - Base implementation branch: `codex/issue-70-exercise-block-history` contains the Agent 2A service/data implementation.
+  - Agent 2B UX branch: `codex/issue-70-exercise-block-history-2B` branches from the Agent 2A state, wires the recorder UI, updates UI docs, runs targeted UX tests, and hands off to review.
+  - Agent 3A numeric/service review branch: `codex/issue-70-exercise-block-history-3A` should branch from the latest accepted implementation state, test/review query correctness and metric accuracy, and commit any small review fixes separately.
+  - Agent 3B UX quality review branch: `codex/issue-70-exercise-block-history-3B` should branch from the latest accepted implementation state, test/review recorder interaction and visual quality, and commit any small review fixes separately.
+  - Final orchestrator branch/review: the orchestrator should compare the 2A/2B/3A/3B outputs, perform final review, resolve any integration differences, and merge the accepted result toward `main`.
 - Issue context:
   - GitHub Issue: `https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/70`
   - No new milestone is created for Issue 70. This is a single direct-execution task under the existing session-recorder parent milestone because the first slice is recorder UI plus local read-only derived history.
@@ -52,9 +52,26 @@ docs_touched: "docs/specs/ui/ux-rules.md, docs/specs/ui/screen-map.md, docs/spec
 
 ## Context Freshness (required at session start; update before edits)
 
-- Verified current branch + HEAD commit: `codex/issue-70-exercise-block-history` at `add1664` after merging fresh `origin/main`.
-- Start-of-session sync completed per `docs/specs/04-ai-development-playbook.md` git sync workflow?: `yes` - Agent 2A ran `git fetch origin main codex/issue-70-exercise-block-history`; branch was current with `origin/codex/issue-70-exercise-block-history` and 11 commits behind `origin/main`, then merged `origin/main` into the integration branch before code edits.
+- Verified current branch + HEAD commit: Agent 2A started on `codex/issue-70-exercise-block-history` at `add1664` after merging fresh `origin/main`; Agent 2B started from Agent 2A handoff commit `6b4c72c`.
+- Start-of-session sync completed per `docs/specs/04-ai-development-playbook.md` git sync workflow?: `yes` - Agent 2A ran `git fetch origin main codex/issue-70-exercise-block-history`; Agent 2B ran `git fetch origin main codex/issue-70-exercise-block-history` and confirmed no new `origin/main` commits were pending relative to the branch.
 - Parent refs opened in this Agent 2A session:
+  - `docs/specs/README.md`
+  - `docs/specs/00-product.md`
+  - `docs/specs/03-technical-architecture.md`
+  - `docs/specs/04-ai-development-playbook.md`
+  - `docs/specs/05-data-model.md`
+  - `docs/specs/06-testing-strategy.md`
+  - `docs/specs/08-ux-delivery-standard.md`
+  - `docs/specs/09-project-structure.md`
+  - `docs/specs/12-worktree-config-and-isolation.md`
+  - `docs/specs/ui/README.md`
+  - `docs/specs/ui/ux-rules.md`
+  - `docs/specs/ui/screen-map.md`
+  - `docs/specs/ui/navigation-contract.md`
+  - `docs/specs/ui/components-catalog.md`
+  - `docs/specs/milestones/M1-ui-session-recorder.md`
+  - `RUNBOOK.md`
+- Parent refs opened in this Agent 2B session:
   - `docs/specs/README.md`
   - `docs/specs/00-product.md`
   - `docs/specs/03-technical-architecture.md`
@@ -76,6 +93,9 @@ docs_touched: "docs/specs/ui/ux-rules.md, docs/specs/ui/screen-map.md, docs/spec
   - `rg "estimated|1RM|one rep|volume|RIR|set_type|rir_" apps/mobile docs/specs -g '!docs/brainstorms/**'` - confirmed existing 1RM/volume helpers and `set_type` semantics.
   - `./scripts/task-bootstrap.sh docs/tasks/T-20260526-01-issue-70-exercise-block-history.md` - confirmed branch/task metadata and required gates.
   - Source review of `apps/mobile/src/data/exercise-history.ts`, `apps/mobile/src/exercise-calculations/index.ts`, `apps/mobile/src/data/set-types.ts`, `apps/mobile/src/data/schema/sessions.ts`, `apps/mobile/src/data/schema/session-exercises.ts`, `apps/mobile/src/data/schema/exercise-sets.ts`, `apps/mobile/src/data/index.ts`, and relevant exercise-history/stats/calculation tests.
+- Code/docs inventory freshness checks run in this Agent 2B session:
+  - `./scripts/task-bootstrap.sh docs/tasks/T-20260526-01-issue-70-exercise-block-history.md` - confirmed branch/task metadata and required gates at `6b4c72c`.
+  - Source review of `apps/mobile/app/(tabs)/session-recorder.tsx`, `apps/mobile/components/session-recorder/session-content-layout.tsx`, `apps/mobile/components/session-recorder/types.ts`, `apps/mobile/src/data/exercise-block-history.ts`, and relevant recorder tests.
 - Known stale references or assumptions:
   - Assumption: `n = 5` recent completed sessions at initial implementation unless the implementer finds an existing product constant or the human gives a different value before coding.
   - Assumption: "up to n sessions" means distinct completed sessions, newest first, not distinct `session_exercises` rows.
@@ -90,7 +110,7 @@ Implement the first Issue 70 slice in the session recorder: when a user selects/
 
 ## Workstream split
 
-This remains one task card and one integration branch, but execution should be split into service/data and UX workstreams so each agent has a crisp ownership boundary.
+This remains one task card, but execution is split across per-agent branches so each workstream has a crisp ownership boundary and the final orchestrator can review/integrate deliberately.
 
 1. Agent 2A - background service/data layer
    - Owns the read-only repository/service contract for recent exercise blocks.
@@ -329,23 +349,32 @@ This remains one task card and one integration branch, but execution should be s
   - Agent 2A: `cd apps/mobile && npm test -- --runTestsByPath app/__tests__/exercise-block-history.test.ts` - passed, 7 tests.
   - Agent 2A: `cd apps/mobile && npm test -- --runTestsByPath app/__tests__/exercise-history-repository.test.ts app/__tests__/exercise-calculations.test.ts app/__tests__/exercise-block-history.test.ts` - passed, 44 tests.
   - Agent 2A: `cd apps/mobile && npm test -- --runInBand` - passed, 50 suites / 364 tests / 1 snapshot.
+  - Agent 2B: `cd apps/mobile && npm test -- --runTestsByPath app/__tests__/session-recorder-interactions.test.tsx app/__tests__/session-recorder-screen.test.tsx` - passed, 45 tests.
+  - Agent 2B: `cd apps/mobile && npm test -- --runTestsByPath app/__tests__/exercise-block-history.test.ts app/__tests__/session-recorder-interactions.test.tsx app/__tests__/session-recorder-screen.test.tsx` - passed, 52 tests.
+  - Agent 2B: `cd apps/mobile && npm test -- --runInBand` - passed, 50 suites / 367 tests / 1 snapshot. Existing console warnings from unrelated VirtualizedList/logging tests appeared, but all suites passed.
 - UI guardrail output:
   - Agent 2A: `cd apps/mobile && npm run lint:ui-guardrails` - passed, 0 raw-color violations.
+  - Agent 2B: `cd apps/mobile && npm run lint:ui-guardrails` - passed, 0 raw-color violations.
 - Fast gate output:
   - Agent 2A: `./scripts/quality-fast.sh frontend` - failed during `npm run typecheck` before tests because `scripts/check-sync-schema-drift.ts` cannot resolve `better-sqlite3` and `pg` types and has three existing implicit-`any` diagnostics on `row` parameters.
   - Agent 2A: `cd apps/mobile && npm run lint` - passed.
   - Agent 2A: `cd apps/mobile && npm run typecheck` - same `scripts/check-sync-schema-drift.ts` failure as the fast gate.
+  - Agent 2B: `cd apps/mobile && npm run lint` - passed.
+  - Agent 2B: `cd apps/mobile && npm run typecheck` - same existing `scripts/check-sync-schema-drift.ts` failure (`better-sqlite3` / `pg` type resolution and three implicit `row` anys), before task-specific type errors are reported.
+  - Agent 2B: `./scripts/quality-fast.sh frontend` - `lint` passed, then failed at the same `npm run typecheck` blocker before running the test step.
+  - Agent 2B: `./scripts/task-closeout-check.sh docs/tasks/T-20260526-01-issue-70-exercise-block-history.md` - failed because task status intentionally remains `in_progress` for Agent 3A/3B review handoff rather than final closeout.
 - UI/UX task visual artifacts note:
-  - Pending for Agent 2B/3B; Agent 2A did not wire UI or create visual states.
-- Manual verification summary (required when CI is absent/partial): Agent 2A implemented and tested the service/data lane only. Agent 3 review has not run yet.
+  - Agent 2B covered the key visible states through React Native Testing Library rendered-state assertions: populated latest block, older/newer navigation, empty state, and error state while set entry remains usable. No simulator screenshot was captured in this 2B pass because the task's slow native gate remains `N/A`; Agent 3B should capture simulator screenshots if stricter visual artifacts are required before closeout.
+- Manual verification summary (required when CI is absent/partial): Agent 2A implemented and tested the service/data lane. Agent 2B wired the recorder UX, updated UI docs, and tested rendered interaction/state behavior. Agent 3 review has not run yet.
 - Deferred/manual hosted checks summary:
   - N/A expected; no hosted/backend work.
 
 ## Completion note (fill at end per `docs/specs/04-ai-development-playbook.md`)
 
 - What changed: Agent 2A added `apps/mobile/src/data/exercise-block-history.ts`, exported it from `apps/mobile/src/data/index.ts`, and added `apps/mobile/app/__tests__/exercise-block-history.test.ts`. The new data/service contract loads distinct recent completed, non-deleted sessions for an `exerciseDefinitionId`, fetches matching logged exercise rows and sets, merges duplicate same-exercise rows inside a session, and returns compact format-ready block stats: `daysAgo`, estimated 1RM, total volume, highest weight, and `<=2 RIR` set count.
-- What tests ran: targeted exercise-block-history Jest passed; combined exercise-history/calculation/block-history Jest passed; full `npm test -- --runInBand` passed; `npm run lint` passed; `npm run lint:ui-guardrails` passed. `npm run typecheck` and `./scripts/quality-fast.sh frontend` currently fail on existing `scripts/check-sync-schema-drift.ts` diagnostics for missing `better-sqlite3`/`pg` types plus implicit `row` anys, before any task-specific type errors are reported.
-- What remains: Agent 2B still needs recorder UI wiring, loading/empty/error/navigator states, UI docs, and visual artifacts. Agent 3A should review the new query/aggregation contract, especially the distinct-session limit, same-session merge behavior, warm-up exclusion, invalid set parsing, and `<=2 RIR` count. RUNBOOK.md reviewed (no changes required). No data model or sync-scope change was made.
+- What changed: Agent 2B wired the recorder UI to `loadRecentExerciseBlocks`, adding a compact per-exercise read-only history panel below tags and above set rows. The panel shows latest block stats by default, supports `<<` older and `>>` newer navigation with disabled boundaries, resets when an exercise card changes definition, and keeps loading/empty/error states inline and non-blocking. Agent 2B also updated `docs/specs/ui/ux-rules.md` and `docs/specs/ui/screen-map.md`. `docs/specs/ui/components-catalog.md` was not changed because no reusable component API was added, and `docs/specs/ui/navigation-contract.md` was not changed because no route/param/transition behavior changed.
+- What tests ran: Agent 2A targeted service/data tests passed; Agent 2B targeted recorder UX tests passed; combined service+UX targeted tests passed; full `npm test -- --runInBand` passed; `npm run lint` passed; `npm run lint:ui-guardrails` passed. `npm run typecheck` and `./scripts/quality-fast.sh frontend` still fail on the existing `scripts/check-sync-schema-drift.ts` diagnostics for missing `better-sqlite3`/`pg` types plus implicit `row` anys, before any task-specific type errors are reported.
+- What remains: Agent 3A should review the query/aggregation contract, especially the distinct-session limit, same-session merge behavior, warm-up exclusion, invalid set parsing, and `<=2 RIR` count. Agent 3B should review mobile density/visual quality and capture simulator screenshots if required for final closeout evidence. RUNBOOK.md reviewed (no changes required). No data model or sync-scope change was made.
 
 ## Status update checklist (mandatory at closeout)
 
