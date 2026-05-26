@@ -1,7 +1,7 @@
 ---
 task_id: T-20260526-01-issue-70-exercise-block-history
 milestone_id: "M1"
-status: planned
+status: in_progress
 ui_impact: "yes"
 areas: "frontend|docs"
 runtimes: "node|expo"
@@ -16,7 +16,7 @@ docs_touched: "docs/specs/ui/ux-rules.md, docs/specs/ui/screen-map.md, docs/spec
 
 - Task ID: `T-20260526-01-issue-70-exercise-block-history`
 - Title: Issue 70 phase 0A - recent exercise block history in recorder
-- Status: `planned`
+- Status: `in_progress`
 - File location rule:
   - author active cards in `docs/tasks/<task-id>.md`
   - move the file to `docs/tasks/complete/<task-id>.md` when `Status` becomes `completed` or `outdated`
@@ -52,9 +52,9 @@ docs_touched: "docs/specs/ui/ux-rules.md, docs/specs/ui/screen-map.md, docs/spec
 
 ## Context Freshness (required at session start; update before edits)
 
-- Verified current branch + HEAD commit: task authored on `main` at `df5e97f`.
-- Start-of-session sync completed per `docs/specs/04-ai-development-playbook.md` git sync workflow?: `yes` - task-writing session ran `git fetch origin main && git pull --ff-only origin main`; local `HEAD...origin/main` was `0 0`.
-- Parent refs opened in this task-writing session:
+- Verified current branch + HEAD commit: `codex/issue-70-exercise-block-history` at `add1664` after merging fresh `origin/main`.
+- Start-of-session sync completed per `docs/specs/04-ai-development-playbook.md` git sync workflow?: `yes` - Agent 2A ran `git fetch origin main codex/issue-70-exercise-block-history`; branch was current with `origin/codex/issue-70-exercise-block-history` and 11 commits behind `origin/main`, then merged `origin/main` into the integration branch before code edits.
+- Parent refs opened in this Agent 2A session:
   - `docs/specs/README.md`
   - `docs/specs/00-product.md`
   - `docs/specs/03-technical-architecture.md`
@@ -70,18 +70,17 @@ docs_touched: "docs/specs/ui/ux-rules.md, docs/specs/ui/screen-map.md, docs/spec
   - `docs/specs/ui/navigation-contract.md`
   - `docs/specs/ui/components-catalog.md`
   - `docs/specs/milestones/M1-ui-session-recorder.md`
-  - `docs/specs/templates/task-card-template.md`
-  - `docs/plans/README.md`
   - `RUNBOOK.md`
-- Code/docs inventory freshness checks run:
+- Code/docs inventory freshness checks run in this Agent 2A session:
   - `rg --files apps/mobile/app apps/mobile/src apps/mobile/components | rg 'session-recorder|exercise-history|session|exercise|stats|history'` - identified existing recorder, exercise-history, session-list, calculation, and test surfaces.
   - `rg "estimated|1RM|one rep|volume|RIR|set_type|rir_" apps/mobile docs/specs -g '!docs/brainstorms/**'` - confirmed existing 1RM/volume helpers and `set_type` semantics.
-  - Source review of `apps/mobile/src/data/exercise-history.ts`, `apps/mobile/src/exercise-calculations/index.ts`, `apps/mobile/src/data/set-types.ts`, `apps/mobile/app/(tabs)/session-recorder.tsx`, `apps/mobile/components/session-recorder/session-content-layout.tsx`, `apps/mobile/components/session-recorder/types.ts`, and relevant recorder/exercise-history tests.
+  - `./scripts/task-bootstrap.sh docs/tasks/T-20260526-01-issue-70-exercise-block-history.md` - confirmed branch/task metadata and required gates.
+  - Source review of `apps/mobile/src/data/exercise-history.ts`, `apps/mobile/src/exercise-calculations/index.ts`, `apps/mobile/src/data/set-types.ts`, `apps/mobile/src/data/schema/sessions.ts`, `apps/mobile/src/data/schema/session-exercises.ts`, `apps/mobile/src/data/schema/exercise-sets.ts`, `apps/mobile/src/data/index.ts`, and relevant exercise-history/stats/calculation tests.
 - Known stale references or assumptions:
   - Assumption: `n = 5` recent completed sessions at initial implementation unless the implementer finds an existing product constant or the human gives a different value before coding.
   - Assumption: "up to n sessions" means distinct completed sessions, newest first, not distinct `session_exercises` rows.
   - Assumption: multiple same-exercise `session_exercises` in one completed session are merged into one displayed block.
-  - Agent 2 must refresh this section with the branch HEAD and any newly inspected files before edits.
+  - Agent 2A kept `n = 5` as `DEFAULT_RECENT_EXERCISE_BLOCK_LIMIT`.
 - Optional helper command (recommended):
   - `./scripts/task-bootstrap.sh docs/tasks/T-20260526-01-issue-70-exercise-block-history.md`
 
@@ -327,23 +326,26 @@ This remains one task card and one integration branch, but execution should be s
 ## Evidence
 
 - Targeted Jest output:
-  - Fill at implementation/test closeout.
+  - Agent 2A: `cd apps/mobile && npm test -- --runTestsByPath app/__tests__/exercise-block-history.test.ts` - passed, 7 tests.
+  - Agent 2A: `cd apps/mobile && npm test -- --runTestsByPath app/__tests__/exercise-history-repository.test.ts app/__tests__/exercise-calculations.test.ts app/__tests__/exercise-block-history.test.ts` - passed, 44 tests.
+  - Agent 2A: `cd apps/mobile && npm test -- --runInBand` - passed, 50 suites / 364 tests / 1 snapshot.
 - UI guardrail output:
-  - Fill at implementation/test closeout.
+  - Agent 2A: `cd apps/mobile && npm run lint:ui-guardrails` - passed, 0 raw-color violations.
 - Fast gate output:
-  - Fill at implementation/test closeout.
+  - Agent 2A: `./scripts/quality-fast.sh frontend` - failed during `npm run typecheck` before tests because `scripts/check-sync-schema-drift.ts` cannot resolve `better-sqlite3` and `pg` types and has three existing implicit-`any` diagnostics on `row` parameters.
+  - Agent 2A: `cd apps/mobile && npm run lint` - passed.
+  - Agent 2A: `cd apps/mobile && npm run typecheck` - same `scripts/check-sync-schema-drift.ts` failure as the fast gate.
 - UI/UX task visual artifacts note:
-  - Required; record screenshot/capture paths or equivalent evidence for populated, navigated, and empty/error block panel states.
-- Manual verification summary:
-  - Fill at implementation/test closeout. Include whether Agent 3 reviewed/tested the Agent 2 branch.
+  - Pending for Agent 2B/3B; Agent 2A did not wire UI or create visual states.
+- Manual verification summary (required when CI is absent/partial): Agent 2A implemented and tested the service/data lane only. Agent 3 review has not run yet.
 - Deferred/manual hosted checks summary:
   - N/A expected; no hosted/backend work.
 
 ## Completion note (fill at end per `docs/specs/04-ai-development-playbook.md`)
 
-- What changed:
-- What tests ran:
-- What remains:
+- What changed: Agent 2A added `apps/mobile/src/data/exercise-block-history.ts`, exported it from `apps/mobile/src/data/index.ts`, and added `apps/mobile/app/__tests__/exercise-block-history.test.ts`. The new data/service contract loads distinct recent completed, non-deleted sessions for an `exerciseDefinitionId`, fetches matching logged exercise rows and sets, merges duplicate same-exercise rows inside a session, and returns compact format-ready block stats: `daysAgo`, estimated 1RM, total volume, highest weight, and `<=2 RIR` set count.
+- What tests ran: targeted exercise-block-history Jest passed; combined exercise-history/calculation/block-history Jest passed; full `npm test -- --runInBand` passed; `npm run lint` passed; `npm run lint:ui-guardrails` passed. `npm run typecheck` and `./scripts/quality-fast.sh frontend` currently fail on existing `scripts/check-sync-schema-drift.ts` diagnostics for missing `better-sqlite3`/`pg` types plus implicit `row` anys, before any task-specific type errors are reported.
+- What remains: Agent 2B still needs recorder UI wiring, loading/empty/error/navigator states, UI docs, and visual artifacts. Agent 3A should review the new query/aggregation contract, especially the distinct-session limit, same-session merge behavior, warm-up exclusion, invalid set parsing, and `<=2 RIR` count. RUNBOOK.md reviewed (no changes required). No data model or sync-scope change was made.
 
 ## Status update checklist (mandatory at closeout)
 
