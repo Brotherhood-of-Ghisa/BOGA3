@@ -49,3 +49,17 @@ Orchestrator log. Append one entry per iteration. Reverse-chronological.
 - Dispatching 3 `mao-builder` agents in parallel (under the cap of 4): t2 (drift checker + spec edit), t3 (`sync_push` RPC), t4 (`sync_pull` RPC).
 
 **Next:** await each builder's PR; review on open; coordinate merges (each independent — no inter-task hand-off until tFINAL).
+
+## Iteration 5 — 2026-05-26
+
+**State snapshot:**
+- All three parallel builders (t2/t3/t4) stalled with the stream watchdog at 600s. Inspecting the stalled worktrees showed partial work in each: t2 had `check-sync-schema-drift.ts` + `topo-order.ts` + `sync-extras.json` + npm dep bumps; t3 had the RPC migration + contract test (stalled at "Now write the wrapper"); t4 had only the migration SQL.
+- No PRs were opened by any of the three stalled attempts.
+
+**Actions:**
+- Committed each agent's partial work and pushed to remote recovery branches: `t2-wip-recover`, `t3-wip-recover`, `t4-wip-recover`.
+- Re-dispatched three fresh `mao-builder` agents pointed at the recovery branches with explicit "resume from here, audit, finish the missing pieces" instructions. Stall-avoidance guidance baked in: t2 told to compute fixture hashes from migration text (not by booting Supabase, which was the inferred stall cause); all three told not to retry `supabase start` in loops.
+- Also flagged for each: the as-built `gyms` carries `latitude`/`longitude` and the column must surface in t3's dispatch and t4's projection.
+- Noted timestamp collision risk between t3 and t4 (both started at `20260525130000_*`); t4 instructed to bump to `20260525130100`.
+
+**Next:** await PRs; review on open. The two RPC migrations need distinct timestamps before both merge.
