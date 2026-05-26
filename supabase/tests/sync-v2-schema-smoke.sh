@@ -44,7 +44,19 @@ select_psql_mode() {
   fi
 
   if command -v docker >/dev/null 2>&1; then
-    DOCKER_DB_CONTAINER="$(docker ps --format '{{.Names}}' 2>/dev/null | grep '^supabase_db_' | head -n1 || true)"
+    # Prefer the container whose name matches this worktree's project_id
+    # from supabase/config.toml. Falling back to `head -n1` picks the wrong
+    # container when multiple agent worktrees share a Docker engine.
+    local project_id=""
+    if [[ -f "${SUPABASE_DIR}/config.toml" ]]; then
+      project_id="$(awk -F'"' '/^project_id[[:space:]]*=/ {print $2; exit}' "${SUPABASE_DIR}/config.toml" || true)"
+    fi
+    if [[ -n "${project_id}" ]]; then
+      DOCKER_DB_CONTAINER="$(docker ps --format '{{.Names}}' 2>/dev/null | grep -F "supabase_db_${project_id}" | head -n1 || true)"
+    fi
+    if [[ -z "${DOCKER_DB_CONTAINER}" ]]; then
+      DOCKER_DB_CONTAINER="$(docker ps --format '{{.Names}}' 2>/dev/null | grep '^supabase_db_' | head -n1 || true)"
+    fi
     if [[ -n "${DOCKER_DB_CONTAINER}" ]]; then
       PSQL_MODE="docker"
       return 0
