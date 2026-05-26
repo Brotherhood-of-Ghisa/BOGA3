@@ -12,20 +12,22 @@ repo. In their place add: two local-only sync columns (`local_dirty`,
 `local_updated_at_ms`) on every entity Drizzle schema; a `deleted_at` column
 on the five entity schemas that lack one; a rewritten `sync_runtime_state`
 singleton (`pull_cursor`, `last_emitted_ms`, `bootstrap_completed_at`,
-`applied_seed_migration_app_version`); a one-shot version-marker that wipes
-the local DB on first v2 boot; the `nowMonotonic()` clock helper from t2 §8
-with the synchronous-persist contract from t2 §8.3; repo write-path wiring
-that flips the dirty bit in the same transaction as every entity write; a new
-`apps/mobile/src/sync/cycle.ts` implementing t2 §6 (pull → push → re-pull,
-layered drain per t2 §4.4, batched per t2 §3.4); a new
-`apps/mobile/src/sync/scheduler.ts` implementing the t4 §2 four-state
+`applied_seed_migration_app_version`); the `nowMonotonic()` clock helper
+from t2 §8 with the synchronous-persist contract from t2 §8.3; repo
+write-path wiring that flips the dirty bit in the same transaction as every
+entity write; a new `apps/mobile/src/sync/cycle.ts` implementing t2 §6
+(pull → push → re-pull, layered drain per t2 §4.4, batched per t2 §3.4); a
+new `apps/mobile/src/sync/scheduler.ts` implementing the t4 §2 four-state
 machine (OFFLINE / LONG_TIMEOUT / SHORT_TIMEOUT / RUNNING) with NetInfo as
 the sole authority on online state; a background-task path via
 `expo-background-task` per t4 §4; and dev-only wipe affordances behind
-`isDevMode()`. Plan 2 ships against an empty/wiped local DB and the
-fully-deployed plan-1 server. Plan 3 (`docs/plans/sync-v2-launch/`) adds
-login enforcement, the sync gate, seed reorder, and the settings sync
-surface on top.
+`isDevMode()`. Plan 2 **assumes a clean local DB on first v2 launch** —
+devs, TestFlight testers, and (eventually) production users perform a
+one-time manual wipe per `docs/plans/sync-v2-client/manual-wipe.md` (t3
+ships the doc; no in-app marker or auto-wipe code exists). Plan 2 ships
+against this clean local DB and the fully-deployed plan-1 server. Plan 3
+(`docs/plans/sync-v2-launch/`) adds login enforcement, the sync gate, seed
+reorder, and the settings sync surface on top.
 
 ## Outcomes
 
@@ -74,17 +76,26 @@ When this plan is done end-to-end, all of these are true:
   default `0` (replaces v1's `seedsAppliedAt` per the stub Outcomes
   note — driven by app version, not wall-clock). The v1-only columns
   (`is_enabled`, `bootstrap_user_id`, `last_bootstrap_error`,
-  `last_bootstrap_attempt_at`, `seeds_applied_at`) are dropped per the
-  decision in `designs/d2.md`. `exercise-catalog-seeds.ts`'s seed
-  marker reads/writes are migrated to the new column.
-- A one-shot version-marker check on app launch (per the storage
-  decision in `designs/d1.md`) detects "v2 boot, local DB still on v1
-  shape" and wipes the local DB (delete + recreate via the Drizzle
-  migrator). The marker is stored outside the wiped tables so the wipe
-  itself does not erase it, and is set after a successful wipe so the
-  wipe never re-runs. Setting the marker is idempotent — a fresh
-  install with no prior v1 state sets the marker without performing a
-  wipe.
+  `last_bootstrap_attempt_at`, `seeds_applied_at`) are dropped — the
+  manual wipe means no v1 row data needs preservation, so the
+  migration may drop and recreate `sync_runtime_state` in its v2
+  shape (or use Drizzle's standard 12-step swap if the tooling
+  prefers it). `exercise-catalog-seeds.ts`'s seed marker reads /
+  writes are migrated to the new column.
+- Manual wipe procedure is documented at
+  `docs/plans/sync-v2-client/manual-wipe.md`, covering iOS Simulator
+  (Xcode → Device → Erase All Content and Settings, OR delete the
+  app from the home screen), Android Emulator (Settings → Apps →
+  Clear Storage, OR AVD Manager wipe), physical devices
+  (uninstall + reinstall on both iOS and Android), and TestFlight
+  (delete the v1 build before installing the v2 build; do NOT
+  update in place). **No in-app version marker or auto-wipe code
+  exists.** The v2 build assumes a clean local DB; if v1 data is
+  present, behaviour is undefined and the user must wipe per the
+  documented procedure. A cross-link from `apps/mobile/README.md`
+  (or the closest equivalent dev-onboarding doc, builder's choice
+  surfaced in the PR body) points devs and reviewers at the
+  manual-wipe doc.
 - `apps/mobile/src/data/clock.ts` exports `nowMonotonic(): number`
   computing `Math.max(Date.now(), last_emitted_ms + 1)` per t2 §8.
   Persistence is **synchronous within the same SQLite transaction** as
@@ -161,7 +172,10 @@ When this plan is done end-to-end, all of these are true:
   plan-1 server deployed to a Supabase branch (push → server LWW →
   pull → local LWW); a test confirms `nowMonotonic()` is strictly
   monotone across simulated app restarts (cold-start reads the
-  persisted value from `sync_runtime_state.last_emitted_ms`).
+  persisted value from `sync_runtime_state.last_emitted_ms`); and a
+  test asserts the manual-wipe doc exists with the required
+  sections AND that no in-app marker module was silently
+  re-introduced under `apps/mobile/src/data/`.
 
 ## Orchestration
 
@@ -184,8 +198,19 @@ When this plan is done end-to-end, all of these are true:
 - Builder concurrency cap: 4
 - Reviewer concurrency cap: unbounded
 - Deviations from default protocol:
-  - **Two design tasks at the front of the DAG** (d1, d2). All other
-    tasks are build.
+  - **No design tasks.** Earlier drafts of this plan included `d1`
+    (version-marker storage) and `d2` (`sync_runtime_state`
+    migration approach). Both were dropped in favour of the
+    manual-wipe procedure documented in t3 — without an in-app
+    marker, d1's storage question is moot, and without v1 data to
+    preserve, d2's migration question collapses to "drop and
+    recreate, or the standard SQLite 12-step swap, whichever
+    Drizzle's tooling produces from the schema diff." See `t2.md`
+    `Out of scope` for the migration-mechanics note.
+  - **t3 is docs-only.** It ships
+    `docs/plans/sync-v2-client/manual-wipe.md` and a cross-link
+    from `apps/mobile/README.md` (or equivalent). No app code.
+    See t3.md.
   - **t5 is split into t5a (Layer 0/1 repos) and t5b (Layer 2/3
     repos)** to keep each PR under the ~2000-line size budget. Each
     half wires the same dirty-bit contract; the split is by entity
@@ -208,13 +233,10 @@ When this plan is done end-to-end, all of these are true:
 
 ```mermaid
 graph TD
-  d1[d1: decide version-marker storage] --> t3
-  d2[d2: decide sync_runtime_state migration approach] --> t2
   t1[t1: delete v1 sync code paths] --> t2
-  t2[t2: Drizzle schema additions + sync_runtime_state rewrite] --> t3
-  t2 --> t4
+  t2[t2: Drizzle schema additions + sync_runtime_state rewrite] --> t4
   t2 --> t6
-  t3[t3: version-marker + wipe-on-v2-boot] --> tFINAL
+  t3[t3: manual-wipe procedure documentation] --> tFINAL
   t4[t4: nowMonotonic clock helper] --> t5a
   t4 --> t5b
   t5a[t5a: write-path dirty-bit wiring — Layer 0/1 repos] --> t6
@@ -229,19 +251,13 @@ graph TD
 
 Notes on the DAG:
 
-- **d1 / d2 run in parallel at the front** — neither depends on the
-  other, both are unblocked from merge of plan 1, and each unblocks
-  exactly one build task.
-- **t1 runs in parallel with d1 / d2** — t1 is pure deletion; it does
-  not touch the schemas d2 covers or the version marker d1 covers. By
-  pulling t1 forward we shorten the critical path.
-- **t2 depends on t1 + d2** — t2 ships the v2-shaped Drizzle schemas
-  in a tree that still references v1 code is messy; cleaner to delete
-  v1 first. t2 also consumes d2's `sync_runtime_state` migration
-  decision.
-- **t3 depends on t2 + d1** — the wipe needs the v2 schemas defined
-  (so the recreate-from-migrations reaches the new shape) and the
-  storage decision in `designs/d1.md`.
+- **t1 and t3 run in parallel at the front, alongside each other.**
+  t1 is pure deletion of v1 code; t3 is a pure documentation task
+  with no code dependency on any other task. Both are unblocked
+  from plan 1's merge.
+- **t2 depends on t1** — t2 ships the v2-shaped Drizzle schemas;
+  in a tree that still references v1 code is messy; cleaner to
+  delete v1 first.
 - **t4 depends on t2** — `nowMonotonic()` persists into
   `sync_runtime_state.last_emitted_ms`, which only exists after t2.
 - **t5a / t5b run in parallel after t4** — both call `nowMonotonic()`
@@ -254,18 +270,17 @@ Notes on the DAG:
   scheduler invokes; t8 wires registration after t7's scheduler is
   in place.
 - **t9** runs in parallel with t7 / t8 (depends only on t6).
-- **tFINAL is the sink** — depends on t3 (so first-boot wipe is in
-  place), t8 (so BG-task is registered for the round-trip), and t9
-  (so dev affordances exist for the tFINAL test setup paths). t5a /
-  t5b are transitive dependencies through t6 → t7 → t8.
+- **tFINAL is the sink** — depends on t3 (so the manual-wipe doc
+  exists and tFINAL can assert it), t8 (so BG-task is registered
+  for the round-trip), and t9 (so dev affordances exist for the
+  tFINAL test setup paths). t5a / t5b are transitive dependencies
+  through t6 → t7 → t8.
 
 ## Tasks
 
-- [d1: decide version-marker storage](tasks/d1.md) — design
-- [d2: decide sync_runtime_state migration approach](tasks/d2.md) — design
 - [t1: delete v1 sync code paths](tasks/t1.md) — build
 - [t2: Drizzle schema additions + sync_runtime_state rewrite](tasks/t2.md) — build
-- [t3: version-marker + wipe-on-v2-boot](tasks/t3.md) — build
+- [t3: manual-wipe procedure documentation](tasks/t3.md) — build (docs-only)
 - [t4: nowMonotonic clock helper](tasks/t4.md) — build
 - [t5a: write-path dirty-bit wiring — Layer 0/1 repos](tasks/t5a.md) — build
 - [t5b: write-path dirty-bit wiring — Layer 2/3 repos](tasks/t5b.md) — build

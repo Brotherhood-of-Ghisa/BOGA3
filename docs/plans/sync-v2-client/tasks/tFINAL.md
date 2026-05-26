@@ -9,8 +9,8 @@ loudly if a regression silently breaks the v2 client semantics.
 
 **Inputs:**
 
-- Every other task merged (`d1, d2, t1, t2, t3, t4, t5a, t5b, t6, t7,
-  t8, t9`).
+- Every other task merged (`t1, t2, t3, t4, t5a, t5b, t6, t7, t8,
+  t9`).
 - Plan's `## Outcomes` section verbatim — the authoritative list this
   card must assert.
 - `docs/plans/sync-v2-server/plan.md ## Outcomes` — plan 1's server
@@ -115,10 +115,15 @@ audit-friendliness.
    - Mock `Date.now()` to return a constant for the second batch;
      assert the helper still returns monotone values.
 
-8. **`sync-v2-final/v2-boot-marker.test.ts`** — asserts the
-   "one-shot version-marker" outcome. Re-uses or extends the test
-   t3 shipped. The four scenarios (fresh install / v1 upgrade /
-   second launch / dev-mode clear) all pass.
+8. **`sync-v2-final/manual-wipe-doc-exists.test.ts`** — asserts the
+   manual-wipe outcome by `fs.existsSync` checking that
+   `docs/plans/sync-v2-client/manual-wipe.md` exists and contains
+   the four required section headings (iOS Simulator, Android
+   Emulator, Physical device, TestFlight). Also asserts NO
+   `v2-boot-marker.ts` (or similarly named module) exists under
+   `apps/mobile/src/data/` — i.e. the manual-wipe procedure was
+   not silently re-implemented as code. No simulation of the wipe
+   itself — that's a human runbook step.
 
 9. **`sync-v2-final/dev-affordances-gate.test.ts`** — asserts the
    `isDevMode()` gate on t9's affordances. The Settings screen
@@ -173,6 +178,13 @@ audit-friendliness.
   asserting a plan-level outcome. Where overlap exists, tFINAL's
   test file may IMPORT the lower-level test helper rather than
   duplicating the test body.
+- **Automated verification of the manual-wipe procedure.** The
+  v1→v2 wipe is a human runbook step (see
+  `docs/plans/sync-v2-client/manual-wipe.md`) performed once on
+  each device by the dev / tester / user. CI verifies the doc
+  exists and that no code re-implements the wipe (see test #8);
+  CI does NOT exercise an actual uninstall+reinstall or Xcode
+  "Erase All Content and Settings" flow.
 - Maestro / e2e UI flows (those live in `apps/mobile/scripts/`
   and are exercised by `test:e2e:ios:*`).
 - Server-side schema tests (plan 1's tFINAL covered those).
