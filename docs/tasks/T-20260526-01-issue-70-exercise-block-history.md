@@ -23,9 +23,11 @@ docs_touched: "docs/specs/ui/ux-rules.md, docs/specs/ui/screen-map.md, docs/spec
 - Session date: `2026-05-26`
 - Session interaction mode: `interactive (default)`
 - Implementation/review branch:
-  - Agent 2 and Agent 3 should use `codex/issue-70-exercise-block-history`.
-  - Agent 2 should create/switch to that branch from fresh `main` before edits.
-  - Agent 3 should test/review the completed Agent 2 branch, apply small verification fixes on the same branch when appropriate, and otherwise leave actionable findings in the task completion/review notes.
+  - Use one integration branch: `codex/issue-70-exercise-block-history`.
+  - Agent 2A (service/data implementation) should create/switch to that branch from fresh `main`, implement the background-service/data layer slice, run its targeted numeric tests, and hand off with a clean working tree or clearly documented partial state.
+  - Agent 2B (UX implementation) should continue from the Agent 2A branch state, wire the recorder UI, update UI docs, run targeted UX tests, and hand off to testing/review.
+  - Agent 3A (numeric/service reviewer) should test/review the data/service layer for query correctness and metric accuracy.
+  - Agent 3B (UX quality reviewer) should test/review the recorder interaction and visual quality, apply small verification fixes on the same branch when appropriate, and otherwise leave actionable findings in the task completion/review notes.
 - Issue context:
   - GitHub Issue: `https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/70`
   - No new milestone is created for Issue 70. This is a single direct-execution task under the existing session-recorder parent milestone because the first slice is recorder UI plus local read-only derived history.
@@ -87,11 +89,32 @@ docs_touched: "docs/specs/ui/ux-rules.md, docs/specs/ui/screen-map.md, docs/spec
 
 Implement the first Issue 70 slice in the session recorder: when a user selects/logs an exercise, show a compact, read-only navigator through up to `n` most recent completed-session blocks containing that exercise, starting from the most recent block and exposing only summary stats.
 
+## Workstream split
+
+This remains one task card and one integration branch, but execution should be split into service/data and UX workstreams so each agent has a crisp ownership boundary.
+
+1. Agent 2A - background service/data layer
+   - Owns the read-only repository/service contract for recent exercise blocks.
+   - Owns pure aggregation/format-ready data shapes, including block ordering, session-level merge behavior, and numeric stats.
+   - Owns numeric/data tests before UX wiring.
+   - Should not make recorder visual/layout decisions beyond exposing a clean API for Agent 2B.
+2. Agent 2B - recorder UX
+   - Owns loading the service output from recorder exercise cards.
+   - Owns the block panel, `<<`/`>>` controls, inline loading/empty/error states, accessibility labels, and UI docs.
+   - Should not rewrite numeric aggregation rules unless Agent 2A's contract is incomplete; if so, update service tests first.
+3. Agent 3A - numeric accuracy review
+   - Owns independent verification of query semantics and calculations.
+   - Focuses on correctness of `n`, ordering, duplicate same-session exercise rows, warm-up exclusion, invalid input handling, and `<=2 RIR` count.
+4. Agent 3B - UX quality review
+   - Owns interaction/appearance review against `docs/specs/08-ux-delivery-standard.md` and `docs/specs/ui/**`.
+   - Focuses on mobile density, state clarity, disabled button behavior, non-blocking failure states, and screenshot evidence.
+
 ## Scope
 
 ### In scope
 
 - Add a read-only local repository/aggregation path for recent exercise blocks.
+- Add a small service/repository API that recorder UI can consume without knowing SQL/join details.
 - Load up to `n` most recent completed, non-deleted sessions containing the selected exercise definition.
 - Merge multiple logged instances of the same exercise inside one session into one block.
 - Show the most recent block by default for each selected exercise in the recorder.
@@ -103,6 +126,7 @@ Implement the first Issue 70 slice in the session recorder: when a user selects/
   - highest weight,
   - number of sets with not more than `2 RIR`.
 - Add targeted data aggregation and recorder UI tests.
+- Split verification between numeric/service tests and UX interaction/quality tests.
 - Update relevant UI docs to reflect the new recorder block-history behavior.
 
 ### Out of scope
@@ -203,7 +227,12 @@ Implement the first Issue 70 slice in the session recorder: when a user selects/
 ## Testing and verification approach
 
 - Planned checks/commands:
-  - `cd apps/mobile && npm test -- --runTestsByPath app/__tests__/exercise-block-history.test.ts app/__tests__/session-recorder-interactions.test.tsx`
+  - Agent 2A / Agent 3A numeric-service lane:
+    - `cd apps/mobile && npm test -- --runTestsByPath app/__tests__/exercise-block-history.test.ts`
+    - If implementation extends existing `exercise-history` tests instead of adding a new file, adapt to the exact service/data test path.
+  - Agent 2B / Agent 3B UX lane:
+    - `cd apps/mobile && npm test -- --runTestsByPath app/__tests__/session-recorder-interactions.test.tsx app/__tests__/session-recorder-screen.test.tsx`
+    - If UX coverage lands in a narrower new test file, adapt to the exact recorder UI test path.
   - If implementation extends existing `exercise-history` repository instead of adding a new file, adapt the targeted path to the actual test file names.
   - `cd apps/mobile && npm run lint:ui-guardrails`
   - `./scripts/quality-fast.sh frontend`
@@ -211,8 +240,8 @@ Implement the first Issue 70 slice in the session recorder: when a user selects/
   - `./scripts/quality-fast.sh frontend` required.
   - `./scripts/quality-slow.sh frontend` is `N/A` unless implementation unexpectedly changes native runtime behavior, Maestro harness flows, navigation, or keyboard/geometry-sensitive UI.
 - Test layers covered:
-  - Unit/data aggregation tests for recent block query/aggregation and metric calculation.
-  - React Native Testing Library route/component tests for recorder display, navigation buttons, empty/loading/error states, and non-blocking logging behavior.
+  - Numeric/service layer: unit/data aggregation tests for recent block query/aggregation and metric calculation.
+  - UX layer: React Native Testing Library route/component tests for recorder display, navigation buttons, empty/loading/error states, and non-blocking logging behavior.
 - Execution triggers:
   - Always for this task.
 - Slow-gate triggers:
@@ -222,7 +251,8 @@ Implement the first Issue 70 slice in the session recorder: when a user selects/
 - CI/manual posture note:
   - CI is absent/partial; local targeted tests, UI guardrail lint, frontend fast gate, and visual evidence must be recorded before closeout.
 - Notes:
-  - Prefer deterministic repository tests over fixture-heavy UI tests for the duplicate-session-exercise and metric edge cases.
+  - Prefer deterministic repository tests over fixture-heavy UI tests for duplicate-session-exercise and metric edge cases.
+  - Prefer UX tests with mocked service output over database fixture setup for panel rendering, navigation, and failure-state behavior.
 
 ## Implementation notes
 
@@ -251,6 +281,9 @@ Implement the first Issue 70 slice in the session recorder: when a user selects/
 ## Agent 3 testing/review checklist
 
 - Confirm Agent 2 worked from branch `codex/issue-70-exercise-block-history`.
+### Agent 3A - numeric/service checklist
+
+- Confirm the service/data contract can be tested without rendering the recorder.
 - Review the data query for:
   - distinct session limit before set loading,
   - newest-first ordering,
@@ -261,12 +294,22 @@ Implement the first Issue 70 slice in the session recorder: when a user selects/
   - invalid text weight/reps handling,
   - `rir_0 | rir_1 | rir_2` count,
   - reuse of existing 1RM/volume parsing helpers.
+- Run the numeric/service targeted tests and inspect at least one edge-case fixture directly.
+
+### Agent 3B - UX quality checklist
+
+- Confirm the UX consumes the service/data contract rather than duplicating query or calculation rules in the route component.
 - Review recorder UI for:
   - default most-recent block,
   - `<<` older and `>>` newer directionality,
   - disabled boundary behavior,
   - empty/loading/error states remaining non-blocking.
-- Run the mandatory gates and record exact results.
+- Review visual quality for:
+  - compact mobile density without cramped or overlapping text,
+  - clear distinction between historical stats and current editable sets,
+  - accessibility labels for older/newer controls,
+  - no raw color literals or token bypasses.
+- Run the UX targeted tests, UI guardrail check, and full frontend fast gate; record exact results.
 - Capture or verify the required visual evidence.
 - Leave only high-signal findings with file/line references if anything remains.
 
@@ -277,7 +320,8 @@ Implement the first Issue 70 slice in the session recorder: when a user selects/
 - Optional closeout validation helper:
   - `./scripts/task-closeout-check.sh docs/tasks/T-20260526-01-issue-70-exercise-block-history.md`
 - Additional gate(s):
-  - `cd apps/mobile && npm test -- --runTestsByPath app/__tests__/exercise-block-history.test.ts app/__tests__/session-recorder-interactions.test.tsx` or adapted exact target files.
+  - Numeric/service: `cd apps/mobile && npm test -- --runTestsByPath app/__tests__/exercise-block-history.test.ts` or adapted exact target file.
+  - UX: `cd apps/mobile && npm test -- --runTestsByPath app/__tests__/session-recorder-interactions.test.tsx app/__tests__/session-recorder-screen.test.tsx` or adapted exact target files.
   - `cd apps/mobile && npm run lint:ui-guardrails`
 
 ## Evidence
