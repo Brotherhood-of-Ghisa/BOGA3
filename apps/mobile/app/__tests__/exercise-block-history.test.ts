@@ -112,6 +112,26 @@ describe('aggregateExerciseBlockHistory', () => {
     expect(block.estimatedOneRepMax).not.toBeNull();
   });
 
+  it('uses the best Wathan 1RM estimate across eligible working sets', () => {
+    const summary = aggregateExerciseBlockHistory({
+      now: new Date('2026-05-20T12:00:00.000Z'),
+      sessions: [
+        sessionRow({ sessionId: 'session-1', completedAt: new Date('2026-05-19T12:00:00.000Z') }),
+      ],
+      sessionExercises: [
+        sessionExerciseRow({ sessionId: 'session-1', sessionExerciseId: 'se-1' }),
+      ],
+      setsBySessionExerciseId: groupBySessionExerciseId([
+        setRow({ setId: 'heaviest', sessionExerciseId: 'se-1', orderIndex: 0, weightValue: '120', repsValue: '1' }),
+        setRow({ setId: 'best-estimate', sessionExerciseId: 'se-1', orderIndex: 1, weightValue: '100', repsValue: '10' }),
+        setRow({ setId: 'warm', sessionExerciseId: 'se-1', orderIndex: 2, weightValue: '200', repsValue: '10', setType: 'warm_up' }),
+      ]),
+    });
+
+    expect(summary.blocks[0].estimatedOneRepMax).toBeCloseTo(134.74669948168537, 8);
+    expect(summary.blocks[0].highestWeight).toBe(120);
+  });
+
   it('returns empty metrics when no eligible set parses cleanly', () => {
     const summary = aggregateExerciseBlockHistory({
       now: new Date('2026-05-20T12:00:00.000Z'),
@@ -153,6 +173,58 @@ describe('aggregateExerciseBlockHistory', () => {
     });
 
     expect(summary.blocks.map((block) => block.sessionId)).toEqual(['session-a', 'session-b']);
+  });
+
+  it('applies caller limits after ordering newest sessions first', () => {
+    const summary = aggregateExerciseBlockHistory({
+      now: new Date('2026-05-20T12:00:00.000Z'),
+      limit: 2,
+      sessions: [
+        sessionRow({ sessionId: 'oldest', completedAt: new Date('2026-05-10T12:00:00.000Z') }),
+        sessionRow({ sessionId: 'newest', completedAt: new Date('2026-05-19T12:00:00.000Z') }),
+        sessionRow({ sessionId: 'middle', completedAt: new Date('2026-05-15T12:00:00.000Z') }),
+      ],
+      sessionExercises: [
+        sessionExerciseRow({ sessionId: 'oldest', sessionExerciseId: 'se-oldest' }),
+        sessionExerciseRow({ sessionId: 'newest', sessionExerciseId: 'se-newest' }),
+        sessionExerciseRow({ sessionId: 'middle', sessionExerciseId: 'se-middle' }),
+      ],
+      setsBySessionExerciseId: {},
+    });
+
+    expect(summary.limit).toBe(2);
+    expect(summary.blocks.map((block) => block.sessionId)).toEqual(['newest', 'middle']);
+  });
+
+  it('rejects invalid dates and invalid limits before returning a summary', () => {
+    const validInput = {
+      now: new Date('2026-05-20T12:00:00.000Z'),
+      sessions: [
+        sessionRow({ sessionId: 'session-1', completedAt: new Date('2026-05-19T12:00:00.000Z') }),
+      ],
+      sessionExercises: [
+        sessionExerciseRow({ sessionId: 'session-1', sessionExerciseId: 'se-1' }),
+      ],
+      setsBySessionExerciseId: {},
+    };
+
+    expect(() =>
+      aggregateExerciseBlockHistory({ ...validInput, now: new Date('not-a-date') })
+    ).toThrow('now must be a valid Date');
+    expect(() => aggregateExerciseBlockHistory({ ...validInput, limit: -1 })).toThrow(
+      'limit must be non-negative'
+    );
+    expect(() => aggregateExerciseBlockHistory({ ...validInput, limit: 1.5 })).toThrow(
+      'limit must be an integer'
+    );
+    expect(() =>
+      aggregateExerciseBlockHistory({
+        ...validInput,
+        sessions: [
+          sessionRow({ sessionId: 'session-1', completedAt: new Date('not-a-date') }),
+        ],
+      })
+    ).toThrow('completedAt must be a valid Date');
   });
 });
 
@@ -217,5 +289,16 @@ describe('createExerciseBlockHistoryRepository', () => {
       exerciseDefinitionId: 'ex-bench',
       limit: 2,
     });
+  });
+
+  it('rejects invalid limits before hitting the store', async () => {
+    const store = buildStore();
+    const repository = createExerciseBlockHistoryRepository(store);
+
+    await expect(
+      repository.loadRecentBlocks({ exerciseDefinitionId: 'ex-bench', limit: -1 })
+    ).rejects.toThrow('limit must be non-negative');
+
+    expect(store.loadRecentCompletedSessionsForExercise).not.toHaveBeenCalled();
   });
 });
