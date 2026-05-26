@@ -64,6 +64,7 @@ Ship the first usable gym logging interface where a user can compose a full sess
 3. `docs/tasks/complete/T-20260219-03-m1-validation-submit-and-tests.md` - validation UX, submit confirmation, and final test coverage.
 4. `docs/tasks/complete/T-20260515-01-session-recorder-set-entry-ergonomics.md` - zero-weight set logging plus repeated-set defaulting ergonomics. (`completed`)
 5. `docs/tasks/complete/T-20260520-01-session-recorder-weight-autofocus.md` - autofocus and select-on-focus ergonomics for new set weight entry. (`completed`)
+6. `docs/tasks/T-20260526-01-issue-70-exercise-block-history.md` - Issue 70 phase 0A: recent per-exercise completed-session block stats in the recorder. (`planned`)
 
 ## Risks / dependencies
 
