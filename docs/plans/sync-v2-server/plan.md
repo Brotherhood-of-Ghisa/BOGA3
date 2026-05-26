@@ -70,11 +70,16 @@ When this plan is done end-to-end, all of these are true:
   a cap of `limit=2` and observes every committed row exactly once across
   pages, in cursor order.
 - **Layer→type mapping integrity and client-FK closure.** The server's
-  layer→types mapping matches t2 §4.4 exactly: every one of the eight
-  entity types appears in exactly one layer (Layer 0: `gyms`,
-  `exercise_definitions`, `exercise_tag_definitions`; Layer 1: `sessions`,
-  `exercise_muscle_mappings`; Layer 2: `session_exercises`; Layer 3:
-  `exercise_sets`, `session_exercise_tags`). An automated test pushes a
+  layer→types mapping matches the corrected partition (see Deviations log
+  entry for t2, PR #72): every one of the eight entity types appears in
+  exactly one layer (Layer 0: `gyms`, `exercise_definitions`; Layer 1:
+  `sessions`, `exercise_muscle_mappings`, `exercise_tag_definitions`;
+  Layer 2: `session_exercises`; Layer 3: `exercise_sets`,
+  `session_exercise_tags`). `exercise_tag_definitions` belongs in Layer 1
+  because it FKs into `exercise_definitions` (Layer 0) — the t1 §7.7
+  invariant forbids intra-layer FKs and the original t1 §2 / t2 §4.4
+  example was internally inconsistent on this point. An automated test
+  pushes a
   fully-connected dataset (rows in every layer with the FK chain
   populated), drains layers 0→3 in order, and asserts the FK-closure
   invariant: for every row in the layer-N response, all of its FK parents
@@ -140,6 +145,7 @@ graph TD
   t2 --> tFINAL
   t3 --> tFINAL
   t4 --> tFINAL
+  tFINAL --> t99[t99: merge orchestrator plan-tracking commits — audit remediation]
 ```
 
 t1 is a single migration task that handles both the v1 drop and the v2
@@ -159,7 +165,13 @@ by t1 and can ship in parallel afterwards.
 - [t3: sync_push RPC](tasks/t3.md) — build
 - [t4: sync_pull RPC](tasks/t4.md) — build
 - [tFINAL: server end-to-end verification](tasks/tFINAL.md) — build (final test card)
+- [t99: merge orchestrator plan-tracking commits](tasks/t99.md) — build (audit remediation, doc-only)
 
 ## Deviations log
 
-<empty until first merge>
+- t1 (PR #69, merged 2026-05-25): ships clean-room migration + smoke test + slow-gate skip-block per spec. Three honest deviations from the card: (a) preserved `gyms.latitude` / `gyms.longitude` columns despite their omission from t1 §2.1 (the client `apps/mobile/src/data/schema/gyms.ts` references them, so dropping would have desynced the v2 contract); (b) retired the v1 `session-sync-api-contract.sh` and `sync-events-ingest-contract.sh` invocations from `scripts/quality-slow.sh run_backend()` because v1 objects no longer exist; (c) patched `supabase/tests/auth-authz-contract.sh` to supply the new NOT NULL `client_updated_at_ms` column and switch a v1 status literal `'draft'` → v2 `'active'`. None of these alter downstream task contracts.
+- t2 (PR #72, merged 2026-05-26): ships drift checker + fixtures + topo-order + sync-extras + spec edit. Five card deviations: (a) **TOPO_LAYERS correction** — moved `exercise_tag_definitions` from Layer 0 to Layer 1. Reasoning: t1 §2.7 declares `exercise_tag_definitions(owner_user_id, exercise_definition_id) → exercise_definitions(owner_user_id, id)` and t1 §7.7's invariant forbids intra-layer FKs; the original Layer 0 placement in t1 §2 / t2 §4.4 / `tasks/t4.md` / `plan.md` was internally inconsistent against the live FK graph. The corrected partition is Layer 0: `gyms`, `exercise_definitions`; Layer 1: `sessions`, `exercise_muscle_mappings`, `exercise_tag_definitions`; Layer 2: `session_exercises`; Layer 3: `exercise_sets`, `session_exercise_tags`. **Load-bearing for t4 and tFINAL** — the `sync_pull` SQL `case` mapping, t4's contract test partition assertion, and tFINAL's outcome 8a all adopt this corrected mapping. (b) Added `server_only_columns` exemption category to `sync-extras.json` to register `deleted_at` as legitimately server-only (the card's wire-envelope universal exclusion didn't cover it). (c) `DB_URL` env-var override on the checker for non-default Postgres targets. (d) Bumped `better-sqlite3` from `^11.10.0` (recovery-branch state) to `^12.10.0` per coordinator override (v12 only drops Node 18 EOL — no API breaks). (e) Inline fix to `supabase/tests/sync-v2-schema-smoke.sh` discovered while running the full slow gate: the docker-fallback container picker (`grep '^supabase_db_' | head -n1`) was picking the wrong worktree's container under multi-worktree Docker sharing — fixed by reading `project_id` from `supabase/config.toml` and preferring `supabase_db_${project_id}`. Cross-task edit justified by the gate-blocking nature of the bug.
+- t3 (PR #71, merged 2026-05-26): ships `sync_push` RPC migration + 13-scenario contract test + wrapper + slow-gate wiring. Two card deviations: (a) function signature `sync_push(entities jsonb default '[]'::jsonb)` instead of card's `sync_push(payload jsonb)` — PostgREST's named-parameter dispatch maps the wire body `{"entities": [...]}` directly to a param named `entities`. (b) `grant execute … to anon` so the function's own `AUTH_REQUIRED` envelope surfaces instead of PostgREST 42501; the `auth.uid() IS NULL` guard is the first statement so anonymous callers never reach state-mutating code. Gyms dispatch correctly includes the four M15 carry-over columns (latitude, longitude, coordinate_accuracy_m, coordinates_updated_at).
+- t4 (PR #73, merged 2026-05-26): ships `sync_pull` RPC migration + 10-scenario contract test + wrapper + slow-gate wiring. Four card deviations: (a) function signature `sync_pull(jsonb)` (unnamed param) instead of named — PostgREST's single-jsonb fallback maps the raw POST body to the unnamed param; pull's wire body has multiple top-level keys (`layer`, `cursor`, `limit`) so the unnamed pattern was preferred over named-per-key dispatch. (b) `grant execute … to anon` mirroring t3 for the AUTH_REQUIRED envelope. (c) `row_to_jsonb` → `to_jsonb` fix discovered while running the contract test. (d) Gyms projection extended to the same four M15 carry-over columns for round-trip symmetry with t3. Layer→type partition adopts the corrected mapping per t2's deviation entry (Layer 1 placement of `exercise_tag_definitions`); SQL `case` and contract-test partition assertion both encode the corrected sets. Final commit `36602d5` is a rebase merge on top of t2 + t3 with the `scripts/quality-slow.sh run_backend()` conflict resolved by keeping all wrappers (auth/authz → sync-v2 schema smoke → sync-push contract → sync-pull contract → drift checker).
+- tFINAL (PR #74, merged 2026-05-26): ships nine E2E test scripts + wrapper + slow-gate wiring asserting each plan-level outcome end-to-end. Test files: `sync-v2-clean-room.sh` (outcomes 1/2/3), `sync-v2-deferrable-fk.sh` (4), `sync-v2-rls-cross-owner.sh` (5), `sync-v2-push-roundtrip.sh` (6), `sync-v2-pull-drain.sh` (7/8), `sync-v2-pull-fk-closure.sh` (8a), `sync-v2-drift-synthetic.sh` (9 negative) + `sync-v2-drift-asbuilt.sh` (9 positive), `sync-v2-spec-rule.sh` (10). Wrapper at `supabase/scripts/test-sync-v2-e2e.sh`, wired into `scripts/quality-slow.sh run_backend()` after per-task wrappers. Two card deviations: (a) The FK assertion in `sync-v2-deferrable-fk.sh` joins `information_schema.referential_constraints` with `information_schema.table_constraints` because PG v17's `referential_constraints` view doesn't expose `is_deferrable` / `initially_deferred`; the card's intent (use information_schema, not pg_catalog) is preserved. (b) Size budget soft overage at ~2491 lines (24% over the 2000-line target) — acknowledged as appropriate for nine integration test scripts averaging ~275 lines each, consistent with existing per-task contract suites.
+- t99 (audit remediation, this PR): lands the orchestrator's plan-tracking commits (deviations log + status.md + tasks/t4.md card update + downstream design/plan annotations) that were written to the orchestrator's session branch during execution but never propagated to `main`. Doc-only. No code, migrations, RPCs, tests, or quality-gate behavior affected. The five upstream code-level deviations are unchanged; this entry exists for traceability.
