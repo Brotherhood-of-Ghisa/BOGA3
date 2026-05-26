@@ -15,6 +15,7 @@
     "test": "jest",
     "db:generate": "drizzle-kit generate --config=drizzle.config.ts",
     "db:generate:canary": "npm run db:generate",
+    "check:sync-drift": "tsx scripts/check-sync-schema-drift.ts",
     "test:sync:reinstall-parity": "./scripts/test-sync-reinstall-restore-parity.sh",
     "test:e2e:ios:smoke": "./scripts/maestro-ios-smoke.sh",
     "test:e2e:ios:data-smoke": "./scripts/maestro-ios-data-smoke.sh",
@@ -49,14 +50,19 @@
   },
   "devDependencies": {
     "@testing-library/react-native": "^13.2.0",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/jest": "29.5.14",
+    "@types/pg": "^8.20.0",
     "@types/react": "~19.1.0",
+    "better-sqlite3": "^12.10.0",
     "drizzle-kit": "^0.31.5",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~10.0.0",
     "jest": "~29.7.0",
     "jest-expo": "~54.0.17",
+    "pg": "^8.21.0",
     "react-test-renderer": "^19.1.0",
+    "tsx": "^4.22.3",
     "typescript": "~5.9.2"
   },
   "private": true
