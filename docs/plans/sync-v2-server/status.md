@@ -104,3 +104,16 @@ Orchestrator log. Append one entry per iteration. Reverse-chronological.
 - Dispatching `mao-builder` for tFINAL (final test card — integration-level E2E verification of each plan-level outcome).
 
 **Next:** await tFINAL PR; review; merge; run `mao-audit` for end-of-plan verification.
+
+## Iteration 9 — 2026-05-26
+
+**State snapshot:**
+- tFINAL PR [#74](https://github.com/Brotherhood-of-Ghisa/BOGA3/pull/74) merged at `df5e97f`.
+- Hand-off verified on `origin/main`: nine `supabase/tests/sync-v2-*.sh` E2E scripts, wrapper `supabase/scripts/test-sync-v2-e2e.sh`, slow-gate wiring updated.
+- All five tasks in the plan DAG (t1, t2, t3, t4, tFINAL) now merged. DAG complete.
+
+**Actions:**
+- Appended tFINAL deviation entry to `plan.md ## Deviations log`.
+- Dispatching `mao-audit` for end-of-plan verification.
+
+**Next:** await audit verdict. PASS → propose deleting plan root + advance to plan 2 (sync-v2-client). FAIL → audit appends remediation cards under `tasks/` + DAG edges; orchestration resumes.
