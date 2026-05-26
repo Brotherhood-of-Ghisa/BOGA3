@@ -6,7 +6,17 @@
 > "full slow gate exits 0" assertion stays valid. The as-built `gyms` table
 > carries `latitude` / `longitude` — include those columns in any
 > push-roundtrip / pull-drain projection assertion that touches `gyms`.
-> See plan.md `## Deviations log`.
+>
+> Updated from t2 (PR #72, awaiting merge — APPROVED): the layer→type
+> partition has been corrected. The canonical partition is **Layer 0:
+> `gyms`, `exercise_definitions`; Layer 1: `sessions`,
+> `exercise_muscle_mappings`, `exercise_tag_definitions`; Layer 2:
+> `session_exercises`; Layer 3: `exercise_sets`, `session_exercise_tags`.**
+> Outcome 8a's "every entity is reachable via exactly one layer" assertion
+> uses this partition. The seed-and-drain test must seed under this layout
+> and assert the per-layer type sets match the corrected mapping.
+>
+> See plan.md `## Deviations log` for both.
 
 **Type:** build (final test card)
 

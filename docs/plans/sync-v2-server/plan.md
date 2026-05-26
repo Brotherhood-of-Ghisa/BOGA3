@@ -70,11 +70,16 @@ When this plan is done end-to-end, all of these are true:
   a cap of `limit=2` and observes every committed row exactly once across
   pages, in cursor order.
 - **Layer→type mapping integrity and client-FK closure.** The server's
-  layer→types mapping matches t2 §4.4 exactly: every one of the eight
-  entity types appears in exactly one layer (Layer 0: `gyms`,
-  `exercise_definitions`, `exercise_tag_definitions`; Layer 1: `sessions`,
-  `exercise_muscle_mappings`; Layer 2: `session_exercises`; Layer 3:
-  `exercise_sets`, `session_exercise_tags`). An automated test pushes a
+  layer→types mapping matches the corrected partition (see Deviations log
+  entry for t2, PR #72): every one of the eight entity types appears in
+  exactly one layer (Layer 0: `gyms`, `exercise_definitions`; Layer 1:
+  `sessions`, `exercise_muscle_mappings`, `exercise_tag_definitions`;
+  Layer 2: `session_exercises`; Layer 3: `exercise_sets`,
+  `session_exercise_tags`). `exercise_tag_definitions` belongs in Layer 1
+  because it FKs into `exercise_definitions` (Layer 0) — the t1 §7.7
+  invariant forbids intra-layer FKs and the original t1 §2 / t2 §4.4
+  example was internally inconsistent on this point. An automated test
+  pushes a
   fully-connected dataset (rows in every layer with the FK chain
   populated), drains layers 0→3 in order, and asserts the FK-closure
   invariant: for every row in the layer-N response, all of its FK parents
@@ -163,3 +168,4 @@ by t1 and can ship in parallel afterwards.
 ## Deviations log
 
 - t1 (PR #69, merged 2026-05-25): ships clean-room migration + smoke test + slow-gate skip-block per spec. Three honest deviations from the card: (a) preserved `gyms.latitude` / `gyms.longitude` columns despite their omission from t1 §2.1 (the client `apps/mobile/src/data/schema/gyms.ts` references them, so dropping would have desynced the v2 contract); (b) retired the v1 `session-sync-api-contract.sh` and `sync-events-ingest-contract.sh` invocations from `scripts/quality-slow.sh run_backend()` because v1 objects no longer exist; (c) patched `supabase/tests/auth-authz-contract.sh` to supply the new NOT NULL `client_updated_at_ms` column and switch a v1 status literal `'draft'` → v2 `'active'`. None of these alter downstream task contracts.
+- t2 (PR #72, awaiting merge — APPROVED 2026-05-26): ships drift checker + fixtures + topo-order + sync-extras + spec edit. Three card deviations: (a) **TOPO_LAYERS correction** — moved `exercise_tag_definitions` from Layer 0 to Layer 1. Reasoning: t1 §2.7 declares `exercise_tag_definitions(owner_user_id, exercise_definition_id) → exercise_definitions(owner_user_id, id)` and t1 §7.7's invariant forbids intra-layer FKs; the original Layer 0 placement in t1 §2 / t2 §4.4 / `tasks/t4.md` / `plan.md` was internally inconsistent against the live FK graph. The corrected partition is Layer 0: `gyms`, `exercise_definitions`; Layer 1: `sessions`, `exercise_muscle_mappings`, `exercise_tag_definitions`; Layer 2: `session_exercises`; Layer 3: `exercise_sets`, `session_exercise_tags`. **Load-bearing for t4 and tFINAL** — the `sync_pull` SQL `case` mapping, t4's contract test partition assertion, and tFINAL's outcome 8a all adopt this corrected mapping. (b) Added `server_only_columns` exemption category to `sync-extras.json` to register `deleted_at` as legitimately server-only (the card's wire-envelope universal exclusion didn't cover it). (c) `DB_URL` env-var override on the checker for non-default Postgres targets.
