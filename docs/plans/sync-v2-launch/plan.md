@@ -186,6 +186,51 @@ The re-dispatched planner should:
 - This plan is the last of the three. After tFINAL passes, the design
   wave's `docs/plans/sync-v2/plan.md` outcomes are fully delivered.
 
+## Carry-over from plan 1 (sync-v2-server, merged 2026-05-26)
+
+The planner re-dispatch must treat the following as as-built facts:
+
+1. **`sync_push` and `sync_pull` are granted `execute` to `anon`** in
+   addition to `authenticated`. This is load-bearing for plan 3's
+   login-gate behaviour: a pre-login app that calls either RPC
+   receives the structured `AUTH_REQUIRED` envelope (per t2 §2.2),
+   NOT a raw 401. Plan 3's t2 (sync-gate full-screen UI) and t1
+   (login-on-start enforcement) must handle the envelope:
+   - The cycle returning AUTH_REQUIRED means "not signed in" — route
+     the user to the sign-in screen rather than rendering a generic
+     error. Treat it as a route signal, not an exception.
+   - The sync gate's retry CTA must NOT re-trigger a cycle if the
+     latest error envelope is AUTH_REQUIRED (a retry will get the
+     same envelope; the user needs to sign in first).
+
+2. **The bootstrap pull walks the corrected layer partition** (Layer
+   0: `gyms`, `exercise_definitions`; Layer 1: `sessions`,
+   `exercise_muscle_mappings`, `exercise_tag_definitions`; Layer 2:
+   `session_exercises`; Layer 3: `exercise_sets`,
+   `session_exercise_tags`). Plan 3's t3 (bootstrapper integration)
+   inherits this from plan 2's t6 (cycle); no plan-3 task should
+   redefine the layers.
+
+3. **`gyms` carries the four M15 location columns** — relevant only
+   if plan 3's Settings sync-status surface (t9) ever surfaces
+   `gyms`-touching state (e.g. "last known gym"). Otherwise no
+   direct impact on plan 3.
+
+4. **`sync_runtime_state.applied_seed_migration_app_version`** —
+   plan 2 will add this column. Plan 3's t5 (bundle migration
+   runtime loop) consumes it. If plan 2 ships the column but
+   doesn't populate the migration loop, plan 3's t5 is responsible
+   for the loop only.
+
+5. **Drift checker is live in the slow gate** (plan 1's t2). Any
+   plan-3 PR that touches an entity Drizzle schema (unlikely — most
+   plan-3 work is UI / auth) must pass `npm run check:sync-drift --
+   --strict` before review.
+
+6. **Spec edit landed in `docs/specs/05-data-model.md`**: a "Client
+   schema drift rule (Sync v2)" subsection per t1 §8.2. Plan 3's
+   PR-time guidance for AI agents should reference it.
+
 ## Deviations log
 
 <empty until re-dispatch>
