@@ -16,9 +16,13 @@
 -- see rows where owner_user_id = auth.uid(). The explicit WHERE predicate is
 -- belt-and-braces and pins the planner on <table>_owner_received_idx.
 --
--- Layer→type mapping (t2 §4.4):
---   0: gyms, exercise_definitions, exercise_tag_definitions
---   1: sessions, exercise_muscle_mappings
+-- Layer→type mapping (corrected per plan.md ## Deviations log, t2 entry — the
+-- t1 §7.7 "no intra-layer FK" invariant precludes exercise_tag_definitions
+-- from sharing Layer 0 with exercise_definitions because
+-- exercise_tag_definitions(exercise_definition_id) → exercise_definitions(id)
+-- is a cross-entity FK):
+--   0: gyms, exercise_definitions
+--   1: sessions, exercise_muscle_mappings, exercise_tag_definitions
 --   2: session_exercises
 --   3: exercise_sets, session_exercise_tags
 --
@@ -229,11 +233,14 @@ begin
   end if;
 
   -- ---------------------------------------------------------------------------
-  -- 4. Layer → entity types (hardcoded, matches t2 §4.4 verbatim).
+  -- 4. Layer → entity types. Hardcoded per the corrected partition recorded in
+  -- plan.md ## Deviations log (t2 entry): exercise_tag_definitions lives in
+  -- Layer 1, not Layer 0, because it FKs into exercise_definitions which is
+  -- itself a Layer-0 entity and t1 §7.7 forbids intra-layer FKs.
   -- ---------------------------------------------------------------------------
   case v_layer
-    when 0 then v_types := array['gyms', 'exercise_definitions', 'exercise_tag_definitions'];
-    when 1 then v_types := array['sessions', 'exercise_muscle_mappings'];
+    when 0 then v_types := array['gyms', 'exercise_definitions'];
+    when 1 then v_types := array['sessions', 'exercise_muscle_mappings', 'exercise_tag_definitions'];
     when 2 then v_types := array['session_exercises'];
     when 3 then v_types := array['exercise_sets', 'session_exercise_tags'];
   end case;

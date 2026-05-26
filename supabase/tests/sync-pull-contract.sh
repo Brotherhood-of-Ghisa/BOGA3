@@ -341,44 +341,50 @@ cleanup_run_rows
 
 echo "[sync-pull-contract] scenario 3: layer→type mapping integrity"
 run_psql_sql "
-  -- Layer 0
+  -- Layer 0: gyms, exercise_definitions.
   insert into app_public.gyms (owner_user_id, id, name, created_at, updated_at, client_updated_at_ms)
     values ('${USER_A_UUID}'::uuid, 'pull-${RUN_TAG}-l0-gym', 'G', ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
   insert into app_public.exercise_definitions (owner_user_id, id, name, created_at, updated_at, client_updated_at_ms)
     values ('${USER_A_UUID}'::uuid, 'pull-${RUN_TAG}-l0-ed', 'ED', ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
-  insert into app_public.exercise_tag_definitions (owner_user_id, id, exercise_definition_id, name, normalized_name, created_at, updated_at, client_updated_at_ms)
-    values ('${USER_A_UUID}'::uuid, 'pull-${RUN_TAG}-l0-etd', 'pull-${RUN_TAG}-l0-ed', 'Tag', 'tag', ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
 
-  -- Layer 1
+  -- Layer 1: sessions, exercise_muscle_mappings, exercise_tag_definitions.
+  -- exercise_tag_definitions lives here (not Layer 0) per the corrected
+  -- partition in plan.md ## Deviations log (t2 entry): it FKs into
+  -- exercise_definitions (Layer 0), so t1 §7.7's no-intra-layer-FK rule
+  -- forces it into a strictly later layer.
   insert into app_public.sessions (owner_user_id, id, gym_id, started_at, created_at, updated_at, client_updated_at_ms)
     values ('${USER_A_UUID}'::uuid, 'pull-${RUN_TAG}-l1-s', 'pull-${RUN_TAG}-l0-gym', ${NOW_MS}, ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
   insert into app_public.exercise_muscle_mappings (owner_user_id, id, exercise_definition_id, muscle_group_id, weight, created_at, updated_at, client_updated_at_ms)
     values ('${USER_A_UUID}'::uuid, 'pull-${RUN_TAG}-l1-emm', 'pull-${RUN_TAG}-l0-ed', 'pectorals', 1.0, ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
+  insert into app_public.exercise_tag_definitions (owner_user_id, id, exercise_definition_id, name, normalized_name, created_at, updated_at, client_updated_at_ms)
+    values ('${USER_A_UUID}'::uuid, 'pull-${RUN_TAG}-l1-etd', 'pull-${RUN_TAG}-l0-ed', 'Tag', 'tag', ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
 
-  -- Layer 2
+  -- Layer 2: session_exercises.
   insert into app_public.session_exercises (owner_user_id, id, session_id, exercise_definition_id, order_index, name, created_at, updated_at, client_updated_at_ms)
     values ('${USER_A_UUID}'::uuid, 'pull-${RUN_TAG}-l2-sx', 'pull-${RUN_TAG}-l1-s', 'pull-${RUN_TAG}-l0-ed', 0, 'SX', ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
 
-  -- Layer 3
+  -- Layer 3: exercise_sets, session_exercise_tags.
   insert into app_public.exercise_sets (owner_user_id, id, session_exercise_id, order_index, weight_value, reps_value, created_at, updated_at, client_updated_at_ms)
     values ('${USER_A_UUID}'::uuid, 'pull-${RUN_TAG}-l3-es', 'pull-${RUN_TAG}-l2-sx', 0, '100', '10', ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
   insert into app_public.session_exercise_tags (owner_user_id, id, session_exercise_id, exercise_tag_definition_id, created_at, client_updated_at_ms)
-    values ('${USER_A_UUID}'::uuid, 'pull-${RUN_TAG}-l3-st', 'pull-${RUN_TAG}-l2-sx', 'pull-${RUN_TAG}-l0-etd', ${NOW_MS}, ${NOW_MS});
+    values ('${USER_A_UUID}'::uuid, 'pull-${RUN_TAG}-l3-st', 'pull-${RUN_TAG}-l2-sx', 'pull-${RUN_TAG}-l1-etd', ${NOW_MS}, ${NOW_MS});
 " >/dev/null
 
-# Layer 0 should yield exactly {gyms, exercise_definitions, exercise_tag_definitions}
-# (restricted to our run-tag rows).
+# Layer 0 should yield exactly {gyms, exercise_definitions} per the corrected
+# partition recorded in plan.md ## Deviations log (t2 entry):
+# exercise_tag_definitions FKs into exercise_definitions, so the t1 §7.7
+# "no intra-layer FK" invariant forces it into Layer 1, not Layer 0.
 sync_pull '{"layer":0,"cursor":null,"limit":200}'
 assert_status "200" "scenario 3 layer 0 status"
 L0_TYPES="$(printf '%s' "${REQUEST_BODY}" | jq -c '[.entities[] | select(.id | startswith("pull-'"${RUN_TAG}"'-")) | .type] | unique | sort')"
-[[ "${L0_TYPES}" == '["exercise_definitions","exercise_tag_definitions","gyms"]' ]] \
-  || fail "scenario 3 layer 0: expected {gyms, exercise_definitions, exercise_tag_definitions}, got ${L0_TYPES}"
+[[ "${L0_TYPES}" == '["exercise_definitions","gyms"]' ]] \
+  || fail "scenario 3 layer 0: expected {gyms, exercise_definitions}, got ${L0_TYPES}"
 
 sync_pull '{"layer":1,"cursor":null,"limit":200}'
 assert_status "200" "scenario 3 layer 1 status"
 L1_TYPES="$(printf '%s' "${REQUEST_BODY}" | jq -c '[.entities[] | select(.id | startswith("pull-'"${RUN_TAG}"'-")) | .type] | unique | sort')"
-[[ "${L1_TYPES}" == '["exercise_muscle_mappings","sessions"]' ]] \
-  || fail "scenario 3 layer 1: expected {sessions, exercise_muscle_mappings}, got ${L1_TYPES}"
+[[ "${L1_TYPES}" == '["exercise_muscle_mappings","exercise_tag_definitions","sessions"]' ]] \
+  || fail "scenario 3 layer 1: expected {sessions, exercise_muscle_mappings, exercise_tag_definitions}, got ${L1_TYPES}"
 
 sync_pull '{"layer":2,"cursor":null,"limit":200}'
 assert_status "200" "scenario 3 layer 2 status"
@@ -415,7 +421,7 @@ UNIQUE_COUNT="$(printf '%s' "${UNION_AND_DISJOINT}" | jq -r '.unique_count')"
 [[ "${UNIQUE_COUNT}" == "8" ]] \
   || fail "scenario 3 disjoint: expected 8 unique entity types (pairwise-disjoint), got ${UNIQUE_COUNT}"
 
-pass "scenario 3: layer→type mapping integrity (partition = t2 §4.4 verbatim)"
+pass "scenario 3: layer→type mapping integrity (corrected partition per plan.md ## Deviations log, t2 entry)"
 
 cleanup_run_rows
 
