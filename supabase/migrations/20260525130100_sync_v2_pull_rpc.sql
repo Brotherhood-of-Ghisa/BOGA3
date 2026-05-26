@@ -40,13 +40,21 @@
 -- This RPC does NOT solve that race.
 -- =============================================================================
 
-create or replace function app_public.sync_pull(payload jsonb)
+-- The parameter is intentionally UNNAMED. PostgREST's "single jsonb fallback"
+-- (https://docs.postgrest.org/en/v14/references/api/functions.html) routes a
+-- raw JSON body to a function with a single unnamed jsonb param when none of
+-- the body's top-level keys match a named parameter. With a named param the
+-- client would have to wrap the body as `{"<param-name>": {...}}`, which is
+-- ergonomically painful for callers. Inside the body we refer to the param
+-- as `_payload` via a `declare` alias.
+create or replace function app_public.sync_pull(jsonb)
 returns jsonb
 language plpgsql
 security invoker
 set search_path = public, pg_temp
 as $$
 declare
+  payload        jsonb := $1;
   v_layer        int;
   v_limit        int;
   v_cursor       jsonb;
@@ -247,9 +255,13 @@ begin
   -- The explicit `where owner_user_id = auth.uid()` on every leg keeps the
   -- planner on `<table>_owner_received_idx` per t1 §2; RLS also enforces it.
   --
-  -- `gyms` projects `latitude` and `longitude` per the v2 clean-room
-  -- migration's t1 §2.1 deviation (M15 carry-over preserved server-side to
-  -- match the client schema). See plan.md "Deviations log".
+  -- `gyms` projects the four M15 carry-over coordinate columns
+  -- (`latitude`, `longitude`, `coordinate_accuracy_m`, `coordinates_updated_at`)
+  -- in addition to the t1 §2.1 enumerated columns. These four are on the
+  -- as-built `app_public.gyms` table per the t1 PR #69 "Deviations from card"
+  -- (the client `apps/mobile/src/data/schema/gyms.ts` schema carries them and
+  -- t3's `sync_push` writes them, so pull must round-trip all four for
+  -- symmetric behaviour). See plan.md "Deviations log".
   -- ---------------------------------------------------------------------------
   with all_rows as (
     select 'gyms'::text as type, g.id, g.client_updated_at_ms,
@@ -258,6 +270,8 @@ begin
              'name', g.name,
              'latitude', g.latitude,
              'longitude', g.longitude,
+             'coordinate_accuracy_m', g.coordinate_accuracy_m,
+             'coordinates_updated_at', g.coordinates_updated_at,
              'created_at', g.created_at,
              'updated_at', g.updated_at,
              'deleted_at', g.deleted_at
@@ -381,7 +395,7 @@ begin
   )
   select coalesce(
            jsonb_agg(
-             row_to_jsonb(p)
+             to_jsonb(p)
              order by p.server_received_at asc,
                       p.owner_user_id asc,
                       p.type asc,
@@ -473,3 +487,10 @@ comment on function app_public.sync_pull(jsonb) is
 revoke all on function app_public.sync_pull(jsonb) from public;
 grant execute on function app_public.sync_pull(jsonb) to authenticated;
 grant execute on function app_public.sync_pull(jsonb) to service_role;
+-- Grant to anon so the function is reachable for an unauthenticated request
+-- and can emit the AUTH_REQUIRED error envelope (t2 §2.2). Without this grant
+-- PostgREST short-circuits with a generic 401/403; the v2 wire contract
+-- requires the structured `{error:{code:"AUTH_REQUIRED"}}` body. RLS and the
+-- explicit auth.uid()-is-null guard inside the function body together ensure
+-- anon callers see zero rows even if they bypass the AUTH_REQUIRED check.
+grant execute on function app_public.sync_pull(jsonb) to anon;
