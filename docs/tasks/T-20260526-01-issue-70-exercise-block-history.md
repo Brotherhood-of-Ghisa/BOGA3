@@ -56,6 +56,8 @@ docs_touched: "docs/specs/ui/ux-rules.md, docs/specs/ui/screen-map.md, docs/spec
 - Start-of-session sync completed per `docs/specs/04-ai-development-playbook.md` git sync workflow?: `yes` - Agent 2A ran `git fetch origin main codex/issue-70-exercise-block-history`; Agent 2B ran `git fetch origin main codex/issue-70-exercise-block-history` and confirmed no new `origin/main` commits were pending relative to the branch.
 - Agent 3A started from Agent 2B handoff commit `41bc94a` on branch `codex/issue-70-exercise-block-history-3A`.
 - Start-of-session sync completed in this Agent 3A session?: `yes` - ran `git fetch origin main codex/issue-70-exercise-block-history codex/issue-70-exercise-block-history-2B` and confirmed no local dirty entries before branching.
+- Agent 3B started from Agent 3A handoff commit `80d7ad0` on branch `codex/issue-70-exercise-block-history-3B`.
+- Start-of-session sync completed in this Agent 3B session?: `yes` - ran `git fetch origin main codex/issue-70-exercise-block-history codex/issue-70-exercise-block-history-2B codex/issue-70-exercise-block-history-3A`, confirmed no existing 3B branch, and created `codex/issue-70-exercise-block-history-3B` from `80d7ad0`.
 - Parent refs opened in this Agent 2A session:
   - `docs/specs/README.md`
   - `docs/specs/00-product.md`
@@ -107,6 +109,23 @@ docs_touched: "docs/specs/ui/ux-rules.md, docs/specs/ui/screen-map.md, docs/spec
   - `docs/specs/ui/components-catalog.md`
   - `docs/specs/milestones/M1-ui-session-recorder.md`
   - `RUNBOOK.md`
+- Parent refs opened in this Agent 3B session:
+  - `docs/specs/README.md`
+  - `docs/specs/00-product.md`
+  - `docs/specs/03-technical-architecture.md`
+  - `docs/specs/04-ai-development-playbook.md`
+  - `docs/specs/05-data-model.md`
+  - `docs/specs/06-testing-strategy.md`
+  - `docs/specs/08-ux-delivery-standard.md`
+  - `docs/specs/09-project-structure.md`
+  - `docs/specs/12-worktree-config-and-isolation.md`
+  - `docs/specs/ui/README.md`
+  - `docs/specs/ui/ux-rules.md`
+  - `docs/specs/ui/screen-map.md`
+  - `docs/specs/ui/navigation-contract.md`
+  - `docs/specs/ui/components-catalog.md`
+  - `docs/specs/milestones/M1-ui-session-recorder.md`
+  - `RUNBOOK.md`
 - Code/docs inventory freshness checks run in this Agent 2A session:
   - `rg --files apps/mobile/app apps/mobile/src apps/mobile/components | rg 'session-recorder|exercise-history|session|exercise|stats|history'` - identified existing recorder, exercise-history, session-list, calculation, and test surfaces.
   - `rg "estimated|1RM|one rep|volume|RIR|set_type|rir_" apps/mobile docs/specs -g '!docs/brainstorms/**'` - confirmed existing 1RM/volume helpers and `set_type` semantics.
@@ -119,6 +138,11 @@ docs_touched: "docs/specs/ui/ux-rules.md, docs/specs/ui/screen-map.md, docs/spec
   - `./scripts/task-bootstrap.sh docs/tasks/T-20260526-01-issue-70-exercise-block-history.md` - confirmed branch/task metadata and required gates at `41bc94a`.
   - Source review of `apps/mobile/src/data/exercise-block-history.ts`, `apps/mobile/src/exercise-calculations/index.ts`, `apps/mobile/src/data/set-types.ts`, `apps/mobile/src/data/schema/sessions.ts`, `apps/mobile/src/data/schema/session-exercises.ts`, `apps/mobile/src/data/schema/exercise-sets.ts`, and `apps/mobile/app/__tests__/exercise-block-history.test.ts`.
   - `cd apps/mobile && npm test -- --runTestsByPath app/__tests__/exercise-block-history.test.ts` - passed before Agent 3A edits.
+- Code/docs inventory freshness checks run in this Agent 3B session:
+  - `./scripts/task-bootstrap.sh docs/tasks/T-20260526-01-issue-70-exercise-block-history.md` - confirmed branch/task metadata and required gates at `80d7ad0`.
+  - Source review of `apps/mobile/app/(tabs)/session-recorder.tsx`, `apps/mobile/components/session-recorder/session-content-layout.tsx`, `apps/mobile/app/__tests__/session-recorder-interactions.test.tsx`, `apps/mobile/app/__tests__/session-recorder-screen.test.tsx`, and relevant UI docs.
+  - `cd apps/mobile && npm test -- --runTestsByPath app/__tests__/session-recorder-interactions.test.tsx app/__tests__/session-recorder-screen.test.tsx` - passed before Agent 3B edits, 45 tests.
+  - `cd apps/mobile && npm run lint:ui-guardrails` - passed before Agent 3B edits, 0 raw-color violations.
 - Known stale references or assumptions:
   - Assumption: `n = 5` recent completed sessions at initial implementation unless the implementer finds an existing product constant or the human gives a different value before coding.
   - Assumption: "up to n sessions" means distinct completed sessions, newest first, not distinct `session_exercises` rows.
@@ -166,7 +190,7 @@ This remains one task card, but execution is split across per-agent branches so 
   - estimated `1RM`,
   - total volume,
   - highest weight,
-  - number of sets with not more than `2 RIR`.
+  - number of sets with not more than `2 RIR` (displayed as `Near failure`).
 - Add targeted data aggregation and recorder UI tests.
 - Split verification between numeric/service tests and UX interaction/quality tests.
 - Update relevant UI docs to reflect the new recorder block-history behavior.
@@ -261,10 +285,13 @@ This remains one task card, but execution is split across per-agent branches so 
   - Exceptions: none expected; no raw literals or new primitive extraction required.
 - UI artifacts/screenshots expectation:
   - Required by `docs/specs/08-ux-delivery-standard.md` or task scope?: `yes`
-  - Planned captures/artifacts:
-    - Recorder card showing a populated latest block.
-    - Recorder card after navigating to an older block.
-    - Empty or error state for an exercise without available block history.
+- Planned captures/artifacts:
+  - Recorder card showing a populated latest block.
+  - Recorder card after navigating to an older block.
+  - Empty or error state for an exercise without available block history.
+  - Agent 3B follow-up QA recommendation:
+    - Add a reusable Maestro fixture path that provisions a deterministic local test profile/state with several completed logs across at least two exercises and multiple dates, then opens the recorder and validates populated, older/newer, empty, and error/non-blocking states from real SQLite data.
+    - Recommended owner if this becomes a follow-up agent task: Agent 2B-style UX/E2E lane, because it is mainly recorder UX plus Maestro fixture coverage. Agent 3B is appropriate if scoped strictly as review-only visual evidence. Agent 2A/3A should own only the lower-level data fixture helper if the flow needs a reusable repository seeding API.
 
 ## Testing and verification approach
 
@@ -377,10 +404,14 @@ This remains one task card, but execution is split across per-agent branches so 
   - Agent 2B: `cd apps/mobile && npm test -- --runInBand` - passed, 50 suites / 367 tests / 1 snapshot. Existing console warnings from unrelated VirtualizedList/logging tests appeared, but all suites passed.
   - Agent 3A: `cd apps/mobile && npm test -- --runTestsByPath app/__tests__/exercise-block-history.test.ts` - passed before review edits, 7 tests.
   - Agent 3A: `cd apps/mobile && npm test -- --runTestsByPath app/__tests__/exercise-block-history.test.ts` - passed after adding numeric-review coverage, 11 tests.
+  - Agent 3B: `cd apps/mobile && npm test -- --runTestsByPath app/__tests__/session-recorder-interactions.test.tsx app/__tests__/session-recorder-screen.test.tsx` - passed before review edits, 45 tests.
+  - Agent 3B: `cd apps/mobile && npm test -- --runTestsByPath app/__tests__/session-recorder-interactions.test.tsx app/__tests__/session-recorder-screen.test.tsx` - passed after UX quality fix, 45 tests.
+  - Agent 3B: `cd apps/mobile && npm test -- --runTestsByPath app/__tests__/session-recorder-interactions.test.tsx app/__tests__/session-recorder-screen.test.tsx` - passed after relabeling the `RIR <= 2` metric to `Near failure`, 45 tests.
 - UI guardrail output:
   - Agent 2A: `cd apps/mobile && npm run lint:ui-guardrails` - passed, 0 raw-color violations.
   - Agent 2B: `cd apps/mobile && npm run lint:ui-guardrails` - passed, 0 raw-color violations.
   - Agent 3A: `cd apps/mobile && npm run lint:ui-guardrails` - passed, 0 raw-color violations.
+  - Agent 3B: `cd apps/mobile && npm run lint:ui-guardrails` - passed before and after review edits, 0 raw-color violations.
 - Fast gate output:
   - Agent 2A: `./scripts/quality-fast.sh frontend` - failed during `npm run typecheck` before tests because `scripts/check-sync-schema-drift.ts` cannot resolve `better-sqlite3` and `pg` types and has three existing implicit-`any` diagnostics on `row` parameters.
   - Agent 2A: `cd apps/mobile && npm run lint` - passed.
@@ -388,13 +419,21 @@ This remains one task card, but execution is split across per-agent branches so 
   - Agent 2B: `cd apps/mobile && npm run lint` - passed.
   - Agent 2B: `cd apps/mobile && npm run typecheck` - same existing `scripts/check-sync-schema-drift.ts` failure (`better-sqlite3` / `pg` type resolution and three implicit `row` anys), before task-specific type errors are reported.
   - Agent 2B: `./scripts/quality-fast.sh frontend` - `lint` passed, then failed at the same `npm run typecheck` blocker before running the test step.
-  - Agent 2B: `./scripts/task-closeout-check.sh docs/tasks/T-20260526-01-issue-70-exercise-block-history.md` - failed because task status intentionally remains `in_progress` for Agent 3A/3B review handoff rather than final closeout.
   - Agent 3A: `./scripts/quality-fast.sh frontend` - first attempt failed at `npm run typecheck` because this worktree's `apps/mobile/node_modules` was missing declared devDependencies `better-sqlite3` and `pg`.
   - Agent 3A: `cd apps/mobile && npm install` - restored missing declared dependencies without tracked lockfile changes.
   - Agent 3A: `./scripts/quality-fast.sh frontend` - passed after dependency restore, 50 suites / 371 tests / 1 snapshot. Existing console warnings from unrelated VirtualizedList/logging tests appeared, but all suites passed.
+  - Agent 3B: `./scripts/quality-fast.sh frontend` - passed, 50 suites / 371 tests / 1 snapshot. Existing console warnings from unrelated `logging-log-event` tests appeared, but all suites passed.
+  - Agent 3B: `./scripts/quality-fast.sh frontend` - passed again after the `Near failure` label change, 50 suites / 371 tests / 1 snapshot. Existing console warnings from unrelated `logging-log-event` tests appeared, but all suites passed.
+- Maestro / simulator visual output:
+  - Agent 3B: `PATH="/opt/homebrew/opt/openjdk/bin:$HOME/.maestro/bin:$PATH" JAVA_HOME="/opt/homebrew/opt/openjdk" TASK_ID=T-20260526-01-issue-70-exercise-block-history-3B ./scripts/maestro-ios-run-flow.sh --flow .maestro/flows/exercise-block-history-visual.tmp.yaml --scenario exercise-block-history-visual` - passed after tuning the temporary QA flow selector, 1 flow / 52s on simulator `BOGA wt1` (`8EE7AAC8-0DD9-4EFA-852A-737A7C5746F8`). The temporary flow created a completed `Barbell Back Squat` session, opened a new recorder session, selected the same exercise, waited for `exercise-block-history-panel-1`, and captured the populated panel screenshot. Artifact: `apps/mobile/artifacts/maestro/T-20260526-01-issue-70-exercise-block-history-3B/20260526-223857-24473/maestro-output/screenshots/exercise-block-history-populated-panel.png`.
+  - Agent 3B: after relabeling the `RIR <= 2` metric as `Near failure`, the same temporary Maestro QA flow passed again, 1 flow / 52s on simulator `BOGA wt1` (`8EE7AAC8-0DD9-4EFA-852A-737A7C5746F8`). Artifact: `apps/mobile/artifacts/maestro/T-20260526-01-issue-70-exercise-block-history-3B/20260526-224517-25757/maestro-output/screenshots/exercise-block-history-populated-panel.png`.
+- Closeout helper output:
+  - Agent 2B: `./scripts/task-closeout-check.sh docs/tasks/T-20260526-01-issue-70-exercise-block-history.md` - failed because task status intentionally remains `in_progress` for Agent 3A/3B review handoff rather than final closeout.
+  - Agent 3B: `./scripts/task-closeout-check.sh docs/tasks/T-20260526-01-issue-70-exercise-block-history.md` - failed because task status intentionally remains `in_progress` for final orchestrator comparison/integration rather than final closeout.
 - UI/UX task visual artifacts note:
-  - Agent 2B covered the key visible states through React Native Testing Library rendered-state assertions: populated latest block, older/newer navigation, empty state, and error state while set entry remains usable. No simulator screenshot was captured in this 2B pass because the task's slow native gate remains `N/A`; Agent 3B should capture simulator screenshots if stricter visual artifacts are required before closeout.
-- Manual verification summary (required when CI is absent/partial): Agent 2A implemented and tested the service/data lane. Agent 2B wired the recorder UX, updated UI docs, and tested rendered interaction/state behavior. Agent 3A reviewed the numeric/service lane, added focused coverage for Wathan best-estimate selection, ordered limits, invalid dates/limits, and repository invalid-limit short-circuiting, then reran the frontend fast gate successfully. Agent 3B UX quality review has not run yet.
+  - Agent 2B covered the key visible states through React Native Testing Library rendered-state assertions: populated latest block, older/newer navigation, empty state, and error state while set entry remains usable. No simulator screenshot was captured in this 2B pass because the task's slow native gate remains `N/A`.
+  - Agent 3B captured simulator visual evidence for a populated recent-block panel via a temporary Maestro QA flow. The screenshot shows the panel in the real iOS simulator with `Previous block`, metric grid, disabled `<<`/`>>` controls, and editable set rows still visible below.
+- Manual verification summary (required when CI is absent/partial): Agent 2A implemented and tested the service/data lane. Agent 2B wired the recorder UX, updated UI docs, and tested rendered interaction/state behavior. Agent 3A reviewed the numeric/service lane, added focused coverage for Wathan best-estimate selection, ordered limits, invalid dates/limits, and repository invalid-limit short-circuiting, then reran the frontend fast gate successfully. Agent 3B reviewed recorder interaction/visual quality, improved the block-history nav controls with button accessibility roles and 44pt touch targets, verified rendered state coverage, reran the UI guardrail check, reran the frontend fast gate successfully, and captured simulator screenshot evidence for the populated panel with Maestro.
 - Deferred/manual hosted checks summary:
   - N/A expected; no hosted/backend work.
 
@@ -403,8 +442,9 @@ This remains one task card, but execution is split across per-agent branches so 
 - What changed: Agent 2A added `apps/mobile/src/data/exercise-block-history.ts`, exported it from `apps/mobile/src/data/index.ts`, and added `apps/mobile/app/__tests__/exercise-block-history.test.ts`. The new data/service contract loads distinct recent completed, non-deleted sessions for an `exerciseDefinitionId`, fetches matching logged exercise rows and sets, merges duplicate same-exercise rows inside a session, and returns compact format-ready block stats: `daysAgo`, estimated 1RM, total volume, highest weight, and `<=2 RIR` set count.
 - What changed: Agent 2B wired the recorder UI to `loadRecentExerciseBlocks`, adding a compact per-exercise read-only history panel below tags and above set rows. The panel shows latest block stats by default, supports `<<` older and `>>` newer navigation with disabled boundaries, resets when an exercise card changes definition, and keeps loading/empty/error states inline and non-blocking. Agent 2B also updated `docs/specs/ui/ux-rules.md` and `docs/specs/ui/screen-map.md`. `docs/specs/ui/components-catalog.md` was not changed because no reusable component API was added, and `docs/specs/ui/navigation-contract.md` was not changed because no route/param/transition behavior changed.
 - What changed: Agent 3A added focused numeric/service review coverage to `apps/mobile/app/__tests__/exercise-block-history.test.ts` for Wathan best-estimate selection, newest-first limit application, invalid `now`/`completedAt`/`limit` handling, and repository invalid-limit short-circuiting before store access. No production code change was needed after review.
-- What tests ran: Agent 2A targeted service/data tests passed; Agent 2B targeted recorder UX tests passed; combined service+UX targeted tests passed; full `npm test -- --runInBand` passed; `npm run lint` passed; `npm run lint:ui-guardrails` passed. Agent 3A reran the targeted numeric test before and after review edits, reran `npm run lint:ui-guardrails`, restored missing declared `apps/mobile` dependencies with `npm install`, and reran `./scripts/quality-fast.sh frontend` successfully.
-- What remains: Agent 3B should review mobile density/visual quality and capture simulator screenshots if required for final closeout evidence. The task card intentionally remains `in_progress` for Agent 3B/orchestrator handoff, so Agent 3A did not run the closeout helper or move the card. RUNBOOK.md reviewed (no changes required). No data model or sync-scope change was made.
+- What changed: Agent 3B reviewed recorder interaction/visual quality against the UX standard and UI docs, then made focused UX/accessibility fixes: the `<<` and `>>` previous-block controls now expose `accessibilityRole="button"` and use a 44pt minimum touch target, and the `RIR <= 2` metric display label is now `Near failure` for better readability while preserving the underlying metric semantics. Agent 3B also extended the recorder interaction test to lock the button roles and label.
+- What tests ran: Agent 2A targeted service/data tests passed; Agent 2B targeted recorder UX tests passed; combined service+UX targeted tests passed; full `npm test -- --runInBand` passed; `npm run lint` passed; `npm run lint:ui-guardrails` passed. Agent 3A reran the targeted numeric test before and after review edits, reran `npm run lint:ui-guardrails`, restored missing declared `apps/mobile` dependencies with `npm install`, and reran `./scripts/quality-fast.sh frontend` successfully. Agent 3B reran the targeted recorder UX tests before and after the UX fix, reran `npm run lint:ui-guardrails`, reran `./scripts/quality-fast.sh frontend`, and ran a temporary Maestro simulator QA flow that captured the populated block-history panel successfully.
+- What remains: The task card intentionally remains `in_progress` for final orchestrator comparison/integration across 2A/2B/3A/3B branches, so Agent 3B did not move the card to `docs/tasks/complete/`. RUNBOOK.md reviewed (no changes required). No data model or sync-scope change was made.
 
 ## Status update checklist (mandatory at closeout)
 

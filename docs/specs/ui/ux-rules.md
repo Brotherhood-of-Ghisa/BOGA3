@@ -118,7 +118,7 @@ Document app-specific UI semantics and guardrails for the current mobile app.
     - clearing coordinates removes the gym from GPS matching until coordinates are saved again.
 16. In `session-recorder`, each logged exercise card loads a read-only recent block-history panel keyed by `exercise_definition_id`:
     - the panel sits below assigned tag chips and above editable set rows,
-    - the most recent completed-session block is shown first and summarizes only age in days, estimated `1RM`, total volume, highest weight, and `<=2 RIR` set count,
+    - the most recent completed-session block is shown first and summarizes only age in days, estimated `1RM`, total volume, highest weight, and a `Near failure` count for eligible sets with `RIR <= 2`,
     - `<<` moves to older loaded blocks and `>>` moves back toward newer blocks, with boundary controls disabled,
     - loading, empty (`No previous blocks`), and error (`Previous blocks unavailable`) states stay compact and inline,
     - block-history state is volatile UI state only; it does not block set entry, tags, exercise actions, autosave, submit/save, or sync.

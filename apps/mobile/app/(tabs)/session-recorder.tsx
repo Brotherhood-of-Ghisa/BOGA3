@@ -1744,7 +1744,7 @@ export default function SessionRecorderScreen() {
               </Text>
             </View>
             <View style={styles.exerciseBlockHistoryMetric}>
-              <Text style={styles.exerciseBlockHistoryMetricLabel}>{'<=2 RIR'}</Text>
+              <Text style={styles.exerciseBlockHistoryMetricLabel}>Near failure</Text>
               <Text
                 style={styles.exerciseBlockHistoryMetricValue}
                 testID={`${panelTestId}-rir-count`}>
@@ -1755,6 +1755,7 @@ export default function SessionRecorderScreen() {
 
           <View style={styles.exerciseBlockHistoryNavRow}>
             <Pressable
+              accessibilityRole="button"
               accessibilityLabel={`Show older previous block for exercise ${exerciseIndex + 1}`}
               accessibilityState={{ disabled: olderDisabled }}
               disabled={olderDisabled}
@@ -1776,6 +1777,7 @@ export default function SessionRecorderScreen() {
               {activeIndex + 1}/{panel.blocks.length}
             </Text>
             <Pressable
+              accessibilityRole="button"
               accessibilityLabel={`Show newer previous block for exercise ${exerciseIndex + 1}`}
               accessibilityState={{ disabled: newerDisabled }}
               disabled={newerDisabled}
@@ -3830,7 +3832,7 @@ const styles = StyleSheet.create({
   },
   exerciseBlockHistoryNavButton: {
     minWidth: 44,
-    height: 32,
+    minHeight: 44,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: uiColors.borderStrong,

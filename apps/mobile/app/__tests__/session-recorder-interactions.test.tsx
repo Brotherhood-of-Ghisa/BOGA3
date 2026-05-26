@@ -518,7 +518,10 @@ describe('SessionRecorderScreen exercise interactions', () => {
     expect(screen.getByTestId('exercise-block-history-panel-1-est-1rm')).toHaveTextContent('250.5');
     expect(screen.getByTestId('exercise-block-history-panel-1-volume')).toHaveTextContent('1500');
     expect(screen.getByTestId('exercise-block-history-panel-1-highest')).toHaveTextContent('205');
+    expect(screen.getByText('Near failure')).toBeTruthy();
     expect(screen.getByTestId('exercise-block-history-panel-1-rir-count')).toHaveTextContent('3');
+    expect(screen.getByTestId('exercise-block-history-panel-1-newer').props.accessibilityRole).toBe('button');
+    expect(screen.getByTestId('exercise-block-history-panel-1-older').props.accessibilityRole).toBe('button');
     expect(screen.getByTestId('exercise-block-history-panel-1-newer').props.accessibilityState.disabled).toBe(true);
     expect(screen.getByTestId('exercise-block-history-panel-1-older').props.accessibilityState.disabled).toBe(false);
 
