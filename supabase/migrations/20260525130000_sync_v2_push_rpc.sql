@@ -64,7 +64,13 @@
 -- mirror keeps them; t1 §1 "server schema mirrors client").
 -- ---------------------------------------------------------------------------
 
-create or replace function app_public.sync_push(payload jsonb)
+-- PostgREST dispatches RPC calls by mapping top-level JSON body keys to
+-- named function parameters. The wire shape (t2 §3.1) is
+-- {"entities": [...]} — so the parameter is named `entities`, and the body
+-- key feeds directly into it. Default to '[]'::jsonb so a malformed call
+-- with no `entities` key surfaces the structural error inside this body
+-- (rather than a PostgREST "function not found" 404).
+create or replace function app_public.sync_push(entities jsonb default '[]'::jsonb)
 returns jsonb
 language plpgsql
 security invoker
@@ -72,7 +78,7 @@ set search_path = app_public, public, extensions
 as $func$
 declare
   _uid              uuid;
-  _entities         jsonb;
+  _entities         jsonb := entities;
   _now_tstz         timestamptz;
   _now_ms_max       bigint;
   _len              integer;
@@ -97,21 +103,15 @@ begin
 
   -- 1b. Structural validation only (t1 §1, t2 §2.2). The drift checker (t2)
   -- catches schema-level malformation at PR time.
-  if payload is null or jsonb_typeof(payload) <> 'object' then
-    raise exception 'INTERNAL: sync_push payload must be a JSON object'
-      using errcode = 'P0001';
-  end if;
-
-  _entities := payload -> 'entities';
   if _entities is null or jsonb_typeof(_entities) <> 'array' then
-    raise exception 'INTERNAL: sync_push payload.entities must be a JSON array'
+    raise exception 'INTERNAL: sync_push entities must be a JSON array'
       using errcode = 'P0001';
   end if;
 
   _len := jsonb_array_length(_entities);
   if _len < 1 or _len > 200 then
     raise exception
-      'INTERNAL: sync_push payload.entities length must be 1..200, got %', _len
+      'INTERNAL: sync_push entities length must be 1..200, got %', _len
       using errcode = 'P0001';
   end if;
 
@@ -403,13 +403,14 @@ comment on function app_public.sync_push(jsonb) is
 
 -- ---------------------------------------------------------------------------
 -- 2. Grants. authenticated may call; service_role bypasses RLS naturally.
--- The function is not granted to anon — anon callers fail at auth.uid() is
--- null inside the body, which is the AUTH_REQUIRED contract we want, but
--- it is also useful to refuse the call at the PostgREST layer first so
--- anon clients can't probe the function's existence. We still grant
--- execute to authenticated only.
+-- anon is granted execute so that an unauthenticated caller surfaces the
+-- function-body AUTH_REQUIRED token (t2 §2.2 wire contract) rather than a
+-- PostgREST-layer "permission denied for function" 42501. RLS still blocks
+-- any actual writes from anon — and the function body short-circuits on
+-- auth.uid() IS NULL before reaching the upsert loop.
 -- ---------------------------------------------------------------------------
 
 revoke all on function app_public.sync_push(jsonb) from public;
+grant execute on function app_public.sync_push(jsonb) to anon;
 grant execute on function app_public.sync_push(jsonb) to authenticated;
 grant execute on function app_public.sync_push(jsonb) to service_role;
