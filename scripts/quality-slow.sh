@@ -75,6 +75,17 @@ run_backend() {
     "${REPO_ROOT}/supabase/scripts/test-sync-push-contract.sh"
   fi
 
+  # Sync v2 sync_pull RPC contract (t4). Exercises the per-layer cursor
+  # protocol — snapshot pull, paginated drain, layer→type partition,
+  # RLS isolation, tombstones, empty-page echo, same-millisecond tiebreak,
+  # limit/layer bounds, AUTH_REQUIRED.
+  if [[ ! -x "${REPO_ROOT}/supabase/scripts/test-sync-pull-contract.sh" ]]; then
+    echo "[quality-slow] skipping backend sync-pull-contract: wrapper not found or not executable"
+  else
+    echo "[quality-slow] backend: test-sync-pull-contract"
+    "${REPO_ROOT}/supabase/scripts/test-sync-pull-contract.sh"
+  fi
+
   # Sync v2 drift checker — per designs/t1.md §7.5. The TypeScript script
   # lands in t2; until then this block skips with a notice so the slow gate
   # stays green. t2's PR will not need to re-touch this file: when the script
