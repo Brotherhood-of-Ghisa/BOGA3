@@ -63,3 +63,17 @@ Orchestrator log. Append one entry per iteration. Reverse-chronological.
 - Noted timestamp collision risk between t3 and t4 (both started at `20260525130000_*`); t4 instructed to bump to `20260525130100`.
 
 **Next:** await PRs; review on open. The two RPC migrations need distinct timestamps before both merge.
+
+## Iteration 6 — 2026-05-26
+
+**State snapshot:**
+- All three parallel PRs are now APPROVED:
+  - [#71 t3 sync_push](https://github.com/Brotherhood-of-Ghisa/BOGA3/pull/71): APPROVED on first review. Builder deviations (named `entities` param matching wire envelope; `anon` execute grant with AUTH_REQUIRED guard first; gyms dispatch covers latitude/longitude/coordinate_accuracy_m/coordinates_updated_at) all validated.
+  - [#72 t2 drift checker](https://github.com/Brotherhood-of-Ghisa/BOGA3/pull/72): re-reviewed APPROVED after coordinator override punch list. Fixups: bumped `better-sqlite3` `^11.10.0` → `^12.10.0` (latest stable, no breaking API changes); full `./scripts/quality-slow.sh backend` run end-to-end and ticked in PR body; inline fix to `supabase/tests/sync-v2-schema-smoke.sh` docker container picker (multi-worktree cross-contamination — now reads `project_id` from `supabase/config.toml`).
+  - [#73 t4 sync_pull](https://github.com/Brotherhood-of-Ghisa/BOGA3/pull/73): re-reviewed APPROVED after first-pass CHANGES_REQUESTED. Fixups: corrected layer partition (`exercise_tag_definitions` Layer 0 → Layer 1 in SQL `case` mapping, contract-test partition assertion, and seed-fixture IDs). Slow gate green; all 10 contract scenarios pass.
+- Plan-level cross-cutting decision logged: layer→type partition is **Layer 0: gyms, exercise_definitions; Layer 1: sessions, exercise_muscle_mappings, exercise_tag_definitions; Layer 2: session_exercises; Layer 3: exercise_sets, session_exercise_tags.** This corrects the original t1 §2 / t2 §4.4 wording (which is internally inconsistent against the live FK graph).
+
+**Actions:**
+- Surfaced merge asks for all three PRs. Coordinator does not merge.
+
+**Next:** once all three merge, iteration 7 will verify hand-offs (TS checker on `main`, both RPC migrations applied, layer partition in `topo-order.ts` matching the sync_pull SQL), append three deviation entries to `plan.md ## Deviations log`, propagate any remaining pointer markers to `tasks/tFINAL.md`, then dispatch the tFINAL builder.
