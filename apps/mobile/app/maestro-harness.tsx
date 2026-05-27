@@ -6,9 +6,11 @@ import { uiColors } from '@/components/ui';
 import {
   coerceMaestroHarnessQueryParam,
   isMaestroHarnessAllowed,
+  resolveMaestroHarnessFixtureName,
   resolveMaestroHarnessResetMode,
   resolveMaestroHarnessTeleportHref,
   resolveMaestroHarnessTeleportTarget,
+  runMaestroHarnessFixture,
   runMaestroHarnessReset,
 } from '@/src/maestro/harness';
 
@@ -21,6 +23,7 @@ export default function MaestroHarnessScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{
     reset?: string | string[];
+    fixture?: string | string[];
     teleport?: string | string[];
     mode?: string | string[];
     intent?: string | string[];
@@ -45,6 +48,7 @@ export default function MaestroHarnessScreen() {
     }
 
     const resetMode = resolveMaestroHarnessResetMode(coerceMaestroHarnessQueryParam(params.reset));
+    const fixtureName = resolveMaestroHarnessFixtureName(coerceMaestroHarnessQueryParam(params.fixture));
     const teleportTarget = resolveMaestroHarnessTeleportTarget(coerceMaestroHarnessQueryParam(params.teleport));
     const teleportHref = resolveMaestroHarnessTeleportHref({
       target: teleportTarget,
@@ -56,6 +60,7 @@ export default function MaestroHarnessScreen() {
     void (async () => {
       try {
         await runMaestroHarnessReset(resetMode);
+        await runMaestroHarnessFixture(fixtureName);
 
         if (cancelled) {
           return;

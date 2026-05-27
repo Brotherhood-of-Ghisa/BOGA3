@@ -34,6 +34,7 @@ import {
   ExerciseTagDomainError,
   listExerciseTagDefinitions,
   listSessionExerciseAssignedTags,
+  loadRecentExerciseBlocks,
   loadLocalGymById,
   loadLatestSessionDraftSnapshot,
   loadSessionSnapshotById,
@@ -45,6 +46,7 @@ import {
   undeleteExerciseTagDefinition,
   upsertLocalGym,
   type ExerciseTagDefinitionRecord,
+  type ExerciseBlockHistoryBlock,
   type SessionExerciseAssignedTag,
   type SessionDraftSnapshot,
   type SessionGraphSnapshot,
@@ -411,8 +413,29 @@ type GymCoordinateDraft = {
 type CurrentCoordinateReadResult =
   | { status: 'success'; coordinates: GymCoordinateDraft }
   | { status: 'error'; message: string };
+type ExerciseBlockHistoryPanelState = {
+  exerciseDefinitionId: string;
+  status: 'loading' | 'success' | 'error';
+  blocks: ExerciseBlockHistoryBlock[];
+  activeIndex: number;
+};
 
 const NEW_GYM_COORDINATE_FEEDBACK_ID = '__new_gym__';
+
+const formatExerciseBlockNumeric = (value: number, fractionDigits = 0): string => {
+  if (!Number.isFinite(value)) return '-';
+  const fixed = value.toFixed(fractionDigits);
+  return fractionDigits > 0 ? fixed.replace(/\.0+$/, '') : fixed;
+};
+
+const formatExerciseBlockStat = (value: number | null, fractionDigits = 0): string =>
+  value === null ? '-' : formatExerciseBlockNumeric(value, fractionDigits);
+
+const formatExerciseBlockVolume = (value: number): string =>
+  value > 0 ? formatExerciseBlockNumeric(value, 1) : '-';
+
+const formatExerciseBlockAge = (daysAgo: number): string =>
+  `${Math.max(0, daysAgo)}d ago`;
 
 const hasSavedGymCoordinates = (location: SessionLocation) =>
   typeof location.latitude === 'number' &&
@@ -615,6 +638,9 @@ export default function SessionRecorderScreen() {
   const [gymCoordinateFeedback, setGymCoordinateFeedback] = useState<GymCoordinateFeedback | null>(null);
   const [gymCoordinateLoadingId, setGymCoordinateLoadingId] = useState<string | null>(null);
   const [pendingNewGymCoordinates, setPendingNewGymCoordinates] = useState<GymCoordinateDraft | null>(null);
+  const [exerciseBlockHistoryByExerciseId, setExerciseBlockHistoryByExerciseId] = useState<
+    Record<string, ExerciseBlockHistoryPanelState>
+  >({});
   const stateRef = useRef(state);
   const completedEditEndDateTimeRef = useRef<string | null>(completedEditEndDateTime);
   const persistedSessionIdRef = useRef<string | null>(null);
@@ -624,6 +650,8 @@ export default function SessionRecorderScreen() {
   const replayingBeforeRemoveActionRef = useRef(false);
   const pendingExercisePickerRestoreTargetRef = useRef<string | null | undefined>(undefined);
   const suppressSetTypeCyclePressRef = useRef(false);
+  const exerciseBlockHistoryRequestKeyRef = useRef<Record<string, string>>({});
+  const isMountedRef = useRef(true);
 
   stateRef.current = state;
   completedEditEndDateTimeRef.current = completedEditEndDateTime;
@@ -864,6 +892,7 @@ export default function SessionRecorderScreen() {
 
   useEffect(() => {
     return () => {
+      isMountedRef.current = false;
       void lifecycleHelpers.onScreenBlur();
       void lifecycleHelpers.onRouteChange();
       void autosaveController.dispose({ flushDirty: true });
@@ -931,6 +960,13 @@ export default function SessionRecorderScreen() {
     () => state.session.exercises.map((exercise) => exercise.id).join('|'),
     [state.session.exercises]
   );
+  const exerciseBlockHistoryLoadKey = useMemo(
+    () =>
+      state.session.exercises
+        .map((exercise) => `${exercise.id}:${exercise.exerciseDefinitionId}`)
+        .join('|'),
+    [state.session.exercises]
+  );
 
   const refreshAssignedTagsForExercise = useCallback(async (sessionExerciseId: string) => {
     try {
@@ -990,6 +1026,83 @@ export default function SessionRecorderScreen() {
       cancelled = true;
     };
   }, [exerciseIdsKey]);
+
+  useEffect(() => {
+    const exercises = stateRef.current.session.exercises.map((exercise) => ({
+      id: exercise.id,
+      exerciseDefinitionId: exercise.exerciseDefinitionId,
+    }));
+    const activeExerciseIds = new Set(exercises.map((exercise) => exercise.id));
+
+    for (const exerciseId of Object.keys(exerciseBlockHistoryRequestKeyRef.current)) {
+      if (!activeExerciseIds.has(exerciseId)) {
+        delete exerciseBlockHistoryRequestKeyRef.current[exerciseId];
+      }
+    }
+
+    setExerciseBlockHistoryByExerciseId((current) => {
+      const next: Record<string, ExerciseBlockHistoryPanelState> = {};
+      for (const exercise of exercises) {
+        const existing = current[exercise.id];
+        next[exercise.id] =
+          existing?.exerciseDefinitionId === exercise.exerciseDefinitionId
+            ? existing
+            : {
+                exerciseDefinitionId: exercise.exerciseDefinitionId,
+                status: 'loading',
+                blocks: [],
+                activeIndex: 0,
+              };
+      }
+      return next;
+    });
+
+    for (const exercise of exercises) {
+      const requestKey = `${exercise.id}:${exercise.exerciseDefinitionId}`;
+      if (exerciseBlockHistoryRequestKeyRef.current[exercise.id] === requestKey) {
+        continue;
+      }
+
+      exerciseBlockHistoryRequestKeyRef.current[exercise.id] = requestKey;
+      void loadRecentExerciseBlocks({ exerciseDefinitionId: exercise.exerciseDefinitionId })
+        .then((summary) => {
+          if (
+            !isMountedRef.current ||
+            exerciseBlockHistoryRequestKeyRef.current[exercise.id] !== requestKey
+          ) {
+            return;
+          }
+
+          setExerciseBlockHistoryByExerciseId((current) => ({
+            ...current,
+            [exercise.id]: {
+              exerciseDefinitionId: exercise.exerciseDefinitionId,
+              status: 'success',
+              blocks: summary.blocks,
+              activeIndex: 0,
+            },
+          }));
+        })
+        .catch(() => {
+          if (
+            !isMountedRef.current ||
+            exerciseBlockHistoryRequestKeyRef.current[exercise.id] !== requestKey
+          ) {
+            return;
+          }
+
+          setExerciseBlockHistoryByExerciseId((current) => ({
+            ...current,
+            [exercise.id]: {
+              exerciseDefinitionId: exercise.exerciseDefinitionId,
+              status: 'error',
+              blocks: [],
+              activeIndex: 0,
+            },
+          }));
+        });
+    }
+  }, [exerciseBlockHistoryLoadKey]);
 
 
   const persistSessionGraphForTagOps = useCallback(async (): Promise<boolean> => {
@@ -1533,6 +1646,161 @@ export default function SessionRecorderScreen() {
       setGymCoordinateLoadingId(null);
     }
   };
+
+  const moveExerciseBlockHistory = useCallback((exerciseId: string, direction: 'older' | 'newer') => {
+    setExerciseBlockHistoryByExerciseId((current) => {
+      const panel = current[exerciseId];
+      if (!panel || panel.status !== 'success' || panel.blocks.length === 0) {
+        return current;
+      }
+
+      const nextIndex =
+        direction === 'older'
+          ? Math.min(panel.activeIndex + 1, panel.blocks.length - 1)
+          : Math.max(panel.activeIndex - 1, 0);
+      if (nextIndex === panel.activeIndex) {
+        return current;
+      }
+
+      return {
+        ...current,
+        [exerciseId]: {
+          ...panel,
+          activeIndex: nextIndex,
+        },
+      };
+    });
+  }, []);
+
+  const renderExerciseBlockHistoryPanel = useCallback(
+    (exercise: SessionExercise, exerciseIndex: number) => {
+      const panel = exerciseBlockHistoryByExerciseId[exercise.id];
+      const panelTestId = `exercise-block-history-panel-${exerciseIndex + 1}`;
+
+      if (!panel || panel.status === 'loading') {
+        return (
+          <View style={styles.exerciseBlockHistoryPanel} testID={`${panelTestId}-loading`}>
+            <Text style={styles.exerciseBlockHistoryStateText}>Loading previous blocks...</Text>
+          </View>
+        );
+      }
+
+      if (panel.status === 'error') {
+        return (
+          <View style={styles.exerciseBlockHistoryPanel} testID={`${panelTestId}-error`}>
+            <Text style={styles.exerciseBlockHistoryStateText}>Previous blocks unavailable</Text>
+          </View>
+        );
+      }
+
+      if (panel.blocks.length === 0) {
+        return (
+          <View style={styles.exerciseBlockHistoryPanel} testID={`${panelTestId}-empty`}>
+            <Text style={styles.exerciseBlockHistoryStateText}>No previous blocks</Text>
+          </View>
+        );
+      }
+
+      const activeIndex = Math.min(panel.activeIndex, panel.blocks.length - 1);
+      const activeBlock = panel.blocks[activeIndex];
+      if (!activeBlock) {
+        return null;
+      }
+      const olderDisabled = activeIndex >= panel.blocks.length - 1;
+      const newerDisabled = activeIndex <= 0;
+
+      return (
+        <View style={styles.exerciseBlockHistoryPanel} testID={panelTestId}>
+          <View style={styles.exerciseBlockHistoryHeaderRow}>
+            <Text style={styles.exerciseBlockHistoryTitle}>Previous block</Text>
+            <Text style={styles.exerciseBlockHistoryAge}>
+              {formatExerciseBlockAge(activeBlock.daysAgo)}
+            </Text>
+          </View>
+
+          <View style={styles.exerciseBlockHistoryMetricGrid}>
+            <View style={styles.exerciseBlockHistoryMetric}>
+              <Text style={styles.exerciseBlockHistoryMetricLabel}>Est. 1RM</Text>
+              <Text
+                style={styles.exerciseBlockHistoryMetricValue}
+                testID={`${panelTestId}-est-1rm`}>
+                {formatExerciseBlockStat(activeBlock.estimatedOneRepMax, 1)}
+              </Text>
+            </View>
+            <View style={styles.exerciseBlockHistoryMetric}>
+              <Text style={styles.exerciseBlockHistoryMetricLabel}>Volume</Text>
+              <Text
+                style={styles.exerciseBlockHistoryMetricValue}
+                testID={`${panelTestId}-volume`}>
+                {formatExerciseBlockVolume(activeBlock.totalVolume)}
+              </Text>
+            </View>
+            <View style={styles.exerciseBlockHistoryMetric}>
+              <Text style={styles.exerciseBlockHistoryMetricLabel}>Highest</Text>
+              <Text
+                style={styles.exerciseBlockHistoryMetricValue}
+                testID={`${panelTestId}-highest`}>
+                {formatExerciseBlockStat(activeBlock.highestWeight, 1)}
+              </Text>
+            </View>
+            <View style={styles.exerciseBlockHistoryMetric}>
+              <Text style={styles.exerciseBlockHistoryMetricLabel}>Near failure</Text>
+              <Text
+                style={styles.exerciseBlockHistoryMetricValue}
+                testID={`${panelTestId}-rir-count`}>
+                {activeBlock.rirAtMostTwoSetCount}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.exerciseBlockHistoryNavRow}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Show older previous block for exercise ${exerciseIndex + 1}`}
+              accessibilityState={{ disabled: olderDisabled }}
+              disabled={olderDisabled}
+              style={[
+                styles.exerciseBlockHistoryNavButton,
+                olderDisabled ? styles.exerciseBlockHistoryNavButtonDisabled : null,
+              ]}
+              testID={`${panelTestId}-older`}
+              onPress={() => moveExerciseBlockHistory(exercise.id, 'older')}>
+              <Text
+                style={[
+                  styles.exerciseBlockHistoryNavButtonText,
+                  olderDisabled ? styles.exerciseBlockHistoryNavButtonTextDisabled : null,
+                ]}>
+                {'<<'}
+              </Text>
+            </Pressable>
+            <Text style={styles.exerciseBlockHistoryPosition}>
+              {activeIndex + 1}/{panel.blocks.length}
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Show newer previous block for exercise ${exerciseIndex + 1}`}
+              accessibilityState={{ disabled: newerDisabled }}
+              disabled={newerDisabled}
+              style={[
+                styles.exerciseBlockHistoryNavButton,
+                newerDisabled ? styles.exerciseBlockHistoryNavButtonDisabled : null,
+              ]}
+              testID={`${panelTestId}-newer`}
+              onPress={() => moveExerciseBlockHistory(exercise.id, 'newer')}>
+              <Text
+                style={[
+                  styles.exerciseBlockHistoryNavButtonText,
+                  newerDisabled ? styles.exerciseBlockHistoryNavButtonTextDisabled : null,
+                ]}>
+                {'>>'}
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      );
+    },
+    [exerciseBlockHistoryByExerciseId, moveExerciseBlockHistory]
+  );
 
   const openExerciseModal = (exerciseIdToChange: string | null = null) => {
     setState((current) => ({
@@ -2521,6 +2789,7 @@ export default function SessionRecorderScreen() {
                 </View>
               ))}
             </View>
+            {renderExerciseBlockHistoryPanel(exercise, exerciseIndex)}
           </View>
         )}
         renderExerciseFooter={({ exercise, exerciseIndex }) => (
@@ -3501,6 +3770,95 @@ const styles = StyleSheet.create({
     lineHeight: 12,
     fontWeight: '700',
     color: uiColors.textMuted,
+  },
+  exerciseBlockHistoryPanel: {
+    borderWidth: 1,
+    borderColor: uiColors.borderMuted,
+    borderRadius: 8,
+    backgroundColor: uiColors.surfaceMuted,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    gap: 8,
+  },
+  exerciseBlockHistoryHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  exerciseBlockHistoryTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: uiColors.textPrimary,
+  },
+  exerciseBlockHistoryAge: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: uiColors.textSecondary,
+  },
+  exerciseBlockHistoryStateText: {
+    fontSize: 12,
+    color: uiColors.textSecondary,
+    fontWeight: '600',
+  },
+  exerciseBlockHistoryMetricGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  exerciseBlockHistoryMetric: {
+    flexGrow: 1,
+    flexBasis: '45%',
+    minWidth: 92,
+    gap: 2,
+  },
+  exerciseBlockHistoryMetricLabel: {
+    fontSize: 11,
+    lineHeight: 13,
+    fontWeight: '600',
+    color: uiColors.textSecondary,
+  },
+  exerciseBlockHistoryMetricValue: {
+    fontSize: 14,
+    lineHeight: 17,
+    fontWeight: '800',
+    color: uiColors.textPrimary,
+  },
+  exerciseBlockHistoryNavRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 8,
+  },
+  exerciseBlockHistoryNavButton: {
+    minWidth: 44,
+    minHeight: 44,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: uiColors.borderStrong,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: uiColors.surfaceDefault,
+  },
+  exerciseBlockHistoryNavButtonDisabled: {
+    backgroundColor: uiColors.surfaceReadOnly,
+    borderColor: uiColors.borderMuted,
+  },
+  exerciseBlockHistoryNavButtonText: {
+    fontSize: 13,
+    lineHeight: 15,
+    fontWeight: '800',
+    color: uiColors.actionPrimary,
+  },
+  exerciseBlockHistoryNavButtonTextDisabled: {
+    color: uiColors.textMuted,
+  },
+  exerciseBlockHistoryPosition: {
+    minWidth: 30,
+    textAlign: 'center',
+    fontSize: 12,
+    color: uiColors.textSecondary,
+    fontWeight: '600',
   },
   setList: {
     gap: 8,

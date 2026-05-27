@@ -127,3 +127,18 @@ export {
   type ExerciseHistoryTagOption,
   type LoadExercisePerformanceHistoryOptions,
 } from './exercise-history';
+export {
+  DEFAULT_RECENT_EXERCISE_BLOCK_LIMIT,
+  aggregateExerciseBlockHistory,
+  createDrizzleExerciseBlockHistoryStore,
+  createExerciseBlockHistoryRepository,
+  loadRecentExerciseBlocks,
+  type ExerciseBlockHistoryAggregationInput,
+  type ExerciseBlockHistoryBlock,
+  type ExerciseBlockHistorySessionExerciseRow,
+  type ExerciseBlockHistorySessionRow,
+  type ExerciseBlockHistorySetRow,
+  type ExerciseBlockHistoryStore,
+  type ExerciseBlockHistorySummary,
+  type LoadRecentExerciseBlocksOptions,
+} from './exercise-block-history';

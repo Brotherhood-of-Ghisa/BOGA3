@@ -1,0 +1,54 @@
+appId: com.dinoderek.mobile
+---
+- openLink: "boga3://maestro-harness?reset=data&fixture=exercise-block-history&teleport=session-recorder"
+- tapOn:
+    text: "Open"
+    optional: true
+- tapOn:
+    text: "Continue"
+    optional: true
+- tapOn:
+    text: "Close"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "session-recorder-empty-state"
+    timeout: 30000
+- tapOn:
+    id: "start-session-button"
+- extendedWaitUntil:
+    visible:
+      id: "session-recorder-screen"
+    timeout: 30000
+- tapOn: "Log new exercise"
+- tapOn: "Exercise filter input"
+- inputText: "back squat"
+- hideKeyboard:
+    optional: true
+- tapOn:
+    point: "50%,27%"
+- extendedWaitUntil:
+    visible:
+      id: "exercise-block-history-panel-1"
+    timeout: 30000
+- assertVisible: "Previous block"
+- assertVisible: "Near failure"
+- assertVisible: "1/5"
+- takeScreenshot: "exercise-block-history-latest"
+- tapOn:
+    id: "exercise-block-history-panel-1-older"
+- assertVisible: "2/5"
+- takeScreenshot: "exercise-block-history-older"
+- tapOn: "Log new exercise"
+- tapOn: "Exercise filter input"
+- inputText: "lat pulldown"
+- hideKeyboard:
+    optional: true
+- tapOn:
+    point: "50%,27%"
+- extendedWaitUntil:
+    visible:
+      id: "exercise-block-history-panel-2-empty"
+    timeout: 30000
+- assertVisible: "No previous blocks"
+- takeScreenshot: "exercise-block-history-empty"
