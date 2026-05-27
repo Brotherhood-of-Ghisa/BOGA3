@@ -27,6 +27,8 @@ docs_touched: "docs/specs/ui/ux-rules.md, docs/specs/ui/screen-map.md, docs/spec
   - Agent 2B UX branch: `codex/issue-70-exercise-block-history-2B` branches from the Agent 2A state, wires the recorder UI, updates UI docs, runs targeted UX tests, and hands off to review.
   - Agent 3A numeric/service review branch: `codex/issue-70-exercise-block-history-3A` should branch from the latest accepted implementation state, test/review query correctness and metric accuracy, and commit any small review fixes separately.
   - Agent 3B UX quality review branch: `codex/issue-70-exercise-block-history-3B` should branch from the latest accepted implementation state, test/review recorder interaction and visual quality, and commit any small review fixes separately.
+  - Agent 2C fixture/QA-data branch: `codex/issue-70-exercise-block-history-fixture` should branch from the latest Agent 3B state, add deterministic local fixture support for richer Maestro/visual QA, and hand back to Agent 3B.
+  - Agent 3B follow-up should continue from `codex/issue-70-exercise-block-history-fixture` after Agent 2C completes, rerun UX visual QA using the new fixture, and update evidence.
   - Final orchestrator branch/review: the orchestrator should compare the 2A/2B/3A/3B outputs, perform final review, resolve any integration differences, and merge the accepted result toward `main`.
 - Issue context:
   - GitHub Issue: `https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/70`
@@ -174,6 +176,11 @@ This remains one task card, but execution is split across per-agent branches so 
 4. Agent 3B - UX quality review
    - Owns interaction/appearance review against `docs/specs/08-ux-delivery-standard.md` and `docs/specs/ui/**`.
    - Focuses on mobile density, state clarity, disabled button behavior, non-blocking failure states, and screenshot evidence.
+5. Agent 2C - fixture/QA data support
+   - Owns deterministic local fixture setup for richer real-SQLite visual QA.
+   - Should not change production exercise-block metric semantics or recorder UX except where needed to expose/test fixture-driven states.
+   - Should prefer app-owned harness setup over long visible UI setup, using existing `data reset` + `teleport` conventions.
+   - Should hand back to Agent 3B for final UX screenshot/evidence pass after the fixture path works.
 
 ## Scope
 
@@ -193,6 +200,7 @@ This remains one task card, but execution is split across per-agent branches so 
   - number of sets with not more than `2 RIR` (displayed as `Near failure`).
 - Add targeted data aggregation and recorder UI tests.
 - Split verification between numeric/service tests and UX interaction/quality tests.
+- Add deterministic local QA fixture support if needed to let Agent 3B test populated/older/newer block UX from real SQLite data without manually creating many sessions.
 - Update relevant UI docs to reflect the new recorder block-history behavior.
 
 ### Out of scope
@@ -202,8 +210,9 @@ This remains one task card, but execution is split across per-agent branches so 
 - Copying prior block sets into the active session.
 - Showing full historic set rows/details inside the recorder.
 - New schema, migrations, backend changes, sync contract changes, or analytics materialization.
+- Supabase/auth user creation for this UX proof; local SQLite fixture data is enough unless a later sync-specific task explicitly broadens scope.
 - Route, query-param, or navigation changes.
-- Maestro automation unless implementation unexpectedly changes native/runtime-sensitive behavior.
+- Broad Maestro runtime refactors beyond the minimal harness/fixture/flow support needed for this QA scenario.
 
 ## UI Impact (required checkpoint)
 
@@ -268,6 +277,7 @@ This remains one task card, but execution is split across per-agent branches so 
   - `docs/specs/ui/screen-map.md` - update the `/session-recorder` key states to mention per-exercise recent block stats.
   - `docs/specs/ui/components-catalog.md` - update only if the implementation adds a reusable `session-recorder` component for the block-history panel; otherwise record explicit no-update rationale.
   - `docs/specs/ui/navigation-contract.md` - no update expected because no route/query transition is planned.
+  - `docs/specs/11-maestro-runtime-and-testing-conventions.md` - update if Agent 2C adds a new supported harness query parameter such as `fixture=exercise-block-history`.
   - `RUNBOOK.md` - update only if local run/test/debug commands or manual verification workflow change.
 - For significant cross-cutting behavior changes:
   - No `docs/specs/03-technical-architecture.md` update expected; this is a local read-only derived view.
@@ -280,6 +290,7 @@ This remains one task card, but execution is split across per-agent branches so 
   - `screen-map.md` changes because `/session-recorder` key states gain a new visible per-exercise history panel.
   - `navigation-contract.md` should stay unchanged unless implementation changes route paths, params, redirects, or transitions.
   - `components-catalog.md` changes only if a reusable component role is added or changed.
+  - `docs/specs/11-maestro-runtime-and-testing-conventions.md` changes if the canonical harness contract changes.
 - Tokens/primitives compliance statement:
   - Reuse plan: existing `SessionContentLayout`, route-local recorder card patterns, and `uiTokens`/`uiColors` from `apps/mobile/components/ui`.
   - Exceptions: none expected; no raw literals or new primitive extraction required.
@@ -291,7 +302,7 @@ This remains one task card, but execution is split across per-agent branches so 
   - Empty or error state for an exercise without available block history.
   - Agent 3B follow-up QA recommendation:
     - Add a reusable Maestro fixture path that provisions a deterministic local test profile/state with several completed logs across at least two exercises and multiple dates, then opens the recorder and validates populated, older/newer, empty, and error/non-blocking states from real SQLite data.
-    - Recommended owner if this becomes a follow-up agent task: Agent 2B-style UX/E2E lane, because it is mainly recorder UX plus Maestro fixture coverage. Agent 3B is appropriate if scoped strictly as review-only visual evidence. Agent 2A/3A should own only the lower-level data fixture helper if the flow needs a reusable repository seeding API.
+    - Owner: Agent 2C fixture/QA-data branch, then Agent 3B follow-up for final UX visual evidence.
 
 ## Testing and verification approach
 
@@ -302,6 +313,10 @@ This remains one task card, but execution is split across per-agent branches so 
   - Agent 2B / Agent 3B UX lane:
     - `cd apps/mobile && npm test -- --runTestsByPath app/__tests__/session-recorder-interactions.test.tsx app/__tests__/session-recorder-screen.test.tsx`
     - If UX coverage lands in a narrower new test file, adapt to the exact recorder UI test path.
+  - Agent 2C fixture/QA-data lane:
+    - `cd apps/mobile && npm test -- --runTestsByPath app/__tests__/maestro-harness.test.ts app/__tests__/exercise-block-history.test.ts`
+    - Add/adapt a focused fixture test if the fixture seeding helper lives outside the harness module.
+    - Run the new Maestro exercise-block-history fixture flow or document the exact simulator/runtime blocker.
   - If implementation extends existing `exercise-history` repository instead of adding a new file, adapt the targeted path to the actual test file names.
   - `cd apps/mobile && npm run lint:ui-guardrails`
   - `./scripts/quality-fast.sh frontend`
@@ -311,6 +326,7 @@ This remains one task card, but execution is split across per-agent branches so 
 - Test layers covered:
   - Numeric/service layer: unit/data aggregation tests for recent block query/aggregation and metric calculation.
   - UX layer: React Native Testing Library route/component tests for recorder display, navigation buttons, empty/loading/error states, and non-blocking logging behavior.
+  - Fixture/QA layer: harness/fixture tests plus Maestro simulator visual proof using real local SQLite fixture data.
 - Execution triggers:
   - Always for this task.
 - Slow-gate triggers:
@@ -330,11 +346,15 @@ This remains one task card, but execution is split across per-agent branches so 
   - `apps/mobile/src/data/index.ts` if a new repository function needs a barrel export
   - `apps/mobile/app/(tabs)/session-recorder.tsx`
   - `apps/mobile/components/session-recorder/**` if extracting a focused display component keeps the route manageable
+  - `apps/mobile/src/maestro/**` and `apps/mobile/app/maestro-harness.tsx` if adding fixture setup through the hidden harness
+  - `apps/mobile/.maestro/flows/**` if adding a checked-in exercise-block-history visual QA flow
   - `apps/mobile/app/__tests__/exercise-block-history.test.ts` or equivalent data test file
+  - `apps/mobile/app/__tests__/maestro-harness.test.ts` or equivalent harness/fixture test file
   - `apps/mobile/app/__tests__/session-recorder-interactions.test.tsx` and/or `session-recorder-screen.test.tsx`
   - `docs/specs/ui/ux-rules.md`
   - `docs/specs/ui/screen-map.md`
   - `docs/specs/ui/components-catalog.md` only if a reusable component is added
+  - `docs/specs/11-maestro-runtime-and-testing-conventions.md` only if the harness query contract changes
   - `RUNBOOK.md` only if operator commands/workflows change
 - Project structure impact:
   - No new top-level paths or canonical folder changes expected.
@@ -346,6 +366,8 @@ This remains one task card, but execution is split across per-agent branches so 
   - Use existing set parsing/calculation helpers rather than duplicating math.
   - Keep history loading per exercise definition efficient enough for recorder use; avoid whole-history loading when a bounded query can return the recent session IDs first.
   - If two completed sessions share identical `completedAt`, tie-break deterministically, for example by `sessionId`.
+  - Agent 2C should seed local SQLite fixture data, not create a Supabase/auth user, unless the human explicitly expands this into sync/auth QA.
+  - Agent 2C should keep fixture data dev/test-only and reachable through the existing Maestro harness guard.
 
 ## Agent 3 testing/review checklist
 
@@ -382,6 +404,22 @@ This remains one task card, but execution is split across per-agent branches so 
 - Capture or verify the required visual evidence.
 - Leave only high-signal findings with file/line references if anything remains.
 
+### Agent 2C - fixture/QA-data checklist
+
+- Branch from the latest `codex/issue-70-exercise-block-history-3B` state into `codex/issue-70-exercise-block-history-fixture`.
+- Add a deterministic local fixture path, preferably via `boga3://maestro-harness?reset=data&fixture=exercise-block-history&teleport=session-recorder`.
+- Fixture should create enough completed local history to exercise:
+  - populated latest block,
+  - older/newer block navigation,
+  - at least five completed sessions for one exercise,
+  - duplicate same-exercise rows inside one completed session,
+  - at least one second exercise with different history,
+  - at least one exercise with no prior block history.
+- Add a checked-in Maestro flow or clearly named reusable QA flow that uses the fixture and captures the recorder panel.
+- Update `docs/specs/11-maestro-runtime-and-testing-conventions.md` if the harness query contract changes.
+- Update `RUNBOOK.md` only if a new human-facing command/workflow should be documented.
+- Hand off to Agent 3B after fixture tests and the fixture Maestro flow pass, or document the exact blocker.
+
 ## Mandatory verify gates
 
 - Standard local fast gate: `./scripts/quality-fast.sh frontend`
@@ -391,7 +429,9 @@ This remains one task card, but execution is split across per-agent branches so 
 - Additional gate(s):
   - Numeric/service: `cd apps/mobile && npm test -- --runTestsByPath app/__tests__/exercise-block-history.test.ts` or adapted exact target file.
   - UX: `cd apps/mobile && npm test -- --runTestsByPath app/__tests__/session-recorder-interactions.test.tsx app/__tests__/session-recorder-screen.test.tsx` or adapted exact target files.
+  - Fixture/QA: `cd apps/mobile && npm test -- --runTestsByPath app/__tests__/maestro-harness.test.ts app/__tests__/exercise-block-history.test.ts` or adapted exact target files.
   - `cd apps/mobile && npm run lint:ui-guardrails`
+  - Agent 2C/3B fixture visual proof: run the checked-in exercise-block-history Maestro fixture flow and record the artifact path, or document the exact simulator/runtime blocker.
 
 ## Evidence
 
