@@ -1,7 +1,7 @@
 ---
 task_id: T-20260526-01-issue-70-exercise-block-history
 milestone_id: "M1"
-status: in_progress
+status: completed
 ui_impact: "yes"
 areas: "frontend|docs"
 runtimes: "node|expo"
@@ -16,7 +16,7 @@ docs_touched: "docs/specs/ui/ux-rules.md, docs/specs/ui/screen-map.md, docs/spec
 
 - Task ID: `T-20260526-01-issue-70-exercise-block-history`
 - Title: Issue 70 phase 0A - recent exercise block history in recorder
-- Status: `in_progress`
+- Status: `completed`
 - File location rule:
   - author active cards in `docs/tasks/<task-id>.md`
   - move the file to `docs/tasks/complete/<task-id>.md` when `Status` becomes `completed` or `outdated`
@@ -512,6 +512,7 @@ This remains one task card, but execution is split across per-agent branches so 
   - Agent 3B: `./scripts/task-closeout-check.sh docs/tasks/T-20260526-01-issue-70-exercise-block-history.md` - failed because task status intentionally remains `in_progress` for final orchestrator comparison/integration rather than final closeout.
   - Agent 2C: `./scripts/task-closeout-check.sh docs/tasks/T-20260526-01-issue-70-exercise-block-history.md` - failed because task status intentionally remains `in_progress` for Agent 3B follow-up and final orchestrator comparison/integration rather than final closeout.
   - Agent 3B-final: `./scripts/task-closeout-check.sh docs/tasks/T-20260526-01-issue-70-exercise-block-history.md` - failed because task status intentionally remains `in_progress` for final orchestrator comparison/integration rather than final task archive.
+  - Final orchestrator: `./scripts/task-closeout-check.sh docs/tasks/complete/T-20260526-01-issue-70-exercise-block-history.md` - passed after marking the task `completed`, archiving the card, and updating the M1 task breakdown.
 - UI/UX task visual artifacts note:
   - Agent 2B covered the key visible states through React Native Testing Library rendered-state assertions: populated latest block, older/newer navigation, empty state, and error state while set entry remains usable. No simulator screenshot was captured in this 2B pass because the task's slow native gate remains `N/A`.
   - Agent 3B captured simulator visual evidence for a populated recent-block panel via a temporary Maestro QA flow. The screenshot shows the panel in the real iOS simulator with `Previous block`, metric grid, disabled `<<`/`>>` controls, and editable set rows still visible below.
@@ -529,8 +530,8 @@ This remains one task card, but execution is split across per-agent branches so 
 - What changed: Agent 3B reviewed recorder interaction/visual quality against the UX standard and UI docs, then made focused UX/accessibility fixes: the `<<` and `>>` previous-block controls now expose `accessibilityRole="button"` and use a 44pt minimum touch target, and the `RIR <= 2` metric display label is now `Near failure` for better readability while preserving the underlying metric semantics. Agent 3B also extended the recorder interaction test to lock the button roles and label.
 - What changed: Agent 2C added dev-only `fixture=exercise-block-history` harness support, a deterministic local SQLite fixture seeding helper, and a checked-in Maestro flow at `apps/mobile/.maestro/flows/exercise-block-history-fixture.yaml`. The fixture seeds six `Barbell Back Squat` completed sessions, duplicate same-exercise rows in the latest completed session, a second exercise with separate history, warm-up/near-failure/invalid set cases, and leaves `Lat Pulldown` with no prior block history. Agent 2C updated the Maestro harness contract doc and `RUNBOOK.md` because the reusable flow is now part of the local QA command surface.
 - What tests ran: Agent 2A targeted service/data tests passed; Agent 2B targeted recorder UX tests passed; combined service+UX targeted tests passed; full `npm test -- --runInBand` passed; `npm run lint` passed; `npm run lint:ui-guardrails` passed. Agent 3A reran the targeted numeric test before and after review edits, reran `npm run lint:ui-guardrails`, restored missing declared `apps/mobile` dependencies with `npm install`, and reran `./scripts/quality-fast.sh frontend` successfully. Agent 3B reran the targeted recorder UX tests before and after the UX fix, reran `npm run lint:ui-guardrails`, reran `./scripts/quality-fast.sh frontend`, and ran a temporary Maestro simulator QA flow that captured the populated block-history panel successfully. Agent 2C ran targeted harness/block-history tests, `npm run typecheck`, `npm run lint`, `npm run lint:ui-guardrails`, `./scripts/quality-fast.sh frontend`, and the checked-in Maestro fixture flow successfully. Agent 3B-final continued from Agent 2C's fixture branch on `codex/issue-70-exercise-block-history-3B-final`, reran the targeted recorder UX tests, targeted harness/block-history tests, `npm run lint:ui-guardrails`, `./scripts/quality-fast.sh frontend`, and the checked-in Maestro fixture flow successfully. Visual review of the new screenshots confirmed the latest populated, older populated, and no-history empty states remain compact, readable, and non-blocking.
-- What remains: The task card intentionally remains `in_progress` for final orchestrator comparison/integration across agent branches, so Agent 3B-final did not move the card to `docs/tasks/complete/`. No data model or sync-scope change was made.
-- RUNBOOK.md reviewed in Agent 3B-final; no changes required.
+- What remains: Nothing remains for Issue 70 phase 0A. Final orchestrator comparison accepted the Agent 3B-final branch as the integrated result, archived this card under `docs/tasks/complete/`, and updated the M1 task breakdown to `completed`. Parent milestone `M1` status remains unchanged because the milestone is a legacy/open parent; only this task's breakdown line changed. No data model or sync-scope change was made.
+- RUNBOOK.md reviewed in Agent 3B-final and by final orchestrator; no further changes required beyond the already documented exercise-block-history fixture command.
 
 ## Status update checklist (mandatory at closeout)
 
@@ -541,5 +542,5 @@ This remains one task card, but execution is split across per-agent branches so 
 - For UI/UX tasks, update the relevant `docs/specs/ui/*.md` files or record explicit `no update` rationale, and keep entries synthetic/overview-first.
 - If significant project-structure changes were made, update `docs/specs/09-project-structure.md` and mention it in completion note.
 - Update parent milestone task breakdown/status in the same session.
-- Run `./scripts/task-closeout-check.sh docs/tasks/T-20260526-01-issue-70-exercise-block-history.md` or document why `N/A` before handoff.
+- Run `./scripts/task-closeout-check.sh docs/tasks/complete/T-20260526-01-issue-70-exercise-block-history.md` or document why `N/A` before handoff.
 - Record `RUNBOOK.md reviewed (no changes required)` in the completion note if local operator workflow did not change.
