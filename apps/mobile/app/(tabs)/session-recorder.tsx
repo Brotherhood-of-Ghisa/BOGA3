@@ -53,6 +53,12 @@ import {
 } from '@/src/data';
 import { SESSION_SET_TYPES, normalizeSessionSetType, type SessionSetType, type SessionSetTypeValue } from '@/src/data/set-types';
 import { type ExerciseCatalogExercise } from '@/src/data/exercise-catalog';
+import {
+  computeExerciseVolume,
+  computeMaxRepsByWeight,
+  estimateExerciseOneRepMax,
+  parseCalculationSet,
+} from '@/src/exercise-calculations';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import { filterIndexedExerciseCatalogExercises } from '@/src/exercise-catalog/search';
 import { getCurrentForegroundPositionLazy } from '@/src/location/foreground-location-lazy';
@@ -418,9 +424,18 @@ type ExerciseBlockHistoryPanelState = {
   status: 'loading' | 'success' | 'error';
   blocks: ExerciseBlockHistoryBlock[];
   activeIndex: number;
+  isCollapsed: boolean;
+};
+type ExerciseBlockComparisonMetrics = {
+  estimatedOneRepMax: number | null;
+  totalVolume: number;
+  highestWeight: number | null;
+  rirAtMostTwoSetCount: number;
 };
 
 const NEW_GYM_COORDINATE_FEEDBACK_ID = '__new_gym__';
+const RIR_AT_MOST_TWO_SET_TYPES = new Set<SessionSetType>(['rir_0', 'rir_1', 'rir_2']);
+const PAST_BLOCKS_LABEL = 'Past blocks';
 
 const formatExerciseBlockNumeric = (value: number, fractionDigits = 0): string => {
   if (!Number.isFinite(value)) return '-';
@@ -436,6 +451,32 @@ const formatExerciseBlockVolume = (value: number): string =>
 
 const formatExerciseBlockAge = (daysAgo: number): string =>
   `${Math.max(0, daysAgo)}d ago`;
+
+const getCurrentExerciseBlockMetrics = (
+  sets: SessionSet[]
+): ExerciseBlockComparisonMetrics => {
+  const calculationSets = sets.map((set) => ({
+    weightValue: set.weight,
+    repsValue: set.reps,
+    setType: normalizeSessionSetType(set.setType),
+  }));
+  const maxRepsByWeight = computeMaxRepsByWeight(calculationSets);
+  let rirAtMostTwoSetCount = 0;
+
+  for (const set of calculationSets) {
+    const setType = normalizeSessionSetType(set.setType);
+    if (!setType || !RIR_AT_MOST_TWO_SET_TYPES.has(setType)) continue;
+    if (parseCalculationSet(set) === null) continue;
+    rirAtMostTwoSetCount += 1;
+  }
+
+  return {
+    estimatedOneRepMax: estimateExerciseOneRepMax(calculationSets),
+    totalVolume: computeExerciseVolume(calculationSets),
+    highestWeight: maxRepsByWeight[0]?.weight ?? null,
+    rirAtMostTwoSetCount,
+  };
+};
 
 const hasSavedGymCoordinates = (location: SessionLocation) =>
   typeof location.latitude === 'number' &&
@@ -1052,6 +1093,7 @@ export default function SessionRecorderScreen() {
                 status: 'loading',
                 blocks: [],
                 activeIndex: 0,
+                isCollapsed: true,
               };
       }
       return next;
@@ -1080,6 +1122,10 @@ export default function SessionRecorderScreen() {
               status: 'success',
               blocks: summary.blocks,
               activeIndex: 0,
+              isCollapsed:
+                current[exercise.id]?.exerciseDefinitionId === exercise.exerciseDefinitionId
+                  ? current[exercise.id].isCollapsed
+                  : true,
             },
           }));
         })
@@ -1098,6 +1144,10 @@ export default function SessionRecorderScreen() {
               status: 'error',
               blocks: [],
               activeIndex: 0,
+              isCollapsed:
+                current[exercise.id]?.exerciseDefinitionId === exercise.exerciseDefinitionId
+                  ? current[exercise.id].isCollapsed
+                  : true,
             },
           }));
         });
@@ -1672,31 +1722,147 @@ export default function SessionRecorderScreen() {
     });
   }, []);
 
+  const toggleExerciseBlockHistoryCollapsed = useCallback((exerciseId: string) => {
+    setExerciseBlockHistoryByExerciseId((current) => {
+      const panel = current[exerciseId];
+      if (!panel) {
+        return current;
+      }
+
+      return {
+        ...current,
+        [exerciseId]: {
+          ...panel,
+          isCollapsed: !panel.isCollapsed,
+        },
+      };
+    });
+  }, []);
+
   const renderExerciseBlockHistoryPanel = useCallback(
     (exercise: SessionExercise, exerciseIndex: number) => {
       const panel = exerciseBlockHistoryByExerciseId[exercise.id];
       const panelTestId = `exercise-block-history-panel-${exerciseIndex + 1}`;
+      const isCollapsed = panel?.isCollapsed ?? true;
+
+      const renderCollapsedPanel = (testID = `${panelTestId}-collapsed`) => (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Show ${PAST_BLOCKS_LABEL} for exercise ${exerciseIndex + 1}`}
+          accessibilityState={{ expanded: false }}
+          style={[styles.exerciseBlockHistoryPanel, styles.exerciseBlockHistoryPanelCollapsed]}
+          testID={testID}
+          onPress={() => toggleExerciseBlockHistoryCollapsed(exercise.id)}>
+          <Text style={styles.exerciseBlockHistoryTitle}>{PAST_BLOCKS_LABEL}</Text>
+        </Pressable>
+      );
+
+      const renderHeader = (metaText: string, nav?: {
+        activeIndex: number;
+        totalBlocks: number;
+        olderDisabled: boolean;
+        newerDisabled: boolean;
+      }) => (
+        <View style={styles.exerciseBlockHistoryHeader}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Hide ${PAST_BLOCKS_LABEL} for exercise ${exerciseIndex + 1}`}
+            accessibilityState={{ expanded: true }}
+            style={styles.exerciseBlockHistoryHeaderRow}
+            testID={`${panelTestId}-toggle`}
+            onPress={() => toggleExerciseBlockHistoryCollapsed(exercise.id)}>
+            <View style={styles.exerciseBlockHistoryHeadingText}>
+              <Text style={styles.exerciseBlockHistoryTitle}>{PAST_BLOCKS_LABEL}</Text>
+              <Text style={styles.exerciseBlockHistoryAge}>{metaText}</Text>
+            </View>
+          </Pressable>
+
+          {nav ? (
+            <View style={styles.exerciseBlockHistoryNavRow}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Show older previous block for exercise ${exerciseIndex + 1}`}
+                accessibilityState={{ disabled: nav.olderDisabled }}
+                disabled={nav.olderDisabled}
+                style={[
+                  styles.exerciseBlockHistoryNavButton,
+                  nav.olderDisabled ? styles.exerciseBlockHistoryNavButtonDisabled : null,
+                ]}
+                testID={`${panelTestId}-older`}
+                onPress={() => moveExerciseBlockHistory(exercise.id, 'older')}>
+                <Text
+                  style={[
+                    styles.exerciseBlockHistoryNavButtonText,
+                    nav.olderDisabled ? styles.exerciseBlockHistoryNavButtonTextDisabled : null,
+                  ]}>
+                  {'<<'}
+                </Text>
+              </Pressable>
+              <Text style={styles.exerciseBlockHistoryPosition}>
+                {nav.activeIndex + 1}/{nav.totalBlocks}
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Show newer previous block for exercise ${exerciseIndex + 1}`}
+                accessibilityState={{ disabled: nav.newerDisabled }}
+                disabled={nav.newerDisabled}
+                style={[
+                  styles.exerciseBlockHistoryNavButton,
+                  nav.newerDisabled ? styles.exerciseBlockHistoryNavButtonDisabled : null,
+                ]}
+                testID={`${panelTestId}-newer`}
+                onPress={() => moveExerciseBlockHistory(exercise.id, 'newer')}>
+                <Text
+                  style={[
+                    styles.exerciseBlockHistoryNavButtonText,
+                    nav.newerDisabled ? styles.exerciseBlockHistoryNavButtonTextDisabled : null,
+                  ]}>
+                  {'>>'}
+                </Text>
+              </Pressable>
+            </View>
+          ) : null}
+        </View>
+      );
 
       if (!panel || panel.status === 'loading') {
+        if (isCollapsed) {
+          return renderCollapsedPanel(`${panelTestId}-loading-collapsed`);
+        }
+
         return (
-          <View style={styles.exerciseBlockHistoryPanel} testID={`${panelTestId}-loading`}>
-            <Text style={styles.exerciseBlockHistoryStateText}>Loading previous blocks...</Text>
+          <View
+            style={styles.exerciseBlockHistoryPanel}
+            testID={`${panelTestId}-loading`}>
+            {renderHeader('Loading previous blocks...')}
           </View>
         );
       }
 
       if (panel.status === 'error') {
+        if (isCollapsed) {
+          return renderCollapsedPanel(`${panelTestId}-error-collapsed`);
+        }
+
         return (
-          <View style={styles.exerciseBlockHistoryPanel} testID={`${panelTestId}-error`}>
-            <Text style={styles.exerciseBlockHistoryStateText}>Previous blocks unavailable</Text>
+          <View
+            style={styles.exerciseBlockHistoryPanel}
+            testID={`${panelTestId}-error`}>
+            {renderHeader('Previous blocks unavailable')}
           </View>
         );
       }
 
       if (panel.blocks.length === 0) {
+        if (isCollapsed) {
+          return renderCollapsedPanel(`${panelTestId}-empty-collapsed`);
+        }
+
         return (
-          <View style={styles.exerciseBlockHistoryPanel} testID={`${panelTestId}-empty`}>
-            <Text style={styles.exerciseBlockHistoryStateText}>No previous blocks</Text>
+          <View
+            style={styles.exerciseBlockHistoryPanel}
+            testID={`${panelTestId}-empty`}>
+            {renderHeader('No previous blocks')}
           </View>
         );
       }
@@ -1708,98 +1874,105 @@ export default function SessionRecorderScreen() {
       }
       const olderDisabled = activeIndex >= panel.blocks.length - 1;
       const newerDisabled = activeIndex <= 0;
+      const currentMetrics = getCurrentExerciseBlockMetrics(exercise.sets);
+      const nav = {
+        activeIndex,
+        totalBlocks: panel.blocks.length,
+        olderDisabled,
+        newerDisabled,
+      };
+
+      if (isCollapsed) {
+        return renderCollapsedPanel();
+      }
 
       return (
-        <View style={styles.exerciseBlockHistoryPanel} testID={panelTestId}>
-          <View style={styles.exerciseBlockHistoryHeaderRow}>
-            <Text style={styles.exerciseBlockHistoryTitle}>Previous block</Text>
-            <Text style={styles.exerciseBlockHistoryAge}>
-              {formatExerciseBlockAge(activeBlock.daysAgo)}
-            </Text>
-          </View>
+        <View
+          style={styles.exerciseBlockHistoryPanel}
+          testID={panelTestId}>
+          {renderHeader(formatExerciseBlockAge(activeBlock.daysAgo), nav)}
 
-          <View style={styles.exerciseBlockHistoryMetricGrid}>
-            <View style={styles.exerciseBlockHistoryMetric}>
-              <Text style={styles.exerciseBlockHistoryMetricLabel}>Est. 1RM</Text>
-              <Text
-                style={styles.exerciseBlockHistoryMetricValue}
-                testID={`${panelTestId}-est-1rm`}>
-                {formatExerciseBlockStat(activeBlock.estimatedOneRepMax, 1)}
-              </Text>
-            </View>
-            <View style={styles.exerciseBlockHistoryMetric}>
-              <Text style={styles.exerciseBlockHistoryMetricLabel}>Volume</Text>
-              <Text
-                style={styles.exerciseBlockHistoryMetricValue}
-                testID={`${panelTestId}-volume`}>
-                {formatExerciseBlockVolume(activeBlock.totalVolume)}
-              </Text>
-            </View>
-            <View style={styles.exerciseBlockHistoryMetric}>
-              <Text style={styles.exerciseBlockHistoryMetricLabel}>Highest</Text>
-              <Text
-                style={styles.exerciseBlockHistoryMetricValue}
-                testID={`${panelTestId}-highest`}>
-                {formatExerciseBlockStat(activeBlock.highestWeight, 1)}
-              </Text>
-            </View>
-            <View style={styles.exerciseBlockHistoryMetric}>
-              <Text style={styles.exerciseBlockHistoryMetricLabel}>Near failure</Text>
-              <Text
-                style={styles.exerciseBlockHistoryMetricValue}
-                testID={`${panelTestId}-rir-count`}>
-                {activeBlock.rirAtMostTwoSetCount}
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.exerciseBlockHistoryNavRow}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`Show older previous block for exercise ${exerciseIndex + 1}`}
-              accessibilityState={{ disabled: olderDisabled }}
-              disabled={olderDisabled}
-              style={[
-                styles.exerciseBlockHistoryNavButton,
-                olderDisabled ? styles.exerciseBlockHistoryNavButtonDisabled : null,
-              ]}
-              testID={`${panelTestId}-older`}
-              onPress={() => moveExerciseBlockHistory(exercise.id, 'older')}>
-              <Text
-                style={[
-                  styles.exerciseBlockHistoryNavButtonText,
-                  olderDisabled ? styles.exerciseBlockHistoryNavButtonTextDisabled : null,
-                ]}>
-                {'<<'}
-              </Text>
-            </Pressable>
-            <Text style={styles.exerciseBlockHistoryPosition}>
-              {activeIndex + 1}/{panel.blocks.length}
-            </Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`Show newer previous block for exercise ${exerciseIndex + 1}`}
-              accessibilityState={{ disabled: newerDisabled }}
-              disabled={newerDisabled}
-              style={[
-                styles.exerciseBlockHistoryNavButton,
-                newerDisabled ? styles.exerciseBlockHistoryNavButtonDisabled : null,
-              ]}
-              testID={`${panelTestId}-newer`}
-              onPress={() => moveExerciseBlockHistory(exercise.id, 'newer')}>
-              <Text
-                style={[
-                  styles.exerciseBlockHistoryNavButtonText,
-                  newerDisabled ? styles.exerciseBlockHistoryNavButtonTextDisabled : null,
-                ]}>
-                {'>>'}
-              </Text>
-            </Pressable>
+          <View style={styles.exerciseBlockHistoryComparisonTable}>
+              <View style={styles.exerciseBlockHistoryComparisonRow}>
+                <Text style={styles.exerciseBlockHistoryMetricLabel} />
+                <Text style={styles.exerciseBlockHistoryColumnHeader}>Previous</Text>
+                <Text
+                  style={[
+                    styles.exerciseBlockHistoryColumnHeader,
+                    styles.exerciseBlockHistoryCurrentHeader,
+                  ]}>
+                  Current
+                </Text>
+              </View>
+              <View style={styles.exerciseBlockHistoryComparisonRow}>
+                <Text style={styles.exerciseBlockHistoryMetricLabel}>Est. 1RM</Text>
+                <Text
+                  style={styles.exerciseBlockHistoryMetricValue}
+                  testID={`${panelTestId}-est-1rm-previous`}>
+                  {formatExerciseBlockStat(activeBlock.estimatedOneRepMax, 1)}
+                </Text>
+                <Text
+                  style={[
+                    styles.exerciseBlockHistoryMetricValue,
+                    styles.exerciseBlockHistoryCurrentValue,
+                  ]}
+                  testID={`${panelTestId}-est-1rm-current`}>
+                  {formatExerciseBlockStat(currentMetrics.estimatedOneRepMax, 1)}
+                </Text>
+              </View>
+              <View style={styles.exerciseBlockHistoryComparisonRow}>
+                <Text style={styles.exerciseBlockHistoryMetricLabel}>Volume</Text>
+                <Text
+                  style={styles.exerciseBlockHistoryMetricValue}
+                  testID={`${panelTestId}-volume-previous`}>
+                  {formatExerciseBlockVolume(activeBlock.totalVolume)}
+                </Text>
+                <Text
+                  style={[
+                    styles.exerciseBlockHistoryMetricValue,
+                    styles.exerciseBlockHistoryCurrentValue,
+                  ]}
+                  testID={`${panelTestId}-volume-current`}>
+                  {formatExerciseBlockVolume(currentMetrics.totalVolume)}
+                </Text>
+              </View>
+              <View style={styles.exerciseBlockHistoryComparisonRow}>
+                <Text style={styles.exerciseBlockHistoryMetricLabel}>Highest</Text>
+                <Text
+                  style={styles.exerciseBlockHistoryMetricValue}
+                  testID={`${panelTestId}-highest-previous`}>
+                  {formatExerciseBlockStat(activeBlock.highestWeight, 1)}
+                </Text>
+                <Text
+                  style={[
+                    styles.exerciseBlockHistoryMetricValue,
+                    styles.exerciseBlockHistoryCurrentValue,
+                  ]}
+                  testID={`${panelTestId}-highest-current`}>
+                  {formatExerciseBlockStat(currentMetrics.highestWeight, 1)}
+                </Text>
+              </View>
+              <View style={styles.exerciseBlockHistoryComparisonRow}>
+                <Text style={styles.exerciseBlockHistoryMetricLabel}>Near failure</Text>
+                <Text
+                  style={styles.exerciseBlockHistoryMetricValue}
+                  testID={`${panelTestId}-rir-count-previous`}>
+                  {activeBlock.rirAtMostTwoSetCount}
+                </Text>
+                <Text
+                  style={[
+                    styles.exerciseBlockHistoryMetricValue,
+                    styles.exerciseBlockHistoryCurrentValue,
+                  ]}
+                  testID={`${panelTestId}-rir-count-current`}>
+                  {currentMetrics.rirAtMostTwoSetCount}
+                </Text>
+              </View>
           </View>
         </View>
       );
     },
-    [exerciseBlockHistoryByExerciseId, moveExerciseBlockHistory]
+    [exerciseBlockHistoryByExerciseId, moveExerciseBlockHistory, toggleExerciseBlockHistoryCollapsed]
   );
 
   const openExerciseModal = (exerciseIdToChange: string | null = null) => {
@@ -3780,11 +3953,23 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     gap: 8,
   },
+  exerciseBlockHistoryPanelCollapsed: {
+    minHeight: 34,
+    paddingVertical: 7,
+    justifyContent: 'center',
+  },
+  exerciseBlockHistoryHeader: {
+    gap: 8,
+  },
   exerciseBlockHistoryHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 8,
+  },
+  exerciseBlockHistoryHeadingText: {
+    flex: 1,
+    gap: 2,
   },
   exerciseBlockHistoryTitle: {
     fontSize: 12,
@@ -3801,6 +3986,23 @@ const styles = StyleSheet.create({
     color: uiColors.textSecondary,
     fontWeight: '600',
   },
+  exerciseBlockHistoryToggle: {
+    minHeight: 36,
+    minWidth: 54,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: uiColors.borderStrong,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: uiColors.surfaceDefault,
+    paddingHorizontal: 10,
+  },
+  exerciseBlockHistoryToggleText: {
+    fontSize: 12,
+    lineHeight: 14,
+    fontWeight: '800',
+    color: uiColors.actionPrimary,
+  },
   exerciseBlockHistoryMetricGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -3813,16 +4015,45 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   exerciseBlockHistoryMetricLabel: {
+    flex: 1,
+    minWidth: 82,
     fontSize: 11,
     lineHeight: 13,
     fontWeight: '600',
     color: uiColors.textSecondary,
   },
   exerciseBlockHistoryMetricValue: {
+    flex: 1,
+    minWidth: 64,
+    textAlign: 'right',
     fontSize: 14,
     lineHeight: 17,
     fontWeight: '800',
     color: uiColors.textPrimary,
+  },
+  exerciseBlockHistoryComparisonTable: {
+    gap: 6,
+  },
+  exerciseBlockHistoryComparisonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    minHeight: 22,
+  },
+  exerciseBlockHistoryColumnHeader: {
+    flex: 1,
+    minWidth: 64,
+    textAlign: 'right',
+    fontSize: 11,
+    lineHeight: 13,
+    fontWeight: '700',
+    color: uiColors.textSecondary,
+  },
+  exerciseBlockHistoryCurrentHeader: {
+    color: uiColors.actionPrimary,
+  },
+  exerciseBlockHistoryCurrentValue: {
+    color: uiColors.actionPrimary,
   },
   exerciseBlockHistoryNavRow: {
     flexDirection: 'row',

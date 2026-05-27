@@ -29,16 +29,39 @@ appId: com.dinoderek.mobile
     point: "50%,27%"
 - extendedWaitUntil:
     visible:
-      id: "exercise-block-history-panel-1"
+      id: "exercise-block-history-panel-1-collapsed"
     timeout: 30000
-- assertVisible: "Previous block"
+- takeScreenshot: "exercise-block-comparison-start-collapsed"
+- tapOn:
+    id: "exercise-block-history-panel-1-collapsed"
+- extendedWaitUntil:
+    visible:
+      id: "exercise-block-history-panel-1"
+    timeout: 10000
+- assertVisible: "Previous"
+- assertVisible: "Current"
 - assertVisible: "Near failure"
 - assertVisible: "1/5"
-- takeScreenshot: "exercise-block-history-latest"
+- tapOn: "Weight for exercise 1 set 1"
+- inputText: "200"
+- tapOn: "Reps for exercise 1 set 1"
+- inputText: "5"
+- hideKeyboard:
+    optional: true
+- takeScreenshot: "exercise-block-comparison-expanded"
+- tapOn:
+    id: "exercise-block-history-panel-1-toggle"
+- extendedWaitUntil:
+    visible:
+      id: "exercise-block-history-panel-1-collapsed"
+    timeout: 10000
+- takeScreenshot: "exercise-block-comparison-collapsed"
+- tapOn:
+    id: "exercise-block-history-panel-1-collapsed"
 - tapOn:
     id: "exercise-block-history-panel-1-older"
 - assertVisible: "2/5"
-- takeScreenshot: "exercise-block-history-older"
+- takeScreenshot: "exercise-block-comparison-older"
 - tapOn: "Log new exercise"
 - tapOn: "Exercise filter input"
 - inputText: "lat pulldown"
@@ -48,7 +71,13 @@ appId: com.dinoderek.mobile
     point: "50%,27%"
 - extendedWaitUntil:
     visible:
-      id: "exercise-block-history-panel-2-empty"
+      id: "exercise-block-history-panel-2-empty-collapsed"
     timeout: 30000
-- assertVisible: "No previous blocks"
-- takeScreenshot: "exercise-block-history-empty"
+- takeScreenshot: "exercise-block-history-empty-collapsed"
+- tapOn:
+    id: "exercise-block-history-panel-2-empty-collapsed"
+- extendedWaitUntil:
+    visible:
+      id: "exercise-block-history-panel-2-empty"
+    timeout: 10000
+- takeScreenshot: "exercise-block-history-empty-expanded"

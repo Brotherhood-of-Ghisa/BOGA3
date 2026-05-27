@@ -1,7 +1,7 @@
 ---
 task_id: T-20260527-01-issue-70-block-comparison
 milestone_id: "M1"
-status: planned
+status: in_progress
 ui_impact: "yes"
 areas: "frontend|docs"
 runtimes: "node|expo|maestro"
@@ -16,7 +16,7 @@ docs_touched: "docs/specs/ui/ux-rules.md, docs/specs/ui/screen-map.md, docs/spec
 
 - Task ID: `T-20260527-01-issue-70-block-comparison`
 - Title: Issue 70 phase 1 - collapsible previous/current block comparison in recorder
-- Status: `planned`
+- Status: `in_progress`
 - File location rule:
   - author active cards in `docs/tasks/<task-id>.md`
   - move the file to `docs/tasks/complete/<task-id>.md` when `Status` becomes `completed` or `outdated`
@@ -48,9 +48,9 @@ docs_touched: "docs/specs/ui/ux-rules.md, docs/specs/ui/screen-map.md, docs/spec
 
 ## Context Freshness (required at session start; update before edits)
 
-- Verified current branch + HEAD commit: task card created on `main` at `285001f` after `git fetch origin main && git pull --ff-only origin main`.
-- Start-of-session sync completed per `docs/specs/04-ai-development-playbook.md` git sync workflow?: `yes` for task-card authoring.
-- Parent refs opened while authoring this card:
+- Verified current branch + HEAD commit: Agent 2A started on `main` at `3168ca0` after `git fetch origin main && git pull --ff-only origin main` confirmed already up to date.
+- Start-of-session sync completed per `docs/specs/04-ai-development-playbook.md` git sync workflow?: `yes` for Agent 2A implementation.
+- Parent refs opened in this Agent 2A session:
   - `docs/specs/README.md`
   - `docs/specs/00-product.md`
   - `docs/specs/03-technical-architecture.md`
@@ -63,14 +63,16 @@ docs_touched: "docs/specs/ui/ux-rules.md, docs/specs/ui/screen-map.md, docs/spec
   - `docs/specs/ui/README.md`
   - `docs/specs/ui/ux-rules.md`
   - `docs/specs/ui/screen-map.md`
+  - `docs/specs/ui/navigation-contract.md`
+  - `docs/specs/ui/components-catalog.md`
   - `docs/specs/milestones/M1-ui-session-recorder.md`
   - `docs/tasks/complete/T-20260526-01-issue-70-exercise-block-history.md`
   - `RUNBOOK.md`
 - Code/docs inventory freshness checks run:
+  - `./scripts/task-bootstrap.sh docs/tasks/T-20260527-01-issue-70-block-comparison.md` - confirmed branch/task metadata and required gates at `3168ca0`.
   - `rg -n "exercise-block-history|loadRecentExerciseBlocks|Previous blocks|Near failure" docs apps/mobile -S` - confirmed Phase 0A implementation/docs/test surfaces.
   - Source review of `apps/mobile/app/(tabs)/session-recorder.tsx`, `apps/mobile/src/data/exercise-block-history.ts`, `apps/mobile/src/exercise-calculations/index.ts`, and `apps/mobile/app/__tests__/session-recorder-interactions.test.tsx`.
 - Known stale references or assumptions:
-  - The implementation session must rerun `./scripts/task-bootstrap.sh docs/tasks/T-20260527-01-issue-70-block-comparison.md` and refresh this section before code edits.
   - Assumption: current-session comparison metrics should use the same calculation semantics as Phase 0A history metrics: warm-up sets excluded, invalid/blank set inputs ignored, estimated 1RM via existing Wathan helper, highest weight from eligible parsed sets, and `Near failure` from valid sets marked `rir_0`, `rir_1`, or `rir_2`.
 - Optional helper command (recommended):
   - `./scripts/task-bootstrap.sh docs/tasks/T-20260527-01-issue-70-block-comparison.md`
@@ -145,8 +147,8 @@ Refine the recorder's Issue 70 block-history panel so it is less visually heavy,
 
 - Prefer a calm table-like comparison over four standalone metric cards.
 - Use `Previous` as neutral/muted and `Current` as the accent column; do not rely on color alone for meaning.
-- Keep the header compact: title, previous-block age/index, collapse affordance, and older/newer controls should not push set rows out of view unnecessarily.
-- Default recommendation: expanded when history exists, with a clearly visible collapse control. If visual review still feels heavy, switch to collapsed-by-default before closeout and update tests/docs accordingly.
+- Keep the collapsed state very compact: a slim `Past blocks` bar only, with no visible Hide/Show button.
+- Default behavior: collapsed when history state first appears; tapping the bar expands, and tapping the expanded header collapses.
 - Avoid delta badges in this task; side-by-side comparison is enough signal for Phase 1.
 
 ## Acceptance criteria
@@ -237,21 +239,34 @@ Refine the recorder's Issue 70 block-history panel so it is less visually heavy,
 ## Evidence
 
 - Targeted tests:
-  - Fill during implementation.
+  - Red check before implementation: `cd apps/mobile && npm test -- --runTestsByPath app/__tests__/session-recorder-interactions.test.tsx` failed on the new comparison/collapse/current-metric assertions against the Phase 0A UI.
+  - `cd apps/mobile && npm test -- --runTestsByPath app/__tests__/session-recorder-interactions.test.tsx` - passed, 21 tests.
+  - `cd apps/mobile && npm test -- --runTestsByPath app/__tests__/session-recorder-interactions.test.tsx app/__tests__/session-recorder-screen.test.tsx app/__tests__/exercise-block-history.test.ts` - passed, 57 tests.
+  - `cd apps/mobile && npm run lint:ui-guardrails` - passed, 0 raw-color violations.
+  - `./scripts/quality-fast.sh frontend` - passed (`lint`, `typecheck`, 50 Jest suites / 374 tests).
+  - `./scripts/task-closeout-check.sh docs/tasks/T-20260527-01-issue-70-block-comparison.md` - failed as expected for this handoff posture because the task remains `in_progress` per instruction not to close/archive; milestone task line was updated to `in_progress`.
 - UI/UX task visual artifacts note:
-  - Required. Record screenshot/artifact paths for expanded comparison, collapsed panel, and empty/error behavior, or document the exact simulator/runtime blocker.
+  - Maestro fixture command passed: `cd apps/mobile && PATH="/opt/homebrew/opt/openjdk/bin:$HOME/.maestro/bin:$PATH" JAVA_HOME="/opt/homebrew/opt/openjdk" TASK_ID=T-20260527-01-issue-70-block-comparison ./scripts/maestro-ios-run-flow.sh --flow .maestro/flows/exercise-block-history-fixture.yaml --scenario exercise-block-history-fixture`.
+  - Artifact root: `apps/mobile/artifacts/maestro/T-20260527-01-issue-70-block-comparison/20260527-171543-24725`.
+  - Default collapsed populated bar: `apps/mobile/artifacts/maestro/T-20260527-01-issue-70-block-comparison/20260527-171543-24725/maestro-output/screenshots/exercise-block-comparison-start-collapsed.png`.
+  - Expanded populated comparison: `apps/mobile/artifacts/maestro/T-20260527-01-issue-70-block-comparison/20260527-171543-24725/maestro-output/screenshots/exercise-block-comparison-expanded.png`.
+  - Re-collapsed populated bar: `apps/mobile/artifacts/maestro/T-20260527-01-issue-70-block-comparison/20260527-171543-24725/maestro-output/screenshots/exercise-block-comparison-collapsed.png`.
+  - Older previous-block navigation: `apps/mobile/artifacts/maestro/T-20260527-01-issue-70-block-comparison/20260527-171543-24725/maestro-output/screenshots/exercise-block-comparison-older.png`.
+  - Empty collapsed bar: `apps/mobile/artifacts/maestro/T-20260527-01-issue-70-block-comparison/20260527-171543-24725/maestro-output/screenshots/exercise-block-history-empty-collapsed.png`.
+  - Empty expanded state: `apps/mobile/artifacts/maestro/T-20260527-01-issue-70-block-comparison/20260527-171543-24725/maestro-output/screenshots/exercise-block-history-empty-expanded.png`.
+  - Error-state visual limitation: no existing Maestro fixture/harness path forces `loadRecentExerciseBlocks` to reject without adding new harness behavior; the error state is covered by RNTL interaction assertions for inline text, collapse, and continued set entry.
 - Manual verification summary:
-  - Fill during implementation.
+  - Reviewed the Maestro screenshots for default collapsed, expanded, re-collapsed, older, and empty states. The default collapsed state is a slim `Past blocks` bar, expanded comparison shows `Previous` and live `Current` values after unsaved set entry, and empty collapsed state no longer spends vertical space on `No previous blocks`.
 - Deferred/manual hosted checks summary:
-  - N/A expected; no hosted/backend work.
+  - N/A; no hosted/backend work.
 
 ## Completion note
 
-- What changed:
-- What tests ran:
-- What remains:
-- Data model/sync impact:
-- RUNBOOK.md reviewed:
+- What changed: Agent 2A implemented the recorder past-blocks UI as collapsed-by-default slim `Past blocks` bars, removed the visible Hide/Show button in favor of tapping the bar/header, added an expanded previous/current table with live current metrics from unsaved set rows, preserved older/newer history navigation, compacted loading/empty/error states, updated targeted RNTL coverage, updated Maestro fixture selectors/screenshots, and updated `docs/specs/ui/ux-rules.md` plus `docs/specs/ui/screen-map.md`.
+- What tests ran: see `Evidence` above.
+- What remains: task intentionally not closed or archived per handoff request. Error-state simulator screenshot remains unproduced because the current Maestro fixture does not provide a history-load failure injection path; RNTL covers the error behavior.
+- Data model/sync impact: no data-model, schema, sync, outbox, or backend changes.
+- RUNBOOK.md reviewed: no changes required. `docs/specs/ui/components-catalog.md` unchanged because no reusable component/API was extracted or changed. `docs/specs/ui/navigation-contract.md` unchanged because route/param/transition behavior did not change.
 
 ## Status update checklist
 
