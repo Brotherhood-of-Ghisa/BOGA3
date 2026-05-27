@@ -377,6 +377,7 @@ Priority rule:
 2. The canonical hidden route is `mobile://maestro-harness`.
 3. Supported harness query parameters are:
    - `reset=data` to perform app-owned persisted-data reset;
+   - `fixture=exercise-block-history` to seed deterministic local SQLite history for Issue 70 recorder block-history visual QA;
    - `teleport=session-list|session-recorder|exercise-catalog|completed-session` to land on the target screen;
    - optional `mode`, `intent`, and `sessionId` when the target route needs them.
 4. The route is guarded by `isDevMode() && Constants.executionEnvironment !== storeClient` (see `apps/mobile/src/utils/isDevMode.ts` — `isDevMode()` is `true` for Metro dev bundles **and** for the `com.phano.boga3.dev` build, i.e. TestFlight dev); blocked contexts render an error state instead of executing reset/setup behavior. Never reach for `__DEV__` directly — it is `false` on TestFlight, and the lint rule will reject it.

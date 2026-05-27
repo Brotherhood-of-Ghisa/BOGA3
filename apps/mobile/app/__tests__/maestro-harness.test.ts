@@ -4,6 +4,16 @@ jest.mock('@/src/data', () => ({
   resetLocalAppData: jest.fn(),
 }));
 
+jest.mock('@/src/maestro/exercise-block-history-fixture', () => ({
+  buildExerciseBlockHistoryFixtureRows: jest.requireActual(
+    '@/src/maestro/exercise-block-history-fixture'
+  ).buildExerciseBlockHistoryFixtureRows,
+  EXERCISE_BLOCK_HISTORY_FIXTURE: jest.requireActual(
+    '@/src/maestro/exercise-block-history-fixture'
+  ).EXERCISE_BLOCK_HISTORY_FIXTURE,
+  seedExerciseBlockHistoryFixture: jest.fn(),
+}));
+
 const mockIsDevMode = jest.fn<boolean, []>();
 jest.mock('@/src/utils/isDevMode', () => ({
   isDevMode: () => mockIsDevMode(),
@@ -13,20 +23,35 @@ import { ExecutionEnvironment } from 'expo-constants';
 
 import { resetLocalAppData } from '@/src/data';
 import {
+  buildExerciseBlockHistoryFixtureRows,
+  EXERCISE_BLOCK_HISTORY_FIXTURE,
+  seedExerciseBlockHistoryFixture,
+} from '@/src/maestro/exercise-block-history-fixture';
+import {
   coerceMaestroHarnessQueryParam,
   isMaestroHarnessAllowed,
+  resolveMaestroHarnessFixtureName,
   resolveMaestroHarnessResetMode,
   resolveMaestroHarnessTeleportHref,
   resolveMaestroHarnessTeleportTarget,
+  runMaestroHarnessFixture,
   runMaestroHarnessReset,
 } from '@/src/maestro/harness';
 
 const mockResetLocalAppData = jest.mocked(resetLocalAppData);
+const mockSeedExerciseBlockHistoryFixture = jest.mocked(seedExerciseBlockHistoryFixture);
 
 describe('maestro harness helpers', () => {
   beforeEach(() => {
     mockResetLocalAppData.mockReset();
     mockResetLocalAppData.mockResolvedValue(undefined as never);
+    mockSeedExerciseBlockHistoryFixture.mockReset();
+    mockSeedExerciseBlockHistoryFixture.mockResolvedValue({
+      ...EXERCISE_BLOCK_HISTORY_FIXTURE,
+      sessionIds: [],
+      sessionExerciseIds: [],
+      setIds: [],
+    } as never);
     mockIsDevMode.mockReset();
     mockIsDevMode.mockReturnValue(false);
   });
@@ -71,6 +96,10 @@ describe('maestro harness helpers', () => {
     expect(coerceMaestroHarnessQueryParam(undefined)).toBeNull();
     expect(resolveMaestroHarnessResetMode('data')).toBe('data');
     expect(resolveMaestroHarnessResetMode('unexpected')).toBe('none');
+    expect(resolveMaestroHarnessFixtureName('exercise-block-history')).toBe(
+      'exercise-block-history'
+    );
+    expect(resolveMaestroHarnessFixtureName('unexpected')).toBe('none');
   });
 
   it('maps supported teleport targets to route hrefs', () => {
@@ -112,5 +141,39 @@ describe('maestro harness helpers', () => {
 
     await runMaestroHarnessReset('data');
     expect(mockResetLocalAppData).toHaveBeenCalledTimes(1);
+  });
+
+  it('runs the exercise block history fixture only when requested', async () => {
+    await runMaestroHarnessFixture('none');
+    expect(mockSeedExerciseBlockHistoryFixture).not.toHaveBeenCalled();
+
+    await runMaestroHarnessFixture('exercise-block-history');
+    expect(mockSeedExerciseBlockHistoryFixture).toHaveBeenCalledTimes(1);
+  });
+
+  it('builds deterministic exercise block history fixture rows for populated and empty visual QA states', () => {
+    const rows = buildExerciseBlockHistoryFixtureRows(
+      new Date('2026-05-26T12:00:00.000Z')
+    );
+    const primarySessionExerciseRows = rows.sessionExercises.filter(
+      (row) => row.exerciseDefinitionId === EXERCISE_BLOCK_HISTORY_FIXTURE.primaryExerciseId
+    );
+    const secondarySessionExerciseRows = rows.sessionExercises.filter(
+      (row) => row.exerciseDefinitionId === EXERCISE_BLOCK_HISTORY_FIXTURE.secondaryExerciseId
+    );
+    const noHistorySessionExerciseRows = rows.sessionExercises.filter(
+      (row) => row.exerciseDefinitionId === EXERCISE_BLOCK_HISTORY_FIXTURE.noHistoryExerciseId
+    );
+
+    expect(new Set(primarySessionExerciseRows.map((row) => row.sessionId)).size).toBeGreaterThanOrEqual(5);
+    expect(secondarySessionExerciseRows.length).toBeGreaterThanOrEqual(1);
+    expect(noHistorySessionExerciseRows).toEqual([]);
+
+    const latestPrimaryRows = primarySessionExerciseRows.filter(
+      (row) => row.sessionId === 'maestro_exercise_block_history_squat_1'
+    );
+    expect(latestPrimaryRows).toHaveLength(2);
+    expect(rows.exerciseSets.some((row) => row.setType === 'warm_up')).toBe(true);
+    expect(rows.exerciseSets.some((row) => row.setType === 'rir_0')).toBe(true);
   });
 });

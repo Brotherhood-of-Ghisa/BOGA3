@@ -338,6 +338,7 @@ cd apps/mobile
 TASK_ID=ad-hoc npm run test:e2e:ios:smoke
 TASK_ID=ad-hoc npm run test:e2e:ios:data-smoke
 TASK_ID=ad-hoc npm run test:e2e:ios:auth-profile
+TASK_ID=ad-hoc ./scripts/maestro-ios-run-flow.sh --flow .maestro/flows/exercise-block-history-fixture.yaml --scenario exercise-block-history-fixture
 ```
 
 ### Backend (Supabase)

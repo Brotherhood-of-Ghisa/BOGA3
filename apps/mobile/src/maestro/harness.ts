@@ -4,7 +4,10 @@ import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { resetLocalAppData } from '@/src/data';
 import { isDevMode } from '@/src/utils/isDevMode';
 
+import { seedExerciseBlockHistoryFixture } from './exercise-block-history-fixture';
+
 export type MaestroHarnessResetMode = 'none' | 'data';
+export type MaestroHarnessFixtureName = 'none' | 'exercise-block-history';
 export type MaestroHarnessTeleportTarget =
   | 'session-list'
   | 'session-recorder'
@@ -30,6 +33,10 @@ export const isMaestroHarnessAllowed = ({
 export const resolveMaestroHarnessResetMode = (
   value: string | null | undefined
 ): MaestroHarnessResetMode => (value === 'data' ? 'data' : 'none');
+
+export const resolveMaestroHarnessFixtureName = (
+  value: string | null | undefined
+): MaestroHarnessFixtureName => (value === 'exercise-block-history' ? value : 'none');
 
 export const resolveMaestroHarnessTeleportTarget = (
   value: string | null | undefined
@@ -97,5 +104,11 @@ export const resolveMaestroHarnessTeleportHref = ({
 export const runMaestroHarnessReset = async (resetMode: MaestroHarnessResetMode) => {
   if (resetMode === 'data') {
     await resetLocalAppData();
+  }
+};
+
+export const runMaestroHarnessFixture = async (fixtureName: MaestroHarnessFixtureName) => {
+  if (fixtureName === 'exercise-block-history') {
+    await seedExerciseBlockHistoryFixture();
   }
 };
