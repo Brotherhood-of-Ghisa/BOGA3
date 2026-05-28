@@ -30,7 +30,7 @@ Brief entrypoint map of the current mobile screens.
 - Key states (high level):
   - Stats summary loading/error/content states with period chips
   - actionable muscle rows in Stats summary; expanded muscle rows and collapsed single-muscle family headers open an in-route muscle-history overlay
-  - muscle-history overlay states for loading, error, no-history, populated heatmap, selected positive-effort date, and selected zero-effort date
+  - muscle-history overlay states for loading, error, no-history, populated heatmap, selected positive-effort date with contributing exercise/set detail, and selected zero-effort date empty detail
 - Notes:
   - tab root inside the `(tabs)` group with `headerShown: false`; the tab bar is `BottomTray` (composing `TopLevelTabs`) supplied via the `tabBar` prop in `(tabs)/_layout.tsx`.
 

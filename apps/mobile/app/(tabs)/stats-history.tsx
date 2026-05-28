@@ -4,6 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import {
   CalendarHeatmap,
+  getCalendarHeatmapBucket,
   type CalendarHeatmapCell,
 } from '@/components/muscle-analytics';
 import { SegmentedChips, uiColors } from '@/components/ui';
@@ -395,6 +396,13 @@ function MuscleHistoryOverlay({
     selectedDateKey === null
       ? null
       : dailyEffort.find((entry) => entry.dateKey === selectedDateKey) ?? null;
+  const maxPositiveEffort = dailyEffort.reduce(
+    (max, entry) => Math.max(max, entry.totalWeight > 0 ? entry.totalWeight : 0),
+    0
+  );
+  const selectedBucket = selectedEffort
+    ? getCalendarHeatmapBucket(selectedEffort.totalWeight, maxPositiveEffort)
+    : 0;
 
   return (
     <View style={styles.overlayRoot} testID="stats-muscle-history-overlay">
@@ -466,6 +474,7 @@ function MuscleHistoryOverlay({
                 muscle={muscle}
                 selectedDateKey={selectedDateKey}
                 selectedEffort={selectedEffort}
+                bucket={selectedBucket}
               />
             </>
           ) : null}
@@ -479,10 +488,12 @@ function SelectedDateSummary({
   muscle,
   selectedDateKey,
   selectedEffort,
+  bucket,
 }: {
   muscle: MuscleHistoryTarget;
   selectedDateKey: string | null;
   selectedEffort: SelectedMuscleDailyEffort | null;
+  bucket: number;
 }) {
   if (selectedDateKey === null) {
     return (
@@ -495,24 +506,121 @@ function SelectedDateSummary({
   if (!selectedEffort || selectedEffort.totalWeight <= 0) {
     return (
       <View style={styles.selectedDatePanel} testID="stats-muscle-history-selected-date">
-        <Text style={styles.stateTitle}>{formatDateKey(selectedDateKey)}</Text>
+        <View style={styles.selectedDateHeader}>
+          <Text style={styles.stateTitle}>{formatDateKey(selectedDateKey)}</Text>
+          <Text style={styles.selectedDateMuscle}>{muscle.displayName}</Text>
+        </View>
+        <Text style={styles.selectedDateMeta}>Effort 0 - Bucket 0</Text>
         <Text style={styles.stateBody}>No {muscle.displayName} training on this date.</Text>
       </View>
     );
   }
 
+  const contributionGroups = groupSelectedDateContributions(selectedEffort.contributions);
+
   return (
     <View style={styles.selectedDatePanel} testID="stats-muscle-history-selected-date">
-      <Text style={styles.stateTitle}>{formatDateKey(selectedDateKey)}</Text>
+      <View style={styles.selectedDateHeader}>
+        <Text style={styles.stateTitle}>{formatDateKey(selectedDateKey)}</Text>
+        <Text style={styles.selectedDateMuscle}>{muscle.displayName}</Text>
+      </View>
+      <Text style={styles.selectedDateMeta}>
+        Effort {formatTotalWeight(selectedEffort.totalWeight)} - Bucket {bucket} of 4
+      </Text>
       <Text style={styles.stateBody}>
         {formatNumber(selectedEffort.sessionCount)} session
-        {selectedEffort.sessionCount === 1 ? '' : 's'},{' '}
-        {formatNumber(selectedEffort.setCount)} set{selectedEffort.setCount === 1 ? '' : 's'},{' '}
-        {formatTotalWeight(selectedEffort.totalWeight)} effort
+        {selectedEffort.sessionCount === 1 ? '' : 's'} - {formatNumber(selectedEffort.setCount)}{' '}
+        set{selectedEffort.setCount === 1 ? '' : 's'}
       </Text>
+
+      {contributionGroups.length === 0 ? (
+        <Text style={styles.stateBody}>No set-level details are available for this date.</Text>
+      ) : (
+        <View style={styles.contributionList}>
+          <Text style={styles.contributionSectionTitle}>Contributing exercises</Text>
+          {contributionGroups.map((group) => (
+            <View
+              key={group.sessionExerciseId}
+              style={styles.contributionExercise}
+              testID={`stats-muscle-history-exercise-${group.sessionExerciseId}`}>
+              <View style={styles.contributionExerciseHeader}>
+                <Text style={styles.contributionExerciseName} numberOfLines={1}>
+                  {group.exerciseName}
+                </Text>
+                <Text style={styles.contributionExerciseMeta}>
+                  {formatSessionTime(group.sessionCompletedAt)}
+                </Text>
+              </View>
+              <Text style={styles.contributionExerciseMeta}>
+                {formatContributionRole(group.role)} - {group.contributions.length} set
+                {group.contributions.length === 1 ? '' : 's'}
+              </Text>
+              <View style={styles.contributionSetList}>
+                {group.contributions.map((contribution, index) => (
+                  <View
+                    key={contribution.setId ?? `${group.sessionExerciseId}-${index}`}
+                    style={styles.contributionSetRow}
+                    testID={`stats-muscle-history-set-${
+                      contribution.setId ?? `${group.sessionExerciseId}-${index}`
+                    }`}>
+                    <Text style={styles.contributionSetLabel}>
+                      {formatContributionSetLabel(contribution, index)}
+                    </Text>
+                    <Text style={styles.contributionSetValue} numberOfLines={1}>
+                      {formatContributionSetLoad(contribution)} - effort{' '}
+                      {formatTotalWeight(contribution.weightedVolume)}
+                    </Text>
+                    {contribution.roleWeight === 1 ? null : (
+                      <Text style={styles.contributionSetDetail} numberOfLines={1}>
+                        base {formatTotalWeight(contribution.setVolume)} x{' '}
+                        {formatRoleWeight(contribution.roleWeight)}
+                      </Text>
+                    )}
+                  </View>
+                ))}
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
     </View>
   );
 }
+
+type SelectedDateContribution =
+  SelectedMuscleDailyEffort['contributions'][number];
+
+type SelectedDateContributionGroup = {
+  sessionExerciseId: string;
+  exerciseName: string;
+  sessionCompletedAt: Date;
+  role: SelectedDateContribution['role'];
+  contributions: SelectedDateContribution[];
+};
+
+const groupSelectedDateContributions = (
+  contributions: SelectedDateContribution[]
+): SelectedDateContributionGroup[] => {
+  const groupsByExerciseId = new Map<string, SelectedDateContributionGroup>();
+
+  for (const contribution of contributions) {
+    const existing = groupsByExerciseId.get(contribution.sessionExerciseId);
+    if (existing) {
+      existing.contributions.push(contribution);
+      continue;
+    }
+
+    groupsByExerciseId.set(contribution.sessionExerciseId, {
+      sessionExerciseId: contribution.sessionExerciseId,
+      exerciseName: contribution.exerciseName ?? 'Logged exercise',
+      sessionCompletedAt: contribution.sessionCompletedAt,
+      role: contribution.role,
+      contributions: [contribution],
+    });
+  }
+
+  return Array.from(groupsByExerciseId.values());
+};
 
 const formatDateKey = (dateKey: string) => {
   const [year, month, day] = dateKey.split('-').map(Number);
@@ -523,6 +631,35 @@ const formatDateKey = (dateKey: string) => {
     year: 'numeric',
   }).format(new Date(Date.UTC(year, month - 1, day)));
 };
+
+const formatSessionTime = (date: Date) =>
+  new Intl.DateTimeFormat('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(date);
+
+const formatContributionRole = (role: SelectedDateContribution['role']) => {
+  if (role === 'primary') return 'Primary';
+  if (role === 'secondary') return 'Secondary';
+  return 'Contribution';
+};
+
+const formatContributionSetLabel = (
+  contribution: SelectedDateContribution,
+  fallbackIndex: number
+) => {
+  if (contribution.setOrderIndex === null) return `Set ${fallbackIndex + 1}`;
+  return `Set ${contribution.setOrderIndex + 1}`;
+};
+
+const formatContributionSetLoad = (contribution: SelectedDateContribution) => {
+  const weight = contribution.weightValue.trim() || '-';
+  const reps = contribution.repsValue.trim() || '-';
+  return `${weight} x ${reps}`;
+};
+
+const formatRoleWeight = (value: number) =>
+  Number.isInteger(value) ? String(value) : value.toFixed(1).replace(/\.0$/, '');
 
 function Metric({
   label,
@@ -931,6 +1068,86 @@ const styles = StyleSheet.create({
     backgroundColor: uiColors.surfaceMuted,
     padding: 12,
     gap: 6,
+  },
+  selectedDateHeader: {
+    gap: 2,
+  },
+  selectedDateMuscle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: uiColors.textSecondary,
+  },
+  selectedDateMeta: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: uiColors.textPrimary,
+  },
+  contributionList: {
+    marginTop: 4,
+    gap: 8,
+  },
+  contributionSectionTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: uiColors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  contributionExercise: {
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: uiColors.borderMuted,
+    backgroundColor: uiColors.surfaceDefault,
+    padding: 10,
+    gap: 4,
+  },
+  contributionExerciseHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  contributionExerciseName: {
+    flexShrink: 1,
+    fontSize: 13,
+    fontWeight: '700',
+    color: uiColors.textPrimary,
+  },
+  contributionExerciseMeta: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: uiColors.textSecondary,
+  },
+  contributionSetList: {
+    gap: 4,
+    marginTop: 2,
+  },
+  contributionSetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: uiColors.borderMuted,
+    paddingTop: 4,
+    gap: 8,
+  },
+  contributionSetLabel: {
+    width: 42,
+    fontSize: 11,
+    fontWeight: '700',
+    color: uiColors.textSecondary,
+  },
+  contributionSetValue: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 12,
+    fontWeight: '600',
+    color: uiColors.textPrimary,
+  },
+  contributionSetDetail: {
+    maxWidth: 84,
+    fontSize: 10,
+    fontWeight: '600',
+    color: uiColors.textSecondary,
   },
   deltaPositive: {
     color: uiColors.textSuccess,

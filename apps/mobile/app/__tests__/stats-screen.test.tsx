@@ -9,7 +9,7 @@ import {
   type StatsScreenShellProps,
   formatDelta,
 } from '../(tabs)/stats-history';
-import type { StatsSummary } from '@/src/data';
+import type { SelectedMuscleDailyEffort, StatsSummary } from '@/src/data';
 
 jest.mock('@/src/data', () => ({
   computeSelectedMuscleDailyEffort: jest.fn(),
@@ -215,6 +215,84 @@ const buildShellProps = (
 const renderStatsScreenShell = (overrides: Partial<StatsScreenShellProps> = {}) =>
   render(<StatsScreenShell {...buildShellProps(overrides)} />);
 
+const buildSelectedDayEffort = (): SelectedMuscleDailyEffort => ({
+  dateKey: '2026-05-18',
+  muscleGroupId: 'front_delts',
+  sessionCount: 2,
+  setCount: 4,
+  totalWeight: 1100,
+  contributions: [
+    {
+      muscleGroupId: 'front_delts',
+      role: 'primary',
+      roleWeight: 1,
+      weightedVolume: 600,
+      setVolume: 600,
+      sessionId: 'session-a',
+      sessionCompletedAt: new Date('2026-05-18T10:00:00.000Z'),
+      sessionExerciseId: 'se-press',
+      exerciseDefinitionId: 'ex-press',
+      exerciseName: 'Overhead Press',
+      setId: 'set-press-1',
+      setOrderIndex: 0,
+      setType: null,
+      weightValue: '120',
+      repsValue: '5',
+    },
+    {
+      muscleGroupId: 'front_delts',
+      role: 'primary',
+      roleWeight: 1,
+      weightedVolume: 0,
+      setVolume: 0,
+      sessionId: 'session-a',
+      sessionCompletedAt: new Date('2026-05-18T10:00:00.000Z'),
+      sessionExerciseId: 'se-press',
+      exerciseDefinitionId: 'ex-press',
+      exerciseName: 'Overhead Press',
+      setId: 'set-press-invalid',
+      setOrderIndex: 1,
+      setType: null,
+      weightValue: '120kg',
+      repsValue: '5',
+    },
+    {
+      muscleGroupId: 'front_delts',
+      role: 'secondary',
+      roleWeight: 0.5,
+      weightedVolume: 300,
+      setVolume: 600,
+      sessionId: 'session-b',
+      sessionCompletedAt: new Date('2026-05-18T18:30:00.000Z'),
+      sessionExerciseId: 'se-bench',
+      exerciseDefinitionId: 'ex-bench',
+      exerciseName: 'Bench Press',
+      setId: 'set-bench-1',
+      setOrderIndex: 0,
+      setType: 'rir_1',
+      weightValue: '100',
+      repsValue: '6',
+    },
+    {
+      muscleGroupId: 'front_delts',
+      role: 'secondary',
+      roleWeight: 0.5,
+      weightedVolume: 200,
+      setVolume: 400,
+      sessionId: 'session-b',
+      sessionCompletedAt: new Date('2026-05-18T18:30:00.000Z'),
+      sessionExerciseId: 'se-bench',
+      exerciseDefinitionId: 'ex-bench',
+      exerciseName: 'Bench Press',
+      setId: 'set-bench-2',
+      setOrderIndex: 1,
+      setType: null,
+      weightValue: '80',
+      repsValue: '5',
+    },
+  ],
+});
+
 const captureUiEvidence = (name: string, tree: unknown) => {
   const evidenceDir = process.env.UI_EVIDENCE_DIR;
   if (!evidenceDir) return;
@@ -393,16 +471,7 @@ describe('StatsScreenShell', () => {
     expect(screen.getByTestId('stats-muscle-history-empty')).toHaveTextContent(/No history yet/);
     captureUiEvidence('stats-muscle-history-empty', toJSON());
 
-    const effort = [
-      {
-        dateKey: '2026-05-18',
-        muscleGroupId: 'front_delts',
-        sessionCount: 1,
-        setCount: 3,
-        totalWeight: 600,
-        contributions: [],
-      },
-    ];
+    const effort = [buildSelectedDayEffort()];
     rerender(
       <StatsScreenShell
         {...buildShellProps({
@@ -418,7 +487,32 @@ describe('StatsScreenShell', () => {
         })}
       />
     );
-    expect(screen.getByTestId('stats-muscle-history-selected-date')).toHaveTextContent(/3 sets/);
+    const detailPanel = screen.getByTestId('stats-muscle-history-selected-date');
+    expect(detailPanel).toHaveTextContent(/May 18, 2026/);
+    expect(detailPanel).toHaveTextContent(/Front Delts/);
+    expect(detailPanel).toHaveTextContent(/Effort 1.1k/);
+    expect(detailPanel).toHaveTextContent(/Bucket 4 of 4/);
+    expect(detailPanel).toHaveTextContent(/2 sessions/);
+    expect(detailPanel).toHaveTextContent(/4 sets/);
+    expect(screen.getByTestId('stats-muscle-history-exercise-se-press')).toHaveTextContent(
+      /Overhead Press/
+    );
+    expect(screen.getByTestId('stats-muscle-history-exercise-se-bench')).toHaveTextContent(
+      /Bench Press/
+    );
+    expect(screen.getByTestId('stats-muscle-history-set-set-press-1')).toHaveTextContent(
+      /120 x 5/
+    );
+    expect(screen.getByTestId('stats-muscle-history-set-set-press-1')).toHaveTextContent(
+      /effort 600/
+    );
+    expect(screen.getByTestId('stats-muscle-history-set-set-press-invalid')).toHaveTextContent(
+      /120kg x 5/
+    );
+    expect(screen.getByTestId('stats-muscle-history-set-set-press-invalid')).toHaveTextContent(
+      /effort 0/
+    );
+    expect(screen.queryByText(/Certified/i)).toBeNull();
     captureUiEvidence('stats-muscle-history-populated-selected', toJSON());
 
     fireEvent.press(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-05-19'));
@@ -444,6 +538,8 @@ describe('StatsScreenShell', () => {
     expect(screen.getByTestId('stats-muscle-history-selected-date')).toHaveTextContent(
       /No Front Delts training/
     );
+    expect(screen.getByTestId('stats-muscle-history-selected-date')).toHaveTextContent(/Effort 0/);
+    expect(screen.getByTestId('stats-muscle-history-selected-date')).toHaveTextContent(/Bucket 0/);
     captureUiEvidence('stats-muscle-history-zero-effort-selected', toJSON());
 
     fireEvent.press(screen.getByTestId('stats-muscle-history-backdrop'));
@@ -511,14 +607,7 @@ describe('StatsRoute', () => {
   it('loads selected-muscle heatmap data when a muscle row is tapped', async () => {
     mockComputeStatsSummary.mockResolvedValue(buildSummary());
     mockComputeSelectedMuscleDailyEffort.mockResolvedValue([
-      {
-        dateKey: '2026-05-18',
-        muscleGroupId: 'front_delts',
-        sessionCount: 1,
-        setCount: 3,
-        totalWeight: 600,
-        contributions: [],
-      },
+      buildSelectedDayEffort(),
     ]);
 
     render(<StatsRoute />);
@@ -549,7 +638,9 @@ describe('StatsRoute', () => {
 
     fireEvent.press(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-05-18'));
     await waitFor(() => {
-      expect(screen.getByTestId('stats-muscle-history-selected-date')).toHaveTextContent(/3 sets/);
+      expect(screen.getByTestId('stats-muscle-history-selected-date')).toHaveTextContent(
+        /Overhead Press/
+      );
     });
   });
 
