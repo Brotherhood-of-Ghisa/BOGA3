@@ -22,6 +22,8 @@ docs_touched: "docs/specs/milestones/M16-muscle-group-calendar-heatmap.md,docs/s
   - move the file to `docs/tasks/complete/<task-id>.md` when `Status` becomes `completed` or `outdated`
 - Session date: `2026-05-28`
 - Session interaction mode: `interactive (default)`
+- Required branch: `codex/m16-t06-qa-visual-evidence-and-doc-closeout`
+- Branch/worktree rule: create or switch to the required branch before edits, preferably via `./scripts/worktree-create.sh <branch-name>` from the main checkout. Do not complete this task directly on `main`.
 
 ## Parent references (required)
 
