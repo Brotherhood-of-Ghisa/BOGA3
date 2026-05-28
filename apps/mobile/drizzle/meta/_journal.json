@@ -5,78 +5,8 @@
     {
       "idx": 0,
       "version": "6",
-      "when": 1771519674243,
-      "tag": "0000_quiet_famine",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "6",
-      "when": 1771597303513,
-      "tag": "0001_wet_moondragon",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "6",
-      "when": 1771865922639,
-      "tag": "0002_pink_justice",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "6",
-      "when": 1771955085482,
-      "tag": "0003_tiny_captain_universe",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "6",
-      "when": 1772125192000,
-      "tag": "0004_active_completed_lifecycle",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "6",
-      "when": 1772190386093,
-      "tag": "0005_slimy_iron_lad",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "6",
-      "when": 1772635381085,
-      "tag": "0006_noisy_vector",
-      "breakpoints": true
-    },
-    {
-      "idx": 10,
-      "version": "6",
-      "when": 1778799600000,
-      "tag": "0010_sync_runtime_attempt",
-      "breakpoints": true
-    },
-    {
-      "idx": 11,
-      "version": "6",
-      "when": 1778790600000,
-      "tag": "0011_drop_origin_columns",
-      "breakpoints": true
-    },
-    {
-      "idx": 12,
-      "version": "6",
-      "when": 1779541826568,
-      "tag": "0012_hot_polaris",
-      "breakpoints": true
-    },
-    {
-      "idx": 14,
-      "version": "6",
-      "when": 1780099200000,
-      "tag": "0014_drop_v1_sync_tables",
+      "when": 1779999418440,
+      "tag": "0000_silky_sinister_six",
       "breakpoints": true
     }
   ]
