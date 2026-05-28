@@ -19,7 +19,11 @@ describe('domain schema and runtime migrations', () => {
 
   it('includes session lifecycle, taxonomy tables, and deterministic ordering constraints in runtime SQL', () => {
     const migrationSql = Object.values(localRuntimeMigrations.migrations).join('\n');
-    const lifecycleStatusMigration = localRuntimeMigrations.migrations.m0004;
+    // After the sync-v2-client t1 baseline squash, every entity table is created
+    // by `m0000` rather than spread across fifteen incremental migrations. The
+    // lifecycle constraints that used to live in m0004 are baked straight into
+    // the `sessions` CREATE TABLE.
+    const baselineMigration = localRuntimeMigrations.migrations.m0000;
 
     expect(migrationSql).toContain('CREATE TABLE `muscle_groups`');
     expect(migrationSql).toContain('CREATE TABLE `exercise_definitions`');
@@ -36,14 +40,17 @@ describe('domain schema and runtime migrations', () => {
     expect(migrationSql).toContain('`completed_at` integer');
     expect(migrationSql).toContain('`duration_sec` integer');
     expect(migrationSql).toContain('`deleted_at` integer');
-    expect(lifecycleStatusMigration).toContain('`status` text DEFAULT \'active\' NOT NULL');
-    expect(lifecycleStatusMigration).toContain(
-      'CONSTRAINT "sessions_status_guard" CHECK("status" in (\'active\', \'completed\'))'
+    expect(baselineMigration).toContain("`status` text DEFAULT 'active' NOT NULL");
+    expect(baselineMigration).toContain(
+      'CONSTRAINT "sessions_status_guard" CHECK("sessions"."status" in (\'active\', \'completed\'))'
     );
-    expect(lifecycleStatusMigration).toContain('INSERT INTO `__new_sessions`');
-    expect(lifecycleStatusMigration).toContain("ELSE 'active'");
-    expect(lifecycleStatusMigration).toContain('PRAGMA foreign_keys=OFF;');
-    expect(lifecycleStatusMigration).toContain('PRAGMA foreign_keys=ON;');
+    expect(baselineMigration).toContain(
+      'CONSTRAINT "sessions_duration_non_negative" CHECK("sessions"."duration_sec" is null or "sessions"."duration_sec" >= 0)'
+    );
+    // The `exercise_sets.set_type` column lives directly in the baseline
+    // CREATE TABLE; the standalone `ALTER TABLE ... ADD set_type` migration
+    // from the pre-squash history is no longer emitted.
+    expect(baselineMigration).toContain('`set_type` text');
 
     expect(migrationSql).toContain('`is_editable` integer DEFAULT 0 NOT NULL');
     expect(migrationSql).toContain('`weight` real NOT NULL');
@@ -65,7 +72,6 @@ describe('domain schema and runtime migrations', () => {
     );
     expect(migrationSql).toContain('CREATE INDEX `sessions_deleted_at_idx` ON `sessions` (`deleted_at`)');
     expect(migrationSql).toContain('CREATE INDEX `session_exercises_exercise_definition_id_idx` ON `session_exercises` (`exercise_definition_id`)');
-    expect(migrationSql).toContain('ALTER TABLE `exercise_sets` ADD `set_type` text;');
     expect(migrationSql).toContain(
       'CONSTRAINT "exercise_muscle_mappings_weight_positive" CHECK("exercise_muscle_mappings"."weight" > 0)'
     );
@@ -92,5 +98,26 @@ describe('domain schema and runtime migrations', () => {
     expect(migrationSql).not.toContain('`is_user_editable` integer');
 
     expect(migrationSql).not.toContain('`name` text NOT NULL UNIQUE');
+
+    // Squash invariants: the v1 sync tables never get created in the
+    // baseline, so the m0014 `DROP TABLE` follow-up is gone too. The
+    // baseline also does not need the m0004-era `__new_sessions` shadow
+    // table or the `__new_gyms` rebuild from the original m0013 — those
+    // were collapsed straight into the final CREATE TABLE.
+    expect(migrationSql).not.toContain('CREATE TABLE `sync_outbox_events`');
+    expect(migrationSql).not.toContain('CREATE TABLE `sync_delivery_state`');
+    expect(migrationSql).not.toContain('DROP TABLE IF EXISTS `sync_outbox_events`');
+    expect(migrationSql).not.toContain('DROP TABLE IF EXISTS `sync_delivery_state`');
+    expect(migrationSql).not.toContain('CREATE TABLE `__new_sessions`');
+    expect(migrationSql).not.toContain('CREATE TABLE `__new_gyms`');
+  });
+
+  it('squashed migration history is a single v2 baseline entry', () => {
+    expect(localRuntimeMigrations.journal.entries).toHaveLength(1);
+    expect(localRuntimeMigrations.journal.entries[0]).toMatchObject({
+      idx: 0,
+      tag: expect.stringMatching(/^0000_/),
+    });
+    expect(Object.keys(localRuntimeMigrations.migrations)).toEqual(['m0000']);
   });
 });

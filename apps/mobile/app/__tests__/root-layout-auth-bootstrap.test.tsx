@@ -4,11 +4,7 @@ import type { ReactNode } from 'react';
 
 const mockBootstrapLocalDataLayer = jest.fn();
 const mockBootstrapAuthState = jest.fn();
-const mockSetDefaultSyncCadenceContextFromPathname = jest.fn();
-const mockStartSyncRuntime = jest.fn();
-const mockStartDefaultSyncScheduler = jest.fn();
-const mockStopSyncRuntime = jest.fn();
-const mockStopDefaultSyncScheduler = jest.fn();
+const mockEnsureExerciseCatalogLoaded = jest.fn();
 
 jest.mock('@/src/data', () => ({
   bootstrapLocalDataLayer: (...args: unknown[]) => mockBootstrapLocalDataLayer(...args),
@@ -24,13 +20,8 @@ jest.mock('@/src/auth', () => {
   };
 });
 
-jest.mock('@/src/sync', () => ({
-  setDefaultSyncCadenceContextFromPathname: (...args: unknown[]) =>
-    mockSetDefaultSyncCadenceContextFromPathname(...args),
-  startSyncRuntime: (...args: unknown[]) => mockStartSyncRuntime(...args),
-  startDefaultSyncScheduler: (...args: unknown[]) => mockStartDefaultSyncScheduler(...args),
-  stopSyncRuntime: (...args: unknown[]) => mockStopSyncRuntime(...args),
-  stopDefaultSyncScheduler: (...args: unknown[]) => mockStopDefaultSyncScheduler(...args),
+jest.mock('@/src/exercise-catalog/cache', () => ({
+  ensureExerciseCatalogLoaded: (...args: unknown[]) => mockEnsureExerciseCatalogLoaded(...args),
 }));
 
 jest.mock('expo-status-bar', () => ({
@@ -48,7 +39,6 @@ jest.mock('expo-router', () => {
 
   return {
     Stack,
-    usePathname: () => '/stats-history',
   };
 });
 
@@ -60,13 +50,10 @@ describe('RootLayout auth bootstrap wiring', () => {
   beforeEach(() => {
     mockBootstrapLocalDataLayer.mockReset();
     mockBootstrapAuthState.mockReset();
-    mockSetDefaultSyncCadenceContextFromPathname.mockReset();
-    mockStartSyncRuntime.mockReset();
-    mockStartDefaultSyncScheduler.mockReset();
-    mockStopSyncRuntime.mockReset();
-    mockStopDefaultSyncScheduler.mockReset();
+    mockEnsureExerciseCatalogLoaded.mockReset();
     mockBootstrapLocalDataLayer.mockResolvedValue(undefined);
     mockBootstrapAuthState.mockResolvedValue(undefined);
+    mockEnsureExerciseCatalogLoaded.mockResolvedValue(undefined);
   });
 
   it('starts local data bootstrap and auth bootstrap on mount', async () => {
@@ -76,9 +63,7 @@ describe('RootLayout auth bootstrap wiring', () => {
       expect(mockBootstrapLocalDataLayer).toHaveBeenCalledTimes(1);
     });
     expect(mockBootstrapAuthState).toHaveBeenCalledTimes(1);
-    expect(mockStartSyncRuntime).toHaveBeenCalledTimes(1);
-    expect(mockStartDefaultSyncScheduler).toHaveBeenCalledTimes(1);
-    expect(mockSetDefaultSyncCadenceContextFromPathname).toHaveBeenCalledWith('/stats-history');
+    expect(mockEnsureExerciseCatalogLoaded).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId('root-stack')).toBeTruthy();
     // Tab roots (incl. settings) live in the `(tabs)` group registered as a single screen
     expect(screen.getByTestId('screen-(tabs)')).toBeTruthy();

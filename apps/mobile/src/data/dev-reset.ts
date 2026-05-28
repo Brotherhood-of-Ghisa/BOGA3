@@ -15,8 +15,6 @@ import {
   sessionExerciseTags,
   sessionExercises,
   sessions,
-  syncDeliveryState,
-  syncOutboxEvents,
 } from './schema';
 
 export type ResetLocalDataAndReseedOptions = {
@@ -45,10 +43,10 @@ export type ResetLocalDataAndReseedResult = {
  * editing seed data) must invoke this helper explicitly.
  *
  * The helper deliberately leaves the singleton `sync_runtime_state` row in
- * place — only its `seedsAppliedAt` field is reset — so any sync feature
- * flags or bootstrap accounting on the same row are preserved. Callers that
- * also want to clear sync runtime state should follow up with
- * `stopSyncRuntime()` / engine reset themselves.
+ * place — only its `seedsAppliedAt` field is reset — so any remaining
+ * bootstrap accounting on that row survives the wipe. The v1 sync engine
+ * was removed in plan `sync-v2-client` t1, so there is no
+ * `stopSyncRuntime()` follow-up to issue from callers any more.
  *
  * Throws synchronously when invoked outside dev mode (see `isDevMode`).
  */
@@ -79,8 +77,6 @@ export const resetLocalDataAndReseed = async (
     tx.delete(exerciseMuscleMappings).run();
     tx.delete(exerciseDefinitions).run();
     tx.delete(muscleGroups).run();
-    tx.delete(syncOutboxEvents).run();
-    tx.delete(syncDeliveryState).run();
   });
 
   // Clear the marker AFTER the wipe so a partial failure above leaves the

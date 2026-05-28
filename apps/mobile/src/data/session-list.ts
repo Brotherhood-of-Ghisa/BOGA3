@@ -2,7 +2,6 @@ import { eq, inArray } from 'drizzle-orm';
 
 import { bootstrapLocalDataLayer } from './bootstrap';
 import { exerciseSets, gyms, sessionExercises, sessions } from './schema';
-import { enqueueSyncEventsTx } from '@/src/sync';
 
 type SessionLifecycleStatus = 'active' | 'completed';
 
@@ -123,18 +122,6 @@ const mapStoreSessionRow = (row: typeof sessions.$inferSelect, gymName: string |
   };
 };
 
-const toSessionSyncPayload = (row: typeof sessions.$inferSelect) => ({
-  id: row.id,
-  gym_id: row.gymId,
-  status: row.status,
-  started_at_ms: row.startedAt.getTime(),
-  completed_at_ms: row.completedAt ? row.completedAt.getTime() : null,
-  duration_sec: row.durationSec,
-  deleted_at_ms: row.deletedAt ? row.deletedAt.getTime() : null,
-  created_at_ms: row.createdAt.getTime(),
-  updated_at_ms: row.updatedAt.getTime(),
-});
-
 export const createDrizzleSessionListStore = (): SessionListStore => ({
   async listSessionRecords() {
     const database = await bootstrapLocalDataLayer();
@@ -212,31 +199,6 @@ export const createDrizzleSessionListStore = (): SessionListStore => ({
         })
         .where(eq(sessions.id, input.sessionId))
         .run();
-
-      const updatedSession = tx.select().from(sessions).where(eq(sessions.id, input.sessionId)).get();
-      if (!updatedSession) {
-        return;
-      }
-
-      enqueueSyncEventsTx(
-        tx,
-        [
-          {
-            entityType: 'sessions',
-            entityId: input.sessionId,
-            eventType: input.deletedAt ? 'delete' : 'upsert',
-            occurredAt: input.updatedAt,
-            payload: input.deletedAt
-              ? {
-                  id: updatedSession.id,
-                  deleted_at_ms: input.deletedAt.getTime(),
-                  updated_at_ms: input.updatedAt.getTime(),
-                }
-              : toSessionSyncPayload(updatedSession),
-          },
-        ],
-        { now: input.updatedAt }
-      );
     });
   },
 });

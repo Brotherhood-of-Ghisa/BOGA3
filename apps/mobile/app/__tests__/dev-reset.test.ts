@@ -15,8 +15,6 @@ import {
   sessionExerciseTags,
   sessionExercises,
   sessions,
-  syncDeliveryState,
-  syncOutboxEvents,
   syncRuntimeState,
 } from '@/src/data/schema';
 
@@ -32,8 +30,6 @@ type FakeState = {
   sessionExercises: FakeRow[];
   sessions: FakeRow[];
   gyms: FakeRow[];
-  syncOutboxEvents: FakeRow[];
-  syncDeliveryState: FakeRow[];
   syncRuntimeState: FakeRow[];
 };
 
@@ -50,8 +46,6 @@ const createFakeDatabase = () => {
     sessionExercises: [],
     sessions: [],
     gyms: [],
-    syncOutboxEvents: [],
-    syncDeliveryState: [],
     syncRuntimeState: [],
   };
 
@@ -65,8 +59,6 @@ const createFakeDatabase = () => {
     [sessionExercises, state.sessionExercises],
     [sessions, state.sessions],
     [gyms, state.gyms],
-    [syncOutboxEvents, state.syncOutboxEvents],
-    [syncDeliveryState, state.syncDeliveryState],
     [syncRuntimeState, state.syncRuntimeState],
   ]);
 
@@ -195,8 +187,6 @@ describe('resetLocalDataAndReseed (T8 — dev reset path)', () => {
     fake.state.sessions.push({ id: 'session-1', gymId: 'gym-1' });
     fake.state.sessionExercises.push({ id: 'sx-1', sessionId: 'session-1' });
     fake.state.exerciseSets.push({ id: 'set-1', sessionExerciseId: 'sx-1' });
-    fake.state.syncOutboxEvents.push({ id: 'event-1' });
-    fake.state.syncDeliveryState.push({ id: 'delivery-1' });
 
     expect(fake.state.exerciseDefinitions.length).toBe(SYSTEM_EXERCISE_DEFINITION_SEEDS.length);
     expect(fake.state.gyms.length).toBe(1);
@@ -217,8 +207,6 @@ describe('resetLocalDataAndReseed (T8 — dev reset path)', () => {
     expect(fake.state.exerciseSets.length).toBe(0);
     expect(fake.state.sessionExerciseTags.length).toBe(0);
     expect(fake.state.exerciseTagDefinitions.length).toBe(0);
-    expect(fake.state.syncOutboxEvents.length).toBe(0);
-    expect(fake.state.syncDeliveryState.length).toBe(0);
 
     // Catalog is repopulated from the canonical seed bundle.
     expect(fake.state.muscleGroups.length).toBe(SYSTEM_MUSCLE_GROUP_SEEDS.length);
