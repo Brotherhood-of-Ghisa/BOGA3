@@ -20,6 +20,9 @@ export const sessionExercises = sqliteTable(
     orderIndex: integer('order_index').notNull(),
     name: text('name').notNull(),
     machineName: text('machine_name'),
+    deletedAt: integer('deleted_at', { mode: 'timestamp_ms' }),
+    localDirty: integer('local_dirty', { mode: 'boolean' }).notNull().default(false),
+    localUpdatedAtMs: integer('local_updated_at_ms').notNull().default(0),
     createdAt: integer('created_at', { mode: 'timestamp_ms' })
       .notNull()
       .default(sql`(unixepoch() * 1000)`),
@@ -30,6 +33,7 @@ export const sessionExercises = sqliteTable(
   (table) => ({
     sessionIdx: index('session_exercises_session_id_idx').on(table.sessionId),
     exerciseDefinitionIdx: index('session_exercises_exercise_definition_id_idx').on(table.exerciseDefinitionId),
+    deletedAtIdx: index('session_exercises_deleted_at_idx').on(table.deletedAt),
     sessionOrderUnique: uniqueIndex('session_exercises_session_id_order_index_unique').on(
       table.sessionId,
       table.orderIndex

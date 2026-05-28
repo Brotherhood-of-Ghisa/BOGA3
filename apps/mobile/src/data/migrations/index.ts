@@ -4,20 +4,25 @@ type RuntimeMigrationConfig = Parameters<typeof migrateExpoSqlite>[1];
 
 export const localRuntimeMigrations: RuntimeMigrationConfig = {
   // Single v2 baseline. The migration history was squashed when plan
-  // `sync-v2-client` t1 deleted v1 sync: every prior migration produced the
-  // same final schema as this baseline, but slower and noisier, and the
-  // plan ships against a manual-wipe contract (every device that runs v2
-  // starts with an empty SQLite file). Regenerate with
-  // `npm --prefix apps/mobile run db:generate` whenever the Drizzle schema
-  // under `src/data/schema/` changes and copy the generated SQL into
-  // `m0000` below; keep the `journal.entries` array a single entry whose
-  // `tag` matches the file in `apps/mobile/drizzle/`.
+  // `sync-v2-client` t1 deleted v1 sync, and re-squashed in plan
+  // `sync-v2-client` t2 to fold the v2-canonical column additions
+  // (`local_dirty`, `local_updated_at_ms`, the five new `deleted_at` columns,
+  // and the rewritten `sync_runtime_state` shape) into the baseline. Every
+  // device that runs v2 starts with an empty SQLite file (manual-wipe
+  // contract per `docs/plans/sync-v2-client/manual-wipe.md`), so the
+  // squash is functionally identical to the t1 baseline plus an `m0001`
+  // ALTER chain — no data preservation needed.
+  //
+  // Regenerate with `npm --prefix apps/mobile run db:generate` whenever the
+  // Drizzle schema under `src/data/schema/` changes and copy the generated
+  // SQL into `m0000` below; keep the `journal.entries` array a single entry
+  // whose `tag` matches the file in `apps/mobile/drizzle/`.
   journal: {
     entries: [
       {
         idx: 0,
-        when: 1779999418440,
-        tag: '0000_silky_sinister_six',
+        when: 1780001862249,
+        tag: '0000_living_bucky',
         breakpoints: true,
       },
     ],
@@ -27,6 +32,8 @@ export const localRuntimeMigrations: RuntimeMigrationConfig = {
 	\`id\` text PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))) NOT NULL,
 	\`name\` text NOT NULL,
 	\`deleted_at\` integer,
+	\`local_dirty\` integer DEFAULT false NOT NULL,
+	\`local_updated_at_ms\` integer DEFAULT 0 NOT NULL,
 	\`created_at\` integer DEFAULT (unixepoch() * 1000) NOT NULL,
 	\`updated_at\` integer DEFAULT (unixepoch() * 1000) NOT NULL,
 	CONSTRAINT "exercise_definitions_name_non_empty" CHECK("exercise_definitions"."name" <> '')
@@ -40,6 +47,9 @@ CREATE TABLE \`exercise_muscle_mappings\` (
 	\`muscle_group_id\` text NOT NULL,
 	\`weight\` real NOT NULL,
 	\`role\` text,
+	\`deleted_at\` integer,
+	\`local_dirty\` integer DEFAULT false NOT NULL,
+	\`local_updated_at_ms\` integer DEFAULT 0 NOT NULL,
 	\`created_at\` integer DEFAULT (unixepoch() * 1000) NOT NULL,
 	\`updated_at\` integer DEFAULT (unixepoch() * 1000) NOT NULL,
 	FOREIGN KEY (\`exercise_definition_id\`) REFERENCES \`exercise_definitions\`(\`id\`) ON UPDATE no action ON DELETE cascade,
@@ -50,6 +60,7 @@ CREATE TABLE \`exercise_muscle_mappings\` (
 --> statement-breakpoint
 CREATE INDEX \`exercise_muscle_mappings_exercise_definition_id_idx\` ON \`exercise_muscle_mappings\` (\`exercise_definition_id\`);--> statement-breakpoint
 CREATE INDEX \`exercise_muscle_mappings_muscle_group_id_idx\` ON \`exercise_muscle_mappings\` (\`muscle_group_id\`);--> statement-breakpoint
+CREATE INDEX \`exercise_muscle_mappings_deleted_at_idx\` ON \`exercise_muscle_mappings\` (\`deleted_at\`);--> statement-breakpoint
 CREATE UNIQUE INDEX \`exercise_muscle_mappings_exercise_id_muscle_group_id_unique\` ON \`exercise_muscle_mappings\` (\`exercise_definition_id\`,\`muscle_group_id\`);--> statement-breakpoint
 CREATE TABLE \`exercise_sets\` (
 	\`id\` text PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))) NOT NULL,
@@ -58,6 +69,9 @@ CREATE TABLE \`exercise_sets\` (
 	\`weight_value\` text DEFAULT '' NOT NULL,
 	\`reps_value\` text DEFAULT '' NOT NULL,
 	\`set_type\` text,
+	\`deleted_at\` integer,
+	\`local_dirty\` integer DEFAULT false NOT NULL,
+	\`local_updated_at_ms\` integer DEFAULT 0 NOT NULL,
 	\`created_at\` integer DEFAULT (unixepoch() * 1000) NOT NULL,
 	\`updated_at\` integer DEFAULT (unixepoch() * 1000) NOT NULL,
 	FOREIGN KEY (\`session_exercise_id\`) REFERENCES \`session_exercises\`(\`id\`) ON UPDATE no action ON DELETE cascade,
@@ -65,6 +79,7 @@ CREATE TABLE \`exercise_sets\` (
 );
 --> statement-breakpoint
 CREATE INDEX \`exercise_sets_session_exercise_id_idx\` ON \`exercise_sets\` (\`session_exercise_id\`);--> statement-breakpoint
+CREATE INDEX \`exercise_sets_deleted_at_idx\` ON \`exercise_sets\` (\`deleted_at\`);--> statement-breakpoint
 CREATE UNIQUE INDEX \`exercise_sets_session_exercise_id_order_index_unique\` ON \`exercise_sets\` (\`session_exercise_id\`,\`order_index\`);--> statement-breakpoint
 CREATE TABLE \`exercise_tag_definitions\` (
 	\`id\` text PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))) NOT NULL,
@@ -72,6 +87,8 @@ CREATE TABLE \`exercise_tag_definitions\` (
 	\`name\` text NOT NULL,
 	\`normalized_name\` text NOT NULL,
 	\`deleted_at\` integer,
+	\`local_dirty\` integer DEFAULT false NOT NULL,
+	\`local_updated_at_ms\` integer DEFAULT 0 NOT NULL,
 	\`created_at\` integer DEFAULT (unixepoch() * 1000) NOT NULL,
 	\`updated_at\` integer DEFAULT (unixepoch() * 1000) NOT NULL,
 	FOREIGN KEY (\`exercise_definition_id\`) REFERENCES \`exercise_definitions\`(\`id\`) ON UPDATE no action ON DELETE cascade,
@@ -89,6 +106,9 @@ CREATE TABLE \`gyms\` (
 	\`longitude\` real,
 	\`coordinate_accuracy_m\` real,
 	\`coordinates_updated_at\` integer,
+	\`deleted_at\` integer,
+	\`local_dirty\` integer DEFAULT false NOT NULL,
+	\`local_updated_at_ms\` integer DEFAULT 0 NOT NULL,
 	\`created_at\` integer DEFAULT (unixepoch() * 1000) NOT NULL,
 	\`updated_at\` integer DEFAULT (unixepoch() * 1000) NOT NULL,
 	CONSTRAINT "gyms_latitude_range" CHECK("gyms"."latitude" is null or ("gyms"."latitude" >= -90 and "gyms"."latitude" <= 90)),
@@ -109,6 +129,7 @@ CREATE TABLE \`gyms\` (
 );
 --> statement-breakpoint
 CREATE INDEX \`gyms_name_idx\` ON \`gyms\` (\`name\`);--> statement-breakpoint
+CREATE INDEX \`gyms_deleted_at_idx\` ON \`gyms\` (\`deleted_at\`);--> statement-breakpoint
 CREATE TABLE \`muscle_groups\` (
 	\`id\` text PRIMARY KEY NOT NULL,
 	\`display_name\` text NOT NULL,
@@ -129,6 +150,9 @@ CREATE TABLE \`session_exercise_tags\` (
 	\`id\` text PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))) NOT NULL,
 	\`session_exercise_id\` text NOT NULL,
 	\`exercise_tag_definition_id\` text NOT NULL,
+	\`deleted_at\` integer,
+	\`local_dirty\` integer DEFAULT false NOT NULL,
+	\`local_updated_at_ms\` integer DEFAULT 0 NOT NULL,
 	\`created_at\` integer DEFAULT (unixepoch() * 1000) NOT NULL,
 	FOREIGN KEY (\`session_exercise_id\`) REFERENCES \`session_exercises\`(\`id\`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (\`exercise_tag_definition_id\`) REFERENCES \`exercise_tag_definitions\`(\`id\`) ON UPDATE no action ON DELETE cascade
@@ -136,6 +160,7 @@ CREATE TABLE \`session_exercise_tags\` (
 --> statement-breakpoint
 CREATE INDEX \`session_exercise_tags_session_exercise_id_idx\` ON \`session_exercise_tags\` (\`session_exercise_id\`);--> statement-breakpoint
 CREATE INDEX \`session_exercise_tags_exercise_tag_definition_id_idx\` ON \`session_exercise_tags\` (\`exercise_tag_definition_id\`);--> statement-breakpoint
+CREATE INDEX \`session_exercise_tags_deleted_at_idx\` ON \`session_exercise_tags\` (\`deleted_at\`);--> statement-breakpoint
 CREATE UNIQUE INDEX \`session_exercise_tags_session_exercise_id_tag_definition_unique\` ON \`session_exercise_tags\` (\`session_exercise_id\`,\`exercise_tag_definition_id\`);--> statement-breakpoint
 CREATE TABLE \`session_exercises\` (
 	\`id\` text PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))) NOT NULL,
@@ -144,6 +169,9 @@ CREATE TABLE \`session_exercises\` (
 	\`order_index\` integer NOT NULL,
 	\`name\` text NOT NULL,
 	\`machine_name\` text,
+	\`deleted_at\` integer,
+	\`local_dirty\` integer DEFAULT false NOT NULL,
+	\`local_updated_at_ms\` integer DEFAULT 0 NOT NULL,
 	\`created_at\` integer DEFAULT (unixepoch() * 1000) NOT NULL,
 	\`updated_at\` integer DEFAULT (unixepoch() * 1000) NOT NULL,
 	FOREIGN KEY (\`session_id\`) REFERENCES \`sessions\`(\`id\`) ON UPDATE no action ON DELETE cascade,
@@ -153,6 +181,7 @@ CREATE TABLE \`session_exercises\` (
 --> statement-breakpoint
 CREATE INDEX \`session_exercises_session_id_idx\` ON \`session_exercises\` (\`session_id\`);--> statement-breakpoint
 CREATE INDEX \`session_exercises_exercise_definition_id_idx\` ON \`session_exercises\` (\`exercise_definition_id\`);--> statement-breakpoint
+CREATE INDEX \`session_exercises_deleted_at_idx\` ON \`session_exercises\` (\`deleted_at\`);--> statement-breakpoint
 CREATE UNIQUE INDEX \`session_exercises_session_id_order_index_unique\` ON \`session_exercises\` (\`session_id\`,\`order_index\`);--> statement-breakpoint
 CREATE TABLE \`sessions\` (
 	\`id\` text PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))) NOT NULL,
@@ -162,6 +191,8 @@ CREATE TABLE \`sessions\` (
 	\`completed_at\` integer,
 	\`duration_sec\` integer,
 	\`deleted_at\` integer,
+	\`local_dirty\` integer DEFAULT false NOT NULL,
+	\`local_updated_at_ms\` integer DEFAULT 0 NOT NULL,
 	\`created_at\` integer DEFAULT (unixepoch() * 1000) NOT NULL,
 	\`updated_at\` integer DEFAULT (unixepoch() * 1000) NOT NULL,
 	FOREIGN KEY (\`gym_id\`) REFERENCES \`gyms\`(\`id\`) ON UPDATE no action ON DELETE set null,
@@ -174,14 +205,10 @@ CREATE INDEX \`sessions_completed_at_idx\` ON \`sessions\` (\`completed_at\`);--
 CREATE INDEX \`sessions_deleted_at_idx\` ON \`sessions\` (\`deleted_at\`);--> statement-breakpoint
 CREATE TABLE \`sync_runtime_state\` (
 	\`id\` text PRIMARY KEY NOT NULL,
-	\`is_enabled\` integer DEFAULT 0 NOT NULL,
-	\`bootstrap_user_id\` text,
+	\`pull_cursor\` text DEFAULT '{}' NOT NULL,
+	\`last_emitted_ms\` integer DEFAULT 0 NOT NULL,
 	\`bootstrap_completed_at\` integer,
-	\`last_bootstrap_error\` text,
-	\`last_bootstrap_attempt_at\` integer,
-	\`seeds_applied_at\` integer,
-	\`updated_at\` integer DEFAULT (unixepoch() * 1000) NOT NULL,
-	CONSTRAINT "sync_runtime_state_is_enabled_boolean_guard" CHECK("sync_runtime_state"."is_enabled" in (0, 1))
+	\`applied_seed_migration_app_version\` integer DEFAULT 0 NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE \`smoke_records\` (
