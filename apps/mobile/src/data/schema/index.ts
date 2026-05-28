@@ -24,12 +24,6 @@ export {
 export { sessionExercises, type NewSessionExercise, type SessionExercise } from './session-exercises';
 export { sessions, type NewSession, type Session } from './sessions';
 export {
-  syncDeliveryState,
-  type NewSyncDeliveryState,
-  type SyncDeliveryState,
-} from './sync-delivery-state';
-export { syncOutboxEvents, type NewSyncOutboxEvent, type SyncOutboxEvent } from './sync-outbox-events';
-export {
   syncRuntimeState,
   type NewSyncRuntimeState,
   type SyncRuntimeState,

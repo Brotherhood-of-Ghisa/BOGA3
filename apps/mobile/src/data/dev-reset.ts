@@ -15,8 +15,6 @@ import {
   sessionExerciseTags,
   sessionExercises,
   sessions,
-  syncDeliveryState,
-  syncOutboxEvents,
 } from './schema';
 
 export type ResetLocalDataAndReseedOptions = {
@@ -79,8 +77,6 @@ export const resetLocalDataAndReseed = async (
     tx.delete(exerciseMuscleMappings).run();
     tx.delete(exerciseDefinitions).run();
     tx.delete(muscleGroups).run();
-    tx.delete(syncOutboxEvents).run();
-    tx.delete(syncDeliveryState).run();
   });
 
   // Clear the marker AFTER the wipe so a partial failure above leaves the

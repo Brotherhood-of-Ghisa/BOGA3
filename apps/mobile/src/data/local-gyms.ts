@@ -2,7 +2,6 @@ import { eq } from 'drizzle-orm';
 
 import { bootstrapLocalDataLayer } from './bootstrap';
 import { gyms } from './schema';
-import { enqueueSyncEventsTx } from '@/src/sync';
 
 export type UpsertLocalGymInput = {
   id: string;
@@ -72,18 +71,6 @@ const normalizeCoordinateInput = (coordinates: UpsertLocalGymInput['coordinates'
   };
 };
 
-const coordinatePayloadFromRow = (row: {
-  latitude: number | null;
-  longitude: number | null;
-  coordinateAccuracyM: number | null;
-  coordinatesUpdatedAt: Date | null;
-}) => ({
-  latitude: row.latitude,
-  longitude: row.longitude,
-  coordinate_accuracy_m: row.coordinateAccuracyM,
-  coordinates_updated_at_ms: row.coordinatesUpdatedAt ? row.coordinatesUpdatedAt.getTime() : null,
-});
-
 export const upsertLocalGym = async (input: UpsertLocalGymInput) => {
   const database = await bootstrapLocalDataLayer();
   const now = input.now ?? new Date();
@@ -111,26 +98,6 @@ export const upsertLocalGym = async (input: UpsertLocalGymInput) => {
         })
         .where(eq(gyms.id, input.id))
         .run();
-
-      enqueueSyncEventsTx(
-        tx,
-        [
-          {
-            entityType: 'gyms',
-            entityId: input.id,
-            eventType: 'upsert',
-            occurredAt: now,
-            payload: {
-              id: input.id,
-              name: input.name,
-              ...coordinatePayloadFromRow(nextCoordinateFields),
-              created_at_ms: existing.createdAt.getTime(),
-              updated_at_ms: now.getTime(),
-            },
-          },
-        ],
-        { now }
-      );
       return;
     }
 
@@ -151,26 +118,6 @@ export const upsertLocalGym = async (input: UpsertLocalGymInput) => {
         updatedAt: now,
       })
       .run();
-
-    enqueueSyncEventsTx(
-      tx,
-      [
-        {
-          entityType: 'gyms',
-          entityId: input.id,
-          eventType: 'upsert',
-          occurredAt: now,
-          payload: {
-            id: input.id,
-            name: input.name,
-            ...coordinatePayloadFromRow(nextCoordinateFields),
-            created_at_ms: now.getTime(),
-            updated_at_ms: now.getTime(),
-          },
-        },
-      ],
-      { now }
-    );
   });
 };
 

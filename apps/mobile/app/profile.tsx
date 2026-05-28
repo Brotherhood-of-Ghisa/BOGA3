@@ -4,7 +4,6 @@ import { ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { UiButton, UiSurface, UiText, uiBorder, uiColors, uiRadius, uiSpace, uiTypography } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import { loadUserProfile, saveUsername, type UserProfileRecord } from '@/src/auth/profile';
-import { loadSyncProfileStatus, setSyncEnabled, type SyncProfileStatusSnapshot } from '@/src/sync';
 
 const EMPTY_FORM_ERROR = 'Enter your email and password to continue.';
 const INVALID_EMAIL_ERROR = 'Enter a valid email address.';
@@ -13,23 +12,11 @@ const EMAIL_PENDING_MESSAGE =
   'Email change submitted. Confirm the change from your email inbox before it fully takes effect.';
 const PROFILE_UPDATED_MESSAGE = 'Profile updated.';
 const NO_PROFILE_CHANGES_ERROR = 'No changes to update.';
-const SYNC_STATUS_POLL_INTERVAL_MS = 2_000;
 
 type InlineFeedback = {
   message: string;
   tone: 'error' | 'success';
 };
-
-const formatSyncTimestamp = (value: Date | null) => {
-  if (!value) {
-    return 'Never';
-  }
-
-  return value.toLocaleString();
-};
-
-const formatPendingCountLabel = (pendingCount: number, pendingCountCapped: boolean) =>
-  pendingCountCapped ? `${pendingCount}+` : String(pendingCount);
 
 export default function ProfileScreen() {
   const {
@@ -60,10 +47,6 @@ export default function ProfileScreen() {
   const [profileUpdateFeedback, setProfileUpdateFeedback] = useState<InlineFeedback | null>(null);
   const [newEmail, setNewEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
-  const [syncStatus, setSyncStatus] = useState<SyncProfileStatusSnapshot | null>(null);
-  const [syncStatusError, setSyncStatusError] = useState<string | null>(null);
-  const [isLoadingSyncStatus, setIsLoadingSyncStatus] = useState(false);
-  const [isUpdatingSyncEnabled, setIsUpdatingSyncEnabled] = useState(false);
 
   const inlineError = signOutError ?? formError ?? lastError ?? null;
   const authDisabledMessage = !isConfigured ? disabledReason ?? 'Supabase mobile auth is not configured.' : null;
@@ -84,10 +67,6 @@ export default function ProfileScreen() {
       setNewEmail('');
       setNewPassword('');
       setIsEditingProfile(false);
-      setSyncStatus(null);
-      setSyncStatusError(null);
-      setIsLoadingSyncStatus(false);
-      setIsUpdatingSyncEnabled(false);
       return;
     }
 
@@ -136,54 +115,6 @@ export default function ProfileScreen() {
 
     return () => {
       isActive = false;
-    };
-  }, [currentUserId]);
-
-  useEffect(() => {
-    if (!currentUserId) {
-      return;
-    }
-
-    let isActive = true;
-
-    const refreshSyncStatus = async (silent: boolean) => {
-      if (!silent) {
-        setIsLoadingSyncStatus(true);
-      }
-
-      try {
-        const nextStatus = await loadSyncProfileStatus({
-          isSignedIn: true,
-        });
-
-        if (!isActive) {
-          return;
-        }
-
-        setSyncStatus(nextStatus);
-        setSyncStatusError(null);
-      } catch (error) {
-        if (!isActive) {
-          return;
-        }
-
-        setSyncStatusError(error instanceof Error ? error.message : 'Unable to load sync status right now.');
-      } finally {
-        if (isActive && !silent) {
-          setIsLoadingSyncStatus(false);
-        }
-      }
-    };
-
-    void refreshSyncStatus(false);
-
-    const interval = setInterval(() => {
-      void refreshSyncStatus(true);
-    }, SYNC_STATUS_POLL_INTERVAL_MS);
-
-    return () => {
-      isActive = false;
-      clearInterval(interval);
     };
   }, [currentUserId]);
 
@@ -345,45 +276,6 @@ export default function ProfileScreen() {
       setIsUpdatingProfile(false);
     }
   };
-
-  const handleSyncToggle = async () => {
-    if (!currentUserId || !syncStatus || isUpdatingSyncEnabled) {
-      return;
-    }
-
-    setSyncStatusError(null);
-    setIsUpdatingSyncEnabled(true);
-
-    try {
-      await setSyncEnabled(!syncStatus.isEnabled);
-      const nextStatus = await loadSyncProfileStatus({
-        isSignedIn: true,
-      });
-      setSyncStatus(nextStatus);
-    } catch (error) {
-      setSyncStatusError(error instanceof Error ? error.message : 'Unable to update sync right now.');
-    } finally {
-      setIsUpdatingSyncEnabled(false);
-    }
-  };
-
-  const syncStatusLabel = isLoadingSyncStatus && !syncStatus ? 'Loading sync status...' : syncStatus?.statusLabel ?? 'Unavailable';
-  const syncStatusHint = syncStatus?.statusHint ?? null;
-  const syncLastSuccessfulLabel = formatSyncTimestamp(syncStatus?.lastSuccessfulSyncAt ?? null);
-  const syncPendingLabel =
-    syncStatus && syncStatus.pendingCount > 0
-      ? formatPendingCountLabel(syncStatus.pendingCount, syncStatus.pendingCountCapped)
-      : null;
-  const syncRetryAtLabel = syncStatus?.nextAttemptAt ? formatSyncTimestamp(syncStatus.nextAttemptAt) : null;
-  const syncInlineError = syncStatus?.errorMessage ?? syncStatusError;
-  const syncRetryHint = syncStatus?.retryHint ?? null;
-  const syncToggleDisabled = isLoadingSyncStatus || isUpdatingSyncEnabled || !syncStatus;
-  const syncToggleLabel =
-    isUpdatingSyncEnabled || isLoadingSyncStatus
-      ? 'Updating...'
-      : syncStatus?.isEnabled
-        ? 'Disable sync'
-        : 'Enable sync';
 
   const renderFeedbackCard = (feedback: InlineFeedback | null, testID: string) => {
     if (!feedback) {
@@ -634,85 +526,6 @@ export default function ProfileScreen() {
             </>
           )}
 
-          <UiSurface style={styles.syncCard} testID="profile-sync-card">
-            <View style={styles.sectionHeader}>
-              <UiText selectable variant="labelStrong">
-                Sync
-              </UiText>
-              <UiText selectable variant="bodyMuted">
-                Backup sync runs in the background. Local tracking stays available if sync fails.
-              </UiText>
-            </View>
-
-            <View style={styles.valueList}>
-              <View style={styles.valueRow}>
-                <UiText selectable style={styles.valueLabel} variant="subtitle">
-                  Status
-                </UiText>
-                <UiText selectable style={styles.valueText} testID="profile-sync-state-value" variant="label">
-                  {syncStatusLabel}
-                </UiText>
-              </View>
-              <View style={styles.valueRow}>
-                <UiText selectable style={styles.valueLabel} variant="subtitle">
-                  Last successful sync
-                </UiText>
-                <UiText selectable style={styles.valueText} testID="profile-sync-last-success-value" variant="label">
-                  {syncLastSuccessfulLabel}
-                </UiText>
-              </View>
-              {syncPendingLabel ? (
-                <View style={styles.valueRow}>
-                  <UiText selectable style={styles.valueLabel} variant="subtitle">
-                    Pending changes
-                  </UiText>
-                  <UiText selectable style={styles.valueText} testID="profile-sync-pending-value" variant="label">
-                    {syncPendingLabel}
-                  </UiText>
-                </View>
-              ) : null}
-              <View style={[styles.valueRow, styles.valueRowLast]}>
-                <UiText selectable style={styles.valueLabel} variant="subtitle">
-                  Next retry
-                </UiText>
-                <UiText selectable style={styles.valueText} testID="profile-sync-next-retry-value" variant="label">
-                  {syncRetryAtLabel ?? 'Not scheduled'}
-                </UiText>
-              </View>
-            </View>
-
-            {syncStatusHint ? (
-              <UiText selectable style={styles.syncHelperText} variant="bodyMuted">
-                {syncStatusHint}
-              </UiText>
-            ) : null}
-
-            {syncInlineError ? (
-              <UiSurface style={[styles.feedbackCard, styles.errorCard]} testID="profile-sync-inline-error">
-                <UiText selectable style={styles.errorText} variant="body">
-                  {syncInlineError}
-                </UiText>
-              </UiSurface>
-            ) : null}
-
-            {syncRetryHint ? (
-              <UiText selectable style={styles.syncRetryHint} testID="profile-sync-retry-hint" variant="bodyMuted">
-                {syncRetryHint}
-              </UiText>
-            ) : null}
-
-            <UiButton
-              accessibilityLabel={syncStatus?.isEnabled ? 'Disable sync' : 'Enable sync'}
-              disabled={syncToggleDisabled}
-              label={syncToggleLabel}
-              onPress={() => {
-                void handleSyncToggle();
-              }}
-              testID="profile-sync-toggle-button"
-              variant={syncStatus?.isEnabled ? 'secondary' : 'primary'}
-            />
-          </UiSurface>
-
           {profileError ? (
             <UiSurface style={[styles.feedbackCard, styles.errorCard]} testID="profile-load-error">
               <UiText selectable style={styles.errorText} variant="body">
@@ -769,18 +582,6 @@ const styles = StyleSheet.create({
   },
   profilePanel: {
     gap: uiSpace.xl,
-  },
-  syncCard: {
-    padding: uiSpace.xxl,
-    gap: uiSpace.md,
-    borderColor: uiColors.actionPrimarySubtleBorder,
-    backgroundColor: uiColors.surfaceInfo,
-  },
-  syncHelperText: {
-    color: uiColors.textAccentMuted,
-  },
-  syncRetryHint: {
-    color: uiColors.textSecondary,
   },
   profileActionRow: {
     flexDirection: 'row',

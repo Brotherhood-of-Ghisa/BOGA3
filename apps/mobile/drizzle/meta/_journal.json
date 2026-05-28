@@ -71,6 +71,13 @@
       "when": 1779541826568,
       "tag": "0012_hot_polaris",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1780099200000,
+      "tag": "0014_drop_v1_sync_tables",
+      "breakpoints": true
     }
   ]
 }

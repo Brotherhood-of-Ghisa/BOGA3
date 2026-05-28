@@ -4,8 +4,6 @@ const mockPush = jest.fn();
 const mockUseAuth = jest.fn();
 const mockLoadUserProfile = jest.fn();
 const mockSaveUsername = jest.fn();
-const mockLoadSyncProfileStatus = jest.fn();
-const mockSetSyncEnabled = jest.fn();
 const mockResetLocalDataAndReseed = jest.fn();
 const mockAlert = jest.fn();
 
@@ -22,11 +20,6 @@ jest.mock('@/src/auth', () => ({
 jest.mock('@/src/auth/profile', () => ({
   loadUserProfile: (...args: unknown[]) => mockLoadUserProfile(...args),
   saveUsername: (...args: unknown[]) => mockSaveUsername(...args),
-}));
-
-jest.mock('@/src/sync', () => ({
-  loadSyncProfileStatus: (...args: unknown[]) => mockLoadSyncProfileStatus(...args),
-  setSyncEnabled: (...args: unknown[]) => mockSetSyncEnabled(...args),
 }));
 
 jest.mock('@/src/data', () => ({
@@ -51,28 +44,6 @@ type MockUseAuthValue = {
   updateUserEmail: jest.Mock;
   updateUserPassword: jest.Mock;
   user: { email?: string | null; id: string } | null;
-};
-
-type SyncStatusShape = {
-  errorMessage: string | null;
-  isEnabled: boolean;
-  isOnline: boolean;
-  kind:
-    | 'disabled'
-    | 'sign_in_required'
-    | 'initial_sync'
-    | 'syncing'
-    | 'up_to_date'
-    | 'waiting_for_network'
-    | 'retry_scheduled'
-    | 'action_required';
-  lastSuccessfulSyncAt: Date | null;
-  nextAttemptAt: Date | null;
-  pendingCount: number;
-  pendingCountCapped: boolean;
-  retryHint: string | null;
-  statusHint: string | null;
-  statusLabel: string;
 };
 
 const createAuthValue = (overrides: Partial<MockUseAuthValue> = {}): MockUseAuthValue => ({
@@ -109,41 +80,15 @@ const createProfileRecord = (overrides: Partial<{ createdAt: string; id: string;
   ...overrides,
 });
 
-const createSyncStatus = (overrides: Partial<SyncStatusShape> = {}): SyncStatusShape => ({
-  errorMessage: null,
-  isEnabled: false,
-  isOnline: true,
-  kind: 'disabled',
-  lastSuccessfulSyncAt: null,
-  nextAttemptAt: null,
-  pendingCount: 0,
-  pendingCountCapped: false,
-  retryHint: null,
-  statusHint: 'Sync is turned off.',
-  statusLabel: 'Disabled',
-  ...overrides,
-});
-
 describe('settings and profile routes', () => {
   beforeEach(() => {
     mockPush.mockReset();
     mockUseAuth.mockReset();
     mockLoadUserProfile.mockReset();
     mockSaveUsername.mockReset();
-    mockLoadSyncProfileStatus.mockReset();
-    mockSetSyncEnabled.mockReset();
     mockResetLocalDataAndReseed.mockReset();
     mockAlert.mockReset();
     jest.spyOn(Alert, 'alert').mockImplementation((...args: unknown[]) => mockAlert(...args));
-    mockSetSyncEnabled.mockResolvedValue({
-      bootstrapCompletedAt: null,
-      bootstrapUserId: null,
-      id: 'primary',
-      isEnabled: true,
-      lastBootstrapError: null,
-      updatedAt: new Date('2026-03-06T10:00:00.000Z'),
-    });
-    mockLoadSyncProfileStatus.mockResolvedValue(createSyncStatus());
   });
 
   it('opens the profile route from settings', () => {
@@ -289,17 +234,10 @@ describe('settings and profile routes', () => {
     await waitFor(() => {
       expect(mockLoadUserProfile).toHaveBeenCalledWith('user-1');
     });
-    await waitFor(() => {
-      expect(mockLoadSyncProfileStatus).toHaveBeenCalledWith({
-        isSignedIn: true,
-      });
-    });
     expect(screen.getByTestId('profile-signed-in-card')).toBeTruthy();
     expect(screen.getByText('member@example.test')).toBeTruthy();
     expect(screen.getByText('member-lifter')).toBeTruthy();
-    expect(screen.getByTestId('profile-sync-card')).toBeTruthy();
-    expect(screen.getByTestId('profile-sync-state-value').props.children).toBe('Disabled');
-    expect(screen.getByTestId('profile-sync-last-success-value').props.children).toBe('Never');
+    expect(screen.queryByTestId('profile-sync-card')).toBeNull();
     expect(screen.getByTestId('profile-edit-button')).toBeTruthy();
     expect(screen.getByTestId('profile-sign-out-button')).toBeTruthy();
     expect(screen.queryByTestId('profile-update-button')).toBeNull();
@@ -316,84 +254,6 @@ describe('settings and profile routes', () => {
     await waitFor(() => {
       expect(authValue.signOut).toHaveBeenCalledTimes(1);
     });
-  });
-
-  it('toggles sync enablement from the profile sync section', async () => {
-    const authValue = createAuthValue({
-      user: {
-        id: 'user-1',
-        email: 'member@example.test',
-      },
-    });
-    mockLoadUserProfile.mockResolvedValue({
-      profile: createProfileRecord(),
-      wasProvisioned: false,
-    });
-    mockLoadSyncProfileStatus
-      .mockResolvedValueOnce(
-        createSyncStatus({
-          isEnabled: false,
-          kind: 'disabled',
-          statusLabel: 'Disabled',
-        })
-      )
-      .mockResolvedValueOnce(
-        createSyncStatus({
-          isEnabled: true,
-          kind: 'up_to_date',
-          statusLabel: 'Enabled',
-          statusHint: 'No successful sync yet.',
-        })
-      );
-    mockUseAuth.mockReturnValue(authValue);
-
-    render(<ProfileRoute />);
-
-    await waitFor(() => {
-      expect(screen.getByTestId('profile-sync-state-value').props.children).toBe('Disabled');
-    });
-
-    fireEvent.press(screen.getByTestId('profile-sync-toggle-button'));
-
-    await waitFor(() => {
-      expect(mockSetSyncEnabled).toHaveBeenCalledWith(true);
-    });
-    expect(screen.getByTestId('profile-sync-state-value').props.children).toBe('Enabled');
-  });
-
-  it('shows blocked sync failures inline with explicit no-auto-retry hint', async () => {
-    const authValue = createAuthValue({
-      user: {
-        id: 'user-1',
-        email: 'member@example.test',
-      },
-    });
-    mockLoadUserProfile.mockResolvedValue({
-      profile: createProfileRecord(),
-      wasProvisioned: false,
-    });
-    mockLoadSyncProfileStatus.mockResolvedValue(
-      createSyncStatus({
-        errorMessage: 'Duplicate event_id with changed payload.',
-        isEnabled: true,
-        kind: 'action_required',
-        pendingCount: 2,
-        retryHint: 'Fix the issue and retry manually by toggling sync off and on.',
-        statusHint: 'Automatic retry is stopped.',
-        statusLabel: 'Sync blocked',
-      })
-    );
-    mockUseAuth.mockReturnValue(authValue);
-
-    render(<ProfileRoute />);
-
-    await waitFor(() => {
-      expect(screen.getByTestId('profile-sync-inline-error')).toBeTruthy();
-    });
-    expect(screen.getByText('Duplicate event_id with changed payload.')).toBeTruthy();
-    expect(screen.getByTestId('profile-sync-retry-hint')).toBeTruthy();
-    expect(screen.getByTestId('profile-sync-state-value').props.children).toBe('Sync blocked');
-    expect(screen.getByTestId('profile-sync-pending-value').props.children).toBe('2');
   });
 
   it('updates username from edit mode with the single update action', async () => {

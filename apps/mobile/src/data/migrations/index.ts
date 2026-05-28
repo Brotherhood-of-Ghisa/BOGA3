@@ -90,6 +90,12 @@ export const localRuntimeMigrations: RuntimeMigrationConfig = {
         tag: '0013_gym_coordinates',
         breakpoints: true,
       },
+      {
+        idx: 14,
+        when: 1780099200000,
+        tag: '0014_drop_v1_sync_tables',
+        breakpoints: true,
+      },
     ],
   },
   migrations: {
@@ -355,5 +361,7 @@ DROP TABLE \`gyms\`;--> statement-breakpoint
 ALTER TABLE \`__new_gyms\` RENAME TO \`gyms\`;--> statement-breakpoint
 PRAGMA foreign_keys=ON;--> statement-breakpoint
 CREATE INDEX \`gyms_name_idx\` ON \`gyms\` (\`name\`);`,
+    m0014: `DROP TABLE IF EXISTS \`sync_outbox_events\`;--> statement-breakpoint
+DROP TABLE IF EXISTS \`sync_delivery_state\`;`,
   },
 };
