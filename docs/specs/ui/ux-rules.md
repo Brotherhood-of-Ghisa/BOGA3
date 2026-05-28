@@ -185,7 +185,25 @@ Guardrail command:
 5. Completed-session edit mode (`/session-recorder?mode=completed-edit`) uses the same add/remove tag interactions as active mode.
 6. Manage-tag row actions are compact icon controls (rename/delete/undelete), while accessibility labels preserve explicit action semantics.
 
-### 11. Documentation maintenance rule (UI semantics)
+### 11. Calendar heatmap semantics
+
+1. Muscle analytics calendar heatmaps render local dates in Monday-start weeks with visible column labels `Mon Tue Wed Thu Fri Sat Sun`.
+2. The reusable heatmap component renders latest weeks first and uses 8 visible week rows by default; parent overlays may provide additional loaded history without changing bucket thresholds while the user scrolls that loaded window.
+3. Zero-effort dates remain visible, neutral, tappable, and accessible.
+4. Positive effort dates use stable green buckets derived from the shared selected-muscle daily effort totals.
+5. Today's date uses a light-blue treatment that remains distinct from green effort intensity and selected-date styling.
+6. Selected cells expose selected accessibility state and remain the parent surface's hook for any out-of-component detail panel.
+
+### 12. Stats muscle-history overlay semantics
+
+1. In `Stats / History`, expanded muscle rows are actionable rows that open the selected muscle's history overlay.
+2. A collapsed single-muscle family header is actionable for its underlying muscle group; multi-muscle family headers remain non-actionable section headers.
+3. The muscle-history overlay is in-route UI state, not route navigation. It occupies roughly three quarters of the screen height, uses the overlay scrim token, and dismisses via backdrop or close control.
+4. Overlay loading, error, no-history, populated, selected positive-effort date, and selected zero-effort date states render inside the overlay and preserve backdrop dismissal.
+5. Dismissing the overlay clears only transient selected-muscle/date UI state and does not mutate sessions, exercises, tags, sync data, or durable preferences.
+6. The v1 overlay loads a capped one-year local completed-session history window for the selected muscle; richer contributing exercise/set detail remains owned by the follow-up selected-day detail task.
+
+### 13. Documentation maintenance rule (UI semantics)
 
 1. If a task changes current UI semantics (action roles, state treatment, modal conventions, list interactions, validation behavior), update this file in the same task/session.
 2. If the change is route-path/param/transition related, update `navigation-contract.md` in the same task.

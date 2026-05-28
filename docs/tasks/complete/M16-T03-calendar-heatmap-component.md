@@ -1,7 +1,7 @@
 ---
 task_id: M16-T03-calendar-heatmap-component
 milestone_id: "M16"
-status: planned
+status: completed
 ui_impact: "yes"
 areas: "frontend|docs"
 runtimes: "node|expo"
@@ -16,7 +16,7 @@ docs_touched: "docs/specs/ui/components-catalog.md,docs/specs/ui/ux-rules.md,doc
 
 - Task ID: `M16-T03-calendar-heatmap-component`
 - Title: Reusable calendar heatmap component
-- Status: `planned`
+- Status: `completed`
 - File location rule:
   - author active cards in `docs/tasks/<task-id>.md`
   - move the file to `docs/tasks/complete/<task-id>.md` when `Status` becomes `completed` or `outdated`
@@ -42,8 +42,8 @@ docs_touched: "docs/specs/ui/components-catalog.md,docs/specs/ui/ux-rules.md,doc
 
 ## Context Freshness (required at session start; update before edits)
 
-- Verified current branch + HEAD commit:
-- Start-of-session sync completed per `docs/specs/04-ai-development-playbook.md` git sync workflow?: `yes | no | N/A` (explain)
+- Verified current branch + HEAD commit: `codex/m16-t03-calendar-heatmap-component @ 9734401`
+- Start-of-session sync completed per `docs/specs/04-ai-development-playbook.md` git sync workflow?: `yes` (`git fetch origin --prune`; created the task worktree from `codex/m16-t02-shared-muscle-analytics-engine` because M16-T03 consumes that shared analytics API and `main @ e93902c` did not contain it yet)
 - Parent refs opened in this session:
   - `docs/specs/README.md`
   - `docs/specs/00-product.md`
@@ -59,10 +59,10 @@ docs_touched: "docs/specs/ui/components-catalog.md,docs/specs/ui/ux-rules.md,doc
   - `docs/specs/milestones/M16-muscle-group-calendar-heatmap.md`
   - `RUNBOOK.md`
 - Code/docs inventory freshness checks run:
-  - Re-check `apps/mobile/components/ui/tokens.ts` before adding heatmap/today color tokens.
-  - Re-check existing UI primitive/component placement under `apps/mobile/components/**`.
-  - Re-check `docs/specs/ui/components-catalog.md` for component inventory style.
-- Known stale references or assumptions (must be explicit; write `none` if none):
+  - Re-checked `apps/mobile/components/ui/tokens.ts` before adding heatmap/today color tokens.
+  - Re-checked existing UI primitive/component placement under `apps/mobile/components/**`.
+  - Re-checked `docs/specs/ui/components-catalog.md` for component inventory style.
+- Known stale references or assumptions (must be explicit; write `none` if none): none
 - Optional helper command:
   - `./scripts/task-bootstrap.sh docs/tasks/M16-T03-calendar-heatmap-component.md`
 
@@ -190,21 +190,22 @@ Build a reusable calendar heatmap component that can render Monday-start daily e
 
 - Standard local fast gate: `./scripts/quality-fast.sh frontend`
 - Standard local slow gate: `N/A` unless slow-gate triggers fire.
-- Optional closeout validation helper: `./scripts/task-closeout-check.sh docs/tasks/M16-T03-calendar-heatmap-component.md`
+- Optional closeout validation helper: `./scripts/task-closeout-check.sh docs/tasks/complete/M16-T03-calendar-heatmap-component.md`
 - Additional gate(s): `git diff --check`
 
 ## Evidence
 
 - UI/UX task visual artifacts note:
-  - Record screenshot/capture paths for populated, zero-effort, today, and selected states when feasible.
-- Manual verification summary (required when CI is absent/partial):
+  - Component-only task with no route/overlay wiring, so simulator screenshots were not feasible without adding out-of-scope wiring.
+  - Equivalent component evidence is covered by RNTL render/style assertions for populated buckets, zero/no-effort cells, today highlight, and selected date in `apps/mobile/app/__tests__/calendar-heatmap.test.tsx`.
+- Manual verification summary (required when CI is absent/partial): Verified reusable component rendering/interaction with targeted Jest/RNTL tests, UI guardrail scan, TypeScript, frontend fast gate, and diff whitespace check.
 - Deferred/manual hosted checks summary: `N/A`
 
 ## Completion note (fill at end per `docs/specs/04-ai-development-playbook.md`)
 
-- What changed:
-- What tests ran:
-- What remains:
+- What changed: Added `CalendarHeatmap` under `apps/mobile/components/muscle-analytics/`, token-backed heatmap colors, deterministic Monday-start/latest-first layout helpers, stable effort buckets over the loaded `SelectedMuscleDailyEffort` window, today/selected treatments, tappable accessible cells, focused tests, UI docs, and M16 task breakdown status.
+- What tests ran: `cd apps/mobile && npm test -- --runTestsByPath app/__tests__/calendar-heatmap.test.tsx --runInBand`; `cd apps/mobile && npm run typecheck`; `cd apps/mobile && npm run lint:ui-guardrails`; `./scripts/quality-fast.sh frontend`; `git diff --check`; `./scripts/task-closeout-check.sh docs/tasks/complete/M16-T03-calendar-heatmap-component.md`.
+- What remains: Overlay opening, real data loading, selected-day detail panel, and simulator visual QA remain with later M16 tasks. `RUNBOOK.md reviewed (no changes required)`.
 
 ## Status update checklist (mandatory at closeout)
 

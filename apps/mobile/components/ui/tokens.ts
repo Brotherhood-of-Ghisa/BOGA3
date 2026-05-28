@@ -35,6 +35,16 @@ export const uiColors = {
   textAccentStrong: '#0f2a46',
   textAccentMuted: '#37516f',
   actionSuccess: '#1f8740',
+  heatmapNeutralBg: '#edf2f6',
+  heatmapNeutralBorder: '#cfdae5',
+  heatmapBucket1: '#dff4e5',
+  heatmapBucket2: '#aee4bd',
+  heatmapBucket3: '#68c57f',
+  heatmapBucket4: '#218f46',
+  heatmapTodayBg: '#e8f4ff',
+  heatmapTodayBorder: '#7bbcf4',
+  heatmapTodayMarker: '#2f8ed8',
+  heatmapSelectedBorder: '#0f5cc0',
 } as const;
 
 export const uiSpace = {
