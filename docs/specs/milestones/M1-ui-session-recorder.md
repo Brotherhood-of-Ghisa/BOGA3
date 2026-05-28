@@ -65,7 +65,7 @@ Ship the first usable gym logging interface where a user can compose a full sess
 4. `docs/tasks/complete/T-20260515-01-session-recorder-set-entry-ergonomics.md` - zero-weight set logging plus repeated-set defaulting ergonomics. (`completed`)
 5. `docs/tasks/complete/T-20260520-01-session-recorder-weight-autofocus.md` - autofocus and select-on-focus ergonomics for new set weight entry. (`completed`)
 6. `docs/tasks/complete/T-20260526-01-issue-70-exercise-block-history.md` - Issue 70 phase 0A: recent per-exercise completed-session block stats in the recorder. (`completed`)
-7. `docs/tasks/T-20260527-01-issue-70-block-comparison.md` - Issue 70 phase 1: collapsible previous/current block comparison in the recorder. (`planned`)
+7. `docs/tasks/complete/T-20260527-01-issue-70-block-comparison.md` - Issue 70 phase 1: collapsible previous/current block comparison in the recorder. (`completed`)
 
 ## Risks / dependencies
 

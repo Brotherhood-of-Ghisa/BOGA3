@@ -116,12 +116,14 @@ Document app-specific UI semantics and guardrails for the current mobile app.
     - replacing or clearing existing coordinates remains confirmation-gated in the single gym editor,
     - permission denial, unavailable services, low accuracy, and persistence failures stay inline in the editor and leave existing coordinates unchanged,
     - clearing coordinates removes the gym from GPS matching until coordinates are saved again.
-16. In `session-recorder`, each logged exercise card loads a read-only recent block-history panel keyed by `exercise_definition_id`:
+16. In `session-recorder`, each logged exercise card loads a volatile past-blocks comparison panel keyed by `exercise_definition_id`:
     - the panel sits below assigned tag chips and above editable set rows,
-    - the most recent completed-session block is shown first and summarizes only age in days, estimated `1RM`, total volume, highest weight, and a `Near failure` count for eligible sets with `RIR <= 2`,
-    - `<<` moves to older loaded blocks and `>>` moves back toward newer blocks, with boundary controls disabled,
-    - loading, empty (`No previous blocks`), and error (`Previous blocks unavailable`) states stay compact and inline,
-    - block-history state is volatile UI state only; it does not block set entry, tags, exercise actions, autosave, submit/save, or sync.
+    - the panel starts collapsed as a slim `Past blocks` bar; tapping the bar expands it, and tapping the expanded header collapses it again without a separate Hide/Show button,
+    - the most recent completed-session block is shown first when expanded and the header shows the selected previous block age plus `<<` older / `>>` newer controls with boundary controls disabled,
+    - the expanded comparison uses four table-like rows (`Est. 1RM`, `Volume`, `Highest`, `Near failure`) with `Previous` values from the selected completed-session block and `Current` values derived live from the unsaved set rows on that exercise card,
+    - current metrics follow the same Phase 0A rules as history metrics: warm-up sets are excluded, invalid/blank set inputs are ignored, `1RM` uses the existing Wathan helper, highest weight comes from eligible parsed sets, and `Near failure` counts valid `rir_0`/`rir_1`/`rir_2` sets,
+    - empty (`No previous blocks`) and error (`Previous blocks unavailable`) messages appear only after expansion; collapsed state remains the same slim `Past blocks` bar,
+    - past-blocks comparison state is volatile UI state only; it does not block set entry, tags, exercise actions, autosave, submit/save, or sync.
 
 ### 6. Loading, empty, error, and feedback state handling
 
