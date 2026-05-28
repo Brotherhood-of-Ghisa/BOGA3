@@ -50,6 +50,8 @@ docs_touched: "docs/specs/ui/ux-rules.md, docs/specs/ui/screen-map.md, docs/spec
 
 - Verified current branch + HEAD commit: Agent 2A started on `main` at `3168ca0` after `git fetch origin main && git pull --ff-only origin main` confirmed already up to date.
 - Start-of-session sync completed per `docs/specs/04-ai-development-playbook.md` git sync workflow?: `yes` for Agent 2A implementation.
+- Agent 3A started from Agent 2A handoff commit `e72f032` on branch `codex/issue-70-block-comparison-3a`, then merged current `origin/main` (`b934e20`) into the 3A branch before review.
+- Start-of-session sync completed in this Agent 3A session?: `yes` - ran `git fetch origin main codex/issue-70-block-comparison-2a`, confirmed a clean worktree before branching, created `codex/issue-70-block-comparison-3a`, and merged `origin/main`.
 - Parent refs opened in this Agent 2A session:
   - `docs/specs/README.md`
   - `docs/specs/00-product.md`
@@ -72,6 +74,10 @@ docs_touched: "docs/specs/ui/ux-rules.md, docs/specs/ui/screen-map.md, docs/spec
   - `./scripts/task-bootstrap.sh docs/tasks/T-20260527-01-issue-70-block-comparison.md` - confirmed branch/task metadata and required gates at `3168ca0`.
   - `rg -n "exercise-block-history|loadRecentExerciseBlocks|Previous blocks|Near failure" docs apps/mobile -S` - confirmed Phase 0A implementation/docs/test surfaces.
   - Source review of `apps/mobile/app/(tabs)/session-recorder.tsx`, `apps/mobile/src/data/exercise-block-history.ts`, `apps/mobile/src/exercise-calculations/index.ts`, and `apps/mobile/app/__tests__/session-recorder-interactions.test.tsx`.
+- Code/docs inventory freshness checks run in this Agent 3A session:
+  - `./scripts/task-bootstrap.sh docs/tasks/T-20260527-01-issue-70-block-comparison.md` - confirmed branch/task metadata and required gates at `e72f032` before creating the 3A branch.
+  - Source review of `apps/mobile/app/(tabs)/session-recorder.tsx`, `apps/mobile/src/data/exercise-block-history.ts`, `apps/mobile/src/exercise-calculations/index.ts`, `apps/mobile/src/data/schema/session-exercises.ts`, `apps/mobile/src/data/schema/exercise-sets.ts`, `apps/mobile/src/data/set-types.ts`, `apps/mobile/app/__tests__/session-recorder-interactions.test.tsx`, `apps/mobile/app/__tests__/session-recorder-screen.test.tsx`, and `apps/mobile/app/__tests__/exercise-block-history.test.ts`.
+  - `rg -n "Past blocks|Current|Previous|Near failure|block history|previous block|current metrics|Previous blocks unavailable|No previous blocks" apps/mobile/app/__tests__` - confirmed comparison/collapse/error test surfaces.
 - Known stale references or assumptions:
   - Assumption: current-session comparison metrics should use the same calculation semantics as Phase 0A history metrics: warm-up sets excluded, invalid/blank set inputs ignored, estimated 1RM via existing Wathan helper, highest weight from eligible parsed sets, and `Near failure` from valid sets marked `rir_0`, `rir_1`, or `rir_2`.
 - Optional helper command (recommended):
@@ -245,6 +251,14 @@ Refine the recorder's Issue 70 block-history panel so it is less visually heavy,
   - `cd apps/mobile && npm run lint:ui-guardrails` - passed, 0 raw-color violations.
   - `./scripts/quality-fast.sh frontend` - passed (`lint`, `typecheck`, 50 Jest suites / 374 tests).
   - `./scripts/task-closeout-check.sh docs/tasks/T-20260527-01-issue-70-block-comparison.md` - failed as expected for this handoff posture because the task remains `in_progress` per instruction not to close/archive; milestone task line was updated to `in_progress`.
+- Agent 3A verification:
+  - Source review found the current unsaved metrics use the shared parser/calculation helpers and match Phase 0A semantics: warm-ups excluded, invalid/blank values ignored, Wathan estimated 1RM reused, highest weight taken from eligible parsed sets, and `rir_0`/`rir_1`/`rir_2` counted only when the set parses.
+  - `cd apps/mobile && npm test -- --runTestsByPath app/__tests__/session-recorder-interactions.test.tsx` - passed, 21 tests.
+  - `cd apps/mobile && npm test -- --runTestsByPath app/__tests__/exercise-block-history.test.ts` - passed, 11 tests.
+  - `cd apps/mobile && npm test -- --runTestsByPath app/__tests__/session-recorder-interactions.test.tsx app/__tests__/session-recorder-screen.test.tsx app/__tests__/exercise-block-history.test.ts` - passed, 57 tests.
+  - `cd apps/mobile && npm run lint:ui-guardrails` - passed, 0 raw-color violations.
+  - `./scripts/quality-fast.sh frontend` - passed (`lint`, `typecheck`, 50 Jest suites / 374 tests; existing logging warning assertions printed expected dev warnings).
+  - `./scripts/task-closeout-check.sh docs/tasks/T-20260527-01-issue-70-block-comparison.md` - failed as expected for this handoff posture because the task remains `in_progress` per instruction not to close/archive.
 - UI/UX task visual artifacts note:
   - Maestro fixture command passed: `cd apps/mobile && PATH="/opt/homebrew/opt/openjdk/bin:$HOME/.maestro/bin:$PATH" JAVA_HOME="/opt/homebrew/opt/openjdk" TASK_ID=T-20260527-01-issue-70-block-comparison ./scripts/maestro-ios-run-flow.sh --flow .maestro/flows/exercise-block-history-fixture.yaml --scenario exercise-block-history-fixture`.
   - Artifact root: `apps/mobile/artifacts/maestro/T-20260527-01-issue-70-block-comparison/20260527-171543-24725`.
@@ -265,6 +279,7 @@ Refine the recorder's Issue 70 block-history panel so it is less visually heavy,
 - What changed: Agent 2A implemented the recorder past-blocks UI as collapsed-by-default slim `Past blocks` bars, removed the visible Hide/Show button in favor of tapping the bar/header, added an expanded previous/current table with live current metrics from unsaved set rows, preserved older/newer history navigation, compacted loading/empty/error states, updated targeted RNTL coverage, updated Maestro fixture selectors/screenshots, and updated `docs/specs/ui/ux-rules.md` plus `docs/specs/ui/screen-map.md`.
 - What tests ran: see `Evidence` above.
 - What remains: task intentionally not closed or archived per handoff request. Error-state simulator screenshot remains unproduced because the current Maestro fixture does not provide a history-load failure injection path; RNTL covers the error behavior.
+- Agent 3A handoff: independent source review and verification found no numeric/current-metric fixes needed. The 3A branch includes only the merge from current `origin/main` plus this evidence update; task remains open for orchestrator/reviewer handoff.
 - Data model/sync impact: no data-model, schema, sync, outbox, or backend changes.
 - RUNBOOK.md reviewed: no changes required. `docs/specs/ui/components-catalog.md` unchanged because no reusable component/API was extracted or changed. `docs/specs/ui/navigation-contract.md` unchanged because route/param/transition behavior did not change.
 
