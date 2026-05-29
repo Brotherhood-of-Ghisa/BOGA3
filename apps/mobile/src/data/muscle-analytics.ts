@@ -1,4 +1,9 @@
-import { computeSetVolume, parseSetReps, parseSetWeight } from '@/src/exercise-calculations';
+import {
+  computeSetVolume,
+  estimateOneRepMax,
+  parseSetReps,
+  parseSetWeight,
+} from '@/src/exercise-calculations';
 
 export type MuscleContributionRole = 'primary' | 'secondary' | 'stabilizer' | null;
 
@@ -61,7 +66,7 @@ export type SelectedMuscleDailyEffort = {
 };
 
 export type AggregateSelectedMuscleDailyEffortOptions = {
-  muscleGroupId: string;
+  muscleGroupIds: string[];
   /**
    * Defaults to the runtime local timezone. Tests can pass an IANA timezone
    * to make local-date bucketing deterministic across developer machines.
@@ -227,15 +232,16 @@ export const aggregateSelectedMuscleDailyEffort = (
     string,
     SelectedMuscleDailyEffort & { sessionIds: Set<string> }
   >();
+  const muscleGroupIdSet = new Set(options.muscleGroupIds);
   const contributions = collectMuscleSetContributions(input).filter(
-    (contribution) => contribution.muscleGroupId === options.muscleGroupId
+    (contribution) => muscleGroupIdSet.has(contribution.muscleGroupId)
   );
 
   for (const contribution of contributions) {
     const dateKey = formatLocalDateKey(contribution.sessionCompletedAt, options.timeZone);
     const entry = entriesByDate.get(dateKey) ?? {
       dateKey,
-      muscleGroupId: options.muscleGroupId,
+      muscleGroupId: contribution.muscleGroupId,
       sessionCount: 0,
       setCount: 0,
       totalWeight: 0,
@@ -257,4 +263,119 @@ export const aggregateSelectedMuscleDailyEffort = (
       contributions: [...entry.contributions].sort(compareContribution),
     }))
     .sort((left, right) => left.dateKey.localeCompare(right.dateKey));
+};
+
+export type CalendarHeatmapMetric = 'totalVolume' | 'nearFailureCount' | 'estimatedRM1' | 'highestWeight';
+
+export type SelectedMuscleWeeklyEffort = {
+  weekStartDateKey: string;
+  monthKey: string;
+  weekOfMonth: number;
+  totalVolume: number;
+  nearFailureCount: number;
+  estimatedRM1: number | null;
+  highestWeight: number | null;
+};
+
+const NEAR_FAILURE_SET_TYPES = new Set(['rir_0', 'rir_1', 'rir_2']);
+
+const dateKeyToUtcDate = (dateKey: string): Date => {
+  const [year, month, day] = dateKey.split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, day));
+};
+
+const formatUtcDateKey = (date: Date): string => {
+  const year = date.getUTCFullYear().toString().padStart(4, '0');
+  const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
+  const day = date.getUTCDate().toString().padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const startOfMondayWeek = (date: Date): Date => {
+  const mondayOffset = (date.getUTCDay() + 6) % 7;
+  return new Date(date.getTime() - mondayOffset * 24 * 60 * 60 * 1000);
+};
+
+export const aggregateSelectedMuscleWeeklyEffort = (
+  dailyEffort: SelectedMuscleDailyEffort[]
+): SelectedMuscleWeeklyEffort[] => {
+  type WeekAccumulator = {
+    weekStartDateKey: string;
+    monthKey: string;
+    totalVolume: number;
+    nearFailureCount: number;
+    bestRM1: number | null;
+    highestWeight: number | null;
+  };
+
+  const weekMap = new Map<string, WeekAccumulator>();
+
+  for (const day of dailyEffort) {
+    const dayDate = dateKeyToUtcDate(day.dateKey);
+    const weekStart = startOfMondayWeek(dayDate);
+    const weekStartDateKey = formatUtcDateKey(weekStart);
+    const monthKey = `${weekStart.getUTCFullYear().toString().padStart(4, '0')}-${(weekStart.getUTCMonth() + 1).toString().padStart(2, '0')}`;
+
+    const acc = weekMap.get(weekStartDateKey) ?? {
+      weekStartDateKey,
+      monthKey,
+      totalVolume: 0,
+      nearFailureCount: 0,
+      bestRM1: null,
+      highestWeight: null,
+    };
+
+    for (const contribution of day.contributions) {
+      acc.totalVolume += contribution.weightedVolume;
+
+      if (contribution.setType !== null && NEAR_FAILURE_SET_TYPES.has(contribution.setType)) {
+        acc.nearFailureCount += 1;
+      }
+
+      const weight = parseSetWeight(contribution.weightValue);
+      const reps = parseSetReps(contribution.repsValue);
+
+      if (weight !== null) {
+        acc.highestWeight = acc.highestWeight === null ? weight : Math.max(acc.highestWeight, weight);
+
+        if (reps !== null) {
+          const rm1 = estimateOneRepMax(weight, reps);
+          if (rm1 !== null) {
+            acc.bestRM1 = acc.bestRM1 === null ? rm1 : Math.max(acc.bestRM1, rm1);
+          }
+        }
+      }
+    }
+
+    weekMap.set(weekStartDateKey, acc);
+  }
+
+  // Sort weeks by date, then assign weekOfMonth (1-based, capped at 4)
+  const sortedWeeks = Array.from(weekMap.values()).sort((a, b) =>
+    a.weekStartDateKey.localeCompare(b.weekStartDateKey)
+  );
+
+  // Track week-of-month index per month
+  const monthWeekCount = new Map<string, number>();
+  const result: SelectedMuscleWeeklyEffort[] = [];
+
+  for (const week of sortedWeeks) {
+    const prev = monthWeekCount.get(week.monthKey) ?? 0;
+    const weekOfMonth = prev + 1;
+    monthWeekCount.set(week.monthKey, weekOfMonth);
+
+    if (weekOfMonth > 4) continue; // clip 5th week
+
+    result.push({
+      weekStartDateKey: week.weekStartDateKey,
+      monthKey: week.monthKey,
+      weekOfMonth,
+      totalVolume: week.totalVolume,
+      nearFailureCount: week.nearFailureCount,
+      estimatedRM1: week.bestRM1,
+      highestWeight: week.highestWeight,
+    });
+  }
+
+  return result;
 };

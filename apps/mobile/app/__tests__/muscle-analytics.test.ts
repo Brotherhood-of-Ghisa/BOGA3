@@ -116,7 +116,7 @@ describe('getMuscleContributionRoleWeight', () => {
 describe('aggregateSelectedMuscleDailyEffort', () => {
   it('groups completed sessions by deterministic local dates across Monday/Sunday and month boundaries', () => {
     const entries = aggregateSelectedMuscleDailyEffort(buildAnalyticsInput(), {
-      muscleGroupId: 'chest_sternal',
+      muscleGroupIds: ['chest_sternal'],
       timeZone: 'Europe/London',
     });
 
@@ -129,7 +129,7 @@ describe('aggregateSelectedMuscleDailyEffort', () => {
 
   it('excludes warm-ups, preserves invalid-set zero volume, and aggregates multiple sessions on one local day', () => {
     const entries = aggregateSelectedMuscleDailyEffort(buildAnalyticsInput(), {
-      muscleGroupId: 'chest_sternal',
+      muscleGroupIds: ['chest_sternal'],
       timeZone: 'Europe/London',
     });
 
@@ -173,7 +173,7 @@ describe('aggregateSelectedMuscleDailyEffort', () => {
     });
 
     const entries = aggregateSelectedMuscleDailyEffort(input, {
-      muscleGroupId: 'chest_sternal',
+      muscleGroupIds: ['chest_sternal'],
       timeZone: 'Europe/London',
     });
 
@@ -186,7 +186,7 @@ describe('aggregateSelectedMuscleDailyEffort', () => {
 
   it('uses the shared contribution math for secondary and multi-muscle exercises', () => {
     const entries = aggregateSelectedMuscleDailyEffort(buildAnalyticsInput(), {
-      muscleGroupId: 'triceps',
+      muscleGroupIds: ['triceps'],
       timeZone: 'Europe/London',
     });
 

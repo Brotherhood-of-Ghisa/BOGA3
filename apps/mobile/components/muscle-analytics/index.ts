@@ -1,12 +1,11 @@
 export {
   CalendarHeatmap,
-  CALENDAR_HEATMAP_WEEKDAY_LABELS,
-  buildCalendarHeatmapWeeks,
+  buildCalendarHeatmapMonthRows,
   getCalendarHeatmapBucket,
   getCurrentLocalDateKey,
-  type BuildCalendarHeatmapWeeksOptions,
   type CalendarHeatmapBucket,
-  type CalendarHeatmapCell,
+  type CalendarHeatmapMetric,
+  type CalendarHeatmapMonthRow,
   type CalendarHeatmapProps,
-  type CalendarHeatmapWeek,
+  type CalendarHeatmapWeekCell,
 } from '@/components/muscle-analytics/calendar-heatmap';

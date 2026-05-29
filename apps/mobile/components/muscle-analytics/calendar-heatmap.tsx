@@ -1,53 +1,37 @@
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
-import { UiText, uiBorder, uiColors, uiRadius, uiSpace, uiTypography } from '@/components/ui';
-import type { SelectedMuscleDailyEffort } from '@/src/data';
+import { uiBorder, uiColors, uiRadius, uiSpace } from '@/components/ui';
+import type { CalendarHeatmapMetric, SelectedMuscleWeeklyEffort } from '@/src/data';
 
-export const CALENDAR_HEATMAP_WEEKDAY_LABELS = [
-  'Mon',
-  'Tue',
-  'Wed',
-  'Thu',
-  'Fri',
-  'Sat',
-  'Sun',
-] as const;
+export type { CalendarHeatmapMetric };
 
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
-const DEFAULT_VISIBLE_WEEK_COUNT = 8;
-const CELL_SIZE = 34;
-const ROW_GAP = uiSpace.xs;
-const COLUMN_GAP = uiSpace.xs;
+const CELL_SIZE = 38;
+const CELL_GAP = uiSpace.xs;
+const WEEKS_PER_ROW = 4;
+const MIN_MONTH_COUNT = 6;
 
 export type CalendarHeatmapBucket = 0 | 1 | 2 | 3 | 4;
 
-export type CalendarHeatmapCell = {
-  dateKey: string;
-  dailyEffort: SelectedMuscleDailyEffort | null;
-  totalWeight: number;
+export type CalendarHeatmapWeekCell = {
+  weekStartDateKey: string;
+  metricValue: number | null;
   bucket: CalendarHeatmapBucket;
-  isToday: boolean;
+  isCurrentWeek: boolean;
   isSelected: boolean;
 };
 
-export type CalendarHeatmapWeek = {
-  weekStartDateKey: string;
-  cells: CalendarHeatmapCell[];
-};
-
-export type BuildCalendarHeatmapWeeksOptions = {
-  latestDateKey?: string;
-  minimumWeekCount?: number;
-  selectedDateKey?: string | null;
-  todayDateKey?: string;
+export type CalendarHeatmapMonthRow = {
+  monthKey: string;
+  monthLabel: string;
+  cells: (CalendarHeatmapWeekCell | null)[];
 };
 
 export type CalendarHeatmapProps = {
-  dailyEffort: SelectedMuscleDailyEffort[];
-  selectedDateKey?: string | null;
-  todayDateKey?: string;
-  visibleWeekCount?: number;
-  onSelectDate?: (cell: CalendarHeatmapCell) => void;
+  weeklyEffort: SelectedMuscleWeeklyEffort[];
+  metric: CalendarHeatmapMetric;
+  selectedWeekKey: string | null;
+  onSelectWeek: (weekStartDateKey: string | null) => void;
+  today?: string;
   testID?: string;
 };
 
@@ -59,243 +43,209 @@ export const getCurrentLocalDateKey = () => {
   return `${year}-${month}-${day}`;
 };
 
-export const getCalendarHeatmapBucket = (
-  totalWeight: number,
-  maxPositiveWeight: number
-): CalendarHeatmapBucket => {
-  if (totalWeight <= 0 || maxPositiveWeight <= 0) return 0;
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-  const ratio = totalWeight / maxPositiveWeight;
+const monthKeyToLabel = (monthKey: string): string => {
+  const monthIndex = Number(monthKey.split('-')[1]) - 1;
+  return MONTH_NAMES[monthIndex] ?? '';
+};
+
+export const getCalendarHeatmapBucket = (
+  value: number,
+  maxPositive: number
+): CalendarHeatmapBucket => {
+  if (value <= 0 || maxPositive <= 0) return 0;
+  const ratio = value / maxPositive;
   if (ratio <= 0.25) return 1;
   if (ratio <= 0.5) return 2;
   if (ratio <= 0.75) return 3;
   return 4;
 };
 
-export const buildCalendarHeatmapWeeks = (
-  dailyEffort: SelectedMuscleDailyEffort[],
-  options: BuildCalendarHeatmapWeeksOptions = {}
-): CalendarHeatmapWeek[] => {
-  const todayDateKey = options.todayDateKey ?? getCurrentLocalDateKey();
-  const minimumWeekCount = options.minimumWeekCount ?? DEFAULT_VISIBLE_WEEK_COUNT;
-  const effortByDate = new Map(dailyEffort.map((entry) => [entry.dateKey, entry]));
-  const maxPositiveWeight = dailyEffort.reduce(
-    (max, entry) => Math.max(max, entry.totalWeight > 0 ? entry.totalWeight : 0),
-    0
-  );
-  const relevantDateKeys = [
-    todayDateKey,
-    options.latestDateKey,
-    options.selectedDateKey ?? undefined,
-    ...dailyEffort.map((entry) => entry.dateKey),
-  ].filter((dateKey): dateKey is string => Boolean(dateKey));
+const getMetricValue = (week: SelectedMuscleWeeklyEffort, metric: CalendarHeatmapMetric): number | null => {
+  switch (metric) {
+    case 'totalVolume': return week.totalVolume > 0 ? week.totalVolume : null;
+    case 'nearFailureCount': return week.nearFailureCount > 0 ? week.nearFailureCount : null;
+    case 'estimatedRM1': return week.estimatedRM1;
+    case 'highestWeight': return week.highestWeight;
+  }
+};
 
-  const latestDateKey = relevantDateKeys.reduce((latest, dateKey) =>
-    compareDateKeys(dateKey, latest) > 0 ? dateKey : latest
-  );
-  const earliestDateKey = relevantDateKeys.reduce((earliest, dateKey) =>
-    compareDateKeys(dateKey, earliest) < 0 ? dateKey : earliest
-  );
-  const latestWeekStart = startOfMondayWeek(dateKeyToUtcDate(latestDateKey));
-  const earliestWeekStart = startOfMondayWeek(dateKeyToUtcDate(earliestDateKey));
-  const loadedWeekCount =
-    Math.floor((latestWeekStart.getTime() - earliestWeekStart.getTime()) / (MS_PER_DAY * 7)) + 1;
-  const weekCount = Math.max(minimumWeekCount, loadedWeekCount);
+const getCurrentWeekStartDateKey = (todayDateKey: string): string => {
+  const [year, month, day] = todayDateKey.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  const mondayOffset = (date.getUTCDay() + 6) % 7;
+  const monday = new Date(date.getTime() - mondayOffset * 24 * 60 * 60 * 1000);
+  const y = monday.getUTCFullYear().toString().padStart(4, '0');
+  const m = (monday.getUTCMonth() + 1).toString().padStart(2, '0');
+  const d = monday.getUTCDate().toString().padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
 
-  return Array.from({ length: weekCount }, (_, weekIndex) => {
-    const weekStart = addDays(latestWeekStart, weekIndex * -7);
-    const weekStartDateKey = formatUtcDateKey(weekStart);
-    const cells = Array.from({ length: 7 }, (_unused, dayIndex) => {
-      const dateKey = formatUtcDateKey(addDays(weekStart, dayIndex));
-      const entry = effortByDate.get(dateKey) ?? null;
-      const totalWeight = entry?.totalWeight ?? 0;
+const buildBaselineMonthKeys = (todayDateKey: string): string[] => {
+  const [y, m] = todayDateKey.split('-').map(Number);
+  const keys: string[] = [];
+  for (let i = MIN_MONTH_COUNT - 1; i >= 0; i--) {
+    const month = ((m - 1 - i + 120) % 12) + 1;
+    const year = y + Math.floor((m - 1 - i) / 12);
+    keys.push(`${year.toString().padStart(4, '0')}-${month.toString().padStart(2, '0')}`);
+  }
+  return keys;
+};
 
-      return {
-        dateKey,
-        dailyEffort: entry,
-        totalWeight,
-        bucket: getCalendarHeatmapBucket(totalWeight, maxPositiveWeight),
-        isToday: dateKey === todayDateKey,
-        isSelected: dateKey === options.selectedDateKey,
-      };
-    });
+export const buildCalendarHeatmapMonthRows = (
+  weeklyEffort: SelectedMuscleWeeklyEffort[],
+  metric: CalendarHeatmapMetric,
+  selectedWeekKey: string | null,
+  todayDateKey: string
+): CalendarHeatmapMonthRow[] => {
+  const currentWeekKey = getCurrentWeekStartDateKey(todayDateKey);
 
-    return { weekStartDateKey, cells };
+  const maxValue = weeklyEffort.reduce((max, week) => {
+    const v = getMetricValue(week, metric);
+    return v !== null && v > max ? v : max;
+  }, 0);
+
+  const byMonthWeek = new Map<string, SelectedMuscleWeeklyEffort>();
+  for (const week of weeklyEffort) {
+    byMonthWeek.set(`${week.monthKey}-${week.weekOfMonth}`, week);
+  }
+
+  // Ensure at least MIN_MONTH_COUNT months are shown, padded with empty rows if needed.
+  // Reverse-chronological: current month first.
+  const effortMonthKeys = new Set(weeklyEffort.map((w) => w.monthKey));
+  const baselineKeys = buildBaselineMonthKeys(todayDateKey);
+  const allMonthKeys = Array.from(new Set([...baselineKeys, ...effortMonthKeys])).sort().reverse();
+
+  return allMonthKeys.map((monthKey) => {
+    const cells: (CalendarHeatmapWeekCell | null)[] = Array.from(
+      { length: WEEKS_PER_ROW },
+      (_, i) => {
+        const week = byMonthWeek.get(`${monthKey}-${i + 1}`);
+        if (!week) return null;
+        const metricValue = getMetricValue(week, metric);
+        const numericValue = metricValue ?? 0;
+        return {
+          weekStartDateKey: week.weekStartDateKey,
+          metricValue,
+          bucket: getCalendarHeatmapBucket(numericValue, maxValue),
+          isCurrentWeek: week.weekStartDateKey === currentWeekKey,
+          isSelected: week.weekStartDateKey === selectedWeekKey,
+        };
+      }
+    );
+
+    return {
+      monthKey,
+      monthLabel: monthKeyToLabel(monthKey),
+      cells,
+    };
   });
 };
 
 export function CalendarHeatmap({
-  dailyEffort,
-  selectedDateKey = null,
-  todayDateKey,
-  visibleWeekCount = DEFAULT_VISIBLE_WEEK_COUNT,
-  onSelectDate,
+  weeklyEffort,
+  metric,
+  selectedWeekKey,
+  onSelectWeek,
+  today,
   testID = 'calendar-heatmap',
 }: CalendarHeatmapProps) {
-  const resolvedTodayDateKey = todayDateKey ?? getCurrentLocalDateKey();
-  const weeks = buildCalendarHeatmapWeeks(dailyEffort, {
-    minimumWeekCount: visibleWeekCount,
-    selectedDateKey,
-    todayDateKey: resolvedTodayDateKey,
-  });
+  const todayDateKey = today ?? getCurrentLocalDateKey();
+  const monthRows = buildCalendarHeatmapMonthRows(weeklyEffort, metric, selectedWeekKey, todayDateKey);
 
   return (
     <View style={styles.container} testID={testID}>
-      <View accessibilityRole="text" style={styles.weekdayRow} testID={`${testID}-weekday-row`}>
-        {CALENDAR_HEATMAP_WEEKDAY_LABELS.map((label) => (
-          <UiText key={label} style={styles.weekdayLabel} variant="subtitle">
-            {label}
-          </UiText>
-        ))}
-      </View>
-      <ScrollView
-        style={[styles.weekViewport, { maxHeight: getVisibleGridHeight(visibleWeekCount) }]}
-        contentContainerStyle={styles.weekList}
-        showsVerticalScrollIndicator={false}
-        testID={`${testID}-scroll`}>
-        {weeks.map((week, weekIndex) => (
-          <View
-            key={week.weekStartDateKey}
-            style={styles.weekRow}
-            testID={`${testID}-week-row-${weekIndex}`}>
-            {week.cells.map((cell) => (
-              <Pressable
-                accessibilityHint="Select this date"
-                accessibilityLabel={buildCellAccessibilityLabel(cell)}
-                accessibilityRole="button"
-                accessibilityState={{ selected: cell.isSelected }}
-                key={cell.dateKey}
-                onPress={() => onSelectDate?.(cell)}
-                style={[
-                  styles.cell,
-                  bucketStyles[cell.bucket],
-                  cell.isToday && cell.bucket === 0 ? styles.todayNeutralCell : null,
-                  cell.isToday ? styles.todayCell : null,
-                  cell.isSelected ? styles.selectedCell : null,
-                ]}
-                testID={`${testID}-cell-${cell.dateKey}`}>
-                {cell.isToday ? (
-                  <View
-                    style={styles.todayMarker}
-                    testID={`${testID}-cell-${cell.dateKey}-today-marker`}
-                  />
-                ) : null}
-                <UiText style={styles.cellText} variant="subtitle">
-                  {dateKeyToDayOfMonth(cell.dateKey)}
-                </UiText>
-              </Pressable>
-            ))}
+      {monthRows.map((row) => (
+        <View key={row.monthKey} style={styles.monthRow} testID={`${testID}-month-${row.monthKey}`}>
+          <View style={styles.cellRow}>
+            {row.cells.map((cell, i) =>
+              cell === null ? (
+                <View
+                  key={`${row.monthKey}-empty-${i}`}
+                  style={[styles.cell, bucketStyles[0]]}
+                  testID={`${testID}-cell-empty-${row.monthKey}-${i + 1}`}
+                />
+              ) : (
+                <Pressable
+                  accessibilityHint="Select this week"
+                  accessibilityLabel={buildWeekCellAccessibilityLabel(cell, metric)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: cell.isSelected }}
+                  key={cell.weekStartDateKey}
+                  onPress={() =>
+                    onSelectWeek(cell.isSelected ? null : cell.weekStartDateKey)
+                  }
+                  style={[
+                    styles.cell,
+                    bucketStyles[cell.bucket],
+                    cell.isCurrentWeek && cell.bucket === 0 ? styles.currentWeekNeutralCell : null,
+                    cell.isCurrentWeek ? styles.currentWeekCell : null,
+                    cell.isSelected ? styles.selectedCell : null,
+                  ]}
+                  testID={`${testID}-cell-${cell.weekStartDateKey}`}
+                />
+              )
+            )}
           </View>
-        ))}
-      </ScrollView>
+        </View>
+      ))}
     </View>
   );
 }
 
-const getVisibleGridHeight = (visibleWeekCount: number) =>
-  visibleWeekCount * CELL_SIZE + Math.max(visibleWeekCount - 1, 0) * ROW_GAP;
+const buildWeekCellAccessibilityLabel = (
+  cell: CalendarHeatmapWeekCell,
+  metric: CalendarHeatmapMetric
+): string => {
+  const metricLabel =
+    metric === 'totalVolume'
+      ? 'Volume'
+      : metric === 'nearFailureCount'
+        ? 'Near-failure sets'
+        : metric === 'estimatedRM1'
+          ? 'Estimated 1RM'
+          : 'Top weight';
 
-const compareDateKeys = (left: string, right: string) => left.localeCompare(right);
+  const valueText =
+    cell.metricValue === null
+      ? 'No data'
+      : `${metricLabel} ${cell.metricValue.toFixed(1)}. Bucket ${cell.bucket} of 4`;
 
-const dateKeyToUtcDate = (dateKey: string) => {
-  const [year, month, day] = dateKey.split('-').map(Number);
-  return new Date(Date.UTC(year, month - 1, day));
-};
-
-const formatUtcDateKey = (date: Date) => {
-  const year = date.getUTCFullYear().toString().padStart(4, '0');
-  const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
-  const day = date.getUTCDate().toString().padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
-
-const addDays = (date: Date, days: number) => new Date(date.getTime() + days * MS_PER_DAY);
-
-const startOfMondayWeek = (date: Date) => {
-  const mondayOffset = (date.getUTCDay() + 6) % 7;
-  return addDays(date, -mondayOffset);
-};
-
-const dateKeyToDayOfMonth = (dateKey: string) => String(dateKeyToUtcDate(dateKey).getUTCDate());
-
-const formatAccessibleDate = (dateKey: string) =>
-  new Intl.DateTimeFormat('en-US', {
-    timeZone: 'UTC',
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  }).format(dateKeyToUtcDate(dateKey));
-
-const buildCellAccessibilityLabel = (cell: CalendarHeatmapCell) => {
-  const effortText =
-    cell.bucket === 0
-      ? 'No effort.'
-      : `Effort ${formatEffort(cell.totalWeight)}. Bucket ${cell.bucket} of 4.`;
-  const todayText = cell.isToday ? ' Today.' : '';
+  const currentText = cell.isCurrentWeek ? ' Current week.' : '';
   const selectedText = cell.isSelected ? ' Selected.' : '';
 
-  return `${formatAccessibleDate(cell.dateKey)}. ${effortText}${todayText}${selectedText}`;
+  return `Week of ${cell.weekStartDateKey}. ${valueText}.${currentText}${selectedText}`;
 };
-
-const formatEffort = (value: number) =>
-  Number.isInteger(value) ? String(value) : value.toFixed(1).replace(/\.0$/, '');
 
 const styles = StyleSheet.create({
   container: {
-    gap: uiSpace.sm,
+    gap: uiSpace.xs,
   },
-  weekdayRow: {
+  monthRow: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: COLUMN_GAP,
   },
-  weekdayLabel: {
-    width: CELL_SIZE,
-    textAlign: 'center',
-    fontSize: uiTypography.size.xs,
-  },
-  weekViewport: {
-    alignSelf: 'center',
-  },
-  weekList: {
-    gap: ROW_GAP,
-  },
-  weekRow: {
+  cellRow: {
     flexDirection: 'row',
-    gap: COLUMN_GAP,
+    gap: CELL_GAP,
   },
   cell: {
     width: CELL_SIZE,
     height: CELL_SIZE,
     borderRadius: uiRadius.sm,
     borderWidth: uiBorder.width,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
-  todayCell: {
+  currentWeekCell: {
     borderColor: uiColors.heatmapTodayBorder,
+    borderWidth: uiBorder.width + 2,
   },
-  todayNeutralCell: {
+  currentWeekNeutralCell: {
     backgroundColor: uiColors.heatmapTodayBg,
   },
   selectedCell: {
     borderColor: uiColors.heatmapSelectedBorder,
     borderWidth: uiBorder.width + 1,
-  },
-  todayMarker: {
-    position: 'absolute',
-    top: uiSpace.xs,
-    right: uiSpace.xs,
-    width: 6,
-    height: 6,
-    borderRadius: uiRadius.full,
-    backgroundColor: uiColors.heatmapTodayMarker,
-  },
-  cellText: {
-    color: uiColors.textAccentStrong,
-    fontSize: uiTypography.size.xs,
-    lineHeight: 13,
   },
 });
 

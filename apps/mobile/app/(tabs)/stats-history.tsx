@@ -4,14 +4,13 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import {
   CalendarHeatmap,
-  getCalendarHeatmapBucket,
-  type CalendarHeatmapCell,
+  type CalendarHeatmapMetric,
 } from '@/components/muscle-analytics';
 import { SegmentedChips, uiColors } from '@/components/ui';
 import {
-  computeSelectedMuscleDailyEffort,
+  computeSelectedMuscleWeeklyEffort,
   computeStatsSummary,
-  type SelectedMuscleDailyEffort,
+  type SelectedMuscleWeeklyEffort,
   type StatsMuscleFamilyPerformance,
   type StatsMusclePerformance,
   type StatsPeriodDays,
@@ -31,10 +30,11 @@ type DeltaDisplay = {
   tone: 'positive' | 'negative' | 'neutral' | 'new';
 };
 
-export type MuscleHistoryTarget = Pick<
-  StatsMusclePerformance,
-  'muscleGroupId' | 'displayName' | 'familyName'
->;
+export type MuscleHistoryTarget = {
+  muscleGroupIds: string[];
+  displayName: string;
+  familyName: string;
+};
 
 export const formatDelta = (current: number, previous: number): DeltaDisplay => {
   if (current === 0 && previous === 0) {
@@ -96,14 +96,16 @@ export type StatsScreenShellProps = {
   onPressSessionsCard: () => void;
   onPressMuscleHistory: (muscle: MuscleHistoryTarget) => void;
   onDismissMuscleHistory: () => void;
-  onSelectMuscleHistoryDate: (cell: CalendarHeatmapCell) => void;
+  onSelectMuscleHistoryWeek: (weekKey: string | null) => void;
   isLoading: boolean;
   errorMessage: string | null;
   selectedMuscle: MuscleHistoryTarget | null;
-  muscleHistoryEffort: SelectedMuscleDailyEffort[];
+  muscleHistoryWeeklyEffort: SelectedMuscleWeeklyEffort[];
   isMuscleHistoryLoading: boolean;
   muscleHistoryErrorMessage: string | null;
-  selectedMuscleHistoryDateKey: string | null;
+  selectedMuscleHistoryWeekKey: string | null;
+  muscleHistoryMetric: CalendarHeatmapMetric;
+  onSelectMuscleHistoryMetric: (metric: CalendarHeatmapMetric) => void;
 };
 
 export function StatsScreenShell({
@@ -113,14 +115,16 @@ export function StatsScreenShell({
   onPressSessionsCard,
   onPressMuscleHistory,
   onDismissMuscleHistory,
-  onSelectMuscleHistoryDate,
+  onSelectMuscleHistoryWeek,
   isLoading,
   errorMessage,
   selectedMuscle,
-  muscleHistoryEffort,
+  muscleHistoryWeeklyEffort,
   isMuscleHistoryLoading,
   muscleHistoryErrorMessage,
-  selectedMuscleHistoryDateKey,
+  selectedMuscleHistoryWeekKey,
+  muscleHistoryMetric,
+  onSelectMuscleHistoryMetric,
 }: StatsScreenShellProps) {
   const sessionDelta = summary
     ? formatDelta(summary.current.totals.sessionCount, summary.previous.totals.sessionCount)
@@ -200,12 +204,14 @@ export function StatsScreenShell({
       {selectedMuscle ? (
         <MuscleHistoryOverlay
           muscle={selectedMuscle}
-          dailyEffort={muscleHistoryEffort}
+          weeklyEffort={muscleHistoryWeeklyEffort}
           isLoading={isMuscleHistoryLoading}
           errorMessage={muscleHistoryErrorMessage}
-          selectedDateKey={selectedMuscleHistoryDateKey}
+          selectedWeekKey={selectedMuscleHistoryWeekKey}
+          metric={muscleHistoryMetric}
+          onSelectMetric={onSelectMuscleHistoryMetric}
           onDismiss={onDismissMuscleHistory}
-          onSelectDate={onSelectMuscleHistoryDate}
+          onSelectWeek={onSelectMuscleHistoryWeek}
         />
       ) : null}
     </View>
@@ -314,7 +320,14 @@ function MuscleFamilyCard({
           {headerContent}
         </Pressable>
       ) : (
-        <View style={styles.familyHeader}>{headerContent}</View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Open ${family.familyName} history`}
+          onPress={() => onPressMuscleHistory(toFamilyHistoryTarget(family))}
+          style={({ pressed }) => [styles.familyHeader, pressed && styles.actionableRowPressed]}
+          testID={`stats-family-header-${testIdSlug}`}>
+          {headerContent}
+        </Pressable>
       )}
       {collapsed ? null : (
         <View style={styles.muscleList}>
@@ -370,40 +383,114 @@ function MuscleFamilyCard({
 }
 
 const toMuscleHistoryTarget = (muscle: StatsMusclePerformance): MuscleHistoryTarget => ({
-  muscleGroupId: muscle.muscleGroupId,
+  muscleGroupIds: [muscle.muscleGroupId],
   displayName: muscle.displayName,
   familyName: muscle.familyName,
 });
 
+const toFamilyHistoryTarget = (family: StatsMuscleFamilyPerformance): MuscleHistoryTarget => ({
+  muscleGroupIds: family.muscles.map((m) => m.muscleGroupId),
+  displayName: family.familyName,
+  familyName: family.familyName,
+});
+
+const METRIC_OPTIONS: readonly { value: CalendarHeatmapMetric; label: string }[] = [
+  { value: 'totalVolume', label: 'Volume' },
+  { value: 'nearFailureCount', label: 'Near failure' },
+  { value: 'estimatedRM1', label: '1RM' },
+  { value: 'highestWeight', label: 'Top weight' },
+];
+
+const METRIC_LABELS: Record<CalendarHeatmapMetric, string> = {
+  totalVolume: 'Volume',
+  nearFailureCount: 'Near failure',
+  estimatedRM1: '1RM',
+  highestWeight: 'Top weight',
+};
+
+const MS_PER_DAY_BANNER = 24 * 60 * 60 * 1000;
+
+const formatWeekDateRange = (weekStartDateKey: string): string => {
+  const [y, m, d] = weekStartDateKey.split('-').map(Number);
+  const start = new Date(Date.UTC(y, m - 1, d));
+  const end = new Date(start.getTime() + 6 * MS_PER_DAY_BANNER);
+  const fmt = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'UTC',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+  const startStr = fmt.format(start);
+  const endStr = fmt.format(end);
+  return `${startStr} – ${endStr}`;
+};
+
+const formatMetricValue = (week: SelectedMuscleWeeklyEffort, metric: CalendarHeatmapMetric): string => {
+  switch (metric) {
+    case 'totalVolume': return formatTotalWeight(week.totalVolume);
+    case 'nearFailureCount': return String(week.nearFailureCount);
+    case 'estimatedRM1': return week.estimatedRM1 !== null ? formatTotalWeight(week.estimatedRM1) : '—';
+    case 'highestWeight': return week.highestWeight !== null ? formatTotalWeight(week.highestWeight) : '—';
+  }
+};
+
+function WeekSelectionBanner({
+  weeklyEffort,
+  selectedWeekKey,
+  metric,
+}: {
+  weeklyEffort: SelectedMuscleWeeklyEffort[];
+  selectedWeekKey: string | null;
+  metric: CalendarHeatmapMetric;
+}) {
+  const week =
+    selectedWeekKey !== null
+      ? (weeklyEffort.find((w) => w.weekStartDateKey === selectedWeekKey) ?? null)
+      : null;
+  const dateRange = selectedWeekKey !== null ? formatWeekDateRange(selectedWeekKey) : null;
+  const value = week !== null ? formatMetricValue(week, metric) : null;
+
+  return (
+    <View style={styles.weekBanner} testID="stats-muscle-history-week-banner">
+      {dateRange !== null ? (
+        <>
+          <Text style={styles.weekBannerRange} testID="stats-muscle-history-week-banner-range">
+            {dateRange}
+          </Text>
+          <Text style={styles.weekBannerValue} testID="stats-muscle-history-week-banner-value">
+            {METRIC_LABELS[metric]}: {value ?? '—'}
+          </Text>
+        </>
+      ) : (
+        <Text style={styles.weekBannerPlaceholder} testID="stats-muscle-history-week-banner-placeholder">
+          Tap a week to see details
+        </Text>
+      )}
+    </View>
+  );
+}
+
 function MuscleHistoryOverlay({
   muscle,
-  dailyEffort,
+  weeklyEffort,
   isLoading,
   errorMessage,
-  selectedDateKey,
+  selectedWeekKey,
+  metric,
+  onSelectMetric,
   onDismiss,
-  onSelectDate,
+  onSelectWeek,
 }: {
   muscle: MuscleHistoryTarget;
-  dailyEffort: SelectedMuscleDailyEffort[];
+  weeklyEffort: SelectedMuscleWeeklyEffort[];
   isLoading: boolean;
   errorMessage: string | null;
-  selectedDateKey: string | null;
+  selectedWeekKey: string | null;
+  metric: CalendarHeatmapMetric;
+  onSelectMetric: (metric: CalendarHeatmapMetric) => void;
   onDismiss: () => void;
-  onSelectDate: (cell: CalendarHeatmapCell) => void;
+  onSelectWeek: (weekKey: string | null) => void;
 }) {
-  const selectedEffort =
-    selectedDateKey === null
-      ? null
-      : dailyEffort.find((entry) => entry.dateKey === selectedDateKey) ?? null;
-  const maxPositiveEffort = dailyEffort.reduce(
-    (max, entry) => Math.max(max, entry.totalWeight > 0 ? entry.totalWeight : 0),
-    0
-  );
-  const selectedBucket = selectedEffort
-    ? getCalendarHeatmapBucket(selectedEffort.totalWeight, maxPositiveEffort)
-    : 0;
-
   return (
     <View style={styles.overlayRoot} testID="stats-muscle-history-overlay">
       <Pressable
@@ -416,9 +503,11 @@ function MuscleHistoryOverlay({
       <View style={styles.overlayCard}>
         <View style={styles.overlayHeader}>
           <View style={styles.overlayTitleGroup}>
-            <Text style={styles.overlayEyebrow}>Muscle history</Text>
+            <Text style={styles.overlayEyebrow}>
+              {muscle.muscleGroupIds.length > 1 ? 'Muscle Group History' : 'Muscle History'}
+            </Text>
             <Text style={styles.overlayTitle} testID="stats-muscle-history-title">
-              {muscle.displayName} history
+              {muscle.displayName}
             </Text>
           </View>
           <Pressable
@@ -433,6 +522,23 @@ function MuscleHistoryOverlay({
             <Text style={styles.overlayCloseButtonText}>X</Text>
           </Pressable>
         </View>
+
+        <View style={styles.overlayMetricSelector}>
+          <SegmentedChips
+            accessibilityLabel="Select effort metric"
+            options={METRIC_OPTIONS}
+            value={metric}
+            onChange={onSelectMetric}
+            testIDPrefix="stats-muscle-history-metric-chip"
+            compact
+          />
+        </View>
+
+        <WeekSelectionBanner
+          weeklyEffort={weeklyEffort}
+          selectedWeekKey={selectedWeekKey}
+          metric={metric}
+        />
 
         <ScrollView
           contentContainerStyle={styles.overlayContent}
@@ -453,7 +559,7 @@ function MuscleHistoryOverlay({
 
           {!isLoading && !errorMessage ? (
             <>
-              {dailyEffort.length === 0 ? (
+              {weeklyEffort.length === 0 ? (
                 <View style={styles.overlayStatePanel} testID="stats-muscle-history-empty">
                   <Text style={styles.stateTitle}>No history yet</Text>
                   <Text style={styles.stateBody}>
@@ -464,17 +570,11 @@ function MuscleHistoryOverlay({
               ) : null}
 
               <CalendarHeatmap
-                dailyEffort={dailyEffort}
-                selectedDateKey={selectedDateKey}
-                onSelectDate={onSelectDate}
+                weeklyEffort={weeklyEffort}
+                metric={metric}
+                selectedWeekKey={selectedWeekKey}
+                onSelectWeek={onSelectWeek}
                 testID="stats-muscle-history-heatmap"
-              />
-
-              <SelectedDateSummary
-                muscle={muscle}
-                selectedDateKey={selectedDateKey}
-                selectedEffort={selectedEffort}
-                bucket={selectedBucket}
               />
             </>
           ) : null}
@@ -484,182 +584,6 @@ function MuscleHistoryOverlay({
   );
 }
 
-function SelectedDateSummary({
-  muscle,
-  selectedDateKey,
-  selectedEffort,
-  bucket,
-}: {
-  muscle: MuscleHistoryTarget;
-  selectedDateKey: string | null;
-  selectedEffort: SelectedMuscleDailyEffort | null;
-  bucket: number;
-}) {
-  if (selectedDateKey === null) {
-    return (
-      <View style={styles.selectedDatePanel} testID="stats-muscle-history-selected-date">
-        <Text style={styles.stateBody}>Select a date to inspect that day.</Text>
-      </View>
-    );
-  }
-
-  if (!selectedEffort || selectedEffort.totalWeight <= 0) {
-    return (
-      <View style={styles.selectedDatePanel} testID="stats-muscle-history-selected-date">
-        <View style={styles.selectedDateHeader}>
-          <Text style={styles.stateTitle}>{formatDateKey(selectedDateKey)}</Text>
-          <Text style={styles.selectedDateMuscle}>{muscle.displayName}</Text>
-        </View>
-        <Text style={styles.selectedDateMeta}>Effort 0 - Bucket 0</Text>
-        <Text style={styles.stateBody}>No {muscle.displayName} training on this date.</Text>
-      </View>
-    );
-  }
-
-  const contributionGroups = groupSelectedDateContributions(selectedEffort.contributions);
-
-  return (
-    <View style={styles.selectedDatePanel} testID="stats-muscle-history-selected-date">
-      <View style={styles.selectedDateHeader}>
-        <Text style={styles.stateTitle}>{formatDateKey(selectedDateKey)}</Text>
-        <Text style={styles.selectedDateMuscle}>{muscle.displayName}</Text>
-      </View>
-      <Text style={styles.selectedDateMeta}>
-        Effort {formatTotalWeight(selectedEffort.totalWeight)} - Bucket {bucket} of 4
-      </Text>
-      <Text style={styles.stateBody}>
-        {formatNumber(selectedEffort.sessionCount)} session
-        {selectedEffort.sessionCount === 1 ? '' : 's'} - {formatNumber(selectedEffort.setCount)}{' '}
-        set{selectedEffort.setCount === 1 ? '' : 's'}
-      </Text>
-
-      {contributionGroups.length === 0 ? (
-        <Text style={styles.stateBody}>No set-level details are available for this date.</Text>
-      ) : (
-        <View style={styles.contributionList}>
-          <Text style={styles.contributionSectionTitle}>Contributing exercises</Text>
-          {contributionGroups.map((group) => (
-            <View
-              key={group.sessionExerciseId}
-              style={styles.contributionExercise}
-              testID={`stats-muscle-history-exercise-${group.sessionExerciseId}`}>
-              <View style={styles.contributionExerciseHeader}>
-                <Text style={styles.contributionExerciseName} numberOfLines={1}>
-                  {group.exerciseName}
-                </Text>
-                <Text style={styles.contributionExerciseMeta}>
-                  {formatSessionTime(group.sessionCompletedAt)}
-                </Text>
-              </View>
-              <Text style={styles.contributionExerciseMeta}>
-                {formatContributionRole(group.role)} - {group.contributions.length} set
-                {group.contributions.length === 1 ? '' : 's'}
-              </Text>
-              <View style={styles.contributionSetList}>
-                {group.contributions.map((contribution, index) => (
-                  <View
-                    key={contribution.setId ?? `${group.sessionExerciseId}-${index}`}
-                    style={styles.contributionSetRow}
-                    testID={`stats-muscle-history-set-${
-                      contribution.setId ?? `${group.sessionExerciseId}-${index}`
-                    }`}>
-                    <Text style={styles.contributionSetLabel}>
-                      {formatContributionSetLabel(contribution, index)}
-                    </Text>
-                    <Text style={styles.contributionSetValue} numberOfLines={1}>
-                      {formatContributionSetLoad(contribution)} - effort{' '}
-                      {formatTotalWeight(contribution.weightedVolume)}
-                    </Text>
-                    {contribution.roleWeight === 1 ? null : (
-                      <Text style={styles.contributionSetDetail} numberOfLines={1}>
-                        base {formatTotalWeight(contribution.setVolume)} x{' '}
-                        {formatRoleWeight(contribution.roleWeight)}
-                      </Text>
-                    )}
-                  </View>
-                ))}
-              </View>
-            </View>
-          ))}
-        </View>
-      )}
-    </View>
-  );
-}
-
-type SelectedDateContribution =
-  SelectedMuscleDailyEffort['contributions'][number];
-
-type SelectedDateContributionGroup = {
-  sessionExerciseId: string;
-  exerciseName: string;
-  sessionCompletedAt: Date;
-  role: SelectedDateContribution['role'];
-  contributions: SelectedDateContribution[];
-};
-
-const groupSelectedDateContributions = (
-  contributions: SelectedDateContribution[]
-): SelectedDateContributionGroup[] => {
-  const groupsByExerciseId = new Map<string, SelectedDateContributionGroup>();
-
-  for (const contribution of contributions) {
-    const existing = groupsByExerciseId.get(contribution.sessionExerciseId);
-    if (existing) {
-      existing.contributions.push(contribution);
-      continue;
-    }
-
-    groupsByExerciseId.set(contribution.sessionExerciseId, {
-      sessionExerciseId: contribution.sessionExerciseId,
-      exerciseName: contribution.exerciseName ?? 'Logged exercise',
-      sessionCompletedAt: contribution.sessionCompletedAt,
-      role: contribution.role,
-      contributions: [contribution],
-    });
-  }
-
-  return Array.from(groupsByExerciseId.values());
-};
-
-const formatDateKey = (dateKey: string) => {
-  const [year, month, day] = dateKey.split('-').map(Number);
-  return new Intl.DateTimeFormat('en-US', {
-    timeZone: 'UTC',
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  }).format(new Date(Date.UTC(year, month - 1, day)));
-};
-
-const formatSessionTime = (date: Date) =>
-  new Intl.DateTimeFormat('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-  }).format(date);
-
-const formatContributionRole = (role: SelectedDateContribution['role']) => {
-  if (role === 'primary') return 'Primary';
-  if (role === 'secondary') return 'Secondary';
-  return 'Contribution';
-};
-
-const formatContributionSetLabel = (
-  contribution: SelectedDateContribution,
-  fallbackIndex: number
-) => {
-  if (contribution.setOrderIndex === null) return `Set ${fallbackIndex + 1}`;
-  return `Set ${contribution.setOrderIndex + 1}`;
-};
-
-const formatContributionSetLoad = (contribution: SelectedDateContribution) => {
-  const weight = contribution.weightValue.trim() || '-';
-  const reps = contribution.repsValue.trim() || '-';
-  return `${weight} x ${reps}`;
-};
-
-const formatRoleWeight = (value: number) =>
-  Number.isInteger(value) ? String(value) : value.toFixed(1).replace(/\.0$/, '');
 
 function Metric({
   label,
@@ -700,14 +624,11 @@ export default function StatsRoute() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [selectedMuscle, setSelectedMuscle] = useState<MuscleHistoryTarget | null>(null);
-  const [muscleHistoryEffort, setMuscleHistoryEffort] = useState<SelectedMuscleDailyEffort[]>(
-    []
-  );
+  const [muscleHistoryWeeklyEffort, setMuscleHistoryWeeklyEffort] = useState<SelectedMuscleWeeklyEffort[]>([]);
   const [isMuscleHistoryLoading, setIsMuscleHistoryLoading] = useState(false);
   const [muscleHistoryErrorMessage, setMuscleHistoryErrorMessage] = useState<string | null>(null);
-  const [selectedMuscleHistoryDateKey, setSelectedMuscleHistoryDateKey] = useState<string | null>(
-    null
-  );
+  const [selectedMuscleHistoryWeekKey, setSelectedMuscleHistoryWeekKey] = useState<string | null>(null);
+  const [muscleHistoryMetric, setMuscleHistoryMetric] = useState<CalendarHeatmapMetric>('totalVolume');
   const muscleHistoryRequestIdRef = useRef(0);
 
   const loadSummary = useCallback(async (period: StatsPeriodDays) => {
@@ -748,19 +669,19 @@ export default function StatsRoute() {
     const start = new Date(end.getTime() - MUSCLE_HISTORY_WINDOW_DAYS * MS_PER_DAY);
 
     setSelectedMuscle(muscle);
-    setMuscleHistoryEffort([]);
-    setSelectedMuscleHistoryDateKey(null);
+    setMuscleHistoryWeeklyEffort([]);
+    setSelectedMuscleHistoryWeekKey(null);
     setMuscleHistoryErrorMessage(null);
     setIsMuscleHistoryLoading(true);
 
     try {
-      const nextEffort = await computeSelectedMuscleDailyEffort({
-        muscleGroupId: muscle.muscleGroupId,
+      const nextEffort = await computeSelectedMuscleWeeklyEffort({
+        muscleGroupIds: muscle.muscleGroupIds,
         start,
         end,
       });
       if (muscleHistoryRequestIdRef.current !== requestId) return;
-      setMuscleHistoryEffort(nextEffort);
+      setMuscleHistoryWeeklyEffort(nextEffort);
     } catch (error) {
       if (muscleHistoryRequestIdRef.current !== requestId) return;
       setMuscleHistoryErrorMessage(error instanceof Error ? error.message : 'Unknown error');
@@ -773,14 +694,14 @@ export default function StatsRoute() {
   const handleDismissMuscleHistory = useCallback(() => {
     muscleHistoryRequestIdRef.current += 1;
     setSelectedMuscle(null);
-    setMuscleHistoryEffort([]);
-    setSelectedMuscleHistoryDateKey(null);
+    setMuscleHistoryWeeklyEffort([]);
+    setSelectedMuscleHistoryWeekKey(null);
     setMuscleHistoryErrorMessage(null);
     setIsMuscleHistoryLoading(false);
   }, []);
 
-  const handleSelectMuscleHistoryDate = useCallback((cell: CalendarHeatmapCell) => {
-    setSelectedMuscleHistoryDateKey(cell.dateKey);
+  const handleSelectMuscleHistoryWeek = useCallback((weekKey: string | null) => {
+    setSelectedMuscleHistoryWeekKey(weekKey);
   }, []);
 
   // useMemo prevents unnecessary re-renders of the shell when the route re-renders.
@@ -792,14 +713,16 @@ export default function StatsRoute() {
       onPressSessionsCard: handlePressSessionsCard,
       onPressMuscleHistory: handlePressMuscleHistory,
       onDismissMuscleHistory: handleDismissMuscleHistory,
-      onSelectMuscleHistoryDate: handleSelectMuscleHistoryDate,
+      onSelectMuscleHistoryWeek: handleSelectMuscleHistoryWeek,
       isLoading,
       errorMessage,
       selectedMuscle,
-      muscleHistoryEffort,
+      muscleHistoryWeeklyEffort,
       isMuscleHistoryLoading,
       muscleHistoryErrorMessage,
-      selectedMuscleHistoryDateKey,
+      selectedMuscleHistoryWeekKey,
+      muscleHistoryMetric,
+      onSelectMuscleHistoryMetric: setMuscleHistoryMetric,
     }),
     [
       summary,
@@ -808,14 +731,15 @@ export default function StatsRoute() {
       handlePressSessionsCard,
       handlePressMuscleHistory,
       handleDismissMuscleHistory,
-      handleSelectMuscleHistoryDate,
+      handleSelectMuscleHistoryWeek,
       isLoading,
       errorMessage,
       selectedMuscle,
-      muscleHistoryEffort,
+      muscleHistoryWeeklyEffort,
       isMuscleHistoryLoading,
       muscleHistoryErrorMessage,
-      selectedMuscleHistoryDateKey,
+      selectedMuscleHistoryWeekKey,
+      muscleHistoryMetric,
     ]
   );
 
@@ -1049,6 +973,39 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: uiColors.actionNeutralSubtleText,
   },
+  overlayMetricSelector: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: uiColors.borderMuted,
+  },
+  weekBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: uiColors.borderMuted,
+    backgroundColor: uiColors.surfaceMuted,
+    gap: 8,
+  },
+  weekBannerRange: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: uiColors.textPrimary,
+    flexShrink: 1,
+  },
+  weekBannerValue: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: uiColors.actionPrimary,
+  },
+  weekBannerPlaceholder: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: uiColors.textSecondary,
+  },
   overlayContent: {
     padding: 16,
     gap: 16,
@@ -1060,94 +1017,6 @@ const styles = StyleSheet.create({
     backgroundColor: uiColors.surfaceInfo,
     padding: 12,
     gap: 6,
-  },
-  selectedDatePanel: {
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: uiColors.borderMuted,
-    backgroundColor: uiColors.surfaceMuted,
-    padding: 12,
-    gap: 6,
-  },
-  selectedDateHeader: {
-    gap: 2,
-  },
-  selectedDateMuscle: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: uiColors.textSecondary,
-  },
-  selectedDateMeta: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: uiColors.textPrimary,
-  },
-  contributionList: {
-    marginTop: 4,
-    gap: 8,
-  },
-  contributionSectionTitle: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: uiColors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-  },
-  contributionExercise: {
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: uiColors.borderMuted,
-    backgroundColor: uiColors.surfaceDefault,
-    padding: 10,
-    gap: 4,
-  },
-  contributionExerciseHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
-  },
-  contributionExerciseName: {
-    flexShrink: 1,
-    fontSize: 13,
-    fontWeight: '700',
-    color: uiColors.textPrimary,
-  },
-  contributionExerciseMeta: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: uiColors.textSecondary,
-  },
-  contributionSetList: {
-    gap: 4,
-    marginTop: 2,
-  },
-  contributionSetRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: uiColors.borderMuted,
-    paddingTop: 4,
-    gap: 8,
-  },
-  contributionSetLabel: {
-    width: 42,
-    fontSize: 11,
-    fontWeight: '700',
-    color: uiColors.textSecondary,
-  },
-  contributionSetValue: {
-    flex: 1,
-    minWidth: 0,
-    fontSize: 12,
-    fontWeight: '600',
-    color: uiColors.textPrimary,
-  },
-  contributionSetDetail: {
-    maxWidth: 84,
-    fontSize: 10,
-    fontWeight: '600',
-    color: uiColors.textSecondary,
   },
   deltaPositive: {
     color: uiColors.textSuccess,

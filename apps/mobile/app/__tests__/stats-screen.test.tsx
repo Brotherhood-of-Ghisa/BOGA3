@@ -9,10 +9,10 @@ import {
   type StatsScreenShellProps,
   formatDelta,
 } from '../(tabs)/stats-history';
-import type { SelectedMuscleDailyEffort, StatsSummary } from '@/src/data';
+import type { SelectedMuscleWeeklyEffort, StatsSummary } from '@/src/data';
 
 jest.mock('@/src/data', () => ({
-  computeSelectedMuscleDailyEffort: jest.fn(),
+  computeSelectedMuscleWeeklyEffort: jest.fn(),
   computeStatsSummary: jest.fn(),
 }));
 
@@ -33,10 +33,10 @@ jest.mock('expo-router', () => {
 });
 
 const {
-  computeSelectedMuscleDailyEffort: mockComputeSelectedMuscleDailyEffort,
+  computeSelectedMuscleWeeklyEffort: mockComputeSelectedMuscleWeeklyEffort,
   computeStatsSummary: mockComputeStatsSummary,
 } = jest.requireMock('@/src/data') as {
-  computeSelectedMuscleDailyEffort: jest.Mock;
+  computeSelectedMuscleWeeklyEffort: jest.Mock;
   computeStatsSummary: jest.Mock;
 };
 
@@ -187,7 +187,7 @@ const buildSummary = (overrides: Partial<StatsSummary> = {}): StatsSummary => ({
 });
 
 beforeEach(() => {
-  mockComputeSelectedMuscleDailyEffort.mockReset();
+  mockComputeSelectedMuscleWeeklyEffort.mockReset();
   mockComputeStatsSummary.mockReset();
   mockPush.mockReset();
 });
@@ -201,96 +201,30 @@ const buildShellProps = (
   onPressSessionsCard: jest.fn(),
   onPressMuscleHistory: jest.fn(),
   onDismissMuscleHistory: jest.fn(),
-  onSelectMuscleHistoryDate: jest.fn(),
+  onSelectMuscleHistoryWeek: jest.fn(),
   isLoading: false,
   errorMessage: null,
   selectedMuscle: null,
-  muscleHistoryEffort: [],
+  muscleHistoryWeeklyEffort: [],
   isMuscleHistoryLoading: false,
   muscleHistoryErrorMessage: null,
-  selectedMuscleHistoryDateKey: null,
+  selectedMuscleHistoryWeekKey: null,
+  muscleHistoryMetric: 'totalVolume',
+  onSelectMuscleHistoryMetric: jest.fn(),
   ...overrides,
 });
 
 const renderStatsScreenShell = (overrides: Partial<StatsScreenShellProps> = {}) =>
   render(<StatsScreenShell {...buildShellProps(overrides)} />);
 
-const buildSelectedDayEffort = (): SelectedMuscleDailyEffort => ({
-  dateKey: '2026-05-18',
-  muscleGroupId: 'front_delts',
-  sessionCount: 2,
-  setCount: 4,
-  totalWeight: 1100,
-  contributions: [
-    {
-      muscleGroupId: 'front_delts',
-      role: 'primary',
-      roleWeight: 1,
-      weightedVolume: 600,
-      setVolume: 600,
-      sessionId: 'session-a',
-      sessionCompletedAt: new Date('2026-05-18T10:00:00.000Z'),
-      sessionExerciseId: 'se-press',
-      exerciseDefinitionId: 'ex-press',
-      exerciseName: 'Overhead Press',
-      setId: 'set-press-1',
-      setOrderIndex: 0,
-      setType: null,
-      weightValue: '120',
-      repsValue: '5',
-    },
-    {
-      muscleGroupId: 'front_delts',
-      role: 'primary',
-      roleWeight: 1,
-      weightedVolume: 0,
-      setVolume: 0,
-      sessionId: 'session-a',
-      sessionCompletedAt: new Date('2026-05-18T10:00:00.000Z'),
-      sessionExerciseId: 'se-press',
-      exerciseDefinitionId: 'ex-press',
-      exerciseName: 'Overhead Press',
-      setId: 'set-press-invalid',
-      setOrderIndex: 1,
-      setType: null,
-      weightValue: '120kg',
-      repsValue: '5',
-    },
-    {
-      muscleGroupId: 'front_delts',
-      role: 'secondary',
-      roleWeight: 0.5,
-      weightedVolume: 300,
-      setVolume: 600,
-      sessionId: 'session-b',
-      sessionCompletedAt: new Date('2026-05-18T18:30:00.000Z'),
-      sessionExerciseId: 'se-bench',
-      exerciseDefinitionId: 'ex-bench',
-      exerciseName: 'Bench Press',
-      setId: 'set-bench-1',
-      setOrderIndex: 0,
-      setType: 'rir_1',
-      weightValue: '100',
-      repsValue: '6',
-    },
-    {
-      muscleGroupId: 'front_delts',
-      role: 'secondary',
-      roleWeight: 0.5,
-      weightedVolume: 200,
-      setVolume: 400,
-      sessionId: 'session-b',
-      sessionCompletedAt: new Date('2026-05-18T18:30:00.000Z'),
-      sessionExerciseId: 'se-bench',
-      exerciseDefinitionId: 'ex-bench',
-      exerciseName: 'Bench Press',
-      setId: 'set-bench-2',
-      setOrderIndex: 1,
-      setType: null,
-      weightValue: '80',
-      repsValue: '5',
-    },
-  ],
+const buildWeeklyEffort = (): SelectedMuscleWeeklyEffort => ({
+  weekStartDateKey: '2026-05-11',
+  monthKey: '2026-05',
+  weekOfMonth: 2,
+  totalVolume: 1100,
+  nearFailureCount: 2,
+  estimatedRM1: 150,
+  highestWeight: 120,
 });
 
 const captureUiEvidence = (name: string, tree: unknown) => {
@@ -400,39 +334,51 @@ describe('StatsScreenShell', () => {
 
     fireEvent.press(screen.getByTestId('stats-muscle-row-front_delts'));
     expect(onPressMuscleHistory).toHaveBeenCalledWith({
-      muscleGroupId: 'front_delts',
+      muscleGroupIds: ['front_delts'],
       displayName: 'Front Delts',
       familyName: 'Shoulders',
     });
 
     fireEvent.press(screen.getByTestId('stats-family-header-button-chest'));
     expect(onPressMuscleHistory).toHaveBeenCalledWith({
-      muscleGroupId: 'chest',
+      muscleGroupIds: ['chest'],
       displayName: 'Chest',
       familyName: 'Chest',
     });
   });
 
-  it('renders muscle-history loading, error, empty, populated, selection, and dismiss states', () => {
+  it('opens family-level muscle history from a multi-muscle family header', () => {
+    const onPressMuscleHistory = jest.fn();
+    renderStatsScreenShell({ onPressMuscleHistory });
+
+    fireEvent.press(screen.getByTestId('stats-family-header-shoulders'));
+    expect(onPressMuscleHistory).toHaveBeenCalledWith({
+      muscleGroupIds: ['front_delts', 'rear_delts'],
+      displayName: 'Shoulders',
+      familyName: 'Shoulders',
+    });
+  });
+
+  it('renders muscle-history overlay states: loading, error, empty, populated, and dismiss', () => {
     const onDismissMuscleHistory = jest.fn();
-    const onSelectMuscleHistoryDate = jest.fn();
+    const onSelectMuscleHistoryWeek = jest.fn();
     const { rerender, toJSON } = render(
       <StatsScreenShell
         {...buildShellProps({
           selectedMuscle: {
-            muscleGroupId: 'front_delts',
+            muscleGroupIds: ['front_delts'],
             displayName: 'Front Delts',
             familyName: 'Shoulders',
           },
           isMuscleHistoryLoading: true,
           onDismissMuscleHistory,
-          onSelectMuscleHistoryDate,
+          onSelectMuscleHistoryWeek,
         })}
       />
     );
 
     expect(screen.getByTestId('stats-muscle-history-title')).toHaveTextContent(
-      /Front Delts history/
+      /Front Delts/
     );
     expect(screen.getByTestId('stats-muscle-history-loading')).toHaveTextContent(/Loading/);
     captureUiEvidence('stats-muscle-history-loading', toJSON());
@@ -441,13 +387,13 @@ describe('StatsScreenShell', () => {
       <StatsScreenShell
         {...buildShellProps({
           selectedMuscle: {
-            muscleGroupId: 'front_delts',
+            muscleGroupIds: ['front_delts'],
             displayName: 'Front Delts',
             familyName: 'Shoulders',
           },
           muscleHistoryErrorMessage: 'Nope',
           onDismissMuscleHistory,
-          onSelectMuscleHistoryDate,
+          onSelectMuscleHistoryWeek,
         })}
       />
     );
@@ -458,92 +404,111 @@ describe('StatsScreenShell', () => {
       <StatsScreenShell
         {...buildShellProps({
           selectedMuscle: {
-            muscleGroupId: 'front_delts',
+            muscleGroupIds: ['front_delts'],
             displayName: 'Front Delts',
             familyName: 'Shoulders',
           },
-          muscleHistoryEffort: [],
+          muscleHistoryWeeklyEffort: [],
           onDismissMuscleHistory,
-          onSelectMuscleHistoryDate,
+          onSelectMuscleHistoryWeek,
         })}
       />
     );
     expect(screen.getByTestId('stats-muscle-history-empty')).toHaveTextContent(/No history yet/);
     captureUiEvidence('stats-muscle-history-empty', toJSON());
 
-    const effort = [buildSelectedDayEffort()];
+    const effort = [buildWeeklyEffort()];
     rerender(
       <StatsScreenShell
         {...buildShellProps({
           selectedMuscle: {
-            muscleGroupId: 'front_delts',
+            muscleGroupIds: ['front_delts'],
             displayName: 'Front Delts',
             familyName: 'Shoulders',
           },
-          muscleHistoryEffort: effort,
-          selectedMuscleHistoryDateKey: '2026-05-18',
+          muscleHistoryWeeklyEffort: effort,
+          selectedMuscleHistoryWeekKey: '2026-05-11',
           onDismissMuscleHistory,
-          onSelectMuscleHistoryDate,
+          onSelectMuscleHistoryWeek,
         })}
       />
     );
-    const detailPanel = screen.getByTestId('stats-muscle-history-selected-date');
-    expect(detailPanel).toHaveTextContent(/May 18, 2026/);
-    expect(detailPanel).toHaveTextContent(/Front Delts/);
-    expect(detailPanel).toHaveTextContent(/Effort 1.1k/);
-    expect(detailPanel).toHaveTextContent(/Bucket 4 of 4/);
-    expect(detailPanel).toHaveTextContent(/2 sessions/);
-    expect(detailPanel).toHaveTextContent(/4 sets/);
-    expect(screen.getByTestId('stats-muscle-history-exercise-se-press')).toHaveTextContent(
-      /Overhead Press/
-    );
-    expect(screen.getByTestId('stats-muscle-history-exercise-se-bench')).toHaveTextContent(
-      /Bench Press/
-    );
-    expect(screen.getByTestId('stats-muscle-history-set-set-press-1')).toHaveTextContent(
-      /120 x 5/
-    );
-    expect(screen.getByTestId('stats-muscle-history-set-set-press-1')).toHaveTextContent(
-      /effort 600/
-    );
-    expect(screen.getByTestId('stats-muscle-history-set-set-press-invalid')).toHaveTextContent(
-      /120kg x 5/
-    );
-    expect(screen.getByTestId('stats-muscle-history-set-set-press-invalid')).toHaveTextContent(
-      /effort 0/
-    );
-    expect(screen.queryByText(/Certified/i)).toBeNull();
-    captureUiEvidence('stats-muscle-history-populated-selected', toJSON());
+    expect(screen.getByTestId('stats-muscle-history-heatmap')).toBeTruthy();
+    captureUiEvidence('stats-muscle-history-populated', toJSON());
 
-    fireEvent.press(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-05-19'));
-    expect(onSelectMuscleHistoryDate).toHaveBeenCalledWith(
-      expect.objectContaining({ dateKey: '2026-05-19', totalWeight: 0 })
-    );
-
-    rerender(
-      <StatsScreenShell
-        {...buildShellProps({
-          selectedMuscle: {
-            muscleGroupId: 'front_delts',
-            displayName: 'Front Delts',
-            familyName: 'Shoulders',
-          },
-          muscleHistoryEffort: effort,
-          selectedMuscleHistoryDateKey: '2026-05-19',
-          onDismissMuscleHistory,
-          onSelectMuscleHistoryDate,
-        })}
-      />
-    );
-    expect(screen.getByTestId('stats-muscle-history-selected-date')).toHaveTextContent(
-      /No Front Delts training/
-    );
-    expect(screen.getByTestId('stats-muscle-history-selected-date')).toHaveTextContent(/Effort 0/);
-    expect(screen.getByTestId('stats-muscle-history-selected-date')).toHaveTextContent(/Bucket 0/);
-    captureUiEvidence('stats-muscle-history-zero-effort-selected', toJSON());
+    fireEvent.press(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-05-11'));
+    expect(onSelectMuscleHistoryWeek).toHaveBeenCalledWith(null); // deselect since it's already selected
 
     fireEvent.press(screen.getByTestId('stats-muscle-history-backdrop'));
     expect(onDismissMuscleHistory).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders metric selector chips in the overlay', () => {
+    renderStatsScreenShell({
+      selectedMuscle: {
+        muscleGroupIds: ['front_delts'],
+        displayName: 'Front Delts',
+        familyName: 'Shoulders',
+      },
+      muscleHistoryWeeklyEffort: [buildWeeklyEffort()],
+      muscleHistoryMetric: 'totalVolume',
+    });
+
+    expect(screen.getByTestId('stats-muscle-history-metric-chip-totalVolume')).toBeTruthy();
+    expect(screen.getByTestId('stats-muscle-history-metric-chip-nearFailureCount')).toBeTruthy();
+    expect(screen.getByTestId('stats-muscle-history-metric-chip-estimatedRM1')).toBeTruthy();
+    expect(screen.getByTestId('stats-muscle-history-metric-chip-highestWeight')).toBeTruthy();
+  });
+
+  it('shows the week selection banner with date range and metric value when a week is selected', () => {
+    renderStatsScreenShell({
+      selectedMuscle: {
+        muscleGroupIds: ['front_delts'],
+        displayName: 'Front Delts',
+        familyName: 'Shoulders',
+      },
+      muscleHistoryWeeklyEffort: [buildWeeklyEffort()],
+      selectedMuscleHistoryWeekKey: '2026-05-11',
+      muscleHistoryMetric: 'totalVolume',
+    });
+
+    const banner = screen.getByTestId('stats-muscle-history-week-banner');
+    expect(banner).toBeTruthy();
+    expect(screen.getByTestId('stats-muscle-history-week-banner-range')).toHaveTextContent(/May/);
+    expect(screen.getByTestId('stats-muscle-history-week-banner-value')).toHaveTextContent(/Volume/);
+  });
+
+  it('shows a placeholder in the banner when no week is selected', () => {
+    renderStatsScreenShell({
+      selectedMuscle: {
+        muscleGroupIds: ['front_delts'],
+        displayName: 'Front Delts',
+        familyName: 'Shoulders',
+      },
+      muscleHistoryWeeklyEffort: [buildWeeklyEffort()],
+      selectedMuscleHistoryWeekKey: null,
+      muscleHistoryMetric: 'totalVolume',
+    });
+
+    expect(screen.getByTestId('stats-muscle-history-week-banner')).toBeTruthy();
+    expect(screen.getByTestId('stats-muscle-history-week-banner-placeholder')).toBeTruthy();
+  });
+
+  it('calls onSelectMuscleHistoryMetric when a metric chip is pressed', () => {
+    const onSelectMuscleHistoryMetric = jest.fn();
+    renderStatsScreenShell({
+      selectedMuscle: {
+        muscleGroupIds: ['front_delts'],
+        displayName: 'Front Delts',
+        familyName: 'Shoulders',
+      },
+      muscleHistoryWeeklyEffort: [buildWeeklyEffort()],
+      muscleHistoryMetric: 'totalVolume',
+      onSelectMuscleHistoryMetric,
+    });
+
+    fireEvent.press(screen.getByTestId('stats-muscle-history-metric-chip-nearFailureCount'));
+    expect(onSelectMuscleHistoryMetric).toHaveBeenCalledWith('nearFailureCount');
   });
 });
 
@@ -604,11 +569,9 @@ describe('StatsRoute', () => {
     expect(mockPush).toHaveBeenCalledWith('/sessions');
   });
 
-  it('loads selected-muscle heatmap data when a muscle row is tapped', async () => {
+  it('loads selected-muscle weekly heatmap data when a muscle row is tapped', async () => {
     mockComputeStatsSummary.mockResolvedValue(buildSummary());
-    mockComputeSelectedMuscleDailyEffort.mockResolvedValue([
-      buildSelectedDayEffort(),
-    ]);
+    mockComputeSelectedMuscleWeeklyEffort.mockResolvedValue([buildWeeklyEffort()]);
 
     render(<StatsRoute />);
 
@@ -623,30 +586,23 @@ describe('StatsRoute', () => {
     fireEvent.press(screen.getByTestId('stats-muscle-row-front_delts'));
 
     await waitFor(() => {
-      expect(mockComputeSelectedMuscleDailyEffort).toHaveBeenCalledWith({
-        muscleGroupId: 'front_delts',
+      expect(mockComputeSelectedMuscleWeeklyEffort).toHaveBeenCalledWith({
+        muscleGroupIds: ['front_delts'],
         start: expect.any(Date),
         end: expect.any(Date),
       });
     });
     await waitFor(() => {
       expect(screen.getByTestId('stats-muscle-history-title')).toHaveTextContent(
-        /Front Delts history/
+        /Front Delts/
       );
     });
-    expect(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-05-18')).toBeTruthy();
-
-    fireEvent.press(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-05-18'));
-    await waitFor(() => {
-      expect(screen.getByTestId('stats-muscle-history-selected-date')).toHaveTextContent(
-        /Overhead Press/
-      );
-    });
+    expect(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-05-11')).toBeTruthy();
   });
 
   it('shows an overlay error when selected-muscle heatmap data fails to load', async () => {
     mockComputeStatsSummary.mockResolvedValue(buildSummary());
-    mockComputeSelectedMuscleDailyEffort.mockRejectedValue(new Error('Daily boom'));
+    mockComputeSelectedMuscleWeeklyEffort.mockRejectedValue(new Error('Weekly boom'));
 
     render(<StatsRoute />);
 
@@ -661,7 +617,7 @@ describe('StatsRoute', () => {
     fireEvent.press(screen.getByTestId('stats-family-header-button-chest'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('stats-muscle-history-error')).toHaveTextContent(/Daily boom/);
+      expect(screen.getByTestId('stats-muscle-history-error')).toHaveTextContent(/Weekly boom/);
     });
 
     fireEvent.press(screen.getByTestId('stats-muscle-history-backdrop'));

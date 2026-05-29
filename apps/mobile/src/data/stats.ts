@@ -3,11 +3,13 @@ import { and, asc, eq, gte, inArray, isNull, lt } from 'drizzle-orm';
 import { bootstrapLocalDataLayer } from './bootstrap';
 import {
   aggregateSelectedMuscleDailyEffort,
+  aggregateSelectedMuscleWeeklyEffort,
   collectMuscleSetContributions,
   countMuscleAnalyticsWorkingSets,
   type AggregateSelectedMuscleDailyEffortOptions,
   type MuscleAnalyticsInput,
   type SelectedMuscleDailyEffort,
+  type SelectedMuscleWeeklyEffort,
 } from './muscle-analytics';
 import {
   exerciseMuscleMappings,
@@ -308,6 +310,19 @@ export const createStatsRepository = (store: StatsStore = createDrizzleStatsStor
     });
     return aggregateSelectedMuscleDailyEffort(input, options);
   },
+  async computeSelectedMuscleWeeklyEffort(
+    options: ComputeSelectedMuscleDailyEffortOptions
+  ): Promise<SelectedMuscleWeeklyEffort[]> {
+    ensureDate(options.start, 'start');
+    ensureDate(options.end, 'end');
+
+    const input = await store.loadAggregationInput({
+      start: options.start,
+      end: options.end,
+    });
+    const daily = aggregateSelectedMuscleDailyEffort(input, options);
+    return aggregateSelectedMuscleWeeklyEffort(daily);
+  },
 });
 
 const defaultStatsRepository = createStatsRepository();
@@ -315,3 +330,5 @@ const defaultStatsRepository = createStatsRepository();
 export const computeStatsSummary = defaultStatsRepository.computeSummary;
 export const computeSelectedMuscleDailyEffort =
   defaultStatsRepository.computeSelectedMuscleDailyEffort;
+export const computeSelectedMuscleWeeklyEffort =
+  defaultStatsRepository.computeSelectedMuscleWeeklyEffort;
