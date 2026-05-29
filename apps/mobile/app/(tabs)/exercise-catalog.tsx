@@ -984,8 +984,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfaceDefault,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
   },
   filterPillSelected: {
     backgroundColor: uiColors.actionPrimarySubtleBg,
