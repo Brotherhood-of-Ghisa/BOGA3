@@ -1,0 +1,1685 @@
+{
+  "type": "View",
+  "props": {
+    "style": {
+      "flex": 1,
+      "backgroundColor": "#f4f7fb",
+      "padding": 16,
+      "gap": 12,
+      "position": "relative"
+    },
+    "testID": "stats-history-screen"
+  },
+  "children": [
+    {
+      "type": "View",
+      "props": {
+        "accessibilityRole": "tablist",
+        "accessibilityLabel": "Select stats period",
+        "style": [
+          {
+            "flexDirection": "row",
+            "gap": 8
+          },
+          null
+        ],
+        "testID": "stats-period-chip-row"
+      },
+      "children": [
+        {
+          "type": "View",
+          "props": {
+            "accessibilityRole": "tab",
+            "accessibilityLabel": "Last 7 days",
+            "testID": "stats-period-chip-7",
+            "accessible": true,
+            "accessibilityState": {
+              "selected": true
+            },
+            "focusable": true,
+            "accessibilityValue": {},
+            "style": [
+              {
+                "borderRadius": 999,
+                "borderWidth": 1,
+                "borderColor": "#dbe3ef",
+                "backgroundColor": "#ffffff",
+                "paddingHorizontal": 14,
+                "paddingVertical": 8
+              },
+              {
+                "borderColor": "#0f5cc0",
+                "backgroundColor": "#eaf2ff"
+              }
+            ],
+            "collapsable": false
+          },
+          "children": [
+            {
+              "type": "Text",
+              "props": {
+                "style": [
+                  {
+                    "fontSize": 13,
+                    "fontWeight": "600",
+                    "color": "#56667f"
+                  },
+                  {
+                    "color": "#0f5cc0"
+                  }
+                ]
+              },
+              "children": [
+                "Last 7 days"
+              ]
+            }
+          ]
+        },
+        {
+          "type": "View",
+          "props": {
+            "accessibilityRole": "tab",
+            "accessibilityLabel": "Last 30 days",
+            "testID": "stats-period-chip-30",
+            "accessible": true,
+            "accessibilityState": {
+              "selected": false
+            },
+            "focusable": true,
+            "accessibilityValue": {},
+            "style": [
+              {
+                "borderRadius": 999,
+                "borderWidth": 1,
+                "borderColor": "#dbe3ef",
+                "backgroundColor": "#ffffff",
+                "paddingHorizontal": 14,
+                "paddingVertical": 8
+              },
+              false
+            ],
+            "collapsable": false
+          },
+          "children": [
+            {
+              "type": "Text",
+              "props": {
+                "style": [
+                  {
+                    "fontSize": 13,
+                    "fontWeight": "600",
+                    "color": "#56667f"
+                  },
+                  false
+                ]
+              },
+              "children": [
+                "Last 30 days"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "RCTScrollView",
+      "props": {
+        "style": {
+          "flex": 1,
+          "minHeight": 0
+        },
+        "contentContainerStyle": {
+          "gap": 16,
+          "paddingBottom": 16
+        },
+        "testID": "stats-scroll"
+      },
+      "children": [
+        {
+          "type": "View",
+          "props": {},
+          "children": [
+            {
+              "type": "View",
+              "props": {
+                "style": {
+                  "flexDirection": "row",
+                  "gap": 12
+                }
+              },
+              "children": [
+                {
+                  "type": "View",
+                  "props": {
+                    "accessibilityRole": "button",
+                    "accessibilityLabel": "Open sessions list",
+                    "testID": "stats-card-sessions",
+                    "accessible": true,
+                    "accessibilityState": {},
+                    "focusable": true,
+                    "accessibilityValue": {},
+                    "style": [
+                      {
+                        "flex": 1,
+                        "borderRadius": 12,
+                        "borderWidth": 1,
+                        "borderColor": "#dbe3ef",
+                        "backgroundColor": "#ffffff",
+                        "padding": 12,
+                        "gap": 4
+                      },
+                      false
+                    ],
+                    "collapsable": false
+                  },
+                  "children": [
+                    {
+                      "type": "Text",
+                      "props": {
+                        "style": {
+                          "fontSize": 12,
+                          "fontWeight": "600",
+                          "color": "#56667f",
+                          "textTransform": "uppercase",
+                          "letterSpacing": 0.5
+                        }
+                      },
+                      "children": [
+                        "Sessions"
+                      ]
+                    },
+                    {
+                      "type": "Text",
+                      "props": {
+                        "style": {
+                          "fontSize": 26,
+                          "fontWeight": "700",
+                          "color": "#122033"
+                        }
+                      },
+                      "children": [
+                        "4"
+                      ]
+                    },
+                    {
+                      "type": "Text",
+                      "props": {
+                        "style": [
+                          {
+                            "fontSize": 12,
+                            "fontWeight": "600"
+                          },
+                          {
+                            "color": "#125d2f"
+                          }
+                        ]
+                      },
+                      "children": [
+                        "+1 (+33%)"
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "View",
+                  "props": {
+                    "style": {
+                      "flex": 1,
+                      "borderRadius": 12,
+                      "borderWidth": 1,
+                      "borderColor": "#dbe3ef",
+                      "backgroundColor": "#ffffff",
+                      "padding": 12,
+                      "gap": 4
+                    },
+                    "testID": "stats-card-sets"
+                  },
+                  "children": [
+                    {
+                      "type": "Text",
+                      "props": {
+                        "style": {
+                          "fontSize": 12,
+                          "fontWeight": "600",
+                          "color": "#56667f",
+                          "textTransform": "uppercase",
+                          "letterSpacing": 0.5
+                        }
+                      },
+                      "children": [
+                        "Working sets"
+                      ]
+                    },
+                    {
+                      "type": "Text",
+                      "props": {
+                        "style": {
+                          "fontSize": 26,
+                          "fontWeight": "700",
+                          "color": "#122033"
+                        }
+                      },
+                      "children": [
+                        "38"
+                      ]
+                    },
+                    {
+                      "type": "Text",
+                      "props": {
+                        "style": [
+                          {
+                            "fontSize": 12,
+                            "fontWeight": "600"
+                          },
+                          {
+                            "color": "#125d2f"
+                          }
+                        ]
+                      },
+                      "children": [
+                        "+8 (+27%)"
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "View",
+              "props": {
+                "style": {
+                  "gap": 12
+                }
+              },
+              "children": [
+                {
+                  "type": "View",
+                  "props": {
+                    "style": {
+                      "borderRadius": 12,
+                      "borderWidth": 1,
+                      "borderColor": "#dbe3ef",
+                      "backgroundColor": "#ffffff",
+                      "overflow": "hidden"
+                    },
+                    "testID": "stats-family-card-chest"
+                  },
+                  "children": [
+                    {
+                      "type": "View",
+                      "props": {
+                        "accessibilityRole": "button",
+                        "accessibilityLabel": "Open Chest history",
+                        "testID": "stats-family-header-button-chest",
+                        "accessible": true,
+                        "accessibilityState": {},
+                        "focusable": true,
+                        "accessibilityValue": {},
+                        "style": [
+                          {
+                            "flexDirection": "row",
+                            "alignItems": "center",
+                            "justifyContent": "space-between",
+                            "paddingHorizontal": 12,
+                            "paddingVertical": 12,
+                            "gap": 12,
+                            "borderBottomWidth": 1,
+                            "borderBottomColor": "#dbe3ef"
+                          },
+                          false
+                        ],
+                        "collapsable": false
+                      },
+                      "children": [
+                        {
+                          "type": "Text",
+                          "props": {
+                            "style": [
+                              {
+                                "fontSize": 16,
+                                "fontWeight": "700",
+                                "color": "#122033",
+                                "flexShrink": 1
+                              },
+                              false
+                            ],
+                            "testID": "stats-family-name-chest"
+                          },
+                          "children": [
+                            "Chest"
+                          ]
+                        },
+                        {
+                          "type": "View",
+                          "props": {
+                            "style": {
+                              "flexDirection": "row",
+                              "gap": 16
+                            }
+                          },
+                          "children": [
+                            {
+                              "type": "View",
+                              "props": {
+                                "style": {
+                                  "alignItems": "flex-end",
+                                  "minWidth": 60
+                                },
+                                "testID": "stats-family-sessions-chest"
+                              },
+                              "children": [
+                                {
+                                  "type": "Text",
+                                  "props": {
+                                    "style": [
+                                      {
+                                        "fontSize": 10,
+                                        "fontWeight": "600",
+                                        "color": "#56667f",
+                                        "textTransform": "uppercase",
+                                        "letterSpacing": 0.4
+                                      },
+                                      false
+                                    ]
+                                  },
+                                  "children": [
+                                    "Sessions"
+                                  ]
+                                },
+                                {
+                                  "type": "Text",
+                                  "props": {
+                                    "style": [
+                                      {
+                                        "fontSize": 15,
+                                        "fontWeight": "700",
+                                        "color": "#122033",
+                                        "marginTop": 2
+                                      },
+                                      false
+                                    ]
+                                  },
+                                  "children": [
+                                    "3"
+                                  ]
+                                },
+                                {
+                                  "type": "Text",
+                                  "props": {
+                                    "style": [
+                                      {
+                                        "fontSize": 11,
+                                        "fontWeight": "600",
+                                        "marginTop": 2
+                                      },
+                                      {
+                                        "color": "#125d2f"
+                                      }
+                                    ]
+                                  },
+                                  "children": [
+                                    "+1 (+50%)"
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "View",
+                              "props": {
+                                "style": {
+                                  "alignItems": "flex-end",
+                                  "minWidth": 60
+                                },
+                                "testID": "stats-family-weight-chest"
+                              },
+                              "children": [
+                                {
+                                  "type": "Text",
+                                  "props": {
+                                    "style": [
+                                      {
+                                        "fontSize": 10,
+                                        "fontWeight": "600",
+                                        "color": "#56667f",
+                                        "textTransform": "uppercase",
+                                        "letterSpacing": 0.4
+                                      },
+                                      false
+                                    ]
+                                  },
+                                  "children": [
+                                    "Total weight"
+                                  ]
+                                },
+                                {
+                                  "type": "Text",
+                                  "props": {
+                                    "style": [
+                                      {
+                                        "fontSize": 15,
+                                        "fontWeight": "700",
+                                        "color": "#122033",
+                                        "marginTop": 2
+                                      },
+                                      false
+                                    ]
+                                  },
+                                  "children": [
+                                    "1.8k"
+                                  ]
+                                },
+                                {
+                                  "type": "Text",
+                                  "props": {
+                                    "style": [
+                                      {
+                                        "fontSize": 11,
+                                        "fontWeight": "600",
+                                        "marginTop": 2
+                                      },
+                                      {
+                                        "color": "#125d2f"
+                                      }
+                                    ]
+                                  },
+                                  "children": [
+                                    "+300 (+20%)"
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "View",
+                  "props": {
+                    "style": {
+                      "borderRadius": 12,
+                      "borderWidth": 1,
+                      "borderColor": "#dbe3ef",
+                      "backgroundColor": "#ffffff",
+                      "overflow": "hidden"
+                    },
+                    "testID": "stats-family-card-shoulders"
+                  },
+                  "children": [
+                    {
+                      "type": "View",
+                      "props": {
+                        "style": {
+                          "flexDirection": "row",
+                          "alignItems": "center",
+                          "justifyContent": "space-between",
+                          "paddingHorizontal": 12,
+                          "paddingVertical": 12,
+                          "gap": 12,
+                          "borderBottomWidth": 1,
+                          "borderBottomColor": "#dbe3ef"
+                        }
+                      },
+                      "children": [
+                        {
+                          "type": "Text",
+                          "props": {
+                            "style": [
+                              {
+                                "fontSize": 16,
+                                "fontWeight": "700",
+                                "color": "#122033",
+                                "flexShrink": 1
+                              },
+                              false
+                            ],
+                            "testID": "stats-family-name-shoulders"
+                          },
+                          "children": [
+                            "Shoulders"
+                          ]
+                        },
+                        {
+                          "type": "View",
+                          "props": {
+                            "style": {
+                              "flexDirection": "row",
+                              "gap": 16
+                            }
+                          },
+                          "children": [
+                            {
+                              "type": "View",
+                              "props": {
+                                "style": {
+                                  "alignItems": "flex-end",
+                                  "minWidth": 60
+                                },
+                                "testID": "stats-family-sessions-shoulders"
+                              },
+                              "children": [
+                                {
+                                  "type": "Text",
+                                  "props": {
+                                    "style": [
+                                      {
+                                        "fontSize": 10,
+                                        "fontWeight": "600",
+                                        "color": "#56667f",
+                                        "textTransform": "uppercase",
+                                        "letterSpacing": 0.4
+                                      },
+                                      false
+                                    ]
+                                  },
+                                  "children": [
+                                    "Sessions"
+                                  ]
+                                },
+                                {
+                                  "type": "Text",
+                                  "props": {
+                                    "style": [
+                                      {
+                                        "fontSize": 15,
+                                        "fontWeight": "700",
+                                        "color": "#122033",
+                                        "marginTop": 2
+                                      },
+                                      false
+                                    ]
+                                  },
+                                  "children": [
+                                    "2"
+                                  ]
+                                },
+                                {
+                                  "type": "Text",
+                                  "props": {
+                                    "style": [
+                                      {
+                                        "fontSize": 11,
+                                        "fontWeight": "600",
+                                        "marginTop": 2
+                                      },
+                                      {
+                                        "color": "#125d2f"
+                                      }
+                                    ]
+                                  },
+                                  "children": [
+                                    "+1 (+100%)"
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "View",
+                              "props": {
+                                "style": {
+                                  "alignItems": "flex-end",
+                                  "minWidth": 60
+                                },
+                                "testID": "stats-family-weight-shoulders"
+                              },
+                              "children": [
+                                {
+                                  "type": "Text",
+                                  "props": {
+                                    "style": [
+                                      {
+                                        "fontSize": 10,
+                                        "fontWeight": "600",
+                                        "color": "#56667f",
+                                        "textTransform": "uppercase",
+                                        "letterSpacing": 0.4
+                                      },
+                                      false
+                                    ]
+                                  },
+                                  "children": [
+                                    "Total weight"
+                                  ]
+                                },
+                                {
+                                  "type": "Text",
+                                  "props": {
+                                    "style": [
+                                      {
+                                        "fontSize": 15,
+                                        "fontWeight": "700",
+                                        "color": "#122033",
+                                        "marginTop": 2
+                                      },
+                                      false
+                                    ]
+                                  },
+                                  "children": [
+                                    "900"
+                                  ]
+                                },
+                                {
+                                  "type": "Text",
+                                  "props": {
+                                    "style": [
+                                      {
+                                        "fontSize": 11,
+                                        "fontWeight": "600",
+                                        "marginTop": 2
+                                      },
+                                      {
+                                        "color": "#125d2f"
+                                      }
+                                    ]
+                                  },
+                                  "children": [
+                                    "+300 (+50%)"
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "View",
+                      "props": {
+                        "style": {
+                          "paddingHorizontal": 12,
+                          "paddingVertical": 4
+                        }
+                      },
+                      "children": [
+                        {
+                          "type": "View",
+                          "props": {
+                            "accessibilityRole": "button",
+                            "accessibilityLabel": "Open Front Delts history",
+                            "testID": "stats-muscle-row-front_delts",
+                            "accessible": true,
+                            "accessibilityState": {},
+                            "focusable": true,
+                            "accessibilityValue": {},
+                            "style": [
+                              {
+                                "flexDirection": "row",
+                                "alignItems": "center",
+                                "justifyContent": "space-between",
+                                "paddingVertical": 8,
+                                "paddingHorizontal": 4,
+                                "gap": 12
+                              },
+                              false
+                            ],
+                            "collapsable": false
+                          },
+                          "children": [
+                            {
+                              "type": "Text",
+                              "props": {
+                                "style": [
+                                  {
+                                    "fontSize": 14,
+                                    "fontWeight": "500",
+                                    "color": "#122033",
+                                    "flexShrink": 1
+                                  },
+                                  false
+                                ],
+                                "numberOfLines": 1
+                              },
+                              "children": [
+                                "Front Delts"
+                              ]
+                            },
+                            {
+                              "type": "View",
+                              "props": {
+                                "style": {
+                                  "flexDirection": "row",
+                                  "gap": 12
+                                }
+                              },
+                              "children": [
+                                {
+                                  "type": "View",
+                                  "props": {
+                                    "style": {
+                                      "alignItems": "flex-end",
+                                      "minWidth": 60
+                                    },
+                                    "testID": "stats-muscle-sessions-front_delts"
+                                  },
+                                  "children": [
+                                    {
+                                      "type": "Text",
+                                      "props": {
+                                        "style": [
+                                          {
+                                            "fontSize": 9,
+                                            "fontWeight": "600",
+                                            "color": "#56667f",
+                                            "textTransform": "uppercase",
+                                            "letterSpacing": 0.4
+                                          },
+                                          false
+                                        ]
+                                      },
+                                      "children": [
+                                        "Sessions"
+                                      ]
+                                    },
+                                    {
+                                      "type": "Text",
+                                      "props": {
+                                        "style": [
+                                          {
+                                            "fontSize": 13,
+                                            "fontWeight": "600",
+                                            "color": "#122033",
+                                            "marginTop": 2
+                                          },
+                                          false
+                                        ]
+                                      },
+                                      "children": [
+                                        "2"
+                                      ]
+                                    },
+                                    {
+                                      "type": "Text",
+                                      "props": {
+                                        "style": [
+                                          {
+                                            "fontSize": 10,
+                                            "fontWeight": "600",
+                                            "marginTop": 2
+                                          },
+                                          {
+                                            "color": "#125d2f"
+                                          }
+                                        ]
+                                      },
+                                      "children": [
+                                        "+1 (+100%)"
+                                      ]
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "View",
+                                  "props": {
+                                    "style": {
+                                      "alignItems": "flex-end",
+                                      "minWidth": 60
+                                    },
+                                    "testID": "stats-muscle-weight-front_delts"
+                                  },
+                                  "children": [
+                                    {
+                                      "type": "Text",
+                                      "props": {
+                                        "style": [
+                                          {
+                                            "fontSize": 9,
+                                            "fontWeight": "600",
+                                            "color": "#56667f",
+                                            "textTransform": "uppercase",
+                                            "letterSpacing": 0.4
+                                          },
+                                          false
+                                        ]
+                                      },
+                                      "children": [
+                                        "Total weight"
+                                      ]
+                                    },
+                                    {
+                                      "type": "Text",
+                                      "props": {
+                                        "style": [
+                                          {
+                                            "fontSize": 13,
+                                            "fontWeight": "600",
+                                            "color": "#122033",
+                                            "marginTop": 2
+                                          },
+                                          false
+                                        ]
+                                      },
+                                      "children": [
+                                        "600"
+                                      ]
+                                    },
+                                    {
+                                      "type": "Text",
+                                      "props": {
+                                        "style": [
+                                          {
+                                            "fontSize": 10,
+                                            "fontWeight": "600",
+                                            "marginTop": 2
+                                          },
+                                          {
+                                            "color": "#125d2f"
+                                          }
+                                        ]
+                                      },
+                                      "children": [
+                                        "+200 (+50%)"
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "View",
+                          "props": {
+                            "accessibilityRole": "button",
+                            "accessibilityLabel": "Open Rear Delts history",
+                            "testID": "stats-muscle-row-rear_delts",
+                            "accessible": true,
+                            "accessibilityState": {},
+                            "focusable": true,
+                            "accessibilityValue": {},
+                            "style": [
+                              {
+                                "flexDirection": "row",
+                                "alignItems": "center",
+                                "justifyContent": "space-between",
+                                "paddingVertical": 8,
+                                "paddingHorizontal": 4,
+                                "gap": 12
+                              },
+                              false
+                            ],
+                            "collapsable": false
+                          },
+                          "children": [
+                            {
+                              "type": "Text",
+                              "props": {
+                                "style": [
+                                  {
+                                    "fontSize": 14,
+                                    "fontWeight": "500",
+                                    "color": "#122033",
+                                    "flexShrink": 1
+                                  },
+                                  false
+                                ],
+                                "numberOfLines": 1
+                              },
+                              "children": [
+                                "Rear Delts"
+                              ]
+                            },
+                            {
+                              "type": "View",
+                              "props": {
+                                "style": {
+                                  "flexDirection": "row",
+                                  "gap": 12
+                                }
+                              },
+                              "children": [
+                                {
+                                  "type": "View",
+                                  "props": {
+                                    "style": {
+                                      "alignItems": "flex-end",
+                                      "minWidth": 60
+                                    },
+                                    "testID": "stats-muscle-sessions-rear_delts"
+                                  },
+                                  "children": [
+                                    {
+                                      "type": "Text",
+                                      "props": {
+                                        "style": [
+                                          {
+                                            "fontSize": 9,
+                                            "fontWeight": "600",
+                                            "color": "#56667f",
+                                            "textTransform": "uppercase",
+                                            "letterSpacing": 0.4
+                                          },
+                                          false
+                                        ]
+                                      },
+                                      "children": [
+                                        "Sessions"
+                                      ]
+                                    },
+                                    {
+                                      "type": "Text",
+                                      "props": {
+                                        "style": [
+                                          {
+                                            "fontSize": 13,
+                                            "fontWeight": "600",
+                                            "color": "#122033",
+                                            "marginTop": 2
+                                          },
+                                          false
+                                        ]
+                                      },
+                                      "children": [
+                                        "1"
+                                      ]
+                                    },
+                                    {
+                                      "type": "Text",
+                                      "props": {
+                                        "style": [
+                                          {
+                                            "fontSize": 10,
+                                            "fontWeight": "600",
+                                            "marginTop": 2
+                                          },
+                                          {
+                                            "color": "#56667f"
+                                          }
+                                        ]
+                                      },
+                                      "children": [
+                                        "±0"
+                                      ]
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "View",
+                                  "props": {
+                                    "style": {
+                                      "alignItems": "flex-end",
+                                      "minWidth": 60
+                                    },
+                                    "testID": "stats-muscle-weight-rear_delts"
+                                  },
+                                  "children": [
+                                    {
+                                      "type": "Text",
+                                      "props": {
+                                        "style": [
+                                          {
+                                            "fontSize": 9,
+                                            "fontWeight": "600",
+                                            "color": "#56667f",
+                                            "textTransform": "uppercase",
+                                            "letterSpacing": 0.4
+                                          },
+                                          false
+                                        ]
+                                      },
+                                      "children": [
+                                        "Total weight"
+                                      ]
+                                    },
+                                    {
+                                      "type": "Text",
+                                      "props": {
+                                        "style": [
+                                          {
+                                            "fontSize": 13,
+                                            "fontWeight": "600",
+                                            "color": "#122033",
+                                            "marginTop": 2
+                                          },
+                                          false
+                                        ]
+                                      },
+                                      "children": [
+                                        "300"
+                                      ]
+                                    },
+                                    {
+                                      "type": "Text",
+                                      "props": {
+                                        "style": [
+                                          {
+                                            "fontSize": 10,
+                                            "fontWeight": "600",
+                                            "marginTop": 2
+                                          },
+                                          {
+                                            "color": "#125d2f"
+                                          }
+                                        ]
+                                      },
+                                      "children": [
+                                        "+100 (+50%)"
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "View",
+                  "props": {
+                    "style": {
+                      "borderRadius": 12,
+                      "borderWidth": 1,
+                      "borderColor": "#dbe3ef",
+                      "backgroundColor": "#ffffff",
+                      "overflow": "hidden"
+                    },
+                    "testID": "stats-family-card-legs"
+                  },
+                  "children": [
+                    {
+                      "type": "View",
+                      "props": {
+                        "style": {
+                          "flexDirection": "row",
+                          "alignItems": "center",
+                          "justifyContent": "space-between",
+                          "paddingHorizontal": 12,
+                          "paddingVertical": 12,
+                          "gap": 12,
+                          "borderBottomWidth": 1,
+                          "borderBottomColor": "#dbe3ef"
+                        }
+                      },
+                      "children": [
+                        {
+                          "type": "Text",
+                          "props": {
+                            "style": [
+                              {
+                                "fontSize": 16,
+                                "fontWeight": "700",
+                                "color": "#122033",
+                                "flexShrink": 1
+                              },
+                              {
+                                "color": "#56667f"
+                              }
+                            ],
+                            "testID": "stats-family-name-legs"
+                          },
+                          "children": [
+                            "Legs"
+                          ]
+                        },
+                        {
+                          "type": "View",
+                          "props": {
+                            "style": {
+                              "flexDirection": "row",
+                              "gap": 16
+                            }
+                          },
+                          "children": [
+                            {
+                              "type": "View",
+                              "props": {
+                                "style": {
+                                  "alignItems": "flex-end",
+                                  "minWidth": 60
+                                },
+                                "testID": "stats-family-sessions-legs"
+                              },
+                              "children": [
+                                {
+                                  "type": "Text",
+                                  "props": {
+                                    "style": [
+                                      {
+                                        "fontSize": 10,
+                                        "fontWeight": "600",
+                                        "color": "#56667f",
+                                        "textTransform": "uppercase",
+                                        "letterSpacing": 0.4
+                                      },
+                                      {
+                                        "color": "#56667f"
+                                      }
+                                    ]
+                                  },
+                                  "children": [
+                                    "Sessions"
+                                  ]
+                                },
+                                {
+                                  "type": "Text",
+                                  "props": {
+                                    "style": [
+                                      {
+                                        "fontSize": 15,
+                                        "fontWeight": "700",
+                                        "color": "#122033",
+                                        "marginTop": 2
+                                      },
+                                      {
+                                        "color": "#56667f"
+                                      }
+                                    ]
+                                  },
+                                  "children": [
+                                    "0"
+                                  ]
+                                },
+                                {
+                                  "type": "Text",
+                                  "props": {
+                                    "style": [
+                                      {
+                                        "fontSize": 11,
+                                        "fontWeight": "600",
+                                        "marginTop": 2
+                                      },
+                                      {
+                                        "color": "#56667f"
+                                      }
+                                    ]
+                                  },
+                                  "children": [
+                                    "—"
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "View",
+                              "props": {
+                                "style": {
+                                  "alignItems": "flex-end",
+                                  "minWidth": 60
+                                },
+                                "testID": "stats-family-weight-legs"
+                              },
+                              "children": [
+                                {
+                                  "type": "Text",
+                                  "props": {
+                                    "style": [
+                                      {
+                                        "fontSize": 10,
+                                        "fontWeight": "600",
+                                        "color": "#56667f",
+                                        "textTransform": "uppercase",
+                                        "letterSpacing": 0.4
+                                      },
+                                      {
+                                        "color": "#56667f"
+                                      }
+                                    ]
+                                  },
+                                  "children": [
+                                    "Total weight"
+                                  ]
+                                },
+                                {
+                                  "type": "Text",
+                                  "props": {
+                                    "style": [
+                                      {
+                                        "fontSize": 15,
+                                        "fontWeight": "700",
+                                        "color": "#122033",
+                                        "marginTop": 2
+                                      },
+                                      {
+                                        "color": "#56667f"
+                                      }
+                                    ]
+                                  },
+                                  "children": [
+                                    "0"
+                                  ]
+                                },
+                                {
+                                  "type": "Text",
+                                  "props": {
+                                    "style": [
+                                      {
+                                        "fontSize": 11,
+                                        "fontWeight": "600",
+                                        "marginTop": 2
+                                      },
+                                      {
+                                        "color": "#56667f"
+                                      }
+                                    ]
+                                  },
+                                  "children": [
+                                    "—"
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "View",
+                      "props": {
+                        "style": {
+                          "paddingHorizontal": 12,
+                          "paddingVertical": 4
+                        }
+                      },
+                      "children": [
+                        {
+                          "type": "View",
+                          "props": {
+                            "accessibilityRole": "button",
+                            "accessibilityLabel": "Open Calves history",
+                            "testID": "stats-muscle-row-calves",
+                            "accessible": true,
+                            "accessibilityState": {},
+                            "focusable": true,
+                            "accessibilityValue": {},
+                            "style": [
+                              {
+                                "flexDirection": "row",
+                                "alignItems": "center",
+                                "justifyContent": "space-between",
+                                "paddingVertical": 8,
+                                "paddingHorizontal": 4,
+                                "gap": 12
+                              },
+                              false
+                            ],
+                            "collapsable": false
+                          },
+                          "children": [
+                            {
+                              "type": "Text",
+                              "props": {
+                                "style": [
+                                  {
+                                    "fontSize": 14,
+                                    "fontWeight": "500",
+                                    "color": "#122033",
+                                    "flexShrink": 1
+                                  },
+                                  {
+                                    "color": "#56667f"
+                                  }
+                                ],
+                                "numberOfLines": 1
+                              },
+                              "children": [
+                                "Calves"
+                              ]
+                            },
+                            {
+                              "type": "View",
+                              "props": {
+                                "style": {
+                                  "flexDirection": "row",
+                                  "gap": 12
+                                }
+                              },
+                              "children": [
+                                {
+                                  "type": "View",
+                                  "props": {
+                                    "style": {
+                                      "alignItems": "flex-end",
+                                      "minWidth": 60
+                                    },
+                                    "testID": "stats-muscle-sessions-calves"
+                                  },
+                                  "children": [
+                                    {
+                                      "type": "Text",
+                                      "props": {
+                                        "style": [
+                                          {
+                                            "fontSize": 9,
+                                            "fontWeight": "600",
+                                            "color": "#56667f",
+                                            "textTransform": "uppercase",
+                                            "letterSpacing": 0.4
+                                          },
+                                          {
+                                            "color": "#56667f"
+                                          }
+                                        ]
+                                      },
+                                      "children": [
+                                        "Sessions"
+                                      ]
+                                    },
+                                    {
+                                      "type": "Text",
+                                      "props": {
+                                        "style": [
+                                          {
+                                            "fontSize": 13,
+                                            "fontWeight": "600",
+                                            "color": "#122033",
+                                            "marginTop": 2
+                                          },
+                                          {
+                                            "color": "#56667f"
+                                          }
+                                        ]
+                                      },
+                                      "children": [
+                                        "0"
+                                      ]
+                                    },
+                                    {
+                                      "type": "Text",
+                                      "props": {
+                                        "style": [
+                                          {
+                                            "fontSize": 10,
+                                            "fontWeight": "600",
+                                            "marginTop": 2
+                                          },
+                                          {
+                                            "color": "#56667f"
+                                          }
+                                        ]
+                                      },
+                                      "children": [
+                                        "—"
+                                      ]
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "View",
+                                  "props": {
+                                    "style": {
+                                      "alignItems": "flex-end",
+                                      "minWidth": 60
+                                    },
+                                    "testID": "stats-muscle-weight-calves"
+                                  },
+                                  "children": [
+                                    {
+                                      "type": "Text",
+                                      "props": {
+                                        "style": [
+                                          {
+                                            "fontSize": 9,
+                                            "fontWeight": "600",
+                                            "color": "#56667f",
+                                            "textTransform": "uppercase",
+                                            "letterSpacing": 0.4
+                                          },
+                                          {
+                                            "color": "#56667f"
+                                          }
+                                        ]
+                                      },
+                                      "children": [
+                                        "Total weight"
+                                      ]
+                                    },
+                                    {
+                                      "type": "Text",
+                                      "props": {
+                                        "style": [
+                                          {
+                                            "fontSize": 13,
+                                            "fontWeight": "600",
+                                            "color": "#122033",
+                                            "marginTop": 2
+                                          },
+                                          {
+                                            "color": "#56667f"
+                                          }
+                                        ]
+                                      },
+                                      "children": [
+                                        "0"
+                                      ]
+                                    },
+                                    {
+                                      "type": "Text",
+                                      "props": {
+                                        "style": [
+                                          {
+                                            "fontSize": 10,
+                                            "fontWeight": "600",
+                                            "marginTop": 2
+                                          },
+                                          {
+                                            "color": "#56667f"
+                                          }
+                                        ]
+                                      },
+                                      "children": [
+                                        "—"
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "View",
+      "props": {
+        "style": {
+          "position": "absolute",
+          "left": 0,
+          "right": 0,
+          "top": 0,
+          "bottom": 0,
+          "justifyContent": "flex-end",
+          "padding": 16
+        },
+        "testID": "stats-muscle-history-overlay"
+      },
+      "children": [
+        {
+          "type": "View",
+          "props": {
+            "accessibilityLabel": "Dismiss muscle history",
+            "accessibilityRole": "button",
+            "testID": "stats-muscle-history-backdrop",
+            "accessible": true,
+            "accessibilityState": {},
+            "focusable": true,
+            "accessibilityValue": {},
+            "style": {
+              "position": "absolute",
+              "left": 0,
+              "right": 0,
+              "top": 0,
+              "bottom": 0,
+              "backgroundColor": "rgba(0, 0, 0, 0.35)"
+            },
+            "collapsable": false
+          },
+          "children": null
+        },
+        {
+          "type": "View",
+          "props": {
+            "style": {
+              "height": "75%",
+              "borderRadius": 12,
+              "borderWidth": 1,
+              "borderColor": "#dbe3ef",
+              "backgroundColor": "#ffffff",
+              "overflow": "hidden"
+            }
+          },
+          "children": [
+            {
+              "type": "View",
+              "props": {
+                "style": {
+                  "flexDirection": "row",
+                  "alignItems": "center",
+                  "justifyContent": "space-between",
+                  "borderBottomWidth": 1,
+                  "borderBottomColor": "#dbe3ef",
+                  "paddingHorizontal": 16,
+                  "paddingVertical": 12,
+                  "gap": 12
+                }
+              },
+              "children": [
+                {
+                  "type": "View",
+                  "props": {
+                    "style": {
+                      "flexShrink": 1,
+                      "gap": 2
+                    }
+                  },
+                  "children": [
+                    {
+                      "type": "Text",
+                      "props": {
+                        "style": {
+                          "fontSize": 11,
+                          "fontWeight": "700",
+                          "color": "#56667f",
+                          "textTransform": "uppercase",
+                          "letterSpacing": 0.4
+                        }
+                      },
+                      "children": [
+                        "Muscle history"
+                      ]
+                    },
+                    {
+                      "type": "Text",
+                      "props": {
+                        "style": {
+                          "fontSize": 18,
+                          "fontWeight": "700",
+                          "color": "#122033"
+                        },
+                        "testID": "stats-muscle-history-title"
+                      },
+                      "children": [
+                        "Front Delts",
+                        " history"
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "View",
+                  "props": {
+                    "accessibilityLabel": "Close muscle history",
+                    "accessibilityRole": "button",
+                    "testID": "stats-muscle-history-close",
+                    "accessible": true,
+                    "accessibilityState": {},
+                    "focusable": true,
+                    "accessibilityValue": {},
+                    "style": [
+                      {
+                        "width": 32,
+                        "height": 32,
+                        "borderRadius": 16,
+                        "borderWidth": 1,
+                        "borderColor": "#c7d3e8",
+                        "backgroundColor": "#eef2f9",
+                        "alignItems": "center",
+                        "justifyContent": "center"
+                      },
+                      false
+                    ],
+                    "collapsable": false
+                  },
+                  "children": [
+                    {
+                      "type": "Text",
+                      "props": {
+                        "style": {
+                          "fontSize": 13,
+                          "fontWeight": "700",
+                          "color": "#20324f"
+                        }
+                      },
+                      "children": [
+                        "X"
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "RCTScrollView",
+              "props": {
+                "contentContainerStyle": {
+                  "padding": 16,
+                  "gap": 16
+                },
+                "showsVerticalScrollIndicator": false,
+                "testID": "stats-muscle-history-scroll"
+              },
+              "children": [
+                {
+                  "type": "View",
+                  "props": {},
+                  "children": [
+                    {
+                      "type": "View",
+                      "props": {
+                        "style": {
+                          "borderRadius": 12,
+                          "borderWidth": 1,
+                          "borderColor": "#dbe3ef",
+                          "backgroundColor": "#f5f9ff",
+                          "padding": 12,
+                          "gap": 6
+                        },
+                        "testID": "stats-muscle-history-loading"
+                      },
+                      "children": [
+                        {
+                          "type": "Text",
+                          "props": {
+                            "style": {
+                              "fontSize": 13,
+                              "color": "#56667f"
+                            }
+                          },
+                          "children": [
+                            "Loading ",
+                            "Front Delts",
+                            " history..."
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

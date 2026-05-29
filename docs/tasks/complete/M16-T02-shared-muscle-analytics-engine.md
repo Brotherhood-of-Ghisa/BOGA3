@@ -1,7 +1,7 @@
 ---
 task_id: M16-T02-shared-muscle-analytics-engine
 milestone_id: "M16"
-status: planned
+status: completed
 ui_impact: "no"
 areas: "frontend|docs"
 runtimes: "node"
@@ -16,12 +16,14 @@ docs_touched: "docs/specs/milestones/M16-muscle-group-calendar-heatmap.md,RUNBOO
 
 - Task ID: `M16-T02-shared-muscle-analytics-engine`
 - Title: Shared muscle analytics engine
-- Status: `planned`
+- Status: `completed`
 - File location rule:
   - author active cards in `docs/tasks/<task-id>.md`
   - move the file to `docs/tasks/complete/<task-id>.md` when `Status` becomes `completed` or `outdated`
 - Session date: `2026-05-28`
 - Session interaction mode: `interactive (default)`
+- Required branch: `codex/m16-t02-shared-muscle-analytics-engine`
+- Branch/worktree rule: create or switch to the required branch before edits, preferably via `./scripts/worktree-create.sh <branch-name>` from the main checkout. Do not complete this task directly on `main`.
 
 ## Parent references (required)
 
@@ -37,8 +39,8 @@ docs_touched: "docs/specs/milestones/M16-muscle-group-calendar-heatmap.md,RUNBOO
 
 ## Context Freshness (required at session start; update before edits)
 
-- Verified current branch + HEAD commit:
-- Start-of-session sync completed per `docs/specs/04-ai-development-playbook.md` git sync workflow?: `yes | no | N/A` (explain)
+- Verified current branch + HEAD commit: `main @ e93902c`
+- Start-of-session sync completed per `docs/specs/04-ai-development-playbook.md` git sync workflow?: `yes` (`git fetch origin main && git pull --ff-only origin main`; already up to date)
 - Parent refs opened in this session:
   - `docs/specs/README.md`
   - `docs/specs/00-product.md`
@@ -51,11 +53,11 @@ docs_touched: "docs/specs/milestones/M16-muscle-group-calendar-heatmap.md,RUNBOO
   - `docs/specs/milestones/M16-muscle-group-calendar-heatmap.md`
   - `RUNBOOK.md`
 - Code/docs inventory freshness checks run:
-  - Re-check `apps/mobile/src/data/stats.ts` for current Stats aggregation behavior.
-  - Re-check `apps/mobile/app/__tests__/stats-repository.test.ts` for current behavior-lock tests.
-  - Re-check `apps/mobile/src/data/index.ts` exports before adding new public data APIs.
-  - Re-check completed session data/query helpers used by Stats and exercise history.
-- Known stale references or assumptions (must be explicit; write `none` if none):
+  - Re-check `apps/mobile/src/data/stats.ts` for current Stats aggregation behavior. `done`
+  - Re-check `apps/mobile/app/__tests__/stats-repository.test.ts` for current behavior-lock tests. `done`
+  - Re-check `apps/mobile/src/data/index.ts` exports before adding new public data APIs. `done`
+  - Re-check completed session data/query helpers used by Stats and exercise history. `done`
+- Known stale references or assumptions (must be explicit; write `none` if none): none
 - Optional helper command:
   - `./scripts/task-bootstrap.sh docs/tasks/M16-T02-shared-muscle-analytics-engine.md`
 
@@ -153,18 +155,31 @@ Extract the current Stats muscle contribution math into a shared local analytics
 ## Evidence
 
 - UI/UX task visual artifacts note: `N/A` - no UI impact.
-- Manual verification summary (required when CI is absent/partial):
+- Manual verification summary (required when CI is absent/partial): Targeted Jest, TypeScript, frontend fast gate, and `git diff --check` passed locally.
+  - Targeted Jest: `cd apps/mobile && npm test -- --runTestsByPath app/__tests__/muscle-analytics.test.ts app/__tests__/stats-repository.test.ts --runInBand` (14 tests passed).
+  - TypeScript: `cd apps/mobile && npm run typecheck` (passed).
+  - Frontend fast gate: `./scripts/quality-fast.sh frontend` (lint, typecheck, and 51 Jest suites / 380 tests passed).
+  - `git diff --check` (passed).
 - Deferred/manual hosted checks summary: `N/A`
 
 ## Completion note (fill at end per `docs/specs/04-ai-development-playbook.md`)
 
-- What changed:
-- What tests ran:
-- What remains:
+- What changed: Added the shared muscle analytics engine and wired Stats plus selected-muscle daily effort APIs to it.
+  - Added `apps/mobile/src/data/muscle-analytics.ts` as the shared muscle analytics engine.
+  - Preserved existing Stats role-based scoring (`primary=1`, `secondary=0.5`, `stabilizer/null=0`) and moved Stats period totals onto the shared contribution collector.
+  - Added selected-muscle daily effort aggregation with local-date bucketing, same-day session aggregation, raw contribution details for later selected-day explanations, and public exports through `apps/mobile/src/data/index.ts`.
+  - Updated the M16 milestone API note and task status.
+  - `RUNBOOK.md reviewed (no changes required)`.
+- What tests ran: Targeted Jest, TypeScript, frontend fast gate, and `git diff --check`.
+  - `cd apps/mobile && npm test -- --runTestsByPath app/__tests__/muscle-analytics.test.ts app/__tests__/stats-repository.test.ts --runInBand`
+  - `cd apps/mobile && npm run typecheck`
+  - `./scripts/quality-fast.sh frontend`
+  - `git diff --check`
+- What remains: `M16-T03+` UI/component/overlay wiring remains out of scope for this task.
 
 ## Status update checklist (mandatory at closeout)
 
-- Update `Status` to `completed`, `blocked`, or `outdated`.
-- If `Status = completed` or `outdated`, move the task card to `docs/tasks/complete/`.
-- Update M16 milestone task breakdown/status in the same session.
-- Record `RUNBOOK.md reviewed (no changes required)` if commands/workflows did not change.
+- Update `Status` to `completed`, `blocked`, or `outdated`. `done`
+- If `Status = completed` or `outdated`, move the task card to `docs/tasks/complete/`. `done`
+- Update M16 milestone task breakdown/status in the same session. `done`
+- Record `RUNBOOK.md reviewed (no changes required)` if commands/workflows did not change. `done`

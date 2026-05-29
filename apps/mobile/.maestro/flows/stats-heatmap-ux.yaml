@@ -1,0 +1,99 @@
+appId: com.dinoderek.mobile
+---
+# Seed exercise history data and teleport to the Stats/History screen
+- openLink: "boga3://maestro-harness?reset=data&fixture=exercise-block-history&teleport=session-list"
+- tapOn:
+    text: "Open"
+    optional: true
+- tapOn:
+    text: "Continue"
+    optional: true
+- tapOn:
+    text: "Close"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "stats-history-screen"
+    timeout: 30000
+- takeScreenshot: "01-stats-screen"
+
+# --- Single muscle: tap Chest (collapsed, single-muscle family) ---
+- tapOn:
+    text: "Chest"
+- extendedWaitUntil:
+    visible:
+      id: "stats-muscle-history-overlay"
+    timeout: 15000
+- takeScreenshot: "02-chest-overlay-volume"
+
+# All 4 metric chips must be visible and compact
+- assertVisible:
+    id: "stats-muscle-history-metric-chip-totalVolume"
+- assertVisible:
+    id: "stats-muscle-history-metric-chip-nearFailureCount"
+- assertVisible:
+    id: "stats-muscle-history-metric-chip-estimatedRM1"
+- assertVisible:
+    id: "stats-muscle-history-metric-chip-highestWeight"
+
+# Calendar grid is present (≥6 month rows will include grey rows)
+- assertVisible:
+    id: "stats-muscle-history-heatmap"
+
+# Tap the current-week cell (first May row, week 4 = 2026-05-25) to show banner
+- tapOn:
+    id: "stats-muscle-history-heatmap-cell-2026-05-25"
+    optional: true
+- takeScreenshot: "03-week-selected-banner-volume"
+
+# Assert banner appears
+- assertVisible:
+    id: "stats-muscle-history-week-banner"
+    optional: true
+
+# Switch to Near failure with banner visible
+- tapOn:
+    id: "stats-muscle-history-metric-chip-nearFailureCount"
+- takeScreenshot: "04-near-failure-metric-with-banner"
+
+# Switch to 1RM
+- tapOn:
+    id: "stats-muscle-history-metric-chip-estimatedRM1"
+- takeScreenshot: "05-1rm-metric"
+
+# Switch to Top Weight
+- tapOn:
+    id: "stats-muscle-history-metric-chip-highestWeight"
+- takeScreenshot: "06-top-weight-metric"
+
+# Switch back to Volume
+- tapOn:
+    id: "stats-muscle-history-metric-chip-totalVolume"
+
+# Dismiss overlay
+- tapOn:
+    id: "stats-muscle-history-close"
+- extendedWaitUntil:
+    notVisible:
+      id: "stats-muscle-history-overlay"
+    timeout: 5000
+
+# --- Family-level: tap Back family header (multi-muscle) ---
+- tapOn:
+    id: "stats-family-header-back"
+- extendedWaitUntil:
+    visible:
+      id: "stats-muscle-history-overlay"
+    timeout: 15000
+- takeScreenshot: "07-back-family-overlay"
+- assertVisible:
+    id: "stats-muscle-history-heatmap"
+
+# Dismiss
+- tapOn:
+    id: "stats-muscle-history-close"
+- extendedWaitUntil:
+    notVisible:
+      id: "stats-muscle-history-overlay"
+    timeout: 5000
+- takeScreenshot: "08-overlay-dismissed"

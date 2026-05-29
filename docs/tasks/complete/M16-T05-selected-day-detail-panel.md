@@ -1,7 +1,7 @@
 ---
 task_id: M16-T05-selected-day-detail-panel
 milestone_id: "M16"
-status: planned
+status: completed
 ui_impact: "yes"
 areas: "frontend|docs"
 runtimes: "node|expo"
@@ -16,12 +16,14 @@ docs_touched: "docs/specs/ui/screen-map.md,docs/specs/ui/ux-rules.md,docs/specs/
 
 - Task ID: `M16-T05-selected-day-detail-panel`
 - Title: Selected-day muscle detail panel
-- Status: `planned`
+- Status: `completed`
 - File location rule:
   - author active cards in `docs/tasks/<task-id>.md`
   - move the file to `docs/tasks/complete/<task-id>.md` when `Status` becomes `completed` or `outdated`
 - Session date: `2026-05-28`
 - Session interaction mode: `interactive (default)`
+- Required branch: `codex/m16-t05-selected-day-detail-panel`
+- Branch/worktree rule: create or switch to the required branch before edits, preferably via `./scripts/worktree-create.sh <branch-name>` from the main checkout. Do not complete this task directly on `main`.
 
 ## Parent references (required)
 
@@ -42,8 +44,8 @@ docs_touched: "docs/specs/ui/screen-map.md,docs/specs/ui/ux-rules.md,docs/specs/
 
 ## Context Freshness (required at session start; update before edits)
 
-- Verified current branch + HEAD commit:
-- Start-of-session sync completed per `docs/specs/04-ai-development-playbook.md` git sync workflow?: `yes | no | N/A` (explain)
+- Verified current branch + HEAD commit: `codex/m16-t05-selected-day-detail-panel @ eb7141b`
+- Start-of-session sync completed per `docs/specs/04-ai-development-playbook.md` git sync workflow?: `yes` (`git fetch origin main`; T05 worktree/branch created from completed `codex/m16-t04-stats-history-muscle-overlay` because this task depends on T04 overlay work rather than bare `main`)
 - Parent refs opened in this session:
   - `docs/specs/README.md`
   - `docs/specs/00-product.md`
@@ -61,10 +63,10 @@ docs_touched: "docs/specs/ui/screen-map.md,docs/specs/ui/ux-rules.md,docs/specs/
   - `docs/specs/milestones/M16-muscle-group-calendar-heatmap.md`
   - `RUNBOOK.md`
 - Code/docs inventory freshness checks run:
-  - Confirm `M16-T02` daily aggregation output includes contributing exercise/set details or extend it without changing scoring semantics.
-  - Confirm `M16-T04` overlay selected-date state and data flow are complete.
-  - Re-check current completed-session/exercise/set display helpers for formatting consistency.
-- Known stale references or assumptions (must be explicit; write `none` if none):
+  - Confirm `M16-T02` daily aggregation output includes contributing exercise/set details or extend it without changing scoring semantics. `done` - `SelectedMuscleDailyEffort.contributions` carries session, exercise, set, raw value, role, and weighted-volume details from the shared contribution collector.
+  - Confirm `M16-T04` overlay selected-date state and data flow are complete. `done` - Stats overlay stores selected muscle/date state, loads `computeSelectedMuscleDailyEffort(...)`, and renders a minimal selected-date summary ready for T05 expansion.
+  - Re-check current completed-session/exercise/set display helpers for formatting consistency. `done` - reviewed exercise-history/completed-session display patterns; detail panel will keep compact table-like rows and reuse token-backed overlay styles.
+- Known stale references or assumptions (must be explicit; write `none` if none): none
 - Optional helper command:
   - `./scripts/task-bootstrap.sh docs/tasks/M16-T05-selected-day-detail-panel.md`
 
@@ -196,19 +198,29 @@ Add the selected-day detail content inside the muscle heatmap overlay so users c
 ## Evidence
 
 - UI/UX task visual artifacts note:
-  - Record screenshot/capture paths for trained date detail and no-training date detail when feasible.
-- Manual verification summary (required when CI is absent/partial):
+  - Render capture: `artifacts/ui/M16-T05-selected-day-detail-panel/stats-muscle-history-loading.json`
+  - Render capture: `artifacts/ui/M16-T05-selected-day-detail-panel/stats-muscle-history-error.json`
+  - Render capture: `artifacts/ui/M16-T05-selected-day-detail-panel/stats-muscle-history-empty.json`
+  - Render capture: `artifacts/ui/M16-T05-selected-day-detail-panel/stats-muscle-history-populated-selected.json`
+  - Render capture: `artifacts/ui/M16-T05-selected-day-detail-panel/stats-muscle-history-zero-effort-selected.json`
+- Manual verification summary (required when CI is absent/partial): RNTL coverage verifies selected-day date/muscle/effort/bucket, grouped contributing exercises, multiple sessions/exercises, set rows, zero-effort empty state, invalid-set zero effort, no fake certification marker, heatmap cell selection, and overlay dismiss/error/loading/empty states. Shared analytics coverage verifies warm-up exclusion and invalid-set zero-volume behavior from the canonical M16 helper.
 - Deferred/manual hosted checks summary: `N/A`
 
 ## Completion note (fill at end per `docs/specs/04-ai-development-playbook.md`)
 
-- What changed:
-- What tests ran:
-- What remains:
+- What changed: Expanded the Stats / History muscle-history selected-day panel from a minimal summary into a compact detail panel showing selected date, selected muscle, effort score/bucket, session/set counts, contributing exercises, and set-level weighted effort rows. Zero-effort selected dates now show date/muscle plus effort `0`, bucket `0`, and a clear no-training empty state. The panel uses existing shared daily contribution objects and the heatmap bucket helper, adds no certification UI, and introduces no schema/backend/sync changes. Updated UI docs for the selected-day detail semantics. `RUNBOOK.md reviewed (no changes required)`.
+- What tests ran: Targeted Jest red/green plus full frontend gate and docs/whitespace checks.
+  - `cd apps/mobile && npm test -- --runTestsByPath app/__tests__/stats-screen.test.tsx --runInBand` (initial red, then pass)
+  - `cd apps/mobile && npm test -- --runTestsByPath app/__tests__/muscle-analytics.test.ts app/__tests__/stats-screen.test.tsx --runInBand`
+  - `cd apps/mobile && npm run typecheck`
+  - `cd apps/mobile && npm run lint:ui-guardrails`
+  - `cd apps/mobile && UI_EVIDENCE_DIR=../../artifacts/ui/M16-T05-selected-day-detail-panel npm test -- --runTestsByPath app/__tests__/stats-screen.test.tsx --runInBand`
+  - `./scripts/quality-fast.sh frontend` (lint, typecheck, 52 Jest suites / 390 tests passed)
+- What remains: `M16-T06` final QA/visual evidence and milestone closeout remains planned.
 
 ## Status update checklist (mandatory at closeout)
 
-- Update `Status` to `completed`, `blocked`, or `outdated`.
-- If `Status = completed` or `outdated`, move the task card to `docs/tasks/complete/`.
-- Update relevant UI docs and M16 milestone task breakdown/status.
-- Record `RUNBOOK.md reviewed (no changes required)` if commands/workflows did not change.
+- Update `Status` to `completed`, `blocked`, or `outdated`. `done`
+- If `Status = completed` or `outdated`, move the task card to `docs/tasks/complete/`. `done`
+- Update relevant UI docs and M16 milestone task breakdown/status. `done`
+- Record `RUNBOOK.md reviewed (no changes required)` if commands/workflows did not change. `done`

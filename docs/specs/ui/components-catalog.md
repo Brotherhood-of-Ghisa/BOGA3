@@ -25,6 +25,8 @@ Brief entrypoint inventory of the current reusable UI component set.
   - shared session-recorder/session-detail UI composition components and supporting UI modules
 - `apps/mobile/components/session-list/`
   - shared building blocks originally extracted from the retired session-list screen (summary line, active-session row, history list, data hook); now consumed by the `stats-history` History sub-view and the Log tab
+- `apps/mobile/components/muscle-analytics/`
+  - shared muscle analytics UI components for Stats/History surfaces
 
 ## Current component set (authoritative)
 
@@ -99,6 +101,13 @@ Brief entrypoint inventory of the current reusable UI component set.
 - File: `apps/mobile/components/session-list/history-list.tsx`
 - Purpose:
   - completed-session history list with delete/undelete modal and deleted-visibility toggle, consumed by the `stats-history` History sub-view
+
+8. `CalendarHeatmap`
+- File: `apps/mobile/components/muscle-analytics/calendar-heatmap.tsx`
+- Purpose:
+  - reusable selected-muscle daily effort calendar heatmap component for the M16 muscle history overlay
+  - consumes the shared `SelectedMuscleDailyEffort` shape from `apps/mobile/src/data/muscle-analytics.ts`
+  - renders Monday-through-Sunday columns, latest weeks first with 8 visible rows by default, token-backed zero/green/today/selected states, tappable cells, and date/effort accessibility labels
 
 ### UI-supporting shared module (non-visual)
 

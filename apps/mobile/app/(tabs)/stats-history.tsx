@@ -1,24 +1,39 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import {
+  CalendarHeatmap,
+  type CalendarHeatmapMetric,
+} from '@/components/muscle-analytics';
+import { SegmentedChips, uiColors } from '@/components/ui';
+import {
+  computeSelectedMuscleWeeklyEffort,
   computeStatsSummary,
+  type SelectedMuscleWeeklyEffort,
   type StatsMuscleFamilyPerformance,
   type StatsMusclePerformance,
   type StatsPeriodDays,
   type StatsSummary,
 } from '@/src/data';
-import { SegmentedChips, uiColors } from '@/components/ui';
 
 const PERIOD_OPTIONS = [
   { value: 7 as StatsPeriodDays, label: 'Last 7 days' },
   { value: 30 as StatsPeriodDays, label: 'Last 30 days' },
 ] as const;
 
+const MUSCLE_HISTORY_WINDOW_DAYS = 365;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
 type DeltaDisplay = {
   text: string;
   tone: 'positive' | 'negative' | 'neutral' | 'new';
+};
+
+export type MuscleHistoryTarget = {
+  muscleGroupIds: string[];
+  displayName: string;
+  familyName: string;
 };
 
 export const formatDelta = (current: number, previous: number): DeltaDisplay => {
@@ -79,8 +94,18 @@ export type StatsScreenShellProps = {
   periodDays: StatsPeriodDays;
   onSelectPeriod: (period: StatsPeriodDays) => void;
   onPressSessionsCard: () => void;
+  onPressMuscleHistory: (muscle: MuscleHistoryTarget) => void;
+  onDismissMuscleHistory: () => void;
+  onSelectMuscleHistoryWeek: (weekKey: string | null) => void;
   isLoading: boolean;
   errorMessage: string | null;
+  selectedMuscle: MuscleHistoryTarget | null;
+  muscleHistoryWeeklyEffort: SelectedMuscleWeeklyEffort[];
+  isMuscleHistoryLoading: boolean;
+  muscleHistoryErrorMessage: string | null;
+  selectedMuscleHistoryWeekKey: string | null;
+  muscleHistoryMetric: CalendarHeatmapMetric;
+  onSelectMuscleHistoryMetric: (metric: CalendarHeatmapMetric) => void;
 };
 
 export function StatsScreenShell({
@@ -88,8 +113,18 @@ export function StatsScreenShell({
   periodDays,
   onSelectPeriod,
   onPressSessionsCard,
+  onPressMuscleHistory,
+  onDismissMuscleHistory,
+  onSelectMuscleHistoryWeek,
   isLoading,
   errorMessage,
+  selectedMuscle,
+  muscleHistoryWeeklyEffort,
+  isMuscleHistoryLoading,
+  muscleHistoryErrorMessage,
+  selectedMuscleHistoryWeekKey,
+  muscleHistoryMetric,
+  onSelectMuscleHistoryMetric,
 }: StatsScreenShellProps) {
   const sessionDelta = summary
     ? formatDelta(summary.current.totals.sessionCount, summary.previous.totals.sessionCount)
@@ -161,10 +196,24 @@ export function StatsScreenShell({
             <MuscleFamilyList
               families={summary.current.totals.muscleFamilies}
               previousFamilies={summary.previous.totals.muscleFamilies}
+              onPressMuscleHistory={onPressMuscleHistory}
             />
           </>
         ) : null}
       </ScrollView>
+      {selectedMuscle ? (
+        <MuscleHistoryOverlay
+          muscle={selectedMuscle}
+          weeklyEffort={muscleHistoryWeeklyEffort}
+          isLoading={isMuscleHistoryLoading}
+          errorMessage={muscleHistoryErrorMessage}
+          selectedWeekKey={selectedMuscleHistoryWeekKey}
+          metric={muscleHistoryMetric}
+          onSelectMetric={onSelectMuscleHistoryMetric}
+          onDismiss={onDismissMuscleHistory}
+          onSelectWeek={onSelectMuscleHistoryWeek}
+        />
+      ) : null}
     </View>
   );
 }
@@ -172,9 +221,11 @@ export function StatsScreenShell({
 function MuscleFamilyList({
   families,
   previousFamilies,
+  onPressMuscleHistory,
 }: {
   families: StatsMuscleFamilyPerformance[];
   previousFamilies: StatsMuscleFamilyPerformance[];
+  onPressMuscleHistory: (muscle: MuscleHistoryTarget) => void;
 }) {
   if (families.length === 0) {
     return (
@@ -202,6 +253,7 @@ function MuscleFamilyList({
           family={family}
           previousFamily={previousByFamilyName.get(family.familyName) ?? null}
           previousMusclesById={previousMusclesById}
+          onPressMuscleHistory={onPressMuscleHistory}
         />
       ))}
     </View>
@@ -217,42 +269,66 @@ function MuscleFamilyCard({
   family,
   previousFamily,
   previousMusclesById,
+  onPressMuscleHistory,
 }: {
   family: StatsMuscleFamilyPerformance;
   previousFamily: StatsMuscleFamilyPerformance | null;
   previousMusclesById: Map<string, StatsMusclePerformance>;
+  onPressMuscleHistory: (muscle: MuscleHistoryTarget) => void;
 }) {
   const familyUntrained = family.sessionCount === 0 && family.totalWeight === 0;
   const testIdSlug = family.familyName.toLowerCase().replace(/\s+/g, '-');
   const sessionsDelta = formatDelta(family.sessionCount, previousFamily?.sessionCount ?? 0);
   const weightDelta = formatDelta(family.totalWeight, previousFamily?.totalWeight ?? 0);
   const collapsed = isFamilyCollapsible(family);
+  const collapsedMuscle = collapsed ? family.muscles[0] : null;
+  const headerContent = (
+    <>
+      <Text
+        style={[styles.familyName, familyUntrained && styles.muscleTextUntrained]}
+        testID={`stats-family-name-${testIdSlug}`}>
+        {family.familyName}
+      </Text>
+      <View style={styles.familyMetrics}>
+        <Metric
+          label="Sessions"
+          value={formatNumber(family.sessionCount)}
+          delta={sessionsDelta}
+          testID={`stats-family-sessions-${testIdSlug}`}
+          muted={familyUntrained}
+        />
+        <Metric
+          label="Total weight"
+          value={formatTotalWeight(family.totalWeight)}
+          delta={weightDelta}
+          testID={`stats-family-weight-${testIdSlug}`}
+          muted={familyUntrained}
+        />
+      </View>
+    </>
+  );
 
   return (
     <View style={styles.familyCard} testID={`stats-family-card-${testIdSlug}`}>
-      <View style={styles.familyHeader}>
-        <Text
-          style={[styles.familyName, familyUntrained && styles.muscleTextUntrained]}
-          testID={`stats-family-name-${testIdSlug}`}>
-          {family.familyName}
-        </Text>
-        <View style={styles.familyMetrics}>
-          <Metric
-            label="Sessions"
-            value={formatNumber(family.sessionCount)}
-            delta={sessionsDelta}
-            testID={`stats-family-sessions-${testIdSlug}`}
-            muted={familyUntrained}
-          />
-          <Metric
-            label="Total weight"
-            value={formatTotalWeight(family.totalWeight)}
-            delta={weightDelta}
-            testID={`stats-family-weight-${testIdSlug}`}
-            muted={familyUntrained}
-          />
-        </View>
-      </View>
+      {collapsedMuscle ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Open ${collapsedMuscle.displayName} history`}
+          onPress={() => onPressMuscleHistory(toMuscleHistoryTarget(collapsedMuscle))}
+          style={({ pressed }) => [styles.familyHeader, pressed && styles.actionableRowPressed]}
+          testID={`stats-family-header-button-${collapsedMuscle.muscleGroupId}`}>
+          {headerContent}
+        </Pressable>
+      ) : (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Open ${family.familyName} history`}
+          onPress={() => onPressMuscleHistory(toFamilyHistoryTarget(family))}
+          style={({ pressed }) => [styles.familyHeader, pressed && styles.actionableRowPressed]}
+          testID={`stats-family-header-${testIdSlug}`}>
+          {headerContent}
+        </Pressable>
+      )}
       {collapsed ? null : (
         <View style={styles.muscleList}>
           {family.muscles.map((muscle) => {
@@ -267,9 +343,12 @@ function MuscleFamilyCard({
               previousMuscle?.totalWeight ?? 0
             );
             return (
-              <View
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Open ${muscle.displayName} history`}
                 key={muscle.muscleGroupId}
-                style={styles.muscleRow}
+                onPress={() => onPressMuscleHistory(toMuscleHistoryTarget(muscle))}
+                style={({ pressed }) => [styles.muscleRow, pressed && styles.actionableRowPressed]}
                 testID={`stats-muscle-row-${muscle.muscleGroupId}`}>
                 <Text
                   style={[styles.muscleName, muscleUntrained && styles.muscleTextUntrained]}
@@ -294,7 +373,7 @@ function MuscleFamilyCard({
                     small
                   />
                 </View>
-              </View>
+              </Pressable>
             );
           })}
         </View>
@@ -302,6 +381,209 @@ function MuscleFamilyCard({
     </View>
   );
 }
+
+const toMuscleHistoryTarget = (muscle: StatsMusclePerformance): MuscleHistoryTarget => ({
+  muscleGroupIds: [muscle.muscleGroupId],
+  displayName: muscle.displayName,
+  familyName: muscle.familyName,
+});
+
+const toFamilyHistoryTarget = (family: StatsMuscleFamilyPerformance): MuscleHistoryTarget => ({
+  muscleGroupIds: family.muscles.map((m) => m.muscleGroupId),
+  displayName: family.familyName,
+  familyName: family.familyName,
+});
+
+const METRIC_OPTIONS: readonly { value: CalendarHeatmapMetric; label: string }[] = [
+  { value: 'totalVolume', label: 'Volume' },
+  { value: 'nearFailureCount', label: 'Near failure' },
+  { value: 'estimatedRM1', label: '1RM' },
+  { value: 'highestWeight', label: 'Top weight' },
+];
+
+const METRIC_LABELS: Record<CalendarHeatmapMetric, string> = {
+  totalVolume: 'Volume',
+  nearFailureCount: 'Near failure',
+  estimatedRM1: '1RM',
+  highestWeight: 'Top weight',
+};
+
+const MS_PER_DAY_BANNER = 24 * 60 * 60 * 1000;
+
+const formatWeekDateRange = (weekStartDateKey: string): string => {
+  const [y, m, d] = weekStartDateKey.split('-').map(Number);
+  const start = new Date(Date.UTC(y, m - 1, d));
+  const end = new Date(start.getTime() + 6 * MS_PER_DAY_BANNER);
+  const fmt = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'UTC',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+  const startStr = fmt.format(start);
+  const endStr = fmt.format(end);
+  return `${startStr} – ${endStr}`;
+};
+
+const formatMetricValue = (week: SelectedMuscleWeeklyEffort, metric: CalendarHeatmapMetric): string => {
+  switch (metric) {
+    case 'totalVolume': return formatTotalWeight(week.totalVolume);
+    case 'nearFailureCount': return String(week.nearFailureCount);
+    case 'estimatedRM1': return week.estimatedRM1 !== null ? formatTotalWeight(week.estimatedRM1) : '—';
+    case 'highestWeight': return week.highestWeight !== null ? formatTotalWeight(week.highestWeight) : '—';
+  }
+};
+
+function WeekSelectionBanner({
+  weeklyEffort,
+  selectedWeekKey,
+  metric,
+}: {
+  weeklyEffort: SelectedMuscleWeeklyEffort[];
+  selectedWeekKey: string | null;
+  metric: CalendarHeatmapMetric;
+}) {
+  const week =
+    selectedWeekKey !== null
+      ? (weeklyEffort.find((w) => w.weekStartDateKey === selectedWeekKey) ?? null)
+      : null;
+  const dateRange = selectedWeekKey !== null ? formatWeekDateRange(selectedWeekKey) : null;
+  const value = week !== null ? formatMetricValue(week, metric) : null;
+
+  return (
+    <View style={styles.weekBanner} testID="stats-muscle-history-week-banner">
+      {dateRange !== null ? (
+        <>
+          <Text style={styles.weekBannerRange} testID="stats-muscle-history-week-banner-range">
+            {dateRange}
+          </Text>
+          <Text style={styles.weekBannerValue} testID="stats-muscle-history-week-banner-value">
+            {METRIC_LABELS[metric]}: {value ?? '—'}
+          </Text>
+        </>
+      ) : (
+        <Text style={styles.weekBannerPlaceholder} testID="stats-muscle-history-week-banner-placeholder">
+          Tap a week to see details
+        </Text>
+      )}
+    </View>
+  );
+}
+
+function MuscleHistoryOverlay({
+  muscle,
+  weeklyEffort,
+  isLoading,
+  errorMessage,
+  selectedWeekKey,
+  metric,
+  onSelectMetric,
+  onDismiss,
+  onSelectWeek,
+}: {
+  muscle: MuscleHistoryTarget;
+  weeklyEffort: SelectedMuscleWeeklyEffort[];
+  isLoading: boolean;
+  errorMessage: string | null;
+  selectedWeekKey: string | null;
+  metric: CalendarHeatmapMetric;
+  onSelectMetric: (metric: CalendarHeatmapMetric) => void;
+  onDismiss: () => void;
+  onSelectWeek: (weekKey: string | null) => void;
+}) {
+  return (
+    <View style={styles.overlayRoot} testID="stats-muscle-history-overlay">
+      <Pressable
+        accessibilityLabel="Dismiss muscle history"
+        accessibilityRole="button"
+        onPress={onDismiss}
+        style={styles.overlayBackdrop}
+        testID="stats-muscle-history-backdrop"
+      />
+      <View style={styles.overlayCard}>
+        <View style={styles.overlayHeader}>
+          <View style={styles.overlayTitleGroup}>
+            <Text style={styles.overlayEyebrow}>
+              {muscle.muscleGroupIds.length > 1 ? 'Muscle Group History' : 'Muscle History'}
+            </Text>
+            <Text style={styles.overlayTitle} testID="stats-muscle-history-title">
+              {muscle.displayName}
+            </Text>
+          </View>
+          <Pressable
+            accessibilityLabel="Close muscle history"
+            accessibilityRole="button"
+            onPress={onDismiss}
+            style={({ pressed }) => [
+              styles.overlayCloseButton,
+              pressed && styles.actionableRowPressed,
+            ]}
+            testID="stats-muscle-history-close">
+            <Text style={styles.overlayCloseButtonText}>X</Text>
+          </Pressable>
+        </View>
+
+        <View style={styles.overlayMetricSelector}>
+          <SegmentedChips
+            accessibilityLabel="Select effort metric"
+            options={METRIC_OPTIONS}
+            value={metric}
+            onChange={onSelectMetric}
+            testIDPrefix="stats-muscle-history-metric-chip"
+            compact
+          />
+        </View>
+
+        <WeekSelectionBanner
+          weeklyEffort={weeklyEffort}
+          selectedWeekKey={selectedWeekKey}
+          metric={metric}
+        />
+
+        <ScrollView
+          contentContainerStyle={styles.overlayContent}
+          showsVerticalScrollIndicator={false}
+          testID="stats-muscle-history-scroll">
+          {isLoading ? (
+            <View style={styles.overlayStatePanel} testID="stats-muscle-history-loading">
+              <Text style={styles.stateBody}>Loading {muscle.displayName} history...</Text>
+            </View>
+          ) : null}
+
+          {!isLoading && errorMessage ? (
+            <View style={styles.overlayStatePanel} testID="stats-muscle-history-error">
+              <Text style={styles.stateTitle}>Could not load muscle history</Text>
+              <Text style={styles.stateBody}>{errorMessage}</Text>
+            </View>
+          ) : null}
+
+          {!isLoading && !errorMessage ? (
+            <>
+              {weeklyEffort.length === 0 ? (
+                <View style={styles.overlayStatePanel} testID="stats-muscle-history-empty">
+                  <Text style={styles.stateTitle}>No history yet</Text>
+                  <Text style={styles.stateBody}>
+                    No {muscle.displayName} training was found in the last{' '}
+                    {MUSCLE_HISTORY_WINDOW_DAYS} days.
+                  </Text>
+                </View>
+              ) : null}
+
+              <CalendarHeatmap
+                weeklyEffort={weeklyEffort}
+                metric={metric}
+                selectedWeekKey={selectedWeekKey}
+                onSelectWeek={onSelectWeek}
+                testID="stats-muscle-history-heatmap"
+              />
+            </>
+          ) : null}
+        </ScrollView>
+      </View>
+    </View>
+  );
+}
+
 
 function Metric({
   label,
@@ -341,6 +623,13 @@ export default function StatsRoute() {
   const [summary, setSummary] = useState<StatsSummary | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [selectedMuscle, setSelectedMuscle] = useState<MuscleHistoryTarget | null>(null);
+  const [muscleHistoryWeeklyEffort, setMuscleHistoryWeeklyEffort] = useState<SelectedMuscleWeeklyEffort[]>([]);
+  const [isMuscleHistoryLoading, setIsMuscleHistoryLoading] = useState(false);
+  const [muscleHistoryErrorMessage, setMuscleHistoryErrorMessage] = useState<string | null>(null);
+  const [selectedMuscleHistoryWeekKey, setSelectedMuscleHistoryWeekKey] = useState<string | null>(null);
+  const [muscleHistoryMetric, setMuscleHistoryMetric] = useState<CalendarHeatmapMetric>('totalVolume');
+  const muscleHistoryRequestIdRef = useRef(0);
 
   const loadSummary = useCallback(async (period: StatsPeriodDays) => {
     setIsLoading(true);
@@ -373,6 +662,48 @@ export default function StatsRoute() {
     router.push('/sessions');
   }, [router]);
 
+  const handlePressMuscleHistory = useCallback(async (muscle: MuscleHistoryTarget) => {
+    const requestId = muscleHistoryRequestIdRef.current + 1;
+    muscleHistoryRequestIdRef.current = requestId;
+    const end = new Date();
+    const start = new Date(end.getTime() - MUSCLE_HISTORY_WINDOW_DAYS * MS_PER_DAY);
+
+    setSelectedMuscle(muscle);
+    setMuscleHistoryWeeklyEffort([]);
+    setSelectedMuscleHistoryWeekKey(null);
+    setMuscleHistoryErrorMessage(null);
+    setIsMuscleHistoryLoading(true);
+
+    try {
+      const nextEffort = await computeSelectedMuscleWeeklyEffort({
+        muscleGroupIds: muscle.muscleGroupIds,
+        start,
+        end,
+      });
+      if (muscleHistoryRequestIdRef.current !== requestId) return;
+      setMuscleHistoryWeeklyEffort(nextEffort);
+    } catch (error) {
+      if (muscleHistoryRequestIdRef.current !== requestId) return;
+      setMuscleHistoryErrorMessage(error instanceof Error ? error.message : 'Unknown error');
+    } finally {
+      if (muscleHistoryRequestIdRef.current !== requestId) return;
+      setIsMuscleHistoryLoading(false);
+    }
+  }, []);
+
+  const handleDismissMuscleHistory = useCallback(() => {
+    muscleHistoryRequestIdRef.current += 1;
+    setSelectedMuscle(null);
+    setMuscleHistoryWeeklyEffort([]);
+    setSelectedMuscleHistoryWeekKey(null);
+    setMuscleHistoryErrorMessage(null);
+    setIsMuscleHistoryLoading(false);
+  }, []);
+
+  const handleSelectMuscleHistoryWeek = useCallback((weekKey: string | null) => {
+    setSelectedMuscleHistoryWeekKey(weekKey);
+  }, []);
+
   // useMemo prevents unnecessary re-renders of the shell when the route re-renders.
   const shellProps = useMemo<StatsScreenShellProps>(
     () => ({
@@ -380,10 +711,36 @@ export default function StatsRoute() {
       periodDays,
       onSelectPeriod: handleSelectPeriod,
       onPressSessionsCard: handlePressSessionsCard,
+      onPressMuscleHistory: handlePressMuscleHistory,
+      onDismissMuscleHistory: handleDismissMuscleHistory,
+      onSelectMuscleHistoryWeek: handleSelectMuscleHistoryWeek,
       isLoading,
       errorMessage,
+      selectedMuscle,
+      muscleHistoryWeeklyEffort,
+      isMuscleHistoryLoading,
+      muscleHistoryErrorMessage,
+      selectedMuscleHistoryWeekKey,
+      muscleHistoryMetric,
+      onSelectMuscleHistoryMetric: setMuscleHistoryMetric,
     }),
-    [summary, periodDays, handleSelectPeriod, handlePressSessionsCard, isLoading, errorMessage]
+    [
+      summary,
+      periodDays,
+      handleSelectPeriod,
+      handlePressSessionsCard,
+      handlePressMuscleHistory,
+      handleDismissMuscleHistory,
+      handleSelectMuscleHistoryWeek,
+      isLoading,
+      errorMessage,
+      selectedMuscle,
+      muscleHistoryWeeklyEffort,
+      isMuscleHistoryLoading,
+      muscleHistoryErrorMessage,
+      selectedMuscleHistoryWeekKey,
+      muscleHistoryMetric,
+    ]
   );
 
   return <StatsScreenShell {...shellProps} />;
@@ -395,6 +752,7 @@ const styles = StyleSheet.create({
     backgroundColor: uiColors.surfacePage,
     padding: 16,
     gap: 12,
+    position: 'relative',
   },
   scroll: {
     flex: 1,
@@ -475,7 +833,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 8,
+    paddingHorizontal: 4,
     gap: 12,
+  },
+  actionableRowPressed: {
+    opacity: 0.7,
   },
   muscleName: {
     fontSize: 14,
@@ -552,6 +914,109 @@ const styles = StyleSheet.create({
   stateBody: {
     fontSize: 13,
     color: uiColors.textSecondary,
+  },
+  overlayRoot: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'flex-end',
+    padding: 16,
+  },
+  overlayBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: uiColors.overlayScrim,
+  },
+  overlayCard: {
+    height: '75%',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: uiColors.borderMuted,
+    backgroundColor: uiColors.surfaceDefault,
+    overflow: 'hidden',
+  },
+  overlayHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderBottomColor: uiColors.borderMuted,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 12,
+  },
+  overlayTitleGroup: {
+    flexShrink: 1,
+    gap: 2,
+  },
+  overlayEyebrow: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: uiColors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  overlayTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: uiColors.textPrimary,
+  },
+  overlayCloseButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: uiColors.actionNeutralSubtleBorder,
+    backgroundColor: uiColors.actionNeutralSubtleBg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  overlayCloseButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: uiColors.actionNeutralSubtleText,
+  },
+  overlayMetricSelector: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: uiColors.borderMuted,
+  },
+  weekBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: uiColors.borderMuted,
+    backgroundColor: uiColors.surfaceMuted,
+    gap: 8,
+  },
+  weekBannerRange: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: uiColors.textPrimary,
+    flexShrink: 1,
+  },
+  weekBannerValue: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: uiColors.actionPrimary,
+  },
+  weekBannerPlaceholder: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: uiColors.textSecondary,
+  },
+  overlayContent: {
+    padding: 16,
+    gap: 16,
+  },
+  overlayStatePanel: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: uiColors.borderMuted,
+    backgroundColor: uiColors.surfaceInfo,
+    padding: 12,
+    gap: 6,
   },
   deltaPositive: {
     color: uiColors.textSuccess,

@@ -1,8 +1,16 @@
 import { and, asc, eq, gte, inArray, isNull, lt } from 'drizzle-orm';
 
-import { computeSetVolume, parseSetReps, parseSetWeight } from '@/src/exercise-calculations';
-
 import { bootstrapLocalDataLayer } from './bootstrap';
+import {
+  aggregateSelectedMuscleDailyEffort,
+  aggregateSelectedMuscleWeeklyEffort,
+  collectMuscleSetContributions,
+  countMuscleAnalyticsWorkingSets,
+  type AggregateSelectedMuscleDailyEffortOptions,
+  type MuscleAnalyticsInput,
+  type SelectedMuscleDailyEffort,
+  type SelectedMuscleWeeklyEffort,
+} from './muscle-analytics';
 import {
   exerciseMuscleMappings,
   exerciseSets,
@@ -47,27 +55,7 @@ export type StatsSummary = {
   previous: { period: StatsPeriodBounds; totals: StatsTotals };
 };
 
-export type StatsAggregationInput = {
-  sessions: { id: string; completedAt: Date }[];
-  sessionExercises: { id: string; sessionId: string; exerciseDefinitionId: string | null }[];
-  exerciseSets: {
-    sessionExerciseId: string;
-    setType: string | null;
-    weightValue: string;
-    repsValue: string;
-  }[];
-  muscleMappings: {
-    exerciseDefinitionId: string;
-    muscleGroupId: string;
-    role: 'primary' | 'secondary' | 'stabilizer' | null;
-  }[];
-  muscleGroups: {
-    id: string;
-    displayName: string;
-    familyName: string;
-    sortOrder: number;
-  }[];
-};
+export type StatsAggregationInput = MuscleAnalyticsInput;
 
 export type StatsStore = {
   loadAggregationInput(input: { start: Date; end: Date }): Promise<StatsAggregationInput>;
@@ -79,6 +67,12 @@ export type ComputeStatsSummaryOptions = {
   now?: Date;
 };
 
+export type ComputeSelectedMuscleDailyEffortOptions =
+  AggregateSelectedMuscleDailyEffortOptions & {
+    start: Date;
+    end: Date;
+  };
+
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 const isValidDate = (value: Date) => !Number.isNaN(value.getTime());
@@ -89,14 +83,6 @@ const ensureDate = (value: Date, label: string): Date => {
   }
   return value;
 };
-
-const muscleRoleWeight = (role: 'primary' | 'secondary' | 'stabilizer' | null): number => {
-  if (role === 'primary') return 1;
-  if (role === 'secondary') return 0.5;
-  return 0;
-};
-
-const isWorkingSet = (setType: string | null) => setType !== 'warm_up';
 
 export const computePeriodBounds = (
   periodDays: StatsPeriodDays,
@@ -114,65 +100,23 @@ const computePreviousPeriodBounds = (current: StatsPeriodBounds): StatsPeriodBou
   return { days: current.days, start, end };
 };
 
-const parseSetVolume = (weightValue: string, repsValue: string): number => {
-  const weight = parseSetWeight(weightValue);
-  const reps = parseSetReps(repsValue);
-  if (weight === null || reps === null) return 0;
-  return computeSetVolume(weight, reps);
-};
-
 export const aggregateStats = (input: StatsAggregationInput): StatsTotals => {
-  const sessionExerciseById = new Map<string, (typeof input.sessionExercises)[number]>();
-  for (const exercise of input.sessionExercises) {
-    sessionExerciseById.set(exercise.id, exercise);
-  }
-
-  const sessionIds = new Set(input.sessions.map((session) => session.id));
-  const includedExerciseIds = new Set<string>();
-  for (const exercise of input.sessionExercises) {
-    if (sessionIds.has(exercise.sessionId)) {
-      includedExerciseIds.add(exercise.id);
-    }
-  }
-
-  const workingSets = input.exerciseSets.filter(
-    (set) => isWorkingSet(set.setType) && includedExerciseIds.has(set.sessionExerciseId)
-  );
-
-  const mappingsByExerciseDefinitionId = new Map<string, typeof input.muscleMappings>();
-  for (const mapping of input.muscleMappings) {
-    const bucket = mappingsByExerciseDefinitionId.get(mapping.exerciseDefinitionId) ?? [];
-    bucket.push(mapping);
-    mappingsByExerciseDefinitionId.set(mapping.exerciseDefinitionId, bucket);
-  }
-
   const totalWeightByMuscleId = new Map<string, number>();
   const sessionsByMuscleId = new Map<string, Set<string>>();
 
-  for (const set of workingSets) {
-    const exercise = sessionExerciseById.get(set.sessionExerciseId);
-    if (!exercise || exercise.exerciseDefinitionId === null) continue;
-    const mappings = mappingsByExerciseDefinitionId.get(exercise.exerciseDefinitionId) ?? [];
-    if (mappings.length === 0) continue;
-
-    const volume = parseSetVolume(set.weightValue, set.repsValue);
-
-    for (const mapping of mappings) {
-      const roleWeight = muscleRoleWeight(mapping.role);
-      if (roleWeight === 0) continue;
-
-      const weighted = volume * roleWeight;
-      if (weighted > 0) {
-        totalWeightByMuscleId.set(
-          mapping.muscleGroupId,
-          (totalWeightByMuscleId.get(mapping.muscleGroupId) ?? 0) + weighted
-        );
-      }
-
-      const sessionsForMuscle = sessionsByMuscleId.get(mapping.muscleGroupId) ?? new Set<string>();
-      sessionsForMuscle.add(exercise.sessionId);
-      sessionsByMuscleId.set(mapping.muscleGroupId, sessionsForMuscle);
+  for (const contribution of collectMuscleSetContributions(input)) {
+    if (contribution.weightedVolume > 0) {
+      totalWeightByMuscleId.set(
+        contribution.muscleGroupId,
+        (totalWeightByMuscleId.get(contribution.muscleGroupId) ?? 0) +
+          contribution.weightedVolume
+      );
     }
+
+    const sessionsForMuscle =
+      sessionsByMuscleId.get(contribution.muscleGroupId) ?? new Set<string>();
+    sessionsForMuscle.add(contribution.sessionId);
+    sessionsByMuscleId.set(contribution.muscleGroupId, sessionsForMuscle);
   }
 
   const musclesByFamily = new Map<string, StatsMusclePerformance[]>();
@@ -222,7 +166,7 @@ export const aggregateStats = (input: StatsAggregationInput): StatsTotals => {
 
   return {
     sessionCount: input.sessions.length,
-    totalSets: workingSets.length,
+    totalSets: countMuscleAnalyticsWorkingSets(input),
     muscleFamilies,
   };
 };
@@ -259,6 +203,7 @@ export const createDrizzleStatsStore = (): StatsStore => ({
               id: sessionExercises.id,
               sessionId: sessionExercises.sessionId,
               exerciseDefinitionId: sessionExercises.exerciseDefinitionId,
+              exerciseName: sessionExercises.name,
             })
             .from(sessionExercises)
             .where(inArray(sessionExercises.sessionId, sessionIds))
@@ -278,7 +223,9 @@ export const createDrizzleStatsStore = (): StatsStore => ({
       sessionExerciseIds.length > 0
         ? database
             .select({
+              id: exerciseSets.id,
               sessionExerciseId: exerciseSets.sessionExerciseId,
+              orderIndex: exerciseSets.orderIndex,
               setType: exerciseSets.setType,
               weightValue: exerciseSets.weightValue,
               repsValue: exerciseSets.repsValue,
@@ -351,8 +298,37 @@ export const createStatsRepository = (store: StatsStore = createDrizzleStatsStor
       previous: { period: previousPeriod, totals: aggregateStats(previousInput) },
     };
   },
+  async computeSelectedMuscleDailyEffort(
+    options: ComputeSelectedMuscleDailyEffortOptions
+  ): Promise<SelectedMuscleDailyEffort[]> {
+    ensureDate(options.start, 'start');
+    ensureDate(options.end, 'end');
+
+    const input = await store.loadAggregationInput({
+      start: options.start,
+      end: options.end,
+    });
+    return aggregateSelectedMuscleDailyEffort(input, options);
+  },
+  async computeSelectedMuscleWeeklyEffort(
+    options: ComputeSelectedMuscleDailyEffortOptions
+  ): Promise<SelectedMuscleWeeklyEffort[]> {
+    ensureDate(options.start, 'start');
+    ensureDate(options.end, 'end');
+
+    const input = await store.loadAggregationInput({
+      start: options.start,
+      end: options.end,
+    });
+    const daily = aggregateSelectedMuscleDailyEffort(input, options);
+    return aggregateSelectedMuscleWeeklyEffort(daily);
+  },
 });
 
 const defaultStatsRepository = createStatsRepository();
 
 export const computeStatsSummary = defaultStatsRepository.computeSummary;
+export const computeSelectedMuscleDailyEffort =
+  defaultStatsRepository.computeSelectedMuscleDailyEffort;
+export const computeSelectedMuscleWeeklyEffort =
+  defaultStatsRepository.computeSelectedMuscleWeeklyEffort;

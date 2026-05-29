@@ -1,7 +1,7 @@
 ---
 task_id: M16-T04-stats-history-muscle-overlay
 milestone_id: "M16"
-status: planned
+status: completed
 ui_impact: "yes"
 areas: "frontend|docs"
 runtimes: "node|expo"
@@ -16,12 +16,14 @@ docs_touched: "docs/specs/ui/screen-map.md,docs/specs/ui/ux-rules.md,docs/specs/
 
 - Task ID: `M16-T04-stats-history-muscle-overlay`
 - Title: Stats / History muscle heatmap overlay
-- Status: `planned`
+- Status: `completed`
 - File location rule:
   - author active cards in `docs/tasks/<task-id>.md`
   - move the file to `docs/tasks/complete/<task-id>.md` when `Status` becomes `completed` or `outdated`
 - Session date: `2026-05-28`
 - Session interaction mode: `interactive (default)`
+- Required branch: `codex/m16-t04-stats-history-muscle-overlay`
+- Branch/worktree rule: create or switch to the required branch before edits, preferably via `./scripts/worktree-create.sh <branch-name>` from the main checkout. Do not complete this task directly on `main`.
 
 ## Parent references (required)
 
@@ -43,8 +45,8 @@ docs_touched: "docs/specs/ui/screen-map.md,docs/specs/ui/ux-rules.md,docs/specs/
 
 ## Context Freshness (required at session start; update before edits)
 
-- Verified current branch + HEAD commit:
-- Start-of-session sync completed per `docs/specs/04-ai-development-playbook.md` git sync workflow?: `yes | no | N/A` (explain)
+- Verified current branch + HEAD commit: `codex/m16-t04-stats-history-muscle-overlay @ 9734401`
+- Start-of-session sync completed per `docs/specs/04-ai-development-playbook.md` git sync workflow?: `N/A` (created the required isolated worktree from the local main checkout with `./scripts/worktree-create.sh`; no remote sync was requested for this task handoff)
 - Parent refs opened in this session:
   - `docs/specs/README.md`
   - `docs/specs/00-product.md`
@@ -63,11 +65,11 @@ docs_touched: "docs/specs/ui/screen-map.md,docs/specs/ui/ux-rules.md,docs/specs/
   - `docs/specs/milestones/M16-muscle-group-calendar-heatmap.md`
   - `RUNBOOK.md`
 - Code/docs inventory freshness checks run:
-  - Confirm `M16-T02` shared analytics API is complete and exported.
-  - Confirm `M16-T03` heatmap component is complete and documented.
-  - Re-check `apps/mobile/app/(tabs)/stats-history.tsx` for current Stats shell and muscle row structure.
-  - Re-check `apps/mobile/app/__tests__/stats-screen.test.tsx` for current route/shell test patterns.
-- Known stale references or assumptions (must be explicit; write `none` if none):
+  - Confirm `M16-T02` shared analytics API is complete and exported: `computeSelectedMuscleDailyEffort(...)` and `SelectedMuscleDailyEffort` are exported through `apps/mobile/src/data/index.ts`.
+  - Confirm `M16-T03` heatmap component is complete and documented: confirmed from the sibling T03 worktree; dependency files were transplanted into this branch because T03 had not been committed when implementation started.
+  - Re-check `apps/mobile/app/(tabs)/stats-history.tsx` for current Stats shell and muscle row structure: done.
+  - Re-check `apps/mobile/app/__tests__/stats-screen.test.tsx` for current route/shell test patterns: done.
+- Known stale references or assumptions (must be explicit; write `none` if none): none
 - Optional helper command:
   - `./scripts/task-bootstrap.sh docs/tasks/M16-T04-stats-history-muscle-overlay.md`
 
@@ -207,15 +209,19 @@ Make Stats / History muscle rows actionable and show an in-route muscle-history 
 ## Evidence
 
 - UI/UX task visual artifacts note:
-  - Record screenshot/capture paths for populated overlay, selected date, empty/no-history, and error state when feasible.
-- Manual verification summary (required when CI is absent/partial):
+  - Render capture: `artifacts/ui/M16-T04-stats-history-muscle-overlay/stats-muscle-history-loading.json`
+  - Render capture: `artifacts/ui/M16-T04-stats-history-muscle-overlay/stats-muscle-history-error.json`
+  - Render capture: `artifacts/ui/M16-T04-stats-history-muscle-overlay/stats-muscle-history-empty.json`
+  - Render capture: `artifacts/ui/M16-T04-stats-history-muscle-overlay/stats-muscle-history-populated-selected.json`
+  - Render capture: `artifacts/ui/M16-T04-stats-history-muscle-overlay/stats-muscle-history-zero-effort-selected.json`
+- Manual verification summary (required when CI is absent/partial): RNTL coverage verifies expanded row tap, collapsed header tap, selected-muscle API load, overlay title/open, loading/error/empty/populated states, heatmap cell selection including zero-effort dates, and backdrop dismiss. Render-tree captures were generated with `UI_EVIDENCE_DIR=../../artifacts/ui/M16-T04-stats-history-muscle-overlay npm test -- --runTestsByPath app/__tests__/stats-screen.test.tsx --runInBand`.
 - Deferred/manual hosted checks summary: `N/A`
 
 ## Completion note (fill at end per `docs/specs/04-ai-development-playbook.md`)
 
-- What changed:
-- What tests ran:
-- What remains:
+- What changed: Stats / History expanded muscle rows and collapsed single-muscle headers now open an in-route selected-muscle history overlay backed by `computeSelectedMuscleDailyEffort(...)`; the overlay renders the shared calendar heatmap with loading, error, no-history, populated, selected positive-date, selected zero-effort-date, close, and backdrop-dismiss states. UI docs and the M16 milestone status were updated. `RUNBOOK.md` reviewed; no changes required.
+- What tests ran: `cd apps/mobile && npm test -- --runTestsByPath app/__tests__/stats-screen.test.tsx --runInBand`; `UI_EVIDENCE_DIR=../../artifacts/ui/M16-T04-stats-history-muscle-overlay npm test -- --runTestsByPath app/__tests__/stats-screen.test.tsx --runInBand`; `cd apps/mobile && npm test -- --runTestsByPath app/__tests__/calendar-heatmap.test.tsx --runInBand`; `cd apps/mobile && npm run typecheck`; `./scripts/quality-fast.sh frontend`; `cd apps/mobile && npm run lint:ui-guardrails`; `git diff --check`.
+- What remains: richer selected-day exercise/set detail remains for M16-T05.
 
 ## Status update checklist (mandatory at closeout)
 

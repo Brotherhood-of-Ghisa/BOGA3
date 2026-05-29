@@ -192,4 +192,61 @@ describe('createStatsRepository.computeSummary', () => {
     expect(summary.previous.totals.sessionCount).toBe(2);
     expect(summary.current.period.days).toBe(7);
   });
+
+  it('loads a completed-session window for selected-muscle daily effort', async () => {
+    const store = buildStore();
+    store.loadAggregationInput.mockResolvedValueOnce({
+      sessions: [{ id: 'session-1', completedAt: new Date('2026-05-18T08:00:00.000Z') }],
+      sessionExercises: [
+        {
+          id: 'se-1',
+          sessionId: 'session-1',
+          exerciseDefinitionId: 'ex-bench',
+          exerciseName: 'Bench Press',
+        },
+      ],
+      exerciseSets: [
+        {
+          id: 'set-1',
+          sessionExerciseId: 'se-1',
+          orderIndex: 0,
+          setType: null,
+          weightValue: '100',
+          repsValue: '5',
+        },
+      ],
+      muscleMappings: [
+        { exerciseDefinitionId: 'ex-bench', muscleGroupId: 'chest_sternal', role: 'primary' },
+      ],
+      muscleGroups: buildMuscleGroupTaxonomy(),
+    });
+
+    const repository = createStatsRepository(store);
+    const start = new Date('2026-05-01T00:00:00.000Z');
+    const end = new Date('2026-06-01T00:00:00.000Z');
+
+    const dailyEffort = await repository.computeSelectedMuscleDailyEffort({
+      muscleGroupIds: ['chest_sternal'],
+      start,
+      end,
+      timeZone: 'UTC',
+    });
+
+    expect(store.loadAggregationInput).toHaveBeenCalledWith({ start, end });
+    expect(dailyEffort).toHaveLength(1);
+    expect(dailyEffort[0]).toMatchObject({
+      dateKey: '2026-05-18',
+      muscleGroupId: 'chest_sternal',
+      sessionCount: 1,
+      setCount: 1,
+      totalWeight: 500,
+    });
+    expect(dailyEffort[0].contributions[0]).toMatchObject({
+      sessionId: 'session-1',
+      sessionExerciseId: 'se-1',
+      exerciseDefinitionId: 'ex-bench',
+      exerciseName: 'Bench Press',
+      setId: 'set-1',
+    });
+  });
 });

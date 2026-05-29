@@ -15,6 +15,7 @@ export type SegmentedChipsProps<TValue extends string | number> = {
   testIDPrefix: string;
   accessibilityLabel?: string;
   style?: StyleProp<ViewStyle>;
+  compact?: boolean;
 };
 
 export function SegmentedChips<TValue extends string | number>({
@@ -24,6 +25,7 @@ export function SegmentedChips<TValue extends string | number>({
   testIDPrefix,
   accessibilityLabel,
   style,
+  compact = false,
 }: SegmentedChipsProps<TValue>) {
   return (
     <View
@@ -44,9 +46,9 @@ export function SegmentedChips<TValue extends string | number>({
                 onChange(option.value);
               }
             }}
-            style={[styles.chip, selected && styles.chipSelected]}
+            style={[styles.chip, compact && styles.chipCompact, selected && styles.chipSelected]}
             testID={`${testIDPrefix}-${option.value}`}>
-            <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
+            <Text style={[styles.chipText, compact && styles.chipTextCompact, selected && styles.chipTextSelected]}>
               {option.label}
             </Text>
           </Pressable>
@@ -69,6 +71,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
+  chipCompact: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
   chipSelected: {
     borderColor: uiColors.actionPrimary,
     backgroundColor: uiColors.actionPrimarySubtleBg,
@@ -77,6 +83,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: uiColors.textSecondary,
+  },
+  chipTextCompact: {
+    fontSize: 11,
   },
   chipTextSelected: {
     color: uiColors.actionPrimary,
