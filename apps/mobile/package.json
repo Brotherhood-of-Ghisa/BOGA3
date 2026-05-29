@@ -13,7 +13,7 @@
     "router:types": "node ./scripts/generate-router-types.js",
     "typecheck": "npm run router:types && tsc --noEmit",
     "test": "jest",
-    "db:generate": "drizzle-kit generate --config=drizzle.config.ts",
+    "db:generate": "drizzle-kit generate --config=drizzle.config.ts && tsx scripts/bundle-migrations.ts",
     "db:generate:canary": "npm run db:generate",
     "check:sync-drift": "tsx scripts/check-sync-schema-drift.ts",
     "test:sync:reinstall-parity": "./scripts/test-sync-reinstall-restore-parity.sh",

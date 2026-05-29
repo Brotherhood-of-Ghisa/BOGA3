@@ -1,0 +1,181 @@
+#!/usr/bin/env tsx
+/**
+ * bundle-migrations — Emit a runtime-loadable TypeScript bundle from
+ * `drizzle-kit generate` output.
+ *
+ * The Drizzle Expo SQLite migrator (`drizzle-orm/expo-sqlite/migrator`)
+ * expects a `{ journal, migrations }` object at runtime:
+ *
+ *   journal: { entries: { idx, when, tag, breakpoints }[] }
+ *   migrations: Record<`m${string}`, string>  // raw SQL per entry
+ *
+ * Pre-t10 we hand-copied the SQL string into
+ * `apps/mobile/src/data/migrations/index.ts`, which silently drifted
+ * from `apps/mobile/drizzle/0000_*.sql` every time the schema was
+ * regenerated. This script wipes that duplication: it reads
+ * `apps/mobile/drizzle/meta/_journal.json` and the matching
+ * `apps/mobile/drizzle/<tag>.sql` files (in journal order) and writes a
+ * single committed TypeScript bundle at
+ * `apps/mobile/drizzle/migrations.generated.ts` that exports the shape
+ * above as a typed `const`.
+ *
+ * Why a `.ts` bundle (Option B) rather than Drizzle's stock `.js` bundle
+ * (Option C / `driver: 'expo'`): Option C requires `.sql` imports to be
+ * inline-rewritten by Babel + Metro + Jest, which would force this
+ * project to grow a `metro.config.js`, a `babel.config.js`, and the
+ * `babel-plugin-inline-import` dep. None of those exist today. A
+ * generated `.ts` file with the SQL embedded as a template literal
+ * needs zero bundler / test-runner config and ships exactly the same
+ * runtime shape.
+ *
+ * Usage: chained off `npm run db:generate`, which runs
+ *   `drizzle-kit generate --config=drizzle.config.ts && tsx scripts/bundle-migrations.ts`
+ * so a single command regenerates both `drizzle/*.sql` AND the bundle.
+ *
+ * Outputs:
+ *   apps/mobile/drizzle/migrations.generated.ts — committed; the runtime
+ *     `apps/mobile/src/data/migrations/index.ts` re-exports it.
+ *
+ * Exit codes:
+ *   0 — bundle written (or already current; re-write is idempotent).
+ *   1 — drizzle/_journal.json or a referenced .sql file is missing.
+ */
+
+import { readFileSync, writeFileSync } from 'node:fs';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+type JournalEntry = {
+  idx: number;
+  version: string;
+  when: number;
+  tag: string;
+  breakpoints: boolean;
+};
+
+type Journal = {
+  version: string;
+  dialect: string;
+  entries: JournalEntry[];
+};
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+const drizzleDir = resolve(__dirname, '..', 'drizzle');
+const journalPath = resolve(drizzleDir, 'meta', '_journal.json');
+const outputPath = resolve(drizzleDir, 'migrations.generated.ts');
+
+function fail(message: string): never {
+  process.stderr.write(`bundle-migrations: ${message}\n`);
+  process.exit(1);
+}
+
+function readJournal(): Journal {
+  let raw: string;
+  try {
+    raw = readFileSync(journalPath, 'utf8');
+  } catch (error) {
+    fail(
+      `cannot read journal at ${journalPath} — run \`npm --prefix apps/mobile run db:generate\` ` +
+        `first. underlying error: ${(error as Error).message}`
+    );
+  }
+  let parsed: Journal;
+  try {
+    parsed = JSON.parse(raw) as Journal;
+  } catch (error) {
+    fail(`journal at ${journalPath} is not valid JSON: ${(error as Error).message}`);
+  }
+  if (!Array.isArray(parsed.entries) || parsed.entries.length === 0) {
+    fail(`journal at ${journalPath} has no entries — expected at least one baseline entry`);
+  }
+  return parsed;
+}
+
+function readSqlForEntry(entry: JournalEntry): string {
+  const sqlPath = resolve(drizzleDir, `${entry.tag}.sql`);
+  try {
+    return readFileSync(sqlPath, 'utf8');
+  } catch (error) {
+    fail(
+      `journal entry idx=${entry.idx} tag=${entry.tag} references missing SQL file ${sqlPath}: ${
+        (error as Error).message
+      }`
+    );
+  }
+}
+
+/**
+ * Escape a SQL string for embedding inside a TypeScript template literal.
+ * The Drizzle migrator splits the string on `--> statement-breakpoint` and
+ * runs each segment as one statement, so the round-trip must preserve every
+ * character verbatim. Only three constructs need escaping inside a template
+ * literal: the backtick that delimits it, the backslash that escapes other
+ * sequences, and the `${...}` expansion form.
+ */
+function escapeForTemplateLiteral(sql: string): string {
+  return sql.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$\{/g, '\\${');
+}
+
+function buildBundleSource(journal: Journal, sqlByMigrationKey: Map<string, string>): string {
+  const journalEntriesLiteral = journal.entries
+    .map((entry) => {
+      return [
+        '  {',
+        `    idx: ${entry.idx},`,
+        `    when: ${entry.when},`,
+        `    tag: ${JSON.stringify(entry.tag)},`,
+        `    breakpoints: ${entry.breakpoints ? 'true' : 'false'},`,
+        '  },',
+      ].join('\n');
+    })
+    .join('\n');
+
+  const migrationsLiteral = Array.from(sqlByMigrationKey.entries())
+    .map(([key, sql]) => `  ${key}: \`${escapeForTemplateLiteral(sql)}\`,`)
+    .join('\n');
+
+  return `// DO NOT EDIT BY HAND — generated by apps/mobile/scripts/bundle-migrations.ts.
+// Regenerate via \`npm --prefix apps/mobile run db:generate\` (drizzle-kit
+// generate + bundle script). The bundle is committed because the Drizzle
+// Expo migrator loads it at runtime and the embedded SQL is the source of
+// truth shipped in the JS bundle.
+
+export const generatedMigrationBundle = {
+  journal: {
+    entries: [
+${journalEntriesLiteral}
+    ],
+  },
+  migrations: {
+${migrationsLiteral}
+  },
+} as const;
+
+export type GeneratedMigrationBundle = typeof generatedMigrationBundle;
+`;
+}
+
+function main(): void {
+  const journal = readJournal();
+
+  // Drizzle's migrator key convention: `m${idx.padStart(4, '0')}` (see
+  // node_modules/drizzle-orm/expo-sqlite/migrator.ts). Match it exactly so
+  // the runtime lookup `migrations[\`m${entry.idx}\`]` resolves.
+  const sqlByMigrationKey = new Map<string, string>();
+  for (const entry of journal.entries) {
+    const key = `m${entry.idx.toString().padStart(4, '0')}`;
+    sqlByMigrationKey.set(key, readSqlForEntry(entry));
+  }
+
+  const source = buildBundleSource(journal, sqlByMigrationKey);
+  writeFileSync(outputPath, source, 'utf8');
+  process.stdout.write(
+    `bundle-migrations: wrote ${outputPath} (${journal.entries.length} entr${
+      journal.entries.length === 1 ? 'y' : 'ies'
+    })\n`
+  );
+}
+
+main();

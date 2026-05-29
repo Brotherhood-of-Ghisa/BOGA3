@@ -310,6 +310,7 @@ Notes on the DAG:
 - [t7: scheduler implementation per t4 §2](tasks/t7.md) — build
 - [t8: BG-task registration per t4 §4](tasks/t8.md) — build
 - [t9: dev-only wipe affordances behind isDevMode\(\)](tasks/t9.md) — build
+- [t10: drop inlined SQL from migrations/index.ts](tasks/t10.md) — build (added 2026-05-29 in response to t2 review)
 - [tFINAL: client end-to-end verification](tasks/tFINAL.md) — build (final test card)
 
 ## Carry-over from plan 1 (sync-v2-server, merged 2026-05-26)
@@ -381,4 +382,18 @@ referenced PRs.
 
 ## Deviations log
 
-<empty until first merge>
+- **2026-05-29 — t10 added (drop inlined SQL from migrations/index.ts).**
+  During the t2 review the user flagged that
+  `apps/mobile/src/data/migrations/index.ts` carries a hand-copied SQL
+  string under `migrations.m0000` that duplicates
+  `apps/mobile/drizzle/0000_living_bucky.sql`. Every `drizzle-kit
+  generate` invocation forces a manual copy-paste; silent drift
+  between the two is invisible to `npm run check:sync-drift` (the
+  drift checker compares client Drizzle schemas vs the server, not
+  the runtime bundle vs `drizzle/*.sql`). t10 — see
+  `tasks/t10.md` — removes the duplication so the runtime bundle is
+  a thin wrapper around the generated SQL file. t10 depends only on
+  t2 (the generated SQL must already be v2-canonical) and is parallel
+  with the rest of the post-t2 chain; tFINAL gains t10 as a transitive
+  precondition because the t10 wrapper is the artifact tFINAL boots
+  against.
