@@ -75,6 +75,8 @@ When multiple worktrees share one Mac, each worktree must set:
 
 Prefer `IOS_SIM_UDID` for shared-host use because duplicate simulator names are easy to confuse.
 If `.maestro/maestro.env.local` is missing, runtime scripts fail immediately instead of silently reusing generic defaults.
+
+`IOS_SIM_AUTO_CREATE` defaults to `1`. When the configured `IOS_SIM_DEVICE` (e.g. the slot-named `BOGA wt<slot>`) does not yet exist, the smoke gate self-heals: it picks the newest installed iOS runtime plus a preferred iPhone device type, creates and boots that simulator on the fly, logs a loud `[maestro] sim "<name>" not found — creating (deviceType=…, runtime=…)` line, and proceeds — no manual provisioning step. Creation is idempotent: an existing (including already-booted) simulator is reused, never duplicated. Set `IOS_SIM_AUTO_CREATE=0` only if you want device lookups to fail fast instead.
 By default teardown shuts the configured simulator down after each run. Set `MAESTRO_KEEP_SIMULATOR_BOOTED=1` only if you intentionally want to keep it running for manual follow-up work.
 
 ## Shared dev-client commands

@@ -63,7 +63,7 @@ create_simulator() {
     return 1
   }
 
-  echo "Creating dedicated iOS simulator '${IOS_SIM_DEVICE}' (${device_type_id}, ${runtime_id})." >&2
+  echo "[maestro] sim \"${IOS_SIM_DEVICE}\" not found — creating (deviceType=${device_type_id}, runtime=${runtime_id})" >&2
   xcrun simctl create "$IOS_SIM_DEVICE" "$device_type_id" "$runtime_id"
 }
 
