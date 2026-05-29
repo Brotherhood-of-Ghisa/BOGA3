@@ -1,5 +1,6 @@
 import { resetLocalDataAndReseed } from '@/src/data/dev-reset';
 import {
+  SEED_CATALOG_BUNDLE_VERSION,
   SYSTEM_EXERCISE_DEFINITION_SEEDS,
   SYSTEM_EXERCISE_MUSCLE_MAPPING_SEEDS,
   SYSTEM_MUSCLE_GROUP_SEEDS,
@@ -213,8 +214,8 @@ describe('resetLocalDataAndReseed (T8 — dev reset path)', () => {
     expect(fake.state.exerciseDefinitions.length).toBe(SYSTEM_EXERCISE_DEFINITION_SEEDS.length);
     expect(fake.state.exerciseMuscleMappings.length).toBe(SYSTEM_EXERCISE_MUSCLE_MAPPING_SEEDS.length);
 
-    // The marker reflects the reset moment so a follow-up seeder call is a
-    // no-op (the seed-once invariant survives the reset).
-    expect(fake.state.syncRuntimeState[0]?.seedsAppliedAt).toEqual(resetAt);
+    // The marker reflects the current catalog bundle version so a follow-up
+    // seeder call is a no-op (the seed-once invariant survives the reset).
+    expect(fake.state.syncRuntimeState[0]?.appliedSeedMigrationAppVersion).toBe(SEED_CATALOG_BUNDLE_VERSION);
   });
 });

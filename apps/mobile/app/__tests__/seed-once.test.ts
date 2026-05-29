@@ -1,5 +1,6 @@
 import {
   __clearSeedsAppliedMarkerForReset,
+  SEED_CATALOG_BUNDLE_VERSION,
   SYSTEM_EXERCISE_DEFINITION_SEEDS,
   SYSTEM_EXERCISE_MUSCLE_MAPPING_SEEDS,
   SYSTEM_MUSCLE_GROUP_SEEDS,
@@ -158,7 +159,7 @@ describe('seedSystemExerciseCatalog (T8 — seed once, never overwrite)', () => 
 
     const runtimeRow = fake.state.syncRuntimeState[0];
     expect(runtimeRow).toBeDefined();
-    expect(runtimeRow?.seedsAppliedAt).toEqual(fixedNow);
+    expect(runtimeRow?.appliedSeedMigrationAppVersion).toBe(SEED_CATALOG_BUNDLE_VERSION);
   });
 
   it('returns early on subsequent calls so a user rename of a seeded row is preserved across launches', () => {
@@ -212,6 +213,6 @@ describe('seedSystemExerciseCatalog (T8 — seed once, never overwrite)', () => 
     expect(fake.state.exerciseDefinitions.length).toBe(SYSTEM_EXERCISE_DEFINITION_SEEDS.length);
     expect(fake.state.muscleGroups.length).toBe(SYSTEM_MUSCLE_GROUP_SEEDS.length);
     expect(fake.state.exerciseMuscleMappings.length).toBe(SYSTEM_EXERCISE_MUSCLE_MAPPING_SEEDS.length);
-    expect(fake.state.syncRuntimeState[0]?.seedsAppliedAt).toEqual(reseedAt);
+    expect(fake.state.syncRuntimeState[0]?.appliedSeedMigrationAppVersion).toBe(SEED_CATALOG_BUNDLE_VERSION);
   });
 });

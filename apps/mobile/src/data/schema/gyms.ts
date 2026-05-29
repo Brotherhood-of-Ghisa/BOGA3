@@ -13,6 +13,9 @@ export const gyms = sqliteTable(
     longitude: real('longitude'),
     coordinateAccuracyM: real('coordinate_accuracy_m'),
     coordinatesUpdatedAt: integer('coordinates_updated_at', { mode: 'timestamp_ms' }),
+    deletedAt: integer('deleted_at', { mode: 'timestamp_ms' }),
+    localDirty: integer('local_dirty', { mode: 'boolean' }).notNull().default(false),
+    localUpdatedAtMs: integer('local_updated_at_ms').notNull().default(0),
     createdAt: integer('created_at', { mode: 'timestamp_ms' })
       .notNull()
       .default(sql`(unixepoch() * 1000)`),
@@ -22,6 +25,7 @@ export const gyms = sqliteTable(
   },
   (table) => ({
     nameLookupIdx: index('gyms_name_idx').on(table.name),
+    deletedAtIdx: index('gyms_deleted_at_idx').on(table.deletedAt),
     latitudeRange: check('gyms_latitude_range', sql`${table.latitude} is null or (${table.latitude} >= -90 and ${table.latitude} <= 90)`),
     longitudeRange: check(
       'gyms_longitude_range',

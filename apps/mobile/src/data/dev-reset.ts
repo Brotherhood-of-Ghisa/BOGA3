@@ -33,19 +33,21 @@ export type ResetLocalDataAndReseedResult = {
 
 /**
  * Wipes every user-mutable table in the local SQLite database, clears the
- * `seedsAppliedAt` marker on `sync_runtime_state`, and re-runs the
- * exercise-catalog seeder so the catalog is repopulated from the canonical
- * seed bundle.
+ * `appliedSeedMigrationAppVersion` marker on `sync_runtime_state` (resetting
+ * it to `0`), and re-runs the exercise-catalog seeder so the catalog is
+ * repopulated from the canonical seed bundle.
  *
  * This is the dev-only escape hatch for the "seed once, never overwrite"
  * model introduced in plan task T8: in production the seeder runs exactly
- * once per install, so any developer who needs a fresh catalog (e.g. after
- * editing seed data) must invoke this helper explicitly.
+ * once per install (per catalog bundle version), so any developer who
+ * needs a fresh catalog (e.g. after editing seed data) must invoke this
+ * helper explicitly.
  *
  * The helper deliberately leaves the singleton `sync_runtime_state` row in
- * place — only its `seedsAppliedAt` field is reset — so any remaining
- * bootstrap accounting on that row survives the wipe. The v1 sync engine
- * was removed in plan `sync-v2-client` t1, so there is no
+ * place — only its `appliedSeedMigrationAppVersion` field is reset — so any
+ * remaining v2 sync accounting (`pull_cursor`, `last_emitted_ms`,
+ * `bootstrap_completed_at`) on that row survives the wipe. The v1 sync
+ * engine was removed in plan `sync-v2-client` t1, so there is no
  * `stopSyncRuntime()` follow-up to issue from callers any more.
  *
  * Throws synchronously when invoked outside dev mode (see `isDevMode`).

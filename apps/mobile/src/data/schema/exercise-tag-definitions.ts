@@ -16,6 +16,8 @@ export const exerciseTagDefinitions = sqliteTable(
     name: text('name').notNull(),
     normalizedName: text('normalized_name').notNull(),
     deletedAt: integer('deleted_at', { mode: 'timestamp_ms' }),
+    localDirty: integer('local_dirty', { mode: 'boolean' }).notNull().default(false),
+    localUpdatedAtMs: integer('local_updated_at_ms').notNull().default(0),
     createdAt: integer('created_at', { mode: 'timestamp_ms' })
       .notNull()
       .default(sql`(unixepoch() * 1000)`),

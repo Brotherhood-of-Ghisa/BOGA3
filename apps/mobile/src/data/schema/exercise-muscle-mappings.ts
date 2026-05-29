@@ -27,6 +27,9 @@ export const exerciseMuscleMappings = sqliteTable(
       .references(() => muscleGroups.id),
     weight: real('weight').notNull(),
     role: text('role', { enum: ['primary', 'secondary', 'stabilizer'] }),
+    deletedAt: integer('deleted_at', { mode: 'timestamp_ms' }),
+    localDirty: integer('local_dirty', { mode: 'boolean' }).notNull().default(false),
+    localUpdatedAtMs: integer('local_updated_at_ms').notNull().default(0),
     createdAt: integer('created_at', { mode: 'timestamp_ms' })
       .notNull()
       .default(sql`(unixepoch() * 1000)`),
@@ -37,6 +40,7 @@ export const exerciseMuscleMappings = sqliteTable(
   (table) => ({
     exerciseDefinitionIdx: index('exercise_muscle_mappings_exercise_definition_id_idx').on(table.exerciseDefinitionId),
     muscleGroupIdx: index('exercise_muscle_mappings_muscle_group_id_idx').on(table.muscleGroupId),
+    deletedAtIdx: index('exercise_muscle_mappings_deleted_at_idx').on(table.deletedAt),
     exerciseMuscleUnique: uniqueIndex('exercise_muscle_mappings_exercise_id_muscle_group_id_unique').on(
       table.exerciseDefinitionId,
       table.muscleGroupId

@@ -5,6 +5,18 @@ import type { LocalDatabase } from './bootstrap';
 
 const SEED_RUNTIME_STATE_ID = 'primary';
 
+/**
+ * Catalog seed bundle version. Bumped whenever the canonical seed bundle in
+ * this file changes (e.g. a new system exercise is added). Persisted on
+ * `sync_runtime_state.applied_seed_migration_app_version` so subsequent
+ * launches can detect "this device has not seen the current catalog version"
+ * and re-seed. A value of `0` on that column means "never seeded".
+ *
+ * Plan-2 t2 introduces the column with a placeholder value of `1`; plan-3 /
+ * follow-up may evolve the semantics (e.g. derive from `app.json` version).
+ */
+export const SEED_CATALOG_BUNDLE_VERSION = 1;
+
 export type MuscleGroupSeed = {
   id: string;
   displayName: string;
@@ -4095,44 +4107,44 @@ export const verifySeededSystemExerciseCatalog = (database: LocalDatabase): Syst
 };
 
 /**
- * Reads the singleton `seedsAppliedAt` marker from `sync_runtime_state`.
+ * Reads the singleton `appliedSeedMigrationAppVersion` marker from
+ * `sync_runtime_state`.
  *
- * Returns `null` when the row does not exist or the marker has not been set
- * (the seeder has not run on this device yet).
+ * Returns `0` when the row does not exist or the marker has not been set
+ * (the seeder has not run on this device yet). Any non-zero integer means
+ * the catalog was seeded under that bundle version; the seeder may re-seed
+ * when the constant {@link SEED_CATALOG_BUNDLE_VERSION} ships a higher
+ * value than the persisted marker.
  */
-const readSeedsAppliedMarker = (database: LocalDatabase): Date | null => {
+const readSeedsAppliedMarker = (database: LocalDatabase): number => {
   const row = database
-    .select({ seedsAppliedAt: syncRuntimeState.seedsAppliedAt })
+    .select({
+      appliedSeedMigrationAppVersion: syncRuntimeState.appliedSeedMigrationAppVersion,
+    })
     .from(syncRuntimeState)
     .where(eq(syncRuntimeState.id, SEED_RUNTIME_STATE_ID))
     .get();
 
-  return row?.seedsAppliedAt ?? null;
+  return row?.appliedSeedMigrationAppVersion ?? 0;
 };
 
 /**
- * Persists the `seedsAppliedAt` marker on the singleton `sync_runtime_state`
- * row, creating the row if it does not exist yet. Subsequent seeder calls
- * observe a non-null marker and short-circuit.
+ * Persists the `appliedSeedMigrationAppVersion` marker on the singleton
+ * `sync_runtime_state` row, creating the row if it does not exist yet.
+ * Subsequent seeder calls observe a marker >= the current bundle version
+ * and short-circuit.
  */
-const writeSeedsAppliedMarker = (database: LocalDatabase, now: Date) => {
+const writeSeedsAppliedMarker = (database: LocalDatabase, version: number) => {
   database
     .insert(syncRuntimeState)
     .values({
       id: SEED_RUNTIME_STATE_ID,
-      isEnabled: 0,
-      bootstrapUserId: null,
-      bootstrapCompletedAt: null,
-      lastBootstrapError: null,
-      lastBootstrapAttemptAt: null,
-      seedsAppliedAt: now,
-      updatedAt: now,
+      appliedSeedMigrationAppVersion: version,
     })
     .onConflictDoUpdate({
       target: syncRuntimeState.id,
       set: {
-        seedsAppliedAt: now,
-        updatedAt: now,
+        appliedSeedMigrationAppVersion: version,
       },
     })
     .run();
@@ -4140,8 +4152,9 @@ const writeSeedsAppliedMarker = (database: LocalDatabase, now: Date) => {
 
 /**
  * Seed the local muscle group / exercise definition / mapping tables exactly
- * once per install. Subsequent calls (every app launch, every sync bootstrap)
- * observe the `seedsAppliedAt` marker on `sync_runtime_state` and return
+ * once per install (per catalog bundle version). Subsequent calls (every app
+ * launch, every sync bootstrap) observe the
+ * `appliedSeedMigrationAppVersion` marker on `sync_runtime_state` and return
  * early without touching seeded rows.
  *
  * This guard is what protects user edits to seeded rows (e.g. renaming
@@ -4153,7 +4166,7 @@ const writeSeedsAppliedMarker = (database: LocalDatabase, now: Date) => {
  * force a re-seed.
  */
 export const seedSystemExerciseCatalog = (database: LocalDatabase, now: Date = new Date()) => {
-  if (readSeedsAppliedMarker(database) !== null) {
+  if (readSeedsAppliedMarker(database) >= SEED_CATALOG_BUNDLE_VERSION) {
     return;
   }
 
@@ -4242,21 +4255,23 @@ export const seedSystemExerciseCatalog = (database: LocalDatabase, now: Date = n
     );
   }
 
-  writeSeedsAppliedMarker(database, now);
+  writeSeedsAppliedMarker(database, SEED_CATALOG_BUNDLE_VERSION);
 };
 
 /**
- * Test/dev-only helper: clears the `seedsAppliedAt` marker so the next call
- * to {@link seedSystemExerciseCatalog} performs a full re-seed. Used by
+ * Test/dev-only helper: clears the `appliedSeedMigrationAppVersion` marker
+ * (resetting it to `0`) so the next call to
+ * {@link seedSystemExerciseCatalog} performs a full re-seed. Used by
  * `resetLocalDataAndReseed` and by tests that need to exercise the
- * first-seed code path against a database whose marker has already been set.
+ * first-seed code path against a database whose marker has already been
+ * set. The `now` parameter is retained for callsite signature stability
+ * with the v1 timestamp-based marker; it is unused.
  */
-export const __clearSeedsAppliedMarkerForReset = (database: LocalDatabase, now: Date = new Date()) => {
+export const __clearSeedsAppliedMarkerForReset = (database: LocalDatabase, _now: Date = new Date()) => {
   database
     .update(syncRuntimeState)
     .set({
-      seedsAppliedAt: null,
-      updatedAt: now,
+      appliedSeedMigrationAppVersion: 0,
     })
     .where(eq(syncRuntimeState.id, SEED_RUNTIME_STATE_ID))
     .run();
