@@ -545,8 +545,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfaceDefault,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
   periodChipSelected: {
     borderColor: uiColors.actionPrimary,
@@ -569,8 +569,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfaceDefault,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     maxWidth: 220,
   },
   tagChipSelected: {
