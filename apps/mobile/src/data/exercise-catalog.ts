@@ -1,6 +1,7 @@
 import { asc, eq, inArray, isNull } from 'drizzle-orm';
 
 import { bootstrapLocalDataLayer, type LocalDatabase } from './bootstrap';
+import { nowMonotonic } from './clock';
 import { exerciseDefinitions, exerciseMuscleMappings, muscleGroups } from './schema';
 import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidation';
 
@@ -182,6 +183,9 @@ export const createDrizzleExerciseCatalogStore = (): ExerciseCatalogStore => ({
             name: input.name,
             deletedAt: null,
             updatedAt: input.now,
+            // Dirty-bit wiring (sync-v2-client t5a, t2 §7.2).
+            localDirty: true,
+            localUpdatedAtMs: nowMonotonic(tx),
           })
           .where(eq(exerciseDefinitions.id, exerciseId))
           .run();
@@ -193,6 +197,9 @@ export const createDrizzleExerciseCatalogStore = (): ExerciseCatalogStore => ({
             deletedAt: null,
             createdAt: input.now,
             updatedAt: input.now,
+            // Dirty-bit wiring (sync-v2-client t5a, t2 §7.2).
+            localDirty: true,
+            localUpdatedAtMs: nowMonotonic(tx),
           })
           .run();
       }
@@ -212,6 +219,10 @@ export const createDrizzleExerciseCatalogStore = (): ExerciseCatalogStore => ({
             role: mapping.role,
             createdAt: input.now,
             updatedAt: input.now,
+            // Dirty-bit wiring (sync-v2-client t5a, t2 §7.2): re-inserted
+            // mapping rows are fresh user writes and must push.
+            localDirty: true,
+            localUpdatedAtMs: nowMonotonic(tx),
           })
           .run();
       }
@@ -250,6 +261,10 @@ export const createDrizzleExerciseCatalogStore = (): ExerciseCatalogStore => ({
         .set({
           deletedAt: input.deletedAt,
           updatedAt: input.now,
+          // Dirty-bit wiring (sync-v2-client t5a, t2 §7.2): soft delete and
+          // restore are both dirtying writes.
+          localDirty: true,
+          localUpdatedAtMs: nowMonotonic(tx),
         })
         .where(eq(exerciseDefinitions.id, input.id))
         .run();
