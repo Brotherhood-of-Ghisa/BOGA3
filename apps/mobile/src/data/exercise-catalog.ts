@@ -183,7 +183,6 @@ export const createDrizzleExerciseCatalogStore = (): ExerciseCatalogStore => ({
             name: input.name,
             deletedAt: null,
             updatedAt: input.now,
-            // Dirty-bit wiring (sync-v2-client t5a, t2 §7.2).
             localDirty: true,
             localUpdatedAtMs: nowMonotonic(tx),
           })
@@ -197,7 +196,6 @@ export const createDrizzleExerciseCatalogStore = (): ExerciseCatalogStore => ({
             deletedAt: null,
             createdAt: input.now,
             updatedAt: input.now,
-            // Dirty-bit wiring (sync-v2-client t5a, t2 §7.2).
             localDirty: true,
             localUpdatedAtMs: nowMonotonic(tx),
           })
@@ -219,8 +217,6 @@ export const createDrizzleExerciseCatalogStore = (): ExerciseCatalogStore => ({
             role: mapping.role,
             createdAt: input.now,
             updatedAt: input.now,
-            // Dirty-bit wiring (sync-v2-client t5a, t2 §7.2): re-inserted
-            // mapping rows are fresh user writes and must push.
             localDirty: true,
             localUpdatedAtMs: nowMonotonic(tx),
           })
@@ -261,8 +257,6 @@ export const createDrizzleExerciseCatalogStore = (): ExerciseCatalogStore => ({
         .set({
           deletedAt: input.deletedAt,
           updatedAt: input.now,
-          // Dirty-bit wiring (sync-v2-client t5a, t2 §7.2): soft delete and
-          // restore are both dirtying writes.
           localDirty: true,
           localUpdatedAtMs: nowMonotonic(tx),
         })

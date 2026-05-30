@@ -96,9 +96,6 @@ export const upsertLocalGym = async (input: UpsertLocalGymInput) => {
           name: input.name,
           ...nextCoordinateFields,
           updatedAt: now,
-          // Dirty-bit wiring (sync-v2-client t5a, t2 §7.2): every repo write
-          // flips local_dirty = 1 and stamps a monotonic timestamp inside the
-          // same transaction as the row write.
           localDirty: true,
           localUpdatedAtMs: nowMonotonic(tx),
         })
@@ -122,7 +119,6 @@ export const upsertLocalGym = async (input: UpsertLocalGymInput) => {
         ...nextCoordinateFields,
         createdAt: now,
         updatedAt: now,
-        // Dirty-bit wiring (sync-v2-client t5a, t2 §7.2).
         localDirty: true,
         localUpdatedAtMs: nowMonotonic(tx),
       })

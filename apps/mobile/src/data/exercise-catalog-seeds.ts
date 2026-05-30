@@ -4174,15 +4174,6 @@ export const seedSystemExerciseCatalog = (database: LocalDatabase, now: Date = n
   assertValidSystemExerciseCatalogSeeds();
 
   database.transaction((tx) => {
-    // Seed inserts are stamped CLEAN (local_dirty = 0) per sync-v2-client
-    // t5a: the canonical catalog already exists server-side, so a fresh
-    // install must NOT re-push the seed rows as if they were user edits.
-    // We still call nowMonotonic(tx) so the device-global monotonic counter
-    // advances inside this transaction (t2 §8.3) — any later user edit to a
-    // seeded row will therefore be stamped with a strictly-higher
-    // local_updated_at_ms and will push correctly. nowMonotonic is called
-    // once for the whole seed batch (a single logical seed event); per-row
-    // calls would burn the counter needlessly across ~1600 seed rows.
     const seedStampMs = nowMonotonic(tx);
 
     for (const muscleGroup of SYSTEM_MUSCLE_GROUP_SEEDS) {
@@ -4211,7 +4202,6 @@ export const seedSystemExerciseCatalog = (database: LocalDatabase, now: Date = n
           ...exerciseDefinition,
           createdAt: now,
           updatedAt: now,
-          // Clean seed stamp (sync-v2-client t5a).
           localDirty: false,
           localUpdatedAtMs: seedStampMs,
         })
@@ -4233,7 +4223,6 @@ export const seedSystemExerciseCatalog = (database: LocalDatabase, now: Date = n
           ...mapping,
           createdAt: now,
           updatedAt: now,
-          // Clean seed stamp (sync-v2-client t5a).
           localDirty: false,
           localUpdatedAtMs: seedStampMs,
         })

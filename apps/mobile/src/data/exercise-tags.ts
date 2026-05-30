@@ -193,7 +193,6 @@ export const createDrizzleExerciseTagStore = (): ExerciseTagStore => ({
           deletedAt: null,
           createdAt: input.now,
           updatedAt: input.now,
-          // Dirty-bit wiring (sync-v2-client t5a, t2 §7.2).
           localDirty: true,
           localUpdatedAtMs: nowMonotonic(tx),
         })
@@ -229,7 +228,6 @@ export const createDrizzleExerciseTagStore = (): ExerciseTagStore => ({
           name: input.name,
           normalizedName: input.normalizedName,
           updatedAt: input.now,
-          // Dirty-bit wiring (sync-v2-client t5a, t2 §7.2).
           localDirty: true,
           localUpdatedAtMs: nowMonotonic(tx),
         })
@@ -261,8 +259,6 @@ export const createDrizzleExerciseTagStore = (): ExerciseTagStore => ({
         .set({
           deletedAt: input.deletedAt,
           updatedAt: input.now,
-          // Dirty-bit wiring (sync-v2-client t5a, t2 §7.2): soft delete and
-          // restore are both dirtying writes.
           localDirty: true,
           localUpdatedAtMs: nowMonotonic(tx),
         })
