@@ -1,8 +1,8 @@
 /**
  * Tests for `apps/mobile/src/data/clock.ts` — the canonical monotonic clock
- * helper per t2 §8 / sync-v2-client t4.
+ * helper.
  *
- * Coverage matrix (mirrors the Outcomes enumerated on t4.md):
+ * Coverage matrix:
  *   - Cold start: first call reads the persisted `last_emitted_ms` fixture.
  *   - Cache hit: a second call inside the same process does NOT re-SELECT.
  *   - `Date.now()` ahead of cache: result equals `Date.now()`.
@@ -82,7 +82,7 @@ const seedRuntimeStateRow = (database: TestDatabase, lastEmittedMs: number): voi
     .run();
 };
 
-describe('nowMonotonic (t4 — sync-v2-client clock helper)', () => {
+describe('nowMonotonic (monotonic clock helper)', () => {
   let realDateNow: typeof Date.now;
 
   beforeEach(() => {

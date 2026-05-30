@@ -1,9 +1,9 @@
 /**
- * Write-path dirty-bit contract for the Layer 0 / Layer 1 repos
- * (sync-v2-client t5a). Per t2 §7.2 every create / update / softDelete /
- * cascade path that writes a Layer 0/1 entity must, inside the SAME
- * transaction as the row write, set `local_dirty = 1` and
- * `local_updated_at_ms = nowMonotonic(tx)`.
+ * Write-path dirty-bit contract for the Layer 0 / Layer 1 repos — the
+ * counterpart to the Layer 2 / 3 coverage in `dirty-bit-layer-2-3.test.ts`.
+ * Every repo create / update / softDelete / cascade path that writes a
+ * Layer 0/1 entity must, inside the SAME transaction as the row write, set
+ * `local_dirty = 1` and `local_updated_at_ms = nowMonotonic(tx)`.
  *
  * Entities covered (one create + update + softDelete assertion group each,
  * plus a cascade assertion where applicable):
@@ -17,19 +17,13 @@
  * the final describe block: seed rows land CLEAN (local_dirty = 0) yet the
  * monotonic counter still advances so later user edits push.
  *
- * All tests drive a real in-memory SQLite database via better-sqlite3 +
- * drizzle's better-sqlite3 adapter (the same pattern as clock.test.ts). The
- * schema is applied from the generated migration SQL so the assertions run
- * against the real column defaults and constraints. `@/src/data/bootstrap`
- * is mocked so the repos' `bootstrapLocalDataLayer()` resolves to this
- * in-memory database.
+ * Driver: a real in-memory `better-sqlite3` database with the full migrated
+ * schema applied, built via the shared `helpers/in-memory-db` fixture (see
+ * that file for why we drive the schema from the generated migration bundle).
+ * `@/src/data/bootstrap` is mocked so the repos' `bootstrapLocalDataLayer()`
+ * resolves to this in-memory database.
  */
 
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-
-import Database from 'better-sqlite3';
-import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { eq } from 'drizzle-orm';
 
 import type { LocalDatabase } from '@/src/data/bootstrap';
@@ -53,7 +47,13 @@ import {
 } from '@/src/data/schema';
 import { createDrizzleSessionListStore } from '@/src/data/session-list';
 
-type TestDatabase = BetterSQLite3Database<typeof schema>;
+import {
+  createInMemoryDatabase,
+  type InMemoryDatabaseFixture,
+  type InMemoryTestDatabase,
+} from './helpers/in-memory-db';
+
+type TestDatabase = InMemoryTestDatabase;
 
 // The repos under test call `bootstrapLocalDataLayer()` to acquire the
 // drizzle handle. The mock factory may only reference variables whose names
@@ -80,36 +80,16 @@ const seedInto = (database: TestDatabase, now: Date): void => {
   seedSystemExerciseCatalog(database as unknown as LocalDatabase, now);
 };
 
-const MIGRATION_SQL_PATH = join(__dirname, '..', '..', 'drizzle', '0000_living_bucky.sql');
-
-const applySchema = (client: Database.Database): void => {
-  const sql = readFileSync(MIGRATION_SQL_PATH, 'utf8');
-  for (const rawStatement of sql.split('--> statement-breakpoint')) {
-    const statement = rawStatement.trim();
-    if (statement.length > 0) {
-      client.exec(statement);
-    }
-  }
-};
-
-const createTestDatabase = (): { database: TestDatabase; client: Database.Database } => {
-  const client = new Database(':memory:');
-  applySchema(client);
-  const database = drizzle(client, { schema });
-  return { database, client };
-};
-
-let client: Database.Database;
+let fixture: InMemoryDatabaseFixture;
 
 beforeEach(() => {
   __resetClockForTests();
-  const created = createTestDatabase();
-  client = created.client;
-  mockBootstrapState.database = created.database;
+  fixture = createInMemoryDatabase();
+  mockBootstrapState.database = fixture.database;
 });
 
 afterEach(() => {
-  client.close();
+  fixture.close();
   mockBootstrapState.database = null;
   __resetClockForTests();
 });
@@ -121,7 +101,7 @@ const requireDatabase = (): TestDatabase => {
   return mockBootstrapState.database;
 };
 
-describe('gyms write paths flip the dirty bit (t5a)', () => {
+describe('gyms write paths flip the dirty bit', () => {
   it('marks the row dirty with a positive timestamp on create', async () => {
     await upsertLocalGym({ id: 'gym-1', name: 'Iron Temple' });
 
@@ -142,7 +122,7 @@ describe('gyms write paths flip the dirty bit (t5a)', () => {
   });
 });
 
-describe('exercise_definitions write paths flip the dirty bit (t5a)', () => {
+describe('exercise_definitions write paths flip the dirty bit', () => {
   const store = createDrizzleExerciseCatalogStore();
 
   const seedMuscleGroup = () => {
@@ -223,7 +203,7 @@ describe('exercise_definitions write paths flip the dirty bit (t5a)', () => {
   });
 });
 
-describe('exercise_muscle_mappings write paths flip the dirty bit (t5a)', () => {
+describe('exercise_muscle_mappings write paths flip the dirty bit', () => {
   const store = createDrizzleExerciseCatalogStore();
 
   const seedMuscleGroups = () => {
@@ -296,7 +276,7 @@ describe('exercise_muscle_mappings write paths flip the dirty bit (t5a)', () => 
   });
 });
 
-describe('sessions write paths flip the dirty bit (t5a)', () => {
+describe('sessions write paths flip the dirty bit', () => {
   const store = createDrizzleSessionListStore();
 
   const insertSession = (id: string) => {
@@ -351,7 +331,7 @@ describe('sessions write paths flip the dirty bit (t5a)', () => {
   });
 });
 
-describe('exercise_tag_definitions write paths flip the dirty bit (t5a)', () => {
+describe('exercise_tag_definitions write paths flip the dirty bit', () => {
   const store = createDrizzleExerciseTagStore();
 
   const insertExerciseDefinition = (id: string) => {
@@ -432,7 +412,7 @@ describe('exercise_tag_definitions write paths flip the dirty bit (t5a)', () => 
   });
 });
 
-describe('seeder stamps catalog rows clean while advancing the clock (t5a)', () => {
+describe('seeder stamps catalog rows clean while advancing the clock', () => {
   it('lands exercise_definitions and exercise_muscle_mappings rows with local_dirty = 0', () => {
     const database = requireDatabase();
     seedInto(database, new Date('2026-05-29T10:00:00.000Z'));

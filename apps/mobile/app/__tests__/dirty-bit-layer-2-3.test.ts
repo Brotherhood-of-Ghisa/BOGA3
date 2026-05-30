@@ -1,43 +1,35 @@
 /**
- * Tests for the write-path dirty-bit contract on the Layer 2 / Layer 3
- * entities (sync-v2-client t5b) — the counterpart to t5a's Layer 0 / 1
- * coverage. Per `docs/plans/sync-v2/designs/t2.md` §7.2, every repo
- * create / update / softDelete / cascade path that writes to one of these
- * tables MUST, inside the SAME `database.transaction((tx) => {...})` as the
- * row write, set `local_dirty = 1` and `local_updated_at_ms = nowMonotonic(tx)`.
+ * Write-path dirty-bit contract for the Layer 2 / Layer 3 entities — the
+ * counterpart to the Layer 0 / 1 coverage in `dirty-bit-layer-0-1.test.ts`.
+ * Every repo create / update / softDelete / cascade path that writes to one
+ * of these tables MUST, inside the SAME `database.transaction((tx) => {...})`
+ * as the row write, set `local_dirty = 1` and
+ * `local_updated_at_ms = nowMonotonic(tx)`.
  *
  * Layer partition (authoritative — `apps/mobile/src/sync/topo-order.ts`):
  *   - Layer 2: `session_exercises`
  *   - Layer 3: `exercise_sets`, `session_exercise_tags`
  *
- * Files under test (t5b's scope):
+ * Files under test:
  *   - `src/data/session-drafts.ts` — writes `session_exercises` and
  *     `exercise_sets` (and the `sessions` row those transactions share).
  *   - `src/data/exercise-tags.ts` — the `session_exercise_tags` create path
  *     (`createTagAssignment`).
  *
- * Coverage required by the card (one test per entity in scope, ≥ 3):
+ * Coverage (one test per entity in scope, ≥ 3):
  *   - create / update / softDelete each leave the row `local_dirty = 1`.
- *   - reorder swapping two siblings leaves BOTH dirty (t2 §10.1 #1 / #2).
+ *   - reorder swapping two siblings leaves BOTH dirty so they ride the same
+ *     push batch and the per-session uniqueness invariant holds.
  *
- * Driver: a real in-memory `better-sqlite3` database seeded from the
- * generated Drizzle migration SQL (`apps/mobile/drizzle/0000_living_bucky.sql`),
- * mirroring the `clock.test.ts` fixture pattern. `bootstrapLocalDataLayer`
- * is mocked to hand the repos this in-memory drizzle instance so the real
- * write paths execute end-to-end. The transaction shape better-sqlite3
- * yields is structurally identical to the production expo-sqlite shape (both
- * extend `BaseSQLiteDatabase<'sync', ..., TSchema>`), so `nowMonotonic`'s
- * `Transaction` parameter accepts the test DB's transaction unchanged.
+ * Driver: a real in-memory `better-sqlite3` database with the full migrated
+ * schema applied, built via the shared `helpers/in-memory-db` fixture (see
+ * that file for why we drive the schema from the generated migration bundle).
+ * `bootstrapLocalDataLayer` is mocked to hand the repos this in-memory drizzle
+ * instance so the real write paths execute end-to-end.
  */
 
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-
-import Database from 'better-sqlite3';
-import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { and, eq } from 'drizzle-orm';
 
-import * as schema from '@/src/data/schema';
 import {
   exerciseDefinitions,
   exerciseSets,
@@ -47,7 +39,13 @@ import {
   sessions,
 } from '@/src/data/schema';
 
-type TestDatabase = BetterSQLite3Database<typeof schema>;
+import {
+  createInMemoryDatabase,
+  type InMemoryDatabaseFixture,
+  type InMemoryTestDatabase,
+} from './helpers/in-memory-db';
+
+type TestDatabase = InMemoryTestDatabase;
 
 let mockActiveDatabase: TestDatabase | null = null;
 
@@ -67,21 +65,6 @@ jest.mock('@/src/data/bootstrap', () => ({
 import { createDrizzleSessionDraftStore } from '@/src/data/session-drafts';
 import { createDrizzleExerciseTagStore } from '@/src/data/exercise-tags';
 import { __resetClockForTests } from '@/src/data/clock';
-
-const MIGRATION_SQL = readFileSync(
-  join(__dirname, '..', '..', 'drizzle', '0000_living_bucky.sql'),
-  'utf8',
-);
-
-const createTestDatabase = (): TestDatabase => {
-  const client = new Database(':memory:');
-  client.pragma('foreign_keys = ON');
-  // The generated migration uses drizzle's `--> statement-breakpoint` markers
-  // between statements; strip them and execute the raw DDL.
-  const ddl = MIGRATION_SQL.split('--> statement-breakpoint').join('\n');
-  client.exec(ddl);
-  return drizzle(client, { schema });
-};
 
 const SESSION_ID = 'session-l23';
 const EXERCISE_DEFINITION_ID = 'sys_barbell_bench_press';
@@ -142,12 +125,16 @@ const draftExercise = (
   sets: overrides.sets ?? [{ repsValue: '5', weightValue: '225' }],
 });
 
-describe('Layer 2 / 3 write-path dirty-bit contract (t5b)', () => {
+describe('Layer 2 / 3 write-path dirty-bit contract', () => {
   let realDateNow: typeof Date.now;
+  let fixture: InMemoryDatabaseFixture;
 
   beforeEach(() => {
     __resetClockForTests();
-    mockActiveDatabase = createTestDatabase();
+    // FK enforcement on: the Layer 2/3 writes under test depend on the
+    // session / exercise-definition parents seeded below.
+    fixture = createInMemoryDatabase({ foreignKeys: true });
+    mockActiveDatabase = fixture.database;
     seedFixtureGraph(mockActiveDatabase);
     realDateNow = Date.now;
   });
@@ -155,6 +142,7 @@ describe('Layer 2 / 3 write-path dirty-bit contract (t5b)', () => {
   afterEach(() => {
     Date.now = realDateNow;
     __resetClockForTests();
+    fixture.close();
     mockActiveDatabase = null;
   });
 
@@ -248,7 +236,7 @@ describe('Layer 2 / 3 write-path dirty-bit contract (t5b)', () => {
       expect(rows[0].localDirty).toBe(true);
     });
 
-    it('reorder: swapping two sibling exercises leaves BOTH rows local_dirty = 1 (t2 §10.1 #1)', async () => {
+    it('reorder: swapping two sibling exercises leaves BOTH rows local_dirty = 1', async () => {
       const store = createDrizzleSessionDraftStore();
       const benchId = 'exercise-bench';
       const squatId = 'exercise-squat';
@@ -288,7 +276,7 @@ describe('Layer 2 / 3 write-path dirty-bit contract (t5b)', () => {
       expect(byId.get(benchId)?.orderIndex).toBe(1);
       // BOTH swapped siblings must be dirty so they ship in the same push
       // batch and the per-session (session_id, order_index) uniqueness
-      // invariant holds across the batch (t2 §10.1 #1).
+      // invariant holds across the batch.
       expect(byId.get(squatId)?.localDirty).toBe(true);
       expect(byId.get(benchId)?.localDirty).toBe(true);
     });
@@ -392,7 +380,7 @@ describe('Layer 2 / 3 write-path dirty-bit contract (t5b)', () => {
       expect(rows[0].localDirty).toBe(true);
     });
 
-    it('reorder: swapping two sibling sets leaves BOTH rows local_dirty = 1 (t2 §10.1 #2)', async () => {
+    it('reorder: swapping two sibling sets leaves BOTH rows local_dirty = 1', async () => {
       const store = createDrizzleSessionDraftStore();
 
       await store.saveDraftGraph({
