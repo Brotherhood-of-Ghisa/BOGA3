@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm';
 
 import { bootstrapLocalDataLayer } from './bootstrap';
+import { nowMonotonic } from './clock';
 import { gyms } from './schema';
 
 export type UpsertLocalGymInput = {
@@ -95,6 +96,8 @@ export const upsertLocalGym = async (input: UpsertLocalGymInput) => {
           name: input.name,
           ...nextCoordinateFields,
           updatedAt: now,
+          localDirty: true,
+          localUpdatedAtMs: nowMonotonic(tx),
         })
         .where(eq(gyms.id, input.id))
         .run();
@@ -116,6 +119,8 @@ export const upsertLocalGym = async (input: UpsertLocalGymInput) => {
         ...nextCoordinateFields,
         createdAt: now,
         updatedAt: now,
+        localDirty: true,
+        localUpdatedAtMs: nowMonotonic(tx),
       })
       .run();
   });
