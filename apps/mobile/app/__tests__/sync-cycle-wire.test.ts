@@ -143,7 +143,11 @@ describe('entityToWire / wireToEntity round-trip', () => {
   it.each(types)('round-trips %s through the wire envelope', (type) => {
     seedParents();
     const table = TABLES[type] as typeof schema.gyms;
-    const sample = { ...SAMPLE_ROWS[type], localDirty: true, localUpdatedAtMs: LOCAL_UPDATED_AT };
+    const sample: Record<string, unknown> = {
+      ...SAMPLE_ROWS[type],
+      localDirty: true,
+      localUpdatedAtMs: LOCAL_UPDATED_AT,
+    };
 
     database.insert(table).values(sample as never).run();
     const original = database.select().from(table).where(eq(table.id, sample.id as string)).get() as Record<string, unknown>;
