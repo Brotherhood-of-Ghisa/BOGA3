@@ -34,6 +34,19 @@ export default function MaestroHarnessScreen() {
     message: 'Preparing Maestro harness action…',
   });
 
+  // `useLocalSearchParams` returns a fresh object on every render, so depending
+  // on `params` directly re-runs this effect each time the component re-renders
+  // (e.g. when the auth store notifies via `useSyncExternalStore`, or when we
+  // call `setStatus`). For the `reset=data` path that means kicking off a brand
+  // new `resetLocalAppData()` mid-flight. Derive stable primitive params and
+  // depend on those so the harness action runs exactly once per harness URL.
+  const resetParam = coerceMaestroHarnessQueryParam(params.reset);
+  const fixtureParam = coerceMaestroHarnessQueryParam(params.fixture);
+  const teleportParam = coerceMaestroHarnessQueryParam(params.teleport);
+  const modeParam = coerceMaestroHarnessQueryParam(params.mode);
+  const intentParam = coerceMaestroHarnessQueryParam(params.intent);
+  const sessionIdParam = coerceMaestroHarnessQueryParam(params.sessionId);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -47,14 +60,14 @@ export default function MaestroHarnessScreen() {
       };
     }
 
-    const resetMode = resolveMaestroHarnessResetMode(coerceMaestroHarnessQueryParam(params.reset));
-    const fixtureName = resolveMaestroHarnessFixtureName(coerceMaestroHarnessQueryParam(params.fixture));
-    const teleportTarget = resolveMaestroHarnessTeleportTarget(coerceMaestroHarnessQueryParam(params.teleport));
+    const resetMode = resolveMaestroHarnessResetMode(resetParam);
+    const fixtureName = resolveMaestroHarnessFixtureName(fixtureParam);
+    const teleportTarget = resolveMaestroHarnessTeleportTarget(teleportParam);
     const teleportHref = resolveMaestroHarnessTeleportHref({
       target: teleportTarget,
-      mode: coerceMaestroHarnessQueryParam(params.mode),
-      intent: coerceMaestroHarnessQueryParam(params.intent),
-      sessionId: coerceMaestroHarnessQueryParam(params.sessionId),
+      mode: modeParam,
+      intent: intentParam,
+      sessionId: sessionIdParam,
     });
 
     void (async () => {
@@ -102,7 +115,7 @@ export default function MaestroHarnessScreen() {
     return () => {
       cancelled = true;
     };
-  }, [params, router]);
+  }, [resetParam, fixtureParam, teleportParam, modeParam, intentParam, sessionIdParam, router]);
 
   return (
     <View style={styles.screen} testID="maestro-harness-screen">
