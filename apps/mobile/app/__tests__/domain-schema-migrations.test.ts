@@ -19,10 +19,10 @@ describe('domain schema and runtime migrations', () => {
 
   it('includes session lifecycle, taxonomy tables, and deterministic ordering constraints in runtime SQL', () => {
     const migrationSql = Object.values(localRuntimeMigrations.migrations).join('\n');
-    // After the sync-v2-client t1 baseline squash, every entity table is created
-    // by `m0000` rather than spread across fifteen incremental migrations. The
-    // lifecycle constraints that used to live in m0004 are baked straight into
-    // the `sessions` CREATE TABLE.
+    // The migration history is squashed to a single baseline, so every entity
+    // table is created by `m0000` rather than spread across fifteen incremental
+    // migrations. The lifecycle constraints that used to live in m0004 are baked
+    // straight into the `sessions` CREATE TABLE.
     const baselineMigration = localRuntimeMigrations.migrations.m0000;
 
     expect(migrationSql).toContain('CREATE TABLE `muscle_groups`');
