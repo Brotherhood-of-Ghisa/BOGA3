@@ -55,6 +55,16 @@ Reason: keeps FE/backend integration test expectations explicit without forcing 
 - During execution sessions, run a targeted test or gate after each meaningful change, then run `./scripts/quality-fast.sh` before task closeout.
 - Run `./scripts/quality-slow.sh <area>` when the task card's risk triggers require slower local runtime/contract checks.
 
+## In-memory SQLite unit tests (shared fixture)
+
+- Unit tests that need a real local SQLite engine (rather than a mocked client) must use the shared fixture at `apps/mobile/app/__tests__/helpers/in-memory-db.ts`.
+- The helper spins up an in-memory `better-sqlite3` database, applies **all** migrations from the generated migration bundle (`apps/mobile/drizzle/migrations.generated.ts`) in journal order, and returns the drizzle handle, the raw client, and a `close()` teardown.
+- Rule:
+  - do not hand-roll DB setup or copy DDL into individual tests; drive the schema from the generated bundle so every test tracks the real shipped schema automatically when a new migration lands.
+  - call `createInMemoryDatabase()` in `beforeEach` and `close()` in `afterEach`. Pass `{ foreignKeys: true }` when the test depends on FK enforcement.
+- Current consumers of this fixture include the write-path dirty-bit suites (`apps/mobile/app/__tests__/dirty-bit-layer-0-1.test.ts` and `apps/mobile/app/__tests__/dirty-bit-layer-2-3.test.ts`), which share the same setup/teardown and assertion style so they read as a matched pair.
+- Exception: tests that intentionally create a deliberately partial schema to assert negative-space behavior (for example `clock.test.ts`, which builds only `sync_runtime_state` so a stray write to another table surfaces as a missing-table error) keep their bespoke setup; the shared full-schema fixture would erase that guard.
+
 ## GPS gym-location coverage policy (M15 onward)
 
 - Applies to foreground location service and gym-coordinate matching work.

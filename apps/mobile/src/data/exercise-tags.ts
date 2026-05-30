@@ -296,15 +296,22 @@ export const createDrizzleExerciseTagStore = (): ExerciseTagStore => ({
     const database = await bootstrapLocalDataLayer();
     const assignmentId = createLocalId('session-exercise-tag');
 
-    database
-      .insert(sessionExerciseTags)
-      .values({
-        id: assignmentId,
-        sessionExerciseId: input.sessionExerciseId,
-        exerciseTagDefinitionId: input.tagDefinitionId,
-        createdAt: input.now,
-      })
-      .run();
+    // Mark the new `session_exercise_tags` row dirty and stamp the monotonic
+    // last-write-wins timestamp inside the SAME transaction as the insert, so
+    // the counter persist (nowMonotonic → sync_runtime_state.last_emitted_ms)
+    // is atomic with the row write and the sync cycle picks it up.
+    database.transaction((tx) => {
+      tx.insert(sessionExerciseTags)
+        .values({
+          id: assignmentId,
+          sessionExerciseId: input.sessionExerciseId,
+          exerciseTagDefinitionId: input.tagDefinitionId,
+          localDirty: true,
+          localUpdatedAtMs: nowMonotonic(tx),
+          createdAt: input.now,
+        })
+        .run();
+    });
   },
   async removeTagAssignment(input) {
     const database = await bootstrapLocalDataLayer();
