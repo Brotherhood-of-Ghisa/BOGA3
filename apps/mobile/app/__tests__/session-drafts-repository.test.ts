@@ -89,6 +89,7 @@ describe('session draft repository', () => {
         },
       ],
       now,
+      localUpdatedAtMs: now.getTime(),
     });
 
     expect(deletedTables).toContain(sessionExerciseTags);

@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, inArray, isNull } from 'drizzle-orm';
 
 import { bootstrapLocalDataLayer, type LocalDatabase } from './bootstrap';
+import { nowMonotonic } from './clock';
 import { exerciseSets, sessionExercises, sessionExerciseTags, sessions } from './schema';
 import { normalizeSessionSetType, type SessionSetTypeValue } from './set-types';
 
@@ -387,6 +388,14 @@ const replaceSessionExerciseGraph = (
     sessionId: string;
     exercises: SessionDraftExerciseInput[];
     now: Date;
+    // Monotonic LWW timestamp produced once per surrounding transaction via
+    // `nowMonotonic(tx)` (t2 §7.2 / §8). Every row this function writes —
+    // each `session_exercises` (Layer 2), `exercise_sets` and
+    // `session_exercise_tags` (Layer 3) — is stamped `localDirty: true` and
+    // this value so the next sync cycle pushes the whole rebuilt graph. The
+    // reorder path rewrites every sibling row here, so all touched siblings
+    // dirty together and ship in the same push batch (t2 §10.1 #1 / #2).
+    localUpdatedAtMs: number;
   }
 ) => {
   const existingExerciseRows = tx
@@ -463,6 +472,8 @@ const replaceSessionExerciseGraph = (
         orderIndex: exerciseIndex,
         name: exercise.name,
         machineName: exercise.machineName ?? null,
+        localDirty: true,
+        localUpdatedAtMs: input.localUpdatedAtMs,
         createdAt: input.now,
         updatedAt: input.now,
       })
@@ -478,6 +489,8 @@ const replaceSessionExerciseGraph = (
             id: assignment.id,
             sessionExerciseId,
             exerciseTagDefinitionId: assignment.exerciseTagDefinitionId,
+            localDirty: true,
+            localUpdatedAtMs: input.localUpdatedAtMs,
             createdAt: assignment.createdAt,
           })
           .run();
@@ -497,6 +510,8 @@ const replaceSessionExerciseGraph = (
           repsValue: set.repsValue,
           weightValue: set.weightValue,
           setType: nextSetType,
+          localDirty: true,
+          localUpdatedAtMs: input.localUpdatedAtMs,
           createdAt: input.now,
           updatedAt: input.now,
         })
@@ -513,6 +528,13 @@ export const createDrizzleSessionDraftStore = (): SessionDraftStore => ({
     const sessionId = input.sessionId?.trim() || createLocalEntityId('session');
 
     database.transaction((tx) => {
+      // One monotonic LWW timestamp for every row written in this draft-save
+      // transaction — the `sessions` row plus the whole `session_exercises` /
+      // `exercise_sets` / `session_exercise_tags` graph rebuilt below — so the
+      // entire graph dirties together and ships in one push batch (t2 §7.2,
+      // §8.3 synchronous persist into sync_runtime_state.last_emitted_ms).
+      const localUpdatedAtMs = nowMonotonic(tx);
+
       const existingSession = tx.select().from(sessions).where(eq(sessions.id, sessionId)).get();
       if (existingSession?.status === 'completed') {
         throw new Error(`Cannot modify completed session ${sessionId}`);
@@ -527,6 +549,8 @@ export const createDrizzleSessionDraftStore = (): SessionDraftStore => ({
             startedAt: input.startedAt,
             completedAt: null,
             durationSec: null,
+            localDirty: true,
+            localUpdatedAtMs,
             createdAt: input.now,
             updatedAt: input.now,
           })
@@ -539,6 +563,8 @@ export const createDrizzleSessionDraftStore = (): SessionDraftStore => ({
             startedAt: input.startedAt,
             completedAt: null,
             durationSec: null,
+            localDirty: true,
+            localUpdatedAtMs,
             updatedAt: input.now,
           })
           .where(eq(sessions.id, sessionId))
@@ -549,6 +575,7 @@ export const createDrizzleSessionDraftStore = (): SessionDraftStore => ({
         sessionId,
         exercises: input.exercises,
         now: input.now,
+        localUpdatedAtMs,
       });
     });
 
@@ -558,6 +585,10 @@ export const createDrizzleSessionDraftStore = (): SessionDraftStore => ({
     const database = await bootstrapLocalDataLayer();
 
     database.transaction((tx) => {
+      // Single monotonic LWW timestamp for the completed-session row and the
+      // whole exercise/set/tag graph rebuilt below (t2 §7.2, §8.3).
+      const localUpdatedAtMs = nowMonotonic(tx);
+
       const existingSession = tx.select().from(sessions).where(eq(sessions.id, input.sessionId)).get();
       if (!existingSession) {
         throw new Error(`Session ${input.sessionId} does not exist`);
@@ -573,6 +604,8 @@ export const createDrizzleSessionDraftStore = (): SessionDraftStore => ({
           startedAt: input.startedAt,
           completedAt: input.completedAt,
           durationSec: input.durationSec,
+          localDirty: true,
+          localUpdatedAtMs,
           updatedAt: input.now,
         })
         .where(eq(sessions.id, input.sessionId))
@@ -582,6 +615,7 @@ export const createDrizzleSessionDraftStore = (): SessionDraftStore => ({
         sessionId: input.sessionId,
         exercises: input.exercises,
         now: input.now,
+        localUpdatedAtMs,
       });
     });
 
@@ -619,6 +653,8 @@ export const createDrizzleSessionDraftStore = (): SessionDraftStore => ({
           status: 'completed',
           completedAt: input.completedAt,
           durationSec: input.durationSec,
+          localDirty: true,
+          localUpdatedAtMs: nowMonotonic(tx),
           updatedAt: input.updatedAt,
         })
         .where(eq(sessions.id, input.sessionId))
@@ -654,6 +690,8 @@ export const createDrizzleSessionDraftStore = (): SessionDraftStore => ({
           completedAt: null,
           durationSec: null,
           deletedAt: null,
+          localDirty: true,
+          localUpdatedAtMs: nowMonotonic(tx),
           updatedAt: input.updatedAt,
         })
         .where(eq(sessions.id, input.sessionId))

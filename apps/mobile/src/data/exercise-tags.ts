@@ -1,6 +1,7 @@
 import { and, asc, eq, isNull } from 'drizzle-orm';
 
 import { bootstrapLocalDataLayer } from './bootstrap';
+import { nowMonotonic } from './clock';
 import { exerciseTagDefinitions, sessionExercises, sessionExerciseTags } from './schema';
 
 export type ExerciseTagDefinitionRecord = {
@@ -287,15 +288,22 @@ export const createDrizzleExerciseTagStore = (): ExerciseTagStore => ({
     const database = await bootstrapLocalDataLayer();
     const assignmentId = createLocalId('session-exercise-tag');
 
-    database
-      .insert(sessionExerciseTags)
-      .values({
-        id: assignmentId,
-        sessionExerciseId: input.sessionExerciseId,
-        exerciseTagDefinitionId: input.tagDefinitionId,
-        createdAt: input.now,
-      })
-      .run();
+    // Layer 3 `session_exercise_tags` create: dirty the new row and stamp the
+    // monotonic LWW timestamp in the SAME transaction as the row write so the
+    // counter persist (nowMonotonic → sync_runtime_state.last_emitted_ms) is
+    // atomic with the insert (t2 §7.2, §8.3).
+    database.transaction((tx) => {
+      tx.insert(sessionExerciseTags)
+        .values({
+          id: assignmentId,
+          sessionExerciseId: input.sessionExerciseId,
+          exerciseTagDefinitionId: input.tagDefinitionId,
+          localDirty: true,
+          localUpdatedAtMs: nowMonotonic(tx),
+          createdAt: input.now,
+        })
+        .run();
+    });
   },
   async removeTagAssignment(input) {
     const database = await bootstrapLocalDataLayer();
