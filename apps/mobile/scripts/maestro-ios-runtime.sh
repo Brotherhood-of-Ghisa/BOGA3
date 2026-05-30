@@ -268,6 +268,17 @@ maestro_warm_dev_client() {
   # gives the alert time to render before the tap. The first openLink + teleport
   # mirror the gated flow's own first two `openLink`s so the bundle is fully
   # loaded and the harness landing screen is reached.
+  #
+  # The trust dialog is re-raised PER deep link on iOS-26 + expo-dev-client, so
+  # the `teleport=session-list` link surfaces a fresh "Open in <App>?" alert that
+  # can sit on top of an already-rendered RN root (confirmed via warm-up failure
+  # screenshots: stats-history was drawn behind a second alert). A single tap can
+  # race the alert's render, so we tap "Open" once right after the link AND once
+  # more immediately before the wait — both `optional: true`, so on a warm sim
+  # (already trusted, no alert) each no-ops. The final wait uses a bounded 45s
+  # timeout: enough to JS-bundle the cold root, but short enough that a genuinely
+  # stuck alert doesn't burn 90s of dead time before the gated flow takes over
+  # (the gated flow clears the same alert with its own `optional: "Open"` taps).
   cat >"$warmup_flow" <<EOF
 appId: ${bundle_id}
 ---
@@ -283,23 +294,31 @@ appId: ${bundle_id}
 - tapOn:
     text: "Open"
     optional: true
+- tapOn:
+    text: "Open"
+    optional: true
 - extendedWaitUntil:
     visible:
       id: "stats-history-screen"
-    timeout: 90000
+    timeout: 45000
 EOF
 
   echo "[maestro] warming dev client / dismissing URL-scheme trust dialog on cold sim ($udid)"
 
-  # The warm-up is best-effort: if it cannot reach the RN root we let the real
-  # flow run anyway (and surface its own failure). A non-zero warm-up exit must
-  # never short-circuit the gate on its own.
+  # The warm-up is best-effort: it taps "Open" to trust the scheme and drives the
+  # cold JS bundle to hot, but the gated flow is the authoritative assertion. A
+  # non-confirmation here is NOT a failure — the trust dialog can be re-raised by
+  # the teleport link and sit over an already-rendered root past the wait window,
+  # yet the bundle is still warmed and the gated flow's own `optional: "Open"`
+  # taps clear the residual alert. So a non-zero warm-up exit never short-circuits
+  # the gate, and we log it as informational (not an error) to avoid a misleading
+  # false-negative in green runs.
   if maestro test "$warmup_flow" \
     --udid "$udid" \
     --test-output-dir "$warmup_output_dir" >/dev/null 2>&1; then
     echo "[maestro] dev-client warm-up complete — URL scheme trusted, RN root mounted, Metro bundle hot"
   else
-    echo "[maestro] dev-client warm-up did not confirm the RN root; continuing to the flow (trust tap was attempted)" >&2
+    echo "[maestro] dev-client warm-up best-effort done (RN root not confirmed within window; trust taps fired + bundle warmed). Gated flow will assert authoritatively."
   fi
 }
 
