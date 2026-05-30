@@ -552,6 +552,16 @@ const rowKey = (type: EntityTableName, id: string): string => `${type} ${id}`;
 const runPushLeg = async (database: LocalDatabase): Promise<number> => {
   let pushedTotal = 0;
 
+  // Rows this drain has already sent at least once. A row stays dirty after its
+  // ack when it was edited again while the request was in flight (the
+  // push-in-flight race): its current timestamp no longer matches the one we
+  // sent, so the ack skips it. If we re-selected such a row in the same drain we
+  // would push it forever, since each push can race with another edit. Instead
+  // the drain stops once a batch makes no forward progress (every row in it has
+  // already been sent this drain) and the newer value re-pushes on the next
+  // convergence round.
+  const attempted = new Set<string>();
+
   for (;;) {
     // Snapshot the batch and the per-row sent timestamps in one read. The map
     // captures the monotonic timestamp at serialise time so the ack handler can
@@ -567,6 +577,17 @@ const runPushLeg = async (database: LocalDatabase): Promise<number> => {
 
     if (batch.length === 0) {
       break;
+    }
+
+    // Forward-progress guard: if no row in this batch is new to the drain, the
+    // dirty stream is not shrinking (every remaining row lost its ack to a
+    // concurrent edit). Stop and let the next convergence round re-push them.
+    const hasNewRow = batch.some((entity) => !attempted.has(rowKey(entity.type, entity.id)));
+    if (!hasNewRow) {
+      break;
+    }
+    for (const entity of batch) {
+      attempted.add(rowKey(entity.type, entity.id));
     }
 
     await callSyncPush(batch);
