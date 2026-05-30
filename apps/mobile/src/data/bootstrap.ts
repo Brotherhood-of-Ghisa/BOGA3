@@ -2,6 +2,8 @@ import { drizzle } from 'drizzle-orm/expo-sqlite';
 import { migrate } from 'drizzle-orm/expo-sqlite/migrator';
 import { deleteDatabaseAsync, openDatabaseSync, type SQLiteDatabase } from 'expo-sqlite';
 
+import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidation';
+
 import { localRuntimeMigrations } from './migrations';
 import { seedSystemExerciseCatalog } from './exercise-catalog-seeds';
 import * as schema from './schema';
@@ -121,7 +123,18 @@ export const resetLocalAppData = (): Promise<LocalDatabase> =>
     // Re-bootstrap inline while still holding the lock. Calling the exported
     // `bootstrapLocalDataLayer()` here would deadlock — it would queue behind
     // this very operation and never resolve.
-    return prepareLocalDataLayer();
+    const database = await prepareLocalDataLayer();
+
+    // The exercise-catalog cache holds an in-memory snapshot taken from the
+    // pre-reset database. Now that the DB has been wiped and re-seeded, that
+    // snapshot is stale. Invalidate the cache so the next read repopulates from
+    // the fresh database rather than serving rows that no longer reflect it.
+    // Done after the re-seed completes (and while still inside the lock) so the
+    // reload sees the final state, and placed here so every reset caller
+    // benefits.
+    invalidateExerciseCatalogCache();
+
+    return database;
   });
 
 export const __resetLocalDataLayerForTests = () => {

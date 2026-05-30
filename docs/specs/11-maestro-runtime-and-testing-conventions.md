@@ -109,7 +109,8 @@ Rules:
 ### Current simulator helper behavior
 
 - `apps/mobile/scripts/ios-sim-boot.sh` resolves a simulator by `IOS_SIM_UDID` or `IOS_SIM_DEVICE`, boots it, waits for boot readiness, and echoes the resolved UDID.
-- When `IOS_SIM_AUTO_CREATE=1` and no simulator matching `IOS_SIM_DEVICE` exists, it creates a dedicated simulator using the newest available iOS runtime and a preferred iPhone simulator type.
+- When `IOS_SIM_AUTO_CREATE=1` and no simulator matching `IOS_SIM_DEVICE` exists, it creates a dedicated simulator using the newest available iOS runtime and a preferred iPhone simulator type, logging a loud `[maestro] sim "<name>" not found — creating (deviceType=…, runtime=…)` line before it does so.
+- `IOS_SIM_AUTO_CREATE` now defaults to `1` everywhere — both the `maestro-env.sh` fallback and `.maestro/maestro.env.sample`. The sample is sourced before `maestro.env.local`, so a `0` in the sample would have pinned the variable and silently suppressed a worktree's intended `1`; keeping both at `1` makes the smoke gate self-heal a missing slot-named simulator with no manual step.
 - App installation and runtime-state emission now live in `maestro-ios-provision.sh`, which wraps the helper instead of expanding `ios-sim-boot.sh` itself.
 - Verified against:
   - `apps/mobile/scripts/ios-sim-boot.sh`

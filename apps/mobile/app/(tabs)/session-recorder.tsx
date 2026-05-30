@@ -3397,7 +3397,16 @@ export default function SessionRecorderScreen() {
               value={exercisePickerSearchValue}
               onChangeText={setExercisePickerSearchValue}
             />
-            <ScrollView contentContainerStyle={styles.modalList}>
+            {/*
+              The filter input above keeps focus while the user picks a result.
+              With the ScrollView's default `keyboardShouldPersistTaps="never"`,
+              the first tap on a result row is consumed to dismiss the keyboard
+              instead of firing the row's `onPress`, so the exercise is never
+              selected and the modal stays open. `"handled"` lets the tap reach
+              the row Pressables while still dismissing the keyboard on taps that
+              hit empty list space.
+            */}
+            <ScrollView contentContainerStyle={styles.modalList} keyboardShouldPersistTaps="handled">
               {isExerciseCatalogLoading ? <Text style={styles.emptyText}>Loading exercises...</Text> : null}
               {!isExerciseCatalogLoading && exerciseCatalogLoadError ? (
                 <Text style={styles.emptyText}>{exerciseCatalogLoadError}</Text>
