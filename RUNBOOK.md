@@ -341,6 +341,7 @@ cd apps/mobile
 npm run lint
 npm run typecheck
 npm run test
+npm run test:handles   # serial --detectOpenHandles guard; fails (with a stack) on any leaked handle
 npm run db:generate:canary
 ```
 
@@ -350,6 +351,7 @@ npm run db:generate:canary
 cd apps/mobile
 TASK_ID=ad-hoc npm run test:e2e:ios:smoke
 TASK_ID=ad-hoc npm run test:e2e:ios:data-smoke
+TASK_ID=ad-hoc npm run test:e2e:ios:gates        # smoke + data-smoke sharing one sim + Metro (~28% faster than running both separately)
 TASK_ID=ad-hoc npm run test:e2e:ios:auth-profile
 TASK_ID=ad-hoc ./scripts/maestro-ios-run-flow.sh --flow .maestro/flows/exercise-block-history-fixture.yaml --scenario exercise-block-history-fixture
 ```

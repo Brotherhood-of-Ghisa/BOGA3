@@ -372,16 +372,14 @@ Rule: confirm `RUNBOOK.md` was reviewed in every implementation session, and upd
    - Test completeness
    - Offline requirements
    - Security/data access constraints
-4. Human review starts only after all applicable loops above are green (`CI` is currently `N/A` until configured).
+4. Human review starts only after all applicable loops above are green (the GitHub Actions frontend gate must be green on the PR).
 
-## Current CI posture (2026-02-25)
+## Current CI posture
 
-1. No CI pipeline is currently configured for this repo.
-2. Until CI exists:
-   - local verification gates are mandatory,
-   - task cards must clearly call out manual/deferred hosted checks,
-   - completion notes must summarize manual verification evidence.
-3. When CI is introduced, update this playbook and `docs/specs/06-testing-strategy.md` in the same task/session to reflect the new gate ownership.
+1. A GitHub Actions pipeline (`.github/workflows/ci.yml`) runs on every push and pull request to `main`. The `frontend` job (`apps/mobile`) runs, in order: `npm ci`, `npm run lint`, `npm run typecheck`, `npm test` (5-minute step timeout), and `npm run test:handles` (the `--detectOpenHandles` open-handle guard, 5-minute step timeout).
+2. Hang-safety is enforced in CI rather than masked: the step timeouts turn a leaked-handle hang (the failure mode that once stalled the unit gate) into a fast, loud failure, and the open-handle guard surfaces the leaking handle with a stack. The unit run deliberately does NOT use `--forceExit`, which would hide such leaks. See `docs/specs/06-testing-strategy.md` (Unit-test hang safety) for the full policy.
+3. Not yet in CI: the iOS Maestro slow gates and the backend Supabase contract suites remain local/manual. Task cards must still call out which `quality-slow`/manual checks are required and their triggers, and completion notes must summarize that evidence.
+4. When CI coverage expands (e.g. backend or e2e gates), update this playbook and `docs/specs/06-testing-strategy.md` in the same task/session to reflect the new gate ownership.
 
 ## Stop-ship conditions
 
