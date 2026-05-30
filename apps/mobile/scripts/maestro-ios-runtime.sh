@@ -227,6 +227,82 @@ maestro_prepare_flow_copy() {
   ' "$source_flow" "$target_flow" "$bundle_id"
 }
 
+# Cold simulators fail the smoke gate for two compounding first-launch reasons:
+#
+#   1. URL-scheme trust: the first deep link surfaces a SpringBoard
+#      `Open in "<App>"?` alert that sits on top of the RN root. Critically,
+#      this prompt is re-raised for EACH deep link until "Open" is tapped — it is
+#      not durably remembered across the run on iOS-26 + expo-dev-client.
+#   2. Cold Metro bundle: the very first `url=` load has to JS-bundle from
+#      scratch (10s+), which alone can blow the real flow's 30s assertion window.
+#
+# So a warm-up that only clears the trust dialog (without actually loading the
+# bundle into the app) is not enough — the dev client lands back on its launcher
+# ("No development servers found" / "RECENTLY OPENED") and the gated flow still
+# times out. The warm-up therefore drives the SAME path the real flow takes:
+# open the dev-client `url=` link AND the harness teleport, tapping "Open" after
+# each, then wait for the RN root (`stats-history-screen`) to actually mount.
+# After this, trust is granted and Metro's bundle is hot, so the real flow's own
+# `openLink` + `optional: "Open"` taps land cleanly and it asserts the root in
+# seconds.
+#
+# Each "Open" tap is `optional: true`, so on a warm sim (scheme already trusted,
+# no dialog) they no-op and the root mounts immediately. The warm-up's own exit
+# code is intentionally ignored by the caller — it never fails the gate itself.
+maestro_warm_dev_client() {
+  local udid="$1"
+  local bundle_id="$2"
+  local dev_client_url="$3"
+  local warmup_flow="$4"
+  local warmup_output_dir="$5"
+
+  [[ -n "$udid" ]] || maestro_fail "maestro_warm_dev_client: missing simulator UDID."
+  [[ -n "$bundle_id" ]] || maestro_fail "maestro_warm_dev_client: missing dev-client bundle id."
+  [[ -n "$dev_client_url" ]] || maestro_fail "maestro_warm_dev_client: missing dev-client URL."
+
+  mkdir -p "$(dirname -- "$warmup_flow")" "$warmup_output_dir"
+
+  # The deep link is re-opened here so the trust dialog is reliably present when
+  # we tap "Open" (the launch script's `openurl` may have raced ahead of
+  # SpringBoard rendering the alert). `waitForAnimationToEnd` after each openLink
+  # gives the alert time to render before the tap. The first openLink + teleport
+  # mirror the gated flow's own first two `openLink`s so the bundle is fully
+  # loaded and the harness landing screen is reached.
+  cat >"$warmup_flow" <<EOF
+appId: ${bundle_id}
+---
+- openLink: "${dev_client_url}"
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    text: "Open"
+    optional: true
+- openLink: "boga3://maestro-harness?teleport=session-list"
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    text: "Open"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "stats-history-screen"
+    timeout: 90000
+EOF
+
+  echo "[maestro] warming dev client / dismissing URL-scheme trust dialog on cold sim ($udid)"
+
+  # The warm-up is best-effort: if it cannot reach the RN root we let the real
+  # flow run anyway (and surface its own failure). A non-zero warm-up exit must
+  # never short-circuit the gate on its own.
+  if maestro test "$warmup_flow" \
+    --udid "$udid" \
+    --test-output-dir "$warmup_output_dir" >/dev/null 2>&1; then
+    echo "[maestro] dev-client warm-up complete — URL scheme trusted, RN root mounted, Metro bundle hot"
+  else
+    echo "[maestro] dev-client warm-up did not confirm the RN root; continuing to the flow (trust tap was attempted)" >&2
+  fi
+}
+
 maestro_capture_simulator_logs() {
   local udid="$1"
   local executable_name="$2"
