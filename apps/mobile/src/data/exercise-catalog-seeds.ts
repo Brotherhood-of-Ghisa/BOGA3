@@ -13,8 +13,8 @@ const SEED_RUNTIME_STATE_ID = 'primary';
  * launches can detect "this device has not seen the current catalog version"
  * and re-seed. A value of `0` on that column means "never seeded".
  *
- * Plan-2 t2 introduces the column with a placeholder value of `1`; plan-3 /
- * follow-up may evolve the semantics (e.g. derive from `app.json` version).
+ * The column starts at a placeholder value of `1`; a follow-up may evolve the
+ * semantics (e.g. derive from `app.json` version).
  */
 export const SEED_CATALOG_BUNDLE_VERSION = 1;
 

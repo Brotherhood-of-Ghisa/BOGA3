@@ -61,7 +61,10 @@ maestro_source_env() {
   : "${MAESTRO_IOS_DEV_CLIENT_APP_PATH:=$MAESTRO_IOS_SHARED_BUILD_ROOT/mobile-dev-client.app}"
   : "${IOS_SIM_DEVICE:=}"
   : "${IOS_SIM_UDID:=}"
-  : "${IOS_SIM_AUTO_CREATE:=0}"
+  # Default ON: a fresh worktree pins a slot-named simulator (e.g. "BOGA wt46")
+  # that does not exist yet. With auto-create the smoke gate self-heals by
+  # creating + booting that slot on the fly instead of failing the lookup.
+  : "${IOS_SIM_AUTO_CREATE:=1}"
   : "${EXPO_DEV_SERVER_PORT:=}"
   : "${EXPO_START_WAIT_SECONDS:=30}"
   : "${MAESTRO_RESET_STRATEGY:=data}"

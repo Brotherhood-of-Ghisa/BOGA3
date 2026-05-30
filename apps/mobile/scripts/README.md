@@ -37,7 +37,7 @@ This directory contains two kinds of files:
 ### Internal Maestro helpers
 
 - `ios-sim-boot.sh`
-  - purpose: resolves a simulator by `IOS_SIM_UDID` or `IOS_SIM_DEVICE`, optionally creates a slot-named simulator when `IOS_SIM_AUTO_CREATE=1`, boots it, and waits for boot readiness.
+  - purpose: resolves a simulator by `IOS_SIM_UDID` or `IOS_SIM_DEVICE`; when `IOS_SIM_AUTO_CREATE=1` (the default) and the named device is missing, it creates a slot-named simulator from the newest installed iOS runtime + a preferred iPhone device type, boots it, and waits for boot readiness. Existing/booted simulators are reused, never duplicated.
   - used by: `maestro-ios-provision.sh`.
   - status: used and needed.
 - `maestro-env.sh`

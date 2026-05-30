@@ -5,6 +5,7 @@ const mockDeleteDatabaseAsync = jest.fn();
 const mockDrizzle = jest.fn();
 const mockMigrate = jest.fn();
 const mockSeedSystemExerciseCatalog = jest.fn();
+const mockInvalidateExerciseCatalogCache = jest.fn();
 
 jest.mock('expo-sqlite', () => ({
   deleteDatabaseAsync: (...args: unknown[]) => mockDeleteDatabaseAsync(...args),
@@ -23,6 +24,11 @@ jest.mock('@/src/data/exercise-catalog-seeds', () => ({
   seedSystemExerciseCatalog: (...args: unknown[]) => mockSeedSystemExerciseCatalog(...args),
 }));
 
+jest.mock('@/src/exercise-catalog/invalidation', () => ({
+  invalidateExerciseCatalogCache: (...args: unknown[]) =>
+    mockInvalidateExerciseCatalogCache(...args),
+}));
+
 import { __resetLocalDataLayerForTests, bootstrapLocalDataLayer, resetLocalAppData } from '@/src/data/bootstrap';
 import { localRuntimeMigrations } from '@/src/data/migrations';
 
@@ -34,6 +40,7 @@ describe('bootstrapLocalDataLayer', () => {
     mockDrizzle.mockReset();
     mockMigrate.mockReset();
     mockSeedSystemExerciseCatalog.mockReset();
+    mockInvalidateExerciseCatalogCache.mockReset();
   });
 
   it('creates the local database, applies runtime migrations, and seeds the system exercise catalog once', async () => {
@@ -128,6 +135,40 @@ describe('bootstrapLocalDataLayer', () => {
     expect(mockDrizzle).toHaveBeenCalledTimes(2);
     expect(mockMigrate).toHaveBeenCalledTimes(2);
     expect(mockSeedSystemExerciseCatalog).toHaveBeenCalledTimes(2);
+  });
+
+  it('invalidates the exercise-catalog cache after a reset re-seeds the database, so the next read repopulates from the fresh seed', async () => {
+    const sqliteClient = {
+      closeAsync: jest.fn().mockResolvedValue(undefined),
+      name: 'sqlite-client',
+    };
+    const resetSqliteClient = {
+      closeAsync: jest.fn().mockResolvedValue(undefined),
+      name: 'sqlite-client-after-reset',
+    };
+    const localDatabase = { name: 'local-db' };
+    const resetLocalDatabase = { name: 'local-db-after-reset' };
+
+    mockOpenDatabaseSync.mockReturnValueOnce(sqliteClient).mockReturnValueOnce(resetSqliteClient);
+    mockDeleteDatabaseAsync.mockResolvedValue(undefined);
+    mockDrizzle.mockReturnValueOnce(localDatabase).mockReturnValueOnce(resetLocalDatabase);
+    mockMigrate.mockResolvedValue(undefined);
+    mockSeedSystemExerciseCatalog.mockReturnValue(undefined);
+
+    // A plain bootstrap must not touch the cache — invalidation only matters
+    // once the DB is wiped and re-seeded out from under the in-memory snapshot.
+    await bootstrapLocalDataLayer();
+    expect(mockInvalidateExerciseCatalogCache).not.toHaveBeenCalled();
+
+    await resetLocalAppData();
+
+    // Reset invalidates exactly once, and only after the re-seed has run so the
+    // subsequent reload observes the freshly seeded rows (not the wiped DB).
+    expect(mockInvalidateExerciseCatalogCache).toHaveBeenCalledTimes(1);
+    expect(mockSeedSystemExerciseCatalog).toHaveBeenCalledTimes(2);
+    expect(mockInvalidateExerciseCatalogCache.mock.invocationCallOrder[0]).toBeGreaterThan(
+      mockSeedSystemExerciseCatalog.mock.invocationCallOrder[1]
+    );
   });
 
   it('serializes a concurrent bootstrap behind an in-flight reset so the database is never reopened before deletion completes', async () => {
