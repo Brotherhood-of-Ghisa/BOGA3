@@ -1,6 +1,7 @@
 import { eq, inArray } from 'drizzle-orm';
 
 import { bootstrapLocalDataLayer } from './bootstrap';
+import { nowMonotonic } from './clock';
 import { exerciseSets, gyms, sessionExercises, sessions } from './schema';
 
 type SessionLifecycleStatus = 'active' | 'completed';
@@ -196,6 +197,8 @@ export const createDrizzleSessionListStore = (): SessionListStore => ({
         .set({
           deletedAt: input.deletedAt,
           updatedAt: input.updatedAt,
+          localDirty: true,
+          localUpdatedAtMs: nowMonotonic(tx),
         })
         .where(eq(sessions.id, input.sessionId))
         .run();

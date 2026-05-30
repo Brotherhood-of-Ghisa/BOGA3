@@ -1,0 +1,494 @@
+/**
+ * Write-path dirty-bit contract for the Layer 0 / Layer 1 repos
+ * (sync-v2-client t5a). Per t2 §7.2 every create / update / softDelete /
+ * cascade path that writes a Layer 0/1 entity must, inside the SAME
+ * transaction as the row write, set `local_dirty = 1` and
+ * `local_updated_at_ms = nowMonotonic(tx)`.
+ *
+ * Entities covered (one create + update + softDelete assertion group each,
+ * plus a cascade assertion where applicable):
+ *   - gyms                       (Layer 0) — local-gyms.ts
+ *   - exercise_definitions       (Layer 0) — exercise-catalog.ts
+ *   - exercise_muscle_mappings   (Layer 1) — exercise-catalog.ts (cascade leg)
+ *   - sessions                   (Layer 1) — session-list.ts (soft-delete/restore)
+ *   - exercise_tag_definitions   (Layer 1) — exercise-tags.ts (tag-def paths)
+ *
+ * The seeder clean-stamp rule (exercise-catalog-seeds.ts) is asserted in
+ * the final describe block: seed rows land CLEAN (local_dirty = 0) yet the
+ * monotonic counter still advances so later user edits push.
+ *
+ * All tests drive a real in-memory SQLite database via better-sqlite3 +
+ * drizzle's better-sqlite3 adapter (the same pattern as clock.test.ts). The
+ * schema is applied from the generated migration SQL so the assertions run
+ * against the real column defaults and constraints. `@/src/data/bootstrap`
+ * is mocked so the repos' `bootstrapLocalDataLayer()` resolves to this
+ * in-memory database.
+ */
+
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+import Database from 'better-sqlite3';
+import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
+import { eq } from 'drizzle-orm';
+
+import type { LocalDatabase } from '@/src/data/bootstrap';
+import { __resetClockForTests } from '@/src/data/clock';
+import { createDrizzleExerciseCatalogStore } from '@/src/data/exercise-catalog';
+import {
+  SEED_CATALOG_BUNDLE_VERSION,
+  SYSTEM_EXERCISE_DEFINITION_SEEDS,
+  seedSystemExerciseCatalog,
+} from '@/src/data/exercise-catalog-seeds';
+import { createDrizzleExerciseTagStore } from '@/src/data/exercise-tags';
+import { upsertLocalGym } from '@/src/data/local-gyms';
+import * as schema from '@/src/data/schema';
+import {
+  exerciseDefinitions,
+  exerciseMuscleMappings,
+  exerciseTagDefinitions,
+  gyms,
+  muscleGroups,
+  sessions,
+} from '@/src/data/schema';
+import { createDrizzleSessionListStore } from '@/src/data/session-list';
+
+type TestDatabase = BetterSQLite3Database<typeof schema>;
+
+// The repos under test call `bootstrapLocalDataLayer()` to acquire the
+// drizzle handle. The mock factory may only reference variables whose names
+// start with `mock`, so the live handle lives on a mock-prefixed holder.
+// `jest.mock` is hoisted above the imports by babel-jest, so the repo
+// modules above bind to this mock when they first resolve `bootstrap`.
+const mockBootstrapState: { database: TestDatabase | null } = { database: null };
+
+jest.mock('@/src/data/bootstrap', () => ({
+  bootstrapLocalDataLayer: jest.fn(async () => {
+    if (!mockBootstrapState.database) {
+      throw new Error('Test database not initialised');
+    }
+    return mockBootstrapState.database;
+  }),
+}));
+
+// `seedSystemExerciseCatalog` is typed against the production
+// `ExpoSQLiteDatabase` handle. The better-sqlite3 handle is structurally
+// identical at the query-builder level (only the driver `RunResult` generic
+// differs), so a single bridging cast keeps the seeder call sites honest
+// without leaking `any` into the assertions.
+const seedInto = (database: TestDatabase, now: Date): void => {
+  seedSystemExerciseCatalog(database as unknown as LocalDatabase, now);
+};
+
+const MIGRATION_SQL_PATH = join(__dirname, '..', '..', 'drizzle', '0000_living_bucky.sql');
+
+const applySchema = (client: Database.Database): void => {
+  const sql = readFileSync(MIGRATION_SQL_PATH, 'utf8');
+  for (const rawStatement of sql.split('--> statement-breakpoint')) {
+    const statement = rawStatement.trim();
+    if (statement.length > 0) {
+      client.exec(statement);
+    }
+  }
+};
+
+const createTestDatabase = (): { database: TestDatabase; client: Database.Database } => {
+  const client = new Database(':memory:');
+  applySchema(client);
+  const database = drizzle(client, { schema });
+  return { database, client };
+};
+
+let client: Database.Database;
+
+beforeEach(() => {
+  __resetClockForTests();
+  const created = createTestDatabase();
+  client = created.client;
+  mockBootstrapState.database = created.database;
+});
+
+afterEach(() => {
+  client.close();
+  mockBootstrapState.database = null;
+  __resetClockForTests();
+});
+
+const requireDatabase = (): TestDatabase => {
+  if (!mockBootstrapState.database) {
+    throw new Error('Test database not initialised');
+  }
+  return mockBootstrapState.database;
+};
+
+describe('gyms write paths flip the dirty bit (t5a)', () => {
+  it('marks the row dirty with a positive timestamp on create', async () => {
+    await upsertLocalGym({ id: 'gym-1', name: 'Iron Temple' });
+
+    const row = requireDatabase().select().from(gyms).where(eq(gyms.id, 'gym-1')).get();
+    expect(row?.localDirty).toBe(true);
+    expect(row?.localUpdatedAtMs ?? 0).toBeGreaterThan(0);
+  });
+
+  it('advances the timestamp and keeps the row dirty on update', async () => {
+    await upsertLocalGym({ id: 'gym-1', name: 'Iron Temple' });
+    const created = requireDatabase().select().from(gyms).where(eq(gyms.id, 'gym-1')).get();
+
+    await upsertLocalGym({ id: 'gym-1', name: 'Iron Temple Annex' });
+    const updated = requireDatabase().select().from(gyms).where(eq(gyms.id, 'gym-1')).get();
+
+    expect(updated?.localDirty).toBe(true);
+    expect(updated?.localUpdatedAtMs ?? 0).toBeGreaterThan(created?.localUpdatedAtMs ?? 0);
+  });
+});
+
+describe('exercise_definitions write paths flip the dirty bit (t5a)', () => {
+  const store = createDrizzleExerciseCatalogStore();
+
+  const seedMuscleGroup = () => {
+    requireDatabase()
+      .insert(muscleGroups)
+      .values({ id: 'chest', displayName: 'Chest', familyName: 'Chest', sortOrder: 0 })
+      .run();
+  };
+
+  it('marks the definition dirty with a positive timestamp on create', async () => {
+    seedMuscleGroup();
+    const now = new Date('2026-05-29T10:00:00.000Z');
+
+    const saved = await store.saveExercise({
+      name: 'Custom Press',
+      mappings: [{ muscleGroupId: 'chest', weight: 1, role: 'primary' }],
+      now,
+    });
+
+    const row = requireDatabase()
+      .select()
+      .from(exerciseDefinitions)
+      .where(eq(exerciseDefinitions.id, saved.id))
+      .get();
+    expect(row?.localDirty).toBe(true);
+    expect(row?.localUpdatedAtMs ?? 0).toBeGreaterThan(0);
+  });
+
+  it('advances the timestamp and keeps the definition dirty on update', async () => {
+    seedMuscleGroup();
+    const saved = await store.saveExercise({
+      id: 'def-1',
+      name: 'Custom Press',
+      mappings: [{ muscleGroupId: 'chest', weight: 1, role: 'primary' }],
+      now: new Date('2026-05-29T10:00:00.000Z'),
+    });
+    const created = requireDatabase()
+      .select()
+      .from(exerciseDefinitions)
+      .where(eq(exerciseDefinitions.id, saved.id))
+      .get();
+
+    await store.saveExercise({
+      id: 'def-1',
+      name: 'Custom Press v2',
+      mappings: [{ muscleGroupId: 'chest', weight: 1, role: 'primary' }],
+      now: new Date('2026-05-29T11:00:00.000Z'),
+    });
+    const updated = requireDatabase()
+      .select()
+      .from(exerciseDefinitions)
+      .where(eq(exerciseDefinitions.id, 'def-1'))
+      .get();
+
+    expect(updated?.localDirty).toBe(true);
+    expect(updated?.localUpdatedAtMs ?? 0).toBeGreaterThan(created?.localUpdatedAtMs ?? 0);
+  });
+
+  it('marks the definition dirty and sets deletedAt on soft delete', async () => {
+    seedMuscleGroup();
+    await store.saveExercise({
+      id: 'def-1',
+      name: 'Custom Press',
+      mappings: [{ muscleGroupId: 'chest', weight: 1, role: 'primary' }],
+      now: new Date('2026-05-29T10:00:00.000Z'),
+    });
+
+    const deletedAt = new Date('2026-05-29T12:00:00.000Z');
+    await store.setExerciseDeletedState({ id: 'def-1', deletedAt, now: deletedAt });
+
+    const row = requireDatabase()
+      .select()
+      .from(exerciseDefinitions)
+      .where(eq(exerciseDefinitions.id, 'def-1'))
+      .get();
+    expect(row?.localDirty).toBe(true);
+    expect(row?.deletedAt?.getTime()).toBe(deletedAt.getTime());
+  });
+});
+
+describe('exercise_muscle_mappings write paths flip the dirty bit (t5a)', () => {
+  const store = createDrizzleExerciseCatalogStore();
+
+  const seedMuscleGroups = () => {
+    requireDatabase()
+      .insert(muscleGroups)
+      .values([
+        { id: 'chest', displayName: 'Chest', familyName: 'Chest', sortOrder: 0 },
+        { id: 'triceps', displayName: 'Triceps', familyName: 'Arms', sortOrder: 1 },
+      ])
+      .run();
+  };
+
+  it('marks re-inserted mapping rows dirty with a positive timestamp', async () => {
+    seedMuscleGroups();
+    await store.saveExercise({
+      id: 'def-1',
+      name: 'Custom Press',
+      mappings: [{ muscleGroupId: 'chest', weight: 1, role: 'primary' }],
+      now: new Date('2026-05-29T10:00:00.000Z'),
+    });
+
+    const rows = requireDatabase()
+      .select()
+      .from(exerciseMuscleMappings)
+      .where(eq(exerciseMuscleMappings.exerciseDefinitionId, 'def-1'))
+      .all();
+
+    expect(rows.length).toBe(1);
+    for (const row of rows) {
+      expect(row.localDirty).toBe(true);
+      expect(row.localUpdatedAtMs ?? 0).toBeGreaterThan(0);
+    }
+  });
+
+  it('re-stamps mappings dirty when the exercise is re-saved (cascade leg)', async () => {
+    seedMuscleGroups();
+    await store.saveExercise({
+      id: 'def-1',
+      name: 'Custom Press',
+      mappings: [{ muscleGroupId: 'chest', weight: 1, role: 'primary' }],
+      now: new Date('2026-05-29T10:00:00.000Z'),
+    });
+    const firstRow = requireDatabase()
+      .select()
+      .from(exerciseMuscleMappings)
+      .where(eq(exerciseMuscleMappings.exerciseDefinitionId, 'def-1'))
+      .get();
+
+    await store.saveExercise({
+      id: 'def-1',
+      name: 'Custom Press',
+      mappings: [
+        { muscleGroupId: 'chest', weight: 1, role: 'primary' },
+        { muscleGroupId: 'triceps', weight: 0.5, role: 'secondary' },
+      ],
+      now: new Date('2026-05-29T11:00:00.000Z'),
+    });
+
+    const rows = requireDatabase()
+      .select()
+      .from(exerciseMuscleMappings)
+      .where(eq(exerciseMuscleMappings.exerciseDefinitionId, 'def-1'))
+      .all();
+
+    expect(rows.length).toBe(2);
+    for (const row of rows) {
+      expect(row.localDirty).toBe(true);
+      expect(row.localUpdatedAtMs ?? 0).toBeGreaterThan(firstRow?.localUpdatedAtMs ?? 0);
+    }
+  });
+});
+
+describe('sessions write paths flip the dirty bit (t5a)', () => {
+  const store = createDrizzleSessionListStore();
+
+  const insertSession = (id: string) => {
+    requireDatabase()
+      .insert(sessions)
+      .values({ id, startedAt: new Date('2026-05-29T08:00:00.000Z') })
+      .run();
+  };
+
+  it('marks the session dirty and sets deletedAt on soft delete', async () => {
+    insertSession('session-1');
+    const deletedAt = new Date('2026-05-29T09:00:00.000Z');
+
+    await store.setSessionDeletedState({
+      sessionId: 'session-1',
+      deletedAt,
+      updatedAt: deletedAt,
+    });
+
+    const row = requireDatabase().select().from(sessions).where(eq(sessions.id, 'session-1')).get();
+    expect(row?.localDirty).toBe(true);
+    expect(row?.deletedAt?.getTime()).toBe(deletedAt.getTime());
+  });
+
+  it('advances the timestamp and keeps the session dirty on restore (update)', async () => {
+    insertSession('session-1');
+    await store.setSessionDeletedState({
+      sessionId: 'session-1',
+      deletedAt: new Date('2026-05-29T09:00:00.000Z'),
+      updatedAt: new Date('2026-05-29T09:00:00.000Z'),
+    });
+    const deleted = requireDatabase()
+      .select()
+      .from(sessions)
+      .where(eq(sessions.id, 'session-1'))
+      .get();
+
+    await store.setSessionDeletedState({
+      sessionId: 'session-1',
+      deletedAt: null,
+      updatedAt: new Date('2026-05-29T10:00:00.000Z'),
+    });
+    const restored = requireDatabase()
+      .select()
+      .from(sessions)
+      .where(eq(sessions.id, 'session-1'))
+      .get();
+
+    expect(restored?.deletedAt).toBeNull();
+    expect(restored?.localDirty).toBe(true);
+    expect(restored?.localUpdatedAtMs ?? 0).toBeGreaterThan(deleted?.localUpdatedAtMs ?? 0);
+  });
+});
+
+describe('exercise_tag_definitions write paths flip the dirty bit (t5a)', () => {
+  const store = createDrizzleExerciseTagStore();
+
+  const insertExerciseDefinition = (id: string) => {
+    requireDatabase()
+      .insert(exerciseDefinitions)
+      .values({ id, name: 'Bench Press' })
+      .run();
+  };
+
+  it('marks the tag definition dirty with a positive timestamp on create', async () => {
+    insertExerciseDefinition('def-1');
+
+    const created = await store.createTagDefinition({
+      exerciseDefinitionId: 'def-1',
+      name: 'Heavy',
+      normalizedName: 'heavy',
+      now: new Date('2026-05-29T10:00:00.000Z'),
+    });
+
+    const row = requireDatabase()
+      .select()
+      .from(exerciseTagDefinitions)
+      .where(eq(exerciseTagDefinitions.id, created.id))
+      .get();
+    expect(row?.localDirty).toBe(true);
+    expect(row?.localUpdatedAtMs ?? 0).toBeGreaterThan(0);
+  });
+
+  it('advances the timestamp and keeps the tag definition dirty on rename (update)', async () => {
+    insertExerciseDefinition('def-1');
+    const created = await store.createTagDefinition({
+      exerciseDefinitionId: 'def-1',
+      name: 'Heavy',
+      normalizedName: 'heavy',
+      now: new Date('2026-05-29T10:00:00.000Z'),
+    });
+    const createdRow = requireDatabase()
+      .select()
+      .from(exerciseTagDefinitions)
+      .where(eq(exerciseTagDefinitions.id, created.id))
+      .get();
+
+    await store.renameTagDefinition({
+      id: created.id,
+      name: 'Very Heavy',
+      normalizedName: 'very heavy',
+      now: new Date('2026-05-29T11:00:00.000Z'),
+    });
+    const renamedRow = requireDatabase()
+      .select()
+      .from(exerciseTagDefinitions)
+      .where(eq(exerciseTagDefinitions.id, created.id))
+      .get();
+
+    expect(renamedRow?.localDirty).toBe(true);
+    expect(renamedRow?.localUpdatedAtMs ?? 0).toBeGreaterThan(createdRow?.localUpdatedAtMs ?? 0);
+  });
+
+  it('marks the tag definition dirty and sets deletedAt on soft delete', async () => {
+    insertExerciseDefinition('def-1');
+    const created = await store.createTagDefinition({
+      exerciseDefinitionId: 'def-1',
+      name: 'Heavy',
+      normalizedName: 'heavy',
+      now: new Date('2026-05-29T10:00:00.000Z'),
+    });
+
+    const deletedAt = new Date('2026-05-29T12:00:00.000Z');
+    await store.setTagDefinitionDeletedState({ id: created.id, deletedAt, now: deletedAt });
+
+    const row = requireDatabase()
+      .select()
+      .from(exerciseTagDefinitions)
+      .where(eq(exerciseTagDefinitions.id, created.id))
+      .get();
+    expect(row?.localDirty).toBe(true);
+    expect(row?.deletedAt?.getTime()).toBe(deletedAt.getTime());
+  });
+});
+
+describe('seeder stamps catalog rows clean while advancing the clock (t5a)', () => {
+  it('lands exercise_definitions and exercise_muscle_mappings rows with local_dirty = 0', () => {
+    const database = requireDatabase();
+    seedInto(database, new Date('2026-05-29T10:00:00.000Z'));
+
+    const definitionRows = database.select().from(exerciseDefinitions).all();
+    const mappingRows = database.select().from(exerciseMuscleMappings).all();
+
+    expect(definitionRows.length).toBe(SYSTEM_EXERCISE_DEFINITION_SEEDS.length);
+    expect(definitionRows.length).toBeGreaterThan(0);
+    expect(mappingRows.length).toBeGreaterThan(0);
+
+    for (const row of definitionRows) {
+      expect(row.localDirty).toBe(false);
+      expect(row.localUpdatedAtMs ?? 0).toBeGreaterThan(0);
+    }
+    for (const row of mappingRows) {
+      expect(row.localDirty).toBe(false);
+      expect(row.localUpdatedAtMs ?? 0).toBeGreaterThan(0);
+    }
+  });
+
+  it('advances the monotonic clock so a later user edit out-stamps the seed and pushes', async () => {
+    const database = requireDatabase();
+    seedInto(database, new Date('2026-05-29T10:00:00.000Z'));
+
+    const seededId = SYSTEM_EXERCISE_DEFINITION_SEEDS[0].id;
+    const seededRow = database
+      .select()
+      .from(exerciseDefinitions)
+      .where(eq(exerciseDefinitions.id, seededId))
+      .get();
+
+    // A later user edit through the real repo store must flip the seed row
+    // dirty AND stamp a strictly-higher monotonic timestamp.
+    const store = createDrizzleExerciseCatalogStore();
+    await store.setExerciseDeletedState({
+      id: seededId,
+      deletedAt: new Date('2026-05-29T11:00:00.000Z'),
+      now: new Date('2026-05-29T11:00:00.000Z'),
+    });
+
+    const editedRow = database
+      .select()
+      .from(exerciseDefinitions)
+      .where(eq(exerciseDefinitions.id, seededId))
+      .get();
+
+    expect(editedRow?.localDirty).toBe(true);
+    expect(editedRow?.localUpdatedAtMs ?? 0).toBeGreaterThan(seededRow?.localUpdatedAtMs ?? 0);
+  });
+
+  it('stamps the applied-seed marker so re-launches short-circuit', () => {
+    const database = requireDatabase();
+    seedInto(database, new Date('2026-05-29T10:00:00.000Z'));
+
+    const runtimeRow = database.select().from(schema.syncRuntimeState).all()[0];
+    expect(runtimeRow?.appliedSeedMigrationAppVersion).toBe(SEED_CATALOG_BUNDLE_VERSION);
+  });
+});

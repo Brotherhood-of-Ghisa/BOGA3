@@ -68,34 +68,61 @@ const runRuntimeExerciseCatalogSeed = async (database: LocalDatabase) => {
   await runtimeExerciseCatalogSeedPromise;
 };
 
-export const bootstrapLocalDataLayer = async () => {
-  if (localDatabase) {
-    await runRuntimeMigrations(localDatabase);
-    await runRuntimeExerciseCatalogSeed(localDatabase);
-    return localDatabase;
+// Bootstrap and reset both mutate the shared `sqliteDatabase`/`localDatabase`
+// singletons and call into native SQLite (`openDatabaseSync`, `closeAsync`,
+// `deleteDatabaseAsync`). They must never interleave: deleting or closing a
+// handle that a concurrent bootstrap has just reopened crashes the native
+// layer. The Maestro `reset=data` harness triggers exactly this — its
+// `resetLocalAppData()` runs while the root layout's bootstrap and the focused
+// screens' queries are still in flight. Serializing every data-layer operation
+// behind a single lock chain keeps each critical section atomic.
+let dataLayerOperationLock: Promise<unknown> = Promise.resolve();
+
+const runExclusiveDataLayerOperation = <T>(operation: () => Promise<T>): Promise<T> => {
+  // Run `operation` after whatever is currently queued, regardless of whether
+  // that prior operation resolved or rejected, so one failure never wedges the
+  // chain. The gate is updated synchronously so the next caller in this tick
+  // queues behind us rather than racing.
+  const run = dataLayerOperationLock.then(operation, operation);
+  dataLayerOperationLock = run.then(
+    () => undefined,
+    () => undefined
+  );
+  return run;
+};
+
+const prepareLocalDataLayer = async (): Promise<LocalDatabase> => {
+  if (!localDatabase) {
+    localDatabase = createLocalDatabase();
   }
 
-  localDatabase = createLocalDatabase();
   await runRuntimeMigrations(localDatabase);
   await runRuntimeExerciseCatalogSeed(localDatabase);
   return localDatabase;
 };
 
-export const resetLocalAppData = async () => {
-  const databaseToClose = sqliteDatabase;
+export const bootstrapLocalDataLayer = (): Promise<LocalDatabase> =>
+  runExclusiveDataLayerOperation(prepareLocalDataLayer);
 
-  sqliteDatabase = null;
-  localDatabase = null;
-  runtimeMigrationsComplete = false;
-  runtimeMigrationPromise = null;
-  runtimeExerciseCatalogSeedComplete = false;
-  runtimeExerciseCatalogSeedPromise = null;
+export const resetLocalAppData = (): Promise<LocalDatabase> =>
+  runExclusiveDataLayerOperation(async () => {
+    const databaseToClose = sqliteDatabase;
 
-  await databaseToClose?.closeAsync();
-  await deleteDatabaseAsync(LOCAL_DATABASE_NAME);
+    sqliteDatabase = null;
+    localDatabase = null;
+    runtimeMigrationsComplete = false;
+    runtimeMigrationPromise = null;
+    runtimeExerciseCatalogSeedComplete = false;
+    runtimeExerciseCatalogSeedPromise = null;
 
-  return bootstrapLocalDataLayer();
-};
+    await databaseToClose?.closeAsync();
+    await deleteDatabaseAsync(LOCAL_DATABASE_NAME);
+
+    // Re-bootstrap inline while still holding the lock. Calling the exported
+    // `bootstrapLocalDataLayer()` here would deadlock — it would queue behind
+    // this very operation and never resolve.
+    return prepareLocalDataLayer();
+  });
 
 export const __resetLocalDataLayerForTests = () => {
   sqliteDatabase = null;
@@ -104,4 +131,5 @@ export const __resetLocalDataLayerForTests = () => {
   runtimeMigrationPromise = null;
   runtimeExerciseCatalogSeedComplete = false;
   runtimeExerciseCatalogSeedPromise = null;
+  dataLayerOperationLock = Promise.resolve();
 };
