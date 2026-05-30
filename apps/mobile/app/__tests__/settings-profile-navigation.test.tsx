@@ -234,6 +234,10 @@ describe('settings and profile routes', () => {
     await waitFor(() => {
       expect(mockLoadUserProfile).toHaveBeenCalledWith('user-1');
     });
+    // The loaded username renders after the profile-load promise resolves, a
+    // tick past the call asserted above. Wait for it before the synchronous
+    // checks so they do not race the post-load render.
+    await screen.findByText('member-lifter');
     expect(screen.getByTestId('profile-signed-in-card')).toBeTruthy();
     expect(screen.getByText('member@example.test')).toBeTruthy();
     expect(screen.getByText('member-lifter')).toBeTruthy();
@@ -294,7 +298,10 @@ describe('settings and profile routes', () => {
     await waitFor(() => {
       expect(mockSaveUsername).toHaveBeenCalledWith('user-1', ' new-name ');
     });
-    expect(screen.getByText('Profile updated.')).toBeTruthy();
+    // The success feedback and the exit from edit mode both land after the save
+    // promise resolves, a tick after the call above. Wait for the message to
+    // render before asserting, then confirm the update control is gone.
+    expect(await screen.findByText('Profile updated.')).toBeTruthy();
     expect(screen.queryByTestId('profile-update-button')).toBeNull();
   });
 
@@ -386,7 +393,15 @@ describe('settings and profile routes', () => {
         email: 'next@example.test',
       });
     });
-    expect(screen.getByText('Email change submitted. Confirm the change from your email inbox before it fully takes effect.')).toBeTruthy();
+    // The success message mounts only after the submit promise resolves and the
+    // resulting state update flushes, which trails the call above by a tick.
+    // findBy* retries until the element renders, so the assertion stays
+    // deterministic even when the render lags under load.
+    expect(
+      await screen.findByText(
+        'Email change submitted. Confirm the change from your email inbox before it fully takes effect.'
+      )
+    ).toBeTruthy();
   });
 
   it('blocks profile updates when the edited email is invalid', async () => {
@@ -444,7 +459,10 @@ describe('settings and profile routes', () => {
         password: 'StrongPassword!234',
       });
     });
-    expect(screen.getByText('Profile updated.')).toBeTruthy();
+    // Success feedback and the return to view mode flush after the update
+    // promise resolves, a tick past the call above. Wait for the message to
+    // render before asserting the edit field has been torn down.
+    expect(await screen.findByText('Profile updated.')).toBeTruthy();
     expect(screen.queryByTestId('profile-password-update-input')).toBeNull();
   });
 
@@ -475,6 +493,10 @@ describe('settings and profile routes', () => {
     await waitFor(() => {
       expect(screen.getByText('Unable to update password right now.')).toBeTruthy();
     });
-    expect(screen.getByTestId('profile-password-update-input').props.value).toBe('');
+    // The field clears in the same submit cycle that surfaces the failure; wait
+    // for the cleared value so the assertion does not race the render flush.
+    await waitFor(() => {
+      expect(screen.getByTestId('profile-password-update-input').props.value).toBe('');
+    });
   });
 });
