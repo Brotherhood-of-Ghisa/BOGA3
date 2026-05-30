@@ -82,11 +82,12 @@ trap cleanup EXIT
 "$SCRIPT_DIR/maestro-ios-launch.sh" "$MAESTRO_RUNTIME_ENV_FILE"
 maestro_load_runtime_env "$MAESTRO_RUNTIME_ENV_FILE"
 
-# Cold sims (e.g. a freshly auto-created slot) surface the dev-client
-# "Open in <App>?" URL-scheme trust dialog on first launch, which covers the RN
-# root and fails the real flow's first assertion. Warm the dev client once here
-# to clear the dialog + establish trust before the gated flow runs. Idempotent:
-# no-ops on warm sims that already trust the scheme.
+# Cold sims (e.g. a freshly auto-created slot) need the cold Metro JS bundle
+# driven hot before the gated flow's 30s assertion window. The dev-client
+# "Open in <App>?" URL-scheme trust dialog is already pre-authorized away in
+# maestro-ios-launch.sh, so the warm-up's main job here is to load the bundle;
+# it also keeps best-effort dialog dismissal as defense-in-depth. Idempotent:
+# no-ops on warm sims.
 maestro_warm_dev_client \
   "$IOS_SIM_UDID" \
   "$MAESTRO_IOS_DEV_CLIENT_BUNDLE_ID" \

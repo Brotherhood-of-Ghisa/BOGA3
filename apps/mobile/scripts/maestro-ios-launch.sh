@@ -47,6 +47,12 @@ if ! maestro_process_alive "$EXPO_PID"; then
   maestro_fail "Expo dev server exited before launch handoff."
 fi
 
+# Seed the URL-scheme trust approval BEFORE the first openurl so the cold-sim
+# "Open in <App>?" SpringBoard dialog never renders. Without this, iOS-26 raises
+# the prompt on the first deep link of each scheme and it covers the RN root.
+# Best-effort: never fails the launch (the warm-up still backstops residual prompts).
+maestro_preauthorize_url_schemes "$IOS_SIM_UDID" "$MAESTRO_IOS_DEV_CLIENT_BUNDLE_ID" "$SCHEME"
+
 xcrun simctl terminate "$IOS_SIM_UDID" "$MAESTRO_IOS_DEV_CLIENT_BUNDLE_ID" >/dev/null 2>&1 || true
 xcrun simctl launch "$IOS_SIM_UDID" "$MAESTRO_IOS_DEV_CLIENT_BUNDLE_ID" >/dev/null 2>&1 || true
 xcrun simctl openurl "$IOS_SIM_UDID" "$MAESTRO_IOS_DEV_CLIENT_URL"
