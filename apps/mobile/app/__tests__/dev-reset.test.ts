@@ -163,7 +163,7 @@ const createFakeDatabase = () => {
   return { database, state } as { database: any; state: FakeState };
 };
 
-describe('resetLocalDataAndReseed (T8 — dev reset path)', () => {
+describe('resetLocalDataAndReseed (dev reset path)', () => {
   it('refuses to run outside dev mode', async () => {
     const fake = createFakeDatabase();
 

@@ -1,9 +1,8 @@
 /**
- * Write-path dirty-bit contract for the Layer 0 / Layer 1 repos
- * (sync-v2-client t5a). Per t2 §7.2 every create / update / softDelete /
- * cascade path that writes a Layer 0/1 entity must, inside the SAME
- * transaction as the row write, set `local_dirty = 1` and
- * `local_updated_at_ms = nowMonotonic(tx)`.
+ * Write-path dirty-bit contract for the Layer 0 / Layer 1 repos. Every
+ * create / update / softDelete / cascade path that writes a Layer 0/1 entity
+ * must, inside the SAME transaction as the row write, set `local_dirty = 1`
+ * and `local_updated_at_ms = nowMonotonic(tx)`.
  *
  * Entities covered (one create + update + softDelete assertion group each,
  * plus a cascade assertion where applicable):
@@ -121,7 +120,7 @@ const requireDatabase = (): TestDatabase => {
   return mockBootstrapState.database;
 };
 
-describe('gyms write paths flip the dirty bit (t5a)', () => {
+describe('gyms write paths flip the dirty bit', () => {
   it('marks the row dirty with a positive timestamp on create', async () => {
     await upsertLocalGym({ id: 'gym-1', name: 'Iron Temple' });
 
@@ -142,7 +141,7 @@ describe('gyms write paths flip the dirty bit (t5a)', () => {
   });
 });
 
-describe('exercise_definitions write paths flip the dirty bit (t5a)', () => {
+describe('exercise_definitions write paths flip the dirty bit', () => {
   const store = createDrizzleExerciseCatalogStore();
 
   const seedMuscleGroup = () => {
@@ -223,7 +222,7 @@ describe('exercise_definitions write paths flip the dirty bit (t5a)', () => {
   });
 });
 
-describe('exercise_muscle_mappings write paths flip the dirty bit (t5a)', () => {
+describe('exercise_muscle_mappings write paths flip the dirty bit', () => {
   const store = createDrizzleExerciseCatalogStore();
 
   const seedMuscleGroups = () => {
@@ -296,7 +295,7 @@ describe('exercise_muscle_mappings write paths flip the dirty bit (t5a)', () => 
   });
 });
 
-describe('sessions write paths flip the dirty bit (t5a)', () => {
+describe('sessions write paths flip the dirty bit', () => {
   const store = createDrizzleSessionListStore();
 
   const insertSession = (id: string) => {
@@ -351,7 +350,7 @@ describe('sessions write paths flip the dirty bit (t5a)', () => {
   });
 });
 
-describe('exercise_tag_definitions write paths flip the dirty bit (t5a)', () => {
+describe('exercise_tag_definitions write paths flip the dirty bit', () => {
   const store = createDrizzleExerciseTagStore();
 
   const insertExerciseDefinition = (id: string) => {
@@ -432,7 +431,7 @@ describe('exercise_tag_definitions write paths flip the dirty bit (t5a)', () => 
   });
 });
 
-describe('seeder stamps catalog rows clean while advancing the clock (t5a)', () => {
+describe('seeder stamps catalog rows clean while advancing the clock', () => {
   it('lands exercise_definitions and exercise_muscle_mappings rows with local_dirty = 0', () => {
     const database = requireDatabase();
     seedInto(database, new Date('2026-05-29T10:00:00.000Z'));

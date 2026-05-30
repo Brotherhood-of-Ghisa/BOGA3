@@ -145,7 +145,7 @@ const createFakeDatabase = () => {
   return { database, state } as { database: any; state: FakeState };
 };
 
-describe('seedSystemExerciseCatalog (T8 — seed once, never overwrite)', () => {
+describe('seedSystemExerciseCatalog (seed once, never overwrite)', () => {
   const fixedNow = new Date('2026-05-14T12:00:00.000Z');
 
   it('seeds the canonical bundle on the first call against an empty database and stamps the marker', () => {

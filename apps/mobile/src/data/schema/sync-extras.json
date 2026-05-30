@@ -5,7 +5,7 @@
       {
         "entity": "exercise_muscle_mappings",
         "column": "muscleGroupId",
-        "rationale": "muscle_groups is client-only taxonomy; see designs/t1.md §2.6.1"
+        "rationale": "muscle_groups is client-only taxonomy"
       }
     ]
   }

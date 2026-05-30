@@ -12,8 +12,7 @@ import { syncRuntimeState } from './schema';
  * exercise-catalog seed marker — kept in sync so the helper and the seeder
  * write the same physical row instead of fighting over two rows.
  *
- * See `apps/mobile/src/data/schema/sync-runtime-state.ts` and
- * `docs/plans/sync-v2/designs/t2.md` §8.3 / §9.3.
+ * See `apps/mobile/src/data/schema/sync-runtime-state.ts`.
  */
 export const PRIMARY_RUNTIME_STATE_ID = 'primary';
 
@@ -39,10 +38,10 @@ export type Transaction = SQLiteTransaction<
 >;
 
 /**
- * Module-scoped cache mirroring the persisted `last_emitted_ms` value per
- * t2 §8.4. Reads the SQLite row exactly once on cold start; every subsequent
+ * Module-scoped cache mirroring the persisted `last_emitted_ms` value.
+ * Reads the SQLite row exactly once on cold start; every subsequent
  * call inside the same process serves from this cache. The cache is updated
- * inside the **same** transaction that persists the new value (t2 §8.3) so
+ * inside the **same** transaction that persists the new value so
  * a crash between cache mutation and row commit cannot leak a forward-only
  * counter through to the next process.
  */
@@ -50,9 +49,9 @@ let cachedLastEmitted: number | null = null;
 
 /**
  * Returns a strictly-monotonic timestamp in epoch milliseconds, computed as
- * `max(Date.now(), last_emitted_ms + 1)` per t2 §8.1, and persists the new
+ * `max(Date.now(), last_emitted_ms + 1)`, and persists the new
  * value to `sync_runtime_state.last_emitted_ms` **inside the caller's
- * transaction** (t2 §8.3). The helper takes a `Transaction` — never a
+ * transaction**. The helper takes a `Transaction` — never a
  * `LocalDatabase` — so the SELECT / UPDATE on the singleton row commits
  * atomically with the entity write that consumed the value.
  *
@@ -64,8 +63,8 @@ let cachedLastEmitted: number | null = null;
  * Callers that do not yet hold a transaction must wrap their write in
  * `database.transaction(tx => { ... nowMonotonic(tx) ... })`.
  *
- * The helper is the single source of monotonic time across the app per
- * t2 §8.2. UI timestamps, log timestamps, and other reads that do **not**
+ * The helper is the single source of monotonic time across the app.
+ * UI timestamps, log timestamps, and other reads that do **not**
  * bump entity `local_updated_at_ms` keep using `Date.now()` directly.
  */
 export const nowMonotonic = (tx: Transaction): number => {
