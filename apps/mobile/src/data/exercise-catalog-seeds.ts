@@ -1,5 +1,6 @@
 import { asc, eq, inArray } from 'drizzle-orm';
 
+import { nowMonotonic } from './clock';
 import { exerciseDefinitions, exerciseMuscleMappings, muscleGroups, syncRuntimeState } from './schema';
 import type { LocalDatabase } from './bootstrap';
 
@@ -4173,6 +4174,8 @@ export const seedSystemExerciseCatalog = (database: LocalDatabase, now: Date = n
   assertValidSystemExerciseCatalogSeeds();
 
   database.transaction((tx) => {
+    const seedStampMs = nowMonotonic(tx);
+
     for (const muscleGroup of SYSTEM_MUSCLE_GROUP_SEEDS) {
       tx.insert(muscleGroups)
         .values({
@@ -4199,12 +4202,16 @@ export const seedSystemExerciseCatalog = (database: LocalDatabase, now: Date = n
           ...exerciseDefinition,
           createdAt: now,
           updatedAt: now,
+          localDirty: false,
+          localUpdatedAtMs: seedStampMs,
         })
         .onConflictDoUpdate({
           target: exerciseDefinitions.id,
           set: {
             name: exerciseDefinition.name,
             updatedAt: now,
+            localDirty: false,
+            localUpdatedAtMs: seedStampMs,
           },
         })
         .run();
@@ -4216,6 +4223,8 @@ export const seedSystemExerciseCatalog = (database: LocalDatabase, now: Date = n
           ...mapping,
           createdAt: now,
           updatedAt: now,
+          localDirty: false,
+          localUpdatedAtMs: seedStampMs,
         })
         .onConflictDoUpdate({
           target: [exerciseMuscleMappings.exerciseDefinitionId, exerciseMuscleMappings.muscleGroupId],
@@ -4223,6 +4232,8 @@ export const seedSystemExerciseCatalog = (database: LocalDatabase, now: Date = n
             weight: mapping.weight,
             role: mapping.role,
             updatedAt: now,
+            localDirty: false,
+            localUpdatedAtMs: seedStampMs,
           },
         })
         .run();

@@ -183,18 +183,21 @@ export const createDrizzleExerciseTagStore = (): ExerciseTagStore => ({
     const database = await bootstrapLocalDataLayer();
     const tagDefinitionId = createLocalId('exercise-tag-definition');
 
-    database
-      .insert(exerciseTagDefinitions)
-      .values({
-        id: tagDefinitionId,
-        exerciseDefinitionId: input.exerciseDefinitionId,
-        name: input.name,
-        normalizedName: input.normalizedName,
-        deletedAt: null,
-        createdAt: input.now,
-        updatedAt: input.now,
-      })
-      .run();
+    database.transaction((tx) => {
+      tx.insert(exerciseTagDefinitions)
+        .values({
+          id: tagDefinitionId,
+          exerciseDefinitionId: input.exerciseDefinitionId,
+          name: input.name,
+          normalizedName: input.normalizedName,
+          deletedAt: null,
+          createdAt: input.now,
+          updatedAt: input.now,
+          localDirty: true,
+          localUpdatedAtMs: nowMonotonic(tx),
+        })
+        .run();
+    });
 
     const tagDefinition = database
       .select({
@@ -219,15 +222,18 @@ export const createDrizzleExerciseTagStore = (): ExerciseTagStore => ({
   async renameTagDefinition(input) {
     const database = await bootstrapLocalDataLayer();
 
-    database
-      .update(exerciseTagDefinitions)
-      .set({
-        name: input.name,
-        normalizedName: input.normalizedName,
-        updatedAt: input.now,
-      })
-      .where(eq(exerciseTagDefinitions.id, input.id))
-      .run();
+    database.transaction((tx) => {
+      tx.update(exerciseTagDefinitions)
+        .set({
+          name: input.name,
+          normalizedName: input.normalizedName,
+          updatedAt: input.now,
+          localDirty: true,
+          localUpdatedAtMs: nowMonotonic(tx),
+        })
+        .where(eq(exerciseTagDefinitions.id, input.id))
+        .run();
+    });
 
     const tagDefinition = database
       .select({
@@ -248,15 +254,17 @@ export const createDrizzleExerciseTagStore = (): ExerciseTagStore => ({
   async setTagDefinitionDeletedState(input) {
     const database = await bootstrapLocalDataLayer();
 
-    database
-      .update(exerciseTagDefinitions)
-      .set({
-        deletedAt: input.deletedAt,
-        updatedAt: input.now,
-      })
-      .where(eq(exerciseTagDefinitions.id, input.id))
-      .run();
-
+    database.transaction((tx) => {
+      tx.update(exerciseTagDefinitions)
+        .set({
+          deletedAt: input.deletedAt,
+          updatedAt: input.now,
+          localDirty: true,
+          localUpdatedAtMs: nowMonotonic(tx),
+        })
+        .where(eq(exerciseTagDefinitions.id, input.id))
+        .run();
+    });
   },
   async loadSessionExerciseScope(sessionExerciseId) {
     const database = await bootstrapLocalDataLayer();
