@@ -280,6 +280,7 @@ Implemented script surface:
 - `apps/mobile/scripts/maestro-ios-teardown.sh`
 - `apps/mobile/scripts/maestro-ios-smoke.sh`
 - `apps/mobile/scripts/maestro-ios-data-smoke.sh`
+- `apps/mobile/scripts/maestro-ios-gates.sh`
 - `apps/mobile/scripts/maestro-ios-run-flow.sh`
 
 Responsibility split:
@@ -294,6 +295,8 @@ Responsibility split:
   - performs cleanup using the emitted runtime state, including Expo process shutdown, app termination, and simulator shutdown by default.
 - `maestro-ios-smoke.sh` / `maestro-ios-data-smoke.sh`
   - remain the high-level scenario entrypoints and call the shared toolkit.
+- `maestro-ios-gates.sh`
+  - additive combined entrypoint (`npm run test:e2e:ios:gates`) that provisions/launches/warms once and runs the smoke and data-runtime-smoke flows back-to-back against that single sim + Metro, then tears down once. It composes the same provision/launch/warm/teardown helpers; it does not duplicate runtime orchestration and does not replace the standalone gates. Reset semantics are preserved: provision performs the `full` reset for smoke, and data-runtime-smoke self-resets data in-flow via its `?reset=data` harness deep links.
 
 ### 6. Runtime state and log expectations
 

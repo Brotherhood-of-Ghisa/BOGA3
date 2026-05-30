@@ -49,6 +49,13 @@ const SYNC_RUNTIME_STATE_DDL = `
   );
 `;
 
+// Every in-memory connection a test opens is tracked here so `afterEach` can
+// close it. better-sqlite3 is synchronous and holds no event-loop handle, so an
+// unclosed connection does NOT hang Jest — but leaving them open leaks native
+// memory across this file's tests and diverges from the shared in-memory-db
+// helper (which closes its handle in teardown). Close them.
+const openClients: Database.Database[] = [];
+
 const createTestDatabase = (): { database: TestDatabase; client: Database.Database } => {
   const client = new Database(':memory:');
   client.exec(SYNC_RUNTIME_STATE_DDL);
@@ -56,6 +63,7 @@ const createTestDatabase = (): { database: TestDatabase; client: Database.Databa
   // shape matches the helper's `Transaction` parameter type exactly — no
   // structural casts needed at the call site.
   const database = drizzle(client, { schema });
+  openClients.push(client);
   return { database, client };
 };
 
@@ -93,6 +101,9 @@ describe('nowMonotonic (monotonic clock helper)', () => {
   afterEach(() => {
     Date.now = realDateNow;
     __resetClockForTests();
+    while (openClients.length > 0) {
+      openClients.pop()?.close();
+    }
   });
 
   it('reads the persisted last_emitted_ms on cold start when the row already exists', () => {

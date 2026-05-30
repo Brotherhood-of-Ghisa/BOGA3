@@ -63,7 +63,7 @@ Reason: keeps FE/backend integration test expectations explicit without forcing 
   - do not hand-roll DB setup or copy DDL into individual tests; drive the schema from the generated bundle so every test tracks the real shipped schema automatically when a new migration lands.
   - call `createInMemoryDatabase()` in `beforeEach` and `close()` in `afterEach`. Pass `{ foreignKeys: true }` when the test depends on FK enforcement.
 - Current consumers of this fixture include the write-path dirty-bit suites (`apps/mobile/app/__tests__/dirty-bit-layer-0-1.test.ts` and `apps/mobile/app/__tests__/dirty-bit-layer-2-3.test.ts`), which share the same setup/teardown and assertion style so they read as a matched pair.
-- Exception: tests that intentionally create a deliberately partial schema to assert negative-space behavior (for example `clock.test.ts`, which builds only `sync_runtime_state` so a stray write to another table surfaces as a missing-table error) keep their bespoke setup; the shared full-schema fixture would erase that guard.
+- Exception: tests that intentionally create a deliberately partial schema to assert negative-space behavior (for example `clock.test.ts`, which builds only `sync_runtime_state` so a stray write to another table surfaces as a missing-table error) keep their bespoke setup; the shared full-schema fixture would erase that guard. Bespoke fixtures still close their connections in `afterEach` (see `Unit-test hang safety`).
 
 ## GPS gym-location coverage policy (M15 onward)
 
@@ -221,15 +221,26 @@ Reason: keeps FE/backend integration test expectations explicit without forcing 
   - generated `supabase/config.toml` is per-worktree and slot-derived;
   - tests should consume local runtime values from `supabase status -o env` or project wrappers, not hardcoded ports.
 
-## Current CI posture (M5)
+## Current CI posture
 
-- There is currently no CI pipeline configured for this repo.
-- Until CI exists, task cards must explicitly document:
+- A GitHub Actions pipeline (`.github/workflows/ci.yml`) runs on every push and pull request to `main`.
+- The `frontend` job (working directory `apps/mobile`) runs, in order: `npm ci`, `npm run lint`, `npm run typecheck`, `npm test` (5-minute step timeout), and `npm run test:handles` (the open-handle guard, 5-minute step timeout). See `Unit-test hang safety` below for why those two steps exist.
+- Not yet in CI: the iOS Maestro slow gates (`./scripts/quality-slow.sh frontend`) and the backend Supabase contract suites remain local/manual. For work not covered by the CI job, task cards must still document:
   - what is run locally for verification,
   - whether `quality-slow` is required and the trigger for it,
   - what is deferred/manual (for example hosted deployment smoke checks),
   - when manual checks must run (per change, before handoff, milestone closeout, release closeout).
-- When CI is introduced, update this doc and `docs/specs/04-ai-development-playbook.md` in the same task to move applicable manual gates into CI.
+- When CI coverage expands (e.g. backend or e2e gates), update this doc and `docs/specs/04-ai-development-playbook.md` in the same task to reflect the new gate ownership.
+
+## Unit-test hang safety
+
+- The mobile unit run (`npm test`) is bare `jest` with **no `--forceExit`** — by design. `--forceExit` masks leaks; it would have hidden the open-handle hang that this policy exists to catch. Do not add it.
+- Two distinct failure modes are covered separately:
+  - a hung test or hook (unresolved `await`, infinite loop) is bounded by `jest.config.js` `testTimeout` (15s) so it fails loudly instead of stalling;
+  - a leaked handle that keeps the process alive AFTER tests pass (e.g. an unclosed connection, a lingering timer, or a real Supabase transport) is caught by the CI step timeout (fast loud failure) and diagnosed by the open-handle guard.
+- Open-handle guard: `npm run test:handles` runs the suite serially with `--detectOpenHandles`, surfacing any leaking handle with a stack. It runs as a dedicated CI step and can be scoped locally to a subset (e.g. `npm run test:handles -- sync-cycle`).
+- Safe-by-default mocking: `apps/mobile/jest.setup.ts` mocks `@supabase/supabase-js` `createClient` to an inert client (no socket, no GoTrue auto-refresh timer), so no suite can construct a real Supabase transport by forgetting a local mock. Suites that need richer behavior still override it with their own `jest.mock`.
+- Any test that opens a real connection (e.g. a `better-sqlite3` `:memory:` handle) must close it in `afterEach`, mirroring the in-memory-db helper — even bespoke fixtures like `clock.test.ts`.
 
 ## Backend / Supabase testing model (M5 onward)
 
@@ -318,6 +329,7 @@ Reason: keeps FE/backend integration test expectations explicit without forcing 
   - `npm run test:e2e:ios:smoke`
   - `npm run test:e2e:ios:data-smoke`
   - `npm run test:e2e:ios:auth-profile`
+  - `npm run test:e2e:ios:gates` (convenience: runs smoke + data-runtime-smoke against one shared sim + Metro; the per-flow gates above remain the canonical individual lanes)
   - `./scripts/quality-slow.sh frontend`
 - Canonical reset terms:
   - `full reset`

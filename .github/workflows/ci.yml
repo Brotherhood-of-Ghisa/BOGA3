@@ -36,5 +36,19 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      # Hard ceiling on the unit run. A leaked handle that keeps Jest alive
+      # AFTER tests pass (the failure mode that once hung this gate silently)
+      # is killed here in minutes instead of running to the default 6h job
+      # timeout. Deliberately NOT `--forceExit`, which would hide the leak.
       - name: Test
         run: npm test
+        timeout-minutes: 5
+
+      # Authoritative open-handle guard: runs the suite serially with
+      # --detectOpenHandles so a new leak (unclosed connection, lingering
+      # timer, real Supabase transport) fails loudly with a stack — caught here
+      # before it can silently hang a future run. Serial + comprehensive (~tens
+      # of seconds); separate from the fast `npm test` feedback step above.
+      - name: Open-handle guard
+        run: npm run test:handles
+        timeout-minutes: 5

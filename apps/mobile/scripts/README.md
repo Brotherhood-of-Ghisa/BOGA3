@@ -33,6 +33,10 @@ This directory contains two kinds of files:
   - purpose: scenario wrapper for the iOS data-runtime smoke flow.
   - used by: `npm run test:e2e:ios:data-smoke`.
   - status: used and needed.
+- `maestro-ios-gates.sh`
+  - purpose: combined runner that executes the smoke + data-runtime-smoke flows against ONE provisioned simulator and ONE Metro instance, paying the ~55-60s fixed overhead (sim boot + dev-client warm-up + Metro start + teardown) once instead of once per gate.
+  - used by: `npm run test:e2e:ios:gates`.
+  - status: used and needed. Additive convenience path; the standalone `maestro-ios-smoke.sh` / `maestro-ios-data-smoke.sh` gates are unchanged. Provision runs a `full` reset (the smoke precondition); the data-runtime-smoke flow self-resets data in-flow via its `?reset=data` harness deep links, so both flows are safe to run back-to-back in one session.
 
 ### Internal Maestro helpers
 
@@ -85,6 +89,8 @@ Current verdict after repository call-graph review:
 
 - `maestro-ios-smoke.sh` / `maestro-ios-data-smoke.sh`
   - thin scenario entrypoints
+- `maestro-ios-gates.sh`
+  - combined entrypoint: one provision/launch/warm/teardown shared across both flows
 - `maestro-ios-run-flow.sh`
   - shared orchestration entrypoint
 - `maestro-ios-provision.sh`

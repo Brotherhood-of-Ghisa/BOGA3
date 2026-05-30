@@ -14,7 +14,8 @@ Run commands from `apps/mobile`.
 - Runtime scripts fail fast if `.maestro/maestro.env.local` is missing.
 - The iOS development-client build is host-local and setup-generated worktree configs default to a slot-scoped cache under `$HOME/.cache/boga/maestro/ios-dev-client/wt<slot>/`.
 - `npm run test:e2e:ios:smoke` and `npm run test:e2e:ios:data-smoke` use the port and simulator configured for this workspace, provision/install the dev client, launch Metro, run Maestro, then tear down.
-- Run artifacts are written to `artifacts/maestro/<task-id-or-ad-hoc>/<timestamp>/`.
+- `npm run test:e2e:ios:gates` runs BOTH the smoke and data-runtime-smoke flows against one provisioned simulator and one Metro instance, so the ~55-60s fixed overhead (sim boot + dev-client warm-up + Metro start + teardown) is paid once instead of per gate (measured ~196s separate -> ~140s combined). The standalone gates above are unchanged; this is an additive convenience path for running both together.
+- Run artifacts are written to `artifacts/maestro/<task-id-or-ad-hoc>/<timestamp>/`. The combined runner namespaces each flow's JUnit/output/debug under a per-flow subdirectory of that root.
 
 ## First-time setup
 
@@ -119,6 +120,12 @@ Data-runtime smoke lane:
 
 ```bash
 TASK_ID=T-20260301-05 npm run test:e2e:ios:data-smoke
+```
+
+Combined lane (smoke + data-runtime-smoke sharing one sim + Metro):
+
+```bash
+TASK_ID=ad-hoc npm run test:e2e:ios:gates
 ```
 
 Repo-level slow gate:
