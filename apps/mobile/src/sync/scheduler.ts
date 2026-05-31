@@ -59,6 +59,17 @@ type ExternalInput = 'request sync' | 'go online' | 'go offline';
 /** The internal events that fire as a consequence of the current state. */
 type InternalEvent = 'timer fires' | 'cycle ends';
 
+/**
+ * Compile-time exhaustiveness guard. Calling this in a switch `default:` makes
+ * the TypeScript compiler reject the code if any member of the discriminated
+ * union is left unhandled — the unhandled case would not narrow to `never` and
+ * the call would fail to type-check. At runtime it throws, so an impossible
+ * state reached via untyped boundaries is loud rather than silently ignored.
+ */
+const assertNever = (value: never): never => {
+  throw new Error(`Unhandled scheduler state: ${JSON.stringify(value)}`);
+};
+
 // -----------------------------------------------------------------------------
 // Module-scoped machine state
 //
@@ -102,6 +113,48 @@ const logTransition = (
         toState.name === 'LONG_TIMEOUT' || toState.name === 'SHORT_TIMEOUT'
           ? toState.deadlineMs
           : null,
+      timestampMs: Date.now(),
+    },
+  });
+};
+
+/**
+ * Records an event the machine deliberately ignored: a (state, trigger) pair
+ * that the transition tables map to no-op. These are meaningful — for instance
+ * the short-debounce-window "request sync" that intentionally does NOT restart
+ * the timer is the heart of the design, and seeing it in the logs confirms the
+ * coalescing is working rather than that an input was lost.
+ */
+const logIgnoredEvent = (
+  trigger: ExternalInput | InternalEvent,
+  fromState: SchedulerStateName,
+): void => {
+  void logEvent({
+    level: 'debug',
+    source: 'sync',
+    event: 'sync_scheduler_ignored_event',
+    context: {
+      trigger,
+      state: fromState,
+      timestampMs: Date.now(),
+    },
+  });
+};
+
+/**
+ * Records a cycle that ended by throwing. The settle logic treats a thrown
+ * cycle identically to a clean one (the long backstop is the only retry path),
+ * but the error itself — an auth-required / internal / FK-violation envelope or
+ * a transport failure — is meaningful signal that was previously invisible.
+ */
+const logCycleError = (error: unknown): void => {
+  void logEvent({
+    level: 'warn',
+    source: 'sync',
+    event: 'sync_scheduler_cycle_error',
+    message: 'Sync cycle ended with an error; the long backstop will retry.',
+    context: {
+      error: String(error),
       timestampMs: Date.now(),
     },
   });
@@ -156,10 +209,12 @@ const transitionTo = (
  */
 const startCycle = (): void => {
   void runSyncCycle()
-    .catch(() => {
-      // A thrown cycle is handled identically to a clean one: the
-      // cycle-ends transition decides what to arm next. Swallowing here
-      // keeps the settle logic in one place below.
+    .catch((error: unknown) => {
+      // A thrown cycle is handled identically to a clean one for control
+      // flow: the cycle-ends transition below decides what to arm next, and
+      // the long backstop is the only retry path. We do surface the error
+      // here as distinct observability — the failure is otherwise invisible.
+      logCycleError(error);
     })
     .finally(() => {
       handleInternal('cycle ends');
@@ -175,6 +230,7 @@ const handleInternal = (event: InternalEvent): void => {
     case 'OFFLINE':
       // No timer armed and no cycle running: neither internal event reaches here
       // in normal operation, and if it does there is nothing to do.
+      logIgnoredEvent(event, state.name);
       return;
 
     case 'LONG_TIMEOUT':
@@ -183,8 +239,10 @@ const handleInternal = (event: InternalEvent): void => {
         // The debounce / backstop window elapsed: start a cycle.
         transitionTo(event, { name: 'RUNNING' });
         startCycle();
+        return;
       }
       // A cycle cannot end while we are in a timeout state.
+      logIgnoredEvent(event, state.name);
       return;
 
     case 'RUNNING':
@@ -196,9 +254,16 @@ const handleInternal = (event: InternalEvent): void => {
           cancelTimer();
           transitionTo(event, { name: 'OFFLINE' });
         }
+        return;
       }
       // The timer is never armed while RUNNING, so "timer fires" cannot reach here.
+      logIgnoredEvent(event, state.name);
       return;
+
+    default:
+      // Exhaustiveness guard: if a state is added to the union without a case
+      // above, this fails to type-check.
+      return assertNever(state);
   }
 };
 
@@ -212,8 +277,10 @@ const handleExternal = (input: ExternalInput): void => {
       if (input === 'go online') {
         const deadlineMs = armTimer(SHORT_INTERVAL);
         transitionTo(input, { name: 'SHORT_TIMEOUT', deadlineMs });
+        return;
       }
       // request sync / go offline: no-op while offline.
+      logIgnoredEvent(input, state.name);
       return;
 
     case 'LONG_TIMEOUT':
@@ -221,28 +288,40 @@ const handleExternal = (input: ExternalInput): void => {
         // Pull the idle backstop forward into the debounce window.
         const deadlineMs = armTimer(SHORT_INTERVAL);
         transitionTo(input, { name: 'SHORT_TIMEOUT', deadlineMs });
-      } else if (input === 'go offline') {
+        return;
+      }
+      if (input === 'go offline') {
         cancelTimer();
         transitionTo(input, { name: 'OFFLINE' });
+        return;
       }
       // go online: already online, no-op.
+      logIgnoredEvent(input, state.name);
       return;
 
     case 'SHORT_TIMEOUT':
       if (input === 'go offline') {
         cancelTimer();
         transitionTo(input, { name: 'OFFLINE' });
+        return;
       }
       // request sync: the short timer is already armed; restarting it would only
       // DELAY the cycle, so this is a deliberate no-op. go online: already
       // online, no-op.
+      logIgnoredEvent(input, state.name);
       return;
 
     case 'RUNNING':
       // Every external input is a no-op while a cycle is in flight. The cycle
       // drains both ends, so an edit landing mid-cycle is picked up by the
       // cycle's own iteration; the cycle-ends transition re-arms afterwards.
+      logIgnoredEvent(input, state.name);
       return;
+
+    default:
+      // Exhaustiveness guard: if a state is added to the union without a case
+      // above, this fails to type-check.
+      return assertNever(state);
   }
 };
 
@@ -280,6 +359,16 @@ const handleAppStateChange = (nextAppState: AppStateStatus): void => {
   previousAppState = nextAppState;
 
   if (wasBackground && nextAppState === 'active') {
+    // The state machine has a single entry point with no per-source distinction
+    // — a foreground edge feeds the same "request sync" as a repo write. We log
+    // the source here so a foreground-triggered sync is distinguishable in the
+    // logs from a write-triggered one without forking the machine input.
+    void logEvent({
+      level: 'debug',
+      source: 'sync',
+      event: 'sync_scheduler_foreground_sync_requested',
+      context: { timestampMs: Date.now() },
+    });
     handleExternal('request sync');
   }
 };
@@ -311,10 +400,12 @@ export const startSyncScheduler = (): void => {
   onlineProjection = false;
   previousAppState = AppState.currentState;
 
-  // Wiring the listeners must never crash app boot. If the network library is
-  // unavailable (e.g. a build where its native module did not link), we stay in
-  // OFFLINE — the safe default — and log it rather than taking down the root
-  // layout. Sync simply does not run until a working build is present.
+  // Wire the network and foreground listeners. In a healthy build these calls
+  // do not throw. A throw means a genuinely broken build (e.g. a missing native
+  // module), which would leave sync permanently dead. We log the failure as an
+  // error for observability and then re-throw so the failure surfaces at boot
+  // rather than silently disabling sync. The caller (the root layout's
+  // bootstrap effect) propagates it.
   try {
     netInfoUnsubscribe = NetInfo.addEventListener(handleNetInfoState);
     appStateSubscription = AppState.addEventListener('change', handleAppStateChange);
@@ -323,9 +414,10 @@ export const startSyncScheduler = (): void => {
       level: 'error',
       source: 'sync',
       event: 'sync_scheduler_start_failed',
-      message: 'Sync scheduler listeners could not be wired; staying offline.',
+      message: 'Sync scheduler listeners could not be wired.',
       context: { error: String(error) },
     });
+    throw error;
   }
 };
 

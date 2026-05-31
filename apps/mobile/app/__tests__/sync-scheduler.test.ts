@@ -497,6 +497,94 @@ describe('structured logging', () => {
 });
 
 // =============================================================================
+// Integration: observability for ignored events, cycle errors, foreground edge
+// =============================================================================
+
+describe('observability for no-op / error / foreground paths', () => {
+  const logsFor = (event: string): LogEventParams[] =>
+    mockLogEvent.mock.calls.map(([params]) => params).filter((params) => params.event === event);
+
+  const ignoredLogs = () => logsFor('sync_scheduler_ignored_event');
+
+  it('logs an ignored event when request sync is a no-op in OFFLINE', () => {
+    requestSync();
+    expect(stateName()).toBe('OFFLINE');
+
+    const logs = ignoredLogs();
+    expect(logs.length).toBe(1);
+    expect(logs[0].level).toBe('debug');
+    expect(logs[0].context).toMatchObject({ trigger: 'request sync', state: 'OFFLINE' });
+  });
+
+  it('logs the deliberate short-window request-sync no-op as ignored', () => {
+    goOnline();
+    expect(stateName()).toBe('SHORT_TIMEOUT');
+
+    requestSync();
+
+    const logs = ignoredLogs();
+    expect(logs.length).toBe(1);
+    expect(logs[0].context).toMatchObject({ trigger: 'request sync', state: 'SHORT_TIMEOUT' });
+  });
+
+  it('logs an ignored event when an external input lands while RUNNING', () => {
+    goOnline();
+    jest.advanceTimersByTime(SHORT_INTERVAL);
+    expect(stateName()).toBe('RUNNING');
+
+    requestSync();
+
+    const logs = ignoredLogs();
+    expect(logs.length).toBe(1);
+    expect(logs[0].context).toMatchObject({ trigger: 'request sync', state: 'RUNNING' });
+  });
+
+  it('logs a distinct cycle-error event when the cycle throws', async () => {
+    goOnline();
+    jest.advanceTimersByTime(SHORT_INTERVAL);
+    expect(stateName()).toBe('RUNNING');
+
+    await endCycleError();
+
+    const logs = logsFor('sync_scheduler_cycle_error');
+    expect(logs.length).toBe(1);
+    expect(logs[0].level).toBe('warn');
+    expect(String(logs[0].context?.error)).toContain('cycle failed');
+    // Control flow is unchanged: the failed cycle still settles into LONG_TIMEOUT.
+    expect(stateName()).toBe('LONG_TIMEOUT');
+  });
+
+  it('does not log a cycle-error event when the cycle resolves cleanly', async () => {
+    goOnline();
+    jest.advanceTimersByTime(SHORT_INTERVAL);
+    await endCycleSuccess();
+
+    expect(logsFor('sync_scheduler_cycle_error').length).toBe(0);
+  });
+
+  it('emits a distinct foreground-sync event on the background -> active edge', () => {
+    goOnline();
+    expect(stateName()).toBe('SHORT_TIMEOUT');
+
+    appStateListener?.('background');
+    appStateListener?.('active');
+
+    const logs = logsFor('sync_scheduler_foreground_sync_requested');
+    expect(logs.length).toBe(1);
+    expect(logs[0].level).toBe('debug');
+  });
+
+  it('does not emit the foreground-sync event on inactive -> active', () => {
+    goOnline();
+
+    appStateListener?.('inactive');
+    appStateListener?.('active');
+
+    expect(logsFor('sync_scheduler_foreground_sync_requested').length).toBe(0);
+  });
+});
+
+// =============================================================================
 // Lifecycle: start / stop wiring
 // =============================================================================
 
@@ -519,21 +607,38 @@ describe('scheduler lifecycle', () => {
     expect(mockNetInfoAddEventListener).toHaveBeenCalledTimes(1);
   });
 
-  it('stays OFFLINE without throwing when the network listener cannot be wired', () => {
+  it('logs at error AND re-throws when the network listener cannot be wired', () => {
     // Reset to a clean, un-started scheduler, then make listener registration
-    // throw the way a missing native module would.
+    // throw the way a missing native module would. A broken build must surface
+    // at boot rather than silently disabling sync forever, so the failure both
+    // logs at error level and propagates out to the caller.
     stopSyncScheduler();
+    mockLogEvent.mockClear();
     mockNetInfoAddEventListener.mockImplementationOnce(() => {
       throw new Error('NativeModule.RNCNetInfo is null');
     });
 
-    expect(() => startSyncScheduler()).not.toThrow();
-    expect(stateName()).toBe('OFFLINE');
+    expect(() => startSyncScheduler()).toThrow('NativeModule.RNCNetInfo is null');
 
     const failureLog = mockLogEvent.mock.calls
       .map(([params]) => params)
       .find((params) => params.event === 'sync_scheduler_start_failed');
     expect(failureLog).toBeDefined();
     expect(failureLog?.level).toBe('error');
+  });
+
+  it('re-arms cleanly on a healthy start after a wiring failure', () => {
+    // After a throw, a subsequent start in a healthy build wires the listeners
+    // (the failed start left the unsubscribe handle null, so the idempotence
+    // guard does not block the retry).
+    stopSyncScheduler();
+    mockNetInfoAddEventListener.mockImplementationOnce(() => {
+      throw new Error('NativeModule.RNCNetInfo is null');
+    });
+    expect(() => startSyncScheduler()).toThrow();
+
+    expect(() => startSyncScheduler()).not.toThrow();
+    expect(stateName()).toBe('OFFLINE');
+    expect(mockNetInfoState.listener).not.toBeNull();
   });
 });
