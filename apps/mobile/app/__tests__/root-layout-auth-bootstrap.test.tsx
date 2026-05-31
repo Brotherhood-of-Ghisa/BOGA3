@@ -8,6 +8,7 @@ const mockEnsureExerciseCatalogLoaded = jest.fn();
 const mockStartSyncScheduler = jest.fn();
 const mockStopSyncScheduler = jest.fn();
 const mockRequestSync = jest.fn();
+const mockRegisterBackgroundSyncTask = jest.fn<Promise<void>, unknown[]>(() => Promise.resolve());
 
 jest.mock('@/src/data', () => ({
   bootstrapLocalDataLayer: (...args: unknown[]) => mockBootstrapLocalDataLayer(...args),
@@ -17,6 +18,12 @@ jest.mock('@/src/sync/scheduler', () => ({
   startSyncScheduler: (...args: unknown[]) => mockStartSyncScheduler(...args),
   stopSyncScheduler: (...args: unknown[]) => mockStopSyncScheduler(...args),
   requestSync: (...args: unknown[]) => mockRequestSync(...args),
+}));
+
+// Mocking the background-task module also avoids loading the real native task
+// manager (its module-load defineTask call) in this UI wiring test.
+jest.mock('@/src/sync/background-task', () => ({
+  registerBackgroundSyncTask: (...args: unknown[]) => mockRegisterBackgroundSyncTask(...args),
 }));
 
 jest.mock('@/src/auth', () => {
@@ -63,6 +70,8 @@ describe('RootLayout auth bootstrap wiring', () => {
     mockStartSyncScheduler.mockReset();
     mockStopSyncScheduler.mockReset();
     mockRequestSync.mockReset();
+    mockRegisterBackgroundSyncTask.mockReset();
+    mockRegisterBackgroundSyncTask.mockResolvedValue(undefined);
     mockBootstrapLocalDataLayer.mockResolvedValue(undefined);
     mockBootstrapAuthState.mockResolvedValue(undefined);
     mockEnsureExerciseCatalogLoaded.mockResolvedValue(undefined);
@@ -90,6 +99,12 @@ describe('RootLayout auth bootstrap wiring', () => {
     await waitFor(() => {
       expect(mockRequestSync).toHaveBeenCalledTimes(1);
     });
+  });
+
+  it('registers the background sync task on mount', () => {
+    render(<RootLayout />);
+
+    expect(mockRegisterBackgroundSyncTask).toHaveBeenCalledTimes(1);
   });
 
   it('stops the sync scheduler on unmount', () => {
