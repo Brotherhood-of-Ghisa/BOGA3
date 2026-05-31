@@ -7,12 +7,26 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, bootstrapAuthState } from '@/src/auth';
 import { bootstrapLocalDataLayer } from '@/src/data';
 import { ensureExerciseCatalogLoaded } from '@/src/exercise-catalog/cache';
+import { requestSync, startSyncScheduler, stopSyncScheduler } from '@/src/sync/scheduler';
 
 export default function RootLayout() {
   useEffect(() => {
-    void bootstrapLocalDataLayer();
-    void bootstrapAuthState();
-    void ensureExerciseCatalogLoaded();
+    startSyncScheduler();
+
+    void Promise.allSettled([
+      bootstrapLocalDataLayer(),
+      bootstrapAuthState(),
+      ensureExerciseCatalogLoaded(),
+    ]).finally(() => {
+      // One cold-launch nudge once the boot sequence settles. It is a no-op
+      // until the network projection first goes online, after which the
+      // scheduler is already heading into its first cycle.
+      requestSync();
+    });
+
+    return () => {
+      stopSyncScheduler();
+    };
   }, []);
 
   return (
