@@ -53,6 +53,15 @@ fi
 # Best-effort: never fails the launch (the warm-up still backstops residual prompts).
 maestro_preauthorize_url_schemes "$IOS_SIM_UDID" "$MAESTRO_IOS_DEV_CLIENT_BUNDLE_ID" "$SCHEME"
 
+# Seed the location TCC grant for the dev client AFTER it is installed (the
+# provision step runs before this launch). The app requests location at session
+# start, so on a cold sim with no prior grant iOS raises a native permission
+# alert that steals focus and stalls Maestro's render-visibility assertions even
+# though the screen renders underneath. A `full` provision reset clears any
+# previous grant, so the alert reappears every cold run without this pre-auth.
+# Granting here makes the dialog never render. Best-effort: never fails the launch.
+maestro_preauthorize_location "$IOS_SIM_UDID" "$MAESTRO_IOS_DEV_CLIENT_BUNDLE_ID"
+
 xcrun simctl terminate "$IOS_SIM_UDID" "$MAESTRO_IOS_DEV_CLIENT_BUNDLE_ID" >/dev/null 2>&1 || true
 xcrun simctl launch "$IOS_SIM_UDID" "$MAESTRO_IOS_DEV_CLIENT_BUNDLE_ID" >/dev/null 2>&1 || true
 xcrun simctl openurl "$IOS_SIM_UDID" "$MAESTRO_IOS_DEV_CLIENT_URL"
