@@ -63,7 +63,8 @@ export default ({ config }: { config: ExpoConfig }) => ({
                 isAndroidBackgroundLocationEnabled: false,
                 isAndroidForegroundServiceEnabled: false
             }
-        ]
+        ],
+        "expo-background-task"
     ],
 
     experiments: {
