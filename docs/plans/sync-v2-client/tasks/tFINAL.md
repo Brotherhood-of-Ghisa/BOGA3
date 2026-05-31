@@ -29,8 +29,27 @@ loudly if a regression silently breaks the v2 client semantics.
 
 **Outcomes:**
 
+> **Coordinator note (2026-05-31, post owner-review of PR #103) — the
+> as-built suite evolved; the authoritative Outcome→test mapping is in
+> PR #103's body.** Changes vs the original list below: (a) the test
+> folder is `apps/mobile/app/__tests__/sync/` (renamed from
+> `sync-v2-final/`); (b) `all-gates.test.ts` (#12) and
+> `bg-task-identifier-match.test.ts` (#10) were DROPPED as duplicative
+> of task-level tests (per this card's own "Out of scope" rule) —
+> coverage retained: gate-existence → the real CI gate + PR checklist,
+> with the no-inlined-SQL half preserved in
+> `migration-wrapper-no-inlined-sql.test.ts`; BG-task identifier↔plist
+> → the merged `background-sync-task.test.ts`; (c) the README was
+> dropped (mapping moved to the PR body); (d) the Supabase/Docker-
+> dependent tests — `cycle-round-trip.test.ts`, `auth-required-envelope.test.ts`,
+> and the `check:sync-drift --strict` shell-out — are EXCLUDED from
+> CI's fast `npm test` lane (`testPathIgnorePatterns`) and run via the
+> dedicated `npm run test:sync:infra` lane (branch-provisioned,
+> fail-hard on missing env); the infra-free exemption-removal assertion
+> stays in the fast lane.
+
 Each automated test below asserts one or more plan-level Outcomes.
-Test files live under `apps/mobile/app/__tests__/sync-v2-final/` for
+Test files live under `apps/mobile/app/__tests__/sync/` for
 audit-friendliness.
 
 1. **`sync-v2-final/v1-deletions.test.ts`** — asserts the plan's
@@ -158,17 +177,18 @@ Orchestration block's "Sim-smoke per task" deviation).
 
 **Output artifact:**
 
-- New directory `apps/mobile/app/__tests__/sync-v2-final/`
-  containing the 12 test files listed above (or a subset that
-  groups coherent outcomes — but each plan Outcome must be covered
-  by at least one assertion in at least one file under this dir,
-  with comments mapping outcomes to assertions for audit).
-- A README at `apps/mobile/app/__tests__/sync-v2-final/README.md`
-  listing the plan Outcomes ↔ test file mapping for audit
-  traceability.
-- A new Jest config or test runner glob if needed (e.g. a
-  `test:sync-v2-final` script in `apps/mobile/package.json`) so the
-  builder can run them as a focused suite.
+- New directory `apps/mobile/app/__tests__/sync/` (renamed from
+  `sync-v2-final/` per owner request) containing the verification
+  test files — each plan Outcome covered by at least one assertion,
+  with self-contained comments (the per-Outcome→test mapping lives
+  in PR #103's body, not a README). See the coordinator note under
+  `## Outcomes` for which files were dropped/added during review.
+- No README (dropped per owner review; mapping moved to the PR body).
+- Test runner scripts in `apps/mobile/package.json`: `test:sync`
+  (the fast, infra-free suite) and `test:sync:infra` (the
+  Supabase/branch-dependent lane — the cycle round-trip,
+  AUTH_REQUIRED, and the `check:sync-drift --strict` shell-out —
+  excluded from CI's fast `npm test` via `testPathIgnorePatterns`).
 - PR body explicitly notes:
   - The Supabase branch URL used for test 5 (and the branch
     teardown cleanup line).
