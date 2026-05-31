@@ -27,6 +27,7 @@ import {
   type InMemoryDatabaseFixture,
   type InMemoryTestDatabase,
 } from '../helpers/in-memory-db';
+import { createBootstrapMockState, createClientMockState } from '../helpers/sync-cycle-mocks';
 import {
   createAnonBranchClient,
   LIVE_BRANCH_SKIP_REASON,
@@ -36,37 +37,35 @@ import {
 
 // Local handle: the in-memory database. Server handle: the anon client. Both
 // live on mock-prefixed holders so the hoisted factories can close over them.
-const mockBootstrapState: { database: InMemoryTestDatabase | null } = { database: null };
-const mockClientState: { client: unknown } = { client: null };
+// The factory bodies come from the shared sync-cycle mock helper.
+const mockBootstrapState = createBootstrapMockState<InMemoryTestDatabase>();
+const mockClientState = createClientMockState<unknown>();
 
-jest.mock('@/src/data/bootstrap', () => ({
-  bootstrapLocalDataLayer: jest.fn(async () => {
-    if (!mockBootstrapState.database) {
-      throw new Error('Test database not initialised');
-    }
-    return mockBootstrapState.database;
-  }),
-}));
+jest.mock('@/src/data/bootstrap', () =>
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted factory: require resolves at call time, after the import hoist.
+  (require('../helpers/sync-cycle-mocks') as typeof import('../helpers/sync-cycle-mocks')).bootstrapMockFactory(
+    () => mockBootstrapState,
+  ),
+);
 
-jest.mock('@/src/auth/supabase', () => ({
-  getRequiredSupabaseMobileClient: jest.fn(() => {
-    if (!mockClientState.client) {
-      throw new Error('Test supabase client not initialised');
-    }
-    return mockClientState.client;
-  }),
-}));
+jest.mock('@/src/auth/supabase', () =>
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted factory: require resolves at call time, after the import hoist.
+  (require('../helpers/sync-cycle-mocks') as typeof import('../helpers/sync-cycle-mocks')).supabaseClientMockFactory(
+    () => mockClientState,
+  ),
+);
 
 import { gyms, syncRuntimeState } from '@/src/data/schema';
 import { runSyncCycle } from '@/src/sync/cycle';
 
+// A partial config throws here (misconfiguration -> red run); both-unset returns
+// null and skips loudly; both-set returns the config and runs.
 const config = readLiveBranchConfig();
-// Use describe.skip when the endpoint is not configured so the run is green and
-// the skip is visible in the report.
 const describeLive = config ? describe : describe.skip;
 
 if (!config) {
-  console.warn(LIVE_BRANCH_SKIP_REASON);
+  // console.error so the loud skip banner is impossible to miss in the output.
+  console.error(LIVE_BRANCH_SKIP_REASON);
 }
 
 describeLive('cycle with no JWT (AUTH_REQUIRED is a clean error envelope)', () => {

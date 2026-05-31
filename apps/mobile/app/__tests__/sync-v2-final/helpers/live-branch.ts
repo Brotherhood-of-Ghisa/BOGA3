@@ -4,8 +4,17 @@
  * auth-required cases), rather than a stubbed RPC.
  *
  * The endpoint URL and anon key are read from the environment
- * (`SUPABASE_BRANCH_URL` / `SUPABASE_BRANCH_ANON_KEY`); when either is unset the
- * tests skip with a clear message so CI stays green when no endpoint is wired.
+ * (`SUPABASE_BRANCH_URL` / `SUPABASE_BRANCH_ANON_KEY`). The three states are
+ * handled distinctly so only a genuinely-clean absence skips and anything broken
+ * fails loudly:
+ *   - BOTH unset    -> the documented "CI without a live endpoint" path: skip,
+ *                      but loudly, so a green run never silently means "didn't
+ *                      run".
+ *   - PARTIALLY set -> a misconfiguration (one var present, one missing): throw,
+ *                      so the run goes red instead of quietly skipping.
+ *   - both set but the endpoint is unreachable / sign-in fails -> the callers
+ *     throw from `createAuthedBranchClient` rather than catching into a skip, so
+ *     a broken endpoint also fails the run.
  *
  * The real `@supabase/supabase-js` is loaded via `jest.requireActual` so it
  * bypasses the global inert client mock the unit suite installs. Clients are
@@ -25,20 +34,52 @@ export interface LiveBranchConfig {
   anonKey: string;
 }
 
-/** Reads the live-endpoint config from the environment, or null if unset. */
+/**
+ * Reads the live-endpoint config from the environment.
+ *
+ * Returns the config when BOTH vars are set, or `null` when BOTH are unset (the
+ * clean "no endpoint wired" path that skips). When exactly one var is set it
+ * THROWS — a half-configured run is a misconfiguration, not a reason to skip, so
+ * it must fail loudly instead of masquerading as a green skip.
+ */
 export const readLiveBranchConfig = (): LiveBranchConfig | null => {
   const url = process.env.SUPABASE_BRANCH_URL;
   const anonKey = process.env.SUPABASE_BRANCH_ANON_KEY;
-  if (!url || !anonKey) {
+  const urlSet = Boolean(url);
+  const keySet = Boolean(anonKey);
+
+  if (urlSet !== keySet) {
+    const present = urlSet ? 'SUPABASE_BRANCH_URL' : 'SUPABASE_BRANCH_ANON_KEY';
+    const missing = urlSet ? 'SUPABASE_BRANCH_ANON_KEY' : 'SUPABASE_BRANCH_URL';
+    throw new Error(
+      `Live-endpoint config is half-set: ${present} is present but ${missing} is missing. ` +
+        'Set BOTH to run the live cycle tests, or NEITHER to skip them. A partial config is a ' +
+        'misconfiguration and fails the run on purpose rather than silently skipping.',
+    );
+  }
+
+  if (!urlSet) {
     return null;
   }
-  return { url, anonKey };
+  return { url: url!, anonKey: anonKey! };
 };
 
-/** Human-readable skip reason when the live endpoint is not configured. */
+/**
+ * Loud, unmistakable skip banner emitted when BOTH env vars are unset. Printed
+ * (not warned quietly) so a reader scanning the output cannot miss that the live
+ * round-trip did not actually run — a green suite must never silently mean
+ * "the live test was skipped".
+ */
 export const LIVE_BRANCH_SKIP_REASON =
-  'SUPABASE_BRANCH_URL / SUPABASE_BRANCH_ANON_KEY not set — skipping the live cycle round-trip. ' +
-  'Point these at a deployed Supabase endpoint carrying the sync server schema to run it.';
+  '\n' +
+  '================================================================\n' +
+  'SKIPPING LIVE SYNC ROUND-TRIP — no endpoint configured.\n' +
+  'SUPABASE_BRANCH_URL and SUPABASE_BRANCH_ANON_KEY are both unset, so\n' +
+  'the cycle was NOT exercised against a real Postgres + PostgREST + RLS\n' +
+  'endpoint. The rest of the suite ran; this lane is green-by-skip only.\n' +
+  'Set BOTH vars to a deployed Supabase endpoint carrying the sync server\n' +
+  'schema (with the user_a auth fixture provisioned) to actually run it.\n' +
+  '================================================================';
 
 // The deterministic local auth fixture the round-trip authenticates as. These
 // are the same credentials the repo's backend contract suites provision.

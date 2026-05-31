@@ -29,22 +29,22 @@ import {
   type InMemoryDatabaseFixture,
   type InMemoryTestDatabase,
 } from '../helpers/in-memory-db';
+import { createBootstrapMockState } from '../helpers/sync-cycle-mocks';
 
 type TestDatabase = InMemoryTestDatabase;
 
 // Repos resolve their handle through `bootstrapLocalDataLayer`; point it at the
 // per-test in-memory database. The mock factory may only close over names that
-// start with `mock`, and babel-jest hoists it above the imports below.
-const mockBootstrapState: { database: TestDatabase | null } = { database: null };
+// start with `mock`, and babel-jest hoists it above the imports below; the
+// factory body comes from the shared sync-cycle mock helper.
+const mockBootstrapState = createBootstrapMockState<TestDatabase>();
 
-jest.mock('@/src/data/bootstrap', () => ({
-  bootstrapLocalDataLayer: jest.fn(async () => {
-    if (!mockBootstrapState.database) {
-      throw new Error('Test database not initialised');
-    }
-    return mockBootstrapState.database;
-  }),
-}));
+jest.mock('@/src/data/bootstrap', () =>
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted factory: require resolves at call time, after the import hoist.
+  (require('../helpers/sync-cycle-mocks') as typeof import('../helpers/sync-cycle-mocks')).bootstrapMockFactory(
+    () => mockBootstrapState,
+  ),
+);
 
 // Imported AFTER the bootstrap mock so the repos bind to it.
 import { __resetClockForTests } from '@/src/data/clock';

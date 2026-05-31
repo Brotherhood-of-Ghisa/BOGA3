@@ -11,6 +11,17 @@
  * with a clear message when they are unset, so CI stays green when no endpoint
  * is wired.
  *
+ * How this differs from the other cycle tests: the rest of the sync-cycle suite
+ * drives `runSyncCycle` against an in-process, stubbed RPC. Those tests verify
+ * the client's control flow (batching, layer order, the in-flight race, cursor
+ * advance) but never touch a server, so they cannot catch a wire-contract bug —
+ * the request shape, the Postgres schema the RPC lives in, server-side LWW, real
+ * cursors, or RLS. This test is the only one that exercises that contract end to
+ * end. It is exactly what surfaced the schema-targeting bug where the client
+ * dispatched the RPCs against the wrong Postgres schema: every stubbed test
+ * passed while the real round-trip failed, because the stub never enforced where
+ * the RPC actually lives.
+ *
  * What it asserts:
  *
  *   1. Push converges. A four-layer FK chain (gym -> session -> session
@@ -37,6 +48,7 @@ import {
   type InMemoryDatabaseFixture,
   type InMemoryTestDatabase,
 } from '../helpers/in-memory-db';
+import { createBootstrapMockState, createClientMockState } from '../helpers/sync-cycle-mocks';
 import {
   createAuthedBranchClient,
   LIVE_BRANCH_SKIP_REASON,
@@ -46,27 +58,25 @@ import {
 } from './helpers/live-branch';
 
 // Local handle and server handle live on mock-prefixed holders so the hoisted
-// factories can close over them.
-const mockBootstrapState: { database: InMemoryTestDatabase | null } = { database: null };
-const mockClientState: { client: unknown } = { client: null };
+// factories can close over them. The factory bodies come from the shared
+// sync-cycle mock helper (required from inside the hoisted factory, the only
+// hoist-safe way to reference a non-`mock` import).
+const mockBootstrapState = createBootstrapMockState<InMemoryTestDatabase>();
+const mockClientState = createClientMockState<unknown>();
 
-jest.mock('@/src/data/bootstrap', () => ({
-  bootstrapLocalDataLayer: jest.fn(async () => {
-    if (!mockBootstrapState.database) {
-      throw new Error('Test database not initialised');
-    }
-    return mockBootstrapState.database;
-  }),
-}));
+jest.mock('@/src/data/bootstrap', () =>
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted factory: require resolves at call time, after the import hoist.
+  (require('../helpers/sync-cycle-mocks') as typeof import('../helpers/sync-cycle-mocks')).bootstrapMockFactory(
+    () => mockBootstrapState,
+  ),
+);
 
-jest.mock('@/src/auth/supabase', () => ({
-  getRequiredSupabaseMobileClient: jest.fn(() => {
-    if (!mockClientState.client) {
-      throw new Error('Test supabase client not initialised');
-    }
-    return mockClientState.client;
-  }),
-}));
+jest.mock('@/src/auth/supabase', () =>
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted factory: require resolves at call time, after the import hoist.
+  (require('../helpers/sync-cycle-mocks') as typeof import('../helpers/sync-cycle-mocks')).supabaseClientMockFactory(
+    () => mockClientState,
+  ),
+);
 
 import { PRIMARY_RUNTIME_STATE_ID, type Transaction } from '@/src/data/clock';
 import {
@@ -78,11 +88,14 @@ import {
 } from '@/src/data/schema';
 import { runSyncCycle } from '@/src/sync/cycle';
 
+// A partial config throws here (misconfiguration -> red run); both-unset returns
+// null and skips loudly; both-set returns the config and runs.
 const config = readLiveBranchConfig();
 const describeLive = config ? describe : describe.skip;
 
 if (!config) {
-  console.warn(LIVE_BRANCH_SKIP_REASON);
+  // console.error so the loud skip banner is impossible to miss in the output.
+  console.error(LIVE_BRANCH_SKIP_REASON);
 }
 
 // Distinct id prefix per run so repeated / parallel runs against the shared
