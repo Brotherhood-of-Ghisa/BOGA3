@@ -9,7 +9,13 @@ const mockIsDevMode = jest.fn();
 const mockResetLocalAppData = jest.fn();
 const mockBootstrapLocalDataLayer = jest.fn();
 const mockRpc = jest.fn();
-const mockGetRequiredClient = jest.fn(() => ({ rpc: mockRpc }));
+// The helper selects the RPC schema before dispatching:
+// `client.schema(...).rpc(...)`. Both that path and a bare `.rpc(...)` resolve
+// to the same spy so the existing call assertions are unaffected.
+const mockGetRequiredClient = jest.fn(() => ({
+  rpc: mockRpc,
+  schema: () => ({ rpc: mockRpc }),
+}));
 
 jest.mock('@/src/utils/isDevMode', () => ({
   isDevMode: () => mockIsDevMode(),

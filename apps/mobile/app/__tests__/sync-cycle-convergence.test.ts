@@ -39,8 +39,14 @@ jest.mock('@/src/data/bootstrap', () => ({
 
 const mockRpc = jest.fn();
 
+// The cycle selects the RPC schema before dispatching: `client.schema(...).rpc(...)`.
+// Both the `.schema(name).rpc(...)` path and a bare `.rpc(...)` resolve to the
+// same spy so the existing call assertions are unaffected.
 jest.mock('@/src/auth/supabase', () => ({
-  getRequiredSupabaseMobileClient: jest.fn(() => ({ rpc: mockRpc })),
+  getRequiredSupabaseMobileClient: jest.fn(() => ({
+    rpc: mockRpc,
+    schema: () => ({ rpc: mockRpc }),
+  })),
 }));
 
 let fixture: InMemoryDatabaseFixture;
