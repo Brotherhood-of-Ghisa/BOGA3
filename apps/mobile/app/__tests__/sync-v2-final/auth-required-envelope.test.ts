@@ -10,8 +10,10 @@
  * pending edits re-push once a session exists, and mutate no local SQLite row.
  *
  * This drives the REAL cycle against a REAL endpoint with NO JWT (an anon
- * client). It is gated on the live-endpoint env vars and skips with a clear
- * message when they are unset, so CI stays green when no endpoint is wired.
+ * client). It requires a live endpoint (URL + anon key in the environment) and
+ * runs only through its own dedicated script; the fast test lane excludes it.
+ * With no endpoint configured it fails hard with a clear message rather than
+ * skipping.
  *
  * The cycle's local handle is an in-memory SQLite built from the shipped
  * migration bundle; its server handle is the anon client. After the cycle:
@@ -30,7 +32,6 @@ import {
 import { createBootstrapMockState, createClientMockState } from '../helpers/sync-cycle-mocks';
 import {
   createAnonBranchClient,
-  LIVE_BRANCH_SKIP_REASON,
   readLiveBranchConfig,
   type AnonBranchClient,
 } from './helpers/live-branch';
@@ -58,17 +59,12 @@ jest.mock('@/src/auth/supabase', () =>
 import { gyms, syncRuntimeState } from '@/src/data/schema';
 import { runSyncCycle } from '@/src/sync/cycle';
 
-// A partial config throws here (misconfiguration -> red run); both-unset returns
-// null and skips loudly; both-set returns the config and runs.
+// Reads the live-endpoint config; throws here (failing the suite) when the env
+// is missing or incomplete, since this suite runs only when an endpoint has
+// been provisioned.
 const config = readLiveBranchConfig();
-const describeLive = config ? describe : describe.skip;
 
-if (!config) {
-  // console.error so the loud skip banner is impossible to miss in the output.
-  console.error(LIVE_BRANCH_SKIP_REASON);
-}
-
-describeLive('cycle with no JWT (AUTH_REQUIRED is a clean error envelope)', () => {
+describe('cycle with no JWT (AUTH_REQUIRED is a clean error envelope)', () => {
   let fixture: InMemoryDatabaseFixture;
   let database: InMemoryTestDatabase;
   let anon: AnonBranchClient;
@@ -78,7 +74,7 @@ describeLive('cycle with no JWT (AUTH_REQUIRED is a clean error envelope)', () =
     database = fixture.database;
     mockBootstrapState.database = database;
 
-    anon = createAnonBranchClient(config!);
+    anon = createAnonBranchClient(config);
     mockClientState.client = anon.client;
   });
 

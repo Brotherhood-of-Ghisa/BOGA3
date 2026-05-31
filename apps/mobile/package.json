@@ -14,6 +14,7 @@
     "typecheck": "npm run router:types && tsc --noEmit",
     "test": "jest",
     "test:sync-v2-final": "jest app/__tests__/sync-v2-final",
+    "test:sync-v2-final:live": "jest --runTestsByPath app/__tests__/sync-v2-final/cycle-round-trip.test.ts app/__tests__/sync-v2-final/auth-required-envelope.test.ts --testPathIgnorePatterns=/node_modules/",
     "test:handles": "jest --detectOpenHandles --silent",
     "db:generate": "drizzle-kit generate --config=drizzle.config.ts && tsx scripts/bundle-migrations.ts",
     "db:generate:canary": "npm run db:generate",

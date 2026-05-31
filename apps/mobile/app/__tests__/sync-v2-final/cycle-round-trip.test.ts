@@ -7,9 +7,10 @@
  * This is the integration assertion the whole sync design exists to satisfy.
  * It runs the REAL cycle against a REAL Postgres + PostgREST + RLS endpoint
  * (not a stubbed RPC), authenticated as a real test user so the RLS-enforced
- * RPCs accept the call. It is gated on the live-endpoint env vars and skips
- * with a clear message when they are unset, so CI stays green when no endpoint
- * is wired.
+ * RPCs accept the call. It requires a live endpoint (URL + anon key in the
+ * environment) and runs only through its own dedicated script; the fast test
+ * lane excludes it. With no endpoint configured it fails hard with a clear
+ * message rather than skipping.
  *
  * How this differs from the other cycle tests: the rest of the sync-cycle suite
  * drives `runSyncCycle` against an in-process, stubbed RPC. Those tests verify
@@ -51,7 +52,6 @@ import {
 import { createBootstrapMockState, createClientMockState } from '../helpers/sync-cycle-mocks';
 import {
   createAuthedBranchClient,
-  LIVE_BRANCH_SKIP_REASON,
   readLiveBranchConfig,
   SYNC_RPC_SCHEMA,
   type AuthedBranchClient,
@@ -88,15 +88,10 @@ import {
 } from '@/src/data/schema';
 import { runSyncCycle } from '@/src/sync/cycle';
 
-// A partial config throws here (misconfiguration -> red run); both-unset returns
-// null and skips loudly; both-set returns the config and runs.
+// Reads the live-endpoint config; throws here (failing the suite) when the env
+// is missing or incomplete, since this suite runs only when an endpoint has
+// been provisioned.
 const config = readLiveBranchConfig();
-const describeLive = config ? describe : describe.skip;
-
-if (!config) {
-  // console.error so the loud skip banner is impossible to miss in the output.
-  console.error(LIVE_BRANCH_SKIP_REASON);
-}
 
 // Distinct id prefix per run so repeated / parallel runs against the shared
 // fixture user never collide on a primary key.
@@ -110,7 +105,7 @@ const ids = {
 
 type PushHook = (() => void) | null;
 
-describeLive('sync cycle round-trip against a live endpoint', () => {
+describe('sync cycle round-trip against a live endpoint', () => {
   let fixture: InMemoryDatabaseFixture;
   let database: InMemoryTestDatabase;
   let authed: AuthedBranchClient;
@@ -217,7 +212,7 @@ describeLive('sync cycle round-trip against a live endpoint', () => {
   };
 
   beforeAll(async () => {
-    authed = await createAuthedBranchClient(config!);
+    authed = await createAuthedBranchClient(config);
   }, 60_000);
 
   afterAll(async () => {

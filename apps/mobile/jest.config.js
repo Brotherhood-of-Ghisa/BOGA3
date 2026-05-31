@@ -2,7 +2,19 @@ module.exports = {
   preset: 'jest-expo',
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
   testMatch: ['**/?(*.)+(test).[tj]s?(x)'],
-  testPathIgnorePatterns: ['<rootDir>/app/__tests__/sync-reinstall-restore-parity.test.ts'],
+  // Suites excluded from the default (`jest` / `npm test`) run because they need
+  // live infrastructure the fast lane does not provision:
+  //   - the reinstall/restore parity check drives a real device-style flow;
+  //   - the two cycle suites below drive the sync cycle against a real deployed
+  //     Postgres + PostgREST + RLS endpoint, so they require a live Supabase
+  //     endpoint (URL + anon key in the environment). They run only via their
+  //     own dedicated script, which overrides this ignore list and fails hard
+  //     when the endpoint env is missing.
+  testPathIgnorePatterns: [
+    '<rootDir>/app/__tests__/sync-reinstall-restore-parity.test.ts',
+    '<rootDir>/app/__tests__/sync-v2-final/cycle-round-trip.test.ts',
+    '<rootDir>/app/__tests__/sync-v2-final/auth-required-envelope.test.ts',
+  ],
   // Explicit per-test/hook ceiling: a hung test or hook (unresolved await,
   // infinite loop) now fails loudly here instead of stalling the run. This is
   // a DIFFERENT failure mode from a leaked handle that keeps the process alive
