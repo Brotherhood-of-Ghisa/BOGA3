@@ -155,6 +155,51 @@ maestro_preauthorize_url_schemes() {
   done
 }
 
+# Pre-authorize location access for the dev-client bundle so the native
+# "Allow <App> to use your location?" permission dialog NEVER renders on a cold
+# simulator. The app requests location at session start, so on a freshly-created
+# (or freshly-reinstalled) simulator with no prior TCC grant, iOS raises that
+# system alert on top of the RN root. Maestro can render the screen underneath
+# fine, but the alert steals focus and the render-visibility assertions time out.
+#
+# A `full` provision reset (uninstall + reinstall the dev client) clears any
+# existing location grant, so without a pre-grant the dialog reappears on every
+# cold run. We seed the grant with `simctl privacy ... grant`, the canonical way
+# to authorize a permission ahead of first use, which is exactly the TCC record
+# iOS would write if a human tapped "Allow". We grant both `location-always` and
+# the in-use `location` scope as belt-and-braces so whichever the app requests is
+# already authorized.
+#
+# Best-effort by design, mirroring the URL-scheme pre-auth: a missing udid or
+# bundle id returns 0 (skips, never fails the gate). The grant is attempted
+# directly — any failure (for example an older Xcode that lacks the `privacy`
+# subcommand) is logged and tolerated rather than aborting the run, so a failed
+# grant is itself the graceful fallback. Idempotent — re-granting an
+# already-granted service is a no-op.
+maestro_preauthorize_location() {
+  local udid="$1"
+  local bundle_id="$2"
+  local service
+
+  [[ -n "$udid" ]] || { echo "[maestro] preauthorize-location: missing simulator UDID (skipping)"; return 0; }
+  [[ -n "$bundle_id" ]] || { echo "[maestro] preauthorize-location: missing bundle id (skipping)"; return 0; }
+
+  echo "[maestro] pre-authorizing location (location-always) for $bundle_id on $udid so the cold-sim location dialog never appears"
+
+  # Attempt the grant directly rather than probing for `simctl privacy` support
+  # first — a failed grant IS the graceful fallback. On an Xcode without the
+  # subcommand the grant simply fails and we log + tolerate it, exactly the same
+  # path as any other grant error. This keeps the helper best-effort and never
+  # lets it fail the gate.
+  for service in location-always location; do
+    if xcrun simctl privacy "$udid" grant "$service" "$bundle_id" >/dev/null 2>&1; then
+      echo "[maestro]   granted '$service' -> $bundle_id"
+    else
+      echo "[maestro]   could not pre-authorize '$service' (best-effort; warm-up will backstop)"
+    fi
+  done
+}
+
 maestro_wait_for_http() {
   local url="$1"
   local timeout_seconds="$2"
