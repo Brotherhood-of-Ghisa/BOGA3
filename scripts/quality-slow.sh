@@ -86,6 +86,16 @@ run_backend() {
     "${REPO_ROOT}/supabase/scripts/test-sync-pull-contract.sh"
   fi
 
+  # Developer-only dev_wipe_my_data RPC contract — exercises the auth guard,
+  # the non-production environment guard, and owner-scoped deletion (the
+  # caller's rows are removed; a second user's rows survive).
+  if [[ ! -x "${REPO_ROOT}/supabase/scripts/test-dev-wipe-my-data.sh" ]]; then
+    echo "[quality-slow] skipping backend dev-wipe-my-data: wrapper not found or not executable"
+  else
+    echo "[quality-slow] backend: test-dev-wipe-my-data"
+    "${REPO_ROOT}/supabase/scripts/test-dev-wipe-my-data.sh"
+  fi
+
   # Sync v2 drift checker — per designs/t1.md §7.5. The TypeScript script
   # lands in t2; until then this block skips with a notice so the slow gate
   # stays green. t2's PR will not need to re-touch this file: when the script
