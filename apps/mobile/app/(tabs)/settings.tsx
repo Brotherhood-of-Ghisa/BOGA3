@@ -4,15 +4,25 @@ import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { UiButton, UiSurface, UiText, uiBorder, uiColors, uiRadius, uiSpace } from '@/components/ui';
 import { resetLocalDataAndReseed } from '@/src/data';
+import {
+  wipeLocalAndReBootstrap,
+  wipeRemoteForCurrentUser,
+} from '@/src/sync/dev-affordances';
 import { isDevMode } from '@/src/utils/isDevMode';
+
+type DevFeedback = { tone: 'success' | 'error'; message: string } | null;
 
 export default function SettingsScreen() {
   const router = useRouter();
 
   const [isResetting, setIsResetting] = useState(false);
-  const [resetFeedback, setResetFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(
-    null
-  );
+  const [resetFeedback, setResetFeedback] = useState<DevFeedback>(null);
+
+  const [isWipingLocal, setIsWipingLocal] = useState(false);
+  const [wipeLocalFeedback, setWipeLocalFeedback] = useState<DevFeedback>(null);
+
+  const [isWipingRemote, setIsWipingRemote] = useState(false);
+  const [wipeRemoteFeedback, setWipeRemoteFeedback] = useState<DevFeedback>(null);
 
   const handleDevReset = async () => {
     setIsResetting(true);
@@ -42,6 +52,62 @@ export default function SettingsScreen() {
           style: 'destructive',
           onPress: () => {
             void handleDevReset();
+          },
+        },
+      ]
+    );
+  };
+
+  const handleWipeLocal = async () => {
+    setIsWipingLocal(true);
+    setWipeLocalFeedback(null);
+    try {
+      await wipeLocalAndReBootstrap();
+      setWipeLocalFeedback({
+        tone: 'success',
+        message: 'Local database wiped and re-bootstrapped. Sync will re-pull from the server.',
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error during local wipe.';
+      setWipeLocalFeedback({ tone: 'error', message });
+    } finally {
+      setIsWipingLocal(false);
+    }
+  };
+
+  // Delete every server row owned by this account, then wipe local so the
+  // just-deleted rows are not re-pushed by the next sync cycle.
+  const handleWipeRemote = async () => {
+    setIsWipingRemote(true);
+    setWipeRemoteFeedback(null);
+    try {
+      const { rowsDeleted } = await wipeRemoteForCurrentUser();
+      await wipeLocalAndReBootstrap();
+      setWipeRemoteFeedback({
+        tone: 'success',
+        message: `Deleted ${rowsDeleted} server ${
+          rowsDeleted === 1 ? 'row' : 'rows'
+        } and wiped local data.`,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error during remote wipe.';
+      setWipeRemoteFeedback({ tone: 'error', message });
+    } finally {
+      setIsWipingRemote(false);
+    }
+  };
+
+  const confirmWipeRemote = () => {
+    Alert.alert(
+      'Wipe remote data?',
+      'This deletes EVERY row on the server owned by your account. Are you sure?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete server data',
+          style: 'destructive',
+          onPress: () => {
+            void handleWipeRemote();
           },
         },
       ]
@@ -104,6 +170,56 @@ export default function SettingsScreen() {
               testID="settings-dev-reset-feedback"
               variant="bodyMuted">
               {resetFeedback.message}
+            </UiText>
+          ) : null}
+
+          <UiText selectable variant="bodyMuted">
+            Drop the local database and re-bootstrap. Sync re-pulls your server state into a clean
+            local store.
+          </UiText>
+          <UiButton
+            accessibilityLabel="Wipe local database and re-bootstrap"
+            disabled={isWipingLocal}
+            label={isWipingLocal ? 'Wiping…' : 'Wipe local & re-bootstrap'}
+            onPress={() => {
+              void handleWipeLocal();
+            }}
+            testID="settings-dev-wipe-local-button"
+            variant="secondary"
+          />
+          {wipeLocalFeedback ? (
+            <UiText
+              selectable
+              style={
+                wipeLocalFeedback.tone === 'success' ? styles.devSuccessText : styles.devErrorText
+              }
+              testID="settings-dev-wipe-local-feedback"
+              variant="bodyMuted">
+              {wipeLocalFeedback.message}
+            </UiText>
+          ) : null}
+
+          <UiText selectable variant="bodyMuted">
+            Delete every row on the server owned by your account, then wipe local. Useful for
+            testing the bootstrap flow against an empty server.
+          </UiText>
+          <UiButton
+            accessibilityLabel="Wipe remote data owned by my account"
+            disabled={isWipingRemote}
+            label={isWipingRemote ? 'Wiping…' : 'Wipe remote (my data)'}
+            onPress={confirmWipeRemote}
+            testID="settings-dev-wipe-remote-button"
+            variant="danger"
+          />
+          {wipeRemoteFeedback ? (
+            <UiText
+              selectable
+              style={
+                wipeRemoteFeedback.tone === 'success' ? styles.devSuccessText : styles.devErrorText
+              }
+              testID="settings-dev-wipe-remote-feedback"
+              variant="bodyMuted">
+              {wipeRemoteFeedback.message}
             </UiText>
           ) : null}
         </UiSurface>
