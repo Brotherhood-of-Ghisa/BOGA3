@@ -5,9 +5,18 @@ import type { ReactNode } from 'react';
 const mockBootstrapLocalDataLayer = jest.fn();
 const mockBootstrapAuthState = jest.fn();
 const mockEnsureExerciseCatalogLoaded = jest.fn();
+const mockStartSyncScheduler = jest.fn();
+const mockStopSyncScheduler = jest.fn();
+const mockRequestSync = jest.fn();
 
 jest.mock('@/src/data', () => ({
   bootstrapLocalDataLayer: (...args: unknown[]) => mockBootstrapLocalDataLayer(...args),
+}));
+
+jest.mock('@/src/sync/scheduler', () => ({
+  startSyncScheduler: (...args: unknown[]) => mockStartSyncScheduler(...args),
+  stopSyncScheduler: (...args: unknown[]) => mockStopSyncScheduler(...args),
+  requestSync: (...args: unknown[]) => mockRequestSync(...args),
 }));
 
 jest.mock('@/src/auth', () => {
@@ -51,6 +60,9 @@ describe('RootLayout auth bootstrap wiring', () => {
     mockBootstrapLocalDataLayer.mockReset();
     mockBootstrapAuthState.mockReset();
     mockEnsureExerciseCatalogLoaded.mockReset();
+    mockStartSyncScheduler.mockReset();
+    mockStopSyncScheduler.mockReset();
+    mockRequestSync.mockReset();
     mockBootstrapLocalDataLayer.mockResolvedValue(undefined);
     mockBootstrapAuthState.mockResolvedValue(undefined);
     mockEnsureExerciseCatalogLoaded.mockResolvedValue(undefined);
@@ -68,5 +80,22 @@ describe('RootLayout auth bootstrap wiring', () => {
     // Tab roots (incl. settings) live in the `(tabs)` group registered as a single screen
     expect(screen.getByTestId('screen-(tabs)')).toBeTruthy();
     expect(screen.getByTestId('screen-profile')).toBeTruthy();
+  });
+
+  it('starts the sync scheduler on mount and fires the cold-launch nudge after boot', async () => {
+    render(<RootLayout />);
+
+    expect(mockStartSyncScheduler).toHaveBeenCalledTimes(1);
+
+    await waitFor(() => {
+      expect(mockRequestSync).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('stops the sync scheduler on unmount', () => {
+    const view = render(<RootLayout />);
+    view.unmount();
+
+    expect(mockStopSyncScheduler).toHaveBeenCalledTimes(1);
   });
 });

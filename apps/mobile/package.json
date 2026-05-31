@@ -24,6 +24,7 @@
     "test:e2e:ios:auth-profile": "./scripts/maestro-ios-auth-profile.sh"
   },
   "dependencies": {
+    "@react-native-community/netinfo": "11.4.1",
     "@react-navigation/native": "^7.1.8",
     "@supabase/supabase-js": "^2.98.0",
     "drizzle-orm": "^0.44.6",
