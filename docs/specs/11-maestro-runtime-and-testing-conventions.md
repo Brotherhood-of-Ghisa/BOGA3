@@ -242,15 +242,34 @@ Current rebuild invalidation rules:
 
 - rebuild when the `.app` artifact is missing;
 - rebuild when `dev-client-build.env` is missing;
-- rebuild when the native-input fingerprint changed;
 - rebuild when `--force` is passed.
 
-Current native-input fingerprint inputs:
+The cache is intentionally **not** auto-invalidated by JS, config, or dependency
+changes. A native rebuild (`expo prebuild` + `pod install` + `xcodebuild`) is
+expensive, and the overwhelming majority of changes — JS, pure-JS dependencies,
+and config that does not alter the native project — load from the Metro bundle at
+runtime and do not need one. Auto-fingerprinting every native input was evaluated
+and rejected because it forces a full native rebuild on changes that don't need
+it. Instead, native-cache freshness is the author's responsibility:
 
-- `apps/mobile/app.json`
-- `apps/mobile/eas.json`
-- `apps/mobile/package.json`
-- `apps/mobile/package-lock.json`
+- **When you add, remove, or upgrade a NATIVE dependency** — any package that
+  ships an iOS pod / native Expo module (for example `expo-task-manager`,
+  `expo-background-task`, `expo-network`, or anything added via `npx expo install`
+  that has native code), or you change a config plugin / native field in
+  `app.config.ts` — you MUST force a rebuild of the shared dev client before
+  running the iOS Maestro gates:
+
+  ```bash
+  ./scripts/maestro-ios-dev-client-build.sh --force
+  ```
+
+  Otherwise the gate silently reuses the previously-built `.app`, which does not
+  contain the new native module, and every flow fails at boot with
+  `Cannot find native module '<X>'` (a hard-to-diagnose failure that cost a full
+  debug cycle on PR #101).
+
+- Pure-JS or config-only changes need no rebuild; the cached `.app` picks them up
+  from the Metro bundle.
 
 Worktree setup note:
 

@@ -80,6 +80,25 @@ print_status() {
   fi
 }
 
+# CocoaPods (Ruby) raises `Unicode Normalization not appropriate for ASCII-8BIT
+# (Encoding::CompatibilityError)` during `pod install` when the shell locale is
+# unset or non-UTF-8 (LC_ALL=C / POSIX) — common in bare CI/agent shells. Force a
+# UTF-8 locale for the prebuild + pod install so file-name normalization runs
+# under UTF-8. An already-UTF-8 locale is left untouched.
+ensure_utf8_locale() {
+  local current="${LC_ALL:-${LANG:-}}"
+
+  case "$current" in
+    *UTF-8*|*utf-8*|*UTF8*|*utf8*)
+      return 0
+      ;;
+  esac
+
+  export LANG="en_US.UTF-8"
+  export LC_ALL="en_US.UTF-8"
+  echo "[maestro-ios-dev-client-build] Forcing UTF-8 locale (was '${current:-unset}') for expo prebuild / pod install" | tee -a "$BUILD_LOG_FILE"
+}
+
 prepare_workspace() {
   rm -rf "$TEMP_ROOT"
   mkdir -p "$WORKSPACE_DIR" "$(dirname -- "$APP_PATH")"
@@ -120,6 +139,7 @@ build_dev_client() {
   : >"$BUILD_LOG_FILE"
 
   prepare_workspace
+  ensure_utf8_locale
 
   {
     echo "[maestro-ios-dev-client-build] Shared build root: $BUILD_ROOT"
