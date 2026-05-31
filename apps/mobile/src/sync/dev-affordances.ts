@@ -22,6 +22,13 @@ import { isDevMode } from '@/src/utils/isDevMode';
 /** The server-side helper that deletes every row owned by the caller. */
 const DEV_WIPE_REMOTE_RPC = 'dev_wipe_my_data';
 
+/**
+ * The Postgres schema the helper RPC lives in. PostgREST exposes it under this
+ * schema rather than the default `public`, so the client must select it before
+ * dispatching or the call fails to resolve the function.
+ */
+const DEV_WIPE_REMOTE_SCHEMA = 'app_public';
+
 const DEV_ONLY_MESSAGE =
   'This is a developer-only tool and must not run in release builds.';
 
@@ -79,7 +86,7 @@ export const wipeRemoteForCurrentUser = (): Promise<WipeRemoteResult> => {
 
 const runWipeRemoteForCurrentUser = async (): Promise<WipeRemoteResult> => {
   const client = getRequiredSupabaseMobileClient();
-  const { data, error } = await client.rpc(DEV_WIPE_REMOTE_RPC);
+  const { data, error } = await client.schema(DEV_WIPE_REMOTE_SCHEMA).rpc(DEV_WIPE_REMOTE_RPC);
 
   if (error) {
     throw new Error(error.message ?? 'Failed to wipe remote data.');

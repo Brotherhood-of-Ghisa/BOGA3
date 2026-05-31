@@ -43,6 +43,14 @@ export const MAX_CYCLES_PER_CALL = 5;
 const SYNC_PUSH_RPC = 'sync_push';
 const SYNC_PULL_RPC = 'sync_pull';
 
+/**
+ * The Postgres schema the sync RPCs live in. PostgREST exposes them under this
+ * schema, not the default `public`, so the client must select it before
+ * dispatching — a plain `.rpc(...)` on the default schema cannot find the
+ * function and fails with a "could not find function public.sync_*" error.
+ */
+const SYNC_RPC_SCHEMA = 'app_public';
+
 // -----------------------------------------------------------------------------
 // Wire types
 // -----------------------------------------------------------------------------
@@ -462,7 +470,9 @@ type RpcResult = { data: unknown; error: { message?: string } | null };
  */
 const callSyncPush = async (entities: WireEntity[]): Promise<void> => {
   const client = getRequiredSupabaseMobileClient();
-  const { data, error } = (await client.rpc(SYNC_PUSH_RPC, { entities })) as RpcResult;
+  const { data, error } = (await client
+    .schema(SYNC_RPC_SCHEMA)
+    .rpc(SYNC_PUSH_RPC, { entities })) as RpcResult;
   const code = classifyRpcResult(error, data);
   if (code) {
     throw new SyncCycleError(code, error?.message ?? `sync push failed: ${code}`);
@@ -476,7 +486,7 @@ const callSyncPush = async (entities: WireEntity[]): Promise<void> => {
  */
 const callSyncPull = async (layer: number, cursor: PullCursor): Promise<PullResponse> => {
   const client = getRequiredSupabaseMobileClient();
-  const { data, error } = (await client.rpc(SYNC_PULL_RPC, {
+  const { data, error } = (await client.schema(SYNC_RPC_SCHEMA).rpc(SYNC_PULL_RPC, {
     layer,
     cursor,
     limit: BATCH_CAP,

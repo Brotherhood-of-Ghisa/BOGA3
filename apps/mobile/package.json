@@ -13,6 +13,7 @@
     "router:types": "node ./scripts/generate-router-types.js",
     "typecheck": "npm run router:types && tsc --noEmit",
     "test": "jest",
+    "test:sync-v2-final": "jest app/__tests__/sync-v2-final",
     "test:handles": "jest --detectOpenHandles --silent",
     "db:generate": "drizzle-kit generate --config=drizzle.config.ts && tsx scripts/bundle-migrations.ts",
     "db:generate:canary": "npm run db:generate",
