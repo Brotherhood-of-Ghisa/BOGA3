@@ -36,6 +36,12 @@ jest.mock('@/src/auth', () => {
   };
 });
 
+// The route-layer auth guard is covered by its own spec; here it is a pass-
+// through so this test stays focused on the boot-effect wiring.
+jest.mock('@/components/navigation/auth-route-guard', () => ({
+  AuthRouteGuard: ({ children }: { children: ReactNode }) => children,
+}));
+
 jest.mock('@/src/exercise-catalog/cache', () => ({
   ensureExerciseCatalogLoaded: (...args: unknown[]) => mockEnsureExerciseCatalogLoaded(...args),
 }));

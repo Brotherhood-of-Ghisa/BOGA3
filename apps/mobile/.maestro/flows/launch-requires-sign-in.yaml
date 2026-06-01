@@ -1,0 +1,41 @@
+appId: com.dinoderek.mobile
+---
+# Login-on-start enforcement: a configured build with no restored session must
+# land on the dedicated sign-in screen before any data screen renders, and must
+# reach data screens only after a successful sign-in.
+#
+# This flow runs in the auth-configured lane (a local Supabase baseline is
+# provisioned by the runner). The infra-free smoke/data-smoke gate build has no
+# Supabase configuration, so the guard is a deliberate no-op there and those
+# flows continue to reach data screens directly.
+
+# Cold launch with no session: the guard redirects to the sign-in screen.
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible:
+      id: "sign-in-screen"
+    timeout: 30000
+- assertVisible:
+    id: "sign-in-card"
+# No data screen may render behind or before the gate.
+- assertNotVisible:
+    id: "stats-history-screen"
+- takeScreenshot: "08-launch-requires-sign-in"
+
+# Signing in from the gate lets the app proceed to the normal route.
+- tapOn:
+    id: "sign-in-email-input"
+- inputText: "${MAESTRO_AUTH_PROFILE_EMAIL}"
+- tapOn:
+    id: "sign-in-password-input"
+- inputText: "${MAESTRO_AUTH_PROFILE_PASSWORD}"
+- tapOn:
+    id: "sign-in-submit-button"
+- extendedWaitUntil:
+    visible:
+      id: "stats-history-screen"
+    timeout: 30000
+- assertNotVisible:
+    id: "sign-in-screen"
+- takeScreenshot: "09-sign-in-reaches-data"

@@ -244,7 +244,13 @@ export const createDrizzleStatsStore = (): StatsStore => ({
               role: exerciseMuscleMappings.role,
             })
             .from(exerciseMuscleMappings)
-            .where(inArray(exerciseMuscleMappings.exerciseDefinitionId, exerciseDefinitionIds))
+            .where(
+              and(
+                inArray(exerciseMuscleMappings.exerciseDefinitionId, exerciseDefinitionIds),
+                // Exclude muscle links the user removed (kept as tombstones).
+                isNull(exerciseMuscleMappings.deletedAt)
+              )
+            )
             .all()
         : [];
 

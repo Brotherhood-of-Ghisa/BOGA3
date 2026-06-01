@@ -1,6 +1,11 @@
 appId: com.dinoderek.mobile
 ---
-- openLink: "boga3://maestro-harness?reset=data&teleport=session-list"
+# Login-on-start is enforced in this auth-configured lane: a clean launch with no
+# session lands on the sign-in gate, so this flow signs in through the gate first
+# and then exercises the in-Profile account affordances (username edit + update +
+# sign-out). Signing out returns to the gate rather than to a data screen.
+- launchApp:
+    clearState: true
 - tapOn:
     text: "Open"
     optional: true
@@ -12,25 +17,28 @@ appId: com.dinoderek.mobile
     optional: true
 - extendedWaitUntil:
     visible:
+      id: "sign-in-screen"
+    timeout: 30000
+- takeScreenshot: "05-auth-profile-gate-start"
+- tapOn:
+    id: "sign-in-email-input"
+- inputText: "${MAESTRO_AUTH_PROFILE_EMAIL}"
+- tapOn:
+    id: "sign-in-password-input"
+- inputText: "${MAESTRO_AUTH_PROFILE_PASSWORD}"
+- tapOn:
+    id: "sign-in-submit-button"
+- extendedWaitUntil:
+    visible:
       id: "stats-history-screen"
     timeout: 30000
-- takeScreenshot: "05-auth-profile-logged-out-start"
+# Now signed in: open Profile and exercise the account affordances.
 - tapOn:
     id: "top-level-settings-button"
 - assertVisible:
     id: "settings-screen"
 - tapOn:
     id: "settings-profile-row"
-- assertVisible:
-    id: "profile-signed-out-card"
-- tapOn:
-    id: "profile-email-input"
-- inputText: "${MAESTRO_AUTH_PROFILE_EMAIL}"
-- tapOn:
-    id: "profile-password-input"
-- inputText: "${MAESTRO_AUTH_PROFILE_PASSWORD}"
-- tapOn:
-    id: "profile-sign-in-button"
 - assertVisible:
     id: "profile-signed-in-card"
 - takeScreenshot: "06-auth-profile-signed-in"
@@ -53,6 +61,9 @@ appId: com.dinoderek.mobile
     direction: DOWN
 - tapOn:
     id: "profile-sign-out-button"
-- assertVisible:
-    id: "profile-signed-out-card"
+# Signing out drops the session; the route-layer guard returns to the gate.
+- extendedWaitUntil:
+    visible:
+      id: "sign-in-screen"
+    timeout: 30000
 - takeScreenshot: "07-auth-profile-signed-out-end"

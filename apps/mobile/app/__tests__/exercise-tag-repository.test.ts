@@ -289,6 +289,7 @@ describe('exercise tag repository', () => {
     expect(store.removeTagAssignment).toHaveBeenCalledWith({
       sessionExerciseId: 'session-exercise-1',
       tagDefinitionId: 'tag-1',
+      now: expect.any(Date),
     });
   });
 });

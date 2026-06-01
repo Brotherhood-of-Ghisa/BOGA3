@@ -18,6 +18,11 @@ import { __resetClockForTests } from '@/src/data/clock';
 import { gyms, sessions } from '@/src/data/schema';
 // Bound to the stubbed bootstrap/supabase modules below; babel-jest hoists the
 // jest.mock calls above every import so the cycle resolves the stubs.
+import {
+  __resetAuthRequiredSignalForTests,
+  getAuthRequiredSignal,
+  markAuthRequired,
+} from '@/src/sync/auth-required-signal';
 import { runSyncCycle, SyncCycleError } from '@/src/sync/cycle';
 
 import {
@@ -54,6 +59,7 @@ let database: InMemoryTestDatabase;
 
 beforeEach(() => {
   __resetClockForTests();
+  __resetAuthRequiredSignalForTests();
   fixture = createInMemoryDatabase();
   database = fixture.database;
   mockBootstrapState.database = database;
@@ -64,6 +70,7 @@ afterEach(() => {
   fixture.close();
   mockBootstrapState.database = null;
   __resetClockForTests();
+  __resetAuthRequiredSignalForTests();
 });
 
 const emptyPage = { entities: [], next_cursor: null, has_more: false };
@@ -159,6 +166,8 @@ describe('AUTH_REQUIRED handling', () => {
     expect(row?.localDirty).toBe(true);
     expect(row?.localUpdatedAtMs).toBe(50);
     expect(database.select().from(sessions).all()).toHaveLength(0);
+    // The no-JWT outcome is surfaced as the route-to-sign-in signal, not an error.
+    expect(getAuthRequiredSignal()).toBe(true);
   });
 
   it('returns cleanly when the push RPC raises the no-JWT token', async () => {
@@ -175,6 +184,26 @@ describe('AUTH_REQUIRED handling', () => {
 
     const row = database.select().from(gyms).where(eq(gyms.id, 'gym-local')).get();
     expect(row?.localDirty).toBe(true);
+    expect(getAuthRequiredSignal()).toBe(true);
+  });
+
+  it('lowers a previously raised auth-required signal once a cycle converges with a session', async () => {
+    // A prior unauthenticated cycle left the signal raised.
+    markAuthRequired();
+    expect(getAuthRequiredSignal()).toBe(true);
+
+    mockRpc.mockImplementation(async (name: string) => {
+      if (name === 'sync_pull') {
+        return { data: emptyPage, error: null };
+      }
+      return pushOk;
+    });
+
+    await runSyncCycle();
+
+    // The authenticated cycle converged, so the route layer should stop routing
+    // the user to sign-in.
+    expect(getAuthRequiredSignal()).toBe(false);
   });
 });
 

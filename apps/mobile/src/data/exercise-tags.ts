@@ -67,6 +67,7 @@ export type ExerciseTagStore = {
   removeTagAssignment(input: {
     sessionExerciseId: string;
     tagDefinitionId: string;
+    now: Date;
   }): Promise<void>;
   listAssignedTags(input: {
     sessionExerciseId: string;
@@ -296,16 +297,47 @@ export const createDrizzleExerciseTagStore = (): ExerciseTagStore => ({
     const database = await bootstrapLocalDataLayer();
     const assignmentId = createLocalId('session-exercise-tag');
 
-    // Mark the new `session_exercise_tags` row dirty and stamp the monotonic
-    // last-write-wins timestamp inside the SAME transaction as the insert, so
+    // Mark the `session_exercise_tags` row dirty and stamp the monotonic
+    // last-write-wins timestamp inside the SAME transaction as the write, so
     // the counter persist (nowMonotonic → sync_runtime_state.last_emitted_ms)
     // is atomic with the row write and the sync cycle picks it up.
+    //
+    // A previously-removed attachment is kept as a tombstone (its row still
+    // occupies the unique (session_exercise_id, tag_definition_id) slot), so a
+    // re-attach of the same pair must revive that row rather than insert a
+    // colliding one. Revive in place when a tombstone exists; insert fresh
+    // otherwise.
     database.transaction((tx) => {
+      const existing = tx
+        .select({ id: sessionExerciseTags.id })
+        .from(sessionExerciseTags)
+        .where(
+          and(
+            eq(sessionExerciseTags.sessionExerciseId, input.sessionExerciseId),
+            eq(sessionExerciseTags.exerciseTagDefinitionId, input.tagDefinitionId)
+          )
+        )
+        .get();
+
+      if (existing) {
+        tx.update(sessionExerciseTags)
+          .set({
+            deletedAt: null,
+            localDirty: true,
+            localUpdatedAtMs: nowMonotonic(tx),
+            createdAt: input.now,
+          })
+          .where(eq(sessionExerciseTags.id, existing.id))
+          .run();
+        return;
+      }
+
       tx.insert(sessionExerciseTags)
         .values({
           id: assignmentId,
           sessionExerciseId: input.sessionExerciseId,
           exerciseTagDefinitionId: input.tagDefinitionId,
+          deletedAt: null,
           localDirty: true,
           localUpdatedAtMs: nowMonotonic(tx),
           createdAt: input.now,
@@ -316,15 +348,26 @@ export const createDrizzleExerciseTagStore = (): ExerciseTagStore => ({
   async removeTagAssignment(input) {
     const database = await bootstrapLocalDataLayer();
 
-    database
-      .delete(sessionExerciseTags)
-      .where(
-        and(
-          eq(sessionExerciseTags.sessionExerciseId, input.sessionExerciseId),
-          eq(sessionExerciseTags.exerciseTagDefinitionId, input.tagDefinitionId)
+    // Tombstone the attachment instead of hard-deleting it: set `deleted_at`
+    // and flip the dirty bit so the row pushes as a deletion and the deletion
+    // survives a reinstall (the server holds the tombstone). Local readers
+    // filter `deleted_at IS NULL` so the attachment disappears from the UI.
+    database.transaction((tx) => {
+      tx.update(sessionExerciseTags)
+        .set({
+          deletedAt: input.now,
+          localDirty: true,
+          localUpdatedAtMs: nowMonotonic(tx),
+        })
+        .where(
+          and(
+            eq(sessionExerciseTags.sessionExerciseId, input.sessionExerciseId),
+            eq(sessionExerciseTags.exerciseTagDefinitionId, input.tagDefinitionId),
+            isNull(sessionExerciseTags.deletedAt)
+          )
         )
-      )
-      .run();
+        .run();
+    });
   },
   async listAssignedTags(input) {
     const database = await bootstrapLocalDataLayer();
@@ -345,7 +388,12 @@ export const createDrizzleExerciseTagStore = (): ExerciseTagStore => ({
         exerciseTagDefinitions,
         eq(sessionExerciseTags.exerciseTagDefinitionId, exerciseTagDefinitions.id)
       )
-      .where(eq(sessionExerciseTags.sessionExerciseId, input.sessionExerciseId))
+      .where(
+        and(
+          eq(sessionExerciseTags.sessionExerciseId, input.sessionExerciseId),
+          isNull(sessionExerciseTags.deletedAt)
+        )
+      )
       .orderBy(
         asc(exerciseTagDefinitions.normalizedName),
         asc(exerciseTagDefinitions.name),
@@ -386,6 +434,7 @@ export type AttachTagToSessionExerciseInput = {
 export type RemoveTagFromSessionExerciseInput = {
   sessionExerciseId: string;
   tagDefinitionId: string;
+  now?: Date;
 };
 
 export const createExerciseTagRepository = (store: ExerciseTagStore = createDrizzleExerciseTagStore()) => {
@@ -534,6 +583,7 @@ export const createExerciseTagRepository = (store: ExerciseTagStore = createDriz
       await store.removeTagAssignment({
         sessionExerciseId: requireId(input.sessionExerciseId, 'sessionExerciseId'),
         tagDefinitionId: requireId(input.tagDefinitionId, 'tagDefinitionId'),
+        now: ensureNow(input.now),
       });
     },
     async listAssignedTagsForSessionExercise(sessionExerciseId: string): Promise<SessionExerciseAssignedTag[]> {
