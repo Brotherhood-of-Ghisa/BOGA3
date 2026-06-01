@@ -6,10 +6,12 @@ import { uiColors } from '@/components/ui';
 import {
   coerceMaestroHarnessQueryParam,
   isMaestroHarnessAllowed,
+  resolveMaestroHarnessBootstrapAction,
   resolveMaestroHarnessFixtureName,
   resolveMaestroHarnessResetMode,
   resolveMaestroHarnessTeleportHref,
   resolveMaestroHarnessTeleportTarget,
+  runMaestroHarnessBootstrapAction,
   runMaestroHarnessFixture,
   runMaestroHarnessReset,
 } from '@/src/maestro/harness';
@@ -24,6 +26,7 @@ export default function MaestroHarnessScreen() {
   const params = useLocalSearchParams<{
     reset?: string | string[];
     fixture?: string | string[];
+    bootstrap?: string | string[];
     teleport?: string | string[];
     mode?: string | string[];
     intent?: string | string[];
@@ -42,6 +45,7 @@ export default function MaestroHarnessScreen() {
   // depend on those so the harness action runs exactly once per harness URL.
   const resetParam = coerceMaestroHarnessQueryParam(params.reset);
   const fixtureParam = coerceMaestroHarnessQueryParam(params.fixture);
+  const bootstrapParam = coerceMaestroHarnessQueryParam(params.bootstrap);
   const teleportParam = coerceMaestroHarnessQueryParam(params.teleport);
   const modeParam = coerceMaestroHarnessQueryParam(params.mode);
   const intentParam = coerceMaestroHarnessQueryParam(params.intent);
@@ -62,6 +66,7 @@ export default function MaestroHarnessScreen() {
 
     const resetMode = resolveMaestroHarnessResetMode(resetParam);
     const fixtureName = resolveMaestroHarnessFixtureName(fixtureParam);
+    const bootstrapAction = resolveMaestroHarnessBootstrapAction(bootstrapParam);
     const teleportTarget = resolveMaestroHarnessTeleportTarget(teleportParam);
     const teleportHref = resolveMaestroHarnessTeleportHref({
       target: teleportTarget,
@@ -74,6 +79,7 @@ export default function MaestroHarnessScreen() {
       try {
         await runMaestroHarnessReset(resetMode);
         await runMaestroHarnessFixture(fixtureName);
+        await runMaestroHarnessBootstrapAction(bootstrapAction);
 
         if (cancelled) {
           return;
@@ -115,7 +121,7 @@ export default function MaestroHarnessScreen() {
     return () => {
       cancelled = true;
     };
-  }, [resetParam, fixtureParam, teleportParam, modeParam, intentParam, sessionIdParam, router]);
+  }, [resetParam, fixtureParam, bootstrapParam, teleportParam, modeParam, intentParam, sessionIdParam, router]);
 
   return (
     <View style={styles.screen} testID="maestro-harness-screen">

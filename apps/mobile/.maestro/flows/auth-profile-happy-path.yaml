@@ -28,6 +28,20 @@ appId: com.dinoderek.mobile
 - inputText: "${MAESTRO_AUTH_PROFILE_PASSWORD}"
 - tapOn:
     id: "sign-in-submit-button"
+- assertNotVisible:
+    id: "sign-in-screen"
+# Drain the first cycle (stamp the bootstrap flag via the harness) so the
+# first-sync gate dismisses and the normal route renders.
+- openLink: "boga3://maestro-harness?bootstrap=complete&teleport=session-list"
+- tapOn:
+    text: "Open"
+    optional: true
+- tapOn:
+    text: "Continue"
+    optional: true
+- tapOn:
+    text: "Close"
+    optional: true
 - extendedWaitUntil:
     visible:
       id: "stats-history-screen"

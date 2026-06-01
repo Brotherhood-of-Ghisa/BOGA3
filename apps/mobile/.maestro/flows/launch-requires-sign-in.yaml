@@ -23,7 +23,8 @@ appId: com.dinoderek.mobile
     id: "stats-history-screen"
 - takeScreenshot: "08-launch-requires-sign-in"
 
-# Signing in from the gate lets the app proceed to the normal route.
+# Signing in from the gate clears the sign-in screen; the first-sync gate then
+# stands between the user and any data screen until the first cycle drains.
 - tapOn:
     id: "sign-in-email-input"
 - inputText: "${MAESTRO_AUTH_PROFILE_EMAIL}"
@@ -32,10 +33,22 @@ appId: com.dinoderek.mobile
 - inputText: "${MAESTRO_AUTH_PROFILE_PASSWORD}"
 - tapOn:
     id: "sign-in-submit-button"
+- assertNotVisible:
+    id: "sign-in-screen"
+# Drain the first cycle (stamp the bootstrap flag via the harness) so the gate
+# dismisses and the normal route renders.
+- openLink: "boga3://maestro-harness?bootstrap=complete&teleport=session-list"
+- tapOn:
+    text: "Open"
+    optional: true
+- tapOn:
+    text: "Continue"
+    optional: true
+- tapOn:
+    text: "Close"
+    optional: true
 - extendedWaitUntil:
     visible:
       id: "stats-history-screen"
     timeout: 30000
-- assertNotVisible:
-    id: "sign-in-screen"
 - takeScreenshot: "09-sign-in-reaches-data"

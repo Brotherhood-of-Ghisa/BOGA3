@@ -34,6 +34,20 @@ Brief entrypoint map of the current mobile screens.
 - Key exits:
   - app proceeds to the normal route once a session exists (guard stops redirecting); no explicit navigation on success
 
+2b. First-sync block (route-layer render state, not a route)
+- File: `apps/mobile/src/sync/SyncGate.tsx`
+- Purpose:
+  - the device-recovery waiting room a signed-in user sees while the first sync cycle drains; renders a full-screen "Setting up your data…" block in place of the navigator until `sync_runtime_state.bootstrap_completed_at` is set, so no data screen is reachable before the user's data is restored
+- Key states (high level):
+  - in-progress: a phase label plus an advancing activity/progress indicator ("layer K of N", "N items") that visibly moves while work happens
+  - offline: an offline message instead of an indefinite spinner when the device is network-unreachable
+  - error: a single error message and a single Retry button (fires exactly one cycle) on a non-`AUTH_REQUIRED` cycle error
+- Key exits:
+  - dismisses in place once `bootstrap_completed_at` is set, and the normal route renders
+  - redirects to `/sign-in` (no Retry) when the latest cycle outcome is `AUTH_REQUIRED`
+- Notes:
+  - stands aside (renders through) for a signed-out or auth-unconfigured app, so it never traps a build with no session; the `/sign-in` route is exempt so the redirect cannot loop; display-only surfaces (phase, activity, offline) carry no extra primary action — Retry is the single action
+
 3. `/stats-history`
 - File: `apps/mobile/app/(tabs)/stats-history.tsx`
 - Purpose:
@@ -136,6 +150,7 @@ Brief entrypoint map of the current mobile screens.
   - root stack registration and local data bootstrap on app mount
 - Notes:
   - wraps the whole navigator in the route-layer auth guard (`apps/mobile/components/navigation/auth-route-guard.tsx`), which enforces login-on-start (neutral loading view while restoring, redirect to `/sign-in` when configured-but-signed-out, render-through when auth is unconfigured)
+  - immediately below the auth guard, wraps the navigator in the first-sync gate (`apps/mobile/src/sync/SyncGate.tsx`), which blocks a signed-in user behind a full-screen "Setting up your data…" block until `sync_runtime_state.bootstrap_completed_at` is set (then dismisses in place), and observes sync runtime state through the single shared scheduler-state accessor
   - tab roots live inside the `(tabs)` route group (`apps/mobile/app/(tabs)/_layout.tsx`) with `headerShown: false`; the root stack registers the `(tabs)` group itself plus the `sign-in` screen and the detail screens (`exercise-history`, `profile`, `maestro-harness`, `completed-session/[sessionId]`)
   - completed-session route sets its title inside the route file
   - exercise-history route also sets its title inside the route file (resolved exercise name)

@@ -1,0 +1,66 @@
+appId: com.dinoderek.mobile
+---
+# First-sync gate: after a fresh install and sign-in, a signed-in user whose
+# device has not yet drained its first sync sees a full-screen "Setting up your
+# data…" block (phase label + advancing activity indicator) in place of any data
+# screen. Once the first cycle completes (the bootstrap flag is set) the block
+# dismisses and the normal route renders.
+#
+# This flow runs in the auth-configured lane (a local Supabase baseline is
+# provisioned by the runner). The block's dismissal is driven deterministically
+# via the test harness (which stamps the bootstrap flag), standing in for the
+# bootstrapper that sets it in production, so the gate's block→dismiss transition
+# is asserted within the foreground window without depending on live server data.
+
+# Cold launch with no session: the route-layer guard lands on sign-in.
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible:
+      id: "sign-in-screen"
+    timeout: 30000
+
+# Sign in. The first sync has not yet drained, so the gate blocks instead of
+# letting a data screen render.
+- tapOn:
+    id: "sign-in-email-input"
+- inputText: "${MAESTRO_AUTH_PROFILE_EMAIL}"
+- tapOn:
+    id: "sign-in-password-input"
+- inputText: "${MAESTRO_AUTH_PROFILE_PASSWORD}"
+- tapOn:
+    id: "sign-in-submit-button"
+
+# The full-screen block is visible with its phase label and activity indicator,
+# and no data screen renders behind it.
+- extendedWaitUntil:
+    visible:
+      id: "sync-gate-block"
+    timeout: 30000
+- assertVisible:
+    id: "sync-gate-phase-label"
+- assertVisible:
+    id: "sync-gate-activity-indicator"
+- assertNotVisible:
+    id: "stats-history-screen"
+- takeScreenshot: "10-sync-gate-block-visible"
+
+# Complete the first cycle (the bootstrap flag is stamped). The block dismisses
+# and the normal route renders, well within a minute of foreground.
+- openLink: "boga3://maestro-harness?bootstrap=complete&teleport=session-list"
+- tapOn:
+    text: "Open"
+    optional: true
+- tapOn:
+    text: "Continue"
+    optional: true
+- tapOn:
+    text: "Close"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "stats-history-screen"
+    timeout: 60000
+- assertNotVisible:
+    id: "sync-gate-block"
+- takeScreenshot: "11-sync-gate-dismissed"
