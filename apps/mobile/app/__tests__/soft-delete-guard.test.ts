@@ -41,11 +41,17 @@ const SRC_ROOT = path.resolve(__dirname, '..', '..', 'src');
 //   - the session-rebuild cascade still hard-deletes the exercise/set/tag
 //     graph before re-inserting it — converting that wipe-and-reinsert to a
 //     soft-delete-then-reconcile is a separate, materially larger change and
-//     lands on its own.
+//     lands on its own;
+//   - the sign-out / account-switch wipe clears every local table wholesale so
+//     the previous account's rows cannot leak into the next account on this
+//     device. It is local-only (no server delete) and the server keeps every
+//     account's data for a later sign-in to restore — so a tombstone here would
+//     be wrong, not missing.
 // Paths are relative to `src/`.
 const EXEMPT_FILES_AGAINST_SYNCABLE_ENTITIES = new Set<string>([
   'data/dev-reset.ts',
   'data/session-drafts.ts',
+  'sync/account-wipe.ts',
 ]);
 
 const collectTypeScriptSourceFiles = (dir: string): string[] => {
