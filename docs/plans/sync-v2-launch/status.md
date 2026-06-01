@@ -91,3 +91,31 @@ Roots of the DAG (no in-plan dependency): **tPROG** (design), **t1**
   #96/#104); t7b card + status + deviations land there. Builder/reviewer get t7b
   inline meanwhile.
 - Still gated: t9 (needs t3), t4/t5/t6/t10 (need t3), tFINAL (needs all).
+
+## 2026-06-01 — iteration 5
+- Wave-2 PRs opened + reviewed. All 4 APPROVED:
+  - t3 → #111 APPROVED. Reviewer re-ran fast gate (603 tests). OPEN CONCERN
+    (follow-up, not a t3 blocker): as-built `seedSystemExerciseCatalog` writes
+    seeds `local_dirty=0`, so fresh-account seeds don't push to server — tension
+    with design intent. Belongs to the seed-bundle owner (t4/t5 territory). A
+    reviewer also auto-spawned a background task chip for it.
+  - t2 → #113 APPROVED. OPEN RISK: the new `sync-gate-first-cycle.yaml` Maestro
+    flow is in the auth-profile lane, which flakes at Expo/Metro warm-up in this
+    sandbox (reproduces on pristine origin/main, fails before app mounts). The
+    card-named `test:e2e:ios:gates` (smoke+data-smoke) passes + covers t2's
+    stand-aside; Jest covers block→dismiss. Verify the auth-profile lane on a
+    healthy runner at tFINAL.
+  - t8 → #110 APPROVED (clean).
+  - t7b → #112 APPROVED (order_index/PK reconciliation verified correct).
+- Cleaned main tree again (t3/t8/t7b spill, all captured in PRs); back on main.
+- TWO merge-conflict pairs to sequence (both PRs independently green):
+  - cycle.ts: #111 (t3) + #113 (t2).
+  - soft-delete-guard.test.ts: #112 (t7b) + #110 (t8) — final exempt set must be
+    {dev-reset, account-wipe, maestro, tests}, NOT session-drafts.
+- MERGE PLAN surfaced to user: merge #111 (t3) + #112 (t7b) first (disjoint,
+  clean) → coordinator re-dispatches #113 (t2) + #110 (t8) to rebase + resolve →
+  re-review → merge. Awaiting the first two merges.
+- t9 reconciliation reminder: t2 made `sync-progress.ts` + `scheduler-state.ts`
+  seam; t3 made `progress.ts` + `getSyncProgress()` producer. t9 MUST unify into
+  ONE SyncProgress type + ONE shared accessor (wire t3 producer → t2 consumer).
+- Next wave (after t3 merges): t9 (tPROG+t3), t4/t5/t6/t10 (t3). t8/t7b feed tFINAL.
