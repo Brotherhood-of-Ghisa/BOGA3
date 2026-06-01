@@ -4152,6 +4152,38 @@ const writeSeedsAppliedMarker = (database: LocalDatabase, version: number) => {
 };
 
 /**
+ * Seed the client-only muscle-group taxonomy at boot.
+ *
+ * Muscle groups are a static, read-only taxonomy that never crosses the sync
+ * wire — every device seeds its own copy from the bundle, independent of sign-in
+ * and independent of the first-sync bootstrap. So this runs at boot, decoupled
+ * from the entity-catalog seeder (which is gated on the first full pull). It is
+ * an all-or-nothing insert today: when the table is empty it inserts every
+ * bundle row; once any row exists it is a no-op, preserving existing rows
+ * verbatim. The insert uses `onConflictDoNothing` so a partially-populated table
+ * never throws on a primary-key collision.
+ */
+export const seedMuscleGroups = (database: LocalDatabase, now: Date = new Date()) => {
+  const existing = database.select({ id: muscleGroups.id }).from(muscleGroups).limit(1).get();
+  if (existing) {
+    return;
+  }
+
+  database.transaction((tx) => {
+    for (const muscleGroup of SYSTEM_MUSCLE_GROUP_SEEDS) {
+      tx.insert(muscleGroups)
+        .values({
+          ...muscleGroup,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .onConflictDoNothing({ target: muscleGroups.id })
+        .run();
+    }
+  });
+};
+
+/**
  * Seed the local muscle group / exercise definition / mapping tables exactly
  * once per install (per catalog bundle version). Subsequent calls (every app
  * launch, every sync bootstrap) observe the

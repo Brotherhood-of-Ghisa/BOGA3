@@ -2,8 +2,11 @@
 // reinstalling the app.
 //
 //   - wipeLocalAndReBootstrap: drop the local SQLite database and re-run the
-//     bootstrap (migrations + catalog seed). The next sync cycle then re-pulls
-//     the user's server state into the fresh local store.
+//     boot data layer (migrations + the client-only muscle-group seed). The
+//     dropped database loses the first-sync flag, so the next sync cycle
+//     re-enters the first-sign-in bootstrapper, which re-pulls the user's server
+//     state into the fresh local store (and re-seeds the starter catalog only
+//     when the server holds nothing for the user).
 //   - wipeRemoteForCurrentUser: ask a server-side helper to delete every row
 //     owned by the signed-in user, then wipe local so the freshly-cleaned
 //     server is not immediately re-populated by a push of the local rows.
@@ -41,9 +44,12 @@ const assertDevModeSync = (): void => {
 
 /**
  * Drops the local SQLite database and re-bootstraps the data layer (runs
- * migrations and re-seeds the exercise catalog). The bootstrap and reset paths
- * are serialized behind a single lock in the data layer, so re-bootstrapping
- * after the reset is safe and never interleaves with the reset's own native
+ * migrations and re-seeds the client-only muscle-group taxonomy). The starter
+ * exercise catalog is NOT re-seeded here — the dropped database loses the
+ * first-sync flag, so the next sync cycle's first-sign-in bootstrapper decides
+ * whether to seed based on the server's state. The bootstrap and reset paths are
+ * serialized behind a single lock in the data layer, so re-bootstrapping after
+ * the reset is safe and never interleaves with the reset's own native
  * close/delete calls.
  *
  * The dev-mode guard runs synchronously, on the caller's stack, BEFORE any
