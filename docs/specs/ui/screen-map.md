@@ -23,7 +23,18 @@ Brief entrypoint map of the current mobile screens.
 - Notes:
   - no unique UI; renders an `expo-router` `Redirect` to the merged Stats/History tab
 
-2. `/stats-history`
+2. `/sign-in`
+- File: `apps/mobile/app/sign-in.tsx`
+- Purpose:
+  - dedicated sign-in entry point enforcing login-on-start; the route-layer auth guard redirects an unauthenticated user here before any data screen renders
+- Key states (high level):
+  - configured signed-out email/password form with inline auth error feedback (reuses the `/profile` signed-out credential pattern)
+  - auth-unconfigured disabled-reason message instead of a form
+  - already-signed-in redirect to `/`
+- Key exits:
+  - app proceeds to the normal route once a session exists (guard stops redirecting); no explicit navigation on success
+
+3. `/stats-history`
 - File: `apps/mobile/app/(tabs)/stats-history.tsx`
 - Purpose:
   - merged Stats / History tab with a top Stats ↔ History segmented toggle; the History sub-view reuses the shared `HistoryList` building block, and the Stats sub-view hosts the period chips and per-exercise picker that link out to `/exercise-history`
@@ -34,7 +45,7 @@ Brief entrypoint map of the current mobile screens.
 - Notes:
   - tab root inside the `(tabs)` group with `headerShown: false`; the tab bar is `BottomTray` (composing `TopLevelTabs`) supplied via the `tabBar` prop in `(tabs)/_layout.tsx`.
 
-3. `/session-recorder`
+4. `/session-recorder`
 - File: `apps/mobile/app/(tabs)/session-recorder.tsx`
 - Purpose:
   - active session recorder and completed-session editor (query-driven mode)
@@ -51,7 +62,7 @@ Brief entrypoint map of the current mobile screens.
   - `exercise-catalog` (`source=session-recorder&intent=manage` from exercise picker)
   - dismisses to `/` on submit/save success
 
-4. `/exercise-catalog`
+5. `/exercise-catalog`
 - File: `apps/mobile/app/(tabs)/exercise-catalog.tsx`
 - Purpose:
   - exercise catalog management (create/edit/soft-delete/undelete exercises and muscle mappings)
@@ -64,7 +75,7 @@ Brief entrypoint map of the current mobile screens.
   - `session-recorder` after save when opened from recorder-origin manage flow
   - `stats-history` / `session-recorder` via the shared bottom tray (`TopLevelTabs`)
 
-5. `/settings`
+6. `/settings`
 - File: `apps/mobile/app/(tabs)/settings.tsx`
 - Purpose:
   - minimal account/settings entry screen for the M11 auth/profile flow
@@ -75,7 +86,7 @@ Brief entrypoint map of the current mobile screens.
   - `profile`
   - back to the previous route via stack navigation
 
-6. `/profile`
+7. `/profile`
 - File: `apps/mobile/app/profile.tsx`
 - Purpose:
   - auth-aware account route for sign-in, signed-in username/email/password management, and M13 sync controls/status
@@ -94,7 +105,7 @@ Brief entrypoint map of the current mobile screens.
   - in-place rerender between signed-out and signed-in states
   - back to `settings` (or previous route) via stack navigation
 
-7. `/completed-session/[sessionId]`
+8. `/completed-session/[sessionId]`
 - File: `apps/mobile/app/completed-session/[sessionId].tsx`
 - Purpose:
   - completed session detail viewer with edit/reopen/delete actions
@@ -105,7 +116,7 @@ Brief entrypoint map of the current mobile screens.
   - `session-recorder` (edit)
   - dismisses to `/` after successful reopen
 
-8. `/exercise-history`
+9. `/exercise-history`
 - File: `apps/mobile/app/exercise-history.tsx`
 - Purpose:
   - per-exercise performance history view (progression signals + per-tag drill-down for a single `exercise_definitions` row)
@@ -124,7 +135,8 @@ Brief entrypoint map of the current mobile screens.
 - Purpose:
   - root stack registration and local data bootstrap on app mount
 - Notes:
-  - tab roots live inside the `(tabs)` route group (`apps/mobile/app/(tabs)/_layout.tsx`) with `headerShown: false`; the root stack registers the `(tabs)` group itself plus the detail screens (`exercise-history`, `profile`, `maestro-harness`, `completed-session/[sessionId]`)
+  - wraps the whole navigator in the route-layer auth guard (`apps/mobile/components/navigation/auth-route-guard.tsx`), which enforces login-on-start (neutral loading view while restoring, redirect to `/sign-in` when configured-but-signed-out, render-through when auth is unconfigured)
+  - tab roots live inside the `(tabs)` route group (`apps/mobile/app/(tabs)/_layout.tsx`) with `headerShown: false`; the root stack registers the `(tabs)` group itself plus the `sign-in` screen and the detail screens (`exercise-history`, `profile`, `maestro-harness`, `completed-session/[sessionId]`)
   - completed-session route sets its title inside the route file
   - exercise-history route also sets its title inside the route file (resolved exercise name)
 

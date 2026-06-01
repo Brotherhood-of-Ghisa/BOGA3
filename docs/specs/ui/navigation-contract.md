@@ -17,6 +17,10 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 
 - Router system: `expo-router` (file-based routes in `apps/mobile/app/`)
 - Root stack/layout: `apps/mobile/app/_layout.tsx`
+- A route-layer auth guard (`apps/mobile/components/navigation/auth-route-guard.tsx`) wraps the whole navigator inside the root layout. It runs before any screen paints and decides whether the user may proceed:
+  - while the session restore is in flight, it renders a neutral loading view (no flash of the sign-in screen or a data screen);
+  - when auth is configured and there is no session — or a sync cycle reported "no signed-in user" — it redirects to `/sign-in`, so a configured-but-signed-out launch never reaches a data screen;
+  - when auth is unconfigured (no working credential path) it renders through, so local-only/dev builds are not stranded on a sign-in form.
 - Tab roots live inside the `(tabs)` route group at `apps/mobile/app/(tabs)/` and share a tab layout at `apps/mobile/app/(tabs)/_layout.tsx`. The group name is parenthesised so it does not appear in URLs (e.g. `/session-recorder` resolves to `app/(tabs)/session-recorder.tsx`).
 - Tab roots have `headerShown: false`; detail screens (`exercise-history`, `profile`, `completed-session/[sessionId]`, `maestro-harness`) remain outside `(tabs)/` and keep their existing native header behavior.
 - Navigation is currently string-path based (no centralized typed route helper layer)
@@ -30,7 +34,19 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 - Behavior:
   - renders an `expo-router` `Redirect` to `/stats-history`
 
-2. `/stats-history`
+2. `/sign-in`
+- File: `apps/mobile/app/sign-in.tsx`
+- Params:
+  - none
+- Behavior:
+  - dedicated sign-in entry point the route-layer auth guard redirects to when auth is configured and there is no session (login-on-start enforcement)
+  - reuses the signed-out email/password credential pattern from `/profile` (no new interaction pattern) with inline auth error feedback
+  - on a successful sign-in the shared auth snapshot flips to a live session and the guard lets the app proceed; the screen itself does not navigate on success
+  - already-signed-in render of this route redirects to `/`
+  - auth-unconfigured render shows the disabled-reason message instead of a form that cannot succeed
+  - `headerShown: false`
+
+3. `/stats-history`
 - File: `apps/mobile/app/(tabs)/stats-history.tsx`
 - Params:
   - none
@@ -38,7 +54,7 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
   - tab root inside the `(tabs)` group; renders the merged Stats / History view with a top Stats ↔ History segmented toggle (History sub-view reuses the shared `HistoryList`; Stats sub-view hosts the period chips and per-exercise picker that links out to `/exercise-history`)
   - M16 muscle-history overlay opens and dismisses as in-route UI state on this route; no path, query param, redirect, or screen-to-screen transition is added for the overlay.
 
-3. `/session-recorder`
+4. `/session-recorder`
 - File: `apps/mobile/app/(tabs)/session-recorder.tsx`
 - Query params:
   - `mode` (optional; `completed-edit` enables completed-session edit flow)
@@ -51,7 +67,7 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
   - maintenance rule:
     - if this route path/segment is renamed, update `apps/mobile/src/sync/scheduler.ts` (`SESSION_RECORDER_ROUTE_SEGMENT`) in the same task/session.
 
-4. `/exercise-catalog`
+5. `/exercise-catalog`
 - File: `apps/mobile/app/(tabs)/exercise-catalog.tsx`
 - Query params:
   - `source` (optional; `session-recorder` enables recorder-return affordances)
@@ -59,7 +75,7 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 - Behavior:
   - when opened from recorder, saving an exercise returns via `router.back()`
 
-5. `/settings`
+6. `/settings`
 - File: `apps/mobile/app/(tabs)/settings.tsx`
 - Params:
   - none
@@ -68,7 +84,7 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
   - remains accessible while logged out; it does not require an authenticated session before opening `/profile`
   - routes to `/profile` from the `Profile` destination row
 
-6. `/profile`
+7. `/profile`
 - File: `apps/mobile/app/profile.tsx`
 - Params:
   - none
@@ -80,14 +96,14 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
   - sign-in/sign-out change route state without redirecting away from `/profile`
   - inline auth/profile failures do not redirect away from `/profile` or block returning to local-only routes
 
-7. `/completed-session/[sessionId]`
+8. `/completed-session/[sessionId]`
 - File: `apps/mobile/app/completed-session/[sessionId].tsx`
 - Path params:
   - `sessionId` (required dynamic segment)
 - Query params:
   - `intent` (optional; `edit` redirects to `session-recorder` completed-edit mode)
 
-8. `/exercise-history`
+9. `/exercise-history`
 - File: `apps/mobile/app/exercise-history.tsx`
 - Query params:
   - `exerciseDefinitionId` (required; if missing, the screen renders an error state instead of crashing)
@@ -127,6 +143,10 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
    - in-place auth-state rerender on sign-in/sign-out; no route replacement
 14. `/exercise-history` -> `/completed-session/<sessionId>`
    - session card tap or all-time-best row tap
+15. (any guarded route) -> `/sign-in`
+   - route-layer auth-guard redirect on a configured-but-no-session launch, or when a sync cycle reports "no signed-in user" (`<Redirect />`)
+16. `/sign-in` -> `/`
+   - successful sign-in: the guard stops redirecting and the app proceeds to the normal route; an already-signed-in render of `/sign-in` also redirects to `/`
 
 Note:
 
