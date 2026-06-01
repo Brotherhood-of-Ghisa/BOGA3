@@ -119,3 +119,21 @@ Roots of the DAG (no in-plan dependency): **tPROG** (design), **t1**
   seam; t3 made `progress.ts` + `getSyncProgress()` producer. t9 MUST unify into
   ONE SyncProgress type + ONE shared accessor (wire t3 producer → t2 consumer).
 - Next wave (after t3 merges): t9 (tPROG+t3), t4/t5/t6/t10 (t3). t8/t7b feed tFINAL.
+
+## 2026-06-01 — iteration 6
+- Root-caused the recurring main-checkout contamination (user request). Cause:
+  agent worktrees are nested at `<repo>/.claude/worktrees/agent-<id>` (inside the
+  primary checkout); builders/designers were `cd`-ing to / hardcoding the primary
+  checkout path `/Users/dinohughes/Projects/BOGA3` and writing there instead of
+  their worktree (the shell resets cwd to the worktree between calls, but
+  within-command cd + absolute Write paths bypass that). This polluted the live
+  tree and once leaked build files into design PR #107.
+- DURABLE FIX: added a "Stay in your isolated worktree — never touch the primary
+  checkout" section to mao-builder + mao-designer agent defs (plugin commit
+  465400f). Also reinforced in dispatch prompts going forward.
+- t2 flake: USER RULED flakes NOT accepted. Re-dispatched the t2 builder (#113,
+  background) to actually fix the `sync-gate-first-cycle.yaml` Expo/Metro warm-up
+  flake and deliver a green Maestro gate (not re-document it as environmental).
+  Awaiting completion → then re-review.
+- Merge plan unchanged: still awaiting user merge of #111 (t3) + #112 (t7b);
+  #110 (t8) + #113 (t2) rebase after. #113 also picks up the flake fix first.
