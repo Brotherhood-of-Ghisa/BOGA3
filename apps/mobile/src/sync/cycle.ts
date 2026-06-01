@@ -20,7 +20,6 @@
 import { and, asc, eq } from 'drizzle-orm';
 
 import { getRequiredSupabaseMobileClient } from '@/src/auth/supabase';
-import { clearAuthRequired, markAuthRequired } from '@/src/sync/auth-required-signal';
 import { bootstrapLocalDataLayer, type LocalDatabase } from '@/src/data/bootstrap';
 import { PRIMARY_RUNTIME_STATE_ID, type Transaction } from '@/src/data/clock';
 import * as schema from '@/src/data/schema';
@@ -659,16 +658,9 @@ export const runSyncCycle = async (): Promise<void> => {
 
       // A round that moved no rows on either end means both sides are quiet.
       if (pulledBefore === 0 && pushed === 0 && pulledAfter === 0) {
-        // A cycle that converged talked to the server with a valid session, so
-        // any earlier "no signed-in user" condition is resolved. Clear the flag
-        // so the route layer no longer holds the user on the sign-in screen.
-        clearAuthRequired();
         return;
       }
     }
-    // Reaching the round cap without a quiet round still means the cycle made
-    // authenticated progress; treat it as a resolved auth condition.
-    clearAuthRequired();
   } catch (error) {
     if (error instanceof SyncCycleError) {
       if (error.code === 'FK_VIOLATION') {
@@ -676,18 +668,9 @@ export const runSyncCycle = async (): Promise<void> => {
         // cursors are left untouched so nothing is silently dropped.
         throw error;
       }
-      if (error.code === 'AUTH_REQUIRED') {
-        // The server reports no signed-in user. This is not an exception to
-        // surface — it is the route signal that the app needs a session. Raise
-        // the observable flag so the route layer sends the user to sign-in, then
-        // give up this cycle cleanly (dirty bits and cursors are untouched, so a
-        // post-login cycle re-pushes and re-pulls the same state).
-        markAuthRequired();
-        return;
-      }
-      // A server-internal hiccup: give up this cycle cleanly. Dirty bits stay
-      // set and cursors are unchanged, so the next scheduled tick starts a fresh
-      // cycle that re-pushes and re-pulls the same state.
+      // No JWT or a server-internal hiccup: give up this cycle cleanly. Dirty
+      // bits stay set and cursors are unchanged, so the next scheduled tick
+      // starts a fresh cycle that re-pushes and re-pulls the same state.
       return;
     }
     throw error;
