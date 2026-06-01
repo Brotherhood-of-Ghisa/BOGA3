@@ -44,3 +44,25 @@ Roots of the DAG (no in-plan dependency): **tPROG** (design), **t1**
   surfaced: main-working-tree contamination cleanup (user's checkout). Awaiting
   user decision before re-dispatching #108/#109 fixes.
 - Stuck: none (>3-iter). Merged this iter: none.
+
+## 2026-06-01 — iteration 3
+- User decisions: (1) ACCEPT the `Builder-Agent:` trailer as a sanctioned
+  provenance convention (coordinator posted a `[coordinator]` reconciliation note
+  on #108/#109; reviewers re-issued verdicts). (2) CLEAN the main working tree —
+  done: switched `/Users/dinohughes/Projects/BOGA3` back to `main` (synced to
+  origin), removed the 9 untracked spill paths (all captured in PRs).
+- Re-dispatched reviewers for #108 + #109 with the ruling. Verdicts now:
+  - #107 (tPROG): `Verdict: APPROVED` (review, fresh).
+  - #108 (t7): `Verdict: APPROVED` (issue comment @ 20:37:55, latest, post-commit).
+  - #109 (t1): `Verdict: APPROVED` (review @ 20:37:58, latest, post-commit).
+  Note: verdicts are COMMENT-type (same-identity can't formally APPROVE), so
+  GitHub `reviewDecision` is empty — state derived from the verdict first line per
+  protocol. All three are APPROVED + non-conflicting (distinct file sets).
+- Awaiting HUMAN merge of #107, #108, #109 (coordinator never merges).
+- Next wave once merged: t2 (tPROG+t1), t3 (tPROG+t1), t8 (t1), t7b (t7) → 4
+  tasks = builder cap. t9/t4/t5/t6/t10 stay gated on t3.
+- Open bookkeeping risk to resolve before dispatching t7b: `tasks/t7b.md` +
+  plan.md DAG live only on the coordinator branch; builders branch from
+  origin/main. Either land coordinator bookkeeping on main (docs PR, repo
+  convention) or pass the t7b card inline. The audit reads status.md +
+  deviations log from main — bookkeeping must reach main before audit.
