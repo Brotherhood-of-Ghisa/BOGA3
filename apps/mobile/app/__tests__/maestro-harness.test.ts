@@ -49,6 +49,10 @@ import {
   runMaestroHarnessFixture,
   runMaestroHarnessReset,
 } from '@/src/maestro/harness';
+import {
+  __resetSchedulerStateForTests,
+  getSchedulerStateSnapshot,
+} from '@/src/sync/scheduler-state';
 
 const mockResetLocalAppData = jest.mocked(resetLocalAppData);
 const mockSeedExerciseBlockHistoryFixture = jest.mocked(seedExerciseBlockHistoryFixture);
@@ -177,11 +181,13 @@ describe('maestro harness helpers', () => {
 
     beforeEach(() => {
       mockHarnessFixture = createInMemoryDatabase();
+      __resetSchedulerStateForTests();
     });
 
     afterEach(() => {
       mockHarnessFixture?.close();
       mockHarnessFixture = null;
+      __resetSchedulerStateForTests();
     });
 
     it('leaves the flag untouched for the none action', async () => {
@@ -200,6 +206,16 @@ describe('maestro harness helpers', () => {
 
       await runMaestroHarnessBootstrapAction('reset');
       expect(readFlag()).toBeNull();
+    });
+
+    it('publishes the new flag into the shared accessor so the gate flips on the same tick', async () => {
+      expect(getSchedulerStateSnapshot().bootstrapCompletedAt).toBeNull();
+
+      await runMaestroHarnessBootstrapAction('complete');
+      expect(getSchedulerStateSnapshot().bootstrapCompletedAt).not.toBeNull();
+
+      await runMaestroHarnessBootstrapAction('reset');
+      expect(getSchedulerStateSnapshot().bootstrapCompletedAt).toBeNull();
     });
   });
 

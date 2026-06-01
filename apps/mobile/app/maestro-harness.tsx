@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { uiColors } from '@/components/ui';
@@ -36,6 +36,15 @@ export default function MaestroHarnessScreen() {
     kind: 'running',
     message: 'Preparing Maestro harness action…',
   });
+  // The harness runs its side effects (data reset, fixture seed, bootstrap-flag
+  // flip) and its one teleport navigation exactly once per distinct harness URL.
+  // The effect can re-run for reasons unrelated to the params (an ancestor
+  // re-render, a router-identity change), and re-firing the teleport — an
+  // imperative navigation issued from inside an effect — can drive a render loop.
+  // Keying the guard on the param signature (not a bare boolean) keeps a fresh
+  // harness link re-running while making a re-render for the SAME link a no-op,
+  // so the screen can still be reused across successive openLinks in one flow.
+  const lastRunKeyRef = useRef<string | null>(null);
 
   // `useLocalSearchParams` returns a fresh object on every render, so depending
   // on `params` directly re-runs this effect each time the component re-renders
@@ -53,6 +62,24 @@ export default function MaestroHarnessScreen() {
 
   useEffect(() => {
     let cancelled = false;
+
+    // Run the harness pipeline (and its single teleport) at most once per distinct
+    // harness URL. A repeat effect pass for the SAME params is a no-op, so the
+    // teleport cannot be re-issued in a loop; a NEW link (different params) still
+    // runs, so the screen stays reusable across successive openLinks.
+    const runKey = JSON.stringify([
+      resetParam,
+      fixtureParam,
+      bootstrapParam,
+      teleportParam,
+      modeParam,
+      intentParam,
+      sessionIdParam,
+    ]);
+    if (lastRunKeyRef.current === runKey) {
+      return;
+    }
+    lastRunKeyRef.current = runKey;
 
     if (!isMaestroHarnessAllowed()) {
       setStatus({

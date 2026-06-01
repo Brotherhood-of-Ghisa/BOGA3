@@ -4,6 +4,11 @@ import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { bootstrapLocalDataLayer, resetLocalAppData } from '@/src/data';
 import { PRIMARY_RUNTIME_STATE_ID } from '@/src/data/clock';
 import { syncRuntimeState } from '@/src/data/schema';
+import { clearAuthRequired, markAuthRequired } from '@/src/sync/auth-required-signal';
+import {
+  getSchedulerStateSnapshot,
+  publishSchedulerState,
+} from '@/src/sync/scheduler-state';
 import { isDevMode } from '@/src/utils/isDevMode';
 
 import { seedExerciseBlockHistoryFixture } from './exercise-block-history-fixture';
@@ -131,6 +136,20 @@ export const runMaestroHarnessFixture = async (fixtureName: MaestroHarnessFixtur
  * runtime-state row, so a test can drive the gate's block on/off without waiting
  * on a live sync cycle. 'complete' stamps the flag now (block dismisses);
  * 'reset' clears it (block shows). A no-op for 'none'.
+ *
+ * The new value is both persisted to the row and published straight into the
+ * shared sync-state accessor the gate reads, so the gate's block→dismiss (or
+ * dismiss→block) transition takes effect on the same tick rather than waiting for
+ * the state bridge's next periodic re-read. That makes the transition observable
+ * deterministically the instant this resolves, with no polling-interval race.
+ *
+ * 'complete' models a fully-drained first sync, which by definition talked to the
+ * server with a valid session — so it also clears the "no signed-in user" route
+ * signal, matching what a real drained cycle does. 'reset' models the not-yet-run
+ * state and raises that signal, so the route layer treats the device as needing a
+ * session again. This keeps the route layer and the gate consistent under the
+ * harness, so a freshly-signed-in user is not bounced back to sign-in by a stale
+ * signal while the first cycle is being simulated.
  */
 export const runMaestroHarnessBootstrapAction = async (
   action: MaestroHarnessBootstrapAction,
@@ -150,4 +169,15 @@ export const runMaestroHarnessBootstrapAction = async (
       set: { bootstrapCompletedAt },
     })
     .run();
+
+  if (action === 'complete') {
+    clearAuthRequired();
+  } else {
+    markAuthRequired();
+  }
+
+  publishSchedulerState({
+    ...getSchedulerStateSnapshot(),
+    bootstrapCompletedAt,
+  });
 };

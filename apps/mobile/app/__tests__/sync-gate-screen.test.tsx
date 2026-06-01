@@ -188,4 +188,18 @@ describe('SyncGate', () => {
     expect(screen.queryByTestId(SYNC_GATE_TEST_IDS.block)).toBeNull();
     expect(screen.getByTestId(childTestId)).toBeTruthy();
   });
+
+  it('renders the test-harness route through the block so it can lift the gate', () => {
+    // The harness is the screen that flips the first-sync flag; if the block hid
+    // it, nothing could ever mount to lift the block. So even with the flag null
+    // and a non-auth error pending, the harness route renders through.
+    mockPathname = '/maestro-harness';
+    renderGate();
+
+    publish({ lastCycleErrorCode: 'INTERNAL' });
+
+    expect(screen.queryByTestId(SYNC_GATE_TEST_IDS.block)).toBeNull();
+    expect(screen.queryByTestId(redirectTestId)).toBeNull();
+    expect(screen.getByTestId(childTestId)).toBeTruthy();
+  });
 });

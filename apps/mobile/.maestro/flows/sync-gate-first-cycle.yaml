@@ -13,12 +13,29 @@ appId: com.dinoderek.mobile
 # is asserted within the foreground window without depending on live server data.
 
 # Cold launch with no session: the route-layer guard lands on sign-in.
+# `clearState` relaunches the dev client with a wiped sandbox, which drops its
+# connection to the Metro dev server — a cold dev client comes up on its own
+# launcher screen, not the app. Re-open the dev-client deep link so the app
+# bundle reloads from Metro into the freshly-wiped sandbox. Reloading into a
+# wiped sandbox also surfaces the one-time Expo developer-menu sheet over the
+# app, so dismiss it ("Open" the deep link, then "Continue"/"Close" the sheet)
+# before asserting on the screen underneath.
 - launchApp:
     clearState: true
+- openLink: "${MAESTRO_IOS_DEV_CLIENT_URL}"
+- tapOn:
+    text: "Open"
+    optional: true
+- tapOn:
+    text: "Continue"
+    optional: true
+- tapOn:
+    text: "Close"
+    optional: true
 - extendedWaitUntil:
     visible:
       id: "sign-in-screen"
-    timeout: 30000
+    timeout: 60000
 
 # Sign in. The first sync has not yet drained, so the gate blocks instead of
 # letting a data screen render.
@@ -45,8 +62,10 @@ appId: com.dinoderek.mobile
     id: "stats-history-screen"
 - takeScreenshot: "10-sync-gate-block-visible"
 
-# Complete the first cycle (the bootstrap flag is stamped). The block dismisses
-# and the normal route renders, well within a minute of foreground.
+# Complete the first cycle: stamp the bootstrap flag AND teleport to the normal
+# route in one harness link. The flag is stamped before the teleport navigates,
+# so the gate has already lifted by the time the route renders. The block
+# dismisses and stats-history renders well within a minute of foreground.
 - openLink: "boga3://maestro-harness?bootstrap=complete&teleport=session-list"
 - tapOn:
     text: "Open"

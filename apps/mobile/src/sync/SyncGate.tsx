@@ -12,6 +12,15 @@ import { useSchedulerState } from '@/src/sync/use-scheduler-state';
 /** The dedicated sign-in entry point an unauthenticated outcome routes to. */
 const SIGN_IN_ROUTE = '/sign-in';
 
+/**
+ * The dev/test harness route is exempt from the block. It is the deterministic
+ * driver tests use to flip the first-sync state on and off, so it must stay
+ * reachable even while the gate is up — otherwise the very screen that would
+ * lift the block can never mount behind it. The route is dev-gated and has no
+ * production reachability, so exempting it never weakens the gate for real users.
+ */
+const HARNESS_ROUTE = '/maestro-harness';
+
 /** Stable testIDs for the gate's surfaces, so tests and Maestro flows can target them. */
 export const SYNC_GATE_TEST_IDS = {
   block: 'sync-gate-block',
@@ -72,7 +81,11 @@ export function SyncGate({ children }: PropsWithChildren) {
   // The sign-in route is exempt: render it through rather than blocking or
   // redirecting onto it, so a "no signed-in user" outcome cannot trap the user
   // behind the gate (or loop the redirect) before they can sign in.
-  if (pathname === SIGN_IN_ROUTE) {
+  //
+  // The dev/test harness route is exempt for the same shape of reason: it is the
+  // screen that flips the first-sync state, so it must render through the block
+  // to be able to lift it.
+  if (pathname === SIGN_IN_ROUTE || pathname === HARNESS_ROUTE) {
     return <>{children}</>;
   }
 

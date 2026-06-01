@@ -4,8 +4,13 @@ appId: com.dinoderek.mobile
 # session lands on the sign-in gate, so this flow signs in through the gate first
 # and then exercises the in-Profile account affordances (username edit + update +
 # sign-out). Signing out returns to the gate rather than to a data screen.
+# `clearState` relaunches the dev client with a wiped sandbox, which drops its
+# connection to the Metro dev server — a cold dev client comes up on its own
+# launcher screen, not the app. Re-open the dev-client deep link so the app
+# bundle reloads from Metro into the freshly-wiped sandbox before asserting.
 - launchApp:
     clearState: true
+- openLink: "${MAESTRO_IOS_DEV_CLIENT_URL}"
 - tapOn:
     text: "Open"
     optional: true
@@ -18,7 +23,7 @@ appId: com.dinoderek.mobile
 - extendedWaitUntil:
     visible:
       id: "sign-in-screen"
-    timeout: 30000
+    timeout: 60000
 - takeScreenshot: "05-auth-profile-gate-start"
 - tapOn:
     id: "sign-in-email-input"
@@ -30,8 +35,9 @@ appId: com.dinoderek.mobile
     id: "sign-in-submit-button"
 - assertNotVisible:
     id: "sign-in-screen"
-# Drain the first cycle (stamp the bootstrap flag via the harness) so the
-# first-sync gate dismisses and the normal route renders.
+# Drain the first cycle: stamp the bootstrap flag AND teleport to the normal
+# route in one harness link. The flag is stamped before the teleport navigates,
+# so the first-sync gate has lifted by the time the route renders.
 - openLink: "boga3://maestro-harness?bootstrap=complete&teleport=session-list"
 - tapOn:
     text: "Open"
@@ -45,7 +51,7 @@ appId: com.dinoderek.mobile
 - extendedWaitUntil:
     visible:
       id: "stats-history-screen"
-    timeout: 30000
+    timeout: 60000
 # Now signed in: open Profile and exercise the account affordances.
 - tapOn:
     id: "top-level-settings-button"
