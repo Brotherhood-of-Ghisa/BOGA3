@@ -25,7 +25,7 @@ import { join } from 'path';
 
 const REPO_ROOT = join(__dirname, '..', '..', '..', '..', '..');
 const MOBILE_ROOT = join(__dirname, '..', '..', '..');
-const WIPE_DOC_PATH = join(REPO_ROOT, 'docs', 'plans', 'sync-v2-client', 'manual-wipe.md');
+const WIPE_DOC_PATH = join(REPO_ROOT, 'docs', 'manual-wipe-v1-to-v2.md');
 const DATA_DIR = join(MOBILE_ROOT, 'src', 'data');
 
 describe('the manual wipe runbook exists and covers every platform', () => {

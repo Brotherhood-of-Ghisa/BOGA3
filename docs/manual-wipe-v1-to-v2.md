@@ -2,7 +2,7 @@
 
 This runbook covers the one-time local-database wipe required when
 upgrading any installation of BOGA3 from the v1 sync stack to the v2
-sync stack shipped by `docs/plans/sync-v2-client/`.
+sync stack.
 
 ## Why this is needed
 
