@@ -430,7 +430,13 @@ export const createDrizzleExerciseHistoryStore = (): ExerciseHistoryStore => ({
         exerciseTagDefinitions,
         eq(sessionExerciseTags.exerciseTagDefinitionId, exerciseTagDefinitions.id)
       )
-      .where(inArray(sessionExerciseTags.sessionExerciseId, sessionExerciseIds))
+      .where(
+        and(
+          inArray(sessionExerciseTags.sessionExerciseId, sessionExerciseIds),
+          // Hide tag attachments the user removed (kept locally as tombstones).
+          isNull(sessionExerciseTags.deletedAt)
+        )
+      )
       .all();
     return rows.map((row) => ({
       sessionExerciseId: row.sessionExerciseId,

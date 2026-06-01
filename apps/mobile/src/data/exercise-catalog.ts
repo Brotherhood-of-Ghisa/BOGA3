@@ -1,4 +1,4 @@
-import { asc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 
 import { bootstrapLocalDataLayer, type LocalDatabase } from './bootstrap';
 import { nowMonotonic } from './clock';
@@ -140,7 +140,12 @@ const listExerciseGraphs = async (
       role: exerciseMuscleMappings.role,
     })
     .from(exerciseMuscleMappings)
-    .where(inArray(exerciseMuscleMappings.exerciseDefinitionId, exerciseIds))
+    .where(
+      and(
+        inArray(exerciseMuscleMappings.exerciseDefinitionId, exerciseIds),
+        isNull(exerciseMuscleMappings.deletedAt)
+      )
+    )
     .orderBy(asc(exerciseMuscleMappings.exerciseDefinitionId), asc(exerciseMuscleMappings.muscleGroupId))
     .all();
 
@@ -202,11 +207,58 @@ export const createDrizzleExerciseCatalogStore = (): ExerciseCatalogStore => ({
           .run();
       }
 
-      tx.delete(exerciseMuscleMappings)
+      // Reconcile the muscle-link rows against the new payload instead of
+      // hard-deleting and re-inserting. A removed link is kept as a tombstone
+      // (`deleted_at` set) so the deletion pushes to the server and survives a
+      // reinstall; its row still occupies the unique
+      // (exercise_definition_id, muscle_group_id) slot, so a link to the same
+      // muscle group is revived in place rather than inserted afresh (which
+      // would collide). The whole set rides the same push batch.
+      const existingMappings = tx
+        .select({
+          id: exerciseMuscleMappings.id,
+          muscleGroupId: exerciseMuscleMappings.muscleGroupId,
+        })
+        .from(exerciseMuscleMappings)
         .where(eq(exerciseMuscleMappings.exerciseDefinitionId, exerciseId))
-        .run();
+        .all();
+      const existingMappingByMuscleGroupId = new Map(
+        existingMappings.map((mapping) => [mapping.muscleGroupId, mapping.id])
+      );
+      const nextMuscleGroupIds = new Set(input.mappings.map((mapping) => mapping.muscleGroupId));
+
+      for (const existing of existingMappings) {
+        if (nextMuscleGroupIds.has(existing.muscleGroupId)) {
+          continue;
+        }
+        tx.update(exerciseMuscleMappings)
+          .set({
+            deletedAt: input.now,
+            updatedAt: input.now,
+            localDirty: true,
+            localUpdatedAtMs: nowMonotonic(tx),
+          })
+          .where(eq(exerciseMuscleMappings.id, existing.id))
+          .run();
+      }
 
       for (const mapping of input.mappings) {
+        const existingMappingId = existingMappingByMuscleGroupId.get(mapping.muscleGroupId);
+        if (existingMappingId) {
+          tx.update(exerciseMuscleMappings)
+            .set({
+              weight: mapping.weight,
+              role: mapping.role,
+              deletedAt: null,
+              updatedAt: input.now,
+              localDirty: true,
+              localUpdatedAtMs: nowMonotonic(tx),
+            })
+            .where(eq(exerciseMuscleMappings.id, existingMappingId))
+            .run();
+          continue;
+        }
+
         const mappingId = createLocalId('exercise-muscle-mapping');
         tx.insert(exerciseMuscleMappings)
           .values({
@@ -215,6 +267,7 @@ export const createDrizzleExerciseCatalogStore = (): ExerciseCatalogStore => ({
             muscleGroupId: mapping.muscleGroupId,
             weight: mapping.weight,
             role: mapping.role,
+            deletedAt: null,
             createdAt: input.now,
             updatedAt: input.now,
             localDirty: true,
@@ -243,7 +296,12 @@ export const createDrizzleExerciseCatalogStore = (): ExerciseCatalogStore => ({
         role: exerciseMuscleMappings.role,
       })
       .from(exerciseMuscleMappings)
-      .where(eq(exerciseMuscleMappings.exerciseDefinitionId, exerciseId))
+      .where(
+        and(
+          eq(exerciseMuscleMappings.exerciseDefinitionId, exerciseId),
+          isNull(exerciseMuscleMappings.deletedAt)
+        )
+      )
       .orderBy(asc(exerciseMuscleMappings.muscleGroupId))
       .all();
 
