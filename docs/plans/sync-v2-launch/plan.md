@@ -123,6 +123,7 @@ graph TD
   t5[t5: bundle-migration loop]
   t6[t6: muscle_groups idempotent bootstrap]
   t7[t7: soft-delete everywhere]
+  t7b[t7b: soft-delete session-rebuild cascade]
   t8[t8: sign-out / account-switch local wipe]
   t9[t9: Settings sync-status surface]
   t10[t10: dev-gated wipe affordances]
@@ -147,6 +148,8 @@ graph TD
   t5 --> tFINAL
   t6 --> tFINAL
   t7 --> tFINAL
+  t7 --> t7b
+  t7b --> tFINAL
   t8 --> tFINAL
   t9 --> tFINAL
   t10 --> tFINAL
@@ -195,7 +198,8 @@ consumes):
 - [t4: `sys_*` → `seed_*` bundle slug rename](tasks/t4.md) — build
 - [t5: bundle-migration runtime loop](tasks/t5.md) — build
 - [t6: `muscle_groups` idempotent bootstrap](tasks/t6.md) — build
-- [t7: soft-delete everywhere — convert hard-delete repo paths](tasks/t7.md) — build (size-check; may split t7a/t7b)
+- [t7: soft-delete everywhere — convert hard-delete repo paths](tasks/t7.md) — build (split: shipped tag+mapping+simple paths in PR #108; session-rebuild cascade → t7b)
+- [t7b: soft-delete the session-rebuild cascade](tasks/t7b.md) — build (split from t7; depends on t7 merged)
 - [t8: sign-out / account-switch local wipe](tasks/t8.md) — build
 - [t9: Settings sync-status surface (+ scheduler state accessor)](tasks/t9.md) — build
 - [t10: dev-gated wipe affordances — confirm correct against launch state](tasks/t10.md) — build (verification delta)
