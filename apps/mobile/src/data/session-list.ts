@@ -1,4 +1,4 @@
-import { eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
 
 import { bootstrapLocalDataLayer } from './bootstrap';
 import { nowMonotonic } from './clock';
@@ -145,7 +145,13 @@ export const createDrizzleSessionListStore = (): SessionListStore => ({
               sessionId: sessionExercises.sessionId,
             })
             .from(sessionExercises)
-            .where(inArray(sessionExercises.sessionId, sessionIds))
+            .where(
+              and(
+                inArray(sessionExercises.sessionId, sessionIds),
+                // Don't count exercises the user removed (kept as tombstones).
+                isNull(sessionExercises.deletedAt)
+              )
+            )
             .all()
         : [];
 
@@ -167,7 +173,13 @@ export const createDrizzleSessionListStore = (): SessionListStore => ({
               sessionExerciseId: exerciseSets.sessionExerciseId,
             })
             .from(exerciseSets)
-            .where(inArray(exerciseSets.sessionExerciseId, exerciseIds))
+            .where(
+              and(
+                inArray(exerciseSets.sessionExerciseId, exerciseIds),
+                // Don't count sets the user removed (kept as tombstones).
+                isNull(exerciseSets.deletedAt)
+              )
+            )
             .all()
         : [];
 

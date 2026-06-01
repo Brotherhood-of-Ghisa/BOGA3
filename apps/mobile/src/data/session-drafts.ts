@@ -331,7 +331,13 @@ const loadDraftGraphBySessionId = (database: LocalDatabase, sessionId: string): 
   const exerciseRows = database
     .select()
     .from(sessionExercises)
-    .where(eq(sessionExercises.sessionId, sessionId))
+    .where(
+      and(
+        eq(sessionExercises.sessionId, sessionId),
+        // Skip exercises removed from the graph (kept as tombstones).
+        isNull(sessionExercises.deletedAt)
+      )
+    )
     .orderBy(asc(sessionExercises.orderIndex))
     .all();
 
@@ -341,7 +347,13 @@ const loadDraftGraphBySessionId = (database: LocalDatabase, sessionId: string): 
       ? database
           .select()
           .from(exerciseSets)
-          .where(inArray(exerciseSets.sessionExerciseId, exerciseIds))
+          .where(
+            and(
+              inArray(exerciseSets.sessionExerciseId, exerciseIds),
+              // Skip sets removed from the graph (kept as tombstones).
+              isNull(exerciseSets.deletedAt)
+            )
+          )
           .orderBy(asc(exerciseSets.orderIndex))
           .all()
       : [];
@@ -380,7 +392,23 @@ const loadDraftGraphBySessionId = (database: LocalDatabase, sessionId: string): 
   };
 };
 
-type SessionGraphWriteTx = Pick<LocalDatabase, 'select' | 'insert' | 'delete'>;
+type SessionGraphWriteTx = Pick<LocalDatabase, 'select' | 'insert' | 'update'>;
+
+// Rows that survive a rebuild are reused (their primary key is kept) and
+// re-positioned by loop order; rows that drop out of the edit are tombstoned —
+// kept in the table with `deleted_at` set so the deletion pushes to the server
+// and survives a device reinstall, never hard-deleted. The local unique index
+// on `(parent, order_index)` is NOT partial, so a tombstone keeps occupying its
+// slot. To stop a surviving/new live row (which takes a position in `0..n-1`)
+// from colliding with a parked tombstone, every existing row is first shifted
+// into a high scratch band (`+SCRATCH_OFFSET`), then live rows are written back
+// down to their final positions. A set tombstone is then re-parked into a
+// strictly-higher band (`+TOMBSTONE_BASE`, allocated by an incrementing cursor)
+// so it cannot collide with a sibling tombstone still sitting at its
+// `SCRATCH_OFFSET + originalIndex` slot. All bands stay non-negative so the
+// `order_index >= 0` check holds, and well inside the integer range.
+const ORDER_INDEX_SCRATCH_OFFSET = 1_000_000;
+const ORDER_INDEX_TOMBSTONE_BASE = 2 * ORDER_INDEX_SCRATCH_OFFSET;
 
 const replaceSessionExerciseGraph = (
   tx: SessionGraphWriteTx,
@@ -391,10 +419,10 @@ const replaceSessionExerciseGraph = (
     // Monotonic last-write-wins timestamp produced once per surrounding
     // transaction via `nowMonotonic(tx)`. Every row this function writes —
     // each `session_exercises`, `exercise_sets` and `session_exercise_tags`
-    // row — is stamped `localDirty: true` and this value so the next sync
-    // cycle pushes the whole rebuilt graph. The reorder path rewrites every
-    // sibling row here, so all touched siblings dirty together and ship in
-    // the same push batch.
+    // row, whether revived, repositioned, or tombstoned — is stamped
+    // `localDirty: true` and this value so the next sync cycle pushes the
+    // whole reconciled graph in one batch. The reorder path rewrites every
+    // sibling row here, so all touched siblings dirty together.
     localUpdatedAtMs: number;
   }
 ) => {
@@ -426,6 +454,12 @@ const replaceSessionExerciseGraph = (
           .all()
       : [];
   const existingSetsById = new Map(existingSetRows.map((row) => [row.id, row]));
+  const existingSetsByExerciseId = existingSetRows.reduce<Map<string, typeof existingSetRows>>((acc, row) => {
+    const current = acc.get(row.sessionExerciseId) ?? [];
+    current.push(row);
+    acc.set(row.sessionExerciseId, current);
+    return acc;
+  }, new Map<string, typeof existingSetRows>());
   const existingTagRows =
     existingExerciseIds.length > 0
       ? (tx
@@ -449,72 +483,215 @@ const replaceSessionExerciseGraph = (
     new Map<string, StoredSessionExerciseTagRecord[]>()
   );
 
+  // Pass 1: lift every currently-stored child row into the high scratch band
+  // so the final positions in `0..n-1` are free of collisions while we write
+  // the reconciled graph back. Tombstones that stay parked here keep a
+  // non-colliding, non-negative `order_index`.
   if (existingExerciseIds.length > 0) {
-    // Do not rely on FK cascade state; clear tag assignments explicitly.
-    tx.delete(sessionExerciseTags).where(inArray(sessionExerciseTags.sessionExerciseId, existingExerciseIds)).run();
-    tx.delete(exerciseSets).where(inArray(exerciseSets.sessionExerciseId, existingExerciseIds)).run();
+    existingExerciseRows.forEach((row) => {
+      tx.update(sessionExercises)
+        .set({ orderIndex: row.orderIndex + ORDER_INDEX_SCRATCH_OFFSET })
+        .where(eq(sessionExercises.id, row.id))
+        .run();
+    });
+    existingSetRows.forEach((row) => {
+      tx.update(exerciseSets)
+        .set({ orderIndex: row.orderIndex + ORDER_INDEX_SCRATCH_OFFSET })
+        .where(eq(exerciseSets.id, row.id))
+        .run();
+    });
   }
-  tx.delete(sessionExercises).where(eq(sessionExercises.sessionId, input.sessionId)).run();
+
+  const keptExerciseIds = new Set<string>();
+  const keptSetIdsByExerciseId = new Map<string, Set<string>>();
+  const keptTagIdsByExerciseId = new Map<string, Set<string>>();
+  // Allocator for set-tombstone park slots, in a band strictly above every
+  // `SCRATCH_OFFSET + originalIndex` slot so re-parking one tombstone never
+  // lands on a sibling tombstone that has not been re-parked yet.
+  let tombstoneCursor = ORDER_INDEX_TOMBSTONE_BASE;
 
   input.exercises.forEach((exercise, exerciseIndex) => {
-    const sessionExerciseId = exercise.id?.trim() || createLocalEntityId('exercise');
+    const requestedId = exercise.id?.trim();
     const exerciseDefinitionId = exercise.exerciseDefinitionId.trim();
 
     if (!exerciseDefinitionId) {
       throw new Error(`Exercise definition id is required for exercise at index ${exerciseIndex}`);
     }
 
-    tx.insert(sessionExercises)
-      .values({
-        id: sessionExerciseId,
-        sessionId: input.sessionId,
-        exerciseDefinitionId,
-        orderIndex: exerciseIndex,
-        name: exercise.name,
-        machineName: exercise.machineName ?? null,
-        localDirty: true,
-        localUpdatedAtMs: input.localUpdatedAtMs,
-        createdAt: input.now,
-        updatedAt: input.now,
-      })
-      .run();
+    const existingExercise = requestedId ? existingExercisesById.get(requestedId) : undefined;
+    const sessionExerciseId = requestedId || createLocalEntityId('exercise');
 
-    const existingExercise = existingExercisesById.get(sessionExerciseId);
-
-    if (existingExercise && existingExercise.exerciseDefinitionId === exerciseDefinitionId) {
-      const existingTags = existingTagsByExerciseId.get(sessionExerciseId) ?? [];
-      existingTags.forEach((assignment) => {
-        tx.insert(sessionExerciseTags)
-          .values({
-            id: assignment.id,
-            sessionExerciseId,
-            exerciseTagDefinitionId: assignment.exerciseTagDefinitionId,
-            localDirty: true,
-            localUpdatedAtMs: input.localUpdatedAtMs,
-            createdAt: assignment.createdAt,
-          })
-          .run();
-      });
-    }
-
-    exercise.sets.forEach((set, setIndex) => {
-      const setId = set.id?.trim() || createLocalEntityId('set');
-      const existingSet = existingSetsById.get(setId);
-      const nextSetType =
-        set.setType === undefined ? normalizeSessionSetType(existingSet?.setType) : normalizeSessionSetType(set.setType);
-      tx.insert(exerciseSets)
+    if (existingExercise) {
+      // Reuse the surviving row: take its final position and revive it (clear
+      // any prior tombstone) instead of inserting a colliding new PK.
+      keptExerciseIds.add(sessionExerciseId);
+      tx.update(sessionExercises)
+        .set({
+          exerciseDefinitionId,
+          orderIndex: exerciseIndex,
+          name: exercise.name,
+          machineName: exercise.machineName ?? null,
+          deletedAt: null,
+          localDirty: true,
+          localUpdatedAtMs: input.localUpdatedAtMs,
+          updatedAt: input.now,
+        })
+        .where(eq(sessionExercises.id, sessionExerciseId))
+        .run();
+    } else {
+      tx.insert(sessionExercises)
         .values({
-          id: setId,
-          sessionExerciseId,
-          orderIndex: setIndex,
-          repsValue: set.repsValue,
-          weightValue: set.weightValue,
-          setType: nextSetType,
+          id: sessionExerciseId,
+          sessionId: input.sessionId,
+          exerciseDefinitionId,
+          orderIndex: exerciseIndex,
+          name: exercise.name,
+          machineName: exercise.machineName ?? null,
+          deletedAt: null,
           localDirty: true,
           localUpdatedAtMs: input.localUpdatedAtMs,
           createdAt: input.now,
           updatedAt: input.now,
         })
+        .run();
+    }
+
+    // Preserve tag attachments only when the exercise row is reused for the
+    // same exercise definition; a changed definition invalidates them and they
+    // are left parked as tombstones below.
+    const tagsPreserved =
+      existingExercise !== undefined && existingExercise.exerciseDefinitionId === exerciseDefinitionId;
+    if (tagsPreserved) {
+      const keptTagIds = keptTagIdsByExerciseId.get(sessionExerciseId) ?? new Set<string>();
+      const existingTags = existingTagsByExerciseId.get(sessionExerciseId) ?? [];
+      existingTags.forEach((assignment) => {
+        keptTagIds.add(assignment.id);
+        tx.update(sessionExerciseTags)
+          .set({
+            deletedAt: null,
+            localDirty: true,
+            localUpdatedAtMs: input.localUpdatedAtMs,
+          })
+          .where(eq(sessionExerciseTags.id, assignment.id))
+          .run();
+      });
+      keptTagIdsByExerciseId.set(sessionExerciseId, keptTagIds);
+    }
+
+    const keptSetIds = keptSetIdsByExerciseId.get(sessionExerciseId) ?? new Set<string>();
+    exercise.sets.forEach((set, setIndex) => {
+      const requestedSetId = set.id?.trim();
+      const existingSet = requestedSetId ? existingSetsById.get(requestedSetId) : undefined;
+      // Only reuse a set row that already belongs to THIS exercise; otherwise a
+      // moved-between-exercises id would steal another exercise's set.
+      const reuseSet = existingSet !== undefined && existingSet.sessionExerciseId === sessionExerciseId;
+      // A requested id that names a row under a DIFFERENT exercise must not be
+      // reused as a fresh insert (it would collide on the primary key), so mint
+      // a new id in that case.
+      const setId = reuseSet
+        ? (requestedSetId as string)
+        : !requestedSetId || existingSet !== undefined
+          ? createLocalEntityId('set')
+          : requestedSetId;
+      const nextSetType =
+        set.setType === undefined ? normalizeSessionSetType(existingSet?.setType) : normalizeSessionSetType(set.setType);
+
+      if (reuseSet) {
+        keptSetIds.add(setId);
+        tx.update(exerciseSets)
+          .set({
+            sessionExerciseId,
+            orderIndex: setIndex,
+            repsValue: set.repsValue,
+            weightValue: set.weightValue,
+            setType: nextSetType,
+            deletedAt: null,
+            localDirty: true,
+            localUpdatedAtMs: input.localUpdatedAtMs,
+            updatedAt: input.now,
+          })
+          .where(eq(exerciseSets.id, setId))
+          .run();
+      } else {
+        tx.insert(exerciseSets)
+          .values({
+            id: setId,
+            sessionExerciseId,
+            orderIndex: setIndex,
+            repsValue: set.repsValue,
+            weightValue: set.weightValue,
+            setType: nextSetType,
+            deletedAt: null,
+            localDirty: true,
+            localUpdatedAtMs: input.localUpdatedAtMs,
+            createdAt: input.now,
+            updatedAt: input.now,
+          })
+          .run();
+      }
+    });
+    keptSetIdsByExerciseId.set(sessionExerciseId, keptSetIds);
+  });
+
+  // Pass 2: tombstone every child row that was not reused.
+  //
+  // An exercise tombstone keeps its pass-1 `SCRATCH_OFFSET + originalIndex`
+  // slot: that band never overlaps the live `0..n-1` band, and distinct
+  // original indexes keep distinct slots, so no extra re-park is needed.
+  existingExerciseRows.forEach((row) => {
+    if (keptExerciseIds.has(row.id)) {
+      return;
+    }
+    tx.update(sessionExercises)
+      .set({
+        deletedAt: input.now,
+        localDirty: true,
+        localUpdatedAtMs: input.localUpdatedAtMs,
+        updatedAt: input.now,
+      })
+      .where(eq(sessionExercises.id, row.id))
+      .run();
+  });
+
+  // A set tombstone IS re-parked into the strictly-higher tombstone band: a
+  // revived sibling may have just taken a `0..n-1` slot, and a sibling
+  // tombstone may still sit at its `SCRATCH_OFFSET + originalIndex` slot, so the
+  // fresh allocator value avoids both.
+  existingExerciseRows.forEach((exerciseRow) => {
+    const keptSetIds = keptSetIdsByExerciseId.get(exerciseRow.id) ?? new Set<string>();
+    const sets = existingSetsByExerciseId.get(exerciseRow.id) ?? [];
+    sets.forEach((setRow) => {
+      if (keptSetIds.has(setRow.id)) {
+        return;
+      }
+      tx.update(exerciseSets)
+        .set({
+          orderIndex: tombstoneCursor,
+          deletedAt: input.now,
+          localDirty: true,
+          localUpdatedAtMs: input.localUpdatedAtMs,
+          updatedAt: input.now,
+        })
+        .where(eq(exerciseSets.id, setRow.id))
+        .run();
+      tombstoneCursor += 1;
+    });
+  });
+
+  existingExerciseRows.forEach((exerciseRow) => {
+    const keptTagIds = keptTagIdsByExerciseId.get(exerciseRow.id) ?? new Set<string>();
+    const tags = existingTagsByExerciseId.get(exerciseRow.id) ?? [];
+    tags.forEach((tagRow) => {
+      if (keptTagIds.has(tagRow.id)) {
+        return;
+      }
+      tx.update(sessionExerciseTags)
+        .set({
+          deletedAt: input.now,
+          localDirty: true,
+          localUpdatedAtMs: input.localUpdatedAtMs,
+        })
+        .where(eq(sessionExerciseTags.id, tagRow.id))
         .run();
     });
   });
