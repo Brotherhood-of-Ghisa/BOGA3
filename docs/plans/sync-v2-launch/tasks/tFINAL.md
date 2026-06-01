@@ -59,7 +59,16 @@ wave's plan (`docs/plans/sync-v2/plan.md` `## Outcomes`) 1:1.
   - Login gate: launch-with-no-session lands on sign-in, renders no data screen
     (Maestro + Jest).
   - Sync gate: fresh install → sign-in → block visible → dismisses after the
-    first cycle within 1 min of foreground (Maestro).
+    first cycle within 1 min of foreground (Maestro). PLUS the expanded
+    self-explanatory-gate assertions, mapped 1:1 to the Sync gate outcome: the
+    block shows the current **phase** label; it shows an **activity/progress
+    signal that advances** during a cycle; and it shows the **offline message**
+    when the network is unreachable. Prefer a Maestro flow that toggles
+    reachability (assert the offline message appears while offline and the gate
+    resumes when reachable) if feasible on the sim lane; otherwise assert the
+    progress-state → gate-render mapping at Jest level (phase label renders;
+    advancing signal renders and advances; offline message renders when the
+    network-unreachable signal is set).
   - Bootstrapper-after-cycle, slug rename, bundle-migration loop, muscle-group
     idempotency, soft-delete everywhere, sign-out local wipe, Settings
     sync-status surface — each asserted by a test (Jest where infra-free, infra
@@ -79,8 +88,12 @@ wave's plan (`docs/plans/sync-v2/plan.md` `## Outcomes`) 1:1.
   `apps/mobile/app/__tests__/no-v1-sync-paths.test.ts`) and a server-object
   absence check.
 - Maestro flows under `apps/mobile/.maestro/flows/` for the login gate, the
-  sync gate, and (dev build) the wipe affordances, wired into
-  `test:e2e:ios:gates`.
+  sync gate (incl. the phase label + advancing activity indicator, and — if
+  reachability-toggling is feasible on the sim lane — the offline message), and
+  (dev build) the wipe affordances, wired into `test:e2e:ios:gates`. Where the
+  offline path is not feasible end-to-end on the sim, a Jest spec under
+  `apps/mobile/app/__tests__/` asserts the progress-state → gate-render mapping
+  (phase label, advancing activity signal, offline message).
 - Jest specs under `apps/mobile/app/__tests__/` covering the infra-free surface
   outcomes.
 - Each test file lists, in a comment or test name, which launch outcome it

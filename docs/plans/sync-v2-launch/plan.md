@@ -31,7 +31,15 @@ When this plan is done, all of these are true (the cross-cutting outcomes from
   the signed-in user, a full-screen "Setting up your data…" block renders and no
   data screen is reachable; it dismisses once the flag is set. On a cycle error
   the block shows the error and a single Retry button; Retry does NOT fire a
-  cycle when the latest outcome is `AUTH_REQUIRED`.
+  cycle when the latest outcome is `AUTH_REQUIRED`. The block also makes a
+  stalled gate self-explanatory: it surfaces (a) the **current phase** label of
+  the first-sync/bootstrap (pull / push / seed / etc. per the progress contract
+  in `designs/tPROG.md`); (b) an **intra-phase activity/progress signal** that
+  visibly advances while work is happening (the exact representation —
+  percentage, item/row count, page/cycle counter, or a phase+heartbeat liveness
+  signal — is fixed by `designs/tPROG.md`); and (c) a **network-unreachable /
+  offline message** when the device is offline, so an offline device shows the
+  offline message rather than spinning indefinitely with no explanation.
 - **Bootstrapper-after-cycle.** The seeded catalog loader runs only inside the
   bootstrapper, gated on the first full pull returning zero rows
   (`rowsPulled == 0`, tombstones counted), and `bootstrap_completed_at` is set
@@ -98,13 +106,16 @@ When this plan is done, all of these are true (the cross-cutting outcomes from
 - Deviations from default protocol: this plan was fleshed out from a
   pre-existing detailed stub — Goal, Outcomes, and the two Carry-over sections
   were authored before planning and are preserved (the Carry-over sections are
-  as-built facts / load-bearing constraints, not deviations). Zero new design
-  tasks were added (see PR body for the judgment).
+  as-built facts / load-bearing constraints, not deviations). One design task
+  (`tPROG`) was added in a later revision to fix the sync/bootstrap
+  progress-reporting contract consumed by t2/t3/t9 (see PR body for the
+  judgment); the original plan shipped with zero design tasks.
 
 ## DAG
 
 ```mermaid
 graph TD
+  tPROG[tPROG: sync/bootstrap progress contract]
   t1[t1: login-on-start gate]
   t2[t2: sync-gate full-screen block]
   t3[t3: bootstrapper integration]
@@ -116,6 +127,10 @@ graph TD
   t9[t9: Settings sync-status surface]
   t10[t10: dev-gated wipe affordances]
   tFINAL[tFINAL: launch end-to-end verification]
+
+  tPROG --> t2
+  tPROG --> t3
+  tPROG --> t9
 
   t1 --> t2
   t1 --> t3
@@ -140,6 +155,14 @@ graph TD
 Edge justifications (each edge is a hand-off one task produces and the next
 consumes):
 
+- `tPROG → t2`: t2 renders the progress contract (phase label, intra-phase
+  activity signal, offline message) that tPROG fixes in `designs/tPROG.md ##
+  Decision`.
+- `tPROG → t3`: t3's bootstrapper produces phase + intra-phase progress
+  (per-layer pull, seed) sourced as tPROG decides.
+- `tPROG → t9`: t9's single shared scheduler state accessor surfaces the
+  phase/progress/network shape tPROG defines (the gate and Settings both consume
+  it).
 - `t1 → t2`: t2's gate sits below t1's route-layer auth guard and consumes t1's
   `AUTH_REQUIRED` → route-to-sign-in hook.
 - `t1 → t3`: the bootstrapper runs on the first auth-gated sign-in, downstream
@@ -153,12 +176,19 @@ consumes):
   the entity bootstrapper.
 - `t3 → t9`: the status surface reads the runtime-state shape t3 finalises.
 - `t3 → t10`: wipe-local's re-bootstrap must compose with t3's reorder.
+- `tPROG` is an independent root within this plan: it composes only with
+  already-merged plan-2 code (the scheduler four-state machine + log events +
+  `isInternetReachable` projection) and the sync-v2 design docs
+  (`docs/plans/sync-v2/designs/t3.md`, `…/t4.md` §5.2) — no in-plan build
+  dependency. (It has no direct `→ tFINAL` edge: its contract is verified
+  through the expanded sync-gate outcome that t2/t9 deliver and tFINAL asserts.)
 - `t7` is an independent root (soft-delete repo paths depend on nothing built
   here).
 - everything `→ tFINAL`: the final test card asserts the union of outcomes.
 
 ## Tasks
 
+- [tPROG: sync/bootstrap progress-reporting contract](tasks/tPROG.md) — design
 - [t1: login-on-start enforcement — redirect to sign-in](tasks/t1.md) — build
 - [t2: sync-gate full-screen block until first cycle drains](tasks/t2.md) — build
 - [t3: bootstrapper integration — seeder runs only after the first cycle](tasks/t3.md) — build
@@ -180,6 +210,12 @@ consumes):
   (§6.2), and the `muscle_groups` extension. `docs/plans/sync-v2/designs/t4.md`
   §5.2 is authoritative for the sync-status surface. Cards cite these in their
   `Inputs`.
+- `tPROG` is this plan's only design task. Its design doc
+  `docs/plans/sync-v2-launch/designs/tPROG.md` is produced at execute time by the
+  designer — the `designs/` dir does not exist yet. Once it lands it is the
+  canonical, binding contract for the phase / intra-phase progress / offline
+  signal that t2 renders, t3 produces, and t9 surfaces; those cards cite it (they
+  do not restate it).
 - Apply `isDevMode()` (never `__DEV__`) on any dev-only affordance so it survives
   the `com.phano.boga3.dev` TestFlight build.
 - Any UI change in `apps/mobile` runs the Maestro gates (`npm run
