@@ -170,6 +170,11 @@ The re-dispatched planner should:
 
 ## Notes for the planner re-dispatch
 
+- **Read `## Carry-over from plan 2` first.** It resolves every "if plan 2
+  already did X" hedge in this stub with as-built facts and states the delta
+  each sketch task reduces to (t10 → verification; t9 → build anew + add a
+  scheduler state accessor; t5 → loop only; t7 incl. `removeTagAssignment`;
+  t8 must not reuse the dev-wipe RPC; all server calls use `.schema('app_public')`).
 - The cross-cutting outcomes in `docs/plans/sync-v2/plan.md` `## Outcomes`
   are the **launch contract** — the final test card here asserts them
   1:1.
@@ -230,6 +235,119 @@ The planner re-dispatch must treat the following as as-built facts:
 6. **Spec edit landed in `docs/specs/05-data-model.md`**: a "Client
    schema drift rule (Sync v2)" subsection per t1 §8.2. Plan 3's
    PR-time guidance for AI agents should reference it.
+
+## Carry-over from plan 2 (sync-v2-client, merged 2026-06-01)
+
+Plan 2 is fully merged + audited (PASS). The planner re-dispatch must treat
+the following as as-built facts and load-bearing constraints. Source of
+record: the `sync-v2-client` `## Deviations log` (captured in PR #104; the
+plan dir itself was retired in PR #105) and the referenced PRs.
+
+1. **`app_public` schema on EVERY Supabase RPC call — non-obvious, just bit
+   plan 2.** The Supabase client (`apps/mobile/src/auth/supabase.ts`) sets no
+   default `db.schema`, but the sync RPCs live in `app_public`. `cycle.ts` and
+   `dev-affordances.ts` therefore call `client.schema('app_public').rpc(...)`
+   (a bare `.rpc()` on the default `public` schema silently never reaches the
+   function — the v2 cycle could never sync until tFINAL's real-endpoint test
+   caught it). **Any new RPC call plan 3 adds (e.g. t8 account-switch, or a t9
+   status query) MUST `.schema('app_public')`.** Match the existing
+   `apps/mobile/src/auth/profile.ts` convention.
+
+2. **Dev-wipe affordances ALREADY shipped (plan 2 t9, PR #99) — launch t10
+   collapses to a verification delta.** `apps/mobile/src/sync/dev-affordances.ts`
+   exports `wipeLocalAndReBootstrap()` + `wipeRemoteForCurrentUser()` (both throw
+   synchronously when `!isDevMode()`); both buttons already live in the
+   `isDevMode()` block of `app/(tabs)/settings.tsx`; the
+   `app_public.dev_wipe_my_data()` RPC (security definer, env-guarded to
+   non-prod via `FORBIDDEN_ENV`) is migrated + contract-tested. ⇒ Launch t10 is
+   "confirm correct against launch state," not net-new. **Caveat for t8:**
+   `dev_wipe_my_data` is non-prod-gated AND is a SERVER delete — t8's
+   production sign-out/account-switch wipe must NOT reuse it. t8's wipe is
+   LOCAL (clear local entity tables + reset runtime-state per §6.2),
+   preserving server data.
+
+3. **Settings sync-status surface (t9): the scheduler has NO production state
+   accessor.** `apps/mobile/src/sync/scheduler.ts` exports only
+   `startSyncScheduler` / `stopSyncScheduler` / `requestSync` / the four-state
+   types / `__getSchedulerStateForTests` (test-only). Plan 3 t9 must ADD a real
+   read API (current state, last-cycle error, online projection) or derive
+   status from `sync_runtime_state` + the structured log events the scheduler
+   emits (`sync_scheduler_transition`, `sync_scheduler_cycle_error`,
+   `sync_scheduler_ignored_event`, `sync_scheduler_foreground_sync_requested`,
+   `sync_scheduler_start_failed` — via `apps/mobile/src/logging/logEvent.ts`).
+   Network state = the scheduler's NetInfo `isInternetReachable` projection;
+   dirty count = `SELECT count(*) WHERE local_dirty = 1` across the 8 tables.
+   `apps/mobile/src/sync/profile-status.ts` is **deleted** (confirmed) → t9
+   builds the surface from scratch (resolves the stub's hedge).
+
+4. **Scheduler wiring failure CRASHES boot (re-throws), not silent-offline.**
+   Per owner review (t7, PR #98), `startSyncScheduler` logs at `error` then
+   **re-throws** if NetInfo/AppState listener wiring fails — a broken native
+   build hard-crashes at boot rather than landing in a recoverable "offline"
+   UI state. Plan 3 t1/t2 (login / sync-gate UX) should treat a wiring failure
+   as a crash, not a UI error state. (Only triggers on a genuinely broken
+   build; healthy builds never throw here.) The `requestSync()` entry point
+   takes NO `reason` param (t4 §2.5) — login/gate trigger sync via the same
+   parameterless call.
+
+5. **`sync_runtime_state` as-built + seed marker (relevant to t2/t5/t8).**
+   Columns: `pull_cursor` (json keyed `"0".."3"`), `last_emitted_ms`,
+   `bootstrap_completed_at` (nullable `timestamp_ms`),
+   `applied_seed_migration_app_version` (default 0). Singleton row id is
+   `PRIMARY_RUNTIME_STATE_ID = 'primary'` (`apps/mobile/src/data/clock.ts`).
+   The seed marker was migrated from a timestamp to an app-version integer:
+   `apps/mobile/src/data/exercise-catalog-seeds.ts` exports
+   `SEED_CATALOG_BUNDLE_VERSION = 1` plus read/write helpers for the marker.
+   ⇒ t5 (bundle-migration loop) adds only the `BUNDLE_MIGRATIONS` array + the
+   runtime loop (column + marker helpers already exist). t8 (sign-out wipe)
+   resets these columns on the `'primary'` row.
+
+6. **`deleted_at` + index on all 8 entities; the cycle already emits it.** The
+   soft-delete columns + `deletedAtIdx` exist on every entity schema and the
+   cycle's wire serialisation includes `deleted_at`. ⇒ t7 (soft-delete
+   everywhere) only needs to (a) flip each hard-delete repo path to set
+   `deleted_at = Date.now()` + the dirty bit, and (b) make readers filter
+   `WHERE deleted_at IS NULL`. **Known remaining hard delete:**
+   `removeTagAssignment` (`session_exercise_tags`, `exercise-tags.ts`) was left
+   as a hard `DELETE` by plan 2 t5b (deferred here) — t7 converts it. Grep
+   `db.delete(` / `.delete(` across the 8 entities for the rest.
+
+7. **Test-lane + infra conventions (as-built; tFINAL must follow).** Two lanes:
+   `test:sync` (fast, infra-free, runs in CI's `npm test`) and `test:sync:infra`
+   (Supabase/branch-dependent — cycle round-trip, AUTH_REQUIRED, drift —
+   **excluded from CI's fast `npm test`** via `jest.config.js`
+   `testPathIgnorePatterns`; **fails hard** when `SUPABASE_BRANCH_URL` /
+   `SUPABASE_BRANCH_ANON_KEY` are unset). Jest hang-safety: `testTimeout: 15000`,
+   a global inert Supabase mock, and `npm run test:handles` (open-handle guard) —
+   never add `--forceExit`. iOS Maestro: the combined `npm run test:e2e:ios:gates`
+   runner (one provision/launch/warm/teardown for both flows); sims
+   auto-provision + pre-authorize URL schemes AND location. ⇒ Plan 3's
+   tFINAL live/round-trip tests (the two-device restore outcomes) go in an
+   infra lane like `test:sync:infra` (branch-provisioned, out of CI's fast
+   lane), and Maestro flows use `test:e2e:ios:gates`.
+
+8. **Migrations: single baseline + generated bundle.** History is squashed to
+   one `apps/mobile/drizzle/0000_living_bucky.sql` baseline; the runtime bundle
+   `apps/mobile/drizzle/migrations.generated.ts` is produced by
+   `apps/mobile/scripts/bundle-migrations.ts` (chained into `db:generate`).
+   Plan 3 is mostly UI/auth and should add NO schema migration (the `sys_*→seed_*`
+   rename is bundle DATA, not a migration). If any plan-3 task does add one, it
+   appends after the baseline and must re-run `bundle-migrations.ts`.
+
+9. **Durable docs / protocol.** The v1→v2 wipe runbook moved to
+   `docs/manual-wipe-v1-to-v2.md` (plan-2 teardown) — reference that path, not
+   the retired `docs/plans/sync-v2-client/...`. The mao skill now enforces: no
+   ephemeral plan/card/design ids (`t1`, `§`, `docs/plans/...`, plan slug) in
+   durable code/comments/tests; coordinator syncs to `main` after every merge;
+   agents branch from the latest `origin/main`. Plan 3's builders inherit these.
+
+> **Net effect on the sketch above:** t10 shrinks to verification (item 2); t9
+> gains a "add a scheduler state accessor" sub-task (item 3) and builds anew
+> (no `profile-status.ts`); t5 adds only the loop (item 5); t7's scope is
+> clear incl. `removeTagAssignment` (item 6); t8 must NOT reuse the dev-wipe RPC
+> (item 2); all server-touching tasks use `.schema('app_public')` (item 1); the
+> live tFINAL tests use an infra lane (item 7). No Goal/Outcome here is
+> *invalidated* — these are refinements the planner folds in at re-dispatch.
 
 ## Deviations log
 

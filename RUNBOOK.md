@@ -12,14 +12,14 @@ Human-operator guide for local development, runtime operations, logs, and tests 
 
 ## Upgrading from v1 sync (one-time wipe)
 
-If you are picking up a v2 sync build (`docs/plans/sync-v2-client/`)
-against an installation that ran the v1 sync stack, you must wipe
-the local SQLite once before launching v2. The v2 build assumes a
-clean local DB and ships no auto-migration; booting against v1 data
-produces undefined behaviour (rows that never sync, missing pull
-cursor, push/pull divergence). The wipe procedure for iOS Simulator,
-Android Emulator, physical devices, and TestFlight testers lives in
-`docs/plans/sync-v2-client/manual-wipe.md`. TestFlight testers in
+If you are picking up a v2 sync build against an installation that
+ran the v1 sync stack, you must wipe the local SQLite once before
+launching v2. The v2 build assumes a clean local DB and ships no
+auto-migration; booting against v1 data produces undefined behaviour
+(rows that never sync, missing pull cursor, push/pull divergence).
+The wipe procedure for iOS Simulator, Android Emulator, physical
+devices, and TestFlight testers lives in
+`docs/manual-wipe-v1-to-v2.md`. TestFlight testers in
 particular must **delete the v1 build before installing v2** — do
 NOT update in place.
 
