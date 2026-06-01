@@ -66,3 +66,28 @@ Roots of the DAG (no in-plan dependency): **tPROG** (design), **t1**
   origin/main. Either land coordinator bookkeeping on main (docs PR, repo
   convention) or pass the t7b card inline. The audit reads status.md +
   deviations log from main — bookkeeping must reach main before audit.
+
+## 2026-06-01 — iteration 4
+- All 3 root PRs merged by user: #107 (tPROG), #108 (t7), #109 (t1). Coordinator
+  synced by merging origin/main into the coordinator branch (no history rewrite,
+  preserves bookkeeping).
+- Hand-offs verified on main: tPROG design doc (1 `## Decision`) + t2/t3/t9
+  pointer markers; t7 guard + converted-path tests present and `exercise-tags.ts`
+  hard-delete gone; t1 sign-in/guard/hook files present.
+- Consistency check (tPROG = single design merge): `SyncProgress` contract
+  composes with merged t1 (AUTH_REQUIRED is the gate's route concern, not
+  `offline`) and t7 (unrelated). Downstream cards point to it; nothing invalidated.
+- Deviations log updated for #107/#108/#109.
+- Dispatched WAVE 2 — 4 builders = cap:
+  - t2 (sync-gate full-screen block; RENDERS `SyncProgress`; t9 accessor not built
+    yet → consumes the typed shape + stubs the source, wiring point = shared
+    accessor).
+  - t3 (bootstrapper reorder; PRODUCES `SyncProgress` + owns instrumentation;
+    stays 1 PR per tPROG's small-instrumentation decision, split t3a/t3b only if
+    it balloons).
+  - t8 (sign-out / account-switch LOCAL wipe per design §6.2; no server delete).
+  - t7b (session-rebuild cascade soft-delete; card passed INLINE — not yet on main).
+- Bookkeeping-to-main deferred to a pre-audit consolidation PR (repo convention
+  #96/#104); t7b card + status + deviations land there. Builder/reviewer get t7b
+  inline meanwhile.
+- Still gated: t9 (needs t3), t4/t5/t6/t10 (need t3), tFINAL (needs all).

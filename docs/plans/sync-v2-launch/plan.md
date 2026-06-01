@@ -376,4 +376,22 @@ and the referenced PRs.
 
 ## Deviations log
 
-<empty until first merge>
+- tPROG (PR #107, merged 2026-06-01): progress-reporting contract landed
+  (`designs/tPROG.md` — `SyncProgress` = phase + denominator-free counters
+  `layersCompleted`/`rowsApplied` + `offline`; t3 produces, t9 surfaces via the
+  single accessor, t2 renders) + pointer edits to t2/t3/t9. Deviation: an earlier
+  revision leaked 3 build files (`exercise-tags.ts`, `auth-required-signal.ts`,
+  `cycle.ts`) from a polluted base; coordinator reverted them pre-merge so the PR
+  is design-only.
+- t7 (PR #108, merged 2026-06-01): soft-delete conversion of tag-assignment +
+  muscle-mapping + simple-delete paths + reader filters + grep guard test.
+  Deviation: SPLIT — the `session-drafts.ts` session-rebuild cascade is deferred
+  to new card t7b (DAG: t7 → t7b → tFINAL). The `Builder-Agent:` commit trailer
+  was accepted by coordinator ruling (subsequently removed from the skill agent
+  defs entirely to resolve the underlying inconsistency).
+- t1 (PR #109, merged 2026-06-01): login-on-start route guard + sign-in screen +
+  AUTH_REQUIRED→sign-in hook + nav-contract/screen-map docs + Maestro flow.
+  Deviation: 3 minor card deviations logged in the PR (guard clamped to
+  `isConfigured`; sign-in-landing Maestro assertion placed in the auth-configured
+  lane; `auth-profile-happy-path.yaml` adapted to the new launch contract).
+  `Builder-Agent:` trailer accepted per the same ruling.
