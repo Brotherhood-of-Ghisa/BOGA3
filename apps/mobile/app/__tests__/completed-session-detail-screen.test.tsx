@@ -492,7 +492,7 @@ describe('CompletedSessionDetailRoute', () => {
       exercises: [
         {
           id: 'exercise-1',
-          exerciseDefinitionId: 'sys_barbell_back_squat',
+          exerciseDefinitionId: 'seed_barbell_back_squat',
           name: 'Back Squat',
           machineName: 'Rack',
           sets: [
