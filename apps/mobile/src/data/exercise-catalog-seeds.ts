@@ -7,16 +7,38 @@ import type { LocalDatabase } from './bootstrap';
 const SEED_RUNTIME_STATE_ID = 'primary';
 
 /**
- * Catalog seed bundle version. Bumped whenever the canonical seed bundle in
- * this file changes (e.g. a new system exercise is added). Persisted on
- * `sync_runtime_state.applied_seed_migration_app_version` so subsequent
- * launches can detect "this device has not seen the current catalog version"
- * and re-seed. A value of `0` on that column means "never seeded".
+ * The current catalog-bundle generation: a monotone integer that increments
+ * each time the app ships a change to the bundled starter catalog that must
+ * reach devices already seeded (a new field on existing seeds, a brand-new
+ * seed slug). It is the single source of truth for two coupled concerns that
+ * both read/write the singleton `sync_runtime_state.applied_seed_migration_app_version`
+ * marker:
  *
- * The column starts at a placeholder value of `1`; a follow-up may evolve the
- * semantics (e.g. derive from `app.json` version).
+ *  1. The first-install seeder ({@link seedSystemExerciseCatalog}) stamps this
+ *     value once it has written the starter catalog, so later launches know the
+ *     device has the current generation and skip re-seeding.
+ *  2. The bundle-migration runtime loop advances the same marker up to this
+ *     value, applying every pending patch whose generation falls in
+ *     `(applied, current]`.
+ *
+ * Keeping both concerns on one constant means the seeder's "I have the current
+ * bundle" marker and the migration loop's "all patches applied" marker can
+ * never silently diverge. The marker column defaults to `0` ("never seeded /
+ * no patch applied").
+ *
+ * This is a deliberate internal generation counter, NOT the user-facing
+ * marketing version in the app config (which is a free-form semver string and
+ * is not monotone in a way the marker can compare). Bump this by one whenever
+ * a catalog change needs to reach already-seeded devices.
  */
-export const SEED_CATALOG_BUNDLE_VERSION = 1;
+export const CURRENT_APP_VERSION = 1;
+
+/**
+ * Catalog seed bundle version stamped by the first-install seeder. Aliased to
+ * {@link CURRENT_APP_VERSION} so the seeder's marker and the bundle-migration
+ * loop's marker share one number and cannot drift apart.
+ */
+export const SEED_CATALOG_BUNDLE_VERSION = CURRENT_APP_VERSION;
 
 export type MuscleGroupSeed = {
   id: string;
@@ -4140,7 +4162,7 @@ export const verifySeededSystemExerciseCatalog = (database: LocalDatabase): Syst
  * when the constant {@link SEED_CATALOG_BUNDLE_VERSION} ships a higher
  * value than the persisted marker.
  */
-const readSeedsAppliedMarker = (database: LocalDatabase): number => {
+export const readSeedsAppliedMarker = (database: LocalDatabase): number => {
   const row = database
     .select({
       appliedSeedMigrationAppVersion: syncRuntimeState.appliedSeedMigrationAppVersion,
