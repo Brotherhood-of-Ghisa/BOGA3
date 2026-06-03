@@ -381,3 +381,27 @@ those + t5 merge → tFINAL. t5 is parallel and nearly independent.
   were an INFINITE bounce-loop HANG on the pre-#116 stale base, not a long run.
   Action: add per-flow Maestro timeouts (hang → fast legible failure) + have
   runners print elapsed; never assert unmeasured durations.
+
+## 2026-06-03 — iteration 19
+- BROKEN-MAIN RESOLVED out-of-band: user's spawned worker landed #123 (`fix: green
+  the two red iOS Maestro lanes (data-runtime-smoke + auth-profile)`). main →
+  0f0cafe; main's slow lanes are GREEN. Logged in deviations.
+- CORRECTION: my "t2-gap" root-cause guess was WRONG. #123 fixed
+  `auth/service.ts` + `data/bootstrap.ts` + the two flow YAMLs (+ 2 tests) — the
+  break was in the auth/bootstrap path + flow assertions, not the missing gate.
+  (Don't assert a root cause without the failure data — which is why I did NOT
+  spawn a fix worker on the guess.) #123 was effectively the first tGATE
+  checkpoint, run out-of-band.
+- DURABLE MAO updates shipped: AGENTS.md slow-gate-checkpoint convention (#122,
+  MERGED); plugin now checks repo CLAUDE.md/AGENTS.md for MAO conventions (planner
+  bakes required gate tasks; audit fails on a missing checkpoint; SKILL +
+  designer) — plugin commit 386d337.
+- CURRENT STATE: main 0f0cafe, slow lanes green. Remaining plan work:
+  - t9 — IN PROGRESS (user's spawned task; branch df3b699; no `[t9]` PR yet).
+  - t2 #113 — CONFLICTING, HELD for t9 (rebase adopts t9's accessor + cycle.ts vs
+    t3/t5). Could land with its stub if t9 stalls; cleaner to rebase once on t9.
+  - t10 — not started; follows t9 (shares settings.tsx; wipe-local dev Maestro via
+    spawned-task pattern).
+  - tGATE re-run before tFINAL (after t9/t10/t2), then tFINAL.
+- Nothing for the coordinator to DISPATCH now without conflicting with the
+  in-progress t9. Staged to move the moment the `[t9]` PR lands.

@@ -455,3 +455,11 @@ and the referenced PRs.
   `SEED_CATALOG_BUNDLE_VERSION`=1), wired into `cycle.ts` after `runBootstrapper`.
   Deviations: minimal idempotent repo surface; `CURRENT_APP_VERSION` aliased to
   the seed marker.
+- (out-of-band) PR #123 (merged 2026-06-03): `fix: green the two red iOS Maestro
+  lanes (data-runtime-smoke + auth-profile)` — fixed the broken-`main` slow lanes
+  the t9 worker discovered. Touched `apps/mobile/src/auth/service.ts`,
+  `apps/mobile/src/data/bootstrap.ts`, the two Maestro flows + 2 tests. ROOT CAUSE
+  was the auth/bootstrap path + flow assertions, NOT the missing sync-gate (t2) —
+  the coordinator's t2-gap hypothesis was WRONG. Effectively the first tGATE-style
+  slow-gate checkpoint, run out-of-band via a user-spawned worker. main's slow
+  lanes (gates + auth-profile) are now green.
