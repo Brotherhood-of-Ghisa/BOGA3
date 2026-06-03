@@ -316,3 +316,33 @@ Roots of the DAG (no in-plan dependency): **tPROG** (design), **t1**
 - #118 (testing-policy docs) MERGED → no-excuses policy now on main for all agents.
 - Remaining: t5 (building) → review/merge; t9 (spawned task) → review/merge; then
   t10 (after t9) + t2 (#113) rebase (after t9) → tFINAL.
+
+## 2026-06-03 — iteration 16 (reconciliation snapshot)
+Verified against the host. main = `f469634`.
+
+MERGED (9 plan tasks): tPROG #107, t7 #108, t1 #109, t3 #111, t7b #112, t11 #116,
+t4 #117, t6 #119, t8 #110. Out-of-band merged: #115 (seed-dirty), #118 (testing
+docs). Deviations log in plan.md covers all 9 plan tasks + #115.
+
+IN FLIGHT:
+- t5 — building (agent a87877be); no branch/PR pushed yet. Data/logic; safe.
+- t9 — spawned-task session running; branch `claude/t9-sync-status-surface`
+  advanced to df3b699 (task is merging main / wiring the settings flow), `[t9]`
+  PR NOT open yet. On open → dispatch reviewer.
+
+HELD:
+- t2 #113 — the visible `Verdict: APPROVED` is STALE (pre-rebase, from the
+  original build). t2 is CONFLICTING and must: rebase on t9 (adopt t9's canonical
+  accessor, drop its stub) + cycle.ts, then run the auth-profile lane green (via a
+  spawned task), then RE-REVIEW. Do NOT merge on the stale approval.
+
+NOT STARTED:
+- t10 (dev-wipe verification) — dispatch after t9 merges (shares settings.tsx;
+  its wipe-local Maestro needs the auth-profile lane → spawned-task pattern).
+- tFINAL (final test card) — after t5, t9, t10, t2 all merge; asserts the 5
+  cross-cutting outcomes; runs the live/round-trip + auth-profile E2E lanes.
+
+NON-PLAN: #114 (M17 heatmap) — ignore.
+
+CRITICAL PATH: t9 (spawned task) → its merge unblocks t10 + the t2 rebase →
+those + t5 merge → tFINAL. t5 is parallel and nearly independent.
