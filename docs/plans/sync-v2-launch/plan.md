@@ -128,6 +128,7 @@ graph TD
   t9[t9: Settings sync-status surface]
   t10[t10: dev-gated wipe affordances]
   t11[t11: post-sign-in sync auth — session loss fix]
+  tGATE[tGATE: slow-gate checkpoint — integration branch green]
   tFINAL[tFINAL: launch end-to-end verification]
 
   tPROG --> t2
@@ -145,6 +146,10 @@ graph TD
 
   t1 --> t11
   t11 --> tFINAL
+  t2 --> tGATE
+  t9 --> tGATE
+  t10 --> tGATE
+  tGATE --> tFINAL
   t1 --> tFINAL
   t2 --> tFINAL
   t4 --> tFINAL
@@ -207,6 +212,7 @@ consumes):
 - [t9: Settings sync-status surface (+ scheduler state accessor)](tasks/t9.md) — build
 - [t10: dev-gated wipe affordances — confirm correct against launch state](tasks/t10.md) — build (verification delta)
 - [t11: post-sign-in sync authentication — session loss fix](tasks/t11.md) — build (remediation; surfaced by t2's Maestro work; gates t2's #113 lane-green merge)
+- [tGATE: slow-gate checkpoint — integration branch green](tasks/tGATE.md) — build (gate checkpoint; barrier before tFINAL; per AGENTS.md slow-gate convention)
 - [tFINAL: launch end-to-end verification](tasks/tFINAL.md) — build (final test card)
 
 ## Planner notes (folded from the stub)
