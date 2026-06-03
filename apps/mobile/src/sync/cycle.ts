@@ -22,6 +22,7 @@ import { and, asc, eq } from 'drizzle-orm';
 import { getRequiredSupabaseMobileClient } from '@/src/auth/supabase';
 import { clearAuthRequired, markAuthRequired } from '@/src/sync/auth-required-signal';
 import { runBootstrapper } from '@/src/sync/bootstrapper';
+import { runBundleMigrations } from '@/src/data/bundle-migrations';
 import { bootstrapLocalDataLayer, type LocalDatabase } from '@/src/data/bootstrap';
 import { PRIMARY_RUNTIME_STATE_ID, type Transaction } from '@/src/data/clock';
 import * as schema from '@/src/data/schema';
@@ -689,6 +690,14 @@ export const runSyncCycle = async (): Promise<void> => {
     // it has completed for this device-account. Runs before the convergence
     // loop so a fresh account has its seeded rows ready to push in the same call.
     await runBootstrapper(database);
+
+    // Apply any pending catalog-bundle migrations, then bring the applied-
+    // generation marker up to the current generation. Runs after the
+    // bootstrapper on every cycle — whether it seeded a fresh account or no-op'd
+    // on a returning one — so a later bundle change reaches already-seeded
+    // devices. Migrated rows go dirty and push in the same call below; a no-op
+    // (no pending migration) only advances the marker.
+    runBundleMigrations(database);
 
     for (let round = 0; round < MAX_CYCLES_PER_CALL; round += 1) {
       const pulledBefore = await runPullLeg(database);
