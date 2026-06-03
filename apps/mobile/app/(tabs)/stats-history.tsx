@@ -54,7 +54,7 @@ export type ExerciseListItem = {
   estimatedOneRepMax: number | null;
 };
 
-export type StatsViewMode = 'stats' | 'heatmap';
+export type StatsViewMode = 'exercise' | 'muscle';
 
 export const formatDelta = (current: number, previous: number): DeltaDisplay => {
   if (current === 0 && previous === 0) {
@@ -127,7 +127,7 @@ export type StatsScreenShellProps = {
   muscleHistoryMetric: CalendarHeatmapMetric;
   onSelectMuscleHistoryMetric: (metric: CalendarHeatmapMetric) => void;
   viewMode: StatsViewMode;
-  onToggleHeatmapMode: () => void;
+  onSelectViewMode: (mode: StatsViewMode) => void;
   exerciseListItems: ExerciseListItem[];
   selectedExercise: ExerciseHeatmapTarget | null;
   exerciseHistoryWeeklyEffort: SelectedExerciseWeeklyEffort[];
@@ -159,7 +159,7 @@ export function StatsScreenShell({
   muscleHistoryMetric,
   onSelectMuscleHistoryMetric,
   viewMode,
-  onToggleHeatmapMode,
+  onSelectViewMode,
   exerciseListItems,
   selectedExercise,
   exerciseHistoryWeeklyEffort,
@@ -181,7 +181,7 @@ export function StatsScreenShell({
 
   return (
     <View style={styles.screen} testID="stats-history-screen">
-      <View style={styles.headerControls}>
+      <View style={styles.headerRow}>
         <SegmentedChips
           accessibilityLabel="Select stats period"
           options={PERIOD_OPTIONS}
@@ -191,18 +191,50 @@ export function StatsScreenShell({
         />
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Toggle exercise heatmap view"
-          accessibilityState={{ selected: viewMode === 'heatmap' }}
-          onPress={onToggleHeatmapMode}
-          style={[styles.heatmapChip, viewMode === 'heatmap' && styles.heatmapChipActive]}
-          testID="stats-heatmap-mode-chip">
-          <Text style={[styles.heatmapChipText, viewMode === 'heatmap' && styles.heatmapChipTextActive]}>
-            Heatmap
+          accessibilityLabel={viewMode === 'muscle' ? 'Switch to exercise view' : 'Switch to muscle view'}
+          onPress={() => onSelectViewMode(viewMode === 'muscle' ? 'exercise' : 'muscle')}
+          style={styles.viewModeChip}
+          testID="stats-view-mode-chip">
+          <Text style={styles.viewModeChipText}>
+            {viewMode === 'muscle' ? 'By Exercise' : 'By Muscle'}
           </Text>
         </Pressable>
       </View>
 
-      {viewMode === 'heatmap' ? (
+      {summary ? (
+        <View style={styles.summaryGrid}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Open sessions list"
+            onPress={onPressSessionsCard}
+            style={({ pressed }) => [styles.summaryCard, pressed && styles.summaryCardPressed]}
+            testID="stats-card-sessions">
+            <Text style={styles.summaryLabel}>Sessions</Text>
+            <Text style={styles.summaryValue}>
+              {formatNumber(summary.current.totals.sessionCount)}
+            </Text>
+            {sessionDelta ? (
+              <Text style={[styles.summaryDelta, deltaToneStyle(sessionDelta.tone)]}>
+                {sessionDelta.text}
+              </Text>
+            ) : null}
+          </Pressable>
+
+          <View style={styles.summaryCard} testID="stats-card-sets">
+            <Text style={styles.summaryLabel}>Working sets</Text>
+            <Text style={styles.summaryValue}>
+              {formatNumber(summary.current.totals.totalSets)}
+            </Text>
+            {setsDelta ? (
+              <Text style={[styles.summaryDelta, deltaToneStyle(setsDelta.tone)]}>
+                {setsDelta.text}
+              </Text>
+            ) : null}
+          </View>
+        </View>
+      ) : null}
+
+      {viewMode === 'exercise' ? (
         <ExerciseListView
           items={exerciseListItems}
           onPressExercise={onPressExerciseHistory}
@@ -226,44 +258,11 @@ export function StatsScreenShell({
           ) : null}
 
           {summary ? (
-            <>
-              <View style={styles.summaryGrid}>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Open sessions list"
-                  onPress={onPressSessionsCard}
-                  style={({ pressed }) => [styles.summaryCard, pressed && styles.summaryCardPressed]}
-                  testID="stats-card-sessions">
-                  <Text style={styles.summaryLabel}>Sessions</Text>
-                  <Text style={styles.summaryValue}>
-                    {formatNumber(summary.current.totals.sessionCount)}
-                  </Text>
-                  {sessionDelta ? (
-                    <Text style={[styles.summaryDelta, deltaToneStyle(sessionDelta.tone)]}>
-                      {sessionDelta.text}
-                    </Text>
-                  ) : null}
-                </Pressable>
-
-                <View style={styles.summaryCard} testID="stats-card-sets">
-                  <Text style={styles.summaryLabel}>Working sets</Text>
-                  <Text style={styles.summaryValue}>
-                    {formatNumber(summary.current.totals.totalSets)}
-                  </Text>
-                  {setsDelta ? (
-                    <Text style={[styles.summaryDelta, deltaToneStyle(setsDelta.tone)]}>
-                      {setsDelta.text}
-                    </Text>
-                  ) : null}
-                </View>
-              </View>
-
-              <MuscleFamilyList
-                families={summary.current.totals.muscleFamilies}
-                previousFamilies={summary.previous.totals.muscleFamilies}
-                onPressMuscleHistory={onPressMuscleHistory}
-              />
-            </>
+            <MuscleFamilyList
+              families={summary.current.totals.muscleFamilies}
+              previousFamilies={summary.previous.totals.muscleFamilies}
+              onPressMuscleHistory={onPressMuscleHistory}
+            />
           ) : null}
         </ScrollView>
       )}
@@ -891,7 +890,7 @@ export default function StatsRoute() {
   const [muscleHistoryMetric, setMuscleHistoryMetric] = useState<CalendarHeatmapMetric>('totalVolume');
   const muscleHistoryRequestIdRef = useRef(0);
 
-  const [viewMode, setViewMode] = useState<StatsViewMode>('stats');
+  const [viewMode, setViewMode] = useState<StatsViewMode>('exercise');
   const [selectedExercise, setSelectedExercise] = useState<ExerciseHeatmapTarget | null>(null);
   const [exerciseHistoryWeeklyEffort, setExerciseHistoryWeeklyEffort] = useState<SelectedExerciseWeeklyEffort[]>([]);
   const [isExerciseHistoryLoading, setIsExerciseHistoryLoading] = useState(false);
@@ -976,8 +975,8 @@ export default function StatsRoute() {
     setSelectedMuscleHistoryWeekKey(weekKey);
   }, []);
 
-  const handleToggleHeatmapMode = useCallback(() => {
-    setViewMode((prev) => (prev === 'heatmap' ? 'stats' : 'heatmap'));
+  const handleSelectViewMode = useCallback((mode: StatsViewMode) => {
+    setViewMode(mode);
     setSelectedExercise(null);
     setExerciseHistoryWeeklyEffort([]);
     setSelectedExerciseHistoryWeekKey(null);
@@ -1065,7 +1064,7 @@ export default function StatsRoute() {
       muscleHistoryMetric,
       onSelectMuscleHistoryMetric: setMuscleHistoryMetric,
       viewMode,
-      onToggleHeatmapMode: handleToggleHeatmapMode,
+      onSelectViewMode: handleSelectViewMode,
       exerciseListItems,
       selectedExercise,
       exerciseHistoryWeeklyEffort,
@@ -1095,7 +1094,7 @@ export default function StatsRoute() {
       selectedMuscleHistoryWeekKey,
       muscleHistoryMetric,
       viewMode,
-      handleToggleHeatmapMode,
+      handleSelectViewMode,
       exerciseListItems,
       selectedExercise,
       exerciseHistoryWeeklyEffort,
@@ -1120,11 +1119,13 @@ const styles = StyleSheet.create({
     gap: 12,
     position: 'relative',
   },
-  headerControls: {
+  headerRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
+    alignItems: 'center',
   },
-  heatmapChip: {
-    alignSelf: 'flex-start',
+  viewModeChip: {
     borderRadius: 999,
     borderWidth: 1,
     borderColor: uiColors.borderMuted,
@@ -1132,17 +1133,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
-  heatmapChipActive: {
-    borderColor: uiColors.actionPrimary,
-    backgroundColor: uiColors.actionPrimarySubtleBg,
-  },
-  heatmapChipText: {
+  viewModeChipText: {
     fontSize: 13,
     fontWeight: '600',
     color: uiColors.textSecondary,
-  },
-  heatmapChipTextActive: {
-    color: uiColors.actionPrimary,
   },
   exerciseRow: {
     flexDirection: 'row',

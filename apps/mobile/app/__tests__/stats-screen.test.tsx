@@ -234,8 +234,8 @@ const buildShellProps = (
   selectedMuscleHistoryWeekKey: null,
   muscleHistoryMetric: 'totalVolume',
   onSelectMuscleHistoryMetric: jest.fn(),
-  viewMode: 'stats',
-  onToggleHeatmapMode: jest.fn(),
+  viewMode: 'muscle',
+  onSelectViewMode: jest.fn(),
   exerciseListItems: [],
   selectedExercise: null,
   exerciseHistoryWeeklyEffort: [],
@@ -615,6 +615,9 @@ describe('StatsRoute', () => {
       triggerFocus();
     });
 
+    await waitFor(() => expect(screen.getByTestId('stats-view-mode-chip')).toBeTruthy());
+    fireEvent.press(screen.getByTestId('stats-view-mode-chip'));
+
     await waitFor(() => {
       expect(screen.getByTestId('stats-muscle-row-front_delts')).toBeTruthy();
     });
@@ -646,6 +649,9 @@ describe('StatsRoute', () => {
       triggerFocus();
     });
 
+    await waitFor(() => expect(screen.getByTestId('stats-view-mode-chip')).toBeTruthy());
+    fireEvent.press(screen.getByTestId('stats-view-mode-chip'));
+
     await waitFor(() => {
       expect(screen.getByTestId('stats-family-header-button-chest')).toBeTruthy();
     });
@@ -661,7 +667,7 @@ describe('StatsRoute', () => {
   });
 });
 
-describe('StatsScreenShell — heatmap mode', () => {
+describe('StatsScreenShell — view mode toggle', () => {
   const buildExerciseListItem = (id: string, name: string) => ({
     id,
     name,
@@ -670,21 +676,21 @@ describe('StatsScreenShell — heatmap mode', () => {
     estimatedOneRepMax: 110,
   });
 
-  it('renders the Heatmap chip', () => {
+  it('renders the view mode chip', () => {
     renderStatsScreenShell();
-    expect(screen.getByTestId('stats-heatmap-mode-chip')).toBeTruthy();
+    expect(screen.getByTestId('stats-view-mode-chip')).toBeTruthy();
   });
 
-  it('calls onToggleHeatmapMode when Heatmap chip is pressed', () => {
-    const onToggleHeatmapMode = jest.fn();
-    renderStatsScreenShell({ onToggleHeatmapMode });
-    fireEvent.press(screen.getByTestId('stats-heatmap-mode-chip'));
-    expect(onToggleHeatmapMode).toHaveBeenCalledTimes(1);
+  it('calls onSelectViewMode when view mode chip is pressed', () => {
+    const onSelectViewMode = jest.fn();
+    renderStatsScreenShell({ onSelectViewMode });
+    fireEvent.press(screen.getByTestId('stats-view-mode-chip'));
+    expect(onSelectViewMode).toHaveBeenCalledTimes(1);
   });
 
-  it('shows the exercise list when viewMode is heatmap', () => {
+  it('shows the exercise list when viewMode is exercise', () => {
     renderStatsScreenShell({
-      viewMode: 'heatmap',
+      viewMode: 'exercise',
       exerciseListItems: [buildExerciseListItem('ex1', 'Bench Press')],
     });
     expect(screen.getByTestId('stats-exercise-list')).toBeTruthy();
@@ -692,20 +698,20 @@ describe('StatsScreenShell — heatmap mode', () => {
     expect(screen.getByTestId('stats-exercise-name-ex1')).toHaveTextContent('Bench Press');
   });
 
-  it('hides the stats scroll view when viewMode is heatmap', () => {
-    renderStatsScreenShell({ viewMode: 'heatmap' });
+  it('hides the stats scroll view when viewMode is exercise', () => {
+    renderStatsScreenShell({ viewMode: 'exercise' });
     expect(screen.queryByTestId('stats-scroll')).toBeNull();
   });
 
-  it('shows empty state when heatmap mode has no exercises', () => {
-    renderStatsScreenShell({ viewMode: 'heatmap', exerciseListItems: [] });
+  it('shows empty state when exercise mode has no exercises', () => {
+    renderStatsScreenShell({ viewMode: 'exercise', exerciseListItems: [] });
     expect(screen.getByTestId('stats-exercise-list-empty')).toBeTruthy();
   });
 
   it('calls onPressExerciseHistory when an exercise row is tapped', () => {
     const onPressExerciseHistory = jest.fn();
     renderStatsScreenShell({
-      viewMode: 'heatmap',
+      viewMode: 'exercise',
       exerciseListItems: [buildExerciseListItem('ex1', 'Bench Press')],
       onPressExerciseHistory,
     });
@@ -805,15 +811,11 @@ describe('StatsRoute — exercise heatmap integration', () => {
     });
   });
 
-  it('shows exercise list when Heatmap chip is pressed', async () => {
+  it('shows exercise list by default', async () => {
     mockComputeStatsSummary.mockResolvedValue(buildSummary());
     render(<StatsRoute />);
 
     await act(async () => { triggerFocus(); });
-    await waitFor(() => expect(screen.getByTestId('stats-heatmap-mode-chip')).toBeTruthy());
-
-    fireEvent.press(screen.getByTestId('stats-heatmap-mode-chip'));
-
     await waitFor(() =>
       expect(screen.getByTestId('stats-exercise-list')).toBeTruthy()
     );
@@ -827,9 +829,6 @@ describe('StatsRoute — exercise heatmap integration', () => {
 
     render(<StatsRoute />);
     await act(async () => { triggerFocus(); });
-    await waitFor(() => expect(screen.getByTestId('stats-heatmap-mode-chip')).toBeTruthy());
-
-    fireEvent.press(screen.getByTestId('stats-heatmap-mode-chip'));
     await waitFor(() => expect(screen.getByTestId('stats-exercise-row-bench-press')).toBeTruthy());
 
     fireEvent.press(screen.getByTestId('stats-exercise-row-bench-press'));
@@ -852,8 +851,6 @@ describe('StatsRoute — exercise heatmap integration', () => {
 
     render(<StatsRoute />);
     await act(async () => { triggerFocus(); });
-
-    fireEvent.press(screen.getByTestId('stats-heatmap-mode-chip'));
     await waitFor(() => expect(screen.getByTestId('stats-exercise-row-bench-press')).toBeTruthy());
 
     fireEvent.press(screen.getByTestId('stats-exercise-row-bench-press'));
@@ -871,8 +868,6 @@ describe('StatsRoute — exercise heatmap integration', () => {
 
     render(<StatsRoute />);
     await act(async () => { triggerFocus(); });
-
-    fireEvent.press(screen.getByTestId('stats-heatmap-mode-chip'));
     await waitFor(() => expect(screen.getByTestId('stats-exercise-row-bench-press')).toBeTruthy());
 
     fireEvent.press(screen.getByTestId('stats-exercise-row-bench-press'));
