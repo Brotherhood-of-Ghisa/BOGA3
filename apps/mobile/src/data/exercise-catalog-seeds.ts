@@ -4180,20 +4180,35 @@ const writeSeedsAppliedMarker = (database: LocalDatabase, version: number) => {
  * Muscle groups are a static, read-only taxonomy that never crosses the sync
  * wire — every device seeds its own copy from the bundle, independent of sign-in
  * and independent of the first-sync bootstrap. So this runs at boot, decoupled
- * from the entity-catalog seeder (which is gated on the first full pull). It is
- * an all-or-nothing insert today: when the table is empty it inserts every
- * bundle row; once any row exists it is a no-op, preserving existing rows
- * verbatim. The insert uses `onConflictDoNothing` so a partially-populated table
- * never throws on a primary-key collision.
+ * from the entity-catalog seeder (which is gated on the first full pull).
+ *
+ * The insert is idempotent per id: it inserts any bundle row whose id is not
+ * already present locally, and leaves every existing row untouched. A fresh
+ * table gains the full bundle; a table missing a single id (e.g. a group added
+ * to the bundle in a later app version) gains exactly that row on the next
+ * launch; a fully-seeded table is a no-op. ids are the join key, so existing
+ * rows are never overwritten or duplicated. Because the taxonomy is
+ * non-editable (`is_editable` stays 0, enforced by a CHECK constraint) and
+ * client-only, skipping ids that already exist can never clobber a user edit.
+ *
+ * `onConflictDoNothing` backstops the explicit id filter against a concurrent
+ * insert racing in between the read and the write within the transaction.
  */
 export const seedMuscleGroups = (database: LocalDatabase, now: Date = new Date()) => {
-  const existing = database.select({ id: muscleGroups.id }).from(muscleGroups).limit(1).get();
-  if (existing) {
-    return;
-  }
-
   database.transaction((tx) => {
+    const existingIds = new Set(
+      tx
+        .select({ id: muscleGroups.id })
+        .from(muscleGroups)
+        .all()
+        .map((row) => row.id)
+    );
+
     for (const muscleGroup of SYSTEM_MUSCLE_GROUP_SEEDS) {
+      if (existingIds.has(muscleGroup.id)) {
+        continue;
+      }
+
       tx.insert(muscleGroups)
         .values({
           ...muscleGroup,
