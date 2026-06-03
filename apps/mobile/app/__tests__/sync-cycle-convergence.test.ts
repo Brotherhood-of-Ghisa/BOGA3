@@ -124,10 +124,14 @@ describe('cycle convergence', () => {
     expect(row?.name).toBe('Server gym-server');
     expect(row?.localDirty).toBe(false);
 
-    // Two rounds: round one moved a row (first pull), round two was fully quiet.
-    // Each round issues 4 pulls before + 4 pulls after; the layer-0 pull count
-    // is 2 rounds x 2 pull legs = 4. The guard cap (5 rounds) was never hit.
-    expect(layer0Pulls).toBe(4);
+    // On a fresh, never-bootstrapped store the cycle runs the first-sign-in
+    // bootstrapper before its convergence loop. The bootstrapper's first full
+    // pull absorbs layer-0 pull #1 (the one carrying the server row), so the
+    // convergence loop opens with everything already local: one quiet round of a
+    // before-pull (#2) and an after-pull (#3) confirms convergence. Layer-0 pull
+    // count is therefore 3 (1 bootstrap + 2 convergence), and the guard cap (5
+    // rounds) was never hit.
+    expect(layer0Pulls).toBe(3);
   });
 
   it('pushes a locally dirty row and clears it on ack during convergence', async () => {
