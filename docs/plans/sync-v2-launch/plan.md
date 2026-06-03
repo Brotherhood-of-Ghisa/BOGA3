@@ -436,3 +436,7 @@ and the referenced PRs.
 - t4 (PR #117, merged 2026-06-03): `sys_*` → `seed_*` bundle slug rename
   (`seed_<slug>`, `seed_map_<exercise>__<muscle>`); muscle-group ids stay bare;
   #115's dirty-write preserved; no Drizzle migration. none.
+- t6 (PR #119, merged 2026-06-03): `muscle_groups` idempotent bootstrap — per-id
+  insert-if-not-exists (replaces all-or-nothing-on-empty); existing rows not
+  overwritten/duplicated, `is_editable` stays 0, no sync-bookkeeping columns, ids
+  stay bare slugs (composes with t4). none.

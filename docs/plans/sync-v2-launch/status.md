@@ -303,3 +303,16 @@ Roots of the DAG (no in-plan dependency): **tPROG** (design), **t1**
   (build @ c814e11, base c669c0a/#116). Task: merge origin/main, run quality-fast
   + test:e2e:ios:gates + test:e2e:ios:auth-profile to green, open `[t9]` PR with
   evidence → relay PR # → coordinator dispatches reviewer.
+
+## 2026-06-03 — iteration 15
+- t6 (#119) APPROVED (reviewer re-ran gate, 615 green) → user merged. main →
+  f469634. Deviation logged (none).
+- Dispatched t5 (agent a87877be, bg) — bundle-migration runtime loop, last of the
+  seed-file cluster. Data/logic only → safe from the kill pattern.
+- t9: coordinator created a SPAWNED-TASK chip (`mcp__ccd_session__spawn_task`) to
+  run the auth-profile lane + open the `[t9]` PR in its own session (survives the
+  turn-boundary kills). User launched it; PR not yet open. When the `[t9]` PR
+  lands → dispatch its reviewer.
+- #118 (testing-policy docs) MERGED → no-excuses policy now on main for all agents.
+- Remaining: t5 (building) → review/merge; t9 (spawned task) → review/merge; then
+  t10 (after t9) + t2 (#113) rebase (after t9) → tFINAL.
