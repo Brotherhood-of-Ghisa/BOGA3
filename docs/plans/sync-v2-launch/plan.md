@@ -440,3 +440,12 @@ and the referenced PRs.
   insert-if-not-exists (replaces all-or-nothing-on-empty); existing rows not
   overwritten/duplicated, `is_editable` stays 0, no sync-bookkeeping columns, ids
   stay bare slugs (composes with t4). none.
+- t5 (PR #121, merged 2026-06-03): bundle-migration runtime loop — new
+  `apps/mobile/src/data/bundle-migrations.ts` (empty `BUNDLE_MIGRATIONS` +
+  `BundleMigration` + `runBundleMigrations`: short-circuit on applied>=current,
+  apply (applied,current] ascending each in own tx with atomic marker advance,
+  empty-array still advances marker to `CURRENT_APP_VERSION`, resumes after
+  partial failure), `CURRENT_APP_VERSION` constant (aliased to the existing
+  `SEED_CATALOG_BUNDLE_VERSION`=1), wired into `cycle.ts` after `runBootstrapper`.
+  Deviations: minimal idempotent repo surface; `CURRENT_APP_VERSION` aliased to
+  the seed marker.

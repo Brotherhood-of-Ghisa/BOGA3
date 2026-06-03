@@ -359,3 +359,25 @@ those + t5 merge → tFINAL. t5 is parallel and nearly independent.
 - NOTE for the t2 (#113) rebase: cycle.ts is now ALSO touched by t5 (#121) — when
   t2 rebases it must reconcile cycle.ts with both t3 (merged) and t5.
 - t9 spawned task: still running (branch advanced; no `[t9]` PR yet).
+
+## 2026-06-03 — iteration 18 (BROKEN TESTS ON MAIN discovered)
+- t5 (#121) APPROVED (reviewer re-ran 650 green) → user merged. main → d9423aa.
+  Deviation logged.
+- t9 spawned worker reports BROKEN TESTS ON MAIN; asked user to spawn a fix worker.
+- STRUCTURAL HYPOTHESIS (verified by file presence): main has login-on-start (t1,
+  `auth-route-guard.tsx`) + bootstrapper (t3) but NOT the sync-gate (t2 —
+  `SyncGate.tsx` absent, #113 still open/held). So a signed-in auth-profile e2e
+  flow hits the post-sign-in bootstrapper state with NO gate UI → likely breaks
+  the lane. HALF-FEATURE on main. Root process miss: t3 (and other behavior-
+  changing "data-only" PRs) skipped the Maestro lanes because "no UI files",
+  while actually changing the boot/sync behavior the e2e lanes exercise →
+  breakage accumulated invisibly (CI runs only the fast gate).
+- LIKELY REORDER: t2 (#113) may need to land to make main e2e-green. Its card
+  permits its STUB accessor when t9 isn't merged, so t2 CAN land before t9
+  (reversing the earlier t9-before-t2 hold). Pending the t9 worker's actual
+  failure list to confirm (stale test vs real boot-flow break vs t9 code).
+- DURATION CORRECTION: my "15-30 min auth-profile lane" was an UNVERIFIED guess
+  (a hallucination). Measured reality: smoke ~17s, data-smoke ~53s. The t9 kills
+  were an INFINITE bounce-loop HANG on the pre-#116 stale base, not a long run.
+  Action: add per-flow Maestro timeouts (hang → fast legible failure) + have
+  runners print elapsed; never assert unmeasured durations.
