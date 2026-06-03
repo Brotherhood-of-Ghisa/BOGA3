@@ -417,3 +417,15 @@ and the referenced PRs.
   invariants against the non-partial local unique index); guard test no longer
   exempts `session-drafts.ts`. Deviation: filtered two readers beyond the card's
   named list (`exercise-catalog-stats.ts` + the in-file draft loader).
+- t11 (PR #116, merged 2026-06-03): post-sign-in auth-session fix. REAL,
+  launch-blocking bug — a signed-in Supabase session exceeds the iOS keychain's
+  2048-byte per-entry limit, so the old single-key auth storage adapter silently
+  persisted NOTHING → cycle `getSession()` null → spurious AUTH_REQUIRED →
+  sign-in bounce loop for every user. Fix: chunk oversized values across keychain
+  entries (`apps/mobile/src/auth/storage.ts`); enforced regression gate in CI's
+  fast lane (`auth-session-visibility.test.ts`, real GoTrue client vs a 2048-byte
+  ceiling). Deviation: remediation task added mid-plan (surfaced by t2's Maestro
+  work; the prior session-loss it masked was never caught because the auth-profile
+  Maestro lane is excluded from CI). The iOS auth-profile lane still needs a host
+  run (local Supabase) to green `launch-requires-sign-in.yaml` end-to-end —
+  deferred to tFINAL's provisioned infra lane / a host.

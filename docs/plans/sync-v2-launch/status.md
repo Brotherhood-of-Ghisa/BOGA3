@@ -227,3 +227,15 @@ Roots of the DAG (no in-plan dependency): **tPROG** (design), **t1**
   top-priority merge (launch-blocking keychain fix; unblocks t2 rebase + signed-in
   flows). main unchanged at 97c0155.
 - Pending merges/holds unchanged: #110 (t8) + #113 (t2) await t11 + rebase.
+
+## 2026-06-03 — iteration 11
+- User merged #116 (t11). main → c669c0a. Hand-off verified (storage.ts chunking,
+  auth-session-visibility.test.ts on main). Deviation logged.
+- #110 (t8) + #113 (t2) now CONFLICTING/DIRTY (expected). Re-dispatched t8 (#110)
+  rebase (bg) to merge main + resolve the soft-delete-guard.test.ts UNION (exempt
+  {dev-reset, account-wipe, maestro, tests}; NOT session-drafts) → re-review.
+- HOLDING t2 (#113) rebase until t9 merges, so t2 rebases ONCE on t3+t11+t9 and
+  adopts t9's canonical accessor (dropping its stub) instead of rebasing twice.
+- t4 (a4ebec82) + t9 (ac9f0d92) still building (bg); no PRs yet.
+- Reminder to user: with #116 on main, the auth-profile lane can be run on a host
+  (`npm run test:e2e:ios:auth-profile`) to confirm the sign-in→sync fix E2E.
