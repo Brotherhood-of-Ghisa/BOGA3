@@ -37,10 +37,16 @@ const SRC_ROOT = path.resolve(__dirname, '..', '..', 'src');
 // Files that legitimately issue a hard `DELETE` against a syncable entity.
 // These are NOT per-row user deletes:
 //   - the dev-only local-table reset wipes every table wholesale before a
-//     re-seed (equivalent to a reinstall), local-only, never pushed.
+//     re-seed (equivalent to a reinstall), local-only, never pushed;
+//   - the sign-out / account-switch wipe clears every local table wholesale so
+//     the previous account's rows cannot leak into the next account on this
+//     device. It is local-only (no server delete) and the server keeps every
+//     account's data for a later sign-in to restore — so a tombstone here would
+//     be wrong, not missing.
 // Paths are relative to `src/`.
 const EXEMPT_FILES_AGAINST_SYNCABLE_ENTITIES = new Set<string>([
   'data/dev-reset.ts',
+  'sync/account-wipe.ts',
 ]);
 
 const collectTypeScriptSourceFiles = (dir: string): string[] => {

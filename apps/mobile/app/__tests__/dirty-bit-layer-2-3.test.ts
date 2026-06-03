@@ -67,7 +67,7 @@ import { createDrizzleExerciseTagStore } from '@/src/data/exercise-tags';
 import { __resetClockForTests } from '@/src/data/clock';
 
 const SESSION_ID = 'session-l23';
-const EXERCISE_DEFINITION_ID = 'sys_barbell_bench_press';
+const EXERCISE_DEFINITION_ID = 'seed_barbell_bench_press';
 
 const seedFixtureGraph = (database: TestDatabase): void => {
   // FK parents for the Layer 2 / 3 writes under test.
