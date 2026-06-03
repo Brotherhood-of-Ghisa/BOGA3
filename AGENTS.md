@@ -37,6 +37,42 @@ Note: product/domain details are maintained in specs. Do not duplicate them here
 - **NEVER ship — and reviewers must NEVER approve — a PR that skips a locally-runnable test with an excuse.** Put the evidenced green run (output/log) in the PR.
 - **The ONLY acceptable deferral is a genuinely cloud / remote-provisioned lane:** `npm run test:sync:infra` and `npm run test:sync:reinstall-parity` need a branch-provisioned remote Supabase (`SUPABASE_BRANCH_URL` / `SUPABASE_BRANCH_ANON_KEY`); when those are unset the lane may be deferred — explicitly and narrowly. Everything else runs locally and must.
 
+## Multi-agent orchestration: slow-gate checkpoint tasks (this repo)
+
+CI runs only the FAST gate (lint + typecheck + jest). The SLOW gates — the iOS
+Maestro lanes (`test:e2e:ios:gates` = smoke + data-smoke, and
+`test:e2e:ios:auth-profile` = signed-in) and the infra lanes (`test:sync:infra`)
+— are NOT in CI, so breakage accumulates on the integration branch invisibly: a
+PR passes its fast gate against its own base, yet the *merged* `main` is red on a
+slow lane that nobody ran. ("data-only / no UI files changed" does NOT mean "no
+e2e impact" — any boot / sync / auth behaviour change is exercised by the e2e
+lanes.) **Every multi-agent plan for this repo MUST therefore include slow-gate
+checkpoint tasks:**
+
+- **Cadence.** Insert a checkpoint after each wave/batch of merges (rule of
+  thumb: at least every ~3–4 build merges), after ANY behaviour-changing merge
+  that skipped the slow lanes, and a MANDATORY one immediately before the final
+  test card (`tFINAL`). The planner adds these to the DAG; the coordinator may
+  insert ad-hoc ones when behaviour-changing PRs land.
+- **What it does.** Runs the slow gates (`test:e2e:ios:gates` +
+  `test:e2e:ios:auth-profile`, plus `test:sync:infra` where relevant) against the
+  CURRENT integration branch (`origin/main` — the merged result, NOT a feature
+  branch). If red, it FIXES the breakage and opens a PR; if the breakage is a
+  half-landed feature that needs another planned task to land, it SURFACES that to
+  the coordinator rather than patching around it.
+- **Who runs it.** A dedicated checkpoint task. These lanes are long-running and
+  in-turn background sub-agents get killed at turn boundaries, so run them as a
+  **spawned task / dedicated session** (or have the human run them) — NOT an
+  in-turn background sub-agent. Give each Maestro flow a hard per-flow timeout so
+  a hang fails fast and legibly (a "timeout", not an ambiguous "slow run").
+- **Blocking.** A checkpoint is a DAG barrier: no further feature merges land
+  while the integration branch's slow gates are red — don't pile changes onto a
+  red `main`.
+- **Avoid the half-feature trap.** Order interdependent PRs so the integration
+  branch is never left in a user-broken intermediate state — land a gate/UI
+  together with the backend behaviour it guards, or feature-flag the incomplete
+  behaviour behind `isDevMode()` / a flag so `main` stays runnable mid-plan.
+
 ## Brainstorms Folder Rule
 
 - `docs/brainstorms/` contains brainstorming documents only.
