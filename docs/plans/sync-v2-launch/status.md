@@ -256,3 +256,24 @@ Roots of the DAG (no in-plan dependency): **tPROG** (design), **t1**
   before review. Future dispatches carry the corrected instruction.
 - Durable follow-up: add a one-line note to the repo's Maestro/testing docs so
   agents stop bailing on `which supabase` (fold into tFINAL or a small doc PR).
+
+## 2026-06-03 — iteration 13
+- POLICY MADE DURABLE (user directive: agents have ALL local infra — Supabase via
+  npx, Maestro, sims; NEVER accept PRs that excuse not running runnable tests,
+  except genuinely cloud/branch-provisioned lanes):
+  - Plugin defs (commit b6fa0fd): mao-builder step 5 = run every runnable gate
+    green, "command not found" = bootstrap not unavailable, only cloud lanes
+    deferrable; mao-reviewer check #11 = reject untested-excuse PRs, require
+    evidenced green runs.
+  - Repo docs PR #118 (`docs/testing-no-excuses`): AGENTS.md explicit
+    Supabase/auth-profile bullet + "Testing is not optional" section; new
+    CLAUDE.md pointer carrying the rule. AWAITING USER MERGE.
+- t4 (#117) APPROVED; t8 (#110) APPROVED post-rebase. Both ready to merge.
+- t9 (2nd attempt, agent ac9f0d92) did NOT ship: it branched from a STALE base
+  (97c0155, pre-#116) so its signed-in Maestro flow hit the keychain bounce loop
+  and looped forever; work was uncommitted. Re-dispatched FRESH (agent ac912b4f,
+  bg) from current main (c669c0a, has #116), with: commit-early, branch-from-
+  current-main verification, and RUN the auth-profile Settings lane to green (no
+  defer). 
+- Ready for user to merge: #110 (t8), #117 (t4), #118 (docs). Queued: t6→t5
+  (after t4), t10 (after t9), t2 (#113) rebase (after t9).
