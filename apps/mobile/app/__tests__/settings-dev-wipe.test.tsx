@@ -7,6 +7,7 @@
 
 const mockPush = jest.fn();
 const mockIsDevMode = jest.fn();
+const mockUseAuth = jest.fn();
 const mockResetLocalDataAndReseed = jest.fn();
 const mockWipeLocalAndReBootstrap = jest.fn();
 const mockWipeRemoteForCurrentUser = jest.fn();
@@ -14,10 +15,25 @@ const mockAlert = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush }),
+  // The sync-status panel uses focus to refresh; in tests run the effect once.
+  useFocusEffect: (callback: () => void | (() => void)) => {
+    callback();
+  },
 }));
 
 jest.mock('@/src/utils/isDevMode', () => ({
   isDevMode: () => mockIsDevMode(),
+}));
+
+jest.mock('@/src/auth', () => ({
+  useAuth: () => mockUseAuth(),
+}));
+
+// The sync-status panel is exercised by its own spec; here it would pull the
+// real scheduler/sync-status modules into the dev-wipe render. Stub it to a
+// marker so this suite stays focused on the dev affordances.
+jest.mock('@/components/sync-status/sync-status-panel', () => ({
+  SyncStatusPanel: () => null,
 }));
 
 jest.mock('@/src/data', () => ({
@@ -38,6 +54,8 @@ describe('settings developer wipe affordances', () => {
   beforeEach(() => {
     mockPush.mockReset();
     mockIsDevMode.mockReset().mockReturnValue(true);
+    // Signed-in user so the screen renders without crashing on `user`.
+    mockUseAuth.mockReset().mockReturnValue({ user: { id: 'user-1', email: 'u@test' } });
     mockResetLocalDataAndReseed.mockReset();
     mockWipeLocalAndReBootstrap.mockReset().mockResolvedValue(undefined);
     mockWipeRemoteForCurrentUser.mockReset().mockResolvedValue({ rowsDeleted: 0 });

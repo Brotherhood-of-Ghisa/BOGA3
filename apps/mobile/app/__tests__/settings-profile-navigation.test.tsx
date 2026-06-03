@@ -17,6 +17,12 @@ jest.mock('@/src/auth', () => ({
   useAuth: () => mockUseAuth(),
 }));
 
+// The sync-status panel has its own spec; stub it here so the Settings render
+// stays focused on navigation and the dev reset surface.
+jest.mock('@/components/sync-status/sync-status-panel', () => ({
+  SyncStatusPanel: () => null,
+}));
+
 jest.mock('@/src/auth/profile', () => ({
   loadUserProfile: (...args: unknown[]) => mockLoadUserProfile(...args),
   saveUsername: (...args: unknown[]) => mockSaveUsername(...args),
@@ -83,7 +89,9 @@ const createProfileRecord = (overrides: Partial<{ createdAt: string; id: string;
 describe('settings and profile routes', () => {
   beforeEach(() => {
     mockPush.mockReset();
-    mockUseAuth.mockReset();
+    // Default to a signed-out-but-ready auth snapshot so the Settings screen can
+    // read `user` without crashing; profile tests override the return value.
+    mockUseAuth.mockReset().mockReturnValue(createAuthValue());
     mockLoadUserProfile.mockReset();
     mockSaveUsername.mockReset();
     mockResetLocalDataAndReseed.mockReset();

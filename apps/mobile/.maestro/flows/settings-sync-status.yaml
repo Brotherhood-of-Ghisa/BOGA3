@@ -1,0 +1,53 @@
+appId: com.dinoderek.mobile
+---
+# Signed-in Settings sync-status surface. Login-on-start is enforced in this
+# auth-configured lane: a clean launch with no session lands on the sign-in
+# gate, so this flow signs in first, opens Settings, and asserts the sync-status
+# card and each of its fields render for the signed-in user.
+- launchApp:
+    clearState: true
+- tapOn:
+    text: "Open"
+    optional: true
+- tapOn:
+    text: "Continue"
+    optional: true
+- tapOn:
+    text: "Close"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "sign-in-screen"
+    timeout: 30000
+- tapOn:
+    id: "sign-in-email-input"
+- inputText: "${MAESTRO_AUTH_PROFILE_EMAIL}"
+- tapOn:
+    id: "sign-in-password-input"
+- inputText: "${MAESTRO_AUTH_PROFILE_PASSWORD}"
+- tapOn:
+    id: "sign-in-submit-button"
+- extendedWaitUntil:
+    visible:
+      id: "stats-history-screen"
+    timeout: 30000
+# Now signed in: open Settings and assert the sync-status surface.
+- tapOn:
+    id: "top-level-settings-button"
+- assertVisible:
+    id: "settings-screen"
+- extendedWaitUntil:
+    visible:
+      id: "settings-sync-status-card"
+    timeout: 30000
+- takeScreenshot: "08-settings-sync-status"
+- assertVisible:
+    id: "settings-sync-status-last-success"
+- assertVisible:
+    id: "settings-sync-status-dirty-count"
+- assertVisible:
+    id: "settings-sync-status-network"
+- assertVisible:
+    id: "settings-sync-status-error"
+- assertVisible:
+    id: "settings-sync-status-refresh-button"

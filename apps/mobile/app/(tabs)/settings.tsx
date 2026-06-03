@@ -2,7 +2,9 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
+import { SyncStatusPanel } from '@/components/sync-status/sync-status-panel';
 import { UiButton, UiSurface, UiText, uiBorder, uiColors, uiRadius, uiSpace } from '@/components/ui';
+import { useAuth } from '@/src/auth';
 import { resetLocalDataAndReseed } from '@/src/data';
 import {
   wipeLocalAndReBootstrap,
@@ -14,6 +16,7 @@ type DevFeedback = { tone: 'success' | 'error'; message: string } | null;
 
 export default function SettingsScreen() {
   const router = useRouter();
+  const { user } = useAuth();
 
   const [isResetting, setIsResetting] = useState(false);
   const [resetFeedback, setResetFeedback] = useState<DevFeedback>(null);
@@ -145,6 +148,8 @@ export default function SettingsScreen() {
           </View>
         </UiSurface>
       </Pressable>
+
+      {user ? <SyncStatusPanel /> : null}
 
       {isDevMode() ? (
         <UiSurface style={styles.devCard} testID="settings-dev-tools-card">

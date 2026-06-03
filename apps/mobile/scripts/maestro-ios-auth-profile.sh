@@ -24,6 +24,10 @@ MAESTRO_RESET_STRATEGY="full" "$SCRIPT_DIR/maestro-ios-run-flow.sh" \
   --scenario "Launch requires sign-in" \
   --flow "$APP_DIR/.maestro/flows/launch-requires-sign-in.yaml"
 
+MAESTRO_RESET_STRATEGY="full" "$SCRIPT_DIR/maestro-ios-run-flow.sh" \
+  --scenario "Settings sync status" \
+  --flow "$APP_DIR/.maestro/flows/settings-sync-status.yaml"
+
 MAESTRO_RESET_STRATEGY="full" exec "$SCRIPT_DIR/maestro-ios-run-flow.sh" \
   --scenario "Auth profile happy path" \
   --flow "$APP_DIR/.maestro/flows/auth-profile-happy-path.yaml"
