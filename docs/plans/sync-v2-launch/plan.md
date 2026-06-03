@@ -429,3 +429,10 @@ and the referenced PRs.
   Maestro lane is excluded from CI). The iOS auth-profile lane still needs a host
   run (local Supabase) to green `launch-requires-sign-in.yaml` end-to-end —
   deferred to tFINAL's provisioned infra lane / a host.
+- t8 (PR #110, merged 2026-06-03): sign-out / account-switch LOCAL wipe (§6.2) —
+  clears the 8 entity tables + resets the runtime-state row, preserves
+  `last_emitted_ms` + `muscle_groups`, no server delete. Rebased post-t7b/t11
+  (guard-test exempt-list union: {dev-reset, account-wipe}, not session-drafts).
+- t4 (PR #117, merged 2026-06-03): `sys_*` → `seed_*` bundle slug rename
+  (`seed_<slug>`, `seed_map_<exercise>__<muscle>`); muscle-group ids stay bare;
+  #115's dirty-write preserved; no Drizzle migration. none.

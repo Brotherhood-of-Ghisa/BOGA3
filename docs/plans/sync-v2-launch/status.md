@@ -277,3 +277,19 @@ Roots of the DAG (no in-plan dependency): **tPROG** (design), **t1**
   defer). 
 - Ready for user to merge: #110 (t8), #117 (t4), #118 (docs). Queued: t6→t5
   (after t4), t10 (after t9), t2 (#113) rebase (after t9).
+
+## 2026-06-03 — iteration 14
+- User merged #110 (t8) + #117 (t4). main → f13dc88. Deviations logged for both.
+- t9 (3rd attempt, agent ac912b4f) KILLED again — but commit-early WORKED: it
+  committed + pushed `claude/t9-sync-status-surface` (HEAD c814e11) on the CORRECT
+  base (c669c0a, has #116) before dying at the auth-profile lane step. Build is
+  SALVAGED on its branch; only the long Maestro run + PR-open didn't happen.
+- KILL PATTERN diagnosed: short agents (builds, data) finish fine; the long
+  auth-profile Maestro run (Docker+Maestro, ~15-30min) dies every time — almost
+  certainly background agents are terminated when a new user turn starts (user has
+  been messaging frequently). Affects t9, t10, t2, tFINAL (all need the lane).
+- Dispatched t6 (agent a11858f, bg) — data-only, safe from the kill pattern.
+  Unblocked by t4 merge. (t5 still queued behind t6 — same seed file.)
+- DECISION PENDING (asked user): how to run the auth-profile lane reliably for the
+  signed-in PRs (you-run-on-warm-stack / coordinator-foreground / consolidate-at-
+  tFINAL). t9's build is ready; its PR + lane-green is the only remaining step.
