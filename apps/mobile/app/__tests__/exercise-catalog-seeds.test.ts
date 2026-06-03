@@ -42,8 +42,8 @@ describe('M6 exercise catalog seeds', () => {
     expect(SYSTEM_MUSCLE_GROUP_SEEDS.map((row) => row.id)).not.toContain('chest_sternal');
     expect(SYSTEM_MUSCLE_GROUP_SEEDS.map((row) => row.id)).not.toContain('chest_upper');
 
-    expect(SYSTEM_EXERCISE_DEFINITION_SEEDS.map((row) => row.id)).not.toContain('sys_side_plank');
-    expect(SYSTEM_EXERCISE_DEFINITION_SEEDS.map((row) => row.id)).not.toContain('sys_cable_triceps_pushdown');
+    expect(SYSTEM_EXERCISE_DEFINITION_SEEDS.map((row) => row.id)).not.toContain('seed_side_plank');
+    expect(SYSTEM_EXERCISE_DEFINITION_SEEDS.map((row) => row.id)).not.toContain('seed_cable_triceps_pushdown');
 
     expect(SYSTEM_EXERCISE_MUSCLE_MAPPING_SEEDS.every((mapping) => mapping.muscleGroupId !== 'chest_sternal')).toBe(true);
     expect(SYSTEM_EXERCISE_MUSCLE_MAPPING_SEEDS.every((mapping) => mapping.muscleGroupId !== 'chest_upper')).toBe(true);

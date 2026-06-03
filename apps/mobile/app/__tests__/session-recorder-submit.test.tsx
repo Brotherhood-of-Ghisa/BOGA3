@@ -30,7 +30,7 @@ jest.mock('@/src/data', () => ({
   attachExerciseTagToSessionExercise: jest.fn().mockResolvedValue(undefined),
   createExerciseTagDefinition: jest.fn().mockResolvedValue({
     id: 'tag-1',
-    exerciseDefinitionId: 'sys_barbell_back_squat',
+    exerciseDefinitionId: 'seed_barbell_back_squat',
     name: 'Paused',
     normalizedName: 'paused',
     deletedAt: null,
@@ -76,9 +76,9 @@ jest.mock('@/src/data', () => ({
 
 jest.mock('@/src/data/exercise-catalog', () => ({
   listExerciseCatalogExercises: jest.fn().mockResolvedValue([
-    { id: 'sys_barbell_back_squat', name: 'Barbell Squat', deletedAt: null, mappings: [] },
-    { id: 'sys_barbell_bench_press', name: 'Bench Press', deletedAt: null, mappings: [] },
-    { id: 'sys_romanian_deadlift', name: 'Deadlift', deletedAt: null, mappings: [] },
+    { id: 'seed_barbell_back_squat', name: 'Barbell Squat', deletedAt: null, mappings: [] },
+    { id: 'seed_barbell_bench_press', name: 'Bench Press', deletedAt: null, mappings: [] },
+    { id: 'seed_romanian_deadlift', name: 'Deadlift', deletedAt: null, mappings: [] },
   ]),
   listExerciseCatalogMuscleGroups: jest.fn().mockResolvedValue([]),
 }));
@@ -141,7 +141,7 @@ const buildCompletedEditSnapshot = (overrides: Partial<any> = {}) => ({
   exercises: [
     {
       id: 'exercise-1',
-      exerciseDefinitionId: 'sys_barbell_bench_press',
+      exerciseDefinitionId: 'seed_barbell_bench_press',
       name: 'Bench Press',
       machineName: 'Flat Bench',
       sets: [{ id: 'set-1', repsValue: '5', weightValue: '225' }],
@@ -294,7 +294,7 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
         exercises: [
           {
             id: 'exercise-1',
-            exerciseDefinitionId: 'sys_barbell_bench_press',
+            exerciseDefinitionId: 'seed_barbell_bench_press',
             name: 'Bench Press',
             machineName: 'Flat Bench',
             sets: [{ id: 'set-1', repsValue: '5', weightValue: '0' }],
@@ -389,7 +389,7 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
         exercises: [
           {
             id: 'exercise-1',
-            exerciseDefinitionId: 'sys_barbell_bench_press',
+            exerciseDefinitionId: 'seed_barbell_bench_press',
             name: 'Bench Press',
             machineName: 'Flat Bench',
             sets: [

@@ -134,7 +134,7 @@ describe('ExerciseCatalogScreen', () => {
   it('edits an existing exercise by changing name and secondary muscles', async () => {
     mockListExercises.mockResolvedValue([
       {
-        id: 'sys_barbell_bench_press',
+        id: 'seed_barbell_bench_press',
         name: 'Barbell Bench Press',
         deletedAt: null,
         mappings: [
@@ -144,7 +144,7 @@ describe('ExerciseCatalogScreen', () => {
       },
     ]);
     const updatedExercise: ExerciseCatalogExercise = {
-      id: 'sys_barbell_bench_press',
+      id: 'seed_barbell_bench_press',
       name: 'Bench Press',
       deletedAt: null,
       mappings: [
@@ -176,7 +176,7 @@ describe('ExerciseCatalogScreen', () => {
 
     await waitFor(() =>
       expect(mockSaveExercise).toHaveBeenCalledWith({
-        id: 'sys_barbell_bench_press',
+        id: 'seed_barbell_bench_press',
         name: 'Bench Press',
         mappings: [
           { muscleGroupId: 'chest', weight: 1, role: 'primary' },

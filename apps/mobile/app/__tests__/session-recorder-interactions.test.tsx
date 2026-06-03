@@ -55,7 +55,7 @@ jest.mock('@/src/data', () => {
     const seededTags: any[] = [
       {
         id: newTagId(),
-        exerciseDefinitionId: 'sys_barbell_back_squat',
+        exerciseDefinitionId: 'seed_barbell_back_squat',
         name: 'Paused',
         normalizedName: 'paused',
         deletedAt: null,
@@ -64,7 +64,7 @@ jest.mock('@/src/data', () => {
       },
       {
         id: newTagId(),
-        exerciseDefinitionId: 'sys_barbell_back_squat',
+        exerciseDefinitionId: 'seed_barbell_back_squat',
         name: 'Tempo',
         normalizedName: 'tempo',
         deletedAt: null,
@@ -73,7 +73,7 @@ jest.mock('@/src/data', () => {
       },
       {
         id: newTagId(),
-        exerciseDefinitionId: 'sys_barbell_bench_press',
+        exerciseDefinitionId: 'seed_barbell_bench_press',
         name: 'Close Grip',
         normalizedName: 'close grip',
         deletedAt: null,
@@ -82,7 +82,7 @@ jest.mock('@/src/data', () => {
       },
       {
         id: newTagId(),
-        exerciseDefinitionId: 'sys_barbell_bench_press',
+        exerciseDefinitionId: 'seed_barbell_bench_press',
         name: 'Feet Up',
         normalizedName: 'feet up',
         deletedAt: null,
@@ -287,13 +287,13 @@ jest.mock('@/src/data', () => {
 jest.mock('@/src/data/exercise-catalog', () => ({
   listExerciseCatalogExercises: jest.fn().mockResolvedValue([
     {
-      id: 'sys_barbell_back_squat',
+      id: 'seed_barbell_back_squat',
       name: 'Barbell Squat',
       deletedAt: null,
       mappings: [{ id: 'map-squat-quads', muscleGroupId: 'quads', weight: 1, role: 'primary' }],
     },
     {
-      id: 'sys_barbell_bench_press',
+      id: 'seed_barbell_bench_press',
       name: 'Bench Press',
       deletedAt: null,
       mappings: [
@@ -302,13 +302,13 @@ jest.mock('@/src/data/exercise-catalog', () => ({
       ],
     },
     {
-      id: 'sys_romanian_deadlift',
+      id: 'seed_romanian_deadlift',
       name: 'Deadlift',
       deletedAt: null,
       mappings: [{ id: 'map-deadlift-hamstrings', muscleGroupId: 'hamstrings', weight: 1, role: 'primary' }],
     },
     {
-      id: 'sys_overhead_press',
+      id: 'seed_overhead_press',
       name: 'Overhead Press',
       deletedAt: null,
       mappings: [{ id: 'map-overhead-press-delts', muscleGroupId: 'delts_front', weight: 1, role: 'primary' }],
@@ -397,7 +397,7 @@ const buildCompletedEditSnapshot = (overrides: Partial<any> = {}) => ({
   exercises: [
     {
       id: 'exercise-1',
-      exerciseDefinitionId: 'sys_barbell_bench_press',
+      exerciseDefinitionId: 'seed_barbell_bench_press',
       name: 'Bench Press',
       machineName: null,
       sets: [{ id: 'set-1', repsValue: '5', weightValue: '225' }],
@@ -464,7 +464,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
       message: 'A session exercise was added to the active workout log.',
       userId: 'user-1',
       context: {
-        exerciseDefinitionId: 'sys_barbell_back_squat',
+        exerciseDefinitionId: 'seed_barbell_back_squat',
         exerciseName: 'Barbell Squat',
       },
     });
@@ -480,7 +480,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
 
   it('shows collapsible previous/current block comparison and navigates older/newer in place', async () => {
     mockLoadRecentExerciseBlocks.mockResolvedValueOnce({
-      exerciseDefinitionId: 'sys_barbell_back_squat',
+      exerciseDefinitionId: 'seed_barbell_back_squat',
       limit: 5,
       blocks: [
         {
@@ -559,7 +559,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
 
   it('updates current comparison metrics live from unsaved working sets', async () => {
     mockLoadRecentExerciseBlocks.mockResolvedValueOnce({
-      exerciseDefinitionId: 'sys_barbell_back_squat',
+      exerciseDefinitionId: 'seed_barbell_back_squat',
       limit: 5,
       blocks: [
         {
@@ -604,7 +604,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
 
   it('keeps set entry usable when exercise block history is empty or unavailable', async () => {
     mockLoadRecentExerciseBlocks.mockResolvedValueOnce({
-      exerciseDefinitionId: 'sys_barbell_back_squat',
+      exerciseDefinitionId: 'seed_barbell_back_squat',
       limit: 5,
       blocks: [],
     });
@@ -648,7 +648,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
   it('resets the block navigator when an exercise card changes exercise definition', async () => {
     mockLoadRecentExerciseBlocks
       .mockResolvedValueOnce({
-        exerciseDefinitionId: 'sys_barbell_back_squat',
+        exerciseDefinitionId: 'seed_barbell_back_squat',
         limit: 5,
         blocks: [
           {
@@ -664,7 +664,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
         ],
       })
       .mockResolvedValueOnce({
-        exerciseDefinitionId: 'sys_barbell_bench_press',
+        exerciseDefinitionId: 'seed_barbell_bench_press',
         limit: 5,
         blocks: [
           {
@@ -694,7 +694,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
 
     await waitFor(() => {
       expect(mockLoadRecentExerciseBlocks).toHaveBeenLastCalledWith({
-        exerciseDefinitionId: 'sys_barbell_bench_press',
+        exerciseDefinitionId: 'seed_barbell_bench_press',
       });
     });
     fireEvent.press(await screen.findByTestId('exercise-block-history-panel-1-collapsed'));
@@ -1033,7 +1033,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     });
 
     expect(mockCreateExerciseTagDefinition).toHaveBeenCalledWith({
-      exerciseDefinitionId: 'sys_romanian_deadlift',
+      exerciseDefinitionId: 'seed_romanian_deadlift',
       name: 'Top Set',
     });
     expect(mockAttachExerciseTagToSessionExercise).toHaveBeenCalledWith(
