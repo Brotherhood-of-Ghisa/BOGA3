@@ -8,11 +8,11 @@ const MINUTE_MS = 60 * 1000;
 
 export const EXERCISE_BLOCK_HISTORY_FIXTURE = {
   gymId: 'maestro_exercise_block_history_gym',
-  primaryExerciseId: 'sys_barbell_back_squat',
+  primaryExerciseId: 'seed_barbell_back_squat',
   primaryExerciseName: 'Barbell Back Squat',
-  secondaryExerciseId: 'sys_barbell_bench_press',
+  secondaryExerciseId: 'seed_barbell_bench_press',
   secondaryExerciseName: 'Barbell Bench Press',
-  noHistoryExerciseId: 'sys_lat_pulldown',
+  noHistoryExerciseId: 'seed_lat_pulldown',
   noHistoryExerciseName: 'Lat Pulldown',
 } as const;
 

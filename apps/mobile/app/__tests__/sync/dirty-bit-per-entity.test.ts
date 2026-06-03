@@ -89,7 +89,7 @@ const db = (): TestDatabase => {
 
 // Fixtures the various write paths reference as FK parents / lookups.
 const SESSION_ID = 'session-dirty';
-const EXERCISE_DEFINITION_ID = 'sys_def_dirty';
+const EXERCISE_DEFINITION_ID = 'seed_def_dirty';
 const MUSCLE_GROUP_ID = 'chest';
 
 const seedMuscleGroup = (): void => {
