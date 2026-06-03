@@ -6,6 +6,17 @@ appId: com.dinoderek.mobile
 # sign-out). Signing out returns to the gate rather than to a data screen.
 - launchApp:
     clearState: true
+# `clearState: true` wipes the Expo dev client's stored Metro dev-server URL, so
+# on relaunch the client shows its own launcher instead of reconnecting and the
+# RN app never loads. Re-open the dev-client deep link (carrying this worktree's
+# Metro port, exported by maestro-ios-launch.sh) to re-point it at Metro. Opening
+# that URL also surfaces the expo-dev-client developer-menu onboarding sheet over
+# the loaded app, so the Continue/Close taps dismiss it (and "Open" clears the
+# URL-scheme trust dialog) before the sign-in gate assertion. `waitForAnimationToEnd`
+# lets the sheet animate in first; every optional tap no-ops when its target is absent.
+- openLink: "${MAESTRO_IOS_DEV_CLIENT_URL}"
+- waitForAnimationToEnd:
+    timeout: 5000
 - tapOn:
     text: "Open"
     optional: true

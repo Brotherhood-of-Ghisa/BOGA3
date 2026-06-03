@@ -5,7 +5,9 @@ const mockDeleteDatabaseAsync = jest.fn();
 const mockDrizzle = jest.fn();
 const mockMigrate = jest.fn();
 const mockSeedMuscleGroups = jest.fn();
+const mockSeedSystemExerciseCatalog = jest.fn();
 const mockInvalidateExerciseCatalogCache = jest.fn();
+const mockGetMobileAuthRuntimeConfig = jest.fn();
 
 jest.mock('expo-sqlite', () => ({
   deleteDatabaseAsync: (...args: unknown[]) => mockDeleteDatabaseAsync(...args),
@@ -22,6 +24,11 @@ jest.mock('drizzle-orm/expo-sqlite/migrator', () => ({
 
 jest.mock('@/src/data/exercise-catalog-seeds', () => ({
   seedMuscleGroups: (...args: unknown[]) => mockSeedMuscleGroups(...args),
+  seedSystemExerciseCatalog: (...args: unknown[]) => mockSeedSystemExerciseCatalog(...args),
+}));
+
+jest.mock('@/src/auth/supabase', () => ({
+  getMobileAuthRuntimeConfig: (...args: unknown[]) => mockGetMobileAuthRuntimeConfig(...args),
 }));
 
 jest.mock('@/src/exercise-catalog/invalidation', () => ({
@@ -40,7 +47,13 @@ describe('bootstrapLocalDataLayer', () => {
     mockDrizzle.mockReset();
     mockMigrate.mockReset();
     mockSeedMuscleGroups.mockReset();
+    mockSeedSystemExerciseCatalog.mockReset();
     mockInvalidateExerciseCatalogCache.mockReset();
+    // Default to a sync-configured build: the first-sign-in bootstrapper owns
+    // the exercise catalog, so boot must NOT seed it. The infra-free branch is
+    // exercised explicitly in its own tests below.
+    mockGetMobileAuthRuntimeConfig.mockReset();
+    mockGetMobileAuthRuntimeConfig.mockReturnValue({ isConfigured: true });
   });
 
   it('creates the local database, applies runtime migrations, and seeds the muscle-group taxonomy once', async () => {
@@ -63,6 +76,9 @@ describe('bootstrapLocalDataLayer', () => {
     expect(mockMigrate).toHaveBeenCalledWith(localDatabase, localRuntimeMigrations);
     expect(mockSeedMuscleGroups).toHaveBeenCalledTimes(1);
     expect(mockSeedMuscleGroups).toHaveBeenCalledWith(localDatabase);
+    // Sync-configured build: the first-sign-in bootstrapper owns the exercise
+    // catalog, so boot must not seed it (a reinstall recovers it from the server).
+    expect(mockSeedSystemExerciseCatalog).not.toHaveBeenCalled();
   });
 
   it('retries runtime migrations on the next bootstrap call after a failure', async () => {
@@ -239,5 +255,62 @@ describe('bootstrapLocalDataLayer', () => {
     expect(mockOpenDatabaseSync).toHaveBeenCalledTimes(2);
     expect(sqliteClient.closeAsync).toHaveBeenCalledTimes(1);
     expect(resetSqliteClient.closeAsync).not.toHaveBeenCalled();
+  });
+
+  it('seeds the full starter exercise catalog at boot when no sync backend is configured (infra-free build)', async () => {
+    mockGetMobileAuthRuntimeConfig.mockReturnValue({ isConfigured: false });
+
+    const sqliteClient = { name: 'sqlite-client' };
+    const localDatabase = { name: 'local-db' };
+
+    mockOpenDatabaseSync.mockReturnValue(sqliteClient);
+    mockDrizzle.mockReturnValue(localDatabase);
+    mockMigrate.mockResolvedValue(undefined);
+    mockSeedMuscleGroups.mockReturnValue(undefined);
+    mockSeedSystemExerciseCatalog.mockReturnValue(undefined);
+
+    await bootstrapLocalDataLayer();
+
+    // With no server to recover the catalog from, boot seeds BOTH the client-only
+    // taxonomy and the syncable starter catalog (the picker would be empty otherwise).
+    expect(mockSeedMuscleGroups).toHaveBeenCalledTimes(1);
+    expect(mockSeedSystemExerciseCatalog).toHaveBeenCalledTimes(1);
+    expect(mockSeedSystemExerciseCatalog).toHaveBeenCalledWith(localDatabase);
+    // The catalog seed runs after the muscle-group seed.
+    expect(mockSeedSystemExerciseCatalog.mock.invocationCallOrder[0]).toBeGreaterThan(
+      mockSeedMuscleGroups.mock.invocationCallOrder[0]
+    );
+  });
+
+  it('re-seeds the starter exercise catalog after a data reset when no sync backend is configured, so the infra-free picker stays populated', async () => {
+    mockGetMobileAuthRuntimeConfig.mockReturnValue({ isConfigured: false });
+
+    const sqliteClient = {
+      closeAsync: jest.fn().mockResolvedValue(undefined),
+      name: 'sqlite-client',
+    };
+    const resetSqliteClient = {
+      closeAsync: jest.fn().mockResolvedValue(undefined),
+      name: 'sqlite-client-after-reset',
+    };
+    const localDatabase = { name: 'local-db' };
+    const resetLocalDatabase = { name: 'local-db-after-reset' };
+
+    mockOpenDatabaseSync.mockReturnValueOnce(sqliteClient).mockReturnValueOnce(resetSqliteClient);
+    mockDeleteDatabaseAsync.mockResolvedValue(undefined);
+    mockDrizzle.mockReturnValueOnce(localDatabase).mockReturnValueOnce(resetLocalDatabase);
+    mockMigrate.mockResolvedValue(undefined);
+    mockSeedMuscleGroups.mockReturnValue(undefined);
+    mockSeedSystemExerciseCatalog.mockReturnValue(undefined);
+
+    await bootstrapLocalDataLayer();
+    await resetLocalAppData();
+
+    // The Maestro `reset=data` harness deletes the DB and re-bootstraps. The
+    // infra-free seed must run again against the freshly re-opened DB so the
+    // exercise picker is populated after the reset — this is exactly the path the
+    // data-runtime-smoke lane exercises.
+    expect(mockSeedSystemExerciseCatalog).toHaveBeenCalledTimes(2);
+    expect(mockSeedSystemExerciseCatalog).toHaveBeenLastCalledWith(resetLocalDatabase);
   });
 });
