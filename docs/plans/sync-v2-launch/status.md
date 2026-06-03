@@ -346,3 +346,16 @@ NON-PLAN: #114 (M17 heatmap) — ignore.
 
 CRITICAL PATH: t9 (spawned task) → its merge unblocks t10 + the t2 rebase →
 those + t5 merge → tFINAL. t5 is parallel and nearly independent.
+
+## 2026-06-03 — iteration 17
+- t5 COMPLETED → PR #121: new `apps/mobile/src/data/bundle-migrations.ts`
+  (`BundleMigration` type, EMPTY `BUNDLE_MIGRATIONS`, `runBundleMigrations()` —
+  short-circuit on applied>=current, apply (applied,current] ascending each in own
+  tx with atomic marker advance, empty-array still advances marker to current,
+  resumes after partial failure); `CURRENT_APP_VERSION` constant (aliased to the
+  existing `SEED_CATALOG_BUNDLE_VERSION`=1); wired into cycle.ts after
+  runBootstrapper; 13 Jest tests; quality-fast 650 green. 2 deviations documented.
+  Dispatched reviewer (agent a5beed04).
+- NOTE for the t2 (#113) rebase: cycle.ts is now ALSO touched by t5 (#121) — when
+  t2 rebases it must reconcile cycle.ts with both t3 (merged) and t5.
+- t9 spawned task: still running (branch advanced; no `[t9]` PR yet).
