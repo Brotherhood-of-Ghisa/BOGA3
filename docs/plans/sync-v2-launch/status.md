@@ -137,3 +137,30 @@ Roots of the DAG (no in-plan dependency): **tPROG** (design), **t1**
   Awaiting completion → then re-review.
 - Merge plan unchanged: still awaiting user merge of #111 (t3) + #112 (t7b);
   #110 (t8) + #113 (t2) rebase after. #113 also picks up the flake fix first.
+
+## 2026-06-03 — iteration 7
+- t2 flake re-dispatch returned. It FIXED the real warm-up bug (dev-client
+  detached from Metro after `clearState`) — verified: quality-fast 624/624 +
+  `test:e2e:ios:gates` green. BUT it surfaced a deeper defect blocking the
+  auth-profile lane: after a successful sign-in the shared Supabase client's
+  `getSession()` returns null in the sync cycle → spurious AUTH_REQUIRED → the
+  guard bounces the signed-in user → redirect loop. Reproduces on t1's merged
+  `launch-requires-sign-in.yaml`; the whole auth-profile lane is excluded from
+  CI's gate (never verified E2E). Coordinator verified there is a SINGLE shared
+  client (not an instance mismatch) — it's a session persistence/refresh/timing
+  defect, in the t1/auth layer, out of t2's scope.
+- USER DECISIONS: (1) add t11 (auth-session fix; first job = determine real-
+  backend vs local-fixture severity, then fix + green the auth-profile lane).
+  (2) HOLD t2 (#113) until the lane is genuinely green (flakes not accepted).
+- Created `tasks/t11.md`; DAG: `t1 --> t11 --> tFINAL`; t11 also gates t2's #113
+  lane-green merge. Dispatched t11 (background) off latest origin/main (depends
+  only on merged t1; parallelizes with the pending #111/#112 merges). Card passed
+  inline (not yet on main).
+- t2 (#113) HELD: head 5e540a2 has new (unreviewed) commits — needs re-review +
+  rebase on t3+t11 + a green auth-profile lane before it can merge.
+- Process gap noted: the auth-profile Maestro lane (sign-in→sync) is not in the
+  mandated gate, so login→sync was never enforced. t11 must wire it into an
+  enforced run (or hand tFINAL the contract).
+- Gating action UNCHANGED for the next build wave: user merges #111 (t3) + #112
+  (t7b) → then dispatch t9/t4/t5/t6/t10 (t11 already in flight). t8 (#110) +
+  t2 (#113) rebase after their pair-mates land.
