@@ -105,9 +105,10 @@ Brief entrypoint inventory of the current reusable UI component set.
 8. `CalendarHeatmap`
 - File: `apps/mobile/components/muscle-analytics/calendar-heatmap.tsx`
 - Purpose:
-  - reusable selected-muscle daily effort calendar heatmap component for the M16 muscle history overlay
-  - consumes the shared `SelectedMuscleDailyEffort` shape from `apps/mobile/src/data/muscle-analytics.ts`
+  - reusable weekly-effort calendar heatmap component; used by both the M16 muscle-history overlay and the M17 exercise-history overlay
+  - accepts `SelectedMuscleWeeklyEffort[]` (also aliased as `SelectedExerciseWeeklyEffort` in M17 — identical shape) from `apps/mobile/src/data`
   - renders Monday-through-Sunday columns, latest weeks first with 8 visible rows by default, token-backed zero/green/today/selected states, tappable cells, and date/effort accessibility labels
+  - `ExerciseHistoryOverlay` in `apps/mobile/app/(tabs)/stats-history.tsx` is screen-local and not catalogued here; it composes `CalendarHeatmap` with the same overlay card structure as `MuscleHistoryOverlay`
 
 ### UI-supporting shared module (non-visual)
 

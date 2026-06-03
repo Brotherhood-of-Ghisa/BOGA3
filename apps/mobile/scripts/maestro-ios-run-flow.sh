@@ -100,13 +100,24 @@ MAESTRO_FLOW_FILE="$MAESTRO_ARTIFACT_ROOT/$flow_basename"
 maestro_prepare_flow_copy "$FLOW_SOURCE" "$MAESTRO_FLOW_FILE" "$MAESTRO_IOS_DEV_CLIENT_BUNDLE_ID"
 maestro_write_runtime_env "$MAESTRO_RUNTIME_ENV_FILE"
 
+# Build --env flags for any MAESTRO_AUTH_PROFILE_* vars exported by the caller
+# (e.g. maestro-ios-auth-profile.sh). Maestro 2.x does not inherit system env
+# vars in flow ${VAR} expressions unless they are passed explicitly via -e.
+maestro_env_flags=()
+for _var in MAESTRO_AUTH_PROFILE_EMAIL MAESTRO_AUTH_PROFILE_PASSWORD MAESTRO_AUTH_PROFILE_USERNAME; do
+  if [[ -n "${!_var+set}" ]]; then
+    maestro_env_flags+=(-e "${_var}=${!_var}")
+  fi
+done
+
 set +e
 maestro test "$MAESTRO_FLOW_FILE" \
   --udid "$IOS_SIM_UDID" \
   --format junit \
   --output "$MAESTRO_JUNIT_FILE" \
   --debug-output "$MAESTRO_DEBUG_DIR" \
-  --test-output-dir "$MAESTRO_OUTPUT_DIR"
+  --test-output-dir "$MAESTRO_OUTPUT_DIR" \
+  ${maestro_env_flags[@]+"${maestro_env_flags[@]}"}
 maestro_exit_code=$?
 set -e
 

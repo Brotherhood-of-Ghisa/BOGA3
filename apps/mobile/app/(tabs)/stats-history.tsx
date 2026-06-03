@@ -8,14 +8,18 @@ import {
 } from '@/components/muscle-analytics';
 import { SegmentedChips, uiColors } from '@/components/ui';
 import {
+  computeSelectedExerciseWeeklyEffort,
   computeSelectedMuscleWeeklyEffort,
   computeStatsSummary,
+  type SelectedExerciseWeeklyEffort,
   type SelectedMuscleWeeklyEffort,
   type StatsMuscleFamilyPerformance,
   type StatsMusclePerformance,
   type StatsPeriodDays,
   type StatsSummary,
 } from '@/src/data';
+import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
+import { useExerciseCatalogStats } from '@/src/exercise-catalog/stats-cache';
 
 const PERIOD_OPTIONS = [
   { value: 7 as StatsPeriodDays, label: 'Last 7 days' },
@@ -23,6 +27,7 @@ const PERIOD_OPTIONS = [
 ] as const;
 
 const MUSCLE_HISTORY_WINDOW_DAYS = 365;
+const EXERCISE_HISTORY_WINDOW_DAYS = 365;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 type DeltaDisplay = {
@@ -35,6 +40,21 @@ export type MuscleHistoryTarget = {
   displayName: string;
   familyName: string;
 };
+
+export type ExerciseHeatmapTarget = {
+  exerciseDefinitionId: string;
+  displayName: string;
+};
+
+export type ExerciseListItem = {
+  id: string;
+  name: string;
+  sessionCount: number;
+  totalVolume: number;
+  estimatedOneRepMax: number | null;
+};
+
+export type StatsViewMode = 'exercise' | 'muscle';
 
 export const formatDelta = (current: number, previous: number): DeltaDisplay => {
   if (current === 0 && previous === 0) {
@@ -106,6 +126,19 @@ export type StatsScreenShellProps = {
   selectedMuscleHistoryWeekKey: string | null;
   muscleHistoryMetric: CalendarHeatmapMetric;
   onSelectMuscleHistoryMetric: (metric: CalendarHeatmapMetric) => void;
+  viewMode: StatsViewMode;
+  onSelectViewMode: (mode: StatsViewMode) => void;
+  exerciseListItems: ExerciseListItem[];
+  selectedExercise: ExerciseHeatmapTarget | null;
+  exerciseHistoryWeeklyEffort: SelectedExerciseWeeklyEffort[];
+  isExerciseHistoryLoading: boolean;
+  exerciseHistoryErrorMessage: string | null;
+  selectedExerciseHistoryWeekKey: string | null;
+  exerciseHistoryMetric: CalendarHeatmapMetric;
+  onPressExerciseHistory: (exercise: ExerciseHeatmapTarget) => void;
+  onDismissExerciseHistory: () => void;
+  onSelectExerciseHistoryWeek: (weekKey: string | null) => void;
+  onSelectExerciseHistoryMetric: (metric: CalendarHeatmapMetric) => void;
 };
 
 export function StatsScreenShell({
@@ -125,6 +158,19 @@ export function StatsScreenShell({
   selectedMuscleHistoryWeekKey,
   muscleHistoryMetric,
   onSelectMuscleHistoryMetric,
+  viewMode,
+  onSelectViewMode,
+  exerciseListItems,
+  selectedExercise,
+  exerciseHistoryWeeklyEffort,
+  isExerciseHistoryLoading,
+  exerciseHistoryErrorMessage,
+  selectedExerciseHistoryWeekKey,
+  exerciseHistoryMetric,
+  onPressExerciseHistory,
+  onDismissExerciseHistory,
+  onSelectExerciseHistoryWeek,
+  onSelectExerciseHistoryMetric,
 }: StatsScreenShellProps) {
   const sessionDelta = summary
     ? formatDelta(summary.current.totals.sessionCount, summary.previous.totals.sessionCount)
@@ -135,72 +181,92 @@ export function StatsScreenShell({
 
   return (
     <View style={styles.screen} testID="stats-history-screen">
-      <SegmentedChips
-        accessibilityLabel="Select stats period"
-        options={PERIOD_OPTIONS}
-        value={periodDays}
-        onChange={onSelectPeriod}
-        testIDPrefix="stats-period-chip"
-      />
+      <View style={styles.headerRow}>
+        <SegmentedChips
+          accessibilityLabel="Select stats period"
+          options={PERIOD_OPTIONS}
+          value={periodDays}
+          onChange={onSelectPeriod}
+          testIDPrefix="stats-period-chip"
+        />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={viewMode === 'muscle' ? 'Switch to exercise view' : 'Switch to muscle view'}
+          onPress={() => onSelectViewMode(viewMode === 'muscle' ? 'exercise' : 'muscle')}
+          style={styles.viewModeChip}
+          testID="stats-view-mode-chip">
+          <Text style={styles.viewModeChipText}>
+            {viewMode === 'muscle' ? 'By Exercise' : 'By Muscle'}
+          </Text>
+        </Pressable>
+      </View>
 
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
-        testID="stats-scroll">
-        {errorMessage ? (
-          <View style={styles.statePanel} testID="stats-error-state">
-            <Text style={styles.stateTitle}>Could not load stats</Text>
-            <Text style={styles.stateBody}>{errorMessage}</Text>
+      {summary ? (
+        <View style={styles.summaryGrid}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Open sessions list"
+            onPress={onPressSessionsCard}
+            style={({ pressed }) => [styles.summaryCard, pressed && styles.summaryCardPressed]}
+            testID="stats-card-sessions">
+            <Text style={styles.summaryLabel}>Sessions</Text>
+            <Text style={styles.summaryValue}>
+              {formatNumber(summary.current.totals.sessionCount)}
+            </Text>
+            {sessionDelta ? (
+              <Text style={[styles.summaryDelta, deltaToneStyle(sessionDelta.tone)]}>
+                {sessionDelta.text}
+              </Text>
+            ) : null}
+          </Pressable>
+
+          <View style={styles.summaryCard} testID="stats-card-sets">
+            <Text style={styles.summaryLabel}>Working sets</Text>
+            <Text style={styles.summaryValue}>
+              {formatNumber(summary.current.totals.totalSets)}
+            </Text>
+            {setsDelta ? (
+              <Text style={[styles.summaryDelta, deltaToneStyle(setsDelta.tone)]}>
+                {setsDelta.text}
+              </Text>
+            ) : null}
           </View>
-        ) : null}
+        </View>
+      ) : null}
 
-        {!errorMessage && isLoading && !summary ? (
-          <View style={styles.statePanel} testID="stats-loading-state">
-            <Text style={styles.stateBody}>Loading stats…</Text>
-          </View>
-        ) : null}
-
-        {summary ? (
-          <>
-            <View style={styles.summaryGrid}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Open sessions list"
-                onPress={onPressSessionsCard}
-                style={({ pressed }) => [styles.summaryCard, pressed && styles.summaryCardPressed]}
-                testID="stats-card-sessions">
-                <Text style={styles.summaryLabel}>Sessions</Text>
-                <Text style={styles.summaryValue}>
-                  {formatNumber(summary.current.totals.sessionCount)}
-                </Text>
-                {sessionDelta ? (
-                  <Text style={[styles.summaryDelta, deltaToneStyle(sessionDelta.tone)]}>
-                    {sessionDelta.text}
-                  </Text>
-                ) : null}
-              </Pressable>
-
-              <View style={styles.summaryCard} testID="stats-card-sets">
-                <Text style={styles.summaryLabel}>Working sets</Text>
-                <Text style={styles.summaryValue}>
-                  {formatNumber(summary.current.totals.totalSets)}
-                </Text>
-                {setsDelta ? (
-                  <Text style={[styles.summaryDelta, deltaToneStyle(setsDelta.tone)]}>
-                    {setsDelta.text}
-                  </Text>
-                ) : null}
-              </View>
+      {viewMode === 'exercise' ? (
+        <ExerciseListView
+          items={exerciseListItems}
+          onPressExercise={onPressExerciseHistory}
+        />
+      ) : (
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollContent}
+          testID="stats-scroll">
+          {errorMessage ? (
+            <View style={styles.statePanel} testID="stats-error-state">
+              <Text style={styles.stateTitle}>Could not load stats</Text>
+              <Text style={styles.stateBody}>{errorMessage}</Text>
             </View>
+          ) : null}
 
+          {!errorMessage && isLoading && !summary ? (
+            <View style={styles.statePanel} testID="stats-loading-state">
+              <Text style={styles.stateBody}>Loading stats…</Text>
+            </View>
+          ) : null}
+
+          {summary ? (
             <MuscleFamilyList
               families={summary.current.totals.muscleFamilies}
               previousFamilies={summary.previous.totals.muscleFamilies}
               onPressMuscleHistory={onPressMuscleHistory}
             />
-          </>
-        ) : null}
-      </ScrollView>
+          ) : null}
+        </ScrollView>
+      )}
+
       {selectedMuscle ? (
         <MuscleHistoryOverlay
           muscle={selectedMuscle}
@@ -212,6 +278,19 @@ export function StatsScreenShell({
           onSelectMetric={onSelectMuscleHistoryMetric}
           onDismiss={onDismissMuscleHistory}
           onSelectWeek={onSelectMuscleHistoryWeek}
+        />
+      ) : null}
+      {selectedExercise ? (
+        <ExerciseHistoryOverlay
+          exercise={selectedExercise}
+          weeklyEffort={exerciseHistoryWeeklyEffort}
+          isLoading={isExerciseHistoryLoading}
+          errorMessage={exerciseHistoryErrorMessage}
+          selectedWeekKey={selectedExerciseHistoryWeekKey}
+          metric={exerciseHistoryMetric}
+          onSelectMetric={onSelectExerciseHistoryMetric}
+          onDismiss={onDismissExerciseHistory}
+          onSelectWeek={onSelectExerciseHistoryWeek}
         />
       ) : null}
     </View>
@@ -585,6 +664,186 @@ function MuscleHistoryOverlay({
 }
 
 
+function ExerciseListView({
+  items,
+  onPressExercise,
+}: {
+  items: ExerciseListItem[];
+  onPressExercise: (exercise: ExerciseHeatmapTarget) => void;
+}) {
+  if (items.length === 0) {
+    return (
+      <View style={styles.statePanel} testID="stats-exercise-list-empty">
+        <Text style={styles.stateBody}>
+          No exercises with recorded history yet.
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <ScrollView
+      style={styles.scroll}
+      contentContainerStyle={styles.scrollContent}
+      testID="stats-exercise-list-scroll">
+      <View style={styles.familyList} testID="stats-exercise-list">
+        {items.map((item) => (
+          <Pressable
+            key={item.id}
+            accessibilityRole="button"
+            accessibilityLabel={`Open ${item.name} heatmap`}
+            onPress={() =>
+              onPressExercise({ exerciseDefinitionId: item.id, displayName: item.name })
+            }
+            style={({ pressed }) => [styles.exerciseRow, pressed && styles.actionableRowPressed]}
+            testID={`stats-exercise-row-${item.id}`}>
+            <Text style={styles.exerciseName} numberOfLines={1} testID={`stats-exercise-name-${item.id}`}>
+              {item.name}
+            </Text>
+            <View style={styles.muscleMetrics}>
+              <Metric
+                label="Sessions"
+                value={formatNumber(item.sessionCount)}
+                testID={`stats-exercise-sessions-${item.id}`}
+                muted={false}
+                small
+              />
+              <Metric
+                label="Volume"
+                value={formatTotalWeight(item.totalVolume)}
+                testID={`stats-exercise-volume-${item.id}`}
+                muted={false}
+                small
+              />
+              {item.estimatedOneRepMax !== null ? (
+                <Metric
+                  label="1RM"
+                  value={formatTotalWeight(item.estimatedOneRepMax)}
+                  testID={`stats-exercise-1rm-${item.id}`}
+                  muted={false}
+                  small
+                />
+              ) : null}
+            </View>
+          </Pressable>
+        ))}
+      </View>
+    </ScrollView>
+  );
+}
+
+function ExerciseHistoryOverlay({
+  exercise,
+  weeklyEffort,
+  isLoading,
+  errorMessage,
+  selectedWeekKey,
+  metric,
+  onSelectMetric,
+  onDismiss,
+  onSelectWeek,
+}: {
+  exercise: ExerciseHeatmapTarget;
+  weeklyEffort: SelectedExerciseWeeklyEffort[];
+  isLoading: boolean;
+  errorMessage: string | null;
+  selectedWeekKey: string | null;
+  metric: CalendarHeatmapMetric;
+  onSelectMetric: (metric: CalendarHeatmapMetric) => void;
+  onDismiss: () => void;
+  onSelectWeek: (weekKey: string | null) => void;
+}) {
+  return (
+    <View style={styles.overlayRoot} testID="stats-exercise-history-overlay">
+      <Pressable
+        accessibilityLabel="Dismiss exercise history"
+        accessibilityRole="button"
+        onPress={onDismiss}
+        style={styles.overlayBackdrop}
+        testID="stats-exercise-history-backdrop"
+      />
+      <View style={styles.overlayCard}>
+        <View style={styles.overlayHeader}>
+          <View style={styles.overlayTitleGroup}>
+            <Text style={styles.overlayEyebrow}>Exercise History</Text>
+            <Text style={styles.overlayTitle} testID="stats-exercise-history-title">
+              {exercise.displayName}
+            </Text>
+          </View>
+          <Pressable
+            accessibilityLabel="Close exercise history"
+            accessibilityRole="button"
+            onPress={onDismiss}
+            style={({ pressed }) => [
+              styles.overlayCloseButton,
+              pressed && styles.actionableRowPressed,
+            ]}
+            testID="stats-exercise-history-close">
+            <Text style={styles.overlayCloseButtonText}>X</Text>
+          </Pressable>
+        </View>
+
+        <View style={styles.overlayMetricSelector}>
+          <SegmentedChips
+            accessibilityLabel="Select effort metric"
+            options={METRIC_OPTIONS}
+            value={metric}
+            onChange={onSelectMetric}
+            testIDPrefix="stats-exercise-history-metric-chip"
+            compact
+          />
+        </View>
+
+        <WeekSelectionBanner
+          weeklyEffort={weeklyEffort}
+          selectedWeekKey={selectedWeekKey}
+          metric={metric}
+        />
+
+        <ScrollView
+          contentContainerStyle={styles.overlayContent}
+          showsVerticalScrollIndicator={false}
+          testID="stats-exercise-history-scroll">
+          {isLoading ? (
+            <View style={styles.overlayStatePanel} testID="stats-exercise-history-loading">
+              <Text style={styles.stateBody}>Loading {exercise.displayName} history...</Text>
+            </View>
+          ) : null}
+
+          {!isLoading && errorMessage ? (
+            <View style={styles.overlayStatePanel} testID="stats-exercise-history-error">
+              <Text style={styles.stateTitle}>Could not load exercise history</Text>
+              <Text style={styles.stateBody}>{errorMessage}</Text>
+            </View>
+          ) : null}
+
+          {!isLoading && !errorMessage ? (
+            <>
+              {weeklyEffort.length === 0 ? (
+                <View style={styles.overlayStatePanel} testID="stats-exercise-history-empty">
+                  <Text style={styles.stateTitle}>No history yet</Text>
+                  <Text style={styles.stateBody}>
+                    No {exercise.displayName} training was found in the last{' '}
+                    {EXERCISE_HISTORY_WINDOW_DAYS} days.
+                  </Text>
+                </View>
+              ) : null}
+
+              <CalendarHeatmap
+                weeklyEffort={weeklyEffort}
+                metric={metric}
+                selectedWeekKey={selectedWeekKey}
+                onSelectWeek={onSelectWeek}
+                testID="stats-exercise-history-heatmap"
+              />
+            </>
+          ) : null}
+        </ScrollView>
+      </View>
+    </View>
+  );
+}
+
 function Metric({
   label,
   value,
@@ -630,6 +889,18 @@ export default function StatsRoute() {
   const [selectedMuscleHistoryWeekKey, setSelectedMuscleHistoryWeekKey] = useState<string | null>(null);
   const [muscleHistoryMetric, setMuscleHistoryMetric] = useState<CalendarHeatmapMetric>('totalVolume');
   const muscleHistoryRequestIdRef = useRef(0);
+
+  const [viewMode, setViewMode] = useState<StatsViewMode>('exercise');
+  const [selectedExercise, setSelectedExercise] = useState<ExerciseHeatmapTarget | null>(null);
+  const [exerciseHistoryWeeklyEffort, setExerciseHistoryWeeklyEffort] = useState<SelectedExerciseWeeklyEffort[]>([]);
+  const [isExerciseHistoryLoading, setIsExerciseHistoryLoading] = useState(false);
+  const [exerciseHistoryErrorMessage, setExerciseHistoryErrorMessage] = useState<string | null>(null);
+  const [selectedExerciseHistoryWeekKey, setSelectedExerciseHistoryWeekKey] = useState<string | null>(null);
+  const [exerciseHistoryMetric, setExerciseHistoryMetric] = useState<CalendarHeatmapMetric>('totalVolume');
+  const exerciseHistoryRequestIdRef = useRef(0);
+
+  const catalogSnapshot = useExerciseCatalog();
+  const { stats: exerciseCatalogStats } = useExerciseCatalogStats('all');
 
   const loadSummary = useCallback(async (period: StatsPeriodDays) => {
     setIsLoading(true);
@@ -704,6 +975,75 @@ export default function StatsRoute() {
     setSelectedMuscleHistoryWeekKey(weekKey);
   }, []);
 
+  const handleSelectViewMode = useCallback((mode: StatsViewMode) => {
+    setViewMode(mode);
+    setSelectedExercise(null);
+    setExerciseHistoryWeeklyEffort([]);
+    setSelectedExerciseHistoryWeekKey(null);
+    setExerciseHistoryErrorMessage(null);
+    setIsExerciseHistoryLoading(false);
+  }, []);
+
+  const handlePressExerciseHistory = useCallback(async (exercise: ExerciseHeatmapTarget) => {
+    const requestId = exerciseHistoryRequestIdRef.current + 1;
+    exerciseHistoryRequestIdRef.current = requestId;
+    const end = new Date();
+    const start = new Date(end.getTime() - EXERCISE_HISTORY_WINDOW_DAYS * MS_PER_DAY);
+
+    setSelectedExercise(exercise);
+    setExerciseHistoryWeeklyEffort([]);
+    setSelectedExerciseHistoryWeekKey(null);
+    setExerciseHistoryErrorMessage(null);
+    setIsExerciseHistoryLoading(true);
+
+    try {
+      const nextEffort = await computeSelectedExerciseWeeklyEffort({
+        exerciseDefinitionId: exercise.exerciseDefinitionId,
+        start,
+        end,
+      });
+      if (exerciseHistoryRequestIdRef.current !== requestId) return;
+      setExerciseHistoryWeeklyEffort(nextEffort);
+    } catch (error) {
+      if (exerciseHistoryRequestIdRef.current !== requestId) return;
+      setExerciseHistoryErrorMessage(error instanceof Error ? error.message : 'Unknown error');
+    } finally {
+      if (exerciseHistoryRequestIdRef.current !== requestId) return;
+      setIsExerciseHistoryLoading(false);
+    }
+  }, []);
+
+  const handleDismissExerciseHistory = useCallback(() => {
+    exerciseHistoryRequestIdRef.current += 1;
+    setSelectedExercise(null);
+    setExerciseHistoryWeeklyEffort([]);
+    setSelectedExerciseHistoryWeekKey(null);
+    setExerciseHistoryErrorMessage(null);
+    setIsExerciseHistoryLoading(false);
+  }, []);
+
+  const handleSelectExerciseHistoryWeek = useCallback((weekKey: string | null) => {
+    setSelectedExerciseHistoryWeekKey(weekKey);
+  }, []);
+
+  const exerciseListItems = useMemo<ExerciseListItem[]>(() => {
+    const { exercises } = catalogSnapshot;
+    const { aggregatesById, everDoneIds } = exerciseCatalogStats;
+    return exercises
+      .filter((ex) => everDoneIds.has(ex.id))
+      .map((ex) => {
+        const agg = aggregatesById.get(ex.id) ?? null;
+        return {
+          id: ex.id,
+          name: ex.name,
+          sessionCount: agg?.sessionCount ?? 0,
+          totalVolume: agg?.totalVolume ?? 0,
+          estimatedOneRepMax: agg?.estimatedOneRepMax ?? null,
+        };
+      })
+      .sort((a, b) => b.sessionCount - a.sessionCount);
+  }, [catalogSnapshot, exerciseCatalogStats]);
+
   // useMemo prevents unnecessary re-renders of the shell when the route re-renders.
   const shellProps = useMemo<StatsScreenShellProps>(
     () => ({
@@ -723,6 +1063,19 @@ export default function StatsRoute() {
       selectedMuscleHistoryWeekKey,
       muscleHistoryMetric,
       onSelectMuscleHistoryMetric: setMuscleHistoryMetric,
+      viewMode,
+      onSelectViewMode: handleSelectViewMode,
+      exerciseListItems,
+      selectedExercise,
+      exerciseHistoryWeeklyEffort,
+      isExerciseHistoryLoading,
+      exerciseHistoryErrorMessage,
+      selectedExerciseHistoryWeekKey,
+      exerciseHistoryMetric,
+      onPressExerciseHistory: handlePressExerciseHistory,
+      onDismissExerciseHistory: handleDismissExerciseHistory,
+      onSelectExerciseHistoryWeek: handleSelectExerciseHistoryWeek,
+      onSelectExerciseHistoryMetric: setExerciseHistoryMetric,
     }),
     [
       summary,
@@ -740,6 +1093,18 @@ export default function StatsRoute() {
       muscleHistoryErrorMessage,
       selectedMuscleHistoryWeekKey,
       muscleHistoryMetric,
+      viewMode,
+      handleSelectViewMode,
+      exerciseListItems,
+      selectedExercise,
+      exerciseHistoryWeeklyEffort,
+      isExerciseHistoryLoading,
+      exerciseHistoryErrorMessage,
+      selectedExerciseHistoryWeekKey,
+      exerciseHistoryMetric,
+      handlePressExerciseHistory,
+      handleDismissExerciseHistory,
+      handleSelectExerciseHistoryWeek,
     ]
   );
 
@@ -753,6 +1118,41 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 12,
     position: 'relative',
+  },
+  headerRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    alignItems: 'center',
+  },
+  viewModeChip: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: uiColors.borderMuted,
+    backgroundColor: uiColors.surfaceDefault,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  viewModeChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: uiColors.textSecondary,
+  },
+  exerciseRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: uiColors.borderMuted,
+    gap: 12,
+  },
+  exerciseName: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: uiColors.textPrimary,
+    flexShrink: 1,
   },
   scroll: {
     flex: 1,
