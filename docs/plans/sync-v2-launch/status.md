@@ -213,3 +213,17 @@ Roots of the DAG (no in-plan dependency): **tPROG** (design), **t1**
   reviewer (#116).
 - After t11 merges: rebase t2 (#113) + t8 (#110); verify auth-profile lane on a
   host. Queue t5/t6 (after t4), t10 (after t9).
+
+## 2026-06-03 — iteration 10 (resume)
+- Session interruption killed both background builders (t4 + t9) ~19:00 before
+  either pushed a branch/PR (t4 had uncommitted slug-rename WIP in its worktree;
+  t9 was at "deps installed, running specs"). No work lost (nothing was pushed).
+- t11 reviewer left the MAIN checkout on branch `pr-116` (clean, no spill) —
+  reviewers can switch the primary checkout's branch; switched it back to `main`.
+  TODO (hygiene): add the worktree-discipline note to mao-reviewer too.
+- Re-dispatched t4 (agent a4ebec82) + t9 (agent ac9f0d92), background, fresh from
+  origin/main. Same conflict-aware plan (t6/t5 after t4; t10 after t9).
+- #116 (t11) STILL OPEN + APPROVED + MERGEABLE/CLEAN — re-flagged to user as the
+  top-priority merge (launch-blocking keychain fix; unblocks t2 rebase + signed-in
+  flows). main unchanged at 97c0155.
+- Pending merges/holds unchanged: #110 (t8) + #113 (t2) await t11 + rebase.
