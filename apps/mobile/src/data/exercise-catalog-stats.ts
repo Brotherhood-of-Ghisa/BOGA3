@@ -67,7 +67,13 @@ export const createDrizzleExerciseCatalogStatsStore = (): ExerciseCatalogStatsSt
               exerciseDefinitionId: sessionExercises.exerciseDefinitionId,
             })
             .from(sessionExercises)
-            .where(inArray(sessionExercises.sessionId, sessionIds))
+            .where(
+              and(
+                inArray(sessionExercises.sessionId, sessionIds),
+                // Exclude exercises the user removed (kept as tombstones).
+                isNull(sessionExercises.deletedAt)
+              )
+            )
             .all()
         : [];
 
@@ -82,7 +88,13 @@ export const createDrizzleExerciseCatalogStatsStore = (): ExerciseCatalogStatsSt
               setType: exerciseSets.setType,
             })
             .from(exerciseSets)
-            .where(inArray(exerciseSets.sessionExerciseId, sessionExerciseIds))
+            .where(
+              and(
+                inArray(exerciseSets.sessionExerciseId, sessionExerciseIds),
+                // Exclude sets the user removed (kept as tombstones).
+                isNull(exerciseSets.deletedAt)
+              )
+            )
             .all()
         : [];
 

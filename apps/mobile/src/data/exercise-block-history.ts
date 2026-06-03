@@ -231,6 +231,8 @@ export const createDrizzleExerciseBlockHistoryStore = (): ExerciseBlockHistorySt
       .where(
         and(
           eq(sessionExercises.exerciseDefinitionId, exerciseDefinitionId),
+          // Exclude exercises the user removed (kept as tombstones).
+          isNull(sessionExercises.deletedAt),
           eq(sessions.status, 'completed'),
           isNull(sessions.deletedAt),
           isNotNull(sessions.completedAt)
@@ -263,7 +265,9 @@ export const createDrizzleExerciseBlockHistoryStore = (): ExerciseBlockHistorySt
       .where(
         and(
           eq(sessionExercises.exerciseDefinitionId, exerciseDefinitionId),
-          inArray(sessionExercises.sessionId, sessionIds)
+          inArray(sessionExercises.sessionId, sessionIds),
+          // Exclude exercises the user removed (kept as tombstones).
+          isNull(sessionExercises.deletedAt)
         )
       )
       .orderBy(asc(sessionExercises.orderIndex), asc(sessionExercises.id))
@@ -288,7 +292,13 @@ export const createDrizzleExerciseBlockHistoryStore = (): ExerciseBlockHistorySt
         setType: exerciseSets.setType,
       })
       .from(exerciseSets)
-      .where(inArray(exerciseSets.sessionExerciseId, sessionExerciseIds))
+      .where(
+        and(
+          inArray(exerciseSets.sessionExerciseId, sessionExerciseIds),
+          // Exclude sets the user removed (kept as tombstones).
+          isNull(exerciseSets.deletedAt)
+        )
+      )
       .orderBy(asc(exerciseSets.orderIndex), asc(exerciseSets.id))
       .all();
 

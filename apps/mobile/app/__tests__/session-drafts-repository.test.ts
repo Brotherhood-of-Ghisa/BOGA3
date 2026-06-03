@@ -1,11 +1,9 @@
 import {
-  __replaceSessionExerciseGraphForTests,
   calculateSessionDurationSec,
   createSessionDraftRepository,
   type SessionDraftStore,
   type SessionPersistenceRecord,
 } from '@/src/data/session-drafts';
-import { exerciseSets, sessionExercises, sessionExerciseTags } from '@/src/data/schema';
 
 const createMockStore = (): jest.Mocked<SessionDraftStore> => ({
   saveDraftGraph: jest.fn(),
@@ -32,71 +30,6 @@ const buildSessionRecord = (overrides: Partial<SessionPersistenceRecord> = {}): 
 });
 
 describe('session draft repository', () => {
-  it('clears existing session exercise tags explicitly when replacing the exercise graph', () => {
-    const now = new Date('2026-03-05T14:00:00.000Z');
-    const existingExerciseRows = [{ id: 'exercise-1', exerciseDefinitionId: 'sys_barbell_back_squat' }];
-    const existingTagRows = [
-      {
-        id: 'assignment-1',
-        sessionExerciseId: 'exercise-1',
-        exerciseTagDefinitionId: 'tag-1',
-        createdAt: now,
-      },
-    ];
-
-    const runMock = jest.fn();
-    const valuesMock = jest.fn(() => ({ run: runMock }));
-    const insertMock = jest.fn(() => ({ values: valuesMock }));
-    const whereForSelectMock = jest.fn((table: unknown) => ({
-      all: () => {
-        if (table === sessionExercises) {
-          return existingExerciseRows;
-        }
-        if (table === sessionExerciseTags) {
-          return existingTagRows;
-        }
-        return [];
-      },
-    }));
-    const fromForSelectMock = jest.fn((table: unknown) => ({
-      where: () => whereForSelectMock(table),
-    }));
-    const selectMock = jest.fn(() => ({ from: fromForSelectMock }));
-    const deletedTables: unknown[] = [];
-    const deleteMock = jest.fn((table: unknown) => {
-      deletedTables.push(table);
-      return {
-        where: () => ({
-          run: runMock,
-        }),
-      };
-    });
-
-    const tx = {
-      select: selectMock,
-      insert: insertMock,
-      delete: deleteMock,
-    } as any;
-
-    __replaceSessionExerciseGraphForTests(tx, {
-      sessionId: 'session-1',
-      exercises: [
-        {
-          id: 'exercise-1',
-          exerciseDefinitionId: 'sys_barbell_back_squat',
-          name: 'Barbell Squat',
-          sets: [{ id: 'set-1', repsValue: '5', weightValue: '225' }],
-        },
-      ],
-      now,
-      localUpdatedAtMs: now.getTime(),
-    });
-
-    expect(deletedTables).toContain(sessionExerciseTags);
-    expect(deletedTables.indexOf(sessionExerciseTags)).toBeLessThan(deletedTables.indexOf(sessionExercises));
-    expect(deletedTables).toContain(exerciseSets);
-  });
-
   it('creates/persists draft snapshots through the store API with active default status', async () => {
     const store = createMockStore();
     const repository = createSessionDraftRepository(store);
