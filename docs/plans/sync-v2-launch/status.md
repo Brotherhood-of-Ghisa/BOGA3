@@ -182,3 +182,34 @@ Roots of the DAG (no in-plan dependency): **tPROG** (design), **t1**
   merge of #111 (t3) + #112 (t7b) to unblock the t9/t4/t5/t6/t10 wave. t11
   (auth fix) still running in background. t2 (#113) held; t8 (#110) rebases after
   t7b.
+
+## 2026-06-03 — iteration 9
+- User merged #111 (t3) + #112 (t7b). main → 97c0155. Hand-offs verified
+  (bootstrapper.ts + progress.ts present; guard no longer exempts session-drafts).
+  Deviations logged for both.
+- t11 (auth fix) COMPLETED → PR #116. ROOT CAUSE: REAL / launch-blocking (not
+  fixture): a signed-in Supabase session exceeds the iOS keychain's 2048-byte
+  per-entry limit; the old single-key auth storage adapter silently persisted
+  NOTHING; the cycle's getSession() reads storage → null → unsigned RPC →
+  AUTH_REQUIRED → bounce loop. EVERY real user would hit this. Fix: chunk
+  oversized values across keychain entries (`apps/mobile/src/auth/storage.ts`),
+  public API unchanged. Enforced regression gate added in CI's FAST lane
+  (`auth-session-visibility.test.ts`, real GoTrue client vs a 2048-byte ceiling —
+  red on old adapter, green with fix). quality-fast 599 green. Guard/signal/
+  classification untouched (loop fixed by removing the spurious signal).
+  CAVEAT: the iOS auth-profile Maestro lane needs LOCAL Supabase (CLI/infra) the
+  agent env lacks — not runnable in-agent; run on an iOS+Supabase host (tFINAL
+  infra lane / user machine) to green `launch-requires-sign-in.yaml`.
+- PROCESS GAP confirmed: ALL signed-in Maestro flows (t1/t2/t9/t10) live in the
+  auth-profile lane needing local Supabase — not runnable by agents or CI's gate.
+  Infra-free `test:e2e:ios:gates` (smoke+data-smoke) IS agent-runnable
+  (stand-aside paths). Signed-in E2E verification belongs to tFINAL's provisioned
+  infra lane (or a host run).
+- WAVE 3 dispatch (conflict-aware): t4/t5/t6 all edit exercise-catalog-seeds.ts →
+  SEQUENCE (t4 now; t6, t5 queued). t9/t10 both edit settings.tsx → t9 now, t10
+  queued. Dispatched t4 (bg; fast gate only) + t9 (bg; single shared accessor +
+  panel + Jest + infra-free gate; auth-profile Settings Maestro deferred to
+  tFINAL/host). Both compose with #115's now-dirty seeder. Dispatched t11
+  reviewer (#116).
+- After t11 merges: rebase t2 (#113) + t8 (#110); verify auth-profile lane on a
+  host. Queue t5/t6 (after t4), t10 (after t9).

@@ -406,3 +406,14 @@ and the referenced PRs.
   main advanced to 71ea317. t3 (#111) + t7b (#112) remained CLEAN/mergeable on top.
   Downstream note: t4 (slug rename) + t5 (bundle migration) must compose with the
   now-dirty seeder. Resolves open-concern #1 from iteration 5.
+- t3 (PR #111, merged 2026-06-03): bootstrapper integration — seeder runs only
+  inside the bootstrapper behind `rowsPulled == 0`, `bootstrap_completed_at` set
+  last; produces the `SyncProgress` snapshot (`apps/mobile/src/sync/progress.ts`,
+  `getSyncProgress`). Deviation: reviewer flagged the as-built seeder wrote seeds
+  `local_dirty=0` — resolved out-of-band by #115; t3 composes with the now-dirty
+  seeder.
+- t7b (PR #112, merged 2026-06-03): session-rebuild cascade converted to
+  soft-delete-then-reconcile (scratch-band/allocator keeps the `order_index`/PK
+  invariants against the non-partial local unique index); guard test no longer
+  exempts `session-drafts.ts`. Deviation: filtered two readers beyond the card's
+  named list (`exercise-catalog-stats.ts` + the in-file draft loader).
