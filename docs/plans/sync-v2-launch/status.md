@@ -293,3 +293,13 @@ Roots of the DAG (no in-plan dependency): **tPROG** (design), **t1**
 - DECISION PENDING (asked user): how to run the auth-profile lane reliably for the
   signed-in PRs (you-run-on-warm-stack / coordinator-foreground / consolidate-at-
   tFINAL). t9's build is ready; its PR + lane-green is the only remaining step.
+- DECISION: user runs the auth-profile lane via a TASK THEY SPAWN (survives the
+  background-kill), which opens the PR; user relays the PR number; coordinator
+  then dispatches the reviewer. User = message-passer between coordinator and the
+  spawned task. Applies to every signed-in-lane task (t9 now; t10, t2-rebase,
+  tFINAL later: coordinator's bg builder commits+pushes the build, user's spawned
+  task runs the lane + opens the PR).
+- t9 hand-off to user's spawned task: branch `claude/t9-sync-status-surface`
+  (build @ c814e11, base c669c0a/#116). Task: merge origin/main, run quality-fast
+  + test:e2e:ios:gates + test:e2e:ios:auth-profile to green, open `[t9]` PR with
+  evidence → relay PR # → coordinator dispatches reviewer.
