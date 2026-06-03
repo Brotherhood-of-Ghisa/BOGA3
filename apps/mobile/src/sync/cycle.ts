@@ -21,6 +21,7 @@ import { and, asc, eq } from 'drizzle-orm';
 
 import { getRequiredSupabaseMobileClient } from '@/src/auth/supabase';
 import { clearAuthRequired, markAuthRequired } from '@/src/sync/auth-required-signal';
+import { runBootstrapper } from '@/src/sync/bootstrapper';
 import { bootstrapLocalDataLayer, type LocalDatabase } from '@/src/data/bootstrap';
 import { PRIMARY_RUNTIME_STATE_ID, type Transaction } from '@/src/data/clock';
 import * as schema from '@/src/data/schema';
@@ -511,11 +512,28 @@ const callSyncPull = async (layer: number, cursor: PullCursor): Promise<PullResp
 // -----------------------------------------------------------------------------
 
 /**
+ * Reports progress as the pull leg crosses observable boundaries. `onPage` fires
+ * after each applied page with how many rows that page carried; `onLayerDrained`
+ * fires once a layer has drained to `has_more = false`, with the 1-based count of
+ * layers completed so far. Both are optional so the converged-state cycle can run
+ * the same leg without instrumentation.
+ */
+export interface PullProgressReporter {
+  onPage?: (rowsApplied: number) => void;
+  onLayerDrained?: (layersCompleted: number) => void;
+}
+
+/**
  * Drains every topological layer once, applying each page and advancing that
  * layer's cursor after the page commits. Returns the number of entities applied
- * across all layers so the cycle can tell whether the pull leg was quiet.
+ * across all layers so the cycle can tell whether the pull leg was quiet. When a
+ * reporter is passed, emits a page event per applied page and a layer event per
+ * drained layer so a first-sync caller can surface advancing progress.
  */
-const runPullLeg = async (database: LocalDatabase): Promise<number> => {
+const runPullLeg = async (
+  database: LocalDatabase,
+  reporter?: PullProgressReporter,
+): Promise<number> => {
   let appliedTotal = 0;
 
   for (let layer = 0; layer < TOPO_LAYERS.length; layer += 1) {
@@ -541,15 +559,29 @@ const runPullLeg = async (database: LocalDatabase): Promise<number> => {
       });
 
       appliedTotal += page.entities.length;
+      reporter?.onPage?.(page.entities.length);
 
       if (!page.has_more) {
         break;
       }
     }
+
+    reporter?.onLayerDrained?.(layer + 1);
   }
 
   return appliedTotal;
 };
+
+/**
+ * Drains all four topological layers once, reporting per-page and per-layer
+ * progress. This is the first full pull the bootstrapper runs before deciding
+ * whether to seed: its return value is the total rows applied across every layer
+ * (tombstones included, since a tombstone is a normal applied row).
+ */
+export const runFirstFullPull = (
+  database: LocalDatabase,
+  reporter?: PullProgressReporter,
+): Promise<number> => runPullLeg(database, reporter);
 
 /** Stable map key for a row's identity across the in-flight push window. */
 const rowKey = (type: EntityTableName, id: string): string => `${type} ${id}`;
@@ -652,6 +684,12 @@ export const runSyncCycle = async (): Promise<void> => {
   const database = await bootstrapLocalDataLayer();
 
   try {
+    // First-sign-in bootstrap: seed the starter catalog iff the server holds
+    // nothing for this user, then mark the first cycle as drained. A no-op once
+    // it has completed for this device-account. Runs before the convergence
+    // loop so a fresh account has its seeded rows ready to push in the same call.
+    await runBootstrapper(database);
+
     for (let round = 0; round < MAX_CYCLES_PER_CALL; round += 1) {
       const pulledBefore = await runPullLeg(database);
       const pushed = await runPushLeg(database);

@@ -5,7 +5,7 @@ import { deleteDatabaseAsync, openDatabaseSync, type SQLiteDatabase } from 'expo
 import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidation';
 
 import { localRuntimeMigrations } from './migrations';
-import { seedSystemExerciseCatalog } from './exercise-catalog-seeds';
+import { seedMuscleGroups } from './exercise-catalog-seeds';
 import * as schema from './schema';
 
 const LOCAL_DATABASE_NAME = 'scaffolding-local.db';
@@ -28,8 +28,8 @@ export type LocalDatabase = ReturnType<typeof createLocalDatabase>;
 let localDatabase: LocalDatabase | null = null;
 let runtimeMigrationsComplete = false;
 let runtimeMigrationPromise: Promise<void> | null = null;
-let runtimeExerciseCatalogSeedComplete = false;
-let runtimeExerciseCatalogSeedPromise: Promise<void> | null = null;
+let muscleGroupSeedComplete = false;
+let muscleGroupSeedPromise: Promise<void> | null = null;
 
 const runRuntimeMigrations = async (database: LocalDatabase) => {
   if (runtimeMigrationsComplete) {
@@ -50,24 +50,29 @@ const runRuntimeMigrations = async (database: LocalDatabase) => {
   await runtimeMigrationPromise;
 };
 
-const runRuntimeExerciseCatalogSeed = async (database: LocalDatabase) => {
-  if (runtimeExerciseCatalogSeedComplete) {
+// Seed the client-only muscle-group taxonomy at boot. The syncable entity
+// catalog (exercise definitions + muscle mappings) is NOT seeded here — it is
+// seeded by the first-sign-in bootstrapper only when the first full pull returns
+// no rows, so a reinstall recovers the server's state rather than re-creating
+// starter rows. Muscle groups never sync, so they seed unconditionally at boot.
+const runMuscleGroupSeed = async (database: LocalDatabase) => {
+  if (muscleGroupSeedComplete) {
     return;
   }
 
-  if (!runtimeExerciseCatalogSeedPromise) {
-    runtimeExerciseCatalogSeedPromise = Promise.resolve()
+  if (!muscleGroupSeedPromise) {
+    muscleGroupSeedPromise = Promise.resolve()
       .then(() => {
-        seedSystemExerciseCatalog(database);
-        runtimeExerciseCatalogSeedComplete = true;
+        seedMuscleGroups(database);
+        muscleGroupSeedComplete = true;
       })
       .catch((error) => {
-        runtimeExerciseCatalogSeedPromise = null;
+        muscleGroupSeedPromise = null;
         throw error;
       });
   }
 
-  await runtimeExerciseCatalogSeedPromise;
+  await muscleGroupSeedPromise;
 };
 
 // Bootstrap and reset both mutate the shared `sqliteDatabase`/`localDatabase`
@@ -99,7 +104,7 @@ const prepareLocalDataLayer = async (): Promise<LocalDatabase> => {
   }
 
   await runRuntimeMigrations(localDatabase);
-  await runRuntimeExerciseCatalogSeed(localDatabase);
+  await runMuscleGroupSeed(localDatabase);
   return localDatabase;
 };
 
@@ -114,8 +119,8 @@ export const resetLocalAppData = (): Promise<LocalDatabase> =>
     localDatabase = null;
     runtimeMigrationsComplete = false;
     runtimeMigrationPromise = null;
-    runtimeExerciseCatalogSeedComplete = false;
-    runtimeExerciseCatalogSeedPromise = null;
+    muscleGroupSeedComplete = false;
+    muscleGroupSeedPromise = null;
 
     await databaseToClose?.closeAsync();
     await deleteDatabaseAsync(LOCAL_DATABASE_NAME);
@@ -142,7 +147,7 @@ export const __resetLocalDataLayerForTests = () => {
   localDatabase = null;
   runtimeMigrationsComplete = false;
   runtimeMigrationPromise = null;
-  runtimeExerciseCatalogSeedComplete = false;
-  runtimeExerciseCatalogSeedPromise = null;
+  muscleGroupSeedComplete = false;
+  muscleGroupSeedPromise = null;
   dataLayerOperationLock = Promise.resolve();
 };
