@@ -164,3 +164,21 @@ Roots of the DAG (no in-plan dependency): **tPROG** (design), **t1**
 - Gating action UNCHANGED for the next build wave: user merges #111 (t3) + #112
   (t7b) → then dispatch t9/t4/t5/t6/t10 (t11 already in flight). t8 (#110) +
   t2 (#113) rebase after their pair-mates land.
+
+## 2026-06-03 — iteration 8
+- OUT-OF-BAND merge: user merged PR #115 (`seed starter catalog dirty so a fresh
+  account pushes it`) — the seed-dirty fix the t3 reviewer auto-spawned. main →
+  71ea317. Resolves open-concern #1 (iteration 5). Logged in deviations.
+- #115 touches `exercise-catalog-seeds.ts` (also t3's territory). Checked: GitHub
+  reports #111/#112/#110/#113 ALL still `MERGEABLE`/`CLEAN` on the new main — the
+  seeder edits auto-reconcile. Semantic interaction (t3 bootstrapper → now-dirty
+  seeder) actually matches t3's card outcome; left to next-wave gates + audit to
+  validate (no t3 re-dispatch).
+- #114 ("M17 exercise calendar heatmap") is an UNRELATED feature PR (not this
+  plan); ignoring. (It touches Stats/History — a future conflict risk for t7b's
+  readers if it merges, but that's #114's rebase problem, not ours.)
+- t4/t5 dispatch note: must compose with #115's now-dirty seeder.
+- Coordinator synced to 71ea317. State otherwise UNCHANGED: still awaiting user
+  merge of #111 (t3) + #112 (t7b) to unblock the t9/t4/t5/t6/t10 wave. t11
+  (auth fix) still running in background. t2 (#113) held; t8 (#110) rebases after
+  t7b.

@@ -399,3 +399,10 @@ and the referenced PRs.
   `isConfigured`; sign-in-landing Maestro assertion placed in the auth-configured
   lane; `auth-profile-happy-path.yaml` adapted to the new launch contract).
   `Builder-Agent:` trailer accepted per the same ruling.
+- (out-of-band) PR #115 (merged 2026-06-03): `fix(mobile): seed starter catalog
+  dirty so a fresh account pushes it` — resolves the concern flagged at t3 review
+  (the as-built seeder wrote seeds `local_dirty=0`, so fresh-account seeds never
+  pushed). Shipped via the reviewer-spawned task chip, OUTSIDE this orchestration;
+  main advanced to 71ea317. t3 (#111) + t7b (#112) remained CLEAN/mergeable on top.
+  Downstream note: t4 (slug rename) + t5 (bundle migration) must compose with the
+  now-dirty seeder. Resolves open-concern #1 from iteration 5.
