@@ -239,3 +239,20 @@ Roots of the DAG (no in-plan dependency): **tPROG** (design), **t1**
 - t4 (a4ebec82) + t9 (ac9f0d92) still building (bg); no PRs yet.
 - Reminder to user: with #116 on main, the auth-profile lane can be run on a host
   (`npm run test:e2e:ios:auth-profile`) to confirm the sign-in→sync fix E2E.
+
+## 2026-06-03 — iteration 12 (policy correction: agents CAN run auth-profile lane)
+- User: "all agents have local supabase." Investigated: the auth-profile runner
+  (`apps/mobile/scripts/maestro-ios-auth-profile.sh`) calls
+  `supabase/scripts/ensure-local-runtime-baseline.sh`, whose `run_supabase()` is
+  `npx -y supabase@<SUPABASE_CLI_VERSION>` and which REUSES an already-running
+  local instance. So `which supabase` failing is a RED HERRING — the lane
+  self-bootstraps. The t11/t9(defer) agents wrongly bailed on `which supabase`.
+- CORRECTED POLICY: every signed-in-flow task RUNS `npm run test:e2e:ios:auth-profile`
+  to GREEN in-agent — no deferring to a host. Applies to t9 (re-run on return),
+  t10, the t2 (#113) rebase, and tFINAL. (Note: the baseline uses a
+  `runtime-baseline.lock`, so concurrent auth-profile runs serialize.)
+- Action: when t9 returns (built with the now-stale "defer Maestro" instruction),
+  re-dispatch it to run the auth-profile Settings flow green + update its PR
+  before review. Future dispatches carry the corrected instruction.
+- Durable follow-up: add a one-line note to the repo's Maestro/testing docs so
+  agents stop bailing on `which supabase` (fold into tFINAL or a small doc PR).
