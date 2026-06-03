@@ -16,6 +16,8 @@ import {
   type StatsPeriodDays,
   type StatsSummary,
 } from '@/src/data';
+import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
+import type { IndexedExerciseCatalogExercise } from '@/src/exercise-catalog/search';
 
 const PERIOD_OPTIONS = [
   { value: 7 as StatsPeriodDays, label: 'Last 7 days' },
@@ -89,6 +91,8 @@ const deltaToneStyle = (tone: DeltaDisplay['tone']) => {
   }
 };
 
+export type StatsViewMode = 'exercise' | 'muscle';
+
 export type StatsScreenShellProps = {
   summary: StatsSummary | null;
   periodDays: StatsPeriodDays;
@@ -106,6 +110,10 @@ export type StatsScreenShellProps = {
   selectedMuscleHistoryWeekKey: string | null;
   muscleHistoryMetric: CalendarHeatmapMetric;
   onSelectMuscleHistoryMetric: (metric: CalendarHeatmapMetric) => void;
+  viewMode: StatsViewMode;
+  onSelectViewMode: (mode: StatsViewMode) => void;
+  exercises: IndexedExerciseCatalogExercise[];
+  onPressExercise: (exerciseId: string) => void;
 };
 
 export function StatsScreenShell({
@@ -125,6 +133,10 @@ export function StatsScreenShell({
   selectedMuscleHistoryWeekKey,
   muscleHistoryMetric,
   onSelectMuscleHistoryMetric,
+  viewMode,
+  onSelectViewMode,
+  exercises,
+  onPressExercise,
 }: StatsScreenShellProps) {
   const sessionDelta = summary
     ? formatDelta(summary.current.totals.sessionCount, summary.previous.totals.sessionCount)
@@ -135,72 +147,91 @@ export function StatsScreenShell({
 
   return (
     <View style={styles.screen} testID="stats-history-screen">
-      <SegmentedChips
-        accessibilityLabel="Select stats period"
-        options={PERIOD_OPTIONS}
-        value={periodDays}
-        onChange={onSelectPeriod}
-        testIDPrefix="stats-period-chip"
-      />
+      <View style={styles.headerRow}>
+        <SegmentedChips
+          accessibilityLabel="Select stats period"
+          options={PERIOD_OPTIONS}
+          value={periodDays}
+          onChange={onSelectPeriod}
+          testIDPrefix="stats-period-chip"
+        />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={
+            viewMode === 'muscle' ? 'Switch to exercise view' : 'Switch to muscle view'
+          }
+          onPress={() => onSelectViewMode(viewMode === 'muscle' ? 'exercise' : 'muscle')}
+          style={styles.viewModeChip}
+          testID="stats-view-mode-chip">
+          <Text style={styles.viewModeChipText}>
+            {viewMode === 'muscle' ? 'By Exercise' : 'By Muscle'}
+          </Text>
+        </Pressable>
+      </View>
 
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
-        testID="stats-scroll">
-        {errorMessage ? (
-          <View style={styles.statePanel} testID="stats-error-state">
-            <Text style={styles.stateTitle}>Could not load stats</Text>
-            <Text style={styles.stateBody}>{errorMessage}</Text>
-          </View>
-        ) : null}
-
-        {!errorMessage && isLoading && !summary ? (
-          <View style={styles.statePanel} testID="stats-loading-state">
-            <Text style={styles.stateBody}>Loading stats…</Text>
-          </View>
-        ) : null}
-
-        {summary ? (
-          <>
-            <View style={styles.summaryGrid}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Open sessions list"
-                onPress={onPressSessionsCard}
-                style={({ pressed }) => [styles.summaryCard, pressed && styles.summaryCardPressed]}
-                testID="stats-card-sessions">
-                <Text style={styles.summaryLabel}>Sessions</Text>
-                <Text style={styles.summaryValue}>
-                  {formatNumber(summary.current.totals.sessionCount)}
-                </Text>
-                {sessionDelta ? (
-                  <Text style={[styles.summaryDelta, deltaToneStyle(sessionDelta.tone)]}>
-                    {sessionDelta.text}
-                  </Text>
-                ) : null}
-              </Pressable>
-
-              <View style={styles.summaryCard} testID="stats-card-sets">
-                <Text style={styles.summaryLabel}>Working sets</Text>
-                <Text style={styles.summaryValue}>
-                  {formatNumber(summary.current.totals.totalSets)}
-                </Text>
-                {setsDelta ? (
-                  <Text style={[styles.summaryDelta, deltaToneStyle(setsDelta.tone)]}>
-                    {setsDelta.text}
-                  </Text>
-                ) : null}
-              </View>
+      {viewMode === 'muscle' ? (
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollContent}
+          testID="stats-scroll">
+          {errorMessage ? (
+            <View style={styles.statePanel} testID="stats-error-state">
+              <Text style={styles.stateTitle}>Could not load stats</Text>
+              <Text style={styles.stateBody}>{errorMessage}</Text>
             </View>
+          ) : null}
 
-            <MuscleFamilyList
-              families={summary.current.totals.muscleFamilies}
-              previousFamilies={summary.previous.totals.muscleFamilies}
-              onPressMuscleHistory={onPressMuscleHistory}
-            />
-          </>
-        ) : null}
-      </ScrollView>
+          {!errorMessage && isLoading && !summary ? (
+            <View style={styles.statePanel} testID="stats-loading-state">
+              <Text style={styles.stateBody}>Loading stats…</Text>
+            </View>
+          ) : null}
+
+          {summary ? (
+            <>
+              <View style={styles.summaryGrid}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Open sessions list"
+                  onPress={onPressSessionsCard}
+                  style={({ pressed }) => [styles.summaryCard, pressed && styles.summaryCardPressed]}
+                  testID="stats-card-sessions">
+                  <Text style={styles.summaryLabel}>Sessions</Text>
+                  <Text style={styles.summaryValue}>
+                    {formatNumber(summary.current.totals.sessionCount)}
+                  </Text>
+                  {sessionDelta ? (
+                    <Text style={[styles.summaryDelta, deltaToneStyle(sessionDelta.tone)]}>
+                      {sessionDelta.text}
+                    </Text>
+                  ) : null}
+                </Pressable>
+
+                <View style={styles.summaryCard} testID="stats-card-sets">
+                  <Text style={styles.summaryLabel}>Working sets</Text>
+                  <Text style={styles.summaryValue}>
+                    {formatNumber(summary.current.totals.totalSets)}
+                  </Text>
+                  {setsDelta ? (
+                    <Text style={[styles.summaryDelta, deltaToneStyle(setsDelta.tone)]}>
+                      {setsDelta.text}
+                    </Text>
+                  ) : null}
+                </View>
+              </View>
+
+              <MuscleFamilyList
+                families={summary.current.totals.muscleFamilies}
+                previousFamilies={summary.previous.totals.muscleFamilies}
+                onPressMuscleHistory={onPressMuscleHistory}
+              />
+            </>
+          ) : null}
+        </ScrollView>
+      ) : (
+        <ExerciseListView exercises={exercises} onPressExercise={onPressExercise} />
+      )}
+
       {selectedMuscle ? (
         <MuscleHistoryOverlay
           muscle={selectedMuscle}
@@ -215,6 +246,40 @@ export function StatsScreenShell({
         />
       ) : null}
     </View>
+  );
+}
+
+function ExerciseListView({
+  exercises,
+  onPressExercise,
+}: {
+  exercises: IndexedExerciseCatalogExercise[];
+  onPressExercise: (exerciseId: string) => void;
+}) {
+  if (exercises.length === 0) {
+    return (
+      <View style={styles.statePanel} testID="stats-exercise-empty">
+        <Text style={styles.stateBody}>No exercises in your catalog yet.</Text>
+      </View>
+    );
+  }
+  return (
+    <ScrollView
+      style={styles.scroll}
+      contentContainerStyle={styles.scrollContent}
+      testID="stats-exercise-scroll">
+      {exercises.map((ex) => (
+        <Pressable
+          key={ex.id}
+          accessibilityRole="button"
+          accessibilityLabel={`Open ${ex.name} history`}
+          onPress={() => onPressExercise(ex.id)}
+          style={({ pressed }) => [styles.exerciseRow, pressed && styles.actionableRowPressed]}
+          testID={`stats-exercise-row-${ex.id}`}>
+          <Text style={styles.exerciseName}>{ex.name}</Text>
+        </Pressable>
+      ))}
+    </ScrollView>
   );
 }
 
@@ -619,6 +684,8 @@ function Metric({
 
 export default function StatsRoute() {
   const router = useRouter();
+  const { exercises } = useExerciseCatalog();
+  const [viewMode, setViewMode] = useState<StatsViewMode>('exercise');
   const [periodDays, setPeriodDays] = useState<StatsPeriodDays>(7);
   const [summary, setSummary] = useState<StatsSummary | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -657,6 +724,14 @@ export default function StatsRoute() {
     },
     [loadSummary]
   );
+
+  const handleSelectViewMode = useCallback((mode: StatsViewMode) => {
+    setViewMode(mode);
+  }, []);
+
+  const handlePressExercise = useCallback((exerciseId: string) => {
+    router.push({ pathname: '/exercise-history', params: { exerciseDefinitionId: exerciseId } });
+  }, [router]);
 
   const handlePressSessionsCard = useCallback(() => {
     router.push('/sessions');
@@ -723,6 +798,10 @@ export default function StatsRoute() {
       selectedMuscleHistoryWeekKey,
       muscleHistoryMetric,
       onSelectMuscleHistoryMetric: setMuscleHistoryMetric,
+      viewMode,
+      onSelectViewMode: handleSelectViewMode,
+      exercises,
+      onPressExercise: handlePressExercise,
     }),
     [
       summary,
@@ -740,6 +819,10 @@ export default function StatsRoute() {
       muscleHistoryErrorMessage,
       selectedMuscleHistoryWeekKey,
       muscleHistoryMetric,
+      viewMode,
+      handleSelectViewMode,
+      exercises,
+      handlePressExercise,
     ]
   );
 
@@ -753,6 +836,36 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 12,
     position: 'relative',
+  },
+  headerRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    alignItems: 'center',
+  },
+  viewModeChip: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: uiColors.borderMuted,
+    backgroundColor: uiColors.surfaceDefault,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  viewModeChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: uiColors.textSecondary,
+  },
+  exerciseRow: {
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: uiColors.borderMuted,
+  },
+  exerciseName: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: uiColors.textPrimary,
   },
   scroll: {
     flex: 1,

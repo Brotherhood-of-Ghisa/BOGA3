@@ -7,6 +7,7 @@ import {
   default as StatsRoute,
   StatsScreenShell,
   type StatsScreenShellProps,
+  type StatsViewMode,
   formatDelta,
 } from '../(tabs)/stats-history';
 import type { SelectedMuscleWeeklyEffort, StatsSummary } from '@/src/data';
@@ -14,6 +15,10 @@ import type { SelectedMuscleWeeklyEffort, StatsSummary } from '@/src/data';
 jest.mock('@/src/data', () => ({
   computeSelectedMuscleWeeklyEffort: jest.fn(),
   computeStatsSummary: jest.fn(),
+}));
+
+jest.mock('@/src/exercise-catalog/cache', () => ({
+  useExerciseCatalog: jest.fn(() => ({ exercises: [], status: 'ready', muscleGroups: [], muscleGroupsById: {}, lastError: null })),
 }));
 
 jest.mock('expo-router', () => {
@@ -211,6 +216,10 @@ const buildShellProps = (
   selectedMuscleHistoryWeekKey: null,
   muscleHistoryMetric: 'totalVolume',
   onSelectMuscleHistoryMetric: jest.fn(),
+  viewMode: 'muscle' as StatsViewMode,
+  onSelectViewMode: jest.fn(),
+  exercises: [],
+  onPressExercise: jest.fn(),
   ...overrides,
 });
 
@@ -512,6 +521,58 @@ describe('StatsScreenShell', () => {
   });
 });
 
+describe('StatsScreenShell — view mode chip', () => {
+  it('renders "By Exercise" chip when in muscle view', () => {
+    renderStatsScreenShell({ viewMode: 'muscle' });
+    expect(screen.getByTestId('stats-view-mode-chip')).toHaveTextContent('By Exercise');
+  });
+
+  it('renders "By Muscle" chip when in exercise view', () => {
+    renderStatsScreenShell({ viewMode: 'exercise' });
+    expect(screen.getByTestId('stats-view-mode-chip')).toHaveTextContent('By Muscle');
+  });
+
+  it('calls onSelectViewMode with opposite mode when tapped from muscle view', () => {
+    const onSelectViewMode = jest.fn();
+    renderStatsScreenShell({ viewMode: 'muscle', onSelectViewMode });
+    fireEvent.press(screen.getByTestId('stats-view-mode-chip'));
+    expect(onSelectViewMode).toHaveBeenCalledWith('exercise');
+  });
+
+  it('calls onSelectViewMode with opposite mode when tapped from exercise view', () => {
+    const onSelectViewMode = jest.fn();
+    renderStatsScreenShell({ viewMode: 'exercise', onSelectViewMode });
+    fireEvent.press(screen.getByTestId('stats-view-mode-chip'));
+    expect(onSelectViewMode).toHaveBeenCalledWith('muscle');
+  });
+
+  it('renders exercise list in exercise view and hides muscle scroll', () => {
+    renderStatsScreenShell({
+      viewMode: 'exercise',
+      exercises: [{ id: 'bench', name: 'Bench Press', searchText: '', deletedAt: null, mappings: [] }],
+    });
+    expect(screen.getByTestId('stats-exercise-row-bench')).toHaveTextContent('Bench Press');
+    expect(screen.queryByTestId('stats-scroll')).toBeNull();
+  });
+
+  it('renders empty state when exercise view has no exercises', () => {
+    renderStatsScreenShell({ viewMode: 'exercise', exercises: [] });
+    expect(screen.getByTestId('stats-exercise-empty')).toBeTruthy();
+    expect(screen.queryByTestId('stats-scroll')).toBeNull();
+  });
+
+  it('calls onPressExercise with the exercise id when an exercise row is tapped', () => {
+    const onPressExercise = jest.fn();
+    renderStatsScreenShell({
+      viewMode: 'exercise',
+      exercises: [{ id: 'squat', name: 'Squat', searchText: '', deletedAt: null, mappings: [] }],
+      onPressExercise,
+    });
+    fireEvent.press(screen.getByTestId('stats-exercise-row-squat'));
+    expect(onPressExercise).toHaveBeenCalledWith('squat');
+  });
+});
+
 describe('StatsRoute', () => {
   it('loads the summary on focus and re-loads when the period changes', async () => {
     mockComputeStatsSummary
@@ -538,6 +599,10 @@ describe('StatsRoute', () => {
     await waitFor(() => {
       expect(mockComputeStatsSummary).toHaveBeenCalledWith({ periodDays: 7 });
     });
+
+    // Switch to muscle view to see summary cards.
+    fireEvent.press(screen.getByTestId('stats-view-mode-chip'));
+
     await waitFor(() => {
       expect(screen.getByTestId('stats-card-sessions')).toHaveTextContent(/4/);
     });
@@ -561,6 +626,9 @@ describe('StatsRoute', () => {
       triggerFocus();
     });
 
+    // Switch to muscle view to see the sessions card.
+    fireEvent.press(screen.getByTestId('stats-view-mode-chip'));
+
     await waitFor(() => {
       expect(screen.getByTestId('stats-card-sessions')).toHaveTextContent(/4/);
     });
@@ -578,6 +646,9 @@ describe('StatsRoute', () => {
     await act(async () => {
       triggerFocus();
     });
+
+    // Switch to muscle view to access muscle rows.
+    fireEvent.press(screen.getByTestId('stats-view-mode-chip'));
 
     await waitFor(() => {
       expect(screen.getByTestId('stats-muscle-row-front_delts')).toBeTruthy();
@@ -609,6 +680,9 @@ describe('StatsRoute', () => {
     await act(async () => {
       triggerFocus();
     });
+
+    // Switch to muscle view to access family header buttons.
+    fireEvent.press(screen.getByTestId('stats-view-mode-chip'));
 
     await waitFor(() => {
       expect(screen.getByTestId('stats-family-header-button-chest')).toBeTruthy();
