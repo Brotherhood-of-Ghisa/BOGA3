@@ -37,15 +37,10 @@ const SRC_ROOT = path.resolve(__dirname, '..', '..', 'src');
 // Files that legitimately issue a hard `DELETE` against a syncable entity.
 // These are NOT per-row user deletes:
 //   - the dev-only local-table reset wipes every table wholesale before a
-//     re-seed (equivalent to a reinstall), local-only, never pushed;
-//   - the session-rebuild cascade still hard-deletes the exercise/set/tag
-//     graph before re-inserting it — converting that wipe-and-reinsert to a
-//     soft-delete-then-reconcile is a separate, materially larger change and
-//     lands on its own.
+//     re-seed (equivalent to a reinstall), local-only, never pushed.
 // Paths are relative to `src/`.
 const EXEMPT_FILES_AGAINST_SYNCABLE_ENTITIES = new Set<string>([
   'data/dev-reset.ts',
-  'data/session-drafts.ts',
 ]);
 
 const collectTypeScriptSourceFiles = (dir: string): string[] => {

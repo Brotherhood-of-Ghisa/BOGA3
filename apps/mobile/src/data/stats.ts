@@ -206,7 +206,13 @@ export const createDrizzleStatsStore = (): StatsStore => ({
               exerciseName: sessionExercises.name,
             })
             .from(sessionExercises)
-            .where(inArray(sessionExercises.sessionId, sessionIds))
+            .where(
+              and(
+                inArray(sessionExercises.sessionId, sessionIds),
+                // Exclude exercises the user removed (kept as tombstones).
+                isNull(sessionExercises.deletedAt)
+              )
+            )
             .all()
         : [];
 
@@ -231,7 +237,13 @@ export const createDrizzleStatsStore = (): StatsStore => ({
               repsValue: exerciseSets.repsValue,
             })
             .from(exerciseSets)
-            .where(inArray(exerciseSets.sessionExerciseId, sessionExerciseIds))
+            .where(
+              and(
+                inArray(exerciseSets.sessionExerciseId, sessionExerciseIds),
+                // Exclude sets the user removed (kept as tombstones).
+                isNull(exerciseSets.deletedAt)
+              )
+            )
             .all()
         : [];
 

@@ -92,12 +92,16 @@ const readSessionExercises = (database: TestDatabase) =>
       id: sessionExercises.id,
       orderIndex: sessionExercises.orderIndex,
       name: sessionExercises.name,
+      deletedAt: sessionExercises.deletedAt,
       localDirty: sessionExercises.localDirty,
       localUpdatedAtMs: sessionExercises.localUpdatedAtMs,
     })
     .from(sessionExercises)
     .where(eq(sessionExercises.sessionId, SESSION_ID))
     .all();
+
+const readLiveSessionExercises = (database: TestDatabase) =>
+  readSessionExercises(database).filter((row) => row.deletedAt === null);
 
 const readExerciseSets = (database: TestDatabase) =>
   database
@@ -106,11 +110,15 @@ const readExerciseSets = (database: TestDatabase) =>
       sessionExerciseId: exerciseSets.sessionExerciseId,
       orderIndex: exerciseSets.orderIndex,
       repsValue: exerciseSets.repsValue,
+      deletedAt: exerciseSets.deletedAt,
       localDirty: exerciseSets.localDirty,
       localUpdatedAtMs: exerciseSets.localUpdatedAtMs,
     })
     .from(exerciseSets)
     .all();
+
+const readLiveExerciseSets = (database: TestDatabase) =>
+  readExerciseSets(database).filter((row) => row.deletedAt === null);
 
 const draftExercise = (
   overrides: Partial<{
@@ -204,7 +212,7 @@ describe('Layer 2 / 3 write-path dirty-bit contract', () => {
       expect(rows[0].localUpdatedAtMs).toBeGreaterThan(firstMs);
     });
 
-    it('softDelete (cascade via graph rebuild): removing an exercise from the draft hard-deletes its row and re-dirties the survivors', async () => {
+    it('softDelete (cascade via graph rebuild): removing an exercise from the draft tombstones its row and re-dirties the survivors', async () => {
       const store = createDrizzleSessionDraftStore();
 
       await store.saveDraftGraph({
@@ -218,10 +226,11 @@ describe('Layer 2 / 3 write-path dirty-bit contract', () => {
         ],
         now: new Date('2026-05-30T10:01:00.000Z'),
       });
-      expect(readSessionExercises(mockActiveDatabase!)).toHaveLength(2);
+      expect(readLiveSessionExercises(mockActiveDatabase!)).toHaveLength(2);
 
-      // Re-save without the dropped exercise. The graph rebuild removes the
-      // dropped row and re-writes the survivor — which must stay dirty.
+      // Re-save without the dropped exercise. The graph rebuild tombstones the
+      // dropped row (so the deletion pushes to the server) and re-writes the
+      // survivor — which must stay live and dirty.
       await store.saveDraftGraph({
         sessionId: SESSION_ID,
         gymId: null,
@@ -231,9 +240,17 @@ describe('Layer 2 / 3 write-path dirty-bit contract', () => {
         now: new Date('2026-05-30T10:02:00.000Z'),
       });
 
-      const rows = readSessionExercises(mockActiveDatabase!);
-      expect(rows.map((row) => row.id)).toEqual(['exercise-keep']);
-      expect(rows[0].localDirty).toBe(true);
+      const live = readLiveSessionExercises(mockActiveDatabase!);
+      expect(live.map((row) => row.id)).toEqual(['exercise-keep']);
+      expect(live[0].localDirty).toBe(true);
+
+      const all = readSessionExercises(mockActiveDatabase!);
+      const dropped = all.find((row) => row.id === 'exercise-drop');
+      // The dropped exercise is NOT hard-deleted: it survives as a dirty
+      // tombstone so the next push carries the deletion to the server.
+      expect(dropped).toBeDefined();
+      expect(dropped?.deletedAt).not.toBeNull();
+      expect(dropped?.localDirty).toBe(true);
     });
 
     it('reorder: swapping two sibling exercises leaves BOTH rows local_dirty = 1', async () => {
@@ -343,7 +360,7 @@ describe('Layer 2 / 3 write-path dirty-bit contract', () => {
       expect(rows[0].localDirty).toBe(true);
     });
 
-    it('softDelete (cascade via graph rebuild): dropping a set removes it and re-dirties the surviving set', async () => {
+    it('softDelete (cascade via graph rebuild): dropping a set tombstones it and re-dirties the surviving set', async () => {
       const store = createDrizzleSessionDraftStore();
 
       await store.saveDraftGraph({
@@ -362,7 +379,7 @@ describe('Layer 2 / 3 write-path dirty-bit contract', () => {
         ],
         now: new Date('2026-05-30T10:01:00.000Z'),
       });
-      expect(readExerciseSets(mockActiveDatabase!)).toHaveLength(2);
+      expect(readLiveExerciseSets(mockActiveDatabase!)).toHaveLength(2);
 
       await store.saveDraftGraph({
         sessionId: SESSION_ID,
@@ -375,9 +392,15 @@ describe('Layer 2 / 3 write-path dirty-bit contract', () => {
         now: new Date('2026-05-30T10:02:00.000Z'),
       });
 
-      const rows = readExerciseSets(mockActiveDatabase!);
-      expect(rows.map((row) => row.id)).toEqual(['set-keep']);
-      expect(rows[0].localDirty).toBe(true);
+      const live = readLiveExerciseSets(mockActiveDatabase!);
+      expect(live.map((row) => row.id)).toEqual(['set-keep']);
+      expect(live[0].localDirty).toBe(true);
+
+      const dropped = readExerciseSets(mockActiveDatabase!).find((row) => row.id === 'set-drop');
+      // The dropped set survives as a dirty tombstone, not a hard delete.
+      expect(dropped).toBeDefined();
+      expect(dropped?.deletedAt).not.toBeNull();
+      expect(dropped?.localDirty).toBe(true);
     });
 
     it('reorder: swapping two sibling sets leaves BOTH rows local_dirty = 1', async () => {

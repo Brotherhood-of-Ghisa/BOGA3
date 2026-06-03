@@ -354,6 +354,8 @@ export const createDrizzleExerciseHistoryStore = (): ExerciseHistoryStore => ({
 
     const conditions = [
       eq(sessionExercises.exerciseDefinitionId, exerciseDefinitionId),
+      // Exclude exercises the user removed (kept as tombstones).
+      isNull(sessionExercises.deletedAt),
       eq(sessions.status, 'completed'),
       isNull(sessions.deletedAt),
     ];
@@ -403,7 +405,13 @@ export const createDrizzleExerciseHistoryStore = (): ExerciseHistoryStore => ({
         setType: exerciseSets.setType,
       })
       .from(exerciseSets)
-      .where(inArray(exerciseSets.sessionExerciseId, sessionExerciseIds))
+      .where(
+        and(
+          inArray(exerciseSets.sessionExerciseId, sessionExerciseIds),
+          // Exclude sets the user removed (kept as tombstones).
+          isNull(exerciseSets.deletedAt)
+        )
+      )
       .orderBy(asc(exerciseSets.orderIndex))
       .all();
     return rows.map((row) => ({
