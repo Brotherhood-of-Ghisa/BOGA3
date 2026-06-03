@@ -8,6 +8,7 @@ import {
 import { __resetAuthStorageAdapterForTests } from './storage';
 import { logEvent } from '@/src/logging';
 import { wipeLocalForAccountSwitch } from '@/src/sync/account-wipe';
+import { clearAuthRequired } from '@/src/sync/auth-required-signal';
 
 export type AuthBootstrapStatus = 'idle' | 'restoring' | 'ready';
 
@@ -99,6 +100,19 @@ const createReadySnapshotFromSession = (session: Session | null): AuthSnapshot =
 const handleAuthStateChange = (_event: AuthChangeEvent, session: Session | null) => {
   const nextUserId = session?.user?.id ?? null;
   const previousUserId = lastKnownUserId;
+
+  // A live session definitively resolves any earlier "no signed-in user" signal a
+  // pre-sign-in cycle raised. Clear it here — synchronously with the session
+  // becoming live, before the snapshot below is emitted — so the route guard
+  // never observes the contradictory (session present + auth-required) state.
+  // That state pits two redirects against each other (the sign-in screen leaves
+  // on a live session; the guard returns to it while auth-required is set) and
+  // spins React into a "Maximum update depth exceeded" loop. The sign-in handler
+  // also clears the flag, but it runs a tick too late: the SIGNED_IN event
+  // re-renders the tree before that clear lands, so the loop has already started.
+  if (nextUserId !== null) {
+    clearAuthRequired();
+  }
 
   // Account switch: a different concrete account is now signed in than the one
   // whose data is in the local store. Clear the previous account's local rows

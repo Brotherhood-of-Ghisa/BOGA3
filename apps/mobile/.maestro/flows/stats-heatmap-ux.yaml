@@ -17,6 +17,14 @@ appId: com.dinoderek.mobile
     timeout: 30000
 - takeScreenshot: "01-stats-screen"
 
+# --- Switch to muscle view (default is exercise list after redesign) ---
+- tapOn:
+    id: "stats-view-mode-chip"
+- extendedWaitUntil:
+    visible:
+      id: "stats-scroll"
+    timeout: 10000
+
 # --- Single muscle: tap Chest (collapsed, single-muscle family) ---
 - tapOn:
     text: "Chest"

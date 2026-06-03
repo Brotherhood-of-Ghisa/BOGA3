@@ -39,6 +39,11 @@ import {
   updateUserEmail,
   updateUserPassword,
 } from '@/src/auth';
+import {
+  __resetAuthRequiredSignalForTests,
+  getAuthRequiredSignal,
+  markAuthRequired,
+} from '@/src/sync/auth-required-signal';
 
 type MockSessionOptions = {
   accessToken?: string;
@@ -94,6 +99,7 @@ describe('auth service bootstrap', () => {
     mockLogEvent.mockReset();
     mockWipeLocalForAccountSwitch.mockReset();
     mockWipeLocalForAccountSwitch.mockResolvedValue(undefined);
+    __resetAuthRequiredSignalForTests();
 
     mockOnAuthStateChange.mockReturnValue({
       data: {
@@ -381,6 +387,48 @@ describe('auth service bootstrap', () => {
     await Promise.resolve();
 
     expect(mockWipeLocalForAccountSwitch).not.toHaveBeenCalled();
+  });
+
+  it('clears a stale "no signed-in user" signal when a live session arrives, so the route guard cannot oscillate', async () => {
+    mockGetSession.mockResolvedValue({ data: { session: null }, error: null });
+    await bootstrapAuthState();
+
+    // A pre-sign-in cycle raised the signal while no user was signed in.
+    markAuthRequired();
+    expect(getAuthRequiredSignal()).toBe(true);
+
+    // Supabase reports a fresh sign-in. The signal must clear synchronously with
+    // the session becoming live so the route guard never observes the
+    // contradictory (session present + auth-required) state, whose competing
+    // redirects would otherwise spin into a "Maximum update depth" loop.
+    const handler = mockOnAuthStateChange.mock.calls[0][0] as (
+      event: string,
+      session: Session | null,
+    ) => void;
+    handler('SIGNED_IN', createMockSession({ userId: 'user-1' }));
+
+    expect(getAuthRequiredSignal()).toBe(false);
+    expect(getAuthSnapshot().session?.user?.id).toBe('user-1');
+  });
+
+  it('leaves the "no signed-in user" signal untouched when an auth state change carries no session', async () => {
+    mockGetSession.mockResolvedValue({
+      data: { session: createMockSession({ userId: 'user-1' }) },
+      error: null,
+    });
+    await bootstrapAuthState();
+
+    markAuthRequired();
+    expect(getAuthRequiredSignal()).toBe(true);
+
+    const handler = mockOnAuthStateChange.mock.calls[0][0] as (
+      event: string,
+      session: Session | null,
+    ) => void;
+    // A sign-out carries no session, so the "needs sign-in" condition stands.
+    handler('SIGNED_OUT', null);
+
+    expect(getAuthRequiredSignal()).toBe(true);
   });
 
   it('updates the signed-in email and reports pending confirmation when auth keeps the current email active', async () => {
