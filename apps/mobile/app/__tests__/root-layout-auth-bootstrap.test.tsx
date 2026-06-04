@@ -8,6 +8,8 @@ const mockEnsureExerciseCatalogLoaded = jest.fn();
 const mockStartSyncScheduler = jest.fn();
 const mockStopSyncScheduler = jest.fn();
 const mockRequestSync = jest.fn();
+const mockStartSyncGateStateBridge = jest.fn();
+const mockStopSyncGateStateBridge = jest.fn();
 const mockRegisterBackgroundSyncTask = jest.fn<Promise<void>, unknown[]>(() => Promise.resolve());
 
 jest.mock('@/src/data', () => ({
@@ -18,6 +20,17 @@ jest.mock('@/src/sync/scheduler', () => ({
   startSyncScheduler: (...args: unknown[]) => mockStartSyncScheduler(...args),
   stopSyncScheduler: (...args: unknown[]) => mockStopSyncScheduler(...args),
   requestSync: (...args: unknown[]) => mockRequestSync(...args),
+}));
+
+jest.mock('@/src/sync/sync-gate-state-bridge', () => ({
+  startSyncGateStateBridge: (...args: unknown[]) => mockStartSyncGateStateBridge(...args),
+  stopSyncGateStateBridge: (...args: unknown[]) => mockStopSyncGateStateBridge(...args),
+}));
+
+// The sync gate is covered by its own spec; here it is a pass-through so this
+// test stays focused on the boot-effect wiring.
+jest.mock('@/src/sync/SyncGate', () => ({
+  SyncGate: ({ children }: { children: ReactNode }) => children,
 }));
 
 // Mocking the background-task module also avoids loading the real native task
@@ -76,6 +89,8 @@ describe('RootLayout auth bootstrap wiring', () => {
     mockStartSyncScheduler.mockReset();
     mockStopSyncScheduler.mockReset();
     mockRequestSync.mockReset();
+    mockStartSyncGateStateBridge.mockReset();
+    mockStopSyncGateStateBridge.mockReset();
     mockRegisterBackgroundSyncTask.mockReset();
     mockRegisterBackgroundSyncTask.mockResolvedValue(undefined);
     mockBootstrapLocalDataLayer.mockResolvedValue(undefined);
@@ -118,5 +133,29 @@ describe('RootLayout auth bootstrap wiring', () => {
     view.unmount();
 
     expect(mockStopSyncScheduler).toHaveBeenCalledTimes(1);
+  });
+
+  it('starts the sync-gate state bridge after the scheduler wires successfully', () => {
+    render(<RootLayout />);
+
+    expect(mockStartSyncScheduler).toHaveBeenCalledTimes(1);
+    expect(mockStartSyncGateStateBridge).toHaveBeenCalledTimes(1);
+    // The scheduler wires before the bridge observes it.
+    expect(mockStartSyncScheduler.mock.invocationCallOrder[0]).toBeLessThan(
+      mockStartSyncGateStateBridge.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('lets a scheduler wiring failure crash boot rather than starting the gate bridge', () => {
+    // A broken native build re-throws from scheduler wiring. That must surface as
+    // the crash it is — it must NOT be swallowed into a recoverable gate state,
+    // so the bridge that drives the gate never starts.
+    const wiringFailure = new Error('listener wiring failed');
+    mockStartSyncScheduler.mockImplementation(() => {
+      throw wiringFailure;
+    });
+
+    expect(() => render(<RootLayout />)).toThrow(wiringFailure);
+    expect(mockStartSyncGateStateBridge).not.toHaveBeenCalled();
   });
 });

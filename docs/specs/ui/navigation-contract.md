@@ -21,6 +21,11 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
   - while the session restore is in flight, it renders a neutral loading view (no flash of the sign-in screen or a data screen);
   - when auth is configured and there is no session — or a sync cycle reported "no signed-in user" — it redirects to `/sign-in`, so a configured-but-signed-out launch never reaches a data screen;
   - when auth is unconfigured (no working credential path) it renders through, so local-only/dev builds are not stranded on a sign-in form.
+- A first-sync gate (`apps/mobile/src/sync/SyncGate.tsx`) wraps the navigator immediately **below** the auth guard, so it only applies to a signed-in user. It keys on the persisted `sync_runtime_state.bootstrap_completed_at` flag:
+  - while the flag is null for a signed-in user, it renders a full-screen "Setting up your data…" block (a phase label plus an advancing activity/progress indicator; an offline message instead of an indefinite spinner when the device is offline) in place of the navigator — no data screen is reachable until the first sync cycle drains;
+  - once the flag is set, it renders the navigator through and the normal routes paint;
+  - on a non-`AUTH_REQUIRED` cycle error it shows the error message and a single Retry that fires exactly one cycle; when the latest cycle outcome is `AUTH_REQUIRED` it redirects to `/sign-in` and renders no Retry;
+  - it stands aside (renders through) when there is no session or auth is unconfigured, so an unconfigured/local build is never trapped behind a block nothing will lift; the `/sign-in` route itself is exempt so the redirect cannot loop.
 - Tab roots live inside the `(tabs)` route group at `apps/mobile/app/(tabs)/` and share a tab layout at `apps/mobile/app/(tabs)/_layout.tsx`. The group name is parenthesised so it does not appear in URLs (e.g. `/session-recorder` resolves to `app/(tabs)/session-recorder.tsx`).
 - Tab roots have `headerShown: false`; detail screens (`exercise-history`, `profile`, `completed-session/[sessionId]`, `maestro-harness`) remain outside `(tabs)/` and keep their existing native header behavior.
 - Navigation is currently string-path based (no centralized typed route helper layer)
@@ -147,6 +152,10 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
    - route-layer auth-guard redirect on a configured-but-no-session launch, or when a sync cycle reports "no signed-in user" (`<Redirect />`)
 16. `/sign-in` -> `/`
    - successful sign-in: the guard stops redirecting and the app proceeds to the normal route; an already-signed-in render of `/sign-in` also redirects to `/`
+17. (any signed-in route) -> first-sync block
+   - the first-sync gate (below the auth guard) renders a full-screen "Setting up your data…" block in place of the navigator while `sync_runtime_state.bootstrap_completed_at` is null for a signed-in user; this is render-substitution, not a route replacement (the URL is unchanged), and it dismisses in place once the flag is set
+18. first-sync block -> `/sign-in`
+   - when the latest sync cycle outcome is `AUTH_REQUIRED`, the gate redirects to `/sign-in` (no Retry); the `/sign-in` route is exempt from the block so the redirect cannot loop
 
 Note:
 

@@ -1,7 +1,13 @@
 /* eslint-disable import/first */
 
+import { createInMemoryDatabase, type InMemoryDatabaseFixture } from './helpers/in-memory-db';
+
+// `mock`-prefixed so the hoisted jest factory may reference it.
+let mockHarnessFixture: InMemoryDatabaseFixture | null = null;
+
 jest.mock('@/src/data', () => ({
   resetLocalAppData: jest.fn(),
+  bootstrapLocalDataLayer: () => Promise.resolve(mockHarnessFixture?.database),
 }));
 
 jest.mock('@/src/maestro/exercise-block-history-fixture', () => ({
@@ -21,7 +27,11 @@ jest.mock('@/src/utils/isDevMode', () => ({
 
 import { ExecutionEnvironment } from 'expo-constants';
 
+import { eq } from 'drizzle-orm';
+
 import { resetLocalAppData } from '@/src/data';
+import { PRIMARY_RUNTIME_STATE_ID } from '@/src/data/clock';
+import { syncRuntimeState } from '@/src/data/schema';
 import {
   buildExerciseBlockHistoryFixtureRows,
   EXERCISE_BLOCK_HISTORY_FIXTURE,
@@ -30,13 +40,19 @@ import {
 import {
   coerceMaestroHarnessQueryParam,
   isMaestroHarnessAllowed,
+  resolveMaestroHarnessBootstrapAction,
   resolveMaestroHarnessFixtureName,
   resolveMaestroHarnessResetMode,
   resolveMaestroHarnessTeleportHref,
   resolveMaestroHarnessTeleportTarget,
+  runMaestroHarnessBootstrapAction,
   runMaestroHarnessFixture,
   runMaestroHarnessReset,
 } from '@/src/maestro/harness';
+import {
+  __resetSyncGateStateForTests,
+  getSyncGateStateSnapshot,
+} from '@/src/sync/sync-gate-state';
 
 const mockResetLocalAppData = jest.mocked(resetLocalAppData);
 const mockSeedExerciseBlockHistoryFixture = jest.mocked(seedExerciseBlockHistoryFixture);
@@ -100,6 +116,10 @@ describe('maestro harness helpers', () => {
       'exercise-block-history'
     );
     expect(resolveMaestroHarnessFixtureName('unexpected')).toBe('none');
+    expect(resolveMaestroHarnessBootstrapAction('complete')).toBe('complete');
+    expect(resolveMaestroHarnessBootstrapAction('reset')).toBe('reset');
+    expect(resolveMaestroHarnessBootstrapAction('unexpected')).toBe('none');
+    expect(resolveMaestroHarnessBootstrapAction(null)).toBe('none');
   });
 
   it('maps supported teleport targets to route hrefs', () => {
@@ -149,6 +169,54 @@ describe('maestro harness helpers', () => {
 
     await runMaestroHarnessFixture('exercise-block-history');
     expect(mockSeedExerciseBlockHistoryFixture).toHaveBeenCalledTimes(1);
+  });
+
+  describe('bootstrap-flag harness action', () => {
+    const readFlag = (): Date | null =>
+      mockHarnessFixture!.database
+        .select({ bootstrapCompletedAt: syncRuntimeState.bootstrapCompletedAt })
+        .from(syncRuntimeState)
+        .where(eq(syncRuntimeState.id, PRIMARY_RUNTIME_STATE_ID))
+        .get()?.bootstrapCompletedAt ?? null;
+
+    beforeEach(() => {
+      mockHarnessFixture = createInMemoryDatabase();
+      __resetSyncGateStateForTests();
+    });
+
+    afterEach(() => {
+      mockHarnessFixture?.close();
+      mockHarnessFixture = null;
+      __resetSyncGateStateForTests();
+    });
+
+    it('leaves the flag untouched for the none action', async () => {
+      await runMaestroHarnessBootstrapAction('none');
+      expect(readFlag()).toBeNull();
+    });
+
+    it('stamps the flag for the complete action so the gate dismisses', async () => {
+      await runMaestroHarnessBootstrapAction('complete');
+      expect(readFlag()).not.toBeNull();
+    });
+
+    it('clears the flag for the reset action so the gate blocks again', async () => {
+      await runMaestroHarnessBootstrapAction('complete');
+      expect(readFlag()).not.toBeNull();
+
+      await runMaestroHarnessBootstrapAction('reset');
+      expect(readFlag()).toBeNull();
+    });
+
+    it('publishes the new flag into the shared accessor so the gate flips on the same tick', async () => {
+      expect(getSyncGateStateSnapshot().bootstrapCompletedAt).toBeNull();
+
+      await runMaestroHarnessBootstrapAction('complete');
+      expect(getSyncGateStateSnapshot().bootstrapCompletedAt).not.toBeNull();
+
+      await runMaestroHarnessBootstrapAction('reset');
+      expect(getSyncGateStateSnapshot().bootstrapCompletedAt).toBeNull();
+    });
   });
 
   it('builds deterministic exercise block history fixture rows for populated and empty visual QA states', () => {

@@ -50,6 +50,13 @@ MAESTRO_RESET_STRATEGY="full" "$SCRIPT_DIR/maestro-ios-run-flow.sh" \
   --scenario "Launch requires sign-in" \
   --flow "$APP_DIR/.maestro/flows/launch-requires-sign-in.yaml"
 
+# First-sync gate: a signed-in user whose first cycle has not drained sees the
+# full-screen block (phase + activity indicator); it dismisses once the cycle
+# completes within the foreground window.
+MAESTRO_RESET_STRATEGY="full" "$SCRIPT_DIR/maestro-ios-run-flow.sh" \
+  --scenario "Sync gate first cycle" \
+  --flow "$APP_DIR/.maestro/flows/sync-gate-first-cycle.yaml"
+
 MAESTRO_RESET_STRATEGY="full" "$SCRIPT_DIR/maestro-ios-run-flow.sh" \
   --scenario "Settings sync status" \
   --flow "$APP_DIR/.maestro/flows/settings-sync-status.yaml"
