@@ -9,12 +9,16 @@ const mockIsDevMode = jest.fn();
 const mockResetLocalAppData = jest.fn();
 const mockBootstrapLocalDataLayer = jest.fn();
 const mockRpc = jest.fn();
-// The helper selects the RPC schema before dispatching:
-// `client.schema(...).rpc(...)`. Both that path and a bare `.rpc(...)` resolve
-// to the same spy so the existing call assertions are unaffected.
+// Records the schema name the helper selects before dispatching the RPC. The
+// wipe RPC lives in a non-default Postgres schema, so the client MUST select it
+// (`client.schema(<name>).rpc(...)`) — a bare `.rpc(...)` on the default schema
+// silently never resolves the function. `mockSchema` captures the argument so a
+// test can pin the exact schema, while still returning the same `rpc` spy so the
+// dispatch and error-handling assertions are unaffected.
+const mockSchema = jest.fn((..._args: unknown[]) => ({ rpc: mockRpc }));
 const mockGetRequiredClient = jest.fn(() => ({
   rpc: mockRpc,
-  schema: () => ({ rpc: mockRpc }),
+  schema: (...args: unknown[]) => mockSchema(...args),
 }));
 
 jest.mock('@/src/utils/isDevMode', () => ({
@@ -41,6 +45,7 @@ describe('dev wipe affordances', () => {
     mockResetLocalAppData.mockReset().mockResolvedValue(undefined);
     mockBootstrapLocalDataLayer.mockReset().mockResolvedValue(undefined);
     mockRpc.mockReset().mockResolvedValue({ data: 0, error: null });
+    mockSchema.mockClear();
     mockGetRequiredClient.mockClear();
   });
 
@@ -90,6 +95,20 @@ describe('dev wipe affordances', () => {
 
       expect(mockRpc).toHaveBeenCalledWith('dev_wipe_my_data');
       expect(result).toEqual({ rowsDeleted: 42 });
+    });
+
+    it('selects the non-default schema before dispatching the RPC', async () => {
+      mockIsDevMode.mockReturnValue(true);
+
+      await wipeRemoteForCurrentUser();
+
+      // The wipe function is exposed under `app_public`, not the default
+      // `public` schema. A bare `.rpc(...)` would silently never reach it, so
+      // the helper must select the schema first. Pin both the selection and its
+      // exact name here.
+      expect(mockSchema).toHaveBeenCalledWith('app_public');
+      expect(mockSchema).toHaveBeenCalledTimes(1);
+      expect(mockRpc).toHaveBeenCalledTimes(1);
     });
 
     it('normalizes an object-wrapped row count', async () => {
