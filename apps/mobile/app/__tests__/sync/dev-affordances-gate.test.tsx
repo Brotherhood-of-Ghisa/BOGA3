@@ -25,6 +25,7 @@ import { join } from 'path';
 
 const mockPush = jest.fn();
 const mockIsDevMode = jest.fn();
+const mockUseAuth = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush }),
@@ -32,6 +33,16 @@ jest.mock('expo-router', () => ({
 
 jest.mock('@/src/utils/isDevMode', () => ({
   isDevMode: () => mockIsDevMode(),
+}));
+
+jest.mock('@/src/auth', () => ({
+  useAuth: () => mockUseAuth(),
+}));
+
+// The sync-status panel has its own spec; stub it so this dev-gate suite stays
+// focused on the wipe affordances.
+jest.mock('@/components/sync-status/sync-status-panel', () => ({
+  SyncStatusPanel: () => null,
 }));
 
 jest.mock('@/src/data', () => ({
@@ -54,6 +65,8 @@ const DEV_AFFORDANCES_PATH = join(MOBILE_ROOT, 'src', 'sync', 'dev-affordances.t
 beforeEach(() => {
   mockPush.mockReset();
   mockIsDevMode.mockReset();
+  // Signed-in user so the screen renders; the panel itself is stubbed above.
+  mockUseAuth.mockReset().mockReturnValue({ user: { id: 'user-1', email: 'u@test' } });
 });
 
 describe('the dev gate on the wipe affordances', () => {

@@ -56,6 +56,8 @@ Brief entrypoint map of the current mobile screens.
   - Stats summary loading/error/content states with period chips
   - actionable muscle rows in Stats summary; expanded muscle rows and collapsed single-muscle family headers open an in-route muscle-history overlay
   - muscle-history overlay states for loading, error, no-history, populated heatmap, selected positive-effort date with contributing exercise/set detail, and selected zero-effort date empty detail
+  - **Heatmap viewMode** (M17): a "Heatmap" chip below the period chips switches the body to a flat exercise list sorted by all-time session count; tapping an exercise opens an in-route `ExerciseHistoryOverlay`
+  - exercise-history overlay states: loading, error, no-history, populated `CalendarHeatmap` (365-day window), metric chip selection (Volume / Near failure / 1RM / Top weight), week-selection banner
 - Notes:
   - tab root inside the `(tabs)` group with `headerShown: false`; the tab bar is `BottomTray` (composing `TopLevelTabs`) supplied via the `tabBar` prop in `(tabs)/_layout.tsx`.
 
@@ -92,9 +94,20 @@ Brief entrypoint map of the current mobile screens.
 6. `/settings`
 - File: `apps/mobile/app/(tabs)/settings.tsx`
 - Purpose:
-  - minimal account/settings entry screen for the M11 auth/profile flow
+  - account/settings entry screen for the auth/profile flow, plus the signed-in
+    sync-status surface
 - Key states (high level):
   - one tappable account/profile card
+  - a sync-status card (signed-in only) showing last successful sync time
+    (`Never` until the first success), pending-change count (rows still waiting
+    to push across the user-owned tables), network state (online/offline), and
+    the latest sync error (or a sign-in-required hint); a Refresh action nudges a
+    sync cycle. The card refreshes on screen focus and on a short interval while
+    focused. Card/fields carry stable testIDs (`settings-sync-status-card`,
+    `settings-sync-status-last-success`, `settings-sync-status-dirty-count`,
+    `settings-sync-status-network`, `settings-sync-status-error`).
+  - a developer-tools card (`isDevMode()` only), separate from the sync-status
+    card, with the local/remote wipe affordances
   - available from the shared settings utility action regardless of auth state
 - Key exits:
   - `profile`

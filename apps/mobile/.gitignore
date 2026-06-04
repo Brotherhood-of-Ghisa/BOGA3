@@ -32,6 +32,10 @@ yarn-error.*
 
 # local env files
 .env*.local
+# Per-run backup of .env.local that the Maestro launcher sets aside while it pins
+# a lane's Supabase config; restored at teardown (a stray one only survives a hard
+# crash).
+.env.local.maestro-backup.*
 
 # typescript
 *.tsbuildinfo
@@ -45,3 +49,6 @@ app-example
 # Maestro artifacts
 artifacts/
 .maestro/maestro.env.local
+# Per-worktree marker of the Supabase config Metro's cache was last built with, so
+# the launcher only clears the cache when a lane switches config.
+.maestro/.metro-supabase-signature

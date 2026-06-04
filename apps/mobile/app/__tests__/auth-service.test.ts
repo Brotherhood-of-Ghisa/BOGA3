@@ -7,6 +7,7 @@ const mockSecureStoreGetItemAsync = jest.fn();
 const mockSecureStoreDeleteItemAsync = jest.fn();
 const mockSecureStoreSetItemAsync = jest.fn();
 const mockLogEvent = jest.fn();
+const mockWipeLocalForAccountSwitch = jest.fn();
 
 jest.mock('@supabase/supabase-js', () => ({
   createClient: (...args: unknown[]) => mockCreateClient(...args),
@@ -22,6 +23,12 @@ jest.mock('@/src/logging', () => ({
   logEvent: (...args: unknown[]) => mockLogEvent(...args),
 }));
 
+// Stub the local-data wipe so this remains a pure auth-service unit test (no
+// real SQLite). The wipe's own behaviour is covered by its dedicated suite.
+jest.mock('@/src/sync/account-wipe', () => ({
+  wipeLocalForAccountSwitch: (...args: unknown[]) => mockWipeLocalForAccountSwitch(...args),
+}));
+
 import {
   __resetAuthForTests,
   bootstrapAuthState,
@@ -32,6 +39,11 @@ import {
   updateUserEmail,
   updateUserPassword,
 } from '@/src/auth';
+import {
+  __resetAuthRequiredSignalForTests,
+  getAuthRequiredSignal,
+  markAuthRequired,
+} from '@/src/sync/auth-required-signal';
 
 type MockSessionOptions = {
   accessToken?: string;
@@ -85,6 +97,9 @@ describe('auth service bootstrap', () => {
     mockUpdateUser.mockReset();
     mockUnsubscribe.mockReset();
     mockLogEvent.mockReset();
+    mockWipeLocalForAccountSwitch.mockReset();
+    mockWipeLocalForAccountSwitch.mockResolvedValue(undefined);
+    __resetAuthRequiredSignalForTests();
 
     mockOnAuthStateChange.mockReturnValue({
       data: {
@@ -304,10 +319,116 @@ describe('auth service bootstrap', () => {
       userId: 'user-1',
     });
     expect(mockSignOut).toHaveBeenCalledTimes(1);
+    // Sign-out clears the previous account's local data so it can't leak into
+    // the next account that signs in on this device.
+    expect(mockWipeLocalForAccountSwitch).toHaveBeenCalledTimes(1);
     expect(snapshot.status).toBe('ready');
     expect(snapshot.session).toBeNull();
     expect(snapshot.user).toBeNull();
     expect(snapshot.lastError).toBeNull();
+  });
+
+  it('does not wipe local data when sign-out fails', async () => {
+    const storedSession = createMockSession();
+
+    mockGetSession.mockResolvedValue({
+      data: { session: storedSession },
+      error: null,
+    });
+    mockSignOut.mockResolvedValue({
+      error: { message: 'network unreachable' },
+    });
+
+    await bootstrapAuthState();
+    await expect(signOut()).rejects.toMatchObject({ message: 'network unreachable' });
+
+    // A failed sign-out leaves the user signed in, so the local store must be
+    // preserved — wiping it would strand the still-signed-in account.
+    expect(mockWipeLocalForAccountSwitch).not.toHaveBeenCalled();
+  });
+
+  it('wipes local data when the active account changes to a different user', async () => {
+    mockGetSession.mockResolvedValue({
+      data: { session: createMockSession({ userId: 'user-1' }) },
+      error: null,
+    });
+
+    await bootstrapAuthState();
+
+    // The captured onAuthStateChange handler is what Supabase invokes when the
+    // signed-in account changes. Drive it with a session for a different user.
+    const handler = mockOnAuthStateChange.mock.calls[0][0] as (
+      event: string,
+      session: Session | null,
+    ) => void;
+
+    handler('SIGNED_IN', createMockSession({ userId: 'user-2', email: 'other@example.test' }));
+    await Promise.resolve();
+
+    expect(mockWipeLocalForAccountSwitch).toHaveBeenCalledTimes(1);
+    expect(getAuthSnapshot().user?.id).toBe('user-2');
+  });
+
+  it('does not wipe local data when the same account re-emits an auth state change', async () => {
+    mockGetSession.mockResolvedValue({
+      data: { session: createMockSession({ userId: 'user-1' }) },
+      error: null,
+    });
+
+    await bootstrapAuthState();
+
+    const handler = mockOnAuthStateChange.mock.calls[0][0] as (
+      event: string,
+      session: Session | null,
+    ) => void;
+
+    // A token refresh re-emits the same account — no switch, so no wipe.
+    handler('TOKEN_REFRESHED', createMockSession({ userId: 'user-1' }));
+    await Promise.resolve();
+
+    expect(mockWipeLocalForAccountSwitch).not.toHaveBeenCalled();
+  });
+
+  it('clears a stale "no signed-in user" signal when a live session arrives, so the route guard cannot oscillate', async () => {
+    mockGetSession.mockResolvedValue({ data: { session: null }, error: null });
+    await bootstrapAuthState();
+
+    // A pre-sign-in cycle raised the signal while no user was signed in.
+    markAuthRequired();
+    expect(getAuthRequiredSignal()).toBe(true);
+
+    // Supabase reports a fresh sign-in. The signal must clear synchronously with
+    // the session becoming live so the route guard never observes the
+    // contradictory (session present + auth-required) state, whose competing
+    // redirects would otherwise spin into a "Maximum update depth" loop.
+    const handler = mockOnAuthStateChange.mock.calls[0][0] as (
+      event: string,
+      session: Session | null,
+    ) => void;
+    handler('SIGNED_IN', createMockSession({ userId: 'user-1' }));
+
+    expect(getAuthRequiredSignal()).toBe(false);
+    expect(getAuthSnapshot().session?.user?.id).toBe('user-1');
+  });
+
+  it('leaves the "no signed-in user" signal untouched when an auth state change carries no session', async () => {
+    mockGetSession.mockResolvedValue({
+      data: { session: createMockSession({ userId: 'user-1' }) },
+      error: null,
+    });
+    await bootstrapAuthState();
+
+    markAuthRequired();
+    expect(getAuthRequiredSignal()).toBe(true);
+
+    const handler = mockOnAuthStateChange.mock.calls[0][0] as (
+      event: string,
+      session: Session | null,
+    ) => void;
+    // A sign-out carries no session, so the "needs sign-in" condition stands.
+    handler('SIGNED_OUT', null);
+
+    expect(getAuthRequiredSignal()).toBe(true);
   });
 
   it('updates the signed-in email and reports pending confirmation when auth keeps the current email active', async () => {

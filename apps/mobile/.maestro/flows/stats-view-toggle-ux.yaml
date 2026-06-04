@@ -1,0 +1,101 @@
+appId: com.dinoderek.mobile
+---
+# --- Seed exercise history data and land on Stats/History screen ---
+- openLink: "boga3://maestro-harness?reset=data&fixture=exercise-block-history&teleport=session-list"
+- tapOn:
+    text: "Open"
+    optional: true
+- tapOn:
+    text: "Continue"
+    optional: true
+- tapOn:
+    text: "Close"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "stats-history-screen"
+    timeout: 30000
+
+# --- 01: Exercise view is shown by default ---
+- assertVisible:
+    id: "stats-exercise-list"
+- assertVisible:
+    id: "stats-card-sessions"
+- assertVisible:
+    id: "stats-card-sets"
+- takeScreenshot: "01-exercise-view-default"
+
+# --- Switch to muscle view via chip ---
+- tapOn:
+    id: "stats-view-mode-chip"
+- extendedWaitUntil:
+    visible:
+      id: "stats-scroll"
+    timeout: 10000
+
+# --- 02: Muscle view shows summary cards ---
+- assertVisible:
+    id: "stats-card-sessions"
+- assertVisible:
+    id: "stats-card-sets"
+- takeScreenshot: "02-muscle-view-with-summary-cards"
+
+# --- Switch back to exercise view via chip ---
+- tapOn:
+    id: "stats-view-mode-chip"
+- extendedWaitUntil:
+    visible:
+      id: "stats-exercise-list"
+    timeout: 10000
+
+# --- 03: Exercise list is restored ---
+- assertVisible:
+    id: "stats-exercise-list"
+- takeScreenshot: "03-back-to-exercise-view"
+
+# --- 04: Tap seeded exercise row to open heatmap overlay ---
+- tapOn:
+    text: "Barbell Back Squat"
+- extendedWaitUntil:
+    visible:
+      id: "stats-exercise-history-overlay"
+    timeout: 15000
+- takeScreenshot: "04-exercise-heatmap-overlay"
+
+# Dismiss exercise overlay via backdrop
+- tapOn:
+    id: "stats-exercise-history-backdrop"
+- extendedWaitUntil:
+    notVisible:
+      id: "stats-exercise-history-overlay"
+    timeout: 5000
+
+# --- Switch to muscle view for muscle overlay test ---
+- tapOn:
+    id: "stats-view-mode-chip"
+- extendedWaitUntil:
+    visible:
+      id: "stats-scroll"
+    timeout: 10000
+
+# --- 05: Tap Chest muscle to open muscle heatmap overlay ---
+- tapOn:
+    text: "Chest"
+- extendedWaitUntil:
+    visible:
+      id: "stats-muscle-history-overlay"
+    timeout: 15000
+- takeScreenshot: "05-muscle-heatmap-overlay"
+
+# Close muscle overlay via close button
+- tapOn:
+    id: "stats-muscle-history-close"
+- extendedWaitUntil:
+    notVisible:
+      id: "stats-muscle-history-overlay"
+    timeout: 5000
+
+# --- 06: Overlay dismissed, back to muscle view ---
+- assertVisible:
+    id: "stats-scroll"
+- takeScreenshot: "06-overlay-dismissed"

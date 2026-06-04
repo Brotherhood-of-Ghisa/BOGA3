@@ -13,9 +13,10 @@
  *   - sessions                   (Layer 1) — session-list.ts (soft-delete/restore)
  *   - exercise_tag_definitions   (Layer 1) — exercise-tags.ts (tag-def paths)
  *
- * The seeder clean-stamp rule (exercise-catalog-seeds.ts) is asserted in
- * the final describe block: seed rows land CLEAN (local_dirty = 0) yet the
- * monotonic counter still advances so later user edits push.
+ * The seeder dirty-stamp rule (exercise-catalog-seeds.ts) is asserted in
+ * the final describe block: seed rows land DIRTY (local_dirty = 1) so a fresh
+ * account's starter catalog pushes to the server on the next cycle, and the
+ * monotonic counter advances so a later user edit out-stamps the seed.
  *
  * Driver: a real in-memory `better-sqlite3` database with the full migrated
  * schema applied, built via the shared `helpers/in-memory-db` fixture (see
@@ -412,8 +413,8 @@ describe('exercise_tag_definitions write paths flip the dirty bit', () => {
   });
 });
 
-describe('seeder stamps catalog rows clean while advancing the clock', () => {
-  it('lands exercise_definitions and exercise_muscle_mappings rows with local_dirty = 0', () => {
+describe('seeder stamps catalog rows dirty while advancing the clock', () => {
+  it('lands exercise_definitions and exercise_muscle_mappings rows with local_dirty = 1 so a fresh account pushes', () => {
     const database = requireDatabase();
     seedInto(database, new Date('2026-05-29T10:00:00.000Z'));
 
@@ -425,11 +426,11 @@ describe('seeder stamps catalog rows clean while advancing the clock', () => {
     expect(mappingRows.length).toBeGreaterThan(0);
 
     for (const row of definitionRows) {
-      expect(row.localDirty).toBe(false);
+      expect(row.localDirty).toBe(true);
       expect(row.localUpdatedAtMs ?? 0).toBeGreaterThan(0);
     }
     for (const row of mappingRows) {
-      expect(row.localDirty).toBe(false);
+      expect(row.localDirty).toBe(true);
       expect(row.localUpdatedAtMs ?? 0).toBeGreaterThan(0);
     }
   });
@@ -445,8 +446,8 @@ describe('seeder stamps catalog rows clean while advancing the clock', () => {
       .where(eq(exerciseDefinitions.id, seededId))
       .get();
 
-    // A later user edit through the real repo store must flip the seed row
-    // dirty AND stamp a strictly-higher monotonic timestamp.
+    // The seed row is already dirty; a later user edit through the real repo
+    // store must keep it dirty AND stamp a strictly-higher monotonic timestamp.
     const store = createDrizzleExerciseCatalogStore();
     await store.setExerciseDeletedState({
       id: seededId,

@@ -7,6 +7,8 @@ import {
 } from './supabase';
 import { __resetAuthStorageAdapterForTests } from './storage';
 import { logEvent } from '@/src/logging';
+import { wipeLocalForAccountSwitch } from '@/src/sync/account-wipe';
+import { clearAuthRequired } from '@/src/sync/auth-required-signal';
 
 export type AuthBootstrapStatus = 'idle' | 'restoring' | 'ready';
 
@@ -56,6 +58,12 @@ let authSnapshot: AuthSnapshot = {
 let authBootstrapPromise: Promise<AuthSnapshot> | null = null;
 let authSubscription: { unsubscribe: () => void } | null = null;
 
+// The user id of the account currently reflected in the local store, tracked
+// across auth-state-change callbacks so a switch from one concrete account to a
+// different one can be detected. `null` means no account is currently mapped to
+// local data (signed out, or not yet signed in).
+let lastKnownUserId: string | null = null;
+
 const emitAuthSnapshot = () => {
   for (const listener of listeners) {
     listener();
@@ -73,6 +81,12 @@ const setAuthSnapshot = (nextSnapshot: Partial<AuthSnapshot>) => {
 const createReadySnapshotFromSession = (session: Session | null): AuthSnapshot => {
   const runtimeConfig = getMobileAuthRuntimeConfig();
 
+  // Keep the tracked account id in step with every ready snapshot so the
+  // account-switch detection in `handleAuthStateChange` always compares
+  // against the account currently mapped to local data, regardless of which
+  // entry point (restore, sign-in, sign-out, state-change) produced it.
+  lastKnownUserId = session?.user?.id ?? null;
+
   return {
     status: 'ready',
     session,
@@ -84,6 +98,45 @@ const createReadySnapshotFromSession = (session: Session | null): AuthSnapshot =
 };
 
 const handleAuthStateChange = (_event: AuthChangeEvent, session: Session | null) => {
+  const nextUserId = session?.user?.id ?? null;
+  const previousUserId = lastKnownUserId;
+
+  // A live session definitively resolves any earlier "no signed-in user" signal a
+  // pre-sign-in cycle raised. Clear it here — synchronously with the session
+  // becoming live, before the snapshot below is emitted — so the route guard
+  // never observes the contradictory (session present + auth-required) state.
+  // That state pits two redirects against each other (the sign-in screen leaves
+  // on a live session; the guard returns to it while auth-required is set) and
+  // spins React into a "Maximum update depth exceeded" loop. The sign-in handler
+  // also clears the flag, but it runs a tick too late: the SIGNED_IN event
+  // re-renders the tree before that clear lands, so the loop has already started.
+  if (nextUserId !== null) {
+    clearAuthRequired();
+  }
+
+  // Account switch: a different concrete account is now signed in than the one
+  // whose data is in the local store. Clear the previous account's local rows
+  // and reset the sync accounting so the bootstrapper restores the new
+  // account's data on the next cycle. (Sign-out — next id null — is handled by
+  // `signOut`, which wipes before tearing down the session; we skip it here to
+  // avoid wiping twice and to keep the wipe on the awaited sign-out path.)
+  const isAccountSwitch =
+    previousUserId !== null && nextUserId !== null && previousUserId !== nextUserId;
+
+  if (isAccountSwitch) {
+    void wipeLocalForAccountSwitch().catch((error: unknown) => {
+      void logEvent({
+        level: 'error',
+        source: 'auth',
+        event: 'auth.account_switch_wipe_failed',
+        message: error instanceof Error ? error.message : 'Local data wipe failed on account switch.',
+        userId: nextUserId,
+      });
+    });
+  }
+
+  // `createReadySnapshotFromSession` advances the tracked account id to
+  // `nextUserId`.
   authSnapshot = createReadySnapshotFromSession(session);
   emitAuthSnapshot();
 };
@@ -258,6 +311,12 @@ export const signOut = async () => {
     throw error;
   }
 
+  // Clear the signed-out account's local rows and reset the sync accounting so
+  // the previous account's data cannot leak into — or suppress the bootstrap
+  // of — the next account that signs in on this device. Local only: the
+  // server keeps the data for a later sign-in to restore.
+  await wipeLocalForAccountSwitch();
+
   authSnapshot = createReadySnapshotFromSession(null);
   emitAuthSnapshot();
 };
@@ -298,6 +357,7 @@ export const __resetAuthForTests = () => {
   authSubscription?.unsubscribe();
   authSubscription = null;
   authBootstrapPromise = null;
+  lastKnownUserId = null;
   __resetSupabaseMobileClientForTests();
   __resetAuthStorageAdapterForTests();
 

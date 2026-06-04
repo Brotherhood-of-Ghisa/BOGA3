@@ -2,10 +2,11 @@ import { drizzle } from 'drizzle-orm/expo-sqlite';
 import { migrate } from 'drizzle-orm/expo-sqlite/migrator';
 import { deleteDatabaseAsync, openDatabaseSync, type SQLiteDatabase } from 'expo-sqlite';
 
+import { getMobileAuthRuntimeConfig } from '@/src/auth/supabase';
 import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidation';
 
 import { localRuntimeMigrations } from './migrations';
-import { seedSystemExerciseCatalog } from './exercise-catalog-seeds';
+import { seedMuscleGroups, seedSystemExerciseCatalog } from './exercise-catalog-seeds';
 import * as schema from './schema';
 
 const LOCAL_DATABASE_NAME = 'scaffolding-local.db';
@@ -28,8 +29,8 @@ export type LocalDatabase = ReturnType<typeof createLocalDatabase>;
 let localDatabase: LocalDatabase | null = null;
 let runtimeMigrationsComplete = false;
 let runtimeMigrationPromise: Promise<void> | null = null;
-let runtimeExerciseCatalogSeedComplete = false;
-let runtimeExerciseCatalogSeedPromise: Promise<void> | null = null;
+let muscleGroupSeedComplete = false;
+let muscleGroupSeedPromise: Promise<void> | null = null;
 
 const runRuntimeMigrations = async (database: LocalDatabase) => {
   if (runtimeMigrationsComplete) {
@@ -50,24 +51,34 @@ const runRuntimeMigrations = async (database: LocalDatabase) => {
   await runtimeMigrationPromise;
 };
 
-const runRuntimeExerciseCatalogSeed = async (database: LocalDatabase) => {
-  if (runtimeExerciseCatalogSeedComplete) {
+// Seed the client-only muscle-group taxonomy at boot. In a sync-configured
+// build the syncable entity catalog (exercise definitions + muscle mappings) is
+// NOT seeded here — it is seeded by the first-sign-in bootstrapper only when the
+// first full pull returns no rows, so a reinstall recovers the server's state
+// rather than re-creating starter rows. Muscle groups never sync, so they seed
+// unconditionally at boot.
+//
+// The infra-free build (no sync backend configured) is the exception: it has no
+// server to recover from, so `prepareLocalDataLayer` also seeds the full starter
+// catalog at boot via `seedStarterCatalogWhenNoSyncBackend`.
+const runMuscleGroupSeed = async (database: LocalDatabase) => {
+  if (muscleGroupSeedComplete) {
     return;
   }
 
-  if (!runtimeExerciseCatalogSeedPromise) {
-    runtimeExerciseCatalogSeedPromise = Promise.resolve()
+  if (!muscleGroupSeedPromise) {
+    muscleGroupSeedPromise = Promise.resolve()
       .then(() => {
-        seedSystemExerciseCatalog(database);
-        runtimeExerciseCatalogSeedComplete = true;
+        seedMuscleGroups(database);
+        muscleGroupSeedComplete = true;
       })
       .catch((error) => {
-        runtimeExerciseCatalogSeedPromise = null;
+        muscleGroupSeedPromise = null;
         throw error;
       });
   }
 
-  await runtimeExerciseCatalogSeedPromise;
+  await muscleGroupSeedPromise;
 };
 
 // Bootstrap and reset both mutate the shared `sqliteDatabase`/`localDatabase`
@@ -93,13 +104,33 @@ const runExclusiveDataLayerOperation = <T>(operation: () => Promise<T>): Promise
   return run;
 };
 
+// Seed the full starter exercise catalog at boot, but ONLY when no sync backend
+// is configured. In a sync-configured build the catalog is owned by the
+// first-sign-in bootstrapper (see `runMuscleGroupSeed` above) so a reinstall
+// recovers the server's catalog — including the user's deletions — instead of
+// re-creating starter rows; seeding here would defeat that recovery, so this
+// stays a no-op there. In an infra-free build there is no server to recover from
+// and nothing else ever seeds the catalog, so the exercise picker would stay
+// permanently empty without this. The seeder is idempotent (guarded by its
+// applied-version marker on `sync_runtime_state`), and `resetLocalAppData()`
+// deletes the database — marker included — so the catalog re-seeds on the next
+// bootstrap.
+const seedStarterCatalogWhenNoSyncBackend = (database: LocalDatabase) => {
+  if (getMobileAuthRuntimeConfig().isConfigured) {
+    return;
+  }
+
+  seedSystemExerciseCatalog(database);
+};
+
 const prepareLocalDataLayer = async (): Promise<LocalDatabase> => {
   if (!localDatabase) {
     localDatabase = createLocalDatabase();
   }
 
   await runRuntimeMigrations(localDatabase);
-  await runRuntimeExerciseCatalogSeed(localDatabase);
+  await runMuscleGroupSeed(localDatabase);
+  seedStarterCatalogWhenNoSyncBackend(localDatabase);
   return localDatabase;
 };
 
@@ -114,8 +145,8 @@ export const resetLocalAppData = (): Promise<LocalDatabase> =>
     localDatabase = null;
     runtimeMigrationsComplete = false;
     runtimeMigrationPromise = null;
-    runtimeExerciseCatalogSeedComplete = false;
-    runtimeExerciseCatalogSeedPromise = null;
+    muscleGroupSeedComplete = false;
+    muscleGroupSeedPromise = null;
 
     await databaseToClose?.closeAsync();
     await deleteDatabaseAsync(LOCAL_DATABASE_NAME);
@@ -142,7 +173,7 @@ export const __resetLocalDataLayerForTests = () => {
   localDatabase = null;
   runtimeMigrationsComplete = false;
   runtimeMigrationPromise = null;
-  runtimeExerciseCatalogSeedComplete = false;
-  runtimeExerciseCatalogSeedPromise = null;
+  muscleGroupSeedComplete = false;
+  muscleGroupSeedPromise = null;
   dataLayerOperationLock = Promise.resolve();
 };

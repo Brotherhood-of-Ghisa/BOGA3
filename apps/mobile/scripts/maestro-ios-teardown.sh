@@ -29,6 +29,14 @@ else
   echo "[maestro-ios-teardown] No active Expo process recorded"
 fi
 
+# Restore the developer's .env.local that the launch step set aside while it
+# pinned this lane's Supabase config (no-op when nothing was managed). Done after
+# the dev server is stopped so the restore can never feed a mid-flow reload.
+if [[ -n "${MAESTRO_ENV_LOCAL_PATH:-}" ]]; then
+  echo "[maestro-ios-teardown] Restoring developer .env.local (${MAESTRO_ENV_LOCAL_BACKUP:+from backup})"
+  maestro_restore_managed_env_local
+fi
+
 if [[ -n "${IOS_SIM_UDID:-}" && -n "${MAESTRO_IOS_DEV_CLIENT_BUNDLE_ID:-}" ]]; then
   echo "[maestro-ios-teardown] Terminating app $MAESTRO_IOS_DEV_CLIENT_BUNDLE_ID on $IOS_SIM_UDID"
   xcrun simctl terminate "$IOS_SIM_UDID" "$MAESTRO_IOS_DEV_CLIENT_BUNDLE_ID" >/dev/null 2>&1 || true
