@@ -1,0 +1,80 @@
+appId: com.dinoderek.mobile
+---
+# Developer-only "Wipe local & re-bootstrap" affordance on the Settings screen.
+#
+# The dev-tools card is gated on the cross-build developer signal, which is true
+# in the Metro dev-client build this harness installs. The card is therefore
+# present here and absent in a release build. This flow asserts the card and its
+# wipe-local button render, drives the wipe, asserts the success feedback, and
+# confirms the app re-bootstraps back to a usable data screen afterward (the
+# wipe drops the local database and re-runs the boot data layer; sync then
+# re-pulls server state).
+#
+# Runs in the infra-free harness lane: the maestro-harness deep link teleports
+# straight to a data screen without a sign-in, the same as the smoke/data-smoke
+# flows.
+
+# Reset the local data layer to a known clean state and land on the tabbed shell.
+- openLink: "boga3://maestro-harness?reset=data&teleport=session-list"
+# The dev-client "Open in <App>?" URL-scheme trust dialog and expo-dev-client's
+# developer-menu onboarding sheet can appear on top of the freshly-loaded app;
+# dismiss them. Each tap is an optional no-op when its target is absent.
+- tapOn:
+    text: "Open"
+    optional: true
+- tapOn:
+    text: "Continue"
+    optional: true
+- tapOn:
+    text: "Close"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "stats-history-screen"
+    timeout: 30000
+- takeScreenshot: "01-dev-wipe-local-start"
+
+# Open Settings and confirm the developer-tools card is present. Its visibility
+# proves the developer-mode gate evaluates true on this build.
+- tapOn:
+    id: "top-level-settings-button"
+- assertVisible:
+    id: "settings-screen"
+- extendedWaitUntil:
+    visible:
+      id: "settings-dev-tools-card"
+    timeout: 30000
+- assertVisible:
+    id: "settings-dev-wipe-local-button"
+- takeScreenshot: "02-dev-wipe-local-settings"
+
+# Drive the wipe: drop the local database and re-bootstrap the data layer.
+- tapOn:
+    id: "settings-dev-wipe-local-button"
+# Success feedback confirms the wipe + re-bootstrap completed without error.
+- extendedWaitUntil:
+    visible:
+      id: "settings-dev-wipe-local-feedback"
+    timeout: 30000
+- assertVisible:
+    text: "Local database wiped and re-bootstrapped. Sync will re-pull from the server."
+- takeScreenshot: "03-dev-wipe-local-feedback"
+
+# After the wipe the data layer is re-bootstrapped, so navigating back to a data
+# screen must still render against the fresh local store (a broken re-bootstrap
+# would leave the app unable to reach a data screen here).
+- openLink: "boga3://maestro-harness?teleport=session-list"
+- tapOn:
+    text: "Open"
+    optional: true
+- tapOn:
+    text: "Continue"
+    optional: true
+- tapOn:
+    text: "Close"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "stats-history-screen"
+    timeout: 30000
+- takeScreenshot: "04-dev-wipe-local-rebootstrapped"
