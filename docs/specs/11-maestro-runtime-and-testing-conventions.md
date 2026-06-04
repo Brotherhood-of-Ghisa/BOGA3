@@ -65,9 +65,11 @@ Rules:
 
 ### Current flows
 
-- There are exactly two committed Maestro flows:
+- The two core runtime-smoke flows this toolkit baseline was first verified against are:
   - `apps/mobile/.maestro/flows/smoke-launch.yaml`
   - `apps/mobile/.maestro/flows/data-runtime-smoke.yaml`
+- The committed flow set has since grown (login/auth-profile and stats/UX flows that
+  reuse the same toolkit and reset taxonomy); the current set lives in `apps/mobile/.maestro/flows/`.
 - Both flows now commit against the development-client bundle identifier surface instead of `host.exp.Exponent`.
 - The shared scenario runner also rewrites a runtime-local flow copy under the artifact root so the executed `appId` always matches the installed development-client bundle id from the built `.app`.
 - Flow setup now uses the M10 taxonomy instead of tapping through setup screens:
@@ -126,13 +128,13 @@ Rules:
 
 ### Current app/build assumptions
 
-- `apps/mobile/app.json` already defines `scheme: "mobile"`, which gives M10 a usable app/deep-link scheme baseline.
+- `apps/mobile/app.config.ts` defines `scheme: "boga3"`, which gives M10 a usable app/deep-link scheme baseline.
 - `apps/mobile/eas.json` already defines a `development` build profile with `developmentClient: true`.
 - `apps/mobile/app/maestro-harness.tsx` is the hidden route used for app-owned data reset and screen teleportation.
 - `apps/mobile/src/maestro/harness.ts` owns the guard, param parsing, and route resolution logic for that hidden route.
 - Verified against:
-  - `apps/mobile/app.json:3-46`
-  - `apps/mobile/eas.json:6-19`
+  - `apps/mobile/app.config.ts`
+  - `apps/mobile/eas.json`
   - `apps/mobile/app/maestro-harness.tsx`
   - `apps/mobile/src/maestro/harness.ts`
 
@@ -385,7 +387,7 @@ M10 locks these exact terms:
    - preferred when a clean app data state is needed without re-testing install semantics.
 3. `teleport`
    - uses deep links or a hidden harness route to land directly in the target screen/state;
-   - current implementation: flows open `mobile://maestro-harness?...` and the harness route `replace`s into the requested screen after reset work completes;
+   - current implementation: flows open `boga3://maestro-harness?...` and the harness route `replace`s into the requested screen after reset work completes;
    - default setup method for routine flow positioning because it minimizes slow UI tapping.
 
 Priority rule:
@@ -396,8 +398,8 @@ Priority rule:
 
 ### 9. Harness and deep-link contract
 
-1. The app-level setup/navigation layer must use the existing app scheme baseline (`mobile`) rather than `Expo Go`-specific URLs.
-2. The canonical hidden route is `mobile://maestro-harness`.
+1. The app-level setup/navigation layer must use the existing app scheme baseline (`boga3`) rather than `Expo Go`-specific URLs.
+2. The canonical hidden route is `boga3://maestro-harness`.
 3. Supported harness query parameters are:
    - `reset=data` to perform app-owned persisted-data reset;
    - `fixture=exercise-block-history` to seed deterministic local SQLite history for Issue 70 recorder block-history visual QA;
