@@ -104,6 +104,83 @@ npm install
 npm run start:ios:dev-client
 ```
 
+## Session import digestion: GymBook export to BOGA JSON
+
+The GymBook digester converts a GymBook XML export into the source-neutral BOGA
+session import JSON contract. It does **not** write rows into local SQLite; the
+generic importer consumes the JSON in a separate step.
+
+Contract reference:
+
+```text
+apps/mobile/scripts/import/BOGA_IMPORT_JSON_CONTRACT.md
+```
+
+Required operator decisions before producing importer-ready JSON:
+
+- identify the local BOGA profile/user being imported into with
+  `--importing-profile-label`;
+- load that profile's local exercise/gym catalog from `--local-db` or an explicit
+  review `--catalog-json`;
+- choose gyms for midday, weekday evening, and weekend buckets, passing `none`
+  for any bucket that should not assign a gym;
+- provide a decisions file for GymBook exercise names that do not exist in that
+  profile's exercise catalog.
+
+Draft/review run, allowing unresolved exercise mappings:
+
+```bash
+cd apps/mobile
+npm run digest:gymbook -- \
+  --input "/path/to/GymBook-Logs.xml" \
+  --catalog-json /path/to/catalog.json \
+  --importing-profile-label "Local profile label" \
+  --gym-midday-id none \
+  --gym-weekday-evening-id none \
+  --gym-weekend-id none \
+  --dry-run \
+  --allow-unresolved
+```
+
+Importer-ready run against a local BOGA SQLite file:
+
+```bash
+cd apps/mobile
+npm run digest:gymbook -- \
+  --input "/path/to/GymBook-Logs.xml" \
+  --local-db /path/to/scaffolding-local.db \
+  --importing-profile-label "Local profile label" \
+  --decisions /path/to/gymbook-decisions.json \
+  --gym-midday-id <gym-id-or-none> \
+  --gym-weekday-evening-id <gym-id-or-none> \
+  --gym-weekend-id <gym-id-or-none> \
+  --output /path/to/boga-session-import.json \
+  --report /path/to/boga-session-import-report.json
+```
+
+Decision file shape:
+
+```json
+{
+  "exerciseDecisions": {
+    "Source Exercise Name": {
+      "decision": "map_existing",
+      "exerciseDefinitionId": "existing-exercise-id"
+    },
+    "New Source Exercise": {
+      "decision": "create_new",
+      "exerciseName": "New Source Exercise",
+      "muscleMappings": []
+    }
+  }
+}
+```
+
+Review `report.unresolvedExercises`, `report.warnings`,
+`report.gymAssignmentCounts`, and `report.notes` before handing the JSON to the
+generic importer. Full private exports must stay out of git; commit only
+synthetic/redacted fixtures.
+
 ## Mobile app: run on iOS simulator
 
 ### Fast JS loop (Expo)

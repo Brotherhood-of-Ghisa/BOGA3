@@ -27,7 +27,7 @@ docs_touched: "RUNBOOK.md,docs/specs/09-project-structure.md as needed"
 
 - Project directives: `docs/specs/README.md`
 - Milestone spec: `docs/specs/milestones/M13-simple-backend-sync.md` (completed baseline; this is post-M13 import/sync-load tooling)
-- Upstream task/card: `docs/tasks/T-20260604-01-boga-import-json-contract-and-gymbook-digester.md`
+- Upstream task/card: `docs/tasks/complete/T-20260604-01-boga-import-json-contract-and-gymbook-digester.md`
 - Architecture: `docs/specs/03-technical-architecture.md`
 - Data model: `docs/specs/05-data-model.md`
 - AI development playbook: `docs/specs/04-ai-development-playbook.md`

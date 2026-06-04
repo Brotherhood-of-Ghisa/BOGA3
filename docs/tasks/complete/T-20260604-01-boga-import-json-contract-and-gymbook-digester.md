@@ -1,7 +1,7 @@
 ---
 task_id: T-20260604-01-boga-import-json-contract-and-gymbook-digester
 milestone_id: "M13"
-status: planned
+status: completed
 ui_impact: "no"
 areas: "frontend|docs"
 runtimes: "node"
@@ -16,7 +16,7 @@ docs_touched: "RUNBOOK.md,docs/specs/09-project-structure.md as needed"
 
 - Task ID: `T-20260604-01-boga-import-json-contract-and-gymbook-digester`
 - Title: BOGA import JSON contract and GymBook export digester
-- Status: `planned`
+- Status: `completed`
 - File location rule:
   - author active cards in `docs/tasks/<task-id>.md`
   - move the file to `docs/tasks/complete/<task-id>.md` when `Status` becomes `completed` or `outdated`
@@ -37,8 +37,8 @@ docs_touched: "RUNBOOK.md,docs/specs/09-project-structure.md as needed"
 
 ## Context Freshness (required at session start; update before edits)
 
-- Verified current branch + HEAD commit: `main` at `66eeee8`
-- Start-of-session sync completed per `docs/specs/04-ai-development-playbook.md` git sync workflow?: `no` - planning card created from an interactive `/plan` discussion; perform normal start-of-session sync before implementation.
+- Verified current branch + HEAD commit: `main` at `d67f802`
+- Start-of-session sync completed per `docs/specs/04-ai-development-playbook.md` git sync workflow?: `yes` - ran `git fetch origin main`; local `main` and `origin/main` were even (`0 0`) before edits.
 - Parent refs opened in this planning session:
   - `docs/specs/README.md`
   - `docs/specs/00-product.md`
@@ -203,18 +203,33 @@ Define the source-app-neutral BOGA import JSON contract and implement the first 
 
 ## Evidence
 
-- To be filled during implementation.
+- Implemented source-neutral contract docs and validator in `apps/mobile/scripts/import/`.
+- Implemented GymBook UTF-16LE XML digester CLI exposed as `npm run digest:gymbook`.
+- Added synthetic GymBook XML fixture and targeted parser/digester/contract tests.
 - Manual verification summary:
-  - Record digest summary counts from the full private GymBook export.
-  - Record warnings and unresolved decisions from dry-run review.
+  - Dry-run against the private GymBook export completed in review mode without committing the export.
+  - Dry-run aggregate counts: `2971` source rows, `61` skipped rows, `2910` imported candidate rows, `220` inferred sessions, `23` preserved notes, `2` unresolved exercises.
+  - Dry-run unresolved exercises: `Ball Dumbbell Chest Press` (`5` rows) and `Zercher Squat` (`11` rows).
+  - Dry-run warning codes: `duration_inferred_short_span`, `duration_raw_span_over_90_min`, `source_note_preserved`.
+  - Dry-run gym bucket counts with all buckets explicitly set to no gym: midday `128`, weekday evening `38`, weekend `33`, none `21`.
+- Manual verification summary (required when CI is absent/partial): Private GymBook export dry run passed in review mode; aggregate counts and unresolved exercise names are recorded above without committing the export.
 - Deferred/manual hosted checks summary:
   - Remote import and hosted Supabase write validation are out of scope.
 
 ## Completion note (fill at end per `docs/specs/04-ai-development-playbook.md`)
 
-- What changed:
-- What tests ran:
-- What remains:
+- What changed: Added the source-neutral BOGA session import JSON v1 contract, GymBook digester CLI, tests, and operator docs.
+  - Added the BOGA session import JSON v1 contract and validation helper.
+  - Added GymBook XML digestion with target-profile preflight, local catalog loading from SQLite or catalog JSON, explicit gym bucket choices, exercise mapping/create decisions, skipped-row reporting, duration inference warnings, and note preservation in metadata/report output.
+  - Added runbook/script inventory/project-structure docs for the new `apps/mobile/scripts/import/` tooling area.
+- What tests ran: Targeted digester Jest suite, mobile typecheck, private export dry run, and `./scripts/quality-fast.sh frontend`.
+  - `cd apps/mobile && npm test -- --runTestsByPath app/__tests__/gymbook-digester.test.ts`
+  - `cd apps/mobile && npm run typecheck`
+  - private export dry run via `npm run digest:gymbook -- --input "/Users/sboschi/Library/Mobile Documents/com~apple~CloudDocs/GymBook-Logs-2026-06-04.xml" --catalog-json /tmp/boga-gymbook-seed-catalog.json --importing-profile-label "Private dry-run seed catalog" --gym-midday-id none --gym-weekday-evening-id none --gym-weekend-id none --dry-run --allow-unresolved`
+  - `./scripts/quality-fast.sh frontend`
+- What remains: The generic local SQLite importer remains in `T-20260604-02-boga-import-json-local-importer`; real import-ready output still needs target-profile gym choices and exercise decisions.
+  - The generic local SQLite importer is still owned by `T-20260604-02-boga-import-json-local-importer`.
+  - Real import-ready output still needs user-specific gym choices and exercise decisions for the target local profile.
 
 ## Status update checklist (mandatory at closeout)
 

@@ -17,6 +17,10 @@ This directory contains two kinds of files:
   - purpose: writes `.expo/types/router.d.ts` so headless `typecheck` works without starting Expo.
   - used by: `npm run router:types`, which is part of `npm run typecheck`.
   - status: used and needed.
+- `import/gymbook-digester.ts`
+  - purpose: parses a GymBook XML export into the source-neutral BOGA session import JSON contract and review report.
+  - used by: `npm run digest:gymbook` in `apps/mobile/package.json`.
+  - status: used and needed. This script only digests/reports data; it does not write imported rows into BOGA SQLite.
 - `maestro-ios-dev-client-build.sh`
   - purpose: builds or reuses the configured iOS simulator development-client `.app`.
   - used by: humans directly, `README` instructions, and `maestro-ios-provision.sh`.

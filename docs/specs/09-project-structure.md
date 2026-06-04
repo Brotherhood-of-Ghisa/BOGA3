@@ -127,6 +127,9 @@ Define the canonical repository structure, path ownership, and placement convent
   - must not be committed.
 - `apps/mobile/scripts/`
   - keep Maestro runtime/toolkit wrappers here (`maestro-env.sh`, `maestro-ios-*.sh`) rather than introducing a separate top-level test-runtime folder.
+- `apps/mobile/scripts/import/`
+  - canonical home for mobile-local import digestion tooling and import handoff contract docs.
+  - source-specific digesters here convert third-party exports into BOGA-friendly JSON only; generic importers or DB-writing tools must be documented separately and must not commit private export data.
 - Mobile test-directory refactor
   - moving tests out of `apps/mobile/app/__tests__/` is a valid follow-up improvement, but it must be done in a dedicated task (not mixed into unrelated backend work).
 
