@@ -463,3 +463,14 @@ and the referenced PRs.
   the coordinator's t2-gap hypothesis was WRONG. Effectively the first tGATE-style
   slow-gate checkpoint, run out-of-band via a user-spawned worker. main's slow
   lanes (gates + auth-profile) are now green.
+- t9 (PR #125, merged 2026-06-04): Settings sync-status surface + the CANONICAL
+  single `getSchedulerStatus()` accessor (`apps/mobile/src/sync/scheduler.ts`) +
+  `apps/mobile/src/sync/sync-status.ts` + the Settings panel. Verified by the
+  user-spawned task running the gates incl. the auth-profile lane GREEN, then
+  merged by the user (no separate mao-reviewer pass — gate-verified). Hand-off
+  accessor confirmed on main; t2 adopts it on its rebase.
+- (out-of-band) PR #124 (merged 2026-06-04): `fix(maestro): isolate each iOS
+  lane's Supabase config from a leftover .env.local` — hardened lane isolation
+  (.gitignore + maestro-ios scripts + testing-strategy / maestro-conventions /
+  worktree-config specs). Another out-of-band CI hardening (the leftover-.env.local
+  gotcha the t2 builder first hit).

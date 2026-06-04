@@ -405,3 +405,22 @@ those + t5 merge → tFINAL. t5 is parallel and nearly independent.
   - tGATE re-run before tFINAL (after t9/t10/t2), then tFINAL.
 - Nothing for the coordinator to DISPATCH now without conflicting with the
   in-progress t9. Staged to move the moment the `[t9]` PR lands.
+
+## 2026-06-04 — iteration 20
+- t9 merged as #125 (the spawned task ran the gates incl. auth-profile GREEN; user
+  merged; no separate mao-reviewer pass — gate-verified). main → 59aa925. Hand-off
+  verified on main: `getSchedulerStatus` in scheduler.ts, sync-status.ts, panel.
+  Deviation logged.
+- #124 (out-of-band CI fix) merged — lane Supabase-config isolation from leftover
+  .env.local. Logged.
+- DISPATCHED the final feature wave (disjoint, parallel; both bg):
+  - t2 #113 REBASE (agent a7c8a9b) — merge main, ADOPT t9's `getSchedulerStatus`
+    + drop t2's stub seam, reconcile cycle.ts (t2 error-signal + t3 bootstrapper +
+    t5 bundle-migrations), build + fast/infra-free gates, commit-early + push;
+    sync-gate auth-profile lane attempted, else spawned-task run.
+  - t10 (agent af2aca19) — verify dev-wipe affordances vs launch state + Jest +
+    fast/infra-free gates, commit-early + push + PR; wipe-local dev Maestro
+    attempted, else spawned-task run.
+- REMAINING: review t2 #113 + t10 → run their signed-in Maestro lanes green (in-
+  agent or spawned task) → merge → tGATE re-run (slow lanes on merged main) →
+  tFINAL.
