@@ -54,6 +54,10 @@ Reason: keeps FE/backend integration test expectations explicit without forcing 
 - Every feature should include at least one success-path test and one offline/error-path test.
 - During execution sessions, run a targeted test or gate after each meaningful change, then run `./scripts/quality-fast.sh` before task closeout.
 - Run `./scripts/quality-slow.sh <area>` when the task card's risk triggers require slower local runtime/contract checks.
+- **Mandatory slow-gate triggers (per change, by what the change touches — not optional, and in addition to periodic checkpoints):**
+  - A change with **any UX component OR any assumption about device / runtime behaviour** (a screen, navigation, a route guard/gate, app lifecycle, native APIs, on-device storage, simulator/OS behaviour) MUST run the **slow frontend gates** — the iOS Maestro lanes (`npm run test:e2e:ios:gates`, plus `npm run test:e2e:ios:auth-profile` when a signed-in / auth / sync path is involved) — to green before closeout.
+  - A change that **depends on the backend / infra** (Supabase RPCs, the sync round-trip, migrations, server contracts, reinstall/restore) MUST run the **slow backend gates** (`npm run test:sync:infra` / the shared-Supabase real-instance tests below; `npm run test:sync:reinstall-parity` where relevant). These are deferrable ONLY when the branch-provisioned remote env (`SUPABASE_BRANCH_URL` / `SUPABASE_BRANCH_ANON_KEY`) is genuinely unset.
+  - The fast lane (`lint`/`typecheck`/`jest`) cannot catch device-behaviour or backend-contract regressions, so a behaviour-changing "data-only" change (e.g. anything touching boot/sync/auth) still triggers the slow frontend gates. Do not classify a behaviour change as "no UI → no e2e impact"; that gap is how a first-sync/gate/online-detection bug reaches the integration branch uncaught.
 
 ## In-memory SQLite unit tests (shared fixture)
 
