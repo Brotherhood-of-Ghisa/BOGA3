@@ -527,3 +527,25 @@ those + t5 merge → tFINAL. t5 is parallel and nearly independent.
 - REMAINING: tFINAL → review + confirm slow lanes green (dedicated run if a lane
   flakes in-agent) → merge → tINVENTORY (non-unit test inventory) → mao-audit →
   propose deleting the plan dir.
+
+## 2026-06-04 — iteration 26
+- tFINAL → PR #131. SLOW LANES GREEN IN-AGENT (first time clean): quality-fast
+  765/765, test:sync:reinstall-parity 7/7 (outcomes 1/2/3-server), check:sync-drift
+  --strict (outcome 4), test:e2e:ios:gates, test:e2e:ios:auth-profile (all 4 flows
+  incl. login-gate + sync-gate launch). 5 new test files map outcomes 1/2/3 +
+  sync-gate phase/progress/offline 1:1; outcomes 4/5 reuse existing per-task
+  assertions (per the card's out-of-scope rule). Dispatched reviewer (a0c9ebc).
+- LATENT BUG SURFACED (track to closure, NOT a tFINAL defect): test:sync:infra
+  `cycle-round-trip.test.ts` trips an FK violation — the cycle inadvertently
+  re-triggers the seeder and re-pulls muscle mappings into a store with no muscle
+  groups. Real sync-ordering bug (bites if FKs are enforced). The tFINAL builder
+  spawned a separate fix task/chip. MUST land before the audit can call
+  test:sync:infra green; flagged to user.
+- tFINAL deviations (in PR): reinstall-parity repointed off a deleted test file;
+  the sign-in/restore suites run in the parity script (not test:sync:infra, whose
+  `supabase db reset` drops the auth fixture mid-run); outcome-3 server half
+  asserted behaviourally over live PostgREST (the v1 objects are absent from the
+  running DB) rather than a migration grep (old CREATEs persist in superseded
+  migrations).
+- REMAINING: tFINAL review → merge; land the cycle-round-trip fix; tINVENTORY →
+  mao-audit → propose deleting the plan dir.
