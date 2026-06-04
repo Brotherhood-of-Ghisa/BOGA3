@@ -19,6 +19,8 @@
 // React context, and the UI subscribes via `useSyncExternalStore`, so all three
 // must reach the same holder.
 
+import type { SyncProgress } from '@/src/sync/progress';
+
 /** The classification of a failed cycle, mirroring the cycle's own error codes. */
 export type LastCycleErrorCode = 'AUTH_REQUIRED' | 'FK_VIOLATION' | 'INTERNAL';
 
@@ -31,12 +33,23 @@ export interface SyncGateStateSnapshot {
   bootstrapCompletedAt: Date | null;
   /** The most recent failed cycle's error code, or null when the last cycle was clean. */
   lastCycleErrorCode: LastCycleErrorCode | null;
+  /**
+   * Test/harness-only: when non-null, the gate renders this in-progress block
+   * (online, the given phase) and stays up regardless of the live scheduler and
+   * the persisted bootstrap flag. The iOS simulator's NetInfo cannot confirm
+   * internet reachability, so the live cycle's online "setting up" state is not
+   * observable in a Maestro flow; this lets the harness drive that state
+   * deterministically, the same way the bootstrap flag drives dismissal. Always
+   * null in production (no harness route is reachable in a release build).
+   */
+  forcedProgress?: SyncProgress | null;
 }
 
 /** The snapshot returned before any cycle has reported anything. */
 const INITIAL_SNAPSHOT: SyncGateStateSnapshot = {
   bootstrapCompletedAt: null,
   lastCycleErrorCode: null,
+  forcedProgress: null,
 };
 
 type Listener = () => void;

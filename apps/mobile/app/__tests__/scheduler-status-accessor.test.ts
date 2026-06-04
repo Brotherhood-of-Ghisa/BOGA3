@@ -26,8 +26,8 @@ jest.mock('@/src/sync/cycle', () => ({
   runSyncCycle: () => mockRunSyncCycle(),
 }));
 
-// NetInfo stub exposing the registered listener so tests drive reachability.
-type NetInfoSnapshot = { isInternetReachable: boolean | null };
+// NetInfo stub exposing the registered listener so tests drive connectivity.
+type NetInfoSnapshot = { isConnected?: boolean | null; isInternetReachable?: boolean | null };
 const mockNetInfoState: { listener: ((state: NetInfoSnapshot) => void) | null } = {
   listener: null,
 };
@@ -50,13 +50,16 @@ jest.mock('@/src/logging/logEvent', () => ({
 }));
 
 import {
+  __resetSchedulerForTests,
   getSchedulerStatus,
   startSyncScheduler,
   stopSyncScheduler,
 } from '@/src/sync/scheduler';
 import { resetSyncProgress, setSyncProgress } from '@/src/sync/progress';
 
-const goOnline = () => mockNetInfoState.listener?.({ isInternetReachable: true });
+// "online" is keyed off the link (isConnected), not the reachability probe.
+const goOnline = () =>
+  mockNetInfoState.listener?.({ isConnected: true, isInternetReachable: true });
 
 const endCycleSuccess = async () => {
   cycleResolvers.shift()?.resolve();
@@ -85,6 +88,7 @@ beforeEach(() => {
   });
   (AppState as { currentState: AppStateStatus }).currentState = 'active';
 
+  __resetSchedulerForTests();
   startSyncScheduler();
 });
 
