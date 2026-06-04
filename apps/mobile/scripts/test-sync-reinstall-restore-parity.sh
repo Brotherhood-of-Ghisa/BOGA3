@@ -26,5 +26,13 @@ export EXPO_PUBLIC_SUPABASE_ANON_KEY="$ANON_KEY"
 export SYNC_TEST_EMAIL="${SYNC_TEST_EMAIL:-$USER_A_EMAIL}"
 export SYNC_TEST_PASSWORD="${SYNC_TEST_PASSWORD:-$USER_A_PASSWORD}"
 
+# The restore-parity suites talk to the live endpoint through the shared
+# live-branch helper, which reads its URL + anon key from these two vars and
+# signs in as the deterministic user_a fixture (provisioned above by the runtime
+# baseline). Point them at the just-provisioned worktree-local Supabase so the
+# lane self-bootstraps a real backend rather than requiring a remote branch.
+export SUPABASE_BRANCH_URL="${SUPABASE_BRANCH_URL:-$API_URL}"
+export SUPABASE_BRANCH_ANON_KEY="${SUPABASE_BRANCH_ANON_KEY:-$ANON_KEY}"
+
 cd "$APP_DIR"
 npm test -- --config jest.integration.config.js --runInBand
