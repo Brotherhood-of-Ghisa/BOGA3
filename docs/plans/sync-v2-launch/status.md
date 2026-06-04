@@ -466,3 +466,23 @@ those + t5 merge → tFINAL. t5 is parallel and nearly independent.
   (full slow suite on merged main, clean+serial) as the final gate → tFINAL.
 - STATE: 10 plan tasks merged. Open: t2 #113 (rebased, re-review running, lane
   pending), t10 #126 (approved, lane pending). Then tGATE → tFINAL → audit.
+
+## 2026-06-04 — iteration 23
+- t2 #113 re-review → APPROVED (code): accessor adoption verified (stub seam
+  removed; one getSchedulerStatus/SyncProgress; legit gate-scoped holder), cycle.ts
+  4-way merge intact, quality-fast 740 green, hygiene clean. Sync-gate Maestro
+  failure confirmed environmental (dev-client foregrounding flake on clean main).
+- BOTH #113 (t2) + #126 (t10) now CODE-APPROVED.
+- LANE-VERIFY DECISION (consolidated): the signed-in Maestro lanes are launch-
+  meaningful on the MERGED main, and are flaky per-branch in-agent. So: MERGE both
+  code-approved PRs → run a single tGATE checkpoint (full slow suite on merged
+  main, CLEAN + SERIAL + warm) as the authoritative launch gate. This honors
+  flakes-not-accepted (lanes run GREEN on the shipping state) + the AGENTS.md
+  convention (tGATE = barrier before tFINAL; no further feature merges while the
+  slow gates are red). If tGATE is red on a real bug → fix-forward before tFINAL.
+- Created the tGATE spawned-task chip (run AFTER #113 + #126 are merged): full slow
+  suite on origin/main, handling the known environmental flakes (.env.local leak,
+  dev-client foregrounding, Supabase port contention) without weakening guard/tests.
+- The earlier t10-only lane chip is SUPERSEDED by tGATE — dismiss it.
+- Path to done: merge #113 + #126 → tGATE chip green → tFINAL (final test card:
+  5 cross-cutting outcomes + two-device restore on the infra lane) → mao-audit.
