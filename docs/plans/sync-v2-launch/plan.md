@@ -123,10 +123,14 @@ graph TD
   t5[t5: bundle-migration loop]
   t6[t6: muscle_groups idempotent bootstrap]
   t7[t7: soft-delete everywhere]
+  t7b[t7b: soft-delete session-rebuild cascade]
   t8[t8: sign-out / account-switch local wipe]
   t9[t9: Settings sync-status surface]
   t10[t10: dev-gated wipe affordances]
+  t11[t11: post-sign-in sync auth — session loss fix]
+  tGATE[tGATE: slow-gate checkpoint — integration branch green]
   tFINAL[tFINAL: launch end-to-end verification]
+  tINVENTORY[tINVENTORY: non-unit test inventory + hygiene review]
 
   tPROG --> t2
   tPROG --> t3
@@ -141,12 +145,21 @@ graph TD
   t3 --> t9
   t3 --> t10
 
+  t1 --> t11
+  t11 --> tFINAL
+  t2 --> tGATE
+  t9 --> tGATE
+  t10 --> tGATE
+  tGATE --> tFINAL
+  tFINAL --> tINVENTORY
   t1 --> tFINAL
   t2 --> tFINAL
   t4 --> tFINAL
   t5 --> tFINAL
   t6 --> tFINAL
   t7 --> tFINAL
+  t7 --> t7b
+  t7b --> tFINAL
   t8 --> tFINAL
   t9 --> tFINAL
   t10 --> tFINAL
@@ -195,10 +208,14 @@ consumes):
 - [t4: `sys_*` → `seed_*` bundle slug rename](tasks/t4.md) — build
 - [t5: bundle-migration runtime loop](tasks/t5.md) — build
 - [t6: `muscle_groups` idempotent bootstrap](tasks/t6.md) — build
-- [t7: soft-delete everywhere — convert hard-delete repo paths](tasks/t7.md) — build (size-check; may split t7a/t7b)
+- [t7: soft-delete everywhere — convert hard-delete repo paths](tasks/t7.md) — build (split: shipped tag+mapping+simple paths in PR #108; session-rebuild cascade → t7b)
+- [t7b: soft-delete the session-rebuild cascade](tasks/t7b.md) — build (split from t7; depends on t7 merged)
 - [t8: sign-out / account-switch local wipe](tasks/t8.md) — build
 - [t9: Settings sync-status surface (+ scheduler state accessor)](tasks/t9.md) — build
 - [t10: dev-gated wipe affordances — confirm correct against launch state](tasks/t10.md) — build (verification delta)
+- [t11: post-sign-in sync authentication — session loss fix](tasks/t11.md) — build (remediation; surfaced by t2's Maestro work; gates t2's #113 lane-green merge)
+- [tGATE: slow-gate checkpoint — integration branch green](tasks/tGATE.md) — build (gate checkpoint; barrier before tFINAL; per AGENTS.md slow-gate convention)
+- [tINVENTORY: non-unit test inventory + hygiene review](tasks/tINVENTORY.md) — build (closure; runs after tFINAL; inventory + keep/drop + principles-conformance for all Maestro / Supabase / mock-device-DB tests)
 - [tFINAL: launch end-to-end verification](tasks/tFINAL.md) — build (final test card)
 
 ## Planner notes (folded from the stub)
@@ -372,4 +389,121 @@ and the referenced PRs.
 
 ## Deviations log
 
-<empty until first merge>
+- tPROG (PR #107, merged 2026-06-01): progress-reporting contract landed
+  (`designs/tPROG.md` — `SyncProgress` = phase + denominator-free counters
+  `layersCompleted`/`rowsApplied` + `offline`; t3 produces, t9 surfaces via the
+  single accessor, t2 renders) + pointer edits to t2/t3/t9. Deviation: an earlier
+  revision leaked 3 build files (`exercise-tags.ts`, `auth-required-signal.ts`,
+  `cycle.ts`) from a polluted base; coordinator reverted them pre-merge so the PR
+  is design-only.
+- t7 (PR #108, merged 2026-06-01): soft-delete conversion of tag-assignment +
+  muscle-mapping + simple-delete paths + reader filters + grep guard test.
+  Deviation: SPLIT — the `session-drafts.ts` session-rebuild cascade is deferred
+  to new card t7b (DAG: t7 → t7b → tFINAL). The `Builder-Agent:` commit trailer
+  was accepted by coordinator ruling (subsequently removed from the skill agent
+  defs entirely to resolve the underlying inconsistency).
+- t1 (PR #109, merged 2026-06-01): login-on-start route guard + sign-in screen +
+  AUTH_REQUIRED→sign-in hook + nav-contract/screen-map docs + Maestro flow.
+  Deviation: 3 minor card deviations logged in the PR (guard clamped to
+  `isConfigured`; sign-in-landing Maestro assertion placed in the auth-configured
+  lane; `auth-profile-happy-path.yaml` adapted to the new launch contract).
+  `Builder-Agent:` trailer accepted per the same ruling.
+- (out-of-band) PR #115 (merged 2026-06-03): `fix(mobile): seed starter catalog
+  dirty so a fresh account pushes it` — resolves the concern flagged at t3 review
+  (the as-built seeder wrote seeds `local_dirty=0`, so fresh-account seeds never
+  pushed). Shipped via the reviewer-spawned task chip, OUTSIDE this orchestration;
+  main advanced to 71ea317. t3 (#111) + t7b (#112) remained CLEAN/mergeable on top.
+  Downstream note: t4 (slug rename) + t5 (bundle migration) must compose with the
+  now-dirty seeder. Resolves open-concern #1 from iteration 5.
+- t3 (PR #111, merged 2026-06-03): bootstrapper integration — seeder runs only
+  inside the bootstrapper behind `rowsPulled == 0`, `bootstrap_completed_at` set
+  last; produces the `SyncProgress` snapshot (`apps/mobile/src/sync/progress.ts`,
+  `getSyncProgress`). Deviation: reviewer flagged the as-built seeder wrote seeds
+  `local_dirty=0` — resolved out-of-band by #115; t3 composes with the now-dirty
+  seeder.
+- t7b (PR #112, merged 2026-06-03): session-rebuild cascade converted to
+  soft-delete-then-reconcile (scratch-band/allocator keeps the `order_index`/PK
+  invariants against the non-partial local unique index); guard test no longer
+  exempts `session-drafts.ts`. Deviation: filtered two readers beyond the card's
+  named list (`exercise-catalog-stats.ts` + the in-file draft loader).
+- t11 (PR #116, merged 2026-06-03): post-sign-in auth-session fix. REAL,
+  launch-blocking bug — a signed-in Supabase session exceeds the iOS keychain's
+  2048-byte per-entry limit, so the old single-key auth storage adapter silently
+  persisted NOTHING → cycle `getSession()` null → spurious AUTH_REQUIRED →
+  sign-in bounce loop for every user. Fix: chunk oversized values across keychain
+  entries (`apps/mobile/src/auth/storage.ts`); enforced regression gate in CI's
+  fast lane (`auth-session-visibility.test.ts`, real GoTrue client vs a 2048-byte
+  ceiling). Deviation: remediation task added mid-plan (surfaced by t2's Maestro
+  work; the prior session-loss it masked was never caught because the auth-profile
+  Maestro lane is excluded from CI). The iOS auth-profile lane still needs a host
+  run (local Supabase) to green `launch-requires-sign-in.yaml` end-to-end —
+  deferred to tFINAL's provisioned infra lane / a host.
+- t8 (PR #110, merged 2026-06-03): sign-out / account-switch LOCAL wipe (§6.2) —
+  clears the 8 entity tables + resets the runtime-state row, preserves
+  `last_emitted_ms` + `muscle_groups`, no server delete. Rebased post-t7b/t11
+  (guard-test exempt-list union: {dev-reset, account-wipe}, not session-drafts).
+- t4 (PR #117, merged 2026-06-03): `sys_*` → `seed_*` bundle slug rename
+  (`seed_<slug>`, `seed_map_<exercise>__<muscle>`); muscle-group ids stay bare;
+  #115's dirty-write preserved; no Drizzle migration. none.
+- t6 (PR #119, merged 2026-06-03): `muscle_groups` idempotent bootstrap — per-id
+  insert-if-not-exists (replaces all-or-nothing-on-empty); existing rows not
+  overwritten/duplicated, `is_editable` stays 0, no sync-bookkeeping columns, ids
+  stay bare slugs (composes with t4). none.
+- t5 (PR #121, merged 2026-06-03): bundle-migration runtime loop — new
+  `apps/mobile/src/data/bundle-migrations.ts` (empty `BUNDLE_MIGRATIONS` +
+  `BundleMigration` + `runBundleMigrations`: short-circuit on applied>=current,
+  apply (applied,current] ascending each in own tx with atomic marker advance,
+  empty-array still advances marker to `CURRENT_APP_VERSION`, resumes after
+  partial failure), `CURRENT_APP_VERSION` constant (aliased to the existing
+  `SEED_CATALOG_BUNDLE_VERSION`=1), wired into `cycle.ts` after `runBootstrapper`.
+  Deviations: minimal idempotent repo surface; `CURRENT_APP_VERSION` aliased to
+  the seed marker.
+- (out-of-band) PR #123 (merged 2026-06-03): `fix: green the two red iOS Maestro
+  lanes (data-runtime-smoke + auth-profile)` — fixed the broken-`main` slow lanes
+  the t9 worker discovered. Touched `apps/mobile/src/auth/service.ts`,
+  `apps/mobile/src/data/bootstrap.ts`, the two Maestro flows + 2 tests. ROOT CAUSE
+  was the auth/bootstrap path + flow assertions, NOT the missing sync-gate (t2) —
+  the coordinator's t2-gap hypothesis was WRONG. Effectively the first tGATE-style
+  slow-gate checkpoint, run out-of-band via a user-spawned worker. main's slow
+  lanes (gates + auth-profile) are now green.
+- t9 (PR #125, merged 2026-06-04): Settings sync-status surface + the CANONICAL
+  single `getSchedulerStatus()` accessor (`apps/mobile/src/sync/scheduler.ts`) +
+  `apps/mobile/src/sync/sync-status.ts` + the Settings panel. Verified by the
+  user-spawned task running the gates incl. the auth-profile lane GREEN, then
+  merged by the user (no separate mao-reviewer pass — gate-verified). Hand-off
+  accessor confirmed on main; t2 adopts it on its rebase.
+- (out-of-band) PR #124 (merged 2026-06-04): `fix(maestro): isolate each iOS
+  lane's Supabase config from a leftover .env.local` — hardened lane isolation
+  (.gitignore + maestro-ios scripts + testing-strategy / maestro-conventions /
+  worktree-config specs). Another out-of-band CI hardening (the leftover-.env.local
+  gotcha the t2 builder first hit).
+- t2 (PR #113, merged 2026-06-04): sync-gate full-screen block — rebased onto t9
+  and adopted the canonical `getSchedulerStatus()` accessor (stub seam removed),
+  4-way `cycle.ts` merge (gate error-signal + bootstrapper + bundle-migrations);
+  gate renders `SyncProgress` (phase/counters/offline) + error+single-Retry +
+  AUTH_REQUIRED→sign-in. quality-fast 740 green. Sync-gate Maestro lane verified
+  via the clean tGATE run (which then surfaced the #129 gate bug). none.
+- t10 (PR #126, merged 2026-06-04): dev-gated wipe verification — confirmed the
+  affordances correct vs the launch state (no prod change); closed the
+  `app_public` schema-assertion test gap; added the wipe-local dev Maestro flow.
+  707 green. none.
+- (tGATE output) PR #129 (merged 2026-06-04): `fix: first-sync gate online
+  detection + kick sync on sign-in` — a REAL gate bug the tGATE clean slow-suite
+  run CAUGHT: the first-sync gate didn't detect online / didn't kick a sync on
+  sign-in, so it would hang. Exactly the launch-blocking class the fast gate
+  cannot catch — and the proximate motivation for the per-change slow-gate-trigger
+  instruction update (#130). Effectively the tGATE checkpoint's fix output.
+- tFINAL (PR #131, merged 2026-06-04): final test card — 5 new test files assert
+  outcomes 1/2 (reinstall + second-device restore <=1 min, real cycle+bootstrapper
+  against the live endpoint, seeder no-ops), 3 (v1 client paths + server objects
+  gone — server half a behavioural PostgREST probe), and the sync-gate
+  phase/progress/offline mapping; outcomes 4 (drift) + 5 (dev-wipes) reuse existing
+  per-task assertions. Slow lanes GREEN: quality-fast 765, reinstall-parity 7/7,
+  drift, e2e gates, auth-profile (4 flows). Deviations: parity-lane repointed off a
+  deleted file; sign-in suites run in the parity script (test:sync:infra's
+  `supabase db reset` drops the auth fixture mid-run); outcome-3 server half via
+  PostgREST. Surfaced a PRE-EXISTING `cycle-round-trip` FK latent bug — separate
+  fix spawned; tracked.
+- (out-of-band) PR #128 (merged 2026-06-04): `fix(worktree): stop leaking Supabase
+  stacks on slot recycle + reclaim orphans` — resolves the Supabase PORT
+  CONTENTION that plagued the in-agent Maestro/infra lanes during the launch.
