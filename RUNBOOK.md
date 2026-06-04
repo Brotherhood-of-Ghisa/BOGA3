@@ -181,6 +181,56 @@ Review `report.unresolvedExercises`, `report.warnings`,
 generic importer. Full private exports must stay out of git; commit only
 synthetic/redacted fixtures.
 
+## Session import loading: BOGA JSON to local SQLite
+
+The generic local importer consumes the source-neutral BOGA session import JSON
+contract and writes completed sessions into one local BOGA SQLite database. It
+does **not** parse GymBook XML and it does **not** write to hosted Supabase.
+Imported sync-scoped rows are stamped as normal dirty local rows so the existing
+sync engine can push them later.
+
+Back up the local SQLite database before a real import. Always review a dry-run
+first:
+
+```bash
+cd apps/mobile
+npm run import:boga-json:local -- \
+  --input /path/to/boga-session-import.json \
+  --local-db /path/to/scaffolding-local.db \
+  --importing-profile-label "Local profile label" \
+  --dry-run
+```
+
+The dry-run prints:
+
+- target profile/database metadata and any mismatch;
+- current row counts for the target tables;
+- package warning counts;
+- rows that would be inserted by table;
+- already-imported session counts for idempotent re-runs.
+
+After reviewing the dry-run and confirming the target profile/database, import
+with an explicit confirmation:
+
+```bash
+cd apps/mobile
+npm run import:boga-json:local -- \
+  --input /path/to/boga-session-import.json \
+  --local-db /path/to/scaffolding-local.db \
+  --importing-profile-label "Local profile label" \
+  --confirm-target "Local profile label"
+```
+
+The importer rejects unresolved exercise/gym decisions, malformed rows, duplicate
+generated IDs, missing local FK targets, target metadata mismatches, and unknown
+contract versions before writing. Use `--fatal-duration-warnings` when inferred
+duration warnings should block an import. Use `--allow-target-mismatch` only when
+deliberately importing a reviewed package into a different local database/profile.
+
+Re-running the same package is idempotent by default: deterministic import IDs
+cause already-imported sessions to be reported and skipped rather than copied.
+There is intentionally no force-copy mode in the first version.
+
 ## Mobile app: run on iOS simulator
 
 ### Fast JS loop (Expo)
