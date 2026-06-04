@@ -642,3 +642,25 @@ those + t5 merge → tFINAL. t5 is parallel and nearly independent.
 - All plan tasks DELIVERED: tPROG, t1, t2, t3, t4, t5, t6, t7, t7b, t8, t9, t10,
   t11, tGATE (via #129), tFINAL, tINVENTORY. Plus out-of-band #115/#118/#122/#124/
   #128/#130 (seed-dirty, testing-policy/single-source docs, port-contention fix).
+
+## 2026-06-04 — iteration 32 (audit → remediation → PASS-worthy)
+- mao-audit (#135) → FAIL, 1 remediation card, but the SUBSTANCE is a clean bill:
+  the auditor reproduced every gate LIVE on e7f2638 — quality-fast 765/765,
+  test:sync:reinstall-parity 7/7, test:sync:infra 6/6 — and confirmed all 5
+  cross-cutting outcomes map 1:1 to real tFINAL tests, all surface outcomes have
+  tests + delivering PRs, hand-offs exist, status spans 31 iterations, card/design
+  separation is clean, tGATE exists as a barrier + caught a real bug (#129), and no
+  deviation contradicts an outcome. NO outcome / code / test affected.
+- The SOLE failing item: the deviations log was missing dedicated entries for #132
+  (tINVENTORY, a merged plan task), #133, and #130 — because the consolidation PR
+  #134 was prepared before #132/#133 merged. REMEDIATION applied directly: added
+  the three deviations-log lines (the audit's t99 card is superseded — no throwaway
+  card, since the plan dir is being removed). The audit's only gap is now closed →
+  PASS-worthy.
+- Audit note (non-bug): test:sync:infra shows 4 false failures ONLY if run
+  back-to-back with reinstall-parity on the same Supabase instance (shared fixture
+  user, no intervening db reset); jest.integration.config.js already isolates the
+  sign-in suites — manual back-to-back-run gotcha only.
+- PLAN COMPLETE. Every outcome delivered + green; the record is complete. Proposing
+  deletion of docs/plans/sync-v2-launch/ (user's call — keep as a retro record or
+  delete per the mao protocol).

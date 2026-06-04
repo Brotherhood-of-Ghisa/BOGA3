@@ -507,3 +507,24 @@ and the referenced PRs.
 - (out-of-band) PR #128 (merged 2026-06-04): `fix(worktree): stop leaking Supabase
   stacks on slot recycle + reclaim orphans` — resolves the Supabase PORT
   CONTENTION that plagued the in-agent Maestro/infra lanes during the launch.
+- (out-of-band) PR #130 (merged 2026-06-04): `docs(testing): mandatory per-change
+  slow-gate triggers` — made the slow-gate trigger explicit PER CHANGE (UX/device
+  → slow FE/Maestro gates; backend/infra → slow BE/Supabase gates), in addition to
+  the periodic checkpoint; consolidated the testing rules into
+  `docs/specs/06-testing-strategy.md` as the single source (AGENTS.md a forcing
+  pointer, CLAUDE.md reference-only). Motivated by the #129 gate bug reaching main
+  uncaught.
+- tINVENTORY (PR #132, merged 2026-06-04): closure test-suite hygiene — inventoried
+  all 33 sync-v2 non-unit tests (Maestro flows / live-endpoint Supabase suites /
+  in-memory-SQLite suites) with keep/drop + principles-conformance; 0 drops, 1 fix
+  (wired the ORPHANED `settings-dev-wipe-local.yaml`, which ran in no lane, into the
+  gates runner). Produced the durable inventory doc
+  `docs/testing/sync-v2-non-unit-test-inventory.md`. Deviation: re-spun once — the
+  first pass missed 9 `sync/` tests + mis-scoped 3 live-endpoint suites; the reviewer
+  caught it; scope corrected to the git add-date boundary.
+- (out-of-band) PR #133 (merged 2026-06-04): `fix(sync): seed muscle groups before
+  the round-trip cycle re-materialises muscle mappings` — fixed the
+  `cycle-round-trip` FK violation surfaced by `test:sync:infra`. ROOT CAUSE: a
+  TEST-FIXTURE bug (the suite mocked `@/src/data/bootstrap`, bypassing the boot-time
+  `muscle_groups` seed); production code confirmed correct/unchanged. `test:sync:infra`
+  now 6/6.
