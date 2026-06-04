@@ -92,7 +92,7 @@ Current local env mapping:
 | `supabase/.env.hosted` | `~/.config/boga/supabase/env.hosted` | Hosted credentials are machine-scoped |
 | `supabase/.env.local` | `~/.config/boga/supabase/cli.env` | Shared Supabase CLI version/defaults |
 | `supabase/functions/.env.local` | `~/.config/boga/edge-functions/env.shared` | Shared local Edge Function identity defaults |
-| `apps/mobile/.env.local` | Worktree-local generated file | Synced from `supabase status -o env` by local runtime startup |
+| `apps/mobile/.env.local` | Worktree-local generated file | The mobile app's Supabase config (`EXPO_PUBLIC_SUPABASE_*`), synced from `supabase status -o env` by local runtime startup. The Maestro runner pins it per lane and restores it after each run — see `docs/specs/11-maestro-runtime-and-testing-conventions.md`. |
 | `apps/mobile/.maestro/maestro.env.local` | Worktree-local generated file | Owns Expo port, simulator identity, and slot-scoped dev-client build cache |
 
 ## Slot model

@@ -348,6 +348,27 @@ Reason: keeps FE/backend integration test expectations explicit without forcing 
 - Per-worktree configuration baseline:
   - source `.maestro/maestro.env.local` from the sample file and keep shared-build overrides there rather than hardcoding machine-specific paths in docs/tasks.
 
+## iOS lane configuration contract (infra-free vs Supabase-configured)
+
+- The committed iOS lanes run the **same** dev-client build in two deliberately
+  exclusive configurations, selected by whether the app sees Supabase credentials
+  (`EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY`):
+  - **infra-free** — `smoke`, `data-runtime-smoke` (and the combined `gates`): no
+    Supabase configured. The app runs local-only with the login-on-start gate
+    disabled, which keeps these gates fast, backend-free, and focused on the local
+    SQLite runtime. `data-runtime-smoke` additionally proves the backend-less build
+    seeds its own starter exercise catalog at boot (there is no server to recover
+    it from, so nothing else would).
+  - **Supabase-configured** — `auth-profile`: a real local Supabase is provisioned
+    via `./supabase/scripts/ensure-local-runtime-baseline.sh`, so the
+    login-on-start gate, fixture sign-in, and sync are exercised.
+- That selection is driven by `apps/mobile/.env.local`, a durable per-worktree
+  file Expo's dev server reads authoritatively. The runner pins each lane's config
+  and restores the developer's file afterward, so a lane is never silently
+  misconfigured by whatever a prior run left on disk. The mechanism is owned by
+  `docs/specs/11-maestro-runtime-and-testing-conventions.md`; do not hand-edit
+  `.env.local` to switch a lane.
+
 ## iOS UI smoke policy (Maestro, current stage)
 
 - Jest/React Native Testing Library remains the default for component logic, state transitions, and CI-safe assertions.
