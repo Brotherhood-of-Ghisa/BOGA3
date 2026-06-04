@@ -568,3 +568,21 @@ those + t5 merge → tFINAL. t5 is parallel and nearly independent.
 - REMAINING: tINVENTORY review/merge + cycle-round-trip fix → mao-audit (re-run
   gates on main, verify 1:1 coverage, deviations/status/hand-offs) → propose
   deleting docs/plans/sync-v2-launch/.
+
+## 2026-06-04 — iteration 28
+- tINVENTORY → PR #132. Result: 0 drops, 1 fix. Inventoried 5 Maestro flows + 3
+  live-endpoint Supabase suites + 9 in-memory-SQLite suites (+2 grep guards);
+  every test earns its place. THE FIX: `settings-dev-wipe-local.yaml` (t10's wipe
+  flow) was ORPHANED — wired into no runner, ran in NO lane (dead coverage + a
+  Maestro contract-ownership violation; explains its earlier "needs a dedicated
+  run"). Wired it into the infra-free gates runner (self-resets in-flow); it now
+  runs GREEN. Produced durable inventory doc docs/testing/sync-v2-non-unit-test-inventory.md.
+  Verified conformance (shared in-memory fixture / no .env.local hand-edits / live
+  suites fail-hard + unique ids / distinct sync-gate suites). quality-fast 765 +
+  test:e2e:ios:gates (incl. the newly-wired wipe-local) green. Dispatched reviewer
+  (a8e36859).
+- cycle-round-trip FK fix (agent a635d4eb) still running (dispatched as a background
+  AGENT, not a chip — user is remote and can't run chips).
+- REMAINING: tINVENTORY #132 review/merge + the cycle-round-trip fix merge →
+  mao-audit (re-run gates on main, verify 1:1 coverage + deviations/status/hand-offs)
+  → propose deleting docs/plans/sync-v2-launch/.
