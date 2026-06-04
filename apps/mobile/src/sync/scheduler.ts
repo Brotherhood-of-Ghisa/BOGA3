@@ -24,6 +24,7 @@ import NetInfo, { type NetInfoState } from '@react-native-community/netinfo';
 
 import { logEvent } from '@/src/logging/logEvent';
 import { runSyncCycle } from '@/src/sync/cycle';
+import { getSyncProgress, type SyncProgress } from '@/src/sync/progress';
 
 // -----------------------------------------------------------------------------
 // Constants
@@ -82,6 +83,17 @@ let state: SchedulerState = { name: 'OFFLINE' };
 let timerHandle: ReturnType<typeof setTimeout> | null = null;
 
 let onlineProjection = false;
+
+// The most recent cycle's failure, or null if the latest cycle ended cleanly.
+// A cycle that throws records its message here; a cycle that completes without
+// throwing clears it. This is the read-only signal the status surface shows as
+// the error state — it never changes the machine's behaviour.
+let lastCycleError: string | null = null;
+
+// The wall-clock time (epoch ms) at which the most recent cycle finished
+// without throwing, or null if no cycle has completed cleanly yet. This is the
+// "last successful sync" the status surface displays.
+let lastSuccessAtMs: number | null = null;
 
 let netInfoUnsubscribe: (() => void) | null = null;
 let appStateSubscription: { remove: () => void } | null = null;
@@ -209,11 +221,20 @@ const transitionTo = (
  */
 const startCycle = (): void => {
   void runSyncCycle()
+    .then(() => {
+      // The cycle completed without throwing: record the success time and
+      // clear any earlier failure so the status surface reflects a healthy
+      // latest cycle.
+      lastSuccessAtMs = Date.now();
+      lastCycleError = null;
+    })
     .catch((error: unknown) => {
       // A thrown cycle is handled identically to a clean one for control
       // flow: the cycle-ends transition below decides what to arm next, and
       // the long backstop is the only retry path. We do surface the error
-      // here as distinct observability — the failure is otherwise invisible.
+      // here as distinct observability — the failure is otherwise invisible —
+      // and retain it so the status surface can show the latest error state.
+      lastCycleError = error instanceof Error ? error.message : String(error);
       logCycleError(error);
     })
     .finally(() => {
@@ -398,6 +419,8 @@ export const startSyncScheduler = (): void => {
 
   state = { name: 'OFFLINE' };
   onlineProjection = false;
+  lastCycleError = null;
+  lastSuccessAtMs = null;
   previousAppState = AppState.currentState;
 
   // Wire the network and foreground listeners. In a healthy build these calls
@@ -439,6 +462,39 @@ export const stopSyncScheduler = (): void => {
   }
 
   state = { name: 'OFFLINE' };
+};
+
+/**
+ * The production read of the scheduler's observable state. This is the single
+ * shared accessor every consumer uses to learn how sync is doing — there is no
+ * parallel read path. It is purely a snapshot getter: reading it never advances
+ * the machine, fires a cycle, or mutates any state.
+ *
+ * It returns:
+ *  - `state`: the current four-state machine state (with any armed deadline).
+ *  - `online`: the latest NetInfo `isInternetReachable` projection.
+ *  - `lastCycleError`: the most recent cycle's failure message, or null when
+ *    the latest cycle ended cleanly (or none has run yet).
+ *  - `lastSuccessAtMs`: epoch-ms of the most recent clean cycle, or null.
+ *  - `progress`: the first-sync progress snapshot (phase + monotonic counters),
+ *    with `offline` overridden from the live online projection so a stale
+ *    producer snapshot can never report the wrong network state.
+ */
+export const getSchedulerStatus = (): {
+  state: SchedulerState;
+  online: boolean;
+  lastCycleError: string | null;
+  lastSuccessAtMs: number | null;
+  progress: SyncProgress;
+} => {
+  const progress = getSyncProgress();
+  return {
+    state,
+    online: onlineProjection,
+    lastCycleError,
+    lastSuccessAtMs,
+    progress: { ...progress, offline: !onlineProjection },
+  };
 };
 
 /**

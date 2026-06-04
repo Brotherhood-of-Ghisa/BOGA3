@@ -80,9 +80,20 @@ Brief entrypoint map of the current mobile screens.
 6. `/settings`
 - File: `apps/mobile/app/(tabs)/settings.tsx`
 - Purpose:
-  - minimal account/settings entry screen for the M11 auth/profile flow
+  - account/settings entry screen for the auth/profile flow, plus the signed-in
+    sync-status surface
 - Key states (high level):
   - one tappable account/profile card
+  - a sync-status card (signed-in only) showing last successful sync time
+    (`Never` until the first success), pending-change count (rows still waiting
+    to push across the user-owned tables), network state (online/offline), and
+    the latest sync error (or a sign-in-required hint); a Refresh action nudges a
+    sync cycle. The card refreshes on screen focus and on a short interval while
+    focused. Card/fields carry stable testIDs (`settings-sync-status-card`,
+    `settings-sync-status-last-success`, `settings-sync-status-dirty-count`,
+    `settings-sync-status-network`, `settings-sync-status-error`).
+  - a developer-tools card (`isDevMode()` only), separate from the sync-status
+    card, with the local/remote wipe affordances
   - available from the shared settings utility action regardless of auth state
 - Key exits:
   - `profile`
