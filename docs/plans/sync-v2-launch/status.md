@@ -586,3 +586,21 @@ those + t5 merge → tFINAL. t5 is parallel and nearly independent.
 - REMAINING: tINVENTORY #132 review/merge + the cycle-round-trip fix merge →
   mao-audit (re-run gates on main, verify 1:1 coverage + deviations/status/hand-offs)
   → propose deleting docs/plans/sync-v2-launch/.
+
+## 2026-06-04 — iteration 29
+- tINVENTORY #132 review → CHANGES_REQUESTED (3 items). Good catch — the inventory
+  was INCOMPLETE: missed 9 plan-introduced sync/ tests (2 in-memory, 6 source-guard,
+  1 component gate) and wrongly dismissed 3 live-endpoint Supabase suites
+  (cycle-round-trip, auth-required-envelope, drift-check) as "pre-existing" — but
+  git (d70b30a, 2026-05-31) shows they're sync-v2-effort tests = exactly the
+  Supabase tests the closure wants. Runner fix / gates / hygiene all verified OK
+  (it's a documentation/scope re-spin, not coverage).
+- SCOPE CALL: per the user's intent ("all the non-unit tests we've introduced —
+  Maestro / Supabase / mock-device-DB"), tINVENTORY covers the WHOLE sync-v2
+  sync-stack non-unit test surface (incl. plan-2 live-endpoint suites), not just
+  the launch-plan PRs. Re-dispatched the builder (agent ab0605b6, revision on #132):
+  fix scope boundary via git-add dates, add the 9 missing, reclassify the 3, re-verify.
+- cycle-round-trip FK fix (agent a635d4eb) still running. (It touches the test's
+  code; tINVENTORY only inventories that file — no conflict.)
+- REMAINING: tINVENTORY #132 (revised) re-review/merge + cycle-round-trip fix merge
+  → mao-audit → propose deleting docs/plans/sync-v2-launch/.
