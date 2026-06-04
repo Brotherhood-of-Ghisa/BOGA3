@@ -604,3 +604,22 @@ those + t5 merge → tFINAL. t5 is parallel and nearly independent.
   code; tINVENTORY only inventories that file — no conflict.)
 - REMAINING: tINVENTORY #132 (revised) re-review/merge + cycle-round-trip fix merge
   → mao-audit → propose deleting docs/plans/sync-v2-launch/.
+
+## 2026-06-04 — iteration 30
+- cycle-round-trip FK fix → PR #133. ROOT CAUSE: TEST-FIXTURE bug (the suite mocked
+  @/src/data/bootstrap, bypassing the boot-time runMuscleGroupSeed; muscle_groups
+  absent → FK violation under enforcement). NOT a product bug — production code
+  read + confirmed correct/unchanged. Fix (cycle-round-trip.test.ts only): seed
+  muscle_groups into every store matching production boot order + stamp the
+  bootstrap-completed flag so the steady-state suite skips the first-sign-in seeder;
+  FK enforcement ON. quality-fast 765 + test:sync:infra 6/6 green (idempotent).
+  Dispatched reviewer (a797259) — crux is confirming it's genuinely fixture-only
+  (not masking a product ordering gap).
+- FLAGGED (separate follow-up, not fixed in #133): drift-check.test.ts's
+  `supabase db reset` drops the auth fixtures sign-in suites in the same jest
+  process depend on → test:sync:infra order-fragility (the same issue tFINAL
+  worked around by moving sign-in suites to the parity script). tINVENTORY's
+  live-suite inventory should note it.
+- tINVENTORY #132 revision (agent ab0605b6) still running.
+- REMAINING: #133 review/merge + tINVENTORY #132 review/merge → mao-audit →
+  propose deleting docs/plans/sync-v2-launch/.
