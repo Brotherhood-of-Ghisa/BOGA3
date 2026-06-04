@@ -59,6 +59,7 @@ jest.mock('@/src/auth/supabase', () =>
 
 import { type LocalDatabase } from '@/src/data/bootstrap';
 import { PRIMARY_RUNTIME_STATE_ID } from '@/src/data/clock';
+import { readSeedsAppliedMarker, seedMuscleGroups } from '@/src/data/exercise-catalog-seeds';
 import {
   exerciseDefinitions,
   exerciseMuscleMappings,
@@ -89,6 +90,9 @@ const ids = {
   sessionExerciseTag: `${RUN}-sxtag`,
 };
 
+// `muscle_groups` is a client-only taxonomy seeded into every store on launch
+// (it never crosses the wire); seeding it on both devices keeps the muscle-
+// mapping's local FK resolvable on the writer and the restorer alike.
 const MUSCLE_GROUP_ID = 'chest';
 
 describe('a fresh second device restores the account within the foreground window', () => {
@@ -189,6 +193,11 @@ describe('a fresh second device restores the account within the foreground windo
   beforeEach(async () => {
     deviceA = createInMemoryDatabase();
     deviceB = createInMemoryDatabase();
+    // Both devices seed the client-only muscle-group taxonomy on launch, exactly
+    // as the boot data layer does, so the muscle-mapping's local FK resolves on
+    // the writer (device A) and the restorer (device B) alike.
+    seedMuscleGroups(deviceA.database as unknown as LocalDatabase);
+    seedMuscleGroups(deviceB.database as unknown as LocalDatabase);
     mockClientState.client = authed.client;
     await authed.client.schema(SYNC_RPC_SCHEMA).rpc('dev_wipe_my_data');
   }, 30_000);
@@ -206,11 +215,13 @@ describe('a fresh second device restores the account within the foreground windo
     seedFullChainOnDeviceA();
     await runSyncCycle();
 
-    // Device B is fresh: nothing local, no first-sync flag. Point the cycle's
-    // database at it and run the production restore path, timing it.
+    // Device B is fresh: nothing local, no first-sync flag, a zero seed marker.
+    // Point the cycle's database at it and run the production restore path,
+    // timing it.
     mockBootstrapState.database = deviceB.database;
     expect(deviceB.database.select().from(gyms).all()).toHaveLength(0);
     expect(deviceBFlagSet()).toBe(false);
+    expect(readSeedsAppliedMarker(deviceB.database as unknown as LocalDatabase)).toBe(0);
 
     // The in-memory fixture and the production expo-sqlite handle share the
     // drizzle API the bootstrapper uses; the cast bridges the driver types.
@@ -242,12 +253,16 @@ describe('a fresh second device restores the account within the foreground windo
         ?.exerciseTagDefinitionId,
     ).toBe(ids.tagDef);
 
-    // First sync drained; the populated pull means the seeder did not overwrite
-    // the account's data with the bundled starter catalog.
+    // First sync drained; device B restored the account's own exercise
+    // definition from the server.
     expect(deviceBFlagSet()).toBe(true);
     const definitionRows = db.select({ id: exerciseDefinitions.id }).from(exerciseDefinitions).all();
     expect(definitionRows.map((row) => row.id)).toContain(ids.exerciseDef);
-    expect(definitionRows.some((row) => row.id.startsWith('seed_'))).toBe(false);
+
+    // Device B's seeder did NOT fire: a non-empty pull means the catalog seeder
+    // no-ops, so device B's seed marker stays at its fresh-install zero — it
+    // would have advanced to the bundle version had the seeder run.
+    expect(readSeedsAppliedMarker(deviceB.database as unknown as LocalDatabase)).toBe(0);
 
     expect(elapsedMs).toBeLessThan(RESTORE_WINDOW_MS);
   }, 90_000);

@@ -12,9 +12,13 @@ module.exports = {
   //     v1 server-object absence check;
   //   - the drift checker shells out to a database reset to materialize the
   //     server schema, so it needs a local Postgres/Supabase stack.
-  //   All run only via their own dedicated infra script, which overrides this
-  //   ignore list (and the endpoint suites fail hard when the endpoint env is
-  //   missing, so a missing endpoint can never pass silently).
+  //   They run only via their dedicated infra scripts, which override this ignore
+  //   list. The sign-in suites (the two restores + the server-object check) run
+  //   in the restore-parity script — kept apart from the drift checker, whose
+  //   `db reset` drops the auth fixture they sign in as — while the drift /
+  //   round-trip / envelope suites run in the other infra script. The endpoint
+  //   suites fail hard when the endpoint env is missing, so a missing endpoint
+  //   can never pass silently.
   testPathIgnorePatterns: [
     '<rootDir>/app/__tests__/sync/cycle-round-trip.test.ts',
     '<rootDir>/app/__tests__/sync/auth-required-envelope.test.ts',

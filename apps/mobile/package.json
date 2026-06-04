@@ -14,7 +14,7 @@
     "typecheck": "npm run router:types && tsc --noEmit",
     "test": "jest",
     "test:sync": "jest app/__tests__/sync",
-    "test:sync:infra": "jest --runTestsByPath app/__tests__/sync/drift-check.test.ts app/__tests__/sync/cycle-round-trip.test.ts app/__tests__/sync/auth-required-envelope.test.ts app/__tests__/sync/launch-reinstall-restore.test.ts app/__tests__/sync/launch-second-device-restore.test.ts app/__tests__/sync/no-v1-server-objects.test.ts --testPathIgnorePatterns=/node_modules/",
+    "test:sync:infra": "jest --runTestsByPath app/__tests__/sync/drift-check.test.ts app/__tests__/sync/cycle-round-trip.test.ts app/__tests__/sync/auth-required-envelope.test.ts --testPathIgnorePatterns=/node_modules/",
     "test:handles": "jest --detectOpenHandles --silent",
     "db:generate": "drizzle-kit generate --config=drizzle.config.ts && tsx scripts/bundle-migrations.ts",
     "db:generate:canary": "npm run db:generate",

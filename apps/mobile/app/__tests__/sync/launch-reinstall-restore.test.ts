@@ -68,6 +68,7 @@ jest.mock('@/src/auth/supabase', () =>
 
 import { type LocalDatabase } from '@/src/data/bootstrap';
 import { PRIMARY_RUNTIME_STATE_ID } from '@/src/data/clock';
+import { readSeedsAppliedMarker, seedMuscleGroups } from '@/src/data/exercise-catalog-seeds';
 import {
   exerciseDefinitions,
   exerciseMuscleMappings,
@@ -105,14 +106,23 @@ const ids = {
 };
 
 // A muscle-group id the mapping points at. `muscle_groups` is a client-only
-// taxonomy that never crosses the wire, so the restore does not pull it; the
-// mapping only needs a stable group id to round-trip its own row.
+// taxonomy that never crosses the wire: in production it is seeded into the
+// local store on every launch (so the mapping's local FK always resolves) and
+// the mapping itself round-trips through the server. The tests seed the
+// taxonomy on each store the same way the boot data layer does.
 const MUSCLE_GROUP_ID = 'chest';
 
 describe('same-device reinstall restores every entity family within the foreground window', () => {
   let fixture: InMemoryDatabaseFixture;
   let database: InMemoryTestDatabase;
   let authed: AuthedBranchClient;
+
+  /** Seeds the client-only muscle-group taxonomy into the current store, as the
+   *  production boot data layer does on every launch — so the muscle-mapping's
+   *  local FK resolves both when it is created and when it is restored. */
+  const seedClientTaxonomy = (): void => {
+    seedMuscleGroups(database as unknown as LocalDatabase);
+  };
 
   /** Inserts one dirty row in every syncable family, FK-correct across layers. */
   const seedFullDirtyChain = (): void => {
@@ -200,12 +210,14 @@ describe('same-device reinstall restores every entity family within the foregrou
   };
 
   /** Re-create a fresh, empty local store — the reinstall: every local row, the
-   *  first-sync flag, and the cursors are gone. */
+   *  first-sync flag, and the cursors are gone. The client-only muscle-group
+   *  taxonomy is re-seeded, exactly as the boot data layer does post-reinstall. */
   const reinstallLocalStore = (): void => {
     fixture.close();
     fixture = createInMemoryDatabase();
     database = fixture.database;
     mockBootstrapState.database = database;
+    seedClientTaxonomy();
   };
 
   /** True once `bootstrap_completed_at` has been stamped on the runtime row. */
@@ -231,6 +243,7 @@ describe('same-device reinstall restores every entity family within the foregrou
     database = fixture.database;
     mockBootstrapState.database = database;
     mockClientState.client = authed.client;
+    seedClientTaxonomy();
 
     // Start each run from an empty server slate (the fixture user persists).
     await authed.client.schema(SYNC_RPC_SCHEMA).rpc('dev_wipe_my_data');
@@ -247,10 +260,13 @@ describe('same-device reinstall restores every entity family within the foregrou
     seedFullDirtyChain();
     await runSyncCycle();
 
-    // Reinstall: drop the entire local store.
+    // Reinstall: drop the entire local store. The fresh store has a zero seed
+    // marker — if the restore-side seeder ran, it would advance to the bundle
+    // version, so the marker is the proof the seeder did or did not fire.
     reinstallLocalStore();
     expect(database.select().from(gyms).all()).toHaveLength(0);
     expect(bootstrapFlagSet()).toBe(false);
+    expect(readSeedsAppliedMarker(database as unknown as LocalDatabase)).toBe(0);
 
     // Run the production first-sign-in restore path and time it. The in-memory
     // fixture and the production expo-sqlite handle share the drizzle API the
@@ -284,13 +300,17 @@ describe('same-device reinstall restores every entity family within the foregrou
         ?.exerciseTagDefinitionId,
     ).toBe(ids.tagDef);
 
-    // The bootstrapper marked the first sync as drained, and a non-empty pull
-    // means the starter catalog was NOT re-seeded over the user's own data: the
-    // exercise-definitions table holds the user's row, not the bundled catalog.
+    // The bootstrapper marked the first sync as drained, restoring the user's
+    // own exercise definition from the server.
     expect(bootstrapFlagSet()).toBe(true);
     const definitionRows = database.select({ id: exerciseDefinitions.id }).from(exerciseDefinitions).all();
     expect(definitionRows.map((row) => row.id)).toContain(ids.exerciseDef);
-    expect(definitionRows.some((row) => row.id.startsWith('seed_'))).toBe(false);
+
+    // The restore-side seeder did NOT fire: a non-empty pull means the catalog
+    // seeder no-ops (the server is authoritative for a returning user), so the
+    // exercise-catalog seed marker stays at its fresh-install zero — it would
+    // have advanced to the bundle version had the seeder run.
+    expect(readSeedsAppliedMarker(database as unknown as LocalDatabase)).toBe(0);
 
     // The whole restore landed within the one-minute foreground window.
     expect(elapsedMs).toBeLessThan(RESTORE_WINDOW_MS);
