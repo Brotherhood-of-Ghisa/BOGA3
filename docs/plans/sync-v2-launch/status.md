@@ -549,3 +549,22 @@ those + t5 merge → tFINAL. t5 is parallel and nearly independent.
   migrations).
 - REMAINING: tFINAL review → merge; land the cycle-round-trip fix; tINVENTORY →
   mao-audit → propose deleting the plan dir.
+
+## 2026-06-04 — iteration 27
+- tFINAL #131 APPROVED (reviewer re-ran 765 green, read all 5 files, confirmed 1:1
+  coverage) → user MERGED. main → 992e6f1. Coordinator worktree confirmed clean
+  (no reviewer spill). Deviation logged.
+- #128 (out-of-band) merged: `fix(worktree): stop leaking Supabase stacks on slot
+  recycle` — resolves the PORT CONTENTION that broke in-agent lanes. Logged.
+  (#127 `chore(quality): open-handle guard in quality-slow` is OPEN, out-of-band,
+  not ours.)
+- ALL 11 feature tasks + tFINAL merged. Dispatched the last closure task
+  tINVENTORY (agent a42d02e8): inventory + keep/drop + principles-conformance for
+  the 11 Maestro flows + 14 sync/infra tests + the in-memory-SQLite suites;
+  produce a durable inventory doc; conservative on drops (never reduce real
+  coverage, esp. tFINAL's outcome tests).
+- STILL PENDING: the `cycle-round-trip` FK latent-bug fix (spawned chip; not yet
+  landed) — must land before the audit certifies test:sync:infra fully green.
+- REMAINING: tINVENTORY review/merge + cycle-round-trip fix → mao-audit (re-run
+  gates on main, verify 1:1 coverage, deviations/status/hand-offs) → propose
+  deleting docs/plans/sync-v2-launch/.

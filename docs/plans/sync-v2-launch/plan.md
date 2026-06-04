@@ -493,3 +493,17 @@ and the referenced PRs.
   sign-in, so it would hang. Exactly the launch-blocking class the fast gate
   cannot catch — and the proximate motivation for the per-change slow-gate-trigger
   instruction update (#130). Effectively the tGATE checkpoint's fix output.
+- tFINAL (PR #131, merged 2026-06-04): final test card — 5 new test files assert
+  outcomes 1/2 (reinstall + second-device restore <=1 min, real cycle+bootstrapper
+  against the live endpoint, seeder no-ops), 3 (v1 client paths + server objects
+  gone — server half a behavioural PostgREST probe), and the sync-gate
+  phase/progress/offline mapping; outcomes 4 (drift) + 5 (dev-wipes) reuse existing
+  per-task assertions. Slow lanes GREEN: quality-fast 765, reinstall-parity 7/7,
+  drift, e2e gates, auth-profile (4 flows). Deviations: parity-lane repointed off a
+  deleted file; sign-in suites run in the parity script (test:sync:infra's
+  `supabase db reset` drops the auth fixture mid-run); outcome-3 server half via
+  PostgREST. Surfaced a PRE-EXISTING `cycle-round-trip` FK latent bug — separate
+  fix spawned; tracked.
+- (out-of-band) PR #128 (merged 2026-06-04): `fix(worktree): stop leaking Supabase
+  stacks on slot recycle + reclaim orphans` — resolves the Supabase PORT
+  CONTENTION that plagued the in-agent Maestro/infra lanes during the launch.
