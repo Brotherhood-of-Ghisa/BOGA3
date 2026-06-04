@@ -34,7 +34,71 @@ MAESTRO_IOS_DEV_CLIENT_EXECUTABLE
 MAESTRO_IOS_DEV_CLIENT_URL
 EXPO_PID
 SIMULATOR_SYSTEM_LOG_FILE
+MAESTRO_ENV_LOCAL_PATH
+MAESTRO_ENV_LOCAL_BACKUP
 EOF
+}
+
+# Expo's dev server reads apps/mobile/.env.local authoritatively — in dev it wins
+# over process.env and is what gets compiled into the served bundle — so the only
+# reliable way to pin a lane's Supabase config is to materialize it into that
+# file. This writes the lane's intended config from the EXPO_PUBLIC_SUPABASE_*
+# vars the lane exported (real values for the auth lane; empty for every
+# infra-free lane), after setting aside any pre-existing file so a developer's
+# manual config is restored at teardown. The result: each lane's build is
+# deterministic and immune to whatever .env.local a prior lane left on disk.
+maestro_write_managed_env_local() {
+  local app_dir="$1"
+  local runtime_env_file="$2"
+  local env_local="$app_dir/.env.local"
+
+  MAESTRO_ENV_LOCAL_PATH="$env_local"
+  MAESTRO_ENV_LOCAL_BACKUP=""
+  if [[ -f "$env_local" ]]; then
+    MAESTRO_ENV_LOCAL_BACKUP="${env_local}.maestro-backup.${MAESTRO_RUNNER_PID:-$$}"
+    mv -f "$env_local" "$MAESTRO_ENV_LOCAL_BACKUP"
+  fi
+
+  {
+    printf 'EXPO_PUBLIC_SUPABASE_URL=%s\n' "${EXPO_PUBLIC_SUPABASE_URL:-}"
+    printf 'EXPO_PUBLIC_SUPABASE_ANON_KEY=%s\n' "${EXPO_PUBLIC_SUPABASE_ANON_KEY:-}"
+  } >"$env_local"
+
+  # Metro's persistent transform cache keys a module's transform on its source +
+  # babel config, NOT on the EXPO_PUBLIC_* values babel-preset-expo inlines — so a
+  # previous lane's supabase.ts transform (with its baked-in URL) survives the
+  # .env.local change above and would keep the prior backend. The launcher fixes
+  # this by passing `--clear` to `expo start`, but clearing on every run forces a
+  # needless cold bundle, so signal a clear ONLY when this lane's Supabase config
+  # differs from what the cache was last built with (tracked per worktree).
+  local signature_file="$app_dir/.maestro/.metro-supabase-signature"
+  local signature
+  # Hash both the URL and the anon key so a key rotation (not just a URL change)
+  # also re-clears. The hash, not the raw values, is what lands on disk.
+  signature="$(printf '%s\n%s' "${EXPO_PUBLIC_SUPABASE_URL:-infra-free}" "${EXPO_PUBLIC_SUPABASE_ANON_KEY:-}" | /usr/bin/shasum | cut -d' ' -f1)"
+  MAESTRO_METRO_CLEAR=0
+  if [[ "$(cat "$signature_file" 2>/dev/null)" != "$signature" ]]; then
+    MAESTRO_METRO_CLEAR=1
+    mkdir -p "$(dirname "$signature_file")"
+    printf '%s' "$signature" >"$signature_file"
+  fi
+
+  if [[ -n "${EXPO_PUBLIC_SUPABASE_URL:-}" ]]; then
+    echo "[maestro] materialized lane .env.local: Supabase-configured (backup=${MAESTRO_ENV_LOCAL_BACKUP:-none}, metro_clear=${MAESTRO_METRO_CLEAR})"
+  else
+    echo "[maestro] materialized lane .env.local: infra-free, no Supabase (backup=${MAESTRO_ENV_LOCAL_BACKUP:-none}, metro_clear=${MAESTRO_METRO_CLEAR})"
+  fi
+}
+
+# Restore the developer's apps/mobile/.env.local that maestro_write_managed_env_local
+# set aside, removing the lane-managed file first. A no-op when no file was
+# managed (the var is unset) so it is safe to call unconditionally at teardown.
+maestro_restore_managed_env_local() {
+  [[ -n "${MAESTRO_ENV_LOCAL_PATH:-}" ]] || return 0
+  rm -f "$MAESTRO_ENV_LOCAL_PATH"
+  if [[ -n "${MAESTRO_ENV_LOCAL_BACKUP:-}" && -f "${MAESTRO_ENV_LOCAL_BACKUP}" ]]; then
+    mv -f "$MAESTRO_ENV_LOCAL_BACKUP" "$MAESTRO_ENV_LOCAL_PATH"
+  fi
 }
 
 maestro_load_runtime_env() {

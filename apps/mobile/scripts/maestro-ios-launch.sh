@@ -33,7 +33,34 @@ echo "[maestro-ios-launch] Launch scheme: $SCHEME"
 echo "[maestro-ios-launch] Dev client URL: $MAESTRO_IOS_DEV_CLIENT_URL"
 
 cd "$APP_DIR"
-CI=1 npx expo start --dev-client --host localhost --scheme "$SCHEME" --port "$EXPO_DEV_SERVER_PORT" >"$EXPO_LOG_FILE" 2>&1 &
+# Pin this lane's Supabase config into apps/mobile/.env.local before starting the
+# dev server. Expo's dev server reads .env.local authoritatively — in dev it wins
+# over process.env and is what gets compiled into the served bundle — so a
+# leftover file (the auth lanes write their local-Supabase env into it via
+# local-runtime-up.sh) would otherwise flip a later infra-free gate (smoke /
+# data-runtime-smoke) into a Supabase-configured build, breaking it (the
+# login-on-start gate appears and the starter catalog stops seeding at boot).
+# `maestro_write_managed_env_local` materializes the lane's intent (the real
+# values the auth lane exported, or empty for every infra-free lane) and backs up
+# the developer's file; `maestro-ios-teardown.sh` restores it afterwards.
+maestro_write_managed_env_local "$APP_DIR" "$RUNTIME_ENV_FILE"
+# `--clear` discards Metro's persistent transform cache on start. It is required
+# when this lane's Supabase config differs from what the cache was last built with
+# (see maestro_write_managed_env_local) — otherwise a previous run's supabase.ts
+# transform, with its baked-in EXPO_PUBLIC_SUPABASE_URL, is reused even though we
+# just materialized a different .env.local, and the build silently keeps the prior
+# lane's backend. When the config is unchanged the cache is correct, so we skip the
+# clear and keep the warm bundle. The warm-up step drives any cold bundle hot
+# before the gated flow asserts, so a clear costs one cold bundle, not flow time.
+maestro_clear_flag=""
+if [[ "${MAESTRO_METRO_CLEAR:-0}" == "1" ]]; then
+  echo "[maestro-ios-launch] Supabase config changed since last bundle; starting Expo with --clear"
+  maestro_clear_flag="--clear"
+fi
+# $maestro_clear_flag is intentionally unquoted so an empty value adds no argument
+# (safe under `set -u`); the only value it ever holds is the single word --clear.
+# shellcheck disable=SC2086
+CI=1 npx expo start --dev-client $maestro_clear_flag --host localhost --scheme "$SCHEME" --port "$EXPO_DEV_SERVER_PORT" >"$EXPO_LOG_FILE" 2>&1 &
 EXPO_PID=$!
 maestro_write_runtime_env "$RUNTIME_ENV_FILE"
 
