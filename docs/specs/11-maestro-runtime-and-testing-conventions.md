@@ -65,9 +65,11 @@ Rules:
 
 ### Current flows
 
-- There are exactly two committed Maestro flows:
+- The two core runtime-smoke flows this toolkit baseline was first verified against are:
   - `apps/mobile/.maestro/flows/smoke-launch.yaml`
   - `apps/mobile/.maestro/flows/data-runtime-smoke.yaml`
+- The committed flow set has since grown (login/auth-profile and stats/UX flows that
+  reuse the same toolkit and reset taxonomy); the current set lives in `apps/mobile/.maestro/flows/`.
 - Both flows now commit against the development-client bundle identifier surface instead of `host.exp.Exponent`.
 - The shared scenario runner also rewrites a runtime-local flow copy under the artifact root so the executed `appId` always matches the installed development-client bundle id from the built `.app`.
 - Flow setup now uses the M10 taxonomy instead of tapping through setup screens:
@@ -126,13 +128,13 @@ Rules:
 
 ### Current app/build assumptions
 
-- `apps/mobile/app.json` already defines `scheme: "mobile"`, which gives M10 a usable app/deep-link scheme baseline.
+- `apps/mobile/app.config.ts` defines `scheme: "boga3"`, which gives M10 a usable app/deep-link scheme baseline.
 - `apps/mobile/eas.json` already defines a `development` build profile with `developmentClient: true`.
 - `apps/mobile/app/maestro-harness.tsx` is the hidden route used for app-owned data reset and screen teleportation.
 - `apps/mobile/src/maestro/harness.ts` owns the guard, param parsing, and route resolution logic for that hidden route.
 - Verified against:
-  - `apps/mobile/app.json:3-46`
-  - `apps/mobile/eas.json:6-19`
+  - `apps/mobile/app.config.ts`
+  - `apps/mobile/eas.json`
   - `apps/mobile/app/maestro-harness.tsx`
   - `apps/mobile/src/maestro/harness.ts`
 
@@ -309,9 +311,9 @@ Responsibility split:
 - `maestro-ios-provision.sh`
   - resolves or creates the simulator, boots it, installs the dev client, and writes runtime state.
 - `maestro-ios-launch.sh`
-  - starts Expo on the configured port, deep-links the dev client, and updates runtime state.
+  - pins the lane's Supabase config into `.env.local` (see "App Supabase config isolation across lanes"), starts Expo on the configured port, deep-links the dev client, and updates runtime state.
 - `maestro-ios-teardown.sh`
-  - performs cleanup using the emitted runtime state, including Expo process shutdown, app termination, and simulator shutdown by default.
+  - performs cleanup using the emitted runtime state, including Expo process shutdown, app termination, simulator shutdown by default, and restoring the developer's `.env.local`.
 - `maestro-ios-smoke.sh` / `maestro-ios-data-smoke.sh`
   - remain the high-level scenario entrypoints and call the shared toolkit.
 - `maestro-ios-gates.sh`
@@ -385,7 +387,7 @@ M10 locks these exact terms:
    - preferred when a clean app data state is needed without re-testing install semantics.
 3. `teleport`
    - uses deep links or a hidden harness route to land directly in the target screen/state;
-   - current implementation: flows open `mobile://maestro-harness?...` and the harness route `replace`s into the requested screen after reset work completes;
+   - current implementation: flows open `boga3://maestro-harness?...` and the harness route `replace`s into the requested screen after reset work completes;
    - default setup method for routine flow positioning because it minimizes slow UI tapping.
 
 Priority rule:
@@ -396,8 +398,8 @@ Priority rule:
 
 ### 9. Harness and deep-link contract
 
-1. The app-level setup/navigation layer must use the existing app scheme baseline (`mobile`) rather than `Expo Go`-specific URLs.
-2. The canonical hidden route is `mobile://maestro-harness`.
+1. The app-level setup/navigation layer must use the existing app scheme baseline (`boga3`) rather than `Expo Go`-specific URLs.
+2. The canonical hidden route is `boga3://maestro-harness`.
 3. Supported harness query parameters are:
    - `reset=data` to perform app-owned persisted-data reset;
    - `fixture=exercise-block-history` to seed deterministic local SQLite history for Issue 70 recorder block-history visual QA;
@@ -405,6 +407,49 @@ Priority rule:
    - optional `mode`, `intent`, and `sessionId` when the target route needs them.
 4. The route is guarded by `isDevMode() && Constants.executionEnvironment !== storeClient` (see `apps/mobile/src/utils/isDevMode.ts` — `isDevMode()` is `true` for Metro dev bundles **and** for the `com.phano.boga3.dev` build, i.e. TestFlight dev); blocked contexts render an error state instead of executing reset/setup behavior. Never reach for `__DEV__` directly — it is `false` on TestFlight, and the lint rule will reject it.
 5. Harness-driven setup is preferred to visible UI tapping whenever the flow is not explicitly testing that setup UI.
+
+## App Supabase config isolation across lanes
+
+Every lane runs the same dev-client build; whether it behaves as a local-only
+(infra-free) app or a Supabase-configured one is decided entirely by the
+`EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY` that Metro inlines
+from `apps/mobile/.env.local` at bundle time. (Which lanes take which shape, and
+why, is testing policy — see `docs/specs/06-testing-strategy.md`.)
+
+`apps/mobile/.env.local` is one per-worktree file that local-Supabase startup
+(`supabase/scripts/local-runtime-up.sh`) writes, that Expo's dev server reads
+**authoritatively** in dev (it overrides `process.env` and is compiled into the
+served bundle), and that persists across runs — so left unmanaged, whichever lane
+ran last configures the next, and a leftover auth `.env.local` silently turns a
+later infra-free gate into a configured build. The launcher therefore pins each
+lane's config:
+
+1. Before `expo start`, `maestro_write_managed_env_local` (in
+   `maestro-ios-runtime.sh`) sets aside any existing `.env.local`, then writes the
+   lane's intended config from the `EXPO_PUBLIC_SUPABASE_*` the lane exported.
+   `maestro-ios-auth-profile.sh` resolves these from `supabase status` in a
+   subshell (so sourcing the backend `_common.sh` cannot clobber its
+   `SCRIPT_DIR`); every infra-free lane exports none, yielding empty values.
+2. `maestro-ios-teardown.sh` restores the developer's file
+   (`maestro_restore_managed_env_local`) on success or failure.
+3. `expo start` is passed `--clear` only when the lane's config differs from what
+   Metro's transform cache was last built with, tracked per worktree in
+   `apps/mobile/.maestro/.metro-supabase-signature`. Metro keys a module's
+   transform on its source + babel config, not on the inlined `EXPO_PUBLIC_*`
+   values, so a prior lane's `supabase.ts` transform would otherwise survive the
+   `.env.local` change; clearing only on a config switch keeps the warm bundle for
+   repeated same-lane runs.
+
+Notes:
+
+- Runtime-state keys `MAESTRO_ENV_LOCAL_PATH` and `MAESTRO_ENV_LOCAL_BACKUP` carry
+  the managed paths from launch to teardown.
+- The per-run backup (`.env.local.maestro-backup.*`) and the signature marker are
+  gitignored; the manual dev launcher (`ios-dev-client-start.sh`) is untouched, so
+  `.env.local` stays usable for `npx expo start` by hand.
+- `EXPO_NO_DOTENV` / exporting empty `EXPO_PUBLIC_*` do **not** work here: in dev
+  Expo loads `.env.local` over the process env, so the file is the only reliable
+  lever — hence materializing the file rather than injecting env.
 
 ## Brainstorm adoption summary
 

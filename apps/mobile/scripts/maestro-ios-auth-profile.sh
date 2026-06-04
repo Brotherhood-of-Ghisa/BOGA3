@@ -12,6 +12,32 @@ source "$REPO_ROOT/supabase/scripts/auth-fixture-constants.sh"
 echo "[maestro-ios-auth-profile] ensuring worktree local Supabase baseline"
 "$REPO_ROOT/supabase/scripts/ensure-local-runtime-baseline.sh"
 
+# This is the only lane whose app build must see the local Supabase backend.
+# Read the URL + anon key straight from this worktree's running stack and export
+# them; the launcher materializes whatever EXPO_PUBLIC_SUPABASE_* a lane exports
+# into a managed .env.local (see maestro_write_managed_env_local), backing up and
+# later restoring the developer's file. So this lane's backend is determined by
+# these explicit exports, deterministically, rather than by whatever .env.local a
+# prior run happened to leave on disk.
+#
+# Resolve the values inside a subshell: supabase/scripts/_common.sh redefines
+# SCRIPT_DIR / REPO_ROOT from its own location, which would otherwise clobber the
+# paths this script uses to launch the run-flow helper below.
+{
+  IFS= read -r EXPO_PUBLIC_SUPABASE_URL
+  IFS= read -r EXPO_PUBLIC_SUPABASE_ANON_KEY
+} < <(
+  # shellcheck disable=SC1091
+  source "$REPO_ROOT/supabase/scripts/_common.sh"
+  load_supabase_status_env
+  printf '%s\n%s\n' "${API_URL:-}" "${ANON_KEY:-}"
+)
+if [[ -z "${EXPO_PUBLIC_SUPABASE_URL:-}" || -z "${EXPO_PUBLIC_SUPABASE_ANON_KEY:-}" ]]; then
+  echo "[maestro-ios-auth-profile] missing API_URL or ANON_KEY from local Supabase status" >&2
+  exit 1
+fi
+export EXPO_PUBLIC_SUPABASE_URL EXPO_PUBLIC_SUPABASE_ANON_KEY
+
 export MAESTRO_AUTH_PROFILE_EMAIL="${MAESTRO_AUTH_PROFILE_EMAIL:-$USER_A_EMAIL}"
 export MAESTRO_AUTH_PROFILE_PASSWORD="${MAESTRO_AUTH_PROFILE_PASSWORD:-$USER_A_PASSWORD}"
 export MAESTRO_AUTH_PROFILE_USERNAME="${MAESTRO_AUTH_PROFILE_USERNAME:-maestro-${TASK_ID:-auth-profile}-$(date +%H%M%S)}"
@@ -23,6 +49,10 @@ export MAESTRO_AUTH_PROFILE_USERNAME="${MAESTRO_AUTH_PROFILE_USERNAME:-maestro-$
 MAESTRO_RESET_STRATEGY="full" "$SCRIPT_DIR/maestro-ios-run-flow.sh" \
   --scenario "Launch requires sign-in" \
   --flow "$APP_DIR/.maestro/flows/launch-requires-sign-in.yaml"
+
+MAESTRO_RESET_STRATEGY="full" "$SCRIPT_DIR/maestro-ios-run-flow.sh" \
+  --scenario "Settings sync status" \
+  --flow "$APP_DIR/.maestro/flows/settings-sync-status.yaml"
 
 MAESTRO_RESET_STRATEGY="full" exec "$SCRIPT_DIR/maestro-ios-run-flow.sh" \
   --scenario "Auth profile happy path" \
