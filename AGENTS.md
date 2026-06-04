@@ -29,17 +29,9 @@ Note: product/domain details are maintained in specs. Do not duplicate them here
 - **The auth + sync E2E lanes self-bootstrap a LOCAL Supabase — a missing `supabase` global is EXPECTED, not a blocker.** `npm run test:e2e:ios:auth-profile` (and the sync infra scripts) call `supabase/scripts/ensure-local-runtime-baseline.sh`, which runs the CLI via `npx -y supabase@<version>` and **reuses any already-running local stack**. So `which supabase` returning nothing is normal and is NOT a reason to skip the auth-profile / signed-in lanes — run them. (Docker must be running for the local stack; the baseline serialises concurrent runs on a lock.)
 - **Added a NATIVE dependency? Force-rebuild the iOS dev client before the gates.** The shared Maestro dev-client `.app` is cached on existence only — it is NOT auto-invalidated when dependencies change. If your task adds, removes, or upgrades a **native** dependency (anything that ships an iOS pod / native Expo module — e.g. `expo-task-manager`, `expo-background-task`, `expo-network`, or anything from `npx expo install` with native code), or changes a config plugin / native field in `apps/mobile/app.config.ts`, you MUST rebuild it first: `cd apps/mobile && ./scripts/maestro-ios-dev-client-build.sh --force`. Skip this and the gate reuses the stale binary, which lacks the new native module, and every flow fails at boot with `Cannot find native module '<X>'`. Pure-JS / config-only changes need no rebuild (Metro bundles them at runtime). See `apps/mobile/README-maestro.md`.
 
-## Testing is not optional — never ship or accept an untested excuse
+## Testing — the rules live in `docs/specs/06-testing-strategy.md` (read it when you change code)
 
-- **You have ALL of this repo's local infrastructure: the database (Supabase, via `npx`), the e2e/UI runner (Maestro), and the iOS simulators.** Every test and gate your change touches is runnable in your worktree.
-- **Run them to GREEN before declaring a PR done** — the quality gate, the unit/integration suites, AND the local e2e/UI lanes your change exercises. For a signed-in UI change that means `npm run test:e2e:ios:gates` AND the auth-profile lane (`npm run test:e2e:ios:auth-profile`), not just the infra-free smoke/data-smoke.
-- **Mandatory slow-gate triggers — PER CHANGE, decided by what the change touches (not optional, not only periodic):**
-  - **Any UX component OR any assumption about device / runtime behaviour** (a screen, navigation, a route guard or gate, app lifecycle, native APIs, on-device storage, simulator/OS behaviour, anything a user sees or the device does) → the change MUST run the **slow FRONTEND gates**: the iOS Maestro lanes (`npm run test:e2e:ios:gates`, plus `npm run test:e2e:ios:auth-profile` whenever a signed-in / auth / sync path is involved).
-  - **Any dependency on the backend / infra** (Supabase RPCs, the sync round-trip, migrations, server contracts, reinstall/restore) → the change MUST run the **slow BACKEND gates** (`npm run test:sync:infra` / the shared-Supabase real-instance tests; `npm run test:sync:reinstall-parity` where relevant). Deferrable only when the branch-provisioned remote env is genuinely unset (see below).
-  - The fast gate (lint / typecheck / jest) CANNOT catch device-behaviour or backend-contract regressions — a "data-only" change that alters boot/sync/auth behaviour still triggers the slow FE gates. Do not classify a behaviour change as "no UI / no e2e impact". This per-change rule is IN ADDITION to the periodic slow-gate checkpoints below — the per-change run catches the bug in the very PR that introduced it.
-- **A test that "won't run" is a bootstrap gap, not an unavailable tool.** Run `npm install` + `./scripts/worktree-setup.sh` and retry. "command not found" / "infra unavailable" is never, by itself, a reason to skip a runnable test.
-- **NEVER ship — and reviewers must NEVER approve — a PR that skips a locally-runnable test with an excuse.** Put the evidenced green run (output/log) in the PR.
-- **The ONLY acceptable deferral is a genuinely cloud / remote-provisioned lane:** `npm run test:sync:infra` and `npm run test:sync:reinstall-parity` need a branch-provisioned remote Supabase (`SUPABASE_BRANCH_URL` / `SUPABASE_BRANCH_ANON_KEY`); when those are unset the lane may be deferred — explicitly and narrowly. Everything else runs locally and must.
+**If you are changing code, you MUST read `docs/specs/06-testing-strategy.md` and follow it.** It is the single source of truth for testing — the no-untested-excuses rule, the per-change slow-gate triggers, and the lane model — and is deliberately NOT restated here (so it cannot drift). The non-negotiable essence: run every locally-runnable test/gate to green (a tool that "won't run" means *bootstrap*, not *unavailable*), and **match the gate to the change** — any UX or device/runtime-behaviour change MUST run the slow FRONTEND (Maestro) gates; any backend/infra change MUST run the slow BACKEND (Supabase) gates; the fast lane alone never suffices for a behaviour or contract change. See the spec for the full rules and the cloud-lane deferral exception.
 
 ## Multi-agent orchestration: slow-gate checkpoint tasks (this repo)
 
@@ -50,7 +42,8 @@ Maestro lanes (`test:e2e:ios:gates` = smoke + data-smoke, and
 PR passes its fast gate against its own base, yet the *merged* `main` is red on a
 slow lane that nobody ran. ("data-only / no UI files changed" does NOT mean "no
 e2e impact" — any boot / sync / auth behaviour change is exercised by the e2e
-lanes.) **Every multi-agent plan for this repo MUST therefore include slow-gate
+lanes; see the per-change slow-gate triggers in `docs/specs/06-testing-strategy.md`.)
+**Every multi-agent plan for this repo MUST therefore include slow-gate
 checkpoint tasks:**
 
 - **Cadence.** Insert a checkpoint after each wave/batch of merges (rule of
