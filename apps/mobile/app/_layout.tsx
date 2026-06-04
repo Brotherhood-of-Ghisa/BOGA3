@@ -9,7 +9,7 @@ import { AuthProvider, bootstrapAuthState } from '@/src/auth';
 import { bootstrapLocalDataLayer } from '@/src/data';
 import { ensureExerciseCatalogLoaded } from '@/src/exercise-catalog/cache';
 import { registerBackgroundSyncTask } from '@/src/sync/background-task';
-import { startSchedulerStateBridge, stopSchedulerStateBridge } from '@/src/sync/scheduler-state-bridge';
+import { startSyncGateStateBridge, stopSyncGateStateBridge } from '@/src/sync/sync-gate-state-bridge';
 import { requestSync, startSyncScheduler, stopSyncScheduler } from '@/src/sync/scheduler';
 import { SyncGate } from '@/src/sync/SyncGate';
 
@@ -21,9 +21,10 @@ export default function RootLayout() {
     // it throws.
     startSyncScheduler();
 
-    // Observe sync runtime state so the first-sync gate can decide whether to
-    // block. Started only after the scheduler wired successfully.
-    startSchedulerStateBridge();
+    // Observe the runtime-state flag and the cycle's error signals so the
+    // first-sync gate can decide whether to block. Started only after the
+    // scheduler wired successfully.
+    startSyncGateStateBridge();
 
     // Ask the OS to schedule the background sync task. Registration is async and
     // must not block boot, and a rejection (e.g. Background App Refresh disabled
@@ -45,7 +46,7 @@ export default function RootLayout() {
     });
 
     return () => {
-      stopSchedulerStateBridge();
+      stopSyncGateStateBridge();
       stopSyncScheduler();
     };
   }, []);

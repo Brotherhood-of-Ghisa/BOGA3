@@ -4,10 +4,10 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { UiButton, UiSurface, UiText, uiColors, uiSpace } from '@/components/ui';
 import { useAuth } from '@/src/auth';
+import { PULL_LAYER_COUNT, type SyncPhase, type SyncProgress } from '@/src/sync/progress';
 import { requestSync } from '@/src/sync/scheduler';
 import { selectSyncGateMode } from '@/src/sync/sync-gate-decision';
-import { SYNC_PULL_LAYER_COUNT, type SyncPhase, type SyncProgress } from '@/src/sync/sync-progress';
-import { useSchedulerState } from '@/src/sync/use-scheduler-state';
+import { useSyncGateState } from '@/src/sync/use-sync-gate-state';
 
 /** The dedicated sign-in entry point an unauthenticated outcome routes to. */
 const SIGN_IN_ROUTE = '/sign-in';
@@ -70,7 +70,7 @@ const ERROR_MESSAGES: Record<'FK_VIOLATION' | 'INTERNAL', string> = {
  */
 export function SyncGate({ children }: PropsWithChildren) {
   const { isConfigured, session } = useAuth();
-  const snapshot = useSchedulerState();
+  const snapshot = useSyncGateState();
   const pathname = usePathname();
   const mode = selectSyncGateMode({ isConfigured, session }, snapshot);
 
@@ -177,8 +177,8 @@ const describeActivity = (progress: SyncProgress): string => {
   const parts: string[] = [];
 
   if (progress.phase === 'pull') {
-    const layer = Math.min(progress.layersCompleted + 1, SYNC_PULL_LAYER_COUNT);
-    parts.push(`Layer ${layer} of ${SYNC_PULL_LAYER_COUNT}`);
+    const layer = Math.min(progress.layersCompleted + 1, PULL_LAYER_COUNT);
+    parts.push(`Layer ${layer} of ${PULL_LAYER_COUNT}`);
   }
 
   if (progress.rowsApplied > 0) {

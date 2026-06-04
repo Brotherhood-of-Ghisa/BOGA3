@@ -50,9 +50,9 @@ import {
   runMaestroHarnessReset,
 } from '@/src/maestro/harness';
 import {
-  __resetSchedulerStateForTests,
-  getSchedulerStateSnapshot,
-} from '@/src/sync/scheduler-state';
+  __resetSyncGateStateForTests,
+  getSyncGateStateSnapshot,
+} from '@/src/sync/sync-gate-state';
 
 const mockResetLocalAppData = jest.mocked(resetLocalAppData);
 const mockSeedExerciseBlockHistoryFixture = jest.mocked(seedExerciseBlockHistoryFixture);
@@ -181,13 +181,13 @@ describe('maestro harness helpers', () => {
 
     beforeEach(() => {
       mockHarnessFixture = createInMemoryDatabase();
-      __resetSchedulerStateForTests();
+      __resetSyncGateStateForTests();
     });
 
     afterEach(() => {
       mockHarnessFixture?.close();
       mockHarnessFixture = null;
-      __resetSchedulerStateForTests();
+      __resetSyncGateStateForTests();
     });
 
     it('leaves the flag untouched for the none action', async () => {
@@ -209,13 +209,13 @@ describe('maestro harness helpers', () => {
     });
 
     it('publishes the new flag into the shared accessor so the gate flips on the same tick', async () => {
-      expect(getSchedulerStateSnapshot().bootstrapCompletedAt).toBeNull();
+      expect(getSyncGateStateSnapshot().bootstrapCompletedAt).toBeNull();
 
       await runMaestroHarnessBootstrapAction('complete');
-      expect(getSchedulerStateSnapshot().bootstrapCompletedAt).not.toBeNull();
+      expect(getSyncGateStateSnapshot().bootstrapCompletedAt).not.toBeNull();
 
       await runMaestroHarnessBootstrapAction('reset');
-      expect(getSchedulerStateSnapshot().bootstrapCompletedAt).toBeNull();
+      expect(getSyncGateStateSnapshot().bootstrapCompletedAt).toBeNull();
     });
   });
 

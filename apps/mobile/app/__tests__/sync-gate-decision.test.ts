@@ -1,16 +1,16 @@
-import type { SchedulerStateSnapshot } from '@/src/sync/scheduler-state';
 import {
   selectSyncGateMode,
   type SyncGateAuthSnapshot,
+  type SyncGateDecisionSnapshot,
 } from '@/src/sync/sync-gate-decision';
-import { IDLE_SYNC_PROGRESS } from '@/src/sync/sync-progress';
 
 const signedIn: SyncGateAuthSnapshot = { isConfigured: true, session: { user: { id: 'u' } } };
 
-const snapshot = (overrides: Partial<SchedulerStateSnapshot> = {}): SchedulerStateSnapshot => ({
+const snapshot = (
+  overrides: Partial<SyncGateDecisionSnapshot> = {},
+): SyncGateDecisionSnapshot => ({
   bootstrapCompletedAt: null,
   lastCycleErrorCode: null,
-  progress: IDLE_SYNC_PROGRESS,
   ...overrides,
 });
 

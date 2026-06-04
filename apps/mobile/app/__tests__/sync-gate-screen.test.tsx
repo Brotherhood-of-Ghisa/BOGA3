@@ -8,8 +8,19 @@ jest.mock('@/src/auth', () => ({
   useAuth: () => mockUseAuth(),
 }));
 
+// The gate reads the progress snapshot from the shared scheduler-status
+// accessor. Drive it from a mutable holder the test sets per assertion; the gate
+// re-reads it on each render the gate-state holder triggers.
+let mockProgress: SyncProgress = {
+  phase: 'idle',
+  layersCompleted: 0,
+  rowsApplied: 0,
+  offline: false,
+};
+
 jest.mock('@/src/sync/scheduler', () => ({
   requestSync: (...args: unknown[]) => mockRequestSync(...args),
+  getSchedulerStatus: () => ({ progress: mockProgress }),
 }));
 
 jest.mock('expo-router', () => {
@@ -27,13 +38,13 @@ jest.mock('expo-router', () => {
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { Text } from 'react-native';
 
+import { INITIAL_SYNC_PROGRESS, type SyncProgress } from '@/src/sync/progress';
 import { SyncGate, SYNC_GATE_TEST_IDS } from '@/src/sync/SyncGate';
 import {
-  __resetSchedulerStateForTests,
-  publishSchedulerState,
+  __resetSyncGateStateForTests,
+  publishSyncGateState,
   type LastCycleErrorCode,
-} from '@/src/sync/scheduler-state';
-import { IDLE_SYNC_PROGRESS, type SyncProgress } from '@/src/sync/sync-progress';
+} from '@/src/sync/sync-gate-state';
 
 type AuthValue = {
   isConfigured: boolean;
@@ -52,17 +63,24 @@ const renderGate = () =>
     </SyncGate>,
   );
 
-/** Publishes a fresh snapshot inside React's act() so subscribers re-render. */
+/**
+ * Publishes a fresh gate-state snapshot (and, when given, the progress the
+ * shared accessor reports) inside React's act() so subscribers re-render. The
+ * progress value is updated before the gate-state holder is published so the
+ * gate re-reads it on the same render.
+ */
 const publish = (overrides: {
   bootstrapCompletedAt?: Date | null;
   lastCycleErrorCode?: LastCycleErrorCode | null;
   progress?: SyncProgress;
 }) => {
+  if (overrides.progress) {
+    mockProgress = overrides.progress;
+  }
   act(() => {
-    publishSchedulerState({
+    publishSyncGateState({
       bootstrapCompletedAt: overrides.bootstrapCompletedAt ?? null,
       lastCycleErrorCode: overrides.lastCycleErrorCode ?? null,
-      progress: overrides.progress ?? IDLE_SYNC_PROGRESS,
     });
   });
 };
@@ -73,7 +91,8 @@ describe('SyncGate', () => {
     mockUseAuth.mockReturnValue(signedInAuth);
     mockPathname = '/stats-history';
     mockRequestSync.mockReset();
-    __resetSchedulerStateForTests();
+    mockProgress = INITIAL_SYNC_PROGRESS;
+    __resetSyncGateStateForTests();
   });
 
   it('renders the full-screen block when the bootstrap flag is null', () => {
@@ -114,12 +133,12 @@ describe('SyncGate', () => {
   it('renders the current phase label from the progress snapshot', () => {
     renderGate();
 
-    publish({ progress: { ...IDLE_SYNC_PROGRESS, phase: 'pull' } });
+    publish({ progress: { ...INITIAL_SYNC_PROGRESS, phase: 'pull' } });
     expect(screen.getByTestId(SYNC_GATE_TEST_IDS.phaseLabel).props.children).toBe(
       'Restoring your data',
     );
 
-    publish({ progress: { ...IDLE_SYNC_PROGRESS, phase: 'seed' } });
+    publish({ progress: { ...INITIAL_SYNC_PROGRESS, phase: 'seed' } });
     expect(screen.getByTestId(SYNC_GATE_TEST_IDS.phaseLabel).props.children).toBe(
       'Loading the exercise catalog',
     );
@@ -144,7 +163,7 @@ describe('SyncGate', () => {
   it('shows the offline message instead of a spinner when the network is unreachable', () => {
     renderGate();
 
-    publish({ progress: { ...IDLE_SYNC_PROGRESS, phase: 'pull', offline: true } });
+    publish({ progress: { ...INITIAL_SYNC_PROGRESS, phase: 'pull', offline: true } });
 
     expect(screen.getByTestId(SYNC_GATE_TEST_IDS.offlineMessage)).toBeTruthy();
     expect(screen.queryByTestId(SYNC_GATE_TEST_IDS.activityIndicator)).toBeNull();

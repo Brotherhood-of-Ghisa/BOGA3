@@ -6,9 +6,9 @@ import { PRIMARY_RUNTIME_STATE_ID } from '@/src/data/clock';
 import { syncRuntimeState } from '@/src/data/schema';
 import { clearAuthRequired, markAuthRequired } from '@/src/sync/auth-required-signal';
 import {
-  getSchedulerStateSnapshot,
-  publishSchedulerState,
-} from '@/src/sync/scheduler-state';
+  getSyncGateStateSnapshot,
+  publishSyncGateState,
+} from '@/src/sync/sync-gate-state';
 import { isDevMode } from '@/src/utils/isDevMode';
 
 import { seedExerciseBlockHistoryFixture } from './exercise-block-history-fixture';
@@ -138,10 +138,10 @@ export const runMaestroHarnessFixture = async (fixtureName: MaestroHarnessFixtur
  * 'reset' clears it (block shows). A no-op for 'none'.
  *
  * The new value is both persisted to the row and published straight into the
- * shared sync-state accessor the gate reads, so the gate's block→dismiss (or
- * dismiss→block) transition takes effect on the same tick rather than waiting for
- * the state bridge's next periodic re-read. That makes the transition observable
- * deterministically the instant this resolves, with no polling-interval race.
+ * gate's reactive holder, so the gate's block→dismiss (or dismiss→block)
+ * transition takes effect on the same tick rather than waiting for the bridge's
+ * next periodic re-read. That makes the transition observable deterministically
+ * the instant this resolves, with no polling-interval race.
  *
  * 'complete' models a fully-drained first sync, which by definition talked to the
  * server with a valid session — so it also clears the "no signed-in user" route
@@ -176,8 +176,8 @@ export const runMaestroHarnessBootstrapAction = async (
     markAuthRequired();
   }
 
-  publishSchedulerState({
-    ...getSchedulerStateSnapshot(),
+  publishSyncGateState({
+    ...getSyncGateStateSnapshot(),
     bootstrapCompletedAt,
   });
 };

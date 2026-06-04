@@ -8,8 +8,8 @@ const mockEnsureExerciseCatalogLoaded = jest.fn();
 const mockStartSyncScheduler = jest.fn();
 const mockStopSyncScheduler = jest.fn();
 const mockRequestSync = jest.fn();
-const mockStartSchedulerStateBridge = jest.fn();
-const mockStopSchedulerStateBridge = jest.fn();
+const mockStartSyncGateStateBridge = jest.fn();
+const mockStopSyncGateStateBridge = jest.fn();
 const mockRegisterBackgroundSyncTask = jest.fn<Promise<void>, unknown[]>(() => Promise.resolve());
 
 jest.mock('@/src/data', () => ({
@@ -22,9 +22,9 @@ jest.mock('@/src/sync/scheduler', () => ({
   requestSync: (...args: unknown[]) => mockRequestSync(...args),
 }));
 
-jest.mock('@/src/sync/scheduler-state-bridge', () => ({
-  startSchedulerStateBridge: (...args: unknown[]) => mockStartSchedulerStateBridge(...args),
-  stopSchedulerStateBridge: (...args: unknown[]) => mockStopSchedulerStateBridge(...args),
+jest.mock('@/src/sync/sync-gate-state-bridge', () => ({
+  startSyncGateStateBridge: (...args: unknown[]) => mockStartSyncGateStateBridge(...args),
+  stopSyncGateStateBridge: (...args: unknown[]) => mockStopSyncGateStateBridge(...args),
 }));
 
 // The sync gate is covered by its own spec; here it is a pass-through so this
@@ -89,8 +89,8 @@ describe('RootLayout auth bootstrap wiring', () => {
     mockStartSyncScheduler.mockReset();
     mockStopSyncScheduler.mockReset();
     mockRequestSync.mockReset();
-    mockStartSchedulerStateBridge.mockReset();
-    mockStopSchedulerStateBridge.mockReset();
+    mockStartSyncGateStateBridge.mockReset();
+    mockStopSyncGateStateBridge.mockReset();
     mockRegisterBackgroundSyncTask.mockReset();
     mockRegisterBackgroundSyncTask.mockResolvedValue(undefined);
     mockBootstrapLocalDataLayer.mockResolvedValue(undefined);
@@ -135,14 +135,14 @@ describe('RootLayout auth bootstrap wiring', () => {
     expect(mockStopSyncScheduler).toHaveBeenCalledTimes(1);
   });
 
-  it('starts the scheduler-state bridge after the scheduler wires successfully', () => {
+  it('starts the sync-gate state bridge after the scheduler wires successfully', () => {
     render(<RootLayout />);
 
     expect(mockStartSyncScheduler).toHaveBeenCalledTimes(1);
-    expect(mockStartSchedulerStateBridge).toHaveBeenCalledTimes(1);
+    expect(mockStartSyncGateStateBridge).toHaveBeenCalledTimes(1);
     // The scheduler wires before the bridge observes it.
     expect(mockStartSyncScheduler.mock.invocationCallOrder[0]).toBeLessThan(
-      mockStartSchedulerStateBridge.mock.invocationCallOrder[0],
+      mockStartSyncGateStateBridge.mock.invocationCallOrder[0],
     );
   });
 
@@ -156,6 +156,6 @@ describe('RootLayout auth bootstrap wiring', () => {
     });
 
     expect(() => render(<RootLayout />)).toThrow(wiringFailure);
-    expect(mockStartSchedulerStateBridge).not.toHaveBeenCalled();
+    expect(mockStartSyncGateStateBridge).not.toHaveBeenCalled();
   });
 });

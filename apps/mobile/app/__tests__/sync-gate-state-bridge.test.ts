@@ -25,13 +25,13 @@ import {
 } from '@/src/sync/cycle-error-signal';
 import {
   BOOTSTRAP_FLAG_POLL_INTERVAL_MS,
-  __resetSchedulerStateBridgeForTests,
-  startSchedulerStateBridge,
-} from '@/src/sync/scheduler-state-bridge';
+  __resetSyncGateStateBridgeForTests,
+  startSyncGateStateBridge,
+} from '@/src/sync/sync-gate-state-bridge';
 import {
-  __resetSchedulerStateForTests,
-  getSchedulerStateSnapshot,
-} from '@/src/sync/scheduler-state';
+  __resetSyncGateStateForTests,
+  getSyncGateStateSnapshot,
+} from '@/src/sync/sync-gate-state';
 
 const setBootstrapCompletedAt = (value: Date | null): void => {
   mockFixture.database
@@ -54,77 +54,77 @@ const readBootstrapColumn = (): Date | null =>
 /** Lets the mocked `bootstrapLocalDataLayer()` promise resolve and run refresh. */
 const flushMicrotasks = () => Promise.resolve().then(() => Promise.resolve());
 
-describe('scheduler-state bridge', () => {
+describe('sync-gate state bridge', () => {
   beforeEach(() => {
     jest.useFakeTimers();
     mockFixture = createInMemoryDatabase();
-    __resetSchedulerStateForTests();
+    __resetSyncGateStateForTests();
     __resetAuthRequiredSignalForTests();
     __resetCycleErrorSignalForTests();
-    __resetSchedulerStateBridgeForTests();
+    __resetSyncGateStateBridgeForTests();
   });
 
   afterEach(() => {
-    __resetSchedulerStateBridgeForTests();
+    __resetSyncGateStateBridgeForTests();
     jest.useRealTimers();
     mockFixture.close();
   });
 
   it('publishes the persisted bootstrap flag once the data layer is ready', async () => {
     setBootstrapCompletedAt(new Date(1_700_000_000_000));
-    startSchedulerStateBridge();
+    startSyncGateStateBridge();
 
     await flushMicrotasks();
 
-    expect(getSchedulerStateSnapshot().bootstrapCompletedAt?.getTime()).toBe(1_700_000_000_000);
+    expect(getSyncGateStateSnapshot().bootstrapCompletedAt?.getTime()).toBe(1_700_000_000_000);
   });
 
   it('keeps the flag null while the first cycle has not drained, then reflects it', async () => {
-    startSchedulerStateBridge();
+    startSyncGateStateBridge();
     await flushMicrotasks();
-    expect(getSchedulerStateSnapshot().bootstrapCompletedAt).toBeNull();
+    expect(getSyncGateStateSnapshot().bootstrapCompletedAt).toBeNull();
 
     // The first cycle sets the flag; the poll picks it up on the next tick.
     setBootstrapCompletedAt(new Date(1_700_000_111_000));
     jest.advanceTimersByTime(BOOTSTRAP_FLAG_POLL_INTERVAL_MS);
     await flushMicrotasks();
 
-    expect(getSchedulerStateSnapshot().bootstrapCompletedAt?.getTime()).toBe(1_700_000_111_000);
+    expect(getSyncGateStateSnapshot().bootstrapCompletedAt?.getTime()).toBe(1_700_000_111_000);
     expect(readBootstrapColumn()?.getTime()).toBe(1_700_000_111_000);
   });
 
   it('mirrors the auth-required signal as AUTH_REQUIRED', async () => {
-    startSchedulerStateBridge();
+    startSyncGateStateBridge();
     await flushMicrotasks();
 
     markAuthRequired();
-    expect(getSchedulerStateSnapshot().lastCycleErrorCode).toBe('AUTH_REQUIRED');
+    expect(getSyncGateStateSnapshot().lastCycleErrorCode).toBe('AUTH_REQUIRED');
 
     clearAuthRequired();
-    expect(getSchedulerStateSnapshot().lastCycleErrorCode).toBeNull();
+    expect(getSyncGateStateSnapshot().lastCycleErrorCode).toBeNull();
   });
 
   it('mirrors non-auth cycle error codes and clears them on a clean cycle', async () => {
-    startSchedulerStateBridge();
+    startSyncGateStateBridge();
     await flushMicrotasks();
 
     markCycleError('INTERNAL');
-    expect(getSchedulerStateSnapshot().lastCycleErrorCode).toBe('INTERNAL');
+    expect(getSyncGateStateSnapshot().lastCycleErrorCode).toBe('INTERNAL');
 
     markCycleError('FK_VIOLATION');
-    expect(getSchedulerStateSnapshot().lastCycleErrorCode).toBe('FK_VIOLATION');
+    expect(getSyncGateStateSnapshot().lastCycleErrorCode).toBe('FK_VIOLATION');
 
     clearCycleError();
-    expect(getSchedulerStateSnapshot().lastCycleErrorCode).toBeNull();
+    expect(getSyncGateStateSnapshot().lastCycleErrorCode).toBeNull();
   });
 
   it('prefers AUTH_REQUIRED over a lingering non-auth code', async () => {
-    startSchedulerStateBridge();
+    startSyncGateStateBridge();
     await flushMicrotasks();
 
     markCycleError('INTERNAL');
     markAuthRequired();
 
-    expect(getSchedulerStateSnapshot().lastCycleErrorCode).toBe('AUTH_REQUIRED');
+    expect(getSyncGateStateSnapshot().lastCycleErrorCode).toBe('AUTH_REQUIRED');
   });
 });

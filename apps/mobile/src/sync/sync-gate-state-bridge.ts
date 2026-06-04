@@ -1,12 +1,5 @@
-// Feeds the shared scheduler-state accessor from the observable sources the gate
-// needs today, so the gate reads everything through the one accessor seam.
-//
-// This is a deliberately minimal producer. The durable instrumentation that
-// reports per-layer phase and row counters from inside the cycle, and the
-// durable persistence behind the accessor, are owned elsewhere and will replace
-// the wiring here without changing the accessor's read surface. What this bridge
-// supplies in the meantime is exactly what the first-sync gate must observe to
-// decide whether to block, dismiss, route to sign-in, or show an error:
+// Feeds the first-sync gate's reactive holder from the two observable sources
+// the shared scheduler-status accessor does not surface on its own snapshot:
 //
 //   - `bootstrapCompletedAt`: read from the `sync_runtime_state` singleton row.
 //     The row is re-read on a short interval while the flag is still null (the
@@ -14,13 +7,13 @@
 //     first cycle sets it. Polling stops as soon as the flag is non-null.
 //   - `lastCycleErrorCode`: 'AUTH_REQUIRED' is mirrored from the cycle's
 //     observable "no signed-in user" signal; the non-auth failure codes
-//     ('FK_VIOLATION' / 'INTERNAL') are mirrored from the cycle's failure-code
-//     signal. The cycle owns raising both; this bridge only projects them onto
-//     the accessor the gate reads.
+//     ('FK_VIOLATION' / 'INTERNAL') are mirrored from the cycle's classified
+//     error signal. The cycle owns raising both; this bridge only projects them
+//     onto the holder the gate reads.
 //
-// `progress` (phase + counters + offline) is published by the cycle/bootstrapper
-// instrumentation through the same accessor; this bridge preserves whatever
-// progress value is current when it republishes the bootstrap/error fields.
+// The phase / progress / offline snapshot is NOT republished here — the gate
+// reads it straight from the shared scheduler-status accessor, so this bridge
+// stays scoped to the two signals that holder carries.
 
 import { eq } from 'drizzle-orm';
 
@@ -36,10 +29,10 @@ import {
   subscribeToCycleErrorCode,
 } from '@/src/sync/cycle-error-signal';
 import {
-  getSchedulerStateSnapshot,
-  publishSchedulerState,
+  getSyncGateStateSnapshot,
+  publishSyncGateState,
   type LastCycleErrorCode,
-} from '@/src/sync/scheduler-state';
+} from '@/src/sync/sync-gate-state';
 
 /** How often the bootstrap flag is re-read while the gate is still up. */
 export const BOOTSTRAP_FLAG_POLL_INTERVAL_MS = 1000;
@@ -82,12 +75,12 @@ const readLastCycleErrorCode = (): LastCycleErrorCode | null => {
 
 /**
  * Recomputes the bootstrap flag and last-cycle error from their live sources and
- * publishes a fresh snapshot when either changed, preserving the current
- * progress value. Stops the poll once the bootstrap flag is set, since the gate
- * dismisses and never re-blocks for this session.
+ * publishes a fresh snapshot when either changed. Stops the poll once the
+ * bootstrap flag is set, since the gate dismisses and never re-blocks for this
+ * session.
  */
 const refresh = (): void => {
-  const current = getSchedulerStateSnapshot();
+  const current = getSyncGateStateSnapshot();
   const bootstrapCompletedAt = database ? readBootstrapCompletedAt(database) : current.bootstrapCompletedAt;
   const lastCycleErrorCode = readLastCycleErrorCode();
 
@@ -95,8 +88,7 @@ const refresh = (): void => {
     (current.bootstrapCompletedAt?.getTime() ?? null) !== (bootstrapCompletedAt?.getTime() ?? null);
 
   if (bootstrapChanged || current.lastCycleErrorCode !== lastCycleErrorCode) {
-    publishSchedulerState({
-      ...current,
+    publishSyncGateState({
       bootstrapCompletedAt,
       lastCycleErrorCode,
     });
@@ -115,12 +107,12 @@ const stopBootstrapFlagPoll = (): void => {
 };
 
 /**
- * Starts the bridge: mirrors the auth-required signal into the accessor and
- * polls the bootstrap flag until it is set. Idempotent — a second call while
- * already running is a no-op. Safe to call at boot; the data-layer handle is
- * acquired asynchronously and the auth-required mirror works immediately.
+ * Starts the bridge: mirrors the cycle's auth-required and error signals into the
+ * gate holder and polls the bootstrap flag until it is set. Idempotent — a second
+ * call while already running is a no-op. Safe to call at boot; the data-layer
+ * handle is acquired asynchronously and the signal mirrors work immediately.
  */
-export const startSchedulerStateBridge = (): void => {
+export const startSyncGateStateBridge = (): void => {
   if (authRequiredUnsubscribe !== null) {
     return;
   }
@@ -146,7 +138,7 @@ export const startSchedulerStateBridge = (): void => {
 };
 
 /** Tears down the bridge so a subsequent start begins clean. */
-export const stopSchedulerStateBridge = (): void => {
+export const stopSyncGateStateBridge = (): void => {
   stopBootstrapFlagPoll();
 
   if (authRequiredUnsubscribe !== null) {
@@ -163,6 +155,6 @@ export const stopSchedulerStateBridge = (): void => {
 };
 
 /** Test-only reset so suites start from a known clean bridge. */
-export const __resetSchedulerStateBridgeForTests = (): void => {
-  stopSchedulerStateBridge();
+export const __resetSyncGateStateBridgeForTests = (): void => {
+  stopSyncGateStateBridge();
 };

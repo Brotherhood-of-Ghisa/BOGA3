@@ -1,6 +1,7 @@
 // Pure decision layer for the first-sync gate: given the auth snapshot and the
-// scheduler-state snapshot, decide what the gate should do. Kept free of React
-// so the branching rules can be asserted directly.
+// gate-state snapshot (the bootstrap flag + the latest cycle error code), decide
+// what the gate should do. Kept free of React so the branching rules can be
+// asserted directly.
 //
 // The rules, in priority order:
 //
@@ -23,7 +24,7 @@
 //      activity counters, and — when the device is offline — the offline message
 //      instead of an indefinite spinner.
 
-import type { SchedulerStateSnapshot } from '@/src/sync/scheduler-state';
+import type { LastCycleErrorCode } from '@/src/sync/sync-gate-state';
 
 /** The minimal auth-snapshot fields the gate decision reads. */
 export interface SyncGateAuthSnapshot {
@@ -31,6 +32,14 @@ export interface SyncGateAuthSnapshot {
   isConfigured: boolean;
   /** Whether a live session is currently held (null/undefined when signed out). */
   session: unknown;
+}
+
+/** The minimal gate-state fields the gate decision reads. */
+export interface SyncGateDecisionSnapshot {
+  /** Null until the first full sync cycle has drained; the gate keys dismissal on this. */
+  bootstrapCompletedAt: Date | null;
+  /** The most recent failed cycle's error code, or null when the last cycle was clean. */
+  lastCycleErrorCode: LastCycleErrorCode | null;
 }
 
 /** What the gate should present for the current snapshots. */
@@ -45,14 +54,14 @@ export type SyncGateMode =
   | { kind: 'in-progress' };
 
 /**
- * Maps the auth snapshot and a scheduler-state snapshot to the gate mode. The
+ * Maps the auth snapshot and the gate-state snapshot to the gate mode. The
  * gate only blocks a signed-in user whose first sync has not yet drained; it
  * stands aside for everyone else so an unconfigured build (no session, no sync)
  * is never trapped behind a block that nothing will ever lift.
  */
 export const selectSyncGateMode = (
   auth: SyncGateAuthSnapshot,
-  snapshot: SchedulerStateSnapshot,
+  snapshot: SyncGateDecisionSnapshot,
 ): SyncGateMode => {
   if (!auth.isConfigured || !auth.session) {
     return { kind: 'pass' };
