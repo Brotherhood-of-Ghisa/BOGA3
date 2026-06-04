@@ -424,3 +424,23 @@ those + t5 merge → tFINAL. t5 is parallel and nearly independent.
 - REMAINING: review t2 #113 + t10 → run their signed-in Maestro lanes green (in-
   agent or spawned task) → merge → tGATE re-run (slow lanes on merged main) →
   tFINAL.
+
+## 2026-06-04 — iteration 21
+- t10 → PR #126. Build solid: confirmed dev-wipe affordances correct vs launch
+  state (no prod change); closed a real coverage gap in `dev-affordances.test.ts`
+  (the prior mock collapsed `client.schema()`+`.rpc()` → never verified the
+  `app_public` schema name); wrote `settings-dev-wipe-local.yaml`. quality-fast
+  707 GREEN.
+- t10 SURFACED: `test:e2e:ios:gates` (infra-free smoke + data-smoke) RED in the
+  agent's run — app lands on /sign-in. ANALYSIS: the auth guard redirects only
+  when auth is CONFIGURED; the infra-free build is configured ONLY with a leftover
+  `apps/mobile/.env.local` (the KNOWN leak #124 targeted; #123 greened data-smoke;
+  t9/#125 don't redirect). ⇒ almost certainly a WORKTREE-LOCAL `.env.local`
+  artifact, NOT a real main regression — i.e. #124's isolation didn't clear a
+  STALE leftover, or the agent's worktree carried one. (The t10 agent filed a
+  spawn chip to harden the lane.)
+- ACTION: confirm by running the infra-free gate + the wipe-local flow in a FRESH
+  worktree (no leftover .env.local) — the spawned-task pattern does exactly that.
+  If it ALSO fails clean → real regression to fix. Dispatched t10 code reviewer
+  (scoped: code/Jest; wipe-local Maestro merge-gated on a clean-worktree run).
+- t2 #113 rebase (agent a7c8a9b) still in flight.
