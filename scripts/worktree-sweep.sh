@@ -241,6 +241,96 @@ clean_slot() {
   "$SCRIPT_DIR/worktree-clean.sh" "${args[@]}"
 }
 
+# True once a project's stack is older than the grace period, so we never tear
+# down a stack whose worktree was only just removed (and might be recreated).
+supabase_project_age_ready() {
+  local project="$1"
+  local cid created epoch now
+
+  cid="$(docker ps -a --filter "label=com.supabase.cli.project=$project" -q 2>/dev/null | head -n1)"
+  [[ -n "$cid" ]] || return 0
+  created="$(docker inspect -f '{{.Created}}' "$cid" 2>/dev/null || true)"
+  [[ -n "$created" ]] || return 0
+  epoch="$(boga_iso_to_epoch "$created" 2>/dev/null || true)"
+  [[ -n "$epoch" ]] || return 0
+  now="$(date +%s)"
+  (( now - epoch >= 10#$GRACE_SECONDS ))
+}
+
+# Registry-independent backstop: a Supabase stack can outlive its registry record
+# entirely — e.g. when a slot is recycled (the prior project id is overwritten) or
+# when registration never happened. Such stacks are invisible to the registry scan
+# above. Here we enumerate running Supabase projects directly from Docker labels and
+# reclaim any BOGA worktree stack that has neither a slot registry entry nor a live
+# worktree. The main `BOGA` project and non-BOGA projects are never touched.
+sweep_orphaned_supabase_projects() {
+  if [[ "$SUPABASE" != "1" ]]; then
+    return 0
+  fi
+  if ! boga_docker_available; then
+    echo "[worktree-sweep] docker unavailable; skipping orphaned-project backstop"
+    return 0
+  fi
+
+  local current_project_id project frag line wt_path wt_name reg_file reg_pid
+  local -a live_fragments=() registered_project_ids=()
+
+  current_project_id="$(boga_project_id_for_slot "$CURRENT_SLOT" "$REPO_ROOT" 2>/dev/null || true)"
+
+  while IFS= read -r line; do
+    case "$line" in
+      worktree\ *)
+        wt_path="${line#worktree }"
+        [[ -d "$wt_path" ]] || continue
+        wt_name="$(basename "$(boga_abs_dir "$wt_path")")"
+        live_fragments+=("$(boga_project_id_fragment "$wt_name")")
+        ;;
+    esac
+  done < <(git -C "$REPO_ROOT" worktree list --porcelain 2>/dev/null)
+
+  shopt -s nullglob
+  for reg_file in "$REGISTRY_DIR"/*; do
+    reg_pid="$(boga_registry_project_id_from_file "$reg_file" 2>/dev/null || true)"
+    [[ -n "$reg_pid" ]] && registered_project_ids+=("$reg_pid")
+  done
+
+  while IFS= read -r project; do
+    [[ -n "$project" ]] || continue
+    # Only ever reclaim BOGA worktree stacks (BOGA-<frag>-wt<slot>). The main
+    # `BOGA` project and any non-BOGA project from another tool are left alone.
+    case "$project" in
+      BOGA-*-wt[0-9]*) : ;;
+      *) continue ;;
+    esac
+    [[ -n "$current_project_id" && "$project" == "$current_project_id" ]] && continue
+
+    # Owned by the registry scan above if a slot file still names it.
+    if boga_array_contains "$project" "${registered_project_ids[@]:-}"; then
+      continue
+    fi
+
+    # Still live if its originating worktree is still checked out.
+    frag="${project#BOGA-}"
+    frag="${frag%-wt[0-9]*}"
+    if boga_array_contains "$frag" "${live_fragments[@]:-}"; then
+      continue
+    fi
+
+    if ! supabase_project_age_ready "$project"; then
+      echo "[worktree-sweep] keeping orphan-looking project $project: younger than ${GRACE_SECONDS}s grace period"
+      continue
+    fi
+
+    echo "[worktree-sweep] orphaned Supabase project detected (no registry, no worktree): $project"
+    if [[ "$DRY_RUN" == "1" ]]; then
+      echo "[worktree-sweep] dry-run: $SCRIPT_DIR/worktree-clean.sh --project $project --supabase"
+      continue
+    fi
+    "$SCRIPT_DIR/worktree-clean.sh" --project "$project" --supabase \
+      || echo "[worktree-sweep] warning: failed to tear down orphan project $project" >&2
+  done < <(docker ps -a --filter "label=com.supabase.cli.project" --format '{{.Label "com.supabase.cli.project"}}' 2>/dev/null | sort -u)
+}
+
 echo "[worktree-sweep] scanning completed worktree slots (current slot: $CURRENT_SLOT)"
 
 shopt -s nullglob
@@ -261,16 +351,28 @@ for registry_file in "$REGISTRY_DIR"/*; do
     continue
   fi
 
+  # Slot 0 is the always-on main checkout (project id `BOGA`). Its branch is
+  # trivially "merged into origin/main", so completion detection would flag it
+  # whenever the sweep runs from a non-main worktree (current slot != 0). Never
+  # reclaim it.
+  if [[ "$slot" == "0" ]]; then
+    echo "[worktree-sweep] keeping slot 0 (always-on main checkout)"
+    continue
+  fi
+
   if ! registry_age_is_ready "$registry_file"; then
     echo "[worktree-sweep] keeping slot $slot: registry younger than ${GRACE_SECONDS}s grace period"
     continue
   fi
 
   if reason="$(completion_reason "$registry_file")"; then
-    clean_slot "$slot" "$reason"
+    clean_slot "$slot" "$reason" \
+      || echo "[worktree-sweep] warning: cleanup for slot $slot failed; continuing" >&2
   else
     echo "[worktree-sweep] keeping slot $slot: registered worktree still looks active"
   fi
 done
+
+sweep_orphaned_supabase_projects
 
 echo "[worktree-sweep] done"
