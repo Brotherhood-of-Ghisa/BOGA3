@@ -8,13 +8,20 @@
  * Maestro flow and these unit tests can pin it.
  */
 
-// useFocusEffect runs the effect callback immediately in this stub (no real
-// navigation focus lifecycle under jsdom).
-jest.mock('expo-router', () => ({
-  useFocusEffect: (callback: () => void | (() => void)) => {
-    callback();
-  },
-}));
+// Stub useFocusEffect with a real effect so it mirrors the navigation
+// focus/blur lifecycle: run the (memoized) callback on focus (mount here) AND
+// invoke the cleanup it returns on unmount. Calling the callback without
+// honoring its cleanup would leak the panel's polling setInterval past the
+// test and hang the --detectOpenHandles guard.
+jest.mock('expo-router', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted factory: require resolves at call time, after the import hoist.
+  const { useEffect } = require('react');
+  return {
+    useFocusEffect: (callback: () => void | (() => void)) => {
+      useEffect(() => callback(), [callback]);
+    },
+  };
+});
 
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
