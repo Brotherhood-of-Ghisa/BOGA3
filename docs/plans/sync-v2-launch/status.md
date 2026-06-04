@@ -486,3 +486,27 @@ those + t5 merge → tFINAL. t5 is parallel and nearly independent.
 - The earlier t10-only lane chip is SUPERSEDED by tGATE — dismiss it.
 - Path to done: merge #113 + #126 → tGATE chip green → tFINAL (final test card:
   5 cross-cutting outcomes + two-device restore on the infra lane) → mao-audit.
+
+## 2026-06-04 — iteration 24
+- t2 #113 + t10 #126 MERGED. tGATE clean slow-suite run CAUGHT A REAL GATE BUG →
+  #129 (`fix: first-sync gate online detection + kick sync on sign-in`): the gate
+  didn't detect online / didn't kick a sync on sign-in → would hang. Launch-
+  blocking class the fast gate can't catch; it's why these slow lanes must run
+  per-change. main → b8e203a. Deviations logged (#113/#126/#129).
+- USER DIRECTIVES actioned:
+  1. PER-CHANGE SLOW-GATE TRIGGERS made explicit (in addition to the periodic
+     checkpoint, which stands): docs PR #130 (AGENTS.md + CLAUDE.md +
+     06-testing-strategy.md — UX component OR device-behaviour assumption ⇒ slow
+     FE/Maestro gates; backend/infra dependency ⇒ slow BE/Supabase gates;
+     "data-only ≠ no e2e impact" disallowed). Plugin commit b1fb9fd (mao-builder
+     runs the matching slow gate; mao-reviewer rejects a behaviour/contract change
+     that ran only the fast gate).
+  2. tINVENTORY closure task added (tasks/tINVENTORY.md; DAG tFINAL → tINVENTORY):
+     inventory every non-unit test the plan introduced (Maestro flows /
+     Supabase-infra tests / mock-device-DB in-memory-SQLite tests), keep/drop each,
+     verify conformance to the testing architecture principles (06-testing-strategy),
+     remove/fix the non-conforming ones, produce a durable inventory doc.
+- REMAINING TO CLOSE: merge #130 (docs); CONFIRM all slow lanes GREEN on main
+  post-#129 (re-run tGATE chip / or trust the #129 author's green run) → dispatch
+  tFINAL (final test card: 5 cross-cutting outcomes + two-device restore on the
+  infra lane) → tINVENTORY → mao-audit → delete plan dir.

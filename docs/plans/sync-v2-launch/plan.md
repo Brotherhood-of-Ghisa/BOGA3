@@ -130,6 +130,7 @@ graph TD
   t11[t11: post-sign-in sync auth — session loss fix]
   tGATE[tGATE: slow-gate checkpoint — integration branch green]
   tFINAL[tFINAL: launch end-to-end verification]
+  tINVENTORY[tINVENTORY: non-unit test inventory + hygiene review]
 
   tPROG --> t2
   tPROG --> t3
@@ -150,6 +151,7 @@ graph TD
   t9 --> tGATE
   t10 --> tGATE
   tGATE --> tFINAL
+  tFINAL --> tINVENTORY
   t1 --> tFINAL
   t2 --> tFINAL
   t4 --> tFINAL
@@ -213,6 +215,7 @@ consumes):
 - [t10: dev-gated wipe affordances — confirm correct against launch state](tasks/t10.md) — build (verification delta)
 - [t11: post-sign-in sync authentication — session loss fix](tasks/t11.md) — build (remediation; surfaced by t2's Maestro work; gates t2's #113 lane-green merge)
 - [tGATE: slow-gate checkpoint — integration branch green](tasks/tGATE.md) — build (gate checkpoint; barrier before tFINAL; per AGENTS.md slow-gate convention)
+- [tINVENTORY: non-unit test inventory + hygiene review](tasks/tINVENTORY.md) — build (closure; runs after tFINAL; inventory + keep/drop + principles-conformance for all Maestro / Supabase / mock-device-DB tests)
 - [tFINAL: launch end-to-end verification](tasks/tFINAL.md) — build (final test card)
 
 ## Planner notes (folded from the stub)
@@ -474,3 +477,19 @@ and the referenced PRs.
   (.gitignore + maestro-ios scripts + testing-strategy / maestro-conventions /
   worktree-config specs). Another out-of-band CI hardening (the leftover-.env.local
   gotcha the t2 builder first hit).
+- t2 (PR #113, merged 2026-06-04): sync-gate full-screen block — rebased onto t9
+  and adopted the canonical `getSchedulerStatus()` accessor (stub seam removed),
+  4-way `cycle.ts` merge (gate error-signal + bootstrapper + bundle-migrations);
+  gate renders `SyncProgress` (phase/counters/offline) + error+single-Retry +
+  AUTH_REQUIRED→sign-in. quality-fast 740 green. Sync-gate Maestro lane verified
+  via the clean tGATE run (which then surfaced the #129 gate bug). none.
+- t10 (PR #126, merged 2026-06-04): dev-gated wipe verification — confirmed the
+  affordances correct vs the launch state (no prod change); closed the
+  `app_public` schema-assertion test gap; added the wipe-local dev Maestro flow.
+  707 green. none.
+- (tGATE output) PR #129 (merged 2026-06-04): `fix: first-sync gate online
+  detection + kick sync on sign-in` — a REAL gate bug the tGATE clean slow-suite
+  run CAUGHT: the first-sync gate didn't detect online / didn't kick a sync on
+  sign-in, so it would hang. Exactly the launch-blocking class the fast gate
+  cannot catch — and the proximate motivation for the per-change slow-gate-trigger
+  instruction update (#130). Effectively the tGATE checkpoint's fix output.
