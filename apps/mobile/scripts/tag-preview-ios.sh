@@ -31,13 +31,11 @@ if [[ ! -x "$PLIST_BUDDY" ]]; then
   exit 1
 fi
 
-# Make sure we are inside a git repo
 git rev-parse --is-inside-work-tree >/dev/null 2>&1 || {
   echo "Error: not inside a git repository"
   exit 1
 }
 
-# Refuse to tag a dirty working tree
 if [[ -n "$(git status --porcelain)" ]]; then
   echo "Error: working tree is not clean."
   echo
@@ -52,29 +50,51 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 
 unzip -q "$IPA_PATH" -d "$TMP_DIR"
 
-APP_PLIST="$(find "$TMP_DIR/Payload" -name Info.plist | head -n 1)"
+APP_DIR="$(find "$TMP_DIR/Payload" -maxdepth 1 -type d -name "*.app" | head -n 1)"
 
-if [[ -z "$APP_PLIST" ]]; then
-  echo "Error: Could not find Info.plist inside IPA"
+if [[ -z "$APP_DIR" ]]; then
+  echo "Error: Could not find .app directory inside IPA"
   exit 1
 fi
 
-BUNDLE_ID="$("$PLIST_BUDDY" -c 'Print :CFBundleIdentifier' "$APP_PLIST")"
-VERSION="$("$PLIST_BUDDY" -c 'Print :CFBundleShortVersionString' "$APP_PLIST")"
-BUILD="$("$PLIST_BUDDY" -c 'Print :CFBundleVersion' "$APP_PLIST")"
+APP_PLIST="$APP_DIR/Info.plist"
+
+if [[ ! -f "$APP_PLIST" ]]; then
+  echo "Error: Could not find app Info.plist inside IPA"
+  echo "Expected: $APP_PLIST"
+  exit 1
+fi
+
+read_plist_value() {
+  local key="$1"
+  local value
+
+  if ! value="$("$PLIST_BUDDY" -c "Print :$key" "$APP_PLIST" 2>/dev/null)"; then
+    echo "Error: Could not read $key from $APP_PLIST"
+    exit 1
+  fi
+
+  echo "$value"
+}
+
+BUNDLE_ID="$(read_plist_value "CFBundleIdentifier")"
+VERSION="$(read_plist_value "CFBundleShortVersionString")"
+BUILD="$(read_plist_value "CFBundleVersion")"
 
 TAG="preview-ios-v${VERSION}-b${BUILD}"
 COMMIT="$(git rev-parse --short HEAD)"
+BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 
 echo "IPA:          $IPA_PATH"
 echo "Bundle ID:    $BUNDLE_ID"
 echo "Version:      $VERSION"
 echo "Build number: $BUILD"
+echo "Git branch:   $BRANCH"
 echo "Git commit:   $COMMIT"
 echo "Tag:          $TAG"
 echo
 
-if git rev-parse "$TAG" >/dev/null 2>&1; then
+if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
   echo "Error: tag already exists: $TAG"
   exit 1
 fi
