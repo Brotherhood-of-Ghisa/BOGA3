@@ -9,6 +9,7 @@ import { __resetAuthStorageAdapterForTests } from './storage';
 import { logEvent } from '@/src/logging';
 import { wipeLocalForAccountSwitch } from '@/src/sync/account-wipe';
 import { clearAuthRequired } from '@/src/sync/auth-required-signal';
+import { requestSync } from '@/src/sync/scheduler';
 
 export type AuthBootstrapStatus = 'idle' | 'restoring' | 'ready';
 
@@ -112,6 +113,16 @@ const handleAuthStateChange = (_event: AuthChangeEvent, session: Session | null)
   // re-renders the tree before that clear lands, so the loop has already started.
   if (nextUserId !== null) {
     clearAuthRequired();
+
+    // Kick the first authenticated sync cycle now that a session is live, rather
+    // than waiting for the scheduler's idle backstop. Without this the cold-launch
+    // nudge fires its only cycle BEFORE sign-in (no session -> AUTH_REQUIRED) and
+    // the first signed-in cycle does not run until the long backstop interval, so
+    // the first-sync gate holds "Setting up your data…" for up to that interval
+    // after sign-in. requestSync coalesces and is a no-op while offline, so firing
+    // it on every session-live transition (sign-in, token refresh, restored
+    // session) is safe and simply keeps sync prompt.
+    requestSync();
   }
 
   // Account switch: a different concrete account is now signed in than the one

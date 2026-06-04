@@ -43,7 +43,7 @@ jest.mock('@/src/sync/cycle', () => ({
 // reachability snapshots through it, and records the unsubscribe call. The
 // `mock`-prefixed names are the only out-of-scope references babel-jest allows
 // inside a hoisted jest.mock factory.
-type NetInfoSnapshot = { isInternetReachable: boolean | null };
+type NetInfoSnapshot = { isConnected?: boolean | null; isInternetReachable?: boolean | null };
 const mockNetInfoState: { listener: ((state: NetInfoSnapshot) => void) | null } = {
   listener: null,
 };
@@ -71,6 +71,7 @@ jest.mock('@/src/logging/logEvent', () => ({
 
 import {
   __getSchedulerStateForTests,
+  __resetSchedulerForTests,
   LONG_INTERVAL,
   requestSync,
   SHORT_INTERVAL,
@@ -82,9 +83,18 @@ import {
 let appStateListener: ((status: AppStateStatus) => void) | null = null;
 const appStateRemove = jest.fn();
 
-const goOnline = () => mockNetInfoState.listener?.({ isInternetReachable: true });
-const goOffline = () => mockNetInfoState.listener?.({ isInternetReachable: false });
-const netInfoNull = () => mockNetInfoState.listener?.({ isInternetReachable: null });
+// "online" is keyed off the link (isConnected), not the reachability probe.
+const goOnline = () =>
+  mockNetInfoState.listener?.({ isConnected: true, isInternetReachable: true });
+const goOffline = () =>
+  mockNetInfoState.listener?.({ isConnected: false, isInternetReachable: false });
+// A reported link whose internet-reachability probe is still pending (null) or
+// has come back negative (false) — captive portal / blocked probe host / the iOS
+// simulator. Both count as online now, because the device has a link.
+const connectedProbePending = () =>
+  mockNetInfoState.listener?.({ isConnected: true, isInternetReachable: null });
+const connectedProbeFalse = () =>
+  mockNetInfoState.listener?.({ isConnected: true, isInternetReachable: false });
 
 /** Settle the most recently started cycle (success). */
 const endCycleSuccess = async () => {
@@ -127,6 +137,9 @@ beforeEach(() => {
   // background->active edge is unambiguous.
   (AppState as { currentState: AppStateStatus }).currentState = 'active';
 
+  // Reset the persisted network projection so each test starts from a clean,
+  // offline scheduler (the projection now survives stop/start by design).
+  __resetSchedulerForTests();
   startSyncScheduler();
 });
 
@@ -412,18 +425,23 @@ describe('AppState foreground edge', () => {
 // =============================================================================
 
 describe('NetInfo projection', () => {
-  it('emits go online only when isInternetReachable === true', () => {
-    netInfoNull();
-    expect(stateName()).toBe('OFFLINE');
-
+  it('treats any reported link as online, regardless of the internet-reachability probe', () => {
+    // No link yet -> OFFLINE.
     goOffline();
     expect(stateName()).toBe('OFFLINE');
 
-    goOnline();
+    // Connected with the reachability probe still pending (null) -> online. This
+    // is the iOS-simulator / probe-pending case that must not strand the user.
+    connectedProbePending();
     expect(stateName()).toBe('SHORT_TIMEOUT');
   });
 
-  it('repeated true snapshots produce no further input (no timer restart)', () => {
+  it('stays online when connected even if the reachability probe reports false (captive portal / blocked probe host)', () => {
+    connectedProbeFalse();
+    expect(stateName()).toBe('SHORT_TIMEOUT');
+  });
+
+  it('repeated connected snapshots produce no further input (no timer restart)', () => {
     goOnline();
     const before = __getSchedulerStateForTests().state;
     const beforeDeadline = before.name === 'SHORT_TIMEOUT' ? before.deadlineMs : -1;
@@ -435,19 +453,38 @@ describe('NetInfo projection', () => {
     const after = __getSchedulerStateForTests().state;
     expect(after.name).toBe('SHORT_TIMEOUT');
     if (after.name === 'SHORT_TIMEOUT') {
-      // The short timer was never restarted by the redundant true snapshots.
+      // The short timer was never restarted by the redundant connected snapshots.
       expect(after.deadlineMs).toBe(beforeDeadline);
     }
   });
 
-  it('null reachability after online flips back to offline', () => {
+  it('stays online when the reachability probe flips while still connected; only a link loss goes offline', () => {
     goOnline();
     expect(stateName()).toBe('SHORT_TIMEOUT');
 
-    // null projects to false, a real change from true: emits go offline.
-    netInfoNull();
+    // The probe result changes but the link is still up -> no change, still online.
+    connectedProbePending();
+    expect(stateName()).toBe('SHORT_TIMEOUT');
+    connectedProbeFalse();
+    expect(stateName()).toBe('SHORT_TIMEOUT');
+
+    // The link drops -> offline.
+    goOffline();
     expect(stateName()).toBe('OFFLINE');
     expect(isTimerArmed()).toBe(false);
+  });
+
+  it('re-arms the online machine on restart from the persisted projection (no new NetInfo event needed)', () => {
+    goOnline();
+    expect(stateName()).toBe('SHORT_TIMEOUT');
+
+    // A bare remount: tear the scheduler down and re-wire it WITHOUT a reset and
+    // WITHOUT the listener re-emitting (NetInfo emits nothing for an unchanged
+    // still-online device). The machine must resume online from the persisted
+    // projection rather than being stranded OFFLINE.
+    stopSyncScheduler();
+    startSyncScheduler();
+    expect(stateName()).toBe('SHORT_TIMEOUT');
   });
 });
 

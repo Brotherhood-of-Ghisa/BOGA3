@@ -530,6 +530,22 @@ describe('StatsScreenShell', () => {
     expect(screen.getByTestId('stats-muscle-history-week-banner-placeholder')).toBeTruthy();
   });
 
+  it('shows only the date range when an empty week is selected', () => {
+    renderStatsScreenShell({
+      selectedMuscle: {
+        muscleGroupIds: ['front_delts'],
+        displayName: 'Front Delts',
+        familyName: 'Shoulders',
+      },
+      muscleHistoryWeeklyEffort: [buildWeeklyEffort()],
+      selectedMuscleHistoryWeekKey: '2026-05-18',
+      muscleHistoryMetric: 'totalVolume',
+    });
+
+    expect(screen.getByTestId('stats-muscle-history-week-banner-range')).toHaveTextContent(/May/);
+    expect(screen.queryByTestId('stats-muscle-history-week-banner-value')).toBeNull();
+  });
+
   it('calls onSelectMuscleHistoryMetric when a metric chip is pressed', () => {
     const onSelectMuscleHistoryMetric = jest.fn();
     renderStatsScreenShell({

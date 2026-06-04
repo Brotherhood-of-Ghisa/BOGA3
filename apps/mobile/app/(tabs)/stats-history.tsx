@@ -536,9 +536,11 @@ function WeekSelectionBanner({
           <Text style={styles.weekBannerRange} testID="stats-muscle-history-week-banner-range">
             {dateRange}
           </Text>
-          <Text style={styles.weekBannerValue} testID="stats-muscle-history-week-banner-value">
-            {METRIC_LABELS[metric]}: {value ?? '—'}
-          </Text>
+          {value !== null ? (
+            <Text style={styles.weekBannerValue} testID="stats-muscle-history-week-banner-value">
+              {METRIC_LABELS[metric]}: {value}
+            </Text>
+          ) : null}
         </>
       ) : (
         <Text style={styles.weekBannerPlaceholder} testID="stats-muscle-history-week-banner-placeholder">
@@ -1317,15 +1319,17 @@ const styles = StyleSheet.create({
   },
   overlayRoot: {
     ...StyleSheet.absoluteFillObject,
-    justifyContent: 'flex-end',
-    padding: 16,
   },
   overlayBackdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: uiColors.overlayScrim,
   },
   overlayCard: {
-    height: '75%',
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    bottom: 16,
+    left: 16,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: uiColors.borderMuted,

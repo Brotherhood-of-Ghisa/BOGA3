@@ -295,6 +295,32 @@ boga_file_mtime_epoch() {
   stat -f %m "$path" 2>/dev/null || stat -c %Y "$path" 2>/dev/null
 }
 
+boga_docker_available() {
+  command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1
+}
+
+boga_array_contains() {
+  local needle="$1"
+  shift
+  local item
+  for item in "$@"; do
+    [[ "$item" == "$needle" ]] && return 0
+  done
+  return 1
+}
+
+# Convert an ISO-8601 / RFC3339 timestamp (e.g. a Docker `.Created` value) to a
+# Unix epoch. Works with both GNU `date -d` and BSD/macOS `date -j`.
+boga_iso_to_epoch() {
+  local iso="$1" trimmed
+  if date -d "$iso" +%s 2>/dev/null; then
+    return 0
+  fi
+  trimmed="${iso%%.*}"
+  trimmed="${trimmed%Z}"
+  date -u -j -f "%Y-%m-%dT%H:%M:%S" "$trimmed" +%s 2>/dev/null
+}
+
 boga_mobile_node_modules_is_isolated() {
   local repo_root="$1"
   local node_modules="$repo_root/apps/mobile/node_modules"

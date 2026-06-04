@@ -78,7 +78,9 @@ jest.mock('@/src/auth/supabase', () =>
   ),
 );
 
+import { type LocalDatabase } from '@/src/data/bootstrap';
 import { PRIMARY_RUNTIME_STATE_ID, type Transaction } from '@/src/data/clock';
+import { seedMuscleGroups } from '@/src/data/exercise-catalog-seeds';
 import {
   exerciseSets,
   gyms,
@@ -202,13 +204,47 @@ describe('sync cycle round-trip against a live endpoint', () => {
     return (typeof raw === 'string' ? JSON.parse(raw) : raw) as Record<string, unknown>;
   };
 
+  // Seed the client-only muscle-group taxonomy into the current store, as the
+  // production boot data layer does on every launch. `muscle_groups` never
+  // crosses the wire, so any path that materialises an `exercise_muscle_mappings`
+  // row locally — the first-sign-in catalog seed the cycle runs on a fresh store,
+  // or a re-pull of those mappings after the catalog reaches the server — needs
+  // the referenced muscle groups already present for the mapping's foreign key to
+  // resolve. Seeding here mirrors that production boot order.
+  const seedClientTaxonomy = (): void => {
+    seedMuscleGroups(database as unknown as LocalDatabase);
+  };
+
+  // Stamp the runtime row as already-bootstrapped so the cycle skips the
+  // first-sign-in bootstrapper. This suite drives the steady-state convergence
+  // of a hand-built chain on a device that has already completed first sign-in;
+  // it is not the first-sign-in path. Without this, a cycle run against the
+  // freshly wiped (empty) server would see a zero-row first pull and re-seed the
+  // entire starter catalog, flooding the server layers and drowning the
+  // hand-built chain this suite asserts on. The dedicated reinstall suite covers
+  // the first-sign-in restore path separately.
+  const markAlreadyBootstrapped = (): void => {
+    database
+      .insert(syncRuntimeState)
+      .values({ id: PRIMARY_RUNTIME_STATE_ID, bootstrapCompletedAt: new Date() })
+      .onConflictDoUpdate({
+        target: syncRuntimeState.id,
+        set: { bootstrapCompletedAt: new Date() },
+      })
+      .run();
+  };
+
   // Re-create a fresh, empty local store so the re-pull starts from nothing —
-  // mirrors wiping the local database on a reinstall.
+  // mirrors wiping the local database on a reinstall. The client-only
+  // muscle-group taxonomy is re-seeded, exactly as the boot data layer does after
+  // a reinstall, so a re-pulled muscle mapping's foreign key still resolves.
   const wipeLocalStore = (): void => {
     fixture.close();
-    fixture = createInMemoryDatabase();
+    fixture = createInMemoryDatabase({ foreignKeys: true });
     database = fixture.database;
     mockBootstrapState.database = database;
+    seedClientTaxonomy();
+    markAlreadyBootstrapped();
   };
 
   beforeAll(async () => {
@@ -221,10 +257,15 @@ describe('sync cycle round-trip against a live endpoint', () => {
 
   beforeEach(async () => {
     beforePushHook = null;
-    fixture = createInMemoryDatabase();
+    // Enforce foreign keys so the store behaves like the production SQLite
+    // engine: a muscle mapping that lands before its muscle group is rejected,
+    // rather than silently orphaned.
+    fixture = createInMemoryDatabase({ foreignKeys: true });
     database = fixture.database;
     mockBootstrapState.database = database;
     mockClientState.client = wrapClientWithPushHook(authed.client);
+    seedClientTaxonomy();
+    markAlreadyBootstrapped();
 
     // Clean the test user's server rows so each test starts from an empty
     // server slate (the fixture user persists across runs).

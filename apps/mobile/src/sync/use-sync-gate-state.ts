@@ -46,6 +46,19 @@ export const useSyncGateState = (): SyncGateSnapshot => {
     getSyncGateStateSnapshot,
   );
 
+  // Harness-pinned in-progress override (tests only): render the pinned
+  // in-progress block and stay up regardless of the live scheduler and the
+  // persisted bootstrap flag, so a Maestro flow can observe the online "setting
+  // up your data" state deterministically on a simulator whose NetInfo cannot
+  // confirm reachability. Never set in production.
+  if (gateState.forcedProgress) {
+    return {
+      bootstrapCompletedAt: null,
+      lastCycleErrorCode: null,
+      progress: gateState.forcedProgress,
+    };
+  }
+
   return {
     bootstrapCompletedAt: gateState.bootstrapCompletedAt,
     lastCycleErrorCode: gateState.lastCycleErrorCode,

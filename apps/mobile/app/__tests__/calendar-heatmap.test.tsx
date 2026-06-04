@@ -44,11 +44,12 @@ describe('buildCalendarHeatmapMonthRows — minimum 6 months', () => {
     expect(rows.length).toBeGreaterThanOrEqual(6);
   });
 
-  it('all cells are null when there is no effort data', () => {
+  it('renders dated neutral cells when there is no effort data', () => {
     const rows = buildCalendarHeatmapMonthRows([], 'totalVolume', null, '2026-05-29');
     for (const row of rows) {
-      expect(row.cells).toHaveLength(4);
-      expect(row.cells.every((c) => c === null)).toBe(true);
+      expect(row.cells.length).toBeGreaterThan(0);
+      expect(row.cells.length).toBeLessThanOrEqual(4);
+      expect(row.cells.every((c) => c.metricValue === null && c.bucket === 0)).toBe(true);
     }
   });
 
@@ -78,21 +79,45 @@ describe('buildCalendarHeatmapMonthRows', () => {
     expect(april?.monthLabel).toBe('Apr');
   });
 
-  it('fills exactly 4 cells per row, null for absent weeks', () => {
+  it('fills past empty weeks with dated neutral cells', () => {
     const rows = buildCalendarHeatmapMonthRows(weeks, 'totalVolume', null, '2026-04-10');
     const march = rows.find((r) => r.monthKey === '2026-03')!;
     const april = rows.find((r) => r.monthKey === '2026-04')!;
 
-    // March: weeks 1,2,3 present, week 4 absent
+    // March: all past weeks remain selectable; week 4 has no effort.
     expect(march.cells).toHaveLength(4);
     expect(march.cells[0]?.weekStartDateKey).toBe('2026-03-02');
     expect(march.cells[1]?.weekStartDateKey).toBe('2026-03-09');
     expect(march.cells[2]?.weekStartDateKey).toBe('2026-03-16');
-    expect(march.cells[3]).toBeNull();
+    expect(march.cells[3]?.weekStartDateKey).toBe('2026-03-23');
+    expect(march.cells[3]?.metricValue).toBeNull();
+    expect(march.cells[3]?.bucket).toBe(0);
 
-    // April: only week 1 present
+    // April: only the current week is rendered; later weeks are future weeks.
+    expect(april.cells).toHaveLength(1);
     expect(april.cells[0]?.weekStartDateKey).toBe('2026-04-06');
-    expect(april.cells[1]).toBeNull();
+  });
+
+  it('omits future week tiles from the current month', () => {
+    const rows = buildCalendarHeatmapMonthRows(weeks, 'totalVolume', null, '2026-04-10');
+    const april = rows.find((r) => r.monthKey === '2026-04')!;
+
+    expect(april.cells.map((cell) => cell.weekStartDateKey)).toEqual(['2026-04-06']);
+  });
+
+  it('omits future effort data from rows and bucket scaling', () => {
+    const rows = buildCalendarHeatmapMonthRows(
+      [...weeks, buildWeek('2026-04-13', '2026-04', 2, 10000)],
+      'totalVolume',
+      null,
+      '2026-04-10'
+    );
+    const april = rows.find((r) => r.monthKey === '2026-04')!;
+    const march = rows.find((r) => r.monthKey === '2026-03')!;
+
+    expect(april.cells.map((cell) => cell.weekStartDateKey)).toEqual(['2026-04-06']);
+    expect(march.cells[0]?.bucket).toBe(2);
+    expect(april.cells[0]?.bucket).toBe(4);
   });
 
   it('assigns correct buckets based on max metric value', () => {
@@ -166,7 +191,7 @@ describe('CalendarHeatmap', () => {
     expect(screen.queryByText('Apr')).toBeNull();
   });
 
-  it('renders empty placeholder cells for absent weeks', () => {
+  it('renders selectable empty week cells for absent past weeks', () => {
     render(
       <CalendarHeatmap
         weeklyEffort={weeks}
@@ -177,9 +202,40 @@ describe('CalendarHeatmap', () => {
       />
     );
 
-    // March has 2 weeks, so week-3 and week-4 slots are empty
-    expect(screen.getByTestId('calendar-heatmap-cell-empty-2026-03-3')).toBeTruthy();
-    expect(screen.getByTestId('calendar-heatmap-cell-empty-2026-03-4')).toBeTruthy();
+    const emptyCell = screen.getByTestId('calendar-heatmap-cell-2026-03-16');
+    expect(emptyCell).toBeTruthy();
+    expect(StyleSheet.flatten(emptyCell.props.style).backgroundColor).toBe(uiColors.heatmapNeutralBg);
+  });
+
+  it('calls onSelectWeek when an empty week cell is pressed', () => {
+    const onSelectWeek = jest.fn();
+
+    render(
+      <CalendarHeatmap
+        weeklyEffort={weeks}
+        metric="totalVolume"
+        selectedWeekKey={null}
+        onSelectWeek={onSelectWeek}
+        today="2026-04-10"
+      />
+    );
+
+    fireEvent.press(screen.getByTestId('calendar-heatmap-cell-2026-03-16'));
+    expect(onSelectWeek).toHaveBeenCalledWith('2026-03-16');
+  });
+
+  it('does not render future week cells', () => {
+    render(
+      <CalendarHeatmap
+        weeklyEffort={weeks}
+        metric="totalVolume"
+        selectedWeekKey={null}
+        onSelectWeek={jest.fn()}
+        today="2026-04-10"
+      />
+    );
+
+    expect(screen.queryByTestId('calendar-heatmap-cell-2026-04-13')).toBeNull();
   });
 
   it('applies correct bucket background colors', () => {

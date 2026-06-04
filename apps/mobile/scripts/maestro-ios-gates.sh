@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
-# Combined iOS gate runner: runs the Smoke and Data-runtime-smoke flows against
-# ONE provisioned simulator and ONE Metro instance, instead of cold-booting,
-# warming, and tearing down a simulator once PER gate.
+# Combined iOS gate runner: runs the Smoke, Data-runtime-smoke, and Dev wipe-local
+# flows against ONE provisioned simulator and ONE Metro instance, instead of
+# cold-booting, warming, and tearing down a simulator once PER gate.
 #
 # Why: each standalone gate pays a ~55-60s fixed overhead (cold sim boot +
 # dev-client warm-up + Metro start + teardown) before its flow even runs. Run
@@ -13,9 +13,15 @@
 # Reset semantics are preserved exactly:
 #   * Provision runs a `full` reset (uninstall + reinstall the dev client),
 #     which is the clean-slate precondition the standalone Smoke gate relies on.
-#   * The Data-runtime-smoke flow resets the data layer IN-FLOW via its
-#     `boga3://maestro-harness?reset=data` deep links, so it needs no separate
-#     provision and is safe to run right after Smoke in the same session.
+#   * The Data-runtime-smoke and Dev wipe-local flows reset the data layer
+#     IN-FLOW via their `boga3://maestro-harness?reset=data` deep links, so they
+#     need no separate provision and are safe to run right after Smoke in the
+#     same session.
+#
+# All three flows are infra-free: the dev client runs local-only (no Supabase
+# configured), so they share this backend-free lane. The Dev wipe-local flow
+# exercises the developer-only "Wipe local & re-bootstrap" affordance and
+# confirms the app re-bootstraps to a usable data screen afterward.
 #
 # The individual gate scripts (maestro-ios-smoke.sh / -data-smoke.sh) are left
 # unchanged; this is an additive, faster path for running both together. Each
@@ -37,16 +43,19 @@ maestro_require_command maestro "Install Maestro from https://maestro.mobile.dev
 
 # Flows to run, in order. Smoke validates a cold launch + navigation on the
 # freshly-installed client; Data-runtime-smoke then exercises the data round
-# trip (it self-resets the data layer in-flow).
-SCENARIOS=("Smoke" "Data runtime smoke")
+# trip (it self-resets the data layer in-flow); Dev wipe-local then drives the
+# developer-only wipe affordance and confirms the app re-bootstraps afterward
+# (it also self-resets the data layer in-flow).
+SCENARIOS=("Smoke" "Data runtime smoke" "Dev wipe-local")
 FLOWS=(
   "$APP_DIR/.maestro/flows/smoke-launch.yaml"
   "$APP_DIR/.maestro/flows/data-runtime-smoke.yaml"
+  "$APP_DIR/.maestro/flows/settings-dev-wipe-local.yaml"
 )
 
 MAESTRO_RUNNER_PID="$$"
 MAESTRO_SESSION_TIMESTAMP="$(date +"%Y%m%d-%H%M%S")-$$"
-MAESTRO_SCENARIO_NAME="iOS gates (smoke + data-runtime-smoke)"
+MAESTRO_SCENARIO_NAME="iOS gates (smoke + data-runtime-smoke + dev-wipe-local)"
 MAESTRO_ARTIFACT_ROOT="$(maestro_runtime_artifact_root "$MAESTRO_SESSION_TIMESTAMP")"
 MAESTRO_RUNTIME_ENV_FILE="$MAESTRO_ARTIFACT_ROOT/runtime.env"
 PROVISION_LOG_FILE="$MAESTRO_ARTIFACT_ROOT/provision.log"
@@ -149,7 +158,7 @@ if [[ -n "${IOS_SIM_UDID:-}" ]]; then
     "30m" || true
 fi
 
-echo "Combined iOS gates complete (smoke + data-runtime-smoke)."
+echo "Combined iOS gates complete (smoke + data-runtime-smoke + dev-wipe-local)."
 echo "Artifacts: $MAESTRO_ARTIFACT_ROOT"
 echo "Runtime: port=$EXPO_DEV_SERVER_PORT, device=${IOS_SIM_DEVICE:-}, udid=${IOS_SIM_UDID:-}"
 
