@@ -8,6 +8,7 @@ REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 source "$SCRIPT_DIR/worktree-lib.sh"
 
 SLOT=""
+PROJECT_OVERRIDE=""
 SUPABASE=0
 REMOVE_REGISTRY=0
 DRY_RUN=0
@@ -16,11 +17,17 @@ FORCE=0
 usage() {
   cat <<'EOF'
 Usage: ./scripts/worktree-clean.sh --slot <n> [options]
+       ./scripts/worktree-clean.sh --project <id> --supabase [--dry-run]
 
 Cleans local infrastructure for a completed BOGA worktree slot.
 
 Options:
-  --supabase          Remove Supabase containers and volumes for the slot project id.
+  --slot <n>          Slot whose registry record drives the cleanup.
+  --project <id>      Tear down a specific Supabase project id directly, bypassing
+                      the slot registry. Use to reclaim an orphaned stack whose
+                      registry record was lost. Implies --supabase; mutually
+                      exclusive with --slot and --remove-registry.
+  --supabase          Remove Supabase containers and volumes for the project id.
   --remove-registry   Remove ~/.config/boga/worktrees/slots/<slot> after cleanup.
   --dry-run           Print actions without removing anything.
   --force             Allow cleaning the current worktree slot.
@@ -33,6 +40,11 @@ while [[ $# -gt 0 ]]; do
     --slot)
       SLOT="${2:-}"
       [[ -n "$SLOT" ]] || { echo "[worktree-clean] --slot requires a value" >&2; exit 2; }
+      shift 2
+      ;;
+    --project)
+      PROJECT_OVERRIDE="${2:-}"
+      [[ -n "$PROJECT_OVERRIDE" ]] || { echo "[worktree-clean] --project requires a value" >&2; exit 2; }
       shift 2
       ;;
     --supabase)
@@ -63,40 +75,56 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-[[ -n "$SLOT" ]] || { echo "[worktree-clean] missing --slot" >&2; usage >&2; exit 2; }
-boga_validate_slot_value "$SLOT" >/dev/null
-
-if [[ "$SUPABASE" != "1" && "$REMOVE_REGISTRY" != "1" ]]; then
-  echo "[worktree-clean] nothing selected; pass --supabase and/or --remove-registry" >&2
-  exit 2
-fi
-
-CURRENT_SLOT="$(boga_worktree_slot_or_default "$REPO_ROOT")"
-if [[ "$SLOT" == "$CURRENT_SLOT" && "$FORCE" != "1" ]]; then
-  echo "[worktree-clean] refusing to clean current worktree slot $SLOT without --force" >&2
-  exit 1
-fi
-
 CONFIG_ROOT="$(boga_config_root)"
-REGISTRY_FILE="$CONFIG_ROOT/worktrees/slots/$SLOT"
+REGISTRY_FILE=""
 PROJECT_IDS=()
-if PROJECT_ID="$(boga_registry_project_id_from_file "$REGISTRY_FILE" 2>/dev/null)"; then
-  :
-else
-  REGISTRY_PATH="$(boga_registry_path_from_file "$REGISTRY_FILE" 2>/dev/null || true)"
-  if [[ -n "$REGISTRY_PATH" && -d "$REGISTRY_PATH" ]]; then
-    PROJECT_ID="$(boga_project_id_for_slot "$SLOT" "$REGISTRY_PATH")"
-  else
-    PROJECT_ID="$(boga_project_id_for_slot "$SLOT" "$REPO_ROOT")"
-  fi
-fi
-PROJECT_IDS+=("$PROJECT_ID")
-LEGACY_PROJECT_ID="$(boga_legacy_project_id_for_slot "$SLOT")"
-if [[ "$LEGACY_PROJECT_ID" != "$PROJECT_ID" ]]; then
-  PROJECT_IDS+=("$LEGACY_PROJECT_ID")
-fi
-LOCK_DIR="$CONFIG_ROOT/worktrees/runtime-locks/$SLOT.lock"
 LOCK_TIMEOUT_SECONDS="${BOGA_CLEAN_LOCK_TIMEOUT_SECONDS:-30}"
+
+if [[ -n "$PROJECT_OVERRIDE" ]]; then
+  if [[ -n "$SLOT" ]]; then
+    echo "[worktree-clean] --project and --slot are mutually exclusive" >&2
+    exit 2
+  fi
+  if [[ "$REMOVE_REGISTRY" == "1" ]]; then
+    echo "[worktree-clean] --remove-registry is not valid with --project" >&2
+    exit 2
+  fi
+  SUPABASE=1
+  PROJECT_IDS+=("$PROJECT_OVERRIDE")
+  LOCK_DIR="$CONFIG_ROOT/worktrees/runtime-locks/project-$(printf '%s' "$PROJECT_OVERRIDE" | tr -c 'A-Za-z0-9_.-' '_').lock"
+else
+  [[ -n "$SLOT" ]] || { echo "[worktree-clean] missing --slot" >&2; usage >&2; exit 2; }
+  boga_validate_slot_value "$SLOT" >/dev/null
+
+  if [[ "$SUPABASE" != "1" && "$REMOVE_REGISTRY" != "1" ]]; then
+    echo "[worktree-clean] nothing selected; pass --supabase and/or --remove-registry" >&2
+    exit 2
+  fi
+
+  CURRENT_SLOT="$(boga_worktree_slot_or_default "$REPO_ROOT")"
+  if [[ "$SLOT" == "$CURRENT_SLOT" && "$FORCE" != "1" ]]; then
+    echo "[worktree-clean] refusing to clean current worktree slot $SLOT without --force" >&2
+    exit 1
+  fi
+
+  REGISTRY_FILE="$CONFIG_ROOT/worktrees/slots/$SLOT"
+  if PROJECT_ID="$(boga_registry_project_id_from_file "$REGISTRY_FILE" 2>/dev/null)"; then
+    :
+  else
+    REGISTRY_PATH="$(boga_registry_path_from_file "$REGISTRY_FILE" 2>/dev/null || true)"
+    if [[ -n "$REGISTRY_PATH" && -d "$REGISTRY_PATH" ]]; then
+      PROJECT_ID="$(boga_project_id_for_slot "$SLOT" "$REGISTRY_PATH")"
+    else
+      PROJECT_ID="$(boga_project_id_for_slot "$SLOT" "$REPO_ROOT")"
+    fi
+  fi
+  PROJECT_IDS+=("$PROJECT_ID")
+  LEGACY_PROJECT_ID="$(boga_legacy_project_id_for_slot "$SLOT")"
+  if [[ "$LEGACY_PROJECT_ID" != "$PROJECT_ID" ]]; then
+    PROJECT_IDS+=("$LEGACY_PROJECT_ID")
+  fi
+  LOCK_DIR="$CONFIG_ROOT/worktrees/runtime-locks/$SLOT.lock"
+fi
 
 run_or_print() {
   if [[ "$DRY_RUN" == "1" ]]; then
@@ -147,7 +175,7 @@ acquire_lock() {
 }
 
 docker_available() {
-  command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1
+  boga_docker_available
 }
 
 cleanup_supabase() {
@@ -215,4 +243,8 @@ if [[ "$REMOVE_REGISTRY" == "1" ]]; then
   fi
 fi
 
-echo "[worktree-clean] done for slot $SLOT ($PROJECT_ID)"
+if [[ -n "$PROJECT_OVERRIDE" ]]; then
+  echo "[worktree-clean] done for project $PROJECT_OVERRIDE"
+else
+  echo "[worktree-clean] done for slot $SLOT ($PROJECT_ID)"
+fi
