@@ -8,3 +8,4 @@
 .DS_Store
 apps/mobile/credentials.json
 apps/mobile/*.ipa
+/tmp/
