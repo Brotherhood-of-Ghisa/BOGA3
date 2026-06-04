@@ -510,3 +510,20 @@ those + t5 merge → tFINAL. t5 is parallel and nearly independent.
   post-#129 (re-run tGATE chip / or trust the #129 author's green run) → dispatch
   tFINAL (final test card: 5 cross-cutting outcomes + two-device restore on the
   infra lane) → tINVENTORY → mao-audit → delete plan dir.
+
+## 2026-06-04 — iteration 25
+- #130 MERGED: single-source testing docs — `06-testing-strategy.md` is now the
+  authoritative source (no-excuses + per-change slow-gate triggers + lane model);
+  AGENTS.md testing section slimmed to a FORCING POINTER ("changing code → MUST
+  read 06"); CLAUDE.md reference-only. main → 6fe8684.
+- Prereqs cleared by user: all infra available (incl. branch-provisioned Supabase
+  for the infra lane); main slow lanes green per #129. tGATE satisfied (via #129).
+- DISPATCHED tFINAL builder (background, agent a3699672): writes the 5
+  cross-cutting outcome assertions (reinstall-parity + second-device restore on
+  the infra lane; v1-gone guard + server-object absence; drift; dev-gated wipes)
+  + this plan's surface outcomes 1:1; wires infra-lane + Maestro tests; runs
+  quality-fast + test:sync:infra + reinstall-parity + e2e gates GREEN; commit-early
+  + push + open `[tFINAL]` PR; flaky long lanes flagged for a clean dedicated run.
+- REMAINING: tFINAL → review + confirm slow lanes green (dedicated run if a lane
+  flakes in-agent) → merge → tINVENTORY (non-unit test inventory) → mao-audit →
+  propose deleting the plan dir.
