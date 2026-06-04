@@ -444,3 +444,25 @@ those + t5 merge → tFINAL. t5 is parallel and nearly independent.
   If it ALSO fails clean → real regression to fix. Dispatched t10 code reviewer
   (scoped: code/Jest; wipe-local Maestro merge-gated on a clean-worktree run).
 - t2 #113 rebase (agent a7c8a9b) still in flight.
+
+## 2026-06-04 — iteration 22
+- t2 #113 REBASE complete + pushed. Adopted t9's canonical `getSchedulerStatus()`
+  + `SyncProgress` from `progress.ts`; REMOVED the duplicate stub seam
+  (scheduler-state.ts / -bridge / use-scheduler-state / sync-progress.ts); kept a
+  thin gate-scoped holder (sync-gate-state.ts / use- / -bridge) for the bootstrap
+  flag + classified error code only; reconciled the 4-way cycle.ts merge (t2
+  error-signal + t3 runBootstrapper + t5 runBundleMigrations). quality-fast 740/740
+  GREEN. Dispatched re-review (agent aae9da89).
+- LANE FLAKINESS — 2nd independent confirmation: the t2 agent hit a dev-client
+  cold-sim FOREGROUNDING flake + Supabase PORT CONTENTION with a parallel agent's
+  stack (had to reassign worktree slots); verified it hits clean origin/main too
+  (environmental). Combined with t10's .env.local leak ⇒ the iOS Maestro lanes are
+  UNRELIABLE in the parallel in-agent environment. They need CLEAN, SERIAL,
+  dedicated runs (spawned tasks / the user's machine). Strong motivation for the
+  timing/lane-reliability research task the user will spawn.
+- LANE-VERIFY PLAN (strict): run each PR's signed-in lane in a clean dedicated
+  session, SERIALLY (port contention). t10 lane chip already created. t2 lane chip
+  to create after its re-review approves. Each green → merge → then tGATE chip
+  (full slow suite on merged main, clean+serial) as the final gate → tFINAL.
+- STATE: 10 plan tasks merged. Open: t2 #113 (rebased, re-review running, lane
+  pending), t10 #126 (approved, lane pending). Then tGATE → tFINAL → audit.
