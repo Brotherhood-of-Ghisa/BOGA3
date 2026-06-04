@@ -131,6 +131,7 @@ graph TD
   tGATE[tGATE: slow-gate checkpoint — integration branch green]
   tFINAL[tFINAL: launch end-to-end verification]
   tINVENTORY[tINVENTORY: non-unit test inventory + hygiene review]
+  t99[t99: complete the deviations log — audit remediation]
 
   tPROG --> t2
   tPROG --> t3
@@ -152,6 +153,7 @@ graph TD
   t10 --> tGATE
   tGATE --> tFINAL
   tFINAL --> tINVENTORY
+  tINVENTORY --> t99
   t1 --> tFINAL
   t2 --> tFINAL
   t4 --> tFINAL
@@ -217,6 +219,7 @@ consumes):
 - [tGATE: slow-gate checkpoint — integration branch green](tasks/tGATE.md) — build (gate checkpoint; barrier before tFINAL; per AGENTS.md slow-gate convention)
 - [tINVENTORY: non-unit test inventory + hygiene review](tasks/tINVENTORY.md) — build (closure; runs after tFINAL; inventory + keep/drop + principles-conformance for all Maestro / Supabase / mock-device-DB tests)
 - [tFINAL: launch end-to-end verification](tasks/tFINAL.md) — build (final test card)
+- [t99: complete the deviations log — add the three missing merged-PR entries](tasks/t99.md) — build (audit remediation; docs-only)
 
 ## Planner notes (folded from the stub)
 
