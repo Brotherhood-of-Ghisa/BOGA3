@@ -15,7 +15,7 @@ Usage:
 
 Runs local slow quality gates.
 - no args: runs all available slow gates (frontend + backend)
-- frontend: runs Maestro-based frontend runtime smoke checks
+- frontend: runs the open-handle guard (jest --detectOpenHandles) then Maestro-based frontend runtime smoke checks
 - backend: runs backend auth/RLS + sync API contract suites (shared Supabase runtime baseline enforced by wrappers)
 
 Note: task cards decide when slow gates are mandatory.
@@ -34,6 +34,15 @@ run_frontend() {
     echo "[quality-slow] skipping frontend: apps/mobile/package.json not found"
     return 0
   fi
+
+  # Open-handle guard: jest --detectOpenHandles, the same audit CI runs
+  # (.github/workflows/ci.yml "Open-handle guard"). It is NOT part of
+  # quality-fast.sh — that gate runs jest in parallel, while --detectOpenHandles
+  # forces serial execution, so it belongs in the slow tier. Run it first: it is
+  # an infra-free pass that fails fast on a leaked timer/handle before the
+  # expensive simulator lanes below boot.
+  echo "[quality-slow] frontend: test:handles (open-handle guard)"
+  (cd "${REPO_ROOT}/apps/mobile" && npm run test:handles)
 
   echo "[quality-slow] frontend: test:e2e:ios:smoke"
   (cd "${REPO_ROOT}/apps/mobile" && npm run test:e2e:ios:smoke)
