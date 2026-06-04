@@ -9,11 +9,22 @@ import { AuthProvider, bootstrapAuthState } from '@/src/auth';
 import { bootstrapLocalDataLayer } from '@/src/data';
 import { ensureExerciseCatalogLoaded } from '@/src/exercise-catalog/cache';
 import { registerBackgroundSyncTask } from '@/src/sync/background-task';
+import { startSyncGateStateBridge, stopSyncGateStateBridge } from '@/src/sync/sync-gate-state-bridge';
 import { requestSync, startSyncScheduler, stopSyncScheduler } from '@/src/sync/scheduler';
+import { SyncGate } from '@/src/sync/SyncGate';
 
 export default function RootLayout() {
   useEffect(() => {
+    // The scheduler must wire first. A wiring failure here re-throws and crashes
+    // boot by design (a broken native build leaves sync permanently dead); it
+    // must NOT be caught into a recoverable gate state, so nothing below runs if
+    // it throws.
     startSyncScheduler();
+
+    // Observe the runtime-state flag and the cycle's error signals so the
+    // first-sync gate can decide whether to block. Started only after the
+    // scheduler wired successfully.
+    startSyncGateStateBridge();
 
     // Ask the OS to schedule the background sync task. Registration is async and
     // must not block boot, and a rejection (e.g. Background App Refresh disabled
@@ -35,6 +46,7 @@ export default function RootLayout() {
     });
 
     return () => {
+      stopSyncGateStateBridge();
       stopSyncScheduler();
     };
   }, []);
@@ -43,15 +55,17 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <AuthProvider>
         <AuthRouteGuard>
-          <Stack>
-            <Stack.Screen name="index" options={{ headerShown: false }} />
-            <Stack.Screen name="sign-in" options={{ headerShown: false }} />
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="exercise-history" />
-            <Stack.Screen name="sessions" options={{ title: 'Sessions' }} />
-            <Stack.Screen name="profile" options={{ title: 'Profile' }} />
-            <Stack.Screen name="maestro-harness" options={{ headerShown: false }} />
-          </Stack>
+          <SyncGate>
+            <Stack>
+              <Stack.Screen name="index" options={{ headerShown: false }} />
+              <Stack.Screen name="sign-in" options={{ headerShown: false }} />
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen name="exercise-history" />
+              <Stack.Screen name="sessions" options={{ title: 'Sessions' }} />
+              <Stack.Screen name="profile" options={{ title: 'Profile' }} />
+              <Stack.Screen name="maestro-harness" options={{ headerShown: false }} />
+            </Stack>
+          </SyncGate>
         </AuthRouteGuard>
         <StatusBar style="auto" />
       </AuthProvider>

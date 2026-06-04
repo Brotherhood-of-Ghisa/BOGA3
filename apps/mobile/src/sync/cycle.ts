@@ -21,6 +21,7 @@ import { and, asc, eq } from 'drizzle-orm';
 
 import { getRequiredSupabaseMobileClient } from '@/src/auth/supabase';
 import { clearAuthRequired, markAuthRequired } from '@/src/sync/auth-required-signal';
+import { clearCycleError, markCycleError } from '@/src/sync/cycle-error-signal';
 import { runBootstrapper } from '@/src/sync/bootstrapper';
 import { runBundleMigrations } from '@/src/data/bundle-migrations';
 import { bootstrapLocalDataLayer, type LocalDatabase } from '@/src/data/bootstrap';
@@ -708,19 +709,24 @@ export const runSyncCycle = async (): Promise<void> => {
       if (pulledBefore === 0 && pushed === 0 && pulledAfter === 0) {
         // A cycle that converged talked to the server with a valid session, so
         // any earlier "no signed-in user" condition is resolved. Clear the flag
-        // so the route layer no longer holds the user on the sign-in screen.
+        // so the route layer no longer holds the user on the sign-in screen, and
+        // clear any prior failure code so a watching gate stops showing an error.
         clearAuthRequired();
+        clearCycleError();
         return;
       }
     }
     // Reaching the round cap without a quiet round still means the cycle made
     // authenticated progress; treat it as a resolved auth condition.
     clearAuthRequired();
+    clearCycleError();
   } catch (error) {
     if (error instanceof SyncCycleError) {
       if (error.code === 'FK_VIOLATION') {
         // Structural bug: not retriable, surfaces to the caller. Dirty bits and
-        // cursors are left untouched so nothing is silently dropped.
+        // cursors are left untouched so nothing is silently dropped. Record the
+        // code so a watching gate can show the error and a single Retry.
+        markCycleError('FK_VIOLATION');
         throw error;
       }
       if (error.code === 'AUTH_REQUIRED') {
@@ -728,13 +734,17 @@ export const runSyncCycle = async (): Promise<void> => {
         // surface — it is the route signal that the app needs a session. Raise
         // the observable flag so the route layer sends the user to sign-in, then
         // give up this cycle cleanly (dirty bits and cursors are untouched, so a
-        // post-login cycle re-pushes and re-pulls the same state).
+        // post-login cycle re-pushes and re-pulls the same state). It is a route
+        // decision, not an in-gate error, so the failure-code signal stays clear.
         markAuthRequired();
+        clearCycleError();
         return;
       }
       // A server-internal hiccup: give up this cycle cleanly. Dirty bits stay
       // set and cursors are unchanged, so the next scheduled tick starts a fresh
-      // cycle that re-pushes and re-pulls the same state.
+      // cycle that re-pushes and re-pulls the same state. Record the code so a
+      // watching gate can show the error and a single Retry.
+      markCycleError('INTERNAL');
       return;
     }
     throw error;

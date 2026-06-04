@@ -6,3 +6,5 @@
 .claude/hooks/*
 !.claude/hooks/*.sh
 .DS_Store
+apps/mobile/credentials.json
+apps/mobile/*.ipa

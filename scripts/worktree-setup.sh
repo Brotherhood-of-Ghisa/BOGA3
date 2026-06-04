@@ -111,6 +111,33 @@ slot_is_used() {
   grep -qx "$slot" "$used_file" 2>/dev/null
 }
 
+# A slot's registry file is the only record of its Supabase project id. When the
+# registered worktree path is gone, forgetting the slot without first tearing the
+# stack down orphans those containers forever (the project id becomes
+# unreachable once the slot is recycled). Reclaim the stack BEFORE forgetting the
+# slot. If Docker is unavailable we cannot reclaim safely, so KEEP the registry
+# file (return 1) and let a later worktree-sweep handle it rather than leaking.
+# Returns 0 when the slot has been reclaimed/forgotten (registry removed).
+reclaim_and_forget_slot() {
+  local registry_file="$1"
+  local slot
+  slot="$(basename "$registry_file")"
+
+  if boga_docker_available; then
+    if "$SCRIPT_DIR/worktree-clean.sh" --slot "$slot" --supabase --remove-registry >/dev/null 2>&1; then
+      return 0
+    fi
+  fi
+
+  # Nothing recorded to leak (legacy/garbage registry) -> safe to drop.
+  if ! boga_registry_project_id_from_file "$registry_file" >/dev/null 2>&1; then
+    rm -f "$registry_file"
+    return 0
+  fi
+
+  return 1
+}
+
 registered_slot_for_current_path() {
   local registry_file slot registered_path current_path
   current_path="$(boga_abs_dir "$REPO_ROOT")"
@@ -146,8 +173,10 @@ collect_used_slots() {
     registered_path="$(boga_registry_path_from_file "$registry_file" 2>/dev/null || true)"
     if [[ -n "$registered_path" && -d "$registered_path" ]]; then
       add_used_slot "$used_file" "$slot"
-    else
-      rm -f "$registry_file"
+    elif ! reclaim_and_forget_slot "$registry_file"; then
+      # Could not reclaim (Docker down): reserve the slot so its project id is
+      # not overwritten before a sweep can tear the orphaned stack down.
+      add_used_slot "$used_file" "$slot"
     fi
   done
 
@@ -178,8 +207,11 @@ assert_slot_available_for_current_path() {
 
   registered_path="$(boga_registry_path_from_file "$registry_file" 2>/dev/null || true)"
   if [[ -z "$registered_path" || ! -d "$registered_path" ]]; then
-    rm -f "$registry_file"
-    return 0
+    if reclaim_and_forget_slot "$registry_file"; then
+      return 0
+    fi
+    echo "[worktree-setup] slot $slot has an unreclaimed Supabase stack (Docker unavailable); reclaim it first" >&2
+    return 1
   fi
 
   if [[ "$(boga_abs_dir "$registered_path")" == "$current_path" ]]; then
