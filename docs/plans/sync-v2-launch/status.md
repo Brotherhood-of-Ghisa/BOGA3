@@ -623,3 +623,22 @@ those + t5 merge → tFINAL. t5 is parallel and nearly independent.
 - tINVENTORY #132 revision (agent ab0605b6) still running.
 - REMAINING: #133 review/merge + tINVENTORY #132 review/merge → mao-audit →
   propose deleting docs/plans/sync-v2-launch/.
+
+## 2026-06-04 — iteration 31 (closure: bookkeeping consolidation + audit prep)
+- BOTH closure PRs APPROVED: #133 (cycle-round-trip fix — reviewer verified
+  production can never hit the FK; genuinely fixture-only; test:sync:infra 6/6) and
+  #132 (tINVENTORY revision — all 3 items closed; 33 suites inventoried, complete;
+  0 drops, 1 fix). Both MERGEABLE.
+- BOOKKEEPING-TO-MAIN (the deferred consolidation, flagged since iteration 3 and
+  re-surfaced by the #132 reviewer): the plan's status.md, the full plan.md
+  deviations log + DAG, and the mid-flight cards (t7b, t11, tGATE, tINVENTORY) live
+  ONLY on the coordinator branch. The audit reads these from main. Opening a
+  docs-only consolidation PR from the coordinator branch (clean delta: 6 files, no
+  code) to land them on main before the audit (repo convention #96/#104).
+- CLOSE-OUT SEQUENCE: user merges #132 + #133 + the consolidation PR → coordinator
+  runs mao-audit (re-runs gates on main, verifies 1:1 launch-outcome coverage, the
+  deviations-log-per-PR, status spans execution, hand-offs, no card restates a
+  design doc) → on PASS, propose deleting docs/plans/sync-v2-launch/.
+- All plan tasks DELIVERED: tPROG, t1, t2, t3, t4, t5, t6, t7, t7b, t8, t9, t10,
+  t11, tGATE (via #129), tFINAL, tINVENTORY. Plus out-of-band #115/#118/#122/#124/
+  #128/#130 (seed-dirty, testing-policy/single-source docs, port-contention fix).
