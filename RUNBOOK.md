@@ -104,6 +104,133 @@ npm install
 npm run start:ios:dev-client
 ```
 
+## Session import digestion: GymBook export to BOGA JSON
+
+The GymBook digester converts a GymBook XML export into the source-neutral BOGA
+session import JSON contract. It does **not** write rows into local SQLite; the
+generic importer consumes the JSON in a separate step.
+
+Contract reference:
+
+```text
+apps/mobile/scripts/import/BOGA_IMPORT_JSON_CONTRACT.md
+```
+
+Required operator decisions before producing importer-ready JSON:
+
+- identify the local BOGA profile/user being imported into with
+  `--importing-profile-label`;
+- load that profile's local exercise/gym catalog from `--local-db` or an explicit
+  review `--catalog-json`;
+- choose gyms for midday, weekday evening, and weekend buckets, passing `none`
+  for any bucket that should not assign a gym;
+- provide a decisions file for GymBook exercise names that do not exist in that
+  profile's exercise catalog.
+
+Draft/review run, allowing unresolved exercise mappings:
+
+```bash
+cd apps/mobile
+npm run digest:gymbook -- \
+  --input "/path/to/GymBook-Logs.xml" \
+  --catalog-json /path/to/catalog.json \
+  --importing-profile-label "Local profile label" \
+  --gym-midday-id none \
+  --gym-weekday-evening-id none \
+  --gym-weekend-id none \
+  --dry-run \
+  --allow-unresolved
+```
+
+Importer-ready run against a local BOGA SQLite file:
+
+```bash
+cd apps/mobile
+npm run digest:gymbook -- \
+  --input "/path/to/GymBook-Logs.xml" \
+  --local-db /path/to/scaffolding-local.db \
+  --importing-profile-label "Local profile label" \
+  --decisions /path/to/gymbook-decisions.json \
+  --gym-midday-id <gym-id-or-none> \
+  --gym-weekday-evening-id <gym-id-or-none> \
+  --gym-weekend-id <gym-id-or-none> \
+  --output /path/to/boga-session-import.json \
+  --report /path/to/boga-session-import-report.json
+```
+
+Decision file shape:
+
+```json
+{
+  "exerciseDecisions": {
+    "Source Exercise Name": {
+      "decision": "map_existing",
+      "exerciseDefinitionId": "existing-exercise-id"
+    },
+    "New Source Exercise": {
+      "decision": "create_new",
+      "exerciseName": "New Source Exercise",
+      "muscleMappings": []
+    }
+  }
+}
+```
+
+Review `report.unresolvedExercises`, `report.warnings`,
+`report.gymAssignmentCounts`, and `report.notes` before handing the JSON to the
+generic importer. Full private exports must stay out of git; commit only
+synthetic/redacted fixtures.
+
+## Session import loading: BOGA JSON to local SQLite
+
+The generic local importer consumes the source-neutral BOGA session import JSON
+contract and writes completed sessions into one local BOGA SQLite database. It
+does **not** parse GymBook XML and it does **not** write to hosted Supabase.
+Imported sync-scoped rows are stamped as normal dirty local rows so the existing
+sync engine can push them later.
+
+Back up the local SQLite database before a real import. Always review a dry-run
+first:
+
+```bash
+cd apps/mobile
+npm run import:boga-json:local -- \
+  --input /path/to/boga-session-import.json \
+  --local-db /path/to/scaffolding-local.db \
+  --importing-profile-label "Local profile label" \
+  --dry-run
+```
+
+The dry-run prints:
+
+- target profile/database metadata and any mismatch;
+- current row counts for the target tables;
+- package warning counts;
+- rows that would be inserted by table;
+- already-imported session counts for idempotent re-runs.
+
+After reviewing the dry-run and confirming the target profile/database, import
+with an explicit confirmation:
+
+```bash
+cd apps/mobile
+npm run import:boga-json:local -- \
+  --input /path/to/boga-session-import.json \
+  --local-db /path/to/scaffolding-local.db \
+  --importing-profile-label "Local profile label" \
+  --confirm-target "Local profile label"
+```
+
+The importer rejects unresolved exercise/gym decisions, malformed rows, duplicate
+generated IDs, missing local FK targets, target metadata mismatches, and unknown
+contract versions before writing. Use `--fatal-duration-warnings` when inferred
+duration warnings should block an import. Use `--allow-target-mismatch` only when
+deliberately importing a reviewed package into a different local database/profile.
+
+Re-running the same package is idempotent by default: deterministic import IDs
+cause already-imported sessions to be reported and skipped rather than copied.
+There is intentionally no force-copy mode in the first version.
+
 ## Mobile app: run on iOS simulator
 
 ### Fast JS loop (Expo)

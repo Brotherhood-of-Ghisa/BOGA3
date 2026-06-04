@@ -1,7 +1,7 @@
 ---
 task_id: T-20260604-02-boga-import-json-local-importer
 milestone_id: "M13"
-status: planned
+status: completed
 ui_impact: "no"
 areas: "frontend|cross-stack|docs"
 runtimes: "node|expo|supabase"
@@ -16,7 +16,7 @@ docs_touched: "RUNBOOK.md,docs/specs/09-project-structure.md as needed"
 
 - Task ID: `T-20260604-02-boga-import-json-local-importer`
 - Title: Generic BOGA import JSON local SQLite importer
-- Status: `planned`
+- Status: `completed`
 - File location rule:
   - author active cards in `docs/tasks/<task-id>.md`
   - move the file to `docs/tasks/complete/<task-id>.md` when `Status` becomes `completed` or `outdated`
@@ -27,7 +27,7 @@ docs_touched: "RUNBOOK.md,docs/specs/09-project-structure.md as needed"
 
 - Project directives: `docs/specs/README.md`
 - Milestone spec: `docs/specs/milestones/M13-simple-backend-sync.md` (completed baseline; this is post-M13 import/sync-load tooling)
-- Upstream task/card: `docs/tasks/T-20260604-01-boga-import-json-contract-and-gymbook-digester.md`
+- Upstream task/card: `docs/tasks/complete/T-20260604-01-boga-import-json-contract-and-gymbook-digester.md`
 - Architecture: `docs/specs/03-technical-architecture.md`
 - Data model: `docs/specs/05-data-model.md`
 - AI development playbook: `docs/specs/04-ai-development-playbook.md`
@@ -39,8 +39,8 @@ docs_touched: "RUNBOOK.md,docs/specs/09-project-structure.md as needed"
 
 ## Context Freshness (required at session start; update before edits)
 
-- Verified current branch + HEAD commit: `main` at `66eeee8`
-- Start-of-session sync completed per `docs/specs/04-ai-development-playbook.md` git sync workflow?: `no` - planning card created from an interactive `/plan` discussion; perform normal start-of-session sync before implementation.
+- Verified current branch + HEAD commit: `codex/external-app-import-tool` at `5524515`
+- Start-of-session sync completed per `docs/specs/04-ai-development-playbook.md` git sync workflow?: `yes` - ran `git fetch origin codex/external-app-import-tool`; local branch and fetched branch were even (`0 0`) before edits.
 - Parent refs opened in this planning session:
   - `docs/specs/README.md`
   - `docs/specs/00-product.md`
@@ -202,18 +202,33 @@ Implement the generic local importer that consumes a locked BOGA-friendly JSON p
 
 ## Evidence
 
-- To be filled during implementation.
-- Manual verification summary:
-  - Record dry-run import row counts and warning counts.
-  - If a real import is performed, record target local database/profile label, imported row counts, duplicate counts, and post-import app/sync validation commands.
+- Implemented generic local importer CLI and module in `apps/mobile/scripts/import/import-boga-json-local.ts`.
+- Added `npm run import:boga-json:local`.
+- Added migration-backed in-memory SQLite importer tests covering:
+  - unresolved/FK validation failure before writes,
+  - duration warnings as optional fatal blockers,
+  - dry-run no-write behavior,
+  - successful FK-safe insert order,
+  - dirty-bit and monotonic `local_updated_at_ms` stamping,
+  - idempotent re-run reporting/skipping already-imported sessions.
+- Updated `RUNBOOK.md`, `apps/mobile/scripts/README.md`, and `docs/specs/09-project-structure.md` for the local import workflow and import folder ownership.
+Manual verification summary: No real private/local app database import was performed in this task; verification used synthetic in-memory packages only.
+- Manual verification summary (required when CI is absent/partial): No real private/local app database import was performed in this task; verification used synthetic in-memory packages only.
+  - No real private/local app database import was performed in this task; verification used synthetic in-memory packages only.
+  - Dry-run behavior was verified in `app/__tests__/boga-json-local-importer.test.ts`.
+  - Slow frontend gate: `N/A` because implementation did not import the large/private dataset into a real local app database and did not change mobile runtime, sync runtime, migrations, native dependencies, or UI.
 - Deferred/manual hosted checks summary:
   - Remote import and hosted Supabase write validation are deferred out of scope.
 
 ## Completion note (fill at end per `docs/specs/04-ai-development-playbook.md`)
 
-- What changed:
-- What tests ran:
-- What remains:
+- What changed: Added the source-neutral BOGA JSON local SQLite importer, exposed it as `npm run import:boga-json:local`, added targeted SQLite integration tests, and documented the local import workflow. The importer validates the locked v1 package, requires target profile/database confirmation for writes, rejects unresolved decisions/FK gaps/duplicate generated IDs, dry-runs without writes, writes completed sessions and optional created exercises/mappings in FK-safe order, marks imported sync-scoped rows dirty, and skips already-imported sessions by default.
+- What tests ran: targeted importer suite, upstream digester regression suite, mobile typecheck, and frontend fast gate.
+  - `cd apps/mobile && npm test -- --runTestsByPath app/__tests__/boga-json-local-importer.test.ts`
+  - `cd apps/mobile && npm test -- --runTestsByPath app/__tests__/gymbook-digester.test.ts`
+  - `cd apps/mobile && npm run typecheck`
+  - `./scripts/quality-fast.sh frontend`
+- What remains: A real import of the private GymBook-derived JSON is still a manual/operator step after choosing target profile/gym/exercise decisions. Slow frontend gates should run after that real import if the imported dataset is used as a sync/e2e stress candidate.
 
 ## Status update checklist (mandatory at closeout)
 
