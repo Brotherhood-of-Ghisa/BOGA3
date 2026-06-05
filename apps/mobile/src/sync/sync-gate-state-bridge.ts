@@ -75,32 +75,24 @@ const readLastCycleErrorCode = (): LastCycleErrorCode | null => {
 
 /**
  * Recomputes the bootstrap flag and last-cycle error from their live sources and
- * publishes a fresh snapshot, which also re-renders the gate so it re-reads the
- * live progress / offline snapshot (see the body comment). Stops the poll once
- * the bootstrap flag is set, since the gate dismisses and never re-blocks for
- * this session.
+ * publishes a fresh snapshot when either changed. Stops the poll once the
+ * bootstrap flag is set, since the gate dismisses and never re-blocks for this
+ * session.
  */
 const refresh = (): void => {
   const current = getSyncGateStateSnapshot();
   const bootstrapCompletedAt = database ? readBootstrapCompletedAt(database) : current.bootstrapCompletedAt;
   const lastCycleErrorCode = readLastCycleErrorCode();
 
-  // Publish a fresh snapshot on every refresh (each signal change AND each poll
-  // tick) so the gate re-renders and re-reads the live progress / offline / phase
-  // snapshot from the shared scheduler-status accessor while the block is up. The
-  // gate's reactive holder is its ONLY re-render trigger; without re-publishing
-  // here the gate would freeze at its mount-time snapshot and never reflect the
-  // scheduler going online (offline -> online) or the cycle's advancing counters.
-  // The block is up only briefly (the first sync) and the poll is 1s, so the
-  // re-render churn is bounded to that window.
-  publishSyncGateState({
-    bootstrapCompletedAt,
-    lastCycleErrorCode,
-    // Preserve a harness-pinned in-progress override across the poll; the bridge
-    // owns only the bootstrap flag + error code, never the pin (the harness sets
-    // and clears it). Dropping it here would let the 1s poll erase the pin.
-    forcedProgress: current.forcedProgress,
-  });
+  const bootstrapChanged =
+    (current.bootstrapCompletedAt?.getTime() ?? null) !== (bootstrapCompletedAt?.getTime() ?? null);
+
+  if (bootstrapChanged || current.lastCycleErrorCode !== lastCycleErrorCode) {
+    publishSyncGateState({
+      bootstrapCompletedAt,
+      lastCycleErrorCode,
+    });
+  }
 
   if (bootstrapCompletedAt !== null) {
     stopBootstrapFlagPoll();

@@ -4,28 +4,20 @@ module.exports = {
   testMatch: ['**/?(*.)+(test).[tj]s?(x)'],
   // Suites excluded from the default (`jest` / `npm test`) run because they need
   // live infrastructure the fast lane does not provision:
-  //   - the cycle / restore suites drive the real sync cycle and the first-sign-in
-  //     bootstrapper against a real deployed Postgres + PostgREST + RLS endpoint,
-  //     so they require a live Supabase endpoint (URL + anon key in the
-  //     environment): the cycle round-trip, the no-JWT envelope case, the
-  //     same-device reinstall restore, the fresh second-device restore, and the
-  //     v1 server-object absence check;
+  //   - the reinstall/restore parity check drives a real device-style flow;
+  //   - the two cycle suites drive the sync cycle against a real deployed
+  //     Postgres + PostgREST + RLS endpoint, so they require a live Supabase
+  //     endpoint (URL + anon key in the environment);
   //   - the drift checker shells out to a database reset to materialize the
   //     server schema, so it needs a local Postgres/Supabase stack.
-  //   They run only via their dedicated infra scripts, which override this ignore
-  //   list. The sign-in suites (the two restores + the server-object check) run
-  //   in the restore-parity script — kept apart from the drift checker, whose
-  //   `db reset` drops the auth fixture they sign in as — while the drift /
-  //   round-trip / envelope suites run in the other infra script. The endpoint
-  //   suites fail hard when the endpoint env is missing, so a missing endpoint
-  //   can never pass silently.
+  //   All three run only via their own dedicated infra script, which overrides
+  //   this ignore list (and the two endpoint suites fail hard when the endpoint
+  //   env is missing).
   testPathIgnorePatterns: [
+    '<rootDir>/app/__tests__/sync-reinstall-restore-parity.test.ts',
     '<rootDir>/app/__tests__/sync/cycle-round-trip.test.ts',
     '<rootDir>/app/__tests__/sync/auth-required-envelope.test.ts',
     '<rootDir>/app/__tests__/sync/drift-check.test.ts',
-    '<rootDir>/app/__tests__/sync/launch-reinstall-restore.test.ts',
-    '<rootDir>/app/__tests__/sync/launch-second-device-restore.test.ts',
-    '<rootDir>/app/__tests__/sync/no-v1-server-objects.test.ts',
   ],
   // Explicit per-test/hook ceiling: a hung test or hook (unresolved await,
   // infinite loop) now fails loudly here instead of stalling the run. This is

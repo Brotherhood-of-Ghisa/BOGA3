@@ -5,7 +5,6 @@ import { bootstrapLocalDataLayer, resetLocalAppData } from '@/src/data';
 import { PRIMARY_RUNTIME_STATE_ID } from '@/src/data/clock';
 import { syncRuntimeState } from '@/src/data/schema';
 import { clearAuthRequired, markAuthRequired } from '@/src/sync/auth-required-signal';
-import type { SyncProgress } from '@/src/sync/progress';
 import {
   getSyncGateStateSnapshot,
   publishSyncGateState,
@@ -22,16 +21,6 @@ export type MaestroHarnessFixtureName = 'none' | 'exercise-block-history';
  * 'complete' sets it so the block dismisses, simulating a drained first cycle.
  */
 export type MaestroHarnessBootstrapAction = 'none' | 'reset' | 'complete';
-/**
- * Drives the first-sync gate's ONLINE in-progress display deterministically:
- * 'in-progress' pins the "setting up your data" block in its online,
- * actively-syncing state (spinner + advancing counters) regardless of the live
- * scheduler — needed because the simulator's NetInfo cannot confirm internet
- * reachability, so the real cycle's online state is not observable in a flow;
- * 'clear' removes the pin so the gate reflects real state again (paired with
- * `bootstrap=complete` to dismiss). A no-op for 'none'.
- */
-export type MaestroHarnessGateAction = 'none' | 'in-progress' | 'clear';
 export type MaestroHarnessTeleportTarget =
   | 'session-list'
   | 'session-recorder'
@@ -66,11 +55,6 @@ export const resolveMaestroHarnessBootstrapAction = (
   value: string | null | undefined
 ): MaestroHarnessBootstrapAction =>
   value === 'reset' || value === 'complete' ? value : 'none';
-
-export const resolveMaestroHarnessGateAction = (
-  value: string | null | undefined
-): MaestroHarnessGateAction =>
-  value === 'in-progress' || value === 'clear' ? value : 'none';
 
 export const resolveMaestroHarnessTeleportTarget = (
   value: string | null | undefined
@@ -195,35 +179,5 @@ export const runMaestroHarnessBootstrapAction = async (
   publishSyncGateState({
     ...getSyncGateStateSnapshot(),
     bootstrapCompletedAt,
-  });
-};
-
-/**
- * A representative in-progress snapshot for the pinned gate display: the pull
- * phase, one layer drained and a few rows applied, online. It renders the
- * "Restoring your data" heading, the spinner, and an advancing-counters line.
- */
-const FORCED_IN_PROGRESS_SNAPSHOT: SyncProgress = {
-  phase: 'pull',
-  layersCompleted: 1,
-  rowsApplied: 3,
-  offline: false,
-};
-
-/**
- * Pins ('in-progress') or clears ('clear') the gate's online in-progress
- * display by publishing straight into the gate's reactive holder, so the block
- * shows its actively-syncing state deterministically the instant this resolves —
- * independent of the live scheduler / NetInfo. Pair 'clear' with
- * `bootstrap=complete` to dismiss the gate. A no-op for 'none'.
- */
-export const runMaestroHarnessGateAction = (action: MaestroHarnessGateAction): void => {
-  if (action === 'none') {
-    return;
-  }
-
-  publishSyncGateState({
-    ...getSyncGateStateSnapshot(),
-    forcedProgress: action === 'in-progress' ? FORCED_IN_PROGRESS_SNAPSHOT : null,
   });
 };

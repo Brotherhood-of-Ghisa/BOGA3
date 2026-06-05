@@ -349,29 +349,18 @@ const handleExternal = (input: ExternalInput): void => {
 // -----------------------------------------------------------------------------
 // NetInfo wiring
 //
-// NetInfo is the authority on whether the device has a network link. A single
-// listener projects `isConnected === true` to a boolean and emits "go online" /
-// "go offline" only when that projection CHANGES. The initial projection is
-// false, so the machine starts OFFLINE and waits for the first reported link.
-//
-// We deliberately key off `isConnected`, NOT `isInternetReachable`. The latter
-// is a probe to a generic external host (NetInfo's default connectivity-check
-// endpoint): it is `null` until that probe resolves, `false` behind a captive
-// portal or on networks that block the probe host (e.g. where Google's
-// connectivity-check endpoints are unreachable), and on the iOS simulator it
-// stays `null` indefinitely. Gating sync on `isInternetReachable === true`
-// therefore strands a user who genuinely has a connection — and can reach OUR
-// backend — behind a permanent "You are offline" first-sync block. So a
-// reported link counts as online, and the sync cycle's own success/failure is
-// the authority on whether the backend is actually reachable; only a true
-// link-down (no connection) projects offline.
+// NetInfo is the sole authority on online/offline. A single listener projects
+// `isInternetReachable === true` to a boolean and emits "go online" / "go
+// offline" only when that projection CHANGES. The initial projection is false,
+// so the machine starts OFFLINE and waits for the first definitive `true`
+// before considering itself online.
 // -----------------------------------------------------------------------------
 
 const handleNetInfoState = (netState: NetInfoState): void => {
-  const nextProjection = netState.isConnected === true;
+  const nextProjection = netState.isInternetReachable === true;
   if (nextProjection === onlineProjection) {
-    // No change in the boolean projection: a reachability-probe flip
-    // (true/false/null) while the link state is unchanged collapses to nothing.
+    // No change in the boolean projection: a link-layer flip, a VPN handoff, or
+    // a still-null reachability all collapse to nothing here.
     return;
   }
 
@@ -419,18 +408,9 @@ export const requestSync = (): void => {
 };
 
 /**
- * Wires the NetInfo and AppState listeners and arms the machine. Idempotent: a
- * second call with the listeners already wired is a no-op so a double-mount
- * cannot stack subscriptions.
- *
- * The network projection is NOT reset to OFFLINE on (re)start: it is the device's
- * network truth, which does not change merely because the scheduler was torn down
- * and re-wired (the root layout remounting on a deep-link navigation does exactly
- * that). NetInfo only emits on a CHANGE, and `addEventListener`'s initial emit is
- * not reliably redelivered on rapid re-subscribe — so resetting the projection to
- * false on every start would pin the machine OFFLINE on a connected device, which
- * strands the first-sync gate on "You are offline." Instead the projection
- * persists and the machine is re-armed from it below.
+ * Wires the NetInfo and AppState listeners and arms the initial state (OFFLINE).
+ * Idempotent: a second call with the listeners already wired is a no-op so a
+ * double-mount cannot stack subscriptions.
  */
 export const startSyncScheduler = (): void => {
   if (netInfoUnsubscribe !== null) {
@@ -438,6 +418,7 @@ export const startSyncScheduler = (): void => {
   }
 
   state = { name: 'OFFLINE' };
+  onlineProjection = false;
   lastCycleError = null;
   lastSuccessAtMs = null;
   previousAppState = AppState.currentState;
@@ -460,15 +441,6 @@ export const startSyncScheduler = (): void => {
       context: { error: String(error) },
     });
     throw error;
-  }
-
-  // Re-derive the machine from the persisted network projection. A bare remount
-  // re-wires the listeners but NetInfo emits nothing for an unchanged still-online
-  // device, so the just-reset OFFLINE state would never advance on its own. When
-  // the projection is online, feed the machine the same "go online" the listener
-  // would, so the cycle resumes deterministically.
-  if (onlineProjection) {
-    handleExternal('go online');
   }
 };
 
@@ -493,18 +465,6 @@ export const stopSyncScheduler = (): void => {
 };
 
 /**
- * Test-only: fully resets module state — including the persisted network
- * projection that `stopSyncScheduler` intentionally keeps — so each suite starts
- * from a clean, offline scheduler. Production code never calls this.
- */
-export const __resetSchedulerForTests = (): void => {
-  stopSyncScheduler();
-  onlineProjection = false;
-  lastCycleError = null;
-  lastSuccessAtMs = null;
-};
-
-/**
  * The production read of the scheduler's observable state. This is the single
  * shared accessor every consumer uses to learn how sync is doing — there is no
  * parallel read path. It is purely a snapshot getter: reading it never advances
@@ -512,7 +472,7 @@ export const __resetSchedulerForTests = (): void => {
  *
  * It returns:
  *  - `state`: the current four-state machine state (with any armed deadline).
- *  - `online`: the latest network-link projection (NetInfo `isConnected`).
+ *  - `online`: the latest NetInfo `isInternetReachable` projection.
  *  - `lastCycleError`: the most recent cycle's failure message, or null when
  *    the latest cycle ended cleanly (or none has run yet).
  *  - `lastSuccessAtMs`: epoch-ms of the most recent clean cycle, or null.

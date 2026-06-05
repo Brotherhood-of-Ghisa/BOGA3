@@ -40,7 +40,7 @@ const mockRunSyncCycle = jest.fn(
 jest.mock('@/src/sync/cycle', () => ({ runSyncCycle: () => mockRunSyncCycle() }));
 
 // --- NetInfo stub: capture the listener so tests feed reachability snapshots.
-type NetInfoSnapshot = { isConnected?: boolean | null; isInternetReachable?: boolean | null };
+type NetInfoSnapshot = { isInternetReachable: boolean | null };
 const mockNetInfoState: { listener: ((state: NetInfoSnapshot) => void) | null } = { listener: null };
 const mockNetInfoUnsubscribe = jest.fn(() => {
   mockNetInfoState.listener = null;
@@ -63,7 +63,6 @@ jest.mock('@/src/logging/logEvent', () => ({ logEvent: (params: LogEventParams) 
 
 import {
   __getSchedulerStateForTests,
-  __resetSchedulerForTests,
   LONG_INTERVAL,
   requestSync,
   SHORT_INTERVAL,
@@ -75,17 +74,9 @@ import {
 let appStateListener: ((status: AppStateStatus) => void) | null = null;
 const appStateRemove = jest.fn();
 
-// "online" is keyed off the link (isConnected), not the reachability probe.
-const goOnline = () =>
-  mockNetInfoState.listener?.({ isConnected: true, isInternetReachable: true });
-const goOffline = () =>
-  mockNetInfoState.listener?.({ isConnected: false, isInternetReachable: false });
-// Connected, but the internet-reachability probe is pending (null) or negative
-// (false) — both still count as online because the device reports a link.
-const connectedProbePending = () =>
-  mockNetInfoState.listener?.({ isConnected: true, isInternetReachable: null });
-const connectedProbeFalse = () =>
-  mockNetInfoState.listener?.({ isConnected: true, isInternetReachable: false });
+const goOnline = () => mockNetInfoState.listener?.({ isInternetReachable: true });
+const goOffline = () => mockNetInfoState.listener?.({ isInternetReachable: false });
+const netInfoNull = () => mockNetInfoState.listener?.({ isInternetReachable: null });
 
 const endCycle = async (mode: 'success' | 'error') => {
   const pending = cycleResolvers.shift();
@@ -143,7 +134,6 @@ beforeEach(() => {
   });
   (AppState as { currentState: AppStateStatus }).currentState = 'active';
 
-  __resetSchedulerForTests();
   startSyncScheduler();
 });
 
@@ -348,27 +338,23 @@ describe('internal event: cycle ends', () => {
 });
 
 // =============================================================================
-// The network LINK (not the reachability probe) is the authority on online/offline.
+// Network reachability is the sole authority on online/offline.
 // =============================================================================
 
-describe('the network link is the authority on online/offline', () => {
-  it('a reported link counts as online; the reachability probe does not gate it', () => {
-    // No link -> OFFLINE.
+describe('the network projection is the sole authority on online/offline', () => {
+  it('only a definitive reachable=true projection counts as online', () => {
+    netInfoNull();
+    expect(stateName()).toBe('OFFLINE');
     goOffline();
     expect(stateName()).toBe('OFFLINE');
-    // Connected, probe still pending (null) -> online.
-    connectedProbePending();
+    goOnline();
     expect(stateName()).toBe('SHORT_TIMEOUT');
   });
 
-  it('stays online while connected even as the reachability probe flips; only a link loss goes OFFLINE', () => {
+  it('a null reachability after online flips the machine back to OFFLINE', () => {
     goOnline();
     expect(stateName()).toBe('SHORT_TIMEOUT');
-    // Probe goes negative (captive portal / blocked host) but link is up -> still online.
-    connectedProbeFalse();
-    expect(stateName()).toBe('SHORT_TIMEOUT');
-    // The link drops -> offline.
-    goOffline();
+    netInfoNull();
     expect(stateName()).toBe('OFFLINE');
     expect(timerArmed()).toBe(false);
   });

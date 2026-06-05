@@ -127,15 +127,11 @@ function GateProgress({ progress }: { progress: SyncProgress }) {
         </UiText>
       ) : (
         <View style={styles.activityRow}>
-          {/* The testID lives on a wrapping View, not the ActivityIndicator
-              itself: RN's ActivityIndicator does not reliably surface its testID
-              to the iOS accessibility tree Maestro queries, so the gate's E2E
-              flow could not locate the spinner even while it was on screen. A
-              plain View wrapper is reliably queryable by both Maestro and the
-              React Testing Library unit tests. */}
-          <View testID={SYNC_GATE_TEST_IDS.activityIndicator}>
-            <ActivityIndicator color={uiColors.actionPrimary} size="large" />
-          </View>
+          <ActivityIndicator
+            color={uiColors.actionPrimary}
+            size="large"
+            testID={SYNC_GATE_TEST_IDS.activityIndicator}
+          />
           <UiText
             style={styles.activityDetail}
             testID={SYNC_GATE_TEST_IDS.activityDetail}

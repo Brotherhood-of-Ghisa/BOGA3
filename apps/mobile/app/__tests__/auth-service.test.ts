@@ -8,7 +8,6 @@ const mockSecureStoreDeleteItemAsync = jest.fn();
 const mockSecureStoreSetItemAsync = jest.fn();
 const mockLogEvent = jest.fn();
 const mockWipeLocalForAccountSwitch = jest.fn();
-const mockRequestSync = jest.fn();
 
 jest.mock('@supabase/supabase-js', () => ({
   createClient: (...args: unknown[]) => mockCreateClient(...args),
@@ -28,12 +27,6 @@ jest.mock('@/src/logging', () => ({
 // real SQLite). The wipe's own behaviour is covered by its dedicated suite.
 jest.mock('@/src/sync/account-wipe', () => ({
   wipeLocalForAccountSwitch: (...args: unknown[]) => mockWipeLocalForAccountSwitch(...args),
-}));
-
-// Stub the scheduler so the test can observe that a live session kicks a sync
-// without wiring the real NetInfo/AppState-driven state machine.
-jest.mock('@/src/sync/scheduler', () => ({
-  requestSync: (...args: unknown[]) => mockRequestSync(...args),
 }));
 
 import {
@@ -106,7 +99,6 @@ describe('auth service bootstrap', () => {
     mockLogEvent.mockReset();
     mockWipeLocalForAccountSwitch.mockReset();
     mockWipeLocalForAccountSwitch.mockResolvedValue(undefined);
-    mockRequestSync.mockReset();
     __resetAuthRequiredSignalForTests();
 
     mockOnAuthStateChange.mockReturnValue({
@@ -417,25 +409,6 @@ describe('auth service bootstrap', () => {
 
     expect(getAuthRequiredSignal()).toBe(false);
     expect(getAuthSnapshot().session?.user?.id).toBe('user-1');
-  });
-
-  it('kicks the first authenticated sync cycle when a live session arrives so the first-sync gate drains promptly', async () => {
-    mockGetSession.mockResolvedValue({ data: { session: null }, error: null });
-    await bootstrapAuthState();
-
-    const handler = mockOnAuthStateChange.mock.calls[0][0] as (
-      event: string,
-      session: Session | null,
-    ) => void;
-
-    // No session: nothing to sync, so the scheduler is not nudged.
-    handler('INITIAL_SESSION', null);
-    expect(mockRequestSync).not.toHaveBeenCalled();
-
-    // A live session: nudge the scheduler now rather than waiting for the idle
-    // backstop, so the first signed-in cycle drains and the gate dismisses.
-    handler('SIGNED_IN', createMockSession({ userId: 'user-1' }));
-    expect(mockRequestSync).toHaveBeenCalledTimes(1);
   });
 
   it('leaves the "no signed-in user" signal untouched when an auth state change carries no session', async () => {

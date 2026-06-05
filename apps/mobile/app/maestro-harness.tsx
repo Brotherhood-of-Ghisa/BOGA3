@@ -8,13 +8,11 @@ import {
   isMaestroHarnessAllowed,
   resolveMaestroHarnessBootstrapAction,
   resolveMaestroHarnessFixtureName,
-  resolveMaestroHarnessGateAction,
   resolveMaestroHarnessResetMode,
   resolveMaestroHarnessTeleportHref,
   resolveMaestroHarnessTeleportTarget,
   runMaestroHarnessBootstrapAction,
   runMaestroHarnessFixture,
-  runMaestroHarnessGateAction,
   runMaestroHarnessReset,
 } from '@/src/maestro/harness';
 
@@ -29,7 +27,6 @@ export default function MaestroHarnessScreen() {
     reset?: string | string[];
     fixture?: string | string[];
     bootstrap?: string | string[];
-    gate?: string | string[];
     teleport?: string | string[];
     mode?: string | string[];
     intent?: string | string[];
@@ -58,7 +55,6 @@ export default function MaestroHarnessScreen() {
   const resetParam = coerceMaestroHarnessQueryParam(params.reset);
   const fixtureParam = coerceMaestroHarnessQueryParam(params.fixture);
   const bootstrapParam = coerceMaestroHarnessQueryParam(params.bootstrap);
-  const gateParam = coerceMaestroHarnessQueryParam(params.gate);
   const teleportParam = coerceMaestroHarnessQueryParam(params.teleport);
   const modeParam = coerceMaestroHarnessQueryParam(params.mode);
   const intentParam = coerceMaestroHarnessQueryParam(params.intent);
@@ -75,7 +71,6 @@ export default function MaestroHarnessScreen() {
       resetParam,
       fixtureParam,
       bootstrapParam,
-      gateParam,
       teleportParam,
       modeParam,
       intentParam,
@@ -99,7 +94,6 @@ export default function MaestroHarnessScreen() {
     const resetMode = resolveMaestroHarnessResetMode(resetParam);
     const fixtureName = resolveMaestroHarnessFixtureName(fixtureParam);
     const bootstrapAction = resolveMaestroHarnessBootstrapAction(bootstrapParam);
-    const gateAction = resolveMaestroHarnessGateAction(gateParam);
     const teleportTarget = resolveMaestroHarnessTeleportTarget(teleportParam);
     const teleportHref = resolveMaestroHarnessTeleportHref({
       target: teleportTarget,
@@ -113,7 +107,6 @@ export default function MaestroHarnessScreen() {
         await runMaestroHarnessReset(resetMode);
         await runMaestroHarnessFixture(fixtureName);
         await runMaestroHarnessBootstrapAction(bootstrapAction);
-        runMaestroHarnessGateAction(gateAction);
 
         if (cancelled) {
           return;
@@ -155,7 +148,7 @@ export default function MaestroHarnessScreen() {
     return () => {
       cancelled = true;
     };
-  }, [resetParam, fixtureParam, bootstrapParam, gateParam, teleportParam, modeParam, intentParam, sessionIdParam, router]);
+  }, [resetParam, fixtureParam, bootstrapParam, teleportParam, modeParam, intentParam, sessionIdParam, router]);
 
   return (
     <View style={styles.screen} testID="maestro-harness-screen">

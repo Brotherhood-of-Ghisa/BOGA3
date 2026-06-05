@@ -144,26 +144,6 @@ describe('SyncGate', () => {
     );
   });
 
-  it('renders the in-progress block from a harness-pinned forcedProgress, overriding a set bootstrap flag', () => {
-    renderGate();
-
-    // A harness pin forces the online in-progress block to stay up and show its
-    // activity indicator even with the bootstrap flag set (which would otherwise
-    // dismiss the gate) — the deterministic E2E driver for the online "setting
-    // up your data" state the simulator's NetInfo cannot produce on its own.
-    act(() => {
-      publishSyncGateState({
-        bootstrapCompletedAt: new Date(1_700_000_000_000),
-        lastCycleErrorCode: null,
-        forcedProgress: { phase: 'pull', layersCompleted: 1, rowsApplied: 3, offline: false },
-      });
-    });
-
-    expect(screen.getByTestId(SYNC_GATE_TEST_IDS.block)).toBeTruthy();
-    expect(screen.getByTestId(SYNC_GATE_TEST_IDS.activityIndicator)).toBeTruthy();
-    expect(screen.queryByTestId(childTestId)).toBeNull();
-  });
-
   it('renders an activity indicator and an advancing detail line', () => {
     renderGate();
 

@@ -8,7 +8,6 @@ export type { CalendarHeatmapMetric };
 const CELL_SIZE = 38;
 const CELL_GAP = uiSpace.xs;
 const WEEKS_PER_ROW = 4;
-const GRID_WIDTH = WEEKS_PER_ROW * CELL_SIZE + (WEEKS_PER_ROW - 1) * CELL_GAP;
 const MIN_MONTH_COUNT = 6;
 
 export type CalendarHeatmapBucket = 0 | 1 | 2 | 3 | 4;
@@ -24,7 +23,7 @@ export type CalendarHeatmapWeekCell = {
 export type CalendarHeatmapMonthRow = {
   monthKey: string;
   monthLabel: string;
-  cells: CalendarHeatmapWeekCell[];
+  cells: (CalendarHeatmapWeekCell | null)[];
 };
 
 export type CalendarHeatmapProps = {
@@ -83,25 +82,6 @@ const getCurrentWeekStartDateKey = (todayDateKey: string): string => {
   return `${y}-${m}-${d}`;
 };
 
-const formatUtcDateKey = (date: Date): string => {
-  const y = date.getUTCFullYear().toString().padStart(4, '0');
-  const m = (date.getUTCMonth() + 1).toString().padStart(2, '0');
-  const d = date.getUTCDate().toString().padStart(2, '0');
-  return `${y}-${m}-${d}`;
-};
-
-const buildMonthWeekStartDateKeys = (monthKey: string): string[] => {
-  const [year, month] = monthKey.split('-').map(Number);
-  const monthStart = new Date(Date.UTC(year, month - 1, 1));
-  const daysUntilMonday = (8 - monthStart.getUTCDay()) % 7;
-  const firstMonday = new Date(monthStart.getTime() + daysUntilMonday * 24 * 60 * 60 * 1000);
-
-  return Array.from({ length: WEEKS_PER_ROW }, (_, i) => {
-    const weekStart = new Date(firstMonday.getTime() + i * 7 * 24 * 60 * 60 * 1000);
-    return formatUtcDateKey(weekStart);
-  });
-};
-
 const buildBaselineMonthKeys = (todayDateKey: string): string[] => {
   const [y, m] = todayDateKey.split('-').map(Number);
   const keys: string[] = [];
@@ -120,40 +100,29 @@ export const buildCalendarHeatmapMonthRows = (
   todayDateKey: string
 ): CalendarHeatmapMonthRow[] => {
   const currentWeekKey = getCurrentWeekStartDateKey(todayDateKey);
-  const visibleWeeklyEffort = weeklyEffort.filter((week) => week.weekStartDateKey <= currentWeekKey);
 
-  const maxValue = visibleWeeklyEffort.reduce((max, week) => {
+  const maxValue = weeklyEffort.reduce((max, week) => {
     const v = getMetricValue(week, metric);
     return v !== null && v > max ? v : max;
   }, 0);
 
-  const byWeekStart = new Map<string, SelectedMuscleWeeklyEffort>();
-  for (const week of visibleWeeklyEffort) {
-    byWeekStart.set(week.weekStartDateKey, week);
+  const byMonthWeek = new Map<string, SelectedMuscleWeeklyEffort>();
+  for (const week of weeklyEffort) {
+    byMonthWeek.set(`${week.monthKey}-${week.weekOfMonth}`, week);
   }
 
   // Ensure at least MIN_MONTH_COUNT months are shown, padded with empty rows if needed.
   // Reverse-chronological: current month first.
-  const effortMonthKeys = new Set(visibleWeeklyEffort.map((w) => w.monthKey));
+  const effortMonthKeys = new Set(weeklyEffort.map((w) => w.monthKey));
   const baselineKeys = buildBaselineMonthKeys(todayDateKey);
   const allMonthKeys = Array.from(new Set([...baselineKeys, ...effortMonthKeys])).sort().reverse();
 
-  return allMonthKeys
-    .map((monthKey) => {
-      const weekStartDateKeys = buildMonthWeekStartDateKeys(monthKey).filter(
-        (weekStartDateKey) => weekStartDateKey <= currentWeekKey
-      );
-      const cells: CalendarHeatmapWeekCell[] = weekStartDateKeys.map((weekStartDateKey) => {
-        const week = byWeekStart.get(weekStartDateKey);
-        if (!week) {
-          return {
-            weekStartDateKey,
-            metricValue: null,
-            bucket: 0,
-            isCurrentWeek: weekStartDateKey === currentWeekKey,
-            isSelected: weekStartDateKey === selectedWeekKey,
-          };
-        }
+  return allMonthKeys.map((monthKey) => {
+    const cells: (CalendarHeatmapWeekCell | null)[] = Array.from(
+      { length: WEEKS_PER_ROW },
+      (_, i) => {
+        const week = byMonthWeek.get(`${monthKey}-${i + 1}`);
+        if (!week) return null;
         const metricValue = getMetricValue(week, metric);
         const numericValue = metricValue ?? 0;
         return {
@@ -163,15 +132,15 @@ export const buildCalendarHeatmapMonthRows = (
           isCurrentWeek: week.weekStartDateKey === currentWeekKey,
           isSelected: week.weekStartDateKey === selectedWeekKey,
         };
-      });
+      }
+    );
 
-      return {
-        monthKey,
-        monthLabel: monthKeyToLabel(monthKey),
-        cells,
-      };
-    })
-    .filter((row) => row.cells.length > 0);
+    return {
+      monthKey,
+      monthLabel: monthKeyToLabel(monthKey),
+      cells,
+    };
+  });
 };
 
 export function CalendarHeatmap({
@@ -190,7 +159,14 @@ export function CalendarHeatmap({
       {monthRows.map((row) => (
         <View key={row.monthKey} style={styles.monthRow} testID={`${testID}-month-${row.monthKey}`}>
           <View style={styles.cellRow}>
-            {row.cells.map((cell) => (
+            {row.cells.map((cell, i) =>
+              cell === null ? (
+                <View
+                  key={`${row.monthKey}-empty-${i}`}
+                  style={[styles.cell, bucketStyles[0]]}
+                  testID={`${testID}-cell-empty-${row.monthKey}-${i + 1}`}
+                />
+              ) : (
                 <Pressable
                   accessibilityHint="Select this week"
                   accessibilityLabel={buildWeekCellAccessibilityLabel(cell, metric)}
@@ -209,7 +185,8 @@ export function CalendarHeatmap({
                   ]}
                   testID={`${testID}-cell-${cell.weekStartDateKey}`}
                 />
-            ))}
+              )
+            )}
           </View>
         </View>
       ))}
@@ -252,7 +229,6 @@ const styles = StyleSheet.create({
   cellRow: {
     flexDirection: 'row',
     gap: CELL_GAP,
-    width: GRID_WIDTH,
   },
   cell: {
     width: CELL_SIZE,

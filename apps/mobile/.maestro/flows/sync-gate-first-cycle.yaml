@@ -48,51 +48,25 @@ appId: com.dinoderek.mobile
 - tapOn:
     id: "sign-in-submit-button"
 
-# The full-screen block is visible with its phase label, and no data screen
-# renders behind it.
+# The full-screen block is visible with its phase label and activity indicator,
+# and no data screen renders behind it.
 - extendedWaitUntil:
     visible:
       id: "sync-gate-block"
     timeout: 30000
 - assertVisible:
     id: "sync-gate-phase-label"
-# Assert the gate blocks the data screen at the moment it first appears — the
-# first cycle has not drained yet, so this is the most reliable point to prove no
-# data screen renders behind the block.
-- assertNotVisible:
-    id: "stats-history-screen"
-
-# Drive the gate's ONLINE in-progress state deterministically. The simulator's
-# NetInfo cannot confirm internet reachability, so the live cycle's online
-# "setting up your data" state is not observable here; the harness pins the
-# in-progress block (spinner + advancing counters) until released below. This
-# stands in for a real connected device mid-first-cycle without weakening the
-# assertion — the block must still render its online in-progress surfaces.
-- openLink: "boga3://maestro-harness?gate=in-progress&teleport=session-list"
-- tapOn:
-    text: "Open"
-    optional: true
-- tapOn:
-    text: "Continue"
-    optional: true
-- tapOn:
-    text: "Close"
-    optional: true
-- extendedWaitUntil:
-    visible:
-      id: "sync-gate-activity-indicator"
-    timeout: 30000
 - assertVisible:
-    id: "sync-gate-phase-label"
+    id: "sync-gate-activity-indicator"
 - assertNotVisible:
     id: "stats-history-screen"
 - takeScreenshot: "10-sync-gate-block-visible"
 
-# Complete the first cycle: clear the in-progress pin AND stamp the bootstrap
-# flag in one harness link, then teleport to the normal route. With the pin
-# cleared and the flag set, the gate has lifted by the time the route renders,
-# so the block dismisses and stats-history renders well within a minute.
-- openLink: "boga3://maestro-harness?gate=clear&bootstrap=complete&teleport=session-list"
+# Complete the first cycle: stamp the bootstrap flag AND teleport to the normal
+# route in one harness link. The flag is stamped before the teleport navigates,
+# so the gate has already lifted by the time the route renders. The block
+# dismisses and stats-history renders well within a minute of foreground.
+- openLink: "boga3://maestro-harness?bootstrap=complete&teleport=session-list"
 - tapOn:
     text: "Open"
     optional: true

@@ -271,15 +271,8 @@ Cleanup scope:
 - `scripts/worktree-sweep.sh` scans completed slots and calls `scripts/worktree-clean.sh`.
 - `scripts/worktree-clean.sh --supabase` removes Docker containers, volumes, and networks labelled with the registry-recorded Supabase project id, plus the legacy `scaffolding[-wtN]` id for older local state.
 - `scripts/worktree-clean.sh --remove-registry` removes the completed slot registry file after cleanup.
-- `scripts/worktree-clean.sh --project <id> --supabase` tears down a specific Supabase project id directly, bypassing the slot registry. This is the escape hatch for an **orphaned** stack whose registry record was lost.
-- Cleanup never targets the current slot unless explicitly forced in the manual cleaner. Slot 0 (the always-on main `BOGA` checkout) is never reclaimed by the sweep.
+- Cleanup never targets the current slot unless explicitly forced in the manual cleaner.
 - Slot runtime locks under `~/.config/boga/worktrees/runtime-locks/` prevent concurrent cleanup attempts for the same slot.
-
-Orphan reclamation (registry-independent):
-
-- A Supabase stack can outlive its slot registry record — e.g. a slot is recycled (the prior project id is overwritten by the next worktree) or registration never happened. Such stacks are invisible to the registry scan.
-- Recycle prevention: when slot allocation forgets a slot whose registered worktree path is gone (`worktree-setup.sh`), it first reclaims that slot's Supabase stack via `worktree-clean.sh`. If Docker is unavailable it keeps the registry record (reserving the slot) so the project id is never lost, leaving the teardown for a later sweep.
-- Backstop: after the registry scan, `worktree-sweep.sh` enumerates running Supabase projects directly from Docker labels and reclaims any `BOGA-<frag>-wt<slot>` project that has neither a slot registry entry nor a live worktree (older than the grace period). The main `BOGA` project and non-BOGA projects from other tools are never touched.
 
 Default cleanup is Supabase-only. It intentionally does not remove iOS simulators or dev-client caches yet.
 
