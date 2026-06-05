@@ -10,7 +10,10 @@ BUILD_ROOT="$MAESTRO_IOS_SHARED_BUILD_ROOT"
 APP_PATH="$MAESTRO_IOS_DEV_CLIENT_APP_PATH"
 METADATA_FILE="$BUILD_ROOT/dev-client-build.env"
 BUILD_LOG_FILE="$BUILD_ROOT/build.log"
-TEMP_ROOT="$BUILD_ROOT/tmp-build"
+# The build scratch lives under the shared root but is PID-scoped, so two
+# worktrees that build the shared cache at the same time never clobber each
+# other's workspace/derived-data. Cleaned up on exit (including failure).
+TEMP_ROOT="$BUILD_ROOT/tmp-build.$$"
 WORKSPACE_DIR="$TEMP_ROOT/workspace"
 DERIVED_DATA_DIR="$TEMP_ROOT/derived-data"
 STATUS="unknown"
@@ -18,6 +21,8 @@ REASON="unknown"
 FORCE_REBUILD=0
 PRINT_APP_PATH_ONLY=0
 STATUS_ONLY=0
+
+trap 'rm -rf "$TEMP_ROOT" 2>/dev/null || true' EXIT
 
 usage() {
   cat <<'EOF'
@@ -118,7 +123,9 @@ prepare_workspace() {
 build_dev_client() {
   local workspace_path
   local scheme_name
+  local host_arch
   local built_app_path
+  local staged_app
   local bundle_id
   local built_at
 
@@ -155,13 +162,19 @@ build_dev_client() {
   workspace_path="$(find "$WORKSPACE_DIR/ios" -maxdepth 1 -name '*.xcworkspace' | head -n 1)"
   [[ -n "$workspace_path" ]] || maestro_fail "Unable to find generated iOS workspace under $WORKSPACE_DIR/ios."
   scheme_name="$(basename -- "$workspace_path" .xcworkspace)"
+  host_arch="$(uname -m)"
 
   {
     echo "[maestro-ios-dev-client-build] Building simulator app with xcodebuild"
     echo "[maestro-ios-dev-client-build] Workspace: $workspace_path"
     echo "[maestro-ios-dev-client-build] Scheme: $scheme_name"
+    echo "[maestro-ios-dev-client-build] Simulator arch: $host_arch (host-only; the shared cache is host-local)"
   } | tee -a "$BUILD_LOG_FILE"
 
+  # Build ONLY the host simulator slice (e.g. arm64 on Apple Silicon) rather than
+  # the default fat arm64+x86_64. This cache is host-local and the host's own
+  # simulators run the host architecture, so the second slice is dead weight that
+  # roughly doubles compile time. ARCHS pins the slice deterministically.
   xcodebuild \
     -workspace "$workspace_path" \
     -scheme "$scheme_name" \
@@ -169,6 +182,8 @@ build_dev_client() {
     -sdk iphonesimulator \
     -destination 'generic/platform=iOS Simulator' \
     -derivedDataPath "$DERIVED_DATA_DIR" \
+    ARCHS="$host_arch" \
+    ONLY_ACTIVE_ARCH=YES \
     CODE_SIGNING_ALLOWED=NO \
     build 2>&1 | tee -a "$BUILD_LOG_FILE"
 
@@ -178,8 +193,16 @@ build_dev_client() {
   fi
   [[ -d "$built_app_path" ]] || maestro_fail "xcodebuild completed without producing a simulator .app artifact."
 
+  # Promote atomically: stage the freshly built .app into our PID-scoped temp dir
+  # (same filesystem as the shared root), then rename it into place. A rename is
+  # atomic within one volume, so a concurrent worktree reading the shared cache
+  # observes either the previous complete .app or the new one — never a partial
+  # copy mid-`ditto`.
+  staged_app="$TEMP_ROOT/$(basename -- "$APP_PATH")"
+  rm -rf "$staged_app"
+  ditto "$built_app_path" "$staged_app"
   rm -rf "$APP_PATH"
-  ditto "$built_app_path" "$APP_PATH"
+  mv "$staged_app" "$APP_PATH"
 
   bundle_id="$(plutil -extract CFBundleIdentifier raw -o - "$APP_PATH/Info.plist" 2>/dev/null || true)"
   built_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"

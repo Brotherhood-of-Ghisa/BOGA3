@@ -150,7 +150,7 @@ Isolation outcomes:
 | Metro/Expo | `EXPO_DEV_SERVER_PORT` in worktree-local Maestro env |
 | iOS simulator | Dedicated `IOS_SIM_UDID` or slot-named simulator from worktree-local Maestro env |
 | Mobile dependencies | Worktree-local `apps/mobile/node_modules`; symlinked `node_modules` is refused by runtime guards |
-| iOS dev-client build cache | Slot-scoped default under `~/.cache/boga/maestro/ios-dev-client/wt<slot>` |
+| iOS dev-client build cache | Intentionally **shared** (not isolated): a single host-local cache at `~/.cache/boga/maestro/ios-dev-client`, reused across all worktrees; rebuild with `--force` after a native change |
 
 ## Supabase config generation
 
