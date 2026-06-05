@@ -279,6 +279,60 @@ export type SelectedMuscleWeeklyEffort = {
 
 const NEAR_FAILURE_SET_TYPES = new Set(['rir_0', 'rir_1', 'rir_2']);
 
+/**
+ * Per-day rollup of the four heatmap metrics (volume / near-failure / 1RM / top
+ * weight). Shared by the muscle and exercise daily heatmaps. `highestWeight` and
+ * `estimatedRM1` are best-of values, so weekly cells can be derived from these by
+ * summing volume/near-failure and taking the max of weight/1RM across the days.
+ */
+export type DailyEffortMetrics = {
+  dateKey: string;
+  totalVolume: number;
+  nearFailureCount: number;
+  estimatedRM1: number | null;
+  highestWeight: number | null;
+};
+
+type EffortMetricAccumulator = {
+  totalVolume: number;
+  nearFailureCount: number;
+  bestRM1: number | null;
+  highestWeight: number | null;
+};
+
+export const createEffortMetricAccumulator = (): EffortMetricAccumulator => ({
+  totalVolume: 0,
+  nearFailureCount: 0,
+  bestRM1: null,
+  highestWeight: null,
+});
+
+/** Fold a single muscle set contribution into a metric accumulator. */
+export const accumulateContributionMetrics = (
+  acc: EffortMetricAccumulator,
+  contribution: MuscleSetContribution
+): void => {
+  acc.totalVolume += contribution.weightedVolume;
+
+  if (contribution.setType !== null && NEAR_FAILURE_SET_TYPES.has(contribution.setType)) {
+    acc.nearFailureCount += 1;
+  }
+
+  const weight = parseSetWeight(contribution.weightValue);
+  const reps = parseSetReps(contribution.repsValue);
+
+  if (weight !== null) {
+    acc.highestWeight = acc.highestWeight === null ? weight : Math.max(acc.highestWeight, weight);
+
+    if (reps !== null) {
+      const rm1 = estimateOneRepMax(weight, reps);
+      if (rm1 !== null) {
+        acc.bestRM1 = acc.bestRM1 === null ? rm1 : Math.max(acc.bestRM1, rm1);
+      }
+    }
+  }
+};
+
 const dateKeyToUtcDate = (dateKey: string): Date => {
   const [year, month, day] = dateKey.split('-').map(Number);
   return new Date(Date.UTC(year, month - 1, day));
@@ -326,36 +380,20 @@ export const aggregateSelectedMuscleWeeklyEffort = (
     };
 
     for (const contribution of day.contributions) {
-      acc.totalVolume += contribution.weightedVolume;
-
-      if (contribution.setType !== null && NEAR_FAILURE_SET_TYPES.has(contribution.setType)) {
-        acc.nearFailureCount += 1;
-      }
-
-      const weight = parseSetWeight(contribution.weightValue);
-      const reps = parseSetReps(contribution.repsValue);
-
-      if (weight !== null) {
-        acc.highestWeight = acc.highestWeight === null ? weight : Math.max(acc.highestWeight, weight);
-
-        if (reps !== null) {
-          const rm1 = estimateOneRepMax(weight, reps);
-          if (rm1 !== null) {
-            acc.bestRM1 = acc.bestRM1 === null ? rm1 : Math.max(acc.bestRM1, rm1);
-          }
-        }
-      }
+      accumulateContributionMetrics(acc, contribution);
     }
 
     weekMap.set(weekStartDateKey, acc);
   }
 
-  // Sort weeks by date, then assign weekOfMonth (1-based, capped at 4)
+  // Sort weeks by date, then assign weekOfMonth (1-based)
   const sortedWeeks = Array.from(weekMap.values()).sort((a, b) =>
     a.weekStartDateKey.localeCompare(b.weekStartDateKey)
   );
 
-  // Track week-of-month index per month
+  // Track week-of-month index per month. Every training week is kept — the
+  // heatmaps draw a bar/column per week and the WeekSelectionBanner resolves
+  // any of them, so there is no 4-week-per-month layout cap to clip against.
   const monthWeekCount = new Map<string, number>();
   const result: SelectedMuscleWeeklyEffort[] = [];
 
@@ -363,8 +401,6 @@ export const aggregateSelectedMuscleWeeklyEffort = (
     const prev = monthWeekCount.get(week.monthKey) ?? 0;
     const weekOfMonth = prev + 1;
     monthWeekCount.set(week.monthKey, weekOfMonth);
-
-    if (weekOfMonth > 4) continue; // clip 5th week
 
     result.push({
       weekStartDateKey: week.weekStartDateKey,
@@ -379,3 +415,26 @@ export const aggregateSelectedMuscleWeeklyEffort = (
 
   return result;
 };
+
+/**
+ * Per-day metric rollup for the daily heatmap grid, derived from the same daily
+ * effort the weekly aggregator consumes. One entry per training day, sorted by date.
+ */
+export const aggregateSelectedMuscleDailyEffortMetrics = (
+  dailyEffort: SelectedMuscleDailyEffort[]
+): DailyEffortMetrics[] =>
+  dailyEffort
+    .map((day) => {
+      const acc = createEffortMetricAccumulator();
+      for (const contribution of day.contributions) {
+        accumulateContributionMetrics(acc, contribution);
+      }
+      return {
+        dateKey: day.dateKey,
+        totalVolume: acc.totalVolume,
+        nearFailureCount: acc.nearFailureCount,
+        estimatedRM1: acc.bestRM1,
+        highestWeight: acc.highestWeight,
+      };
+    })
+    .sort((left, right) => left.dateKey.localeCompare(right.dateKey));

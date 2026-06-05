@@ -7,7 +7,7 @@ import {
 } from '@/src/exercise-calculations';
 
 import { bootstrapLocalDataLayer } from './bootstrap';
-import type { SelectedMuscleWeeklyEffort } from './muscle-analytics';
+import type { DailyEffortMetrics, SelectedMuscleWeeklyEffort } from './muscle-analytics';
 import { exerciseSets, sessionExercises, sessions } from './schema';
 
 // Same shape as SelectedMuscleWeeklyEffort; aliased to allow CalendarHeatmap reuse without casts.
@@ -77,10 +77,10 @@ type WeekAccumulator = {
   highestWeight: number | null;
 };
 
-export const aggregateExerciseWeeklyEffort = (
+export const aggregateExerciseDailyEffort = (
   rawSessions: ExerciseRawSession[],
   timeZone?: string
-): SelectedExerciseWeeklyEffort[] => {
+): DailyEffortMetrics[] => {
   const dayMap = new Map<string, DayAccumulator>();
 
   for (const session of rawSessions) {
@@ -117,10 +117,26 @@ export const aggregateExerciseWeeklyEffort = (
     dayMap.set(dateKey, day);
   }
 
+  return Array.from(dayMap.entries())
+    .map(([dateKey, day]) => ({
+      dateKey,
+      totalVolume: day.totalVolume,
+      nearFailureCount: day.nearFailureCount,
+      estimatedRM1: day.bestRM1,
+      highestWeight: day.highestWeight,
+    }))
+    .sort((a, b) => a.dateKey.localeCompare(b.dateKey));
+};
+
+export const aggregateExerciseWeeklyEffort = (
+  rawSessions: ExerciseRawSession[],
+  timeZone?: string
+): SelectedExerciseWeeklyEffort[] => {
+  const dailyEffort = aggregateExerciseDailyEffort(rawSessions, timeZone);
   const weekMap = new Map<string, WeekAccumulator>();
 
-  for (const [dateKey, day] of dayMap) {
-    const dayDate = dateKeyToUtcDate(dateKey);
+  for (const day of dailyEffort) {
+    const dayDate = dateKeyToUtcDate(day.dateKey);
     const weekStart = startOfMondayWeek(dayDate);
     const weekStartDateKey = formatUtcDateKey(weekStart);
     const monthKey = `${weekStart.getUTCFullYear().toString().padStart(4, '0')}-${(weekStart.getUTCMonth() + 1).toString().padStart(2, '0')}`;
@@ -144,9 +160,9 @@ export const aggregateExerciseWeeklyEffort = (
           : Math.max(acc.highestWeight, day.highestWeight);
     }
 
-    if (day.bestRM1 !== null) {
+    if (day.estimatedRM1 !== null) {
       acc.bestRM1 =
-        acc.bestRM1 === null ? day.bestRM1 : Math.max(acc.bestRM1, day.bestRM1);
+        acc.bestRM1 === null ? day.estimatedRM1 : Math.max(acc.bestRM1, day.estimatedRM1);
     }
 
     weekMap.set(weekStartDateKey, acc);
@@ -164,8 +180,7 @@ export const aggregateExerciseWeeklyEffort = (
     const weekOfMonth = prev + 1;
     monthWeekCount.set(week.monthKey, weekOfMonth);
 
-    if (weekOfMonth > 4) continue;
-
+    // Keep every training week — see aggregateSelectedMuscleWeeklyEffort.
     result.push({
       weekStartDateKey: week.weekStartDateKey,
       monthKey: week.monthKey,
@@ -187,9 +202,11 @@ export type ComputeSelectedExerciseWeeklyEffortOptions = {
   timeZone?: string;
 };
 
-export const computeSelectedExerciseWeeklyEffort = async (
+export type ComputeSelectedExerciseDailyEffortOptions = ComputeSelectedExerciseWeeklyEffortOptions;
+
+const loadExerciseRawSessions = async (
   options: ComputeSelectedExerciseWeeklyEffortOptions
-): Promise<SelectedExerciseWeeklyEffort[]> => {
+): Promise<ExerciseRawSession[]> => {
   const database = await bootstrapLocalDataLayer();
 
   const sessionRows = database
@@ -267,5 +284,19 @@ export const computeSelectedExerciseWeeklyEffort = async (
     });
   }
 
+  return rawSessions;
+};
+
+export const computeSelectedExerciseWeeklyEffort = async (
+  options: ComputeSelectedExerciseWeeklyEffortOptions
+): Promise<SelectedExerciseWeeklyEffort[]> => {
+  const rawSessions = await loadExerciseRawSessions(options);
   return aggregateExerciseWeeklyEffort(rawSessions, options.timeZone);
+};
+
+export const computeSelectedExerciseDailyEffort = async (
+  options: ComputeSelectedExerciseDailyEffortOptions
+): Promise<DailyEffortMetrics[]> => {
+  const rawSessions = await loadExerciseRawSessions(options);
+  return aggregateExerciseDailyEffort(rawSessions, options.timeZone);
 };
