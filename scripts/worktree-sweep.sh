@@ -12,6 +12,7 @@ SUPABASE=1
 DRY_RUN=0
 GRACE_SECONDS="${BOGA_WORKTREE_SWEEP_GRACE_SECONDS:-600}"
 DETECT_MERGED="${BOGA_WORKTREE_SWEEP_DETECT_MERGED:-1}"
+DETECT_DEAD_LOCKS="${BOGA_WORKTREE_SWEEP_DETECT_DEAD_LOCKS:-1}"
 FETCH="${BOGA_WORKTREE_SWEEP_FETCH:-1}"
 REMOTE="${BOGA_WORKTREE_SWEEP_REMOTE:-origin}"
 MAIN_BRANCH="${BOGA_WORKTREE_SWEEP_MAIN_BRANCH:-main}"
@@ -26,16 +27,22 @@ worktree slots recorded in ~/.config/boga/worktrees/slots.
 
 A slot is considered completed when, after the grace period, ANY of these hold
 for its registered worktree: the path is gone / no longer a BOGA root; it was
-in this git worktree group and is no longer listed by `git worktree list`; its
+in this git worktree group and is no longer listed by `git worktree list`; it
+is still listed but locked by an agent PID that is no longer running; its
 checked-out branch's HEAD is reachable from the configured remote main; or its
 checked-out branch no longer exists on the configured remote.
 
+When a slot completes because its lock-holder PID is dead, the sweep first reaps
+the abandoned git worktree (`git worktree unlock` + `git worktree remove
+--force`) before the Supabase/registry cleanup, so the slot is fully reclaimed.
+
 Options:
-  --current-slot <n>     Slot that must never be cleaned (default: current worktree slot).
-  --no-supabase          Only report/prune logic; do not clean Supabase infra.
-  --dry-run              Print actions without removing containers/volumes/registry files.
-  --grace-seconds n      Minimum registry age before cleanup (default: 600).
-  --no-merge-detection   Disable "branch merged / branch deleted on remote" completion signals.
+  --current-slot <n>        Slot that must never be cleaned (default: current worktree slot).
+  --no-supabase             Only report/prune logic; do not clean Supabase infra.
+  --dry-run                 Print actions without removing containers/volumes/worktrees/registry files.
+  --grace-seconds n         Minimum registry age before cleanup (default: 600).
+  --no-merge-detection      Disable "branch merged / branch deleted on remote" completion signals.
+  --no-dead-lock-detection  Disable the "locked by a dead agent PID" completion signal + worktree reaping.
   --no-fetch             Skip the pre-scan `git fetch --prune` (uses cached remote-tracking refs).
   --remote <name>        Remote to consult for merge detection (default: origin).
   --main-branch <name>   Main branch to consult for merge detection (default: main).
@@ -65,6 +72,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --no-merge-detection)
       DETECT_MERGED=0
+      shift
+      ;;
+    --no-dead-lock-detection)
+      DETECT_DEAD_LOCKS=0
       shift
       ;;
     --no-fetch)
@@ -202,6 +213,19 @@ completion_reason() {
       printf 'not-in-current-git-worktree-list\n'
       return 0
     fi
+
+    # Still listed by git, but the agent that locked it is gone. Without this
+    # signal such a worktree never completes: its dir is on disk, it is in
+    # `git worktree list`, and its pushed branch is neither merged nor deleted
+    # on the remote — so the merge-detection signals below can't fire either.
+    if [[ "$DETECT_DEAD_LOCKS" == "1" ]]; then
+      local lock_pid
+      if lock_pid="$(boga_worktree_lock_pid "$REPO_ROOT" "$registered_abs")" \
+        && ! boga_pid_is_alive "$lock_pid"; then
+        printf 'locked-by-dead-agent-pid-%s\n' "$lock_pid"
+        return 0
+      fi
+    fi
   fi
 
   if [[ "$DETECT_MERGED" == "1" ]]; then
@@ -219,6 +243,37 @@ completion_reason() {
   fi
 
   return 1
+}
+
+# For a slot completed because its lock-holder PID is dead, the git worktree is
+# still registered and on disk; worktree-clean.sh only handles Supabase + the
+# registry file, so without this the worktree (and its directory) would dangle.
+# Unlock + force-remove it here, before the infra cleanup. The branch ref is not
+# touched, so committed history survives; only the abandoned working tree goes.
+reap_dead_agent_worktree() {
+  local registry_file="$1"
+  local slot="$2"
+  local reason="$3"
+  local registered_path registered_abs
+
+  registered_path="$(boga_registry_path_from_file "$registry_file" 2>/dev/null || true)"
+  if [[ -z "$registered_path" || ! -d "$registered_path" ]]; then
+    return 0
+  fi
+  registered_abs="$(boga_abs_dir "$registered_path")"
+
+  echo "[worktree-sweep] reaping abandoned git worktree for slot $slot ($reason): $registered_abs"
+  if [[ "$DRY_RUN" == "1" ]]; then
+    echo "[worktree-sweep] dry-run: git -C $REPO_ROOT worktree unlock $registered_abs"
+    echo "[worktree-sweep] dry-run: git -C $REPO_ROOT worktree remove --force $registered_abs"
+    return 0
+  fi
+
+  git -C "$REPO_ROOT" worktree unlock "$registered_abs" >/dev/null 2>&1 || true
+  if ! git -C "$REPO_ROOT" worktree remove --force "$registered_abs" >/dev/null 2>&1; then
+    echo "[worktree-sweep] warning: 'git worktree remove --force $registered_abs' failed; running 'git worktree prune'" >&2
+    git -C "$REPO_ROOT" worktree prune >/dev/null 2>&1 || true
+  fi
 }
 
 clean_slot() {
@@ -267,6 +322,11 @@ for registry_file in "$REGISTRY_DIR"/*; do
   fi
 
   if reason="$(completion_reason "$registry_file")"; then
+    case "$reason" in
+      locked-by-dead-agent-pid-*)
+        reap_dead_agent_worktree "$registry_file" "$slot" "$reason"
+        ;;
+    esac
     clean_slot "$slot" "$reason"
   else
     echo "[worktree-sweep] keeping slot $slot: registered worktree still looks active"
