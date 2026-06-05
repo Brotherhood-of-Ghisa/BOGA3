@@ -14,8 +14,35 @@ Run commands from `apps/mobile`.
 - Runtime scripts fail fast if `.maestro/maestro.env.local` is missing.
 - The iOS development-client build is host-local and **shared across every worktree**: a single cache at `$HOME/.cache/boga/maestro/ios-dev-client/` (NOT keyed by worktree slot). A freshly set-up worktree reuses an already-built client instead of rebuilding from scratch. The cache is trusted on existence and rebuilt only via `--force` (see the native-dependency warning below).
 - `npm run test:e2e:ios:smoke` and `npm run test:e2e:ios:data-smoke` use the port and simulator configured for this workspace, provision/install the dev client, launch Metro, run Maestro, then tear down.
-- `npm run test:e2e:ios:gates` runs BOTH the smoke and data-runtime-smoke flows against one provisioned simulator and one Metro instance, so the ~55-60s fixed overhead (sim boot + dev-client warm-up + Metro start + teardown) is paid once instead of per gate (measured ~196s separate -> ~140s combined). The standalone gates above are unchanged; this is an additive convenience path for running both together.
+- `npm run test:e2e:ios:gates` runs BOTH the smoke and data-runtime-smoke flows against one provisioned simulator and one Metro instance, so the ~55-60s fixed overhead (sim boot + dev-client warm-up + Metro start + teardown) is paid once instead of per gate (measured ~196s separate -> ~140s combined; see **Timing caveats** below). The standalone gates above are unchanged; this is an additive convenience path for running both together.
 - Run artifacts are written to `artifacts/maestro/<task-id-or-ad-hoc>/<timestamp>/`. The combined runner namespaces each flow's JUnit/output/debug under a per-flow subdirectory of that root.
+
+### Timing caveats (asterisks)
+
+The `~196s separate -> ~140s combined` figures are **steady-state, infra-free,
+warm-cache** numbers. Read them with these asterisks:
+
+- **✱ No Supabase cost.** `smoke` / `data-smoke` / `gates` run with **no Supabase
+  configured** (`materialized lane .env.local: infra-free, no Supabase`), so these
+  numbers contain **zero** backend spin-up. The Supabase-backed lanes
+  (`auth-profile`, the backend contract suites, `check:sync-drift`) additionally
+  require a local Supabase whose **one-time cold spin-up** via
+  `./supabase/scripts/ensure-local-runtime-baseline.sh` was measured at **~70s**
+  (containers + migrations + seed + `user_a`/`user_b` fixtures) — not reflected in
+  the gate timings.
+- **✱ Warm dev-client cache assumed.** The ~55-60s overhead assumes the shared
+  `.app` already exists (the normal case). A cold `--force` rebuild is a separate
+  multi-minute cost, not part of these numbers.
+- **✱ Warm Metro assumed.** The first lane run after a `.env.local` Supabase-config
+  flip pays a one-time Metro `--clear` cold bundle (`metro_clear=1`); steady-state
+  runs reuse the warm cache (`metro_clear=0`). The recorded figures are warm-Metro.
+- **✱ Sim boot every run.** Default teardown shuts the simulator down after each
+  run (`MAESTRO_KEEP_SIMULATOR_BOOTED` unset), so every run pays sim boot — already
+  inside the per-run overhead. Expect a few seconds of run-to-run jitter from host
+  load.
+- **Re-verified 2026-06-05 (3x each):** combined `gates` ~138s (136 / 136 / 142s);
+  separate smoke ~78s (77 / 79 / 77s) + data-smoke ~118s (113 / 114 / 127s) =
+  ~196s. Per-flow times were steady (smoke 17-18s, data 54-55s).
 
 ## First-time setup
 
