@@ -58,7 +58,24 @@ maestro_source_env() {
 
   : "${TASK_ID:=ad-hoc}"
   : "${MAESTRO_IOS_SHARED_BUILD_ROOT:=$HOME/.cache/boga/maestro/ios-dev-client}"
-  : "${MAESTRO_IOS_DEV_CLIENT_APP_PATH:=$MAESTRO_IOS_SHARED_BUILD_ROOT/mobile-dev-client.app}"
+
+  # The simulator dev-client .app is host-local and byte-identical across every
+  # worktree that shares the same native inputs, so its build cache is SHARED: one
+  # canonical host-local root, never keyed by worktree slot. That is what lets a
+  # fresh worktree reuse an already-built client instead of rebuilding from
+  # scratch. Collapse any legacy per-slot ".../ios-dev-client/wt<n>" root left
+  # behind in an older generated maestro.env.local back to the shared root so
+  # pre-existing worktrees converge on the same cache too.
+  case "$MAESTRO_IOS_SHARED_BUILD_ROOT" in
+    */ios-dev-client/wt[0-9]*)
+      MAESTRO_IOS_SHARED_BUILD_ROOT="${MAESTRO_IOS_SHARED_BUILD_ROOT%/wt[0-9]*}"
+      ;;
+  esac
+
+  # Always derive the .app path from the single shared root so the build-write
+  # path and the cache-lookup path can never diverge (the prior shadowing bug,
+  # where a non-slot sample default silently won over a per-slot local value).
+  MAESTRO_IOS_DEV_CLIENT_APP_PATH="$MAESTRO_IOS_SHARED_BUILD_ROOT/mobile-dev-client.app"
   : "${IOS_SIM_DEVICE:=}"
   : "${IOS_SIM_UDID:=}"
   # Default ON: a fresh worktree pins a slot-named simulator (e.g. "BOGA wt46")

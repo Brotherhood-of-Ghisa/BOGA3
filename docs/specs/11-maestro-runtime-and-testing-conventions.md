@@ -237,8 +237,8 @@ Current implemented build method:
 - `apps/mobile/scripts/maestro-ios-dev-client-build.sh` builds in a temp workspace under the shared build root.
 - It runs:
   - `npx expo prebuild --platform ios --clean --npm`
-  - `xcodebuild ... -destination 'generic/platform=iOS Simulator' ... build`
-- It then copies the resulting simulator `.app` into `MAESTRO_IOS_DEV_CLIENT_APP_PATH`.
+  - `xcodebuild ... -destination 'generic/platform=iOS Simulator' ARCHS=<host-arch> ONLY_ACTIVE_ARCH=YES ... build` — only the host simulator slice (e.g. `arm64` on Apple Silicon) is built, not the default fat `arm64+x86_64`; the cache is host-local so the second slice is unnecessary and roughly doubles compile time.
+- It then stages the resulting simulator `.app` in a PID-scoped temp dir and atomically renames it into `MAESTRO_IOS_DEV_CLIENT_APP_PATH`, so a concurrent worktree reading the shared cache never observes a partial copy.
 
 Current rebuild invalidation rules:
 
@@ -275,9 +275,25 @@ it. Instead, native-cache freshness is the author's responsibility:
 
 Worktree setup note:
 
-- `./scripts/worktree-setup.sh` generates `apps/mobile/.maestro/maestro.env.local` with a slot-scoped default build root:
-  - `$HOME/.cache/boga/maestro/ios-dev-client/wt<slot>`
-- This prevents concurrent agents on different branches from mutating the same native build temp directory or installed `.app` path unless a human explicitly opts into a shared override.
+- The shared dev-client `.app` is host-local and byte-identical across worktrees
+  with the same native inputs, so the build cache is intentionally **shared**: a
+  single canonical root (`$HOME/.cache/boga/maestro/ios-dev-client`), never keyed
+  by worktree slot. A freshly set-up worktree therefore reuses an already-built
+  client instead of rebuilding from scratch.
+- `./scripts/worktree-setup.sh` no longer writes a per-slot build root into
+  `apps/mobile/.maestro/maestro.env.local`. The canonical shared root is owned by
+  `apps/mobile/scripts/maestro-env.sh`, and the `.app` path is derived from it, so
+  the build-write path and the cache-lookup path can never diverge. Only the
+  genuinely per-worktree values — the slot-named simulator (`BOGA wt<slot>`) and
+  `EXPO_DEV_SERVER_PORT` — remain in the generated env. `maestro-env.sh` also
+  collapses any legacy `.../ios-dev-client/wt<slot>` root left in an older
+  generated env back onto the shared root, so pre-existing worktrees converge
+  without regeneration.
+- Concurrent builds targeting the shared root are isolated by a PID-scoped temp
+  workspace and an atomic rename of the finished `.app` into place, so a build in
+  one worktree never corrupts the artifact another worktree is reading. The
+  earlier per-slot default addressed the same concern at the cost of zero
+  cross-worktree reuse; this replaces it without that cost.
 
 Current host-tool prerequisites for the local shared build:
 
