@@ -4,9 +4,13 @@
 # scripts/worktree-sweep.sh (and the boga_worktree_lock_pid / boga_pid_is_alive
 # helpers in scripts/worktree-lib.sh).
 #
-# It builds a throwaway git repo with two registered worktree slots:
-#   - one locked by a PID that is dead   -> must be reaped + cleaned
-#   - one locked by a PID that is alive  -> must be kept
+# It builds a throwaway git repo covering both the registry-driven signal and the
+# registry-less prune pass:
+#   - registered slot locked by a dead PID  -> completed + reaped + cleaned
+#   - registered slot locked by a live PID  -> kept
+#   - registry-LESS worktree, dead PID      -> reaped by the prune pass
+#   - registry-LESS worktree, live PID      -> kept
+#   - registered dead worktree within grace -> deferred to the registry loop
 # and exercises dry-run, real, and --no-dead-lock-detection runs.
 #
 # Self-contained: no Supabase/Docker (runs with --no-supabase) and no network
@@ -36,6 +40,9 @@ assert_not_ok() { # label cmd...
 }
 assert_contains() { # haystack needle label
   if grep -qF -- "$2" <<<"$1"; then pass "$3"; else fail "$3 (missing: '$2')"; fi
+}
+assert_not_contains() { # haystack needle label
+  if grep -qF -- "$2" <<<"$1"; then fail "$3 (unexpected: '$2')"; else pass "$3"; fi
 }
 
 WORK="$(mktemp -d)"
@@ -97,6 +104,11 @@ ALIVE_WT="$(add_locked_worktree live-agent "$ALIVE_PID")"
 register_slot 21 "$DEAD_WT"
 register_slot 22 "$ALIVE_WT"
 
+# Registry-less worktrees for the second (prune) pass: locked by a dead/live PID
+# but deliberately never registered, so the registry scan can't see them.
+ORPHAN_DEAD_WT="$(add_locked_worktree orphan-dead "$DEAD_PID")"
+ORPHAN_LIVE_WT="$(add_locked_worktree orphan-live "$ALIVE_PID")"
+
 SWEEP="$REPO/scripts/worktree-sweep.sh"
 BASE_ARGS=(--no-supabase --no-merge-detection --no-fetch --grace-seconds 0 --current-slot 0)
 
@@ -118,12 +130,19 @@ assert_contains "$out" "dry-run: git -C $REPO worktree remove --force $DEAD_WT" 
 assert_contains "$out" "keeping slot 22: registered worktree still looks active" "live slot 22 kept"
 assert_ok "dry-run left dead worktree registered" in_worktree_list "$DEAD_WT"
 assert_ok "dry-run left dead registry" test -f "$REGISTRY_DIR/21"
+# Prune pass: registry-less dead orphan planned for reaping; live orphan untouched.
+assert_contains "$out" "reaping registry-less worktree locked by dead pid $DEAD_PID: $ORPHAN_DEAD_WT" "orphan-dead reap planned"
+assert_not_contains "$out" "$ORPHAN_LIVE_WT" "orphan-live (live pid) untouched"
+assert_ok "dry-run left orphan-dead registered" in_worktree_list "$ORPHAN_DEAD_WT"
 
 echo "== --no-dead-lock-detection: signal off, dead slot kept =="
 out="$(bash "$SWEEP" "${BASE_ARGS[@]}" --no-dead-lock-detection 2>&1)"
 assert_contains "$out" "keeping slot 21: registered worktree still looks active" "dead slot 21 kept when detection off"
 assert_ok "detection-off left dead worktree" in_worktree_list "$DEAD_WT"
 assert_ok "detection-off left dead registry" test -f "$REGISTRY_DIR/21"
+# Detection off must also disable the prune pass.
+assert_not_contains "$out" "reaping registry-less worktree" "detection-off skips prune pass"
+assert_ok "detection-off left orphan-dead" in_worktree_list "$ORPHAN_DEAD_WT"
 
 echo "== real run: reap dead, keep live =="
 out="$(bash "$SWEEP" "${BASE_ARGS[@]}" 2>&1)"
@@ -133,6 +152,25 @@ assert_not_ok "real run removed dead worktree dir" test -e "$DEAD_WT"
 assert_not_ok "real run removed dead registry" test -f "$REGISTRY_DIR/21"
 assert_ok "real run kept live worktree" in_worktree_list "$ALIVE_WT"
 assert_ok "real run kept live registry" test -f "$REGISTRY_DIR/22"
+# Prune pass: registry-less dead orphan reaped; live orphan spared.
+assert_contains "$out" "reaping registry-less worktree locked by dead pid $DEAD_PID: $ORPHAN_DEAD_WT" "real run reaped orphan-dead"
+assert_not_ok "real run removed orphan-dead from git" in_worktree_list "$ORPHAN_DEAD_WT"
+assert_not_ok "real run removed orphan-dead dir" test -e "$ORPHAN_DEAD_WT"
+assert_ok "real run kept orphan-live worktree" in_worktree_list "$ORPHAN_LIVE_WT"
+
+echo "== prune pass respects grace via the registry-backed loop =="
+# A registry-backed dead worktree: the prune pass must defer to the registry
+# loop (which honours --grace-seconds), never reaping it out from under it.
+GRACED_WT="$(add_locked_worktree graced-dead "$DEAD_PID")"
+register_slot 31 "$GRACED_WT"
+out="$(bash "$SWEEP" --no-supabase --no-merge-detection --no-fetch --grace-seconds 3600 --current-slot 0 2>&1)"
+assert_contains "$out" "keeping slot 31: registry younger than 3600s grace period" "graced slot 31 held by grace"
+assert_not_contains "$out" "reaping registry-less worktree locked by dead pid $DEAD_PID: $GRACED_WT" "prune pass does not bypass grace"
+assert_ok "graced worktree still present" in_worktree_list "$GRACED_WT"
+# With no grace, the registry loop (not the prune pass) completes + reaps it.
+out="$(bash "$SWEEP" "${BASE_ARGS[@]}" 2>&1)"
+assert_contains "$out" "completed slot 31 detected (locked-by-dead-agent-pid-$DEAD_PID)" "graced slot 31 completes once grace passes"
+assert_not_ok "graced worktree reaped after grace" in_worktree_list "$GRACED_WT"
 
 echo
 echo "== summary: $PASS passed, $FAIL failed =="

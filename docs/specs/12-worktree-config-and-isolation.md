@@ -269,6 +269,17 @@ committed history survives. The signal is on by default and can be disabled with
 `--no-dead-lock-detection` (or `BOGA_WORKTREE_SWEEP_DETECT_DEAD_LOCKS=0`); a lock
 whose reason carries no `(pid <N>)` marker (e.g. a manual lock) is never reaped.
 
+The signal above is registry-driven: it only sees worktrees that still have a
+slot registry file. A dead-agent worktree whose registry was already removed (or
+never written — agent worktrees under `<repo>/.claude/worktrees/` do not run
+their own Supabase stack and need no slot) is invisible to it, leaving the git
+worktree registration dangling. After the registry scan, a **second prune pass**
+walks `git worktree list --porcelain` and reaps any worktree still locked by a
+dead PID that has no registry file. The current checkout and registry-backed
+worktrees are skipped — the latter belong to the registry-driven loop, so the
+prune pass never bypasses the grace period. This pass is governed by the same
+`--no-dead-lock-detection` / `BOGA_WORKTREE_SWEEP_DETECT_DEAD_LOCKS` switch.
+
 The branch-merged and branch-deleted signals are referred to as *merge detection*. They are on by default and can be disabled with `--no-merge-detection` (or `BOGA_WORKTREE_SWEEP_DETECT_MERGED=0`). To make them accurate, the sweep performs a single `git fetch --prune --quiet <remote> <main-branch>` at start-up (timeout `BOGA_WORKTREE_SWEEP_FETCH_TIMEOUT_SECONDS`, default `10`). Skip the fetch with `--no-fetch`; the sweep will then rely on cached remote-tracking refs. If the fetch fails or the remote main ref is missing afterwards, merge detection is disabled for that run only and the legacy on-disk signals still apply.
 
 Configurable knobs (env or flag):
@@ -287,6 +298,7 @@ Cleanup scope:
 
 - `scripts/worktree-sweep.sh` scans completed slots and calls `scripts/worktree-clean.sh`.
 - For slots completed via the dead-agent-lock signal, `scripts/worktree-sweep.sh` additionally reaps the abandoned git worktree (`git worktree unlock` + `git worktree remove --force`) before invoking `scripts/worktree-clean.sh`; the other signals assume the git worktree was already removed by whoever finished the work.
+- After the registry scan, `scripts/worktree-sweep.sh` runs a prune pass that reaps registry-less worktrees still locked by a dead PID (git worktree only — these carry no Supabase stack). This catches dead-agent worktrees whose registry was already cleaned but whose git worktree registration was left dangling.
 - `scripts/worktree-clean.sh --supabase` removes Docker containers, volumes, and networks labelled with the registry-recorded Supabase project id, plus the legacy `scaffolding[-wtN]` id for older local state.
 - `scripts/worktree-clean.sh --remove-registry` removes the completed slot registry file after cleanup.
 - Cleanup never targets the current slot unless explicitly forced in the manual cleaner.

@@ -36,6 +36,12 @@ When a slot completes because its lock-holder PID is dead, the sweep first reaps
 the abandoned git worktree (`git worktree unlock` + `git worktree remove
 --force`) before the Supabase/registry cleanup, so the slot is fully reclaimed.
 
+After the registry scan, a second pass reaps any *registry-less* worktree that
+is still locked by a dead agent PID — agent worktrees whose registry was already
+removed (or never written), which the registry scan can't see. The current
+checkout and registry-backed worktrees are left untouched. Disable both the
+signal and this pass with --no-dead-lock-detection.
+
 Options:
   --current-slot <n>        Slot that must never be cleaned (default: current worktree slot).
   --no-supabase             Only report/prune logic; do not clean Supabase infra.
@@ -245,11 +251,47 @@ completion_reason() {
   return 1
 }
 
+# Unlock + force-remove a linked git worktree (dry-run aware). The caller logs
+# the reason. The branch ref is not touched, so committed history survives; only
+# the abandoned working tree is discarded.
+git_worktree_remove() {
+  local abs="$1"
+
+  if [[ "$DRY_RUN" == "1" ]]; then
+    echo "[worktree-sweep] dry-run: git -C $REPO_ROOT worktree unlock $abs"
+    echo "[worktree-sweep] dry-run: git -C $REPO_ROOT worktree remove --force $abs"
+    return 0
+  fi
+
+  git -C "$REPO_ROOT" worktree unlock "$abs" >/dev/null 2>&1 || true
+  if ! git -C "$REPO_ROOT" worktree remove --force "$abs" >/dev/null 2>&1; then
+    echo "[worktree-sweep] warning: 'git worktree remove --force $abs' failed; running 'git worktree prune'" >&2
+    git -C "$REPO_ROOT" worktree prune >/dev/null 2>&1 || true
+  fi
+}
+
+# True when some slot registry file points at the given (already-abs) worktree
+# path. Used to leave registry-backed worktrees to the registry-driven loop
+# (which honours the grace period) instead of pruning them out from under it.
+path_has_registry() {
+  local target_abs="$1"
+  local registry_file registry_path
+
+  for registry_file in "$REGISTRY_DIR"/*; do
+    [[ -e "$registry_file" ]] || continue
+    registry_path="$(boga_registry_path_from_file "$registry_file" 2>/dev/null || true)"
+    [[ -n "$registry_path" && -d "$registry_path" ]] || continue
+    if [[ "$(boga_abs_dir "$registry_path")" == "$target_abs" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
 # For a slot completed because its lock-holder PID is dead, the git worktree is
 # still registered and on disk; worktree-clean.sh only handles Supabase + the
 # registry file, so without this the worktree (and its directory) would dangle.
-# Unlock + force-remove it here, before the infra cleanup. The branch ref is not
-# touched, so committed history survives; only the abandoned working tree goes.
+# Reap it here, before the infra cleanup.
 reap_dead_agent_worktree() {
   local registry_file="$1"
   local slot="$2"
@@ -263,17 +305,43 @@ reap_dead_agent_worktree() {
   registered_abs="$(boga_abs_dir "$registered_path")"
 
   echo "[worktree-sweep] reaping abandoned git worktree for slot $slot ($reason): $registered_abs"
-  if [[ "$DRY_RUN" == "1" ]]; then
-    echo "[worktree-sweep] dry-run: git -C $REPO_ROOT worktree unlock $registered_abs"
-    echo "[worktree-sweep] dry-run: git -C $REPO_ROOT worktree remove --force $registered_abs"
-    return 0
-  fi
+  git_worktree_remove "$registered_abs"
+}
 
-  git -C "$REPO_ROOT" worktree unlock "$registered_abs" >/dev/null 2>&1 || true
-  if ! git -C "$REPO_ROOT" worktree remove --force "$registered_abs" >/dev/null 2>&1; then
-    echo "[worktree-sweep] warning: 'git worktree remove --force $registered_abs' failed; running 'git worktree prune'" >&2
-    git -C "$REPO_ROOT" worktree prune >/dev/null 2>&1 || true
-  fi
+# Second pass: reap worktrees locked by a dead agent PID that have NO slot
+# registry, so the registry-driven loop above never sees them. These are agent
+# worktrees under `<repo>/.claude/worktrees/` whose registry was already removed
+# (or never written) — they do not run their own Supabase stack, so reaping the
+# dangling git worktree registration fully reclaims them. Registry-backed
+# worktrees are intentionally skipped: the loop above owns them and its grace
+# period; the current checkout is never touched.
+prune_orphaned_dead_locks() {
+  [[ "$DETECT_DEAD_LOCKS" == "1" ]] || return 0
+
+  local current_abs line worktree_path abs lock_pid
+  current_abs="$(boga_abs_dir "$REPO_ROOT")"
+
+  while IFS= read -r line; do
+    case "$line" in
+      worktree\ *)
+        worktree_path="${line#worktree }"
+        if [[ -d "$worktree_path" ]]; then
+          abs="$(boga_abs_dir "$worktree_path")"
+        else
+          abs=""
+        fi
+        ;;
+      locked*)
+        [[ -n "$abs" && "$abs" != "$current_abs" ]] || continue
+        [[ "$line" =~ \(pid\ ([0-9]+)\) ]] || continue
+        lock_pid="${BASH_REMATCH[1]}"
+        boga_pid_is_alive "$lock_pid" && continue
+        path_has_registry "$abs" && continue
+        echo "[worktree-sweep] reaping registry-less worktree locked by dead pid $lock_pid: $abs"
+        git_worktree_remove "$abs"
+        ;;
+    esac
+  done < <(git -C "$REPO_ROOT" worktree list --porcelain)
 }
 
 clean_slot() {
@@ -332,5 +400,7 @@ for registry_file in "$REGISTRY_DIR"/*; do
     echo "[worktree-sweep] keeping slot $slot: registered worktree still looks active"
   fi
 done
+
+prune_orphaned_dead_locks
 
 echo "[worktree-sweep] done"
