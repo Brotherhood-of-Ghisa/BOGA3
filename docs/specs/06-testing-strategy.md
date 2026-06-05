@@ -138,12 +138,10 @@ Reason: keeps FE/backend integration test expectations explicit without forcing 
   - `apps/mobile/app/__tests__/sync-runtime-bootstrap.test.ts` (first-enable trigger and logged-out-then-login bootstrap trigger),
   - `apps/mobile/app/__tests__/sync-outbox-engine.test.ts` (batch response semantics, including retry scheduling and blocked failure mapping),
   - `apps/mobile/app/__tests__/sync-profile-status.test.ts` (profile-facing sync status mapping, including blocked and retry-scheduled states),
-  - `apps/mobile/app/__tests__/settings-profile-navigation.test.tsx` (profile sync section render + toggle + inline blocked-failure messaging),
-  - `apps/mobile/app/__tests__/sync-reinstall-restore-parity.test.ts` (M13 reinstall restore-parity proof: real outbox delivery to local Supabase ingest + reinstall bootstrap/merge parity assertion for all M13 data-scope entities).
-- Local command wrapper for the restore-parity lane:
-  - `apps/mobile/scripts/test-sync-reinstall-restore-parity.sh`
-  - `npm run test:sync:reinstall-parity` (from `apps/mobile`)
-  - behavior: enforces local Supabase runtime baseline, injects `EXPO_PUBLIC_SUPABASE_URL`/`EXPO_PUBLIC_SUPABASE_ANON_KEY` from local runtime status, and runs the dedicated Jest integration config (`apps/mobile/jest.integration.config.js`) targeting this suite.
+  - `apps/mobile/app/__tests__/settings-profile-navigation.test.tsx` (profile sync section render + toggle + inline blocked-failure messaging).
+- Reinstall restore-parity coverage (sync v2): the dedicated `test:sync:reinstall-parity` mobile lane was **retired** in the sync v1 retirement — its target suite was deleted with the v1 code paths. Under the sync v2 model (push/pull RPC + per-layer cursor protocol) the same guarantee is proven by:
+  - `apps/mobile/app/__tests__/sync/cycle-round-trip.test.ts` — the *"a wiped client re-pulls all four rows via the layered drain with advancing cursors"* assertion drops the entire local store to mirror a reinstall, re-runs the real cycle against a live endpoint, and asserts every layer restores with FK integrity and advancing cursors. It runs in the branch-provisioned `test:sync:infra` lane (requires `SUPABASE_BRANCH_URL` / `SUPABASE_BRANCH_ANON_KEY`).
+  - backend contract suites `supabase/tests/sync-v2-push-roundtrip.sh` and `supabase/tests/sync-v2-pull-drain.sh` independently assert push→pull parity across all data-scope entities (including soft-delete tombstone visibility) at the RPC layer; they run via `./scripts/quality-slow.sh backend`.
 
 ## Maestro contract ownership (M10)
 

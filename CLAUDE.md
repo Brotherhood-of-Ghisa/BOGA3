@@ -13,8 +13,8 @@ done; a missing global (e.g. `which supabase` returning nothing) means
 *bootstrap* (`npm install` + `./scripts/worktree-setup.sh`), not *unavailable*.
 
 **Never ship — and never approve — a PR that skips a runnable test with an
-excuse.** The only deferrable lanes are the genuinely cloud / branch-provisioned
-ones (`test:sync:infra`, `test:sync:reinstall-parity`) when their remote env
-(`SUPABASE_BRANCH_URL` / `SUPABASE_BRANCH_ANON_KEY`) is unset.
+excuse.** The only deferrable lane is the genuinely cloud / branch-provisioned
+`test:sync:infra` when its remote env (`SUPABASE_BRANCH_URL` /
+`SUPABASE_BRANCH_ANON_KEY`) is unset.
 
 See `AGENTS.md` → "Testing is not optional" and `docs/specs/06-testing-strategy.md`.
