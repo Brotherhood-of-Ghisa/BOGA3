@@ -109,6 +109,19 @@ appId: com.dinoderek.mobile
     timeout: 15000
 - takeScreenshot: "m17-03-overlay-populated"
 
+# --- Daily/Weekly view toggle is available; capture the daily grid too ---
+- assertVisible:
+    id: "stats-exercise-history-view-chip-weekly"
+- assertVisible:
+    id: "stats-exercise-history-view-chip-daily"
+- tapOn:
+    id: "stats-exercise-history-view-chip-daily"
+- assertVisible:
+    id: "stats-exercise-history-heatmap"
+- takeScreenshot: "m17-03b-overlay-daily-grid"
+- tapOn:
+    id: "stats-exercise-history-view-chip-weekly"
+
 # --- Tap a week cell to show the week-selection banner ---
 - tapOn:
     id: "stats-exercise-history-heatmap-cell-2026-06-02"

@@ -44,7 +44,24 @@ appId: com.dinoderek.mobile
 - assertVisible:
     id: "stats-muscle-history-metric-chip-highestWeight"
 
-# Calendar grid is present (≥6 month rows will include grey rows)
+# Heatmap is present; defaults to the weekly bar view
+- assertVisible:
+    id: "stats-muscle-history-heatmap"
+
+# Daily/Weekly view toggle must be visible
+- assertVisible:
+    id: "stats-muscle-history-view-chip-weekly"
+- assertVisible:
+    id: "stats-muscle-history-view-chip-daily"
+
+# Switch to the daily grid and back to weekly
+- tapOn:
+    id: "stats-muscle-history-view-chip-daily"
+- assertVisible:
+    id: "stats-muscle-history-heatmap"
+- takeScreenshot: "02b-chest-overlay-daily-grid"
+- tapOn:
+    id: "stats-muscle-history-view-chip-weekly"
 - assertVisible:
     id: "stats-muscle-history-heatmap"
 

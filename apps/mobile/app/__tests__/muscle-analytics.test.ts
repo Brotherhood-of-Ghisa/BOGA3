@@ -1,5 +1,6 @@
 import {
   aggregateSelectedMuscleDailyEffort,
+  aggregateSelectedMuscleDailyEffortMetrics,
   getMuscleContributionRoleWeight,
   type MuscleAnalyticsInput,
 } from '@/src/data/muscle-analytics';
@@ -204,5 +205,25 @@ describe('aggregateSelectedMuscleDailyEffort', () => {
       exerciseDefinitionId: 'ex-press',
       exerciseName: 'Press',
     });
+  });
+});
+
+describe('aggregateSelectedMuscleDailyEffortMetrics', () => {
+  const options = { muscleGroupIds: ['chest_sternal'], timeZone: 'Europe/London' };
+
+  it('emits one metric row per training day, aligned with the daily effort', () => {
+    const daily = aggregateSelectedMuscleDailyEffort(buildAnalyticsInput(), options);
+    const metrics = aggregateSelectedMuscleDailyEffortMetrics(daily);
+
+    expect(metrics.map((m) => m.dateKey)).toEqual(daily.map((d) => d.dateKey));
+  });
+
+  it('derives totalVolume from the same weighted contributions as totalWeight', () => {
+    const daily = aggregateSelectedMuscleDailyEffort(buildAnalyticsInput(), options);
+    const metrics = aggregateSelectedMuscleDailyEffortMetrics(daily);
+
+    const monday = metrics.find((m) => m.dateKey === '2026-03-30');
+    expect(monday?.totalVolume).toBe(600);
+    expect(monday?.highestWeight).not.toBeNull();
   });
 });

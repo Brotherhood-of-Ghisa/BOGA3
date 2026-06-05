@@ -87,6 +87,7 @@ export { insertSmokeRecord, listSmokeRecords, type SmokeRecord } from './smoke-r
 export { runLocalDataRuntimeSmoke, type LocalDataRuntimeSmokeResult } from './runtime-smoke';
 export {
   aggregateSelectedMuscleDailyEffort,
+  aggregateSelectedMuscleDailyEffortMetrics,
   aggregateSelectedMuscleWeeklyEffort,
   collectMuscleSetContributions,
   computeMuscleSetVolume,
@@ -95,6 +96,7 @@ export {
   isMuscleAnalyticsWorkingSet,
   type AggregateSelectedMuscleDailyEffortOptions,
   type CalendarHeatmapMetric,
+  type DailyEffortMetrics,
   type MuscleAnalyticsInput,
   type MuscleContributionRole,
   type MuscleSetContribution,
@@ -106,6 +108,7 @@ export {
   aggregateStats,
   computePeriodBounds,
   computeSelectedMuscleDailyEffort,
+  computeSelectedMuscleDailyEffortMetrics,
   computeSelectedMuscleWeeklyEffort,
   computeStatsSummary,
   createDrizzleStatsStore,
@@ -148,8 +151,11 @@ export {
   type LoadExercisePerformanceHistoryOptions,
 } from './exercise-history';
 export {
+  aggregateExerciseDailyEffort,
   aggregateExerciseWeeklyEffort,
+  computeSelectedExerciseDailyEffort,
   computeSelectedExerciseWeeklyEffort,
+  type ComputeSelectedExerciseDailyEffortOptions,
   type ComputeSelectedExerciseWeeklyEffortOptions,
   type ExerciseRawSession,
   type SelectedExerciseWeeklyEffort,

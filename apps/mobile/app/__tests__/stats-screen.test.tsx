@@ -13,7 +13,9 @@ import type { SelectedMuscleWeeklyEffort, StatsSummary } from '@/src/data';
 
 jest.mock('@/src/data', () => ({
   computeSelectedExerciseWeeklyEffort: jest.fn(),
+  computeSelectedExerciseDailyEffort: jest.fn(() => Promise.resolve([])),
   computeSelectedMuscleWeeklyEffort: jest.fn(),
+  computeSelectedMuscleDailyEffortMetrics: jest.fn(() => Promise.resolve([])),
   computeStatsSummary: jest.fn(),
 }));
 
@@ -27,14 +29,18 @@ jest.mock('@/src/exercise-catalog/cache', () => ({
   })),
 }));
 
-jest.mock('@/src/exercise-catalog/stats-cache', () => ({
-  useExerciseCatalogStats: jest.fn(() => ({
-    status: 'ready',
-    stats: { aggregatesById: new Map(), everDoneIds: new Set() },
-    lastError: null,
-    reload: jest.fn(),
-  })),
-}));
+jest.mock('@/src/exercise-catalog/stats-cache', () => {
+  const reload = jest.fn();
+  return {
+    __reload: reload,
+    useExerciseCatalogStats: jest.fn(() => ({
+      status: 'ready',
+      stats: { aggregatesById: new Map(), everDoneIds: new Set() },
+      lastError: null,
+      reload,
+    })),
+  };
+});
 
 jest.mock('expo-router', () => {
   const mockPush = jest.fn();
@@ -54,17 +60,25 @@ jest.mock('expo-router', () => {
 
 const {
   computeSelectedExerciseWeeklyEffort: mockComputeSelectedExerciseWeeklyEffort,
+  computeSelectedExerciseDailyEffort: mockComputeSelectedExerciseDailyEffort,
   computeSelectedMuscleWeeklyEffort: mockComputeSelectedMuscleWeeklyEffort,
+  computeSelectedMuscleDailyEffortMetrics: mockComputeSelectedMuscleDailyEffortMetrics,
   computeStatsSummary: mockComputeStatsSummary,
 } = jest.requireMock('@/src/data') as {
   computeSelectedExerciseWeeklyEffort: jest.Mock;
+  computeSelectedExerciseDailyEffort: jest.Mock;
   computeSelectedMuscleWeeklyEffort: jest.Mock;
+  computeSelectedMuscleDailyEffortMetrics: jest.Mock;
   computeStatsSummary: jest.Mock;
 };
 
 const { __mockPush: mockPush, __triggerFocus: triggerFocus } = jest.requireMock(
   'expo-router'
 ) as { __mockPush: jest.Mock; __triggerFocus: () => void };
+
+const { __reload: mockReloadExerciseCatalogStats } = jest.requireMock(
+  '@/src/exercise-catalog/stats-cache'
+) as { __reload: jest.Mock };
 
 const buildSummary = (overrides: Partial<StatsSummary> = {}): StatsSummary => ({
   current: {
@@ -210,9 +224,12 @@ const buildSummary = (overrides: Partial<StatsSummary> = {}): StatsSummary => ({
 
 beforeEach(() => {
   mockComputeSelectedExerciseWeeklyEffort.mockReset();
+  mockComputeSelectedExerciseDailyEffort.mockReset().mockResolvedValue([]);
   mockComputeSelectedMuscleWeeklyEffort.mockReset();
+  mockComputeSelectedMuscleDailyEffortMetrics.mockReset().mockResolvedValue([]);
   mockComputeStatsSummary.mockReset();
   mockPush.mockReset();
+  mockReloadExerciseCatalogStats.mockClear();
 });
 
 const buildShellProps = (
@@ -229,24 +246,31 @@ const buildShellProps = (
   errorMessage: null,
   selectedMuscle: null,
   muscleHistoryWeeklyEffort: [],
+  muscleHistoryDailyMetrics: [],
   isMuscleHistoryLoading: false,
   muscleHistoryErrorMessage: null,
   selectedMuscleHistoryWeekKey: null,
   muscleHistoryMetric: 'totalVolume',
+  muscleHistoryView: 'weekly',
   onSelectMuscleHistoryMetric: jest.fn(),
+  onSelectMuscleHistoryView: jest.fn(),
   viewMode: 'muscle',
   onSelectViewMode: jest.fn(),
   exerciseListItems: [],
   selectedExercise: null,
   exerciseHistoryWeeklyEffort: [],
+  exerciseHistoryDailyMetrics: [],
   isExerciseHistoryLoading: false,
   exerciseHistoryErrorMessage: null,
   selectedExerciseHistoryWeekKey: null,
   exerciseHistoryMetric: 'totalVolume',
+  exerciseHistoryView: 'weekly',
   onPressExerciseHistory: jest.fn(),
   onDismissExerciseHistory: jest.fn(),
   onSelectExerciseHistoryWeek: jest.fn(),
   onSelectExerciseHistoryMetric: jest.fn(),
+  onSelectExerciseHistoryView: jest.fn(),
+  historyTodayDateKey: '2026-06-05',
   ...overrides,
 });
 
@@ -496,6 +520,60 @@ describe('StatsScreenShell', () => {
     expect(screen.getByTestId('stats-muscle-history-metric-chip-highestWeight')).toBeTruthy();
   });
 
+  it('renders the Daily/Weekly view toggle and reports changes', () => {
+    const onSelectMuscleHistoryView = jest.fn();
+    renderStatsScreenShell({
+      selectedMuscle: {
+        muscleGroupIds: ['front_delts'],
+        displayName: 'Front Delts',
+        familyName: 'Shoulders',
+      },
+      muscleHistoryWeeklyEffort: [buildWeeklyEffort()],
+      muscleHistoryView: 'weekly',
+      onSelectMuscleHistoryView,
+    });
+
+    expect(screen.getByTestId('stats-muscle-history-view-chip-weekly')).toBeTruthy();
+    expect(screen.getByTestId('stats-muscle-history-view-chip-daily')).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('stats-muscle-history-view-chip-daily'));
+    expect(onSelectMuscleHistoryView).toHaveBeenCalledWith('daily');
+  });
+
+  it('selects a single day (not a week) and shows its detail in daily view', () => {
+    renderStatsScreenShell({
+      selectedMuscle: {
+        muscleGroupIds: ['front_delts'],
+        displayName: 'Front Delts',
+        familyName: 'Shoulders',
+      },
+      muscleHistoryWeeklyEffort: [buildWeeklyEffort()],
+      muscleHistoryDailyMetrics: [
+        {
+          dateKey: '2026-05-13',
+          totalVolume: 1200,
+          nearFailureCount: 2,
+          estimatedRM1: 95,
+          highestWeight: 80,
+        },
+      ],
+      muscleHistoryMetric: 'totalVolume',
+      muscleHistoryView: 'daily',
+    });
+
+    // The weekly rollup banner is hidden in daily view.
+    expect(screen.queryByTestId('stats-muscle-history-week-banner')).toBeNull();
+
+    // One square per day → addressable by its date key; tapping shows the DAY detail.
+    fireEvent.press(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-05-13'));
+    expect(screen.getByTestId('stats-muscle-history-heatmap-day-detail-date')).toHaveTextContent(
+      'May 13, 2026'
+    );
+    expect(screen.getByTestId('stats-muscle-history-heatmap-day-detail-value')).toHaveTextContent(
+      /Volume: 1\.2k/
+    );
+  });
+
   it('shows the week selection banner with date range and metric value when a week is selected', () => {
     renderStatsScreenShell({
       selectedMuscle: {
@@ -588,6 +666,21 @@ describe('StatsRoute', () => {
     });
   });
 
+  it('recomputes the exercise list from the DB on focus (not just on catalog invalidation)', async () => {
+    mockComputeStatsSummary.mockResolvedValue(buildSummary());
+
+    render(<StatsRoute />);
+
+    await act(async () => {
+      triggerFocus();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('stats-card-sessions')).toBeTruthy();
+    });
+    expect(mockReloadExerciseCatalogStats).toHaveBeenCalled();
+  });
+
   it('navigates to the sessions list when the Sessions card is tapped', async () => {
     mockComputeStatsSummary.mockResolvedValue(buildSummary());
 
@@ -608,6 +701,7 @@ describe('StatsRoute', () => {
   it('loads selected-muscle weekly heatmap data when a muscle row is tapped', async () => {
     mockComputeStatsSummary.mockResolvedValue(buildSummary());
     mockComputeSelectedMuscleWeeklyEffort.mockResolvedValue([buildWeeklyEffort()]);
+    mockComputeSelectedMuscleDailyEffortMetrics.mockResolvedValue([]);
 
     render(<StatsRoute />);
 
@@ -636,7 +730,12 @@ describe('StatsRoute', () => {
         /Front Delts/
       );
     });
-    expect(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-05-11')).toBeTruthy();
+    expect(mockComputeSelectedMuscleDailyEffortMetrics).toHaveBeenCalledWith({
+      muscleGroupIds: ['front_delts'],
+      start: expect.any(Date),
+      end: expect.any(Date),
+    });
+    expect(screen.getByTestId('stats-muscle-history-heatmap')).toBeTruthy();
   });
 
   it('shows an overlay error when selected-muscle heatmap data fails to load', async () => {
@@ -840,6 +939,11 @@ describe('StatsRoute — exercise heatmap integration', () => {
         end: expect.any(Date),
       })
     );
+    expect(mockComputeSelectedExerciseDailyEffort).toHaveBeenCalledWith({
+      exerciseDefinitionId: 'bench-press',
+      start: expect.any(Date),
+      end: expect.any(Date),
+    });
     await waitFor(() =>
       expect(screen.getByTestId('stats-exercise-history-title')).toHaveTextContent('Bench Press')
     );

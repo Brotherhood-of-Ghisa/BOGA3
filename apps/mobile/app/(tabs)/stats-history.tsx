@@ -2,15 +2,16 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import {
-  CalendarHeatmap,
-  type CalendarHeatmapMetric,
-} from '@/components/muscle-analytics';
+import { DailyHeatmap, WeeklyHeatmap, buildHeatmapData } from '@/components/heatmaps';
 import { SegmentedChips, uiColors } from '@/components/ui';
 import {
+  computeSelectedExerciseDailyEffort,
   computeSelectedExerciseWeeklyEffort,
+  computeSelectedMuscleDailyEffortMetrics,
   computeSelectedMuscleWeeklyEffort,
   computeStatsSummary,
+  type CalendarHeatmapMetric,
+  type DailyEffortMetrics,
   type SelectedExerciseWeeklyEffort,
   type SelectedMuscleWeeklyEffort,
   type StatsMuscleFamilyPerformance,
@@ -121,24 +122,32 @@ export type StatsScreenShellProps = {
   errorMessage: string | null;
   selectedMuscle: MuscleHistoryTarget | null;
   muscleHistoryWeeklyEffort: SelectedMuscleWeeklyEffort[];
+  muscleHistoryDailyMetrics: DailyEffortMetrics[];
   isMuscleHistoryLoading: boolean;
   muscleHistoryErrorMessage: string | null;
   selectedMuscleHistoryWeekKey: string | null;
   muscleHistoryMetric: CalendarHeatmapMetric;
+  muscleHistoryView: HeatmapView;
   onSelectMuscleHistoryMetric: (metric: CalendarHeatmapMetric) => void;
+  onSelectMuscleHistoryView: (view: HeatmapView) => void;
   viewMode: StatsViewMode;
   onSelectViewMode: (mode: StatsViewMode) => void;
   exerciseListItems: ExerciseListItem[];
   selectedExercise: ExerciseHeatmapTarget | null;
   exerciseHistoryWeeklyEffort: SelectedExerciseWeeklyEffort[];
+  exerciseHistoryDailyMetrics: DailyEffortMetrics[];
   isExerciseHistoryLoading: boolean;
   exerciseHistoryErrorMessage: string | null;
   selectedExerciseHistoryWeekKey: string | null;
   exerciseHistoryMetric: CalendarHeatmapMetric;
+  exerciseHistoryView: HeatmapView;
   onPressExerciseHistory: (exercise: ExerciseHeatmapTarget) => void;
   onDismissExerciseHistory: () => void;
   onSelectExerciseHistoryWeek: (weekKey: string | null) => void;
   onSelectExerciseHistoryMetric: (metric: CalendarHeatmapMetric) => void;
+  onSelectExerciseHistoryView: (view: HeatmapView) => void;
+  /** Optional determinism seam: anchors the heatmap window. Defaults to today. */
+  historyTodayDateKey?: string;
 };
 
 export function StatsScreenShell({
@@ -153,24 +162,31 @@ export function StatsScreenShell({
   errorMessage,
   selectedMuscle,
   muscleHistoryWeeklyEffort,
+  muscleHistoryDailyMetrics,
   isMuscleHistoryLoading,
   muscleHistoryErrorMessage,
   selectedMuscleHistoryWeekKey,
   muscleHistoryMetric,
+  muscleHistoryView,
   onSelectMuscleHistoryMetric,
+  onSelectMuscleHistoryView,
   viewMode,
   onSelectViewMode,
   exerciseListItems,
   selectedExercise,
   exerciseHistoryWeeklyEffort,
+  exerciseHistoryDailyMetrics,
   isExerciseHistoryLoading,
   exerciseHistoryErrorMessage,
   selectedExerciseHistoryWeekKey,
   exerciseHistoryMetric,
+  exerciseHistoryView,
   onPressExerciseHistory,
   onDismissExerciseHistory,
   onSelectExerciseHistoryWeek,
   onSelectExerciseHistoryMetric,
+  onSelectExerciseHistoryView,
+  historyTodayDateKey,
 }: StatsScreenShellProps) {
   const sessionDelta = summary
     ? formatDelta(summary.current.totals.sessionCount, summary.previous.totals.sessionCount)
@@ -271,26 +287,34 @@ export function StatsScreenShell({
         <MuscleHistoryOverlay
           muscle={selectedMuscle}
           weeklyEffort={muscleHistoryWeeklyEffort}
+          dailyMetrics={muscleHistoryDailyMetrics}
           isLoading={isMuscleHistoryLoading}
           errorMessage={muscleHistoryErrorMessage}
           selectedWeekKey={selectedMuscleHistoryWeekKey}
           metric={muscleHistoryMetric}
+          view={muscleHistoryView}
           onSelectMetric={onSelectMuscleHistoryMetric}
+          onSelectView={onSelectMuscleHistoryView}
           onDismiss={onDismissMuscleHistory}
           onSelectWeek={onSelectMuscleHistoryWeek}
+          todayDateKey={historyTodayDateKey}
         />
       ) : null}
       {selectedExercise ? (
         <ExerciseHistoryOverlay
           exercise={selectedExercise}
           weeklyEffort={exerciseHistoryWeeklyEffort}
+          dailyMetrics={exerciseHistoryDailyMetrics}
           isLoading={isExerciseHistoryLoading}
           errorMessage={exerciseHistoryErrorMessage}
           selectedWeekKey={selectedExerciseHistoryWeekKey}
           metric={exerciseHistoryMetric}
+          view={exerciseHistoryView}
           onSelectMetric={onSelectExerciseHistoryMetric}
+          onSelectView={onSelectExerciseHistoryView}
           onDismiss={onDismissExerciseHistory}
           onSelectWeek={onSelectExerciseHistoryWeek}
+          todayDateKey={historyTodayDateKey}
         />
       ) : null}
     </View>
@@ -487,6 +511,13 @@ const METRIC_LABELS: Record<CalendarHeatmapMetric, string> = {
   highestWeight: 'Top weight',
 };
 
+export type HeatmapView = 'weekly' | 'daily';
+
+const HEATMAP_VIEW_OPTIONS: readonly { value: HeatmapView; label: string }[] = [
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'daily', label: 'Daily' },
+];
+
 const MS_PER_DAY_BANNER = 24 * 60 * 60 * 1000;
 
 const formatWeekDateRange = (weekStartDateKey: string): string => {
@@ -512,6 +543,11 @@ const formatMetricValue = (week: SelectedMuscleWeeklyEffort, metric: CalendarHea
     case 'highestWeight': return week.highestWeight !== null ? formatTotalWeight(week.highestWeight) : '—';
   }
 };
+
+// Formats a single value for the chosen metric (near-failure is a raw count;
+// the rest are weights). Used by the daily heatmap's per-day detail card.
+const formatMetricNumber = (value: number, metric: CalendarHeatmapMetric): string =>
+  metric === 'nearFailureCount' ? String(value) : formatTotalWeight(value);
 
 function WeekSelectionBanner({
   weeklyEffort,
@@ -549,26 +585,72 @@ function WeekSelectionBanner({
   );
 }
 
+function HistoryHeatmap({
+  dailyMetrics,
+  metric,
+  view,
+  selectedWeekKey,
+  onSelectWeek,
+  testIDPrefix,
+  todayDateKey,
+}: {
+  dailyMetrics: DailyEffortMetrics[];
+  metric: CalendarHeatmapMetric;
+  view: HeatmapView;
+  selectedWeekKey: string | null;
+  onSelectWeek: (weekKey: string | null) => void;
+  testIDPrefix: string;
+  todayDateKey?: string;
+}) {
+  const data = useMemo(
+    () => buildHeatmapData(dailyMetrics, metric, { todayDateKey }),
+    [dailyMetrics, metric, todayDateKey]
+  );
+  return view === 'daily' ? (
+    <DailyHeatmap
+      data={data}
+      testIDPrefix={testIDPrefix}
+      metricLabel={METRIC_LABELS[metric]}
+      formatValue={(value) => formatMetricNumber(value, metric)}
+    />
+  ) : (
+    <WeeklyHeatmap
+      data={data}
+      selectedWeekKey={selectedWeekKey}
+      onSelectWeek={onSelectWeek}
+      testIDPrefix={testIDPrefix}
+    />
+  );
+}
+
 function MuscleHistoryOverlay({
   muscle,
   weeklyEffort,
+  dailyMetrics,
   isLoading,
   errorMessage,
   selectedWeekKey,
   metric,
+  view,
   onSelectMetric,
+  onSelectView,
   onDismiss,
   onSelectWeek,
+  todayDateKey,
 }: {
   muscle: MuscleHistoryTarget;
   weeklyEffort: SelectedMuscleWeeklyEffort[];
+  dailyMetrics: DailyEffortMetrics[];
   isLoading: boolean;
   errorMessage: string | null;
   selectedWeekKey: string | null;
   metric: CalendarHeatmapMetric;
+  view: HeatmapView;
   onSelectMetric: (metric: CalendarHeatmapMetric) => void;
+  onSelectView: (view: HeatmapView) => void;
   onDismiss: () => void;
   onSelectWeek: (weekKey: string | null) => void;
+  todayDateKey?: string;
 }) {
   return (
     <View style={styles.overlayRoot} testID="stats-muscle-history-overlay">
@@ -613,11 +695,24 @@ function MuscleHistoryOverlay({
           />
         </View>
 
-        <WeekSelectionBanner
-          weeklyEffort={weeklyEffort}
-          selectedWeekKey={selectedWeekKey}
-          metric={metric}
-        />
+        <View style={styles.overlayViewSelector}>
+          <SegmentedChips
+            accessibilityLabel="Select heatmap view"
+            options={HEATMAP_VIEW_OPTIONS}
+            value={view}
+            onChange={onSelectView}
+            testIDPrefix="stats-muscle-history-view-chip"
+            compact
+          />
+        </View>
+
+        {view === 'weekly' ? (
+          <WeekSelectionBanner
+            weeklyEffort={weeklyEffort}
+            selectedWeekKey={selectedWeekKey}
+            metric={metric}
+          />
+        ) : null}
 
         <ScrollView
           contentContainerStyle={styles.overlayContent}
@@ -648,12 +743,14 @@ function MuscleHistoryOverlay({
                 </View>
               ) : null}
 
-              <CalendarHeatmap
-                weeklyEffort={weeklyEffort}
+              <HistoryHeatmap
+                dailyMetrics={dailyMetrics}
                 metric={metric}
+                view={view}
                 selectedWeekKey={selectedWeekKey}
                 onSelectWeek={onSelectWeek}
-                testID="stats-muscle-history-heatmap"
+                testIDPrefix="stats-muscle-history"
+                todayDateKey={todayDateKey}
               />
             </>
           ) : null}
@@ -735,23 +832,31 @@ function ExerciseListView({
 function ExerciseHistoryOverlay({
   exercise,
   weeklyEffort,
+  dailyMetrics,
   isLoading,
   errorMessage,
   selectedWeekKey,
   metric,
+  view,
   onSelectMetric,
+  onSelectView,
   onDismiss,
   onSelectWeek,
+  todayDateKey,
 }: {
   exercise: ExerciseHeatmapTarget;
   weeklyEffort: SelectedExerciseWeeklyEffort[];
+  dailyMetrics: DailyEffortMetrics[];
   isLoading: boolean;
   errorMessage: string | null;
   selectedWeekKey: string | null;
   metric: CalendarHeatmapMetric;
+  view: HeatmapView;
   onSelectMetric: (metric: CalendarHeatmapMetric) => void;
+  onSelectView: (view: HeatmapView) => void;
   onDismiss: () => void;
   onSelectWeek: (weekKey: string | null) => void;
+  todayDateKey?: string;
 }) {
   return (
     <View style={styles.overlayRoot} testID="stats-exercise-history-overlay">
@@ -794,11 +899,24 @@ function ExerciseHistoryOverlay({
           />
         </View>
 
-        <WeekSelectionBanner
-          weeklyEffort={weeklyEffort}
-          selectedWeekKey={selectedWeekKey}
-          metric={metric}
-        />
+        <View style={styles.overlayViewSelector}>
+          <SegmentedChips
+            accessibilityLabel="Select heatmap view"
+            options={HEATMAP_VIEW_OPTIONS}
+            value={view}
+            onChange={onSelectView}
+            testIDPrefix="stats-exercise-history-view-chip"
+            compact
+          />
+        </View>
+
+        {view === 'weekly' ? (
+          <WeekSelectionBanner
+            weeklyEffort={weeklyEffort}
+            selectedWeekKey={selectedWeekKey}
+            metric={metric}
+          />
+        ) : null}
 
         <ScrollView
           contentContainerStyle={styles.overlayContent}
@@ -829,12 +947,14 @@ function ExerciseHistoryOverlay({
                 </View>
               ) : null}
 
-              <CalendarHeatmap
-                weeklyEffort={weeklyEffort}
+              <HistoryHeatmap
+                dailyMetrics={dailyMetrics}
                 metric={metric}
+                view={view}
                 selectedWeekKey={selectedWeekKey}
                 onSelectWeek={onSelectWeek}
-                testID="stats-exercise-history-heatmap"
+                testIDPrefix="stats-exercise-history"
+                todayDateKey={todayDateKey}
               />
             </>
           ) : null}
@@ -884,23 +1004,28 @@ export default function StatsRoute() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [selectedMuscle, setSelectedMuscle] = useState<MuscleHistoryTarget | null>(null);
   const [muscleHistoryWeeklyEffort, setMuscleHistoryWeeklyEffort] = useState<SelectedMuscleWeeklyEffort[]>([]);
+  const [muscleHistoryDailyMetrics, setMuscleHistoryDailyMetrics] = useState<DailyEffortMetrics[]>([]);
   const [isMuscleHistoryLoading, setIsMuscleHistoryLoading] = useState(false);
   const [muscleHistoryErrorMessage, setMuscleHistoryErrorMessage] = useState<string | null>(null);
   const [selectedMuscleHistoryWeekKey, setSelectedMuscleHistoryWeekKey] = useState<string | null>(null);
   const [muscleHistoryMetric, setMuscleHistoryMetric] = useState<CalendarHeatmapMetric>('totalVolume');
+  const [muscleHistoryView, setMuscleHistoryView] = useState<HeatmapView>('weekly');
   const muscleHistoryRequestIdRef = useRef(0);
 
   const [viewMode, setViewMode] = useState<StatsViewMode>('exercise');
   const [selectedExercise, setSelectedExercise] = useState<ExerciseHeatmapTarget | null>(null);
   const [exerciseHistoryWeeklyEffort, setExerciseHistoryWeeklyEffort] = useState<SelectedExerciseWeeklyEffort[]>([]);
+  const [exerciseHistoryDailyMetrics, setExerciseHistoryDailyMetrics] = useState<DailyEffortMetrics[]>([]);
   const [isExerciseHistoryLoading, setIsExerciseHistoryLoading] = useState(false);
   const [exerciseHistoryErrorMessage, setExerciseHistoryErrorMessage] = useState<string | null>(null);
   const [selectedExerciseHistoryWeekKey, setSelectedExerciseHistoryWeekKey] = useState<string | null>(null);
   const [exerciseHistoryMetric, setExerciseHistoryMetric] = useState<CalendarHeatmapMetric>('totalVolume');
+  const [exerciseHistoryView, setExerciseHistoryView] = useState<HeatmapView>('weekly');
   const exerciseHistoryRequestIdRef = useRef(0);
 
   const catalogSnapshot = useExerciseCatalog();
-  const { stats: exerciseCatalogStats } = useExerciseCatalogStats('all');
+  const { stats: exerciseCatalogStats, reload: reloadExerciseCatalogStats } =
+    useExerciseCatalogStats('all');
 
   const loadSummary = useCallback(async (period: StatsPeriodDays) => {
     setIsLoading(true);
@@ -917,8 +1042,12 @@ export default function StatsRoute() {
 
   useFocusEffect(
     useCallback(() => {
+      // Both the muscle summary and the exercise list recompute from the DB on
+      // focus, so directly-seeded or out-of-band data (e.g. a session logged in
+      // another tab) is reflected without relying on a catalog-invalidation event.
       void loadSummary(periodDays);
-    }, [loadSummary, periodDays])
+      reloadExerciseCatalogStats();
+    }, [loadSummary, periodDays, reloadExerciseCatalogStats])
   );
 
   const handleSelectPeriod = useCallback(
@@ -941,18 +1070,27 @@ export default function StatsRoute() {
 
     setSelectedMuscle(muscle);
     setMuscleHistoryWeeklyEffort([]);
+    setMuscleHistoryDailyMetrics([]);
     setSelectedMuscleHistoryWeekKey(null);
     setMuscleHistoryErrorMessage(null);
     setIsMuscleHistoryLoading(true);
 
     try {
-      const nextEffort = await computeSelectedMuscleWeeklyEffort({
-        muscleGroupIds: muscle.muscleGroupIds,
-        start,
-        end,
-      });
+      const [nextEffort, nextDaily] = await Promise.all([
+        computeSelectedMuscleWeeklyEffort({
+          muscleGroupIds: muscle.muscleGroupIds,
+          start,
+          end,
+        }),
+        computeSelectedMuscleDailyEffortMetrics({
+          muscleGroupIds: muscle.muscleGroupIds,
+          start,
+          end,
+        }),
+      ]);
       if (muscleHistoryRequestIdRef.current !== requestId) return;
       setMuscleHistoryWeeklyEffort(nextEffort);
+      setMuscleHistoryDailyMetrics(nextDaily);
     } catch (error) {
       if (muscleHistoryRequestIdRef.current !== requestId) return;
       setMuscleHistoryErrorMessage(error instanceof Error ? error.message : 'Unknown error');
@@ -966,6 +1104,7 @@ export default function StatsRoute() {
     muscleHistoryRequestIdRef.current += 1;
     setSelectedMuscle(null);
     setMuscleHistoryWeeklyEffort([]);
+    setMuscleHistoryDailyMetrics([]);
     setSelectedMuscleHistoryWeekKey(null);
     setMuscleHistoryErrorMessage(null);
     setIsMuscleHistoryLoading(false);
@@ -979,6 +1118,7 @@ export default function StatsRoute() {
     setViewMode(mode);
     setSelectedExercise(null);
     setExerciseHistoryWeeklyEffort([]);
+    setExerciseHistoryDailyMetrics([]);
     setSelectedExerciseHistoryWeekKey(null);
     setExerciseHistoryErrorMessage(null);
     setIsExerciseHistoryLoading(false);
@@ -992,18 +1132,27 @@ export default function StatsRoute() {
 
     setSelectedExercise(exercise);
     setExerciseHistoryWeeklyEffort([]);
+    setExerciseHistoryDailyMetrics([]);
     setSelectedExerciseHistoryWeekKey(null);
     setExerciseHistoryErrorMessage(null);
     setIsExerciseHistoryLoading(true);
 
     try {
-      const nextEffort = await computeSelectedExerciseWeeklyEffort({
-        exerciseDefinitionId: exercise.exerciseDefinitionId,
-        start,
-        end,
-      });
+      const [nextEffort, nextDaily] = await Promise.all([
+        computeSelectedExerciseWeeklyEffort({
+          exerciseDefinitionId: exercise.exerciseDefinitionId,
+          start,
+          end,
+        }),
+        computeSelectedExerciseDailyEffort({
+          exerciseDefinitionId: exercise.exerciseDefinitionId,
+          start,
+          end,
+        }),
+      ]);
       if (exerciseHistoryRequestIdRef.current !== requestId) return;
       setExerciseHistoryWeeklyEffort(nextEffort);
+      setExerciseHistoryDailyMetrics(nextDaily);
     } catch (error) {
       if (exerciseHistoryRequestIdRef.current !== requestId) return;
       setExerciseHistoryErrorMessage(error instanceof Error ? error.message : 'Unknown error');
@@ -1017,6 +1166,7 @@ export default function StatsRoute() {
     exerciseHistoryRequestIdRef.current += 1;
     setSelectedExercise(null);
     setExerciseHistoryWeeklyEffort([]);
+    setExerciseHistoryDailyMetrics([]);
     setSelectedExerciseHistoryWeekKey(null);
     setExerciseHistoryErrorMessage(null);
     setIsExerciseHistoryLoading(false);
@@ -1058,24 +1208,30 @@ export default function StatsRoute() {
       errorMessage,
       selectedMuscle,
       muscleHistoryWeeklyEffort,
+      muscleHistoryDailyMetrics,
       isMuscleHistoryLoading,
       muscleHistoryErrorMessage,
       selectedMuscleHistoryWeekKey,
       muscleHistoryMetric,
+      muscleHistoryView,
       onSelectMuscleHistoryMetric: setMuscleHistoryMetric,
+      onSelectMuscleHistoryView: setMuscleHistoryView,
       viewMode,
       onSelectViewMode: handleSelectViewMode,
       exerciseListItems,
       selectedExercise,
       exerciseHistoryWeeklyEffort,
+      exerciseHistoryDailyMetrics,
       isExerciseHistoryLoading,
       exerciseHistoryErrorMessage,
       selectedExerciseHistoryWeekKey,
       exerciseHistoryMetric,
+      exerciseHistoryView,
       onPressExerciseHistory: handlePressExerciseHistory,
       onDismissExerciseHistory: handleDismissExerciseHistory,
       onSelectExerciseHistoryWeek: handleSelectExerciseHistoryWeek,
       onSelectExerciseHistoryMetric: setExerciseHistoryMetric,
+      onSelectExerciseHistoryView: setExerciseHistoryView,
     }),
     [
       summary,
@@ -1089,19 +1245,23 @@ export default function StatsRoute() {
       errorMessage,
       selectedMuscle,
       muscleHistoryWeeklyEffort,
+      muscleHistoryDailyMetrics,
       isMuscleHistoryLoading,
       muscleHistoryErrorMessage,
       selectedMuscleHistoryWeekKey,
       muscleHistoryMetric,
+      muscleHistoryView,
       viewMode,
       handleSelectViewMode,
       exerciseListItems,
       selectedExercise,
       exerciseHistoryWeeklyEffort,
+      exerciseHistoryDailyMetrics,
       isExerciseHistoryLoading,
       exerciseHistoryErrorMessage,
       selectedExerciseHistoryWeekKey,
       exerciseHistoryMetric,
+      exerciseHistoryView,
       handlePressExerciseHistory,
       handleDismissExerciseHistory,
       handleSelectExerciseHistoryWeek,
@@ -1378,6 +1538,11 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: uiColors.borderMuted,
+  },
+  overlayViewSelector: {
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 10,
   },
   weekBanner: {
     flexDirection: 'row',
