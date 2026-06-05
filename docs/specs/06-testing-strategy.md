@@ -54,6 +54,7 @@ Reason: keeps FE/backend integration test expectations explicit without forcing 
 - Every feature should include at least one success-path test and one offline/error-path test.
 - During execution sessions, run a targeted test or gate after each meaningful change, then run `./scripts/quality-fast.sh` before task closeout.
 - Run `./scripts/quality-slow.sh <area>` when the task card's risk triggers require slower local runtime/contract checks.
+- For how long each lane actually takes, see `docs/testing/local-test-timings.md` — **measured** best-case, single-agent, local wall-clock times (median + a 3× "investigate above this" ceiling) for every runnable lane. Cite that file or re-measure; do not invent test durations. A run exceeding ~2-3× the recorded median is a signal something is wrong, not a normal slow run.
 
 ## In-memory SQLite unit tests (shared fixture)
 
