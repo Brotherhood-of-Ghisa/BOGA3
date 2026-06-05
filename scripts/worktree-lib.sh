@@ -289,6 +289,49 @@ boga_worktree_branch_exists_on_remote() {
   git -C "$worktree_path" show-ref --verify --quiet "refs/remotes/$remote/$branch"
 }
 
+boga_pid_is_alive() {
+  local pid="$1"
+
+  boga_is_integer "$pid" || return 1
+  kill -0 "$pid" 2>/dev/null
+}
+
+# Print the PID embedded in the lock reason of the worktree registered at
+# target_abs, by scanning `git worktree list --porcelain` for repo_root's
+# worktree group. Agent worktrees are locked with a reason shaped like
+# `claude agent <name> (pid <N>)`; this extracts <N>. Returns non-zero when the
+# path is not a locked worktree in this group, or its lock reason carries no
+# `(pid <N>)` marker (e.g. a manual lock) — callers must treat that as
+# "unknown owner, do not reap".
+boga_worktree_lock_pid() {
+  local repo_root="$1"
+  local target_abs="$2"
+  local line worktree_path current_abs=""
+
+  while IFS= read -r line; do
+    case "$line" in
+      worktree\ *)
+        worktree_path="${line#worktree }"
+        if [[ -d "$worktree_path" ]]; then
+          current_abs="$(boga_abs_dir "$worktree_path")"
+        else
+          current_abs=""
+        fi
+        ;;
+      locked*)
+        if [[ -n "$current_abs" \
+          && "$current_abs" == "$target_abs" \
+          && "$line" =~ \(pid\ ([0-9]+)\) ]]; then
+          printf '%s\n' "${BASH_REMATCH[1]}"
+          return 0
+        fi
+        ;;
+    esac
+  done < <(git -C "$repo_root" worktree list --porcelain)
+
+  return 1
+}
+
 boga_file_mtime_epoch() {
   local path="$1"
 
