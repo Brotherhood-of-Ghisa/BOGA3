@@ -21,6 +21,14 @@ This directory contains two kinds of files:
   - purpose: builds or reuses the configured iOS simulator development-client `.app`.
   - used by: humans directly, `README` instructions, and `maestro-ios-provision.sh`.
   - status: used and needed.
+- `tag-dev-ios.sh`
+  - purpose: validates a local iOS development IPA, creates an annotated git tag named `dev-ios-v<version>-b<build>`, and pushes it to `origin`.
+  - used by: humans after creating a local physical-device development build.
+  - status: used and needed.
+- `tag-preview-ios.sh`
+  - purpose: validates an iOS preview/TestFlight IPA, creates an annotated git tag named `preview-ios-v<version>-b<build>`, and pushes it to `origin`.
+  - used by: humans after creating a preview iOS build.
+  - status: used and needed.
 - `ios-dev-client-start.sh`
   - purpose: starts the manual iOS dev-client loop using the worktree's configured simulator and Expo port.
   - used by: `npm run start:ios:dev-client`.

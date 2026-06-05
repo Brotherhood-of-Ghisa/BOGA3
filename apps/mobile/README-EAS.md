@@ -20,6 +20,20 @@ eas build --platform ios --profile dev --local
 Detailed local install/run instructions live in
 `apps/mobile/README-LOCAL-DEV-BUILD.md`.
 
+Upload a local build to EAS for a shareable install link:
+
+```bash
+eas upload --platform ios --build-path ../../artifacts/builds/boga3-dev.ipa
+```
+
+For iOS, teammate devices must be included in the ad hoc provisioning profile.
+Register new phones with `eas device:create`, then rebuild with
+`--refresh-ad-hoc-provisioning-profile` before uploading.
+
+After install, the shared `dev` build still needs Metro: use `npx expo start
+--dev-client --host lan --scheme boga3 --port <worktree-port>` for same-LAN
+testing, or `--tunnel` for a remote teammate.
+
 Submit the latest dev iOS build:
 
 ```bash

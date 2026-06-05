@@ -37,12 +37,27 @@ npx eas-cli whoami
 npx eas-cli device:list --apple-team-id 89BUGQ8K7C
 ```
 
-Register a new phone before building if it is missing from `device:list`:
+## Register iPhones For Ad Hoc Installs
+
+iOS ad hoc builds only install on phones included in the provisioning profile.
+Before building, list the registered devices:
+
+```bash
+cd /Users/sboschi/Code/BOGA3/apps/mobile
+npx eas-cli device:list --apple-team-id 89BUGQ8K7C
+```
+
+Register your iPhone, or a teammate's iPhone, if it is missing:
 
 ```bash
 cd /Users/sboschi/Code/BOGA3/apps/mobile
 npx eas-cli device:create
 ```
+
+`device:create` gives a registration URL or QR code. Open it on the target
+iPhone and finish the profile/device registration flow there. After adding a new
+phone, rebuild with `--refresh-ad-hoc-provisioning-profile` so the generated IPA
+includes that device.
 
 ## Point The App At Local Supabase
 
@@ -92,6 +107,41 @@ You can find the build artifacts in .../artifacts/builds/boga3-dev.ipa
 
 If you changed native dependencies or app config and want to avoid stale native
 state, add `--clear-cache`.
+
+If you registered a new iPhone after the last ad hoc profile was generated, use
+EAS CLI 19.1.0 or newer and refresh the profile during the rebuild:
+
+```bash
+cd /Users/sboschi/Code/BOGA3/apps/mobile
+mkdir -p ../../artifacts/builds
+
+npx eas-cli@latest build \
+  --platform ios \
+  --profile dev \
+  --local \
+  --non-interactive \
+  --refresh-ad-hoc-provisioning-profile \
+  --output ../../artifacts/builds/boga3-dev.ipa
+```
+
+## Tag The Dev Build Commit
+
+After the IPA is built, tag the current git commit with the app version and build
+number from the IPA:
+
+```bash
+cd /Users/sboschi/Code/BOGA3/apps/mobile
+./scripts/tag-dev-ios.sh ../../artifacts/builds/boga3-dev.ipa
+```
+
+The script creates and pushes an annotated tag named:
+
+```text
+dev-ios-v<version>-b<build>
+```
+
+The working tree must be clean because the tag points at the current commit.
+Commit or stash local changes before tagging.
 
 ## Extract The App For CLI Install
 
@@ -155,6 +205,84 @@ LAN_HOST="$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/
 node -e 'const host = process.argv[1]; const port = process.argv[2]; const url = `http://${host}:${port}`; console.log(`exp+boga3://expo-development-client/?url=${encodeURIComponent(url)}`);' "$LAN_HOST" "$EXPO_DEV_SERVER_PORT"
 ```
 
+For a remote teammate who cannot reach your Mac over the LAN, use an Expo tunnel
+instead:
+
+```bash
+cd /Users/sboschi/Code/BOGA3/apps/mobile
+set -a
+source .maestro/maestro.env.local
+set +a
+
+npx expo start \
+  --dev-client \
+  --tunnel \
+  --scheme boga3 \
+  --port "$EXPO_DEV_SERVER_PORT"
+```
+
+Use the QR code or tunnel URL shown by Expo. Local Supabase over the Mac LAN IP
+will not work for remote teammates unless they are on the same network or VPN.
+
+## Share With Teammates
+
+You can upload the locally built IPA to EAS and get a shareable install link:
+
+```bash
+cd /Users/sboschi/Code/BOGA3/apps/mobile
+
+npx eas-cli upload \
+  --platform ios \
+  --build-path ../../artifacts/builds/boga3-dev.ipa
+```
+
+Share the generated URL with the teammate.
+
+iOS ad hoc signing is device-bound. Uploading an IPA hosts the exact signed
+build; it does not add new phones to the provisioning profile. If the teammate's
+iPhone was already listed when the IPA was built, the EAS link should install.
+If not, do the full registration/rebuild/upload loop:
+
+1. Register their phone:
+
+```bash
+cd /Users/sboschi/Code/BOGA3/apps/mobile
+npx eas-cli device:create
+```
+
+Have them open the registration URL or QR code on their iPhone and complete the
+device-registration flow.
+
+2. Rebuild locally with a refreshed ad hoc provisioning profile:
+
+```bash
+cd /Users/sboschi/Code/BOGA3/apps/mobile
+mkdir -p ../../artifacts/builds
+
+npx eas-cli@latest build \
+  --platform ios \
+  --profile dev \
+  --local \
+  --non-interactive \
+  --refresh-ad-hoc-provisioning-profile \
+  --output ../../artifacts/builds/boga3-dev.ipa
+```
+
+3. Upload the rebuilt IPA:
+
+```bash
+npx eas-cli@latest upload \
+  --platform ios \
+  --build-path ../../artifacts/builds/boga3-dev.ipa
+```
+
+This build is a development client. The teammate still needs access to Metro:
+
+- Same Wi-Fi/LAN: start Metro with the `--host lan` command in
+  `Start Metro For The Phone`.
+- Remote teammate: start Metro with the `--tunnel` command in
+  `Start Metro For The Phone`.
+
 ## Troubleshooting
 
 - `Cannot connect to the Docker daemon`: start Docker Desktop or Colima, then
@@ -164,6 +292,7 @@ node -e 'const host = process.argv[1]; const port = process.argv[2]; const url =
 - Phone can load the app but auth/sync is disabled: rerun
   `./supabase/scripts/use-local-mobile-lan-env.sh`, then restart Metro.
 - Install fails with provisioning/device errors: register the phone with
-  `npx eas-cli device:create`, then rebuild so the ad hoc profile includes it.
+  `npx eas-cli device:create`, then rebuild with
+  `--refresh-ad-hoc-provisioning-profile` so the ad hoc profile includes it.
 - Local build fails at `expo doctor`: fix or explicitly accept the reported
   project issue before relying on the build.
