@@ -39,8 +39,10 @@ const mockRunSyncCycle = jest.fn(
 );
 jest.mock('@/src/sync/cycle', () => ({ runSyncCycle: () => mockRunSyncCycle() }));
 
-// --- NetInfo stub: capture the listener so tests feed reachability snapshots.
-type NetInfoSnapshot = { isInternetReachable: boolean | null };
+// --- NetInfo stub: capture the listener so tests feed connectivity snapshots.
+// The scheduler keys "online" off `isConnected`; `isInternetReachable` is carried
+// only so a test can prove it is ignored.
+type NetInfoSnapshot = { isConnected?: boolean | null; isInternetReachable?: boolean | null };
 const mockNetInfoState: { listener: ((state: NetInfoSnapshot) => void) | null } = { listener: null };
 const mockNetInfoUnsubscribe = jest.fn(() => {
   mockNetInfoState.listener = null;
@@ -74,9 +76,10 @@ import {
 let appStateListener: ((status: AppStateStatus) => void) | null = null;
 const appStateRemove = jest.fn();
 
-const goOnline = () => mockNetInfoState.listener?.({ isInternetReachable: true });
-const goOffline = () => mockNetInfoState.listener?.({ isInternetReachable: false });
-const netInfoNull = () => mockNetInfoState.listener?.({ isInternetReachable: null });
+const goOnline = () => mockNetInfoState.listener?.({ isConnected: true });
+const goOffline = () => mockNetInfoState.listener?.({ isConnected: false });
+/** A snapshot with no usable link (isConnected null) — projects offline. */
+const linkUnknown = () => mockNetInfoState.listener?.({ isConnected: null });
 
 const endCycle = async (mode: 'success' | 'error') => {
   const pending = cycleResolvers.shift();
@@ -338,12 +341,12 @@ describe('internal event: cycle ends', () => {
 });
 
 // =============================================================================
-// Network reachability is the sole authority on online/offline.
+// Network connectivity (isConnected) is the authority on online/offline.
 // =============================================================================
 
 describe('the network projection is the sole authority on online/offline', () => {
-  it('only a definitive reachable=true projection counts as online', () => {
-    netInfoNull();
+  it('only a connected link counts as online', () => {
+    linkUnknown();
     expect(stateName()).toBe('OFFLINE');
     goOffline();
     expect(stateName()).toBe('OFFLINE');
@@ -351,10 +354,10 @@ describe('the network projection is the sole authority on online/offline', () =>
     expect(stateName()).toBe('SHORT_TIMEOUT');
   });
 
-  it('a null reachability after online flips the machine back to OFFLINE', () => {
+  it('losing the link after online flips the machine back to OFFLINE', () => {
     goOnline();
     expect(stateName()).toBe('SHORT_TIMEOUT');
-    netInfoNull();
+    goOffline();
     expect(stateName()).toBe('OFFLINE');
     expect(timerArmed()).toBe(false);
   });

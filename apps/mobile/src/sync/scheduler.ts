@@ -349,18 +349,25 @@ const handleExternal = (input: ExternalInput): void => {
 // -----------------------------------------------------------------------------
 // NetInfo wiring
 //
-// NetInfo is the sole authority on online/offline. A single listener projects
-// `isInternetReachable === true` to a boolean and emits "go online" / "go
-// offline" only when that projection CHANGES. The initial projection is false,
-// so the machine starts OFFLINE and waits for the first definitive `true`
-// before considering itself online.
+// A single listener projects NetInfo `isConnected === true` to a boolean and
+// emits "go online" / "go offline" only when that projection CHANGES. We key off
+// `isConnected` (a usable link) rather than `isInternetReachable` (a probe to a
+// connectivity-check host): the probe is `null` on the iOS simulator and `false`
+// behind a captive portal or where the probe host is blocked, so keying off it
+// would strand a connected user who can actually reach the backend on the
+// offline branch forever. The sync cycle's own success/failure is the authority
+// on whether the backend is reachable — a cycle that fails on a dead link is
+// caught and retried on the long backstop, not treated as "online" forever. The
+// initial projection is false, so the machine starts OFFLINE and waits for the
+// first `isConnected === true` before considering itself online.
 // -----------------------------------------------------------------------------
 
 const handleNetInfoState = (netState: NetInfoState): void => {
-  const nextProjection = netState.isInternetReachable === true;
+  const nextProjection = netState.isConnected === true;
   if (nextProjection === onlineProjection) {
-    // No change in the boolean projection: a link-layer flip, a VPN handoff, or
-    // a still-null reachability all collapse to nothing here.
+    // No change in the boolean projection: a reachability-probe flip, a VPN
+    // handoff, or a still-null/false reachability while the link stays up all
+    // collapse to nothing here.
     return;
   }
 
@@ -472,7 +479,7 @@ export const stopSyncScheduler = (): void => {
  *
  * It returns:
  *  - `state`: the current four-state machine state (with any armed deadline).
- *  - `online`: the latest NetInfo `isInternetReachable` projection.
+ *  - `online`: the latest NetInfo `isConnected` projection.
  *  - `lastCycleError`: the most recent cycle's failure message, or null when
  *    the latest cycle ended cleanly (or none has run yet).
  *  - `lastSuccessAtMs`: epoch-ms of the most recent clean cycle, or null.

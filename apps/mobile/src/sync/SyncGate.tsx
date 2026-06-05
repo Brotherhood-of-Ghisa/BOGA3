@@ -127,11 +127,14 @@ function GateProgress({ progress }: { progress: SyncProgress }) {
         </UiText>
       ) : (
         <View style={styles.activityRow}>
-          <ActivityIndicator
-            color={uiColors.actionPrimary}
-            size="large"
-            testID={SYNC_GATE_TEST_IDS.activityIndicator}
-          />
+          {/* The testID lives on a wrapping View, not the ActivityIndicator
+              itself: RN's ActivityIndicator does not reliably surface its testID
+              to the iOS accessibility tree Maestro queries, so an assertion on
+              the indicator would never see it. A plain View wrapper is reliably
+              queryable by both Maestro and React Native Testing Library. */}
+          <View testID={SYNC_GATE_TEST_IDS.activityIndicator}>
+            <ActivityIndicator color={uiColors.actionPrimary} size="large" />
+          </View>
           <UiText
             style={styles.activityDetail}
             testID={SYNC_GATE_TEST_IDS.activityDetail}

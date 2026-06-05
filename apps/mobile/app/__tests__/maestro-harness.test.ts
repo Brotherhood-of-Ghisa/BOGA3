@@ -42,11 +42,13 @@ import {
   isMaestroHarnessAllowed,
   resolveMaestroHarnessBootstrapAction,
   resolveMaestroHarnessFixtureName,
+  resolveMaestroHarnessGateAction,
   resolveMaestroHarnessResetMode,
   resolveMaestroHarnessTeleportHref,
   resolveMaestroHarnessTeleportTarget,
   runMaestroHarnessBootstrapAction,
   runMaestroHarnessFixture,
+  runMaestroHarnessGateAction,
   runMaestroHarnessReset,
 } from '@/src/maestro/harness';
 import {
@@ -216,6 +218,47 @@ describe('maestro harness helpers', () => {
 
       await runMaestroHarnessBootstrapAction('reset');
       expect(getSyncGateStateSnapshot().bootstrapCompletedAt).toBeNull();
+    });
+  });
+
+  describe('gate in-progress harness action', () => {
+    beforeEach(() => {
+      __resetSyncGateStateForTests();
+    });
+
+    afterEach(() => {
+      __resetSyncGateStateForTests();
+    });
+
+    it('resolves only the known gate actions', () => {
+      expect(resolveMaestroHarnessGateAction('in-progress')).toBe('in-progress');
+      expect(resolveMaestroHarnessGateAction('clear')).toBe('clear');
+      expect(resolveMaestroHarnessGateAction('unexpected')).toBe('none');
+      expect(resolveMaestroHarnessGateAction(null)).toBe('none');
+    });
+
+    it('pins an online in-progress snapshot for the in-progress action', () => {
+      expect(getSyncGateStateSnapshot().forcedProgress).toBeFalsy();
+
+      runMaestroHarnessGateAction('in-progress');
+
+      const pinned = getSyncGateStateSnapshot().forcedProgress;
+      expect(pinned).not.toBeNull();
+      expect(pinned?.offline).toBe(false);
+      expect(pinned?.phase).toBe('pull');
+    });
+
+    it('clears the pin for the clear action so the gate reflects real state again', () => {
+      runMaestroHarnessGateAction('in-progress');
+      expect(getSyncGateStateSnapshot().forcedProgress).not.toBeNull();
+
+      runMaestroHarnessGateAction('clear');
+      expect(getSyncGateStateSnapshot().forcedProgress).toBeNull();
+    });
+
+    it('is a no-op for the none action', () => {
+      runMaestroHarnessGateAction('none');
+      expect(getSyncGateStateSnapshot().forcedProgress).toBeFalsy();
     });
   });
 
