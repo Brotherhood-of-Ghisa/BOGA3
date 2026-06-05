@@ -219,14 +219,10 @@ Gym event note:
 - `apps/mobile/app/__tests__/settings-profile-navigation.test.tsx`
 - coverage: signed-in profile sync section render, toggle wiring, and inline blocked-failure messaging.
 
-8. Reinstall restore-parity proof lane
-- `apps/mobile/app/__tests__/sync-reinstall-restore-parity.test.ts`
-- dedicated Jest config: `apps/mobile/jest.integration.config.js`
-- command wrapper: `apps/mobile/scripts/test-sync-reinstall-restore-parity.sh`
-- npm script: `npm run test:sync:reinstall-parity` (run from `apps/mobile`)
-- coverage: deterministic M13 full-scope fixture (`gyms`, `sessions`, `session_exercises`, `exercise_sets`, `exercise_definitions`, `exercise_muscle_mappings`, `exercise_tag_definitions`, `session_exercise_tags`), real outbox -> local Supabase ingest delivery, reinstall simulation (fresh local state + fresh sync device state), post-login bootstrap/merge + convergence, and scoped pre-sync vs post-restore parity assertion.
-- snapshot boundary rule in this lane: parity compares only M13 user-domain entities; auth/session credentials, smoke artifacts, and sync runtime/outbox metadata are intentionally excluded.
-- M15 coordinate extension: the gym snapshot includes `latitude`, `longitude`, `coordinate_accuracy_m`, and `coordinates_updated_at` so coordinate-bearing gyms are covered by the same restore-parity lane.
+8. Reinstall restore-parity proof (sync v2)
+- The dedicated `test:sync:reinstall-parity` lane (v1 suite `sync-reinstall-restore-parity.test.ts`, config `jest.integration.config.js`, wrapper `test-sync-reinstall-restore-parity.sh`) was **retired**: its target suite was deleted with the v1 sync code paths, so the lane only ever printed "No tests found". Under the v2 push/pull RPC + per-layer cursor protocol, restore-parity is proven by:
+  - `apps/mobile/app/__tests__/sync/cycle-round-trip.test.ts` — the *"a wiped client re-pulls all four rows via the layered drain with advancing cursors"* case drops the local store (mirrors a reinstall = fresh local SQLite), re-runs the real cycle against a live endpoint, and asserts each layer restores with FK integrity and advancing per-layer cursors. Runs in the branch-provisioned `test:sync:infra` lane.
+  - backend contract suites `supabase/tests/sync-v2-push-roundtrip.sh` and `supabase/tests/sync-v2-pull-drain.sh` assert push→pull parity across all data-scope entities (including soft-delete tombstones) at the RPC layer, via `./scripts/quality-slow.sh backend`.
 
 ## Maintenance rule for follow-up tasks
 
