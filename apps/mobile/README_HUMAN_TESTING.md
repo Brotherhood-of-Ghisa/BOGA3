@@ -164,19 +164,19 @@ cd ../..
 
 Use this when you need a development client on a physical device instead of the simulator.
 
-Hosted EAS build path:
+Local build path:
 
 ```bash
 npx eas-cli login
-npx eas-cli init
-npx eas-cli build -p ios --profile development
+npx eas-cli build -p ios --profile dev --local
 ```
 
 Notes:
 
 - `npx eas-cli init` is only needed if the app is not already linked to an EAS project.
-- The `development` profile builds a real-device development client; the local simulator `.app` from Workflow B cannot be installed on a phone.
+- The `dev` profile builds a real-device development client; the local simulator `.app` from Workflow B cannot be installed on a phone.
 - Start Metro with `npx expo start --dev-client` before opening the installed build on the phone.
+- Full local build, install, LAN Metro, and local Supabase instructions live in `apps/mobile/README-LOCAL-DEV-BUILD.md`.
 
 ## Workflow E: Preview publish loop
 

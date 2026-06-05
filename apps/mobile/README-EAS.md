@@ -10,6 +10,16 @@ Build the dev iOS app:
 eas build --platform ios --profile dev
 ```
 
+Build the same profile locally when you need a physical-phone dev client without
+remote build minutes:
+
+```bash
+eas build --platform ios --profile dev --local
+```
+
+Detailed local install/run instructions live in
+`apps/mobile/README-LOCAL-DEV-BUILD.md`.
+
 Submit the latest dev iOS build:
 
 ```bash

@@ -286,6 +286,11 @@ Use the mode that matches where the app is running:
 
 After either switch, restart Expo/Metro so `EXPO_PUBLIC_*` values are rebundled.
 
+For a real iPhone development-client build that installs on a physical device,
+use `apps/mobile/README-LOCAL-DEV-BUILD.md`. It covers the local `eas build
+--profile dev --local` path, ad hoc install, Metro over LAN, and local Supabase
+LAN env setup.
+
 ### Test accounts (local fixtures)
 
 - `user_a.local@example.test` / `ScaffoldingUserA!234`
