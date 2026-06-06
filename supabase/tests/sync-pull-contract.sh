@@ -49,11 +49,11 @@ select_psql_mode() {
     return 0
   fi
   if command -v docker >/dev/null 2>&1; then
-    DOCKER_DB_CONTAINER="$(docker ps --format '{{.Names}}' 2>/dev/null | grep '^supabase_db_' | head -n1 || true)"
-    if [[ -n "${DOCKER_DB_CONTAINER}" ]]; then
-      PSQL_MODE="docker"
-      return 0
-    fi
+    # Resolve strictly by this worktree's project_id (resolve_db_container errors
+    # if this worktree's stack is not up — never a foreign DB).
+    DOCKER_DB_CONTAINER="$(resolve_db_container)" || exit 1
+    PSQL_MODE="docker"
+    return 0
   fi
   echo "[sync-pull-contract] need either host psql or supabase_db_* container" >&2
   exit 1
