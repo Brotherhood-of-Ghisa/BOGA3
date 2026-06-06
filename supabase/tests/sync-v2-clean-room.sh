@@ -42,20 +42,12 @@ select_psql_mode() {
     return 0
   fi
   if command -v docker >/dev/null 2>&1; then
-    local project_id=""
-    if [[ -f "${SUPABASE_DIR}/config.toml" ]]; then
-      project_id="$(awk -F'"' '/^project_id[[:space:]]*=/ {print $2; exit}' "${SUPABASE_DIR}/config.toml" || true)"
-    fi
-    if [[ -n "${project_id}" ]]; then
-      DOCKER_DB_CONTAINER="$(docker ps --format '{{.Names}}' 2>/dev/null | grep -F "supabase_db_${project_id}" | head -n1 || true)"
-    fi
-    if [[ -z "${DOCKER_DB_CONTAINER}" ]]; then
-      DOCKER_DB_CONTAINER="$(docker ps --format '{{.Names}}' 2>/dev/null | grep '^supabase_db_' | head -n1 || true)"
-    fi
-    if [[ -n "${DOCKER_DB_CONTAINER}" ]]; then
-      PSQL_MODE="docker"
-      return 0
-    fi
+    # Resolve strictly by this worktree's project_id (resolve_db_container in
+    # _common.sh errors if this worktree's stack is down — no unscoped
+    # head -n1 fallback that could target a foreign worktree's DB).
+    DOCKER_DB_CONTAINER="$(resolve_db_container)" || exit 1
+    PSQL_MODE="docker"
+    return 0
   fi
   echo "[sync-v2-clean-room] need either host psql or running supabase_db_* container." >&2
   exit 1

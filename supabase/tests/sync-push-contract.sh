@@ -28,8 +28,8 @@ require_jq() {
 }
 
 # ---------------------------------------------------------------------------
-# Generic HTTP / assertion helpers (mirrors session-sync-api-contract.sh's
-# shape so future tests follow the same idiom).
+# Generic HTTP / assertion helpers (shared idiom across the sync v2 contract
+# suites, e.g. sync-pull-contract.sh).
 # ---------------------------------------------------------------------------
 
 http_request() {
