@@ -14,8 +14,9 @@
 
 import { eq } from 'drizzle-orm';
 
-import { __resetClockForTests } from '@/src/data/clock';
-import { gyms, sessions } from '@/src/data/schema';
+import type { LogEventParams } from '@/src/logging/logEvent';
+import { __resetClockForTests, PRIMARY_RUNTIME_STATE_ID } from '@/src/data/clock';
+import { gyms, sessions, syncRuntimeState } from '@/src/data/schema';
 // Bound to the stubbed bootstrap/supabase modules below; babel-jest hoists the
 // jest.mock calls above every import so the cycle resolves the stubs.
 import {
@@ -23,7 +24,11 @@ import {
   getAuthRequiredSignal,
   markAuthRequired,
 } from '@/src/sync/auth-required-signal';
-import { runSyncCycle, SyncCycleError } from '@/src/sync/cycle';
+import { runSyncCycle, SyncCycleError, type WireEntity } from '@/src/sync/cycle';
+import {
+  __resetCycleErrorSignalForTests,
+  getCycleErrorCode,
+} from '@/src/sync/cycle-error-signal';
 
 import {
   createInMemoryDatabase,
@@ -32,6 +37,7 @@ import {
 } from './helpers/in-memory-db';
 
 const mockBootstrapState: { database: InMemoryTestDatabase | null } = { database: null };
+const mockLogEvent = jest.fn<Promise<void>, [LogEventParams]>(() => Promise.resolve());
 
 jest.mock('@/src/data/bootstrap', () => ({
   bootstrapLocalDataLayer: jest.fn(async () => {
@@ -54,16 +60,23 @@ jest.mock('@/src/auth/supabase', () => ({
   })),
 }));
 
+jest.mock('@/src/logging/logEvent', () => ({
+  logEvent: (params: LogEventParams) => mockLogEvent(params),
+}));
+
 let fixture: InMemoryDatabaseFixture;
 let database: InMemoryTestDatabase;
 
 beforeEach(() => {
   __resetClockForTests();
   __resetAuthRequiredSignalForTests();
+  __resetCycleErrorSignalForTests();
   fixture = createInMemoryDatabase();
   database = fixture.database;
   mockBootstrapState.database = database;
   mockRpc.mockReset();
+  mockLogEvent.mockReset();
+  mockLogEvent.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -71,6 +84,7 @@ afterEach(() => {
   mockBootstrapState.database = null;
   __resetClockForTests();
   __resetAuthRequiredSignalForTests();
+  __resetCycleErrorSignalForTests();
 });
 
 const emptyPage = { entities: [], next_cursor: null, has_more: false };
@@ -91,6 +105,46 @@ const gymEntity = (id: string, ms: number) => ({
     deleted_at: null,
   },
 });
+
+const orphanSessionEntity = (id: string, ms: number): WireEntity => ({
+  type: 'sessions',
+  id,
+  client_updated_at_ms: ms,
+  fields: {
+    gym_id: 'missing-gym',
+    status: 'active',
+    started_at: ms,
+    completed_at: null,
+    duration_sec: null,
+    created_at: ms,
+    updated_at: ms,
+    deleted_at: null,
+  },
+});
+
+const markBootstrapDone = () => {
+  database
+    .insert(syncRuntimeState)
+    .values({ id: PRIMARY_RUNTIME_STATE_ID, bootstrapCompletedAt: new Date(1_700_000_000_000) })
+    .onConflictDoUpdate({
+      target: syncRuntimeState.id,
+      set: { bootstrapCompletedAt: new Date(1_700_000_000_000) },
+    })
+    .run();
+};
+
+const readPullCursorJson = (): Record<string, unknown> => {
+  const row = database
+    .select({ pullCursor: syncRuntimeState.pullCursor })
+    .from(syncRuntimeState)
+    .where(eq(syncRuntimeState.id, PRIMARY_RUNTIME_STATE_ID))
+    .get();
+  const raw = row?.pullCursor;
+  if (!raw) {
+    return {};
+  }
+  return (typeof raw === 'string' ? JSON.parse(raw) : raw) as Record<string, unknown>;
+};
 
 describe('cycle convergence', () => {
   it('terminates after one row arrives and a later pull is empty', async () => {
@@ -226,6 +280,97 @@ describe('FK_VIOLATION handling', () => {
 
     const row = database.select().from(gyms).where(eq(gyms.id, 'gym-local')).get();
     expect(row?.localDirty).toBe(true);
+  });
+
+  it('classifies and logs a pull-side local FK failure without advancing the failed layer cursor', async () => {
+    fixture.close();
+    fixture = createInMemoryDatabase({ foreignKeys: true });
+    database = fixture.database;
+    mockBootstrapState.database = database;
+    markBootstrapDone();
+
+    const failedCursor = {
+      server_received_at: '2026-05-29T10:00:00.000Z',
+      owner_user_id: 'u',
+      type: 'sessions',
+      id: 'sess-orphan',
+    };
+    let servedOrphan = false;
+    mockRpc.mockImplementation(async (name: string, args: { layer?: number }) => {
+      if (name === 'sync_pull') {
+        if (args.layer === 1 && !servedOrphan) {
+          servedOrphan = true;
+          return {
+            data: {
+              entities: [orphanSessionEntity('sess-orphan', 100)],
+              next_cursor: failedCursor,
+              has_more: false,
+            },
+            error: null,
+          };
+        }
+        return { data: emptyPage, error: null };
+      }
+      return pushOk;
+    });
+
+    await expect(runSyncCycle()).rejects.toMatchObject({
+      code: 'LOCAL_FK_VIOLATION',
+    });
+
+    expect(getCycleErrorCode()).toBe('LOCAL_FK_VIOLATION');
+    expect(database.select().from(sessions).where(eq(sessions.id, 'sess-orphan')).get()).toBeUndefined();
+    expect(readPullCursorJson()).not.toHaveProperty('1');
+    expect(mockLogEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'error',
+        source: 'database',
+        event: 'sync.pull_local_fk_violation',
+        context: expect.objectContaining({
+          layer: 1,
+          entity_types: ['sessions'],
+          row_count: 1,
+          operation: 'pull_page_apply',
+          error_code: 'LOCAL_FK_VIOLATION',
+          exception_message: expect.stringMatching(/foreign key/i),
+        }),
+      }),
+    );
+  });
+
+  it('does not let pull FK diagnostic logging replace the original sync error', async () => {
+    fixture.close();
+    fixture = createInMemoryDatabase({ foreignKeys: true });
+    database = fixture.database;
+    mockBootstrapState.database = database;
+    markBootstrapDone();
+    mockLogEvent.mockRejectedValueOnce(new Error('log insert failed'));
+
+    mockRpc.mockImplementation(async (name: string, args: { layer?: number }) => {
+      if (name === 'sync_pull') {
+        if (args.layer === 1) {
+          return {
+            data: {
+              entities: [orphanSessionEntity('sess-orphan', 100)],
+              next_cursor: {
+                server_received_at: '2026-05-29T10:00:00.000Z',
+                owner_user_id: 'u',
+                type: 'sessions',
+                id: 'sess-orphan',
+              },
+              has_more: false,
+            },
+            error: null,
+          };
+        }
+        return { data: emptyPage, error: null };
+      }
+      return pushOk;
+    });
+
+    await expect(runSyncCycle()).rejects.toMatchObject({
+      code: 'LOCAL_FK_VIOLATION',
+    });
   });
 
   it('returns cleanly on an INTERNAL / transport error', async () => {

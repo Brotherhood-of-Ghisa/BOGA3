@@ -44,9 +44,10 @@ const PHASE_LABELS: Record<SyncPhase, string> = {
  * A short human description of the kind of failure, so the block explains what
  * went wrong without leaking internal error tokens.
  */
-const ERROR_MESSAGES: Record<'FK_VIOLATION' | 'INTERNAL', string> = {
+const ERROR_MESSAGES: Record<'FK_VIOLATION' | 'LOCAL_FK_VIOLATION' | 'INTERNAL', string> = {
   INTERNAL: 'We could not finish setting up your data. Check your connection and try again.',
   FK_VIOLATION: 'Something went wrong while setting up your data. Please try again.',
+  LOCAL_FK_VIOLATION: 'Something went wrong while setting up your data. Please try again.',
 };
 
 /**
@@ -148,7 +149,7 @@ function GateProgress({ progress }: { progress: SyncProgress }) {
 }
 
 /** The error body: a human message plus a single Retry that fires one cycle. */
-function GateError({ errorCode }: { errorCode: 'FK_VIOLATION' | 'INTERNAL' }) {
+function GateError({ errorCode }: { errorCode: 'FK_VIOLATION' | 'LOCAL_FK_VIOLATION' | 'INTERNAL' }) {
   return (
     <View style={styles.body}>
       <UiText

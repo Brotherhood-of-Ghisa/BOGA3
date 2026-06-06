@@ -7,7 +7,8 @@
 // sign-in), not a recoverable in-gate error. This module covers only the
 // non-auth failure codes the gate renders as an error message:
 //
-//   - 'FK_VIOLATION': a structural mismatch the cycle could not push past.
+//   - 'FK_VIOLATION': a server-side structural mismatch the cycle could not push past.
+//   - 'LOCAL_FK_VIOLATION': a local SQLite FK failure while applying a pulled page.
 //   - 'INTERNAL': a server-internal or transport failure.
 //
 // It is module-scoped on purpose: the cycle runs with no React context, so the
@@ -15,7 +16,7 @@
 // user data — just the latest code, or null when the last cycle was clean.
 
 /** The non-auth failure classifications a cycle can report. */
-export type CycleErrorCode = 'FK_VIOLATION' | 'INTERNAL';
+export type CycleErrorCode = 'FK_VIOLATION' | 'LOCAL_FK_VIOLATION' | 'INTERNAL';
 
 type CycleErrorListener = () => void;
 

@@ -49,7 +49,7 @@ export type SyncGateMode =
   /** No signed-in user; route to the sign-in screen (no Retry). */
   | { kind: 'route-to-sign-in' }
   /** A retriable cycle error; show the message and a single Retry. */
-  | { kind: 'error'; errorCode: 'FK_VIOLATION' | 'INTERNAL' }
+  | { kind: 'error'; errorCode: 'FK_VIOLATION' | 'LOCAL_FK_VIOLATION' | 'INTERNAL' }
   /** Work is in progress (or waiting on the network); show the block. */
   | { kind: 'in-progress' };
 
@@ -77,6 +77,7 @@ export const selectSyncGateMode = (
 
   if (
     snapshot.lastCycleErrorCode === 'FK_VIOLATION' ||
+    snapshot.lastCycleErrorCode === 'LOCAL_FK_VIOLATION' ||
     snapshot.lastCycleErrorCode === 'INTERNAL'
   ) {
     return { kind: 'error', errorCode: snapshot.lastCycleErrorCode };

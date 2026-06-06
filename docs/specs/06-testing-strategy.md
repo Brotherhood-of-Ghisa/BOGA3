@@ -130,6 +130,7 @@ Reason: keeps FE/backend integration test expectations explicit without forcing 
   - auth missing/expired or sync disabled due to no authenticated session,
   - offline or backend-unavailable retry/recovery behavior with locked backoff policy constants,
   - local FK enforcement for pull/apply and repository writes, including at least one negative child-without-parent assertion that fails locally before it can become a backend sync failure,
+  - pull-side local FK apply failures classified as `LOCAL_FK_VIOLATION`, with page rollback, failed-layer cursor not advanced, and non-blocking diagnostic logger coverage,
   - batch-order semantics (strict request-order processing, stop-on-first-failure, and prefix-commit behavior),
   - response contract semantics (`SUCCESS | FAILURE`, failure `error_index`, `should_retry`, free-text `message`, optional `error_event_id`),
   - projection/read-model correctness after event ingest/replay.
@@ -140,6 +141,8 @@ Reason: keeps FE/backend integration test expectations explicit without forcing 
   - `apps/mobile/app/__tests__/sync-bootstrap-merge.test.ts` (deterministic merge decisions + convergence-loop terminal behavior),
   - `apps/mobile/app/__tests__/sync-runtime-bootstrap.test.ts` (first-enable trigger and logged-out-then-login bootstrap trigger),
   - `apps/mobile/app/__tests__/sync-outbox-engine.test.ts` (batch response semantics, including retry scheduling and blocked failure mapping),
+  - `apps/mobile/app/__tests__/sync-cycle-pull.test.ts` (pull LWW apply, FK-enabled page rollback, and cursor atomicity),
+  - `apps/mobile/app/__tests__/sync-cycle-convergence.test.ts` (cycle convergence plus server/pull-local FK classification paths, including `sync.pull_local_fk_violation` logging),
   - `apps/mobile/app/__tests__/sync-profile-status.test.ts` (profile-facing sync status mapping, including blocked and retry-scheduled states),
   - `apps/mobile/app/__tests__/settings-profile-navigation.test.tsx` (profile sync section render + toggle + inline blocked-failure messaging).
 - Reinstall restore-parity coverage (sync v2): the dedicated `test:sync:reinstall-parity` mobile lane was **retired** in the sync v1 retirement — its target suite was deleted with the v1 code paths. Under the sync v2 model (push/pull RPC + per-layer cursor protocol) the same guarantee is proven by:

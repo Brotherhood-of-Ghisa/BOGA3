@@ -28,6 +28,7 @@ import { bootstrapLocalDataLayer, type LocalDatabase } from '@/src/data/bootstra
 import { PRIMARY_RUNTIME_STATE_ID, type Transaction } from '@/src/data/clock';
 import * as schema from '@/src/data/schema';
 import { syncRuntimeState } from '@/src/data/schema';
+import { logEvent } from '@/src/logging/logEvent';
 import { TOPO_LAYERS, type EntityTableName } from '@/src/sync/topo-order';
 
 // -----------------------------------------------------------------------------
@@ -99,7 +100,7 @@ interface ErrorEnvelope {
 // Error classification
 // -----------------------------------------------------------------------------
 
-export type SyncErrorCode = 'AUTH_REQUIRED' | 'FK_VIOLATION' | 'INTERNAL';
+export type SyncErrorCode = 'AUTH_REQUIRED' | 'FK_VIOLATION' | 'LOCAL_FK_VIOLATION' | 'INTERNAL';
 
 export class SyncCycleError extends Error {
   readonly code: SyncErrorCode;
@@ -153,6 +154,70 @@ export const classifyRpcResult = (
   }
 
   return null;
+};
+
+const LOCAL_FK_ERROR_CODE: SyncErrorCode = 'LOCAL_FK_VIOLATION';
+const MAX_EXCEPTION_MESSAGE_LENGTH = 300;
+
+const sanitizeExceptionMessage = (error: unknown): string => {
+  const raw =
+    error instanceof Error
+      ? error.message
+      : typeof error === 'object' && error !== null && 'message' in error
+        ? String((error as { message?: unknown }).message ?? '')
+        : String(error ?? '');
+
+  const compact = raw.replace(/\s+/g, ' ').trim();
+  if (!compact) {
+    return 'Unknown SQLite error';
+  }
+  return compact.length > MAX_EXCEPTION_MESSAGE_LENGTH
+    ? `${compact.slice(0, MAX_EXCEPTION_MESSAGE_LENGTH)}...`
+    : compact;
+};
+
+const readErrorCode = (error: unknown): string | null => {
+  if (typeof error === 'object' && error !== null && 'code' in error) {
+    const code = (error as { code?: unknown }).code;
+    return typeof code === 'string' ? code : null;
+  }
+  return null;
+};
+
+const isLocalSqliteForeignKeyError = (error: unknown): boolean => {
+  const code = readErrorCode(error);
+  if (code === 'SQLITE_CONSTRAINT_FOREIGNKEY' || code?.includes('FOREIGNKEY')) {
+    return true;
+  }
+  return sanitizeExceptionMessage(error).toLowerCase().includes('foreign key');
+};
+
+const logPullLocalFkViolation = (
+  error: unknown,
+  layer: number,
+  entities: readonly WireEntity[],
+): void => {
+  const entityTypes = Array.from(new Set(entities.map((entity) => entity.type))).sort();
+  const exceptionMessage = sanitizeExceptionMessage(error);
+
+  try {
+    void logEvent({
+      level: 'error',
+      source: 'database',
+      event: 'sync.pull_local_fk_violation',
+      message: 'Local SQLite foreign-key violation while applying a pulled sync page.',
+      context: {
+        layer,
+        entity_types: entityTypes,
+        row_count: entities.length,
+        operation: 'pull_page_apply',
+        error_code: LOCAL_FK_ERROR_CODE,
+        exception_message: exceptionMessage,
+      },
+    }).catch(() => undefined);
+  } catch {
+    // Diagnostic logging is best-effort and must never mask the sync error.
+  }
 };
 
 // -----------------------------------------------------------------------------
@@ -547,18 +612,29 @@ const runPullLeg = async (
       );
       const page = await callSyncPull(layer, cursor);
 
-      // Apply the page and advance the cursor in one transaction: the cursor
-      // only moves past rows that actually committed locally.
-      database.transaction((tx) => {
-        const transaction = tx as Transaction;
-        for (const type of layerTypes) {
-          const forType = page.entities.filter((entity) => entity.type === type);
-          if (forType.length > 0) {
-            applyPullPage(transaction, forType, type);
+      try {
+        // Apply the page and advance the cursor in one transaction: the cursor
+        // only moves past rows that actually committed locally.
+        database.transaction((tx) => {
+          const transaction = tx as Transaction;
+          for (const type of layerTypes) {
+            const forType = page.entities.filter((entity) => entity.type === type);
+            if (forType.length > 0) {
+              applyPullPage(transaction, forType, type);
+            }
           }
+          writeCursorEntry(transaction, layer, page.next_cursor);
+        });
+      } catch (error) {
+        if (isLocalSqliteForeignKeyError(error)) {
+          logPullLocalFkViolation(error, layer, page.entities);
+          throw new SyncCycleError(
+            LOCAL_FK_ERROR_CODE,
+            `local pull apply failed: ${sanitizeExceptionMessage(error)}`,
+          );
         }
-        writeCursorEntry(transaction, layer, page.next_cursor);
-      });
+        throw error;
+      }
 
       appliedTotal += page.entities.length;
       reporter?.onPage?.(page.entities.length);
@@ -722,11 +798,11 @@ export const runSyncCycle = async (): Promise<void> => {
     clearCycleError();
   } catch (error) {
     if (error instanceof SyncCycleError) {
-      if (error.code === 'FK_VIOLATION') {
+      if (error.code === 'FK_VIOLATION' || error.code === 'LOCAL_FK_VIOLATION') {
         // Structural bug: not retriable, surfaces to the caller. Dirty bits and
         // cursors are left untouched so nothing is silently dropped. Record the
         // code so a watching gate can show the error and a single Retry.
-        markCycleError('FK_VIOLATION');
+        markCycleError(error.code);
         throw error;
       }
       if (error.code === 'AUTH_REQUIRED') {

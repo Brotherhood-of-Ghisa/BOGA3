@@ -195,6 +195,23 @@ Gym event note:
   `database` and rethrows the original SQLite failure; diagnostic logging is
   non-blocking and cannot replace the original error.
 
+13. Pull-side local SQLite FK apply failure
+- pull pages are applied and their layer cursor is advanced inside one local
+  SQLite transaction. If a pulled page violates a local FK, the whole page rolls
+  back and that layer's cursor is not advanced.
+- the cycle converts local SQLite FK failures into `SyncCycleError` code
+  `LOCAL_FK_VIOLATION` instead of surfacing the raw SQLite exception. The first
+  sync gate observes the code as a retryable structural setup error, while the
+  caller still receives the structured exception.
+- the cycle emits best-effort diagnostic event `sync.pull_local_fk_violation`
+  through `logEvent` with source `database` and safe context only: layer,
+  entity types, page row count, operation (`pull_page_apply`), error code, and a
+  sanitized/truncated exception message. Diagnostic logging failures are
+  swallowed so they never replace the original sync error.
+- automatic repair is intentionally deferred: no cursor reset, full-repull,
+  local wipe, row quarantine, or UI repair flow is performed by this behavior.
+  Retrying re-requests the same failed page because the cursor did not advance.
+
 ## 5) Test overview
 
 1. Engine/outbox behavior
@@ -220,18 +237,24 @@ Gym event note:
 - coverage: first-enable bootstrap trigger and logged-out-then-login bootstrap trigger.
 - includes explicit M13 journey proof for already-signed-in recorder sync convergence and logged-out-then-login bootstrap/convergence followed by recorder cadence sync.
 
-6. Backend ingest/projection contract
+6. Pull cycle and local FK classification
+- `apps/mobile/app/__tests__/sync-cycle-pull.test.ts`
+- coverage: pull LWW insert/update/no-op behavior, FK-enabled whole-page rollback, and cursor write atomicity.
+- `apps/mobile/app/__tests__/sync-cycle-convergence.test.ts`
+- coverage: cycle convergence, auth/server FK handling, pull-side `LOCAL_FK_VIOLATION` classification, failed-layer cursor preservation, and `sync.pull_local_fk_violation` logger emission / logger-failure isolation.
+
+7. Backend ingest/projection contract
 - `supabase/tests/sync-events-ingest-contract.sh`
 - coverage: success projection, duplicate replay idempotency, duplicate-with-drift rejection, strict ordering + prefix commit, and auth/RLS denial paths.
   - includes explicit duplicate replay assertions and changed-payload duplicate rejection assertions.
 
-7. Profile sync status semantics
+8. Profile sync status semantics
 - `apps/mobile/app/__tests__/sync-profile-status.test.ts`
 - coverage: derived status mapping for disabled, initial-sync, retry-scheduled, and blocked/action-required states.
 - `apps/mobile/app/__tests__/settings-profile-navigation.test.tsx`
 - coverage: signed-in profile sync section render, toggle wiring, and inline blocked-failure messaging.
 
-8. Reinstall restore-parity proof (sync v2)
+9. Reinstall restore-parity proof (sync v2)
 - The dedicated `test:sync:reinstall-parity` lane (v1 suite `sync-reinstall-restore-parity.test.ts`, config `jest.integration.config.js`, wrapper `test-sync-reinstall-restore-parity.sh`) was **retired**: its target suite was deleted with the v1 sync code paths, so the lane only ever printed "No tests found". Under the v2 push/pull RPC + per-layer cursor protocol, restore-parity is proven by:
   - `apps/mobile/app/__tests__/sync/cycle-round-trip.test.ts` — the *"a wiped client re-pulls all four rows via the layered drain with advancing cursors"* case drops the local store (mirrors a reinstall = fresh local SQLite), re-runs the real cycle against a live endpoint, and asserts each layer restores with FK integrity and advancing per-layer cursors. Runs in the branch-provisioned `test:sync:infra` lane.
   - backend contract suites `supabase/tests/sync-v2-push-roundtrip.sh` and `supabase/tests/sync-v2-pull-drain.sh` assert push→pull parity across all data-scope entities (including soft-delete tombstones) at the RPC layer, via `./scripts/quality-slow.sh backend`.

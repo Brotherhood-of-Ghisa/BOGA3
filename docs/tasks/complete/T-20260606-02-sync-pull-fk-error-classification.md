@@ -1,7 +1,7 @@
 ---
 task_id: T-20260606-02-sync-pull-fk-error-classification
 milestone_id: "M13"
-status: planned
+status: completed
 ui_impact: "no"
 areas: "frontend|docs"
 runtimes: "node"
@@ -16,7 +16,7 @@ docs_touched: "docs/specs/03-technical-architecture.md,docs/specs/06-testing-str
 
 - Task ID: `T-20260606-02-sync-pull-fk-error-classification`
 - Title: Classify and log pull-side local FK failures
-- Status: `planned`
+- Status: `completed`
 - File location rule:
   - author active cards in `docs/tasks/<task-id>.md`
   - move the file to `docs/tasks/complete/<task-id>.md` when `Status` becomes `completed` or `outdated`
@@ -39,8 +39,8 @@ docs_touched: "docs/specs/03-technical-architecture.md,docs/specs/06-testing-str
 
 ## Context Freshness (required at session start; update before edits)
 
-- Verified current branch + HEAD commit:
-- Start-of-session sync completed per `docs/specs/04-ai-development-playbook.md` git sync workflow?: `yes | no | N/A` (explain)
+- Verified current branch + HEAD commit: `codex/review-db-sync-functionalities-for-issues @ 5569b86`
+- Start-of-session sync completed per `docs/specs/04-ai-development-playbook.md` git sync workflow?: `yes` (`git fetch --prune origin`; current branch is even with upstream at start)
 - Parent refs opened in this session:
   - `docs/specs/README.md`
   - `docs/specs/03-technical-architecture.md`
@@ -53,9 +53,10 @@ docs_touched: "docs/specs/03-technical-architecture.md,docs/specs/06-testing-str
   - `docs/reviews/db-sync-offline-fk-review-2026-06-06.md`
   - `RUNBOOK.md`
 - Code/docs inventory freshness checks run:
-  - Inspect `apps/mobile/src/sync/cycle.ts` pull leg and `applyPullPage`.
-  - Inspect `apps/mobile/app/__tests__/sync-cycle-pull.test.ts`.
-  - Inspect `apps/mobile/src/sync/cycle-error-signal.ts` and logger patterns.
+  - `./scripts/task-bootstrap.sh docs/tasks/T-20260606-02-sync-pull-fk-error-classification.md`
+  - Inspected `apps/mobile/src/sync/cycle.ts` pull leg and `applyPullPage`.
+  - Inspected `apps/mobile/app/__tests__/sync-cycle-pull.test.ts`.
+  - Inspected `apps/mobile/src/sync/cycle-error-signal.ts` and logger patterns.
 - Known stale references or assumptions:
   - Single-device-per-user reduces conflict-resolution needs but does not remove local corruption/migration/FK-drift handling.
 - Optional helper command:
@@ -141,16 +142,26 @@ Convert pull-side local SQLite FK failures from raw database exceptions into str
 
 ## Evidence
 
-- Record targeted Jest output.
-- Record `./scripts/quality-fast.sh frontend` output.
-- Manual verification summary:
-  - include the structured error code and logger assertion summary.
+- Red check:
+  - `cd apps/mobile && npm test -- --runTestsByPath app/__tests__/sync-cycle-convergence.test.ts` initially failed on the new pull-FK assertions because the raw SQLite error code `SQLITE_CONSTRAINT_FOREIGNKEY` escaped instead of `LOCAL_FK_VIOLATION`.
+- Targeted Jest:
+  - `(cd apps/mobile && PATH="/Users/sboschi/.nvm/versions/node/v24.14.0/bin:$PATH" npm test -- --runTestsByPath app/__tests__/sync-cycle-pull.test.ts app/__tests__/sync-cycle-convergence.test.ts app/__tests__/sync-gate-state-bridge.test.ts app/__tests__/cycle-error-signal.test.ts app/__tests__/sync-gate-decision.test.ts)`
+  - Result: `PASS` - 5 suites, 34 tests.
+- Fast gate:
+  - `PATH="/Users/sboschi/.nvm/versions/node/v24.14.0/bin:$PATH" ./scripts/quality-fast.sh frontend`
+  - Result: `PASS` - lint/typecheck/full Jest (`85` suites, `756` tests). Lint emitted pre-existing warnings in unrelated tests but exited successfully.
+- Manual verification summary (required when CI is absent/partial): verified structured code, cursor rollback, and logger behavior.
+  - Pull-side local FK apply failures now throw `SyncCycleError` code `LOCAL_FK_VIOLATION`.
+  - Failed pull transactions roll back and the failed layer cursor remains unadvanced.
+  - Logger spy verifies event `sync.pull_local_fk_violation` with layer, entity types, row count, operation, error code, and sanitized exception message.
+  - Logger rejection is isolated and does not replace the original sync error.
+  - `RUNBOOK.md` reviewed; no changes required because app-log inspection workflow is unchanged.
 
 ## Completion note
 
-- What changed:
-- What tests ran:
-- What remains:
+- What changed: Added pull-side SQLite FK classification/logging in the sync cycle, propagated `LOCAL_FK_VIOLATION` through the existing gate error signal, and documented runtime/test behavior.
+- What tests ran: Targeted Jest suites above plus `./scripts/quality-fast.sh frontend` under Node `v24.14.0` after rebuilding `better-sqlite3` for that ABI.
+- What remains: Automatic recovery is intentionally deferred; this task does not reset cursors, full-repull, quarantine rows, wipe local data, or add UI repair flows.
 
 ## Status update checklist
 

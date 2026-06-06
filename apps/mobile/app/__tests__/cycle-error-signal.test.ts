@@ -21,6 +21,9 @@ describe('cycle-error signal', () => {
 
     markCycleError('FK_VIOLATION');
     expect(getCycleErrorCode()).toBe('FK_VIOLATION');
+
+    markCycleError('LOCAL_FK_VIOLATION');
+    expect(getCycleErrorCode()).toBe('LOCAL_FK_VIOLATION');
   });
 
   it('clears the code on a clean cycle', () => {
