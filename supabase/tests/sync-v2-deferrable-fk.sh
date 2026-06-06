@@ -2,7 +2,7 @@
 
 # tFINAL integration test — Deferrable FKs (plan outcome #4).
 #
-# Asserts the two halves of the deferrable-FK contract from designs/t1.md §5.2:
+# Asserts the two halves of the deferrable-FK contract from docs/specs/tech/sync-v2-server-contract.md §A.5.2:
 #
 #   A. All eight cross-entity FKs are present in information_schema.
 #      referential_constraints with is_deferrable='YES' and
@@ -16,8 +16,8 @@
 #
 # This is integration-level on top of t1's per-table smoke (which only checks
 # pg_constraint.condeferred). The transaction-level assertion is the
-# behaviour the push RPC relies on (designs/t2.md §3.2 "SET CONSTRAINTS ALL
-# DEFERRED inside the function").
+# behaviour the push RPC relies on (docs/specs/tech/sync-v2-server-contract.md §B.3.2
+# "SET CONSTRAINTS ALL DEFERRED inside the function").
 
 set -euo pipefail
 
@@ -96,7 +96,7 @@ pass() { echo "[sync-v2-deferrable-fk] pass: $*"; }
 # -----------------------------------------------------------------------------
 # A. All eight cross-entity FKs deferrable + initially deferred.
 #
-# Map (constraint_name -> child_table) per designs/t1.md §5.2.
+# Map (constraint_name -> child_table) per docs/specs/tech/sync-v2-server-contract.md §A.5.2.
 # -----------------------------------------------------------------------------
 
 FK_SPECS=(

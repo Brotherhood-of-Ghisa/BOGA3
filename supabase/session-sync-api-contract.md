@@ -6,7 +6,7 @@
 - M13 locks a new client-facing sync protocol: batched granular events with idempotent ingest + projection.
 - M5 table CRUD remains a legacy baseline and may still be used internally by backend projection paths, but it is not the M13 mobile sync contract.
 
-## Related baseline docs (per `docs/specs/04-ai-development-playbook.md`)
+## Related baseline docs
 
 - `docs/specs/10-api-authn-authz-guidelines.md` (backend API/authN/authZ rules for this sync surface)
 

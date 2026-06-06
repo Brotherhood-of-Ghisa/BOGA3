@@ -1,149 +1,90 @@
 # Quality & Test Gates (Always-Load Quickref)
 
-This is the **single source of truth** for what gates exist, which ones are
-mandatory, what infrastructure you have, and how to run each lane. It is one of
-the three always-load docs (with `03-technical-architecture.md` and
-`09-project-structure.md`).
+The single source of truth for how to verify a change in this repo: how to set up,
+the exact commands, and which gate to run for what you changed. One of the three
+always-load docs (with `03-technical-architecture.md` and `09-project-structure.md`).
 
-Keep it short and correct. Deep policy lives in the conditional docs linked at the
-bottom — cite them, don't restate them here.
+The deep per-test catalog and strategy live in `06-testing-strategy.md`; cite it,
+don't restate it here.
 
-## First, the thing that trips everyone up
+## Setup (once per worktree)
 
-- **There is no root `package.json`.** Every `npm run …` lives in
-  `apps/mobile/package.json` and must run from `apps/mobile/`.
-- **The gate wrappers live at the repo root** (`./scripts/quality-fast.sh`,
-  `./scripts/quality-slow.sh`) and `cd` into the right workspace for you.
-- **A "command not found" / "infra unavailable" error is almost always a
-  bootstrap gap, not a missing tool.** You have access to every tool this repo
-  uses (`supabase`, `maestro`, `tsx`, `drizzle-kit`, …) — most are local
-  dev-dependencies invoked via `npm run …` / `npx …`, not global binaries. Before
-  concluding a tool is missing: run `npm install` (repo root and/or
-  `apps/mobile/`) then `./scripts/worktree-setup.sh`, and retry. "It won't run" is
-  never, by itself, a reason to skip a runnable test.
+```bash
+./scripts/worktree-setup.sh        # idempotent: installs deps + generates this worktree's isolated config
+```
 
-## The gate ladder
+You normally never run this by hand — **the gate scripts below run any setup they
+need themselves** (install deps if missing, boot/seed the local Supabase, create
+the iOS simulator). Docker must be running for the backend/sync lanes.
 
-| Lane | Command (from repo root) | What runs | In CI? | When |
-| --- | --- | --- | --- | --- |
-| **Fast** | `./scripts/quality-fast.sh` | frontend = `apps/mobile` `lint` + `typecheck` + `test` (jest); backend = `supabase/scripts/test-fast.sh` | **Yes** (frontend only) | Every task, before closeout |
-| **Open-handle guard** | `cd apps/mobile && npm run test:handles` | `jest --detectOpenHandles` | **Yes** | Run locally before any PR — it's a separate CI step not bundled into `quality-fast.sh`, and a leaked timer hangs it |
-| **Sync infra** | `cd apps/mobile && npm run test:sync:infra` | jest: `drift-check` + `cycle-round-trip` + `auth-required-envelope` | No | **Local + mandatory** for any sync/boot/auth change (see below) |
-| **Slow / iOS** | `./scripts/quality-slow.sh frontend` | Maestro lanes: `test:e2e:ios:smoke` + `data-smoke` + `auth-profile` | No | Task-card risk triggers (UI / runtime / Maestro changes) |
-| **Slow / backend** | `./scripts/quality-slow.sh backend` | local Supabase contract suites (auth/RLS + the sync-v2 push/pull/schema/e2e suites) | No | Backend migration / RLS / sync-contract changes |
+## Run the gates (from the repo root)
 
-**CI runs only the fast lane** (`.github/workflows/ci.yml`, working dir
-`apps/mobile`): `npm ci` → `lint` → `typecheck` → `test` → `test:handles`, each
-with a 5-minute step timeout. **Everything else is local-only and accumulates
-breakage invisibly** — a PR can be green in CI while the merged `main` is red on a
-slow lane nobody ran.
+```bash
+./scripts/quality-fast.sh          # lint + typecheck + jest unit/integration tests
+./scripts/quality-slow.sh backend  # boots local Supabase, runs auth/RLS + sync-v2 contract suites + sync-infra
+./scripts/quality-slow.sh frontend # boots the iOS simulator, runs Maestro smoke + data-smoke + auth-profile
+```
 
-`npm test` is deliberately bare `jest` (no `--forceExit`) so leaked handles
-surface instead of hiding. Don't add `--forceExit`. Full rationale: `06` §
-*Unit-test hang safety*.
+Each script bootstraps what it needs (idempotent) and `cd`s into the right
+workspace. You do not set environment variables or provision infrastructure by
+hand. (`npm run …` scripts live only in `apps/mobile/package.json` — there is no
+root `package.json` — but you should invoke the gates above, not the raw scripts.)
 
-## What is mandatory
+## Which gate for what you changed
 
-- **Fast gate: always**, before declaring a task done. CI enforces it on every PR.
-- **`test:sync:infra`: local and mandatory** for any change to sync, boot, or auth
-  — it is **not** a deferrable "remote-only" lane. The lane reads
-  `SUPABASE_BRANCH_URL` / `SUPABASE_BRANCH_ANON_KEY`, but those just name *an*
-  endpoint carrying the sync schema + the `user_a` fixture, and **this worktree's
-  own slot-isolated local Supabase is exactly such an endpoint**. To run it:
-  ```bash
-  ./supabase/scripts/ensure-local-runtime-baseline.sh
-  eval "$(cd supabase && npx -y supabase@<pinned> status -o env)"
-  export SUPABASE_BRANCH_URL="$API_URL" SUPABASE_BRANCH_ANON_KEY="$ANON_KEY"
-  cd apps/mobile && npm run test:sync:infra
-  ```
-  It is far lighter than the iOS lanes (no simulator / Metro). There is no
-  acceptable local deferral.
-- **Slow gates: task-card-triggered**, not always required. The task card owns the
-  trigger. Run them to GREEN — and put the evidenced run (output/artifact path) in
-  the PR — when the card says so or when you changed UI, boot/sync/auth behaviour,
-  Maestro runtime, or backend contracts. "data-only / no UI files" does **not**
-  mean "no e2e impact": any boot/sync/auth change is exercised by the e2e lanes.
-- **Never ship — and reviewers must never approve — a PR that skips a
-  locally-runnable test with an excuse.**
+| You changed… | Run |
+| --- | --- |
+| Any `apps/mobile` TS/JS logic | `./scripts/quality-fast.sh` |
+| `apps/mobile` UI screens / components / navigation (`app/**`, `components/**`) | `quality-fast` **+** `./scripts/quality-slow.sh frontend` |
+| Sync / boot / auth (`apps/mobile/src/sync/**`, `src/auth/**`, data bootstrap/migrations, `drizzle/**`) | `quality-fast` **+** `./scripts/quality-slow.sh backend` |
+| Backend (`supabase/migrations/**`, `functions/**`, RLS/policies, sync RPCs) | `./scripts/quality-slow.sh backend` |
+| Added/removed/upgraded a **native** dependency (iOS pod, native Expo module, or a native field / config plugin in `apps/mobile/app.config.ts`) | **First** `cd apps/mobile && ./scripts/maestro-ios-dev-client-build.sh --force`, then `./scripts/quality-slow.sh frontend` |
 
-For measured wall-clock times per lane (median + a 3× "investigate above this"
-ceiling), see `docs/testing/local-test-timings.md`. Cite it or re-measure; don't
-invent durations. A run exceeding ~2–3× the median is a signal something is wrong.
+Run the gate(s) for your change **to green before opening the PR**, and put the
+evidence (command output / Maestro artifact path) in the PR. A pure-JS or
+config-only change never needs the dev-client rebuild (Metro bundles it at
+runtime); a native change always does, or every worktree's Maestro run fails at
+boot with `Cannot find native module`.
 
-## The infrastructure you have (per worktree)
+## What CI runs
 
-Everything needed to run every gate is available locally in your worktree.
+CI (`.github/workflows/ci.yml`) runs **only the fast lane** — `lint`, `typecheck`,
+`test`, `test:handles` — in `apps/mobile`, with a 5-minute timeout per step.
+`test:handles` is the open-handle guard (`jest --detectOpenHandles`); CI runs it
+on every PR, so you only need it locally when you touched timers, sockets,
+subscriptions, or async teardown. `npm test` is deliberately bare `jest` (no
+`--forceExit`) so leaked handles surface — don't add it.
 
-- **Local Supabase** — slot-isolated per worktree (its own `project_id`,
-  slot-derived ports, containers, DB volume; generated by
-  `./scripts/worktree-setup.sh`). Booted by
-  `./supabase/scripts/ensure-local-runtime-baseline.sh`, which runs the CLI via
-  `npx -y supabase@<pinned>` and **reuses any already-running stack** — so
-  `which supabase` returning nothing is normal, not a blocker. Docker must be
-  running. Worktrees never share a stack, so no data-isolation serialization is
-  needed. Deep design: `12`.
-- **iOS simulators** — the smoke gates self-heal a missing sim. `smoke` /
-  `data-smoke` default to `IOS_SIM_AUTO_CREATE=1`: if the worktree's slot-named
-  sim (`BOGA wt<slot>`) is absent, the gate creates and boots one and proceeds.
-- **Maestro iOS dev-client** — ONE shared `.app`, cached host-local at
-  `$HOME/.cache/boga/maestro/ios-dev-client` (NOT keyed by worktree slot), reused
-  by every worktree. The cache is **trusted on existence** — it is NOT
-  auto-invalidated when dependencies change. **If your task adds/removes/upgrades a
-  NATIVE dependency** (anything shipping an iOS pod / native Expo module, or a
-  change to a config plugin / native field in `apps/mobile/app.config.ts`), you
-  MUST rebuild first: `cd apps/mobile && ./scripts/maestro-ios-dev-client-build.sh
-  --force`. Skip it and every worktree's gate reuses the stale binary and fails at
-  boot with `Cannot find native module '<X>'`. Pure-JS / config-only changes need
-  no rebuild. Deep contract: `11`; ops: `apps/mobile/README-maestro.md`.
+**The slow gates (Maestro iOS + the backend/sync-v2 suites) are NOT in CI.** They
+only run when you run them locally, so breakage on those lanes accumulates on
+`main` invisibly. Run the slow gate for your area (table above) before the PR.
 
-The iOS lanes run the **same** dev-client build in two configs, selected by
-whether Supabase creds are present: `smoke` / `data-smoke` / `gates` are
-**infra-free** (local-only, login gate off); `auth-profile` is
-**Supabase-configured** (real local Supabase, sign-in + sync exercised). The
-runner pins each lane's `.env.local` and restores it after — don't hand-edit it.
+## Infrastructure (already available in your worktree)
 
-**Host-capacity caveat for parallel agents.** Worktree *stacks* are isolated, but
-the *host* is not infinite. Run the heavy slow gates **serially** (one full
-slow-gate run at a time) and reap orphaned stacks before a run
-(`./scripts/worktree-sweep.sh` / `./supabase/scripts/local-runtime-down.sh`) so
-green evidence is real and not a load artifact. Do **not** use `git stash` in a
-worktree while other agents run — it operates on the shared `.git`; commit to your
-branch instead.
+You have everything needed to run every gate locally — nothing is "unavailable."
+A "command not found" / "infra unavailable" error is a bootstrap gap: re-run
+`./scripts/worktree-setup.sh` and retry.
 
-## Multi-agent orchestration: slow-gate checkpoints
+- **Local Supabase** — slot-isolated per worktree (own ports, containers, DB).
+  Booted and seeded automatically by `quality-slow.sh backend`. Needs Docker.
+  `which supabase` returning nothing is normal — it runs via `npx`.
+- **iOS simulator** — `quality-slow.sh frontend` auto-creates and boots the
+  worktree's slot simulator if missing.
+- **Maestro iOS dev-client** — one shared `.app` cached at
+  `$HOME/.cache/boga/maestro/ios-dev-client`, reused across worktrees and **trusted
+  on existence** (not rebuilt on dependency change). Hence the `--force` rebuild
+  rule above for native changes.
 
-Because the slow gates are not in CI, every multi-agent plan for this repo MUST
-include slow-gate checkpoint tasks:
+## Maintenance
 
-- **Cadence** — after each wave/batch of merges (≈ every 3–4 build merges), after
-  any behaviour-changing merge that skipped the slow lanes, and a MANDATORY one
-  immediately before the final test card (`tFINAL`).
-- **What** — run the slow gates against the CURRENT integration branch
-  (`origin/main`, the merged result — not a feature branch). If red, fix and open a
-  PR; if the breakage is a half-landed feature, surface it to the coordinator.
-- **Who** — a dedicated checkpoint task run as a spawned task / dedicated session
-  (in-turn background sub-agents get killed at turn boundaries). Give each Maestro
-  flow a hard per-flow timeout so a hang fails fast.
-- **Blocking** — a checkpoint is a DAG barrier: no further feature merges land on a
-  red integration branch.
-- **Avoid the half-feature trap** — order interdependent PRs so `main` is never
-  left user-broken; land a gate/UI together with the behaviour it guards, or
-  feature-flag incomplete behaviour behind `isDevMode()` so `main` stays runnable.
+Update this doc in the same change whenever you alter a gate: a `scripts/quality-*`
+wrapper, a `supabase/scripts/test-*` wrapper, an `apps/mobile/package.json`
+`test*`/`lint`/`typecheck` script, or `.github/workflows/ci.yml`. If a fact here
+ever disagrees with the scripts, the scripts win — fix the doc.
 
-## Maintenance rule
+## Deeper docs (load when relevant)
 
-Update this doc in the same session whenever you change a gate: a script under
-`scripts/` or `apps/mobile/scripts/maestro*`, an `apps/mobile/package.json`
-`test*` script, the CI workflow, or which lanes are mandatory. If a fact here
-drifts from the scripts, the scripts win — fix the doc.
-
-## Where the depth lives (conditional load)
-
-- `06-testing-strategy.md` — full testing strategy, per-feature coverage policies,
-  backend test layers, hang-safety rationale.
-- `11-maestro-runtime-and-testing-conventions.md` — authoritative Maestro runtime
-  contract (reset taxonomy, artifacts, config).
-- `12-worktree-config-and-isolation.md` — slot model, port derivation, isolation.
+- `06-testing-strategy.md` — per-test-entry-point catalog (purpose / infra / when), coverage policies, hang-safety rationale.
+- `11-maestro-runtime-and-testing-conventions.md` — Maestro runtime contract.
+- `12-worktree-config-and-isolation.md` — slot model and isolation.
 - `docs/testing/local-test-timings.md` — measured per-lane wall-clock times.
-</content>
-</invoke>

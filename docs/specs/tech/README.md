@@ -4,7 +4,7 @@ This folder holds subsystem-level implementation references that sit below the t
 
 Current docs:
 
-- `client-sync-engine.md`: mobile outbox/scheduler/flush engine design and maintenance notes for M13+.
+- `sync-v2-server-contract.md`: authoritative Sync v2 server contract — Part A (server schema, composite PKs, RLS, deferrable FKs, LWW/undelete, drift checker) and Part B (push/pull RPC wire protocol, batch caps, per-layer cursor drain). Verified against the as-built migrations and RPCs.
 
 Maintenance rule:
 

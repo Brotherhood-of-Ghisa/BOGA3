@@ -26,32 +26,17 @@ enters their area.
 | --- | --- |
 | UI / screens / components / navigation | `docs/specs/08-ux-delivery-standard.md`, `docs/specs/ui/README.md` (index → load only the bundle docs you need) |
 | Data model / schema / migrations / sync scope | `docs/specs/05-data-model.md` |
-| Sync engine (outbox, push/pull, bootstrap, drift) | `docs/specs/05-data-model.md`, `docs/specs/tech/client-sync-engine.md`, `supabase/session-sync-api-contract.md` |
+| Sync (data model, server schema, push/pull RPC, drift) | `docs/specs/05-data-model.md`, `docs/specs/tech/sync-v2-server-contract.md` |
 | Auth / RLS / backend API | `docs/specs/10-api-authn-authz-guidelines.md`, `supabase/README.md` |
 | Maestro / iOS e2e flows or harness | `docs/specs/11-maestro-runtime-and-testing-conventions.md`, `apps/mobile/README-maestro.md` |
 | Worktree setup / isolation / cross-worktree bugs | `docs/specs/12-worktree-config-and-isolation.md` |
 | Deep testing strategy / adding or changing a test lane | `docs/specs/06-testing-strategy.md`, `docs/testing/local-test-timings.md` |
 | Data import (GymBook / JSON) | `apps/mobile/scripts/import/BOGA_IMPORT_JSON_CONTRACT.md` |
-| Executing a structured task end-to-end (TDD loop, closeout, status discipline) | `docs/specs/04-ai-development-playbook.md` |
-| Multi-agent orchestration | `docs/specs/02-quality-and-test-gates.md` § *Multi-agent orchestration: slow-gate checkpoints* (+ the `multi-agent-orchestration` skill) |
 | Human local-dev ops (run/build/debug, logs, reset) | `RUNBOOK.md` |
 | Product/domain context | `docs/specs/00-product.md`, `docs/specs/README.md` (full spec index) |
 
 Product and domain details are maintained in the specs above — do not duplicate
 them here.
-
-## Non-negotiables
-
-- **Test to green before you call a task done.** Run the gates your change touches
-  and put the evidence in the PR. What's mandatory, what infra you have, and how to
-  run each lane: `docs/specs/02-quality-and-test-gates.md`. A test that "won't run"
-  is a bootstrap gap, not an unavailable tool — `npm install` +
-  `./scripts/worktree-setup.sh`, then retry.
-- **Never use `__DEV__` directly** in `apps/mobile`. Import `isDevMode` from
-  `@/src/utils/isDevMode` so dev-only UI survives the `com.phano.boga3.dev`
-  TestFlight build (an ESLint rule rejects bare `__DEV__`).
-- **Commit/push only when a human asks.** Sessions run on `main` unless told
-  otherwise; sync at start and before handoff.
 
 ## Ignore plans, tasks, and brainstorms unless you are executing one
 
@@ -61,4 +46,3 @@ that will mislead you if you treat it as current. **Do not read them, and do not
 let them steer your work, unless the user explicitly points you at a specific
 plan/task to execute or to brainstorm in.** Source-of-truth lives in
 `docs/specs/**`, `AGENTS.md`, and `RUNBOOK.md`.
-</content>

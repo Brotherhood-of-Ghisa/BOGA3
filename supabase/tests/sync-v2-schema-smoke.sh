@@ -4,7 +4,7 @@
 #
 # Asserts, against the freshly-reset local database, that the clean-room
 # migration in supabase/migrations/<ts>_sync_v2_clean_room.sql produced exactly
-# the shape designs/t1.md prescribes:
+# the shape docs/specs/tech/sync-v2-server-contract.md Part A prescribes:
 #
 #   - All eight v2 entity tables exist in app_public.
 #   - Every v1 sync server object name is absent from information_schema /
@@ -232,7 +232,7 @@ pass "both universal triggers present on every entity table"
 # Map: <constraint_name>|<expected_confdeltype>
 #   confdeltype values: 'a' = no action, 'c' = cascade, 'n' = set null,
 #                       'r' = restrict, 'd' = set default.
-# Per designs/t1.md §5.2:
+# Per docs/specs/tech/sync-v2-server-contract.md §A.5.2:
 #   sessions_gym_fk                                  on delete set null   -> n
 #   session_exercises_session_fk                     on delete cascade    -> c
 #   session_exercises_exercise_definition_fk         on delete no action  -> a
@@ -289,7 +289,7 @@ done
 pass "eight composite FKs present with condeferrable=t, condeferred=t, expected on-delete actions"
 
 # -----------------------------------------------------------------------------
-# 6. Zero CHECK constraints on any of the eight tables (t1 §1).
+# 6. Zero CHECK constraints on any of the eight tables (docs/specs/tech/sync-v2-server-contract.md §A.1).
 # -----------------------------------------------------------------------------
 
 for entity in "${ENTITIES[@]}"; do
@@ -303,7 +303,7 @@ for entity in "${ENTITIES[@]}"; do
        and con.contype = 'c';
   ")"
   if [[ "${count}" != "0" ]]; then
-    fail "app_public.${entity} has ${count} CHECK constraint(s); expected zero per t1 §1"
+    fail "app_public.${entity} has ${count} CHECK constraint(s); expected zero per docs/specs/tech/sync-v2-server-contract.md §A.1"
   fi
 done
 pass "no CHECK constraints on any of the eight v2 entity tables"

@@ -1,492 +1,557 @@
-# Testing Strategy (High-Level)
+# Testing Strategy (Deep Companion)
 
 ## Purpose
 
-Define the top-level testing stack and working practices for MVP.
+Define the testing stack, the per-entry-point catalog (what each script verifies,
+what infrastructure it needs, and which code changes should trigger it), and the
+coverage policies that govern how features are tested.
 
 Scope boundary:
 
-- This doc owns the deep testing strategy and verification policy. For the
-  at-a-glance gate ladder, what is mandatory, and the local infrastructure you
-  have, see `docs/specs/02-quality-and-test-gates.md` (the always-load quickref) —
-  this doc is its conditional companion.
-- App-specific UI route/component inventories and navigation summaries live in `docs/specs/ui/**` (entrypoint: `docs/specs/ui/README.md`) and should remain brief/source-linked.
+- **`docs/specs/02-quality-and-test-gates.md` is the always-load quickref** — it
+  owns the at-a-glance gate ladder, what is mandatory, and the one-line summary of
+  the local infrastructure you have. **Do not restate that here.** This document
+  is its conditional deep companion: the comprehensive per-entry-point catalog
+  plus the testing-strategy and coverage policies.
+- App-specific UI route/component inventories and navigation summaries live in
+  `docs/specs/ui/**` (entrypoint: `docs/specs/ui/README.md`) and should remain
+  brief/source-linked.
+- `docs/specs/11-maestro-runtime-and-testing-conventions.md` is the authoritative
+  Maestro runtime/testing contract (reset taxonomy, artifacts, per-worktree
+  config). This document owns only the Maestro *testing policy* (when slow gates
+  are required, which command wrappers are canonical, where evidence is expected).
+- `docs/specs/12-worktree-config-and-isolation.md` owns the worktree slot model,
+  port derivation, and runtime isolation.
+- `docs/testing/local-test-timings.md` holds **measured** best-case, single-agent,
+  local wall-clock times (median + a 3× "investigate above this" ceiling) for
+  every runnable lane. Cite that file or re-measure; do not invent test durations.
+  A run exceeding ~2-3× the recorded median is a signal something is wrong, not a
+  normal slow run.
 
 ## Decisions and rationale
 
-1. `Vitest` for unit/domain tests.
-Reason: fast feedback loop for logic-heavy parts like set/session calculations and sync state behavior.
+1. `Jest + jest-expo` for unit/integration and `React Native Testing Library` for
+   UI/component tests. Reason: validates real screen behavior and logic-heavy
+   parts (set/session calculations, sync state) with React Native-friendly tooling
+   on a fast feedback loop.
+2. `Data-layer integration tests` against a real in-memory SQLite engine
+   (`better-sqlite3`) built from the shipped migration bundle. Reason: catches
+   migration and persistence issues early in an offline-first app.
+3. `Two-lane local data verification` for SQLite runtime confidence. Reason: keep
+   the fast lane deterministic while still proving real-device migration and
+   persistence behavior in the native Expo runtime.
+4. `Backend auth/RLS + sync-v2 contract tests` against a local Supabase stack.
+   Reason: prevents data-leak/security regressions and proves the real wire
+   contract before hosted deployment.
+5. `Maestro + iOS Simulator + Expo dev client` for end-to-end flows. Reason:
+   practical mobile E2E coverage with lower setup cost than heavier alternatives.
+6. `Quality gates` (fast/slow wrappers + a CI job) keep AI-generated changes safe
+   and predictable as code volume grows.
 
-2. `React Native Testing Library + jest-expo` for UI/component tests.
-Reason: validates real screen behavior with React Native-friendly tooling.
+---
 
-3. `Data layer integration tests` against local SQLite schema.
-Reason: catches migration and persistence issues early in an offline-first app.
+# Entry-point catalog
 
-4. `Two-lane local data verification` for SQLite runtime confidence.
-Reason: keep CI feedback fast with deterministic checks while still proving real-device migration and persistence behavior in native Expo runtime.
+Every test / quality entry point in the repo, with three facts each: **PURPOSE**
+(what it verifies), **INFRASTRUCTURE** (what it needs), and **WHEN TO RUN** (which
+codebase areas/changes should trigger it — by path/area). Infrastructure values:
 
-5. `Backend auth/RLS contract tests`.
-Reason: prevents data-leak/security regressions as backend is introduced.
+- **none** — pure Node/Jest; no external services. CI-safe.
+- **local Supabase + Docker** — a running local Supabase stack (Postgres +
+  PostgREST + RLS), ensured via `./supabase/scripts/ensure-local-runtime-baseline.sh`.
+- **iOS simulator + Metro + Maestro dev-client** — a booted iOS simulator, the
+  Expo dev client `.app`, a Metro dev server, and the Maestro CLI.
 
-6. `Maestro` for MVP end-to-end flows.
-Reason: practical mobile E2E coverage with lower setup cost than heavier alternatives.
+## Mobile npm scripts (`apps/mobile/package.json`, run from `apps/mobile/`)
 
-7. `Quality gate in CI` (core tests must pass before merge).
-Reason: keeps AI-generated changes safe and predictable as code volume grows.
+| Script | Purpose | Infrastructure | When to run (paths/areas) |
+|---|---|---|---|
+| `npm run lint` | `expo lint` (ESLint flat config). Enforces the repo lint rules, including the `no-restricted-globals` ban on `__DEV__` (use `isDevMode()` instead). | none | Any `apps/mobile/**` source change. Part of `quality-fast.sh frontend` and CI. |
+| `npm run lint:ui-guardrails` | Standalone guardrail (`scripts/check-ui-guardrails.js`): flags raw color literals (hex / `rgb(a)`) in `apps/mobile/app/**` and `components/**`. NOT wired into `lint`, ESLint, any gate wrapper, or CI — invoke it directly. | none | UI/styling changes under `apps/mobile/app/**` or `apps/mobile/components/**` where the design-token guardrail matters. |
+| `npm run typecheck` | Regenerates router types (`router:types`) then `tsc --noEmit`. | none | Any `apps/mobile/**` TS change. Part of `quality-fast.sh frontend` and CI. |
+| `npm test` | Full Jest unit/integration suite. Bare `jest` — deliberately **no `--forceExit`** (see *Unit-test hang safety*). Excludes infra-dependent sync tests (they live behind `test:sync:infra`). | none | Any `apps/mobile/**` change. Part of `quality-fast.sh frontend` and CI. |
+| `npm run test:sync` | `jest app/__tests__/sync` — the sync-focused subset (still infra-free; the infra-dependent files in that dir fail fast without an endpoint and are normally run via `test:sync:infra`). | none | Targeted feedback while editing mobile sync code under `apps/mobile/app/__tests__/sync/**` or the sync runtime it covers. |
+| `npm run test:sync:infra` | Runs the three **infra-dependent** sync tests by path: `drift-check.test.ts` (shells out to `check:sync-drift --strict`), `cycle-round-trip.test.ts` (real push→server-LWW→pull→local-LWW round trip, incl. a wiped-client reinstall re-pull), and `auth-required-envelope.test.ts` (unauthenticated cycle is a clean no-op). | local Supabase + Docker. Reads `SUPABASE_BRANCH_URL` / `SUPABASE_BRANCH_ANON_KEY` — these may point at **this worktree's own local stack** (`API_URL`/`ANON_KEY` from `supabase status -o env`); it is **runnable locally, not a deferred/branch-only lane**. | Changes to the mobile sync cycle, client Drizzle schemas, the migration bundle, or the wire contract under `apps/mobile/src/**` sync code and `apps/mobile/app/__tests__/sync/**`. |
+| `npm run test:handles` | Open-handle guard: `jest --detectOpenHandles --silent`, serial. Surfaces any leaked handle (unclosed connection, lingering timer, real Supabase transport) with a stack after tests pass. Can be scoped (e.g. `-- sync-cycle`). | none | Any change that touches timers, connections, async teardown, or test fixtures. Part of CI; **not** in `quality-fast.sh` — run it before opening a PR. |
+| `npm run db:generate` | `drizzle-kit generate` + `tsx scripts/bundle-migrations.ts`: regenerates `drizzle/*.sql` AND the committed runtime bundle `drizzle/migrations.generated.ts`. Idempotent. | none | Any schema change under `apps/mobile/src/data/**` / `apps/mobile/drizzle/**`. Run it and commit the regenerated artifacts. |
+| `npm run db:generate:canary` | Alias of `db:generate`. Intended as a migration-artifact drift canary: re-run it and confirm a clean working tree (no uncommitted diff) to prove the generated SQL/bundle match the schema. NOT wired into any gate or CI. | none | Same triggers as `db:generate`; use when you want to *verify* (rather than write) that the bundle is current. |
+| `npm run check:sync-drift` | `tsx scripts/check-sync-schema-drift.ts`: resets local Postgres, introspects server schema vs the client Drizzle schemas, and asserts no client/server drift (universal index, two triggers, four RLS policies w/ body hashes, soft-delete + sync columns, topo FK order). `--strict` promotes warn-only (exit 2) to failure. | local Supabase + Docker (it drives a DB reset). | Changes to `apps/mobile/src/data/**` schemas, `supabase/migrations/**`, or sync columns/RLS. Invoked with `--strict` by `quality-slow.sh backend`; also exercised by `test:sync:infra`. |
+| `npm run test:e2e:ios:smoke` | `scripts/maestro-ios-smoke.sh` → runs `smoke-launch.yaml` with a `full` reset. Cold-launch + navigation smoke on the freshly-installed dev client (infra-free config). Captures `01-app-launch`, `02-session-recorder-visible`. | iOS simulator + Metro + Maestro dev-client. **No** Supabase. | UI/runtime changes that need fresh real-simulator smoke evidence (see *iOS UI smoke policy*). Part of `quality-slow.sh frontend`. |
+| `npm run test:e2e:ios:data-smoke` | `scripts/maestro-ios-data-smoke.sh` → runs `data-runtime-smoke.yaml` with a `data` reset. Validates real `expo-sqlite` migration + smoke write/read and that the backend-less build seeds its own starter exercise catalog at boot. Captures `03-data-runtime-smoke-start`, `04-data-runtime-smoke-success`. | iOS simulator + Metro + Maestro dev-client. **No** Supabase. | See *iOS simulator data smoke policy* (bootstrap/migrations/drizzle/native-runtime changes). Part of `quality-slow.sh frontend`. |
+| `npm run test:e2e:ios:gates` | `scripts/maestro-ios-gates.sh` — convenience: runs smoke + data-runtime-smoke against **one** provisioned sim + Metro (pays the ~55-60s boot/warm overhead once). Reset semantics preserved (provision `full`; data-smoke self-resets in-flow). | iOS simulator + Metro + Maestro dev-client. **No** Supabase. | When you want both infra-free iOS gates faster; the per-flow lanes above remain the canonical individual lanes. |
+| `npm run test:e2e:ios:auth-profile` | `scripts/maestro-ios-auth-profile.sh` — the **only** Supabase-configured iOS lane. Runs four flows in order, each with a `full` reset: `launch-requires-sign-in`, `sync-gate-first-cycle`, `settings-sync-status`, `auth-profile-happy-path`. Validates login-on-start enforcement, the first-sync gate, settings sync status, and the fixture-backed sign-in / profile / username-update / sign-out happy path. Captures `05-…-logged-out-start`, `06-…-signed-in`, `07-…-signed-out-end`. | iOS simulator + Metro + Maestro dev-client **and** local Supabase + Docker (ensures baseline, exports `EXPO_PUBLIC_SUPABASE_*` from the running stack, signs in as `user_a`). | See *iOS simulator auth/profile happy-path policy* (profile-route UI/state, auth bootstrap/session restore, local-Supabase auth wiring). Part of `quality-slow.sh frontend`. **Currently RED** — see the timings-doc note. |
 
-8. `Supabase-local backend contract/integration testing` as the default backend verification lane for M5+.
-Reason: validates real auth + `RLS` behavior before hosted deployment and preserves local-first confidence.
+## Repo-root quality wrappers (`scripts/`, run from repo root)
 
-9. `Cross-stack E2E strategy` (`Maestro` + local Supabase) is documented before implementation.
-Reason: keeps FE/backend integration test expectations explicit without forcing premature E2E build-out during backend foundation work.
+| Wrapper | Expands to | Infrastructure | When to run |
+|---|---|---|---|
+| `./scripts/quality-fast.sh` | `frontend` + `backend` fast lanes | per sub-lane | Default local closeout fast gate for covered workspaces. |
+| `./scripts/quality-fast.sh frontend` | `apps/mobile`: `lint` + `typecheck` + `test` | none | Any `apps/mobile/**` change. |
+| `./scripts/quality-fast.sh backend` | `./supabase/scripts/test-fast.sh` | local Supabase + Docker | Any `supabase/**` change. |
+| `./scripts/quality-slow.sh frontend` | `test:e2e:ios:smoke` + `test:e2e:ios:data-smoke` + `test:e2e:ios:auth-profile` (in that order) | iOS simulator + Metro + Maestro dev-client; auth-profile additionally needs local Supabase + Docker | Risk-triggered: UI/runtime/auth-profile changes needing real-simulator evidence. |
+| `./scripts/quality-slow.sh backend` | `test-auth-authz.sh` → `test-sync-v2-schema-smoke.sh` → `test-sync-push-contract.sh` → `test-sync-pull-contract.sh` → `test-dev-wipe-my-data.sh` → `check:sync-drift --strict` → `test-sync-v2-e2e.sh` (in that order) | local Supabase + Docker (each wrapper calls `ensure-local-runtime-baseline.sh`) | Risk-triggered backend work: `supabase/migrations/**`, `supabase/functions/**`, auth config/policies, sync RPC contracts/fixtures. |
 
-## Local data two-lane policy (M2)
+> The slow gate runs are not always mandatory. "When to run" is governed by the
+> codebase areas/paths in the policies below; the always-load quickref
+> (`02-quality-and-test-gates.md`) states what is mandatory.
 
-- Lane 1 (`CI-safe`):
-  - Run fast checks in `apps/mobile` (`lint`, `typecheck`, `test`) and include targeted data-layer tests that validate migration/bootstrap orchestration and smoke insert/read behavior using deterministic test doubles.
-  - Include migration-generation canary (`npm run db:generate:canary`) to detect schema/migration artifact drift.
-- Lane 2 (`native runtime smoke`):
-  - Run a focused smoke flow on Expo native runtime with real `expo-sqlite`.
-  - Capture concise evidence: runtime environment, steps executed, migration success signal, and smoke write/read success signal.
-- Rule:
-  - Do not treat Lane 1 as a substitute for Lane 2 when validating runtime SQLite behavior; both lanes are required for milestone-level local data confidence.
+## Backend wrappers (`supabase/scripts/`, run from repo root)
+
+Each `test-*.sh` wrapper first calls `ensure-local-runtime-baseline.sh`, then runs
+its target suite under `supabase/tests/`.
+
+| Wrapper | Target suite | Purpose | Infrastructure | When to run |
+|---|---|---|---|---|
+| `test-fast.sh` | `tests/local-runtime-smoke.sh` | Combined fast backend smoke: runtime up + reset (migrations + seed) + DB schema lint + health endpoint + deterministic seed-fixture presence. | local Supabase + Docker | Any `supabase/**` change. Backend fast gate (`quality-fast.sh backend`). |
+| `test-auth-authz.sh` | `tests/auth-authz-contract.sh` | Real auth context + RLS behavior: owner success, cross-user denial, validation/unauthorized paths (incl. `auth.users`-keyed profile tables and `public.app_logs` insert/read-deny). | local Supabase + Docker | `supabase/migrations/**` (RLS/policies/functions), auth config. Part of `quality-slow.sh backend`. |
+| `test-sync-v2-schema-smoke.sh` | `tests/sync-v2-schema-smoke.sh` | Sync-v2 clean-room schema shape (the columns/indexes/triggers/RLS the migration ships). | local Supabase + Docker | `supabase/migrations/**` sync-v2 schema changes. Part of `quality-slow.sh backend`. |
+| `test-sync-push-contract.sh` | `tests/sync-push-contract.sh` | `sync_push` RPC contract: LWW, clamp, undelete, envelope, batch caps, FK closure, auth/RLS. | local Supabase + Docker | `sync_push` RPC / sync push contract changes under `supabase/**`. Part of `quality-slow.sh backend`. |
+| `test-sync-pull-contract.sh` | `tests/sync-pull-contract.sh` | `sync_pull` RPC contract: per-layer cursor protocol — snapshot pull, paginated drain, layer→type partition, RLS isolation, tombstones, empty-page echo, same-ms tiebreak, limit/layer bounds, AUTH_REQUIRED. | local Supabase + Docker | `sync_pull` RPC / pull contract changes under `supabase/**`. Part of `quality-slow.sh backend`. |
+| `test-dev-wipe-my-data.sh` | `tests/dev-wipe-my-data-contract.sh` | Developer-only `dev_wipe_my_data` RPC: auth guard, non-production environment guard, owner-scoped deletion (caller's rows removed, second user's rows survive). | local Supabase + Docker | Changes to the `dev_wipe_my_data` RPC or its guards. Part of `quality-slow.sh backend`. |
+| `test-sync-v2-e2e.sh` | `tests/sync-v2-*.sh` group | Integration-level plan-outcome assertions across the as-built stack: `sync-v2-clean-room.sh`, `-deferrable-fk.sh`, `-rls-cross-owner.sh`, `-push-roundtrip.sh`, `-pull-drain.sh`, `-pull-fk-closure.sh`, `-drift-synthetic.sh`, `-drift-asbuilt.sh`, `-spec-rule.sh`. Includes the independent push→pull parity assertions across all data-scope entities (incl. soft-delete tombstone visibility). | local Supabase + Docker | Any cross-cutting sync-v2 backend change; milestone/release closeout for sync. Part of `quality-slow.sh backend` (runs last). |
+| `ensure-local-runtime-baseline.sh` | — | Shared runtime preflight (not a test): lock + conditional bootstrap/reset + deterministic fixture enforcement. If runtime is down: start + reset/seed + provision auth fixtures. If up: reuse as-is (no reset), apply pending migrations, verify baseline rows, re-provision auth fixtures idempotently. | local Supabase + Docker | Invoked automatically by every real-instance wrapper above and by `test:e2e:ios:auth-profile`. Run it directly before any real-instance slow test. |
+
+Supporting (non-test) backend scripts: `local-runtime-up.sh` (start stack + health
+function serve), `reset-local.sh` (migrate/bootstrap + deterministic seed),
+`db-lint-local.sh` (fast schema lint), `smoke-health.sh` (health endpoint smoke),
+`smoke-seed.sh` (fixture baseline smoke via REST), `auth-provision-*.sh` (fixture
+identities), `auth-fixture-constants.sh` (fixture credentials).
+
+## Maestro iOS helper scripts (`apps/mobile/scripts/`)
+
+The four `test:e2e:ios:*` npm scripts above are thin wrappers over these. The
+shared runtime plumbing — `maestro-ios-run-flow.sh`, `maestro-ios-runtime.sh`,
+`maestro-ios-provision.sh`, `maestro-ios-launch.sh`, `maestro-ios-teardown.sh`,
+`maestro-env.sh`, `ios-sim-boot.sh` — provisions/launches/tears down the sim +
+Metro and is owned operationally by
+`docs/specs/11-maestro-runtime-and-testing-conventions.md`. One-time setup:
+`maestro-ios-dev-client-build.sh` builds the dev-client `.app` (per worktree).
+
+## Retired / removed entry points (do not reintroduce)
+
+- **`supabase/scripts/test-sync-api-contract.sh`** (→ `tests/session-sync-api-contract.sh`)
+  and **`supabase/scripts/test-sync-events-ingest-contract.sh`** (→ `tests/sync-events-ingest-contract.sh`):
+  v1 suites targeting the M13/M14 projection RPC family dropped by the
+  `sync_v2_clean_room` migration. The wrapper files and their target suites still
+  exist on disk but are wired into **no** gate and would fail if run. Treat as
+  **retired**; the sync-v2 suites replaced them.
+- **`npm run test:sync:reinstall-parity`**: **removed**. Its target file
+  (`app/__tests__/sync-reinstall-restore-parity.test.ts`) and
+  `jest.integration.config.js` were deleted with the v1 code paths; the npm script
+  no longer exists. Under sync v2 the reinstall guarantee is proven by
+  `app/__tests__/sync/cycle-round-trip.test.ts` (wiped-client re-pull via the
+  layered drain, in `test:sync:infra`) and by the backend
+  `sync-v2-push-roundtrip.sh` / `sync-v2-pull-drain.sh` suites (push→pull parity at
+  the RPC layer, in `test-sync-v2-e2e.sh`).
+
+---
+
+# CI posture
+
+- `.github/workflows/ci.yml` runs one job (`frontend`, working directory
+  `apps/mobile`) on every push and pull request to `main`.
+- It runs, in order: `npm ci`, `npm run lint`, `npm run typecheck`, `npm test`
+  (5-minute step timeout), and `npm run test:handles` (open-handle guard, 5-minute
+  step timeout). That is the **entire** CI surface today.
+- **Not in CI:** the iOS Maestro slow gates (`quality-slow.sh frontend`) and the
+  backend Supabase contract suites (`quality-slow.sh backend`) remain local/manual,
+  along with `lint:ui-guardrails` and `db:generate:canary`. For work not covered by
+  the CI job, the verification record must still document: what was run locally,
+  whether a slow gate was required and its trigger, and what is deferred/manual
+  (e.g. hosted deployment smoke).
+- **Keep-in-sync rule:** when CI coverage expands (e.g. backend or e2e gates land
+  in CI), update this catalog and the always-load quickref
+  (`docs/specs/02-quality-and-test-gates.md`) in the same change so gate ownership
+  stays accurate. See `AGENTS.md` for the documentation-maintenance expectation.
+
+---
+
+# Testing practices and policies
 
 ## Default testing practice
 
-- Every feature should include at least one success-path test and one offline/error-path test.
-- During execution sessions, run a targeted test or gate after each meaningful change, then run `./scripts/quality-fast.sh` before task closeout.
-- Run `./scripts/quality-slow.sh <area>` when the task card's risk triggers require slower local runtime/contract checks.
-- For how long each lane actually takes, see `docs/testing/local-test-timings.md` — **measured** best-case, single-agent, local wall-clock times (median + a 3× "investigate above this" ceiling) for every runnable lane. Cite that file or re-measure; do not invent test durations. A run exceeding ~2-3× the recorded median is a signal something is wrong, not a normal slow run.
+- Every feature should include at least one success-path test and one
+  offline/error-path test.
+- Run a targeted test or gate after each meaningful change, then run
+  `./scripts/quality-fast.sh` before closeout. Run `./scripts/quality-slow.sh
+  <area>` when the change touches the areas/paths its lanes cover (see the catalog
+  and policies).
+- For how long each lane actually takes, cite `docs/testing/local-test-timings.md`
+  (measured medians + 3× ceilings). Do not invent durations.
+
+## Local data two-lane policy
+
+- **Lane 1 (CI-safe):** fast `apps/mobile` checks (`lint`, `typecheck`, `test`)
+  plus the data-layer tests that validate migration/bootstrap orchestration and
+  smoke insert/read using deterministic in-memory SQLite. Use `db:generate:canary`
+  to confirm the migration bundle has no uncommitted drift.
+- **Lane 2 (native runtime smoke):** the focused smoke flow on the Expo native
+  runtime with real `expo-sqlite` (`test:e2e:ios:data-smoke`). Capture concise
+  evidence: runtime environment, steps, migration success, smoke write/read
+  success.
+- **Rule:** Lane 1 is not a substitute for Lane 2 when validating runtime SQLite
+  behavior; both are required for milestone-level local data confidence.
 
 ## In-memory SQLite unit tests (shared fixture)
 
-- Unit tests that need a real local SQLite engine (rather than a mocked client) must use the shared fixture at `apps/mobile/app/__tests__/helpers/in-memory-db.ts`.
-- The helper spins up an in-memory `better-sqlite3` database, applies **all** migrations from the generated migration bundle (`apps/mobile/drizzle/migrations.generated.ts`) in journal order, and returns the drizzle handle, the raw client, and a `close()` teardown.
-- Rule:
-  - do not hand-roll DB setup or copy DDL into individual tests; drive the schema from the generated bundle so every test tracks the real shipped schema automatically when a new migration lands.
-  - call `createInMemoryDatabase()` in `beforeEach` and `close()` in `afterEach`. Pass `{ foreignKeys: true }` when the test depends on FK enforcement.
-- Current consumers of this fixture include the write-path dirty-bit suites (`apps/mobile/app/__tests__/dirty-bit-layer-0-1.test.ts` and `apps/mobile/app/__tests__/dirty-bit-layer-2-3.test.ts`), which share the same setup/teardown and assertion style so they read as a matched pair.
-- Exception: tests that intentionally create a deliberately partial schema to assert negative-space behavior (for example `clock.test.ts`, which builds only `sync_runtime_state` so a stray write to another table surfaces as a missing-table error) keep their bespoke setup; the shared full-schema fixture would erase that guard. Bespoke fixtures still close their connections in `afterEach` (see `Unit-test hang safety`).
-
-## GPS gym-location coverage policy (M15 onward)
-
-- Applies to foreground location service and gym-coordinate matching work.
-- Required coverage should include:
-  - foreground permission/service normalization for granted, denied, unavailable services, timeout, read failure, unexpected native errors, and successful position reads,
-  - pure matcher assertions for Haversine distance, missing/invalid/archived/deleted gym coordinate rejection, low-accuracy position rejection, no-match handling, and ambiguous tie handling,
-  - no use of background permission APIs, background tasks, geofencing, or continuous background updates for M15 GPS flows.
-- Use deterministic Jest coverage for service wrappers and matching logic. Add simulator/manual or Maestro evidence when UI permission flows are introduced or native permission behavior itself is being validated.
-
-## Exercise-tag coverage policy (M12 onward)
-
-- Applies to exercise-tag schema/repository/UI work in the mobile local runtime.
-- Required coverage should include:
-  - schema/migration assertions for `exercise_tag_definitions`, `session_exercise_tags`, and durable `session_exercises.exercise_definition_id` linkage,
-  - repository/domain assertions for normalized duplicate prevention, scoped attach validation, and assignment uniqueness protection,
-  - assignment-history semantics where soft-deleted tag definitions stay hidden from default suggestions but existing logged-exercise assignments remain queryable/listable,
-  - recorder interaction assertions for add/select/create/manage (rename/delete/undelete) and chip removal,
-  - completed-edit parity assertions for tag attach/remove behavior already supported in active recorder mode.
-- Use targeted Jest coverage for the scenario matrix, and require `./scripts/quality-slow.sh frontend` at milestone closeout or when runtime-sensitive recorder tag behavior changes.
-
-## Mobile auth bootstrap coverage policy (M11 onward)
-
-- Applies to mobile auth/session-foundation work before generic sync exists.
-- Required coverage should include:
-  - launch/bootstrap with no stored authenticated session,
-  - launch/bootstrap with a stored authenticated session,
-  - session-restore failure falling back to a safe logged-out state with inline error reporting,
-  - explicit sign-out / session-clear behavior,
-  - missing auth config or auth-disabled bootstrap path when the task changes config/bootstrap handling.
-- Prefer deterministic Jest coverage for the auth bootstrap/service logic and root wiring, then add real local-Supabase + `Maestro` proof once the user-facing auth/profile flow exists.
-- Rule:
-  - auth bootstrap must remain non-blocking for local-only tracker routes while logged out or when auth config is missing.
-
-## Mobile profile-management coverage policy (M11 onward)
-
-- Applies to authenticated profile UI/data work before generic sync exists.
-- Required coverage should include:
-  - sign-in success plus invalid-credentials or validation failure feedback,
-  - signed-in profile load when a profile row already exists,
-  - lazy profile provisioning when `user_profiles` is missing,
-  - idempotent lazy profile provisioning when concurrent first-write races occur,
-  - username save success plus inline failure feedback,
-  - email update validation plus success vs pending-confirmation messaging,
-  - password update success/failure with field clearing after submit,
-  - backend-unavailable/profile-fetch failure staying inline on the profile route without signing the user out.
-- Prefer deterministic Jest coverage for the mobile auth/profile service wrappers and the profile route state transitions, then add local-Supabase + `Maestro` proof for the full happy path with deterministic fixture credentials.
-
-## Sync integration coverage policy (M13 onward)
-
-- Applies to mobile/frontend-backend sync work.
-- Required coverage should include the relevant subset of:
-  - event envelope validation for required vs optional fields (`device_id`, `batch_id`, `sent_at_ms`, and per-event required fields),
-  - entity-event compatibility checks across all M13 data-scope entities,
-  - first-enable bootstrap pull + local merge + convergence flush,
-  - event outbox ordering (`sequence_in_device`) and idempotency (`event_id`) behavior,
-  - full M13 data-scope backup coverage across user-owned entities (not only session-core tables),
-  - per-user composite-PK positive case: two distinct users (`user_a`, `user_b`) ingesting rows with the same `id` (e.g. shared seeded `exercise_definitions.id`) both succeed and each owns their per-user copy on the backend (no cross-owner conflict path exists by construction),
-  - cadence behavior by context (`60s` general, `10s` while on `session-recorder`),
-  - already-logged-in journey: user starts session recording and sync eventually converges,
-  - logged-out-then-login journey: user logs in, bootstrap/merge converges, starts session recording, and sync eventually converges,
-  - auth missing/expired or sync disabled due to no authenticated session,
-  - offline or backend-unavailable retry/recovery behavior with locked backoff policy constants,
-  - batch-order semantics (strict request-order processing, stop-on-first-failure, and prefix-commit behavior),
-  - response contract semantics (`SUCCESS | FAILURE`, failure `error_index`, `should_retry`, free-text `message`, optional `error_event_id`),
-  - projection/read-model correctness after event ingest/replay.
-  - GPS gym coordinate sync coverage for `gyms`: local range/shape validation, backend range/shape rejection, coordinate-bearing `gyms.upsert` payloads, bootstrap fetch/merge/convergence, and reinstall restore parity.
-- Use mocks/fakes for broad scenario coverage, then require at least one real cross-stack proof path with local `Supabase` validating event ingest, idempotent retries, and restorable projection state.
-- Backend-first sync tasks should run the real local sync-v2 contract suites via `./scripts/quality-slow.sh backend` (schema smoke + push + pull + e2e); the v1 `test-sync-events-ingest-contract.sh` suite was retired with the M13 projection RPC family and no longer exists.
-- Current frontend baseline suites for this policy include:
-  - `apps/mobile/app/__tests__/sync-bootstrap-merge.test.ts` (deterministic merge decisions + convergence-loop terminal behavior),
-  - `apps/mobile/app/__tests__/sync-runtime-bootstrap.test.ts` (first-enable trigger and logged-out-then-login bootstrap trigger),
-  - `apps/mobile/app/__tests__/sync-outbox-engine.test.ts` (batch response semantics, including retry scheduling and blocked failure mapping),
-  - `apps/mobile/app/__tests__/sync-profile-status.test.ts` (profile-facing sync status mapping, including blocked and retry-scheduled states),
-  - `apps/mobile/app/__tests__/settings-profile-navigation.test.tsx` (profile sync section render + toggle + inline blocked-failure messaging).
-- Reinstall restore-parity coverage (sync v2): the dedicated `test:sync:reinstall-parity` mobile lane was **retired** in the sync v1 retirement — its target suite was deleted with the v1 code paths. Under the sync v2 model (push/pull RPC + per-layer cursor protocol) the same guarantee is proven by:
-  - `apps/mobile/app/__tests__/sync/cycle-round-trip.test.ts` — the *"a wiped client re-pulls all four rows via the layered drain with advancing cursors"* assertion drops the entire local store to mirror a reinstall, re-runs the real cycle against a live endpoint, and asserts every layer restores with FK integrity and advancing cursors. It runs in the branch-provisioned `test:sync:infra` lane (requires `SUPABASE_BRANCH_URL` / `SUPABASE_BRANCH_ANON_KEY`).
-  - backend contract suites `supabase/tests/sync-v2-push-roundtrip.sh` and `supabase/tests/sync-v2-pull-drain.sh` independently assert push→pull parity across all data-scope entities (including soft-delete tombstone visibility) at the RPC layer; they run via `./scripts/quality-slow.sh backend`.
-
-## Maestro contract ownership (M10)
-
-- `docs/specs/11-maestro-runtime-and-testing-conventions.md` is the authoritative Maestro runtime/testing contract.
-- This document owns only the testing policy:
-  - when Maestro slow gates are required,
-  - which command wrappers are canonical,
-  - which reset terms task cards must use,
-  - where run evidence is expected.
-- Runbooks such as `apps/mobile/README-maestro.md` and `apps/mobile/README_HUMAN_TESTING.md` should stay operational and link back to the contract instead of restating it in full.
-
-## Standard local quality-gate wrappers (M5)
-
-- Fast gate (default local closeout gate for covered workspaces):
-  - `./scripts/quality-fast.sh`
-  - area-specific form: `./scripts/quality-fast.sh frontend|backend`
-- Slow gate (risk-triggered local gate, not always mandatory):
-  - `./scripts/quality-slow.sh`
-  - area-specific form: `./scripts/quality-slow.sh frontend|backend`
-- Coverage intent (current repo):
-  - `./scripts/quality-fast.sh frontend` -> `apps/mobile` `lint` + `typecheck` + `test`
-  - `./scripts/quality-fast.sh backend` -> `./supabase/scripts/test-fast.sh`
-  - `./scripts/quality-slow.sh frontend` -> `Maestro` local simulator smoke + data-smoke + auth/profile happy-path commands
-- `./scripts/quality-slow.sh backend` -> local backend auth/RLS plus the sync-v2 contract suites (schema smoke, push, pull, dev-wipe, schema-drift, and the e2e plan-outcome suite); shared Supabase runtime baseline enforced
-- Rule:
-  - wrappers reduce checklist repetition, but task cards still own trigger conditions and any hosted/manual checks.
-
-## Shared Supabase runtime contract (slow real-instance tests)
-
-- Scope:
-  - applies to local real-instance test commands that hit a running Supabase stack rather than mocked clients.
-  - current required entrypoints include:
-    - `./supabase/scripts/test-auth-authz.sh`
-    - `./supabase/scripts/test-sync-v2-schema-smoke.sh`
-    - `./supabase/scripts/test-sync-push-contract.sh`
-    - `./supabase/scripts/test-sync-pull-contract.sh`
-    - `./supabase/scripts/test-sync-v2-e2e.sh`
-    - `npm run test:e2e:ios:auth-profile` (via `apps/mobile/scripts/maestro-ios-auth-profile.sh`)
-- Expected baseline state:
-  - a local Supabase runtime is reachable,
-  - `public.dev_fixture_principals` contains at least `anonymous`, `user_a`, `user_b`,
-  - deterministic auth fixtures for `user_a` and `user_b` are provisioned with known credentials from `supabase/scripts/auth-fixture-constants.sh`.
-- Enforcement path:
-  - use `./supabase/scripts/ensure-local-runtime-baseline.sh` before real-instance slow tests.
-  - behavior:
-    - if runtime is down: start runtime + reset/seed + fixture provisioning,
-    - if runtime is already up: reuse as-is (no reset), verify baseline fixture rows, and re-provision auth fixtures idempotently.
-- Data-shape contract:
-  - baseline rows must exist, but extra rows are allowed.
-  - test suites must not assume empty tables beyond the baseline.
-- Parallel-run contract (same machine):
-  - each initialized BOGA worktree has its own readable Supabase `project_id`, slot-derived port block, containers, and database volume.
-  - runtime bootstrap remains serialized per worktree via a lock in `ensure-local-runtime-baseline.sh` to avoid startup/reset races within the same slot.
-  - backend contract suites must use per-run unique entity IDs so repeated runs in one slot do not collide.
-  - avoid manual destructive operations (`db reset`, stack restart) in a worktree while another suite is actively using that same worktree slot.
-  - use `./scripts/worktree-doctor.sh` when a backend suite appears to hit the wrong local Supabase instance.
-
-## Worktree isolation testing policy
-
-- Worktree setup and runtime isolation are owned by `docs/specs/12-worktree-config-and-isolation.md`.
-- Before running local gates in a linked worktree, initialize it with:
-  - `./scripts/worktree-setup.sh`
-- Diagnostic entrypoint:
-  - `./scripts/worktree-doctor.sh`
-- Completed-worktree Supabase cleanup:
-  - `./scripts/worktree-sweep.sh`
-  - `./supabase/scripts/local-runtime-up.sh` runs this sweep opportunistically before starting the current slot.
-  - cleanup is limited to slots that are not the current slot, are past the grace period, and match one of the completion signals enumerated in `docs/specs/12-worktree-config-and-isolation.md` (path gone / not a BOGA root / no longer listed by `git worktree list` / branch merged into configured remote main / branch deleted on configured remote).
-  - the merge-into-main and branch-deleted-on-remote signals are on by default; disable with `--no-merge-detection` or `BOGA_WORKTREE_SWEEP_DETECT_MERGED=0`.
-- Placement rule:
-  - BOGA worktrees must not be nested inside another BOGA checkout.
-  - quality wrappers and runtime helpers fail before starting services when nested placement is detected.
-- Dependency isolation rule:
-  - each worktree owns its own `apps/mobile/node_modules`;
-  - symlinked `apps/mobile/node_modules` is refused by runtime guards.
-- Supabase isolation rule:
-  - generated `supabase/config.toml` is per-worktree and slot-derived;
-  - tests should consume local runtime values from `supabase status -o env` or project wrappers, not hardcoded ports.
-
-## Current CI posture
-
-- A GitHub Actions pipeline (`.github/workflows/ci.yml`) runs on every push and pull request to `main`.
-- The `frontend` job (working directory `apps/mobile`) runs, in order: `npm ci`, `npm run lint`, `npm run typecheck`, `npm test` (5-minute step timeout), and `npm run test:handles` (the open-handle guard, 5-minute step timeout). See `Unit-test hang safety` below for why those two steps exist.
-- Not yet in CI: the iOS Maestro slow gates (`./scripts/quality-slow.sh frontend`) and the backend Supabase contract suites remain local/manual. For work not covered by the CI job, task cards must still document:
-  - what is run locally for verification,
-  - whether `quality-slow` is required and the trigger for it,
-  - what is deferred/manual (for example hosted deployment smoke checks),
-  - when manual checks must run (per change, before handoff, milestone closeout, release closeout).
-- When CI coverage expands (e.g. backend or e2e gates), update this doc and `docs/specs/04-ai-development-playbook.md` in the same task to reflect the new gate ownership.
+- Unit tests that need a real local SQLite engine (rather than a mocked client)
+  must use the shared fixture at
+  `apps/mobile/app/__tests__/helpers/in-memory-db.ts`.
+- The helper spins up an in-memory `better-sqlite3` database, applies **all**
+  migrations from the generated bundle (`apps/mobile/drizzle/migrations.generated.ts`)
+  in journal order, and returns the drizzle handle, the raw client, and a
+  `close()` teardown.
+- Rules:
+  - do not hand-roll DB setup or copy DDL into individual tests; drive the schema
+    from the generated bundle so every test tracks the real shipped schema when a
+    new migration lands.
+  - call `createInMemoryDatabase()` in `beforeEach` and `close()` in `afterEach`.
+    Pass `{ foreignKeys: true }` when the test depends on FK enforcement.
+- Exception: tests that intentionally create a deliberately partial schema to
+  assert negative-space behavior (for example `clock.test.ts`, which builds only
+  `sync_runtime_state` so a stray write to another table surfaces as a
+  missing-table error) keep their bespoke setup; the shared full-schema fixture
+  would erase that guard. Bespoke fixtures still close their connections in
+  `afterEach` (see *Unit-test hang safety*).
 
 ## Unit-test hang safety
 
-- The mobile unit run (`npm test`) is bare `jest` with **no `--forceExit`** — by design. `--forceExit` masks leaks; it would have hidden the open-handle hang that this policy exists to catch. Do not add it.
+- `npm test` is bare `jest` with **no `--forceExit`** — by design. `--forceExit`
+  masks leaks; it would hide the open-handle hang this policy exists to catch. Do
+  not add it.
 - Two distinct failure modes are covered separately:
-  - a hung test or hook (unresolved `await`, infinite loop) is bounded by `jest.config.js` `testTimeout` (15s) so it fails loudly instead of stalling;
-  - a leaked handle that keeps the process alive AFTER tests pass (e.g. an unclosed connection, a lingering timer, or a real Supabase transport) is caught by the CI step timeout (fast loud failure) and diagnosed by the open-handle guard.
-- Open-handle guard: `npm run test:handles` runs the suite serially with `--detectOpenHandles`, surfacing any leaking handle with a stack. It runs as a dedicated CI step and can be scoped locally to a subset (e.g. `npm run test:handles -- sync-cycle`).
-- Safe-by-default mocking: `apps/mobile/jest.setup.ts` mocks `@supabase/supabase-js` `createClient` to an inert client (no socket, no GoTrue auto-refresh timer), so no suite can construct a real Supabase transport by forgetting a local mock. Suites that need richer behavior still override it with their own `jest.mock`.
-- Any test that opens a real connection (e.g. a `better-sqlite3` `:memory:` handle) must close it in `afterEach`, mirroring the in-memory-db helper — even bespoke fixtures like `clock.test.ts`.
+  - a hung test or hook (unresolved `await`, infinite loop) is bounded by
+    `jest.config.js` `testTimeout` (15s) so it fails loudly instead of stalling;
+  - a leaked handle that keeps the process alive AFTER tests pass (unclosed
+    connection, lingering timer, real Supabase transport) is caught by the CI step
+    timeout (fast loud failure) and diagnosed by the open-handle guard.
+- Open-handle guard: `npm run test:handles` runs the suite serially with
+  `--detectOpenHandles`, surfacing any leaking handle with a stack. It is a
+  dedicated CI step and can be scoped locally (e.g. `npm run test:handles -- sync-cycle`).
+- Safe-by-default mocking: `apps/mobile/jest.setup.ts` mocks
+  `@supabase/supabase-js` `createClient` to an inert client (no socket, no GoTrue
+  auto-refresh timer), so no suite can construct a real Supabase transport by
+  forgetting a local mock. Suites needing richer behavior override it with their
+  own `jest.mock`.
+- Any test that opens a real connection (e.g. a `better-sqlite3` `:memory:` handle)
+  must close it in `afterEach`, mirroring the in-memory-db helper — even bespoke
+  fixtures like `clock.test.ts`.
 
-## Backend / Supabase testing model (M5 onward)
+## Sync integration coverage policy
 
-- Scope:
-  - applies to `supabase/**`, backend helper workspaces, and any cross-stack mobile+backend verification.
-- Test layers (top-level ownership):
-  - `DB` tests (`pgTAP` preferred, or equivalent SQL-level test path):
-    - cover `RLS` policies, SQL functions, constraints, and invariants.
-    - required for policy/function/constraint changes.
-  - `Edge` unit tests (runtime-native, for example `deno test`) when Edge Functions/custom backend runtime code exists:
-    - cover validation, mapping, and pure logic.
-  - `Supabase-local integration/contract tests` (required for backend auth/authz/API work):
-    - run against local Supabase runtime and verify real auth context + `RLS` behavior.
-    - cover success, validation failure, unauthorized, and cross-user denial paths.
-    - for auth/profile tables keyed directly to `auth.users(id)` instead of `owner_user_id`, still cover owner success plus cross-user denial explicitly.
-    - for operational diagnostics tables such as `public.app_logs`, cover authenticated insert plus client-side read/update/delete denial.
-  - Hosted/deployed smoke validation:
-    - validates environment-specific behavior (secrets/bindings, ingress, hosted auth/provider config, migration execution on hosted instance).
-    - manual by default until CI exists.
-  - Cross-stack `E2E` (`Maestro` + local Supabase):
-    - strategy is documented during M5.
-    - first implementation should land once mobile sync integration exists, alongside mock-backend sync scenario coverage.
-- Deterministic backend fixture baseline:
-  - maintain named fixture identities for ownership tests (at minimum `anonymous`, `user_a`, `user_b`; optional admin/service-role-only helper path).
-  - enforce the baseline through `./supabase/scripts/ensure-local-runtime-baseline.sh` (reset/seed only when runtime is absent; non-destructive baseline verification/provisioning when runtime is already running).
-- Execution triggers (minimum expectations):
-  - always run cheap tests relevant to the changed layer(s).
-  - `./scripts/quality-fast.sh backend` is the default backend fast gate for covered local backend work.
-  - run `Supabase-local integration/contract` tests when changing:
-    - `supabase/migrations/**`
-    - `supabase/functions/**`
-    - auth configuration/policies
-    - sync API contracts/fixtures
-  - in current repo conventions, those backend integration/contract suites are grouped under `./scripts/quality-slow.sh backend`, but tasks must still mark them as required when risk triggers apply (not every backend task requires all slow suites)
-  - run hosted smoke validation when changing:
-    - deployment/env/secrets config
-    - hosted-only behavior
-    - milestone/release closeout that requires fresh hosted evidence
-  - cross-stack `E2E` runs are not required during M5 backend foundation unless a task explicitly scopes them.
-- Coverage policy for Supabase API surfaces:
-  - if implementation uses custom runtime code (for example Edge Functions), require unit tests plus local integration/contract tests.
-  - if implementation is mostly `PostgREST/RPC`, unit-test surface may be small; compensate with stronger DB + local integration/contract coverage.
+- Applies to mobile/frontend-backend sync work under `apps/mobile/**` sync code,
+  `apps/mobile/app/__tests__/sync/**`, and the backend sync RPCs in `supabase/**`.
+- Required coverage should include the relevant subset of:
+  - first-enable bootstrap pull + local merge + convergence flush,
+  - the full sync cycle converging local and server state over a real
+    push → server-side LWW → pull → local LWW loop,
+  - per-layer cursor protocol (snapshot pull, paginated drain, layer→type
+    partition, tombstones, empty-page echo, same-ms tiebreak, limit/layer bounds),
+  - dirty-bit / outbox ordering and idempotency behavior,
+  - already-logged-in journey and logged-out-then-login journey both converging,
+  - auth missing/expired (AUTH_REQUIRED): unauthenticated cycle is a clean no-op,
+    no mutation, dirty bits preserved,
+  - offline / backend-unavailable retry/recovery with the locked backoff policy,
+  - response contract semantics and RLS cross-owner isolation,
+  - projection/read-model correctness after ingest/replay,
+  - wiped-client reinstall re-pull restoring every layer with FK integrity and
+    advancing cursors.
+- Use mocks/fakes for broad scenario coverage in the fast lane, then prove at
+  least one real cross-stack path:
+  - mobile side: `npm run test:sync:infra` (real round trip, AUTH_REQUIRED no-op,
+    drift check) against a live endpoint;
+  - backend side: `./scripts/quality-slow.sh backend` (schema smoke + push + pull +
+    dev-wipe + drift + e2e). The push→pull parity / reinstall guarantee is proven
+    by `sync-v2-push-roundtrip.sh` and `sync-v2-pull-drain.sh` inside the e2e
+    wrapper.
+- Current frontend baseline suites for this policy include
+  `apps/mobile/app/__tests__/sync-bootstrap-merge.test.ts`,
+  `sync-runtime-bootstrap.test.ts`, `sync-outbox-engine.test.ts`,
+  `sync-profile-status.test.ts`, `settings-profile-navigation.test.tsx`, and the
+  `app/__tests__/sync/**` directory (cycle, drift, auth-required-envelope,
+  dirty-bit, scheduler-state, topo-order, v1-deletions, manual-wipe-doc-exists).
 
-## Backend local runtime baseline (implemented in `T-20260220-08`)
+## GPS gym-location coverage policy
 
-- Current implemented command path (`supabase/**`):
-  - `./supabase/scripts/local-runtime-up.sh` (starts local stack + local health function serve)
-  - `./supabase/scripts/reset-local.sh` (local migration/bootstrap + deterministic seed)
-  - `./supabase/scripts/ensure-local-runtime-baseline.sh` (shared runtime preflight; lock + conditional bootstrap/reset + deterministic fixture enforcement)
-  - `./supabase/scripts/db-lint-local.sh` (fast schema lint)
-  - `./supabase/scripts/smoke-health.sh` (health endpoint smoke)
-  - `./supabase/scripts/smoke-seed.sh` (fixture baseline smoke through local REST API)
-  - `./supabase/scripts/test-fast.sh` (combined fast backend-local smoke suite)
-  - repo-level wrapper mapping:
-    - `./scripts/quality-fast.sh backend` -> `./supabase/scripts/test-fast.sh`
-    - `./scripts/quality-slow.sh backend` -> backend contract suites (`test-auth-authz.sh` plus the sync-v2 suites `test-sync-v2-schema-smoke.sh`, `test-sync-push-contract.sh`, `test-sync-pull-contract.sh`, `test-sync-v2-e2e.sh`) that each enforce the shared runtime baseline via `ensure-local-runtime-baseline.sh`
-- Current automated backend-local coverage (minimum baseline):
-  - migration/reset/seed flow
-  - deterministic fixture presence (`anonymous`, `user_a`, `user_b`, optional helper fixture)
-  - local Edge health endpoint reachability
-  - local DB schema lint
-- Local Edge-function smoke note:
-  - local Supabase gateway still expects auth headers; health smoke scripts must call the endpoint with the local `ANON_KEY`.
-- `npm run lint` / `typecheck` / `test` posture for this baseline:
-  - no backend Node/TS helper workspace was introduced in `T-20260220-08`, so FE-style `npm` gates are `N/A` here.
-  - runtime-specific Supabase local gates above are the required baseline until a backend workspace/test harness is added.
-- Hosted/deployed smoke command path:
-  - deferred to `T-20260220-09` (manual by default until CI exists).
+- Applies to foreground location service and gym-coordinate matching work.
+- Required coverage should include:
+  - foreground permission/service normalization (granted, denied, unavailable,
+    timeout, read failure, unexpected native error, successful read),
+  - pure matcher assertions (Haversine distance; missing/invalid/archived/deleted
+    coordinate rejection; low-accuracy rejection; no-match; ambiguous tie),
+  - no background permission APIs, background tasks, geofencing, or continuous
+    background updates for these GPS flows,
+  - GPS gym-coordinate sync coverage for `gyms`: local + backend range/shape
+    validation, coordinate-bearing upsert payloads, bootstrap fetch/merge/
+    convergence, and reinstall restore parity.
+- Use deterministic Jest coverage for service wrappers and matching logic. Add
+  simulator/manual or Maestro evidence when UI permission flows are introduced or
+  native permission behavior is being validated.
 
-## Project structure conventions for testing assets (M5 backend additions)
+## Exercise-tag coverage policy
 
-- `apps/mobile/.maestro/flows` remains the canonical location for Maestro flow definitions.
-- `apps/mobile/.maestro/maestro.env.sample` is the checked-in Maestro config sample; `apps/mobile/.maestro/maestro.env.local` is the canonical per-worktree untracked config.
-- `apps/mobile/src/auth/` is the canonical location for shared mobile auth client, storage, session-service, and provider modules.
-- Repo-root `e2e/` is reserved for cross-stack orchestration/tests (strategy documented in M5; implementation may be added later).
-- `supabase/` is the backend root for migrations, seeds, functions, and backend-local test assets.
-- `supabase/scripts/` is the canonical location for backend local runtime/test wrappers.
-- `supabase/tests/` is the canonical location for backend-local smoke/integration test entrypoints until a dedicated helper workspace is introduced.
-- Do not couple backend foundation work to a mobile test-directory refactor (for example moving `apps/mobile/app/__tests__`) unless a dedicated task explicitly scopes that change.
+- Applies to exercise-tag schema/repository/UI work in the mobile local runtime.
+- Required coverage should include:
+  - schema/migration assertions for `exercise_tag_definitions`,
+    `session_exercise_tags`, and durable
+    `session_exercises.exercise_definition_id` linkage,
+  - repository/domain assertions for normalized duplicate prevention, scoped
+    attach validation, and assignment uniqueness,
+  - assignment-history semantics (soft-deleted tag definitions hidden from default
+    suggestions but existing assignments remain queryable),
+  - recorder interaction assertions (add/select/create/manage rename/delete/
+    undelete, chip removal) and completed-edit parity.
+- Use targeted Jest coverage; require `./scripts/quality-slow.sh frontend` when
+  runtime-sensitive recorder tag behavior changes.
 
-## Maestro runtime topology summary (M10)
+## Mobile auth bootstrap coverage policy
 
-- Primary automation runtime:
-  - `Maestro + iOS Simulator + Expo development client`
-- Canonical command surface:
-  - `npm run test:e2e:ios:smoke`
-  - `npm run test:e2e:ios:data-smoke`
-  - `npm run test:e2e:ios:auth-profile`
-  - `npm run test:e2e:ios:gates` (convenience: runs smoke + data-runtime-smoke against one shared sim + Metro; the per-flow gates above remain the canonical individual lanes)
-  - `./scripts/quality-slow.sh frontend`
-- Canonical reset terms:
-  - `full reset`
-  - `data reset`
-  - `teleport`
-- Canonical artifact root:
-  - `apps/mobile/artifacts/maestro/<task-id-or-ad-hoc>/<timestamp>/`
-- Minimum expected runtime artifacts:
-  - `runtime.env`
-  - `provision.log`
-  - `launch.log`
-  - `teardown.log`
-  - `expo-start.log`
-  - `simulator-system.log`
-  - `maestro-junit.xml`
-- Per-worktree configuration baseline:
-  - source `.maestro/maestro.env.local` from the sample file and keep shared-build overrides there rather than hardcoding machine-specific paths in docs/tasks.
+- Applies to mobile auth/session-foundation work under `apps/mobile/src/auth/**`
+  and root wiring.
+- Required coverage should include: launch with no stored session; launch with a
+  stored session; session-restore failure falling back to a safe logged-out state
+  with inline error; explicit sign-out / session-clear; missing auth config /
+  auth-disabled bootstrap path.
+- Prefer deterministic Jest coverage, then add real local-Supabase + Maestro proof
+  via `test:e2e:ios:auth-profile` once the user-facing flow exists.
+- Rule: auth bootstrap must remain non-blocking for local-only tracker routes
+  while logged out or when auth config is missing.
+
+## Mobile profile-management coverage policy
+
+- Applies to authenticated profile UI/data work under `apps/mobile/src/auth/**`
+  and the profile route.
+- Required coverage should include: sign-in success + invalid-credentials/
+  validation feedback; profile load when a row exists; lazy profile provisioning
+  when `user_profiles` is missing; idempotent provisioning under concurrent
+  first-write races; username save success + inline failure; email update
+  validation + success vs pending-confirmation; password update success/failure
+  with field clearing; backend-unavailable/profile-fetch failure staying inline
+  without signing the user out.
+- Prefer deterministic Jest coverage for the service wrappers and profile-route
+  state transitions, then add local-Supabase + Maestro proof for the full happy
+  path with deterministic fixture credentials.
+
+## iOS UI smoke policy (Maestro)
+
+- Jest / RNTL remains the default for component logic, state transitions, and
+  CI-safe assertions. Maestro is for simulator-integrated UI smoke that confirms
+  core screens are reachable and visibly intact.
+- In the standard local gate matrix, current Maestro checks are `frontend + slow`
+  and run via `./scripts/quality-slow.sh frontend` (smoke + data-smoke +
+  auth-profile).
+- Required smoke coverage: app launch visible state; session recorder visible
+  state; logged-out profile state; fixture-backed sign-in; signed-in profile state;
+  username update; sign-out back to logged-out. Reset policy: `full reset` (smoke
+  is the cold-start lane), then `teleport` to the recorder once launch visibility
+  is confirmed. Required smoke screenshots: `01-app-launch`,
+  `02-session-recorder-visible` (capture automated by the flow; stored under the
+  canonical artifact root).
+- Require `./scripts/quality-slow.sh frontend` when a change touches the committed
+  smoke/data-smoke flows, Maestro runtime scripts, the dev-client/runtime
+  handshake, harness setup behavior, or user-facing UI that needs fresh
+  real-simulator smoke evidence.
+
+## iOS simulator data smoke policy (Maestro)
+
+- Purpose: validate runtime migration + smoke insert/read on real Expo iOS runtime
+  (`expo-sqlite`) when change risk is runtime-sensitive (`test:e2e:ios:data-smoke`,
+  also covered by `quality-slow.sh frontend`). Reset policy: `data reset` then
+  `teleport` to the recorder; avoid `full reset` unless cold-install evidence is
+  needed.
+- Required when any of these change:
+  - `apps/mobile/src/data/bootstrap.ts`,
+  - `apps/mobile/src/data/migrations/**`,
+  - `apps/mobile/drizzle/**` migration artifacts or schema outputs,
+  - `apps/mobile/package.json` Expo/SQLite/Drizzle dependency updates,
+  - `apps/mobile/app/maestro-harness.tsx` or `apps/mobile/src/maestro/**`,
+  - `apps/mobile/.maestro/**` or `apps/mobile/scripts/maestro*` where data-smoke
+    setup/runtime orchestration is affected,
+  - milestone/release closeout requiring fresh native runtime data evidence.
+- Optional (recommended) when data-layer changes are low risk and local runtime
+  confidence is desired before handoff. Usually not required when changes are
+  limited to data-repository pure logic that does not alter runtime
+  migration/bootstrap wiring and Lane 1 is green.
+- Evidence: command result + artifact root under
+  `apps/mobile/artifacts/maestro/<id-or-ad-hoc>/<timestamp>/`, plus screenshots
+  `03-data-runtime-smoke-start`, `04-data-runtime-smoke-success`.
+
+## iOS simulator auth/profile happy-path policy (Maestro)
+
+- Purpose: validate the real local-Supabase login/profile happy path (plus
+  login-on-start enforcement, the first-sync gate, and settings sync status) on the
+  iOS simulator with deterministic fixture credentials
+  (`test:e2e:ios:auth-profile`, also covered by `quality-slow.sh frontend`).
+- Setup: `full reset` so each run starts logged out with no restored session;
+  preflight `./supabase/scripts/ensure-local-runtime-baseline.sh`; use the
+  deterministic fixture credentials (`user_a` by default) from
+  `supabase/scripts/auth-fixture-constants.sh`; use a per-run username so repeated
+  runs still exercise the username-save path.
+- Required when any of these are true: milestone/release closeout needs fresh
+  auth/profile proof; profile-route UI/state semantics change; auth
+  bootstrap/session-restore behavior changes; local-Supabase auth/profile wiring
+  changes.
+- Evidence: command result + artifact root, plus screenshots
+  `05-auth-profile-logged-out-start`, `06-auth-profile-signed-in`,
+  `07-auth-profile-signed-out-end`.
 
 ## iOS lane configuration contract (infra-free vs Supabase-configured)
 
 - The committed iOS lanes run the **same** dev-client build in two deliberately
   exclusive configurations, selected by whether the app sees Supabase credentials
   (`EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY`):
-  - **infra-free** — `smoke`, `data-runtime-smoke` (and the combined `gates`): no
-    Supabase configured. The app runs local-only with the login-on-start gate
-    disabled, which keeps these gates fast, backend-free, and focused on the local
-    SQLite runtime. `data-runtime-smoke` additionally proves the backend-less build
-    seeds its own starter exercise catalog at boot (there is no server to recover
-    it from, so nothing else would).
+  - **infra-free** — `smoke`, `data-runtime-smoke` (and combined `gates`): no
+    Supabase. The app runs local-only with the login-on-start gate disabled, which
+    keeps these gates fast, backend-free, and focused on the local SQLite runtime.
+    `data-runtime-smoke` additionally proves the backend-less build seeds its own
+    starter exercise catalog at boot.
   - **Supabase-configured** — `auth-profile`: a real local Supabase is provisioned
-    via `./supabase/scripts/ensure-local-runtime-baseline.sh`, so the
-    login-on-start gate, fixture sign-in, and sync are exercised.
-- That selection is driven by `apps/mobile/.env.local`, a durable per-worktree
-  file Expo's dev server reads authoritatively. The runner pins each lane's config
-  and restores the developer's file afterward, so a lane is never silently
-  misconfigured by whatever a prior run left on disk. The mechanism is owned by
+    via `ensure-local-runtime-baseline.sh`, so login-on-start, fixture sign-in, and
+    sync are exercised.
+- The selection is driven by `apps/mobile/.env.local`, a durable per-worktree file
+  Expo's dev server reads authoritatively. The runner pins each lane's config and
+  restores the developer's file afterward. The mechanism is owned by
   `docs/specs/11-maestro-runtime-and-testing-conventions.md`; do not hand-edit
   `.env.local` to switch a lane.
 
-## iOS UI smoke policy (Maestro, current stage)
-
-- Jest/React Native Testing Library remains the default for component logic, state transitions, and CI-safe assertions.
-- Maestro is used for simulator/device-integrated UI smoke checks that confirm core screens are reachable and visibly intact.
-- In the standard local gate matrix, current `Maestro` checks are classified as `frontend + slow` and run via `./scripts/quality-slow.sh frontend`.
-- `./scripts/quality-slow.sh frontend` currently runs:
-  - `npm run test:e2e:ios:smoke`
-  - `npm run test:e2e:ios:data-smoke`
-- `npm run test:e2e:ios:auth-profile`
-- Current required Maestro coverage includes:
-  - app launch visible state
-  - session recorder visible state
-  - logged-out profile state
-  - fixture-backed sign-in
-  - signed-in profile state
-  - username update
-  - sign-out back to the logged-out profile state
-- Reset/setup policy for this flow:
-  - use `full reset` because smoke is the cold-start coverage lane;
-  - use `teleport` to the recorder once launch visibility is confirmed.
-- Required screenshots for smoke flow:
-  - `01-app-launch`
-  - `02-session-recorder-visible`
-- Screenshot capture is automated by the Maestro flow and stored under the canonical artifact root from the M10 contract.
-- Rule:
-  - require `./scripts/quality-slow.sh frontend` when a task changes the committed smoke/data-smoke flows, Maestro runtime scripts, development-client/runtime handshake, harness setup behavior, or user-facing UI that needs fresh real-simulator smoke evidence.
-
-## iOS simulator auth/profile happy-path policy (Maestro, M11)
-
-- Purpose:
-  - validate the real local-Supabase login/profile happy path on the iOS simulator with deterministic fixture credentials.
-- Command:
-  - `npm run test:e2e:ios:auth-profile`
-  - (also covered by `./scripts/quality-slow.sh frontend`)
-- Reset/setup policy for this flow:
-  - use `full reset` so the run starts logged out with no restored mobile session;
-  - preflight Supabase with `./supabase/scripts/ensure-local-runtime-baseline.sh` so the shared local runtime baseline exists before sign-in;
-  - use the deterministic local fixture credentials (`user_a` by default) from `supabase/scripts/auth-fixture-constants.sh`;
-  - use a per-run username value so repeated local runs still exercise the username-save path even when the backend profile row already exists.
-- Required screenshots for auth/profile flow:
-  - `05-auth-profile-logged-out-start`
-  - `06-auth-profile-signed-in`
-  - `07-auth-profile-signed-out-end`
-- Required when any of these are true:
-  - milestone/release closeout needs fresh M11 auth/profile proof,
-  - profile-route UI/state semantics change,
-  - auth bootstrap/session restore behavior changes,
-  - local Supabase-backed auth/profile wiring changes.
-- Evidence expectations:
-  - include command result and artifact root from `apps/mobile/artifacts/maestro/<task-id-or-ad-hoc>/<timestamp>/`.
-  - include the screenshot filenames captured under that artifact root.
-
-## iOS simulator data smoke policy (Maestro, current stage)
-
-- Purpose:
-  - validate runtime migration + smoke insert/read behavior on real Expo iOS runtime (`expo-sqlite`) when change risk is runtime-sensitive.
-- Command:
-  - `npm run test:e2e:ios:data-smoke`
-  - (also covered by `./scripts/quality-slow.sh frontend`)
-- Reset/setup policy for this flow:
-  - use `data reset` to clear app-owned SQLite state without re-testing install semantics;
-  - use `teleport` to land directly on the recorder before performing the write/read assertions;
-  - avoid `full reset` here unless the task specifically needs cold-install evidence.
-- Required when any of these are true:
-  - `apps/mobile/src/data/bootstrap.ts` changes.
-  - `apps/mobile/src/data/migrations/**` changes.
-  - `apps/mobile/drizzle/**` migration artifacts or schema outputs change.
-  - `apps/mobile/package.json` changes include Expo/SQLite/Drizzle dependency updates.
-  - `apps/mobile/app/maestro-harness.tsx` or `apps/mobile/src/maestro/**` changes.
-  - `apps/mobile/.maestro/**` or `apps/mobile/scripts/maestro*` changes affect data-smoke setup or runtime orchestration.
-  - milestone/release closeout requires fresh native runtime data evidence.
-- Optional (recommended) when:
-  - data-layer behavior changes are low risk and local runtime confidence is desired before handoff.
-- Usually not required when:
-  - changes are limited to data-repository pure logic that does not alter runtime migration/bootstrap wiring and Lane 1 checks are green.
-- Evidence expectations:
-  - include command result and artifact root from `apps/mobile/artifacts/maestro/<task-id-or-ad-hoc>/<timestamp>/`.
-  - include screenshot paths or the screenshot filenames captured under that artifact root.
-  - required screenshots for data smoke flow:
-    - `03-data-runtime-smoke-start`
-    - `04-data-runtime-smoke-success`
-
 ## iOS simulator parallel-run policy (Maestro)
 
-- Problem:
-  - parallel local agents can collide on simulator selection and Expo dev-server ports.
-- Enforcement:
-  - iOS Maestro runner scripts now rely on explicit per-worktree config instead of host-level locking.
-  - each worktree must own one Metro port and one simulator target.
-- Configuration:
-  - `EXPO_DEV_SERVER_PORT` (generated default: `8082 + worktree slot`; must be unique per workspace on a shared host)
-  - `IOS_SIM_UDID` (preferred on a shared host)
-  - `IOS_SIM_DEVICE` (fallback only when the simulator name is unique for that workspace)
-  - `IOS_SIM_AUTO_CREATE` (generated default: `1` for setup-created worktree env files; creates a slot-named simulator when possible)
-- Operational rules:
-  - parallel runs are safe only when each worktree uses a unique `EXPO_DEV_SERVER_PORT` and a unique simulator target.
-  - if two worktrees point at the same simulator or port, the runners can clobber each other; there is no longer an automatic host-level lock to prevent that.
-  - direct environment overrides remain allowed, but they should match the values committed to that workspace's `.maestro/maestro.env.local`.
-- Documentation rule:
-  - keep machine-specific simulator/port overrides in `.maestro/maestro.env.local`, not in shared docs or task cards.
+- Parallel local agents can collide on simulator selection and Expo dev-server
+  ports. iOS Maestro runner scripts rely on explicit per-worktree config (no
+  host-level lock): each worktree must own one Metro port and one simulator target.
+- Configuration: `EXPO_DEV_SERVER_PORT` (generated default `8082 + worktree slot`;
+  unique per workspace), `IOS_SIM_UDID` (preferred on a shared host),
+  `IOS_SIM_DEVICE` (fallback when the name is unique), `IOS_SIM_AUTO_CREATE`
+  (generated default `1` for setup-created env files).
+- Parallel runs are safe only when each worktree uses a unique
+  `EXPO_DEV_SERVER_PORT` and a unique simulator target; otherwise runners can
+  clobber each other. Keep machine-specific overrides in
+  `.maestro/maestro.env.local`, not in shared docs.
+
+## Maestro contract ownership
+
+- `docs/specs/11-maestro-runtime-and-testing-conventions.md` is the authoritative
+  Maestro runtime/testing contract (reset taxonomy `full reset` / `data reset` /
+  `teleport`, artifact root `apps/mobile/artifacts/maestro/<id-or-ad-hoc>/<timestamp>/`,
+  minimum artifacts `runtime.env` / `provision.log` / `launch.log` / `teardown.log`
+  / `expo-start.log` / `simulator-system.log` / `maestro-junit.xml`, and
+  per-worktree config). This document owns only the testing policy: when Maestro
+  slow gates are required, which command wrappers are canonical, and where evidence
+  is expected. Runbooks (`apps/mobile/README-maestro.md`,
+  `apps/mobile/README_HUMAN_TESTING.md`) stay operational and link back to the
+  contract.
+
+## Shared Supabase runtime contract (slow real-instance tests)
+
+- Applies to local real-instance test commands that hit a running Supabase stack
+  rather than mocked clients. Current required entrypoints: `test-auth-authz.sh`,
+  `test-sync-v2-schema-smoke.sh`, `test-sync-push-contract.sh`,
+  `test-sync-pull-contract.sh`, `test-dev-wipe-my-data.sh`, `test-sync-v2-e2e.sh`,
+  `npm run check:sync-drift -- --strict`, `npm run test:sync:infra`, and
+  `npm run test:e2e:ios:auth-profile`.
+- Expected baseline state: a local Supabase runtime is reachable;
+  `public.dev_fixture_principals` contains at least `anonymous`, `user_a`,
+  `user_b`; deterministic auth fixtures for `user_a`/`user_b` are provisioned with
+  known credentials from `supabase/scripts/auth-fixture-constants.sh`.
+- Enforcement: use `./supabase/scripts/ensure-local-runtime-baseline.sh` before
+  real-instance slow tests. If runtime is down: start + reset/seed + provision. If
+  up: reuse as-is (no reset), apply pending migrations, verify baseline rows,
+  re-provision auth fixtures idempotently.
+- Data-shape contract: baseline rows must exist, but extra rows are allowed; suites
+  must not assume empty tables beyond the baseline, and must use per-run unique
+  entity IDs so repeated runs in one slot do not collide.
+- Parallel-run contract (same machine): each initialized worktree has its own
+  Supabase `project_id`, slot-derived port block, containers, and DB volume.
+  Runtime bootstrap is serialized per worktree via a lock in
+  `ensure-local-runtime-baseline.sh`. Avoid manual destructive operations
+  (`db reset`, stack restart) in a worktree while another suite uses that slot. Use
+  `./scripts/worktree-doctor.sh` if a backend suite appears to hit the wrong local
+  Supabase instance.
+
+## Worktree isolation testing policy
+
+- Worktree setup and runtime isolation are owned by
+  `docs/specs/12-worktree-config-and-isolation.md`.
+- Before running local gates in a linked worktree, initialize it with
+  `./scripts/worktree-setup.sh`. Diagnostic entrypoint: `./scripts/worktree-doctor.sh`.
+  Completed-worktree Supabase cleanup: `./scripts/worktree-sweep.sh` (also run
+  opportunistically by `./supabase/scripts/local-runtime-up.sh` before starting the
+  current slot; limited to non-current slots past the grace period that match a
+  completion signal enumerated in spec 12 — merge-into-main and branch-deleted
+  signals are on by default, disable with `--no-merge-detection` or
+  `BOGA_WORKTREE_SWEEP_DETECT_MERGED=0`).
+- Placement rule: BOGA worktrees must not be nested inside another BOGA checkout;
+  quality wrappers and runtime helpers fail before starting services when nested
+  placement is detected.
+- Dependency isolation: each worktree owns its own `apps/mobile/node_modules`;
+  symlinked `node_modules` is refused by runtime guards.
+- Supabase isolation: generated `supabase/config.toml` is per-worktree and
+  slot-derived; tests consume local runtime values from `supabase status -o env` or
+  project wrappers, not hardcoded ports.
+
+## Backend / Supabase testing model
+
+- Applies to `supabase/**`, backend helper workspaces, and cross-stack
+  mobile+backend verification.
+- Test layers (top-level ownership):
+  - **DB tests** (pgTAP preferred, or equivalent SQL-level path): RLS policies, SQL
+    functions, constraints, invariants. Required for policy/function/constraint
+    changes.
+  - **Edge unit tests** (runtime-native, e.g. `deno test`) when Edge Functions /
+    custom runtime code exists: validation, mapping, pure logic.
+  - **Supabase-local integration/contract tests** (required for backend auth/authz/
+    API work): run against the local runtime; verify real auth context + RLS;
+    cover success, validation failure, unauthorized, and cross-user denial; for
+    `auth.users`-keyed profile tables cover owner success + cross-user denial; for
+    operational tables like `public.app_logs` cover authenticated insert plus
+    client-side read/update/delete denial.
+  - **Hosted/deployed smoke validation**: environment-specific behavior
+    (secrets/bindings, ingress, hosted auth/provider config, migration execution on
+    the hosted instance). Manual by default until CI exists.
+  - **Cross-stack E2E** (Maestro + local Supabase): `test:e2e:ios:auth-profile`
+    plus the backend sync-v2 e2e wrapper.
+- Deterministic fixture baseline: named fixture identities (`anonymous`, `user_a`,
+  `user_b`; optional helper/service-role path), enforced through
+  `ensure-local-runtime-baseline.sh`.
+- Execution triggers (minimum): always run cheap tests for the changed layer(s);
+  `./scripts/quality-fast.sh backend` is the default backend fast gate; run the
+  Supabase-local integration/contract suites (grouped under
+  `./scripts/quality-slow.sh backend`) when changing `supabase/migrations/**`,
+  `supabase/functions/**`, auth config/policies, or sync RPC contracts/fixtures
+  (not every backend change requires every slow suite); run hosted smoke when
+  changing deployment/env/secrets config, hosted-only behavior, or at
+  milestone/release closeout needing fresh hosted evidence.
+- Coverage policy for Supabase API surfaces: custom runtime code (Edge Functions)
+  requires unit tests + local integration/contract tests; a mostly-PostgREST/RPC
+  surface can have a small unit surface, compensated by stronger DB + local
+  integration/contract coverage.
+
+## Project structure conventions for testing assets
+
+- `apps/mobile/.maestro/flows` — canonical Maestro flow definitions.
+- `apps/mobile/.maestro/maestro.env.sample` — checked-in config sample;
+  `apps/mobile/.maestro/maestro.env.local` — canonical per-worktree untracked
+  config.
+- `apps/mobile/src/auth/` — shared mobile auth client, storage, session-service,
+  provider modules.
+- Repo-root `e2e/` — reserved for cross-stack orchestration/tests.
+- `supabase/` — backend root for migrations, seeds, functions, and backend-local
+  test assets. `supabase/scripts/` — backend local runtime/test wrappers.
+  `supabase/tests/` — backend-local smoke/integration test entrypoints (until a
+  dedicated helper workspace is introduced).
+- Do not couple backend work to a mobile test-directory refactor (e.g. moving
+  `apps/mobile/app/__tests__`) unless a dedicated change scopes it.
+
+---
 
 ## Planned next phase (UI quality and appearance)
 
-1. Add visual regression testing for critical screens/components.
-Reason: catch layout and styling regressions (spacing, clipping, overlap) that behavior tests miss.
-
-2. Define a lightweight UI contract per key screen (visibility, tap targets, no overlap, small-phone fit).
-Reason: make visual correctness explicit so both humans and AI can validate against clear rules.
-
-3. Add screenshot checkpoints in end-to-end flows.
-Reason: verify real user journeys preserve expected appearance.
-
-4. Establish baseline update policy for snapshots.
-Reason: ensure visual changes are intentional and reviewed, not silently accepted.
-
-5. Use visual diff output as AI iteration input.
-Reason: helps AI make targeted UI fixes and faster design refinements.
+1. Add visual regression testing for critical screens/components — catch layout
+   and styling regressions (spacing, clipping, overlap) that behavior tests miss.
+2. Define a lightweight UI contract per key screen (visibility, tap targets, no
+   overlap, small-phone fit) — make visual correctness explicit for humans and AI.
+3. Add screenshot checkpoints in end-to-end flows — verify real user journeys
+   preserve expected appearance.
+4. Establish a baseline-update policy for snapshots — ensure visual changes are
+   intentional and reviewed.
+5. Use visual diff output as AI iteration input — faster targeted UI fixes.

@@ -225,7 +225,7 @@ Parallel-run note:
 
 ## Hosted sync bootstrap and reset
 
-Canonical hosted bootstrap is the checked-in migration chain (`supabase/migrations/*.sql`) applied via the Supabase CLI. The previous hand-curated bootstrap blob (`hosted-bootstrap-sync.sql`) was removed during the sync redesign clean-slate (`docs/tasks/fix-sync/plan.md`, T7) — it had drifted from the live schema and is not part of the supported path.
+Canonical hosted bootstrap is the checked-in migration chain (`supabase/migrations/*.sql`) applied via the Supabase CLI. The previous hand-curated bootstrap blob (`hosted-bootstrap-sync.sql`) was removed during the sync redesign clean-slate — it had drifted from the live schema and is not part of the supported path.
 
 Standard hosted enablement on a fresh project:
 
@@ -239,7 +239,7 @@ Historical note: `supabase/hosted-hotfix-relax-session-exercise-definition-fk.sq
 
 For local parity before and after a hosted reset, run `./supabase/scripts/reset-local.sh`, `./supabase/scripts/ensure-local-runtime-baseline.sh`, `./scripts/quality-fast.sh backend`, and `./scripts/quality-slow.sh backend`. On WSL, verify Docker Desktop integration from this distribution first with `docker info`.
 
-First repair task (historical, pre-redesign): `docs/tasks/complete/T-20260510-01-supabase-migration-history-repair.md`.
+(An earlier hosted migration-history repair predates the sync redesign; its task card has been archived out.)
 
 ## Fixture baseline (deterministic)
 

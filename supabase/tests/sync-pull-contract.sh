@@ -2,15 +2,14 @@
 
 # Sync v2 — sync_pull RPC contract tests.
 #
-# Implements the t4 contract test surface (docs/plans/sync-v2-server/tasks/t4.md
-# "Outcomes" → "Contract tests"). Asserts the wire contract of
-# POST /rest/v1/rpc/sync_pull per docs/plans/sync-v2/designs/t2.md §4.
+# Asserts the wire contract of POST /rest/v1/rpc/sync_pull per
+# docs/specs/tech/sync-v2-server-contract.md §B.4.
 #
-# Scenarios covered (matching the t4 outcome list verbatim):
+# Scenarios covered:
 #   1. Snapshot pull (cursor=null)
 #   2. Paginated drain (limit=2 over 5 rows)
 #   3. Layer→type mapping integrity (all four layers, all eight entities;
-#      asserts the t2 §4.4 partition: pairwise disjoint, union = all 8)
+#      asserts the §B.4.4 partition: pairwise disjoint, union = all 8)
 #   4. RLS isolation (user_a vs user_b)
 #   5. Tombstones included (rows with deleted_at != null appear in the pull)
 #   6. Empty page after drain (next_cursor echoes the input cursor)
@@ -335,7 +334,7 @@ cleanup_run_rows
 #
 # Seed at least one row of EVERY entity type for user A, with a fully-
 # connected FK chain. Pull each layer (0..3) with cursor=null, limit=100.
-# Assert each layer's response `type` set equals exactly the t2 §4.4 mapping;
+# Assert each layer's response `type` set equals exactly the §B.4.4 mapping;
 # union = all eight; pairwise disjoint.
 # -----------------------------------------------------------------------------
 
@@ -349,8 +348,8 @@ run_psql_sql "
 
   -- Layer 1: sessions, exercise_muscle_mappings, exercise_tag_definitions.
   -- exercise_tag_definitions lives here (not Layer 0) per the corrected
-  -- partition in plan.md ## Deviations log (t2 entry): it FKs into
-  -- exercise_definitions (Layer 0), so t1 §7.7's no-intra-layer-FK rule
+  -- partition in docs/specs/tech/sync-v2-server-contract.md §B.3.4.1: it FKs
+  -- into exercise_definitions (Layer 0), so §A.7.7's no-intra-layer-FK rule
   -- forces it into a strictly later layer.
   insert into app_public.sessions (owner_user_id, id, gym_id, started_at, created_at, updated_at, client_updated_at_ms)
     values ('${USER_A_UUID}'::uuid, 'pull-${RUN_TAG}-l1-s', 'pull-${RUN_TAG}-l0-gym', ${NOW_MS}, ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
@@ -371,8 +370,8 @@ run_psql_sql "
 " >/dev/null
 
 # Layer 0 should yield exactly {gyms, exercise_definitions} per the corrected
-# partition recorded in plan.md ## Deviations log (t2 entry):
-# exercise_tag_definitions FKs into exercise_definitions, so the t1 §7.7
+# partition in docs/specs/tech/sync-v2-server-contract.md §B.3.4.1:
+# exercise_tag_definitions FKs into exercise_definitions, so the §A.7.7
 # "no intra-layer FK" invariant forces it into Layer 1, not Layer 0.
 sync_pull '{"layer":0,"cursor":null,"limit":200}'
 assert_status "200" "scenario 3 layer 0 status"
@@ -465,7 +464,8 @@ cleanup_run_rows
 
 echo "[sync-pull-contract] scenario 5: tombstones included"
 # The owner-immutability trigger refuses any UPDATE when auth.uid() is NULL
-# (t1 §6.3). To soft-delete a row via direct SQL we set the JWT-claim GUC for
+# (docs/specs/tech/sync-v2-server-contract.md §A.6.3). To soft-delete a row via
+# direct SQL we set the JWT-claim GUC for
 # the duration of the UPDATE so auth.uid() resolves to USER_A_UUID. This
 # matches the path service_role and the push RPC take.
 run_psql_sql "

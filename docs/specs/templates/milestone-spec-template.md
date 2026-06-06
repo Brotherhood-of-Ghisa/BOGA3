@@ -33,7 +33,7 @@ Describe the outcome this milestone must achieve.
 2. 
 3. 
 
-Rule (when applicable): if the milestone introduces a new runtime, deployment surface, or test layer, include a deliverable/task to update `docs/specs/04-ai-development-playbook.md`, `docs/specs/06-testing-strategy.md`, and relevant template(s) and name the owner of hosted/deployed smoke validation if it is deferred.
+Rule (when applicable): if the milestone introduces a new runtime, deployment surface, or test layer, include a deliverable/task to update `docs/specs/06-testing-strategy.md` and relevant template(s) and name the owner of hosted/deployed smoke validation if it is deferred.
 
 ## Acceptance criteria
 
