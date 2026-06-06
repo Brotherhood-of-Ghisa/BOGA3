@@ -160,7 +160,7 @@ Prevent one structurally bad dirty row from permanently blocking an otherwise va
 - `npm run db:generate:canary`: regenerated cleanly, then `No schema changes, nothing to migrate` on re-run (schema ⇄ migration bundle in sync); produced `drizzle/0001_dapper_vision.sql` (CREATE TABLE `sync_quarantine`, composite PK, no FKs) + bundle now 2 entries.
 - `./scripts/quality-fast.sh frontend`: PASS — 87 suites, 788 tests green (the in-test `[logging] app log insert failed` console.warn is the expected best-effort logEvent error path, not a failure).
 - `./scripts/quality-slow.sh frontend`: PASS — all six iOS Maestro flows green: `smoke-launch`, `data-runtime-smoke` (proves the new `0001` migration applies on a real device boot), `launch-requires-sign-in`, `sync-gate-first-cycle`, `settings-sync-status` (the surface extended with `blockedRowCount`), `auth-profile-happy-path`. NOTE: the first run exited 0 *vacuously* because `JAVA_HOME` was unset and Maestro silently no-op'd; re-ran with `JAVA_HOME=/opt/homebrew/opt/openjdk` exported and confirmed each `[Passed] <flow>` marker. No native deps changed, so no dev-client rebuild was required.
-- Manual verification summary:
+- Manual verification summary (required when CI is absent/partial): quarantine persists, skips/continues, cascades, and survives reopen; the two diagnostics carry safe context only and never block on logger failure (all asserted by `sync-cycle-quarantine.test.ts`); the `settings-sync-status` Maestro flow renders the extended status surface on a real device. Details:
   - Persistence: `quarantineRows` upsert — fresh insert at count 1 (first==last), repeat preserves `first_seen`, advances `last_seen` + `occurrence_count`, no duplicate row. Survives a fresh drizzle handle over the same SQLite connection (restart proxy).
   - Skip/continue: `selectPushBatch` excludes quarantined ids; integration proves one orphan + one valid independent dirty row → valid row pushes and clears dirty, orphan quarantined (still dirty), cycle converges (no throw, no gate error). Cascade: a child of a quarantined orphan is itself quarantined in the same drain.
   - Logger: `sync.row_quarantined` (warn) + `sync.push_continued_after_quarantine` (info) carry opaque ids/structural metadata only (no `Ex se-orphan` payload); a rejecting logger never blocks persistence or the continued push.
@@ -179,8 +179,8 @@ Prevent one structurally bad dirty row from permanently blocking an otherwise va
   - `npm run db:generate:canary` — clean (`No schema changes` on re-run).
   - `./scripts/quality-fast.sh frontend` — 87 suites / 788 tests green.
   - `./scripts/quality-slow.sh frontend` — all 6 iOS Maestro flows passed (see Evidence; required because this task adds a SQLite migration).
-- What remains:
-  - Nothing for this card. Deliberately out of scope per the card: user-facing repair UI, automatic destructive local graph repair, multi-device conflict resolution. Server-side `FK_VIOLATION` (without row identity) still throws as before — the deterministic preflight is the quarantine driver.
+- What remains: nothing for this card; the items below are deliberately out of scope. Details:
+  - Out of scope per the card: user-facing repair UI, automatic destructive local graph repair, multi-device conflict resolution. Server-side `FK_VIOLATION` (without row identity) still throws as before — the deterministic preflight is the quarantine driver.
 
 ## Status update checklist
 
