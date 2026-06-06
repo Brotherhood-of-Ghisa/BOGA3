@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 import { bootstrapLocalDataLayer } from './bootstrap';
 import { nowMonotonic } from './clock';
 import { gyms } from './schema';
+import { notifyLocalWrite } from '@/src/sync/write-nudge';
 
 export type UpsertLocalGymInput = {
   id: string;
@@ -124,6 +125,10 @@ export const upsertLocalGym = async (input: UpsertLocalGymInput) => {
       })
       .run();
   });
+
+  // Post-commit: the gym row is dirtied above, so nudge the scheduler to push it
+  // soon rather than waiting for the next foreground edge or the long backstop.
+  notifyLocalWrite();
 };
 
 export const loadLocalGymById = async (gymId: string): Promise<LocalGymLookupRecord | null> => {

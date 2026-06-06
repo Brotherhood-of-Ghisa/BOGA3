@@ -25,6 +25,7 @@ import NetInfo, { type NetInfoState } from '@react-native-community/netinfo';
 import { logEvent } from '@/src/logging/logEvent';
 import { runSyncCycle } from '@/src/sync/cycle';
 import { getSyncProgress, type SyncProgress } from '@/src/sync/progress';
+import { subscribeToLocalWrites } from '@/src/sync/write-nudge';
 
 // -----------------------------------------------------------------------------
 // Constants
@@ -97,6 +98,7 @@ let lastSuccessAtMs: number | null = null;
 
 let netInfoUnsubscribe: (() => void) | null = null;
 let appStateSubscription: { remove: () => void } | null = null;
+let localWriteUnsubscribe: (() => void) | null = null;
 let previousAppState: AppStateStatus = AppState.currentState;
 
 // -----------------------------------------------------------------------------
@@ -402,6 +404,27 @@ const handleAppStateChange = (nextAppState: AppStateStatus): void => {
 };
 
 // -----------------------------------------------------------------------------
+// Local-write wiring
+//
+// A committed repo mutation feeds the same single "request sync" entry point as
+// the foreground edge and the cold-launch nudge. The data layer fires the nudge
+// through the `write-nudge` emitter rather than importing the scheduler, which
+// would close an import cycle (scheduler -> cycle -> data -> scheduler). We log
+// the source here so a write-triggered sync is distinguishable in the logs from
+// a foreground-triggered one without forking the machine input.
+// -----------------------------------------------------------------------------
+
+const handleLocalWrite = (): void => {
+  void logEvent({
+    level: 'debug',
+    source: 'sync',
+    event: 'sync_scheduler_write_sync_requested',
+    context: { timestampMs: Date.now() },
+  });
+  handleExternal('request sync');
+};
+
+// -----------------------------------------------------------------------------
 // Public surface
 // -----------------------------------------------------------------------------
 
@@ -439,6 +462,11 @@ export const startSyncScheduler = (): void => {
   try {
     netInfoUnsubscribe = NetInfo.addEventListener(handleNetInfoState);
     appStateSubscription = AppState.addEventListener('change', handleAppStateChange);
+    // Subscribe the same single entry point to post-commit repo-write nudges.
+    // This is an in-process emitter (not a native listener), so it cannot throw
+    // for a broken-native-module reason; it sits inside the same try only so a
+    // partially-wired start still tears down cleanly.
+    localWriteUnsubscribe = subscribeToLocalWrites(handleLocalWrite);
   } catch (error) {
     void logEvent({
       level: 'error',
@@ -466,6 +494,11 @@ export const stopSyncScheduler = (): void => {
   if (appStateSubscription !== null) {
     appStateSubscription.remove();
     appStateSubscription = null;
+  }
+
+  if (localWriteUnsubscribe !== null) {
+    localWriteUnsubscribe();
+    localWriteUnsubscribe = null;
   }
 
   state = { name: 'OFFLINE' };

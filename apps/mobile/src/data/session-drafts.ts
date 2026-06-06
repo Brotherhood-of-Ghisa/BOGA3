@@ -4,6 +4,7 @@ import { bootstrapLocalDataLayer, type LocalDatabase } from './bootstrap';
 import { nowMonotonic } from './clock';
 import { exerciseSets, sessionExercises, sessionExerciseTags, sessions } from './schema';
 import { normalizeSessionSetType, type SessionSetTypeValue } from './set-types';
+import { notifyLocalWrite } from '@/src/sync/write-nudge';
 
 export type SessionDraftStatus = 'active';
 
@@ -757,6 +758,11 @@ export const createDrizzleSessionDraftStore = (): SessionDraftStore => ({
       });
     });
 
+    // Post-commit: the session row and the whole exercise/set/tag graph were
+    // dirtied in the transaction above; one nudge per save asks the scheduler to
+    // push the batch soon.
+    notifyLocalWrite();
+
     return { sessionId };
   },
   async saveCompletedSessionGraph(input) {
@@ -797,6 +803,10 @@ export const createDrizzleSessionDraftStore = (): SessionDraftStore => ({
         localUpdatedAtMs,
       });
     });
+
+    // Post-commit: the completed-session row and its exercise/set/tag graph were
+    // dirtied in the transaction above; one nudge per save pushes the batch soon.
+    notifyLocalWrite();
 
     return { sessionId: input.sessionId };
   },
@@ -839,6 +849,10 @@ export const createDrizzleSessionDraftStore = (): SessionDraftStore => ({
         .where(eq(sessions.id, input.sessionId))
         .run();
     });
+
+    // Post-commit: the session row was dirtied above; nudge to push the
+    // completion soon.
+    notifyLocalWrite();
   },
   async reopenCompletedSession(input) {
     const database = await bootstrapLocalDataLayer();
@@ -876,6 +890,10 @@ export const createDrizzleSessionDraftStore = (): SessionDraftStore => ({
         .where(eq(sessions.id, input.sessionId))
         .run();
     });
+
+    // Post-commit: the reopened session row was dirtied above; nudge to push the
+    // reopen soon.
+    notifyLocalWrite();
   },
   async listCompletedSessions() {
     const database = await bootstrapLocalDataLayer();
