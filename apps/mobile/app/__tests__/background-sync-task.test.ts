@@ -66,7 +66,7 @@ jest.mock('expo-network', () => ({
 }));
 
 // --- cycle stub --------------------------------------------------------------
-const mockRunSyncCycle = jest.fn(() => Promise.resolve());
+const mockRunSyncCycle = jest.fn(() => Promise.resolve('converged'));
 
 jest.mock('@/src/sync/cycle', () => ({
   __esModule: true,
@@ -128,7 +128,7 @@ beforeEach(() => {
   mockStopSyncScheduler.mockClear();
   mockGetSchedulerState.mockClear();
   mockNetworkState.isInternetReachable = true;
-  mockRunSyncCycle.mockImplementation(() => Promise.resolve());
+  mockRunSyncCycle.mockImplementation(() => Promise.resolve('converged'));
 });
 
 describe('task definition and registration', () => {
@@ -189,8 +189,45 @@ describe('task body — network offline (pre-flight fails)', () => {
   });
 });
 
-describe('task body — cycle throws', () => {
-  it('returns Failed when the cycle rejects', async () => {
+describe('task body — cycle outcome drives the result', () => {
+  it('returns Success on a converged cycle', async () => {
+    mockNetworkState.isInternetReachable = true;
+    mockRunSyncCycle.mockImplementation(() => Promise.resolve('converged'));
+
+    const result = await runBackgroundSyncTask();
+
+    expect(mockRunSyncCycle).toHaveBeenCalledTimes(1);
+    expect(result).toBe(BackgroundTaskResult.Success);
+  });
+
+  it('returns Failed on a retriable INTERNAL outcome so the OS retries sooner', async () => {
+    mockNetworkState.isInternetReachable = true;
+    mockRunSyncCycle.mockImplementation(() => Promise.resolve('internal'));
+
+    const result = await runBackgroundSyncTask();
+
+    expect(result).toBe(BackgroundTaskResult.Failed);
+  });
+
+  it('returns Failed on an FK_VIOLATION outcome', async () => {
+    mockNetworkState.isInternetReachable = true;
+    mockRunSyncCycle.mockImplementation(() => Promise.resolve('fk-violation'));
+
+    const result = await runBackgroundSyncTask();
+
+    expect(result).toBe(BackgroundTaskResult.Failed);
+  });
+
+  it('returns Success on an auth-required outcome (no foreground to route, retry is futile)', async () => {
+    mockNetworkState.isInternetReachable = true;
+    mockRunSyncCycle.mockImplementation(() => Promise.resolve('auth-required'));
+
+    const result = await runBackgroundSyncTask();
+
+    expect(result).toBe(BackgroundTaskResult.Success);
+  });
+
+  it('returns Failed when the cycle defensively rejects (escaped throw)', async () => {
     mockNetworkState.isInternetReachable = true;
     mockRunSyncCycle.mockImplementation(() => Promise.reject(new Error('cycle blew up')));
 

@@ -94,8 +94,9 @@ describe('cycle with no JWT (AUTH_REQUIRED is a clean error envelope)', () => {
     const before = database.select().from(gyms).where(eq(gyms.id, 'gym-noauth')).get();
     const cursorBefore = database.select().from(syncRuntimeState).all();
 
-    // The cycle must NOT throw on a missing JWT.
-    await expect(runSyncCycle()).resolves.toBeUndefined();
+    // The cycle must NOT throw on a missing JWT; it classifies the outcome as
+    // 'auth-required' (the route-to-sign-in signal) and returns it.
+    await expect(runSyncCycle()).resolves.toBe('auth-required');
 
     const after = database.select().from(gyms).where(eq(gyms.id, 'gym-noauth')).get();
     // Dirty bit and timestamp untouched — the edit will re-push once signed in.
