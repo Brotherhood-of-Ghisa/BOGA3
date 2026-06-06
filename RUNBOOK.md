@@ -366,9 +366,15 @@ TASK_ID=ad-hoc ./scripts/maestro-ios-run-flow.sh --flow .maestro/flows/exercise-
 ```bash
 ./supabase/scripts/test-fast.sh
 ./supabase/scripts/test-auth-authz.sh
-./supabase/scripts/test-sync-api-contract.sh
-./supabase/scripts/test-sync-events-ingest-contract.sh
+# sync v2 contract suites (or run all backend slow suites via: ./scripts/quality-slow.sh backend)
+./supabase/scripts/test-sync-v2-schema-smoke.sh
+./supabase/scripts/test-sync-push-contract.sh
+./supabase/scripts/test-sync-pull-contract.sh
+./supabase/scripts/test-sync-v2-e2e.sh
 ```
+
+(The v1 `test-sync-api-contract.sh` / `test-sync-events-ingest-contract.sh`
+wrappers were retired with the M13 projection RPCs.)
 
 ### Logger diagnostics smoke (Docker Supabase)
 
@@ -400,7 +406,16 @@ Notes:
 
 ### Cross-stack restore-parity lane
 
+The `test:sync:reinstall-parity` lane was **retired** with sync v1 (its target
+suite was deleted). Reinstall/restore parity is now proven by the sync-v2
+`cycle-round-trip` assertion inside `test:sync:infra`, plus the backend sync-v2
+contract suites:
+
 ```bash
 cd apps/mobile
-npm run test:sync:reinstall-parity
+npm run test:sync:infra            # includes the wiped-client restore assertion
+# backend parity: ./scripts/quality-slow.sh backend (from repo root)
 ```
+
+See `docs/specs/02-quality-and-test-gates.md` for how to provision the local
+endpoint these read.

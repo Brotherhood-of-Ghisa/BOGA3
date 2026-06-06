@@ -1,5 +1,11 @@
 # Plan: Sync v2
 
+> **NOT IN FLIGHT (working notes) — reviewed 2026-06-06.** This is the Sync v2
+> *design* wave. t1+t2 design docs are merged and authoritative; t3 was deferred
+> and t4 was open at PR #65. Treat this plan as historical working notes, not
+> live orchestration — verify current status via git/PRs before acting, and do
+> not execute it unless a human explicitly points you here.
+
 ## Goal
 
 Rebuild sync from first principles. v1 (M13) tried to make the server understand the

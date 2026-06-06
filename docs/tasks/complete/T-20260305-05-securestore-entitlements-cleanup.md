@@ -1,7 +1,7 @@
 ---
 task_id: T-20260305-05-securestore-entitlements-cleanup
 milestone_id: "M11"
-status: planned
+status: outdated
 ui_impact: "no"
 areas: "frontend"
 runtimes: "expo,maestro"
@@ -10,11 +10,15 @@ gates_slow: "./scripts/quality-slow.sh frontend"
 docs_touched: "docs/specs/06-testing-strategy.md,docs/specs/11-maestro-runtime-and-testing-conventions.md"
 ---
 
+> **OUTDATED — archived 2026-06-06.** This M11-era cleanup (authored 2026-03-05)
+> was never actioned and M11 has long shipped. Retained for history only; not in
+> flight. Ignore unless explicitly re-opened.
+
 ## Task metadata
 
 - Task ID: `T-20260305-05-securestore-entitlements-cleanup`
 - Title: Remove temporary SecureStore entitlement fallback once signed iOS dev-client is available
-- Status: `planned`
+- Status: `outdated`
 - File location rule:
   - author active cards in `docs/tasks/<task-id>.md`
   - move the file to `docs/tasks/complete/<task-id>.md` when `Status` becomes `completed` or `outdated`

@@ -193,13 +193,19 @@ Provider-neutral method catalog + Supabase mapping:
 
 - `supabase/session-sync-api-contract.md`
 
-Local sync API contract suite:
+Local sync contract suites (sync v2):
 
 ```bash
-./supabase/scripts/test-sync-api-contract.sh
+# run all backend slow suites together:
+./scripts/quality-slow.sh backend
+# or individually:
+./supabase/scripts/test-sync-v2-schema-smoke.sh
+./supabase/scripts/test-sync-push-contract.sh
+./supabase/scripts/test-sync-pull-contract.sh
+./supabase/scripts/test-sync-v2-e2e.sh
 ```
 
-This wrapper enforces the shared runtime baseline first (`ensure-local-runtime-baseline.sh`) and then runs the sync contract suite.
+These enforce the shared runtime baseline first (`ensure-local-runtime-baseline.sh`) and then run the sync-v2 contract suites. The v1 `test-sync-api-contract.sh` / `test-sync-events-ingest-contract.sh` wrappers were retired with the M13 projection RPCs.
 
 Coverage includes success read/write flows, validation failures, unauthenticated denial, and cross-user denial across all sync-domain entities, including session metadata parity fields (`session_exercises.exercise_definition_id`, `exercise_sets.set_type`).
 

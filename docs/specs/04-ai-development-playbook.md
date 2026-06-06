@@ -4,35 +4,23 @@
 
 Define the minimum scaffolding required before feature development, and standardize how AI sessions consume project context.
 
-## Minimum scaffolding 
+## Minimum scaffolding
 
-1. Project directives/specs exist and are current:
-   - `docs/specs/README.md`
-   - `docs/specs/00-product.md`
-   - `docs/specs/03-technical-architecture.md`
-   - `docs/specs/05-data-model.md`
-   - `docs/specs/06-testing-strategy.md`
-   - `docs/specs/09-project-structure.md`
-   - `docs/specs/08-ux-delivery-standard.md` (required for UI tasks)
-   - `docs/specs/ui/README.md` (required for UI tasks; load relevant bundle docs from there)
-   - `RUNBOOK.md` (human run/test/debug entrypoint; must stay current)
+1. Project directives/specs exist and are current. `AGENTS.md` is the session
+   entrypoint and router: it defines the always-load set and which docs to pull in
+   per task area. Do not maintain a competing load list here.
 2. This playbook exists and is followed.
 3. (If executing a task) A milestone spec exists for the active milestone.
 4. (If executing a task) A task card exists for the active coding session.
 
 ## Reference hierarchy (source-of-truth chain)
 
-1. Project level:
-   - `docs/specs/README.md`
-   - `docs/specs/03-technical-architecture.md`
-   - `docs/specs/05-data-model.md`
-   - `docs/specs/06-testing-strategy.md`
-   - `docs/specs/09-project-structure.md`
-   - `docs/specs/11-maestro-runtime-and-testing-conventions.md` (required for Maestro runtime/testing work)
-   - `docs/specs/12-worktree-config-and-isolation.md` (required for local worktree/runtime isolation, cross-worktree test failures, and parallel-agent setup)
+1. Project level: the specs under `docs/specs/**`, plus `AGENTS.md` and
+   `RUNBOOK.md`. `AGENTS.md` routes you to the right project-level docs per task
+   area — that router is the single source for what to load.
 2. Milestone level:
    - `docs/specs/milestones/<milestone-id>.md`
-3. Task level:
+3. Task level (only when explicitly executing a task):
    - active/in-flight: `docs/tasks/<task-id>.md`
    - completed archive: `docs/tasks/complete/<task-id>.md`
 
@@ -136,7 +124,7 @@ Rule: task cards must list the exact gate commands they require; this section on
 
 ## Delivery workflow
 
-1. Select one MVP milestone from `docs/specs/00-mvp-deliverables.md`.
+1. Select one milestone from `docs/specs/milestones/` (see `docs/specs/milestones/README.md` for the index).
 2. Write a milestone spec using `docs/specs/templates/milestone-spec-template.md`.
 3. Break milestone spec into small task cards using `docs/specs/templates/task-card-template.md`.
 4. Execute one task card per AI session (or a tightly related pair only).
@@ -213,22 +201,15 @@ If complexity/risk justifies it, create additional follow-up task cards:
 
 ## Execution-mode context packet (strict gatekeeper)
 
-Provide these references at execution start:
+At execution start, load the always-load set plus the task-area docs from the
+`AGENTS.md` routing table — that table is the single source for which docs a task
+needs; do not duplicate it here. In addition, always provide the execution-only
+references the router cannot know:
 
 1. This playbook: `docs/specs/04-ai-development-playbook.md`
-2. Active milestone spec
-3. Active task card
-4. Any changed parent specs
-5. `docs/specs/05-data-model.md` (always load when task touches schema/entities/sync scope; update when data-model boundaries change)
-6. `docs/specs/09-project-structure.md` (always load for context; update only when task changes paths/layout/conventions)
-7. `docs/specs/08-ux-delivery-standard.md` (for UI tasks)
-8. `docs/specs/ui/README.md` (for UI tasks; use as the index to load only the relevant UI docs)
-9. Relevant `docs/specs/ui/*.md` bundle docs for the task (UI tasks only; usually `ux-rules`, `screen-map`, `navigation-contract`, `components-catalog`)
-10. `docs/specs/10-api-authn-authz-guidelines.md` (for backend API/auth work and API-consuming integration tasks)
-11. `supabase/session-sync-api-contract.md` (for session sync API work and FE/backend sync integration tasks, when present)
-12. `docs/specs/11-maestro-runtime-and-testing-conventions.md` (required for tasks that touch `apps/mobile/.maestro/**`, `apps/mobile/scripts/maestro*`, the Maestro harness/runtime helpers, or that require real iOS simulator smoke validation)
-13. `RUNBOOK.md` (always load; update in-session when local operator workflow changes)
-14. `docs/specs/12-worktree-config-and-isolation.md` (required when creating/repairing worktrees, changing local runtime setup, or investigating cross-worktree contamination)
+2. The active milestone spec
+3. The active task card
+4. Any parent specs the task changes
 
 ## Worktree execution rules
 

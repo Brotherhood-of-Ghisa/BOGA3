@@ -212,7 +212,8 @@ Make the gym list a first-class personal, database-backed, sync-restorable user 
   - `cd apps/mobile && npm test -- --runTestsByPath app/__tests__/sync-domain-event-emission.test.ts`
   - `cd apps/mobile && npm test -- --runTestsByPath app/__tests__/sync-bootstrap-merge.test.ts`
   - `cd apps/mobile && npm run db:generate:canary`
-  - `cd apps/mobile && npm run test:sync:reinstall-parity`
+  - `cd apps/mobile && npm run test:sync:infra`  <!-- was test:sync:reinstall-parity (retired with sync v1) -->
+
   - `./scripts/quality-fast.sh frontend`
   - `./scripts/quality-slow.sh frontend`
 - Standard local gate usage:
@@ -277,7 +278,8 @@ Make the gym list a first-class personal, database-backed, sync-restorable user 
 - Additional required gates:
   - targeted Jest suites listed above
   - `cd apps/mobile && npm run db:generate:canary`
-  - `cd apps/mobile && npm run test:sync:reinstall-parity`
+  - `cd apps/mobile && npm run test:sync:infra`  <!-- was test:sync:reinstall-parity (retired with sync v1) -->
+
 - Conditional gate:
   - `./scripts/quality-slow.sh backend` if any `supabase/**` schema/API/contract implementation changes are made.
 - Optional closeout validation helper:

@@ -1,5 +1,10 @@
 # Plan: Sync v2 — Server
 
+> **NOT IN FLIGHT (historical) — reviewed 2026-06-06.** The build DAG (t1–t4 +
+> tFINAL) merged by 2026-05-26 (see `status.md`). Retained for design lineage;
+> not live orchestration. Do not execute or resume unless a human explicitly
+> re-opens the plan.
+
 ## Goal
 
 Rebuild the Supabase side of sync from a clean slate to match the v2 design.

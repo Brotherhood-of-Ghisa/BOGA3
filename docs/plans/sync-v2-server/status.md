@@ -1,5 +1,10 @@
 # Status: Sync v2 — Server
 
+> **NOT IN FLIGHT (historical log) — reviewed 2026-06-06.** The build DAG
+> (t1–t4 + tFINAL) merged by Iteration 9 (2026-05-26); the final audit verdict is
+> not recorded below. This is a historical orchestrator log, not live state. Do
+> not resume orchestration from it unless a human explicitly re-opens the plan.
+
 Orchestrator log. Append one entry per iteration. Reverse-chronological.
 
 ## Iteration 1 — 2026-05-25

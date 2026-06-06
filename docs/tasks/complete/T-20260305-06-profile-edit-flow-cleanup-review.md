@@ -1,7 +1,7 @@
 ---
 task_id: T-20260305-06-profile-edit-flow-cleanup-review
 milestone_id: "M11"
-status: planned
+status: outdated
 ui_impact: "yes"
 areas: "frontend,docs"
 runtimes: "expo,node"
@@ -10,11 +10,15 @@ gates_slow: "N/A"
 docs_touched: "docs/specs/ui/ux-rules.md,docs/specs/ui/screen-map.md"
 ---
 
+> **OUTDATED — archived 2026-06-06.** This M11-era cleanup-review (authored
+> 2026-03-05) was never actioned and M11 has long shipped. Retained for history
+> only; not in flight. Ignore unless explicitly re-opened.
+
 ## Task metadata
 
 - Task ID: `T-20260305-06-profile-edit-flow-cleanup-review`
 - Title: Review and cleanup unified profile edit flows after view/edit mode simplification
-- Status: `planned`
+- Status: `outdated`
 - Session date: `2026-03-05`
 - Session interaction mode: `interactive (default)`
 

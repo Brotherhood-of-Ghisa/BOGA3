@@ -6,7 +6,10 @@ Define the top-level testing stack and working practices for MVP.
 
 Scope boundary:
 
-- This doc owns testing strategy and verification policy.
+- This doc owns the deep testing strategy and verification policy. For the
+  at-a-glance gate ladder, what is mandatory, and the local infrastructure you
+  have, see `docs/specs/02-quality-and-test-gates.md` (the always-load quickref) —
+  this doc is its conditional companion.
 - App-specific UI route/component inventories and navigation summaries live in `docs/specs/ui/**` (entrypoint: `docs/specs/ui/README.md`) and should remain brief/source-linked.
 
 ## Decisions and rationale
@@ -133,7 +136,7 @@ Reason: keeps FE/backend integration test expectations explicit without forcing 
   - projection/read-model correctness after event ingest/replay.
   - GPS gym coordinate sync coverage for `gyms`: local range/shape validation, backend range/shape rejection, coordinate-bearing `gyms.upsert` payloads, bootstrap fetch/merge/convergence, and reinstall restore parity.
 - Use mocks/fakes for broad scenario coverage, then require at least one real cross-stack proof path with local `Supabase` validating event ingest, idempotent retries, and restorable projection state.
-- Backend-first M13 ingest/projection tasks should include the real local contract suite `./supabase/scripts/test-sync-events-ingest-contract.sh`.
+- Backend-first sync tasks should run the real local sync-v2 contract suites via `./scripts/quality-slow.sh backend` (schema smoke + push + pull + e2e); the v1 `test-sync-events-ingest-contract.sh` suite was retired with the M13 projection RPC family and no longer exists.
 - Current frontend baseline suites for this policy include:
   - `apps/mobile/app/__tests__/sync-bootstrap-merge.test.ts` (deterministic merge decisions + convergence-loop terminal behavior),
   - `apps/mobile/app/__tests__/sync-runtime-bootstrap.test.ts` (first-enable trigger and logged-out-then-login bootstrap trigger),
@@ -166,7 +169,7 @@ Reason: keeps FE/backend integration test expectations explicit without forcing 
   - `./scripts/quality-fast.sh frontend` -> `apps/mobile` `lint` + `typecheck` + `test`
   - `./scripts/quality-fast.sh backend` -> `./supabase/scripts/test-fast.sh`
   - `./scripts/quality-slow.sh frontend` -> `Maestro` local simulator smoke + data-smoke + auth/profile happy-path commands
-- `./scripts/quality-slow.sh backend` -> local backend auth/RLS, sync API contract, and sync ingest contract suites (shared Supabase runtime baseline enforced)
+- `./scripts/quality-slow.sh backend` -> local backend auth/RLS plus the sync-v2 contract suites (schema smoke, push, pull, dev-wipe, schema-drift, and the e2e plan-outcome suite); shared Supabase runtime baseline enforced
 - Rule:
   - wrappers reduce checklist repetition, but task cards still own trigger conditions and any hosted/manual checks.
 
@@ -176,8 +179,10 @@ Reason: keeps FE/backend integration test expectations explicit without forcing 
   - applies to local real-instance test commands that hit a running Supabase stack rather than mocked clients.
   - current required entrypoints include:
     - `./supabase/scripts/test-auth-authz.sh`
-    - `./supabase/scripts/test-sync-api-contract.sh`
-    - `./supabase/scripts/test-sync-events-ingest-contract.sh`
+    - `./supabase/scripts/test-sync-v2-schema-smoke.sh`
+    - `./supabase/scripts/test-sync-push-contract.sh`
+    - `./supabase/scripts/test-sync-pull-contract.sh`
+    - `./supabase/scripts/test-sync-v2-e2e.sh`
     - `npm run test:e2e:ios:auth-profile` (via `apps/mobile/scripts/maestro-ios-auth-profile.sh`)
 - Expected baseline state:
   - a local Supabase runtime is reachable,
@@ -295,7 +300,7 @@ Reason: keeps FE/backend integration test expectations explicit without forcing 
   - `./supabase/scripts/test-fast.sh` (combined fast backend-local smoke suite)
   - repo-level wrapper mapping:
     - `./scripts/quality-fast.sh backend` -> `./supabase/scripts/test-fast.sh`
-    - `./scripts/quality-slow.sh backend` -> backend contract suites (`test-auth-authz.sh`, `test-sync-api-contract.sh`, `test-sync-events-ingest-contract.sh`) that each call `ensure-local-runtime-baseline.sh`
+    - `./scripts/quality-slow.sh backend` -> backend contract suites (`test-auth-authz.sh` plus the sync-v2 suites `test-sync-v2-schema-smoke.sh`, `test-sync-push-contract.sh`, `test-sync-pull-contract.sh`, `test-sync-v2-e2e.sh`) that each enforce the shared runtime baseline via `ensure-local-runtime-baseline.sh`
 - Current automated backend-local coverage (minimum baseline):
   - migration/reset/seed flow
   - deterministic fixture presence (`anonymous`, `user_a`, `user_b`, optional helper fixture)

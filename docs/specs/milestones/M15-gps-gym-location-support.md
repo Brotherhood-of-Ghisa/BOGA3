@@ -283,7 +283,7 @@ Original M15 closeout verified the following source-of-truth docs were aligned w
   - Added foreground-only location reads behind an injectable service, pure Haversine gym matching, quiet one-shot recorder gym preselection, explicit gym-box long-press retry, `No gym` picker semantics, and single-gym editor controls to save, replace, or clear coordinates.
   - Kept GPS advisory/private for M15: no background location, no automatic check-ins, no maps/geocoding, and no social/shared location exposure.
 - Verification summary:
-  - Restore parity: `cd apps/mobile && npm run test:sync:reinstall-parity` passed with coordinate-bearing gyms in the normalized snapshot.
+  - Restore parity: `cd apps/mobile && npm run test:sync:reinstall-parity` passed with coordinate-bearing gyms in the normalized snapshot. *(Historical: that lane was retired with sync v1; the current equivalent is `npm run test:sync:infra` — see `docs/specs/02-quality-and-test-gates.md`.)*
   - Backend contracts: `./scripts/quality-fast.sh backend` and `./scripts/quality-slow.sh backend` passed, including coordinate projection and invalid-coordinate rejection in `sync_events_ingest`.
   - Frontend/runtime: `./scripts/quality-fast.sh frontend` and `PATH="/opt/homebrew/opt/openjdk/bin:$HOME/.maestro/bin:$PATH" JAVA_HOME="/opt/homebrew/opt/openjdk" ./scripts/quality-slow.sh frontend` passed.
   - Final frontend slow artifacts:

@@ -1,5 +1,11 @@
 # Sync redesign — plan
 
+> **SUPERSEDED & COMPLETE — archived 2026-06-06.** This pre-v2 sync redesign
+> (waves merged through ~2026-03) was superseded by the **Sync v2** rebuild
+> (`docs/plans/sync-v2/`, `docs/plans/sync-v2-server/`). Retained for decision
+> lineage only; not in flight. Do not execute or follow this plan unless a human
+> explicitly re-opens it.
+
 ## Context
 
 The user reports sync "completely broken." Root cause: backend schema treats `id text

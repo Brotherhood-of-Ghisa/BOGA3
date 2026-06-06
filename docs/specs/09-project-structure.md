@@ -9,6 +9,17 @@ Define the canonical repository structure, path ownership, and placement convent
 - Update this document in the same task/session when significant project-structure changes are made (for example new top-level folders, workspace moves, canonical test-location changes, or path-convention changes).
 - Minor file additions within an existing well-defined folder usually do not require updates.
 
+## Running commands (workspaces)
+
+- **There is no root `package.json`.** Every `npm run …` script lives in
+  `apps/mobile/package.json` and must be run from `apps/mobile/`. Backend scripts
+  live under `supabase/scripts/`.
+- **Repo-level gate wrappers live at the repo root** (`./scripts/quality-fast.sh`,
+  `./scripts/quality-slow.sh`) and `cd` into the correct workspace for you. Run
+  them from the repo root.
+- For the full gate ladder, what's mandatory, and the local infrastructure you
+  have, see `docs/specs/02-quality-and-test-gates.md`.
+
 ## Current repository structure (verified 2026-03-02)
 
 ```text

@@ -11,7 +11,7 @@
 ## Parent references
 
 - Project directives: `docs/specs/README.md`
-- MVP deliverables: `docs/specs/00-mvp-deliverables.md#1-fe-scaffolding-and-session-tracking`
+- Milestone index: `docs/specs/milestones/README.md` (the retired `00-mvp-deliverables.md` index)
 - Architecture: `docs/specs/03-technical-architecture.md`
 - Testing strategy: `docs/specs/06-testing-strategy.md`
 

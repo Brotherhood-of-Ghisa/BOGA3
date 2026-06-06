@@ -1,5 +1,9 @@
 # Sync redesign — status
 
+> **SUPERSEDED & COMPLETE — archived 2026-06-06.** Superseded by Sync v2; the
+> table below is a historical snapshot (last real update 2026-05-14), not live
+> orchestration state. Not in flight.
+
 Last updated: 2026-05-14
 
 ## Tasks
