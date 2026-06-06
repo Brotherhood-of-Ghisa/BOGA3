@@ -113,6 +113,32 @@ export class SyncCycleError extends Error {
 }
 
 /**
+ * The classified outcome of a finished cycle, returned by `runSyncCycle` so the
+ * scheduler can tell real convergence apart from the two non-success outcomes
+ * that previously also resolved cleanly:
+ *
+ *  - `converged`: both ends went quiet (or the round cap was reached after
+ *    authenticated progress). This — and only this — is a real sync success.
+ *  - `auth_required`: the server reported no signed-in user. A route signal, not
+ *    a success and not an in-gate error; surfaced via the auth-required signal.
+ *  - `retryable_error`: a server-internal / transport hiccup. Dirty bits are left
+ *    set for the next tick; the status surface must keep this visible, not treat
+ *    it as success.
+ *
+ * The fourth class — a non-retriable STRUCTURAL error (`FK_VIOLATION` /
+ * `LOCAL_FK_VIOLATION`) — is exposed distinctly by THROWING a `SyncCycleError`
+ * rather than returning, so the existing cadence policy still settles the state
+ * machine while recording no success.
+ */
+export type SyncCycleOutcome = 'converged' | 'auth_required' | 'retryable_error';
+
+export interface SyncCycleResult {
+  outcome: SyncCycleOutcome;
+  /** The classified error code for a `retryable_error`, else null. */
+  errorCode: SyncErrorCode | null;
+}
+
+/**
  * Maps a server response into a sync error code, or null when the response is a
  * clean success. The two server RPCs surface failures differently and both
  * shapes are handled here:
@@ -217,6 +243,40 @@ const logPullLocalFkViolation = (
     }).catch(() => undefined);
   } catch {
     // Diagnostic logging is best-effort and must never mask the sync error.
+  }
+};
+
+/**
+ * Records the classified outcome of a finished cycle as one structured event.
+ * The non-converged classes carry a sanitized exception message (never a payload
+ * or user-entered value) so a backend outage / FK mismatch is diagnosable.
+ *
+ * Fire-and-forget on purpose: a logging failure must never change the cycle's
+ * result or mask it — a thrown structural error still propagates and a returned
+ * result is still returned regardless of whether this insert succeeds.
+ */
+const logCycleOutcome = (
+  outcome: SyncCycleOutcome | 'structural_error',
+  errorCode: SyncErrorCode | null,
+  error?: unknown,
+): void => {
+  const level: 'info' | 'warn' | 'error' =
+    outcome === 'converged' ? 'info' : outcome === 'structural_error' ? 'error' : 'warn';
+
+  try {
+    void logEvent({
+      level,
+      source: 'sync',
+      event: 'sync.cycle_result',
+      message: 'Sync cycle finished.',
+      context: {
+        outcome,
+        error_code: errorCode,
+        ...(error !== undefined ? { exception_message: sanitizeExceptionMessage(error) } : {}),
+      },
+    }).catch(() => undefined);
+  } catch {
+    // Best-effort: cycle-result logging must never change the cycle's result.
   }
 };
 
@@ -751,14 +811,31 @@ const runPushLeg = async (database: LocalDatabase): Promise<number> => {
 // -----------------------------------------------------------------------------
 
 /**
+ * Settles a successful (converged / progressed) cycle: a cycle that talked to
+ * the server with a valid session and either quieted both ends or made
+ * authenticated progress to the round cap. Clears the auth-required flag (any
+ * earlier "no signed-in user" condition is resolved) and any prior failure code
+ * (a watching gate stops showing an error), logs the success, and returns the
+ * converged result.
+ */
+const settleConverged = (): SyncCycleResult => {
+  clearAuthRequired();
+  clearCycleError();
+  logCycleOutcome('converged', null);
+  return { outcome: 'converged', errorCode: null };
+};
+
+/**
  * Runs one convergence cycle: pull every layer, push the dirty stream, then
  * pull again, repeating until a full round moves nothing in either direction
- * (or the round guard trips). Returns cleanly when converged or when a
- * recoverable error envelope (no JWT / server-internal) is seen, leaving dirty
- * bits set for a later retry. Throws only on a non-retriable structural FK
- * violation.
+ * (or the round guard trips). Returns a classified {@link SyncCycleResult}:
+ * `converged` on real success/progress, `auth_required` when the server reports
+ * no signed-in user, and `retryable_error` on a recoverable server-internal /
+ * transport envelope (dirty bits left set for a later retry). Throws a
+ * `SyncCycleError` only on a non-retriable structural FK violation, so the
+ * scheduler settles per the existing cadence policy without recording success.
  */
-export const runSyncCycle = async (): Promise<void> => {
+export const runSyncCycle = async (): Promise<SyncCycleResult> => {
   const database = await bootstrapLocalDataLayer();
 
   try {
@@ -783,45 +860,45 @@ export const runSyncCycle = async (): Promise<void> => {
 
       // A round that moved no rows on either end means both sides are quiet.
       if (pulledBefore === 0 && pushed === 0 && pulledAfter === 0) {
-        // A cycle that converged talked to the server with a valid session, so
-        // any earlier "no signed-in user" condition is resolved. Clear the flag
-        // so the route layer no longer holds the user on the sign-in screen, and
-        // clear any prior failure code so a watching gate stops showing an error.
-        clearAuthRequired();
-        clearCycleError();
-        return;
+        return settleConverged();
       }
     }
     // Reaching the round cap without a quiet round still means the cycle made
-    // authenticated progress; treat it as a resolved auth condition.
-    clearAuthRequired();
-    clearCycleError();
+    // authenticated progress; treat it as a resolved auth condition and a
+    // successful cycle for status purposes.
+    return settleConverged();
   } catch (error) {
     if (error instanceof SyncCycleError) {
       if (error.code === 'FK_VIOLATION' || error.code === 'LOCAL_FK_VIOLATION') {
-        // Structural bug: not retriable, surfaces to the caller. Dirty bits and
-        // cursors are left untouched so nothing is silently dropped. Record the
-        // code so a watching gate can show the error and a single Retry.
+        // Structural bug: not retriable, surfaces to the caller by THROWING.
+        // Dirty bits and cursors are left untouched so nothing is silently
+        // dropped. Record the code so a watching gate can show the error and a
+        // single Retry; the throw keeps the scheduler from recording success.
         markCycleError(error.code);
+        logCycleOutcome('structural_error', error.code, error);
         throw error;
       }
       if (error.code === 'AUTH_REQUIRED') {
         // The server reports no signed-in user. This is not an exception to
         // surface — it is the route signal that the app needs a session. Raise
         // the observable flag so the route layer sends the user to sign-in, then
-        // give up this cycle cleanly (dirty bits and cursors are untouched, so a
-        // post-login cycle re-pushes and re-pulls the same state). It is a route
-        // decision, not an in-gate error, so the failure-code signal stays clear.
+        // return the auth-required result (dirty bits and cursors are untouched,
+        // so a post-login cycle re-pushes and re-pulls the same state). It is a
+        // route decision, not an in-gate error, so the failure-code signal stays
+        // clear and the scheduler records no success.
         markAuthRequired();
         clearCycleError();
-        return;
+        logCycleOutcome('auth_required', null);
+        return { outcome: 'auth_required', errorCode: null };
       }
-      // A server-internal hiccup: give up this cycle cleanly. Dirty bits stay
-      // set and cursors are unchanged, so the next scheduled tick starts a fresh
-      // cycle that re-pushes and re-pulls the same state. Record the code so a
-      // watching gate can show the error and a single Retry.
+      // A server-internal hiccup: a retryable error. Dirty bits stay set and
+      // cursors are unchanged, so the next scheduled tick starts a fresh cycle
+      // that re-pushes and re-pulls the same state. Record the code so a watching
+      // gate can show the error and a single Retry, and return the retryable
+      // result so the scheduler keeps it visible rather than recording success.
       markCycleError('INTERNAL');
-      return;
+      logCycleOutcome('retryable_error', 'INTERNAL', error);
+      return { outcome: 'retryable_error', errorCode: 'INTERNAL' };
     }
     throw error;
   }

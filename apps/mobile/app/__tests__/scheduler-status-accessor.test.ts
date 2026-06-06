@@ -12,12 +12,16 @@
 import { AppState, type AppStateStatus } from 'react-native';
 
 import type { LogEventParams } from '@/src/logging/logEvent';
+import type { SyncCycleResult } from '@/src/sync/cycle';
 
 // Controllable cycle stub: resolve/reject by hand so RUNNING is observable.
-let cycleResolvers: { resolve: () => void; reject: (error: unknown) => void }[] = [];
+let cycleResolvers: {
+  resolve: (result?: SyncCycleResult) => void;
+  reject: (error: unknown) => void;
+}[] = [];
 const mockRunSyncCycle = jest.fn(
   () =>
-    new Promise<void>((resolve, reject) => {
+    new Promise<SyncCycleResult | void>((resolve, reject) => {
       cycleResolvers.push({ resolve, reject });
     }),
 );
@@ -59,7 +63,19 @@ import { resetSyncProgress, setSyncProgress } from '@/src/sync/progress';
 const goOnline = () => mockNetInfoState.listener?.({ isConnected: true });
 
 const endCycleSuccess = async () => {
-  cycleResolvers.shift()?.resolve();
+  cycleResolvers.shift()?.resolve({ outcome: 'converged', errorCode: null });
+  await Promise.resolve();
+  await Promise.resolve();
+};
+
+const endCycleAuthRequired = async () => {
+  cycleResolvers.shift()?.resolve({ outcome: 'auth_required', errorCode: null });
+  await Promise.resolve();
+  await Promise.resolve();
+};
+
+const endCycleRetryable = async () => {
+  cycleResolvers.shift()?.resolve({ outcome: 'retryable_error', errorCode: 'INTERNAL' });
   await Promise.resolve();
   await Promise.resolve();
 };
@@ -147,6 +163,52 @@ describe('production scheduler status accessor', () => {
     await endCycleSuccess();
 
     expect(getSchedulerStatus().lastCycleError).toBeNull();
+  });
+
+  it('does not record a success on an auth-required outcome', async () => {
+    goOnline();
+    jest.advanceTimersByTime(1000);
+    await endCycleAuthRequired();
+
+    const status = getSchedulerStatus();
+    // Auth-required is a route signal, not a successful sync.
+    expect(status.lastSuccessAtMs).toBeNull();
+  });
+
+  it('keeps a retryable error visible and records no success', async () => {
+    goOnline();
+    jest.advanceTimersByTime(1000);
+    await endCycleRetryable();
+
+    const status = getSchedulerStatus();
+    expect(status.lastSuccessAtMs).toBeNull();
+    expect(status.lastCycleError).toBe('INTERNAL');
+  });
+
+  it('clears a prior retryable error only once a later cycle converges', async () => {
+    goOnline();
+    jest.advanceTimersByTime(1000);
+    await endCycleRetryable();
+    expect(getSchedulerStatus().lastCycleError).toBe('INTERNAL');
+    expect(getSchedulerStatus().lastSuccessAtMs).toBeNull();
+
+    // Idle backstop re-arms; the next cycle converges and clears the error.
+    jest.advanceTimersByTime(60_000);
+    await endCycleSuccess();
+
+    const status = getSchedulerStatus();
+    expect(status.lastCycleError).toBeNull();
+    expect(status.lastSuccessAtMs).not.toBeNull();
+  });
+
+  it('does not record a success when the cycle throws a structural error', async () => {
+    goOnline();
+    jest.advanceTimersByTime(1000);
+    await endCycleError();
+
+    const status = getSchedulerStatus();
+    expect(status.lastSuccessAtMs).toBeNull();
+    expect(status.lastCycleError).toBe('cycle blew up');
   });
 
   it('surfaces the first-sync progress phase and counters from the producer', () => {

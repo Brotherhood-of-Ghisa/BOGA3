@@ -323,6 +323,7 @@ Restore-parity ownership note:
 6. `docs/tasks/complete/M13-T06-reinstall-restore-state-parity.md` - add deterministic reinstall restore-parity verification (`Jest` + local `Supabase`) across all M13 data-scope entities. (`completed`)
 7. `docs/tasks/complete/T-20260606-01-sync-local-sqlite-fk-enforcement.md` - harden production local SQLite bootstrap to require FK enforcement and record diagnostic/test evidence for sync-data integrity. (`completed`)
 8. `docs/tasks/complete/T-20260606-02-sync-pull-fk-error-classification.md` - classify pull-side local SQLite FK apply failures as structured sync errors with sanitized diagnostics while preserving rollback/cursor atomicity. (`completed`)
+9. `docs/tasks/complete/T-20260606-03-sync-scheduler-result-semantics.md` - make `runSyncCycle` return a classified result so the scheduler records sync success only on real convergence (never on auth-required/retryable/thrown structural outcomes) and add `sync.cycle_result` structured logging. (`completed`)
 
 Rule:
 

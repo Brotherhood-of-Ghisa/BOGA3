@@ -171,7 +171,10 @@ describe('cycle convergence', () => {
       return pushOk;
     });
 
-    await runSyncCycle();
+    await expect(runSyncCycle()).resolves.toMatchObject({
+      outcome: 'converged',
+      errorCode: null,
+    });
 
     // The single server row landed locally and clean.
     const row = database.select().from(gyms).where(eq(gyms.id, 'gym-server')).get();
@@ -217,7 +220,10 @@ describe('AUTH_REQUIRED handling', () => {
       error: null,
     }));
 
-    await expect(runSyncCycle()).resolves.toBeUndefined();
+    await expect(runSyncCycle()).resolves.toMatchObject({
+      outcome: 'auth_required',
+      errorCode: null,
+    });
 
     // Dirty bit untouched; nothing pulled.
     const row = database.select().from(gyms).where(eq(gyms.id, 'gym-local')).get();
@@ -238,7 +244,10 @@ describe('AUTH_REQUIRED handling', () => {
       return { data: null, error: { code: 'P0001', message: 'AUTH_REQUIRED: sync_push requires an authenticated user' } };
     });
 
-    await expect(runSyncCycle()).resolves.toBeUndefined();
+    await expect(runSyncCycle()).resolves.toMatchObject({
+      outcome: 'auth_required',
+      errorCode: null,
+    });
 
     const row = database.select().from(gyms).where(eq(gyms.id, 'gym-local')).get();
     expect(row?.localDirty).toBe(true);
@@ -383,9 +392,105 @@ describe('FK_VIOLATION handling', () => {
       return { data: null, error: { code: '500', message: 'network blip' } };
     });
 
-    await expect(runSyncCycle()).resolves.toBeUndefined();
+    await expect(runSyncCycle()).resolves.toMatchObject({
+      outcome: 'retryable_error',
+      errorCode: 'INTERNAL',
+    });
 
     const row = database.select().from(gyms).where(eq(gyms.id, 'gym-local')).get();
     expect(row?.localDirty).toBe(true);
+  });
+});
+
+describe('structured cycle-result logging', () => {
+  const cycleResultLogs = (): LogEventParams[] =>
+    mockLogEvent.mock.calls.map(([params]) => params).filter((p) => p.event === 'sync.cycle_result');
+
+  it('logs a converged result at info with a null error code', async () => {
+    mockRpc.mockImplementation(async (name: string) => {
+      if (name === 'sync_pull') {
+        return { data: emptyPage, error: null };
+      }
+      return pushOk;
+    });
+
+    await runSyncCycle();
+
+    const logs = cycleResultLogs();
+    expect(logs).toHaveLength(1);
+    expect(logs[0].level).toBe('info');
+    expect(logs[0].source).toBe('sync');
+    expect(logs[0].context).toMatchObject({ outcome: 'converged', error_code: null });
+    // A clean cycle carries no exception message.
+    expect(logs[0].context).not.toHaveProperty('exception_message');
+  });
+
+  it('logs an auth-required result at warn with no exception message', async () => {
+    mockRpc.mockImplementation(async () => ({
+      data: { error: { code: 'AUTH_REQUIRED', message: 'requires an authenticated JWT' } },
+      error: null,
+    }));
+
+    await runSyncCycle();
+
+    const logs = cycleResultLogs();
+    expect(logs).toHaveLength(1);
+    expect(logs[0].level).toBe('warn');
+    expect(logs[0].context).toMatchObject({ outcome: 'auth_required', error_code: null });
+    expect(logs[0].context).not.toHaveProperty('exception_message');
+  });
+
+  it('logs a retryable result at warn with the INTERNAL code and a sanitized message', async () => {
+    database.insert(gyms).values({ id: 'gym-local', name: 'Local', localDirty: true, localUpdatedAtMs: 50 }).run();
+    mockRpc.mockImplementation(async (name: string) => {
+      if (name === 'sync_pull') {
+        return { data: emptyPage, error: null };
+      }
+      return { data: null, error: { code: '500', message: 'network blip' } };
+    });
+
+    await runSyncCycle();
+
+    const logs = cycleResultLogs();
+    expect(logs).toHaveLength(1);
+    expect(logs[0].level).toBe('warn');
+    expect(logs[0].context).toMatchObject({
+      outcome: 'retryable_error',
+      error_code: 'INTERNAL',
+      exception_message: expect.stringContaining('network blip'),
+    });
+  });
+
+  it('logs a structural result at error with the FK code when the cycle throws', async () => {
+    database.insert(gyms).values({ id: 'gym-local', name: 'Local', localDirty: true, localUpdatedAtMs: 50 }).run();
+    mockRpc.mockImplementation(async (name: string) => {
+      if (name === 'sync_pull') {
+        return { data: emptyPage, error: null };
+      }
+      return { data: null, error: { code: 'P0001', message: 'FK_VIOLATION: parent not found' } };
+    });
+
+    await expect(runSyncCycle()).rejects.toBeInstanceOf(SyncCycleError);
+
+    const logs = cycleResultLogs();
+    expect(logs).toHaveLength(1);
+    expect(logs[0].level).toBe('error');
+    expect(logs[0].context).toMatchObject({
+      outcome: 'structural_error',
+      error_code: 'FK_VIOLATION',
+    });
+  });
+
+  it('does not let a cycle-result logging failure mask a converged result', async () => {
+    // The result log insert rejects; the cycle must still resolve converged.
+    mockLogEvent.mockRejectedValueOnce(new Error('log insert failed'));
+    mockRpc.mockImplementation(async (name: string) => {
+      if (name === 'sync_pull') {
+        return { data: emptyPage, error: null };
+      }
+      return pushOk;
+    });
+
+    await expect(runSyncCycle()).resolves.toMatchObject({ outcome: 'converged' });
   });
 });

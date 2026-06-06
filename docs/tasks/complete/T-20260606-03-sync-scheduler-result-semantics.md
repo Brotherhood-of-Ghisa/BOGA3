@@ -1,7 +1,7 @@
 ---
 task_id: T-20260606-03-sync-scheduler-result-semantics
 milestone_id: "M13"
-status: planned
+status: completed
 ui_impact: "no"
 areas: "frontend|docs"
 runtimes: "node"
@@ -16,7 +16,7 @@ docs_touched: "docs/specs/03-technical-architecture.md,docs/specs/06-testing-str
 
 - Task ID: `T-20260606-03-sync-scheduler-result-semantics`
 - Title: Make scheduler success reflect real sync convergence
-- Status: `planned`
+- Status: `completed`
 - File location rule:
   - author active cards in `docs/tasks/<task-id>.md`
   - move the file to `docs/tasks/complete/<task-id>.md` when `Status` becomes `completed` or `outdated`
@@ -39,8 +39,8 @@ docs_touched: "docs/specs/03-technical-architecture.md,docs/specs/06-testing-str
 
 ## Context Freshness (required at session start; update before edits)
 
-- Verified current branch + HEAD commit:
-- Start-of-session sync completed per `docs/specs/04-ai-development-playbook.md` git sync workflow?: `yes | no | N/A` (explain)
+- Verified current branch + HEAD commit: `codex/review-db-sync-functionalities-for-issues` @ `cb0a076d4806b19cf5e1c9a7480647891f504956`
+- Start-of-session sync completed per `docs/specs/04-ai-development-playbook.md` git sync workflow?: `N/A` (continued on the existing review branch; no upstream sync requested for this scoped frontend/docs change)
 - Parent refs opened in this session:
   - `docs/specs/README.md`
   - `docs/specs/03-technical-architecture.md`
@@ -147,16 +147,30 @@ Prevent scheduler/status surfaces from treating retryable or auth-required sync 
 
 ## Evidence
 
-- Record targeted Jest output.
-- Record `./scripts/quality-fast.sh frontend` output.
-- Manual verification summary:
-  - include scheduler result matrix and logger assertion summary.
+- Targeted Jest (result-semantics suites):
+  `npm test -- --runTestsByPath app/__tests__/sync-cycle-convergence.test.ts app/__tests__/scheduler-status-accessor.test.ts app/__tests__/sync-scheduler.test.ts app/__tests__/sync/scheduler-state-table.test.ts app/__tests__/sync-status-composer.test.ts`
+  → `Test Suites: 5 passed, 5 total; Tests: 99 passed, 99 total`.
+- Adjacent cycle suites (regression sweep):
+  `npm test -- --runTestsByPath app/__tests__/background-sync-task.test.ts app/__tests__/sync-cycle-pull.test.ts app/__tests__/sync-cycle-push.test.ts app/__tests__/sync-cycle-race.test.ts app/__tests__/sync/cycle-round-trip.test.ts`
+  → `Test Suites: 4 passed, 4 total; Tests: 31 passed, 31 total`.
+- Fast gate: `./scripts/quality-fast.sh frontend` → lint + typecheck + jest green
+  (`Test Suites: 85 passed, 85 total; Tests: 765 passed, 765 total`).
+- Manual verification summary (required when CI is absent/partial): scheduler result matrix (observable status via `getSchedulerStatus`):
+  - `converged` → `lastSuccessAtMs` advances, `lastCycleError` cleared.
+  - `auth_required` → `lastSuccessAtMs` untouched (no false success); auth surfaced via auth-required signal.
+  - `retryable_error` (`INTERNAL`) → `lastSuccessAtMs` untouched, `lastCycleError = 'INTERNAL'`, cleared only by a later converged cycle.
+  - thrown structural (`FK_VIOLATION` / `LOCAL_FK_VIOLATION`) → `lastSuccessAtMs` untouched, `lastCycleError` retains the thrown message; cadence settles into the long backstop unchanged.
+  - Logger assertions: `sync.cycle_result` emitted per finished cycle (info/warn/error by class, error code + sanitized message for error classes); a failed result log never masks a converged result or a thrown structural error.
 
 ## Completion note
 
-- What changed:
-- What tests ran:
-- What remains:
+- What changed: `runSyncCycle` now returns a classified result and the scheduler records success only on real convergence; full breakdown below.
+  - `apps/mobile/src/sync/cycle.ts`: `runSyncCycle` now returns a classified `SyncCycleResult` (`converged` / `auth_required` / `retryable_error`); structural FK errors still throw `SyncCycleError`. Added a fire-and-forget `sync.cycle_result` structured log (sanitized) for every finished cycle, plus a `settleConverged` helper.
+  - `apps/mobile/src/sync/scheduler.ts`: `startCycle` folds the result via a new `recordCycleResult` — `lastSuccessAtMs` advances only on `converged`; auth-required/retryable/thrown outcomes record no false success and a retryable error stays visible in `lastCycleError` until a later converged cycle clears it. Cadence/state machine unchanged.
+  - Tests: extended `sync-cycle-convergence.test.ts` (result contract + `sync.cycle_result` logging + logger-failure isolation) and `scheduler-status-accessor.test.ts` (per-result-class success semantics).
+  - Docs: `03-technical-architecture.md` (new decision row), `06-testing-strategy.md` (result-semantics coverage), `tech/client-sync-engine.md` (failure-mode entry 14 + test overview), `RUNBOOK.md` (sync-health triage via `sync.cycle_result`).
+- What tests ran: the targeted Jest suites and `./scripts/quality-fast.sh frontend` above — all green.
+- What remains: nothing for this card. Background-task behavior is unchanged (it ignores the return value; structural errors still throw → `Failed`). No slow-gate trigger (no UI/native/Maestro-sensitive change).
 
 ## Status update checklist
 

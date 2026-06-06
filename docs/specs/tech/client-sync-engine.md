@@ -212,6 +212,39 @@ Gym event note:
   local wipe, row quarantine, or UI repair flow is performed by this behavior.
   Retrying re-requests the same failed page because the cursor did not advance.
 
+14. Cycle result semantics vs scheduler cadence
+- `runSyncCycle` returns a classified `SyncCycleResult` (`apps/mobile/src/sync/cycle.ts`)
+  so the scheduler can tell a real sync success apart from the non-success
+  outcomes that also resolve cleanly. The four classes are distinct:
+  - `converged` — both ends went quiet, or the round cap was reached after
+    authenticated progress. This (and only this) is a real sync success: it
+    clears the auth-required signal and any prior cycle-error code.
+  - `auth_required` — the server reported no signed-in user. A route signal
+    (raise the auth-required flag, send the user to sign-in), not a success and
+    not an in-gate error. Dirty bits and cursors are untouched.
+  - `retryable_error` (code `INTERNAL`) — a server-internal / transport hiccup.
+    Dirty bits stay set for the next tick. The result carries the code so the
+    status surface keeps the failure visible rather than reporting success.
+  - structural error (`FK_VIOLATION` / `LOCAL_FK_VIOLATION`) — exposed by
+    THROWING a `SyncCycleError` rather than returning, so the caller still
+    receives the structured exception and records no success.
+- Scheduler success semantics: the scheduler's `lastSuccessAtMs` /
+  `lastCycleError` are observable status only — they never change the state
+  machine's cadence. `lastSuccessAtMs` advances ONLY on a `converged` result;
+  `auth_required` and `retryable_error` (and a thrown structural error) never
+  record a success, and `retryable_error` keeps its code visible in
+  `lastCycleError` until a later converged cycle clears it. Cadence is unchanged:
+  every cycle — success, retryable, auth-required, or thrown — settles via the
+  cycle-ends transition into the long backstop (or OFFLINE), with no per-error
+  backoff. The cadence state machine and the sync-success status are separate
+  concerns.
+- The cycle emits one best-effort `sync.cycle_result` diagnostic per finished
+  cycle through `logEvent` with source `sync` and safe context only: the outcome
+  (`converged` / `auth_required` / `retryable_error` / `structural_error`), the
+  error code, and — for the two error classes — a sanitized/truncated exception
+  message (never payload or user-entered data). Logging is fire-and-forget: a
+  logging failure never changes the result or masks a thrown structural error.
+
 ## 5) Test overview
 
 1. Engine/outbox behavior
@@ -242,6 +275,9 @@ Gym event note:
 - coverage: pull LWW insert/update/no-op behavior, FK-enabled whole-page rollback, and cursor write atomicity.
 - `apps/mobile/app/__tests__/sync-cycle-convergence.test.ts`
 - coverage: cycle convergence, auth/server FK handling, pull-side `LOCAL_FK_VIOLATION` classification, failed-layer cursor preservation, and `sync.pull_local_fk_violation` logger emission / logger-failure isolation.
+- coverage: the classified `SyncCycleResult` contract — `converged` / `auth_required` / `retryable_error` return values and the thrown structural error — plus `sync.cycle_result` structured logging (level + outcome + error code + sanitized message per class) and logger-failure isolation (a failed result log never masks a converged result).
+- `apps/mobile/app/__tests__/scheduler-status-accessor.test.ts`
+- coverage: scheduler success semantics — `lastSuccessAtMs` advances only on a converged cycle; `auth_required`, `retryable_error`, and a thrown structural error record no false success; a retryable error stays visible in `lastCycleError` until a later converged cycle clears it.
 
 7. Backend ingest/projection contract
 - `supabase/tests/sync-events-ingest-contract.sh`

@@ -23,7 +23,7 @@ import { AppState, type AppStateStatus } from 'react-native';
 import NetInfo, { type NetInfoState } from '@react-native-community/netinfo';
 
 import { logEvent } from '@/src/logging/logEvent';
-import { runSyncCycle } from '@/src/sync/cycle';
+import { runSyncCycle, type SyncCycleResult } from '@/src/sync/cycle';
 import { getSyncProgress, type SyncProgress } from '@/src/sync/progress';
 
 // -----------------------------------------------------------------------------
@@ -84,14 +84,18 @@ let timerHandle: ReturnType<typeof setTimeout> | null = null;
 
 let onlineProjection = false;
 
-// The most recent cycle's failure, or null if the latest cycle ended cleanly.
-// A cycle that throws records its message here; a cycle that completes without
-// throwing clears it. This is the read-only signal the status surface shows as
-// the error state — it never changes the machine's behaviour.
+// The most recent cycle's failure, or null if the latest cycle succeeded. A
+// thrown (structural) cycle records its message here; a returned retryable
+// error records its code; an auth-required outcome leaves it untouched (it is
+// surfaced through the dedicated auth-required signal, not as an error); and a
+// converged cycle clears it. This is the read-only signal the status surface
+// shows as the error state — it never changes the machine's behaviour.
 let lastCycleError: string | null = null;
 
-// The wall-clock time (epoch ms) at which the most recent cycle finished
-// without throwing, or null if no cycle has completed cleanly yet. This is the
+// The wall-clock time (epoch ms) at which the most recent cycle CONVERGED (real
+// success/progress), or null if none has yet. A retryable error, an
+// auth-required outcome, and a thrown structural error all leave this untouched
+// so a non-converged cycle is never reported as a successful sync. This is the
 // "last successful sync" the status surface displays.
 let lastSuccessAtMs: number | null = null;
 
@@ -213,27 +217,59 @@ const transitionTo = (
 // -----------------------------------------------------------------------------
 
 /**
+ * Folds a finished cycle's classified result into the observable status. Only a
+ * `converged` outcome records a success and clears a prior error; the two
+ * non-success outcomes that also resolve cleanly are kept from masquerading as
+ * convergence:
+ *
+ *  - `converged`: record the success time and clear any prior retryable error.
+ *  - `auth_required`: not a success and not an in-gate error (it is surfaced via
+ *    the dedicated auth-required signal). Leave both fields untouched so no false
+ *    success is recorded and any prior error stays visible.
+ *  - `retryable_error`: not a success. Keep it visible through the status
+ *    accessor (record the code) until a genuinely converged cycle clears it.
+ *
+ * A resolved cycle with no explicit result is treated as converged — a defensive
+ * default for the production path, where `runSyncCycle` always returns one.
+ */
+const recordCycleResult = (result: SyncCycleResult | undefined): void => {
+  const outcome = result?.outcome ?? 'converged';
+
+  if (outcome === 'converged') {
+    lastSuccessAtMs = Date.now();
+    lastCycleError = null;
+    return;
+  }
+
+  if (outcome === 'auth_required') {
+    return;
+  }
+
+  // retryable_error
+  lastCycleError = result?.errorCode ?? 'INTERNAL';
+};
+
+/**
  * Runs one cycle to completion, then settles the machine per the internal-event
  * table: a cycle that ends while online re-arms the long backstop; one that
- * ends while offline falls back to OFFLINE. Success and error settle the same
- * way — the scheduler does not distinguish; a thrown cycle is just the cycle
- * ending, and the long backstop is the only retry path (no per-error backoff).
+ * ends while offline falls back to OFFLINE. The settle path does not distinguish
+ * the result — the long backstop is the only retry path (no per-error backoff) —
+ * but the observable status DOES: a converged cycle records success, while a
+ * retryable / auth-required / thrown structural outcome never does.
  */
 const startCycle = (): void => {
   void runSyncCycle()
-    .then(() => {
-      // The cycle completed without throwing: record the success time and
-      // clear any earlier failure so the status surface reflects a healthy
-      // latest cycle.
-      lastSuccessAtMs = Date.now();
-      lastCycleError = null;
+    .then((result) => {
+      // The cycle resolved with a classified result: fold it into the
+      // observable status without changing the settle path below.
+      recordCycleResult(result);
     })
     .catch((error: unknown) => {
-      // A thrown cycle is handled identically to a clean one for control
-      // flow: the cycle-ends transition below decides what to arm next, and
-      // the long backstop is the only retry path. We do surface the error
-      // here as distinct observability — the failure is otherwise invisible —
-      // and retain it so the status surface can show the latest error state.
+      // A thrown cycle is a non-retriable structural sync error (or an
+      // unexpected failure). It is handled identically to a resolved one for
+      // control flow — the cycle-ends transition below decides what to arm
+      // next — but it is NOT a success: leave the last-success time untouched
+      // and retain the message so the status surface shows the error state.
       lastCycleError = error instanceof Error ? error.message : String(error);
       logCycleError(error);
     })
