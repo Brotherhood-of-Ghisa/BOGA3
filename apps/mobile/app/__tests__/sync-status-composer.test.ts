@@ -42,6 +42,7 @@ import {
   sessionExercises,
   sessionExerciseTags,
   sessions,
+  syncQuarantine,
   syncRuntimeState,
 } from '@/src/data/schema';
 import { getSyncStatus } from '@/src/sync/sync-status';
@@ -181,5 +182,36 @@ describe('snapshot composition', () => {
     });
 
     expect((await getSyncStatus()).bootstrapCompleted).toBe(true);
+  });
+
+  it('reports the count of blocked (quarantined) sync rows', async () => {
+    expect((await getSyncStatus()).blockedRowCount).toBe(0);
+
+    await fixture.database.insert(syncQuarantine).values([
+      {
+        entityType: 'session_exercises',
+        entityId: 'se-orphan',
+        errorCode: 'LOCAL_FK_VIOLATION',
+        parentType: 'sessions',
+        parentIdField: 'session_id',
+        parentId: 'sess-missing',
+        firstSeenAtMs: 1_700_000_000_000,
+        lastSeenAtMs: 1_700_000_000_000,
+        occurrenceCount: 1,
+      },
+      {
+        entityType: 'exercise_sets',
+        entityId: 'set-orphan',
+        errorCode: 'LOCAL_FK_VIOLATION',
+        parentType: 'session_exercises',
+        parentIdField: 'session_exercise_id',
+        parentId: 'se-missing',
+        firstSeenAtMs: 1_700_000_000_000,
+        lastSeenAtMs: 1_700_000_000_000,
+        occurrenceCount: 1,
+      },
+    ]);
+
+    expect((await getSyncStatus()).blockedRowCount).toBe(2);
   });
 });

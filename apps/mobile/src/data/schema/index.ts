@@ -24,6 +24,11 @@ export {
 export { sessionExercises, type NewSessionExercise, type SessionExercise } from './session-exercises';
 export { sessions, type NewSession, type Session } from './sessions';
 export {
+  syncQuarantine,
+  type NewSyncQuarantineRecord,
+  type SyncQuarantineRecord,
+} from './sync-quarantine';
+export {
   syncRuntimeState,
   type NewSyncRuntimeState,
   type SyncRuntimeState,

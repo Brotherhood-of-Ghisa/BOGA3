@@ -31,7 +31,7 @@ import {
 } from '@/src/data/schema';
 import { __resetAuthRequiredSignalForTests } from '@/src/sync/auth-required-signal';
 import { __resetCycleErrorSignalForTests, getCycleErrorCode } from '@/src/sync/cycle-error-signal';
-import { BATCH_CAP, runSyncCycle, selectPushBatch, SyncCycleError } from '@/src/sync/cycle';
+import { BATCH_CAP, runSyncCycle, selectPushBatch } from '@/src/sync/cycle';
 import { findPushBatchFkViolations } from '@/src/sync/fk-graph';
 
 import {
@@ -287,17 +287,41 @@ describe('findPushBatchFkViolations', () => {
 
     expect(preflight()).toEqual([]);
   });
+
+  it('flags a child whose parent is present locally but already quarantined', () => {
+    // The parent session is present and clean locally, but it is in the
+    // quarantined set — so it will not be pushed this cycle. A child relying on
+    // it would be rejected by the server, so the preflight must flag it. This is
+    // what cascades a quarantine down a chain of orphans.
+    insertSession('sess-q', 10, false);
+    insertSessionExercise('se-1', 'sess-q', 20);
+
+    const violations = database.transaction((tx) => {
+      const batch = selectPushBatch(tx as Transaction, BATCH_CAP);
+      return findPushBatchFkViolations(tx as Transaction, batch, new Set(['sessions sess-q']));
+    });
+
+    expect(violations).toEqual([
+      {
+        childType: 'session_exercises',
+        childId: 'se-1',
+        parentType: 'sessions',
+        parentIdField: 'session_id',
+        parentId: 'sess-q',
+      },
+    ]);
+  });
 });
 
 // ---------------------------------------------------------------------------
-// Integration: runSyncCycle preflight behaviour
+// Integration: runSyncCycle preflight -> quarantine behaviour
 // ---------------------------------------------------------------------------
 
 describe('runSyncCycle push preflight', () => {
   const pushCalls = (): unknown[][] =>
     mockRpc.mock.calls.filter(([name]) => name === 'sync_push');
 
-  it('does not send an orphan batch to sync_push and surfaces LOCAL_FK_VIOLATION', async () => {
+  it('quarantines an orphan instead of sending it, and the cycle converges', async () => {
     markBootstrapDone();
     plantOrphan(() => insertSessionExercise('se-orphan', 'sess-missing', 100));
 
@@ -305,52 +329,42 @@ describe('runSyncCycle push preflight', () => {
       name === 'sync_pull' ? { data: emptyPage, error: null } : pushOk,
     );
 
-    await expect(runSyncCycle()).rejects.toMatchObject({ code: 'LOCAL_FK_VIOLATION' });
+    // No throw: the orphan is quarantined out of the way and the cycle settles.
+    await expect(runSyncCycle()).resolves.toMatchObject({ outcome: 'converged' });
 
     // The orphan batch never reached the server.
     expect(pushCalls()).toHaveLength(0);
-    // The structural code is recorded for the gate, distinct from server FK_VIOLATION.
-    expect(getCycleErrorCode()).toBe('LOCAL_FK_VIOLATION');
+    // No structural error is surfaced to the gate — quarantine is not a wedge.
+    expect(getCycleErrorCode()).toBeNull();
     // Dirty bit is left set so a later repair + cycle can push it.
     const row = database.select().from(sessionExercises).where(eq(sessionExercises.id, 'se-orphan')).get();
     expect(row?.localDirty).toBe(true);
   });
 
-  it('throws LOCAL_FK_VIOLATION (not the server FK_VIOLATION) for a local orphan', async () => {
+  it('logs a structured row_quarantined event with safe context only', async () => {
     markBootstrapDone();
     plantOrphan(() => insertSessionExercise('se-orphan', 'sess-missing', 100));
     mockRpc.mockImplementation(async (name: string) =>
       name === 'sync_pull' ? { data: emptyPage, error: null } : pushOk,
     );
 
-    await expect(runSyncCycle()).rejects.toBeInstanceOf(SyncCycleError);
-  });
+    await runSyncCycle();
 
-  it('logs a structured push_fk_preflight_violation event with safe context only', async () => {
-    markBootstrapDone();
-    plantOrphan(() => insertSessionExercise('se-orphan', 'sess-missing', 100));
-    mockRpc.mockImplementation(async (name: string) =>
-      name === 'sync_pull' ? { data: emptyPage, error: null } : pushOk,
-    );
-
-    await expect(runSyncCycle()).rejects.toMatchObject({ code: 'LOCAL_FK_VIOLATION' });
-
-    const preflightLogs = mockLogEvent.mock.calls
+    const quarantineLogs = mockLogEvent.mock.calls
       .map(([params]) => params)
-      .filter((p) => p.event === 'sync.push_fk_preflight_violation');
-    expect(preflightLogs).toHaveLength(1);
-    const [log] = preflightLogs;
-    expect(log.level).toBe('error');
+      .filter((p) => p.event === 'sync.row_quarantined');
+    expect(quarantineLogs.length).toBeGreaterThanOrEqual(1);
+    const [log] = quarantineLogs;
+    expect(log.level).toBe('warn');
     expect(log.source).toBe('sync');
     expect(log.context).toMatchObject({
       operation: 'push_batch_preflight',
       error_code: 'LOCAL_FK_VIOLATION',
-      batch_size: 1,
-      violation_count: 1,
-      violations: [
+      quarantined_count: 1,
+      rows: [
         {
-          child_type: 'session_exercises',
-          child_id: 'se-orphan',
+          entity_type: 'session_exercises',
+          entity_id: 'se-orphan',
           parent_type: 'sessions',
           parent_id_field: 'session_id',
           parent_id: 'sess-missing',
@@ -361,7 +375,7 @@ describe('runSyncCycle push preflight', () => {
     expect(JSON.stringify(log.context)).not.toContain('Ex se-orphan');
   });
 
-  it('does not let a preflight logging failure replace the sync error', async () => {
+  it('does not let a quarantine logging failure wedge the cycle', async () => {
     markBootstrapDone();
     plantOrphan(() => insertSessionExercise('se-orphan', 'sess-missing', 100));
     mockLogEvent.mockRejectedValueOnce(new Error('log insert failed'));
@@ -369,7 +383,8 @@ describe('runSyncCycle push preflight', () => {
       name === 'sync_pull' ? { data: emptyPage, error: null } : pushOk,
     );
 
-    await expect(runSyncCycle()).rejects.toMatchObject({ code: 'LOCAL_FK_VIOLATION' });
+    // The log rejects, but quarantine persistence and convergence proceed.
+    await expect(runSyncCycle()).resolves.toMatchObject({ outcome: 'converged' });
   });
 
   it('pushes a valid parent+child graph in topological order', async () => {

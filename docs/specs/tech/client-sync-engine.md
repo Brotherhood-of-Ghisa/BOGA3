@@ -229,28 +229,60 @@ Gym event note:
 - the preflight runs in the same read transaction that snapshots the batch, so it
   validates exactly what would be sent. It is a pure read: it never mutates and
   never calls `sync_push`.
-- on a violation the cycle raises `SyncCycleError` code `LOCAL_FK_VIOLATION`
-  WITHOUT calling `sync_push`. This is the same structural code the pull-side uses
-  and is deliberately distinct from the server's `FK_VIOLATION`, so downstream
-  status surfaces tell a local-orphan preflight block apart from a server-side
-  rejection. The throw leaves dirty bits and cursors untouched.
-- **Temporary behavior (until the quarantine task lands):** a single orphan
-  blocks the ENTIRE push — there is no skip-and-continue and no persistent
-  quarantine yet. The dirty stream stays wedged behind the orphan until the row
-  is repaired (parent restored or child removed), at which point the next cycle
-  pushes normally. Skip-only-the-offending-row and a quarantine table are
-  explicitly deferred.
-- the cycle emits best-effort diagnostic event `sync.push_fk_preflight_violation`
-  through `logEvent` with source `sync` and safe context only: operation
-  (`push_batch_preflight`), error code, batch size, violation count, and a
-  capped list of violations carrying opaque identifiers and structural metadata
-  only — child type, child id (random hex, not user data), parent type, the
-  missing FK column name, and the unresolved parent id. Row payloads and
-  user-entered values (names, machine names, weights) are never logged.
-  Diagnostic logging failures are swallowed so they never replace the preflight
-  sync error.
+- on a violation the cycle does NOT raise and does NOT call `sync_push`. Instead
+  it **quarantines** the offending row(s) and continues — see section 15. The
+  `LOCAL_FK_VIOLATION` code is still the classification stamped on each
+  quarantine record (and still the structural code the pull-side raises), and is
+  deliberately distinct from the server's `FK_VIOLATION`.
+- `findPushBatchFkViolations` accepts an optional `quarantinedKeys` set: a parent
+  that is physically present locally but already quarantined is treated as a
+  violation too (it will not reach the server this cycle), which is what lets a
+  quarantine cascade down a chain of orphans in one pass.
 
-15. Cycle result semantics vs scheduler cadence
+15. Sync quarantine for FK-blocked dirty rows
+- a structurally orphaned dirty row (a required FK parent neither in the batch
+  nor present-and-clean locally) would, if pushed, make the server reject the
+  WHOLE batch with `FK_VIOLATION` — wedging an otherwise-valid offline backlog
+  behind one bad row. Quarantine prevents that wedge.
+- on a preflight violation the push leg persists the offending row(s) to the
+  local `sync_quarantine` table (`apps/mobile/src/sync/quarantine.ts`,
+  `quarantineRows`), re-selects the batch (which now excludes them), and
+  continues pushing the remaining valid rows. The orphan's local dirty bit is
+  left set so a future repair + cycle can still push it.
+- `sync_quarantine` is local-only sync bookkeeping (see the data model): keyed
+  `(entity_type, entity_id)`, it records the error code, diagnostic FK context
+  (`parent_type`, `parent_id_field`, `parent_id`), `first_seen_at_ms`,
+  `last_seen_at_ms`, and `occurrence_count`. It is never synced, carries no dirty
+  bit/monotonic timestamp, is not in the topological layers, and declares no
+  foreign keys (its ids point at possibly-missing rows). It survives app restart
+  / database reopen like any other table.
+- repeated detection is an idempotent upsert: a re-detected `(type, id)` preserves
+  `first_seen_at_ms`, advances `last_seen_at_ms`, and increments
+  `occurrence_count` rather than creating a duplicate row.
+- `selectPushBatch` reads `sync_quarantine` and excludes quarantined ids from
+  selection, so a quarantined row is skipped by every future push until it is
+  repaired or explicitly cleared. The resolution loop inside the push leg is
+  bounded (≤ layer count + 1 passes) and cascades quarantine to children of a
+  just-quarantined orphan via the `quarantinedKeys` preflight argument.
+- status surface: `getSyncStatus` exposes `blockedRowCount` (a count over
+  `sync_quarantine`) so a status surface can report that blocked sync rows exist.
+  A full user-facing repair workflow (and automatic destructive local graph
+  repair) is explicitly out of scope — quarantine handles local structural
+  defects, not multi-device conflict resolution.
+- the cycle emits two best-effort `logEvent` diagnostics (source `sync`, safe
+  context only — opaque identifiers and structural metadata, never row payloads
+  or user-entered values like names/machine names/weights):
+  - `sync.row_quarantined` (level `warn`): operation `push_batch_preflight`,
+    error code, quarantined count, and a capped list of rows (entity type/id,
+    parent type, missing FK column, unresolved parent id) — logged once per drain
+    for the freshly-created records.
+  - `sync.push_continued_after_quarantine` (level `info`): operation
+    `push_batch_continue`, pushed row count, and quarantined row count — the
+    observable proof that valid rows continued past a quarantine.
+  Logging failures are swallowed and can never prevent the quarantine
+  persistence (already committed) or the continued push of the valid rows.
+
+16. Cycle result semantics vs scheduler cadence
 - `runSyncCycle` returns a classified `SyncCycleResult` (`apps/mobile/src/sync/cycle.ts`)
   so the scheduler can tell a real sync success apart from the non-success
   outcomes that also resolve cleanly. The four classes are distinct:
@@ -265,7 +297,10 @@ Gym event note:
     status surface keeps the failure visible rather than reporting success.
   - structural error (`FK_VIOLATION` / `LOCAL_FK_VIOLATION`) — exposed by
     THROWING a `SyncCycleError` rather than returning, so the caller still
-    receives the structured exception and records no success.
+    receives the structured exception and records no success. This now covers
+    the server's `FK_VIOLATION` and the pull-side local FK violation only; a
+    push-side local orphan no longer throws — it is quarantined and the cycle
+    continues (section 15).
 - Scheduler success semantics: the scheduler's `lastSuccessAtMs` /
   `lastCycleError` are observable status only — they never change the state
   machine's cadence. `lastSuccessAtMs` advances ONLY on a `converged` result;
@@ -317,7 +352,9 @@ Gym event note:
 - `apps/mobile/app/__tests__/scheduler-status-accessor.test.ts`
 - coverage: scheduler success semantics — `lastSuccessAtMs` advances only on a converged cycle; `auth_required`, `retryable_error`, and a thrown structural error record no false success; a retryable error stays visible in `lastCycleError` until a later converged cycle clears it.
 - `apps/mobile/app/__tests__/sync-cycle-push-preflight.test.ts`
-- coverage: push-side FK closure preflight — `findPushBatchFkViolations` flags orphan dirty children (layer-2 `session_exercises` and layer-3 `exercise_sets` / `session_exercise_tags`) while passing valid parent+child graphs, clean-on-server parents, independent valid rows, and null nullable FKs; and the whole-cycle proof that an orphan batch is never sent to `sync_push`, surfaces `LOCAL_FK_VIOLATION` (distinct from server `FK_VIOLATION`) with dirty bits left set, emits the `sync.push_fk_preflight_violation` diagnostic with safe context only, isolates logger failures, and still pushes a valid graph in topological order.
+- coverage: push-side FK closure preflight — `findPushBatchFkViolations` flags orphan dirty children (layer-2 `session_exercises` and layer-3 `exercise_sets` / `session_exercise_tags`) while passing valid parent+child graphs, clean-on-server parents, independent valid rows, and null nullable FKs; flags a child whose present-but-quarantined parent will not reach the server; and the whole-cycle proof that an orphan batch is never sent to `sync_push`, is quarantined instead of wedging (cycle converges, no structural error surfaced) with the orphan's dirty bit left set, emits the `sync.row_quarantined` diagnostic with safe context only, isolates logger failures, and still pushes a valid graph in topological order.
+- `apps/mobile/app/__tests__/sync-cycle-quarantine.test.ts`
+- coverage: quarantine persistence semantics (`quarantineRows` idempotent upsert — fresh insert at count 1, repeat preserves `first_seen` while advancing `last_seen`/`occurrence_count` with no duplicate row; `readQuarantine` keys/ids-by-type; `countQuarantinedRows`); `selectPushBatch` skips a quarantined row while still selecting a valid one; and the whole-cycle proof that one orphan beside one valid independent dirty row pushes the valid row (clears dirty) while the orphan is quarantined (persisted with diagnostic context, still dirty), the cycle converges, the quarantine survives a database reopen, a logger failure never blocks persistence/continuation, the `sync.push_continued_after_quarantine` event fires, and a child of a quarantined orphan cascades into quarantine.
 
 7. Backend ingest/projection contract
 - `supabase/tests/sync-events-ingest-contract.sh`

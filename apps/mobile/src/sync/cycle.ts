@@ -17,7 +17,7 @@
 // local-only bookkeeping columns (the dirty bit and the monotonic timestamp)
 // never cross the wire.
 
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, notInArray } from 'drizzle-orm';
 
 import { getRequiredSupabaseMobileClient } from '@/src/auth/supabase';
 import { clearAuthRequired, markAuthRequired } from '@/src/sync/auth-required-signal';
@@ -30,6 +30,13 @@ import * as schema from '@/src/data/schema';
 import { syncRuntimeState } from '@/src/data/schema';
 import { logEvent } from '@/src/logging/logEvent';
 import { findPushBatchFkViolations, type PushFkViolation } from '@/src/sync/fk-graph';
+import {
+  quarantineKey,
+  quarantineRows,
+  readQuarantine,
+  type QuarantineRecordInput,
+  type QuarantineWriteResult,
+} from '@/src/sync/quarantine';
 import { TOPO_LAYERS, type EntityTableName } from '@/src/sync/topo-order';
 
 // -----------------------------------------------------------------------------
@@ -247,44 +254,82 @@ const logPullLocalFkViolation = (
   }
 };
 
-/** Cap the per-event violation list so a large orphan backlog cannot bloat one log row. */
-const MAX_LOGGED_FK_VIOLATIONS = 20;
+/** Cap the per-event row list so a large orphan backlog cannot bloat one log row. */
+const MAX_LOGGED_QUARANTINE_ROWS = 20;
+
+/** Maps a push FK preflight violation onto a quarantine record. */
+const violationToQuarantineRecord = (violation: PushFkViolation): QuarantineRecordInput => ({
+  entityType: violation.childType,
+  entityId: violation.childId,
+  errorCode: LOCAL_FK_ERROR_CODE,
+  parentType: violation.parentType,
+  parentIdField: violation.parentIdField,
+  parentId: violation.parentId,
+});
 
 /**
- * Records a push-side FK closure preflight failure as one structured event so an
- * operator can identify the orphan rows blocking the dirty stream. Logs only
- * opaque identifiers and structural metadata — the random-hex row id, the parent
- * type, the missing FK column, and the unresolved parent id — never a row
- * payload or any user-entered value (names, machine names, weights).
+ * Records that one or more dirty rows were freshly quarantined as one structured
+ * event, so an operator can identify the orphan rows that were pulled out of the
+ * push stream. Logs only opaque identifiers and structural metadata — the
+ * random-hex row id, the parent type, the missing FK column, and the unresolved
+ * parent id — never a row payload or any user-entered value (names, machine
+ * names, weights).
  *
- * Best-effort: a logging failure must never replace the preflight sync error.
+ * Best-effort: a logging failure must never prevent the quarantine persistence
+ * (already committed) or the continued push of the valid rows beside it.
  */
-const logPushFkPreflightViolations = (
-  violations: readonly PushFkViolation[],
-  batchSize: number,
-): void => {
+const logRowsQuarantined = (created: readonly QuarantineWriteResult[]): void => {
   try {
     void logEvent({
-      level: 'error',
+      level: 'warn',
       source: 'sync',
-      event: 'sync.push_fk_preflight_violation',
-      message: 'Push preflight found dirty child rows whose required FK parents are missing locally.',
+      event: 'sync.row_quarantined',
+      message: 'Quarantined dirty rows whose required FK parents are missing locally.',
       context: {
         operation: 'push_batch_preflight',
         error_code: LOCAL_FK_ERROR_CODE,
-        batch_size: batchSize,
-        violation_count: violations.length,
-        violations: violations.slice(0, MAX_LOGGED_FK_VIOLATIONS).map((violation) => ({
-          child_type: violation.childType,
-          child_id: violation.childId,
-          parent_type: violation.parentType,
-          parent_id_field: violation.parentIdField,
-          parent_id: violation.parentId,
+        quarantined_count: created.length,
+        rows: created.slice(0, MAX_LOGGED_QUARANTINE_ROWS).map(({ input }) => ({
+          entity_type: input.entityType,
+          entity_id: input.entityId,
+          parent_type: input.parentType,
+          parent_id_field: input.parentIdField,
+          parent_id: input.parentId,
         })),
       },
     }).catch(() => undefined);
   } catch {
-    // Diagnostic logging is best-effort and must never mask the sync error.
+    // Diagnostic logging is best-effort and must never mask sync progress.
+  }
+};
+
+/**
+ * Records that the push leg continued flushing valid rows after quarantining one
+ * or more orphans in the same drain — the observable proof that one bad row no
+ * longer wedges the whole backlog. Counts only; carries no row identity or
+ * payload.
+ *
+ * Best-effort: a logging failure must never affect the push that already
+ * happened.
+ */
+const logPushContinuedAfterQuarantine = (
+  pushedRowCount: number,
+  quarantinedRowCount: number,
+): void => {
+  try {
+    void logEvent({
+      level: 'info',
+      source: 'sync',
+      event: 'sync.push_continued_after_quarantine',
+      message: 'Push continued flushing valid rows after quarantining orphaned rows.',
+      context: {
+        operation: 'push_batch_continue',
+        pushed_row_count: pushedRowCount,
+        quarantined_row_count: quarantinedRowCount,
+      },
+    }).catch(() => undefined);
+  } catch {
+    // Diagnostic logging is best-effort and must never affect the push.
   }
 };
 
@@ -522,9 +567,16 @@ export const wireToEntity = (envelope: WireEntity, type: EntityTableName): Entit
  * drains without starving the oldest entry. Stops as soon as the cap is hit.
  * Returns the serialised wire envelopes; an empty array means the dirty stream
  * is exhausted.
+ *
+ * Quarantined rows are excluded: a row recorded in `sync_quarantine` is a known
+ * structural orphan that the server would reject, so it is skipped here rather
+ * than wedging the batch behind it. The exclusion reads the quarantine table in
+ * the caller's transaction, so a row quarantined earlier in the same transaction
+ * is already absent from a subsequent selection.
  */
 export const selectPushBatch = (tx: Transaction, batchCap: number): WireEntity[] => {
   const batch: WireEntity[] = [];
+  const quarantinedIdsByType = readQuarantine(tx).idsByType;
 
   for (const type of ENTITY_ORDER) {
     if (batch.length >= batchCap) {
@@ -532,10 +584,16 @@ export const selectPushBatch = (tx: Transaction, batchCap: number): WireEntity[]
     }
     const remaining = batchCap - batch.length;
     const table = ENTITY_TABLES[type] as typeof schema.gyms;
+    const excludedIds = quarantinedIdsByType.get(type);
+    const dirtyClause = eq(table.localDirty, true);
+    const whereClause =
+      excludedIds && excludedIds.length > 0
+        ? and(dirtyClause, notInArray(table.id, excludedIds))
+        : dirtyClause;
     const rows = tx
       .select()
       .from(table)
-      .where(eq(table.localDirty, true))
+      .where(whereClause)
       .orderBy(asc(table.localUpdatedAtMs))
       .limit(remaining)
       .all() as EntityRow[];
@@ -789,36 +847,61 @@ const runPushLeg = async (database: LocalDatabase): Promise<number> => {
     // Snapshot the batch and the per-row sent timestamps in one read. The map
     // captures the monotonic timestamp at serialise time so the ack handler can
     // detect a concurrent edit that landed while the request was in flight.
-    const { batch, sentAt, fkViolations } = database.transaction((tx) => {
+    //
+    // FK closure preflight + quarantine, all inside this one transaction so the
+    // selection, the quarantine writes, and the final batch are consistent: an
+    // orphan dirty row (a required FK parent neither in the batch nor present &
+    // clean locally) would be rejected wholesale by the server's FK check,
+    // wedging the dirty stream behind one bad row. Instead, quarantine the
+    // orphan(s) — persisting them so future selections skip them — and re-select
+    // so the remaining valid rows continue. Cascades resolve in a bounded loop:
+    // a child of a just-quarantined orphan is caught on the next pass because the
+    // preflight treats a quarantined parent as not-on-server.
+    const { batch, sentAt, created } = database.transaction((tx) => {
       const transaction = tx as Transaction;
-      const selected = selectPushBatch(transaction, BATCH_CAP);
+      const quarantinedKeys = new Set(readQuarantine(transaction).keys);
+      const createdThisDrain: QuarantineWriteResult[] = [];
+
+      let selected = selectPushBatch(transaction, BATCH_CAP);
+      // Each pass quarantines at least one row and re-selects (which now excludes
+      // it); a clean preflight ends the loop. The pass cap is the layer count + 1
+      // so even a full top-to-bottom orphan chain cannot spin.
+      for (let pass = 0; pass <= ENTITY_ORDER.length; pass += 1) {
+        const violations = findPushBatchFkViolations(transaction, selected, quarantinedKeys);
+        if (violations.length === 0) {
+          break;
+        }
+        const written = quarantineRows(
+          transaction,
+          violations.map(violationToQuarantineRecord),
+          Date.now(),
+        );
+        createdThisDrain.push(...written);
+        for (const violation of violations) {
+          quarantinedKeys.add(quarantineKey(violation.childType, violation.childId));
+        }
+        selected = selectPushBatch(transaction, BATCH_CAP);
+      }
+
       const stamps = new Map<string, number>();
       for (const entity of selected) {
         stamps.set(rowKey(entity.type, entity.id), entity.client_updated_at_ms);
       }
-      // FK closure preflight: verify each dirty child's required parent is in the
-      // batch or physically present locally, in the same read that snapshots the
-      // batch so the check sees exactly what would be sent.
-      const violations = findPushBatchFkViolations(transaction, selected);
-      return { batch: selected, sentAt: stamps, fkViolations: violations };
+      return { batch: selected, sentAt: stamps, created: createdThisDrain };
     });
 
-    if (batch.length === 0) {
-      break;
+    // Log the freshly-quarantined rows once, after the transaction commits, so
+    // the persistence is durable regardless of whether the (best-effort) log
+    // succeeds.
+    const newlyQuarantined = created.filter((result) => result.created);
+    if (newlyQuarantined.length > 0) {
+      logRowsQuarantined(newlyQuarantined);
     }
 
-    // A local orphan would be rejected wholesale by the server's FK check,
-    // wedging the dirty stream behind one bad row. Detect it client-side, log
-    // actionable diagnostics, and surface a LOCAL_FK_VIOLATION (distinct from the
-    // server's FK_VIOLATION) WITHOUT calling sync_push. The throw leaves dirty
-    // bits set; the whole push blocks until the orphan is repaired (there is no
-    // skip-and-continue yet — that is deferred to the quarantine task).
-    if (fkViolations.length > 0) {
-      logPushFkPreflightViolations(fkViolations, batch.length);
-      throw new SyncCycleError(
-        LOCAL_FK_ERROR_CODE,
-        `push preflight blocked: ${fkViolations.length} dirty row(s) reference a missing local FK parent`,
-      );
+    if (batch.length === 0) {
+      // Nothing left to push: either the dirty stream is exhausted or every
+      // remaining dirty row was quarantined this drain.
+      break;
     }
 
     // Forward-progress guard: if no row in this batch is new to the drain, the
@@ -862,6 +945,13 @@ const runPushLeg = async (database: LocalDatabase): Promise<number> => {
     }
 
     pushedTotal += batch.length;
+
+    // The valid rows just flushed despite an orphan being quarantined this drain:
+    // record that one bad row no longer wedged the backlog. Counts only — the
+    // quarantined rows' identities were already logged by `logRowsQuarantined`.
+    if (newlyQuarantined.length > 0) {
+      logPushContinuedAfterQuarantine(batch.length, newlyQuarantined.length);
+    }
   }
 
   return pushedTotal;

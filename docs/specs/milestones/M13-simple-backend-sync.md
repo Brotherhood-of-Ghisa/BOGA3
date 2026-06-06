@@ -325,6 +325,7 @@ Restore-parity ownership note:
 8. `docs/tasks/complete/T-20260606-02-sync-pull-fk-error-classification.md` - classify pull-side local SQLite FK apply failures as structured sync errors with sanitized diagnostics while preserving rollback/cursor atomicity. (`completed`)
 9. `docs/tasks/complete/T-20260606-03-sync-scheduler-result-semantics.md` - make `runSyncCycle` return a classified result so the scheduler records sync success only on real convergence (never on auth-required/retryable/thrown structural outcomes) and add `sync.cycle_result` structured logging. (`completed`)
 10. `docs/tasks/complete/T-20260606-04-sync-push-fk-preflight.md` - add a client-side push FK closure preflight that blocks orphan dirty rows before `sync_push`, surfacing `LOCAL_FK_VIOLATION` (distinct from server `FK_VIOLATION`) with a sanitized `sync.push_fk_preflight_violation` diagnostic; one orphan blocks the whole push (skip-and-continue/quarantine deferred). (`completed`)
+11. `docs/tasks/complete/T-20260606-05-sync-quarantine-and-observability.md` - persist FK-blocked dirty rows to a local-only `sync_quarantine` table, skip them in future push selection, and keep valid rows pushing so one orphan no longer wedges the backlog; idempotent repeat detection (count bump), restart-durable, cascades to children of quarantined orphans, surfaced via `getSyncStatus.blockedRowCount` and the `sync.row_quarantined` / `sync.push_continued_after_quarantine` diagnostics. Supersedes the task-04 skip-and-continue deferral. (`completed`)
 
 Rule:
 

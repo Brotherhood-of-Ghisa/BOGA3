@@ -116,10 +116,18 @@ const rowKey = (type: EntityTableName, id: string): string => `${type} ${id}`;
  * present locally; a reference that resolves to neither is recorded as a
  * violation. The check is a pure read against the caller's transaction — it
  * never mutates and never sends anything.
+ *
+ * `quarantinedKeys` carries the `${type} ${id}` identities already quarantined
+ * (orphans the caller has decided NOT to push). A parent that is physically
+ * present locally but quarantined is treated as a violation just like an absent
+ * one: it will not reach the server this cycle, so a child relying on it would
+ * be rejected. This is what lets the caller cascade a quarantine down a chain of
+ * orphans (a child of a quarantined orphan is itself quarantined) in one pass.
  */
 export const findPushBatchFkViolations = (
   tx: Transaction,
   batch: readonly { type: EntityTableName; id: string; fields: Record<string, unknown> }[],
+  quarantinedKeys: ReadonlySet<string> = new Set(),
 ): PushFkViolation[] => {
   const batchKeys = new Set(batch.map((entity) => rowKey(entity.type, entity.id)));
   const violations: PushFkViolation[] = [];
@@ -140,14 +148,18 @@ export const findPushBatchFkViolations = (
       const parentId = String(raw);
 
       // (a) Parent rides in the same batch: deferred server FKs resolve it.
+      // (Quarantined rows are excluded from the batch, so a batch-member parent
+      // is never itself quarantined.)
       if (batchKeys.has(rowKey(edge.parentType, parentId))) {
         continue;
       }
 
-      // (b) Parent is physically present locally. Given the topological selector
-      // (parents in earlier layers are always selected before their children), a
-      // present-but-not-in-batch parent is necessarily clean — and therefore
-      // already on the server. Absent means a local orphan the server rejects.
+      // (b) Parent is physically present locally and NOT quarantined. Given the
+      // topological selector (parents in earlier layers are always selected
+      // before their children), a present, non-quarantined, not-in-batch parent
+      // is necessarily clean — and therefore already on the server. Absent — or
+      // present but quarantined (so it will not be pushed this cycle) — means a
+      // reference the server would reject.
       const parentTable = PARENT_TABLES[edge.parentType] as typeof schema.gyms;
       const exists = tx
         .select({ id: parentTable.id })
@@ -155,7 +167,7 @@ export const findPushBatchFkViolations = (
         .where(eq(parentTable.id, parentId))
         .get();
 
-      if (!exists) {
+      if (!exists || quarantinedKeys.has(rowKey(edge.parentType, parentId))) {
         violations.push({
           childType: entity.type,
           childId: entity.id,

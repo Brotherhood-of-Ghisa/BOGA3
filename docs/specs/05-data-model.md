@@ -52,6 +52,13 @@ This document is project-level source of truth for what data exists and how it i
 - `sync_outbox_events`
 - `sync_delivery_state`
 - `sync_runtime_state`
+- `sync_quarantine` — local-only push-side quarantine bookkeeping. One row per
+  dirty entity the FK closure preflight found structurally orphaned, keyed
+  `(entity_type, entity_id)` with `error_code`, diagnostic FK context
+  (`parent_type`, `parent_id_field`, `parent_id`), `first_seen_at_ms`,
+  `last_seen_at_ms`, and `occurrence_count`. Never synced and FK-free (its ids
+  point at possibly-missing rows); excluded from push selection so one orphan
+  cannot wedge the backlog. See `docs/specs/tech/client-sync-engine.md` §15.
 
 ## Backend schema inventory (current)
 
@@ -202,9 +209,12 @@ list also fails the gate.
 
 This rule does NOT apply to: `muscle_groups` (client-only taxonomy),
 `smoke_records`, `sync_outbox_events`, `sync_delivery_state`,
-`sync_runtime_state` (test/runtime scaffolding), or the two local-only
-sync-bookkeeping columns (`local_dirty`, `local_updated_at_ms`) on each entity
-table. All of these are listed under `exemptions` in `sync-extras.json`.
+`sync_runtime_state`, `sync_quarantine` (test/runtime scaffolding and local sync
+bookkeeping — no server counterpart, so the drift checker, which walks the
+server's `owner_user_id` entity tables, never expects them), or the two
+local-only sync-bookkeeping columns (`local_dirty`, `local_updated_at_ms`) on
+each entity table. The column-level exemptions are listed under `exemptions` in
+`sync-extras.json`.
 
 If your client change adds a value to an existing column (e.g., a new enum literal),
 the rule does not apply because the column already exists on both sides; the client
