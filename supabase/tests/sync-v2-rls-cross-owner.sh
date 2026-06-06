@@ -39,11 +39,10 @@ DOCKER_DB_CONTAINER=""
 select_psql_mode() {
   if command -v psql >/dev/null 2>&1; then PSQL_MODE="host"; return 0; fi
   if command -v docker >/dev/null 2>&1; then
-    local project_id=""
-    [[ -f "${SUPABASE_DIR}/config.toml" ]] && project_id="$(awk -F'"' '/^project_id[[:space:]]*=/ {print $2; exit}' "${SUPABASE_DIR}/config.toml" || true)"
-    [[ -n "${project_id}" ]] && DOCKER_DB_CONTAINER="$(docker ps --format '{{.Names}}' 2>/dev/null | grep -F "supabase_db_${project_id}" | head -n1 || true)"
-    [[ -z "${DOCKER_DB_CONTAINER}" ]] && DOCKER_DB_CONTAINER="$(docker ps --format '{{.Names}}' 2>/dev/null | grep '^supabase_db_' | head -n1 || true)"
-    if [[ -n "${DOCKER_DB_CONTAINER}" ]]; then PSQL_MODE="docker"; return 0; fi
+    # Strictly this worktree's container (resolve_db_container errors — no
+    # unscoped fallback that could target a foreign worktree's DB).
+    DOCKER_DB_CONTAINER="$(resolve_db_container)" || exit 1
+    PSQL_MODE="docker"; return 0
   fi
   echo "[sync-v2-rls] need host psql or supabase_db_* container." >&2
   exit 1
