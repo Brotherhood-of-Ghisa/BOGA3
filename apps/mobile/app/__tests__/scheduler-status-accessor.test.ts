@@ -27,7 +27,7 @@ jest.mock('@/src/sync/cycle', () => ({
 }));
 
 // NetInfo stub exposing the registered listener so tests drive reachability.
-type NetInfoSnapshot = { isInternetReachable: boolean | null };
+type NetInfoSnapshot = { isConnected?: boolean | null; isInternetReachable?: boolean | null };
 const mockNetInfoState: { listener: ((state: NetInfoSnapshot) => void) | null } = {
   listener: null,
 };
@@ -56,7 +56,7 @@ import {
 } from '@/src/sync/scheduler';
 import { resetSyncProgress, setSyncProgress } from '@/src/sync/progress';
 
-const goOnline = () => mockNetInfoState.listener?.({ isInternetReachable: true });
+const goOnline = () => mockNetInfoState.listener?.({ isConnected: true });
 
 const endCycleSuccess = async () => {
   cycleResolvers.shift()?.resolve();
@@ -106,7 +106,7 @@ describe('production scheduler status accessor', () => {
     expect(status.progress.offline).toBe(true);
   });
 
-  it('reports the online projection once the network goes reachable', () => {
+  it('reports the online projection once the link is connected', () => {
     goOnline();
     const status = getSchedulerStatus();
     expect(status.online).toBe(true);

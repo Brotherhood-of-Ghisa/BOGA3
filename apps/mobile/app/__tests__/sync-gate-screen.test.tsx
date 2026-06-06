@@ -169,6 +169,28 @@ describe('SyncGate', () => {
     expect(screen.queryByTestId(SYNC_GATE_TEST_IDS.activityIndicator)).toBeNull();
   });
 
+  it('renders the harness-pinned in-progress block regardless of the bootstrap flag or live offline state', () => {
+    renderGate();
+
+    // The harness pin must win over BOTH a set bootstrap flag (which would
+    // normally dismiss the gate) and a live offline projection (which would
+    // normally hide the spinner): the block stays up with a queryable activity
+    // indicator so a Maestro flow can assert the online in-progress state.
+    mockProgress = { ...INITIAL_SYNC_PROGRESS, offline: true };
+    act(() => {
+      publishSyncGateState({
+        bootstrapCompletedAt: new Date(1_700_000_000_000),
+        lastCycleErrorCode: null,
+        forcedProgress: { phase: 'pull', layersCompleted: 1, rowsApplied: 3, offline: false },
+      });
+    });
+
+    expect(screen.getByTestId(SYNC_GATE_TEST_IDS.block)).toBeTruthy();
+    expect(screen.getByTestId(SYNC_GATE_TEST_IDS.activityIndicator)).toBeTruthy();
+    expect(screen.queryByTestId(SYNC_GATE_TEST_IDS.offlineMessage)).toBeNull();
+    expect(screen.queryByTestId(childTestId)).toBeNull();
+  });
+
   it('shows the error message and a single Retry on a non-auth cycle error', () => {
     renderGate();
 
