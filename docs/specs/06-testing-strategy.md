@@ -129,12 +129,11 @@ Metro and is owned operationally by
 
 ## Retired / removed entry points (do not reintroduce)
 
-- **`supabase/scripts/test-sync-api-contract.sh`** (→ `tests/session-sync-api-contract.sh`)
-  and **`supabase/scripts/test-sync-events-ingest-contract.sh`** (→ `tests/sync-events-ingest-contract.sh`):
-  v1 suites targeting the M13/M14 projection RPC family dropped by the
-  `sync_v2_clean_room` migration. The wrapper files and their target suites still
-  exist on disk but are wired into **no** gate and would fail if run. Treat as
-  **retired**; the sync-v2 suites replaced them.
+- **`test-sync-api-contract.sh`** and **`test-sync-events-ingest-contract.sh`**
+  (with their `supabase/tests/` suites): v1 suites targeting the M13/M14 projection
+  RPC family dropped by the `sync_v2_clean_room` migration. **Removed** (deleted
+  with the v1 backend); the sync-v2 contract suites replaced them. Do not
+  reintroduce.
 - **`npm run test:sync:reinstall-parity`**: **removed**. Its target file
   (`app/__tests__/sync-reinstall-restore-parity.test.ts`) and
   `jest.integration.config.js` were deleted with the v1 code paths; the npm script

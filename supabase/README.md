@@ -189,9 +189,9 @@ Chosen API surface for the M5 sync baseline:
 - auth via `anon` key + user JWT
 - authorization via table `RLS` + FK/check constraints
 
-Provider-neutral method catalog + Supabase mapping:
+Sync v2 server contract (schema + push/pull RPC wire protocol):
 
-- `supabase/session-sync-api-contract.md`
+- `docs/specs/tech/sync-v2-server-contract.md`
 
 Local sync contract suites (sync v2):
 
