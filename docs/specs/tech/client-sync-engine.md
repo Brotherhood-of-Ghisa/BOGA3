@@ -212,7 +212,45 @@ Gym event note:
   local wipe, row quarantine, or UI repair flow is performed by this behavior.
   Retrying re-requests the same failed page because the cursor did not advance.
 
-14. Cycle result semantics vs scheduler cadence
+14. Push-side FK closure preflight
+- before a selected push batch is sent, the cycle runs a client-side FK closure
+  preflight (`apps/mobile/src/sync/fk-graph.ts` `findPushBatchFkViolations`).
+  The FK dependency graph for the eight syncable entities is declared once in
+  `SYNCABLE_FK_GRAPH`, mirroring the `.references(...)` edges whose parent is
+  itself syncable (`exercise_muscle_mappings.muscle_group_id` is excluded — its
+  parent is the locally-bundled, server-seeded `muscle_groups` catalog, never a
+  sync orphan).
+- for each dirty child row in the batch, every non-null FK reference must resolve
+  to a parent that is either (a) in the same batch — the server defers FKs so a
+  child may land before its parent inside one transaction — or (b) physically
+  present in local SQLite, which (given the topological selector) implies the
+  parent is clean and already on the server. A populated reference that resolves
+  to neither is a local orphan the server would reject wholesale.
+- the preflight runs in the same read transaction that snapshots the batch, so it
+  validates exactly what would be sent. It is a pure read: it never mutates and
+  never calls `sync_push`.
+- on a violation the cycle raises `SyncCycleError` code `LOCAL_FK_VIOLATION`
+  WITHOUT calling `sync_push`. This is the same structural code the pull-side uses
+  and is deliberately distinct from the server's `FK_VIOLATION`, so downstream
+  status surfaces tell a local-orphan preflight block apart from a server-side
+  rejection. The throw leaves dirty bits and cursors untouched.
+- **Temporary behavior (until the quarantine task lands):** a single orphan
+  blocks the ENTIRE push — there is no skip-and-continue and no persistent
+  quarantine yet. The dirty stream stays wedged behind the orphan until the row
+  is repaired (parent restored or child removed), at which point the next cycle
+  pushes normally. Skip-only-the-offending-row and a quarantine table are
+  explicitly deferred.
+- the cycle emits best-effort diagnostic event `sync.push_fk_preflight_violation`
+  through `logEvent` with source `sync` and safe context only: operation
+  (`push_batch_preflight`), error code, batch size, violation count, and a
+  capped list of violations carrying opaque identifiers and structural metadata
+  only — child type, child id (random hex, not user data), parent type, the
+  missing FK column name, and the unresolved parent id. Row payloads and
+  user-entered values (names, machine names, weights) are never logged.
+  Diagnostic logging failures are swallowed so they never replace the preflight
+  sync error.
+
+15. Cycle result semantics vs scheduler cadence
 - `runSyncCycle` returns a classified `SyncCycleResult` (`apps/mobile/src/sync/cycle.ts`)
   so the scheduler can tell a real sync success apart from the non-success
   outcomes that also resolve cleanly. The four classes are distinct:
@@ -278,6 +316,8 @@ Gym event note:
 - coverage: the classified `SyncCycleResult` contract — `converged` / `auth_required` / `retryable_error` return values and the thrown structural error — plus `sync.cycle_result` structured logging (level + outcome + error code + sanitized message per class) and logger-failure isolation (a failed result log never masks a converged result).
 - `apps/mobile/app/__tests__/scheduler-status-accessor.test.ts`
 - coverage: scheduler success semantics — `lastSuccessAtMs` advances only on a converged cycle; `auth_required`, `retryable_error`, and a thrown structural error record no false success; a retryable error stays visible in `lastCycleError` until a later converged cycle clears it.
+- `apps/mobile/app/__tests__/sync-cycle-push-preflight.test.ts`
+- coverage: push-side FK closure preflight — `findPushBatchFkViolations` flags orphan dirty children (layer-2 `session_exercises` and layer-3 `exercise_sets` / `session_exercise_tags`) while passing valid parent+child graphs, clean-on-server parents, independent valid rows, and null nullable FKs; and the whole-cycle proof that an orphan batch is never sent to `sync_push`, surfaces `LOCAL_FK_VIOLATION` (distinct from server `FK_VIOLATION`) with dirty bits left set, emits the `sync.push_fk_preflight_violation` diagnostic with safe context only, isolates logger failures, and still pushes a valid graph in topological order.
 
 7. Backend ingest/projection contract
 - `supabase/tests/sync-events-ingest-contract.sh`

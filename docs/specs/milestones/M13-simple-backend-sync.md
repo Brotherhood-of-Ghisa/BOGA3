@@ -324,6 +324,7 @@ Restore-parity ownership note:
 7. `docs/tasks/complete/T-20260606-01-sync-local-sqlite-fk-enforcement.md` - harden production local SQLite bootstrap to require FK enforcement and record diagnostic/test evidence for sync-data integrity. (`completed`)
 8. `docs/tasks/complete/T-20260606-02-sync-pull-fk-error-classification.md` - classify pull-side local SQLite FK apply failures as structured sync errors with sanitized diagnostics while preserving rollback/cursor atomicity. (`completed`)
 9. `docs/tasks/complete/T-20260606-03-sync-scheduler-result-semantics.md` - make `runSyncCycle` return a classified result so the scheduler records sync success only on real convergence (never on auth-required/retryable/thrown structural outcomes) and add `sync.cycle_result` structured logging. (`completed`)
+10. `docs/tasks/complete/T-20260606-04-sync-push-fk-preflight.md` - add a client-side push FK closure preflight that blocks orphan dirty rows before `sync_push`, surfacing `LOCAL_FK_VIOLATION` (distinct from server `FK_VIOLATION`) with a sanitized `sync.push_fk_preflight_violation` diagnostic; one orphan blocks the whole push (skip-and-continue/quarantine deferred). (`completed`)
 
 Rule:
 

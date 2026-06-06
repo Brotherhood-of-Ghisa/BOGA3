@@ -29,6 +29,7 @@ import { PRIMARY_RUNTIME_STATE_ID, type Transaction } from '@/src/data/clock';
 import * as schema from '@/src/data/schema';
 import { syncRuntimeState } from '@/src/data/schema';
 import { logEvent } from '@/src/logging/logEvent';
+import { findPushBatchFkViolations, type PushFkViolation } from '@/src/sync/fk-graph';
 import { TOPO_LAYERS, type EntityTableName } from '@/src/sync/topo-order';
 
 // -----------------------------------------------------------------------------
@@ -239,6 +240,47 @@ const logPullLocalFkViolation = (
         operation: 'pull_page_apply',
         error_code: LOCAL_FK_ERROR_CODE,
         exception_message: exceptionMessage,
+      },
+    }).catch(() => undefined);
+  } catch {
+    // Diagnostic logging is best-effort and must never mask the sync error.
+  }
+};
+
+/** Cap the per-event violation list so a large orphan backlog cannot bloat one log row. */
+const MAX_LOGGED_FK_VIOLATIONS = 20;
+
+/**
+ * Records a push-side FK closure preflight failure as one structured event so an
+ * operator can identify the orphan rows blocking the dirty stream. Logs only
+ * opaque identifiers and structural metadata — the random-hex row id, the parent
+ * type, the missing FK column, and the unresolved parent id — never a row
+ * payload or any user-entered value (names, machine names, weights).
+ *
+ * Best-effort: a logging failure must never replace the preflight sync error.
+ */
+const logPushFkPreflightViolations = (
+  violations: readonly PushFkViolation[],
+  batchSize: number,
+): void => {
+  try {
+    void logEvent({
+      level: 'error',
+      source: 'sync',
+      event: 'sync.push_fk_preflight_violation',
+      message: 'Push preflight found dirty child rows whose required FK parents are missing locally.',
+      context: {
+        operation: 'push_batch_preflight',
+        error_code: LOCAL_FK_ERROR_CODE,
+        batch_size: batchSize,
+        violation_count: violations.length,
+        violations: violations.slice(0, MAX_LOGGED_FK_VIOLATIONS).map((violation) => ({
+          child_type: violation.childType,
+          child_id: violation.childId,
+          parent_type: violation.parentType,
+          parent_id_field: violation.parentIdField,
+          parent_id: violation.parentId,
+        })),
       },
     }).catch(() => undefined);
   } catch {
@@ -747,17 +789,36 @@ const runPushLeg = async (database: LocalDatabase): Promise<number> => {
     // Snapshot the batch and the per-row sent timestamps in one read. The map
     // captures the monotonic timestamp at serialise time so the ack handler can
     // detect a concurrent edit that landed while the request was in flight.
-    const { batch, sentAt } = database.transaction((tx) => {
-      const selected = selectPushBatch(tx as Transaction, BATCH_CAP);
+    const { batch, sentAt, fkViolations } = database.transaction((tx) => {
+      const transaction = tx as Transaction;
+      const selected = selectPushBatch(transaction, BATCH_CAP);
       const stamps = new Map<string, number>();
       for (const entity of selected) {
         stamps.set(rowKey(entity.type, entity.id), entity.client_updated_at_ms);
       }
-      return { batch: selected, sentAt: stamps };
+      // FK closure preflight: verify each dirty child's required parent is in the
+      // batch or physically present locally, in the same read that snapshots the
+      // batch so the check sees exactly what would be sent.
+      const violations = findPushBatchFkViolations(transaction, selected);
+      return { batch: selected, sentAt: stamps, fkViolations: violations };
     });
 
     if (batch.length === 0) {
       break;
+    }
+
+    // A local orphan would be rejected wholesale by the server's FK check,
+    // wedging the dirty stream behind one bad row. Detect it client-side, log
+    // actionable diagnostics, and surface a LOCAL_FK_VIOLATION (distinct from the
+    // server's FK_VIOLATION) WITHOUT calling sync_push. The throw leaves dirty
+    // bits set; the whole push blocks until the orphan is repaired (there is no
+    // skip-and-continue yet — that is deferred to the quarantine task).
+    if (fkViolations.length > 0) {
+      logPushFkPreflightViolations(fkViolations, batch.length);
+      throw new SyncCycleError(
+        LOCAL_FK_ERROR_CODE,
+        `push preflight blocked: ${fkViolations.length} dirty row(s) reference a missing local FK parent`,
+      );
     }
 
     // Forward-progress guard: if no row in this batch is new to the drain, the

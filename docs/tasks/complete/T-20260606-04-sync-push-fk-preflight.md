@@ -1,7 +1,7 @@
 ---
 task_id: T-20260606-04-sync-push-fk-preflight
 milestone_id: "M13"
-status: planned
+status: completed
 ui_impact: "no"
 areas: "frontend|docs"
 runtimes: "node"
@@ -16,7 +16,7 @@ docs_touched: "docs/specs/03-technical-architecture.md,docs/specs/06-testing-str
 
 - Task ID: `T-20260606-04-sync-push-fk-preflight`
 - Title: Add push-side FK closure preflight and diagnostics
-- Status: `planned`
+- Status: `completed`
 - File location rule:
   - author active cards in `docs/tasks/<task-id>.md`
   - move the file to `docs/tasks/complete/<task-id>.md` when `Status` becomes `completed` or `outdated`
@@ -39,8 +39,8 @@ docs_touched: "docs/specs/03-technical-architecture.md,docs/specs/06-testing-str
 
 ## Context Freshness (required at session start; update before edits)
 
-- Verified current branch + HEAD commit:
-- Start-of-session sync completed per `docs/specs/04-ai-development-playbook.md` git sync workflow?: `yes | no | N/A` (explain)
+- Verified current branch + HEAD commit: `codex/review-db-sync-functionalities-for-issues` @ `b6b4047`.
+- Start-of-session sync completed per `docs/specs/04-ai-development-playbook.md` git sync workflow?: `N/A` — continued on the existing feature branch where the sibling sync-hardening cards already landed; no rebase needed for this single-file-area change.
 - Parent refs opened in this session:
   - `docs/specs/README.md`
   - `docs/specs/03-technical-architecture.md`
@@ -144,16 +144,45 @@ Before calling `sync_push`, detect dirty child rows whose required FK parents ar
 
 ## Evidence
 
-- Record targeted Jest output.
-- Record `./scripts/quality-fast.sh frontend` output.
+- Targeted Jest (new + adjacent suites):
+  `npx jest --runTestsByPath app/__tests__/sync-cycle-push.test.ts app/__tests__/sync-cycle-convergence.test.ts app/__tests__/sync/dirty-bit-per-entity.test.ts app/__tests__/sync-cycle-push-preflight.test.ts`
+  → `Test Suites: 4 passed, 4 total; Tests: 42 passed, 42 total`.
+  - New `sync-cycle-push-preflight.test.ts`: 12 passed (7 unit + 5 integration).
+- Fast gate: `./scripts/quality-fast.sh frontend` → lint (0 errors, 11 pre-existing warnings), typecheck clean,
+  full Jest run `Test Suites: 86 passed, 86 total; Tests: 777 passed, 777 total`, `[quality-fast] done (frontend)`.
 - Manual verification summary:
-  - include RPC-not-called assertion for orphan preflight and logger assertion summary.
+  - RPC-not-called proof: the orphan-batch integration test asserts `pushCalls()` (filtered `sync_push`
+    spy calls) has length 0 while the cycle rejects with `LOCAL_FK_VIOLATION` and the orphan row's dirty bit
+    stays set.
+  - Logger assertions: `sync.push_fk_preflight_violation` emitted once at `error`/`source: 'sync'` with safe
+    context only (operation, error_code, batch_size, violation_count, and a violations list of opaque
+    child/parent ids + missing FK column — no names/payloads); a separate test injects a rejected `logEvent`
+    and confirms the preflight `LOCAL_FK_VIOLATION` still propagates unchanged.
+  - False-positive guard: valid parent+child graph, clean-on-server parent, independent valid row, and a null
+    nullable FK all produce zero violations; the valid graph still pushes parents-before-children.
 
 ## Completion note
 
-- What changed:
-- What tests ran:
-- What remains:
+- What changed: added a push-side FK closure preflight (new `fk-graph.ts` + `cycle.ts` wiring) that blocks orphan dirty rows before `sync_push`, with tests and spec/RUNBOOK updates. Details:
+  - New `apps/mobile/src/sync/fk-graph.ts`: declares the syncable FK dependency graph (`SYNCABLE_FK_GRAPH`,
+    mirroring schema `.references(...)` edges whose parent is itself syncable; `muscle_groups` excluded as a
+    bundled catalog) and `findPushBatchFkViolations(tx, batch)`, a pure-read closure check.
+  - `apps/mobile/src/sync/cycle.ts`: `runPushLeg` now runs the preflight in the same read that snapshots the
+    batch; a violation logs `sync.push_fk_preflight_violation` (best-effort, safe context only) and throws
+    `SyncCycleError('LOCAL_FK_VIOLATION', …)` WITHOUT calling `sync_push`. The existing `runSyncCycle` catch
+    already treats `LOCAL_FK_VIOLATION` as a thrown structural error (marks the cycle error, logs
+    `structural_error`, leaves dirty bits/cursors set).
+  - Decision (acceptance #10): preflight BLOCKS the whole push on any orphan — no skip-and-continue, no
+    persistent quarantine (explicitly deferred to the quarantine task). Documented as temporary in the specs.
+  - Tests: new `apps/mobile/app/__tests__/sync-cycle-push-preflight.test.ts`.
+  - Docs: `docs/specs/tech/client-sync-engine.md` (new §14 push preflight + test overview entry),
+    `docs/specs/03-technical-architecture.md` (decision row), `docs/specs/06-testing-strategy.md` (coverage +
+    baseline suite entry), `RUNBOOK.md` (operator triage line for the new event).
+- What tests ran: targeted Jest (4 suites / 42 tests) and `./scripts/quality-fast.sh frontend`
+  (86 suites / 777 tests, lint + typecheck clean). See Evidence.
+- What remains: persistent quarantine + skip-and-continue and a UI repair flow are out of scope here (future
+  quarantine task). Server RPC and multi-device conflict resolution unchanged. `test:sync:infra` not exercised
+  (branch-provisioned remote; no behavior change to the RPC contract).
 
 ## Status update checklist
 
