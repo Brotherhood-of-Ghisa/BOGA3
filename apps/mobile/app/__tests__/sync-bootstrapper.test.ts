@@ -84,6 +84,21 @@ const gymRow = (id: string, deleted: boolean): WireEntity => ({
   },
 });
 
+// A layer-0 exercise_definitions wire row. Used by the resumed-bootstrap test to
+// model a returning user whose server holds their own customised catalog row —
+// the seeder, if it wrongly ran, would clobber it.
+const exerciseDefinitionRow = (id: string, name: string, updatedAtMs: number): WireEntity => ({
+  type: 'exercise_definitions',
+  id,
+  client_updated_at_ms: updatedAtMs,
+  fields: {
+    name,
+    created_at: updatedAtMs,
+    updated_at: updatedAtMs,
+    deleted_at: null,
+  },
+});
+
 // Builds a Supabase-client shape whose `sync_pull` RPC serves scripted pages.
 const createPullStub = (pagesByLayer: Record<number, PullPage[]>): unknown => {
   const queues: Record<number, PullPage[]> = {};
@@ -120,6 +135,29 @@ const readBootstrapFlag = (): Date | null => {
 
 const seededDefinitionCount = (): number =>
   database.select({ id: exerciseDefinitions.id }).from(exerciseDefinitions).all().length;
+
+// Reads the persisted per-layer pull-cursor map off the singleton runtime row.
+// The column is JSON mode, so drizzle hands back the parsed object (or the empty
+// `{}` default); a string fallback covers a raw-text read just in case.
+const readPullCursorMap = (): Record<string, unknown> => {
+  const row = database
+    .select({ pullCursor: syncRuntimeState.pullCursor })
+    .from(syncRuntimeState)
+    .where(eq(syncRuntimeState.id, PRIMARY_RUNTIME_STATE_ID))
+    .get();
+  const raw = row?.pullCursor;
+  if (!raw) {
+    return {};
+  }
+  if (typeof raw === 'string') {
+    try {
+      return JSON.parse(raw) as Record<string, unknown>;
+    } catch {
+      return {};
+    }
+  }
+  return raw as Record<string, unknown>;
+};
 
 beforeEach(() => {
   fixture = createInMemoryDatabase();
@@ -271,6 +309,158 @@ describe('runBootstrapper crash recovery', () => {
     // At the done boundary the flag is set AND the seed rows have landed.
     expect(flagByPhase.get('done')).not.toBeNull();
     expect(seedCountByPhase.get('done')).toBe(SYSTEM_EXERCISE_DEFINITION_SEEDS.length);
+  });
+});
+
+describe('runBootstrapper resumed first sync (returning user, server holds data)', () => {
+  // A real seed id the server-side row reuses, so the seeder's last-write-wins
+  // upsert would target (and clobber) this exact row if it wrongly ran.
+  const CUSTOMISED_DEF_ID = SYSTEM_EXERCISE_DEFINITION_SEEDS[0].id; // 'seed_barbell_bench_press'
+  const CUSTOM_NAME = 'My Custom Bench Variant';
+  const DEFAULT_SEED_NAME = SYSTEM_EXERCISE_DEFINITION_SEEDS[0].name; // 'Barbell Bench Press'
+  // A monotonic stamp far ahead of the seeder's wall-clock-derived stamp would
+  // not matter — the seeder's upsert overwrites unconditionally — so the bug is
+  // about the seeder running at all, not about LWW ordering.
+  const SERVER_STAMP = 5_000;
+
+  const readDefinition = (id: string) =>
+    database.select().from(exerciseDefinitions).where(eq(exerciseDefinitions.id, id)).get();
+
+  it('does NOT re-seed or clobber the pulled catalog when a prior interrupted attempt left a cursor advanced', async () => {
+    // The server holds the user's own customised catalog row on layer 0. Build a
+    // cursor-aware sync_pull stub that faithfully models a RESUMED pull:
+    //
+    //   - Layer 0 with a NULL cursor serves the data page once and hands back a
+    //     non-null next_cursor (so the persisted cursor advances past the row).
+    //   - Layer 0 with a NON-null cursor (a resume) is already past the row, so
+    //     it serves a drained empty page — exactly what makes the resumed run
+    //     see "zero rows".
+    //   - The first attempt is interrupted at layer 1 (network blip), AFTER
+    //     layer 0's cursor advanced and the row landed locally. The second
+    //     attempt's layers 1..3 drain empty.
+    const dataCursor = {
+      server_received_at: '2026-01-01T00:00:00Z',
+      owner_user_id: 'user-1',
+      type: 'exercise_definitions',
+      id: CUSTOMISED_DEF_ID,
+    };
+    let failLayer1Once = true;
+    mockClientState.client = {
+      schema: () => ({
+        rpc: async (fn: string, args?: { layer?: number; cursor?: unknown }) => {
+          if (fn !== 'sync_pull') {
+            return { data: {}, error: null };
+          }
+          const layer = args?.layer ?? 0;
+          const cursor = args?.cursor ?? null;
+          if (layer === 0) {
+            if (cursor === null) {
+              // Fresh drain: serve the user's row, advance the cursor, stop.
+              return {
+                data: {
+                  entities: [
+                    exerciseDefinitionRow(CUSTOMISED_DEF_ID, CUSTOM_NAME, SERVER_STAMP),
+                  ],
+                  next_cursor: dataCursor,
+                  has_more: false,
+                },
+                error: null,
+              };
+            }
+            // Resume: the cursor is already past the row, so nothing new.
+            return { data: { entities: [], next_cursor: cursor, has_more: false }, error: null };
+          }
+          if (layer === 1 && failLayer1Once) {
+            // Interrupt the FIRST attempt after layer 0's cursor advanced.
+            failLayer1Once = false;
+            throw new Error('network dropped mid-pull (layer 1)');
+          }
+          return { data: { entities: [], next_cursor: null, has_more: false }, error: null };
+        },
+      }),
+    };
+
+    // Attempt 1: drains layer 0 (row lands, cursor advances) then dies at layer 1.
+    await expect(bootstrap(database)).rejects.toThrow('network dropped mid-pull');
+
+    // Sanity: the row was pulled, the bootstrap flag stayed null (re-attempt
+    // allowed), and layer 0's cursor was persisted (a real interrupted resume
+    // state — NOT a hand-poked fixture).
+    expect(readDefinition(CUSTOMISED_DEF_ID)?.name).toBe(CUSTOM_NAME);
+    expect(readBootstrapFlag()).toBeNull();
+    expect(readPullCursorMap()['0']).not.toBeNull();
+    expect(readPullCursorMap()['0']).toBeDefined();
+
+    // Attempt 2: the resumed bootstrapper. On origin/main it would read the
+    // advanced layer-0 cursor, pull zero NEW rows, conclude "server empty", and
+    // SEED — whose upsert clobbers the customised row back to the default name
+    // and marks it dirty. With the fix it resets the cursor first, re-pulls the
+    // row from scratch, sees a non-zero pull, and never seeds.
+    await bootstrap(database);
+
+    // The starter catalog must NOT have been re-created: only the single pulled
+    // definition exists.
+    expect(seededDefinitionCount()).toBe(1);
+
+    const resumed = readDefinition(CUSTOMISED_DEF_ID);
+    // The user's customisation survives — the name was NOT reverted to the seed
+    // default...
+    expect(resumed?.name).toBe(CUSTOM_NAME);
+    expect(resumed?.name).not.toBe(DEFAULT_SEED_NAME);
+    // ...and the pulled row was NOT marked dirty (a seed upsert would have set
+    // localDirty = true and a fresh monotonic stamp, which the next push's LWW
+    // would propagate as a reversion to all the user's devices).
+    expect(resumed?.localDirty).toBe(false);
+    expect(resumed?.localUpdatedAtMs).toBe(SERVER_STAMP);
+
+    // Bootstrap completed this time.
+    expect(readBootstrapFlag()).not.toBeNull();
+  });
+
+  it('still seeds exactly once for a genuinely fresh account even after a prior empty-pull interruption', async () => {
+    // Attempt 1: a fresh account (empty server) whose pull is interrupted at
+    // layer 1 — no rows anywhere, but layer 0's cursor still advances to a
+    // non-null drained cursor before the blip.
+    const drainedCursor = {
+      server_received_at: '2026-01-01T00:00:00Z',
+      owner_user_id: 'user-1',
+      type: 'gyms',
+      id: 'cursor-only',
+    };
+    let failLayer1Once = true;
+    mockClientState.client = {
+      schema: () => ({
+        rpc: async (fn: string, args?: { layer?: number }) => {
+          if (fn !== 'sync_pull') {
+            return { data: {}, error: null };
+          }
+          const layer = args?.layer ?? 0;
+          if (layer === 0) {
+            // Empty data, but a non-null cursor so it persists and advances.
+            return { data: { entities: [], next_cursor: drainedCursor, has_more: false }, error: null };
+          }
+          if (layer === 1 && failLayer1Once) {
+            failLayer1Once = false;
+            throw new Error('network dropped mid-pull (layer 1)');
+          }
+          return { data: { entities: [], next_cursor: null, has_more: false }, error: null };
+        },
+      }),
+    };
+
+    await expect(bootstrap(database)).rejects.toThrow('network dropped mid-pull');
+    // Cursor advanced, nothing seeded yet, flag still null.
+    expect(readPullCursorMap()['0']).not.toBeNull();
+    expect(readPullCursorMap()['0']).toBeDefined();
+    expect(seededDefinitionCount()).toBe(0);
+    expect(readBootstrapFlag()).toBeNull();
+
+    // Attempt 2: still a genuinely empty server. The resumed bootstrapper must
+    // seed exactly once (the from-scratch pull confirms the server is empty).
+    await bootstrap(database);
+
+    expect(seededDefinitionCount()).toBe(SYSTEM_EXERCISE_DEFINITION_SEEDS.length);
+    expect(readBootstrapFlag()).not.toBeNull();
   });
 });
 

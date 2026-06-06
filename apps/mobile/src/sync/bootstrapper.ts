@@ -6,11 +6,13 @@
 // NULL`. On a fresh install (or after a sign-out wipe) the local entity tables
 // are empty, so the bootstrapper:
 //
-//   1. runs the first full pull, draining every topological layer;
-//   2. iff that pull returned ZERO rows (the server holds nothing for this user,
+//   1. resets the persisted pull cursors so the first full pull always replays
+//      from scratch (see below);
+//   2. runs the first full pull, draining every topological layer;
+//   3. iff that pull returned ZERO rows (the server holds nothing for this user,
 //      not even a tombstone) it seeds the starter catalog via the normal repo
 //      path, so the seeded rows become dirty and the next cycle pushes them;
-//   3. sets `bootstrap_completed_at` LAST.
+//   4. sets `bootstrap_completed_at` LAST.
 //
 // Setting the flag last is what makes a crash recoverable: if the process dies
 // between the pull and the flag write, the flag stays null and the next sign-in
@@ -18,6 +20,21 @@
 // a single row (or a tombstone for a previously-deleted row) sees a non-zero
 // pull, the seeder no-ops and the server's state — including the user's
 // deletions — stands, which is the device-recovery guarantee.
+//
+// Resetting the cursors first is what keeps that guarantee honest across a
+// RESUMED attempt. The per-layer pull cursors are persisted page-by-page inside
+// the pull leg and survive INDEPENDENTLY of `bootstrap_completed_at` and of the
+// seed marker. Without a reset, an attempt that advanced some cursors and then
+// died before marking bootstrap complete would, on the next attempt, RESUME the
+// first full pull from those cursors, pull zero NEW rows on a returning user
+// whose data it had already drained, and wrongly conclude "the server is empty"
+// — re-seeding the starter catalog and overwriting (via the seeder's
+// last-write-wins upsert) the very rows it had just pulled. Clearing the cursors
+// while the bootstrap is incomplete forces every attempt to compute the seed
+// decision from a complete, from-scratch pull, so a resumed attempt can never
+// see a spuriously-empty pull. Steady state is untouched: once
+// `bootstrap_completed_at` is set the bootstrapper no-ops, so the converged
+// cycle keeps its cursors and resumes incrementally exactly as before.
 //
 // As it crosses each boundary it publishes a progress snapshot (phase + the
 // monotonic counters) so a setup screen can show the current phase and prove it
@@ -66,6 +83,26 @@ const markBootstrapCompleted = (database: LocalDatabase, completedAt: Date): voi
 };
 
 /**
+ * Clears every persisted per-layer pull cursor back to the empty map, creating
+ * the runtime-state row if it does not exist yet. Called only while the
+ * bootstrap is incomplete, BEFORE the first full pull, so each (re)attempt
+ * replays the pull from scratch and the seed decision is computed from a
+ * complete drain — never from cursors a prior interrupted attempt left advanced.
+ * The empty `{}` matches the column's default; the steady-state cycle, which
+ * runs only after `bootstrap_completed_at` is set, is never reached by this.
+ */
+const resetPullCursors = (database: LocalDatabase): void => {
+  database
+    .insert(syncRuntimeState)
+    .values({ id: PRIMARY_RUNTIME_STATE_ID, pullCursor: {} as never })
+    .onConflictDoUpdate({
+      target: syncRuntimeState.id,
+      set: { pullCursor: {} as never },
+    })
+    .run();
+};
+
+/**
  * Runs the first-sign-in bootstrapper if it has not completed yet. A no-op when
  * `bootstrap_completed_at` is already set. The caller passes the already-prepared
  * local database handle (the cycle holds it) so the bootstrapper does not
@@ -83,6 +120,15 @@ export const runBootstrapper = async (database: LocalDatabase): Promise<void> =>
   // Start every run from a clean idle snapshot so the per-run counters are
   // honest (a previous, interrupted run never leaks its counts forward).
   resetSyncProgress();
+
+  // Reset the persisted pull cursors before the first full pull. The cursors
+  // survive independently of `bootstrap_completed_at`, so an interrupted prior
+  // attempt may have left them advanced; clearing them here makes every
+  // (re)attempt replay the pull from scratch and compute the seed decision from
+  // a complete drain rather than from a resumed — and so spuriously-empty —
+  // pull. Only reached while the bootstrap is incomplete (the gate above), so
+  // the steady-state cycle's incremental cursors are never touched.
+  resetPullCursors(database);
 
   let rowsApplied = 0;
   let layersCompleted = 0;
