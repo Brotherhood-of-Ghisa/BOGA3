@@ -31,6 +31,35 @@
   Maestro guardrails (`smoke-launch`, `data-runtime-smoke`) pass on a booted sim.
 - This document is deleted.
 
+### Resolved decisions (2026-06-06 discussion)
+
+Three scope calls were debated and settled toward the **maximal clean-slate**
+direction. They reinforce each other and — notably — make the teardown *safer*,
+not riskier:
+
+1. **Supabase — remove entirely from the repo (not a skeleton).** With sync and
+   auth both gone, nothing in the app has a Supabase client. Delete all of
+   `supabase/**` and the Supabase provisioning in `scripts/worktree-setup.sh` /
+   `scripts/quality-*.sh`. The hosted **cloud project** is left dormant and
+   untouched (external; reuse-or-recreate decided when sync returns).
+   `supabase init` regenerates scaffolding later. *(Supersedes the earlier
+   "keep `config.toml` + `health`" skeleton.)*
+2. **Seeding — simplify to "insert missing ids only" (the existing
+   `seedMuscleGroups` pattern).** Drop the sync dirty/clock stamps, the
+   `nonDirty*` verification, AND the `appliedSeedMigrationAppVersion` marker.
+   Inserting only ids not already present protects user edits *by construction*
+   (no marker needed) and still adds new bundle exercises. **Consequence:** the
+   marker was the only non-sync user of `sync_runtime_state`, so that table
+   becomes a **clean outright delete** — this **eliminates Risk ①** (the
+   seed-marker landmine) from the data-layer phase. Trade-off accepted: content
+   corrections to *already-seeded* rows no longer propagate on app upgrade
+   (handle via an explicit data migration if ever needed).
+3. **Auth — remove entirely.** Auth exists only to gate sync (login-on-start,
+   PR #109); an offline tracker has no accounts. Its identity model was coupled
+   to sync's ownership model, so it is redesigned *with* the future sync, not
+   retrofitted. Removing it also drops native deps `expo-secure-store` /
+   `@supabase/supabase-js`, shrinking the build-risky part of Tier C.
+
 ---
 
 ## 2. The change is three changes — split along the risk seam
@@ -44,8 +73,8 @@ isolated and never blocks the safe 90%.
 |---|---|---|---|
 | **A** | Leaf sync/auth modules + their tests | Low | `tsc` (every importer errors) |
 | **B** | App wiring (`_layout`, `settings`, `profile`, recorder, harness) | Medium | `tsc` + jest component tests; boot via data-smoke |
-| **C** | **Data layer**: drop `local_dirty`/`local_updated_at_ms`, remove clock, regen Drizzle baseline, prune native deps | **High** | jest repo/seed/migration tests **+ data-smoke on a populated DB** |
-| **D** | Supabase backend + docs | Low | No app dependency (build unaffected) |
+| **C** | **Data layer**: drop `local_dirty`/`local_updated_at_ms`, remove clock, **delete `sync_runtime_state` + simplify seeding**, regen Drizzle baseline, prune native deps | **High** | jest repo/seed/migration tests **+ data-smoke on a populated DB** |
+| **D** | **Remove `supabase/**` entirely** + docs | Low | No app dependency (build unaffected) |
 
 ---
 
@@ -79,15 +108,24 @@ isolated and never blocks the safe 90%.
   (`session-drafts`, `session-list`, `exercise-catalog`, `exercise-tags`, `local-gyms`,
   `exercise-catalog-seeds`, `bundle-migrations`) + `scripts/import/import-boga-json-local.ts`.
   First relocate the generic `Transaction` type (only non-sync export) to `src/data/tx.ts`.
-- Delete the `sync_runtime_state` table **but rehome the seed marker first** (see §4, Risk ①).
+- **Simplify seeding** (`exercise-catalog-seeds.ts`): adopt the existing
+  `seedMuscleGroups` "insert missing ids only" pattern — drop the dirty/clock
+  stamps, the `nonDirty*` verification, and the `appliedSeedMigrationAppVersion`
+  marker. (Decision #2.)
+- **Delete the `sync_runtime_state` table outright.** With the seed marker gone
+  (above) and the clock gone, it has **zero remaining users** — no rehoming,
+  no rename. *This is what eliminates the old Risk ①.*
 - Regenerate the Drizzle baseline (`drizzle/0000_*.sql`, `drizzle/meta/*`, `migrations.generated.ts`).
 - Prune native deps **only after a dev-client rebuild** (see §4, Risk ④):
   `@supabase/supabase-js`, `expo-secure-store`, `expo-background-task`, `expo-task-manager`,
   `@react-native-community/netinfo`.
 
 ### 3.D — Backend + docs (LOW risk)
-- `supabase/**` → empty migration baseline; keep `config.toml` + generic `health` function only.
-  **The live hosted DB is intentionally left untouched** (reconcile before any future `db push`).
+- **Remove the entire `supabase/**` directory** (migrations, functions incl. `health`,
+  tests, scripts, config) and strip the Supabase provisioning from
+  `scripts/worktree-setup.sh` + `scripts/quality-*.sh`. (Decision #1.)
+  **The hosted cloud project is left dormant and untouched** — external to the repo;
+  reuse-or-recreate is decided when sync is rebuilt.
 - Purge **all** sync/auth docs *including history* (objective 2): `docs/specs/tech/client-sync-engine.md`,
   milestones `M5`/`M11`/`M13`/`M14`, `docs/plans/sync-v2*`, brainstorms `004/005/009/011`,
   `docs/tasks/fix-sync/**`, all `docs/tasks/**` sync/auth records, `docs/specs/10-api-authn-authz-guidelines.md`.
@@ -105,15 +143,14 @@ Nothing is kept by default; each retention has an explicit reason.
 |---|---|
 | **Soft-delete (`deletedAt`) on all tables + its 3 tests** | A **user-facing domain feature** — `completed-session/[sessionId].tsx` toggles delete/restore; stats & history filter on it. It predates and is independent of sync. Removing it would delete product behavior. |
 | **`updatedAt` / `createdAt` domain columns** | Drive list ordering (`orderBy(desc(sessions.updatedAt), desc(sessions.createdAt))`) and display. Verified stamped from `input.now` (a `Date`), **not** the monotonic clock — so they survive the clock removal unchanged. |
-| **A local runtime-state table (renamed from `sync_runtime_state`)** | **Not purely sync.** It hosts the **seed-once marker** `appliedSeedMigrationAppVersion`, read/written by `exercise-catalog-seeds.ts` on every launch. The "sync" name is misleading; the row's seed-marker duty is pure offline domain. *Open decision:* rename-and-keep the table vs. move the marker to a new `app_runtime_state`/KV. Either is fine; **deleting it outright is not** (breaks seed idempotency → boot failure). |
-| **`bundle-migrations.ts`, `exercise-catalog-seeds.ts`, `dev-reset.ts`** | Local migration runner, starter-catalog seeder, and dev reset are **offline domain infra**. Only their *dirty/clock stamping lines* are removed, never the mechanisms. |
+| **`bundle-migrations.ts`, `exercise-catalog-seeds.ts`, `dev-reset.ts`** | Local migration runner, starter-catalog seeder, and dev reset are **offline domain infra** — kept, but **simplified**: seeding drops to the `seedMuscleGroups` "insert-missing-ids" pattern (no marker, no dirty/clock). Consequently `sync_runtime_state` is **deleted, not kept** (Decision #2) — its only non-sync user (the seed marker) is gone, so the old "rehome the marker" landmine disappears. |
 | **All other `src/data/*` repos + `src/data/bootstrap.ts`** | The offline data layer is the app. Edits are surgical (remove sync columns/imports), not deletions. |
 | **Native deps (kept installed-but-unused for now)** | Removing native modules forces a Maestro dev-client rebuild or every flow boot-fails with `Cannot find native module`. Leaving them dormant is harmless and de-risks the main pass; prune in a later build-validated change. |
 
 ### Backend / infra
 | Kept | Rationale |
 |---|---|
-| **Supabase project + endpoints + `config.toml` + `health` fn** | User wants the project retained for future use. `health` is a generic check with no sync/auth logic. The empty migration baseline keeps the repo honest while the live DB is left untouched. |
+| **The hosted Supabase *cloud project* only (dormant, untouched)** | Decision #1: the **repo-side `supabase/**` is removed entirely** — no skeleton, no `config.toml`, no `health` fn. Only the external cloud project is left parked for possible reuse; nothing in the repo depends on it. |
 
 ### Docs
 | Kept | Rationale |
@@ -147,15 +184,18 @@ fix in Phase 2. Run `jest` → domain set stays green. *Gate: fast.*
 **Phase 2 — Tier B (wiring).** Edit `_layout`/`settings`/`session-recorder`/harness;
 delete `profile.tsx` + its nav. `tsc` now clean; `jest` green. *Gate: fast.*
 
-**Phase 3 — Tier D (backend + docs).** Delete `supabase/**` sync/auth + reset baseline;
-purge & edit docs. No app code touched → build unaffected. *Gate: fast (unchanged).*
+**Phase 3 — Tier D (backend + docs).** Delete the entire `supabase/**` dir + strip
+the Supabase steps from `worktree-setup.sh`/`quality-*.sh`; purge & edit docs. No app
+code touched → build unaffected. *Gate: fast (unchanged).*
 
 > After Phases 1–3 the app is **source-level sync-free and auth-free** and the fast
-> gate proves it. The two vestigial columns + runtime-state table remain as **inert
-> dead fields** (nothing writes them) — safe to leave until Phase 4.
+> gate proves it. The two vestigial columns and `sync_runtime_state` are still
+> physically present and harmlessly populated (the repos keep stamping the columns,
+> the seeder keeps its marker) — all of it is removed together in Phase 4.
 
 **Phase 4 — Tier C (data layer) — DEFERRED to an emulator-equipped session.**
-Relocate `Transaction`; strip columns + clock; rehome seed marker; regen Drizzle baseline;
+Relocate `Transaction`; strip the two columns + clock; **simplify seeding and delete
+`sync_runtime_state` outright** (no rehoming — Risk ① is gone); regen Drizzle baseline;
 rebuild dev-client; prune native deps. *Gate: fast **plus** data-smoke on a
 **populated** DB (the upgrade path jest cannot see — §6.C).*
 
@@ -176,7 +216,7 @@ These touch no sync/auth code. The **bolded** ones sit directly on the Tier-C ed
 surface and are the highest-value signal that the data layer survived the strip:
 
 - **`session-drafts-repository`**, **`session-list-repository`**, **`session-recorder-{interactions,persistence,screen,submit}`** — the primary write/recorder path that Tier C edits.
-- **`exercise-catalog-seeds`**, **`seed-once`**, `seed-catalog-slug-shape`, **`muscle-group-bootstrap-idempotent`** — seeder + the seed-marker (Risk ①).
+- **`exercise-catalog-seeds`**, `seed-catalog-slug-shape`, **`muscle-group-bootstrap-idempotent`** — the seeder. *Note:* `seed-once.test.ts` covers the **removed** marker → it is **rewritten** in Phase 4 to assert the new "insert-missing-ids, never clobber user edits, no marker" behavior (the *guarantee* survives; the mechanism changes).
 - **`local-data-bootstrap`**, **`domain-schema-migrations`**, `bundle-migrations`, `runtime-smoke`, `smoke-records` — boot/migration path (Risk ②/③).
 - `completed-session-detail-screen`, `session-rebuild-soft-delete`, `soft-delete-guard`, `soft-delete-converted-paths` — soft-delete domain feature.
 - `exercise-{analytics,block-history,calculations,catalog-cache,catalog-repository,catalog-screen,catalog-search,catalog-stats,history-repository,history-screen,tag-repository}`, `muscle-analytics`, `heatmap-data`, `stats-{repository,screen}` — analytics/catalog/stats.
@@ -215,6 +255,7 @@ When teardown is complete, verify the slate is clean so the *next* sync attempt 
 not influenced by this one:
 - `grep -ri 'sync\|outbox\|scheduler' apps/mobile/src apps/mobile/app docs/specs` → no machinery, no specs.
 - No `docs/specs/tech/client-sync-engine.md`, no `M5/M11/M13/M14`, no `sync-v2` plans, no `fix-sync`.
+- No `supabase/` directory exists; `worktree-setup.sh`/`quality-*.sh` have no Supabase steps.
 - `AGENTS.md` has no sync/auth/Supabase test lanes or "slow-gate sync launch" section.
 - A future "build sync" task starts from a **new brainstorm**, citing the product
   need only — never this teardown doc or any removed artifact.
