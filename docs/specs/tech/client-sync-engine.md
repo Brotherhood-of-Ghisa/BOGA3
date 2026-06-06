@@ -114,6 +114,10 @@ Gym event note:
 2. Data repositories (`apps/mobile/src/data/**`)
 - Emit sync events at mutation boundaries.
 - Keep local-first behavior even when sync transport is unavailable.
+- Run on the production local SQLite connection with `PRAGMA foreign_keys = ON`
+  enabled by data-layer bootstrap, so invalid local parent/child graphs are
+  rejected near the write/pull-apply boundary before they can wedge a backend
+  sync push.
 
 3. Auth/profile/runtime integration (current M13 state)
 - Runtime subscribes to auth state changes and only enables transport/bootstrap when sync is enabled and a valid session exists.
@@ -182,6 +186,14 @@ Gym event note:
 - events are only removed from outbox after ingest response handling (`applySyncIngestResponse`); if app closes before response handling, queued events remain.
 - after restart, runtime/scheduler re-attempts eligible flushes from persisted queue state.
 - replay safety relies on backend idempotency key `(owner_user_id, device_id, event_id)` and duplicate-same-payload no-op semantics.
+
+12. Local SQLite FK pragma/integrity failure
+- data-layer bootstrap enables `PRAGMA foreign_keys = ON` on the Expo SQLite
+  connection and runs `PRAGMA foreign_key_check` after migrations/seeds.
+- if enabling FK enforcement or the integrity check fails, bootstrap logs a
+  sanitized `data.sqlite_foreign_key_bootstrap_failed` diagnostic with source
+  `database` and rethrows the original SQLite failure; diagnostic logging is
+  non-blocking and cannot replace the original error.
 
 ## 5) Test overview
 

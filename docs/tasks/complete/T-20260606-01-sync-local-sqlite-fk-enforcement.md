@@ -1,7 +1,7 @@
 ---
 task_id: T-20260606-01-sync-local-sqlite-fk-enforcement
 milestone_id: "M13"
-status: planned
+status: completed
 ui_impact: "no"
 areas: "frontend|docs"
 runtimes: "node|expo"
@@ -16,7 +16,7 @@ docs_touched: "docs/specs/05-data-model.md,docs/specs/06-testing-strategy.md,doc
 
 - Task ID: `T-20260606-01-sync-local-sqlite-fk-enforcement`
 - Title: Enable and verify local SQLite foreign-key enforcement
-- Status: `planned`
+- Status: `completed`
 - File location rule:
   - author active cards in `docs/tasks/<task-id>.md`
   - move the file to `docs/tasks/complete/<task-id>.md` when `Status` becomes `completed` or `outdated`
@@ -39,8 +39,8 @@ docs_touched: "docs/specs/05-data-model.md,docs/specs/06-testing-strategy.md,doc
 
 ## Context Freshness (required at session start; update before edits)
 
-- Verified current branch + HEAD commit:
-- Start-of-session sync completed per `docs/specs/04-ai-development-playbook.md` git sync workflow?: `yes | no | N/A` (explain)
+- Verified current branch + HEAD commit: `codex/review-db-sync-functionalities-for-issues` at `695940b`
+- Start-of-session sync completed per `docs/specs/04-ai-development-playbook.md` git sync workflow?: `yes` - ran `./scripts/task-bootstrap.sh docs/tasks/T-20260606-01-sync-local-sqlite-fk-enforcement.md` and `git fetch --prune origin`; branch was `0	0` vs upstream and `2	1` vs `origin/main`, so no rebase/merge was performed.
 - Parent refs opened in this session:
   - `docs/specs/README.md`
   - `docs/specs/03-technical-architecture.md`
@@ -52,10 +52,13 @@ docs_touched: "docs/specs/05-data-model.md,docs/specs/06-testing-strategy.md,doc
   - `docs/specs/tech/client-sync-engine.md`
   - `docs/reviews/db-sync-offline-fk-review-2026-06-06.md`
   - `RUNBOOK.md`
+  - `docs/specs/milestones/M13-simple-backend-sync.md`
+  - `docs/specs/11-maestro-runtime-and-testing-conventions.md`
 - Code/docs inventory freshness checks run:
   - Inspect `apps/mobile/src/data/bootstrap.ts` for production SQLite open/bootstrap behavior.
   - Inspect `apps/mobile/app/__tests__/helpers/in-memory-db.ts` for current FK-enabled test helper behavior.
   - Inspect local schema FK declarations under `apps/mobile/src/data/schema/**`.
+  - Inspect `apps/mobile/.maestro/flows/{smoke-launch,data-runtime-smoke}.yaml` and `apps/mobile/scripts/maestro-ios-{run-flow,gates}.sh` while diagnosing required slow-gate launcher/selector failures.
 - Known stale references or assumptions:
   - Single-device-per-user is the product assumption for this hardening pass; do not introduce multi-device conflict resolution.
 - Optional helper command:
@@ -140,20 +143,37 @@ Make local SQLite FK enforcement explicit in production bootstrap and prove it i
 
 ## Evidence
 
-- Record targeted Jest output.
-- Record `./scripts/quality-fast.sh frontend` output.
-- Record `./scripts/quality-slow.sh frontend` output.
-- Manual verification summary:
-  - include whether FK pragma was observed as enabled and whether logger assertions passed.
+- Targeted Jest:
+  - `cd apps/mobile && npm test -- --runTestsByPath app/__tests__/local-data-bootstrap.test.ts` - PASS, 11 tests.
+  - `cd apps/mobile && npm test -- --runTestsByPath app/__tests__/sync-cycle-pull.test.ts app/__tests__/sync/dirty-bit-per-entity.test.ts` - PASS, 17 tests after rebuilding `better-sqlite3` for the active Node ABI.
+- Typecheck:
+  - `cd apps/mobile && npm run typecheck` - PASS.
+- Script syntax:
+  - `bash -n apps/mobile/scripts/maestro-ios-run-flow.sh apps/mobile/scripts/maestro-ios-gates.sh` - PASS.
+- Standard fast gate:
+  - `./scripts/quality-fast.sh frontend` - PASS; lint reported 11 existing warnings and 0 errors; Jest reported 85 passed suites, 754 passed tests, 1 snapshot.
+- Standard slow gate:
+  - `./scripts/quality-slow.sh frontend` - PASS.
+  - Artifacts:
+    - smoke: `apps/mobile/artifacts/maestro/ad-hoc/20260606-193419-58849`
+    - data-smoke: `apps/mobile/artifacts/maestro/ad-hoc/20260606-193559-60403`
+    - launch-requires-sign-in: `apps/mobile/artifacts/maestro/ad-hoc/20260606-193853-62341`
+    - sync-gate-first-cycle: `apps/mobile/artifacts/maestro/ad-hoc/20260606-194108-63810`
+    - settings-sync-status: `apps/mobile/artifacts/maestro/ad-hoc/20260606-194330-65281`
+    - auth-profile-happy-path: `apps/mobile/artifacts/maestro/ad-hoc/20260606-194535-61919`
+- Manual verification summary (required when CI is absent/partial): FK pragma enablement and diagnostic logging were verified in production-bootstrap-adjacent tests.
+  - FK pragma was observed through production-bootstrap-adjacent mock assertions: `PRAGMA foreign_keys = ON`, `PRAGMA foreign_keys`, and `PRAGMA foreign_key_check` all run during bootstrap.
+  - Logger assertions passed for pragma-off, integrity-check violation, and non-blocking logger rejection cases.
+  - `RUNBOOK.md` was reviewed; no operator workflow change was needed.
 
 ## Completion note
 
-- What changed:
-- What tests ran:
-- What remains:
+- What changed: Production Expo SQLite bootstrap now enables/verifies FK enforcement, runs `PRAGMA foreign_key_check` after migrations/seeds, emits safe non-blocking structured app-log diagnostics on FK bootstrap failures, adds bootstrap tests for pragma/integrity/logging behavior, records the local FK contract in docs, and hardens Maestro smoke/data-smoke launcher assertions needed to complete the slow gate.
+- What tests ran: Targeted Jest, typecheck, script syntax check, `./scripts/quality-fast.sh frontend`, and `./scripts/quality-slow.sh frontend` as recorded above.
+- What remains: Nothing for this contract.
 
 ## Status update checklist
 
-- Update `Status` to `completed`, `blocked`, or `outdated`.
-- If completed/outdated, move this file to `docs/tasks/complete/`.
-- Run `./scripts/task-closeout-check.sh docs/tasks/T-20260606-01-sync-local-sqlite-fk-enforcement.md` or document why `N/A`.
+- Update `Status` to `completed`, `blocked`, or `outdated`. - done
+- If completed/outdated, move this file to `docs/tasks/complete/`. - done
+- Run `./scripts/task-closeout-check.sh docs/tasks/complete/T-20260606-01-sync-local-sqlite-fk-enforcement.md` or document why `N/A`. - done; PASS

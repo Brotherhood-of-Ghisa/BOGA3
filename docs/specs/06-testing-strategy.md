@@ -63,6 +63,7 @@ Reason: keeps FE/backend integration test expectations explicit without forcing 
 - Rule:
   - do not hand-roll DB setup or copy DDL into individual tests; drive the schema from the generated bundle so every test tracks the real shipped schema automatically when a new migration lands.
   - call `createInMemoryDatabase()` in `beforeEach` and `close()` in `afterEach`. Pass `{ foreignKeys: true }` when the test depends on FK enforcement.
+  - FK-sensitive repository, sync pull/apply, dirty-bit, and bootstrap-adjacent tests must run with FK enforcement enabled or assert the production Expo SQLite bootstrap path enables `PRAGMA foreign_keys = ON`; do not rely on SQLite's default per-connection FK-off mode for sync/data integrity coverage.
 - Current consumers of this fixture include the write-path dirty-bit suites (`apps/mobile/app/__tests__/dirty-bit-layer-0-1.test.ts` and `apps/mobile/app/__tests__/dirty-bit-layer-2-3.test.ts`), which share the same setup/teardown and assertion style so they read as a matched pair.
 - Exception: tests that intentionally create a deliberately partial schema to assert negative-space behavior (for example `clock.test.ts`, which builds only `sync_runtime_state` so a stray write to another table surfaces as a missing-table error) keep their bespoke setup; the shared full-schema fixture would erase that guard. Bespoke fixtures still close their connections in `afterEach` (see `Unit-test hang safety`).
 
@@ -128,6 +129,7 @@ Reason: keeps FE/backend integration test expectations explicit without forcing 
   - logged-out-then-login journey: user logs in, bootstrap/merge converges, starts session recording, and sync eventually converges,
   - auth missing/expired or sync disabled due to no authenticated session,
   - offline or backend-unavailable retry/recovery behavior with locked backoff policy constants,
+  - local FK enforcement for pull/apply and repository writes, including at least one negative child-without-parent assertion that fails locally before it can become a backend sync failure,
   - batch-order semantics (strict request-order processing, stop-on-first-failure, and prefix-commit behavior),
   - response contract semantics (`SUCCESS | FAILURE`, failure `error_index`, `should_retry`, free-text `message`, optional `error_event_id`),
   - projection/read-model correctness after event ingest/replay.

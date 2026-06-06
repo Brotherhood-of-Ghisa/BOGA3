@@ -1,5 +1,17 @@
 appId: com.dinoderek.mobile
 ---
+- openLink: "${MAESTRO_IOS_DEV_CLIENT_URL}"
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    text: "Open"
+    optional: true
+- tapOn:
+    text: "Continue"
+    optional: true
+- tapOn:
+    text: "Close"
+    optional: true
 - openLink: "boga3://maestro-harness?reset=data&teleport=session-list"
 - tapOn:
     text: "Open"
@@ -27,13 +39,17 @@ appId: com.dinoderek.mobile
     optional: true
 - extendedWaitUntil:
     visible:
-      id: "session-recorder-empty-state"
+      id: "start-session-button"
     timeout: 30000
 - tapOn:
     id: "start-session-button"
 - extendedWaitUntil:
     visible:
       id: "session-recorder-screen"
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      text: "No exercises logged yet."
     timeout: 30000
 - tapOn:
     text: "Continue"

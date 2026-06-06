@@ -17,6 +17,10 @@ This document is project-level source of truth for what data exists and how it i
 1. Mobile local data layer (`SQLite` via Drizzle)
 - primary runtime store for app behavior.
 - includes user-owned domain data plus static seeded taxonomy data.
+- production bootstrap must enable SQLite `PRAGMA foreign_keys = ON` for the app
+  connection before normal repository/sync writes run, and must run
+  `PRAGMA foreign_key_check` after migrations/seeds so local graph violations
+  are diagnosed at startup instead of surfacing only during backend sync.
 
 2. Backend auth/profile layer (`Supabase Auth` + `app_public.user_profiles`)
 - auth identity and account profile management.
@@ -89,6 +93,19 @@ This document is project-level source of truth for what data exists and how it i
 5. Diagnostic log rows are write-only from authenticated clients and are manually inspected through backend operator tooling.
 6. All eight sync-domain projection tables use composite primary key `(id, owner_user_id)`. Every user owns their own `id` keyspace, so two users may legitimately hold rows with the same `id` (for example, the same seeded `exercise_definitions.id`) without conflict. Cross-owner row-level conflicts are not possible by construction, and the backend has no cross-owner rejection path. Each user's seed catalog is per-user data from day one; no shared/global catalog of these entities exists on the backend.
 7. Gym coordinate metadata is private, user-owned data stored on `gyms`, not a shared/public location entity.
+
+## Local integrity contract
+
+1. Local SQLite foreign-key enforcement is required for the production mobile
+   database connection. Repository and sync write paths should assume declared
+   local FK constraints are active, so invalid child rows fail at the local write
+   or pull-apply boundary.
+2. Bootstrap FK pragma/integrity failures are logged through `public.app_logs`
+   diagnostics with sanitized context and then rethrown; logging failure must
+   not mask the original SQLite failure.
+3. Tests that assert FK-sensitive data or sync behavior must enable FK
+   enforcement in their SQLite fixture instead of relying on SQLite's default
+   per-connection FK-off mode.
 
 ## M13 sync data-model contract (implemented baseline)
 

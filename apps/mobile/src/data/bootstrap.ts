@@ -4,12 +4,24 @@ import { deleteDatabaseAsync, openDatabaseSync, type SQLiteDatabase } from 'expo
 
 import { getMobileAuthRuntimeConfig } from '@/src/auth/supabase';
 import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidation';
+import { logEvent } from '@/src/logging';
 
 import { localRuntimeMigrations } from './migrations';
 import { seedMuscleGroups, seedSystemExerciseCatalog } from './exercise-catalog-seeds';
 import * as schema from './schema';
 
 const LOCAL_DATABASE_NAME = 'scaffolding-local.db';
+
+type ForeignKeyPragmaRow = {
+  foreign_keys?: number | boolean | string | null;
+};
+
+type ForeignKeyCheckRow = {
+  table?: string | null;
+  rowid?: number | string | null;
+  parent?: string | null;
+  fkid?: number | string | null;
+};
 
 let sqliteDatabase: SQLiteDatabase | null = null;
 
@@ -19,7 +31,88 @@ export const getSqliteDatabase = () => {
   }
 
   sqliteDatabase = openDatabaseSync(LOCAL_DATABASE_NAME);
+  configureForeignKeyEnforcement(sqliteDatabase);
   return sqliteDatabase;
+};
+
+const sanitizeErrorMessage = (error: unknown): string =>
+  error instanceof Error && error.message.trim() ? error.message : String(error);
+
+const recordForeignKeyBootstrapFailure = (context: Record<string, unknown>, error: unknown) => {
+  void logEvent({
+    level: 'error',
+    source: 'database',
+    event: 'data.sqlite_foreign_key_bootstrap_failed',
+    message: 'SQLite foreign-key bootstrap check failed',
+    context: {
+      ...context,
+      error_message: sanitizeErrorMessage(error),
+    },
+  }).catch(() => undefined);
+};
+
+const readForeignKeyPragma = (database: SQLiteDatabase): number => {
+  const row = database.getFirstSync<ForeignKeyPragmaRow>('PRAGMA foreign_keys');
+  const rawValue = row?.foreign_keys;
+  if (typeof rawValue === 'number') {
+    return rawValue;
+  }
+  if (typeof rawValue === 'boolean') {
+    return rawValue ? 1 : 0;
+  }
+  if (typeof rawValue === 'string') {
+    return Number.parseInt(rawValue, 10);
+  }
+  return 0;
+};
+
+const configureForeignKeyEnforcement = (database: SQLiteDatabase) => {
+  try {
+    database.execSync('PRAGMA foreign_keys = ON');
+    const pragmaState = readForeignKeyPragma(database);
+    if (pragmaState !== 1) {
+      throw new Error(`SQLite foreign_keys pragma is ${pragmaState}`);
+    }
+  } catch (error) {
+    recordForeignKeyBootstrapFailure(
+      {
+        operation: 'configure_foreign_keys',
+        foreign_keys: (() => {
+          try {
+            return readForeignKeyPragma(database);
+          } catch {
+            return 'unreadable';
+          }
+        })(),
+      },
+      error,
+    );
+    throw error;
+  }
+};
+
+const runForeignKeyIntegrityCheck = (database: SQLiteDatabase) => {
+  try {
+    const firstViolation = database.getFirstSync<ForeignKeyCheckRow>('PRAGMA foreign_key_check');
+    if (firstViolation) {
+      throw new Error('SQLite foreign_key_check found violations');
+    }
+  } catch (error) {
+    recordForeignKeyBootstrapFailure(
+      {
+        operation: 'foreign_key_check',
+        foreign_keys: (() => {
+          try {
+            return readForeignKeyPragma(database);
+          } catch {
+            return 'unreadable';
+          }
+        })(),
+      },
+      error,
+    );
+    throw error;
+  }
 };
 
 const createLocalDatabase = () => drizzle(getSqliteDatabase(), { schema });
@@ -131,6 +224,7 @@ const prepareLocalDataLayer = async (): Promise<LocalDatabase> => {
   await runRuntimeMigrations(localDatabase);
   await runMuscleGroupSeed(localDatabase);
   seedStarterCatalogWhenNoSyncBackend(localDatabase);
+  runForeignKeyIntegrityCheck(getSqliteDatabase());
   return localDatabase;
 };
 
