@@ -1,4 +1,4 @@
-// Topological FK layering for the eight v2 user-owned entity tables.
+// Topological FK layering for the nine v2 user-owned entity tables.
 //
 // Each layer must satisfy two properties (asserted by the schema drift checker):
 //
@@ -25,8 +25,14 @@
 // `exercise_tag_definitions` next to `exercise_muscle_mappings` and `sessions`
 // in Layer 1, the only placement that satisfies that invariant against the
 // live FK graph.
+//
+// NOTE: `muscle_groups` belongs in Layer 0: it declares no FK to any other
+// entity and is itself the parent of `exercise_muscle_mappings` (which holds
+// `(owner_user_id, muscle_group_id) → muscle_groups(owner_user_id, id)` in
+// Layer 1). Placing it in Layer 0 keeps property 2 ("every FK points to a
+// strictly earlier layer") satisfied for that child edge.
 export const TOPO_LAYERS: readonly (readonly string[])[] = [
-  ['gyms', 'exercise_definitions'], // Layer 0
+  ['gyms', 'exercise_definitions', 'muscle_groups'], // Layer 0
   ['sessions', 'exercise_muscle_mappings', 'exercise_tag_definitions'], // Layer 1
   ['session_exercises'], // Layer 2
   ['exercise_sets', 'session_exercise_tags'], // Layer 3
