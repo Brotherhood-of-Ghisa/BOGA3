@@ -3,13 +3,23 @@
  * and the soft-delete column on every entity that the server expects, and the
  * schema-drift checker confirms client and server schemas agree.
  *
- * This shells out to `check:sync-drift --strict` and asserts it exits 0. The
- * checker compares every client Drizzle entity schema against the server's
- * column set; exit 0 means the two-column additions and the added soft-delete
- * columns line up with the server with no drift.
+ * This shells out to `check:sync-drift --strict --skip-reset` and asserts it
+ * exits 0. The checker compares every client Drizzle entity schema against the
+ * server's column set; exit 0 means the two-column additions and the added
+ * soft-delete columns line up with the server with no drift.
  *
- * The checker drives a database reset to materialize the server schema, so it
- * needs a local Postgres/Supabase stack — it is therefore an INFRA-DEPENDENT
+ * `--skip-reset` is load-bearing here: the dedicated infra script
+ * (`test:sync:infra`) runs `ensure-local-runtime-baseline.sh` first, whose
+ * `apply_pending_local_migrations` (`db push --local --include-all`) has already
+ * materialized the server schema on the shared stack. Without `--skip-reset` the
+ * checker would shell a *redundant* `supabase db reset` mid-lane, dropping
+ * `auth.users` and wiping the GoTrue `user_a` fixture the sibling sign-in suites
+ * depend on. With `--skip-reset` this becomes a pure read-only introspection +
+ * diff against the already-migrated baseline: it cannot wipe the fixture or race
+ * the round-trip, so the lane is order-independent. (Standalone / `quality-slow
+ * backend` runs of the checker still reset by default to materialize the schema
+ * themselves; only this in-lane invocation skips it.) It still needs a local
+ * Postgres/Supabase stack to introspect — it is therefore an INFRA-DEPENDENT
  * test, excluded from the fast lane and run only via the dedicated infra
  * script. The infra-free half of the original drift coverage (the server-only
  * exemption is gone from the schema-extras file) lives in
@@ -29,7 +39,7 @@ describe('schema drift checker', () => {
   it('exits 0 against the as-built client schemas under --strict', () => {
     let exitCode = 0;
     try {
-      execFileSync('npm', ['run', 'check:sync-drift', '--', '--strict'], {
+      execFileSync('npm', ['run', 'check:sync-drift', '--', '--strict', '--skip-reset'], {
         cwd: MOBILE_ROOT,
         stdio: 'pipe',
         encoding: 'utf8',
