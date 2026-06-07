@@ -83,22 +83,78 @@ const markBootstrapCompleted = (database: LocalDatabase, completedAt: Date): voi
 };
 
 /**
- * Clears every persisted per-layer pull cursor back to the empty map, creating
- * the runtime-state row if it does not exist yet. Called only while the
- * bootstrap is incomplete, BEFORE the first full pull, so each (re)attempt
- * replays the pull from scratch and the seed decision is computed from a
- * complete drain — never from cursors a prior interrupted attempt left advanced.
- * The empty `{}` matches the column's default; the steady-state cycle, which
- * runs only after `bootstrap_completed_at` is set, is never reached by this.
+ * Reads the persisted per-layer pull-cursor map off the singleton runtime row.
+ * The column is JSON mode, so drizzle hands back the parsed object (or the empty
+ * `{}` default); a raw-string fallback covers a non-parsed read. Returns `null`
+ * (distinct from an empty map) when the runtime-state row does not exist at all,
+ * so the caller can tell "no row" from "row with an empty cursor".
+ */
+const readPullCursorMap = (database: LocalDatabase): Record<string, unknown> | null => {
+  const row = database
+    .select({ pullCursor: syncRuntimeState.pullCursor })
+    .from(syncRuntimeState)
+    .where(eq(syncRuntimeState.id, PRIMARY_RUNTIME_STATE_ID))
+    .get();
+
+  if (row == null) {
+    return null;
+  }
+
+  const raw = row.pullCursor;
+  if (!raw) {
+    return {};
+  }
+  if (typeof raw === 'string') {
+    try {
+      return JSON.parse(raw) as Record<string, unknown>;
+    } catch {
+      return {};
+    }
+  }
+  return raw as Record<string, unknown>;
+};
+
+/**
+ * Clears every persisted per-layer pull cursor back to the empty map. Called
+ * only while the bootstrap is incomplete, BEFORE the first full pull, so each
+ * (re)attempt replays the pull from scratch and the seed decision is computed
+ * from a complete drain — never from cursors a prior interrupted attempt left
+ * advanced. The empty `{}` matches the column's default; the steady-state cycle,
+ * which runs only after `bootstrap_completed_at` is set, is never reached by
+ * this.
+ *
+ * Crucially this is a NO-OP when there is nothing to reset: it only UPDATEs an
+ * EXISTING runtime-state row whose cursor map is currently non-empty, and never
+ * INSERTs a fresh row (or writes at all) when no row exists or the cursor is
+ * already `{}`. `runBootstrapper` runs before the auth outcome surfaces in the
+ * cycle, so on a no-JWT cycle — which must mutate nothing — a clean fresh DB has
+ * no row and this writes nothing, leaving `sync_runtime_state` untouched. The
+ * re-seed bug it guards against only arises after a prior interrupted attempt
+ * advanced a cursor, which leaves a row with a non-empty map — exactly the case
+ * this still resets.
  */
 const resetPullCursors = (database: LocalDatabase): void => {
+  const cursorMap = readPullCursorMap(database);
+
+  // No runtime-state row yet (a clean first cycle): nothing persisted to reset,
+  // and we must not create a row — a no-JWT cycle would otherwise mutate state.
+  if (cursorMap == null) {
+    return;
+  }
+
+  // The row exists but its cursor is already empty/`{}`: nothing to clear, so
+  // skip the write and leave the row byte-for-byte unchanged.
+  if (Object.keys(cursorMap).length === 0) {
+    return;
+  }
+
+  // A prior interrupted attempt advanced at least one layer's cursor. UPDATE the
+  // existing row's cursor back to `{}` (never INSERT) so the resumed attempt
+  // replays the pull from scratch.
   database
-    .insert(syncRuntimeState)
-    .values({ id: PRIMARY_RUNTIME_STATE_ID, pullCursor: {} as never })
-    .onConflictDoUpdate({
-      target: syncRuntimeState.id,
-      set: { pullCursor: {} as never },
-    })
+    .update(syncRuntimeState)
+    .set({ pullCursor: {} as never })
+    .where(eq(syncRuntimeState.id, PRIMARY_RUNTIME_STATE_ID))
     .run();
 };
 

@@ -136,6 +136,11 @@ const readBootstrapFlag = (): Date | null => {
 const seededDefinitionCount = (): number =>
   database.select({ id: exerciseDefinitions.id }).from(exerciseDefinitions).all().length;
 
+// Snapshots every sync_runtime_state row. Used to prove the cursor-reset step
+// neither creates nor mutates the singleton row on a cycle that must write
+// nothing (the no-JWT / clean-incomplete-bootstrap path).
+const allRuntimeStateRows = () => database.select().from(syncRuntimeState).all();
+
 // Reads the persisted per-layer pull-cursor map off the singleton runtime row.
 // The column is JSON mode, so drizzle hands back the parsed object (or the empty
 // `{}` default); a string fallback covers a raw-text read just in case.
@@ -309,6 +314,93 @@ describe('runBootstrapper crash recovery', () => {
     // At the done boundary the flag is set AND the seed rows have landed.
     expect(flagByPhase.get('done')).not.toBeNull();
     expect(seedCountByPhase.get('done')).toBe(SYSTEM_EXERCISE_DEFINITION_SEEDS.length);
+  });
+});
+
+describe('runBootstrapper cursor reset is a no-op when there is nothing to reset', () => {
+  // Regression guard for the #149 reseed fix. `runBootstrapper` runs BEFORE the
+  // auth outcome surfaces in `runSyncCycle`, so on a no-JWT cycle — which must
+  // mutate NOTHING — the cursor-reset step must not touch sync_runtime_state.
+  // The earlier fix did an unconditional INSERT ... ON CONFLICT, which wrote a
+  // fresh row on a clean DB and regressed auth-required-envelope (it asserts an
+  // unauthenticated cycle leaves the runtime-state table untouched). The reset
+  // must therefore be a no-op unless an EXISTING row carries a non-empty cursor.
+
+  it('writes NO sync_runtime_state row when the pull throws on a fresh DB (no prior cursor)', async () => {
+    // The runtime-state table starts empty (a fresh in-memory DB), exactly like
+    // a clean device on a no-JWT cycle.
+    expect(allRuntimeStateRows()).toEqual([]);
+
+    // The pull throws immediately (a missing JWT / dropped network) — the same
+    // shape as the unauthenticated cycle. The reset runs first, the pull then
+    // throws, and the bootstrapper rejects before it could mark anything.
+    mockClientState.client = {
+      schema: () => ({
+        rpc: async () => {
+          throw new Error('AUTH_REQUIRED: no signed-in user');
+        },
+      }),
+    };
+
+    await expect(bootstrap(database)).rejects.toThrow('AUTH_REQUIRED');
+
+    // The reset created NO row. Without the guard the unconditional INSERT would
+    // have left a single `{}`-cursor row here, regressing auth-required-envelope.
+    expect(allRuntimeStateRows()).toEqual([]);
+    expect(readBootstrapFlag()).toBeNull();
+    expect(seededDefinitionCount()).toBe(0);
+  });
+
+  it('leaves an EXISTING empty-cursor row byte-for-byte unchanged when the pull throws', async () => {
+    // A runtime-state row already exists with the default empty cursor (e.g. a
+    // prior cycle persisted last_emitted_ms but never advanced a pull cursor).
+    database
+      .insert(syncRuntimeState)
+      .values({ id: PRIMARY_RUNTIME_STATE_ID, lastEmittedMs: 7 })
+      .run();
+    const before = allRuntimeStateRows();
+    expect(readPullCursorMap()).toEqual({});
+
+    mockClientState.client = {
+      schema: () => ({
+        rpc: async () => {
+          throw new Error('AUTH_REQUIRED: no signed-in user');
+        },
+      }),
+    };
+
+    await expect(bootstrap(database)).rejects.toThrow('AUTH_REQUIRED');
+
+    // The empty cursor needed no reset, so the row is untouched (no UPDATE ran).
+    expect(allRuntimeStateRows()).toEqual(before);
+  });
+
+  it('DOES reset an existing non-empty cursor back to {} (the reseed-bug case still works)', async () => {
+    // A prior interrupted attempt advanced layer 0's cursor — the precise state
+    // the reseed fix must still clear so the resumed pull replays from scratch.
+    const advancedCursor = { '0': { server_received_at: '2026-01-01T00:00:00Z', id: 'x' } };
+    database
+      .insert(syncRuntimeState)
+      .values({ id: PRIMARY_RUNTIME_STATE_ID, pullCursor: advancedCursor as never })
+      .run();
+    expect(readPullCursorMap()['0']).toBeDefined();
+
+    // Let the pull throw after the reset so we observe the cursor state without a
+    // full successful bootstrap muddying it.
+    mockClientState.client = {
+      schema: () => ({
+        rpc: async () => {
+          throw new Error('network dropped mid-pull');
+        },
+      }),
+    };
+
+    await expect(bootstrap(database)).rejects.toThrow('network dropped mid-pull');
+
+    // The reset cleared the advanced cursor back to the empty map (UPDATE, not
+    // INSERT — still a single row), so the resumed seed decision is honest.
+    expect(allRuntimeStateRows()).toHaveLength(1);
+    expect(readPullCursorMap()).toEqual({});
   });
 });
 
