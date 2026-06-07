@@ -3,6 +3,7 @@ import { and, asc, eq, isNull } from 'drizzle-orm';
 import { bootstrapLocalDataLayer } from './bootstrap';
 import { nowMonotonic } from './clock';
 import { exerciseTagDefinitions, sessionExercises, sessionExerciseTags } from './schema';
+import { notifyLocalWrite } from '@/src/sync/write-nudge';
 
 export type ExerciseTagDefinitionRecord = {
   id: string;
@@ -200,6 +201,10 @@ export const createDrizzleExerciseTagStore = (): ExerciseTagStore => ({
         .run();
     });
 
+    // Post-commit: the tag-definition row was dirtied above; nudge to push the
+    // new definition soon. The read below only re-projects it for the return.
+    notifyLocalWrite();
+
     const tagDefinition = database
       .select({
         id: exerciseTagDefinitions.id,
@@ -236,6 +241,10 @@ export const createDrizzleExerciseTagStore = (): ExerciseTagStore => ({
         .run();
     });
 
+    // Post-commit: the renamed tag-definition row was dirtied above; nudge to
+    // push the rename soon. The read below only re-projects it for the return.
+    notifyLocalWrite();
+
     const tagDefinition = database
       .select({
         id: exerciseTagDefinitions.id,
@@ -266,6 +275,10 @@ export const createDrizzleExerciseTagStore = (): ExerciseTagStore => ({
         .where(eq(exerciseTagDefinitions.id, input.id))
         .run();
     });
+
+    // Post-commit: the tag-definition row was dirtied above; nudge to push the
+    // soft-delete/undelete soon.
+    notifyLocalWrite();
   },
   async loadSessionExerciseScope(sessionExerciseId) {
     const database = await bootstrapLocalDataLayer();
@@ -344,6 +357,10 @@ export const createDrizzleExerciseTagStore = (): ExerciseTagStore => ({
         })
         .run();
     });
+
+    // Post-commit: the attachment row (revived or inserted) was dirtied above;
+    // nudge to push the new attachment soon.
+    notifyLocalWrite();
   },
   async removeTagAssignment(input) {
     const database = await bootstrapLocalDataLayer();
@@ -368,6 +385,10 @@ export const createDrizzleExerciseTagStore = (): ExerciseTagStore => ({
         )
         .run();
     });
+
+    // Post-commit: the attachment row was tombstoned + dirtied above; nudge to
+    // push the removal soon.
+    notifyLocalWrite();
   },
   async listAssignedTags(input) {
     const database = await bootstrapLocalDataLayer();
