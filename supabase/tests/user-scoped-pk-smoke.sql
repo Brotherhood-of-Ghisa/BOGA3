@@ -1,5 +1,6 @@
--- T1 smoke test: prove that the user-scoped composite PK lets two distinct
--- users own a row with the same `id` in every sync-domain table.
+-- User-scoped composite-PK smoke test: prove that the user-scoped composite PK
+-- lets two distinct users own a row with the same `id` in every sync-domain
+-- table.
 --
 -- Run with the service-role connection (RLS bypass):
 --   psql "postgresql://postgres:postgres@127.0.0.1:55522/postgres" \
@@ -20,14 +21,14 @@ do $$
 declare
   v_user_a uuid := '00000000-0000-0000-0000-00000000aaaa';
   v_user_b uuid := '00000000-0000-0000-0000-00000000bbbb';
-  v_shared_id text := 't1-smoke-shared-id';
+  v_shared_id text := 'pk-smoke-shared-id';
   v_now bigint := 1700000000000;
   v_count integer;
 begin
   insert into auth.users (id, instance_id, aud, role, email, encrypted_password, raw_app_meta_data, raw_user_meta_data, created_at, updated_at, email_confirmed_at)
   values
-    (v_user_a, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 't1-smoke-a@example.com', '', '{}'::jsonb, '{}'::jsonb, now(), now(), now()),
-    (v_user_b, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 't1-smoke-b@example.com', '', '{}'::jsonb, '{}'::jsonb, now(), now(), now())
+    (v_user_a, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'pk-smoke-a@example.com', '', '{}'::jsonb, '{}'::jsonb, now(), now(), now()),
+    (v_user_b, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'pk-smoke-b@example.com', '', '{}'::jsonb, '{}'::jsonb, now(), now(), now())
   on conflict (id) do nothing;
 
   -- gyms: same shared id under two owners.

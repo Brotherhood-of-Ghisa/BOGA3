@@ -424,7 +424,7 @@ UNIQUE_COUNT="$(printf '%s' "${UNION_AND_DISJOINT}" | jq -r '.unique_count')"
 [[ "${UNIQUE_COUNT}" == "9" ]] \
   || fail "scenario 3 disjoint: expected 9 unique entity types (pairwise-disjoint), got ${UNIQUE_COUNT}"
 
-pass "scenario 3: layer→type mapping integrity (corrected partition per plan.md ## Deviations log, t2 entry)"
+pass "scenario 3: layer→type mapping integrity (topological partition per the server contract §B.4.4)"
 
 cleanup_run_rows
 

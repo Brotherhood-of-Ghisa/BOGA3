@@ -1,13 +1,12 @@
 -- =============================================================================
 -- Sync v2: sync_pull RPC.
 --
--- Implements t4 of docs/plans/sync-v2-server/plan.md, per the authoritative
--- design at docs/plans/sync-v2/designs/t2.md §4 (request/response shape,
--- cursor pagination, layer→type mapping) and t1.md §2 (per-entity column
--- projections + the universal (owner_user_id, server_received_at) index that
--- the query is planned against).
+-- Authoritative reference: docs/specs/tech/sync-v2-server-contract.md — §B.4
+-- (request/response shape, cursor pagination, layer→type mapping) and §A.2
+-- (per-entity column projections + the universal (owner_user_id,
+-- server_received_at) index that the query is planned against).
 --
--- Wire shape (per t2 §4.1 / §4.2):
+-- Wire shape (per §B.4.1 / §B.4.2):
 --
 --   Request:  { layer: 0..3, cursor: null | <cursor object>, limit: 1..200 }
 --   Response: { entities: Entity[], next_cursor: <cursor>, has_more: bool }
@@ -16,23 +15,22 @@
 -- see rows where owner_user_id = auth.uid(). The explicit WHERE predicate is
 -- belt-and-braces and pins the planner on <table>_owner_received_idx.
 --
--- Layer→type mapping (corrected per plan.md ## Deviations log, t2 entry — the
--- t1 §7.7 "no intra-layer FK" invariant precludes exercise_tag_definitions
--- from sharing Layer 0 with exercise_definitions because
--- exercise_tag_definitions(exercise_definition_id) → exercise_definitions(id)
--- is a cross-entity FK):
+-- Layer→type mapping (the §A.7.7 "no intra-layer FK" invariant precludes
+-- exercise_tag_definitions from sharing Layer 0 with exercise_definitions
+-- because exercise_tag_definitions(exercise_definition_id) →
+-- exercise_definitions(id) is a cross-entity FK):
 --   0: gyms, exercise_definitions, muscle_groups
 --   1: sessions, exercise_muscle_mappings, exercise_tag_definitions
 --   2: session_exercises
 --   3: exercise_sets, session_exercise_tags
 --
--- Cursor semantics (t2 §4.3): the eight-byte cursor `(server_received_at,
+-- Cursor semantics (§B.4.3): the eight-byte cursor `(server_received_at,
 -- owner_user_id, type, id)` is used as a row-value `>` predicate so the next
 -- pull strictly advances past the last-emitted row. Same-millisecond rows
 -- inside one transaction share `server_received_at`; the lexicographic
 -- tiebreak on `(owner_user_id, type, id)` gives every row a unique sort key.
 --
--- KNOWN LIMITATION (acknowledged per t2 §4.3): `server_received_at` is
+-- KNOWN LIMITATION (acknowledged per §B.4.3): `server_received_at` is
 -- stamped at INSERT/UPDATE time via the touch trigger or the column default,
 -- which is BEFORE COMMIT. Two concurrent writes for the same owner can
 -- commit in inverted order vs their `server_received_at` values; a pull
@@ -77,7 +75,7 @@ begin
   -- 1. Auth precondition.
   --
   -- security invoker + RLS would already deny the rows, but we want the
-  -- AUTH_REQUIRED envelope (t2 §2.2) rather than a silent empty response. An
+  -- AUTH_REQUIRED envelope (§B.2.2) rather than a silent empty response. An
   -- unauthenticated request still reaches this RPC body because the function
   -- is granted to `authenticated` AND the wider `anon` role talks to PostgREST
   -- with a no-JWT bearer; sub-claim absence shows up here as a NULL.
@@ -94,7 +92,7 @@ begin
   -- ---------------------------------------------------------------------------
   -- 2. Structural validation of `layer` and `limit`.
   --
-  -- Per t2 §2.2, the only error codes pull can emit are AUTH_REQUIRED and
+  -- Per §B.2.2, the only error codes pull can emit are AUTH_REQUIRED and
   -- INTERNAL. Malformed payloads collapse to INTERNAL.
   -- ---------------------------------------------------------------------------
   if payload is null or jsonb_typeof(payload) <> 'object' then
@@ -233,10 +231,10 @@ begin
   end if;
 
   -- ---------------------------------------------------------------------------
-  -- 4. Layer → entity types. Hardcoded per the corrected partition recorded in
-  -- plan.md ## Deviations log (t2 entry): exercise_tag_definitions lives in
-  -- Layer 1, not Layer 0, because it FKs into exercise_definitions which is
-  -- itself a Layer-0 entity and t1 §7.7 forbids intra-layer FKs.
+  -- 4. Layer → entity types. Hardcoded per the topological partition in the
+  -- server contract §B.4.4: exercise_tag_definitions lives in Layer 1, not
+  -- Layer 0, because it FKs into exercise_definitions which is itself a Layer-0
+  -- entity and §A.7.7 forbids intra-layer FKs.
   -- ---------------------------------------------------------------------------
   case v_layer
     when 0 then v_types := array['gyms', 'exercise_definitions', 'muscle_groups'];
@@ -249,7 +247,7 @@ begin
   -- 5. Pull. One static UNION ALL spanning all entity tables, scoped to the
   -- requested layer by a literal-set `type IN (...)` filter realized via the
   -- `where type = any(v_types)` outer predicate. Per-entity SELECTs project
-  -- the wire envelope shape directly (t2 §2.1):
+  -- the wire envelope shape directly (§B.2.1):
   --
   --   { type, id, client_updated_at_ms, fields, server_received_at,
   --     owner_user_id }
@@ -260,15 +258,14 @@ begin
   -- `next_cursor`).
   --
   -- The explicit `where owner_user_id = auth.uid()` on every leg keeps the
-  -- planner on `<table>_owner_received_idx` per t1 §2; RLS also enforces it.
+  -- planner on `<table>_owner_received_idx` per §A.2; RLS also enforces it.
   --
   -- `gyms` projects the four M15 carry-over coordinate columns
   -- (`latitude`, `longitude`, `coordinate_accuracy_m`, `coordinates_updated_at`)
-  -- in addition to the t1 §2.1 enumerated columns. These four are on the
-  -- as-built `app_public.gyms` table per the t1 PR #69 "Deviations from card"
-  -- (the client `apps/mobile/src/data/schema/gyms.ts` schema carries them and
-  -- t3's `sync_push` writes them, so pull must round-trip all four for
-  -- symmetric behaviour). See plan.md "Deviations log".
+  -- in addition to the §A.2.1 enumerated columns. These four are on the
+  -- as-built `app_public.gyms` table because the client
+  -- `apps/mobile/src/data/schema/gyms.ts` schema carries them and `sync_push`
+  -- writes them, so pull must round-trip all four for symmetric behaviour.
   -- ---------------------------------------------------------------------------
   with all_rows as (
     select 'gyms'::text as type, g.id, g.client_updated_at_ms,
@@ -431,14 +428,14 @@ begin
 
   -- ---------------------------------------------------------------------------
   -- 6. Compose response. Trim the (limit+1)th row when present, set has_more,
-  -- compute next_cursor per t2 §4.2.
+  -- compute next_cursor per §B.4.2.
   --
   -- v_rows currently holds up to (v_limit + 1) raw rows, each as a JSONB
   -- object with keys {type, id, client_updated_at_ms, server_received_at,
   -- owner_user_id, fields}. The cursor sort key fields are present on each
   -- row so we don't need to re-query the union after the LIMIT+1 sweep.
   --
-  -- The emitted entity envelope (t2 §2.1) strips owner_user_id and
+  -- The emitted entity envelope (§B.2.1) strips owner_user_id and
   -- server_received_at (both are cursor concerns, not entity data).
   -- ---------------------------------------------------------------------------
   v_has_more := v_count > v_limit;
@@ -467,7 +464,7 @@ begin
         'id', v_last_elem->'id'
       );
     elsif v_has_cursor then
-      -- Empty page on a cursored pull — echo input cursor unchanged per t2 §4.2.
+      -- Empty page on a cursored pull — echo input cursor unchanged per §B.4.2.
       -- We re-emit the parsed-cursor object (v_cursor) verbatim rather than
       -- rebuilding from its components so the client gets the same string
       -- back it sent in (no timezone-formatting drift).
@@ -478,7 +475,7 @@ begin
       v_next_cursor := 'null'::jsonb;
     end if;
 
-    -- Strip sort-key fields off each emitted entity (t2 §2.1: wire envelope
+    -- Strip sort-key fields off each emitted entity (§B.2.1: wire envelope
     -- carries type/id/client_updated_at_ms/fields only) and trim to
     -- v_keep_count.
     v_rows := (
@@ -504,13 +501,13 @@ end;
 $$;
 
 comment on function app_public.sync_pull(jsonb) is
-  'Sync v2: per-layer cursor-paged pull. See docs/plans/sync-v2/designs/t2.md §4. Returns up to `limit` typed rows from the requested topological layer ordered by (server_received_at, owner_user_id, type, id). security invoker so RLS scopes results to auth.uid().';
+  'Sync v2: per-layer cursor-paged pull. See the server contract §B.4. Returns up to `limit` typed rows from the requested topological layer ordered by (server_received_at, owner_user_id, type, id). security invoker so RLS scopes results to auth.uid().';
 
 revoke all on function app_public.sync_pull(jsonb) from public;
 grant execute on function app_public.sync_pull(jsonb) to authenticated;
 grant execute on function app_public.sync_pull(jsonb) to service_role;
 -- Grant to anon so the function is reachable for an unauthenticated request
--- and can emit the AUTH_REQUIRED error envelope (t2 §2.2). Without this grant
+-- and can emit the AUTH_REQUIRED error envelope (§B.2.2). Without this grant
 -- PostgREST short-circuits with a generic 401/403; the v2 wire contract
 -- requires the structured `{error:{code:"AUTH_REQUIRED"}}` body. RLS and the
 -- explicit auth.uid()-is-null guard inside the function body together ensure

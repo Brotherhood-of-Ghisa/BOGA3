@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 
-# tFINAL integration test — sync_pull drain + push→pull round-trip
-# (plan outcomes #7 and #8).
+# Integration test — sync_pull drain + push→pull round-trip.
 #
-# Outcome #7 — drain semantics. Push rows across all four topological layers
+# Part A — drain semantics. Push rows across all four topological layers
 # for user A using sync_push, then drain each layer with `limit: 2`:
 #
 #   - Pages within a layer are non-overlapping in the
@@ -12,7 +11,7 @@
 #   - The last page of every layer has has_more: false.
 #   - Tombstones (rows with deleted_at != null) are included in pull responses.
 #
-# Outcome #8 — cross-task push→pull round-trip.
+# Part B — push→pull round-trip.
 #
 #   - Every row pushed in the seed batch reappears in a pull response with
 #     identical `fields` (deep-equal jq comparison, ignoring server-stamped
@@ -147,7 +146,7 @@ trap cleanup_rows EXIT
 
 sync_push() { http_request POST "${API_URL}/rest/v1/rpc/sync_push" "$1" "$2"; }
 sync_pull() {
-  # Layer/cursor/limit body shape per t2 §4.1.
+  # Layer/cursor/limit body shape per the server contract §B.4.1.
   http_request POST "${API_URL}/rest/v1/rpc/sync_pull" "$1" "$2"
 }
 
@@ -356,15 +355,15 @@ drain_layer 1 "${LAYER1_FILTER}"
 drain_layer 2 "${LAYER2_FILTER}"
 drain_layer 3 "${LAYER3_FILTER}"
 
-pass "outcome #7 — every layer drained with limit=2; union of pages equals seeded set; final page has_more=false"
+pass "drain — every layer drained with limit=2; union of pages equals seeded set; final page has_more=false"
 
 # Tombstone visibility — gym-tomb (Layer 0) has deleted_at != null. Assert it's in the accumulator.
 TOMBSTONE_HIT="$(printf '%s' "${LAYER0_DRAIN}" | jq --arg id "pd-${RUN_TAG}-gym-tomb" \
   '[.[] | select(.id == $id and .fields.deleted_at != null)] | length')"
 if [[ "${TOMBSTONE_HIT}" != "1" ]]; then
-  fail "outcome #7: gym-tomb (deleted_at != null) not found in Layer 0 drain (count=${TOMBSTONE_HIT})"
+  fail "drain: gym-tomb (deleted_at != null) not found in Layer 0 drain (count=${TOMBSTONE_HIT})"
 fi
-pass "outcome #7 — tombstone row included in pull response with deleted_at != null"
+pass "drain — tombstone row included in pull response with deleted_at != null"
 
 # ---------------------------------------------------------------------------
 # Step 3 — push→pull round-trip. For every pushed (type, id) the drained
@@ -398,9 +397,9 @@ if [[ "${MISSING_COUNT}" != "0" ]]; then
     ($drained | map({key: (.type + ":" + .id), value: .fields}) | from_entries) as $byKey
     | [ $seed[] | select(($byKey[.type + ":" + .id] // null) != .fields) | {type, id, sent: .fields, got: $byKey[.type + ":" + .id]} ]
     ' >&2
-  fail "outcome #8: ${MISSING_COUNT} pushed row(s) did not round-trip with identical fields"
+  fail "round-trip: ${MISSING_COUNT} pushed row(s) did not round-trip with identical fields"
 fi
-pass "outcome #8 — every pushed row reappeared in a pull response with identical fields"
+pass "round-trip — every pushed row reappeared in a pull response with identical fields"
 
 # ---------------------------------------------------------------------------
 # Step 4 — RLS for the round-trip. User B drains all four layers; ZERO of
@@ -414,9 +413,9 @@ for layer in 0 1 2 3; do
   LEAK_COUNT="$(printf '%s' "${REQUEST_BODY}" | jq --arg run "${RUN_TAG}" \
     '[.entities[] | select(.id | startswith("pd-" + $run + "-"))] | length')"
   if [[ "${LEAK_COUNT}" != "0" ]]; then
-    fail "outcome #8: user B saw ${LEAK_COUNT} of A's run-tagged rows in layer ${layer}"
+    fail "round-trip: user B saw ${LEAK_COUNT} of A's run-tagged rows in layer ${layer}"
   fi
 done
-pass "outcome #8 — user B's pulls return zero of A's rows on all four layers"
+pass "round-trip — user B's pulls return zero of A's rows on all four layers"
 
 echo "[sync-v2-pull-drain] all assertions passed"

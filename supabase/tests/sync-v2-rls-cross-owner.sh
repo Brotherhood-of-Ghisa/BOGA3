@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# tFINAL integration test — RLS cross-owner isolation (plan outcome #5).
+# Integration test — RLS cross-owner isolation.
 #
 # Sets up rows for two fixture users (A and B), then with user A's JWT
 # exercises SELECT / INSERT / UPDATE / DELETE against user B's rows on every
@@ -96,7 +96,7 @@ for entity in "${ENTITIES[@]}"; do
     fail "${entity}: pg_class.relrowsecurity is not true (got '${rls}')"
   fi
 done
-pass "outcome #5 — pg_class.relrowsecurity=true on every entity table"
+pass "rls — pg_class.relrowsecurity=true on every probed entity table"
 
 # -----------------------------------------------------------------------------
 # Sign in A and B; resolve their UUIDs.
@@ -424,6 +424,6 @@ for entity in "${ENTITIES[@]}"; do
   fi
 done
 
-pass "outcome #5 — A's JWT cannot SELECT/INSERT/UPDATE/DELETE B's rows on any of the eight entity tables"
+pass "rls — A's JWT cannot SELECT/INSERT/UPDATE/DELETE B's rows on any probed entity table"
 
 echo "[sync-v2-rls] all assertions passed"

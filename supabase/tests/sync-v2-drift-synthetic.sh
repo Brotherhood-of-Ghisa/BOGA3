@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 
-# tFINAL integration test — Drift checker rejects synthetic drift
-# (plan outcome #9 negative case).
+# Integration test — drift checker rejects synthetic drift (negative case).
 #
 # The drift checker (apps/mobile/scripts/check-sync-schema-drift.ts) must
 # detect a client schema change with no paired server migration and exit
@@ -18,7 +17,7 @@
 #        - the literal string `notes`
 #        - the fix-flow template
 #          `alter table app_public.exercise_sets add column notes`
-#      (per t1 §7.4).
+#      (per the server contract §A.7.4).
 #   5. Restores the original schema file (idempotent — re-runs leave the
 #      working tree clean).
 #
@@ -98,7 +97,7 @@ tail -n 40 "${OUTPUT_FILE}" || true
 if [[ "${DRIFT_RC}" == "0" ]]; then
   fail "drift checker exited 0; expected non-zero (a client column with no server counterpart should fail --strict)"
 fi
-pass "outcome #9 negative — drift checker exited non-zero (rc=${DRIFT_RC}) on synthetic drift"
+pass "drift negative — drift checker exited non-zero (rc=${DRIFT_RC}) on synthetic drift"
 
 # Assert the failure output mentions the table, the new column, and the
 # fix-flow template snippet.
@@ -111,7 +110,7 @@ fi
 if ! grep -q "alter table app_public.exercise_sets" "${OUTPUT_FILE}"; then
   fail "drift checker output missing fix-flow template 'alter table app_public.exercise_sets'"
 fi
-# The full fix-flow line per t1 §7.4 reads
+# The full fix-flow line per the server contract §A.7.4 reads
 #   alter table app_public.exercise_sets
 #     add column notes
 # which our `add column notes` substring catches even if the checker line-
@@ -119,23 +118,20 @@ fi
 if ! grep -q "add column notes" "${OUTPUT_FILE}"; then
   fail "drift checker output missing 'add column notes' fix-flow snippet"
 fi
-pass "outcome #9 negative — output cites exercise_sets, notes, and the 'alter table app_public.exercise_sets … add column notes' fix template"
+pass "drift negative — output cites exercise_sets, notes, and the 'alter table app_public.exercise_sets … add column notes' fix template"
 
 # Hermetic sanity — the working tree should be unchanged after this script.
 # Use git diff against the SCHEMA_FILE; an exit-0 means no diff.
 if ! (cd "${REPO_ROOT}" && git diff --quiet -- "${SCHEMA_FILE}"); then
   fail "schema file ${SCHEMA_FILE} not restored to original after drift run (working tree is DIRTY)"
 fi
-pass "outcome #9 — hermetic: schema file restored, git diff is clean"
+pass "drift — hermetic: schema file restored, git diff is clean"
 
 rm -f "${OUTPUT_FILE}"
 
 # ---------------------------------------------------------------------------
-# Positive case (plan outcome #9 positive — folded into this script per the
-# task card's "or fold into the synthetic script" allowance).
-#
-# After restoring, the drift checker against the unmodified tree must exit 0
-# in --strict mode.
+# Positive case — folded into this script: after restoring, the drift checker
+# against the unmodified tree must exit 0 in --strict mode.
 # ---------------------------------------------------------------------------
 echo "[sync-v2-drift-synthetic] positive case — drift checker on unmodified tree"
 POS_OUTPUT_FILE="$(mktemp)"
@@ -149,6 +145,6 @@ if [[ "${POS_RC}" != "0" ]]; then
   fail "drift checker on the unmodified tree exited rc=${POS_RC}; expected 0 (as-built schema must pass)"
 fi
 rm -f "${POS_OUTPUT_FILE}"
-pass "outcome #9 positive — drift checker exits 0 on the as-built tree"
+pass "drift positive — drift checker exits 0 on the as-built tree"
 
 echo "[sync-v2-drift-synthetic] all assertions passed"
