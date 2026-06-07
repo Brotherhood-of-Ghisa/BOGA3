@@ -2,61 +2,7 @@
   "$description": "SHA-256 hashes (whitespace-collapsed, comments-stripped, lowercased) of the v2 owner_user_id-immutable trigger body and per-entity RLS policy expressions. Regenerate via `npm run check:sync-drift -- --write-fixtures` when policy/trigger text intentionally changes.",
   "enforce_owner_user_id_immutable_sha256": "a6f1c08210df939ddbd077508d77464dd202263bf87f7d6c6754c83bc37b718d",
   "policies_sha256": {
-    "gyms": {
-      "owner_select": {
-        "qual": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186",
-        "with_check": null
-      },
-      "owner_insert": {
-        "qual": null,
-        "with_check": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186"
-      },
-      "owner_update": {
-        "qual": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186",
-        "with_check": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186"
-      },
-      "owner_delete": {
-        "qual": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186",
-        "with_check": null
-      }
-    },
     "exercise_definitions": {
-      "owner_select": {
-        "qual": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186",
-        "with_check": null
-      },
-      "owner_insert": {
-        "qual": null,
-        "with_check": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186"
-      },
-      "owner_update": {
-        "qual": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186",
-        "with_check": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186"
-      },
-      "owner_delete": {
-        "qual": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186",
-        "with_check": null
-      }
-    },
-    "exercise_tag_definitions": {
-      "owner_select": {
-        "qual": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186",
-        "with_check": null
-      },
-      "owner_insert": {
-        "qual": null,
-        "with_check": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186"
-      },
-      "owner_update": {
-        "qual": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186",
-        "with_check": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186"
-      },
-      "owner_delete": {
-        "qual": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186",
-        "with_check": null
-      }
-    },
-    "sessions": {
       "owner_select": {
         "qual": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186",
         "with_check": null
@@ -92,24 +38,6 @@
         "with_check": null
       }
     },
-    "session_exercises": {
-      "owner_select": {
-        "qual": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186",
-        "with_check": null
-      },
-      "owner_insert": {
-        "qual": null,
-        "with_check": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186"
-      },
-      "owner_update": {
-        "qual": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186",
-        "with_check": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186"
-      },
-      "owner_delete": {
-        "qual": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186",
-        "with_check": null
-      }
-    },
     "exercise_sets": {
       "owner_select": {
         "qual": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186",
@@ -128,7 +56,97 @@
         "with_check": null
       }
     },
+    "exercise_tag_definitions": {
+      "owner_select": {
+        "qual": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186",
+        "with_check": null
+      },
+      "owner_insert": {
+        "qual": null,
+        "with_check": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186"
+      },
+      "owner_update": {
+        "qual": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186",
+        "with_check": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186"
+      },
+      "owner_delete": {
+        "qual": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186",
+        "with_check": null
+      }
+    },
+    "gyms": {
+      "owner_select": {
+        "qual": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186",
+        "with_check": null
+      },
+      "owner_insert": {
+        "qual": null,
+        "with_check": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186"
+      },
+      "owner_update": {
+        "qual": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186",
+        "with_check": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186"
+      },
+      "owner_delete": {
+        "qual": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186",
+        "with_check": null
+      }
+    },
+    "muscle_groups": {
+      "owner_select": {
+        "qual": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186",
+        "with_check": null
+      },
+      "owner_insert": {
+        "qual": null,
+        "with_check": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186"
+      },
+      "owner_update": {
+        "qual": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186",
+        "with_check": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186"
+      },
+      "owner_delete": {
+        "qual": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186",
+        "with_check": null
+      }
+    },
     "session_exercise_tags": {
+      "owner_select": {
+        "qual": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186",
+        "with_check": null
+      },
+      "owner_insert": {
+        "qual": null,
+        "with_check": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186"
+      },
+      "owner_update": {
+        "qual": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186",
+        "with_check": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186"
+      },
+      "owner_delete": {
+        "qual": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186",
+        "with_check": null
+      }
+    },
+    "session_exercises": {
+      "owner_select": {
+        "qual": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186",
+        "with_check": null
+      },
+      "owner_insert": {
+        "qual": null,
+        "with_check": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186"
+      },
+      "owner_update": {
+        "qual": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186",
+        "with_check": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186"
+      },
+      "owner_delete": {
+        "qual": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186",
+        "with_check": null
+      }
+    },
+    "sessions": {
       "owner_select": {
         "qual": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186",
         "with_check": null

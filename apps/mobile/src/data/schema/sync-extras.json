@@ -1,12 +1,5 @@
 {
   "exemptions": {
-    "local_only_columns": ["local_dirty", "local_updated_at_ms"],
-    "untyped_text_references": [
-      {
-        "entity": "exercise_muscle_mappings",
-        "column": "muscleGroupId",
-        "rationale": "muscle_groups is client-only taxonomy"
-      }
-    ]
+    "local_only_columns": ["local_dirty", "local_updated_at_ms"]
   }
 }

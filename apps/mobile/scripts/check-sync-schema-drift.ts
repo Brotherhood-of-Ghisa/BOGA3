@@ -625,13 +625,16 @@ async function main(): Promise<number> {
         // (typically because plan-2 hasn't shipped the matching client column
         // yet — see sync-extras.json rationale per entry).
         server_only_columns?: { column: string; rationale?: string }[];
-        untyped_text_references: { entity: string; column: string }[];
+        // Client columns whose server counterpart is intentionally untyped text.
+        // Optional: the key (and the whole list) may be absent when no entity
+        // needs the waiver.
+        untyped_text_references?: { entity: string; column: string }[];
       };
     };
 
     const entities = await listEntityTables(pg);
     if (entities.length === 0) {
-      addError(findings, 'no entity tables with owner_user_id found in app_public; expected 8+ per docs/specs/tech/sync-v2-server-contract.md §A.2');
+      addError(findings, 'no entity tables with owner_user_id found in app_public; expected 9+ per docs/specs/tech/sync-v2-server-contract.md §A.2');
     }
 
     log(`introspecting ${entities.length} entity table(s): ${entities.join(', ')}`);
@@ -719,7 +722,7 @@ interface EntityContext {
     exemptions: {
       local_only_columns: string[];
       server_only_columns?: { column: string; rationale?: string }[];
-      untyped_text_references: { entity: string; column: string }[];
+      untyped_text_references?: { entity: string; column: string }[];
     };
   };
   fixtureFile: FixtureFile;
@@ -860,7 +863,7 @@ async function checkEntity(ctx: EntityContext): Promise<void> {
   // ---- 4d: client column has typed server counterpart -------------------
   const exempt = new Set(extras.exemptions.local_only_columns);
   const untypedTextRefs = new Set(
-    extras.exemptions.untyped_text_references
+    (extras.exemptions.untyped_text_references ?? [])
       .filter((r) => r.entity === entity)
       .map((r) => camelToSnake(r.column))
   );
