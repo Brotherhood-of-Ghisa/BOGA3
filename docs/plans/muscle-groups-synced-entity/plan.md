@@ -107,6 +107,7 @@ graph TD
   t4 --> t5[t5 build: seeding + bootstrap + FK pragma]
   t4 --> t6[t6 build: drift checker + exemption]
   t4 --> t7[t7 build: tests + FK-on default + comment fixes]
+  t4 --> t9[t9 build: dirty-count includes muscle_groups]
   t2 --> tFINAL
   t5 --> t8[t8 build: docs]
   t6 --> t8
@@ -115,6 +116,7 @@ graph TD
   t5 --> tFINAL
   t6 --> tFINAL
   t7 --> tFINAL
+  t9 --> tFINAL
 ```
 
 ## Tasks
@@ -127,8 +129,20 @@ graph TD
 - [t6: drift checker — drop muscleGroupId exemption, 9th entity](tasks/t6.md) — build
 - [t7: tests — FK-on harness default, coverage, comment fixes](tasks/t7.md) — build
 - [t8: docs — data-model + sync-v2 server contract](tasks/t8.md) — build
+- [t9: dirty-count — include muscle_groups in the Settings pending-push count](tasks/t9.md) — build (added at execute time, iteration 5)
 - [tFINAL: verify plan outcomes](tasks/tFINAL.md) — build (final test card)
 
 ## Deviations log
 
-<empty until first merge>
+- t1 (PR #168, merged 2026-06-07): design only, no deviation from card. Canonical `designs/t1.md`
+  pins items 1–5. Open sub-decision resolved: mappings FK on-delete = `cascade` (`set null`
+  structurally impossible — `muscle_group_id` is NOT NULL; `cascade` matches the sibling
+  `exercise_muscle_mappings_exercise_definition_fk`). Pointer markers added to t2–t8 + tFINAL.
+- t2 (PR #170, merged 2026-06-07): server baseline. Deviation: builder edited beyond the 3 named
+  files — fixed ~11 backend test shells (`supabase/tests/*.sh`) and extended `dev_wipe_my_data` to
+  delete `muscle_groups` (both required to keep existing contract suites green under the new FK /
+  9th entity; reviewer confirmed in-scope, no encroachment on t6/t7/tFINAL). Known consequence:
+  `check:sync-drift --strict` is red on `main` until t6 lands (server-first window; plan outcome 7).
+- t3 (PR #169, merged 2026-06-07): client schema + single-baseline regen. No deviation. Journal
+  stays length-1 (`m0000`, tag `0000_living_bucky`); `muscle-group-bootstrap-idempotent.test.ts`
+  left untouched (its premise is rewritten by t5/t7; still green).
