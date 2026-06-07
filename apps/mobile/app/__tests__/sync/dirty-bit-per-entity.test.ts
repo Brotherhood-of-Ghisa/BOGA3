@@ -6,11 +6,13 @@
  *
  * The push side of sync only ships rows whose dirty bit is set; a write path
  * that forgets to flip the bit silently drops the user's edit from sync. This
- * file asserts the contract once per entity table (all eight), exercising the
+ * file asserts the contract once per entity table (all nine), exercising the
  * canonical create / update / soft-delete path the app actually uses and then
  * asserting the persisted row has `local_dirty = 1` and a positive monotonic
- * `local_updated_at_ms`. The eight per-entity checks together cover the whole
- * entity surface.
+ * `local_updated_at_ms`. The nine per-entity checks together cover the whole
+ * entity surface. `muscle_groups` has no user-facing write path this iteration
+ * (it is system-seeded only), so its write path is the starter-catalog seeder —
+ * which must land its rows dirty just like the rest of the catalog.
  *
  * One case is called out explicitly: reordering two sibling exercise sets must
  * dirty BOTH rows in the same transaction, otherwise a half-applied reorder
@@ -47,8 +49,13 @@ jest.mock('@/src/data/bootstrap', () =>
 );
 
 // Imported AFTER the bootstrap mock so the repos bind to it.
+import type { LocalDatabase } from '@/src/data/bootstrap';
 import { __resetClockForTests } from '@/src/data/clock';
 import { createDrizzleExerciseCatalogStore } from '@/src/data/exercise-catalog';
+import {
+  SYSTEM_MUSCLE_GROUP_SEEDS,
+  seedSystemExerciseCatalog,
+} from '@/src/data/exercise-catalog-seeds';
 import { createDrizzleExerciseTagStore } from '@/src/data/exercise-tags';
 import { upsertLocalGym } from '@/src/data/local-gyms';
 import {
@@ -144,6 +151,21 @@ describe('every entity write path flips the dirty bit in the write transaction',
       .get();
     expect(row?.localDirty).toBe(true);
     expect(row?.localUpdatedAtMs ?? 0).toBeGreaterThan(0);
+  });
+
+  it('muscle_groups — the starter-catalog seeder lands its rows dirty with a positive timestamp', () => {
+    // muscle_groups is system-seeded only this iteration, so the seeder is its
+    // sole write path. It must stamp every row dirty so a fresh account pushes
+    // the taxonomy to the server, exactly like exercise_definitions.
+    seedSystemExerciseCatalog(db() as unknown as LocalDatabase, new Date('2026-05-30T10:00:00.000Z'));
+
+    const rows = db().select().from(muscleGroups).all();
+    expect(rows.length).toBe(SYSTEM_MUSCLE_GROUP_SEEDS.length);
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) {
+      expect(row.localDirty).toBe(true);
+      expect(row.localUpdatedAtMs ?? 0).toBeGreaterThan(0);
+    }
   });
 
   it('exercise_muscle_mappings — saving an exercise dirties its mapping rows', async () => {

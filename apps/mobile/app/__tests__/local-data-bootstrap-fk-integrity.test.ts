@@ -1,23 +1,26 @@
 /**
- * FK integrity of the `muscle_groups` parent layer under enforcement.
+ * Topo-order FK integrity: Layer 0 drains before Layer 1 under enforcement.
  *
- * `exercise_muscle_mappings.muscle_group_id` is a NOT NULL local FK into
- * `muscle_groups`. `muscle_groups` is a Layer 0 synced parent of the Layer 1
- * mapping, so on the first-sign-in / reinstall re-pull the parent rows drain
- * before the child page lands and the FK is satisfied. This is the infra-free
- * regression guard for the bug class where that ordering is violated: a pulled
- * mapping referencing an absent muscle group aborts the whole pull page.
+ * `exercise_muscle_mappings` (Layer 1) holds a NOT NULL local FK
+ * `muscle_group_id` into `muscle_groups` and a nullable FK into
+ * `exercise_definitions` — both Layer 0 synced parents. On the first-sign-in /
+ * reinstall re-pull the cycle drains Layer 0 (`muscle_groups`,
+ * `exercise_definitions`) before the Layer 1 mapping page lands, so every
+ * referenced parent is already present and the FK is satisfied. This is the
+ * infra-free regression guard for the bug class where that layer ordering is
+ * violated: a pulled mapping referencing an absent parent aborts the whole pull
+ * page.
  *
  * This test closes that gap in the fast lane: it seeds the `muscle_groups`
- * bundle into a real, fully-migrated in-memory `better-sqlite3` database with
- * `PRAGMA foreign_keys = ON` (the enforcement we enable at boot via
- * `PRAGMA foreign_keys = ON`), then exercises the exact production path — a
+ * bundle into a real, fully-migrated in-memory `better-sqlite3` database with FK
+ * enforcement ON — the same enforcement the app enables at boot via
+ * `PRAGMA foreign_keys = ON` — then exercises the exact production path: a
  * pulled mapping referencing a *present* muscle group and a *pulled* exercise
- * definition — and asserts it inserts cleanly. The negative control proves the
- * parent layer is load-bearing: with the FK enforced and `muscle_groups` empty,
- * the same insert fails. The hard-asserted FK-present check below is meant to
- * fail loudly if the client FK is ever dropped, so this guard is revisited
- * deliberately rather than silently passing against a dropped FK.
+ * definition inserts cleanly. The negative control proves the parent layer is
+ * load-bearing: with the FK enforced and `muscle_groups` empty, the same insert
+ * fails. The hard-asserted FK-present check below is meant to fail loudly if the
+ * client FK is ever dropped, so this guard is revisited deliberately rather than
+ * silently passing against a dropped FK.
  */
 
 import {
