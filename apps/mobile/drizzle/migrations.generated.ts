@@ -13,6 +13,12 @@ export const generatedMigrationBundle = {
     tag: "0000_living_bucky",
     breakpoints: true,
   },
+  {
+    idx: 1,
+    when: 1780777656701,
+    tag: "0001_dapper_vision",
+    breakpoints: true,
+  },
     ],
   },
   migrations: {
@@ -206,6 +212,19 @@ CREATE TABLE \`smoke_records\` (
 	\`value\` text NOT NULL,
 	\`created_at\` integer DEFAULT (unixepoch() * 1000) NOT NULL,
 	\`updated_at\` integer DEFAULT (unixepoch() * 1000) NOT NULL
+);
+`,
+  m0001: `CREATE TABLE \`sync_quarantine\` (
+	\`entity_type\` text NOT NULL,
+	\`entity_id\` text NOT NULL,
+	\`error_code\` text NOT NULL,
+	\`parent_type\` text,
+	\`parent_id_field\` text,
+	\`parent_id\` text,
+	\`first_seen_at_ms\` integer NOT NULL,
+	\`last_seen_at_ms\` integer NOT NULL,
+	\`occurrence_count\` integer DEFAULT 1 NOT NULL,
+	PRIMARY KEY(\`entity_type\`, \`entity_id\`)
 );
 `,
   },

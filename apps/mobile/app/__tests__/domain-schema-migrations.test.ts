@@ -123,12 +123,30 @@ describe('domain schema and runtime migrations', () => {
     expect(migrationSql).not.toContain('CREATE TABLE `__new_gyms`');
   });
 
-  it('squashed migration history is a single v2 baseline entry', () => {
-    expect(localRuntimeMigrations.journal.entries).toHaveLength(1);
+  it('keeps the squashed v2 baseline as m0000 and appends the quarantine table as m0001', () => {
+    // The history was squashed to a single v2 baseline (`m0000`); forward feature
+    // migrations append after it. The first such follow-up is the local sync
+    // quarantine table.
+    expect(localRuntimeMigrations.journal.entries).toHaveLength(2);
     expect(localRuntimeMigrations.journal.entries[0]).toMatchObject({
       idx: 0,
       tag: expect.stringMatching(/^0000_/),
     });
-    expect(Object.keys(localRuntimeMigrations.migrations)).toEqual(['m0000']);
+    expect(localRuntimeMigrations.journal.entries[1]).toMatchObject({
+      idx: 1,
+      tag: expect.stringMatching(/^0001_/),
+    });
+    expect(Object.keys(localRuntimeMigrations.migrations)).toEqual(['m0000', 'm0001']);
+  });
+
+  it('creates the local sync quarantine table in the m0001 follow-up migration', () => {
+    const quarantineMigration = localRuntimeMigrations.migrations.m0001;
+    expect(quarantineMigration).toContain('CREATE TABLE `sync_quarantine`');
+    expect(quarantineMigration).toContain('PRIMARY KEY(`entity_type`, `entity_id`)');
+    expect(quarantineMigration).toContain('`error_code` text NOT NULL');
+    expect(quarantineMigration).toContain('`occurrence_count` integer DEFAULT 1 NOT NULL');
+    // The quarantine table is FK-free local bookkeeping over possibly-orphaned
+    // rows — it must declare no foreign keys.
+    expect(quarantineMigration).not.toContain('FOREIGN KEY');
   });
 });

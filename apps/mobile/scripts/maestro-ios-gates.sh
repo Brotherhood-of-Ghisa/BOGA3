@@ -106,13 +106,19 @@ run_flow() {
   maestro_prepare_flow_copy "$flow_source" "$flow_file" "$MAESTRO_IOS_DEV_CLIENT_BUNDLE_ID"
 
   echo "[maestro-ios-gates] >>> ${scenario} (${slug})"
+  maestro_env_flags=()
+  if [[ -n "${MAESTRO_IOS_DEV_CLIENT_URL+set}" ]]; then
+    maestro_env_flags+=(-e "MAESTRO_IOS_DEV_CLIENT_URL=${MAESTRO_IOS_DEV_CLIENT_URL}")
+  fi
+
   set +e
   maestro test "$flow_file" \
     --udid "$IOS_SIM_UDID" \
     --format junit \
     --output "$junit_file" \
     --debug-output "$debug_dir" \
-    --test-output-dir "$output_dir"
+    --test-output-dir "$output_dir" \
+    ${maestro_env_flags[@]+"${maestro_env_flags[@]}"}
   rc=$?
   set -e
 

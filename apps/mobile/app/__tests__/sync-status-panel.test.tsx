@@ -35,6 +35,7 @@ const baseStatus: SyncStatusSnapshot = {
   authRequired: false,
   networkState: 'online',
   bootstrapCompleted: true,
+  blockedRowCount: 0,
 };
 
 const renderPanel = (overrides: Partial<SyncStatusSnapshot> = {}, onRequestSync = jest.fn()) => {

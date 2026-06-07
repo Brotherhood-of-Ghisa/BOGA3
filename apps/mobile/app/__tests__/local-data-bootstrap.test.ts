@@ -8,6 +8,7 @@ const mockSeedMuscleGroups = jest.fn();
 const mockSeedSystemExerciseCatalog = jest.fn();
 const mockInvalidateExerciseCatalogCache = jest.fn();
 const mockGetMobileAuthRuntimeConfig = jest.fn();
+const mockLogEvent = jest.fn();
 
 jest.mock('expo-sqlite', () => ({
   deleteDatabaseAsync: (...args: unknown[]) => mockDeleteDatabaseAsync(...args),
@@ -36,8 +37,43 @@ jest.mock('@/src/exercise-catalog/invalidation', () => ({
     mockInvalidateExerciseCatalogCache(...args),
 }));
 
+jest.mock('@/src/logging', () => ({
+  logEvent: (...args: unknown[]) => mockLogEvent(...args),
+}));
+
 import { __resetLocalDataLayerForTests, bootstrapLocalDataLayer, resetLocalAppData } from '@/src/data/bootstrap';
 import { localRuntimeMigrations } from '@/src/data/migrations';
+
+const createSqliteClient = (
+  name: string,
+  options: {
+    closeAsync?: jest.Mock<Promise<void>, []>;
+    foreignKeysStayOff?: boolean;
+    foreignKeyCheckViolation?: Record<string, unknown>;
+  } = {},
+) => {
+  let foreignKeys = 0;
+  const client = {
+    closeAsync: options.closeAsync ?? jest.fn().mockResolvedValue(undefined),
+    execSync: jest.fn((sql: string) => {
+      if (sql.trim().toUpperCase() === 'PRAGMA FOREIGN_KEYS = ON') {
+        foreignKeys = options.foreignKeysStayOff ? 0 : 1;
+      }
+    }),
+    getFirstSync: jest.fn((sql: string) => {
+      const normalizedSql = sql.trim().toUpperCase();
+      if (normalizedSql === 'PRAGMA FOREIGN_KEYS') {
+        return { foreign_keys: foreignKeys };
+      }
+      if (normalizedSql === 'PRAGMA FOREIGN_KEY_CHECK') {
+        return options.foreignKeyCheckViolation ?? null;
+      }
+      return null;
+    }),
+    name,
+  };
+  return client;
+};
 
 describe('bootstrapLocalDataLayer', () => {
   beforeEach(() => {
@@ -49,6 +85,8 @@ describe('bootstrapLocalDataLayer', () => {
     mockSeedMuscleGroups.mockReset();
     mockSeedSystemExerciseCatalog.mockReset();
     mockInvalidateExerciseCatalogCache.mockReset();
+    mockLogEvent.mockReset();
+    mockLogEvent.mockResolvedValue(undefined);
     // Default to a sync-configured build: the first-sign-in bootstrapper owns
     // the exercise catalog, so boot must NOT seed it. The infra-free branch is
     // exercised explicitly in its own tests below.
@@ -57,7 +95,7 @@ describe('bootstrapLocalDataLayer', () => {
   });
 
   it('creates the local database, applies runtime migrations, and seeds the muscle-group taxonomy once', async () => {
-    const sqliteClient = { name: 'sqlite-client' };
+    const sqliteClient = createSqliteClient('sqlite-client');
     const localDatabase = { name: 'local-db' };
 
     mockOpenDatabaseSync.mockReturnValue(sqliteClient);
@@ -71,6 +109,9 @@ describe('bootstrapLocalDataLayer', () => {
     expect(firstBootstrap).toBe(localDatabase);
     expect(secondBootstrap).toBe(localDatabase);
     expect(mockOpenDatabaseSync).toHaveBeenCalledTimes(1);
+    expect(sqliteClient.execSync).toHaveBeenCalledWith('PRAGMA foreign_keys = ON');
+    expect(sqliteClient.getFirstSync).toHaveBeenCalledWith('PRAGMA foreign_keys');
+    expect(sqliteClient.getFirstSync).toHaveBeenCalledWith('PRAGMA foreign_key_check');
     expect(mockDrizzle).toHaveBeenCalledTimes(1);
     expect(mockMigrate).toHaveBeenCalledTimes(1);
     expect(mockMigrate).toHaveBeenCalledWith(localDatabase, localRuntimeMigrations);
@@ -81,8 +122,71 @@ describe('bootstrapLocalDataLayer', () => {
     expect(mockSeedSystemExerciseCatalog).not.toHaveBeenCalled();
   });
 
+  it('logs and rethrows when SQLite foreign-key enforcement cannot be enabled', async () => {
+    const sqliteClient = createSqliteClient('sqlite-client', { foreignKeysStayOff: true });
+
+    mockOpenDatabaseSync.mockReturnValue(sqliteClient);
+
+    await expect(bootstrapLocalDataLayer()).rejects.toThrow('SQLite foreign_keys pragma is 0');
+
+    expect(mockDrizzle).not.toHaveBeenCalled();
+    expect(mockMigrate).not.toHaveBeenCalled();
+    expect(mockLogEvent).toHaveBeenCalledWith({
+      level: 'error',
+      source: 'database',
+      event: 'data.sqlite_foreign_key_bootstrap_failed',
+      message: 'SQLite foreign-key bootstrap check failed',
+      context: {
+        operation: 'configure_foreign_keys',
+        foreign_keys: 0,
+        error_message: 'SQLite foreign_keys pragma is 0',
+      },
+    });
+  });
+
+  it('logs and rethrows integrity-check failures after migrations and seeds complete', async () => {
+    const sqliteClient = createSqliteClient('sqlite-client', {
+      foreignKeyCheckViolation: {
+        table: 'session_exercises',
+        rowid: 7,
+        parent: 'sessions',
+        fkid: 0,
+      },
+    });
+    const localDatabase = { name: 'local-db' };
+
+    mockOpenDatabaseSync.mockReturnValue(sqliteClient);
+    mockDrizzle.mockReturnValue(localDatabase);
+    mockMigrate.mockResolvedValue(undefined);
+    mockSeedMuscleGroups.mockReturnValue(undefined);
+
+    await expect(bootstrapLocalDataLayer()).rejects.toThrow('SQLite foreign_key_check found violations');
+
+    expect(mockMigrate).toHaveBeenCalledTimes(1);
+    expect(mockSeedMuscleGroups).toHaveBeenCalledTimes(1);
+    expect(mockLogEvent).toHaveBeenCalledWith({
+      level: 'error',
+      source: 'database',
+      event: 'data.sqlite_foreign_key_bootstrap_failed',
+      message: 'SQLite foreign-key bootstrap check failed',
+      context: {
+        operation: 'foreign_key_check',
+        foreign_keys: 1,
+        error_message: 'SQLite foreign_key_check found violations',
+      },
+    });
+  });
+
+  it('does not let diagnostic logging failure mask the original FK bootstrap failure', async () => {
+    const sqliteClient = createSqliteClient('sqlite-client', { foreignKeysStayOff: true });
+    mockLogEvent.mockRejectedValueOnce(new Error('logger unavailable'));
+    mockOpenDatabaseSync.mockReturnValue(sqliteClient);
+
+    await expect(bootstrapLocalDataLayer()).rejects.toThrow('SQLite foreign_keys pragma is 0');
+  });
+
   it('retries runtime migrations on the next bootstrap call after a failure', async () => {
-    const sqliteClient = { name: 'sqlite-client' };
+    const sqliteClient = createSqliteClient('sqlite-client');
     const localDatabase = { name: 'local-db' };
 
     mockOpenDatabaseSync.mockReturnValue(sqliteClient);
@@ -100,7 +204,7 @@ describe('bootstrapLocalDataLayer', () => {
   });
 
   it('retries muscle-group seeding on the next bootstrap call after a seed failure', async () => {
-    const sqliteClient = { name: 'sqlite-client' };
+    const sqliteClient = createSqliteClient('sqlite-client');
     const localDatabase = { name: 'local-db' };
 
     mockOpenDatabaseSync.mockReturnValue(sqliteClient);
@@ -123,14 +227,8 @@ describe('bootstrapLocalDataLayer', () => {
   });
 
   it('resets runtime app data by closing the database, deleting it, and re-running bootstrap', async () => {
-    const sqliteClient = {
-      closeAsync: jest.fn().mockResolvedValue(undefined),
-      name: 'sqlite-client',
-    };
-    const resetSqliteClient = {
-      closeAsync: jest.fn().mockResolvedValue(undefined),
-      name: 'sqlite-client-after-reset',
-    };
+    const sqliteClient = createSqliteClient('sqlite-client');
+    const resetSqliteClient = createSqliteClient('sqlite-client-after-reset');
     const localDatabase = { name: 'local-db' };
     const resetLocalDatabase = { name: 'local-db-after-reset' };
 
@@ -154,14 +252,8 @@ describe('bootstrapLocalDataLayer', () => {
   });
 
   it('invalidates the exercise-catalog cache after a reset re-seeds the database, so the next read repopulates from the fresh seed', async () => {
-    const sqliteClient = {
-      closeAsync: jest.fn().mockResolvedValue(undefined),
-      name: 'sqlite-client',
-    };
-    const resetSqliteClient = {
-      closeAsync: jest.fn().mockResolvedValue(undefined),
-      name: 'sqlite-client-after-reset',
-    };
+    const sqliteClient = createSqliteClient('sqlite-client');
+    const resetSqliteClient = createSqliteClient('sqlite-client-after-reset');
     const localDatabase = { name: 'local-db' };
     const resetLocalDatabase = { name: 'local-db-after-reset' };
 
@@ -188,14 +280,8 @@ describe('bootstrapLocalDataLayer', () => {
   });
 
   it('serializes a concurrent bootstrap behind an in-flight reset so the database is never reopened before deletion completes', async () => {
-    const sqliteClient = {
-      closeAsync: jest.fn().mockResolvedValue(undefined),
-      name: 'sqlite-client',
-    };
-    const resetSqliteClient = {
-      closeAsync: jest.fn().mockResolvedValue(undefined),
-      name: 'sqlite-client-after-reset',
-    };
+    const sqliteClient = createSqliteClient('sqlite-client');
+    const resetSqliteClient = createSqliteClient('sqlite-client-after-reset');
     const localDatabase = { name: 'local-db' };
     const resetLocalDatabase = { name: 'local-db-after-reset' };
 
@@ -262,14 +348,8 @@ describe('bootstrapLocalDataLayer', () => {
     // one REGARDLESS of whether it resolved or rejected (`.then(op, op)` on the
     // gate). This proves the failure path: a reset that throws at the native
     // delete must not leave the lock chain permanently blocked.
-    const sqliteClient = {
-      closeAsync: jest.fn().mockResolvedValue(undefined),
-      name: 'sqlite-client',
-    };
-    const reopenedSqliteClient = {
-      closeAsync: jest.fn().mockResolvedValue(undefined),
-      name: 'sqlite-client-reopened',
-    };
+    const sqliteClient = createSqliteClient('sqlite-client');
+    const reopenedSqliteClient = createSqliteClient('sqlite-client-reopened');
     const localDatabase = { name: 'local-db' };
     const reopenedLocalDatabase = { name: 'local-db-reopened' };
 
@@ -305,7 +385,7 @@ describe('bootstrapLocalDataLayer', () => {
   it('seeds the full starter exercise catalog at boot when no sync backend is configured (infra-free build)', async () => {
     mockGetMobileAuthRuntimeConfig.mockReturnValue({ isConfigured: false });
 
-    const sqliteClient = { name: 'sqlite-client' };
+    const sqliteClient = createSqliteClient('sqlite-client');
     const localDatabase = { name: 'local-db' };
 
     mockOpenDatabaseSync.mockReturnValue(sqliteClient);
@@ -330,14 +410,8 @@ describe('bootstrapLocalDataLayer', () => {
   it('re-seeds the starter exercise catalog after a data reset when no sync backend is configured, so the infra-free picker stays populated', async () => {
     mockGetMobileAuthRuntimeConfig.mockReturnValue({ isConfigured: false });
 
-    const sqliteClient = {
-      closeAsync: jest.fn().mockResolvedValue(undefined),
-      name: 'sqlite-client',
-    };
-    const resetSqliteClient = {
-      closeAsync: jest.fn().mockResolvedValue(undefined),
-      name: 'sqlite-client-after-reset',
-    };
+    const sqliteClient = createSqliteClient('sqlite-client');
+    const resetSqliteClient = createSqliteClient('sqlite-client-after-reset');
     const localDatabase = { name: 'local-db' };
     const resetLocalDatabase = { name: 'local-db-after-reset' };
 

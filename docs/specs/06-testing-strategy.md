@@ -245,6 +245,22 @@ Metro and is owned operationally by
   - auth missing/expired (AUTH_REQUIRED): unauthenticated cycle is a clean no-op,
     no mutation, dirty bits preserved,
   - offline / backend-unavailable retry/recovery with the locked backoff policy,
+  - local FK enforcement for pull/apply and repository writes; pull-side local FK
+    apply failures must be classified as `LOCAL_FK_VIOLATION`, must roll back the
+    failed page without advancing that layer cursor, and must log sanitized
+    diagnostics without masking the original cycle outcome,
+  - push-side FK closure preflight: orphan dirty children must be detected before
+    `sync_push`, valid parent/child graphs must not be falsely blocked, and a
+    present-but-quarantined parent must cascade to its child,
+  - sync quarantine: a FK-blocked dirty row must persist to `sync_quarantine`,
+    be excluded from future push selection, survive database reopen, be
+    idempotently updated on repeat detection, and allow independent valid dirty
+    rows beside it to push and clear,
+  - sync-cycle result semantics: `runSyncCycle` outcomes (`converged`,
+    `auth-required`, `fk-violation`, `internal`) must be distinguished; the
+    scheduler advances `lastSuccessAtMs` only for `converged`, and
+    non-converged outcomes stay visible until a later converged cycle clears
+    them,
   - response contract semantics and RLS cross-owner isolation,
   - projection/read-model correctness after ingest/replay,
   - wiped-client reinstall re-pull restoring every layer with FK integrity and
@@ -261,6 +277,7 @@ Metro and is owned operationally by
 - Current frontend baseline suites for this policy (Sync v2) include the
   `apps/mobile/app/__tests__/sync-cycle-*.test.ts` family
   (`-convergence`, `-pull`, `-push`, `-race`, `-wire`),
+  `sync-cycle-push-preflight.test.ts`, `sync-cycle-quarantine.test.ts`,
   `sync-bootstrapper.test.ts`, `sync-status-composer.test.ts`,
   `sync-gate-decision.test.ts`, `settings-profile-navigation.test.tsx`, and the
   `app/__tests__/sync/**` directory (cycle-round-trip, cycle-multidevice-lww,

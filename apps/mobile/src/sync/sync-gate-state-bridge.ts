@@ -7,9 +7,9 @@
 //     first cycle sets it. Polling stops as soon as the flag is non-null.
 //   - `lastCycleErrorCode`: 'AUTH_REQUIRED' is mirrored from the cycle's
 //     observable "no signed-in user" signal; the non-auth failure codes
-//     ('FK_VIOLATION' / 'INTERNAL') are mirrored from the cycle's classified
-//     error signal. The cycle owns raising both; this bridge only projects them
-//     onto the holder the gate reads.
+//     ('FK_VIOLATION' / 'LOCAL_FK_VIOLATION' / 'INTERNAL') are mirrored from
+//     the cycle's classified error signal. The cycle owns raising them; this
+//     bridge only projects them onto the holder the gate reads.
 //
 // The phase / progress / offline snapshot is NOT republished here — the gate
 // reads it straight from the shared scheduler-status accessor, so this bridge

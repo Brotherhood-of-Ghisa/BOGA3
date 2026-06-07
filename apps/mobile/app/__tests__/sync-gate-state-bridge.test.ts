@@ -116,6 +116,9 @@ describe('sync-gate state bridge', () => {
     markCycleError('FK_VIOLATION');
     expect(getSyncGateStateSnapshot().lastCycleErrorCode).toBe('FK_VIOLATION');
 
+    markCycleError('LOCAL_FK_VIOLATION');
+    expect(getSyncGateStateSnapshot().lastCycleErrorCode).toBe('LOCAL_FK_VIOLATION');
+
     clearCycleError();
     expect(getSyncGateStateSnapshot().lastCycleErrorCode).toBeNull();
   });

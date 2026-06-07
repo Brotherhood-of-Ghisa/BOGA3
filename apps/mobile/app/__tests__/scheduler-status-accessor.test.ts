@@ -203,6 +203,53 @@ describe('production scheduler status accessor', () => {
     expect(getSchedulerStatus().lastCycleError).toBeNull();
   });
 
+  it('does not record a success on an auth-required outcome', async () => {
+    goOnline();
+    jest.advanceTimersByTime(1000);
+    await endCycleOutcome('auth-required');
+
+    const status = getSchedulerStatus();
+    // Auth-required is a route signal, not a successful sync.
+    expect(status.lastSuccessAtMs).toBeNull();
+    expect(status.lastCycleError).not.toBeNull();
+  });
+
+  it('keeps a retryable error visible and records no success', async () => {
+    goOnline();
+    jest.advanceTimersByTime(1000);
+    await endCycleOutcome('internal');
+
+    const status = getSchedulerStatus();
+    expect(status.lastSuccessAtMs).toBeNull();
+    expect(status.lastCycleError).not.toBeNull();
+  });
+
+  it('clears a prior retryable error only once a later cycle converges', async () => {
+    goOnline();
+    jest.advanceTimersByTime(1000);
+    await endCycleOutcome('internal');
+    expect(getSchedulerStatus().lastCycleError).not.toBeNull();
+    expect(getSchedulerStatus().lastSuccessAtMs).toBeNull();
+
+    // Idle backstop re-arms; the next cycle converges and clears the error.
+    jest.advanceTimersByTime(60_000);
+    await endCycleConverged();
+
+    const status = getSchedulerStatus();
+    expect(status.lastCycleError).toBeNull();
+    expect(status.lastSuccessAtMs).not.toBeNull();
+  });
+
+  it('does not record a success when the cycle throws a structural error', async () => {
+    goOnline();
+    jest.advanceTimersByTime(1000);
+    await endCycleThrow();
+
+    const status = getSchedulerStatus();
+    expect(status.lastSuccessAtMs).toBeNull();
+    expect(status.lastCycleError).toBe('cycle blew up');
+  });
+
   it('surfaces the first-sync progress phase and counters from the producer', () => {
     setSyncProgress({ phase: 'pull', layersCompleted: 2, rowsApplied: 137, offline: false });
     goOnline();

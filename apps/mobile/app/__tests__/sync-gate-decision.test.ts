@@ -39,10 +39,14 @@ describe('selectSyncGateMode', () => {
     ).toBe('route-to-sign-in');
   });
 
-  it('shows a retriable error for FK_VIOLATION and INTERNAL', () => {
+  it('shows a retriable error for FK_VIOLATION, LOCAL_FK_VIOLATION, and INTERNAL', () => {
     expect(selectSyncGateMode(signedIn, snapshot({ lastCycleErrorCode: 'FK_VIOLATION' }))).toEqual({
       kind: 'error',
       errorCode: 'FK_VIOLATION',
+    });
+    expect(selectSyncGateMode(signedIn, snapshot({ lastCycleErrorCode: 'LOCAL_FK_VIOLATION' }))).toEqual({
+      kind: 'error',
+      errorCode: 'LOCAL_FK_VIOLATION',
     });
     expect(selectSyncGateMode(signedIn, snapshot({ lastCycleErrorCode: 'INTERNAL' }))).toEqual({
       kind: 'error',

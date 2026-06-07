@@ -60,6 +60,13 @@ export interface SyncStatusSnapshot {
   networkState: SyncNetworkState;
   /** Whether the first-sync bootstrap has completed for this device-account. */
   bootstrapCompleted: boolean;
+  /**
+   * Count of rows the push leg has quarantined as structurally orphaned: blocked
+   * sync rows that are skipped on every push and need repair. 0 in the healthy
+   * case; a non-zero value is the "sync needs repair" signal a status surface can
+   * render even though the full repair UI is deferred.
+   */
+  blockedRowCount: number;
 }
 
 /**
@@ -77,6 +84,16 @@ const countDirtyRows = async (database: LocalDatabase): Promise<number> => {
     total += row?.value ?? 0;
   }
   return total;
+};
+
+/**
+ * Counts the rows currently quarantined as structural orphans — the "blocked
+ * sync rows exist" status signal. A single aggregate over the local-only
+ * `sync_quarantine` bookkeeping table; 0 in the healthy case.
+ */
+const countBlockedRows = async (database: LocalDatabase): Promise<number> => {
+  const [row] = await database.select({ value: count() }).from(schema.syncQuarantine);
+  return row?.value ?? 0;
 };
 
 /**
@@ -100,9 +117,10 @@ export const getSyncStatus = async (): Promise<SyncStatusSnapshot> => {
   const database = await bootstrapLocalDataLayer();
   const schedulerStatus = getSchedulerStatus();
 
-  const [dirtyCount, bootstrapCompleted] = await Promise.all([
+  const [dirtyCount, bootstrapCompleted, blockedRowCount] = await Promise.all([
     countDirtyRows(database),
     readBootstrapCompleted(database),
+    countBlockedRows(database),
   ]);
 
   return {
@@ -112,5 +130,6 @@ export const getSyncStatus = async (): Promise<SyncStatusSnapshot> => {
     authRequired: getAuthRequiredSignal(),
     networkState: schedulerStatus.online ? 'online' : 'offline',
     bootstrapCompleted,
+    blockedRowCount,
   };
 };

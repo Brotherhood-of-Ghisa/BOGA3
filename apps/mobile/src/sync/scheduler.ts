@@ -85,14 +85,18 @@ let timerHandle: ReturnType<typeof setTimeout> | null = null;
 
 let onlineProjection = false;
 
-// The most recent cycle's failure, or null if the latest cycle ended cleanly.
-// A cycle that throws records its message here; a cycle that completes without
-// throwing clears it. This is the read-only signal the status surface shows as
-// the error state — it never changes the machine's behaviour.
+// The most recent cycle's failure, or null if the latest cycle succeeded. A
+// thrown (structural) cycle records its message here; a returned retryable
+// error records its code; an auth-required outcome leaves it untouched (it is
+// surfaced through the dedicated auth-required signal, not as an error); and a
+// converged cycle clears it. This is the read-only signal the status surface
+// shows as the error state — it never changes the machine's behaviour.
 let lastCycleError: string | null = null;
 
-// The wall-clock time (epoch ms) at which the most recent cycle finished
-// without throwing, or null if no cycle has completed cleanly yet. This is the
+// The wall-clock time (epoch ms) at which the most recent cycle CONVERGED (real
+// success/progress), or null if none has yet. A retryable error, an
+// auth-required outcome, and a thrown structural error all leave this untouched
+// so a non-converged cycle is never reported as a successful sync. This is the
 // "last successful sync" the status surface displays.
 let lastSuccessAtMs: number | null = null;
 

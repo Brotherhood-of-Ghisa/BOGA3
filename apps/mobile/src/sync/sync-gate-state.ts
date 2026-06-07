@@ -6,10 +6,11 @@
 //     dismissal on this. It lives in the local runtime-state row, not on the
 //     scheduler, so the gate reads it from the row and republishes it here.
 //   - `lastCycleErrorCode`: the classification of the most recent failed cycle
-//     ('AUTH_REQUIRED' | 'FK_VIOLATION' | 'INTERNAL'), or null when the last
-//     cycle was clean. The gate renders an error + Retry for the non-auth codes
-//     and routes to sign-in for the auth one. It is mirrored from the cycle's own
-//     observable signals (the auth-required flag and the classified error code).
+//     ('AUTH_REQUIRED' | 'FK_VIOLATION' | 'LOCAL_FK_VIOLATION' | 'INTERNAL'), or
+//     null when the last cycle was clean. The gate renders an error + Retry for
+//     the non-auth codes and routes to sign-in for the auth one. It is mirrored
+//     from the cycle's own observable signals (the auth-required flag and the
+//     classified error code).
 //
 // This is NOT a second scheduler-state accessor: the phase / progress / offline
 // snapshot is read straight from the shared scheduler-status accessor. This
@@ -22,7 +23,7 @@
 import type { SyncProgress } from '@/src/sync/progress';
 
 /** The classification of a failed cycle, mirroring the cycle's own error codes. */
-export type LastCycleErrorCode = 'AUTH_REQUIRED' | 'FK_VIOLATION' | 'INTERNAL';
+export type LastCycleErrorCode = 'AUTH_REQUIRED' | 'FK_VIOLATION' | 'LOCAL_FK_VIOLATION' | 'INTERNAL';
 
 /** The immutable gate-scoped snapshot the gate subscribes to. */
 export interface SyncGateStateSnapshot {

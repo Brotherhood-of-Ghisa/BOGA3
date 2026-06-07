@@ -17,7 +17,7 @@
 // local-only bookkeeping columns (the dirty bit and the monotonic timestamp)
 // never cross the wire.
 
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, notInArray } from 'drizzle-orm';
 
 import { getRequiredSupabaseMobileClient } from '@/src/auth/supabase';
 import { clearAuthRequired, markAuthRequired } from '@/src/sync/auth-required-signal';
@@ -28,6 +28,15 @@ import { bootstrapLocalDataLayer, type LocalDatabase } from '@/src/data/bootstra
 import { PRIMARY_RUNTIME_STATE_ID, type Transaction } from '@/src/data/clock';
 import * as schema from '@/src/data/schema';
 import { syncRuntimeState } from '@/src/data/schema';
+import { logEvent } from '@/src/logging/logEvent';
+import { findPushBatchFkViolations, type PushFkViolation } from '@/src/sync/fk-graph';
+import {
+  quarantineKey,
+  quarantineRows,
+  readQuarantine,
+  type QuarantineRecordInput,
+  type QuarantineWriteResult,
+} from '@/src/sync/quarantine';
 import { TOPO_LAYERS, type EntityTableName } from '@/src/sync/topo-order';
 
 // -----------------------------------------------------------------------------
@@ -92,7 +101,7 @@ interface ErrorEnvelope {
 // Error classification
 // -----------------------------------------------------------------------------
 
-export type SyncErrorCode = 'AUTH_REQUIRED' | 'FK_VIOLATION' | 'INTERNAL';
+export type SyncErrorCode = 'AUTH_REQUIRED' | 'FK_VIOLATION' | 'LOCAL_FK_VIOLATION' | 'INTERNAL';
 
 export class SyncCycleError extends Error {
   readonly code: SyncErrorCode;
@@ -103,6 +112,13 @@ export class SyncCycleError extends Error {
     this.code = code;
   }
 }
+
+/**
+ * The single, explicit outcome of one cycle call. Every non-converged path is
+ * classified into one of these values so the gate, scheduler, background task,
+ * and status surfaces derive their view from the same result.
+ */
+export type SyncCycleOutcome = 'converged' | 'auth-required' | 'fk-violation' | 'internal';
 
 /**
  * Maps a server response into a sync error code, or null when the response is a
@@ -146,6 +162,183 @@ export const classifyRpcResult = (
   }
 
   return null;
+};
+
+const LOCAL_FK_ERROR_CODE: SyncErrorCode = 'LOCAL_FK_VIOLATION';
+const MAX_EXCEPTION_MESSAGE_LENGTH = 300;
+
+const sanitizeExceptionMessage = (error: unknown): string => {
+  const raw =
+    error instanceof Error
+      ? error.message
+      : typeof error === 'object' && error !== null && 'message' in error
+        ? String((error as { message?: unknown }).message ?? '')
+        : String(error ?? '');
+
+  const compact = raw.replace(/\s+/g, ' ').trim();
+  if (!compact) {
+    return 'Unknown SQLite error';
+  }
+  return compact.length > MAX_EXCEPTION_MESSAGE_LENGTH
+    ? `${compact.slice(0, MAX_EXCEPTION_MESSAGE_LENGTH)}...`
+    : compact;
+};
+
+const readErrorCode = (error: unknown): string | null => {
+  if (typeof error === 'object' && error !== null && 'code' in error) {
+    const code = (error as { code?: unknown }).code;
+    return typeof code === 'string' ? code : null;
+  }
+  return null;
+};
+
+const isLocalSqliteForeignKeyError = (error: unknown): boolean => {
+  const code = readErrorCode(error);
+  if (code === 'SQLITE_CONSTRAINT_FOREIGNKEY' || code?.includes('FOREIGNKEY')) {
+    return true;
+  }
+  return sanitizeExceptionMessage(error).toLowerCase().includes('foreign key');
+};
+
+const logPullLocalFkViolation = (
+  error: unknown,
+  layer: number,
+  entities: readonly WireEntity[],
+): void => {
+  const entityTypes = Array.from(new Set(entities.map((entity) => entity.type))).sort();
+  const exceptionMessage = sanitizeExceptionMessage(error);
+
+  try {
+    void logEvent({
+      level: 'error',
+      source: 'database',
+      event: 'sync.pull_local_fk_violation',
+      message: 'Local SQLite foreign-key violation while applying a pulled sync page.',
+      context: {
+        layer,
+        entity_types: entityTypes,
+        row_count: entities.length,
+        operation: 'pull_page_apply',
+        error_code: LOCAL_FK_ERROR_CODE,
+        exception_message: exceptionMessage,
+      },
+    }).catch(() => undefined);
+  } catch {
+    // Diagnostic logging is best-effort and must never mask the sync error.
+  }
+};
+
+/** Cap the per-event row list so a large orphan backlog cannot bloat one log row. */
+const MAX_LOGGED_QUARANTINE_ROWS = 20;
+
+/** Maps a push FK preflight violation onto a quarantine record. */
+const violationToQuarantineRecord = (violation: PushFkViolation): QuarantineRecordInput => ({
+  entityType: violation.childType,
+  entityId: violation.childId,
+  errorCode: LOCAL_FK_ERROR_CODE,
+  parentType: violation.parentType,
+  parentIdField: violation.parentIdField,
+  parentId: violation.parentId,
+});
+
+/**
+ * Records that one or more dirty rows were freshly quarantined as one structured
+ * event, so an operator can identify the orphan rows that were pulled out of the
+ * push stream. Logs only opaque identifiers and structural metadata — the
+ * random-hex row id, the parent type, the missing FK column, and the unresolved
+ * parent id — never a row payload or any user-entered value (names, machine
+ * names, weights).
+ *
+ * Best-effort: a logging failure must never prevent the quarantine persistence
+ * (already committed) or the continued push of the valid rows beside it.
+ */
+const logRowsQuarantined = (created: readonly QuarantineWriteResult[]): void => {
+  try {
+    void logEvent({
+      level: 'warn',
+      source: 'sync',
+      event: 'sync.row_quarantined',
+      message: 'Quarantined dirty rows whose required FK parents are missing locally.',
+      context: {
+        operation: 'push_batch_preflight',
+        error_code: LOCAL_FK_ERROR_CODE,
+        quarantined_count: created.length,
+        rows: created.slice(0, MAX_LOGGED_QUARANTINE_ROWS).map(({ input }) => ({
+          entity_type: input.entityType,
+          entity_id: input.entityId,
+          parent_type: input.parentType,
+          parent_id_field: input.parentIdField,
+          parent_id: input.parentId,
+        })),
+      },
+    }).catch(() => undefined);
+  } catch {
+    // Diagnostic logging is best-effort and must never mask sync progress.
+  }
+};
+
+/**
+ * Records that the push leg continued flushing valid rows after quarantining one
+ * or more orphans in the same drain — the observable proof that one bad row no
+ * longer wedges the whole backlog. Counts only; carries no row identity or
+ * payload.
+ *
+ * Best-effort: a logging failure must never affect the push that already
+ * happened.
+ */
+const logPushContinuedAfterQuarantine = (
+  pushedRowCount: number,
+  quarantinedRowCount: number,
+): void => {
+  try {
+    void logEvent({
+      level: 'info',
+      source: 'sync',
+      event: 'sync.push_continued_after_quarantine',
+      message: 'Push continued flushing valid rows after quarantining orphaned rows.',
+      context: {
+        operation: 'push_batch_continue',
+        pushed_row_count: pushedRowCount,
+        quarantined_row_count: quarantinedRowCount,
+      },
+    }).catch(() => undefined);
+  } catch {
+    // Diagnostic logging is best-effort and must never affect the push.
+  }
+};
+
+/**
+ * Records the classified outcome of a finished cycle as one structured event.
+ * The non-converged classes carry a sanitized exception message (never a payload
+ * or user-entered value) so a backend outage / FK mismatch is diagnosable.
+ *
+ * Fire-and-forget on purpose: a logging failure must never change the cycle's
+ * result or mask it — a thrown structural error still propagates and a returned
+ * result is still returned regardless of whether this insert succeeds.
+ */
+const logCycleOutcome = (
+  outcome: SyncCycleOutcome,
+  errorCode: SyncErrorCode | null,
+  error?: unknown,
+): void => {
+  const level: 'info' | 'warn' | 'error' =
+    outcome === 'converged' ? 'info' : outcome === 'fk-violation' ? 'error' : 'warn';
+
+  try {
+    void logEvent({
+      level,
+      source: 'sync',
+      event: 'sync.cycle_result',
+      message: 'Sync cycle finished.',
+      context: {
+        outcome,
+        error_code: errorCode,
+        ...(error !== undefined ? { exception_message: sanitizeExceptionMessage(error) } : {}),
+      },
+    }).catch(() => undefined);
+  } catch {
+    // Best-effort: cycle-result logging must never change the cycle's result.
+  }
 };
 
 // -----------------------------------------------------------------------------
@@ -358,9 +551,16 @@ export const wireToEntity = (envelope: WireEntity, type: EntityTableName): Entit
  * drains without starving the oldest entry. Stops as soon as the cap is hit.
  * Returns the serialised wire envelopes; an empty array means the dirty stream
  * is exhausted.
+ *
+ * Quarantined rows are excluded: a row recorded in `sync_quarantine` is a known
+ * structural orphan that the server would reject, so it is skipped here rather
+ * than wedging the batch behind it. The exclusion reads the quarantine table in
+ * the caller's transaction, so a row quarantined earlier in the same transaction
+ * is already absent from a subsequent selection.
  */
 export const selectPushBatch = (tx: Transaction, batchCap: number): WireEntity[] => {
   const batch: WireEntity[] = [];
+  const quarantinedIdsByType = readQuarantine(tx).idsByType;
 
   for (const type of ENTITY_ORDER) {
     if (batch.length >= batchCap) {
@@ -368,10 +568,16 @@ export const selectPushBatch = (tx: Transaction, batchCap: number): WireEntity[]
     }
     const remaining = batchCap - batch.length;
     const table = ENTITY_TABLES[type] as typeof schema.gyms;
+    const excludedIds = quarantinedIdsByType.get(type);
+    const dirtyClause = eq(table.localDirty, true);
+    const whereClause =
+      excludedIds && excludedIds.length > 0
+        ? and(dirtyClause, notInArray(table.id, excludedIds))
+        : dirtyClause;
     const rows = tx
       .select()
       .from(table)
-      .where(eq(table.localDirty, true))
+      .where(whereClause)
       .orderBy(asc(table.localUpdatedAtMs))
       .limit(remaining)
       .all() as EntityRow[];
@@ -590,18 +796,30 @@ const runPullLeg = async (
       // only moves past rows that actually committed locally. The transaction
       // returns the count of rows actually written so a no-op page does not
       // count toward convergence motion.
-      const pageChanged = database.transaction((tx) => {
-        const transaction = tx as Transaction;
-        let changed = 0;
-        for (const type of layerTypes) {
-          const forType = page.entities.filter((entity) => entity.type === type);
-          if (forType.length > 0) {
-            changed += applyPullPage(transaction, forType, type);
+      let pageChanged: number;
+      try {
+        pageChanged = database.transaction((tx) => {
+          const transaction = tx as Transaction;
+          let changed = 0;
+          for (const type of layerTypes) {
+            const forType = page.entities.filter((entity) => entity.type === type);
+            if (forType.length > 0) {
+              changed += applyPullPage(transaction, forType, type);
+            }
           }
+          writeCursorEntry(transaction, layer, page.next_cursor);
+          return changed;
+        });
+      } catch (error) {
+        if (isLocalSqliteForeignKeyError(error)) {
+          logPullLocalFkViolation(error, layer, page.entities);
+          throw new SyncCycleError(
+            LOCAL_FK_ERROR_CODE,
+            `local pull apply failed: ${sanitizeExceptionMessage(error)}`,
+          );
         }
-        writeCursorEntry(transaction, layer, page.next_cursor);
-        return changed;
-      });
+        throw error;
+      }
 
       receivedTotal += page.entities.length;
       changedTotal += pageChanged;
@@ -659,16 +877,60 @@ const runPushLeg = async (database: LocalDatabase): Promise<number> => {
     // Snapshot the batch and the per-row sent timestamps in one read. The map
     // captures the monotonic timestamp at serialise time so the ack handler can
     // detect a concurrent edit that landed while the request was in flight.
-    const { batch, sentAt } = database.transaction((tx) => {
-      const selected = selectPushBatch(tx as Transaction, BATCH_CAP);
+    //
+    // FK closure preflight + quarantine, all inside this one transaction so the
+    // selection, the quarantine writes, and the final batch are consistent: an
+    // orphan dirty row (a required FK parent neither in the batch nor present &
+    // clean locally) would be rejected wholesale by the server's FK check,
+    // wedging the dirty stream behind one bad row. Instead, quarantine the
+    // orphan(s) — persisting them so future selections skip them — and re-select
+    // so the remaining valid rows continue. Cascades resolve in a bounded loop:
+    // a child of a just-quarantined orphan is caught on the next pass because the
+    // preflight treats a quarantined parent as not-on-server.
+    const { batch, sentAt, created } = database.transaction((tx) => {
+      const transaction = tx as Transaction;
+      const quarantinedKeys = new Set(readQuarantine(transaction).keys);
+      const createdThisDrain: QuarantineWriteResult[] = [];
+
+      let selected = selectPushBatch(transaction, BATCH_CAP);
+      // Each pass quarantines at least one row and re-selects (which now excludes
+      // it); a clean preflight ends the loop. The pass cap is the layer count + 1
+      // so even a full top-to-bottom orphan chain cannot spin.
+      for (let pass = 0; pass <= ENTITY_ORDER.length; pass += 1) {
+        const violations = findPushBatchFkViolations(transaction, selected, quarantinedKeys);
+        if (violations.length === 0) {
+          break;
+        }
+        const written = quarantineRows(
+          transaction,
+          violations.map(violationToQuarantineRecord),
+          Date.now(),
+        );
+        createdThisDrain.push(...written);
+        for (const violation of violations) {
+          quarantinedKeys.add(quarantineKey(violation.childType, violation.childId));
+        }
+        selected = selectPushBatch(transaction, BATCH_CAP);
+      }
+
       const stamps = new Map<string, number>();
       for (const entity of selected) {
         stamps.set(rowKey(entity.type, entity.id), entity.client_updated_at_ms);
       }
-      return { batch: selected, sentAt: stamps };
+      return { batch: selected, sentAt: stamps, created: createdThisDrain };
     });
 
+    // Log the freshly-quarantined rows once, after the transaction commits, so
+    // the persistence is durable regardless of whether the (best-effort) log
+    // succeeds.
+    const newlyQuarantined = created.filter((result) => result.created);
+    if (newlyQuarantined.length > 0) {
+      logRowsQuarantined(newlyQuarantined);
+    }
+
     if (batch.length === 0) {
+      // Nothing left to push: either the dirty stream is exhausted or every
+      // remaining dirty row was quarantined this drain.
       break;
     }
 
@@ -713,6 +975,13 @@ const runPushLeg = async (database: LocalDatabase): Promise<number> => {
     }
 
     pushedTotal += batch.length;
+
+    // The valid rows just flushed despite an orphan being quarantined this drain:
+    // record that one bad row no longer wedged the backlog. Counts only — the
+    // quarantined rows' identities were already logged by `logRowsQuarantined`.
+    if (newlyQuarantined.length > 0) {
+      logPushContinuedAfterQuarantine(batch.length, newlyQuarantined.length);
+    }
   }
 
   return pushedTotal;
@@ -721,27 +990,6 @@ const runPushLeg = async (database: LocalDatabase): Promise<number> => {
 // -----------------------------------------------------------------------------
 // Entry point
 // -----------------------------------------------------------------------------
-
-/**
- * The single, explicit outcome of one cycle call. Every non-converged path —
- * including an unexpected throw from the bootstrapper/seed/pull/push — is
- * classified into exactly one of these, so the two surfaces that react to a
- * cycle (the first-sync gate and the scheduler/`sync-status`) derive their view
- * from the same value and can never disagree:
- *
- *  - 'converged': the cycle reached a quiet round talking to the server with a
- *    valid session. This is the only outcome that counts as real progress for
- *    the scheduler's last-success time.
- *  - 'auth-required': the server reported no signed-in user. A route signal, not
- *    an in-gate error: the gate sends the user to sign-in and shows no Retry.
- *  - 'fk-violation': a structural FK mismatch the cycle could not push past. Not
- *    retriable by a plain re-run, but still surfaced as an error + Retry in the
- *    gate so the user is never trapped behind a silent block.
- *  - 'internal': a recoverable server-internal / transport failure, OR any
- *    unexpected throw escaping the cycle body. Retriable: dirty bits and cursors
- *    are left untouched so the next tick re-runs the same state.
- */
-export type SyncCycleOutcome = 'converged' | 'auth-required' | 'fk-violation' | 'internal';
 
 /**
  * Runs one convergence cycle: pull every layer, push the dirty stream, then
@@ -812,6 +1060,7 @@ export const runSyncCycle = async (): Promise<SyncCycleOutcome> => {
 const markConverged = (): SyncCycleOutcome => {
   clearAuthRequired();
   clearCycleError();
+  logCycleOutcome('converged', null);
   return 'converged';
 };
 
@@ -835,15 +1084,20 @@ const classifyThrow = (error: unknown): SyncCycleOutcome => {
     // is a route decision, not an in-gate error, so the failure code stays clear.
     markAuthRequired();
     clearCycleError();
+    logCycleOutcome('auth-required', null);
     return 'auth-required';
   }
 
-  if (error instanceof SyncCycleError && error.code === 'FK_VIOLATION') {
+  if (
+    error instanceof SyncCycleError &&
+    (error.code === 'FK_VIOLATION' || error.code === 'LOCAL_FK_VIOLATION')
+  ) {
     // Structural bug: a plain re-run will not push past it. Dirty bits and
     // cursors are left untouched so nothing is silently dropped. Record the code
     // so a watching gate shows the error and a single Retry rather than trapping
     // the user behind a silent block.
-    markCycleError('FK_VIOLATION');
+    markCycleError(error.code);
+    logCycleOutcome('fk-violation', error.code, error);
     return 'fk-violation';
   }
 
@@ -853,5 +1107,6 @@ const classifyThrow = (error: unknown): SyncCycleOutcome => {
   // re-pushes and re-pulls the same state. Record the code so a watching gate
   // shows the error and a single Retry.
   markCycleError('INTERNAL');
+  logCycleOutcome('internal', 'INTERNAL', error);
   return 'internal';
 };
