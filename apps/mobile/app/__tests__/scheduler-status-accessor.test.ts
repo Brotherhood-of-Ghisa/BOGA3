@@ -13,11 +13,15 @@ import { AppState, type AppStateStatus } from 'react-native';
 
 import type { LogEventParams } from '@/src/logging/logEvent';
 
-// Controllable cycle stub: resolve/reject by hand so RUNNING is observable.
-let cycleResolvers: { resolve: () => void; reject: (error: unknown) => void }[] = [];
+// Controllable cycle stub: resolve/reject by hand so RUNNING is observable. The
+// cycle returns a classified outcome (it never throws in production); the stub
+// resolves with that outcome so the status accessor sees the same contract.
+type CycleOutcome = 'converged' | 'auth-required' | 'fk-violation' | 'internal';
+let cycleResolvers: { resolve: (outcome: CycleOutcome) => void; reject: (error: unknown) => void }[] =
+  [];
 const mockRunSyncCycle = jest.fn(
   () =>
-    new Promise<void>((resolve, reject) => {
+    new Promise<CycleOutcome>((resolve, reject) => {
       cycleResolvers.push({ resolve, reject });
     }),
 );
@@ -58,13 +62,19 @@ import { resetSyncProgress, setSyncProgress } from '@/src/sync/progress';
 
 const goOnline = () => mockNetInfoState.listener?.({ isConnected: true });
 
-const endCycleSuccess = async () => {
-  cycleResolvers.shift()?.resolve();
+const endCycleConverged = async () => {
+  cycleResolvers.shift()?.resolve('converged');
   await Promise.resolve();
   await Promise.resolve();
 };
 
-const endCycleError = async () => {
+const endCycleOutcome = async (outcome: Exclude<CycleOutcome, 'converged'>) => {
+  cycleResolvers.shift()?.resolve(outcome);
+  await Promise.resolve();
+  await Promise.resolve();
+};
+
+const endCycleThrow = async () => {
   cycleResolvers.shift()?.reject(new Error('cycle blew up'));
   await Promise.resolve();
   await Promise.resolve();
@@ -113,13 +123,13 @@ describe('production scheduler status accessor', () => {
     expect(status.progress.offline).toBe(false);
   });
 
-  it('records the last successful sync time and clears the error on a clean cycle', async () => {
+  it('records the last successful sync time and clears the error on a converged cycle', async () => {
     goOnline();
     jest.advanceTimersByTime(1000); // short timer fires -> RUNNING
     expect(getSchedulerStatus().state.name).toBe('RUNNING');
 
     const before = Date.now();
-    await endCycleSuccess();
+    await endCycleConverged();
 
     const status = getSchedulerStatus();
     expect(status.lastCycleError).toBeNull();
@@ -127,24 +137,68 @@ describe('production scheduler status accessor', () => {
     expect(status.lastSuccessAtMs).toBeGreaterThanOrEqual(before);
   });
 
-  it('retains the latest cycle error message after a thrown cycle', async () => {
+  it('does NOT record a success time and DOES surface an error on an INTERNAL outcome', async () => {
+    // Regression: an INTERNAL-returning cycle previously resolved cleanly, so the
+    // scheduler recorded it as a fresh success ("last synced: just now, no error")
+    // while dirty rows piled up. The outcome must instead leave lastSuccessAtMs
+    // untouched and set a visible error.
     goOnline();
     jest.advanceTimersByTime(1000);
-    await endCycleError();
+    await endCycleOutcome('internal');
+
+    const status = getSchedulerStatus();
+    expect(status.lastSuccessAtMs).toBeNull();
+    expect(status.lastCycleError).not.toBeNull();
+  });
+
+  it('does NOT record a success time on an FK_VIOLATION outcome', async () => {
+    goOnline();
+    jest.advanceTimersByTime(1000);
+    await endCycleOutcome('fk-violation');
+
+    const status = getSchedulerStatus();
+    expect(status.lastSuccessAtMs).toBeNull();
+    expect(status.lastCycleError).not.toBeNull();
+  });
+
+  it('does not let a non-converged outcome overwrite an earlier success time', async () => {
+    // A converged cycle records the success time; a later INTERNAL outcome must
+    // not clear it (the last *successful* sync is still real) but must surface the
+    // new error so the failure is visible.
+    goOnline();
+    jest.advanceTimersByTime(1000);
+    const before = Date.now();
+    await endCycleConverged();
+    const successAt = getSchedulerStatus().lastSuccessAtMs;
+    expect(successAt).toBeGreaterThanOrEqual(before);
+
+    jest.advanceTimersByTime(60_000);
+    await endCycleOutcome('internal');
+
+    const status = getSchedulerStatus();
+    expect(status.lastSuccessAtMs).toBe(successAt);
+    expect(status.lastCycleError).not.toBeNull();
+  });
+
+  it('retains the latest cycle error message after a defensively thrown cycle', async () => {
+    goOnline();
+    jest.advanceTimersByTime(1000);
+    await endCycleThrow();
 
     const status = getSchedulerStatus();
     expect(status.lastCycleError).toBe('cycle blew up');
+    expect(status.lastSuccessAtMs).toBeNull();
   });
 
-  it('clears a prior error once a later cycle completes cleanly', async () => {
+  it('clears a prior error once a later cycle converges', async () => {
     goOnline();
     jest.advanceTimersByTime(1000);
-    await endCycleError();
-    expect(getSchedulerStatus().lastCycleError).toBe('cycle blew up');
+    await endCycleOutcome('internal');
+    expect(getSchedulerStatus().lastCycleError).not.toBeNull();
 
-    // Idle backstop re-arms; let it fire and settle cleanly.
+    // Idle backstop re-arms; let it fire and settle converged.
     jest.advanceTimersByTime(60_000);
-    await endCycleSuccess();
+    await endCycleConverged();
 
     expect(getSchedulerStatus().lastCycleError).toBeNull();
   });

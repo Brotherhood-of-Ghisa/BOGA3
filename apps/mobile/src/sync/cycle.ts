@@ -675,14 +675,42 @@ const runPushLeg = async (database: LocalDatabase): Promise<number> => {
 // -----------------------------------------------------------------------------
 
 /**
+ * The single, explicit outcome of one cycle call. Every non-converged path —
+ * including an unexpected throw from the bootstrapper/seed/pull/push — is
+ * classified into exactly one of these, so the two surfaces that react to a
+ * cycle (the first-sync gate and the scheduler/`sync-status`) derive their view
+ * from the same value and can never disagree:
+ *
+ *  - 'converged': the cycle reached a quiet round (or the round cap) talking to
+ *    the server with a valid session. This is the only outcome that counts as
+ *    real progress for the scheduler's last-success time.
+ *  - 'auth-required': the server reported no signed-in user. A route signal, not
+ *    an in-gate error: the gate sends the user to sign-in and shows no Retry.
+ *  - 'fk-violation': a structural FK mismatch the cycle could not push past. Not
+ *    retriable by a plain re-run, but still surfaced as an error + Retry in the
+ *    gate so the user is never trapped behind a silent block.
+ *  - 'internal': a recoverable server-internal / transport failure, OR any
+ *    unexpected throw escaping the cycle body. Retriable: dirty bits and cursors
+ *    are left untouched so the next tick re-runs the same state.
+ */
+export type SyncCycleOutcome = 'converged' | 'auth-required' | 'fk-violation' | 'internal';
+
+/**
  * Runs one convergence cycle: pull every layer, push the dirty stream, then
  * pull again, repeating until a full round moves nothing in either direction
- * (or the round guard trips). Returns cleanly when converged or when a
- * recoverable error envelope (no JWT / server-internal) is seen, leaving dirty
- * bits set for a later retry. Throws only on a non-retriable structural FK
- * violation.
+ * (or the round guard trips).
+ *
+ * It never throws: every outcome — convergence, the recoverable no-JWT /
+ * server-internal envelopes, a structural FK violation, AND any unexpected throw
+ * from the bootstrapper/seed/pull/push (a Drizzle/SQLite write failure, a seed
+ * verification error, a malformed-payload `new Date(NaN)`, a missing Supabase
+ * client) — is classified into a single {@link SyncCycleOutcome} and returned.
+ * It also raises the matching observable signal (the auth-required flag or the
+ * non-auth error code) before returning, so the gate and the scheduler read one
+ * consistent view of the same cycle. On any non-converged outcome the dirty bits
+ * and cursors are left untouched, so the next scheduled tick re-runs cleanly.
  */
-export const runSyncCycle = async (): Promise<void> => {
+export const runSyncCycle = async (): Promise<SyncCycleOutcome> => {
   const database = await bootstrapLocalDataLayer();
 
   try {
@@ -707,46 +735,67 @@ export const runSyncCycle = async (): Promise<void> => {
 
       // A round that moved no rows on either end means both sides are quiet.
       if (pulledBefore === 0 && pushed === 0 && pulledAfter === 0) {
-        // A cycle that converged talked to the server with a valid session, so
-        // any earlier "no signed-in user" condition is resolved. Clear the flag
-        // so the route layer no longer holds the user on the sign-in screen, and
-        // clear any prior failure code so a watching gate stops showing an error.
-        clearAuthRequired();
-        clearCycleError();
-        return;
+        return markConverged();
       }
     }
     // Reaching the round cap without a quiet round still means the cycle made
-    // authenticated progress; treat it as a resolved auth condition.
-    clearAuthRequired();
-    clearCycleError();
+    // authenticated progress; treat it as a converged, resolved auth condition.
+    return markConverged();
   } catch (error) {
-    if (error instanceof SyncCycleError) {
-      if (error.code === 'FK_VIOLATION') {
-        // Structural bug: not retriable, surfaces to the caller. Dirty bits and
-        // cursors are left untouched so nothing is silently dropped. Record the
-        // code so a watching gate can show the error and a single Retry.
-        markCycleError('FK_VIOLATION');
-        throw error;
-      }
-      if (error.code === 'AUTH_REQUIRED') {
-        // The server reports no signed-in user. This is not an exception to
-        // surface — it is the route signal that the app needs a session. Raise
-        // the observable flag so the route layer sends the user to sign-in, then
-        // give up this cycle cleanly (dirty bits and cursors are untouched, so a
-        // post-login cycle re-pushes and re-pulls the same state). It is a route
-        // decision, not an in-gate error, so the failure-code signal stays clear.
-        markAuthRequired();
-        clearCycleError();
-        return;
-      }
-      // A server-internal hiccup: give up this cycle cleanly. Dirty bits stay
-      // set and cursors are unchanged, so the next scheduled tick starts a fresh
-      // cycle that re-pushes and re-pulls the same state. Record the code so a
-      // watching gate can show the error and a single Retry.
-      markCycleError('INTERNAL');
-      return;
-    }
-    throw error;
+    return classifyThrow(error);
   }
+};
+
+/**
+ * Records a converged cycle and returns the matching outcome. A cycle that
+ * converged talked to the server with a valid session, so any earlier "no
+ * signed-in user" condition is resolved: clear the auth flag so the route layer
+ * no longer holds the user on sign-in, and clear any prior failure code so a
+ * watching gate stops showing an error.
+ */
+const markConverged = (): SyncCycleOutcome => {
+  clearAuthRequired();
+  clearCycleError();
+  return 'converged';
+};
+
+/**
+ * Classifies a throw escaping the cycle body into a single outcome and raises
+ * the matching observable signal. A recognised {@link SyncCycleError} maps to
+ * its code; ANY other throw — a Drizzle/SQLite write failure, the seed
+ * verification error, a malformed-payload `new Date(NaN)`, a missing Supabase
+ * client — is treated as a recoverable INTERNAL failure rather than escaping
+ * unclassified. Letting such a throw escape was the bug that left the first-sync
+ * gate spinning forever with no error and no Retry: the bootstrap flag was never
+ * set AND no error code was ever recorded, so the gate fell through to
+ * in-progress with nothing to lift it.
+ */
+const classifyThrow = (error: unknown): SyncCycleOutcome => {
+  if (error instanceof SyncCycleError && error.code === 'AUTH_REQUIRED') {
+    // The server reports no signed-in user. This is not an error to surface — it
+    // is the route signal that the app needs a session. Raise the observable flag
+    // so the route layer sends the user to sign-in (dirty bits and cursors are
+    // untouched, so a post-login cycle re-pushes and re-pulls the same state). It
+    // is a route decision, not an in-gate error, so the failure code stays clear.
+    markAuthRequired();
+    clearCycleError();
+    return 'auth-required';
+  }
+
+  if (error instanceof SyncCycleError && error.code === 'FK_VIOLATION') {
+    // Structural bug: a plain re-run will not push past it. Dirty bits and
+    // cursors are left untouched so nothing is silently dropped. Record the code
+    // so a watching gate shows the error and a single Retry rather than trapping
+    // the user behind a silent block.
+    markCycleError('FK_VIOLATION');
+    return 'fk-violation';
+  }
+
+  // A recognised server-internal hiccup OR any other unexpected throw: give up
+  // this cycle cleanly as a retriable INTERNAL failure. Dirty bits stay set and
+  // cursors are unchanged, so the next scheduled tick starts a fresh cycle that
+  // re-pushes and re-pulls the same state. Record the code so a watching gate
+  // shows the error and a single Retry.
+  markCycleError('INTERNAL');
+  return 'internal';
 };
