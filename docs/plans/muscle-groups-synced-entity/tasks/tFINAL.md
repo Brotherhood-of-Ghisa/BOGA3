@@ -29,9 +29,12 @@ Binding contract in `designs/t1.md ## Decision`. Relevant landed artifacts to ex
   `deferrable initially deferred` FK exists.
 - **PO3 (client schema round-trips):** a wire round-trip test serializes a `muscle_groups` row and
   reads it back with `deletedAt` / dirty columns / id-default behavior intact.
-- **PO4 (single baseline):** an assertion (extending or referencing `domain-schema-migrations.test.ts`)
-  confirms `localRuntimeMigrations.journal.entries` length 1, keys `['m0000']`, and that the baseline
-  carries the new `muscle_groups` shape without the non-editable guard.
+- **PO4 (muscle_groups lives in the `m0000` baseline, no migration of its own):** an assertion
+  (extending or referencing `domain-schema-migrations.test.ts`) confirms `m0000` (tag
+  `0000_living_bucky`) carries the new `muscle_groups` shape WITHOUT the non-editable guard, and that
+  `muscle_groups` added no incremental migration of its own. NOTE (re-scoped): do NOT assert the
+  journal length is 1 — an unrelated `sync_quarantine` `m0001` legitimately exists on the journal and
+  is out of scope. Assert the `muscle_groups` shape is in `m0000`, not the total journal length.
 - **PO5 (registry):** an assertion confirms `'muscle_groups'` is in Layer 0 of `TOPO_LAYERS`, is in
   `EntityTableName`, and has `ENTITY_FIELDS`/`ENTITY_TABLES` entries with the exact wire field set.
 - **PO6 (dirty seed + boot FK):** an assertion confirms `seedSystemExerciseCatalog` seeds

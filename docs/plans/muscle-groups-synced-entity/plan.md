@@ -35,12 +35,15 @@ Observable, specific, testable, bounded. The final test card verifies these end-
    and keeps `displayName` / `familyName` / `sortOrder` / `isEditable` / `createdAt` / `updatedAt`.
    The `muscle_groups_non_editable_guard` CHECK is dropped; the boolean guard and the
    `sort_order >= 0` guard remain. The client FK `muscleGroupId → muscleGroups.id` is preserved.
-4. **The client baseline stays a single squashed `m0000`.** After `npm run db:generate`,
-   `localRuntimeMigrations.journal.entries` has length 1 and its keys equal `['m0000']` (the
-   `0000_living_bucky` tag is kept; no incremental client migration is added). The regenerated
+4. **The `muscle_groups` change adds no client migration of its own; its shape lives in the squashed
+   `m0000` baseline.** After `npm run db:generate`, `m0000` (tag `0000_living_bucky` preserved)
+   carries the new `muscle_groups` shape and the dropped non-editable guard — the regenerated
    `drizzle/0000_living_bucky.sql`, `drizzle/meta/0000_snapshot.json`, and
-   `drizzle/migrations.generated.ts` reflect the new `muscle_groups` shape and the dropped
-   non-editable guard. `domain-schema-migrations.test.ts` is green.
+   `drizzle/migrations.generated.ts` reflect it; no `muscle_groups`-specific incremental migration is
+   added. `domain-schema-migrations.test.ts` is green. (Re-scoped at execute time: an unrelated
+   change appended a `sync_quarantine` `m0001` to the journal, so the original "journal length 1 /
+   keys `['m0000']`" framing no longer holds; the in-scope guarantee is that `muscle_groups` lives in
+   `m0000` and introduces no migration of its own. The `m0001` quarantine entry is out of scope.)
 5. **`muscle_groups` is registered as the 9th synced entity in the sync engine.** It is a member of
    `EntityTableName` and sits in **Layer 0** of `TOPO_LAYERS`; `ENTITY_FIELDS[muscle_groups]` and
    `ENTITY_TABLES[muscle_groups]` exist. The wire field set is exactly
@@ -166,3 +169,17 @@ graph TD
   reconciled the sync-status-composer test. No deviation. (Reviewer verdict posted to the PR at the
   user's request.) Noted stale "client-only" comments in seed-once.test.ts / account-switch-local-
   wipe.test.ts → seeding/wipe-task (t5/t7) territory.
+- t10 (PR #176, merged 2026-06-07): remediated t2 server-contract-test fallout. Scenario-1 has_more
+  "failure" diagnosed as an ENVIRONMENT artifact (orphaned Supabase stack, >10 Layer-0 rows), not a
+  code bug — pull RPC correct; scenario hardened to be hermetic. Fixed ALL durable-hygiene leaks
+  across supabase/ (15 files; migrations comment-only). Deviation: scope expanded beyond 3 named
+  files (justified — "the final grep must be clean") and one commit-message reword was required
+  (CHANGES_REQUESTED → fixed). Surfaced cross-owner RLS gap → folded in as t11 (user decision).
+- EXTERNAL OVERLAP (unrelated PR #148 "DB Sync review: FK-blocked inserts", merged onto main between
+  t9 and t10): independently shipped **boot FK enforcement** (`PRAGMA foreign_keys = ON` at
+  connection-open + post-seed `foreign_key_check` in bootstrap.ts) plus pull FK error classification,
+  push FK-closure preflight, quarantine, and scheduler-result semantics (44 files incl. cycle.ts,
+  sync-status.ts, fk-graph.ts, quarantine.ts). VERIFIED our merged t2/t4/t6/t9 artifacts survived its
+  merge intact. Impact: plan **outcome 6's FK-pragma requirement is now pre-satisfied** — t5
+  reconciles (does NOT re-add it); t7 (FK-harness default + false-FK-comment fixes) and tFINAL
+  (PO6/PO8 FK assertions) must reconcile with #148's FK infrastructure rather than assume a greenfield.
