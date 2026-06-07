@@ -44,7 +44,8 @@ currently draws the line.
 ### Lane matrix (what runs where)
 
 The one table that joins all four facts. Exact durations live in
-`docs/testing/local-test-timings.md`; the time column here is order-of-magnitude.
+`docs/testing/local-test-timings.md`; the time column here is order-of-magnitude
+(`N/A` = not currently measured, not "instant").
 
 | Lane | Command | In which gate | CI? | ~Time |
 | --- | --- | --- | :--: | --- |
@@ -62,11 +63,11 @@ The one table that joins all four facts. Exact durations live in
 | dev-wipe contract | `test-dev-wipe-my-data.sh` | `quality-slow.sh backend` | ❌ | ~3s |
 | sync schema-drift (strict) | `npm run check:sync-drift -- --strict` | `quality-slow.sh backend` | ❌ | ~35s |
 | sync-v2 end-to-end | `test-sync-v2-e2e.sh` | `quality-slow.sh backend` | ❌ | ~2min |
-| **sync-infra (mobile cross-stack)** | `npm run test:sync:infra` (`test-sync-infra.sh`) | `quality-slow.sh backend` (last) | ❌ | ~40s (est.) |
+| **sync-infra (mobile cross-stack)** | `npm run test:sync:infra` (`test-sync-infra.sh`) | `quality-slow.sh backend` (last) | ❌ | N/A |
 | *Infra: iOS simulator + Metro — never CI-able* | | | | |
 | iOS smoke | `npm run test:e2e:ios:smoke` | `quality-slow.sh frontend` | ❌ | ~75s |
 | iOS data-smoke | `npm run test:e2e:ios:data-smoke` | `quality-slow.sh frontend` | ❌ | ~110s |
-| iOS auth-profile | `npm run test:e2e:ios:auth-profile` | `quality-slow.sh frontend` | ❌ | RED |
+| iOS auth-profile | `npm run test:e2e:ios:auth-profile` | `quality-slow.sh frontend` | ❌ | N/A |
 
 Two traps this table exists to kill:
 

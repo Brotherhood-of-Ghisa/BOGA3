@@ -78,7 +78,7 @@ the headline. `≤ ceiling` = 3× median = "above this, something is wrong".
 | dev_wipe_my_data contract | `./supabase/scripts/test-dev-wipe-my-data.sh` | 3.3 s | 3.1–3.5 s | 9.8 s | ✅ pass |
 | sync schema-drift (strict) | `npm run check:sync-drift -- --strict` (from `apps/mobile`) | 35.4 s | 27.2–35.5 s | 106 s | ✅ pass |
 | sync v2 end-to-end | `./supabase/scripts/test-sync-v2-e2e.sh` | 118.4 s | 118.3–120.9 s | 355 s (~5.9 min) | ✅ pass |
-| sync-infra (mobile cross-stack) | `./supabase/scripts/test-sync-infra.sh` | *est. ~40 s* | not yet measured | — | ⚠️ unmeasured (see Notes) |
+| sync-infra (mobile cross-stack) | `./supabase/scripts/test-sync-infra.sh` | N/A | N/A | N/A | not yet measured (see Notes) |
 
 > `./scripts/quality-slow.sh backend` runs every row above **except** `backend
 > fast smoke` (that one is `quality-fast.sh backend`) — i.e. `auth / RLS contract`
@@ -97,7 +97,7 @@ the headline. `≤ ceiling` = 3× median = "above this, something is wrong".
 | smoke | `npm run test:e2e:ios:smoke` | 73.6 s | 71.5–98.9 s | 221 s (~3.7 min) | ✅ pass |
 | data-runtime-smoke | `npm run test:e2e:ios:data-smoke` | 110.0 s | 109.3–110.4 s | 330 s (~5.5 min) | ✅ pass |
 | gates (smoke + data, shared sim/Metro) | `npm run test:e2e:ios:gates` | 135.3 s | 134.5–135.5 s | 406 s (~6.8 min) | ✅ pass |
-| auth-profile (signed-in) | `npm run test:e2e:ios:auth-profile` | — | (≈283 s to **fail**) | — | ❌ **red** (see Notes) |
+| auth-profile (signed-in) | `npm run test:e2e:ios:auth-profile` | N/A | N/A | N/A | not re-measured (see Notes) |
 
 > `gates` runs the smoke + data-runtime-smoke flows against **one** provisioned
 > simulator + one Metro instance, so it is cheaper (~135 s) than running smoke
@@ -126,16 +126,15 @@ the headline. `≤ ceiling` = 3× median = "above this, something is wrong".
   removed from the tables above. See the "Retired / removed entry points" section
   in `docs/specs/06-testing-strategy.md`.
 
-- **`test:e2e:ios:auth-profile` is currently RED (≈283 s to fail).** The lane runs
-  four flows; it aborts at the 2nd (`sync-gate-first-cycle.yaml`) on
-  `assertVisible: sync-gate-activity-indicator`. On the simulator the first-sync
-  gate renders its **offline** branch ("You are offline…") instead of the activity
-  indicator, because the sync scheduler projects `NetInfo.isInternetReachable ===
-  true` and arms offline-first, and `isInternetReachable` is unreliable/`null` on
-  the iOS simulator. The ~283 s is a real full run that ends in a failure (not a
-  hang/timeout); flows 3-4 never execute. When fixed, expect this lane to run
-  **longer** than 283 s (it currently stops early) — re-measure once green.
-  *(A fix-it card was spawned.)*
+- **`test:e2e:ios:auth-profile` — not re-measured here (table shows N/A).** This
+  lane was **previously RED**: it aborted at the 2nd flow
+  (`sync-gate-first-cycle.yaml`) because on the simulator the first-sync gate
+  rendered its **offline** branch when connectivity was keyed off
+  `NetInfo.isInternetReachable` (unreliable/`null` on the iOS sim). **That has since
+  been fixed** — the scheduler now keys off `NetInfo.isConnected`
+  (`apps/mobile/src/sync/scheduler.ts`). The earlier ≈283 s figure was a pre-fix run
+  that stopped early on failure, so it was never a valid lane timing — removed.
+  Re-measure on a green run to record a current median.
 
 - **`test:sync:infra` (LOCAL — runnable here, do NOT defer) — still UNMEASURED.**
   Simplest run path: `./supabase/scripts/test-sync-infra.sh`, which ensures this
@@ -146,13 +145,11 @@ the headline. `≤ ceiling` = 3× median = "above this, something is wrong".
   script directly — any endpoint carrying the sync schema + the `user_a` fixture
   works.) It has **no** iOS sim / Metro, but it is **not** one of the cheap
   slow-side lanes: its `drift-check.test.ts` half shells out to the full
-  `check:sync-drift --strict` (~35 s, see the `sync schema-drift` row), so expect
-  it to land around that drift figure **plus** the two round-trip jest files — an
-  **estimated ~40 s**, not yet measured here. The `est. ~40 s` in the table above
-  is that estimate; replace it with a real 3×-median once measured on a clean slot.
-  A `2026-06-07` attempt in worktree `quizzical-nobel-fa305f` was blocked by a
-  baseline port collision on the shared slot (`db` port already allocated), not by
-  the lane itself.
+  `check:sync-drift --strict` (~35 s, see the `sync schema-drift` row), so it will
+  not be near the few-second contract lanes. No measured median yet — the table
+  shows **N/A**; record a real 3×-median once measured on a clean slot. (A
+  `2026-06-07` attempt here was blocked by a baseline `db`-port collision on the
+  shared slot, not by the lane itself.)
 
 - **Excluded as retired:** `./supabase/scripts/test-sync-api-contract.sh` and
   `./supabase/scripts/test-sync-events-ingest-contract.sh` target the M13/M14
