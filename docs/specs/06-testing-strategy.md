@@ -52,6 +52,11 @@ Scope boundary:
 
 # Entry-point catalog
 
+> For the at-a-glance **lane → {gate, CI?, ~time}** matrix and the
+> infra-dependency mental model, see the lane matrix in
+> `02-quality-and-test-gates.md` (it owns CI membership). This catalog owns each
+> entry point's PURPOSE / INFRASTRUCTURE / WHEN — not the CI column.
+
 Every test / quality entry point in the repo, with three facts each: **PURPOSE**
 (what it verifies), **INFRASTRUCTURE** (what it needs), and **WHEN TO RUN** (which
 codebase areas/changes should trigger it — by path/area). Infrastructure values:
@@ -89,7 +94,7 @@ codebase areas/changes should trigger it — by path/area). Infrastructure value
 | `./scripts/quality-fast.sh frontend` | `apps/mobile`: `lint` + `typecheck` + `test` | none | Any `apps/mobile/**` change. |
 | `./scripts/quality-fast.sh backend` | `./supabase/scripts/test-fast.sh` | local Supabase + Docker | Any `supabase/**` change. |
 | `./scripts/quality-slow.sh frontend` | `test:e2e:ios:smoke` + `test:e2e:ios:data-smoke` + `test:e2e:ios:auth-profile` (in that order) | iOS simulator + Metro + Maestro dev-client; auth-profile additionally needs local Supabase + Docker | Risk-triggered: UI/runtime/auth-profile changes needing real-simulator evidence. |
-| `./scripts/quality-slow.sh backend` | `test-auth-authz.sh` → `test-sync-v2-schema-smoke.sh` → `test-sync-push-contract.sh` → `test-sync-pull-contract.sh` → `test-dev-wipe-my-data.sh` → `check:sync-drift --strict` → `test-sync-v2-e2e.sh` (in that order) | local Supabase + Docker (each wrapper calls `ensure-local-runtime-baseline.sh`) | Risk-triggered backend work: `supabase/migrations/**`, `supabase/functions/**`, auth config/policies, sync RPC contracts/fixtures. |
+| `./scripts/quality-slow.sh backend` | `test-auth-authz.sh` → `test-sync-v2-schema-smoke.sh` → `test-sync-push-contract.sh` → `test-sync-pull-contract.sh` → `test-dev-wipe-my-data.sh` → `check:sync-drift --strict` → `test-sync-v2-e2e.sh` → `test-sync-infra.sh` (in that order) | local Supabase + Docker (each wrapper calls `ensure-local-runtime-baseline.sh`) | Risk-triggered backend work: `supabase/migrations/**`, `supabase/functions/**`, auth config/policies, sync RPC contracts/fixtures. |
 
 > The slow gate runs are not always mandatory. "When to run" is governed by the
 > codebase areas/paths in the policies below; the always-load quickref
@@ -108,7 +113,8 @@ its target suite under `supabase/tests/`.
 | `test-sync-push-contract.sh` | `tests/sync-push-contract.sh` | `sync_push` RPC contract: LWW, clamp, undelete, envelope, batch caps, FK closure, auth/RLS. | local Supabase + Docker | `sync_push` RPC / sync push contract changes under `supabase/**`. Part of `quality-slow.sh backend`. |
 | `test-sync-pull-contract.sh` | `tests/sync-pull-contract.sh` | `sync_pull` RPC contract: per-layer cursor protocol — snapshot pull, paginated drain, layer→type partition, RLS isolation, tombstones, empty-page echo, same-ms tiebreak, limit/layer bounds, AUTH_REQUIRED. | local Supabase + Docker | `sync_pull` RPC / pull contract changes under `supabase/**`. Part of `quality-slow.sh backend`. |
 | `test-dev-wipe-my-data.sh` | `tests/dev-wipe-my-data-contract.sh` | Developer-only `dev_wipe_my_data` RPC: auth guard, non-production environment guard, owner-scoped deletion (caller's rows removed, second user's rows survive). | local Supabase + Docker | Changes to the `dev_wipe_my_data` RPC or its guards. Part of `quality-slow.sh backend`. |
-| `test-sync-v2-e2e.sh` | `tests/sync-v2-*.sh` group | Integration-level plan-outcome assertions across the as-built stack: `sync-v2-clean-room.sh`, `-deferrable-fk.sh`, `-rls-cross-owner.sh`, `-push-roundtrip.sh`, `-pull-drain.sh`, `-pull-fk-closure.sh`, `-drift-synthetic.sh`, `-drift-asbuilt.sh`, `-spec-rule.sh`. Includes the independent push→pull parity assertions across all data-scope entities (incl. soft-delete tombstone visibility). | local Supabase + Docker | Any cross-cutting sync-v2 backend change; milestone/release closeout for sync. Part of `quality-slow.sh backend` (runs last). |
+| `test-sync-v2-e2e.sh` | `tests/sync-v2-*.sh` group | Integration-level plan-outcome assertions across the as-built stack: `sync-v2-clean-room.sh`, `-deferrable-fk.sh`, `-rls-cross-owner.sh`, `-push-roundtrip.sh`, `-pull-drain.sh`, `-pull-fk-closure.sh`, `-drift-synthetic.sh`, `-drift-asbuilt.sh`, `-spec-rule.sh`. Includes the independent push→pull parity assertions across all data-scope entities (incl. soft-delete tombstone visibility). | local Supabase + Docker | Any cross-cutting sync-v2 backend change; milestone/release closeout for sync. Part of `quality-slow.sh backend` (runs after the per-task wrappers, before `test-sync-infra.sh`). |
+| `test-sync-infra.sh` | `apps/mobile` jest `test:sync:infra` (`drift-check` + `cycle-round-trip` + `auth-required-envelope`) | Mobile **cross-stack** sync proof: drives the real `runSyncCycle` against THIS worktree's slot-isolated local Supabase. Ensures the baseline, reads `API_URL`/`ANON_KEY`, exports them as `SUPABASE_BRANCH_URL`/`ANON_KEY`, then runs the lane — zero manual env setup. The one lane whose test body is frontend but whose infra is backend. | local Supabase + Docker | Mobile sync cycle / client Drizzle schema / migration bundle / wire-contract changes. Part of `quality-slow.sh backend` (**runs last**); also runnable standalone (`npm run test:sync:infra` with the env exported). |
 | `ensure-local-runtime-baseline.sh` | — | Shared runtime preflight (not a test): lock + conditional bootstrap/reset + deterministic fixture enforcement. If runtime is down: start + reset/seed + provision auth fixtures. If up: reuse as-is (no reset), apply pending migrations, verify baseline rows, re-provision auth fixtures idempotently. | local Supabase + Docker | Invoked automatically by every real-instance wrapper above and by `test:e2e:ios:auth-profile`. Run it directly before any real-instance slow test. |
 
 Supporting (non-test) backend scripts: `local-runtime-up.sh` (start stack + health
@@ -259,8 +265,9 @@ Metro and is owned operationally by
   least one real cross-stack path:
   - mobile side: `npm run test:sync:infra` (real round trip, AUTH_REQUIRED no-op,
     drift check) against a live endpoint;
-  - backend side: `./scripts/quality-slow.sh backend` (schema smoke + push + pull +
-    dev-wipe + drift + e2e). The push→pull parity / reinstall guarantee is proven
+  - backend side: `./scripts/quality-slow.sh backend` (auth/RLS + schema smoke +
+    push + pull + dev-wipe + drift + e2e + sync-infra). The push→pull parity /
+    reinstall guarantee is proven
     by `sync-v2-push-roundtrip.sh` and `sync-v2-pull-drain.sh` inside the e2e
     wrapper.
 - Current frontend baseline suites for this policy include

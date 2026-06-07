@@ -65,7 +65,6 @@ the headline. `≤ ceiling` = 3× median = "above this, something is wrong".
 | jest (full unit/integration) | `npm test` | 4.6 s | 4.4–9.7 s | 13.7 s | ✅ pass |
 | jest (sync subset) | `npm run test:sync` | 3.6 s | 3.5–3.6 s | 10.7 s | ✅ pass |
 | open-handle guard | `npm run test:handles` | 19.9 s | 19.5–32.6 s | 59.7 s | ✅ pass |
-| reinstall-parity | `npm run test:sync:reinstall-parity` | — | — | — | ❌ **broken** (see Notes) |
 
 ### Backend — Supabase (commands run from repo root; each re-ensures the warm local stack)
 
@@ -79,11 +78,15 @@ the headline. `≤ ceiling` = 3× median = "above this, something is wrong".
 | dev_wipe_my_data contract | `./supabase/scripts/test-dev-wipe-my-data.sh` | 3.3 s | 3.1–3.5 s | 9.8 s | ✅ pass |
 | sync schema-drift (strict) | `npm run check:sync-drift -- --strict` (from `apps/mobile`) | 35.4 s | 27.2–35.5 s | 106 s | ✅ pass |
 | sync v2 end-to-end | `./supabase/scripts/test-sync-v2-e2e.sh` | 118.4 s | 118.3–120.9 s | 355 s (~5.9 min) | ✅ pass |
+| sync-infra (mobile cross-stack) | `./supabase/scripts/test-sync-infra.sh` | *est. ~40 s* | not yet measured | — | ⚠️ unmeasured (see Notes) |
 
-> The backend lanes above are exactly what `./scripts/quality-slow.sh backend`
-> runs, in order. Each wrapper calls `ensure-local-runtime-baseline.sh`, which is
-> a no-op (~a few seconds) when the stack is already up — that overhead **is**
-> included in each figure. First-ever boot of the local stack (image pull +
+> `./scripts/quality-slow.sh backend` runs every row above **except** `backend
+> fast smoke` (that one is `quality-fast.sh backend`) — i.e. `auth / RLS contract`
+> through `sync-infra`, in that table order (`sync schema-drift` runs as
+> `check:sync-drift --strict` between `dev_wipe` and `sync v2 end-to-end`). Each
+> wrapper calls `ensure-local-runtime-baseline.sh`, which is a no-op (~a few
+> seconds) when the stack is already up — that overhead **is** included in each
+> figure. First-ever boot of the local stack (image pull +
 > migrate + seed + fixtures) is a separate one-time cost, not included here (tens
 > of seconds to a few minutes depending on Docker image cache).
 
@@ -119,13 +122,9 @@ the headline. `≤ ceiling` = 3× median = "above this, something is wrong".
   shell/session can sit near the listed **max**; that is expected and still well
   under the 3× ceiling.
 
-- **`test:sync:reinstall-parity` is currently BROKEN (not a timing).** It spends
-  ~3.5 s ensuring the local Supabase baseline, then `jest --config
-  jest.integration.config.js` exits 1 with **"No tests found"**: the config's
-  `testMatch` points at `app/__tests__/sync-reinstall-restore-parity.test.ts`,
-  which was deleted in commit `73b9661` ("[t1] delete v1 sync code paths"). The
-  npm script, the wrapper, and `jest.integration.config.js` were left dangling.
-  The ~3.5 s is pure setup, not test execution. *(A fix-it card was spawned.)*
+- **`test:sync:reinstall-parity` is retired** (target file deleted in `73b9661`);
+  removed from the tables above. See the "Retired / removed entry points" section
+  in `docs/specs/06-testing-strategy.md`.
 
 - **`test:e2e:ios:auth-profile` is currently RED (≈283 s to fail).** The lane runs
   four flows; it aborts at the 2nd (`sync-gate-first-cycle.yaml`) on
@@ -138,16 +137,22 @@ the headline. `≤ ceiling` = 3× median = "above this, something is wrong".
   **longer** than 283 s (it currently stops early) — re-measure once green.
   *(A fix-it card was spawned.)*
 
-- **`test:sync:infra` (LOCAL — runnable here, do NOT defer):** the lane reads
-  `SUPABASE_BRANCH_URL` / `SUPABASE_BRANCH_ANON_KEY`, but those name *any* endpoint
-  carrying the sync schema + the `user_a` fixture — including **this worktree's own
-  slot-isolated local Supabase**. Bring the baseline up
-  (`./supabase/scripts/ensure-local-runtime-baseline.sh`), export
-  `SUPABASE_BRANCH_URL`/`SUPABASE_BRANCH_ANON_KEY` from `supabase status -o env`
-  (`API_URL`/`ANON_KEY`), then `npm run test:sync:infra`. It is light (no iOS
-  simulator / Metro), so it should be one of the cheaper slow-side lanes — measure
-  and record its local timing here. Its schema-drift half is also covered by the
-  `sync-drift` backend lane above.
+- **`test:sync:infra` (LOCAL — runnable here, do NOT defer) — still UNMEASURED.**
+  Simplest run path: `./supabase/scripts/test-sync-infra.sh`, which ensures this
+  worktree's slot-isolated baseline and exports
+  `SUPABASE_BRANCH_URL`/`SUPABASE_BRANCH_ANON_KEY` (= the stack's `API_URL`/
+  `ANON_KEY`) for you, then runs `npm run test:sync:infra` in `apps/mobile`. (You
+  can also export those vars by hand from `supabase status -o env` and run the npm
+  script directly — any endpoint carrying the sync schema + the `user_a` fixture
+  works.) It has **no** iOS sim / Metro, but it is **not** one of the cheap
+  slow-side lanes: its `drift-check.test.ts` half shells out to the full
+  `check:sync-drift --strict` (~35 s, see the `sync schema-drift` row), so expect
+  it to land around that drift figure **plus** the two round-trip jest files — an
+  **estimated ~40 s**, not yet measured here. The `est. ~40 s` in the table above
+  is that estimate; replace it with a real 3×-median once measured on a clean slot.
+  A `2026-06-07` attempt in worktree `quizzical-nobel-fa305f` was blocked by a
+  baseline port collision on the shared slot (`db` port already allocated), not by
+  the lane itself.
 
 - **Excluded as retired:** `./supabase/scripts/test-sync-api-contract.sh` and
   `./supabase/scripts/test-sync-events-ingest-contract.sh` target the M13/M14
@@ -178,7 +183,6 @@ All three runs per lane (ms), exactly as recorded.
 | jest-full | 9739 | 4558 | 4417 | 0/0/0 |
 | jest-sync | 3558 | 3555 | 3517 | 0/0/0 |
 | handles | 32554 | 19889 | 19506 | 0/0/0 |
-| reinstall-parity | 4182 | 3557 | 3574 | 1/1/1 (no tests found) |
 | backend-fast | 31058 | 38475 | 38579 | 0/0/0 |
 | auth-authz | 4090 | 3538 | 3528 | 0/0/0 |
 | sync-v2-schema | 5621 | 5167 | 5150 | 0/0/0 |
