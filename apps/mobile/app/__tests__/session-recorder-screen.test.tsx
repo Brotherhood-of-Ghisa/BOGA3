@@ -23,6 +23,7 @@ jest.mock('@/src/data', () => ({
   },
   listExerciseTagDefinitions: jest.fn().mockResolvedValue([]),
   listSessionExerciseAssignedTags: jest.fn().mockResolvedValue([]),
+  listLocalGyms: jest.fn().mockResolvedValue([]),
   loadRecentExerciseBlocks: jest.fn().mockImplementation(async ({ exerciseDefinitionId }: { exerciseDefinitionId: string }) => ({
     exerciseDefinitionId,
     limit: 5,
@@ -110,6 +111,7 @@ const dataMock = jest.requireMock('@/src/data') as {
   loadLatestSessionDraftSnapshot: jest.Mock;
   loadSessionSnapshotById: jest.Mock;
   persistSessionDraftSnapshot: jest.Mock;
+  listLocalGyms: jest.Mock;
   upsertLocalGym: jest.Mock;
 };
 
@@ -121,6 +123,8 @@ describe('SessionRecorderScreen', () => {
     dataMock.loadSessionSnapshotById.mockResolvedValue(null);
     dataMock.persistSessionDraftSnapshot.mockReset();
     dataMock.persistSessionDraftSnapshot.mockResolvedValue({ sessionId: 'test-session' });
+    dataMock.listLocalGyms.mockReset();
+    dataMock.listLocalGyms.mockResolvedValue([]);
     dataMock.upsertLocalGym.mockClear();
     dataMock.upsertLocalGym.mockResolvedValue(undefined);
     locationMock.getCurrentForegroundPositionLazy.mockReset();
@@ -276,6 +280,33 @@ describe('SessionRecorderScreen', () => {
     fireEvent.press(screen.getByText('Add'));
 
     expect(screen.getAllByText('Southside Fitness Forge').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('hydrates non-seeded local gyms into the picker and manager', async () => {
+    dataMock.listLocalGyms.mockResolvedValueOnce([
+      {
+        id: 'synced-strength-house',
+        name: 'Synced Strength House',
+        latitude: 51.5,
+        longitude: -0.12,
+        coordinateAccuracyM: 15,
+        coordinatesUpdatedAt: new Date('2026-05-23T10:00:00.000Z'),
+      },
+    ]);
+
+    render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
+
+    fireEvent.press(screen.getByText('No gym'));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Select gym Synced Strength House')).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByText('Manage'));
+
+    expect(screen.getByText('Synced Strength House')).toBeTruthy();
+    expect(screen.getByText('GPS saved')).toBeTruthy();
   });
 
   it('supports manage gyms edit/archive/filter/unarchive flow', async () => {

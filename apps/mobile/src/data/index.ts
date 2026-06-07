@@ -50,7 +50,13 @@ export {
   type SessionListSummary,
   type SetSessionDeletedStateOptions,
 } from './session-list';
-export { loadLocalGymById, upsertLocalGym, type LocalGymLookupRecord, type UpsertLocalGymInput } from './local-gyms';
+export {
+  listLocalGyms,
+  loadLocalGymById,
+  upsertLocalGym,
+  type LocalGymLookupRecord,
+  type UpsertLocalGymInput,
+} from './local-gyms';
 export {
   calculateSessionDurationSec,
   completeSessionDraft,

@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { asc, eq, isNull } from 'drizzle-orm';
 
 import { bootstrapLocalDataLayer } from './bootstrap';
 import { nowMonotonic } from './clock';
@@ -146,4 +146,21 @@ export const loadLocalGymById = async (gymId: string): Promise<LocalGymLookupRec
     .where(eq(gyms.id, gymId))
     .get();
   return row ?? null;
+};
+
+export const listLocalGyms = async (): Promise<LocalGymLookupRecord[]> => {
+  const database = await bootstrapLocalDataLayer();
+  return database
+    .select({
+      id: gyms.id,
+      name: gyms.name,
+      latitude: gyms.latitude,
+      longitude: gyms.longitude,
+      coordinateAccuracyM: gyms.coordinateAccuracyM,
+      coordinatesUpdatedAt: gyms.coordinatesUpdatedAt,
+    })
+    .from(gyms)
+    .where(isNull(gyms.deletedAt))
+    .orderBy(asc(gyms.name), asc(gyms.id))
+    .all();
 };

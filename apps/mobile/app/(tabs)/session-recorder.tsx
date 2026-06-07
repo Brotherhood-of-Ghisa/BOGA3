@@ -34,6 +34,7 @@ import {
   ExerciseTagDomainError,
   listExerciseTagDefinitions,
   listSessionExerciseAssignedTags,
+  listLocalGyms,
   loadRecentExerciseBlocks,
   loadLocalGymById,
   loadLatestSessionDraftSnapshot,
@@ -47,6 +48,7 @@ import {
   upsertLocalGym,
   type ExerciseTagDefinitionRecord,
   type ExerciseBlockHistoryBlock,
+  type LocalGymLookupRecord,
   type SessionExerciseAssignedTag,
   type SessionDraftSnapshot,
   type SessionGraphSnapshot,
@@ -265,6 +267,62 @@ function createInitialState(): SessionRecorderState {
     exerciseActionMenuVisible: false,
     activeExerciseActionId: null,
   };
+}
+
+const SEEDED_LOCATION_NAME_BY_ID = new Map(SEEDED_LOCATIONS.map((location) => [location.id, location.name]));
+
+function mapLocalGymToSessionLocation(gym: LocalGymLookupRecord): SessionLocation {
+  return {
+    id: gym.id,
+    name: gym.name,
+    archived: false,
+    latitude: gym.latitude,
+    longitude: gym.longitude,
+    coordinateAccuracyM: gym.coordinateAccuracyM,
+    coordinatesUpdatedAt: gym.coordinatesUpdatedAt,
+  };
+}
+
+function mergeLocalGymsIntoLocations(
+  currentLocations: SessionLocation[],
+  localGyms: LocalGymLookupRecord[]
+): SessionLocation[] {
+  let didChange = false;
+  const nextLocations = [...currentLocations];
+
+  for (const localGym of localGyms) {
+    const existingIndex = nextLocations.findIndex((location) => location.id === localGym.id);
+
+    if (existingIndex === -1) {
+      nextLocations.push(mapLocalGymToSessionLocation(localGym));
+      didChange = true;
+      continue;
+    }
+
+    const existing = nextLocations[existingIndex];
+    const seededName = SEEDED_LOCATION_NAME_BY_ID.get(existing.id);
+    const mergedLocation: SessionLocation = {
+      ...existing,
+      name: seededName && existing.name === seededName ? localGym.name : existing.name,
+      latitude: localGym.latitude,
+      longitude: localGym.longitude,
+      coordinateAccuracyM: localGym.coordinateAccuracyM,
+      coordinatesUpdatedAt: localGym.coordinatesUpdatedAt,
+    };
+
+    if (
+      mergedLocation.name !== existing.name ||
+      mergedLocation.latitude !== existing.latitude ||
+      mergedLocation.longitude !== existing.longitude ||
+      mergedLocation.coordinateAccuracyM !== existing.coordinateAccuracyM ||
+      mergedLocation.coordinatesUpdatedAt !== existing.coordinatesUpdatedAt
+    ) {
+      nextLocations[existingIndex] = mergedLocation;
+      didChange = true;
+    }
+  }
+
+  return didChange ? nextLocations : currentLocations;
 }
 
 function createLocationId(locationName: string): string {
@@ -806,6 +864,29 @@ export default function SessionRecorderScreen() {
 
     return unsubscribe;
   }, [autosaveController, navigation, routeMode]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void listLocalGyms()
+      .then((localGyms) => {
+        if (cancelled) {
+          return;
+        }
+
+        setState((current) => ({
+          ...current,
+          locations: mergeLocalGymsIntoLocations(current.locations, localGyms),
+        }));
+      })
+      .catch(() => {
+        // Keep seeded gyms available if local SQLite hydration fails.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -2583,7 +2664,10 @@ export default function SessionRecorderScreen() {
       persistedSessionIdRef.current = null;
       hasSessionMutationRef.current = false;
       setHasActiveSession(false);
-      setState(() => createInitialState());
+      setState((current) => ({
+        ...createInitialState(),
+        locations: current.locations,
+      }));
     }
   };
 

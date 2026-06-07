@@ -65,7 +65,7 @@ jest.mock('@/src/sync/write-nudge', () => ({
 
 // Imported AFTER the mocks so the repos bind to them.
 import { __resetClockForTests } from '@/src/data/clock';
-import { upsertLocalGym, loadLocalGymById } from '@/src/data/local-gyms';
+import { listLocalGyms, upsertLocalGym, loadLocalGymById } from '@/src/data/local-gyms';
 import { createDrizzleExerciseCatalogStore } from '@/src/data/exercise-catalog';
 import { createDrizzleExerciseTagStore } from '@/src/data/exercise-tags';
 import { createDrizzleSessionDraftStore } from '@/src/data/session-drafts';
@@ -125,6 +125,24 @@ describe('repo write paths nudge the scheduler exactly once, post-commit', () =>
 
     await loadLocalGymById('gym-1');
 
+    expect(mockNotifyLocalWrite).not.toHaveBeenCalled();
+  });
+
+  it('gyms read path (listLocalGyms) never nudges and skips tombstones', async () => {
+    await upsertLocalGym({ id: 'gym-live', name: 'Live Gym' });
+    requireDatabase()
+      .insert(gyms)
+      .values({
+        id: 'gym-deleted',
+        name: 'Deleted Gym',
+        deletedAt: new Date('2026-05-24T10:00:00.000Z'),
+      })
+      .run();
+    mockNotifyLocalWrite.mockClear();
+
+    const rows = await listLocalGyms();
+
+    expect(rows.map((row) => row.id)).toEqual(['gym-live']);
     expect(mockNotifyLocalWrite).not.toHaveBeenCalled();
   });
 
