@@ -45,7 +45,7 @@ So for example: `M33-T04-Do_Something.md`
 ## Context Freshness (required at session start; update before edits)
 
 - Verified current branch + HEAD commit:
-- Start-of-session sync completed per `docs/specs/04-ai-development-playbook.md` git sync workflow?: `yes | no | N/A` (explain)
+- Start-of-session sync with `origin/main` completed?: `yes | no | N/A` (explain)
 - Parent refs opened in this session (list exact files actually reviewed):
   - `<path>`
 - Code/docs inventory freshness checks run (route inventory, UI docs inventory, schema/runtime inventory as applicable):
@@ -120,7 +120,6 @@ UI task acceptance boilerplate (include/adapt when `UI Impact = yes`; remove for
   - `<path>` - `<why>`
 - For significant cross-cutting behavior changes (for example sync model, auth-gated sync behavior, conflict policy, offline/online semantics, runtime topology, or test-layer expectations), include the relevant project-level docs here:
   - `docs/specs/03-technical-architecture.md`
-  - `docs/specs/04-ai-development-playbook.md`
   - `docs/specs/05-data-model.md`
   - `docs/specs/06-testing-strategy.md`
 - Rule:
@@ -141,7 +140,7 @@ UI task acceptance boilerplate (include/adapt when `UI Impact = yes`; remove for
   - keep docs synthetic/overview-first and source-linked
   - do not duplicate detailed props/variants/implementation notes that are better read from source files
 
-## Testing and verification approach (follow `docs/specs/04-ai-development-playbook.md` and `docs/specs/08-ux-delivery-standard.md` for UI tasks)
+## Testing and verification approach (see `docs/specs/02-quality-and-test-gates.md`; `docs/specs/08-ux-delivery-standard.md` for UI tasks)
 
 - Planned checks/commands:
 - Standard local gate usage:
@@ -168,14 +167,14 @@ UI task acceptance boilerplate (include/adapt when `UI Impact = yes`; remove for
 - Optional closeout validation helper (recommended before handoff): `./scripts/task-closeout-check.sh <task-card-path>`
 - Additional gate(s), if any:
 
-## Evidence (follow `docs/specs/04-ai-development-playbook.md` and `docs/specs/08-ux-delivery-standard.md` for UI tasks)
+## Evidence (see `docs/specs/02-quality-and-test-gates.md`; `docs/specs/08-ux-delivery-standard.md` for UI tasks)
 
 - 
 - UI/UX task visual artifacts note (remove for non-UI tasks): list screenshot/capture evidence here when required by `docs/specs/08-ux-delivery-standard.md` or task scope; otherwise record `N/A` + rationale
 - Manual verification summary (required when CI is absent/partial):
 - Deferred/manual hosted checks summary (owner + trigger timing), if applicable:
 
-## Completion note (fill at end per `docs/specs/04-ai-development-playbook.md`)
+## Completion note
 
 - What changed:
 - What tests ran:

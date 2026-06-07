@@ -72,12 +72,6 @@ This is the shortest operational summary. Use the "Further reading" section when
 
 ## Further reading (load when needed)
 
-- Design proposal (current M5 auth baseline rationale):
-  - `docs/brainstorms/M5-AuthN-AuthZ-Security-Baseline-Design.md`
-- M5 auth/authz implementation task:
-  - `docs/tasks/complete/T-20260220-10-m5-user-auth-authz-and-security-baseline.md`
-- M5 milestone scope and acceptance criteria:
-  - `docs/specs/milestones/M5-backend-foundation-authz-and-sync-api.md`
 - Testing requirements for backend auth/RLS/API work:
   - `docs/specs/06-testing-strategy.md`
 - Local Supabase runtime and fixture commands:

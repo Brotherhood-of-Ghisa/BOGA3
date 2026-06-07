@@ -56,7 +56,7 @@ Each UI task card UX contract must include:
    - Keep this compact (prefer <= 5 bullets total).
 3. Evidence + completion notes:
    - Fill under the task card `Evidence` and `Completion note` headers.
-   - Follow execution/closeout expectations in `docs/specs/04-ai-development-playbook.md`.
+   - Follow the verification expectations in `docs/specs/02-quality-and-test-gates.md`.
 
 Notes:
 
@@ -145,6 +145,6 @@ Do not mark a UI task complete if any are true:
 
 ## Adoption notes
 
-1. This standard complements `docs/specs/04-ai-development-playbook.md` and `docs/specs/06-testing-strategy.md`.
+1. This standard complements `docs/specs/06-testing-strategy.md` and the `AGENTS.md` workflow router.
 2. For app-specific UI inventory/navigation/component docs, use `docs/specs/ui/README.md` and the linked UI docs bundle.
 3. If a UI task needs exceptions, record them explicitly in that task card with reason and impact.

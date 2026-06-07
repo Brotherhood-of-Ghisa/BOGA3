@@ -3,8 +3,9 @@
 # tFINAL wrapper — server-side end-to-end test suite for the Sync v2 plan.
 #
 # Runs every test under supabase/tests/sync-v2-*.sh that maps 1:1 (or as a
-# coherent group) to a plan-level outcome from
-# docs/plans/sync-v2-server/plan.md ## Outcomes. Exits 0 only if all of them
+# coherent group) to a Sync v2 server-contract outcome (schema, deferrable FKs,
+# RLS isolation, push/pull round-trip, drift, drain) as specified in
+# docs/specs/tech/sync-v2-server-contract.md. Exits 0 only if all of them
 # pass. Mirrors the shape of the per-task wrappers
 # (test-sync-v2-schema-smoke.sh, test-sync-push-contract.sh,
 # test-sync-pull-contract.sh) so the slow-gate plumbing stays uniform.

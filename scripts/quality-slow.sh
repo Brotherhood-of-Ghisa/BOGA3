@@ -35,6 +35,11 @@ run_frontend() {
     return 0
   fi
 
+  if [[ ! -d "${REPO_ROOT}/apps/mobile/node_modules" ]]; then
+    echo "[quality-slow] frontend: dependencies missing; running worktree setup (idempotent)"
+    "${REPO_ROOT}/scripts/worktree-setup.sh"
+  fi
+
   echo "[quality-slow] frontend: test:e2e:ios:smoke"
   (cd "${REPO_ROOT}/apps/mobile" && npm run test:e2e:ios:smoke)
 
@@ -65,8 +70,9 @@ run_backend() {
     "${REPO_ROOT}/supabase/scripts/test-sync-v2-schema-smoke.sh"
   fi
 
-  # Sync v2 push RPC contract — exercises designs/t1.md §1 (LWW, clamp,
-  # undelete) and designs/t2.md §3 (envelope, batch caps, FK closure,
+  # Sync v2 push RPC contract — exercises the sync-v2 server contract
+  # (docs/specs/tech/sync-v2-server-contract.md) Part A §1 (LWW, clamp,
+  # undelete) and Part B §3 (envelope, batch caps, FK closure,
   # auth/RLS). Lands with t3.
   if [[ ! -x "${REPO_ROOT}/supabase/scripts/test-sync-push-contract.sh" ]]; then
     echo "[quality-slow] skipping backend sync-push-contract: wrapper not found or not executable"
@@ -96,7 +102,7 @@ run_backend() {
     "${REPO_ROOT}/supabase/scripts/test-dev-wipe-my-data.sh"
   fi
 
-  # Sync v2 drift checker — per designs/t1.md §7.5. The TypeScript script
+  # Sync v2 drift checker — per docs/specs/tech/sync-v2-server-contract.md Part A §7.5. The TypeScript script
   # lands in t2; until then this block skips with a notice so the slow gate
   # stays green. t2's PR will not need to re-touch this file: when the script
   # exists, the else branch invokes `npm run check:sync-drift -- --strict`.
@@ -117,6 +123,17 @@ run_backend() {
   else
     echo "[quality-slow] backend: test-sync-v2-e2e (integration-level plan outcome assertions)"
     "${REPO_ROOT}/supabase/scripts/test-sync-v2-e2e.sh"
+  fi
+
+  # Mobile sync-infra jest lane (drift-check + cycle-round-trip +
+  # auth-required-envelope) against this worktree's local stack. The wrapper
+  # provisions the baseline and the SUPABASE_BRANCH_URL/ANON_KEY env itself, so
+  # this lane needs no manual setup.
+  if [[ ! -x "${REPO_ROOT}/supabase/scripts/test-sync-infra.sh" ]]; then
+    echo "[quality-slow] skipping sync-infra: wrapper not found or not executable"
+  else
+    echo "[quality-slow] backend: test-sync-infra (mobile sync lane vs local stack)"
+    "${REPO_ROOT}/supabase/scripts/test-sync-infra.sh"
   fi
 }
 

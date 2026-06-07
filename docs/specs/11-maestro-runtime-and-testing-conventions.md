@@ -28,7 +28,6 @@ It has two jobs:
   - `apps/mobile/README-maestro.md`
   - `apps/mobile/README_HUMAN_TESTING.md`
 - Supporting but non-authoritative context:
-  - `docs/specs/milestones/M10-maestro-parallel-runtime-and-testing-conventions.md`
   - `docs/brainstorms/Maestro-Revamp`
   - historical Maestro task cards
 
