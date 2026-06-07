@@ -22,6 +22,64 @@ for the slow lanes). (`npm run …` scripts live only in `apps/mobile/package.js
 there is no root `package.json` — but invoke the gates above, not the raw scripts.)
 New-worktree setup, prerequisites, and teardown: `01-worktree-and-environment.md`.
 
+## The test-lane map (read this once)
+
+**One idea explains the whole gate structure: a lane's *infrastructure
+dependency* decides everything — how fast it is, which gate it sits in, and
+whether CI can run it.** "Fast/slow" and "frontend/backend" are labels that track
+that one axis; when they seem to disagree, infra wins.
+
+- **No infra (pure Node/jest)** → CI-safe. The only lanes CI runs today.
+- **Local Supabase + Docker** → CI-*able*, but kept local **by choice** today
+  (Docker boot cost). A regression here lands on `main` green until a human runs
+  the backend gate; the cheap way to add CI coverage is to run this gate in CI —
+  not to rewrite the tests as infra-free.
+- **iOS simulator + Metro** → can **never** run on CI's Linux runners. Local-only
+  by necessity.
+
+So "fast" does **not** imply "in CI" (the backend fast smoke needs Docker and is
+local-only), and "not in CI" is not a property of a *test* — it is where the repo
+currently draws the line.
+
+### Lane matrix (what runs where)
+
+The one table that joins all four facts. Exact durations live in
+`docs/testing/local-test-timings.md`; the time column here is order-of-magnitude
+(`N/A` = not currently measured, not "instant").
+
+| Lane | Command | In which gate | CI? | ~Time |
+| --- | --- | --- | :--: | --- |
+| *Infra: none — CI runs these* | | | | |
+| lint | `npm run lint` | `quality-fast.sh frontend` | ✅ | ~1s |
+| typecheck | `npm run typecheck` | `quality-fast.sh frontend` | ✅ | ~3s |
+| jest unit/integration | `npm test` | `quality-fast.sh frontend` | ✅ | ~5s |
+| open-handle guard | `npm run test:handles` | **CI only** (no wrapper runs it) | ✅ | ~20s |
+| *Infra: local Supabase + Docker — CI-able, local-only today* | | | | |
+| backend fast smoke | `test-fast.sh` | `quality-fast.sh backend` | ❌ | ~40s |
+| auth / RLS contract | `test-auth-authz.sh` | `quality-slow.sh backend` | ❌ | ~4s |
+| sync-v2 schema smoke | `test-sync-v2-schema-smoke.sh` | `quality-slow.sh backend` | ❌ | ~5s |
+| sync-v2 push contract | `test-sync-push-contract.sh` | `quality-slow.sh backend` | ❌ | ~4s |
+| sync-v2 pull contract | `test-sync-pull-contract.sh` | `quality-slow.sh backend` | ❌ | ~4s |
+| dev-wipe contract | `test-dev-wipe-my-data.sh` | `quality-slow.sh backend` | ❌ | ~3s |
+| sync schema-drift (strict) | `npm run check:sync-drift -- --strict` | `quality-slow.sh backend` | ❌ | ~35s |
+| sync-v2 end-to-end | `test-sync-v2-e2e.sh` | `quality-slow.sh backend` | ❌ | ~2min |
+| **sync-infra (mobile cross-stack)** | `npm run test:sync:infra` (`test-sync-infra.sh`) | `quality-slow.sh backend` (last) | ❌ | N/A |
+| *Infra: iOS simulator + Metro — never CI-able* | | | | |
+| iOS smoke | `npm run test:e2e:ios:smoke` | `quality-slow.sh frontend` | ❌ | ~75s |
+| iOS data-smoke | `npm run test:e2e:ios:data-smoke` | `quality-slow.sh frontend` | ❌ | ~110s |
+| iOS auth-profile | `npm run test:e2e:ios:auth-profile` | `quality-slow.sh frontend` | ❌ | N/A |
+
+Two traps this table exists to kill:
+
+- **`test:handles` is the one lane CI runs that no `quality-*` wrapper does**, so a
+  green local `quality-fast.sh frontend` is **not** the same as a green CI run. Run
+  `test:handles` yourself when you touch timers, sockets, subscriptions, or async
+  teardown.
+- **sync-infra is the only lane that crosses the FE/BE line:** a mobile jest body
+  (`apps/mobile`) driving the *real* `runSyncCycle` against a *real* Supabase
+  endpoint. That is why it needs backend infra despite being a frontend test, and
+  why it sits at the end of `quality-slow.sh backend`.
+
 ## Which gate for what you changed
 
 | You changed… | Run |
@@ -47,16 +105,24 @@ on every PR, so you only need it locally when you touched timers, sockets,
 subscriptions, or async teardown. `npm test` is deliberately bare `jest` (no
 `--forceExit`) so leaked handles surface — don't add it.
 
-**The slow gates (Maestro iOS + the backend/sync-v2 suites) are NOT in CI.** They
-only run when you run them locally, so breakage on those lanes accumulates on
-`main` invisibly. Run the slow gate for your area (table above) before the PR.
+**Everything else is local-only** (see the `CI?` column in the lane matrix). The
+backend/sync-v2 suites are CI-*able* but kept local by choice; the Maestro iOS
+lanes can never run on CI's Linux runners. Either way, breakage on those lanes
+accumulates on `main` invisibly until a human runs them — so run the slow gate for
+your area (table above) before the PR.
 
 ## Maintenance
 
-Update this doc in the same change whenever you alter a gate: a `scripts/quality-*`
-wrapper, a `supabase/scripts/test-*` wrapper, an `apps/mobile/package.json`
-`test*`/`lint`/`typecheck` script, or `.github/workflows/ci.yml`. If a fact here
-ever disagrees with the scripts, the scripts win — fix the doc.
+Update this doc — **including the lane matrix above** — in the same change whenever
+you alter a gate: a `scripts/quality-*` wrapper, a `supabase/scripts/test-*`
+wrapper, an `apps/mobile/package.json` `test*`/`lint`/`typecheck` script, or
+`.github/workflows/ci.yml`. If a fact here ever disagrees with the scripts, the
+scripts win — fix the doc.
+
+**Source-of-truth ownership** (so the three test docs can't drift apart again):
+this doc owns the lane matrix + CI membership; `06-testing-strategy.md` owns each
+test's purpose/why; `docs/testing/local-test-timings.md` owns exact durations. Each
+links by lane name; none restates another's column.
 
 ## Deeper docs (load when relevant)
 
