@@ -4,7 +4,7 @@
  * The sync-status composer: it folds the scheduler's production status, the
  * runtime-state row, and a dirty-row count into the single snapshot the Settings
  * surface renders. These tests pin two things against a real in-memory database:
- *  1. the dirty count sums `local_dirty = 1` rows across all eight entity tables
+ *  1. the dirty count sums `local_dirty = 1` rows across all nine entity tables
  *     (and excludes clean rows), and
  *  2. the snapshot carries the scheduler's last-success time, error, network
  *     state, the auth-required flag, and the bootstrap-completed flag.
@@ -69,7 +69,7 @@ afterEach(() => {
   fixture.close();
 });
 
-describe('dirty-row count across the eight entity tables', () => {
+describe('dirty-row count across the nine entity tables', () => {
   it('is zero on an empty database', async () => {
     const status = await getSyncStatus();
     expect(status.dirtyCount).toBe(0);
@@ -85,11 +85,11 @@ describe('dirty-row count across the eight entity tables', () => {
       { id: 'gym-clean', name: 'C', localDirty: false },
     ]);
 
-    // A muscle group the mapping below references. `muscle_groups` is NOT one
-    // of the eight dirty-counted tables, so it never affects the count.
+    // A dirty muscle group the mapping below references. `muscle_groups` is a
+    // synced entity like every other table here, so a pending row counts.
     await db
       .insert(muscleGroups)
-      .values({ id: 'chest', displayName: 'Chest', familyName: 'Chest' });
+      .values({ id: 'chest', displayName: 'Chest', familyName: 'Chest', localDirty: true });
 
     // One dirty exercise definition (Layer 0).
     await db.insert(exerciseDefinitions).values({ id: 'def-1', name: 'Bench', localDirty: true });
@@ -140,8 +140,22 @@ describe('dirty-row count across the eight entity tables', () => {
     });
 
     const status = await getSyncStatus();
-    // 2 gyms + 1 def + 1 tag-def + 1 mapping + 1 session + 1 se + 1 set + 1 se-tag = 9
-    expect(status.dirtyCount).toBe(9);
+    // 2 gyms + 1 def + 1 muscle group + 1 tag-def + 1 mapping + 1 session
+    // + 1 se + 1 set + 1 se-tag = 10
+    expect(status.dirtyCount).toBe(10);
+  });
+
+  it('counts a dirty muscle_groups row like every other synced entity', async () => {
+    const db = fixture.database;
+
+    await db.insert(muscleGroups).values([
+      { id: 'chest', displayName: 'Chest', familyName: 'Chest', localDirty: true },
+      { id: 'back', displayName: 'Back', familyName: 'Back', localDirty: true },
+      { id: 'quads', displayName: 'Quads', familyName: 'Legs', localDirty: false },
+    ]);
+
+    // Two pending muscle groups contribute; the clean one does not.
+    expect((await getSyncStatus()).dirtyCount).toBe(2);
   });
 });
 

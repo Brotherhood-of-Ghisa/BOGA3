@@ -7,7 +7,7 @@
 //   2. The local `sync_runtime_state` row: whether the first-sync bootstrap has
 //      completed.
 //   3. A dirty-row count: how many local edits are still waiting to be pushed,
-//      summed across the eight user-owned entity tables.
+//      summed across the nine user-owned entity tables.
 //
 // It is read-only: building the snapshot never triggers a sync, mutates state,
 // or talks to the server.
@@ -21,13 +21,15 @@ import { getAuthRequiredSignal } from '@/src/sync/auth-required-signal';
 import { getSchedulerStatus } from '@/src/sync/scheduler';
 
 /**
- * The eight user-owned entity tables that carry a `local_dirty` flag. The dirty
+ * The nine user-owned entity tables that carry a `local_dirty` flag. The dirty
  * count sums pending (unpushed) rows across all of them. Kept as an explicit
- * list so the count is obviously total over every syncable entity.
+ * list so the count is obviously total over every syncable entity. Listed in
+ * the same dependency order the sync engine drains, Layer 0 parents first.
  */
 const DIRTY_COUNTED_TABLES = [
   schema.gyms,
   schema.exerciseDefinitions,
+  schema.muscleGroups,
   schema.exerciseTagDefinitions,
   schema.sessions,
   schema.exerciseMuscleMappings,
@@ -48,7 +50,7 @@ export type SyncNetworkState = 'online' | 'offline';
 export interface SyncStatusSnapshot {
   /** Epoch-ms of the most recent clean sync cycle, or null if none yet. */
   lastSuccessAtMs: number | null;
-  /** Count of local rows still waiting to be pushed, across all 8 tables. */
+  /** Count of local rows still waiting to be pushed, across all 9 tables. */
   dirtyCount: number;
   /** The latest cycle's error message, or null when the latest cycle was clean. */
   errorMessage: string | null;
@@ -61,7 +63,7 @@ export interface SyncStatusSnapshot {
 }
 
 /**
- * Sums `count(*) WHERE local_dirty = 1` across the eight entity tables. Each
+ * Sums `count(*) WHERE local_dirty = 1` across the nine entity tables. Each
  * table is a small aggregate query; the total is the number of local edits the
  * next push will flush.
  */
