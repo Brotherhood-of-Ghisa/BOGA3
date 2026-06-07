@@ -33,6 +33,11 @@ run_frontend() {
     return 0
   fi
 
+  if [[ ! -d "${REPO_ROOT}/apps/mobile/node_modules" ]]; then
+    echo "[quality-fast] frontend: dependencies missing; running worktree setup (idempotent)"
+    "${REPO_ROOT}/scripts/worktree-setup.sh"
+  fi
+
   echo "[quality-fast] frontend: lint"
   (cd "${REPO_ROOT}/apps/mobile" && npm run lint)
 

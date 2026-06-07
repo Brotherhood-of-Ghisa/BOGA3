@@ -270,6 +270,7 @@ jest.mock('@/src/data', () => {
     },
     listExerciseTagDefinitions: listTagDefinitions,
     listSessionExerciseAssignedTags,
+    listLocalGyms: jest.fn().mockResolvedValue([]),
     loadRecentExerciseBlocks,
     loadLocalGymById: jest.fn().mockResolvedValue(null),
     loadLatestSessionDraftSnapshot: jest.fn().mockResolvedValue(null),

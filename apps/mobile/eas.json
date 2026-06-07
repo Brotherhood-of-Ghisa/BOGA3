@@ -5,9 +5,9 @@
   },
   "build": {
     "preview": {
-      "developmentClient": false,
+      "developmentClient": true,
       "autoIncrement": true,
-      "environment": "production",
+      "environment": "development",
       "ios": {
         "distribution": "store"
       },

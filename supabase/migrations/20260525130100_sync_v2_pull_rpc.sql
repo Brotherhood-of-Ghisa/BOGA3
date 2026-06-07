@@ -21,7 +21,7 @@
 -- from sharing Layer 0 with exercise_definitions because
 -- exercise_tag_definitions(exercise_definition_id) → exercise_definitions(id)
 -- is a cross-entity FK):
---   0: gyms, exercise_definitions
+--   0: gyms, exercise_definitions, muscle_groups
 --   1: sessions, exercise_muscle_mappings, exercise_tag_definitions
 --   2: session_exercises
 --   3: exercise_sets, session_exercise_tags
@@ -172,7 +172,7 @@ begin
   --
   -- Either JSON null / absent (snapshot pull) or an object with all four of
   -- (server_received_at, owner_user_id, type, id). `type` must be one of the
-  -- eight entity-type strings — invalid types short-circuit with INTERNAL.
+  -- entity-type strings — invalid types short-circuit with INTERNAL.
   -- ---------------------------------------------------------------------------
   v_cursor := payload->'cursor';
   if v_cursor is null or jsonb_typeof(v_cursor) = 'null' then
@@ -211,9 +211,9 @@ begin
       );
     end if;
     if v_cursor_type not in (
-      'gyms', 'exercise_definitions', 'exercise_tag_definitions',
-      'sessions', 'exercise_muscle_mappings', 'session_exercises',
-      'exercise_sets', 'session_exercise_tags'
+      'gyms', 'exercise_definitions', 'muscle_groups',
+      'exercise_tag_definitions', 'sessions', 'exercise_muscle_mappings',
+      'session_exercises', 'exercise_sets', 'session_exercise_tags'
     ) then
       return jsonb_build_object(
         'error', jsonb_build_object(
@@ -239,14 +239,14 @@ begin
   -- itself a Layer-0 entity and t1 §7.7 forbids intra-layer FKs.
   -- ---------------------------------------------------------------------------
   case v_layer
-    when 0 then v_types := array['gyms', 'exercise_definitions'];
+    when 0 then v_types := array['gyms', 'exercise_definitions', 'muscle_groups'];
     when 1 then v_types := array['sessions', 'exercise_muscle_mappings', 'exercise_tag_definitions'];
     when 2 then v_types := array['session_exercises'];
     when 3 then v_types := array['exercise_sets', 'session_exercise_tags'];
   end case;
 
   -- ---------------------------------------------------------------------------
-  -- 5. Pull. One static UNION ALL spanning all eight tables, scoped to the
+  -- 5. Pull. One static UNION ALL spanning all entity tables, scoped to the
   -- requested layer by a literal-set `type IN (...)` filter realized via the
   -- `where type = any(v_types)` outer predicate. Per-entity SELECTs project
   -- the wire envelope shape directly (t2 §2.1):
@@ -298,6 +298,21 @@ begin
       from app_public.exercise_definitions ed
      where ed.owner_user_id = auth.uid()
        and 'exercise_definitions' = any(v_types)
+    union all
+    select 'muscle_groups'::text, mg.id, mg.client_updated_at_ms,
+           mg.server_received_at, mg.owner_user_id,
+           jsonb_build_object(
+             'display_name', mg.display_name,
+             'family_name', mg.family_name,
+             'sort_order', mg.sort_order,
+             'is_editable', mg.is_editable,
+             'created_at', mg.created_at,
+             'updated_at', mg.updated_at,
+             'deleted_at', mg.deleted_at
+           )
+      from app_public.muscle_groups mg
+     where mg.owner_user_id = auth.uid()
+       and 'muscle_groups' = any(v_types)
     union all
     select 'exercise_tag_definitions'::text, etd.id, etd.client_updated_at_ms,
            etd.server_received_at, etd.owner_user_id,

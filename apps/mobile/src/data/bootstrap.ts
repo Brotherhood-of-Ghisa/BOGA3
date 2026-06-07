@@ -144,12 +144,28 @@ const runRuntimeMigrations = async (database: LocalDatabase) => {
   await runtimeMigrationPromise;
 };
 
+// The boot-time data-layer seeding that must run on every prepared database
+// BEFORE any sync pull touches it, regardless of build flavour: the client-only
+// muscle-group taxonomy. `exercise_muscle_mappings.muscle_group_id` is a NOT
+// NULL local FK into `muscle_groups`, and `muscle_groups` never crosses the sync
+// wire — so a pulled mapping can only be inserted once these rows exist. Boot
+// always seeds them (it is idempotent), which is why production never hits an FK
+// violation on the re-pull path.
+//
+// Extracted as its own synchronous helper so the in-memory test harness can run
+// the EXACT same seed on its fixture database via one shared path — keeping the
+// test faithful to production boot and preventing the mock from silently
+// drifting away from what boot actually prepares.
+export const seedBootDataLayer = (database: LocalDatabase): void => {
+  seedMuscleGroups(database);
+};
+
 // Seed the client-only muscle-group taxonomy at boot. In a sync-configured
 // build the syncable entity catalog (exercise definitions + muscle mappings) is
 // NOT seeded here — it is seeded by the first-sign-in bootstrapper only when the
 // first full pull returns no rows, so a reinstall recovers the server's state
 // rather than re-creating starter rows. Muscle groups never sync, so they seed
-// unconditionally at boot.
+// unconditionally at boot (via the shared `seedBootDataLayer` helper).
 //
 // The infra-free build (no sync backend configured) is the exception: it has no
 // server to recover from, so `prepareLocalDataLayer` also seeds the full starter
@@ -162,7 +178,7 @@ const runMuscleGroupSeed = async (database: LocalDatabase) => {
   if (!muscleGroupSeedPromise) {
     muscleGroupSeedPromise = Promise.resolve()
       .then(() => {
-        seedMuscleGroups(database);
+        seedBootDataLayer(database);
         muscleGroupSeedComplete = true;
       })
       .catch((error) => {

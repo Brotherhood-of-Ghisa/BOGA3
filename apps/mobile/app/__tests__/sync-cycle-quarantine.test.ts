@@ -243,7 +243,7 @@ describe('runSyncCycle quarantine', () => {
     insertGym('gym-valid', 5);
     plantOrphan(() => insertSessionExercise('se-orphan', 'sess-missing', 100));
 
-    await expect(runSyncCycle()).resolves.toMatchObject({ outcome: 'converged' });
+    await expect(runSyncCycle()).resolves.toBe('converged');
 
     // The valid row reached the server; the orphan never did.
     const pushed = pushedEntities();
@@ -308,7 +308,7 @@ describe('runSyncCycle quarantine', () => {
     plantOrphan(() => insertSessionExercise('se-orphan', 'sess-missing', 100));
     mockLogEvent.mockRejectedValue(new Error('log insert failed'));
 
-    await expect(runSyncCycle()).resolves.toMatchObject({ outcome: 'converged' });
+    await expect(runSyncCycle()).resolves.toBe('converged');
 
     // Persistence and the valid push both proceeded despite the logger failure.
     expect(database.select().from(syncQuarantine).all()).toHaveLength(1);
@@ -327,7 +327,7 @@ describe('runSyncCycle quarantine', () => {
         .run();
     });
 
-    await expect(runSyncCycle()).resolves.toMatchObject({ outcome: 'converged' });
+    await expect(runSyncCycle()).resolves.toBe('converged');
 
     const quarantinedIds = database
       .select({ id: syncQuarantine.entityId })

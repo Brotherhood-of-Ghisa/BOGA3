@@ -11,7 +11,6 @@
 - Project directives: `docs/specs/README.md`
 - Product overview: `docs/specs/00-product.md`
 - Architecture: `docs/specs/03-technical-architecture.md`
-- AI development playbook: `docs/specs/04-ai-development-playbook.md`
 - Data model: `docs/specs/05-data-model.md`
 - Testing strategy: `docs/specs/06-testing-strategy.md`
 - Project structure: `docs/specs/09-project-structure.md`
@@ -136,10 +135,10 @@ Same contract as M16:
 
 ## Task breakdown
 
-1. `docs/tasks/complete/M17-T01-exercise-heatmap-milestone-spec.md` - create milestone spec and task cards. (`completed`)
-2. `docs/tasks/complete/M17-T02-exercise-weekly-effort-analytics.md` - new exercise analytics engine + exports + unit tests. (`completed`)
-3. `docs/tasks/complete/M17-T03-exercise-heatmap-overlay.md` - Heatmap mode chip, exercise list, and overlay in stats-history.tsx + integration tests + UI docs. (`completed`)
-4. `docs/tasks/M17-T04-qa-doc-closeout.md` - QA, visual evidence, doc closeout. (`planned`)
+1. `M17-T01-exercise-heatmap-milestone-spec` - create milestone spec and task cards. (`completed`)
+2. `M17-T02-exercise-weekly-effort-analytics` - new exercise analytics engine + exports + unit tests. (`completed`)
+3. `M17-T03-exercise-heatmap-overlay` - Heatmap mode chip, exercise list, and overlay in stats-history.tsx + integration tests + UI docs. (`completed`)
+4. `M17-T04-qa-doc-closeout` - QA, visual evidence, doc closeout. (`planned`)
 
 ## Dependencies and parallelization
 

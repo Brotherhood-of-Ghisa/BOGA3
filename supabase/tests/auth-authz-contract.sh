@@ -337,10 +337,10 @@ fi
 
 echo "[auth-test] creating user-scoped records for user_a"
 NOW_MS="$(($(date +%s) * 1000))"
-# v2 schema (designs/sync-v2/t1.md §2): every entity table requires
-# client_updated_at_ms NOT NULL. Direct PostgREST inserts in this auth/RLS
-# contract must supply it; the sync push RPC (t3) will close over the same
-# rule on the wire-level path.
+# v2 schema (docs/specs/tech/sync-v2-server-contract.md §A.2): every entity
+# table requires client_updated_at_ms NOT NULL. Direct PostgREST inserts in this
+# auth/RLS contract must supply it; the sync_push RPC closes over the same rule
+# on the wire-level path.
 postgrest_insert "gyms" "${USER_A_TOKEN}" "$(jq -nc \
   --arg id "${GYM_A_ID}" \
   --arg name "Garage A" \

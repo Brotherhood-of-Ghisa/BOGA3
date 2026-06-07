@@ -4,6 +4,7 @@ import { bootstrapLocalDataLayer, type LocalDatabase } from './bootstrap';
 import { nowMonotonic } from './clock';
 import { exerciseDefinitions, exerciseMuscleMappings, muscleGroups } from './schema';
 import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidation';
+import { notifyLocalWrite } from '@/src/sync/write-nudge';
 
 export type ExerciseCatalogMuscleGroup = {
   id: string;
@@ -277,6 +278,11 @@ export const createDrizzleExerciseCatalogStore = (): ExerciseCatalogStore => ({
       }
     });
 
+    // Post-commit: the definition and its muscle-link rows were dirtied in the
+    // transaction above; one nudge per save asks the scheduler to push the batch
+    // soon. The reads below only re-project the saved graph for the return value.
+    notifyLocalWrite();
+
     const exerciseRow = database
       .select({
         id: exerciseDefinitions.id,
@@ -321,6 +327,10 @@ export const createDrizzleExerciseCatalogStore = (): ExerciseCatalogStore => ({
         .where(eq(exerciseDefinitions.id, input.id))
         .run();
     });
+
+    // Post-commit: the definition row was dirtied above; nudge to push the
+    // soft-delete/restore soon.
+    notifyLocalWrite();
   },
 });
 

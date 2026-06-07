@@ -73,35 +73,43 @@ const insertDirtyGym = (id: string, ms: number): void => {
 };
 
 describe('push-in-flight race', () => {
-  it('never clears the dirty bit when an edit lands between every capture and ack', async () => {
+  it('keeps re-pushing a row edited in every in-flight window, then converges losing nothing', async () => {
     insertDirtyGym('gym-race', 100);
 
-    // Every push request fires a concurrent local edit before the ack is
-    // processed, bumping the row's monotonic timestamp past the captured value.
-    // The ack handler compares current vs captured and must therefore leave the
-    // dirty bit set on every round, so the edit is never clobbered.
+    // The cycle has no round cap, so a row re-edited in EVERY push-in-flight
+    // window would keep the cycle non-quiet forever. Bound the racing edits to a
+    // fixed count: while they race, each push serialises the row, the hook bumps
+    // its monotonic timestamp past the captured value, and the ack must SKIP it
+    // (so the dirty bit survives and the newer value re-pushes next round). Once
+    // the edits stop, the next push captures a stable timestamp, its ack matches,
+    // and the row converges clean carrying the LATEST in-flight value — proving
+    // no intermediate edit was silently clobbered.
+    const RACE_EDITS = 3;
     let edits = 0;
     mockRpc.mockImplementation(async (name: string) => {
       if (name === 'sync_pull') {
         return emptyPull;
       }
-      edits += 1;
-      const editLabel = `Edited In Flight ${edits}`;
-      (database as unknown as LocalDatabase).transaction((tx) => {
-        const next = nowMonotonic(tx as Transaction);
-        tx.update(gyms).set({ localUpdatedAtMs: next, name: editLabel }).where(eq(gyms.id, 'gym-race')).run();
-      });
+      if (edits < RACE_EDITS) {
+        edits += 1;
+        const editLabel = `Edited In Flight ${edits}`;
+        (database as unknown as LocalDatabase).transaction((tx) => {
+          const next = nowMonotonic(tx as Transaction);
+          tx.update(gyms).set({ localUpdatedAtMs: next, name: editLabel }).where(eq(gyms.id, 'gym-race')).run();
+        });
+      }
       return pushOk;
     });
 
     await runSyncCycle();
 
     const row = database.select().from(gyms).where(eq(gyms.id, 'gym-race')).get();
-    // The in-flight edits always out-stamp the captured value, so the dirty bit
-    // survives every ack and the latest edit is preserved.
-    expect(row?.localDirty).toBe(true);
-    expect(row?.name).toBe(`Edited In Flight ${edits}`);
-    expect(edits).toBeGreaterThan(0);
+    // The row raced across every bounded in-flight window (the ack skipped it each
+    // time rather than clobbering the newer edit), then settled clean once the
+    // edits stopped, carrying the last in-flight value.
+    expect(edits).toBe(RACE_EDITS);
+    expect(row?.name).toBe(`Edited In Flight ${RACE_EDITS}`);
+    expect(row?.localDirty).toBe(false);
   });
 
   it('clears the dirty bit on the ack when the captured timestamp still matches', async () => {

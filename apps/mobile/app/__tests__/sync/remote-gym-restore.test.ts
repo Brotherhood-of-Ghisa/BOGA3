@@ -152,10 +152,7 @@ describe('empty local DB restores remote gyms on first authenticated sync', () =
       return pushOk;
     });
 
-    await expect(runSyncCycle()).resolves.toMatchObject({
-      outcome: 'converged',
-      errorCode: null,
-    });
+    await expect(runSyncCycle()).resolves.toBe('converged');
 
     // An authenticated, converged cycle does not raise the route-to-sign-in
     // signal.

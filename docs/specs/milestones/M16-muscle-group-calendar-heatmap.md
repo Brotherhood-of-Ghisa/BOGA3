@@ -11,7 +11,6 @@
 - Project directives: `docs/specs/README.md`
 - Product overview: `docs/specs/00-product.md`
 - Architecture: `docs/specs/03-technical-architecture.md`
-- AI development playbook: `docs/specs/04-ai-development-playbook.md`
 - Data model: `docs/specs/05-data-model.md`
 - Testing strategy: `docs/specs/06-testing-strategy.md`
 - Project structure: `docs/specs/09-project-structure.md`
@@ -211,12 +210,12 @@ M16 v1 should therefore:
 
 ## Task breakdown
 
-1. `docs/tasks/M16-T01-muscle-heatmap-milestone-spec.md` - create this milestone spec and lock the shared-analytics decision. (`planned`)
-2. `docs/tasks/complete/M16-T02-shared-muscle-analytics-engine.md` - extract current Stats muscle contribution math into a shared analytics engine, preserve Stats behavior with tests, and add daily selected-muscle aggregation. (`completed`)
-3. `docs/tasks/complete/M16-T03-calendar-heatmap-component.md` - build the reusable heatmap component with Monday-start columns, 8 visible week rows, vertical scrolling, bucket styling, today highlight, selection, and accessibility labels. (`completed`)
-4. `docs/tasks/complete/M16-T04-stats-history-muscle-overlay.md` - make Stats muscle rows actionable, load heatmap data, show the overlay card, wire loading/error/empty states, and update UI docs. (`completed`)
-5. `docs/tasks/complete/M16-T05-selected-day-detail-panel.md` - add selected-day detail content with contributing exercises/sets and empty-day handling. (`completed`)
-6. `docs/tasks/M16-T06-qa-visual-evidence-and-doc-closeout.md` - run final integration/visual QA, capture required evidence, update closeout docs, and close the milestone when complete. (`planned`)
+1. `M16-T01-muscle-heatmap-milestone-spec` - create this milestone spec and lock the shared-analytics decision. (`planned`)
+2. `M16-T02-shared-muscle-analytics-engine` - extract current Stats muscle contribution math into a shared analytics engine, preserve Stats behavior with tests, and add daily selected-muscle aggregation. (`completed`)
+3. `M16-T03-calendar-heatmap-component` - build the reusable heatmap component with Monday-start columns, 8 visible week rows, vertical scrolling, bucket styling, today highlight, selection, and accessibility labels. (`completed`)
+4. `M16-T04-stats-history-muscle-overlay` - make Stats muscle rows actionable, load heatmap data, show the overlay card, wire loading/error/empty states, and update UI docs. (`completed`)
+5. `M16-T05-selected-day-detail-panel` - add selected-day detail content with contributing exercises/sets and empty-day handling. (`completed`)
+6. `M16-T06-qa-visual-evidence-and-doc-closeout` - run final integration/visual QA, capture required evidence, update closeout docs, and close the milestone when complete. (`planned`)
 
 ## Dependencies and parallelization
 

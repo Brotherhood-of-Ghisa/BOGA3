@@ -8,9 +8,9 @@
 #
 #   #1  v1 sync objects absent (sync_apply_projection_event,
 #       sync_events_ingest, sync_events_ingest_impl, sync_ingest_failure,
-#       sync_device_ingest_state, sync_ingested_events); all eight v2 tables
+#       sync_device_ingest_state, sync_ingested_events); all nine v2 tables
 #       present in app_public.
-#   #2  Each of the eight tables has composite PK (owner_user_id, id),
+#   #2  Each of the nine tables has composite PK (owner_user_id, id),
 #       universal columns (owner_user_id, client_updated_at_ms,
 #       server_received_at, deleted_at), the per-table btree indexes,
 #       and ZERO CHECK constraints (per t1 §1, "no server validation").
@@ -42,20 +42,12 @@ select_psql_mode() {
     return 0
   fi
   if command -v docker >/dev/null 2>&1; then
-    local project_id=""
-    if [[ -f "${SUPABASE_DIR}/config.toml" ]]; then
-      project_id="$(awk -F'"' '/^project_id[[:space:]]*=/ {print $2; exit}' "${SUPABASE_DIR}/config.toml" || true)"
-    fi
-    if [[ -n "${project_id}" ]]; then
-      DOCKER_DB_CONTAINER="$(docker ps --format '{{.Names}}' 2>/dev/null | grep -F "supabase_db_${project_id}" | head -n1 || true)"
-    fi
-    if [[ -z "${DOCKER_DB_CONTAINER}" ]]; then
-      DOCKER_DB_CONTAINER="$(docker ps --format '{{.Names}}' 2>/dev/null | grep '^supabase_db_' | head -n1 || true)"
-    fi
-    if [[ -n "${DOCKER_DB_CONTAINER}" ]]; then
-      PSQL_MODE="docker"
-      return 0
-    fi
+    # Resolve strictly by this worktree's project_id (resolve_db_container in
+    # _common.sh errors if this worktree's stack is down — no unscoped
+    # head -n1 fallback that could target a foreign worktree's DB).
+    DOCKER_DB_CONTAINER="$(resolve_db_container)" || exit 1
+    PSQL_MODE="docker"
+    return 0
   fi
   echo "[sync-v2-clean-room] need either host psql or running supabase_db_* container." >&2
   exit 1
@@ -93,6 +85,7 @@ pass() {
 ENTITIES=(
   gyms
   exercise_definitions
+  muscle_groups
   exercise_tag_definitions
   sessions
   exercise_muscle_mappings
@@ -144,7 +137,7 @@ done
 pass "outcome #1.A — v1 sync-state tables absent from pg_class"
 
 # -----------------------------------------------------------------------------
-# Plan outcome #1.B — all eight v2 entity tables present.
+# Plan outcome #1.B — all nine v2 entity tables present.
 # -----------------------------------------------------------------------------
 
 for entity in "${ENTITIES[@]}"; do
@@ -160,7 +153,7 @@ for entity in "${ENTITIES[@]}"; do
     fail "expected app_public.${entity} to exist (got count=${count})"
   fi
 done
-pass "outcome #1.B — eight v2 entity tables present in app_public"
+pass "outcome #1.B — nine v2 entity tables present in app_public"
 
 # -----------------------------------------------------------------------------
 # Plan outcome #2 — schema shape: composite PK, universal columns with correct
@@ -248,7 +241,7 @@ for entity in "${ENTITIES[@]}"; do
     fail "${entity}: expected 0 CHECK constraints; got ${count}"
   fi
 done
-pass "outcome #2.D — zero CHECK constraints on any of the eight entity tables"
+pass "outcome #2.D — zero CHECK constraints on any of the nine entity tables"
 
 # -----------------------------------------------------------------------------
 # Plan outcome #3 — triggers + immutability function body.

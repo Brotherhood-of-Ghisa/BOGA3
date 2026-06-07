@@ -58,10 +58,16 @@ describe('Settings sync-status panel', () => {
 
   it('shows "Never" for last success and the dirty count from the source', async () => {
     renderPanel({ lastSuccessAtMs: null, dirtyCount: 7 });
+    // Gate on the dirty count reaching 7 — the only value here that differs
+    // before and after the mocked read resolves, so it is the unambiguous
+    // post-resolution signal. "Never" renders both pre-resolution (the null
+    // initial state) and post-resolution (lastSuccessAtMs: null), so waiting on
+    // it would be satisfied by the initial render and let the dirty-count
+    // assertion race the still-unresolved promise.
     await waitFor(() => {
-      expect(screen.getByTestId('settings-sync-status-last-success')).toHaveTextContent('Never');
+      expect(screen.getByTestId('settings-sync-status-dirty-count')).toHaveTextContent('7');
     });
-    expect(screen.getByTestId('settings-sync-status-dirty-count')).toHaveTextContent('7');
+    expect(screen.getByTestId('settings-sync-status-last-success')).toHaveTextContent('Never');
   });
 
   it('renders a formatted timestamp when a successful sync exists', async () => {
@@ -94,10 +100,16 @@ describe('Settings sync-status panel', () => {
   });
 
   it('shows "None" for the error when the latest cycle was clean', async () => {
-    renderPanel({ errorMessage: null, authRequired: false });
+    // "None" is the error field's value both before the mocked read resolves
+    // (the null initial state) and after (a clean cycle), so gating on it would
+    // be satisfied by the initial render without ever waiting for resolution.
+    // Carry a non-default dirty count as the unambiguous post-resolution signal,
+    // then assert the clean cycle resolves to "None".
+    renderPanel({ dirtyCount: 3, errorMessage: null, authRequired: false });
     await waitFor(() => {
-      expect(screen.getByTestId('settings-sync-status-error')).toHaveTextContent('None');
+      expect(screen.getByTestId('settings-sync-status-dirty-count')).toHaveTextContent('3');
     });
+    expect(screen.getByTestId('settings-sync-status-error')).toHaveTextContent('None');
   });
 
   it('nudges a sync cycle and re-reads on manual refresh', async () => {

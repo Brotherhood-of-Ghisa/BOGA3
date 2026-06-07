@@ -1,5 +1,10 @@
 # Local test-lane timings (measured reference)
 
+**Last updated: 2026-06-07.** These timings drift as the suites, toolchain, and
+hardware change — treat them as a guide and re-measure if a figure looks off (the
+measurement date and method are under *How to read these numbers*). Bump this date
+whenever you revise the table or re-measure.
+
 > **Why this file exists.** Agents working on Sync (and elsewhere) have a habit of
 > *inventing* test durations ("this lane takes ~10 minutes") instead of measuring
 > them. This document records **real, measured** wall-clock times for every
@@ -65,7 +70,6 @@ the headline. `≤ ceiling` = 3× median = "above this, something is wrong".
 | jest (full unit/integration) | `npm test` | 4.6 s | 4.4–9.7 s | 13.7 s | ✅ pass |
 | jest (sync subset) | `npm run test:sync` | 3.6 s | 3.5–3.6 s | 10.7 s | ✅ pass |
 | open-handle guard | `npm run test:handles` | 19.9 s | 19.5–32.6 s | 59.7 s | ✅ pass |
-| reinstall-parity | `npm run test:sync:reinstall-parity` | — | — | — | ❌ **broken** (see Notes) |
 
 ### Backend — Supabase (commands run from repo root; each re-ensures the warm local stack)
 
@@ -79,11 +83,15 @@ the headline. `≤ ceiling` = 3× median = "above this, something is wrong".
 | dev_wipe_my_data contract | `./supabase/scripts/test-dev-wipe-my-data.sh` | 3.3 s | 3.1–3.5 s | 9.8 s | ✅ pass |
 | sync schema-drift (strict) | `npm run check:sync-drift -- --strict` (from `apps/mobile`) | 35.4 s | 27.2–35.5 s | 106 s | ✅ pass |
 | sync v2 end-to-end | `./supabase/scripts/test-sync-v2-e2e.sh` | 118.4 s | 118.3–120.9 s | 355 s (~5.9 min) | ✅ pass |
+| sync-infra (mobile cross-stack) | `./supabase/scripts/test-sync-infra.sh` | N/A | N/A | N/A | not yet measured (see Notes) |
 
-> The backend lanes above are exactly what `./scripts/quality-slow.sh backend`
-> runs, in order. Each wrapper calls `ensure-local-runtime-baseline.sh`, which is
-> a no-op (~a few seconds) when the stack is already up — that overhead **is**
-> included in each figure. First-ever boot of the local stack (image pull +
+> `./scripts/quality-slow.sh backend` runs every row above **except** `backend
+> fast smoke` (that one is `quality-fast.sh backend`) — i.e. `auth / RLS contract`
+> through `sync-infra`, in that table order (`sync schema-drift` runs as
+> `check:sync-drift --strict` between `dev_wipe` and `sync v2 end-to-end`). Each
+> wrapper calls `ensure-local-runtime-baseline.sh`, which is a no-op (~a few
+> seconds) when the stack is already up — that overhead **is** included in each
+> figure. First-ever boot of the local stack (image pull +
 > migrate + seed + fixtures) is a separate one-time cost, not included here (tens
 > of seconds to a few minutes depending on Docker image cache).
 
@@ -94,7 +102,7 @@ the headline. `≤ ceiling` = 3× median = "above this, something is wrong".
 | smoke | `npm run test:e2e:ios:smoke` | 73.6 s | 71.5–98.9 s | 221 s (~3.7 min) | ✅ pass |
 | data-runtime-smoke | `npm run test:e2e:ios:data-smoke` | 110.0 s | 109.3–110.4 s | 330 s (~5.5 min) | ✅ pass |
 | gates (smoke + data, shared sim/Metro) | `npm run test:e2e:ios:gates` | 135.3 s | 134.5–135.5 s | 406 s (~6.8 min) | ✅ pass |
-| auth-profile (signed-in) | `npm run test:e2e:ios:auth-profile` | — | (≈283 s to **fail**) | — | ❌ **red** (see Notes) |
+| auth-profile (signed-in) | `npm run test:e2e:ios:auth-profile` | N/A | N/A | N/A | not re-measured (see Notes) |
 
 > `gates` runs the smoke + data-runtime-smoke flows against **one** provisioned
 > simulator + one Metro instance, so it is cheaper (~135 s) than running smoke
@@ -119,36 +127,30 @@ the headline. `≤ ceiling` = 3× median = "above this, something is wrong".
   shell/session can sit near the listed **max**; that is expected and still well
   under the 3× ceiling.
 
-- **`test:sync:reinstall-parity` is currently BROKEN (not a timing).** It spends
-  ~3.5 s ensuring the local Supabase baseline, then `jest --config
-  jest.integration.config.js` exits 1 with **"No tests found"**: the config's
-  `testMatch` points at `app/__tests__/sync-reinstall-restore-parity.test.ts`,
-  which was deleted in commit `73b9661` ("[t1] delete v1 sync code paths"). The
-  npm script, the wrapper, and `jest.integration.config.js` were left dangling.
-  The ~3.5 s is pure setup, not test execution. *(A fix-it card was spawned.)*
+- **`test:e2e:ios:auth-profile` — not re-measured here (table shows N/A).** This
+  lane was **previously RED**: it aborted at the 2nd flow
+  (`sync-gate-first-cycle.yaml`) because on the simulator the first-sync gate
+  rendered its **offline** branch when connectivity was keyed off
+  `NetInfo.isInternetReachable` (unreliable/`null` on the iOS sim). **That has since
+  been fixed** — the scheduler now keys off `NetInfo.isConnected`
+  (`apps/mobile/src/sync/scheduler.ts`). The earlier ≈283 s figure was a pre-fix run
+  that stopped early on failure, so it was never a valid lane timing — removed.
+  Re-measure on a green run to record a current median.
 
-- **`test:e2e:ios:auth-profile` is currently RED (≈283 s to fail).** The lane runs
-  four flows; it aborts at the 2nd (`sync-gate-first-cycle.yaml`) on
-  `assertVisible: sync-gate-activity-indicator`. On the simulator the first-sync
-  gate renders its **offline** branch ("You are offline…") instead of the activity
-  indicator, because the sync scheduler projects `NetInfo.isInternetReachable ===
-  true` and arms offline-first, and `isInternetReachable` is unreliable/`null` on
-  the iOS simulator. The ~283 s is a real full run that ends in a failure (not a
-  hang/timeout); flows 3-4 never execute. When fixed, expect this lane to run
-  **longer** than 283 s (it currently stops early) — re-measure once green.
-  *(A fix-it card was spawned.)*
-
-- **Deferred (not run here):** `npm run test:sync:infra` requires a live
-  branch-provisioned remote Supabase (`SUPABASE_BRANCH_URL` /
-  `SUPABASE_BRANCH_ANON_KEY`), both unset locally — it fails hard with no endpoint
-  rather than skipping, so it is the one genuinely deferrable lane (per AGENTS.md).
-  Its schema-drift half is covered locally by the `sync-drift` backend lane above.
-
-- **Excluded as retired:** `./supabase/scripts/test-sync-api-contract.sh` and
-  `./supabase/scripts/test-sync-events-ingest-contract.sh` target the M13/M14
-  projection RPC family dropped by the `sync_v2_clean_room` migration; they are no
-  longer wired into any gate (`quality-slow.sh` replaced them with the sync-v2
-  suites) and would fail if run. Not part of the current matrix.
+- **`test:sync:infra` (LOCAL — runnable here, do NOT defer) — still UNMEASURED.**
+  Simplest run path: `./supabase/scripts/test-sync-infra.sh`, which ensures this
+  worktree's slot-isolated baseline and exports
+  `SUPABASE_BRANCH_URL`/`SUPABASE_BRANCH_ANON_KEY` (= the stack's `API_URL`/
+  `ANON_KEY`) for you, then runs `npm run test:sync:infra` in `apps/mobile`. (You
+  can also export those vars by hand from `supabase status -o env` and run the npm
+  script directly — any endpoint carrying the sync schema + the `user_a` fixture
+  works.) It has **no** iOS sim / Metro, but it is **not** one of the cheap
+  slow-side lanes: its `drift-check.test.ts` half shells out to the full
+  `check:sync-drift --strict` (~35 s, see the `sync schema-drift` row), so it will
+  not be near the few-second contract lanes. No measured median yet — the table
+  shows **N/A**; record a real 3×-median once measured on a clean slot. (A
+  `2026-06-07` attempt here was blocked by a baseline `db`-port collision on the
+  shared slot, not by the lane itself.)
 
 - **`lint`/`typecheck` are gates, not tests** — included for completeness because
   they are part of `./scripts/quality-fast.sh frontend` and agents quote them too.
@@ -173,7 +175,6 @@ All three runs per lane (ms), exactly as recorded.
 | jest-full | 9739 | 4558 | 4417 | 0/0/0 |
 | jest-sync | 3558 | 3555 | 3517 | 0/0/0 |
 | handles | 32554 | 19889 | 19506 | 0/0/0 |
-| reinstall-parity | 4182 | 3557 | 3574 | 1/1/1 (no tests found) |
 | backend-fast | 31058 | 38475 | 38579 | 0/0/0 |
 | auth-authz | 4090 | 3538 | 3528 | 0/0/0 |
 | sync-v2-schema | 5621 | 5167 | 5150 | 0/0/0 |
@@ -185,5 +186,5 @@ All three runs per lane (ms), exactly as recorded.
 | ios-smoke | 98924 | 73621 | 71519 | 0/0/0 |
 | ios-data-smoke | 109347 | 110368 | 110016 | 0/0/0 |
 | ios-gates | 135490 | 134534 | 135261 | 0/0/0 |
-| ios-auth-profile | 283612 | 280177 | 286347 | 1/1/1 (sync-gate offline) |
+| ios-auth-profile | 283612 | 280177 | 286347 | 1/1/1 (PRE-FIX, superseded — sync-gate offline; lane since fixed, see Notes) |
 | dev-client-build (one-time) | 129401 | — | — | 0 |

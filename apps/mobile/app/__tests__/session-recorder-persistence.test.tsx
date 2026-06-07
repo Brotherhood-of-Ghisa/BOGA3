@@ -38,6 +38,7 @@ jest.mock('@/src/data', () => ({
   },
   listExerciseTagDefinitions: jest.fn().mockResolvedValue([]),
   listSessionExerciseAssignedTags: jest.fn().mockResolvedValue([]),
+  listLocalGyms: jest.fn().mockResolvedValue([]),
   loadRecentExerciseBlocks: jest.fn().mockImplementation(async ({ exerciseDefinitionId }: { exerciseDefinitionId: string }) => ({
     exerciseDefinitionId,
     limit: 5,

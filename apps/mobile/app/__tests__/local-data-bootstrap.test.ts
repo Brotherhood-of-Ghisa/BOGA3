@@ -343,6 +343,45 @@ describe('bootstrapLocalDataLayer', () => {
     expect(resetSqliteClient.closeAsync).not.toHaveBeenCalled();
   });
 
+  it('a rejected reset does not wedge the data-layer lock chain — a later bootstrap still resolves', async () => {
+    // `runExclusiveDataLayerOperation` queues the next op behind the previous
+    // one REGARDLESS of whether it resolved or rejected (`.then(op, op)` on the
+    // gate). This proves the failure path: a reset that throws at the native
+    // delete must not leave the lock chain permanently blocked.
+    const sqliteClient = createSqliteClient('sqlite-client');
+    const reopenedSqliteClient = createSqliteClient('sqlite-client-reopened');
+    const localDatabase = { name: 'local-db' };
+    const reopenedLocalDatabase = { name: 'local-db-reopened' };
+
+    mockOpenDatabaseSync.mockReturnValueOnce(sqliteClient).mockReturnValueOnce(reopenedSqliteClient);
+    mockDrizzle.mockReturnValueOnce(localDatabase).mockReturnValueOnce(reopenedLocalDatabase);
+    mockMigrate.mockResolvedValue(undefined);
+    mockSeedMuscleGroups.mockReturnValue(undefined);
+    // The native delete rejects exactly once — the reset operation fails.
+    mockDeleteDatabaseAsync.mockRejectedValueOnce(new Error('delete failed'));
+
+    await bootstrapLocalDataLayer();
+    expect(mockOpenDatabaseSync).toHaveBeenCalledTimes(1);
+
+    // The reset closes the old handle, then rejects at the gated delete.
+    await expect(resetLocalAppData()).rejects.toThrow('delete failed');
+    expect(sqliteClient.closeAsync).toHaveBeenCalledTimes(1);
+    // It rejected before re-preparing the data layer, so it never reached the
+    // re-seed or the cache invalidation.
+    expect(mockInvalidateExerciseCatalogCache).not.toHaveBeenCalled();
+
+    // The chain is NOT wedged: the next bootstrap runs and re-opens the database
+    // (the reset cleared the singletons before it failed). Pre-fix a rejected op
+    // would have left the gate rejected and this would never resolve.
+    const reopened = await bootstrapLocalDataLayer();
+
+    expect(reopened).toBe(reopenedLocalDatabase);
+    expect(mockOpenDatabaseSync).toHaveBeenCalledTimes(2);
+    expect(mockDrizzle).toHaveBeenCalledTimes(2);
+    expect(mockMigrate).toHaveBeenCalledTimes(2);
+    expect(mockSeedMuscleGroups).toHaveBeenCalledTimes(2);
+  });
+
   it('seeds the full starter exercise catalog at boot when no sync backend is configured (infra-free build)', async () => {
     mockGetMobileAuthRuntimeConfig.mockReturnValue({ isConfigured: false });
 

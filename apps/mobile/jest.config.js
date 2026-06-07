@@ -16,6 +16,7 @@ module.exports = {
   //   env is missing).
   testPathIgnorePatterns: [
     '<rootDir>/app/__tests__/sync/cycle-round-trip.test.ts',
+    '<rootDir>/app/__tests__/sync/cycle-multidevice-lww.test.ts',
     '<rootDir>/app/__tests__/sync/auth-required-envelope.test.ts',
     '<rootDir>/app/__tests__/sync/drift-check.test.ts',
   ],

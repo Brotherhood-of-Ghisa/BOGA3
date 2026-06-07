@@ -330,7 +330,7 @@ describe('runSyncCycle push preflight', () => {
     );
 
     // No throw: the orphan is quarantined out of the way and the cycle settles.
-    await expect(runSyncCycle()).resolves.toMatchObject({ outcome: 'converged' });
+    await expect(runSyncCycle()).resolves.toBe('converged');
 
     // The orphan batch never reached the server.
     expect(pushCalls()).toHaveLength(0);
@@ -384,7 +384,7 @@ describe('runSyncCycle push preflight', () => {
     );
 
     // The log rejects, but quarantine persistence and convergence proceed.
-    await expect(runSyncCycle()).resolves.toMatchObject({ outcome: 'converged' });
+    await expect(runSyncCycle()).resolves.toBe('converged');
   });
 
   it('pushes a valid parent+child graph in topological order', async () => {
@@ -396,7 +396,7 @@ describe('runSyncCycle push preflight', () => {
       name === 'sync_pull' ? { data: emptyPage, error: null } : pushOk,
     );
 
-    await expect(runSyncCycle()).resolves.toMatchObject({ outcome: 'converged' });
+    await expect(runSyncCycle()).resolves.toBe('converged');
 
     const calls = pushCalls();
     expect(calls.length).toBeGreaterThanOrEqual(1);

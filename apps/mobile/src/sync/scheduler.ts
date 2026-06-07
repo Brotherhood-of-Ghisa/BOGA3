@@ -23,8 +23,9 @@ import { AppState, type AppStateStatus } from 'react-native';
 import NetInfo, { type NetInfoState } from '@react-native-community/netinfo';
 
 import { logEvent } from '@/src/logging/logEvent';
-import { runSyncCycle, type SyncCycleResult } from '@/src/sync/cycle';
+import { runSyncCycle, type SyncCycleOutcome } from '@/src/sync/cycle';
 import { getSyncProgress, type SyncProgress } from '@/src/sync/progress';
+import { subscribeToLocalWrites } from '@/src/sync/write-nudge';
 
 // -----------------------------------------------------------------------------
 // Constants
@@ -101,6 +102,7 @@ let lastSuccessAtMs: number | null = null;
 
 let netInfoUnsubscribe: (() => void) | null = null;
 let appStateSubscription: { remove: () => void } | null = null;
+let localWriteUnsubscribe: (() => void) | null = null;
 let previousAppState: AppStateStatus = AppState.currentState;
 
 // -----------------------------------------------------------------------------
@@ -158,10 +160,11 @@ const logIgnoredEvent = (
 };
 
 /**
- * Records a cycle that ended by throwing. The settle logic treats a thrown
- * cycle identically to a clean one (the long backstop is the only retry path),
- * but the error itself — an auth-required / internal / FK-violation envelope or
- * a transport failure — is meaningful signal that was previously invisible.
+ * Records a cycle that ended in a non-converged outcome (or, defensively, by an
+ * escaped throw). The settle logic treats a failed cycle identically to a clean
+ * one (the long backstop is the only retry path), but the outcome itself — an
+ * auth-required / internal / FK-violation classification or a transport failure
+ * — is meaningful signal that was previously easy to lose.
  */
 const logCycleError = (error: unknown): void => {
   void logEvent({
@@ -217,65 +220,68 @@ const transitionTo = (
 // -----------------------------------------------------------------------------
 
 /**
- * Folds a finished cycle's classified result into the observable status. Only a
- * `converged` outcome records a success and clears a prior error; the two
- * non-success outcomes that also resolve cleanly are kept from masquerading as
- * convergence:
- *
- *  - `converged`: record the success time and clear any prior retryable error.
- *  - `auth_required`: not a success and not an in-gate error (it is surfaced via
- *    the dedicated auth-required signal). Leave both fields untouched so no false
- *    success is recorded and any prior error stays visible.
- *  - `retryable_error`: not a success. Keep it visible through the status
- *    accessor (record the code) until a genuinely converged cycle clears it.
- *
- * A resolved cycle with no explicit result is treated as converged — a defensive
- * default for the production path, where `runSyncCycle` always returns one.
- */
-const recordCycleResult = (result: SyncCycleResult | undefined): void => {
-  const outcome = result?.outcome ?? 'converged';
-
-  if (outcome === 'converged') {
-    lastSuccessAtMs = Date.now();
-    lastCycleError = null;
-    return;
-  }
-
-  if (outcome === 'auth_required') {
-    return;
-  }
-
-  // retryable_error
-  lastCycleError = result?.errorCode ?? 'INTERNAL';
-};
-
-/**
  * Runs one cycle to completion, then settles the machine per the internal-event
  * table: a cycle that ends while online re-arms the long backstop; one that
- * ends while offline falls back to OFFLINE. The settle path does not distinguish
- * the result — the long backstop is the only retry path (no per-error backoff) —
- * but the observable status DOES: a converged cycle records success, while a
- * retryable / auth-required / thrown structural outcome never does.
+ * ends while offline falls back to OFFLINE. The settle path does NOT distinguish
+ * outcome — every cycle is just the cycle ending, and the long backstop is the
+ * only retry path (no per-error backoff).
+ *
+ * What the outcome DOES drive is the observable health the status surface reads.
+ * The cycle returns a single explicit {@link SyncCycleOutcome} for every path
+ * (it never throws); only a genuinely converged cycle records the last-success
+ * time and clears the error. A non-converged outcome — including a recoverable
+ * INTERNAL failure or a structural FK violation — records the error and leaves
+ * `lastSuccessAtMs` untouched, so a failed cycle can never read as a fresh
+ * success while dirty rows pile up. (The `.catch` is a defensive backstop: the
+ * cycle classifies its own throws, so this only fires if something escapes the
+ * cycle body entirely, and it is treated as a non-success failure too.)
  */
 const startCycle = (): void => {
   void runSyncCycle()
-    .then((result) => {
-      // The cycle resolved with a classified result: fold it into the
-      // observable status without changing the settle path below.
-      recordCycleResult(result);
+    .then((outcome) => {
+      if (outcome === 'converged') {
+        // Real convergence/progress with a valid session: record the success
+        // time and clear any earlier failure so the status surface reflects a
+        // healthy latest cycle.
+        lastSuccessAtMs = Date.now();
+        lastCycleError = null;
+        return;
+      }
+      // A classified non-converged outcome: surface it as the latest error state
+      // and DO NOT advance the last-success time. The failure stays visible in
+      // the status surface until a later cycle actually converges.
+      lastCycleError = describeOutcome(outcome);
+      logCycleError(outcome);
     })
     .catch((error: unknown) => {
-      // A thrown cycle is a non-retriable structural sync error (or an
-      // unexpected failure). It is handled identically to a resolved one for
-      // control flow — the cycle-ends transition below decides what to arm
-      // next — but it is NOT a success: leave the last-success time untouched
-      // and retain the message so the status surface shows the error state.
+      // Defensive: the cycle classifies its own throws into an outcome, so this
+      // path means something escaped the cycle body entirely. Treat it as a
+      // non-success failure — record it for the status surface and leave the
+      // last-success time untouched — rather than ever settling it as success.
       lastCycleError = error instanceof Error ? error.message : String(error);
       logCycleError(error);
     })
     .finally(() => {
       handleInternal('cycle ends');
     });
+};
+
+/**
+ * A short, human-readable message for a non-converged outcome, retained as the
+ * latest error state the status surface shows. Kept terse and free of internal
+ * tokens; the gate renders its own user-facing copy from the error code signal.
+ */
+const describeOutcome = (outcome: Exclude<SyncCycleOutcome, 'converged'>): string => {
+  switch (outcome) {
+    case 'auth-required':
+      return 'Sync needs you to sign in again.';
+    case 'fk-violation':
+      return 'Sync could not reconcile your data (structural conflict).';
+    case 'internal':
+      return 'Sync did not complete; it will retry automatically.';
+    default:
+      return 'Sync did not complete; it will retry automatically.';
+  }
 };
 
 // -----------------------------------------------------------------------------
@@ -438,6 +444,27 @@ const handleAppStateChange = (nextAppState: AppStateStatus): void => {
 };
 
 // -----------------------------------------------------------------------------
+// Local-write wiring
+//
+// A committed repo mutation feeds the same single "request sync" entry point as
+// the foreground edge and the cold-launch nudge. The data layer fires the nudge
+// through the `write-nudge` emitter rather than importing the scheduler, which
+// would close an import cycle (scheduler -> cycle -> data -> scheduler). We log
+// the source here so a write-triggered sync is distinguishable in the logs from
+// a foreground-triggered one without forking the machine input.
+// -----------------------------------------------------------------------------
+
+const handleLocalWrite = (): void => {
+  void logEvent({
+    level: 'debug',
+    source: 'sync',
+    event: 'sync_scheduler_write_sync_requested',
+    context: { timestampMs: Date.now() },
+  });
+  handleExternal('request sync');
+};
+
+// -----------------------------------------------------------------------------
 // Public surface
 // -----------------------------------------------------------------------------
 
@@ -475,6 +502,11 @@ export const startSyncScheduler = (): void => {
   try {
     netInfoUnsubscribe = NetInfo.addEventListener(handleNetInfoState);
     appStateSubscription = AppState.addEventListener('change', handleAppStateChange);
+    // Subscribe the same single entry point to post-commit repo-write nudges.
+    // This is an in-process emitter (not a native listener), so it cannot throw
+    // for a broken-native-module reason; it sits inside the same try only so a
+    // partially-wired start still tears down cleanly.
+    localWriteUnsubscribe = subscribeToLocalWrites(handleLocalWrite);
   } catch (error) {
     void logEvent({
       level: 'error',
@@ -502,6 +534,11 @@ export const stopSyncScheduler = (): void => {
   if (appStateSubscription !== null) {
     appStateSubscription.remove();
     appStateSubscription = null;
+  }
+
+  if (localWriteUnsubscribe !== null) {
+    localWriteUnsubscribe();
+    localWriteUnsubscribe = null;
   }
 
   state = { name: 'OFFLINE' };

@@ -7,7 +7,8 @@
  *  - AUTH_REQUIRED: a server that returns the no-JWT envelope makes the cycle
  *    return cleanly without mutating SQLite and without throwing.
  *  - FK_VIOLATION: a server that rejects a push with the structural-error token
- *    makes the cycle throw (non-retriable) while leaving dirty bits set.
+ *    makes the cycle return the 'fk-violation' outcome (non-retriable) and raise
+ *    the gate error code, while leaving dirty bits set.
  *
  * The cycle's only outbound dependency is the Supabase RPC, stubbed here.
  */
@@ -24,11 +25,11 @@ import {
   getAuthRequiredSignal,
   markAuthRequired,
 } from '@/src/sync/auth-required-signal';
-import { runSyncCycle, SyncCycleError, type WireEntity } from '@/src/sync/cycle';
 import {
   __resetCycleErrorSignalForTests,
   getCycleErrorCode,
 } from '@/src/sync/cycle-error-signal';
+import { runSyncCycle, type WireEntity } from '@/src/sync/cycle';
 
 import {
   createInMemoryDatabase,
@@ -171,10 +172,7 @@ describe('cycle convergence', () => {
       return pushOk;
     });
 
-    await expect(runSyncCycle()).resolves.toMatchObject({
-      outcome: 'converged',
-      errorCode: null,
-    });
+    await expect(runSyncCycle()).resolves.toBe('converged');
 
     // The single server row landed locally and clean.
     const row = database.select().from(gyms).where(eq(gyms.id, 'gym-server')).get();
@@ -185,9 +183,9 @@ describe('cycle convergence', () => {
     // bootstrapper before its convergence loop. The bootstrapper's first full
     // pull absorbs layer-0 pull #1 (the one carrying the server row), so the
     // convergence loop opens with everything already local: one quiet round of a
-    // before-pull (#2) and an after-pull (#3) confirms convergence. Layer-0 pull
-    // count is therefore 3 (1 bootstrap + 2 convergence), and the guard cap (5
-    // rounds) was never hit.
+    // before-pull (#2) and an after-pull (#3) confirms convergence and the loop
+    // exits on that first quiet round. Layer-0 pull count is therefore 3 (1
+    // bootstrap + 2 convergence).
     expect(layer0Pulls).toBe(3);
   });
 
@@ -211,6 +209,93 @@ describe('cycle convergence', () => {
   });
 });
 
+describe('convergence loop quietness and the absent round cap', () => {
+  it('treats a no-op re-pull as quiet and converges without a wasted round', async () => {
+    // The server hands the SAME already-applied gym back on the first
+    // convergence pull (a benign echo the device already holds at an equal
+    // timestamp). Quietness now counts rows actually CHANGED, not rows the server
+    // returned, so that no-op reads as quiet and the loop exits on the first
+    // round. The old "count rows received" heuristic would have read the no-op as
+    // motion and spun a second, pointless round.
+    let layer0Pulls = 0;
+    mockRpc.mockImplementation(async (name: string, args: { layer?: number }) => {
+      if (name === 'sync_pull') {
+        if (args.layer === 0) {
+          layer0Pulls += 1;
+          // Same gym on the first two layer-0 pulls (bootstrap full-pull #1, then
+          // convergence before-pull #2); empty thereafter. The second delivery is
+          // a no-op because the row is already local at the same timestamp.
+          if (layer0Pulls <= 2) {
+            return {
+              data: {
+                entities: [gymEntity('gym-echo', 100)],
+                next_cursor: { server_received_at: '2026-05-29T10:00:00.000Z', owner_user_id: 'u', type: 'gyms', id: 'gym-echo' },
+                has_more: false,
+              },
+              error: null,
+            };
+          }
+        }
+        return { data: emptyPage, error: null };
+      }
+      return pushOk;
+    });
+
+    await expect(runSyncCycle()).resolves.toBe('converged');
+
+    const row = database.select().from(gyms).where(eq(gyms.id, 'gym-echo')).get();
+    expect(row?.localDirty).toBe(false);
+
+    // 3 layer-0 pulls: bootstrap #1 (applies the gym), convergence before-pull #2
+    // (re-delivers it as a no-op → 0 changed → quiet), after-pull #3 (empty). The
+    // received-counting heuristic would have read pull #2 as motion and run a
+    // second round (5 layer-0 pulls).
+    expect(layer0Pulls).toBe(3);
+  });
+
+  it('drains a long fresh stream and converges without a round cap truncating it', async () => {
+    // The server hands back a fresh, distinct, strictly-newer row on each of the
+    // first STREAM_LEN layer-0 pulls, then goes empty. Every such pull CHANGES a
+    // row (a new insert), so no round is quiet until the stream stops. The old
+    // 5-round cap bounded the loop to ~10 layer-0 convergence pulls and would have
+    // force-returned 'converged' partway through, stranding the tail; with no cap
+    // the loop follows the whole stream.
+    const STREAM_LEN = 12;
+    let layer0Pulls = 0;
+    mockRpc.mockImplementation(async (name: string, args: { layer?: number }) => {
+      if (name === 'sync_pull') {
+        if (args.layer === 0) {
+          layer0Pulls += 1;
+          if (layer0Pulls <= STREAM_LEN) {
+            const n = layer0Pulls;
+            return {
+              data: {
+                entities: [gymEntity(`gym-churn-${n}`, 100 + n)],
+                next_cursor: { server_received_at: `2026-05-29T10:00:${String(n).padStart(2, '0')}.000Z`, owner_user_id: 'u', type: 'gyms', id: `gym-churn-${n}` },
+                has_more: false,
+              },
+              error: null,
+            };
+          }
+        }
+        return { data: emptyPage, error: null };
+      }
+      return pushOk;
+    });
+
+    await expect(runSyncCycle()).resolves.toBe('converged');
+
+    // Every streamed row landed locally — the loop followed the full stream past
+    // where the old 5-round cap would have stopped (it would have left only the
+    // first 11). The bootstrapper did not seed (the first pull returned a row).
+    const allGyms = database.select().from(gyms).all();
+    expect(allGyms).toHaveLength(STREAM_LEN);
+    expect(
+      database.select().from(gyms).where(eq(gyms.id, `gym-churn-${STREAM_LEN}`)).get(),
+    ).toBeDefined();
+  });
+});
+
 describe('AUTH_REQUIRED handling', () => {
   it('returns cleanly with no SQLite mutation when the pull RPC reports no JWT', async () => {
     database.insert(gyms).values({ id: 'gym-local', name: 'Local', localDirty: true, localUpdatedAtMs: 50 }).run();
@@ -220,10 +305,7 @@ describe('AUTH_REQUIRED handling', () => {
       error: null,
     }));
 
-    await expect(runSyncCycle()).resolves.toMatchObject({
-      outcome: 'auth_required',
-      errorCode: null,
-    });
+    await expect(runSyncCycle()).resolves.toBe('auth-required');
 
     // Dirty bit untouched; nothing pulled.
     const row = database.select().from(gyms).where(eq(gyms.id, 'gym-local')).get();
@@ -244,10 +326,7 @@ describe('AUTH_REQUIRED handling', () => {
       return { data: null, error: { code: 'P0001', message: 'AUTH_REQUIRED: sync_push requires an authenticated user' } };
     });
 
-    await expect(runSyncCycle()).resolves.toMatchObject({
-      outcome: 'auth_required',
-      errorCode: null,
-    });
+    await expect(runSyncCycle()).resolves.toBe('auth-required');
 
     const row = database.select().from(gyms).where(eq(gyms.id, 'gym-local')).get();
     expect(row?.localDirty).toBe(true);
@@ -275,7 +354,7 @@ describe('AUTH_REQUIRED handling', () => {
 });
 
 describe('FK_VIOLATION handling', () => {
-  it('throws and leaves dirty bits set when the push RPC reports an FK violation', async () => {
+  it('returns the fk-violation outcome, raises the gate error code, and leaves dirty bits set', async () => {
     database.insert(gyms).values({ id: 'gym-local', name: 'Local', localDirty: true, localUpdatedAtMs: 50 }).run();
 
     mockRpc.mockImplementation(async (name: string) => {
@@ -285,7 +364,11 @@ describe('FK_VIOLATION handling', () => {
       return { data: null, error: { code: 'P0001', message: 'FK_VIOLATION: parent not found' } };
     });
 
-    await expect(runSyncCycle()).rejects.toBeInstanceOf(SyncCycleError);
+    // The cycle no longer throws: a structural FK violation is classified into a
+    // single returned outcome so the scheduler and the gate read one consistent
+    // view. It still surfaces as an error + Retry in the gate via the error code.
+    await expect(runSyncCycle()).resolves.toBe('fk-violation');
+    expect(getCycleErrorCode()).toBe('FK_VIOLATION');
 
     const row = database.select().from(gyms).where(eq(gyms.id, 'gym-local')).get();
     expect(row?.localDirty).toBe(true);
@@ -323,9 +406,7 @@ describe('FK_VIOLATION handling', () => {
       return pushOk;
     });
 
-    await expect(runSyncCycle()).rejects.toMatchObject({
-      code: 'LOCAL_FK_VIOLATION',
-    });
+    await expect(runSyncCycle()).resolves.toBe('fk-violation');
 
     expect(getCycleErrorCode()).toBe('LOCAL_FK_VIOLATION');
     expect(database.select().from(sessions).where(eq(sessions.id, 'sess-orphan')).get()).toBeUndefined();
@@ -377,12 +458,11 @@ describe('FK_VIOLATION handling', () => {
       return pushOk;
     });
 
-    await expect(runSyncCycle()).rejects.toMatchObject({
-      code: 'LOCAL_FK_VIOLATION',
-    });
+    await expect(runSyncCycle()).resolves.toBe('fk-violation');
+    expect(getCycleErrorCode()).toBe('LOCAL_FK_VIOLATION');
   });
 
-  it('returns cleanly on an INTERNAL / transport error', async () => {
+  it('returns the internal outcome and raises the gate error code on a transport error', async () => {
     database.insert(gyms).values({ id: 'gym-local', name: 'Local', localDirty: true, localUpdatedAtMs: 50 }).run();
 
     mockRpc.mockImplementation(async (name: string) => {
@@ -392,10 +472,8 @@ describe('FK_VIOLATION handling', () => {
       return { data: null, error: { code: '500', message: 'network blip' } };
     });
 
-    await expect(runSyncCycle()).resolves.toMatchObject({
-      outcome: 'retryable_error',
-      errorCode: 'INTERNAL',
-    });
+    await expect(runSyncCycle()).resolves.toBe('internal');
+    expect(getCycleErrorCode()).toBe('INTERNAL');
 
     const row = database.select().from(gyms).where(eq(gyms.id, 'gym-local')).get();
     expect(row?.localDirty).toBe(true);
@@ -436,7 +514,7 @@ describe('structured cycle-result logging', () => {
     const logs = cycleResultLogs();
     expect(logs).toHaveLength(1);
     expect(logs[0].level).toBe('warn');
-    expect(logs[0].context).toMatchObject({ outcome: 'auth_required', error_code: null });
+    expect(logs[0].context).toMatchObject({ outcome: 'auth-required', error_code: null });
     expect(logs[0].context).not.toHaveProperty('exception_message');
   });
 
@@ -455,13 +533,13 @@ describe('structured cycle-result logging', () => {
     expect(logs).toHaveLength(1);
     expect(logs[0].level).toBe('warn');
     expect(logs[0].context).toMatchObject({
-      outcome: 'retryable_error',
+      outcome: 'internal',
       error_code: 'INTERNAL',
       exception_message: expect.stringContaining('network blip'),
     });
   });
 
-  it('logs a structural result at error with the FK code when the cycle throws', async () => {
+  it('logs a structural result at error with the FK code when the cycle classifies a FK failure', async () => {
     database.insert(gyms).values({ id: 'gym-local', name: 'Local', localDirty: true, localUpdatedAtMs: 50 }).run();
     mockRpc.mockImplementation(async (name: string) => {
       if (name === 'sync_pull') {
@@ -470,13 +548,13 @@ describe('structured cycle-result logging', () => {
       return { data: null, error: { code: 'P0001', message: 'FK_VIOLATION: parent not found' } };
     });
 
-    await expect(runSyncCycle()).rejects.toBeInstanceOf(SyncCycleError);
+    await expect(runSyncCycle()).resolves.toBe('fk-violation');
 
     const logs = cycleResultLogs();
     expect(logs).toHaveLength(1);
     expect(logs[0].level).toBe('error');
     expect(logs[0].context).toMatchObject({
-      outcome: 'structural_error',
+      outcome: 'fk-violation',
       error_code: 'FK_VIOLATION',
     });
   });
@@ -491,6 +569,6 @@ describe('structured cycle-result logging', () => {
       return pushOk;
     });
 
-    await expect(runSyncCycle()).resolves.toMatchObject({ outcome: 'converged' });
+    await expect(runSyncCycle()).resolves.toBe('converged');
   });
 });

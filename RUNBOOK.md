@@ -40,69 +40,23 @@ PATH="/opt/homebrew/opt/openjdk/bin:$HOME/.maestro/bin:$PATH" JAVA_HOME="/opt/ho
 
 ## Worktree setup and isolation
 
-Authoritative design: `docs/specs/12-worktree-config-and-isolation.md`.
+Worktree setup, the environment sequence, and teardown are in
+`docs/specs/01-worktree-and-environment.md` (always-load quickref). The full
+isolation contract — slot/port model, every script, and the cleanup completion
+signals — is in `docs/specs/12-worktree-config-and-isolation.md`.
 
-BOGA worktrees must live outside another BOGA checkout. Use the wrapper when possible:
+Operator rules:
 
-```bash
-./scripts/worktree-create.sh codex/my-branch
-```
-
-Initialize or repair the current checkout/worktree:
-
-```bash
-./scripts/worktree-setup.sh
-```
-
-Diagnose isolation/config problems:
-
-```bash
-./scripts/worktree-doctor.sh
-```
-
-Sweep completed worktree Supabase infrastructure:
-
-```bash
-./scripts/worktree-sweep.sh
-```
-
-Setup generates `.worktree-slot`, `supabase/config.toml`, shared Supabase env symlinks, and `apps/mobile/.maestro/maestro.env.local`.
-
-Rules:
-
-- never create a BOGA worktree under another BOGA checkout;
+- never create a BOGA worktree under another BOGA checkout (it must live outside it);
 - run `cd apps/mobile && npm install` in each worktree;
 - do not symlink `apps/mobile/node_modules` between worktrees;
-- use a unique simulator target per concurrent worktree.
-
-`./supabase/scripts/local-runtime-up.sh` automatically runs a Supabase cleanup sweep for completed worktree slots before starting the current slot. A slot is considered completed when, after the grace period, ANY of: its registered path is gone/invalid; it belongs to this git worktree group and is no longer listed by `git worktree list`; its branch HEAD is reachable from the configured remote main (default `origin/main`); or its branch has been deleted on the configured remote. Merge detection performs a single `git fetch --prune` at start-up (10 s timeout); disable with `--no-merge-detection` or skip the fetch with `--no-fetch`. Full contract: `docs/specs/12-worktree-config-and-isolation.md`.
+- use a unique iOS simulator target per concurrent worktree.
 
 ## Quick start (full local stack)
 
-1. Initialize this checkout/worktree:
-
-```bash
-./scripts/worktree-setup.sh
-```
-
-2. Start backend runtime:
-
-```bash
-./supabase/scripts/local-runtime-up.sh
-```
-
-3. Install mobile dependencies:
-
-```bash
-cd apps/mobile
-npm install
-```
-
-4. Start the iOS dev-client manual loop:
-
-```bash
-npm run start:ios:dev-client
-```
+New-worktree setup (create → install deps → boot local Supabase) is the
+ordered sequence in `docs/specs/01-worktree-and-environment.md`. To run the app on
+a simulator afterward, see **Mobile app: run on iOS simulator** below.
 
 ## Mobile app: run on iOS simulator
 
@@ -211,17 +165,8 @@ Stop runtime:
 ./supabase/scripts/local-runtime-down.sh
 ```
 
-Clean completed/orphaned Supabase infra:
-
-```bash
-./scripts/worktree-sweep.sh
-```
-
-Clean one completed slot manually:
-
-```bash
-./scripts/worktree-clean.sh --slot <n> --supabase --remove-registry
-```
+Worktree teardown — stopping, sweeping orphans, and cleaning a completed slot
+(`worktree-sweep` / `worktree-clean`): `docs/specs/01-worktree-and-environment.md`.
 
 Reset DB (migrations + seed):
 
@@ -367,8 +312,11 @@ TASK_ID=ad-hoc ./scripts/maestro-ios-run-flow.sh --flow .maestro/flows/exercise-
 ```bash
 ./supabase/scripts/test-fast.sh
 ./supabase/scripts/test-auth-authz.sh
-./supabase/scripts/test-sync-api-contract.sh
-./supabase/scripts/test-sync-events-ingest-contract.sh
+# sync v2 contract suites (or run all backend slow suites via: ./scripts/quality-slow.sh backend)
+./supabase/scripts/test-sync-v2-schema-smoke.sh
+./supabase/scripts/test-sync-push-contract.sh
+./supabase/scripts/test-sync-pull-contract.sh
+./supabase/scripts/test-sync-v2-e2e.sh
 ```
 
 ### Logger diagnostics smoke (Docker Supabase)
@@ -401,7 +349,14 @@ Notes:
 
 ### Cross-stack restore-parity lane
 
+Reinstall/restore parity is proven by the sync-v2 `cycle-round-trip` assertion
+inside `test:sync:infra`, plus the backend sync-v2 contract suites:
+
 ```bash
 cd apps/mobile
-npm run test:sync:reinstall-parity
+npm run test:sync:infra            # includes the wiped-client restore assertion
+# backend parity: ./scripts/quality-slow.sh backend (from repo root)
 ```
+
+See `docs/specs/02-quality-and-test-gates.md` for how to provision the local
+endpoint these read.

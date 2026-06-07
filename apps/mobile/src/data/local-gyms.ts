@@ -1,8 +1,9 @@
-import { eq } from 'drizzle-orm';
+import { asc, eq, isNull } from 'drizzle-orm';
 
 import { bootstrapLocalDataLayer } from './bootstrap';
 import { nowMonotonic } from './clock';
 import { gyms } from './schema';
+import { notifyLocalWrite } from '@/src/sync/write-nudge';
 
 export type UpsertLocalGymInput = {
   id: string;
@@ -124,6 +125,10 @@ export const upsertLocalGym = async (input: UpsertLocalGymInput) => {
       })
       .run();
   });
+
+  // Post-commit: the gym row is dirtied above, so nudge the scheduler to push it
+  // soon rather than waiting for the next foreground edge or the long backstop.
+  notifyLocalWrite();
 };
 
 export const loadLocalGymById = async (gymId: string): Promise<LocalGymLookupRecord | null> => {
@@ -141,4 +146,21 @@ export const loadLocalGymById = async (gymId: string): Promise<LocalGymLookupRec
     .where(eq(gyms.id, gymId))
     .get();
   return row ?? null;
+};
+
+export const listLocalGyms = async (): Promise<LocalGymLookupRecord[]> => {
+  const database = await bootstrapLocalDataLayer();
+  return database
+    .select({
+      id: gyms.id,
+      name: gyms.name,
+      latitude: gyms.latitude,
+      longitude: gyms.longitude,
+      coordinateAccuracyM: gyms.coordinateAccuracyM,
+      coordinatesUpdatedAt: gyms.coordinatesUpdatedAt,
+    })
+    .from(gyms)
+    .where(isNull(gyms.deletedAt))
+    .orderBy(asc(gyms.name), asc(gyms.id))
+    .all();
 };

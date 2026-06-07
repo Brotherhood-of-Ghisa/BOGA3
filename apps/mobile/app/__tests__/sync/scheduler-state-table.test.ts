@@ -28,11 +28,15 @@ import { AppState, type AppStateStatus } from 'react-native';
 import type { LogEventParams } from '@/src/logging/logEvent';
 
 // --- Controllable cycle stub: resolve/reject by hand to observe RUNNING. ------
-let cycleResolvers: { resolve: () => void; reject: (error: unknown) => void }[] = [];
+// The cycle returns a classified outcome (it never throws in production); the
+// stub resolves with one so the settle path sees the production contract.
+type CycleOutcome = 'converged' | 'auth-required' | 'fk-violation' | 'internal';
+let cycleResolvers: { resolve: (outcome: CycleOutcome) => void; reject: (error: unknown) => void }[] =
+  [];
 let cycleStartCount = 0;
 const mockRunSyncCycle = jest.fn(
   () =>
-    new Promise<void>((resolve, reject) => {
+    new Promise<CycleOutcome>((resolve, reject) => {
       cycleStartCount += 1;
       cycleResolvers.push({ resolve, reject });
     }),
@@ -84,7 +88,7 @@ const linkUnknown = () => mockNetInfoState.listener?.({ isConnected: null });
 const endCycle = async (mode: 'success' | 'error') => {
   const pending = cycleResolvers.shift();
   if (mode === 'success') {
-    pending?.resolve();
+    pending?.resolve('converged');
   } else {
     pending?.reject(new Error('cycle failed'));
   }

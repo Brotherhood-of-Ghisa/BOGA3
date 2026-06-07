@@ -46,13 +46,6 @@ import { TOPO_LAYERS, type EntityTableName } from '@/src/sync/topo-order';
 /** Maximum rows in a single push batch and a single pull page. */
 export const BATCH_CAP = 200;
 
-/**
- * Hard ceiling on PULL -> PUSH -> PULL rounds per cycle call. Convergence
- * normally settles in one or two rounds; this guard stops a pathological spin
- * if two devices' clock skew causes LWW to thrash back and forth.
- */
-export const MAX_CYCLES_PER_CALL = 5;
-
 const SYNC_PUSH_RPC = 'sync_push';
 const SYNC_PULL_RPC = 'sync_pull';
 
@@ -121,30 +114,11 @@ export class SyncCycleError extends Error {
 }
 
 /**
- * The classified outcome of a finished cycle, returned by `runSyncCycle` so the
- * scheduler can tell real convergence apart from the two non-success outcomes
- * that previously also resolved cleanly:
- *
- *  - `converged`: both ends went quiet (or the round cap was reached after
- *    authenticated progress). This — and only this — is a real sync success.
- *  - `auth_required`: the server reported no signed-in user. A route signal, not
- *    a success and not an in-gate error; surfaced via the auth-required signal.
- *  - `retryable_error`: a server-internal / transport hiccup. Dirty bits are left
- *    set for the next tick; the status surface must keep this visible, not treat
- *    it as success.
- *
- * The fourth class — a non-retriable STRUCTURAL error (`FK_VIOLATION` /
- * `LOCAL_FK_VIOLATION`) — is exposed distinctly by THROWING a `SyncCycleError`
- * rather than returning, so the existing cadence policy still settles the state
- * machine while recording no success.
+ * The single, explicit outcome of one cycle call. Every non-converged path is
+ * classified into one of these values so the gate, scheduler, background task,
+ * and status surfaces derive their view from the same result.
  */
-export type SyncCycleOutcome = 'converged' | 'auth_required' | 'retryable_error';
-
-export interface SyncCycleResult {
-  outcome: SyncCycleOutcome;
-  /** The classified error code for a `retryable_error`, else null. */
-  errorCode: SyncErrorCode | null;
-}
+export type SyncCycleOutcome = 'converged' | 'auth-required' | 'fk-violation' | 'internal';
 
 /**
  * Maps a server response into a sync error code, or null when the response is a
@@ -343,12 +317,12 @@ const logPushContinuedAfterQuarantine = (
  * result is still returned regardless of whether this insert succeeds.
  */
 const logCycleOutcome = (
-  outcome: SyncCycleOutcome | 'structural_error',
+  outcome: SyncCycleOutcome,
   errorCode: SyncErrorCode | null,
   error?: unknown,
 ): void => {
   const level: 'info' | 'warn' | 'error' =
-    outcome === 'converged' ? 'info' : outcome === 'structural_error' ? 'error' : 'warn';
+    outcome === 'converged' ? 'info' : outcome === 'fk-violation' ? 'error' : 'warn';
 
   try {
     void logEvent({
@@ -415,6 +389,15 @@ const ENTITY_FIELDS: Record<EntityTableName, FieldSpec[]> = {
     TS('updated_at', 'updatedAt'),
     TS('deleted_at', 'deletedAt'),
   ],
+  muscle_groups: [
+    SC('display_name', 'displayName'),
+    SC('family_name', 'familyName'),
+    SC('sort_order', 'sortOrder'),
+    SC('is_editable', 'isEditable'),
+    TS('created_at', 'createdAt'),
+    TS('updated_at', 'updatedAt'),
+    TS('deleted_at', 'deletedAt'),
+  ],
   exercise_tag_definitions: [
     SC('exercise_definition_id', 'exerciseDefinitionId'),
     SC('name', 'name'),
@@ -474,6 +457,7 @@ const ENTITY_FIELDS: Record<EntityTableName, FieldSpec[]> = {
 const ENTITY_TABLES: Record<EntityTableName, (typeof schema)[keyof typeof schema]> = {
   gyms: schema.gyms,
   exercise_definitions: schema.exerciseDefinitions,
+  muscle_groups: schema.muscleGroups,
   exercise_tag_definitions: schema.exerciseTagDefinitions,
   sessions: schema.sessions,
   exercise_muscle_mappings: schema.exerciseMuscleMappings,
@@ -611,11 +595,21 @@ export const selectPushBatch = (tx: Transaction, batchCap: number): WireEntity[]
 // -----------------------------------------------------------------------------
 
 /**
- * Applies one pull page's worth of entities under per-row last-write-wins. For
- * each incoming row: insert it if absent; overwrite every typed column if the
- * incoming monotonic timestamp is strictly newer than the local one; otherwise
- * no-op (the local edit is newer and stays dirty). Applied rows are stamped not
- * dirty with the incoming timestamp.
+ * Applies one pull page's worth of entities under per-row last-write-wins and
+ * returns how many rows it actually wrote. For each incoming row: insert it if
+ * absent; overwrite every typed column if the incoming monotonic timestamp is
+ * strictly newer than the local one; otherwise no-op (the local edit is newer
+ * and stays dirty). Applied rows are stamped not dirty with the incoming
+ * timestamp.
+ *
+ * The return value counts ONLY rows whose local state changed (insert or
+ * incoming-wins); no-op LWW rows are excluded. This is what lets the convergence
+ * loop tell a quiet round from a benign re-pull of rows the device already
+ * holds: counting "rows the server returned" would treat a no-op echo (a row
+ * the server hands back unchanged, e.g. this device's own just-pushed row, or a
+ * row a second device re-stamped to an equal-or-older value) as motion and spin
+ * an extra, pointless round. Counting rows actually written makes "nothing
+ * changed locally" the exact convergence signal.
  *
  * Runs inside the caller's transaction so the whole page either lands or rolls
  * back together; a per-row insert failure (e.g. an FK violation) aborts the
@@ -625,8 +619,9 @@ export const applyPullPage = (
   tx: Transaction,
   entities: WireEntity[],
   type: EntityTableName,
-): void => {
+): number => {
   const table = ENTITY_TABLES[type] as typeof schema.gyms;
+  let changed = 0;
 
   for (const envelope of entities) {
     const existing = tx
@@ -639,14 +634,18 @@ export const applyPullPage = (
 
     if (!existing) {
       tx.insert(table).values(values as never).run();
+      changed += 1;
       continue;
     }
 
     if (envelope.client_updated_at_ms > existing.localUpdatedAtMs) {
       tx.update(table).set(values as never).where(eq(table.id, envelope.id)).run();
+      changed += 1;
     }
     // Otherwise the local row is newer-or-equal: leave it untouched and dirty.
   }
+
+  return changed;
 };
 
 // -----------------------------------------------------------------------------
@@ -751,17 +750,38 @@ export interface PullProgressReporter {
 }
 
 /**
+ * The two counts a pull leg produces. They differ deliberately and must not be
+ * collapsed into one:
+ *
+ *  - `received`: rows the server returned across the leg (every `entities`
+ *    envelope, no-op LWW rows included). This is what the first-sign-in seed
+ *    decision keys off — "did the server hold ANYTHING for this user" — so a
+ *    resumed bootstrap that re-pulls already-local rows (cursor reset, every row
+ *    a no-op) still sees a non-empty pull and does NOT re-seed over the server's
+ *    data. See `bootstrapper.ts`.
+ *  - `changed`: rows `applyPullPage` actually wrote (insert or incoming-wins).
+ *    This is the convergence-quietness signal: a round is quiet only when both
+ *    pull legs changed nothing locally. Using `received` here would count a
+ *    benign no-op echo as motion and spin a pointless extra round.
+ */
+export interface PullLegResult {
+  received: number;
+  changed: number;
+}
+
+/**
  * Drains every topological layer once, applying each page and advancing that
- * layer's cursor after the page commits. Returns the number of entities applied
- * across all layers so the cycle can tell whether the pull leg was quiet. When a
+ * layer's cursor after the page commits. Returns both the rows received and the
+ * rows actually changed across all layers (see {@link PullLegResult}). When a
  * reporter is passed, emits a page event per applied page and a layer event per
  * drained layer so a first-sync caller can surface advancing progress.
  */
 const runPullLeg = async (
   database: LocalDatabase,
   reporter?: PullProgressReporter,
-): Promise<number> => {
-  let appliedTotal = 0;
+): Promise<PullLegResult> => {
+  let receivedTotal = 0;
+  let changedTotal = 0;
 
   for (let layer = 0; layer < TOPO_LAYERS.length; layer += 1) {
     const layerTypes = TOPO_LAYERS[layer] as readonly EntityTableName[];
@@ -772,18 +792,23 @@ const runPullLeg = async (
       );
       const page = await callSyncPull(layer, cursor);
 
+      // Apply the page and advance the cursor in one transaction: the cursor
+      // only moves past rows that actually committed locally. The transaction
+      // returns the count of rows actually written so a no-op page does not
+      // count toward convergence motion.
+      let pageChanged: number;
       try {
-        // Apply the page and advance the cursor in one transaction: the cursor
-        // only moves past rows that actually committed locally.
-        database.transaction((tx) => {
+        pageChanged = database.transaction((tx) => {
           const transaction = tx as Transaction;
+          let changed = 0;
           for (const type of layerTypes) {
             const forType = page.entities.filter((entity) => entity.type === type);
             if (forType.length > 0) {
-              applyPullPage(transaction, forType, type);
+              changed += applyPullPage(transaction, forType, type);
             }
           }
           writeCursorEntry(transaction, layer, page.next_cursor);
+          return changed;
         });
       } catch (error) {
         if (isLocalSqliteForeignKeyError(error)) {
@@ -796,7 +821,10 @@ const runPullLeg = async (
         throw error;
       }
 
-      appliedTotal += page.entities.length;
+      receivedTotal += page.entities.length;
+      changedTotal += pageChanged;
+      // Progress reflects rows the server delivered (received), matching what a
+      // first-sync watcher expects to see advance as the snapshot streams in.
       reporter?.onPage?.(page.entities.length);
 
       if (!page.has_more) {
@@ -807,19 +835,21 @@ const runPullLeg = async (
     reporter?.onLayerDrained?.(layer + 1);
   }
 
-  return appliedTotal;
+  return { received: receivedTotal, changed: changedTotal };
 };
 
 /**
  * Drains all four topological layers once, reporting per-page and per-layer
  * progress. This is the first full pull the bootstrapper runs before deciding
- * whether to seed: its return value is the total rows applied across every layer
- * (tombstones included, since a tombstone is a normal applied row).
+ * whether to seed: its return value is the total rows RECEIVED across every
+ * layer (tombstones included, since a tombstone is a normal returned row). The
+ * seed decision must use received — not rows-changed — so a resumed bootstrap
+ * that re-pulls already-local rows (all no-ops) does not look empty and re-seed.
  */
-export const runFirstFullPull = (
+export const runFirstFullPull = async (
   database: LocalDatabase,
   reporter?: PullProgressReporter,
-): Promise<number> => runPullLeg(database, reporter);
+): Promise<number> => (await runPullLeg(database, reporter)).received;
 
 /** Stable map key for a row's identity across the in-flight push window. */
 const rowKey = (type: EntityTableName, id: string): string => `${type} ${id}`;
@@ -962,31 +992,27 @@ const runPushLeg = async (database: LocalDatabase): Promise<number> => {
 // -----------------------------------------------------------------------------
 
 /**
- * Settles a successful (converged / progressed) cycle: a cycle that talked to
- * the server with a valid session and either quieted both ends or made
- * authenticated progress to the round cap. Clears the auth-required flag (any
- * earlier "no signed-in user" condition is resolved) and any prior failure code
- * (a watching gate stops showing an error), logs the success, and returns the
- * converged result.
- */
-const settleConverged = (): SyncCycleResult => {
-  clearAuthRequired();
-  clearCycleError();
-  logCycleOutcome('converged', null);
-  return { outcome: 'converged', errorCode: null };
-};
-
-/**
  * Runs one convergence cycle: pull every layer, push the dirty stream, then
- * pull again, repeating until a full round moves nothing in either direction
- * (or the round guard trips). Returns a classified {@link SyncCycleResult}:
- * `converged` on real success/progress, `auth_required` when the server reports
- * no signed-in user, and `retryable_error` on a recoverable server-internal /
- * transport envelope (dirty bits left set for a later retry). Throws a
- * `SyncCycleError` only on a non-retriable structural FK violation, so the
- * scheduler settles per the existing cadence policy without recording success.
+ * pull again, repeating until a full round changes nothing locally in either
+ * direction. There is no round cap: the loop is bounded by convergence itself
+ * (and, per leg, by each RPC's own request timeout), so it keeps draining as
+ * long as there is real work — a second device's live edit stream is followed,
+ * not truncated, and a locally re-edited row keeps re-pushing its latest value.
+ * The exit test counts rows ACTUALLY changed, not rows the server returned, so a
+ * benign no-op re-pull (an echo of an already-local row) reads as quiet instead
+ * of forcing a wasted extra round.
+ *
+ * It never throws: every outcome — convergence, the recoverable no-JWT /
+ * server-internal envelopes, a structural FK violation, AND any unexpected throw
+ * from the bootstrapper/seed/pull/push (a Drizzle/SQLite write failure, a seed
+ * verification error, a malformed-payload `new Date(NaN)`, a missing Supabase
+ * client) — is classified into a single {@link SyncCycleOutcome} and returned.
+ * It also raises the matching observable signal (the auth-required flag or the
+ * non-auth error code) before returning, so the gate and the scheduler read one
+ * consistent view of the same cycle. On any non-converged outcome the dirty bits
+ * and cursors are left untouched, so the next scheduled tick re-runs cleanly.
  */
-export const runSyncCycle = async (): Promise<SyncCycleResult> => {
+export const runSyncCycle = async (): Promise<SyncCycleOutcome> => {
   const database = await bootstrapLocalDataLayer();
 
   try {
@@ -1004,53 +1030,83 @@ export const runSyncCycle = async (): Promise<SyncCycleResult> => {
     // (no pending migration) only advances the marker.
     runBundleMigrations(database);
 
-    for (let round = 0; round < MAX_CYCLES_PER_CALL; round += 1) {
+    // Convergence-or-bust: PULL -> PUSH -> PULL until a full round changes
+    // nothing locally on either end. No round cap — the loop's only exits are a
+    // quiet round (below) or a throw caught at the bottom. A quiet round means
+    // both pull legs WROTE nothing (not merely "the server returned nothing" —
+    // a no-op echo of an already-local row is not motion) and the push leg sent
+    // nothing. Anything else is real work the next round must follow.
+    for (;;) {
       const pulledBefore = await runPullLeg(database);
       const pushed = await runPushLeg(database);
       const pulledAfter = await runPullLeg(database);
 
-      // A round that moved no rows on either end means both sides are quiet.
-      if (pulledBefore === 0 && pushed === 0 && pulledAfter === 0) {
-        return settleConverged();
+      if (pulledBefore.changed === 0 && pushed === 0 && pulledAfter.changed === 0) {
+        return markConverged();
       }
     }
-    // Reaching the round cap without a quiet round still means the cycle made
-    // authenticated progress; treat it as a resolved auth condition and a
-    // successful cycle for status purposes.
-    return settleConverged();
   } catch (error) {
-    if (error instanceof SyncCycleError) {
-      if (error.code === 'FK_VIOLATION' || error.code === 'LOCAL_FK_VIOLATION') {
-        // Structural bug: not retriable, surfaces to the caller by THROWING.
-        // Dirty bits and cursors are left untouched so nothing is silently
-        // dropped. Record the code so a watching gate can show the error and a
-        // single Retry; the throw keeps the scheduler from recording success.
-        markCycleError(error.code);
-        logCycleOutcome('structural_error', error.code, error);
-        throw error;
-      }
-      if (error.code === 'AUTH_REQUIRED') {
-        // The server reports no signed-in user. This is not an exception to
-        // surface — it is the route signal that the app needs a session. Raise
-        // the observable flag so the route layer sends the user to sign-in, then
-        // return the auth-required result (dirty bits and cursors are untouched,
-        // so a post-login cycle re-pushes and re-pulls the same state). It is a
-        // route decision, not an in-gate error, so the failure-code signal stays
-        // clear and the scheduler records no success.
-        markAuthRequired();
-        clearCycleError();
-        logCycleOutcome('auth_required', null);
-        return { outcome: 'auth_required', errorCode: null };
-      }
-      // A server-internal hiccup: a retryable error. Dirty bits stay set and
-      // cursors are unchanged, so the next scheduled tick starts a fresh cycle
-      // that re-pushes and re-pulls the same state. Record the code so a watching
-      // gate can show the error and a single Retry, and return the retryable
-      // result so the scheduler keeps it visible rather than recording success.
-      markCycleError('INTERNAL');
-      logCycleOutcome('retryable_error', 'INTERNAL', error);
-      return { outcome: 'retryable_error', errorCode: 'INTERNAL' };
-    }
-    throw error;
+    return classifyThrow(error);
   }
+};
+
+/**
+ * Records a converged cycle and returns the matching outcome. A cycle that
+ * converged talked to the server with a valid session, so any earlier "no
+ * signed-in user" condition is resolved: clear the auth flag so the route layer
+ * no longer holds the user on sign-in, and clear any prior failure code so a
+ * watching gate stops showing an error.
+ */
+const markConverged = (): SyncCycleOutcome => {
+  clearAuthRequired();
+  clearCycleError();
+  logCycleOutcome('converged', null);
+  return 'converged';
+};
+
+/**
+ * Classifies a throw escaping the cycle body into a single outcome and raises
+ * the matching observable signal. A recognised {@link SyncCycleError} maps to
+ * its code; ANY other throw — a Drizzle/SQLite write failure, the seed
+ * verification error, a malformed-payload `new Date(NaN)`, a missing Supabase
+ * client — is treated as a recoverable INTERNAL failure rather than escaping
+ * unclassified. Letting such a throw escape was the bug that left the first-sync
+ * gate spinning forever with no error and no Retry: the bootstrap flag was never
+ * set AND no error code was ever recorded, so the gate fell through to
+ * in-progress with nothing to lift it.
+ */
+const classifyThrow = (error: unknown): SyncCycleOutcome => {
+  if (error instanceof SyncCycleError && error.code === 'AUTH_REQUIRED') {
+    // The server reports no signed-in user. This is not an error to surface — it
+    // is the route signal that the app needs a session. Raise the observable flag
+    // so the route layer sends the user to sign-in (dirty bits and cursors are
+    // untouched, so a post-login cycle re-pushes and re-pulls the same state). It
+    // is a route decision, not an in-gate error, so the failure code stays clear.
+    markAuthRequired();
+    clearCycleError();
+    logCycleOutcome('auth-required', null);
+    return 'auth-required';
+  }
+
+  if (
+    error instanceof SyncCycleError &&
+    (error.code === 'FK_VIOLATION' || error.code === 'LOCAL_FK_VIOLATION')
+  ) {
+    // Structural bug: a plain re-run will not push past it. Dirty bits and
+    // cursors are left untouched so nothing is silently dropped. Record the code
+    // so a watching gate shows the error and a single Retry rather than trapping
+    // the user behind a silent block.
+    markCycleError(error.code);
+    logCycleOutcome('fk-violation', error.code, error);
+    return 'fk-violation';
+  }
+
+  // A recognised server-internal hiccup OR any other unexpected throw: give up
+  // this cycle cleanly as a retriable INTERNAL failure. Dirty bits stay set and
+  // cursors are unchanged, so the next scheduled tick starts a fresh cycle that
+  // re-pushes and re-pulls the same state. Record the code so a watching gate
+  // shows the error and a single Retry.
+  markCycleError('INTERNAL');
+  logCycleOutcome('internal', 'INTERNAL', error);
+  return 'internal';
 };
