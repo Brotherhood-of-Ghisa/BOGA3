@@ -10,6 +10,8 @@ source "$SCRIPT_DIR/worktree-lib.sh"
 CURRENT_SLOT=""
 SUPABASE=1
 DRY_RUN=0
+REPORT=0
+PRUNE_ORPHANS=0
 GRACE_SECONDS="${BOGA_WORKTREE_SWEEP_GRACE_SECONDS:-600}"
 DETECT_MERGED="${BOGA_WORKTREE_SWEEP_DETECT_MERGED:-1}"
 DETECT_DEAD_LOCKS="${BOGA_WORKTREE_SWEEP_DETECT_DEAD_LOCKS:-1}"
@@ -45,6 +47,13 @@ signal and this pass with --no-dead-lock-detection.
 Options:
   --current-slot <n>        Slot that must never be cleaned (default: current worktree slot).
   --no-supabase             Only report/prune logic; do not clean Supabase infra.
+  --report                  Read-only fleet report: enumerate every Supabase stack in
+                            Docker (the ground truth the registry scan can miss) and print
+                            a KEEP/EVICT verdict + reason per stack. Removes nothing, then exits.
+  --prune-orphans           Docker-ground-truth eviction: remove every Supabase stack that no
+                            live worktree backs (orphans, dead-agent + abandoned-agent worktrees),
+                            by exact label, plus its stale registry file. Honours --dry-run.
+                            A live agent lock and non-agent (human) checkouts are never touched.
   --dry-run                 Print actions without removing containers/volumes/worktrees/registry files.
   --grace-seconds n         Minimum registry age before cleanup (default: 600).
   --no-merge-detection      Disable "branch merged / branch deleted on remote" completion signals.
@@ -69,6 +78,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     --dry-run)
       DRY_RUN=1
+      shift
+      ;;
+    --report)
+      REPORT=1
+      shift
+      ;;
+    --prune-orphans)
+      PRUNE_ORPHANS=1
       shift
       ;;
     --grace-seconds)
@@ -157,6 +174,270 @@ maybe_fetch_for_merge_detection() {
   fi
 }
 
+docker_available() {
+  command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1
+}
+
+# Run a command, or just print it (quoted) under --dry-run.
+run_or_print() {
+  if [[ "$DRY_RUN" == "1" ]]; then
+    printf '[worktree-sweep] dry-run:'
+    printf ' %q' "$@"
+    printf '\n'
+  else
+    "$@"
+  fi
+}
+
+# Every distinct Supabase project label present in Docker (containers + volumes).
+# This is the ground truth the registry-driven scan below cannot see.
+collect_supabase_labels() {
+  {
+    docker ps -a --filter "label=com.supabase.cli.project" --format '{{.Label "com.supabase.cli.project"}}'
+    docker volume ls --filter "label=com.supabase.cli.project" --format '{{.Label "com.supabase.cli.project"}}'
+  } 2>/dev/null | sort -u
+}
+
+# Populate the parallel arrays WT_IDX_PATHS / WT_IDX_SLOTS with (path, slot) for
+# every git worktree that carries a .worktree-slot. This is how a stack is mapped
+# back to a live worktree even when its slot registry file is gone.
+WT_IDX_PATHS=()
+WT_IDX_SLOTS=()
+build_worktree_slot_index() {
+  WT_IDX_PATHS=()
+  WT_IDX_SLOTS=()
+  local line wt_path abs slot
+  while IFS= read -r line; do
+    case "$line" in
+      worktree\ *)
+        wt_path="${line#worktree }"
+        [[ -d "$wt_path" ]] || continue
+        abs="$(boga_abs_dir "$wt_path")"
+        if [[ -f "$abs/.worktree-slot" ]] && slot="$(boga_read_slot_file "$abs" 2>/dev/null)"; then
+          WT_IDX_PATHS+=("$abs")
+          WT_IDX_SLOTS+=("$slot")
+        fi
+        ;;
+    esac
+  done < <(git -C "$REPO_ROOT" worktree list --porcelain)
+}
+
+# Lock state of a worktree. Prints one of: "locked <pid>", "locked" (locked but
+# the reason carries no parseable pid — an unknown owner), or "unlocked".
+worktree_lock_info() {
+  local target_abs="$1"
+  local line wt_path abs="" state="unlocked" pid=""
+  while IFS= read -r line; do
+    case "$line" in
+      worktree\ *)
+        wt_path="${line#worktree }"
+        if [[ -d "$wt_path" ]]; then abs="$(boga_abs_dir "$wt_path")"; else abs=""; fi
+        ;;
+      locked*)
+        if [[ -n "$abs" && "$abs" == "$target_abs" ]]; then
+          state="locked"
+          [[ "$line" =~ \(pid\ ([0-9]+) ]] && pid="${BASH_REMATCH[1]}"
+        fi
+        ;;
+    esac
+  done < <(git -C "$REPO_ROOT" worktree list --porcelain)
+  if [[ "$state" == "locked" ]]; then
+    printf 'locked %s\n' "$pid"
+  else
+    printf 'unlocked\n'
+  fi
+}
+
+# Classify one Supabase project label, setting globals:
+#   CLS_SLOT  CLS_REG  CLS_PATH  CLS_VERDICT (KEEP|EVICT)  CLS_REASON
+# Safety model, shared by --report (print) and --prune-orphans (act):
+#   - backing worktree held by a LIVE agent lock                 -> KEEP (hard veto)
+#   - the current slot                                           -> KEEP
+#   - backing worktree locked but pid unparseable (unknown owner)-> KEEP (never reap)
+#   - no backing worktree at all                                 -> EVICT (orphan: dir gone)
+#   - backing worktree locked by a DEAD pid                      -> EVICT (dead agent)
+#   - backing AGENT worktree (under .claude/worktrees), unlocked -> EVICT (abandoned: agent
+#       worktrees stay locked for their whole lifetime, so unlocked == the agent is gone)
+#   - any OTHER backing worktree (e.g. a human checkout), unlocked -> KEEP (could be an
+#       active human session; leave it to the merge-detection sweep, never nuke it here)
+classify_label() {
+  local label="$1"
+  local idx slot found_slot="" lock_state lock_pid
+
+  CLS_SLOT=""
+  [[ "$label" =~ -wt([0-9]+)$ ]] && CLS_SLOT="${BASH_REMATCH[1]}"
+
+  CLS_REG="-"
+  if [[ -n "$CLS_SLOT" ]]; then
+    if [[ -f "$REGISTRY_DIR/$CLS_SLOT" ]]; then CLS_REG="yes"; else CLS_REG="missing"; fi
+  fi
+
+  CLS_PATH=""
+  for idx in "${!WT_IDX_PATHS[@]}"; do
+    slot="${WT_IDX_SLOTS[$idx]}"
+    if [[ "$label" == "$(boga_project_id_for_slot "$slot" "${WT_IDX_PATHS[$idx]}")" \
+      || "$label" == "$(boga_legacy_project_id_for_slot "$slot")" ]]; then
+      CLS_PATH="${WT_IDX_PATHS[$idx]}"
+      found_slot="$slot"
+      break
+    fi
+  done
+
+  if [[ -z "$CLS_PATH" ]]; then
+    CLS_VERDICT="EVICT"
+    CLS_REASON="orphan — no live worktree maps to this stack (dir gone or untracked)"
+    return 0
+  fi
+
+  if [[ -n "$found_slot" && "$found_slot" == "$CURRENT_SLOT" ]]; then
+    CLS_VERDICT="KEEP"; CLS_REASON="current slot ($CLS_PATH)"; return 0
+  fi
+
+  read -r lock_state lock_pid < <(worktree_lock_info "$CLS_PATH")
+  if [[ "$lock_state" == "locked" ]]; then
+    if [[ -z "$lock_pid" ]]; then
+      CLS_VERDICT="KEEP"; CLS_REASON="locked, owner pid unknown — not reaping ($CLS_PATH)"; return 0
+    fi
+    if boga_pid_is_alive "$lock_pid"; then
+      CLS_VERDICT="KEEP"; CLS_REASON="live agent pid $lock_pid holds $CLS_PATH"; return 0
+    fi
+    CLS_VERDICT="EVICT"; CLS_REASON="dead-agent lock (pid $lock_pid) on $CLS_PATH"; return 0
+  fi
+
+  # Unlocked, backing worktree present.
+  if [[ "$CLS_PATH" == */.claude/worktrees/* ]]; then
+    CLS_VERDICT="EVICT"; CLS_REASON="abandoned agent worktree — unlocked, no live agent ($CLS_PATH)"
+  else
+    CLS_VERDICT="KEEP"; CLS_REASON="idle non-agent worktree — left to merge-detection sweep ($CLS_PATH)"
+  fi
+  return 0
+}
+
+# Read-only fleet report (--report). Prints a KEEP/EVICT verdict per Supabase
+# stack using the ground-truth + classify_label model above. Changes nothing.
+report_verdicts() {
+  if ! docker_available; then
+    echo "[worktree-sweep] report: docker unavailable; cannot enumerate Supabase stacks" >&2
+    return 1
+  fi
+
+  local labels=() l
+  while IFS= read -r l; do [[ -n "$l" ]] && labels+=("$l"); done < <(collect_supabase_labels)
+  if (( ${#labels[@]} == 0 )); then
+    echo "[worktree-sweep] report: no Supabase stacks present in Docker"
+    return 0
+  fi
+
+  build_worktree_slot_index
+
+  local evict_labels=() label
+  printf '\n%-44s %-5s %-9s %-7s %s\n' "STACK (project label)" "SLOT" "REGISTRY" "VERDICT" "REASON"
+  printf -- '----------------------------------------------------------------------------------------------------\n'
+  for label in "${labels[@]}"; do
+    classify_label "$label"
+    [[ "$CLS_VERDICT" == "EVICT" ]] && evict_labels+=("$label")
+    printf '%-44s %-5s %-9s %-7s %s\n' "$label" "${CLS_SLOT:-?}" "$CLS_REG" "$CLS_VERDICT" "$CLS_REASON"
+  done
+
+  if (( ${#evict_labels[@]} > 0 )); then
+    printf '\n[worktree-sweep] %d of %d stack(s) evictable. Reclaim with:\n' \
+      "${#evict_labels[@]}" "${#labels[@]}"
+    printf '  ./scripts/worktree-sweep.sh --prune-orphans --dry-run   # preview\n'
+    printf '  ./scripts/worktree-sweep.sh --prune-orphans             # remove\n'
+  else
+    echo
+    echo "[worktree-sweep] no evictable stacks"
+  fi
+
+  return 0
+}
+
+# Remove every Docker resource (containers, volumes, networks) labelled with an
+# exact Supabase project id. Dry-run aware. Unlike worktree-clean.sh --slot, this
+# targets the label directly, so it can reclaim orphans whose registry + path are
+# gone (worktree-clean.sh would mis-derive the project id from the current dir).
+remove_stack_by_label() {
+  local label="$1"
+  local ids=() id
+
+  ids=()
+  while IFS= read -r id; do [[ -n "$id" ]] && ids+=("$id"); done < <(docker ps -aq --filter "label=com.supabase.cli.project=$label" 2>/dev/null)
+  if (( ${#ids[@]} > 0 )); then
+    echo "[worktree-sweep] removing containers for $label: ${ids[*]}"
+    run_or_print docker rm -f "${ids[@]}"
+  fi
+
+  ids=()
+  while IFS= read -r id; do [[ -n "$id" ]] && ids+=("$id"); done < <(docker volume ls -q --filter "label=com.supabase.cli.project=$label" 2>/dev/null)
+  if (( ${#ids[@]} > 0 )); then
+    echo "[worktree-sweep] removing volumes for $label: ${ids[*]}"
+    run_or_print docker volume rm -f "${ids[@]}"
+  fi
+
+  ids=()
+  while IFS= read -r id; do [[ -n "$id" ]] && ids+=("$id"); done < <(docker network ls -q --filter "label=com.supabase.cli.project=$label" 2>/dev/null)
+  if (( ${#ids[@]} > 0 )); then
+    echo "[worktree-sweep] removing networks for $label: ${ids[*]}"
+    run_or_print docker network rm "${ids[@]}"
+  fi
+}
+
+# --prune-orphans: docker-ground-truth eviction. Enumerate every Supabase stack,
+# classify it, and remove every EVICT stack by exact label (plus its stale slot
+# registry file, if any). The live-lock veto and the human-worktree guard in
+# classify_label keep this from ever touching an in-use stack. Opt-in; honours
+# --dry-run. Grace is intentionally not applied: this is an explicit operator
+# action, and active work is protected structurally (by lock state), not by age.
+prune_orphans() {
+  if ! docker_available; then
+    echo "[worktree-sweep] prune-orphans: docker unavailable; nothing to do" >&2
+    return 1
+  fi
+
+  local labels=() l
+  while IFS= read -r l; do [[ -n "$l" ]] && labels+=("$l"); done < <(collect_supabase_labels)
+  if (( ${#labels[@]} == 0 )); then
+    echo "[worktree-sweep] prune-orphans: no Supabase stacks present in Docker"
+    return 0
+  fi
+
+  build_worktree_slot_index
+
+  local label kept=0 evicted=0
+  for label in "${labels[@]}"; do
+    classify_label "$label"
+    if [[ "$CLS_VERDICT" == "KEEP" ]]; then
+      echo "[worktree-sweep] keeping $label: $CLS_REASON"
+      kept=$((kept + 1))
+      continue
+    fi
+    echo "[worktree-sweep] evicting $label: $CLS_REASON"
+    remove_stack_by_label "$label"
+    if [[ -n "$CLS_SLOT" && -f "$REGISTRY_DIR/$CLS_SLOT" ]]; then
+      if [[ "$DRY_RUN" == "1" ]]; then
+        echo "[worktree-sweep] dry-run: rm -f $REGISTRY_DIR/$CLS_SLOT"
+      else
+        rm -f "$REGISTRY_DIR/$CLS_SLOT"
+        echo "[worktree-sweep] removed stale slot registry: $REGISTRY_DIR/$CLS_SLOT"
+      fi
+    fi
+    evicted=$((evicted + 1))
+  done
+
+  echo "[worktree-sweep] prune-orphans done: $evicted evicted, $kept kept"
+  return 0
+}
+
+if [[ "$REPORT" == "1" ]]; then
+  report_verdicts
+  exit $?
+fi
+
+if [[ "$PRUNE_ORPHANS" == "1" ]]; then
+  prune_orphans
+  exit $?
+fi
+
 maybe_fetch_for_merge_detection
 
 active_path_is_current_worktree_group() {
@@ -220,14 +501,20 @@ completion_reason() {
       return 0
     fi
 
-    # Still listed by git, but the agent that locked it is gone. Without this
-    # signal such a worktree never completes: its dir is on disk, it is in
-    # `git worktree list`, and its pushed branch is neither merged nor deleted
-    # on the remote — so the merge-detection signals below can't fire either.
+    # Inspect the lock once. A LIVE lock is a hard veto: never complete a slot an
+    # agent is actively holding, whatever its branch state. An agent mid-task
+    # frequently has not pushed its branch, so the branch-deleted / not-merged
+    # signals below would otherwise false-positive and tear its Supabase stack
+    # out from under it. A DEAD lock is the opposite — a completion signal:
+    # without it such a worktree never completes (its dir is on disk, it is in
+    # `git worktree list`, and its branch is neither merged nor deleted on the
+    # remote, so the merge-detection signals below can't fire either).
     if [[ "$DETECT_DEAD_LOCKS" == "1" ]]; then
       local lock_pid
-      if lock_pid="$(boga_worktree_lock_pid "$REPO_ROOT" "$registered_abs")" \
-        && ! boga_pid_is_alive "$lock_pid"; then
+      if lock_pid="$(boga_worktree_lock_pid "$REPO_ROOT" "$registered_abs")"; then
+        if boga_pid_is_alive "$lock_pid"; then
+          return 1
+        fi
         printf 'locked-by-dead-agent-pid-%s\n' "$lock_pid"
         return 0
       fi
@@ -333,7 +620,9 @@ prune_orphaned_dead_locks() {
         ;;
       locked*)
         [[ -n "$abs" && "$abs" != "$current_abs" ]] || continue
-        [[ "$line" =~ \(pid\ ([0-9]+)\) ]] || continue
+        # Lock reason is `claude agent <name> (pid <N> start <date>)`; older
+        # harness versions omit ` start <date>`. Match `(pid <N>` for both.
+        [[ "$line" =~ \(pid\ ([0-9]+) ]] || continue
         lock_pid="${BASH_REMATCH[1]}"
         boga_pid_is_alive "$lock_pid" && continue
         path_has_registry "$abs" && continue

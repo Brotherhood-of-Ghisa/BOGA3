@@ -88,9 +88,15 @@ EOF
 }
 
 add_locked_worktree() { # name pid -> prints worktree path
+  # Use the REAL Claude Code lock-reason format, which carries a ` start <date>`
+  # suffix after the pid: `claude agent <name> (pid <N> start <date>)`. A fixture
+  # using the older `(pid <N>)` form drifted from production and let a regex bug
+  # (which only matched the closing-paren form) ship undetected — dead-agent
+  # detection was a silent no-op for every real lock. Keep this fixture in lockstep
+  # with reality; the legacy form is covered separately below.
   local name="$1" pid="$2" path="$REPO/.claude/worktrees/$1"
   git -C "$REPO" worktree add -q -b "$name" "$path" main
-  git -C "$REPO" worktree lock --reason "claude agent $name (pid $pid)" "$path"
+  git -C "$REPO" worktree lock --reason "claude agent $name (pid $pid start Mon Jan  1 00:00:00 2024)" "$path"
   printf '%s\n' "$path"
 }
 
@@ -117,10 +123,19 @@ in_worktree_list() { git -C "$REPO" worktree list --porcelain | grep -qx "worktr
 echo "== unit: boga_worktree_lock_pid / boga_pid_is_alive =="
 # shellcheck disable=SC1091
 source "$REPO/scripts/worktree-lib.sh"
-assert_eq "$(boga_worktree_lock_pid "$REPO" "$DEAD_WT" || echo MISS)" "$DEAD_PID" "lock_pid reads dead worktree pid"
-assert_eq "$(boga_worktree_lock_pid "$REPO" "$ALIVE_WT" || echo MISS)" "$ALIVE_PID" "lock_pid reads live worktree pid"
+assert_eq "$(boga_worktree_lock_pid "$REPO" "$DEAD_WT" || echo MISS)" "$DEAD_PID" "lock_pid reads dead worktree pid (real ' start' format)"
+assert_eq "$(boga_worktree_lock_pid "$REPO" "$ALIVE_WT" || echo MISS)" "$ALIVE_PID" "lock_pid reads live worktree pid (real ' start' format)"
 assert_ok     "pid_is_alive: true for live pid"  boga_pid_is_alive "$ALIVE_PID"
 assert_not_ok "pid_is_alive: false for dead pid" boga_pid_is_alive "$DEAD_PID"
+
+# Legacy lock reason without the ` start <date>` suffix must still parse, so the
+# relaxed regex stays backward compatible with older harness versions.
+LEGACY_WT="$REPO/.claude/worktrees/legacy-agent"
+git -C "$REPO" worktree add -q -b legacy-agent "$LEGACY_WT" main
+git -C "$REPO" worktree lock --reason "claude agent legacy-agent (pid $ALIVE_PID)" "$LEGACY_WT"
+assert_eq "$(boga_worktree_lock_pid "$REPO" "$LEGACY_WT" || echo MISS)" "$ALIVE_PID" "lock_pid reads legacy '(pid N)' format"
+git -C "$REPO" worktree unlock "$LEGACY_WT"
+git -C "$REPO" worktree remove --force "$LEGACY_WT"
 
 echo "== dry-run: detect + plan, change nothing =="
 out="$(bash "$SWEEP" "${BASE_ARGS[@]}" --dry-run 2>&1)"
@@ -171,6 +186,20 @@ assert_ok "graced worktree still present" in_worktree_list "$GRACED_WT"
 out="$(bash "$SWEEP" "${BASE_ARGS[@]}" 2>&1)"
 assert_contains "$out" "completed slot 31 detected (locked-by-dead-agent-pid-$DEAD_PID)" "graced slot 31 completes once grace passes"
 assert_not_ok "graced worktree reaped after grace" in_worktree_list "$GRACED_WT"
+
+echo "== live lock vetoes merge-detection eviction =="
+# A live-locked worktree on a branch that does NOT exist on the remote would
+# otherwise be evicted via branch-deleted-on-<remote>. The live lock must veto
+# that, so an agent's Supabase is never torn out while it works on an unpushed
+# branch. Merge detection is ON here (only --no-fetch, to stay offline); the test
+# repo has no remote ref for the branch, so branch-deleted would fire without the veto.
+VETO_WT="$(add_locked_worktree veto-live "$ALIVE_PID")"
+register_slot 41 "$VETO_WT"
+out="$(bash "$SWEEP" --no-supabase --no-fetch --grace-seconds 0 --current-slot 0 2>&1)"
+assert_contains "$out" "keeping slot 41: registered worktree still looks active" "live lock vetoes branch-deleted eviction"
+assert_not_contains "$out" "completed slot 41 detected" "live-locked slot 41 never marked completed"
+assert_ok "veto worktree still present" in_worktree_list "$VETO_WT"
+assert_ok "veto registry still present" test -f "$REGISTRY_DIR/41"
 
 echo
 echo "== summary: $PASS passed, $FAIL failed =="

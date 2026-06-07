@@ -207,8 +207,10 @@ Setup:
 Teardown:
 
 - `supabase/scripts/local-runtime-down.sh` — stop this slot's Supabase + health server. Docker containers and volumes persist for a fast restart.
-- `scripts/worktree-clean.sh --slot <n> --supabase --remove-registry` — remove a specific slot's Docker containers/volumes/networks and its registry file. Refuses the current slot without `--force`; serialized by a per-slot runtime lock.
+- `scripts/worktree-clean.sh --slot <n> --supabase --remove-registry` — remove a specific slot's Docker containers/volumes/networks and its registry file. Refuses the current slot without `--force`; serialized by a per-slot runtime lock. **Fail-loud:** if `--supabase` cleanup cannot run (Docker unavailable), it refuses to remove the registry and exits non-zero — dropping the only pointer to a surviving stack is exactly how an unreclaimable orphan is born.
 - `scripts/worktree-sweep.sh` — reap completed/orphaned slots: calls `worktree-clean.sh` per completed slot and reaps dead-agent git worktrees. Runs automatically before every `local-runtime-up.sh`. Completion signals and knobs are in *Completed worktree cleanup* below.
+  - `--report` — read-only fleet report. Enumerates **every** Supabase stack present in Docker (the ground truth the registry scan can miss), correlates each to a live worktree via the worktree's own `.worktree-slot`, and prints a KEEP/EVICT verdict + reason per stack. Changes nothing.
+  - `--prune-orphans` — docker-ground-truth eviction. Removes, by exact label, every Supabase stack that no live worktree backs (orphans whose dir/registry is gone, dead-agent and abandoned-agent worktrees), plus any stale registry file. A live agent lock and non-agent (human) checkouts are never touched. Opt-in; honours `--dry-run`.
 
 Manual iOS dev-client loop using this worktree's port and simulator:
 `cd apps/mobile && npm run start:ios:dev-client`.
@@ -230,9 +232,17 @@ A registered worktree slot is completed when all of these are true:
    - the registered worktree's checked-out branch HEAD is reachable from the configured remote main (default `origin/main`);
    - the registered worktree's checked-out branch no longer exists on the configured remote (default `origin`).
 
+A **live** lock is a hard veto on the merge-detection signals: if the registered
+worktree is still locked by an agent PID that is alive, the slot is never marked
+completed, whatever its branch state. An agent mid-task frequently has not pushed
+its branch yet, so `branch-deleted-on-<remote>` (and a squash-merge that orphans
+the local HEAD) would otherwise false-positive and tear the agent's Supabase
+stack out from under it. The veto runs before merge detection.
+
 The dead-agent signal closes a leak: an agent worktree is locked with a reason
-of the form `claude agent <name> (pid <N>)`. If that agent dies without removing
-its worktree, the directory stays on disk, stays in `git worktree list`, and its
+of the form `claude agent <name> (pid <N> start <date>)` (older harness versions
+emit `(pid <N>)`; both are parsed). If that agent dies without removing its
+worktree, the directory stays on disk, stays in `git worktree list`, and its
 pushed branch is typically neither merged nor deleted on the remote — so none of
 the other signals fire and the slot (with any Supabase stack) lingers forever.
 The sweep detects the dead PID via `git worktree list --porcelain` and treats the
@@ -269,6 +279,17 @@ Configurable knobs (env or flag):
 If a registered path still exists and still looks like a valid BOGA checkout from another git clone/worktree group, and merge detection cannot confirm completion via the signals above, the sweep keeps it. This prevents one checkout from destroying another still-existing checkout's local Supabase data.
 
 Squash-merge note: with squash merges, the merged branch's original HEAD is no longer an ancestor of main, so `branch-merged-into-<remote>/<main>` will not fire. In that case the sweep relies on `branch-deleted-on-<remote>`, which requires the remote to delete merged branches automatically (e.g. GitHub's "Automatically delete head branches" repo setting).
+
+Registry-driven blindness and the ground-truth pass: the automatic sweep and the
+per-slot cleaner key off the slot registry. A Supabase stack whose registry file
+is gone (removed early, or never written) becomes invisible to both — no signal
+can fire, so it leaks forever. `--report` and `--prune-orphans` close this by
+working from **Docker ground truth** (every `com.supabase.cli.project` label on a
+container or volume) instead of the registry, mapping each stack back to a live
+worktree by that worktree's own `.worktree-slot`. Use `--report` to see the full
+fleet with a KEEP/EVICT verdict, and `--prune-orphans` (preview with `--dry-run`)
+to reclaim everything no live worktree backs. Both apply the live-lock veto and
+never touch a non-agent (human) checkout's stack.
 
 Cleanup scope:
 
@@ -323,8 +344,9 @@ When cross-worktree behavior is suspicious, check these first:
 8. Parent/sibling scan symptoms:
    - Vitest/Jest/TypeScript/Metro seeing files from another worktree almost always means nested layout or an over-broad watch root.
 9. Orphaned Supabase data:
-   - run `./scripts/worktree-sweep.sh --dry-run`;
-   - if the slot is completed, run `./scripts/worktree-sweep.sh` or let the next `./supabase/scripts/local-runtime-up.sh` clean it opportunistically.
+   - run `./scripts/worktree-sweep.sh --report` to see every Docker stack with a KEEP/EVICT verdict (this catches registry-less stacks the next item cannot);
+   - run `./scripts/worktree-sweep.sh --dry-run`; if the slot is completed, run `./scripts/worktree-sweep.sh` or let the next `./supabase/scripts/local-runtime-up.sh` clean it opportunistically;
+   - for stacks with no registry/worktree backing them, run `./scripts/worktree-sweep.sh --prune-orphans --dry-run` then `--prune-orphans` to reclaim them by Docker label.
 
 ## Verification contract
 
