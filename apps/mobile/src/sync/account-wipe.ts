@@ -27,6 +27,7 @@ import {
   exerciseSets,
   exerciseTagDefinitions,
   gyms,
+  muscleGroups,
   sessionExerciseTags,
   sessionExercises,
   sessions,
@@ -37,12 +38,12 @@ import {
  * Clears every per-user local table and resets the singleton sync-accounting
  * row, in a single transaction, on the supplied database handle.
  *
- * What it clears (the eight syncable, per-user entity tables, deleted in
+ * What it clears (the nine syncable, per-user entity tables, deleted in
  * child-before-parent order so foreign keys stay satisfied even if a future
  * schema change drops a cascade):
  *   session_exercise_tags, exercise_sets, session_exercises, sessions,
  *   gyms, exercise_tag_definitions, exercise_muscle_mappings,
- *   exercise_definitions.
+ *   exercise_definitions, muscle_groups.
  *
  * What it resets on the singleton runtime-state row:
  *   - bootstrap_completed_at → null  (so the first-cycle bootstrapper re-runs
@@ -57,9 +58,6 @@ import {
  *     per-account. Resetting it could let a later write emit a timestamp at or
  *     below an already-pushed one, which the server's last-write-wins rule
  *     would silently reject.
- *   - muscle_groups — a client-only, read-only taxonomy with no per-user
- *     ownership. It is seeded once per install and never synced, so it must
- *     outlive an account switch.
  *
  * The runtime-state reset is a plain UPDATE on the existing singleton row: if
  * no row exists yet (a fresh install that has never written the monotonic
@@ -79,6 +77,7 @@ const wipeLocalTables = (database: LocalDatabase): void => {
     transaction.delete(exerciseTagDefinitions).run();
     transaction.delete(exerciseMuscleMappings).run();
     transaction.delete(exerciseDefinitions).run();
+    transaction.delete(muscleGroups).run();
 
     transaction
       .update(syncRuntimeState)

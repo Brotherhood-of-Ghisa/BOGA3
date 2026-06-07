@@ -8,12 +8,13 @@
  * restore.
  *
  * The wipe must, on the singleton runtime-state row:
- *   - clear all rows from the eight syncable entity tables;
+ *   - clear all rows from the nine syncable entity tables (muscle_groups
+ *     included — it is now a synced entity, recovered for the next account via
+ *     the generic first-sign-in pull);
  *   - reset bootstrap_completed_at → null;
  *   - reset pull_cursor → {};
  *   - reset applied_seed_migration_app_version → 0;
- *   - PRESERVE last_emitted_ms (the monotonic clock is device-global);
- *   - PRESERVE the client-only muscle_groups taxonomy.
+ *   - PRESERVE last_emitted_ms (the monotonic clock is device-global).
  *
  * Driver: a real in-memory SQLite built from the shipped migration bundle via
  * the shared fixture, with `bootstrapLocalDataLayer` mocked to return it so the
@@ -80,9 +81,10 @@ import {
 } from '@/src/data/schema';
 import { wipeLocalForAccountSwitch } from '@/src/sync/account-wipe';
 
-// The eight syncable, per-user entity tables the wipe must clear, paired with a
+// The nine syncable, per-user entity tables the wipe must clear, paired with a
 // label for readable assertions.
 const ENTITY_TABLES = [
+  ['muscle_groups', muscleGroups],
   ['gyms', gyms],
   ['exercise_definitions', exerciseDefinitions],
   ['exercise_muscle_mappings', exerciseMuscleMappings],
@@ -99,8 +101,12 @@ const db = (): TestDatabase => fixture.database;
 
 const PRESERVED_LAST_EMITTED_MS = 1_700_000_555_000;
 
-/** Inserts one minimal row into each of the eight syncable entity tables. */
+/** Inserts one minimal row into each of the nine syncable entity tables. */
 const seedEveryEntityTable = (): void => {
+  db()
+    .insert(muscleGroups)
+    .values({ id: 'chest', displayName: 'Chest', familyName: 'Chest', sortOrder: 0 })
+    .run();
   db().insert(gyms).values({ id: 'gym-1', name: 'Iron Temple' }).run();
   db().insert(exerciseDefinitions).values({ id: 'def-1', name: 'Bench Press' }).run();
   db()
@@ -131,17 +137,6 @@ const seedEveryEntityTable = (): void => {
   db()
     .insert(sessionExerciseTags)
     .values({ id: 'sxt-1', sessionExerciseId: 'sx-1', exerciseTagDefinitionId: 'tag-1' })
-    .run();
-};
-
-/** Seeds the client-only muscle-group taxonomy the wipe must preserve. */
-const seedMuscleGroups = (): void => {
-  db()
-    .insert(muscleGroups)
-    .values([
-      { id: 'chest', displayName: 'Chest', familyName: 'Chest', sortOrder: 0 },
-      { id: 'back_lats', displayName: 'Lats', familyName: 'Back', sortOrder: 1 },
-    ])
     .run();
 };
 
@@ -177,9 +172,6 @@ describe('sign-out / account-switch local wipe', () => {
     mockBootstrapState.database = fixture.database;
     mockClientState.client = { rpc: jest.fn() };
     (getRequiredSupabaseMobileClient as jest.Mock).mockClear();
-    // Muscle groups first: an entity row references them, and the migration
-    // bundle enables foreign-key enforcement.
-    seedMuscleGroups();
     seedEveryEntityTable();
     seedRuntimeStateRow();
   });
@@ -190,7 +182,7 @@ describe('sign-out / account-switch local wipe', () => {
     mockClientState.client = null;
   });
 
-  it('clears every one of the eight syncable entity tables', async () => {
+  it('clears every one of the nine syncable entity tables', async () => {
     for (const [label, table] of ENTITY_TABLES) {
       expect([label, countRows(table)]).toEqual([label, 1]);
     }
@@ -217,11 +209,12 @@ describe('sign-out / account-switch local wipe', () => {
     expect(readRuntimeStateRow()?.lastEmittedMs).toBe(PRESERVED_LAST_EMITTED_MS);
   });
 
-  it('preserves the client-only muscle_groups taxonomy', async () => {
+  it('clears the muscle_groups taxonomy (a synced entity, recovered via the next sign-in pull)', async () => {
+    expect(db().select().from(muscleGroups).all()).toHaveLength(1);
+
     await wipeLocalForAccountSwitch();
 
-    const rows = db().select().from(muscleGroups).all();
-    expect(rows.map((row) => row.id).sort()).toEqual(['back_lats', 'chest']);
+    expect(db().select().from(muscleGroups).all()).toHaveLength(0);
   });
 
   it('issues no server call (and therefore no server delete)', async () => {

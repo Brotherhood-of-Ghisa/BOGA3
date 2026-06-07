@@ -41,10 +41,9 @@
  * fixture user's server state accumulates across cases and across repeated runs,
  * and isolation comes solely from minting a unique row-id set per `it`, so
  * concurrent or repeated runs never collide. Each fixture database is stood up
- * the way production boot does — fully migrated, then seeded via the real
- * `seedBootDataLayer` (which populates the client-only `muscle_groups`
- * taxonomy) — so a pulled `exercise_muscle_mappings` row never violates its FK
- * into `muscle_groups`, exactly as in production.
+ * fully migrated, with the `muscle_groups` taxonomy bundle seeded up front — so
+ * a pulled `exercise_muscle_mappings` row never violates its FK into
+ * `muscle_groups` (its Layer 0 synced parent, which drains first in production).
  */
 
 import { and, eq } from 'drizzle-orm';
@@ -71,10 +70,9 @@ const mockClientState = createClientMockState<unknown>();
 
 jest.mock('@/src/data/bootstrap', () => ({
   // The cycle resolves its local DB through the mocked `bootstrapLocalDataLayer`
-  // (a bare in-memory DB), but the TEST seeds that DB the same way production
-  // boot does — by calling the REAL `seedBootDataLayer`. Re-export the actual
-  // helper from `jest.requireActual` so the test and production share one seeding
-  // path; the mock cannot silently drift from what boot prepares.
+  // (a bare in-memory DB); the TEST seeds the `muscle_groups` taxonomy onto that
+  // DB itself (see `seedFixtureDatabase`). Re-export the actual module so any
+  // non-mocked helper the cycle reaches for resolves to the real implementation.
   ...(jest.requireActual('@/src/data/bootstrap') as typeof import('@/src/data/bootstrap')),
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted factory: require resolves at call time, after the import hoist.
   ...(require('../helpers/sync-cycle-mocks') as typeof import('../helpers/sync-cycle-mocks')).bootstrapMockFactory(
@@ -89,14 +87,12 @@ jest.mock('@/src/auth/supabase', () =>
   ),
 );
 
-// `seedBootDataLayer` is the REAL boot-time seed (re-exported from the actual
-// module by the mock above); production runs it unconditionally at boot, so the
-// test runs it too — see `seedFixtureDatabase`.
-import { seedBootDataLayer } from '@/src/data/bootstrap';
+import { SYSTEM_MUSCLE_GROUP_SEEDS } from '@/src/data/exercise-catalog-seeds';
 import { PRIMARY_RUNTIME_STATE_ID, type Transaction } from '@/src/data/clock';
 import {
   exerciseSets,
   gyms,
+  muscleGroups,
   sessionExercises,
   sessions,
   syncRuntimeState,
@@ -235,25 +231,29 @@ describe('sync cycle round-trip against a live endpoint', () => {
     return (typeof raw === 'string' ? JSON.parse(raw) : raw) as Record<string, unknown>;
   };
 
-  // Stand up a fresh fixture DB exactly the way production boot prepares the
-  // local data layer: a fully-migrated store (done by `createInMemoryDatabase`)
-  // PLUS the unconditional boot seed (`seedBootDataLayer`), which populates the
-  // client-only `muscle_groups` taxonomy. That seed is the boot step the mock
-  // used to skip; without it, `exercise_muscle_mappings` pulled back on the
-  // re-pull path violate their NOT NULL FK into the empty `muscle_groups` table
-  // and the whole pull page aborts. Running the real seed here makes the test
-  // faithful to production, where boot always seeds `muscle_groups` first.
+  // Stand up a fresh fixture DB with the `muscle_groups` taxonomy already
+  // present, so a pulled `exercise_muscle_mappings` row never violates its NOT
+  // NULL FK into `muscle_groups`. `muscle_groups` is a Layer 0 synced parent
+  // that drains before its Layer 1 mapping child; on this re-pull path the
+  // parent rows must exist before the child page lands. Seeding the bundle
+  // directly is the minimal stand-in for that drained parent layer.
   //
-  // The better-sqlite3 fixture enforces foreign keys by default (PRAGMA
-  // foreign_keys defaults ON), the same as the production expo-sqlite handle, so
-  // this seed is load-bearing rather than cosmetic.
+  // FK enforcement is ON for this fixture (the same as the production expo-sqlite
+  // handle), so this seed is load-bearing rather than cosmetic.
   const seedFixtureDatabase = (): void => {
-    seedBootDataLayer(database as never);
+    const now = new Date();
+    for (const muscleGroup of SYSTEM_MUSCLE_GROUP_SEEDS) {
+      database
+        .insert(muscleGroups)
+        .values({ ...muscleGroup, createdAt: now, updatedAt: now })
+        .onConflictDoNothing({ target: muscleGroups.id })
+        .run();
+    }
   };
 
   // Re-create a fresh, empty local store so the re-pull starts from nothing —
-  // mirrors wiping the local database on a reinstall, which re-runs boot
-  // (migrations + `seedBootDataLayer`) before any sync.
+  // mirrors wiping the local database on a reinstall, which re-migrates and then
+  // drains `muscle_groups` (Layer 0) before its mapping child (Layer 1).
   const wipeLocalStore = (): void => {
     fixture.close();
     fixture = createInMemoryDatabase();

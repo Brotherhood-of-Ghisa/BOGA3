@@ -162,13 +162,18 @@ describe('seedSystemExerciseCatalog (seed once, never overwrite)', () => {
     expect(runtimeRow?.appliedSeedMigrationAppVersion).toBe(SEED_CATALOG_BUNDLE_VERSION);
   });
 
-  it('writes seeded exercise and mapping rows local_dirty = 1 so a fresh account pushes them, while muscle groups stay client-only', () => {
+  it('writes seeded muscle-group, exercise, and mapping rows local_dirty = 1 so a fresh account pushes the whole starter catalog', () => {
     const fake = createFakeDatabase();
 
     seedSystemExerciseCatalog(fake.database, fixedNow);
 
-    // exercise_definitions / exercise_muscle_mappings sync — they must land
+    // All three starter-catalog tables are synced entities — they must land
     // dirty with a positive monotonic stamp so the next push picks them up.
+    // muscle_groups is the Layer 0 parent of the mapping join.
+    for (const row of fake.state.muscleGroups) {
+      expect(row.localDirty).toBe(true);
+      expect((row.localUpdatedAtMs as number) ?? 0).toBeGreaterThan(0);
+    }
     for (const row of fake.state.exerciseDefinitions) {
       expect(row.localDirty).toBe(true);
       expect((row.localUpdatedAtMs as number) ?? 0).toBeGreaterThan(0);
@@ -176,11 +181,6 @@ describe('seedSystemExerciseCatalog (seed once, never overwrite)', () => {
     for (const row of fake.state.exerciseMuscleMappings) {
       expect(row.localDirty).toBe(true);
       expect((row.localUpdatedAtMs as number) ?? 0).toBeGreaterThan(0);
-    }
-
-    // muscle_groups is client-only: it has no dirty columns and never syncs.
-    for (const row of fake.state.muscleGroups) {
-      expect(row.localDirty).toBeUndefined();
     }
   });
 

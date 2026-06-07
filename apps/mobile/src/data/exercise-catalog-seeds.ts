@@ -4104,11 +4104,12 @@ export type SystemExerciseCatalogSeedVerifyResult = {
   exerciseCount: number;
   mappingCount: number;
   exercisesMissingMappings: string[];
-  // Seeded exercise-definition / muscle-mapping rows that did NOT land
-  // `local_dirty = 1`. Seeded catalog rows ride the normal repo dirty
+  // Seeded muscle-group / exercise-definition / muscle-mapping rows that did NOT
+  // land `local_dirty = 1`. Seeded catalog rows ride the normal repo dirty
   // contract so a fresh account's starter catalog pushes to the server on the
   // next sync cycle; a non-zero count here means a row was written clean and
   // would silently never round-trip.
+  nonDirtyMuscleGroupCount: number;
   nonDirtyExerciseCount: number;
   nonDirtyMappingCount: number;
 };
@@ -4118,7 +4119,7 @@ export const verifySeededSystemExerciseCatalog = (database: LocalDatabase): Syst
   const seedMuscleIds = SYSTEM_MUSCLE_GROUP_SEEDS.map((muscleGroup) => muscleGroup.id);
 
   const seededMuscleRows = database
-    .select({ id: muscleGroups.id })
+    .select({ id: muscleGroups.id, localDirty: muscleGroups.localDirty })
     .from(muscleGroups)
     .where(inArray(muscleGroups.id, seedMuscleIds))
     .all();
@@ -4147,6 +4148,7 @@ export const verifySeededSystemExerciseCatalog = (database: LocalDatabase): Syst
     exerciseCount: seededExerciseRows.length,
     mappingCount: seededMappingRows.length,
     exercisesMissingMappings,
+    nonDirtyMuscleGroupCount: seededMuscleRows.filter((row) => !row.localDirty).length,
     nonDirtyExerciseCount: seededExerciseRows.filter((row) => !row.localDirty).length,
     nonDirtyMappingCount: seededMappingRows.filter((row) => !row.localDirty).length,
   };
@@ -4197,53 +4199,6 @@ const writeSeedsAppliedMarker = (database: LocalDatabase, version: number) => {
 };
 
 /**
- * Seed the client-only muscle-group taxonomy at boot.
- *
- * Muscle groups are a static, read-only taxonomy that never crosses the sync
- * wire — every device seeds its own copy from the bundle, independent of sign-in
- * and independent of the first-sync bootstrap. So this runs at boot, decoupled
- * from the entity-catalog seeder (which is gated on the first full pull).
- *
- * The insert is idempotent per id: it inserts any bundle row whose id is not
- * already present locally, and leaves every existing row untouched. A fresh
- * table gains the full bundle; a table missing a single id (e.g. a group added
- * to the bundle in a later app version) gains exactly that row on the next
- * launch; a fully-seeded table is a no-op. ids are the join key, so existing
- * rows are never overwritten or duplicated. Because the taxonomy is
- * non-editable (`is_editable` stays 0, enforced by a CHECK constraint) and
- * client-only, skipping ids that already exist can never clobber a user edit.
- *
- * `onConflictDoNothing` backstops the explicit id filter against a concurrent
- * insert racing in between the read and the write within the transaction.
- */
-export const seedMuscleGroups = (database: LocalDatabase, now: Date = new Date()) => {
-  database.transaction((tx) => {
-    const existingIds = new Set(
-      tx
-        .select({ id: muscleGroups.id })
-        .from(muscleGroups)
-        .all()
-        .map((row) => row.id)
-    );
-
-    for (const muscleGroup of SYSTEM_MUSCLE_GROUP_SEEDS) {
-      if (existingIds.has(muscleGroup.id)) {
-        continue;
-      }
-
-      tx.insert(muscleGroups)
-        .values({
-          ...muscleGroup,
-          createdAt: now,
-          updatedAt: now,
-        })
-        .onConflictDoNothing({ target: muscleGroups.id })
-        .run();
-    }
-  });
-};
-
-/**
  * Seed the local muscle group / exercise definition / mapping tables exactly
  * once per install (per catalog bundle version). Subsequent calls (every app
  * launch, every sync bootstrap) observe the
@@ -4255,13 +4210,14 @@ export const seedMuscleGroups = (database: LocalDatabase, now: Date = new Date()
  * bootstrap merge from queueing spurious convergence events for unchanged
  * seed rows on every launch.
  *
- * The seeded `exercise_definitions` and `exercise_muscle_mappings` rows are
- * written `local_dirty = 1` with a `nowMonotonic()` stamp — exactly like the
- * normal repo create path — so a fresh account's starter catalog is picked up
- * by the sync push leg and round-trips to the server on the next cycle. The
- * push clears the dirty bit; the marker above keeps the seeder from re-dirtying
- * the rows on later launches. `muscle_groups` stays client-only (it has no
- * dirty columns and never syncs).
+ * The seeded `muscle_groups`, `exercise_definitions`, and
+ * `exercise_muscle_mappings` rows are all written `local_dirty = 1` with a
+ * `nowMonotonic()` stamp — exactly like the normal repo create path — so a
+ * fresh account's starter catalog is picked up by the sync push leg and
+ * round-trips to the server on the next cycle. The push clears the dirty bit;
+ * the marker above keeps the seeder from re-dirtying the rows on later
+ * launches. `muscle_groups` is a Layer 0 synced parent (the FK target of
+ * `exercise_muscle_mappings`), so it seeds first within this transaction.
  *
  * Use {@link resetLocalDataAndReseed} (dev-only) to clear the marker and
  * force a re-seed.
@@ -4282,6 +4238,10 @@ export const seedSystemExerciseCatalog = (database: LocalDatabase, now: Date = n
           ...muscleGroup,
           createdAt: now,
           updatedAt: now,
+          // Seeded rows ride the normal repo dirty contract so a fresh
+          // account's starter catalog pushes to the server on the next cycle.
+          localDirty: true,
+          localUpdatedAtMs: seedStampMs,
         })
         .onConflictDoUpdate({
           target: muscleGroups.id,
@@ -4291,6 +4251,8 @@ export const seedSystemExerciseCatalog = (database: LocalDatabase, now: Date = n
             sortOrder: muscleGroup.sortOrder,
             isEditable: 0,
             updatedAt: now,
+            localDirty: true,
+            localUpdatedAtMs: seedStampMs,
           },
         })
         .run();
@@ -4379,6 +4341,12 @@ export const seedSystemExerciseCatalog = (database: LocalDatabase, now: Date = n
   if (verification.nonDirtyMappingCount > 0) {
     throw new Error(
       `System exercise catalog seed verification failed: ${verification.nonDirtyMappingCount} muscle mappings are not local_dirty = 1; seeded rows must push to the server`
+    );
+  }
+
+  if (verification.nonDirtyMuscleGroupCount > 0) {
+    throw new Error(
+      `System exercise catalog seed verification failed: ${verification.nonDirtyMuscleGroupCount} muscle groups are not local_dirty = 1; seeded rows must push to the server`
     );
   }
 

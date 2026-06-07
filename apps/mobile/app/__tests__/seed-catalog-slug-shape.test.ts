@@ -7,7 +7,7 @@
  *  - Every muscle-mapping id is `seed_map_<exercise-slug>__<muscle-slug>` and
  *    its exercise slug resolves back to a definition in the bundle while its
  *    muscle slug resolves to a bundled muscle group.
- *  - Muscle-group ids stay bare slugs (client-only taxonomy — no lineage
+ *  - Muscle-group ids stay bare slugs (stable system-seeded ids — no lineage
  *    prefix).
  *  - No row carries the retired ownership-tier prefix.
  *
