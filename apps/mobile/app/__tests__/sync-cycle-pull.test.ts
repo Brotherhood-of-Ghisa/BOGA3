@@ -12,7 +12,14 @@ import { eq } from 'drizzle-orm';
 
 import { applyPullPage, type WireEntity } from '@/src/sync/cycle';
 import { PRIMARY_RUNTIME_STATE_ID, type Transaction } from '@/src/data/clock';
-import { gyms, sessions, syncRuntimeState } from '@/src/data/schema';
+import {
+  exerciseDefinitions,
+  exerciseMuscleMappings,
+  gyms,
+  muscleGroups,
+  sessions,
+  syncRuntimeState,
+} from '@/src/data/schema';
 
 import {
   createInMemoryDatabase,
@@ -152,6 +159,68 @@ describe('applyPullPage page atomicity under FK enforcement', () => {
 
     // Neither row landed: the page rolled back as a unit.
     expect(database.select().from(sessions).all()).toHaveLength(0);
+  });
+});
+
+describe('applyPullPage tolerates cross-version muscle-group taxonomy skew', () => {
+  // muscle_groups is a client-only, never-synced taxonomy table; the server
+  // stores exercise_muscle_mappings.muscle_group_id as opaque text with NO FK.
+  // Before this fix the client enforced a NOT-NULL FK to muscle_groups, so a
+  // mapping pushed by an app version whose taxonomy is ahead would brick a
+  // device whose seeded taxonomy lacked that muscle group: the pull would
+  // violate the FK, throw inside the page transaction, and trap the user behind
+  // a forever-retriable first-sync gate. With the FK dropped, the row must land
+  // even when muscle_groups is empty.
+  beforeEach(() => {
+    fixture = createInMemoryDatabase({ foreignKeys: true });
+    database = fixture.database;
+  });
+
+  it('lands a mapping whose muscle_group_id is absent from the local taxonomy', () => {
+    // The legitimate FK to exercise_definitions (a synced parent) still holds,
+    // so the parent must be present — topo order guarantees this in production.
+    database
+      .insert(exerciseDefinitions)
+      .values({ id: 'exdef-1', name: 'Bench Press' })
+      .run();
+
+    // muscle_groups is deliberately empty: this device's seeded taxonomy is a
+    // version behind and never received 'mg-future'.
+    expect(database.select().from(muscleGroups).all()).toHaveLength(0);
+
+    const mappingWire: WireEntity = {
+      type: 'exercise_muscle_mappings',
+      id: 'emm-1',
+      client_updated_at_ms: 100,
+      fields: {
+        exercise_definition_id: 'exdef-1',
+        // Not present in the local muscle_groups taxonomy.
+        muscle_group_id: 'mg-future',
+        weight: 1,
+        role: 'primary',
+        created_at: 100,
+        updated_at: 100,
+        deleted_at: null,
+      },
+    };
+
+    // On origin/main (client FK to muscle_groups) this throws an FK violation
+    // under foreign_keys=ON; with the FK dropped it commits cleanly.
+    expect(() => {
+      database.transaction((tx) => {
+        applyPullPage(tx as Transaction, [mappingWire], 'exercise_muscle_mappings');
+      });
+    }).not.toThrow();
+
+    const row = database
+      .select()
+      .from(exerciseMuscleMappings)
+      .where(eq(exerciseMuscleMappings.id, 'emm-1'))
+      .get();
+    expect(row?.muscleGroupId).toBe('mg-future');
+    expect(row?.exerciseDefinitionId).toBe('exdef-1');
+    expect(row?.localDirty).toBe(false);
+    expect(row?.localUpdatedAtMs).toBe(100);
   });
 });
 

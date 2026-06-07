@@ -41,7 +41,6 @@ CREATE TABLE \`exercise_muscle_mappings\` (
 	\`created_at\` integer DEFAULT (unixepoch() * 1000) NOT NULL,
 	\`updated_at\` integer DEFAULT (unixepoch() * 1000) NOT NULL,
 	FOREIGN KEY (\`exercise_definition_id\`) REFERENCES \`exercise_definitions\`(\`id\`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (\`muscle_group_id\`) REFERENCES \`muscle_groups\`(\`id\`) ON UPDATE no action ON DELETE no action,
 	CONSTRAINT "exercise_muscle_mappings_weight_positive" CHECK("exercise_muscle_mappings"."weight" > 0),
 	CONSTRAINT "exercise_muscle_mappings_role_guard" CHECK("exercise_muscle_mappings"."role" is null or "exercise_muscle_mappings"."role" in ('primary', 'secondary', 'stabilizer'))
 );

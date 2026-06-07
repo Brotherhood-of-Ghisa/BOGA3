@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "34ef7603-4ae4-49bf-af67-dc414f8ed695",
+  "id": "16f9edb7-4dee-4ba3-9112-50c3459f5ddd",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "exercise_definitions": {
@@ -210,19 +210,6 @@
             "id"
           ],
           "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "exercise_muscle_mappings_muscle_group_id_muscle_groups_id_fk": {
-          "name": "exercise_muscle_mappings_muscle_group_id_muscle_groups_id_fk",
-          "tableFrom": "exercise_muscle_mappings",
-          "tableTo": "muscle_groups",
-          "columnsFrom": [
-            "muscle_group_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
           "onUpdate": "no action"
         }
       },

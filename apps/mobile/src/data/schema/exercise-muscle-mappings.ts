@@ -10,7 +10,6 @@ import {
 } from 'drizzle-orm/sqlite-core';
 
 import { exerciseDefinitions } from './exercise-definitions';
-import { muscleGroups } from './muscle-groups';
 
 export const exerciseMuscleMappings = sqliteTable(
   'exercise_muscle_mappings',
@@ -22,9 +21,14 @@ export const exerciseMuscleMappings = sqliteTable(
     exerciseDefinitionId: text('exercise_definition_id')
       .notNull()
       .references(() => exerciseDefinitions.id, { onDelete: 'cascade' }),
-    muscleGroupId: text('muscle_group_id')
-      .notNull()
-      .references(() => muscleGroups.id),
+    // Opaque text with NO FK — mirrors the server, which stores muscle_group_id
+    // as opaque text with no foreign key because muscle_groups is a client-only,
+    // never-synced taxonomy table. A client FK here bricks cross-version sync:
+    // a vN device can push a mapping referencing a muscle group that a v(N-1)
+    // device's seeded taxonomy lacks, and the pull would violate the FK and
+    // hard-fail the first-sync gate. Kept .notNull() and indexed, like the
+    // server.
+    muscleGroupId: text('muscle_group_id').notNull(),
     weight: real('weight').notNull(),
     role: text('role', { enum: ['primary', 'secondary', 'stabilizer'] }),
     deletedAt: integer('deleted_at', { mode: 'timestamp_ms' }),
