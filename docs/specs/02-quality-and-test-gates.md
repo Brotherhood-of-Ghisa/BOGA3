@@ -7,16 +7,6 @@ always-load docs (with `03-technical-architecture.md` and `09-project-structure.
 The deep per-test catalog and strategy live in `06-testing-strategy.md`; cite it,
 don't restate it here.
 
-## Setup (once per worktree)
-
-```bash
-./scripts/worktree-setup.sh        # idempotent: installs deps + generates this worktree's isolated config
-```
-
-You normally never run this by hand — **the gate scripts below run any setup they
-need themselves** (install deps if missing, boot/seed the local Supabase, create
-the iOS simulator). Docker must be running for the backend/sync lanes.
-
 ## Run the gates (from the repo root)
 
 ```bash
@@ -26,9 +16,11 @@ the iOS simulator). Docker must be running for the backend/sync lanes.
 ```
 
 Each script bootstraps what it needs (idempotent) and `cd`s into the right
-workspace. You do not set environment variables or provision infrastructure by
-hand. (`npm run …` scripts live only in `apps/mobile/package.json` — there is no
-root `package.json` — but you should invoke the gates above, not the raw scripts.)
+workspace — installing deps if missing and booting/seeding the local Supabase, so
+you do not set env vars or provision infrastructure by hand (Docker must be running
+for the slow lanes). (`npm run …` scripts live only in `apps/mobile/package.json` —
+there is no root `package.json` — but invoke the gates above, not the raw scripts.)
+New-worktree setup, prerequisites, and teardown: `01-worktree-and-environment.md`.
 
 ## Which gate for what you changed
 
@@ -58,22 +50,6 @@ subscriptions, or async teardown. `npm test` is deliberately bare `jest` (no
 **The slow gates (Maestro iOS + the backend/sync-v2 suites) are NOT in CI.** They
 only run when you run them locally, so breakage on those lanes accumulates on
 `main` invisibly. Run the slow gate for your area (table above) before the PR.
-
-## Infrastructure (already available in your worktree)
-
-You have everything needed to run every gate locally — nothing is "unavailable."
-A "command not found" / "infra unavailable" error is a bootstrap gap: re-run
-`./scripts/worktree-setup.sh` and retry.
-
-- **Local Supabase** — slot-isolated per worktree (own ports, containers, DB).
-  Booted and seeded automatically by `quality-slow.sh backend`. Needs Docker.
-  `which supabase` returning nothing is normal — it runs via `npx`.
-- **iOS simulator** — `quality-slow.sh frontend` auto-creates and boots the
-  worktree's slot simulator if missing.
-- **Maestro iOS dev-client** — one shared `.app` cached at
-  `$HOME/.cache/boga/maestro/ios-dev-client`, reused across worktrees and **trusted
-  on existence** (not rebuilt on dependency change). Hence the `--force` rebuild
-  rule above for native changes.
 
 ## Maintenance
 
