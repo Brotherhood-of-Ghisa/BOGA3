@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "34ef7603-4ae4-49bf-af67-dc414f8ed695",
+  "id": "3f03f4ac-98b1-4b22-a577-2fba972c26a8",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "exercise_definitions": {
@@ -635,7 +635,8 @@
           "type": "text",
           "primaryKey": true,
           "notNull": true,
-          "autoincrement": false
+          "autoincrement": false,
+          "default": "(lower(hex(randomblob(16))))"
         },
         "display_name": {
           "name": "display_name",
@@ -661,6 +662,29 @@
         },
         "is_editable": {
           "name": "is_editable",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "local_dirty": {
+          "name": "local_dirty",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "local_updated_at_ms": {
+          "name": "local_updated_at_ms",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -718,10 +742,6 @@
         "muscle_groups_is_editable_boolean_guard": {
           "name": "muscle_groups_is_editable_boolean_guard",
           "value": "\"muscle_groups\".\"is_editable\" in (0, 1)"
-        },
-        "muscle_groups_non_editable_guard": {
-          "name": "muscle_groups_non_editable_guard",
-          "value": "\"muscle_groups\".\"is_editable\" = 0"
         }
       }
     },
