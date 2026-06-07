@@ -85,7 +85,7 @@ boga_validate_worktree_placement() {
 [worktree] preferably with:
 [worktree]   ./scripts/worktree-create.sh <branch-name>
 [worktree]
-[worktree] Agent worktrees under `<parent>/.claude/worktrees/` are exempt by design.
+[worktree] Agent worktrees under \`<parent>/.claude/worktrees/\` are exempt by design.
 [worktree] Override only for one-off diagnostics with BOGA_ALLOW_NESTED_WORKTREE=1.
 EOF
     return 1
