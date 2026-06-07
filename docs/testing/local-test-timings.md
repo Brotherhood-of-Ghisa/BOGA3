@@ -191,5 +191,5 @@ All three runs per lane (ms), exactly as recorded.
 | ios-smoke | 98924 | 73621 | 71519 | 0/0/0 |
 | ios-data-smoke | 109347 | 110368 | 110016 | 0/0/0 |
 | ios-gates | 135490 | 134534 | 135261 | 0/0/0 |
-| ios-auth-profile | 283612 | 280177 | 286347 | 1/1/1 (sync-gate offline) |
+| ios-auth-profile | 283612 | 280177 | 286347 | 1/1/1 (PRE-FIX, superseded — sync-gate offline; lane since fixed, see Notes) |
 | dev-client-build (one-time) | 129401 | — | — | 0 |
