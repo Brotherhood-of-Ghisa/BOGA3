@@ -10,6 +10,11 @@ This document is project-level source of truth for what data exists and how it i
 
 - Architecture/runtime behavior lives in `docs/specs/03-technical-architecture.md`.
 - Testing requirements live in `docs/specs/06-testing-strategy.md`.
+- The verified-accurate, normative Sync v2 reference (server schema, the
+  push/pull RPC protocol, LWW/undelete semantics, drift control) is
+  `docs/specs/tech/sync-v2-server-contract.md`. This document owns the
+  data-model boundaries and ownership invariants; it defers deep wire/RPC detail
+  to that contract by anchor (`§A.x` server schema, `§B.x` push/pull protocol).
 - Milestone/task docs may add detail but must not override this document.
 
 ## Current model layers
@@ -22,8 +27,10 @@ This document is project-level source of truth for what data exists and how it i
 - auth identity and account profile management.
 - not the same as generic sync-domain backup.
 
-3. Backend sync/projection layer (M13 implemented baseline)
-- event ingest + projection for user-domain backup/restore.
+3. Backend sync mirror layer (Sync v2)
+- one typed `app_public.<entity>` table per client entity table, written by the
+  `sync_push` RPC and read by the `sync_pull` RPC under per-row last-write-wins.
+- there is no projection function and no event log: the data is the event.
 
 ## Local schema inventory (current)
 
@@ -45,9 +52,18 @@ This document is project-level source of truth for what data exists and how it i
 ### Test/runtime-only data (not user backup scope)
 
 - `smoke_records`
-- `sync_outbox_events`
-- `sync_delivery_state`
-- `sync_runtime_state`
+- `sync_runtime_state` (singleton row; see *Local sync bookkeeping* below)
+
+### Local sync bookkeeping (Sync v2)
+
+v2 keeps no separate outbox/delivery tables. Per-row sync state is two local-only
+columns on each of the eight user-owned entity tables:
+`local_dirty` (1 iff the row needs pushing) and `local_updated_at_ms` (the
+monotonic client timestamp, sent as `client_updated_at_ms`). Neither crosses the
+wire. Device-global sync state lives on the `sync_runtime_state` singleton row:
+`pull_cursor` (per-layer JSON cursor map), `last_emitted_ms` (the monotonic-clock
+high-water mark), and `bootstrap_completed_at`. Deep detail:
+`docs/specs/tech/sync-v2-server-contract.md` §B.9.
 
 ## Backend schema inventory (current)
 
@@ -56,21 +72,27 @@ This document is project-level source of truth for what data exists and how it i
 - `auth.users` (identity)
 - `app_public.user_profiles` (username profile data, `1:1` with `auth.users(id)`)
 
-### Sync-domain projection tables (M13 backend baseline)
+### Sync-domain mirror tables (Sync v2)
 
-- `app_public.gyms` (`deleted_at` projection support plus nullable private coordinate metadata)
+One typed `app_public.<entity>` table per client entity table. Each is a direct
+mirror of its client Drizzle table (no projection layer): composite primary key
+`(owner_user_id, id)`, all eight composite cross-entity FKs declared
+`DEFERRABLE INITIALLY DEFERRED`, and the universal sync columns
+`client_updated_at_ms` (the LWW key), `server_received_at` (the pull-cursor axis),
+and a nullable `deleted_at` tombstone. Per-column mapping is in
+`docs/specs/tech/sync-v2-server-contract.md` §A.2.
+
+- `app_public.gyms` (carries the four nullable private coordinate columns)
 - `app_public.sessions`
-- `app_public.session_exercises` (`exercise_definition_id` + `deleted_at` projection support)
-- `app_public.exercise_sets` (`deleted_at` projection support; optional `set_type` metadata projection)
+- `app_public.session_exercises`
+- `app_public.exercise_sets` (optional `set_type` metadata)
 - `app_public.exercise_definitions`
 - `app_public.exercise_muscle_mappings`
 - `app_public.exercise_tag_definitions`
 - `app_public.session_exercise_tags`
 
-### Ingest metadata tables (M13 backend baseline)
-
-- `app_public.sync_device_ingest_state`
-- `app_public.sync_ingested_events`
+There are no backend ingest-metadata tables: with no event log there is nothing
+to deduplicate per device, so idempotency falls out of per-row LWW.
 
 ### Diagnostics tables (M14 baseline)
 
@@ -84,63 +106,88 @@ This document is project-level source of truth for what data exists and how it i
 
 1. User-owned backend rows are auth-scoped and backend-enforced (`RLS`/constraints).
 2. Mobile clients never use `service_role` credentials.
-3. Sync transport must be idempotent for repeated delivery attempts.
-4. Single-device assumptions are valid for M13; multi-device semantics are deferred.
+3. Sync transport must be idempotent for repeated delivery attempts. Under v2 this
+   follows from per-row last-write-wins: re-pushing a row with the same
+   `client_updated_at_ms` is a server no-op (the ack still clears the dirty bit).
+4. Concurrent multi-device writes are resolved by per-row last-write-wins keyed on
+   `client_updated_at_ms`; there is no central ordering authority, no per-device
+   sequence, and no event log. Acknowledged trade-off: a stale-clock write can lose
+   to a newer stored value (including the undelete-loses case in
+   `docs/specs/tech/sync-v2-server-contract.md` §A.1.1.2 Scenario A).
 5. Diagnostic log rows are write-only from authenticated clients and are manually inspected through backend operator tooling.
-6. All eight sync-domain projection tables use composite primary key `(id, owner_user_id)`. Every user owns their own `id` keyspace, so two users may legitimately hold rows with the same `id` (for example, the same seeded `exercise_definitions.id`) without conflict. Cross-owner row-level conflicts are not possible by construction, and the backend has no cross-owner rejection path. Each user's seed catalog is per-user data from day one; no shared/global catalog of these entities exists on the backend.
+6. All eight sync-domain mirror tables use composite primary key
+   `(owner_user_id, id)` — **owner-first**. The column order is load-bearing: the
+   canonical pull query (`where owner_user_id = … order by server_received_at`)
+   leads with the PK column, and the per-layer pull cursor depends on it (contract
+   §A.1, §B.4.3). Every user owns their own `id` keyspace, so two users may
+   legitimately hold rows with the same `id` (for example, the same seeded
+   `exercise_definitions.id`) without conflict. Cross-owner row-level conflicts are
+   not possible by construction, and the backend has no cross-owner rejection path.
+   Each user's seed catalog is per-user data from day one; no shared/global catalog
+   of these entities exists on the backend.
 7. Gym coordinate metadata is private, user-owned data stored on `gyms`, not a shared/public location entity.
 
-## M13 sync data-model contract (implemented baseline)
+## Sync v2 data-model contract
 
-1. Client emits granular outbox events for user-domain mutations.
-2. Backend ingests events with idempotency key `(owner_user_id, device_id, event_id)` and strict per-device ordering via `sequence_in_device`.
-3. Backend projects applied events into restorable user-state models.
-4. Restore/bootstrap must be coherent across all user-owned entities listed in this document.
+Deep wire/RPC detail lives in `docs/specs/tech/sync-v2-server-contract.md`; this
+section states only the data-model-level invariants.
+
+1. The eight user-owned entity tables are mirrored 1:1 on the backend as typed
+   `app_public.<entity>` tables. The client marks a mutated row dirty
+   (`local_dirty = 1`, `local_updated_at_ms = nowMonotonic()`) and pushes the full
+   typed row — not a granular event. There is no outbox, no projection, no event
+   log: the data is the event.
+2. Conflict resolution is per-row last-write-wins keyed on `client_updated_at_ms`,
+   resolved identically on both ends (the `sync_push` upsert predicate and the
+   client pull-apply). Row identity is the composite PK `(owner_user_id, id)`;
+   idempotency follows from LWW (contract §A.1.1, §B.10).
+3. The backend stores each pushed row directly under LWW upsert. Deletion is
+   `deleted_at` going non-null; undelete is the same row with `deleted_at` returning
+   to null under the same LWW rule. There is no separate `deleted` flag and no
+   special delete/undelete path (contract §A.1.1).
+4. Restore/bootstrap is a full `sync_pull` drain across all four topological layers
+   (first sign-in or wiped-client reinstall). It must be coherent across all
+   user-owned entities listed in this document, with FK integrity preserved at every
+   layer boundary (parents drain before children).
 5. `exercise_sets` metadata includes optional `set_type` (`warm_up | rir_0 | rir_1 | rir_2 | null`) and remains nullable for legacy/unspecified sets.
-6. `gyms` may include nullable coordinate metadata: `latitude`, `longitude`, `coordinate_accuracy_m`, and `coordinates_updated_at`. The sync impact decision is `in sync scope`; these fields are carried by `gyms.upsert`, bootstrap fetch/merge, convergence events, and reinstall restore parity.
-7. Gym coordinate fields are either all null or all non-null. Valid ranges are latitude `-90..90`, longitude `-180..180`, accuracy `>= 0`, and non-negative `coordinates_updated_at` epoch milliseconds. Clearing saved coordinates sets all four coordinate fields to null.
+6. `gyms` may include nullable coordinate metadata: `latitude`, `longitude`, `coordinate_accuracy_m`, and `coordinates_updated_at`. The sync impact decision is `in sync scope`; all four columns are carried verbatim by the `gyms` push/pull wire envelope, the first-full-pull bootstrap, and reinstall restore parity.
+7. Gym coordinate fields are either all null or all non-null. Valid ranges are latitude `-90..90`, longitude `-180..180`, accuracy `>= 0`, and non-negative `coordinates_updated_at` epoch milliseconds. Clearing saved coordinates sets all four coordinate fields to null. These ranges are client-enforced — the server runs no validation (contract §A.1).
 
-### Canonical event envelope invariants
+### Wire envelope (Sync v2)
 
-- Request-level required fields:
-  - `device_id`
-  - `batch_id`
-  - `sent_at_ms`
-  - `events` (`1..100`)
-- Event-level required fields:
-  - `event_id`
-  - `sequence_in_device`
-  - `occurred_at_ms`
-  - `entity_type`
-  - `entity_id`
-  - `event_type`
-  - `payload`
-- Event-level optional fields:
-  - `schema_version` (default `1`)
-  - `trace_id`
+Push request and pull response share **one** envelope shape per row:
 
-### M13 entity-event coverage (locked; undelete is supported for all entities)
+```json
+{ "type": "<entity>", "id": "...", "client_updated_at_ms": 0, "fields": { } }
+```
 
-| Entity | Supported event types |
-| --- | --- |
-| `gyms` | `upsert`, `delete` (`upsert` handles undelete) |
-| `sessions` | `upsert`, `delete`, `complete` (`upsert` handles undelete/reopen) |
-| `session_exercises` | `upsert`, `delete`, `reorder` (`upsert` handles undelete) |
-| `exercise_sets` | `upsert`, `delete`, `reorder` (`upsert` handles undelete) |
-| `exercise_definitions` | `upsert`, `delete` (`upsert` handles undelete) |
-| `exercise_muscle_mappings` | `attach`, `detach` (`attach` recreates detached edges) |
-| `exercise_tag_definitions` | `upsert`, `delete` (`upsert` handles undelete) |
-| `session_exercise_tags` | `attach`, `detach` (`attach` recreates detached edges) |
+`fields` carries every typed column for the entity (including `deleted_at`, which
+is a normal LWW column); `owner_user_id` never crosses the wire (the RPCs are
+`security invoker`, so it is derived from `auth.uid()` via RLS). The envelope
+carries no event-log metadata — no device, sequence, or event ids — because there
+is no event log. Field-by-field detail: contract §B.2.
 
-### M13 ingest/ack invariants (locked)
+### Entity coverage (Sync v2)
 
-1. Backend processes batch events strictly in request order and stops on the first failing event.
-2. Response contract is minimal:
-   - `SUCCESS` for full-batch success.
-   - `FAILURE` with `error_index`, `should_retry`, and free-text `message` (optional `error_event_id`).
-3. Events before `error_index` are committed; the failed event and all later events are not applied.
-4. Duplicate submit with same event body is a no-op success.
-5. Reuse of `event_id` with a different event body fails with `should_retry=false`.
+There are no per-entity event types. Every one of the eight entities moves through
+the same LWW upsert path. A delete is a row whose `deleted_at` is non-null; an
+undelete is that same row with `deleted_at` back to null. A reorder or complete is
+an ordinary field change (`order_index` / `status`); an attach is the join-table
+row (`exercise_muscle_mappings` / `session_exercise_tags`) being inserted or
+undeleted, and a detach is that same row soft-deleted via `deleted_at`.
+
+### Push/pull contract (Sync v2)
+
+- `sync_push` uploads a batch of `1..200` dirty rows and upserts them under LWW in
+  **one transaction**, returning a single `{ "ok": true, "server_received_at": … }`
+  ack — no per-row outcomes, no partial-batch commit. The whole batch either
+  commits or rolls back (deferrable FKs are checked at COMMIT). Failures surface as
+  exactly one of `AUTH_REQUIRED`, `FK_VIOLATION`, or `INTERNAL` (contract §B.2.2,
+  §B.3).
+- `sync_pull` downloads rows newer than a per-layer cursor, draining the four
+  topological layers in order so a child page never lands before its parents
+  (contract §B.4). The four per-layer cursors persist in
+  `sync_runtime_state.pull_cursor`.
 
 ## Maintenance rule (mandatory)
 
@@ -184,10 +231,14 @@ also asserts the hardcoded topological table order in
 or FK without updating that list also fails the gate.
 
 This rule does NOT apply to: `muscle_groups` (client-only taxonomy),
-`smoke_records`, `sync_outbox_events`, `sync_delivery_state`,
-`sync_runtime_state` (test/runtime scaffolding), or the two local-only
-sync-bookkeeping columns (`local_dirty`, `local_updated_at_ms`) on each entity
-table. All of these are listed under `exemptions` in `sync-extras.json`.
+`smoke_records`, or `sync_runtime_state` (test/runtime scaffolding) — these have
+no server counterpart and are out of the checker's scope, which introspects only
+the eight `app_public.<entity>` mirror tables. Nor does it apply to the two
+local-only sync-bookkeeping columns (`local_dirty`, `local_updated_at_ms`) on each
+entity table: those are listed under `exemptions.local_only_columns` in
+`sync-extras.json`, alongside the single `untyped_text_references` entry that
+exempts `exercise_muscle_mappings.muscleGroupId` (the no-FK reference into the
+client-only `muscle_groups` taxonomy).
 
 If your client change adds a value to an existing column (e.g., a new enum literal),
 the rule does not apply because the column already exists on both sides; the client

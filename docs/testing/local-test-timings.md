@@ -1,5 +1,10 @@
 # Local test-lane timings (measured reference)
 
+**Last updated: 2026-06-07.** These timings drift as the suites, toolchain, and
+hardware change — treat them as a guide and re-measure if a figure looks off (the
+measurement date and method are under *How to read these numbers*). Bump this date
+whenever you revise the table or re-measure.
+
 > **Why this file exists.** Agents working on Sync (and elsewhere) have a habit of
 > *inventing* test durations ("this lane takes ~10 minutes") instead of measuring
 > them. This document records **real, measured** wall-clock times for every
@@ -122,10 +127,6 @@ the headline. `≤ ceiling` = 3× median = "above this, something is wrong".
   shell/session can sit near the listed **max**; that is expected and still well
   under the 3× ceiling.
 
-- **`test:sync:reinstall-parity` is retired** (target file deleted in `73b9661`);
-  removed from the tables above. See the "Retired / removed entry points" section
-  in `docs/specs/06-testing-strategy.md`.
-
 - **`test:e2e:ios:auth-profile` — not re-measured here (table shows N/A).** This
   lane was **previously RED**: it aborted at the 2nd flow
   (`sync-gate-first-cycle.yaml`) because on the simulator the first-sync gate
@@ -150,12 +151,6 @@ the headline. `≤ ceiling` = 3× median = "above this, something is wrong".
   shows **N/A**; record a real 3×-median once measured on a clean slot. (A
   `2026-06-07` attempt here was blocked by a baseline `db`-port collision on the
   shared slot, not by the lane itself.)
-
-- **Excluded as retired:** `./supabase/scripts/test-sync-api-contract.sh` and
-  `./supabase/scripts/test-sync-events-ingest-contract.sh` target the M13/M14
-  projection RPC family dropped by the `sync_v2_clean_room` migration; they are no
-  longer wired into any gate (`quality-slow.sh` replaced them with the sync-v2
-  suites) and would fail if run. Not part of the current matrix.
 
 - **`lint`/`typecheck` are gates, not tests** — included for completeness because
   they are part of `./scripts/quality-fast.sh frontend` and agents quote them too.

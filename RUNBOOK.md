@@ -318,9 +318,6 @@ TASK_ID=ad-hoc ./scripts/maestro-ios-run-flow.sh --flow .maestro/flows/exercise-
 ./supabase/scripts/test-sync-v2-e2e.sh
 ```
 
-(The v1 `test-sync-api-contract.sh` / `test-sync-events-ingest-contract.sh`
-wrappers were retired with the M13 projection RPCs.)
-
 ### Logger diagnostics smoke (Docker Supabase)
 
 Use the auth/authz contract suite as the canonical Docker-hosted local Supabase check for `public.app_logs`:
@@ -351,10 +348,8 @@ Notes:
 
 ### Cross-stack restore-parity lane
 
-The `test:sync:reinstall-parity` lane was **retired** with sync v1 (its target
-suite was deleted). Reinstall/restore parity is now proven by the sync-v2
-`cycle-round-trip` assertion inside `test:sync:infra`, plus the backend sync-v2
-contract suites:
+Reinstall/restore parity is proven by the sync-v2 `cycle-round-trip` assertion
+inside `test:sync:infra`, plus the backend sync-v2 contract suites:
 
 ```bash
 cd apps/mobile
