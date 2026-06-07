@@ -26,12 +26,12 @@
  * NEVER wiped, so its rows accumulate across cases and across repeated lane
  * runs. Every case mints a fresh, globally-unique id set (`makeChainIds`) so two
  * cases — or two back-to-back runs — can never collide on a primary key. Each
- * fixture is stood up the way production boot does: fully migrated, then seeded
- * with the real `seedBootDataLayer` (the client-only `muscle_groups` taxonomy).
- * That seed is load-bearing — the client `exercise_muscle_mappings.muscle_group_id`
- * FK is still present, so a pulled mapping (left on the accumulating server by
- * any prior run) would violate its FK into an empty `muscle_groups` and abort
- * the whole pull page otherwise.
+ * fixture is stood up fully migrated, with the `muscle_groups` taxonomy bundle
+ * seeded up front. That seed is load-bearing — the client
+ * `exercise_muscle_mappings.muscle_group_id` FK is present, so a pulled mapping
+ * (left on the accumulating server by any prior run) would violate its FK into
+ * an empty `muscle_groups` (its Layer 0 synced parent) and abort the whole pull
+ * page otherwise.
  *
  * Every device is additionally stamped with `bootstrap_completed_at` so the
  * first-sign-in bootstrapper no-ops: it makes each fixture a RETURNING device,
@@ -77,10 +77,10 @@ const mockBootstrapState = createBootstrapMockState<InMemoryTestDatabase>();
 const mockClientState = createClientMockState<unknown>();
 
 jest.mock('@/src/data/bootstrap', () => ({
-  // The cycle resolves its local DB through the mocked `bootstrapLocalDataLayer`,
-  // but the TEST seeds that DB the same way production boot does — by calling the
-  // REAL `seedBootDataLayer`. Re-export the actual module so the real seed path
-  // is shared and the mock cannot silently drift from what boot prepares.
+  // The cycle resolves its local DB through the mocked `bootstrapLocalDataLayer`;
+  // the TEST seeds the `muscle_groups` taxonomy onto that DB itself (see
+  // `makeDevice`). Re-export the actual module so any non-mocked helper the cycle
+  // reaches for resolves to the real implementation.
   ...(jest.requireActual('@/src/data/bootstrap') as typeof import('@/src/data/bootstrap')),
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted factory: require resolves at call time, after the import hoist.
   ...(require('../helpers/sync-cycle-mocks') as typeof import('../helpers/sync-cycle-mocks')).bootstrapMockFactory(
@@ -95,9 +95,9 @@ jest.mock('@/src/auth/supabase', () =>
   ),
 );
 
-import { seedBootDataLayer } from '@/src/data/bootstrap';
+import { SYSTEM_MUSCLE_GROUP_SEEDS } from '@/src/data/exercise-catalog-seeds';
 import { PRIMARY_RUNTIME_STATE_ID } from '@/src/data/clock';
-import { gyms, sessions, sessionExercises, exerciseSets, syncRuntimeState } from '@/src/data/schema';
+import { gyms, muscleGroups, sessions, sessionExercises, exerciseSets, syncRuntimeState } from '@/src/data/schema';
 import { runSyncCycle, type SyncCycleOutcome } from '@/src/sync/cycle';
 
 // Reads the live-endpoint config; throws here (failing the suite) when the env
@@ -165,14 +165,25 @@ describe('sync cycle multi-device LWW against a live endpoint', () => {
       .run();
   };
 
-  // Stands up one fresh device: a fully-migrated in-memory store, seeded the way
-  // production boot is (muscle_groups via the real `seedBootDataLayer`), and
-  // stamped as already-bootstrapped.
+  // Stands up one fresh device: a fully-migrated in-memory store, with the
+  // `muscle_groups` taxonomy bundle seeded (its Layer 0 synced parent, so a
+  // pulled mapping satisfies its FK), and stamped as already-bootstrapped.
+  const seedMuscleGroupTaxonomy = (database: InMemoryTestDatabase): void => {
+    const now = new Date();
+    for (const muscleGroup of SYSTEM_MUSCLE_GROUP_SEEDS) {
+      database
+        .insert(muscleGroups)
+        .values({ ...muscleGroup, createdAt: now, updatedAt: now })
+        .onConflictDoNothing({ target: muscleGroups.id })
+        .run();
+    }
+  };
+
   const makeDevice = (): DeviceFixture => {
     const fixture = createInMemoryDatabase();
     openFixtures.push(fixture);
     const { database } = fixture;
-    seedBootDataLayer(database as never);
+    seedMuscleGroupTaxonomy(database);
     markBootstrapCompleted(database);
     return { fixture, database };
   };

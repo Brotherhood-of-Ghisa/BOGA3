@@ -7,7 +7,7 @@ import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidat
 import { logEvent } from '@/src/logging';
 
 import { localRuntimeMigrations } from './migrations';
-import { seedMuscleGroups, seedSystemExerciseCatalog } from './exercise-catalog-seeds';
+import { seedSystemExerciseCatalog } from './exercise-catalog-seeds';
 import * as schema from './schema';
 
 const LOCAL_DATABASE_NAME = 'scaffolding-local.db';
@@ -122,8 +122,6 @@ export type LocalDatabase = ReturnType<typeof createLocalDatabase>;
 let localDatabase: LocalDatabase | null = null;
 let runtimeMigrationsComplete = false;
 let runtimeMigrationPromise: Promise<void> | null = null;
-let muscleGroupSeedComplete = false;
-let muscleGroupSeedPromise: Promise<void> | null = null;
 
 const runRuntimeMigrations = async (database: LocalDatabase) => {
   if (runtimeMigrationsComplete) {
@@ -142,52 +140,6 @@ const runRuntimeMigrations = async (database: LocalDatabase) => {
   }
 
   await runtimeMigrationPromise;
-};
-
-// The boot-time data-layer seeding that must run on every prepared database
-// BEFORE any sync pull touches it, regardless of build flavour: the client-only
-// muscle-group taxonomy. `exercise_muscle_mappings.muscle_group_id` is a NOT
-// NULL local FK into `muscle_groups`, and `muscle_groups` never crosses the sync
-// wire — so a pulled mapping can only be inserted once these rows exist. Boot
-// always seeds them (it is idempotent), which is why production never hits an FK
-// violation on the re-pull path.
-//
-// Extracted as its own synchronous helper so the in-memory test harness can run
-// the EXACT same seed on its fixture database via one shared path — keeping the
-// test faithful to production boot and preventing the mock from silently
-// drifting away from what boot actually prepares.
-export const seedBootDataLayer = (database: LocalDatabase): void => {
-  seedMuscleGroups(database);
-};
-
-// Seed the client-only muscle-group taxonomy at boot. In a sync-configured
-// build the syncable entity catalog (exercise definitions + muscle mappings) is
-// NOT seeded here — it is seeded by the first-sign-in bootstrapper only when the
-// first full pull returns no rows, so a reinstall recovers the server's state
-// rather than re-creating starter rows. Muscle groups never sync, so they seed
-// unconditionally at boot (via the shared `seedBootDataLayer` helper).
-//
-// The infra-free build (no sync backend configured) is the exception: it has no
-// server to recover from, so `prepareLocalDataLayer` also seeds the full starter
-// catalog at boot via `seedStarterCatalogWhenNoSyncBackend`.
-const runMuscleGroupSeed = async (database: LocalDatabase) => {
-  if (muscleGroupSeedComplete) {
-    return;
-  }
-
-  if (!muscleGroupSeedPromise) {
-    muscleGroupSeedPromise = Promise.resolve()
-      .then(() => {
-        seedBootDataLayer(database);
-        muscleGroupSeedComplete = true;
-      })
-      .catch((error) => {
-        muscleGroupSeedPromise = null;
-        throw error;
-      });
-  }
-
-  await muscleGroupSeedPromise;
 };
 
 // Bootstrap and reset both mutate the shared `sqliteDatabase`/`localDatabase`
@@ -213,17 +165,20 @@ const runExclusiveDataLayerOperation = <T>(operation: () => Promise<T>): Promise
   return run;
 };
 
-// Seed the full starter exercise catalog at boot, but ONLY when no sync backend
-// is configured. In a sync-configured build the catalog is owned by the
-// first-sign-in bootstrapper (see `runMuscleGroupSeed` above) so a reinstall
-// recovers the server's catalog — including the user's deletions — instead of
-// re-creating starter rows; seeding here would defeat that recovery, so this
-// stays a no-op there. In an infra-free build there is no server to recover from
-// and nothing else ever seeds the catalog, so the exercise picker would stay
-// permanently empty without this. The seeder is idempotent (guarded by its
-// applied-version marker on `sync_runtime_state`), and `resetLocalAppData()`
-// deletes the database — marker included — so the catalog re-seeds on the next
-// bootstrap.
+// Seed the full starter catalog at boot, but ONLY when no sync backend is
+// configured. The starter catalog is the three system-seeded tables —
+// muscle_groups (Layer 0), exercise_definitions (Layer 0), and the
+// exercise_muscle_mappings join (Layer 1) — all written dirty so they push once
+// an account is wired up. In a sync-configured build the catalog is owned by the
+// first-sign-in bootstrapper, so a reinstall recovers the server's catalog
+// (including the user's deletions) instead of re-creating starter rows; seeding
+// here would defeat that recovery, so this stays a no-op there. In an infra-free
+// build there is no server to recover from and nothing else ever seeds the
+// catalog, so the exercise picker would stay permanently empty without this. The
+// seeder is idempotent (guarded by its applied-version marker on
+// `sync_runtime_state`) and seeds the Layer 0 parents before the Layer 1 join so
+// the post-seed FK integrity check passes; `resetLocalAppData()` deletes the
+// database — marker included — so the catalog re-seeds on the next bootstrap.
 const seedStarterCatalogWhenNoSyncBackend = (database: LocalDatabase) => {
   if (getMobileAuthRuntimeConfig().isConfigured) {
     return;
@@ -238,7 +193,6 @@ const prepareLocalDataLayer = async (): Promise<LocalDatabase> => {
   }
 
   await runRuntimeMigrations(localDatabase);
-  await runMuscleGroupSeed(localDatabase);
   seedStarterCatalogWhenNoSyncBackend(localDatabase);
   runForeignKeyIntegrityCheck(getSqliteDatabase());
   return localDatabase;
@@ -255,8 +209,6 @@ export const resetLocalAppData = (): Promise<LocalDatabase> =>
     localDatabase = null;
     runtimeMigrationsComplete = false;
     runtimeMigrationPromise = null;
-    muscleGroupSeedComplete = false;
-    muscleGroupSeedPromise = null;
 
     await databaseToClose?.closeAsync();
     await deleteDatabaseAsync(LOCAL_DATABASE_NAME);
@@ -283,7 +235,5 @@ export const __resetLocalDataLayerForTests = () => {
   localDatabase = null;
   runtimeMigrationsComplete = false;
   runtimeMigrationPromise = null;
-  muscleGroupSeedComplete = false;
-  muscleGroupSeedPromise = null;
   dataLayerOperationLock = Promise.resolve();
 };
