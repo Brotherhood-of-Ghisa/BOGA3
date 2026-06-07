@@ -243,40 +243,59 @@ trap cleanup_run_rows EXIT
 NOW_MS="$(($(date +%s) * 1000))"
 
 # -----------------------------------------------------------------------------
-# Scenario 1: Snapshot pull (cursor=null).
+# Scenario 1: Snapshot pull.
 #
-# Seed three Layer-0 rows for user A (one gyms, two exercise_definitions).
-# POST { layer: 0, cursor: null, limit: 10 } as user A.
-# Expect: 3 entities in sort order; has_more=false; next_cursor matches last
-# row's sort key.
+# Seed three Layer-0 rows for user A (one gyms, two exercise_definitions) with
+# strictly-increasing server_received_at FAR in the future (2098) so any other
+# Layer-0 rows already on this DB (baseline seeds, residue from other contract
+# suites) sort strictly BEFORE ours. A pull from a cursor positioned just
+# before our first seeded instant then returns EXACTLY our three rows.
+#
+# This makes the has_more=false assertion hermetic: with a small enough seed
+# set fully inside one page, has_more is false regardless of how many OTHER
+# Layer-0 rows exist for this owner. (A cursor=null snapshot would set
+# has_more=true whenever >limit Layer-0 rows exist in total — a non-hermetic
+# false-fail that leftover rows from a dirty DB can trigger.)
+#
+# Expect: 3 entities in sort order; has_more=false; next_cursor = last row.
 # -----------------------------------------------------------------------------
 
 echo "[sync-pull-contract] scenario 1: snapshot pull"
 run_psql_sql "
   insert into app_public.gyms (owner_user_id, id, name, created_at, updated_at, client_updated_at_ms, server_received_at)
     values ('${USER_A_UUID}'::uuid, 'pull-${RUN_TAG}-gym-1', 'Gym 1',
-            ${NOW_MS}, ${NOW_MS}, ${NOW_MS}, '2026-01-01 10:00:00.000+00');
+            ${NOW_MS}, ${NOW_MS}, ${NOW_MS}, '2098-01-01 10:00:00.000+00');
   insert into app_public.exercise_definitions (owner_user_id, id, name, created_at, updated_at, client_updated_at_ms, server_received_at)
     values ('${USER_A_UUID}'::uuid, 'pull-${RUN_TAG}-ed-1', 'Bench',
-            ${NOW_MS}, ${NOW_MS}, ${NOW_MS}, '2026-01-01 10:00:01.000+00'),
+            ${NOW_MS}, ${NOW_MS}, ${NOW_MS}, '2098-01-01 10:00:01.000+00'),
            ('${USER_A_UUID}'::uuid, 'pull-${RUN_TAG}-ed-2', 'Squat',
-            ${NOW_MS}, ${NOW_MS}, ${NOW_MS}, '2026-01-01 10:00:02.000+00');
+            ${NOW_MS}, ${NOW_MS}, ${NOW_MS}, '2098-01-01 10:00:02.000+00');
 " >/dev/null
 
-sync_pull '{"layer":0,"cursor":null,"limit":10}'
+# Cursor positioned just before our first seeded instant; limit 10 comfortably
+# holds all three rows so the page is complete (has_more=false) hermetically.
+SNAPSHOT_CURSOR='{"server_received_at":"2097-12-31T23:59:59.999+00:00","owner_user_id":"00000000-0000-0000-0000-000000000000","type":"gyms","id":""}'
+sync_pull '{"layer":0,"cursor":'"${SNAPSHOT_CURSOR}"',"limit":10}'
 assert_status "200" "scenario 1 status"
-# Filter entities to just our run-tag ids so other Layer-0 rows on the DB
-# (e.g. from previous test runs of other contract tests) don't break the count.
+# The window contains exactly our three rows: assert both the run-tag-scoped
+# count AND the total entities length (proves nothing else lands in this slice).
 assert_jq '[.entities[] | select(.id | startswith("pull-'"${RUN_TAG}"'-"))] | length == 3' "scenario 1 entity count"
+assert_jq '.entities | length == 3' "scenario 1 page holds exactly the seeded rows"
 assert_jq '.has_more == false' "scenario 1 has_more"
-# Sort key on last row: gym → first by server_received_at, ed-2 → last.
-assert_jq '[.entities[] | select(.id | startswith("pull-'"${RUN_TAG}"'-"))][0].type == "gyms" and [.entities[] | select(.id | startswith("pull-'"${RUN_TAG}"'-"))][0].id == "pull-'"${RUN_TAG}"'-gym-1"' "scenario 1 first entity"
-assert_jq '[.entities[] | select(.id | startswith("pull-'"${RUN_TAG}"'-"))][-1].type == "exercise_definitions" and [.entities[] | select(.id | startswith("pull-'"${RUN_TAG}"'-"))][-1].id == "pull-'"${RUN_TAG}"'-ed-2"' "scenario 1 last entity"
-# next_cursor reflects last returned row (in this DB, the last returned row may
-# not be our last seeded row if other seeded rows exist with later
-# server_received_at; we just assert next_cursor is an object with the four
-# required keys).
+# Sort key: gym → first by server_received_at, ed-2 → last.
+assert_jq '.entities[0].type == "gyms" and .entities[0].id == "pull-'"${RUN_TAG}"'-gym-1"' "scenario 1 first entity"
+assert_jq '.entities[-1].type == "exercise_definitions" and .entities[-1].id == "pull-'"${RUN_TAG}"'-ed-2"' "scenario 1 last entity"
+# next_cursor is the sort key of the last emitted row.
 assert_jq '.next_cursor | type == "object" and has("server_received_at") and has("owner_user_id") and has("type") and has("id")' "scenario 1 next_cursor shape"
+assert_jq '.next_cursor.type == "exercise_definitions" and .next_cursor.id == "pull-'"${RUN_TAG}"'-ed-2"' "scenario 1 next_cursor points at last row"
+
+# Also exercise the cursor=null snapshot path: the initial pull of this layer
+# must include all three seeded rows (count scoped to our run tag so unrelated
+# residue does not interfere). has_more is intentionally NOT asserted here — it
+# is a global property of the layer, not of our slice.
+sync_pull '{"layer":0,"cursor":null,"limit":200}'
+assert_status "200" "scenario 1 cursor=null status"
+assert_jq '[.entities[] | select(.id | startswith("pull-'"${RUN_TAG}"'-"))] | length == 3' "scenario 1 cursor=null includes all seeded rows"
 pass "scenario 1: snapshot pull"
 
 cleanup_run_rows
