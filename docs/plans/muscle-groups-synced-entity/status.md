@@ -59,3 +59,23 @@
 - Dispatched: none yet (awaiting t6+t9 merge; then dispatch t10).
 - Revised build order: (t6 ∥ t9) → t10 → t5 → t7 → t8 → tFINAL.
 - Per user request: dispatched a fresh reviewer for t9 that POSTED its verdict to PR #173 (`Verdict: APPROVED`, COMMENTED review, reviewer a6c2b14). Posting reviewer verdicts to the PR is now USER-DIRECTED-OK (overrides the earlier conservative report-only default for verdicts the user asks to be posted). No security warning fired. t6 #174 review remains report-to-me only (user didn't ask to post that one).
+
+## 2026-06-07 — iteration 8
+- Merged this iter: t6 (PR #174) + t9 (PR #173), human-merged. Coordinator rebased onto origin/main @ cb2492f. Hand-offs verified: muscleGroupId exemption removed (t6); muscleGroups in DIRTY_COUNTED_TABLES (t9). Drift now GREEN on main. 4 t2 hygiene leaks confirmed still present (t10 target). Deviations log updated (t6, t9).
+- Ready work: t10 only (deps: t6 ✓). t5 blocked on t10; t7 blocked on t5; t8 on t5+t6+t7; tFINAL on all.
+- Dispatched: t10 (builder) — fix 4 durable-hygiene leaks in supabase/tests/*.sh + clean-reset verify/fix of sync-pull-contract scenario 1 has_more. Runs full backend lane (now drift-green) to settle whether scenario 1 is a real regression or env pollution.
+- Stuck: none.
+- Notes: t10 is the gate to t5 (t5 needs a fully-green backend lane). Critical path from here: t10 → t5 → t7 → t8 → tFINAL (single-file serial; t9 already done in parallel).
+
+## 2026-06-07 — iteration 9
+- t10 PR #176 built (builder aa705c6). Scenario-1 has_more failure = ENVIRONMENT ARTIFACT (orphaned Supabase stack with >10 Layer-0 rows on t6's slot), NOT a code regression — pull RPC logic correct, no migration fix. Builder hardened scenario 1 to be hermetic + fixed ALL durable-hygiene leaks across supabase/ (3 migrations comment-only + ~11 files; also re-anchored refs to OLDER deleted plans). Backend lane GREEN end-to-end on clean reset.
+- Reviewed: t10 #176 → reviewer a4123905 returned `Verdict: CHANGES_REQUESTED` (1 item): first commit message body carried literal ephemeral tokens (plan.md / ## Outcomes / ## Deviations log / docs/plans/...). Everything substantive PASSED (tree grep clean, migrations verified comment-only — no SQL logic, scenario-1 hardening strengthens contract, backend green). Re-dispatched builder (ae9d388) → reworded commit msgs (tree byte-identical: 15 files 238+/227−), force-pushed. Coordinator verified commit bodies now token-clean. t10 = substantively APPROVED, pending CI re-run (Frontend Quality Gates) after the reword.
+- NEW GAP flagged by t10 builder (background chip task_4d0a7304): `supabase/tests/sync-v2-rls-cross-owner.sh` cross-owner RLS probe omits the new synced `muscle_groups` table. RLS policies EXIST (t2) + are hash-verified (t6 drift fixtures), but no RUNTIME cross-owner isolation probe covers muscle_groups → parity + security-adjacent gap. Surfacing fold-in decision to user (candidate t11, after t10, → tFINAL).
+- Dispatched: none new (t10 revision in flight → done). Awaiting CI green + human merge of t10.
+
+## 2026-06-07 — iteration 10 (session resume)
+- Resume state refresh: t1/t2/t3/t4/t6/t9 MERGED. t10 #176 OPEN, MERGEABLE, mergeStateStatus=CLEAN (CI went green after the commit-message reword) → approved + green, ready to merge. t5/t7/t8/t11/tFINAL not started.
+- Cleanup: coordinator worktree had t10's 15-file diff (238+/227−) leaked + STAGED in the index (not my bookkeeping). Discarded via `git restore --staged --worktree -- supabase/` (t10's work is safely on PR #176). Worktree now clean except plan-dir bookkeeping.
+- USER DECISION: fold the cross-owner RLS gap into the plan as **t11**. Created `tasks/t11.md`; wired DAG `t10 → t11`, `t11 → tFINAL`; added to task list; tFINAL inputs → t1-t11. (Builder's chip task_4d0a7304 superseded.)
+- main advanced via unrelated PRs #175 (codex gym-picker / session-recorder local-gyms) and #148 (codex DB-sync review: offline reconnect + FK-blocked inserts). #148 is FK-adjacent — WATCH for overlap when dispatching t5 (boot FK pragma) and t7 (FK harness). Coordinator rebasing onto origin/main @ 715ad68.
+- Ready work: t10 approved+green → human merge. Nothing new dispatchable until t10 merges (t5+t11 both gated on t10). After t10: dispatch t5 (backend lane). SCHEDULING RULE: ≤1 backend-lane builder in flight at a time (t5, t11, t7?, tFINAL all hit Supabase; saw orphaned-stack/slot contention on t6/t10) — serialize backend tasks; fast-only tasks (t8) may overlap.

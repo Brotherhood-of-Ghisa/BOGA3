@@ -110,6 +110,7 @@ graph TD
   t4 --> t9[t9 build: dirty-count includes muscle_groups]
   t6 --> t10[t10 build: contract-test hygiene + verify/fix pull-contract]
   t10 --> t5
+  t10 --> t11[t11 build: cross-owner RLS coverage for muscle_groups]
   t2 --> tFINAL
   t5 --> t8[t8 build: docs]
   t6 --> t8
@@ -120,6 +121,7 @@ graph TD
   t7 --> tFINAL
   t9 --> tFINAL
   t10 --> tFINAL
+  t11 --> tFINAL
 ```
 
 ## Tasks
@@ -134,6 +136,7 @@ graph TD
 - [t8: docs — data-model + sync-v2 server contract](tasks/t8.md) — build
 - [t9: dirty-count — include muscle_groups in the Settings pending-push count](tasks/t9.md) — build (added at execute time, iteration 5)
 - [t10: remediate server-contract-test fallout — hygiene leaks + verify/fix pull-contract](tasks/t10.md) — build (added at execute time, iteration 7)
+- [t11: cross-owner RLS contract coverage for muscle_groups](tasks/t11.md) — build (added at execute time, iteration 9)
 - [tFINAL: verify plan outcomes](tasks/tFINAL.md) — build (final test card)
 
 ## Deviations log
@@ -154,3 +157,12 @@ graph TD
   ENTITY_TABLES. Minor in-scope deviation: updated `topo-order-imported.test.ts` (8→9 Layer 0 shape
   guard) to keep the fast lane green. Surfaced a real downstream gap (`DIRTY_COUNTED_TABLES` in
   `sync-status.ts` excludes muscle_groups) → folded into the plan as new task **t9** (user decision).
+- t6 (PR #174, merged 2026-06-07): drift checker — dropped muscleGroupId exemption, 9-entity
+  derivation; `check:sync-drift --strict` now exits 0 (drift green on main). In-scope deviation:
+  regenerated `check-sync-schema-drift.fixtures.json` (purely additive — only the muscle_groups RLS
+  policy hashes; reviewer verified prior 8 entities byte-identical). Flagged the `quality-slow.sh
+  backend` wrapper aborting in `sync-pull-contract.sh` scenario 1 — traced to t2 fallout (see t10).
+- t9 (PR #173, merged 2026-06-07): dirty-count now includes muscle_groups in DIRTY_COUNTED_TABLES;
+  reconciled the sync-status-composer test. No deviation. (Reviewer verdict posted to the PR at the
+  user's request.) Noted stale "client-only" comments in seed-once.test.ts / account-switch-local-
+  wipe.test.ts → seeding/wipe-task (t5/t7) territory.
