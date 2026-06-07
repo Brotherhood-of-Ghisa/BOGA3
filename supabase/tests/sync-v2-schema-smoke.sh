@@ -6,16 +6,16 @@
 # migration in supabase/migrations/<ts>_sync_v2_clean_room.sql produced exactly
 # the shape docs/specs/tech/sync-v2-server-contract.md Part A prescribes:
 #
-#   - All eight v2 entity tables exist in app_public.
+#   - All nine v2 entity tables exist in app_public.
 #   - Every v1 sync server object name is absent from information_schema /
 #     pg_catalog.
 #   - RLS is enabled on every entity table and the four named policies are
 #     present.
 #   - Each entity carries the two universal triggers
 #     (<table>_touch_server_received_at, <table>_owner_user_id_immutable).
-#   - The eight cross-entity FKs are present with condeferrable=true,
+#   - The nine cross-entity FKs are present with condeferrable=true,
 #     condeferred=true, and the expected on-delete actions.
-#   - Zero CHECK constraints exist on any of the eight tables.
+#   - Zero CHECK constraints exist on any of the nine tables.
 #
 # Run via the wrapper at supabase/scripts/test-sync-v2-schema-smoke.sh
 # (which ensures the local runtime is up + baseline applied before this
@@ -90,12 +90,13 @@ pass() {
 }
 
 # -----------------------------------------------------------------------------
-# 1. All eight v2 entity tables exist in app_public.
+# 1. All nine v2 entity tables exist in app_public.
 # -----------------------------------------------------------------------------
 
 ENTITIES=(
   gyms
   exercise_definitions
+  muscle_groups
   exercise_tag_definitions
   sessions
   exercise_muscle_mappings
@@ -115,7 +116,7 @@ for entity in "${ENTITIES[@]}"; do
     fail "expected app_public.${entity} to exist (got count=${count})"
   fi
 done
-pass "all eight v2 entity tables present"
+pass "all nine v2 entity tables present"
 
 # -----------------------------------------------------------------------------
 # 2. Every v1 sync server object name is absent.
@@ -217,7 +218,7 @@ done
 pass "both universal triggers present on every entity table"
 
 # -----------------------------------------------------------------------------
-# 5. The eight deferrable composite FKs.
+# 5. The nine deferrable composite FKs.
 #
 # Map: <constraint_name>|<expected_confdeltype>
 #   confdeltype values: 'a' = no action, 'c' = cascade, 'n' = set null,
@@ -228,6 +229,7 @@ pass "both universal triggers present on every entity table"
 #   session_exercises_exercise_definition_fk         on delete no action  -> a
 #   exercise_sets_session_exercise_fk                on delete cascade    -> c
 #   exercise_muscle_mappings_exercise_definition_fk  on delete cascade    -> c
+#   exercise_muscle_mappings_muscle_group_fk         on delete cascade    -> c
 #   exercise_tag_definitions_exercise_definition_fk  on delete cascade    -> c
 #   session_exercise_tags_session_exercise_fk        on delete cascade    -> c
 #   session_exercise_tags_exercise_tag_definition_fk on delete cascade    -> c
@@ -239,6 +241,7 @@ FK_EXPECTATIONS=(
   "session_exercises|session_exercises_exercise_definition_fk|a"
   "exercise_sets|exercise_sets_session_exercise_fk|c"
   "exercise_muscle_mappings|exercise_muscle_mappings_exercise_definition_fk|c"
+  "exercise_muscle_mappings|exercise_muscle_mappings_muscle_group_fk|c"
   "exercise_tag_definitions|exercise_tag_definitions_exercise_definition_fk|c"
   "session_exercise_tags|session_exercise_tags_session_exercise_fk|c"
   "session_exercise_tags|session_exercise_tags_exercise_tag_definition_fk|c"
@@ -276,10 +279,10 @@ for spec in "${FK_EXPECTATIONS[@]}"; do
     fail "${fk_name}: expected confdeltype=${expected_delete}, got '${confdeltype}'"
   fi
 done
-pass "eight composite FKs present with condeferrable=t, condeferred=t, expected on-delete actions"
+pass "nine composite FKs present with condeferrable=t, condeferred=t, expected on-delete actions"
 
 # -----------------------------------------------------------------------------
-# 6. Zero CHECK constraints on any of the eight tables (docs/specs/tech/sync-v2-server-contract.md §A.1).
+# 6. Zero CHECK constraints on any of the nine tables (docs/specs/tech/sync-v2-server-contract.md §A.1).
 # -----------------------------------------------------------------------------
 
 for entity in "${ENTITIES[@]}"; do
@@ -296,6 +299,6 @@ for entity in "${ENTITIES[@]}"; do
     fail "app_public.${entity} has ${count} CHECK constraint(s); expected zero per docs/specs/tech/sync-v2-server-contract.md §A.1"
   fi
 done
-pass "no CHECK constraints on any of the eight v2 entity tables"
+pass "no CHECK constraints on any of the nine v2 entity tables"
 
 echo "[sync-v2-smoke] all assertions passed"

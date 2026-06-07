@@ -185,10 +185,11 @@ BASE_MS="$(($(date +%s) * 1000))"
 # Per-layer ID set. Non-topological ARRAY ORDER for the multi-layer batch:
 # we list layer-3 first, layer-2, layer-1, layer-0 last so the deferrable-FK
 # path is exercised inside one transaction (mirroring t3's contract test
-# scenario 2 + 10, but with all four topological layers and all eight types
+# scenario 2 + 10, but with all four topological layers and all nine types
 # in one call rather than just the four-row chain).
 GYM_ID="rt-${RUN_TAG}-gym"
 EDEF_ID="rt-${RUN_TAG}-edef"
+MG_ID="rt-${RUN_TAG}-mg"
 ETD_ID="rt-${RUN_TAG}-etd"
 SESS_ID="rt-${RUN_TAG}-sess"
 EMM_ID="rt-${RUN_TAG}-emm"
@@ -203,6 +204,7 @@ cleanup_rows() {
   service_delete "exercise_sets"            "owner_user_id=eq.${USER_A_UUID}&id=like.rt-${RUN_TAG}-%" >/dev/null
   service_delete "session_exercises"        "owner_user_id=eq.${USER_A_UUID}&id=like.rt-${RUN_TAG}-%" >/dev/null
   service_delete "exercise_muscle_mappings" "owner_user_id=eq.${USER_A_UUID}&id=like.rt-${RUN_TAG}-%" >/dev/null
+  service_delete "muscle_groups"            "owner_user_id=eq.${USER_A_UUID}&id=like.rt-${RUN_TAG}-%" >/dev/null
   service_delete "exercise_tag_definitions" "owner_user_id=eq.${USER_A_UUID}&id=like.rt-${RUN_TAG}-%" >/dev/null
   service_delete "sessions"                 "owner_user_id=eq.${USER_A_UUID}&id=like.rt-${RUN_TAG}-%" >/dev/null
   service_delete "exercise_definitions"     "owner_user_id=eq.${USER_A_UUID}&id=like.rt-${RUN_TAG}-%" >/dev/null
@@ -213,13 +215,13 @@ trap cleanup_rows EXIT
 
 # ---------------------------------------------------------------------------
 # Step 1 — multi-layer multi-row batch in NON-topological order. All four
-# layers, all eight entity types in a single push.
+# layers, all nine entity types in a single push.
 # ---------------------------------------------------------------------------
 echo "[sync-v2-push-roundtrip] step 1 — multi-layer batch in non-topological order"
 
 T1=$((BASE_MS + 100))
 BATCH_PAYLOAD="$(jq -nc \
-  --arg gym "${GYM_ID}" --arg edef "${EDEF_ID}" --arg etd "${ETD_ID}" \
+  --arg gym "${GYM_ID}" --arg edef "${EDEF_ID}" --arg mg "${MG_ID}" --arg etd "${ETD_ID}" \
   --arg sess "${SESS_ID}" --arg emm "${EMM_ID}" --arg sx "${SX_ID}" \
   --arg set "${SET_ID}" --arg sxtag "${SXTAG_ID}" \
   --argjson ts "${T1}" \
@@ -243,7 +245,7 @@ BATCH_PAYLOAD="$(jq -nc \
               completed_at: null, duration_sec: null,
               created_at: $ts, updated_at: $ts, deleted_at: null}},
     {type: "exercise_muscle_mappings", id: $emm, client_updated_at_ms: $ts,
-     fields: {exercise_definition_id: $edef, muscle_group_id: "pectorals",
+     fields: {exercise_definition_id: $edef, muscle_group_id: $mg,
               weight: 1.0, role: null,
               created_at: $ts, updated_at: $ts, deleted_at: null}},
     {type: "exercise_tag_definitions", id: $etd, client_updated_at_ms: $ts,
@@ -255,7 +257,11 @@ BATCH_PAYLOAD="$(jq -nc \
               coordinate_accuracy_m: null, coordinates_updated_at: null,
               created_at: $ts, updated_at: $ts, deleted_at: null}},
     {type: "exercise_definitions", id: $edef, client_updated_at_ms: $ts,
-     fields: {name: "Bench Press", created_at: $ts, updated_at: $ts, deleted_at: null}}
+     fields: {name: "Bench Press", created_at: $ts, updated_at: $ts, deleted_at: null}},
+    {type: "muscle_groups", id: $mg, client_updated_at_ms: $ts,
+     fields: {display_name: "Pectorals", family_name: "chest",
+              sort_order: 0, is_editable: 0,
+              created_at: $ts, updated_at: $ts, deleted_at: null}}
   ]}')"
 
 sync_push "${USER_A_TOKEN}" "${BATCH_PAYLOAD}"
@@ -265,6 +271,7 @@ assert_jq '.server_received_at | test("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2
 
 # Each row is queryable via service-role SELECT.
 for spec in "gyms|${GYM_ID}" "exercise_definitions|${EDEF_ID}" \
+            "muscle_groups|${MG_ID}" \
             "exercise_tag_definitions|${ETD_ID}" "sessions|${SESS_ID}" \
             "exercise_muscle_mappings|${EMM_ID}" "session_exercises|${SX_ID}" \
             "exercise_sets|${SET_ID}" "session_exercise_tags|${SXTAG_ID}"; do
@@ -281,7 +288,7 @@ echo "[sync-v2-push-roundtrip] step 1 ok — every row in every layer landed"
 echo "[sync-v2-push-roundtrip] step 2 — LWW newer wins"
 T2=$((BASE_MS + 200))
 NEWER_PAYLOAD="$(jq -nc \
-  --arg gym "${GYM_ID}" --arg edef "${EDEF_ID}" --arg etd "${ETD_ID}" \
+  --arg gym "${GYM_ID}" --arg edef "${EDEF_ID}" --arg mg "${MG_ID}" --arg etd "${ETD_ID}" \
   --arg sess "${SESS_ID}" --arg emm "${EMM_ID}" --arg sx "${SX_ID}" \
   --arg set "${SET_ID}" --arg sxtag "${SXTAG_ID}" \
   --argjson ts "${T2}" \
@@ -301,7 +308,7 @@ NEWER_PAYLOAD="$(jq -nc \
               completed_at: $ts, duration_sec: 3600,
               created_at: $ts, updated_at: $ts, deleted_at: null}},
     {type: "exercise_muscle_mappings", id: $emm, client_updated_at_ms: $ts,
-     fields: {exercise_definition_id: $edef, muscle_group_id: "pectorals",
+     fields: {exercise_definition_id: $edef, muscle_group_id: $mg,
               weight: 2.0, role: "primary",
               created_at: $ts, updated_at: $ts, deleted_at: null}},
     {type: "session_exercises", id: $sx, client_updated_at_ms: $ts,

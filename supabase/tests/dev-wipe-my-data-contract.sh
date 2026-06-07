@@ -82,10 +82,11 @@ RUN_TAG="$(date +%s)-$$-${RANDOM}"
 RUN_TAG="$(printf '%s' "${RUN_TAG}" | tr -c 'a-zA-Z0-9-' '-')"
 NOW_MS="$(($(date +%s) * 1000))"
 
-# IDs for user A's full eight-table FK chain (deleted by the helper) plus a
+# IDs for user A's full nine-table FK chain (deleted by the helper) plus a
 # single user B gym that must survive (owner-scoping check).
 A_GYM="dw-${RUN_TAG}-agym"
 A_EDEF="dw-${RUN_TAG}-aedef"
+A_MG="dw-${RUN_TAG}-amg"
 A_ETD="dw-${RUN_TAG}-aetd"
 A_SESS="dw-${RUN_TAG}-asess"
 A_EMM="dw-${RUN_TAG}-aemm"
@@ -100,6 +101,7 @@ cleanup_rows() {
     delete from app_public.exercise_sets            where id in ('${A_SET}');
     delete from app_public.session_exercises        where id in ('${A_SX}');
     delete from app_public.exercise_muscle_mappings where id in ('${A_EMM}');
+    delete from app_public.muscle_groups            where id in ('${A_MG}');
     delete from app_public.exercise_tag_definitions where id in ('${A_ETD}');
     delete from app_public.sessions                 where id in ('${A_SESS}');
     delete from app_public.exercise_definitions     where id in ('${A_EDEF}');
@@ -148,9 +150,9 @@ pass "scenario 2: unset app.env raises FORBIDDEN_ENV"
 # ---------------------------------------------------------------------------
 # Scenario 3: owner-scoped wipe under a non-production env.
 #
-# Seed user A's full eight-table FK chain plus one user B gym, then call the
+# Seed user A's full nine-table FK chain plus one user B gym, then call the
 # helper as user A with app.env='local'. Assert: the return count equals A's
-# eight rows, all of A's rows are gone, and B's gym survives.
+# nine rows, all of A's rows are gone, and B's gym survives.
 # ---------------------------------------------------------------------------
 echo "[dev-wipe] scenario 3: owner-scoped wipe deletes only the caller's rows"
 
@@ -158,7 +160,7 @@ echo "[dev-wipe] scenario 3: owner-scoped wipe deletes only the caller's rows"
 # earlier suites in the same gate run may have left rows owned by this fixture
 # user, and the helper (correctly) deletes ALL of the caller's rows. Removing
 # A's existing rows up front means the helper's count reflects exactly the
-# eight rows seeded below.
+# nine rows seeded below.
 run_psql_sql "
   begin;
     set constraints all deferred;
@@ -166,6 +168,7 @@ run_psql_sql "
     delete from app_public.exercise_sets            where owner_user_id = '${USER_A_UUID}'::uuid;
     delete from app_public.session_exercises        where owner_user_id = '${USER_A_UUID}'::uuid;
     delete from app_public.exercise_muscle_mappings where owner_user_id = '${USER_A_UUID}'::uuid;
+    delete from app_public.muscle_groups            where owner_user_id = '${USER_A_UUID}'::uuid;
     delete from app_public.exercise_tag_definitions where owner_user_id = '${USER_A_UUID}'::uuid;
     delete from app_public.sessions                 where owner_user_id = '${USER_A_UUID}'::uuid;
     delete from app_public.exercise_definitions     where owner_user_id = '${USER_A_UUID}'::uuid;
@@ -185,6 +188,12 @@ run_psql_sql "
       (owner_user_id, id, name, created_at, updated_at, client_updated_at_ms)
     values ('${USER_A_UUID}'::uuid, '${A_EDEF}', 'A Exercise', ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
 
+    insert into app_public.muscle_groups
+      (owner_user_id, id, display_name, family_name, sort_order, is_editable,
+       created_at, updated_at, client_updated_at_ms)
+    values ('${USER_A_UUID}'::uuid, '${A_MG}', 'A Pectorals', 'chest', 0, 0,
+            ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
+
     insert into app_public.exercise_tag_definitions
       (owner_user_id, id, exercise_definition_id, name, normalized_name,
        created_at, updated_at, client_updated_at_ms)
@@ -200,7 +209,7 @@ run_psql_sql "
     insert into app_public.exercise_muscle_mappings
       (owner_user_id, id, exercise_definition_id, muscle_group_id, weight,
        created_at, updated_at, client_updated_at_ms)
-    values ('${USER_A_UUID}'::uuid, '${A_EMM}', '${A_EDEF}', 'pectorals', 1.0,
+    values ('${USER_A_UUID}'::uuid, '${A_EMM}', '${A_EDEF}', '${A_MG}', 1.0,
             ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
 
     insert into app_public.session_exercises
@@ -239,15 +248,16 @@ deleted="$(run_psql_sql "
   commit;
 " | grep -E '^[0-9]+$' | head -n1)"
 
-if [[ "${deleted}" != "8" ]]; then
-  fail "scenario 3 expected 8 rows deleted, got '${deleted}'"
+if [[ "${deleted}" != "9" ]]; then
+  fail "scenario 3 expected 9 rows deleted, got '${deleted}'"
 fi
-pass "scenario 3: helper returned rows_deleted = 8"
+pass "scenario 3: helper returned rows_deleted = 9"
 
 remaining_a="$(run_psql "
   select
     (select count(*) from app_public.gyms                     where owner_user_id = '${USER_A_UUID}'::uuid and id = '${A_GYM}')
   + (select count(*) from app_public.exercise_definitions     where owner_user_id = '${USER_A_UUID}'::uuid and id = '${A_EDEF}')
+  + (select count(*) from app_public.muscle_groups            where owner_user_id = '${USER_A_UUID}'::uuid and id = '${A_MG}')
   + (select count(*) from app_public.exercise_tag_definitions where owner_user_id = '${USER_A_UUID}'::uuid and id = '${A_ETD}')
   + (select count(*) from app_public.sessions                 where owner_user_id = '${USER_A_UUID}'::uuid and id = '${A_SESS}')
   + (select count(*) from app_public.exercise_muscle_mappings where owner_user_id = '${USER_A_UUID}'::uuid and id = '${A_EMM}')

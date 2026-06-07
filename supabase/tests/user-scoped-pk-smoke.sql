@@ -42,6 +42,12 @@ begin
   insert into app_public.exercise_definitions (id, owner_user_id, name, created_at, updated_at)
   values (v_shared_id, v_user_b, 'Squat B', v_now, v_now);
 
+  -- muscle_groups: same shared id under two owners (parent of the mapping below).
+  insert into app_public.muscle_groups (id, owner_user_id, display_name, family_name, sort_order, is_editable, created_at, updated_at)
+  values (v_shared_id, v_user_a, 'Quadriceps A', 'legs', 0, 0, v_now, v_now);
+  insert into app_public.muscle_groups (id, owner_user_id, display_name, family_name, sort_order, is_editable, created_at, updated_at)
+  values (v_shared_id, v_user_b, 'Quadriceps B', 'legs', 0, 0, v_now, v_now);
+
   -- sessions: same shared id under two owners.
   insert into app_public.sessions (id, owner_user_id, status, started_at, created_at, updated_at)
   values (v_shared_id, v_user_a, 'draft', v_now, v_now, v_now);
@@ -66,8 +72,8 @@ begin
   insert into app_public.exercise_muscle_mappings (
     id, owner_user_id, exercise_definition_id, muscle_group_id, weight, role, created_at, updated_at
   ) values
-    (v_shared_id, v_user_a, v_shared_id, 'quadriceps', 1.0, 'primary', v_now, v_now),
-    (v_shared_id, v_user_b, v_shared_id, 'quadriceps', 1.0, 'primary', v_now, v_now);
+    (v_shared_id, v_user_a, v_shared_id, v_shared_id, 1.0, 'primary', v_now, v_now),
+    (v_shared_id, v_user_b, v_shared_id, v_shared_id, 1.0, 'primary', v_now, v_now);
 
   -- exercise_tag_definitions: same shared id under two owners.
   insert into app_public.exercise_tag_definitions (
@@ -125,6 +131,14 @@ begin
   end loop;
 
   for v_count in
+    select count(*) from app_public.muscle_groups where id = v_shared_id
+  loop
+    if v_count <> 2 then
+      raise exception 'muscle_groups: expected 2 rows for shared id, got %', v_count;
+    end if;
+  end loop;
+
+  for v_count in
     select count(*) from app_public.exercise_muscle_mappings where id = v_shared_id
   loop
     if v_count <> 2 then
@@ -148,7 +162,7 @@ begin
     end if;
   end loop;
 
-  raise notice 'T1 smoke: all eight sync tables accept shared id across two owners.';
+  raise notice 'T1 smoke: all nine sync tables accept shared id across two owners.';
 end
 $$;
 

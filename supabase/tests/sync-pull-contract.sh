@@ -225,6 +225,7 @@ cleanup_run_rows() {
     delete from app_public.exercise_sets where id like 'pull-${RUN_TAG}-%';
     delete from app_public.session_exercises where id like 'pull-${RUN_TAG}-%';
     delete from app_public.exercise_muscle_mappings where id like 'pull-${RUN_TAG}-%';
+    delete from app_public.muscle_groups where id like 'pull-${RUN_TAG}-%';
     delete from app_public.sessions where id like 'pull-${RUN_TAG}-%';
     delete from app_public.exercise_tag_definitions where id like 'pull-${RUN_TAG}-%';
     delete from app_public.exercise_definitions where id like 'pull-${RUN_TAG}-%';
@@ -340,11 +341,14 @@ cleanup_run_rows
 
 echo "[sync-pull-contract] scenario 3: layer→type mapping integrity"
 run_psql_sql "
-  -- Layer 0: gyms, exercise_definitions.
+  -- Layer 0: gyms, exercise_definitions, muscle_groups.
   insert into app_public.gyms (owner_user_id, id, name, created_at, updated_at, client_updated_at_ms)
     values ('${USER_A_UUID}'::uuid, 'pull-${RUN_TAG}-l0-gym', 'G', ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
   insert into app_public.exercise_definitions (owner_user_id, id, name, created_at, updated_at, client_updated_at_ms)
     values ('${USER_A_UUID}'::uuid, 'pull-${RUN_TAG}-l0-ed', 'ED', ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
+  -- Parent for the exercise_muscle_mappings row below (composite FK target).
+  insert into app_public.muscle_groups (owner_user_id, id, display_name, family_name, sort_order, is_editable, created_at, updated_at, client_updated_at_ms)
+    values ('${USER_A_UUID}'::uuid, 'pull-${RUN_TAG}-l0-mg', 'Pectorals', 'chest', 0, 0, ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
 
   -- Layer 1: sessions, exercise_muscle_mappings, exercise_tag_definitions.
   -- exercise_tag_definitions lives here (not Layer 0) per the corrected
@@ -354,7 +358,7 @@ run_psql_sql "
   insert into app_public.sessions (owner_user_id, id, gym_id, started_at, created_at, updated_at, client_updated_at_ms)
     values ('${USER_A_UUID}'::uuid, 'pull-${RUN_TAG}-l1-s', 'pull-${RUN_TAG}-l0-gym', ${NOW_MS}, ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
   insert into app_public.exercise_muscle_mappings (owner_user_id, id, exercise_definition_id, muscle_group_id, weight, created_at, updated_at, client_updated_at_ms)
-    values ('${USER_A_UUID}'::uuid, 'pull-${RUN_TAG}-l1-emm', 'pull-${RUN_TAG}-l0-ed', 'pectorals', 1.0, ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
+    values ('${USER_A_UUID}'::uuid, 'pull-${RUN_TAG}-l1-emm', 'pull-${RUN_TAG}-l0-ed', 'pull-${RUN_TAG}-l0-mg', 1.0, ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
   insert into app_public.exercise_tag_definitions (owner_user_id, id, exercise_definition_id, name, normalized_name, created_at, updated_at, client_updated_at_ms)
     values ('${USER_A_UUID}'::uuid, 'pull-${RUN_TAG}-l1-etd', 'pull-${RUN_TAG}-l0-ed', 'Tag', 'tag', ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
 
@@ -369,15 +373,15 @@ run_psql_sql "
     values ('${USER_A_UUID}'::uuid, 'pull-${RUN_TAG}-l3-st', 'pull-${RUN_TAG}-l2-sx', 'pull-${RUN_TAG}-l1-etd', ${NOW_MS}, ${NOW_MS});
 " >/dev/null
 
-# Layer 0 should yield exactly {gyms, exercise_definitions} per the corrected
-# partition in docs/specs/tech/sync-v2-server-contract.md §B.3.4.1:
-# exercise_tag_definitions FKs into exercise_definitions, so the §A.7.7
-# "no intra-layer FK" invariant forces it into Layer 1, not Layer 0.
+# Layer 0 should yield exactly {gyms, exercise_definitions, muscle_groups} per
+# the corrected partition in docs/specs/tech/sync-v2-server-contract.md
+# §B.3.4.1: exercise_tag_definitions FKs into exercise_definitions, so the
+# §A.7.7 "no intra-layer FK" invariant forces it into Layer 1, not Layer 0.
 sync_pull '{"layer":0,"cursor":null,"limit":200}'
 assert_status "200" "scenario 3 layer 0 status"
 L0_TYPES="$(printf '%s' "${REQUEST_BODY}" | jq -c '[.entities[] | select(.id | startswith("pull-'"${RUN_TAG}"'-")) | .type] | unique | sort')"
-[[ "${L0_TYPES}" == '["exercise_definitions","gyms"]' ]] \
-  || fail "scenario 3 layer 0: expected {gyms, exercise_definitions}, got ${L0_TYPES}"
+[[ "${L0_TYPES}" == '["exercise_definitions","gyms","muscle_groups"]' ]] \
+  || fail "scenario 3 layer 0: expected {gyms, exercise_definitions, muscle_groups}, got ${L0_TYPES}"
 
 sync_pull '{"layer":1,"cursor":null,"limit":200}'
 assert_status "200" "scenario 3 layer 1 status"
@@ -397,7 +401,7 @@ L3_TYPES="$(printf '%s' "${REQUEST_BODY}" | jq -c '[.entities[] | select(.id | s
 [[ "${L3_TYPES}" == '["exercise_sets","session_exercise_tags"]' ]] \
   || fail "scenario 3 layer 3: expected {exercise_sets, session_exercise_tags}, got ${L3_TYPES}"
 
-# Union equals all eight; pairwise disjoint (jq computes both at once).
+# Union equals all nine; pairwise disjoint (jq computes both at once).
 UNION_AND_DISJOINT="$(jq -nc \
   --argjson l0 "${L0_TYPES}" \
   --argjson l1 "${L1_TYPES}" \
@@ -409,16 +413,16 @@ UNION_AND_DISJOINT="$(jq -nc \
       total_count: ($all | length),
       unique_count: ($all | unique | length)
     }')"
-EXPECTED_UNION='["exercise_definitions","exercise_muscle_mappings","exercise_sets","exercise_tag_definitions","gyms","session_exercise_tags","session_exercises","sessions"]'
+EXPECTED_UNION='["exercise_definitions","exercise_muscle_mappings","exercise_sets","exercise_tag_definitions","gyms","muscle_groups","session_exercise_tags","session_exercises","sessions"]'
 ACTUAL_UNION="$(printf '%s' "${UNION_AND_DISJOINT}" | jq -c '.union_sorted')"
 TOTAL_COUNT="$(printf '%s' "${UNION_AND_DISJOINT}" | jq -r '.total_count')"
 UNIQUE_COUNT="$(printf '%s' "${UNION_AND_DISJOINT}" | jq -r '.unique_count')"
 [[ "${ACTUAL_UNION}" == "${EXPECTED_UNION}" ]] \
-  || fail "scenario 3 union: expected all eight, got ${ACTUAL_UNION}"
-[[ "${TOTAL_COUNT}" == "8" ]] \
-  || fail "scenario 3 total: expected 8 entity-type slots across layers, got ${TOTAL_COUNT}"
-[[ "${UNIQUE_COUNT}" == "8" ]] \
-  || fail "scenario 3 disjoint: expected 8 unique entity types (pairwise-disjoint), got ${UNIQUE_COUNT}"
+  || fail "scenario 3 union: expected all nine, got ${ACTUAL_UNION}"
+[[ "${TOTAL_COUNT}" == "9" ]] \
+  || fail "scenario 3 total: expected 9 entity-type slots across layers, got ${TOTAL_COUNT}"
+[[ "${UNIQUE_COUNT}" == "9" ]] \
+  || fail "scenario 3 disjoint: expected 9 unique entity types (pairwise-disjoint), got ${UNIQUE_COUNT}"
 
 pass "scenario 3: layer→type mapping integrity (corrected partition per plan.md ## Deviations log, t2 entry)"
 

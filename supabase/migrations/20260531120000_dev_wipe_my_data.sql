@@ -81,6 +81,12 @@ begin
   get diagnostics _deleted = row_count;
   _total := _total + _deleted;
 
+  -- muscle_groups after its child exercise_muscle_mappings (the mapping carries
+  -- the composite FK into this table).
+  delete from app_public.muscle_groups where owner_user_id = _uid;
+  get diagnostics _deleted = row_count;
+  _total := _total + _deleted;
+
   delete from app_public.exercise_tag_definitions where owner_user_id = _uid;
   get diagnostics _deleted = row_count;
   _total := _total + _deleted;
