@@ -205,7 +205,7 @@ Local sync contract suites (sync v2):
 ./supabase/scripts/test-sync-v2-e2e.sh
 ```
 
-These enforce the shared runtime baseline first (`ensure-local-runtime-baseline.sh`) and then run the sync-v2 contract suites. The v1 `test-sync-api-contract.sh` / `test-sync-events-ingest-contract.sh` wrappers were retired with the M13 projection RPCs.
+These enforce the shared runtime baseline first (`ensure-local-runtime-baseline.sh`) and then run the sync-v2 contract suites.
 
 Coverage includes success read/write flows, validation failures, unauthenticated denial, and cross-user denial across all sync-domain entities, including session metadata parity fields (`session_exercises.exercise_definition_id`, `exercise_sets.set_type`).
 

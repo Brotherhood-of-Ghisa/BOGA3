@@ -127,22 +127,6 @@ Metro and is owned operationally by
 `docs/specs/11-maestro-runtime-and-testing-conventions.md`. One-time setup:
 `maestro-ios-dev-client-build.sh` builds the dev-client `.app` (per worktree).
 
-## Retired / removed entry points (do not reintroduce)
-
-- **`test-sync-api-contract.sh`** and **`test-sync-events-ingest-contract.sh`**
-  (with their `supabase/tests/` suites): v1 suites targeting the M13/M14 projection
-  RPC family dropped by the `sync_v2_clean_room` migration. **Removed** (deleted
-  with the v1 backend); the sync-v2 contract suites replaced them. Do not
-  reintroduce.
-- **`npm run test:sync:reinstall-parity`**: **removed**. Its target file
-  (`app/__tests__/sync-reinstall-restore-parity.test.ts`) and
-  `jest.integration.config.js` were deleted with the v1 code paths; the npm script
-  no longer exists. Under sync v2 the reinstall guarantee is proven by
-  `app/__tests__/sync/cycle-round-trip.test.ts` (wiped-client re-pull via the
-  layered drain, in `test:sync:infra`) and by the backend
-  `sync-v2-push-roundtrip.sh` / `sync-v2-pull-drain.sh` suites (push→pull parity at
-  the RPC layer, in `test-sync-v2-e2e.sh`).
-
 ---
 
 # CI posture
@@ -246,7 +230,7 @@ Metro and is owned operationally by
     push → server-side LWW → pull → local LWW loop,
   - per-layer cursor protocol (snapshot pull, paginated drain, layer→type
     partition, tombstones, empty-page echo, same-ms tiebreak, limit/layer bounds),
-  - dirty-bit / outbox ordering and idempotency behavior,
+  - dirty-bit ordering and idempotency behavior (v2 has no outbox),
   - already-logged-in journey and logged-out-then-login journey both converging,
   - auth missing/expired (AUTH_REQUIRED): unauthenticated cycle is a clean no-op,
     no mutation, dirty bits preserved,
@@ -263,12 +247,15 @@ Metro and is owned operationally by
     dev-wipe + drift + e2e). The push→pull parity / reinstall guarantee is proven
     by `sync-v2-push-roundtrip.sh` and `sync-v2-pull-drain.sh` inside the e2e
     wrapper.
-- Current frontend baseline suites for this policy include
-  `apps/mobile/app/__tests__/sync-bootstrap-merge.test.ts`,
-  `sync-runtime-bootstrap.test.ts`, `sync-outbox-engine.test.ts`,
-  `sync-profile-status.test.ts`, `settings-profile-navigation.test.tsx`, and the
-  `app/__tests__/sync/**` directory (cycle, drift, auth-required-envelope,
-  dirty-bit, scheduler-state, topo-order, v1-deletions, manual-wipe-doc-exists).
+- Current frontend baseline suites for this policy (Sync v2) include the
+  `apps/mobile/app/__tests__/sync-cycle-*.test.ts` family
+  (`-convergence`, `-pull`, `-push`, `-race`, `-wire`),
+  `sync-bootstrapper.test.ts`, `sync-status-composer.test.ts`,
+  `sync-gate-decision.test.ts`, `settings-profile-navigation.test.tsx`, and the
+  `app/__tests__/sync/**` directory (cycle-round-trip, drift-check,
+  auth-required-envelope, dirty-bit-per-entity, scheduler-state-table,
+  topo-order-imported, now-monotonic-cross-restart,
+  manual-wipe-doc-exists).
 
 ## GPS gym-location coverage policy
 
