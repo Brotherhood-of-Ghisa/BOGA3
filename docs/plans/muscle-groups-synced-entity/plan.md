@@ -108,6 +108,8 @@ graph TD
   t4 --> t6[t6 build: drift checker + exemption]
   t4 --> t7[t7 build: tests + FK-on default + comment fixes]
   t4 --> t9[t9 build: dirty-count includes muscle_groups]
+  t6 --> t10[t10 build: contract-test hygiene + verify/fix pull-contract]
+  t10 --> t5
   t2 --> tFINAL
   t5 --> t8[t8 build: docs]
   t6 --> t8
@@ -117,6 +119,7 @@ graph TD
   t6 --> tFINAL
   t7 --> tFINAL
   t9 --> tFINAL
+  t10 --> tFINAL
 ```
 
 ## Tasks
@@ -130,6 +133,7 @@ graph TD
 - [t7: tests — FK-on harness default, coverage, comment fixes](tasks/t7.md) — build
 - [t8: docs — data-model + sync-v2 server contract](tasks/t8.md) — build
 - [t9: dirty-count — include muscle_groups in the Settings pending-push count](tasks/t9.md) — build (added at execute time, iteration 5)
+- [t10: remediate server-contract-test fallout — hygiene leaks + verify/fix pull-contract](tasks/t10.md) — build (added at execute time, iteration 7)
 - [tFINAL: verify plan outcomes](tasks/tFINAL.md) — build (final test card)
 
 ## Deviations log
@@ -146,3 +150,7 @@ graph TD
 - t3 (PR #169, merged 2026-06-07): client schema + single-baseline regen. No deviation. Journal
   stays length-1 (`m0000`, tag `0000_living_bucky`); `muscle-group-bootstrap-idempotent.test.ts`
   left untouched (its premise is rewritten by t5/t7; still green).
+- t4 (PR #171, merged 2026-06-07): sync registry — muscle_groups in Layer 0 + ENTITY_FIELDS/
+  ENTITY_TABLES. Minor in-scope deviation: updated `topo-order-imported.test.ts` (8→9 Layer 0 shape
+  guard) to keep the fast lane green. Surfaced a real downstream gap (`DIRTY_COUNTED_TABLES` in
+  `sync-status.ts` excludes muscle_groups) → folded into the plan as new task **t9** (user decision).

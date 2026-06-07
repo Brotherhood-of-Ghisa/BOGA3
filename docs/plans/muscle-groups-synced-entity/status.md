@@ -41,3 +41,21 @@
 - Dispatched: none yet (awaiting t4 merge + gap decision).
 - DECISION (user): fold the dirty-count gap into the plan as new task **t9** (DIRTY_COUNTED_TABLES + reconcile sync-status-composer test). Created `tasks/t9.md`; wired DAG `t4 → t9 → tFINAL`; added to task list; updated tFINAL inputs to t1-t9. t9 runs fast+handles only (no drift/backend), parallel-safe with t6. No new plan-level outcome added (outcomes 1-9 stay the locked contract); t9 carries its own test coverage. Builder's background chip for this is now superseded by t9 (can't auto-dismiss it — spawned in subagent context; user may dismiss the duplicate chip).
 - Next ready after t4 merges: t6 (drift; needs t2+t3+t4) + t9 (dirty-count; needs t4) — dispatch in parallel.
+
+## 2026-06-07 — iteration 6
+- Merged this iter: t4 (PR #171), human-merged. Also unrelated #172 (silly-carson) landed on main — incorporated via rebase. Coordinator sync model SWITCHED from `reset --hard` to commit-bookkeeping + `git rebase origin/main` (stops wiping tracked plan-dir edits; bookkeeping now persists in coordinator branch). HEAD @ 834fe39 (bookkeeping) on top of d59357d (#171). t4 hand-off verified: muscle_groups in TOPO_LAYERS Layer 0 + ENTITY_FIELDS + ENTITY_TABLES; sync-status.ts still excludes muscleGroups (t9 target).
+- Dispatched (parallel, disjoint files): t6 (builder) — drift checker drops muscleGroupId exemption + 9th entity, makes `check:sync-drift --strict` GREEN on main; t9 (builder) — DIRTY_COUNTED_TABLES + reconcile composer test.
+- Stuck: none.
+- Notes: t6 is the drift-coherence task — once it merges, main's drift lane goes green and t5 unblocks (t5 backend gate needs green drift). t9 runs fast+handles only (no drift), safe in parallel with red-drift main. Concurrency 2/4. Bookkeeping (plan.md/status.md) reconciled onto main before audit.
+
+## 2026-06-07 — iteration 7
+- Reviewed: t6 PR #174 → `Verdict: APPROVED` (reviewer a0269c7); t9 PR #173 → `Verdict: APPROVED` (reviewer a4a62eb). Both reported to coordinator only (no PR posts). Both OPEN + MERGEABLE. Awaiting human merge.
+- Bonus: unrelated #172 ("fix sync-status-panel waitFor race flake") already fixed the flake I'd filed as task_7f180da5; that background task was already started by the user (will likely no-op). 
+- INVESTIGATION — t2 fallout (the `quality-slow.sh backend` wrapper failure t6 flagged):
+  - Git evidence: only commit touching `supabase/` or catalog seeds since pre-plan baseline 5afbc97 is `8cf5d04` (t2). So the failure is NOT pre-existing-before-the-plan; it's t2 fallout OR a polluted-DB artifact in t6's worktree (t6 noted an orphaned Supabase stack on its slot).
+  - `sync-pull-contract.sh` scenario 1 (line 254) seeds 3 Layer-0 rows, pulls {layer0,limit10}, asserts has_more=false. "got true" ⇒ >10 Layer-0 rows for the user ⇒ real regression OR non-hermetic DB pollution. Needs a CLEAN-RESET reproduction to settle.
+  - DURABLE-HYGIENE LEAKS from t2 (definite, audit-blocking): `sync-pull-contract.sh:427`, `sync-v2-pull-fk-closure.sh:23` + `:275`, `sync-v2-clean-room.sh:7` reference plan.md/Deviations/t1/t2. (t2 reviewer missed these.)
+- DECISION: created remediation task **t10** (hygiene leaks + clean-reset verify/fix of pull-contract scenario 1). Wired DAG `t6 → t10 → t5`, `t10 → tFINAL`; added to tasks list; tFINAL inputs → t1-t10. t10 gated on t6 (so it branches off green-drift main and the only backend question is the pull-contract). 
+- Dispatched: none yet (awaiting t6+t9 merge; then dispatch t10).
+- Revised build order: (t6 ∥ t9) → t10 → t5 → t7 → t8 → tFINAL.
+- Per user request: dispatched a fresh reviewer for t9 that POSTED its verdict to PR #173 (`Verdict: APPROVED`, COMMENTED review, reviewer a6c2b14). Posting reviewer verdicts to the PR is now USER-DIRECTED-OK (overrides the earlier conservative report-only default for verdicts the user asks to be posted). No security warning fired. t6 #174 review remains report-to-me only (user didn't ask to post that one).
