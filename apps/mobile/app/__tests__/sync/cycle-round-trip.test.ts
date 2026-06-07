@@ -400,17 +400,25 @@ describe('sync cycle round-trip against a live endpoint', () => {
     expect(readCursorMap()).toEqual(cursorAfterDrain);
   }, 45_000);
 
-  it('an edit injected mid-push keeps that row dirty (push-in-flight race)', async () => {
+  it('re-pushes a row edited in every in-flight window, then converges losing nothing (push-in-flight race)', async () => {
     seedDirtyChain();
 
-    // Before EVERY push request, bump the gym row's monotonic timestamp after
-    // the batch was serialised but before the ack lands. The cycle's ack
-    // handler clears the dirty bit only when the row's current timestamp still
-    // equals the one it sent; because the row moves on every in-flight window,
-    // its ack never matches and it must end the cycle still dirty, carrying the
-    // latest in-flight value (nothing is silently clobbered).
+    // Before each push request (until the bound), bump the gym row's monotonic
+    // timestamp after the batch was serialised but before the ack lands. The
+    // cycle's ack handler clears the dirty bit only when the row's current
+    // timestamp still equals the one it sent; while the row keeps moving, its ack
+    // never matches, so it stays dirty and re-pushes the newer value next round.
+    // The cycle has no round cap, so the edits MUST be bounded or the row never
+    // settles and the cycle never converges. Once the edits stop, the next push
+    // captures a stable timestamp, its ack matches, and the gym converges clean
+    // carrying the LATEST in-flight value — proving no edit was silently
+    // clobbered across the race.
+    const RACE_EDITS = 3;
     let edits = 0;
     beforePushHook = () => {
+      if (edits >= RACE_EDITS) {
+        return;
+      }
       edits += 1;
       (database as unknown as { transaction: (fn: (tx: Transaction) => void) => void }).transaction(
         (tx) => {
@@ -424,12 +432,13 @@ describe('sync cycle round-trip against a live endpoint', () => {
 
     await runSyncCycle();
 
-    // The gym carries the latest in-flight edit and stays dirty for a later
-    // round; the other three rows, never touched mid-flight, converged clean.
+    // The gym raced across every bounded in-flight window (the ack skipped it each
+    // time), then settled clean once the edits stopped, carrying the last in-flight
+    // value. The other three rows, never touched mid-flight, converged clean too.
     const gym = database.select().from(gyms).where(eq(gyms.id, ids.gym)).get();
-    expect(edits).toBeGreaterThan(0);
-    expect(gym?.name).toBe(`Edited In Flight ${edits}`);
-    expect(gym?.localDirty).toBe(true);
+    expect(edits).toBe(RACE_EDITS);
+    expect(gym?.name).toBe(`Edited In Flight ${RACE_EDITS}`);
+    expect(gym?.localDirty).toBe(false);
 
     const others = [
       database.select().from(sessions).where(eq(sessions.id, ids.session)).get(),

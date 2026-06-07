@@ -37,13 +37,6 @@ import { TOPO_LAYERS, type EntityTableName } from '@/src/sync/topo-order';
 /** Maximum rows in a single push batch and a single pull page. */
 export const BATCH_CAP = 200;
 
-/**
- * Hard ceiling on PULL -> PUSH -> PULL rounds per cycle call. Convergence
- * normally settles in one or two rounds; this guard stops a pathological spin
- * if two devices' clock skew causes LWW to thrash back and forth.
- */
-export const MAX_CYCLES_PER_CALL = 5;
-
 const SYNC_PUSH_RPC = 'sync_push';
 const SYNC_PULL_RPC = 'sync_pull';
 
@@ -386,11 +379,21 @@ export const selectPushBatch = (tx: Transaction, batchCap: number): WireEntity[]
 // -----------------------------------------------------------------------------
 
 /**
- * Applies one pull page's worth of entities under per-row last-write-wins. For
- * each incoming row: insert it if absent; overwrite every typed column if the
- * incoming monotonic timestamp is strictly newer than the local one; otherwise
- * no-op (the local edit is newer and stays dirty). Applied rows are stamped not
- * dirty with the incoming timestamp.
+ * Applies one pull page's worth of entities under per-row last-write-wins and
+ * returns how many rows it actually wrote. For each incoming row: insert it if
+ * absent; overwrite every typed column if the incoming monotonic timestamp is
+ * strictly newer than the local one; otherwise no-op (the local edit is newer
+ * and stays dirty). Applied rows are stamped not dirty with the incoming
+ * timestamp.
+ *
+ * The return value counts ONLY rows whose local state changed (insert or
+ * incoming-wins); no-op LWW rows are excluded. This is what lets the convergence
+ * loop tell a quiet round from a benign re-pull of rows the device already
+ * holds: counting "rows the server returned" would treat a no-op echo (a row
+ * the server hands back unchanged, e.g. this device's own just-pushed row, or a
+ * row a second device re-stamped to an equal-or-older value) as motion and spin
+ * an extra, pointless round. Counting rows actually written makes "nothing
+ * changed locally" the exact convergence signal.
  *
  * Runs inside the caller's transaction so the whole page either lands or rolls
  * back together; a per-row insert failure (e.g. an FK violation) aborts the
@@ -400,8 +403,9 @@ export const applyPullPage = (
   tx: Transaction,
   entities: WireEntity[],
   type: EntityTableName,
-): void => {
+): number => {
   const table = ENTITY_TABLES[type] as typeof schema.gyms;
+  let changed = 0;
 
   for (const envelope of entities) {
     const existing = tx
@@ -414,14 +418,18 @@ export const applyPullPage = (
 
     if (!existing) {
       tx.insert(table).values(values as never).run();
+      changed += 1;
       continue;
     }
 
     if (envelope.client_updated_at_ms > existing.localUpdatedAtMs) {
       tx.update(table).set(values as never).where(eq(table.id, envelope.id)).run();
+      changed += 1;
     }
     // Otherwise the local row is newer-or-equal: leave it untouched and dirty.
   }
+
+  return changed;
 };
 
 // -----------------------------------------------------------------------------
@@ -526,17 +534,38 @@ export interface PullProgressReporter {
 }
 
 /**
+ * The two counts a pull leg produces. They differ deliberately and must not be
+ * collapsed into one:
+ *
+ *  - `received`: rows the server returned across the leg (every `entities`
+ *    envelope, no-op LWW rows included). This is what the first-sign-in seed
+ *    decision keys off — "did the server hold ANYTHING for this user" — so a
+ *    resumed bootstrap that re-pulls already-local rows (cursor reset, every row
+ *    a no-op) still sees a non-empty pull and does NOT re-seed over the server's
+ *    data. See `bootstrapper.ts`.
+ *  - `changed`: rows `applyPullPage` actually wrote (insert or incoming-wins).
+ *    This is the convergence-quietness signal: a round is quiet only when both
+ *    pull legs changed nothing locally. Using `received` here would count a
+ *    benign no-op echo as motion and spin a pointless extra round.
+ */
+export interface PullLegResult {
+  received: number;
+  changed: number;
+}
+
+/**
  * Drains every topological layer once, applying each page and advancing that
- * layer's cursor after the page commits. Returns the number of entities applied
- * across all layers so the cycle can tell whether the pull leg was quiet. When a
+ * layer's cursor after the page commits. Returns both the rows received and the
+ * rows actually changed across all layers (see {@link PullLegResult}). When a
  * reporter is passed, emits a page event per applied page and a layer event per
  * drained layer so a first-sync caller can surface advancing progress.
  */
 const runPullLeg = async (
   database: LocalDatabase,
   reporter?: PullProgressReporter,
-): Promise<number> => {
-  let appliedTotal = 0;
+): Promise<PullLegResult> => {
+  let receivedTotal = 0;
+  let changedTotal = 0;
 
   for (let layer = 0; layer < TOPO_LAYERS.length; layer += 1) {
     const layerTypes = TOPO_LAYERS[layer] as readonly EntityTableName[];
@@ -548,19 +577,26 @@ const runPullLeg = async (
       const page = await callSyncPull(layer, cursor);
 
       // Apply the page and advance the cursor in one transaction: the cursor
-      // only moves past rows that actually committed locally.
-      database.transaction((tx) => {
+      // only moves past rows that actually committed locally. The transaction
+      // returns the count of rows actually written so a no-op page does not
+      // count toward convergence motion.
+      const pageChanged = database.transaction((tx) => {
         const transaction = tx as Transaction;
+        let changed = 0;
         for (const type of layerTypes) {
           const forType = page.entities.filter((entity) => entity.type === type);
           if (forType.length > 0) {
-            applyPullPage(transaction, forType, type);
+            changed += applyPullPage(transaction, forType, type);
           }
         }
         writeCursorEntry(transaction, layer, page.next_cursor);
+        return changed;
       });
 
-      appliedTotal += page.entities.length;
+      receivedTotal += page.entities.length;
+      changedTotal += pageChanged;
+      // Progress reflects rows the server delivered (received), matching what a
+      // first-sync watcher expects to see advance as the snapshot streams in.
       reporter?.onPage?.(page.entities.length);
 
       if (!page.has_more) {
@@ -571,19 +607,21 @@ const runPullLeg = async (
     reporter?.onLayerDrained?.(layer + 1);
   }
 
-  return appliedTotal;
+  return { received: receivedTotal, changed: changedTotal };
 };
 
 /**
  * Drains all four topological layers once, reporting per-page and per-layer
  * progress. This is the first full pull the bootstrapper runs before deciding
- * whether to seed: its return value is the total rows applied across every layer
- * (tombstones included, since a tombstone is a normal applied row).
+ * whether to seed: its return value is the total rows RECEIVED across every
+ * layer (tombstones included, since a tombstone is a normal returned row). The
+ * seed decision must use received — not rows-changed — so a resumed bootstrap
+ * that re-pulls already-local rows (all no-ops) does not look empty and re-seed.
  */
-export const runFirstFullPull = (
+export const runFirstFullPull = async (
   database: LocalDatabase,
   reporter?: PullProgressReporter,
-): Promise<number> => runPullLeg(database, reporter);
+): Promise<number> => (await runPullLeg(database, reporter)).received;
 
 /** Stable map key for a row's identity across the in-flight push window. */
 const rowKey = (type: EntityTableName, id: string): string => `${type} ${id}`;
@@ -681,9 +719,9 @@ const runPushLeg = async (database: LocalDatabase): Promise<number> => {
  * cycle (the first-sync gate and the scheduler/`sync-status`) derive their view
  * from the same value and can never disagree:
  *
- *  - 'converged': the cycle reached a quiet round (or the round cap) talking to
- *    the server with a valid session. This is the only outcome that counts as
- *    real progress for the scheduler's last-success time.
+ *  - 'converged': the cycle reached a quiet round talking to the server with a
+ *    valid session. This is the only outcome that counts as real progress for
+ *    the scheduler's last-success time.
  *  - 'auth-required': the server reported no signed-in user. A route signal, not
  *    an in-gate error: the gate sends the user to sign-in and shows no Retry.
  *  - 'fk-violation': a structural FK mismatch the cycle could not push past. Not
@@ -697,8 +735,14 @@ export type SyncCycleOutcome = 'converged' | 'auth-required' | 'fk-violation' | 
 
 /**
  * Runs one convergence cycle: pull every layer, push the dirty stream, then
- * pull again, repeating until a full round moves nothing in either direction
- * (or the round guard trips).
+ * pull again, repeating until a full round changes nothing locally in either
+ * direction. There is no round cap: the loop is bounded by convergence itself
+ * (and, per leg, by each RPC's own request timeout), so it keeps draining as
+ * long as there is real work — a second device's live edit stream is followed,
+ * not truncated, and a locally re-edited row keeps re-pushing its latest value.
+ * The exit test counts rows ACTUALLY changed, not rows the server returned, so a
+ * benign no-op re-pull (an echo of an already-local row) reads as quiet instead
+ * of forcing a wasted extra round.
  *
  * It never throws: every outcome — convergence, the recoverable no-JWT /
  * server-internal envelopes, a structural FK violation, AND any unexpected throw
@@ -728,19 +772,21 @@ export const runSyncCycle = async (): Promise<SyncCycleOutcome> => {
     // (no pending migration) only advances the marker.
     runBundleMigrations(database);
 
-    for (let round = 0; round < MAX_CYCLES_PER_CALL; round += 1) {
+    // Convergence-or-bust: PULL -> PUSH -> PULL until a full round changes
+    // nothing locally on either end. No round cap — the loop's only exits are a
+    // quiet round (below) or a throw caught at the bottom. A quiet round means
+    // both pull legs WROTE nothing (not merely "the server returned nothing" —
+    // a no-op echo of an already-local row is not motion) and the push leg sent
+    // nothing. Anything else is real work the next round must follow.
+    for (;;) {
       const pulledBefore = await runPullLeg(database);
       const pushed = await runPushLeg(database);
       const pulledAfter = await runPullLeg(database);
 
-      // A round that moved no rows on either end means both sides are quiet.
-      if (pulledBefore === 0 && pushed === 0 && pulledAfter === 0) {
+      if (pulledBefore.changed === 0 && pushed === 0 && pulledAfter.changed === 0) {
         return markConverged();
       }
     }
-    // Reaching the round cap without a quiet round still means the cycle made
-    // authenticated progress; treat it as a converged, resolved auth condition.
-    return markConverged();
   } catch (error) {
     return classifyThrow(error);
   }
