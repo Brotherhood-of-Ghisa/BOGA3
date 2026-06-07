@@ -1,5 +1,10 @@
 # Local test-lane timings (measured reference)
 
+**Last updated: 2026-06-07.** These timings drift as the suites, toolchain, and
+hardware change — treat them as a guide and re-measure if a figure looks off (the
+measurement date and method are under *How to read these numbers*). Bump this date
+whenever you revise the table or re-measure.
+
 > **Why this file exists.** Agents working on Sync (and elsewhere) have a habit of
 > *inventing* test durations ("this lane takes ~10 minutes") instead of measuring
 > them. This document records **real, measured** wall-clock times for every
@@ -65,7 +70,6 @@ the headline. `≤ ceiling` = 3× median = "above this, something is wrong".
 | jest (full unit/integration) | `npm test` | 4.6 s | 4.4–9.7 s | 13.7 s | ✅ pass |
 | jest (sync subset) | `npm run test:sync` | 3.6 s | 3.5–3.6 s | 10.7 s | ✅ pass |
 | open-handle guard | `npm run test:handles` | 19.9 s | 19.5–32.6 s | 59.7 s | ✅ pass |
-| reinstall-parity | `npm run test:sync:reinstall-parity` | — | — | — | ❌ **broken** (see Notes) |
 
 ### Backend — Supabase (commands run from repo root; each re-ensures the warm local stack)
 
@@ -119,14 +123,6 @@ the headline. `≤ ceiling` = 3× median = "above this, something is wrong".
   shell/session can sit near the listed **max**; that is expected and still well
   under the 3× ceiling.
 
-- **`test:sync:reinstall-parity` is currently BROKEN (not a timing).** It spends
-  ~3.5 s ensuring the local Supabase baseline, then `jest --config
-  jest.integration.config.js` exits 1 with **"No tests found"**: the config's
-  `testMatch` points at `app/__tests__/sync-reinstall-restore-parity.test.ts`,
-  which was deleted in commit `73b9661` ("[t1] delete v1 sync code paths"). The
-  npm script, the wrapper, and `jest.integration.config.js` were left dangling.
-  The ~3.5 s is pure setup, not test execution. *(A fix-it card was spawned.)*
-
 - **`test:e2e:ios:auth-profile` is currently RED (≈283 s to fail).** The lane runs
   four flows; it aborts at the 2nd (`sync-gate-first-cycle.yaml`) on
   `assertVisible: sync-gate-activity-indicator`. On the simulator the first-sync
@@ -148,12 +144,6 @@ the headline. `≤ ceiling` = 3× median = "above this, something is wrong".
   simulator / Metro), so it should be one of the cheaper slow-side lanes — measure
   and record its local timing here. Its schema-drift half is also covered by the
   `sync-drift` backend lane above.
-
-- **Excluded as retired:** `./supabase/scripts/test-sync-api-contract.sh` and
-  `./supabase/scripts/test-sync-events-ingest-contract.sh` target the M13/M14
-  projection RPC family dropped by the `sync_v2_clean_room` migration; they are no
-  longer wired into any gate (`quality-slow.sh` replaced them with the sync-v2
-  suites) and would fail if run. Not part of the current matrix.
 
 - **`lint`/`typecheck` are gates, not tests** — included for completeness because
   they are part of `./scripts/quality-fast.sh frontend` and agents quote them too.
@@ -178,7 +168,6 @@ All three runs per lane (ms), exactly as recorded.
 | jest-full | 9739 | 4558 | 4417 | 0/0/0 |
 | jest-sync | 3558 | 3555 | 3517 | 0/0/0 |
 | handles | 32554 | 19889 | 19506 | 0/0/0 |
-| reinstall-parity | 4182 | 3557 | 3574 | 1/1/1 (no tests found) |
 | backend-fast | 31058 | 38475 | 38579 | 0/0/0 |
 | auth-authz | 4090 | 3538 | 3528 | 0/0/0 |
 | sync-v2-schema | 5621 | 5167 | 5150 | 0/0/0 |
