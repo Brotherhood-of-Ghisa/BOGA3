@@ -22,6 +22,27 @@ for the slow lanes). (`npm run …` scripts live only in `apps/mobile/package.js
 there is no root `package.json` — but invoke the gates above, not the raw scripts.)
 New-worktree setup, prerequisites, and teardown: `01-worktree-and-environment.md`.
 
+## This dev environment runs EVERY gate — "not in CI" ≠ "can't run here"
+
+This machine can run **every** local gate, including the slow ones: the iOS
+Maestro lanes (booted simulator + Metro + dev client) and the local Supabase
+backend lanes (Docker). **"Not in CI" means you must run it locally — not that it
+cannot be run.** Never defer a gate by claiming the simulator or Supabase is
+"unavailable" in your environment: that is a recurring false assumption. Verify
+capability with the command, don't assume absence:
+
+```bash
+xcrun simctl list devices available   # bootable iOS sims (e.g. iPhone 17 Pro) → Maestro lanes runnable
+maestro --version                     # Maestro CLI present → quality-slow.sh frontend runnable
+xcodebuild -version                   # Xcode present → dev-client build / sim runnable
+docker info                           # Docker up → local Supabase → quality-slow.sh backend runnable
+```
+
+The **only** thing that genuinely "can't run" the iOS/Supabase slow gates is
+**CI's** Linux runner (no iOS simulator) — a CI-runner fact, **not** a
+this-machine fact. CI-can't ≠ this-machine-can't. If a check above fails, fix the
+tool and run the gate; do not skip it.
+
 ## The test-lane map (read this once)
 
 **One idea explains the whole gate structure: a lane's *infrastructure

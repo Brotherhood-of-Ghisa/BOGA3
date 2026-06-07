@@ -13,7 +13,9 @@ the tech choices, and where does code live?
 - `docs/specs/01-worktree-and-environment.md` — set up / tear down a worktree
   environment (the slot model in one line; deep contract is `12`).
 - `docs/specs/02-quality-and-test-gates.md` — quality/test gates, what's
-  mandatory, and how to run each lane.
+  mandatory, and how to run each lane. **This machine runs every lane — incl. the
+  iOS Maestro and local-Supabase slow gates. "Not in CI" means run it locally,
+  never "can't run"; verify capability with the commands there before deferring.**
 - `docs/specs/03-technical-architecture.md` — high-level technical choices and the
   decision register.
 - `docs/specs/09-project-structure.md` — repo layout, path ownership, placement
