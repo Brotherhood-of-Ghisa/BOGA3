@@ -158,8 +158,8 @@ cleanup_supabase() {
   local container_id volume_name network_id
 
   if ! docker_available; then
-    echo "[worktree-clean] docker is unavailable; skipping Supabase cleanup for slot $SLOT" >&2
-    return 0
+    echo "[worktree-clean] docker is unavailable; cannot clean Supabase for slot $SLOT" >&2
+    return 1
   fi
 
   for project_id in "${PROJECT_IDS[@]}"; do
@@ -200,11 +200,24 @@ cleanup_supabase() {
 
 acquire_lock
 
+SUPABASE_CLEANED=1
 if [[ "$SUPABASE" == "1" ]]; then
-  cleanup_supabase
+  if ! cleanup_supabase; then
+    SUPABASE_CLEANED=0
+  fi
 fi
 
 if [[ "$REMOVE_REGISTRY" == "1" ]]; then
+  # Fail loud: never delete the slot registry when the Supabase cleanup it was
+  # paired with could not run. The registry is the only pointer back to the
+  # stack's project id; dropping it while the containers/volumes survive is
+  # exactly how an unreclaimable orphan is born (no registry -> the sweep's
+  # registry scan can never see it again). Leave the registry so a later run —
+  # once Docker is back — can still find and clean the stack.
+  if [[ "$SUPABASE" == "1" && "$SUPABASE_CLEANED" != "1" ]]; then
+    echo "[worktree-clean] refusing to remove slot registry $REGISTRY_FILE: Supabase cleanup did not complete (would orphan the stack). Re-run once Docker is available." >&2
+    exit 1
+  fi
   if [[ -f "$REGISTRY_FILE" ]]; then
     if [[ "$DRY_RUN" == "1" ]]; then
       run_or_print rm -f "$REGISTRY_FILE"

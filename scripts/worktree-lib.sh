@@ -299,10 +299,11 @@ boga_pid_is_alive() {
 # Print the PID embedded in the lock reason of the worktree registered at
 # target_abs, by scanning `git worktree list --porcelain` for repo_root's
 # worktree group. Agent worktrees are locked with a reason shaped like
-# `claude agent <name> (pid <N>)`; this extracts <N>. Returns non-zero when the
-# path is not a locked worktree in this group, or its lock reason carries no
-# `(pid <N>)` marker (e.g. a manual lock) — callers must treat that as
-# "unknown owner, do not reap".
+# `claude agent <name> (pid <N> start <date>)` (older harness versions omit the
+# ` start <date>` suffix and emit `(pid <N>)`); this extracts <N> from either.
+# Returns non-zero when the path is not a locked worktree in this group, or its
+# lock reason carries no `(pid <N>` marker (e.g. a manual lock) — callers must
+# treat that as "unknown owner, do not reap".
 boga_worktree_lock_pid() {
   local repo_root="$1"
   local target_abs="$2"
@@ -321,7 +322,7 @@ boga_worktree_lock_pid() {
       locked*)
         if [[ -n "$current_abs" \
           && "$current_abs" == "$target_abs" \
-          && "$line" =~ \(pid\ ([0-9]+)\) ]]; then
+          && "$line" =~ \(pid\ ([0-9]+) ]]; then
           printf '%s\n' "${BASH_REMATCH[1]}"
           return 0
         fi
