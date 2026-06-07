@@ -135,9 +135,9 @@ describe('cycle convergence', () => {
     // bootstrapper before its convergence loop. The bootstrapper's first full
     // pull absorbs layer-0 pull #1 (the one carrying the server row), so the
     // convergence loop opens with everything already local: one quiet round of a
-    // before-pull (#2) and an after-pull (#3) confirms convergence. Layer-0 pull
-    // count is therefore 3 (1 bootstrap + 2 convergence), and the guard cap (5
-    // rounds) was never hit.
+    // before-pull (#2) and an after-pull (#3) confirms convergence and the loop
+    // exits on that first quiet round. Layer-0 pull count is therefore 3 (1
+    // bootstrap + 2 convergence).
     expect(layer0Pulls).toBe(3);
   });
 
@@ -158,6 +158,93 @@ describe('cycle convergence', () => {
     expect(pushedBatches.length).toBeGreaterThanOrEqual(1);
     const row = database.select().from(gyms).where(eq(gyms.id, 'gym-local')).get();
     expect(row?.localDirty).toBe(false);
+  });
+});
+
+describe('convergence loop quietness and the absent round cap', () => {
+  it('treats a no-op re-pull as quiet and converges without a wasted round', async () => {
+    // The server hands the SAME already-applied gym back on the first
+    // convergence pull (a benign echo the device already holds at an equal
+    // timestamp). Quietness now counts rows actually CHANGED, not rows the server
+    // returned, so that no-op reads as quiet and the loop exits on the first
+    // round. The old "count rows received" heuristic would have read the no-op as
+    // motion and spun a second, pointless round.
+    let layer0Pulls = 0;
+    mockRpc.mockImplementation(async (name: string, args: { layer?: number }) => {
+      if (name === 'sync_pull') {
+        if (args.layer === 0) {
+          layer0Pulls += 1;
+          // Same gym on the first two layer-0 pulls (bootstrap full-pull #1, then
+          // convergence before-pull #2); empty thereafter. The second delivery is
+          // a no-op because the row is already local at the same timestamp.
+          if (layer0Pulls <= 2) {
+            return {
+              data: {
+                entities: [gymEntity('gym-echo', 100)],
+                next_cursor: { server_received_at: '2026-05-29T10:00:00.000Z', owner_user_id: 'u', type: 'gyms', id: 'gym-echo' },
+                has_more: false,
+              },
+              error: null,
+            };
+          }
+        }
+        return { data: emptyPage, error: null };
+      }
+      return pushOk;
+    });
+
+    await expect(runSyncCycle()).resolves.toBe('converged');
+
+    const row = database.select().from(gyms).where(eq(gyms.id, 'gym-echo')).get();
+    expect(row?.localDirty).toBe(false);
+
+    // 3 layer-0 pulls: bootstrap #1 (applies the gym), convergence before-pull #2
+    // (re-delivers it as a no-op → 0 changed → quiet), after-pull #3 (empty). The
+    // received-counting heuristic would have read pull #2 as motion and run a
+    // second round (5 layer-0 pulls).
+    expect(layer0Pulls).toBe(3);
+  });
+
+  it('drains a long fresh stream and converges without a round cap truncating it', async () => {
+    // The server hands back a fresh, distinct, strictly-newer row on each of the
+    // first STREAM_LEN layer-0 pulls, then goes empty. Every such pull CHANGES a
+    // row (a new insert), so no round is quiet until the stream stops. The old
+    // 5-round cap bounded the loop to ~10 layer-0 convergence pulls and would have
+    // force-returned 'converged' partway through, stranding the tail; with no cap
+    // the loop follows the whole stream.
+    const STREAM_LEN = 12;
+    let layer0Pulls = 0;
+    mockRpc.mockImplementation(async (name: string, args: { layer?: number }) => {
+      if (name === 'sync_pull') {
+        if (args.layer === 0) {
+          layer0Pulls += 1;
+          if (layer0Pulls <= STREAM_LEN) {
+            const n = layer0Pulls;
+            return {
+              data: {
+                entities: [gymEntity(`gym-churn-${n}`, 100 + n)],
+                next_cursor: { server_received_at: `2026-05-29T10:00:${String(n).padStart(2, '0')}.000Z`, owner_user_id: 'u', type: 'gyms', id: `gym-churn-${n}` },
+                has_more: false,
+              },
+              error: null,
+            };
+          }
+        }
+        return { data: emptyPage, error: null };
+      }
+      return pushOk;
+    });
+
+    await expect(runSyncCycle()).resolves.toBe('converged');
+
+    // Every streamed row landed locally — the loop followed the full stream past
+    // where the old 5-round cap would have stopped (it would have left only the
+    // first 11). The bootstrapper did not seed (the first pull returned a row).
+    const allGyms = database.select().from(gyms).all();
+    expect(allGyms).toHaveLength(STREAM_LEN);
+    expect(
+      database.select().from(gyms).where(eq(gyms.id, `gym-churn-${STREAM_LEN}`)).get(),
+    ).toBeDefined();
   });
 });
 

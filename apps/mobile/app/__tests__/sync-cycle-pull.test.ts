@@ -50,9 +50,11 @@ describe('applyPullPage last-write-wins', () => {
   });
 
   it('inserts a row that is absent locally and lands it clean', () => {
-    database.transaction((tx) => {
-      applyPullPage(tx as Transaction, [gymWire('gym-1', 100, 'Iron Temple')], 'gyms');
-    });
+    const changed = database.transaction((tx) =>
+      applyPullPage(tx as Transaction, [gymWire('gym-1', 100, 'Iron Temple')], 'gyms'),
+    );
+    // An insert is a real local change, so it counts toward convergence motion.
+    expect(changed).toBe(1);
 
     const row = database.select().from(gyms).where(eq(gyms.id, 'gym-1')).get();
     expect(row?.name).toBe('Iron Temple');
@@ -63,9 +65,11 @@ describe('applyPullPage last-write-wins', () => {
   it('overwrites a local row when the incoming timestamp is strictly newer', () => {
     database.insert(gyms).values({ id: 'gym-1', name: 'Old', localDirty: true, localUpdatedAtMs: 100 }).run();
 
-    database.transaction((tx) => {
-      applyPullPage(tx as Transaction, [gymWire('gym-1', 200, 'New')], 'gyms');
-    });
+    const changed = database.transaction((tx) =>
+      applyPullPage(tx as Transaction, [gymWire('gym-1', 200, 'New')], 'gyms'),
+    );
+    // Incoming wins and overwrites the row — a real change.
+    expect(changed).toBe(1);
 
     const row = database.select().from(gyms).where(eq(gyms.id, 'gym-1')).get();
     expect(row?.name).toBe('New');
@@ -76,9 +80,12 @@ describe('applyPullPage last-write-wins', () => {
   it('no-ops when the incoming timestamp is older-or-equal and keeps the row dirty', () => {
     database.insert(gyms).values({ id: 'gym-1', name: 'Local Newer', localDirty: true, localUpdatedAtMs: 300 }).run();
 
-    database.transaction((tx) => {
-      applyPullPage(tx as Transaction, [gymWire('gym-1', 200, 'Server Stale')], 'gyms');
-    });
+    const changed = database.transaction((tx) =>
+      applyPullPage(tx as Transaction, [gymWire('gym-1', 200, 'Server Stale')], 'gyms'),
+    );
+    // The local edit is newer: nothing is written, so this contributes no motion
+    // (a round of only such no-ops is quiet).
+    expect(changed).toBe(0);
 
     const row = database.select().from(gyms).where(eq(gyms.id, 'gym-1')).get();
     expect(row?.name).toBe('Local Newer');
@@ -90,9 +97,11 @@ describe('applyPullPage last-write-wins', () => {
   it('treats an equal timestamp as incoming-loses (no clear of the dirty bit)', () => {
     database.insert(gyms).values({ id: 'gym-1', name: 'Local', localDirty: true, localUpdatedAtMs: 200 }).run();
 
-    database.transaction((tx) => {
-      applyPullPage(tx as Transaction, [gymWire('gym-1', 200, 'Server')], 'gyms');
-    });
+    const changed = database.transaction((tx) =>
+      applyPullPage(tx as Transaction, [gymWire('gym-1', 200, 'Server')], 'gyms'),
+    );
+    // Equal timestamp is incoming-loses: a no-op that counts no motion.
+    expect(changed).toBe(0);
 
     const row = database.select().from(gyms).where(eq(gyms.id, 'gym-1')).get();
     expect(row?.name).toBe('Local');
@@ -104,9 +113,11 @@ describe('applyPullPage last-write-wins', () => {
     const deletePage = gymWire('gym-1', 200, 'Live');
     deletePage.fields.deleted_at = 250;
 
-    database.transaction((tx) => {
-      applyPullPage(tx as Transaction, [deletePage], 'gyms');
-    });
+    const changed = database.transaction((tx) =>
+      applyPullPage(tx as Transaction, [deletePage], 'gyms'),
+    );
+    // A tombstone arriving as incoming-wins is a normal LWW write — one change.
+    expect(changed).toBe(1);
 
     const row = database.select().from(gyms).where(eq(gyms.id, 'gym-1')).get();
     expect(row?.deletedAt?.getTime()).toBe(250);

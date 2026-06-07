@@ -987,13 +987,29 @@ account (RLS sets `owner_user_id = auth.uid()`) and break B.3.4.3's
    and advancing `cursors[layer]` after each.
 2. **Push** — repeatedly `selectPushBatch` (B.3.4) + `sync_push` until the dirty
    stream is exhausted.
-3. **Re-pull** — drain all four layers again; if every layer returns
-   `has_more=false` and `entities.length=0` on its first probe, the cycle
-   converged; otherwise apply and continue.
-4. **Repeat** until both ends are quiet for one full round.
+3. **Re-pull** — drain all four layers again; if a full round APPLIED no rows in
+   either direction — every re-pull page empty or a pure no-op (re-delivering
+   rows the device already holds at an equal-or-older timestamp), and the push
+   leg sent nothing — the cycle converged; otherwise apply and continue.
+4. **Repeat** until a full round is quiet.
 
 Recommended order is PULL → PUSH → PULL; the scheduler only requires
 convergence.
+
+Quietness is keyed on **rows actually applied, not rows the server returned.** A
+re-pull that hands back only rows already local (a benign echo — this device's
+own just-pushed row, or a row a second device re-stamped to an equal-or-older
+value) writes nothing and counts as quiet. Keying on `entities.length` would read
+such a no-op as motion and spin a pointless extra round.
+
+> **Build note — DRIFT (doc-said-X → code-is-Y).** An earlier draft of step 3
+> tested `entities.length = 0` (rows RETURNED) for convergence. The as-built
+> client (`apps/mobile/src/sync/cycle.ts`) keys the quiet-round test on rows
+> CHANGED: `applyPullPage` returns the count it wrote and the loop converges when
+> both pull legs wrote 0 and the push leg sent 0. The first-sign-in SEED decision
+> still keys on rows RECEIVED (so a resumed bootstrap re-pulling already-local
+> rows does not look empty and re-seed) — the two counts are intentionally
+> distinct (`PullLegResult.received` vs `.changed`).
 
 ### B.6.2 What a cycle MUST guarantee
 
@@ -1006,8 +1022,26 @@ convergence.
 - **Surviving state** — only `local_dirty`, `local_updated_at_ms`, the four
   per-layer cursors, and the bootstrap flag survive between cycles (all in
   SQLite).
-- **Duration** — background cycles abort cleanly within ~20s; each batch HTTP
-  request times out at 15s; the cycle checks elapsed time after each batch.
+- **Duration** — the cycle runs PULL → PUSH → PULL until a full round is quiet
+  (B.6.1); there is **no round cap and no wall-clock cycle deadline.** It is
+  bounded by convergence itself plus each batch's own HTTP request timeout, so a
+  sustained external write stream (a second device editing live) is followed to
+  convergence rather than truncated, and a row re-edited in every push-in-flight
+  window keeps re-pushing its latest value until the edits stop. Each cycle is
+  retriable and resumable, so a long-running one need not finish in a single
+  scheduler tick — the next tick resumes from the persisted cursors and dirty
+  bits.
+
+> **Build note — DRIFT (doc-said-X → code-is-Y).** An earlier draft promised a
+> hard cycle duration ("abort cleanly within ~20s; the cycle checks elapsed time
+> after each batch") and a round cap (`MAX_CYCLES_PER_CALL`). Neither is in the
+> as-built v2: there is no per-batch elapsed-time check, and the former 5-round
+> cap was removed because it silently rewrote any non-converging spin into a
+> `'converged'` outcome — masking bugs and truncating a legitimate update stream
+> — rather than surfacing it. The loop is now bounded purely by convergence and
+> per-request HTTP timeouts. A hard cycle-level duration budget (abort-within-N
+> with a per-batch elapsed check) remains possible future hardening; if added it
+> must persist cursors/dirty bits on abort so the next tick resumes cleanly.
 
 ### B.6.3 Multi-batch push
 
