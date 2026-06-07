@@ -428,8 +428,12 @@ Priority rule:
 Every lane runs the same dev-client build; whether it behaves as a local-only
 (infra-free) app or a Supabase-configured one is decided entirely by the
 `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY` that Metro inlines
-from `apps/mobile/.env.local` at bundle time. (Which lanes take which shape, and
-why, is testing policy — see `docs/specs/06-testing-strategy.md`.)
+from `apps/mobile/.env.local` at bundle time. Concretely: the `auth-profile` lane
+(`test:e2e:ios:auth-profile`) is the **only** Supabase-backed iOS lane — it
+provisions a local Supabase baseline and exports those vars; `smoke`,
+`data-runtime-smoke`, and the combined `gates` lane are deliberately **infra-free**
+(they export none, so the inlined values are empty). (Which lanes take which
+shape, and why, is testing policy — see `docs/specs/06-testing-strategy.md`.)
 
 `apps/mobile/.env.local` is one per-worktree file that local-Supabase startup
 (`supabase/scripts/local-runtime-up.sh`) writes, that Expo's dev server reads

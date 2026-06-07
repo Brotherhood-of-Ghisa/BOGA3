@@ -50,12 +50,22 @@ MAESTRO_RESET_STRATEGY="full" "$SCRIPT_DIR/maestro-ios-run-flow.sh" \
   --scenario "Launch requires sign-in" \
   --flow "$APP_DIR/.maestro/flows/launch-requires-sign-in.yaml"
 
-# First-sync gate: a signed-in user whose first cycle has not drained sees the
-# full-screen block (phase + activity indicator); it dismisses once the cycle
-# completes within the foreground window.
+# First-sync gate (pinned in-progress surfaces): a signed-in user whose first
+# cycle has not drained sees the full-screen block (phase + activity indicator);
+# the harness pins the online in-progress state to assert it deterministically,
+# then stamps the bootstrap flag to prove the block→dismiss transition.
 MAESTRO_RESET_STRATEGY="full" "$SCRIPT_DIR/maestro-ios-run-flow.sh" \
   --scenario "Sync gate first cycle" \
   --flow "$APP_DIR/.maestro/flows/sync-gate-first-cycle.yaml"
+
+# First-sync gate (REAL cycle): same sign-in, but the REAL bootstrapper→seed→
+# push→pull cycle runs against the provisioned local Supabase and lifts the gate
+# on its own — no `bootstrap=complete` harness stamp. Asserts the user lands on
+# stats-history and the block is gone. Complements the pinned flow above, which
+# owns the (too-fast-to-observe-naturally) in-progress surfaces.
+MAESTRO_RESET_STRATEGY="full" "$SCRIPT_DIR/maestro-ios-run-flow.sh" \
+  --scenario "Sync gate first cycle (real)" \
+  --flow "$APP_DIR/.maestro/flows/sync-gate-first-cycle-real.yaml"
 
 MAESTRO_RESET_STRATEGY="full" "$SCRIPT_DIR/maestro-ios-run-flow.sh" \
   --scenario "Settings sync status" \
