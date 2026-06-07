@@ -101,16 +101,18 @@ CREATE TABLE `gyms` (
 CREATE INDEX `gyms_name_idx` ON `gyms` (`name`);--> statement-breakpoint
 CREATE INDEX `gyms_deleted_at_idx` ON `gyms` (`deleted_at`);--> statement-breakpoint
 CREATE TABLE `muscle_groups` (
-	`id` text PRIMARY KEY NOT NULL,
+	`id` text PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))) NOT NULL,
 	`display_name` text NOT NULL,
 	`family_name` text NOT NULL,
 	`sort_order` integer DEFAULT 0 NOT NULL,
 	`is_editable` integer DEFAULT 0 NOT NULL,
+	`deleted_at` integer,
+	`local_dirty` integer DEFAULT false NOT NULL,
+	`local_updated_at_ms` integer DEFAULT 0 NOT NULL,
 	`created_at` integer DEFAULT (unixepoch() * 1000) NOT NULL,
 	`updated_at` integer DEFAULT (unixepoch() * 1000) NOT NULL,
 	CONSTRAINT "muscle_groups_sort_order_non_negative" CHECK("muscle_groups"."sort_order" >= 0),
-	CONSTRAINT "muscle_groups_is_editable_boolean_guard" CHECK("muscle_groups"."is_editable" in (0, 1)),
-	CONSTRAINT "muscle_groups_non_editable_guard" CHECK("muscle_groups"."is_editable" = 0)
+	CONSTRAINT "muscle_groups_is_editable_boolean_guard" CHECK("muscle_groups"."is_editable" in (0, 1))
 );
 --> statement-breakpoint
 CREATE INDEX `muscle_groups_family_name_idx` ON `muscle_groups` (`family_name`);--> statement-breakpoint

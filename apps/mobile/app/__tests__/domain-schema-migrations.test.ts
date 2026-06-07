@@ -75,9 +75,20 @@ describe('domain schema and runtime migrations', () => {
     expect(migrationSql).toContain(
       'CONSTRAINT "exercise_muscle_mappings_weight_positive" CHECK("exercise_muscle_mappings"."weight" > 0)'
     );
+    // `muscle_groups` is a normal per-user synced entity: it carries the
+    // local-only sync bookkeeping columns and a generated `id` default, and it
+    // keeps only generic data guards. The old "must stay non-editable" CHECK is
+    // gone so the taxonomy can round-trip on the wire like every other entity.
     expect(migrationSql).toContain(
-      'CONSTRAINT "muscle_groups_non_editable_guard" CHECK("muscle_groups"."is_editable" = 0)'
+      '`id` text PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))) NOT NULL'
     );
+    expect(migrationSql).toContain(
+      'CONSTRAINT "muscle_groups_sort_order_non_negative" CHECK("muscle_groups"."sort_order" >= 0)'
+    );
+    expect(migrationSql).toContain(
+      'CONSTRAINT "muscle_groups_is_editable_boolean_guard" CHECK("muscle_groups"."is_editable" in (0, 1))'
+    );
+    expect(migrationSql).not.toContain('muscle_groups_non_editable_guard');
     expect(migrationSql).toContain(
       'CONSTRAINT "exercise_definitions_name_non_empty" CHECK("exercise_definitions"."name" <> \'\')'
     );
