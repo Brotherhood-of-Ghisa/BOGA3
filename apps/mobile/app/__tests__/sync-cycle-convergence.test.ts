@@ -7,7 +7,8 @@
  *  - AUTH_REQUIRED: a server that returns the no-JWT envelope makes the cycle
  *    return cleanly without mutating SQLite and without throwing.
  *  - FK_VIOLATION: a server that rejects a push with the structural-error token
- *    makes the cycle throw (non-retriable) while leaving dirty bits set.
+ *    makes the cycle return the 'fk-violation' outcome (non-retriable) and raise
+ *    the gate error code, while leaving dirty bits set.
  *
  * The cycle's only outbound dependency is the Supabase RPC, stubbed here.
  */
@@ -23,7 +24,11 @@ import {
   getAuthRequiredSignal,
   markAuthRequired,
 } from '@/src/sync/auth-required-signal';
-import { runSyncCycle, SyncCycleError } from '@/src/sync/cycle';
+import {
+  __resetCycleErrorSignalForTests,
+  getCycleErrorCode,
+} from '@/src/sync/cycle-error-signal';
+import { runSyncCycle } from '@/src/sync/cycle';
 
 import {
   createInMemoryDatabase,
@@ -60,6 +65,7 @@ let database: InMemoryTestDatabase;
 beforeEach(() => {
   __resetClockForTests();
   __resetAuthRequiredSignalForTests();
+  __resetCycleErrorSignalForTests();
   fixture = createInMemoryDatabase();
   database = fixture.database;
   mockBootstrapState.database = database;
@@ -71,6 +77,7 @@ afterEach(() => {
   mockBootstrapState.database = null;
   __resetClockForTests();
   __resetAuthRequiredSignalForTests();
+  __resetCycleErrorSignalForTests();
 });
 
 const emptyPage = { entities: [], next_cursor: null, has_more: false };
@@ -117,7 +124,7 @@ describe('cycle convergence', () => {
       return pushOk;
     });
 
-    await runSyncCycle();
+    await expect(runSyncCycle()).resolves.toBe('converged');
 
     // The single server row landed locally and clean.
     const row = database.select().from(gyms).where(eq(gyms.id, 'gym-server')).get();
@@ -163,7 +170,7 @@ describe('AUTH_REQUIRED handling', () => {
       error: null,
     }));
 
-    await expect(runSyncCycle()).resolves.toBeUndefined();
+    await expect(runSyncCycle()).resolves.toBe('auth-required');
 
     // Dirty bit untouched; nothing pulled.
     const row = database.select().from(gyms).where(eq(gyms.id, 'gym-local')).get();
@@ -184,7 +191,7 @@ describe('AUTH_REQUIRED handling', () => {
       return { data: null, error: { code: 'P0001', message: 'AUTH_REQUIRED: sync_push requires an authenticated user' } };
     });
 
-    await expect(runSyncCycle()).resolves.toBeUndefined();
+    await expect(runSyncCycle()).resolves.toBe('auth-required');
 
     const row = database.select().from(gyms).where(eq(gyms.id, 'gym-local')).get();
     expect(row?.localDirty).toBe(true);
@@ -212,7 +219,7 @@ describe('AUTH_REQUIRED handling', () => {
 });
 
 describe('FK_VIOLATION handling', () => {
-  it('throws and leaves dirty bits set when the push RPC reports an FK violation', async () => {
+  it('returns the fk-violation outcome, raises the gate error code, and leaves dirty bits set', async () => {
     database.insert(gyms).values({ id: 'gym-local', name: 'Local', localDirty: true, localUpdatedAtMs: 50 }).run();
 
     mockRpc.mockImplementation(async (name: string) => {
@@ -222,13 +229,17 @@ describe('FK_VIOLATION handling', () => {
       return { data: null, error: { code: 'P0001', message: 'FK_VIOLATION: parent not found' } };
     });
 
-    await expect(runSyncCycle()).rejects.toBeInstanceOf(SyncCycleError);
+    // The cycle no longer throws: a structural FK violation is classified into a
+    // single returned outcome so the scheduler and the gate read one consistent
+    // view. It still surfaces as an error + Retry in the gate via the error code.
+    await expect(runSyncCycle()).resolves.toBe('fk-violation');
+    expect(getCycleErrorCode()).toBe('FK_VIOLATION');
 
     const row = database.select().from(gyms).where(eq(gyms.id, 'gym-local')).get();
     expect(row?.localDirty).toBe(true);
   });
 
-  it('returns cleanly on an INTERNAL / transport error', async () => {
+  it('returns the internal outcome and raises the gate error code on a transport error', async () => {
     database.insert(gyms).values({ id: 'gym-local', name: 'Local', localDirty: true, localUpdatedAtMs: 50 }).run();
 
     mockRpc.mockImplementation(async (name: string) => {
@@ -238,7 +249,8 @@ describe('FK_VIOLATION handling', () => {
       return { data: null, error: { code: '500', message: 'network blip' } };
     });
 
-    await expect(runSyncCycle()).resolves.toBeUndefined();
+    await expect(runSyncCycle()).resolves.toBe('internal');
+    expect(getCycleErrorCode()).toBe('INTERNAL');
 
     const row = database.select().from(gyms).where(eq(gyms.id, 'gym-local')).get();
     expect(row?.localDirty).toBe(true);

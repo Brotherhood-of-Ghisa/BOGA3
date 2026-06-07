@@ -26,13 +26,12 @@ Verified during `T-20260226-01` on `2026-02-26`.
 
 ### Exact AI development guidelines document path/name
 
-- AI development guidelines document (exact path): `docs/specs/04-ai-development-playbook.md:1`
+- AI development guidelines entrypoint (exact path): `AGENTS.md`
 
 ### Milestone/task template paths (exact)
 
 - Milestone template: `docs/specs/templates/milestone-spec-template.md`
 - Task card template: `docs/specs/templates/task-card-template.md`
-- These template paths are also referenced from the M8 milestone spec parent references: `docs/specs/milestones/M8-ui-guardrails-and-authoritative-ui-docs.md:18`
 
 ## Navigation approach and route locations
 
@@ -128,7 +127,7 @@ Verified during `T-20260226-01` on `2026-02-26`.
 ### Shared style helpers / theme layer status (baseline finding)
 
 - Shared UI components exist (`TopLevelTabs`, `SessionContentLayout`), but no centralized UI tokens/theme/style helper module is part of the current M8 baseline in `apps/mobile/components/**` route usage.
-- This is consistent with the milestone's draft assumption that styling is currently screen/component-local and raw-literal-heavy: `docs/specs/milestones/M8-ui-guardrails-and-authoritative-ui-docs.md:50`
+- This is consistent with the milestone's draft assumption that styling is currently screen/component-local and raw-literal-heavy.
 
 ### Repeated raw-literal usage patterns (high-level observations)
 

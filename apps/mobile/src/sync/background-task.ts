@@ -17,7 +17,7 @@ import * as Network from 'expo-network';
 import * as TaskManager from 'expo-task-manager';
 
 import { logEvent } from '@/src/logging/logEvent';
-import { runSyncCycle } from '@/src/sync/cycle';
+import { runSyncCycle, type SyncCycleOutcome } from '@/src/sync/cycle';
 
 /**
  * The single task identifier for the background sync task. This exact string
@@ -60,7 +60,13 @@ const MINIMUM_INTERVAL_MINUTES = 15;
  *      expo-network. If the internet is not reachable, the task returns Success
  *      (not Failed) without starting a cycle — returning Success preserves the
  *      OS's scheduling preference for the task, where Failed would penalise it.
- *   2. One sync cycle directly. Success on resolve, Failed on throw.
+ *   2. One sync cycle directly. The cycle returns a single explicit outcome (it
+ *      never throws); only a genuinely converged cycle is Success. A retriable
+ *      non-converged outcome (an INTERNAL hiccup or an FK violation) reports
+ *      Failed so the OS retries it sooner rather than treating a failed sync as a
+ *      good run. An auth-required outcome reports Success: there is no foreground
+ *      to route to sign-in here and an immediate retry would only re-hit the same
+ *      envelope, so — like the offline skip — it keeps the task in good standing.
  *
  * Exported for unit coverage; the registration wires it through TaskManager.
  */
@@ -85,16 +91,12 @@ export const runBackgroundSyncTask = async (): Promise<BackgroundTask.Background
     return BackgroundTask.BackgroundTaskResult.Success;
   }
 
+  let outcome: SyncCycleOutcome;
   try {
-    await runSyncCycle();
-    void logEvent({
-      level: 'debug',
-      source: 'sync',
-      event: 'sync_background_task_succeeded',
-      context: { timestampMs: Date.now() },
-    });
-    return BackgroundTask.BackgroundTaskResult.Success;
+    outcome = await runSyncCycle();
   } catch (error) {
+    // Defensive: the cycle classifies its own throws, so this only fires if
+    // something escapes the cycle body entirely. Report Failed so the OS retries.
     void logEvent({
       level: 'warn',
       source: 'sync',
@@ -104,6 +106,28 @@ export const runBackgroundSyncTask = async (): Promise<BackgroundTask.Background
     });
     return BackgroundTask.BackgroundTaskResult.Failed;
   }
+
+  if (outcome === 'converged' || outcome === 'auth-required') {
+    void logEvent({
+      level: 'debug',
+      source: 'sync',
+      event: 'sync_background_task_succeeded',
+      context: { outcome, timestampMs: Date.now() },
+    });
+    return BackgroundTask.BackgroundTaskResult.Success;
+  }
+
+  // A retriable non-converged outcome (INTERNAL / FK_VIOLATION): report Failed so
+  // the OS schedules another attempt sooner rather than recording a failed sync
+  // as a successful run.
+  void logEvent({
+    level: 'warn',
+    source: 'sync',
+    event: 'sync_background_task_failed',
+    message: 'Background sync cycle did not converge; the OS will retry on its next window.',
+    context: { outcome, timestampMs: Date.now() },
+  });
+  return BackgroundTask.BackgroundTaskResult.Failed;
 };
 
 // Register the task handler at module-load time. iOS relaunches the JS bundle to

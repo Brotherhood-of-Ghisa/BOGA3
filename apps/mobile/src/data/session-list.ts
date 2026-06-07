@@ -3,6 +3,7 @@ import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { bootstrapLocalDataLayer } from './bootstrap';
 import { nowMonotonic } from './clock';
 import { exerciseSets, gyms, sessionExercises, sessions } from './schema';
+import { notifyLocalWrite } from '@/src/sync/write-nudge';
 
 type SessionLifecycleStatus = 'active' | 'completed';
 
@@ -215,6 +216,10 @@ export const createDrizzleSessionListStore = (): SessionListStore => ({
         .where(eq(sessions.id, input.sessionId))
         .run();
     });
+
+    // Post-commit: the session row is dirtied above; nudge the scheduler to push
+    // the soft-delete/restore soon rather than on the next foreground/backstop.
+    notifyLocalWrite();
   },
 });
 

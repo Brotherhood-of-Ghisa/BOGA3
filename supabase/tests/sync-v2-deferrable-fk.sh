@@ -2,7 +2,7 @@
 
 # tFINAL integration test — Deferrable FKs (plan outcome #4).
 #
-# Asserts the two halves of the deferrable-FK contract from designs/t1.md §5.2:
+# Asserts the two halves of the deferrable-FK contract from docs/specs/tech/sync-v2-server-contract.md §A.5.2:
 #
 #   A. All eight cross-entity FKs are present in information_schema.
 #      referential_constraints with is_deferrable='YES' and
@@ -16,8 +16,8 @@
 #
 # This is integration-level on top of t1's per-table smoke (which only checks
 # pg_constraint.condeferred). The transaction-level assertion is the
-# behaviour the push RPC relies on (designs/t2.md §3.2 "SET CONSTRAINTS ALL
-# DEFERRED inside the function").
+# behaviour the push RPC relies on (docs/specs/tech/sync-v2-server-contract.md §B.3.2
+# "SET CONSTRAINTS ALL DEFERRED inside the function").
 
 set -euo pipefail
 
@@ -37,20 +37,12 @@ select_psql_mode() {
     return 0
   fi
   if command -v docker >/dev/null 2>&1; then
-    local project_id=""
-    if [[ -f "${SUPABASE_DIR}/config.toml" ]]; then
-      project_id="$(awk -F'"' '/^project_id[[:space:]]*=/ {print $2; exit}' "${SUPABASE_DIR}/config.toml" || true)"
-    fi
-    if [[ -n "${project_id}" ]]; then
-      DOCKER_DB_CONTAINER="$(docker ps --format '{{.Names}}' 2>/dev/null | grep -F "supabase_db_${project_id}" | head -n1 || true)"
-    fi
-    if [[ -z "${DOCKER_DB_CONTAINER}" ]]; then
-      DOCKER_DB_CONTAINER="$(docker ps --format '{{.Names}}' 2>/dev/null | grep '^supabase_db_' | head -n1 || true)"
-    fi
-    if [[ -n "${DOCKER_DB_CONTAINER}" ]]; then
-      PSQL_MODE="docker"
-      return 0
-    fi
+    # Resolve strictly by this worktree's project_id (resolve_db_container in
+    # _common.sh errors if this worktree's stack is down — no unscoped
+    # head -n1 fallback that could target a foreign worktree's DB).
+    DOCKER_DB_CONTAINER="$(resolve_db_container)" || exit 1
+    PSQL_MODE="docker"
+    return 0
   fi
   echo "[sync-v2-deferrable-fk] need host psql or supabase_db_* container." >&2
   exit 1
@@ -96,7 +88,7 @@ pass() { echo "[sync-v2-deferrable-fk] pass: $*"; }
 # -----------------------------------------------------------------------------
 # A. All eight cross-entity FKs deferrable + initially deferred.
 #
-# Map (constraint_name -> child_table) per designs/t1.md §5.2.
+# Map (constraint_name -> child_table) per docs/specs/tech/sync-v2-server-contract.md §A.5.2.
 # -----------------------------------------------------------------------------
 
 FK_SPECS=(

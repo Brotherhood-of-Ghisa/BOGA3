@@ -2,9 +2,9 @@
 /**
  * check-sync-schema-drift — Sync v2 client/server schema drift checker.
  *
- * Spec: docs/plans/sync-v2/designs/t1.md §7 (especially §7.3 algorithm and
- * §7.7 topological FK assertion). This script implements the contract; the
- * accompanying card is docs/plans/sync-v2-server/tasks/t2.md.
+ * Spec: docs/specs/tech/sync-v2-server-contract.md §A.7 (especially §A.7.3
+ * algorithm and §A.7.7 topological FK assertion). This script implements that
+ * drift-control contract.
  *
  * High-level steps:
  *   1. Reset the local Supabase Postgres (apply every migration from scratch).
@@ -438,11 +438,12 @@ function quoteIdent(name: string): string {
  * reports for the server column (`text`, `int4`, `int8`, `float8`, `numeric`,
  * `bool`, `uuid`, `timestamp`, `timestamptz`).
  *
- * Returns true if the pair is acceptable per the t1 §7.3 narrow map. The
- * timestamp_ms discriminator on the client is reflected as `integer` by the
- * SQLite catalog; bigint on the server is `int8`. The narrow map accepts
- * client `integer` against either `int4` or `int8` (which is exactly the
- * t1 §7.3 row). Default-expression equality is NOT compared.
+ * Returns true if the pair is acceptable per the §A.7.3 narrow map
+ * (docs/specs/tech/sync-v2-server-contract.md). The timestamp_ms discriminator
+ * on the client is reflected as `integer` by the SQLite catalog; bigint on the
+ * server is `int8`. The narrow map accepts client `integer` against either
+ * `int4` or `int8` (which is exactly the §A.7.3 row). Default-expression
+ * equality is NOT compared.
  */
 function isTypeCompatible(sqliteType: string, udtName: string): boolean {
   const c = sqliteType.toLowerCase();
@@ -462,7 +463,7 @@ function camelToSnake(s: string): string {
 }
 
 // The wire-envelope columns (universal server-side, never declared on the
-// client Drizzle side) — per t1 §2.
+// client Drizzle side) — per docs/specs/tech/sync-v2-server-contract.md §A.2.
 const WIRE_ENVELOPE_COLUMNS = new Set([
   'owner_user_id',
   'client_updated_at_ms',
@@ -556,7 +557,7 @@ function formatMissingServerCounterpart(
     `    alter table app_public.${entity}`,
     `      add column ${column} ${pgType};`,
     ``,
-    `  Server-first deploy is unconditional (per designs/t1.md §4.1 and §9). Once`,
+    `  Server-first deploy is unconditional (per docs/specs/tech/sync-v2-server-contract.md §A.3 and §A.9). Once`,
     `  deployed, re-run \`npm run check:sync-drift\` — the local DB reset will pick`,
     `  up the new migration and the check will pass.`,
   ].join('\n');
@@ -630,7 +631,7 @@ async function main(): Promise<number> {
 
     const entities = await listEntityTables(pg);
     if (entities.length === 0) {
-      addError(findings, 'no entity tables with owner_user_id found in app_public; expected 8+ per t1 §2');
+      addError(findings, 'no entity tables with owner_user_id found in app_public; expected 8+ per docs/specs/tech/sync-v2-server-contract.md §A.2');
     }
 
     log(`introspecting ${entities.length} entity table(s): ${entities.join(', ')}`);
@@ -656,7 +657,7 @@ async function main(): Promise<number> {
           `  expected: ${fixtureFile.enforce_owner_user_id_immutable_sha256}\n` +
           `  actual:   ${immutableHash}\n` +
           `  If this change is intentional, re-run with --write-fixtures and commit the diff.\n` +
-          `  Otherwise, restore the canonical body from designs/t1.md §6.3.`
+          `  Otherwise, restore the canonical body from docs/specs/tech/sync-v2-server-contract.md §A.6.3.`
       );
     }
 
@@ -752,39 +753,39 @@ async function checkEntity(ctx: EntityContext): Promise<void> {
   if (checkCount > 0) {
     addError(
       findings,
-      `${entity}: ${checkCount} CHECK constraint(s) present; expected zero per designs/t1.md §1 ("no server validation")`
+      `${entity}: ${checkCount} CHECK constraint(s) present; expected zero per docs/specs/tech/sync-v2-server-contract.md §A.1 ("no server validation")`
     );
   }
   if (pgColByName.has('extras')) {
     addError(
       findings,
-      `${entity}: server has an "extras" column; v2 forbids extras-blob columns per designs/t1.md §1`
+      `${entity}: server has an "extras" column; v2 forbids extras-blob columns per docs/specs/tech/sync-v2-server-contract.md §A.1`
     );
   }
   if (pgColByName.has('deleted')) {
     addError(
       findings,
-      `${entity}: server has a "deleted" boolean column; v2 uses only deleted_at (designs/t1.md §1)`
+      `${entity}: server has a "deleted" boolean column; v2 uses only deleted_at (docs/specs/tech/sync-v2-server-contract.md §A.1)`
     );
   }
 
   // ---- 4f sanity: universal index, two structural triggers ---------------
   const universalIdx = `${entity}_owner_received_idx`;
   if (!pgIdx.some((ix) => ix.indexname === universalIdx)) {
-    addError(findings, `${entity}: missing universal index ${universalIdx} (designs/t1.md §2)`);
+    addError(findings, `${entity}: missing universal index ${universalIdx} (docs/specs/tech/sync-v2-server-contract.md §A.2)`);
   }
   const expectedTouch = `${entity}_touch_server_received_at`;
   const expectedImmut = `${entity}_owner_user_id_immutable`;
   if (!pgTrigs.includes(expectedTouch)) {
-    addError(findings, `${entity}: missing trigger ${expectedTouch} (designs/t1.md §2)`);
+    addError(findings, `${entity}: missing trigger ${expectedTouch} (docs/specs/tech/sync-v2-server-contract.md §A.2)`);
   }
   if (!pgTrigs.includes(expectedImmut)) {
-    addError(findings, `${entity}: missing trigger ${expectedImmut} (designs/t1.md §6.3)`);
+    addError(findings, `${entity}: missing trigger ${expectedImmut} (docs/specs/tech/sync-v2-server-contract.md §A.6.3)`);
   }
 
   // ---- 4f sanity: RLS enabled with 4 owner policies and matching bodies --
   if (!rlsEnabled) {
-    addError(findings, `${entity}: RLS not enabled (designs/t1.md §6.1)`);
+    addError(findings, `${entity}: RLS not enabled (docs/specs/tech/sync-v2-server-contract.md §A.6.1)`);
   }
   const polByName = new Map(pgPols.map((p) => [p.policyname, p]));
   const expectedPolicies = [
@@ -799,7 +800,7 @@ async function checkEntity(ctx: EntityContext): Promise<void> {
     const name = `${entity}_${spec.suffix}`;
     const pol = polByName.get(name);
     if (!pol) {
-      addError(findings, `${entity}: missing RLS policy ${name} (designs/t1.md §6.1)`);
+      addError(findings, `${entity}: missing RLS policy ${name} (docs/specs/tech/sync-v2-server-contract.md §A.6.1)`);
       continue;
     }
     const qualHash = pol.qual ? sha256(normalise(pol.qual)) : null;
@@ -826,7 +827,7 @@ async function checkEntity(ctx: EntityContext): Promise<void> {
           `${name}: policy USING-expression hash drifted.\n` +
             `  expected: ${expected.qual}\n` +
             `  actual:   ${qualHash}\n` +
-            `  Canonical body per designs/t1.md §6.1 is \`owner_user_id = auth.uid()\`.\n` +
+            `  Canonical body per docs/specs/tech/sync-v2-server-contract.md §A.6.1 is \`owner_user_id = auth.uid()\`.\n` +
             `  If intentional, --write-fixtures.`
         );
       }
@@ -836,7 +837,7 @@ async function checkEntity(ctx: EntityContext): Promise<void> {
           `${name}: policy WITH-CHECK expression hash drifted.\n` +
             `  expected: ${expected.with_check}\n` +
             `  actual:   ${withCheckHash}\n` +
-            `  Canonical body per designs/t1.md §6.1 is \`owner_user_id = auth.uid()\`.\n` +
+            `  Canonical body per docs/specs/tech/sync-v2-server-contract.md §A.6.1 is \`owner_user_id = auth.uid()\`.\n` +
             `  If intentional, --write-fixtures.`
         );
       }
@@ -873,7 +874,7 @@ async function checkEntity(ctx: EntityContext): Promise<void> {
         addError(
           findings,
           `${entity}.${wireName}: type mismatch — client ${col.type} vs server ${pgCol.udt_name} (udt). ` +
-            `Type-compat map: text↔text, integer↔int4|int8, real↔float8|numeric (designs/t1.md §7.3).`
+            `Type-compat map: text↔text, integer↔int4|int8, real↔float8|numeric (docs/specs/tech/sync-v2-server-contract.md §A.7.3).`
         );
       }
       continue;

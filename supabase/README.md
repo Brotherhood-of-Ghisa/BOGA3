@@ -189,17 +189,23 @@ Chosen API surface for the M5 sync baseline:
 - auth via `anon` key + user JWT
 - authorization via table `RLS` + FK/check constraints
 
-Provider-neutral method catalog + Supabase mapping:
+Sync v2 server contract (schema + push/pull RPC wire protocol):
 
-- `supabase/session-sync-api-contract.md`
+- `docs/specs/tech/sync-v2-server-contract.md`
 
-Local sync API contract suite:
+Local sync contract suites (sync v2):
 
 ```bash
-./supabase/scripts/test-sync-api-contract.sh
+# run all backend slow suites together:
+./scripts/quality-slow.sh backend
+# or individually:
+./supabase/scripts/test-sync-v2-schema-smoke.sh
+./supabase/scripts/test-sync-push-contract.sh
+./supabase/scripts/test-sync-pull-contract.sh
+./supabase/scripts/test-sync-v2-e2e.sh
 ```
 
-This wrapper enforces the shared runtime baseline first (`ensure-local-runtime-baseline.sh`) and then runs the sync contract suite.
+These enforce the shared runtime baseline first (`ensure-local-runtime-baseline.sh`) and then run the sync-v2 contract suites. The v1 `test-sync-api-contract.sh` / `test-sync-events-ingest-contract.sh` wrappers were retired with the M13 projection RPCs.
 
 Coverage includes success read/write flows, validation failures, unauthenticated denial, and cross-user denial across all sync-domain entities, including session metadata parity fields (`session_exercises.exercise_definition_id`, `exercise_sets.set_type`).
 
@@ -219,7 +225,7 @@ Parallel-run note:
 
 ## Hosted sync bootstrap and reset
 
-Canonical hosted bootstrap is the checked-in migration chain (`supabase/migrations/*.sql`) applied via the Supabase CLI. The previous hand-curated bootstrap blob (`hosted-bootstrap-sync.sql`) was removed during the sync redesign clean-slate (`docs/tasks/fix-sync/plan.md`, T7) — it had drifted from the live schema and is not part of the supported path.
+Canonical hosted bootstrap is the checked-in migration chain (`supabase/migrations/*.sql`) applied via the Supabase CLI. The previous hand-curated bootstrap blob (`hosted-bootstrap-sync.sql`) was removed during the sync redesign clean-slate — it had drifted from the live schema and is not part of the supported path.
 
 Standard hosted enablement on a fresh project:
 
@@ -233,7 +239,7 @@ Historical note: `supabase/hosted-hotfix-relax-session-exercise-definition-fk.sq
 
 For local parity before and after a hosted reset, run `./supabase/scripts/reset-local.sh`, `./supabase/scripts/ensure-local-runtime-baseline.sh`, `./scripts/quality-fast.sh backend`, and `./scripts/quality-slow.sh backend`. On WSL, verify Docker Desktop integration from this distribution first with `docker info`.
 
-First repair task (historical, pre-redesign): `docs/tasks/complete/T-20260510-01-supabase-migration-history-repair.md`.
+(An earlier hosted migration-history repair predates the sync redesign; its task card has been archived out.)
 
 ## Fixture baseline (deterministic)
 

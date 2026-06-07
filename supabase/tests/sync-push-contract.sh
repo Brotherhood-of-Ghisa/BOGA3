@@ -2,9 +2,9 @@
 
 # Sync v2 sync_push RPC contract test.
 #
-# Exercises the wire-level behaviour pinned in designs/t1.md §1 (LWW,
-# future-clock clamp, undelete) and designs/t2.md §3 (envelope, batch caps,
-# success/error shapes, FK closure).
+# Exercises the wire-level behaviour pinned in
+# docs/specs/tech/sync-v2-server-contract.md §A.1 (LWW, future-clock clamp,
+# undelete) and §B.3 (envelope, batch caps, success/error shapes, FK closure).
 #
 # Run via the wrapper at supabase/scripts/test-sync-push-contract.sh (which
 # brings up the shared local runtime baseline first). For ad-hoc local
@@ -28,8 +28,8 @@ require_jq() {
 }
 
 # ---------------------------------------------------------------------------
-# Generic HTTP / assertion helpers (mirrors session-sync-api-contract.sh's
-# shape so future tests follow the same idiom).
+# Generic HTTP / assertion helpers (shared idiom across the sync v2 contract
+# suites, e.g. sync-pull-contract.sh).
 # ---------------------------------------------------------------------------
 
 http_request() {
@@ -272,7 +272,7 @@ user_select "gyms" "id=eq.${GYM_A_ID}&select=id" "${USER_B_TOKEN}"
 assert_status "200" "user B read gym (RLS deny)"
 assert_json_expr 'length == 0' "user B does not see user A's gym"
 
-# Bigint epoch-ms returned as JSON integer (designs/t2.md §1). Service-role
+# Bigint epoch-ms returned as JSON integer (docs/specs/tech/sync-v2-server-contract.md §B.1). Service-role
 # select bypasses RLS; we want a deterministic peek at the raw stored value.
 service_select "gyms" "owner_user_id=eq.${USER_A_UUID}&id=eq.${GYM_A_ID}&select=client_updated_at_ms,created_at"
 assert_status "200" "service select bigint shape"
@@ -441,7 +441,7 @@ service_select "gyms" "owner_user_id=eq.${USER_A_UUID}&id=eq.${GYM_DELETE_ID}&se
 assert_json_expr --argjson ts "${T_DEL_TOMBSTONE}" 'length == 1 and .[0].deleted_at == $ts' "soft-delete: deleted_at stored non-null"
 
 # ===========================================================================
-# 7. Undelete via LWW (designs/t1.md §1.1.2 scenario B).
+# 7. Undelete via LWW (docs/specs/tech/sync-v2-server-contract.md §A.1.1.2 scenario B).
 #    Tombstone at T=600 (already exists from #6); now push deleted_at=null at
 #    T=700 with a newer client_updated_at_ms. deleted_at flips back to null.
 # ===========================================================================
@@ -477,7 +477,7 @@ assert_json_expr 'length == 1 and .[0].name == "Resurrected" and .[0].deleted_at
 
 # ===========================================================================
 # 8. Future-clock clamp — client claims now()+1day. Stored value must be
-#    <= now()+5min (designs/t1.md §1).
+#    <= now()+5min (docs/specs/tech/sync-v2-server-contract.md §A.1).
 # ===========================================================================
 
 echo "[sync-push] future-clock clamp"
@@ -558,7 +558,8 @@ assert_json_expr --arg sid "${SESSION_FK_ID}" 'length == 1 and .[0].session_id =
 # ===========================================================================
 # 11. RLS cross-owner injection. The function derives owner_user_id from
 #     auth.uid() and ignores any owner-shaped key the client might smuggle
-#     into the envelope (there is no such key on the wire per t2 §2.1's
+#     into the envelope (there is no such key on the wire per
+#     docs/specs/tech/sync-v2-server-contract.md §B.2.1's
 #     "no owner_user_id on the wire envelope"). The row lands under the
 #     authenticated user. We assert two things:
 #       (a) A push under user A's JWT lands the row under user A,

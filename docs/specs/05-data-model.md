@@ -180,8 +180,8 @@ enforces the rule by booting a local Postgres, applying every migration, and
 introspecting the live schema. PRs failing the gate cannot merge. The checker
 also asserts the hardcoded topological table order in
 `apps/mobile/src/sync/topo-order.ts` against the live FK graph (see
-`designs/t1.md` §7.7) — adding a new entity table or FK without updating that
-list also fails the gate.
+`docs/specs/tech/sync-v2-server-contract.md` §A.7.7) — adding a new entity table
+or FK without updating that list also fails the gate.
 
 This rule does NOT apply to: `muscle_groups` (client-only taxonomy),
 `smoke_records`, `sync_outbox_events`, `sync_delivery_state`,
@@ -192,4 +192,4 @@ table. All of these are listed under `exemptions` in `sync-extras.json`.
 If your client change adds a value to an existing column (e.g., a new enum literal),
 the rule does not apply because the column already exists on both sides; the client
 is free to validate the enum and the server stores arbitrary text per the v2
-no-server-validation policy in `docs/plans/sync-v2/designs/t1.md` §1.
+no-server-validation policy in `docs/specs/tech/sync-v2-server-contract.md` §A.1.

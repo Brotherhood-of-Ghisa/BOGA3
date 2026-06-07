@@ -4,7 +4,7 @@
 #
 # Asserts, against the freshly-reset local database, that the clean-room
 # migration in supabase/migrations/<ts>_sync_v2_clean_room.sql produced exactly
-# the shape designs/t1.md prescribes:
+# the shape docs/specs/tech/sync-v2-server-contract.md Part A prescribes:
 #
 #   - All eight v2 entity tables exist in app_public.
 #   - Every v1 sync server object name is absent from information_schema /
@@ -44,23 +44,13 @@ select_psql_mode() {
   fi
 
   if command -v docker >/dev/null 2>&1; then
-    # Prefer the container whose name matches this worktree's project_id
-    # from supabase/config.toml. Falling back to `head -n1` picks the wrong
-    # container when multiple agent worktrees share a Docker engine.
-    local project_id=""
-    if [[ -f "${SUPABASE_DIR}/config.toml" ]]; then
-      project_id="$(awk -F'"' '/^project_id[[:space:]]*=/ {print $2; exit}' "${SUPABASE_DIR}/config.toml" || true)"
-    fi
-    if [[ -n "${project_id}" ]]; then
-      DOCKER_DB_CONTAINER="$(docker ps --format '{{.Names}}' 2>/dev/null | grep -F "supabase_db_${project_id}" | head -n1 || true)"
-    fi
-    if [[ -z "${DOCKER_DB_CONTAINER}" ]]; then
-      DOCKER_DB_CONTAINER="$(docker ps --format '{{.Names}}' 2>/dev/null | grep '^supabase_db_' | head -n1 || true)"
-    fi
-    if [[ -n "${DOCKER_DB_CONTAINER}" ]]; then
-      PSQL_MODE="docker"
-      return 0
-    fi
+    # Resolve the container whose name matches this worktree's project_id, via
+    # the shared helper in _common.sh. An unscoped `head -n1` would pick the
+    # wrong container when multiple agent worktrees share a Docker engine, so
+    # resolve_db_container has NO such fallback — it errors clearly instead.
+    DOCKER_DB_CONTAINER="$(resolve_db_container)" || exit 1
+    PSQL_MODE="docker"
+    return 0
   fi
 
   echo "[sync-v2-smoke] need either a host psql binary or a running supabase_db_* container." >&2
@@ -232,7 +222,7 @@ pass "both universal triggers present on every entity table"
 # Map: <constraint_name>|<expected_confdeltype>
 #   confdeltype values: 'a' = no action, 'c' = cascade, 'n' = set null,
 #                       'r' = restrict, 'd' = set default.
-# Per designs/t1.md §5.2:
+# Per docs/specs/tech/sync-v2-server-contract.md §A.5.2:
 #   sessions_gym_fk                                  on delete set null   -> n
 #   session_exercises_session_fk                     on delete cascade    -> c
 #   session_exercises_exercise_definition_fk         on delete no action  -> a
@@ -289,7 +279,7 @@ done
 pass "eight composite FKs present with condeferrable=t, condeferred=t, expected on-delete actions"
 
 # -----------------------------------------------------------------------------
-# 6. Zero CHECK constraints on any of the eight tables (t1 §1).
+# 6. Zero CHECK constraints on any of the eight tables (docs/specs/tech/sync-v2-server-contract.md §A.1).
 # -----------------------------------------------------------------------------
 
 for entity in "${ENTITIES[@]}"; do
@@ -303,7 +293,7 @@ for entity in "${ENTITIES[@]}"; do
        and con.contype = 'c';
   ")"
   if [[ "${count}" != "0" ]]; then
-    fail "app_public.${entity} has ${count} CHECK constraint(s); expected zero per t1 §1"
+    fail "app_public.${entity} has ${count} CHECK constraint(s); expected zero per docs/specs/tech/sync-v2-server-contract.md §A.1"
   fi
 done
 pass "no CHECK constraints on any of the eight v2 entity tables"

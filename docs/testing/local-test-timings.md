@@ -138,11 +138,16 @@ the headline. `≤ ceiling` = 3× median = "above this, something is wrong".
   **longer** than 283 s (it currently stops early) — re-measure once green.
   *(A fix-it card was spawned.)*
 
-- **Deferred (not run here):** `npm run test:sync:infra` requires a live
-  branch-provisioned remote Supabase (`SUPABASE_BRANCH_URL` /
-  `SUPABASE_BRANCH_ANON_KEY`), both unset locally — it fails hard with no endpoint
-  rather than skipping, so it is the one genuinely deferrable lane (per AGENTS.md).
-  Its schema-drift half is covered locally by the `sync-drift` backend lane above.
+- **`test:sync:infra` (LOCAL — runnable here, do NOT defer):** the lane reads
+  `SUPABASE_BRANCH_URL` / `SUPABASE_BRANCH_ANON_KEY`, but those name *any* endpoint
+  carrying the sync schema + the `user_a` fixture — including **this worktree's own
+  slot-isolated local Supabase**. Bring the baseline up
+  (`./supabase/scripts/ensure-local-runtime-baseline.sh`), export
+  `SUPABASE_BRANCH_URL`/`SUPABASE_BRANCH_ANON_KEY` from `supabase status -o env`
+  (`API_URL`/`ANON_KEY`), then `npm run test:sync:infra`. It is light (no iOS
+  simulator / Metro), so it should be one of the cheaper slow-side lanes — measure
+  and record its local timing here. Its schema-drift half is also covered by the
+  `sync-drift` backend lane above.
 
 - **Excluded as retired:** `./supabase/scripts/test-sync-api-contract.sh` and
   `./supabase/scripts/test-sync-events-ingest-contract.sh` target the M13/M14

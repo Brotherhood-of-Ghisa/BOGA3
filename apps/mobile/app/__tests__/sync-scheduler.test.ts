@@ -21,13 +21,16 @@ import type { LogEventParams } from '@/src/logging/logEvent';
 // --- Controllable cycle stub -------------------------------------------------
 //
 // runSyncCycle returns a promise the test resolves/rejects by hand so the
-// RUNNING state can be observed before the cycle settles.
-let cycleResolvers: { resolve: () => void; reject: (error: unknown) => void }[] = [];
+// RUNNING state can be observed before the cycle settles. It resolves with the
+// cycle's classified outcome (it never throws in production).
+type CycleOutcome = 'converged' | 'auth-required' | 'fk-violation' | 'internal';
+let cycleResolvers: { resolve: (outcome: CycleOutcome) => void; reject: (error: unknown) => void }[] =
+  [];
 let cycleStartCount = 0;
 
 const mockRunSyncCycle = jest.fn(
   () =>
-    new Promise<void>((resolve, reject) => {
+    new Promise<CycleOutcome>((resolve, reject) => {
       cycleStartCount += 1;
       cycleResolvers.push({ resolve, reject });
     }),
@@ -94,10 +97,10 @@ const connectedReachabilityNull = () =>
 const connectedReachabilityFalse = () =>
   mockNetInfoState.listener?.({ isConnected: true, isInternetReachable: false });
 
-/** Settle the most recently started cycle (success). */
+/** Settle the most recently started cycle (converged). */
 const endCycleSuccess = async () => {
   const pending = cycleResolvers.shift();
-  pending?.resolve();
+  pending?.resolve('converged');
   // Let the .finally() chain run so the cycle-ends transition lands.
   await Promise.resolve();
   await Promise.resolve();

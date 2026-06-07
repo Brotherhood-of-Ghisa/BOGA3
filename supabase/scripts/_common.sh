@@ -78,6 +78,60 @@ run_supabase() {
   )
 }
 
+# Read this worktree's Supabase project_id from supabase/config.toml.
+# Echoes the id (empty string if config.toml is absent or has no project_id).
+worktree_project_id() {
+  local config_file="${SUPABASE_DIR}/config.toml"
+  [[ -f "${config_file}" ]] || return 0
+  awk -F'"' '/^project_id[[:space:]]*=/ {print $2; exit}' "${config_file}" || true
+}
+
+# Resolve the Postgres container for THIS worktree's Supabase stack.
+#
+# This host runs multiple worktree Supabase stacks at once, so a name match
+# MUST be scoped to this worktree's project_id. An unscoped
+# `grep '^supabase_db_' | head -n1` can select a FOREIGN worktree's database,
+# producing fixture-owner UUID mismatches and spurious FK errors. We therefore
+# match strictly on `supabase_db_${project_id}` and ERROR (no fallback) if that
+# exact container is not running.
+#
+# On success: echoes the container name and returns 0.
+# On failure: prints a clear diagnostic to stderr and returns 1.
+resolve_db_container() {
+  if ! command -v docker >/dev/null 2>&1; then
+    echo "[resolve_db_container] docker is not available on PATH." >&2
+    return 1
+  fi
+
+  local project_id
+  project_id="$(worktree_project_id)"
+  if [[ -z "${project_id}" ]]; then
+    echo "[resolve_db_container] could not read project_id from ${SUPABASE_DIR}/config.toml;" \
+         "run ./scripts/worktree-setup.sh to generate this worktree's config." >&2
+    return 1
+  fi
+
+  local container
+  # Exact, anchored match on this worktree's project_id. The container name is
+  # `supabase_db_<project_id>`; project_id is unique per worktree, so this never
+  # matches a foreign stack. No unscoped head -n1 fallback.
+  container="$(docker ps --format '{{.Names}}' 2>/dev/null \
+    | grep -F "supabase_db_${project_id}" \
+    | head -n1 || true)"
+
+  if [[ -z "${container}" ]]; then
+    echo "[resolve_db_container] no running container named 'supabase_db_${project_id}'" \
+         "for this worktree (project_id='${project_id}')." >&2
+    echo "[resolve_db_container] this worktree's local Supabase stack is not up." \
+         "Start it with ./supabase/scripts/ensure-local-runtime-baseline.sh" \
+         "(or local-runtime-up.sh). NOT falling back to a foreign stack." >&2
+    return 1
+  fi
+
+  printf '%s\n' "${container}"
+  return 0
+}
+
 load_supabase_status_env() {
   local line key value
   local output
