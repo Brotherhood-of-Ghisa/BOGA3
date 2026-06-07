@@ -2,6 +2,8 @@
 
 **Type:** build
 
+> Updated from t1: see designs/t1.md ## Decision
+
 **Problem:** Verify that the plan's outcomes are delivered end-to-end. This task is the contract with
 the human — its tests must fail if an outcome is missed. The central proof is the anti-brick
 guarantee: a wiped/reinstalled client must re-pull `muscle_groups` (Layer 0) before
