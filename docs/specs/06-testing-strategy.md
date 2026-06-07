@@ -143,11 +143,15 @@ Metro and is owned operationally by
   (5-minute step timeout), and `npm run test:handles` (open-handle guard, 5-minute
   step timeout). That is the **entire** CI surface today.
 - **Not in CI:** the iOS Maestro slow gates (`quality-slow.sh frontend`) and the
-  backend Supabase contract suites (`quality-slow.sh backend`) remain local/manual,
-  along with `lint:ui-guardrails` and `db:generate:canary`. For work not covered by
-  the CI job, the verification record must still document: what was run locally,
-  whether a slow gate was required and its trigger, and what is deferred/manual
-  (e.g. hosted deployment smoke).
+  backend Supabase contract suites (`quality-slow.sh backend`) are local-only,
+  along with `lint:ui-guardrails` and `db:generate:canary`. **Local-only means you
+  run them on your dev machine — not that they can't be run: this environment boots
+  the iOS simulator and local Supabase (verify + run per
+  `02-quality-and-test-gates.md`). Do not record a slow gate as "deferred" because
+  the sim/Supabase is "unavailable".** For work not covered by the CI job, the
+  verification record must still document: what was run locally, whether a slow
+  gate was required and its trigger, and what is genuinely deferred (e.g. hosted
+  deployment smoke that has no local equivalent).
 - **Keep-in-sync rule:** when CI coverage expands (e.g. backend or e2e gates land
   in CI), update this catalog and the always-load quickref
   (`docs/specs/02-quality-and-test-gates.md`) in the same change so gate ownership
