@@ -1,29 +1,29 @@
 -- =============================================================================
 -- Sync v2 clean-room migration.
 --
--- Implements t1 of docs/plans/sync-v2-server/plan.md, per the authoritative
--- design at docs/plans/sync-v2/designs/t1.md. This single migration:
+-- Authoritative reference: docs/specs/tech/sync-v2-server-contract.md (Part A,
+-- server schema). This single migration:
 --
 --   1. Drops every v1 sync server object — the M13/M14 projection function
 --      family, the sync-events ingest RPC + impl, the in-flight strict variant
 --      from M15-era idempotency patch, the M15 gym-coordinates trigger and
 --      validation helper, the device/ingested-events tables, and the eight
 --      legacy entity tables from the user-scoped PK redesign.
---   2. Recreates the eight v2 app_public.<entity> tables with composite
+--   2. Recreates the per-user app_public.<entity> tables with composite
 --      (owner_user_id, id) PKs, universal sync columns (client_updated_at_ms,
---      server_received_at, deleted_at), and zero CHECK constraints (t1 §1).
---   3. Declares the eight cross-entity FKs as composite, DEFERRABLE INITIALLY
---      DEFERRED references per t1 §5.2.
+--      server_received_at, deleted_at), and zero CHECK constraints (§A.1).
+--   3. Declares the cross-entity FKs as composite, DEFERRABLE INITIALLY
+--      DEFERRED references per §A.5.
 --   4. Adds universal owner/received-at indexes plus per-entity btree and
---      partial WHERE-deleted_at-IS-NULL indexes per t1 §2.
+--      partial WHERE-deleted_at-IS-NULL indexes per §A.2.
 --   5. Installs the two universal triggers per entity (touch-server-received-at,
 --      owner-immutability) and redefines the immutability function body to the
---      NULL-safe canonical form in t1 §6.3.
---   6. Enables RLS and creates the four owner-scoped policies per t1 §6.1.
+--      NULL-safe canonical form in §A.6.3.
+--   6. Enables RLS and creates the four owner-scoped policies per §A.6.1.
 --   7. Grants select/insert/update/delete on every entity table to
---      authenticated and service_role per t1 §10 step 6.
+--      authenticated and service_role.
 --
--- There is no rollback path: the hosted DB is wiped post-merge (t1 §1, "Hard
+-- There is no rollback path: the hosted DB is wiped post-merge (§A.1, "Hard
 -- cut from v1"). Reverting this migration is not a supported operation; reset
 -- the local stack and re-apply the migration tree from scratch instead.
 -- =============================================================================
@@ -69,12 +69,12 @@ drop table if exists app_public.exercise_definitions cascade;
 drop table if exists app_public.gyms cascade;
 
 -- -----------------------------------------------------------------------------
--- 2. Redefine the owner-immutability function to the canonical t1 §6.3 body.
+-- 2. Redefine the owner-immutability function to the canonical §A.6.3 body.
 --
 -- The pre-existing body in M5 used `<>` and had no auth.uid()-is-null guard,
 -- which left a silent RLS-bypass path open under three-valued logic. The v2
 -- body uses IS DISTINCT FROM and refuses the write outright when auth.uid()
--- is NULL. Verbatim from designs/t1.md §6.3.
+-- is NULL. Verbatim from §A.6.3 of the server contract.
 -- -----------------------------------------------------------------------------
 
 create or replace function app_public.enforce_owner_user_id_immutable()
@@ -93,7 +93,7 @@ end;
 $$;
 
 comment on function app_public.enforce_owner_user_id_immutable() is
-  'Sync v2: BEFORE UPDATE trigger guarding owner_user_id against silent re-homing. NULL-safe per designs/t1.md §6.3.';
+  'Sync v2: BEFORE UPDATE trigger guarding owner_user_id against silent re-homing. NULL-safe per the server contract §A.6.3.';
 
 -- Shared touch-server-received-at trigger function. Stamps now() onto every
 -- non-no-op UPDATE so the pull cursor (server_received_at) advances. INSERT
@@ -112,20 +112,19 @@ end;
 $$;
 
 comment on function app_public.touch_server_received_at() is
-  'Sync v2: BEFORE UPDATE trigger stamping server_received_at = now() on every cursor-affecting change. Paired with a NEW IS DISTINCT FROM OLD WHEN clause per designs/t1.md §2.';
+  'Sync v2: BEFORE UPDATE trigger stamping server_received_at = now() on every cursor-affecting change. Paired with a NEW IS DISTINCT FROM OLD WHEN clause per the server contract §A.2.';
 
 -- -----------------------------------------------------------------------------
--- 3. Create the eight v2 entity tables (parent -> child order). All FKs are
---    composite, DEFERRABLE INITIALLY DEFERRED per t1 §5.2. No CHECK
---    constraints anywhere (t1 §1, "no server validation").
+-- 3. Create the v2 entity tables (parent -> child order). All FKs are
+--    composite, DEFERRABLE INITIALLY DEFERRED per §A.5. No CHECK
+--    constraints anywhere (§A.1, "no server validation").
 --
--- Note on gyms latitude/longitude/coordinate columns: t1 §2.1 does not list
--- these, but the v1 m15 migration added them and the client Drizzle schema
--- (apps/mobile/src/data/schema/gyms.ts) carries them. To keep the v2 server
--- aligned with the client (designs/t1.md §1, "Server schema mirrors client"),
+-- Note on gyms latitude/longitude/coordinate columns: the canonical §A.2.1
+-- mapping carries them because the v1 m15 migration added them and the client
+-- Drizzle schema (apps/mobile/src/data/schema/gyms.ts) carries them. To keep
+-- the v2 server aligned with the client (§A.1, "Server schema mirrors client"),
 -- the columns are preserved here as typed nullable columns with no CHECK
--- constraints (per the v2 no-server-validation rule). Flagged in the PR body
--- under "Deviations from card".
+-- constraints (per the v2 no-server-validation rule).
 -- -----------------------------------------------------------------------------
 
 -- 3.1 gyms ------------------------------------------------------------------
@@ -434,7 +433,7 @@ create index session_exercise_tags_pair_idx
 -- -----------------------------------------------------------------------------
 -- 4. Universal triggers per entity: touch-server-received-at + owner-immutable.
 --    Defense-in-depth WHEN (NEW IS DISTINCT FROM OLD) on the touch trigger
---    per designs/t1.md §2.
+--    per the server contract §A.2.
 -- -----------------------------------------------------------------------------
 
 create trigger gyms_touch_server_received_at
@@ -528,8 +527,8 @@ create trigger session_exercise_tags_owner_user_id_immutable
   execute function app_public.enforce_owner_user_id_immutable();
 
 -- -----------------------------------------------------------------------------
--- 5. RLS policies. Identical shape per t1 §6.1. All four operations gated on
---    owner_user_id = auth.uid().
+-- 5. RLS policies. Identical shape per the server contract §A.6.1. All four
+--    operations gated on owner_user_id = auth.uid().
 -- -----------------------------------------------------------------------------
 
 alter table app_public.gyms enable row level security;
@@ -641,7 +640,7 @@ create policy session_exercise_tags_owner_delete on app_public.session_exercise_
   for delete to authenticated using (owner_user_id = auth.uid());
 
 -- -----------------------------------------------------------------------------
--- 6. Grants per t1 §10 step 6.
+-- 6. Grants: select/insert/update/delete to authenticated and service_role.
 -- -----------------------------------------------------------------------------
 
 grant select, insert, update, delete on table app_public.gyms to authenticated;

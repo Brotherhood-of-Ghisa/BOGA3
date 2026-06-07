@@ -1,35 +1,35 @@
 -- =============================================================================
 -- Sync v2: sync_push RPC.
 --
--- Implements t3 of docs/plans/sync-v2-server/plan.md, per the authoritative
--- designs at docs/plans/sync-v2/designs/{t1,t2}.md. Stack on top of t1's
+-- Authoritative reference: docs/specs/tech/sync-v2-server-contract.md (Part B,
+-- push/pull protocol, plus Part A server schema). Stacks on top of the
 -- clean-room migration (20260525120000_sync_v2_clean_room.sql).
 --
 -- Endpoint: POST /rest/v1/rpc/sync_push
--- Body:     {"entities": Entity[]}                       (per t2 §3.1)
--- Returns:  {"ok": true, "server_received_at": <iso>}    (per t2 §3.5)
+-- Body:     {"entities": Entity[]}                       (per §B.3.1)
+-- Returns:  {"ok": true, "server_received_at": <iso>}    (per §B.3.5)
 --
--- Semantics (load-bearing per the designs):
---   - security invoker: RLS evaluates as the caller (t1 §6.2). NOT definer.
---   - Structural validation only (t1 §1, t2 §2.2): array shape, length 1..200,
+-- Semantics (load-bearing per the contract):
+--   - security invoker: RLS evaluates as the caller (§A.6.2). NOT definer.
+--   - Structural validation only (§A.1, §B.2.2): array shape, length 1..200,
 --     auth.uid() non-null. No type/range/enum checks.
---   - Single transaction with SET CONSTRAINTS ALL DEFERRED (t2 §3.2). Per-row
+--   - Single transaction with SET CONSTRAINTS ALL DEFERRED (§B.3.2). Per-row
 --     LWW upsert into app_public.<entity>; FK closure re-checked at
 --     SET CONSTRAINTS ALL IMMEDIATE before function return so we can raise a
 --     FK_VIOLATION-shaped error inside the function body (PostgREST surfaces
 --     errcode P0001 + message verbatim — see error-envelope notes below).
---   - LWW predicate (t1 §1.1.1): ON CONFLICT (owner_user_id, id) DO UPDATE
+--   - LWW predicate (§A.1.1.1): ON CONFLICT (owner_user_id, id) DO UPDATE
 --     WHERE excluded.client_updated_at_ms > <table>.client_updated_at_ms.
---   - Future-clock clamp (t1 §1): least(incoming_cuam, now_ms() + 5*60*1000).
+--   - Future-clock clamp (§A.1): least(incoming_cuam, now_ms() + 5*60*1000).
 --   - Every typed column from `fields` is written verbatim on overwrite,
---     including deleted_at (t1 §1.1).
---   - Single now() per transaction (t2 §3.5): captured once at function entry
+--     including deleted_at (§A.1.1).
+--   - Single now() per transaction (§B.3.5): captured once at function entry
 --     and re-used for server_received_at on every row in the batch.
 --
 -- Error envelope on failure:
 --   PostgREST surfaces a raise exception as a JSON body with shape
 --   {"code": "<errcode>", "message": "<msg>", "details": ..., "hint": ...}.
---   We don't write our own wrapper — t2 §2.2's envelope ({"error":{"code","message"}})
+--   We don't write our own wrapper — the §B.2.2 envelope ({"error":{"code","message"}})
 --   is the client-side contract; the message string carries the literal
 --   "AUTH_REQUIRED" / "FK_VIOLATION" / "INTERNAL" token so the client can
 --   pattern-match. Structural failures use errcode P0001 + an "INTERNAL: ..."
@@ -38,7 +38,7 @@
 --   "FK_VIOLATION: ..." so the wire token is stable regardless of which FK
 --   triggered.
 --
--- Note on bigint serialization (t2 §1):
+-- Note on bigint serialization (§B.1):
 --   PostgREST (the Supabase-bundled version in this repo's CLI pin
 --   2.76.x ships PostgREST >= 12) returns Postgres bigint values as JSON
 --   integers, not strings, by default. epoch-ms < 2^53 fits safely in
@@ -47,7 +47,7 @@
 --   number (jq's `type == "number"`) from a service-role SELECT of a stored
 --   row, and that the sync_push response's server_received_at is a string
 --   (the function explicitly returns an ISO-8601 string for that field per
---   t2 §3.5 "iso8601 with ms").
+--   §B.3.5 "iso8601 with ms").
 -- =============================================================================
 
 -- ---------------------------------------------------------------------------
@@ -56,16 +56,16 @@
 -- One private function per entity would balloon the migration without
 -- meaningful benefit; instead the dispatch lives inside the main RPC as an
 -- IF/ELSIF chain. The per-entity column lists below are the exact typed
--- columns from designs/t1.md §2 as built by the clean-room migration
+-- columns from the server contract §A.2 as built by the clean-room migration
 -- (20260525120000_sync_v2_clean_room.sql) — the `gyms` branch includes
--- latitude/longitude/coordinate_accuracy_m/coordinates_updated_at per the
--- t1 PR's "Deviations from card" note (the v1 m15 migration added them and
--- the client Drizzle schema continues to carry them, so the v2 server
--- mirror keeps them; t1 §1 "server schema mirrors client").
+-- latitude/longitude/coordinate_accuracy_m/coordinates_updated_at because the
+-- v1 m15 migration added them and the client Drizzle schema continues to carry
+-- them, so the v2 server mirror keeps them (§A.1 "server schema mirrors
+-- client").
 -- ---------------------------------------------------------------------------
 
 -- PostgREST dispatches RPC calls by mapping top-level JSON body keys to
--- named function parameters. The wire shape (t2 §3.1) is
+-- named function parameters. The wire shape (§B.3.1) is
 -- {"entities": [...]} — so the parameter is named `entities`, and the body
 -- key feeds directly into it. Default to '[]'::jsonb so a malformed call
 -- with no `entities` key surfaces the structural error inside this body
@@ -92,7 +92,7 @@ declare
 begin
   -- 1a. Auth precondition. RLS would block the writes regardless, but
   -- without auth.uid() the row-default for owner_user_id resolves to NULL
-  -- and the immutability trigger explicitly refuses NULL auth (t1 §6.3).
+  -- and the immutability trigger explicitly refuses NULL auth (§A.6.3).
   -- Short-circuit here so the client gets a clear AUTH_REQUIRED token
   -- rather than a downstream NOT NULL / RLS message.
   _uid := auth.uid();
@@ -101,7 +101,7 @@ begin
       using errcode = 'P0001';
   end if;
 
-  -- 1b. Structural validation only (t1 §1, t2 §2.2). The drift checker (t2)
+  -- 1b. Structural validation only (§A.1, §B.2.2). The schema-drift checker
   -- catches schema-level malformation at PR time.
   if _entities is null or jsonb_typeof(_entities) <> 'array' then
     raise exception 'INTERNAL: sync_push entities must be a JSON array'
@@ -115,21 +115,21 @@ begin
       using errcode = 'P0001';
   end if;
 
-  -- 1c. Capture a single now() for the entire transaction (t2 §3.5).
+  -- 1c. Capture a single now() for the entire transaction (§B.3.5).
   -- server_received_at on every upserted row uses this same value, and the
   -- success response echoes it back to the client.
   _now_tstz   := now();
   _now_ms_max := (extract(epoch from _now_tstz) * 1000)::bigint + 5 * 60 * 1000;
 
-  -- 1d. Defer all FKs for the duration of this transaction (t2 §3.2). The
+  -- 1d. Defer all FKs for the duration of this transaction (§B.3.2). The
   -- caller may push a child row before its parent inside the same batch;
   -- closure is checked at SET CONSTRAINTS ALL IMMEDIATE below.
   set constraints all deferred;
 
-  -- 1e. Dispatch per entity. Per t1 §1.1.1: LWW upsert on (owner_user_id,
+  -- 1e. Dispatch per entity. Per §A.1.1.1: LWW upsert on (owner_user_id,
   -- id) — overwrite every column in `fields` (including deleted_at) when
   -- incoming.client_updated_at_ms > stored.client_updated_at_ms; no-op
-  -- otherwise. Future-clock clamp on client_updated_at_ms per t1 §1.
+  -- otherwise. Future-clock clamp on client_updated_at_ms per §A.1.
   for _idx in 0 .. _len - 1 loop
     _entity := _entities -> _idx;
 
@@ -416,7 +416,7 @@ begin
       raise exception 'FK_VIOLATION: %', sqlerrm using errcode = 'P0001';
   end;
 
-  -- 1g. Success ack (t2 §3.5). server_received_at is the ISO-8601 string of
+  -- 1g. Success ack (§B.3.5). server_received_at is the ISO-8601 string of
   -- the captured _now_tstz; the client uses it for observability only.
   _ok_payload := jsonb_build_object(
     'ok', true,
@@ -428,12 +428,12 @@ end;
 $func$;
 
 comment on function app_public.sync_push(jsonb) is
-  'Sync v2 push RPC. POST /rest/v1/rpc/sync_push. Batched LWW upsert with deferrable FKs. security invoker — RLS applies. See designs/t1.md §1.1 and designs/t2.md §3.';
+  'Sync v2 push RPC. POST /rest/v1/rpc/sync_push. Batched LWW upsert with deferrable FKs. security invoker — RLS applies. See the server contract §A.1.1 and §B.3.';
 
 -- ---------------------------------------------------------------------------
 -- 2. Grants. authenticated may call; service_role bypasses RLS naturally.
 -- anon is granted execute so that an unauthenticated caller surfaces the
--- function-body AUTH_REQUIRED token (t2 §2.2 wire contract) rather than a
+-- function-body AUTH_REQUIRED token (§B.2.2 wire contract) rather than a
 -- PostgREST-layer "permission denied for function" 42501. RLS still blocks
 -- any actual writes from anon — and the function body short-circuits on
 -- auth.uid() IS NULL before reaching the upsert loop.

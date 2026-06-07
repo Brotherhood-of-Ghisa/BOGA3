@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# tFINAL integration test — sync_push end-to-end (plan outcome #6).
+# Integration test — sync_push end-to-end.
 #
 # Asserts the integration-level behaviour of POST /rest/v1/rpc/sync_push:
 #
@@ -12,14 +12,14 @@
 #     is a no-op (ack ok:true, stored row unchanged).
 #   - Future-clock clamp: pushing an inflated client_updated_at_ms results
 #     in the stored value being <= now()+5min and strictly less than the
-#     sent value (t1 §1).
+#     sent value (server contract §A.1).
 #   - FK closure failure: an orphan-child push (session_exercises whose
 #     session_id is neither in the batch nor on the server) returns the
 #     FK_VIOLATION error envelope and no rows from the batch land.
 #
-# This is integration-level on top of t3's per-feature contract suite — it
-# exercises the multi-layer ordering + LWW + clamp + FK-violation paths
-# together against the as-built RPC.
+# This is integration-level on top of the per-feature push contract suite
+# (sync-push-contract.sh) — it exercises the multi-layer ordering + LWW +
+# clamp + FK-violation paths together against the as-built RPC.
 
 set -euo pipefail
 
@@ -184,9 +184,9 @@ BASE_MS="$(($(date +%s) * 1000))"
 
 # Per-layer ID set. Non-topological ARRAY ORDER for the multi-layer batch:
 # we list layer-3 first, layer-2, layer-1, layer-0 last so the deferrable-FK
-# path is exercised inside one transaction (mirroring t3's contract test
-# scenario 2 + 10, but with all four topological layers and all nine types
-# in one call rather than just the four-row chain).
+# path is exercised inside one transaction (mirroring the push contract
+# suite's deferrable-FK scenarios, but with all four topological layers and
+# all nine types in one call rather than just the four-row chain).
 GYM_ID="rt-${RUN_TAG}-gym"
 EDEF_ID="rt-${RUN_TAG}-edef"
 MG_ID="rt-${RUN_TAG}-mg"

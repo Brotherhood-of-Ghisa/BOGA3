@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 
-# tFINAL integration test — Drift checker passes on the as-built schema
-# (plan outcome #9 positive case).
+# Integration test — drift checker passes on the as-built schema
+# (positive case).
 #
 # Standalone positive-case test for the slow gate. Lives separately from
 # sync-v2-drift-synthetic.sh so the orchestration wrapper can run the
 # positive case even if a future refactor splits the synthetic test out.
 # Both scripts ultimately invoke the same `npm run check:sync-drift --
-# --strict` command and both must pass for outcome #9 to hold.
+# --strict` command and both must pass for the drift gate to hold.
 
 set -euo pipefail
 
@@ -42,4 +42,4 @@ if [[ "${RC}" != "0" ]]; then
   fail "drift checker exited rc=${RC} on as-built tree; expected 0"
 fi
 rm -f "${OUTPUT_FILE}"
-pass "outcome #9 positive — drift checker exits 0 on the as-built schema"
+pass "drift positive — drift checker exits 0 on the as-built schema"

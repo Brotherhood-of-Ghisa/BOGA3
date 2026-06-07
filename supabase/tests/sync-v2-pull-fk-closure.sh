@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
 
-# tFINAL integration test — Layered drain preserves client-FK closure
-# (plan outcome #8a — load-bearing).
+# Integration test — layered drain preserves client-FK closure (load-bearing).
 #
 # Pushes a fully-connected dataset for user A (one row in every entity type,
 # with the entire FK chain wired up), then drains layers 0→3 sequentially.
 # For every row emitted by the layer-N response, asserts that every FK parent
 # of that row has already appeared in a layer-M response with M ≤ N (or in
-# the same layer-N response — though the t1 §5 FK graph has no intra-layer
-# references).
+# the same layer-N response — though the FK graph (server contract §A.5) has no
+# intra-layer references).
 #
 # Method: simulate a client SQLite by maintaining a `seen_ids` set keyed by
 # (type, id) across layer responses. Every time we process a row, we read its
@@ -19,9 +18,9 @@
 # violation a client inserting layer-by-layer would hit against its own
 # SQLite.
 #
-# Also asserts the layer→type partition exactly matches the corrected
-# mapping recorded in plan.md ## Deviations log (t2 entry):
-#   Layer 0: gyms, exercise_definitions
+# Also asserts the layer→type partition exactly matches the topological
+# mapping in the server contract §B.4.4:
+#   Layer 0: gyms, exercise_definitions, muscle_groups
 #   Layer 1: sessions, exercise_muscle_mappings, exercise_tag_definitions
 #   Layer 2: session_exercises
 #   Layer 3: exercise_sets, session_exercise_tags
@@ -121,8 +120,8 @@ trap cleanup_rows EXIT
 
 BASE_MS="$(($(date +%s) * 1000))"
 
-# Per t1 §5 FK graph. Used by the seen_ids check below to discover the
-# parents of any row given its type and field set.
+# Per the FK graph (server contract §A.5). Used by the seen_ids check below to
+# discover the parents of any row given its type and field set.
 #
 # Format: "<type>|<fk_field_name>|<parent_type>"
 # Where:
@@ -144,7 +143,7 @@ FK_EDGES=(
   "session_exercise_tags|exercise_tag_definition_id|exercise_tag_definitions"
 )
 
-# Per layer expected type set per t2 §4.4 corrected partition.
+# Per-layer expected type set per the server contract §B.4.4 partition.
 # Sorted lex so we can compare against `jq | unique | sort`.
 LAYER_TYPES_0='["exercise_definitions","gyms","muscle_groups"]'
 LAYER_TYPES_1='["exercise_muscle_mappings","exercise_tag_definitions","sessions"]'
@@ -246,8 +245,9 @@ drain_layer_and_check() {
   # For each row in OURS we read its FK columns from `fields`, look up the
   # `(parent_type, parent_id)` pair in SEEN_IDS, and fail if absent.
   # After all rows in this layer pass, we add them ALL to SEEN_IDS — only
-  # then, because in the t1 §5 FK graph there are NO intra-layer FKs, so a
-  # layer-N row cannot legitimately reference a sibling in the same layer.
+  # then, because in the FK graph (server contract §A.5) there are NO
+  # intra-layer FKs, so a layer-N row cannot legitimately reference a sibling
+  # in the same layer.
   # If that invariant ever breaks (intra-layer FK introduced) this check
   # surfaces it as a forward-reference violation.
 
@@ -272,7 +272,7 @@ drain_layer_and_check() {
       parent_id="$(printf '%s' "${row_fields}" | jq -r --arg col "${fk_col}" '.[$col] // null')"
       if [[ "${parent_id}" == "null" || -z "${parent_id}" ]]; then
         # Nullable FK is fine — sessions.gym_id, session_exercises.exercise_definition_id
-        # both can be null per the t1 schema.
+        # both can be null per the entity schema (server contract §A.2).
         continue
       fi
       # Is (parent_type, parent_id) in SEEN_IDS?
@@ -309,14 +309,14 @@ if [[ "${TOTAL_SEEN}" != "9" ]]; then
   fail "after draining all four layers SEEN_IDS holds ${TOTAL_SEEN} rows, expected 9 (one per entity type)"
 fi
 
-pass "outcome #8a — fully-connected dataset drained layer-by-layer with zero forward FK references"
-pass "outcome #8a — nine entity types partition exactly across the four layers (corrected mapping)"
+pass "FK closure — fully-connected dataset drained layer-by-layer with zero forward FK references"
+pass "FK closure — nine entity types partition exactly across the four layers"
 
 # ---------------------------------------------------------------------------
 # Step 3 — pull every layer one more time as a sanity check that the
 # partition assertion holds against ALL rows for user A (not only our
 # run-tagged subset). I.e. for any layer L the response, restricted to types
-# in t2 §4.4's set for L, must equal exactly that set or a subset (other
+# in the §B.4.4 set for L, must equal exactly that set or a subset (other
 # tests may not have seeded every type but the response cannot include types
 # from a different layer).
 # ---------------------------------------------------------------------------
@@ -337,6 +337,6 @@ for layer in 0 1 2 3; do
     fail "partition violation layer ${layer}: response carries types not in ${ALLOWED} — actual=${ACTUAL_TYPES}"
   fi
 done
-pass "outcome #8a — every layer's full response is a subset of its declared type set (no cross-layer leakage)"
+pass "FK closure — every layer's full response is a subset of its declared type set (no cross-layer leakage)"
 
 echo "[sync-v2-pull-fk-closure] all assertions passed"

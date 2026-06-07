@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 
-# tFINAL integration test — Spec edit landed (plan outcome #10).
+# Integration test — client-schema-drift rule present in the data-model spec.
 #
 # Greps docs/specs/05-data-model.md for:
 #   - The literal heading `## Client schema drift rule (Sync v2)`
-#   - The exact sentence from t1 §8.2 about the server migration being
-#     deployed first before the client change ships
+#   - The exact sentence about the server migration being deployed first
+#     before the client change ships (the server-first deploy rule, server
+#     contract §A.8)
 #
 # Exits non-zero if either is missing. This is intentionally a one-shot
 # grep — the rule wording is contractual and must not drift; any rephrasing
-# should be a deliberate co-edit of t1 §8.2 and this assertion.
+# should be a deliberate co-edit of the spec and this assertion.
 
 set -euo pipefail
 
@@ -27,9 +28,9 @@ pass() { echo "[sync-v2-spec-rule] pass: $*"; }
 if ! grep -qxF "## Client schema drift rule (Sync v2)" "${SPEC_FILE}"; then
   fail "spec is missing the literal heading '## Client schema drift rule (Sync v2)'"
 fi
-pass "outcome #10 — heading '## Client schema drift rule (Sync v2)' present"
+pass "spec rule — heading '## Client schema drift rule (Sync v2)' present"
 
-# Assertion B: the server-first sentence from t1 §8.2.
+# Assertion B: the server-first deploy sentence (server contract §A.8).
 #
 # The exact wording in the as-merged spec is:
 #   "and the server migration must be deployed to production before the
@@ -40,8 +41,8 @@ pass "outcome #10 — heading '## Client schema drift rule (Sync v2)' present"
 # rewording of the actual phrase.
 NORMALISED="$(tr '\n' ' ' < "${SPEC_FILE}" | tr -s ' ')"
 if ! printf '%s' "${NORMALISED}" | grep -qF "the server migration must be deployed to production before the client change ships"; then
-  fail "spec is missing the t1 §8.2 sentence about server-first deploy ('the server migration must be deployed to production before the client change ships')"
+  fail "spec is missing the server-first deploy sentence ('the server migration must be deployed to production before the client change ships')"
 fi
-pass "outcome #10 — server-first deploy sentence from t1 §8.2 present verbatim (whitespace-normalised match)"
+pass "spec rule — server-first deploy sentence present verbatim (whitespace-normalised match)"
 
 echo "[sync-v2-spec-rule] all assertions passed"

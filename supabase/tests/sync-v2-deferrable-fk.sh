@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 
-# tFINAL integration test — Deferrable FKs (plan outcome #4).
+# Integration test — deferrable FKs.
 #
 # Asserts the two halves of the deferrable-FK contract from docs/specs/tech/sync-v2-server-contract.md §A.5.2:
 #
-#   A. All eight cross-entity FKs are present in information_schema.
+#   A. All nine cross-entity FKs are present in information_schema.
 #      referential_constraints with is_deferrable='YES' and
 #      initially_deferred='YES'.
 #   B. A transaction that inserts a complete FK chain in child-before-parent
@@ -14,8 +14,8 @@
 #      With INITIALLY DEFERRED FKs, the check happens at COMMIT, by which
 #      time the closure is complete.
 #
-# This is integration-level on top of t1's per-table smoke (which only checks
-# pg_constraint.condeferred). The transaction-level assertion is the
+# This is integration-level on top of the per-table schema smoke (which only
+# checks pg_constraint.condeferred). The transaction-level assertion is the
 # behaviour the push RPC relies on (docs/specs/tech/sync-v2-server-contract.md §B.3.2
 # "SET CONSTRAINTS ALL DEFERRED inside the function").
 
@@ -131,7 +131,7 @@ for spec in "${FK_SPECS[@]}"; do
     fail "${fk_name}: expected initially_deferred=YES, got '${initially_deferred}'"
   fi
 done
-pass "outcome #4.A — nine expected FKs present with is_deferrable=YES and initially_deferred=YES (information_schema.referential_constraints joined to .table_constraints)"
+pass "deferrable-fk A — nine expected FKs present with is_deferrable=YES and initially_deferred=YES (information_schema.referential_constraints joined to .table_constraints)"
 
 # Also check: exactly 9 cross-entity FKs in app_public schema with both flags
 # set. (The auth.users CASCADE FKs from each entity's owner_user_id sit in
@@ -152,7 +152,7 @@ TOTAL_DEFERRED_FKS="$(run_psql "
 if [[ "${TOTAL_DEFERRED_FKS}" != "9" ]]; then
   fail "expected exactly 9 deferrable+initially-deferred app_public→app_public FKs; got ${TOTAL_DEFERRED_FKS}"
 fi
-pass "outcome #4.A — exactly 9 cross-entity deferrable FKs in app_public"
+pass "deferrable-fk A — exactly 9 cross-entity deferrable FKs in app_public"
 
 # -----------------------------------------------------------------------------
 # B. Behavioural: insert children before parents inside one transaction.
@@ -277,7 +277,7 @@ if [[ "${SESS_LANDED}" != "1" ]]; then
   fail "deferred-FK txn committed but sessions row missing (count=${SESS_LANDED})"
 fi
 
-pass "outcome #4.B — child-before-parent chain commits inside one deferrable-FK transaction"
+pass "deferrable-fk B — child-before-parent chain commits inside one deferrable-FK transaction"
 
 # Negative control: with FKs forced IMMEDIATE the same payload must fail.
 # We expect the SET CONSTRAINTS ALL IMMEDIATE statement to error or, failing
@@ -303,6 +303,6 @@ set -e
 if [[ "${neg_rc}" == "0" ]]; then
   fail "negative control: insert with FKs IMMEDIATE unexpectedly committed (rc=0)"
 fi
-pass "outcome #4.B — negative control: IMMEDIATE FKs reject the same orphan insert (rc=${neg_rc})"
+pass "deferrable-fk B — negative control: IMMEDIATE FKs reject the same orphan insert (rc=${neg_rc})"
 
 echo "[sync-v2-deferrable-fk] all assertions passed"

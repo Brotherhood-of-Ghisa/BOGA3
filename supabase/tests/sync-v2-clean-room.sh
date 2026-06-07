@@ -1,30 +1,29 @@
 #!/usr/bin/env bash
 
-# tFINAL integration test — Clean migration tree (plan outcomes 1, 2, 3).
+# Integration test — clean migration tree end-state.
 #
 # Asserts, against the live local stack (already reset + migrations applied by
 # the slow-gate wrapper), that the sync v2 clean-room migration produces the
-# end-state required by plan.md ## Outcomes #1–#3:
+# expected end-state (see docs/specs/tech/sync-v2-server-contract.md, Part A):
 #
-#   #1  v1 sync objects absent (sync_apply_projection_event,
-#       sync_events_ingest, sync_events_ingest_impl, sync_ingest_failure,
-#       sync_device_ingest_state, sync_ingested_events); all nine v2 tables
-#       present in app_public.
-#   #2  Each of the nine tables has composite PK (owner_user_id, id),
-#       universal columns (owner_user_id, client_updated_at_ms,
-#       server_received_at, deleted_at), the per-table btree indexes,
-#       and ZERO CHECK constraints (per t1 §1, "no server validation").
-#   #3  Each table has the two universal triggers
-#       (<table>_touch_server_received_at, <table>_owner_user_id_immutable);
-#       the enforce_owner_user_id_immutable function body contains the
-#       literal strings 'IS DISTINCT FROM' and 'auth.uid() IS NULL'
-#       (NULL-safe form per t1 §6.3).
+#   1. v1 sync objects absent (sync_apply_projection_event,
+#      sync_events_ingest, sync_events_ingest_impl, sync_ingest_failure,
+#      sync_device_ingest_state, sync_ingested_events); all nine v2 entity
+#      tables present in app_public.
+#   2. Each of the nine tables has composite PK (owner_user_id, id),
+#      universal columns (owner_user_id, client_updated_at_ms,
+#      server_received_at, deleted_at), the per-table btree indexes,
+#      and ZERO CHECK constraints (per §A.1, "no server validation").
+#   3. Each table has the two universal triggers
+#      (<table>_touch_server_received_at, <table>_owner_user_id_immutable);
+#      the enforce_owner_user_id_immutable function body contains the
+#      literal strings 'IS DISTINCT FROM' and 'auth.uid() IS NULL'
+#      (NULL-safe form per §A.6.3).
 #
 # This script overlaps with sync-v2-schema-smoke.sh but reads the catalogs at
 # the integration level (column-type assertions, function-body introspection)
 # rather than only existence checks. The two suites complement each other —
-# the per-task smoke runs in t1's wrapper; this script runs in the tFINAL
-# wrapper, after t2/t3/t4 have stacked on top.
+# the smoke suite checks existence; this one verifies the full as-built shape.
 
 set -euo pipefail
 
@@ -95,7 +94,7 @@ ENTITIES=(
 )
 
 # -----------------------------------------------------------------------------
-# Plan outcome #1.A — v1 sync objects absent.
+# Check 1.A — v1 sync objects absent.
 # -----------------------------------------------------------------------------
 
 V1_FUNCTIONS=(
@@ -118,7 +117,7 @@ for fn in "${V1_FUNCTIONS[@]}"; do
     fail "v1 function app_public.${fn} still present (count=${count})"
   fi
 done
-pass "outcome #1.A — v1 sync functions absent from pg_proc"
+pass "check 1.A — v1 sync functions absent from pg_proc"
 
 V1_TABLES=(sync_device_ingest_state sync_ingested_events)
 for tbl in "${V1_TABLES[@]}"; do
@@ -134,10 +133,10 @@ for tbl in "${V1_TABLES[@]}"; do
     fail "v1 table app_public.${tbl} still present (count=${count})"
   fi
 done
-pass "outcome #1.A — v1 sync-state tables absent from pg_class"
+pass "check 1.A — v1 sync-state tables absent from pg_class"
 
 # -----------------------------------------------------------------------------
-# Plan outcome #1.B — all nine v2 entity tables present.
+# Check 1.B — all nine v2 entity tables present.
 # -----------------------------------------------------------------------------
 
 for entity in "${ENTITIES[@]}"; do
@@ -153,10 +152,10 @@ for entity in "${ENTITIES[@]}"; do
     fail "expected app_public.${entity} to exist (got count=${count})"
   fi
 done
-pass "outcome #1.B — nine v2 entity tables present in app_public"
+pass "check 1.B — nine v2 entity tables present in app_public"
 
 # -----------------------------------------------------------------------------
-# Plan outcome #2 — schema shape: composite PK, universal columns with correct
+# Check 2 — schema shape: composite PK, universal columns with correct
 # types, per-table owner_received index, zero CHECK constraints.
 # -----------------------------------------------------------------------------
 
@@ -177,11 +176,11 @@ for entity in "${ENTITIES[@]}"; do
     fail "${entity}: expected composite PK (owner_user_id, id); got '${pk_cols}'"
   fi
 done
-pass "outcome #2.A — composite (owner_user_id, id) PK on every entity"
+pass "check 2.A — composite (owner_user_id, id) PK on every entity"
 
 # 2.B — universal columns present with correct Postgres types.
 # (owner_user_id uuid, client_updated_at_ms bigint, server_received_at
-# timestamptz, deleted_at bigint per t1 §2.)
+# timestamptz, deleted_at bigint per §A.2.)
 #
 # Parallel arrays (not assoc array) to keep this portable to older bash on
 # macOS dev boxes where `declare -A` interacts badly with `set -u`.
@@ -206,11 +205,11 @@ for entity in "${ENTITIES[@]}"; do
     fi
   done
 done
-pass "outcome #2.B — universal columns (owner_user_id uuid, client_updated_at_ms bigint, server_received_at timestamptz, deleted_at bigint) present on every entity"
+pass "check 2.B — universal columns (owner_user_id uuid, client_updated_at_ms bigint, server_received_at timestamptz, deleted_at bigint) present on every entity"
 
 # 2.C — per-table owner_received_idx present (composite index on
 # (owner_user_id, server_received_at)). This is the index the sync_pull RPC
-# plans against; t1 §2 requires it on every entity.
+# plans against; §A.2 requires it on every entity.
 for entity in "${ENTITIES[@]}"; do
   idx_name="${entity}_owner_received_idx"
   count="$(run_psql "
@@ -224,9 +223,9 @@ for entity in "${ENTITIES[@]}"; do
     fail "${entity}: expected index ${idx_name} (got count=${count})"
   fi
 done
-pass "outcome #2.C — <table>_owner_received_idx present on every entity"
+pass "check 2.C — <table>_owner_received_idx present on every entity"
 
-# 2.D — zero CHECK constraints on every entity (t1 §1 "no server validation").
+# 2.D — zero CHECK constraints on every entity (§A.1 "no server validation").
 for entity in "${ENTITIES[@]}"; do
   count="$(run_psql "
     select count(*)
@@ -241,10 +240,10 @@ for entity in "${ENTITIES[@]}"; do
     fail "${entity}: expected 0 CHECK constraints; got ${count}"
   fi
 done
-pass "outcome #2.D — zero CHECK constraints on any of the nine entity tables"
+pass "check 2.D — zero CHECK constraints on any of the nine entity tables"
 
 # -----------------------------------------------------------------------------
-# Plan outcome #3 — triggers + immutability function body.
+# Check 3 — triggers + immutability function body.
 # -----------------------------------------------------------------------------
 
 # 3.A — two universal triggers per entity.
@@ -267,12 +266,12 @@ for entity in "${ENTITIES[@]}"; do
     fi
   done
 done
-pass "outcome #3.A — both <table>_touch_server_received_at and <table>_owner_user_id_immutable triggers present on every entity"
+pass "check 3.A — both <table>_touch_server_received_at and <table>_owner_user_id_immutable triggers present on every entity"
 
 # 3.B — enforce_owner_user_id_immutable function body contains the literal
 # 'IS DISTINCT FROM' and 'auth.uid() IS NULL' tokens (NULL-safe form per
-# t1 §6.3). Compare case-insensitively because Postgres normalises some SQL
-# tokens on prosrc storage; the t1 §6.3 canonical text uses lowercase, so we
+# §A.6.3). Compare case-insensitively because Postgres normalises some SQL
+# tokens on prosrc storage; the §A.6.3 canonical text uses lowercase, so we
 # do a lowercase substring match.
 PROSRC="$(run_psql "
   select prosrc
@@ -291,6 +290,6 @@ fi
 if [[ "${PROSRC_LC}" != *"auth.uid() is null"* ]]; then
   fail "enforce_owner_user_id_immutable body does not contain 'auth.uid() IS NULL' guard"
 fi
-pass "outcome #3.B — enforce_owner_user_id_immutable body uses IS DISTINCT FROM and explicit auth.uid() IS NULL guard"
+pass "check 3.B — enforce_owner_user_id_immutable body uses IS DISTINCT FROM and explicit auth.uid() IS NULL guard"
 
 echo "[sync-v2-clean-room] all assertions passed"
