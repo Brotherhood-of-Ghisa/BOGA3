@@ -48,3 +48,11 @@ that will mislead you if you treat it as current. **Do not read them, and do not
 let them steer your work, unless the user explicitly points you at a specific
 plan/task to execute or to brainstorm in.** Source-of-truth lives in
 `docs/specs/**`, `AGENTS.md`, and `RUNBOOK.md`.
+
+## Pull requests
+
+Keep PR bodies lean and data-driven — follow `.github/pull_request_template.md`:
+**Objective / Tests / Review hard / Deviations**, using data and `file:line`
+pointers, not prose (~25 lines; link, don't quote). The **Tests** section must list
+every gate lane from `docs/specs/02-quality-and-test-gates.md` with ✅ ran / ⛔ N/A
+and a result + evidence link for each — "CI green" alone is not enough.
