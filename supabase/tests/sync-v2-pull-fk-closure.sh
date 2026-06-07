@@ -110,7 +110,7 @@ RUN_TAG="$(printf '%s' "${RUN_TAG}" | tr -c 'a-zA-Z0-9-' '-')"
 cleanup_rows() {
   for table in session_exercise_tags exercise_sets session_exercises \
                exercise_muscle_mappings exercise_tag_definitions sessions \
-               exercise_definitions gyms; do
+               muscle_groups exercise_definitions gyms; do
     http_request DELETE \
       "${API_URL}/rest/v1/${table}?owner_user_id=eq.${USER_A_UUID}&id=like.fkc-${RUN_TAG}-%" \
       "${SERVICE_ROLE_KEY}" >/dev/null 2>&1 || true
@@ -138,6 +138,7 @@ FK_EDGES=(
   "session_exercises|exercise_definition_id|exercise_definitions"
   "exercise_sets|session_exercise_id|session_exercises"
   "exercise_muscle_mappings|exercise_definition_id|exercise_definitions"
+  "exercise_muscle_mappings|muscle_group_id|muscle_groups"
   "exercise_tag_definitions|exercise_definition_id|exercise_definitions"
   "session_exercise_tags|session_exercise_id|session_exercises"
   "session_exercise_tags|exercise_tag_definition_id|exercise_tag_definitions"
@@ -145,7 +146,7 @@ FK_EDGES=(
 
 # Per layer expected type set per t2 §4.4 corrected partition.
 # Sorted lex so we can compare against `jq | unique | sort`.
-LAYER_TYPES_0='["exercise_definitions","gyms"]'
+LAYER_TYPES_0='["exercise_definitions","gyms","muscle_groups"]'
 LAYER_TYPES_1='["exercise_muscle_mappings","exercise_tag_definitions","sessions"]'
 LAYER_TYPES_2='["session_exercises"]'
 LAYER_TYPES_3='["exercise_sets","session_exercise_tags"]'
@@ -157,6 +158,7 @@ LAYER_TYPES_3='["exercise_sets","session_exercise_tags"]'
 echo "[sync-v2-pull-fk-closure] step 1 — push fully-connected dataset"
 GYM_ID="fkc-${RUN_TAG}-gym"
 ED_ID="fkc-${RUN_TAG}-ed"
+MG_ID="fkc-${RUN_TAG}-mg"
 ETD_ID="fkc-${RUN_TAG}-etd"
 SESS_ID="fkc-${RUN_TAG}-sess"
 EMM_ID="fkc-${RUN_TAG}-emm"
@@ -165,7 +167,7 @@ SET_ID="fkc-${RUN_TAG}-set"
 SXTAG_ID="fkc-${RUN_TAG}-sxtag"
 
 PAYLOAD="$(jq -nc \
-  --arg gym "${GYM_ID}" --arg ed "${ED_ID}" --arg etd "${ETD_ID}" \
+  --arg gym "${GYM_ID}" --arg ed "${ED_ID}" --arg mg "${MG_ID}" --arg etd "${ETD_ID}" \
   --arg sess "${SESS_ID}" --arg emm "${EMM_ID}" --arg sx "${SX_ID}" \
   --arg set "${SET_ID}" --arg sxtag "${SXTAG_ID}" \
   --argjson ts "${BASE_MS}" \
@@ -176,6 +178,10 @@ PAYLOAD="$(jq -nc \
               created_at: $ts, updated_at: $ts, deleted_at: null}},
     {type: "exercise_definitions", id: $ed, client_updated_at_ms: ($ts + 2),
      fields: {name: "ED", created_at: $ts, updated_at: $ts, deleted_at: null}},
+    {type: "muscle_groups", id: $mg, client_updated_at_ms: ($ts + 2),
+     fields: {display_name: "Pectorals", family_name: "chest",
+              sort_order: 0, is_editable: 0,
+              created_at: $ts, updated_at: $ts, deleted_at: null}},
     {type: "exercise_tag_definitions", id: $etd, client_updated_at_ms: ($ts + 3),
      fields: {exercise_definition_id: $ed, name: "Tag", normalized_name: "tag",
               created_at: $ts, updated_at: $ts, deleted_at: null}},
@@ -184,7 +190,7 @@ PAYLOAD="$(jq -nc \
               completed_at: null, duration_sec: null,
               created_at: $ts, updated_at: $ts, deleted_at: null}},
     {type: "exercise_muscle_mappings", id: $emm, client_updated_at_ms: ($ts + 5),
-     fields: {exercise_definition_id: $ed, muscle_group_id: "pectorals",
+     fields: {exercise_definition_id: $ed, muscle_group_id: $mg,
               weight: 1.0, role: null,
               created_at: $ts, updated_at: $ts, deleted_at: null}},
     {type: "session_exercises", id: $sx, client_updated_at_ms: ($ts + 6),
@@ -214,7 +220,7 @@ SEEN_IDS='[]'  # JSON array of {type, id} pairs.
 
 drain_layer_and_check() {
   local layer="$1" expected_types_sorted="$2"
-  # Pull all rows for this layer (limit 200 covers everything in our 8-row seed).
+  # Pull all rows for this layer (limit 200 covers everything in our 9-row seed).
   local body
   body="$(jq -nc --argjson layer "${layer}" '{layer: $layer, cursor: null, limit: 200}')"
   http_request POST "${API_URL}/rest/v1/rpc/sync_pull" "${USER_A_TOKEN}" "${body}"
@@ -297,14 +303,14 @@ drain_layer_and_check 1 "${LAYER_TYPES_1}"
 drain_layer_and_check 2 "${LAYER_TYPES_2}"
 drain_layer_and_check 3 "${LAYER_TYPES_3}"
 
-# Final sanity: SEEN_IDS holds all eight of our seed rows.
+# Final sanity: SEEN_IDS holds all nine of our seed rows.
 TOTAL_SEEN="$(printf '%s' "${SEEN_IDS}" | jq 'length')"
-if [[ "${TOTAL_SEEN}" != "8" ]]; then
-  fail "after draining all four layers SEEN_IDS holds ${TOTAL_SEEN} rows, expected 8 (one per entity type)"
+if [[ "${TOTAL_SEEN}" != "9" ]]; then
+  fail "after draining all four layers SEEN_IDS holds ${TOTAL_SEEN} rows, expected 9 (one per entity type)"
 fi
 
 pass "outcome #8a — fully-connected dataset drained layer-by-layer with zero forward FK references"
-pass "outcome #8a — eight entity types partition exactly across the four layers (corrected mapping)"
+pass "outcome #8a — nine entity types partition exactly across the four layers (corrected mapping)"
 
 # ---------------------------------------------------------------------------
 # Step 3 — pull every layer one more time as a sanity check that the

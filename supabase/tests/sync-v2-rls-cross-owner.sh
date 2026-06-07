@@ -152,6 +152,7 @@ NOW_MS="$(($(date +%s) * 1000))"
 # session_exercise_tag referencing the session_exercise + exercise_tag_definition.
 GYM_ID="rls-${RUN_TAG}-bgym"
 EDEF_ID="rls-${RUN_TAG}-bedef"
+MG_ID="rls-${RUN_TAG}-bmg"
 ETD_ID="rls-${RUN_TAG}-betd"
 SESS_ID="rls-${RUN_TAG}-bsess"
 EMM_ID="rls-${RUN_TAG}-bemm"
@@ -177,6 +178,7 @@ cleanup_rows() {
     delete from app_public.exercise_sets            where id = '${SET_ID}';
     delete from app_public.session_exercises        where id = '${SX_ID}';
     delete from app_public.exercise_muscle_mappings where id = '${EMM_ID}';
+    delete from app_public.muscle_groups            where id = '${MG_ID}';
     delete from app_public.exercise_tag_definitions where id = '${ETD_ID}';
     delete from app_public.sessions                 where id = '${SESS_ID}';
     delete from app_public.exercise_definitions     where id = '${EDEF_ID}';
@@ -204,6 +206,12 @@ run_psql_sql "
       (owner_user_id, id, name, created_at, updated_at, client_updated_at_ms)
     values ('${USER_B_UUID}'::uuid, '${EDEF_ID}', 'B Exercise', ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
 
+    insert into app_public.muscle_groups
+      (owner_user_id, id, display_name, family_name, sort_order, is_editable,
+       created_at, updated_at, client_updated_at_ms)
+    values ('${USER_B_UUID}'::uuid, '${MG_ID}', 'B Pectorals', 'chest', 0, 0,
+            ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
+
     insert into app_public.exercise_tag_definitions
       (owner_user_id, id, exercise_definition_id, name, normalized_name,
        created_at, updated_at, client_updated_at_ms)
@@ -219,7 +227,7 @@ run_psql_sql "
     insert into app_public.exercise_muscle_mappings
       (owner_user_id, id, exercise_definition_id, muscle_group_id, weight,
        created_at, updated_at, client_updated_at_ms)
-    values ('${USER_B_UUID}'::uuid, '${EMM_ID}', '${EDEF_ID}', 'pectorals', 1.0,
+    values ('${USER_B_UUID}'::uuid, '${EMM_ID}', '${EDEF_ID}', '${MG_ID}', 1.0,
             ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
 
     insert into app_public.session_exercises

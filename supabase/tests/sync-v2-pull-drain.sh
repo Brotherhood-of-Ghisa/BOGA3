@@ -136,7 +136,7 @@ RUN_TAG="$(printf '%s' "${RUN_TAG}" | tr -c 'a-zA-Z0-9-' '-')"
 cleanup_rows() {
   for table in session_exercise_tags exercise_sets session_exercises \
                exercise_muscle_mappings exercise_tag_definitions sessions \
-               exercise_definitions gyms; do
+               muscle_groups exercise_definitions gyms; do
     http_request DELETE \
       "${API_URL}/rest/v1/${table}?owner_user_id=in.(${USER_A_UUID},${USER_B_UUID})&id=like.pd-${RUN_TAG}-%" \
       "${SERVICE_ROLE_KEY}" >/dev/null 2>&1 || true
@@ -155,7 +155,7 @@ sync_pull() {
 # Step 1 — push the seed: multiple rows in EACH layer. We use timestamps that
 # strictly increase by row so the pull cursor order is deterministic.
 #
-# Layer 0: 2 gyms + 2 exercise_definitions = 4 rows
+# Layer 0: 2 gyms + 2 exercise_definitions + 2 muscle_groups = 6 rows
 # Layer 1: 2 sessions + 2 exercise_muscle_mappings + 2 exercise_tag_definitions = 6 rows
 # Layer 2: 2 session_exercises = 2 rows
 # Layer 3: 2 exercise_sets + 2 session_exercise_tags = 4 rows
@@ -189,6 +189,17 @@ SEED_PAYLOAD="$(jq -nc \
     {type: "exercise_definitions", id: ("pd-" + $tag + "-ed-2"),
      client_updated_at_ms: ($b + 50),
      fields: {name: "ED2", created_at: ($b + 50), updated_at: ($b + 50), deleted_at: null}},
+    # Layer 0 muscle_groups — parents for the exercise_muscle_mappings below.
+    {type: "muscle_groups", id: ("pd-" + $tag + "-mg-1"),
+     client_updated_at_ms: ($b + 52),
+     fields: {display_name: "Pectorals", family_name: "chest",
+              sort_order: 0, is_editable: 0,
+              created_at: ($b + 52), updated_at: ($b + 52), deleted_at: null}},
+    {type: "muscle_groups", id: ("pd-" + $tag + "-mg-2"),
+     client_updated_at_ms: ($b + 54),
+     fields: {display_name: "Quadriceps", family_name: "legs",
+              sort_order: 1, is_editable: 0,
+              created_at: ($b + 54), updated_at: ($b + 54), deleted_at: null}},
 
     # Layer 1
     {type: "sessions", id: ("pd-" + $tag + "-sess-1"), client_updated_at_ms: ($b + 60),
@@ -202,12 +213,12 @@ SEED_PAYLOAD="$(jq -nc \
     {type: "exercise_muscle_mappings", id: ("pd-" + $tag + "-emm-1"),
      client_updated_at_ms: ($b + 80),
      fields: {exercise_definition_id: ("pd-" + $tag + "-ed-1"),
-              muscle_group_id: "pectorals", weight: 1.0, role: null,
+              muscle_group_id: ("pd-" + $tag + "-mg-1"), weight: 1.0, role: null,
               created_at: ($b + 80), updated_at: ($b + 80), deleted_at: null}},
     {type: "exercise_muscle_mappings", id: ("pd-" + $tag + "-emm-2"),
      client_updated_at_ms: ($b + 90),
      fields: {exercise_definition_id: ("pd-" + $tag + "-ed-2"),
-              muscle_group_id: "quadriceps", weight: 1.0, role: null,
+              muscle_group_id: ("pd-" + $tag + "-mg-2"), weight: 1.0, role: null,
               created_at: ($b + 90), updated_at: ($b + 90), deleted_at: null}},
     {type: "exercise_tag_definitions", id: ("pd-" + $tag + "-etd-1"),
      client_updated_at_ms: ($b + 100),
@@ -282,7 +293,7 @@ all_seed_ids_for() {
     | jq -c "[.[] | select(${filter}) | {type, id}] | sort_by(.type, .id)"
 }
 
-LAYER0_FILTER='(.type == "gyms" or .type == "exercise_definitions")'
+LAYER0_FILTER='(.type == "gyms" or .type == "exercise_definitions" or .type == "muscle_groups")'
 LAYER1_FILTER='(.type == "sessions" or .type == "exercise_muscle_mappings" or .type == "exercise_tag_definitions")'
 LAYER2_FILTER='(.type == "session_exercises")'
 LAYER3_FILTER='(.type == "exercise_sets" or .type == "session_exercise_tags")'

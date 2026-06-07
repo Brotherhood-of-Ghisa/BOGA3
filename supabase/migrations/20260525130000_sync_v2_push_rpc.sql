@@ -196,6 +196,35 @@ begin
             server_received_at   = excluded.server_received_at
         where excluded.client_updated_at_ms > app_public.exercise_definitions.client_updated_at_ms;
 
+    elsif _type = 'muscle_groups' then
+      insert into app_public.muscle_groups (
+        owner_user_id, id,
+        display_name, family_name, sort_order, is_editable,
+        created_at, updated_at, deleted_at,
+        client_updated_at_ms, server_received_at
+      ) values (
+        _uid, _id,
+        _fields ->> 'display_name',
+        _fields ->> 'family_name',
+        (_fields ->> 'sort_order')::integer,
+        (_fields ->> 'is_editable')::integer,
+        (_fields ->> 'created_at')::bigint,
+        (_fields ->> 'updated_at')::bigint,
+        (_fields ->> 'deleted_at')::bigint,
+        _cuam, _now_tstz
+      )
+      on conflict (owner_user_id, id) do update
+        set display_name         = excluded.display_name,
+            family_name          = excluded.family_name,
+            sort_order           = excluded.sort_order,
+            is_editable          = excluded.is_editable,
+            created_at           = excluded.created_at,
+            updated_at           = excluded.updated_at,
+            deleted_at           = excluded.deleted_at,
+            client_updated_at_ms = excluded.client_updated_at_ms,
+            server_received_at   = excluded.server_received_at
+        where excluded.client_updated_at_ms > app_public.muscle_groups.client_updated_at_ms;
+
     elsif _type = 'exercise_tag_definitions' then
       insert into app_public.exercise_tag_definitions (
         owner_user_id, id,

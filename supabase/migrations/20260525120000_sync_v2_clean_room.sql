@@ -54,12 +54,14 @@ drop function if exists app_public.sync_ingest_failure(integer, boolean, text, t
 drop table if exists app_public.sync_ingested_events cascade;
 drop table if exists app_public.sync_device_ingest_state cascade;
 
--- The eight legacy entity tables (M5/M13/M14/M15/user-scoped-PK redesign).
+-- The legacy entity tables (M5/M13/M14/M15/user-scoped-PK redesign).
 -- Drop child-first to make the intent readable; `cascade` covers FKs in any
--- order regardless.
+-- order regardless. muscle_groups is dropped after its child
+-- exercise_muscle_mappings (the mappings row references a muscle_groups parent).
 drop table if exists app_public.session_exercise_tags cascade;
 drop table if exists app_public.exercise_tag_definitions cascade;
 drop table if exists app_public.exercise_muscle_mappings cascade;
+drop table if exists app_public.muscle_groups cascade;
 drop table if exists app_public.exercise_sets cascade;
 drop table if exists app_public.session_exercises cascade;
 drop table if exists app_public.sessions cascade;
@@ -172,6 +174,41 @@ create index exercise_definitions_name_idx
 create index exercise_definitions_deleted_at_idx
   on app_public.exercise_definitions (deleted_at);
 
+-- 3.2b muscle_groups --------------------------------------------------------
+-- Per-user synced taxonomy, structurally a clone of exercise_definitions with
+-- the taxonomy scalars (display_name/family_name/sort_order/is_editable). It is
+-- a Layer-0 parent (no FK dependencies) and is the FK target of
+-- exercise_muscle_mappings.muscle_group_id (created below, so this table must
+-- precede it). Zero CHECK constraints (the no-server-validation rule); the
+-- sort-order and is_editable guards are client-side only.
+
+create table app_public.muscle_groups (
+  owner_user_id uuid not null default auth.uid()
+    references auth.users (id) on delete cascade,
+  id text not null,
+  display_name text not null,
+  family_name text not null,
+  sort_order integer not null,
+  is_editable integer not null,
+  created_at bigint not null,
+  updated_at bigint not null,
+  deleted_at bigint,
+  client_updated_at_ms bigint not null,
+  server_received_at timestamptz not null default now(),
+  constraint muscle_groups_pkey primary key (owner_user_id, id)
+);
+
+create index muscle_groups_owner_received_idx
+  on app_public.muscle_groups (owner_user_id, server_received_at);
+create index muscle_groups_family_name_idx
+  on app_public.muscle_groups (family_name);
+create index muscle_groups_sort_order_idx
+  on app_public.muscle_groups (sort_order);
+create index muscle_groups_display_name_idx
+  on app_public.muscle_groups (display_name);
+create index muscle_groups_deleted_at_idx
+  on app_public.muscle_groups (deleted_at);
+
 -- 3.3 exercise_tag_definitions ----------------------------------------------
 
 create table app_public.exercise_tag_definitions (
@@ -237,8 +274,10 @@ create index sessions_completed_at_idx on app_public.sessions (completed_at);
 create index sessions_deleted_at_idx on app_public.sessions (deleted_at);
 
 -- 3.5 exercise_muscle_mappings ----------------------------------------------
--- muscle_group_id is opaque text (no FK); muscle_groups is client-only
--- taxonomy per designs/t1.md §2.6.1.
+-- muscle_group_id is a real composite FK into the per-user muscle_groups
+-- taxonomy (owner_user_id, muscle_group_id) -> muscle_groups(owner_user_id, id).
+-- muscle_groups is a synced Layer-0 entity, so this is a legitimate
+-- synced-parent FK, not opaque text.
 
 create table app_public.exercise_muscle_mappings (
   owner_user_id uuid not null default auth.uid()
@@ -257,6 +296,11 @@ create table app_public.exercise_muscle_mappings (
   constraint exercise_muscle_mappings_exercise_definition_fk
     foreign key (owner_user_id, exercise_definition_id)
     references app_public.exercise_definitions (owner_user_id, id)
+    on delete cascade
+    deferrable initially deferred,
+  constraint exercise_muscle_mappings_muscle_group_fk
+    foreign key (owner_user_id, muscle_group_id)
+    references app_public.muscle_groups (owner_user_id, id)
     on delete cascade
     deferrable initially deferred
 );
@@ -413,6 +457,16 @@ create trigger exercise_definitions_owner_user_id_immutable
   for each row
   execute function app_public.enforce_owner_user_id_immutable();
 
+create trigger muscle_groups_touch_server_received_at
+  before update on app_public.muscle_groups
+  for each row
+  when (new is distinct from old)
+  execute function app_public.touch_server_received_at();
+create trigger muscle_groups_owner_user_id_immutable
+  before update on app_public.muscle_groups
+  for each row
+  execute function app_public.enforce_owner_user_id_immutable();
+
 create trigger exercise_tag_definitions_touch_server_received_at
   before update on app_public.exercise_tag_definitions
   for each row
@@ -502,6 +556,18 @@ create policy exercise_definitions_owner_update on app_public.exercise_definitio
 create policy exercise_definitions_owner_delete on app_public.exercise_definitions
   for delete to authenticated using (owner_user_id = auth.uid());
 
+alter table app_public.muscle_groups enable row level security;
+create policy muscle_groups_owner_select on app_public.muscle_groups
+  for select to authenticated using (owner_user_id = auth.uid());
+create policy muscle_groups_owner_insert on app_public.muscle_groups
+  for insert to authenticated with check (owner_user_id = auth.uid());
+create policy muscle_groups_owner_update on app_public.muscle_groups
+  for update to authenticated
+  using (owner_user_id = auth.uid())
+  with check (owner_user_id = auth.uid());
+create policy muscle_groups_owner_delete on app_public.muscle_groups
+  for delete to authenticated using (owner_user_id = auth.uid());
+
 alter table app_public.exercise_tag_definitions enable row level security;
 create policy exercise_tag_definitions_owner_select on app_public.exercise_tag_definitions
   for select to authenticated using (owner_user_id = auth.uid());
@@ -580,6 +646,7 @@ create policy session_exercise_tags_owner_delete on app_public.session_exercise_
 
 grant select, insert, update, delete on table app_public.gyms to authenticated;
 grant select, insert, update, delete on table app_public.exercise_definitions to authenticated;
+grant select, insert, update, delete on table app_public.muscle_groups to authenticated;
 grant select, insert, update, delete on table app_public.exercise_tag_definitions to authenticated;
 grant select, insert, update, delete on table app_public.sessions to authenticated;
 grant select, insert, update, delete on table app_public.exercise_muscle_mappings to authenticated;
@@ -589,6 +656,7 @@ grant select, insert, update, delete on table app_public.session_exercise_tags t
 
 grant select, insert, update, delete on table app_public.gyms to service_role;
 grant select, insert, update, delete on table app_public.exercise_definitions to service_role;
+grant select, insert, update, delete on table app_public.muscle_groups to service_role;
 grant select, insert, update, delete on table app_public.exercise_tag_definitions to service_role;
 grant select, insert, update, delete on table app_public.sessions to service_role;
 grant select, insert, update, delete on table app_public.exercise_muscle_mappings to service_role;

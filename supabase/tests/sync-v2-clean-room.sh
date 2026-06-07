@@ -8,9 +8,9 @@
 #
 #   #1  v1 sync objects absent (sync_apply_projection_event,
 #       sync_events_ingest, sync_events_ingest_impl, sync_ingest_failure,
-#       sync_device_ingest_state, sync_ingested_events); all eight v2 tables
+#       sync_device_ingest_state, sync_ingested_events); all nine v2 tables
 #       present in app_public.
-#   #2  Each of the eight tables has composite PK (owner_user_id, id),
+#   #2  Each of the nine tables has composite PK (owner_user_id, id),
 #       universal columns (owner_user_id, client_updated_at_ms,
 #       server_received_at, deleted_at), the per-table btree indexes,
 #       and ZERO CHECK constraints (per t1 §1, "no server validation").
@@ -85,6 +85,7 @@ pass() {
 ENTITIES=(
   gyms
   exercise_definitions
+  muscle_groups
   exercise_tag_definitions
   sessions
   exercise_muscle_mappings
@@ -136,7 +137,7 @@ done
 pass "outcome #1.A — v1 sync-state tables absent from pg_class"
 
 # -----------------------------------------------------------------------------
-# Plan outcome #1.B — all eight v2 entity tables present.
+# Plan outcome #1.B — all nine v2 entity tables present.
 # -----------------------------------------------------------------------------
 
 for entity in "${ENTITIES[@]}"; do
@@ -152,7 +153,7 @@ for entity in "${ENTITIES[@]}"; do
     fail "expected app_public.${entity} to exist (got count=${count})"
   fi
 done
-pass "outcome #1.B — eight v2 entity tables present in app_public"
+pass "outcome #1.B — nine v2 entity tables present in app_public"
 
 # -----------------------------------------------------------------------------
 # Plan outcome #2 — schema shape: composite PK, universal columns with correct
@@ -240,7 +241,7 @@ for entity in "${ENTITIES[@]}"; do
     fail "${entity}: expected 0 CHECK constraints; got ${count}"
   fi
 done
-pass "outcome #2.D — zero CHECK constraints on any of the eight entity tables"
+pass "outcome #2.D — zero CHECK constraints on any of the nine entity tables"
 
 # -----------------------------------------------------------------------------
 # Plan outcome #3 — triggers + immutability function body.
