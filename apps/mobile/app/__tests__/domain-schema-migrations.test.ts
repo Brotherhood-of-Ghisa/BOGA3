@@ -150,3 +150,57 @@ describe('domain schema and runtime migrations', () => {
     expect(quarantineMigration).not.toContain('FOREIGN KEY');
   });
 });
+
+describe('muscle_groups lives in the squashed baseline and adds no migration of its own', () => {
+  // The synced-entity muscle_groups shape ships inside the squashed baseline
+  // (the `0000_living_bucky` baseline), NOT as a follow-up incremental
+  // migration. The follow-up that DOES exist on the journal is the unrelated
+  // local sync-quarantine table — that one is out of scope here.
+  const BASELINE_TAG = '0000_living_bucky';
+
+  it('keeps the squashed baseline tagged 0000_living_bucky', () => {
+    const baselineEntry = localRuntimeMigrations.journal.entries.find((entry) => entry.idx === 0);
+    expect(baselineEntry?.tag).toBe(BASELINE_TAG);
+  });
+
+  it('carries the synced-entity muscle_groups shape in the baseline without the non-editable guard', () => {
+    const baselineMigration = localRuntimeMigrations.migrations.m0000;
+
+    // The table is created by the baseline itself.
+    expect(baselineMigration).toContain('CREATE TABLE `muscle_groups`');
+    // It carries the generated id default and the two local-only sync columns,
+    // so it round-trips on the wire like every other synced entity.
+    expect(baselineMigration).toContain(
+      '`id` text PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))) NOT NULL'
+    );
+    expect(baselineMigration).toContain('`local_dirty` integer DEFAULT false NOT NULL');
+    expect(baselineMigration).toContain('`local_updated_at_ms` integer DEFAULT 0 NOT NULL');
+    expect(baselineMigration).toContain('`deleted_at` integer');
+    // The only data guards left are generic; the "must stay non-editable" CHECK
+    // that blocked the wire round-trip is gone.
+    expect(baselineMigration).toContain(
+      'CONSTRAINT "muscle_groups_sort_order_non_negative" CHECK("muscle_groups"."sort_order" >= 0)'
+    );
+    expect(baselineMigration).toContain(
+      'CONSTRAINT "muscle_groups_is_editable_boolean_guard" CHECK("muscle_groups"."is_editable" in (0, 1))'
+    );
+    expect(baselineMigration).not.toContain('muscle_groups_non_editable_guard');
+  });
+
+  it('introduces no muscle_groups-specific incremental migration after the baseline', () => {
+    // Every follow-up migration after the baseline (idx > 0) must NOT create,
+    // alter, or otherwise carry a muscle_groups DDL statement — the taxonomy's
+    // whole shape lives in the baseline. (The journal legitimately carries the
+    // unrelated sync-quarantine follow-up; that is the only post-baseline entry
+    // and it touches no entity table.)
+    const followUps = localRuntimeMigrations.journal.entries
+      .filter((entry) => entry.idx > 0)
+      .map((entry) => `m${String(entry.idx).padStart(4, '0')}`);
+
+    for (const key of followUps) {
+      const sql = (localRuntimeMigrations.migrations as Record<string, string | undefined>)[key] ?? '';
+      expect(sql).not.toContain('`muscle_groups`');
+      expect(sql).not.toContain('muscle_groups');
+    }
+  });
+});
