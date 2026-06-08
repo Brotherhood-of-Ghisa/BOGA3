@@ -9,7 +9,7 @@
  *   journal: { entries: { idx, when, tag, breakpoints }[] }
  *   migrations: Record<`m${string}`, string>  // raw SQL per entry
  *
- * Pre-t10 we hand-copied the SQL string into
+ * Before this script existed, the SQL string was hand-copied into
  * `apps/mobile/src/data/migrations/index.ts`, which silently drifted
  * from `apps/mobile/drizzle/0000_*.sql` every time the schema was
  * regenerated. This script wipes that duplication: it reads
