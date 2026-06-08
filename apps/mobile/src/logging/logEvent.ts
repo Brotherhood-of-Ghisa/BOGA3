@@ -1,6 +1,7 @@
 import * as Application from 'expo-application';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { getSupabaseMobileClient } from '@/src/auth/supabase';
 import { isDevMode } from '@/src/utils/isDevMode';
@@ -101,12 +102,25 @@ const readExpoConfigValue = (key: string): string | null => {
   return normalizeOptionalString(value);
 };
 
+const resolveCurrentUserId = async (client: SupabaseClient): Promise<string | null> => {
+  try {
+    const { data, error } = await client.auth.getSession();
+    if (error) {
+      return null;
+    }
+
+    return normalizeOptionalString(data.session?.user?.id);
+  } catch {
+    return null;
+  }
+};
+
 export const logEvent = async ({
   level,
   source = 'app',
   event,
   message,
-  userId = null,
+  userId,
   context,
 }: LogEventParams): Promise<void> => {
   try {
@@ -115,12 +129,14 @@ export const logEvent = async ({
       return;
     }
 
+    const resolvedUserId = userId === undefined ? await resolveCurrentUserId(client) : userId;
+
     const { error } = await client.from('app_logs').insert({
       level,
       source,
       event,
       message: message ?? null,
-      user_id: userId,
+      user_id: resolvedUserId,
       client_platform: Platform.OS,
       client_app_version: normalizeOptionalString(Application.nativeApplicationVersion) ?? readExpoConfigValue('version'),
       client_build_number: normalizeOptionalString(Application.nativeBuildVersion),
