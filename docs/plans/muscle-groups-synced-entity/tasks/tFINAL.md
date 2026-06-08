@@ -9,7 +9,7 @@ the human — its tests must fail if an outcome is missed. The central proof is 
 guarantee: a wiped/reinstalled client must re-pull `muscle_groups` (Layer 0) before
 `exercise_muscle_mappings` (Layer 1) under `PRAGMA foreign_keys = ON`, and the FK must hold.
 
-**Inputs:** All other tasks merged (t1-t8). Read the plan-level `## Outcomes` section verbatim.
+**Inputs:** All other tasks merged (t1-t12). Read the plan-level `## Outcomes` section verbatim.
 Binding contract in `designs/t1.md ## Decision`. Relevant landed artifacts to exercise:
 - Server: `app_public.muscle_groups` + composite FK in
   `supabase/migrations/20260525120000_sync_v2_clean_room.sql`; the push/pull RPCs.
@@ -29,15 +29,20 @@ Binding contract in `designs/t1.md ## Decision`. Relevant landed artifacts to ex
   `deferrable initially deferred` FK exists.
 - **PO3 (client schema round-trips):** a wire round-trip test serializes a `muscle_groups` row and
   reads it back with `deletedAt` / dirty columns / id-default behavior intact.
-- **PO4 (single baseline):** an assertion (extending or referencing `domain-schema-migrations.test.ts`)
-  confirms `localRuntimeMigrations.journal.entries` length 1, keys `['m0000']`, and that the baseline
-  carries the new `muscle_groups` shape without the non-editable guard.
+- **PO4 (muscle_groups lives in the `m0000` baseline, no migration of its own):** an assertion
+  (extending or referencing `domain-schema-migrations.test.ts`) confirms `m0000` (tag
+  `0000_living_bucky`) carries the new `muscle_groups` shape WITHOUT the non-editable guard, and that
+  `muscle_groups` added no incremental migration of its own. NOTE (re-scoped): do NOT assert the
+  journal length is 1 — an unrelated `sync_quarantine` `m0001` legitimately exists on the journal and
+  is out of scope. Assert the `muscle_groups` shape is in `m0000`, not the total journal length.
 - **PO5 (registry):** an assertion confirms `'muscle_groups'` is in Layer 0 of `TOPO_LAYERS`, is in
   `EntityTableName`, and has `ENTITY_FIELDS`/`ENTITY_TABLES` entries with the exact wire field set.
 - **PO6 (dirty seed + boot FK):** an assertion confirms `seedSystemExerciseCatalog` seeds
   `muscle_groups` `local_dirty = 1`, the standalone boot seed no longer runs for `muscle_groups`,
-  `account-wipe` clears `muscle_groups`, and boot enables `PRAGMA foreign_keys = ON` after migrations
-  / before seeding.
+  `account-wipe` clears `muscle_groups`, and boot enables FK enforcement (`PRAGMA foreign_keys = ON`
+  at connection-open, so it is live across migrations and seeding; a post-seed `PRAGMA
+  foreign_key_check` runs) — assert FK enforcement is live before `muscle_groups` is seeded, not a
+  specific post-migrate call site.
 - **PO7 (drift):** an assertion confirms `sync-extras.json` lacks the `muscleGroupId` exemption and
   the checker derives 9 entities and exits 0 under `--strict`.
 - **PO8 (anti-brick round-trip — the central proof):** under `PRAGMA foreign_keys = ON`, seed
