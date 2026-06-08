@@ -114,6 +114,7 @@ graph TD
   t6 --> t10[t10 build: contract-test hygiene + verify/fix pull-contract]
   t10 --> t5
   t10 --> t11[t11 build: cross-owner RLS coverage for muscle_groups]
+  t7 --> t12[t12 build: push FK-preflight edge + straggler sweep]
   t2 --> tFINAL
   t5 --> t8[t8 build: docs]
   t6 --> t8
@@ -125,6 +126,7 @@ graph TD
   t9 --> tFINAL
   t10 --> tFINAL
   t11 --> tFINAL
+  t12 --> tFINAL
 ```
 
 ## Tasks
@@ -140,6 +142,7 @@ graph TD
 - [t9: dirty-count — include muscle_groups in the Settings pending-push count](tasks/t9.md) — build (added at execute time, iteration 5)
 - [t10: remediate server-contract-test fallout — hygiene leaks + verify/fix pull-contract](tasks/t10.md) — build (added at execute time, iteration 7)
 - [t11: cross-owner RLS contract coverage for muscle_groups](tasks/t11.md) — build (added at execute time, iteration 9)
+- [t12: push FK-preflight edge for muscle_groups + client-only straggler sweep](tasks/t12.md) — build (added at execute time, iteration 13)
 - [tFINAL: verify plan outcomes](tasks/tFINAL.md) — build (final test card)
 
 ## Deviations log

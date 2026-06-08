@@ -9,7 +9,7 @@ the human — its tests must fail if an outcome is missed. The central proof is 
 guarantee: a wiped/reinstalled client must re-pull `muscle_groups` (Layer 0) before
 `exercise_muscle_mappings` (Layer 1) under `PRAGMA foreign_keys = ON`, and the FK must hold.
 
-**Inputs:** All other tasks merged (t1-t11). Read the plan-level `## Outcomes` section verbatim.
+**Inputs:** All other tasks merged (t1-t12). Read the plan-level `## Outcomes` section verbatim.
 Binding contract in `designs/t1.md ## Decision`. Relevant landed artifacts to exercise:
 - Server: `app_public.muscle_groups` + composite FK in
   `supabase/migrations/20260525120000_sync_v2_clean_room.sql`; the push/pull RPCs.
