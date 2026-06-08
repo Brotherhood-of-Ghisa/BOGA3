@@ -602,8 +602,9 @@ function HistoryHeatmap({
   testIDPrefix: string;
   todayDateKey?: string;
 }) {
+  // Both views span the full available history and scroll horizontally.
   const data = useMemo(
-    () => buildHeatmapData(dailyMetrics, metric, { todayDateKey }),
+    () => buildHeatmapData(dailyMetrics, metric, { todayDateKey, weeks: 'all' }),
     [dailyMetrics, metric, todayDateKey]
   );
   return view === 'daily' ? (

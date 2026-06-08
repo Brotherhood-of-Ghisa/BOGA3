@@ -47,16 +47,28 @@ export const getMetricValue = (
 };
 
 /**
- * Buckets a value into the heat ramp (0 = rest, 1..4 = intensity) using the
- * max-of-window ratio. Mirrors the original CalendarHeatmap behavior so the
- * color scale stays calibrated to the athlete's own training window.
+ * Buckets a value into the heat ramp (0 = rest, 1..4 = intensity) by normalizing
+ * it across the *observed* range of activity in the window — i.e. against
+ * [minPositive, maxPositive] rather than [0, maxPositive].
+ *
+ * Anchoring at the smallest logged value (instead of zero) spreads the ramp across
+ * the athlete's actual spread of effort. This matters most for high-floor metrics
+ * like top weight / 1RM, whose values cluster well above zero: a 0-anchored scale
+ * pushes nearly everything into the darkest bucket, whereas the range-relative scale
+ * makes the lightest session light and the heaviest dark.
+ *
+ * `minPositive`/`maxPositive` are the min/max over values > 0 in the window. The
+ * lowest logged value maps to bucket 1 (light green, never grey); the highest to 4.
+ * When every logged value is identical (range collapses), any activity maps to 4.
  */
 export const getCalendarHeatmapBucket = (
   value: number,
+  minPositive: number,
   maxPositive: number
 ): CalendarHeatmapBucket => {
   if (value <= 0 || maxPositive <= 0) return 0;
-  const ratio = value / maxPositive;
+  if (maxPositive <= minPositive) return 4;
+  const ratio = (value - minPositive) / (maxPositive - minPositive);
   if (ratio <= 0.25) return 1;
   if (ratio <= 0.5) return 2;
   if (ratio <= 0.75) return 3;
