@@ -52,7 +52,8 @@ Add minimal production diagnostics for auth and sync failures without introducin
 ## Task breakdown
 
 1. `M14-T01-minimal-supabase-app-logging` - `completed` - Minimal Supabase-backed app logging.
-2. `T-20260510-01-supabase-migration-history-repair` - (`completed`) - Repaired hosted Supabase migration history for the FK relaxation and `public.app_logs`; local verification and hosted metadata repair are complete.
+2. `M14-T02-log-user-id-enrichment.md` - (`completed`) - Populate `public.app_logs.user_id` whenever the current authenticated user can be determined safely by the mobile logger.
+3. `T-20260510-01-supabase-migration-history-repair` - (`completed`) - Repaired hosted Supabase migration history for the FK relaxation and `public.app_logs`; local verification and hosted metadata repair are complete.
 
 ## Risks / dependencies
 
