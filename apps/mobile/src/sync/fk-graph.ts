@@ -19,10 +19,12 @@
 // structured `LOCAL_FK_VIOLATION` instead of a blind, doomed `sync_push`.
 //
 // Scope: this only models FK edges whose parent is itself a *syncable* entity.
-// `exercise_muscle_mappings.muscle_group_id -> muscle_groups` is deliberately
-// omitted: `muscle_groups` is a locally-bundled, server-seeded catalog table
-// that is never pushed, so it is always present on both ends and is not a sync
-// orphan concern.
+// `muscle_groups` is a syncable, per-user entity that is pushed and pulled like
+// the rest of the dirty stream, so `exercise_muscle_mappings.muscle_group_id ->
+// muscle_groups` is a real orphan concern and is modelled below: a dirty mapping
+// whose muscle-group parent is missing locally (and not riding in the same
+// batch) would be rejected by the server's FK check, so the preflight must catch
+// it here.
 
 import { eq } from 'drizzle-orm';
 
@@ -46,10 +48,10 @@ export interface SyncFkEdge {
 }
 
 /**
- * The local FK dependency graph for the eight syncable entities, keyed by child
- * type. Mirrors the `.references(...)` declarations in `src/data/schema/*` for
- * every edge whose parent is itself syncable. Entities with no syncable-parent
- * FK (`gyms`, `exercise_definitions`) are simply absent.
+ * The local FK dependency graph for the syncable entities, keyed by child type.
+ * Mirrors the `.references(...)` declarations in `src/data/schema/*` for every
+ * edge whose parent is itself syncable. Entities with no syncable-parent FK
+ * (`gyms`, `exercise_definitions`, `muscle_groups`) are simply absent.
  *
  * Kept in sync with the schema by the same review discipline as
  * `topo-order.ts`: a new cross-entity FK must be added here as well as to its
@@ -62,6 +64,7 @@ export const SYNCABLE_FK_GRAPH: Partial<Record<EntityTableName, readonly SyncFkE
   ],
   exercise_muscle_mappings: [
     { parentIdField: 'exercise_definition_id', parentType: 'exercise_definitions', required: true },
+    { parentIdField: 'muscle_group_id', parentType: 'muscle_groups', required: true },
   ],
   session_exercises: [
     { parentIdField: 'session_id', parentType: 'sessions', required: true },
@@ -84,6 +87,7 @@ export const SYNCABLE_FK_GRAPH: Partial<Record<EntityTableName, readonly SyncFkE
 const PARENT_TABLES: Record<EntityTableName, (typeof schema)[keyof typeof schema]> = {
   gyms: schema.gyms,
   exercise_definitions: schema.exerciseDefinitions,
+  muscle_groups: schema.muscleGroups,
   exercise_tag_definitions: schema.exerciseTagDefinitions,
   sessions: schema.sessions,
   exercise_muscle_mappings: schema.exerciseMuscleMappings,

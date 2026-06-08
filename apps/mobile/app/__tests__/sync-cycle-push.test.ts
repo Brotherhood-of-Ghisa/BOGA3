@@ -2,7 +2,8 @@
  * Push-leg coverage for the sync cycle: the batch selector walks entity tables
  * in topological order (parents before children), respects the batch cap,
  * breaks out of the walk once the cap is hit, and orders rows oldest-dirty
- * first within a table.
+ * first within a table; and the FK-closure preflight flags an orphan dirty
+ * child LOCALLY before any batch leaves for the server.
  *
  * Driver: a real in-memory better-sqlite3 database with the full migrated
  * schema applied, via the shared helpers/in-memory-db fixture.
@@ -10,9 +11,10 @@
 
 import { eq } from 'drizzle-orm';
 
-import { BATCH_CAP, selectPushBatch } from '@/src/sync/cycle';
+import { BATCH_CAP, selectPushBatch, type WireEntity } from '@/src/sync/cycle';
+import { findPushBatchFkViolations } from '@/src/sync/fk-graph';
 import type { Transaction } from '@/src/data/clock';
-import { exerciseDefinitions, gyms, sessions } from '@/src/data/schema';
+import { exerciseDefinitions, gyms, muscleGroups, sessions } from '@/src/data/schema';
 
 import {
   createInMemoryDatabase,
@@ -138,5 +140,122 @@ describe('selectPushBatch wire shape', () => {
 
     const row = database.select().from(gyms).where(eq(gyms.id, 'gym-1')).get();
     expect(row?.localDirty).toBe(true);
+  });
+});
+
+// A dirty exercise-muscle mapping carries two required parents: its exercise
+// definition and its muscle group. Both are syncable entities, so a mapping
+// whose muscle group is missing locally (and not in the same batch) is an orphan
+// the server's FK check would reject wholesale — the preflight must catch it
+// before the push.
+const mappingEnvelope = (
+  id: string,
+  exerciseDefinitionId: string,
+  muscleGroupId: string,
+): WireEntity => ({
+  type: 'exercise_muscle_mappings',
+  id,
+  client_updated_at_ms: 1000,
+  fields: {
+    exercise_definition_id: exerciseDefinitionId,
+    muscle_group_id: muscleGroupId,
+    weight: 1,
+    role: 'primary',
+    deleted_at: null,
+  },
+});
+
+const muscleGroupEnvelope = (id: string): WireEntity => ({
+  type: 'muscle_groups',
+  id,
+  client_updated_at_ms: 900,
+  fields: {
+    display_name: 'Chest',
+    family_name: 'Chest',
+    sort_order: 0,
+    is_editable: 0,
+    deleted_at: null,
+  },
+});
+
+describe('findPushBatchFkViolations: muscle_groups parent edge', () => {
+  const insertExerciseDefinitionParent = (id: string): void => {
+    database.insert(exerciseDefinitions).values({ id, name: `Def ${id}` }).run();
+  };
+  const insertMuscleGroupParent = (id: string): void => {
+    database
+      .insert(muscleGroups)
+      .values({ id, displayName: 'Chest', familyName: 'Chest', sortOrder: 0 })
+      .run();
+  };
+
+  it('flags a dirty mapping whose muscle_group parent is absent locally', () => {
+    // The exercise-definition parent is present and clean; only the muscle group
+    // is missing. The mapping must still be flagged, on the muscle_group_id edge.
+    insertExerciseDefinitionParent('def-1');
+
+    const batch = [mappingEnvelope('emm-orphan', 'def-1', 'mg-missing')];
+    const violations = database.transaction((tx) =>
+      findPushBatchFkViolations(tx as Transaction, batch),
+    );
+
+    expect(violations).toEqual([
+      {
+        childType: 'exercise_muscle_mappings',
+        childId: 'emm-orphan',
+        parentType: 'muscle_groups',
+        parentIdField: 'muscle_group_id',
+        parentId: 'mg-missing',
+      },
+    ]);
+  });
+
+  it('flags the mapping when its muscle_group parent is quarantined, not on the server', () => {
+    // The muscle group exists locally but is itself quarantined, so it will not
+    // be pushed this cycle. The server has never seen it, so a child relying on
+    // it would be rejected — the preflight treats a quarantined parent as absent.
+    insertExerciseDefinitionParent('def-1');
+    insertMuscleGroupParent('mg-1');
+
+    const batch = [mappingEnvelope('emm-1', 'def-1', 'mg-1')];
+    const quarantined = new Set(['muscle_groups mg-1']);
+    const violations = database.transaction((tx) =>
+      findPushBatchFkViolations(tx as Transaction, batch, quarantined),
+    );
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0]).toMatchObject({
+      childId: 'emm-1',
+      parentType: 'muscle_groups',
+      parentIdField: 'muscle_group_id',
+    });
+  });
+
+  it('passes a valid batch whose muscle_group parent is present and clean locally', () => {
+    // Both parents present and clean (so, given the topological selector, already
+    // on the server). The mapping is FK-safe to push.
+    insertExerciseDefinitionParent('def-1');
+    insertMuscleGroupParent('mg-1');
+
+    const batch = [mappingEnvelope('emm-1', 'def-1', 'mg-1')];
+    const violations = database.transaction((tx) =>
+      findPushBatchFkViolations(tx as Transaction, batch),
+    );
+
+    expect(violations).toEqual([]);
+  });
+
+  it('passes when the muscle_group parent rides in the same batch (deferred FK)', () => {
+    // The muscle group is new (not yet on the server) but ships in the same
+    // batch ahead of the mapping; deferred server FKs resolve it inside one
+    // transaction, so the preflight must not flag the child.
+    insertExerciseDefinitionParent('def-1');
+
+    const batch = [muscleGroupEnvelope('mg-1'), mappingEnvelope('emm-1', 'def-1', 'mg-1')];
+    const violations = database.transaction((tx) =>
+      findPushBatchFkViolations(tx as Transaction, batch),
+    );
+
+    expect(violations).toEqual([]);
   });
 });
