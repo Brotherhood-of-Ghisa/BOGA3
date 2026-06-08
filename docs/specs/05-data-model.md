@@ -255,16 +255,16 @@ also asserts the hardcoded topological table order in
 `docs/specs/tech/sync-v2-server-contract.md` §A.7.7) — adding a new entity table
 or FK without updating that list also fails the gate.
 
-This rule does NOT apply to: `muscle_groups` (client-only taxonomy),
-`smoke_records`, `sync_runtime_state`, or `sync_quarantine` (test/runtime
-scaffolding and local sync bookkeeping) — these have no server counterpart and
-are out of the checker's scope, which introspects only the eight
-`app_public.<entity>` mirror tables. Nor does it apply to the two local-only
-sync-bookkeeping columns (`local_dirty`, `local_updated_at_ms`) on each entity
-table: those are listed under `exemptions.local_only_columns` in
-`sync-extras.json`, alongside the single `untyped_text_references` entry that
-exempts `exercise_muscle_mappings.muscleGroupId` (the no-FK reference into the
-client-only `muscle_groups` taxonomy).
+This rule does NOT apply to: `smoke_records`, `sync_runtime_state`, or
+`sync_quarantine` (test/runtime scaffolding and local sync bookkeeping) — these
+have no server counterpart and are out of the checker's scope, which introspects
+only the `app_public.<entity>` mirror tables. (`muscle_groups` is no longer
+exempt: it is now a synced, seeded — still non-user-editable — Layer-0 entity
+with its own `app_public.muscle_groups` mirror, so the server-first rule and the
+drift checker cover it like every other entity.) Nor does it apply to the two
+local-only sync-bookkeeping columns (`local_dirty`, `local_updated_at_ms`) on
+each entity table: those are listed under `exemptions.local_only_columns` in
+`sync-extras.json`.
 
 If your client change adds a value to an existing column (e.g., a new enum literal),
 the rule does not apply because the column already exists on both sides; the client
