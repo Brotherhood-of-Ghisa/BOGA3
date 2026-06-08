@@ -4,7 +4,7 @@
 #
 # Sets up rows for two fixture users (A and B), then with user A's JWT
 # exercises SELECT / INSERT / UPDATE / DELETE against user B's rows on every
-# one of the eight v2 entity tables. All four operations must either:
+# one of the nine v2 entity tables. All four operations must either:
 #
 #   - return zero rows (SELECT, UPDATE, DELETE under PostgREST + RLS),
 #   - or fail with an RLS-deny status / response shape (INSERT with a
@@ -73,6 +73,7 @@ load_supabase_status_env
 ENTITIES=(
   gyms
   exercise_definitions
+  muscle_groups
   exercise_tag_definitions
   sessions
   exercise_muscle_mappings
@@ -145,11 +146,12 @@ RUN_TAG="$(printf '%s' "${RUN_TAG}" | tr -c 'a-zA-Z0-9-' '-')"
 NOW_MS="$(($(date +%s) * 1000))"
 
 # Per-entity row IDs. The chain is the same one the push contract test seeds:
-# user B owns a gym, an exercise_definition, an exercise_tag_definition, a
-# session referencing the gym, an exercise_muscle_mapping referencing the
-# exercise_definition, a session_exercise referencing the session +
-# exercise_definition, an exercise_set referencing the session_exercise, and a
-# session_exercise_tag referencing the session_exercise + exercise_tag_definition.
+# user B owns a gym, an exercise_definition, a muscle_group, an
+# exercise_tag_definition, a session referencing the gym, an
+# exercise_muscle_mapping referencing the exercise_definition + muscle_group, a
+# session_exercise referencing the session + exercise_definition, an exercise_set
+# referencing the session_exercise, and a session_exercise_tag referencing the
+# session_exercise + exercise_tag_definition.
 GYM_ID="rls-${RUN_TAG}-bgym"
 EDEF_ID="rls-${RUN_TAG}-bedef"
 MG_ID="rls-${RUN_TAG}-bmg"
@@ -164,6 +166,7 @@ SXTAG_ID="rls-${RUN_TAG}-bsxtag"
 declare -a ROW_IDS=(
   "${GYM_ID}"
   "${EDEF_ID}"
+  "${MG_ID}"
   "${ETD_ID}"
   "${SESS_ID}"
   "${EMM_ID}"
@@ -302,6 +305,13 @@ insert_payload_for() {
         --argjson ts "${NOW_MS}" \
         '{owner_user_id: $owner, id: $id, name: "Injected", client_updated_at_ms: $ts, created_at: $ts, updated_at: $ts}'
       ;;
+    muscle_groups)
+      jq -nc --arg owner "${USER_B_UUID}" --arg id "rls-inject-${RUN_TAG}-$1" \
+        --argjson ts "${NOW_MS}" \
+        '{owner_user_id: $owner, id: $id, display_name: "Injected",
+          family_name: "injected", sort_order: 0, is_editable: 0,
+          client_updated_at_ms: $ts, created_at: $ts, updated_at: $ts}'
+      ;;
     exercise_tag_definitions)
       jq -nc --arg owner "${USER_B_UUID}" --arg id "rls-inject-${RUN_TAG}-$1" \
         --arg edef "${EDEF_ID}" \
@@ -350,6 +360,7 @@ target_row_id_for() {
   case "$1" in
     gyms)                     echo "${GYM_ID}" ;;
     exercise_definitions)     echo "${EDEF_ID}" ;;
+    muscle_groups)            echo "${MG_ID}" ;;
     exercise_tag_definitions) echo "${ETD_ID}" ;;
     sessions)                 echo "${SESS_ID}" ;;
     exercise_muscle_mappings) echo "${EMM_ID}" ;;
