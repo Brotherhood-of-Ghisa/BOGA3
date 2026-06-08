@@ -130,6 +130,7 @@ graph TD
   t10 --> tFINAL
   t11 --> tFINAL
   t12 --> tFINAL
+  tFINAL --> t13[t13 build: remove durable plan-id leak — audit remediation]
 ```
 
 ## Tasks
@@ -147,6 +148,7 @@ graph TD
 - [t11: cross-owner RLS contract coverage for muscle_groups](tasks/t11.md) — build (added at execute time, iteration 9)
 - [t12: push FK-preflight edge for muscle_groups + client-only straggler sweep](tasks/t12.md) — build (added at execute time, iteration 13)
 - [tFINAL: verify plan outcomes](tasks/tFINAL.md) — build (final test card)
+- [t13: remove durable plan-id leak in bundle-migrations.ts](tasks/t13.md) — build (added by audit; remediation)
 
 ## Deviations log
 
