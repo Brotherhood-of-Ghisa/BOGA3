@@ -1,5 +1,5 @@
 /**
- * Wire-serialisation round-trip coverage: for every one of the eight entity
+ * Wire-serialisation round-trip coverage: for every one of the nine entity
  * types, a representative row serialised to the wire envelope and back through
  * the database round-trips its typed columns intact. Confirms the local-only
  * bookkeeping columns never reach the wire, and that timestamp columns
@@ -36,6 +36,7 @@ afterEach(() => {
 const TABLES: Record<EntityTableName, (typeof schema)[keyof typeof schema]> = {
   gyms: schema.gyms,
   exercise_definitions: schema.exerciseDefinitions,
+  muscle_groups: schema.muscleGroups,
   exercise_tag_definitions: schema.exerciseTagDefinitions,
   sessions: schema.sessions,
   exercise_muscle_mappings: schema.exerciseMuscleMappings,
@@ -70,6 +71,16 @@ const SAMPLE_ROWS: Record<EntityTableName, Record<string, unknown>> = {
   exercise_definitions: {
     id: 'def-wire',
     name: 'Squat',
+    createdAt: new Date('2026-05-29T08:00:00.000Z'),
+    updatedAt: new Date('2026-05-29T08:30:00.000Z'),
+    deletedAt: new Date('2026-05-29T10:00:00.000Z'),
+  },
+  muscle_groups: {
+    id: 'mg-wire',
+    displayName: 'Quadriceps',
+    familyName: 'Legs',
+    sortOrder: 3,
+    isEditable: 1,
     createdAt: new Date('2026-05-29T08:00:00.000Z'),
     updatedAt: new Date('2026-05-29T08:30:00.000Z'),
     deletedAt: new Date('2026-05-29T10:00:00.000Z'),
@@ -194,6 +205,21 @@ describe('entityToWire / wireToEntity round-trip', () => {
   it('serialises a soft-deleted row with a non-null deleted_at', () => {
     const wire = entityToWire(SAMPLE_ROWS.exercise_definitions, 'exercise_definitions');
     expect(typeof wire.fields.deleted_at).toBe('number');
+  });
+
+  it('emits the taxonomy columns and a soft-deleted deleted_at for muscle_groups', () => {
+    const wire = entityToWire(SAMPLE_ROWS.muscle_groups, 'muscle_groups');
+    // The four taxonomy scalars cross the wire; the local-only bookkeeping
+    // columns do not. A tombstoned group serialises its deleted_at as epoch ms.
+    expect(wire.fields).toMatchObject({
+      display_name: 'Quadriceps',
+      family_name: 'Legs',
+      sort_order: 3,
+      is_editable: 1,
+    });
+    expect(typeof wire.fields.deleted_at).toBe('number');
+    expect(wire.fields).not.toHaveProperty('local_dirty');
+    expect(wire.fields).not.toHaveProperty('local_updated_at_ms');
   });
 
   it('reconstructs timestamp columns as Date values and scalars verbatim', () => {

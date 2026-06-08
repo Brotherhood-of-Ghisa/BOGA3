@@ -14,7 +14,8 @@
  *   - exercise_tag_definitions   (Layer 1) — exercise-tags.ts (tag-def paths)
  *
  * The seeder dirty-stamp rule (exercise-catalog-seeds.ts) is asserted in
- * the final describe block: seed rows land DIRTY (local_dirty = 1) so a fresh
+ * the final describe block: seed rows — muscle_groups, exercise_definitions,
+ * and exercise_muscle_mappings — land DIRTY (local_dirty = 1) so a fresh
  * account's starter catalog pushes to the server on the next cycle, and the
  * monotonic counter advances so a later user edit out-stamps the seed.
  *
@@ -33,6 +34,7 @@ import { createDrizzleExerciseCatalogStore } from '@/src/data/exercise-catalog';
 import {
   SEED_CATALOG_BUNDLE_VERSION,
   SYSTEM_EXERCISE_DEFINITION_SEEDS,
+  SYSTEM_MUSCLE_GROUP_SEEDS,
   seedSystemExerciseCatalog,
 } from '@/src/data/exercise-catalog-seeds';
 import { createDrizzleExerciseTagStore } from '@/src/data/exercise-tags';
@@ -414,17 +416,27 @@ describe('exercise_tag_definitions write paths flip the dirty bit', () => {
 });
 
 describe('seeder stamps catalog rows dirty while advancing the clock', () => {
-  it('lands exercise_definitions and exercise_muscle_mappings rows with local_dirty = 1 so a fresh account pushes', () => {
+  it('lands muscle_groups, exercise_definitions and exercise_muscle_mappings rows with local_dirty = 1 so a fresh account pushes', () => {
     const database = requireDatabase();
     seedInto(database, new Date('2026-05-29T10:00:00.000Z'));
 
+    const muscleGroupRows = database.select().from(muscleGroups).all();
     const definitionRows = database.select().from(exerciseDefinitions).all();
     const mappingRows = database.select().from(exerciseMuscleMappings).all();
 
+    expect(muscleGroupRows.length).toBe(SYSTEM_MUSCLE_GROUP_SEEDS.length);
+    expect(muscleGroupRows.length).toBeGreaterThan(0);
     expect(definitionRows.length).toBe(SYSTEM_EXERCISE_DEFINITION_SEEDS.length);
     expect(definitionRows.length).toBeGreaterThan(0);
     expect(mappingRows.length).toBeGreaterThan(0);
 
+    // muscle_groups is a Layer 0 synced entity seeded through the same generic
+    // starter-catalog path as exercise_definitions, so its rows must land dirty
+    // too — otherwise the taxonomy never reaches the server for a fresh account.
+    for (const row of muscleGroupRows) {
+      expect(row.localDirty).toBe(true);
+      expect(row.localUpdatedAtMs ?? 0).toBeGreaterThan(0);
+    }
     for (const row of definitionRows) {
       expect(row.localDirty).toBe(true);
       expect(row.localUpdatedAtMs ?? 0).toBeGreaterThan(0);

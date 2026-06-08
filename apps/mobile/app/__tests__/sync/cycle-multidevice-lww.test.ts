@@ -209,8 +209,9 @@ describe('sync cycle multi-device LWW against a live endpoint', () => {
   };
 
   // Seeds the full dirty gym -> session -> sx -> set chain (parents first; the
-  // better-sqlite3 fixture enforces FKs by default). The gym carries the
-  // caller-controlled name + LWW stamp; the rest get derived, near-now stamps.
+  // fixture enforces FKs the same way production does — enabled at boot via
+  // `PRAGMA foreign_keys = ON`). The gym carries the caller-controlled name +
+  // LWW stamp; the rest get derived, near-now stamps.
   const seedDirtyChain = (
     database: InMemoryTestDatabase,
     ids: ChainIds,

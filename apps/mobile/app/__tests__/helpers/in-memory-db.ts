@@ -67,18 +67,27 @@ export const applyAllMigrations = (client: Database.Database): void => {
 /**
  * Creates a fresh in-memory database with the full migrated schema applied.
  *
- * @param options.foreignKeys - when `true`, enables `PRAGMA foreign_keys`
- *   so FK constraints are enforced (off by default, matching SQLite's
- *   per-connection default).
+ * Foreign-key enforcement is ON by default, mirroring production: at boot the
+ * app runs `PRAGMA foreign_keys = ON` after migrations and before any data is
+ * written, so every fixture sees the same enforcement the running app does and
+ * an insertion-order bug fails a test here instead of bricking a real device.
+ * (SQLite leaves `foreign_keys` OFF per connection unless this pragma is set —
+ * it is never on "by default".) The pragma is applied after the migrations run,
+ * matching the boot order, so the schema DDL itself is never affected.
+ *
+ * @param options.foreignKeys - pass `false` to leave enforcement OFF. Only for
+ *   fixtures that deliberately need to plant an orphan or otherwise insert a
+ *   child before its parent for a non-FK reason; document the reason at the call
+ *   site.
  */
 export const createInMemoryDatabase = (
   options: { foreignKeys?: boolean } = {},
 ): InMemoryDatabaseFixture => {
   const client = new Database(':memory:');
-  if (options.foreignKeys) {
+  applyAllMigrations(client);
+  if (options.foreignKeys !== false) {
     client.pragma('foreign_keys = ON');
   }
-  applyAllMigrations(client);
   const database = drizzle(client, { schema });
   return {
     database,
