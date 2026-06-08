@@ -1,0 +1,253 @@
+appId: com.dinoderek.mobile
+---
+# First-run end-to-end round-trip — REAL cycle, real Supabase, on the simulator.
+#
+# This is the device-level proof that a brand-new user's data is bootstrapped
+# locally AND lands in the remote database, and that a subsequently logged
+# workout is uploaded by sync. It runs in the auth-configured lane (the only
+# Supabase-backed iOS lane: the runner provisions a local Supabase baseline and
+# exports the fixture credentials), so every cycle here talks to a real server.
+#
+# ISOLATION — this flow signs in as a DEDICATED fixture user (user_b, passed in as
+# MAESTRO_ROUNDTRIP_EMAIL/PASSWORD by the lane runner), NOT the user_a that every
+# other auth-profile flow uses. That is load-bearing, not cosmetic: the preceding
+# `sync-gate-first-cycle-real` flow seeds+pushes user_a's ~400-row starter catalog,
+# but its gate lifts (and the flow ends + tears down) BEFORE that push finishes, so
+# user_a's server-side catalog is left PARTIAL. A flow pulling user_a would hit the
+# bootstrapper's PULL branch (server non-empty -> no local re-seed) and get an
+# incomplete catalog that sometimes lacks "Barbell Back Squat" -> empty picker ->
+# flaky failure. user_b is untouched by other flows, so this flow's first sign-in
+# always finds an empty server -> the bootstrapper's SEED branch runs -> the FULL
+# catalog is seeded locally and deterministically. (A passing run pushes user_b's
+# complete catalog to dirty=0 in phase C, so even repeated lane runs that later hit
+# user_b's pull branch get a complete catalog.)
+#
+# Phases (each maps to a step in the user-asked flow):
+#   A. New user signs in -> the REAL bootstrapper -> seed -> push -> pull cycle
+#      runs against the provisioned Supabase and lifts the first-sync gate on its
+#      own (NO `bootstrap=complete` harness stamp). Landing on the data screen
+#      proves: logged in + all bootstrap data seeded locally.
+#   B. Log exactly ONE exercise (Barbell Back Squat, 1 set) in a session.
+#   C. Force a sync from the Settings sync-status surface and wait for "Pending
+#      changes" to reach 0. This is the run-SPECIFIC upload proof: the dirty rows
+#      were created THIS run in (B) on a freshly-bootstrapped local DB, so
+#      draining them to 0 means the logged exercise was accepted by the server.
+#   D. Fully wipe the device (clearState wipes BOTH the SQLite data AND the
+#      SecureStore session — see src/auth/storage.ts) and sign in again. The
+#      bootstrapper now PULLS from the (non-empty) server, so the logged workout
+#      reappears in history. After a full local wipe the ONLY source of any
+#      session is the remote DB — so a restored session proves the data is in the
+#      remote database.
+#
+# Why no exact-count / unique-row assertion in (D): the lane reuses a running
+# local Supabase WITHOUT reset between runs (ensure-local-runtime-baseline.sh:
+# "reusing existing instance without reset"), so user_b's server rows accumulate
+# across runs. Run-specific upload proof therefore lives in (C) (dirty-count -> 0,
+# which cannot false-pass); (D) proves the remote->device restore direction. user_b
+# is exclusive to this flow and only this flow ever logs a workout for it, so the
+# "1 exercise" history row asserted here is this suite's own logged session.
+#
+# Why a Maestro flow cannot assert the strict "ONLY that exercise was in the push
+# payload": the push wire payload is not observable from the UI. That delta-only
+# assertion is covered at the wire level by the jest push suite
+# (app/__tests__/sync-cycle-push.test.ts, dirty-bit-only push). This flow proves
+# the observable end goal: the logged exercise is uploaded and round-trips
+# through the remote DB.
+
+# === Phase A: new user, first sign-in, real bootstrap + sync ===
+# Cold launch with no session: the route-layer guard lands on sign-in.
+# `clearState` relaunches the dev client with a wiped sandbox, dropping its Metro
+# connection, so re-open the dev-client deep link (carrying this worktree's Metro
+# port, exported by maestro-ios-launch.sh) to reload the app bundle into the
+# wiped sandbox. That also surfaces the one-time expo-dev-client menu sheet, so
+# the optional Open/Continue/Close taps dismiss it; each is a no-op when absent.
+- launchApp:
+    clearState: true
+- openLink: "${MAESTRO_IOS_DEV_CLIENT_URL}"
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    text: "Open"
+    optional: true
+- tapOn:
+    text: "Continue"
+    optional: true
+- tapOn:
+    text: "Close"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "sign-in-screen"
+    timeout: 60000
+- assertVisible:
+    id: "sign-in-card"
+# No data screen may render before sign-in.
+- assertNotVisible:
+    id: "stats-history-screen"
+- takeScreenshot: "16-first-run-roundtrip-signed-out"
+
+# Sign in as the fixture user. The auth layer fires a real requestSync() on a
+# live session (src/auth/service.ts), so the first authenticated cycle starts
+# within ~1s. The first-sync gate stands in front of the data screen until the
+# REAL bootstrapper->seed->push->pull cycle drains and stamps the bootstrap flag.
+- tapOn:
+    id: "sign-in-email-input"
+- inputText: "${MAESTRO_ROUNDTRIP_EMAIL}"
+- tapOn:
+    id: "sign-in-password-input"
+- inputText: "${MAESTRO_ROUNDTRIP_PASSWORD}"
+- tapOn:
+    id: "sign-in-submit-button"
+# Let the real first cycle complete on its own (no harness stamp). Reaching the
+# data screen with the gate block gone proves the gate lifted from real sync
+# progress. A generous window absorbs sim/Metro warm-up.
+- extendedWaitUntil:
+    visible:
+      id: "stats-history-screen"
+    timeout: 90000
+- assertNotVisible:
+    id: "sync-gate-block"
+- takeScreenshot: "17-first-run-roundtrip-bootstrapped"
+
+# === Phase B: log exactly one exercise in a session ===
+# Teleport to the recorder WITHOUT a data reset — the just-bootstrapped local DB
+# (seeded catalog + bootstrap flag) must be preserved; we only need to navigate.
+- openLink: "boga3://maestro-harness?teleport=session-recorder"
+- tapOn:
+    text: "Open"
+    optional: true
+- tapOn:
+    text: "Continue"
+    optional: true
+- tapOn:
+    text: "Close"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "start-session-button"
+    timeout: 30000
+- tapOn:
+    id: "start-session-button"
+- extendedWaitUntil:
+    visible:
+      id: "session-recorder-screen"
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      text: "No exercises logged yet."
+    timeout: 30000
+- tapOn:
+    text: "Continue"
+    optional: true
+- tapOn: "Log new exercise"
+- tapOn: "Exercise filter input"
+- inputText: "Barbell Back Squat"
+- hideKeyboard:
+    optional: true
+# Selecting the seeded "Barbell Back Squat" here also implicitly proves the
+# catalog bootstrapped in Phase A: the row only exists if the seed landed.
+- extendedWaitUntil:
+    visible:
+      text: "Select exercise Barbell Back Squat"
+    timeout: 15000
+- tapOn:
+    text: "Select exercise Barbell Back Squat"
+- tapOn: "Weight for exercise 1 set 1"
+- inputText: "135"
+- tapOn: "Reps for exercise 1 set 1"
+- inputText: "8"
+- tapOn: "Submit Session"
+- tapOn:
+    text: "Submit Session"
+    optional: true
+- tapOn:
+    text: "Remove incomplete sets and submit"
+    optional: true
+- tapOn:
+    text: "Remove empty exercises and submit"
+    optional: true
+- tapOn:
+    text: "Continue"
+    optional: true
+- tapOn:
+    text: "Close"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "stats-history-screen"
+    timeout: 30000
+- takeScreenshot: "18-first-run-roundtrip-logged"
+
+# === Phase C: force a sync, prove the logged delta uploaded (Pending -> 0) ===
+- tapOn:
+    id: "top-level-settings-button"
+- assertVisible:
+    id: "settings-screen"
+- extendedWaitUntil:
+    visible:
+      id: "settings-sync-status-card"
+    timeout: 30000
+# Tap Refresh: fires a real full sync cycle (push the dirty delta + pull).
+- tapOn:
+    id: "settings-sync-status-refresh-button"
+# Wait until "Pending changes" reads exactly 0 — the logged exercise's local
+# dirty rows have all been accepted by the server. The combined id+text matcher
+# targets the dirty-count field specifically so an unrelated "0" elsewhere cannot
+# satisfy it. If the push never completes, this times out (correct failure).
+- extendedWaitUntil:
+    visible:
+      id: "settings-sync-status-dirty-count"
+      text: "0"
+    timeout: 60000
+- takeScreenshot: "19-first-run-roundtrip-delta-synced"
+
+# === Phase D: full device wipe + re-sign-in -> data restored from remote ===
+# clearState wipes BOTH the local SQLite AND the SecureStore session, modelling a
+# fresh install / new device for the same account. Signing in again runs the real
+# bootstrapper, which finds the server non-empty (catalog + the logged session
+# from Phase C) and PULLS everything back — no re-seed.
+- launchApp:
+    clearState: true
+- openLink: "${MAESTRO_IOS_DEV_CLIENT_URL}"
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    text: "Open"
+    optional: true
+- tapOn:
+    text: "Continue"
+    optional: true
+- tapOn:
+    text: "Close"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "sign-in-screen"
+    timeout: 60000
+- tapOn:
+    id: "sign-in-email-input"
+- inputText: "${MAESTRO_ROUNDTRIP_EMAIL}"
+- tapOn:
+    id: "sign-in-password-input"
+- inputText: "${MAESTRO_ROUNDTRIP_PASSWORD}"
+- tapOn:
+    id: "sign-in-submit-button"
+# Gate lifts off the real re-pull cycle and lands on the data screen.
+- extendedWaitUntil:
+    visible:
+      id: "stats-history-screen"
+    timeout: 90000
+- assertNotVisible:
+    id: "sync-gate-block"
+# Open the sessions history. After a full local wipe the only source of any
+# session is the remote DB, so a restored "1 exercise" session row proves the
+# logged workout is in the remote database.
+- tapOn:
+    id: "stats-card-sessions"
+- assertVisible:
+    id: "completed-history-scroll"
+- extendedWaitUntil:
+    visible:
+      text: "1 exercise"
+    timeout: 30000
+- takeScreenshot: "20-first-run-roundtrip-restored-from-remote"

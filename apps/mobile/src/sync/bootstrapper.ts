@@ -46,6 +46,7 @@ import { type LocalDatabase } from '@/src/data/bootstrap';
 import { PRIMARY_RUNTIME_STATE_ID } from '@/src/data/clock';
 import { seedSystemExerciseCatalog } from '@/src/data/exercise-catalog-seeds';
 import { syncRuntimeState } from '@/src/data/schema';
+import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidation';
 import { runFirstFullPull } from '@/src/sync/cycle';
 import {
   PULL_LAYER_COUNT,
@@ -218,6 +219,18 @@ export const runBootstrapper = async (database: LocalDatabase): Promise<void> =>
     publish('seed');
     seedSystemExerciseCatalog(database);
   }
+
+  // The first full pull and/or the starter-catalog seed above have populated the
+  // local catalog tables (exercise definitions, muscle groups, mappings). The
+  // in-memory catalog cache was hydrated EMPTY at cold boot (app/_layout.tsx
+  // calls `ensureExerciseCatalogLoaded()` before this first sign-in seeds/pulls),
+  // and the sync apply path never touches that cache — so without this explicit
+  // invalidation a brand-new user would see an empty exercise picker / catalog /
+  // stats for the whole first session, until an unrelated catalog write or an app
+  // restart re-hydrated it. Invalidate so the freshly-bootstrapped catalog shows
+  // immediately. Fires for both branches: the seed path AND a returning user
+  // whose catalog arrived via the pull.
+  invalidateExerciseCatalogCache();
 
   // Flag last: a crash before this point leaves `bootstrap_completed_at` null so
   // the next sign-in re-runs the whole pass.

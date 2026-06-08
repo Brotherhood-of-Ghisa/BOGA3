@@ -67,6 +67,25 @@ MAESTRO_RESET_STRATEGY="full" "$SCRIPT_DIR/maestro-ios-run-flow.sh" \
   --scenario "Sync gate first cycle (real)" \
   --flow "$APP_DIR/.maestro/flows/sync-gate-first-cycle-real.yaml"
 
+# First-run end-to-end round-trip: extends the real-cycle gate proof above with a
+# logged workout that must upload (Pending changes -> 0) and then survive a full
+# device wipe + re-sign-in (restored from the remote DB). Proves new-user
+# bootstrap + delta upload + remote round-trip on the simulator.
+#
+# Runs as a DEDICATED fixture user (user_b), not the user_a the rest of this lane
+# uses. The preceding real-cycle flow leaves user_a's ~400-row catalog only
+# PARTIALLY pushed (its gate lifts + flow tears down before the push drains), so a
+# flow that pulled user_a would hit the bootstrapper's pull branch with an
+# incomplete catalog and flakily fail to find "Barbell Back Squat". user_b is
+# untouched by every other flow, so this flow's first sign-in always finds an empty
+# server and takes the bootstrapper's SEED branch -> the full catalog is seeded
+# locally and deterministically. See the flow file's ISOLATION note.
+MAESTRO_ROUNDTRIP_EMAIL="$USER_B_EMAIL" \
+MAESTRO_ROUNDTRIP_PASSWORD="$USER_B_PASSWORD" \
+MAESTRO_RESET_STRATEGY="full" "$SCRIPT_DIR/maestro-ios-run-flow.sh" \
+  --scenario "First-run log and remote round-trip" \
+  --flow "$APP_DIR/.maestro/flows/sync-first-run-log-and-roundtrip.yaml"
+
 MAESTRO_RESET_STRATEGY="full" "$SCRIPT_DIR/maestro-ios-run-flow.sh" \
   --scenario "Settings sync status" \
   --flow "$APP_DIR/.maestro/flows/settings-sync-status.yaml"
