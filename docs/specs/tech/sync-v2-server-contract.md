@@ -20,7 +20,7 @@
 
 # Part A — Server schema
 
-The server is a typed mirror of the eight client entity tables. One
+The server is a typed mirror of the nine client entity tables. One
 `app_public.<entity>` table per client Drizzle table; no projection function,
 no event log, no per-row dispatch. Every write reaches the tables through the
 push RPC (Part B); the server is otherwise not a write source.
@@ -30,7 +30,7 @@ push RPC (Part B); the server is otherwise not a write source.
 These invariants hold for every table below.
 
 - **Server schema mirrors client.** One `app_public.<entity>` table per client
-  Drizzle table for the eight user-owned entities.
+  Drizzle table for the nine user-owned entities.
 - **Composite PK `(owner_user_id, id)`** on every table. Column order is
   owner-first so the canonical pull query (`where owner_user_id = … order by
   server_received_at`) leads with the PK column.
@@ -55,7 +55,7 @@ These invariants hold for every table below.
       `server_received_at` touch on UPDATE, and the `owner_user_id` immutability
       guard (A.6.3).
   What the server *does* enforce is structural, not validation: PK uniqueness,
-  the eight composite FKs (A.5), and the RLS policies (A.6).
+  the nine composite FKs (A.5), and the RLS policies (A.6).
   **No other uniqueness constraints.** The `(session_id, order_index)` /
   `(session_exercise_id, order_index)` slot uniqueness and the join-table pair
   uniqueness are **not** enforced as UNIQUE — they exist as **non-unique btree
@@ -88,7 +88,7 @@ These invariants hold for every table below.
 
 > **Build note (verified).** A.1's schema rules are confirmed against the
 > clean-room migration: composite PKs, `bigint` timestamps, `deleted_at bigint`
-> on all eight tables, zero CHECK constraints, no `extras` column, no `deleted`
+> on all nine tables, zero CHECK constraints, no `extras` column, no `deleted`
 > boolean, and the non-unique form of every slot/pair index. The drift checker
 > independently asserts no-CHECK, no-`extras`, no-`deleted` (see A.7).
 
@@ -158,7 +158,7 @@ Every table also gets the **identical** index
 below.
 
 > **Build note (verified).** All three universal columns, the
-> `<table>_owner_received_idx` index, and both triggers exist on all eight
+> `<table>_owner_received_idx` index, and both triggers exist on all nine
 > tables in the clean-room migration; the drift checker asserts the index and
 > both triggers per entity.
 
@@ -271,7 +271,7 @@ Source: `apps/mobile/src/data/schema/exercise-muscle-mappings.ts`.
 | --- | --- | --- | --- | --- | --- |
 | `id` | `id` | `text` | NO | — | part of PK |
 | `exerciseDefinitionId` | `exercise_definition_id` | `text` | NO | yes (`exercise_muscle_mappings_exercise_definition_id_idx`) | `(owner_user_id, exercise_definition_id) → exercise_definitions(owner_user_id, id)` `on delete cascade` deferred |
-| `muscleGroupId` | `muscle_group_id` | `text` | NO | yes (`exercise_muscle_mappings_muscle_group_id_idx`) | **No FK** — `muscle_groups` is client-only taxonomy (A.2.6.1) |
+| `muscleGroupId` | `muscle_group_id` | `text` | NO | yes (`exercise_muscle_mappings_muscle_group_id_idx`) | `(owner_user_id, muscle_group_id) → muscle_groups(owner_user_id, id)` `on delete cascade` deferred (A.2.9) |
 | `weight` | `weight` | `double precision` | NO | — | — |
 | `role` | `role` | `text` | YES | — | — |
 | `createdAt` | `created_at` | `bigint` | NO | — | — |
@@ -284,13 +284,18 @@ PK `(owner_user_id, id)`. No CHECK constraints (including `role`, `weight`).
 client-enforced (B.10 #3). `deleted_at` present so the LWW upsert path is
 uniform; local readers filter `WHERE deleted_at IS NULL`.
 
-#### A.2.6.1 `muscle_groups` is intentionally not synced
+#### A.2.6.1 `muscle_group_id` is a synced-parent FK
 
-`muscle_groups` is a client-only seeded taxonomy (`isEditable = 0`), not one of
-the eight user-owned entities. There is no `app_public.muscle_groups` table;
-`muscle_group_id` is opaque durable text resolved locally. The drift checker
-exempts it via `sync-extras.json`'s `untyped_text_references` (the
-`muscleGroupId` entry).
+`muscle_groups` is one of the nine user-owned synced entities (A.2.9), seeded as
+a starter catalog and then synced per-user like `exercise_definitions`. So
+`muscle_group_id` is **not** opaque text: it is a real composite FK into
+`app_public.muscle_groups(owner_user_id, id)` (constraint
+`exercise_muscle_mappings_muscle_group_fk`, `on delete cascade`, deferred —
+listed in A.5.2). Because the parent is Layer 0 and the mapping is Layer 1, a
+bootstrap/restore pulls the muscle group before the mapping, so the FK holds
+under enforcement. There is no `untyped_text_references` exemption in
+`sync-extras.json` for this column anymore — the drift checker enforces the
+typed-column and FK rule on it like any other.
 
 ### A.2.7 `exercise_tag_definitions`
 
@@ -330,9 +335,34 @@ uniqueness is client-enforced (B.10 #5). This is the one entity with no client
 `updated_at`; on the server it still carries the universal
 `client_updated_at_ms` / `server_received_at` envelope columns.
 
+### A.2.9 `muscle_groups`
+
+Source: `apps/mobile/src/data/schema/muscle-groups.ts`. A per-user synced
+taxonomy modeled on `exercise_definitions` (A.2.5): system-seeded as a starter
+catalog, then synced per-user. It is a **Layer 0** entity (no FK dependencies)
+and the FK parent of `exercise_muscle_mappings.muscle_group_id` (A.2.6, A.5.2).
+
+| Client column | Server column | Server type | Null | Indexed | FK |
+| --- | --- | --- | --- | --- | --- |
+| `id` | `id` | `text` | NO | — | part of PK |
+| `displayName` | `display_name` | `text` | NO | yes (`muscle_groups_display_name_idx`) | — |
+| `familyName` | `family_name` | `text` | NO | yes (`muscle_groups_family_name_idx`) | — |
+| `sortOrder` | `sort_order` | `integer` | NO | yes (`muscle_groups_sort_order_idx`) | — |
+| `isEditable` | `is_editable` | `integer` | NO | — | — |
+| `createdAt` | `created_at` | `bigint` | NO | — | — |
+| `updatedAt` | `updated_at` | `bigint` | NO | — | — |
+| `deletedAt` | `deleted_at` | `bigint` | YES | yes (`muscle_groups_deleted_at_idx`) | — |
+
+PK `(owner_user_id, id)`. **Zero CHECK constraints** on the server (the
+no-server-validation rule, A.1): the client-side `sort_order >= 0` and
+`is_editable in (0,1)` guards stay client-only. The client seeds stable ids
+(e.g. `chest_sternal`); the server treats `id` as opaque text. The two
+client-only bookkeeping columns (`local_dirty`, `local_updated_at_ms`) never
+cross the wire (A.3).
+
 ## A.3 Local schema additions (mechanism)
 
-Sync v2 adds local-only sync-bookkeeping columns to the eight client tables.
+Sync v2 adds local-only sync-bookkeeping columns to the nine client tables.
 They are set/cleared by the sync engine and **never travel on the wire**. The
 canonical names and types are owned by Part B (B.9): `local_dirty` and
 `local_updated_at_ms` on each entity table, plus singleton state on
@@ -354,28 +384,27 @@ drift check at PR time. See A.9 for the worked example.
 ```jsonc
 {
   "exemptions": {
-    "local_only_columns": ["local_dirty", "local_updated_at_ms"],
-    "untyped_text_references": [
-      { "entity": "exercise_muscle_mappings", "column": "muscleGroupId",
-        "rationale": "muscle_groups is client-only taxonomy" }
-    ]
+    "local_only_columns": ["local_dirty", "local_updated_at_ms"]
   }
 }
 ```
 
-> **Build note (verified).** The as-built `sync-extras.json` matches: the two
-> `local_only_columns` and the single `muscleGroupId` `untyped_text_references`
-> entry are present. The drift checker also tolerates an optional
-> `server_only_columns` exemption list (none currently used).
+> **Build note (verified).** The as-built `sync-extras.json` matches: only the
+> two `local_only_columns` remain. There is no `untyped_text_references` entry —
+> the former `muscleGroupId` waiver was removed when `muscle_groups` became a
+> typed synced entity (A.2.9) and `muscle_group_id` gained its real FK (A.5.2),
+> so the checker now enforces the typed-column and FK rule on that column like
+> any other. The drift checker still tolerates an optional `server_only_columns`
+> exemption list (none currently used).
 
 ### A.3.1 `deleted_at` columns
 
-All eight tables carry `deleted_at` (`bigint`, nullable) plus a
+All nine tables carry `deleted_at` (`bigint`, nullable) plus a
 `<table>_deleted_at_idx` index. The tables that previously lacked it on the
 client (`gyms`, `session_exercises`, `exercise_sets`,
 `exercise_muscle_mappings`, `session_exercise_tags`) gained it in the v2 build
 wave; `sessions`, `exercise_definitions`, `exercise_tag_definitions` already
-had it.
+had it; `muscle_groups` gained it when it became a synced entity (A.2.9).
 
 ## A.5 Deferrable foreign keys
 
@@ -388,7 +417,7 @@ violation. At COMMIT all FKs are re-checked; any unsatisfied constraint rolls
 back the entire transaction. From the client's view the push RPC is atomic per
 batch.
 
-### A.5.2 The eight deferrable FKs
+### A.5.2 The nine deferrable FKs
 
 | Constraint | From | To | On delete |
 | --- | --- | --- | --- |
@@ -397,11 +426,12 @@ batch.
 | `session_exercises_exercise_definition_fk` | `session_exercises(owner_user_id, exercise_definition_id)` | `exercise_definitions(owner_user_id, id)` | `no action` |
 | `exercise_sets_session_exercise_fk` | `exercise_sets(owner_user_id, session_exercise_id)` | `session_exercises(owner_user_id, id)` | `cascade` |
 | `exercise_muscle_mappings_exercise_definition_fk` | `exercise_muscle_mappings(owner_user_id, exercise_definition_id)` | `exercise_definitions(owner_user_id, id)` | `cascade` |
+| `exercise_muscle_mappings_muscle_group_fk` | `exercise_muscle_mappings(owner_user_id, muscle_group_id)` | `muscle_groups(owner_user_id, id)` | `cascade` |
 | `exercise_tag_definitions_exercise_definition_fk` | `exercise_tag_definitions(owner_user_id, exercise_definition_id)` | `exercise_definitions(owner_user_id, id)` | `cascade` |
 | `session_exercise_tags_session_exercise_fk` | `session_exercise_tags(owner_user_id, session_exercise_id)` | `session_exercises(owner_user_id, id)` | `cascade` |
 | `session_exercise_tags_exercise_tag_definition_fk` | `session_exercise_tags(owner_user_id, exercise_tag_definition_id)` | `exercise_tag_definitions(owner_user_id, id)` | `cascade` |
 
-All eight declared `DEFERRABLE INITIALLY DEFERRED`. Migration template:
+All nine declared `DEFERRABLE INITIALLY DEFERRED`. Migration template:
 
 ```sql
 constraint <name>
@@ -411,7 +441,7 @@ constraint <name>
   deferrable initially deferred
 ```
 
-> **Build note (verified).** All eight FK names, targets, on-delete actions,
+> **Build note (verified).** All nine FK names, targets, on-delete actions,
 > and the `DEFERRABLE INITIALLY DEFERRED` flag match the clean-room migration.
 > `supabase/tests/sync-v2-deferrable-fk.sh` asserts each is
 > `is_deferrable='YES' / initially_deferred='YES'` and that a
@@ -432,7 +462,7 @@ COMMIT-time failure is a defense-in-depth backstop only; there is no retry path.
 
 ### A.6.1 Universal shape
 
-Identical for all eight tables (substitute `<table>`):
+Identical for all nine tables (substitute `<table>`):
 
 ```sql
 alter table app_public.<table> enable row level security;
@@ -518,7 +548,7 @@ Location: `apps/mobile/scripts/check-sync-schema-drift.ts`. Command:
 1. Reset the local Postgres (apply all migrations) unless `--skip-reset`.
 2. `drizzle-kit export` → in-memory SQLite; introspect via PRAGMAs.
 3. Derive `ENTITY_TABLES` = every `app_public` table with an `owner_user_id`
-   column (do **not** hardcode 8 — A.7.7).
+   column (do **not** hardcode the count — there are nine today — A.7.7).
 4. Per entity: walk client→server (every client column must map to a typed
    server column of compatible type, unless `local_only` or
    `untyped_text_references`), and server→client (a server column with no client
@@ -561,7 +591,7 @@ topological order. The checker asserts the hardcoded layering in
 
 ```ts
 export const TOPO_LAYERS: readonly (readonly string[])[] = [
-  ['gyms', 'exercise_definitions'],                                     // Layer 0
+  ['gyms', 'exercise_definitions', 'muscle_groups'],                    // Layer 0
   ['sessions', 'exercise_muscle_mappings', 'exercise_tag_definitions'], // Layer 1
   ['session_exercises'],                                                // Layer 2
   ['exercise_sets', 'session_exercise_tags'],                           // Layer 3
@@ -581,18 +611,21 @@ strictly earlier layer or is a self-edge**. The assertion:
 
 > **Build note (verified).** `exercise_tag_definitions` is in **Layer 1**, not
 > Layer 0, because it FKs into `exercise_definitions` (Layer 0) and an
-> intra-layer FK is forbidden. The as-built `topo-order.ts`, the `sync_pull` SQL
-> `case` (B.4), and the `sync-v2-pull-fk-closure.sh` partition assertion all
-> encode this. Self-edges are allowed (a future `replaced_by_id` self-FK would
-> be deferred-safe in one batch); same-layer cross-table FKs are forbidden
-> because B.3.4.1's "any intra-layer order is safe" depends on it.
+> intra-layer FK is forbidden. `muscle_groups` is in **Layer 0**: it declares no
+> FK to any other entity and is the parent of `exercise_muscle_mappings`
+> (Layer 1, via `muscle_group_id`), so the child's FK points to a strictly
+> earlier layer. The as-built `topo-order.ts`, the `sync_pull` SQL `case` (B.4),
+> and the `sync-v2-pull-fk-closure.sh` partition assertion all encode this.
+> Self-edges are allowed (a future `replaced_by_id` self-FK would be
+> deferred-safe in one batch); same-layer cross-table FKs are forbidden because
+> B.3.4.1's "any intra-layer order is safe" depends on it.
 
 ## A.8 Agent-reminder mechanism
 
 The client-schema-drift rule lives in `docs/specs/05-data-model.md`
 ("Client schema drift rule (Sync v2)") because that file is always-loaded for
 agents and already owns the sync-impact gate. The rule requires a paired,
-deployed-first server migration for any new domain column on the eight entity
+deployed-first server migration for any new domain column on the nine entity
 tables, enforced by the drift checker. It does not apply to adding a value to an
 existing column (the column exists on both sides; the server stores arbitrary
 text per A.1).
@@ -665,7 +698,7 @@ carries the LWW key; `fields` carries every typed column (including
 }
 ```
 
-- `type` — one of the eight entity names (plural, snake_case), matching the
+- `type` — one of the nine entity names (plural, snake_case), matching the
   Part A table names.
 - `id` — client-assigned (ULID for user rows, slug for seeds), stable forever.
 - `client_updated_at_ms` — epoch ms, the LWW key, `>= 0`, produced by the
@@ -751,15 +784,15 @@ column is drift, caught at PR time.
 ### B.3.4 Building the batch
 
 The client must never push a child whose parent is neither in the batch nor on
-the server (B.10 #6). It satisfies this by walking the eight tables in a fixed
+the server (B.10 #6). It satisfies this by walking the nine tables in a fixed
 **topological order** when collecting dirty rows.
 
 #### B.3.4.1 Topological order
 
 | Layer | Tables (any intra-layer order) | FKs to earlier layers |
 | --- | --- | --- |
-| 0 | `gyms`, `exercise_definitions` | none |
-| 1 | `sessions`, `exercise_muscle_mappings`, `exercise_tag_definitions` | `sessions → gyms`; `exercise_muscle_mappings → exercise_definitions`; `exercise_tag_definitions → exercise_definitions` |
+| 0 | `gyms`, `exercise_definitions`, `muscle_groups` | none |
+| 1 | `sessions`, `exercise_muscle_mappings`, `exercise_tag_definitions` | `sessions → gyms`; `exercise_muscle_mappings → exercise_definitions`, `→ muscle_groups`; `exercise_tag_definitions → exercise_definitions` |
 | 2 | `session_exercises` | `→ sessions`, `→ exercise_definitions` |
 | 3 | `exercise_sets`, `session_exercise_tags` | `exercise_sets → session_exercises`; `session_exercise_tags → session_exercises`, `→ exercise_tag_definitions` |
 
@@ -770,9 +803,10 @@ the drift checker (A.7.7).
 
 > **Build note — corrected mapping (verified).** `exercise_tag_definitions` is
 > in **Layer 1**, not Layer 0. The earlier draft placing it in Layer 0 was
-> structurally impossible against the A.5.2 FK graph. The as-built
-> `topo-order.ts` and the `sync_pull` SQL `case` both encode the Layer-1
-> placement.
+> structurally impossible against the A.5.2 FK graph. `muscle_groups` is in
+> **Layer 0** (no FK dependencies) and is the FK parent of
+> `exercise_muscle_mappings` in Layer 1. The as-built `topo-order.ts` and the
+> `sync_pull` SQL `case` both encode these placements.
 
 #### B.3.4.2 `selectPushBatch(batchCap = 200) → Entity[]`
 
@@ -854,7 +888,7 @@ on the client.
 > `execute` to `authenticated`, `service_role`, and `anon` (same `AUTH_REQUIRED`
 > rationale as push). `layer` must be an integer `0..3`; `limit` an integer
 > `1..200` defaulting to 200; `cursor` either null/absent or an object carrying
-> all four keys with a `type` that is one of the eight entity types — otherwise
+> all four keys with a `type` that is one of the nine entity types — otherwise
 > `INTERNAL`.
 
 ### B.4.2 Response
@@ -902,7 +936,7 @@ limitation; future hardening could use `pg_xact_commit_timestamp(xmin)`.
 > **Build note (verified).** The as-built query fetches `limit + 1` rows to
 > compute `has_more`, then trims the overshoot row and strips the cursor-axis
 > fields (`owner_user_id`, `server_received_at`) off each emitted envelope. The
-> static `UNION ALL` over all eight tables is scoped to the layer by
+> static `UNION ALL` over all nine tables is scoped to the layer by
 > `type = any(v_types)`; each leg also carries an explicit
 > `where owner_user_id = auth.uid()` to pin the planner on
 > `<table>_owner_received_idx`. The known race is documented in the migration
@@ -925,9 +959,10 @@ for layer in [0, 1, 2, 3]:
 ```
 
 Layer→type mapping (as-built `sync_pull` `case`): 0 = `gyms`,
-`exercise_definitions`; 1 = `sessions`, `exercise_muscle_mappings`,
-`exercise_tag_definitions`; 2 = `session_exercises`; 3 = `exercise_sets`,
-`session_exercise_tags`. (See the B.3.4.1 corrected-mapping note.)
+`exercise_definitions`, `muscle_groups`; 1 = `sessions`,
+`exercise_muscle_mappings`, `exercise_tag_definitions`; 2 = `session_exercises`;
+3 = `exercise_sets`, `session_exercise_tags`. (See the B.3.4.1 corrected-mapping
+note.)
 Per-layer cursors persist after every page COMMIT, so an aborted drain resumes
 from where it stopped; the DB is FK-consistent at every commit boundary.
 
@@ -1104,7 +1139,7 @@ module-scoped cache mirrors the persisted value for tight loops.
 
 ### B.9.1 The two entity columns
 
-All eight entity tables gain `local_dirty` (SQLite 0/1, default 0) and
+All nine entity tables gain `local_dirty` (SQLite 0/1, default 0) and
 `local_updated_at_ms` (epoch ms, default 0) — snake_case in SQLite,
 `localDirty` / `localUpdatedAtMs` in Drizzle. Both are local-only: the push
 serialiser omits them (B.3.3); the pull apply writes them (B.4.5).
@@ -1126,7 +1161,7 @@ Each advances independently after that layer's page COMMIT (B.4.7).
 The two entity columns are registered globally in `sync-extras.json` under
 `exemptions.local_only_columns`. `sync_runtime_state` is **not** in the drift
 checker's scope (it has no server counterpart by design — the checker scans only
-the eight entity tables), so `pull_cursor`, `last_emitted_ms`, and
+the nine entity tables), so `pull_cursor`, `last_emitted_ms`, and
 `bootstrap_completed_at` need no registration.
 
 ### B.9.5 Push serialiser exclusion

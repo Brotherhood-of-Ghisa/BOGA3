@@ -21,11 +21,15 @@ This document is project-level source of truth for what data exists and how it i
 
 1. Mobile local data layer (`SQLite` via Drizzle)
 - primary runtime store for app behavior.
-- includes user-owned domain data plus static seeded taxonomy data.
+- holds user-owned domain data; the seeded taxonomies (`exercise_definitions`,
+  `muscle_groups`) are system-seeded starter catalogs that then sync as ordinary
+  per-user entities, not static read-only data.
 - production bootstrap must enable SQLite `PRAGMA foreign_keys = ON` for the app
-  connection before normal repository/sync writes run, and must run
-  `PRAGMA foreign_key_check` after migrations/seeds so local graph violations
-  are diagnosed at startup instead of surfacing only during backend sync.
+  connection at connection-open (the moment the database handle is opened, before
+  any migrations or seeding run) so enforcement is active for both migrations and
+  seed inserts — and must run `PRAGMA foreign_key_check` after migrations/seeds so
+  local graph violations are diagnosed at startup instead of surfacing only
+  during backend sync.
 
 2. Backend auth/profile layer (`Supabase Auth` + `app_public.user_profiles`)
 - auth identity and account profile management.
@@ -48,10 +52,8 @@ This document is project-level source of truth for what data exists and how it i
 - `exercise_muscle_mappings`
 - `exercise_tag_definitions`
 - `session_exercise_tags`
-
-### Static/system data (not user backup scope)
-
-- `muscle_groups` (seeded, non-editable taxonomy)
+- `muscle_groups` (per-user taxonomy; system-seeded as a starter catalog, then
+  synced like any other entity — modeled on `exercise_definitions`)
 
 ### Test/runtime-only data (not user backup scope)
 
@@ -63,7 +65,7 @@ This document is project-level source of truth for what data exists and how it i
 ### Local sync bookkeeping (Sync v2)
 
 v2 keeps no separate outbox/delivery tables. Per-row sync state is two local-only
-columns on each of the eight user-owned entity tables:
+columns on each of the nine user-owned entity tables:
 `local_dirty` (1 iff the row needs pushing) and `local_updated_at_ms` (the
 monotonic client timestamp, sent as `client_updated_at_ms`). Neither crosses the
 wire. Device-global sync state lives on the `sync_runtime_state` singleton row:
@@ -88,7 +90,7 @@ rows so one local orphan cannot wedge the backlog.
 
 One typed `app_public.<entity>` table per client entity table. Each is a direct
 mirror of its client Drizzle table (no projection layer): composite primary key
-`(owner_user_id, id)`, all eight composite cross-entity FKs declared
+`(owner_user_id, id)`, all nine composite cross-entity FKs declared
 `DEFERRABLE INITIALLY DEFERRED`, and the universal sync columns
 `client_updated_at_ms` (the LWW key), `server_received_at` (the pull-cursor axis),
 and a nullable `deleted_at` tombstone. Per-column mapping is in
@@ -102,6 +104,8 @@ and a nullable `deleted_at` tombstone. Per-column mapping is in
 - `app_public.exercise_muscle_mappings`
 - `app_public.exercise_tag_definitions`
 - `app_public.session_exercise_tags`
+- `app_public.muscle_groups` (per-user taxonomy mirror; FK parent of
+  `exercise_muscle_mappings.muscle_group_id`)
 
 There are no backend ingest-metadata tables: with no event log there is nothing
 to deduplicate per device, so idempotency falls out of per-row LWW.
@@ -127,7 +131,7 @@ to deduplicate per device, so idempotency falls out of per-row LWW.
    to a newer stored value (including the undelete-loses case in
    `docs/specs/tech/sync-v2-server-contract.md` §A.1.1.2 Scenario A).
 5. Diagnostic log rows are write-only from authenticated clients and are manually inspected through backend operator tooling.
-6. All eight sync-domain mirror tables use composite primary key
+6. All nine sync-domain mirror tables use composite primary key
    `(owner_user_id, id)` — **owner-first**. The column order is load-bearing: the
    canonical pull query (`where owner_user_id = … order by server_received_at`)
    leads with the PK column, and the per-layer pull cursor depends on it (contract
@@ -142,13 +146,25 @@ to deduplicate per device, so idempotency falls out of per-row LWW.
 ## Local integrity contract
 
 1. Local SQLite foreign-key enforcement is required for the production mobile
-   database connection. Repository and sync write paths should assume declared
-   local FK constraints are active, so invalid child rows fail at the local write
-   or pull-apply boundary.
-2. Bootstrap FK pragma/integrity failures are logged through `public.app_logs`
+   database connection. The app enables it explicitly via
+   `PRAGMA foreign_keys = ON` at **connection-open** — immediately after the
+   database handle is opened, before migrations and seeding run — so enforcement
+   is active for both. expo-sqlite does not enforce FKs by default, so this pragma
+   is what makes the declared local FK constraints active. After migrations and
+   seeds complete, bootstrap runs `PRAGMA foreign_key_check` to surface any local
+   graph violations at startup. Repository and sync write paths assume enforcement
+   is on, so invalid child rows fail at the local write or pull-apply boundary.
+2. **Client FKs only reference synced parents.** Every declared local FK points
+   at a table that is itself a per-user synced entity, so a wiped/reinstalled
+   client re-pulls the parent (its earlier topological layer) before the child
+   and the FK holds under enforcement. There is no local FK into a static or
+   client-only table that could brick on a cross-version skew. (This is why
+   `muscle_groups` — the FK parent of `exercise_muscle_mappings.muscle_group_id`
+   — is a synced entity rather than a version-bundled taxonomy.)
+3. Bootstrap FK pragma/integrity failures are logged through `public.app_logs`
    diagnostics with sanitized context and then rethrown; logging failure must
    not mask the original SQLite failure.
-3. Tests that assert FK-sensitive data or sync behavior must enable FK
+4. Tests that assert FK-sensitive data or sync behavior must enable FK
    enforcement in their SQLite fixture instead of relying on SQLite's default
    per-connection FK-off mode.
 
@@ -157,7 +173,7 @@ to deduplicate per device, so idempotency falls out of per-row LWW.
 Deep wire/RPC detail lives in `docs/specs/tech/sync-v2-server-contract.md`; this
 section states only the data-model-level invariants.
 
-1. The eight user-owned entity tables are mirrored 1:1 on the backend as typed
+1. The nine user-owned entity tables are mirrored 1:1 on the backend as typed
    `app_public.<entity>` tables. The client marks a mutated row dirty
    (`local_dirty = 1`, `local_updated_at_ms = nowMonotonic()`) and pushes the full
    typed row — not a granular event. There is no outbox, no projection, no event
@@ -194,7 +210,7 @@ is no event log. Field-by-field detail: contract §B.2.
 
 ### Entity coverage (Sync v2)
 
-There are no per-entity event types. Every one of the eight entities moves through
+There are no per-entity event types. Every one of the nine entities moves through
 the same LWW upsert path. A delete is a row whose `deleted_at` is non-null; an
 undelete is that same row with `deleted_at` back to null. A reorder or complete is
 an ordinary field change (`order_index` / `status`); an attach is the join-table
@@ -233,11 +249,11 @@ Sync impact gate (mandatory for every data-model change):
 
 ## Client schema drift rule (Sync v2)
 
-Modifying any file under `apps/mobile/src/data/schema/` for the eight user-owned
+Modifying any file under `apps/mobile/src/data/schema/` for the nine user-owned
 entities (`gyms`, `sessions`, `session_exercises`, `exercise_sets`,
 `exercise_definitions`, `exercise_muscle_mappings`, `exercise_tag_definitions`,
-`session_exercise_tags`) to add a domain column requires a paired server
-migration under `supabase/migrations/` that adds the matching
+`session_exercise_tags`, `muscle_groups`) to add a domain column requires a
+paired server migration under `supabase/migrations/` that adds the matching
 `app_public.<entity>` column with a compatible Postgres type, **and the server
 migration must be deployed to production before the client change ships**.
 
@@ -255,16 +271,15 @@ also asserts the hardcoded topological table order in
 `docs/specs/tech/sync-v2-server-contract.md` §A.7.7) — adding a new entity table
 or FK without updating that list also fails the gate.
 
-This rule does NOT apply to: `muscle_groups` (client-only taxonomy),
-`smoke_records`, `sync_runtime_state`, or `sync_quarantine` (test/runtime
-scaffolding and local sync bookkeeping) — these have no server counterpart and
-are out of the checker's scope, which introspects only the eight
-`app_public.<entity>` mirror tables. Nor does it apply to the two local-only
-sync-bookkeeping columns (`local_dirty`, `local_updated_at_ms`) on each entity
-table: those are listed under `exemptions.local_only_columns` in
-`sync-extras.json`, alongside the single `untyped_text_references` entry that
-exempts `exercise_muscle_mappings.muscleGroupId` (the no-FK reference into the
-client-only `muscle_groups` taxonomy).
+This rule does NOT apply to: `smoke_records`, `sync_runtime_state`, or
+`sync_quarantine` (test/runtime scaffolding and local sync bookkeeping) — these
+have no server counterpart and are out of the checker's scope, which introspects
+only the nine `app_public.<entity>` mirror tables. Nor does it apply to the two
+local-only sync-bookkeeping columns (`local_dirty`, `local_updated_at_ms`) on
+each entity table: those are listed under `exemptions.local_only_columns` in
+`sync-extras.json`. (`muscle_groups` is no longer exempt — it is one of the nine
+synced entities, and `exercise_muscle_mappings.muscleGroupId` is a typed,
+FK-checked column like any other.)
 
 If your client change adds a value to an existing column (e.g., a new enum literal),
 the rule does not apply because the column already exists on both sides; the client
