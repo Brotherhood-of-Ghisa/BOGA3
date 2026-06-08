@@ -53,8 +53,11 @@ Observable, specific, testable, bounded. The final test card verifies these end-
    (`seedMuscleGroups` as that standalone path is gone); rows are seeded `local_dirty = 1` by the
    same `seedSystemExerciseCatalog` path as `exercise_definitions`, gated by the existing
    `appliedSeedMigrationAppVersion` marker, and `account-wipe` clears/recovers them generically
-   (no client-only special note). `PRAGMA foreign_keys = ON` is enabled at boot **after** migrations
-   and **before** seeding.
+   (no client-only special note). `PRAGMA foreign_keys = ON` is enabled at boot — **at
+   connection-open**, so it is active across both migrations and seeding — with a post-seed
+   `PRAGMA foreign_key_check`. (Re-scoped at execute time: an unrelated merged change implemented the
+   boot FK pragma at connection-open rather than post-migrate; the in-scope guarantee is that FK
+   enforcement is live before `muscle_groups` is seeded, which holds.)
 7. **The schema-drift checker treats `muscle_groups` as a normal entity table.** The
    `untyped_text_references` exemption for `muscleGroupId` is removed from `sync-extras.json`; the
    checker derives 9 entity tables from the live schema (no hardcoded "8") and exits 0 under
@@ -186,3 +189,25 @@ graph TD
   merge intact. Impact: plan **outcome 6's FK-pragma requirement is now pre-satisfied** — t5
   reconciles (does NOT re-add it); t7 (FK-harness default + false-FK-comment fixes) and tFINAL
   (PO6/PO8 FK assertions) must reconcile with #148's FK infrastructure rather than assume a greenfield.
+- t5 (PR #180, merged 2026-06-07): seeding + bootstrap. muscle_groups seeds dirty via
+  `seedSystemExerciseCatalog`, wiped generically. Deviation: reconciled with #148's already-present
+  boot FK pragma (verified placement works under the dirty seed; did NOT re-add); deleted obsolete
+  `muscle-group-bootstrap-idempotent.test.ts` + reconciled tests broken by removing the standalone
+  seed. All gates incl. iOS data-smoke green.
+- t11 (PR #181, merged 2026-06-07): cross-owner RLS contract coverage for muscle_groups (added as a
+  consumer-parity task). One file; backend green. No deviation.
+- t7 (PR #182, merged 2026-06-07): in-memory harness FK-on by default + muscle_groups per-entity
+  coverage; fk-integrity guarantee reconciled to topo framing. FK-on flip surfaced zero regressions.
+  Stayed tests-only; surfaced a real product bug (fk-graph.ts omits the muscle_groups push-preflight
+  edge) → folded in as t12.
+- OUTCOME 4 RE-SCOPED (user-approved): #148's unrelated `m0001` (sync_quarantine) makes the original
+  "journal length 1 / ['m0000']" literal false; re-scoped to "muscle_groups lives in m0000, adds no
+  migration of its own" (outcome 4 + tFINAL PO4 updated).
+- OUTCOME 6 RE-SCOPED (execute-time): #148 enables the boot FK pragma at connection-open, not
+  post-migrate; re-scoped outcome 6 + tFINAL PO6 to "FK enforcement live before seeding" (the
+  in-scope guarantee), not a specific post-migrate call site.
+- t8 (PR #184): docs — both specs reframed to the synced-entity reality (9 entities, real FK, boot FK
+  enforcement, synced-parent-FK invariant, drift exemption dropped). Reviewer CHANGES_REQUESTED 1
+  item (docs said FK pragma "after migrations"; as-built is connection-open) → builder fixed.
+- t12 (PR #183): push FK-preflight edge for muscle_groups (fk-graph.ts) + straggler sweep (fk-graph
+  was the only apps/mobile/src straggler). No deviation.

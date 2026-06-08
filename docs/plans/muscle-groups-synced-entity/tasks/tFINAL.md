@@ -39,8 +39,10 @@ Binding contract in `designs/t1.md ## Decision`. Relevant landed artifacts to ex
   `EntityTableName`, and has `ENTITY_FIELDS`/`ENTITY_TABLES` entries with the exact wire field set.
 - **PO6 (dirty seed + boot FK):** an assertion confirms `seedSystemExerciseCatalog` seeds
   `muscle_groups` `local_dirty = 1`, the standalone boot seed no longer runs for `muscle_groups`,
-  `account-wipe` clears `muscle_groups`, and boot enables `PRAGMA foreign_keys = ON` after migrations
-  / before seeding.
+  `account-wipe` clears `muscle_groups`, and boot enables FK enforcement (`PRAGMA foreign_keys = ON`
+  at connection-open, so it is live across migrations and seeding; a post-seed `PRAGMA
+  foreign_key_check` runs) — assert FK enforcement is live before `muscle_groups` is seeded, not a
+  specific post-migrate call site.
 - **PO7 (drift):** an assertion confirms `sync-extras.json` lacks the `muscleGroupId` exemption and
   the checker derives 9 entities and exits 0 under `--strict`.
 - **PO8 (anti-brick round-trip — the central proof):** under `PRAGMA foreign_keys = ON`, seed
