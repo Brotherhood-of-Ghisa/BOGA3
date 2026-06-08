@@ -25,8 +25,9 @@ This document is project-level source of truth for what data exists and how it i
   `muscle_groups`) are system-seeded starter catalogs that then sync as ordinary
   per-user entities, not static read-only data.
 - production bootstrap must enable SQLite `PRAGMA foreign_keys = ON` for the app
-  connection — after migrations and before seeding, so seed inserts run under
-  enforcement — and must run `PRAGMA foreign_key_check` after migrations/seeds so
+  connection at connection-open (the moment the database handle is opened, before
+  any migrations or seeding run) so enforcement is active for both migrations and
+  seed inserts — and must run `PRAGMA foreign_key_check` after migrations/seeds so
   local graph violations are diagnosed at startup instead of surfacing only
   during backend sync.
 
@@ -145,12 +146,14 @@ to deduplicate per device, so idempotency falls out of per-row LWW.
 ## Local integrity contract
 
 1. Local SQLite foreign-key enforcement is required for the production mobile
-   database connection. The app enables it explicitly at boot via
-   `PRAGMA foreign_keys = ON`, run **after** migrations and **before** seeding —
-   expo-sqlite does not enforce FKs by default, so this pragma is what makes the
-   declared local FK constraints active. Repository and sync write paths assume
-   enforcement is on, so invalid child rows fail at the local write or pull-apply
-   boundary.
+   database connection. The app enables it explicitly via
+   `PRAGMA foreign_keys = ON` at **connection-open** — immediately after the
+   database handle is opened, before migrations and seeding run — so enforcement
+   is active for both. expo-sqlite does not enforce FKs by default, so this pragma
+   is what makes the declared local FK constraints active. After migrations and
+   seeds complete, bootstrap runs `PRAGMA foreign_key_check` to surface any local
+   graph violations at startup. Repository and sync write paths assume enforcement
+   is on, so invalid child rows fail at the local write or pull-apply boundary.
 2. **Client FKs only reference synced parents.** Every declared local FK points
    at a table that is itself a per-user synced entity, so a wiped/reinstalled
    client re-pulls the parent (its earlier topological layer) before the child
