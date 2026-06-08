@@ -3,8 +3,8 @@
 // Tapping a square selects that DAY and shows its detail (date + metric value);
 // the daily view is for per-day inspection, the weekly view for weekly rollups.
 
-import React, { useMemo, useState } from 'react';
-import { LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useMemo, useRef, useState } from 'react';
+import { LayoutChangeEvent, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { uiColors } from '@/components/ui';
 
@@ -42,8 +42,14 @@ export function DailyHeatmap({
 }: Props) {
   const [gridW, setGridW] = useState(0);
   const [pickedDateKey, setPickedDateKey] = useState<string | null>(null);
-  const GUT = 16;
-  const GAP = 1.4;
+  const scrollRef = useRef<ScrollView>(null);
+  const GUT = 20;
+  const GAP = 3;
+  // Tile size is keyed to a ~3-month viewport: ~13 week columns fill the visible width,
+  // and older history is reachable by scrolling horizontally.
+  const WEEKS_VISIBLE = 13;
+  const MIN_CELL = 14;
+  const AXIS_H = 18;
 
   // Default selection = today; falls back to the most recent day with data.
   const selectedDateKey = pickedDateKey ?? data.todayDateKey;
@@ -71,8 +77,9 @@ export function DailyHeatmap({
   }, [data.daily]);
 
   const colCount = cols.length || 52;
-  const cell = gridW > 0 ? Math.max(3, (gridW - GUT) / colCount - GAP) : 5;
+  const cell = gridW > 0 ? Math.max(MIN_CELL, (gridW - GUT) / WEEKS_VISIBLE - GAP) : MIN_CELL;
   const colW = cell + GAP;
+  const rowH = cell + GAP;
 
   // month axis: label the first column of each new month
   const monthMarks = cols.map((c, i) => {
@@ -90,68 +97,83 @@ export function DailyHeatmap({
         <Text style={styles.muted}>each square = one day</Text>
       </View>
 
-      {/* month axis */}
-      <View style={[styles.axis, { marginLeft: GUT }]}>
-        {monthMarks.map((m, i) => (
-          <View key={i} style={{ width: colW }}>
-            {m ? <Text style={styles.axisLabel}>{m}</Text> : null}
-          </View>
-        ))}
-      </View>
-
-      {/* grid */}
-      <View style={styles.grid} onLayout={onLayout}>
+      {/* fixed weekday column + horizontally scrollable (month axis + grid) */}
+      <View style={styles.body} onLayout={onLayout}>
         <View style={{ width: GUT }}>
+          {/* spacer aligns the weekday labels with the grid rows (below the month axis) */}
+          <View style={{ height: AXIS_H }} />
           {['M', '', 'W', '', 'F', '', ''].map((w, r) => (
-            <Text key={r} style={[styles.wd, { height: cell, marginBottom: r < 6 ? GAP : 0 }]}>
+            <Text key={r} style={[styles.wd, { height: rowH, lineHeight: rowH }]}>
               {w}
             </Text>
           ))}
         </View>
-        {cols.map((c) => (
-          <View key={c.weekStartDateKey} style={{ width: colW }}>
-            {c.days.map((d, r) => {
-              if (!d) {
-                return (
-                  <View
-                    key={r}
-                    style={{ width: cell, height: cell, marginBottom: r < 6 ? GAP : 0 }}
-                  />
-                );
-              }
-              const selected = d.dateKey === selectedDateKey;
-              return (
-                <Pressable
-                  key={r}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected }}
-                  onPress={() => setPickedDateKey(d.dateKey)}
-                  testID={`${heatmapTestID}-cell-${d.dateKey}`}
-                  style={{
-                    width: cell,
-                    height: cell,
-                    marginBottom: r < 6 ? GAP : 0,
-                    borderRadius: 1.5,
-                    backgroundColor: HEAT_RAMP[d.level],
-                    borderWidth: d.isToday || selected ? 1.4 : StyleSheet.hairlineWidth,
-                    borderColor: d.isToday
-                      ? accent
-                      : selected
-                        ? uiColors.heatmapSelectedBorder
-                        : d.level === 0
-                          ? uiColors.heatmapNeutralBorder
-                          : 'transparent',
-                  }}
-                />
-              );
-            })}
-          </View>
-        ))}
-      </View>
 
-      {/* Today caption */}
-      <View style={styles.todayRow}>
-        <Text style={[styles.todayTxt, { color: accent }]}>▲ TODAY</Text>
+        <ScrollView
+          ref={scrollRef}
+          horizontal
+          style={styles.scroll}
+          showsHorizontalScrollIndicator={false}
+          onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: false })}>
+          <View style={{ width: colCount * colW }}>
+            {/* month axis — labels overflow their column so they aren't clipped */}
+            <View style={[styles.axis, { width: colCount * colW }]}>
+              {monthMarks.map((m, i) =>
+                m ? (
+                  <Text
+                    key={i}
+                    numberOfLines={1}
+                    style={[styles.axisLabel, { left: i * colW }]}>
+                    {m}
+                  </Text>
+                ) : null
+              )}
+            </View>
+
+            {/* grid */}
+            <View style={styles.grid}>
+              {cols.map((c) => (
+                <View key={c.weekStartDateKey} style={{ width: colW }}>
+                  {c.days.map((d, r) => {
+                    if (!d) {
+                      return (
+                        <View
+                          key={r}
+                          style={{ width: cell, height: cell, marginBottom: r < 6 ? GAP : 0 }}
+                        />
+                      );
+                    }
+                    const selected = d.dateKey === selectedDateKey;
+                    return (
+                      <Pressable
+                        key={r}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected }}
+                        onPress={() => setPickedDateKey(d.dateKey)}
+                        testID={`${heatmapTestID}-cell-${d.dateKey}`}
+                        style={{
+                          width: cell,
+                          height: cell,
+                          marginBottom: r < 6 ? GAP : 0,
+                          borderRadius: 3,
+                          backgroundColor: HEAT_RAMP[d.level],
+                          borderWidth: d.isToday || selected ? 1.6 : StyleSheet.hairlineWidth,
+                          borderColor: d.isToday
+                            ? accent
+                            : selected
+                              ? uiColors.heatmapSelectedBorder
+                              : d.level === 0
+                                ? uiColors.heatmapNeutralBorder
+                                : 'transparent',
+                        }}
+                      />
+                    );
+                  })}
+                </View>
+              ))}
+            </View>
+          </View>
+        </ScrollView>
       </View>
 
       {/* selected-day detail */}
@@ -225,12 +247,20 @@ const styles = StyleSheet.create({
   },
   h1: { fontSize: 15, fontWeight: '600', color: uiColors.textPrimary },
   muted: { fontSize: 12, color: uiColors.textMuted },
-  axis: { flexDirection: 'row', height: 14 },
-  axisLabel: { fontSize: 10, color: uiColors.textMuted, fontWeight: '500' },
+  body: { flexDirection: 'row' },
+  scroll: { flex: 1 },
+  axis: { height: 18, position: 'relative' },
+  axisLabel: {
+    position: 'absolute',
+    top: 0,
+    width: 32,
+    fontSize: 10,
+    lineHeight: 14,
+    color: uiColors.textMuted,
+    fontWeight: '500',
+  },
   grid: { flexDirection: 'row' },
-  wd: { fontSize: 9, color: uiColors.textMuted },
-  todayRow: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 6 },
-  todayTxt: { fontSize: 10, fontWeight: '700', letterSpacing: 0.4 },
+  wd: { fontSize: 9, color: uiColors.textMuted, textAlign: 'center' },
   detail: {
     marginTop: 14,
     backgroundColor: uiColors.surfaceMuted,
