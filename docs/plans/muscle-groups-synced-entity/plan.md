@@ -209,5 +209,12 @@ graph TD
 - t8 (PR #184): docs — both specs reframed to the synced-entity reality (9 entities, real FK, boot FK
   enforcement, synced-parent-FK invariant, drift exemption dropped). Reviewer CHANGES_REQUESTED 1
   item (docs said FK pragma "after migrations"; as-built is connection-open) → builder fixed.
-- t12 (PR #183): push FK-preflight edge for muscle_groups (fk-graph.ts) + straggler sweep (fk-graph
-  was the only apps/mobile/src straggler). No deviation.
+- t12 (PR #183, merged 2026-06-08): push FK-preflight edge for muscle_groups (fk-graph.ts) +
+  straggler sweep (fk-graph was the only apps/mobile/src straggler). No deviation.
+- t8 (PR #184, merged 2026-06-08): docs — both specs reframed; FK-pragma ordering corrected to
+  connection-open. Merged.
+- tFINAL (PR #188, merged 2026-06-08): final test card — PO1-PO9 each asserted by a non-vacuous test;
+  central anti-brick PO8 round-trip under FK-on with a negative control (orphan@L1 → fk-violation).
+  Test-only (sole non-test change: 1-line e2e script registration). PO4/PO6 assert the re-scoped
+  wording (muscle_groups in m0000 not journal-length-1; FK live-before-seed via connection-open). All
+  gates green incl. iOS data-smoke. No deviation.
