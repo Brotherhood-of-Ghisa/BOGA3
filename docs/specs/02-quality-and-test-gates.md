@@ -12,7 +12,7 @@ don't restate it here.
 ```bash
 ./scripts/quality-fast.sh          # lint + typecheck + jest unit/integration tests
 ./scripts/quality-slow.sh backend  # boots local Supabase, runs auth/RLS + sync-v2 contract suites + sync-infra
-./scripts/quality-slow.sh frontend # boots the iOS simulator, runs Maestro smoke + data-smoke + auth-profile
+./scripts/quality-slow.sh frontend # boots the iOS simulator, runs Maestro smoke + data-smoke + auth-profile + sync e2e
 ```
 
 Each script bootstraps what it needs (idempotent) and `cd`s into the right
@@ -64,9 +64,11 @@ currently draws the line.
 
 ### Lane matrix (what runs where)
 
-The one table that joins all four facts. Exact durations live in
-`docs/testing/local-test-timings.md`; the time column here is order-of-magnitude
-(`N/A` = not currently measured, not "instant").
+The one table that joins all four facts. For durations, run
+`./scripts/test-timings.sh` — it aggregates the measured records the gates write
+automatically (interpretation guide: `docs/testing/local-test-timings.md`). The
+time column here is order-of-magnitude only (`N/A` = not currently measured, not
+"instant"); never quote a duration you didn't get from the reader or a run.
 
 | Lane | Command | In which gate | CI? | ~Time |
 | --- | --- | --- | :--: | --- |
@@ -89,6 +91,7 @@ The one table that joins all four facts. Exact durations live in
 | iOS smoke | `npm run test:e2e:ios:smoke` | `quality-slow.sh frontend` | ❌ | ~75s |
 | iOS data-smoke | `npm run test:e2e:ios:data-smoke` | `quality-slow.sh frontend` | ❌ | ~110s |
 | iOS auth-profile | `npm run test:e2e:ios:auth-profile` | `quality-slow.sh frontend` | ❌ | N/A |
+| **iOS sync e2e (UI↔server)** | `npm run test:e2e:ios:sync` | `quality-slow.sh frontend` (last) | ❌ | N/A |
 
 Two traps this table exists to kill:
 
@@ -96,10 +99,15 @@ Two traps this table exists to kill:
   green local `quality-fast.sh frontend` is **not** the same as a green CI run. Run
   `test:handles` yourself when you touch timers, sockets, subscriptions, or async
   teardown.
-- **sync-infra is the only lane that crosses the FE/BE line:** a mobile jest body
-  (`apps/mobile`) driving the *real* `runSyncCycle` against a *real* Supabase
-  endpoint. That is why it needs backend infra despite being a frontend test, and
-  why it sits at the end of `quality-slow.sh backend`.
+- **Two lanes cross the FE/BE line, and they are NOT interchangeable:**
+  **sync-infra** is a mobile jest body driving the *real* `runSyncCycle` against a
+  *real* Supabase endpoint — breadth coverage (LWW, multi-device, drift) with
+  emulated storage and no UI; it sits at the end of `quality-slow.sh backend`.
+  **iOS sync e2e** is the device-level proof — real recorder UI, real cycle, real
+  local Supabase (log a workout → pending drains to 0 → full wipe → re-sign-in
+  restores from the remote DB). Bugs in UI gating, NetInfo, session handoff, and
+  trigger wiring only surface in the e2e lane; a green sync-infra is not evidence
+  for them.
 
 ## Which gate for what you changed
 
@@ -107,7 +115,7 @@ Two traps this table exists to kill:
 | --- | --- |
 | Any `apps/mobile` TS/JS logic | `./scripts/quality-fast.sh` |
 | `apps/mobile` UI screens / components / navigation (`app/**`, `components/**`) | `quality-fast` **+** `./scripts/quality-slow.sh frontend` |
-| Sync / boot / auth (`apps/mobile/src/sync/**`, `src/auth/**`, data bootstrap/migrations, `drizzle/**`) | `quality-fast` **+** `./scripts/quality-slow.sh backend` |
+| Sync / boot / auth (`apps/mobile/src/sync/**`, `src/auth/**`, scheduler, data bootstrap/migrations, `drizzle/**`, sync RPCs) | `quality-fast` **+** `./scripts/quality-slow.sh backend` **+** `npm run test:e2e:ios:sync` (the UI↔server e2e lane) |
 | Backend (`supabase/migrations/**`, `functions/**`, RLS/policies, sync RPCs) | `./scripts/quality-slow.sh backend` |
 | Added/removed/upgraded a **native** dependency (iOS pod, native Expo module, or a native field / config plugin in `apps/mobile/app.config.ts`) | **First** `cd apps/mobile && ./scripts/maestro-ios-dev-client-build.sh --force`, then `./scripts/quality-slow.sh frontend` |
 
@@ -140,14 +148,16 @@ wrapper, an `apps/mobile/package.json` `test*`/`lint`/`typecheck` script, or
 `.github/workflows/ci.yml`. If a fact here ever disagrees with the scripts, the
 scripts win — fix the doc.
 
-**Source-of-truth ownership** (so the three test docs can't drift apart again):
+**Source-of-truth ownership** (so the test docs can't drift apart again):
 this doc owns the lane matrix + CI membership; `06-testing-strategy.md` owns each
-test's purpose/why; `docs/testing/local-test-timings.md` owns exact durations. Each
-links by lane name; none restates another's column.
+test's purpose/why; durations are owned by the measured records under
+`docs/testing/timings/records/` (written by the gates, read via
+`./scripts/test-timings.sh` — no doc hand-maintains them). Each links by lane
+name; none restates another's column.
 
 ## Deeper docs (load when relevant)
 
 - `06-testing-strategy.md` — per-test-entry-point catalog (purpose / infra / when), coverage policies, hang-safety rationale.
 - `11-maestro-runtime-and-testing-conventions.md` — Maestro runtime contract.
 - `12-worktree-config-and-isolation.md` — slot model and isolation.
-- `docs/testing/local-test-timings.md` — measured per-lane wall-clock times.
+- `./scripts/test-timings.sh` — measured per-lane wall-clock times (interpretation: `docs/testing/local-test-timings.md`).

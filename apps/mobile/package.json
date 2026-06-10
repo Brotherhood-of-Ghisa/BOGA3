@@ -22,7 +22,8 @@
     "test:e2e:ios:smoke": "./scripts/maestro-ios-smoke.sh",
     "test:e2e:ios:data-smoke": "./scripts/maestro-ios-data-smoke.sh",
     "test:e2e:ios:gates": "./scripts/maestro-ios-gates.sh",
-    "test:e2e:ios:auth-profile": "./scripts/maestro-ios-auth-profile.sh"
+    "test:e2e:ios:auth-profile": "./scripts/maestro-ios-auth-profile.sh",
+    "test:e2e:ios:sync": "./scripts/maestro-ios-sync-e2e.sh"
   },
   "dependencies": {
     "@react-native-community/netinfo": "11.4.1",

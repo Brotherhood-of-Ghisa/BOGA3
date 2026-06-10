@@ -65,11 +65,11 @@ import {
 } from '../helpers/in-memory-db';
 import { createBootstrapMockState, createClientMockState } from '../helpers/sync-cycle-mocks';
 import {
-  createAuthedBranchClient,
-  readLiveBranchConfig,
+  createAuthedTestClient,
+  readSyncTestEndpoint,
   SYNC_RPC_SCHEMA,
-  type AuthedBranchClient,
-} from './helpers/live-branch';
+  type AuthedTestClient,
+} from './helpers/sync-test-endpoint';
 
 // Local DB handle and server client live on mock-prefixed holders so the
 // hoisted `jest.mock` factories can close over them (see `sync-cycle-mocks`).
@@ -103,7 +103,7 @@ import { runSyncCycle, type SyncCycleOutcome } from '@/src/sync/cycle';
 // Reads the live-endpoint config; throws here (failing the suite) when the env
 // is missing or incomplete, since this suite runs only when an endpoint has been
 // provisioned.
-const config = readLiveBranchConfig();
+const config = readSyncTestEndpoint();
 
 const FIVE_MINUTES_MS = 5 * 60 * 1000;
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
@@ -147,7 +147,7 @@ interface ServerEntity {
 }
 
 describe('sync cycle multi-device LWW against a live endpoint', () => {
-  let authed: AuthedBranchClient;
+  let authed: AuthedTestClient;
   // Every fixture opened during a case, closed in afterEach.
   const openFixtures: InMemoryDatabaseFixture[] = [];
 
@@ -284,7 +284,7 @@ describe('sync cycle multi-device LWW against a live endpoint', () => {
   };
 
   beforeAll(async () => {
-    authed = await createAuthedBranchClient(config);
+    authed = await createAuthedTestClient(config);
   }, 60_000);
 
   afterAll(async () => {

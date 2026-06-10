@@ -8,6 +8,15 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "${REPO_ROOT}/scripts/worktree-lib.sh"
 boga_validate_runtime_worktree "${REPO_ROOT}" || exit 1
 
+# Lane-timing recorder: every lane run lands a measurement record under
+# docs/testing/timings/records/ (read it back with ./scripts/test-timings.sh).
+# shellcheck disable=SC1091
+source "${REPO_ROOT}/scripts/lane-timing.sh"
+
+run_in_mobile() {
+  (cd "${REPO_ROOT}/apps/mobile" && "$@")
+}
+
 usage() {
   cat <<'EOF'
 Usage:
@@ -15,7 +24,7 @@ Usage:
 
 Runs local slow quality gates.
 - no args: runs all available slow gates (frontend + backend)
-- frontend: runs Maestro-based frontend runtime smoke checks
+- frontend: runs Maestro-based frontend runtime smoke checks + the iOS sync e2e lane
 - backend: runs backend auth/RLS + sync API contract suites (shared Supabase runtime baseline enforced by wrappers)
 
 Note: task cards decide when slow gates are mandatory.
@@ -41,13 +50,19 @@ run_frontend() {
   fi
 
   echo "[quality-slow] frontend: test:e2e:ios:smoke"
-  (cd "${REPO_ROOT}/apps/mobile" && npm run test:e2e:ios:smoke)
+  boga_time_lane ios-smoke run_in_mobile npm run test:e2e:ios:smoke
 
   echo "[quality-slow] frontend: test:e2e:ios:data-smoke"
-  (cd "${REPO_ROOT}/apps/mobile" && npm run test:e2e:ios:data-smoke)
+  boga_time_lane ios-data-smoke run_in_mobile npm run test:e2e:ios:data-smoke
 
   echo "[quality-slow] frontend: test:e2e:ios:auth-profile"
-  (cd "${REPO_ROOT}/apps/mobile" && npm run test:e2e:ios:auth-profile)
+  boga_time_lane ios-auth-profile run_in_mobile npm run test:e2e:ios:auth-profile
+
+  # iOS sync e2e — the UI↔server end-to-end lane: real recorder UI, real sync
+  # cycle, real local Supabase. Proves a logged workout uploads (dirty -> 0)
+  # and survives a full device wipe + re-sign-in (restored from the remote DB).
+  echo "[quality-slow] frontend: test:e2e:ios:sync (UI <-> real backend e2e)"
+  boga_time_lane ios-sync-e2e run_in_mobile npm run test:e2e:ios:sync
 }
 
 run_backend() {
@@ -55,7 +70,7 @@ run_backend() {
     echo "[quality-slow] skipping backend auth/authz: wrapper not found or not executable"
   else
     echo "[quality-slow] backend: test-auth-authz"
-    "${REPO_ROOT}/supabase/scripts/test-auth-authz.sh"
+    boga_time_lane auth-authz "${REPO_ROOT}/supabase/scripts/test-auth-authz.sh"
   fi
 
   # Sync v2 schema smoke (replaces the retired v1 sync-api / sync-events-ingest
@@ -67,7 +82,7 @@ run_backend() {
     echo "[quality-slow] skipping backend sync-v2-schema-smoke: wrapper not found or not executable"
   else
     echo "[quality-slow] backend: test-sync-v2-schema-smoke"
-    "${REPO_ROOT}/supabase/scripts/test-sync-v2-schema-smoke.sh"
+    boga_time_lane sync-v2-schema "${REPO_ROOT}/supabase/scripts/test-sync-v2-schema-smoke.sh"
   fi
 
   # Sync v2 push RPC contract — exercises the sync-v2 server contract
@@ -78,7 +93,7 @@ run_backend() {
     echo "[quality-slow] skipping backend sync-push-contract: wrapper not found or not executable"
   else
     echo "[quality-slow] backend: test-sync-push-contract"
-    "${REPO_ROOT}/supabase/scripts/test-sync-push-contract.sh"
+    boga_time_lane sync-push-contract "${REPO_ROOT}/supabase/scripts/test-sync-push-contract.sh"
   fi
 
   # Sync v2 sync_pull RPC contract (t4). Exercises the per-layer cursor
@@ -89,7 +104,7 @@ run_backend() {
     echo "[quality-slow] skipping backend sync-pull-contract: wrapper not found or not executable"
   else
     echo "[quality-slow] backend: test-sync-pull-contract"
-    "${REPO_ROOT}/supabase/scripts/test-sync-pull-contract.sh"
+    boga_time_lane sync-pull-contract "${REPO_ROOT}/supabase/scripts/test-sync-pull-contract.sh"
   fi
 
   # Developer-only dev_wipe_my_data RPC contract — exercises the auth guard,
@@ -99,7 +114,7 @@ run_backend() {
     echo "[quality-slow] skipping backend dev-wipe-my-data: wrapper not found or not executable"
   else
     echo "[quality-slow] backend: test-dev-wipe-my-data"
-    "${REPO_ROOT}/supabase/scripts/test-dev-wipe-my-data.sh"
+    boga_time_lane dev-wipe-my-data "${REPO_ROOT}/supabase/scripts/test-dev-wipe-my-data.sh"
   fi
 
   # Sync v2 drift checker — per docs/specs/tech/sync-v2-server-contract.md Part A §7.5. The TypeScript script
@@ -110,7 +125,7 @@ run_backend() {
     echo "[quality-slow] skipping backend sync-schema-drift: script not found (lands in t2)"
   else
     echo "[quality-slow] backend: sync-schema-drift (boots local supabase + introspects)"
-    (cd "${REPO_ROOT}/apps/mobile" && npm run check:sync-drift -- --strict)
+    boga_time_lane sync-drift run_in_mobile npm run check:sync-drift -- --strict
   fi
 
   # Sync v2 end-to-end (tFINAL). Runs the integration test suite under
@@ -122,18 +137,19 @@ run_backend() {
     echo "[quality-slow] skipping backend sync-v2-e2e: wrapper not found or not executable"
   else
     echo "[quality-slow] backend: test-sync-v2-e2e (integration-level plan outcome assertions)"
-    "${REPO_ROOT}/supabase/scripts/test-sync-v2-e2e.sh"
+    boga_time_lane sync-v2-e2e "${REPO_ROOT}/supabase/scripts/test-sync-v2-e2e.sh"
   fi
 
   # Mobile sync-infra jest lane (drift-check + cycle-round-trip +
-  # auth-required-envelope) against this worktree's local stack. The wrapper
-  # provisions the baseline and the SUPABASE_BRANCH_URL/ANON_KEY env itself, so
-  # this lane needs no manual setup.
+  # cycle-multidevice-lww + auth-required-envelope) against this worktree's
+  # local stack. The wrapper provisions the baseline and the
+  # SYNC_TEST_SUPABASE_URL/ANON_KEY env itself, so this lane needs no manual
+  # setup.
   if [[ ! -x "${REPO_ROOT}/supabase/scripts/test-sync-infra.sh" ]]; then
     echo "[quality-slow] skipping sync-infra: wrapper not found or not executable"
   else
     echo "[quality-slow] backend: test-sync-infra (mobile sync lane vs local stack)"
-    "${REPO_ROOT}/supabase/scripts/test-sync-infra.sh"
+    boga_time_lane sync-infra "${REPO_ROOT}/supabase/scripts/test-sync-infra.sh"
   fi
 }
 

@@ -8,6 +8,15 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "${REPO_ROOT}/scripts/worktree-lib.sh"
 boga_validate_runtime_worktree "${REPO_ROOT}" || exit 1
 
+# Lane-timing recorder: every lane run lands a measurement record under
+# docs/testing/timings/records/ (read it back with ./scripts/test-timings.sh).
+# shellcheck disable=SC1091
+source "${REPO_ROOT}/scripts/lane-timing.sh"
+
+run_in_mobile() {
+  (cd "${REPO_ROOT}/apps/mobile" && "$@")
+}
+
 usage() {
   cat <<'EOF'
 Usage:
@@ -39,13 +48,13 @@ run_frontend() {
   fi
 
   echo "[quality-fast] frontend: lint"
-  (cd "${REPO_ROOT}/apps/mobile" && npm run lint)
+  boga_time_lane lint run_in_mobile npm run lint
 
   echo "[quality-fast] frontend: typecheck"
-  (cd "${REPO_ROOT}/apps/mobile" && npm run typecheck)
+  boga_time_lane typecheck run_in_mobile npm run typecheck
 
   echo "[quality-fast] frontend: test"
-  (cd "${REPO_ROOT}/apps/mobile" && npm run test)
+  boga_time_lane jest-full run_in_mobile npm run test
 }
 
 run_backend() {
@@ -55,7 +64,7 @@ run_backend() {
   fi
 
   echo "[quality-fast] backend: test-fast"
-  "${REPO_ROOT}/supabase/scripts/test-fast.sh"
+  boga_time_lane backend-fast "${REPO_ROOT}/supabase/scripts/test-fast.sh"
 }
 
 case "${area}" in

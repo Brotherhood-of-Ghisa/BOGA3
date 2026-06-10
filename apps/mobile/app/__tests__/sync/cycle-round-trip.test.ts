@@ -55,11 +55,11 @@ import {
 } from '../helpers/in-memory-db';
 import { createBootstrapMockState, createClientMockState } from '../helpers/sync-cycle-mocks';
 import {
-  createAuthedBranchClient,
-  readLiveBranchConfig,
+  createAuthedTestClient,
+  readSyncTestEndpoint,
   SYNC_RPC_SCHEMA,
-  type AuthedBranchClient,
-} from './helpers/live-branch';
+  type AuthedTestClient,
+} from './helpers/sync-test-endpoint';
 
 // Local handle and server handle live on mock-prefixed holders so the hoisted
 // factories can close over them. The factory bodies come from the shared
@@ -102,7 +102,7 @@ import { runSyncCycle } from '@/src/sync/cycle';
 // Reads the live-endpoint config; throws here (failing the suite) when the env
 // is missing or incomplete, since this suite runs only when an endpoint has
 // been provisioned.
-const config = readLiveBranchConfig();
+const config = readSyncTestEndpoint();
 
 interface ChainIds {
   gym: string;
@@ -134,7 +134,7 @@ type PushHook = (() => void) | null;
 describe('sync cycle round-trip against a live endpoint', () => {
   let fixture: InMemoryDatabaseFixture;
   let database: InMemoryTestDatabase;
-  let authed: AuthedBranchClient;
+  let authed: AuthedTestClient;
   // The unique row-id set for the case currently running; assigned at the top of
   // each `it` from `makeChainIds()`.
   let ids: ChainIds;
@@ -145,7 +145,7 @@ describe('sync cycle round-trip against a live endpoint', () => {
   // Wraps the authed client so a sync_push call fires the hook (if set) before
   // delegating to the real RPC, modelling an edit landing while the request is
   // in flight.
-  const wrapClientWithPushHook = (client: AuthedBranchClient['client']): unknown => ({
+  const wrapClientWithPushHook = (client: AuthedTestClient['client']): unknown => ({
     ...client,
     schema: (name: string) => {
       const scoped = client.schema(name);
@@ -263,7 +263,7 @@ describe('sync cycle round-trip against a live endpoint', () => {
   };
 
   beforeAll(async () => {
-    authed = await createAuthedBranchClient(config);
+    authed = await createAuthedTestClient(config);
   }, 60_000);
 
   afterAll(async () => {
