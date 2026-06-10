@@ -1,0 +1,219 @@
+#!/usr/bin/env bash
+
+# boga — the single entrypoint for this repo's gates, lanes, and ops.
+#
+# Runnable from anywhere inside the repo; it resolves its own root. Lanes are
+# defined in scripts/lanes.tsv (the lane registry); every lane run is timed and
+# recorded under docs/testing/timings/records/ (read back with `boga timings`).
+#
+#   boga test fast|backend|frontend|slow|all   # gate aggregates
+#   boga test <lane>                           # one lane by registry name
+#   boga test --list                           # what exists, where it runs
+#   boga test <lane> --dry-run                 # print the command, don't run
+#   boga doctor                                # can THIS machine run every lane?
+#   boga timings [lane]                        # measured durations (never guess)
+#   boga worktree create|setup|clean|sweep|doctor
+#   boga db up|down|reset|baseline
+#   boga ios build-client|start
+#   boga env lan|hosted
+#   boga task bootstrap|closeout
+#
+# Legacy entrypoints ./scripts/quality-fast.sh and ./scripts/quality-slow.sh
+# forward here.
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LANES_TSV="${REPO_ROOT}/scripts/lanes.tsv"
+
+# shellcheck disable=SC1091
+source "${REPO_ROOT}/scripts/worktree-lib.sh"
+# shellcheck disable=SC1091
+source "${REPO_ROOT}/scripts/lane-timing.sh"
+
+usage() {
+  sed -n '3,23p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+}
+
+fail() {
+  echo "[boga] $*" >&2
+  exit 1
+}
+
+# ---------- lane registry ----------
+
+# Iterates registry rows as: name<TAB>gate<TAB>infra<TAB>ci<TAB>cwd<TAB>command
+lanes_rows() {
+  grep -v '^[[:space:]]*#' "${LANES_TSV}" | grep -v '^[[:space:]]*$'
+}
+
+lane_lookup() {
+  local name="$1"
+  lanes_rows | awk -F'\t' -v n="${name}" '$1 == n { print; found=1 } END { exit !found }'
+}
+
+# Frontend lanes need apps/mobile deps; mirror the old gate bootstrap.
+ensure_mobile_deps() {
+  [[ -f "${REPO_ROOT}/apps/mobile/package.json" ]] || return 0
+  if [[ ! -d "${REPO_ROOT}/apps/mobile/node_modules" ]]; then
+    echo "[boga] mobile dependencies missing; running worktree setup (idempotent)"
+    "${REPO_ROOT}/scripts/worktree-setup.sh"
+    (cd "${REPO_ROOT}/apps/mobile" && npm install)
+  fi
+}
+
+run_lane_row() {
+  local row="$1" dry="$2"
+  local name cwd cmd
+  name="$(printf '%s' "${row}" | cut -f1)"
+  cwd="$(printf '%s' "${row}" | cut -f5)"
+  cmd="$(printf '%s' "${row}" | cut -f6)"
+
+  if [[ "${dry}" == "1" ]]; then
+    echo "[boga] ${name}: (cd ${cwd} && ${cmd})"
+    return 0
+  fi
+
+  [[ "${cwd}" == "apps/mobile" ]] && ensure_mobile_deps
+
+  echo "[boga] lane: ${name}  (cd ${cwd} && ${cmd})"
+  lane_body() { (cd "${REPO_ROOT}/${cwd}" && eval "${cmd}"); }
+  boga_time_lane "${name}" lane_body
+}
+
+run_gate() {
+  local dry="$1"
+  shift
+  local gates=("$@")
+  local row matched=0
+  boga_validate_runtime_worktree "${REPO_ROOT}" || exit 1
+  for gate in "${gates[@]}"; do
+    while IFS= read -r row; do
+      matched=1
+      run_lane_row "${row}" "${dry}"
+    done < <(lanes_rows | awk -F'\t' -v g="${gate}" '$2 == g')
+  done
+  [[ "${matched}" == "1" ]] || fail "no lanes found for gate(s): ${gates[*]}"
+}
+
+cmd_test() {
+  local target="" dry=0
+  for arg in "$@"; do
+    case "${arg}" in
+      --dry-run) dry=1 ;;
+      --list) target="--list" ;;
+      *) target="${arg}" ;;
+    esac
+  done
+  [[ -n "${target}" ]] || fail "usage: boga test <gate|lane|--list> [--dry-run]"
+
+  case "${target}" in
+    --list)
+      echo "Lanes (scripts/lanes.tsv). Gates: fast | backend | frontend | slow | all."
+      echo "Durations: ./boga timings   Capability: ./boga doctor"
+      echo
+      printf '%-20s %-15s %-13s %-4s %-12s %s\n' "LANE" "GATE" "INFRA" "CI" "CWD" "COMMAND"
+      lanes_rows | awk -F'\t' '{ printf "%-20s %-15s %-13s %-4s %-12s %s\n", $1, $2, $3, $4, $5, $6 }'
+      ;;
+    fast)          run_gate "${dry}" fast-frontend fast-backend ;;
+    fast-frontend) run_gate "${dry}" fast-frontend ;;
+    fast-backend)  run_gate "${dry}" fast-backend ;;
+    backend)       run_gate "${dry}" slow-backend ;;
+    frontend)      run_gate "${dry}" slow-frontend ;;
+    slow)          run_gate "${dry}" slow-frontend slow-backend ;;
+    all)           run_gate "${dry}" fast-frontend fast-backend slow-frontend slow-backend ;;
+    *)
+      local row
+      row="$(lane_lookup "${target}")" || fail "unknown lane or gate: '${target}' (see: boga test --list)"
+      run_lane_row "${row}" "${dry}"
+      ;;
+  esac
+}
+
+cmd_doctor() {
+  echo "[boga doctor] capability checks — a FAIL is a bootstrap gap to fix, not a reason to skip a lane"
+  local ok=0
+  check() {
+    local label="$1"; shift
+    if "$@" >/dev/null 2>&1; then
+      echo "  OK   ${label}"
+    else
+      echo "  FAIL ${label}  (fix this, then the lane runs)"
+      ok=1
+    fi
+  }
+  check "docker daemon (local Supabase lanes)" docker info
+  check "iOS simulators (Maestro lanes)" xcrun simctl list devices available
+  check "maestro CLI (Maestro lanes)" maestro --version
+  check "xcodebuild (dev-client build)" xcodebuild -version
+  check "node" node --version
+  check "jq (worktree tooling)" jq --version
+  if [[ -x "${REPO_ROOT}/scripts/worktree-doctor.sh" ]]; then
+    echo "[boga doctor] worktree diagnostics:"
+    "${REPO_ROOT}/scripts/worktree-doctor.sh" || ok=1
+  fi
+  return "${ok}"
+}
+
+dispatch_script() {
+  local script="$1"
+  shift
+  [[ -x "${script}" ]] || fail "missing or not executable: ${script}"
+  exec "${script}" "$@"
+}
+
+cmd="${1:-help}"
+shift || true
+
+case "${cmd}" in
+  test)     cmd_test "$@" ;;
+  doctor)   cmd_doctor ;;
+  timings)  dispatch_script "${REPO_ROOT}/scripts/test-timings.sh" "$@" ;;
+  worktree)
+    sub="${1:-}"; shift || true
+    case "${sub}" in
+      create|setup|clean|sweep|doctor) dispatch_script "${REPO_ROOT}/scripts/worktree-${sub}.sh" "$@" ;;
+      *) fail "usage: boga worktree create|setup|clean|sweep|doctor" ;;
+    esac
+    ;;
+  db)
+    sub="${1:-}"; shift || true
+    case "${sub}" in
+      up)       dispatch_script "${REPO_ROOT}/supabase/scripts/local-runtime-up.sh" "$@" ;;
+      down)     dispatch_script "${REPO_ROOT}/supabase/scripts/local-runtime-down.sh" "$@" ;;
+      reset)    dispatch_script "${REPO_ROOT}/supabase/scripts/reset-local.sh" "$@" ;;
+      baseline) dispatch_script "${REPO_ROOT}/supabase/scripts/ensure-local-runtime-baseline.sh" "$@" ;;
+      *) fail "usage: boga db up|down|reset|baseline" ;;
+    esac
+    ;;
+  ios)
+    sub="${1:-}"; shift || true
+    case "${sub}" in
+      build-client) dispatch_script "${REPO_ROOT}/apps/mobile/scripts/maestro-ios-dev-client-build.sh" "$@" ;;
+      start)        dispatch_script "${REPO_ROOT}/apps/mobile/scripts/ios-dev-client-start.sh" "$@" ;;
+      *) fail "usage: boga ios build-client|start" ;;
+    esac
+    ;;
+  env)
+    sub="${1:-}"; shift || true
+    case "${sub}" in
+      lan)    dispatch_script "${REPO_ROOT}/scripts/dev/use-local-mobile-lan-env.sh" "$@" ;;
+      hosted) dispatch_script "${REPO_ROOT}/scripts/dev/use-hosted-mobile-env.sh" "$@" ;;
+      *) fail "usage: boga env lan|hosted   (full phone-on-LAN session: scripts/dev/dev-lan.sh)" ;;
+    esac
+    ;;
+  task)
+    sub="${1:-}"; shift || true
+    case "${sub}" in
+      bootstrap) dispatch_script "${REPO_ROOT}/scripts/task-bootstrap.sh" "$@" ;;
+      closeout)  dispatch_script "${REPO_ROOT}/scripts/task-closeout-check.sh" "$@" ;;
+      *) fail "usage: boga task bootstrap|closeout" ;;
+    esac
+    ;;
+  help|--help|-h) usage ;;
+  *)
+    echo "[boga] unknown command: ${cmd}" >&2
+    usage >&2
+    exit 2
+    ;;
+esac

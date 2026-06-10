@@ -21,30 +21,18 @@ This directory contains two kinds of files:
   - purpose: builds or reuses the configured iOS simulator development-client `.app`.
   - used by: humans directly, `README` instructions, and `maestro-ios-provision.sh`.
   - status: used and needed.
-- `tag-dev-ios.sh`
-  - purpose: validates a local iOS development IPA, creates an annotated git tag named `dev-ios-v<version>-b<build>`, and pushes it to `origin`.
-  - used by: humans after creating a local physical-device development build.
-  - status: used and needed.
-- `tag-preview-ios.sh`
-  - purpose: validates an iOS preview/TestFlight IPA, creates an annotated git tag named `preview-ios-v<version>-b<build>`, and pushes it to `origin`.
-  - used by: humans after creating a preview iOS build.
-  - status: used and needed.
 - `ios-dev-client-start.sh`
   - purpose: starts the manual iOS dev-client loop using the worktree's configured simulator and Expo port.
   - used by: `npm run start:ios:dev-client`.
   - status: used and needed.
-- `maestro-ios-smoke.sh`
-  - purpose: scenario wrapper for the iOS smoke flow.
-  - used by: `npm run test:e2e:ios:smoke`.
-  - status: used and needed.
-- `maestro-ios-data-smoke.sh`
-  - purpose: scenario wrapper for the iOS data-runtime smoke flow.
-  - used by: `npm run test:e2e:ios:data-smoke`.
-  - status: used and needed.
+- `maestro-run-lane.sh`
+  - purpose: the single parameterized per-lane Maestro runner (`smoke` / `data-smoke` / `auth-profile` / `sync-e2e`). Holds each lane's data — flows, reset strategy, Supabase configuration, fixture user — and delegates to `maestro-ios-run-flow.sh` per flow. Canonical lane names: `scripts/lanes.tsv` (run via `./boga test ios-smoke` etc.).
+  - used by: all `npm run test:e2e:ios:*` scripts except `gates`.
+  - status: used and needed. Replaced the one-wrapper-per-lane scripts (`maestro-ios-smoke.sh`, `-data-smoke.sh`, `-auth-profile.sh`, `-sync-e2e.sh`).
 - `maestro-ios-gates.sh`
   - purpose: combined runner that executes the smoke + data-runtime-smoke flows against ONE provisioned simulator and ONE Metro instance, paying the ~55-60s fixed overhead (sim boot + dev-client warm-up + Metro start + teardown) once instead of once per gate.
   - used by: `npm run test:e2e:ios:gates`.
-  - status: used and needed. Additive convenience path; the standalone `maestro-ios-smoke.sh` / `maestro-ios-data-smoke.sh` gates are unchanged. Provision runs a `full` reset (the smoke precondition); the data-runtime-smoke flow self-resets data in-flow via its `?reset=data` harness deep links, so both flows are safe to run back-to-back in one session.
+  - status: used and needed. Additive convenience path; the standalone `maestro-run-lane.sh smoke` / `data-smoke` lanes are unchanged. Provision runs a `full` reset (the smoke precondition); the data-runtime-smoke flow self-resets data in-flow via its `?reset=data` harness deep links, so both flows are safe to run back-to-back in one session. Kept as its own script (not a `maestro-run-lane.sh` case) because it is a different execution model: one provision/launch/warm/teardown shared across flows.
 
 ### Internal Maestro helpers
 
@@ -62,7 +50,7 @@ This directory contains two kinds of files:
   - status: used and needed.
 - `maestro-ios-run-flow.sh`
   - purpose: common scenario runner that orchestrates provision, launch, Maestro execution, artifact emission, and cleanup.
-  - used by: `maestro-ios-smoke.sh` and `maestro-ios-data-smoke.sh`.
+  - used by: `maestro-run-lane.sh`.
   - status: used and needed.
 - `maestro-ios-provision.sh`
   - purpose: ensures the shared dev client exists, boots the configured simulator, and installs the app.
@@ -92,11 +80,12 @@ Current verdict after repository call-graph review:
 - keep all files in this directory.
 - no remaining script here appears unused.
 - the previously removed `maestro-ios-slot-lock.sh` was obsolete after the move to explicit per-worktree config and has already been deleted.
+- the per-lane wrappers (`maestro-ios-smoke.sh`, `-data-smoke.sh`, `-auth-profile.sh`, `-sync-e2e.sh`) were collapsed into `maestro-run-lane.sh`; the human release-tagging scripts (`tag-dev-ios.sh`, `tag-preview-ios.sh`) moved to `scripts/dev/` at the repo root.
 
 ## Maestro flow ownership map
 
-- `maestro-ios-smoke.sh` / `maestro-ios-data-smoke.sh`
-  - thin scenario entrypoints
+- `maestro-run-lane.sh`
+  - per-lane scenario entrypoint (lane data lives here)
 - `maestro-ios-gates.sh`
   - combined entrypoint: one provision/launch/warm/teardown shared across both flows
 - `maestro-ios-run-flow.sh`

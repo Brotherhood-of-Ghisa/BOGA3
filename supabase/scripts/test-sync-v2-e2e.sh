@@ -6,12 +6,13 @@
 # server-contract invariant (schema, deferrable FKs, RLS isolation, push/pull
 # round-trip, drift, drain) as specified in
 # docs/specs/tech/sync-v2-server-contract.md. Exits 0 only if all of them
-# pass. Mirrors the shape of the per-feature wrappers
-# (test-sync-v2-schema-smoke.sh, test-sync-push-contract.sh,
-# test-sync-pull-contract.sh) so the slow-gate plumbing stays uniform.
+# pass. Kept as its own script (not folded into run-suite.sh) because the
+# ordered test list below, with its per-outcome comments, is load-bearing
+# documentation.
 #
-# Invocation:
-#   ./supabase/scripts/test-sync-v2-e2e.sh           # run all tests
+# Invocation (lane name: sync-v2-e2e — see scripts/lanes.tsv):
+#   ./boga test sync-v2-e2e            # canonical
+#   ./supabase/scripts/test-sync-v2-e2e.sh   # direct
 #
 # The shared local runtime baseline is ensured once at the top of this
 # script so the individual tests can assume a healthy stack + provisioned

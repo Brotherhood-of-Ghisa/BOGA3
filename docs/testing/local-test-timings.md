@@ -44,8 +44,8 @@ quality gate wrappers via `scripts/lane-timing.sh`) and are read with:
 
 ## How records are produced
 
-- Every lane invoked through `./scripts/quality-fast.sh` / `./scripts/quality-slow.sh`
-  is timed by `scripts/lane-timing.sh` and lands one JSON file in
+- Every lane invoked through `./boga test <gate|lane>` (and the legacy
+  `quality-*.sh` forwarders) is timed by `scripts/lane-timing.sh` and lands one JSON file in
   `docs/testing/timings/records/` (append-only by construction —
   timestamp + machine + slot + lane in the filename — so parallel agents,
   parallel worktrees, and branch merges never conflict).

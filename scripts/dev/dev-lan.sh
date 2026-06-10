@@ -24,7 +24,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
+REPO_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd)"
 MOBILE_DIR="$REPO_ROOT/apps/mobile"
 
 # 1. Ensure this worktree has a generated Supabase config (slot/project_id/ports).
@@ -32,7 +32,7 @@ MOBILE_DIR="$REPO_ROOT/apps/mobile"
 #    only fires for a checkout that was never set up.
 if [[ ! -f "$REPO_ROOT/supabase/config.toml" ]]; then
   echo "[dev-lan] no supabase/config.toml — running worktree setup"
-  "$SCRIPT_DIR/worktree-setup.sh"
+  "$REPO_ROOT/scripts/worktree-setup.sh"
 fi
 
 # 2. Ensure isolated mobile deps. Per the worktree contract these must be
@@ -46,7 +46,7 @@ fi
 #        Mac LAN IP. use-local-mobile-lan-env.sh runs local-runtime-up.sh itself,
 #        then rewrites EXPO_PUBLIC_SUPABASE_URL/ANON_KEY to http://<lan-ip>:<port>.
 echo "[dev-lan] starting local Supabase and pointing apps/mobile/.env.local at the LAN IP"
-"$REPO_ROOT/supabase/scripts/use-local-mobile-lan-env.sh"
+"$REPO_ROOT/scripts/dev/use-local-mobile-lan-env.sh"
 
 # 5. Start Expo/Metro over the LAN. The env was rewritten in step 4 BEFORE this,
 #    so EXPO_PUBLIC_* values are bundled with the LAN URL. --host lan makes the

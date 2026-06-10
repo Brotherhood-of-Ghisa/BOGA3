@@ -66,7 +66,7 @@ the mobile env:
 
 ```bash
 cd /Users/sboschi/Code/BOGA3
-./supabase/scripts/use-local-mobile-lan-env.sh
+./scripts/dev/use-local-mobile-lan-env.sh
 ```
 
 This starts or reuses local Supabase, writes `apps/mobile/.env.local` with
@@ -76,7 +76,7 @@ client-safe anon key in that file.
 If auto-detection picks the wrong interface:
 
 ```bash
-BOGA_MOBILE_LAN_HOST=<mac-lan-ip> ./supabase/scripts/use-local-mobile-lan-env.sh
+BOGA_MOBILE_LAN_HOST=<mac-lan-ip> ./scripts/dev/use-local-mobile-lan-env.sh
 ```
 
 Restart Metro after every local/hosted Supabase switch so `EXPO_PUBLIC_*` values
@@ -130,8 +130,8 @@ After the IPA is built, tag the current git commit with the app version and buil
 number from the IPA:
 
 ```bash
-cd /Users/sboschi/Code/BOGA3/apps/mobile
-./scripts/tag-dev-ios.sh ../../artifacts/builds/boga3-dev.ipa
+cd /Users/sboschi/Code/BOGA3
+./scripts/dev/tag-dev-ios.sh artifacts/builds/boga3-dev.ipa
 ```
 
 The script creates and pushes an annotated tag named:
@@ -286,11 +286,11 @@ This build is a development client. The teammate still needs access to Metro:
 ## Troubleshooting
 
 - `Cannot connect to the Docker daemon`: start Docker Desktop or Colima, then
-  rerun `./supabase/scripts/use-local-mobile-lan-env.sh`.
+  rerun `./scripts/dev/use-local-mobile-lan-env.sh`.
 - Phone cannot load Metro: confirm Mac and phone are on the same Wi-Fi, restart
   Metro with `--host lan`, and check macOS firewall prompts.
 - Phone can load the app but auth/sync is disabled: rerun
-  `./supabase/scripts/use-local-mobile-lan-env.sh`, then restart Metro.
+  `./scripts/dev/use-local-mobile-lan-env.sh`, then restart Metro.
 - Install fails with provisioning/device errors: register the phone with
   `npx eas-cli device:create`, then rebuild with
   `--refresh-ad-hoc-provisioning-profile` so the ad hoc profile includes it.

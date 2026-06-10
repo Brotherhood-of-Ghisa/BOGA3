@@ -25,14 +25,14 @@ Ideas, in rough order of value:
    `apps/mobile/app/__tests__/sync/README.md`, GPS policy next to the location
    code, etc. Agents editing a directory see its README; a policy two specs away
    is invisible. `06` keeps strategy + the entry-point catalog only.
-2. **Generate the lane matrix from a machine-readable lane registry** (one
-   JSON/TSV: lane → command → gate → infra → CI?) consumed by both `02`'s table
-   and a future `--list` command, so the doc cannot drift from reality. The
-   timing records already key by lane name; the registry would make lane names
-   canonical.
-3. **A `test.sh` dispatcher** over the ~60 scripts (`test.sh --list`,
-   `test.sh doctor`, `test.sh for <changed-path>`) — deferred from the
-   retrospective; the gate wrappers remain the entrypoints for now.
+2. **Generate the lane matrix from the lane registry.** The registry now
+   exists (`scripts/lanes.tsv`, consumed by `./boga`); what remains is
+   generating/drift-checking `02`'s matrix table from it so the doc cannot
+   drift from reality.
+3. ~~A dispatcher over the ~60 scripts~~ — **LANDED** as `./boga` +
+   `scripts/lanes.tsv` (2026-06-10): `boga test --list`, `boga doctor`,
+   per-lane runs with automatic timing records. Still open from this idea:
+   `boga test for <changed-path>` (path-trigger mapping).
 
 Open questions: who regenerates the matrix (pre-commit? CI check?); whether
 colocated READMEs need a loading rule in AGENTS.md ("read the README of any

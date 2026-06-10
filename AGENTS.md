@@ -10,35 +10,31 @@ place each under `docs/specs/**`, routed from here.
 1. **This machine runs EVERY local gate** — including the iOS Maestro lanes
    (simulator + Metro) and the local-Supabase backend lanes (Docker). "Not in
    CI" means *you* run it locally, never "can't run". Before claiming a gate is
-   unavailable, verify capability — a failing check is a bootstrap gap to fix,
-   not a skip:
+   unavailable, run `./boga doctor` — a FAIL there is a bootstrap gap to fix,
+   not a skip.
+
+2. **Never state a test duration you didn't measure.** Run `./boga timings` —
+   it aggregates the measured per-run records the gates write automatically
+   (`docs/testing/timings/records/`). If a lane has no data, run it; the gate
+   records it. Estimating a duration is an error.
+
+3. **Run the gates for what you changed, to green, before opening the PR.**
+   `./boga` is the single entrypoint (runnable from anywhere in the repo;
+   lanes defined in `scripts/lanes.tsv`; `./boga test --list` shows everything):
 
    ```bash
-   xcrun simctl list devices available   # bootable iOS sims → Maestro lanes runnable
-   maestro --version && xcodebuild -version
-   docker info                           # Docker up → local Supabase lanes runnable
-   ```
-
-2. **Never state a test duration you didn't measure.** Run
-   `./scripts/test-timings.sh` — it aggregates the measured per-run records the
-   gates write automatically (`docs/testing/timings/records/`). If a lane has no
-   data, run it; the gate records it. Estimating a duration is an error.
-
-3. **Run the gates for what you changed, to green, before opening the PR:**
-
-   ```bash
-   ./scripts/quality-fast.sh          # lint + typecheck + jest (+ backend fast smoke)
-   ./scripts/quality-slow.sh backend  # local Supabase: auth/RLS + sync-v2 contracts + drift + sync-infra
-   ./scripts/quality-slow.sh frontend # iOS sim: Maestro smoke + data-smoke + auth-profile + sync e2e
+   ./boga test fast       # lint + typecheck + jest + backend fast smoke
+   ./boga test backend    # local Supabase: auth/RLS + sync-v2 contracts + drift + sync-infra
+   ./boga test frontend   # iOS sim: Maestro smoke + data-smoke + auth-profile + sync e2e
    ```
 
    | You changed… | Run |
    | --- | --- |
-   | Any `apps/mobile` TS/JS logic | `quality-fast.sh` |
-   | UI screens / components / navigation | `quality-fast.sh` + `quality-slow.sh frontend` |
-   | Sync / boot / auth (`src/sync/**`, `src/auth/**`, scheduler, drizzle/migrations) | `quality-fast.sh` + `quality-slow.sh backend` + `npm run test:e2e:ios:sync` (UI↔server e2e) |
-   | Backend (`supabase/migrations/**`, functions, RLS, sync RPCs) | `quality-slow.sh backend` |
-   | Native dependency / config-plugin change | rebuild dev client first, then `quality-slow.sh frontend` (see `02`) |
+   | Any `apps/mobile` TS/JS logic | `boga test fast` |
+   | UI screens / components / navigation | `boga test fast` + `boga test frontend` |
+   | Sync / boot / auth (`src/sync/**`, `src/auth/**`, scheduler, drizzle/migrations) | `boga test fast` + `boga test backend` + `boga test ios-sync-e2e` (UI↔server e2e) |
+   | Backend (`supabase/migrations/**`, functions, RLS, sync RPCs) | `boga test backend` |
+   | Native dependency / config-plugin change | `./boga ios build-client --force` first, then `boga test frontend` (see `02`) |
 
    The gates self-bootstrap deps and the local Supabase stack; Docker must be
    running for the slow lanes. Full lane matrix, CI posture, and the dev-client

@@ -7,13 +7,21 @@ always-load docs (with `03-technical-architecture.md` and `09-project-structure.
 The deep per-test catalog and strategy live in `06-testing-strategy.md`; cite it,
 don't restate it here.
 
-## Run the gates (from the repo root)
+## Run the gates (`./boga`, from anywhere in the repo)
 
 ```bash
-./scripts/quality-fast.sh          # lint + typecheck + jest unit/integration tests
-./scripts/quality-slow.sh backend  # boots local Supabase, runs auth/RLS + sync-v2 contract suites + sync-infra
-./scripts/quality-slow.sh frontend # boots the iOS simulator, runs Maestro smoke + data-smoke + auth-profile + sync e2e
+./boga test fast       # lint + typecheck + jest + backend fast smoke
+./boga test backend    # boots local Supabase, runs auth/RLS + sync-v2 contract suites + sync-infra
+./boga test frontend   # boots the iOS simulator, runs Maestro smoke + data-smoke + auth-profile + sync e2e
+./boga test --list     # every lane: name, gate, infra, CI?, command
+./boga test <lane>     # one lane by name (e.g. ./boga test sync-push-contract)
+./boga doctor          # verify THIS machine can run every lane
 ```
+
+Lanes are defined in `scripts/lanes.tsv` (the lane registry — names there are
+the canonical lane names everywhere: this doc, the timing records, `boga`).
+The legacy `./scripts/quality-fast.sh` / `./scripts/quality-slow.sh` forward to
+`boga` with their old argument forms.
 
 Each script bootstraps what it needs (idempotent) and `cd`s into the right
 workspace — installing deps if missing and booting/seeding the local Supabase, so
@@ -33,9 +41,9 @@ capability with the command, don't assume absence:
 
 ```bash
 xcrun simctl list devices available   # bootable iOS sims (e.g. iPhone 17 Pro) → Maestro lanes runnable
-maestro --version                     # Maestro CLI present → quality-slow.sh frontend runnable
+maestro --version                     # Maestro CLI present → boga test frontend runnable
 xcodebuild -version                   # Xcode present → dev-client build / sim runnable
-docker info                           # Docker up → local Supabase → quality-slow.sh backend runnable
+docker info                           # Docker up → local Supabase → boga test backend runnable
 ```
 
 The **only** thing that genuinely "can't run" the iOS/Supabase slow gates is
@@ -73,36 +81,36 @@ time column here is order-of-magnitude only (`N/A` = not currently measured, not
 | Lane | Command | In which gate | CI? | ~Time |
 | --- | --- | --- | :--: | --- |
 | *Infra: none — CI runs these* | | | | |
-| lint | `npm run lint` | `quality-fast.sh frontend` | ✅ | ~1s |
-| typecheck | `npm run typecheck` | `quality-fast.sh frontend` | ✅ | ~3s |
-| jest unit/integration | `npm test` | `quality-fast.sh frontend` | ✅ | ~5s |
+| lint | `npm run lint` | fast gate (frontend) | ✅ | ~1s |
+| typecheck | `npm run typecheck` | fast gate (frontend) | ✅ | ~3s |
+| jest unit/integration | `npm test` | fast gate (frontend) | ✅ | ~5s |
 | open-handle guard | `npm run test:handles` | **CI only** (no wrapper runs it) | ✅ | ~20s |
 | *Infra: local Supabase + Docker — CI-able, local-only today* | | | | |
-| backend fast smoke | `test-fast.sh` | `quality-fast.sh backend` | ❌ | ~40s |
-| auth / RLS contract | `test-auth-authz.sh` | `quality-slow.sh backend` | ❌ | ~4s |
-| sync-v2 schema smoke | `test-sync-v2-schema-smoke.sh` | `quality-slow.sh backend` | ❌ | ~5s |
-| sync-v2 push contract | `test-sync-push-contract.sh` | `quality-slow.sh backend` | ❌ | ~4s |
-| sync-v2 pull contract | `test-sync-pull-contract.sh` | `quality-slow.sh backend` | ❌ | ~4s |
-| dev-wipe contract | `test-dev-wipe-my-data.sh` | `quality-slow.sh backend` | ❌ | ~3s |
-| sync schema-drift (strict) | `npm run check:sync-drift -- --strict` | `quality-slow.sh backend` | ❌ | ~35s |
-| sync-v2 end-to-end | `test-sync-v2-e2e.sh` | `quality-slow.sh backend` | ❌ | ~2min |
-| **sync-infra (mobile cross-stack)** | `npm run test:sync:infra` (`test-sync-infra.sh`) | `quality-slow.sh backend` (last) | ❌ | N/A |
+| backend fast smoke | `./boga test backend-fast` | fast gate (backend) | ❌ | ~40s |
+| auth / RLS contract | `./boga test auth-authz` | `boga test backend` | ❌ | ~4s |
+| sync-v2 schema smoke | `./boga test sync-v2-schema` | `boga test backend` | ❌ | ~5s |
+| sync-v2 push contract | `./boga test sync-push-contract` | `boga test backend` | ❌ | ~4s |
+| sync-v2 pull contract | `./boga test sync-pull-contract` | `boga test backend` | ❌ | ~4s |
+| dev-wipe contract | `./boga test dev-wipe-my-data` | `boga test backend` | ❌ | ~3s |
+| sync schema-drift (strict) | `./boga test sync-drift` | `boga test backend` | ❌ | ~35s |
+| sync-v2 end-to-end | `./boga test sync-v2-e2e` | `boga test backend` | ❌ | ~2min |
+| **sync-infra (mobile cross-stack)** | `./boga test sync-infra` (`test-sync-infra.sh`) | `boga test backend` (last) | ❌ | N/A |
 | *Infra: iOS simulator + Metro — never CI-able* | | | | |
-| iOS smoke | `npm run test:e2e:ios:smoke` | `quality-slow.sh frontend` | ❌ | ~75s |
-| iOS data-smoke | `npm run test:e2e:ios:data-smoke` | `quality-slow.sh frontend` | ❌ | ~110s |
-| iOS auth-profile | `npm run test:e2e:ios:auth-profile` | `quality-slow.sh frontend` | ❌ | N/A |
-| **iOS sync e2e (UI↔server)** | `npm run test:e2e:ios:sync` | `quality-slow.sh frontend` (last) | ❌ | N/A |
+| iOS smoke | `npm run test:e2e:ios:smoke` | `boga test frontend` | ❌ | ~75s |
+| iOS data-smoke | `npm run test:e2e:ios:data-smoke` | `boga test frontend` | ❌ | ~110s |
+| iOS auth-profile | `npm run test:e2e:ios:auth-profile` | `boga test frontend` | ❌ | N/A |
+| **iOS sync e2e (UI↔server)** | `npm run test:e2e:ios:sync` | `boga test frontend` (last) | ❌ | N/A |
 
 Two traps this table exists to kill:
 
-- **`test:handles` is the one lane CI runs that no `quality-*` wrapper does**, so a
-  green local `quality-fast.sh frontend` is **not** the same as a green CI run. Run
-  `test:handles` yourself when you touch timers, sockets, subscriptions, or async
-  teardown.
+- **`test:handles` is the one CI lane outside every gate aggregate** (registry
+  gate `extra`), so a green local `boga test fast` is **not** the same as a green
+  CI run. Run `./boga test handles` yourself when you touch timers, sockets,
+  subscriptions, or async teardown.
 - **Two lanes cross the FE/BE line, and they are NOT interchangeable:**
   **sync-infra** is a mobile jest body driving the *real* `runSyncCycle` against a
   *real* Supabase endpoint — breadth coverage (LWW, multi-device, drift) with
-  emulated storage and no UI; it sits at the end of `quality-slow.sh backend`.
+  emulated storage and no UI; it sits at the end of `boga test backend`.
   **iOS sync e2e** is the device-level proof — real recorder UI, real cycle, real
   local Supabase (log a workout → pending drains to 0 → full wipe → re-sign-in
   restores from the remote DB). Bugs in UI gating, NetInfo, session handoff, and
@@ -113,11 +121,11 @@ Two traps this table exists to kill:
 
 | You changed… | Run |
 | --- | --- |
-| Any `apps/mobile` TS/JS logic | `./scripts/quality-fast.sh` |
-| `apps/mobile` UI screens / components / navigation (`app/**`, `components/**`) | `quality-fast` **+** `./scripts/quality-slow.sh frontend` |
-| Sync / boot / auth (`apps/mobile/src/sync/**`, `src/auth/**`, scheduler, data bootstrap/migrations, `drizzle/**`, sync RPCs) | `quality-fast` **+** `./scripts/quality-slow.sh backend` **+** `npm run test:e2e:ios:sync` (the UI↔server e2e lane) |
-| Backend (`supabase/migrations/**`, `functions/**`, RLS/policies, sync RPCs) | `./scripts/quality-slow.sh backend` |
-| Added/removed/upgraded a **native** dependency (iOS pod, native Expo module, or a native field / config plugin in `apps/mobile/app.config.ts`) | **First** `cd apps/mobile && ./scripts/maestro-ios-dev-client-build.sh --force`, then `./scripts/quality-slow.sh frontend` |
+| Any `apps/mobile` TS/JS logic | `./boga test fast` |
+| `apps/mobile` UI screens / components / navigation (`app/**`, `components/**`) | `./boga test fast` **+** `./boga test frontend` |
+| Sync / boot / auth (`apps/mobile/src/sync/**`, `src/auth/**`, scheduler, data bootstrap/migrations, `drizzle/**`, sync RPCs) | `./boga test fast` **+** `./boga test backend` **+** `./boga test ios-sync-e2e` (the UI↔server e2e lane) |
+| Backend (`supabase/migrations/**`, `functions/**`, RLS/policies, sync RPCs) | `./boga test backend` |
+| Added/removed/upgraded a **native** dependency (iOS pod, native Expo module, or a native field / config plugin in `apps/mobile/app.config.ts`) | **First** `./boga ios build-client --force`, then `./boga test frontend` |
 
 Run the gate(s) for your change **to green before opening the PR**, and put the
 evidence (command output / Maestro artifact path) in the PR. A pure-JS or
@@ -142,11 +150,13 @@ your area (table above) before the PR.
 
 ## Maintenance
 
-Update this doc — **including the lane matrix above** — in the same change whenever
-you alter a gate: a `scripts/quality-*` wrapper, a `supabase/scripts/test-*`
-wrapper, an `apps/mobile/package.json` `test*`/`lint`/`typecheck` script, or
-`.github/workflows/ci.yml`. If a fact here ever disagrees with the scripts, the
-scripts win — fix the doc.
+Update this doc — **including the lane matrix above** — in the same change
+whenever you alter a gate or lane: `scripts/lanes.tsv` (the registry `./boga`
+runs from), `supabase/scripts/run-suite.sh` / `test-*.sh`,
+`apps/mobile/scripts/maestro-run-lane.sh`, an `apps/mobile/package.json`
+`test*`/`lint`/`typecheck` script, or `.github/workflows/ci.yml`. If a fact here
+ever disagrees with `scripts/lanes.tsv` or the scripts, the registry/scripts
+win — fix the doc.
 
 **Source-of-truth ownership** (so the test docs can't drift apart again):
 this doc owns the lane matrix + CI membership; `06-testing-strategy.md` owns each

@@ -6,8 +6,8 @@
 # docs/specs/tech/sync-v2-server-contract.md §A.1 (LWW, future-clock clamp,
 # undelete) and §B.3 (envelope, batch caps, success/error shapes, FK closure).
 #
-# Run via the wrapper at supabase/scripts/test-sync-push-contract.sh (which
-# brings up the shared local runtime baseline first). For ad-hoc local
+# Run via `./boga test sync-push-contract` (run-suite.sh brings up the shared
+# local runtime baseline first). For ad-hoc local
 # iteration, call this script directly after running
 # `./supabase/scripts/ensure-local-runtime-baseline.sh`.
 

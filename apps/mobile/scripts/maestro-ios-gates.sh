@@ -17,7 +17,7 @@
 #     `boga3://maestro-harness?reset=data` deep links, so it needs no separate
 #     provision and is safe to run right after Smoke in the same session.
 #
-# The individual gate scripts (maestro-ios-smoke.sh / -data-smoke.sh) are left
+# The individual lanes (maestro-run-lane.sh smoke / data-smoke) are left
 # unchanged; this is an additive, faster path for running both together. Each
 # flow still produces its own JUnit + debug output (namespaced per flow), and a
 # failure in either flow fails the whole run with a non-zero exit.

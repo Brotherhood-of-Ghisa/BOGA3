@@ -4,7 +4,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
-source "${SCRIPT_DIR}/_common.sh"
+source "${SCRIPT_DIR}/../../supabase/scripts/_common.sh"
 
 MOBILE_ENV_FILE="${REPO_ROOT}/apps/mobile/.env.local"
 
@@ -48,7 +48,7 @@ rewrite_mobile_supabase_env() {
   trap - EXIT
 }
 
-"${SCRIPT_DIR}/local-runtime-up.sh"
+"${REPO_ROOT}/supabase/scripts/local-runtime-up.sh"
 load_supabase_status_env
 
 if [[ -z "${API_URL:-}" || -z "${ANON_KEY:-}" ]]; then

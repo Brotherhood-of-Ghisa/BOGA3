@@ -73,51 +73,56 @@ codebase areas/changes should trigger it — by path/area). Infrastructure value
 
 | Script | Purpose | Infrastructure | When to run (paths/areas) |
 |---|---|---|---|
-| `npm run lint` | `expo lint` (ESLint flat config). Enforces the repo lint rules, including the `no-restricted-globals` ban on `__DEV__` (use `isDevMode()` instead). | none | Any `apps/mobile/**` source change. Part of `quality-fast.sh frontend` and CI. |
+| `npm run lint` | `expo lint` (ESLint flat config). Enforces the repo lint rules, including the `no-restricted-globals` ban on `__DEV__` (use `isDevMode()` instead). | none | Any `apps/mobile/**` source change. Part of the fast gate (`./boga test fast`) and CI. |
 | `npm run lint:ui-guardrails` | Standalone guardrail (`scripts/check-ui-guardrails.js`): flags raw color literals (hex / `rgb(a)`) in `apps/mobile/app/**` and `components/**`. NOT wired into `lint`, ESLint, any gate wrapper, or CI — invoke it directly. | none | UI/styling changes under `apps/mobile/app/**` or `apps/mobile/components/**` where the design-token guardrail matters. |
-| `npm run typecheck` | Regenerates router types (`router:types`) then `tsc --noEmit`. | none | Any `apps/mobile/**` TS change. Part of `quality-fast.sh frontend` and CI. |
-| `npm test` | Full Jest unit/integration suite. Bare `jest` — deliberately **no `--forceExit`** (see *Unit-test hang safety*). Excludes infra-dependent sync tests (they live behind `test:sync:infra`). | none | Any `apps/mobile/**` change. Part of `quality-fast.sh frontend` and CI. |
+| `npm run typecheck` | Regenerates router types (`router:types`) then `tsc --noEmit`. | none | Any `apps/mobile/**` TS change. Part of the fast gate (`./boga test fast`) and CI. |
+| `npm test` | Full Jest unit/integration suite. Bare `jest` — deliberately **no `--forceExit`** (see *Unit-test hang safety*). Excludes infra-dependent sync tests (they live behind `test:sync:infra`). | none | Any `apps/mobile/**` change. Part of the fast gate (`./boga test fast`) and CI. |
 | `npm run test:sync` | `jest app/__tests__/sync` — the sync-focused subset (still infra-free; the infra-dependent files in that dir fail fast without an endpoint and are normally run via `test:sync:infra`). | none | Targeted feedback while editing mobile sync code under `apps/mobile/app/__tests__/sync/**` or the sync runtime it covers. |
 | `npm run test:sync:infra` | Runs the four **infra-dependent** sync tests by path: `drift-check.test.ts` (shells out to `check:sync-drift --strict`), `cycle-round-trip.test.ts` (real push→server-LWW→pull→local-LWW round trip, incl. a wiped-client reinstall re-pull), `cycle-multidevice-lww.test.ts` (two local DBs sharing one server: end-to-end LWW collisions, multi-device convergence, future-clock-clamp reconciliation), and `auth-required-envelope.test.ts` (unauthenticated cycle is a clean no-op). | local Supabase + Docker. Reads `SYNC_TEST_SUPABASE_URL` / `SYNC_TEST_SUPABASE_ANON_KEY` — these normally point at **this worktree's own local stack** (`API_URL`/`ANON_KEY` from `supabase status -o env`); it is **runnable locally, not a deferred/remote lane**. | Changes to the mobile sync cycle, client Drizzle schemas, the migration bundle, or the wire contract under `apps/mobile/src/**` sync code and `apps/mobile/app/__tests__/sync/**`. |
-| `npm run test:handles` | Open-handle guard: `jest --detectOpenHandles --silent`, serial. Surfaces any leaked handle (unclosed connection, lingering timer, real Supabase transport) with a stack after tests pass. Can be scoped (e.g. `-- sync-cycle`). | none | Any change that touches timers, connections, async teardown, or test fixtures. Part of CI; **not** in `quality-fast.sh` — run it before opening a PR. |
+| `npm run test:handles` | Open-handle guard: `jest --detectOpenHandles --silent`, serial. Surfaces any leaked handle (unclosed connection, lingering timer, real Supabase transport) with a stack after tests pass. Can be scoped (e.g. `-- sync-cycle`). | none | Any change that touches timers, connections, async teardown, or test fixtures. Part of CI; **not** in any gate aggregate — run `./boga test handles` before opening a PR. |
 | `npm run db:generate` | `drizzle-kit generate` + `tsx scripts/bundle-migrations.ts`: regenerates `drizzle/*.sql` AND the committed runtime bundle `drizzle/migrations.generated.ts`. Idempotent. | none | Any schema change under `apps/mobile/src/data/**` / `apps/mobile/drizzle/**`. Run it and commit the regenerated artifacts. |
 | `npm run db:generate:canary` | Alias of `db:generate`. Intended as a migration-artifact drift canary: re-run it and confirm a clean working tree (no uncommitted diff) to prove the generated SQL/bundle match the schema. NOT wired into any gate or CI. | none | Same triggers as `db:generate`; use when you want to *verify* (rather than write) that the bundle is current. |
-| `npm run check:sync-drift` | `tsx scripts/check-sync-schema-drift.ts`: resets local Postgres, introspects server schema vs the client Drizzle schemas, and asserts no client/server drift (universal index, two triggers, four RLS policies w/ body hashes, soft-delete + sync columns, topo FK order). `--strict` promotes warn-only (exit 2) to failure. | local Supabase + Docker (it drives a DB reset). | Changes to `apps/mobile/src/data/**` schemas, `supabase/migrations/**`, or sync columns/RLS. Invoked with `--strict` by `quality-slow.sh backend`; also exercised by `test:sync:infra`. |
-| `npm run test:e2e:ios:smoke` | `scripts/maestro-ios-smoke.sh` → runs `smoke-launch.yaml` with a `full` reset. Cold-launch + navigation smoke on the freshly-installed dev client (infra-free config). Captures `01-app-launch`, `02-session-recorder-visible`. | iOS simulator + Metro + Maestro dev-client. **No** Supabase. | UI/runtime changes that need fresh real-simulator smoke evidence (see *iOS UI smoke policy*). Part of `quality-slow.sh frontend`. |
-| `npm run test:e2e:ios:data-smoke` | `scripts/maestro-ios-data-smoke.sh` → runs `data-runtime-smoke.yaml` with a `data` reset. Validates real `expo-sqlite` migration + smoke write/read and that the backend-less build seeds its own starter exercise catalog at boot. Captures `03-data-runtime-smoke-start`, `04-data-runtime-smoke-success`. | iOS simulator + Metro + Maestro dev-client. **No** Supabase. | See *iOS simulator data smoke policy* (bootstrap/migrations/drizzle/native-runtime changes). Part of `quality-slow.sh frontend`. |
+| `npm run check:sync-drift` | `tsx scripts/check-sync-schema-drift.ts`: resets local Postgres, introspects server schema vs the client Drizzle schemas, and asserts no client/server drift (universal index, two triggers, four RLS policies w/ body hashes, soft-delete + sync columns, topo FK order). `--strict` promotes warn-only (exit 2) to failure. | local Supabase + Docker (it drives a DB reset). | Changes to `apps/mobile/src/data/**` schemas, `supabase/migrations/**`, or sync columns/RLS. Run with `--strict` as the `sync-drift` lane of `boga test backend`; also exercised by `test:sync:infra`. |
+| `npm run test:e2e:ios:smoke` | `scripts/maestro-run-lane.sh smoke` → runs `smoke-launch.yaml` with a `full` reset. Cold-launch + navigation smoke on the freshly-installed dev client (infra-free config). Captures `01-app-launch`, `02-session-recorder-visible`. | iOS simulator + Metro + Maestro dev-client. **No** Supabase. | UI/runtime changes that need fresh real-simulator smoke evidence (see *iOS UI smoke policy*). Part of `boga test frontend`. |
+| `npm run test:e2e:ios:data-smoke` | `scripts/maestro-run-lane.sh data-smoke` → runs `data-runtime-smoke.yaml` with a `data` reset. Validates real `expo-sqlite` migration + smoke write/read and that the backend-less build seeds its own starter exercise catalog at boot. Captures `03-data-runtime-smoke-start`, `04-data-runtime-smoke-success`. | iOS simulator + Metro + Maestro dev-client. **No** Supabase. | See *iOS simulator data smoke policy* (bootstrap/migrations/drizzle/native-runtime changes). Part of `boga test frontend`. |
 | `npm run test:e2e:ios:gates` | `scripts/maestro-ios-gates.sh` — convenience: runs smoke + data-runtime-smoke against **one** provisioned sim + Metro (pays the ~55-60s boot/warm overhead once). Reset semantics preserved (provision `full`; data-smoke self-resets in-flow). | iOS simulator + Metro + Maestro dev-client. **No** Supabase. | When you want both infra-free iOS gates faster; the per-flow lanes above remain the canonical individual lanes. |
-| `npm run test:e2e:ios:auth-profile` | `scripts/maestro-ios-auth-profile.sh` — the **only** Supabase-configured iOS lane. Runs five flows in order, each with a `full` reset: `launch-requires-sign-in`, `sync-gate-first-cycle` (pinned in-progress surfaces), `sync-gate-first-cycle-real` (real cycle lifts the gate, no harness stamp), `settings-sync-status`, `auth-profile-happy-path`. Validates login-on-start enforcement, the first-sync gate (both the deterministically-pinned in-progress block AND the real bootstrap cycle dismissing it against local Supabase), settings sync status, and the fixture-backed sign-in / profile / username-update / sign-out happy path. Captures `05-…-logged-out-start`, `06-…-signed-in`, `07-…-signed-out-end`. | iOS simulator + Metro + Maestro dev-client **and** local Supabase + Docker (ensures baseline, exports `EXPO_PUBLIC_SUPABASE_*` from the running stack, signs in as `user_a`). | See *iOS simulator auth/profile happy-path policy* (profile-route UI/state, auth bootstrap/session restore, local-Supabase auth wiring). Part of `quality-slow.sh frontend`. Previously RED on a simulator connectivity issue, since fixed (scheduler keys off `NetInfo.isConnected`); not re-measured — see the timings-doc note. |
-| `npm run test:e2e:ios:sync` | `scripts/maestro-ios-sync-e2e.sh` — the **UI↔server sync e2e lane** (a category of its own: real recorder UI + real sync cycle + real local Supabase). Runs `sync-first-run-log-and-roundtrip.yaml` as the dedicated `user_b` fixture with a `full` reset: (A) new-user sign-in → real bootstrap cycle lifts the first-sync gate, (B) one workout logged through the recorder UI, (C) forced sync drains "Pending changes" to 0 (run-specific upload proof), (D) full device wipe + re-sign-in restores the workout from the remote DB. Exists because `test:sync:infra` (emulated storage, no UI) cannot catch UI-gating / NetInfo / session-handoff / trigger-wiring bugs — the classes that shipped during sync v2. Captures screenshots `16`–`20`. | iOS simulator + Metro + Maestro dev-client **and** local Supabase + Docker. | Any change under `apps/mobile/src/sync/**`, the scheduler, auth session wiring, or the sync RPCs. Part of `quality-slow.sh frontend` (runs last). |
+| `npm run test:e2e:ios:auth-profile` | `scripts/maestro-run-lane.sh auth-profile` — the **only** Supabase-configured iOS lane. Runs five flows in order, each with a `full` reset: `launch-requires-sign-in`, `sync-gate-first-cycle` (pinned in-progress surfaces), `sync-gate-first-cycle-real` (real cycle lifts the gate, no harness stamp), `settings-sync-status`, `auth-profile-happy-path`. Validates login-on-start enforcement, the first-sync gate (both the deterministically-pinned in-progress block AND the real bootstrap cycle dismissing it against local Supabase), settings sync status, and the fixture-backed sign-in / profile / username-update / sign-out happy path. Captures `05-…-logged-out-start`, `06-…-signed-in`, `07-…-signed-out-end`. | iOS simulator + Metro + Maestro dev-client **and** local Supabase + Docker (ensures baseline, exports `EXPO_PUBLIC_SUPABASE_*` from the running stack, signs in as `user_a`). | See *iOS simulator auth/profile happy-path policy* (profile-route UI/state, auth bootstrap/session restore, local-Supabase auth wiring). Part of `boga test frontend`. Previously RED on a simulator connectivity issue, since fixed (scheduler keys off `NetInfo.isConnected`); not re-measured — see the timings-doc note. |
+| `npm run test:e2e:ios:sync` | `scripts/maestro-run-lane.sh sync-e2e` — the **UI↔server sync e2e lane** (a category of its own: real recorder UI + real sync cycle + real local Supabase). Runs `sync-first-run-log-and-roundtrip.yaml` as the dedicated `user_b` fixture with a `full` reset: (A) new-user sign-in → real bootstrap cycle lifts the first-sync gate, (B) one workout logged through the recorder UI, (C) forced sync drains "Pending changes" to 0 (run-specific upload proof), (D) full device wipe + re-sign-in restores the workout from the remote DB. Exists because `test:sync:infra` (emulated storage, no UI) cannot catch UI-gating / NetInfo / session-handoff / trigger-wiring bugs — the classes that shipped during sync v2. Captures screenshots `16`–`20`. | iOS simulator + Metro + Maestro dev-client **and** local Supabase + Docker. | Any change under `apps/mobile/src/sync/**`, the scheduler, auth session wiring, or the sync RPCs. Part of `boga test frontend` (runs last). |
 
 ## Repo-root quality wrappers (`scripts/`, run from repo root)
 
-| Wrapper | Expands to | Infrastructure | When to run |
+Gate aggregates are defined by the `gate` column of `scripts/lanes.tsv` and run
+via `./boga test <gate>`; row order in the registry is execution order. The
+legacy `./scripts/quality-fast.sh` / `./scripts/quality-slow.sh` forward here.
+
+| Gate | Expands to (registry order) | Infrastructure | When to run |
 |---|---|---|---|
-| `./scripts/quality-fast.sh` | `frontend` + `backend` fast lanes | per sub-lane | Default local closeout fast gate for covered workspaces. |
-| `./scripts/quality-fast.sh frontend` | `apps/mobile`: `lint` + `typecheck` + `test` | none | Any `apps/mobile/**` change. |
-| `./scripts/quality-fast.sh backend` | `./supabase/scripts/test-fast.sh` | local Supabase + Docker | Any `supabase/**` change. |
-| `./scripts/quality-slow.sh frontend` | `test:e2e:ios:smoke` + `test:e2e:ios:data-smoke` + `test:e2e:ios:auth-profile` + `test:e2e:ios:sync` (in that order) | iOS simulator + Metro + Maestro dev-client; auth-profile and sync additionally need local Supabase + Docker | Risk-triggered: UI/runtime/auth-profile/sync changes needing real-simulator evidence. |
-| `./scripts/quality-slow.sh backend` | `test-auth-authz.sh` → `test-sync-v2-schema-smoke.sh` → `test-sync-push-contract.sh` → `test-sync-pull-contract.sh` → `test-dev-wipe-my-data.sh` → `check:sync-drift --strict` → `test-sync-v2-e2e.sh` → `test-sync-infra.sh` (in that order) | local Supabase + Docker (each wrapper calls `ensure-local-runtime-baseline.sh`) | Risk-triggered backend work: `supabase/migrations/**`, `supabase/functions/**`, auth config/policies, sync RPC contracts/fixtures. |
+| `./boga test fast` | `lint` + `typecheck` + `jest-full` + `backend-fast` | jest lanes none; backend-fast local Supabase + Docker | Default local closeout fast gate. (`fast-frontend` / `fast-backend` run the halves.) |
+| `./boga test frontend` | `ios-smoke` + `ios-data-smoke` + `ios-auth-profile` + `ios-sync-e2e` | iOS simulator + Metro + Maestro dev-client; auth-profile and sync-e2e additionally need local Supabase + Docker | Risk-triggered: UI/runtime/auth-profile/sync changes needing real-simulator evidence. |
+| `./boga test backend` | `auth-authz` → `sync-v2-schema` → `sync-push-contract` → `sync-pull-contract` → `dev-wipe-my-data` → `sync-drift` → `sync-v2-e2e` → `sync-infra` | local Supabase + Docker (`run-suite.sh` ensures `ensure-local-runtime-baseline.sh` per lane) | Risk-triggered backend work: `supabase/migrations/**`, `supabase/functions/**`, auth config/policies, sync RPC contracts/fixtures. |
 
 > The slow gate runs are not always mandatory. "When to run" is governed by the
 > codebase areas/paths in the policies below; the always-load quickref
 > (`02-quality-and-test-gates.md`) states what is mandatory.
 
-## Backend wrappers (`supabase/scripts/`, run from repo root)
+## Backend lanes (`./boga test <lane>`; bodies under `supabase/tests/`)
 
-Each `test-*.sh` wrapper first calls `ensure-local-runtime-baseline.sh`, then runs
-its target suite under `supabase/tests/`.
+Most backend lanes run through `supabase/scripts/run-suite.sh`, which calls
+`ensure-local-runtime-baseline.sh` and then the lane's body under
+`supabase/tests/` (lane → body mapping: `scripts/lanes.tsv`). Group/special
+lanes keep their own wrapper scripts (`test-sync-v2-e2e.sh`,
+`test-sync-infra.sh`).
 
-| Wrapper | Target suite | Purpose | Infrastructure | When to run |
+| Lane | Body / target | Purpose | Infrastructure | When to run |
 |---|---|---|---|---|
-| `test-fast.sh` | `tests/local-runtime-smoke.sh` | Combined fast backend smoke: runtime up + reset (migrations + seed) + DB schema lint + health endpoint + deterministic seed-fixture presence. | local Supabase + Docker | Any `supabase/**` change. Backend fast gate (`quality-fast.sh backend`). |
-| `test-auth-authz.sh` | `tests/auth-authz-contract.sh` | Real auth context + RLS behavior: owner success, cross-user denial, validation/unauthorized paths (incl. `auth.users`-keyed profile tables and `public.app_logs` insert/read-deny). | local Supabase + Docker | `supabase/migrations/**` (RLS/policies/functions), auth config. Part of `quality-slow.sh backend`. |
-| `test-sync-v2-schema-smoke.sh` | `tests/sync-v2-schema-smoke.sh` | Sync-v2 clean-room schema shape (the columns/indexes/triggers/RLS the migration ships). | local Supabase + Docker | `supabase/migrations/**` sync-v2 schema changes. Part of `quality-slow.sh backend`. |
-| `test-sync-push-contract.sh` | `tests/sync-push-contract.sh` | `sync_push` RPC contract: LWW, clamp, undelete, envelope, batch caps, FK closure, auth/RLS. | local Supabase + Docker | `sync_push` RPC / sync push contract changes under `supabase/**`. Part of `quality-slow.sh backend`. |
-| `test-sync-pull-contract.sh` | `tests/sync-pull-contract.sh` | `sync_pull` RPC contract: per-layer cursor protocol — snapshot pull, paginated drain, layer→type partition, RLS isolation, tombstones, empty-page echo, same-ms tiebreak, limit/layer bounds, AUTH_REQUIRED. | local Supabase + Docker | `sync_pull` RPC / pull contract changes under `supabase/**`. Part of `quality-slow.sh backend`. |
-| `test-dev-wipe-my-data.sh` | `tests/dev-wipe-my-data-contract.sh` | Developer-only `dev_wipe_my_data` RPC: auth guard, non-production environment guard, owner-scoped deletion (caller's rows removed, second user's rows survive). | local Supabase + Docker | Changes to the `dev_wipe_my_data` RPC or its guards. Part of `quality-slow.sh backend`. |
-| `test-sync-v2-e2e.sh` | `tests/sync-v2-*.sh` group | Integration-level plan-outcome assertions across the as-built stack: `sync-v2-clean-room.sh`, `-deferrable-fk.sh`, `-rls-cross-owner.sh`, `-push-roundtrip.sh`, `-pull-drain.sh`, `-pull-fk-closure.sh`, `-drift-synthetic.sh`, `-drift-asbuilt.sh`, `-spec-rule.sh`. Includes the independent push→pull parity assertions across all data-scope entities (incl. soft-delete tombstone visibility). | local Supabase + Docker | Any cross-cutting sync-v2 backend change; milestone/release closeout for sync. Part of `quality-slow.sh backend` (runs after the per-task wrappers, before `test-sync-infra.sh`). |
-| `test-sync-infra.sh` | `apps/mobile` jest `test:sync:infra` (`drift-check` + `cycle-round-trip` + `cycle-multidevice-lww` + `auth-required-envelope`) | Mobile **cross-stack** sync proof: drives the real `runSyncCycle` against THIS worktree's slot-isolated local Supabase. Ensures the baseline, reads `API_URL`/`ANON_KEY`, exports them as `SYNC_TEST_SUPABASE_URL`/`ANON_KEY`, then runs the lane — zero manual env setup. The one lane whose test body is frontend but whose infra is backend. | local Supabase + Docker | Mobile sync cycle / client Drizzle schema / migration bundle / wire-contract changes. Part of `quality-slow.sh backend` (**runs last**); also runnable standalone (`npm run test:sync:infra` with the env exported). |
+| `backend-fast` | `tests/local-runtime-smoke.sh` (no baseline preflight — the body manages the runtime itself) | Combined fast backend smoke: runtime up + reset (migrations + seed) + DB schema lint + health endpoint + deterministic seed-fixture presence. | local Supabase + Docker | Any `supabase/**` change. Backend half of the fast gate (`./boga test fast-backend`). |
+| `auth-authz` | `tests/auth-authz-contract.sh` | Real auth context + RLS behavior: owner success, cross-user denial, validation/unauthorized paths (incl. `auth.users`-keyed profile tables and `public.app_logs` insert/read-deny). | local Supabase + Docker | `supabase/migrations/**` (RLS/policies/functions), auth config. Part of `boga test backend`. |
+| `sync-v2-schema` | `tests/sync-v2-schema-smoke.sh` | Sync-v2 clean-room schema shape (the columns/indexes/triggers/RLS the migration ships). | local Supabase + Docker | `supabase/migrations/**` sync-v2 schema changes. Part of `boga test backend`. |
+| `sync-push-contract` | `tests/sync-push-contract.sh` | `sync_push` RPC contract: LWW, clamp, undelete, envelope, batch caps, FK closure, auth/RLS. | local Supabase + Docker | `sync_push` RPC / sync push contract changes under `supabase/**`. Part of `boga test backend`. |
+| `sync-pull-contract` | `tests/sync-pull-contract.sh` | `sync_pull` RPC contract: per-layer cursor protocol — snapshot pull, paginated drain, layer→type partition, RLS isolation, tombstones, empty-page echo, same-ms tiebreak, limit/layer bounds, AUTH_REQUIRED. | local Supabase + Docker | `sync_pull` RPC / pull contract changes under `supabase/**`. Part of `boga test backend`. |
+| `dev-wipe-my-data` | `tests/dev-wipe-my-data-contract.sh` | Developer-only `dev_wipe_my_data` RPC: auth guard, non-production environment guard, owner-scoped deletion (caller's rows removed, second user's rows survive). | local Supabase + Docker | Changes to the `dev_wipe_my_data` RPC or its guards. Part of `boga test backend`. |
+| `sync-v2-e2e` (`test-sync-v2-e2e.sh`) | `tests/sync-v2-*.sh` group | Integration-level plan-outcome assertions across the as-built stack: `sync-v2-clean-room.sh`, `-deferrable-fk.sh`, `-rls-cross-owner.sh`, `-push-roundtrip.sh`, `-pull-drain.sh`, `-pull-fk-closure.sh`, `-drift-synthetic.sh`, `-drift-asbuilt.sh`, `-spec-rule.sh`. Includes the independent push→pull parity assertions across all data-scope entities (incl. soft-delete tombstone visibility). | local Supabase + Docker | Any cross-cutting sync-v2 backend change; milestone/release closeout for sync. Part of `boga test backend` (runs after the per-task wrappers, before `test-sync-infra.sh`). |
+| `sync-infra` (`test-sync-infra.sh`) | `apps/mobile` jest `test:sync:infra` (`drift-check` + `cycle-round-trip` + `cycle-multidevice-lww` + `auth-required-envelope`) | Mobile **cross-stack** sync proof: drives the real `runSyncCycle` against THIS worktree's slot-isolated local Supabase. Ensures the baseline, reads `API_URL`/`ANON_KEY`, exports them as `SYNC_TEST_SUPABASE_URL`/`ANON_KEY`, then runs the lane — zero manual env setup. The one lane whose test body is frontend but whose infra is backend. | local Supabase + Docker | Mobile sync cycle / client Drizzle schema / migration bundle / wire-contract changes. Part of `boga test backend` (**runs last**); also runnable standalone (`npm run test:sync:infra` with the env exported). |
 | `ensure-local-runtime-baseline.sh` | — | Shared runtime preflight (not a test): lock + conditional bootstrap/reset + deterministic fixture enforcement. If runtime is down: start + reset/seed + provision auth fixtures. If up: reuse as-is (no reset), apply pending migrations, verify baseline rows, re-provision auth fixtures idempotently. | local Supabase + Docker | Invoked automatically by every real-instance wrapper above and by `test:e2e:ios:auth-profile`. Run it directly before any real-instance slow test. |
 
 Supporting (non-test) backend scripts: `local-runtime-up.sh` (start stack + health
@@ -145,8 +150,8 @@ Metro and is owned operationally by
 - It runs, in order: `npm ci`, `npm run lint`, `npm run typecheck`, `npm test`
   (5-minute step timeout), and `npm run test:handles` (open-handle guard, 5-minute
   step timeout). That is the **entire** CI surface today.
-- **Not in CI:** the iOS Maestro slow gates (`quality-slow.sh frontend`) and the
-  backend Supabase contract suites (`quality-slow.sh backend`) are local-only,
+- **Not in CI:** the iOS Maestro slow gates (`boga test frontend`) and the
+  backend Supabase contract suites (`boga test backend`) are local-only,
   along with `lint:ui-guardrails` and `db:generate:canary`. **Local-only means you
   run them on your dev machine — not that they can't be run: this environment boots
   the iOS simulator and local Supabase (verify + run per
@@ -169,8 +174,8 @@ Metro and is owned operationally by
 - Every feature should include at least one success-path test and one
   offline/error-path test.
 - Run a targeted test or gate after each meaningful change, then run
-  `./scripts/quality-fast.sh` before closeout. Run `./scripts/quality-slow.sh
-  <area>` when the change touches the areas/paths its lanes cover (see the catalog
+  `./boga test fast` before closeout. Run `./boga test
+  backend|frontend` when the change touches the areas/paths its lanes cover (see the catalog
   and policies).
 - For how long each lane actually takes, run `./scripts/test-timings.sh`
   (measured medians + 3× ceilings from the records the gates write). Do not
@@ -273,7 +278,7 @@ Metro and is owned operationally by
   least one real cross-stack path:
   - mobile side: `npm run test:sync:infra` (real round trip, AUTH_REQUIRED no-op,
     drift check) against a live endpoint;
-  - backend side: `./scripts/quality-slow.sh backend` (auth/RLS + schema smoke +
+  - backend side: `./boga test backend` (auth/RLS + schema smoke +
     push + pull + dev-wipe + drift + e2e + sync-infra). The push→pull parity /
     reinstall guarantee is proven
     by `sync-v2-push-roundtrip.sh` and `sync-v2-pull-drain.sh` inside the e2e
@@ -326,7 +331,7 @@ Metro and is owned operationally by
     suggestions but existing assignments remain queryable),
   - recorder interaction assertions (add/select/create/manage rename/delete/
     undelete, chip removal) and completed-edit parity.
-- Use targeted Jest coverage; require `./scripts/quality-slow.sh frontend` when
+- Use targeted Jest coverage; require `./boga test frontend` when
   runtime-sensitive recorder tag behavior changes.
 
 ## Mobile auth bootstrap coverage policy
@@ -363,7 +368,7 @@ Metro and is owned operationally by
   CI-safe assertions. Maestro is for simulator-integrated UI smoke that confirms
   core screens are reachable and visibly intact.
 - In the standard local gate matrix, current Maestro checks are `frontend + slow`
-  and run via `./scripts/quality-slow.sh frontend` (smoke + data-smoke +
+  and run via `./boga test frontend` (smoke + data-smoke +
   auth-profile).
 - Required smoke coverage: app launch visible state; session recorder visible
   state; logged-out profile state; fixture-backed sign-in; signed-in profile state;
@@ -372,7 +377,7 @@ Metro and is owned operationally by
   is confirmed. Required smoke screenshots: `01-app-launch`,
   `02-session-recorder-visible` (capture automated by the flow; stored under the
   canonical artifact root).
-- Require `./scripts/quality-slow.sh frontend` when a change touches the committed
+- Require `./boga test frontend` when a change touches the committed
   smoke/data-smoke flows, Maestro runtime scripts, the dev-client/runtime
   handshake, harness setup behavior, or user-facing UI that needs fresh
   real-simulator smoke evidence.
@@ -381,7 +386,7 @@ Metro and is owned operationally by
 
 - Purpose: validate runtime migration + smoke insert/read on real Expo iOS runtime
   (`expo-sqlite`) when change risk is runtime-sensitive (`test:e2e:ios:data-smoke`,
-  also covered by `quality-slow.sh frontend`). Reset policy: `data reset` then
+  also covered by `boga test frontend`). Reset policy: `data reset` then
   `teleport` to the recorder; avoid `full reset` unless cold-install evidence is
   needed.
 - Required when any of these change:
@@ -406,7 +411,7 @@ Metro and is owned operationally by
 - Purpose: validate the real local-Supabase login/profile happy path (plus
   login-on-start enforcement, the first-sync gate, and settings sync status) on the
   iOS simulator with deterministic fixture credentials
-  (`test:e2e:ios:auth-profile`, also covered by `quality-slow.sh frontend`).
+  (`test:e2e:ios:auth-profile`, also covered by `boga test frontend`).
 - Setup: `full reset` so each run starts logged out with no restored session;
   preflight `./supabase/scripts/ensure-local-runtime-baseline.sh`; use the
   deterministic fixture credentials (`user_a` by default) from
@@ -469,9 +474,9 @@ Metro and is owned operationally by
 ## Shared Supabase runtime contract (slow real-instance tests)
 
 - Applies to local real-instance test commands that hit a running Supabase stack
-  rather than mocked clients. Current required entrypoints: `test-auth-authz.sh`,
-  `test-sync-v2-schema-smoke.sh`, `test-sync-push-contract.sh`,
-  `test-sync-pull-contract.sh`, `test-dev-wipe-my-data.sh`, `test-sync-v2-e2e.sh`,
+  rather than mocked clients. Current required entrypoints (`./boga test <lane>`):
+  `auth-authz`, `sync-v2-schema`, `sync-push-contract`, `sync-pull-contract`,
+  `dev-wipe-my-data`, `sync-v2-e2e`,
   `npm run check:sync-drift -- --strict`, `npm run test:sync:infra`,
   `npm run test:e2e:ios:auth-profile`, and `npm run test:e2e:ios:sync`.
 - Expected baseline state: a local Supabase runtime is reachable;
@@ -539,9 +544,9 @@ Metro and is owned operationally by
   `user_b`; optional helper/service-role path), enforced through
   `ensure-local-runtime-baseline.sh`.
 - Execution triggers (minimum): always run cheap tests for the changed layer(s);
-  `./scripts/quality-fast.sh backend` is the default backend fast gate; run the
+  `./boga test fast-backend` is the default backend fast gate; run the
   Supabase-local integration/contract suites (grouped under
-  `./scripts/quality-slow.sh backend`) when changing `supabase/migrations/**`,
+  `./boga test backend`) when changing `supabase/migrations/**`,
   `supabase/functions/**`, auth config/policies, or sync RPC contracts/fixtures
   (not every backend change requires every slow suite); run hosted smoke when
   changing deployment/env/secrets config, hosted-only behavior, or at

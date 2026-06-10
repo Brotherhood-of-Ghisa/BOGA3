@@ -49,13 +49,13 @@ What it does:
 For a physical device pointed at local Supabase over the Mac LAN IP:
 
 ```bash
-./supabase/scripts/use-local-mobile-lan-env.sh
+./scripts/dev/use-local-mobile-lan-env.sh   # or: ./boga env lan
 ```
 
 For a physical device pointed at hosted Supabase:
 
 ```bash
-./supabase/scripts/use-hosted-mobile-env.sh
+./scripts/dev/use-hosted-mobile-env.sh   # or: ./boga env hosted
 ```
 
 Stop the local runtime:
@@ -100,7 +100,7 @@ Seed fixture baseline (via local Supabase REST API):
 Combined fast backend-local check (current baseline for this task):
 
 ```bash
-./supabase/scripts/test-fast.sh
+./boga test backend-fast
 ```
 
 Shared runtime baseline preflight for real-instance contract/E2E flows:
@@ -167,10 +167,10 @@ Notes:
 Run the M5 auth/authz baseline suite:
 
 ```bash
-./supabase/scripts/test-auth-authz.sh
+./boga test auth-authz
 ```
 
-This wrapper enforces the shared runtime baseline first (`ensure-local-runtime-baseline.sh`) and then runs the contract suite.
+The lane runs through `supabase/scripts/run-suite.sh`, which enforces the shared runtime baseline first (`ensure-local-runtime-baseline.sh`) and then runs the contract suite.
 
 Coverage includes:
 
@@ -197,12 +197,12 @@ Local sync contract suites (sync v2):
 
 ```bash
 # run all backend slow suites together:
-./scripts/quality-slow.sh backend
+./boga test backend
 # or individually:
-./supabase/scripts/test-sync-v2-schema-smoke.sh
-./supabase/scripts/test-sync-push-contract.sh
-./supabase/scripts/test-sync-pull-contract.sh
-./supabase/scripts/test-sync-v2-e2e.sh
+./boga test sync-v2-schema
+./boga test sync-push-contract
+./boga test sync-pull-contract
+./boga test sync-v2-e2e
 ```
 
 These enforce the shared runtime baseline first (`ensure-local-runtime-baseline.sh`) and then run the sync-v2 contract suites.
