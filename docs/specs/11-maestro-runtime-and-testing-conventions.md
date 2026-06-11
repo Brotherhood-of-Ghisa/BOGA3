@@ -81,10 +81,11 @@ Rules:
 
 ### Current runner behavior
 
-- The current entrypoints are `npm run test:e2e:ios:smoke` and `npm run test:e2e:ios:data-smoke`, which call:
-  - `apps/mobile/scripts/maestro-ios-smoke.sh`
-  - `apps/mobile/scripts/maestro-ios-data-smoke.sh`
-- Both runner scripts now:
+- The current entrypoints are `npm run test:e2e:ios:smoke` and `npm run test:e2e:ios:data-smoke`, which call
+  `apps/mobile/scripts/maestro-run-lane.sh` (`smoke` / `data-smoke`) — the single
+  parameterized per-lane runner (lane data: flows, reset strategy, Supabase
+  config; canonical lane names live in `scripts/lanes.tsv`, run via `./boga test <lane>`).
+- The lane runner now:
   - delegate immediately to `apps/mobile/scripts/maestro-ios-run-flow.sh`,
   - set `MAESTRO_RESET_STRATEGY` before entering the shared runner (`full` for smoke, `data` for data-smoke),
   - source the per-worktree config from `.maestro/maestro.env.local`,
@@ -99,9 +100,8 @@ Rules:
   - execute `maestro test`,
   - call `maestro-ios-teardown.sh` on both success and failure to stop Expo and terminate the app process.
 - Verified against:
-  - `apps/mobile/package.json:17-18`
-  - `apps/mobile/scripts/maestro-ios-smoke.sh`
-  - `apps/mobile/scripts/maestro-ios-data-smoke.sh`
+  - `apps/mobile/package.json` (`test:e2e:ios:*` scripts)
+  - `apps/mobile/scripts/maestro-run-lane.sh`
   - `apps/mobile/scripts/maestro-ios-run-flow.sh`
   - `apps/mobile/scripts/maestro-ios-provision.sh`
   - `apps/mobile/scripts/maestro-ios-launch.sh`
@@ -314,8 +314,7 @@ Implemented script surface:
 - `apps/mobile/scripts/maestro-ios-provision.sh`
 - `apps/mobile/scripts/maestro-ios-launch.sh`
 - `apps/mobile/scripts/maestro-ios-teardown.sh`
-- `apps/mobile/scripts/maestro-ios-smoke.sh`
-- `apps/mobile/scripts/maestro-ios-data-smoke.sh`
+- `apps/mobile/scripts/maestro-run-lane.sh`
 - `apps/mobile/scripts/maestro-ios-gates.sh`
 - `apps/mobile/scripts/maestro-ios-run-flow.sh`
 
@@ -329,8 +328,10 @@ Responsibility split:
   - pins the lane's Supabase config into `.env.local` (see "App Supabase config isolation across lanes"), starts Expo on the configured port, deep-links the dev client, and updates runtime state.
 - `maestro-ios-teardown.sh`
   - performs cleanup using the emitted runtime state, including Expo process shutdown, app termination, simulator shutdown by default, and restoring the developer's `.env.local`.
-- `maestro-ios-smoke.sh` / `maestro-ios-data-smoke.sh`
-  - remain the high-level scenario entrypoints and call the shared toolkit.
+- `maestro-run-lane.sh`
+  - the high-level per-lane entrypoint (`smoke` / `data-smoke` / `auth-profile` /
+    `sync-e2e`); holds each lane's data (flows, reset strategy, Supabase config,
+    fixture user) and calls the shared toolkit via `maestro-ios-run-flow.sh`.
 - `maestro-ios-gates.sh`
   - additive combined entrypoint (`npm run test:e2e:ios:gates`) that provisions/launches/warms once and runs the smoke and data-runtime-smoke flows back-to-back against that single sim + Metro, then tears down once. It composes the same provision/launch/warm/teardown helpers; it does not duplicate runtime orchestration and does not replace the standalone gates. Reset semantics are preserved: provision performs the `full` reset for smoke, and data-runtime-smoke self-resets data in-flow via its `?reset=data` harness deep links.
 
@@ -446,7 +447,7 @@ lane's config:
 1. Before `expo start`, `maestro_write_managed_env_local` (in
    `maestro-ios-runtime.sh`) sets aside any existing `.env.local`, then writes the
    lane's intended config from the `EXPO_PUBLIC_SUPABASE_*` the lane exported.
-   `maestro-ios-auth-profile.sh` resolves these from `supabase status` in a
+   `maestro-run-lane.sh` (Supabase-configured lanes) resolves these from `supabase status` in a
    subshell (so sourcing the backend `_common.sh` cannot clobber its
    `SCRIPT_DIR`); every infra-free lane exports none, yielding empty values.
 2. `maestro-ios-teardown.sh` restores the developer's file

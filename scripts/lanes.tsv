@@ -1,0 +1,33 @@
+# BOGA lane registry — the single source for test lanes.
+#
+# Consumed by ./boga (gates, `test --list`, `test <lane>`); lane names here ARE
+# the timing-record lane names (docs/testing/timings/records/) and the names the
+# docs cite. Keep docs/specs/02-quality-and-test-gates.md's matrix in sync with
+# this file in the same change.
+#
+# Columns (tab-separated): name	gate	infra	ci	cwd	command
+#   gate:  fast-frontend | fast-backend | slow-backend | slow-frontend | extra
+#          (extra = not part of any gate aggregate; run by name)
+#   infra: none | supabase | ios | ios+supabase
+#   ci:    yes | no   (whether .github/workflows/ci.yml runs it)
+#   cwd:   working directory relative to the repo root
+#   ROW ORDER IS EXECUTION ORDER within a gate.
+lint	fast-frontend	none	yes	apps/mobile	npm run lint
+typecheck	fast-frontend	none	yes	apps/mobile	npm run typecheck
+jest-full	fast-frontend	none	yes	apps/mobile	npm test
+backend-fast	fast-backend	supabase	no	.	./supabase/scripts/run-suite.sh --no-baseline local-runtime-smoke.sh
+auth-authz	slow-backend	supabase	no	.	./supabase/scripts/run-suite.sh auth-authz-contract.sh
+sync-v2-schema	slow-backend	supabase	no	.	./supabase/scripts/run-suite.sh sync-v2-schema-smoke.sh
+sync-push-contract	slow-backend	supabase	no	.	./supabase/scripts/run-suite.sh sync-push-contract.sh
+sync-pull-contract	slow-backend	supabase	no	.	./supabase/scripts/run-suite.sh sync-pull-contract.sh
+dev-wipe-my-data	slow-backend	supabase	no	.	./supabase/scripts/run-suite.sh dev-wipe-my-data-contract.sh
+sync-drift	slow-backend	supabase	no	apps/mobile	npm run check:sync-drift -- --strict
+sync-v2-e2e	slow-backend	supabase	no	.	./supabase/scripts/test-sync-v2-e2e.sh
+sync-infra	slow-backend	supabase	no	.	./supabase/scripts/test-sync-infra.sh
+ios-smoke	slow-frontend	ios	no	apps/mobile	./scripts/maestro-run-lane.sh smoke
+ios-data-smoke	slow-frontend	ios	no	apps/mobile	./scripts/maestro-run-lane.sh data-smoke
+ios-auth-profile	slow-frontend	ios+supabase	no	apps/mobile	./scripts/maestro-run-lane.sh auth-profile
+ios-sync-e2e	slow-frontend	ios+supabase	no	apps/mobile	./scripts/maestro-run-lane.sh sync-e2e
+handles	extra	none	yes	apps/mobile	npm run test:handles
+ios-gates	extra	ios	no	apps/mobile	./scripts/maestro-ios-gates.sh
+jest-sync	extra	none	no	apps/mobile	npm run test:sync

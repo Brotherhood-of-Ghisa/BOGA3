@@ -148,7 +148,7 @@ Repo-level slow gate:
 
 ```bash
 cd ../..
-./scripts/quality-slow.sh frontend
+./boga test frontend   # (repo root; legacy ./scripts/quality-slow.sh frontend forwards here)
 ```
 
 ## Reset rules

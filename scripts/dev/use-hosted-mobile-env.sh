@@ -3,8 +3,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SUPABASE_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
-REPO_ROOT="$(cd "${SUPABASE_DIR}/.." && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+SUPABASE_DIR="${REPO_ROOT}/supabase"
 HOSTED_ENV_FILE="${SUPABASE_DIR}/.env.hosted"
 MOBILE_ENV_FILE="${REPO_ROOT}/apps/mobile/.env.local"
 

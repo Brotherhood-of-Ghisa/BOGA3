@@ -19,10 +19,11 @@
     "db:generate": "drizzle-kit generate --config=drizzle.config.ts && tsx scripts/bundle-migrations.ts",
     "db:generate:canary": "npm run db:generate",
     "check:sync-drift": "tsx scripts/check-sync-schema-drift.ts",
-    "test:e2e:ios:smoke": "./scripts/maestro-ios-smoke.sh",
-    "test:e2e:ios:data-smoke": "./scripts/maestro-ios-data-smoke.sh",
+    "test:e2e:ios:smoke": "./scripts/maestro-run-lane.sh smoke",
+    "test:e2e:ios:data-smoke": "./scripts/maestro-run-lane.sh data-smoke",
     "test:e2e:ios:gates": "./scripts/maestro-ios-gates.sh",
-    "test:e2e:ios:auth-profile": "./scripts/maestro-ios-auth-profile.sh"
+    "test:e2e:ios:auth-profile": "./scripts/maestro-run-lane.sh auth-profile",
+    "test:e2e:ios:sync": "./scripts/maestro-run-lane.sh sync-e2e"
   },
   "dependencies": {
     "@react-native-community/netinfo": "11.4.1",

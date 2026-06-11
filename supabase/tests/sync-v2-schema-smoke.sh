@@ -17,9 +17,9 @@
 #     condeferred=true, and the expected on-delete actions.
 #   - Zero CHECK constraints exist on any of the nine tables.
 #
-# Run via the wrapper at supabase/scripts/test-sync-v2-schema-smoke.sh
-# (which ensures the local runtime is up + baseline applied before this
-# script runs). For local debug, call this script directly after a
+# Run via `./boga test sync-v2-schema` (run-suite.sh ensures the local
+# runtime is up + baseline applied before this script runs). For local
+# debug, call this script directly after a
 # `supabase db reset --local --yes`.
 
 set -euo pipefail

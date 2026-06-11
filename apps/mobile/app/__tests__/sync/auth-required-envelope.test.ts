@@ -31,10 +31,10 @@ import {
 } from '../helpers/in-memory-db';
 import { createBootstrapMockState, createClientMockState } from '../helpers/sync-cycle-mocks';
 import {
-  createAnonBranchClient,
-  readLiveBranchConfig,
-  type AnonBranchClient,
-} from './helpers/live-branch';
+  createAnonTestClient,
+  readSyncTestEndpoint,
+  type AnonTestClient,
+} from './helpers/sync-test-endpoint';
 
 // Local handle: the in-memory database. Server handle: the anon client. Both
 // live on mock-prefixed holders so the hoisted factories can close over them.
@@ -62,19 +62,19 @@ import { runSyncCycle } from '@/src/sync/cycle';
 // Reads the live-endpoint config; throws here (failing the suite) when the env
 // is missing or incomplete, since this suite runs only when an endpoint has
 // been provisioned.
-const config = readLiveBranchConfig();
+const config = readSyncTestEndpoint();
 
 describe('cycle with no JWT (AUTH_REQUIRED is a clean error envelope)', () => {
   let fixture: InMemoryDatabaseFixture;
   let database: InMemoryTestDatabase;
-  let anon: AnonBranchClient;
+  let anon: AnonTestClient;
 
   beforeEach(() => {
     fixture = createInMemoryDatabase();
     database = fixture.database;
     mockBootstrapState.database = database;
 
-    anon = createAnonBranchClient(config);
+    anon = createAnonTestClient(config);
     mockClientState.client = anon.client;
   });
 

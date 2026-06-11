@@ -19,9 +19,8 @@
 #   9. Layer bounds: -1 rejected, 4 rejected, 0..3 each accepted
 #  10. AUTH_REQUIRED (no JWT)
 #
-# Run via the wrapper at supabase/scripts/test-sync-pull-contract.sh (which
-# ensures the shared baseline is up + migrations applied before invoking this
-# script).
+# Run via `./boga test sync-pull-contract` (run-suite.sh ensures the shared
+# baseline is up + migrations applied before invoking this script).
 
 set -euo pipefail
 

@@ -220,10 +220,10 @@ Use the mode that matches where the app is running:
 ./supabase/scripts/local-runtime-up.sh
 
 # Physical device -> local Docker/Colima Supabase over the Mac LAN IP
-./supabase/scripts/use-local-mobile-lan-env.sh
+./scripts/dev/use-local-mobile-lan-env.sh
 
 # Physical device -> hosted Supabase
-./supabase/scripts/use-hosted-mobile-env.sh
+./scripts/dev/use-hosted-mobile-env.sh
 ```
 
 `use-local-mobile-lan-env.sh` auto-detects the Mac LAN IP; override with `BOGA_MOBILE_LAN_HOST=<ip>` if needed.
@@ -310,13 +310,14 @@ TASK_ID=ad-hoc ./scripts/maestro-ios-run-flow.sh --flow .maestro/flows/exercise-
 ### Backend (Supabase)
 
 ```bash
-./supabase/scripts/test-fast.sh
-./supabase/scripts/test-auth-authz.sh
-# sync v2 contract suites (or run all backend slow suites via: ./scripts/quality-slow.sh backend)
-./supabase/scripts/test-sync-v2-schema-smoke.sh
-./supabase/scripts/test-sync-push-contract.sh
-./supabase/scripts/test-sync-pull-contract.sh
-./supabase/scripts/test-sync-v2-e2e.sh
+./boga test backend-fast
+./boga test auth-authz
+# sync v2 contract suites (or run all backend slow suites via: ./boga test backend)
+./boga test sync-v2-schema
+./boga test sync-push-contract
+./boga test sync-pull-contract
+./boga test sync-v2-e2e
+# every lane: ./boga test --list
 ```
 
 ### Logger diagnostics smoke (Docker Supabase)
@@ -324,7 +325,7 @@ TASK_ID=ad-hoc ./scripts/maestro-ios-run-flow.sh --flow .maestro/flows/exercise-
 Use the auth/authz contract suite as the canonical Docker-hosted local Supabase check for `public.app_logs`:
 
 ```bash
-./supabase/scripts/test-auth-authz.sh
+./boga test auth-authz
 ```
 
 Notes:
