@@ -1,8 +1,10 @@
-# Environment & Worktree Setup (Always-Load Quickref)
+# Environment & Worktree Setup (Quickref)
+
+> **Owns:** everyday worktree setup/teardown commands. **Not here:** slot/port/isolation deep contract → `12`; gates → `02`. **Load when:** creating, tearing down, or repairing a worktree environment.
 
 How to take a git worktree from nothing to a working environment, and how to tear
-it down. One of the always-load docs. The full isolation contract — slot model,
-port formulas, every flag — is the conditional deep companion
+it down. Load on demand (worktree lifecycle/repair). The full isolation contract —
+slot model, port formulas, every flag — is the conditional deep companion
 `12-worktree-config-and-isolation.md`. Gates are `02-quality-and-test-gates.md`.
 
 This repo runs multiple agents/humans in parallel via `git worktree`; each worktree

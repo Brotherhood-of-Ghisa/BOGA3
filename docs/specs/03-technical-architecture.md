@@ -1,5 +1,7 @@
 # Technical Architecture Decisions (High-Level)
 
+> **Owns:** top-level technical choices and the decision register. **Not here:** data model → `05`; testing → `02`/`06`. **Load when:** always (always-load).
+
 ## Purpose
 
 Capture top-level architecture decisions for MVP, with clear `Adopted` vs `Planned` status.

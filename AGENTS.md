@@ -45,9 +45,13 @@ place each under `docs/specs/**`, routed from here.
    `SYNC_TEST_SUPABASE_URL`/`SYNC_TEST_SUPABASE_ANON_KEY` themselves. There is
    no remote-only test lane in this repo.
 
+5. **Worktrees:** never nest a BOGA worktree inside another checkout; never
+   share `apps/mobile/node_modules` or an iOS simulator across worktrees. The
+   gates self-bootstrap deps and the stack — lifecycle commands and repair only
+   when needed: `./boga worktree create|setup|doctor|clean|sweep` (spec `01`).
+
 ## Always load (every session)
 
-- `docs/specs/01-worktree-and-environment.md` — set up / tear down a worktree.
 - `docs/specs/02-quality-and-test-gates.md` — the full gate/lane reference.
 - `docs/specs/03-technical-architecture.md` — tech choices, decision register.
 - `docs/specs/09-project-structure.md` — repo layout, path ownership.
@@ -61,11 +65,15 @@ place each under `docs/specs/**`, routed from here.
 | Sync (data model, server schema, push/pull RPC, drift) | `docs/specs/05-data-model.md`, `docs/specs/tech/sync-v2-server-contract.md` |
 | Auth / RLS / backend API | `docs/specs/10-api-authn-authz-guidelines.md`, `supabase/README.md` |
 | Maestro / iOS e2e flows or harness | `docs/specs/11-maestro-runtime-and-testing-conventions.md`, `apps/mobile/README-maestro.md` |
-| Worktree internals / isolation / slot model / cross-worktree bugs | `docs/specs/12-worktree-config-and-isolation.md` (deep contract; everyday setup is in `01`) |
+| Worktree lifecycle (create / tear down / repair) or isolation / slot bugs | `docs/specs/01-worktree-and-environment.md` (everyday), `docs/specs/12-worktree-config-and-isolation.md` (deep contract) |
 | Deep testing strategy / adding or changing a test lane | `docs/specs/06-testing-strategy.md` |
 | Data import (GymBook / JSON) | `apps/mobile/scripts/import/BOGA_IMPORT_JSON_CONTRACT.md` |
 | Human local-dev ops (run/build/debug, logs, reset) | `RUNBOOK.md` |
 | Product/domain context | `docs/specs/00-product.md`, `docs/specs/README.md` (full spec index) |
+
+**Editing tests in a directory ⇒ read that directory's `README.md` first** —
+per-feature coverage policies live next to the tests they govern (e.g.
+`apps/mobile/app/__tests__/sync/README.md`), not in the specs.
 
 Product and domain details are maintained in the specs above — do not duplicate
 them here.

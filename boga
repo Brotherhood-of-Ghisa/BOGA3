@@ -11,6 +11,7 @@
 #   boga test --list                           # what exists, where it runs
 #   boga test <lane> --dry-run                 # print the command, don't run
 #   boga doctor                                # can THIS machine run every lane?
+#   boga docs gen|check                        # (re)generate / drift-check derived doc blocks
 #   boga timings [lane]                        # measured durations (never guess)
 #   boga worktree create|setup|clean|sweep|doctor
 #   boga db up|down|reset|baseline
@@ -115,13 +116,14 @@ cmd_test() {
       printf '%-20s %-15s %-13s %-4s %-12s %s\n' "LANE" "GATE" "INFRA" "CI" "CWD" "COMMAND"
       lanes_rows | awk -F'\t' '{ printf "%-20s %-15s %-13s %-4s %-12s %s\n", $1, $2, $3, $4, $5, $6 }'
       ;;
-    fast)          run_gate "${dry}" fast-frontend fast-backend ;;
+    fast)          run_gate "${dry}" fast-frontend fast-backend fast-repo ;;
     fast-frontend) run_gate "${dry}" fast-frontend ;;
     fast-backend)  run_gate "${dry}" fast-backend ;;
+    fast-repo)     run_gate "${dry}" fast-repo ;;
     backend)       run_gate "${dry}" slow-backend ;;
     frontend)      run_gate "${dry}" slow-frontend ;;
     slow)          run_gate "${dry}" slow-frontend slow-backend ;;
-    all)           run_gate "${dry}" fast-frontend fast-backend slow-frontend slow-backend ;;
+    all)           run_gate "${dry}" fast-frontend fast-backend fast-repo slow-frontend slow-backend ;;
     *)
       local row
       row="$(lane_lookup "${target}")" || fail "unknown lane or gate: '${target}' (see: boga test --list)"
@@ -168,6 +170,13 @@ shift || true
 case "${cmd}" in
   test)     cmd_test "$@" ;;
   doctor)   cmd_doctor ;;
+  docs)
+    sub="${1:-check}"
+    case "${sub}" in
+      gen|check) exec "${REPO_ROOT}/scripts/gen-docs.sh" "${sub}" ;;
+      *) fail "usage: boga docs gen|check" ;;
+    esac
+    ;;
   timings)  dispatch_script "${REPO_ROOT}/scripts/test-timings.sh" "$@" ;;
   worktree)
     sub="${1:-}"; shift || true

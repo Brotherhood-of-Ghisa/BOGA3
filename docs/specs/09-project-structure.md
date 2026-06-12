@@ -1,5 +1,7 @@
 # Project Structure (Current + Conventions)
 
+> **Owns:** repo layout, path ownership, placement conventions. **Not here:** worktree environments → `01`/`12`. **Load when:** always (always-load).
+
 ## Purpose
 
 Define the canonical repository structure, path ownership, and placement conventions so implementation and test assets land in predictable locations.

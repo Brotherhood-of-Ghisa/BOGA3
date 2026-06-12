@@ -1,5 +1,7 @@
 # Maestro Runtime and Testing Conventions (M10 Contract)
 
+> **Owns:** the Maestro iOS runtime/testing contract — reset taxonomy, artifacts, config files, isolation. **Not here:** lane membership → `02`/`scripts/lanes.tsv`; when lanes are required → `06`. **Load when:** Maestro/iOS e2e flow or harness work.
+
 ## Purpose
 
 This document is the authoritative source of truth for the `apps/mobile` Maestro runtime and testing contract.
@@ -37,133 +39,15 @@ Rules:
 2. Secondary runbooks should stay operational and link back here instead of duplicating the full contract.
 3. The brainstorm and old task docs are context only; they are not source-of-truth once this doc exists.
 
-## Implemented runtime toolkit (`2026-03-01`)
+## Current state
 
-- Checked-in config sample:
-  - `apps/mobile/.maestro/maestro.env.sample`
-- Canonical untracked local config:
-  - `apps/mobile/.maestro/maestro.env.local`
-- Shared env helper:
-  - `apps/mobile/scripts/maestro-env.sh`
-- Shared runtime helper:
-  - `apps/mobile/scripts/maestro-ios-runtime.sh`
-- Shared build/reuse entrypoint:
-  - `apps/mobile/scripts/maestro-ios-dev-client-build.sh`
-- Shared lifecycle entrypoints:
-  - `apps/mobile/scripts/maestro-ios-provision.sh`
-  - `apps/mobile/scripts/maestro-ios-launch.sh`
-  - `apps/mobile/scripts/maestro-ios-teardown.sh`
-- Shared scenario runner:
-  - `apps/mobile/scripts/maestro-ios-run-flow.sh`
-- Current implementation note:
-  - the shared env/build contract remains in place;
-  - the smoke/data-smoke runners are now thin wrappers over the shared lifecycle toolkit;
-  - app-side harness-driven data reset and teleport setup are now implemented.
-
-## Verified current-state baseline (`2026-03-01`)
-
-### Current flows
-
-- The two core runtime-smoke flows this toolkit baseline was first verified against are:
-  - `apps/mobile/.maestro/flows/smoke-launch.yaml`
-  - `apps/mobile/.maestro/flows/data-runtime-smoke.yaml`
-- The committed flow set has since grown (login/auth-profile and stats/UX flows that
-  reuse the same toolkit and reset taxonomy); the current set lives in `apps/mobile/.maestro/flows/`.
-- Both flows now commit against the development-client bundle identifier surface instead of `host.exp.Exponent`.
-- The shared scenario runner also rewrites a runtime-local flow copy under the artifact root so the executed `appId` always matches the installed development-client bundle id from the built `.app`.
-- Flow setup now uses the M10 taxonomy instead of tapping through setup screens:
-  - `smoke-launch.yaml` relies on runner-owned `full reset` plus a harness `teleport` to the recorder.
-  - `data-runtime-smoke.yaml` uses a harness `data reset + teleport` to land on the recorder before performing the actual data insert/read assertions.
-- Both flows include optional dismissals for current development-client onboarding/dev-menu overlays so the scenario assertions target the app rather than the shell chrome.
-- Verified against:
-  - `apps/mobile/.maestro/flows/smoke-launch.yaml`
-  - `apps/mobile/.maestro/flows/data-runtime-smoke.yaml`
-
-### Current runner behavior
-
-- The current entrypoints are `npm run test:e2e:ios:smoke` and `npm run test:e2e:ios:data-smoke`, which call
-  `apps/mobile/scripts/maestro-run-lane.sh` (`smoke` / `data-smoke`) — the single
-  parameterized per-lane runner (lane data: flows, reset strategy, Supabase
-  config; canonical lane names live in `scripts/lanes.tsv`, run via `./boga test <lane>`).
-- The lane runner now:
-  - delegate immediately to `apps/mobile/scripts/maestro-ios-run-flow.sh`,
-  - set `MAESTRO_RESET_STRATEGY` before entering the shared runner (`full` for smoke, `data` for data-smoke),
-  - source the per-worktree config from `.maestro/maestro.env.local`,
-  - use the configured `EXPO_DEV_SERVER_PORT`,
-  - resolve a simulator from `IOS_SIM_UDID` or fall back to `IOS_SIM_DEVICE`,
-  - create artifacts under `apps/mobile/artifacts/maestro/<task-id-or-ad-hoc>/<timestamp>/`,
-  - write `runtime.env` before provisioning so downstream lifecycle steps and teardown share one state file,
-  - call `maestro-ios-provision.sh` to ensure the shared development-client build exists, boot the simulator, and install the `.app`,
-  - let `maestro-ios-provision.sh` convert `MAESTRO_RESET_STRATEGY=full` into a simulator uninstall/reinstall cycle before launch,
-  - call `maestro-ios-launch.sh` to start `npx expo start --dev-client --host localhost --scheme <scheme> --port <port>`, wait on Metro `/status`, and open `exp+<scheme>://expo-development-client/?url=http://127.0.0.1:<port>`,
-  - create a runtime-local flow copy with the resolved development-client bundle id,
-  - execute `maestro test`,
-  - call `maestro-ios-teardown.sh` on both success and failure to stop Expo and terminate the app process.
-- Verified against:
-  - `apps/mobile/package.json` (`test:e2e:ios:*` scripts)
-  - `apps/mobile/scripts/maestro-run-lane.sh`
-  - `apps/mobile/scripts/maestro-ios-run-flow.sh`
-  - `apps/mobile/scripts/maestro-ios-provision.sh`
-  - `apps/mobile/scripts/maestro-ios-launch.sh`
-  - `apps/mobile/scripts/maestro-ios-teardown.sh`
-
-### Current simulator helper behavior
-
-- `apps/mobile/scripts/ios-sim-boot.sh` resolves a simulator by `IOS_SIM_UDID` or `IOS_SIM_DEVICE`, boots it, waits for boot readiness, and echoes the resolved UDID.
-- When `IOS_SIM_AUTO_CREATE=1` and no simulator matching `IOS_SIM_DEVICE` exists, it creates a dedicated simulator using the newest available iOS runtime and a preferred iPhone simulator type, logging a loud `[maestro] sim "<name>" not found — creating (deviceType=…, runtime=…)` line before it does so.
-- `IOS_SIM_AUTO_CREATE` now defaults to `1` everywhere — both the `maestro-env.sh` fallback and `.maestro/maestro.env.sample`. The sample is sourced before `maestro.env.local`, so a `0` in the sample would have pinned the variable and silently suppressed a worktree's intended `1`; keeping both at `1` makes the smoke gate self-heal a missing slot-named simulator with no manual step.
-- App installation and runtime-state emission now live in `maestro-ios-provision.sh`, which wraps the helper instead of expanding `ios-sim-boot.sh` itself.
-- Verified against:
-  - `apps/mobile/scripts/ios-sim-boot.sh`
-  - `apps/mobile/scripts/maestro-ios-provision.sh`
-
-### Current worktree-isolation behavior
-
-- Runtime isolation now comes from explicit per-worktree config instead of a shared host lock.
-- Each workspace sets its own `EXPO_DEV_SERVER_PORT` and simulator target in `apps/mobile/.maestro/maestro.env.local`.
-- Worktree setup generates `EXPO_DEV_SERVER_PORT` from the BOGA worktree slot and defaults `IOS_SIM_DEVICE` to a slot-named simulator with `IOS_SIM_AUTO_CREATE=1`.
-- `IOS_SIM_UDID` is preferred for shared-host use because simulator names can collide across cloned devices.
-- If two worktrees are configured with the same simulator or Metro port, they can still interfere with each other; the scripts no longer arbitrate that automatically.
-
-### Current app/build assumptions
-
-- `apps/mobile/app.config.ts` defines `scheme: "boga3"`, which gives M10 a usable app/deep-link scheme baseline.
-- `apps/mobile/eas.json` already defines a `development` build profile with `developmentClient: true`.
-- `apps/mobile/app/maestro-harness.tsx` is the hidden route used for app-owned data reset and screen teleportation.
-- `apps/mobile/src/maestro/harness.ts` owns the guard, param parsing, and route resolution logic for that hidden route.
-- Verified against:
-  - `apps/mobile/app.config.ts`
-  - `apps/mobile/eas.json`
-  - `apps/mobile/app/maestro-harness.tsx`
-  - `apps/mobile/src/maestro/harness.ts`
-
-### Current artifact/log shape
-
-- Current smoke/data-smoke runners now create:
-  - `apps/mobile/artifacts/maestro/<task-id-or-ad-hoc>/<timestamp>/`
-  - `runtime.env`
-  - `provision.log`
-  - `launch.log`
-  - `teardown.log`
-  - `maestro-output/`
-  - `maestro-debug/`
-  - `expo-start.log`
-  - `simulator-system.log`
-  - `maestro-junit.xml`
-- Verified against:
-  - `apps/mobile/scripts/maestro-ios-run-flow.sh`
-  - successful runtime artifacts under `apps/mobile/artifacts/maestro/ad-hoc/20260301-191439-59787/`
-  - successful runtime artifacts under `apps/mobile/artifacts/maestro/ad-hoc/20260301-191537-60914/`
-
-### Current documentation status
-
-- `apps/mobile/README-maestro.md` and `apps/mobile/README_HUMAN_TESTING.md` are operational runbooks and no longer hardcode stale workspace paths.
-- The full Maestro runtime/testing contract remains authoritative in this document; secondary runbooks should continue linking here instead of duplicating the full policy.
-- Cross-component local operator instructions live in the repo-root `RUNBOOK.md`.
-- Verified against:
-  - `apps/mobile/README-maestro.md`
-  - `apps/mobile/README_HUMAN_TESTING.md`
-  - `RUNBOOK.md`
+The locked contract below **is** the current state — the runtime toolkit
+(`apps/mobile/scripts/maestro-*`), the per-lane runner (`maestro-run-lane.sh`),
+and the committed flows under `apps/mobile/.maestro/flows/` implement it. For
+what each script does, read the scripts (`apps/mobile/scripts/README.md` is the
+index); for lane membership and commands, `scripts/lanes.tsv` / `./boga test
+--list`. Dated "verified current-state" snapshots were removed from this doc:
+they duplicated the scripts and went stale — the scripts win.
 
 ## Locked M10 target contract
 
@@ -470,29 +354,3 @@ Notes:
 - `EXPO_NO_DOTENV` / exporting empty `EXPO_PUBLIC_*` do **not** work here: in dev
   Expo loads `.env.local` over the process env, so the file is the only reliable
   lever — hence materializing the file rather than injecting env.
-
-## Brainstorm adoption summary
-
-Adopted from `docs/brainstorms/Maestro-Revamp`:
-
-- shared host-local development-client artifact
-- provision / launch / teardown toolkit split
-- runtime state file for downstream scripts
-- synthetic authoritative documentation
-- `full reset` / `data reset` / `teleport` style setup taxonomy
-
-Adjusted to fit the current codebase:
-
-- rely on explicit per-worktree simulator/port config instead of host-level arbitration
-- keep `apps/mobile/artifacts/maestro/...` as the canonical artifact root
-- preserve existing runner command names and make them thin wrappers instead of replacing them
-- keep currently implemented env names where they already exist rather than renaming the whole surface
-
-Deferred to later M10 tasks:
-
-- exact dev-client build invalidation logic
-- exact simulator creation naming convention
-
-## M10 closeout note
-
-When M10 closes, move implementation history and milestone-specific cleanup notes out of this document and into milestone closure notes or another non-authoritative historical record. This document should remain the stable runtime/testing contract after the migration is complete.

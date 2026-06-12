@@ -10,7 +10,6 @@ Brief entrypoint inventory of the current reusable UI component set.
 ## Sources
 
 - UI docs index: `docs/specs/ui/README.md`
-- UI pattern audit (candidate rationale): `docs/specs/ui/ui-pattern-audit.md`
 - UX rules/semantics: `docs/specs/ui/ux-rules.md`
 
 ## Canonical locations (current)
@@ -142,7 +141,7 @@ Audit-approved candidates that are not yet implemented/finalized:
 - `PressableRowCard`
 - `IconActionButton`
 
-Reference: `docs/specs/ui/ui-pattern-audit.md`
+Reference: the M8 UI pattern audit (deleted 2026-06-10; in git history)
 
 ## Refactor convergence notes (Task `T-20260226-06`)
 

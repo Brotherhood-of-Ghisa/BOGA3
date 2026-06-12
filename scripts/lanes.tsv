@@ -6,7 +6,7 @@
 # this file in the same change.
 #
 # Columns (tab-separated): name	gate	infra	ci	cwd	command
-#   gate:  fast-frontend | fast-backend | slow-backend | slow-frontend | extra
+#   gate:  fast-frontend | fast-backend | fast-repo | slow-backend | slow-frontend | extra
 #          (extra = not part of any gate aggregate; run by name)
 #   infra: none | supabase | ios | ios+supabase
 #   ci:    yes | no   (whether .github/workflows/ci.yml runs it)
@@ -15,6 +15,7 @@
 lint	fast-frontend	none	yes	apps/mobile	npm run lint
 typecheck	fast-frontend	none	yes	apps/mobile	npm run typecheck
 jest-full	fast-frontend	none	yes	apps/mobile	npm test
+docs-check	fast-repo	none	yes	.	./scripts/gen-docs.sh check
 backend-fast	fast-backend	supabase	no	.	./supabase/scripts/run-suite.sh --no-baseline local-runtime-smoke.sh
 auth-authz	slow-backend	supabase	no	.	./supabase/scripts/run-suite.sh auth-authz-contract.sh
 sync-v2-schema	slow-backend	supabase	no	.	./supabase/scripts/run-suite.sh sync-v2-schema-smoke.sh

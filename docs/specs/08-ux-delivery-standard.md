@@ -1,5 +1,7 @@
 # UX Delivery Standard (v0)
 
+> **Owns:** the UX delivery process, iteration loop, and evidence standard. **Not here:** concrete UI rules and inventories → `docs/specs/ui/`. **Load when:** any UI work.
+
 ## Purpose
 
 Define a repeatable, lightweight process for specifying and iterating on UX quality and visual appearance for MVP UI work.

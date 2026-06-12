@@ -10,9 +10,8 @@ Brief entrypoint map of the current mobile screens.
 
 ## Sources
 
-- `docs/specs/ui/repo-discovery-baseline.md`
-- `docs/specs/ui/ui-pattern-audit.md`
 - `docs/specs/ui/navigation-contract.md`
+- Route files under `apps/mobile/app/**`
 
 ## User-facing route map (current)
 

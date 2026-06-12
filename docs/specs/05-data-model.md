@@ -1,5 +1,7 @@
 # Data Model (Authoritative)
 
+> **Owns:** the canonical data model, entity boundaries, sync scope, ownership invariants. **Not here:** the server wire contract → `tech/sync-v2-server-contract.md`. **Load when:** schema, migration, or sync-scope work.
+
 ## Purpose
 
 Define the canonical data model boundaries for local mobile storage, backend persistence, ownership, and sync scope.

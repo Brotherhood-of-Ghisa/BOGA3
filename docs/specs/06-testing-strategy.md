@@ -1,5 +1,7 @@
 # Testing Strategy (Deep Companion)
 
+> **Owns:** testing strategy, the per-entry-point catalog (purpose/infra/when), cross-cutting test policies. **Not here:** gate ladder + lane matrix → `02`; Maestro runtime contract → `11`; per-feature coverage policies → the README of the test directory they govern. **Load when:** adding or changing a test lane, or doing deep test-strategy work.
+
 ## Purpose
 
 Define the testing stack, the per-entry-point catalog (what each script verifies,
@@ -239,128 +241,18 @@ Metro and is owned operationally by
   must close it in `afterEach`, mirroring the in-memory-db helper — even bespoke
   fixtures like `clock.test.ts`.
 
-## Sync integration coverage policy
+## Per-feature coverage policies (colocated with the tests)
 
-- Applies to mobile/frontend-backend sync work under `apps/mobile/**` sync code,
-  `apps/mobile/app/__tests__/sync/**`, and the backend sync RPCs in `supabase/**`.
-- Required coverage should include the relevant subset of:
-  - first-enable bootstrap pull + local merge + convergence flush,
-  - the full sync cycle converging local and server state over a real
-    push → server-side LWW → pull → local LWW loop,
-  - per-layer cursor protocol (snapshot pull, paginated drain, layer→type
-    partition, tombstones, empty-page echo, same-ms tiebreak, limit/layer bounds),
-  - dirty-bit ordering and idempotency behavior (v2 has no outbox),
-  - already-logged-in journey and logged-out-then-login journey both converging,
-  - auth missing/expired (AUTH_REQUIRED): unauthenticated cycle is a clean no-op,
-    no mutation, dirty bits preserved,
-  - offline / backend-unavailable retry/recovery with the locked backoff policy,
-  - local FK enforcement for pull/apply and repository writes; pull-side local FK
-    apply failures must be classified as `LOCAL_FK_VIOLATION`, must roll back the
-    failed page without advancing that layer cursor, and must log sanitized
-    diagnostics without masking the original cycle outcome,
-  - push-side FK closure preflight: orphan dirty children must be detected before
-    `sync_push`, valid parent/child graphs must not be falsely blocked, and a
-    present-but-quarantined parent must cascade to its child,
-  - sync quarantine: a FK-blocked dirty row must persist to `sync_quarantine`,
-    be excluded from future push selection, survive database reopen, be
-    idempotently updated on repeat detection, and allow independent valid dirty
-    rows beside it to push and clear,
-  - sync-cycle result semantics: `runSyncCycle` outcomes (`converged`,
-    `auth-required`, `fk-violation`, `internal`) must be distinguished; the
-    scheduler advances `lastSuccessAtMs` only for `converged`, and
-    non-converged outcomes stay visible until a later converged cycle clears
-    them,
-  - response contract semantics and RLS cross-owner isolation,
-  - projection/read-model correctness after ingest/replay,
-  - wiped-client reinstall re-pull restoring every layer with FK integrity and
-    advancing cursors.
-- Use mocks/fakes for broad scenario coverage in the fast lane, then prove at
-  least one real cross-stack path:
-  - mobile side: `npm run test:sync:infra` (real round trip, AUTH_REQUIRED no-op,
-    drift check) against a live endpoint;
-  - backend side: `./boga test backend` (auth/RLS + schema smoke +
-    push + pull + dev-wipe + drift + e2e + sync-infra). The push→pull parity /
-    reinstall guarantee is proven
-    by `sync-v2-push-roundtrip.sh` and `sync-v2-pull-drain.sh` inside the e2e
-    wrapper.
-- **The device-level proof is its own requirement and is NOT satisfied by the
-  above:** `npm run test:e2e:ios:sync` (real recorder UI + real cycle + real
-  local Supabase) is mandatory for changes to the sync cycle, scheduler, sync
-  triggers, auth session handoff, or the first-sync gate. `test:sync:infra` is
-  the breadth lane (LWW, multi-device, drift) — it bypasses the UI, NetInfo, and
-  the scheduler wiring, so a green run there is not evidence for those layers.
-- Current frontend baseline suites for this policy (Sync v2) include the
-  `apps/mobile/app/__tests__/sync-cycle-*.test.ts` family
-  (`-convergence`, `-pull`, `-push`, `-race`, `-wire`),
-  `sync-cycle-push-preflight.test.ts`, `sync-cycle-quarantine.test.ts`,
-  `sync-bootstrapper.test.ts`, `sync-status-composer.test.ts`,
-  `sync-gate-decision.test.ts`, `settings-profile-navigation.test.tsx`, and the
-  `app/__tests__/sync/**` directory (cycle-round-trip, cycle-multidevice-lww,
-  drift-check,
-  auth-required-envelope, dirty-bit-per-entity, scheduler-state-table,
-  topo-order-imported, now-monotonic-cross-restart,
-  manual-wipe-doc-exists).
+Per-feature coverage policies live in the README of the test directory they
+govern — read them when editing tests there (rule in `AGENTS.md`):
 
-## GPS gym-location coverage policy
+- `apps/mobile/app/__tests__/sync/README.md` — sync integration coverage policy
+  (cycle, cursors, dirty bits, quarantine, AUTH_REQUIRED, reinstall re-pull, and
+  the UI↔server e2e requirement).
+- `apps/mobile/app/__tests__/README.md` — GPS gym-location, exercise-tag, auth
+  bootstrap, and profile-management coverage policies.
 
-- Applies to foreground location service and gym-coordinate matching work.
-- Required coverage should include:
-  - foreground permission/service normalization (granted, denied, unavailable,
-    timeout, read failure, unexpected native error, successful read),
-  - pure matcher assertions (Haversine distance; missing/invalid/archived/deleted
-    coordinate rejection; low-accuracy rejection; no-match; ambiguous tie),
-  - no background permission APIs, background tasks, geofencing, or continuous
-    background updates for these GPS flows,
-  - GPS gym-coordinate sync coverage for `gyms`: local + backend range/shape
-    validation, coordinate-bearing upsert payloads, bootstrap fetch/merge/
-    convergence, and reinstall restore parity.
-- Use deterministic Jest coverage for service wrappers and matching logic. Add
-  simulator/manual or Maestro evidence when UI permission flows are introduced or
-  native permission behavior is being validated.
-
-## Exercise-tag coverage policy
-
-- Applies to exercise-tag schema/repository/UI work in the mobile local runtime.
-- Required coverage should include:
-  - schema/migration assertions for `exercise_tag_definitions`,
-    `session_exercise_tags`, and durable
-    `session_exercises.exercise_definition_id` linkage,
-  - repository/domain assertions for normalized duplicate prevention, scoped
-    attach validation, and assignment uniqueness,
-  - assignment-history semantics (soft-deleted tag definitions hidden from default
-    suggestions but existing assignments remain queryable),
-  - recorder interaction assertions (add/select/create/manage rename/delete/
-    undelete, chip removal) and completed-edit parity.
-- Use targeted Jest coverage; require `./boga test frontend` when
-  runtime-sensitive recorder tag behavior changes.
-
-## Mobile auth bootstrap coverage policy
-
-- Applies to mobile auth/session-foundation work under `apps/mobile/src/auth/**`
-  and root wiring.
-- Required coverage should include: launch with no stored session; launch with a
-  stored session; session-restore failure falling back to a safe logged-out state
-  with inline error; explicit sign-out / session-clear; missing auth config /
-  auth-disabled bootstrap path.
-- Prefer deterministic Jest coverage, then add real local-Supabase + Maestro proof
-  via `test:e2e:ios:auth-profile` once the user-facing flow exists.
-- Rule: auth bootstrap must remain non-blocking for local-only tracker routes
-  while logged out or when auth config is missing.
-
-## Mobile profile-management coverage policy
-
-- Applies to authenticated profile UI/data work under `apps/mobile/src/auth/**`
-  and the profile route.
-- Required coverage should include: sign-in success + invalid-credentials/
-  validation feedback; profile load when a row exists; lazy profile provisioning
-  when `user_profiles` is missing; idempotent provisioning under concurrent
-  first-write races; username save success + inline failure; email update
-  validation + success vs pending-confirmation; password update success/failure
-  with field clearing; backend-unavailable/profile-fetch failure staying inline
-  without signing the user out.
-- Prefer deterministic Jest coverage for the service wrappers and profile-route
-  state transitions, then add local-Supabase + Maestro proof for the full happy
-  path with deterministic fixture credentials.
+This document keeps only the cross-cutting policies below.
 
 ## iOS UI smoke policy (Maestro)
 

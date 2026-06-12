@@ -4,11 +4,12 @@ This folder is the source of truth for product and technical decisions.
 
 ## File map
 
-The four always-load docs (per `AGENTS.md`) are marked **[always-load]**; the
-rest load on demand per the `AGENTS.md` routing table.
+The three always-load docs (per `AGENTS.md`) are marked **[always-load]**; the
+rest load on demand per the `AGENTS.md` routing table. (Spec numbering has
+gaps — `04`, `07` — from retired docs; gaps are intentional, do not renumber.)
 
 - `docs/specs/00-product.md`: Product overview.
-- `docs/specs/01-worktree-and-environment.md`: **[always-load]** Set up / tear down a worktree environment (quickref; `12` is the deep contract).
+- `docs/specs/01-worktree-and-environment.md`: Set up / tear down a worktree environment (quickref; `12` is the deep contract).
 - `docs/specs/02-quality-and-test-gates.md`: **[always-load]** Quality/test gate ladder, what's mandatory, and how to run each lane (quickref; `06` is the deep companion).
 - `docs/specs/03-technical-architecture.md`: **[always-load]** Top-level architecture decisions and rationale.
 - `docs/specs/05-data-model.md`: Canonical data model boundaries, sync scope, and ownership invariants.

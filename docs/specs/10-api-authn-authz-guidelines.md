@@ -1,5 +1,7 @@
 # API AuthN/AuthZ Guidelines (M5 Baseline)
 
+> **Owns:** authN/authZ and API development/consumption rules. **Not here:** backend local-dev runbook → `supabase/README.md`; sync RPC contract → `tech/sync-v2-server-contract.md`. **Load when:** auth, RLS, or backend API work.
+
 ## Purpose
 
 Minimal authN/authZ context every agent must know before:

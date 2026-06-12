@@ -10,8 +10,6 @@ Document app-specific UI semantics and guardrails for the current mobile app.
 ## Sources
 
 - UI docs index: `docs/specs/ui/README.md`
-- Repo discovery baseline: `docs/specs/ui/repo-discovery-baseline.md`
-- UI pattern audit (evidence): `docs/specs/ui/ui-pattern-audit.md`
 - Screen map: `docs/specs/ui/screen-map.md`
 - Navigation contract: `docs/specs/ui/navigation-contract.md`
 - Components catalog: `docs/specs/ui/components-catalog.md`
