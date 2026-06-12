@@ -50,7 +50,8 @@ with open(os.path.join(root, "scripts/lanes.tsv")) as f:
         lanes.append(parts)
 lane_names = {l[0] for l in lanes}
 GATE_ALIASES = {"fast", "backend", "frontend", "slow", "all",
-                "fast-frontend", "fast-backend", "fast-repo"}
+                "fast-frontend", "fast-backend", "fast-repo",
+                "for"}  # `boga test for` — the trigger-matcher subcommand
 
 # ---------- measured medians (all machines, green runs) ----------
 def load_medians():
@@ -142,8 +143,20 @@ else:
             print("[gen-docs] regenerated lane matrix in docs/specs/02-quality-and-test-gates.md")
         else:
             print("[gen-docs] lane matrix already current")
-    elif new != src:
-        problems.append("02-quality-and-test-gates.md: lane matrix is STALE — run ./boga docs gen")
+    else:
+        # Staleness ignores the median column: timing records land on every
+        # gate run and shift medians constantly — that must not fail the
+        # check. Structural drift (lanes, gates, CI flags) still fails; `gen`
+        # refreshes medians opportunistically.
+        def normalize(text):
+            out = []
+            for line in text.splitlines():
+                if line.startswith("|") and line.count("|") >= 5:
+                    line = line.rsplit("|", 2)[0] + "|"
+                out.append(line)
+            return "\n".join(out)
+        if normalize(new) != normalize(src):
+            problems.append("02-quality-and-test-gates.md: lane matrix is STALE — run ./boga docs gen")
 
 # ---------- check-only validations ----------
 CURATED = []

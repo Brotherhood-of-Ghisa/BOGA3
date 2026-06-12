@@ -29,6 +29,26 @@ jobs:
         working-directory: ${{ github.workspace }}
         timeout-minutes: 2
 
+      # Meta-tooling self-tests (`meta-tests` lane): gen-docs / test-for /
+      # pr-check against fixtures. Infra-free.
+      - name: Meta tests
+        run: ./scripts/tests/run-meta-tests.sh
+        working-directory: ${{ github.workspace }}
+        timeout-minutes: 2
+
+      # PR Tests-table check: the body's gate table is filled, every ⛔ has a
+      # reason, and gates the changed paths REQUIRE (scripts/triggers.tsv) are
+      # not marked N/A (warn-only for now; structural violations fail). Skips
+      # the trigger cross-check gracefully if the base isn't fetchable.
+      - name: PR Tests-table check
+        if: github.event_name == 'pull_request'
+        working-directory: ${{ github.workspace }}
+        run: |
+          git fetch origin "${{ github.base_ref }}" --depth=200 || true
+          python3 -c "import json,os;print(json.load(open(os.environ['GITHUB_EVENT_PATH']))['pull_request'].get('body') or '')" > /tmp/pr-body.md
+          ./scripts/pr-check.sh --body /tmp/pr-body.md --diff "origin/${{ github.base_ref }}...HEAD"
+        timeout-minutes: 2
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
