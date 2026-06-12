@@ -20,26 +20,26 @@ day of #196).
 
 Ideas, in rough order of value:
 
-1. **Colocate per-feature coverage policies with the code they govern** — e.g.
-   move `06`'s "Sync integration coverage policy" to
-   `apps/mobile/app/__tests__/sync/README.md`, GPS policy next to the location
-   code, etc. Agents editing a directory see its README; a policy two specs away
-   is invisible. `06` keeps strategy + the entry-point catalog only.
-2. **Generate the lane matrix from the lane registry.** The registry now
-   exists (`scripts/lanes.tsv`, consumed by `./boga`); what remains is
-   generating/drift-checking `02`'s matrix table from it so the doc cannot
-   drift from reality.
-3. ~~A dispatcher over the ~60 scripts~~ — **LANDED** as `./boga` +
-   `scripts/lanes.tsv` (2026-06-10): `boga test --list`, `boga doctor`,
-   per-lane runs with automatic timing records. Still open from this idea:
-   `boga test for <changed-path>` (path-trigger mapping).
+1. ~~Colocate per-feature coverage policies~~ — **LANDED** in PR #198: policies
+   live in `apps/mobile/app/__tests__/README.md` + `__tests__/sync/README.md`;
+   AGENTS.md carries the "read the test dir's README" rule.
+2. ~~Generate the lane matrix from the lane registry~~ — **LANDED** in PR #198:
+   `./boga docs gen|check`, `docs-check` lane in the fast gate + CI.
+3. ~~Dispatcher / path-trigger mapping~~ — **LANDED**: `./boga` +
+   `scripts/lanes.tsv` (2026-06-10), and `boga test for` over
+   `scripts/triggers.tsv` (2026-06-12).
 
-Open questions: who regenerates the matrix (pre-commit? CI check?); whether
-colocated READMEs need a loading rule in AGENTS.md ("read the README of any
-test directory you touch"); how `11`'s runtime contract splits from runbook
-content.
+Still open from E: generating `ui/screen-map.md`'s route inventory from the
+expo-router file tree (markers-only, like the lane matrix); generating the
+human trigger tables in AGENTS.md/spec 02 from `triggers.tsv`.
 
-## F — Mechanical PR Tests-table enforcement
+## F — Mechanical PR Tests-table enforcement — **LANDED 2026-06-12** (except 3)
+
+`./boga pr check` (scripts/pr-check.sh): structural validation (table present,
+no ⬜, every ⛔ has a reason) fails CI; trigger cross-check ("this gate is ⛔
+but your paths require it, per rule X") warns by default, `--strict` to fail.
+CI runs it on every PR from the event payload. Item 3 below (measured-duration
+in Result cells, cross-checked against timing ceilings) remains open.
 
 Problem: the PR template's gate table is honest *when filled*, but wrong ⛔ N/A
 reasons were never machine-checked (e.g. #171 declared the backend lane N/A on a

@@ -1,0 +1,13 @@
+{
+  "lane": "meta-tests",
+  "wall_ms": 1487,
+  "exit_code": 0,
+  "recorded_at": "20260612T054443Z",
+  "machine_id": "06e922bb",
+  "hw": "x86_64",
+  "cores": 4,
+  "os": "Ubuntu 24.04.4 LTS",
+  "slot": "na",
+  "commit": "bbcd200",
+  "source": "gate"
+}

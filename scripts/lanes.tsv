@@ -16,6 +16,7 @@ lint	fast-frontend	none	yes	apps/mobile	npm run lint
 typecheck	fast-frontend	none	yes	apps/mobile	npm run typecheck
 jest-full	fast-frontend	none	yes	apps/mobile	npm test
 docs-check	fast-repo	none	yes	.	./scripts/gen-docs.sh check
+meta-tests	fast-repo	none	yes	.	./scripts/tests/run-meta-tests.sh
 backend-fast	fast-backend	supabase	no	.	./supabase/scripts/run-suite.sh --no-baseline local-runtime-smoke.sh
 auth-authz	slow-backend	supabase	no	.	./supabase/scripts/run-suite.sh auth-authz-contract.sh
 sync-v2-schema	slow-backend	supabase	no	.	./supabase/scripts/run-suite.sh sync-v2-schema-smoke.sh

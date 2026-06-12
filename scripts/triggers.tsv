@@ -1,0 +1,42 @@
+# BOGA path-trigger registry — machine-readable form of "which gate for what
+# you changed" (the human tables live in AGENTS.md and
+# docs/specs/02-quality-and-test-gates.md; keep all three in sync in the same
+# change — docs-check validates that the lanes cited here exist).
+#
+# Consumed by `./boga test for [--diff <range>] [paths...]` and `./boga pr check`.
+#
+# Columns (tab-separated): pattern	requires	rule
+#   pattern:  glob over repo-relative paths. `**` matches across `/`,
+#             `*` matches within one path segment.
+#   requires: comma-separated gate aliases (fast|backend|frontend) and/or lane
+#             names from scripts/lanes.tsv.
+#   rule:     short human name — this is what a ⛔ N/A justification cites.
+#   A changed path may match many rows; the requirement is the UNION.
+apps/mobile/app/**	fast,frontend	UI screens / routes
+apps/mobile/components/**	fast,frontend	UI components
+apps/mobile/app/__tests__/sync/**	fast,backend	sync tests (sync-infra lane covers them)
+apps/mobile/src/sync/**	fast,backend,ios-sync-e2e	sync runtime
+apps/mobile/src/auth/**	fast,backend,ios-sync-e2e	auth / session wiring
+apps/mobile/src/data/**	fast,backend	data layer / client schema
+apps/mobile/drizzle/**	fast,backend	migration artifacts
+apps/mobile/src/**	fast	mobile TS/JS logic
+apps/mobile/*.json	fast	mobile config (native dep change ⇒ also rebuild dev client + frontend, see spec 02)
+apps/mobile/*.ts	fast	mobile config
+apps/mobile/scripts/maestro*	frontend	Maestro runtime / lane scripts
+apps/mobile/.maestro/**	frontend	Maestro flows / config
+supabase/migrations/**	backend	server schema / RLS / RPCs
+supabase/functions/**	backend	edge functions
+supabase/tests/**	backend	backend test bodies
+supabase/scripts/**	backend	backend wrappers / runtime scripts
+boga	docs-check,meta-tests	boga dispatcher
+scripts/lanes.tsv	docs-check	lane registry (regenerate the matrix: ./boga docs gen)
+scripts/triggers.tsv	docs-check,meta-tests	trigger registry
+scripts/gen-docs.sh	docs-check,meta-tests	docs generator/checker
+scripts/test-for.sh	meta-tests	trigger matcher
+scripts/pr-check.sh	meta-tests	PR Tests-table checker
+scripts/tests/**	meta-tests	meta-tooling tests
+.github/workflows/**	docs-check	CI definition (update spec 02 CI posture)
+.github/pull_request_template.md	docs-check,meta-tests	PR template (pr-check parses it)
+AGENTS.md	docs-check	agent entrypoint
+docs/**	docs-check	curated docs
+*.md	docs-check	markdown anywhere

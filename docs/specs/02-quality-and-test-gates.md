@@ -87,6 +87,7 @@ get from `./boga timings` or a run.
 | typecheck | `./boga test typecheck` | `boga test fast` (frontend half) | ✅ | ~2.5s |
 | jest-full | `./boga test jest-full` | `boga test fast` (frontend half) | ✅ | ~4.6s |
 | docs-check | `./boga test docs-check` | `boga test fast` (repo half) | ✅ | N/A |
+| meta-tests | `./boga test meta-tests` | `boga test fast` (repo half) | ✅ | ~1.5s |
 | handles | `./boga test handles` | — (run by name) | ✅ | ~20s |
 | jest-sync | `./boga test jest-sync` | — (run by name) | ❌ | ~3.6s |
 | *Infra: local Supabase + Docker — CI-able, local-only today* | | | | |
@@ -127,6 +128,12 @@ Two traps this table exists to kill:
 
 ## Which gate for what you changed
 
+Machine-readable form: `scripts/triggers.tsv`, queried with
+`./boga test for [--diff <range>] [paths…]` — it prints the required gates AND
+the trigger rule demanding each, which is exactly what a ⛔ N/A in the PR
+Tests table must cite. `./boga pr check` enforces this on PR bodies (CI runs
+it on every PR). The table below is the human summary; keep both in sync.
+
 | You changed… | Run |
 | --- | --- |
 | Any `apps/mobile` TS/JS logic | `./boga test fast` |
@@ -160,7 +167,8 @@ your area (table above) before the PR.
 
 Update this doc — **including the lane matrix above** — in the same change
 whenever you alter a gate or lane: `scripts/lanes.tsv` (the registry `./boga`
-runs from), `supabase/scripts/run-suite.sh` / `test-*.sh`,
+runs from), `scripts/triggers.tsv` (the path-trigger registry behind
+`boga test for` / `boga pr check`), `supabase/scripts/run-suite.sh` / `test-*.sh`,
 `apps/mobile/scripts/maestro-run-lane.sh`, an `apps/mobile/package.json`
 `test*`/`lint`/`typecheck` script, or `.github/workflows/ci.yml`. If a fact here
 ever disagrees with `scripts/lanes.tsv` or the scripts, the registry/scripts

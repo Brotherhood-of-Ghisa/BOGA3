@@ -10,7 +10,9 @@ Link CI runs / artifacts / prior threads — do not paste them.
 ## Tests
 
 <!-- List EVERY gate lane (docs/specs/02-quality-and-test-gates.md). Mark ✅ ran / ⛔ N/A.
-     Add an evidence link for greens and a one-line reason for each ⛔. "CI green" alone is not enough. -->
+     Add an evidence link for greens and a one-line reason for each ⛔. "CI green" alone is not enough.
+     `./boga test for` prints what your diff requires (cite its rule in any ⛔);
+     `./boga pr check --body <draft>` validates this table — CI runs the same check. -->
 
 | Gate | Ran? | Result |
 | --- | --- | --- |

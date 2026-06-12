@@ -107,6 +107,13 @@ legacy `./scripts/quality-fast.sh` / `./scripts/quality-slow.sh` forward here.
 > codebase areas/paths in the policies below; the always-load quickref
 > (`02-quality-and-test-gates.md`) states what is mandatory.
 
+## Repo meta lanes (`./boga test <lane>`, repo root, infra-free)
+
+| Lane | Purpose | When to run |
+|---|---|---|
+| `docs-check` | `gen-docs.sh check`: generated doc blocks current (lane matrix; median column exempt from staleness), lane-name citations valid, relative `.md` links resolve, spec ownership headers present. | Any docs/registry/CI-definition change. Part of `boga test fast` and CI. |
+| `meta-tests` | `scripts/tests/run-meta-tests.sh`: fixture-based self-tests for `gen-docs.sh`, `test-for.sh` (trigger matcher), and `pr-check.sh` (PR Tests-table checker). | Any change to the meta-tooling under `scripts/`. Part of `boga test fast` and CI. |
+
 ## Backend lanes (`./boga test <lane>`; bodies under `supabase/tests/`)
 
 Most backend lanes run through `supabase/scripts/run-suite.sh`, which calls

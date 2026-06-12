@@ -94,4 +94,6 @@ Keep PR bodies lean and data-driven — follow `.github/pull_request_template.md
 pointers, not prose (~25 lines; link, don't quote). The **Tests** section must list
 every gate lane from `docs/specs/02-quality-and-test-gates.md` with ✅ ran / ⛔ N/A
 and a result + evidence link for each — "CI green" alone is not enough, and every
-⛔ must cite the path-trigger rule it relies on (table above / spec `02`).
+⛔ must cite the path-trigger rule it relies on. Get the rules from
+`./boga test for` (it prints what your diff requires and why); validate the body
+with `./boga pr check --body <file>` before opening — CI runs the same check.

@@ -10,6 +10,8 @@
 #   boga test <lane>                           # one lane by registry name
 #   boga test --list                           # what exists, where it runs
 #   boga test <lane> --dry-run                 # print the command, don't run
+#   boga test for [--diff <range>] [paths...]  # which gates does a change require?
+#   boga pr check --body <file|->              # validate a PR body's Tests table
 #   boga doctor                                # can THIS machine run every lane?
 #   boga docs gen|check                        # (re)generate / drift-check derived doc blocks
 #   boga timings [lane]                        # measured durations (never guess)
@@ -98,6 +100,11 @@ run_gate() {
 }
 
 cmd_test() {
+  # `boga test for ...` → the trigger matcher (scripts/triggers.tsv)
+  if [[ "${1:-}" == "for" ]]; then
+    shift
+    exec "${REPO_ROOT}/scripts/test-for.sh" "$@"
+  fi
   local target="" dry=0
   for arg in "$@"; do
     case "${arg}" in
@@ -106,7 +113,7 @@ cmd_test() {
       *) target="${arg}" ;;
     esac
   done
-  [[ -n "${target}" ]] || fail "usage: boga test <gate|lane|--list> [--dry-run]"
+  [[ -n "${target}" ]] || fail "usage: boga test <gate|lane|--list|for> [--dry-run]"
 
   case "${target}" in
     --list)
@@ -170,6 +177,13 @@ shift || true
 case "${cmd}" in
   test)     cmd_test "$@" ;;
   doctor)   cmd_doctor ;;
+  pr)
+    sub="${1:-}"; shift || true
+    case "${sub}" in
+      check) exec "${REPO_ROOT}/scripts/pr-check.sh" "$@" ;;
+      *) fail "usage: boga pr check --body <file|-> [--diff <range>] [--strict]" ;;
+    esac
+    ;;
   docs)
     sub="${1:-check}"
     case "${sub}" in
