@@ -1,5 +1,7 @@
 # Worktree Config and Isolation
 
+> **Owns:** the worktree slot model, port derivation, and isolation deep contract. **Not here:** everyday setup/teardown → `01`. **Load when:** worktree internals, slot collisions, or cross-worktree bugs.
+
 ## Purpose
 
 Define the BOGA contract for running multiple local agents or humans on the same machine using `git worktree`, with isolated tests, Supabase infrastructure, Expo/Metro runtime, iOS simulator targets, and dependency/build state.

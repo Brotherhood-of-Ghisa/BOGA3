@@ -5,8 +5,11 @@
 This folder is the authoritative, app-specific UI documentation bundle for the current mobile app.
 
 - Use these docs for current behavior, route contracts, and reusable UI component/primitives usage.
-- Use `repo-discovery-baseline` and `ui-pattern-audit` as evidence inputs and implementation context.
 - Use `docs/specs/08-ux-delivery-standard.md` for process/policy expectations across UI tasks.
+
+(The one-time M8 audit snapshots — `repo-discovery-baseline.md`,
+`ui-pattern-audit.md` — were deleted 2026-06-10: dated 2026-02-26, they had
+drifted from the code and predated several UI milestones. Git history has them.)
 
 ## Status legend
 
@@ -15,10 +18,6 @@ This folder is the authoritative, app-specific UI documentation bundle for the c
 
 ## Bundle map
 
-- `repo-discovery-baseline.md`
-  - verified inventory of routes, docs paths, styling approach, and reusable UI baseline (Task 01)
-- `ui-pattern-audit.md`
-  - code-referenced pattern inventory and primitive candidates (Task 02)
 - `ux-rules.md`
   - authoritative semantic UI rules and guardrails grounded in current behavior
 - `screen-map.md`
@@ -36,7 +35,6 @@ Task templates/task cards may summarize these triggers for convenience, but shou
 1. Route files added/removed/renamed:
    - Update `screen-map.md`
    - Update `navigation-contract.md`
-   - Update `repo-discovery-baseline.md` when route inventory facts materially change
 2. Route params/query behavior or transition behavior changed:
    - Update `navigation-contract.md`
    - Update `screen-map.md` if screen entry/exit behavior changes

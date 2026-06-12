@@ -21,6 +21,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Docs drift guard (`docs-check` lane): generated blocks (lane matrix)
+      # current, lane-name citations valid, relative .md links resolve, spec
+      # ownership headers present. Pure python3/bash — runs before npm ci.
+      - name: Docs check
+        run: ./scripts/gen-docs.sh check
+        working-directory: ${{ github.workspace }}
+        timeout-minutes: 2
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20

@@ -10,7 +10,6 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 ## Sources
 
 - `docs/specs/ui/screen-map.md`
-- `docs/specs/ui/repo-discovery-baseline.md`
 - Route files under `apps/mobile/app/**`
 
 ## Router baseline (current)

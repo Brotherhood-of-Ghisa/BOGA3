@@ -1,5 +1,7 @@
 # What are we building
 
+> **Owns:** product overview and domain context. **Not here:** technical choices → `03`; data model → `05`. **Load when:** you need product/domain context.
+
 ## Document scope
 
 This document provides an overview of our product and current product-level decisions.

@@ -16,6 +16,18 @@
 > anchors. Where a normative claim differs from the as-built code, the code is
 > ground truth and the discrepancy is called out in a **Build note**.
 
+**Contents — this doc is ~1,200 lines; load the part your task needs, not all
+of it.**
+
+- **Part A — Server schema**: A.1 ground rules · A.2 per-entity mapping ·
+  A.3 local schema additions · A.5 deferrable FKs · A.6 RLS policies ·
+  A.7 drift-detection mechanism · A.8 agent-reminder mechanism · A.9 worked
+  example (adding a column).
+- **Part B — Push/pull RPC protocol**: B.2 wire types · B.3 `sync_push` ·
+  B.4 `sync_pull` · B.5 first sign-in · B.6 the cycle interface · B.7 dirty-bit
+  lifecycle · B.8 clock-monotonicity guard · B.9 local-only bookkeeping
+  columns · B.10 client-enforced constraints · B.11 out of scope.
+
 ---
 
 # Part A — Server schema
