@@ -1,42 +1,21 @@
 appId: com.dinoderek.mobile
 ---
+# No per-openLink Open/Continue/Close dismissal taps: the URL-scheme trust dialog
+# is pre-authorized in maestro-ios-launch.sh and the one-time dev-client menu
+# sheet is dismissed by the warm-up before this flow runs, so neither renders
+# here (this lane does NOT clearState, so the dev-client's "seen menu" state is
+# preserved between warm-up and flow). Each optional tap on an absent element
+# costs the full ~7s optionalLookupTimeoutMs (measured) and they were all
+# WARNED/absent on every run. If pre-authorization regresses, the next assertion
+# fails loudly rather than silently absorbing ~7s/tap.
 - takeScreenshot: "01-app-launch"
 - openLink: "${MAESTRO_IOS_DEV_CLIENT_URL}"
-- waitForAnimationToEnd:
-    timeout: 5000
-- tapOn:
-    text: "Open"
-    optional: true
-- tapOn:
-    text: "Continue"
-    optional: true
-- tapOn:
-    text: "Close"
-    optional: true
 - openLink: "boga3://maestro-harness?teleport=session-list"
-- tapOn:
-    text: "Open"
-    optional: true
-- tapOn:
-    text: "Continue"
-    optional: true
-- tapOn:
-    text: "Close"
-    optional: true
 - extendedWaitUntil:
     visible:
       id: "stats-history-screen"
     timeout: 30000
 - openLink: "boga3://maestro-harness?teleport=session-recorder"
-- tapOn:
-    text: "Open"
-    optional: true
-- tapOn:
-    text: "Continue"
-    optional: true
-- tapOn:
-    text: "Close"
-    optional: true
 - extendedWaitUntil:
     visible:
       id: "start-session-button"

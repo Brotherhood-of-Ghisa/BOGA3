@@ -58,22 +58,36 @@ appId: com.dinoderek.mobile
 # `clearState` relaunches the dev client with a wiped sandbox, dropping its Metro
 # connection, so re-open the dev-client deep link (carrying this worktree's Metro
 # port, exported by maestro-ios-launch.sh) to reload the app bundle into the
-# wiped sandbox. That also surfaces the one-time expo-dev-client menu sheet, so
-# the optional Open/Continue/Close taps dismiss it; each is a no-op when absent.
+# wiped sandbox. clearState reinstalled the app, so the expo-dev-client menu
+# reappears over the app and BLOCKS sign-in: wait for the onboarding intro and
+# dismiss it (Continue -> dev menu, Close -> app). The URL-scheme trust dialog is
+# pre-authorized in maestro-ios-launch.sh, so there is no "Open" tap (absent it
+# cost ~7s and FAILED on transient iOS-26 hierarchy errors). See
+# auth-profile-happy-path for the failure screenshots that proved the dev menu is
+# load-bearing after clearState.
 - launchApp:
     clearState: true
 - openLink: "${MAESTRO_IOS_DEV_CLIENT_URL}"
+- extendedWaitUntil:
+    visible:
+      text: "Continue"
+    timeout: 30000
+# Settle the sheet, then retry each dismissal tap so the transient iOS-26
+# `kAXErrorInvalidUIElement` (stale element ref during the post-clearState reload
+# churn) is re-attempted rather than failing the run. Each retry wraps one tap
+# and is idempotent: the element stays present until the tap succeeds.
 - waitForAnimationToEnd:
-    timeout: 5000
-- tapOn:
-    text: "Open"
-    optional: true
-- tapOn:
-    text: "Continue"
-    optional: true
-- tapOn:
-    text: "Close"
-    optional: true
+    timeout: 4000
+- retry:
+    maxRetries: 3
+    commands:
+      - tapOn:
+          text: "Continue"
+- retry:
+    maxRetries: 3
+    commands:
+      - tapOn:
+          text: "Close"
 - extendedWaitUntil:
     visible:
       id: "sign-in-screen"
@@ -111,16 +125,9 @@ appId: com.dinoderek.mobile
 # === Phase B: log exactly one exercise in a session ===
 # Teleport to the recorder WITHOUT a data reset — the just-bootstrapped local DB
 # (seeded catalog + bootstrap flag) must be preserved; we only need to navigate.
+# No dev-menu/trust dismissal taps: this teleport runs in the already-loaded,
+# signed-in app (no clearState since Phase A), so no dialog renders.
 - openLink: "boga3://maestro-harness?teleport=session-recorder"
-- tapOn:
-    text: "Open"
-    optional: true
-- tapOn:
-    text: "Continue"
-    optional: true
-- tapOn:
-    text: "Close"
-    optional: true
 - extendedWaitUntil:
     visible:
       id: "start-session-button"
@@ -135,9 +142,6 @@ appId: com.dinoderek.mobile
     visible:
       text: "No exercises logged yet."
     timeout: 30000
-- tapOn:
-    text: "Continue"
-    optional: true
 - tapOn: "Log new exercise"
 - tapOn: "Exercise filter input"
 - inputText: "Barbell Back Squat"
@@ -155,22 +159,11 @@ appId: com.dinoderek.mobile
 - inputText: "135"
 - tapOn: "Reps for exercise 1 set 1"
 - inputText: "8"
+# One complete set (weight + reps) submits straight through — no
+# "Remove incomplete/empty" confirmation dialog renders, so the previous optional
+# re-tap/confirmation taps were always absent (~7s each, WARNED). Assert the
+# success screen directly; a blocked submit fails the extendedWaitUntil loudly.
 - tapOn: "Submit Session"
-- tapOn:
-    text: "Submit Session"
-    optional: true
-- tapOn:
-    text: "Remove incomplete sets and submit"
-    optional: true
-- tapOn:
-    text: "Remove empty exercises and submit"
-    optional: true
-- tapOn:
-    text: "Continue"
-    optional: true
-- tapOn:
-    text: "Close"
-    optional: true
 - extendedWaitUntil:
     visible:
       id: "stats-history-screen"
@@ -215,20 +208,32 @@ appId: com.dinoderek.mobile
 # fresh install / new device for the same account. Signing in again runs the real
 # bootstrapper, which finds the server non-empty (catalog + the logged session
 # from Phase C) and PULLS everything back — no re-seed.
+# Second clearState reinstall -> dev-client menu reappears and blocks sign-in;
+# dismiss it (Continue -> dev menu, Close -> app), same as Phase A. Trust dialog
+# pre-authorized away (no "Open" tap).
 - launchApp:
     clearState: true
 - openLink: "${MAESTRO_IOS_DEV_CLIENT_URL}"
+- extendedWaitUntil:
+    visible:
+      text: "Continue"
+    timeout: 30000
+# Settle the sheet, then retry each dismissal tap so the transient iOS-26
+# `kAXErrorInvalidUIElement` (stale element ref during the post-clearState reload
+# churn) is re-attempted rather than failing the run. Each retry wraps one tap
+# and is idempotent: the element stays present until the tap succeeds.
 - waitForAnimationToEnd:
-    timeout: 5000
-- tapOn:
-    text: "Open"
-    optional: true
-- tapOn:
-    text: "Continue"
-    optional: true
-- tapOn:
-    text: "Close"
-    optional: true
+    timeout: 4000
+- retry:
+    maxRetries: 3
+    commands:
+      - tapOn:
+          text: "Continue"
+- retry:
+    maxRetries: 3
+    commands:
+      - tapOn:
+          text: "Close"
 - extendedWaitUntil:
     visible:
       id: "sign-in-screen"

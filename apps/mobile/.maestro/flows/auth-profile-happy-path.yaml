@@ -10,26 +10,48 @@ appId: com.dinoderek.mobile
 # bundle reloads from Metro into the freshly-wiped sandbox before asserting.
 - launchApp:
     clearState: true
-# `clearState: true` wipes the Expo dev client's stored Metro dev-server URL, so
-# on relaunch the client shows its own launcher instead of reconnecting and the
-# RN app never loads. Re-open the dev-client deep link (carrying this worktree's
-# Metro port, exported by maestro-ios-launch.sh) to re-point it at Metro. Opening
-# that URL also surfaces the expo-dev-client developer-menu onboarding sheet over
-# the loaded app, so the Continue/Close taps dismiss it (and "Open" clears the
-# URL-scheme trust dialog) before the sign-in gate assertion. `waitForAnimationToEnd`
-# lets the sheet animate in first; every optional tap no-ops when its target is absent.
+# Re-open the dev-client deep link (carrying this worktree's Metro port, exported
+# by maestro-ios-launch.sh) to re-point the wiped dev client at Metro. The
+# URL-scheme trust dialog is pre-authorized in maestro-ios-launch.sh, so it never
+# renders — we do NOT tap "Open" (it cost the full ~7s optionalLookupTimeoutMs
+# when absent, and a blind tapOn fetched the view hierarchy mid-reload, which on
+# iOS-26 throws a transient `kAXErrorInvalidUIElement` and FAILED the flow).
+#
+# The expo-dev-client developer-menu, however, DOES reappear after clearState:
+# the reinstall wipes the dev client's "seen menu" flag, so opening the deep link
+# surfaces its onboarding intro ("Continue") which advances to the full dev menu,
+# and that menu covers and BLOCKS the sign-in screen (both states verified by
+# failure screenshots). Dismiss it deterministically: wait for the intro, tap
+# Continue (intro -> dev menu), then Close (X, dev menu -> app). Waiting for the
+# button instead of firing a blind optional tap makes this both faster (it fires
+# the instant the sheet renders instead of burning the ~7s optional timeout) and
+# robust (extendedWaitUntil polls through the cold-bundle reload and the transient
+# iOS-26 `kAXErrorInvalidUIElement` hierarchy errors a blind tapOn FAILS on). The
+# previously-tapped "Open" (URL-scheme trust dialog) is pre-authorized away and is
+# not tapped. If this dismissal ever stops matching, the sign-in assertion below
+# fails loudly.
 - openLink: "${MAESTRO_IOS_DEV_CLIENT_URL}"
+- extendedWaitUntil:
+    visible:
+      text: "Continue"
+    timeout: 30000
+# Let the sheet finish animating before tapping so the tap doesn't fetch a
+# hierarchy mid-transition; then retry each tap so the transient iOS-26
+# `kAXErrorInvalidUIElement` (a stale element ref during the post-reload churn)
+# is re-attempted rather than failing the run. Each retry wraps a single tap and
+# is idempotent: the element stays present until the tap succeeds.
 - waitForAnimationToEnd:
-    timeout: 5000
-- tapOn:
-    text: "Open"
-    optional: true
-- tapOn:
-    text: "Continue"
-    optional: true
-- tapOn:
-    text: "Close"
-    optional: true
+    timeout: 4000
+- retry:
+    maxRetries: 3
+    commands:
+      - tapOn:
+          text: "Continue"
+- retry:
+    maxRetries: 3
+    commands:
+      - tapOn:
+          text: "Close"
 - extendedWaitUntil:
     visible:
       id: "sign-in-screen"
@@ -49,15 +71,6 @@ appId: com.dinoderek.mobile
 # route in one harness link. The flag is stamped before the teleport navigates,
 # so the first-sync gate has lifted by the time the route renders.
 - openLink: "boga3://maestro-harness?bootstrap=complete&teleport=session-list"
-- tapOn:
-    text: "Open"
-    optional: true
-- tapOn:
-    text: "Continue"
-    optional: true
-- tapOn:
-    text: "Close"
-    optional: true
 - extendedWaitUntil:
     visible:
       id: "stats-history-screen"
