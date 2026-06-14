@@ -210,7 +210,7 @@ Teardown:
 
 - `supabase/scripts/local-runtime-down.sh` — stop this slot's Supabase + health server. Docker containers and volumes persist for a fast restart.
 - `scripts/worktree-clean.sh --slot <n> --supabase --remove-registry` — remove a specific slot's Docker containers/volumes/networks and its registry file. Refuses the current slot without `--force`; serialized by a per-slot runtime lock. **Fail-loud:** if `--supabase` cleanup cannot run (Docker unavailable), it refuses to remove the registry and exits non-zero — dropping the only pointer to a surviving stack is exactly how an unreclaimable orphan is born.
-- `scripts/worktree-sweep.sh` — reap completed/orphaned slots: calls `worktree-clean.sh` per completed slot and reaps dead-agent git worktrees. Runs automatically before every `local-runtime-up.sh`. Completion signals and knobs are in *Completed worktree cleanup* below.
+- `scripts/worktree-sweep.sh` — reap completed/orphaned slots: calls `worktree-clean.sh` per completed slot, reaps dead-agent git worktrees, and (unless `--no-supabase`) makes a Docker-ground-truth pass that evicts any Supabase stack no live worktree backs — matched by project-id, so it reclaims a stack left behind by a deleted worktree even when its slot number was later reused and even when it squats on the current slot's ports. Runs automatically before every `local-runtime-up.sh`. Completion signals and knobs are in *Completed worktree cleanup* below.
   - `--report` — read-only fleet report. Enumerates **every** Supabase stack present in Docker (the ground truth the registry scan can miss), correlates each to a live worktree via the worktree's own `.worktree-slot`, and prints a KEEP/EVICT verdict + reason per stack. Changes nothing.
   - `--prune-orphans` — docker-ground-truth eviction. Removes, by exact label, every Supabase stack that no live worktree backs (orphans whose dir/registry is gone, dead-agent and abandoned-agent worktrees), plus any stale registry file. A live agent lock and non-agent (human) checkouts are never touched. Opt-in; honours `--dry-run`.
 
@@ -282,22 +282,37 @@ If a registered path still exists and still looks like a valid BOGA checkout fro
 
 Squash-merge note: with squash merges, the merged branch's original HEAD is no longer an ancestor of main, so `branch-merged-into-<remote>/<main>` will not fire. In that case the sweep relies on `branch-deleted-on-<remote>`, which requires the remote to delete merged branches automatically (e.g. GitHub's "Automatically delete head branches" repo setting).
 
-Registry-driven blindness and the ground-truth pass: the automatic sweep and the
-per-slot cleaner key off the slot registry. A Supabase stack whose registry file
-is gone (removed early, or never written) becomes invisible to both — no signal
-can fire, so it leaks forever. `--report` and `--prune-orphans` close this by
-working from **Docker ground truth** (every `com.supabase.cli.project` label on a
-container or volume) instead of the registry, mapping each stack back to a live
-worktree by that worktree's own `.worktree-slot`. Use `--report` to see the full
-fleet with a KEEP/EVICT verdict, and `--prune-orphans` (preview with `--dry-run`)
-to reclaim everything no live worktree backs. Both apply the live-lock veto and
-never touch a non-agent (human) checkout's stack.
+Registry-driven blindness and the ground-truth pass: the completion signals and
+the per-slot cleaner key off the slot registry, which is keyed by **slot number**
+(one file per slot). A Supabase stack whose registry file is gone — removed early,
+never written, or **overwritten when its slot number was reused by another
+worktree** — becomes invisible to the registry scan: no completion signal can
+fire, so it leaks. The classic leak is a deleted worktree whose stack outlived it
+and whose slot was then handed to a new worktree; the new worktree's registry now
+occupies that slot number, and the orphan's stack squats on the same ports
+(`Bind for 0.0.0.0:<port> failed: port is already allocated`).
+
+To close this, every run works from **Docker ground truth** (every
+`com.supabase.cli.project` label on a container or volume) instead of the
+registry, and maps each stack back to a live worktree by **project-id** — never
+by slot number alone, so a stack sharing the current slot's number but a different
+project-id is correctly recognised as an orphan. After the registry scan, the
+automatic sweep evicts every stack with **no live `git worktree list` entry**
+(true orphans), including a same-slot squatter; the live worktree's own stack is
+matched by project-id and kept, and its slot registry is never deleted even though
+the orphan reused its slot number. `--report` prints the full fleet with a
+KEEP/EVICT verdict (changes nothing), and `--prune-orphans` (preview with
+`--dry-run`) is the wider explicit form — it also evicts dead-agent and
+abandoned-agent stacks, which the automatic pass defers to the grace-honouring
+registry loop. All forms apply the live-lock veto and never touch a non-agent
+(human) checkout's stack.
 
 Cleanup scope:
 
 - `scripts/worktree-sweep.sh` scans completed slots and calls `scripts/worktree-clean.sh`.
 - For slots completed via the dead-agent-lock signal, `scripts/worktree-sweep.sh` additionally reaps the abandoned git worktree (`git worktree unlock` + `git worktree remove --force`) before invoking `scripts/worktree-clean.sh`; the other signals assume the git worktree was already removed by whoever finished the work.
 - After the registry scan, `scripts/worktree-sweep.sh` runs a prune pass that reaps registry-less worktrees still locked by a dead PID (git worktree only — these carry no Supabase stack). This catches dead-agent worktrees whose registry was already cleaned but whose git worktree registration was left dangling.
+- Then (unless `--no-supabase`) `scripts/worktree-sweep.sh` runs a Docker-ground-truth orphan pass: it evicts, by exact project-id label, every Supabase stack with no live `git worktree list` entry — the registry-blind leak above — removing its containers/volumes/networks and any stale registry file. A stack squatting on the current slot's number but carrying a different project-id is reclaimed; the current worktree's own stack is matched by project-id and kept, and the current slot's registry is never deleted. Dead/abandoned-agent stacks (which still have a worktree entry) are deferred to the registry loop and its grace period; use `--prune-orphans` to evict those too.
 - `scripts/worktree-clean.sh --supabase` removes Docker containers, volumes, and networks labelled with the registry-recorded Supabase project id, plus the legacy `scaffolding[-wtN]` id for older local state.
 - `scripts/worktree-clean.sh --remove-registry` removes the completed slot registry file after cleanup.
 - Cleanup never targets the current slot unless explicitly forced in the manual cleaner.

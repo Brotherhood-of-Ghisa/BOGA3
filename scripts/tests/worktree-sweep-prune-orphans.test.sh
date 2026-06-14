@@ -167,6 +167,55 @@ assert_file "$REGISTRY_DIR/51" "live registry kept"
 assert_file "$REGISTRY_DIR/54" "human registry kept"
 assert_contains "$out" "prune-orphans done: 3 evicted, 2 kept" "summary counts correct"
 
+echo "== active-slot squatter: prune the orphan, never the live current stack =="
+# Regression for the registry-blind same-slot leak: a worktree was deleted but its
+# Supabase stack outlived it; the slot number was then reused by the *current*
+# worktree, whose registry overwrote the orphan's. The orphan now shares the
+# `-wt<slot>` suffix with the live current stack and squats on its ports. The
+# sweep must evict the orphan (matched by project-id) while leaving the current
+# worktree's own stack AND its slot registry untouched — even though both share
+# slot 12.
+CUR_WT="$(add_slot_worktree current-active 12 live)"        # locked by ALIVE_PID
+register_slot 12 "$CUR_WT"
+CUR_LABEL="$(boga_project_id_for_slot 12 "$CUR_WT")"        # BOGA-current-active-wt12
+SQUAT_LABEL="BOGA-deleted-twin-wt12"                         # orphan: no backing worktree, same slot 12
+# Isolate the Docker view to just these two stacks so the assertions below are
+# unambiguous; the registry loop still walks the leftover slots 51/54 (both kept).
+printf '%s\n' "$CUR_LABEL" "$SQUAT_LABEL" >"$STUB_LABELS"
+
+echo "-- automatic sweep (what local-runtime-up.sh runs before 'supabase start') --"
+: >"$STUB_REMOVED"
+out="$(bash "$SWEEP" --current-slot 12 --no-merge-detection --no-fetch --grace-seconds 0 2>&1)"
+removed="$(sort -u "$STUB_REMOVED")"
+assert_contains "$out" "evicting $SQUAT_LABEL: orphan" "auto sweep evicts the same-slot squatter"
+assert_contains "$removed" "$SQUAT_LABEL" "auto sweep removed the squatter's Docker stack"
+assert_not_contains "$removed" "$CUR_LABEL" "auto sweep never removed the current stack"
+assert_contains "$out" "keeping $CUR_LABEL: current slot" "auto sweep kept the current stack (by project-id)"
+assert_contains "$out" "keeping current slot registry $REGISTRY_DIR/12" "auto sweep preserved the current slot registry"
+assert_file "$REGISTRY_DIR/12" "current slot registry survives same-slot orphan eviction"
+
+echo "-- explicit --prune-orphans must behave identically for the active slot --"
+: >"$STUB_REMOVED"
+out="$(bash "$SWEEP" --prune-orphans --current-slot 12 2>&1)"
+removed="$(sort -u "$STUB_REMOVED")"
+assert_contains "$removed" "$SQUAT_LABEL" "prune-orphans removed the same-slot squatter"
+assert_not_contains "$removed" "$CUR_LABEL" "prune-orphans never removed the current stack"
+assert_contains "$out" "keeping current slot registry $REGISTRY_DIR/12" "prune-orphans preserved the current slot registry"
+assert_file "$REGISTRY_DIR/12" "current slot registry still present after prune-orphans"
+
+echo "== self-guard: the current worktree's own stack is kept even when absent from the index =="
+# REPO_ROOT (the main checkout the sweep runs from) carries no .worktree-slot, so
+# it never appears in the worktree index. Its own stack must still be kept —
+# identified directly from REPO_ROOT + the current slot — never mistaken for an
+# orphan and evicted moments before the worktree starts it.
+SELF_LABEL="$(boga_project_id_for_slot 7 "$REPO")"           # BOGA-main-wt7
+printf '%s\n' "$SELF_LABEL" >"$STUB_LABELS"
+: >"$STUB_REMOVED"
+out="$(bash "$SWEEP" --prune-orphans --current-slot 7 2>&1)"
+removed="$(sort -u "$STUB_REMOVED")"
+assert_contains "$out" "keeping $SELF_LABEL: current slot" "current worktree's own stack kept by self-guard"
+assert_not_contains "$removed" "$SELF_LABEL" "current worktree's own stack never removed"
+
 echo "== worktree-clean fail-loud: docker down must NOT drop the registry =="
 register_slot 60 "$WORK/whatever-60"
 clean_rc=0
