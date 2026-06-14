@@ -82,18 +82,11 @@ trap cleanup EXIT
 "$SCRIPT_DIR/maestro-ios-launch.sh" "$MAESTRO_RUNTIME_ENV_FILE"
 maestro_load_runtime_env "$MAESTRO_RUNTIME_ENV_FILE"
 
-# Cold sims (e.g. a freshly auto-created slot) need the cold Metro JS bundle
-# driven hot before the gated flow's 30s assertion window. The dev-client
-# "Open in <App>?" URL-scheme trust dialog is already pre-authorized away in
-# maestro-ios-launch.sh, so the warm-up's main job here is to load the bundle;
-# it also keeps best-effort dialog dismissal as defense-in-depth. Idempotent:
-# no-ops on warm sims.
-maestro_warm_dev_client \
-  "$IOS_SIM_UDID" \
-  "$MAESTRO_IOS_DEV_CLIENT_BUNDLE_ID" \
-  "$MAESTRO_IOS_DEV_CLIENT_URL" \
-  "$MAESTRO_ARTIFACT_ROOT/warmup.yaml" \
-  "$MAESTRO_ARTIFACT_ROOT/maestro-warmup"
+# The cold Metro JS bundle is driven hot in maestro-ios-launch.sh, which blocks on
+# Metro's bundle-ready marker right after opening the dev-client link. So the gated
+# flow's RN root mounts within its assertion window without a separate Maestro
+# warm-up invocation (which used to cost a duplicate XCUITest driver install, and
+# on the signed-out auth/sync lanes burned ~45s waiting on a never-shown screen).
 
 flow_basename="$(basename -- "$FLOW_SOURCE")"
 MAESTRO_FLOW_FILE="$MAESTRO_ARTIFACT_ROOT/$flow_basename"

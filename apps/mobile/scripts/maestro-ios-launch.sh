@@ -50,8 +50,8 @@ maestro_write_managed_env_local "$APP_DIR" "$RUNTIME_ENV_FILE"
 # transform, with its baked-in EXPO_PUBLIC_SUPABASE_URL, is reused even though we
 # just materialized a different .env.local, and the build silently keeps the prior
 # lane's backend. When the config is unchanged the cache is correct, so we skip the
-# clear and keep the warm bundle. The warm-up step drives any cold bundle hot
-# before the gated flow asserts, so a clear costs one cold bundle, not flow time.
+# clear and keep the warm bundle. The bundle-ready wait below drives any cold bundle
+# hot before the gated flow asserts, so a clear costs one cold bundle, not flow time.
 maestro_clear_flag=""
 if [[ "${MAESTRO_METRO_CLEAR:-0}" == "1" ]]; then
   echo "[maestro-ios-launch] Supabase config changed since last bundle; starting Expo with --clear"
@@ -92,7 +92,21 @@ maestro_preauthorize_location "$IOS_SIM_UDID" "$MAESTRO_IOS_DEV_CLIENT_BUNDLE_ID
 xcrun simctl terminate "$IOS_SIM_UDID" "$MAESTRO_IOS_DEV_CLIENT_BUNDLE_ID" >/dev/null 2>&1 || true
 xcrun simctl launch "$IOS_SIM_UDID" "$MAESTRO_IOS_DEV_CLIENT_BUNDLE_ID" >/dev/null 2>&1 || true
 xcrun simctl openurl "$IOS_SIM_UDID" "$MAESTRO_IOS_DEV_CLIENT_URL"
-sleep 5
+
+# Block until Metro has built + served the app-entry bundle (the openurl above
+# made the dev client request it). This drives the cold JS bundle hot HERE,
+# replacing the separate Maestro warm-up flow — which paid a duplicate XCUITest
+# driver install and, on the signed-out auth/sync lanes, burned ~45s waiting on a
+# data screen they never render. The poll returns the instant the bundle is ready
+# (warm runs: a few seconds), so the gated flow's RN root mounts in seconds.
+# Generous ceiling: a cold cache rebuild ("Bundler cache is empty") can take ~a
+# minute. Best-effort like the old warm-up — a miss only logs; the gated flow
+# still asserts the RN root authoritatively.
+if ! maestro_wait_for_metro_bundle "$EXPO_LOG_FILE" "${MAESTRO_BUNDLE_WAIT_SECONDS:-150}"; then
+  echo "[maestro-ios-launch] WARN: Metro app-entry bundle not confirmed within ${MAESTRO_BUNDLE_WAIT_SECONDS:-150}s; proceeding (gated flow asserts the RN root authoritatively)."
+else
+  echo "[maestro-ios-launch] Metro app-entry bundle built and served (dev client hot)."
+fi
 
 if ! maestro_process_alive "$EXPO_PID"; then
   tail -n 120 "$EXPO_LOG_FILE" || true

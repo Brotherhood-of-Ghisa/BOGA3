@@ -171,10 +171,15 @@ appId: com.dinoderek.mobile
 - takeScreenshot: "18-first-run-roundtrip-logged"
 
 # === Phase C: force a sync, prove the logged delta uploaded (Pending -> 0) ===
+# Poll for the settings screen rather than asserting it immediately after the tap:
+# the transition can lag a beat on a cold-JIT first render, and extendedWaitUntil
+# rides that out (an immediate assert is what flaked the auth lane once).
 - tapOn:
     id: "top-level-settings-button"
-- assertVisible:
-    id: "settings-screen"
+- extendedWaitUntil:
+    visible:
+      id: "settings-screen"
+    timeout: 15000
 - extendedWaitUntil:
     visible:
       id: "settings-sync-status-card"
