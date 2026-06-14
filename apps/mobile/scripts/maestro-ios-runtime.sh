@@ -305,6 +305,38 @@ maestro_wait_for_metro_status() {
   done
 }
 
+# Wait until Metro has built and SERVED the app-entry JS bundle — i.e. the bundle
+# request triggered by the dev-client `openurl` has completed and the (possibly
+# cold) bundle is now hot and cached. Metro logs a line like
+#   iOS Bundled 3029ms node_modules/expo-router/entry.js (1704 modules)
+# on completion; the first such entry-bundle line is the warm signal, after which
+# the gated flow's RN root mounts in seconds.
+#
+# This replaces the former separate Maestro warm-up FLOW (maestro_warm_dev_client),
+# which paid a full XCUITest driver install just to drive the same bundle build and,
+# on the signed-out auth/sync lanes, then burned ~45s timing out on a data screen
+# those lanes never reach. Polling Metro's own log returns the instant the bundle
+# is ready, independent of which screen the lane lands on, with no extra driver.
+maestro_wait_for_metro_bundle() {
+  local log_file="$1"
+  local timeout_seconds="$2"
+  local started_at now
+
+  started_at="$(date +%s)"
+  while true; do
+    if grep -qE 'iOS Bundled [0-9]+ms .*entry\.[jt]sx? ' "$log_file" 2>/dev/null; then
+      return 0
+    fi
+
+    now="$(date +%s)"
+    if (( now - started_at >= timeout_seconds )); then
+      return 1
+    fi
+
+    sleep 1
+  done
+}
+
 maestro_process_alive() {
   local pid="${1:-}"
   [[ -n "$pid" ]] && kill -0 "$pid" >/dev/null 2>&1
@@ -385,90 +417,6 @@ maestro_prepare_flow_copy() {
     }
     fs.writeFileSync(targetPath, `${next.join("\n").replace(/\n?$/, "\n")}`);
   ' "$source_flow" "$target_flow" "$bundle_id"
-}
-
-# Cold simulators need a warm-up for two first-launch reasons:
-#
-#   1. URL-scheme trust: the first deep link of each scheme surfaces a SpringBoard
-#      `Open in "<App>"?` alert on top of the RN root (iOS-26 + expo-dev-client).
-#      This is now PRE-AUTHORIZED in maestro-ios-launch.sh via
-#      `maestro_preauthorize_url_schemes` (it seeds the same
-#      `com.apple.launchservices.schemeapproval` record iOS writes when a human
-#      taps "Open"), so the dialog should never render. The dismissal steps below
-#      remain only as defense-in-depth for any un-seeded scheme variant.
-#   2. Cold Metro bundle: the very first `url=` load has to JS-bundle from
-#      scratch (10s+), which alone can blow the real flow's 30s assertion window.
-#      This is the warm-up's primary remaining job — drive the cold bundle hot.
-#
-# So the warm-up drives the SAME path the real flow takes: open the dev-client
-# `url=` link AND the harness teleport, then wait for the RN root
-# (`stats-history-screen`) to mount. After this, Metro's bundle is hot, so the
-# gated flow asserts the root in seconds.
-#
-# Dialog dismissal (defense-in-depth, in case pre-authorization is bypassed):
-#   * `tapOn: text: "Open"` — the alert IS in Maestro's accessibility tree on
-#     iOS-26.2 (the "Open" button exposes `accessibilityText: "Open"`), so a text
-#     tap dismisses it when present. Verified empirically.
-#   * `tapOn: point: "68%,54%"` — a resolution-independent coordinate tap at the
-#     "Open" button's location, as a backstop for the rare case the alert renders
-#     just outside the queried hierarchy snapshot. Both taps are `optional` /
-#     no-op when no alert is present (the expected case post-preauthorization).
-maestro_warm_dev_client() {
-  local udid="$1"
-  local bundle_id="$2"
-  local dev_client_url="$3"
-  local warmup_flow="$4"
-  local warmup_output_dir="$5"
-
-  [[ -n "$udid" ]] || maestro_fail "maestro_warm_dev_client: missing simulator UDID."
-  [[ -n "$bundle_id" ]] || maestro_fail "maestro_warm_dev_client: missing dev-client bundle id."
-  [[ -n "$dev_client_url" ]] || maestro_fail "maestro_warm_dev_client: missing dev-client URL."
-
-  mkdir -p "$(dirname -- "$warmup_flow")" "$warmup_output_dir"
-
-  # The first openLink + teleport mirror the gated flow's own first two
-  # `openLink`s so the cold JS bundle is fully loaded and the harness landing
-  # screen is reached. `waitForAnimationToEnd` after each openLink lets any
-  # (normally pre-authorized away) alert settle before the optional dismissal
-  # taps. After each link we fire BOTH an optional text tap and an optional
-  # coordinate tap on the "Open" button as defense-in-depth — both no-op when no
-  # alert is present (the expected case once schemes are pre-authorized). The
-  # final wait uses a bounded 45s timeout: enough to JS-bundle the cold root, but
-  # short enough that a genuinely stuck state doesn't burn dead time before the
-  # gated flow takes over.
-  # No optional "Open"/coordinate dismissal taps: the URL-scheme trust dialog is
-  # pre-authorized in maestro-ios-launch.sh, so it never renders. Each optional
-  # tap on the (absent) "Open" cost the full ~7s optionalLookupTimeoutMs
-  # (measured 2×~7.2s ≈ 14s of pure dead wait in the warm-up alone). The warm-up's
-  # only real job is to drive the cold Metro bundle hot; the extendedWaitUntil on
-  # the RN root does that and returns the instant the root mounts. If
-  # pre-authorization ever regresses, the gated flow asserts authoritatively and
-  # fails loudly rather than this best-effort warm-up silently absorbing the cost.
-  cat >"$warmup_flow" <<EOF
-appId: ${bundle_id}
----
-- openLink: "${dev_client_url}"
-- openLink: "boga3://maestro-harness?teleport=session-list"
-- extendedWaitUntil:
-    visible:
-      id: "stats-history-screen"
-    timeout: 45000
-EOF
-
-  echo "[maestro] warming dev client on cold sim ($udid) — driving cold Metro bundle hot (URL-scheme trust pre-authorized in launch step; dialog dismissal kept as defense-in-depth)"
-
-  # The warm-up is best-effort: it drives the cold JS bundle to hot, but the gated
-  # flow is the authoritative assertion. A non-confirmation here is NOT a failure;
-  # the gated flow still asserts the root authoritatively. So a non-zero warm-up
-  # exit never short-circuits the gate, and we log it as informational (not an
-  # error) to avoid a misleading false-negative in green runs.
-  if maestro test "$warmup_flow" \
-    --udid "$udid" \
-    --test-output-dir "$warmup_output_dir" >/dev/null 2>&1; then
-    echo "[maestro] dev-client warm-up complete — RN root mounted, Metro bundle hot (URL scheme pre-authorized; no trust dialog)"
-  else
-    echo "[maestro] dev-client warm-up best-effort done (RN root not confirmed within window; bundle warmed). Gated flow will assert authoritatively."
-  fi
 }
 
 maestro_capture_simulator_logs() {

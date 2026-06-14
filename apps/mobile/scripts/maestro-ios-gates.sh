@@ -75,17 +75,13 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# --- One-time shared setup: provision + launch + warm (paid ONCE for both) ---
+# --- One-time shared setup: provision + launch (paid ONCE for both) ---
+# launch.sh drives the cold Metro bundle hot (it blocks on Metro's bundle-ready
+# marker after opening the dev-client link), so both flows below start against a
+# hot bundle with no separate warm-up invocation.
 "$SCRIPT_DIR/maestro-ios-provision.sh" "$MAESTRO_RUNTIME_ENV_FILE"
 "$SCRIPT_DIR/maestro-ios-launch.sh" "$MAESTRO_RUNTIME_ENV_FILE"
 maestro_load_runtime_env "$MAESTRO_RUNTIME_ENV_FILE"
-
-maestro_warm_dev_client \
-  "$IOS_SIM_UDID" \
-  "$MAESTRO_IOS_DEV_CLIENT_BUNDLE_ID" \
-  "$MAESTRO_IOS_DEV_CLIENT_URL" \
-  "$MAESTRO_ARTIFACT_ROOT/warmup.yaml" \
-  "$MAESTRO_ARTIFACT_ROOT/maestro-warmup"
 
 # --- Run each flow against the shared sim + Metro ---
 run_flow() {

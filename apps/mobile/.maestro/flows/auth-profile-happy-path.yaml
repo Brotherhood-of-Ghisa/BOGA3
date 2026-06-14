@@ -76,14 +76,22 @@ appId: com.dinoderek.mobile
       id: "stats-history-screen"
     timeout: 60000
 # Now signed in: open Profile and exercise the account affordances.
+# Use extendedWaitUntil (poll) rather than a bare assertVisible after each
+# navigating tap: the tab/screen transition can lag a beat on the cold-JIT first
+# render (an immediate assert raced it and flaked once), and polling rides that
+# out without padding the run.
 - tapOn:
     id: "top-level-settings-button"
-- assertVisible:
-    id: "settings-screen"
+- extendedWaitUntil:
+    visible:
+      id: "settings-screen"
+    timeout: 15000
 - tapOn:
     id: "settings-profile-row"
-- assertVisible:
-    id: "profile-signed-in-card"
+- extendedWaitUntil:
+    visible:
+      id: "profile-signed-in-card"
+    timeout: 15000
 - takeScreenshot: "06-auth-profile-signed-in"
 - tapOn:
     id: "profile-edit-button"
