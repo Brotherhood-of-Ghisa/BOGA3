@@ -313,12 +313,30 @@ Priority rule:
 Every lane runs the same dev-client build; whether it behaves as a local-only
 (infra-free) app or a Supabase-configured one is decided entirely by the
 `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY` that Metro inlines
-from `apps/mobile/.env.local` at bundle time. Concretely: the `auth-profile` lane
-(`test:e2e:ios:auth-profile`) is the **only** Supabase-backed iOS lane — it
-provisions a local Supabase baseline and exports those vars; `smoke`,
-`data-runtime-smoke`, and the combined `gates` lane are deliberately **infra-free**
-(they export none, so the inlined values are empty). (Which lanes take which
-shape, and why, is testing policy — see `docs/specs/06-testing-strategy.md`.)
+from `apps/mobile/.env.local` at bundle time. Concretely: the `auth-profile` and
+`sync-e2e` lanes (`test:e2e:ios:auth-profile`, `test:e2e:ios:sync`) are the
+Supabase-backed iOS lanes — they provision a local Supabase baseline and export
+those vars; `smoke`, `data-runtime-smoke`, and the combined `gates` lane are
+deliberately **infra-free** (they export none, so the inlined values are empty).
+(Which lanes take which shape, and why, is testing policy — see
+`docs/specs/06-testing-strategy.md`.)
+
+### Fixture users: one per Supabase-backed flow
+
+Every Maestro flow that signs in owns a **dedicated** auth fixture user; no two
+flows share one. The pool is defined in
+`supabase/scripts/auth-fixture-constants.sh` (`user_a`, `user_b`, …) and bound to
+a flow by `maestro-run-lane.sh` (`auth-profile-happy-path` → `user_a`,
+`sync-first-run-log-and-roundtrip` → `user_b`). This is load-bearing: the lanes
+reuse one local Supabase **without reset between runs**, so a shared user would
+let one flow's residual server state (a partial catalog, a logged workout) leak
+into another flow's pull and flake it. Self-signup is disabled, so the pool is
+fixed — **adding a sign-in flow means adding a fixture user** in
+`auth-fixture-constants.sh`, provisioning it (baseline), and wiring the mapping in
+the runner. The rule is enforced by
+`scripts/tests/maestro-fixture-users.test.sh` (the `meta-tests` lane, which the
+trigger registry runs on any `.maestro/**` or `maestro*` change): it fails if two
+sign-in flows resolve to the same fixture.
 
 `apps/mobile/.env.local` is one per-worktree file that local-Supabase startup
 (`supabase/scripts/local-runtime-up.sh`) writes, that Expo's dev server reads

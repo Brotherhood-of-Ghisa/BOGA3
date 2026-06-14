@@ -22,8 +22,8 @@ apps/mobile/drizzle/**	fast,backend	migration artifacts
 apps/mobile/src/**	fast	mobile TS/JS logic
 apps/mobile/*.json	fast	mobile config (native dep change ⇒ also rebuild dev client + frontend, see spec 02)
 apps/mobile/*.ts	fast	mobile config
-apps/mobile/scripts/maestro*	frontend	Maestro runtime / lane scripts
-apps/mobile/.maestro/**	frontend	Maestro flows / config
+apps/mobile/scripts/maestro*	frontend,meta-tests	Maestro runtime / lane scripts (+ fixture-user rule)
+apps/mobile/.maestro/**	frontend,meta-tests	Maestro flows / config (+ fixture-user rule)
 supabase/migrations/**	backend	server schema / RLS / RPCs
 supabase/functions/**	backend	edge functions
 supabase/tests/**	backend	backend test bodies

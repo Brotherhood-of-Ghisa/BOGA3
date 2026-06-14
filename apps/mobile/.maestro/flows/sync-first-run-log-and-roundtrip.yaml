@@ -4,23 +4,22 @@ appId: com.dinoderek.mobile
 #
 # This is the device-level proof that a brand-new user's data is bootstrapped
 # locally AND lands in the remote database, and that a subsequently logged
-# workout is uploaded by sync. It runs in the auth-configured lane (the only
-# Supabase-backed iOS lane: the runner provisions a local Supabase baseline and
-# exports the fixture credentials), so every cycle here talks to a real server.
+# workout is uploaded by sync. It runs in the Supabase-backed sync-e2e lane (the
+# runner provisions a local Supabase baseline and exports the fixture
+# credentials), so every cycle here talks to a real server.
 #
-# ISOLATION — this flow signs in as a DEDICATED fixture user (user_b, passed in as
-# MAESTRO_ROUNDTRIP_EMAIL/PASSWORD by the lane runner), NOT the user_a that every
-# other auth-profile flow uses. That is load-bearing, not cosmetic: the preceding
-# `sync-gate-first-cycle-real` flow seeds+pushes user_a's ~400-row starter catalog,
-# but its gate lifts (and the flow ends + tears down) BEFORE that push finishes, so
-# user_a's server-side catalog is left PARTIAL. A flow pulling user_a would hit the
-# bootstrapper's PULL branch (server non-empty -> no local re-seed) and get an
-# incomplete catalog that sometimes lacks "Barbell Back Squat" -> empty picker ->
-# flaky failure. user_b is untouched by other flows, so this flow's first sign-in
-# always finds an empty server -> the bootstrapper's SEED branch runs -> the FULL
-# catalog is seeded locally and deterministically. (A passing run pushes user_b's
-# complete catalog to dirty=0 in phase C, so even repeated lane runs that later hit
-# user_b's pull branch get a complete catalog.)
+# ISOLATION — this flow signs in as a DEDICATED fixture user (user_b, passed in
+# as MAESTRO_ROUNDTRIP_EMAIL/PASSWORD by the lane runner). Per the
+# one-user-per-flow rule (docs/specs/11), every Supabase-backed Maestro flow owns
+# its OWN fixture user so no flow ever depends on — or is corrupted by — another
+# flow's residual server state (auth-profile-happy-path owns user_a; this flow
+# owns user_b; enforced by scripts/tests/maestro-fixture-users.test.sh). A
+# dedicated, otherwise-untouched user also makes this flow's first sign-in
+# deterministic: it always finds an EMPTY server -> the bootstrapper's SEED branch
+# runs -> the FULL catalog is seeded locally, so the "Barbell Back Squat" pick in
+# phase B is guaranteed present. (A passing run pushes user_b's complete catalog
+# to dirty=0 in phase C, so even repeated lane runs that later hit user_b's pull
+# branch still get a complete catalog.)
 #
 # Phases (each maps to a step in the user-asked flow):
 #   A. New user signs in -> the REAL bootstrapper -> seed -> push -> pull cycle
@@ -187,6 +186,16 @@ appId: com.dinoderek.mobile
     visible:
       id: "settings-sync-status-card"
     timeout: 30000
+# Every status field must render on-device for the signed-in user — the surface
+# check the standalone settings-sync-status flow used to own (its field-content
+# assertions live in jest sync-status-panel.test.tsx). dirty-count is asserted
+# below; refresh-button is exercised next.
+- assertVisible:
+    id: "settings-sync-status-last-success"
+- assertVisible:
+    id: "settings-sync-status-network"
+- assertVisible:
+    id: "settings-sync-status-error"
 # Tap Refresh: fires a real full sync cycle (push the dirty delta + pull).
 - tapOn:
     id: "settings-sync-status-refresh-button"
