@@ -44,6 +44,15 @@ removed (or never written), which the registry scan can't see. The current
 checkout and registry-backed worktrees are left untouched. Disable both the
 signal and this pass with --no-dead-lock-detection.
 
+Finally (unless --no-supabase), the sweep makes a Docker-ground-truth pass that
+evicts any Supabase stack no live `git worktree list` entry backs — matched by
+project-id, not slot number. This reclaims a stack left behind by a deleted
+worktree even when its slot number was later reused by another worktree (whose
+registry then overwrote the orphan's, making it invisible to the registry scan)
+and even when it squats on the current slot's ports. The current worktree's own
+stack is matched by project-id and never touched. --prune-orphans is the wider,
+explicit form of this pass (it also evicts dead/abandoned-agent stacks).
+
 Options:
   --current-slot <n>        Slot that must never be cleaned (default: current worktree slot).
   --no-supabase             Only report/prune logic; do not clean Supabase infra.
@@ -272,6 +281,18 @@ classify_label() {
     if [[ -f "$REGISTRY_DIR/$CLS_SLOT" ]]; then CLS_REG="yes"; else CLS_REG="missing"; fi
   fi
 
+  # The current worktree's OWN stack is identified directly from REPO_ROOT +
+  # CURRENT_SLOT and is never a candidate, whatever it is named. This is a hard
+  # safety net for the automatic pre-startup pass: the current worktree always
+  # appears in `git worktree list`, but if it somehow lacked a .worktree-slot it
+  # would be absent from the index below and its own stack would look like an
+  # orphan — exactly the stack we must never evict moments before it starts.
+  if [[ "$label" == "$(boga_project_id_for_slot "$CURRENT_SLOT" "$REPO_ROOT")" \
+     || "$label" == "$(boga_legacy_project_id_for_slot "$CURRENT_SLOT")" ]]; then
+    CLS_PATH="$(boga_abs_dir "$REPO_ROOT")"
+    CLS_VERDICT="KEEP"; CLS_REASON="current slot ($CLS_PATH)"; return 0
+  fi
+
   CLS_PATH=""
   for idx in "${!WT_IDX_PATHS[@]}"; do
     slot="${WT_IDX_SLOTS[$idx]}"
@@ -382,49 +403,103 @@ remove_stack_by_label() {
   fi
 }
 
-# --prune-orphans: docker-ground-truth eviction. Enumerate every Supabase stack,
-# classify it, and remove every EVICT stack by exact label (plus its stale slot
-# registry file, if any). The live-lock veto and the human-worktree guard in
-# classify_label keep this from ever touching an in-use stack. Opt-in; honours
-# --dry-run. Grace is intentionally not applied: this is an explicit operator
-# action, and active work is protected structurally (by lock state), not by age.
+# Remove the stale slot-registry file that backed an evicted orphan stack — but
+# NEVER the current slot's registry. When a deleted worktree's slot number is
+# later reused, its leftover stack keeps the same `-wt<slot>` suffix (hence the
+# same CLS_SLOT) as the live worktree that took the slot over; deleting
+# $REGISTRY_DIR/$CLS_SLOT would then strip the *current* worktree's own registry
+# while reclaiming someone else's stack. Match on the active slot, not the bare
+# number, so the squatter loses its Docker stack and the live registry survives.
+remove_stale_slot_registry() {
+  local label="$1"
+
+  [[ -n "$CLS_SLOT" && -f "$REGISTRY_DIR/$CLS_SLOT" ]] || return 0
+
+  if [[ "$CLS_SLOT" == "$CURRENT_SLOT" ]]; then
+    echo "[worktree-sweep] keeping current slot registry $REGISTRY_DIR/$CLS_SLOT (orphan $label reused the active slot number)"
+    return 0
+  fi
+
+  if [[ "$DRY_RUN" == "1" ]]; then
+    echo "[worktree-sweep] dry-run: rm -f $REGISTRY_DIR/$CLS_SLOT"
+  else
+    rm -f "$REGISTRY_DIR/$CLS_SLOT"
+    echo "[worktree-sweep] removed stale slot registry: $REGISTRY_DIR/$CLS_SLOT"
+  fi
+}
+
+# Docker-ground-truth eviction core, shared by the automatic sweep and the
+# explicit --prune-orphans. Enumerate every Supabase stack, classify it against
+# the live `git worktree list`, and remove the stacks no live worktree backs — by
+# exact project-id label, so a stack is matched to its worktree by identity, never
+# by slot number alone. The live-lock veto, current-slot guard, human-checkout
+# guard, and unknown-owner guard in classify_label keep an in-use stack from ever
+# being touched. Sets SWEEP_EVICTED / SWEEP_KEPT. Honours --dry-run; the caller
+# must have confirmed Docker is available.
+#
+# scope:
+#   orphans  Evict ONLY stacks with no backing worktree at all (CLS_PATH empty) —
+#            a deleted worktree's leftovers, including one squatting on the
+#            current slot's ports. Dead/abandoned-agent stacks still have a
+#            `git worktree list` entry, so they are deferred to the registry-driven
+#            loop, which honours the grace period. This is the automatic sweep.
+#   all      Evict every EVICT verdict (orphans + dead-agent + abandoned-agent
+#            stacks). This is the explicit operator action behind --prune-orphans;
+#            grace is intentionally not applied — active work is protected
+#            structurally by lock state, not by age.
+evict_supabase_stacks() {
+  local scope="$1"
+
+  SWEEP_EVICTED=0
+  SWEEP_KEPT=0
+
+  local labels=() l
+  while IFS= read -r l; do [[ -n "$l" ]] && labels+=("$l"); done < <(collect_supabase_labels)
+  (( ${#labels[@]} > 0 )) || return 0
+
+  build_worktree_slot_index
+
+  local label
+  for label in "${labels[@]}"; do
+    classify_label "$label"
+
+    if [[ "$CLS_VERDICT" == "KEEP" ]]; then
+      echo "[worktree-sweep] keeping $label: $CLS_REASON"
+      SWEEP_KEPT=$((SWEEP_KEPT + 1))
+      continue
+    fi
+
+    # EVICT verdict. In "orphans" scope we only reclaim stacks with no backing
+    # worktree (CLS_PATH empty). A dead/abandoned-agent stack still maps to a
+    # listed worktree, so leave it to the grace-honouring registry loop.
+    if [[ "$scope" == "orphans" && -n "$CLS_PATH" ]]; then
+      echo "[worktree-sweep] deferring $label to registry sweep: $CLS_REASON"
+      SWEEP_KEPT=$((SWEEP_KEPT + 1))
+      continue
+    fi
+
+    echo "[worktree-sweep] evicting $label: $CLS_REASON"
+    remove_stack_by_label "$label"
+    remove_stale_slot_registry "$label"
+    SWEEP_EVICTED=$((SWEEP_EVICTED + 1))
+  done
+}
+
+# --prune-orphans: explicit, full docker-ground-truth eviction (orphans plus
+# dead-agent and abandoned-agent stacks). Opt-in; honours --dry-run.
 prune_orphans() {
   if ! docker_available; then
     echo "[worktree-sweep] prune-orphans: docker unavailable; nothing to do" >&2
     return 1
   fi
 
-  local labels=() l
-  while IFS= read -r l; do [[ -n "$l" ]] && labels+=("$l"); done < <(collect_supabase_labels)
-  if (( ${#labels[@]} == 0 )); then
+  evict_supabase_stacks all
+  if (( SWEEP_EVICTED == 0 && SWEEP_KEPT == 0 )); then
     echo "[worktree-sweep] prune-orphans: no Supabase stacks present in Docker"
     return 0
   fi
 
-  build_worktree_slot_index
-
-  local label kept=0 evicted=0
-  for label in "${labels[@]}"; do
-    classify_label "$label"
-    if [[ "$CLS_VERDICT" == "KEEP" ]]; then
-      echo "[worktree-sweep] keeping $label: $CLS_REASON"
-      kept=$((kept + 1))
-      continue
-    fi
-    echo "[worktree-sweep] evicting $label: $CLS_REASON"
-    remove_stack_by_label "$label"
-    if [[ -n "$CLS_SLOT" && -f "$REGISTRY_DIR/$CLS_SLOT" ]]; then
-      if [[ "$DRY_RUN" == "1" ]]; then
-        echo "[worktree-sweep] dry-run: rm -f $REGISTRY_DIR/$CLS_SLOT"
-      else
-        rm -f "$REGISTRY_DIR/$CLS_SLOT"
-        echo "[worktree-sweep] removed stale slot registry: $REGISTRY_DIR/$CLS_SLOT"
-      fi
-    fi
-    evicted=$((evicted + 1))
-  done
-
-  echo "[worktree-sweep] prune-orphans done: $evicted evicted, $kept kept"
+  echo "[worktree-sweep] prune-orphans done: $SWEEP_EVICTED evicted, $SWEEP_KEPT kept"
   return 0
 }
 
@@ -691,5 +766,24 @@ for registry_file in "$REGISTRY_DIR"/*; do
 done
 
 prune_orphaned_dead_locks
+
+# Docker-ground-truth orphan eviction. The registry scan above is keyed by slot
+# number, so it can only see stacks that still own a registry file. A Supabase
+# stack abandoned by a deleted worktree whose slot number was later reused has no
+# registry of its own — the reusing worktree overwrote it — so the scan never
+# sees it, yet it squats on that slot's ports and blocks the live worktree's own
+# stack from starting ("Bind for 0.0.0.0:<port> failed: port is already
+# allocated"). Enumerate Docker directly and evict every stack with no
+# live-worktree correspondence, matched by project-id, so a same-slot orphan is
+# reclaimed while the current worktree's own stack and registry are left intact.
+if [[ "$SUPABASE" == "1" ]]; then
+  if docker_available; then
+    echo "[worktree-sweep] scanning Docker for orphaned Supabase stacks"
+    evict_supabase_stacks orphans
+    echo "[worktree-sweep] orphan-stack scan done: $SWEEP_EVICTED evicted, $SWEEP_KEPT kept"
+  else
+    echo "[worktree-sweep] docker unavailable; skipping orphaned Supabase stack scan" >&2
+  fi
+fi
 
 echo "[worktree-sweep] done"
