@@ -159,6 +159,17 @@ cd ../..
 - Use `data reset` when app-owned persisted state must be cleared without reinstalling the binary.
 - Use `teleport` as the default navigation/setup method when the flow is not explicitly testing setup UI.
 
+## Fixture users (one per flow)
+
+Every Supabase-backed flow that signs in uses its **own** fixture user — no
+sharing: `auth-profile-happy-path` → `user_a`, `sync-first-run-log-and-roundtrip`
+→ `user_b`. The lanes reuse one local Supabase without reset between runs, so a
+shared user would leak state between flows and flake them. Adding a sign-in flow
+means adding a fixture user in `supabase/scripts/auth-fixture-constants.sh` and
+wiring it in `scripts/maestro-run-lane.sh`. Enforced by
+`scripts/tests/maestro-fixture-users.test.sh` (meta-tests lane); full contract in
+[`docs/specs/11`](../../docs/specs/11-maestro-runtime-and-testing-conventions.md).
+
 ## Artifacts and logs
 
 Each run writes `artifacts/maestro/<task-id-or-ad-hoc>/<timestamp>/` with:

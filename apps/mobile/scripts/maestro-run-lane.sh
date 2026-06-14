@@ -75,33 +75,33 @@ case "$lane" in
     run_flow data "Data runtime smoke" data-runtime-smoke.yaml
     ;;
 
-  # The Supabase-configured auth/profile lane: login-on-start enforcement, the
-  # first-sync gate (pinned in-progress surfaces AND the real cycle lifting the
-  # gate), settings sync status, and the fixture-backed sign-in / profile /
-  # username-update / sign-out happy path. Each flow self-provisions a clean
-  # install via the `full` reset, so they run as independent runs.
+  # The Supabase-configured auth/profile lane: login-on-start enforcement and the
+  # fixture-backed sign-in / profile / username-update / sign-out happy path (the
+  # happy-path flow also asserts the route guard at both ends). The first-sync
+  # gate's in-progress + dismissal surfaces are covered by the jest
+  # sync-gate-screen suite; the real-cycle gate lift and the settings sync-status
+  # surface are proven on-device by the sync-e2e round-trip. Signs in as user_a —
+  # its own dedicated fixture, per the one-user-per-flow rule (see docs/specs/11,
+  # enforced by scripts/tests/maestro-fixture-users.test.sh).
   auth-profile)
     export_local_supabase_env
     export MAESTRO_AUTH_PROFILE_EMAIL="${MAESTRO_AUTH_PROFILE_EMAIL:-$USER_A_EMAIL}"
     export MAESTRO_AUTH_PROFILE_PASSWORD="${MAESTRO_AUTH_PROFILE_PASSWORD:-$USER_A_PASSWORD}"
     export MAESTRO_AUTH_PROFILE_USERNAME="${MAESTRO_AUTH_PROFILE_USERNAME:-maestro-${TASK_ID:-auth-profile}-$(date +%H%M%S)}"
-    run_flow full "Launch requires sign-in" launch-requires-sign-in.yaml
-    run_flow full "Sync gate first cycle" sync-gate-first-cycle.yaml
-    run_flow full "Sync gate first cycle (real)" sync-gate-first-cycle-real.yaml
-    run_flow full "Settings sync status" settings-sync-status.yaml
     run_flow full "Auth profile happy path" auth-profile-happy-path.yaml
     ;;
 
   # The UI <-> server sync e2e lane: real recorder UI + real sync cycle + real
   # local Supabase. Proves (A) new-user bootstrap lifts the gate, (B) a workout
-  # logged through the recorder, (C) forced sync drains Pending changes to 0,
-  # (D) full device wipe + re-sign-in restores the workout from the remote DB.
+  # logged through the recorder, (C) forced sync drains Pending changes to 0 and
+  # the settings sync-status surface renders, (D) full device wipe + re-sign-in
+  # restores the workout from the remote DB.
   #
-  # Signs in as the DEDICATED fixture user (user_b), not user_a: the
-  # auth-profile lane's gate flows can leave user_a's server catalog PARTIALLY
-  # pushed, which would make this flow's bootstrap take the incomplete PULL
-  # branch and flake. user_b is exclusive to this flow, so its first sign-in
-  # deterministically takes the SEED branch. See the flow file's ISOLATION note.
+  # Signs in as user_b — its own dedicated fixture, per the one-user-per-flow rule
+  # (docs/specs/11): every Supabase-backed Maestro flow owns a distinct fixture so
+  # no flow depends on another's residual server state. A pristine user also makes
+  # first sign-in deterministic (empty server -> bootstrapper SEED branch). See the
+  # flow file's ISOLATION note; enforced by scripts/tests/maestro-fixture-users.test.sh.
   sync-e2e)
     export_local_supabase_env
     MAESTRO_ROUNDTRIP_EMAIL="$USER_B_EMAIL" \

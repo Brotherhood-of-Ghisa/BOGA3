@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 
 # run-meta-tests.sh — infra-free self-tests for the repo meta-tooling
-# (gen-docs.sh, test-for.sh, pr-check.sh). Runs as the `meta-tests` lane
-# (fast gate, repo half; see scripts/lanes.tsv) and in CI.
+# (gen-docs.sh, test-for.sh, pr-check.sh) and the Maestro fixture-user rule.
+# Runs as the `meta-tests` lane (fast gate, repo half; see scripts/lanes.tsv)
+# and in CI.
 #
 # The worktree-sweep tests in this directory are NOT run here — they exercise
 # real git/registry state and remain manual.
@@ -15,6 +16,7 @@ TESTS=(
   "gen-docs.test.sh"
   "test-for.test.sh"
   "pr-check.test.sh"
+  "maestro-fixture-users.test.sh"
 )
 
 failed=0

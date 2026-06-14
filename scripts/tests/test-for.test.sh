@@ -51,8 +51,10 @@ not_requires fast      docs/specs/05-data-model.md
 requires meta-tests    scripts/pr-check.sh
 requires meta-tests    scripts/tests/fixtures/pr-bodies/good.md
 
-# Maestro flows → frontend
+# Maestro flows / runner → frontend + meta-tests (the fixture-user rule guard)
 requires frontend      apps/mobile/.maestro/flows/smoke-launch.yaml
+requires meta-tests    apps/mobile/.maestro/flows/smoke-launch.yaml
+requires meta-tests    apps/mobile/scripts/maestro-run-lane.sh
 
 # union across files
 requires backend       apps/mobile/components/Button.tsx supabase/tests/x.sh
