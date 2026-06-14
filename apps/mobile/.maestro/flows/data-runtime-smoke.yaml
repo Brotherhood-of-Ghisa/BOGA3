@@ -1,42 +1,23 @@
 appId: com.dinoderek.mobile
 ---
+# No per-openLink Open/Continue/Close dismissal taps: the dev-client URL-scheme
+# trust dialog ("Open in <App>?") is pre-authorized in maestro-ios-launch.sh
+# (maestro_preauthorize_url_schemes seeds the schemeapproval record), location is
+# pre-granted (maestro_preauthorize_location), and the one-time expo-dev-client
+# menu sheet is dismissed by the warm-up before this flow runs — so none of those
+# dialogs render here. Each optional tap on an ABSENT element costs the full ~7s
+# optionalLookupTimeoutMs (measured: 3×7.1s + 1×7.0s + 1×7.1s ≈ 35s of dead wait
+# in the previous version), and every one was WARNED/absent on every run. If
+# pre-authorization ever regresses, the dialog blocks the next assertion and the
+# flow fails loudly (the correct signal) instead of silently absorbing ~7s/tap.
 - openLink: "${MAESTRO_IOS_DEV_CLIENT_URL}"
-- waitForAnimationToEnd:
-    timeout: 5000
-- tapOn:
-    text: "Open"
-    optional: true
-- tapOn:
-    text: "Continue"
-    optional: true
-- tapOn:
-    text: "Close"
-    optional: true
 - openLink: "boga3://maestro-harness?reset=data&teleport=session-list"
-- tapOn:
-    text: "Open"
-    optional: true
-- tapOn:
-    text: "Continue"
-    optional: true
-- tapOn:
-    text: "Close"
-    optional: true
 - extendedWaitUntil:
     visible:
       id: "stats-history-screen"
     timeout: 30000
 - takeScreenshot: "03-data-runtime-smoke-start"
 - openLink: "boga3://maestro-harness?reset=data&teleport=session-recorder"
-- tapOn:
-    text: "Open"
-    optional: true
-- tapOn:
-    text: "Continue"
-    optional: true
-- tapOn:
-    text: "Close"
-    optional: true
 - extendedWaitUntil:
     visible:
       id: "start-session-button"
@@ -51,9 +32,6 @@ appId: com.dinoderek.mobile
     visible:
       text: "No exercises logged yet."
     timeout: 30000
-- tapOn:
-    text: "Continue"
-    optional: true
 - tapOn: "Log new exercise"
 - tapOn: "Exercise filter input"
 - inputText: "Barbell Back Squat"
@@ -77,32 +55,16 @@ appId: com.dinoderek.mobile
 - inputText: "135"
 - tapOn: "Reps for exercise 1 set 1"
 - inputText: "8"
+# The session has one complete set (weight + reps), so Submit goes straight
+# through with no "Remove incomplete/empty" confirmation dialog — the previous
+# optional re-tap + confirmation taps here were always absent (WARNED) and cost
+# ~7s. We assert the success screen directly; a missing/blocked submit fails the
+# extendedWaitUntil loudly.
 - tapOn: "Submit Session"
-- tapOn:
-    text: "Submit Session"
-    optional: true
-- tapOn:
-    text: "Remove incomplete sets and submit"
-    optional: true
-- tapOn:
-    text: "Remove empty exercises and submit"
-    optional: true
-- tapOn:
-    text: "Continue"
-    optional: true
-- tapOn:
-    text: "Close"
-    optional: true
 - extendedWaitUntil:
     visible:
       id: "stats-history-screen"
     timeout: 30000
-- tapOn:
-    text: "Continue"
-    optional: true
-- tapOn:
-    text: "Close"
-    optional: true
 - tapOn:
     id: "stats-card-sessions"
 - assertVisible:

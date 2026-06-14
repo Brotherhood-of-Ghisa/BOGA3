@@ -436,27 +436,19 @@ maestro_warm_dev_client() {
   # final wait uses a bounded 45s timeout: enough to JS-bundle the cold root, but
   # short enough that a genuinely stuck state doesn't burn dead time before the
   # gated flow takes over.
+  # No optional "Open"/coordinate dismissal taps: the URL-scheme trust dialog is
+  # pre-authorized in maestro-ios-launch.sh, so it never renders. Each optional
+  # tap on the (absent) "Open" cost the full ~7s optionalLookupTimeoutMs
+  # (measured 2×~7.2s ≈ 14s of pure dead wait in the warm-up alone). The warm-up's
+  # only real job is to drive the cold Metro bundle hot; the extendedWaitUntil on
+  # the RN root does that and returns the instant the root mounts. If
+  # pre-authorization ever regresses, the gated flow asserts authoritatively and
+  # fails loudly rather than this best-effort warm-up silently absorbing the cost.
   cat >"$warmup_flow" <<EOF
 appId: ${bundle_id}
 ---
 - openLink: "${dev_client_url}"
-- waitForAnimationToEnd:
-    timeout: 5000
-- tapOn:
-    text: "Open"
-    optional: true
-- tapOn:
-    point: "68%,54%"
-    optional: true
 - openLink: "boga3://maestro-harness?teleport=session-list"
-- waitForAnimationToEnd:
-    timeout: 5000
-- tapOn:
-    text: "Open"
-    optional: true
-- tapOn:
-    point: "68%,54%"
-    optional: true
 - extendedWaitUntil:
     visible:
       id: "stats-history-screen"
