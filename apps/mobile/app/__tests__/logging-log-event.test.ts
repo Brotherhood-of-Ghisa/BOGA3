@@ -2,10 +2,15 @@
 
 const mockGetSupabaseMobileClient = jest.fn();
 const mockInsert = jest.fn();
-const mockGetSession = jest.fn();
+const mockIsDevMode = jest.fn();
 
 jest.mock('@/src/auth/supabase', () => ({
   getSupabaseMobileClient: (...args: unknown[]) => mockGetSupabaseMobileClient(...args),
+}));
+
+jest.mock('@/src/utils/isDevMode', () => ({
+  isDevMode: (...args: unknown[]) => mockIsDevMode(...args),
+  DEV_BUNDLE_ID: 'com.phano.boga3.dev',
 }));
 
 jest.mock('expo-application', () => ({
@@ -26,181 +31,134 @@ jest.mock('react-native', () => ({
   Platform: {
     OS: 'ios',
   },
+  AppState: {
+    addEventListener: jest.fn(() => ({ remove: jest.fn() })),
+  },
 }));
 
+import { __resetLogBufferForTests, getRecentLogs } from '@/src/logging/buffer';
+import { __resetLoggingUserIdForTests, setLoggingUserId } from '@/src/logging/currentUser';
+import { __resetLogFlushForTests, flushLogs } from '@/src/logging/flush';
 import { logEvent } from '@/src/logging/logEvent';
 
 const buildMockClient = () => ({
-  auth: {
-    getSession: mockGetSession,
-  },
   from: jest.fn(() => ({
     insert: mockInsert,
   })),
 });
 
-describe('logEvent', () => {
+const insertedRows = (call = 0): Record<string, unknown>[] => mockInsert.mock.calls[call][0];
+
+describe('logEvent + flush', () => {
+  let logSpy: jest.SpyInstance;
+  let warnSpy: jest.SpyInstance;
+  let errorSpy: jest.SpyInstance;
+
   beforeEach(() => {
     mockGetSupabaseMobileClient.mockReset();
     mockInsert.mockReset();
-    mockGetSession.mockReset();
-    mockInsert.mockResolvedValue({
-      data: null,
-      error: null,
-    });
-    mockGetSession.mockResolvedValue({
-      data: {
-        session: null,
-      },
-      error: null,
-    });
+    mockIsDevMode.mockReset();
+    mockInsert.mockResolvedValue({ data: null, error: null });
+    mockGetSupabaseMobileClient.mockReturnValue(buildMockClient());
+    mockIsDevMode.mockReturnValue(false);
+
+    __resetLogBufferForTests();
+    __resetLoggingUserIdForTests();
+    __resetLogFlushForTests();
+
+    logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
   });
 
-  it('returns without inserting when the Supabase mobile client is unavailable', async () => {
-    mockGetSupabaseMobileClient.mockReturnValue(null);
+  afterEach(() => {
+    logSpy.mockRestore();
+    warnSpy.mockRestore();
+    errorSpy.mockRestore();
+  });
 
-    await expect(
-      logEvent({
-        level: 'error',
-        event: 'auth.restore_failed',
-      })
-    ).resolves.toBeUndefined();
+  it('prints every level to the matching console channel and buffers it', async () => {
+    await logEvent({ level: 'debug', source: 'sync', event: 'sync.debug' });
+    await logEvent({ level: 'info', source: 'auth', event: 'auth.info' });
+    await logEvent({ level: 'warn', source: 'app', event: 'app.warn' });
+    await logEvent({ level: 'error', source: 'database', event: 'db.error' });
+
+    expect(logSpy).toHaveBeenCalledWith('[sync] sync.debug');
+    expect(logSpy).toHaveBeenCalledWith('[auth] auth.info');
+    expect(warnSpy).toHaveBeenCalledWith('[app] app.warn');
+    expect(errorSpy).toHaveBeenCalledWith('[database] db.error');
+
+    const events = getRecentLogs().map((entry) => entry.event);
+    expect(events).toEqual(['sync.debug', 'auth.info', 'app.warn', 'db.error']);
+  });
+
+  it('does not persist debug/info to Supabase even when signed in', async () => {
+    setLoggingUserId('user-1');
+
+    await logEvent({ level: 'debug', source: 'sync', event: 'sync.debug' });
+    await logEvent({ level: 'info', source: 'auth', event: 'auth.info' });
+    await flushLogs();
 
     expect(mockInsert).not.toHaveBeenCalled();
   });
 
-  it('inserts the current authenticated user id when userId is omitted', async () => {
-    mockGetSupabaseMobileClient.mockReturnValue(buildMockClient());
-    mockGetSession.mockResolvedValueOnce({
-      data: {
-        session: {
-          user: {
-            id: 'current-user-1',
-          },
-        },
-      },
-      error: null,
-    });
+  it('buffers warn/error while signed out and flushes them in one batch after login', async () => {
+    // Signed out: the table only accepts authenticated inserts, so nothing is
+    // written yet — anon access stays fully revoked.
+    await logEvent({ level: 'warn', source: 'auth', event: 'auth.sign_in_failed' });
+    await logEvent({ level: 'error', source: 'sync', event: 'sync.boot_failed' });
+    expect(mockInsert).not.toHaveBeenCalled();
 
-    await logEvent({
-      level: 'info',
-      source: 'auth',
-      event: 'auth.restore_succeeded',
-    });
+    // Login mirrors the user id and flushes the backlog in a single insert.
+    setLoggingUserId('later-user');
+    await flushLogs();
 
-    expect(mockGetSession).toHaveBeenCalledTimes(1);
-    expect(mockInsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        user_id: 'current-user-1',
-      })
-    );
+    expect(mockInsert).toHaveBeenCalledTimes(1);
+    const rows = insertedRows();
+    expect(rows).toHaveLength(2);
+    expect(rows.map((row) => row.event)).toEqual(['auth.sign_in_failed', 'sync.boot_failed']);
+    // Captured at log time → these happened before login, so user_id stays null
+    // (RLS accepts a null user_id from an authenticated session).
+    expect(rows.every((row) => row.user_id === null)).toBe(true);
   });
 
-  it('preserves an explicit userId without reading the current session', async () => {
-    mockGetSupabaseMobileClient.mockReturnValue(buildMockClient());
+  it('stamps the signed-in user and inserts on a warn while signed in', async () => {
+    setLoggingUserId('user-1');
 
-    await logEvent({
-      level: 'info',
-      source: 'auth',
-      event: 'auth.sign_in_succeeded',
-      userId: 'explicit-user-1',
-    });
+    await logEvent({ level: 'warn', source: 'sync', event: 'sync.flush_failed' });
+    await flushLogs();
 
-    expect(mockGetSession).not.toHaveBeenCalled();
-    expect(mockInsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        user_id: 'explicit-user-1',
-      })
-    );
+    expect(mockInsert).toHaveBeenCalledTimes(1);
+    expect(insertedRows()[0]).toEqual(expect.objectContaining({ user_id: 'user-1' }));
   });
 
-  it('inserts null when userId is omitted and no session is available', async () => {
-    mockGetSupabaseMobileClient.mockReturnValue(buildMockClient());
+  it('honours an explicit userId over the auth mirror', async () => {
+    setLoggingUserId('mirror-user');
 
-    await logEvent({
-      level: 'warn',
-      source: 'sync',
-      event: 'sync.auth_required',
-    });
+    await logEvent({ level: 'warn', source: 'auth', event: 'auth.x', userId: 'explicit-user' });
+    await flushLogs();
 
-    expect(mockGetSession).toHaveBeenCalledTimes(1);
-    expect(mockInsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        user_id: null,
-      })
-    );
+    expect(insertedRows()[0]).toEqual(expect.objectContaining({ user_id: 'explicit-user' }));
   });
 
-  it('preserves an explicit null userId', async () => {
-    mockGetSupabaseMobileClient.mockReturnValue(buildMockClient());
+  it('preserves an explicit null userId while still inserting', async () => {
+    setLoggingUserId('mirror-user');
 
-    await logEvent({
-      level: 'info',
-      source: 'auth',
-      event: 'auth.sign_out_requested',
-      userId: null,
-    });
+    await logEvent({ level: 'error', source: 'auth', event: 'auth.x', userId: null });
+    await flushLogs();
 
-    expect(mockGetSession).not.toHaveBeenCalled();
-    expect(mockInsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        user_id: null,
-      })
-    );
+    expect(insertedRows()[0]).toEqual(expect.objectContaining({ user_id: null }));
   });
 
-  it('still attempts the log insert when the session lookup fails', async () => {
-    mockGetSupabaseMobileClient.mockReturnValue(buildMockClient());
-    mockGetSession.mockRejectedValueOnce(new Error('session lookup failed'));
+  it('never inserts while signed out (table is authenticated-only)', async () => {
+    await logEvent({ level: 'error', source: 'sync', event: 'sync.boot_failed' });
+    await flushLogs();
 
-    await expect(
-      logEvent({
-        level: 'error',
-        source: 'sync',
-        event: 'sync.flush_transport_failed',
-      })
-    ).resolves.toBeUndefined();
-
-    expect(mockGetSession).toHaveBeenCalledTimes(1);
-    expect(mockInsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        user_id: null,
-      })
-    );
+    expect(mockInsert).not.toHaveBeenCalled();
   });
 
-  it('still attempts the log insert when Supabase returns a session lookup error', async () => {
-    mockGetSupabaseMobileClient.mockReturnValue(buildMockClient());
-    mockGetSession.mockResolvedValueOnce({
-      data: {
-        session: {
-          user: {
-            id: 'ignored-user-1',
-          },
-        },
-      },
-      error: {
-        message: 'session unavailable',
-      },
-    });
-
-    await expect(
-      logEvent({
-        level: 'error',
-        source: 'sync',
-        event: 'sync.flush_transport_failed',
-      })
-    ).resolves.toBeUndefined();
-
-    expect(mockInsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        user_id: null,
-      })
-    );
-  });
-
-  it('inserts default source, client metadata, and sanitized context', async () => {
-    mockGetSupabaseMobileClient.mockReturnValue(buildMockClient());
+  it('inserts default source, client metadata, an event timestamp, and sanitized context', async () => {
+    setLoggingUserId('user-1');
 
     await logEvent({
       level: 'warn',
@@ -220,57 +178,82 @@ describe('logEvent', () => {
         },
       },
     });
+    await flushLogs();
 
-    expect(mockInsert).toHaveBeenCalledWith({
-      level: 'warn',
-      source: 'app',
-      event: 'sync.flush_transport_failed',
-      message: 'network failed',
-      user_id: 'user-1',
-      client_platform: 'ios',
-      client_app_version: '1.2.3',
-      client_build_number: '45',
-      client_runtime_version: null,
-      client_update_id: null,
-      client_channel: null,
-      client_variant: 'test',
-      context: {
-        retryCount: 2,
-        nested: {
-          status: 'transport_failure',
+    const row = insertedRows()[0];
+    expect(row).toEqual(
+      expect.objectContaining({
+        level: 'warn',
+        source: 'app',
+        event: 'sync.flush_transport_failed',
+        message: 'network failed',
+        user_id: 'user-1',
+        client_platform: 'ios',
+        client_app_version: '1.2.3',
+        client_build_number: '45',
+        client_runtime_version: null,
+        client_update_id: null,
+        client_channel: null,
+        client_variant: 'test',
+        context: {
+          retryCount: 2,
+          nested: {
+            status: 'transport_failure',
+          },
         },
-      },
-    });
+      })
+    );
+    expect(typeof row.created_at).toBe('string');
+    expect(Number.isNaN(new Date(row.created_at as string).getTime())).toBe(false);
   });
 
-  it('never throws when the insert fails', async () => {
-    mockGetSupabaseMobileClient.mockReturnValue(buildMockClient());
+  it('never throws when the insert rejects (records stay queued for retry)', async () => {
+    setLoggingUserId('user-1');
     mockInsert.mockRejectedValueOnce(new Error('insert failed'));
 
     await expect(
-      logEvent({
-        level: 'error',
-        source: 'auth',
-        event: 'auth.sign_in_failed',
-      })
+      logEvent({ level: 'error', source: 'auth', event: 'auth.sign_in_failed' })
     ).resolves.toBeUndefined();
+    await expect(flushLogs()).resolves.toBeUndefined();
   });
 
   it('never throws when Supabase returns an insert error', async () => {
-    mockGetSupabaseMobileClient.mockReturnValue(buildMockClient());
+    setLoggingUserId('user-1');
     mockInsert.mockResolvedValueOnce({
       data: null,
-      error: {
-        message: 'permission denied for table app_logs',
-      },
+      error: { message: 'permission denied for table app_logs' },
     });
 
     await expect(
-      logEvent({
-        level: 'info',
-        source: 'auth',
-        event: 'auth.sign_in_succeeded',
-      })
+      logEvent({ level: 'warn', source: 'auth', event: 'auth.x' })
     ).resolves.toBeUndefined();
+    await expect(flushLogs()).resolves.toBeUndefined();
+  });
+
+  it('returns without inserting when the Supabase client is unavailable', async () => {
+    mockGetSupabaseMobileClient.mockReturnValue(null);
+    setLoggingUserId('user-1');
+
+    await expect(
+      logEvent({ level: 'error', event: 'auth.restore_failed' })
+    ).resolves.toBeUndefined();
+    await flushLogs();
+
+    expect(mockInsert).not.toHaveBeenCalled();
+  });
+
+  it('emits a loud drop notice when the pending queue overflows', async () => {
+    // Overflow the 200-entry pending queue by 5 while signed out (no flush
+    // drains it), then flush once signed in.
+    for (let index = 0; index < 205; index += 1) {
+      await logEvent({ level: 'warn', source: 'sync', event: `sync.warn_${index}` });
+    }
+
+    setLoggingUserId('user-1');
+    await flushLogs();
+
+    const dropNotice = getRecentLogs().find((entry) => entry.event === 'logging.dropped');
+    expect(dropNotice).toBeDefined();
+    expect(dropNotice?.context).toEqual({ droppedCount: 5 });
   });
 });

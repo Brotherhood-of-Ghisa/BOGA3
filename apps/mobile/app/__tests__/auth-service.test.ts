@@ -7,6 +7,8 @@ const mockSecureStoreGetItemAsync = jest.fn();
 const mockSecureStoreDeleteItemAsync = jest.fn();
 const mockSecureStoreSetItemAsync = jest.fn();
 const mockLogEvent = jest.fn();
+const mockSetLoggingUserId = jest.fn();
+const mockFlushLogs = jest.fn();
 const mockWipeLocalForAccountSwitch = jest.fn();
 const mockRequestSync = jest.fn();
 
@@ -22,6 +24,8 @@ jest.mock('expo-secure-store', () => ({
 
 jest.mock('@/src/logging', () => ({
   logEvent: (...args: unknown[]) => mockLogEvent(...args),
+  setLoggingUserId: (...args: unknown[]) => mockSetLoggingUserId(...args),
+  flushLogs: (...args: unknown[]) => mockFlushLogs(...args),
 }));
 
 // Stub the local-data wipe so this remains a pure auth-service unit test (no
@@ -104,6 +108,8 @@ describe('auth service bootstrap', () => {
     mockUpdateUser.mockReset();
     mockUnsubscribe.mockReset();
     mockLogEvent.mockReset();
+    mockSetLoggingUserId.mockReset();
+    mockFlushLogs.mockReset();
     mockWipeLocalForAccountSwitch.mockReset();
     mockWipeLocalForAccountSwitch.mockResolvedValue(undefined);
     mockRequestSync.mockReset();

@@ -1,159 +1,61 @@
-import * as Application from 'expo-application';
-import Constants from 'expo-constants';
-import { Platform } from 'react-native';
-import type { SupabaseClient } from '@supabase/supabase-js';
+import { pushLog } from './buffer';
+import { flushLogs } from './flush';
+import { buildRecord } from './record';
+import type { LogEventParams, LogRecord } from './types';
 
-import { getSupabaseMobileClient } from '@/src/auth/supabase';
-import { isDevMode } from '@/src/utils/isDevMode';
+export type { LogEventParams, LogLevel, LogSource } from './types';
 
-type LogLevel = 'debug' | 'info' | 'warn' | 'error';
-type LogSource = 'app' | 'backend' | 'database' | 'sync' | 'auth';
+const emitToConsole = (record: LogRecord): void => {
+  const prefix = `[${record.source}] ${record.event}`;
+  const parts: unknown[] = [prefix];
+  if (record.message) {
+    parts.push(record.message);
+  }
+  if (record.context) {
+    parts.push(record.context);
+  }
 
-export type LogEventParams = {
-  level: LogLevel;
-  source?: LogSource;
-  event: string;
-  message?: string;
-  userId?: string | null;
-  context?: Record<string, unknown>;
+  // Call the live console methods (not a captured reference) so debug/info land
+  // on console.log and warn/error on their matching channels — and so dev tools
+  // or tests that override console are respected.
+  switch (record.level) {
+    case 'error':
+      console.error(...parts);
+      break;
+    case 'warn':
+      console.warn(...parts);
+      break;
+    default:
+      console.log(...parts);
+      break;
+  }
 };
 
-const SENSITIVE_KEY_PATTERNS = [
-  /password/i,
-  /token/i,
-  /secret/i,
-  /authorization/i,
-  /^cookie$/i,
-  /^session$/i,
-  /^user$/i,
-  /api[_-]?key/i,
-  /anon[_-]?key/i,
-  /service[_-]?role/i,
-];
-
-const MAX_CONTEXT_DEPTH = 5;
-const MAX_ARRAY_ITEMS = 20;
-
-const isSensitiveKey = (key: string) => SENSITIVE_KEY_PATTERNS.some((pattern) => pattern.test(key));
-
-const isPlainObject = (value: unknown): value is Record<string, unknown> =>
-  !!value && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date);
-
-const sanitizeContextValue = (value: unknown, depth: number): unknown => {
-  if (value === undefined || typeof value === 'function' || typeof value === 'symbol') {
-    return undefined;
-  }
-
-  if (typeof value === 'bigint') {
-    return value.toString();
-  }
-
-  if (value instanceof Date) {
-    return value.toISOString();
-  }
-
-  if (depth >= MAX_CONTEXT_DEPTH) {
-    return '[truncated]';
-  }
-
-  if (Array.isArray(value)) {
-    return value.slice(0, MAX_ARRAY_ITEMS).map((entry) => {
-      const sanitized = sanitizeContextValue(entry, depth + 1);
-      return sanitized === undefined ? null : sanitized;
-    });
-  }
-
-  if (isPlainObject(value)) {
-    const sanitizedEntries = Object.entries(value).flatMap(([key, entry]) => {
-      if (isSensitiveKey(key)) {
-        return [];
-      }
-
-      const sanitized = sanitizeContextValue(entry, depth + 1);
-      return sanitized === undefined ? [] : [[key, sanitized] as const];
-    });
-
-    return Object.fromEntries(sanitizedEntries);
-  }
-
-  return value;
-};
-
-const sanitizeContext = (context: Record<string, unknown> | undefined) => {
-  if (!context) {
-    return null;
-  }
-
-  return sanitizeContextValue(context, 0) as Record<string, unknown>;
-};
-
-const normalizeOptionalString = (value: unknown): string | null =>
-  typeof value === 'string' && value.trim() ? value : null;
-
-const readExpoConfigValue = (key: string): string | null => {
-  const expoConfig = Constants.expoConfig as
-    | {
-        extra?: Record<string, unknown>;
-        version?: string | null;
-      }
-    | null
-    | undefined;
-  const value = key === 'version' ? expoConfig?.version : expoConfig?.extra?.[key];
-  return normalizeOptionalString(value);
-};
-
-const resolveCurrentUserId = async (client: SupabaseClient): Promise<string | null> => {
+/**
+ * Log an application event. Behaviour by level:
+ *
+ *   - ALL levels → printed to the console (visible in the Metro/Expo dev
+ *     server and the in-app dev viewer) and pushed to the in-memory buffer.
+ *   - `warn` / `error` → additionally queued for durable persistence to
+ *     Supabase `app_logs`, flushed (batched) once signed in. A best-effort
+ *     immediate flush is kicked here so errors surface promptly; the flush
+ *     self-gates on auth and an in-flight guard, so this stays cheap.
+ *
+ * Fire-and-forget: always resolves, never throws — logging must never
+ * interrupt auth, sync, or local-first app flows. The `async`/`Promise<void>`
+ * signature is preserved for the existing ~30 call sites (and lets a caller
+ * `await` an `info` write in tests), but no I/O is awaited here.
+ */
+export const logEvent = async (params: LogEventParams): Promise<void> => {
   try {
-    const { data, error } = await client.auth.getSession();
-    if (error) {
-      return null;
-    }
+    const record = buildRecord(params);
+    emitToConsole(record);
+    pushLog(record);
 
-    return normalizeOptionalString(data.session?.user?.id);
+    if (record.level === 'warn' || record.level === 'error') {
+      void flushLogs();
+    }
   } catch {
-    return null;
-  }
-};
-
-export const logEvent = async ({
-  level,
-  source = 'app',
-  event,
-  message,
-  userId,
-  context,
-}: LogEventParams): Promise<void> => {
-  try {
-    const client = getSupabaseMobileClient();
-    if (!client) {
-      return;
-    }
-
-    const resolvedUserId = userId === undefined ? await resolveCurrentUserId(client) : userId;
-
-    const { error } = await client.from('app_logs').insert({
-      level,
-      source,
-      event,
-      message: message ?? null,
-      user_id: resolvedUserId,
-      client_platform: Platform.OS,
-      client_app_version: normalizeOptionalString(Application.nativeApplicationVersion) ?? readExpoConfigValue('version'),
-      client_build_number: normalizeOptionalString(Application.nativeBuildVersion),
-      client_runtime_version: null,
-      client_update_id: null,
-      client_channel: null,
-      client_variant: readExpoConfigValue('env'),
-      context: sanitizeContext(context),
-    });
-
-    if (error) {
-      throw error;
-    }
-  } catch (error) {
-    if (isDevMode()) {
-      console.warn('[logging] app log insert failed', error);
-    }
-    // Logging must never interrupt auth, sync, or local-first app flows.
+    // Never let logging throw into a caller.
   }
 };
