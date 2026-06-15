@@ -4,15 +4,15 @@ import { getSupabaseMobileClient } from '@/src/auth/supabase';
 import { isDevMode } from '@/src/utils/isDevMode';
 
 import {
-  drainDroppedCount,
+  peekDroppedCount,
   peekPendingLogs,
-  pushLog,
-  removePendingLogs,
+  removePendingBySeq,
+  subtractDroppedCount,
 } from './buffer';
 import { buildDropNotice, toInsertRow } from './record';
 import { getLoggingUserId } from './currentUser';
 
-const FLUSH_INTERVAL_MS = 15_000;
+export const FLUSH_INTERVAL_MS = 15_000;
 const FLUSH_BATCH_SIZE = 50;
 
 let flushing = false;
@@ -47,24 +47,35 @@ export const flushLogs = async (): Promise<void> => {
 
   flushing = true;
   try {
-    const dropped = drainDroppedCount();
-    if (dropped > 0) {
-      pushLog(buildDropNotice(dropped));
-    }
-
     const batch = peekPendingLogs(FLUSH_BATCH_SIZE);
-    if (batch.length === 0) {
+    const dropped = peekDroppedCount();
+    if (batch.length === 0 && dropped === 0) {
       return;
     }
 
-    const { error } = await client.from('app_logs').insert(batch.map(toInsertRow));
+    // Materialize the drop notice into THIS insert only — never via the buffer,
+    // where pushing a record onto an already-full pending queue would itself
+    // evict a real record and re-arm the drop counter (a self-perpetuating
+    // loss + duplicate-notice loop).
+    const rows = [
+      ...(dropped > 0 ? [toInsertRow(buildDropNotice(dropped))] : []),
+      ...batch.map(toInsertRow),
+    ];
+
+    const { error } = await client.from('app_logs').insert(rows);
     if (error) {
       throw error;
     }
 
-    removePendingLogs(batch.length);
+    // Success: remove exactly the flushed records by identity, and clear the
+    // drops we reported. Records that arrived (or overflowed) during the await
+    // are preserved by seq-matching and the keep-on-failure counter.
+    removePendingBySeq(new Set(batch.map((record) => record.seq)));
+    if (dropped > 0) {
+      subtractDroppedCount(dropped);
+    }
   } catch (error) {
-    // Keep the batch queued for the next attempt; surface only in dev.
+    // Keep the batch + drop counter queued for the next attempt; surface in dev.
     if (isDevMode()) {
       console.warn('[logging] app log flush failed', error);
     }

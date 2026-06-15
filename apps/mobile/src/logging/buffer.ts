@@ -64,16 +64,31 @@ export const getRecentLogs = (): LogRecord[] => recent.slice();
 /** The leading `count` un-flushed warn/error records, without removing them. */
 export const peekPendingLogs = (count: number): LogRecord[] => pending.slice(0, count);
 
-/** Drop the leading `count` records after a successful flush. */
-export const removePendingLogs = (count: number): void => {
-  pending.splice(0, count);
+/**
+ * Remove specific records (by `seq`) after a successful flush. Identity-based,
+ * NOT count-based: if the queue overflowed and trimmed its front during the
+ * in-flight insert, removing by count would delete records that were never
+ * sent. Matching on `seq` only ever removes the records that were inserted.
+ */
+export const removePendingBySeq = (seqs: ReadonlySet<number>): void => {
+  if (seqs.size === 0) {
+    return;
+  }
+  const survivors = pending.filter((record) => !seqs.has(record.seq));
+  pending.length = 0;
+  pending.push(...survivors);
 };
 
-/** Read and reset the overflow-drop counter (emitted as a notice on flush). */
-export const drainDroppedCount = (): number => {
-  const dropped = droppedSinceFlush;
-  droppedSinceFlush = 0;
-  return dropped;
+/**
+ * Current overflow-drop count, WITHOUT resetting it — the count is only cleared
+ * (via `subtractDroppedCount`) once a flush has successfully reported it, so a
+ * failed flush retries the notice rather than losing it.
+ */
+export const peekDroppedCount = (): number => droppedSinceFlush;
+
+/** Clear the drops already reported by a successful flush (keeps any newer). */
+export const subtractDroppedCount = (count: number): void => {
+  droppedSinceFlush = Math.max(0, droppedSinceFlush - count);
 };
 
 export const subscribeToLogs = (subscriber: () => void): (() => void) => {

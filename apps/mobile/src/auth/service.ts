@@ -326,6 +326,13 @@ export const signOut = async () => {
     userId: authSnapshot.user?.id ?? null,
   });
 
+  // Stop attributing logs to this user before the token is revoked. Between
+  // `signOut()` and the final snapshot below the session is dead but the
+  // account is still on screen; clearing the mirror now means a warn/error in
+  // that window buffers as a pre-auth (null user) record instead of kicking a
+  // flush the server will reject every interval until the snapshot lands.
+  setLoggingUserId(null);
+
   const { error } = await client.auth.signOut();
 
   if (error) {

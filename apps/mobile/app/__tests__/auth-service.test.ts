@@ -333,6 +333,14 @@ describe('auth service bootstrap', () => {
       userId: 'user-1',
     });
     expect(mockSignOut).toHaveBeenCalledTimes(1);
+    // The logging user id is cleared BEFORE the token is revoked, so a
+    // warn/error logged during the sign-out window does not kick a flush the
+    // dead session would have the server reject.
+    const firstClearIndex = mockSetLoggingUserId.mock.calls.findIndex((call) => call[0] === null);
+    expect(firstClearIndex).toBeGreaterThanOrEqual(0);
+    expect(mockSetLoggingUserId.mock.invocationCallOrder[firstClearIndex]).toBeLessThan(
+      mockSignOut.mock.invocationCallOrder[0]
+    );
     // Sign-out clears the previous account's local data so it can't leak into
     // the next account that signs in on this device.
     expect(mockWipeLocalForAccountSwitch).toHaveBeenCalledTimes(1);
