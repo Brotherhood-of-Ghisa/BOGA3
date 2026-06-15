@@ -8,6 +8,7 @@ import { AuthRouteGuard } from '@/components/navigation/auth-route-guard';
 import { AuthProvider, bootstrapAuthState } from '@/src/auth';
 import { bootstrapLocalDataLayer } from '@/src/data';
 import { ensureExerciseCatalogLoaded } from '@/src/exercise-catalog/cache';
+import { startLogFlushLoop, stopLogFlushLoop } from '@/src/logging';
 import { registerBackgroundSyncTask } from '@/src/sync/background-task';
 import { startSyncGateStateBridge, stopSyncGateStateBridge } from '@/src/sync/sync-gate-state-bridge';
 import { requestSync, startSyncScheduler, stopSyncScheduler } from '@/src/sync/scheduler';
@@ -25,6 +26,11 @@ export default function RootLayout() {
     // first-sync gate can decide whether to block. Started only after the
     // scheduler wired successfully.
     startSyncGateStateBridge();
+
+    // Start the log flush loop: drains buffered warn/error logs to Supabase on
+    // an interval and when the app backgrounds. Cheap and self-gating (no-op
+    // until signed in); stopped on unmount so no timer leaks.
+    startLogFlushLoop();
 
     // Ask the OS to schedule the background sync task. Registration is async and
     // must not block boot, and a rejection (e.g. Background App Refresh disabled
@@ -48,6 +54,7 @@ export default function RootLayout() {
     return () => {
       stopSyncGateStateBridge();
       stopSyncScheduler();
+      stopLogFlushLoop();
     };
   }, []);
 
@@ -63,6 +70,7 @@ export default function RootLayout() {
               <Stack.Screen name="exercise-history" />
               <Stack.Screen name="sessions" options={{ title: 'Sessions' }} />
               <Stack.Screen name="profile" options={{ title: 'Profile' }} />
+              <Stack.Screen name="dev-logs" options={{ title: 'Logs' }} />
               <Stack.Screen name="maestro-harness" options={{ headerShown: false }} />
             </Stack>
           </SyncGate>

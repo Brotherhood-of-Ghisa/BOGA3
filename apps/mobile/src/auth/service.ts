@@ -6,7 +6,7 @@ import {
   __resetSupabaseMobileClientForTests,
 } from './supabase';
 import { __resetAuthStorageAdapterForTests } from './storage';
-import { logEvent } from '@/src/logging';
+import { flushLogs, logEvent, setLoggingUserId } from '@/src/logging';
 import { wipeLocalForAccountSwitch } from '@/src/sync/account-wipe';
 import { clearAuthRequired } from '@/src/sync/auth-required-signal';
 import { requestSync } from '@/src/sync/scheduler';
@@ -86,7 +86,18 @@ const createReadySnapshotFromSession = (session: Session | null): AuthSnapshot =
   // account-switch detection in `handleAuthStateChange` always compares
   // against the account currently mapped to local data, regardless of which
   // entry point (restore, sign-in, sign-out, state-change) produced it.
-  lastKnownUserId = session?.user?.id ?? null;
+  const userId = session?.user?.id ?? null;
+  lastKnownUserId = userId;
+
+  // Mirror the signed-in user into the logging module so it can stamp `user_id`
+  // and gate its Supabase flush without importing auth (the one allowed
+  // direction). When a session becomes live, flush any logs buffered before the
+  // session existed — including pre-login warnings/errors, which the table
+  // accepts with a null `user_id` from an authenticated session.
+  setLoggingUserId(userId);
+  if (userId !== null) {
+    void flushLogs();
+  }
 
   return {
     status: 'ready',
@@ -186,6 +197,7 @@ export const bootstrapAuthState = async () => {
   const runtimeConfig = getMobileAuthRuntimeConfig();
 
   if (!runtimeConfig.isConfigured) {
+    setLoggingUserId(null);
     authSnapshot = {
       status: 'ready',
       session: null,
@@ -217,6 +229,7 @@ export const bootstrapAuthState = async () => {
       .getSession()
       .then(({ data, error }) => {
         if (error) {
+          setLoggingUserId(null);
           void logEvent({
             level: 'error',
             source: 'auth',
@@ -312,6 +325,13 @@ export const signOut = async () => {
     message: 'User session termination was requested.',
     userId: authSnapshot.user?.id ?? null,
   });
+
+  // Stop attributing logs to this user before the token is revoked. Between
+  // `signOut()` and the final snapshot below the session is dead but the
+  // account is still on screen; clearing the mirror now means a warn/error in
+  // that window buffers as a pre-auth (null user) record instead of kicking a
+  // flush the server will reject every interval until the snapshot lands.
+  setLoggingUserId(null);
 
   const { error } = await client.auth.signOut();
 

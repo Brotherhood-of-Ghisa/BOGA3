@@ -157,6 +157,18 @@ export default function SettingsScreen() {
             Developer tools
           </UiText>
           <UiText selectable variant="bodyMuted">
+            View the in-app logs captured this session (all levels). Errors and warnings also sync
+            to the backend once signed in.
+          </UiText>
+          <UiButton
+            accessibilityLabel="Open the in-app log viewer"
+            label="View logs"
+            onPress={() => router.push('/dev-logs')}
+            testID="settings-dev-logs-button"
+            variant="secondary"
+          />
+
+          <UiText selectable variant="bodyMuted">
             Wipe every local table and re-run the exercise catalog seeder. Available only in
             development builds — does nothing in release.
           </UiText>
