@@ -23,6 +23,7 @@ import { getRequiredSupabaseMobileClient } from '@/src/auth/supabase';
 import { clearAuthRequired, markAuthRequired } from '@/src/sync/auth-required-signal';
 import { clearCycleError, markCycleError } from '@/src/sync/cycle-error-signal';
 import { runBootstrapper } from '@/src/sync/bootstrapper';
+import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidation';
 import { runBundleMigrations } from '@/src/data/bundle-migrations';
 import { bootstrapLocalDataLayer, type LocalDatabase } from '@/src/data/bootstrap';
 import { PRIMARY_RUNTIME_STATE_ID, type Transaction } from '@/src/data/clock';
@@ -1040,6 +1041,22 @@ export const runSyncCycle = async (): Promise<SyncCycleOutcome> => {
       const pulledBefore = await runPullLeg(database);
       const pushed = await runPushLeg(database);
       const pulledAfter = await runPullLeg(database);
+
+      // A pull leg that applied rows changed the local read model the running app
+      // shows — an exercise/muscle-group renamed, added, or tombstoned on the
+      // server and pulled down here. The in-memory exercise-catalog cache mirrors
+      // those tables and is not touched by the SQLite write, so without this it
+      // keeps serving a stale snapshot until an unrelated local write, a screen
+      // refocus, or an app restart. The first-sign-in bootstrapper already
+      // invalidates after its pull (see bootstrapper.ts); this extends the same
+      // guarantee to every steady-state cycle. Keyed on pull motion only: a push
+      // merely clears dirty bits (invisible to readers) and an empty/no-op pull
+      // changes nothing locally, so neither needs an invalidation. The catalog
+      // cache is the only in-memory read model; rebuilding it is cheap, so a
+      // coarse "any pulled change" trigger is acceptable.
+      if (pulledBefore.changed > 0 || pulledAfter.changed > 0) {
+        invalidateExerciseCatalogCache();
+      }
 
       if (pulledBefore.changed === 0 && pushed === 0 && pulledAfter.changed === 0) {
         return markConverged();
