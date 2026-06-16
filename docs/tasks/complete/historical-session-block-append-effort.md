@@ -26,8 +26,9 @@ remain untouched.
   exercise block/card.
 - Extend the completed-session detail read model so each set carries `setType`.
 - Add a block-scoped append data API.
-- Merge appended planned rows into the first active exercise with the same
-  `exerciseDefinitionId`.
+- Append planned rows to the bottom of the active workout: merge into the
+  current last exercise only when it has the same `exerciseDefinitionId`;
+  otherwise create a new bottom exercise block.
 - Update focused repository and screen tests.
 - Update relevant UI docs for the changed completed-session detail behavior.
 
@@ -95,9 +96,9 @@ remain untouched.
   - if no active draft exists, create one using the historical session gym and
     current timestamp;
   - if an active draft exists, preserve its gym and start time;
-  - if the active draft already has an exercise with the same
-    `exerciseDefinitionId`, append planned rows to the first matching exercise;
-  - otherwise create a new planned exercise card;
+  - if the active draft's last exercise has the same `exerciseDefinitionId`,
+    append planned rows to that last exercise;
+  - otherwise create a new planned exercise card at the bottom;
   - historical sets become planned targets:
     - `weightValue`, `repsValue`, and `setType` are blank/null,
     - `plannedWeightValue`, `plannedRepsValue`, and `plannedSetType` copy the
@@ -118,8 +119,8 @@ remain untouched.
 2. The sticky action bar no longer shows workout-level `Append`.
 3. Each historical exercise block has an `Append` action.
 4. Appending a block appends only that block as planned target rows.
-5. Appending into an active session merges by first matching
-   `exerciseDefinitionId`.
+5. Appending into an active session merges only when the last active exercise
+   has the same `exerciseDefinitionId`; otherwise it creates a new bottom block.
 6. Appending with no active session creates an active session.
 7. Append failure feedback stays inline and does not navigate.
 8. Recorder `Past blocks` behavior is unchanged.
@@ -143,7 +144,7 @@ Focused test updates:
   - keeps failure feedback inline on error.
 - `session-drafts-repository.test.ts`
   - appends only the selected source exercise block,
-  - merges planned rows into the first active matching exercise,
+  - appends planned rows to the last active exercise when it matches,
   - creates a new planned exercise card when no match exists,
   - rejects non-completed source sessions,
   - rejects source exercise ids not in the source session.
@@ -166,9 +167,10 @@ Focused test updates:
 - `./boga test fast` — blocked before execution: missing `.worktree-slot`; `./scripts/worktree-setup.sh` timed out twice waiting for the slot allocation lock.
 - `./boga test frontend` — blocked before execution: missing `.worktree-slot`; `./scripts/worktree-setup.sh` timed out twice waiting for the slot allocation lock.
 - `./boga doctor` — confirmed the missing `.worktree-slot` worktree bootstrap gap and also reported Docker, iOS simulators, and Maestro unavailable in this worker environment.
+- Follow-up spec change: append placement changed to bottom-of-workout semantics; no tests rerun per YOLO instruction.
 
 ## Completion Note
 
-- What changed: completed-session detail now shows set `Effort`, exposes per-exercise `Append`, and calls a new block-scoped planned append repository API that merges by first matching `exerciseDefinitionId`.
+- What changed: completed-session detail now shows set `Effort`, exposes per-exercise `Append`, and calls a new block-scoped planned append repository API that appends at the bottom of the workout, merging only when the last active exercise matches.
 - What tests ran: focused completed-session and repository Jest tests, full mobile Jest, typecheck, lint, and UI guardrails.
 - What remains: run canonical `./boga test fast` and `./boga test frontend` after the forked worktree slot allocation lock is cleared and `.worktree-slot` is generated.

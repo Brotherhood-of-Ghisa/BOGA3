@@ -1168,13 +1168,14 @@ export const createSessionDraftRepository = (store: SessionDraftStore = createDr
         })),
       })) ?? [];
 
-    const matchingExerciseIndex = existingExercises.findIndex(
-      (exercise) => exercise.exerciseDefinitionId === sourceExercise.exerciseDefinitionId
-    );
+    const lastExerciseIndex = existingExercises.length - 1;
+    const lastExercise = existingExercises[lastExerciseIndex];
+    const shouldAppendToLastExercise =
+      lastExercise?.exerciseDefinitionId === sourceExercise.exerciseDefinitionId;
     const exercises =
-      matchingExerciseIndex >= 0
+      shouldAppendToLastExercise
         ? existingExercises.map((exercise, index) =>
-            index === matchingExerciseIndex
+            index === lastExerciseIndex
               ? {
                   ...exercise,
                   sets: [...exercise.sets, ...plannedSets],

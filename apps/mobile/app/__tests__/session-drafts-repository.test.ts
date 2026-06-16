@@ -438,7 +438,7 @@ describe('session draft repository', () => {
     );
   });
 
-  it('merges block append planned rows into the first active exercise with the same definition', async () => {
+  it('appends block planned rows to the last active exercise when it has the same definition', async () => {
     const store = createMockStore();
     const repository = createSessionDraftRepository(store);
     const now = new Date('2026-02-20T12:00:00.000Z');
@@ -531,8 +531,9 @@ describe('session draft repository', () => {
       })
     );
     expect(saveInput?.exercises).toHaveLength(2);
-    expect(saveInput?.exercises[0]?.sets).toHaveLength(2);
-    expect(saveInput?.exercises[0]?.sets[1]).toEqual(
+    expect(saveInput?.exercises[0]?.sets).toHaveLength(1);
+    expect(saveInput?.exercises[1]?.sets).toHaveLength(2);
+    expect(saveInput?.exercises[1]?.sets[1]).toEqual(
       expect.objectContaining({
         repsValue: '',
         weightValue: '',
@@ -543,10 +544,9 @@ describe('session draft repository', () => {
         performanceStatus: 'planned',
       })
     );
-    expect(saveInput?.exercises[1]?.sets).toHaveLength(1);
   });
 
-  it('creates a new active exercise card when block append has no matching active exercise', async () => {
+  it('creates a new bottom exercise card when the last active exercise does not match', async () => {
     const store = createMockStore();
     const repository = createSessionDraftRepository(store);
     const now = new Date('2026-02-20T12:00:00.000Z');
@@ -591,8 +591,17 @@ describe('session draft repository', () => {
         {
           id: 'active-exercise-1',
           sessionId: 'active-session',
-          exerciseDefinitionId: 'seed_bench_press',
+          exerciseDefinitionId: 'seed_pull_up',
           orderIndex: 0,
+          name: 'Pull-ups earlier',
+          machineName: null,
+          sets: [],
+        },
+        {
+          id: 'active-exercise-2',
+          sessionId: 'active-session',
+          exerciseDefinitionId: 'seed_bench_press',
+          orderIndex: 1,
           name: 'Bench Press',
           machineName: null,
           sets: [],
@@ -604,8 +613,10 @@ describe('session draft repository', () => {
     await repository.appendCompletedSessionExerciseAsPlanned('session-source', 'source-exercise-1', { now });
 
     const saveInput = store.saveDraftGraph.mock.calls[0]?.[0];
-    expect(saveInput?.exercises).toHaveLength(2);
-    expect(saveInput?.exercises[1]).toEqual(
+    expect(saveInput?.exercises).toHaveLength(3);
+    expect(saveInput?.exercises[0]?.name).toBe('Pull-ups earlier');
+    expect(saveInput?.exercises[1]?.name).toBe('Bench Press');
+    expect(saveInput?.exercises[2]).toEqual(
       expect.objectContaining({
         exerciseDefinitionId: 'seed_pull_up',
         name: 'Pull-ups',
