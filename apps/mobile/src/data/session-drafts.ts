@@ -141,6 +141,14 @@ export type AppendCompletedSessionAsPlannedResult = {
   sessionId: string;
 };
 
+export type AppendCompletedSessionExerciseAsPlannedOptions = {
+  now?: Date;
+};
+
+export type AppendCompletedSessionExerciseAsPlannedResult = {
+  sessionId: string;
+};
+
 export type SessionSetPerformanceStatus = 'planned' | 'skipped' | null;
 
 export type SessionPersistenceRecord = {
@@ -1107,6 +1115,94 @@ export const createSessionDraftRepository = (store: SessionDraftStore = createDr
 
     return { sessionId: saved.sessionId };
   },
+  async appendCompletedSessionExerciseAsPlanned(
+    sourceSessionId: string,
+    sourceSessionExerciseId: string,
+    options: AppendCompletedSessionExerciseAsPlannedOptions = {}
+  ): Promise<AppendCompletedSessionExerciseAsPlannedResult> {
+    const now = options.now ?? new Date();
+    ensureDate(now, 'now');
+
+    const sourceGraph = await store.loadSessionGraphById(sourceSessionId);
+    if (!sourceGraph) {
+      throw new Error(`Session ${sourceSessionId} does not exist`);
+    }
+    if (sourceGraph.session.status !== 'completed') {
+      throw new Error(`Cannot append non-completed session ${sourceSessionId}`);
+    }
+
+    const sourceExercise = sourceGraph.exercises.find((exercise) => exercise.id === sourceSessionExerciseId);
+    if (!sourceExercise) {
+      throw new Error(`Exercise ${sourceSessionExerciseId} does not belong to session ${sourceSessionId}`);
+    }
+
+    const activeGraph = await store.loadLatestDraftGraph();
+    const targetSessionId = activeGraph?.session.id;
+    const startedAt = activeGraph?.session.startedAt ?? now;
+    const gymId = activeGraph?.session.gymId ?? sourceGraph.session.gymId;
+    const plannedSets = sourceExercise.sets.map((set) => ({
+      id: createLocalEntityId('set'),
+      repsValue: '',
+      weightValue: '',
+      setType: null,
+      plannedRepsValue: set.repsValue,
+      plannedWeightValue: set.weightValue,
+      plannedSetType: set.setType,
+      performanceStatus: 'planned' as const,
+    }));
+    const existingExercises =
+      activeGraph?.exercises.map((exercise) => ({
+        id: exercise.id,
+        exerciseDefinitionId: exercise.exerciseDefinitionId,
+        name: exercise.name,
+        machineName: exercise.machineName,
+        sets: exercise.sets.map((set) => ({
+          id: set.id,
+          repsValue: set.repsValue,
+          weightValue: set.weightValue,
+          setType: set.setType,
+          plannedRepsValue: set.plannedRepsValue,
+          plannedWeightValue: set.plannedWeightValue,
+          plannedSetType: set.plannedSetType,
+          performanceStatus: set.performanceStatus,
+        })),
+      })) ?? [];
+
+    const matchingExerciseIndex = existingExercises.findIndex(
+      (exercise) => exercise.exerciseDefinitionId === sourceExercise.exerciseDefinitionId
+    );
+    const exercises =
+      matchingExerciseIndex >= 0
+        ? existingExercises.map((exercise, index) =>
+            index === matchingExerciseIndex
+              ? {
+                  ...exercise,
+                  sets: [...exercise.sets, ...plannedSets],
+                }
+              : exercise
+          )
+        : [
+            ...existingExercises,
+            {
+              id: createLocalEntityId('exercise'),
+              exerciseDefinitionId: sourceExercise.exerciseDefinitionId,
+              name: sourceExercise.name,
+              machineName: sourceExercise.machineName,
+              sets: plannedSets,
+            },
+          ];
+
+    const saved = await store.saveDraftGraph({
+      sessionId: targetSessionId,
+      gymId,
+      startedAt,
+      status: 'active',
+      exercises,
+      now,
+    });
+
+    return { sessionId: saved.sessionId };
+  },
   async completeSession(sessionId: string, options: CompleteSessionOptions = {}): Promise<CompleteSessionResult> {
     const existingSession = await store.loadSessionById(sessionId);
     if (!existingSession) {
@@ -1212,4 +1308,6 @@ export const loadSessionSnapshotById = defaultSessionDraftRepository.loadSession
 export const completeSessionDraft = defaultSessionDraftRepository.completeSession;
 export const reopenCompletedSessionDraft = defaultSessionDraftRepository.reopenCompletedSession;
 export const appendCompletedSessionAsPlanned = defaultSessionDraftRepository.appendCompletedSessionAsPlanned;
+export const appendCompletedSessionExerciseAsPlanned =
+  defaultSessionDraftRepository.appendCompletedSessionExerciseAsPlanned;
 export const listCompletedSessionsForAnalysis = defaultSessionDraftRepository.listCompletedSessionsForAnalysis;

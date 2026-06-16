@@ -135,13 +135,15 @@ Brief entrypoint map of the current mobile screens.
 8. `/completed-session/[sessionId]`
 - File: `apps/mobile/app/completed-session/[sessionId].tsx`
 - Purpose:
-  - completed session detail viewer with edit/append/delete actions
+  - completed session detail viewer with edit/delete session actions and per-exercise block append actions
 - Key states (high level):
   - loading / error / not-found / detail
+  - read-only exercise cards include a set table with `Set`, `Weight`, `Reps`, and `Effort`
+  - each exercise card header exposes `Append` to copy that one historical block as planned target rows into the active recorder
   - temporary redirect placeholder for `intent=edit`
 - Key exits:
   - `session-recorder` (edit)
-  - dismisses to `/` after successful reopen
+  - `session-recorder` after successful per-exercise block append
 
 9. `/exercise-history`
 - File: `apps/mobile/app/exercise-history.tsx`

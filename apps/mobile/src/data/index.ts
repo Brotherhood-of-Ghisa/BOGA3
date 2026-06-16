@@ -60,6 +60,7 @@ export {
 export {
   calculateSessionDurationSec,
   appendCompletedSessionAsPlanned,
+  appendCompletedSessionExerciseAsPlanned,
   completeSessionDraft,
   createDrizzleSessionDraftStore,
   createSessionDraftRepository,
@@ -73,6 +74,8 @@ export {
   type CompleteSessionResult,
   type AppendCompletedSessionAsPlannedOptions,
   type AppendCompletedSessionAsPlannedResult,
+  type AppendCompletedSessionExerciseAsPlannedOptions,
+  type AppendCompletedSessionExerciseAsPlannedResult,
   type CompletedSessionAnalysisRecord,
   type ListCompletedSessionsOptions,
   type PersistCompletedSessionInput,
