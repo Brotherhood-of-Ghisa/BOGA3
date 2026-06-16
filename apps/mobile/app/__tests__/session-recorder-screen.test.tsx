@@ -348,9 +348,15 @@ describe('SessionRecorderScreen', () => {
     expect(screen.getByLabelText('Weight for exercise 1 set 2').props.value).toBe('30');
     expect(screen.getByLabelText('Reps for exercise 1 set 2').props.value).toBe('8');
     expect(screen.getByLabelText('Quality for exercise 1 set 2: RIR 2')).toBeTruthy();
-    fireEvent.press(screen.getByLabelText('Done editing set 2'));
-    expect(screen.getByText('Set 2 · 30kg · 8 reps')).toBeTruthy();
+    expect(screen.queryByLabelText('Done editing set 2')).toBeNull();
+    expect(screen.getByLabelText('Skip set 2')).toBeTruthy();
     expect(screen.getByText('2 planned · 3 performed')).toBeTruthy();
+    fireEvent.changeText(screen.getByLabelText('Weight for exercise 1 set 2'), '35');
+    expect(screen.getByLabelText('Weight for exercise 1 set 2').props.value).toBe('35');
+
+    fireEvent.press(screen.getByLabelText('Skip set 2'));
+    expect(screen.getByText('Set 2 · 30kg · 8 reps · Skipped')).toBeTruthy();
+    expect(screen.getByText('2 planned · 2 performed · 1 skipped')).toBeTruthy();
   });
 
   it('treats equal planned volume as matched even when quality changes', async () => {

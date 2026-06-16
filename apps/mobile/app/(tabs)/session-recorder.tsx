@@ -2610,20 +2610,6 @@ export default function SessionRecorderScreen() {
     setExpandedSetIds(new Set([setId]));
   };
 
-  const collapseSetIfDisplayable = (setId: string) => {
-    const matchingSet = state.session.exercises.flatMap((exercise) => exercise.sets).find((set) => set.id === setId);
-    const rowState = matchingSet ? getSetRowState(matchingSet) : null;
-    if (!matchingSet || (!hasPerformedActual(matchingSet) && rowState !== 'planned' && rowState !== 'skipped')) {
-      return;
-    }
-
-    setExpandedSetIds((current) => {
-      const next = new Set(current);
-      next.delete(setId);
-      return next;
-    });
-  };
-
   const updateSetType = (exerciseId: string, setId: string, setType: SessionSetTypeValue) => {
     const nextSetType = normalizeSessionSetType(setType);
     setState((current) => ({
@@ -3465,10 +3451,11 @@ export default function SessionRecorderScreen() {
               {showQualityControl ? renderQualityButton('edit') : null}
               {isPlannedRow ? (
                 <Pressable
-                  accessibilityLabel={`Done editing set ${setIndex + 1}`}
-                  style={styles.setDoneButton}
-                  onPress={() => collapseSetIfDisplayable(set.id)}>
-                  <Text style={styles.setDoneButtonText}>Done</Text>
+                  accessibilityLabel={`Skip set ${setIndex + 1}`}
+                  accessibilityRole="button"
+                  style={styles.plannedSetSkipButton}
+                  onPress={() => markPlannedSetSkipped(exercise.id, set.id)}>
+                  <Text style={styles.plannedSetSkipButtonText}>Skip</Text>
                 </Pressable>
               ) : (
                 <Pressable
@@ -4827,21 +4814,6 @@ const styles = StyleSheet.create({
     color: uiColors.textSecondary,
     fontWeight: '700',
     fontSize: 12,
-  },
-  setDoneButton: {
-    minWidth: 50,
-    minHeight: 32,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: uiColors.borderStrong,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: uiColors.surfaceDefault,
-  },
-  setDoneButtonText: {
-    color: uiColors.actionPrimary,
-    fontSize: 12,
-    fontWeight: '800',
   },
   submitRow: {
     flexDirection: 'row',
