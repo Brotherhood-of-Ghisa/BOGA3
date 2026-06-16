@@ -432,7 +432,7 @@ describe('SessionRecorderScreen', () => {
 
     fireEvent.press(screen.getByLabelText('logged set 1 for exercise 1: 30kg · 8 reps; quality RIR 2'));
 
-    expect(screen.getByPlaceholderText('Weight')).toBeTruthy();
+    expect(screen.getByLabelText('Weight for exercise 1 set 1')).toBeTruthy();
     expect(screen.getByText('kg')).toBeTruthy();
     expect(screen.getByPlaceholderText('Reps')).toBeTruthy();
     expect(screen.getByLabelText('Quality for exercise 1 set 1: RIR 2')).toBeTruthy();

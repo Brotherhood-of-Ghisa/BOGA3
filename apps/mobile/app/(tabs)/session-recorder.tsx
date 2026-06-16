@@ -388,13 +388,13 @@ function createSetFromPrevious(previousSet: SessionSet | undefined): SessionSet 
 
 const SET_TYPE_CYCLE_ORDER: SessionSetTypeValue[] = [null, ...SESSION_SET_TYPES];
 const SET_TYPE_SHORT_LABELS: Record<SessionSetType, string> = {
-  warm_up: 'WU',
+  warm_up: 'WUp',
   rir_0: 'R0',
   rir_1: 'R1',
   rir_2: 'R2',
 };
 const SET_TYPE_MENU_LABELS: Record<SessionSetType, string> = {
-  warm_up: 'Warm-up',
+  warm_up: 'WUp',
   rir_0: 'RIR 0',
   rir_1: 'RIR 1',
   rir_2: 'RIR 2',
@@ -3419,8 +3419,6 @@ export default function SessionRecorderScreen() {
                   autoFocus={pendingFocusedWeightSetId === set.id}
                   inputMode="decimal"
                   keyboardType="decimal-pad"
-                  placeholder="Weight"
-                  placeholderTextColor={uiColors.textDisabled}
                   style={styles.setWeightTextInput}
                   value={set.weight}
                   onBlur={() => {

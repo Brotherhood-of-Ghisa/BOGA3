@@ -451,7 +451,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     expect(screen.queryByText('Select Exercise')).toBeNull();
     expect(screen.getByText('Barbell Squat')).toBeTruthy();
     expect(screen.queryByTestId('exercise-1-set-header')).toBeNull();
-    expect(screen.getByPlaceholderText('Weight')).toBeTruthy();
+    expect(screen.getByLabelText('Weight for exercise 1 set 1')).toBeTruthy();
     expect(screen.getByText('kg')).toBeTruthy();
     expect(screen.getByPlaceholderText('Reps')).toBeTruthy();
     expect(screen.getByLabelText('Weight for exercise 1 set 1').props.autoFocus).toBe(true);
@@ -716,7 +716,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     expect(setTypeButton.findByType('Text').props.children).toBe('•');
 
     fireEvent.press(setTypeButton);
-    expect(screen.getByText('Warm-up')).toBeTruthy();
+    expect(screen.getByText('WUp')).toBeTruthy();
     fireEvent.press(setTypeButton);
     expect(screen.getByText('RIR 0')).toBeTruthy();
     fireEvent.press(setTypeButton);
@@ -727,6 +727,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     expect(screen.getByLabelText('Quality for exercise 1 set 1: none')).toBeTruthy();
 
     fireEvent(setTypeButton, 'onLongPress');
+    expect(screen.getByLabelText('Choose WUp set type')).toBeTruthy();
     expect(screen.getByLabelText('Choose RIR 1 set type')).toBeTruthy();
     fireEvent.press(screen.getByLabelText('Choose RIR 1 set type'));
     expect(screen.getByText('RIR 1')).toBeTruthy();
@@ -1141,7 +1142,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     const setTypeButton = screen.getByTestId('set-quality-button-1-1');
 
     fireEvent.press(setTypeButton);
-    expect(screen.getByText('Warm-up')).toBeTruthy();
+    expect(screen.getByText('WUp')).toBeTruthy();
 
     fireEvent(setTypeButton, 'onLongPress');
     expect(screen.getByLabelText('Choose None set type')).toBeTruthy();
