@@ -46,6 +46,20 @@ Human-operator guide for local development, runtime operations, logs, and tests 
 - Docker (for local Supabase stack)
 - `jq` (required by backend contract test scripts)
 
+On macOS, prefer **Docker Desktop** for this repo when it is installed. If both
+Docker Desktop and Colima are present, check the active context before starting
+local Supabase:
+
+```bash
+docker context ls
+docker context use desktop-linux   # preferred for BOGA local Supabase
+```
+
+Using the Colima context can make Supabase CLI fail while starting optional
+service containers that mount the host Docker socket. See
+[Colima on macOS preflight](#colima-on-macos-preflight) for the symptom and
+workaround.
+
 If Java is installed through Homebrew OpenJDK and Maestro cannot locate it, run Maestro/E2E commands with:
 
 ```bash
@@ -391,7 +405,9 @@ Reference: https://docs.docker.com/desktop/features/wsl/
 
 ### Colima on macOS preflight
 
-On macOS, Colima can provide the Docker-compatible daemon for local Supabase.
+On macOS, prefer Docker Desktop for BOGA local Supabase when it is available. If
+Docker Desktop and Colima are both installed, the active Docker context decides
+which daemon Supabase CLI uses.
 
 Check the active Docker context:
 
@@ -399,19 +415,42 @@ Check the active Docker context:
 docker context ls
 ```
 
-If the active context is `colima` but Docker cannot connect, start Colima:
+Recommended context for this repo:
 
 ```bash
-colima start
-```
-
-Then start or reuse local Supabase:
-
-```bash
+docker context use desktop-linux
+docker info --format '{{.ServerVersion}} {{.OperatingSystem}}'
 ./supabase/scripts/local-runtime-up.sh
 ```
 
-Maestro flows that require local Supabase depend on the same daemon.
+Colima can run the minimal Auth/REST stack, but the full Supabase local stack may
+fail when optional services try to bind-mount the Colima Docker socket:
+
+```text
+failed to start docker container: Error response from daemon:
+error while creating mount source path '/Users/<you>/.colima/default/docker.sock':
+mkdir /Users/<you>/.colima/default/docker.sock: operation not supported
+```
+
+If you intentionally use Colima, first make sure it is running:
+
+```bash
+colima start
+docker context use colima
+docker info --format '{{.ServerVersion}} {{.OperatingSystem}}'
+```
+
+For normal simulator login while on Colima, start the minimal local Supabase
+stack and provision the human dev accounts:
+
+```bash
+bash -lc 'source supabase/scripts/_common.sh && run_supabase start --exclude realtime,storage-api,imgproxy,mailpit,postgres-meta,studio,edge-runtime,logflare,vector'
+./supabase/scripts/auth-provision-dev-accounts.sh
+```
+
+That workaround is enough for app login (`a@dev.local` / `dev123`) and ordinary
+REST/Auth development. Use Docker Desktop, not this Colima workaround, for the
+full local runtime and test gates that expect the complete Supabase stack.
 
 ### Start/stop/reset
 
@@ -478,10 +517,10 @@ Do not print hosted keys, connection strings, or database passwords in task note
 Use the mode that matches where the app is running:
 
 ```bash
-# iOS Simulator -> local Docker/Colima Supabase
+# iOS Simulator -> local Docker Desktop Supabase
 ./supabase/scripts/local-runtime-up.sh
 
-# Physical device -> local Docker/Colima Supabase over the Mac LAN IP
+# Physical device -> local Docker Desktop Supabase over the Mac LAN IP
 ./scripts/dev/use-local-mobile-lan-env.sh
 
 # Physical device -> hosted Supabase
