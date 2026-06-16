@@ -79,9 +79,16 @@ appId: com.dinoderek.mobile
 # Use extendedWaitUntil (poll) rather than a bare assertVisible after each
 # navigating tap: the tab/screen transition can lag a beat on the cold-JIT first
 # render (an immediate assert raced it and flaked once), and polling rides that
-# out without padding the run.
+  # out without padding the run. iOS 26 occasionally reports a stale
+  # accessibility frame for the settings cog after the harness teleport and taps
+  # the Exercises tab instead; tap the visible cog region once the bottom nav is
+  # present so this remains a harness fix, not a product navigation change.
+- extendedWaitUntil:
+    visible:
+      id: "top-level-bottom-tabs"
+    timeout: 15000
 - tapOn:
-    id: "top-level-settings-button"
+    point: "88%,94%"
 - extendedWaitUntil:
     visible:
       id: "settings-screen"

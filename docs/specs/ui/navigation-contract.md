@@ -131,8 +131,8 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
    - edit action
 6. `/completed-session/<sessionId>?intent=edit` -> `/session-recorder?mode=completed-edit&sessionId=<sessionId>`
    - route-side redirect (`replace`)
-7. `/completed-session/<sessionId>` -> `/`
-   - successful reopen (`dismissTo('/')`, which the root alias forwards to `/stats-history`)
+7. `/completed-session/<sessionId>` -> `/session-recorder`
+   - successful append of the historical session as planned target rows in the active recorder (creates an active session first when needed)
 8. `/session-recorder...` -> `/`
    - successful submit/save (`dismissTo('/')`, forwarded to `/stats-history` by the root alias)
 9. `/session-recorder` -> `/exercise-catalog?source=session-recorder&intent=manage`

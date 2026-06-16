@@ -132,6 +132,11 @@ appId: com.dinoderek.mobile
     visible:
       id: "start-session-button"
     timeout: 30000
+# The deep-link transition can expose the Start button before iOS has settled
+# the safe-area-adjusted bounds; tapping immediately has produced a stale
+# y=16..53 hit box even though the visual button is lower on screen.
+- waitForAnimationToEnd:
+    timeout: 4000
 - tapOn:
     id: "start-session-button"
 - extendedWaitUntil:

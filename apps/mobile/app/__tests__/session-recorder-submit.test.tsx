@@ -308,8 +308,10 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Save Changes')).toBeTruthy();
-      expect(screen.getByLabelText('Weight for exercise 1 set 1').props.value).toBe('0');
+      expect(screen.getByLabelText('logged set 1 for exercise 1: 0kg · 5 reps; quality none')).toBeTruthy();
     });
+    fireEvent.press(screen.getByLabelText('logged set 1 for exercise 1: 0kg · 5 reps; quality none'));
+    expect(screen.getByLabelText('Weight for exercise 1 set 1').props.value).toBe('0');
 
     fireEvent.press(screen.getByText('Save Changes'));
 
@@ -433,6 +435,7 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
       expect(screen.getByDisplayValue('2026-02-25 10:45')).toBeTruthy();
     });
 
+    fireEvent.press(screen.getByLabelText('logged set 1 for exercise 1: 225kg · 5 reps; quality none'));
     fireEvent.press(screen.getByLabelText('Remove set 1 from exercise 1'));
     fireEvent.press(screen.getByText('Save Changes'));
 

@@ -271,6 +271,81 @@ describe('session draft repository', () => {
     );
   });
 
+  it('appends a completed session into an active draft as planned target rows', async () => {
+    const store = createMockStore();
+    const repository = createSessionDraftRepository(store);
+    const now = new Date('2026-02-20T12:00:00.000Z');
+
+    store.loadSessionGraphById.mockResolvedValue({
+      session: buildSessionRecord({
+        id: 'session-source',
+        status: 'completed',
+        gymId: 'gym-history',
+        completedAt: new Date('2026-02-19T11:00:00.000Z'),
+        durationSec: 3600,
+      }),
+      exercises: [
+        {
+          id: 'source-exercise-1',
+          sessionId: 'session-source',
+          exerciseDefinitionId: 'seed_pull_up',
+          orderIndex: 0,
+          name: 'Pull-ups',
+          machineName: null,
+          sets: [
+            {
+              id: 'source-set-1',
+              sessionExerciseId: 'source-exercise-1',
+              orderIndex: 0,
+              repsValue: '6',
+              weightValue: '',
+              setType: null,
+            },
+          ],
+        },
+      ],
+    });
+    store.loadLatestDraftGraph.mockResolvedValue({
+      session: buildSessionRecord({
+        id: 'active-session',
+        status: 'active',
+        gymId: 'gym-active',
+        startedAt: new Date('2026-02-20T10:00:00.000Z'),
+      }),
+      exercises: [],
+    });
+    store.saveDraftGraph.mockResolvedValue({ sessionId: 'active-session' });
+
+    const result = await repository.appendCompletedSessionAsPlanned('session-source', { now });
+
+    expect(result).toEqual({ sessionId: 'active-session' });
+    expect(store.saveDraftGraph).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId: 'active-session',
+        gymId: 'gym-active',
+        startedAt: new Date('2026-02-20T10:00:00.000Z'),
+        exercises: [
+          expect.objectContaining({
+            exerciseDefinitionId: 'seed_pull_up',
+            name: 'Pull-ups',
+            sets: [
+              expect.objectContaining({
+                repsValue: '',
+                weightValue: '',
+                setType: null,
+                plannedRepsValue: '6',
+                plannedWeightValue: '',
+                plannedSetType: null,
+                performanceStatus: 'planned',
+              }),
+            ],
+          }),
+        ],
+        now,
+      })
+    );
+  });
+
   it('completes a session with deterministic materialized duration seconds', async () => {
     const store = createMockStore();
     const repository = createSessionDraftRepository(store);

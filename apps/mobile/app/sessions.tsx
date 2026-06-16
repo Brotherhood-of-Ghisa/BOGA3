@@ -12,7 +12,7 @@ import {
   type SessionListItem,
 } from '@/components/session-list';
 import { uiColors } from '@/components/ui';
-import { reopenCompletedSessionDraft } from '@/src/data';
+import { appendCompletedSessionAsPlanned } from '@/src/data';
 
 export type SessionsScreenProps = {
   dataClient?: SessionListDataClient;
@@ -51,7 +51,6 @@ export function SessionsScreen({
 
   const showGlobalEmptyState =
     !isLoadingSessions && !loadErrorMessage && !activeSession && completedSessions.length === 0;
-  const reopenDisabled = Boolean(activeSession);
 
   useEffect(() => {
     if (!activeSession) {
@@ -133,18 +132,15 @@ export function SessionsScreen({
     router.push(`/session-recorder?mode=completed-edit&sessionId=${sessionId}`);
   };
 
-  const reopenCompletedSession = (sessionId: string) => {
-    if (activeSession) {
-      return;
-    }
+  const appendCompletedSession = (sessionId: string) => {
     if (dataClient) {
       return (async () => {
-        await dataClient.reopenCompletedSession(sessionId);
+        await dataClient.appendCompletedSessionAsPlanned(sessionId);
         await reloadSessions();
       })();
     }
     return (async () => {
-      await reopenCompletedSessionDraft(sessionId);
+      await appendCompletedSessionAsPlanned(sessionId);
       await reloadSessions();
     })();
   };
@@ -186,8 +182,7 @@ export function SessionsScreen({
         onOpenCompletedSession={navigateToCompletedSessionDetail}
         onSetCompletedSessionDeleted={setCompletedSessionDeleted}
         onEditCompletedSession={openCompletedSessionEdit}
-        onReopenCompletedSession={reopenCompletedSession}
-        reopenDisabled={reopenDisabled}
+        onAppendCompletedSession={appendCompletedSession}
       />
     </View>
   );

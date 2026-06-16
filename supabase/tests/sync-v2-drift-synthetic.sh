@@ -38,9 +38,13 @@ pass() { echo "[sync-v2-drift-synthetic] pass: $*"; }
 [[ -f "${SCHEMA_FILE}" ]] || fail "schema file not found at ${SCHEMA_FILE}"
 [[ -f "${MOBILE_DIR}/package.json" ]] || fail "apps/mobile/package.json not found at ${MOBILE_DIR}/package.json"
 
-# Snapshot the original schema file so we can restore on exit.
+# Snapshot the original schema file so we can restore on exit and prove this
+# script leaves the pre-test contents intact, even when the caller's worktree
+# already contains legitimate schema edits.
 ORIGINAL_BACKUP="$(mktemp)"
+ORIGINAL_COMPARE="$(mktemp)"
 cp "${SCHEMA_FILE}" "${ORIGINAL_BACKUP}"
+cp "${SCHEMA_FILE}" "${ORIGINAL_COMPARE}"
 HERMETIC_RESTORED=0
 restore_schema_file() {
   if [[ "${HERMETIC_RESTORED}" == "1" ]]; then
@@ -120,14 +124,15 @@ if ! grep -q "add column notes" "${OUTPUT_FILE}"; then
 fi
 pass "drift negative — output cites exercise_sets, notes, and the 'alter table app_public.exercise_sets … add column notes' fix template"
 
-# Hermetic sanity — the working tree should be unchanged after this script.
-# Use git diff against the SCHEMA_FILE; an exit-0 means no diff.
-if ! (cd "${REPO_ROOT}" && git diff --quiet -- "${SCHEMA_FILE}"); then
-  fail "schema file ${SCHEMA_FILE} not restored to original after drift run (working tree is DIRTY)"
+# Hermetic sanity — the file should match the bytes this script saw before
+# injecting synthetic drift. Do not compare with HEAD: this lane must work while
+# validating an in-progress schema change.
+if ! cmp -s "${ORIGINAL_COMPARE}" "${SCHEMA_FILE}"; then
+  fail "schema file ${SCHEMA_FILE} not restored to original after drift run"
 fi
-pass "drift — hermetic: schema file restored, git diff is clean"
+pass "drift — hermetic: schema file restored to pre-test contents"
 
-rm -f "${OUTPUT_FILE}"
+rm -f "${OUTPUT_FILE}" "${ORIGINAL_COMPARE}"
 
 # ---------------------------------------------------------------------------
 # Positive case — folded into this script: after restoring, the drift checker

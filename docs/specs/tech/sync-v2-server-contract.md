@@ -251,6 +251,10 @@ Source: `apps/mobile/src/data/schema/exercise-sets.ts`.
 | `weightValue` | `weight_value` | `text` | NO | `''` | — | — |
 | `repsValue` | `reps_value` | `text` | NO | `''` | — | — |
 | `setType` | `set_type` | `text` | YES | — | — | — |
+| `plannedWeightValue` | `planned_weight_value` | `text` | YES | — | — | — |
+| `plannedRepsValue` | `planned_reps_value` | `text` | YES | — | — | — |
+| `plannedSetType` | `planned_set_type` | `text` | YES | — | — | — |
+| `performanceStatus` | `performance_status` | `text` | YES | — | — | — |
 | `createdAt` | `created_at` | `bigint` | NO | — | — | — |
 | `updatedAt` | `updated_at` | `bigint` | NO | — | — | — |
 | `deletedAt` | `deleted_at` | `bigint` | YES | — | yes (`exercise_sets_deleted_at_idx`) | — |

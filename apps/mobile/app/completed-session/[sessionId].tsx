@@ -7,10 +7,9 @@ import { uiColors } from '@/components/ui';
 import {
   formatSessionListCompactDuration,
   listSessionExerciseAssignedTags,
-  listSessionListBuckets,
   loadLocalGymById,
   loadSessionSnapshotById,
-  reopenCompletedSessionDraft,
+  appendCompletedSessionAsPlanned as appendCompletedSessionAsPlannedDraft,
   setSessionDeletedState,
 } from '@/src/data';
 
@@ -41,13 +40,12 @@ export type CompletedSessionDetailRecord = {
   durationDisplay: string;
   gymName: string | null;
   deletedAt: string | null;
-  reopenDisabledReason?: string | null;
   exercises: CompletedSessionDetailExercise[];
 };
 
 export type CompletedSessionDetailDataClient = {
   loadCompletedSession(sessionId: string): Promise<CompletedSessionDetailRecord | null>;
-  reopenCompletedSession(sessionId: string): Promise<void>;
+  appendCompletedSessionAsPlanned(sessionId: string): Promise<void>;
   setCompletedSessionDeletedState(sessionId: string, isDeleted: boolean): Promise<void>;
 };
 
@@ -88,7 +86,6 @@ const DEFAULT_COMPLETED_SESSION_DETAILS: Record<string, CompletedSessionDetailRe
     durationDisplay: '58m',
     gymName: 'Westside Barbell Club',
     deletedAt: null,
-    reopenDisabledReason: 'Finish or discard the active session before reopening another.',
     exercises: [
       {
         id: 'm7-detail-ex-1',
@@ -119,7 +116,6 @@ const DEFAULT_COMPLETED_SESSION_DETAILS: Record<string, CompletedSessionDetailRe
     durationDisplay: '1h 5m',
     gymName: 'Downtown Fitness',
     deletedAt: '2026-02-18T08:00:00.000Z',
-    reopenDisabledReason: null,
     exercises: [
       {
         id: 'm7-detail-ex-3',
@@ -142,8 +138,6 @@ export const DEFAULT_COMPLETED_SESSION_DETAIL_DATA_CLIENT: CompletedSessionDetai
     if (sessionGraph && sessionGraph.status === 'completed') {
       const gymRecord = sessionGraph.gymId ? await loadLocalGymById(sessionGraph.gymId) : null;
       const completedAt = sessionGraph.completedAt ?? sessionGraph.startedAt;
-      const buckets = await listSessionListBuckets();
-      const hasOtherActiveSession = Boolean(buckets.active && buckets.active.id !== sessionGraph.sessionId);
       const tagsBySessionExerciseId = new Map<string, CompletedSessionDetailExerciseTag[]>(
         await Promise.all(
           sessionGraph.exercises.map(async (exercise) => {
@@ -171,9 +165,6 @@ export const DEFAULT_COMPLETED_SESSION_DETAIL_DATA_CLIENT: CompletedSessionDetai
         durationDisplay: formatSessionListCompactDuration(sessionGraph.durationSec),
         gymName: gymRecord?.name ?? null,
         deletedAt: sessionGraph.deletedAt ? sessionGraph.deletedAt.toISOString() : null,
-        reopenDisabledReason: hasOtherActiveSession
-          ? 'Finish or discard the active session before reopening another.'
-          : null,
         exercises: sessionGraph.exercises.map((exercise) => ({
           id: exercise.id,
           name: exercise.name,
@@ -190,8 +181,8 @@ export const DEFAULT_COMPLETED_SESSION_DETAIL_DATA_CLIENT: CompletedSessionDetai
 
     return DEFAULT_COMPLETED_SESSION_DETAILS[sessionId] ?? null;
   },
-  async reopenCompletedSession(sessionId) {
-    await reopenCompletedSessionDraft(sessionId);
+  async appendCompletedSessionAsPlanned(sessionId) {
+    await appendCompletedSessionAsPlannedDraft(sessionId);
   },
   async setCompletedSessionDeletedState(sessionId, isDeleted) {
     await setSessionDeletedState(sessionId, isDeleted);
@@ -268,7 +259,6 @@ export function CompletedSessionDetailScreenShell({
     : session?.deletedAt
       ? 'Undelete'
       : 'Delete';
-  const reopenDisabled = Boolean(session?.reopenDisabledReason);
   const editLabel = 'Edit';
 
   const formattedStartedAt = useMemo(
@@ -288,23 +278,19 @@ export function CompletedSessionDetailScreenShell({
     router.push(`/session-recorder?mode=completed-edit&sessionId=${session.id}`);
   };
 
-  const handleReopen = () => {
-    if (reopenDisabled) {
-      return;
-    }
-
+  const handleAppend = () => {
     if (!session) {
       return;
     }
 
     setActionFeedback(null);
     void dataClient
-      .reopenCompletedSession(session.id)
+      .appendCompletedSessionAsPlanned(session.id)
       .then(() => {
-        router.dismissTo('/');
+        router.push('/session-recorder');
       })
       .catch((error) => {
-        setActionFeedback(error instanceof Error ? error.message : 'Unable to reopen session');
+        setActionFeedback(error instanceof Error ? error.message : 'Unable to append session');
       });
   };
 
@@ -402,21 +388,18 @@ export function CompletedSessionDetailScreenShell({
 
               <Pressable
                 accessibilityRole="button"
-                disabled={reopenDisabled}
-                onPress={handleReopen}
+                onPress={handleAppend}
                 style={[
                   styles.actionBarButton,
                   styles.actionBarSecondaryButton,
-                  reopenDisabled ? styles.disabledActionButton : null,
                 ]}
                 testID="completed-session-detail-reopen-button">
                 <Text
                   numberOfLines={1}
                   style={[
                     styles.actionBarSecondaryButtonText,
-                    reopenDisabled ? styles.disabledActionButtonText : null,
                   ]}>
-                  Reopen
+                  Append
                 </Text>
               </Pressable>
 
@@ -440,10 +423,6 @@ export function CompletedSessionDetailScreenShell({
                 </Text>
               </Pressable>
             </View>
-
-            {reopenDisabled && session.reopenDisabledReason ? (
-              <Text style={styles.reopenHintText}>{session.reopenDisabledReason}</Text>
-            ) : null}
 
             {actionFeedback ? <Text style={styles.actionFeedbackText}>{actionFeedback}</Text> : null}
           </View>

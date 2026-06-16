@@ -13,6 +13,10 @@ export type SessionDraftSetInput = {
   repsValue: string;
   weightValue: string;
   setType?: SessionSetTypeValue;
+  plannedRepsValue?: string | null;
+  plannedWeightValue?: string | null;
+  plannedSetType?: SessionSetTypeValue;
+  performanceStatus?: SessionSetPerformanceStatus;
 };
 
 export type SessionDraftExerciseInput = {
@@ -54,6 +58,10 @@ export type SessionDraftSetSnapshot = {
   repsValue: string;
   weightValue: string;
   setType: SessionSetTypeValue;
+  plannedRepsValue?: string | null;
+  plannedWeightValue?: string | null;
+  plannedSetType?: SessionSetTypeValue;
+  performanceStatus?: SessionSetPerformanceStatus;
 };
 
 export type SessionDraftExerciseSnapshot = {
@@ -125,6 +133,16 @@ export type ReopenCompletedSessionResult = {
   sessionId: string;
 };
 
+export type AppendCompletedSessionAsPlannedOptions = {
+  now?: Date;
+};
+
+export type AppendCompletedSessionAsPlannedResult = {
+  sessionId: string;
+};
+
+export type SessionSetPerformanceStatus = 'planned' | 'skipped' | null;
+
 export type SessionPersistenceRecord = {
   id: string;
   gymId: string | null;
@@ -144,6 +162,10 @@ type StoredDraftSetRecord = {
   repsValue: string;
   weightValue: string;
   setType: SessionSetTypeValue;
+  plannedRepsValue?: string | null;
+  plannedWeightValue?: string | null;
+  plannedSetType?: SessionSetTypeValue;
+  performanceStatus?: SessionSetPerformanceStatus;
 };
 
 type StoredDraftExerciseRecord = {
@@ -239,6 +261,10 @@ const normalizePersistedSessionStatus = (status: string): SessionPersistenceReco
 
 const normalizeDraftStatus = (status: SessionDraftStatus | undefined): SessionDraftStatus => status ?? 'active';
 
+const normalizeSetPerformanceStatus = (
+  status: string | null | undefined
+): SessionSetPerformanceStatus => (status === 'planned' || status === 'skipped' ? status : null);
+
 export const calculateSessionDurationSec = (startedAt: Date, completedAt: Date) => {
   ensureDate(startedAt, 'startedAt');
   ensureDate(completedAt, 'completedAt');
@@ -295,6 +321,10 @@ const mapDraftSnapshot = (graph: StoredDraftGraph): SessionDraftSnapshot => ({
       repsValue: set.repsValue,
       weightValue: set.weightValue,
       setType: set.setType,
+      plannedRepsValue: set.plannedRepsValue ?? null,
+      plannedWeightValue: set.plannedWeightValue ?? null,
+      plannedSetType: normalizeSessionSetType(set.plannedSetType),
+      performanceStatus: normalizeSetPerformanceStatus(set.performanceStatus),
     })),
   })),
 });
@@ -319,6 +349,10 @@ const mapSessionGraphSnapshot = (graph: StoredDraftGraph): SessionGraphSnapshot 
       repsValue: set.repsValue,
       weightValue: set.weightValue,
       setType: set.setType,
+      plannedRepsValue: set.plannedRepsValue ?? null,
+      plannedWeightValue: set.plannedWeightValue ?? null,
+      plannedSetType: normalizeSessionSetType(set.plannedSetType),
+      performanceStatus: normalizeSetPerformanceStatus(set.performanceStatus),
     })),
   })),
 });
@@ -368,6 +402,10 @@ const loadDraftGraphBySessionId = (database: LocalDatabase, sessionId: string): 
       repsValue: row.repsValue,
       weightValue: row.weightValue,
       setType: normalizeSessionSetType(row.setType),
+      plannedRepsValue: row.plannedRepsValue,
+      plannedWeightValue: row.plannedWeightValue,
+      plannedSetType: normalizeSessionSetType(row.plannedSetType),
+      performanceStatus: normalizeSetPerformanceStatus(row.performanceStatus),
     });
     acc.set(row.sessionExerciseId, current);
     return acc;
@@ -449,6 +487,10 @@ const replaceSessionExerciseGraph = (
             repsValue: exerciseSets.repsValue,
             weightValue: exerciseSets.weightValue,
             setType: exerciseSets.setType,
+            plannedRepsValue: exerciseSets.plannedRepsValue,
+            plannedWeightValue: exerciseSets.plannedWeightValue,
+            plannedSetType: exerciseSets.plannedSetType,
+            performanceStatus: exerciseSets.performanceStatus,
           })
           .from(exerciseSets)
           .where(inArray(exerciseSets.sessionExerciseId, existingExerciseIds))
@@ -596,6 +638,14 @@ const replaceSessionExerciseGraph = (
           : requestedSetId;
       const nextSetType =
         set.setType === undefined ? normalizeSessionSetType(existingSet?.setType) : normalizeSessionSetType(set.setType);
+      const nextPlannedSetType =
+        set.plannedSetType === undefined
+          ? normalizeSessionSetType(existingSet?.plannedSetType)
+          : normalizeSessionSetType(set.plannedSetType);
+      const nextPerformanceStatus =
+        set.performanceStatus === undefined
+          ? normalizeSetPerformanceStatus(existingSet?.performanceStatus)
+          : normalizeSetPerformanceStatus(set.performanceStatus);
 
       if (reuseSet) {
         keptSetIds.add(setId);
@@ -606,6 +656,12 @@ const replaceSessionExerciseGraph = (
             repsValue: set.repsValue,
             weightValue: set.weightValue,
             setType: nextSetType,
+            plannedRepsValue:
+              set.plannedRepsValue === undefined ? existingSet?.plannedRepsValue ?? null : set.plannedRepsValue,
+            plannedWeightValue:
+              set.plannedWeightValue === undefined ? existingSet?.plannedWeightValue ?? null : set.plannedWeightValue,
+            plannedSetType: nextPlannedSetType,
+            performanceStatus: nextPerformanceStatus,
             deletedAt: null,
             localDirty: true,
             localUpdatedAtMs: input.localUpdatedAtMs,
@@ -622,6 +678,10 @@ const replaceSessionExerciseGraph = (
             repsValue: set.repsValue,
             weightValue: set.weightValue,
             setType: nextSetType,
+            plannedRepsValue: set.plannedRepsValue ?? null,
+            plannedWeightValue: set.plannedWeightValue ?? null,
+            plannedSetType: nextPlannedSetType,
+            performanceStatus: nextPerformanceStatus,
             deletedAt: null,
             localDirty: true,
             localUpdatedAtMs: input.localUpdatedAtMs,
@@ -983,6 +1043,70 @@ export const createSessionDraftRepository = (store: SessionDraftStore = createDr
 
     return { sessionId };
   },
+  async appendCompletedSessionAsPlanned(
+    sourceSessionId: string,
+    options: AppendCompletedSessionAsPlannedOptions = {}
+  ): Promise<AppendCompletedSessionAsPlannedResult> {
+    const now = options.now ?? new Date();
+    ensureDate(now, 'now');
+
+    const sourceGraph = await store.loadSessionGraphById(sourceSessionId);
+    if (!sourceGraph) {
+      throw new Error(`Session ${sourceSessionId} does not exist`);
+    }
+    if (sourceGraph.session.status !== 'completed') {
+      throw new Error(`Cannot append non-completed session ${sourceSessionId}`);
+    }
+
+    const activeGraph = await store.loadLatestDraftGraph();
+    const targetSessionId = activeGraph?.session.id;
+    const startedAt = activeGraph?.session.startedAt ?? now;
+    const gymId = activeGraph?.session.gymId ?? sourceGraph.session.gymId;
+    const existingExercises = activeGraph?.exercises.map((exercise) => ({
+      id: exercise.id,
+      exerciseDefinitionId: exercise.exerciseDefinitionId,
+      name: exercise.name,
+      machineName: exercise.machineName,
+      sets: exercise.sets.map((set) => ({
+        id: set.id,
+        repsValue: set.repsValue,
+        weightValue: set.weightValue,
+        setType: set.setType,
+        plannedRepsValue: set.plannedRepsValue,
+        plannedWeightValue: set.plannedWeightValue,
+        plannedSetType: set.plannedSetType,
+        performanceStatus: set.performanceStatus,
+      })),
+    })) ?? [];
+
+    const plannedExercises = sourceGraph.exercises.map((exercise) => ({
+      id: createLocalEntityId('exercise'),
+      exerciseDefinitionId: exercise.exerciseDefinitionId,
+      name: exercise.name,
+      machineName: exercise.machineName,
+      sets: exercise.sets.map((set) => ({
+        id: createLocalEntityId('set'),
+        repsValue: '',
+        weightValue: '',
+        setType: null,
+        plannedRepsValue: set.repsValue,
+        plannedWeightValue: set.weightValue,
+        plannedSetType: set.setType,
+        performanceStatus: 'planned' as const,
+      })),
+    }));
+
+    const saved = await store.saveDraftGraph({
+      sessionId: targetSessionId,
+      gymId,
+      startedAt,
+      status: 'active',
+      exercises: [...existingExercises, ...plannedExercises],
+      now,
+    });
+
+    return { sessionId: saved.sessionId };
+  },
   async completeSession(sessionId: string, options: CompleteSessionOptions = {}): Promise<CompleteSessionResult> {
     const existingSession = await store.loadSessionById(sessionId);
     if (!existingSession) {
@@ -1087,4 +1211,5 @@ export const loadLatestSessionDraftSnapshot = defaultSessionDraftRepository.load
 export const loadSessionSnapshotById = defaultSessionDraftRepository.loadSessionSnapshotById;
 export const completeSessionDraft = defaultSessionDraftRepository.completeSession;
 export const reopenCompletedSessionDraft = defaultSessionDraftRepository.reopenCompletedSession;
+export const appendCompletedSessionAsPlanned = defaultSessionDraftRepository.appendCompletedSessionAsPlanned;
 export const listCompletedSessionsForAnalysis = defaultSessionDraftRepository.listCompletedSessionsForAnalysis;

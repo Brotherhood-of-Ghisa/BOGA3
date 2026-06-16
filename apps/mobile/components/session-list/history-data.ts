@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react';
 
 import {
   completeSessionDraft,
+  appendCompletedSessionAsPlanned as appendCompletedSessionAsPlannedDraft,
   listSessionListBuckets,
   persistSessionDraftSnapshot,
-  reopenCompletedSessionDraft,
   setSessionDeletedState,
 } from '@/src/data';
 
@@ -66,8 +66,8 @@ export const DEFAULT_SESSION_LIST_DATA_CLIENT: SessionListDataClient = {
   async setCompletedSessionDeletedState(sessionId, isDeleted) {
     await setSessionDeletedState(sessionId, isDeleted);
   },
-  async reopenCompletedSession(sessionId) {
-    await reopenCompletedSessionDraft(sessionId);
+  async appendCompletedSessionAsPlanned(sessionId) {
+    await appendCompletedSessionAsPlannedDraft(sessionId);
   },
 };
 
