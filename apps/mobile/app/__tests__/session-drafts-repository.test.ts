@@ -533,6 +533,29 @@ describe('session draft repository', () => {
     expect(saveInput?.exercises).toHaveLength(2);
     expect(saveInput?.exercises[0]?.sets).toHaveLength(1);
     expect(saveInput?.exercises[1]?.sets).toHaveLength(2);
+    expect(saveInput?.exercises[0]).toEqual(
+      expect.objectContaining({
+        id: 'active-exercise-first',
+        exerciseDefinitionId: 'seed_pull_up',
+        name: 'Pull-ups',
+        sets: [
+          expect.objectContaining({
+            id: 'active-set-1',
+            repsValue: '5',
+            weightValue: '',
+            setType: null,
+          }),
+        ],
+      })
+    );
+    expect(saveInput?.exercises[1]?.sets[0]).toEqual(
+      expect.objectContaining({
+        id: 'active-set-2',
+        repsValue: '4',
+        weightValue: '',
+        setType: null,
+      })
+    );
     expect(saveInput?.exercises[1]?.sets[1]).toEqual(
       expect.objectContaining({
         repsValue: '',
@@ -589,16 +612,25 @@ describe('session draft repository', () => {
       }),
       exercises: [
         {
-          id: 'active-exercise-1',
+          id: 'active-exercise-earlier-match',
           sessionId: 'active-session',
           exerciseDefinitionId: 'seed_pull_up',
           orderIndex: 0,
-          name: 'Pull-ups earlier',
+          name: 'Pull-ups earlier block',
           machineName: null,
-          sets: [],
+          sets: [
+            {
+              id: 'active-set-earlier-match',
+              sessionExerciseId: 'active-exercise-earlier-match',
+              orderIndex: 0,
+              repsValue: '5',
+              weightValue: '',
+              setType: null,
+            },
+          ],
         },
         {
-          id: 'active-exercise-2',
+          id: 'active-exercise-last',
           sessionId: 'active-session',
           exerciseDefinitionId: 'seed_bench_press',
           orderIndex: 1,
@@ -614,8 +646,29 @@ describe('session draft repository', () => {
 
     const saveInput = store.saveDraftGraph.mock.calls[0]?.[0];
     expect(saveInput?.exercises).toHaveLength(3);
-    expect(saveInput?.exercises[0]?.name).toBe('Pull-ups earlier');
-    expect(saveInput?.exercises[1]?.name).toBe('Bench Press');
+    expect(saveInput?.exercises[0]).toEqual(
+      expect.objectContaining({
+        id: 'active-exercise-earlier-match',
+        exerciseDefinitionId: 'seed_pull_up',
+        name: 'Pull-ups earlier block',
+        sets: [
+          expect.objectContaining({
+            id: 'active-set-earlier-match',
+            repsValue: '5',
+            weightValue: '',
+            setType: null,
+          }),
+        ],
+      })
+    );
+    expect(saveInput?.exercises[1]).toEqual(
+      expect.objectContaining({
+        id: 'active-exercise-last',
+        exerciseDefinitionId: 'seed_bench_press',
+        name: 'Bench Press',
+        sets: [],
+      })
+    );
     expect(saveInput?.exercises[2]).toEqual(
       expect.objectContaining({
         exerciseDefinitionId: 'seed_pull_up',

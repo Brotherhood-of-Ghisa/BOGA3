@@ -388,13 +388,13 @@ function createSetFromPrevious(previousSet: SessionSet | undefined): SessionSet 
 
 const SET_TYPE_CYCLE_ORDER: SessionSetTypeValue[] = [null, ...SESSION_SET_TYPES];
 const SET_TYPE_SHORT_LABELS: Record<SessionSetType, string> = {
-  warm_up: 'WUp',
+  warm_up: 'W-Up',
   rir_0: 'R0',
   rir_1: 'R1',
   rir_2: 'R2',
 };
 const SET_TYPE_MENU_LABELS: Record<SessionSetType, string> = {
-  warm_up: 'WUp',
+  warm_up: 'W-Up',
   rir_0: 'RIR 0',
   rir_1: 'RIR 1',
   rir_2: 'RIR 2',
@@ -512,8 +512,8 @@ const getSetRowState = (set: SessionSet): PlannedSetRowState => {
 };
 
 const formatSetWeightLabel = (value: string | null | undefined): string => {
-  const trimmed = (value ?? '').trim();
-  return trimmed.length > 0 ? `${trimmed}kg` : 'BW';
+  const trimmed = (value ?? '').trim() || '0';
+  return `${trimmed}kg`;
 };
 
 const formatSetRepsLabel = (value: string | null | undefined): string => {
@@ -2560,7 +2560,20 @@ export default function SessionRecorderScreen() {
     markSessionTextMutation();
   };
 
+  const consumeTapIfAnotherSetIsExpanded = (setId: string): boolean => {
+    if (expandedSetIds.size === 0 || expandedSetIds.has(setId)) {
+      return false;
+    }
+
+    setExpandedSetIds(new Set());
+    return true;
+  };
+
   const toggleSetExpandedForEditing = (exerciseId: string, setId: string) => {
+    if (consumeTapIfAnotherSetIsExpanded(setId)) {
+      return;
+    }
+
     const shouldOpen = !expandedSetIds.has(setId);
 
     if (!shouldOpen) {
@@ -3277,7 +3290,7 @@ export default function SessionRecorderScreen() {
           const actualLabel = getActualSetLabel(set);
           const compactLabel =
             rowState === 'modified'
-              ? `${plannedLabel} → ${actualLabel}`
+              ? `${plannedLabel}; actual ${actualLabel}`
               : rowState === 'added' || !isPlannedRow
                 ? actualLabel
                 : plannedLabel;
@@ -3312,6 +3325,9 @@ export default function SessionRecorderScreen() {
                 ]}
                 testID={`set-quality-button-${exerciseIndex + 1}-${setIndex + 1}`}
                 onPress={() => {
+                  if (variant === 'compact' && consumeTapIfAnotherSetIsExpanded(set.id)) {
+                    return;
+                  }
                   if (suppressSetTypeCyclePressRef.current) {
                     suppressSetTypeCyclePressRef.current = false;
                     return;
@@ -3319,6 +3335,9 @@ export default function SessionRecorderScreen() {
                   cycleSetType(exercise.id, set.id, set.setType);
                 }}
                 onLongPress={() => {
+                  if (variant === 'compact' && consumeTapIfAnotherSetIsExpanded(set.id)) {
+                    return;
+                  }
                   suppressSetTypeCyclePressRef.current = true;
                   openSetTypePicker({
                     exerciseId: exercise.id,
@@ -3328,6 +3347,9 @@ export default function SessionRecorderScreen() {
                   });
                 }}>
                 <Text
+                  adjustsFontSizeToFit
+                  ellipsizeMode="clip"
+                  minimumFontScale={0.75}
                   numberOfLines={1}
                   style={[
                     styles.setQualityButtonText,
@@ -3340,8 +3362,56 @@ export default function SessionRecorderScreen() {
           };
 
           if (isCompactSetRow) {
-            const compactStateSuffix =
-              rowState === 'skipped' ? ' · Skipped' : isAddedBeyondPlan ? ' · Added' : '';
+            const setNumberLabel = `Set ${setIndex + 1}`;
+            const plannedWeightLabel = formatSetWeightLabel(set.plannedWeight);
+            const plannedRepsLabel = formatSetRepsLabel(set.plannedReps);
+            const actualWeightLabel = formatSetWeightLabel(set.weight);
+            const actualRepsLabel = formatSetRepsLabel(set.reps);
+            const compactSetIndexTextStyle = [
+              styles.compactSetIndexText,
+              isMutedRow ? styles.compactSetMutedText : null,
+            ];
+            const compactSetWeightTextStyle = [
+              styles.compactSetValueText,
+              styles.compactSetWeightText,
+              isMutedRow ? styles.compactSetMutedText : null,
+            ];
+            const compactSetRepsTextStyle = [
+              styles.compactSetValueText,
+              styles.compactSetRepsText,
+              isMutedRow ? styles.compactSetMutedText : null,
+            ];
+            const inlineWeightLabel =
+              rowState === 'added' || !isPlannedRow ? actualWeightLabel : plannedWeightLabel;
+            const inlineRepsLabel =
+              rowState === 'added' || !isPlannedRow ? actualRepsLabel : plannedRepsLabel;
+            const renderCompactSetValueLine = (
+              weightLabel: string,
+              repsLabel: string,
+              struck = false
+            ) => (
+              <View style={styles.compactSetValueLine}>
+                <Text
+                  adjustsFontSizeToFit
+                  ellipsizeMode="clip"
+                  minimumFontScale={0.75}
+                  numberOfLines={1}
+                  style={[compactSetWeightTextStyle, struck ? styles.compactSetPrescriptionText : null]}>
+                  {weightLabel}
+                </Text>
+                <Text style={[styles.compactSetSeparatorText, isMutedRow ? styles.compactSetMutedText : null]}>
+                  ·
+                </Text>
+                <Text
+                  adjustsFontSizeToFit
+                  ellipsizeMode="clip"
+                  minimumFontScale={0.75}
+                  numberOfLines={1}
+                  style={[compactSetRepsTextStyle, struck ? styles.compactSetPrescriptionText : null]}>
+                  {repsLabel}
+                </Text>
+              </View>
+            );
 
             return (
               <View
@@ -3358,14 +3428,42 @@ export default function SessionRecorderScreen() {
                   style={styles.compactSetMainPressable}
                   testID={`set-row-pressable-${exerciseIndex + 1}-${setIndex + 1}`}
                   onPress={() => toggleSetExpandedForEditing(exercise.id, set.id)}>
-                  <Text style={[styles.setRowGlyph, isMutedRow ? styles.compactSetMutedText : null]}>
+                  <Text
+                    adjustsFontSizeToFit
+                    ellipsizeMode="clip"
+                    minimumFontScale={0.75}
+                    numberOfLines={1}
+                    style={[styles.setRowGlyph, isMutedRow ? styles.compactSetMutedText : null]}>
                     {rowGlyph}
                   </Text>
-                  <Text
-                    numberOfLines={rowState === 'modified' ? 2 : 1}
-                    style={[styles.compactSetText, isMutedRow ? styles.compactSetMutedText : null]}>
-                    {`Set ${setIndex + 1} · ${compactLabel}${compactStateSuffix}`}
-                  </Text>
+                  {rowState === 'modified' ? (
+                    <View style={styles.compactSetModifiedLayout}>
+                      <Text
+                        adjustsFontSizeToFit
+                        ellipsizeMode="clip"
+                        minimumFontScale={0.75}
+                        numberOfLines={1}
+                        style={compactSetIndexTextStyle}>
+                        {setNumberLabel}
+                      </Text>
+                      <View style={styles.compactSetModifiedStack}>
+                        {renderCompactSetValueLine(plannedWeightLabel, plannedRepsLabel, true)}
+                        {renderCompactSetValueLine(actualWeightLabel, actualRepsLabel)}
+                      </View>
+                    </View>
+                  ) : (
+                    <View style={styles.compactSetInlineLayout}>
+                      <Text
+                        adjustsFontSizeToFit
+                        ellipsizeMode="clip"
+                        minimumFontScale={0.75}
+                        numberOfLines={1}
+                        style={compactSetIndexTextStyle}>
+                        {setNumberLabel}
+                      </Text>
+                      {renderCompactSetValueLine(inlineWeightLabel, inlineRepsLabel)}
+                    </View>
+                  )}
                 </Pressable>
                 {showQualityControl ? renderQualityButton('compact') : null}
                 {rowState === 'planned' ? (
@@ -3374,15 +3472,39 @@ export default function SessionRecorderScreen() {
                       accessibilityLabel={`Log set ${setIndex + 1} as planned`}
                       accessibilityRole="button"
                       style={styles.plannedSetLogButton}
-                      onPress={() => markPlannedSetLogged(exercise.id, set.id)}>
-                      <Text style={styles.plannedSetLogButtonText}>Log</Text>
+                      onPress={() => {
+                        if (consumeTapIfAnotherSetIsExpanded(set.id)) {
+                          return;
+                        }
+                        markPlannedSetLogged(exercise.id, set.id);
+                      }}>
+                      <Text
+                        adjustsFontSizeToFit
+                        ellipsizeMode="clip"
+                        minimumFontScale={0.75}
+                        numberOfLines={1}
+                        style={styles.plannedSetLogButtonText}>
+                        Log
+                      </Text>
                     </Pressable>
                     <Pressable
                       accessibilityLabel={`Skip set ${setIndex + 1}`}
                       accessibilityRole="button"
                       style={styles.plannedSetSkipButton}
-                      onPress={() => markPlannedSetSkipped(exercise.id, set.id)}>
-                      <Text style={styles.plannedSetSkipButtonText}>Skip</Text>
+                      onPress={() => {
+                        if (consumeTapIfAnotherSetIsExpanded(set.id)) {
+                          return;
+                        }
+                        markPlannedSetSkipped(exercise.id, set.id);
+                      }}>
+                      <Text
+                        adjustsFontSizeToFit
+                        ellipsizeMode="clip"
+                        minimumFontScale={0.75}
+                        numberOfLines={1}
+                        style={styles.plannedSetSkipButtonText}>
+                        Skip
+                      </Text>
                     </Pressable>
                   </View>
                 ) : null}
@@ -3455,14 +3577,28 @@ export default function SessionRecorderScreen() {
                   accessibilityRole="button"
                   style={styles.plannedSetSkipButton}
                   onPress={() => markPlannedSetSkipped(exercise.id, set.id)}>
-                  <Text style={styles.plannedSetSkipButtonText}>Skip</Text>
+                  <Text
+                    adjustsFontSizeToFit
+                    ellipsizeMode="clip"
+                    minimumFontScale={0.75}
+                    numberOfLines={1}
+                    style={styles.plannedSetSkipButtonText}>
+                    Skip
+                  </Text>
                 </Pressable>
               ) : (
                 <Pressable
                   accessibilityLabel={`Remove set ${setIndex + 1} from exercise ${exerciseIndex + 1}`}
                   style={styles.setDeleteButton}
                   onPress={() => removeSetFromExercise(exercise.id, set.id)}>
-                  <Text style={styles.setDeleteButtonText}>rm</Text>
+                  <Text
+                    adjustsFontSizeToFit
+                    ellipsizeMode="clip"
+                    minimumFontScale={0.75}
+                    numberOfLines={1}
+                    style={styles.setDeleteButtonText}>
+                    rm
+                  </Text>
                 </Pressable>
               )}
             </View>
@@ -4697,13 +4833,63 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  compactSetText: {
+  compactSetInlineLayout: {
     flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  compactSetModifiedLayout: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  compactSetModifiedStack: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
+  },
+  compactSetValueLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minWidth: 0,
+    position: 'relative',
+  },
+  compactSetIndexText: {
+    width: 50,
+    fontSize: 13,
+    lineHeight: 16,
+    fontWeight: '700',
+    color: uiColors.textPrimary,
+  },
+  compactSetValueText: {
+    width: 58,
     minWidth: 0,
     fontSize: 13,
     lineHeight: 16,
     fontWeight: '600',
     color: uiColors.textPrimary,
+  },
+  compactSetWeightText: {
+    textAlign: 'right',
+  },
+  compactSetRepsText: {
+    width: 72,
+    textAlign: 'left',
+  },
+  compactSetSeparatorText: {
+    width: 16,
+    fontSize: 13,
+    lineHeight: 16,
+    fontWeight: '600',
+    color: uiColors.textPrimary,
+    textAlign: 'center',
+  },
+  compactSetPrescriptionText: {
+    textDecorationLine: 'line-through',
   },
   compactSetMutedText: {
     color: uiColors.textSecondary,

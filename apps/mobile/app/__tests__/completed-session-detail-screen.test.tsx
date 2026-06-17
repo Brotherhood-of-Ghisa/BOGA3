@@ -152,7 +152,7 @@ describe('CompletedSessionDetailScreenShell', () => {
     expect(screen.getAllByText('Weight').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Reps').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Effort').length).toBeGreaterThan(0);
-    expect(screen.getByText('WUp')).toBeTruthy();
+    expect(screen.getByText('W-Up')).toBeTruthy();
     expect(screen.getByText('RIR 0')).toBeTruthy();
     expect(screen.getByText('RIR 1')).toBeTruthy();
     expect(screen.getByText('RIR 2')).toBeTruthy();

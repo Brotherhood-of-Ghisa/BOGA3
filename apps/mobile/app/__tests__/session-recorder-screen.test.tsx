@@ -324,8 +324,13 @@ describe('SessionRecorderScreen', () => {
     await act(async () => {});
 
     expect(screen.getByText('2 planned · 1 performed')).toBeTruthy();
-    expect(screen.getByText('Set 1 · BW · 6 reps')).toBeTruthy();
-    expect(screen.getByText('Set 3 · 185kg · 8 reps · Added')).toBeTruthy();
+    expect(screen.getByText('Set 1')).toBeTruthy();
+    expect(screen.getByText('0kg')).toBeTruthy();
+    expect(screen.getByText('6 reps')).toBeTruthy();
+    expect(screen.getByText('Set 3')).toBeTruthy();
+    expect(screen.getByText('185kg')).toBeTruthy();
+    expect(screen.getAllByText('8 reps').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Added')).toBeNull();
     expect(screen.queryByText('RIR 2')).toBeNull();
     expect(screen.getByText('RIR 1')).toBeTruthy();
     expect(screen.queryByLabelText('Weight for exercise 1 set 3')).toBeNull();
@@ -335,14 +340,26 @@ describe('SessionRecorderScreen', () => {
     fireEvent(screen.getByLabelText('Weight for exercise 1 set 3'), 'blur');
 
     fireEvent.press(screen.getByLabelText('Log set 1 as planned'));
-    expect(screen.getByText('Set 1 · BW · 6 reps')).toBeTruthy();
+    expect(screen.getByText('Set 1')).toBeTruthy();
+    expect(screen.getByText('0kg')).toBeTruthy();
+    expect(screen.getByText('6 reps')).toBeTruthy();
     expect(screen.getByText('2 planned · 2 performed')).toBeTruthy();
     expect(screen.getByLabelText('Quality for exercise 1 set 1: RIR 2')).toBeTruthy();
 
     expect(screen.queryByLabelText('Quality for exercise 1 set 2: none')).toBeNull();
     fireEvent.press(screen.getByLabelText('Skip set 2'));
-    expect(screen.getByText('Set 2 · 30kg · 8 reps · Skipped')).toBeTruthy();
+    expect(screen.getByText('Set 2')).toBeTruthy();
+    expect(screen.getByText('30kg')).toBeTruthy();
+    expect(screen.getAllByText('8 reps').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Skipped')).toBeNull();
     expect(screen.getByText('2 planned · 2 performed · 1 skipped')).toBeTruthy();
+
+    fireEvent.press(screen.getByLabelText('added set 3 for exercise 1: 185kg · 8 reps; quality RIR 1'));
+    expect(screen.getByLabelText('Weight for exercise 1 set 3')).toBeTruthy();
+
+    fireEvent.press(screen.getByLabelText('skipped planned set 2 for exercise 1: 30kg · 8 reps; quality RIR 2'));
+    expect(screen.queryByLabelText('Weight for exercise 1 set 2')).toBeNull();
+    expect(screen.queryByLabelText('Weight for exercise 1 set 3')).toBeNull();
 
     fireEvent.press(screen.getByLabelText('skipped planned set 2 for exercise 1: 30kg · 8 reps; quality RIR 2'));
     expect(screen.getByLabelText('Weight for exercise 1 set 2').props.value).toBe('30');
@@ -355,7 +372,10 @@ describe('SessionRecorderScreen', () => {
     expect(screen.getByLabelText('Weight for exercise 1 set 2').props.value).toBe('35');
 
     fireEvent.press(screen.getByLabelText('Skip set 2'));
-    expect(screen.getByText('Set 2 · 30kg · 8 reps · Skipped')).toBeTruthy();
+    expect(screen.getByText('Set 2')).toBeTruthy();
+    expect(screen.getByText('30kg')).toBeTruthy();
+    expect(screen.getAllByText('8 reps').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Skipped')).toBeNull();
     expect(screen.getByText('2 planned · 2 performed · 1 skipped')).toBeTruthy();
   });
 
@@ -394,8 +414,10 @@ describe('SessionRecorderScreen', () => {
 
     expect(screen.getByText('1 planned · 1 performed')).toBeTruthy();
     expect(screen.getByLabelText('matched planned set 1 for exercise 1: 30kg · 8 reps; quality RIR 0')).toBeTruthy();
-    expect(screen.getByText('Set 1 · 30kg · 8 reps')).toBeTruthy();
-    expect(screen.queryByText('Set 1 · 30kg · 8 reps → 30kg · 8 reps')).toBeNull();
+    expect(screen.getByText('Set 1')).toBeTruthy();
+    expect(screen.getByText('30kg')).toBeTruthy();
+    expect(screen.getByText('8 reps')).toBeTruthy();
+    expect(screen.queryByText('Set 1 · 30kg · 8 reps -> 30kg · 8 reps')).toBeNull();
   });
 
   it('uses compact editable rows for normal logged sets', async () => {
@@ -432,7 +454,9 @@ describe('SessionRecorderScreen', () => {
     await act(async () => {});
 
     expect(screen.queryByTestId('exercise-1-set-header')).toBeNull();
-    expect(screen.getByText('Set 1 · 30kg · 8 reps')).toBeTruthy();
+    expect(screen.getByText('Set 1')).toBeTruthy();
+    expect(screen.getByText('30kg')).toBeTruthy();
+    expect(screen.getByText('8 reps')).toBeTruthy();
     expect(screen.getByText('RIR 2')).toBeTruthy();
     expect(screen.queryByLabelText('Weight for exercise 1 set 1')).toBeNull();
 
@@ -445,7 +469,9 @@ describe('SessionRecorderScreen', () => {
 
     fireEvent.press(screen.getByLabelText('Add set to exercise 1'));
 
-    expect(screen.getByText('Set 1 · 30kg · 8 reps')).toBeTruthy();
+    expect(screen.getByText('Set 1')).toBeTruthy();
+    expect(screen.getByText('30kg')).toBeTruthy();
+    expect(screen.getByText('8 reps')).toBeTruthy();
     expect(screen.getByLabelText('Weight for exercise 1 set 2')).toBeTruthy();
     expect(screen.getByLabelText('Reps for exercise 1 set 2')).toBeTruthy();
     expect(screen.getByLabelText('Quality for exercise 1 set 2: RIR 2')).toBeTruthy();
@@ -454,7 +480,19 @@ describe('SessionRecorderScreen', () => {
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
-    expect(screen.getByText('Set 2 · 30kg · 8 reps')).toBeTruthy();
+    expect(screen.getByText('Set 2')).toBeTruthy();
+    expect(screen.getAllByText('30kg').length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText('8 reps').length).toBeGreaterThanOrEqual(2);
+
+    fireEvent.press(screen.getByLabelText('logged set 1 for exercise 1: 30kg · 8 reps; quality RIR 2'));
+    expect(screen.getByLabelText('Weight for exercise 1 set 1')).toBeTruthy();
+
+    fireEvent.press(screen.getByLabelText('logged set 2 for exercise 1: 30kg · 8 reps; quality RIR 2'));
+    expect(screen.queryByLabelText('Weight for exercise 1 set 1')).toBeNull();
+    expect(screen.queryByLabelText('Weight for exercise 1 set 2')).toBeNull();
+
+    fireEvent.press(screen.getByLabelText('logged set 2 for exercise 1: 30kg · 8 reps; quality RIR 2'));
+    expect(screen.getByLabelText('Weight for exercise 1 set 2')).toBeTruthy();
   });
 
   it('prefills date and time with the current value pattern', async () => {

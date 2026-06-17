@@ -92,6 +92,10 @@ exports[`UI primitives matches the current top-level tabs snapshot after primiti
       testID="top-level-tab-stats-history"
     >
       <Text
+        adjustsFontSizeToFit={true}
+        ellipsizeMode="clip"
+        minimumFontScale={0.75}
+        numberOfLines={1}
         selectable={false}
         style={
           [
@@ -167,6 +171,10 @@ exports[`UI primitives matches the current top-level tabs snapshot after primiti
       testID="top-level-tab-log"
     >
       <Text
+        adjustsFontSizeToFit={true}
+        ellipsizeMode="clip"
+        minimumFontScale={0.75}
+        numberOfLines={1}
         selectable={false}
         style={
           [
@@ -242,6 +250,10 @@ exports[`UI primitives matches the current top-level tabs snapshot after primiti
       testID="top-level-tab-exercises"
     >
       <Text
+        adjustsFontSizeToFit={true}
+        ellipsizeMode="clip"
+        minimumFontScale={0.75}
+        numberOfLines={1}
         selectable={false}
         style={
           [
@@ -320,6 +332,10 @@ exports[`UI primitives matches the current top-level tabs snapshot after primiti
     testID="top-level-settings-button"
   >
     <Text
+      adjustsFontSizeToFit={true}
+      ellipsizeMode="clip"
+      minimumFontScale={0.75}
+      numberOfLines={1}
       selectable={false}
       style={
         [

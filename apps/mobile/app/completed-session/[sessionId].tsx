@@ -84,7 +84,7 @@ function coerceRouteParam(value: string | string[] | undefined): string | null {
 const formatSetEffortLabel = (setType: SessionSetTypeValue): string => {
   switch (setType) {
     case 'warm_up':
-      return 'WUp';
+      return 'W-Up';
     case 'rir_0':
       return 'RIR 0';
     case 'rir_1':
@@ -400,7 +400,12 @@ export function CompletedSessionDetailScreenShell({
                 onPress={handleEdit}
                 style={[styles.actionBarButton, styles.actionBarPrimaryButton]}
                 testID="completed-session-detail-edit-button">
-                <Text numberOfLines={1} style={styles.actionBarPrimaryButtonText}>
+                <Text
+                  adjustsFontSizeToFit
+                  ellipsizeMode="clip"
+                  minimumFontScale={0.75}
+                  numberOfLines={1}
+                  style={styles.actionBarPrimaryButtonText}>
                   {editLabel}
                 </Text>
               </Pressable>
@@ -416,6 +421,9 @@ export function CompletedSessionDetailScreenShell({
                 ]}
                 testID="completed-session-detail-delete-button">
                 <Text
+                  adjustsFontSizeToFit
+                  ellipsizeMode="clip"
+                  minimumFontScale={0.75}
                   numberOfLines={1}
                   style={[
                     styles.actionBarDangerButtonText,
@@ -433,19 +441,47 @@ export function CompletedSessionDetailScreenShell({
         <View style={styles.headerCard}>
           <View style={styles.metricGrid}>
             <View style={styles.metricCell}>
-              <Text style={styles.metricLabel}>Start</Text>
+              <Text
+                adjustsFontSizeToFit
+                ellipsizeMode="clip"
+                minimumFontScale={0.75}
+                numberOfLines={1}
+                style={styles.metricLabel}>
+                Start
+              </Text>
               <Text style={styles.metricValue}>{formattedStartedAt}</Text>
             </View>
             <View style={styles.metricCell}>
-              <Text style={styles.metricLabel}>End</Text>
+              <Text
+                adjustsFontSizeToFit
+                ellipsizeMode="clip"
+                minimumFontScale={0.75}
+                numberOfLines={1}
+                style={styles.metricLabel}>
+                End
+              </Text>
               <Text style={styles.metricValue}>{formattedCompletedAt}</Text>
             </View>
             <View style={styles.metricCell}>
-              <Text style={styles.metricLabel}>Duration</Text>
+              <Text
+                adjustsFontSizeToFit
+                ellipsizeMode="clip"
+                minimumFontScale={0.75}
+                numberOfLines={1}
+                style={styles.metricLabel}>
+                Duration
+              </Text>
               <Text style={styles.metricValue}>{session.durationDisplay}</Text>
             </View>
             <View style={styles.metricCell}>
-              <Text style={styles.metricLabel}>Location</Text>
+              <Text
+                adjustsFontSizeToFit
+                ellipsizeMode="clip"
+                minimumFontScale={0.75}
+                numberOfLines={1}
+                style={styles.metricLabel}>
+                Location
+              </Text>
               <Text numberOfLines={1} style={styles.metricValue}>
                 {session.gymName?.trim() ? session.gymName : 'No gym'}
               </Text>
@@ -476,7 +512,12 @@ export function CompletedSessionDetailScreenShell({
               onPress={() => handleAppendExercise(exercise.id)}
               style={[styles.exerciseAppendButton, styles.actionBarSecondaryButton]}
               testID={`completed-session-detail-append-exercise-button-${exercise.id}`}>
-              <Text numberOfLines={1} style={styles.actionBarSecondaryButtonText}>
+              <Text
+                adjustsFontSizeToFit
+                ellipsizeMode="clip"
+                minimumFontScale={0.75}
+                numberOfLines={1}
+                style={styles.actionBarSecondaryButtonText}>
                 Append
               </Text>
             </Pressable>
@@ -487,17 +528,71 @@ export function CompletedSessionDetailScreenShell({
                 <View
                   style={styles.setTableHeaderRow}
                   testID={`completed-session-detail-sets-table-header-${exercise.id}`}>
-                  <Text style={[styles.setTableHeaderCell, styles.setTableIndexCell]}>Set</Text>
-                  <Text style={[styles.setTableHeaderCell, styles.setTableValueCell]}>Weight</Text>
-                  <Text style={[styles.setTableHeaderCell, styles.setTableValueCell]}>Reps</Text>
-                  <Text style={[styles.setTableHeaderCell, styles.setTableEffortCell]}>Effort</Text>
+                  <Text
+                    adjustsFontSizeToFit
+                    ellipsizeMode="clip"
+                    minimumFontScale={0.75}
+                    numberOfLines={1}
+                    style={[styles.setTableHeaderCell, styles.setTableIndexCell]}>
+                    Set
+                  </Text>
+                  <Text
+                    adjustsFontSizeToFit
+                    ellipsizeMode="clip"
+                    minimumFontScale={0.75}
+                    numberOfLines={1}
+                    style={[styles.setTableHeaderCell, styles.setTableValueCell]}>
+                    Weight
+                  </Text>
+                  <Text
+                    adjustsFontSizeToFit
+                    ellipsizeMode="clip"
+                    minimumFontScale={0.75}
+                    numberOfLines={1}
+                    style={[styles.setTableHeaderCell, styles.setTableValueCell]}>
+                    Reps
+                  </Text>
+                  <Text
+                    adjustsFontSizeToFit
+                    ellipsizeMode="clip"
+                    minimumFontScale={0.75}
+                    numberOfLines={1}
+                    style={[styles.setTableHeaderCell, styles.setTableEffortCell]}>
+                    Effort
+                  </Text>
                 </View>
               ) : null}
               <View style={styles.setTableRow} testID={`completed-session-detail-set-row-${set.id}`}>
-                <Text style={[styles.setTableCell, styles.setTableIndexCell]}>{setIndex + 1}</Text>
-                <Text style={[styles.setTableCell, styles.setTableValueCell]}>{set.weight || '—'}</Text>
-                <Text style={[styles.setTableCell, styles.setTableValueCell]}>{set.reps || '—'}</Text>
-                <Text style={[styles.setTableCell, styles.setTableEffortCell]}>
+                <Text
+                  adjustsFontSizeToFit
+                  ellipsizeMode="clip"
+                  minimumFontScale={0.75}
+                  numberOfLines={1}
+                  style={[styles.setTableCell, styles.setTableIndexCell]}>
+                  {setIndex + 1}
+                </Text>
+                <Text
+                  adjustsFontSizeToFit
+                  ellipsizeMode="clip"
+                  minimumFontScale={0.75}
+                  numberOfLines={1}
+                  style={[styles.setTableCell, styles.setTableValueCell]}>
+                  {set.weight || '—'}
+                </Text>
+                <Text
+                  adjustsFontSizeToFit
+                  ellipsizeMode="clip"
+                  minimumFontScale={0.75}
+                  numberOfLines={1}
+                  style={[styles.setTableCell, styles.setTableValueCell]}>
+                  {set.reps || '—'}
+                </Text>
+                <Text
+                  adjustsFontSizeToFit
+                  ellipsizeMode="clip"
+                  minimumFontScale={0.75}
+                  numberOfLines={1}
+                  style={[styles.setTableCell, styles.setTableEffortCell]}>
                   {formatSetEffortLabel(set.setType)}
                 </Text>
               </View>

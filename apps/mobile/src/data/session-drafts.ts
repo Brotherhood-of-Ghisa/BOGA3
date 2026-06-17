@@ -1169,9 +1169,9 @@ export const createSessionDraftRepository = (store: SessionDraftStore = createDr
       })) ?? [];
 
     const lastExerciseIndex = existingExercises.length - 1;
-    const lastExercise = existingExercises[lastExerciseIndex];
     const shouldAppendToLastExercise =
-      lastExercise?.exerciseDefinitionId === sourceExercise.exerciseDefinitionId;
+      lastExerciseIndex >= 0 &&
+      existingExercises[lastExerciseIndex]?.exerciseDefinitionId === sourceExercise.exerciseDefinitionId;
     const exercises =
       shouldAppendToLastExercise
         ? existingExercises.map((exercise, index) =>

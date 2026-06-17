@@ -87,11 +87,21 @@ export function SessionContentLayout<
           <UiSurface key={exercise.id} style={styles.exerciseCard}>
             <View style={styles.exerciseCardHeader}>
               <View style={styles.exerciseHeaderTextStack}>
-                <UiText numberOfLines={1} variant="title">
+                <UiText
+                  adjustsFontSizeToFit
+                  ellipsizeMode="clip"
+                  minimumFontScale={0.82}
+                  numberOfLines={2}
+                  variant="title">
                   {exercise.name || `Exercise ${exerciseIndex + 1}`}
                 </UiText>
                 {exercise.machineName?.trim() ? (
-                  <UiText numberOfLines={1} variant="subtitle">
+                  <UiText
+                    adjustsFontSizeToFit
+                    ellipsizeMode="clip"
+                    minimumFontScale={0.82}
+                    numberOfLines={1}
+                    variant="subtitle">
                     {exercise.machineName.trim()}
                   </UiText>
                 ) : null}
@@ -154,7 +164,7 @@ const styles = StyleSheet.create({
   },
   exerciseCardHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     gap: uiSpace.sm,
   },

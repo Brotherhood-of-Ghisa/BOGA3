@@ -62,7 +62,7 @@ const formatEstOneRm = (value: number | null) =>
 const formatSetTypeBadge = (setType: ExerciseHistorySessionEntry['sets'][number]['setType']) => {
   switch (setType) {
     case 'warm_up':
-      return 'WU';
+      return 'W-Up';
     case 'rir_0':
       return 'R0';
     case 'rir_1':

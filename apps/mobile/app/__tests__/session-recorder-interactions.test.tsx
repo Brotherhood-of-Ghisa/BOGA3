@@ -716,7 +716,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     expect(setTypeButton.findByType('Text').props.children).toBe('•');
 
     fireEvent.press(setTypeButton);
-    expect(screen.getByText('WUp')).toBeTruthy();
+    expect(screen.getByText('W-Up')).toBeTruthy();
     fireEvent.press(setTypeButton);
     expect(screen.getByText('RIR 0')).toBeTruthy();
     fireEvent.press(setTypeButton);
@@ -727,7 +727,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     expect(screen.getByLabelText('Quality for exercise 1 set 1: none')).toBeTruthy();
 
     fireEvent(setTypeButton, 'onLongPress');
-    expect(screen.getByLabelText('Choose WUp set type')).toBeTruthy();
+    expect(screen.getByLabelText('Choose W-Up set type')).toBeTruthy();
     expect(screen.getByLabelText('Choose RIR 1 set type')).toBeTruthy();
     fireEvent.press(screen.getByLabelText('Choose RIR 1 set type'));
     expect(screen.getByText('RIR 1')).toBeTruthy();
@@ -785,7 +785,9 @@ describe('SessionRecorderScreen exercise interactions', () => {
     fireEvent.press(screen.getByLabelText('Add set to exercise 1'));
 
     expect(screen.queryByLabelText('Weight for exercise 1 set 1')).toBeNull();
-    expect(screen.getByText('Set 1 · 135.5kg · 8 reps')).toBeTruthy();
+    expect(screen.getByText('Set 1')).toBeTruthy();
+    expect(screen.getByText('135.5kg')).toBeTruthy();
+    expect(screen.getByText('8 reps')).toBeTruthy();
     expect(screen.getByLabelText('Weight for exercise 1 set 2').props.autoFocus).toBe(true);
     expect(screen.getByLabelText('Weight for exercise 1 set 2').props.selectTextOnFocus).toBeUndefined();
     expect(screen.getByLabelText('Weight for exercise 1 set 2').props.selection).toBeUndefined();
@@ -1142,7 +1144,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     const setTypeButton = screen.getByTestId('set-quality-button-1-1');
 
     fireEvent.press(setTypeButton);
-    expect(screen.getByText('WUp')).toBeTruthy();
+    expect(screen.getByText('W-Up')).toBeTruthy();
 
     fireEvent(setTypeButton, 'onLongPress');
     expect(screen.getByLabelText('Choose None set type')).toBeTruthy();
