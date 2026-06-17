@@ -72,6 +72,7 @@ Brief entrypoint map of the current mobile screens.
   - in-route single gym editor owns private coordinate controls (`Save current location`, confirmation-gated replace, and confirmation-gated clear)
   - in-route exercise-tag add/manage modals (search/select/create, rename/delete/undelete, deleted-visibility toggle)
   - per-exercise collapsed-by-default `Past blocks` bar below tags and above set rows; tapping expands inline loading/empty/error states, `<<` older / `>>` newer controls, and `Previous` vs live `Current` rows for estimated `1RM`, volume, highest weight, and near-failure set count
+  - compact tap-to-edit set rows for normal and planned execution rows; appended historical/program targets support planned, matched, modified, skipped, and added states without replacing the existing recorder chrome; unperformed planned rows show `Log` / `Skip` without the right-side quality control until the user logs, edits, or skips the target; tapping a planned/skipped target to edit hydrates the actual fields from the plan, and matched/modified classification defaults to prescribed volume rather than quality
   - foreground GPS gym assistance is hidden on the recorder surface: brand-new active-session start may preselect one confident saved-gym match, null state displays as `No gym`, and long-pressing the gym box explicitly retries detection without a persistent suggestion panel
 - Key exits:
   - `exercise-catalog` (`source=session-recorder&intent=manage` from exercise picker)
@@ -134,13 +135,15 @@ Brief entrypoint map of the current mobile screens.
 8. `/completed-session/[sessionId]`
 - File: `apps/mobile/app/completed-session/[sessionId].tsx`
 - Purpose:
-  - completed session detail viewer with edit/reopen/delete actions
+  - completed session detail viewer with edit/delete session actions and per-exercise block append actions
 - Key states (high level):
   - loading / error / not-found / detail
+  - read-only exercise cards include a set table with `Set`, `Weight`, `Reps`, and `Effort`
+  - each exercise card header exposes `Append` to copy that one historical block as planned target rows into the active recorder
   - temporary redirect placeholder for `intent=edit`
 - Key exits:
   - `session-recorder` (edit)
-  - dismisses to `/` after successful reopen
+  - `session-recorder` after successful per-exercise block append
 
 9. `/exercise-history`
 - File: `apps/mobile/app/exercise-history.tsx`

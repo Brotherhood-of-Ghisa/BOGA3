@@ -72,6 +72,8 @@ import { logEvent } from '@/src/logging';
 import { createDraftAutosaveController, type DraftAutosaveController } from '@/src/session-recorder/draft-autosave';
 import { createSessionRecorderLifecycleHelpers } from '@/src/session-recorder/lifecycle-helpers';
 
+const START_SESSION_GYM_DETECTION_TIMEOUT_MS = 1500;
+
 function formatCurrentDateTime(date: Date): string {
   const year = date.getFullYear();
   const month = `${date.getMonth() + 1}`.padStart(2, '0');
@@ -137,6 +139,10 @@ function mapDraftSnapshotToSession(snapshot: SessionDraftSnapshot): Session {
         reps: set.repsValue,
         weight: set.weightValue,
         setType: normalizeSessionSetType(set.setType),
+        plannedReps: set.plannedRepsValue ?? null,
+        plannedWeight: set.plannedWeightValue ?? null,
+        plannedSetType: normalizeSessionSetType(set.plannedSetType),
+        performanceStatus: set.performanceStatus ?? null,
       })),
     })),
   };
@@ -157,6 +163,10 @@ function mapSessionGraphSnapshotToSession(snapshot: SessionGraphSnapshot): Sessi
         reps: set.repsValue,
         weight: set.weightValue,
         setType: normalizeSessionSetType(set.setType),
+        plannedReps: set.plannedRepsValue ?? null,
+        plannedWeight: set.plannedWeightValue ?? null,
+        plannedSetType: normalizeSessionSetType(set.plannedSetType),
+        performanceStatus: set.performanceStatus ?? null,
       })),
     })),
   };
@@ -244,6 +254,10 @@ const toPersistDraftExercises = (session: Session) =>
       repsValue: set.reps,
       weightValue: set.weight,
       setType: set.setType,
+      plannedRepsValue: set.plannedReps,
+      plannedWeightValue: set.plannedWeight,
+      plannedSetType: set.plannedSetType,
+      performanceStatus: set.performanceStatus,
     })),
   }));
 
@@ -348,6 +362,10 @@ function createEmptySet(): SessionSet {
     reps: '',
     weight: '',
     setType: null,
+    plannedReps: null,
+    plannedWeight: null,
+    plannedSetType: null,
+    performanceStatus: null,
   };
 }
 
@@ -361,18 +379,22 @@ function createSetFromPrevious(previousSet: SessionSet | undefined): SessionSet 
     reps: previousSet.reps,
     weight: previousSet.weight,
     setType: normalizeSessionSetType(previousSet.setType),
+    plannedReps: null,
+    plannedWeight: null,
+    plannedSetType: null,
+    performanceStatus: null,
   };
 }
 
 const SET_TYPE_CYCLE_ORDER: SessionSetTypeValue[] = [null, ...SESSION_SET_TYPES];
 const SET_TYPE_SHORT_LABELS: Record<SessionSetType, string> = {
-  warm_up: 'WU',
+  warm_up: 'W-Up',
   rir_0: 'R0',
   rir_1: 'R1',
   rir_2: 'R2',
 };
 const SET_TYPE_MENU_LABELS: Record<SessionSetType, string> = {
-  warm_up: 'Warm-up',
+  warm_up: 'W-Up',
   rir_0: 'RIR 0',
   rir_1: 'RIR 1',
   rir_2: 'RIR 2',
@@ -380,6 +402,9 @@ const SET_TYPE_MENU_LABELS: Record<SessionSetType, string> = {
 
 const getSetTypeButtonLabel = (setType: SessionSetTypeValue): string =>
   setType === null ? '•' : SET_TYPE_SHORT_LABELS[setType];
+
+const getSetQualityDisplayLabel = (setType: SessionSetTypeValue): string =>
+  setType === null ? '•' : SET_TYPE_MENU_LABELS[setType];
 
 const getSetTypeMenuLabel = (setType: SessionSetTypeValue): string =>
   setType === null ? 'None' : SET_TYPE_MENU_LABELS[setType];
@@ -429,10 +454,142 @@ const isPositiveIntegerInput = (value: string): boolean => {
 const hasSetFieldValidationError = (field: SetFieldName, value: string): boolean =>
   field === 'weight' ? !isNonNegativeDecimalInput(value) : !isPositiveIntegerInput(value);
 
+type PlannedSetRowState = 'planned' | 'matched' | 'modified' | 'skipped' | 'added';
+type PlannedSetMatchMode = 'volume' | 'quality' | 'volume-and-quality';
+
+const PLANNED_SET_MATCH_MODE: PlannedSetMatchMode = 'volume';
+
+const hasPlannedTarget = (set: SessionSet): boolean =>
+  set.plannedReps !== null || set.plannedWeight !== null || set.plannedSetType !== null;
+
+const hasPerformedActual = (set: SessionSet): boolean => {
+  if (set.reps.trim().length === 0) {
+    return false;
+  }
+
+  if (hasPlannedTarget(set) && (set.plannedWeight ?? '').trim().length === 0) {
+    return true;
+  }
+
+  return set.weight.trim().length > 0;
+};
+
+const plannedSetVolumeMatches = (set: SessionSet): boolean =>
+  set.weight.trim() === (set.plannedWeight ?? '').trim() &&
+  set.reps.trim() === (set.plannedReps ?? '').trim();
+
+const plannedSetQualityMatches = (set: SessionSet): boolean =>
+  normalizeSessionSetType(set.setType) === normalizeSessionSetType(set.plannedSetType);
+
+const plannedSetMatches = (
+  set: SessionSet,
+  matchMode: PlannedSetMatchMode = PLANNED_SET_MATCH_MODE
+): boolean => {
+  switch (matchMode) {
+    case 'quality':
+      return plannedSetQualityMatches(set);
+    case 'volume-and-quality':
+      return plannedSetVolumeMatches(set) && plannedSetQualityMatches(set);
+    case 'volume':
+      return plannedSetVolumeMatches(set);
+  }
+};
+
+const getSetRowState = (set: SessionSet): PlannedSetRowState => {
+  if (!hasPlannedTarget(set)) {
+    return 'added';
+  }
+
+  if (set.performanceStatus === 'skipped') {
+    return 'skipped';
+  }
+
+  if (!hasPerformedActual(set)) {
+    return 'planned';
+  }
+
+  return plannedSetMatches(set) ? 'matched' : 'modified';
+};
+
+const formatSetWeightLabel = (value: string | null | undefined): string => {
+  const trimmed = (value ?? '').trim() || '0';
+  return `${trimmed}kg`;
+};
+
+const formatSetRepsLabel = (value: string | null | undefined): string => {
+  const trimmed = (value ?? '').trim() || '0';
+  return `${trimmed} ${trimmed === '1' ? 'rep' : 'reps'}`;
+};
+
+const getPlannedSetLabel = (set: SessionSet): string =>
+  `${formatSetWeightLabel(set.plannedWeight)} · ${formatSetRepsLabel(set.plannedReps)}`;
+
+const getActualSetLabel = (set: SessionSet): string =>
+  `${formatSetWeightLabel(set.weight)} · ${formatSetRepsLabel(set.reps)}`;
+
+const getRowGlyph = (rowState: PlannedSetRowState, isAddedBeyondPlan: boolean): string => {
+  if (rowState === 'added' && !isAddedBeyondPlan) {
+    return '•';
+  }
+
+  const rowStateGlyph: Record<PlannedSetRowState, string> = {
+    planned: '○',
+    matched: '✓',
+    modified: '≈',
+    skipped: '−',
+    added: '+',
+  };
+  return rowStateGlyph[rowState];
+};
+
+const getSetQualityForRow = (set: SessionSet, rowState: PlannedSetRowState): SessionSetTypeValue =>
+  rowState === 'planned' || rowState === 'skipped'
+    ? normalizeSessionSetType(set.plannedSetType)
+    : normalizeSessionSetType(set.setType);
+
+const resolveWithTimeout = async <T,>(promise: Promise<T>, timeoutMs: number, fallback: T): Promise<T> => {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+  try {
+    return await Promise.race([
+      promise.catch(() => fallback),
+      new Promise<T>((resolve) => {
+        timeoutId = setTimeout(() => resolve(fallback), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  }
+};
+
+const getExerciseSetSummary = (sets: SessionSet[]): string => {
+  const planned = sets.filter(hasPlannedTarget).length;
+  const performed = sets.filter((set) => {
+    const state = getSetRowState(set);
+    return state === 'matched' || state === 'modified' || state === 'added';
+  }).length;
+  const skipped = sets.filter((set) => getSetRowState(set) === 'skipped').length;
+
+  if (planned > 0) {
+    const parts = [`${planned} planned`, `${performed} performed`];
+    if (skipped > 0) {
+      parts.push(`${skipped} skipped`);
+    }
+    return parts.join(' · ');
+  }
+
+  return `${sets.length} set${sets.length === 1 ? '' : 's'}`;
+};
+
 const sessionHasInvalidSetValues = (session: Session): boolean =>
   session.exercises.some((exercise) =>
     exercise.sets.some(
-      (set) => hasSetFieldValidationError('weight', set.weight) || hasSetFieldValidationError('reps', set.reps)
+      (set) =>
+        getSetRowState(set) !== 'planned' &&
+        getSetRowState(set) !== 'skipped' &&
+        (hasSetFieldValidationError('weight', set.weight) || hasSetFieldValidationError('reps', set.reps))
     )
   );
 
@@ -641,6 +798,9 @@ function removeIncompleteSets(session: Session): { session: Session; removedSets
 
   const exercises = session.exercises.map((exercise) => {
     const sets = exercise.sets.filter((set) => {
+      if (hasPlannedTarget(set)) {
+        return true;
+      }
       const isComplete = set.reps.trim().length > 0 && set.weight.trim().length > 0;
       if (!isComplete) {
         removedSets += 1;
@@ -726,8 +886,8 @@ export default function SessionRecorderScreen() {
   const [editingTagName, setEditingTagName] = useState('');
   const [isTagMutationInFlight, setIsTagMutationInFlight] = useState(false);
   const [activeSetTypePicker, setActiveSetTypePicker] = useState<SetTypePickerState | null>(null);
+  const [expandedSetIds, setExpandedSetIds] = useState<Set<string>>(() => new Set());
   const [pendingFocusedWeightSetId, setPendingFocusedWeightSetId] = useState<string | null>(null);
-  const [focusedRepsSetId, setFocusedRepsSetId] = useState<string | null>(null);
   const [isDeleteConfirmVisible, setIsDeleteConfirmVisible] = useState(false);
   const [isGpsDetectionInFlight, setIsGpsDetectionInFlight] = useState(false);
   const [pendingGymCoordinateAction, setPendingGymCoordinateAction] = useState<{
@@ -750,6 +910,7 @@ export default function SessionRecorderScreen() {
   const pendingExercisePickerRestoreTargetRef = useRef<string | null | undefined>(undefined);
   const suppressSetTypeCyclePressRef = useRef(false);
   const exerciseBlockHistoryRequestKeyRef = useRef<Record<string, string>>({});
+  const focusedSetInputIdRef = useRef<string | null>(null);
   const isMountedRef = useRef(true);
 
   stateRef.current = state;
@@ -1349,7 +1510,11 @@ export default function SessionRecorderScreen() {
     setIsStartingSession(true);
     try {
       const startedAt = new Date();
-      let detectedGym = await findMatchedGymFromCurrentLocation();
+      let detectedGym = await resolveWithTimeout(
+        findMatchedGymFromCurrentLocation(),
+        START_SESSION_GYM_DETECTION_TIMEOUT_MS,
+        null
+      );
       if (detectedGym) {
         try {
           await upsertLocalGym({
@@ -1378,7 +1543,16 @@ export default function SessionRecorderScreen() {
         },
       }));
       setHasActiveSession(true);
-    } catch {
+    } catch (error) {
+      void logEvent({
+        level: 'warn',
+        source: 'app',
+        event: 'session_recorder.start_session_failed',
+        message: 'Failed to start an empty workout session.',
+        context: {
+          error_message: error instanceof Error ? error.message : String(error),
+        },
+      }).catch(() => undefined);
       // Keep the empty state visible if the persistence call fails — user can retry.
     } finally {
       setIsStartingSession(false);
@@ -2217,7 +2391,8 @@ export default function SessionRecorderScreen() {
 
   const addSetToExercise = (exerciseId: string) => {
     const exercise = state.session.exercises.find((candidate) => candidate.id === exerciseId);
-    const newSet = createSetFromPrevious(exercise?.sets[exercise.sets.length - 1]);
+    const previousSet = exercise?.sets[exercise.sets.length - 1];
+    const newSet = createSetFromPrevious(previousSet);
 
     setState((current) => ({
       ...current,
@@ -2230,9 +2405,60 @@ export default function SessionRecorderScreen() {
         ),
       },
     }));
+    setExpandedSetIds((current) => {
+      const next = new Set(current);
+      if (previousSet && (hasPerformedActual(previousSet) || getSetRowState(previousSet) === 'skipped')) {
+        next.delete(previousSet.id);
+      }
+      next.add(newSet.id);
+      return next;
+    });
     setPendingFocusedWeightSetId(newSet.id);
     clearSubmitFeedback();
     markSessionStructuralMutation();
+  };
+
+  const collapseDisplayableSetRows = () => {
+    const displayableSetIds = new Set(
+      stateRef.current.session.exercises.flatMap((exercise) =>
+        exercise.sets
+          .filter((set) => {
+            const rowState = getSetRowState(set);
+            return hasPerformedActual(set) || rowState === 'planned' || rowState === 'skipped';
+          })
+          .map((set) => set.id)
+      )
+    );
+
+    if (displayableSetIds.size === 0) {
+      return;
+    }
+
+    setExpandedSetIds((current) => {
+      let changed = false;
+      const next = new Set(current);
+      displayableSetIds.forEach((setId) => {
+        if (next.delete(setId)) {
+          changed = true;
+        }
+      });
+      return changed ? next : current;
+    });
+  };
+
+  const focusSetInput = (setId: string) => {
+    focusedSetInputIdRef.current = setId;
+    setExpandedSetIds(new Set([setId]));
+  };
+
+  const handleSetInputBlur = (setId: string) => {
+    setPendingFocusedWeightSetId((currentSetId) => (currentSetId === setId ? null : currentSetId));
+    if (focusedSetInputIdRef.current === setId) {
+      focusedSetInputIdRef.current = null;
+    }
+    if (focusedSetInputIdRef.current === null) {
+      collapseDisplayableSetRows();
+    }
   };
 
   const updateSetField = (
@@ -2262,8 +2488,139 @@ export default function SessionRecorderScreen() {
         ),
       },
     }));
+    setExpandedSetIds((current) => {
+      if (current.size === 1 && current.has(setId)) {
+        return current;
+      }
+      return new Set([setId]);
+    });
     clearSubmitFeedback();
     markSessionTextMutation();
+  };
+
+  const markPlannedSetLogged = (exerciseId: string, setId: string) => {
+    setState((current) => ({
+      ...current,
+      session: {
+        ...current.session,
+        exercises: current.session.exercises.map((exercise) =>
+          exercise.id === exerciseId
+            ? {
+                ...exercise,
+                sets: exercise.sets.map((set) =>
+                  set.id === setId
+                    ? {
+                        ...set,
+                        reps: set.plannedReps ?? set.reps,
+                        weight: set.plannedWeight ?? set.weight,
+                        setType: normalizeSessionSetType(set.plannedSetType),
+                        performanceStatus: null,
+                      }
+                    : set
+                ),
+              }
+            : exercise
+        ),
+      },
+    }));
+    setExpandedSetIds((current) => {
+      const next = new Set(current);
+      next.delete(setId);
+      return next;
+    });
+    clearSubmitFeedback();
+    markSessionTextMutation();
+  };
+
+  const markPlannedSetSkipped = (exerciseId: string, setId: string) => {
+    setState((current) => ({
+      ...current,
+      session: {
+        ...current.session,
+        exercises: current.session.exercises.map((exercise) =>
+          exercise.id === exerciseId
+            ? {
+                ...exercise,
+                sets: exercise.sets.map((set) =>
+                  set.id === setId
+                    ? { ...set, reps: '', weight: '', setType: null, performanceStatus: 'skipped' }
+                    : set
+                ),
+              }
+            : exercise
+        ),
+      },
+    }));
+    setExpandedSetIds((current) => {
+      const next = new Set(current);
+      next.delete(setId);
+      return next;
+    });
+    clearSubmitFeedback();
+    markSessionTextMutation();
+  };
+
+  const consumeTapIfAnotherSetIsExpanded = (setId: string): boolean => {
+    if (expandedSetIds.size === 0 || expandedSetIds.has(setId)) {
+      return false;
+    }
+
+    setExpandedSetIds(new Set());
+    return true;
+  };
+
+  const toggleSetExpandedForEditing = (exerciseId: string, setId: string) => {
+    if (consumeTapIfAnotherSetIsExpanded(setId)) {
+      return;
+    }
+
+    const shouldOpen = !expandedSetIds.has(setId);
+
+    if (!shouldOpen) {
+      setExpandedSetIds(new Set());
+      return;
+    }
+
+    const targetSet = stateRef.current.session.exercises
+      .find((exercise) => exercise.id === exerciseId)
+      ?.sets.find((set) => set.id === setId);
+    const shouldHydratePlan =
+      targetSet !== undefined &&
+      hasPlannedTarget(targetSet) &&
+      (getSetRowState(targetSet) === 'planned' || getSetRowState(targetSet) === 'skipped');
+
+    if (shouldHydratePlan) {
+      setState((current) => ({
+        ...current,
+        session: {
+          ...current.session,
+          exercises: current.session.exercises.map((exercise) =>
+            exercise.id === exerciseId
+              ? {
+                  ...exercise,
+                  sets: exercise.sets.map((set) =>
+                    set.id === setId
+                      ? {
+                          ...set,
+                          reps: set.reps.trim().length > 0 ? set.reps : set.plannedReps ?? set.reps,
+                          weight: set.weight.trim().length > 0 ? set.weight : set.plannedWeight ?? set.weight,
+                          setType:
+                            set.setType !== null
+                              ? set.setType
+                              : normalizeSessionSetType(set.plannedSetType),
+                          performanceStatus: null,
+                        }
+                      : set
+                  ),
+                }
+              : exercise
+          ),
+        },
+      }));
+      clearSubmitFeedback();
+      markSessionTextMutation();
+    }
+    setExpandedSetIds(new Set([setId]));
   };
 
   const updateSetType = (exerciseId: string, setId: string, setType: SessionSetTypeValue) => {
@@ -2846,6 +3203,7 @@ export default function SessionRecorderScreen() {
         automaticallyAdjustKeyboardInsets
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
+        onScrollBeginDrag={collapseDisplayableSetRows}
         testID="session-recorder-screen">
       {routeMode === 'completed-edit' ? (
         <View style={styles.completedEditMetadataCard}>
@@ -2912,103 +3270,340 @@ export default function SessionRecorderScreen() {
           gymSelectionControl
         }
         exercises={state.session.exercises}
-        renderSetHeader={({ exerciseIndex }) => (
-          <View style={styles.setHeaderRow} testID={`exercise-${exerciseIndex + 1}-set-header`}>
-            <Text style={[styles.setHeaderLabel, styles.setHeaderTypeLabel]}>Type</Text>
-            <Text style={[styles.setHeaderLabel, styles.setHeaderInputLabel]}>Weight</Text>
-            <Text style={[styles.setHeaderLabel, styles.setHeaderInputLabel]}>Reps</Text>
-            <View style={styles.setHeaderDeleteSpacer} />
-          </View>
-        )}
-        renderSetRow={({ exercise, exerciseIndex, set, setIndex }) => (
-          <View style={styles.setRow}>
-            <Pressable
-              accessibilityLabel={`Set type for exercise ${exerciseIndex + 1} set ${setIndex + 1}: ${getSetTypeAccessibilityLabel(
-                normalizeSessionSetType(set.setType)
-              )}`}
-              accessibilityHint="Double tap to cycle set type. Long press to choose from all options."
-              style={styles.setTypeButton}
-              testID={`set-type-button-${exerciseIndex + 1}-${setIndex + 1}`}
-              onPress={() => {
-                if (suppressSetTypeCyclePressRef.current) {
-                  suppressSetTypeCyclePressRef.current = false;
-                  return;
-                }
-                cycleSetType(exercise.id, set.id, set.setType);
-              }}
-              onLongPress={() => {
-                suppressSetTypeCyclePressRef.current = true;
-                openSetTypePicker({
-                  exerciseId: exercise.id,
-                  setId: set.id,
-                  exerciseIndex,
-                  setIndex,
-                });
-              }}>
-              <Text style={styles.setTypeButtonText}>
-                {getSetTypeButtonLabel(normalizeSessionSetType(set.setType))}
-              </Text>
-            </Pressable>
-            <TextInput
-              accessibilityLabel={`Weight for exercise ${exerciseIndex + 1} set ${setIndex + 1}`}
-              autoFocus={pendingFocusedWeightSetId === set.id}
-              inputMode="decimal"
-              keyboardType="decimal-pad"
-              selectTextOnFocus
-              selection={
-                pendingFocusedWeightSetId === set.id && set.weight.length > 0
-                  ? { start: 0, end: set.weight.length }
-                  : undefined
-              }
-              style={[
-                styles.input,
-                styles.setRowInput,
-                hasSetFieldValidationError('weight', set.weight) ? styles.inputInvalid : null,
-              ]}
-              value={set.weight}
-              onBlur={() => {
-                setPendingFocusedWeightSetId((currentSetId) => (currentSetId === set.id ? null : currentSetId));
-              }}
-              onChangeText={(value) => {
-                updateSetField(exercise.id, set.id, 'weight', value);
-                setPendingFocusedWeightSetId((currentSetId) => (currentSetId === set.id ? null : currentSetId));
-              }}
-            />
-            <TextInput
-              accessibilityLabel={`Reps for exercise ${exerciseIndex + 1} set ${setIndex + 1}`}
-              inputMode="numeric"
-              keyboardType="number-pad"
-              selectTextOnFocus
-              selection={
-                focusedRepsSetId === set.id && set.reps.length > 0
-                  ? { start: 0, end: set.reps.length }
-                  : undefined
-              }
-              style={[
-                styles.input,
-                styles.setRowInput,
-                hasSetFieldValidationError('reps', set.reps) ? styles.inputInvalid : null,
-              ]}
-              value={set.reps}
-              onBlur={() => {
-                setFocusedRepsSetId((currentSetId) => (currentSetId === set.id ? null : currentSetId));
-              }}
-              onChangeText={(value) => {
-                updateSetField(exercise.id, set.id, 'reps', value);
-                setFocusedRepsSetId((currentSetId) => (currentSetId === set.id ? null : currentSetId));
-              }}
-              onFocus={() => {
-                setFocusedRepsSetId(set.id);
-              }}
-            />
-            <Pressable
-              accessibilityLabel={`Remove set ${setIndex + 1} from exercise ${exerciseIndex + 1}`}
-              style={styles.setDeleteButton}
-              onPress={() => removeSetFromExercise(exercise.id, set.id)}>
-              <Text style={styles.setDeleteButtonText}>X</Text>
-            </Pressable>
-          </View>
-        )}
+        renderSetRow={({ exercise, exerciseIndex, set, setIndex }) => {
+          const rowState = getSetRowState(set);
+          const isPlannedRow = hasPlannedTarget(set);
+          const exerciseHasPlannedTargets = exercise.sets.some(hasPlannedTarget);
+          const isExpanded = expandedSetIds.has(set.id);
+          const isAddedBeyondPlan = exerciseHasPlannedTargets && rowState === 'added';
+          const isDisplayableRow =
+            rowState === 'planned' ||
+            rowState === 'skipped' ||
+            hasPerformedActual(set);
+          const isCompactSetRow = isDisplayableRow && !isExpanded;
+          const rowGlyph = getRowGlyph(rowState, isAddedBeyondPlan);
+          const compactQuality = getSetQualityForRow(set, rowState);
+          const compactQualityAccessibilityLabel = getSetTypeAccessibilityLabel(compactQuality);
+          const showQualityControl = rowState !== 'planned';
+          const isMutedRow = rowState === 'planned' || rowState === 'skipped';
+          const plannedLabel = getPlannedSetLabel(set);
+          const actualLabel = getActualSetLabel(set);
+          const compactLabel =
+            rowState === 'modified'
+              ? `${plannedLabel}; actual ${actualLabel}`
+              : rowState === 'added' || !isPlannedRow
+                ? actualLabel
+                : plannedLabel;
+          const stateLabel =
+            rowState === 'matched'
+              ? 'matched planned set'
+              : rowState === 'modified'
+                ? 'modified planned set'
+                : rowState === 'skipped'
+                  ? 'skipped planned set'
+                  : rowState === 'planned'
+                    ? 'planned set'
+                    : isAddedBeyondPlan
+                      ? 'added set'
+                      : 'logged set';
+
+          const renderQualityButton = (variant: 'compact' | 'edit') => {
+            const displayedQuality =
+              variant === 'compact' ? compactQuality : normalizeSessionSetType(set.setType);
+            const qualityLabel = getSetQualityDisplayLabel(displayedQuality);
+            const qualityAccessibilityLabel = getSetTypeAccessibilityLabel(displayedQuality);
+
+            return (
+              <Pressable
+                accessibilityLabel={`Quality for exercise ${exerciseIndex + 1} set ${setIndex + 1}: ${qualityAccessibilityLabel}`}
+                accessibilityHint="Double tap to cycle quality. Long press to choose from all options."
+                accessibilityRole="button"
+                style={[
+                  styles.setQualityButton,
+                  variant === 'compact' ? styles.setQualityButtonCompact : null,
+                  displayedQuality === null ? styles.setQualityButtonEmpty : null,
+                ]}
+                testID={`set-quality-button-${exerciseIndex + 1}-${setIndex + 1}`}
+                onPress={() => {
+                  if (variant === 'compact' && consumeTapIfAnotherSetIsExpanded(set.id)) {
+                    return;
+                  }
+                  if (suppressSetTypeCyclePressRef.current) {
+                    suppressSetTypeCyclePressRef.current = false;
+                    return;
+                  }
+                  cycleSetType(exercise.id, set.id, set.setType);
+                }}
+                onLongPress={() => {
+                  if (variant === 'compact' && consumeTapIfAnotherSetIsExpanded(set.id)) {
+                    return;
+                  }
+                  suppressSetTypeCyclePressRef.current = true;
+                  openSetTypePicker({
+                    exerciseId: exercise.id,
+                    setId: set.id,
+                    exerciseIndex,
+                    setIndex,
+                  });
+                }}>
+                <Text
+                  adjustsFontSizeToFit
+                  ellipsizeMode="clip"
+                  minimumFontScale={0.75}
+                  numberOfLines={1}
+                  style={[
+                    styles.setQualityButtonText,
+                    displayedQuality === null ? styles.setQualityButtonTextEmpty : null,
+                  ]}>
+                  {qualityLabel}
+                </Text>
+              </Pressable>
+            );
+          };
+
+          if (isCompactSetRow) {
+            const setNumberLabel = `Set ${setIndex + 1}`;
+            const plannedWeightLabel = formatSetWeightLabel(set.plannedWeight);
+            const plannedRepsLabel = formatSetRepsLabel(set.plannedReps);
+            const actualWeightLabel = formatSetWeightLabel(set.weight);
+            const actualRepsLabel = formatSetRepsLabel(set.reps);
+            const compactSetIndexTextStyle = [
+              styles.compactSetIndexText,
+              isMutedRow ? styles.compactSetMutedText : null,
+            ];
+            const compactSetWeightTextStyle = [
+              styles.compactSetValueText,
+              styles.compactSetWeightText,
+              isMutedRow ? styles.compactSetMutedText : null,
+            ];
+            const compactSetRepsTextStyle = [
+              styles.compactSetValueText,
+              styles.compactSetRepsText,
+              isMutedRow ? styles.compactSetMutedText : null,
+            ];
+            const inlineWeightLabel =
+              rowState === 'added' || !isPlannedRow ? actualWeightLabel : plannedWeightLabel;
+            const inlineRepsLabel =
+              rowState === 'added' || !isPlannedRow ? actualRepsLabel : plannedRepsLabel;
+            const renderCompactSetValueLine = (
+              weightLabel: string,
+              repsLabel: string,
+              struck = false
+            ) => (
+              <View style={styles.compactSetValueLine}>
+                <Text
+                  adjustsFontSizeToFit
+                  ellipsizeMode="clip"
+                  minimumFontScale={0.75}
+                  numberOfLines={1}
+                  style={[compactSetWeightTextStyle, struck ? styles.compactSetPrescriptionText : null]}>
+                  {weightLabel}
+                </Text>
+                <Text style={[styles.compactSetSeparatorText, isMutedRow ? styles.compactSetMutedText : null]}>
+                  ·
+                </Text>
+                <Text
+                  adjustsFontSizeToFit
+                  ellipsizeMode="clip"
+                  minimumFontScale={0.75}
+                  numberOfLines={1}
+                  style={[compactSetRepsTextStyle, struck ? styles.compactSetPrescriptionText : null]}>
+                  {repsLabel}
+                </Text>
+              </View>
+            );
+
+            return (
+              <View
+                style={[
+                  styles.compactSetRow,
+                  rowState === 'planned' ? styles.compactSetRowGhost : null,
+                  rowState === 'skipped' ? styles.compactSetRowSkipped : null,
+                ]}
+                testID={`planned-set-row-${exerciseIndex + 1}-${setIndex + 1}`}>
+                <Pressable
+                  accessibilityLabel={`${stateLabel} ${setIndex + 1} for exercise ${exerciseIndex + 1}: ${compactLabel}${showQualityControl ? `; quality ${compactQualityAccessibilityLabel}` : ''}`}
+                  accessibilityHint="Double tap to edit actual values."
+                  accessibilityRole="button"
+                  style={styles.compactSetMainPressable}
+                  testID={`set-row-pressable-${exerciseIndex + 1}-${setIndex + 1}`}
+                  onPress={() => toggleSetExpandedForEditing(exercise.id, set.id)}>
+                  <Text
+                    adjustsFontSizeToFit
+                    ellipsizeMode="clip"
+                    minimumFontScale={0.75}
+                    numberOfLines={1}
+                    style={[styles.setRowGlyph, isMutedRow ? styles.compactSetMutedText : null]}>
+                    {rowGlyph}
+                  </Text>
+                  {rowState === 'modified' ? (
+                    <View style={styles.compactSetModifiedLayout}>
+                      <Text
+                        adjustsFontSizeToFit
+                        ellipsizeMode="clip"
+                        minimumFontScale={0.75}
+                        numberOfLines={1}
+                        style={compactSetIndexTextStyle}>
+                        {setNumberLabel}
+                      </Text>
+                      <View style={styles.compactSetModifiedStack}>
+                        {renderCompactSetValueLine(plannedWeightLabel, plannedRepsLabel, true)}
+                        {renderCompactSetValueLine(actualWeightLabel, actualRepsLabel)}
+                      </View>
+                    </View>
+                  ) : (
+                    <View style={styles.compactSetInlineLayout}>
+                      <Text
+                        adjustsFontSizeToFit
+                        ellipsizeMode="clip"
+                        minimumFontScale={0.75}
+                        numberOfLines={1}
+                        style={compactSetIndexTextStyle}>
+                        {setNumberLabel}
+                      </Text>
+                      {renderCompactSetValueLine(inlineWeightLabel, inlineRepsLabel)}
+                    </View>
+                  )}
+                </Pressable>
+                {showQualityControl ? renderQualityButton('compact') : null}
+                {rowState === 'planned' ? (
+                  <View style={styles.compactSetActionRow}>
+                    <Pressable
+                      accessibilityLabel={`Log set ${setIndex + 1} as planned`}
+                      accessibilityRole="button"
+                      style={styles.plannedSetLogButton}
+                      onPress={() => {
+                        if (consumeTapIfAnotherSetIsExpanded(set.id)) {
+                          return;
+                        }
+                        markPlannedSetLogged(exercise.id, set.id);
+                      }}>
+                      <Text
+                        adjustsFontSizeToFit
+                        ellipsizeMode="clip"
+                        minimumFontScale={0.75}
+                        numberOfLines={1}
+                        style={styles.plannedSetLogButtonText}>
+                        Log
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      accessibilityLabel={`Skip set ${setIndex + 1}`}
+                      accessibilityRole="button"
+                      style={styles.plannedSetSkipButton}
+                      onPress={() => {
+                        if (consumeTapIfAnotherSetIsExpanded(set.id)) {
+                          return;
+                        }
+                        markPlannedSetSkipped(exercise.id, set.id);
+                      }}>
+                      <Text
+                        adjustsFontSizeToFit
+                        ellipsizeMode="clip"
+                        minimumFontScale={0.75}
+                        numberOfLines={1}
+                        style={styles.plannedSetSkipButtonText}>
+                        Skip
+                      </Text>
+                    </Pressable>
+                  </View>
+                ) : null}
+              </View>
+            );
+          }
+
+          return (
+            <View style={styles.setRow}>
+              <Text style={[styles.setRowGlyph, isMutedRow ? styles.compactSetMutedText : null]}>{rowGlyph}</Text>
+              <View
+                style={[
+                  styles.input,
+                  styles.setWeightInputShell,
+                  hasSetFieldValidationError('weight', set.weight) ? styles.inputInvalid : null,
+                ]}
+                testID={`set-weight-input-shell-${exerciseIndex + 1}-${setIndex + 1}`}>
+                <TextInput
+                  accessibilityLabel={`Weight for exercise ${exerciseIndex + 1} set ${setIndex + 1}`}
+                  autoFocus={pendingFocusedWeightSetId === set.id}
+                  inputMode="decimal"
+                  keyboardType="decimal-pad"
+                  style={styles.setWeightTextInput}
+                  value={set.weight}
+                  onBlur={() => {
+                    handleSetInputBlur(set.id);
+                  }}
+                  onChangeText={(value) => {
+                    updateSetField(exercise.id, set.id, 'weight', value);
+                    setPendingFocusedWeightSetId((currentSetId) => (currentSetId === set.id ? null : currentSetId));
+                  }}
+                  onFocus={() => {
+                    focusSetInput(set.id);
+                  }}
+                  onPressIn={() => {
+                    focusedSetInputIdRef.current = set.id;
+                  }}
+                />
+                <Text style={styles.setWeightUnitText}>kg</Text>
+              </View>
+              <TextInput
+                accessibilityLabel={`Reps for exercise ${exerciseIndex + 1} set ${setIndex + 1}`}
+                inputMode="numeric"
+                keyboardType="number-pad"
+                placeholder="Reps"
+                placeholderTextColor={uiColors.textDisabled}
+                style={[
+                  styles.input,
+                  styles.setRowInput,
+                  hasSetFieldValidationError('reps', set.reps) ? styles.inputInvalid : null,
+                ]}
+                value={set.reps}
+                onBlur={() => {
+                  handleSetInputBlur(set.id);
+                }}
+                onChangeText={(value) => {
+                  updateSetField(exercise.id, set.id, 'reps', value);
+                }}
+                onFocus={() => {
+                  focusSetInput(set.id);
+                }}
+                onPressIn={() => {
+                  focusedSetInputIdRef.current = set.id;
+                }}
+              />
+              {showQualityControl ? renderQualityButton('edit') : null}
+              {isPlannedRow ? (
+                <Pressable
+                  accessibilityLabel={`Skip set ${setIndex + 1}`}
+                  accessibilityRole="button"
+                  style={styles.plannedSetSkipButton}
+                  onPress={() => markPlannedSetSkipped(exercise.id, set.id)}>
+                  <Text
+                    adjustsFontSizeToFit
+                    ellipsizeMode="clip"
+                    minimumFontScale={0.75}
+                    numberOfLines={1}
+                    style={styles.plannedSetSkipButtonText}>
+                    Skip
+                  </Text>
+                </Pressable>
+              ) : (
+                <Pressable
+                  accessibilityLabel={`Remove set ${setIndex + 1} from exercise ${exerciseIndex + 1}`}
+                  style={styles.setDeleteButton}
+                  onPress={() => removeSetFromExercise(exercise.id, set.id)}>
+                  <Text
+                    adjustsFontSizeToFit
+                    ellipsizeMode="clip"
+                    minimumFontScale={0.75}
+                    numberOfLines={1}
+                    style={styles.setDeleteButtonText}>
+                    rm
+                  </Text>
+                </Pressable>
+              )}
+            </View>
+          );
+        }}
         renderExerciseHeaderAction={({ exercise, exerciseIndex }) => (
           <View style={styles.exerciseHeaderActionRow}>
             <Pressable
@@ -3027,6 +3622,9 @@ export default function SessionRecorderScreen() {
         )}
         renderExerciseMeta={({ exercise, exerciseIndex }) => (
           <View style={styles.exerciseTagSection}>
+            {exercise.sets.length > 0 ? (
+              <Text style={styles.exerciseSetSummaryText}>{getExerciseSetSummary(exercise.sets)}</Text>
+            ) : null}
             <View style={styles.exerciseTagChipWrap}>
               {exercise.tags.map((tag) => (
                 <View
@@ -3053,6 +3651,7 @@ export default function SessionRecorderScreen() {
           <Pressable
             accessibilityLabel={`Add set to exercise ${exerciseIndex + 1}`}
             style={styles.addSetButton}
+            testID={`add-set-button-${exerciseIndex + 1}`}
             onPress={() => addSetToExercise(exercise.id)}>
             <Text style={styles.primaryActionButtonText}>Add set</Text>
           </Pressable>
@@ -3993,6 +4592,12 @@ const styles = StyleSheet.create({
   exerciseTagSection: {
     gap: 8,
   },
+  exerciseSetSummaryText: {
+    fontSize: 12,
+    lineHeight: 15,
+    fontWeight: '700',
+    color: uiColors.textSecondary,
+  },
   exerciseTagChipWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -4187,52 +4792,189 @@ const styles = StyleSheet.create({
   setList: {
     gap: 8,
   },
-  setHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 2,
-  },
-  setHeaderLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: uiColors.textSecondary,
-  },
-  setHeaderInputLabel: {
-    flex: 1,
-  },
-  setHeaderTypeLabel: {
-    width: 36,
-    textAlign: 'left',
-  },
-  setHeaderDeleteSpacer: {
-    width: 28,
-  },
   setRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 0,
     gap: 8,
   },
+  compactSetRow: {
+    minHeight: 38,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: uiColors.borderMuted,
+    backgroundColor: uiColors.surfaceDefault,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  compactSetRowGhost: {
+    backgroundColor: uiColors.surfaceMuted,
+    borderColor: uiColors.borderMuted,
+  },
+  compactSetRowSkipped: {
+    backgroundColor: uiColors.surfaceDisabled,
+    borderColor: uiColors.borderMuted,
+  },
+  setRowGlyph: {
+    width: 16,
+    fontSize: 14,
+    lineHeight: 16,
+    fontWeight: '800',
+    color: uiColors.textPrimary,
+    textAlign: 'center',
+  },
+  compactSetMainPressable: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  compactSetInlineLayout: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  compactSetModifiedLayout: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  compactSetModifiedStack: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
+  },
+  compactSetValueLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minWidth: 0,
+    position: 'relative',
+  },
+  compactSetIndexText: {
+    width: 50,
+    fontSize: 13,
+    lineHeight: 16,
+    fontWeight: '700',
+    color: uiColors.textPrimary,
+  },
+  compactSetValueText: {
+    width: 58,
+    minWidth: 0,
+    fontSize: 13,
+    lineHeight: 16,
+    fontWeight: '600',
+    color: uiColors.textPrimary,
+  },
+  compactSetWeightText: {
+    textAlign: 'right',
+  },
+  compactSetRepsText: {
+    width: 72,
+    textAlign: 'left',
+  },
+  compactSetSeparatorText: {
+    width: 16,
+    fontSize: 13,
+    lineHeight: 16,
+    fontWeight: '600',
+    color: uiColors.textPrimary,
+    textAlign: 'center',
+  },
+  compactSetPrescriptionText: {
+    textDecorationLine: 'line-through',
+  },
+  compactSetMutedText: {
+    color: uiColors.textSecondary,
+  },
+  compactSetActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  plannedSetLogButton: {
+    minHeight: 30,
+    borderRadius: 8,
+    paddingHorizontal: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: uiColors.actionPrimary,
+  },
+  plannedSetLogButtonText: {
+    color: uiColors.surfaceDefault,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  plannedSetSkipButton: {
+    minHeight: 30,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: uiColors.borderMuted,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: uiColors.surfaceDefault,
+  },
+  plannedSetSkipButtonText: {
+    color: uiColors.textSecondary,
+    fontSize: 12,
+    fontWeight: '700',
+  },
   setRowInput: {
     flex: 1,
     paddingVertical: 8,
   },
-  setTypeButton: {
-    width: 36,
-    height: 36,
+  setWeightInputShell: {
+    flex: 1,
+    minWidth: 0,
+    paddingVertical: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  setWeightTextInput: {
+    flex: 1,
+    minWidth: 0,
+    paddingVertical: 8,
+    color: uiColors.textPrimary,
+  },
+  setWeightUnitText: {
+    color: uiColors.textDisabled,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  setQualityButton: {
+    width: 74,
+    height: 34,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: uiColors.borderDefault,
+    borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfaceDefault,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 7,
   },
-  setTypeButtonText: {
+  setQualityButtonCompact: {
+    height: 30,
+  },
+  setQualityButtonEmpty: {
+    backgroundColor: uiColors.surfaceMuted,
+  },
+  setQualityButtonText: {
     fontSize: 12,
     lineHeight: 14,
     fontWeight: '700',
     color: uiColors.textPrimary,
+  },
+  setQualityButtonTextEmpty: {
+    color: uiColors.textSecondary,
   },
   inputInvalid: {
     borderColor: uiColors.actionDangerSubtleBorder,
@@ -4245,16 +4987,18 @@ const styles = StyleSheet.create({
     backgroundColor: uiColors.actionPrimary,
   },
   setDeleteButton: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    minHeight: 30,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: uiColors.borderMuted,
+    paddingHorizontal: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: uiColors.actionDanger,
+    backgroundColor: uiColors.surfaceDefault,
   },
   setDeleteButtonText: {
-    color: uiColors.surfaceDefault,
-    fontWeight: '600',
+    color: uiColors.textSecondary,
+    fontWeight: '700',
     fontSize: 12,
   },
   submitRow: {

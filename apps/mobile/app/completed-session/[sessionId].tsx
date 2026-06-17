@@ -7,17 +7,19 @@ import { uiColors } from '@/components/ui';
 import {
   formatSessionListCompactDuration,
   listSessionExerciseAssignedTags,
-  listSessionListBuckets,
   loadLocalGymById,
   loadSessionSnapshotById,
-  reopenCompletedSessionDraft,
+  appendCompletedSessionExerciseAsPlanned as appendCompletedSessionExerciseAsPlannedDraft,
+  normalizeSessionSetType,
   setSessionDeletedState,
+  type SessionSetTypeValue,
 } from '@/src/data';
 
 export type CompletedSessionDetailSet = {
   id: string;
   weight: string;
   reps: string;
+  setType: SessionSetTypeValue;
 };
 
 export type CompletedSessionDetailExerciseTag = {
@@ -41,13 +43,12 @@ export type CompletedSessionDetailRecord = {
   durationDisplay: string;
   gymName: string | null;
   deletedAt: string | null;
-  reopenDisabledReason?: string | null;
   exercises: CompletedSessionDetailExercise[];
 };
 
 export type CompletedSessionDetailDataClient = {
   loadCompletedSession(sessionId: string): Promise<CompletedSessionDetailRecord | null>;
-  reopenCompletedSession(sessionId: string): Promise<void>;
+  appendCompletedSessionExerciseAsPlanned(sessionId: string, sessionExerciseId: string): Promise<void>;
   setCompletedSessionDeletedState(sessionId: string, isDeleted: boolean): Promise<void>;
 };
 
@@ -80,6 +81,21 @@ function coerceRouteParam(value: string | string[] | undefined): string | null {
   return value ?? null;
 }
 
+const formatSetEffortLabel = (setType: SessionSetTypeValue): string => {
+  switch (setType) {
+    case 'warm_up':
+      return 'W-Up';
+    case 'rir_0':
+      return 'RIR 0';
+    case 'rir_1':
+      return 'RIR 1';
+    case 'rir_2':
+      return 'RIR 2';
+    default:
+      return '-';
+  }
+};
+
 const DEFAULT_COMPLETED_SESSION_DETAILS: Record<string, CompletedSessionDetailRecord> = {
   'session-completed-1': {
     id: 'session-completed-1',
@@ -88,7 +104,6 @@ const DEFAULT_COMPLETED_SESSION_DETAILS: Record<string, CompletedSessionDetailRe
     durationDisplay: '58m',
     gymName: 'Westside Barbell Club',
     deletedAt: null,
-    reopenDisabledReason: 'Finish or discard the active session before reopening another.',
     exercises: [
       {
         id: 'm7-detail-ex-1',
@@ -96,8 +111,8 @@ const DEFAULT_COMPLETED_SESSION_DETAILS: Record<string, CompletedSessionDetailRe
         machineName: 'Flat Bench',
         tags: [],
         sets: [
-          { id: 'm7-detail-set-1', weight: '185', reps: '8' },
-          { id: 'm7-detail-set-2', weight: '185', reps: '6' },
+          { id: 'm7-detail-set-1', weight: '185', reps: '8', setType: null },
+          { id: 'm7-detail-set-2', weight: '185', reps: '6', setType: null },
         ],
       },
       {
@@ -106,8 +121,8 @@ const DEFAULT_COMPLETED_SESSION_DETAILS: Record<string, CompletedSessionDetailRe
         machineName: 'Cable',
         tags: [],
         sets: [
-          { id: 'm7-detail-set-3', weight: '120', reps: '12' },
-          { id: 'm7-detail-set-4', weight: '120', reps: '12' },
+          { id: 'm7-detail-set-3', weight: '120', reps: '12', setType: null },
+          { id: 'm7-detail-set-4', weight: '120', reps: '12', setType: null },
         ],
       },
     ],
@@ -119,7 +134,6 @@ const DEFAULT_COMPLETED_SESSION_DETAILS: Record<string, CompletedSessionDetailRe
     durationDisplay: '1h 5m',
     gymName: 'Downtown Fitness',
     deletedAt: '2026-02-18T08:00:00.000Z',
-    reopenDisabledReason: null,
     exercises: [
       {
         id: 'm7-detail-ex-3',
@@ -127,8 +141,8 @@ const DEFAULT_COMPLETED_SESSION_DETAILS: Record<string, CompletedSessionDetailRe
         machineName: 'Hammer Strength',
         tags: [],
         sets: [
-          { id: 'm7-detail-set-5', weight: '360', reps: '10' },
-          { id: 'm7-detail-set-6', weight: '360', reps: '10' },
+          { id: 'm7-detail-set-5', weight: '360', reps: '10', setType: null },
+          { id: 'm7-detail-set-6', weight: '360', reps: '10', setType: null },
         ],
       },
     ],
@@ -142,8 +156,6 @@ export const DEFAULT_COMPLETED_SESSION_DETAIL_DATA_CLIENT: CompletedSessionDetai
     if (sessionGraph && sessionGraph.status === 'completed') {
       const gymRecord = sessionGraph.gymId ? await loadLocalGymById(sessionGraph.gymId) : null;
       const completedAt = sessionGraph.completedAt ?? sessionGraph.startedAt;
-      const buckets = await listSessionListBuckets();
-      const hasOtherActiveSession = Boolean(buckets.active && buckets.active.id !== sessionGraph.sessionId);
       const tagsBySessionExerciseId = new Map<string, CompletedSessionDetailExerciseTag[]>(
         await Promise.all(
           sessionGraph.exercises.map(async (exercise) => {
@@ -171,9 +183,6 @@ export const DEFAULT_COMPLETED_SESSION_DETAIL_DATA_CLIENT: CompletedSessionDetai
         durationDisplay: formatSessionListCompactDuration(sessionGraph.durationSec),
         gymName: gymRecord?.name ?? null,
         deletedAt: sessionGraph.deletedAt ? sessionGraph.deletedAt.toISOString() : null,
-        reopenDisabledReason: hasOtherActiveSession
-          ? 'Finish or discard the active session before reopening another.'
-          : null,
         exercises: sessionGraph.exercises.map((exercise) => ({
           id: exercise.id,
           name: exercise.name,
@@ -183,6 +192,7 @@ export const DEFAULT_COMPLETED_SESSION_DETAIL_DATA_CLIENT: CompletedSessionDetai
             id: set.id,
             weight: set.weightValue,
             reps: set.repsValue,
+            setType: normalizeSessionSetType(set.setType),
           })),
         })),
       };
@@ -190,8 +200,8 @@ export const DEFAULT_COMPLETED_SESSION_DETAIL_DATA_CLIENT: CompletedSessionDetai
 
     return DEFAULT_COMPLETED_SESSION_DETAILS[sessionId] ?? null;
   },
-  async reopenCompletedSession(sessionId) {
-    await reopenCompletedSessionDraft(sessionId);
+  async appendCompletedSessionExerciseAsPlanned(sessionId, sessionExerciseId) {
+    await appendCompletedSessionExerciseAsPlannedDraft(sessionId, sessionExerciseId);
   },
   async setCompletedSessionDeletedState(sessionId, isDeleted) {
     await setSessionDeletedState(sessionId, isDeleted);
@@ -268,7 +278,6 @@ export function CompletedSessionDetailScreenShell({
     : session?.deletedAt
       ? 'Undelete'
       : 'Delete';
-  const reopenDisabled = Boolean(session?.reopenDisabledReason);
   const editLabel = 'Edit';
 
   const formattedStartedAt = useMemo(
@@ -288,23 +297,19 @@ export function CompletedSessionDetailScreenShell({
     router.push(`/session-recorder?mode=completed-edit&sessionId=${session.id}`);
   };
 
-  const handleReopen = () => {
-    if (reopenDisabled) {
-      return;
-    }
-
+  const handleAppendExercise = (sessionExerciseId: string) => {
     if (!session) {
       return;
     }
 
     setActionFeedback(null);
     void dataClient
-      .reopenCompletedSession(session.id)
+      .appendCompletedSessionExerciseAsPlanned(session.id, sessionExerciseId)
       .then(() => {
-        router.dismissTo('/');
+        router.push('/session-recorder');
       })
       .catch((error) => {
-        setActionFeedback(error instanceof Error ? error.message : 'Unable to reopen session');
+        setActionFeedback(error instanceof Error ? error.message : 'Unable to append exercise block');
       });
   };
 
@@ -395,28 +400,13 @@ export function CompletedSessionDetailScreenShell({
                 onPress={handleEdit}
                 style={[styles.actionBarButton, styles.actionBarPrimaryButton]}
                 testID="completed-session-detail-edit-button">
-                <Text numberOfLines={1} style={styles.actionBarPrimaryButtonText}>
-                  {editLabel}
-                </Text>
-              </Pressable>
-
-              <Pressable
-                accessibilityRole="button"
-                disabled={reopenDisabled}
-                onPress={handleReopen}
-                style={[
-                  styles.actionBarButton,
-                  styles.actionBarSecondaryButton,
-                  reopenDisabled ? styles.disabledActionButton : null,
-                ]}
-                testID="completed-session-detail-reopen-button">
                 <Text
+                  adjustsFontSizeToFit
+                  ellipsizeMode="clip"
+                  minimumFontScale={0.75}
                   numberOfLines={1}
-                  style={[
-                    styles.actionBarSecondaryButtonText,
-                    reopenDisabled ? styles.disabledActionButtonText : null,
-                  ]}>
-                  Reopen
+                  style={styles.actionBarPrimaryButtonText}>
+                  {editLabel}
                 </Text>
               </Pressable>
 
@@ -431,6 +421,9 @@ export function CompletedSessionDetailScreenShell({
                 ]}
                 testID="completed-session-detail-delete-button">
                 <Text
+                  adjustsFontSizeToFit
+                  ellipsizeMode="clip"
+                  minimumFontScale={0.75}
                   numberOfLines={1}
                   style={[
                     styles.actionBarDangerButtonText,
@@ -441,10 +434,6 @@ export function CompletedSessionDetailScreenShell({
               </Pressable>
             </View>
 
-            {reopenDisabled && session.reopenDisabledReason ? (
-              <Text style={styles.reopenHintText}>{session.reopenDisabledReason}</Text>
-            ) : null}
-
             {actionFeedback ? <Text style={styles.actionFeedbackText}>{actionFeedback}</Text> : null}
           </View>
         </View>
@@ -452,19 +441,47 @@ export function CompletedSessionDetailScreenShell({
         <View style={styles.headerCard}>
           <View style={styles.metricGrid}>
             <View style={styles.metricCell}>
-              <Text style={styles.metricLabel}>Start</Text>
+              <Text
+                adjustsFontSizeToFit
+                ellipsizeMode="clip"
+                minimumFontScale={0.75}
+                numberOfLines={1}
+                style={styles.metricLabel}>
+                Start
+              </Text>
               <Text style={styles.metricValue}>{formattedStartedAt}</Text>
             </View>
             <View style={styles.metricCell}>
-              <Text style={styles.metricLabel}>End</Text>
+              <Text
+                adjustsFontSizeToFit
+                ellipsizeMode="clip"
+                minimumFontScale={0.75}
+                numberOfLines={1}
+                style={styles.metricLabel}>
+                End
+              </Text>
               <Text style={styles.metricValue}>{formattedCompletedAt}</Text>
             </View>
             <View style={styles.metricCell}>
-              <Text style={styles.metricLabel}>Duration</Text>
+              <Text
+                adjustsFontSizeToFit
+                ellipsizeMode="clip"
+                minimumFontScale={0.75}
+                numberOfLines={1}
+                style={styles.metricLabel}>
+                Duration
+              </Text>
               <Text style={styles.metricValue}>{session.durationDisplay}</Text>
             </View>
             <View style={styles.metricCell}>
-              <Text style={styles.metricLabel}>Location</Text>
+              <Text
+                adjustsFontSizeToFit
+                ellipsizeMode="clip"
+                minimumFontScale={0.75}
+                numberOfLines={1}
+                style={styles.metricLabel}>
+                Location
+              </Text>
               <Text numberOfLines={1} style={styles.metricValue}>
                 {session.gymName?.trim() ? session.gymName : 'No gym'}
               </Text>
@@ -488,21 +505,96 @@ export function CompletedSessionDetailScreenShell({
           }
           exercises={session.exercises}
           emptyExercisesText="No exercises logged in this session."
+          renderExerciseHeaderAction={({ exercise }) => (
+            <Pressable
+              accessibilityLabel={`Append ${exercise.name || 'exercise'} block to current session`}
+              accessibilityRole="button"
+              onPress={() => handleAppendExercise(exercise.id)}
+              style={[styles.exerciseAppendButton, styles.actionBarSecondaryButton]}
+              testID={`completed-session-detail-append-exercise-button-${exercise.id}`}>
+              <Text
+                adjustsFontSizeToFit
+                ellipsizeMode="clip"
+                minimumFontScale={0.75}
+                numberOfLines={1}
+                style={styles.actionBarSecondaryButtonText}>
+                Append
+              </Text>
+            </Pressable>
+          )}
           renderSetRow={({ exercise, set, setIndex }) => (
             <View>
               {setIndex === 0 ? (
                 <View
                   style={styles.setTableHeaderRow}
                   testID={`completed-session-detail-sets-table-header-${exercise.id}`}>
-                  <Text style={[styles.setTableHeaderCell, styles.setTableIndexCell]}>Set</Text>
-                  <Text style={[styles.setTableHeaderCell, styles.setTableValueCell]}>Weight</Text>
-                  <Text style={[styles.setTableHeaderCell, styles.setTableValueCell]}>Reps</Text>
+                  <Text
+                    adjustsFontSizeToFit
+                    ellipsizeMode="clip"
+                    minimumFontScale={0.75}
+                    numberOfLines={1}
+                    style={[styles.setTableHeaderCell, styles.setTableIndexCell]}>
+                    Set
+                  </Text>
+                  <Text
+                    adjustsFontSizeToFit
+                    ellipsizeMode="clip"
+                    minimumFontScale={0.75}
+                    numberOfLines={1}
+                    style={[styles.setTableHeaderCell, styles.setTableValueCell]}>
+                    Weight
+                  </Text>
+                  <Text
+                    adjustsFontSizeToFit
+                    ellipsizeMode="clip"
+                    minimumFontScale={0.75}
+                    numberOfLines={1}
+                    style={[styles.setTableHeaderCell, styles.setTableValueCell]}>
+                    Reps
+                  </Text>
+                  <Text
+                    adjustsFontSizeToFit
+                    ellipsizeMode="clip"
+                    minimumFontScale={0.75}
+                    numberOfLines={1}
+                    style={[styles.setTableHeaderCell, styles.setTableEffortCell]}>
+                    Effort
+                  </Text>
                 </View>
               ) : null}
               <View style={styles.setTableRow} testID={`completed-session-detail-set-row-${set.id}`}>
-                <Text style={[styles.setTableCell, styles.setTableIndexCell]}>{setIndex + 1}</Text>
-                <Text style={[styles.setTableCell, styles.setTableValueCell]}>{set.weight || '—'}</Text>
-                <Text style={[styles.setTableCell, styles.setTableValueCell]}>{set.reps || '—'}</Text>
+                <Text
+                  adjustsFontSizeToFit
+                  ellipsizeMode="clip"
+                  minimumFontScale={0.75}
+                  numberOfLines={1}
+                  style={[styles.setTableCell, styles.setTableIndexCell]}>
+                  {setIndex + 1}
+                </Text>
+                <Text
+                  adjustsFontSizeToFit
+                  ellipsizeMode="clip"
+                  minimumFontScale={0.75}
+                  numberOfLines={1}
+                  style={[styles.setTableCell, styles.setTableValueCell]}>
+                  {set.weight || '—'}
+                </Text>
+                <Text
+                  adjustsFontSizeToFit
+                  ellipsizeMode="clip"
+                  minimumFontScale={0.75}
+                  numberOfLines={1}
+                  style={[styles.setTableCell, styles.setTableValueCell]}>
+                  {set.reps || '—'}
+                </Text>
+                <Text
+                  adjustsFontSizeToFit
+                  ellipsizeMode="clip"
+                  minimumFontScale={0.75}
+                  numberOfLines={1}
+                  style={[styles.setTableCell, styles.setTableEffortCell]}>
+                  {formatSetEffortLabel(set.setType)}
+                </Text>
               </View>
             </View>
           )}
@@ -671,6 +763,16 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 12,
   },
+  exerciseAppendButton: {
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    minHeight: 34,
+    maxWidth: 96,
+  },
   actionFeedbackText: {
     color: uiColors.actionNeutralSubtleText,
     fontSize: 12,
@@ -782,6 +884,9 @@ const styles = StyleSheet.create({
   },
   setTableValueCell: {
     flex: 1,
+  },
+  setTableEffortCell: {
+    width: 56,
   },
   exerciseTagSection: {
     gap: 8,

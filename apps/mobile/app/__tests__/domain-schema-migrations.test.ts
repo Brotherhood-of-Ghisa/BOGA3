@@ -123,11 +123,11 @@ describe('domain schema and runtime migrations', () => {
     expect(migrationSql).not.toContain('CREATE TABLE `__new_gyms`');
   });
 
-  it('keeps the squashed v2 baseline as m0000 and appends the quarantine table as m0001', () => {
+  it('keeps the squashed v2 baseline as m0000 and appends feature migrations after it', () => {
     // The history was squashed to a single v2 baseline (`m0000`); forward feature
-    // migrations append after it. The first such follow-up is the local sync
-    // quarantine table.
-    expect(localRuntimeMigrations.journal.entries).toHaveLength(2);
+    // migrations append after it. The first follow-up is the local sync
+    // quarantine table; planned set targets append after that.
+    expect(localRuntimeMigrations.journal.entries).toHaveLength(3);
     expect(localRuntimeMigrations.journal.entries[0]).toMatchObject({
       idx: 0,
       tag: expect.stringMatching(/^0000_/),
@@ -136,7 +136,11 @@ describe('domain schema and runtime migrations', () => {
       idx: 1,
       tag: expect.stringMatching(/^0001_/),
     });
-    expect(Object.keys(localRuntimeMigrations.migrations)).toEqual(['m0000', 'm0001']);
+    expect(localRuntimeMigrations.journal.entries[2]).toMatchObject({
+      idx: 2,
+      tag: expect.stringMatching(/^0002_/),
+    });
+    expect(Object.keys(localRuntimeMigrations.migrations)).toEqual(['m0000', 'm0001', 'm0002']);
   });
 
   it('creates the local sync quarantine table in the m0001 follow-up migration', () => {
@@ -148,6 +152,14 @@ describe('domain schema and runtime migrations', () => {
     // The quarantine table is FK-free local bookkeeping over possibly-orphaned
     // rows — it must declare no foreign keys.
     expect(quarantineMigration).not.toContain('FOREIGN KEY');
+  });
+
+  it('adds planned-vs-performed set columns in the m0002 follow-up migration', () => {
+    const plannedSetMigration = localRuntimeMigrations.migrations.m0002;
+    expect(plannedSetMigration).toContain('ADD `planned_weight_value` text');
+    expect(plannedSetMigration).toContain('ADD `planned_reps_value` text');
+    expect(plannedSetMigration).toContain('ADD `planned_set_type` text');
+    expect(plannedSetMigration).toContain('ADD `performance_status` text');
   });
 });
 

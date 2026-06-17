@@ -19,6 +19,12 @@ export const generatedMigrationBundle = {
     tag: "0001_dapper_vision",
     breakpoints: true,
   },
+  {
+    idx: 2,
+    when: 1781540570750,
+    tag: "0002_abandoned_mister_fear",
+    breakpoints: true,
+  },
     ],
   },
   migrations: {
@@ -227,6 +233,10 @@ CREATE TABLE \`smoke_records\` (
 	PRIMARY KEY(\`entity_type\`, \`entity_id\`)
 );
 `,
+  m0002: `ALTER TABLE \`exercise_sets\` ADD \`planned_weight_value\` text;--> statement-breakpoint
+ALTER TABLE \`exercise_sets\` ADD \`planned_reps_value\` text;--> statement-breakpoint
+ALTER TABLE \`exercise_sets\` ADD \`planned_set_type\` text;--> statement-breakpoint
+ALTER TABLE \`exercise_sets\` ADD \`performance_status\` text;`,
   },
 } as const;
 

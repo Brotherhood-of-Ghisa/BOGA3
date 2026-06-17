@@ -20,7 +20,7 @@ export type SessionListDataClient = {
   completeActiveSession(sessionId: string): Promise<void>;
   discardActiveSession(sessionId: string): Promise<void>;
   setCompletedSessionDeletedState(sessionId: string, isDeleted: boolean): Promise<void>;
-  reopenCompletedSession(sessionId: string): Promise<void>;
+  appendCompletedSessionAsPlanned(sessionId: string): Promise<void>;
 };
 
 export const DEFAULT_SESSION_LIST_ITEMS: SessionListItem[] = [

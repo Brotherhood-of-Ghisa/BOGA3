@@ -87,13 +87,18 @@ Document app-specific UI semantics and guardrails for the current mobile app.
 8. The M11 profile sign-in form performs basic client-side email-shape validation before attempting the auth request.
 9. The signed-in profile route defaults to a view-only summary with row-based account values and one bottom action row (`Edit` + danger-styled `Sign Out`), with no extra title/help copy.
 10. Entering profile edit mode reveals `username`, `new email`, and `new password` fields plus a single `Update` submit action; update failures stay inline and successful updates return to view mode.
-11. In `session-recorder`, logged sets render as in-card rows with a header row (`Type`, `Weight`, `Reps`) instead of per-set subcards, and set numeric validation uses visual cues only (no inline validation text):
-    - The left square `Type` button cycles set type on tap in this order: `None -> WU -> R0 -> R1 -> R2 -> None`.
-    - Long-pressing the `Type` button opens an in-route modal picker with explicit options (`None`, `Warm-up`, `RIR 0`, `RIR 1`, `RIR 2`).
+11. In `session-recorder`, logged sets render as compact in-card text rows once they have displayable values; tapping the compact row turns it into inline editable inputs, and set numeric validation uses visual cues only (no inline validation text):
+    - Every set row reserves a fixed left glyph slot so normal and planned execution rows align (`•` normal logged, `○` planned, `✓` matched, `≈` modified, `−` skipped, `+` added beyond plan).
+    - The former `Type` control is presented as right-side set quality in both compact and editable modes (`•`, `W-Up`, `RIR 0`, `RIR 1`, `RIR 2`); `•` maps to `null`, tapping cycles quality in the same order, and long-pressing opens the in-route modal picker with explicit options (`None`, `W-Up`, `RIR 0`, `RIR 1`, `RIR 2`). Unperformed planned target rows suppress this quality control while they show the `Log` / `Skip` decision controls; quality appears after the target is logged, edited into an actual, skipped, or added as a normal performed row. Quality is displayed and persisted separately from planned volume; by default, planned-row matched/modified classification compares prescribed volume only (`Weight` + `Reps`), not quality.
+    - Editable set rows keep quality adjacent to the weight/reps text inputs; the quality button has a fixed width sized for `W-Up`, and the row-level remove action is a compact secondary `rm` button styled like `Skip`.
+    - Set input rows have no `Type` / `Weight` / `Reps` column header; weight has no placeholder text and uses a persistent muted `kg` suffix inside the field, and reps uses placeholder text `Reps`.
+    - Tapping outside set inputs collapses the editable set row back to compact text; moving focus between weight and reps inside a row does not collapse the row. At most one set row is editable at a time. When one row is editable, the first tap on another compact set row only collapses the current row; the tapped row opens on a second tap.
     - `Weight` accepts decimal numeric input and must be a non-negative number.
     - `Reps` accepts integer numeric input and must be a positive integer.
-    - Adding a set to an exercise copies the previous set's `Weight`, `Reps`, and `Type` values, while assigning the new row its own identity.
-    - Logging a new exercise focuses its first `Weight` input, and adding a set focuses the new set's `Weight` input. Weight and `Reps` inputs select their current value on focus so copied/defaulted values can be overwritten quickly.
+    - Compact set rows separate the `Set N` label from the value text with layout spacing rather than an inline dot (`Set 1    60kg · 8 reps`, `Set 2    0kg · 6 reps`); weight, separator dot, and reps are laid out in fixed slots so the dot spacing is consistent across one-line and modified rows. Quality stays in the right-side quality control rather than inside the main text.
+    - Adding a set to an exercise copies the previous set's `Weight`, `Reps`, and quality values while assigning the new row its own identity; when the previous row has valid performed values, it is committed/collapsed. Adding after an unlogged planned target does not silently log it; the planned row remains until the user explicitly logs or skips it.
+    - Logging a new exercise focuses its first `Weight` input, and adding a set focuses the new set's `Weight` input. Copied/defaulted values remain visible in inputs when edited and are not auto-selected.
+    - Planned workout-execution rows use the same compact/edit row model in the same recorder card: planned rows are muted ghost rows with `Log`/`Skip`, matched rows show the confirmed planned target, modified rows show the planned prescription struck through above the actual values with aligned weight/reps columns, skipped rows remain visible with muted styling and the `−` glyph, and user-added unplanned rows use the `+` glyph without an extra `Added` text suffix. Tapping a planned or skipped target to edit hydrates the actual `Weight`, `Reps`, and quality controls from the planned target before the row opens; expanded imported rows expose `Skip` as the state-reset action back to the imported target, while user-added rows expose remove.
 12. The shared exercise editor dismisses the text keyboard before opening primary/secondary muscle selectors, and selector lists remain keyboard-aware so all muscle-group options stay reachable on iOS.
 13. In `session-recorder`, GPS gym detection is quiet assistance:
     - the default recorder surface shows only the gym box, with no visible Detect button or persistent GPS suggestion panel,
@@ -149,10 +154,11 @@ Document app-specific UI semantics and guardrails for the current mobile app.
 
 ### 7. Completed-session detail screen semantics
 
-1. Completed-session detail uses a sticky action bar for edit/reopen/delete actions above the detail content.
-2. `Reopen` can be disabled when another active session exists; the UI shows a textual hint explaining why.
+1. Completed-session detail uses a sticky action bar for session-level edit/delete actions above the detail content.
+2. Historical exercise cards expose their own `Append` action in the card header; append copies that one exercise block as planned target rows into the active recorder.
 3. `intent=edit` on the completed-session route is a redirect behavior, not a separate screen.
 4. Completed-session exercise cards show assigned tags as chips under the exercise title only when one or more tags exist; no tag placeholder is shown when there are none.
+5. Completed-session set tables show historical set effort from `set_type` as `W-Up`, `RIR 0`, `RIR 1`, `RIR 2`, or `-` for unspecified sets.
 
 ### 8. Navigation/query semantics (UI-facing rule)
 

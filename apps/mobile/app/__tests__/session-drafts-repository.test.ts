@@ -271,6 +271,451 @@ describe('session draft repository', () => {
     );
   });
 
+  it('appends a completed session into an active draft as planned target rows', async () => {
+    const store = createMockStore();
+    const repository = createSessionDraftRepository(store);
+    const now = new Date('2026-02-20T12:00:00.000Z');
+
+    store.loadSessionGraphById.mockResolvedValue({
+      session: buildSessionRecord({
+        id: 'session-source',
+        status: 'completed',
+        gymId: 'gym-history',
+        completedAt: new Date('2026-02-19T11:00:00.000Z'),
+        durationSec: 3600,
+      }),
+      exercises: [
+        {
+          id: 'source-exercise-1',
+          sessionId: 'session-source',
+          exerciseDefinitionId: 'seed_pull_up',
+          orderIndex: 0,
+          name: 'Pull-ups',
+          machineName: null,
+          sets: [
+            {
+              id: 'source-set-1',
+              sessionExerciseId: 'source-exercise-1',
+              orderIndex: 0,
+              repsValue: '6',
+              weightValue: '',
+              setType: null,
+            },
+          ],
+        },
+      ],
+    });
+    store.loadLatestDraftGraph.mockResolvedValue({
+      session: buildSessionRecord({
+        id: 'active-session',
+        status: 'active',
+        gymId: 'gym-active',
+        startedAt: new Date('2026-02-20T10:00:00.000Z'),
+      }),
+      exercises: [],
+    });
+    store.saveDraftGraph.mockResolvedValue({ sessionId: 'active-session' });
+
+    const result = await repository.appendCompletedSessionAsPlanned('session-source', { now });
+
+    expect(result).toEqual({ sessionId: 'active-session' });
+    expect(store.saveDraftGraph).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId: 'active-session',
+        gymId: 'gym-active',
+        startedAt: new Date('2026-02-20T10:00:00.000Z'),
+        exercises: [
+          expect.objectContaining({
+            exerciseDefinitionId: 'seed_pull_up',
+            name: 'Pull-ups',
+            sets: [
+              expect.objectContaining({
+                repsValue: '',
+                weightValue: '',
+                setType: null,
+                plannedRepsValue: '6',
+                plannedWeightValue: '',
+                plannedSetType: null,
+                performanceStatus: 'planned',
+              }),
+            ],
+          }),
+        ],
+        now,
+      })
+    );
+  });
+
+  it('appends only the selected completed-session exercise block as planned target rows', async () => {
+    const store = createMockStore();
+    const repository = createSessionDraftRepository(store);
+    const now = new Date('2026-02-20T12:00:00.000Z');
+
+    store.loadSessionGraphById.mockResolvedValue({
+      session: buildSessionRecord({
+        id: 'session-source',
+        status: 'completed',
+        gymId: 'gym-history',
+        completedAt: new Date('2026-02-19T11:00:00.000Z'),
+        durationSec: 3600,
+      }),
+      exercises: [
+        {
+          id: 'source-exercise-1',
+          sessionId: 'session-source',
+          exerciseDefinitionId: 'seed_pull_up',
+          orderIndex: 0,
+          name: 'Pull-ups',
+          machineName: null,
+          sets: [
+            {
+              id: 'source-set-1',
+              sessionExerciseId: 'source-exercise-1',
+              orderIndex: 0,
+              repsValue: '6',
+              weightValue: '',
+              setType: null,
+            },
+          ],
+        },
+        {
+          id: 'source-exercise-2',
+          sessionId: 'session-source',
+          exerciseDefinitionId: 'seed_dumbbell_row',
+          orderIndex: 1,
+          name: 'DB Row',
+          machineName: null,
+          sets: [
+            {
+              id: 'source-set-2',
+              sessionExerciseId: 'source-exercise-2',
+              orderIndex: 0,
+              repsValue: '8',
+              weightValue: '30',
+              setType: 'rir_1',
+            },
+          ],
+        },
+      ],
+    });
+    store.loadLatestDraftGraph.mockResolvedValue(null);
+    store.saveDraftGraph.mockResolvedValue({ sessionId: 'new-active-session' });
+
+    const result = await repository.appendCompletedSessionExerciseAsPlanned(
+      'session-source',
+      'source-exercise-2',
+      { now }
+    );
+
+    expect(result).toEqual({ sessionId: 'new-active-session' });
+    const saveInput = store.saveDraftGraph.mock.calls[0]?.[0];
+    expect(saveInput).toEqual(
+      expect.objectContaining({
+        sessionId: undefined,
+        gymId: 'gym-history',
+        startedAt: now,
+        status: 'active',
+        now,
+      })
+    );
+    expect(saveInput?.exercises).toHaveLength(1);
+    expect(saveInput?.exercises[0]).toEqual(
+      expect.objectContaining({
+        exerciseDefinitionId: 'seed_dumbbell_row',
+        name: 'DB Row',
+        sets: [
+          expect.objectContaining({
+            repsValue: '',
+            weightValue: '',
+            setType: null,
+            plannedRepsValue: '8',
+            plannedWeightValue: '30',
+            plannedSetType: 'rir_1',
+            performanceStatus: 'planned',
+          }),
+        ],
+      })
+    );
+  });
+
+  it('appends block planned rows to the last active exercise when it has the same definition', async () => {
+    const store = createMockStore();
+    const repository = createSessionDraftRepository(store);
+    const now = new Date('2026-02-20T12:00:00.000Z');
+
+    store.loadSessionGraphById.mockResolvedValue({
+      session: buildSessionRecord({
+        id: 'session-source',
+        status: 'completed',
+        gymId: 'gym-history',
+        completedAt: new Date('2026-02-19T11:00:00.000Z'),
+        durationSec: 3600,
+      }),
+      exercises: [
+        {
+          id: 'source-exercise-1',
+          sessionId: 'session-source',
+          exerciseDefinitionId: 'seed_pull_up',
+          orderIndex: 0,
+          name: 'Pull-ups',
+          machineName: null,
+          sets: [
+            {
+              id: 'source-set-1',
+              sessionExerciseId: 'source-exercise-1',
+              orderIndex: 0,
+              repsValue: '6',
+              weightValue: '',
+              setType: 'rir_2',
+            },
+          ],
+        },
+      ],
+    });
+    store.loadLatestDraftGraph.mockResolvedValue({
+      session: buildSessionRecord({
+        id: 'active-session',
+        status: 'active',
+        gymId: 'gym-active',
+        startedAt: new Date('2026-02-20T10:00:00.000Z'),
+      }),
+      exercises: [
+        {
+          id: 'active-exercise-first',
+          sessionId: 'active-session',
+          exerciseDefinitionId: 'seed_pull_up',
+          orderIndex: 0,
+          name: 'Pull-ups',
+          machineName: null,
+          sets: [
+            {
+              id: 'active-set-1',
+              sessionExerciseId: 'active-exercise-first',
+              orderIndex: 0,
+              repsValue: '5',
+              weightValue: '',
+              setType: null,
+            },
+          ],
+        },
+        {
+          id: 'active-exercise-second',
+          sessionId: 'active-session',
+          exerciseDefinitionId: 'seed_pull_up',
+          orderIndex: 1,
+          name: 'Pull-ups duplicate',
+          machineName: null,
+          sets: [
+            {
+              id: 'active-set-2',
+              sessionExerciseId: 'active-exercise-second',
+              orderIndex: 0,
+              repsValue: '4',
+              weightValue: '',
+              setType: null,
+            },
+          ],
+        },
+      ],
+    });
+    store.saveDraftGraph.mockResolvedValue({ sessionId: 'active-session' });
+
+    await repository.appendCompletedSessionExerciseAsPlanned('session-source', 'source-exercise-1', { now });
+
+    const saveInput = store.saveDraftGraph.mock.calls[0]?.[0];
+    expect(saveInput).toEqual(
+      expect.objectContaining({
+        sessionId: 'active-session',
+        gymId: 'gym-active',
+        startedAt: new Date('2026-02-20T10:00:00.000Z'),
+      })
+    );
+    expect(saveInput?.exercises).toHaveLength(2);
+    expect(saveInput?.exercises[0]?.sets).toHaveLength(1);
+    expect(saveInput?.exercises[1]?.sets).toHaveLength(2);
+    expect(saveInput?.exercises[0]).toEqual(
+      expect.objectContaining({
+        id: 'active-exercise-first',
+        exerciseDefinitionId: 'seed_pull_up',
+        name: 'Pull-ups',
+        sets: [
+          expect.objectContaining({
+            id: 'active-set-1',
+            repsValue: '5',
+            weightValue: '',
+            setType: null,
+          }),
+        ],
+      })
+    );
+    expect(saveInput?.exercises[1]?.sets[0]).toEqual(
+      expect.objectContaining({
+        id: 'active-set-2',
+        repsValue: '4',
+        weightValue: '',
+        setType: null,
+      })
+    );
+    expect(saveInput?.exercises[1]?.sets[1]).toEqual(
+      expect.objectContaining({
+        repsValue: '',
+        weightValue: '',
+        setType: null,
+        plannedRepsValue: '6',
+        plannedWeightValue: '',
+        plannedSetType: 'rir_2',
+        performanceStatus: 'planned',
+      })
+    );
+  });
+
+  it('creates a new bottom exercise card when the last active exercise does not match', async () => {
+    const store = createMockStore();
+    const repository = createSessionDraftRepository(store);
+    const now = new Date('2026-02-20T12:00:00.000Z');
+
+    store.loadSessionGraphById.mockResolvedValue({
+      session: buildSessionRecord({
+        id: 'session-source',
+        status: 'completed',
+        gymId: 'gym-history',
+        completedAt: new Date('2026-02-19T11:00:00.000Z'),
+        durationSec: 3600,
+      }),
+      exercises: [
+        {
+          id: 'source-exercise-1',
+          sessionId: 'session-source',
+          exerciseDefinitionId: 'seed_pull_up',
+          orderIndex: 0,
+          name: 'Pull-ups',
+          machineName: null,
+          sets: [
+            {
+              id: 'source-set-1',
+              sessionExerciseId: 'source-exercise-1',
+              orderIndex: 0,
+              repsValue: '6',
+              weightValue: '',
+              setType: null,
+            },
+          ],
+        },
+      ],
+    });
+    store.loadLatestDraftGraph.mockResolvedValue({
+      session: buildSessionRecord({
+        id: 'active-session',
+        status: 'active',
+        gymId: 'gym-active',
+        startedAt: new Date('2026-02-20T10:00:00.000Z'),
+      }),
+      exercises: [
+        {
+          id: 'active-exercise-earlier-match',
+          sessionId: 'active-session',
+          exerciseDefinitionId: 'seed_pull_up',
+          orderIndex: 0,
+          name: 'Pull-ups earlier block',
+          machineName: null,
+          sets: [
+            {
+              id: 'active-set-earlier-match',
+              sessionExerciseId: 'active-exercise-earlier-match',
+              orderIndex: 0,
+              repsValue: '5',
+              weightValue: '',
+              setType: null,
+            },
+          ],
+        },
+        {
+          id: 'active-exercise-last',
+          sessionId: 'active-session',
+          exerciseDefinitionId: 'seed_bench_press',
+          orderIndex: 1,
+          name: 'Bench Press',
+          machineName: null,
+          sets: [],
+        },
+      ],
+    });
+    store.saveDraftGraph.mockResolvedValue({ sessionId: 'active-session' });
+
+    await repository.appendCompletedSessionExerciseAsPlanned('session-source', 'source-exercise-1', { now });
+
+    const saveInput = store.saveDraftGraph.mock.calls[0]?.[0];
+    expect(saveInput?.exercises).toHaveLength(3);
+    expect(saveInput?.exercises[0]).toEqual(
+      expect.objectContaining({
+        id: 'active-exercise-earlier-match',
+        exerciseDefinitionId: 'seed_pull_up',
+        name: 'Pull-ups earlier block',
+        sets: [
+          expect.objectContaining({
+            id: 'active-set-earlier-match',
+            repsValue: '5',
+            weightValue: '',
+            setType: null,
+          }),
+        ],
+      })
+    );
+    expect(saveInput?.exercises[1]).toEqual(
+      expect.objectContaining({
+        id: 'active-exercise-last',
+        exerciseDefinitionId: 'seed_bench_press',
+        name: 'Bench Press',
+        sets: [],
+      })
+    );
+    expect(saveInput?.exercises[2]).toEqual(
+      expect.objectContaining({
+        exerciseDefinitionId: 'seed_pull_up',
+        name: 'Pull-ups',
+        sets: [
+          expect.objectContaining({
+            plannedRepsValue: '6',
+            performanceStatus: 'planned',
+          }),
+        ],
+      })
+    );
+  });
+
+  it('rejects block append for non-completed source sessions and source exercises outside the session', async () => {
+    const store = createMockStore();
+    const repository = createSessionDraftRepository(store);
+
+    store.loadSessionGraphById.mockResolvedValueOnce({
+      session: buildSessionRecord({
+        id: 'session-source',
+        status: 'active',
+      }),
+      exercises: [],
+    });
+
+    await expect(
+      repository.appendCompletedSessionExerciseAsPlanned('session-source', 'source-exercise-1')
+    ).rejects.toThrow('Cannot append non-completed session session-source');
+
+    store.loadSessionGraphById.mockResolvedValueOnce({
+      session: buildSessionRecord({
+        id: 'session-source',
+        status: 'completed',
+        completedAt: new Date('2026-02-19T11:00:00.000Z'),
+        durationSec: 3600,
+      }),
+      exercises: [],
+    });
+
+    await expect(
+      repository.appendCompletedSessionExerciseAsPlanned('session-source', 'missing-exercise')
+    ).rejects.toThrow('Exercise missing-exercise does not belong to session session-source');
+
+    expect(store.saveDraftGraph).toHaveBeenCalledTimes(0);
+  });
+
   it('completes a session with deterministic materialized duration seconds', async () => {
     const store = createMockStore();
     const repository = createSessionDraftRepository(store);

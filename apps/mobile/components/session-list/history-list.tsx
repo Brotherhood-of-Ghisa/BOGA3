@@ -41,9 +41,7 @@ export type HistoryListProps = {
    */
   onSetCompletedSessionDeleted: (sessionId: string, isDeleted: boolean) => Promise<void> | void;
   onEditCompletedSession: (sessionId: string) => void;
-  onReopenCompletedSession: (sessionId: string) => Promise<void> | void;
-  /** Whether the Reopen menu action should be disabled (typically when an active session exists). */
-  reopenDisabled: boolean;
+  onAppendCompletedSession: (sessionId: string) => Promise<void> | void;
 };
 
 const COMPLETED_ROW_DELETE_EXIT_MS = 350;
@@ -62,8 +60,7 @@ export function HistoryList({
   onOpenCompletedSession,
   onSetCompletedSessionDeleted,
   onEditCompletedSession,
-  onReopenCompletedSession,
-  reopenDisabled,
+  onAppendCompletedSession,
 }: HistoryListProps) {
   const [menuVisible, setMenuVisible] = useState(false);
   const [menuState, setMenuState] = useState<CompletedSessionMenuState | null>(null);
@@ -106,13 +103,13 @@ export function HistoryList({
     onEditCompletedSession(sessionId);
   };
 
-  const handleReopen = () => {
-    if (!menuState || reopenDisabled) {
+  const handleAppend = () => {
+    if (!menuState) {
       return;
     }
     const { sessionId } = menuState;
     setMenuVisible(false);
-    const result = onReopenCompletedSession(sessionId);
+    const result = onAppendCompletedSession(sessionId);
     if (result && typeof (result as Promise<void>).then === 'function') {
       const noop = () => {};
       (result as Promise<void>).then(noop, noop);
@@ -287,24 +284,19 @@ export function HistoryList({
                 </Pressable>
 
                 <Pressable
-                  accessibilityLabel="Reopen completed session"
+                  accessibilityLabel="Append completed session to workout log"
                   accessibilityRole="button"
-                  disabled={reopenDisabled}
-                  onPress={handleReopen}
+                  onPress={handleAppend}
                   style={[
                     styles.modalActionButton,
                     styles.modalActionRowButton,
                     styles.modalNeutralButton,
-                    reopenDisabled ? styles.modalDisabledButton : null,
                   ]}
                   testID="completed-session-reopen-menu-action-button">
                   <Text
                     style={[
                       styles.modalNeutralButtonText,
-                      reopenDisabled ? styles.modalDisabledButtonText : null,
-                    ]}>
-                    Reopen
-                  </Text>
+                    ]}>Append</Text>
                 </Pressable>
 
                 <Pressable
@@ -331,24 +323,19 @@ export function HistoryList({
                 </Pressable>
 
                 <Pressable
-                  accessibilityLabel="Reopen completed session"
+                  accessibilityLabel="Append completed session to workout log"
                   accessibilityRole="button"
-                  disabled={reopenDisabled}
-                  onPress={handleReopen}
+                  onPress={handleAppend}
                   style={[
                     styles.modalActionButton,
                     styles.modalActionRowButton,
                     styles.modalNeutralButton,
-                    reopenDisabled ? styles.modalDisabledButton : null,
                   ]}
                   testID="completed-session-reopen-menu-action-button">
                   <Text
                     style={[
                       styles.modalNeutralButtonText,
-                      reopenDisabled ? styles.modalDisabledButtonText : null,
-                    ]}>
-                    Reopen
-                  </Text>
+                    ]}>Append</Text>
                 </Pressable>
 
                 <Pressable

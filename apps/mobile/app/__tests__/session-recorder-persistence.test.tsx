@@ -219,7 +219,7 @@ describe('SessionRecorderScreen persistence wiring', () => {
 
     mockPersistSessionDraftSnapshot.mockClear();
 
-    fireEvent.press(screen.getByTestId('set-type-button-1-1'));
+    fireEvent.press(screen.getByTestId('set-quality-button-1-1'));
 
     await act(async () => {
       jest.advanceTimersByTime(3_000);

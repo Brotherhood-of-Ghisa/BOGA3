@@ -1,0 +1,13 @@
+{
+  "lane": "ios-auth-profile",
+  "wall_ms": 82227,
+  "exit_code": 1,
+  "recorded_at": "20260615T204347Z",
+  "machine_id": "6443fb0d",
+  "hw": "Apple M4",
+  "cores": 10,
+  "os": "macOS 26.5.1",
+  "slot": "1",
+  "commit": "89ec100",
+  "source": "gate"
+}

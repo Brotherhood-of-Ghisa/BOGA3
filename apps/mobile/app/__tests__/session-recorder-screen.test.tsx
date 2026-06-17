@@ -181,6 +181,37 @@ describe('SessionRecorderScreen', () => {
     expect(screen.queryByText('Ignore')).toBeNull();
   });
 
+  it('starts a session when startup GPS preselection does not resolve', async () => {
+    jest.useFakeTimers();
+    dataMock.persistSessionDraftSnapshot.mockClear();
+    locationMock.getCurrentForegroundPositionLazy.mockImplementationOnce(() => new Promise(() => {}));
+
+    try {
+      render(<SessionRecorderScreen />);
+      await act(async () => {});
+
+      fireEvent.press(screen.getByTestId('start-session-button'));
+      expect(dataMock.persistSessionDraftSnapshot).not.toHaveBeenCalled();
+
+      await act(async () => {
+        jest.advanceTimersByTime(1500);
+      });
+      await act(async () => {});
+
+      expect(dataMock.persistSessionDraftSnapshot).toHaveBeenCalledWith(
+        expect.objectContaining({
+          gymId: null,
+          status: 'active',
+          exercises: [],
+        })
+      );
+      expect(screen.queryByTestId('session-recorder-empty-state')).toBeNull();
+      expect(screen.getByText('No exercises logged yet.')).toBeTruthy();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('renders the baseline session recorder shell', async () => {
     render(<SessionRecorderScreen />);
     await dismissEmptyStateIfPresent();
@@ -237,6 +268,231 @@ describe('SessionRecorderScreen', () => {
     expect(screen.getByText('No gym')).toBeTruthy();
     expect(locationMock.getCurrentForegroundPositionLazy).not.toHaveBeenCalled();
     expect(locationMock.matchNearestGymForPosition).not.toHaveBeenCalled();
+  });
+
+  it('renders planned imported sets and supports log and skip actions', async () => {
+    dataMock.loadLatestSessionDraftSnapshot.mockResolvedValueOnce({
+      sessionId: 'planned-draft',
+      gymId: null,
+      status: 'active',
+      startedAt: new Date('2026-05-23T10:00:00.000Z'),
+      createdAt: new Date('2026-05-23T10:00:00.000Z'),
+      updatedAt: new Date('2026-05-23T10:00:00.000Z'),
+      exercises: [
+        {
+          id: 'exercise-pullups',
+          exerciseDefinitionId: 'seed_pull_up',
+          name: 'Pull-ups',
+          machineName: null,
+          sets: [
+            {
+              id: 'planned-set-1',
+              repsValue: '',
+              weightValue: '',
+              setType: null,
+              plannedRepsValue: '6',
+              plannedWeightValue: '',
+              plannedSetType: 'rir_2',
+              performanceStatus: 'planned',
+            },
+            {
+              id: 'planned-set-2',
+              repsValue: '',
+              weightValue: '',
+              setType: null,
+              plannedRepsValue: '8',
+              plannedWeightValue: '30',
+              plannedSetType: 'rir_2',
+              performanceStatus: 'planned',
+            },
+            {
+              id: 'added-set-3',
+              repsValue: '8',
+              weightValue: '185',
+              setType: 'rir_1',
+              plannedRepsValue: null,
+              plannedWeightValue: null,
+              plannedSetType: null,
+              performanceStatus: null,
+            },
+          ],
+        },
+      ],
+    });
+
+    render(<SessionRecorderScreen />);
+    await act(async () => {});
+
+    expect(screen.getByText('2 planned · 1 performed')).toBeTruthy();
+    expect(screen.getByText('Set 1')).toBeTruthy();
+    expect(screen.getByText('0kg')).toBeTruthy();
+    expect(screen.getByText('6 reps')).toBeTruthy();
+    expect(screen.getByText('Set 3')).toBeTruthy();
+    expect(screen.getByText('185kg')).toBeTruthy();
+    expect(screen.getAllByText('8 reps').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Added')).toBeNull();
+    expect(screen.queryByText('RIR 2')).toBeNull();
+    expect(screen.getByText('RIR 1')).toBeTruthy();
+    expect(screen.queryByLabelText('Weight for exercise 1 set 3')).toBeNull();
+
+    fireEvent.press(screen.getByLabelText('added set 3 for exercise 1: 185kg · 8 reps; quality RIR 1'));
+    expect(screen.getByLabelText('Weight for exercise 1 set 3')).toBeTruthy();
+    fireEvent(screen.getByLabelText('Weight for exercise 1 set 3'), 'blur');
+
+    fireEvent.press(screen.getByLabelText('Log set 1 as planned'));
+    expect(screen.getByText('Set 1')).toBeTruthy();
+    expect(screen.getByText('0kg')).toBeTruthy();
+    expect(screen.getByText('6 reps')).toBeTruthy();
+    expect(screen.getByText('2 planned · 2 performed')).toBeTruthy();
+    expect(screen.getByLabelText('Quality for exercise 1 set 1: RIR 2')).toBeTruthy();
+
+    expect(screen.queryByLabelText('Quality for exercise 1 set 2: none')).toBeNull();
+    fireEvent.press(screen.getByLabelText('Skip set 2'));
+    expect(screen.getByText('Set 2')).toBeTruthy();
+    expect(screen.getByText('30kg')).toBeTruthy();
+    expect(screen.getAllByText('8 reps').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Skipped')).toBeNull();
+    expect(screen.getByText('2 planned · 2 performed · 1 skipped')).toBeTruthy();
+
+    fireEvent.press(screen.getByLabelText('added set 3 for exercise 1: 185kg · 8 reps; quality RIR 1'));
+    expect(screen.getByLabelText('Weight for exercise 1 set 3')).toBeTruthy();
+
+    fireEvent.press(screen.getByLabelText('skipped planned set 2 for exercise 1: 30kg · 8 reps; quality RIR 2'));
+    expect(screen.queryByLabelText('Weight for exercise 1 set 2')).toBeNull();
+    expect(screen.queryByLabelText('Weight for exercise 1 set 3')).toBeNull();
+
+    fireEvent.press(screen.getByLabelText('skipped planned set 2 for exercise 1: 30kg · 8 reps; quality RIR 2'));
+    expect(screen.getByLabelText('Weight for exercise 1 set 2').props.value).toBe('30');
+    expect(screen.getByLabelText('Reps for exercise 1 set 2').props.value).toBe('8');
+    expect(screen.getByLabelText('Quality for exercise 1 set 2: RIR 2')).toBeTruthy();
+    expect(screen.queryByLabelText('Done editing set 2')).toBeNull();
+    expect(screen.getByLabelText('Skip set 2')).toBeTruthy();
+    expect(screen.getByText('2 planned · 3 performed')).toBeTruthy();
+    fireEvent.changeText(screen.getByLabelText('Weight for exercise 1 set 2'), '35');
+    expect(screen.getByLabelText('Weight for exercise 1 set 2').props.value).toBe('35');
+
+    fireEvent.press(screen.getByLabelText('Skip set 2'));
+    expect(screen.getByText('Set 2')).toBeTruthy();
+    expect(screen.getByText('30kg')).toBeTruthy();
+    expect(screen.getAllByText('8 reps').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Skipped')).toBeNull();
+    expect(screen.getByText('2 planned · 2 performed · 1 skipped')).toBeTruthy();
+  });
+
+  it('treats equal planned volume as matched even when quality changes', async () => {
+    dataMock.loadLatestSessionDraftSnapshot.mockResolvedValueOnce({
+      sessionId: 'planned-quality-draft',
+      gymId: null,
+      status: 'active',
+      startedAt: new Date('2026-05-23T10:00:00.000Z'),
+      createdAt: new Date('2026-05-23T10:00:00.000Z'),
+      updatedAt: new Date('2026-05-23T10:00:00.000Z'),
+      exercises: [
+        {
+          id: 'exercise-row',
+          exerciseDefinitionId: 'seed_one_arm_dumbbell_row',
+          name: 'DB Row',
+          machineName: null,
+          sets: [
+            {
+              id: 'planned-set-1',
+              repsValue: '8',
+              weightValue: '30',
+              setType: 'rir_0',
+              plannedRepsValue: '8',
+              plannedWeightValue: '30',
+              plannedSetType: 'rir_2',
+              performanceStatus: null,
+            },
+          ],
+        },
+      ],
+    });
+
+    render(<SessionRecorderScreen />);
+    await act(async () => {});
+
+    expect(screen.getByText('1 planned · 1 performed')).toBeTruthy();
+    expect(screen.getByLabelText('matched planned set 1 for exercise 1: 30kg · 8 reps; quality RIR 0')).toBeTruthy();
+    expect(screen.getByText('Set 1')).toBeTruthy();
+    expect(screen.getByText('30kg')).toBeTruthy();
+    expect(screen.getByText('8 reps')).toBeTruthy();
+    expect(screen.queryByText('Set 1 · 30kg · 8 reps -> 30kg · 8 reps')).toBeNull();
+  });
+
+  it('uses compact editable rows for normal logged sets', async () => {
+    dataMock.loadLatestSessionDraftSnapshot.mockResolvedValueOnce({
+      sessionId: 'normal-draft',
+      gymId: null,
+      status: 'active',
+      startedAt: new Date('2026-05-23T10:00:00.000Z'),
+      createdAt: new Date('2026-05-23T10:00:00.000Z'),
+      updatedAt: new Date('2026-05-23T10:00:00.000Z'),
+      exercises: [
+        {
+          id: 'exercise-row',
+          exerciseDefinitionId: 'seed_one_arm_dumbbell_row',
+          name: 'DB Row',
+          machineName: null,
+          sets: [
+            {
+              id: 'normal-set-1',
+              repsValue: '8',
+              weightValue: '30',
+              setType: 'rir_2',
+              plannedRepsValue: null,
+              plannedWeightValue: null,
+              plannedSetType: null,
+              performanceStatus: null,
+            },
+          ],
+        },
+      ],
+    });
+
+    render(<SessionRecorderScreen />);
+    await act(async () => {});
+
+    expect(screen.queryByTestId('exercise-1-set-header')).toBeNull();
+    expect(screen.getByText('Set 1')).toBeTruthy();
+    expect(screen.getByText('30kg')).toBeTruthy();
+    expect(screen.getByText('8 reps')).toBeTruthy();
+    expect(screen.getByText('RIR 2')).toBeTruthy();
+    expect(screen.queryByLabelText('Weight for exercise 1 set 1')).toBeNull();
+
+    fireEvent.press(screen.getByLabelText('logged set 1 for exercise 1: 30kg · 8 reps; quality RIR 2'));
+
+    expect(screen.getByLabelText('Weight for exercise 1 set 1')).toBeTruthy();
+    expect(screen.getByText('kg')).toBeTruthy();
+    expect(screen.getByPlaceholderText('Reps')).toBeTruthy();
+    expect(screen.getByLabelText('Quality for exercise 1 set 1: RIR 2')).toBeTruthy();
+
+    fireEvent.press(screen.getByLabelText('Add set to exercise 1'));
+
+    expect(screen.getByText('Set 1')).toBeTruthy();
+    expect(screen.getByText('30kg')).toBeTruthy();
+    expect(screen.getByText('8 reps')).toBeTruthy();
+    expect(screen.getByLabelText('Weight for exercise 1 set 2')).toBeTruthy();
+    expect(screen.getByLabelText('Reps for exercise 1 set 2')).toBeTruthy();
+    expect(screen.getByLabelText('Quality for exercise 1 set 2: RIR 2')).toBeTruthy();
+
+    fireEvent(screen.getByLabelText('Reps for exercise 1 set 2'), 'blur');
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(screen.getByText('Set 2')).toBeTruthy();
+    expect(screen.getAllByText('30kg').length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText('8 reps').length).toBeGreaterThanOrEqual(2);
+
+    fireEvent.press(screen.getByLabelText('logged set 1 for exercise 1: 30kg · 8 reps; quality RIR 2'));
+    expect(screen.getByLabelText('Weight for exercise 1 set 1')).toBeTruthy();
+
+    fireEvent.press(screen.getByLabelText('logged set 2 for exercise 1: 30kg · 8 reps; quality RIR 2'));
+    expect(screen.queryByLabelText('Weight for exercise 1 set 1')).toBeNull();
+    expect(screen.queryByLabelText('Weight for exercise 1 set 2')).toBeNull();
+
+    fireEvent.press(screen.getByLabelText('logged set 2 for exercise 1: 30kg · 8 reps; quality RIR 2'));
+    expect(screen.getByLabelText('Weight for exercise 1 set 2')).toBeTruthy();
   });
 
   it('prefills date and time with the current value pattern', async () => {

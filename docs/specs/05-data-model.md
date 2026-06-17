@@ -49,7 +49,7 @@ This document is project-level source of truth for what data exists and how it i
 - `gyms` (user-owned personal gym rows; nullable private coordinate metadata is in sync scope)
 - `sessions`
 - `session_exercises`
-- `exercise_sets` (optional `set_type` metadata: `warm_up | rir_0 | rir_1 | rir_2 | null`)
+- `exercise_sets` (actual logged `weight_value` / `reps_value` / `set_type`, plus optional planned target fields `planned_weight_value` / `planned_reps_value` / `planned_set_type` and `performance_status` for planned/skipped execution rows)
 - `exercise_definitions`
 - `exercise_muscle_mappings`
 - `exercise_tag_definitions`
@@ -101,7 +101,7 @@ and a nullable `deleted_at` tombstone. Per-column mapping is in
 - `app_public.gyms` (carries the four nullable private coordinate columns)
 - `app_public.sessions`
 - `app_public.session_exercises`
-- `app_public.exercise_sets` (optional `set_type` metadata)
+- `app_public.exercise_sets` (actual logged set values plus optional planned target fields and `performance_status`)
 - `app_public.exercise_definitions`
 - `app_public.exercise_muscle_mappings`
 - `app_public.exercise_tag_definitions`
@@ -193,8 +193,9 @@ section states only the data-model-level invariants.
    user-owned entities listed in this document, with FK integrity preserved at every
    layer boundary (parents drain before children).
 5. `exercise_sets` metadata includes optional `set_type` (`warm_up | rir_0 | rir_1 | rir_2 | null`) and remains nullable for legacy/unspecified sets.
-6. `gyms` may include nullable coordinate metadata: `latitude`, `longitude`, `coordinate_accuracy_m`, and `coordinates_updated_at`. The sync impact decision is `in sync scope`; all four columns are carried verbatim by the `gyms` push/pull wire envelope, the first-full-pull bootstrap, and reinstall restore parity.
-7. Gym coordinate fields are either all null or all non-null. Valid ranges are latitude `-90..90`, longitude `-180..180`, accuracy `>= 0`, and non-negative `coordinates_updated_at` epoch milliseconds. Clearing saved coordinates sets all four coordinate fields to null. These ranges are client-enforced — the server runs no validation (contract §A.1).
+6. Planned workout execution targets are `in sync scope`: `exercise_sets.planned_weight_value`, `planned_reps_value`, `planned_set_type`, and `performance_status` are carried in the push/pull wire envelope so appended historical/program rows restore as planned targets rather than completed logs. Actual performed values remain in `weight_value`, `reps_value`, and `set_type`.
+7. `gyms` may include nullable coordinate metadata: `latitude`, `longitude`, `coordinate_accuracy_m`, and `coordinates_updated_at`. The sync impact decision is `in sync scope`; all four columns are carried verbatim by the `gyms` push/pull wire envelope, the first-full-pull bootstrap, and reinstall restore parity.
+8. Gym coordinate fields are either all null or all non-null. Valid ranges are latitude `-90..90`, longitude `-180..180`, accuracy `>= 0`, and non-negative `coordinates_updated_at` epoch milliseconds. Clearing saved coordinates sets all four coordinate fields to null. These ranges are client-enforced — the server runs no validation (contract §A.1).
 
 ### Wire envelope (Sync v2)
 

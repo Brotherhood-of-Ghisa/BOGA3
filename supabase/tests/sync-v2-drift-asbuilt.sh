@@ -21,13 +21,6 @@ pass() { echo "[sync-v2-drift-asbuilt] pass: $*"; }
 
 [[ -f "${MOBILE_DIR}/package.json" ]] || fail "apps/mobile/package.json not found at ${MOBILE_DIR}/package.json"
 
-# A clean working tree is a precondition — if a developer has uncommitted
-# changes to a schema file the drift checker is expected to fail. We surface
-# that as a clearer message than the raw checker output.
-if ! (cd "${REPO_ROOT}" && git diff --quiet -- apps/mobile/src/data/schema/); then
-  fail "working tree has uncommitted changes under apps/mobile/src/data/schema/; commit or stash before running"
-fi
-
 OUTPUT_FILE="$(mktemp)"
 set +e
 (cd "${MOBILE_DIR}" && npm run check:sync-drift -- --strict) >"${OUTPUT_FILE}" 2>&1

@@ -5,7 +5,13 @@ export type SessionSet = {
   reps: string;
   weight: string;
   setType: SessionSetTypeValue;
+  plannedReps: string | null;
+  plannedWeight: string | null;
+  plannedSetType: SessionSetTypeValue;
+  performanceStatus: SessionSetPerformanceStatus;
 };
+
+export type SessionSetPerformanceStatus = 'planned' | 'skipped' | null;
 
 export type SessionExerciseTag = {
   assignmentId: string;

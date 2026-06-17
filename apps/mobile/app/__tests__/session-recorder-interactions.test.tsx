@@ -450,12 +450,13 @@ describe('SessionRecorderScreen exercise interactions', () => {
 
     expect(screen.queryByText('Select Exercise')).toBeNull();
     expect(screen.getByText('Barbell Squat')).toBeTruthy();
-    expect(screen.getByTestId('exercise-1-set-header')).toBeTruthy();
-    expect(screen.getByText('Weight')).toBeTruthy();
-    expect(screen.getByText('Reps')).toBeTruthy();
+    expect(screen.queryByTestId('exercise-1-set-header')).toBeNull();
+    expect(screen.getByLabelText('Weight for exercise 1 set 1')).toBeTruthy();
+    expect(screen.getByText('kg')).toBeTruthy();
+    expect(screen.getByPlaceholderText('Reps')).toBeTruthy();
     expect(screen.getByLabelText('Weight for exercise 1 set 1').props.autoFocus).toBe(true);
-    expect(screen.getByLabelText('Weight for exercise 1 set 1').props.selectTextOnFocus).toBe(true);
-    expect(screen.getByLabelText('Reps for exercise 1 set 1').props.selectTextOnFocus).toBe(true);
+    expect(screen.getByLabelText('Weight for exercise 1 set 1').props.selectTextOnFocus).toBeUndefined();
+    expect(screen.getByLabelText('Reps for exercise 1 set 1').props.selectTextOnFocus).toBeUndefined();
     expect(screen.queryByText('No exercises logged yet.')).toBeNull();
     expect(screen.queryByText('No tags yet.')).toBeNull();
     expect(mockLogEvent).toHaveBeenCalledWith({
@@ -583,7 +584,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     fireEvent.press(await screen.findByLabelText('Select exercise Barbell Squat'));
     fireEvent.press(await screen.findByTestId('exercise-block-history-panel-1-collapsed'));
 
-    const firstSetTypeButton = screen.getByTestId('set-type-button-1-1');
+    const firstSetTypeButton = screen.getByTestId('set-quality-button-1-1');
     fireEvent.press(firstSetTypeButton);
     fireEvent.changeText(screen.getByLabelText('Weight for exercise 1 set 1'), '500');
     fireEvent.changeText(screen.getByLabelText('Reps for exercise 1 set 1'), '5');
@@ -591,7 +592,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     expect(screen.getByTestId('exercise-block-history-panel-1-highest-current')).toHaveTextContent('-');
 
     fireEvent.press(screen.getByLabelText('Add set to exercise 1'));
-    const secondSetTypeButton = screen.getByTestId('set-type-button-1-2');
+    const secondSetTypeButton = screen.getByTestId('set-quality-button-1-2');
     fireEvent.press(secondSetTypeButton);
     fireEvent.changeText(screen.getByLabelText('Weight for exercise 1 set 2'), '200');
     fireEvent.changeText(screen.getByLabelText('Reps for exercise 1 set 2'), '5');
@@ -711,24 +712,25 @@ describe('SessionRecorderScreen exercise interactions', () => {
     fireEvent.press(screen.getByText('Log new exercise'));
     fireEvent.press(await screen.findByLabelText('Select exercise Barbell Squat'));
 
-    const setTypeButton = screen.getByTestId('set-type-button-1-1');
+    const setTypeButton = screen.getByTestId('set-quality-button-1-1');
     expect(setTypeButton.findByType('Text').props.children).toBe('•');
 
     fireEvent.press(setTypeButton);
-    expect(screen.getByText('WU')).toBeTruthy();
+    expect(screen.getByText('W-Up')).toBeTruthy();
     fireEvent.press(setTypeButton);
-    expect(screen.getByText('R0')).toBeTruthy();
+    expect(screen.getByText('RIR 0')).toBeTruthy();
     fireEvent.press(setTypeButton);
-    expect(screen.getByText('R1')).toBeTruthy();
+    expect(screen.getByText('RIR 1')).toBeTruthy();
     fireEvent.press(setTypeButton);
-    expect(screen.getByText('R2')).toBeTruthy();
+    expect(screen.getByText('RIR 2')).toBeTruthy();
     fireEvent.press(setTypeButton);
-    expect(setTypeButton.findByType('Text').props.children).toBe('•');
+    expect(screen.getByLabelText('Quality for exercise 1 set 1: none')).toBeTruthy();
 
     fireEvent(setTypeButton, 'onLongPress');
+    expect(screen.getByLabelText('Choose W-Up set type')).toBeTruthy();
     expect(screen.getByLabelText('Choose RIR 1 set type')).toBeTruthy();
     fireEvent.press(screen.getByLabelText('Choose RIR 1 set type'));
-    expect(screen.getByText('R1')).toBeTruthy();
+    expect(screen.getByText('RIR 1')).toBeTruthy();
 
     await act(async () => {});
   });
@@ -751,7 +753,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     fireEvent.changeText(screen.getByLabelText(weightInputLabel), '0');
     fireEvent.changeText(screen.getByLabelText(repsInputLabel), '0');
 
-    const zeroWeightStyle = StyleSheet.flatten(screen.getByLabelText(weightInputLabel).props.style);
+    const zeroWeightStyle = StyleSheet.flatten(screen.getByTestId('set-weight-input-shell-1-1').props.style);
     const invalidRepsStyle = StyleSheet.flatten(screen.getByLabelText(repsInputLabel).props.style);
     expect(zeroWeightStyle.borderColor).toBe(uiColors.borderDefault);
     expect(invalidRepsStyle.borderColor).toBe(uiColors.actionDangerSubtleBorder);
@@ -759,7 +761,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     fireEvent.changeText(screen.getByLabelText(weightInputLabel), '135.5');
     fireEvent.changeText(screen.getByLabelText(repsInputLabel), '8');
 
-    const validWeightStyle = StyleSheet.flatten(screen.getByLabelText(weightInputLabel).props.style);
+    const validWeightStyle = StyleSheet.flatten(screen.getByTestId('set-weight-input-shell-1-1').props.style);
     const validRepsStyle = StyleSheet.flatten(screen.getByLabelText(repsInputLabel).props.style);
     expect(validWeightStyle.borderColor).toBe(uiColors.borderDefault);
     expect(validRepsStyle.borderColor).toBe(uiColors.borderDefault);
@@ -774,7 +776,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     fireEvent.press(screen.getByText('Log new exercise'));
     fireEvent.press(await screen.findByLabelText('Select exercise Barbell Squat'));
 
-    const firstSetTypeButton = screen.getByTestId('set-type-button-1-1');
+    const firstSetTypeButton = screen.getByTestId('set-quality-button-1-1');
     fireEvent.press(firstSetTypeButton);
     fireEvent.press(firstSetTypeButton);
     fireEvent.changeText(screen.getByLabelText('Weight for exercise 1 set 1'), '135.5');
@@ -782,22 +784,19 @@ describe('SessionRecorderScreen exercise interactions', () => {
 
     fireEvent.press(screen.getByLabelText('Add set to exercise 1'));
 
-    expect(screen.getByLabelText('Weight for exercise 1 set 1').props.autoFocus).toBe(false);
+    expect(screen.queryByLabelText('Weight for exercise 1 set 1')).toBeNull();
+    expect(screen.getByText('Set 1')).toBeTruthy();
+    expect(screen.getByText('135.5kg')).toBeTruthy();
+    expect(screen.getByText('8 reps')).toBeTruthy();
     expect(screen.getByLabelText('Weight for exercise 1 set 2').props.autoFocus).toBe(true);
-    expect(screen.getByLabelText('Weight for exercise 1 set 2').props.selectTextOnFocus).toBe(true);
-    expect(screen.getByLabelText('Weight for exercise 1 set 2').props.selection).toEqual({
-      start: 0,
-      end: 5,
-    });
+    expect(screen.getByLabelText('Weight for exercise 1 set 2').props.selectTextOnFocus).toBeUndefined();
+    expect(screen.getByLabelText('Weight for exercise 1 set 2').props.selection).toBeUndefined();
     expect(screen.getByLabelText('Weight for exercise 1 set 2').props.value).toBe('135.5');
     expect(screen.getByLabelText('Reps for exercise 1 set 2').props.value).toBe('8');
-    expect(screen.getAllByText('R0')).toHaveLength(2);
+    expect(screen.getAllByText('RIR 0')).toHaveLength(2);
 
     fireEvent(screen.getByLabelText('Reps for exercise 1 set 2'), 'focus');
-    expect(screen.getByLabelText('Reps for exercise 1 set 2').props.selection).toEqual({
-      start: 0,
-      end: 1,
-    });
+    expect(screen.getByLabelText('Reps for exercise 1 set 2').props.selection).toBeUndefined();
 
     fireEvent.changeText(screen.getByLabelText('Reps for exercise 1 set 2'), '10');
     expect(screen.getByLabelText('Reps for exercise 1 set 2').props.value).toBe('10');
@@ -882,7 +881,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
 
     expect(screen.getByText('Custom Press')).toBeTruthy();
     expect(screen.getByLabelText('Weight for exercise 1 set 1').props.autoFocus).toBe(true);
-    expect(screen.getByLabelText('Weight for exercise 1 set 1').props.selectTextOnFocus).toBe(true);
+    expect(screen.getByLabelText('Weight for exercise 1 set 1').props.selectTextOnFocus).toBeUndefined();
 
     fireEvent.press(screen.getByLabelText('Add set to exercise 1'));
     expect(screen.getByLabelText('Weight for exercise 1 set 2')).toBeTruthy();
@@ -1142,15 +1141,15 @@ describe('SessionRecorderScreen exercise interactions', () => {
       expect(screen.getByText('Bench Press')).toBeTruthy();
     });
 
-    const setTypeButton = screen.getByTestId('set-type-button-1-1');
+    const setTypeButton = screen.getByTestId('set-quality-button-1-1');
 
     fireEvent.press(setTypeButton);
-    expect(screen.getByText('WU')).toBeTruthy();
+    expect(screen.getByText('W-Up')).toBeTruthy();
 
     fireEvent(setTypeButton, 'onLongPress');
     expect(screen.getByLabelText('Choose None set type')).toBeTruthy();
     fireEvent.press(screen.getByLabelText('Choose None set type'));
-    expect(screen.getByText('•')).toBeTruthy();
+    expect(setTypeButton.findByType('Text').props.children).toBe('•');
   });
 
   it('supports tag attach/remove in completed-edit mode', async () => {

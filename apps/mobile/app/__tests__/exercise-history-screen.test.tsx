@@ -71,7 +71,7 @@ const buildSummary = (overrides: Partial<ExerciseHistorySummary> = {}): Exercise
       gymName: 'Westside Barbell Club',
       tagIds: ['tag-westside'],
       sets: [
-        { setId: 'st-1', orderIndex: 0, weightValue: '185', repsValue: '8', setType: null, isWorking: true },
+        { setId: 'st-1', orderIndex: 0, weightValue: '135', repsValue: '8', setType: 'warm_up', isWorking: false },
         { setId: 'st-2', orderIndex: 1, weightValue: '185', repsValue: '6', setType: 'rir_1', isWorking: true },
       ],
       workingSetCount: 2,
@@ -138,6 +138,7 @@ describe('ExerciseHistoryScreenShell', () => {
     expect(screen.getByTestId('exercise-history-best-est-1rm')).toHaveTextContent(/230/);
     expect(screen.getByTestId('exercise-history-best-top-weight')).toHaveTextContent(/185.*×.*8/);
     expect(screen.getByTestId('exercise-history-session-card-se-newest')).toHaveTextContent(/2026-05-18/);
+    expect(screen.getByTestId('exercise-history-session-card-se-newest')).toHaveTextContent(/W-Up/);
     expect(screen.getByTestId('exercise-history-session-card-se-older')).toBeTruthy();
   });
 

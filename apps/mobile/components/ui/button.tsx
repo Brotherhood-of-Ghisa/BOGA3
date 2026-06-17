@@ -54,7 +54,14 @@ export function UiButton({
           typeof style === 'function' ? style(state) : style,
         ];
       }}>
-      <UiText selectable={textSelectable} variant={textVariant} style={textStyle}>
+      <UiText
+        adjustsFontSizeToFit
+        ellipsizeMode="clip"
+        minimumFontScale={0.75}
+        numberOfLines={1}
+        selectable={textSelectable}
+        variant={textVariant}
+        style={textStyle}>
         {label}
       </UiText>
     </Pressable>
