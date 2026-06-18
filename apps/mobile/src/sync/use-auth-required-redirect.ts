@@ -2,10 +2,10 @@
 //
 // Two independent inputs combine here:
 //
-//   1. The auth snapshot — when auth is configured and there is no session, no
-//      data screen may render. (An unconfigured client never forces sign-in: it
-//      has no working credential path, so trapping the user on a dead form would
-//      be worse than letting local-only surfaces render.)
+//   1. The auth snapshot — when there is no session, no data screen may render.
+//      This is intentionally fail-closed even if the Supabase runtime config is
+//      missing: a misconfigured build should show the sign-in/unavailable state,
+//      not silently fall through to local-only app usage.
 //   2. The sync cycle's auth-required signal — a cycle that ran against the
 //      server and got back "no signed-in user" means the stored session is gone
 //      or invalid even if the local snapshot has not caught up yet.
@@ -30,20 +30,17 @@ export type AuthGateSnapshot = Pick<AuthSnapshot, 'isConfigured' | 'session'>;
  * signal, decide whether the user must be routed to the sign-in entry point.
  *
  * Returns true when EITHER:
- *   - auth is configured and there is no session, OR
+ *   - there is no session, OR
  *   - the latest sync cycle reported "no signed-in user".
  *
- * Both conditions are clamped by configuration: when auth is unconfigured there
- * is no usable sign-in path, so the app falls through to its local-only surfaces
- * rather than redirecting to a form that cannot succeed.
+ * Missing auth configuration is not treated as permission to use the app: the
+ * sign-in screen owns showing the disabled credential path. That keeps the
+ * top-level contract simple — no session means no data route.
  */
 export const selectShouldRouteToSignIn = (
   snapshot: AuthGateSnapshot,
   authRequiredSignal: boolean,
 ): boolean => {
-  if (!snapshot.isConfigured) {
-    return false;
-  }
   if (!snapshot.session) {
     return true;
   }

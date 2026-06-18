@@ -95,13 +95,13 @@ describe('AuthRouteGuard', () => {
     expect(screen.queryByTestId(childTestId)).toBeNull();
   });
 
-  it('renders children without redirecting when auth is unconfigured', () => {
+  it('redirects to sign-in when auth is unconfigured and there is no session', () => {
     mockUseAuth.mockReturnValue(createAuthValue({ isConfigured: false, session: null }));
 
     renderGuard();
 
-    expect(screen.getByTestId(childTestId)).toBeTruthy();
-    expect(screen.queryByTestId(redirectTestId)).toBeNull();
+    expect(screen.getByTestId(redirectTestId).props.children).toBe('/sign-in');
+    expect(screen.queryByTestId(childTestId)).toBeNull();
   });
 
   it('does not redirect when already on the sign-in route (no redirect loop)', () => {
