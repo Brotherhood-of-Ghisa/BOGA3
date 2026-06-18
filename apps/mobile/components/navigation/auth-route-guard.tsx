@@ -20,8 +20,9 @@ const SIGN_IN_ROUTE = '/sign-in';
  *     or a sync cycle reported "no signed-in user"), it redirects to the sign-in
  *     route. A configured-but-signed-out launch therefore never reaches a data
  *     screen.
- *   - Otherwise (signed in, or auth unconfigured with no working credential
- *     path) it renders its children untouched.
+ *   - Otherwise (signed in) it renders its children untouched. An unconfigured
+ *     auth client is still routed to sign-in so the missing credential path is
+ *     visible instead of silently allowing local-only app usage.
  *
  * The sign-in route itself is exempt: the guard renders it through rather than
  * redirecting to it, so the redirect cannot loop.
