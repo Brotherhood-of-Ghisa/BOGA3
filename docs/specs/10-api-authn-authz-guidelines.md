@@ -53,6 +53,66 @@ This is the shortest operational summary. Use the "Further reading" section when
 - Handle auth failures and `RLS` denials as expected runtime outcomes (not exceptional backend bugs by default).
 - Do not embed or request `service_role` credentials for any app feature.
 
+## Mobile app login/session routing policy
+
+The mobile app's top-level product contract is **login before use**. App launch
+may restore a persisted Supabase Auth session automatically, but cached local
+SQLite app data is never treated as proof of identity. Without a live Supabase
+session, the route layer must render the sign-in route (or the sign-in-unavailable
+state when auth config is missing) before any data screen can paint.
+
+### Decision flow
+
+```mermaid
+flowchart TD
+  launch[App launch / RootLayout mounts] --> auth_boot[AuthProvider bootstraps auth state]
+  auth_boot --> config{Supabase mobile env configured?}
+
+  config -- No --> missing_env[Auth snapshot: ready, no session, disabledReason]
+  missing_env --> guard_no_env[Route guard sees no session]
+  guard_no_env --> sign_in_disabled[/sign-in: show sign-in unavailable + missing env]
+
+  config -- Yes --> restore[Supabase auth.getSession from persisted auth storage]
+  restore --> restoring{Restore in flight?}
+  restoring -- Yes --> loading[Route guard shows neutral Loading state]
+  loading --> restore
+  restoring -- No --> session{Restored session?}
+
+  session -- Yes --> stale{Sync raised AUTH_REQUIRED?}
+  stale -- No --> app[Render app screens]
+  stale -- Yes --> sign_in[/sign-in: ask user to sign in again]
+
+  session -- No --> sign_in
+  sign_in --> credentials[User enters email + password]
+  credentials --> success{signInWithPassword succeeds?}
+  success -- Yes --> persist[Supabase persists session; auth snapshot has session]
+  persist --> app
+  success -- No --> inline_error[Stay on /sign-in and show inline error]
+```
+
+### Case table
+
+| Case | Expected behavior | Why |
+| --- | --- | --- |
+| Auth config exists and a persisted Supabase session restores | Auto-enter the app. | The session is the authenticated identity; no manual login prompt is needed. |
+| Auth config exists and no session restores | Redirect to `/sign-in`. | The app has a working credential path and no authenticated user. |
+| Auth config exists, a stale session is present, and sync reports `AUTH_REQUIRED` | Redirect to `/sign-in`. | The server has rejected the current auth state; route to credential repair instead of showing a generic sync error. |
+| Auth config is missing | Route to `/sign-in` and show the disabled auth message. | Misconfiguration must be visible and fail closed; it is not permission to use local-only data screens. |
+| User signs in successfully | Persist the Supabase session and allow app screens. | Supabase Auth owns session persistence and token refresh. |
+| User signs in unsuccessfully | Stay on `/sign-in` and show inline feedback. | Failed credentials must not transition into app state. |
+| User signs out or switches account | Clear the session and wipe local account-scoped data before the next account uses the device. | Prevents one user's local data from leaking into another account or suppressing first-sign-in restore. |
+| Device is offline at launch with a valid persisted session | Allow app screens from the restored session; sync waits until reachable. | Offline availability is tied to an already-authenticated cached session, not anonymous use. |
+| Device is offline at launch with no persisted session | Show `/sign-in`; sign-in may fail until network/auth is available. | Cached local app data alone is not authentication. |
+| A future guest/offline mode is explicitly added | It must be a distinct product mode with clear UI, disabled sync/profile/server features, and separate tests. | Guest/local-only use must be deliberate, not a fallback from broken auth. |
+
+### Implementation ownership
+
+- `apps/mobile/src/auth/supabase.ts` owns mobile Supabase client config and persisted-session options.
+- `apps/mobile/src/auth/service.ts` owns bootstrapping/restoring the Supabase Auth session and publishing the shared auth snapshot.
+- `apps/mobile/src/sync/use-auth-required-redirect.ts` owns the pure "should route to sign-in?" selector shared by the route guard and sync gate.
+- `apps/mobile/components/navigation/auth-route-guard.tsx` owns the top-level redirect/loading decision before app screens render.
+- `apps/mobile/app/sign-in.tsx` owns credential entry, inline auth errors, and the missing-auth-config disabled state.
+
 ## Local development / test expectations
 
 - Use local Supabase runtime for auth/RLS/API verification when backend authz behavior changes.
