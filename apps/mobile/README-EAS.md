@@ -53,6 +53,32 @@ Build the prod iOS app:
 eas build --platform ios --profile prod
 ```
 
+Build the same prod profile locally when you need the App Store IPA produced on
+this Mac instead of by an EAS remote worker:
+
+```bash
+mkdir -p ../../artifacts/builds
+
+eas build \
+  --platform ios \
+  --profile prod \
+  --local \
+  --non-interactive \
+  --output ../../artifacts/builds/boga3-prod.ipa
+```
+
+The local build still contacts EAS for project metadata, signing credentials,
+and production environment values. It just runs the native build on this Mac.
+
+Submit the local prod IPA to App Store Connect:
+
+```bash
+eas submit \
+  --platform ios \
+  --profile prod \
+  --path ../../artifacts/builds/boga3-prod.ipa
+```
+
 Submit the latest prod iOS build:
 
 ```bash
