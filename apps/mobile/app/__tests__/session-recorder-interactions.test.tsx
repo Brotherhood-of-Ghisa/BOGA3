@@ -9,6 +9,16 @@ const mockLogEvent = jest.fn();
 const mockFocusCallbacks = new Set<() => void | (() => void)>();
 let mockSearchParams: Record<string, string | undefined> = {};
 
+const swipeLeft = (target: ReturnType<typeof screen.getByTestId>) => {
+  fireEvent(target, 'touchStart', { nativeEvent: { pageX: 220 } });
+  fireEvent(target, 'touchEnd', { nativeEvent: { pageX: 120 } });
+};
+
+const swipeRight = (target: ReturnType<typeof screen.getByTestId>) => {
+  fireEvent(target, 'touchStart', { nativeEvent: { pageX: 120 } });
+  fireEvent(target, 'touchEnd', { nativeEvent: { pageX: 220 } });
+};
+
 jest.mock('@/src/logging', () => ({
   logEvent: (...args: unknown[]) => mockLogEvent(...args),
 }));
@@ -242,7 +252,7 @@ jest.mock('@/src/data', () => {
   });
   const loadRecentExerciseBlocks = jest.fn().mockImplementation(async ({ exerciseDefinitionId }: { exerciseDefinitionId: string }) => ({
     exerciseDefinitionId,
-    limit: 5,
+    limit: null,
     blocks: [],
   }));
 
@@ -428,7 +438,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     mockLoadRecentExerciseBlocks.mockReset();
     mockLoadRecentExerciseBlocks.mockImplementation(async ({ exerciseDefinitionId }: { exerciseDefinitionId: string }) => ({
       exerciseDefinitionId,
-      limit: 5,
+      limit: null,
       blocks: [],
     }));
     mockLoadSessionSnapshotById.mockReset();
@@ -480,10 +490,10 @@ describe('SessionRecorderScreen exercise interactions', () => {
     await act(async () => {});
   });
 
-  it('shows collapsible previous/current block comparison and navigates older/newer in place', async () => {
+  it('shows collapsible Past Records with date/current/max columns and swipe navigation', async () => {
     mockLoadRecentExerciseBlocks.mockResolvedValueOnce({
       exerciseDefinitionId: 'seed_barbell_back_squat',
-      limit: 5,
+      limit: null,
       blocks: [
         {
           sessionId: 'session-new',
@@ -515,54 +525,62 @@ describe('SessionRecorderScreen exercise interactions', () => {
     fireEvent.press(await screen.findByLabelText('Select exercise Barbell Squat'));
 
     const collapsedPanel = await screen.findByTestId('exercise-block-history-panel-1-collapsed');
-    expect(collapsedPanel).toHaveTextContent('Past blocks');
+    expect(collapsedPanel).toHaveTextContent('Past Records');
     expect(screen.queryByText('Previous')).toBeNull();
     expect(screen.queryByText('Current')).toBeNull();
 
     fireEvent.press(collapsedPanel);
     await screen.findByTestId('exercise-block-history-panel-1');
-    expect(screen.getByText('Past blocks')).toBeTruthy();
-    expect(screen.getByText('Previous')).toBeTruthy();
+    expect(screen.getByText('Past Records')).toBeTruthy();
+    expect(screen.queryByText('Previous')).toBeNull();
+    expect(screen.getByText('2026-05-24')).toBeTruthy();
     expect(screen.getByText('Current')).toBeTruthy();
-    expect(screen.getByText('2d ago')).toBeTruthy();
-    expect(screen.getByTestId('exercise-block-history-panel-1-est-1rm-previous')).toHaveTextContent('250.5');
-    expect(screen.getByTestId('exercise-block-history-panel-1-volume-previous')).toHaveTextContent('1500');
-    expect(screen.getByTestId('exercise-block-history-panel-1-highest-previous')).toHaveTextContent('205');
+    expect(screen.getByText('Max')).toBeTruthy();
+    expect(screen.getByText(/2d ago/)).toBeTruthy();
+    expect(screen.getByTestId('exercise-block-history-panel-1-est-1rm-date')).toHaveTextContent('250.5');
+    expect(screen.getByTestId('exercise-block-history-panel-1-volume-date')).toHaveTextContent('1500');
+    expect(screen.getByTestId('exercise-block-history-panel-1-highest-date')).toHaveTextContent('205');
     expect(screen.getByText('Near failure')).toBeTruthy();
-    expect(screen.getByTestId('exercise-block-history-panel-1-rir-count-previous')).toHaveTextContent('3');
+    expect(screen.getByTestId('exercise-block-history-panel-1-rir-count-date')).toHaveTextContent('3');
     expect(screen.getByTestId('exercise-block-history-panel-1-est-1rm-current')).toHaveTextContent('-');
     expect(screen.getByTestId('exercise-block-history-panel-1-volume-current')).toHaveTextContent('-');
     expect(screen.getByTestId('exercise-block-history-panel-1-highest-current')).toHaveTextContent('-');
     expect(screen.getByTestId('exercise-block-history-panel-1-rir-count-current')).toHaveTextContent('0');
-    expect(screen.getByTestId('exercise-block-history-panel-1-newer').props.accessibilityRole).toBe('button');
-    expect(screen.getByTestId('exercise-block-history-panel-1-older').props.accessibilityRole).toBe('button');
-    expect(screen.getByTestId('exercise-block-history-panel-1-newer').props.accessibilityState.disabled).toBe(true);
-    expect(screen.getByTestId('exercise-block-history-panel-1-older').props.accessibilityState.disabled).toBe(false);
+    expect(screen.getByTestId('exercise-block-history-panel-1-est-1rm-max')).toHaveTextContent('250.5');
+    expect(screen.getByTestId('exercise-block-history-panel-1-volume-max')).toHaveTextContent('1500');
+    expect(screen.getByTestId('exercise-block-history-panel-1-highest-max')).toHaveTextContent('205');
+    expect(screen.getByTestId('exercise-block-history-panel-1-rir-count-max')).toHaveTextContent('3');
+    expect(screen.queryByTestId('exercise-block-history-panel-1-newer')).toBeNull();
+    expect(screen.queryByTestId('exercise-block-history-panel-1-older')).toBeNull();
     expect(screen.getByTestId('exercise-block-history-panel-1-toggle').props.accessibilityState.expanded).toBe(true);
+    expect(StyleSheet.flatten(screen.getByTestId('exercise-block-history-panel-1-highest-date').props.style).color).toBe(
+      uiColors.heatmapBucket4
+    );
 
     fireEvent.press(screen.getByTestId('exercise-block-history-panel-1-toggle'));
     expect(screen.getByTestId('exercise-block-history-panel-1-collapsed')).toHaveTextContent(
-      'Past blocks'
+      'Past Records'
     );
     expect(screen.queryByTestId('exercise-block-history-panel-1-est-1rm-current')).toBeNull();
     fireEvent.press(screen.getByTestId('exercise-block-history-panel-1-collapsed'));
     expect(screen.getByTestId('exercise-block-history-panel-1-est-1rm-current')).toHaveTextContent('-');
     expect(mockLoadRecentExerciseBlocks).toHaveBeenCalledTimes(1);
+    const reopenedPanel = screen.getByTestId('exercise-block-history-panel-1');
 
-    fireEvent.press(screen.getByTestId('exercise-block-history-panel-1-older'));
-    expect(screen.getByText('9d ago')).toBeTruthy();
-    expect(screen.getByTestId('exercise-block-history-panel-1-est-1rm-previous')).toHaveTextContent('235');
-    expect(screen.getByTestId('exercise-block-history-panel-1-newer').props.accessibilityState.disabled).toBe(false);
-    expect(screen.getByTestId('exercise-block-history-panel-1-older').props.accessibilityState.disabled).toBe(true);
+    swipeLeft(reopenedPanel);
+    expect(screen.getByText(/9d ago/)).toBeTruthy();
+    expect(screen.getByText('2026-05-17')).toBeTruthy();
+    expect(screen.getByTestId('exercise-block-history-panel-1-est-1rm-date')).toHaveTextContent('235');
 
-    fireEvent.press(screen.getByTestId('exercise-block-history-panel-1-newer'));
-    expect(screen.getByText('2d ago')).toBeTruthy();
+    swipeRight(reopenedPanel);
+    expect(screen.getByText(/2d ago/)).toBeTruthy();
+    expect(screen.getByText('2026-05-24')).toBeTruthy();
   });
 
   it('updates current comparison metrics live from unsaved working sets', async () => {
     mockLoadRecentExerciseBlocks.mockResolvedValueOnce({
       exerciseDefinitionId: 'seed_barbell_back_squat',
-      limit: 5,
+      limit: null,
       blocks: [
         {
           sessionId: 'session-new',
@@ -594,20 +612,59 @@ describe('SessionRecorderScreen exercise interactions', () => {
     fireEvent.press(screen.getByLabelText('Add set to exercise 1'));
     const secondSetTypeButton = screen.getByTestId('set-quality-button-1-2');
     fireEvent.press(secondSetTypeButton);
-    fireEvent.changeText(screen.getByLabelText('Weight for exercise 1 set 2'), '200');
-    fireEvent.changeText(screen.getByLabelText('Reps for exercise 1 set 2'), '5');
+    fireEvent.changeText(screen.getByLabelText('Weight for exercise 1 set 2'), '260');
+    fireEvent.changeText(screen.getByLabelText('Reps for exercise 1 set 2'), '6');
 
-    expect(screen.getByTestId('exercise-block-history-panel-1-volume-current')).toHaveTextContent('1000');
-    expect(screen.getByTestId('exercise-block-history-panel-1-highest-current')).toHaveTextContent('200');
+    expect(screen.getByTestId('exercise-block-history-panel-1-volume-current')).toHaveTextContent('1560');
+    expect(screen.getByTestId('exercise-block-history-panel-1-highest-current')).toHaveTextContent('260');
     expect(screen.getByTestId('exercise-block-history-panel-1-est-1rm-current')).not.toHaveTextContent('-');
     expect(screen.getByTestId('exercise-block-history-panel-1-rir-count-current')).toHaveTextContent('1');
-    expect(screen.getByTestId('exercise-block-history-panel-1-est-1rm-previous')).toHaveTextContent('250.5');
+    expect(screen.getByTestId('exercise-block-history-panel-1-est-1rm-date')).toHaveTextContent('250.5');
+    expect(StyleSheet.flatten(screen.getByTestId('exercise-block-history-panel-1-highest-current').props.style).color).toBe(
+      uiColors.heatmapBucket4
+    );
+  });
+
+  it('uses the first Past Records tap to collapse an active editable set row without opening history', async () => {
+    mockLoadRecentExerciseBlocks.mockResolvedValueOnce({
+      exerciseDefinitionId: 'seed_barbell_back_squat',
+      limit: null,
+      blocks: [
+        {
+          sessionId: 'session-new',
+          completedAt: new Date('2026-05-24T10:00:00.000Z'),
+          daysAgo: 2,
+          sessionExerciseIds: ['se-new'],
+          estimatedOneRepMax: 250.5,
+          totalVolume: 1500,
+          highestWeight: 205,
+          rirAtMostTwoSetCount: 3,
+        },
+      ],
+    });
+
+    render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
+
+    fireEvent.press(screen.getByText('Log new exercise'));
+    fireEvent.press(await screen.findByLabelText('Select exercise Barbell Squat'));
+    fireEvent.changeText(screen.getByLabelText('Weight for exercise 1 set 1'), '120');
+    fireEvent.changeText(screen.getByLabelText('Reps for exercise 1 set 1'), '5');
+
+    fireEvent.press(await screen.findByTestId('exercise-block-history-panel-1-collapsed'));
+
+    expect(screen.queryByLabelText('Weight for exercise 1 set 1')).toBeNull();
+    expect(screen.getByTestId('exercise-block-history-panel-1-collapsed')).toHaveTextContent('Past Records');
+    expect(screen.queryByTestId('exercise-block-history-panel-1-est-1rm-current')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('exercise-block-history-panel-1-collapsed'));
+    expect(await screen.findByTestId('exercise-block-history-panel-1')).toHaveTextContent(/2026-05-24/);
   });
 
   it('keeps set entry usable when exercise block history is empty or unavailable', async () => {
     mockLoadRecentExerciseBlocks.mockResolvedValueOnce({
       exerciseDefinitionId: 'seed_barbell_back_squat',
-      limit: 5,
+      limit: null,
       blocks: [],
     });
 
@@ -618,14 +675,14 @@ describe('SessionRecorderScreen exercise interactions', () => {
     fireEvent.press(await screen.findByLabelText('Select exercise Barbell Squat'));
 
     expect(await screen.findByTestId('exercise-block-history-panel-1-empty-collapsed')).toHaveTextContent(
-      'Past blocks'
+      'Past Records'
     );
-    expect(screen.queryByText('No previous blocks')).toBeNull();
+    expect(screen.queryByText('No past records')).toBeNull();
     fireEvent.press(screen.getByTestId('exercise-block-history-panel-1-empty-collapsed'));
     expect(await screen.findByTestId('exercise-block-history-panel-1-empty')).toHaveTextContent(
-      /No previous blocks/
+      /No past records/
     );
-    expect(screen.getAllByText('No previous blocks')).toHaveLength(1);
+    expect(screen.getAllByText('No past records')).toHaveLength(1);
     fireEvent.changeText(screen.getByLabelText('Weight for exercise 1 set 1'), '135');
     fireEvent.changeText(screen.getByLabelText('Reps for exercise 1 set 1'), '8');
     expect(screen.getByDisplayValue('135')).toBeTruthy();
@@ -636,12 +693,16 @@ describe('SessionRecorderScreen exercise interactions', () => {
     fireEvent.press(await screen.findByLabelText('Select exercise Bench Press'));
 
     expect(await screen.findByTestId('exercise-block-history-panel-2-error-collapsed')).toHaveTextContent(
-      'Past blocks'
+      'Past Records'
     );
-    expect(screen.queryByText('Previous blocks unavailable')).toBeNull();
+    expect(screen.queryByText('Past records unavailable')).toBeNull();
+    fireEvent.press(screen.getByTestId('exercise-block-history-panel-2-error-collapsed'));
+    expect(screen.getByTestId('exercise-block-history-panel-2-error-collapsed')).toHaveTextContent(
+      'Past Records'
+    );
     fireEvent.press(screen.getByTestId('exercise-block-history-panel-2-error-collapsed'));
     expect(await screen.findByTestId('exercise-block-history-panel-2-error')).toHaveTextContent(
-      /Previous blocks unavailable/
+      /Past records unavailable/
     );
     fireEvent.press(screen.getByLabelText('Add set to exercise 2'));
     expect(screen.getByLabelText('Weight for exercise 2 set 2')).toBeTruthy();
@@ -651,7 +712,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     mockLoadRecentExerciseBlocks
       .mockResolvedValueOnce({
         exerciseDefinitionId: 'seed_barbell_back_squat',
-        limit: 5,
+        limit: null,
         blocks: [
           {
             sessionId: 'squat-history',
@@ -667,7 +728,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
       })
       .mockResolvedValueOnce({
         exerciseDefinitionId: 'seed_barbell_bench_press',
-        limit: 5,
+        limit: null,
         blocks: [
           {
             sessionId: 'bench-history',
@@ -891,7 +952,8 @@ describe('SessionRecorderScreen exercise interactions', () => {
     fireEvent.changeText(screen.getByLabelText('Reps for exercise 1 set 2'), '10');
     fireEvent.changeText(screen.getByLabelText('Weight for exercise 1 set 2'), '70');
 
-    fireEvent.press(screen.getByLabelText('Remove set 1 from exercise 1'));
+    expect(screen.queryByLabelText('Remove set 1 from exercise 1')).toBeNull();
+    swipeLeft(screen.getByTestId('set-swipe-delete-1-1'));
     expect(screen.queryByLabelText('Weight for exercise 1 set 2')).toBeNull();
     expect(screen.getByLabelText('Weight for exercise 1 set 1')).toBeTruthy();
     expect(screen.getByDisplayValue('10')).toBeTruthy();

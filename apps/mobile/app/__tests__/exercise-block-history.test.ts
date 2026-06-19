@@ -1,5 +1,4 @@
 import {
-  DEFAULT_RECENT_EXERCISE_BLOCK_LIMIT,
   aggregateExerciseBlockHistory,
   createExerciseBlockHistoryRepository,
   type ExerciseBlockHistorySessionExerciseRow,
@@ -175,6 +174,26 @@ describe('aggregateExerciseBlockHistory', () => {
     expect(summary.blocks.map((block) => block.sessionId)).toEqual(['session-a', 'session-b']);
   });
 
+  it('returns all ordered completed records by default', () => {
+    const summary = aggregateExerciseBlockHistory({
+      now: new Date('2026-05-20T12:00:00.000Z'),
+      sessions: [
+        sessionRow({ sessionId: 'oldest', completedAt: new Date('2026-05-10T12:00:00.000Z') }),
+        sessionRow({ sessionId: 'newest', completedAt: new Date('2026-05-19T12:00:00.000Z') }),
+        sessionRow({ sessionId: 'middle', completedAt: new Date('2026-05-15T12:00:00.000Z') }),
+      ],
+      sessionExercises: [
+        sessionExerciseRow({ sessionId: 'oldest', sessionExerciseId: 'se-oldest' }),
+        sessionExerciseRow({ sessionId: 'newest', sessionExerciseId: 'se-newest' }),
+        sessionExerciseRow({ sessionId: 'middle', sessionExerciseId: 'se-middle' }),
+      ],
+      setsBySessionExerciseId: {},
+    });
+
+    expect(summary.limit).toBeNull();
+    expect(summary.blocks.map((block) => block.sessionId)).toEqual(['newest', 'middle', 'oldest']);
+  });
+
   it('applies caller limits after ordering newest sessions first', () => {
     const summary = aggregateExerciseBlockHistory({
       now: new Date('2026-05-20T12:00:00.000Z'),
@@ -229,7 +248,7 @@ describe('aggregateExerciseBlockHistory', () => {
 });
 
 describe('createExerciseBlockHistoryRepository', () => {
-  it('loads the default number of recent sessions before fetching matching exercises and sets', async () => {
+  it('loads all matching sessions by default before fetching exercises and sets', async () => {
     const sessions = [
       sessionRow({ sessionId: 'recent', completedAt: new Date('2026-05-18T12:00:00.000Z') }),
       sessionRow({ sessionId: 'older', completedAt: new Date('2026-05-17T12:00:00.000Z') }),
@@ -252,7 +271,7 @@ describe('createExerciseBlockHistoryRepository', () => {
 
     expect(store.loadRecentCompletedSessionsForExercise).toHaveBeenCalledWith({
       exerciseDefinitionId: 'ex-bench',
-      limit: DEFAULT_RECENT_EXERCISE_BLOCK_LIMIT,
+      limit: undefined,
     });
     expect(store.loadSessionExercisesForSessions).toHaveBeenCalledWith({
       exerciseDefinitionId: 'ex-bench',
@@ -262,6 +281,7 @@ describe('createExerciseBlockHistoryRepository', () => {
       sessionExerciseIds: ['se-recent', 'se-older'],
     });
     expect(summary.blocks.map((block) => block.sessionId)).toEqual(['recent', 'older']);
+    expect(summary.limit).toBeNull();
   });
 
   it('returns an empty result without loading exercises or sets when no recent sessions exist', async () => {
@@ -289,6 +309,42 @@ describe('createExerciseBlockHistoryRepository', () => {
       exerciseDefinitionId: 'ex-bench',
       limit: 2,
     });
+  });
+
+  it('derives max-capable metrics from the same returned blocks dataset', async () => {
+    const sessions = [
+      sessionRow({ sessionId: 'newer', completedAt: new Date('2026-05-19T12:00:00.000Z') }),
+      sessionRow({ sessionId: 'older', completedAt: new Date('2026-05-10T12:00:00.000Z') }),
+    ];
+    const sessionExercises = [
+      sessionExerciseRow({ sessionId: 'newer', sessionExerciseId: 'se-newer' }),
+      sessionExerciseRow({ sessionId: 'older', sessionExerciseId: 'se-older' }),
+    ];
+    const store = buildStore({
+      loadRecentCompletedSessionsForExercise: jest.fn().mockResolvedValue(sessions),
+      loadSessionExercisesForSessions: jest.fn().mockResolvedValue(sessionExercises),
+      loadSetsForSessionExercises: jest.fn().mockResolvedValue([
+        setRow({ setId: 'newer-1', sessionExerciseId: 'se-newer', orderIndex: 0, weightValue: '100', repsValue: '5' }),
+        setRow({ setId: 'older-1', sessionExerciseId: 'se-older', orderIndex: 0, weightValue: '160', repsValue: '3' }),
+      ]),
+    });
+
+    const repository = createExerciseBlockHistoryRepository(store);
+    const summary = await repository.loadRecentBlocks({
+      exerciseDefinitionId: 'ex-bench',
+      now: new Date('2026-05-20T12:00:00.000Z'),
+      limit: 1,
+    });
+
+    expect(summary.blocks).toHaveLength(1);
+    expect(summary.blocks[0]).toEqual(
+      expect.objectContaining({
+        sessionId: 'newer',
+        totalVolume: 500,
+        highestWeight: 100,
+      })
+    );
+    expect(summary.blocks.some((block) => block.highestWeight === 160)).toBe(false);
   });
 
   it('rejects invalid limits before hitting the store', async () => {

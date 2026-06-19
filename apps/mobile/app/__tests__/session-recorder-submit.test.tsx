@@ -14,6 +14,11 @@ const dismissEmptyStateIfPresent = async () => {
 let mockSearchParams: Record<string, string | undefined> = {};
 const mockLogEvent = jest.fn();
 
+const swipeLeft = (target: ReturnType<typeof screen.getByTestId>) => {
+  fireEvent(target, 'touchStart', { nativeEvent: { pageX: 220 } });
+  fireEvent(target, 'touchEnd', { nativeEvent: { pageX: 120 } });
+};
+
 jest.mock('@/src/logging', () => ({
   logEvent: (...args: unknown[]) => mockLogEvent(...args),
 }));
@@ -50,7 +55,7 @@ jest.mock('@/src/data', () => ({
   listLocalGyms: jest.fn().mockResolvedValue([]),
   loadRecentExerciseBlocks: jest.fn().mockImplementation(async ({ exerciseDefinitionId }: { exerciseDefinitionId: string }) => ({
     exerciseDefinitionId,
-    limit: 5,
+    limit: null,
     blocks: [],
   })),
   loadLocalGymById: jest.fn().mockResolvedValue(null),
@@ -251,7 +256,8 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
 
     fireEvent.press(screen.getByText('Log new exercise'));
     fireEvent.press(await screen.findByLabelText('Select exercise Bench Press'));
-    fireEvent.press(screen.getByLabelText('Remove set 1 from exercise 1'));
+    expect(screen.queryByLabelText('Remove set 1 from exercise 1')).toBeNull();
+    swipeLeft(screen.getByTestId('set-swipe-delete-1-1'));
     fireEvent.press(screen.getByText('Submit Session'));
 
     expect(screen.getByText('Remove exercises with no sets and submit?')).toBeTruthy();
@@ -436,7 +442,8 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
     });
 
     fireEvent.press(screen.getByLabelText('logged set 1 for exercise 1: 225kg · 5 reps; quality none'));
-    fireEvent.press(screen.getByLabelText('Remove set 1 from exercise 1'));
+    expect(screen.queryByLabelText('Remove set 1 from exercise 1')).toBeNull();
+    swipeLeft(screen.getByTestId('set-swipe-delete-1-1'));
     fireEvent.press(screen.getByText('Save Changes'));
 
     expect(screen.getByText('Remove exercises with no sets and submit?')).toBeTruthy();

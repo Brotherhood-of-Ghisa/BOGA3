@@ -11,8 +11,6 @@ import { bootstrapLocalDataLayer } from './bootstrap';
 import { exerciseSets, sessionExercises, sessions } from './schema';
 import { normalizeSessionSetType } from './set-types';
 
-export const DEFAULT_RECENT_EXERCISE_BLOCK_LIMIT = 5;
-
 const DAY_MS = 24 * 60 * 60 * 1000;
 const RIR_AT_MOST_TWO_SET_TYPES = new Set(['rir_0', 'rir_1', 'rir_2']);
 
@@ -49,13 +47,13 @@ export type ExerciseBlockHistoryBlock = {
 
 export type ExerciseBlockHistorySummary = {
   exerciseDefinitionId: string | null;
-  limit: number;
+  limit: number | null;
   blocks: ExerciseBlockHistoryBlock[];
 };
 
 export type ExerciseBlockHistoryAggregationInput = {
   exerciseDefinitionId?: string | null;
-  limit?: number;
+  limit?: number | null;
   now: Date;
   sessions: ExerciseBlockHistorySessionRow[];
   sessionExercises: ExerciseBlockHistorySessionExerciseRow[];
@@ -65,7 +63,7 @@ export type ExerciseBlockHistoryAggregationInput = {
 export type ExerciseBlockHistoryStore = {
   loadRecentCompletedSessionsForExercise(input: {
     exerciseDefinitionId: string;
-    limit: number;
+    limit?: number;
   }): Promise<ExerciseBlockHistorySessionRow[]>;
   loadSessionExercisesForSessions(input: {
     exerciseDefinitionId: string;
@@ -90,8 +88,8 @@ const ensureValidDate = (value: Date, label: string) => {
   }
 };
 
-const normalizeLimit = (limit: number | undefined): number => {
-  if (limit === undefined) return DEFAULT_RECENT_EXERCISE_BLOCK_LIMIT;
+const normalizeLimit = (limit: number | null | undefined): number | null => {
+  if (limit === undefined || limit === null) return null;
   if (!Number.isFinite(limit) || !Number.isInteger(limit)) {
     throw new Error('limit must be an integer');
   }
@@ -163,10 +161,11 @@ export const aggregateExerciseBlockHistory = (
   ensureValidDate(input.now, 'now');
   const limit = normalizeLimit(input.limit);
   const sessionExercisesBySessionId = groupSessionExercisesBySessionId(input.sessionExercises);
-  const orderedSessions = [...input.sessions].sort(compareCompletedDesc).slice(0, limit);
+  const orderedSessions = [...input.sessions].sort(compareCompletedDesc);
+  const sessionsForSummary = limit === null ? orderedSessions : orderedSessions.slice(0, limit);
 
   const blocks: ExerciseBlockHistoryBlock[] = [];
-  for (const session of orderedSessions) {
+  for (const session of sessionsForSummary) {
     ensureValidDate(session.completedAt, 'completedAt');
     const matchingSessionExercises = [
       ...(sessionExercisesBySessionId[session.sessionId] ?? []),
@@ -221,7 +220,7 @@ export const createDrizzleExerciseBlockHistoryStore = (): ExerciseBlockHistorySt
   async loadRecentCompletedSessionsForExercise({ exerciseDefinitionId, limit }) {
     if (limit === 0) return [];
     const database = await bootstrapLocalDataLayer();
-    const rows = database
+    const baseQuery = database
       .select({
         sessionId: sessions.id,
         completedAt: sessions.completedAt,
@@ -239,9 +238,8 @@ export const createDrizzleExerciseBlockHistoryStore = (): ExerciseBlockHistorySt
         )
       )
       .groupBy(sessions.id, sessions.completedAt)
-      .orderBy(desc(sessions.completedAt), asc(sessions.id))
-      .limit(limit)
-      .all();
+      .orderBy(desc(sessions.completedAt), asc(sessions.id));
+    const rows = limit === undefined ? baseQuery.all() : baseQuery.limit(limit).all();
 
     return rows
       .filter(
@@ -325,7 +323,7 @@ export const createExerciseBlockHistoryRepository = (
 
     const recentSessions = await store.loadRecentCompletedSessionsForExercise({
       exerciseDefinitionId: options.exerciseDefinitionId,
-      limit,
+      limit: limit ?? undefined,
     });
     if (recentSessions.length === 0) {
       return aggregateExerciseBlockHistory({

@@ -26,7 +26,7 @@ jest.mock('@/src/data', () => ({
   listLocalGyms: jest.fn().mockResolvedValue([]),
   loadRecentExerciseBlocks: jest.fn().mockImplementation(async ({ exerciseDefinitionId }: { exerciseDefinitionId: string }) => ({
     exerciseDefinitionId,
-    limit: 5,
+    limit: null,
     blocks: [],
   })),
   loadLocalGymById: jest.fn().mockResolvedValue(null),

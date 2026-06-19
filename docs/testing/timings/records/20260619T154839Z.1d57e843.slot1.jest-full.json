@@ -1,0 +1,13 @@
+{
+  "lane": "jest-full",
+  "wall_ms": 452,
+  "exit_code": 1,
+  "recorded_at": "20260619T154839Z",
+  "machine_id": "1d57e843",
+  "hw": "arm64",
+  "cores": 0,
+  "os": "macOS 26.5.1",
+  "slot": "1",
+  "commit": "930a880",
+  "source": "gate"
+}
