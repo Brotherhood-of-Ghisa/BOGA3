@@ -53,12 +53,12 @@ describe('aggregateExerciseCatalogStats', () => {
     expect(result.everDoneIds.size).toBe(0);
   });
 
-  it('excludes warm-up sets from volume and 1RM', () => {
+  it('includes warm-up sets in volume and 1RM', () => {
     const result = aggregateExerciseCatalogStats(buildRawHistory(), 7, NOW);
     const bench = result.aggregatesById.get('ex-bench');
     expect(bench).toBeDefined();
-    // 100*5 + 100*4 = 900 (the 60*10 warm-up is excluded)
-    expect(bench?.totalVolume).toBe(900);
+    // 60*10 + 100*5 + 100*4 = 1500
+    expect(bench?.totalVolume).toBe(1500);
     // Best Wathan estimate of 100x5 vs 100x4 — 5 reps is higher
     expect(bench?.estimatedOneRepMax).toBeCloseTo(estimateOneRepMax(100, 5)!, 5);
   });
@@ -89,7 +89,7 @@ describe('aggregateExerciseCatalogStats', () => {
     expect(result.aggregatesById.has('ex-only-bad')).toBe(false);
   });
 
-  it('treats warm-up-only exercises as not done', () => {
+  it('counts warm-up-only exercises as done', () => {
     const result = aggregateExerciseCatalogStats(
       {
         sessions: [{ id: 's1', completedAt: daysBefore(NOW, 1) }],
@@ -101,8 +101,13 @@ describe('aggregateExerciseCatalogStats', () => {
       30,
       NOW
     );
-    expect(result.everDoneIds.has('ex-warm-only')).toBe(false);
-    expect(result.aggregatesById.size).toBe(0);
+    expect(result.everDoneIds.has('ex-warm-only')).toBe(true);
+    expect(result.aggregatesById.get('ex-warm-only')).toEqual(
+      expect.objectContaining({
+        sessionCount: 1,
+        totalVolume: 400,
+      })
+    );
   });
 
   it('ignores sessionExercises with null exerciseDefinitionId', () => {

@@ -49,11 +49,11 @@ const flattenMuscles = (totals: ReturnType<typeof aggregateStats>) =>
   totals.muscleFamilies.flatMap((family) => family.muscles);
 
 describe('aggregateStats', () => {
-  it('excludes warm-up sets from totals and counts orphan-exercise sets in total only', () => {
+  it('includes warm-up sets in totals and counts orphan-exercise sets in total only', () => {
     const totals = aggregateStats(buildAggregationInput());
 
     expect(totals.sessionCount).toBe(2);
-    expect(totals.totalSets).toBe(6);
+    expect(totals.totalSets).toBe(7);
   });
 
   it('attributes total weight to muscles using role weights (primary=1, secondary=0.5, stabilizer=0)', () => {
@@ -63,10 +63,10 @@ describe('aggregateStats', () => {
       flattenMuscles(totals).map((entry) => [entry.muscleGroupId, entry])
     );
 
-    // chest_sternal (primary): bench sets 100×5 + 110×4 + 120×3 = 1300
-    expect(byId.get('chest_sternal')?.totalWeight).toBe(1300);
-    // triceps (secondary on bench): 1300 × 0.5 = 650
-    expect(byId.get('triceps')?.totalWeight).toBe(650);
+    // chest_sternal (primary): bench sets 100×5 + 100x5 + 110×4 + 120×3 = 1800
+    expect(byId.get('chest_sternal')?.totalWeight).toBe(1800);
+    // triceps (secondary on bench): 1800 × 0.5 = 900
+    expect(byId.get('triceps')?.totalWeight).toBe(900);
     // biceps (primary on curl): 20×10 + 20×8 = 360
     expect(byId.get('biceps')?.totalWeight).toBe(360);
     // calves only stabilizer mapping → 0
@@ -93,11 +93,11 @@ describe('aggregateStats', () => {
 
     // Chest family: just chest_sternal so it inherits its totals.
     expect(familiesByName.get('Chest')?.sessionCount).toBe(2);
-    expect(familiesByName.get('Chest')?.totalWeight).toBe(1300);
+    expect(familiesByName.get('Chest')?.totalWeight).toBe(1800);
 
     // Arms family: union of biceps (session-1) + triceps (session-1, session-2) = 2.
     expect(familiesByName.get('Arms')?.sessionCount).toBe(2);
-    expect(familiesByName.get('Arms')?.totalWeight).toBe(360 + 650);
+    expect(familiesByName.get('Arms')?.totalWeight).toBe(360 + 900);
 
     // Legs untrained.
     expect(familiesByName.get('Legs')?.sessionCount).toBe(0);

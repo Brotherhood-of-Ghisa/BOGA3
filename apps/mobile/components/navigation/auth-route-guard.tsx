@@ -4,10 +4,8 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { UiText, uiColors, uiSpace } from '@/components/ui';
 import { useAuth } from '@/src/auth';
+import { SIGN_IN_ROUTE, isMaestroHarnessRoutePathname, isSignInRoutePathname } from '@/src/navigation/routes';
 import { useShouldRouteToSignIn } from '@/src/sync/use-auth-required-redirect';
-
-/** The dedicated sign-in entry point this guard sends unauthenticated users to. */
-const SIGN_IN_ROUTE = '/sign-in';
 
 /**
  * Route-layer auth gate. Wraps the whole navigator so it decides, before any
@@ -20,12 +18,15 @@ const SIGN_IN_ROUTE = '/sign-in';
  *     or a sync cycle reported "no signed-in user"), it redirects to the sign-in
  *     route. A configured-but-signed-out launch therefore never reaches a data
  *     screen.
- *   - Otherwise (signed in) it renders its children untouched. An unconfigured
- *     auth client is still routed to sign-in so the missing credential path is
- *     visible instead of silently allowing local-only app usage.
+ *   - Otherwise it renders its children untouched. An unconfigured auth client
+ *     remains a local-only tracker build; the sign-in route still shows the
+ *     disabled credential path when opened directly.
  *
  * The sign-in route itself is exempt: the guard renders it through rather than
- * redirecting to it, so the redirect cannot loop.
+ * redirecting to it, so the redirect cannot loop. The Maestro harness route is
+ * also exempt so infra-free device test lanes can run their local-data setup
+ * links before teleporting; the harness screen still self-gates to dev/test
+ * runtime contexts.
  */
 export function AuthRouteGuard({ children }: PropsWithChildren) {
   const { isConfigured, session, status } = useAuth();
@@ -47,9 +48,10 @@ export function AuthRouteGuard({ children }: PropsWithChildren) {
     );
   }
 
-  const isOnSignInRoute = pathname === SIGN_IN_ROUTE;
+  const isOnSignInRoute = isSignInRoutePathname(pathname);
+  const isOnMaestroHarnessRoute = isMaestroHarnessRoutePathname(pathname);
 
-  if (shouldRouteToSignIn && !isOnSignInRoute) {
+  if (shouldRouteToSignIn && !isOnSignInRoute && !isOnMaestroHarnessRoute) {
     return <Redirect href={SIGN_IN_ROUTE} />;
   }
 

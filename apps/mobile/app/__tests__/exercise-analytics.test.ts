@@ -36,7 +36,7 @@ describe('aggregateExerciseWeeklyEffort', () => {
     expect(week.estimatedRM1).not.toBeNull();
   });
 
-  it('excludes warm-up sets from all metrics', () => {
+  it('includes warm-up sets in all metrics except near failure', () => {
     const sessions = [
       makeSession('2026-05-18T10:00:00Z', [
         { setType: 'warm_up', weight: 60, reps: 10 },
@@ -45,7 +45,7 @@ describe('aggregateExerciseWeeklyEffort', () => {
     ];
     const result = aggregateExerciseWeeklyEffort(sessions, TZ);
     expect(result).toHaveLength(1);
-    expect(result[0].totalVolume).toBe(500);
+    expect(result[0].totalVolume).toBe(60 * 10 + 500);
     expect(result[0].nearFailureCount).toBe(1);
     expect(result[0].highestWeight).toBe(100);
   });
@@ -208,7 +208,7 @@ describe('aggregateExerciseDailyEffort', () => {
     expect(result.map((d) => d.dateKey)).toEqual(['2026-05-18', '2026-05-20']);
   });
 
-  it('rolls the four metrics per day and excludes warm-ups', () => {
+  it('rolls the four metrics per day and includes warm-ups outside near failure', () => {
     const sessions = [
       makeSession('2026-05-18T10:00:00Z', [
         { setType: 'warm_up', weight: 60, reps: 10 },
@@ -217,7 +217,7 @@ describe('aggregateExerciseDailyEffort', () => {
       ]),
     ];
     const [day] = aggregateExerciseDailyEffort(sessions, TZ);
-    expect(day.totalVolume).toBe(100 * 5 + 120 * 3);
+    expect(day.totalVolume).toBe(60 * 10 + 100 * 5 + 120 * 3);
     expect(day.nearFailureCount).toBe(1);
     expect(day.highestWeight).toBe(120);
     expect(day.estimatedRM1).not.toBeNull();

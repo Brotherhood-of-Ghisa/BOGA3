@@ -243,4 +243,15 @@ describe('SyncGate', () => {
     expect(screen.queryByTestId(redirectTestId)).toBeNull();
     expect(screen.getByTestId(childTestId)).toBeTruthy();
   });
+
+  it('renders the test-harness route through when Expo exposes the dev-client path prefix', () => {
+    mockPathname = '/--/maestro-harness';
+    renderGate();
+
+    publish({ lastCycleErrorCode: 'INTERNAL' });
+
+    expect(screen.queryByTestId(SYNC_GATE_TEST_IDS.block)).toBeNull();
+    expect(screen.queryByTestId(redirectTestId)).toBeNull();
+    expect(screen.getByTestId(childTestId)).toBeTruthy();
+  });
 });

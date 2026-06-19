@@ -43,7 +43,7 @@ This is the shortest operational summary. Use the "Further reading" section when
 ## Practical guidance for API consumers (mobile/app)
 
 - Use client-safe Supabase credentials only (`anon` key), plus the authenticated user session token.
-- Mobile auth bootstrap reads `EXPO_PUBLIC_SUPABASE_URL` + `EXPO_PUBLIC_SUPABASE_ANON_KEY`; missing config must not crash the app, but the route layer still fails closed to the sign-in screen where the disabled auth state is visible.
+- Mobile auth bootstrap reads `EXPO_PUBLIC_SUPABASE_URL` + `EXPO_PUBLIC_SUPABASE_ANON_KEY`; missing config must not crash the app, and the route layer must stand aside for local-only tracker routes. The sign-in screen still shows the disabled auth state when opened directly.
 - Persist and restore the normal `Supabase Auth` session; do not invent an app-specific long-lived token format.
 - Assume all user data access is scoped to the authenticated user by backend policy.
 - Never assume the client can override ownership (`owner_user_id`) for another user.

@@ -24,7 +24,6 @@ export type ExerciseRawSession = {
   sets: ExerciseRawSet[];
 };
 
-const WARM_UP_SET_TYPE = 'warm_up';
 const NEAR_FAILURE_SET_TYPES = new Set(['rir_0', 'rir_1', 'rir_2']);
 
 const formatLocalDateKey = (date: Date, timeZone: string | undefined): string => {
@@ -93,8 +92,6 @@ export const aggregateExerciseDailyEffort = (
     };
 
     for (const set of session.sets) {
-      if (set.setType === WARM_UP_SET_TYPE) continue;
-
       const weight = parseSetWeight(set.weightValue);
       const reps = parseSetReps(set.repsValue);
       if (weight === null || reps === null) continue;

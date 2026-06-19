@@ -4,13 +4,11 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { UiButton, UiSurface, UiText, uiColors, uiSpace } from '@/components/ui';
 import { useAuth } from '@/src/auth';
+import { SIGN_IN_ROUTE, isMaestroHarnessRoutePathname, isSignInRoutePathname } from '@/src/navigation/routes';
 import { PULL_LAYER_COUNT, type SyncPhase, type SyncProgress } from '@/src/sync/progress';
 import { requestSync } from '@/src/sync/scheduler';
 import { selectSyncGateMode } from '@/src/sync/sync-gate-decision';
 import { useSyncGateState } from '@/src/sync/use-sync-gate-state';
-
-/** The dedicated sign-in entry point an unauthenticated outcome routes to. */
-const SIGN_IN_ROUTE = '/sign-in';
 
 /**
  * The dev/test harness route is exempt from the block. It is the deterministic
@@ -19,8 +17,6 @@ const SIGN_IN_ROUTE = '/sign-in';
  * lift the block can never mount behind it. The route is dev-gated and has no
  * production reachability, so exempting it never weakens the gate for real users.
  */
-const HARNESS_ROUTE = '/maestro-harness';
-
 /** Stable testIDs for the gate's surfaces, so tests and Maestro flows can target them. */
 export const SYNC_GATE_TEST_IDS = {
   block: 'sync-gate-block',
@@ -86,7 +82,7 @@ export function SyncGate({ children }: PropsWithChildren) {
   // The dev/test harness route is exempt for the same shape of reason: it is the
   // screen that flips the first-sync state, so it must render through the block
   // to be able to lift it.
-  if (pathname === SIGN_IN_ROUTE || pathname === HARNESS_ROUTE) {
+  if (isSignInRoutePathname(pathname) || isMaestroHarnessRoutePathname(pathname)) {
     return <>{children}</>;
   }
 

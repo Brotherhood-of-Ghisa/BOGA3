@@ -113,11 +113,13 @@ jest.mock('expo-router', () => {
 });
 
 const {
+  loadLatestSessionDraftSnapshot: mockLoadLatestSessionDraftSnapshot,
   loadSessionSnapshotById: mockLoadSessionSnapshotById,
   persistCompletedSessionSnapshot: mockPersistCompletedSessionSnapshot,
   persistSessionDraftSnapshot: mockPersistSessionDraftSnapshot,
   completeSessionDraft: mockCompleteSessionDraft,
 } = jest.requireMock('@/src/data') as {
+  loadLatestSessionDraftSnapshot: jest.Mock;
   loadSessionSnapshotById: jest.Mock;
   persistCompletedSessionSnapshot: jest.Mock;
   persistSessionDraftSnapshot: jest.Mock;
@@ -156,10 +158,32 @@ const buildCompletedEditSnapshot = (overrides: Partial<any> = {}) => ({
   ...overrides,
 });
 
+const buildActiveDraftSnapshot = (overrides: Partial<any> = {}) => ({
+  sessionId: 'active-draft-1',
+  gymId: null,
+  status: 'active',
+  startedAt: new Date('2026-02-25T10:00:00.000Z'),
+  createdAt: new Date('2026-02-25T10:00:00.000Z'),
+  updatedAt: new Date('2026-02-25T10:45:00.000Z'),
+  exercises: [
+    {
+      id: 'exercise-1',
+      exerciseDefinitionId: 'seed_barbell_bench_press',
+      name: 'Bench Press',
+      machineName: 'Flat Bench',
+      sets: [{ id: 'set-1', repsValue: '5', weightValue: '225' }],
+    },
+  ],
+  ...overrides,
+});
+
 describe('SessionRecorderScreen submit cleanup flow', () => {
   beforeEach(() => {
     mockSearchParams = {};
+    mockLoadLatestSessionDraftSnapshot.mockClear();
+    mockLoadLatestSessionDraftSnapshot.mockResolvedValue(null);
     mockLoadSessionSnapshotById.mockClear();
+    mockLoadSessionSnapshotById.mockResolvedValue(null);
     mockPersistCompletedSessionSnapshot.mockClear();
     mockPersistSessionDraftSnapshot.mockClear();
     mockCompleteSessionDraft.mockClear();
@@ -197,6 +221,87 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
       expect(mockCompleteSessionDraft).toHaveBeenCalledWith('test-session');
       expect(mockReplace).toHaveBeenCalledWith('/stats-history');
     });
+  });
+
+  it('filters skipped and unperformed planned rows out of active submit persistence before completing', async () => {
+    mockLoadLatestSessionDraftSnapshot.mockResolvedValueOnce(
+      buildActiveDraftSnapshot({
+        sessionId: 'planned-draft',
+        exercises: [
+          {
+            id: 'exercise-planned',
+            exerciseDefinitionId: 'seed_barbell_bench_press',
+            name: 'Bench Press',
+            machineName: null,
+            sets: [
+              {
+                id: 'set-skipped',
+                repsValue: '',
+                weightValue: '',
+                setType: null,
+                plannedRepsValue: '5',
+                plannedWeightValue: '225',
+                plannedSetType: 'rir_2',
+                performanceStatus: 'skipped',
+              },
+              {
+                id: 'set-planned',
+                repsValue: '',
+                weightValue: '',
+                setType: null,
+                plannedRepsValue: '3',
+                plannedWeightValue: '245',
+                plannedSetType: 'rir_1',
+                performanceStatus: 'planned',
+              },
+              {
+                id: 'set-performed',
+                repsValue: '8',
+                weightValue: '185',
+                setType: 'rir_1',
+                plannedRepsValue: '8',
+                plannedWeightValue: '185',
+                plannedSetType: 'rir_2',
+                performanceStatus: null,
+              },
+            ],
+          },
+        ],
+      })
+    );
+
+    render(<SessionRecorderScreen />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Submit Session')).toBeTruthy();
+    });
+    fireEvent.press(screen.getByText('Submit Session'));
+
+    await waitFor(() => {
+      expect(mockCompleteSessionDraft).toHaveBeenCalledWith('test-session');
+    });
+
+    const persistCalls = mockPersistSessionDraftSnapshot.mock.calls;
+    const finalPayload = persistCalls[persistCalls.length - 1][0];
+    expect(finalPayload.exercises).toEqual([
+      expect.objectContaining({
+        id: 'exercise-planned',
+        sets: [
+          expect.objectContaining({
+            id: 'set-performed',
+            repsValue: '8',
+            weightValue: '185',
+            setType: 'rir_1',
+            plannedRepsValue: null,
+            plannedWeightValue: null,
+            plannedSetType: null,
+            performanceStatus: null,
+          }),
+        ],
+      }),
+    ]);
+    expect(JSON.stringify(finalPayload)).not.toContain('set-skipped');
+    expect(JSON.stringify(finalPayload)).not.toContain('set-planned');
   });
 
   it('clears the stack back to the root list on submit so the list header has no back button', async () => {
@@ -341,6 +446,144 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
     });
     expect(screen.queryByText('Remove incomplete sets and submit?')).toBeNull();
     expect(mockCompleteSessionDraft).not.toHaveBeenCalled();
+  });
+
+  it('filters skipped and unperformed planned rows out of completed-edit save persistence', async () => {
+    mockSearchParams = { mode: 'completed-edit', sessionId: 'completed-edit-1' };
+    mockLoadSessionSnapshotById.mockResolvedValue(
+      buildCompletedEditSnapshot({
+        exercises: [
+          {
+            id: 'exercise-1',
+            exerciseDefinitionId: 'seed_barbell_bench_press',
+            name: 'Bench Press',
+            machineName: 'Flat Bench',
+            sets: [
+              {
+                id: 'set-skipped',
+                repsValue: '',
+                weightValue: '',
+                setType: null,
+                plannedRepsValue: '5',
+                plannedWeightValue: '225',
+                plannedSetType: 'rir_2',
+                performanceStatus: 'skipped',
+              },
+              {
+                id: 'set-planned',
+                repsValue: '',
+                weightValue: '',
+                setType: null,
+                plannedRepsValue: '3',
+                plannedWeightValue: '245',
+                plannedSetType: 'rir_1',
+                performanceStatus: 'planned',
+              },
+              {
+                id: 'set-performed',
+                repsValue: '8',
+                weightValue: '185',
+                setType: 'rir_1',
+                plannedRepsValue: '8',
+                plannedWeightValue: '185',
+                plannedSetType: 'rir_2',
+                performanceStatus: null,
+              },
+            ],
+          },
+        ],
+      })
+    );
+
+    render(<SessionRecorderScreen />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Save Changes')).toBeTruthy();
+    });
+    fireEvent.press(screen.getByText('Save Changes'));
+
+    await waitFor(() => {
+      expect(mockPersistCompletedSessionSnapshot).toHaveBeenCalled();
+    });
+
+    const persistCalls = mockPersistCompletedSessionSnapshot.mock.calls;
+    const finalPayload = persistCalls[persistCalls.length - 1][0];
+    expect(finalPayload.exercises).toEqual([
+      expect.objectContaining({
+        id: 'exercise-1',
+        sets: [
+          expect.objectContaining({
+            id: 'set-performed',
+            repsValue: '8',
+            weightValue: '185',
+            setType: 'rir_1',
+            plannedRepsValue: null,
+            plannedWeightValue: null,
+            plannedSetType: null,
+            performanceStatus: null,
+          }),
+        ],
+      }),
+    ]);
+    expect(JSON.stringify(finalPayload)).not.toContain('set-skipped');
+    expect(JSON.stringify(finalPayload)).not.toContain('set-planned');
+  });
+
+  it('uses the empty-exercise cleanup path when completed filtering removes every planned row', async () => {
+    mockLoadLatestSessionDraftSnapshot.mockResolvedValueOnce(
+      buildActiveDraftSnapshot({
+        sessionId: 'planned-only-draft',
+        exercises: [
+          {
+            id: 'exercise-planned-only',
+            exerciseDefinitionId: 'seed_barbell_bench_press',
+            name: 'Bench Press',
+            machineName: null,
+            sets: [
+              {
+                id: 'set-skipped',
+                repsValue: '',
+                weightValue: '',
+                setType: null,
+                plannedRepsValue: '5',
+                plannedWeightValue: '225',
+                plannedSetType: 'rir_2',
+                performanceStatus: 'skipped',
+              },
+              {
+                id: 'set-planned',
+                repsValue: '',
+                weightValue: '',
+                setType: null,
+                plannedRepsValue: '3',
+                plannedWeightValue: '245',
+                plannedSetType: 'rir_1',
+                performanceStatus: 'planned',
+              },
+            ],
+          },
+        ],
+      })
+    );
+
+    render(<SessionRecorderScreen />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Submit Session')).toBeTruthy();
+    });
+    fireEvent.press(screen.getByText('Submit Session'));
+
+    expect(screen.getByText('Remove exercises with no sets and submit?')).toBeTruthy();
+    fireEvent.press(screen.getByText('Remove empty exercises and submit'));
+
+    await waitFor(() => {
+      expect(mockPersistSessionDraftSnapshot).toHaveBeenCalled();
+      expect(mockCompleteSessionDraft).toHaveBeenCalledWith('test-session');
+    });
+
+    const persistCalls = mockPersistSessionDraftSnapshot.mock.calls;
+    const finalPayload = persistCalls[persistCalls.length - 1][0];
+    expect(finalPayload.exercises).toEqual([]);
   });
 
   it('loads completed-edit mode, validates end time, and saves changes back to the list', async () => {

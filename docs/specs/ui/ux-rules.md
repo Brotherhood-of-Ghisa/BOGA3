@@ -95,6 +95,7 @@ Document app-specific UI semantics and guardrails for the current mobile app.
     - Tapping outside set inputs collapses the editable set row back to compact text; moving focus between weight and reps inside a row does not collapse the row. At most one set row is editable at a time. When one row is editable, the first tap on another compact set row only collapses the current row; the tapped row opens on a second tap.
     - `Weight` accepts decimal numeric input and must be a non-negative number.
     - `Reps` accepts integer numeric input and must be a positive integer.
+    - `W-Up` marks a set as warm-up effort for display and near-failure semantics only; warm-up sets still count toward volume, estimated 1RM, highest/top weight, heatmaps, and other strength/volume statistics.
     - Compact set rows separate the `Set N` label from the value text with layout spacing rather than an inline dot (`Set 1    60kg · 8 reps`, `Set 2    0kg · 6 reps`); weight, separator dot, and reps are laid out in fixed slots so the dot spacing is consistent across one-line and modified rows. Quality stays in the right-side quality control rather than inside the main text.
     - Adding a set to an exercise copies the previous set's `Weight`, `Reps`, and quality values while assigning the new row its own identity; when the previous row has valid performed values, it is committed/collapsed. Adding after an unlogged planned target does not silently log it; the planned row remains until the user explicitly logs or skips it.
     - Logging a new exercise focuses its first `Weight` input, and adding a set focuses the new set's `Weight` input. Copied/defaulted values remain visible in inputs when edited and are not auto-selected.
@@ -126,11 +127,14 @@ Document app-specific UI semantics and guardrails for the current mobile app.
     - all available completed, non-deleted history for the exercise is loaded by default; optional numeric limits remain a repository/test hook, not the recorder default,
     - the most recent completed-session block is shown first when expanded, and swiping left/right on the expanded panel changes the selected historical record,
     - the expanded comparison uses four table-like rows (`Est. 1RM`, `Volume`, `Highest`, `Near failure`) with columns for metric label, selected record local date (`YYYY-MM-DD`), live `Current`, and `Max`,
-    - `Max` values are computed from the same loaded records the panel can swipe through; there is no separate all-time query or hidden max scope,
+    - `Max` values are computed from the same loaded records the panel can swipe through plus valid current-session metrics; there is no separate all-time query or hidden max scope,
+    - displayed non-empty `Max` values use `uiColors.heatmapBucket4`,
     - selected historical values use `uiColors.heatmapBucket4` when they equal `Max`; live current values use the same token when they meet or beat `Max`,
-    - current metrics follow the same Phase 0A rules as history metrics: warm-up sets are excluded, invalid/blank set inputs are ignored, `1RM` uses the existing Wathan helper, highest weight comes from eligible parsed sets, and `Near failure` counts valid `rir_0`/`rir_1`/`rir_2` sets,
+    - current metrics follow the same Phase 0A rules as history metrics: valid warm-up sets count for volume, `1RM`, and highest weight; invalid/blank set inputs are ignored; `1RM` uses the existing Wathan helper; highest weight comes from eligible parsed sets; and `Near failure` counts only valid `rir_0`/`rir_1`/`rir_2` sets,
+    - left/right swipes on the whole expanded panel surface change the selected historical record, and the header copy reads `swipe for records`,
     - empty (`No past records`) and error (`Past records unavailable`) messages appear only after expansion; collapsed state remains the same slim `Past Records` bar,
-    - `Past Records` comparison state is volatile UI state only; it does not block set entry, tags, exercise actions, autosave, submit/save, or sync.
+    - `Past Records` comparison state is volatile UI state only; it does not block set entry, tags, exercise actions, autosave, submit/save, or sync,
+    - planned/skipped rows remain visible and autosavable during active recorder work, but final active-session submit and completed-edit save persist completed workout history as performed actual sets only; skipped and otherwise unperformed planned rows are removed before the completed payload is written, and exercises emptied by that filter use the existing empty-exercise cleanup flow.
 
 ### 6. Loading, empty, error, and feedback state handling
 

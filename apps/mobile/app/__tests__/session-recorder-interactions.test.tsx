@@ -537,6 +537,11 @@ describe('SessionRecorderScreen exercise interactions', () => {
     expect(screen.getByText('Current')).toBeTruthy();
     expect(screen.getByText('Max')).toBeTruthy();
     expect(screen.getByText(/2d ago/)).toBeTruthy();
+    const selectedDateHeader = screen.getByText('2026-05-24');
+    expect(selectedDateHeader.props.children).toBe('2026-05-24');
+    expect(selectedDateHeader.props.numberOfLines).toBe(1);
+    expect(screen.getByText(/swipe for records/)).toBeTruthy();
+    expect(screen.queryByText(/swipe records/)).toBeNull();
     expect(screen.getByTestId('exercise-block-history-panel-1-est-1rm-date')).toHaveTextContent('250.5');
     expect(screen.getByTestId('exercise-block-history-panel-1-volume-date')).toHaveTextContent('1500');
     expect(screen.getByTestId('exercise-block-history-panel-1-highest-date')).toHaveTextContent('205');
@@ -550,6 +555,18 @@ describe('SessionRecorderScreen exercise interactions', () => {
     expect(screen.getByTestId('exercise-block-history-panel-1-volume-max')).toHaveTextContent('1500');
     expect(screen.getByTestId('exercise-block-history-panel-1-highest-max')).toHaveTextContent('205');
     expect(screen.getByTestId('exercise-block-history-panel-1-rir-count-max')).toHaveTextContent('3');
+    expect(StyleSheet.flatten(screen.getByTestId('exercise-block-history-panel-1-est-1rm-max').props.style).color).toBe(
+      uiColors.heatmapBucket4
+    );
+    expect(StyleSheet.flatten(screen.getByTestId('exercise-block-history-panel-1-volume-max').props.style).color).toBe(
+      uiColors.heatmapBucket4
+    );
+    expect(StyleSheet.flatten(screen.getByTestId('exercise-block-history-panel-1-highest-max').props.style).color).toBe(
+      uiColors.heatmapBucket4
+    );
+    expect(StyleSheet.flatten(screen.getByTestId('exercise-block-history-panel-1-rir-count-max').props.style).color).toBe(
+      uiColors.heatmapBucket4
+    );
     expect(screen.queryByTestId('exercise-block-history-panel-1-newer')).toBeNull();
     expect(screen.queryByTestId('exercise-block-history-panel-1-older')).toBeNull();
     expect(screen.getByTestId('exercise-block-history-panel-1-toggle').props.accessibilityState.expanded).toBe(true);
@@ -577,7 +594,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     expect(screen.getByText('2026-05-24')).toBeTruthy();
   });
 
-  it('updates current comparison metrics live from unsaved working sets', async () => {
+  it('updates current comparison metrics live from unsaved sets', async () => {
     mockLoadRecentExerciseBlocks.mockResolvedValueOnce({
       exerciseDefinitionId: 'seed_barbell_back_squat',
       limit: null,
@@ -606,8 +623,9 @@ describe('SessionRecorderScreen exercise interactions', () => {
     fireEvent.press(firstSetTypeButton);
     fireEvent.changeText(screen.getByLabelText('Weight for exercise 1 set 1'), '500');
     fireEvent.changeText(screen.getByLabelText('Reps for exercise 1 set 1'), '5');
-    expect(screen.getByTestId('exercise-block-history-panel-1-volume-current')).toHaveTextContent('-');
-    expect(screen.getByTestId('exercise-block-history-panel-1-highest-current')).toHaveTextContent('-');
+    expect(screen.getByTestId('exercise-block-history-panel-1-volume-current')).toHaveTextContent('2500');
+    expect(screen.getByTestId('exercise-block-history-panel-1-highest-current')).toHaveTextContent('500');
+    expect(screen.getByTestId('exercise-block-history-panel-1-rir-count-current')).toHaveTextContent('0');
 
     fireEvent.press(screen.getByLabelText('Add set to exercise 1'));
     const secondSetTypeButton = screen.getByTestId('set-quality-button-1-2');
@@ -615,12 +633,20 @@ describe('SessionRecorderScreen exercise interactions', () => {
     fireEvent.changeText(screen.getByLabelText('Weight for exercise 1 set 2'), '260');
     fireEvent.changeText(screen.getByLabelText('Reps for exercise 1 set 2'), '6');
 
-    expect(screen.getByTestId('exercise-block-history-panel-1-volume-current')).toHaveTextContent('1560');
-    expect(screen.getByTestId('exercise-block-history-panel-1-highest-current')).toHaveTextContent('260');
+    expect(screen.getByTestId('exercise-block-history-panel-1-volume-current')).toHaveTextContent('4060');
+    expect(screen.getByTestId('exercise-block-history-panel-1-highest-current')).toHaveTextContent('500');
     expect(screen.getByTestId('exercise-block-history-panel-1-est-1rm-current')).not.toHaveTextContent('-');
     expect(screen.getByTestId('exercise-block-history-panel-1-rir-count-current')).toHaveTextContent('1');
     expect(screen.getByTestId('exercise-block-history-panel-1-est-1rm-date')).toHaveTextContent('250.5');
+    expect(screen.getByTestId('exercise-block-history-panel-1-volume-max')).toHaveTextContent('4060');
+    expect(screen.getByTestId('exercise-block-history-panel-1-highest-max')).toHaveTextContent('500');
+    expect(StyleSheet.flatten(screen.getByTestId('exercise-block-history-panel-1-highest-date').props.style).color).not.toBe(
+      uiColors.heatmapBucket4
+    );
     expect(StyleSheet.flatten(screen.getByTestId('exercise-block-history-panel-1-highest-current').props.style).color).toBe(
+      uiColors.heatmapBucket4
+    );
+    expect(StyleSheet.flatten(screen.getByTestId('exercise-block-history-panel-1-highest-max').props.style).color).toBe(
       uiColors.heatmapBucket4
     );
   });

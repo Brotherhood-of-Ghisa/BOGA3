@@ -87,7 +87,7 @@ describe('aggregateExerciseBlockHistory', () => {
     expect(recent.daysAgo).toBe(2);
   });
 
-  it('excludes warm-ups and invalid set values from metrics and <=2 RIR counts', () => {
+  it('includes warm-ups in metrics but not <=2 RIR counts', () => {
     const summary = aggregateExerciseBlockHistory({
       now: new Date('2026-05-20T12:00:00.000Z'),
       sessions: [
@@ -105,13 +105,13 @@ describe('aggregateExerciseBlockHistory', () => {
     });
 
     const block = summary.blocks[0];
-    expect(block.totalVolume).toBe(100 * 5 + 90 * 4);
-    expect(block.highestWeight).toBe(100);
+    expect(block.totalVolume).toBe(500 * 5 + 100 * 5 + 90 * 4);
+    expect(block.highestWeight).toBe(500);
     expect(block.rirAtMostTwoSetCount).toBe(1);
     expect(block.estimatedOneRepMax).not.toBeNull();
   });
 
-  it('uses the best Wathan 1RM estimate across eligible working sets', () => {
+  it('uses the best Wathan 1RM estimate across eligible sets', () => {
     const summary = aggregateExerciseBlockHistory({
       now: new Date('2026-05-20T12:00:00.000Z'),
       sessions: [
@@ -127,8 +127,8 @@ describe('aggregateExerciseBlockHistory', () => {
       ]),
     });
 
-    expect(summary.blocks[0].estimatedOneRepMax).toBeCloseTo(134.74669948168537, 8);
-    expect(summary.blocks[0].highestWeight).toBe(120);
+    expect(summary.blocks[0].estimatedOneRepMax).toBeCloseTo(269.49339896337074, 8);
+    expect(summary.blocks[0].highestWeight).toBe(200);
   });
 
   it('returns empty metrics when no eligible set parses cleanly', () => {
@@ -141,7 +141,7 @@ describe('aggregateExerciseBlockHistory', () => {
         sessionExerciseRow({ sessionId: 'session-1', sessionExerciseId: 'se-1' }),
       ],
       setsBySessionExerciseId: groupBySessionExerciseId([
-        setRow({ setId: 'warm', sessionExerciseId: 'se-1', orderIndex: 0, setType: 'warm_up' }),
+        setRow({ setId: 'warm', sessionExerciseId: 'se-1', orderIndex: 0, weightValue: '', repsValue: '', setType: 'warm_up' }),
         setRow({ setId: 'invalid', sessionExerciseId: 'se-1', orderIndex: 1, weightValue: '', repsValue: '0', setType: 'rir_0' }),
       ]),
     });

@@ -594,6 +594,23 @@ const sessionHasInvalidSetValues = (session: Session): boolean =>
     )
   );
 
+const toCompletedHistorySession = (session: Session): Session => ({
+  ...session,
+  exercises: session.exercises.map((exercise) => ({
+    ...exercise,
+    sets: exercise.sets.filter(hasPerformedActual).map((set) => ({
+      ...set,
+      plannedReps: null,
+      plannedWeight: null,
+      plannedSetType: null,
+      performanceStatus: null,
+    })),
+  })),
+});
+
+const toPersistCompletedExercises = (session: Session) =>
+  toPersistDraftExercises(toCompletedHistorySession(session));
+
 function createExercise(exerciseDefinitionId: string, name: string): SessionExercise {
   return {
     id: createExerciseId(),
@@ -692,12 +709,26 @@ const getNullableMetricMax = (values: (number | null)[]): number | null =>
   getFiniteMetricMax(values.filter((value): value is number => value !== null));
 
 const getExerciseBlockMaxMetrics = (
-  blocks: ExerciseBlockHistoryBlock[]
+  blocks: ExerciseBlockHistoryBlock[],
+  currentMetrics?: ExerciseBlockComparisonMetrics
 ): ExerciseBlockMaxMetrics => ({
-  estimatedOneRepMax: getNullableMetricMax(blocks.map((block) => block.estimatedOneRepMax)),
-  totalVolume: getFiniteMetricMax(blocks.map((block) => block.totalVolume).filter((value) => value > 0)),
-  highestWeight: getNullableMetricMax(blocks.map((block) => block.highestWeight)),
-  rirAtMostTwoSetCount: getFiniteMetricMax(blocks.map((block) => block.rirAtMostTwoSetCount)) ?? 0,
+  estimatedOneRepMax: getNullableMetricMax([
+    ...blocks.map((block) => block.estimatedOneRepMax),
+    currentMetrics?.estimatedOneRepMax ?? null,
+  ]),
+  totalVolume: getFiniteMetricMax([
+    ...blocks.map((block) => block.totalVolume).filter((value) => value > 0),
+    currentMetrics && currentMetrics.totalVolume > 0 ? currentMetrics.totalVolume : Number.NaN,
+  ]),
+  highestWeight: getNullableMetricMax([
+    ...blocks.map((block) => block.highestWeight),
+    currentMetrics?.highestWeight ?? null,
+  ]),
+  rirAtMostTwoSetCount:
+    getFiniteMetricMax([
+      ...blocks.map((block) => block.rirAtMostTwoSetCount),
+      currentMetrics?.rirAtMostTwoSetCount ?? Number.NaN,
+    ]) ?? 0,
 });
 
 const isHistoricalPrMetric = (value: number | null, maxValue: number | null): boolean =>
@@ -2178,7 +2209,7 @@ export default function SessionRecorderScreen() {
         return null;
       }
       const currentMetrics = getCurrentExerciseBlockMetrics(exercise.sets);
-      const maxMetrics = getExerciseBlockMaxMetrics(panel.blocks);
+      const maxMetrics = getExerciseBlockMaxMetrics(panel.blocks, currentMetrics);
       const historySwipeKey = `${panelTestId}:history`;
       const selectedRecordDate = formatLocalDate(activeBlock.completedAt);
       const recordPosition = `${activeIndex + 1}/${panel.blocks.length}`;
@@ -2197,20 +2228,27 @@ export default function SessionRecorderScreen() {
               moveExerciseBlockHistory(exercise.id, direction === 'left' ? 'older' : 'newer');
             })
           }>
-          {renderHeader(`${formatExerciseBlockAge(activeBlock.daysAgo)} · ${recordPosition} · swipe records`)}
+          {renderHeader(`${formatExerciseBlockAge(activeBlock.daysAgo)} · ${recordPosition} · swipe for records`)}
 
           <View style={styles.exerciseBlockHistoryComparisonTable}>
               <View style={styles.exerciseBlockHistoryComparisonRow}>
                 <Text style={styles.exerciseBlockHistoryMetricLabel} />
-                <Text style={styles.exerciseBlockHistoryColumnHeader}>{selectedRecordDate}</Text>
                 <Text
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.85}
+                  numberOfLines={1}
+                  style={styles.exerciseBlockHistoryColumnHeader}>
+                  {selectedRecordDate}
+                </Text>
+                <Text
+                  numberOfLines={1}
                   style={[
                     styles.exerciseBlockHistoryColumnHeader,
                     styles.exerciseBlockHistoryCurrentHeader,
                   ]}>
                   Current
                 </Text>
-                <Text style={styles.exerciseBlockHistoryColumnHeader}>Max</Text>
+                <Text numberOfLines={1} style={styles.exerciseBlockHistoryColumnHeader}>Max</Text>
               </View>
               <View style={styles.exerciseBlockHistoryComparisonRow}>
                 <Text style={styles.exerciseBlockHistoryMetricLabel}>Est. 1RM</Text>
@@ -2236,7 +2274,10 @@ export default function SessionRecorderScreen() {
                   {formatExerciseBlockStat(currentMetrics.estimatedOneRepMax, 1)}
                 </Text>
                 <Text
-                  style={styles.exerciseBlockHistoryMetricValue}
+                  style={[
+                    styles.exerciseBlockHistoryMetricValue,
+                    maxMetrics.estimatedOneRepMax !== null ? styles.exerciseBlockHistoryPrValue : null,
+                  ]}
                   testID={`${panelTestId}-est-1rm-max`}>
                   {formatExerciseBlockStat(maxMetrics.estimatedOneRepMax, 1)}
                 </Text>
@@ -2265,7 +2306,10 @@ export default function SessionRecorderScreen() {
                   {formatExerciseBlockVolume(currentMetrics.totalVolume)}
                 </Text>
                 <Text
-                  style={styles.exerciseBlockHistoryMetricValue}
+                  style={[
+                    styles.exerciseBlockHistoryMetricValue,
+                    maxMetrics.totalVolume !== null ? styles.exerciseBlockHistoryPrValue : null,
+                  ]}
                   testID={`${panelTestId}-volume-max`}>
                   {maxMetrics.totalVolume === null ? '-' : formatExerciseBlockVolume(maxMetrics.totalVolume)}
                 </Text>
@@ -2294,7 +2338,10 @@ export default function SessionRecorderScreen() {
                   {formatExerciseBlockStat(currentMetrics.highestWeight, 1)}
                 </Text>
                 <Text
-                  style={styles.exerciseBlockHistoryMetricValue}
+                  style={[
+                    styles.exerciseBlockHistoryMetricValue,
+                    maxMetrics.highestWeight !== null ? styles.exerciseBlockHistoryPrValue : null,
+                  ]}
                   testID={`${panelTestId}-highest-max`}>
                   {formatExerciseBlockStat(maxMetrics.highestWeight, 1)}
                 </Text>
@@ -2323,7 +2370,7 @@ export default function SessionRecorderScreen() {
                   {currentMetrics.rirAtMostTwoSetCount}
                 </Text>
                 <Text
-                  style={styles.exerciseBlockHistoryMetricValue}
+                  style={[styles.exerciseBlockHistoryMetricValue, styles.exerciseBlockHistoryPrValue]}
                   testID={`${panelTestId}-rir-count-max`}>
                   {maxMetrics.rirAtMostTwoSetCount}
                 </Text>
@@ -3024,7 +3071,7 @@ export default function SessionRecorderScreen() {
           gymId: submittedGym?.id ?? null,
           startedAt: parsedStartedAt,
           completedAt: parsedCompletedAt,
-          exercises: toPersistDraftExercises(submittedSession),
+          exercises: toPersistCompletedExercises(submittedSession),
         });
 
         hasSessionMutationRef.current = false;
@@ -3039,7 +3086,7 @@ export default function SessionRecorderScreen() {
         gymId: submittedGym?.id ?? null,
         startedAt: parsedStartedAt,
         status: 'active',
-        exercises: toPersistDraftExercises(submittedSession),
+        exercises: toPersistCompletedExercises(submittedSession),
       });
 
       await completeSessionDraft(persisted.sessionId);
@@ -3063,7 +3110,8 @@ export default function SessionRecorderScreen() {
       return;
     }
 
-    const { session: withoutEmptyExercises, removedExercises } = removeExercisesWithNoSets(sessionCandidate);
+    const completedHistorySession = toCompletedHistorySession(withoutIncompleteSets);
+    const { session: withoutEmptyExercises, removedExercises } = removeExercisesWithNoSets(completedHistorySession);
     if (removedExercises > 0) {
       setSubmitCleanupPrompt({
         step: 'empty-exercises',
@@ -3074,7 +3122,7 @@ export default function SessionRecorderScreen() {
     }
 
     setSubmitCleanupPrompt(null);
-    finalizeSubmit(sessionCandidate);
+    finalizeSubmit(completedHistorySession);
   };
 
   const handleSubmit = () => {
@@ -4874,7 +4922,7 @@ const styles = StyleSheet.create({
   },
   exerciseBlockHistoryColumnHeader: {
     flex: 1,
-    minWidth: 64,
+    minWidth: 70,
     textAlign: 'right',
     fontSize: 11,
     lineHeight: 13,

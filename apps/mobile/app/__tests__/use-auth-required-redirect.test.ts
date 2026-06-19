@@ -17,11 +17,11 @@ describe('selectShouldRouteToSignIn', () => {
     expect(selectShouldRouteToSignIn({ isConfigured: true, session: fakeSession }, true)).toBe(true);
   });
 
-  it('routes to sign-in when auth is unconfigured with no session so the build fails closed', () => {
-    expect(selectShouldRouteToSignIn({ isConfigured: false, session: null }, false)).toBe(true);
+  it('does not route to sign-in when auth is unconfigured with no session', () => {
+    expect(selectShouldRouteToSignIn({ isConfigured: false, session: null }, false)).toBe(false);
   });
 
-  it('routes to sign-in when auth is unconfigured and the signal is raised', () => {
-    expect(selectShouldRouteToSignIn({ isConfigured: false, session: null }, true)).toBe(true);
+  it('does not route to sign-in when auth is unconfigured even if the signal is raised', () => {
+    expect(selectShouldRouteToSignIn({ isConfigured: false, session: null }, true)).toBe(false);
   });
 });
