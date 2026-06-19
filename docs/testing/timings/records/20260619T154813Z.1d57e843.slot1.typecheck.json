@@ -1,0 +1,13 @@
+{
+  "lane": "typecheck",
+  "wall_ms": 2912,
+  "exit_code": 2,
+  "recorded_at": "20260619T154813Z",
+  "machine_id": "1d57e843",
+  "hw": "arm64",
+  "cores": 0,
+  "os": "macOS 26.5.1",
+  "slot": "1",
+  "commit": "930a880",
+  "source": "gate"
+}

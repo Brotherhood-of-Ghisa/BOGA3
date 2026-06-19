@@ -20,7 +20,7 @@ export type ParsedCalculationSet = {
 };
 
 export type CalculationOptions = {
-  /** When true, warm-up sets are included. Defaults to false. */
+  /** When false, warm-up sets are excluded. Defaults to true. */
   includeWarmUps?: boolean;
 };
 
@@ -79,7 +79,7 @@ const collectParsedSets = (
   sets: CalculationSetInput[],
   options: CalculationOptions | undefined
 ): ParsedCalculationSet[] => {
-  const includeWarmUps = options?.includeWarmUps ?? false;
+  const includeWarmUps = options?.includeWarmUps ?? true;
   const parsed: ParsedCalculationSet[] = [];
   for (const raw of sets) {
     if (!includeWarmUps && (raw.setType ?? null) === WARM_UP_SET_TYPE) continue;

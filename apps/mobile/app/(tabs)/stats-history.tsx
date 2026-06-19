@@ -211,7 +211,11 @@ export function StatsScreenShell({
           onPress={() => onSelectViewMode(viewMode === 'muscle' ? 'exercise' : 'muscle')}
           style={styles.viewModeChip}
           testID="stats-view-mode-chip">
-          <Text style={styles.viewModeChipText}>
+          <Text
+            adjustsFontSizeToFit
+            minimumFontScale={0.78}
+            numberOfLines={1}
+            style={styles.viewModeChipText}>
             {viewMode === 'muscle' ? 'By Exercise' : 'By Muscle'}
           </Text>
         </Pressable>
@@ -1287,12 +1291,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   viewModeChip: {
+    width: 104,
     borderRadius: 999,
     borderWidth: 1,
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfaceDefault,
     paddingHorizontal: 14,
     paddingVertical: 8,
+    alignItems: 'center',
   },
   viewModeChipText: {
     fontSize: 13,

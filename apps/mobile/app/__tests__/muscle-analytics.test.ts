@@ -128,7 +128,7 @@ describe('aggregateSelectedMuscleDailyEffort', () => {
     ]);
   });
 
-  it('excludes warm-ups, preserves invalid-set zero volume, and aggregates multiple sessions on one local day', () => {
+  it('preserves invalid-set zero volume and aggregates multiple sessions on one local day', () => {
     const entries = aggregateSelectedMuscleDailyEffort(buildAnalyticsInput(), {
       muscleGroupIds: ['chest_sternal'],
       timeZone: 'Europe/London',
@@ -194,7 +194,7 @@ describe('aggregateSelectedMuscleDailyEffort', () => {
     const sunday = entries.find((entry) => entry.dateKey === '2026-03-29');
     const monday = entries.find((entry) => entry.dateKey === '2026-03-30');
 
-    expect(sunday?.totalWeight).toBe(250);
+    expect(sunday?.totalWeight).toBe(750);
     expect(monday?.totalWeight).toBe(300);
     expect(monday?.contributions[0]).toMatchObject({
       muscleGroupId: 'triceps',

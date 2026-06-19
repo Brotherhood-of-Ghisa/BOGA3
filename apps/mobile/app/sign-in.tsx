@@ -23,8 +23,8 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  *
  * When auth is unconfigured there is no working credential path, so the screen
  * shows the disabled-reason message instead of a form that cannot succeed. The
- * route guard intentionally sends users here even in that misconfigured state so
- * the app fails closed instead of allowing data routes without login.
+ * route guard stands aside in that local-only state; this screen still documents
+ * the missing credential path when opened directly.
  */
 export default function SignInScreen() {
   const { clearAuthError, disabledReason, isConfigured, lastError, session, signInWithPassword, status } = useAuth();

@@ -95,18 +95,38 @@ describe('AuthRouteGuard', () => {
     expect(screen.queryByTestId(childTestId)).toBeNull();
   });
 
-  it('redirects to sign-in when auth is unconfigured and there is no session', () => {
+  it('renders children when auth is unconfigured and there is no session', () => {
     mockUseAuth.mockReturnValue(createAuthValue({ isConfigured: false, session: null }));
 
     renderGuard();
 
-    expect(screen.getByTestId(redirectTestId).props.children).toBe('/sign-in');
-    expect(screen.queryByTestId(childTestId)).toBeNull();
+    expect(screen.queryByTestId(redirectTestId)).toBeNull();
+    expect(screen.getByTestId(childTestId)).toBeTruthy();
   });
 
   it('does not redirect when already on the sign-in route (no redirect loop)', () => {
     mockPathname = '/sign-in';
     mockUseAuth.mockReturnValue(createAuthValue({ isConfigured: true, session: null }));
+
+    renderGuard();
+
+    expect(screen.queryByTestId(redirectTestId)).toBeNull();
+    expect(screen.getByTestId(childTestId)).toBeTruthy();
+  });
+
+  it('does not redirect the Maestro harness route before its dev/test self-gate can run', () => {
+    mockPathname = '/maestro-harness';
+    mockUseAuth.mockReturnValue(createAuthValue({ isConfigured: false, session: null }));
+
+    renderGuard();
+
+    expect(screen.queryByTestId(redirectTestId)).toBeNull();
+    expect(screen.getByTestId(childTestId)).toBeTruthy();
+  });
+
+  it('does not redirect the Maestro harness route when Expo exposes the dev-client path prefix', () => {
+    mockPathname = '/--/maestro-harness';
+    mockUseAuth.mockReturnValue(createAuthValue({ isConfigured: false, session: null }));
 
     renderGuard();
 

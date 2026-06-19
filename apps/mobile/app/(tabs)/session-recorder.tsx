@@ -11,6 +11,7 @@ import {
   Text,
   TextInput,
   View,
+  type GestureResponderEvent,
 } from 'react-native';
 
 import { ExerciseEditorModal } from '@/components/exercise-catalog/exercise-editor-modal';
@@ -593,6 +594,23 @@ const sessionHasInvalidSetValues = (session: Session): boolean =>
     )
   );
 
+const toCompletedHistorySession = (session: Session): Session => ({
+  ...session,
+  exercises: session.exercises.map((exercise) => ({
+    ...exercise,
+    sets: exercise.sets.filter(hasPerformedActual).map((set) => ({
+      ...set,
+      plannedReps: null,
+      plannedWeight: null,
+      plannedSetType: null,
+      performanceStatus: null,
+    })),
+  })),
+});
+
+const toPersistCompletedExercises = (session: Session) =>
+  toPersistDraftExercises(toCompletedHistorySession(session));
+
 function createExercise(exerciseDefinitionId: string, name: string): SessionExercise {
   return {
     id: createExerciseId(),
@@ -647,10 +665,18 @@ type ExerciseBlockComparisonMetrics = {
   highestWeight: number | null;
   rirAtMostTwoSetCount: number;
 };
+type ExerciseBlockMaxMetrics = {
+  estimatedOneRepMax: number | null;
+  totalVolume: number | null;
+  highestWeight: number | null;
+  rirAtMostTwoSetCount: number;
+};
+type HorizontalSwipeDirection = 'left' | 'right';
 
 const NEW_GYM_COORDINATE_FEEDBACK_ID = '__new_gym__';
 const RIR_AT_MOST_TWO_SET_TYPES = new Set<SessionSetType>(['rir_0', 'rir_1', 'rir_2']);
-const PAST_BLOCKS_LABEL = 'Past blocks';
+const PAST_RECORDS_LABEL = 'Past Records';
+const SWIPE_ACTION_THRESHOLD_X = 48;
 
 const formatExerciseBlockNumeric = (value: number, fractionDigits = 0): string => {
   if (!Number.isFinite(value)) return '-';
@@ -666,6 +692,55 @@ const formatExerciseBlockVolume = (value: number): string =>
 
 const formatExerciseBlockAge = (daysAgo: number): string =>
   `${Math.max(0, daysAgo)}d ago`;
+
+const formatLocalDate = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, '0');
+  const day = `${date.getDate()}`.padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const getFiniteMetricMax = (values: number[]): number | null => {
+  const finiteValues = values.filter((value) => Number.isFinite(value));
+  return finiteValues.length > 0 ? Math.max(...finiteValues) : null;
+};
+
+const getNullableMetricMax = (values: (number | null)[]): number | null =>
+  getFiniteMetricMax(values.filter((value): value is number => value !== null));
+
+const getExerciseBlockMaxMetrics = (
+  blocks: ExerciseBlockHistoryBlock[],
+  currentMetrics?: ExerciseBlockComparisonMetrics
+): ExerciseBlockMaxMetrics => ({
+  estimatedOneRepMax: getNullableMetricMax([
+    ...blocks.map((block) => block.estimatedOneRepMax),
+    currentMetrics?.estimatedOneRepMax ?? null,
+  ]),
+  totalVolume: getFiniteMetricMax([
+    ...blocks.map((block) => block.totalVolume).filter((value) => value > 0),
+    currentMetrics && currentMetrics.totalVolume > 0 ? currentMetrics.totalVolume : Number.NaN,
+  ]),
+  highestWeight: getNullableMetricMax([
+    ...blocks.map((block) => block.highestWeight),
+    currentMetrics?.highestWeight ?? null,
+  ]),
+  rirAtMostTwoSetCount:
+    getFiniteMetricMax([
+      ...blocks.map((block) => block.rirAtMostTwoSetCount),
+      currentMetrics?.rirAtMostTwoSetCount ?? Number.NaN,
+    ]) ?? 0,
+});
+
+const isHistoricalPrMetric = (value: number | null, maxValue: number | null): boolean =>
+  value !== null && maxValue !== null && value === maxValue;
+
+const isCurrentPrMetric = (value: number | null, maxValue: number | null): boolean =>
+  value !== null && maxValue !== null && value >= maxValue;
+
+const getGesturePageX = (event: GestureResponderEvent): number | null => {
+  const pageX = event.nativeEvent.pageX;
+  return typeof pageX === 'number' && Number.isFinite(pageX) ? pageX : null;
+};
 
 const getCurrentExerciseBlockMetrics = (
   sets: SessionSet[]
@@ -911,6 +986,7 @@ export default function SessionRecorderScreen() {
   const suppressSetTypeCyclePressRef = useRef(false);
   const exerciseBlockHistoryRequestKeyRef = useRef<Record<string, string>>({});
   const focusedSetInputIdRef = useRef<string | null>(null);
+  const horizontalSwipeStartXByKeyRef = useRef<Record<string, number>>({});
   const isMountedRef = useRef(true);
 
   stateRef.current = state;
@@ -1952,6 +2028,37 @@ export default function SessionRecorderScreen() {
     }
   };
 
+  const rememberHorizontalSwipeStart = useCallback((key: string, event: GestureResponderEvent) => {
+    const pageX = getGesturePageX(event);
+    if (pageX === null) {
+      delete horizontalSwipeStartXByKeyRef.current[key];
+      return;
+    }
+    horizontalSwipeStartXByKeyRef.current[key] = pageX;
+  }, []);
+
+  const consumeHorizontalSwipeEnd = useCallback(
+    (
+      key: string,
+      event: GestureResponderEvent,
+      onSwipe: (direction: HorizontalSwipeDirection) => void
+    ) => {
+      const startX = horizontalSwipeStartXByKeyRef.current[key];
+      delete horizontalSwipeStartXByKeyRef.current[key];
+      const endX = getGesturePageX(event);
+      if (typeof startX !== 'number' || endX === null) {
+        return;
+      }
+
+      const deltaX = endX - startX;
+      if (Math.abs(deltaX) < SWIPE_ACTION_THRESHOLD_X) {
+        return;
+      }
+      onSwipe(deltaX < 0 ? 'left' : 'right');
+    },
+    []
+  );
+
   const moveExerciseBlockHistory = useCallback((exerciseId: string, direction: 'older' | 'newer') => {
     setExerciseBlockHistoryByExerciseId((current) => {
       const panel = current[exerciseId];
@@ -1978,6 +2085,31 @@ export default function SessionRecorderScreen() {
   }, []);
 
   const toggleExerciseBlockHistoryCollapsed = useCallback((exerciseId: string) => {
+    const collapsibleExpandedSetIds = new Set(
+      stateRef.current.session.exercises.flatMap((exercise) =>
+        exercise.sets
+          .filter((set) => {
+            if (!expandedSetIds.has(set.id)) {
+              return false;
+            }
+            const rowState = getSetRowState(set);
+            return hasPerformedActual(set) || rowState === 'planned' || rowState === 'skipped';
+          })
+          .map((set) => set.id)
+      )
+    );
+
+    if (collapsibleExpandedSetIds.size > 0) {
+      setExpandedSetIds((current) => {
+        const next = new Set(current);
+        collapsibleExpandedSetIds.forEach((setId) => {
+          next.delete(setId);
+        });
+        return next;
+      });
+      return;
+    }
+
     setExerciseBlockHistoryByExerciseId((current) => {
       const panel = current[exerciseId];
       if (!panel) {
@@ -1992,7 +2124,7 @@ export default function SessionRecorderScreen() {
         },
       };
     });
-  }, []);
+  }, [expandedSetIds]);
 
   const renderExerciseBlockHistoryPanel = useCallback(
     (exercise: SessionExercise, exerciseIndex: number) => {
@@ -2003,80 +2135,29 @@ export default function SessionRecorderScreen() {
       const renderCollapsedPanel = (testID = `${panelTestId}-collapsed`) => (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`Show ${PAST_BLOCKS_LABEL} for exercise ${exerciseIndex + 1}`}
+          accessibilityLabel={`Show ${PAST_RECORDS_LABEL} for exercise ${exerciseIndex + 1}`}
           accessibilityState={{ expanded: false }}
           style={[styles.exerciseBlockHistoryPanel, styles.exerciseBlockHistoryPanelCollapsed]}
           testID={testID}
           onPress={() => toggleExerciseBlockHistoryCollapsed(exercise.id)}>
-          <Text style={styles.exerciseBlockHistoryTitle}>{PAST_BLOCKS_LABEL}</Text>
+          <Text style={styles.exerciseBlockHistoryTitle}>{PAST_RECORDS_LABEL}</Text>
         </Pressable>
       );
 
-      const renderHeader = (metaText: string, nav?: {
-        activeIndex: number;
-        totalBlocks: number;
-        olderDisabled: boolean;
-        newerDisabled: boolean;
-      }) => (
+      const renderHeader = (metaText: string) => (
         <View style={styles.exerciseBlockHistoryHeader}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={`Hide ${PAST_BLOCKS_LABEL} for exercise ${exerciseIndex + 1}`}
+            accessibilityLabel={`Hide ${PAST_RECORDS_LABEL} for exercise ${exerciseIndex + 1}`}
             accessibilityState={{ expanded: true }}
             style={styles.exerciseBlockHistoryHeaderRow}
             testID={`${panelTestId}-toggle`}
             onPress={() => toggleExerciseBlockHistoryCollapsed(exercise.id)}>
             <View style={styles.exerciseBlockHistoryHeadingText}>
-              <Text style={styles.exerciseBlockHistoryTitle}>{PAST_BLOCKS_LABEL}</Text>
+              <Text style={styles.exerciseBlockHistoryTitle}>{PAST_RECORDS_LABEL}</Text>
               <Text style={styles.exerciseBlockHistoryAge}>{metaText}</Text>
             </View>
           </Pressable>
-
-          {nav ? (
-            <View style={styles.exerciseBlockHistoryNavRow}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`Show older previous block for exercise ${exerciseIndex + 1}`}
-                accessibilityState={{ disabled: nav.olderDisabled }}
-                disabled={nav.olderDisabled}
-                style={[
-                  styles.exerciseBlockHistoryNavButton,
-                  nav.olderDisabled ? styles.exerciseBlockHistoryNavButtonDisabled : null,
-                ]}
-                testID={`${panelTestId}-older`}
-                onPress={() => moveExerciseBlockHistory(exercise.id, 'older')}>
-                <Text
-                  style={[
-                    styles.exerciseBlockHistoryNavButtonText,
-                    nav.olderDisabled ? styles.exerciseBlockHistoryNavButtonTextDisabled : null,
-                  ]}>
-                  {'<<'}
-                </Text>
-              </Pressable>
-              <Text style={styles.exerciseBlockHistoryPosition}>
-                {nav.activeIndex + 1}/{nav.totalBlocks}
-              </Text>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`Show newer previous block for exercise ${exerciseIndex + 1}`}
-                accessibilityState={{ disabled: nav.newerDisabled }}
-                disabled={nav.newerDisabled}
-                style={[
-                  styles.exerciseBlockHistoryNavButton,
-                  nav.newerDisabled ? styles.exerciseBlockHistoryNavButtonDisabled : null,
-                ]}
-                testID={`${panelTestId}-newer`}
-                onPress={() => moveExerciseBlockHistory(exercise.id, 'newer')}>
-                <Text
-                  style={[
-                    styles.exerciseBlockHistoryNavButtonText,
-                    nav.newerDisabled ? styles.exerciseBlockHistoryNavButtonTextDisabled : null,
-                  ]}>
-                  {'>>'}
-                </Text>
-              </Pressable>
-            </View>
-          ) : null}
         </View>
       );
 
@@ -2089,7 +2170,7 @@ export default function SessionRecorderScreen() {
           <View
             style={styles.exerciseBlockHistoryPanel}
             testID={`${panelTestId}-loading`}>
-            {renderHeader('Loading previous blocks...')}
+            {renderHeader('Loading past records...')}
           </View>
         );
       }
@@ -2103,7 +2184,7 @@ export default function SessionRecorderScreen() {
           <View
             style={styles.exerciseBlockHistoryPanel}
             testID={`${panelTestId}-error`}>
-            {renderHeader('Previous blocks unavailable')}
+            {renderHeader('Past records unavailable')}
           </View>
         );
       }
@@ -2117,7 +2198,7 @@ export default function SessionRecorderScreen() {
           <View
             style={styles.exerciseBlockHistoryPanel}
             testID={`${panelTestId}-empty`}>
-            {renderHeader('No previous blocks')}
+            {renderHeader('No past records')}
           </View>
         );
       }
@@ -2127,15 +2208,11 @@ export default function SessionRecorderScreen() {
       if (!activeBlock) {
         return null;
       }
-      const olderDisabled = activeIndex >= panel.blocks.length - 1;
-      const newerDisabled = activeIndex <= 0;
       const currentMetrics = getCurrentExerciseBlockMetrics(exercise.sets);
-      const nav = {
-        activeIndex,
-        totalBlocks: panel.blocks.length,
-        olderDisabled,
-        newerDisabled,
-      };
+      const maxMetrics = getExerciseBlockMaxMetrics(panel.blocks, currentMetrics);
+      const historySwipeKey = `${panelTestId}:history`;
+      const selectedRecordDate = formatLocalDate(activeBlock.completedAt);
+      const recordPosition = `${activeIndex + 1}/${panel.blocks.length}`;
 
       if (isCollapsed) {
         return renderCollapsedPanel();
@@ -2144,90 +2221,171 @@ export default function SessionRecorderScreen() {
       return (
         <View
           style={styles.exerciseBlockHistoryPanel}
-          testID={panelTestId}>
-          {renderHeader(formatExerciseBlockAge(activeBlock.daysAgo), nav)}
+          testID={panelTestId}
+          onTouchStart={(event) => rememberHorizontalSwipeStart(historySwipeKey, event)}
+          onTouchEnd={(event) =>
+            consumeHorizontalSwipeEnd(historySwipeKey, event, (direction) => {
+              moveExerciseBlockHistory(exercise.id, direction === 'left' ? 'older' : 'newer');
+            })
+          }>
+          {renderHeader(`${formatExerciseBlockAge(activeBlock.daysAgo)} · ${recordPosition} · swipe for records`)}
 
           <View style={styles.exerciseBlockHistoryComparisonTable}>
               <View style={styles.exerciseBlockHistoryComparisonRow}>
                 <Text style={styles.exerciseBlockHistoryMetricLabel} />
-                <Text style={styles.exerciseBlockHistoryColumnHeader}>Previous</Text>
                 <Text
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.85}
+                  numberOfLines={1}
+                  style={styles.exerciseBlockHistoryColumnHeader}>
+                  {selectedRecordDate}
+                </Text>
+                <Text
+                  numberOfLines={1}
                   style={[
                     styles.exerciseBlockHistoryColumnHeader,
                     styles.exerciseBlockHistoryCurrentHeader,
                   ]}>
                   Current
                 </Text>
+                <Text numberOfLines={1} style={styles.exerciseBlockHistoryColumnHeader}>Max</Text>
               </View>
               <View style={styles.exerciseBlockHistoryComparisonRow}>
                 <Text style={styles.exerciseBlockHistoryMetricLabel}>Est. 1RM</Text>
                 <Text
-                  style={styles.exerciseBlockHistoryMetricValue}
-                  testID={`${panelTestId}-est-1rm-previous`}>
+                  style={[
+                    styles.exerciseBlockHistoryMetricValue,
+                    isHistoricalPrMetric(activeBlock.estimatedOneRepMax, maxMetrics.estimatedOneRepMax)
+                      ? styles.exerciseBlockHistoryPrValue
+                      : null,
+                  ]}
+                  testID={`${panelTestId}-est-1rm-date`}>
                   {formatExerciseBlockStat(activeBlock.estimatedOneRepMax, 1)}
                 </Text>
                 <Text
                   style={[
                     styles.exerciseBlockHistoryMetricValue,
                     styles.exerciseBlockHistoryCurrentValue,
+                    isCurrentPrMetric(currentMetrics.estimatedOneRepMax, maxMetrics.estimatedOneRepMax)
+                      ? styles.exerciseBlockHistoryPrValue
+                      : null,
                   ]}
                   testID={`${panelTestId}-est-1rm-current`}>
                   {formatExerciseBlockStat(currentMetrics.estimatedOneRepMax, 1)}
+                </Text>
+                <Text
+                  style={[
+                    styles.exerciseBlockHistoryMetricValue,
+                    maxMetrics.estimatedOneRepMax !== null ? styles.exerciseBlockHistoryPrValue : null,
+                  ]}
+                  testID={`${panelTestId}-est-1rm-max`}>
+                  {formatExerciseBlockStat(maxMetrics.estimatedOneRepMax, 1)}
                 </Text>
               </View>
               <View style={styles.exerciseBlockHistoryComparisonRow}>
                 <Text style={styles.exerciseBlockHistoryMetricLabel}>Volume</Text>
                 <Text
-                  style={styles.exerciseBlockHistoryMetricValue}
-                  testID={`${panelTestId}-volume-previous`}>
+                  style={[
+                    styles.exerciseBlockHistoryMetricValue,
+                    isHistoricalPrMetric(activeBlock.totalVolume > 0 ? activeBlock.totalVolume : null, maxMetrics.totalVolume)
+                      ? styles.exerciseBlockHistoryPrValue
+                      : null,
+                  ]}
+                  testID={`${panelTestId}-volume-date`}>
                   {formatExerciseBlockVolume(activeBlock.totalVolume)}
                 </Text>
                 <Text
                   style={[
                     styles.exerciseBlockHistoryMetricValue,
                     styles.exerciseBlockHistoryCurrentValue,
+                    isCurrentPrMetric(currentMetrics.totalVolume > 0 ? currentMetrics.totalVolume : null, maxMetrics.totalVolume)
+                      ? styles.exerciseBlockHistoryPrValue
+                      : null,
                   ]}
                   testID={`${panelTestId}-volume-current`}>
                   {formatExerciseBlockVolume(currentMetrics.totalVolume)}
+                </Text>
+                <Text
+                  style={[
+                    styles.exerciseBlockHistoryMetricValue,
+                    maxMetrics.totalVolume !== null ? styles.exerciseBlockHistoryPrValue : null,
+                  ]}
+                  testID={`${panelTestId}-volume-max`}>
+                  {maxMetrics.totalVolume === null ? '-' : formatExerciseBlockVolume(maxMetrics.totalVolume)}
                 </Text>
               </View>
               <View style={styles.exerciseBlockHistoryComparisonRow}>
                 <Text style={styles.exerciseBlockHistoryMetricLabel}>Highest</Text>
                 <Text
-                  style={styles.exerciseBlockHistoryMetricValue}
-                  testID={`${panelTestId}-highest-previous`}>
+                  style={[
+                    styles.exerciseBlockHistoryMetricValue,
+                    isHistoricalPrMetric(activeBlock.highestWeight, maxMetrics.highestWeight)
+                      ? styles.exerciseBlockHistoryPrValue
+                      : null,
+                  ]}
+                  testID={`${panelTestId}-highest-date`}>
                   {formatExerciseBlockStat(activeBlock.highestWeight, 1)}
                 </Text>
                 <Text
                   style={[
                     styles.exerciseBlockHistoryMetricValue,
                     styles.exerciseBlockHistoryCurrentValue,
+                    isCurrentPrMetric(currentMetrics.highestWeight, maxMetrics.highestWeight)
+                      ? styles.exerciseBlockHistoryPrValue
+                      : null,
                   ]}
                   testID={`${panelTestId}-highest-current`}>
                   {formatExerciseBlockStat(currentMetrics.highestWeight, 1)}
+                </Text>
+                <Text
+                  style={[
+                    styles.exerciseBlockHistoryMetricValue,
+                    maxMetrics.highestWeight !== null ? styles.exerciseBlockHistoryPrValue : null,
+                  ]}
+                  testID={`${panelTestId}-highest-max`}>
+                  {formatExerciseBlockStat(maxMetrics.highestWeight, 1)}
                 </Text>
               </View>
               <View style={styles.exerciseBlockHistoryComparisonRow}>
                 <Text style={styles.exerciseBlockHistoryMetricLabel}>Near failure</Text>
                 <Text
-                  style={styles.exerciseBlockHistoryMetricValue}
-                  testID={`${panelTestId}-rir-count-previous`}>
+                  style={[
+                    styles.exerciseBlockHistoryMetricValue,
+                    isHistoricalPrMetric(activeBlock.rirAtMostTwoSetCount, maxMetrics.rirAtMostTwoSetCount)
+                      ? styles.exerciseBlockHistoryPrValue
+                      : null,
+                  ]}
+                  testID={`${panelTestId}-rir-count-date`}>
                   {activeBlock.rirAtMostTwoSetCount}
                 </Text>
                 <Text
                   style={[
                     styles.exerciseBlockHistoryMetricValue,
                     styles.exerciseBlockHistoryCurrentValue,
+                    isCurrentPrMetric(currentMetrics.rirAtMostTwoSetCount, maxMetrics.rirAtMostTwoSetCount)
+                      ? styles.exerciseBlockHistoryPrValue
+                      : null,
                   ]}
                   testID={`${panelTestId}-rir-count-current`}>
                   {currentMetrics.rirAtMostTwoSetCount}
+                </Text>
+                <Text
+                  style={[styles.exerciseBlockHistoryMetricValue, styles.exerciseBlockHistoryPrValue]}
+                  testID={`${panelTestId}-rir-count-max`}>
+                  {maxMetrics.rirAtMostTwoSetCount}
                 </Text>
               </View>
           </View>
         </View>
       );
     },
-    [exerciseBlockHistoryByExerciseId, moveExerciseBlockHistory, toggleExerciseBlockHistoryCollapsed]
+    [
+      consumeHorizontalSwipeEnd,
+      exerciseBlockHistoryByExerciseId,
+      moveExerciseBlockHistory,
+      rememberHorizontalSwipeStart,
+      toggleExerciseBlockHistoryCollapsed,
+    ]
   );
 
   const openExerciseModal = (exerciseIdToChange: string | null = null) => {
@@ -2913,7 +3071,7 @@ export default function SessionRecorderScreen() {
           gymId: submittedGym?.id ?? null,
           startedAt: parsedStartedAt,
           completedAt: parsedCompletedAt,
-          exercises: toPersistDraftExercises(submittedSession),
+          exercises: toPersistCompletedExercises(submittedSession),
         });
 
         hasSessionMutationRef.current = false;
@@ -2928,7 +3086,7 @@ export default function SessionRecorderScreen() {
         gymId: submittedGym?.id ?? null,
         startedAt: parsedStartedAt,
         status: 'active',
-        exercises: toPersistDraftExercises(submittedSession),
+        exercises: toPersistCompletedExercises(submittedSession),
       });
 
       await completeSessionDraft(persisted.sessionId);
@@ -2952,7 +3110,8 @@ export default function SessionRecorderScreen() {
       return;
     }
 
-    const { session: withoutEmptyExercises, removedExercises } = removeExercisesWithNoSets(sessionCandidate);
+    const completedHistorySession = toCompletedHistorySession(withoutIncompleteSets);
+    const { session: withoutEmptyExercises, removedExercises } = removeExercisesWithNoSets(completedHistorySession);
     if (removedExercises > 0) {
       setSubmitCleanupPrompt({
         step: 'empty-exercises',
@@ -2963,7 +3122,7 @@ export default function SessionRecorderScreen() {
     }
 
     setSubmitCleanupPrompt(null);
-    finalizeSubmit(sessionCandidate);
+    finalizeSubmit(completedHistorySession);
   };
 
   const handleSubmit = () => {
@@ -3306,6 +3465,13 @@ export default function SessionRecorderScreen() {
                     : isAddedBeyondPlan
                       ? 'added set'
                       : 'logged set';
+          const canSwipeDeleteSet = !isPlannedRow;
+          const swipeDeleteKey = `set:${exercise.id}:${set.id}`;
+          const removeSetFromSwipe = (direction: HorizontalSwipeDirection) => {
+            if (direction === 'left' && canSwipeDeleteSet) {
+              removeSetFromExercise(exercise.id, set.id);
+            }
+          };
 
           const renderQualityButton = (variant: 'compact' | 'edit') => {
             const displayedQuality =
@@ -3420,7 +3586,21 @@ export default function SessionRecorderScreen() {
                   rowState === 'planned' ? styles.compactSetRowGhost : null,
                   rowState === 'skipped' ? styles.compactSetRowSkipped : null,
                 ]}
-                testID={`planned-set-row-${exerciseIndex + 1}-${setIndex + 1}`}>
+                testID={
+                  canSwipeDeleteSet
+                    ? `set-swipe-delete-${exerciseIndex + 1}-${setIndex + 1}`
+                    : `planned-set-row-${exerciseIndex + 1}-${setIndex + 1}`
+                }
+                onTouchStart={(event) => {
+                  if (canSwipeDeleteSet) {
+                    rememberHorizontalSwipeStart(swipeDeleteKey, event);
+                  }
+                }}
+                onTouchEnd={(event) => {
+                  if (canSwipeDeleteSet) {
+                    consumeHorizontalSwipeEnd(swipeDeleteKey, event, removeSetFromSwipe);
+                  }
+                }}>
                 <Pressable
                   accessibilityLabel={`${stateLabel} ${setIndex + 1} for exercise ${exerciseIndex + 1}: ${compactLabel}${showQualityControl ? `; quality ${compactQualityAccessibilityLabel}` : ''}`}
                   accessibilityHint="Double tap to edit actual values."
@@ -3513,7 +3693,23 @@ export default function SessionRecorderScreen() {
           }
 
           return (
-            <View style={styles.setRow}>
+            <View
+              style={styles.setRow}
+              testID={
+                canSwipeDeleteSet
+                  ? `set-swipe-delete-${exerciseIndex + 1}-${setIndex + 1}`
+                  : `planned-set-row-${exerciseIndex + 1}-${setIndex + 1}`
+              }
+              onTouchStart={(event) => {
+                if (canSwipeDeleteSet) {
+                  rememberHorizontalSwipeStart(swipeDeleteKey, event);
+                }
+              }}
+              onTouchEnd={(event) => {
+                if (canSwipeDeleteSet) {
+                  consumeHorizontalSwipeEnd(swipeDeleteKey, event, removeSetFromSwipe);
+                }
+              }}>
               <Text style={[styles.setRowGlyph, isMutedRow ? styles.compactSetMutedText : null]}>{rowGlyph}</Text>
               <View
                 style={[
@@ -3586,21 +3782,7 @@ export default function SessionRecorderScreen() {
                     Skip
                   </Text>
                 </Pressable>
-              ) : (
-                <Pressable
-                  accessibilityLabel={`Remove set ${setIndex + 1} from exercise ${exerciseIndex + 1}`}
-                  style={styles.setDeleteButton}
-                  onPress={() => removeSetFromExercise(exercise.id, set.id)}>
-                  <Text
-                    adjustsFontSizeToFit
-                    ellipsizeMode="clip"
-                    minimumFontScale={0.75}
-                    numberOfLines={1}
-                    style={styles.setDeleteButtonText}>
-                    rm
-                  </Text>
-                </Pressable>
-              )}
+              ) : null}
             </View>
           );
         }}
@@ -4740,7 +4922,7 @@ const styles = StyleSheet.create({
   },
   exerciseBlockHistoryColumnHeader: {
     flex: 1,
-    minWidth: 64,
+    minWidth: 70,
     textAlign: 'right',
     fontSize: 11,
     lineHeight: 13,
@@ -4753,41 +4935,8 @@ const styles = StyleSheet.create({
   exerciseBlockHistoryCurrentValue: {
     color: uiColors.actionPrimary,
   },
-  exerciseBlockHistoryNavRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: 8,
-  },
-  exerciseBlockHistoryNavButton: {
-    minWidth: 44,
-    minHeight: 44,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: uiColors.borderStrong,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: uiColors.surfaceDefault,
-  },
-  exerciseBlockHistoryNavButtonDisabled: {
-    backgroundColor: uiColors.surfaceReadOnly,
-    borderColor: uiColors.borderMuted,
-  },
-  exerciseBlockHistoryNavButtonText: {
-    fontSize: 13,
-    lineHeight: 15,
-    fontWeight: '800',
-    color: uiColors.actionPrimary,
-  },
-  exerciseBlockHistoryNavButtonTextDisabled: {
-    color: uiColors.textMuted,
-  },
-  exerciseBlockHistoryPosition: {
-    minWidth: 30,
-    textAlign: 'center',
-    fontSize: 12,
-    color: uiColors.textSecondary,
-    fontWeight: '600',
+  exerciseBlockHistoryPrValue: {
+    color: uiColors.heatmapBucket4,
   },
   setList: {
     gap: 8,
@@ -4985,21 +5134,6 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     alignItems: 'center',
     backgroundColor: uiColors.actionPrimary,
-  },
-  setDeleteButton: {
-    minHeight: 30,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: uiColors.borderMuted,
-    paddingHorizontal: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: uiColors.surfaceDefault,
-  },
-  setDeleteButtonText: {
-    color: uiColors.textSecondary,
-    fontWeight: '700',
-    fontSize: 12,
   },
   submitRow: {
     flexDirection: 'row',

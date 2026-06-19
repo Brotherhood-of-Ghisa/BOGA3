@@ -174,7 +174,6 @@ export {
   type SelectedExerciseWeeklyEffort,
 } from './exercise-analytics';
 export {
-  DEFAULT_RECENT_EXERCISE_BLOCK_LIMIT,
   aggregateExerciseBlockHistory,
   createDrizzleExerciseBlockHistoryStore,
   createExerciseBlockHistoryRepository,

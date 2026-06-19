@@ -103,17 +103,17 @@ const buildInput = (
 };
 
 describe('aggregateExerciseHistory', () => {
-  it('orders sessions newest first and excludes warm-ups from per-session metrics', () => {
+  it('orders sessions newest first and includes warm-ups in per-session metrics', () => {
     const summary = aggregateExerciseHistory(buildInput());
 
     expect(summary.sessions.map((entry) => entry.sessionId)).toEqual(['s2', 's1']);
 
     const benchFirst = summary.sessions.find((entry) => entry.sessionId === 's1');
     expect(benchFirst?.workingSetCount).toBe(2);
-    expect(benchFirst?.totalVolume).toBe(100 * 8 + 100 * 6);
+    expect(benchFirst?.totalVolume).toBe(45 * 10 + 100 * 8 + 100 * 6);
     expect(benchFirst?.topWeightSet).toEqual({ weight: 100, reps: 8 });
     expect(benchFirst?.estimatedOneRepMax).not.toBeNull();
-    // Warm-up set still present in the sets list, just flagged isWorking=false
+    // Warm-up set is still visually flagged isWorking=false.
     expect(benchFirst?.sets).toHaveLength(3);
     expect(benchFirst?.sets[0].isWorking).toBe(false);
     expect(benchFirst?.sets[0].setType).toBe('warm_up');

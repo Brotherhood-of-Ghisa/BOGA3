@@ -74,8 +74,6 @@ export type AggregateSelectedMuscleDailyEffortOptions = {
   timeZone?: string;
 };
 
-const WARM_UP_SET_TYPE = 'warm_up';
-
 const isValidDate = (value: Date) => !Number.isNaN(value.getTime());
 
 const ensureDate = (value: Date, label: string): Date => {
@@ -91,8 +89,7 @@ export const getMuscleContributionRoleWeight = (role: MuscleContributionRole): n
   return 0;
 };
 
-export const isMuscleAnalyticsWorkingSet = (setType: string | null): boolean =>
-  setType !== WARM_UP_SET_TYPE;
+export const isMuscleAnalyticsWorkingSet = (_setType: string | null): boolean => true;
 
 export const computeMuscleSetVolume = (weightValue: string, repsValue: string): number => {
   const weight = parseSetWeight(weightValue);
@@ -110,11 +107,7 @@ export const countMuscleAnalyticsWorkingSets = (input: MuscleAnalyticsInput): nu
     }
   }
 
-  return input.exerciseSets.filter(
-    (set) =>
-      isMuscleAnalyticsWorkingSet(set.setType) &&
-      includedExerciseIds.has(set.sessionExerciseId)
-  ).length;
+  return input.exerciseSets.filter((set) => includedExerciseIds.has(set.sessionExerciseId)).length;
 };
 
 const buildMappingsByExerciseDefinitionId = (input: MuscleAnalyticsInput) => {
@@ -164,8 +157,6 @@ export const collectMuscleSetContributions = (
   const contributions: MuscleSetContribution[] = [];
 
   for (const set of input.exerciseSets) {
-    if (!isMuscleAnalyticsWorkingSet(set.setType)) continue;
-
     const exercise = sessionExerciseById.get(set.sessionExerciseId);
     if (!exercise || exercise.exerciseDefinitionId === null) continue;
 

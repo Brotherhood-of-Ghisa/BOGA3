@@ -89,7 +89,7 @@ The M17 feature must not modify the M16 muscle analytics engine or the `Calendar
 
 ### Exercise volume
 
-Exercise volume is `weight × reps` (raw set volume, no muscle-role weighting). Warm-up sets (`setType = 'warm_up'`) are excluded, matching the existing Stats behavior.
+Exercise volume is `weight × reps` (raw set volume, no muscle-role weighting). Superseded behavior: this milestone originally excluded warm-up sets (`setType = 'warm_up'`) to match Stats at the time; current specs include valid warm-up sets in volume/strength metrics and exclude them only from near-failure counts.
 
 ### Metrics
 

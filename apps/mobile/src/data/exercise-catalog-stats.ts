@@ -38,8 +38,6 @@ export type ExerciseCatalogStatsStore = {
   loadRawHistory(): Promise<ExerciseCatalogStatsRawHistory>;
 };
 
-const WARM_UP_SET_TYPE = 'warm_up';
-
 export const createDrizzleExerciseCatalogStatsStore = (): ExerciseCatalogStatsStore => ({
   async loadRawHistory() {
     const database = await bootstrapLocalDataLayer();
@@ -154,8 +152,6 @@ export const aggregateExerciseCatalogStats = (
   const sessionsSeenByDef = new Map<string, Set<string>>();
 
   for (const set of raw.exerciseSets) {
-    if ((set.setType ?? null) === WARM_UP_SET_TYPE) continue;
-
     const link = sessionExerciseById.get(set.sessionExerciseId);
     if (!link || link.exerciseDefinitionId === null) continue;
 
