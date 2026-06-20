@@ -75,7 +75,11 @@ export default function RootLayout() {
             </Stack>
           </SyncGate>
         </AuthRouteGuard>
-        <StatusBar style="auto" />
+        {/* The app renders on a fixed light background (no dark-mode theming),
+            so force dark status-bar content — `auto` turns the clock/icons
+            white when the phone is in dark mode, leaving them unreadable on the
+            light safe area. */}
+        <StatusBar style="dark" />
       </AuthProvider>
     </SafeAreaProvider>
   );
