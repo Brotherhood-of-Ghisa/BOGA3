@@ -19,6 +19,7 @@ gaps — `04`, `07` — from retired docs; gaps are intentional, do not renumber
 - `docs/specs/10-api-authn-authz-guidelines.md`: Minimal authN/authZ/API development and consumption rules for backend work.
 - `docs/specs/11-maestro-runtime-and-testing-conventions.md`: Authoritative Maestro iOS runtime/testing contract and documentation ownership model.
 - `docs/specs/12-worktree-config-and-isolation.md`: Git worktree support, shared machine-level config, and per-worktree serving isolation design.
+- `docs/specs/13-groups-exercise-catalogue.md`: Planned groups, group exercise catalogue, private-to-group exercise mapping, and shared workout projection milestone.
 - `docs/specs/tech/README.md`: Index of subsystem-level technical deep-dive docs.
 - `docs/specs/tech/sync-v2-server-contract.md`: Authoritative sync-v2 server contract — schema / LWW / RLS (Part A) and push/pull RPC wire contract (Part B).
 - `docs/specs/templates/milestone-spec-template.md`: Template for milestone deep dives.
