@@ -16,6 +16,7 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { uiColors, uiRadius, uiSpace } from '@/components/ui';
 import { resolveTraySnap, type TraySnapState } from '@/src/navigation/tray-snap';
@@ -90,6 +91,12 @@ type BottomTrayProps = {
  */
 export function BottomTray({ children }: BottomTrayProps) {
   const { state, expand, collapse } = useTrayVisibility();
+  // The custom tab bar does not receive React Navigation's safe-area inset
+  // (the (tabs) layout only applies the top edge), so without this the tray
+  // hugs the device's bottom edge / home indicator. Reserve the bottom inset
+  // below the whole tray — applied in both collapsed and expanded states, and
+  // below the handle so the handle itself is never padded.
+  const insets = useSafeAreaInsets();
 
   // Natural (uncollapsed) inner-content height, measured via the inner
   // wrapper's onLayout. Kept in a ref so the PanResponder closure always
@@ -197,29 +204,31 @@ export function BottomTray({ children }: BottomTrayProps) {
   }, [expand, collapse]);
 
   return (
-    <Animated.View
-      pointerEvents="box-none"
-      style={[styles.root, { height: containerHeight }]}
-      testID="bottom-tray-root">
-      <View onLayout={onContentLayout} style={styles.content}>
-        <View {...panResponder.panHandlers} style={styles.handleHitArea}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={
-              state === 'expanded' ? 'Collapse navigation tray' : 'Expand navigation tray'
-            }
-            accessibilityState={{ expanded: state === 'expanded' }}
-            onPress={handleHandleTap}
-            style={styles.handlePressable}
-            testID="bottom-tray-handle">
-            <View style={styles.handleIndicator} />
-          </Pressable>
+    <View pointerEvents="box-none" style={{ paddingBottom: insets.bottom }}>
+      <Animated.View
+        pointerEvents="box-none"
+        style={[styles.root, { height: containerHeight }]}
+        testID="bottom-tray-root">
+        <View onLayout={onContentLayout} style={styles.content}>
+          <View {...panResponder.panHandlers} style={styles.handleHitArea}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={
+                state === 'expanded' ? 'Collapse navigation tray' : 'Expand navigation tray'
+              }
+              accessibilityState={{ expanded: state === 'expanded' }}
+              onPress={handleHandleTap}
+              style={styles.handlePressable}
+              testID="bottom-tray-handle">
+              <View style={styles.handleIndicator} />
+            </Pressable>
+          </View>
+          <View style={styles.body} testID="bottom-tray-body">
+            {children}
+          </View>
         </View>
-        <View style={styles.body} testID="bottom-tray-body">
-          {children}
-        </View>
-      </View>
-    </Animated.View>
+      </Animated.View>
+    </View>
   );
 }
 
