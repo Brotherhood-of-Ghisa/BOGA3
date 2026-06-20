@@ -2,6 +2,8 @@ import 'react-native-url-polyfill/auto';
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
+import { getAuthStorageKey } from '@/src/utils/app-flavor';
+
 import { getAuthStorageAdapter } from './storage';
 
 export type MobileAuthRuntimeConfig = {
@@ -71,6 +73,11 @@ export const getSupabaseMobileClient = () => {
   supabaseClient = createClient(config.url, config.anonKey, {
     auth: {
       storage: getAuthStorageAdapter(),
+      // Pin the session storage key to the deployment flavor instead of letting
+      // supabase-js derive it from the URL (`sb-<hostname-label>-auth-token`),
+      // so the session survives backend-URL changes (localhost ↔ LAN ↔ tailnet)
+      // while staying isolated per Preview / Full / local build.
+      storageKey: getAuthStorageKey(),
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: false,

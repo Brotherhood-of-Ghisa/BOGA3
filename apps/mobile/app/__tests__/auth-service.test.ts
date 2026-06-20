@@ -176,6 +176,9 @@ describe('auth service bootstrap', () => {
           autoRefreshToken: true,
           detectSessionInUrl: false,
           persistSession: true,
+          // Session storage key is namespaced per deployment flavor, not derived
+          // from the backend URL (see src/utils/app-flavor.ts).
+          storageKey: expect.stringMatching(/^boga3-auth-/),
           storage: expect.objectContaining({
             getItem: expect.any(Function),
             removeItem: expect.any(Function),

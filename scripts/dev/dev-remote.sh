@@ -87,4 +87,12 @@ EOF
 #    bundle, and assets over HTTPS through tailscale serve (no http/asset leaks).
 cd "$MOBILE_DIR"
 export EXPO_PACKAGER_PROXY_URL="https://${TS_HOST}:${TS_METRO_HTTPS_PORT}"
+
+# Pin the tailnet Supabase values into Metro's OWN environment so a later
+# .env.local rewrite (a gate run, `boga db up`, a Maestro lane) can't break a
+# live session on reload. Same hardening is applied to dev-lan.sh; the shared
+# helper documents the @expo/env precedence it relies on.
+# shellcheck source=scripts/dev/export-mobile-supabase-env.sh
+source "$SCRIPT_DIR/export-mobile-supabase-env.sh" "$MOBILE_DIR/.env.local"
+
 exec npx expo start --dev-client --port "$EXPO_PORT" "$@"
