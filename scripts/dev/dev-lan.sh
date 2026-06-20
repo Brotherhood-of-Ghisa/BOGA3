@@ -54,4 +54,12 @@ echo "[dev-lan] starting local Supabase and pointing apps/mobile/.env.local at t
 #    client (not Expo Go). Extra args ($@) are forwarded to `expo start`.
 echo "[dev-lan] starting Expo over LAN — open the dev client on your phone (same Wi-Fi)"
 cd "$MOBILE_DIR"
+
+# Pin the LAN Supabase values into Metro's OWN environment so a later .env.local
+# rewrite (a gate run, `boga db up`, a Maestro lane) can't break a live session
+# on reload. Mirrors dev-remote.sh; the shared helper documents the @expo/env
+# precedence it relies on.
+# shellcheck source=scripts/dev/export-mobile-supabase-env.sh
+source "$SCRIPT_DIR/export-mobile-supabase-env.sh" "$MOBILE_DIR/.env.local"
+
 exec npx expo start --dev-client --host lan "$@"
