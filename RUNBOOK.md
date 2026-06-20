@@ -22,6 +22,7 @@ Human-operator guide for local development, runtime operations, logs, and tests 
   - [Automated uninstall/reinstall via smoke lane](#automated-uninstallreinstall-via-smoke-lane)
 - [Run a development build on a physical iPhone](#run-a-development-build-on-a-physical-iphone)
   - [One-stop: dev-lan.sh](#one-stop-dev-lansh)
+  - [Outside the LAN (Tailscale): dev-remote.sh](#outside-the-lan-tailscale-dev-remotesh)
   - [Make local Supabase reachable from the phone](#make-local-supabase-reachable-from-the-phone)
   - [Manual steps (env + Metro)](#manual-steps-env--metro)
   - [Point the app at hosted Supabase instead](#point-the-app-at-hosted-supabase-instead)
@@ -199,6 +200,46 @@ Notes:
 - Extra args are forwarded to `expo start`, e.g. `./scripts/dev/dev-lan.sh --clear`.
 - Supabase containers persist after you Ctrl+C Expo. Stop them with
   `./supabase/scripts/local-runtime-down.sh`.
+
+### Outside the LAN (Tailscale): dev-remote.sh
+
+When the phone is **not** on the same Wi-Fi (cellular, a different building, guest
+Wi-Fi with client isolation), route the whole session over your tailnet instead.
+This keeps the **local** Supabase + Metro — no hosted backend, no dev-client
+rebuild — by publishing both over `tailscale serve` as real HTTPS:
+
+```bash
+./scripts/dev/dev-remote.sh
+```
+
+It boots this slot's Supabase, publishes it at `https://<magicdns-name>`, rewrites
+`apps/mobile/.env.local` to that URL, publishes Metro at
+`https://<magicdns-name>:8443`, and starts Expo. On the phone's dev client, load
+`https://<magicdns-name>:8443` (the script prints the exact URL).
+
+Why HTTPS and not the LAN flow's plain HTTP: a strict-ATS dev build (the
+`com.phano.boga3.dev` TestFlight build) rejects plain HTTP to a `100.x` Tailscale
+address. The trusted `*.ts.net` cert from `tailscale serve` sidesteps App
+Transport Security entirely, so the existing build works unchanged.
+
+Prerequisites (one-time):
+
+- Tailscale installed and signed into the **same tailnet** on both this Mac and
+  the phone.
+- HTTPS certificates enabled for the tailnet:
+  [admin → DNS](https://login.tailscale.com/admin/dns) → MagicDNS on, then
+  **Enable HTTPS**. `dev-remote.sh` fails fast with this instruction if it is off.
+
+Notes:
+
+- The env-only half (boot Supabase + publish it + rewrite `.env.local`) is
+  `./scripts/dev/use-local-mobile-tailscale-env.sh` — also `./boga env tailscale`.
+- Run **one worktree at a time**: the `443`/`8443` serve mappings are per-machine.
+- Override MagicDNS detection with `BOGA_MOBILE_TS_HOST=...`; the Metro port with
+  `EXPO_PORT=...`. Extra args forward to `expo start` (e.g. `--clear`).
+- Tear down when done:
+  `./supabase/scripts/local-runtime-down.sh` and
+  `tailscale serve --https=443 off && tailscale serve --https=8443 off`.
 
 ### Make local Supabase reachable from the phone
 

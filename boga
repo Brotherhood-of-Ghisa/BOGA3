@@ -18,7 +18,7 @@
 #   boga worktree create|setup|clean|sweep|doctor
 #   boga db up|down|reset|baseline
 #   boga ios build-client|start
-#   boga env lan|hosted
+#   boga env lan|hosted|tailscale
 #   boga task bootstrap|closeout
 #
 # Legacy entrypoints ./scripts/quality-fast.sh and ./scripts/quality-slow.sh
@@ -220,9 +220,10 @@ case "${cmd}" in
   env)
     sub="${1:-}"; shift || true
     case "${sub}" in
-      lan)    dispatch_script "${REPO_ROOT}/scripts/dev/use-local-mobile-lan-env.sh" "$@" ;;
-      hosted) dispatch_script "${REPO_ROOT}/scripts/dev/use-hosted-mobile-env.sh" "$@" ;;
-      *) fail "usage: boga env lan|hosted   (full phone-on-LAN session: scripts/dev/dev-lan.sh)" ;;
+      lan)       dispatch_script "${REPO_ROOT}/scripts/dev/use-local-mobile-lan-env.sh" "$@" ;;
+      hosted)    dispatch_script "${REPO_ROOT}/scripts/dev/use-hosted-mobile-env.sh" "$@" ;;
+      tailscale) dispatch_script "${REPO_ROOT}/scripts/dev/use-local-mobile-tailscale-env.sh" "$@" ;;
+      *) fail "usage: boga env lan|hosted|tailscale   (full phone sessions: scripts/dev/dev-lan.sh on-LAN, scripts/dev/dev-remote.sh over Tailscale)" ;;
     esac
     ;;
   task)
