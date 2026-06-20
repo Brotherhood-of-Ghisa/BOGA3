@@ -87,4 +87,16 @@ EOF
 #    bundle, and assets over HTTPS through tailscale serve (no http/asset leaks).
 cd "$MOBILE_DIR"
 export EXPO_PACKAGER_PROXY_URL="https://${TS_HOST}:${TS_METRO_HTTPS_PORT}"
+
+# Pin the tailnet Supabase values into Metro's OWN environment. @expo/env never
+# overrides a variable already present in process.env, so even if a later
+# Supabase boot (a gate run, `boga db up`, a Maestro lane) rewrites
+# apps/mobile/.env.local back to 127.0.0.1 under a live session, the running
+# bundle keeps the tailnet URL on reload instead of silently breaking (a phone
+# can't reach 127.0.0.1 — that's the phone itself). The anon key is read back
+# from the .env.local the env-half just wrote, so the two never drift.
+anon_line="$(grep -E '^EXPO_PUBLIC_SUPABASE_ANON_KEY=' "$MOBILE_DIR/.env.local" | head -1 || true)"
+export EXPO_PUBLIC_SUPABASE_URL="https://${TS_HOST}"
+export EXPO_PUBLIC_SUPABASE_ANON_KEY="${anon_line#EXPO_PUBLIC_SUPABASE_ANON_KEY=}"
+
 exec npx expo start --dev-client --port "$EXPO_PORT" "$@"
