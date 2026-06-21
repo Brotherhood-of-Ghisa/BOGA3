@@ -293,6 +293,14 @@ classify_label() {
     CLS_VERDICT="KEEP"; CLS_REASON="current slot ($CLS_PATH)"; return 0
   fi
 
+  # The dedicated dev stack is human-owned and deliberately NOT backed by a git
+  # worktree, so it would otherwise read as an orphan and be reaped on the next
+  # gate run — destroying the very dev data the split exists to protect. Never
+  # auto-evict it; rebuild explicitly with `boga db dev-reset` when wanted.
+  if [[ "$label" == "$(boga_dev_project_id)" ]]; then
+    CLS_VERDICT="KEEP"; CLS_REASON="dedicated dev stack (BOGA-dev) — never auto-evicted"; return 0
+  fi
+
   CLS_PATH=""
   for idx in "${!WT_IDX_PATHS[@]}"; do
     slot="${WT_IDX_SLOTS[$idx]}"

@@ -71,17 +71,30 @@ ensure_tmp_dir() {
   mkdir -p "${SUPABASE_DIR}/.temp"
 }
 
+# When BOGA_SUPABASE_WORKDIR is set, every `supabase` call targets that project
+# directory instead of this worktree's default (slot-0) stack. This is how the
+# dedicated dev stack (project_id BOGA-dev, see supabase/scripts/dev-stack-lib.sh)
+# reuses all of these helpers — load_supabase_status_env, the up/down/reset
+# scripts, auth provisioning — against a second, isolated Supabase without a
+# parallel copy of this machinery. Unset (the default), everything targets the
+# gate stack exactly as before.
 run_supabase() {
   (
     cd "${REPO_ROOT}"
-    npx -y "supabase@${SUPABASE_CLI_VERSION}" "$@"
+    if [[ -n "${BOGA_SUPABASE_WORKDIR:-}" ]]; then
+      npx -y "supabase@${SUPABASE_CLI_VERSION}" --workdir "${BOGA_SUPABASE_WORKDIR}" "$@"
+    else
+      npx -y "supabase@${SUPABASE_CLI_VERSION}" "$@"
+    fi
   )
 }
 
-# Read this worktree's Supabase project_id from supabase/config.toml.
+# Read the active Supabase project_id from config.toml. Honors
+# BOGA_SUPABASE_WORKDIR so the dev stack resolves to BOGA-dev, not the slot-0 id.
 # Echoes the id (empty string if config.toml is absent or has no project_id).
 worktree_project_id() {
   local config_file="${SUPABASE_DIR}/config.toml"
+  [[ -n "${BOGA_SUPABASE_WORKDIR:-}" ]] && config_file="${BOGA_SUPABASE_WORKDIR}/supabase/config.toml"
   [[ -f "${config_file}" ]] || return 0
   awk -F'"' '/^project_id[[:space:]]*=/ {print $2; exit}' "${config_file}" || true
 }

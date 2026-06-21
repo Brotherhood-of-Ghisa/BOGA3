@@ -113,6 +113,8 @@ Supported range:
 
 Slot `0` preserves the original local Supabase port block for the main checkout and uses project id `BOGA`.
 Higher slots offset local ports and use readable project ids derived from the worktree directory name.
+Slot `100` is **reserved** (outside the allocatable range) for the main checkout's
+dedicated dev stack — see [Dedicated dev stack (BOGA-dev)](#dedicated-dev-stack-boga-dev).
 
 Port formulas:
 
@@ -173,6 +175,41 @@ Rules:
 3. `supabase/scripts/_common.sh` regenerates it when missing or older than the template.
 4. If a linked worktree has no slot, `_common.sh` runs setup before starting Supabase.
 5. Nested worktree layout is checked before generation or Supabase startup.
+
+## Dedicated dev stack (BOGA-dev)
+
+The main checkout's slot-0 stack (`project_id BOGA`) backs the **gates**, which
+truncate/reset it on every run. A human dev session must not share it, or a gate
+wipes the developer's data mid-session. The **dev stack** is a second, isolated
+local Supabase for that session:
+
+| | Dev stack | Slot-0 (gate) stack |
+| --- | --- | --- |
+| `project_id` | `BOGA-dev` | `BOGA` |
+| Ports | reserved **slot 100** via the port formula (API `65431`, DB `65422`, …) | slot 0 (`55431`, …) |
+| Config + workdir | `.supabase-dev/supabase/config.toml` (gitignored), migrations/seed/functions **symlinked** to `supabase/` | `supabase/config.toml` |
+| Run mechanism | `supabase --workdir .supabase-dev …` (concurrent with slot 0) | default workdir |
+| Lifecycle | `boga db dev` (baseline: up + migrate + seed dev users, no reset), `boga db dev-up\|dev-down\|dev-reset` | `boga db up\|down\|reset\|baseline` |
+| Used by | `dev-lan.sh` / `dev-remote.sh` (they `export BOGA_MOBILE_DEV_DB=1`) | the gates and `boga test *` |
+
+Slot 100 is **reserved** — outside the allocatable `0..99` range, so its ports
+never collide with a real worktree and stay under 65535. The Supabase helpers in
+`supabase/scripts/_common.sh` follow `BOGA_SUPABASE_WORKDIR`: setting it (via
+`engage_dev_stack` in `dev-stack-lib.sh`) re-points `run_supabase`,
+`load_supabase_status_env`, and auth provisioning at the dev stack, so the dev
+scripts reuse the slot-0 machinery without a parallel copy. Dev scripts refuse to
+run unless the active `project_id` is `BOGA-dev` (`dev_stack_assert_engaged`),
+and the gates never set the var — so neither side can target the other's stack.
+
+**Sweep exemption (mandatory):** `BOGA-dev` is deliberately not backed by a
+`git worktree`, so `worktree-sweep.sh` would classify it as an orphan and evict
+it before the next `local-runtime-up.sh`. The sweep special-cases the dev
+project id to **KEEP** (regression test:
+`scripts/tests/worktree-sweep-dev-exemption.test.sh`). Rebuild the dev stack
+explicitly with `boga db dev-reset` (drops all dev data) when wanted.
+
+This is main-checkout-only; linked worktrees are short-lived and already
+slot-isolated, so they keep using their own slot stack for everything.
 
 ## Hook behavior
 

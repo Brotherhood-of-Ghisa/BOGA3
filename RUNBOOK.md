@@ -383,18 +383,23 @@ reset — it is idempotent (creates the accounts if missing, resets their passwo
 if present).
 
 **Automatic (the usual path):** the phone launchers `scripts/dev/dev-lan.sh` and
-`scripts/dev/dev-remote.sh` now run the **dev DB baseline** on every start, which
-seeds these accounts for you. The baseline reuses a running stack **without
-resetting it** (your logged data survives), applies any pending migrations in
-place, and seeds `a@dev.local` / `b@dev.local`. Run it standalone any time with:
+`scripts/dev/dev-remote.sh` target a **dedicated dev Supabase stack**
+(`project_id BOGA-dev`, API `65431`) that is isolated from the slot-0 stack the
+gates use — so **running `boga test *` never wipes your dev data or session.**
+They run the **dev DB baseline** on every start: reuse the dev stack **without
+resetting it** (your logged data survives), apply any pending migrations in
+place, and seed `a@dev.local` / `b@dev.local`. The full isolation contract is in
+`docs/specs/12-worktree-config-and-isolation.md` (Dedicated dev stack). Commands:
 
 ```bash
-boga db dev      # ./supabase/scripts/ensure-dev-baseline.sh
+boga db dev          # baseline: up + migrate + seed dev users (no reset)
+boga db dev-up       # start the dev stack only
+boga db dev-down     # stop it (data persists)
+boga db dev-reset    # rebuild it — DROPS ALL DEV DATA
 ```
 
-On real schema drift it **fails loud** rather than wiping — it tells you to run
-`boga db reset` (which DROPS ALL LOCAL DATA) explicitly. Use that only when you
-actually want a clean rebuild.
+On real schema drift the baseline **fails loud** rather than wiping — it tells
+you to run `boga db dev-reset` explicitly. Use that only for a clean rebuild.
 
 Local Docker/Colima Supabase, provisioning the accounts by themselves:
 
