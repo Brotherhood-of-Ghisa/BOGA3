@@ -382,7 +382,21 @@ stack and `supabase db reset` both wipe `auth.users`, so re-run this after a
 reset — it is idempotent (creates the accounts if missing, resets their passwords
 if present).
 
-Local Docker/Colima Supabase (the default):
+**Automatic (the usual path):** the phone launchers `scripts/dev/dev-lan.sh` and
+`scripts/dev/dev-remote.sh` now run the **dev DB baseline** on every start, which
+seeds these accounts for you. The baseline reuses a running stack **without
+resetting it** (your logged data survives), applies any pending migrations in
+place, and seeds `a@dev.local` / `b@dev.local`. Run it standalone any time with:
+
+```bash
+boga db dev      # ./supabase/scripts/ensure-dev-baseline.sh
+```
+
+On real schema drift it **fails loud** rather than wiping — it tells you to run
+`boga db reset` (which DROPS ALL LOCAL DATA) explicitly. Use that only when you
+actually want a clean rebuild.
+
+Local Docker/Colima Supabase, provisioning the accounts by themselves:
 
 ```bash
 ./supabase/scripts/local-runtime-up.sh             # ensure this worktree's stack is up
