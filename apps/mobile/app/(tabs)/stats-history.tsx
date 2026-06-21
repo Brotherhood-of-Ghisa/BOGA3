@@ -1,6 +1,6 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { DailyHeatmap, WeeklyHeatmap, buildHeatmapData } from '@/components/heatmaps';
 import { SegmentedChips, uiColors } from '@/components/ui';
@@ -148,6 +148,8 @@ export type StatsScreenShellProps = {
   onSelectExerciseHistoryView: (view: HeatmapView) => void;
   /** Optional determinism seam: anchors the heatmap window. Defaults to today. */
   historyTodayDateKey?: string;
+  searchQuery: string;
+  onSearchQueryChange: (query: string) => void;
 };
 
 export function StatsScreenShell({
@@ -187,6 +189,8 @@ export function StatsScreenShell({
   onSelectExerciseHistoryMetric,
   onSelectExerciseHistoryView,
   historyTodayDateKey,
+  searchQuery,
+  onSearchQueryChange,
 }: StatsScreenShellProps) {
   const sessionDelta = summary
     ? formatDelta(summary.current.totals.sessionCount, summary.previous.totals.sessionCount)
@@ -194,6 +198,36 @@ export function StatsScreenShell({
   const setsDelta = summary
     ? formatDelta(summary.current.totals.totalSets, summary.previous.totals.totalSets)
     : null;
+
+  const filteredFamilies = useMemo(() => {
+    if (!summary) return [];
+    const query = searchQuery.toLowerCase().trim();
+    if (!query) return summary.current.totals.muscleFamilies;
+    return summary.current.totals.muscleFamilies
+      .map((family) => {
+        const familyMatches = family.familyName.toLowerCase().includes(query);
+        const matchingMuscles = family.muscles.filter((muscle) =>
+          muscle.displayName.toLowerCase().includes(query)
+        );
+        const filteredMuscles = familyMatches ? family.muscles : matchingMuscles;
+        if (filteredMuscles.length > 0) {
+          return {
+            ...family,
+            muscles: filteredMuscles,
+          };
+        }
+        return null;
+      })
+      .filter((family): family is StatsMuscleFamilyPerformance => family !== null);
+  }, [summary, searchQuery]);
+
+  const filteredExerciseListItems = useMemo(() => {
+    const query = searchQuery.toLowerCase().trim();
+    if (!query) return exerciseListItems;
+    return exerciseListItems.filter((item) =>
+      item.name.toLowerCase().includes(query)
+    );
+  }, [exerciseListItems, searchQuery]);
 
   return (
     <View style={styles.screen} testID="stats-history-screen">
@@ -254,10 +288,34 @@ export function StatsScreenShell({
         </View>
       ) : null}
 
+      <View style={styles.searchContainer}>
+        <TextInput
+          accessibilityLabel={viewMode === 'exercise' ? 'Exercise filter input' : 'Muscle filter input'}
+          autoCapitalize="none"
+          autoCorrect={false}
+          onChangeText={onSearchQueryChange}
+          placeholder={viewMode === 'exercise' ? 'Filter by exercise...' : 'Filter by muscle...'}
+          style={styles.filterInput}
+          value={searchQuery}
+          testID="stats-search-input"
+        />
+        {searchQuery ? (
+          <Pressable
+            accessibilityLabel="Clear search input"
+            accessibilityRole="button"
+            onPress={() => onSearchQueryChange('')}
+            style={styles.clearSearchButton}
+            testID="stats-search-clear-button">
+            <Text style={styles.clearSearchButtonText}>×</Text>
+          </Pressable>
+        ) : null}
+      </View>
+
       {viewMode === 'exercise' ? (
         <ExerciseListView
-          items={exerciseListItems}
+          items={filteredExerciseListItems}
           onPressExercise={onPressExerciseHistory}
+          isFiltered={Boolean(searchQuery.trim())}
         />
       ) : (
         <ScrollView
@@ -278,11 +336,21 @@ export function StatsScreenShell({
           ) : null}
 
           {summary ? (
-            <MuscleFamilyList
-              families={summary.current.totals.muscleFamilies}
-              previousFamilies={summary.previous.totals.muscleFamilies}
-              onPressMuscleHistory={onPressMuscleHistory}
-            />
+            filteredFamilies.length === 0 ? (
+              <View style={styles.statePanel} testID="stats-muscle-empty">
+                <Text style={styles.stateBody}>
+                  {searchQuery.trim()
+                    ? 'No muscle groups match the search query.'
+                    : 'No muscle taxonomy loaded yet. Add some exercises to see this section.'}
+                </Text>
+              </View>
+            ) : (
+              <MuscleFamilyList
+                families={filteredFamilies}
+                previousFamilies={summary.previous.totals.muscleFamilies}
+                onPressMuscleHistory={onPressMuscleHistory}
+              />
+            )
           ) : null}
         </ScrollView>
       )}
@@ -769,15 +837,19 @@ function MuscleHistoryOverlay({
 function ExerciseListView({
   items,
   onPressExercise,
+  isFiltered,
 }: {
   items: ExerciseListItem[];
   onPressExercise: (exercise: ExerciseHeatmapTarget) => void;
+  isFiltered: boolean;
 }) {
   if (items.length === 0) {
     return (
       <View style={styles.statePanel} testID="stats-exercise-list-empty">
         <Text style={styles.stateBody}>
-          No exercises with recorded history yet.
+          {isFiltered
+            ? 'No exercises match the search query.'
+            : 'No exercises with recorded history yet.'}
         </Text>
       </View>
     );
@@ -1018,6 +1090,7 @@ export default function StatsRoute() {
   const muscleHistoryRequestIdRef = useRef(0);
 
   const [viewMode, setViewMode] = useState<StatsViewMode>('exercise');
+  const [searchQuery, setSearchQuery] = useState('');
   const [selectedExercise, setSelectedExercise] = useState<ExerciseHeatmapTarget | null>(null);
   const [exerciseHistoryWeeklyEffort, setExerciseHistoryWeeklyEffort] = useState<SelectedExerciseWeeklyEffort[]>([]);
   const [exerciseHistoryDailyMetrics, setExerciseHistoryDailyMetrics] = useState<DailyEffortMetrics[]>([]);
@@ -1121,6 +1194,7 @@ export default function StatsRoute() {
 
   const handleSelectViewMode = useCallback((mode: StatsViewMode) => {
     setViewMode(mode);
+    setSearchQuery('');
     setSelectedExercise(null);
     setExerciseHistoryWeeklyEffort([]);
     setExerciseHistoryDailyMetrics([]);
@@ -1237,6 +1311,8 @@ export default function StatsRoute() {
       onSelectExerciseHistoryWeek: handleSelectExerciseHistoryWeek,
       onSelectExerciseHistoryMetric: setExerciseHistoryMetric,
       onSelectExerciseHistoryView: setExerciseHistoryView,
+      searchQuery,
+      onSearchQueryChange: setSearchQuery,
     }),
     [
       summary,
@@ -1270,6 +1346,7 @@ export default function StatsRoute() {
       handlePressExerciseHistory,
       handleDismissExerciseHistory,
       handleSelectExerciseHistoryWeek,
+      searchQuery,
     ]
   );
 
@@ -1598,6 +1675,38 @@ const styles = StyleSheet.create({
   },
   deltaNeutral: {
     color: uiColors.textSecondary,
+  },
+  searchContainer: {
+    position: 'relative',
+    justifyContent: 'center',
+  },
+  filterInput: {
+    borderWidth: 1,
+    borderColor: uiColors.borderMuted,
+    borderRadius: 8,
+    backgroundColor: uiColors.surfaceDefault,
+    color: uiColors.textPrimary,
+    paddingLeft: 10,
+    paddingRight: 36,
+    paddingVertical: 9,
+    minHeight: 42,
+    fontSize: 14,
+  },
+  clearSearchButton: {
+    position: 'absolute',
+    right: 10,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: uiColors.borderMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  clearSearchButtonText: {
+    color: uiColors.textSecondary,
+    fontSize: 14,
+    fontWeight: 'bold',
+    lineHeight: 16,
   },
   deltaNew: {
     color: uiColors.actionPrimary,
