@@ -30,7 +30,11 @@ import { PRIMARY_RUNTIME_STATE_ID, type Transaction } from '@/src/data/clock';
 import * as schema from '@/src/data/schema';
 import { syncRuntimeState } from '@/src/data/schema';
 import { logEvent } from '@/src/logging/logEvent';
-import { findPushBatchFkViolations, type PushFkViolation } from '@/src/sync/fk-graph';
+import {
+  findPushBatchFkViolations,
+  SYNCABLE_FK_GRAPH,
+  type PushFkViolation,
+} from '@/src/sync/fk-graph';
 import {
   quarantineKey,
   quarantineRows,
@@ -106,11 +110,19 @@ export type SyncErrorCode = 'AUTH_REQUIRED' | 'FK_VIOLATION' | 'LOCAL_FK_VIOLATI
 
 export class SyncCycleError extends Error {
   readonly code: SyncErrorCode;
+  /**
+   * Optional structured, privacy-safe diagnostics surfaced into the
+   * `sync.cycle_result` log context. For a server FK_VIOLATION this is a
+   * {@link ServerFkViolationDetail} carrying the offending table/constraint and
+   * the opaque FK ids the batch tried to write — never names/weights.
+   */
+  readonly detail?: ServerFkViolationDetail;
 
-  constructor(code: SyncErrorCode, message: string) {
+  constructor(code: SyncErrorCode, message: string, detail?: ServerFkViolationDetail) {
     super(message);
     this.name = 'SyncCycleError';
     this.code = code;
+    this.detail = detail;
   }
 }
 
@@ -199,6 +211,93 @@ const isLocalSqliteForeignKeyError = (error: unknown): boolean => {
     return true;
   }
   return sanitizeExceptionMessage(error).toLowerCase().includes('foreign key');
+};
+
+/**
+ * Structured, privacy-safe description of a server FK_VIOLATION, derived by
+ * mapping the Postgres error string back onto the push batch we sent. A bare
+ * "violates foreign key constraint" tells an operator nothing actionable; this
+ * recovers WHICH table, WHICH constraint, the suspected FK column, and the
+ * opaque parent ids the batch tried to write — so the failure is diagnosable.
+ *
+ * Carries opaque identifiers ONLY (random-hex row ids, FK column names, the
+ * unresolved parent ids / taxonomy keys) — NEVER a row payload or user-entered
+ * value (names, machine names, weights). Same discipline as the quarantine log.
+ */
+export interface ServerFkViolationDetail {
+  /** The child table named in the PG message (`on table "<x>"`), or null. */
+  readonly table: string | null;
+  /** The constraint named in the PG message (`constraint "<x>"`), or null. */
+  readonly constraint: string | null;
+  /** The FK column on `table` the constraint maps to, when identifiable. */
+  readonly suspectColumn: string | null;
+  /** True when more offending rows existed than `rows` lists (capped for log size). */
+  readonly truncated: boolean;
+  /**
+   * The batch rows of `table` with their syncable FK references (opaque ids
+   * only). The `suspectColumn` value is the parent id the server could not
+   * resolve — the actual culprit the old message hid.
+   */
+  readonly rows: readonly { readonly id: string; readonly refs: Record<string, WireValue> }[];
+}
+
+/** Cap the rows listed in one FK_VIOLATION diagnostic so a large batch can't bloat a log row. */
+const MAX_LOGGED_FK_ROWS = 20;
+
+/** Extracts the value of a `<label> "<value>"` pair from a Postgres error string. */
+const parseQuotedAfter = (message: string, label: string): string | null => {
+  const match = new RegExp(`${label} "([^"]+)"`).exec(message);
+  return match ? match[1] : null;
+};
+
+/**
+ * Builds a {@link ServerFkViolationDetail} from a server FK_VIOLATION message and
+ * the batch that triggered it. Pure and side-effect free so it is unit-testable
+ * without a live RPC; the only inputs are the error string and the wire batch.
+ */
+export const describeServerFkViolation = (
+  serverMessage: string,
+  batch: readonly WireEntity[],
+): ServerFkViolationDetail => {
+  const message = serverMessage ?? '';
+  const table = parseQuotedAfter(message, 'on table');
+  const constraint = parseQuotedAfter(message, 'constraint');
+
+  const edges = table ? SYNCABLE_FK_GRAPH[table as EntityTableName] : undefined;
+
+  // Identify the suspect FK column. Strip the child-table prefix off the
+  // constraint name first, so a child table whose own name contains a parent
+  // stem (e.g. `session_exercises` contains `session`) cannot shadow the real
+  // edge; then match the remaining suffix against each edge's parent column /
+  // parent type.
+  let suspectColumn: string | null = null;
+  if (edges && constraint && table) {
+    const suffix = constraint.startsWith(`${table}_`)
+      ? constraint.slice(table.length + 1)
+      : constraint;
+    const match = edges.find((edge) => {
+      const stem = edge.parentIdField.replace(/_id$/, '');
+      return suffix.includes(stem) || suffix.includes(edge.parentType);
+    });
+    suspectColumn = match?.parentIdField ?? null;
+  }
+
+  const refFields = edges?.map((edge) => edge.parentIdField) ?? [];
+  const offending = batch.filter((entity) => entity.type === table);
+  const rows = offending.slice(0, MAX_LOGGED_FK_ROWS).map((entity) => ({
+    id: entity.id,
+    refs: Object.fromEntries(
+      refFields.map((field) => [field, entity.fields[field] ?? null]),
+    ) as Record<string, WireValue>,
+  }));
+
+  return {
+    table,
+    constraint,
+    suspectColumn,
+    truncated: offending.length > rows.length,
+    rows,
+  };
 };
 
 const logPullLocalFkViolation = (
@@ -325,6 +424,11 @@ const logCycleOutcome = (
   const level: 'info' | 'warn' | 'error' =
     outcome === 'converged' ? 'info' : outcome === 'fk-violation' ? 'error' : 'warn';
 
+  // Server FK_VIOLATION carries structured batch context (which table/column/
+  // row ids) on the SyncCycleError; lift it into the log so the failure names
+  // the offending values instead of just the constraint.
+  const detail = error instanceof SyncCycleError ? error.detail : undefined;
+
   try {
     void logEvent({
       level,
@@ -335,6 +439,7 @@ const logCycleOutcome = (
         outcome,
         error_code: errorCode,
         ...(error !== undefined ? { exception_message: sanitizeExceptionMessage(error) } : {}),
+        ...(detail ? { fk_violation: detail } : {}),
       },
     }).catch(() => undefined);
   } catch {
@@ -708,7 +813,14 @@ const callSyncPush = async (entities: WireEntity[]): Promise<void> => {
     .rpc(SYNC_PUSH_RPC, { entities })) as RpcResult;
   const code = classifyRpcResult(error, data);
   if (code) {
-    throw new SyncCycleError(code, error?.message ?? `sync push failed: ${code}`);
+    const message = error?.message ?? `sync push failed: ${code}`;
+    // Map a server FK_VIOLATION back onto the batch we just sent so the log can
+    // name the offending row(s), column, and unresolved parent id instead of a
+    // bare constraint name. Ids only — never the row payload.
+    if (code === 'FK_VIOLATION') {
+      throw new SyncCycleError(code, message, describeServerFkViolation(message, entities));
+    }
+    throw new SyncCycleError(code, message);
   }
 };
 
