@@ -473,6 +473,10 @@ function MuscleFamilyCard({
   const headerContent = (
     <>
       <Text
+        adjustsFontSizeToFit
+        ellipsizeMode="clip"
+        minimumFontScale={0.82}
+        numberOfLines={2}
         style={[styles.familyName, familyUntrained && styles.muscleTextUntrained]}
         testID={`stats-family-name-${testIdSlug}`}>
         {family.familyName}
@@ -540,7 +544,10 @@ function MuscleFamilyCard({
                 testID={`stats-muscle-row-${muscle.muscleGroupId}`}>
                 <Text
                   style={[styles.muscleName, muscleUntrained && styles.muscleTextUntrained]}
-                  numberOfLines={1}>
+                  adjustsFontSizeToFit
+                  ellipsizeMode="clip"
+                  minimumFontScale={0.82}
+                  numberOfLines={2}>
                   {muscle.displayName}
                 </Text>
                 <View style={styles.muscleMetrics}>
@@ -753,7 +760,13 @@ function MuscleHistoryOverlay({
             <Text style={styles.overlayEyebrow}>
               {muscle.muscleGroupIds.length > 1 ? 'Muscle Group History' : 'Muscle History'}
             </Text>
-            <Text style={styles.overlayTitle} testID="stats-muscle-history-title">
+            <Text
+              adjustsFontSizeToFit
+              ellipsizeMode="clip"
+              minimumFontScale={0.82}
+              numberOfLines={2}
+              style={styles.overlayTitle}
+              testID="stats-muscle-history-title">
               {muscle.displayName}
             </Text>
           </View>
@@ -884,10 +897,16 @@ function ExerciseListView({
             }
             style={({ pressed }) => [styles.exerciseRow, pressed && styles.actionableRowPressed]}
             testID={`stats-exercise-row-${item.id}`}>
-            <Text style={styles.exerciseName} numberOfLines={1} testID={`stats-exercise-name-${item.id}`}>
+            <Text
+              adjustsFontSizeToFit
+              ellipsizeMode="clip"
+              minimumFontScale={0.82}
+              numberOfLines={2}
+              style={styles.exerciseName}
+              testID={`stats-exercise-name-${item.id}`}>
               {item.name}
             </Text>
-            <View style={styles.muscleMetrics}>
+            <View style={styles.exerciseMetrics}>
               <Metric
                 label="Sessions"
                 value={formatNumber(item.sessionCount)}
@@ -961,7 +980,13 @@ function ExerciseHistoryOverlay({
         <View style={styles.overlayHeader}>
           <View style={styles.overlayTitleGroup}>
             <Text style={styles.overlayEyebrow}>Exercise History</Text>
-            <Text style={styles.overlayTitle} testID="stats-exercise-history-title">
+            <Text
+              adjustsFontSizeToFit
+              ellipsizeMode="clip"
+              minimumFontScale={0.82}
+              numberOfLines={2}
+              style={styles.overlayTitle}
+              testID="stats-exercise-history-title">
               {exercise.displayName}
             </Text>
           </View>
@@ -1396,20 +1421,23 @@ const styles = StyleSheet.create({
     color: uiColors.textSecondary,
   },
   exerciseRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 10,
     paddingHorizontal: 12,
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: uiColors.borderMuted,
-    gap: 12,
   },
   exerciseName: {
     fontSize: 14,
     fontWeight: '500',
     color: uiColors.textPrimary,
-    flexShrink: 1,
+    alignSelf: 'stretch',
+    minWidth: 0,
+  },
+  exerciseMetrics: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 12,
   },
   scroll: {
     flex: 1,
@@ -1476,6 +1504,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: uiColors.textPrimary,
     flexShrink: 1,
+    minWidth: 0,
   },
   familyMetrics: {
     flexDirection: 'row',
@@ -1501,6 +1530,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: uiColors.textPrimary,
     flexShrink: 1,
+    minWidth: 0,
   },
   muscleMetrics: {
     flexDirection: 'row',
@@ -1601,6 +1631,7 @@ const styles = StyleSheet.create({
   },
   overlayTitleGroup: {
     flexShrink: 1,
+    minWidth: 0,
     gap: 2,
   },
   overlayEyebrow: {

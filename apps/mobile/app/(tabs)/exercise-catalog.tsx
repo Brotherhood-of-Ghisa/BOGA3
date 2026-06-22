@@ -151,7 +151,12 @@ const ExerciseRow = memo(function ExerciseRow({
         onPress={() => onPressEdit(exercise)}>
         <View style={styles.exerciseListRowTextStack}>
           <View style={styles.exerciseListRowTitleRow}>
-            <Text numberOfLines={1} style={styles.exerciseListRowTitle}>
+            <Text
+              adjustsFontSizeToFit
+              ellipsizeMode="clip"
+              minimumFontScale={0.82}
+              numberOfLines={2}
+              style={styles.exerciseListRowTitle}>
               {exercise.name}
             </Text>
             {exercise.deletedAt ? (
@@ -160,7 +165,12 @@ const ExerciseRow = memo(function ExerciseRow({
               </Text>
             ) : null}
           </View>
-          <Text numberOfLines={1} style={styles.exerciseListRowMuscleSummary}>
+          <Text
+            adjustsFontSizeToFit
+            ellipsizeMode="clip"
+            minimumFontScale={0.82}
+            numberOfLines={1}
+            style={styles.exerciseListRowMuscleSummary}>
             {formatExerciseMuscleSummary(exercise, muscleGroupById)}
           </Text>
           <Text numberOfLines={1} style={styles.exerciseListRowStats}>
@@ -834,6 +844,7 @@ const styles = StyleSheet.create({
   },
   exerciseListRowTitle: {
     flexShrink: 1,
+    minWidth: 0,
     fontSize: 13,
     fontWeight: '600',
     color: uiColors.textPrimary,
