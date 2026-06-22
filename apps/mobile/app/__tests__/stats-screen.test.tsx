@@ -421,6 +421,24 @@ describe('StatsScreenShell', () => {
     });
   });
 
+  it('keeps family header history targets complete when muscle search hides non-matching rows', () => {
+    const onPressMuscleHistory = jest.fn();
+    renderStatsScreenShell({
+      searchQuery: 'front',
+      onPressMuscleHistory,
+    });
+
+    expect(screen.getByTestId('stats-muscle-row-front_delts')).toBeTruthy();
+    expect(screen.queryByTestId('stats-muscle-row-rear_delts')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('stats-family-header-shoulders'));
+    expect(onPressMuscleHistory).toHaveBeenCalledWith({
+      muscleGroupIds: ['front_delts', 'rear_delts'],
+      displayName: 'Shoulders',
+      familyName: 'Shoulders',
+    });
+  });
+
   it('renders muscle-history overlay states: loading, error, empty, populated, and dismiss', () => {
     const onDismissMuscleHistory = jest.fn();
     const onSelectMuscleHistoryWeek = jest.fn();

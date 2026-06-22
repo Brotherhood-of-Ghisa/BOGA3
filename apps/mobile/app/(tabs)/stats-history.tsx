@@ -57,6 +57,11 @@ export type ExerciseListItem = {
 
 export type StatsViewMode = 'exercise' | 'muscle';
 
+type DisplayMuscleFamily = {
+  family: StatsMuscleFamilyPerformance;
+  visibleMuscles: StatsMusclePerformance[];
+};
+
 export const formatDelta = (current: number, previous: number): DeltaDisplay => {
   if (current === 0 && previous === 0) {
     return { text: '—', tone: 'neutral' };
@@ -199,10 +204,15 @@ export function StatsScreenShell({
     ? formatDelta(summary.current.totals.totalSets, summary.previous.totals.totalSets)
     : null;
 
-  const filteredFamilies = useMemo(() => {
+  const filteredFamilies = useMemo((): DisplayMuscleFamily[] => {
     if (!summary) return [];
     const query = searchQuery.toLowerCase().trim();
-    if (!query) return summary.current.totals.muscleFamilies;
+    if (!query) {
+      return summary.current.totals.muscleFamilies.map((family) => ({
+        family,
+        visibleMuscles: family.muscles,
+      }));
+    }
     return summary.current.totals.muscleFamilies
       .map((family) => {
         const familyMatches = family.familyName.toLowerCase().includes(query);
@@ -212,13 +222,13 @@ export function StatsScreenShell({
         const filteredMuscles = familyMatches ? family.muscles : matchingMuscles;
         if (filteredMuscles.length > 0) {
           return {
-            ...family,
-            muscles: filteredMuscles,
+            family,
+            visibleMuscles: filteredMuscles,
           };
         }
         return null;
       })
-      .filter((family): family is StatsMuscleFamilyPerformance => family !== null);
+      .filter((family): family is DisplayMuscleFamily => family !== null);
   }, [summary, searchQuery]);
 
   const filteredExerciseListItems = useMemo(() => {
@@ -398,7 +408,7 @@ function MuscleFamilyList({
   previousFamilies,
   onPressMuscleHistory,
 }: {
-  families: StatsMuscleFamilyPerformance[];
+  families: DisplayMuscleFamily[];
   previousFamilies: StatsMuscleFamilyPerformance[];
   onPressMuscleHistory: (muscle: MuscleHistoryTarget) => void;
 }) {
@@ -422,10 +432,11 @@ function MuscleFamilyList({
 
   return (
     <View style={styles.familyList}>
-      {families.map((family) => (
+      {families.map(({ family, visibleMuscles }) => (
         <MuscleFamilyCard
           key={family.familyName}
           family={family}
+          visibleMuscles={visibleMuscles}
           previousFamily={previousByFamilyName.get(family.familyName) ?? null}
           previousMusclesById={previousMusclesById}
           onPressMuscleHistory={onPressMuscleHistory}
@@ -442,11 +453,13 @@ function isFamilyCollapsible(family: StatsMuscleFamilyPerformance): boolean {
 
 function MuscleFamilyCard({
   family,
+  visibleMuscles,
   previousFamily,
   previousMusclesById,
   onPressMuscleHistory,
 }: {
   family: StatsMuscleFamilyPerformance;
+  visibleMuscles: StatsMusclePerformance[];
   previousFamily: StatsMuscleFamilyPerformance | null;
   previousMusclesById: Map<string, StatsMusclePerformance>;
   onPressMuscleHistory: (muscle: MuscleHistoryTarget) => void;
@@ -506,7 +519,7 @@ function MuscleFamilyCard({
       )}
       {collapsed ? null : (
         <View style={styles.muscleList}>
-          {family.muscles.map((muscle) => {
+          {visibleMuscles.map((muscle) => {
             const muscleUntrained = muscle.sessionCount === 0 && muscle.totalWeight === 0;
             const previousMuscle = previousMusclesById.get(muscle.muscleGroupId) ?? null;
             const muscleSessionsDelta = formatDelta(
