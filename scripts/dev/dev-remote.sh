@@ -43,6 +43,11 @@ MOBILE_DIR="$REPO_ROOT/apps/mobile"
 EXPO_PORT="${EXPO_PORT:-8081}"
 TS_METRO_HTTPS_PORT=8443
 
+# Target the dedicated dev Supabase stack (BOGA-dev), not the slot-0 gate stack,
+# so running the gates never wipes this phone session's data. The env-half and
+# ensure-dev-baseline below both honor this flag. See docs/specs/12.
+export BOGA_MOBILE_DEV_DB=1
+
 # 1. Ensure this worktree has a generated Supabase config (slot/project_id/ports).
 if [[ ! -f "$REPO_ROOT/supabase/config.toml" ]]; then
   echo "[dev-remote] no supabase/config.toml — running worktree setup"

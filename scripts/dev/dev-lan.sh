@@ -29,6 +29,11 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd)"
 MOBILE_DIR="$REPO_ROOT/apps/mobile"
 
+# Target the dedicated dev Supabase stack (BOGA-dev), not the slot-0 gate stack,
+# so running the gates never wipes this phone session's data. The env-half and
+# ensure-dev-baseline below both honor this flag. See docs/specs/12.
+export BOGA_MOBILE_DEV_DB=1
+
 # 1. Ensure this worktree has a generated Supabase config (slot/project_id/ports).
 #    A fresh worktree created via worktree-create.sh already has this; the guard
 #    only fires for a checkout that was never set up.

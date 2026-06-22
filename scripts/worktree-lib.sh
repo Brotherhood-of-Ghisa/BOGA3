@@ -195,6 +195,14 @@ boga_project_id_for_slot() {
   fi
 }
 
+# The dedicated local DEV Supabase stack's project id (see
+# supabase/scripts/dev-stack-lib.sh). It is intentionally NOT backed by a git
+# worktree, so the orphan sweep must special-case it (worktree-sweep.sh) and
+# never reap it. Centralized here so the sweep and the dev-stack scripts agree.
+boga_dev_project_id() {
+  printf 'BOGA-dev\n'
+}
+
 boga_legacy_project_id_for_slot() {
   local slot="$1"
   if [[ "$slot" == "0" ]]; then

@@ -16,7 +16,8 @@
 #   boga docs gen|check                        # (re)generate / drift-check derived doc blocks
 #   boga timings [lane]                        # measured durations (never guess)
 #   boga worktree create|setup|clean|sweep|doctor
-#   boga db up|down|reset|baseline|dev        # dev: start (no reset) + migrate + seed dev users
+#   boga db up|down|reset|baseline             # slot-0 stack (gates)
+#   boga db dev|dev-up|dev-down|dev-reset       # dedicated dev stack (BOGA-dev), isolated from gates
 #   boga ios build-client|start
 #   boga env lan|hosted|tailscale
 #   boga task bootstrap|closeout
@@ -206,8 +207,11 @@ case "${cmd}" in
       down)     dispatch_script "${REPO_ROOT}/supabase/scripts/local-runtime-down.sh" "$@" ;;
       reset)    dispatch_script "${REPO_ROOT}/supabase/scripts/reset-local.sh" "$@" ;;
       baseline) dispatch_script "${REPO_ROOT}/supabase/scripts/ensure-local-runtime-baseline.sh" "$@" ;;
-      dev)      dispatch_script "${REPO_ROOT}/supabase/scripts/ensure-dev-baseline.sh" "$@" ;;
-      *) fail "usage: boga db up|down|reset|baseline|dev" ;;
+      dev)        dispatch_script "${REPO_ROOT}/supabase/scripts/ensure-dev-baseline.sh" "$@" ;;
+      dev-up)     dispatch_script "${REPO_ROOT}/supabase/scripts/dev-runtime-up.sh" "$@" ;;
+      dev-down)   dispatch_script "${REPO_ROOT}/supabase/scripts/dev-runtime-down.sh" "$@" ;;
+      dev-reset)  dispatch_script "${REPO_ROOT}/supabase/scripts/dev-reset.sh" "$@" ;;
+      *) fail "usage: boga db up|down|reset|baseline | dev|dev-up|dev-down|dev-reset" ;;
     esac
     ;;
   ios)
