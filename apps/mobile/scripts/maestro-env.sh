@@ -12,6 +12,10 @@ if [[ -f "$REPO_ROOT/scripts/worktree-lib.sh" ]]; then
   # shellcheck disable=SC1091
   source "$REPO_ROOT/scripts/worktree-lib.sh"
 fi
+if [[ -f "$REPO_ROOT/scripts/java-env.sh" ]]; then
+  # shellcheck disable=SC1091
+  source "$REPO_ROOT/scripts/java-env.sh"
+fi
 
 maestro_fail() {
   echo "$*" >&2
@@ -104,4 +108,3 @@ maestro_source_env() {
 maestro_trim() {
   echo "$1" | xargs
 }
-

@@ -53,11 +53,15 @@ export type BogaImportExerciseTarget =
       exerciseName: string;
     };
 
+export const BOGA_IMPORT_SET_TYPES = ['warm_up', 'rir_0', 'rir_1', 'rir_2'] as const;
+
+export type BogaImportSetType = (typeof BOGA_IMPORT_SET_TYPES)[number] | null;
+
 export type BogaImportSet = {
   orderIndex: number;
   repsValue: string;
   weightValue: string;
-  setType: null;
+  setType: BogaImportSetType;
   source: {
     rowIndex: number;
     workoutName: string;
@@ -164,6 +168,9 @@ const isNumber = (value: unknown): value is number =>
   typeof value === 'number' && Number.isFinite(value);
 
 const isArray = (value: unknown): value is unknown[] => Array.isArray(value);
+
+export const isValidBogaImportSetType = (value: unknown): value is BogaImportSetType =>
+  value === null || BOGA_IMPORT_SET_TYPES.includes(value as (typeof BOGA_IMPORT_SET_TYPES)[number]);
 
 export const validateBogaSessionImportPackage = (
   value: unknown,
@@ -287,6 +294,30 @@ export const validateBogaSessionImportPackage = (
         }
         if (!isArray(exercise.sets) || exercise.sets.length === 0) {
           errors.push(`sessions[${sessionIndex}].exercises[${exerciseIndex}].sets must be non-empty`);
+        } else {
+          exercise.sets.forEach((set, setIndex) => {
+            if (!isRecord(set)) {
+              errors.push(`sessions[${sessionIndex}].exercises[${exerciseIndex}].sets[${setIndex}] must be an object`);
+              return;
+            }
+            const orderIndex = set.orderIndex;
+            if (typeof orderIndex !== 'number' || !Number.isInteger(orderIndex) || orderIndex < 0) {
+              errors.push(
+                `sessions[${sessionIndex}].exercises[${exerciseIndex}].sets[${setIndex}].orderIndex must be a non-negative integer`
+              );
+            }
+            if (!isString(set.repsValue)) {
+              errors.push(`sessions[${sessionIndex}].exercises[${exerciseIndex}].sets[${setIndex}].repsValue must be a string`);
+            }
+            if (!isString(set.weightValue)) {
+              errors.push(`sessions[${sessionIndex}].exercises[${exerciseIndex}].sets[${setIndex}].weightValue must be a string`);
+            }
+            if (!isValidBogaImportSetType(set.setType)) {
+              errors.push(
+                `sessions[${sessionIndex}].exercises[${exerciseIndex}].sets[${setIndex}].setType must be warm_up|rir_0|rir_1|rir_2|null`
+              );
+            }
+          });
         }
       });
     });

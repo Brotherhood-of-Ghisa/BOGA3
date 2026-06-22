@@ -23,7 +23,10 @@
     "test:e2e:ios:data-smoke": "./scripts/maestro-run-lane.sh data-smoke",
     "test:e2e:ios:gates": "./scripts/maestro-ios-gates.sh",
     "test:e2e:ios:auth-profile": "./scripts/maestro-run-lane.sh auth-profile",
-    "test:e2e:ios:sync": "./scripts/maestro-run-lane.sh sync-e2e"
+    "test:e2e:ios:sync": "./scripts/maestro-run-lane.sh sync-e2e",
+    "import:boga-json:local": "tsx scripts/import/import-boga-json-local.ts",
+    "import:boga-json:enrich-set-types": "tsx scripts/import/enrich-boga-import-set-types.ts",
+    "seed:dev-rich-history": "tsx scripts/import/seed-dev-rich-history.ts"
   },
   "dependencies": {
     "@react-native-community/netinfo": "11.4.1",

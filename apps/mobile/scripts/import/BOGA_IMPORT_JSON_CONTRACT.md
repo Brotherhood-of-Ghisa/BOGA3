@@ -104,7 +104,9 @@ Sets use BOGA-ready string values:
 - `repsValue`: source reps as a string.
 - `weightValue`: kg numeric text with the unit stripped, or empty string for
   bodyweight/reps-only sets.
-- `setType`: currently `null`; source set-type text is preserved under
+- `setType`: `null`, `warm_up`, `rir_2`, `rir_1`, or `rir_0`. Imported
+  packages may leave this as `null`, or may classify historical effort when the
+  source data is good enough. Source set-type text is preserved under
   `source.type`.
 
 Non-empty source notes are preserved under set `source.note` and summarized in

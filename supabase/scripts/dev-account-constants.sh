@@ -21,3 +21,6 @@ export DEV_ACCOUNT_A_PASSWORD="dev123"
 
 export DEV_ACCOUNT_B_EMAIL="b@dev.local"
 export DEV_ACCOUNT_B_PASSWORD="dev123"
+
+export DEV_RICH_HISTORY_EMAIL="history@dev.local"
+export DEV_RICH_HISTORY_PASSWORD="dev123"
