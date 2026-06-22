@@ -1,6 +1,6 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { DailyHeatmap, WeeklyHeatmap, buildHeatmapData } from '@/components/heatmaps';
 import { SegmentedChips, uiColors } from '@/components/ui';
@@ -56,6 +56,11 @@ export type ExerciseListItem = {
 };
 
 export type StatsViewMode = 'exercise' | 'muscle';
+
+type DisplayMuscleFamily = {
+  family: StatsMuscleFamilyPerformance;
+  visibleMuscles: StatsMusclePerformance[];
+};
 
 export const formatDelta = (current: number, previous: number): DeltaDisplay => {
   if (current === 0 && previous === 0) {
@@ -148,6 +153,8 @@ export type StatsScreenShellProps = {
   onSelectExerciseHistoryView: (view: HeatmapView) => void;
   /** Optional determinism seam: anchors the heatmap window. Defaults to today. */
   historyTodayDateKey?: string;
+  searchQuery: string;
+  onSearchQueryChange: (query: string) => void;
 };
 
 export function StatsScreenShell({
@@ -187,6 +194,8 @@ export function StatsScreenShell({
   onSelectExerciseHistoryMetric,
   onSelectExerciseHistoryView,
   historyTodayDateKey,
+  searchQuery,
+  onSearchQueryChange,
 }: StatsScreenShellProps) {
   const sessionDelta = summary
     ? formatDelta(summary.current.totals.sessionCount, summary.previous.totals.sessionCount)
@@ -194,6 +203,41 @@ export function StatsScreenShell({
   const setsDelta = summary
     ? formatDelta(summary.current.totals.totalSets, summary.previous.totals.totalSets)
     : null;
+
+  const filteredFamilies = useMemo((): DisplayMuscleFamily[] => {
+    if (!summary) return [];
+    const query = searchQuery.toLowerCase().trim();
+    if (!query) {
+      return summary.current.totals.muscleFamilies.map((family) => ({
+        family,
+        visibleMuscles: family.muscles,
+      }));
+    }
+    return summary.current.totals.muscleFamilies
+      .map((family) => {
+        const familyMatches = family.familyName.toLowerCase().includes(query);
+        const matchingMuscles = family.muscles.filter((muscle) =>
+          muscle.displayName.toLowerCase().includes(query)
+        );
+        const filteredMuscles = familyMatches ? family.muscles : matchingMuscles;
+        if (filteredMuscles.length > 0) {
+          return {
+            family,
+            visibleMuscles: filteredMuscles,
+          };
+        }
+        return null;
+      })
+      .filter((family): family is DisplayMuscleFamily => family !== null);
+  }, [summary, searchQuery]);
+
+  const filteredExerciseListItems = useMemo(() => {
+    const query = searchQuery.toLowerCase().trim();
+    if (!query) return exerciseListItems;
+    return exerciseListItems.filter((item) =>
+      item.name.toLowerCase().includes(query)
+    );
+  }, [exerciseListItems, searchQuery]);
 
   return (
     <View style={styles.screen} testID="stats-history-screen">
@@ -254,10 +298,34 @@ export function StatsScreenShell({
         </View>
       ) : null}
 
+      <View style={styles.searchContainer}>
+        <TextInput
+          accessibilityLabel={viewMode === 'exercise' ? 'Exercise filter input' : 'Muscle filter input'}
+          autoCapitalize="none"
+          autoCorrect={false}
+          onChangeText={onSearchQueryChange}
+          placeholder={viewMode === 'exercise' ? 'Filter by exercise...' : 'Filter by muscle...'}
+          style={styles.filterInput}
+          value={searchQuery}
+          testID="stats-search-input"
+        />
+        {searchQuery ? (
+          <Pressable
+            accessibilityLabel="Clear search input"
+            accessibilityRole="button"
+            onPress={() => onSearchQueryChange('')}
+            style={styles.clearSearchButton}
+            testID="stats-search-clear-button">
+            <Text style={styles.clearSearchButtonText}>×</Text>
+          </Pressable>
+        ) : null}
+      </View>
+
       {viewMode === 'exercise' ? (
         <ExerciseListView
-          items={exerciseListItems}
+          items={filteredExerciseListItems}
           onPressExercise={onPressExerciseHistory}
+          isFiltered={Boolean(searchQuery.trim())}
         />
       ) : (
         <ScrollView
@@ -278,11 +346,21 @@ export function StatsScreenShell({
           ) : null}
 
           {summary ? (
-            <MuscleFamilyList
-              families={summary.current.totals.muscleFamilies}
-              previousFamilies={summary.previous.totals.muscleFamilies}
-              onPressMuscleHistory={onPressMuscleHistory}
-            />
+            filteredFamilies.length === 0 ? (
+              <View style={styles.statePanel} testID="stats-muscle-empty">
+                <Text style={styles.stateBody}>
+                  {searchQuery.trim()
+                    ? 'No muscle groups match the search query.'
+                    : 'No muscle taxonomy loaded yet. Add some exercises to see this section.'}
+                </Text>
+              </View>
+            ) : (
+              <MuscleFamilyList
+                families={filteredFamilies}
+                previousFamilies={summary.previous.totals.muscleFamilies}
+                onPressMuscleHistory={onPressMuscleHistory}
+              />
+            )
           ) : null}
         </ScrollView>
       )}
@@ -330,7 +408,7 @@ function MuscleFamilyList({
   previousFamilies,
   onPressMuscleHistory,
 }: {
-  families: StatsMuscleFamilyPerformance[];
+  families: DisplayMuscleFamily[];
   previousFamilies: StatsMuscleFamilyPerformance[];
   onPressMuscleHistory: (muscle: MuscleHistoryTarget) => void;
 }) {
@@ -354,10 +432,11 @@ function MuscleFamilyList({
 
   return (
     <View style={styles.familyList}>
-      {families.map((family) => (
+      {families.map(({ family, visibleMuscles }) => (
         <MuscleFamilyCard
           key={family.familyName}
           family={family}
+          visibleMuscles={visibleMuscles}
           previousFamily={previousByFamilyName.get(family.familyName) ?? null}
           previousMusclesById={previousMusclesById}
           onPressMuscleHistory={onPressMuscleHistory}
@@ -374,11 +453,13 @@ function isFamilyCollapsible(family: StatsMuscleFamilyPerformance): boolean {
 
 function MuscleFamilyCard({
   family,
+  visibleMuscles,
   previousFamily,
   previousMusclesById,
   onPressMuscleHistory,
 }: {
   family: StatsMuscleFamilyPerformance;
+  visibleMuscles: StatsMusclePerformance[];
   previousFamily: StatsMuscleFamilyPerformance | null;
   previousMusclesById: Map<string, StatsMusclePerformance>;
   onPressMuscleHistory: (muscle: MuscleHistoryTarget) => void;
@@ -392,6 +473,10 @@ function MuscleFamilyCard({
   const headerContent = (
     <>
       <Text
+        adjustsFontSizeToFit
+        ellipsizeMode="clip"
+        minimumFontScale={0.82}
+        numberOfLines={2}
         style={[styles.familyName, familyUntrained && styles.muscleTextUntrained]}
         testID={`stats-family-name-${testIdSlug}`}>
         {family.familyName}
@@ -438,7 +523,7 @@ function MuscleFamilyCard({
       )}
       {collapsed ? null : (
         <View style={styles.muscleList}>
-          {family.muscles.map((muscle) => {
+          {visibleMuscles.map((muscle) => {
             const muscleUntrained = muscle.sessionCount === 0 && muscle.totalWeight === 0;
             const previousMuscle = previousMusclesById.get(muscle.muscleGroupId) ?? null;
             const muscleSessionsDelta = formatDelta(
@@ -459,7 +544,10 @@ function MuscleFamilyCard({
                 testID={`stats-muscle-row-${muscle.muscleGroupId}`}>
                 <Text
                   style={[styles.muscleName, muscleUntrained && styles.muscleTextUntrained]}
-                  numberOfLines={1}>
+                  adjustsFontSizeToFit
+                  ellipsizeMode="clip"
+                  minimumFontScale={0.82}
+                  numberOfLines={2}>
                   {muscle.displayName}
                 </Text>
                 <View style={styles.muscleMetrics}>
@@ -672,7 +760,13 @@ function MuscleHistoryOverlay({
             <Text style={styles.overlayEyebrow}>
               {muscle.muscleGroupIds.length > 1 ? 'Muscle Group History' : 'Muscle History'}
             </Text>
-            <Text style={styles.overlayTitle} testID="stats-muscle-history-title">
+            <Text
+              adjustsFontSizeToFit
+              ellipsizeMode="clip"
+              minimumFontScale={0.82}
+              numberOfLines={2}
+              style={styles.overlayTitle}
+              testID="stats-muscle-history-title">
               {muscle.displayName}
             </Text>
           </View>
@@ -769,15 +863,19 @@ function MuscleHistoryOverlay({
 function ExerciseListView({
   items,
   onPressExercise,
+  isFiltered,
 }: {
   items: ExerciseListItem[];
   onPressExercise: (exercise: ExerciseHeatmapTarget) => void;
+  isFiltered: boolean;
 }) {
   if (items.length === 0) {
     return (
       <View style={styles.statePanel} testID="stats-exercise-list-empty">
         <Text style={styles.stateBody}>
-          No exercises with recorded history yet.
+          {isFiltered
+            ? 'No exercises match the search query.'
+            : 'No exercises with recorded history yet.'}
         </Text>
       </View>
     );
@@ -799,10 +897,16 @@ function ExerciseListView({
             }
             style={({ pressed }) => [styles.exerciseRow, pressed && styles.actionableRowPressed]}
             testID={`stats-exercise-row-${item.id}`}>
-            <Text style={styles.exerciseName} numberOfLines={1} testID={`stats-exercise-name-${item.id}`}>
+            <Text
+              adjustsFontSizeToFit
+              ellipsizeMode="clip"
+              minimumFontScale={0.82}
+              numberOfLines={2}
+              style={styles.exerciseName}
+              testID={`stats-exercise-name-${item.id}`}>
               {item.name}
             </Text>
-            <View style={styles.muscleMetrics}>
+            <View style={styles.exerciseMetrics}>
               <Metric
                 label="Sessions"
                 value={formatNumber(item.sessionCount)}
@@ -876,7 +980,13 @@ function ExerciseHistoryOverlay({
         <View style={styles.overlayHeader}>
           <View style={styles.overlayTitleGroup}>
             <Text style={styles.overlayEyebrow}>Exercise History</Text>
-            <Text style={styles.overlayTitle} testID="stats-exercise-history-title">
+            <Text
+              adjustsFontSizeToFit
+              ellipsizeMode="clip"
+              minimumFontScale={0.82}
+              numberOfLines={2}
+              style={styles.overlayTitle}
+              testID="stats-exercise-history-title">
               {exercise.displayName}
             </Text>
           </View>
@@ -1018,6 +1128,7 @@ export default function StatsRoute() {
   const muscleHistoryRequestIdRef = useRef(0);
 
   const [viewMode, setViewMode] = useState<StatsViewMode>('exercise');
+  const [searchQuery, setSearchQuery] = useState('');
   const [selectedExercise, setSelectedExercise] = useState<ExerciseHeatmapTarget | null>(null);
   const [exerciseHistoryWeeklyEffort, setExerciseHistoryWeeklyEffort] = useState<SelectedExerciseWeeklyEffort[]>([]);
   const [exerciseHistoryDailyMetrics, setExerciseHistoryDailyMetrics] = useState<DailyEffortMetrics[]>([]);
@@ -1121,6 +1232,7 @@ export default function StatsRoute() {
 
   const handleSelectViewMode = useCallback((mode: StatsViewMode) => {
     setViewMode(mode);
+    setSearchQuery('');
     setSelectedExercise(null);
     setExerciseHistoryWeeklyEffort([]);
     setExerciseHistoryDailyMetrics([]);
@@ -1237,6 +1349,8 @@ export default function StatsRoute() {
       onSelectExerciseHistoryWeek: handleSelectExerciseHistoryWeek,
       onSelectExerciseHistoryMetric: setExerciseHistoryMetric,
       onSelectExerciseHistoryView: setExerciseHistoryView,
+      searchQuery,
+      onSearchQueryChange: setSearchQuery,
     }),
     [
       summary,
@@ -1270,6 +1384,7 @@ export default function StatsRoute() {
       handlePressExerciseHistory,
       handleDismissExerciseHistory,
       handleSelectExerciseHistoryWeek,
+      searchQuery,
     ]
   );
 
@@ -1306,20 +1421,23 @@ const styles = StyleSheet.create({
     color: uiColors.textSecondary,
   },
   exerciseRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 10,
     paddingHorizontal: 12,
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: uiColors.borderMuted,
-    gap: 12,
   },
   exerciseName: {
     fontSize: 14,
     fontWeight: '500',
     color: uiColors.textPrimary,
-    flexShrink: 1,
+    alignSelf: 'stretch',
+    minWidth: 0,
+  },
+  exerciseMetrics: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 12,
   },
   scroll: {
     flex: 1,
@@ -1386,6 +1504,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: uiColors.textPrimary,
     flexShrink: 1,
+    minWidth: 0,
   },
   familyMetrics: {
     flexDirection: 'row',
@@ -1411,6 +1530,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: uiColors.textPrimary,
     flexShrink: 1,
+    minWidth: 0,
   },
   muscleMetrics: {
     flexDirection: 'row',
@@ -1511,6 +1631,7 @@ const styles = StyleSheet.create({
   },
   overlayTitleGroup: {
     flexShrink: 1,
+    minWidth: 0,
     gap: 2,
   },
   overlayEyebrow: {
@@ -1598,6 +1719,38 @@ const styles = StyleSheet.create({
   },
   deltaNeutral: {
     color: uiColors.textSecondary,
+  },
+  searchContainer: {
+    position: 'relative',
+    justifyContent: 'center',
+  },
+  filterInput: {
+    borderWidth: 1,
+    borderColor: uiColors.borderMuted,
+    borderRadius: 8,
+    backgroundColor: uiColors.surfaceDefault,
+    color: uiColors.textPrimary,
+    paddingLeft: 10,
+    paddingRight: 36,
+    paddingVertical: 9,
+    minHeight: 42,
+    fontSize: 14,
+  },
+  clearSearchButton: {
+    position: 'absolute',
+    right: 10,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: uiColors.borderMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  clearSearchButtonText: {
+    color: uiColors.textSecondary,
+    fontSize: 14,
+    fontWeight: 'bold',
+    lineHeight: 16,
   },
   deltaNew: {
     color: uiColors.actionPrimary,

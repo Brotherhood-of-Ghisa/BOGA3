@@ -271,6 +271,8 @@ const buildShellProps = (
   onSelectExerciseHistoryMetric: jest.fn(),
   onSelectExerciseHistoryView: jest.fn(),
   historyTodayDateKey: '2026-06-05',
+  searchQuery: '',
+  onSearchQueryChange: jest.fn(),
   ...overrides,
 });
 
@@ -410,6 +412,24 @@ describe('StatsScreenShell', () => {
   it('opens family-level muscle history from a multi-muscle family header', () => {
     const onPressMuscleHistory = jest.fn();
     renderStatsScreenShell({ onPressMuscleHistory });
+
+    fireEvent.press(screen.getByTestId('stats-family-header-shoulders'));
+    expect(onPressMuscleHistory).toHaveBeenCalledWith({
+      muscleGroupIds: ['front_delts', 'rear_delts'],
+      displayName: 'Shoulders',
+      familyName: 'Shoulders',
+    });
+  });
+
+  it('keeps family header history targets complete when muscle search hides non-matching rows', () => {
+    const onPressMuscleHistory = jest.fn();
+    renderStatsScreenShell({
+      searchQuery: 'front',
+      onPressMuscleHistory,
+    });
+
+    expect(screen.getByTestId('stats-muscle-row-front_delts')).toBeTruthy();
+    expect(screen.queryByTestId('stats-muscle-row-rear_delts')).toBeNull();
 
     fireEvent.press(screen.getByTestId('stats-family-header-shoulders'));
     expect(onPressMuscleHistory).toHaveBeenCalledWith({
@@ -978,5 +998,150 @@ describe('StatsRoute — exercise heatmap integration', () => {
     await waitFor(() =>
       expect(screen.getByTestId('stats-exercise-history-error')).toHaveTextContent(/DB error/)
     );
+  });
+});
+
+describe('StatsScreenShell — search & filtering', () => {
+  const buildExerciseListItem = (id: string, name: string) => ({
+    id,
+    name,
+    sessionCount: 5,
+    totalVolume: 2500,
+    estimatedOneRepMax: 110,
+  });
+
+  it('renders search input with dynamic placeholder depending on viewMode', () => {
+    const { rerender } = render(
+      <StatsScreenShell {...buildShellProps({ viewMode: 'exercise' })} />
+    );
+    expect(screen.getByPlaceholderText('Filter by exercise...')).toBeTruthy();
+
+    rerender(<StatsScreenShell {...buildShellProps({ viewMode: 'muscle' })} />);
+    expect(screen.getByPlaceholderText('Filter by muscle...')).toBeTruthy();
+  });
+
+  it('calls onSearchQueryChange when typing and shows clear button', () => {
+    const onSearchQueryChange = jest.fn();
+    const { rerender } = render(
+      <StatsScreenShell
+        {...buildShellProps({
+          searchQuery: '',
+          onSearchQueryChange,
+        })}
+      />
+    );
+
+    const input = screen.getByTestId('stats-search-input');
+    fireEvent.changeText(input, 'Bench');
+    expect(onSearchQueryChange).toHaveBeenCalledWith('Bench');
+
+    expect(screen.queryByTestId('stats-search-clear-button')).toBeNull();
+
+    rerender(
+      <StatsScreenShell
+        {...buildShellProps({
+          searchQuery: 'Bench',
+          onSearchQueryChange,
+        })}
+      />
+    );
+    expect(screen.getByTestId('stats-search-clear-button')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('stats-search-clear-button'));
+    expect(onSearchQueryChange).toHaveBeenLastCalledWith('');
+  });
+
+  it('filters exercises based on searchQuery', () => {
+    render(
+      <StatsScreenShell
+        {...buildShellProps({
+          viewMode: 'exercise',
+          searchQuery: 'bench',
+          exerciseListItems: [
+            buildExerciseListItem('ex1', 'Bench Press'),
+            buildExerciseListItem('ex2', 'Squat'),
+          ],
+        })}
+      />
+    );
+
+    expect(screen.getByTestId('stats-exercise-row-ex1')).toBeTruthy();
+    expect(screen.queryByTestId('stats-exercise-row-ex2')).toBeNull();
+  });
+
+  it('shows correct empty state when no exercises match', () => {
+    render(
+      <StatsScreenShell
+        {...buildShellProps({
+          viewMode: 'exercise',
+          searchQuery: 'deadlift',
+          exerciseListItems: [
+            buildExerciseListItem('ex1', 'Bench Press'),
+          ],
+        })}
+      />
+    );
+
+    expect(screen.queryByTestId('stats-exercise-row-ex1')).toBeNull();
+    expect(screen.getByTestId('stats-exercise-list-empty')).toHaveTextContent(
+      'No exercises match the search query.'
+    );
+  });
+
+  it('filters muscle families and groups based on searchQuery', () => {
+    render(
+      <StatsScreenShell
+        {...buildShellProps({
+          viewMode: 'muscle',
+          searchQuery: 'front',
+          summary: buildSummary(),
+        })}
+      />
+    );
+
+    // Shoulders has "Front Delts" which matches, so Shoulders family should render
+    expect(screen.getByTestId('stats-family-card-shoulders')).toBeTruthy();
+    expect(screen.getByTestId('stats-muscle-row-front_delts')).toBeTruthy();
+
+    // Rear Delts doesn't match "front", so it should be hidden
+    expect(screen.queryByTestId('stats-muscle-row-rear_delts')).toBeNull();
+
+    // Chest has "Chest" muscle, which doesn't match "front", so Chest family should be hidden
+    expect(screen.queryByTestId('stats-family-card-chest')).toBeNull();
+  });
+
+  it('shows correct empty state when no muscles match query', () => {
+    render(
+      <StatsScreenShell
+        {...buildShellProps({
+          viewMode: 'muscle',
+          searchQuery: 'biceps',
+          summary: buildSummary(),
+        })}
+      />
+    );
+
+    expect(screen.queryByTestId('stats-family-card-shoulders')).toBeNull();
+    expect(screen.queryByTestId('stats-family-card-chest')).toBeNull();
+    expect(screen.getByTestId('stats-muscle-empty')).toHaveTextContent(
+      'No muscle groups match the search query.'
+    );
+  });
+});
+
+describe('StatsRoute — view mode toggle search query reset', () => {
+  it('resets search query when view mode chip is pressed', async () => {
+    mockComputeStatsSummary.mockResolvedValue(buildSummary());
+    render(<StatsRoute />);
+
+    await act(async () => { triggerFocus(); });
+    await waitFor(() => expect(screen.getByTestId('stats-search-input')).toBeTruthy());
+
+    // Type in search query
+    fireEvent.changeText(screen.getByTestId('stats-search-input'), 'Chest');
+    expect(screen.getByTestId('stats-search-input').props.value).toBe('Chest');
+
+    // Switch view modes
+    fireEvent.press(screen.getByTestId('stats-view-mode-chip'));
+    expect(screen.getByTestId('stats-search-input').props.value).toBe('');
   });
 });

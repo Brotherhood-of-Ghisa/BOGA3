@@ -335,8 +335,16 @@ export function ExerciseEditorModal({
                   accessibilityLabel="Exercise definition name"
                   testID="exercise-editor-name-input"
                   autoFocus
+                  autoCorrect={false}
+                  multiline={false}
+                  numberOfLines={1}
                   placeholder="Exercise name"
-                  style={[styles.input, validation.nameError ? styles.inputError : null]}
+                  scrollEnabled
+                  style={[
+                    styles.input,
+                    styles.exerciseNameInput,
+                    validation.nameError ? styles.inputError : null,
+                  ]}
                   value={exerciseName}
                   onChangeText={(nextValue) => {
                     setExerciseName(nextValue);
@@ -359,7 +367,10 @@ export function ExerciseEditorModal({
                   style={[styles.pickerButton, validation.primaryMuscleError ? styles.inputError : null]}
                   onPress={() => openMuscleSelector('primary')}>
                   <Text
-                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    ellipsizeMode="clip"
+                    minimumFontScale={0.82}
+                    numberOfLines={2}
                     style={primaryMuscleGroupId ? styles.pickerButtonText : styles.pickerButtonPlaceholder}>
                     {primaryMuscleGroupId
                       ? getMuscleDisplayName(primaryMuscleGroupId, muscleGroupById)
@@ -381,7 +392,12 @@ export function ExerciseEditorModal({
                       <View key={row.rowId} style={styles.secondaryMuscleRow}>
                         <View style={styles.secondaryMuscleRowControls}>
                           <View style={styles.secondaryMuscleLabelCell}>
-                            <Text numberOfLines={1} style={styles.secondaryMuscleRowTitle}>
+                            <Text
+                              adjustsFontSizeToFit
+                              ellipsizeMode="clip"
+                              minimumFontScale={0.82}
+                              numberOfLines={2}
+                              style={styles.secondaryMuscleRowTitle}>
                               {muscleGroup?.displayName ?? row.muscleGroupId}
                             </Text>
                             <Text numberOfLines={1} style={styles.secondaryMuscleRowFamily}>
@@ -478,7 +494,12 @@ export function ExerciseEditorModal({
                       addSecondaryMuscle(muscleGroup.id);
                     }}>
                     <View style={styles.selectorListRowTextStack}>
-                      <Text numberOfLines={1} style={styles.selectorListRowTitle}>
+                      <Text
+                        adjustsFontSizeToFit
+                        ellipsizeMode="clip"
+                        minimumFontScale={0.82}
+                        numberOfLines={2}
+                        style={styles.selectorListRowTitle}>
                         {muscleGroup.displayName}
                       </Text>
                       <Text numberOfLines={1} style={styles.selectorListRowMeta}>
@@ -569,6 +590,10 @@ const styles = StyleSheet.create({
     backgroundColor: uiColors.surfaceDefault,
     paddingHorizontal: 10,
     paddingVertical: 9,
+  },
+  exerciseNameInput: {
+    height: 42,
+    overflow: 'hidden',
   },
   inputError: {
     borderColor: uiColors.actionDanger,
