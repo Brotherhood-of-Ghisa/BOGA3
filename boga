@@ -34,6 +34,8 @@ LANES_TSV="${REPO_ROOT}/scripts/lanes.tsv"
 source "${REPO_ROOT}/scripts/worktree-lib.sh"
 # shellcheck disable=SC1091
 source "${REPO_ROOT}/scripts/lane-timing.sh"
+# shellcheck disable=SC1091
+source "${REPO_ROOT}/scripts/java-env.sh"
 
 usage() {
   sed -n '3,23p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'

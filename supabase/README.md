@@ -148,7 +148,7 @@ Provision deterministic local auth fixtures (`user_a`, `user_b`) after local res
 ./supabase/scripts/auth-provision-local-fixtures.sh
 ```
 
-Provision the human **development** sign-in accounts (`a@dev.local`, `b@dev.local`) — kept
+Provision the human **development** sign-in accounts (`a@dev.local`, `b@dev.local`, `history@dev.local`) — kept
 separate from the test fixtures so manual dev never collides with the suites that
 reset/wipe `user_a`/`user_b`:
 
@@ -158,8 +158,9 @@ reset/wipe `user_a`/`user_b`:
 
 These dev accounts are plain auth users (no `--fixture-key`, not in
 `public.dev_fixture_principals`); credentials live in
-`supabase/scripts/dev-account-constants.sh`. See `RUNBOOK.md` →
-"Log into a development database" for the full account inventory and sign-in flow.
+`supabase/scripts/dev-account-constants.sh`. `history@dev.local` is the rich
+GymBook-history account seeded by `boga db dev`. See `RUNBOOK.md` → "Log into a
+development database" for the full account inventory and sign-in flow.
 
 Provision or update one user (local, or any environment where `API_URL` + `SERVICE_ROLE_KEY` or `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` are exported):
 

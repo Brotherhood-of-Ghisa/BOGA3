@@ -30,6 +30,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/_common.sh"
 # shellcheck disable=SC1091
 source "${SCRIPT_DIR}/dev-stack-lib.sh"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/dev-account-constants.sh"
 
 # Point every Supabase helper below (and the auth-provisioning child) at the dev
 # stack. From here on, run_supabase / load_supabase_status_env target BOGA-dev.
@@ -94,5 +96,18 @@ apply_pending_local_migrations
 
 echo "[dev-baseline] seeding human development accounts (idempotent)"
 "${SCRIPT_DIR}/auth-provision-dev-accounts.sh"
+
+echo "[dev-baseline] seeding rich imported history for ${DEV_RICH_HISTORY_EMAIL} (idempotent)"
+if [[ ! -x "${SCRIPT_DIR}/../../apps/mobile/node_modules/.bin/tsx" ]]; then
+  cat >&2 <<'MSG'
+[dev-baseline] mobile dependencies missing; rich-history seed tooling needs tsx.
+[dev-baseline] Run the worktree setup/bootstrap first, then retry:
+[dev-baseline]     ./boga worktree setup
+MSG
+  exit 1
+fi
+(cd "${SCRIPT_DIR}/../../apps/mobile" && npm run seed:dev-rich-history -- \
+  --email "${DEV_RICH_HISTORY_EMAIL}" \
+  --password "${DEV_RICH_HISTORY_PASSWORD}")
 
 echo "[dev-baseline] dev baseline ready — dev data preserved, no reset performed"

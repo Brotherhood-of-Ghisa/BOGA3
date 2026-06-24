@@ -166,9 +166,38 @@ function resetLocalDb(): void {
   if (!existsSync(RESET_SCRIPT)) {
     throw new Error(`reset script missing: ${RESET_SCRIPT}`);
   }
-  const r = spawnSync('bash', [RESET_SCRIPT], { cwd: REPO_ROOT, stdio: 'inherit' });
-  if ((r.status ?? 1) !== 0) {
-    throw new Error(`supabase db reset failed (rc=${r.status})`);
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    const r = spawnSync('bash', [RESET_SCRIPT], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+      maxBuffer: 20 * 1024 * 1024,
+    });
+    if (r.stdout) {
+      process.stdout.write(r.stdout);
+    }
+    if (r.stderr) {
+      process.stderr.write(r.stderr);
+    }
+    if ((r.status ?? 1) === 0) {
+      return;
+    }
+    const combinedOutput = `${r.stdout}\n${r.stderr}`;
+    if (combinedOutput.includes('Error status 502')) {
+      log('supabase db reset hit transient upstream 502; checking whether reset completed anyway');
+      const smoke = spawnSync('bash', ['supabase/scripts/smoke-seed.sh'], {
+        cwd: REPO_ROOT,
+        stdio: 'inherit',
+      });
+      if ((smoke.status ?? 1) === 0) {
+        log('seed smoke passed after upstream 502; continuing');
+        return;
+      }
+    }
+    if (attempt === 2) {
+      throw new Error(`supabase db reset failed (rc=${r.status})`);
+    }
+    log(`supabase db reset failed (rc=${r.status}); retrying once after local stack restart settles`);
+    spawnSync('sleep', ['2'], { stdio: 'inherit' });
   }
 }
 
