@@ -1,0 +1,13 @@
+{
+  "lane": "ios-smoke",
+  "wall_ms": 47667,
+  "exit_code": 0,
+  "recorded_at": "20260624T141334Z",
+  "machine_id": "6443fb0d",
+  "hw": "Apple M4",
+  "cores": 10,
+  "os": "macOS 26.5.1",
+  "slot": "1",
+  "commit": "3c354e3",
+  "source": "gate"
+}

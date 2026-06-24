@@ -13,6 +13,7 @@ import {
 } from '@/src/data/exercise-catalog';
 import { __resetExerciseCatalogCacheForTests } from '@/src/exercise-catalog/cache';
 import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidation';
+import { __resetExerciseListPreferencesForTests } from '@/src/exercise-catalog/list-preferences';
 import { loadExerciseCatalogStatsRawHistory } from '@/src/data/exercise-catalog-stats';
 import { __resetExerciseCatalogStatsCacheForTests } from '@/src/exercise-catalog/stats-cache';
 
@@ -55,6 +56,10 @@ const setExerciseListAndInvalidate = (next: ExerciseCatalogExercise[]) => {
   invalidateExerciseCatalogCache();
 };
 
+const expandFamily = async (familyName: string, count: number) => {
+  fireEvent.press(await screen.findByLabelText(`${familyName} exercises ${count}`));
+};
+
 describe('ExerciseCatalogScreen', () => {
   beforeEach(() => {
     mockListMuscleGroups.mockReset();
@@ -70,6 +75,7 @@ describe('ExerciseCatalogScreen', () => {
     });
     __resetExerciseCatalogCacheForTests();
     __resetExerciseCatalogStatsCacheForTests();
+    __resetExerciseListPreferencesForTests();
 
     mockListMuscleGroups.mockResolvedValue([
       { id: 'chest', displayName: 'Chest', familyName: 'Chest', sortOrder: 0 },
@@ -127,6 +133,7 @@ describe('ExerciseCatalogScreen', () => {
     );
 
     expect(screen.getByText('Exercise created.')).toBeTruthy();
+    await expandFamily('Chest', 1);
     expect(screen.getByText('Incline Press')).toBeTruthy();
     expect(screen.getByText('Chest · Triceps (s)')).toBeTruthy();
   });
@@ -159,6 +166,7 @@ describe('ExerciseCatalogScreen', () => {
 
     render(<ExerciseCatalogScreen />);
 
+    await expandFamily('Chest', 1);
     await screen.findByText('Barbell Bench Press');
     expect(screen.getByText('Chest · Triceps (s)')).toBeTruthy();
 
@@ -271,6 +279,7 @@ describe('ExerciseCatalogScreen', () => {
 
     render(<ExerciseCatalogScreen />);
 
+    await expandFamily('Chest', 1);
     await screen.findByText('Incline Press');
     fireEvent.press(screen.getByLabelText('Exercise actions Incline Press'));
     await screen.findByText('Exercise Actions');
@@ -300,6 +309,7 @@ describe('ExerciseCatalogScreen', () => {
 
     render(<ExerciseCatalogScreen />);
 
+    await expandFamily('Chest', 1);
     await screen.findByText('Bench Press');
     expect(mockListExercises).toHaveBeenCalledWith({ includeDeleted: true });
     expect(screen.queryByText('Old Fly')).toBeNull();
@@ -309,9 +319,7 @@ describe('ExerciseCatalogScreen', () => {
     fireEvent.press(screen.getByLabelText('Show deleted exercises'));
     fireEvent.press(screen.getByLabelText('Close filters'));
 
-    await waitFor(() => {
-      expect(screen.getByText('Old Fly')).toBeTruthy();
-    });
+    await screen.findByText('Old Fly');
 
     fireEvent.press(screen.getByLabelText('Exercise actions Old Fly'));
     await screen.findByText('Exercise Actions');

@@ -21,12 +21,22 @@ appId: com.dinoderek.mobile
       id: "session-recorder-screen"
     timeout: 30000
 - tapOn: "Log new exercise"
+- tapOn: "Exercise picker options"
+- tapOn: "Turn grouping off"
+- tapOn: "Exercise picker options"
 - tapOn: "Exercise filter input"
 - inputText: "back squat"
 - hideKeyboard:
     optional: true
+- tapOn: "Select Exercise"
+- extendedWaitUntil:
+    visible:
+      text: "Select exercise Barbell Back Squat"
+    timeout: 15000
 - tapOn:
-    point: "50%,27%"
+    text: "Select exercise Barbell Back Squat"
+- tapOn:
+    id: "exercise-picker-add-empty-set-button"
 - extendedWaitUntil:
     visible:
       id: "exercise-block-history-panel-1-collapsed"
@@ -67,8 +77,15 @@ appId: com.dinoderek.mobile
 - inputText: "lat pulldown"
 - hideKeyboard:
     optional: true
+- tapOn: "Select Exercise"
+- extendedWaitUntil:
+    visible:
+      text: "Select exercise Lat Pulldown"
+    timeout: 15000
 - tapOn:
-    point: "50%,27%"
+    text: "Select exercise Lat Pulldown"
+- tapOn:
+    id: "exercise-picker-add-empty-set-button"
 - extendedWaitUntil:
     visible:
       id: "exercise-block-history-panel-2-empty-collapsed"

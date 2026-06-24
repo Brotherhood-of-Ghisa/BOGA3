@@ -52,16 +52,22 @@ appId: com.dinoderek.mobile
     text: "Continue"
     optional: true
 - tapOn: "Log new exercise"
+- tapOn: "Exercise picker options"
+- tapOn: "Turn grouping off"
+- tapOn: "Exercise picker options"
 - tapOn: "Exercise filter input"
 - inputText: "Barbell Back Squat"
 - hideKeyboard:
     optional: true
+- tapOn: "Select Exercise"
 - extendedWaitUntil:
     visible:
       text: "Select exercise Barbell Back Squat"
     timeout: 15000
 - tapOn:
     text: "Select exercise Barbell Back Squat"
+- tapOn:
+    id: "exercise-picker-add-empty-set-button"
 - tapOn: "Weight for exercise 1 set 1"
 - inputText: "100"
 - tapOn: "Reps for exercise 1 set 1"

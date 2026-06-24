@@ -1,21 +1,25 @@
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type ListRenderItem } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { ExerciseEditorModal } from '@/components/exercise-catalog/exercise-editor-modal';
+import {
+  ExerciseListContent,
+  ExerciseListPreferenceControls,
+} from '@/components/exercise-catalog/exercise-list-controls';
 import { uiColors } from '@/components/ui';
 import {
   deleteExerciseCatalogExercise,
   undeleteExerciseCatalogExercise,
   type ExerciseCatalogExercise,
-  type ExerciseCatalogMuscleGroup,
 } from '@/src/data/exercise-catalog';
-import type {
-  ExerciseAggregate,
-  ExerciseCatalogStatsPeriod,
-} from '@/src/data/exercise-catalog-stats';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
-import { filterIndexedExerciseCatalogExercises } from '@/src/exercise-catalog/search';
+import {
+  buildExerciseListModel,
+  getExerciseListDateRangeLabel,
+  type ExerciseListItem,
+} from '@/src/exercise-catalog/list-model';
+import { useExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
 import { useExerciseCatalogStats } from '@/src/exercise-catalog/stats-cache';
 
 const coerceRouteParam = (value: string | string[] | undefined): string | null => {
@@ -26,88 +30,13 @@ const coerceRouteParam = (value: string | string[] | undefined): string | null =
   return value ?? null;
 };
 
-const getMuscleDisplayName = (
-  muscleGroupId: string,
-  muscleGroupById: Map<string, ExerciseCatalogMuscleGroup>
-) => muscleGroupById.get(muscleGroupId)?.displayName ?? muscleGroupId;
-
-const pickPrimaryMapping = (exercise: ExerciseCatalogExercise) =>
-  exercise.mappings.find((mapping) => mapping.role === 'primary') ??
-  [...exercise.mappings].sort((left, right) => right.weight - left.weight)[0] ??
-  null;
-
-const formatExerciseMuscleSummary = (
-  exercise: ExerciseCatalogExercise,
-  muscleGroupById: Map<string, ExerciseCatalogMuscleGroup>
-) => {
-  if (exercise.mappings.length === 0) {
-    return 'No muscle links';
-  }
-
-  const primaryMapping = pickPrimaryMapping(exercise);
-
-  if (!primaryMapping) {
-    return 'No muscle links';
-  }
-
-  const secondaryMappings = exercise.mappings.filter((mapping) => mapping.id !== primaryMapping.id);
-  const primaryLabel = getMuscleDisplayName(primaryMapping.muscleGroupId, muscleGroupById);
-
-  if (secondaryMappings.length === 0) {
-    return primaryLabel;
-  }
-
-  if (secondaryMappings.length === 1) {
-    const secondaryLabel = getMuscleDisplayName(secondaryMappings[0].muscleGroupId, muscleGroupById);
-    return `${primaryLabel} · ${secondaryLabel} (s)`;
-  }
-
-  return `${primaryLabel} · ${secondaryMappings.length} secondaries`;
-};
-
-const formatVolume = (volume: number): string => {
-  if (volume <= 0) return '0';
-  if (volume >= 1000) return `${(volume / 1000).toFixed(1)}k`;
-  return `${Math.round(volume)}`;
-};
-
-const formatStatsSummary = (
-  aggregate: ExerciseAggregate | undefined,
-  hasAllTimeHistory: boolean
-): string => {
-  if (!hasAllTimeHistory) return 'Never done';
-  if (!aggregate) return 'No sets in range';
-  const parts: string[] = [`${aggregate.sessionCount} sessions`];
-  parts.push(`${formatVolume(aggregate.totalVolume)} vol`);
-  parts.push(
-    aggregate.estimatedOneRepMax !== null
-      ? `${Math.round(aggregate.estimatedOneRepMax)} 1RM`
-      : '— 1RM'
-  );
-  return parts.join(' · ');
-};
-
-type PeriodOption = { value: ExerciseCatalogStatsPeriod; label: string };
-
-const PERIOD_OPTIONS: PeriodOption[] = [
-  { value: 7, label: '7d' },
-  { value: 30, label: '30d' },
-  { value: 365, label: '1y' },
-  { value: 'all', label: 'All' },
-];
-
-const periodLabel = (period: ExerciseCatalogStatsPeriod): string =>
-  PERIOD_OPTIONS.find((option) => option.value === period)?.label ?? '30d';
-
 type CatalogFilters = {
-  period: ExerciseCatalogStatsPeriod;
   muscleGroupIds: ReadonlySet<string>;
   showDeleted: boolean;
   showNeverDone: boolean;
 };
 
 const DEFAULT_FILTERS: CatalogFilters = {
-  period: 30,
   muscleGroupIds: new Set<string>(),
   showDeleted: false,
   showNeverDone: true,
@@ -126,68 +55,6 @@ const useDebouncedValue = <T,>(value: T, delayMs: number): T => {
   return debouncedValue;
 };
 
-type ExerciseRowProps = {
-  exercise: ExerciseCatalogExercise;
-  muscleGroupById: Map<string, ExerciseCatalogMuscleGroup>;
-  aggregate: ExerciseAggregate | undefined;
-  hasAllTimeHistory: boolean;
-  onPressEdit: (exercise: ExerciseCatalogExercise) => void;
-  onPressActions: (exercise: ExerciseCatalogExercise) => void;
-};
-
-const ExerciseRow = memo(function ExerciseRow({
-  exercise,
-  muscleGroupById,
-  aggregate,
-  hasAllTimeHistory,
-  onPressEdit,
-  onPressActions,
-}: ExerciseRowProps) {
-  return (
-    <View style={styles.exerciseListRow}>
-      <Pressable
-        accessibilityLabel={`Edit exercise definition ${exercise.name}`}
-        style={styles.exerciseListRowMainPressable}
-        onPress={() => onPressEdit(exercise)}>
-        <View style={styles.exerciseListRowTextStack}>
-          <View style={styles.exerciseListRowTitleRow}>
-            <Text
-              adjustsFontSizeToFit
-              ellipsizeMode="clip"
-              minimumFontScale={0.82}
-              numberOfLines={2}
-              style={styles.exerciseListRowTitle}>
-              {exercise.name}
-            </Text>
-            {exercise.deletedAt ? (
-              <Text selectable style={styles.deletedExerciseChip}>
-                Deleted
-              </Text>
-            ) : null}
-          </View>
-          <Text
-            adjustsFontSizeToFit
-            ellipsizeMode="clip"
-            minimumFontScale={0.82}
-            numberOfLines={1}
-            style={styles.exerciseListRowMuscleSummary}>
-            {formatExerciseMuscleSummary(exercise, muscleGroupById)}
-          </Text>
-          <Text numberOfLines={1} style={styles.exerciseListRowStats}>
-            {formatStatsSummary(aggregate, hasAllTimeHistory)}
-          </Text>
-        </View>
-      </Pressable>
-      <Pressable
-        accessibilityLabel={`Exercise actions ${exercise.name}`}
-        style={styles.exerciseRowKebabButton}
-        onPress={() => onPressActions(exercise)}>
-        <Text style={styles.exerciseRowKebabText}>⋮</Text>
-      </Pressable>
-    </View>
-  );
-});
-
 export default function ExerciseCatalogScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ source?: string | string[]; intent?: string | string[] }>();
@@ -202,8 +69,10 @@ export default function ExerciseCatalogScreen() {
   const [exerciseActionMenuTarget, setExerciseActionMenuTarget] = useState<ExerciseCatalogExercise | null>(null);
   const [editorExerciseTarget, setEditorExerciseTarget] = useState<ExerciseCatalogExercise | null>(null);
   const [exerciseSearchValue, setExerciseSearchValue] = useState('');
+  const [expandedExerciseFamilies, setExpandedExerciseFamilies] = useState<Set<string>>(() => new Set());
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [listPreferences, setListPreferences] = useExerciseListPreferences();
 
   const catalog = useExerciseCatalog();
   const isLoading = catalog.status === 'idle' || catalog.status === 'loading';
@@ -211,7 +80,7 @@ export default function ExerciseCatalogScreen() {
   const exercises = catalog.exercises;
   const muscleGroups = catalog.muscleGroups;
 
-  const statsResult = useExerciseCatalogStats(filters.period);
+  const statsResult = useExerciseCatalogStats(listPreferences.dateRange);
   const { stats, reload: reloadStats } = statsResult;
 
   useFocusEffect(
@@ -222,26 +91,28 @@ export default function ExerciseCatalogScreen() {
 
   const debouncedExerciseSearchValue = useDebouncedValue(exerciseSearchValue, SEARCH_DEBOUNCE_MS);
 
-  const muscleGroupById = useMemo(
-    () => new Map(muscleGroups.map((muscleGroup) => [muscleGroup.id, muscleGroup])),
-    [muscleGroups]
-  );
-  const visibleExercises = useMemo(() => {
-    const selectedMuscleIds = filters.muscleGroupIds;
-    const filterByMuscle = selectedMuscleIds.size > 0;
-    return exercises.filter((exercise) => {
-      if (!filters.showDeleted && exercise.deletedAt) return false;
-      if (!filters.showNeverDone && !stats.everDoneIds.has(exercise.id)) return false;
-      if (filterByMuscle) {
-        const primary = pickPrimaryMapping(exercise);
-        if (!primary || !selectedMuscleIds.has(primary.muscleGroupId)) return false;
-      }
-      return true;
-    });
-  }, [exercises, filters.showDeleted, filters.showNeverDone, filters.muscleGroupIds, stats.everDoneIds]);
-  const filteredExercises = useMemo(
-    () => filterIndexedExerciseCatalogExercises(visibleExercises, debouncedExerciseSearchValue),
-    [visibleExercises, debouncedExerciseSearchValue]
+  const exerciseListModel = useMemo(
+    () =>
+      buildExerciseListModel({
+        exercises,
+        muscleGroups,
+        stats,
+        preferences: listPreferences,
+        query: debouncedExerciseSearchValue,
+        includeDeleted: filters.showDeleted,
+        showNeverDone: filters.showNeverDone,
+        selectedMuscleGroupIds: filters.muscleGroupIds,
+      }),
+    [
+      exercises,
+      muscleGroups,
+      stats,
+      listPreferences,
+      debouncedExerciseSearchValue,
+      filters.showDeleted,
+      filters.showNeverDone,
+      filters.muscleGroupIds,
+    ]
   );
 
   const openEditorForExercise = useCallback((exercise: ExerciseCatalogExercise) => {
@@ -251,7 +122,7 @@ export default function ExerciseCatalogScreen() {
   }, []);
 
   const handlePressEditRow = useCallback(
-    (exercise: ExerciseCatalogExercise) => {
+    (exercise: ExerciseListItem) => {
       if (exercise.deletedAt) {
         return;
       }
@@ -264,21 +135,29 @@ export default function ExerciseCatalogScreen() {
     setExerciseActionMenuTarget(exercise);
   }, []);
 
-  const renderExerciseRow = useCallback<ListRenderItem<ExerciseCatalogExercise>>(
-    ({ item }) => (
-      <ExerciseRow
-        exercise={item}
-        muscleGroupById={muscleGroupById}
-        aggregate={stats.aggregatesById.get(item.id)}
-        hasAllTimeHistory={stats.everDoneIds.has(item.id)}
-        onPressEdit={handlePressEditRow}
-        onPressActions={handlePressRowActions}
-      />
+  const renderExerciseActions = useCallback(
+    (exercise: ExerciseListItem) => (
+      <Pressable
+        accessibilityLabel={`Exercise actions ${exercise.name}`}
+        style={styles.exerciseRowKebabButton}
+        onPress={() => handlePressRowActions(exercise)}>
+        <Text style={styles.exerciseRowKebabText}>⋮</Text>
+      </Pressable>
     ),
-    [muscleGroupById, stats.aggregatesById, stats.everDoneIds, handlePressEditRow, handlePressRowActions]
+    [handlePressRowActions]
   );
 
-  const keyExtractor = useCallback((item: ExerciseCatalogExercise) => item.id, []);
+  const toggleExerciseFamily = useCallback((familyName: string) => {
+    setExpandedExerciseFamilies((current) => {
+      const next = new Set(current);
+      if (next.has(familyName)) {
+        next.delete(familyName);
+      } else {
+        next.add(familyName);
+      }
+      return next;
+    });
+  }, []);
 
   const startNewExercise = () => {
     setEditorExerciseTarget(null);
@@ -341,9 +220,6 @@ export default function ExerciseCatalogScreen() {
     }
   };
 
-  const setFilterPeriod = (period: ExerciseCatalogStatsPeriod) => {
-    setFilters((current) => ({ ...current, period }));
-  };
   const toggleFilterMuscleGroup = (muscleGroupId: string) => {
     setFilters((current) => {
       const next = new Set(current.muscleGroupIds);
@@ -369,14 +245,16 @@ export default function ExerciseCatalogScreen() {
 
   const activeFilterChips = useMemo(() => {
     const chips: { key: string; label: string }[] = [];
-    chips.push({ key: 'period', label: `Range: ${periodLabel(filters.period)}` });
+    chips.push({ key: 'period', label: `Range: ${getExerciseListDateRangeLabel(listPreferences.dateRange)}` });
+    chips.push({ key: 'grouping', label: listPreferences.groupByMuscleFamily ? 'Grouped' : 'Flat' });
+    chips.push({ key: 'recents', label: listPreferences.recentsOnTop ? 'Recents: On' : 'A-Z' });
     if (filters.muscleGroupIds.size > 0) {
       chips.push({ key: 'muscles', label: `Muscles: ${filters.muscleGroupIds.size}` });
     }
     if (!filters.showNeverDone) chips.push({ key: 'never-done', label: 'Hide never-done' });
     if (filters.showDeleted) chips.push({ key: 'deleted', label: 'Deleted: On' });
     return chips;
-  }, [filters]);
+  }, [filters, listPreferences]);
 
   if (isLoading) {
     return (
@@ -461,25 +339,34 @@ export default function ExerciseCatalogScreen() {
         ) : null}
       </View>
 
-      <FlatList
+      <ScrollView
         style={styles.scroll}
-        data={filteredExercises}
-        keyExtractor={keyExtractor}
-        renderItem={renderExerciseRow}
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={styles.content}
-        initialNumToRender={16}
-        maxToRenderPerBatch={16}
-        windowSize={9}
-        removeClippedSubviews
-        ListEmptyComponent={
+        keyboardShouldPersistTaps="handled">
+        <ExerciseListContent
+          mode={exerciseListModel.mode}
+          items={exerciseListModel.items}
+          sections={exerciseListModel.sections}
+          expandedFamilies={expandedExerciseFamilies}
+          emptyText={
+            exercises.length === 0
+              ? 'No active exercises yet. Create one with the button above.'
+              : 'No exercises match the current filters.'
+          }
+          onToggleFamily={toggleExerciseFamily}
+          onPressExercise={handlePressEditRow}
+          getExerciseAccessibilityLabel={(exercise) => `Edit exercise definition ${exercise.name}`}
+          renderActions={renderExerciseActions}
+        />
+        {exerciseListModel.items.length === 0 && exerciseListModel.mode === 'grouped' ? (
           <Text selectable style={styles.helperText}>
             {exercises.length === 0
               ? 'No active exercises yet. Create one with the button above.'
               : 'No exercises match the current filters.'}
           </Text>
-        }
-      />
+        ) : null}
+      </ScrollView>
 
       <ExerciseEditorModal
         visible={isEditorModalVisible}
@@ -516,29 +403,10 @@ export default function ExerciseCatalogScreen() {
               style={styles.filtersScroll}
               contentContainerStyle={styles.filtersScrollContent}
               keyboardShouldPersistTaps="handled">
-              <Text selectable style={styles.filtersSectionLabel}>
-                Date range
-              </Text>
-              <View style={styles.filtersPillRow}>
-                {PERIOD_OPTIONS.map((option) => {
-                  const selected = filters.period === option.value;
-                  return (
-                    <Pressable
-                      key={String(option.value)}
-                      accessibilityLabel={`Date range ${option.label}`}
-                      style={[styles.filterPill, selected && styles.filterPillSelected]}
-                      onPress={() => setFilterPeriod(option.value)}>
-                      <Text
-                        style={[
-                          styles.filterPillText,
-                          selected && styles.filterPillTextSelected,
-                        ]}>
-                        {option.label}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
+              <ExerciseListPreferenceControls
+                preferences={listPreferences}
+                onChangePreferences={setListPreferences}
+              />
 
               <View style={styles.filtersSectionHeaderRow}>
                 <Text selectable style={styles.filtersSectionLabel}>
@@ -818,58 +686,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: uiColors.textSuccess,
     fontWeight: '600',
-  },
-  exerciseListRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    borderWidth: 1,
-    borderColor: uiColors.borderMuted,
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 7,
-    backgroundColor: uiColors.surfaceDefault,
-  },
-  exerciseListRowMainPressable: {
-    flex: 1,
-  },
-  exerciseListRowTextStack: {
-    flex: 1,
-    gap: 1,
-  },
-  exerciseListRowTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  exerciseListRowTitle: {
-    flexShrink: 1,
-    minWidth: 0,
-    fontSize: 13,
-    fontWeight: '600',
-    color: uiColors.textPrimary,
-  },
-  exerciseListRowMuscleSummary: {
-    fontSize: 11,
-    color: uiColors.textSecondary,
-    fontWeight: '600',
-  },
-  exerciseListRowStats: {
-    fontSize: 11,
-    color: uiColors.textAccentMuted,
-    fontWeight: '600',
-    marginTop: 2,
-  },
-  deletedExerciseChip: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: uiColors.textWarning,
-    borderWidth: 1,
-    borderColor: uiColors.borderWarning,
-    backgroundColor: uiColors.surfaceWarning,
-    borderRadius: 999,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
   },
   exerciseRowKebabButton: {
     width: 30,

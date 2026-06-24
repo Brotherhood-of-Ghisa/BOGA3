@@ -5,6 +5,8 @@ import {
   computeMaxRepsByWeight,
   estimateExerciseOneRepMax,
   parseCalculationSet,
+  parseSetReps,
+  parseSetWeight,
 } from '@/src/exercise-calculations';
 
 import { bootstrapLocalDataLayer } from './bootstrap';
@@ -51,6 +53,21 @@ export type ExerciseBlockHistorySummary = {
   blocks: ExerciseBlockHistoryBlock[];
 };
 
+export type ExerciseBlockHistorySuggestedSet = {
+  setId: string;
+  sessionExerciseId: string;
+  weightValue: string;
+  repsValue: string;
+  setType: string | null;
+};
+
+export type ExerciseBlockHistorySuggestedPlan = {
+  sessionId: string;
+  completedAt: Date;
+  sessionExerciseIds: string[];
+  sets: ExerciseBlockHistorySuggestedSet[];
+};
+
 export type ExerciseBlockHistoryAggregationInput = {
   exerciseDefinitionId?: string | null;
   limit?: number | null;
@@ -78,6 +95,10 @@ export type LoadRecentExerciseBlocksOptions = {
   exerciseDefinitionId: string;
   limit?: number;
   now?: Date;
+};
+
+export type LoadSuggestedExercisePlanOptions = {
+  exerciseDefinitionId: string;
 };
 
 const isValidDate = (value: Date) => !Number.isNaN(value.getTime());
@@ -155,6 +176,9 @@ const countRirAtMostTwoSets = (setRows: ExerciseBlockHistorySetRow[]): number =>
   return count;
 };
 
+const isValidSuggestedPlanSet = (row: ExerciseBlockHistorySetRow): boolean =>
+  parseSetWeight(row.weightValue) !== null && parseSetReps(row.repsValue) !== null;
+
 export const aggregateExerciseBlockHistory = (
   input: ExerciseBlockHistoryAggregationInput
 ): ExerciseBlockHistorySummary => {
@@ -199,6 +223,47 @@ export const aggregateExerciseBlockHistory = (
     limit,
     blocks,
   };
+};
+
+export const selectSuggestedExercisePlanFromHistory = (input: {
+  sessions: ExerciseBlockHistorySessionRow[];
+  sessionExercises: ExerciseBlockHistorySessionExerciseRow[];
+  setsBySessionExerciseId: Record<string, ExerciseBlockHistorySetRow[]>;
+}): ExerciseBlockHistorySuggestedPlan | null => {
+  const sessionExercisesBySessionId = groupSessionExercisesBySessionId(input.sessionExercises);
+  const orderedSessions = [...input.sessions].sort(compareCompletedDesc);
+
+  for (const session of orderedSessions) {
+    ensureValidDate(session.completedAt, 'completedAt');
+    const matchingSessionExercises = [
+      ...(sessionExercisesBySessionId[session.sessionId] ?? []),
+    ].sort(compareSessionExerciseOrder);
+    if (matchingSessionExercises.length === 0) continue;
+
+    const suggestedSets = matchingSessionExercises.flatMap((sessionExercise) =>
+      [...(input.setsBySessionExerciseId[sessionExercise.sessionExerciseId] ?? [])]
+        .sort(compareSetOrder)
+        .filter(isValidSuggestedPlanSet)
+        .map((set) => ({
+          setId: set.setId,
+          sessionExerciseId: set.sessionExerciseId,
+          weightValue: set.weightValue,
+          repsValue: set.repsValue,
+          setType: normalizeSessionSetType(set.setType),
+        }))
+    );
+
+    if (suggestedSets.length === 0) continue;
+
+    return {
+      sessionId: session.sessionId,
+      completedAt: session.completedAt,
+      sessionExerciseIds: matchingSessionExercises.map((row) => row.sessionExerciseId),
+      sets: suggestedSets,
+    };
+  }
+
+  return null;
 };
 
 const groupSetsBySessionExerciseId = (
@@ -354,9 +419,36 @@ export const createExerciseBlockHistoryRepository = (
       setsBySessionExerciseId: groupSetsBySessionExerciseId(setRows),
     });
   },
+  async loadSuggestedPlan(
+    options: LoadSuggestedExercisePlanOptions
+  ): Promise<ExerciseBlockHistorySuggestedPlan | null> {
+    const recentSessions = await store.loadRecentCompletedSessionsForExercise({
+      exerciseDefinitionId: options.exerciseDefinitionId,
+      limit: undefined,
+    });
+    if (recentSessions.length === 0) {
+      return null;
+    }
+
+    const sessionIds = recentSessions.map((session) => session.sessionId);
+    const sessionExerciseRows = await store.loadSessionExercisesForSessions({
+      exerciseDefinitionId: options.exerciseDefinitionId,
+      sessionIds,
+    });
+    const sessionExerciseIds = sessionExerciseRows.map((row) => row.sessionExerciseId);
+    const setRows = await store.loadSetsForSessionExercises({ sessionExerciseIds });
+
+    return selectSuggestedExercisePlanFromHistory({
+      sessions: recentSessions,
+      sessionExercises: sessionExerciseRows,
+      setsBySessionExerciseId: groupSetsBySessionExerciseId(setRows),
+    });
+  },
 });
 
 const defaultExerciseBlockHistoryRepository = createExerciseBlockHistoryRepository();
 
 export const loadRecentExerciseBlocks =
   defaultExerciseBlockHistoryRepository.loadRecentBlocks;
+export const loadSuggestedExercisePlan =
+  defaultExerciseBlockHistoryRepository.loadSuggestedPlan;

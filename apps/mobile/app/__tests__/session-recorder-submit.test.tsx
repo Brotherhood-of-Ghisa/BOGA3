@@ -58,6 +58,7 @@ jest.mock('@/src/data', () => ({
     limit: null,
     blocks: [],
   })),
+  loadSuggestedExercisePlan: jest.fn().mockResolvedValue(null),
   loadLocalGymById: jest.fn().mockResolvedValue(null),
   loadLatestSessionDraftSnapshot: jest.fn().mockResolvedValue(null),
   loadSessionSnapshotById: jest.fn().mockResolvedValue(null),
@@ -177,6 +178,11 @@ const buildActiveDraftSnapshot = (overrides: Partial<any> = {}) => ({
   ...overrides,
 });
 
+const addExerciseWithEmptySet = async (exerciseName: string) => {
+  fireEvent.press(await screen.findByLabelText(`Select exercise ${exerciseName}`));
+  fireEvent.press(await screen.findByTestId('exercise-picker-add-empty-set-button'));
+};
+
 describe('SessionRecorderScreen submit cleanup flow', () => {
   beforeEach(() => {
     mockSearchParams = {};
@@ -197,7 +203,7 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
     await dismissEmptyStateIfPresent();
 
     fireEvent.press(screen.getByText('Log new exercise'));
-    fireEvent.press(await screen.findByLabelText('Select exercise Barbell Squat'));
+    await addExerciseWithEmptySet('Barbell Squat');
     fireEvent.changeText(screen.getByLabelText('Weight for exercise 1 set 1'), '0');
     fireEvent.changeText(screen.getByLabelText('Reps for exercise 1 set 1'), '5');
     fireEvent.press(screen.getByText('Submit Session'));
@@ -309,7 +315,7 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
     await dismissEmptyStateIfPresent();
 
     fireEvent.press(screen.getByText('Log new exercise'));
-    fireEvent.press(await screen.findByLabelText('Select exercise Barbell Squat'));
+    await addExerciseWithEmptySet('Barbell Squat');
     fireEvent.changeText(screen.getByLabelText('Weight for exercise 1 set 1'), '225');
     fireEvent.changeText(screen.getByLabelText('Reps for exercise 1 set 1'), '5');
     fireEvent.press(screen.getByText('Submit Session'));
@@ -330,7 +336,7 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
     fireEvent.press(screen.getByText('No gym'));
     fireEvent.press(screen.getByLabelText('Select gym Westside Barbell Club'));
     fireEvent.press(screen.getByText('Log new exercise'));
-    fireEvent.press(await screen.findByLabelText('Select exercise Barbell Squat'));
+    await addExerciseWithEmptySet('Barbell Squat');
     fireEvent.changeText(screen.getByLabelText('Weight for exercise 1 set 1'), '225');
     fireEvent.changeText(screen.getByLabelText('Reps for exercise 1 set 1'), '5');
     fireEvent.press(screen.getByLabelText('Add set to exercise 1'));
@@ -360,7 +366,7 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
     await dismissEmptyStateIfPresent();
 
     fireEvent.press(screen.getByText('Log new exercise'));
-    fireEvent.press(await screen.findByLabelText('Select exercise Bench Press'));
+    await addExerciseWithEmptySet('Bench Press');
     expect(screen.queryByLabelText('Remove set 1 from exercise 1')).toBeNull();
     swipeLeft(screen.getByTestId('set-swipe-delete-1-1'));
     fireEvent.press(screen.getByText('Submit Session'));
@@ -381,7 +387,7 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
     await dismissEmptyStateIfPresent();
 
     fireEvent.press(screen.getByText('Log new exercise'));
-    fireEvent.press(await screen.findByLabelText('Select exercise Barbell Squat'));
+    await addExerciseWithEmptySet('Barbell Squat');
     mockPersistSessionDraftSnapshot.mockClear();
     mockCompleteSessionDraft.mockClear();
 

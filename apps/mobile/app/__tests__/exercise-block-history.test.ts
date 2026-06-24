@@ -1,6 +1,7 @@
 import {
   aggregateExerciseBlockHistory,
   createExerciseBlockHistoryRepository,
+  selectSuggestedExercisePlanFromHistory,
   type ExerciseBlockHistorySessionExerciseRow,
   type ExerciseBlockHistorySessionRow,
   type ExerciseBlockHistorySetRow,
@@ -247,6 +248,73 @@ describe('aggregateExerciseBlockHistory', () => {
   });
 });
 
+describe('selectSuggestedExercisePlanFromHistory', () => {
+  it('selects the newest completed session with valid sets and combines duplicate blocks in session order', () => {
+    const suggestion = selectSuggestedExercisePlanFromHistory({
+      sessions: [
+        sessionRow({ sessionId: 'older-valid', completedAt: new Date('2026-05-10T12:00:00.000Z') }),
+        sessionRow({ sessionId: 'newer-invalid', completedAt: new Date('2026-05-19T12:00:00.000Z') }),
+        sessionRow({ sessionId: 'newest-valid', completedAt: new Date('2026-05-20T12:00:00.000Z') }),
+      ],
+      sessionExercises: [
+        sessionExerciseRow({ sessionId: 'newer-invalid', sessionExerciseId: 'invalid-a', orderIndex: 0 }),
+        sessionExerciseRow({ sessionId: 'newest-valid', sessionExerciseId: 'valid-second-block', orderIndex: 2 }),
+        sessionExerciseRow({ sessionId: 'newest-valid', sessionExerciseId: 'valid-first-block', orderIndex: 1 }),
+        sessionExerciseRow({ sessionId: 'older-valid', sessionExerciseId: 'older-a', orderIndex: 0 }),
+      ],
+      setsBySessionExerciseId: groupBySessionExerciseId([
+        setRow({ setId: 'invalid-blank-weight', sessionExerciseId: 'invalid-a', orderIndex: 0, weightValue: '', repsValue: '8' }),
+        setRow({ setId: 'invalid-zero-reps', sessionExerciseId: 'invalid-a', orderIndex: 1, weightValue: '100', repsValue: '0' }),
+        setRow({ setId: 'second-1', sessionExerciseId: 'valid-second-block', orderIndex: 0, weightValue: '120', repsValue: '3', setType: 'rir_1' }),
+        setRow({ setId: 'first-2-invalid-negative', sessionExerciseId: 'valid-first-block', orderIndex: 2, weightValue: '-1', repsValue: '5' }),
+        setRow({ setId: 'first-1', sessionExerciseId: 'valid-first-block', orderIndex: 1, weightValue: '0', repsValue: '10', setType: 'warm_up' }),
+        setRow({ setId: 'older-1', sessionExerciseId: 'older-a', orderIndex: 0, weightValue: '90', repsValue: '6' }),
+      ]),
+    });
+
+    expect(suggestion).toEqual(
+      expect.objectContaining({
+        sessionId: 'newest-valid',
+        completedAt: new Date('2026-05-20T12:00:00.000Z'),
+        sessionExerciseIds: ['valid-first-block', 'valid-second-block'],
+      })
+    );
+    expect(suggestion?.sets).toEqual([
+      expect.objectContaining({
+        setId: 'first-1',
+        sessionExerciseId: 'valid-first-block',
+        weightValue: '0',
+        repsValue: '10',
+        setType: 'warm_up',
+      }),
+      expect.objectContaining({
+        setId: 'second-1',
+        sessionExerciseId: 'valid-second-block',
+        weightValue: '120',
+        repsValue: '3',
+        setType: 'rir_1',
+      }),
+    ]);
+  });
+
+  it('returns null when completed history contains no valid planned source sets', () => {
+    const suggestion = selectSuggestedExercisePlanFromHistory({
+      sessions: [
+        sessionRow({ sessionId: 'invalid-only', completedAt: new Date('2026-05-20T12:00:00.000Z') }),
+      ],
+      sessionExercises: [
+        sessionExerciseRow({ sessionId: 'invalid-only', sessionExerciseId: 'se-1' }),
+      ],
+      setsBySessionExerciseId: groupBySessionExerciseId([
+        setRow({ setId: 'blank', sessionExerciseId: 'se-1', orderIndex: 0, weightValue: '', repsValue: '5' }),
+        setRow({ setId: 'fractional-reps', sessionExerciseId: 'se-1', orderIndex: 1, weightValue: '100', repsValue: '5.5' }),
+      ]),
+    });
+
+    expect(suggestion).toBeNull();
+  });
+});
+
 describe('createExerciseBlockHistoryRepository', () => {
   it('loads all matching sessions by default before fetching exercises and sets', async () => {
     const sessions = [
@@ -356,5 +424,34 @@ describe('createExerciseBlockHistoryRepository', () => {
     ).rejects.toThrow('limit must be non-negative');
 
     expect(store.loadRecentCompletedSessionsForExercise).not.toHaveBeenCalled();
+  });
+
+  it('loads suggested plans from all completed matching sessions independent of caller date ranges', async () => {
+    const sessions = [
+      sessionRow({ sessionId: 'newer-invalid', completedAt: new Date('2026-05-20T12:00:00.000Z') }),
+      sessionRow({ sessionId: 'older-valid', completedAt: new Date('2026-05-10T12:00:00.000Z') }),
+    ];
+    const sessionExercises = [
+      sessionExerciseRow({ sessionId: 'newer-invalid', sessionExerciseId: 'se-newer' }),
+      sessionExerciseRow({ sessionId: 'older-valid', sessionExerciseId: 'se-older' }),
+    ];
+    const store = buildStore({
+      loadRecentCompletedSessionsForExercise: jest.fn().mockResolvedValue(sessions),
+      loadSessionExercisesForSessions: jest.fn().mockResolvedValue(sessionExercises),
+      loadSetsForSessionExercises: jest.fn().mockResolvedValue([
+        setRow({ setId: 'newer-invalid', sessionExerciseId: 'se-newer', orderIndex: 0, weightValue: '', repsValue: '' }),
+        setRow({ setId: 'older-valid', sessionExerciseId: 'se-older', orderIndex: 0, weightValue: '80', repsValue: '8' }),
+      ]),
+    });
+
+    const repository = createExerciseBlockHistoryRepository(store);
+    const suggestion = await repository.loadSuggestedPlan({ exerciseDefinitionId: 'ex-bench' });
+
+    expect(store.loadRecentCompletedSessionsForExercise).toHaveBeenCalledWith({
+      exerciseDefinitionId: 'ex-bench',
+      limit: undefined,
+    });
+    expect(suggestion?.sessionId).toBe('older-valid');
+    expect(suggestion?.sets).toHaveLength(1);
   });
 });

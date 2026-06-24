@@ -18,8 +18,16 @@ export type ExerciseAggregate = {
   estimatedOneRepMax: number | null;
 };
 
+export type ExerciseRecencyScore = {
+  exerciseDefinitionId: string;
+  score: number;
+  completedSetCount: number;
+  lastCompletedAt: Date | null;
+};
+
 export type ExerciseCatalogStats = {
   aggregatesById: Map<string, ExerciseAggregate>;
+  recencyScoresById: Map<string, ExerciseRecencyScore>;
   everDoneIds: Set<string>;
 };
 
@@ -111,6 +119,10 @@ export const createDrizzleExerciseCatalogStatsStore = (): ExerciseCatalogStatsSt
 
 type PeriodWindow = { start: Date | null; end: Date | null };
 
+const RECENCY_HALF_LIFE_DAYS = 60;
+const ALL_RECENCY_SCORE_CAP_DAYS = 365;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
 const resolvePeriodWindow = (
   period: ExerciseCatalogStatsPeriod,
   now: Date
@@ -124,6 +136,25 @@ const isInWindow = (completedAt: Date, window: PeriodWindow): boolean => {
   if (window.start && completedAt < window.start) return false;
   if (window.end && completedAt >= window.end) return false;
   return true;
+};
+
+const resolveRecencyScoringWindow = (
+  period: ExerciseCatalogStatsPeriod,
+  now: Date
+): PeriodWindow => {
+  if (period === 'all') {
+    return {
+      start: new Date(now.getTime() - ALL_RECENCY_SCORE_CAP_DAYS * MS_PER_DAY),
+      end: new Date(now.getTime()),
+    };
+  }
+
+  return resolvePeriodWindow(period, now);
+};
+
+const computeSetRecencyScore = (completedAt: Date, now: Date): number => {
+  const ageDays = Math.max(0, (now.getTime() - completedAt.getTime()) / MS_PER_DAY);
+  return Math.pow(0.5, ageDays / RECENCY_HALF_LIFE_DAYS);
 };
 
 export const aggregateExerciseCatalogStats = (
@@ -149,7 +180,9 @@ export const aggregateExerciseCatalogStats = (
 
   const everDoneIds = new Set<string>();
   const aggregatesById = new Map<string, ExerciseAggregate>();
+  const recencyScoresById = new Map<string, ExerciseRecencyScore>();
   const sessionsSeenByDef = new Map<string, Set<string>>();
+  const recencyWindow = resolveRecencyScoringWindow(period, now);
 
   for (const set of raw.exerciseSets) {
     const link = sessionExerciseById.get(set.sessionExerciseId);
@@ -166,6 +199,25 @@ export const aggregateExerciseCatalogStats = (
       setType: set.setType,
     });
     if (parsed === null) continue;
+
+    const completedAt = raw.sessions.find((session) => session.id === link.sessionId)?.completedAt ?? null;
+    if (completedAt && isInWindow(completedAt, recencyWindow)) {
+      let recency = recencyScoresById.get(defId);
+      if (!recency) {
+        recency = {
+          exerciseDefinitionId: defId,
+          score: 0,
+          completedSetCount: 0,
+          lastCompletedAt: null,
+        };
+        recencyScoresById.set(defId, recency);
+      }
+      recency.score += computeSetRecencyScore(completedAt, now);
+      recency.completedSetCount += 1;
+      if (recency.lastCompletedAt === null || completedAt > recency.lastCompletedAt) {
+        recency.lastCompletedAt = completedAt;
+      }
+    }
 
     let aggregate = aggregatesById.get(defId);
     if (!aggregate) {
@@ -199,7 +251,7 @@ export const aggregateExerciseCatalogStats = (
     }
   }
 
-  return { aggregatesById, everDoneIds };
+  return { aggregatesById, recencyScoresById, everDoneIds };
 };
 
 export const createExerciseCatalogStatsRepository = (

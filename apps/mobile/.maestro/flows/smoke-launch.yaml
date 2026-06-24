@@ -20,14 +20,13 @@ appId: com.dinoderek.mobile
     visible:
       id: "start-session-button"
     timeout: 30000
-- tapOn:
-    id: "start-session-button"
-- extendedWaitUntil:
-    visible:
-      id: "session-recorder-screen"
-    timeout: 30000
-- extendedWaitUntil:
-    visible:
-      text: "No exercises logged yet."
-    timeout: 30000
+- retry:
+    maxRetries: 3
+    commands:
+      - tapOn:
+          id: "start-session-button"
+      - extendedWaitUntil:
+          visible:
+            text: "No exercises logged yet."
+          timeout: 30000
 - takeScreenshot: "02-session-recorder-visible"

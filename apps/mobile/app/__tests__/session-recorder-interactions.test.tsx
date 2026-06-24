@@ -3,6 +3,10 @@ import { StyleSheet } from 'react-native';
 
 import { uiColors } from '@/components/ui';
 import SessionRecorderScreen from '../(tabs)/session-recorder';
+import {
+  __resetExerciseListPreferencesForTests,
+  setExerciseListPreferences,
+} from '@/src/exercise-catalog/list-preferences';
 
 const mockPush = jest.fn();
 const mockLogEvent = jest.fn();
@@ -255,6 +259,7 @@ jest.mock('@/src/data', () => {
     limit: null,
     blocks: [],
   }));
+  const loadSuggestedExercisePlan = jest.fn().mockResolvedValue(null);
 
   return {
     ExerciseTagDomainError,
@@ -282,6 +287,7 @@ jest.mock('@/src/data', () => {
     listSessionExerciseAssignedTags,
     listLocalGyms: jest.fn().mockResolvedValue([]),
     loadRecentExerciseBlocks,
+    loadSuggestedExercisePlan,
     loadLocalGymById: jest.fn().mockResolvedValue(null),
     loadLatestSessionDraftSnapshot: jest.fn().mockResolvedValue(null),
     loadSessionSnapshotById: jest.fn().mockResolvedValue(null),
@@ -345,6 +351,17 @@ jest.mock('@/src/data/exercise-catalog', () => ({
   })),
 }));
 
+jest.mock('@/src/data/exercise-catalog-stats', () => ({
+  loadExerciseCatalogStatsRawHistory: jest.fn().mockResolvedValue({
+    sessions: [],
+    sessionExercises: [],
+    exerciseSets: [],
+  }),
+  aggregateExerciseCatalogStats: jest.requireActual(
+    '@/src/data/exercise-catalog-stats'
+  ).aggregateExerciseCatalogStats,
+}));
+
 jest.mock('expo-router', () => ({
   useFocusEffect: (callback: () => void | (() => void)) => {
     const React = jest.requireActual('react');
@@ -379,6 +396,7 @@ const {
   attachExerciseTagToSessionExercise: mockAttachExerciseTagToSessionExercise,
   createExerciseTagDefinition: mockCreateExerciseTagDefinition,
   loadRecentExerciseBlocks: mockLoadRecentExerciseBlocks,
+  loadSuggestedExercisePlan: mockLoadSuggestedExercisePlan,
   loadSessionSnapshotById: mockLoadSessionSnapshotById,
 } = jest.requireMock('@/src/data') as {
   __resetTagStore: () => void;
@@ -386,6 +404,7 @@ const {
   attachExerciseTagToSessionExercise: jest.Mock;
   createExerciseTagDefinition: jest.Mock;
   loadRecentExerciseBlocks: jest.Mock;
+  loadSuggestedExercisePlan: jest.Mock;
   loadSessionSnapshotById: jest.Mock;
 };
 
@@ -426,6 +445,17 @@ const dismissEmptyStateIfPresent = async () => {
   }
 };
 
+const selectExerciseFromPicker = async (
+  exerciseName: string,
+  options: { addEmpty?: boolean } = {}
+) => {
+  const addEmpty = options.addEmpty ?? true;
+  fireEvent.press(await screen.findByLabelText(`Select exercise ${exerciseName}`));
+  if (addEmpty) {
+    fireEvent.press(await screen.findByTestId('exercise-picker-add-empty-set-button'));
+  }
+};
+
 describe('SessionRecorderScreen exercise interactions', () => {
   beforeEach(() => {
     mockPush.mockReset();
@@ -441,10 +471,14 @@ describe('SessionRecorderScreen exercise interactions', () => {
       limit: null,
       blocks: [],
     }));
+    mockLoadSuggestedExercisePlan.mockReset();
+    mockLoadSuggestedExercisePlan.mockResolvedValue(null);
     mockLoadSessionSnapshotById.mockReset();
     mockLoadSessionSnapshotById.mockResolvedValue(null);
     mockSaveExerciseCatalogExercise.mockClear();
     mockLogEvent.mockClear();
+    __resetExerciseListPreferencesForTests();
+    setExerciseListPreferences({ groupByMuscleFamily: false });
   });
 
   it('adds a preset exercise from the log flow and updates first set fields', async () => {
@@ -456,7 +490,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     fireEvent.press(screen.getByText('Log new exercise'));
     expect(screen.getByText('Select Exercise')).toBeTruthy();
     expect(await screen.findByLabelText('Select exercise Barbell Squat')).toBeTruthy();
-    fireEvent.press(screen.getByLabelText('Select exercise Barbell Squat'));
+    await selectExerciseFromPicker('Barbell Squat');
 
     expect(screen.queryByText('Select Exercise')).toBeNull();
     expect(screen.getByText('Barbell Squat')).toBeTruthy();
@@ -488,6 +522,101 @@ describe('SessionRecorderScreen exercise interactions', () => {
     expect(screen.getByDisplayValue('5')).toBeTruthy();
 
     await act(async () => {});
+  });
+
+  it('opens preselection for add-row picks, keeps Append plan disabled without valid history, and clears on search', async () => {
+    render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
+
+    fireEvent.press(screen.getByText('Log new exercise'));
+    fireEvent.press(await screen.findByLabelText('Select exercise Barbell Squat'));
+
+    expect(await screen.findByTestId('exercise-picker-preselection-panel')).toBeTruthy();
+    expect(screen.getByText('Add empty set')).toBeTruthy();
+    const appendButton = screen.getByTestId('exercise-picker-append-plan-button');
+    expect(appendButton.props.accessibilityState?.disabled).toBe(true);
+    expect(screen.queryByText(/Unable/i)).toBeNull();
+
+    fireEvent.changeText(screen.getByLabelText('Exercise filter input'), 'bench');
+    await waitFor(() => {
+      expect(screen.queryByTestId('exercise-picker-preselection-panel')).toBeNull();
+      expect(screen.getByLabelText('Select exercise Bench Press')).toBeTruthy();
+    });
+  });
+
+  it('shows Append plan disabled while the historical suggestion is loading', async () => {
+    mockLoadSuggestedExercisePlan.mockImplementationOnce(() => new Promise(() => undefined));
+
+    render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
+
+    fireEvent.press(screen.getByText('Log new exercise'));
+    fireEvent.press(await screen.findByLabelText('Select exercise Barbell Squat'));
+
+    const appendButton = await screen.findByTestId('exercise-picker-append-plan-button');
+    expect(appendButton.props.accessibilityState?.disabled).toBe(true);
+    expect(screen.queryByTestId('exercise-picker-plan-source')).toBeNull();
+  });
+
+  it('previews a valid historical plan and appends it as planned rows into the recorder', async () => {
+    mockLoadSuggestedExercisePlan
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        sessionId: 'history-session-1',
+        completedAt: new Date(2026, 5, 10, 18, 42),
+        sessionExerciseIds: ['history-exercise-1', 'history-exercise-2'],
+        sets: [
+          {
+            setId: 'history-set-1',
+            sessionExerciseId: 'history-exercise-1',
+            weightValue: '0',
+            repsValue: '10',
+            setType: 'warm_up',
+          },
+          {
+            setId: 'history-set-2',
+            sessionExerciseId: 'history-exercise-2',
+            weightValue: '120',
+            repsValue: '5',
+            setType: 'rir_1',
+          },
+        ],
+      });
+
+    render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
+
+    fireEvent.press(screen.getByText('Log new exercise'));
+    await selectExerciseFromPicker('Bench Press');
+    fireEvent.press(screen.getByText('Log new exercise'));
+    fireEvent.press(await screen.findByLabelText('Select exercise Barbell Squat'));
+
+    expect(mockLoadSuggestedExercisePlan).toHaveBeenLastCalledWith({
+      exerciseDefinitionId: 'seed_barbell_back_squat',
+    });
+    expect(await screen.findByTestId('exercise-picker-plan-source')).toHaveTextContent(
+      'From 2026-06-10 18:42'
+    );
+    expect(screen.getByTestId('exercise-picker-plan-set-row-1')).toHaveTextContent(/0kg/);
+    expect(screen.getByTestId('exercise-picker-plan-set-row-1')).toHaveTextContent(/10 reps/);
+    expect(screen.getByTestId('exercise-picker-plan-set-row-1')).toHaveTextContent(/W-Up/);
+    expect(screen.getByTestId('exercise-picker-plan-set-row-2')).toHaveTextContent(/RIR 1/);
+
+    const appendButton = screen.getByTestId('exercise-picker-append-plan-button');
+    expect(appendButton.props.accessibilityState?.disabled).toBe(false);
+    fireEvent.press(appendButton);
+
+    expect(screen.queryByText('Select Exercise')).toBeNull();
+    expect(screen.getByText('Bench Press')).toBeTruthy();
+    expect(screen.getByText('Barbell Squat')).toBeTruthy();
+    expect(screen.getByTestId('session-exercise-card-2').props.accessibilityState?.selected).toBe(true);
+    expect(screen.getByLabelText('Exercise options 2')).toBeTruthy();
+    expect(screen.getByTestId('planned-set-row-2-1')).toHaveTextContent(/0kg/);
+    expect(screen.getByTestId('planned-set-row-2-1')).toHaveTextContent(/10 reps/);
+    expect(screen.getByTestId('planned-set-row-2-2')).toHaveTextContent(/120kg/);
+    expect(screen.getByTestId('planned-set-row-2-2')).toHaveTextContent(/5 reps/);
+    expect(screen.getByLabelText('Log set 1 as planned')).toBeTruthy();
+    expect(screen.getByLabelText('Skip set 2')).toBeTruthy();
   });
 
   it('shows collapsible Past Records with date/current/max columns and swipe navigation', async () => {
@@ -522,7 +651,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     await dismissEmptyStateIfPresent();
 
     fireEvent.press(screen.getByText('Log new exercise'));
-    fireEvent.press(await screen.findByLabelText('Select exercise Barbell Squat'));
+    await selectExerciseFromPicker('Barbell Squat');
 
     const collapsedPanel = await screen.findByTestId('exercise-block-history-panel-1-collapsed');
     expect(collapsedPanel).toHaveTextContent('Past Records');
@@ -616,7 +745,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     await dismissEmptyStateIfPresent();
 
     fireEvent.press(screen.getByText('Log new exercise'));
-    fireEvent.press(await screen.findByLabelText('Select exercise Barbell Squat'));
+    await selectExerciseFromPicker('Barbell Squat');
     fireEvent.press(await screen.findByTestId('exercise-block-history-panel-1-collapsed'));
 
     const firstSetTypeButton = screen.getByTestId('set-quality-button-1-1');
@@ -673,7 +802,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     await dismissEmptyStateIfPresent();
 
     fireEvent.press(screen.getByText('Log new exercise'));
-    fireEvent.press(await screen.findByLabelText('Select exercise Barbell Squat'));
+    await selectExerciseFromPicker('Barbell Squat');
     fireEvent.changeText(screen.getByLabelText('Weight for exercise 1 set 1'), '120');
     fireEvent.changeText(screen.getByLabelText('Reps for exercise 1 set 1'), '5');
 
@@ -698,7 +827,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     await dismissEmptyStateIfPresent();
 
     fireEvent.press(screen.getByText('Log new exercise'));
-    fireEvent.press(await screen.findByLabelText('Select exercise Barbell Squat'));
+    await selectExerciseFromPicker('Barbell Squat');
 
     expect(await screen.findByTestId('exercise-block-history-panel-1-empty-collapsed')).toHaveTextContent(
       'Past Records'
@@ -716,7 +845,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
 
     mockLoadRecentExerciseBlocks.mockRejectedValueOnce(new Error('history unavailable'));
     fireEvent.press(screen.getByText('Log new exercise'));
-    fireEvent.press(await screen.findByLabelText('Select exercise Bench Press'));
+    await selectExerciseFromPicker('Bench Press');
 
     expect(await screen.findByTestId('exercise-block-history-panel-2-error-collapsed')).toHaveTextContent(
       'Past Records'
@@ -773,13 +902,14 @@ describe('SessionRecorderScreen exercise interactions', () => {
     await dismissEmptyStateIfPresent();
 
     fireEvent.press(screen.getByText('Log new exercise'));
-    fireEvent.press(await screen.findByLabelText('Select exercise Barbell Squat'));
+    await selectExerciseFromPicker('Barbell Squat');
     fireEvent.press(await screen.findByTestId('exercise-block-history-panel-1-collapsed'));
     expect(await screen.findByTestId('exercise-block-history-panel-1')).toHaveTextContent(/2d ago/);
 
     fireEvent.press(screen.getByLabelText('Exercise options 1'));
     fireEvent.press(screen.getByLabelText('Change exercise'));
-    fireEvent.press(await screen.findByLabelText('Select exercise Bench Press'));
+    await selectExerciseFromPicker('Bench Press', { addEmpty: false });
+    expect(screen.queryByTestId('exercise-picker-preselection-panel')).toBeNull();
 
     await waitFor(() => {
       expect(mockLoadRecentExerciseBlocks).toHaveBeenLastCalledWith({
@@ -797,7 +927,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     await dismissEmptyStateIfPresent();
 
     fireEvent.press(screen.getByText('Log new exercise'));
-    fireEvent.press(await screen.findByLabelText('Select exercise Barbell Squat'));
+    await selectExerciseFromPicker('Barbell Squat');
 
     const setTypeButton = screen.getByTestId('set-quality-button-1-1');
     expect(setTypeButton.findByType('Text').props.children).toBe('•');
@@ -827,7 +957,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     await dismissEmptyStateIfPresent();
 
     fireEvent.press(screen.getByText('Log new exercise'));
-    fireEvent.press(await screen.findByLabelText('Select exercise Barbell Squat'));
+    await selectExerciseFromPicker('Barbell Squat');
 
     const weightInputLabel = 'Weight for exercise 1 set 1';
     const repsInputLabel = 'Reps for exercise 1 set 1';
@@ -861,7 +991,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     await dismissEmptyStateIfPresent();
 
     fireEvent.press(screen.getByText('Log new exercise'));
-    fireEvent.press(await screen.findByLabelText('Select exercise Barbell Squat'));
+    await selectExerciseFromPicker('Barbell Squat');
 
     const firstSetTypeButton = screen.getByTestId('set-quality-button-1-1');
     fireEvent.press(firstSetTypeButton);
@@ -944,6 +1074,23 @@ describe('SessionRecorderScreen exercise interactions', () => {
     });
   }, 30000);
 
+  it('uses grouped picker rows with shared stats when grouping is enabled', async () => {
+    __resetExerciseListPreferencesForTests();
+
+    render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
+
+    fireEvent.press(screen.getByText('Log new exercise'));
+    expect(await screen.findByLabelText('Chest exercises 1')).toBeTruthy();
+    expect(screen.getByLabelText('Core exercises 0')).toBeTruthy();
+    expect(screen.queryByLabelText('Select exercise Bench Press')).toBeNull();
+
+    fireEvent.press(screen.getByLabelText('Chest exercises 1'));
+
+    expect(await screen.findByLabelText('Select exercise Bench Press')).toBeTruthy();
+    expect(screen.getByText('Never done')).toBeTruthy();
+  });
+
   it('creates a new exercise inline from the picker and keeps set add/remove interactions intact', async () => {
     render(<SessionRecorderScreen />);
     await dismissEmptyStateIfPresent();
@@ -993,7 +1140,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     await dismissEmptyStateIfPresent();
 
     fireEvent.press(screen.getByText('Log new exercise'));
-    fireEvent.press(await screen.findByLabelText('Select exercise Barbell Squat'));
+    await selectExerciseFromPicker('Barbell Squat');
     fireEvent.press(screen.getByLabelText('Add tag to exercise 1'));
     expect(await screen.findByLabelText('Tag search input')).toBeTruthy();
 
@@ -1021,7 +1168,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     await dismissEmptyStateIfPresent();
 
     fireEvent.press(screen.getByText('Log new exercise'));
-    fireEvent.press(await screen.findByLabelText('Select exercise Barbell Squat'));
+    await selectExerciseFromPicker('Barbell Squat');
     fireEvent.press(screen.getByLabelText('Add tag to exercise 1'));
     fireEvent.press(await screen.findByLabelText('Select tag Paused'));
     await waitFor(() => {
@@ -1055,7 +1202,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     await dismissEmptyStateIfPresent();
 
     fireEvent.press(screen.getByText('Log new exercise'));
-    fireEvent.press(await screen.findByLabelText('Select exercise Bench Press'));
+    await selectExerciseFromPicker('Bench Press');
     fireEvent.press(screen.getByLabelText('Add tag to exercise 1'));
     expect(await screen.findByLabelText('Tag search input')).toBeTruthy();
 
@@ -1109,7 +1256,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     await dismissEmptyStateIfPresent();
 
     fireEvent.press(screen.getByText('Log new exercise'));
-    fireEvent.press(await screen.findByLabelText('Select exercise Deadlift'));
+    await selectExerciseFromPicker('Deadlift');
     fireEvent.press(screen.getByLabelText('Add tag to exercise 1'));
     expect(await screen.findByLabelText('Tag search input')).toBeTruthy();
 
@@ -1137,7 +1284,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     await dismissEmptyStateIfPresent();
 
     fireEvent.press(screen.getByText('Log new exercise'));
-    fireEvent.press(await screen.findByLabelText('Select exercise Bench Press'));
+    await selectExerciseFromPicker('Bench Press');
     fireEvent.press(screen.getByLabelText('Add tag to exercise 1'));
 
     await waitFor(() => {
@@ -1272,10 +1419,10 @@ describe('SessionRecorderScreen exercise interactions', () => {
 
     fireEvent.press(screen.getByText('Log new exercise'));
     expect(await screen.findByLabelText('Select exercise Barbell Squat')).toBeTruthy();
-    fireEvent.press(screen.getByLabelText('Select exercise Barbell Squat'));
+    await selectExerciseFromPicker('Barbell Squat');
     fireEvent.press(screen.getByText('Log new exercise'));
     expect(await screen.findByLabelText('Select exercise Bench Press')).toBeTruthy();
-    fireEvent.press(screen.getByLabelText('Select exercise Bench Press'));
+    await selectExerciseFromPicker('Bench Press');
 
     expect(screen.getByLabelText('Exercise options 1')).toBeTruthy();
     expect(screen.getByLabelText('Exercise options 2')).toBeTruthy();
@@ -1284,7 +1431,8 @@ describe('SessionRecorderScreen exercise interactions', () => {
     expect(screen.getByLabelText('Change exercise')).toBeTruthy();
     fireEvent.press(screen.getByText('Change exercise'));
     expect(await screen.findByLabelText('Select exercise Deadlift')).toBeTruthy();
-    fireEvent.press(screen.getByLabelText('Select exercise Deadlift'));
+    await selectExerciseFromPicker('Deadlift', { addEmpty: false });
+    expect(screen.queryByTestId('exercise-picker-preselection-panel')).toBeNull();
     expect(screen.getByText('Deadlift')).toBeTruthy();
 
     fireEvent.press(screen.getByLabelText('Exercise options 2'));
