@@ -28,6 +28,8 @@ const data = buildHeatmapData(dailyMetrics, metric); // metric: 'totalVolume' | 
 `DailyEffortMetrics` (`{ dateKey, totalVolume, nearFailureCount, estimatedRM1,
 highestWeight }`) comes from the muscle/exercise analytics in `src/data`; the
 weekly effort the same screens already load powers the `WeekSelectionBanner`.
+The Muscle History overlay intentionally selects only `nearFailureCount`; the
+Exercise History overlay exposes all four metrics.
 
 **Buckets** use max-of-window ratios (`getCalendarHeatmapBucket`), matching the rest
 of the stats screen. Volume / near-failure aggregate (sum) per week; 1RM / top weight

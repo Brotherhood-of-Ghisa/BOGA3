@@ -217,14 +217,15 @@ Guardrail command:
 7. Selected-day set rows are explanatory only: they show concise raw set values plus weighted effort, preserve existing warm-up exclusion/invalid-set zero-effort semantics from the shared analytics helper, and do not duplicate completed-session detail navigation or editing affordances.
 8. Certification markers are not rendered in the muscle-history overlay unless a real certification data source exists; v1 does not invent certification state.
 9. Dismissing the overlay clears only transient selected-muscle/date UI state and does not mutate sessions, exercises, tags, sync data, or durable preferences.
-10. The v1 overlay loads a capped one-year local completed-session history window for the selected muscle.
+10. The overlay renders only the `Near failure` metric chip and uses near-failure counts for its weekly and daily heatmap values; volume, estimated 1RM, and top weight are not selectable for muscle-level history.
+11. The v1 overlay loads a capped one-year local completed-session history window for the selected muscle.
 
 ### 13. Exercise heatmap mode semantics (M17)
 
 1. The `Stats / History` screen exposes a **Heatmap** chip below the period chips (Last 7 days / Last 30 days). This chip acts as a view-mode toggle: pressing it switches the body between the muscle-stats table (`viewMode: 'stats'`) and the exercise list (`viewMode: 'heatmap'`).
 2. In Heatmap mode the exercise list is a flat list of exercises that have been trained at least once, sorted by all-time session count descending. Each row shows the exercise name, session count, volume, and estimated 1RM.
 3. Tapping an exercise row in Heatmap mode opens an in-route `ExerciseHistoryOverlay` — the same overlay card structure as the muscle-history overlay (occupies ~75% screen height, backdrop-dismissible).
-4. The `ExerciseHistoryOverlay` renders the reusable `CalendarHeatmap` component over a 365-day window for the selected exercise. The four metric chips (Volume / Near failure / 1RM / Top weight) and the week-selection banner follow the same interaction semantics as the muscle-history overlay.
+4. The `ExerciseHistoryOverlay` renders the reusable `CalendarHeatmap` component over a 365-day window for the selected exercise. It keeps the four metric chips (Volume / Near failure / 1RM / Top weight) plus the week-selection banner; unlike muscle-history, it remains a multi-metric exercise-specific view.
 5. The Heatmap chip active/inactive visual states use the `actionPrimary` / `actionPrimarySubtleBg` / `borderMuted` / `surfaceDefault` tokens; no raw color literals.
 6. Dismissing the exercise overlay returns to the exercise list in Heatmap mode. It clears only transient selected-exercise/week UI state and does not mutate any data.
 7. Volume for exercise analytics is raw `weight × reps` (no muscle-role weighting). This differs from the muscle-history overlay where volume is role-weighted.

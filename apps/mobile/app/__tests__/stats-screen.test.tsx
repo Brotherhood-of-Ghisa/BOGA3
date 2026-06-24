@@ -250,9 +250,7 @@ const buildShellProps = (
   isMuscleHistoryLoading: false,
   muscleHistoryErrorMessage: null,
   selectedMuscleHistoryWeekKey: null,
-  muscleHistoryMetric: 'totalVolume',
   muscleHistoryView: 'weekly',
-  onSelectMuscleHistoryMetric: jest.fn(),
   onSelectMuscleHistoryView: jest.fn(),
   viewMode: 'muscle',
   onSelectViewMode: jest.fn(),
@@ -503,7 +501,7 @@ describe('StatsScreenShell', () => {
     expect(onDismissMuscleHistory).toHaveBeenCalledTimes(1);
   });
 
-  it('renders metric selector chips in the overlay', () => {
+  it('renders only the Near failure metric chip in the muscle overlay', () => {
     renderStatsScreenShell({
       selectedMuscle: {
         muscleGroupIds: ['front_delts'],
@@ -511,13 +509,12 @@ describe('StatsScreenShell', () => {
         familyName: 'Shoulders',
       },
       muscleHistoryWeeklyEffort: [buildWeeklyEffort()],
-      muscleHistoryMetric: 'totalVolume',
     });
 
-    expect(screen.getByTestId('stats-muscle-history-metric-chip-totalVolume')).toBeTruthy();
     expect(screen.getByTestId('stats-muscle-history-metric-chip-nearFailureCount')).toBeTruthy();
-    expect(screen.getByTestId('stats-muscle-history-metric-chip-estimatedRM1')).toBeTruthy();
-    expect(screen.getByTestId('stats-muscle-history-metric-chip-highestWeight')).toBeTruthy();
+    expect(screen.queryByTestId('stats-muscle-history-metric-chip-totalVolume')).toBeNull();
+    expect(screen.queryByTestId('stats-muscle-history-metric-chip-estimatedRM1')).toBeNull();
+    expect(screen.queryByTestId('stats-muscle-history-metric-chip-highestWeight')).toBeNull();
   });
 
   it('renders the Daily/Weekly view toggle and reports changes', () => {
@@ -557,7 +554,6 @@ describe('StatsScreenShell', () => {
           highestWeight: 80,
         },
       ],
-      muscleHistoryMetric: 'totalVolume',
       muscleHistoryView: 'daily',
     });
 
@@ -570,7 +566,7 @@ describe('StatsScreenShell', () => {
       'May 13, 2026'
     );
     expect(screen.getByTestId('stats-muscle-history-heatmap-day-detail-value')).toHaveTextContent(
-      /Volume: 1\.2k/
+      /Near failure: 2/
     );
   });
 
@@ -583,13 +579,14 @@ describe('StatsScreenShell', () => {
       },
       muscleHistoryWeeklyEffort: [buildWeeklyEffort()],
       selectedMuscleHistoryWeekKey: '2026-05-11',
-      muscleHistoryMetric: 'totalVolume',
     });
 
     const banner = screen.getByTestId('stats-muscle-history-week-banner');
     expect(banner).toBeTruthy();
     expect(screen.getByTestId('stats-muscle-history-week-banner-range')).toHaveTextContent(/May/);
-    expect(screen.getByTestId('stats-muscle-history-week-banner-value')).toHaveTextContent(/Volume/);
+    expect(screen.getByTestId('stats-muscle-history-week-banner-value')).toHaveTextContent(
+      /Near failure: 2/
+    );
   });
 
   it('shows a placeholder in the banner when no week is selected', () => {
@@ -601,28 +598,10 @@ describe('StatsScreenShell', () => {
       },
       muscleHistoryWeeklyEffort: [buildWeeklyEffort()],
       selectedMuscleHistoryWeekKey: null,
-      muscleHistoryMetric: 'totalVolume',
     });
 
     expect(screen.getByTestId('stats-muscle-history-week-banner')).toBeTruthy();
     expect(screen.getByTestId('stats-muscle-history-week-banner-placeholder')).toBeTruthy();
-  });
-
-  it('calls onSelectMuscleHistoryMetric when a metric chip is pressed', () => {
-    const onSelectMuscleHistoryMetric = jest.fn();
-    renderStatsScreenShell({
-      selectedMuscle: {
-        muscleGroupIds: ['front_delts'],
-        displayName: 'Front Delts',
-        familyName: 'Shoulders',
-      },
-      muscleHistoryWeeklyEffort: [buildWeeklyEffort()],
-      muscleHistoryMetric: 'totalVolume',
-      onSelectMuscleHistoryMetric,
-    });
-
-    fireEvent.press(screen.getByTestId('stats-muscle-history-metric-chip-nearFailureCount'));
-    expect(onSelectMuscleHistoryMetric).toHaveBeenCalledWith('nearFailureCount');
   });
 });
 
@@ -832,6 +811,18 @@ describe('StatsScreenShell — view mode toggle', () => {
     expect(screen.getByTestId('stats-exercise-history-overlay')).toBeTruthy();
     expect(screen.getByTestId('stats-exercise-history-title')).toHaveTextContent('Bench Press');
     expect(screen.getByTestId('stats-exercise-history-heatmap-cell-2026-05-11')).toBeTruthy();
+  });
+
+  it('keeps all metric selector chips in the exercise overlay', () => {
+    renderStatsScreenShell({
+      selectedExercise: { exerciseDefinitionId: 'ex1', displayName: 'Bench Press' },
+      exerciseHistoryWeeklyEffort: [buildWeeklyEffort()],
+    });
+
+    expect(screen.getByTestId('stats-exercise-history-metric-chip-totalVolume')).toBeTruthy();
+    expect(screen.getByTestId('stats-exercise-history-metric-chip-nearFailureCount')).toBeTruthy();
+    expect(screen.getByTestId('stats-exercise-history-metric-chip-estimatedRM1')).toBeTruthy();
+    expect(screen.getByTestId('stats-exercise-history-metric-chip-highestWeight')).toBeTruthy();
   });
 
   it('shows loading state in exercise overlay', () => {
