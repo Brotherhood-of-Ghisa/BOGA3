@@ -14,6 +14,8 @@
 #   2. ensures isolated mobile deps are installed
 #   3. boots Supabase, publishes it at https://<magicdns>, and rewrites
 #      apps/mobile/.env.local to that URL  (use-local-mobile-tailscale-env.sh)
+#   3.5 ensures the dev DB baseline (ensure-dev-baseline.sh): applies pending
+#       migrations in place and seeds the dev sign-in accounts — never resets
 #   4. publishes Metro at https://<magicdns>:8443 via `tailscale serve`
 #   5. starts Expo/Metro on a fixed port behind that proxy
 #
@@ -41,6 +43,11 @@ MOBILE_DIR="$REPO_ROOT/apps/mobile"
 EXPO_PORT="${EXPO_PORT:-8081}"
 TS_METRO_HTTPS_PORT=8443
 
+# Target the dedicated dev Supabase stack (BOGA-dev), not the slot-0 gate stack,
+# so running the gates never wipes this phone session's data. The env-half and
+# ensure-dev-baseline below both honor this flag. See docs/specs/12.
+export BOGA_MOBILE_DEV_DB=1
+
 # 1. Ensure this worktree has a generated Supabase config (slot/project_id/ports).
 if [[ ! -f "$REPO_ROOT/supabase/config.toml" ]]; then
   echo "[dev-remote] no supabase/config.toml — running worktree setup"
@@ -57,6 +64,14 @@ fi
 #    This also fails fast if the tailnet lacks HTTPS support, before Metro starts.
 echo "[dev-remote] starting local Supabase and publishing it over the tailnet (HTTPS)"
 "$REPO_ROOT/scripts/dev/use-local-mobile-tailscale-env.sh"
+
+# 3.5 Ensure the dev DB baseline against the now-running stack: apply any pending
+#     migrations IN PLACE (no reset) and seed the human dev accounts
+#     (a@dev.local / b@dev.local). Runs AFTER the env-half so the tailnet HTTPS
+#     prerequisite still fails fast before any Docker work; reuses the running
+#     stack, so it never resets your local data. Fails loud on schema drift.
+echo "[dev-remote] ensuring dev DB baseline (no reset; seeds dev users)"
+"$REPO_ROOT/supabase/scripts/ensure-dev-baseline.sh"
 
 # Resolve the MagicDNS name again for the Metro proxy + dev-client URL.
 if [[ -n "${BOGA_MOBILE_TS_HOST:-}" ]]; then

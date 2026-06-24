@@ -359,6 +359,7 @@ Auth on whichever stack it targets.
 | --- | --- | --- | --- | --- |
 | **Dev A** | `a@dev.local` | `dev123` | **Manual development** — sign in and click around | No |
 | **Dev B** | `b@dev.local` | `dev123` | Second human account (cross-user / sharing / sync) | No |
+| **Rich History** | `history@dev.local` | `dev123` | Manual/dev testing with imported GymBook history | No |
 | Fixture `user_a` | `user_a.local@example.test` | `ScaffoldingUserA!234` | Integration-test fixture (primary owner) | **Yes — reset / mutated / wiped every run** |
 | Fixture `user_b` | `user_b.local@example.test` | `ScaffoldingUserB!234` | Integration-test fixture (cross-user denial) | **Yes** |
 | `service_role_helper` | — (no login) | — | Service-role setup fixture | Yes |
@@ -367,13 +368,13 @@ Auth on whichever stack it targets.
 Sources: dev accounts — `supabase/scripts/dev-account-constants.sh`; fixtures —
 `supabase/scripts/auth-fixture-constants.sh` + `supabase/seed.sql`.
 
-**Use the dev accounts (`a@dev.local` / `b@dev.local`) for manual development — not the
-fixtures.** The backend contract suites and Maestro lanes create, mutate, and
-wipe `user_a` / `user_b` on every run, so anything you do as a fixture user can
-vanish mid-session and your edits can perturb a test run. The dev accounts exist
-precisely so manual dev never collides with integration testing: they are plain
-auth users, are not registered in `public.dev_fixture_principals`, and no gate,
-CI lane, or seed touches them.
+**Use the dev accounts (`a@dev.local` / `b@dev.local` / `history@dev.local`) for manual
+development — not the fixtures.** The backend contract suites and Maestro lanes
+create, mutate, and wipe `user_a` / `user_b` on every run, so anything you do as a
+fixture user can vanish mid-session and your edits can perturb a test run. The dev
+accounts exist precisely so manual dev never collides with integration testing:
+they are plain auth users, are not registered in `public.dev_fixture_principals`,
+and no gate, CI lane, or seed touches them.
 
 ### Provision the dev accounts
 
@@ -382,11 +383,32 @@ stack and `supabase db reset` both wipe `auth.users`, so re-run this after a
 reset — it is idempotent (creates the accounts if missing, resets their passwords
 if present).
 
-Local Docker/Colima Supabase (the default):
+**Automatic (the usual path):** the phone launchers `scripts/dev/dev-lan.sh` and
+`scripts/dev/dev-remote.sh` target a **dedicated dev Supabase stack**
+(`project_id BOGA-dev`, API `65431`) that is isolated from the slot-0 stack the
+gates use — so **running `boga test *` never wipes your dev data or session.**
+They run the **dev DB baseline** on every start: reuse the dev stack **without
+resetting it** (your logged data survives), apply any pending migrations in
+place, seed `a@dev.local` / `b@dev.local` / `history@dev.local`, and push the
+rich imported history into the `history@dev.local` account. The full isolation
+contract is in `docs/specs/12-worktree-config-and-isolation.md` (Dedicated dev
+stack). Commands:
+
+```bash
+boga db dev          # baseline: up + migrate + seed dev users (no reset)
+boga db dev-up       # start the dev stack only
+boga db dev-down     # stop it (data persists)
+boga db dev-reset    # rebuild it — DROPS ALL DEV DATA
+```
+
+On real schema drift the baseline **fails loud** rather than wiping — it tells
+you to run `boga db dev-reset` explicitly. Use that only for a clean rebuild.
+
+Local Docker/Colima Supabase, provisioning the accounts by themselves:
 
 ```bash
 ./supabase/scripts/local-runtime-up.sh             # ensure this worktree's stack is up
-./supabase/scripts/auth-provision-dev-accounts.sh  # create/refresh a@dev.local + b@dev.local
+./supabase/scripts/auth-provision-dev-accounts.sh  # create/refresh dev accounts
 ```
 
 Hosted dev Supabase project:
@@ -408,7 +430,8 @@ runs automatically; you do not need it for manual dev.
    - **iOS Simulator** → local Docker/Colima Supabase (`./supabase/scripts/local-runtime-up.sh`).
    - **Physical iPhone** → local Supabase over the Mac LAN (`./scripts/dev/dev-lan.sh`), or hosted (`./scripts/dev/use-hosted-mobile-env.sh`). See [Switch mobile app between local and hosted Supabase](#switch-mobile-app-between-local-and-hosted-supabase).
 2. Make sure the dev accounts exist on that database (provision step above).
-3. Launch the app and sign in on the auth screen as `a@dev.local` / `dev123` (or `b@dev.local`).
+3. Launch the app and sign in on the auth screen as `a@dev.local` / `dev123` (or
+   `history@dev.local` / `dev123` for the imported history account).
 
 If sign-in fails with a **network** error rather than invalid-credentials, that is
 a connectivity problem, not an account problem — see
@@ -581,9 +604,9 @@ LAN env setup. The day-to-day run loop is summarized in
 
 ### Accounts and sign-in
 
-Development sign-in accounts (`a@dev.local` / `b@dev.local`) and the integration-test
-fixtures (`user_a` / `user_b`) — what each is for, how to provision them, and how
-to sign in — are inventoried in
+Development sign-in accounts (`a@dev.local` / `b@dev.local` / `history@dev.local`)
+and the integration-test fixtures (`user_a` / `user_b`) — what each is for, how
+to provision them, and how to sign in — are inventoried in
 [Log into a development database](#log-into-a-development-database). Use the dev
 accounts for manual work; the fixtures are mutated and wiped by the test suites.
 

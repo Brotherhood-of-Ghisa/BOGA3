@@ -57,6 +57,11 @@ export type ExerciseListItem = {
 
 export type StatsViewMode = 'exercise' | 'muscle';
 
+type DisplayMuscleFamily = {
+  family: StatsMuscleFamilyPerformance;
+  visibleMuscles: StatsMusclePerformance[];
+};
+
 export const formatDelta = (current: number, previous: number): DeltaDisplay => {
   if (current === 0 && previous === 0) {
     return { text: '—', tone: 'neutral' };
@@ -126,9 +131,7 @@ export type StatsScreenShellProps = {
   isMuscleHistoryLoading: boolean;
   muscleHistoryErrorMessage: string | null;
   selectedMuscleHistoryWeekKey: string | null;
-  muscleHistoryMetric: CalendarHeatmapMetric;
   muscleHistoryView: HeatmapView;
-  onSelectMuscleHistoryMetric: (metric: CalendarHeatmapMetric) => void;
   onSelectMuscleHistoryView: (view: HeatmapView) => void;
   viewMode: StatsViewMode;
   onSelectViewMode: (mode: StatsViewMode) => void;
@@ -168,9 +171,7 @@ export function StatsScreenShell({
   isMuscleHistoryLoading,
   muscleHistoryErrorMessage,
   selectedMuscleHistoryWeekKey,
-  muscleHistoryMetric,
   muscleHistoryView,
-  onSelectMuscleHistoryMetric,
   onSelectMuscleHistoryView,
   viewMode,
   onSelectViewMode,
@@ -199,10 +200,15 @@ export function StatsScreenShell({
     ? formatDelta(summary.current.totals.totalSets, summary.previous.totals.totalSets)
     : null;
 
-  const filteredFamilies = useMemo(() => {
+  const filteredFamilies = useMemo((): DisplayMuscleFamily[] => {
     if (!summary) return [];
     const query = searchQuery.toLowerCase().trim();
-    if (!query) return summary.current.totals.muscleFamilies;
+    if (!query) {
+      return summary.current.totals.muscleFamilies.map((family) => ({
+        family,
+        visibleMuscles: family.muscles,
+      }));
+    }
     return summary.current.totals.muscleFamilies
       .map((family) => {
         const familyMatches = family.familyName.toLowerCase().includes(query);
@@ -212,13 +218,13 @@ export function StatsScreenShell({
         const filteredMuscles = familyMatches ? family.muscles : matchingMuscles;
         if (filteredMuscles.length > 0) {
           return {
-            ...family,
-            muscles: filteredMuscles,
+            family,
+            visibleMuscles: filteredMuscles,
           };
         }
         return null;
       })
-      .filter((family): family is StatsMuscleFamilyPerformance => family !== null);
+      .filter((family): family is DisplayMuscleFamily => family !== null);
   }, [summary, searchQuery]);
 
   const filteredExerciseListItems = useMemo(() => {
@@ -363,9 +369,7 @@ export function StatsScreenShell({
           isLoading={isMuscleHistoryLoading}
           errorMessage={muscleHistoryErrorMessage}
           selectedWeekKey={selectedMuscleHistoryWeekKey}
-          metric={muscleHistoryMetric}
           view={muscleHistoryView}
-          onSelectMetric={onSelectMuscleHistoryMetric}
           onSelectView={onSelectMuscleHistoryView}
           onDismiss={onDismissMuscleHistory}
           onSelectWeek={onSelectMuscleHistoryWeek}
@@ -398,7 +402,7 @@ function MuscleFamilyList({
   previousFamilies,
   onPressMuscleHistory,
 }: {
-  families: StatsMuscleFamilyPerformance[];
+  families: DisplayMuscleFamily[];
   previousFamilies: StatsMuscleFamilyPerformance[];
   onPressMuscleHistory: (muscle: MuscleHistoryTarget) => void;
 }) {
@@ -422,10 +426,11 @@ function MuscleFamilyList({
 
   return (
     <View style={styles.familyList}>
-      {families.map((family) => (
+      {families.map(({ family, visibleMuscles }) => (
         <MuscleFamilyCard
           key={family.familyName}
           family={family}
+          visibleMuscles={visibleMuscles}
           previousFamily={previousByFamilyName.get(family.familyName) ?? null}
           previousMusclesById={previousMusclesById}
           onPressMuscleHistory={onPressMuscleHistory}
@@ -442,11 +447,13 @@ function isFamilyCollapsible(family: StatsMuscleFamilyPerformance): boolean {
 
 function MuscleFamilyCard({
   family,
+  visibleMuscles,
   previousFamily,
   previousMusclesById,
   onPressMuscleHistory,
 }: {
   family: StatsMuscleFamilyPerformance;
+  visibleMuscles: StatsMusclePerformance[];
   previousFamily: StatsMuscleFamilyPerformance | null;
   previousMusclesById: Map<string, StatsMusclePerformance>;
   onPressMuscleHistory: (muscle: MuscleHistoryTarget) => void;
@@ -460,6 +467,10 @@ function MuscleFamilyCard({
   const headerContent = (
     <>
       <Text
+        adjustsFontSizeToFit
+        ellipsizeMode="clip"
+        minimumFontScale={0.82}
+        numberOfLines={2}
         style={[styles.familyName, familyUntrained && styles.muscleTextUntrained]}
         testID={`stats-family-name-${testIdSlug}`}>
         {family.familyName}
@@ -506,7 +517,7 @@ function MuscleFamilyCard({
       )}
       {collapsed ? null : (
         <View style={styles.muscleList}>
-          {family.muscles.map((muscle) => {
+          {visibleMuscles.map((muscle) => {
             const muscleUntrained = muscle.sessionCount === 0 && muscle.totalWeight === 0;
             const previousMuscle = previousMusclesById.get(muscle.muscleGroupId) ?? null;
             const muscleSessionsDelta = formatDelta(
@@ -527,7 +538,10 @@ function MuscleFamilyCard({
                 testID={`stats-muscle-row-${muscle.muscleGroupId}`}>
                 <Text
                   style={[styles.muscleName, muscleUntrained && styles.muscleTextUntrained]}
-                  numberOfLines={1}>
+                  adjustsFontSizeToFit
+                  ellipsizeMode="clip"
+                  minimumFontScale={0.82}
+                  numberOfLines={2}>
                   {muscle.displayName}
                 </Text>
                 <View style={styles.muscleMetrics}>
@@ -569,7 +583,7 @@ const toFamilyHistoryTarget = (family: StatsMuscleFamilyPerformance): MuscleHist
   familyName: family.familyName,
 });
 
-const METRIC_OPTIONS: readonly { value: CalendarHeatmapMetric; label: string }[] = [
+const EXERCISE_HISTORY_METRIC_OPTIONS: readonly { value: CalendarHeatmapMetric; label: string }[] = [
   { value: 'totalVolume', label: 'Volume' },
   { value: 'nearFailureCount', label: 'Near failure' },
   { value: 'estimatedRM1', label: '1RM' },
@@ -582,6 +596,11 @@ const METRIC_LABELS: Record<CalendarHeatmapMetric, string> = {
   estimatedRM1: '1RM',
   highestWeight: 'Top weight',
 };
+
+const MUSCLE_HISTORY_METRIC: CalendarHeatmapMetric = 'nearFailureCount';
+const MUSCLE_HISTORY_METRIC_OPTIONS: readonly { value: CalendarHeatmapMetric; label: string }[] = [
+  { value: MUSCLE_HISTORY_METRIC, label: METRIC_LABELS[MUSCLE_HISTORY_METRIC] },
+];
 
 export type HeatmapView = 'weekly' | 'daily';
 
@@ -703,9 +722,7 @@ function MuscleHistoryOverlay({
   isLoading,
   errorMessage,
   selectedWeekKey,
-  metric,
   view,
-  onSelectMetric,
   onSelectView,
   onDismiss,
   onSelectWeek,
@@ -717,9 +734,7 @@ function MuscleHistoryOverlay({
   isLoading: boolean;
   errorMessage: string | null;
   selectedWeekKey: string | null;
-  metric: CalendarHeatmapMetric;
   view: HeatmapView;
-  onSelectMetric: (metric: CalendarHeatmapMetric) => void;
   onSelectView: (view: HeatmapView) => void;
   onDismiss: () => void;
   onSelectWeek: (weekKey: string | null) => void;
@@ -740,7 +755,13 @@ function MuscleHistoryOverlay({
             <Text style={styles.overlayEyebrow}>
               {muscle.muscleGroupIds.length > 1 ? 'Muscle Group History' : 'Muscle History'}
             </Text>
-            <Text style={styles.overlayTitle} testID="stats-muscle-history-title">
+            <Text
+              adjustsFontSizeToFit
+              ellipsizeMode="clip"
+              minimumFontScale={0.82}
+              numberOfLines={2}
+              style={styles.overlayTitle}
+              testID="stats-muscle-history-title">
               {muscle.displayName}
             </Text>
           </View>
@@ -760,9 +781,9 @@ function MuscleHistoryOverlay({
         <View style={styles.overlayMetricSelector}>
           <SegmentedChips
             accessibilityLabel="Select effort metric"
-            options={METRIC_OPTIONS}
-            value={metric}
-            onChange={onSelectMetric}
+            options={MUSCLE_HISTORY_METRIC_OPTIONS}
+            value={MUSCLE_HISTORY_METRIC}
+            onChange={() => undefined}
             testIDPrefix="stats-muscle-history-metric-chip"
             compact
           />
@@ -783,7 +804,7 @@ function MuscleHistoryOverlay({
           <WeekSelectionBanner
             weeklyEffort={weeklyEffort}
             selectedWeekKey={selectedWeekKey}
-            metric={metric}
+            metric={MUSCLE_HISTORY_METRIC}
           />
         ) : null}
 
@@ -818,7 +839,7 @@ function MuscleHistoryOverlay({
 
               <HistoryHeatmap
                 dailyMetrics={dailyMetrics}
-                metric={metric}
+                metric={MUSCLE_HISTORY_METRIC}
                 view={view}
                 selectedWeekKey={selectedWeekKey}
                 onSelectWeek={onSelectWeek}
@@ -871,10 +892,16 @@ function ExerciseListView({
             }
             style={({ pressed }) => [styles.exerciseRow, pressed && styles.actionableRowPressed]}
             testID={`stats-exercise-row-${item.id}`}>
-            <Text style={styles.exerciseName} numberOfLines={1} testID={`stats-exercise-name-${item.id}`}>
+            <Text
+              adjustsFontSizeToFit
+              ellipsizeMode="clip"
+              minimumFontScale={0.82}
+              numberOfLines={2}
+              style={styles.exerciseName}
+              testID={`stats-exercise-name-${item.id}`}>
               {item.name}
             </Text>
-            <View style={styles.muscleMetrics}>
+            <View style={styles.exerciseMetrics}>
               <Metric
                 label="Sessions"
                 value={formatNumber(item.sessionCount)}
@@ -948,7 +975,13 @@ function ExerciseHistoryOverlay({
         <View style={styles.overlayHeader}>
           <View style={styles.overlayTitleGroup}>
             <Text style={styles.overlayEyebrow}>Exercise History</Text>
-            <Text style={styles.overlayTitle} testID="stats-exercise-history-title">
+            <Text
+              adjustsFontSizeToFit
+              ellipsizeMode="clip"
+              minimumFontScale={0.82}
+              numberOfLines={2}
+              style={styles.overlayTitle}
+              testID="stats-exercise-history-title">
               {exercise.displayName}
             </Text>
           </View>
@@ -968,7 +1001,7 @@ function ExerciseHistoryOverlay({
         <View style={styles.overlayMetricSelector}>
           <SegmentedChips
             accessibilityLabel="Select effort metric"
-            options={METRIC_OPTIONS}
+            options={EXERCISE_HISTORY_METRIC_OPTIONS}
             value={metric}
             onChange={onSelectMetric}
             testIDPrefix="stats-exercise-history-metric-chip"
@@ -1085,7 +1118,6 @@ export default function StatsRoute() {
   const [isMuscleHistoryLoading, setIsMuscleHistoryLoading] = useState(false);
   const [muscleHistoryErrorMessage, setMuscleHistoryErrorMessage] = useState<string | null>(null);
   const [selectedMuscleHistoryWeekKey, setSelectedMuscleHistoryWeekKey] = useState<string | null>(null);
-  const [muscleHistoryMetric, setMuscleHistoryMetric] = useState<CalendarHeatmapMetric>('totalVolume');
   const [muscleHistoryView, setMuscleHistoryView] = useState<HeatmapView>('weekly');
   const muscleHistoryRequestIdRef = useRef(0);
 
@@ -1291,9 +1323,7 @@ export default function StatsRoute() {
       isMuscleHistoryLoading,
       muscleHistoryErrorMessage,
       selectedMuscleHistoryWeekKey,
-      muscleHistoryMetric,
       muscleHistoryView,
-      onSelectMuscleHistoryMetric: setMuscleHistoryMetric,
       onSelectMuscleHistoryView: setMuscleHistoryView,
       viewMode,
       onSelectViewMode: handleSelectViewMode,
@@ -1330,7 +1360,6 @@ export default function StatsRoute() {
       isMuscleHistoryLoading,
       muscleHistoryErrorMessage,
       selectedMuscleHistoryWeekKey,
-      muscleHistoryMetric,
       muscleHistoryView,
       viewMode,
       handleSelectViewMode,
@@ -1383,20 +1412,23 @@ const styles = StyleSheet.create({
     color: uiColors.textSecondary,
   },
   exerciseRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 10,
     paddingHorizontal: 12,
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: uiColors.borderMuted,
-    gap: 12,
   },
   exerciseName: {
     fontSize: 14,
     fontWeight: '500',
     color: uiColors.textPrimary,
-    flexShrink: 1,
+    alignSelf: 'stretch',
+    minWidth: 0,
+  },
+  exerciseMetrics: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 12,
   },
   scroll: {
     flex: 1,
@@ -1463,6 +1495,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: uiColors.textPrimary,
     flexShrink: 1,
+    minWidth: 0,
   },
   familyMetrics: {
     flexDirection: 'row',
@@ -1488,6 +1521,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: uiColors.textPrimary,
     flexShrink: 1,
+    minWidth: 0,
   },
   muscleMetrics: {
     flexDirection: 'row',
@@ -1588,6 +1622,7 @@ const styles = StyleSheet.create({
   },
   overlayTitleGroup: {
     flexShrink: 1,
+    minWidth: 0,
     gap: 2,
   },
   overlayEyebrow: {

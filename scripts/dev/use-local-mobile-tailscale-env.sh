@@ -104,7 +104,18 @@ require_tailscale_https
 TS_HOST="$(detect_tailscale_host)"
 
 # 3. Boot this slot's local Supabase and read its URL + anon key.
-"${REPO_ROOT}/supabase/scripts/local-runtime-up.sh"
+# The dev launchers set BOGA_MOBILE_DEV_DB=1 to target the dedicated dev stack
+# (BOGA-dev) instead of the slot-0 gate stack, so a gate run never wipes the
+# phone's data. engage_dev_stack points every helper below (status read, serve
+# port, env rewrite) at the dev stack; without the flag this is slot-0 as before.
+if [[ -n "${BOGA_MOBILE_DEV_DB:-}" ]]; then
+  # shellcheck disable=SC1091
+  source "${REPO_ROOT}/supabase/scripts/dev-stack-lib.sh"
+  engage_dev_stack
+  "${REPO_ROOT}/supabase/scripts/dev-runtime-up.sh"
+else
+  "${REPO_ROOT}/supabase/scripts/local-runtime-up.sh"
+fi
 load_supabase_status_env
 
 if [[ -z "${API_URL:-}" || -z "${ANON_KEY:-}" ]]; then

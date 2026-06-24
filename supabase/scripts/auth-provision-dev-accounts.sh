@@ -36,6 +36,12 @@ echo "[supabase] provisioning human development accounts (separate from test fix
   --password "${DEV_ACCOUNT_B_PASSWORD}" \
   --email-confirm true
 
+"${SCRIPT_DIR}/auth-provision-user.sh" \
+  --email "${DEV_RICH_HISTORY_EMAIL}" \
+  --password "${DEV_RICH_HISTORY_PASSWORD}" \
+  --email-confirm true
+
 echo "[supabase] development accounts ready (sign in through the app):"
 echo "  - ${DEV_ACCOUNT_A_EMAIL} / ${DEV_ACCOUNT_A_PASSWORD}"
 echo "  - ${DEV_ACCOUNT_B_EMAIL} / ${DEV_ACCOUNT_B_PASSWORD}"
+echo "  - ${DEV_RICH_HISTORY_EMAIL} / ${DEV_RICH_HISTORY_PASSWORD} (rich imported history)"

@@ -1,6 +1,5 @@
 #!/usr/bin/env tsx
 import Database from 'better-sqlite3';
-import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -27,6 +26,13 @@ import {
   sessionExercises,
   sessions,
 } from '../../src/data/schema';
+import {
+  generatedExerciseDefinitionId,
+  generatedExerciseMuscleMappingId,
+  generatedSessionExerciseId,
+  generatedSessionId,
+  generatedSetId,
+} from './boga-import-ids';
 
 export type BogaLocalImportDatabase = BetterSQLite3Database<typeof schema>;
 
@@ -159,9 +165,6 @@ const EMPTY_INSERT_COUNTS = {
 
 const isNonEmptyString = (value: unknown): value is string =>
   typeof value === 'string' && value.trim() !== '';
-
-const hashId = (prefix: string, ...parts: string[]) =>
-  `${prefix}-${createHash('sha256').update(parts.join('\0')).digest('hex').slice(0, 24)}`;
 
 const parseIsoDate = (value: string, label: string, errors: string[]): Date => {
   const date = new Date(value);
@@ -322,31 +325,6 @@ const ensureUnique = (label: string, values: string[], errors: string[]) => {
     seen.add(value);
   }
 };
-
-const generatedSessionId = (pkg: BogaSessionImportPackage, session: BogaImportSession) =>
-  hashId(
-    'import-session',
-    pkg.schema,
-    pkg.source.app,
-    pkg.source.exportFile.sha256 ?? pkg.source.exportFile.path ?? 'source',
-    session.importSessionKey
-  );
-
-const generatedSessionExerciseId = (sessionId: string, exercise: BogaImportSessionExercise) =>
-  hashId('import-session-exercise', sessionId, String(exercise.orderIndex));
-
-const generatedSetId = (sessionExerciseId: string, set: BogaImportSet) =>
-  hashId('import-set', sessionExerciseId, String(set.orderIndex), String(set.source.rowIndex));
-
-const generatedExerciseDefinitionId = (pkg: BogaSessionImportPackage, decision: BogaImportExerciseDecision) => {
-  if (decision.decision !== 'create_new') {
-    throw new Error('Internal error: cannot generate an exercise id for a map_existing decision');
-  }
-  return hashId('import-exercise-definition', pkg.schema, pkg.source.app, decision.importExerciseKey);
-};
-
-const generatedExerciseMuscleMappingId = (exerciseDefinitionId: string, muscleGroupId: string) =>
-  hashId('import-exercise-muscle', exerciseDefinitionId, muscleGroupId);
 
 const normalizePath = (path: string) => resolve(path);
 
@@ -589,9 +567,6 @@ export const planBogaLocalImport = (
       for (const set of exercise.sets) {
         if (!Number.isInteger(set.orderIndex) || set.orderIndex < 0) {
           errors.push(`session ${session.importSessionKey} set orderIndex must be a non-negative integer`);
-        }
-        if (set.setType !== null) {
-          errors.push(`session ${session.importSessionKey} setType must be null in ${pkg.schema}`);
         }
         const setId = generatedSetId(sessionExerciseId, set);
         generatedIds.push(setId);

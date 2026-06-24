@@ -1,0 +1,13 @@
+{
+  "lane": "auth-authz",
+  "wall_ms": 3174,
+  "exit_code": 0,
+  "recorded_at": "20260622T204237Z",
+  "machine_id": "6443fb0d",
+  "hw": "Apple M4",
+  "cores": 10,
+  "os": "macOS 26.5.1",
+  "slot": "5",
+  "commit": "109ebe0",
+  "source": "gate"
+}

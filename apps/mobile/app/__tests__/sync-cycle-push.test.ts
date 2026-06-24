@@ -11,7 +11,12 @@
 
 import { eq } from 'drizzle-orm';
 
-import { BATCH_CAP, selectPushBatch, type WireEntity } from '@/src/sync/cycle';
+import {
+  BATCH_CAP,
+  describeServerFkViolation,
+  selectPushBatch,
+  type WireEntity,
+} from '@/src/sync/cycle';
 import { findPushBatchFkViolations } from '@/src/sync/fk-graph';
 import type { Transaction } from '@/src/data/clock';
 import { exerciseDefinitions, gyms, muscleGroups, sessions } from '@/src/data/schema';
@@ -257,5 +262,82 @@ describe('findPushBatchFkViolations: muscle_groups parent edge', () => {
     );
 
     expect(violations).toEqual([]);
+  });
+});
+
+describe('describeServerFkViolation', () => {
+  // The exact Postgres string the server surfaced in the field report.
+  const REAL_MESSAGE =
+    'FK_VIOLATION: insert or update on table "session_exercises" violates foreign key ' +
+    'constraint "session_exercises_exercise_definition_fk"';
+
+  const sessionExerciseEnvelope = (
+    id: string,
+    sessionId: string,
+    exerciseDefinitionId: string,
+  ): WireEntity => ({
+    type: 'session_exercises',
+    id,
+    client_updated_at_ms: 1,
+    // `fields` deliberately includes user content (a name) to prove it is NOT
+    // logged — only the FK columns are lifted into the diagnostic.
+    fields: {
+      session_id: sessionId,
+      exercise_definition_id: exerciseDefinitionId,
+      display_name: 'Machine Bench Presses',
+      position: 0,
+    },
+  });
+
+  it('names the table, constraint, suspect column, and the offending FK ids', () => {
+    const detail = describeServerFkViolation(REAL_MESSAGE, [
+      sessionExerciseEnvelope('se-1', 'sess-1', 'def-missing'),
+    ]);
+
+    expect(detail.table).toBe('session_exercises');
+    expect(detail.constraint).toBe('session_exercises_exercise_definition_fk');
+    // The child table name itself contains "session"; the prefix-strip must keep
+    // it from shadowing the session_id edge and resolve the real culprit column.
+    expect(detail.suspectColumn).toBe('exercise_definition_id');
+    expect(detail.truncated).toBe(false);
+    expect(detail.rows).toEqual([
+      { id: 'se-1', refs: { session_id: 'sess-1', exercise_definition_id: 'def-missing' } },
+    ]);
+  });
+
+  it('logs FK ids only — never user-entered values from the row payload', () => {
+    const detail = describeServerFkViolation(REAL_MESSAGE, [
+      sessionExerciseEnvelope('se-1', 'sess-1', 'def-missing'),
+    ]);
+
+    const serialized = JSON.stringify(detail);
+    expect(serialized).not.toContain('Machine Bench Presses');
+    expect(serialized).not.toContain('display_name');
+    expect(Object.keys(detail.rows[0].refs).sort()).toEqual([
+      'exercise_definition_id',
+      'session_id',
+    ]);
+  });
+
+  it('caps the listed rows and flags truncation for a large offending batch', () => {
+    const batch = Array.from({ length: 25 }, (_, index) =>
+      sessionExerciseEnvelope(`se-${index}`, 'sess-1', `def-${index}`),
+    );
+
+    const detail = describeServerFkViolation(REAL_MESSAGE, batch);
+
+    expect(detail.rows).toHaveLength(20);
+    expect(detail.truncated).toBe(true);
+  });
+
+  it('degrades gracefully on an unparseable message', () => {
+    const detail = describeServerFkViolation('some opaque transport failure', [
+      sessionExerciseEnvelope('se-1', 'sess-1', 'def-missing'),
+    ]);
+
+    expect(detail.table).toBeNull();
+    expect(detail.constraint).toBeNull();
+    expect(detail.suspectColumn).toBeNull();
+    expect(detail.rows).toEqual([]);
   });
 });
