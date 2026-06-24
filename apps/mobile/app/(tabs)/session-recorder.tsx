@@ -15,6 +15,10 @@ import {
 } from 'react-native';
 
 import { ExerciseEditorModal } from '@/components/exercise-catalog/exercise-editor-modal';
+import {
+  ExerciseListContent,
+  ExerciseListPreferenceControls,
+} from '@/components/exercise-catalog/exercise-list-controls';
 import { SessionContentLayout } from '@/components/session-recorder/session-content-layout';
 import { uiColors } from '@/components/ui';
 import { getAuthSnapshot } from '@/src/auth';
@@ -37,6 +41,7 @@ import {
   listSessionExerciseAssignedTags,
   listLocalGyms,
   loadRecentExerciseBlocks,
+  loadSuggestedExercisePlan,
   loadLocalGymById,
   loadLatestSessionDraftSnapshot,
   loadSessionSnapshotById,
@@ -49,6 +54,8 @@ import {
   upsertLocalGym,
   type ExerciseTagDefinitionRecord,
   type ExerciseBlockHistoryBlock,
+  type ExerciseBlockHistorySuggestedPlan,
+  type ExerciseBlockHistorySuggestedSet,
   type LocalGymLookupRecord,
   type SessionExerciseAssignedTag,
   type SessionDraftSnapshot,
@@ -63,7 +70,9 @@ import {
   parseCalculationSet,
 } from '@/src/exercise-calculations';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
-import { filterIndexedExerciseCatalogExercises } from '@/src/exercise-catalog/search';
+import { buildExerciseListModel, type ExerciseListItem } from '@/src/exercise-catalog/list-model';
+import { useExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
+import { useExerciseCatalogStats } from '@/src/exercise-catalog/stats-cache';
 import { getCurrentForegroundPositionLazy } from '@/src/location/foreground-location-lazy';
 import {
   DEFAULT_MAX_POSITION_ACCURACY_M,
@@ -387,6 +396,19 @@ function createSetFromPrevious(previousSet: SessionSet | undefined): SessionSet 
   };
 }
 
+function createPlannedSetFromSuggestedSet(set: ExerciseBlockHistorySuggestedSet): SessionSet {
+  return {
+    id: createSetId(),
+    reps: '',
+    weight: '',
+    setType: null,
+    plannedReps: set.repsValue,
+    plannedWeight: set.weightValue,
+    plannedSetType: normalizeSessionSetType(set.setType),
+    performanceStatus: 'planned',
+  };
+}
+
 const SET_TYPE_CYCLE_ORDER: SessionSetTypeValue[] = [null, ...SESSION_SET_TYPES];
 const SET_TYPE_SHORT_LABELS: Record<SessionSetType, string> = {
   warm_up: 'W-Up',
@@ -629,6 +651,11 @@ type SubmitCleanupPrompt = {
 };
 
 type TagModalMode = 'picker' | 'manage';
+type ExercisePickerPreselectionState = {
+  exercise: ExerciseListItem;
+  status: 'loading' | 'ready' | 'error';
+  suggestion: ExerciseBlockHistorySuggestedPlan | null;
+};
 type SetTypePickerState = {
   exerciseId: string;
   setId: string;
@@ -937,6 +964,11 @@ export default function SessionRecorderScreen() {
   const [completedEditEndTouched, setCompletedEditEndTouched] = useState(false);
   const [completedEditSubmitAttempted, setCompletedEditSubmitAttempted] = useState(false);
   const [exercisePickerSearchValue, setExercisePickerSearchValue] = useState('');
+  const [exercisePickerPreselection, setExercisePickerPreselection] =
+    useState<ExercisePickerPreselectionState | null>(null);
+  const [isExercisePickerOptionsVisible, setIsExercisePickerOptionsVisible] = useState(false);
+  const [expandedExercisePickerFamilies, setExpandedExercisePickerFamilies] = useState<Set<string>>(() => new Set());
+  const [listPreferences, setListPreferences] = useExerciseListPreferences();
   const exerciseCatalog = useExerciseCatalog();
   const isExerciseCatalogLoading =
     exerciseCatalog.status === 'idle' || exerciseCatalog.status === 'loading';
@@ -948,6 +980,8 @@ export default function SessionRecorderScreen() {
     () => exerciseCatalog.exercises.filter((exercise) => !exercise.deletedAt),
     [exerciseCatalog.exercises]
   );
+  const exerciseCatalogStatsResult = useExerciseCatalogStats(listPreferences.dateRange);
+  const { stats: exerciseCatalogStats, reload: reloadExerciseCatalogStats } = exerciseCatalogStatsResult;
   const [isExerciseCreateModalVisible, setIsExerciseCreateModalVisible] = useState(false);
   const [isTagModalVisible, setIsTagModalVisible] = useState(false);
   const [tagModalMode, setTagModalMode] = useState<TagModalMode>('picker');
@@ -963,6 +997,7 @@ export default function SessionRecorderScreen() {
   const [activeSetTypePicker, setActiveSetTypePicker] = useState<SetTypePickerState | null>(null);
   const [expandedSetIds, setExpandedSetIds] = useState<Set<string>>(() => new Set());
   const [pendingFocusedWeightSetId, setPendingFocusedWeightSetId] = useState<string | null>(null);
+  const [focusedExerciseCardId, setFocusedExerciseCardId] = useState<string | null>(null);
   const [isDeleteConfirmVisible, setIsDeleteConfirmVisible] = useState(false);
   const [isGpsDetectionInFlight, setIsGpsDetectionInFlight] = useState(false);
   const [pendingGymCoordinateAction, setPendingGymCoordinateAction] = useState<{
@@ -985,7 +1020,10 @@ export default function SessionRecorderScreen() {
   const pendingExercisePickerRestoreTargetRef = useRef<string | null | undefined>(undefined);
   const suppressSetTypeCyclePressRef = useRef(false);
   const exerciseBlockHistoryRequestKeyRef = useRef<Record<string, string>>({});
+  const exercisePickerPreselectionRequestKeyRef = useRef<string | null>(null);
   const focusedSetInputIdRef = useRef<string | null>(null);
+  const recorderScrollViewRef = useRef<ScrollView | null>(null);
+  const exerciseCardYByExerciseIdRef = useRef<Record<string, number>>({});
   const horizontalSwipeStartXByKeyRef = useRef<Record<string, number>>({});
   const isMountedRef = useRef(true);
 
@@ -1260,6 +1298,8 @@ export default function SessionRecorderScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      reloadExerciseCatalogStats();
+
       if (pendingExercisePickerRestoreTargetRef.current === undefined) {
         return;
       }
@@ -1273,7 +1313,7 @@ export default function SessionRecorderScreen() {
         exerciseActionMenuVisible: false,
         activeExerciseActionId: null,
       }));
-    }, [])
+    }, [reloadExerciseCatalogStats])
   );
 
   const markSessionStructuralMutation = useCallback(() => {
@@ -1311,10 +1351,26 @@ export default function SessionRecorderScreen() {
         : state.locations.filter((location) => !location.archived),
     [state.locations, state.showArchivedInManager]
   );
-  const filteredExercisePickerOptions = useMemo(
-    () => filterIndexedExerciseCatalogExercises(exercisePickerOptions, exercisePickerSearchValue),
-    [exercisePickerOptions, exercisePickerSearchValue]
+  const exercisePickerListModel = useMemo(
+    () =>
+      buildExerciseListModel({
+        exercises: exercisePickerOptions,
+        muscleGroups: exerciseCatalog.muscleGroups,
+        stats: exerciseCatalogStats,
+        preferences: listPreferences,
+        query: exercisePickerSearchValue,
+        includeDeleted: false,
+        showNeverDone: true,
+      }),
+    [
+      exercisePickerOptions,
+      exerciseCatalog.muscleGroups,
+      exerciseCatalogStats,
+      listPreferences,
+      exercisePickerSearchValue,
+    ]
   );
+
   const exerciseIdsKey = useMemo(
     () => state.session.exercises.map((exercise) => exercise.id).join('|'),
     [state.session.exercises]
@@ -1326,6 +1382,19 @@ export default function SessionRecorderScreen() {
         .join('|'),
     [state.session.exercises]
   );
+
+  useEffect(() => {
+    const activeExerciseIds = new Set(stateRef.current.session.exercises.map((exercise) => exercise.id));
+    for (const exerciseId of Object.keys(exerciseCardYByExerciseIdRef.current)) {
+      if (!activeExerciseIds.has(exerciseId)) {
+        delete exerciseCardYByExerciseIdRef.current[exerciseId];
+      }
+    }
+
+    if (focusedExerciseCardId && !activeExerciseIds.has(focusedExerciseCardId)) {
+      setFocusedExerciseCardId(null);
+    }
+  }, [exerciseIdsKey, focusedExerciseCardId]);
 
   const refreshAssignedTagsForExercise = useCallback(async (sessionExerciseId: string) => {
     try {
@@ -2397,6 +2466,8 @@ export default function SessionRecorderScreen() {
       activeExerciseActionId: null,
     }));
     setExercisePickerSearchValue('');
+    setExercisePickerPreselection(null);
+    exercisePickerPreselectionRequestKeyRef.current = null;
   };
 
   const dismissExerciseModal = () => {
@@ -2406,7 +2477,41 @@ export default function SessionRecorderScreen() {
       exerciseSelectionTargetId: null,
     }));
     setExercisePickerSearchValue('');
+    setExercisePickerPreselection(null);
+    exercisePickerPreselectionRequestKeyRef.current = null;
+    setIsExercisePickerOptionsVisible(false);
   };
+
+  const clearExercisePickerPreselection = () => {
+    setExercisePickerPreselection(null);
+    exercisePickerPreselectionRequestKeyRef.current = null;
+  };
+
+  const updateExercisePickerSearchValue = (value: string) => {
+    clearExercisePickerPreselection();
+    setExercisePickerSearchValue(value);
+  };
+
+  const scrollToExerciseCard = useCallback((exerciseId: string) => {
+    const cardY = exerciseCardYByExerciseIdRef.current[exerciseId];
+    if (typeof cardY !== 'number') {
+      return;
+    }
+
+    recorderScrollViewRef.current?.scrollTo({
+      y: Math.max(cardY - 12, 0),
+      animated: true,
+    });
+  }, []);
+
+  const focusExerciseCard = useCallback((exerciseId: string | null) => {
+    if (!exerciseId) {
+      return;
+    }
+
+    setFocusedExerciseCardId(exerciseId);
+    requestAnimationFrame(() => scrollToExerciseCard(exerciseId));
+  }, [scrollToExerciseCard]);
 
   const selectExercisePreset = (exercisePresetId: string) => {
     const selectedExercisePreset = exercisePickerOptions.find((exercisePreset) => exercisePreset.id === exercisePresetId);
@@ -2415,6 +2520,56 @@ export default function SessionRecorderScreen() {
     }
 
     applySelectedExerciseSelection(selectedExercisePreset.id, selectedExercisePreset.name);
+  };
+
+  const selectExerciseListItem = (exercise: ExerciseListItem) => {
+    if (state.exerciseSelectionTargetId) {
+      selectExercisePreset(exercise.id);
+      return;
+    }
+
+    const requestKey = `${exercise.id}:${Date.now()}:${Math.random().toString(36).slice(2)}`;
+    exercisePickerPreselectionRequestKeyRef.current = requestKey;
+    setIsExercisePickerOptionsVisible(false);
+    setExercisePickerPreselection({
+      exercise,
+      status: 'loading',
+      suggestion: null,
+    });
+
+    void loadSuggestedExercisePlan({ exerciseDefinitionId: exercise.id })
+      .then((suggestion) => {
+        if (!isMountedRef.current || exercisePickerPreselectionRequestKeyRef.current !== requestKey) {
+          return;
+        }
+        setExercisePickerPreselection({
+          exercise,
+          status: 'ready',
+          suggestion,
+        });
+      })
+      .catch(() => {
+        if (!isMountedRef.current || exercisePickerPreselectionRequestKeyRef.current !== requestKey) {
+          return;
+        }
+        setExercisePickerPreselection({
+          exercise,
+          status: 'error',
+          suggestion: null,
+        });
+      });
+  };
+
+  const toggleExercisePickerFamily = (familyName: string) => {
+    setExpandedExercisePickerFamilies((current) => {
+      const next = new Set(current);
+      if (next.has(familyName)) {
+        next.delete(familyName);
+      } else {
+        next.add(familyName);
+      }
+      return next;
+    });
   };
 
   const applySelectedExerciseSelection = (exerciseDefinitionId: string, exerciseName: string) => {
@@ -2437,6 +2592,8 @@ export default function SessionRecorderScreen() {
       exerciseSelectionTargetId: null,
     }));
     setPendingFocusedWeightSetId(newSessionExercise?.sets[0]?.id ?? null);
+    setExercisePickerPreselection(null);
+    exercisePickerPreselectionRequestKeyRef.current = null;
     clearSubmitFeedback();
     markSessionStructuralMutation();
 
@@ -2455,8 +2612,85 @@ export default function SessionRecorderScreen() {
     }
   };
 
+  const appendSuggestedPlanToSession = (suggestionState: ExercisePickerPreselectionState) => {
+    const suggestion = suggestionState.suggestion;
+    if (!suggestion || suggestion.sets.length === 0) {
+      return;
+    }
+
+    const plannedSets = suggestion.sets.map(createPlannedSetFromSuggestedSet);
+    const currentLastExercise = stateRef.current.session.exercises[stateRef.current.session.exercises.length - 1];
+    const shouldAppendToLastExercise =
+      currentLastExercise?.exerciseDefinitionId === suggestionState.exercise.id;
+    const createdExerciseId = shouldAppendToLastExercise ? null : createExerciseId();
+    const targetExerciseId = shouldAppendToLastExercise
+      ? currentLastExercise?.id ?? null
+      : createdExerciseId;
+
+    setState((current) => {
+      const lastExercise = current.session.exercises[current.session.exercises.length - 1];
+      const canAppendToLastExercise =
+        shouldAppendToLastExercise && lastExercise?.id === currentLastExercise?.id;
+      const nextExercises = canAppendToLastExercise && lastExercise
+        ? current.session.exercises.map((exercise) => {
+            if (exercise.id !== lastExercise.id) {
+              return exercise;
+            }
+            return {
+              ...exercise,
+              sets: [...exercise.sets, ...plannedSets],
+            };
+          })
+        : [
+            ...current.session.exercises,
+            {
+              id: createdExerciseId ?? createExerciseId(),
+              exerciseDefinitionId: suggestionState.exercise.id,
+              name: suggestionState.exercise.name,
+              machineName: '',
+              tags: [],
+              sets: plannedSets,
+            },
+          ];
+
+      return {
+        ...current,
+        session: {
+          ...current.session,
+          exercises: nextExercises,
+        },
+        exercisePickerVisible: false,
+        exerciseSelectionTargetId: null,
+      };
+    });
+
+    setExercisePickerSearchValue('');
+    setExercisePickerPreselection(null);
+    exercisePickerPreselectionRequestKeyRef.current = null;
+    setPendingFocusedWeightSetId(null);
+    focusExerciseCard(targetExerciseId);
+    clearSubmitFeedback();
+    markSessionStructuralMutation();
+
+    void logEvent({
+      level: 'info',
+      source: 'app',
+      event: 'session.exercise_plan_appended',
+      message: 'A historical exercise plan was appended to the active workout log.',
+      userId: getAuthSnapshot().user?.id ?? null,
+      context: {
+        exerciseDefinitionId: suggestionState.exercise.id,
+        exerciseName: suggestionState.exercise.name,
+        sourceSessionId: suggestion.sessionId,
+        targetExerciseId,
+        setCount: suggestion.sets.length,
+      },
+    });
+  };
+
   const openExerciseCatalogFromRecorder = () => {
     pendingExercisePickerRestoreTargetRef.current = state.exerciseSelectionTargetId;
+    clearExercisePickerPreselection();
     setState((current) => ({
       ...current,
       exercisePickerVisible: false,
@@ -2467,6 +2701,7 @@ export default function SessionRecorderScreen() {
   };
 
   const openInlineExerciseCreate = () => {
+    clearExercisePickerPreselection();
     setState((current) => ({
       ...current,
       exercisePickerVisible: false,
@@ -3363,6 +3598,7 @@ export default function SessionRecorderScreen() {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
         onScrollBeginDrag={collapseDisplayableSetRows}
+        ref={recorderScrollViewRef}
         testID="session-recorder-screen">
       {routeMode === 'completed-edit' ? (
         <View style={styles.completedEditMetadataCard}>
@@ -3429,6 +3665,21 @@ export default function SessionRecorderScreen() {
           gymSelectionControl
         }
         exercises={state.session.exercises}
+        getExerciseCardProps={({ exercise, exerciseIndex }) => ({
+          accessibilityLabel: `Exercise ${exerciseIndex + 1}: ${exercise.name}`,
+          accessibilityState:
+            focusedExerciseCardId === exercise.id
+              ? { selected: true }
+              : undefined,
+          onLayout: (event) => {
+            exerciseCardYByExerciseIdRef.current[exercise.id] = event.nativeEvent.layout.y;
+            if (focusedExerciseCardId === exercise.id) {
+              requestAnimationFrame(() => scrollToExerciseCard(exercise.id));
+            }
+          },
+          style: focusedExerciseCardId === exercise.id ? styles.focusedExerciseCard : null,
+          testID: `session-exercise-card-${exerciseIndex + 1}`,
+        })}
         renderSetRow={({ exercise, exerciseIndex, set, setIndex }) => {
           const rowState = getSetRowState(set);
           const isPlannedRow = hasPlannedTarget(set);
@@ -4240,6 +4491,15 @@ export default function SessionRecorderScreen() {
               <Text style={styles.modalTitle}>Select Exercise</Text>
               <View style={styles.exercisePickerHeaderActionRow}>
                 <Pressable
+                  accessibilityLabel="Exercise picker options"
+                  style={styles.exercisePickerIconButton}
+                  onPress={() => {
+                    clearExercisePickerPreselection();
+                    setIsExercisePickerOptionsVisible((current) => !current);
+                  }}>
+                  <Text style={styles.exercisePickerIconButtonText}>⋮</Text>
+                </Pressable>
+                <Pressable
                   accessibilityLabel="Open exercise catalog manage flow"
                   style={styles.exercisePickerIconButton}
                   onPress={openExerciseCatalogFromRecorder}>
@@ -4260,8 +4520,16 @@ export default function SessionRecorderScreen() {
               placeholder="Filter by exercise or muscle group"
               style={styles.input}
               value={exercisePickerSearchValue}
-              onChangeText={setExercisePickerSearchValue}
+              onChangeText={updateExercisePickerSearchValue}
             />
+            {isExercisePickerOptionsVisible ? (
+              <View style={styles.exercisePickerOptionsPanel}>
+                <ExerciseListPreferenceControls
+                  preferences={listPreferences}
+                  onChangePreferences={setListPreferences}
+                />
+              </View>
+            ) : null}
             {/*
               The filter input above keeps focus while the user picks a result.
               With the ScrollView's default `keyboardShouldPersistTaps="never"`,
@@ -4276,18 +4544,110 @@ export default function SessionRecorderScreen() {
               {!isExerciseCatalogLoading && exerciseCatalogLoadError ? (
                 <Text style={styles.emptyText}>{exerciseCatalogLoadError}</Text>
               ) : null}
-              {!isExerciseCatalogLoading && !exerciseCatalogLoadError ? (
+              {!isExerciseCatalogLoading && !exerciseCatalogLoadError && exercisePickerPreselection ? (
                 <>
-                  {filteredExercisePickerOptions.map((exercisePreset) => (
-                    <Pressable
-                      key={exercisePreset.id}
-                      accessibilityLabel={`Select exercise ${exercisePreset.name}`}
-                      style={styles.pickerOption}
-                      onPress={() => selectExercisePreset(exercisePreset.id)}>
-                      <Text style={styles.pickerOptionText}>{exercisePreset.name}</Text>
-                    </Pressable>
-                  ))}
-                  {filteredExercisePickerOptions.length === 0 ? (
+                  <View
+                    style={styles.exercisePickerPreselectionPanel}
+                    testID="exercise-picker-preselection-panel">
+                    <Text style={styles.exercisePickerPreselectionTitle}>
+                      {exercisePickerPreselection.exercise.name}
+                    </Text>
+                    <View style={styles.exercisePickerPreselectionActions}>
+                      <Pressable
+                        accessibilityLabel={`Add empty set for ${exercisePickerPreselection.exercise.name}`}
+                        accessibilityRole="button"
+                        style={styles.secondaryActionButton}
+                        testID="exercise-picker-add-empty-set-button"
+                        onPress={() =>
+                          applySelectedExerciseSelection(
+                            exercisePickerPreselection.exercise.id,
+                            exercisePickerPreselection.exercise.name
+                          )
+                        }>
+                        <Text style={styles.secondaryActionButtonText}>Add empty set</Text>
+                      </Pressable>
+                      <Pressable
+                        accessibilityLabel={`Append historical plan for ${exercisePickerPreselection.exercise.name}`}
+                        accessibilityRole="button"
+                        accessibilityState={{
+                          disabled:
+                            exercisePickerPreselection.status !== 'ready' ||
+                            !exercisePickerPreselection.suggestion,
+                        }}
+                        disabled={
+                          exercisePickerPreselection.status !== 'ready' ||
+                          !exercisePickerPreselection.suggestion
+                        }
+                        style={[
+                          styles.primaryActionButton,
+                          exercisePickerPreselection.status !== 'ready' ||
+                          !exercisePickerPreselection.suggestion
+                            ? styles.exercisePickerAppendPlanButtonDisabled
+                            : null,
+                        ]}
+                        testID="exercise-picker-append-plan-button"
+                        onPress={() => appendSuggestedPlanToSession(exercisePickerPreselection)}>
+                        <Text style={styles.primaryActionButtonText}>Append plan</Text>
+                      </Pressable>
+                    </View>
+                    {exercisePickerPreselection.suggestion ? (
+                      <View style={styles.exercisePickerPlanPreview}>
+                        <Text
+                          style={styles.exercisePickerPlanPreviewSource}
+                          testID="exercise-picker-plan-source">
+                          From {formatCurrentDateTime(exercisePickerPreselection.suggestion.completedAt)}
+                        </Text>
+                        <ScrollView
+                          nestedScrollEnabled
+                          style={styles.exercisePickerPlanSetList}
+                          contentContainerStyle={styles.exercisePickerPlanSetListContent}>
+                          {exercisePickerPreselection.suggestion.sets.map((set, index) => {
+                            const quality = normalizeSessionSetType(set.setType);
+                            return (
+                              <View
+                                key={set.setId}
+                                style={styles.exercisePickerPlanSetRow}
+                                testID={`exercise-picker-plan-set-row-${index + 1}`}>
+                                <Text style={styles.exercisePickerPlanSetIndex}>Set {index + 1}</Text>
+                                <Text style={styles.exercisePickerPlanSetValue}>
+                                  {formatSetWeightLabel(set.weightValue)} · {formatSetRepsLabel(set.repsValue)}
+                                </Text>
+                                {quality ? (
+                                  <Text style={styles.exercisePickerPlanSetQuality}>
+                                    {getSetQualityDisplayLabel(quality)}
+                                  </Text>
+                                ) : null}
+                              </View>
+                            );
+                          })}
+                        </ScrollView>
+                      </View>
+                    ) : null}
+                  </View>
+                  <Pressable
+                    accessibilityLabel="Dismiss exercise preselection"
+                    style={styles.exercisePickerPreselectionDismissArea}
+                    testID="exercise-picker-preselection-dismiss-area"
+                    onPress={clearExercisePickerPreselection}
+                  />
+                </>
+              ) : null}
+              {!isExerciseCatalogLoading && !exerciseCatalogLoadError && !exercisePickerPreselection ? (
+                <>
+                  <ExerciseListContent
+                    mode={exercisePickerListModel.mode}
+                    items={exercisePickerListModel.items}
+                    sections={exercisePickerListModel.sections}
+                    expandedFamilies={expandedExercisePickerFamilies}
+                    emptyText={
+                      exercisePickerOptions.length === 0
+                        ? 'No active exercises available.'
+                        : 'No exercises match that filter.'
+                    }
+                    onToggleFamily={toggleExercisePickerFamily}
+                    onPressExercise={selectExerciseListItem}
+                  />
+                  {exercisePickerListModel.items.length === 0 && exercisePickerListModel.mode === 'grouped' ? (
                     <Text style={styles.emptyText}>
                       {exercisePickerOptions.length === 0 ? 'No active exercises available.' : 'No exercises match that filter.'}
                     </Text>
@@ -4722,6 +5082,10 @@ const styles = StyleSheet.create({
     backgroundColor: uiColors.surfaceDefault,
     padding: 10,
     gap: 8,
+  },
+  focusedExerciseCard: {
+    borderColor: uiColors.actionPrimary,
+    backgroundColor: uiColors.surfaceInfo,
   },
   exerciseCardHeader: {
     flexDirection: 'row',
@@ -5257,6 +5621,89 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     fontWeight: '700',
     color: uiColors.textMuted,
+  },
+  exercisePickerOptionsPanel: {
+    borderWidth: 1,
+    borderColor: uiColors.borderMuted,
+    borderRadius: 8,
+    backgroundColor: uiColors.surfacePage,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  exercisePickerPreselectionPanel: {
+    borderWidth: 1,
+    borderColor: uiColors.borderMuted,
+    borderRadius: 8,
+    backgroundColor: uiColors.surfacePage,
+    padding: 12,
+    gap: 12,
+  },
+  exercisePickerPreselectionTitle: {
+    fontSize: 16,
+    lineHeight: 20,
+    fontWeight: '800',
+    color: uiColors.textPrimary,
+  },
+  exercisePickerPreselectionActions: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: 8,
+  },
+  exercisePickerAppendPlanButtonDisabled: {
+    backgroundColor: uiColors.actionPrimaryDisabled,
+  },
+  exercisePickerPlanPreview: {
+    gap: 8,
+  },
+  exercisePickerPlanPreviewSource: {
+    fontSize: 13,
+    lineHeight: 16,
+    fontWeight: '700',
+    color: uiColors.textSecondary,
+  },
+  exercisePickerPlanSetList: {
+    maxHeight: 238,
+  },
+  exercisePickerPlanSetListContent: {
+    gap: 6,
+  },
+  exercisePickerPlanSetRow: {
+    minHeight: 34,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: uiColors.borderMuted,
+    backgroundColor: uiColors.surfaceDefault,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  exercisePickerPlanSetIndex: {
+    width: 48,
+    fontSize: 13,
+    lineHeight: 16,
+    fontWeight: '700',
+    color: uiColors.textPrimary,
+  },
+  exercisePickerPlanSetValue: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 13,
+    lineHeight: 16,
+    fontWeight: '600',
+    color: uiColors.textPrimary,
+  },
+  exercisePickerPlanSetQuality: {
+    width: 48,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '700',
+    color: uiColors.textSecondary,
+    textAlign: 'right',
+  },
+  exercisePickerPreselectionDismissArea: {
+    minHeight: 120,
   },
   tagModalCard: {
     height: '80%',

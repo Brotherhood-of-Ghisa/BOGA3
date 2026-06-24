@@ -6,7 +6,7 @@ import {
   type ExerciseCatalogStats,
   type ExerciseCatalogStatsPeriod,
   type ExerciseCatalogStatsRawHistory,
-} from '@/src/data';
+} from '@/src/data/exercise-catalog-stats';
 
 import { subscribeToExerciseCatalogInvalidation } from './invalidation';
 
@@ -131,6 +131,7 @@ export const __resetExerciseCatalogStatsCacheForTests = (): void => {
 export type UseExerciseCatalogStatsResult = {
   status: ExerciseCatalogStatsCacheStatus;
   stats: ExerciseCatalogStats;
+  rawHistory: ExerciseCatalogStatsRawHistory | null;
   lastError: string | null;
   reload: () => void;
 };
@@ -157,6 +158,7 @@ export const useExerciseCatalogStats = (
   return {
     status: current.status,
     stats,
+    rawHistory: current.rawHistory,
     lastError: current.lastError,
     reload: invalidateExerciseCatalogStatsCache,
   };

@@ -1,6 +1,10 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
 import SessionRecorderScreen from '../(tabs)/session-recorder';
+import {
+  __resetExerciseListPreferencesForTests,
+  setExerciseListPreferences,
+} from '@/src/exercise-catalog/list-preferences';
 
 let mockSearchParams: Record<string, string | undefined> = {};
 let mockBeforeRemoveListener: ((event: any) => void) | null = null;
@@ -44,6 +48,7 @@ jest.mock('@/src/data', () => ({
     limit: null,
     blocks: [],
   })),
+  loadSuggestedExercisePlan: jest.fn().mockResolvedValue(null),
   loadLocalGymById: jest.fn().mockResolvedValue(null),
   loadLatestSessionDraftSnapshot: jest.fn().mockResolvedValue(null),
   loadSessionSnapshotById: jest.fn().mockResolvedValue(null),
@@ -73,6 +78,17 @@ jest.mock('@/src/data/exercise-catalog', () => ({
     { id: 'seed_romanian_deadlift', name: 'Deadlift', deletedAt: null, mappings: [] },
   ]),
   listExerciseCatalogMuscleGroups: jest.fn().mockResolvedValue([]),
+}));
+
+jest.mock('@/src/data/exercise-catalog-stats', () => ({
+  loadExerciseCatalogStatsRawHistory: jest.fn().mockResolvedValue({
+    sessions: [],
+    sessionExercises: [],
+    exerciseSets: [],
+  }),
+  aggregateExerciseCatalogStats: jest.requireActual(
+    '@/src/data/exercise-catalog-stats'
+  ).aggregateExerciseCatalogStats,
 }));
 
 jest.mock('expo-router', () => ({
@@ -115,6 +131,11 @@ const dismissEmptyStateIfPresent = async () => {
   }
 };
 
+const addExerciseWithEmptySet = async (exerciseName: string) => {
+  fireEvent.press(await screen.findByLabelText(`Select exercise ${exerciseName}`));
+  fireEvent.press(await screen.findByTestId('exercise-picker-add-empty-set-button'));
+};
+
 const buildCompletedEditSnapshot = (overrides: Partial<any> = {}) => ({
   sessionId: 'completed-edit-1',
   gymId: null,
@@ -142,6 +163,8 @@ describe('SessionRecorderScreen persistence wiring', () => {
     jest.useFakeTimers();
     mockSearchParams = {};
     mockBeforeRemoveListener = null;
+    __resetExerciseListPreferencesForTests();
+    setExerciseListPreferences({ groupByMuscleFamily: false });
     mockNavigationDispatch.mockReset();
     mockNavigationAddListener.mockClear();
     mockLoadLatestSessionDraftSnapshot.mockReset();
@@ -173,7 +196,7 @@ describe('SessionRecorderScreen persistence wiring', () => {
     mockPersistSessionDraftSnapshot.mockClear();
 
     fireEvent.press(screen.getByText('Log new exercise'));
-    fireEvent.press(await screen.findByLabelText('Select exercise Barbell Squat'));
+    await addExerciseWithEmptySet('Barbell Squat');
 
     await waitFor(() => {
       expect(mockPersistSessionDraftSnapshot).toHaveBeenCalledTimes(1);
@@ -249,7 +272,7 @@ describe('SessionRecorderScreen persistence wiring', () => {
     mockPersistSessionDraftSnapshot.mockClear();
 
     fireEvent.press(screen.getByText('Log new exercise'));
-    fireEvent.press(await screen.findByLabelText('Select exercise Barbell Squat'));
+    await addExerciseWithEmptySet('Barbell Squat');
     await waitFor(() => {
       expect(mockPersistSessionDraftSnapshot).toHaveBeenCalledTimes(1);
     });

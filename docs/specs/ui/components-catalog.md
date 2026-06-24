@@ -80,28 +80,34 @@ Brief entrypoint inventory of the current reusable UI component set.
 - Purpose:
   - shared create/edit exercise editor modal reused by `exercise-catalog` and `session-recorder` add-new flow
 
-4. `SessionContentLayout`
+4. `ExerciseListContent` / `ExerciseListPreferenceControls`
+- File: `apps/mobile/components/exercise-catalog/exercise-list-controls.tsx`
+- Purpose:
+  - shared exercise list row/header rendering and shared grouping/date-range/recents controls for `exercise-catalog` and the `session-recorder` exercise picker
+  - composes the non-visual list model/preference modules under `apps/mobile/src/exercise-catalog/` so both surfaces share grouping, filtering, sorting, row stats, collapsed-group state behavior, and local-only preference behavior while each route keeps its surface-specific actions
+
+5. `SessionContentLayout`
 - File: `apps/mobile/components/session-recorder/session-content-layout.tsx`
 - Purpose:
   - shared layout scaffold for session exercise/set content used by `session-recorder` and completed-session detail screens
   - supports optional per-exercise metadata injection (`renderExerciseMeta`) so recorder mode can render tag chips/actions without duplicating card structure
 
-5. `SessionSummaryLine`
+6. `SessionSummaryLine`
 - File: `apps/mobile/components/session-list/session-summary-line.tsx`
 - Purpose:
   - shared two-line summary row (date/duration/gym + sets/exercises) reused by `ActiveSessionRow` and `HistoryList`, and available to the upcoming Stats/History and Log tabs
 
-6. `ActiveSessionRow`
+7. `ActiveSessionRow`
 - File: `apps/mobile/components/session-list/active-session-row.tsx`
 - Purpose:
   - active-session row plus its overflow menu (resume / complete / delete) used by the Log tab
 
-7. `HistoryList`
+8. `HistoryList`
 - File: `apps/mobile/components/session-list/history-list.tsx`
 - Purpose:
   - completed-session history list with delete/undelete modal and deleted-visibility toggle, consumed by the `stats-history` History sub-view
 
-8. `CalendarHeatmap`
+9. `CalendarHeatmap`
 - File: `apps/mobile/components/muscle-analytics/calendar-heatmap.tsx`
 - Purpose:
   - reusable weekly-effort calendar heatmap component; used by both the M16 muscle-history overlay and the M17 exercise-history overlay

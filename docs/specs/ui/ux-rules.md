@@ -51,7 +51,12 @@ Document app-specific UI semantics and guardrails for the current mobile app.
      - session list action menus
      - exercise catalog editor/action/delete modals
      - session recorder gym/exercise pickers/action menus and inline exercise creation editor
-2. In the `session-recorder` exercise picker, `Manage` and `Add new` are compact icon actions in the modal header row (same row as the title), replacing the old bottom text-button row.
+2. In the `session-recorder` exercise picker, shared list options, `Manage`, and `Add new` are compact icon actions in the modal header row (same row as the title), replacing the old bottom text-button row.
+3. In the `session-recorder` exercise picker, tapping an exercise while adding a new recorder card opens an in-place preselection panel instead of immediately adding:
+   - `Add empty set` is always available first and preserves the current blank-set add behavior.
+   - `Append plan` remains visible but disabled while completed-history suggestion data loads or when no valid completed-history plan exists; the disabled state has no inline error copy.
+   - Changing the search text dismisses the preselection panel and returns to the filtered list without changing grouped-list expansion state.
+   - Changing/replacing an existing exercise remains a direct selection with no preselection panel.
 3. Modal open/close is treated as state within the current route and should not be documented as a navigation transition.
 4. Dismiss overlays via backdrop press are common and expected when the flow is not destructive-final.
 
@@ -71,6 +76,13 @@ Document app-specific UI semantics and guardrails for the current mobile app.
 3. Deleted/archived visibility is controlled via toggles and state hints, not separate routes.
 4. In `exercise-catalog`, deleted exercises remain in list history when deleted visibility is enabled, show explicit `Deleted` state, and expose `Undelete` from row actions.
 5. `exercise-catalog` top actions use compact icon buttons (`+` create, kebab options), and deleted visibility toggle lives under the top-level options menu.
+6. `exercise-catalog` and the `session-recorder` exercise picker share exercise-list preferences and row semantics:
+   - local-only shared preferences default to grouped by muscle family, `90d` range, and recents-on-top enabled; options are `7d`, `30d`, `90d`, `1y`, and `All`,
+   - grouped mode shows taxonomy-ordered family headers (`Chest`, `Shoulders`, `Back`, `Arms`, `Core`, `Legs`, `Lower Legs`, `Other`) with `Family · count`; all groups remain visible, zero-count groups are disabled/collapsed, non-empty headers toggle expansion without chevrons or show/hide text, and active text search preserves collapsed/expanded state without flattening the list,
+   - flat mode renders rows directly without an all-exercises section header,
+   - recents-on-top sorts by valid completed-set recency score with a fixed 60-day half-life, includes warm-up sets, ignores active/unperformed/deleted/tombstoned rows, uses the selected finite date window, and caps `All` scoring to the last year; recents-off sorts alphabetically,
+   - recorder picker rows use the same muscle summary and stats line as Exercise Catalog rows but hide catalog edit/delete actions and catalog-only filters.
+7. Recorder picker historical preselection plans are sourced from completed workout history only, independent of the picker/catalog date-range setting. The plan uses the most recent completed session with valid performed set rows for the selected exercise; duplicate same-exercise blocks inside that session are combined in session order, and preview rows are numbered continuously. Valid plan rows require a non-negative numeric weight and a positive integer rep count; `0kg` is valid.
 
 ### 5. Forms and validation conventions
 
@@ -82,6 +94,7 @@ Document app-specific UI semantics and guardrails for the current mobile app.
    - trims and collapses extra whitespace in user input,
    - matches case-insensitively,
    - matches when any typed word appears in either exercise names or linked muscle-group metadata.
+   - preserves the current grouped/flat layout mode instead of flattening grouped results; grouped search results keep section headers and preserve collapsed/expanded state.
 6. The M11 profile sign-in form keeps auth failure messaging inline inside the same card as the email/password inputs.
 7. When auth config is unavailable, the profile route shows a warning state and disables sign-in rather than failing only after submit.
 8. The M11 profile sign-in form performs basic client-side email-shape validation before attempting the auth request.

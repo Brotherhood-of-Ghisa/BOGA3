@@ -1,6 +1,10 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
 import SessionRecorderScreen from '../(tabs)/session-recorder';
+import {
+  __resetExerciseListPreferencesForTests,
+  setExerciseListPreferences,
+} from '@/src/exercise-catalog/list-preferences';
 
 jest.mock('@/src/data', () => ({
   attachExerciseTagToSessionExercise: jest.fn().mockResolvedValue(undefined),
@@ -29,6 +33,7 @@ jest.mock('@/src/data', () => ({
     limit: null,
     blocks: [],
   })),
+  loadSuggestedExercisePlan: jest.fn().mockResolvedValue(null),
   loadLocalGymById: jest.fn().mockResolvedValue(null),
   loadLatestSessionDraftSnapshot: jest.fn().mockResolvedValue(null),
   loadSessionSnapshotById: jest.fn().mockResolvedValue(null),
@@ -58,6 +63,17 @@ jest.mock('@/src/data/exercise-catalog', () => ({
     { id: 'seed_romanian_deadlift', name: 'Deadlift', deletedAt: null, mappings: [] },
   ]),
   listExerciseCatalogMuscleGroups: jest.fn().mockResolvedValue([]),
+}));
+
+jest.mock('@/src/data/exercise-catalog-stats', () => ({
+  loadExerciseCatalogStatsRawHistory: jest.fn().mockResolvedValue({
+    sessions: [],
+    sessionExercises: [],
+    exerciseSets: [],
+  }),
+  aggregateExerciseCatalogStats: jest.requireActual(
+    '@/src/data/exercise-catalog-stats'
+  ).aggregateExerciseCatalogStats,
 }));
 
 jest.mock('@/src/location/foreground-location-lazy', () => ({
@@ -117,6 +133,8 @@ const dataMock = jest.requireMock('@/src/data') as {
 
 describe('SessionRecorderScreen', () => {
   beforeEach(() => {
+    __resetExerciseListPreferencesForTests();
+    setExerciseListPreferences({ groupByMuscleFamily: false });
     dataMock.loadLatestSessionDraftSnapshot.mockReset();
     dataMock.loadLatestSessionDraftSnapshot.mockResolvedValue(null);
     dataMock.loadSessionSnapshotById.mockReset();

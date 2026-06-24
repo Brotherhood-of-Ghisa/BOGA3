@@ -67,7 +67,7 @@ Brief entrypoint map of the current mobile screens.
 - Key states (high level):
   - active mode
   - completed-edit loading/error/content states
-  - in-route picker/editor/action modals (exercise picker includes text filtering by exercise name + primary muscle display/family terms, with compact header icon actions for manage/add)
+  - in-route picker/editor/action modals (exercise picker uses the shared exercise-list model: text filtering by exercise name + primary muscle display/family terms, local shared list options for grouping/date range/recents, initially collapsed muscle-family groups that preserve collapsed/expanded state while searching, matching catalog row stats, and compact header icon actions for options/manage/add; adding a new recorder exercise opens an in-place preselection panel with `Add empty set` and a disabled-or-enabled completed-history `Append plan`, while replacing an existing exercise remains direct)
   - in-route gym picker includes `No gym` as the null session-gym option; gym Manage focuses on edit/archive/unarchive plus archived visibility
   - in-route single gym editor owns private coordinate controls (`Save current location`, confirmation-gated replace, and confirmation-gated clear)
   - in-route exercise-tag add/manage modals (search/select/create, rename/delete/undelete, deleted-visibility toggle)
@@ -84,9 +84,9 @@ Brief entrypoint map of the current mobile screens.
   - exercise catalog management (create/edit/soft-delete/undelete exercises and muscle mappings)
 - Key states (high level):
   - loading / error / content
-  - text filtering across exercise names + primary muscle display/family terms
+  - shared exercise-list content with local shared preferences for grouping/date range/recents, default grouped `90d` recents-on-top behavior, taxonomy-ordered collapsible muscle-family headers, text filtering across exercise names + primary muscle display/family terms that preserves collapsed/expanded group state, and per-row stats for the selected range
   - in-route editor/action/delete modals
-  - deleted visibility toggle (`Show deleted` / `Hide deleted`) via top-level options kebab menu
+  - catalog-only muscle, deleted visibility (`Show deleted` / `Hide deleted`), and never-done visibility filters via top-level options kebab menu
 - Key exits:
   - `session-recorder` after save when opened from recorder-origin manage flow
   - `stats-history` / `session-recorder` via the shared bottom tray (`TopLevelTabs`)

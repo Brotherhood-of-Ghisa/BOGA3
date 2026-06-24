@@ -1,4 +1,4 @@
-import { Fragment, type ReactNode } from 'react';
+import { Fragment, type ComponentProps, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { UiSurface, UiText, uiSpace } from '@/components/ui';
@@ -13,6 +13,8 @@ export type SessionContentExerciseValue<TSet extends SessionContentSetValue = Se
   machineName?: string | null;
   sets: TSet[];
 };
+
+type ExerciseCardProps = Omit<ComponentProps<typeof UiSurface>, 'children'>;
 
 type SessionContentLayoutProps<
   TSet extends SessionContentSetValue,
@@ -41,6 +43,10 @@ type SessionContentLayoutProps<
     exercise: TExercise;
     exerciseIndex: number;
   }) => ReactNode;
+  getExerciseCardProps?: (input: {
+    exercise: TExercise;
+    exerciseIndex: number;
+  }) => ExerciseCardProps;
   renderExerciseFooter?: (input: {
     exercise: TExercise;
     exerciseIndex: number;
@@ -61,6 +67,7 @@ export function SessionContentLayout<
   renderSetHeader,
   renderExerciseHeaderAction,
   renderExerciseMeta,
+  getExerciseCardProps,
   renderExerciseFooter,
   renderEmptyState,
 }: SessionContentLayoutProps<TSet, TExercise>) {
@@ -83,51 +90,58 @@ export function SessionContentLayout<
       ) : null}
 
       <View style={styles.exerciseList}>
-        {exercises.map((exercise, exerciseIndex) => (
-          <UiSurface key={exercise.id} style={styles.exerciseCard}>
-            <View style={styles.exerciseCardHeader}>
-              <View style={styles.exerciseHeaderTextStack}>
-                <UiText
-                  adjustsFontSizeToFit
-                  ellipsizeMode="clip"
-                  minimumFontScale={0.82}
-                  numberOfLines={2}
-                  variant="title">
-                  {exercise.name || `Exercise ${exerciseIndex + 1}`}
-                </UiText>
-                {exercise.machineName?.trim() ? (
+        {exercises.map((exercise, exerciseIndex) => {
+          const exerciseCardProps = getExerciseCardProps?.({ exercise, exerciseIndex });
+
+          return (
+            <UiSurface
+              key={exercise.id}
+              {...exerciseCardProps}
+              style={[styles.exerciseCard, exerciseCardProps?.style]}>
+              <View style={styles.exerciseCardHeader}>
+                <View style={styles.exerciseHeaderTextStack}>
                   <UiText
                     adjustsFontSizeToFit
                     ellipsizeMode="clip"
                     minimumFontScale={0.82}
-                    numberOfLines={1}
-                    variant="subtitle">
-                    {exercise.machineName.trim()}
+                    numberOfLines={2}
+                    variant="title">
+                    {exercise.name || `Exercise ${exerciseIndex + 1}`}
                   </UiText>
-                ) : null}
+                  {exercise.machineName?.trim() ? (
+                    <UiText
+                      adjustsFontSizeToFit
+                      ellipsizeMode="clip"
+                      minimumFontScale={0.82}
+                      numberOfLines={1}
+                      variant="subtitle">
+                      {exercise.machineName.trim()}
+                    </UiText>
+                  ) : null}
+                </View>
+                {renderExerciseHeaderAction ? renderExerciseHeaderAction({ exercise, exerciseIndex }) : null}
               </View>
-              {renderExerciseHeaderAction ? renderExerciseHeaderAction({ exercise, exerciseIndex }) : null}
-            </View>
 
-            {renderExerciseMeta ? renderExerciseMeta({ exercise, exerciseIndex }) : null}
+              {renderExerciseMeta ? renderExerciseMeta({ exercise, exerciseIndex }) : null}
 
-            <View style={styles.setList}>
-              {renderSetHeader && exercise.sets.length > 0 ? renderSetHeader({ exercise, exerciseIndex }) : null}
-              {exercise.sets.map((set, setIndex) => (
-                <Fragment key={set.id}>
-                  {renderSetRow({
-                    exercise,
-                    exerciseIndex,
-                    set,
-                    setIndex,
-                  })}
-                </Fragment>
-              ))}
-            </View>
+              <View style={styles.setList}>
+                {renderSetHeader && exercise.sets.length > 0 ? renderSetHeader({ exercise, exerciseIndex }) : null}
+                {exercise.sets.map((set, setIndex) => (
+                  <Fragment key={set.id}>
+                    {renderSetRow({
+                      exercise,
+                      exerciseIndex,
+                      set,
+                      setIndex,
+                    })}
+                  </Fragment>
+                ))}
+              </View>
 
-            {renderExerciseFooter ? renderExerciseFooter({ exercise, exerciseIndex }) : null}
-          </UiSurface>
-        ))}
+              {renderExerciseFooter ? renderExerciseFooter({ exercise, exerciseIndex }) : null}
+            </UiSurface>
+          );
+        })}
 
         {exercises.length === 0
           ? renderEmptyState

@@ -128,60 +128,44 @@ appId: com.dinoderek.mobile
 # No dev-menu/trust dismissal taps: this teleport runs in the already-loaded,
 # signed-in app (no clearState since Phase A), so no dialog renders.
 - openLink: "boga3://maestro-harness?teleport=session-recorder"
-- extendedWaitUntil:
-    visible:
-      id: "start-session-button"
-    timeout: 30000
-# The deep-link transition can expose the Start button before iOS has settled
-# the safe-area-adjusted bounds; tapping immediately has produced a stale
-# y=16..53 hit box even though the visual button is lower on screen.
-- waitForAnimationToEnd:
-    timeout: 4000
-# Harden the recorder-open tap against an intermittent SWALLOWED tap. On a failing
-# run the screenshot showed a healthy app still on the Log tab with "Start Session"
-# STILL visible and the tab bar intact: the tap landed before the screen was
-# interactive (or a re-render ate the press), so the screen never transitioned and
-# the session-recorder-screen wait below timed out. Phase A had fully synced and an
-# immediate rerun passed — a pure interaction race, not a product bug.
-#
-# A bare retry wrapping only the tapOn (like the Continue/Close dismissals above)
-# would NOT fix this: those retries re-fire on a THROWN error (the transient iOS-26
-# kAXErrorInvalidUIElement stale-ref), but a swallowed tap throws nothing — tapOn
-# finds the button and "succeeds", so retry sees no failure to re-run. Instead put
-# the post-condition INSIDE the retry: if session-recorder-screen doesn't appear,
-# the inner wait fails and retry re-fires the tap. The tap is idempotent
-# (start-session-button stays present until it takes effect — exactly what the
-# failure screenshot showed), and the assertion is NOT weakened: after maxRetries
-# the inner wait still fails the flow loudly if the recorder never opens. The 30s
-# inner window also cleanly distinguishes the two cases — a genuine-but-slow
-# transition resolves the button away well within 30s (no re-tap), while a
-# swallowed tap leaves the button present at 30s so the re-tap finds and re-fires it.
+# Depending on persisted draft restoration, teleporting to the recorder can land
+# either on the empty Start CTA or directly in an active empty recorder. Keep the
+# postcondition strict while accepting both entry states.
 - retry:
     maxRetries: 3
     commands:
       - tapOn:
           id: "start-session-button"
+          optional: true
       - extendedWaitUntil:
           visible:
-            id: "session-recorder-screen"
+            text: "No exercises logged yet."
           timeout: 30000
 - extendedWaitUntil:
     visible:
       text: "No exercises logged yet."
     timeout: 30000
 - tapOn: "Log new exercise"
+- tapOn: "Exercise picker options"
+- tapOn: "Turn grouping off"
+- tapOn: "Exercise picker options"
 - tapOn: "Exercise filter input"
 - inputText: "Barbell Back Squat"
 - hideKeyboard:
     optional: true
+- tapOn: "Select Exercise"
 # Selecting the seeded "Barbell Back Squat" here also implicitly proves the
-# catalog bootstrapped in Phase A: the row only exists if the seed landed.
+# catalog bootstrapped in Phase A: the row only exists if the seed landed. The
+# flow turns grouping off explicitly above; grouped collapse/search behavior is
+# covered by focused tests.
 - extendedWaitUntil:
     visible:
       text: "Select exercise Barbell Back Squat"
     timeout: 15000
 - tapOn:
     text: "Select exercise Barbell Back Squat"
+- tapOn:
+    id: "exercise-picker-add-empty-set-button"
 - tapOn: "Weight for exercise 1 set 1"
 - inputText: "135"
 - tapOn: "Reps for exercise 1 set 1"

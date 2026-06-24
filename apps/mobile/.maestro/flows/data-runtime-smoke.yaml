@@ -33,24 +33,30 @@ appId: com.dinoderek.mobile
       text: "No exercises logged yet."
     timeout: 30000
 - tapOn: "Log new exercise"
+- tapOn: "Exercise picker options"
+- tapOn: "Turn grouping off"
+- tapOn: "Exercise picker options"
 - tapOn: "Exercise filter input"
 - inputText: "Barbell Back Squat"
 - hideKeyboard:
     optional: true
+- tapOn: "Select Exercise"
 # Pick the seeded "Barbell Back Squat" exercise by its accessibility label
 # ("Select exercise <name>", session-recorder.tsx) rather than a fragile
 # `point: "50%,26%"` coordinate tap. On a cold sim the picker list can render a
 # beat later than on a warm one, so a coordinate tap raced the row layout and
 # landed on empty space — leaving no exercise selected and failing the later
 # "Weight for exercise 1 set 1" step. Filtering by the exact seeded name yields a
-# deterministic, content-stable row, and `extendedWaitUntil` rides out the cold
-# render before the tap.
+# deterministic seeded row. This smoke flow turns grouping off explicitly above;
+# grouped collapse/search behavior is covered by focused tests.
 - extendedWaitUntil:
     visible:
       text: "Select exercise Barbell Back Squat"
     timeout: 15000
 - tapOn:
     text: "Select exercise Barbell Back Squat"
+- tapOn:
+    id: "exercise-picker-add-empty-set-button"
 - tapOn: "Weight for exercise 1 set 1"
 - inputText: "135"
 - tapOn: "Reps for exercise 1 set 1"
