@@ -708,7 +708,7 @@ type ExerciseBlockMaxMetrics = {
   rirAtMostTwoSetCount: number;
 };
 type HorizontalSwipeDirection = 'left' | 'right';
-type SetSwipeActionType = 'delete' | 'skip';
+type SetSwipeActionType = 'delete' | 'log' | 'skip';
 
 type SwipeableSetRowProps = {
   actionType: SetSwipeActionType;
@@ -801,8 +801,15 @@ function SwipeableSetRow({
   onTouchSwipeEnd,
 }: SwipeableSetRowProps) {
   const translateX = useSharedValue(0);
-  const actionLabel = actionType === 'skip' ? 'Skip' : 'Delete';
-  const actionGlyph = actionType === 'skip' ? '↷' : '×';
+  const actionLabel =
+    actionType === 'log' ? 'Log' : actionType === 'skip' ? 'Skip' : 'Delete';
+  const actionGlyph = actionType === 'log' ? '✓' : actionType === 'skip' ? '↷' : '×';
+  const actionBackgroundStyle =
+    actionType === 'delete'
+      ? styles.swipeDeleteBackground
+      : actionType === 'log'
+        ? styles.swipeLogBackground
+        : styles.swipeSkipBackground;
 
   const closeRow = useCallback(() => {
     translateX.value = withTiming(0, { duration: 180 });
@@ -881,7 +888,7 @@ function SwipeableSetRow({
           pointerEvents="none"
           style={[
             styles.swipeActionBackground,
-            actionType === 'delete' ? styles.swipeDeleteBackground : styles.swipeSkipBackground,
+            actionBackgroundStyle,
             backgroundStyle,
           ]}
           testID={`${testID}-${actionType}-action-background`}>
@@ -3866,24 +3873,31 @@ export default function SessionRecorderScreen() {
                     : isAddedBeyondPlan
                       ? 'added set'
                       : 'logged set';
-          const swipeActionType: SetSwipeActionType = isPlannedRow ? 'skip' : 'delete';
-          const swipeDeleteKey = `set:${exercise.id}:${set.id}`;
-          const removeSetFromSwipe = (direction: HorizontalSwipeDirection) => {
-            if (direction !== 'left') {
+          const swipeActionType: SetSwipeActionType = !isPlannedRow
+            ? 'delete'
+            : rowState === 'skipped'
+              ? 'log'
+              : 'skip';
+          const swipeActionKey = `set:${exercise.id}:${set.id}`;
+          const runSetSwipeAction = () => {
+            if (swipeActionType === 'log') {
+              markPlannedSetLogged(exercise.id, set.id);
               return;
             }
-            if (swipeActionType === 'skip') {
-              markPlannedSetSkipped(exercise.id, set.id);
-            } else {
-              removeSetFromExercise(exercise.id, set.id);
-            }
-          };
-          const handleSwipeAction = () => {
             if (swipeActionType === 'skip') {
               markPlannedSetSkipped(exercise.id, set.id);
               return;
             }
             removeSetFromExercise(exercise.id, set.id);
+          };
+          const removeSetFromSwipe = (direction: HorizontalSwipeDirection) => {
+            if (direction !== 'left') {
+              return;
+            }
+            runSetSwipeAction();
+          };
+          const handleSwipeAction = () => {
+            runSetSwipeAction();
           };
 
           const renderQualityButton = (variant: 'compact' | 'edit') => {
@@ -4002,8 +4016,8 @@ export default function SessionRecorderScreen() {
                 }
                 onInteract={() => activateSetRow(set.id)}
                 onSwipeAction={handleSwipeAction}
-                onTouchSwipeStart={(event) => rememberHorizontalSwipeStart(swipeDeleteKey, event)}
-                onTouchSwipeEnd={(event) => consumeHorizontalSwipeEnd(swipeDeleteKey, event, removeSetFromSwipe)}>
+                onTouchSwipeStart={(event) => rememberHorizontalSwipeStart(swipeActionKey, event)}
+                onTouchSwipeEnd={(event) => consumeHorizontalSwipeEnd(swipeActionKey, event, removeSetFromSwipe)}>
                 <View
                   style={[
                     styles.compactSetRow,
@@ -4114,8 +4128,8 @@ export default function SessionRecorderScreen() {
               }
               onInteract={() => activateSetRow(set.id)}
               onSwipeAction={handleSwipeAction}
-              onTouchSwipeStart={(event) => rememberHorizontalSwipeStart(swipeDeleteKey, event)}
-              onTouchSwipeEnd={(event) => consumeHorizontalSwipeEnd(swipeDeleteKey, event, removeSetFromSwipe)}>
+              onTouchSwipeStart={(event) => rememberHorizontalSwipeStart(swipeActionKey, event)}
+              onTouchSwipeEnd={(event) => consumeHorizontalSwipeEnd(swipeActionKey, event, removeSetFromSwipe)}>
             <View
               style={[
                 styles.setRow,
@@ -4179,22 +4193,6 @@ export default function SessionRecorderScreen() {
                 }}
               />
               {showQualityControl ? renderQualityButton('edit') : null}
-              {isPlannedRow ? (
-                <Pressable
-                  accessibilityLabel={`Skip set ${setIndex + 1}`}
-                  accessibilityRole="button"
-                  style={styles.plannedSetSkipButton}
-                  onPress={() => markPlannedSetSkipped(exercise.id, set.id)}>
-                  <Text
-                    adjustsFontSizeToFit
-                    ellipsizeMode="clip"
-                    minimumFontScale={0.75}
-                    numberOfLines={1}
-                    style={styles.plannedSetSkipButtonText}>
-                    Skip
-                  </Text>
-                </Pressable>
-              ) : null}
             </View>
             </SwipeableSetRow>
           );
@@ -5480,6 +5478,9 @@ const styles = StyleSheet.create({
   },
   swipeDeleteBackground: {
     backgroundColor: uiColors.rowSwipeDeleteBackground,
+  },
+  swipeLogBackground: {
+    backgroundColor: uiColors.actionPrimarySubtleBg,
   },
   swipeSkipBackground: {
     backgroundColor: uiColors.rowSwipeSkipBackground,
