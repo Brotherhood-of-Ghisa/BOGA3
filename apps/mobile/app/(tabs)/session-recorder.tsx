@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import {
   AppState,
@@ -13,6 +13,15 @@ import {
   View,
   type GestureResponderEvent,
 } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, {
+  Extrapolation,
+  interpolate,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 
 import { ExerciseEditorModal } from '@/components/exercise-catalog/exercise-editor-modal';
 import {
@@ -698,11 +707,24 @@ type ExerciseBlockMaxMetrics = {
   rirAtMostTwoSetCount: number;
 };
 type HorizontalSwipeDirection = 'left' | 'right';
+type SetSwipeActionType = 'delete' | 'skip';
+
+type SwipeableSetRowProps = {
+  actionType: SetSwipeActionType;
+  children: ReactNode;
+  testID: string;
+  onInteract: () => void;
+  onSwipeAction: () => void;
+  onTouchSwipeStart: (event: GestureResponderEvent) => void;
+  onTouchSwipeEnd: (event: GestureResponderEvent) => void;
+};
 
 const NEW_GYM_COORDINATE_FEEDBACK_ID = '__new_gym__';
 const RIR_AT_MOST_TWO_SET_TYPES = new Set<SessionSetType>(['rir_0', 'rir_1', 'rir_2']);
 const PAST_RECORDS_LABEL = 'Past Records';
 const SWIPE_ACTION_THRESHOLD_X = 48;
+const SWIPE_ACTION_REVEAL_X = 78;
+const SWIPE_ACTION_MAX_DRAG_X = 108;
 
 const formatExerciseBlockNumeric = (value: number, fractionDigits = 0): string => {
   if (!Number.isFinite(value)) return '-';
@@ -767,6 +789,111 @@ const getGesturePageX = (event: GestureResponderEvent): number | null => {
   const pageX = event.nativeEvent.pageX;
   return typeof pageX === 'number' && Number.isFinite(pageX) ? pageX : null;
 };
+
+function SwipeableSetRow({
+  actionType,
+  children,
+  testID,
+  onInteract,
+  onSwipeAction,
+  onTouchSwipeStart,
+  onTouchSwipeEnd,
+}: SwipeableSetRowProps) {
+  const translateX = useSharedValue(0);
+  const actionLabel = actionType === 'skip' ? 'Skip' : 'Delete';
+  const actionGlyph = actionType === 'skip' ? '↷' : '×';
+
+  const closeRow = useCallback(() => {
+    translateX.value = withTiming(0, { duration: 180 });
+  }, [translateX]);
+
+  const triggerAction = useCallback(() => {
+    translateX.value = withTiming(-SWIPE_ACTION_REVEAL_X, { duration: 150 }, () => {
+      runOnJS(onSwipeAction)();
+      translateX.value = 0;
+    });
+  }, [onSwipeAction, translateX]);
+
+  const panGesture = Gesture.Pan()
+    .activeOffsetX([-8, 8])
+    .failOffsetY([-14, 14])
+    .onBegin(() => {
+      runOnJS(onInteract)();
+    })
+    .onUpdate((event) => {
+      translateX.value = Math.max(-SWIPE_ACTION_MAX_DRAG_X, Math.min(0, event.translationX));
+    })
+    .onEnd(() => {
+      if (Math.abs(translateX.value) >= SWIPE_ACTION_THRESHOLD_X) {
+        runOnJS(triggerAction)();
+        return;
+      }
+      runOnJS(closeRow)();
+    })
+    .onFinalize(() => {
+      if (Math.abs(translateX.value) < SWIPE_ACTION_THRESHOLD_X) {
+        translateX.value = withTiming(0, { duration: 180 });
+      }
+    });
+
+  const foregroundStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: translateX.value }],
+  }));
+
+  const backgroundStyle = useAnimatedStyle(() => {
+    const progress = interpolate(
+      Math.abs(translateX.value),
+      [0, SWIPE_ACTION_THRESHOLD_X],
+      [0, 1],
+      Extrapolation.CLAMP
+    );
+
+    return {
+      opacity: interpolate(progress, [0, 1], [0, 1], Extrapolation.CLAMP),
+    };
+  });
+
+  const cueStyle = useAnimatedStyle(() => {
+    const progress = interpolate(
+      Math.abs(translateX.value),
+      [0, SWIPE_ACTION_THRESHOLD_X],
+      [0, 1],
+      Extrapolation.CLAMP
+    );
+
+    return {
+      opacity: interpolate(progress, [0, 1], [0.34, 1], Extrapolation.CLAMP),
+    };
+  });
+
+  return (
+    <GestureDetector gesture={panGesture}>
+      <View
+        style={styles.swipeableSetRow}
+        testID={testID}
+        onTouchStart={(event) => {
+          onInteract();
+          onTouchSwipeStart(event);
+        }}
+        onTouchEnd={onTouchSwipeEnd}>
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.swipeActionBackground,
+            actionType === 'delete' ? styles.swipeDeleteBackground : styles.swipeSkipBackground,
+            backgroundStyle,
+          ]}
+          testID={`${testID}-${actionType}-action-background`}>
+          <Animated.View style={[styles.swipeActionCue, cueStyle]}>
+            <Text style={styles.swipeActionIcon}>{actionGlyph}</Text>
+            <Text style={styles.swipeActionText}>{actionLabel}</Text>
+          </Animated.View>
+        </Animated.View>
+        <Animated.View style={foregroundStyle}>{children}</Animated.View>
+      </View>
+    </GestureDetector>
+  );
+}
 
 const getCurrentExerciseBlockMetrics = (
   sets: SessionSet[]
@@ -995,6 +1122,8 @@ export default function SessionRecorderScreen() {
   const [isTagMutationInFlight, setIsTagMutationInFlight] = useState(false);
   const [activeSetTypePicker, setActiveSetTypePicker] = useState<SetTypePickerState | null>(null);
   const [expandedSetIds, setExpandedSetIds] = useState<Set<string>>(() => new Set());
+  const [activeRowId, setActiveRowId] = useState<string | null>(null);
+  const [lastAddedRowId, setLastAddedRowId] = useState<string | null>(null);
   const [pendingFocusedWeightSetId, setPendingFocusedWeightSetId] = useState<string | null>(null);
   const [focusedExerciseCardId, setFocusedExerciseCardId] = useState<string | null>(null);
   const [isGpsDetectionInFlight, setIsGpsDetectionInFlight] = useState(false);
@@ -2126,6 +2255,15 @@ export default function SessionRecorderScreen() {
     []
   );
 
+  const activateSetRow = useCallback((setId: string) => {
+    setActiveRowId(setId);
+  }, []);
+
+  const clearSetRowMemory = useCallback((setId: string) => {
+    setActiveRowId((current) => (current === setId ? null : current));
+    setLastAddedRowId((current) => (current === setId ? null : current));
+  }, []);
+
   const moveExerciseBlockHistory = useCallback((exerciseId: string, direction: 'older' | 'newer') => {
     setExerciseBlockHistoryByExerciseId((current) => {
       const panel = current[exerciseId];
@@ -2796,6 +2934,8 @@ export default function SessionRecorderScreen() {
         ),
       },
     }));
+    setActiveRowId(newSet.id);
+    setLastAddedRowId(newSet.id);
     setExpandedSetIds((current) => {
       const next = new Set(current);
       if (previousSet && (hasPerformedActual(previousSet) || getSetRowState(previousSet) === 'skipped')) {
@@ -2839,6 +2979,7 @@ export default function SessionRecorderScreen() {
 
   const focusSetInput = (setId: string) => {
     focusedSetInputIdRef.current = setId;
+    activateSetRow(setId);
     setExpandedSetIds(new Set([setId]));
   };
 
@@ -2863,6 +3004,7 @@ export default function SessionRecorderScreen() {
       return;
     }
 
+    activateSetRow(setId);
     setState((current) => ({
       ...current,
       session: {
@@ -2890,6 +3032,7 @@ export default function SessionRecorderScreen() {
   };
 
   const markPlannedSetLogged = (exerciseId: string, setId: string) => {
+    activateSetRow(setId);
     setState((current) => ({
       ...current,
       session: {
@@ -2924,6 +3067,7 @@ export default function SessionRecorderScreen() {
   };
 
   const markPlannedSetSkipped = (exerciseId: string, setId: string) => {
+    activateSetRow(setId);
     setState((current) => ({
       ...current,
       session: {
@@ -2965,6 +3109,7 @@ export default function SessionRecorderScreen() {
       return;
     }
 
+    activateSetRow(setId);
     const shouldOpen = !expandedSetIds.has(setId);
 
     if (!shouldOpen) {
@@ -3016,6 +3161,7 @@ export default function SessionRecorderScreen() {
 
   const updateSetType = (exerciseId: string, setId: string, setType: SessionSetTypeValue) => {
     const nextSetType = normalizeSessionSetType(setType);
+    activateSetRow(setId);
     setState((current) => ({
       ...current,
       session: {
@@ -3039,6 +3185,7 @@ export default function SessionRecorderScreen() {
   };
 
   const openSetTypePicker = (input: SetTypePickerState) => {
+    activateSetRow(input.setId);
     setActiveSetTypePicker(input);
   };
 
@@ -3083,6 +3230,7 @@ export default function SessionRecorderScreen() {
   };
 
   const removeSetFromExercise = (exerciseId: string, setId: string) => {
+    clearSetRowMemory(setId);
     setState((current) => ({
       ...current,
       session: {
@@ -3663,6 +3811,8 @@ export default function SessionRecorderScreen() {
           const compactQualityAccessibilityLabel = getSetTypeAccessibilityLabel(compactQuality);
           const showQualityControl = rowState !== 'planned';
           const isMutedRow = rowState === 'planned' || rowState === 'skipped';
+          const isActiveRow = activeRowId === set.id;
+          const isLastAddedRow = activeRowId === null && lastAddedRowId === set.id;
           const plannedLabel = getPlannedSetLabel(set);
           const actualLabel = getActualSetLabel(set);
           const compactLabel =
@@ -3683,12 +3833,24 @@ export default function SessionRecorderScreen() {
                     : isAddedBeyondPlan
                       ? 'added set'
                       : 'logged set';
-          const canSwipeDeleteSet = !isPlannedRow;
+          const swipeActionType: SetSwipeActionType = isPlannedRow ? 'skip' : 'delete';
           const swipeDeleteKey = `set:${exercise.id}:${set.id}`;
           const removeSetFromSwipe = (direction: HorizontalSwipeDirection) => {
-            if (direction === 'left' && canSwipeDeleteSet) {
+            if (direction !== 'left') {
+              return;
+            }
+            if (swipeActionType === 'skip') {
+              markPlannedSetSkipped(exercise.id, set.id);
+            } else {
               removeSetFromExercise(exercise.id, set.id);
             }
+          };
+          const handleSwipeAction = () => {
+            if (swipeActionType === 'skip') {
+              markPlannedSetSkipped(exercise.id, set.id);
+              return;
+            }
+            removeSetFromExercise(exercise.id, set.id);
           };
 
           const renderQualityButton = (variant: 'compact' | 'edit') => {
@@ -3798,27 +3960,25 @@ export default function SessionRecorderScreen() {
             );
 
             return (
-              <View
-                style={[
-                  styles.compactSetRow,
-                  rowState === 'planned' ? styles.compactSetRowGhost : null,
-                  rowState === 'skipped' ? styles.compactSetRowSkipped : null,
-                ]}
+              <SwipeableSetRow
+                actionType={swipeActionType}
                 testID={
-                  canSwipeDeleteSet
+                  swipeActionType === 'delete'
                     ? `set-swipe-delete-${exerciseIndex + 1}-${setIndex + 1}`
                     : `planned-set-row-${exerciseIndex + 1}-${setIndex + 1}`
                 }
-                onTouchStart={(event) => {
-                  if (canSwipeDeleteSet) {
-                    rememberHorizontalSwipeStart(swipeDeleteKey, event);
-                  }
-                }}
-                onTouchEnd={(event) => {
-                  if (canSwipeDeleteSet) {
-                    consumeHorizontalSwipeEnd(swipeDeleteKey, event, removeSetFromSwipe);
-                  }
-                }}>
+                onInteract={() => activateSetRow(set.id)}
+                onSwipeAction={handleSwipeAction}
+                onTouchSwipeStart={(event) => rememberHorizontalSwipeStart(swipeDeleteKey, event)}
+                onTouchSwipeEnd={(event) => consumeHorizontalSwipeEnd(swipeDeleteKey, event, removeSetFromSwipe)}>
+                <View
+                  style={[
+                    styles.compactSetRow,
+                    rowState === 'planned' ? styles.compactSetRowGhost : null,
+                    rowState === 'skipped' ? styles.compactSetRowSkipped : null,
+                    isLastAddedRow ? styles.setRowLastAdded : null,
+                    isActiveRow ? styles.setRowActive : null,
+                  ]}>
                 <Pressable
                   accessibilityLabel={`${stateLabel} ${setIndex + 1} for exercise ${exerciseIndex + 1}: ${compactLabel}${showQualityControl ? `; quality ${compactQualityAccessibilityLabel}` : ''}`}
                   accessibilityHint="Double tap to edit actual values."
@@ -3906,28 +4066,29 @@ export default function SessionRecorderScreen() {
                     </Pressable>
                   </View>
                 ) : null}
-              </View>
+                </View>
+              </SwipeableSetRow>
             );
           }
 
           return (
-            <View
-              style={styles.setRow}
+            <SwipeableSetRow
+              actionType={swipeActionType}
               testID={
-                canSwipeDeleteSet
+                swipeActionType === 'delete'
                   ? `set-swipe-delete-${exerciseIndex + 1}-${setIndex + 1}`
                   : `planned-set-row-${exerciseIndex + 1}-${setIndex + 1}`
               }
-              onTouchStart={(event) => {
-                if (canSwipeDeleteSet) {
-                  rememberHorizontalSwipeStart(swipeDeleteKey, event);
-                }
-              }}
-              onTouchEnd={(event) => {
-                if (canSwipeDeleteSet) {
-                  consumeHorizontalSwipeEnd(swipeDeleteKey, event, removeSetFromSwipe);
-                }
-              }}>
+              onInteract={() => activateSetRow(set.id)}
+              onSwipeAction={handleSwipeAction}
+              onTouchSwipeStart={(event) => rememberHorizontalSwipeStart(swipeDeleteKey, event)}
+              onTouchSwipeEnd={(event) => consumeHorizontalSwipeEnd(swipeDeleteKey, event, removeSetFromSwipe)}>
+            <View
+              style={[
+                styles.setRow,
+                isLastAddedRow ? styles.setRowLastAdded : null,
+                isActiveRow ? styles.setRowActive : null,
+              ]}>
               <Text style={[styles.setRowGlyph, isMutedRow ? styles.compactSetMutedText : null]}>{rowGlyph}</Text>
               <View
                 style={[
@@ -4002,6 +4163,7 @@ export default function SessionRecorderScreen() {
                 </Pressable>
               ) : null}
             </View>
+            </SwipeableSetRow>
           );
         }}
         renderExerciseHeaderAction={({ exercise, exerciseIndex }) => (
@@ -5228,10 +5390,50 @@ const styles = StyleSheet.create({
   setList: {
     gap: 8,
   },
+  swipeableSetRow: {
+    borderRadius: 8,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  swipeActionBackground: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    paddingRight: 14,
+  },
+  swipeDeleteBackground: {
+    backgroundColor: uiColors.rowSwipeDeleteBackground,
+  },
+  swipeSkipBackground: {
+    backgroundColor: uiColors.rowSwipeSkipBackground,
+  },
+  swipeActionCue: {
+    minWidth: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 1,
+  },
+  swipeActionIcon: {
+    fontSize: 16,
+    lineHeight: 18,
+    fontWeight: '800',
+    color: uiColors.rowSwipeIcon,
+  },
+  swipeActionText: {
+    fontSize: 11,
+    lineHeight: 13,
+    fontWeight: '800',
+    color: uiColors.rowSwipeText,
+  },
   setRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 0,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    backgroundColor: uiColors.surfacePage,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
     gap: 8,
   },
   compactSetRow: {
@@ -5253,6 +5455,13 @@ const styles = StyleSheet.create({
   compactSetRowSkipped: {
     backgroundColor: uiColors.surfaceDisabled,
     borderColor: uiColors.borderMuted,
+  },
+  setRowLastAdded: {
+    backgroundColor: uiColors.rowLastAddedBackground,
+  },
+  setRowActive: {
+    backgroundColor: uiColors.rowActiveBackground,
+    borderColor: uiColors.rowActiveBorder,
   },
   setRowGlyph: {
     width: 16,
