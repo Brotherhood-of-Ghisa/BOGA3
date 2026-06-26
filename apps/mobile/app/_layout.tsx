@@ -2,6 +2,8 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AuthRouteGuard } from '@/components/navigation/auth-route-guard';
@@ -59,28 +61,36 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <SafeAreaProvider>
-      <AuthProvider>
-        <AuthRouteGuard>
-          <SyncGate>
-            <Stack>
-              <Stack.Screen name="index" options={{ headerShown: false }} />
-              <Stack.Screen name="sign-in" options={{ headerShown: false }} />
-              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-              <Stack.Screen name="exercise-history" />
-              <Stack.Screen name="sessions" options={{ title: 'Sessions' }} />
-              <Stack.Screen name="profile" options={{ title: 'Profile' }} />
-              <Stack.Screen name="dev-logs" options={{ title: 'Logs' }} />
-              <Stack.Screen name="maestro-harness" options={{ headerShown: false }} />
-            </Stack>
-          </SyncGate>
-        </AuthRouteGuard>
-        {/* The app renders on a fixed light background (no dark-mode theming),
-            so force dark status-bar content — `auto` turns the clock/icons
-            white when the phone is in dark mode, leaving them unreadable on the
-            light safe area. */}
-        <StatusBar style="dark" />
-      </AuthProvider>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={styles.gestureRoot}>
+      <SafeAreaProvider>
+        <AuthProvider>
+          <AuthRouteGuard>
+            <SyncGate>
+              <Stack>
+                <Stack.Screen name="index" options={{ headerShown: false }} />
+                <Stack.Screen name="sign-in" options={{ headerShown: false }} />
+                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                <Stack.Screen name="exercise-history" />
+                <Stack.Screen name="sessions" options={{ title: 'Sessions' }} />
+                <Stack.Screen name="profile" options={{ title: 'Profile' }} />
+                <Stack.Screen name="dev-logs" options={{ title: 'Logs' }} />
+                <Stack.Screen name="maestro-harness" options={{ headerShown: false }} />
+              </Stack>
+            </SyncGate>
+          </AuthRouteGuard>
+          {/* The app renders on a fixed light background (no dark-mode theming),
+              so force dark status-bar content — `auto` turns the clock/icons
+              white when the phone is in dark mode, leaving them unreadable on the
+              light safe area. */}
+          <StatusBar style="dark" />
+        </AuthProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
+
+const styles = StyleSheet.create({
+  gestureRoot: {
+    flex: 1,
+  },
+});
