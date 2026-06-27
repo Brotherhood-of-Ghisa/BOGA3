@@ -1,6 +1,11 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
 import SessionRecorderScreen from '../(tabs)/session-recorder';
+
+const swipeLeft = (target: ReturnType<typeof screen.getByTestId>) => {
+  fireEvent(target, 'touchStart', { nativeEvent: { pageX: 220 } });
+  fireEvent(target, 'touchEnd', { nativeEvent: { pageX: 120 } });
+};
 import {
   __resetExerciseListPreferencesForTests,
   setExerciseListPreferences,
@@ -384,12 +389,12 @@ describe('SessionRecorderScreen', () => {
     expect(screen.getByLabelText('Reps for exercise 1 set 2').props.value).toBe('8');
     expect(screen.getByLabelText('Quality for exercise 1 set 2: RIR 2')).toBeTruthy();
     expect(screen.queryByLabelText('Done editing set 2')).toBeNull();
-    expect(screen.getByLabelText('Skip set 2')).toBeTruthy();
+    expect(screen.queryByLabelText('Skip set 2')).toBeNull();
     expect(screen.getByText('2 planned · 3 performed')).toBeTruthy();
     fireEvent.changeText(screen.getByLabelText('Weight for exercise 1 set 2'), '35');
     expect(screen.getByLabelText('Weight for exercise 1 set 2').props.value).toBe('35');
 
-    fireEvent.press(screen.getByLabelText('Skip set 2'));
+    swipeLeft(screen.getByTestId('planned-set-row-1-2'));
     expect(screen.getByText('Set 2')).toBeTruthy();
     expect(screen.getByText('30kg')).toBeTruthy();
     expect(screen.getAllByText('8 reps').length).toBeGreaterThan(0);
