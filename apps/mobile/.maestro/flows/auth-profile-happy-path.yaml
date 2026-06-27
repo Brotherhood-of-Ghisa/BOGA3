@@ -99,6 +99,10 @@ appId: com.dinoderek.mobile
     visible:
       id: "profile-signed-in-card"
     timeout: 15000
+- extendedWaitUntil:
+    notVisible:
+      text: "Loading..."
+    timeout: 10000
 - takeScreenshot: "06-auth-profile-signed-in"
 - tapOn:
     id: "profile-edit-button"
