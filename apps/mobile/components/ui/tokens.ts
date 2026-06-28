@@ -45,13 +45,6 @@ export const uiColors = {
   heatmapTodayBorder: '#7bbcf4',
   heatmapTodayMarker: '#2f8ed8',
   heatmapSelectedBorder: '#0f5cc0',
-  rowActiveBackground: '#eef5ff',
-  rowActiveBorder: '#a9c7f5',
-  rowLastAddedBackground: '#f5f9ff',
-  rowSwipeDeleteBackground: '#fff0f0',
-  rowSwipeSkipBackground: '#eef2f9',
-  rowSwipeIcon: '#20324f',
-  rowSwipeText: '#20324f',
 } as const;
 
 export const uiSpace = {

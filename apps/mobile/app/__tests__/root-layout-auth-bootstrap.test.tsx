@@ -63,16 +63,6 @@ jest.mock('expo-status-bar', () => ({
   StatusBar: () => null,
 }));
 
-jest.mock('react-native-gesture-handler', () => {
-  const { View: MockView } = jest.requireActual('react-native');
-
-  return {
-    GestureHandlerRootView: ({ children }: { children: ReactNode }) => (
-      <MockView testID="gesture-handler-root">{children}</MockView>
-    ),
-  };
-});
-
 jest.mock('expo-router', () => {
   const { View: MockView } = jest.requireActual('react-native');
   const Stack = ({ children }: { children: ReactNode }) => <MockView testID="root-stack">{children}</MockView>;
@@ -116,7 +106,6 @@ describe('RootLayout auth bootstrap wiring', () => {
     });
     expect(mockBootstrapAuthState).toHaveBeenCalledTimes(1);
     expect(mockEnsureExerciseCatalogLoaded).toHaveBeenCalledTimes(1);
-    expect(screen.getByTestId('gesture-handler-root')).toBeTruthy();
     expect(screen.getByTestId('root-stack')).toBeTruthy();
     // Tab roots (incl. settings) live in the `(tabs)` group registered as a single screen
     expect(screen.getByTestId('screen-(tabs)')).toBeTruthy();
