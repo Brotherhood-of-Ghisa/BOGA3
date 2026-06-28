@@ -1,0 +1,13 @@
+{
+  "lane": "docs-check",
+  "wall_ms": 122,
+  "exit_code": 0,
+  "recorded_at": "20260628T143538Z",
+  "machine_id": "a226fceb",
+  "hw": "Intel(R) Core(TM) i9-9980HK CPU @ 2.40GHz",
+  "cores": 16,
+  "os": "macOS 14.6.1",
+  "slot": "0",
+  "commit": "dff1109",
+  "source": "gate"
+}

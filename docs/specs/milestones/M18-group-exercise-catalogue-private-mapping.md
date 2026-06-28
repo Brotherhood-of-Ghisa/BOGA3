@@ -50,13 +50,15 @@ Introduce the first group-sharing domain slice: a user can create a private grou
 - Group competitions, leaderboards, PR certification, comments, reactions, or notifications.
 - Background group feed sync beyond what is required to persist and display this MVP's direct share/review flows.
 - Changing the existing private exercise catalogue semantics for non-group tracker usage.
+- Synchronizing edits made to a private session after it has been shared (projection drift resolution is deferred to post-MVP; shared sessions are treated as static snapshots at the time of sharing).
+- Adapting the Sync v2 protocol/contract and client engine to support shared multi-user scopes, such as local caching/syncing of group catalogues, memberships, and shared projections (group operations remain online-only backend calls for this MVP; sync integration is deferred to post-MVP).
 
 ## Domain and privacy rules
 
 1. A user's existing `exercise_definitions` remain private user-owned rows unless explicitly mapped or projected through a group share action.
 2. Group exercise rows are group-scoped catalogue entries governed by group owner/admin permissions.
 3. A private-to-group mapping is owned by the mapping user and must not give other group members read access to that user's private exercise row.
-4. Sharing a session to a group creates a group-visible projection. The projection uses mapped group exercise identifiers and stores only fields intentionally needed for the group view.
+4. Sharing a session to a group creates a group-visible projection. The projection uses mapped group exercise identifiers and stores only fields intentionally needed for the group view. For the MVP, this projection is a static snapshot at the time of sharing; subsequent edits to the private source session do not propagate to the shared projection.
 5. Unmapped private exercises must be resolved before share completion by mapping to an existing group exercise, requesting a new group exercise, or excluding the exercise from the group projection.
 6. Admin review actions must be backend-enforced by group role/RLS; mobile UI affordances are not an authorization boundary.
 
