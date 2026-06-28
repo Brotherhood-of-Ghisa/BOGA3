@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
 
 import SessionRecorderScreen from '../(tabs)/session-recorder';
 
@@ -199,6 +200,8 @@ describe('SessionRecorderScreen', () => {
     expect(screen.getByText('Log new exercise')).toBeTruthy();
     expect(screen.getByText('No exercises logged yet.')).toBeTruthy();
     expect(screen.getByText('Submit Session')).toBeTruthy();
+    expect(screen.queryByTestId('session-recorder-delete-button')).toBeNull();
+    expect(screen.queryByTestId('session-recorder-delete-confirm-button')).toBeNull();
     expect(screen.queryByLabelText('Detect current gym')).toBeNull();
     expect(screen.queryByText('Use this gym')).toBeNull();
     expect(screen.queryByText('Ignore')).toBeNull();
@@ -246,6 +249,13 @@ describe('SessionRecorderScreen', () => {
     expect(screen.getByText('No exercises logged yet.')).toBeTruthy();
     expect(screen.queryByText('Barbell Squat')).toBeNull();
     expect(screen.getByText('Submit Session')).toBeTruthy();
+    expect(screen.queryByTestId('session-recorder-delete-button')).toBeNull();
+    expect(StyleSheet.flatten(screen.getByTestId('session-recorder-submit-button').props.style)).toEqual(
+      expect.objectContaining({
+        borderRadius: StyleSheet.flatten(screen.getByLabelText('Log new exercise').props.style).borderRadius,
+        paddingVertical: StyleSheet.flatten(screen.getByLabelText('Log new exercise').props.style).paddingVertical,
+      })
+    );
     expect(screen.queryByLabelText('Select gym Downtown Iron Temple')).toBeNull();
     expect(screen.queryByTestId('detect-current-gym-button')).toBeNull();
     expect(screen.queryByTestId('gps-gym-suggestion-feedback')).toBeNull();
