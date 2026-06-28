@@ -2439,7 +2439,7 @@ export default function SessionRecorderScreen() {
           onTouchStart={(event) => rememberHorizontalSwipeStart(historySwipeKey, event)}
           onTouchEnd={(event) =>
             consumeHorizontalSwipeEnd(historySwipeKey, event, (direction) => {
-              moveExerciseBlockHistory(exercise.id, direction === 'right' ? 'older' : 'newer');
+              moveExerciseBlockHistory(exercise.id, direction === 'left' ? 'older' : 'newer');
             })
           }>
           {renderHeader(`${formatExerciseBlockAge(activeBlock.daysAgo)} · ${recordPosition} · swipe for records`)}
