@@ -54,6 +54,7 @@ Define the canonical group, membership, catalogue, mapping, request, and project
 
 - Deliver the slice named in the task title.
 - Preserve the milestone privacy rule that private exercise definitions stay private unless intentionally mapped/projected.
+- Propose concrete RLS policy structures and helper functions that explicitly avoid infinite recursion during membership and role checks.
 - Update source-of-truth docs listed below when behavior becomes canonical.
 
 ### Out of scope
@@ -72,6 +73,7 @@ Define the canonical group, membership, catalogue, mapping, request, and project
 2. Positive-path behavior is covered by targeted tests or documented verification.
 3. Negative privacy/authorization/projection behavior is covered when the slice touches backend data, RLS, mappings, or share projections.
 4. Project-level docs are updated when this slice changes source-of-truth behavior.
+5. The designed data model includes RLS policy templates and security definer functions (or equivalent strategies) that are verified to be recursion-free.
 
 ## Docs touched
 
