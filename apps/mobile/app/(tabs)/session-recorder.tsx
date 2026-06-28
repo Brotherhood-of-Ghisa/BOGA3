@@ -58,6 +58,7 @@ import {
   persistSessionDraftSnapshot,
   removeExerciseTagFromSessionExercise,
   renameExerciseTagDefinition,
+  setSessionDeletedState,
   undeleteExerciseTagDefinition,
   upsertLocalGym,
   type ExerciseTagDefinitionRecord,
@@ -1133,6 +1134,7 @@ export default function SessionRecorderScreen() {
   const [lastAddedRowId, setLastAddedRowId] = useState<string | null>(null);
   const [pendingFocusedWeightSetId, setPendingFocusedWeightSetId] = useState<string | null>(null);
   const [focusedExerciseCardId, setFocusedExerciseCardId] = useState<string | null>(null);
+  const [isDeleteConfirmVisible, setIsDeleteConfirmVisible] = useState(false);
   const [isGpsDetectionInFlight, setIsGpsDetectionInFlight] = useState(false);
   const [pendingGymCoordinateAction, setPendingGymCoordinateAction] = useState<{
     gymId: string;
@@ -3544,6 +3546,37 @@ export default function SessionRecorderScreen() {
     setSubmitCleanupPrompt(null);
   };
 
+  const openDeleteActiveSessionConfirm = () => {
+    setIsDeleteConfirmVisible(true);
+  };
+
+  const cancelDeleteActiveSession = () => {
+    setIsDeleteConfirmVisible(false);
+  };
+
+  const confirmDeleteActiveSession = async () => {
+    setIsDeleteConfirmVisible(false);
+    const sessionId = persistedSessionIdRef.current;
+    if (!sessionId) {
+      return;
+    }
+
+    try {
+      await autosaveController.dispose({ flushDirty: false });
+      await setSessionDeletedState(sessionId, true);
+    } catch {
+      // Even if persistence fails, reset the recorder locally so the user can start fresh.
+    } finally {
+      persistedSessionIdRef.current = null;
+      hasSessionMutationRef.current = false;
+      setHasActiveSession(false);
+      setState((current) => ({
+        ...createInitialState(),
+        locations: current.locations,
+      }));
+    }
+  };
+
   const gymEditorPrimaryLabel = state.editingLocationId ? 'Save' : 'Add';
   const gymEditorTitle = state.editingLocationId ? 'Edit Gym' : 'Add Gym';
   const gymEditorInputValue = state.editingLocationId ? state.editingLocationName : state.pendingLocationName;
@@ -4234,16 +4267,60 @@ export default function SessionRecorderScreen() {
         </View>
       ) : null}
 
-      <Pressable
-        accessibilityLabel={routeMode === 'completed-edit' ? 'Save changes' : 'Submit session'}
-        testID="session-recorder-submit-button"
-        style={[styles.submitButton, isSubmitDisabled ? styles.submitButtonDisabled : null]}
-        disabled={isSubmitDisabled}
-        onPress={handleSubmit}>
-        <Text style={styles.submitButtonText}>
-          {routeMode === 'completed-edit' ? 'Save Changes' : 'Submit Session'}
-        </Text>
-      </Pressable>
+      <View style={styles.submitRow}>
+        <Pressable
+          accessibilityLabel={routeMode === 'completed-edit' ? 'Save changes' : 'Submit session'}
+          testID="session-recorder-submit-button"
+          style={[
+            styles.submitButton,
+            styles.submitRowPrimary,
+            isSubmitDisabled ? styles.submitButtonDisabled : null,
+          ]}
+          disabled={isSubmitDisabled}
+          onPress={handleSubmit}>
+          <Text style={styles.submitButtonText}>
+            {routeMode === 'completed-edit' ? 'Save Changes' : 'Submit Session'}
+          </Text>
+        </Pressable>
+        {routeMode !== 'completed-edit' && hasActiveSession ? (
+          <Pressable
+            accessibilityLabel="Delete active session"
+            testID="session-recorder-delete-button"
+            style={styles.deleteSessionButton}
+            onPress={openDeleteActiveSessionConfirm}>
+            <Text style={styles.deleteSessionButtonText}>🗑</Text>
+          </Pressable>
+        ) : null}
+      </View>
+
+      <Modal
+        animationType="fade"
+        transparent
+        visible={isDeleteConfirmVisible}
+        onRequestClose={cancelDeleteActiveSession}>
+        <View style={styles.modalContainer}>
+          <Pressable
+            accessibilityLabel="Dismiss delete session modal overlay"
+            style={styles.modalBackdrop}
+            onPress={cancelDeleteActiveSession}
+          />
+          <View style={styles.confirmationModalCard}>
+            <Text style={styles.confirmationTitle}>Delete this session?</Text>
+            <Text style={styles.confirmationBody}>
+              The in-progress session and all its sets will be discarded. This cannot be undone.
+            </Text>
+            <Pressable
+              accessibilityLabel="Confirm delete active session"
+              testID="session-recorder-delete-confirm-button"
+              style={styles.deleteSessionConfirmButton}
+              onPress={() => {
+                void confirmDeleteActiveSession();
+              }}>
+              <Text style={styles.deleteSessionConfirmButtonText}>Delete session</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
 
       <Modal
         animationType="fade"
@@ -5632,9 +5709,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: uiColors.actionPrimary,
   },
+  submitRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: 8,
+  },
+  submitRowPrimary: {
+    flex: 1,
+  },
   submitButton: {
-    borderRadius: 8,
-    paddingVertical: 10,
+    borderRadius: 10,
+    paddingVertical: 14,
     alignItems: 'center',
     backgroundColor: uiColors.actionPrimary,
   },
@@ -5642,6 +5727,27 @@ const styles = StyleSheet.create({
     backgroundColor: uiColors.actionPrimaryDisabled,
   },
   submitButtonText: {
+    color: uiColors.surfaceDefault,
+    fontWeight: '700',
+  },
+  deleteSessionButton: {
+    width: 48,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: uiColors.actionDanger,
+  },
+  deleteSessionButtonText: {
+    color: uiColors.surfaceDefault,
+    fontSize: 20,
+  },
+  deleteSessionConfirmButton: {
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: 'center',
+    backgroundColor: uiColors.actionDanger,
+  },
+  deleteSessionConfirmButtonText: {
     color: uiColors.surfaceDefault,
     fontWeight: '700',
   },
