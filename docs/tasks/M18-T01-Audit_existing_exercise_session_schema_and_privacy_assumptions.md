@@ -54,6 +54,7 @@ Review current private exercise/session tables, sync mirrors, and product privac
 
 - Deliver the slice named in the task title.
 - Preserve the milestone privacy rule that private exercise definitions stay private unless intentionally mapped/projected.
+- Audit potential RLS recursion vectors for group membership, catalogues, and shared projections on the backend.
 - Update source-of-truth docs listed below when behavior becomes canonical.
 
 ### Out of scope
@@ -72,6 +73,7 @@ Review current private exercise/session tables, sync mirrors, and product privac
 2. Positive-path behavior is covered by targeted tests or documented verification.
 3. Negative privacy/authorization/projection behavior is covered when the slice touches backend data, RLS, mappings, or share projections.
 4. Project-level docs are updated when this slice changes source-of-truth behavior.
+5. The audit explicitly identifies potential RLS recursion scenarios (e.g. self-referencing checks on group_memberships) and provides architectural guidelines to prevent them.
 
 ## Docs touched
 
