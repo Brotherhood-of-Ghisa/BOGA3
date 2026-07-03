@@ -10,10 +10,13 @@ import { filterIndexedExerciseCatalogExercises, type IndexedExerciseCatalogExerc
 
 export type ExerciseListDateRange = ExerciseCatalogStatsPeriod;
 
+export type ExerciseDateFormat = 'DD-MM-YYYY' | 'MM-DD-YYYY' | 'YYYY-MM-DD';
+
 export type ExerciseListPreferences = {
   groupByMuscleFamily: boolean;
   dateRange: ExerciseListDateRange;
   recentsOnTop: boolean;
+  dateFormat: ExerciseDateFormat;
 };
 
 export type ExerciseListDateRangeOption = {
@@ -33,6 +36,7 @@ export const DEFAULT_EXERCISE_LIST_PREFERENCES: ExerciseListPreferences = {
   groupByMuscleFamily: true,
   dateRange: 90,
   recentsOnTop: true,
+  dateFormat: 'DD-MM-YYYY',
 };
 
 export const EXERCISE_LIST_FAMILY_ORDER = [
@@ -52,6 +56,7 @@ export type ExerciseListItem = IndexedExerciseCatalogExercise & {
   aggregate: ExerciseAggregate | undefined;
   recency: ExerciseRecencyScore | undefined;
   hasAllTimeHistory: boolean;
+  lastDoneDate: Date | null;
   primaryFamilyName: string;
   muscleSummary: string;
   statsSummary: string;
@@ -137,12 +142,31 @@ export const formatExerciseListVolume = (volume: number): string => {
   return `${Math.round(volume)}`;
 };
 
+const formatShortDate = (date: Date, dateFormat: ExerciseDateFormat): string => {
+  const month = `${date.getMonth() + 1}`.padStart(2, '0');
+  const day = `${date.getDate()}`.padStart(2, '0');
+  const year = date.getFullYear();
+  if (dateFormat === 'YYYY-MM-DD') {
+    return `${year}-${month}-${day}`;
+  }
+  if (dateFormat === 'MM-DD-YYYY') {
+    return `${month}-${day}-${year}`;
+  }
+  return `${day}-${month}-${year}`;
+};
+
 export const formatExerciseListStatsSummary = (
   aggregate: ExerciseAggregate | undefined,
-  hasAllTimeHistory: boolean
+  hasAllTimeHistory: boolean,
+  lastDoneDate?: Date | null,
+  dateFormat: ExerciseDateFormat = 'DD-MM-YYYY'
 ): string => {
   if (!hasAllTimeHistory) return 'Never done';
-  if (!aggregate) return 'No sets in range';
+  const lastDoneStr = lastDoneDate ? `Last: ${formatShortDate(lastDoneDate, dateFormat)}` : '';
+
+  if (!aggregate) {
+    return lastDoneStr ? `No sets in range · ${lastDoneStr}` : 'No sets in range';
+  }
   const parts: string[] = [`${aggregate.sessionCount} sessions`];
   parts.push(`${formatExerciseListVolume(aggregate.totalVolume)} vol`);
   parts.push(
@@ -150,6 +174,9 @@ export const formatExerciseListStatsSummary = (
       ? `${Math.round(aggregate.estimatedOneRepMax)} 1RM`
       : '- 1RM'
   );
+  if (lastDoneStr) {
+    parts.push(lastDoneStr);
+  }
   return parts.join(' · ');
 };
 
@@ -212,14 +239,16 @@ export const buildExerciseListModel = ({
   const items = filtered.map<ExerciseListItem>((exercise) => {
     const aggregate = stats.aggregatesById.get(exercise.id);
     const hasAllTimeHistory = stats.everDoneIds.has(exercise.id);
+    const lastDoneDate = stats.lastCompletedAtById?.get(exercise.id) ?? null;
     return {
       ...exercise,
       aggregate,
       recency: stats.recencyScoresById.get(exercise.id),
       hasAllTimeHistory,
+      lastDoneDate,
       primaryFamilyName: getExercisePrimaryFamilyName(exercise, muscleGroupById),
       muscleSummary: formatExerciseMuscleSummary(exercise, muscleGroupById),
-      statsSummary: formatExerciseListStatsSummary(aggregate, hasAllTimeHistory),
+      statsSummary: formatExerciseListStatsSummary(aggregate, hasAllTimeHistory, lastDoneDate, preferences.dateFormat),
     };
   });
 

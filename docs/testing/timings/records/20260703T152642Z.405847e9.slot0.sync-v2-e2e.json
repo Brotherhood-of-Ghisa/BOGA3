@@ -1,0 +1,13 @@
+{
+  "lane": "sync-v2-e2e",
+  "wall_ms": 130800,
+  "exit_code": 0,
+  "recorded_at": "20260703T152642Z",
+  "machine_id": "405847e9",
+  "hw": "x86_64",
+  "cores": 16,
+  "os": "Manjaro Linux",
+  "slot": "0",
+  "commit": "3b6c826",
+  "source": "gate"
+}

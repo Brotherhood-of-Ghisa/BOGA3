@@ -165,4 +165,34 @@ describe('exercise list model', () => {
       'Other:0',
     ]);
   });
+
+  it('correctly maps lastDoneDate and appends it to statsSummary in different custom formats', () => {
+    // 1. Default (DD-MM-YYYY)
+    const modelDD = buildModel({ groupByMuscleFamily: false, dateRange: 90, dateFormat: 'DD-MM-YYYY' });
+    const benchDD = modelDD.items.find((item) => item.id === 'bench');
+    const expectedBenchDateDD = `${String(daysBefore(2).getDate()).padStart(2, '0')}-${String(daysBefore(2).getMonth() + 1).padStart(2, '0')}-${daysBefore(2).getFullYear()}`;
+    expect(benchDD?.statsSummary).toContain(`Last: ${expectedBenchDateDD}`);
+
+    // 2. MM-DD-YYYY
+    const modelMM = buildModel({ groupByMuscleFamily: false, dateRange: 90, dateFormat: 'MM-DD-YYYY' });
+    const benchMM = modelMM.items.find((item) => item.id === 'bench');
+    const expectedBenchDateMM = `${String(daysBefore(2).getMonth() + 1).padStart(2, '0')}-${String(daysBefore(2).getDate()).padStart(2, '0')}-${daysBefore(2).getFullYear()}`;
+    expect(benchMM?.statsSummary).toContain(`Last: ${expectedBenchDateMM}`);
+
+    // 3. YYYY-MM-DD
+    const modelYYYY = buildModel({ groupByMuscleFamily: false, dateRange: 90, dateFormat: 'YYYY-MM-DD' });
+    const benchYYYY = modelYYYY.items.find((item) => item.id === 'bench');
+    const expectedBenchDateYYYY = `${daysBefore(2).getFullYear()}-${String(daysBefore(2).getMonth() + 1).padStart(2, '0')}-${String(daysBefore(2).getDate()).padStart(2, '0')}`;
+    expect(benchYYYY?.statsSummary).toContain(`Last: ${expectedBenchDateYYYY}`);
+
+    // Check lastDoneDate mapping and empty / never done behavior
+    expect(benchDD?.lastDoneDate).toEqual(daysBefore(2));
+    const curl = modelDD.items.find((item) => item.id === 'curl');
+    expect(curl?.lastDoneDate).toEqual(daysBefore(120));
+    expect(curl?.statsSummary).toBe(`No sets in range · Last: ${String(daysBefore(120).getDate()).padStart(2, '0')}-${String(daysBefore(120).getMonth() + 1).padStart(2, '0')}-${daysBefore(120).getFullYear()}`);
+
+    const never = modelDD.items.find((item) => item.id === 'never');
+    expect(never?.lastDoneDate).toBeNull();
+    expect(never?.statsSummary).toBe('Never done');
+  });
 });

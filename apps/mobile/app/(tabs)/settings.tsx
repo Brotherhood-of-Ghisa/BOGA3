@@ -10,6 +10,7 @@ import {
   wipeLocalAndReBootstrap,
   wipeRemoteForCurrentUser,
 } from '@/src/sync/dev-affordances';
+import { useExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
 import { isDevMode } from '@/src/utils/isDevMode';
 
 type DevFeedback = { tone: 'success' | 'error'; message: string } | null;
@@ -17,6 +18,7 @@ type DevFeedback = { tone: 'success' | 'error'; message: string } | null;
 export default function SettingsScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const [listPreferences, setListPreferences] = useExerciseListPreferences();
 
   const [isResetting, setIsResetting] = useState(false);
   const [resetFeedback, setResetFeedback] = useState<DevFeedback>(null);
@@ -148,6 +150,37 @@ export default function SettingsScreen() {
           </View>
         </UiSurface>
       </Pressable>
+
+      <UiSurface style={styles.preferencesCard} testID="settings-preferences-card">
+        <UiText selectable variant="labelStrong">
+          Preferences
+        </UiText>
+        <UiText selectable variant="bodyMuted">
+          Configure how dates and other details are displayed throughout BOGA.
+        </UiText>
+        <View style={styles.preferenceGroup}>
+          <UiText selectable variant="labelStrong" style={styles.preferenceLabel}>
+            Date Format
+          </UiText>
+          <View style={styles.preferenceRow}>
+            {(['DD-MM-YYYY', 'MM-DD-YYYY', 'YYYY-MM-DD'] as const).map((format) => {
+              const selected = listPreferences.dateFormat === format;
+              return (
+                <Pressable
+                  key={format}
+                  accessibilityLabel={`Set date format to ${format}`}
+                  style={[styles.prefButton, selected && styles.prefButtonSelected]}
+                  onPress={() => setListPreferences({ dateFormat: format })}
+                  testID={`settings-date-format-${format}`}>
+                  <UiText style={[styles.prefButtonText, selected && styles.prefButtonTextSelected]}>
+                    {format}
+                  </UiText>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      </UiSurface>
 
       {user ? <SyncStatusPanel /> : null}
 
@@ -298,5 +331,42 @@ const styles = StyleSheet.create({
   },
   devErrorText: {
     color: uiColors.actionDangerText,
+  },
+  preferencesCard: {
+    padding: uiSpace.xxl,
+    gap: uiSpace.md,
+  },
+  preferenceGroup: {
+    gap: uiSpace.sm,
+    marginTop: uiSpace.sm,
+  },
+  preferenceLabel: {
+    fontSize: 13,
+  },
+  preferenceRow: {
+    flexDirection: 'row',
+    gap: uiSpace.sm,
+    flexWrap: 'wrap',
+  },
+  prefButton: {
+    borderRadius: uiRadius.md,
+    borderWidth: uiBorder.width,
+    borderColor: uiColors.borderMuted,
+    backgroundColor: uiColors.surfaceDefault,
+    paddingHorizontal: uiSpace.lg,
+    paddingVertical: uiSpace.sm,
+  },
+  prefButtonSelected: {
+    backgroundColor: uiColors.actionPrimarySubtleBg,
+    borderColor: uiColors.actionPrimary,
+  },
+  prefButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: uiColors.textPrimary,
+  },
+  prefButtonTextSelected: {
+    color: uiColors.actionPrimary,
+    fontWeight: '700',
   },
 });

@@ -107,6 +107,17 @@ describe('settings and profile routes', () => {
     expect(mockPush).toHaveBeenCalledWith('/profile');
   });
 
+  it('renders the Preferences card and allows changing the date format setting', () => {
+    render(<SettingsRoute />);
+
+    expect(screen.getByTestId('settings-preferences-card')).toBeTruthy();
+    expect(screen.getByTestId('settings-date-format-DD-MM-YYYY')).toBeTruthy();
+    expect(screen.getByTestId('settings-date-format-MM-DD-YYYY')).toBeTruthy();
+    expect(screen.getByTestId('settings-date-format-YYYY-MM-DD')).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('settings-date-format-YYYY-MM-DD'));
+  });
+
   it('exposes the dev reset surface in development builds and invokes the reset helper after confirmation', async () => {
     mockResetLocalDataAndReseed.mockResolvedValue({
       database: { name: 'fake-db' },
