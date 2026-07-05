@@ -1,0 +1,4 @@
+# .coderabbit.yaml
+reviews:
+  auto_review:
+    enabled: false
