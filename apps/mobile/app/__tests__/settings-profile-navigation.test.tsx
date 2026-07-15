@@ -35,6 +35,11 @@ jest.mock('@/src/data', () => ({
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { Alert } from 'react-native';
 
+import {
+  __resetExerciseListPreferencesForTests,
+  ensureExerciseListPreferencesLoaded,
+  getExerciseListPreferencesSnapshot,
+} from '@/src/exercise-catalog/list-preferences';
 import ProfileRoute from '../profile';
 import SettingsRoute from '../(tabs)/settings';
 
@@ -96,6 +101,7 @@ describe('settings and profile routes', () => {
     mockSaveUsername.mockReset();
     mockResetLocalDataAndReseed.mockReset();
     mockAlert.mockReset();
+    __resetExerciseListPreferencesForTests();
     jest.spyOn(Alert, 'alert').mockImplementation((...args: unknown[]) => mockAlert(...args));
   });
 
@@ -107,15 +113,20 @@ describe('settings and profile routes', () => {
     expect(mockPush).toHaveBeenCalledWith('/profile');
   });
 
-  it('renders the Preferences card and allows changing the date format setting', () => {
+  it('renders the Preferences card and allows changing the date format setting', async () => {
+    await ensureExerciseListPreferencesLoaded();
+
     render(<SettingsRoute />);
 
     expect(screen.getByTestId('settings-preferences-card')).toBeTruthy();
     expect(screen.getByTestId('settings-date-format-DD-MM-YYYY')).toBeTruthy();
     expect(screen.getByTestId('settings-date-format-MM-DD-YYYY')).toBeTruthy();
     expect(screen.getByTestId('settings-date-format-YYYY-MM-DD')).toBeTruthy();
+    expect(getExerciseListPreferencesSnapshot().dateFormat).toBe('DD-MM-YYYY');
 
     fireEvent.press(screen.getByTestId('settings-date-format-YYYY-MM-DD'));
+
+    expect(getExerciseListPreferencesSnapshot().dateFormat).toBe('YYYY-MM-DD');
   });
 
   it('exposes the dev reset surface in development builds and invokes the reset helper after confirmation', async () => {

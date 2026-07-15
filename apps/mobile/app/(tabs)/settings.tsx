@@ -169,6 +169,8 @@ export default function SettingsScreen() {
                 <Pressable
                   key={format}
                   accessibilityLabel={`Set date format to ${format}`}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
                   style={[styles.prefButton, selected && styles.prefButtonSelected]}
                   onPress={() => setListPreferences({ dateFormat: format })}
                   testID={`settings-date-format-${format}`}>

@@ -159,7 +159,7 @@ export const formatExerciseListStatsSummary = (
   aggregate: ExerciseAggregate | undefined,
   hasAllTimeHistory: boolean,
   lastDoneDate?: Date | null,
-  dateFormat: ExerciseDateFormat = 'DD-MM-YYYY'
+  dateFormat: ExerciseDateFormat = DEFAULT_EXERCISE_LIST_PREFERENCES.dateFormat
 ): string => {
   if (!hasAllTimeHistory) return 'Never done';
   const lastDoneStr = lastDoneDate ? `Last: ${formatShortDate(lastDoneDate, dateFormat)}` : '';
@@ -239,7 +239,7 @@ export const buildExerciseListModel = ({
   const items = filtered.map<ExerciseListItem>((exercise) => {
     const aggregate = stats.aggregatesById.get(exercise.id);
     const hasAllTimeHistory = stats.everDoneIds.has(exercise.id);
-    const lastDoneDate = stats.lastCompletedAtById?.get(exercise.id) ?? null;
+    const lastDoneDate = stats.lastCompletedAtById.get(exercise.id) ?? null;
     return {
       ...exercise,
       aggregate,

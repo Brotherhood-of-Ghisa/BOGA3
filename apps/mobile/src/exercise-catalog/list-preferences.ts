@@ -17,6 +17,8 @@ const dateRangeValues = new Set<ExerciseListDateRange>(
   EXERCISE_LIST_DATE_RANGE_OPTIONS.map((option) => option.value)
 );
 
+const dateFormatValues = new Set<ExerciseDateFormat>(['DD-MM-YYYY', 'MM-DD-YYYY', 'YYYY-MM-DD']);
+
 const listeners = new Set<Listener>();
 let snapshot: ExerciseListPreferences = DEFAULT_EXERCISE_LIST_PREFERENCES;
 let didLoad = false;
@@ -56,7 +58,7 @@ const normalizeDateRange = (value: unknown): ExerciseListDateRange =>
     : DEFAULT_EXERCISE_LIST_PREFERENCES.dateRange;
 
 const normalizeDateFormat = (value: unknown): ExerciseDateFormat =>
-  value === 'DD-MM-YYYY' || value === 'MM-DD-YYYY' || value === 'YYYY-MM-DD'
+  dateFormatValues.has(value as ExerciseDateFormat)
     ? (value as ExerciseDateFormat)
     : DEFAULT_EXERCISE_LIST_PREFERENCES.dateFormat;
 
