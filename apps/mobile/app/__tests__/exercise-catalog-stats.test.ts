@@ -146,4 +146,11 @@ describe('aggregateExerciseCatalogStats', () => {
     // Squat falls outside 7d window but is still everDone
     expect(seven.everDoneIds.has('ex-squat')).toBe(true);
   });
+
+  it('correctly tracks the lastCompletedAt date for all completed exercises across periods', () => {
+    const result = aggregateExerciseCatalogStats(buildRawHistory(), 7, NOW);
+    expect(result.lastCompletedAtById.get('ex-bench')).toEqual(daysBefore(NOW, 3));
+    expect(result.lastCompletedAtById.get('ex-curl')).toEqual(daysBefore(NOW, 3));
+    expect(result.lastCompletedAtById.get('ex-squat')).toEqual(daysBefore(NOW, 200));
+  });
 });

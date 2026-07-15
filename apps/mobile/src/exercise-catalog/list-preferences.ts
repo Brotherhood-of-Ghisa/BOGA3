@@ -4,6 +4,7 @@ import * as SecureStore from 'expo-secure-store';
 import {
   DEFAULT_EXERCISE_LIST_PREFERENCES,
   EXERCISE_LIST_DATE_RANGE_OPTIONS,
+  type ExerciseDateFormat,
   type ExerciseListDateRange,
   type ExerciseListPreferences,
 } from './list-model';
@@ -15,6 +16,8 @@ type Listener = () => void;
 const dateRangeValues = new Set<ExerciseListDateRange>(
   EXERCISE_LIST_DATE_RANGE_OPTIONS.map((option) => option.value)
 );
+
+const dateFormatValues = new Set<ExerciseDateFormat>(['DD-MM-YYYY', 'MM-DD-YYYY', 'YYYY-MM-DD']);
 
 const listeners = new Set<Listener>();
 let snapshot: ExerciseListPreferences = DEFAULT_EXERCISE_LIST_PREFERENCES;
@@ -54,6 +57,11 @@ const normalizeDateRange = (value: unknown): ExerciseListDateRange =>
     ? (value as ExerciseListDateRange)
     : DEFAULT_EXERCISE_LIST_PREFERENCES.dateRange;
 
+const normalizeDateFormat = (value: unknown): ExerciseDateFormat =>
+  dateFormatValues.has(value as ExerciseDateFormat)
+    ? (value as ExerciseDateFormat)
+    : DEFAULT_EXERCISE_LIST_PREFERENCES.dateFormat;
+
 const parsePreferences = (stored: string | null): ExerciseListPreferences => {
   if (!stored) return DEFAULT_EXERCISE_LIST_PREFERENCES;
   try {
@@ -68,6 +76,7 @@ const parsePreferences = (stored: string | null): ExerciseListPreferences => {
         typeof parsed.recentsOnTop === 'boolean'
           ? parsed.recentsOnTop
           : DEFAULT_EXERCISE_LIST_PREFERENCES.recentsOnTop,
+      dateFormat: normalizeDateFormat(parsed.dateFormat),
     };
   } catch {
     return DEFAULT_EXERCISE_LIST_PREFERENCES;
@@ -106,6 +115,7 @@ export const setExerciseListPreferences = (
     ...snapshot,
     ...patch,
     dateRange: patch.dateRange === undefined ? snapshot.dateRange : normalizeDateRange(patch.dateRange),
+    dateFormat: patch.dateFormat === undefined ? snapshot.dateFormat : normalizeDateFormat(patch.dateFormat),
   };
   emit();
   void writeStoredValue(JSON.stringify(snapshot));

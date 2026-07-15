@@ -29,6 +29,7 @@ export type ExerciseCatalogStats = {
   aggregatesById: Map<string, ExerciseAggregate>;
   recencyScoresById: Map<string, ExerciseRecencyScore>;
   everDoneIds: Set<string>;
+  lastCompletedAtById: Map<string, Date>;
 };
 
 export type ExerciseCatalogStatsRawHistory = {
@@ -165,8 +166,10 @@ export const aggregateExerciseCatalogStats = (
   const window = resolvePeriodWindow(period, now);
 
   const sessionInWindow = new Map<string, boolean>();
+  const sessionCompletedAt = new Map<string, Date>();
   for (const session of raw.sessions) {
     sessionInWindow.set(session.id, isInWindow(session.completedAt, window));
+    sessionCompletedAt.set(session.id, session.completedAt);
   }
 
   type SessionExerciseLookup = { sessionId: string; exerciseDefinitionId: string | null };
@@ -181,6 +184,7 @@ export const aggregateExerciseCatalogStats = (
   const everDoneIds = new Set<string>();
   const aggregatesById = new Map<string, ExerciseAggregate>();
   const recencyScoresById = new Map<string, ExerciseRecencyScore>();
+  const lastCompletedAtById = new Map<string, Date>();
   const sessionsSeenByDef = new Map<string, Set<string>>();
   const recencyWindow = resolveRecencyScoringWindow(period, now);
 
@@ -191,6 +195,14 @@ export const aggregateExerciseCatalogStats = (
     const defId = link.exerciseDefinitionId;
     everDoneIds.add(defId);
 
+    const completedAt = sessionCompletedAt.get(link.sessionId) ?? null;
+    if (completedAt) {
+      const existing = lastCompletedAtById.get(defId);
+      if (!existing || completedAt > existing) {
+        lastCompletedAtById.set(defId, completedAt);
+      }
+    }
+
     if (!sessionInWindow.get(link.sessionId)) continue;
 
     const parsed = parseCalculationSet({
@@ -200,7 +212,6 @@ export const aggregateExerciseCatalogStats = (
     });
     if (parsed === null) continue;
 
-    const completedAt = raw.sessions.find((session) => session.id === link.sessionId)?.completedAt ?? null;
     if (completedAt && isInWindow(completedAt, recencyWindow)) {
       let recency = recencyScoresById.get(defId);
       if (!recency) {
@@ -251,7 +262,7 @@ export const aggregateExerciseCatalogStats = (
     }
   }
 
-  return { aggregatesById, recencyScoresById, everDoneIds };
+  return { aggregatesById, recencyScoresById, everDoneIds, lastCompletedAtById };
 };
 
 export const createExerciseCatalogStatsRepository = (

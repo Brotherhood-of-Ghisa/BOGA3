@@ -1,0 +1,13 @@
+{
+  "lane": "docs-check",
+  "wall_ms": 39,
+  "exit_code": 0,
+  "recorded_at": "20260703T150422Z",
+  "machine_id": "405847e9",
+  "hw": "x86_64",
+  "cores": 16,
+  "os": "Manjaro Linux",
+  "slot": "0",
+  "commit": "3b6c826",
+  "source": "gate"
+}

@@ -35,7 +35,7 @@ jest.mock('@/src/exercise-catalog/stats-cache', () => {
     __reload: reload,
     useExerciseCatalogStats: jest.fn(() => ({
       status: 'ready',
-      stats: { aggregatesById: new Map(), everDoneIds: new Set() },
+      stats: { aggregatesById: new Map(), everDoneIds: new Set(), lastCompletedAtById: new Map() },
       lastError: null,
       reload,
     })),
@@ -915,6 +915,7 @@ describe('StatsRoute — exercise heatmap integration', () => {
       stats: {
         aggregatesById: new Map([['bench-press', exerciseAggregate]]),
         everDoneIds: new Set(['bench-press']),
+        lastCompletedAtById: new Map(),
       },
       lastError: null,
       reload: jest.fn(),
