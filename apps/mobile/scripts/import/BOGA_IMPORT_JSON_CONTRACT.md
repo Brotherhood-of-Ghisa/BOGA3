@@ -24,6 +24,18 @@ The package is importer-ready only when:
 Review drafts may contain unresolved exercises only when generated with an
 explicit draft/review flag. The generic importer must reject such packages.
 
+## Remote Write Path
+
+Remote imports must write through the app sync API (`sync_push`) with a target
+user JWT, not by direct table mutation. Use:
+
+```bash
+npm run import:boga-json:remote -- --input <boga-import.json> --dry-run
+```
+
+After reviewing the dry-run entity counts, write mode requires
+`--confirm-target` matching `target.importingProfileLabel`.
+
 ## Top-Level Shape
 
 ```json
@@ -54,6 +66,8 @@ explicit draft/review flag. The generic importer must reject such packages.
     "shortSessionThresholdMinutes": 30,
     "shortSessionDefaultDurationMinutes": 60,
     "longSessionWarningThresholdMinutes": 90,
+    "dateStartLocal": "2024-12-23",
+    "dateEndLocal": "2026-07-16",
     "gymAssignments": {
       "midday": "gym-id-or-null",
       "weekdayEvening": "gym-id-or-null",
@@ -116,10 +130,15 @@ Non-empty source notes are preserved under set `source.note` and summarized in
 
 - Parse GymBook UTF-16LE XML with `<logs>/<log>` rows.
 - Skip rows where `skipped` is `Yes` and report the count.
+- Optional local-date windows are inclusive at `dateStartLocal` and exclusive at
+  `dateEndLocal`.
 - Infer sessions by same-date timestamp clusters, not GymBook workout name.
 - Default cluster gap is 90 minutes.
 - If raw span is under 30 minutes, output a 60 minute duration and warn.
 - If raw span is over 90 minutes, warn for review.
+- Effort enrichment leaves endurance swing variants, including
+  `Kettlebell Swings` and `Kettlebell One-Arm Swings`, with unregistered set
+  effort.
 - Exact exercise-name matches against the target catalog map automatically.
 - Missing exercises require an explicit decision file or draft mode.
 - Gym bucket choices must be explicit: midday, weekday evening, and weekend;

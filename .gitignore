@@ -10,6 +10,7 @@ apps/mobile/credentials.json
 apps/mobile/*.ipa
 artifacts/builds/
 **/tmp/
+docs/testing/timings/records/*.json
 
 # Dedicated local dev Supabase workdir (generated; see supabase/scripts/dev-stack-lib.sh)
 .supabase-dev/

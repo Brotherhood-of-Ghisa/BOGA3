@@ -71,6 +71,8 @@ export type BogaImportSet = {
     targetRegion: string;
     targetMusclesPrimary: string;
     targetMusclesSecondary: string;
+    weightLoggedKg?: string;
+    weightAdjustment?: 'two_sided_halved';
     note?: string;
   };
   warnings: BogaImportWarning[];
@@ -121,6 +123,10 @@ export type BogaSessionImportPackage = {
     shortSessionThresholdMinutes: number;
     shortSessionDefaultDurationMinutes: number;
     longSessionWarningThresholdMinutes: number;
+    dateStartLocal?: string;
+    dateEndLocal?: string;
+    enrichSetTypes?: boolean;
+    halveWeightExercises?: string[];
     gymAssignments: {
       midday: string | null;
       weekdayEvening: string | null;
@@ -138,7 +144,13 @@ export type BogaSessionImportPackage = {
       notesPreserved: number;
       unresolvedExercises: number;
       durationWarnings: number;
+      dateFilteredRows?: number;
+      weightsHalvedSets?: number;
     };
+    weightHalvedExercises?: {
+      sourceExerciseName: string;
+      setCount: number;
+    }[];
     unresolvedExercises: {
       sourceExerciseName: string;
       rowCount: number;

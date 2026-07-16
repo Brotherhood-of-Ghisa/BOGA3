@@ -15,6 +15,7 @@ import {
   type BogaImportWarning,
   type BogaSessionImportPackage,
 } from './boga-import-contract';
+import { enrichBogaImportSetTypes } from './set-type-enricher';
 
 export type GymBookRawLog = {
   rowIndex: number;
@@ -70,6 +71,10 @@ export type DigestGymBookOptions = {
   shortSessionDefaultDurationMinutes?: number;
   longSessionWarningThresholdMinutes?: number;
   gymAssignments: GymBucketChoices;
+  dateStartLocal?: string;
+  dateEndLocal?: string;
+  enrichSetTypes?: boolean;
+  halveWeightExercises?: string[];
   exerciseDecisions?: Record<string, GymBookExerciseDecisionInput>;
   allowUnresolvedExercises?: boolean;
 };
@@ -98,6 +103,9 @@ type CliFlags = {
   dryRun: boolean;
   allowUnresolved: boolean;
   gymAssignments: Partial<GymBucketChoices>;
+  dateStartLocal?: string;
+  dateEndLocal?: string;
+  enrichSetTypes: boolean;
   help: boolean;
 };
 
@@ -198,6 +206,20 @@ const isSkipped = (row: GymBookRawLog) => row.skipped.toLowerCase() === 'yes';
 
 const normalizeExerciseName = (name: string) => name.trim().toLowerCase();
 
+const formatNumberText = (value: number) =>
+  Number.isInteger(value) ? value.toString() : value.toString().replace(/0+$/, '').replace(/\.$/, '');
+
+const normalizeLocalDateOption = (value: string | undefined, label: string) => {
+  if (value === undefined) {
+    return undefined;
+  }
+  const normalized = value.trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
+    throw new Error(`${label} must be a local date in YYYY-MM-DD format`);
+  }
+  return normalized;
+};
+
 const slug = (value: string) =>
   value
     .toLowerCase()
@@ -205,7 +227,14 @@ const slug = (value: string) =>
     .replace(/^-+|-+$/g, '')
     .slice(0, 80);
 
-const normalizeWeightValue = (weight: string): { value: string; warnings: BogaImportWarning[] } => {
+const normalizeWeightValue = (
+  weight: string,
+  options: { halve?: boolean } = {}
+): {
+  value: string;
+  warnings: BogaImportWarning[];
+  sourceMetadata?: Pick<BogaImportSet['source'], 'weightLoggedKg' | 'weightAdjustment'>;
+} => {
   const normalized = weight.replace(/[\u00A0\u202F]/g, ' ').trim();
   if (normalized === '') {
     return { value: '', warnings: [] };
@@ -225,14 +254,18 @@ const normalizeWeightValue = (weight: string): { value: string; warnings: BogaIm
       warnings: [warning('weight_unparsed', `Could not parse weight "${weight}"; preserved original value.`)],
     };
   }
-  const value = Number.isInteger(numeric) ? numeric.toString() : numeric.toString().replace(/0+$/, '').replace(/\.$/, '');
+  const value = formatNumberText(options.halve ? numeric / 2 : numeric);
+  const sourceMetadata = options.halve
+    ? { weightLoggedKg: formatNumberText(numeric), weightAdjustment: 'two_sided_halved' as const }
+    : undefined;
   if (unit && unit !== 'kg') {
     return {
       value,
+      ...(sourceMetadata ? { sourceMetadata } : {}),
       warnings: [warning('weight_non_kg_unit', `Weight unit "${unit}" was not kg; numeric value was preserved.`)],
     };
   }
-  return { value, warnings: [] };
+  return { value, warnings: [], ...(sourceMetadata ? { sourceMetadata } : {}) };
 };
 
 const resolveExerciseDecisions = (
@@ -386,7 +419,8 @@ const validateGymAssignments = (catalog: BogaImportCatalog, assignments: GymBuck
 
 const buildSessionExercises = (
   rows: ParsedLog[],
-  decisions: Map<string, BogaImportExerciseDecision>
+  decisions: Map<string, BogaImportExerciseDecision>,
+  halveWeightExercises: Set<string>
 ) => {
   const exercises: {
     orderIndex: number;
@@ -415,7 +449,7 @@ const buildSessionExercises = (
       exercises.push(block);
     }
 
-    const weight = normalizeWeightValue(row.weight);
+    const weight = normalizeWeightValue(row.weight, { halve: halveWeightExercises.has(normalizeExerciseName(row.exercise)) });
     const setWarnings = [...weight.warnings];
     if (row.reps.trim() === '') {
       setWarnings.push(warning('reps_missing', `Missing reps at source row ${row.rowIndex}.`));
@@ -434,6 +468,7 @@ const buildSessionExercises = (
         targetRegion: row.targetRegion,
         targetMusclesPrimary: row.targetMusclesPrimary,
         targetMusclesSecondary: row.targetMusclesSecondary,
+        ...(weight.sourceMetadata ?? {}),
         ...(row.notes ? { note: row.notes } : {}),
       },
       warnings: setWarnings,
@@ -450,6 +485,13 @@ export const digestGymBookExport = (xml: string, options: DigestGymBookOptions):
   const shortThresholdMinutes = options.shortSessionThresholdMinutes ?? DEFAULT_SHORT_SESSION_THRESHOLD_MINUTES;
   const shortDefaultMinutes = options.shortSessionDefaultDurationMinutes ?? DEFAULT_SHORT_SESSION_DURATION_MINUTES;
   const longWarningMinutes = options.longSessionWarningThresholdMinutes ?? DEFAULT_LONG_SESSION_WARNING_MINUTES;
+  const dateStartLocal = normalizeLocalDateOption(options.dateStartLocal, 'dateStartLocal');
+  const dateEndLocal = normalizeLocalDateOption(options.dateEndLocal, 'dateEndLocal');
+  if (dateStartLocal && dateEndLocal && dateStartLocal >= dateEndLocal) {
+    throw new Error('dateStartLocal must be before dateEndLocal');
+  }
+  const halveWeightExercises = [...new Set(options.halveWeightExercises ?? [])].sort((a, b) => a.localeCompare(b));
+  const halveWeightExerciseNames = new Set(halveWeightExercises.map(normalizeExerciseName));
 
   if (options.importingProfileLabel.trim() === '') {
     throw new Error('An importing profile label is required before exercise and gym mapping.');
@@ -459,7 +501,11 @@ export const digestGymBookExport = (xml: string, options: DigestGymBookOptions):
 
   const rawRows = parseGymBookXml(xml);
   const skippedRows = rawRows.filter(isSkipped);
-  const importedRows = rawRows.filter((row) => !isSkipped(row)).map(parseDateTime);
+  const parsedImportedRows = rawRows.filter((row) => !isSkipped(row)).map(parseDateTime);
+  const importedRows = parsedImportedRows.filter(
+    (row) => (!dateStartLocal || row.localDate >= dateStartLocal) && (!dateEndLocal || row.localDate < dateEndLocal)
+  );
+  const dateFilteredRows = parsedImportedRows.length - importedRows.length;
   const noteRows = importedRows
     .filter((row) => row.notes.trim() !== '')
     .map((row) => ({
@@ -527,7 +573,7 @@ export const digestGymBookExport = (xml: string, options: DigestGymBookOptions):
     const startedAt = new Date(startedAtMs).toISOString();
     const completedAt = new Date(startedAtMs + durationSec * 1000).toISOString();
     const sourceWorkoutNames = [...new Set(rows.map((row) => row.workout).filter(Boolean))];
-    const exercises = buildSessionExercises(rows, exerciseResolution.resolved);
+    const exercises = buildSessionExercises(rows, exerciseResolution.resolved, halveWeightExerciseNames);
 
     warnings.push(...sessionWarnings);
 
@@ -561,6 +607,20 @@ export const digestGymBookExport = (xml: string, options: DigestGymBookOptions):
   const exerciseDecisions = [...exerciseResolution.resolved.values()].sort((a, b) =>
     a.sourceExerciseName.localeCompare(b.sourceExerciseName)
   );
+  const weightsHalvedByExercise = new Map<string, number>();
+  for (const session of sessions) {
+    for (const exercise of session.exercises) {
+      for (const set of exercise.sets) {
+        if (set.source.weightAdjustment === 'two_sided_halved') {
+          weightsHalvedByExercise.set(
+            exercise.sourceExerciseName,
+            (weightsHalvedByExercise.get(exercise.sourceExerciseName) ?? 0) + 1
+          );
+        }
+      }
+    }
+  }
+
   const packageValue: BogaSessionImportPackage = {
     schema: BOGA_SESSION_IMPORT_SCHEMA,
     generatedAt: generatedAt.toISOString(),
@@ -584,6 +644,10 @@ export const digestGymBookExport = (xml: string, options: DigestGymBookOptions):
       shortSessionThresholdMinutes: shortThresholdMinutes,
       shortSessionDefaultDurationMinutes: shortDefaultMinutes,
       longSessionWarningThresholdMinutes: longWarningMinutes,
+      ...(dateStartLocal ? { dateStartLocal } : {}),
+      ...(dateEndLocal ? { dateEndLocal } : {}),
+      ...(options.enrichSetTypes ? { enrichSetTypes: true } : {}),
+      ...(halveWeightExercises.length > 0 ? { halveWeightExercises } : {}),
       gymAssignments: options.gymAssignments,
     },
     exerciseDecisions,
@@ -597,7 +661,18 @@ export const digestGymBookExport = (xml: string, options: DigestGymBookOptions):
         notesPreserved: noteRows.length,
         unresolvedExercises: exerciseResolution.unresolved.length,
         durationWarnings: warnings.filter((item) => item.code.startsWith('duration_')).length,
+        ...(dateFilteredRows > 0 ? { dateFilteredRows } : {}),
+        ...(weightsHalvedByExercise.size > 0
+          ? { weightsHalvedSets: [...weightsHalvedByExercise.values()].reduce((sum, count) => sum + count, 0) }
+          : {}),
       },
+      ...(weightsHalvedByExercise.size > 0
+        ? {
+            weightHalvedExercises: [...weightsHalvedByExercise.entries()]
+              .map(([sourceExerciseName, setCount]) => ({ sourceExerciseName, setCount }))
+              .sort((a, b) => a.sourceExerciseName.localeCompare(b.sourceExerciseName)),
+          }
+        : {}),
       unresolvedExercises: exerciseResolution.unresolved,
       gymAssignmentCounts,
       notes: noteRows,
@@ -605,7 +680,7 @@ export const digestGymBookExport = (xml: string, options: DigestGymBookOptions):
     },
   };
 
-  return packageValue;
+  return options.enrichSetTypes ? enrichBogaImportSetTypes(packageValue) : packageValue;
 };
 
 export const loadCatalogFromLocalDb = (localDbPath: string): BogaImportCatalog => {
@@ -643,6 +718,7 @@ const loadCatalogJson = (path: string): BogaImportCatalog => {
 
 const loadDecisionJson = (path: string) =>
   JSON.parse(readFileSync(path, 'utf8')) as {
+    halveWeightExercises?: string[];
     exerciseDecisions?: Record<string, GymBookExerciseDecisionInput>;
   };
 
@@ -658,6 +734,7 @@ const parseCliFlags = (argv: string[]): CliFlags => {
     dryRun: false,
     allowUnresolved: false,
     gymAssignments: {},
+    enrichSetTypes: false,
     help: false,
   };
   for (let i = 0; i < argv.length; i += 1) {
@@ -695,6 +772,15 @@ const parseCliFlags = (argv: string[]): CliFlags => {
       case '--timezone':
         flags.timezone = next();
         break;
+      case '--date-start':
+        flags.dateStartLocal = next();
+        break;
+      case '--date-end':
+        flags.dateEndLocal = next();
+        break;
+      case '--enrich-set-types':
+        flags.enrichSetTypes = true;
+        break;
       case '--gym-midday-id':
         flags.gymAssignments.midday = parseGymId(next());
         break;
@@ -727,7 +813,8 @@ const printHelp = () => {
 Usage:
   npm run digest:gymbook -- --input <GymBook.xml> --output <boga-import.json> \\
     --importing-profile-label "<user/profile>" --local-db <path-to-boga-sqlite> \\
-    --gym-midday-id <gym-id|none> --gym-weekday-evening-id <gym-id|none> --gym-weekend-id <gym-id|none>
+    --gym-midday-id <gym-id|none> --gym-weekday-evening-id <gym-id|none> --gym-weekend-id <gym-id|none> \\
+    [--date-start YYYY-MM-DD] [--date-end YYYY-MM-DD] [--enrich-set-types]
 
 Review/draft mode:
   npm run digest:gymbook -- --input <GymBook.xml> --catalog-json <catalog.json> \\
@@ -736,6 +823,7 @@ Review/draft mode:
 
 Decision JSON shape:
   {
+    "halveWeightExercises": ["Dumbbell Bench Presses"],
     "exerciseDecisions": {
       "Source Exercise Name": { "decision": "map_existing", "exerciseDefinitionId": "..." },
       "New Source Exercise": { "decision": "create_new", "exerciseName": "New Source Exercise", "muscleMappings": [] }
@@ -799,6 +887,10 @@ export const runGymBookDigesterCli = (argv: string[]) => {
     ...(flags.localDb ? { localDatabasePath: flags.localDb } : {}),
     timezone: flags.timezone,
     gymAssignments: requireGymAssignments(flags.gymAssignments),
+    dateStartLocal: flags.dateStartLocal,
+    dateEndLocal: flags.dateEndLocal,
+    enrichSetTypes: flags.enrichSetTypes,
+    halveWeightExercises: decisions.halveWeightExercises,
     exerciseDecisions: decisions.exerciseDecisions,
     allowUnresolvedExercises: flags.allowUnresolved,
   });

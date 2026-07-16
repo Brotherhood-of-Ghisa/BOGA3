@@ -24,7 +24,9 @@
     "test:e2e:ios:gates": "./scripts/maestro-ios-gates.sh",
     "test:e2e:ios:auth-profile": "./scripts/maestro-run-lane.sh auth-profile",
     "test:e2e:ios:sync": "./scripts/maestro-run-lane.sh sync-e2e",
+    "digest:gymbook": "tsx scripts/import/gymbook-digester.ts",
     "import:boga-json:local": "tsx scripts/import/import-boga-json-local.ts",
+    "import:boga-json:remote": "tsx scripts/import/import-boga-json-remote.ts",
     "import:boga-json:enrich-set-types": "tsx scripts/import/enrich-boga-import-set-types.ts",
     "seed:dev-rich-history": "tsx scripts/import/seed-dev-rich-history.ts"
   },

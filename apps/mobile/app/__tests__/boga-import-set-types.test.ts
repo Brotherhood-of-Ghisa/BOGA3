@@ -1,14 +1,21 @@
 import { validateBogaSessionImportPackage, type BogaSessionImportPackage } from '../../scripts/import/boga-import-contract';
-import { enrichBogaImportSetTypes, setTypeForRank } from '../../scripts/import/set-type-enricher';
+import {
+  enrichBogaImportSetTypes,
+  setTypeForRank,
+  shouldLeaveImportSetTypesUnregistered,
+} from '../../scripts/import/set-type-enricher';
 
-const makePackage = (sets: { orderIndex: number; setType: null | string }[]): BogaSessionImportPackage =>
+const makePackage = (
+  sets: { orderIndex: number; setType: null | string }[],
+  exerciseName = 'Bench'
+): BogaSessionImportPackage =>
   ({
     schema: 'boga.session-import.v1',
     generatedAt: '2026-06-05T17:02:00.498Z',
     target: {
       importingProfileLabel: 'test',
       catalogSnapshot: {
-        exercises: [{ id: 'seed_bench', name: 'Bench' }],
+        exercises: [{ id: 'seed_bench', name: exerciseName }],
         gyms: [],
       },
     },
@@ -28,10 +35,10 @@ const makePackage = (sets: { orderIndex: number; setType: null | string }[]): Bo
     },
     exerciseDecisions: [
       {
-        sourceExerciseName: 'Bench',
+        sourceExerciseName: exerciseName,
         decision: 'map_existing',
         exerciseDefinitionId: 'seed_bench',
-        exerciseName: 'Bench',
+        exerciseName,
       },
     ],
     sessions: [
@@ -49,11 +56,11 @@ const makePackage = (sets: { orderIndex: number; setType: null | string }[]): Bo
         exercises: [
           {
             orderIndex: 0,
-            sourceExerciseName: 'Bench',
+            sourceExerciseName: exerciseName,
             targetExercise: {
               kind: 'existing',
               exerciseDefinitionId: 'seed_bench',
-              exerciseName: 'Bench',
+              exerciseName,
             },
             sets: sets.map((set, index) => ({
               orderIndex: set.orderIndex,
@@ -63,7 +70,7 @@ const makePackage = (sets: { orderIndex: number; setType: null | string }[]): Bo
               source: {
                 rowIndex: index,
                 workoutName: 'Workout',
-                exerciseName: 'Bench',
+                exerciseName,
                 loggedAtLocal: '2026-06-05 10:00:00',
                 type: '',
                 targetRegion: '',
@@ -118,6 +125,44 @@ describe('BOGA import set type enrichment', () => {
     const sets = enriched.sessions[0].exercises[0].sets;
     expect(sets.map((set) => set.orderIndex)).toEqual([2, 0, 1]);
     expect(sets.map((set) => set.setType)).toEqual(['rir_2', 'warm_up', null]);
+  });
+
+  it('leaves kettlebell swings without registered effort', () => {
+    const enriched = enrichBogaImportSetTypes(
+      makePackage(
+        [
+          { orderIndex: 0, setType: 'rir_0' },
+          { orderIndex: 1, setType: null },
+          { orderIndex: 2, setType: null },
+          { orderIndex: 3, setType: null },
+        ],
+        'Kettlebell Swings'
+      )
+    );
+
+    expect(enriched.sessions[0].exercises[0].sets.map((set) => set.setType)).toEqual([
+      null,
+      null,
+      null,
+      null,
+    ]);
+  });
+
+  it('leaves one-arm kettlebell swings without registered effort', () => {
+    const enriched = enrichBogaImportSetTypes(
+      makePackage(
+        [
+          { orderIndex: 0, setType: null },
+          { orderIndex: 1, setType: null },
+          { orderIndex: 2, setType: null },
+        ],
+        'Kettlebell One-Arm Swings'
+      )
+    );
+
+    expect(enriched.sessions[0].exercises[0].sets.map((set) => set.setType)).toEqual([null, null, null]);
+    expect(shouldLeaveImportSetTypesUnregistered('Single-Arm Kettlebell Swings')).toBe(true);
+    expect(shouldLeaveImportSetTypesUnregistered('Kettlebell Swing')).toBe(true);
   });
 
   it('validates enriched set types and rejects unsupported values', () => {
