@@ -42,7 +42,9 @@ docs_touched: "docs/specs/milestones/M19-prune-starter-exercise-catalog.md, docs
   - `docs/specs/02-quality-and-test-gates.md`
 - Code/docs inventory freshness checks run:
   - Task is planned only; run final diff and gate-trigger inventory during closeout kickoff.
-- Known stale references or assumptions: old app builds can seed the previous long catalog until retired.
+- Known stale references or assumptions: old app builds can still seed the
+  previous long catalog locally, but `M19-T07` should prevent known deprecated
+  seed rows from persisting remotely as active rows after the guard deploys.
 - Optional helper command:
   - `./scripts/task-bootstrap.sh docs/tasks/M19-T06-Rollout_and_closeout_catalog_prune.md`
 
@@ -59,6 +61,8 @@ clear account of remote cleanup and old-client caveats.
 - Confirm milestone task statuses and completion notes are current.
 - Record final duplicate suppression summary and active seed counts.
 - Record hosted cleanup status, owner, and any deferred rerun trigger.
+- Record `sync_push` deprecated-seed guard deployment status, stale-client
+  fallback behavior, and any remaining old-client caveat.
 - Move completed M19 task cards to `docs/tasks/complete/` as appropriate.
 - Update the M19 milestone completion note and status when all slices are complete.
 
@@ -75,7 +79,8 @@ clear account of remote cleanup and old-client caveats.
 ## Acceptance criteria
 
 1. All M19 implementation task cards are either completed or explicitly blocked/outdated with rationale.
-2. The milestone completion note records what changed, what gates ran, hosted cleanup status, and any old-client follow-up.
+2. The milestone completion note records what changed, what gates ran, hosted
+   cleanup status, server guard status, and any old-client follow-up.
 3. PR body evidence lists every required gate with result and N/A rationale where applicable.
 4. No source-of-truth docs remain stale for behavior changed during M19.
 5. The final diff contains no unplanned implementation scope.

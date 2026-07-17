@@ -69,6 +69,8 @@ by default.
 - New catalog merge UI.
 - New exercise editor features.
 - Backend cleanup or sync migration implementation.
+- Stale old-client update-required sync messaging; `M19-T07` owns that
+  server/client sync state if needed.
 
 ## UI Impact
 

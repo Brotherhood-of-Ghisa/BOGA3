@@ -44,7 +44,9 @@ docs_touched: "docs/specs/05-data-model.md, docs/specs/10-api-authn-authz-guidel
   - `supabase/README.md`
 - Code/docs inventory freshness checks run:
   - Task is planned only; run migration/RPC/schema inventory during implementation kickoff.
-- Known stale references or assumptions: old app builds can reintroduce suppressed seeds for brand-new accounts until retired.
+- Known stale references or assumptions: old app builds can still seed the old
+  bundle locally; task `M19-T07` owns the server-side guard that prevents those
+  rows from persisting remotely as active rows.
 - Optional helper command:
   - `./scripts/task-bootstrap.sh docs/tasks/M19-T03-Add_remote_catalog_cleanup_migration.md`
 
@@ -69,7 +71,8 @@ user-authored rows.
 
 - Physical deletes of Sync v2 rows.
 - Any change to RLS policy shape.
-- Any change to sync RPC wire contract.
+- Any change to sync RPC wire contract or future `sync_push` stale-seed guard
+  behavior; `M19-T07` owns that slice.
 - Cleanup of non-`seed_*` user-created rows.
 
 ## UI Impact
@@ -83,7 +86,9 @@ user-authored rows.
 2. Migration is idempotent and safe to rerun.
 3. Only exact known bundled seed IDs are tombstoned or renamed.
 4. Suppressed remote rows pull as tombstones to clients rather than disappearing physically.
-5. Local backend contract/smoke gates pass.
+5. Cleanup migration can be paired with the `M19-T07` guard without conflicting
+   timestamps or undeleting suppressed seed rows.
+6. Local backend contract/smoke gates pass.
 
 ## Docs touched
 

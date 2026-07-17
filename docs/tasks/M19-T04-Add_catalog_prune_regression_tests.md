@@ -52,7 +52,8 @@ docs_touched: "docs/specs/06-testing-strategy.md"
 ## Objective
 
 Add regression tests that make the catalog prune durable across seed validation,
-local bootstrap, Sync v2 migration/push/pull, and remote cleanup.
+local bootstrap, Sync v2 migration/push/pull, remote cleanup, and old-client
+deprecated-seed push protection.
 
 ## Scope
 
@@ -66,6 +67,11 @@ local bootstrap, Sync v2 migration/push/pull, and remote cleanup.
 - Assert duplicate singular/plural groups resolve to the intended kept rows.
 - Cover bundle migration idempotency, user-renamed preservation, and tombstone dirtying.
 - Cover sync-cycle push of tombstones and no re-population after pull.
+- Cover the server-side `sync_push` guard that receives stale active pushes for
+  exact deprecated seed IDs from an old client and stores/pulls back tombstones
+  instead of active rows.
+- Cover the fallback stale-catalog error classification and user-visible
+  update-required sync state if `M19-T07` adds that rejection path.
 - Update existing fixtures/tests that hard-code old counts or old seed names.
 
 ### Out of scope
@@ -81,13 +87,16 @@ local bootstrap, Sync v2 migration/push/pull, and remote cleanup.
 
 ## Acceptance criteria
 
-1. Tests fail against the old long catalog and pass against the M19 pruned catalog.
+1. Tests fail against the old long catalog or unguarded `sync_push` behavior and
+   pass against the M19 pruned/guarded catalog.
 2. Tests protect user-created and user-renamed exercise preservation.
 3. Tests cover local and backend sync behavior relevant to tombstone propagation.
 4. Existing seed-count assertions are updated to the finalized M19 counts.
 5. Regression coverage prevents incline rows from being suppressed by a generic
    duplicate-normalization rule.
-6. Testing docs are updated if a new coverage policy or lane is introduced.
+6. Backend tests prove an old-client active push for a deprecated seed cannot
+   leave an active remote row after push/pull convergence.
+7. Testing docs are updated if a new coverage policy or lane is introduced.
 
 ## Docs touched
 
@@ -112,6 +121,8 @@ local bootstrap, Sync v2 migration/push/pull, and remote cleanup.
   - `apps/mobile/app/__tests__/**`
   - `apps/mobile/app/__tests__/sync/**`
   - `supabase/tests/**` only if backend contract coverage needs a scenario
+  - `apps/mobile/src/sync/**` UI-state tests only if stale-catalog
+    classification is added by `M19-T07`
 - Project structure impact: none planned.
 - Constraints/assumptions: do not add a lane unless there is a clear maintenance need and update gate docs if so.
 

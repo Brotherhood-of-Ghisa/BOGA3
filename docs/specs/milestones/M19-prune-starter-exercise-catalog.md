@@ -39,8 +39,10 @@ remote state does not re-populate suppressed bundled rows.
 - Add bundle-migration coverage so existing clients push seed renames and
   tombstones through normal Sync v2 LWW flow.
 - Add a Supabase cleanup migration for already-synced remote rows.
+- Add a server-side `sync_push` guard so old app builds cannot reintroduce
+  known deprecated bundled seed IDs into an empty or cleaned remote account.
 - Update regression coverage for seed counts, duplicate suppression, bootstrap,
-  and sync non-repopulation behavior.
+  stale-client suppression, and sync non-repopulation behavior.
 
 ## Out of scope
 
@@ -48,8 +50,8 @@ remote state does not re-populate suppressed bundled rows.
 - Auto-merging historical `session_exercises.exercise_definition_id` references
   from suppressed seed IDs into kept seed IDs.
 - Deleting or modifying non-`seed_*` user-created exercises.
-- Changing Sync v2 wire shape, table schema, RLS policy shape, or ownership
-  model.
+- Changing the general Sync v2 wire shape, table schema, RLS policy shape, or
+  ownership model outside the M19 deprecated-seed guard.
 - Building new UI for catalog merge decisions.
 - Implementing any M18 group exercise catalog behavior.
 
@@ -114,14 +116,35 @@ unless a future task records an explicit user-approved exception:
 - Preserve non-`seed_*` exercise IDs and seed rows whose name no longer matches
   the prior bundle value, treating them as user-authored or user-renamed.
 
+## Old-client `sync_push` guard policy
+
+Hosted cleanup handles rows already present in remote state. A server-side
+`sync_push` guard must also protect future writes from old app builds that still
+ship the pre-M19 seed bundle.
+
+The primary path should coerce active pushes for exact known deprecated
+`seed_*` exercise definition IDs and their exact known seed mapping IDs into
+tombstones, then acknowledge the batch. The server-written tombstone must be
+newer under LWW than the stale active row the old client tried to push, so a
+subsequent pull makes that old client hide the row locally.
+
+The guard must not touch non-`seed_*` user-created rows, kept seed rows, or
+historical `session_exercises` that reference a now-suppressed exercise
+definition. If a deprecated-seed batch cannot be safely coerced into tombstones,
+the server may reject it with a stable stale-catalog error token. New app
+versions should classify that token and show a user-visible update-required
+sync state. `public.app_logs` diagnostics are useful for operators, but they are
+not user-visible and must not be the only feedback path.
+
 ## Deliverables
 
 1. Pruned seed bundle with validation still passing.
 2. Client bundle migration for kept-row renames and suppressed-row tombstones.
 3. Supabase remote cleanup migration for existing synced rows.
-4. Regression coverage for seed shape, duplicate suppression, sync push/pull,
+4. Server-side `sync_push` guard for stale old-client deprecated seed pushes.
+5. Regression coverage for seed shape, duplicate suppression, sync push/pull,
    and frontend catalog visibility.
-5. Final rollout/closeout notes documenting old-client caveats and verification.
+6. Final rollout/closeout notes documenting old-client caveats and verification.
 
 ## Acceptance criteria
 
@@ -137,23 +160,30 @@ unless a future task records an explicit user-approved exception:
    migration.
 7. Existing clients push tombstones for suppressed seed rows and remote state
    does not re-populate them on a subsequent pull.
-8. Hosted cleanup is idempotent and operates only on exact known `seed_*` IDs.
-9. Required local gates are green before the milestone closes.
+8. Old app builds cannot reintroduce exact known deprecated bundled seed rows
+   through `sync_push`; the server tombstones those rows or returns a classified
+   stale-catalog error that new clients surface as an update-required sync state.
+9. Hosted cleanup is idempotent and operates only on exact known `seed_*` IDs.
+10. Required local gates are green before the milestone closes.
 
 ## Task breakdown
 
 1. `docs/tasks/M19-T01-Prune_starter_catalog_seed_bundle.md` - Prune starter catalog seed bundle (`planned`).
 2. `docs/tasks/M19-T02-Add_catalog_bundle_migration_for_existing_clients.md` - Add catalog bundle migration for existing clients (`planned`).
 3. `docs/tasks/M19-T03-Add_remote_catalog_cleanup_migration.md` - Add remote catalog cleanup migration (`planned`).
-4. `docs/tasks/M19-T04-Add_catalog_prune_regression_tests.md` - Add catalog prune regression tests (`planned`).
-5. `docs/tasks/M19-T05-Verify_frontend_catalog_and_picker_behaviour.md` - Verify frontend catalog and picker behaviour (`planned`).
-6. `docs/tasks/M19-T06-Rollout_and_closeout_catalog_prune.md` - Rollout and closeout catalog prune (`planned`).
+4. `docs/tasks/M19-T07-Add_server_sync_push_guard_for_deprecated_seed_rows.md` - Add server sync_push guard for deprecated seed rows (`planned`).
+5. `docs/tasks/M19-T04-Add_catalog_prune_regression_tests.md` - Add catalog prune regression tests (`planned`).
+6. `docs/tasks/M19-T05-Verify_frontend_catalog_and_picker_behaviour.md` - Verify frontend catalog and picker behaviour (`planned`).
+7. `docs/tasks/M19-T06-Rollout_and_closeout_catalog_prune.md` - Rollout and closeout catalog prune (`planned`).
 
 ## Risks / dependencies
 
-- An old app build can still seed the previous long bundle for a brand-new empty
-  account until that build is retired; cleanup must be idempotent and may need
-  to be rerun after rollout.
+- An old app build can still seed the previous long bundle locally for a
+  brand-new empty account, but after the M19 `sync_push` guard is deployed it
+  must not be able to persist known deprecated seed rows as active remote rows.
+  If the guard has to reject rather than coerce a batch, old clients may show
+  only the existing generic sync error because they cannot be retrofitted with a
+  tailored update-required message.
 - Suppressed rows may still be referenced by historical `session_exercises`.
   History should continue to render from persisted session exercise display
   names rather than requiring active catalog rows.

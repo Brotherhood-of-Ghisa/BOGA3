@@ -42,7 +42,9 @@ docs_touched: "docs/specs/03-technical-architecture.md, docs/specs/05-data-model
   - `docs/specs/tech/sync-v2-server-contract.md`
 - Code/docs inventory freshness checks run:
   - Task is planned only; run bundle-migration, bootstrap, and sync-cycle inventory during implementation kickoff.
-- Known stale references or assumptions: old client builds may seed the long catalog until retired.
+- Known stale references or assumptions: old client builds may still seed the
+  long catalog locally; `M19-T07` owns the server-side guard that prevents known
+  deprecated seed rows from persisting remotely as active rows.
 - Optional helper command:
   - `./scripts/task-bootstrap.sh docs/tasks/M19-T02-Add_catalog_bundle_migration_for_existing_clients.md`
 
