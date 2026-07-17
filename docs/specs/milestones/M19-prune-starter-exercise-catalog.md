@@ -24,9 +24,13 @@ remote state does not re-populate suppressed bundled rows.
 
 ## In scope
 
-- Prune the bundled `seed_*` starter exercise definitions to the approved
-  curated 70-exercise keep set.
+- Prune the bundled `seed_*` starter exercise definitions to a curated keep set
+  finalized by task `M19-T01`; the originally proposed 70-row target is not
+  authoritative.
 - Prefer singular, equipment-specific names for kept seeds.
+- Preserve incline variants as distinct exercises. Incline movements are not
+  duplicates of flat/non-incline movements, and current `Incline` seed rows must
+  stay active unless a future task records an explicit user-approved exception.
 - Remove suppressed bundled exercises from new-user seeding by pruning the seed
   definition, mapping, documentation, and rationale rows.
 - Preserve user-added exercises and user-renamed seed exercises.
@@ -49,86 +53,59 @@ remote state does not re-populate suppressed bundled rows.
 - Building new UI for catalog merge decisions.
 - Implementing any M18 group exercise catalog behavior.
 
-## Approved keep set
+## Keep-set policy
 
-The final starter seed bundle should keep these 70 exercise definition IDs:
+Task `M19-T01` owns the final keep/suppress table and must update this milestone
+with the exact active exercise and mapping counts before implementation closes.
+It must treat each modifier that changes the performed movement as a candidate
+for preservation rather than a duplicate. That includes at least:
 
-1. `seed_barbell_bench_press`
-2. `seed_dumbbell_bench_press`
-3. `seed_incline_dumbbell_press`
-4. `seed_incline_barbell_bench_presses`
-5. `seed_machine_bench_presses`
-6. `seed_smith_machine_bench_presses`
-7. `seed_push_up`
-8. `seed_parallel_bar_dips`
-9. `seed_cable_flys`
-10. `seed_dumbbell_fly`
-11. `seed_seated_dumbbell_overhead_press`
-12. `seed_standing_barbell_overhead_press`
-13. `seed_dumbbell_lateral_raise`
-14. `seed_machine_lateral_raises`
-15. `seed_face_pull`
-16. `seed_reverse_machine_flys`
-17. `seed_barbell_upright_rows`
-18. `seed_lat_pulldown`
-19. `seed_pull_up`
-20. `seed_chin-ups`
-21. `seed_seated_cable_row`
-22. `seed_barbell_bent_over_row`
-23. `seed_dumbbell_row`
-24. `seed_t-bar_rows`
-25. `seed_seated_machine_rows`
-26. `seed_machine_pullovers`
-27. `seed_machine_back_extensions`
-28. `seed_barbell_shrugs`
-29. `seed_barbell_back_squat`
-30. `seed_barbell_front_squats`
-31. `seed_dumbbell_goblet_squats`
-32. `seed_leg_press`
-33. `seed_machine_hack_squats`
-34. `seed_bulgarian_split_squat`
-35. `seed_dumbbell_lunges`
-36. `seed_leg_extension`
-37. `seed_seated_leg_curl`
-38. `seed_lying_leg_curls`
-39. `seed_nordic_leg_curls`
-40. `seed_conventional_deadlift`
-41. `seed_romanian_deadlift`
-42. `seed_trap_bar_deadlifts`
-43. `seed_barbell_hip_thrust`
-44. `seed_seated_machine_hip_abductions`
-45. `seed_machine_adductions`
-46. `seed_standing_calf_raise`
-47. `seed_seated_machine_calf_raises`
-48. `seed_close_grip_bench_press`
-49. `seed_push-downs`
-50. `seed_overhead_tricep_extension`
-51. `seed_lying_ez-bar_triceps_extensions`
-52. `seed_barbell_curl`
-53. `seed_dumbbell_biceps_curl`
-54. `seed_hammer_curl`
-55. `seed_ez-bar_preacher_curls`
-56. `seed_reverse_barbell_curls`
-57. `seed_barbell_wrist_curls`
-58. `seed_plank`
-59. `seed_side_planks`
-60. `seed_cable_crunch`
-61. `seed_hanging_leg_raises`
-62. `seed_ab-wheel_rollouts`
-63. `seed_russian_twists`
-64. `seed_rowing`
-65. `seed_stationary_cycling`
-66. `seed_elliptical_trainer`
-67. `seed_treadmill_jogging`
-68. `seed_treadmill_walking`
-69. `seed_jumping_rope`
-70. `seed_swimming`
+- incline / decline / flat angle,
+- equipment (`barbell`, `dumbbell`, `cable`, `machine`, `Smith machine`,
+  `kettlebell`, bodyweight),
+- body position (`seated`, `standing`, `lying`),
+- grip or stance (`close-grip`, `wide-grip`, `sumo`, `front`, `back`),
+- unilateral or alternating variants where the movement pattern meaningfully
+  differs.
+
+Current seed rows containing `Incline` must remain distinct active exercises
+unless a future task records an explicit user-approved exception:
+
+1. `seed_incline_dumbbell_press` - Incline Dumbbell Press
+2. `seed_incline_dumbbell_flys` - Incline Dumbbell Flys
+3. `seed_incline_machine_bench_presses` - Incline Machine Bench Presses
+4. `seed_incline_barbell_bench_presses` - Incline Barbell Bench Presses
+5. `seed_incline_cable_bench_presses` - Incline Cable Bench Presses
+6. `seed_incline_dumbbell_bench_presses` - Incline Dumbbell Bench Presses
+7. `seed_incline_smith_machine_bench_presses` - Incline Smith Machine Bench Presses
+8. `seed_ball_incline_push-ups` - Ball Incline Push-Ups
+9. `seed_incline_push-ups` - Incline Push-Ups
+10. `seed_incline_dumbbell_pullover` - Incline Dumbbell Pullover
+11. `seed_incline_barbell_rows` - Incline Barbell Rows
+12. `seed_incline_dumbbell_rows` - Incline Dumbbell Rows
+13. `seed_reverse_incline_barbell_rows` - Reverse Incline Barbell Rows
+14. `seed_close-grip_incline_dumbbell_bench_presses` - Close-Grip Incline Dumbbell Bench Presses
+15. `seed_close-grip_incline_push-ups` - Close-Grip Incline Push-Ups
+16. `seed_incline_low_cable_triceps_extensions` - Incline Low Cable Triceps Extensions
+17. `seed_alternating_incline_dumbbell_curls` - Alternating Incline Dumbbell Curls
+18. `seed_alternating_incline_hammer_curls` - Alternating Incline Hammer Curls
+19. `seed_incline_dumbbell_curls` - Incline Dumbbell Curls
+20. `seed_incline_hammer_curls` - Incline Hammer Curls
+21. `seed_alternating_incline_dumbbell_twist_curls` - Alternating Incline Dumbbell Twist Curls
+22. `seed_incline_dumbbell_twist_curls` - Incline Dumbbell Twist Curls
+23. `seed_incline_leg_raises` - Incline Leg Raises
+24. `seed_incline_sit-ups` - Incline Sit-Ups
+25. `seed_incline_twist_sit-ups` - Incline Twist Sit-Ups
 
 ## Duplicate suppression rules
 
 - Suppress plural variants where a singular seed remains, for example
   `Barbell Bench Presses` -> `Barbell Bench Press`, `Leg Presses` -> `Leg Press`,
   and `Standing Calf Raises` -> `Standing Calf Raise`.
+- Do not suppress an incline exercise in favor of a flat/non-incline exercise.
+  `Incline Dumbbell Press` and `Dumbbell Bench Press` are different exercises,
+  and machine/cable/Smith/barbell/dumbbell incline variants remain distinct by
+  default.
 - Prefer explicit equipment names over generic names, for example keep
   `Barbell Squat` over generic squat variants and keep machine/cable variants
   only when they represent common distinct equipment.
@@ -148,18 +125,20 @@ The final starter seed bundle should keep these 70 exercise definition IDs:
 
 ## Acceptance criteria
 
-1. A fresh local seed contains exactly 70 exercise definitions and 232 active
-   exercise-muscle mappings.
+1. A fresh local seed contains the finalized M19 active exercise and mapping
+   counts recorded by `M19-T01`.
 2. Every remaining seeded exercise has at least one active mapping and valid
    seed documentation.
-3. Default exercise catalog and recorder picker views hide suppressed exercises.
-4. User-created exercises remain visible and untouched.
-5. User-renamed seed rows are not overwritten or tombstoned by the bundle
+3. All current `Incline` seed rows remain active unless this milestone records
+   an explicit user-approved exception.
+4. Default exercise catalog and recorder picker views hide suppressed exercises.
+5. User-created exercises remain visible and untouched.
+6. User-renamed seed rows are not overwritten or tombstoned by the bundle
    migration.
-6. Existing clients push tombstones for suppressed seed rows and remote state
+7. Existing clients push tombstones for suppressed seed rows and remote state
    does not re-populate them on a subsequent pull.
-7. Hosted cleanup is idempotent and operates only on exact known `seed_*` IDs.
-8. Required local gates are green before the milestone closes.
+8. Hosted cleanup is idempotent and operates only on exact known `seed_*` IDs.
+9. Required local gates are green before the milestone closes.
 
 ## Task breakdown
 

@@ -58,7 +58,10 @@ local bootstrap, Sync v2 migration/push/pull, and remote cleanup.
 
 ### In scope
 
-- Assert 70 exercise definitions and 232 mappings in the pruned bundle.
+- Assert the finalized M19 exercise-definition and mapping counts recorded by
+  `M19-T01`.
+- Assert every current `Incline` seed row remains active unless the milestone
+  records an explicit user-approved exception.
 - Assert suppressed IDs are absent from active seed definitions and mappings.
 - Assert duplicate singular/plural groups resolve to the intended kept rows.
 - Cover bundle migration idempotency, user-renamed preservation, and tombstone dirtying.
@@ -81,8 +84,10 @@ local bootstrap, Sync v2 migration/push/pull, and remote cleanup.
 1. Tests fail against the old long catalog and pass against the M19 pruned catalog.
 2. Tests protect user-created and user-renamed exercise preservation.
 3. Tests cover local and backend sync behavior relevant to tombstone propagation.
-4. Existing seed-count assertions are updated to the M19 counts.
-5. Testing docs are updated if a new coverage policy or lane is introduced.
+4. Existing seed-count assertions are updated to the finalized M19 counts.
+5. Regression coverage prevents incline rows from being suppressed by a generic
+   duplicate-normalization rule.
+6. Testing docs are updated if a new coverage policy or lane is introduced.
 
 ## Docs touched
 

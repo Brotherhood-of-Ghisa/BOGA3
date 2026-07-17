@@ -46,20 +46,24 @@ docs_touched: "docs/specs/milestones/M19-prune-starter-exercise-catalog.md"
 
 ## Objective
 
-Shrink the bundled starter exercise seed bundle to the approved 70-exercise keep
-set while keeping seed validation, mapping coverage, and documentation coverage
-intact.
+Shrink the bundled starter exercise seed bundle to a curated keep set while
+keeping seed validation, mapping coverage, documentation coverage, and the M19
+incline-variant preservation rule intact.
 
 ## Scope
 
 ### In scope
 
-- Prune `SYSTEM_EXERCISE_DEFINITION_SEEDS` to the M19 keep set.
+- Audit the current `SYSTEM_EXERCISE_DEFINITION_SEEDS` and produce the final
+  M19 keep/suppress table in the milestone before pruning.
+- Prune `SYSTEM_EXERCISE_DEFINITION_SEEDS` to the finalized M19 keep set.
 - Prune `SYSTEM_EXERCISE_MUSCLE_MAPPING_SEEDS` to mappings whose
   `exerciseDefinitionId` remains in the keep set.
 - Prune seed documentation and granular rationale rows for suppressed exercises.
 - Rename kept bundled exercise names to the M19 singular/equipment-specific
   display names.
+- Preserve all current `Incline` seed rows as active distinct exercises unless
+  the milestone records an explicit user-approved exception.
 - Update seed-count expectations in seed-only tests affected by the bundle size.
 
 ### Out of scope
@@ -77,15 +81,18 @@ intact.
 ## Acceptance criteria
 
 1. The seed bundle validates with no duplicate exercise definition IDs/names.
-2. The seed summary reports exactly 70 exercises and 232 mappings.
+2. The seed summary reports the finalized M19 exercise and mapping counts, and
+   those counts are recorded in the milestone.
 3. Every remaining exercise has at least one mapping and documentation row.
-4. No suppressed exercise ID remains in seed definitions, mappings, documentation, or rationale rows.
-5. Project-level docs are updated only if implementation discovers a source-of-truth behavior change beyond this milestone.
+4. Every current `Incline` seed row remains active unless the milestone records
+   an explicit user-approved exception.
+5. No suppressed exercise ID remains in seed definitions, mappings, documentation, or rationale rows.
+6. Project-level docs are updated only if implementation discovers a source-of-truth behavior change beyond this milestone.
 
 ## Docs touched
 
 - Planned docs/spec files to update and why:
-  - `docs/specs/milestones/M19-prune-starter-exercise-catalog.md` - update task status/details if the approved keep set changes during implementation.
+  - `docs/specs/milestones/M19-prune-starter-exercise-catalog.md` - update task status/details if the finalized keep set changes during implementation.
 
 ## Testing and verification approach
 
@@ -103,7 +110,8 @@ intact.
   - `apps/mobile/src/data/exercise-catalog-seeds.ts`
   - seed-focused tests under `apps/mobile/app/__tests__/`
 - Project structure impact: none planned.
-- Constraints/assumptions: do not add new seed IDs unless the M19 keep set is deliberately revised and the milestone is updated.
+- Constraints/assumptions: do not suppress incline variants unless the milestone
+  is deliberately revised with explicit user approval.
 
 ## Mandatory verify gates
 
