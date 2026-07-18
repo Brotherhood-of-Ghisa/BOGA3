@@ -213,6 +213,24 @@ describe('resetLocalDataAndReseed (dev reset path)', () => {
     expect(fake.state.muscleGroups.length).toBe(SYSTEM_MUSCLE_GROUP_SEEDS.length);
     expect(fake.state.exerciseDefinitions.length).toBe(SYSTEM_EXERCISE_DEFINITION_SEEDS.length);
     expect(fake.state.exerciseMuscleMappings.length).toBe(SYSTEM_EXERCISE_MUSCLE_MAPPING_SEEDS.length);
+    expect(fake.state.exerciseDefinitions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'seed_incline_barbell_bench_presses',
+          name: 'Incline Barbell Bench Press',
+        }),
+      ])
+    );
+    expect(fake.state.exerciseDefinitions).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'seed_barbell_bench_presses' }),
+      ])
+    );
+    expect(fake.state.exerciseMuscleMappings).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ exerciseDefinitionId: 'seed_barbell_bench_presses' }),
+      ])
+    );
 
     // The marker reflects the current catalog bundle version so a follow-up
     // seeder call is a no-op (the seed-once invariant survives the reset).
