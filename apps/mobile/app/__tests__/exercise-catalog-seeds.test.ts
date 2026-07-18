@@ -6,9 +6,49 @@ import {
   SYSTEM_EXERCISE_CATALOG_SEED_BUNDLE,
   SYSTEM_EXERCISE_DEFINITION_SEEDS,
   SYSTEM_EXERCISE_MUSCLE_MAPPING_SEEDS,
+  SYSTEM_EXERCISE_SEED_DOCUMENTATION,
   SYSTEM_MUSCLE_GROUP_SEEDS,
   validateSystemExerciseCatalogSeeds,
 } from '@/src/data/exercise-catalog-seeds';
+
+const M19_PRESERVED_INCLINE_SEED_IDS = [
+  'seed_incline_dumbbell_press',
+  'seed_incline_dumbbell_flys',
+  'seed_incline_machine_bench_presses',
+  'seed_incline_barbell_bench_presses',
+  'seed_incline_cable_bench_presses',
+  'seed_incline_dumbbell_bench_presses',
+  'seed_incline_smith_machine_bench_presses',
+  'seed_ball_incline_push-ups',
+  'seed_incline_push-ups',
+  'seed_incline_dumbbell_pullover',
+  'seed_incline_barbell_rows',
+  'seed_incline_dumbbell_rows',
+  'seed_reverse_incline_barbell_rows',
+  'seed_close-grip_incline_dumbbell_bench_presses',
+  'seed_close-grip_incline_push-ups',
+  'seed_incline_low_cable_triceps_extensions',
+  'seed_alternating_incline_dumbbell_curls',
+  'seed_alternating_incline_hammer_curls',
+  'seed_incline_dumbbell_curls',
+  'seed_incline_hammer_curls',
+  'seed_alternating_incline_dumbbell_twist_curls',
+  'seed_incline_dumbbell_twist_curls',
+  'seed_incline_leg_raises',
+  'seed_incline_sit-ups',
+  'seed_incline_twist_sit-ups',
+];
+
+const M19_SUPPRESSED_DUPLICATE_SEED_IDS = [
+  'seed_barbell_bench_presses',
+  'seed_dumbbell_bench_presses',
+  'seed_push-ups',
+  'seed_pull-ups',
+  'seed_planks',
+  'seed_leg_extensions',
+  'seed_leg_presses',
+  'seed_front_elbow_pull_stretch',
+];
 
 const cloneSeedBundle = (
   bundle: SystemExerciseCatalogSeedBundle = SYSTEM_EXERCISE_CATALOG_SEED_BUNDLE
@@ -25,15 +65,15 @@ const cloneSeedBundle = (
 });
 
 describe('M6 exercise catalog seeds', () => {
-  it('ships a valid expanded default seed bundle and summary', () => {
+  it('ships a valid pruned default seed bundle and summary', () => {
     expect(validateSystemExerciseCatalogSeeds()).toEqual([]);
     expect(() => assertValidSystemExerciseCatalogSeeds()).not.toThrow();
 
     const summary = getSystemExerciseCatalogSeedSummary();
 
     expect(summary.muscleGroupCount).toBe(19);
-    expect(summary.exerciseCount).toBe(393);
-    expect(summary.mappingCount).toBe(1194);
+    expect(summary.exerciseCount).toBe(136);
+    expect(summary.mappingCount).toBe(412);
     expect(summary.defaultWeightPolicy).toContain('non-normalized');
 
     expect(M6_SYSTEM_EXERCISE_SEED_POLICY_NOTE).toContain('practical logging defaults');
@@ -49,6 +89,41 @@ describe('M6 exercise catalog seeds', () => {
     expect(SYSTEM_EXERCISE_MUSCLE_MAPPING_SEEDS.every((mapping) => mapping.muscleGroupId !== 'chest_upper')).toBe(true);
     expect(SYSTEM_EXERCISE_MUSCLE_MAPPING_SEEDS.every((mapping) => ['primary', 'secondary'].includes(mapping.role))).toBe(true);
     expect(SYSTEM_EXERCISE_MUSCLE_MAPPING_SEEDS.every((mapping) => [1, 0.5].includes(mapping.weight))).toBe(true);
+  });
+
+  it('ships the M19-pruned starter list while preserving every current incline seed', () => {
+    const exerciseIds = new Set(SYSTEM_EXERCISE_DEFINITION_SEEDS.map((exercise) => exercise.id));
+    const exerciseNames = new Set(SYSTEM_EXERCISE_DEFINITION_SEEDS.map((exercise) => exercise.name));
+    const mappingExerciseIds = new Set(
+      SYSTEM_EXERCISE_MUSCLE_MAPPING_SEEDS.map((mapping) => mapping.exerciseDefinitionId)
+    );
+    const documentationExerciseIds = new Set(
+      SYSTEM_EXERCISE_SEED_DOCUMENTATION.map((documentation) => documentation.exerciseDefinitionId)
+    );
+
+    expect(exerciseIds.size).toBe(136);
+    expect(mappingExerciseIds.size).toBe(136);
+    expect(documentationExerciseIds.size).toBe(136);
+
+    for (const exerciseId of M19_PRESERVED_INCLINE_SEED_IDS) {
+      expect(exerciseIds.has(exerciseId)).toBe(true);
+      expect(mappingExerciseIds.has(exerciseId)).toBe(true);
+      expect(documentationExerciseIds.has(exerciseId)).toBe(true);
+    }
+
+    for (const exerciseId of M19_SUPPRESSED_DUPLICATE_SEED_IDS) {
+      expect(exerciseIds.has(exerciseId)).toBe(false);
+      expect(mappingExerciseIds.has(exerciseId)).toBe(false);
+      expect(documentationExerciseIds.has(exerciseId)).toBe(false);
+    }
+
+    expect(exerciseNames).toContain('Incline Dumbbell Fly');
+    expect(exerciseNames).toContain('Incline Barbell Bench Press');
+    expect(exerciseNames).toContain('Cable Triceps Pushdown');
+    expect(exerciseNames).toContain('Single-Leg Leg Press');
+    expect(exerciseNames).not.toContain('Incline Dumbbell Flys');
+    expect(exerciseNames).not.toContain('Barbell Bench Presses');
+    expect(exerciseNames).not.toContain('Push-Ups');
   });
 
   it('flags duplicate mappings and unknown referenced IDs', () => {
