@@ -20,6 +20,8 @@ gaps — `04`, `07` — from retired docs; gaps are intentional, do not renumber
 - `docs/specs/11-maestro-runtime-and-testing-conventions.md`: Authoritative Maestro iOS runtime/testing contract and documentation ownership model.
 - `docs/specs/12-worktree-config-and-isolation.md`: Git worktree support, shared machine-level config, and per-worktree serving isolation design.
 - `docs/specs/milestones/M18-group-exercise-catalogue-private-mapping.md`: Planned group exercise catalogue, private-to-group exercise mapping, and group session-share milestone.
+- `docs/specs/milestones/M19-per-side-muscle-volume.md`: Planned per-side load-entry semantics, exercise load-mode metadata, and muscle-volume/stat behavior.
+- `docs/specs/milestones/M20-prune-starter-exercise-catalog.md`: Planned starter exercise catalog pruning, remote tombstone cleanup, server-side deprecated-seed push guard, and sync-safe rollout.
 - `docs/specs/tech/README.md`: Index of subsystem-level technical deep-dive docs.
 - `docs/specs/tech/sync-v2-server-contract.md`: Authoritative sync-v2 server contract — schema / LWW / RLS (Part A) and push/pull RPC wire contract (Part B).
 - `docs/specs/templates/milestone-spec-template.md`: Template for milestone deep dives.
