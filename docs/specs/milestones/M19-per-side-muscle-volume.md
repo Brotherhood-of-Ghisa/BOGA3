@@ -29,20 +29,36 @@ entered-load volume displays.
 
 1. Muscle volume is reported per side. For symmetric muscles, a muscle group
    value represents one pec, one bicep, one quad, and so on.
-2. Exercises whose logged weight is total external load use half of the entered
-   load as the per-side base for muscle volume.
-3. Dumbbell, kettlebell, and two-cable bilateral exercises are entered per
-   implement; the entered weight is already the per-side base.
-4. One-arm and one-leg exercise rows imply both sides were performed equally in
+2. `loadInputMode` records load distribution semantics, not equipment type or
+   implement count. The app must not infer this from words like dumbbell,
+   cable, barbell, machine, or kettlebell.
+3. `total_load` means the entered weight is a shared total load for a symmetric
+   movement, so muscle analytics uses half of the entered load as the per-side
+   base.
+4. `per_side_load` means the entered weight already represents one side, hand,
+   stack, or working limb, so muscle analytics uses the entered load directly as
+   the per-side base.
+5. One-arm and one-leg exercise rows imply both sides were performed equally in
    v1. There is no left/right side tracking in this milestone.
-5. Existing completed history is recomputed from the current exercise metadata;
+6. Existing completed history is recomputed from the current exercise metadata;
    no legacy snapshot field preserves old muscle-volume totals.
-6. Existing per-exercise volume and record displays remain entered-load volume.
+7. Existing per-exercise volume and record displays remain entered-load volume.
+
+## Load-mode examples
+
+1. Barbell bench press: `total_load`; `45 kg x 1` contributes `22.5` to each pec
+   before mapping weights.
+2. Two-dumbbell bench press: `per_side_load`; `22 kg each x 1` contributes `22`
+   to each pec before mapping weights.
+3. Single-dumbbell two-arm pullover: `total_load`; `22 kg x 1` contributes `11`
+   to each side of the mapped symmetric muscle groups before mapping weights.
+4. One-arm dumbbell row: `per_side_load`; `22 kg x 1` contributes `22` to each
+   side of the mapped muscle groups, because v1 treats both sides as performed.
 
 ## In scope
 
-- Exercise-level load-entry semantics for total-load versus per-side/implement
-  load.
+- Exercise-level load distribution semantics for `total_load` versus
+  `per_side_load`.
 - Local SQLite schema, Supabase mirror schema, and Sync v2 push/pull wire updates
   for the new exercise-definition metadata.
 - Bundled seed metadata for resolving load-entry mode on starter exercise
@@ -77,7 +93,7 @@ entered-load volume displays.
 3. Muscle analytics math that computes per-side muscle contribution from parsed
    set values, resolved exercise load mode, and mapping weight.
 4. Exercise editor and recorder UI updates for visible load-entry selection and
-   clear `kg total` / `kg each` labeling.
+   clear `kg total` / `kg per side` labeling.
 5. Test coverage for analytics examples, repository projection, schema/wire
    round trips, backend sync contracts, and UI behavior.
 6. Updated project-level data model, sync contract, testing, and UI docs where
@@ -90,17 +106,21 @@ entered-load volume displays.
 2. Dumbbell bench `22 kg each x 1` contributes `22` to chest per side when chest
    is the primary muscle mapping.
 3. Combining those two sets reports `44.5` per-side chest volume.
-4. Secondary muscle contribution uses `exercise_muscle_mappings.weight`; null or
+4. Single-dumbbell two-arm pullover uses `total_load`, so `22 kg x 1`
+   contributes `11` per side before mapping weights.
+5. One-arm dumbbell row uses `per_side_load`, and a logged set implies both
+   sides were performed in v1.
+6. Secondary muscle contribution uses `exercise_muscle_mappings.weight`; null or
    stabilizer role mappings remain excluded from volume totals.
-5. Existing completed history recomputes when an exercise's load-entry mode is
+7. Existing completed history recomputes when an exercise's load-entry mode is
    changed.
-6. Custom exercises can be saved with total-load or per-side load-entry mode.
-7. Recorder set rows label weight entry according to the selected exercise's
+8. Custom exercises can be saved with total-load or per-side load-entry mode.
+9. Recorder set rows label weight entry according to the selected exercise's
    resolved load-entry mode.
-8. Per-exercise history and current-session record panels continue to display
+10. Per-exercise history and current-session record panels continue to display
    entered-load volume.
-9. Sync restore preserves load-entry mode across devices and after reinstall.
-10. Required local gates for each implementation slice are green before that
+11. Sync restore preserves load-entry mode across devices and after reinstall.
+12. Required local gates for each implementation slice are green before that
     slice is marked complete.
 
 ## Task breakdown
@@ -131,8 +151,8 @@ until a task is opened for execution.
 - Sync v2 mirrors typed columns exactly, so schema changes must update local
   Drizzle schema, generated migrations, Supabase migrations, RPC field lists,
   drift checks, and contract tests together.
-- UI copy must make `kg total` versus `kg each` clear without slowing normal set
-  entry.
+- UI copy must make `kg total` versus `kg per side` clear without slowing normal
+  set entry.
 
 ## Completion note (fill when milestone closes)
 
