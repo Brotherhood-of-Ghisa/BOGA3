@@ -139,6 +139,9 @@ Non-empty source notes are preserved under set `source.note` and summarized in
 - Effort enrichment leaves endurance swing variants, including
   `Kettlebell Swings` and `Kettlebell One-Arm Swings`, with unregistered set
   effort.
+- Weight normalization halves GymBook total-weight entries for exercises that
+  BOGA logs per implement. `Arnold Presses` are treated as a two-dumbbell
+  total-weight exercise; `One-Arm Arnold Presses` are not halved.
 - Exact exercise-name matches against the target catalog map automatically.
 - Missing exercises require an explicit decision file or draft mode.
 - Gym bucket choices must be explicit: midday, weekday evening, and weekend;
