@@ -713,12 +713,12 @@ describe('SessionRecorderScreen exercise interactions', () => {
     expect(mockLoadRecentExerciseBlocks).toHaveBeenCalledTimes(1);
     const reopenedPanel = screen.getByTestId('exercise-block-history-panel-1');
 
-    swipeLeft(reopenedPanel);
+    swipeRight(reopenedPanel);
     expect(screen.getByText(/9d ago/)).toBeTruthy();
     expect(screen.getByText('2026-05-17')).toBeTruthy();
     expect(screen.getByTestId('exercise-block-history-panel-1-est-1rm-date')).toHaveTextContent('235');
 
-    swipeRight(reopenedPanel);
+    swipeLeft(reopenedPanel);
     expect(screen.getByText(/2d ago/)).toBeTruthy();
     expect(screen.getByText('2026-05-24')).toBeTruthy();
   });
