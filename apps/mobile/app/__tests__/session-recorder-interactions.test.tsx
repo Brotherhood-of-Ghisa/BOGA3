@@ -306,17 +306,26 @@ jest.mock('@/src/data/exercise-catalog', () => ({
     {
       id: 'seed_barbell_back_squat',
       name: 'Barbell Squat',
+      loadInputMode: 'total_load',
       deletedAt: null,
       mappings: [{ id: 'map-squat-quads', muscleGroupId: 'quads', weight: 1, role: 'primary' }],
     },
     {
       id: 'seed_barbell_bench_press',
       name: 'Bench Press',
+      loadInputMode: 'total_load',
       deletedAt: null,
       mappings: [
         { id: 'map-bench-chest', muscleGroupId: 'chest', weight: 1, role: 'primary' },
         { id: 'map-bench-triceps', muscleGroupId: 'triceps', weight: 0.5, role: 'secondary' },
       ],
+    },
+    {
+      id: 'seed_dumbbell_bench_press',
+      name: 'Dumbbell Bench Press',
+      loadInputMode: 'per_side_load',
+      deletedAt: null,
+      mappings: [{ id: 'map-db-bench-chest', muscleGroupId: 'chest', weight: 1, role: 'primary' }],
     },
     {
       id: 'seed_romanian_deadlift',
@@ -341,6 +350,7 @@ jest.mock('@/src/data/exercise-catalog', () => ({
   saveExerciseCatalogExercise: jest.fn().mockImplementation(async (input: any) => ({
     id: input.id ?? 'custom-exercise-1',
     name: input.name.trim(),
+    loadInputMode: input.loadInputMode,
     deletedAt: null,
     mappings: input.mappings.map((mapping: any, index: number) => ({
       id: `map-${index + 1}`,
@@ -496,7 +506,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     expect(screen.getByText('Barbell Squat')).toBeTruthy();
     expect(screen.queryByTestId('exercise-1-set-header')).toBeNull();
     expect(screen.getByLabelText('Weight for exercise 1 set 1')).toBeTruthy();
-    expect(screen.getByText('kg')).toBeTruthy();
+    expect(screen.getByTestId('set-weight-unit-1-1')).toHaveTextContent('kg total');
     expect(screen.getByPlaceholderText('Reps')).toBeTruthy();
     expect(screen.getByLabelText('Weight for exercise 1 set 1').props.autoFocus).toBe(true);
     expect(screen.getByLabelText('Weight for exercise 1 set 1').props.selectTextOnFocus).toBeUndefined();
@@ -522,6 +532,17 @@ describe('SessionRecorderScreen exercise interactions', () => {
     expect(screen.getByDisplayValue('5')).toBeTruthy();
 
     await act(async () => {});
+  });
+
+  it('labels per-side exercise weight entry without changing the scalar input', async () => {
+    render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
+    fireEvent.press(screen.getByText('Log new exercise'));
+    await selectExerciseFromPicker('Dumbbell Bench Press');
+
+    expect(screen.getByTestId('set-weight-unit-1-1')).toHaveTextContent('kg per side');
+    fireEvent.changeText(screen.getByLabelText('Weight for exercise 1 set 1'), '22');
+    expect(screen.getByLabelText('Weight for exercise 1 set 1').props.value).toBe('22');
   });
 
   it('opens preselection for add-row picks, keeps Append plan disabled without valid history, and clears on search', async () => {
@@ -1081,14 +1102,14 @@ describe('SessionRecorderScreen exercise interactions', () => {
     await dismissEmptyStateIfPresent();
 
     fireEvent.press(screen.getByText('Log new exercise'));
-    expect(await screen.findByLabelText('Chest exercises 1')).toBeTruthy();
+    expect(await screen.findByLabelText('Chest exercises 2')).toBeTruthy();
     expect(screen.getByLabelText('Core exercises 0')).toBeTruthy();
     expect(screen.queryByLabelText('Select exercise Bench Press')).toBeNull();
 
-    fireEvent.press(screen.getByLabelText('Chest exercises 1'));
+    fireEvent.press(screen.getByLabelText('Chest exercises 2'));
 
     expect(await screen.findByLabelText('Select exercise Bench Press')).toBeTruthy();
-    expect(screen.getByText('Never done')).toBeTruthy();
+    expect(screen.getAllByText('Never done')).toHaveLength(2);
   });
 
   it('creates a new exercise inline from the picker and keeps set add/remove interactions intact', async () => {
@@ -1109,6 +1130,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
       expect(mockSaveExerciseCatalogExercise).toHaveBeenCalledWith({
         id: undefined,
         name: 'Custom Press',
+        loadInputMode: 'total_load',
         mappings: [{ muscleGroupId: 'chest', weight: 1, role: 'primary' }],
       });
     });
@@ -1358,6 +1380,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
       expect(mockSaveExerciseCatalogExercise).toHaveBeenCalledWith({
         id: undefined,
         name: 'Cable Fly',
+        loadInputMode: 'total_load',
         mappings: [{ muscleGroupId: 'chest', weight: 1, role: 'primary' }],
       });
       expect(screen.getByText('Cable Fly')).toBeTruthy();

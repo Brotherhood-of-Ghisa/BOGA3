@@ -14,6 +14,7 @@ import {
   type SelectedMuscleWeeklyEffort,
 } from './muscle-analytics';
 import {
+  exerciseDefinitions,
   exerciseMuscleMappings,
   exerciseSets,
   muscleGroups,
@@ -256,6 +257,7 @@ export const createDrizzleStatsStore = (): StatsStore => ({
               exerciseDefinitionId: exerciseMuscleMappings.exerciseDefinitionId,
               muscleGroupId: exerciseMuscleMappings.muscleGroupId,
               role: exerciseMuscleMappings.role,
+              weight: exerciseMuscleMappings.weight,
             })
             .from(exerciseMuscleMappings)
             .where(
@@ -279,8 +281,21 @@ export const createDrizzleStatsStore = (): StatsStore => ({
       .orderBy(asc(muscleGroups.sortOrder), asc(muscleGroups.displayName))
       .all();
 
+    const exerciseDefinitionRows =
+      exerciseDefinitionIds.length > 0
+        ? database
+            .select({
+              id: exerciseDefinitions.id,
+              loadInputMode: exerciseDefinitions.loadInputMode,
+            })
+            .from(exerciseDefinitions)
+            .where(inArray(exerciseDefinitions.id, exerciseDefinitionIds))
+            .all()
+        : [];
+
     return {
       sessions: sessionsInPeriod,
+      exerciseDefinitions: exerciseDefinitionRows,
       sessionExercises: sessionExerciseRows,
       exerciseSets: exerciseSetRows,
       muscleMappings: muscleMappingRows,

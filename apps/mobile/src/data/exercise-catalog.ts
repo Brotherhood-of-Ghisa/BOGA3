@@ -23,6 +23,7 @@ export type ExerciseCatalogExerciseMuscleMapping = {
 export type ExerciseCatalogExercise = {
   id: string;
   name: string;
+  loadInputMode?: 'total_load' | 'per_side_load';
   deletedAt: Date | null;
   mappings: ExerciseCatalogExerciseMuscleMapping[];
 };
@@ -34,6 +35,7 @@ export type ListExerciseCatalogExercisesOptions = {
 export type SaveExerciseCatalogExerciseInput = {
   id?: string;
   name: string;
+  loadInputMode?: 'total_load' | 'per_side_load';
   mappings: {
     muscleGroupId: string;
     weight: number;
@@ -51,6 +53,7 @@ export type SetExerciseCatalogExerciseDeletedStateInput = {
 type DrizzleExerciseRow = {
   id: string;
   name: string;
+  loadInputMode: 'total_load' | 'per_side_load';
   deletedAt: Date | null;
 };
 
@@ -60,6 +63,7 @@ export type ExerciseCatalogStore = {
   saveExercise(input: {
     id?: string;
     name: string;
+    loadInputMode?: 'total_load' | 'per_side_load';
     mappings: {
       muscleGroupId: string;
       weight: number;
@@ -94,6 +98,7 @@ const mapExerciseGraph = (
   return {
     id: exerciseRow.id,
     name: exerciseRow.name,
+    loadInputMode: exerciseRow.loadInputMode,
     deletedAt: exerciseRow.deletedAt,
     mappings: mappingRows
       .filter((mapping) => mapping.exerciseDefinitionId === exerciseRow.id)
@@ -114,6 +119,7 @@ const listExerciseGraphs = async (
     .select({
       id: exerciseDefinitions.id,
       name: exerciseDefinitions.name,
+      loadInputMode: exerciseDefinitions.loadInputMode,
       deletedAt: exerciseDefinitions.deletedAt,
     })
     .from(exerciseDefinitions);
@@ -187,6 +193,7 @@ export const createDrizzleExerciseCatalogStore = (): ExerciseCatalogStore => ({
         tx.update(exerciseDefinitions)
           .set({
             name: input.name,
+            loadInputMode: input.loadInputMode ?? 'total_load',
             deletedAt: null,
             updatedAt: input.now,
             localDirty: true,
@@ -199,6 +206,7 @@ export const createDrizzleExerciseCatalogStore = (): ExerciseCatalogStore => ({
           .values({
             id: exerciseId,
             name: input.name,
+            loadInputMode: input.loadInputMode ?? 'total_load',
             deletedAt: null,
             createdAt: input.now,
             updatedAt: input.now,

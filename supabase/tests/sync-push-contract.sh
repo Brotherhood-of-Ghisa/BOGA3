@@ -304,7 +304,8 @@ PAYLOAD="$(jq -nc \
               completed_at: null, duration_sec: null,
               created_at: $now, updated_at: $now, deleted_at: null}},
     {type: "exercise_definitions", id: $exdef_id, client_updated_at_ms: $now,
-     fields: {name: "Bench Press", created_at: $now, updated_at: $now,
+     fields: {name: "Bench Press", load_input_mode: "per_side_load",
+              created_at: $now, updated_at: $now,
               deleted_at: null}}
   ]}')"
 sync_push "${USER_A_TOKEN}" "${PAYLOAD}"
@@ -312,8 +313,8 @@ assert_status "200" "multi-layer batch push"
 assert_json_expr '.ok == true' "multi-layer batch push ok=true"
 
 # Every row landed.
-service_select "exercise_definitions" "owner_user_id=eq.${USER_A_UUID}&id=eq.${EXDEF_A_ID}&select=id"
-assert_json_expr 'length == 1' "multi-layer: exercise_definition landed"
+service_select "exercise_definitions" "owner_user_id=eq.${USER_A_UUID}&id=eq.${EXDEF_A_ID}&select=id,load_input_mode"
+assert_json_expr 'length == 1 and .[0].load_input_mode == "per_side_load"' "multi-layer: exercise_definition load mode landed"
 service_select "sessions" "owner_user_id=eq.${USER_A_UUID}&id=eq.${SESSION_A_ID}&select=id"
 assert_json_expr 'length == 1' "multi-layer: session landed"
 service_select "session_exercises" "owner_user_id=eq.${USER_A_UUID}&id=eq.${SX_A_ID}&select=id,exercise_definition_id"

@@ -15,7 +15,7 @@
 #     (<table>_touch_server_received_at, <table>_owner_user_id_immutable).
 #   - The nine cross-entity FKs are present with condeferrable=true,
 #     condeferred=true, and the expected on-delete actions.
-#   - Zero CHECK constraints exist on any of the nine tables.
+#   - Only the M19 load-input-mode CHECK exists; all other entity CHECKs are absent.
 #
 # Run via `./boga test sync-v2-schema` (run-suite.sh ensures the local
 # runtime is up + baseline applied before this script runs). For local
@@ -282,12 +282,12 @@ done
 pass "nine composite FKs present with condeferrable=t, condeferred=t, expected on-delete actions"
 
 # -----------------------------------------------------------------------------
-# 6. Zero CHECK constraints on any of the nine tables (docs/specs/tech/sync-v2-server-contract.md §A.1).
+# 6. Only the M19 load-input-mode CHECK is allowed (contract §A.1).
 # -----------------------------------------------------------------------------
 
 for entity in "${ENTITIES[@]}"; do
-  count="$(run_psql "
-    select count(*)
+  names="$(run_psql "
+    select coalesce(string_agg(con.conname, ',' order by con.conname), '')
       from pg_constraint con
       join pg_class c on c.oid = con.conrelid
       join pg_namespace n on n.oid = c.relnamespace
@@ -295,10 +295,14 @@ for entity in "${ENTITIES[@]}"; do
        and c.relname = '${entity}'
        and con.contype = 'c';
   ")"
-  if [[ "${count}" != "0" ]]; then
-    fail "app_public.${entity} has ${count} CHECK constraint(s); expected zero per docs/specs/tech/sync-v2-server-contract.md §A.1"
+  expected=""
+  if [[ "${entity}" == "exercise_definitions" ]]; then
+    expected="exercise_definitions_load_input_mode_valid"
+  fi
+  if [[ "${names}" != "${expected}" ]]; then
+    fail "app_public.${entity} CHECK constraints '${names}'; expected '${expected}' per docs/specs/tech/sync-v2-server-contract.md §A.1"
   fi
 done
-pass "no CHECK constraints on any of the nine v2 entity tables"
+pass "only the M19 load-input-mode CHECK is present across v2 entity tables"
 
 echo "[sync-v2-smoke] all assertions passed"

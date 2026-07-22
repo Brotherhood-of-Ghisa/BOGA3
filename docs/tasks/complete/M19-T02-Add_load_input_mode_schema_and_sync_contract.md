@@ -1,7 +1,7 @@
 ---
 task_id: M19-T02-Add_load_input_mode_schema_and_sync_contract
 milestone_id: "M19"
-status: planned
+status: completed
 ui_impact: "no"
 areas: "frontend|backend|cross-stack|docs"
 runtimes: "node|supabase|sql|docs"
@@ -16,7 +16,7 @@ docs_touched: "docs/specs/05-data-model.md, docs/specs/tech/sync-v2-server-contr
 
 - Task ID: M19-T02-Add_load_input_mode_schema_and_sync_contract
 - Title: Add load input mode schema and sync contract
-- Status: `planned`
+- Status: `completed`
 - File location rule:
   - author active cards in `docs/tasks/<task-id>.md`
   - move the file to `docs/tasks/complete/<task-id>.md` when `Status` becomes `completed` or `outdated`
@@ -137,14 +137,14 @@ Sync v2 so every exercise definition can carry explicit `total_load` or
 
 ## Evidence
 
-- Fill during implementation.
-- Manual verification summary: fill during implementation.
+- Implementation and contract evidence is captured in the M19 source, test, migration, and spec diff.
+- Manual verification summary (required when CI is absent/partial): exercised the shipped behavior through Jest, local Supabase contracts, and the iOS Maestro frontend lane.
 
 ## Completion note
 
-- What changed:
-- What tests ran:
-- What remains:
+- What changed: completed this task's M19 deliverables and updated the corresponding source-of-truth contracts.
+- What tests ran: `./boga test fast`, `./boga test backend`, and `./boga test frontend` passed for the integrated milestone.
+- What remains: nothing for M19; future left/right tracking and per-set overrides remain explicitly out of scope.
 
 ## Status update checklist
 

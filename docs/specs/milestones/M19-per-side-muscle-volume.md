@@ -4,7 +4,7 @@
 
 - Milestone ID: `M19`
 - Title: Milestone: Per-Side Muscle Volume and Load Semantics
-- Status: `planned`
+- Status: `completed`
 
 ## Parent references
 
@@ -125,18 +125,17 @@ entered-load volume displays.
 
 ## Task breakdown
 
-List planned task cards for this milestone. These task files are references only
-until a task is opened for execution.
+Completed task cards for this milestone:
 
-1. `docs/tasks/M19-T01-Audit_current_volume_and_load_semantics.md` - Audit current exercise, muscle, stats, and UI volume semantics (`planned`).
-2. `docs/tasks/M19-T02-Add_load_input_mode_schema_and_sync_contract.md` - Add exercise load-entry mode to local schema, Supabase mirror, sync wire, and drift docs/tests (`planned`).
-3. `docs/tasks/M19-T03-Add_seeded_exercise_load_mode_metadata.md` - Add and validate bundled load-mode defaults for every system exercise definition (`planned`).
-4. `docs/tasks/M19-T04-Update_per_side_muscle_analytics.md` - Update analytics aggregation to use per-side load mode and mapping weights (`planned`).
-5. `docs/tasks/M19-T05-Expose_load_mode_in_exercise_editor.md` - Add visible load-entry controls for custom exercises (`planned`).
-6. `docs/tasks/M19-T06-Label_recorder_weight_entry_by_load_mode.md` - Show recorder weight-entry labels derived from resolved exercise mode (`planned`).
-7. `docs/tasks/M19-T07-Update_stats_history_docs_and_ui_contracts.md` - Update source-of-truth docs for data, sync, stats, and UI behavior (`planned`).
-8. `docs/tasks/M19-T08-Add_backend_and_sync_contract_coverage.md` - Add backend/schema/wire tests proving load-mode round trip and restore behavior (`planned`).
-9. `docs/tasks/M19-T09-Run_full_feature_gates_and_close_milestone.md` - Run required fast, backend, and frontend gates and close the milestone (`planned`).
+1. `docs/tasks/complete/M19-T01-Audit_current_volume_and_load_semantics.md` - Audit current exercise, muscle, stats, and UI volume semantics (`completed`).
+2. `docs/tasks/complete/M19-T02-Add_load_input_mode_schema_and_sync_contract.md` - Add exercise load-entry mode to local schema, Supabase mirror, sync wire, and drift docs/tests (`completed`).
+3. `docs/tasks/complete/M19-T03-Add_seeded_exercise_load_mode_metadata.md` - Add and validate bundled load-mode defaults for every system exercise definition (`completed`).
+4. `docs/tasks/complete/M19-T04-Update_per_side_muscle_analytics.md` - Update analytics aggregation to use per-side load mode and mapping weights (`completed`).
+5. `docs/tasks/complete/M19-T05-Expose_load_mode_in_exercise_editor.md` - Add visible load-entry controls for custom exercises (`completed`).
+6. `docs/tasks/complete/M19-T06-Label_recorder_weight_entry_by_load_mode.md` - Show recorder weight-entry labels derived from resolved exercise mode (`completed`).
+7. `docs/tasks/complete/M19-T07-Update_stats_history_docs_and_ui_contracts.md` - Update source-of-truth docs for data, sync, stats, and UI behavior (`completed`).
+8. `docs/tasks/complete/M19-T08-Add_backend_and_sync_contract_coverage.md` - Add backend/schema/wire tests proving load-mode round trip and restore behavior (`completed`).
+9. `docs/tasks/complete/M19-T09-Run_full_feature_gates_and_close_milestone.md` - Run required fast, backend, and frontend gates and close the milestone (`completed`).
 
 ## Risks / dependencies
 
@@ -156,9 +155,9 @@ until a task is opened for execution.
 
 ## Completion note (fill when milestone closes)
 
-- What changed:
-- Verification summary:
-- What remains:
+- What changed: added durable exercise load semantics, deterministic seed/backfill metadata, per-side muscle analytics, editor controls, recorder labels, Sync v2 round trips, and source-of-truth documentation.
+- Verification summary: `./boga test fast`, `./boga test backend`, and `./boga test frontend` passed locally, including all Sync v2 integration tests and the iOS sync round trip.
+- What remains: nothing for M19; left/right tracking and per-set load-mode overrides remain out of scope for a future milestone.
 
 ## Status update checklist (mandatory during task closeout)
 

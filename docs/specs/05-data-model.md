@@ -51,6 +51,9 @@ This document is project-level source of truth for what data exists and how it i
 - `session_exercises`
 - `exercise_sets` (actual logged `weight_value` / `reps_value` / `set_type`, plus optional planned target fields `planned_weight_value` / `planned_reps_value` / `planned_set_type` and `performance_status` for planned/skipped execution rows)
 - `exercise_definitions`
+  - `load_input_mode` is required metadata with values `total_load` and
+    `per_side_load`. It describes whether the entered scalar is a shared load
+    or already one-side load; it is not inferred from equipment names.
 - `exercise_muscle_mappings`
 - `exercise_tag_definitions`
 - `session_exercise_tags`
@@ -197,6 +200,13 @@ section states only the data-model-level invariants.
    - Active drafts may store planned/skipped target UI state. Completed workout history is actual-only for now: final active-session submit and completed-edit save remove skipped and otherwise unperformed planned rows before writing the completed payload, so only performed actual sets become completed workout data.
 7. `gyms` may include nullable coordinate metadata: `latitude`, `longitude`, `coordinate_accuracy_m`, and `coordinates_updated_at`. The sync impact decision is `in sync scope`; all four columns are carried verbatim by the `gyms` push/pull wire envelope, the first-full-pull bootstrap, and reinstall restore parity.
 8. Gym coordinate fields are either all null or all non-null. Valid ranges are latitude `-90..90`, longitude `-180..180`, accuracy `>= 0`, and non-negative `coordinates_updated_at` epoch milliseconds. Clearing saved coordinates sets all four coordinate fields to null. These ranges are client-enforced — the server runs no validation (contract §A.1).
+9. Muscle volume is recomputed per side from current exercise metadata. Each
+   valid set starts with entered volume (`weight × reps`), halves that base for
+   `total_load`, preserves it for `per_side_load`, then multiplies by
+   `exercise_muscle_mappings.weight`. Null-role and stabilizer mappings do not
+   contribute. One-arm/one-leg rows imply both sides were performed in v1.
+   Exercise history, records, highest weight, and estimated 1RM remain based on
+   the entered scalar and do not use per-side normalization.
 
 ### Wire envelope (Sync v2)
 

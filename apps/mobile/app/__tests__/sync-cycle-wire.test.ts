@@ -71,6 +71,7 @@ const SAMPLE_ROWS: Record<EntityTableName, Record<string, unknown>> = {
   exercise_definitions: {
     id: 'def-wire',
     name: 'Squat',
+    loadInputMode: 'per_side_load',
     createdAt: new Date('2026-05-29T08:00:00.000Z'),
     updatedAt: new Date('2026-05-29T08:30:00.000Z'),
     deletedAt: new Date('2026-05-29T10:00:00.000Z'),

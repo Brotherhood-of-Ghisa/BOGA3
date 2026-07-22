@@ -359,10 +359,10 @@ async function pgRlsEnabled(pg: PgClient, table: string): Promise<boolean> {
   return r.rows[0]?.relrowsecurity ?? false;
 }
 
-async function pgCheckConstraintCount(pg: PgClient, table: string): Promise<number> {
-  const r = await pg.query<{ count: string }>(
+async function pgCheckConstraintNames(pg: PgClient, table: string): Promise<string[]> {
+  const r = await pg.query<{ conname: string }>(
     `
-    select count(*) as count
+    select con.conname
       from pg_constraint con
       join pg_class c on c.oid = con.conrelid
       join pg_namespace n on n.oid = c.relnamespace
@@ -372,7 +372,7 @@ async function pgCheckConstraintCount(pg: PgClient, table: string): Promise<numb
     `,
     [table]
   );
-  return Number(r.rows[0]?.count ?? '0');
+  return r.rows.map((row) => row.conname).sort();
 }
 
 interface FkEdge {
@@ -776,16 +776,18 @@ async function checkEntity(ctx: EntityContext): Promise<void> {
   const pgTrigs = await pgTriggerNames(pg, entity);
   const pgPols = await pgPolicies(pg, entity);
   const rlsEnabled = await pgRlsEnabled(pg, entity);
-  const checkCount = await pgCheckConstraintCount(pg, entity);
+  const checkNames = await pgCheckConstraintNames(pg, entity);
 
   const pgColByName = new Map(pgCols.map((c) => [c.column_name, c]));
   const pgColumnsInOrder = pgCols.map((c) => c.column_name);
 
   // ---- 4f sanity: §1 ground-rule regressions ------------------------------
-  if (checkCount > 0) {
+  const allowedCheckNames =
+    entity === 'exercise_definitions' ? ['exercise_definitions_load_input_mode_valid'] : [];
+  if (JSON.stringify(checkNames) !== JSON.stringify(allowedCheckNames)) {
     addError(
       findings,
-      `${entity}: ${checkCount} CHECK constraint(s) present; expected zero per docs/specs/tech/sync-v2-server-contract.md §A.1 ("no server validation")`
+      `${entity}: unexpected CHECK constraints ${JSON.stringify(checkNames)}; expected ${JSON.stringify(allowedCheckNames)} per docs/specs/tech/sync-v2-server-contract.md §A.1`
     );
   }
   if (pgColByName.has('extras')) {

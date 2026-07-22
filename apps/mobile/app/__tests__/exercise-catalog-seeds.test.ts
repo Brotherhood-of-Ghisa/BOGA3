@@ -65,6 +65,19 @@ const cloneSeedBundle = (
 });
 
 describe('M6 exercise catalog seeds', () => {
+  it('assigns explicit load semantics to every starter exercise', () => {
+    for (const exercise of SYSTEM_EXERCISE_DEFINITION_SEEDS) {
+      expect(['total_load', 'per_side_load']).toContain(exercise.loadInputMode);
+    }
+
+    const mode = (id: string) =>
+      SYSTEM_EXERCISE_DEFINITION_SEEDS.find((exercise) => exercise.id === id)?.loadInputMode;
+    expect(mode('seed_barbell_bench_press')).toBe('total_load');
+    expect(mode('seed_dumbbell_bench_press')).toBe('per_side_load');
+    expect(mode('seed_dumbbell_one-arm_rows')).toBe('per_side_load');
+    expect(mode('seed_incline_dumbbell_pullover')).toBe('total_load');
+  });
+
   it('ships a valid pruned default seed bundle and summary', () => {
     expect(validateSystemExerciseCatalogSeeds()).toEqual([]);
     expect(() => assertValidSystemExerciseCatalogSeeds()).not.toThrow();

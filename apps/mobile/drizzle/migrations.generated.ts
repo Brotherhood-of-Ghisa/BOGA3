@@ -25,6 +25,12 @@ export const generatedMigrationBundle = {
     tag: "0002_abandoned_mister_fear",
     breakpoints: true,
   },
+  {
+    idx: 3,
+    when: 1784754901118,
+    tag: "0003_high_sprite",
+    breakpoints: true,
+  },
     ],
   },
   migrations: {
@@ -237,6 +243,26 @@ CREATE TABLE \`smoke_records\` (
 ALTER TABLE \`exercise_sets\` ADD \`planned_reps_value\` text;--> statement-breakpoint
 ALTER TABLE \`exercise_sets\` ADD \`planned_set_type\` text;--> statement-breakpoint
 ALTER TABLE \`exercise_sets\` ADD \`performance_status\` text;`,
+  m0003: `PRAGMA foreign_keys=OFF;--> statement-breakpoint
+CREATE TABLE \`__new_exercise_definitions\` (
+	\`id\` text PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))) NOT NULL,
+	\`name\` text NOT NULL,
+	\`load_input_mode\` text DEFAULT 'total_load' NOT NULL,
+	\`deleted_at\` integer,
+	\`local_dirty\` integer DEFAULT false NOT NULL,
+	\`local_updated_at_ms\` integer DEFAULT 0 NOT NULL,
+	\`created_at\` integer DEFAULT (unixepoch() * 1000) NOT NULL,
+	\`updated_at\` integer DEFAULT (unixepoch() * 1000) NOT NULL,
+	CONSTRAINT "exercise_definitions_name_non_empty" CHECK("__new_exercise_definitions"."name" <> ''),
+	CONSTRAINT "exercise_definitions_load_input_mode_valid" CHECK("__new_exercise_definitions"."load_input_mode" in ('total_load', 'per_side_load'))
+);
+--> statement-breakpoint
+INSERT INTO \`__new_exercise_definitions\`("id", "name", "load_input_mode", "deleted_at", "local_dirty", "local_updated_at_ms", "created_at", "updated_at") SELECT "id", "name", 'total_load', "deleted_at", "local_dirty", "local_updated_at_ms", "created_at", "updated_at" FROM \`exercise_definitions\`;--> statement-breakpoint
+DROP TABLE \`exercise_definitions\`;--> statement-breakpoint
+ALTER TABLE \`__new_exercise_definitions\` RENAME TO \`exercise_definitions\`;--> statement-breakpoint
+PRAGMA foreign_keys=ON;--> statement-breakpoint
+CREATE INDEX \`exercise_definitions_name_idx\` ON \`exercise_definitions\` (\`name\`);--> statement-breakpoint
+CREATE INDEX \`exercise_definitions_deleted_at_idx\` ON \`exercise_definitions\` (\`deleted_at\`);`,
   },
 } as const;
 

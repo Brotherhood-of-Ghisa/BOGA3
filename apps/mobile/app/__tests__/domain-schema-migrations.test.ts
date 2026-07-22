@@ -127,7 +127,7 @@ describe('domain schema and runtime migrations', () => {
     // The history was squashed to a single v2 baseline (`m0000`); forward feature
     // migrations append after it. The first follow-up is the local sync
     // quarantine table; planned set targets append after that.
-    expect(localRuntimeMigrations.journal.entries).toHaveLength(3);
+    expect(localRuntimeMigrations.journal.entries).toHaveLength(4);
     expect(localRuntimeMigrations.journal.entries[0]).toMatchObject({
       idx: 0,
       tag: expect.stringMatching(/^0000_/),
@@ -140,7 +140,11 @@ describe('domain schema and runtime migrations', () => {
       idx: 2,
       tag: expect.stringMatching(/^0002_/),
     });
-    expect(Object.keys(localRuntimeMigrations.migrations)).toEqual(['m0000', 'm0001', 'm0002']);
+    expect(localRuntimeMigrations.journal.entries[3]).toMatchObject({
+      idx: 3,
+      tag: expect.stringMatching(/^0003_/),
+    });
+    expect(Object.keys(localRuntimeMigrations.migrations)).toEqual(['m0000', 'm0001', 'm0002', 'm0003']);
   });
 
   it('creates the local sync quarantine table in the m0001 follow-up migration', () => {
@@ -160,6 +164,12 @@ describe('domain schema and runtime migrations', () => {
     expect(plannedSetMigration).toContain('ADD `planned_reps_value` text');
     expect(plannedSetMigration).toContain('ADD `planned_set_type` text');
     expect(plannedSetMigration).toContain('ADD `performance_status` text');
+  });
+
+  it('adds constrained load semantics in the m0003 follow-up migration', () => {
+    const loadModeMigration = localRuntimeMigrations.migrations.m0003;
+    expect(loadModeMigration).toContain('`load_input_mode` text DEFAULT \'total_load\' NOT NULL');
+    expect(loadModeMigration).toContain('exercise_definitions_load_input_mode_valid');
   });
 });
 

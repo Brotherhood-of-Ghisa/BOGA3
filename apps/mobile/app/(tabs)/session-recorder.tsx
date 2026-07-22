@@ -1113,6 +1113,16 @@ export default function SessionRecorderScreen() {
     () => exerciseCatalog.exercises.filter((exercise) => !exercise.deletedAt),
     [exerciseCatalog.exercises]
   );
+  const loadInputModeByExerciseDefinitionId = useMemo(
+    () =>
+      new Map(
+        exerciseCatalog.exercises.map((exercise) => [
+          exercise.id,
+          exercise.loadInputMode ?? 'total_load',
+        ])
+      ),
+    [exerciseCatalog.exercises]
+  );
   const exerciseCatalogStatsResult = useExerciseCatalogStats(listPreferences.dateRange);
   const { stats: exerciseCatalogStats, reload: reloadExerciseCatalogStats } = exerciseCatalogStatsResult;
   const [isExerciseCreateModalVisible, setIsExerciseCreateModalVisible] = useState(false);
@@ -3803,6 +3813,9 @@ export default function SessionRecorderScreen() {
           testID: `session-exercise-card-${exerciseIndex + 1}`,
         })}
         renderSetRow={({ exercise, exerciseIndex, set, setIndex }) => {
+          const loadInputMode =
+            loadInputModeByExerciseDefinitionId.get(exercise.exerciseDefinitionId) ?? 'total_load';
+          const weightUnitLabel = loadInputMode === 'per_side_load' ? 'kg per side' : 'kg total';
           const rowState = getSetRowState(set);
           const isPlannedRow = hasPlannedTarget(set);
           const exerciseHasPlannedTargets = exercise.sets.some(hasPlannedTarget);
@@ -4132,7 +4145,9 @@ export default function SessionRecorderScreen() {
                     focusedSetInputIdRef.current = set.id;
                   }}
                 />
-                <Text style={styles.setWeightUnitText}>kg</Text>
+                <Text testID={`set-weight-unit-${exerciseIndex + 1}-${setIndex + 1}`} style={styles.setWeightUnitText}>
+                  {weightUnitLabel}
+                </Text>
               </View>
               <TextInput
                 accessibilityLabel={`Reps for exercise ${exerciseIndex + 1} set ${setIndex + 1}`}

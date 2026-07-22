@@ -1,7 +1,7 @@
 ---
 task_id: M19-T07-Update_stats_history_docs_and_ui_contracts
 milestone_id: "M19"
-status: planned
+status: completed
 ui_impact: "no"
 areas: "docs|frontend|cross-stack"
 runtimes: "docs|node"
@@ -16,7 +16,7 @@ docs_touched: "docs/specs/05-data-model.md, docs/specs/06-testing-strategy.md, d
 
 - Task ID: M19-T07-Update_stats_history_docs_and_ui_contracts
 - Title: Update stats history docs and UI contracts
-- Status: `planned`
+- Status: `completed`
 - File location rule:
   - author active cards in `docs/tasks/<task-id>.md`
   - move the file to `docs/tasks/complete/<task-id>.md` when `Status` becomes `completed` or `outdated`
@@ -133,14 +133,14 @@ entered-load exercise history displays.
 
 ## Evidence
 
-- Fill during implementation.
-- Manual verification summary: fill during implementation.
+- Implementation and contract evidence is captured in the M19 source, test, migration, and spec diff.
+- Manual verification summary (required when CI is absent/partial): exercised the shipped behavior through Jest, local Supabase contracts, and the iOS Maestro frontend lane.
 
 ## Completion note
 
-- What changed:
-- What tests ran:
-- What remains:
+- What changed: completed this task's M19 deliverables and updated the corresponding source-of-truth contracts.
+- What tests ran: `./boga test fast`, `./boga test backend`, and `./boga test frontend` passed for the integrated milestone.
+- What remains: nothing for M19; future left/right tracking and per-set overrides remain explicitly out of scope.
 
 ## Status update checklist
 

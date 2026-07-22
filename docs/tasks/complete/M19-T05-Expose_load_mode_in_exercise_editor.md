@@ -1,7 +1,7 @@
 ---
 task_id: M19-T05-Expose_load_mode_in_exercise_editor
 milestone_id: "M19"
-status: planned
+status: completed
 ui_impact: "yes"
 areas: "frontend|docs"
 runtimes: "node|expo|maestro|docs"
@@ -16,7 +16,7 @@ docs_touched: "docs/specs/ui/README.md, docs/specs/ui/screen-map.md"
 
 - Task ID: M19-T05-Expose_load_mode_in_exercise_editor
 - Title: Expose load mode in exercise editor
-- Status: `planned`
+- Status: `completed`
 - File location rule:
   - author active cards in `docs/tasks/<task-id>.md`
   - move the file to `docs/tasks/complete/<task-id>.md` when `Status` becomes `completed` or `outdated`
@@ -165,15 +165,15 @@ exercises can be saved as either total-load or per-side-load movements.
 
 ## Evidence
 
-- Fill during implementation.
-- UI/UX task visual artifacts note: attach or reference screenshots/captures during closeout.
-- Manual verification summary: fill during implementation.
+- Implementation and contract evidence is captured in the M19 source, test, migration, and spec diff.
+- UI/UX task visual artifacts note: the passing frontend lane captured simulator artifacts under `apps/mobile/artifacts/maestro/ad-hoc/20260722-223927-42726/`; focused editor state assertions live in `exercise-catalog-screen.test.tsx`.
+- Manual verification summary (required when CI is absent/partial): exercised the shipped behavior through Jest, local Supabase contracts, and the iOS Maestro frontend lane.
 
 ## Completion note
 
-- What changed:
-- What tests ran:
-- What remains:
+- What changed: completed this task's M19 deliverables and updated the corresponding source-of-truth contracts.
+- What tests ran: `./boga test fast`, `./boga test backend`, and `./boga test frontend` passed for the integrated milestone.
+- What remains: nothing for M19; future left/right tracking and per-set overrides remain explicitly out of scope.
 
 ## Status update checklist
 

@@ -99,6 +99,7 @@ export function ExerciseEditorModal({
   const [isSaving, setIsSaving] = useState(false);
   const [muscleSelectorMode, setMuscleSelectorMode] = useState<MuscleSelectorMode>(null);
   const [exerciseName, setExerciseName] = useState('');
+  const [loadInputMode, setLoadInputMode] = useState<'total_load' | 'per_side_load'>('total_load');
   const [primaryMuscleGroupId, setPrimaryMuscleGroupId] = useState<string | null>(null);
   const [secondaryMuscleRows, setSecondaryMuscleRows] = useState<EditableSecondaryMuscleRow[]>([]);
   const [validation, setValidation] = useState<EditorValidationState>(createBlankValidationState);
@@ -124,10 +125,12 @@ export function ExerciseEditorModal({
     if (editingExercise) {
       const nextSelections = buildEditorMuscleSelectionsFromExercise(editingExercise);
       setExerciseName(editingExercise.name);
+      setLoadInputMode(editingExercise.loadInputMode ?? 'total_load');
       setPrimaryMuscleGroupId(nextSelections.primaryMuscleGroupId);
       setSecondaryMuscleRows(nextSelections.secondaryMuscleRows);
     } else {
       setExerciseName('');
+      setLoadInputMode('total_load');
       setPrimaryMuscleGroupId(null);
       setSecondaryMuscleRows([]);
     }
@@ -284,6 +287,7 @@ export function ExerciseEditorModal({
       const savedExercise = await saveExerciseCatalogExercise({
         id: editingExercise?.id ?? undefined,
         name: exerciseName,
+        loadInputMode,
         mappings: result.parsedMappings,
       });
       onSaved(savedExercise);
@@ -359,6 +363,33 @@ export function ExerciseEditorModal({
                     {validation.nameError}
                   </Text>
                 ) : null}
+
+                <Text style={styles.fieldLabel}>Weight entry</Text>
+                <View style={styles.loadModeRow}>
+                  {([
+                    ['total_load', 'Total load'],
+                    ['per_side_load', 'Per side'],
+                  ] as const).map(([mode, label]) => {
+                    const selected = loadInputMode === mode;
+                    return (
+                      <Pressable
+                        key={mode}
+                        accessibilityLabel={`${label} weight entry`}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected }}
+                        testID={`exercise-editor-load-mode-${mode}`}
+                        style={[styles.loadModeButton, selected ? styles.loadModeButtonSelected : null]}
+                        onPress={() => setLoadInputMode(mode)}>
+                        <Text style={[styles.loadModeButtonText, selected ? styles.loadModeButtonTextSelected : null]}>
+                          {label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                <Text style={styles.helperText}>
+                  Choose whether the weight you enter is shared across both sides or already represents one side.
+                </Text>
 
                 <Text style={styles.fieldLabel}>Primary muscle</Text>
                 <Pressable
@@ -609,6 +640,32 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: uiColors.actionDanger,
     fontWeight: '500',
+  },
+  loadModeRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  loadModeButton: {
+    flex: 1,
+    minHeight: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: uiColors.borderDefault,
+    borderRadius: 8,
+    backgroundColor: uiColors.surfaceDefault,
+    paddingHorizontal: 10,
+  },
+  loadModeButtonSelected: {
+    borderColor: uiColors.actionPrimary,
+    backgroundColor: uiColors.actionPrimarySubtleBg,
+  },
+  loadModeButtonText: {
+    color: uiColors.textSecondary,
+    fontWeight: '600',
+  },
+  loadModeButtonTextSelected: {
+    color: uiColors.actionPrimary,
   },
   pickerButton: {
     borderWidth: 1,

@@ -72,7 +72,7 @@ Brief entrypoint map of the current mobile screens.
   - in-route single gym editor owns private coordinate controls (`Save current location`, confirmation-gated replace, and confirmation-gated clear)
   - in-route exercise-tag add/manage modals (search/select/create, rename/delete/undelete, deleted-visibility toggle)
   - per-exercise collapsed-by-default `Past Records` bar below tags and above set rows; tapping expands inline loading/empty/error states plus metric label / selected record date / live `Current` / green `Max` rows for estimated `1RM`, volume, highest weight, and near-failure set count; left/right swipes anywhere on the expanded panel change the selected historical record, and max values derive from loaded records plus valid current metrics
-  - compact tap-to-edit set rows for normal and planned execution rows; appended historical/program targets support planned, matched, modified, skipped, and added states without replacing the existing recorder chrome; newly imported unperformed planned rows show initial `Log` / `Skip` controls without the right-side quality control until the user logs, edits, or skips the target, then later log/skip status changes use right-to-left swipe; tapping a planned/skipped target to edit hydrates the actual fields from the plan, matched/modified classification defaults to prescribed volume rather than quality, and removable user-added rows delete via right-to-left swipe rather than visible row remove buttons
+  - compact tap-to-edit set rows for normal and planned execution rows; editable weight fields label the scalar as `kg total` or `kg per side` from current exercise metadata; appended historical/program targets support planned, matched, modified, skipped, and added states without replacing the existing recorder chrome; newly imported unperformed planned rows show initial `Log` / `Skip` controls without the right-side quality control until the user logs, edits, or skips the target, then later log/skip status changes use right-to-left swipe; tapping a planned/skipped target to edit hydrates the actual fields from the plan, matched/modified classification defaults to prescribed volume rather than quality, and removable user-added rows delete via right-to-left swipe rather than visible row remove buttons
   - foreground GPS gym assistance is hidden on the recorder surface: brand-new active-session start may preselect one confident saved-gym match, null state displays as `No gym`, and long-pressing the gym box explicitly retries detection without a persistent suggestion panel
 - Key exits:
   - `exercise-catalog` (`source=session-recorder&intent=manage` from exercise picker)
@@ -81,7 +81,7 @@ Brief entrypoint map of the current mobile screens.
 5. `/exercise-catalog`
 - File: `apps/mobile/app/(tabs)/exercise-catalog.tsx`
 - Purpose:
-  - exercise catalog management (create/edit/soft-delete/undelete exercises and muscle mappings)
+  - exercise catalog management (create/edit/soft-delete/undelete exercises, load-entry mode, and muscle mappings)
 - Key states (high level):
   - loading / error / content
   - shared exercise-list content with local shared preferences for grouping/date range/recents, default grouped `90d` recents-on-top behavior, taxonomy-ordered collapsible muscle-family headers, text filtering across exercise names + primary muscle display/family terms that preserves collapsed/expanded group state, and per-row stats for the selected range

@@ -33,6 +33,7 @@ import { and, eq } from 'drizzle-orm';
 import { nowMonotonic, type Transaction } from './clock';
 import {
   CURRENT_APP_VERSION,
+  PER_SIDE_LOAD_SEED_IDS,
   readSeedsAppliedMarker,
 } from './exercise-catalog-seeds';
 import { exerciseDefinitions, syncRuntimeState } from './schema';
@@ -66,6 +67,12 @@ export interface BundleMigrationRepo {
    * "untouched-by-the-user" signal.
    */
   reviseExerciseDefinitionName(id: string, fromName: string, toName: string): void;
+
+  reviseExerciseDefinitionLoadInputMode(
+    id: string,
+    fromMode: 'total_load' | 'per_side_load',
+    toMode: 'total_load' | 'per_side_load'
+  ): void;
 
   /**
    * Inserts an exercise-definition seed iff a row with that id is not already
@@ -101,7 +108,16 @@ export interface BundleMigration {
  * change appends one entry here, keyed to the generation it bumps
  * {@link CURRENT_APP_VERSION} to, with an idempotent `apply`.
  */
-export const BUNDLE_MIGRATIONS: readonly BundleMigration[] = [];
+export const BUNDLE_MIGRATIONS: readonly BundleMigration[] = [
+  {
+    appVersion: 2,
+    apply(repo) {
+      for (const id of PER_SIDE_LOAD_SEED_IDS) {
+        repo.reviseExerciseDefinitionLoadInputMode(id, 'total_load', 'per_side_load');
+      }
+    },
+  },
+];
 
 /**
  * Test-only override of the migration list the loop runs against. `null` (the
@@ -163,6 +179,20 @@ const createBundleMigrationRepo = (tx: Transaction): BundleMigrationRepo => ({
       // already revised) and a user-renamed row both fail this predicate and
       // are left untouched.
       .where(and(eq(exerciseDefinitions.id, id), eq(exerciseDefinitions.name, fromName)))
+      .run();
+  },
+  reviseExerciseDefinitionLoadInputMode: (id, fromMode, toMode) => {
+    const stampMs = nowMonotonic(tx);
+    tx.update(exerciseDefinitions)
+      .set({
+        loadInputMode: toMode,
+        updatedAt: new Date(),
+        localDirty: true,
+        localUpdatedAtMs: stampMs,
+      })
+      .where(
+        and(eq(exerciseDefinitions.id, id), eq(exerciseDefinitions.loadInputMode, fromMode))
+      )
       .run();
   },
   insertExerciseDefinitionIfAbsent: ({ id, name }) => {

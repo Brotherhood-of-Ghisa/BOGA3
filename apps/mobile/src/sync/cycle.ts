@@ -491,6 +491,7 @@ const ENTITY_FIELDS: Record<EntityTableName, FieldSpec[]> = {
   ],
   exercise_definitions: [
     SC('name', 'name'),
+    SC('load_input_mode', 'loadInputMode'),
     TS('created_at', 'createdAt'),
     TS('updated_at', 'updatedAt'),
     TS('deleted_at', 'deletedAt'),
@@ -644,6 +645,14 @@ export const wireToEntity = (envelope: WireEntity, type: EntityTableName): Entit
     localUpdatedAtMs: envelope.client_updated_at_ms,
   };
   for (const spec of ENTITY_FIELDS[type]) {
+    if (
+      type === 'exercise_definitions' &&
+      spec.wireKey === 'load_input_mode' &&
+      envelope.fields[spec.wireKey] === undefined
+    ) {
+      values[spec.prop] = 'total_load';
+      continue;
+    }
     values[spec.prop] = fromWireValue(envelope.fields[spec.wireKey] ?? null, spec.kind);
   }
   return values;
