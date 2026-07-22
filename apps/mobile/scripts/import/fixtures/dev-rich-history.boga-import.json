@@ -1614,8 +1614,10 @@
     "halveWeightExercises": [
       "Alternating Dumbbell Curls",
       "Alternating Incline Dumbbell Curls",
+      "Arnold Presses",
       "Ball Dumbbell Chest Press",
       "Bent-Over Dumbbell Lateral Raises",
+      "Cable Flys",
       "Dumbbell Bench Presses",
       "Dumbbell Curls",
       "Dumbbell Curls (rotated)",
@@ -1626,13 +1628,12 @@
       "Dumbbell Twist Curls",
       "Dumbbell Wrist Curls",
       "Dumbbells Reverse Fly",
+      "High Cable Flys",
       "Incline Dumbbell Bench Presses",
       "Incline Dumbbell Curls",
       "Reverse Dumbbell Wrist Curls",
-      "Standing Dumbbell Presses",
-      "Cable Flys",
-      "High Cable Flys",
-      "Reverse High Cable Flys"
+      "Reverse High Cable Flys",
+      "Standing Dumbbell Presses"
     ]
   },
   "exerciseDecisions": [
@@ -55402,7 +55403,7 @@
             {
               "orderIndex": 0,
               "repsValue": "10",
-              "weightValue": "25",
+              "weightValue": "12.5",
               "setType": "warm_up",
               "source": {
                 "rowIndex": 506,
@@ -55412,14 +55413,16 @@
                 "type": "default",
                 "targetRegion": "Shoulders",
                 "targetMusclesPrimary": "Shoulders",
-                "targetMusclesSecondary": "Pectorals, Arm extensors"
+                "targetMusclesSecondary": "Pectorals, Arm extensors",
+                "weightLoggedKg": "25",
+                "weightAdjustment": "two_sided_halved"
               },
               "warnings": []
             },
             {
               "orderIndex": 1,
               "repsValue": "8",
-              "weightValue": "25",
+              "weightValue": "12.5",
               "setType": null,
               "source": {
                 "rowIndex": 507,
@@ -55429,14 +55432,16 @@
                 "type": "default",
                 "targetRegion": "Shoulders",
                 "targetMusclesPrimary": "Shoulders",
-                "targetMusclesSecondary": "Pectorals, Arm extensors"
+                "targetMusclesSecondary": "Pectorals, Arm extensors",
+                "weightLoggedKg": "25",
+                "weightAdjustment": "two_sided_halved"
               },
               "warnings": []
             },
             {
               "orderIndex": 2,
               "repsValue": "8",
-              "weightValue": "25",
+              "weightValue": "12.5",
               "setType": "rir_2",
               "source": {
                 "rowIndex": 508,
@@ -55446,7 +55451,9 @@
                 "type": "default",
                 "targetRegion": "Shoulders",
                 "targetMusclesPrimary": "Shoulders",
-                "targetMusclesSecondary": "Pectorals, Arm extensors"
+                "targetMusclesSecondary": "Pectorals, Arm extensors",
+                "weightLoggedKg": "25",
+                "weightAdjustment": "two_sided_halved"
               },
               "warnings": []
             }
@@ -56553,7 +56560,7 @@
             {
               "orderIndex": 0,
               "repsValue": "10",
-              "weightValue": "25",
+              "weightValue": "12.5",
               "setType": "warm_up",
               "source": {
                 "rowIndex": 448,
@@ -56563,14 +56570,16 @@
                 "type": "default",
                 "targetRegion": "Shoulders",
                 "targetMusclesPrimary": "Shoulders",
-                "targetMusclesSecondary": "Pectorals, Arm extensors"
+                "targetMusclesSecondary": "Pectorals, Arm extensors",
+                "weightLoggedKg": "25",
+                "weightAdjustment": "two_sided_halved"
               },
               "warnings": []
             },
             {
               "orderIndex": 1,
               "repsValue": "10",
-              "weightValue": "25",
+              "weightValue": "12.5",
               "setType": null,
               "source": {
                 "rowIndex": 449,
@@ -56580,14 +56589,16 @@
                 "type": "default",
                 "targetRegion": "Shoulders",
                 "targetMusclesPrimary": "Shoulders",
-                "targetMusclesSecondary": "Pectorals, Arm extensors"
+                "targetMusclesSecondary": "Pectorals, Arm extensors",
+                "weightLoggedKg": "25",
+                "weightAdjustment": "two_sided_halved"
               },
               "warnings": []
             },
             {
               "orderIndex": 2,
               "repsValue": "10",
-              "weightValue": "25",
+              "weightValue": "12.5",
               "setType": "rir_2",
               "source": {
                 "rowIndex": 450,
@@ -56597,7 +56608,9 @@
                 "type": "default",
                 "targetRegion": "Shoulders",
                 "targetMusclesPrimary": "Shoulders",
-                "targetMusclesSecondary": "Pectorals, Arm extensors"
+                "targetMusclesSecondary": "Pectorals, Arm extensors",
+                "weightLoggedKg": "25",
+                "weightAdjustment": "two_sided_halved"
               },
               "warnings": []
             }
@@ -57055,7 +57068,7 @@
             {
               "orderIndex": 0,
               "repsValue": "10",
-              "weightValue": "25",
+              "weightValue": "12.5",
               "setType": "warm_up",
               "source": {
                 "rowIndex": 431,
@@ -57065,14 +57078,16 @@
                 "type": "default",
                 "targetRegion": "Shoulders",
                 "targetMusclesPrimary": "Shoulders",
-                "targetMusclesSecondary": "Pectorals, Arm extensors"
+                "targetMusclesSecondary": "Pectorals, Arm extensors",
+                "weightLoggedKg": "25",
+                "weightAdjustment": "two_sided_halved"
               },
               "warnings": []
             },
             {
               "orderIndex": 1,
               "repsValue": "10",
-              "weightValue": "25",
+              "weightValue": "12.5",
               "setType": null,
               "source": {
                 "rowIndex": 432,
@@ -57082,14 +57097,16 @@
                 "type": "default",
                 "targetRegion": "Shoulders",
                 "targetMusclesPrimary": "Shoulders",
-                "targetMusclesSecondary": "Pectorals, Arm extensors"
+                "targetMusclesSecondary": "Pectorals, Arm extensors",
+                "weightLoggedKg": "25",
+                "weightAdjustment": "two_sided_halved"
               },
               "warnings": []
             },
             {
               "orderIndex": 2,
               "repsValue": "10",
-              "weightValue": "25",
+              "weightValue": "12.5",
               "setType": "rir_2",
               "source": {
                 "rowIndex": 433,
@@ -57099,7 +57116,9 @@
                 "type": "default",
                 "targetRegion": "Shoulders",
                 "targetMusclesPrimary": "Shoulders",
-                "targetMusclesSecondary": "Pectorals, Arm extensors"
+                "targetMusclesSecondary": "Pectorals, Arm extensors",
+                "weightLoggedKg": "25",
+                "weightAdjustment": "two_sided_halved"
               },
               "warnings": []
             }
@@ -57764,7 +57783,7 @@
             {
               "orderIndex": 0,
               "repsValue": "10",
-              "weightValue": "24",
+              "weightValue": "12",
               "setType": "warm_up",
               "source": {
                 "rowIndex": 391,
@@ -57774,14 +57793,16 @@
                 "type": "default",
                 "targetRegion": "Shoulders",
                 "targetMusclesPrimary": "Shoulders",
-                "targetMusclesSecondary": "Pectorals, Arm extensors"
+                "targetMusclesSecondary": "Pectorals, Arm extensors",
+                "weightLoggedKg": "24",
+                "weightAdjustment": "two_sided_halved"
               },
               "warnings": []
             },
             {
               "orderIndex": 1,
               "repsValue": "10",
-              "weightValue": "24",
+              "weightValue": "12",
               "setType": null,
               "source": {
                 "rowIndex": 392,
@@ -57791,14 +57812,16 @@
                 "type": "default",
                 "targetRegion": "Shoulders",
                 "targetMusclesPrimary": "Shoulders",
-                "targetMusclesSecondary": "Pectorals, Arm extensors"
+                "targetMusclesSecondary": "Pectorals, Arm extensors",
+                "weightLoggedKg": "24",
+                "weightAdjustment": "two_sided_halved"
               },
               "warnings": []
             },
             {
               "orderIndex": 2,
               "repsValue": "10",
-              "weightValue": "28",
+              "weightValue": "14",
               "setType": "rir_2",
               "source": {
                 "rowIndex": 393,
@@ -57808,14 +57831,16 @@
                 "type": "default",
                 "targetRegion": "Shoulders",
                 "targetMusclesPrimary": "Shoulders",
-                "targetMusclesSecondary": "Pectorals, Arm extensors"
+                "targetMusclesSecondary": "Pectorals, Arm extensors",
+                "weightLoggedKg": "28",
+                "weightAdjustment": "two_sided_halved"
               },
               "warnings": []
             },
             {
               "orderIndex": 3,
               "repsValue": "10",
-              "weightValue": "28",
+              "weightValue": "14",
               "setType": "rir_1",
               "source": {
                 "rowIndex": 394,
@@ -57825,7 +57850,9 @@
                 "type": "default",
                 "targetRegion": "Shoulders",
                 "targetMusclesPrimary": "Shoulders",
-                "targetMusclesSecondary": "Pectorals, Arm extensors"
+                "targetMusclesSecondary": "Pectorals, Arm extensors",
+                "weightLoggedKg": "28",
+                "weightAdjustment": "two_sided_halved"
               },
               "warnings": []
             }
@@ -60434,7 +60461,7 @@
             {
               "orderIndex": 0,
               "repsValue": "10",
-              "weightValue": "25",
+              "weightValue": "12.5",
               "setType": "warm_up",
               "source": {
                 "rowIndex": 277,
@@ -60444,14 +60471,16 @@
                 "type": "default",
                 "targetRegion": "Shoulders",
                 "targetMusclesPrimary": "Shoulders",
-                "targetMusclesSecondary": "Pectorals, Arm extensors"
+                "targetMusclesSecondary": "Pectorals, Arm extensors",
+                "weightLoggedKg": "25",
+                "weightAdjustment": "two_sided_halved"
               },
               "warnings": []
             },
             {
               "orderIndex": 1,
               "repsValue": "8",
-              "weightValue": "25",
+              "weightValue": "12.5",
               "setType": null,
               "source": {
                 "rowIndex": 278,
@@ -60461,7 +60490,9 @@
                 "type": "default",
                 "targetRegion": "Shoulders",
                 "targetMusclesPrimary": "Shoulders",
-                "targetMusclesSecondary": "Pectorals, Arm extensors"
+                "targetMusclesSecondary": "Pectorals, Arm extensors",
+                "weightLoggedKg": "25",
+                "weightAdjustment": "two_sided_halved"
               },
               "warnings": []
             }
@@ -61952,7 +61983,7 @@
             {
               "orderIndex": 0,
               "repsValue": "9",
-              "weightValue": "25",
+              "weightValue": "12.5",
               "setType": "warm_up",
               "source": {
                 "rowIndex": 206,
@@ -61962,14 +61993,16 @@
                 "type": "default",
                 "targetRegion": "Shoulders",
                 "targetMusclesPrimary": "Shoulders",
-                "targetMusclesSecondary": "Pectorals, Arm extensors"
+                "targetMusclesSecondary": "Pectorals, Arm extensors",
+                "weightLoggedKg": "25",
+                "weightAdjustment": "two_sided_halved"
               },
               "warnings": []
             },
             {
               "orderIndex": 1,
               "repsValue": "10",
-              "weightValue": "25",
+              "weightValue": "12.5",
               "setType": null,
               "source": {
                 "rowIndex": 207,
@@ -61979,14 +62012,16 @@
                 "type": "default",
                 "targetRegion": "Shoulders",
                 "targetMusclesPrimary": "Shoulders",
-                "targetMusclesSecondary": "Pectorals, Arm extensors"
+                "targetMusclesSecondary": "Pectorals, Arm extensors",
+                "weightLoggedKg": "25",
+                "weightAdjustment": "two_sided_halved"
               },
               "warnings": []
             },
             {
               "orderIndex": 2,
               "repsValue": "9",
-              "weightValue": "28",
+              "weightValue": "14",
               "setType": "rir_2",
               "source": {
                 "rowIndex": 208,
@@ -61996,7 +62031,9 @@
                 "type": "default",
                 "targetRegion": "Shoulders",
                 "targetMusclesPrimary": "Shoulders",
-                "targetMusclesSecondary": "Pectorals, Arm extensors"
+                "targetMusclesSecondary": "Pectorals, Arm extensors",
+                "weightLoggedKg": "28",
+                "weightAdjustment": "two_sided_halved"
               },
               "warnings": []
             }
@@ -65693,7 +65730,7 @@
             {
               "orderIndex": 0,
               "repsValue": "6",
-              "weightValue": "20",
+              "weightValue": "10",
               "setType": "warm_up",
               "source": {
                 "rowIndex": 41,
@@ -65703,14 +65740,16 @@
                 "type": "default",
                 "targetRegion": "Shoulders",
                 "targetMusclesPrimary": "Shoulders",
-                "targetMusclesSecondary": "Pectorals, Arm extensors"
+                "targetMusclesSecondary": "Pectorals, Arm extensors",
+                "weightLoggedKg": "20",
+                "weightAdjustment": "two_sided_halved"
               },
               "warnings": []
             },
             {
               "orderIndex": 1,
               "repsValue": "6",
-              "weightValue": "20",
+              "weightValue": "10",
               "setType": null,
               "source": {
                 "rowIndex": 42,
@@ -65720,14 +65759,16 @@
                 "type": "default",
                 "targetRegion": "Shoulders",
                 "targetMusclesPrimary": "Shoulders",
-                "targetMusclesSecondary": "Pectorals, Arm extensors"
+                "targetMusclesSecondary": "Pectorals, Arm extensors",
+                "weightLoggedKg": "20",
+                "weightAdjustment": "two_sided_halved"
               },
               "warnings": []
             },
             {
               "orderIndex": 2,
               "repsValue": "8",
-              "weightValue": "20",
+              "weightValue": "10",
               "setType": "rir_2",
               "source": {
                 "rowIndex": 43,
@@ -65737,14 +65778,16 @@
                 "type": "default",
                 "targetRegion": "Shoulders",
                 "targetMusclesPrimary": "Shoulders",
-                "targetMusclesSecondary": "Pectorals, Arm extensors"
+                "targetMusclesSecondary": "Pectorals, Arm extensors",
+                "weightLoggedKg": "20",
+                "weightAdjustment": "two_sided_halved"
               },
               "warnings": []
             },
             {
               "orderIndex": 3,
               "repsValue": "10",
-              "weightValue": "20",
+              "weightValue": "10",
               "setType": "rir_1",
               "source": {
                 "rowIndex": 44,
@@ -65754,7 +65797,9 @@
                 "type": "default",
                 "targetRegion": "Shoulders",
                 "targetMusclesPrimary": "Shoulders",
-                "targetMusclesSecondary": "Pectorals, Arm extensors"
+                "targetMusclesSecondary": "Pectorals, Arm extensors",
+                "weightLoggedKg": "20",
+                "weightAdjustment": "two_sided_halved"
               },
               "warnings": []
             }
@@ -66691,7 +66736,7 @@
       "notesPreserved": 23,
       "unresolvedExercises": 0,
       "durationWarnings": 80,
-      "weightsHalvedSets": 460
+      "weightsHalvedSets": 482
     },
     "unresolvedExercises": [],
     "weightHalvedExercises": [
@@ -66702,6 +66747,10 @@
       {
         "sourceExerciseName": "Alternating Incline Dumbbell Curls",
         "setCount": 1
+      },
+      {
+        "sourceExerciseName": "Arnold Presses",
+        "setCount": 22
       },
       {
         "sourceExerciseName": "Ball Dumbbell Chest Press",
