@@ -138,7 +138,7 @@ Document app-specific UI semantics and guardrails for the current mobile app.
     - the panel starts collapsed as a slim `Past Records` bar; tapping the bar expands it, and tapping the expanded header collapses it again without a separate Hide/Show button,
     - if a set row is editable, the first tap on the `Past Records` bar only collapses that row; a second tap opens the panel,
     - all available completed, non-deleted history for the exercise is loaded by default; optional numeric limits remain a repository/test hook, not the recorder default,
-    - the most recent completed-session block is shown first when expanded, and swiping left/right on the expanded panel changes the selected historical record,
+    - the most recent completed-session block is shown first when expanded; swiping right selects an older record and swiping left selects a newer record,
     - the expanded comparison uses four table-like rows (`Est. 1RM`, `Volume`, `Highest`, `Near failure`) with columns for metric label, selected record local date (`YYYY-MM-DD`), live `Current`, and `Max`,
     - `Max` values are computed from the same loaded records the panel can swipe through plus valid current-session metrics; there is no separate all-time query or hidden max scope,
     - displayed non-empty `Max` values use `uiColors.heatmapBucket4`,
