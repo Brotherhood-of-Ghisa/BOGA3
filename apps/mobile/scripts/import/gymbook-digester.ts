@@ -114,6 +114,7 @@ const DEFAULT_SHORT_SESSION_THRESHOLD_MINUTES = 30;
 const DEFAULT_SHORT_SESSION_DURATION_MINUTES = 60;
 const DEFAULT_LONG_SESSION_WARNING_MINUTES = 90;
 const SOURCE_APP = 'GymBook';
+export const DEFAULT_TWO_SIDED_TOTAL_WEIGHT_EXERCISES = ['Arnold Presses'] as const;
 
 const warning = (code: string, message: string, severity: BogaImportWarning['severity'] = 'warning') => ({
   code,
@@ -490,7 +491,9 @@ export const digestGymBookExport = (xml: string, options: DigestGymBookOptions):
   if (dateStartLocal && dateEndLocal && dateStartLocal >= dateEndLocal) {
     throw new Error('dateStartLocal must be before dateEndLocal');
   }
-  const halveWeightExercises = [...new Set(options.halveWeightExercises ?? [])].sort((a, b) => a.localeCompare(b));
+  const halveWeightExercises = [
+    ...new Set([...DEFAULT_TWO_SIDED_TOTAL_WEIGHT_EXERCISES, ...(options.halveWeightExercises ?? [])]),
+  ].sort((a, b) => a.localeCompare(b));
   const halveWeightExerciseNames = new Set(halveWeightExercises.map(normalizeExerciseName));
 
   if (options.importingProfileLabel.trim() === '') {
