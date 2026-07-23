@@ -116,8 +116,8 @@ or:
 Sets use BOGA-ready string values:
 
 - `repsValue`: source reps as a string.
-- `weightValue`: kg numeric text with the unit stripped, or empty string for
-  bodyweight/reps-only sets.
+- `weightValue`: kg numeric text with the unit stripped. GymBook sets with no
+  source weight, including bodyweight/reps-only sets, are imported as `0`.
 - `setType`: `null`, `warm_up`, `rir_2`, `rir_1`, or `rir_0`. Imported
   packages may leave this as `null`, or may classify historical effort when the
   source data is good enough. Source set-type text is preserved under
@@ -141,7 +141,8 @@ Non-empty source notes are preserved under set `source.note` and summarized in
   effort.
 - Weight normalization halves GymBook total-weight entries for exercises that
   BOGA logs per implement. `Arnold Presses` are treated as a two-dumbbell
-  total-weight exercise; `One-Arm Arnold Presses` are not halved.
+  total-weight exercise; `Low Cable Flys` are treated as a bilateral cable total
+  weight; `One-Arm Arnold Presses` and `Ball Dumbbell Pullovers` are not halved.
 - Exact exercise-name matches against the target catalog map automatically.
 - Missing exercises require an explicit decision file or draft mode.
 - Gym bucket choices must be explicit: midday, weekday evening, and weekend;
