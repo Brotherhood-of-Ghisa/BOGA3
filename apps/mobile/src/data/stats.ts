@@ -257,7 +257,6 @@ export const createDrizzleStatsStore = (): StatsStore => ({
               exerciseDefinitionId: exerciseMuscleMappings.exerciseDefinitionId,
               muscleGroupId: exerciseMuscleMappings.muscleGroupId,
               role: exerciseMuscleMappings.role,
-              weight: exerciseMuscleMappings.weight,
             })
             .from(exerciseMuscleMappings)
             .where(

@@ -28,7 +28,6 @@ describe('per-side load semantics', () => {
             exerciseDefinitionId: 'bench',
             muscleGroupId: 'chest_sternal',
             role: 'primary',
-            weight: 1,
           },
         ],
       }),
@@ -54,7 +53,7 @@ describe('per-side load semantics', () => {
     expect(contributionFor('per_side_load', '22')).toBe(22);
   });
 
-  it('applies the persisted mapping weight after per-side normalization', () => {
+  it('uses the role factor after per-side normalization, ignoring legacy mapping weight', () => {
     const input = buildAnalyticsInput({
       exerciseDefinitions: [{ id: 'ex-press', loadInputMode: 'total_load' }],
       muscleMappings: [
@@ -70,7 +69,8 @@ describe('per-side load semantics', () => {
       muscleGroupIds: ['chest_sternal'],
       timeZone: 'Europe/London',
     });
-    expect(entries[0]?.contributions[0]?.weightedVolume).toBe(125);
+    expect(entries[0]?.contributions[0]?.weightedVolume).toBe(250);
+    expect(entries[0]?.contributions[0]?.roleWeight).toBe(0.5);
   });
 });
 

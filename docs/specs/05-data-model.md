@@ -202,11 +202,13 @@ section states only the data-model-level invariants.
 8. Gym coordinate fields are either all null or all non-null. Valid ranges are latitude `-90..90`, longitude `-180..180`, accuracy `>= 0`, and non-negative `coordinates_updated_at` epoch milliseconds. Clearing saved coordinates sets all four coordinate fields to null. These ranges are client-enforced — the server runs no validation (contract §A.1).
 9. Muscle volume is recomputed per side from current exercise metadata. Each
    valid set starts with entered volume (`weight × reps`), halves that base for
-   `total_load`, preserves it for `per_side_load`, then multiplies by
-   `exercise_muscle_mappings.weight`. Null-role and stabilizer mappings do not
-   contribute. One-arm/one-leg rows imply both sides were performed in v1.
-   Exercise history, records, highest weight, and estimated 1RM remain based on
-   the entered scalar and do not use per-side normalization.
+   `total_load`, preserves it for `per_side_load`, then multiplies by the
+   mapping role factor: `1` for primary and `0.5` for secondary. Persisted
+   `exercise_muscle_mappings.weight` does not alter this calculation; null-role
+   and stabilizer mappings do not contribute. One-arm/one-leg rows imply both
+   sides were performed in v1. Exercise history, records, highest weight, and
+   estimated 1RM remain based on the entered scalar and do not use per-side
+   normalization or muscle-role factors.
 
 ### Wire envelope (Sync v2)
 

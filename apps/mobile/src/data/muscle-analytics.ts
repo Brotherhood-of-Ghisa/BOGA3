@@ -31,6 +31,7 @@ export type MuscleAnalyticsInput = {
     exerciseDefinitionId: string;
     muscleGroupId: string;
     role: MuscleContributionRole;
+    /** Persisted for compatibility; muscle analytics derives its factor from role. */
     weight?: number;
   }[];
   muscleGroups: {
@@ -192,9 +193,8 @@ export const collectMuscleSetContributions = (
     );
 
     for (const mapping of mappings) {
-      if (mapping.role === null || mapping.role === 'stabilizer') continue;
-      const roleWeight = mapping.weight ?? getMuscleContributionRoleWeight(mapping.role);
-      if (!Number.isFinite(roleWeight) || roleWeight <= 0) continue;
+      const roleWeight = getMuscleContributionRoleWeight(mapping.role);
+      if (roleWeight === 0) continue;
 
       contributions.push({
         muscleGroupId: mapping.muscleGroupId,

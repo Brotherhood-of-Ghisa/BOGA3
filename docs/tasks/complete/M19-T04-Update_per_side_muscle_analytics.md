@@ -54,8 +54,8 @@ docs_touched: "docs/specs/05-data-model.md"
 ## Objective
 
 Update muscle-level analytics so every completed set contributes per-side
-volume using resolved exercise load-entry semantics and
-`exercise_muscle_mappings.weight`, while exercise-level history and record
+volume using resolved exercise load-entry semantics and the fixed mapping role
+factor (`primary = 1`, `secondary = 0.5`), while exercise-level history and record
 panels keep entered-load semantics.
 
 ## Scope
@@ -66,10 +66,10 @@ panels keep entered-load semantics.
 - Compute per-side muscle base volume as:
   - `weight * reps / 2` when mode is `total_load`
   - `weight * reps` when mode is `per_side_load`
-- Apply `exercise_muscle_mappings.weight` after the per-side base volume is computed.
+- Apply factor `1` for primary mappings and `0.5` for secondary mappings after the per-side base volume is computed; persisted mapping weight does not alter muscle volume.
 - Keep null-role and stabilizer mappings excluded from muscle volume totals unless the current source-of-truth says otherwise.
 - Recompute existing completed history from current exercise metadata.
-- Add tests for the barbell bench, dumbbell bench, combined chest, single-dumbbell pullover, one-arm row, secondary mapping weight, and stabilizer/null exclusion examples.
+- Add tests for the barbell bench, dumbbell bench, combined chest, single-dumbbell pullover, one-arm row, fixed primary/secondary role factors, and stabilizer/null exclusion examples.
 
 ### Out of scope
 
@@ -89,9 +89,9 @@ panels keep entered-load semantics.
 1. Barbell bench `45 kg x 1` with primary chest mapping contributes `22.5` per-side chest volume.
 2. Two-dumbbell bench `22 kg x 1` with primary chest mapping contributes `22` per-side chest volume.
 3. Combining those sets reports `44.5` per-side chest volume.
-4. Single-dumbbell two-arm pullover `22 kg x 1` resolves as `total_load` and contributes `11` per side before mapping weight.
+4. Single-dumbbell two-arm pullover `22 kg x 1` resolves as `total_load` and contributes `11` per side before the role factor.
 5. One-arm dumbbell row `22 kg x 1` resolves as `per_side_load` and contributes `22` to each side in v1.
-6. Secondary mappings multiply the per-side base by `exercise_muscle_mappings.weight`.
+6. Primary mappings multiply the per-side base by `1`; secondary mappings multiply it by `0.5`, regardless of persisted mapping weight.
 7. Existing per-exercise history and record tests continue to prove entered-load volume.
 
 ## Docs touched
