@@ -79,6 +79,7 @@ describe('M6 exercise catalog seeds', () => {
 
     for (const id of [
       'seed_arnold_presses',
+      'seed_landmine_press',
       'seed_cable_flys',
       'seed_incline_cable_bench_presses',
       'seed_triceps_kickbacks',

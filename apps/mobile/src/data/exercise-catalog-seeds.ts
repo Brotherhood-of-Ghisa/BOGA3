@@ -817,6 +817,7 @@ export const PER_SIDE_LOAD_SEED_IDS = new Set<string>([
   'seed_low_cable_one-arm_lateral_raises',
   'seed_arnold_presses',
   'seed_standing_dumbbell_presses',
+  'seed_landmine_press',
   'seed_cable_flys',
   'seed_decline_dumbbell_flys',
   'seed_incline_dumbbell_flys',
