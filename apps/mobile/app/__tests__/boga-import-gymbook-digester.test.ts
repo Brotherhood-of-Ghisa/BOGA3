@@ -15,6 +15,7 @@ const catalog = {
     { id: 'seed_ball_dumbbell_pullovers', name: 'Ball Dumbbell Pullovers' },
     { id: 'seed_low_cable_flys', name: 'Low Cable Flys' },
     { id: 'seed_one_arm_arnold_presses', name: 'One-Arm Arnold Presses' },
+    { id: 'seed_push_ups', name: 'Push Ups' },
   ],
   gyms: [],
 };
@@ -42,6 +43,7 @@ describe('GymBook import digester', () => {
         ${logRow('One-Arm Arnold Presses', '12.00 kg', '12:05')}
         ${logRow('Low Cable Flys', '28.00 kg', '12:10')}
         ${logRow('Ball Dumbbell Pullovers', '16.00 kg', '12:15')}
+        ${logRow('Push Ups', '', '12:20')}
       </logs>`,
       {
         importingProfileLabel: 'test',
@@ -60,6 +62,7 @@ describe('GymBook import digester', () => {
     const pullover = pkg.sessions[0].exercises.find(
       (exercise) => exercise.sourceExerciseName === 'Ball Dumbbell Pullovers'
     );
+    const pushUps = pkg.sessions[0].exercises.find((exercise) => exercise.sourceExerciseName === 'Push Ups');
 
     expect(DEFAULT_TWO_SIDED_TOTAL_WEIGHT_EXERCISES).toContain('Arnold Presses');
     expect(DEFAULT_TWO_SIDED_TOTAL_WEIGHT_EXERCISES).toContain('Low Cable Flys');
@@ -83,6 +86,8 @@ describe('GymBook import digester', () => {
     expect(oneArm?.sets[0].source.weightAdjustment).toBeUndefined();
     expect(pullover?.sets[0].weightValue).toBe('16');
     expect(pullover?.sets[0].source.weightAdjustment).toBeUndefined();
+    expect(pushUps?.sets[0].weightValue).toBe('0');
+    expect(pushUps?.sets[0].source.weightAdjustment).toBeUndefined();
     expect(pkg.report.counts.weightsHalvedSets).toBe(2);
     expect(pkg.report.weightHalvedExercises).toEqual([
       { sourceExerciseName: 'Arnold Presses', setCount: 1 },

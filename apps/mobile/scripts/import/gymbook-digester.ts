@@ -238,7 +238,7 @@ const normalizeWeightValue = (
 } => {
   const normalized = weight.replace(/[\u00A0\u202F]/g, ' ').trim();
   if (normalized === '') {
-    return { value: '', warnings: [] };
+    return { value: '0', warnings: [] };
   }
   const match = /^(-?\d+(?:\.\d+)?)\s*([a-zA-Z]*)$/.exec(normalized);
   if (!match) {
