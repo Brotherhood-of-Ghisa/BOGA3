@@ -76,6 +76,32 @@ describe('M6 exercise catalog seeds', () => {
     expect(mode('seed_dumbbell_bench_press')).toBe('per_side_load');
     expect(mode('seed_dumbbell_one-arm_rows')).toBe('per_side_load');
     expect(mode('seed_incline_dumbbell_pullover')).toBe('total_load');
+
+    for (const id of [
+      'seed_arnold_presses',
+      'seed_cable_flys',
+      'seed_incline_cable_bench_presses',
+      'seed_triceps_kickbacks',
+      'seed_concentration_curls',
+      'seed_hammer_curl',
+      'seed_high_cable_curls',
+      'seed_cable_hip_abductions',
+      'seed_single_leg_romanian_deadlift',
+      'seed_bulgarian_split_squat',
+      'seed_standing_leg_curls',
+    ]) {
+      expect(mode(id)).toBe('per_side_load');
+    }
+
+    for (const id of [
+      'seed_barbell_back_squat',
+      'seed_pull_up',
+      'seed_push_up',
+      'seed_incline_dumbbell_pullover',
+      'seed_dumbbell_goblet_squats',
+    ]) {
+      expect(mode(id)).toBe('total_load');
+    }
   });
 
   it('ships a valid pruned default seed bundle and summary', () => {
