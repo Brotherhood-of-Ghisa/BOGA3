@@ -33,8 +33,14 @@ begin
     revised,
     'set name                 = excluded.name,
             created_at',
+    -- The coalesced EXCLUDED value supplies the insert default for pre-M19
+    -- clients. On conflict, only a payload that actually carried the new key
+    -- may replace an existing mode.
     'set name                 = excluded.name,
-            load_input_mode      = excluded.load_input_mode,
+            load_input_mode      = case
+              when _fields ? ''load_input_mode'' then excluded.load_input_mode
+              else app_public.exercise_definitions.load_input_mode
+            end,
             created_at'
   );
   if revised = definition then

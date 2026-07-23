@@ -295,6 +295,7 @@ export const createDrizzleExerciseCatalogStore = (): ExerciseCatalogStore => ({
       .select({
         id: exerciseDefinitions.id,
         name: exerciseDefinitions.name,
+        loadInputMode: exerciseDefinitions.loadInputMode,
         deletedAt: exerciseDefinitions.deletedAt,
       })
       .from(exerciseDefinitions)
@@ -416,6 +417,7 @@ export const createExerciseCatalogRepository = (store: ExerciseCatalogStore = cr
       return store.saveExercise({
         id: input.id,
         name,
+        loadInputMode: input.loadInputMode,
         mappings: normalizedMappings,
         now,
       });

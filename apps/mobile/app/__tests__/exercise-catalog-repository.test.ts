@@ -23,6 +23,7 @@ describe('exercise catalog repository', () => {
     store.saveExercise.mockResolvedValue({
       id: 'exercise-1',
       name: 'Custom Press',
+      loadInputMode: 'per_side_load',
       deletedAt: null,
       mappings: [
         { id: 'map-1', muscleGroupId: 'chest', weight: 1, role: 'primary' },
@@ -32,6 +33,7 @@ describe('exercise catalog repository', () => {
 
     const saved = await repository.saveExercise({
       name: '  Custom Press  ',
+      loadInputMode: 'per_side_load',
       mappings: [
         { muscleGroupId: 'chest', weight: 1 },
         { muscleGroupId: 'triceps', weight: 0.5, role: null },
@@ -43,6 +45,7 @@ describe('exercise catalog repository', () => {
     expect(store.saveExercise).toHaveBeenCalledWith({
       id: undefined,
       name: 'Custom Press',
+      loadInputMode: 'per_side_load',
       mappings: [
         { muscleGroupId: 'chest', weight: 1, role: 'primary' },
         { muscleGroupId: 'triceps', weight: 0.5, role: 'secondary' },

@@ -4,7 +4,7 @@ const mockOpenDatabaseSync = jest.fn();
 const mockDeleteDatabaseAsync = jest.fn();
 const mockDrizzle = jest.fn();
 const mockMigrate = jest.fn();
-const mockSeedSystemExerciseCatalog = jest.fn();
+const mockMaintainInfraFreeStarterCatalog = jest.fn();
 const mockInvalidateExerciseCatalogCache = jest.fn();
 const mockGetMobileAuthRuntimeConfig = jest.fn();
 const mockLogEvent = jest.fn();
@@ -22,8 +22,9 @@ jest.mock('drizzle-orm/expo-sqlite/migrator', () => ({
   migrate: (...args: unknown[]) => mockMigrate(...args),
 }));
 
-jest.mock('@/src/data/exercise-catalog-seeds', () => ({
-  seedSystemExerciseCatalog: (...args: unknown[]) => mockSeedSystemExerciseCatalog(...args),
+jest.mock('@/src/data/infra-free-catalog-bootstrap', () => ({
+  maintainInfraFreeStarterCatalog: (...args: unknown[]) =>
+    mockMaintainInfraFreeStarterCatalog(...args),
 }));
 
 jest.mock('@/src/auth/supabase', () => ({
@@ -80,7 +81,7 @@ describe('bootstrapLocalDataLayer', () => {
     mockDeleteDatabaseAsync.mockReset();
     mockDrizzle.mockReset();
     mockMigrate.mockReset();
-    mockSeedSystemExerciseCatalog.mockReset();
+    mockMaintainInfraFreeStarterCatalog.mockReset();
     mockInvalidateExerciseCatalogCache.mockReset();
     mockLogEvent.mockReset();
     mockLogEvent.mockResolvedValue(undefined);
@@ -115,7 +116,7 @@ describe('bootstrapLocalDataLayer', () => {
     // Sync-configured build: the first-sign-in bootstrapper owns the starter
     // catalog (which now includes muscle_groups), so boot must not seed it (a
     // reinstall recovers it from the server).
-    expect(mockSeedSystemExerciseCatalog).not.toHaveBeenCalled();
+    expect(mockMaintainInfraFreeStarterCatalog).not.toHaveBeenCalled();
   });
 
   it('logs and rethrows when SQLite foreign-key enforcement cannot be enabled', async () => {
@@ -232,7 +233,7 @@ describe('bootstrapLocalDataLayer', () => {
     mockDeleteDatabaseAsync.mockResolvedValue(undefined);
     mockDrizzle.mockReturnValueOnce(localDatabase).mockReturnValueOnce(resetLocalDatabase);
     mockMigrate.mockResolvedValue(undefined);
-    mockSeedSystemExerciseCatalog.mockReturnValue(undefined);
+    mockMaintainInfraFreeStarterCatalog.mockReturnValue(undefined);
 
     // A plain bootstrap must not touch the cache — invalidation only matters
     // once the DB is wiped and re-seeded out from under the in-memory snapshot.
@@ -244,9 +245,9 @@ describe('bootstrapLocalDataLayer', () => {
     // Reset invalidates exactly once, and only after the re-seed has run so the
     // subsequent reload observes the freshly seeded rows (not the wiped DB).
     expect(mockInvalidateExerciseCatalogCache).toHaveBeenCalledTimes(1);
-    expect(mockSeedSystemExerciseCatalog).toHaveBeenCalledTimes(2);
+    expect(mockMaintainInfraFreeStarterCatalog).toHaveBeenCalledTimes(2);
     expect(mockInvalidateExerciseCatalogCache.mock.invocationCallOrder[0]).toBeGreaterThan(
-      mockSeedSystemExerciseCatalog.mock.invocationCallOrder[1]
+      mockMaintainInfraFreeStarterCatalog.mock.invocationCallOrder[1]
     );
   });
 
@@ -359,17 +360,17 @@ describe('bootstrapLocalDataLayer', () => {
     mockOpenDatabaseSync.mockReturnValue(sqliteClient);
     mockDrizzle.mockReturnValue(localDatabase);
     mockMigrate.mockResolvedValue(undefined);
-    mockSeedSystemExerciseCatalog.mockReturnValue(undefined);
+    mockMaintainInfraFreeStarterCatalog.mockReturnValue(undefined);
 
     await bootstrapLocalDataLayer();
 
     // With no server to recover the catalog from, boot seeds the full starter
     // catalog — muscle_groups, exercise definitions, and mappings — via the
     // generic seeder (the picker would be empty otherwise).
-    expect(mockSeedSystemExerciseCatalog).toHaveBeenCalledTimes(1);
-    expect(mockSeedSystemExerciseCatalog).toHaveBeenCalledWith(localDatabase);
+    expect(mockMaintainInfraFreeStarterCatalog).toHaveBeenCalledTimes(1);
+    expect(mockMaintainInfraFreeStarterCatalog).toHaveBeenCalledWith(localDatabase);
     // The catalog seed runs after migrations have applied.
-    expect(mockSeedSystemExerciseCatalog.mock.invocationCallOrder[0]).toBeGreaterThan(
+    expect(mockMaintainInfraFreeStarterCatalog.mock.invocationCallOrder[0]).toBeGreaterThan(
       mockMigrate.mock.invocationCallOrder[0]
     );
   });
@@ -386,7 +387,7 @@ describe('bootstrapLocalDataLayer', () => {
     mockDeleteDatabaseAsync.mockResolvedValue(undefined);
     mockDrizzle.mockReturnValueOnce(localDatabase).mockReturnValueOnce(resetLocalDatabase);
     mockMigrate.mockResolvedValue(undefined);
-    mockSeedSystemExerciseCatalog.mockReturnValue(undefined);
+    mockMaintainInfraFreeStarterCatalog.mockReturnValue(undefined);
 
     await bootstrapLocalDataLayer();
     await resetLocalAppData();
@@ -395,7 +396,7 @@ describe('bootstrapLocalDataLayer', () => {
     // infra-free seed must run again against the freshly re-opened DB so the
     // exercise picker is populated after the reset — this is exactly the path the
     // data-runtime-smoke lane exercises.
-    expect(mockSeedSystemExerciseCatalog).toHaveBeenCalledTimes(2);
-    expect(mockSeedSystemExerciseCatalog).toHaveBeenLastCalledWith(resetLocalDatabase);
+    expect(mockMaintainInfraFreeStarterCatalog).toHaveBeenCalledTimes(2);
+    expect(mockMaintainInfraFreeStarterCatalog).toHaveBeenLastCalledWith(resetLocalDatabase);
   });
 });

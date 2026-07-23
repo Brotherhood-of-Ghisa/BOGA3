@@ -146,12 +146,21 @@ describe('there is no standalone muscle-group boot seed', () => {
     expect(catalogSeeds).toHaveProperty('seedSystemExerciseCatalog');
   });
 
-  it('routes the boot starter-catalog seed only through the generic catalog seeder', () => {
-    // The boot path seeds the whole starter catalog via `seedSystemExerciseCatalog`
-    // and nothing else — no separate every-boot muscle-group call.
+  it('routes the boot starter catalog through the infra-free seed-or-migrate dispatcher', () => {
+    // Bootstrap delegates the infra-free path to the dispatcher. That helper
+    // uses the generic full-catalog seeder for a first install and bundle
+    // migrations for existing installs; neither path introduces a standalone
+    // every-boot muscle-group seed.
     const bootstrapSource = readFileSync(join(DATA_DIR, 'bootstrap.ts'), 'utf8');
-    expect(bootstrapSource).toContain('seedSystemExerciseCatalog');
+    const dispatcherSource = readFileSync(
+      join(DATA_DIR, 'infra-free-catalog-bootstrap.ts'),
+      'utf8'
+    );
+    expect(bootstrapSource).toContain('maintainInfraFreeStarterCatalog');
+    expect(dispatcherSource).toContain('seedSystemExerciseCatalog');
+    expect(dispatcherSource).toContain('runBundleMigrations');
     expect(bootstrapSource).not.toMatch(/seedMuscleGroups/);
+    expect(dispatcherSource).not.toMatch(/seedMuscleGroups/);
   });
 });
 
