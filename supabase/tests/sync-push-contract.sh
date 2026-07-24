@@ -230,6 +230,7 @@ GYM_UNDELETE_ID="push-gym-undelete-${RUN_TAG}"
 GYM_CLAMP_ID="push-gym-clamp-${RUN_TAG}"
 GYM_CROSS_OWNER_ID="push-gym-cross-${RUN_TAG}"
 EXDEF_A_ID="push-exdef-a-${RUN_TAG}"
+EXDEF_COMPAT_ID="push-exdef-compat-${RUN_TAG}"
 SESSION_A_ID="push-session-a-${RUN_TAG}"
 SX_A_ID="push-sx-a-${RUN_TAG}"
 SX_ORPHAN_ID="push-sx-orphan-${RUN_TAG}"
@@ -304,7 +305,8 @@ PAYLOAD="$(jq -nc \
               completed_at: null, duration_sec: null,
               created_at: $now, updated_at: $now, deleted_at: null}},
     {type: "exercise_definitions", id: $exdef_id, client_updated_at_ms: $now,
-     fields: {name: "Bench Press", created_at: $now, updated_at: $now,
+     fields: {name: "Bench Press", load_input_mode: "per_side_load",
+              created_at: $now, updated_at: $now,
               deleted_at: null}}
   ]}')"
 sync_push "${USER_A_TOKEN}" "${PAYLOAD}"
@@ -312,8 +314,8 @@ assert_status "200" "multi-layer batch push"
 assert_json_expr '.ok == true' "multi-layer batch push ok=true"
 
 # Every row landed.
-service_select "exercise_definitions" "owner_user_id=eq.${USER_A_UUID}&id=eq.${EXDEF_A_ID}&select=id"
-assert_json_expr 'length == 1' "multi-layer: exercise_definition landed"
+service_select "exercise_definitions" "owner_user_id=eq.${USER_A_UUID}&id=eq.${EXDEF_A_ID}&select=id,load_input_mode"
+assert_json_expr 'length == 1 and .[0].load_input_mode == "per_side_load"' "multi-layer: exercise_definition load mode landed"
 service_select "sessions" "owner_user_id=eq.${USER_A_UUID}&id=eq.${SESSION_A_ID}&select=id"
 assert_json_expr 'length == 1' "multi-layer: session landed"
 service_select "session_exercises" "owner_user_id=eq.${USER_A_UUID}&id=eq.${SX_A_ID}&select=id,exercise_definition_id"
@@ -322,7 +324,58 @@ service_select "exercise_sets" "owner_user_id=eq.${USER_A_UUID}&id=eq.${SET_A_ID
 assert_json_expr 'length == 1 and .[0].weight_value == "100" and .[0].reps_value == "8" and .[0].set_type == "rir_2"' "multi-layer: exercise_set landed"
 
 # ===========================================================================
-# 3. LWW newer wins — push T=100, then T=200 with a different name.
+# 3. Server-first compatibility for pre-M19 clients. An omitted
+#    load_input_mode defaults to total_load for a new row. Once a current
+#    client stores per_side_load, a newer legacy payload without the key still
+#    wins row-level LWW for the fields it knows, but preserves the stored mode.
+# ===========================================================================
+
+echo "[sync-push] pre-M19 omission defaults on insert and preserves on update"
+T_COMPAT_INSERT=$((BASE_MS + 110))
+PAYLOAD="$(jq -nc --arg id "${EXDEF_COMPAT_ID}" \
+  --argjson cuam "${T_COMPAT_INSERT}" --argjson ts "${T_COMPAT_INSERT}" \
+  '{entities: [
+    {type: "exercise_definitions", id: $id, client_updated_at_ms: $cuam,
+     fields: {name: "Legacy Insert",
+              created_at: $ts, updated_at: $ts, deleted_at: null}}
+  ]}')"
+sync_push "${USER_A_TOKEN}" "${PAYLOAD}"
+assert_status "200" "pre-M19 compatibility: omitted-key insert"
+
+service_select "exercise_definitions" "owner_user_id=eq.${USER_A_UUID}&id=eq.${EXDEF_COMPAT_ID}&select=name,load_input_mode,client_updated_at_ms"
+assert_json_expr --argjson cuam "${T_COMPAT_INSERT}" \
+  'length == 1 and .[0].name == "Legacy Insert" and .[0].load_input_mode == "total_load" and .[0].client_updated_at_ms == $cuam' \
+  "pre-M19 compatibility: omitted-key insert defaults to total_load"
+
+T_COMPAT_CURRENT=$((BASE_MS + 120))
+PAYLOAD="$(jq -nc --arg id "${EXDEF_COMPAT_ID}" \
+  --argjson cuam "${T_COMPAT_CURRENT}" --argjson ts "${T_COMPAT_CURRENT}" \
+  '{entities: [
+    {type: "exercise_definitions", id: $id, client_updated_at_ms: $cuam,
+     fields: {name: "Current Per-Side", load_input_mode: "per_side_load",
+              created_at: $ts, updated_at: $ts, deleted_at: null}}
+  ]}')"
+sync_push "${USER_A_TOKEN}" "${PAYLOAD}"
+assert_status "200" "pre-M19 compatibility: establish per-side row"
+
+T_COMPAT_LEGACY=$((BASE_MS + 130))
+PAYLOAD="$(jq -nc --arg id "${EXDEF_COMPAT_ID}" \
+  --argjson cuam "${T_COMPAT_LEGACY}" --argjson ts "${T_COMPAT_LEGACY}" \
+  '{entities: [
+    {type: "exercise_definitions", id: $id, client_updated_at_ms: $cuam,
+     fields: {name: "Legacy Rename",
+              created_at: $ts, updated_at: $ts, deleted_at: null}}
+  ]}')"
+sync_push "${USER_A_TOKEN}" "${PAYLOAD}"
+assert_status "200" "pre-M19 compatibility: newer omitted-key update"
+
+service_select "exercise_definitions" "owner_user_id=eq.${USER_A_UUID}&id=eq.${EXDEF_COMPAT_ID}&select=name,load_input_mode,client_updated_at_ms"
+assert_json_expr --argjson cuam "${T_COMPAT_LEGACY}" \
+  'length == 1 and .[0].name == "Legacy Rename" and .[0].load_input_mode == "per_side_load" and .[0].client_updated_at_ms == $cuam' \
+  "pre-M19 compatibility: newer omitted-key update preserves per_side_load"
+
+# ===========================================================================
+# 4. LWW newer wins — push T=100, then T=200 with a different name.
 # ===========================================================================
 
 echo "[sync-push] LWW newer wins"
@@ -354,7 +407,7 @@ service_select "gyms" "owner_user_id=eq.${USER_A_UUID}&id=eq.${GYM_LWW_ID}&selec
 assert_json_expr --argjson cuam "${T200}" 'length == 1 and .[0].name == "Second Name" and .[0].latitude == 51.5 and .[0].client_updated_at_ms == $cuam' "LWW newer write overwrote every column"
 
 # ===========================================================================
-# 4. LWW older no-op — push T=200, then T=100 with different name; stored row
+# 5. LWW older no-op — push T=200, then T=100 with different name; stored row
 #    is unchanged but the ack still says ok:true.
 # ===========================================================================
 
@@ -386,7 +439,7 @@ service_select "gyms" "owner_user_id=eq.${USER_A_UUID}&id=eq.${GYM_OLDER_ID}&sel
 assert_json_expr --argjson cuam "${T200}" 'length == 1 and .[0].name == "Newer First" and .[0].client_updated_at_ms == $cuam' "LWW older write left stored row unchanged"
 
 # ===========================================================================
-# 5. LWW retry idempotent — identical payload twice in quick succession.
+# 6. LWW retry idempotent — identical payload twice in quick succession.
 # ===========================================================================
 
 echo "[sync-push] LWW retry idempotent"
@@ -408,7 +461,7 @@ service_select "gyms" "owner_user_id=eq.${USER_A_UUID}&id=eq.${GYM_RETRY_ID}&sel
 assert_json_expr --argjson cuam "${T_RETRY}" 'length == 1 and .[0].name == "Retry Gym" and .[0].client_updated_at_ms == $cuam' "retry: stored row matches payload"
 
 # ===========================================================================
-# 6. Soft-delete via deleted_at.
+# 7. Soft-delete via deleted_at.
 # ===========================================================================
 
 echo "[sync-push] soft-delete via deleted_at"
@@ -441,8 +494,8 @@ service_select "gyms" "owner_user_id=eq.${USER_A_UUID}&id=eq.${GYM_DELETE_ID}&se
 assert_json_expr --argjson ts "${T_DEL_TOMBSTONE}" 'length == 1 and .[0].deleted_at == $ts' "soft-delete: deleted_at stored non-null"
 
 # ===========================================================================
-# 7. Undelete via LWW (docs/specs/tech/sync-v2-server-contract.md §A.1.1.2 scenario B).
-#    Tombstone at T=600 (already exists from #6); now push deleted_at=null at
+# 8. Undelete via LWW (docs/specs/tech/sync-v2-server-contract.md §A.1.1.2 scenario B).
+#    Tombstone at T=600 (already exists from #7); now push deleted_at=null at
 #    T=700 with a newer client_updated_at_ms. deleted_at flips back to null.
 # ===========================================================================
 
@@ -476,7 +529,7 @@ service_select "gyms" "owner_user_id=eq.${USER_A_UUID}&id=eq.${GYM_UNDELETE_ID}&
 assert_json_expr 'length == 1 and .[0].name == "Resurrected" and .[0].deleted_at == null' "undelete: deleted_at flipped back to null and name overwrote"
 
 # ===========================================================================
-# 8. Future-clock clamp — client claims now()+1day. Stored value must be
+# 9. Future-clock clamp — client claims now()+1day. Stored value must be
 #    <= now()+5min (docs/specs/tech/sync-v2-server-contract.md §A.1).
 # ===========================================================================
 
@@ -507,7 +560,7 @@ assert_json_expr --argjson max "${MAX_ACCEPTABLE}" --argjson sent "${FUTURE_CUAM
   "clamp: stored client_updated_at_ms clamped to <= now()+5min and strictly less than the sent value"
 
 # ===========================================================================
-# 9. FK closure: missing parent — push session_exercise pointing at a
+# 10. FK closure: missing parent — push session_exercise pointing at a
 #    session that is neither in the batch nor on the server. Must roll
 #    back with FK_VIOLATION and zero rows landed.
 # ===========================================================================
@@ -531,7 +584,7 @@ service_select "session_exercises" "owner_user_id=eq.${USER_A_UUID}&id=eq.${MISS
 assert_json_expr 'length == 0' "FK: orphan row absent from server"
 
 # ===========================================================================
-# 10. FK closure: parent in same batch, child-before-parent in array order.
+# 11. FK closure: parent in same batch, child-before-parent in array order.
 #     Transaction commits because constraints are deferred to COMMIT.
 # ===========================================================================
 
@@ -556,7 +609,7 @@ service_select "session_exercises" "owner_user_id=eq.${USER_A_UUID}&id=eq.${SX_F
 assert_json_expr --arg sid "${SESSION_FK_ID}" 'length == 1 and .[0].session_id == $sid' "deferred FK: both rows landed"
 
 # ===========================================================================
-# 11. RLS cross-owner injection. The function derives owner_user_id from
+# 12. RLS cross-owner injection. The function derives owner_user_id from
 #     auth.uid() and ignores any owner-shaped key the client might smuggle
 #     into the envelope (there is no such key on the wire per
 #     docs/specs/tech/sync-v2-server-contract.md §B.2.1's
@@ -586,7 +639,7 @@ assert_status "200" "cross-owner: user B select"
 assert_json_expr 'length == 0' "cross-owner: user B does not see the row"
 
 # ===========================================================================
-# 12. Batch size bounds.
+# 13. Batch size bounds.
 #     - empty array rejected (length 0 < 1)
 #     - 201-row batch rejected
 #     - 200-row batch accepted
@@ -655,7 +708,7 @@ service_select "gyms" "owner_user_id=eq.${USER_A_UUID}&id=like.push-batch-200-${
 assert_json_expr 'length == 200' "batch bounds: 200 rows landed"
 
 # ===========================================================================
-# 13. AUTH_REQUIRED — POST without a JWT.
+# 14. AUTH_REQUIRED — POST without a JWT.
 # ===========================================================================
 
 echo "[sync-push] AUTH_REQUIRED without JWT"

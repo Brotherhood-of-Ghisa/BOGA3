@@ -5,9 +5,82 @@ import {
   type MuscleAnalyticsInput,
 } from '@/src/data/muscle-analytics';
 
+describe('per-side load semantics', () => {
+  const contributionFor = (loadInputMode: 'total_load' | 'per_side_load', weightValue: string) =>
+    aggregateSelectedMuscleDailyEffort(
+      buildAnalyticsInput({
+        sessions: [{ id: 'session', completedAt: new Date('2026-07-22T12:00:00Z') }],
+        exerciseDefinitions: [{ id: 'bench', loadInputMode }],
+        sessionExercises: [
+          { id: 'session-exercise', sessionId: 'session', exerciseDefinitionId: 'bench' },
+        ],
+        exerciseSets: [
+          {
+            id: 'set',
+            sessionExerciseId: 'session-exercise',
+            setType: null,
+            weightValue,
+            repsValue: '1',
+          },
+        ],
+        muscleMappings: [
+          {
+            exerciseDefinitionId: 'bench',
+            muscleGroupId: 'chest_sternal',
+            role: 'primary',
+          },
+        ],
+      }),
+      { muscleGroupIds: ['chest_sternal'], timeZone: 'UTC' }
+    )[0]?.totalWeight;
+
+  it('halves shared total load and preserves already-per-side load', () => {
+    expect(contributionFor('total_load', '45')).toBe(22.5);
+    expect(contributionFor('per_side_load', '22')).toBe(22);
+  });
+
+  it('combines barbell and dumbbell chest work on the same per-side basis', () => {
+    expect(contributionFor('total_load', '45') + contributionFor('per_side_load', '22')).toBe(
+      44.5
+    );
+  });
+
+  it('treats a shared two-arm pullover load as total load', () => {
+    expect(contributionFor('total_load', '22')).toBe(11);
+  });
+
+  it('treats a one-arm row entry as the per-side load with both sides implied', () => {
+    expect(contributionFor('per_side_load', '22')).toBe(22);
+  });
+
+  it('uses the role factor after per-side normalization, ignoring legacy mapping weight', () => {
+    const input = buildAnalyticsInput({
+      exerciseDefinitions: [{ id: 'ex-press', loadInputMode: 'total_load' }],
+      muscleMappings: [
+        {
+          exerciseDefinitionId: 'ex-press',
+          muscleGroupId: 'chest_sternal',
+          role: 'secondary',
+          weight: 0.25,
+        },
+      ],
+    });
+    const entries = aggregateSelectedMuscleDailyEffort(input, {
+      muscleGroupIds: ['chest_sternal'],
+      timeZone: 'Europe/London',
+    });
+    expect(entries[0]?.contributions[0]?.weightedVolume).toBe(250);
+    expect(entries[0]?.contributions[0]?.roleWeight).toBe(0.5);
+  });
+});
+
 const buildAnalyticsInput = (
   overrides: Partial<MuscleAnalyticsInput> = {}
 ): MuscleAnalyticsInput => ({
+  exerciseDefinitions: [
+    { id: 'ex-press', loadInputMode: 'per_side_load' },
+    { id: 'ex-curl', loadInputMode: 'per_side_load' },
+  ],
   sessions: [
     { id: 'session-sunday', completedAt: new Date('2026-03-29T22:30:00.000Z') },
     { id: 'session-monday-a', completedAt: new Date('2026-03-29T23:30:00.000Z') },

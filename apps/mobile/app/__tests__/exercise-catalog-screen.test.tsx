@@ -95,6 +95,7 @@ describe('ExerciseCatalogScreen', () => {
     const savedExercise: ExerciseCatalogExercise = {
       id: 'custom-ex-1',
       name: 'Incline Press',
+      loadInputMode: 'per_side_load',
       deletedAt: null,
       mappings: [
         { id: 'map-1', muscleGroupId: 'chest', weight: 1, role: 'primary' },
@@ -113,6 +114,7 @@ describe('ExerciseCatalogScreen', () => {
     fireEvent.press(screen.getByLabelText('Create new exercise'));
     await screen.findByText('Create Exercise');
     fireEvent.changeText(screen.getByLabelText('Exercise definition name'), 'Incline Press');
+    fireEvent.press(screen.getByLabelText('Per side weight entry'));
     fireEvent.press(screen.getByLabelText('Open primary muscle selector'));
     await screen.findByLabelText('Select primary muscle Chest');
     fireEvent.press(screen.getByLabelText('Select primary muscle Chest'));
@@ -125,6 +127,7 @@ describe('ExerciseCatalogScreen', () => {
       expect(mockSaveExercise).toHaveBeenCalledWith({
         id: undefined,
         name: 'Incline Press',
+        loadInputMode: 'per_side_load',
         mappings: [
           { muscleGroupId: 'chest', weight: 1, role: 'primary' },
           { muscleGroupId: 'triceps', weight: 0.5, role: 'secondary' },
@@ -143,6 +146,7 @@ describe('ExerciseCatalogScreen', () => {
       {
         id: 'seed_barbell_bench_press',
         name: 'Barbell Bench Press',
+        loadInputMode: 'total_load',
         deletedAt: null,
         mappings: [
           { id: 'map-chest', muscleGroupId: 'chest', weight: 1, role: 'primary' },
@@ -153,6 +157,7 @@ describe('ExerciseCatalogScreen', () => {
     const updatedExercise: ExerciseCatalogExercise = {
       id: 'seed_barbell_bench_press',
       name: 'Bench Press',
+      loadInputMode: 'per_side_load',
       deletedAt: null,
       mappings: [
         { id: 'map-chest', muscleGroupId: 'chest', weight: 1, role: 'primary' },
@@ -174,8 +179,10 @@ describe('ExerciseCatalogScreen', () => {
     await screen.findByText('Exercise Actions');
     fireEvent.press(screen.getByLabelText('Edit exercise from actions'));
     await screen.findByText('Edit Exercise');
+    expect(screen.getByLabelText('Total load weight entry').props.accessibilityState.selected).toBe(true);
     expect(screen.queryByText('Cancel')).toBeNull();
     fireEvent.changeText(screen.getByLabelText('Exercise definition name'), 'Bench Press');
+    fireEvent.press(screen.getByLabelText('Per side weight entry'));
     fireEvent.press(screen.getByLabelText('Remove secondary muscle Triceps'));
     fireEvent.press(screen.getByLabelText('Open secondary muscle selector'));
     await screen.findByLabelText('Select secondary muscle Front Delts');
@@ -186,6 +193,7 @@ describe('ExerciseCatalogScreen', () => {
       expect(mockSaveExercise).toHaveBeenCalledWith({
         id: 'seed_barbell_bench_press',
         name: 'Bench Press',
+        loadInputMode: 'per_side_load',
         mappings: [
           { muscleGroupId: 'chest', weight: 1, role: 'primary' },
           { muscleGroupId: 'delts_front', weight: 0.5, role: 'secondary' },

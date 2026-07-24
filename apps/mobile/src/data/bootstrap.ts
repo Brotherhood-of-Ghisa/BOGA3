@@ -7,7 +7,7 @@ import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidat
 import { logEvent } from '@/src/logging';
 
 import { localRuntimeMigrations } from './migrations';
-import { seedSystemExerciseCatalog } from './exercise-catalog-seeds';
+import { maintainInfraFreeStarterCatalog } from './infra-free-catalog-bootstrap';
 import * as schema from './schema';
 
 const LOCAL_DATABASE_NAME = 'scaffolding-local.db';
@@ -165,7 +165,7 @@ const runExclusiveDataLayerOperation = <T>(operation: () => Promise<T>): Promise
   return run;
 };
 
-// Seed the full starter catalog at boot, but ONLY when no sync backend is
+// Maintain the starter catalog at boot, but ONLY when no sync backend is
 // configured. The starter catalog is the three system-seeded tables —
 // muscle_groups (Layer 0), exercise_definitions (Layer 0), and the
 // exercise_muscle_mappings join (Layer 1) — all written dirty so they push once
@@ -179,12 +179,14 @@ const runExclusiveDataLayerOperation = <T>(operation: () => Promise<T>): Promise
 // `sync_runtime_state`) and seeds the Layer 0 parents before the Layer 1 join so
 // the post-seed FK integrity check passes; `resetLocalAppData()` deletes the
 // database — marker included — so the catalog re-seeds on the next bootstrap.
+// An existing local-only database instead runs the pending bundle migrations,
+// whose compare-from-prior-value writes preserve user edits.
 const seedStarterCatalogWhenNoSyncBackend = (database: LocalDatabase) => {
   if (getMobileAuthRuntimeConfig().isConfigured) {
     return;
   }
 
-  seedSystemExerciseCatalog(database);
+  maintainInfraFreeStarterCatalog(database);
 };
 
 const prepareLocalDataLayer = async (): Promise<LocalDatabase> => {

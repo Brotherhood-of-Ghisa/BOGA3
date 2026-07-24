@@ -257,7 +257,8 @@ BATCH_PAYLOAD="$(jq -nc \
               coordinate_accuracy_m: null, coordinates_updated_at: null,
               created_at: $ts, updated_at: $ts, deleted_at: null}},
     {type: "exercise_definitions", id: $edef, client_updated_at_ms: $ts,
-     fields: {name: "Bench Press", created_at: $ts, updated_at: $ts, deleted_at: null}},
+     fields: {name: "Bench Press", load_input_mode: "total_load",
+              created_at: $ts, updated_at: $ts, deleted_at: null}},
     {type: "muscle_groups", id: $mg, client_updated_at_ms: $ts,
      fields: {display_name: "Pectorals", family_name: "chest",
               sort_order: 0, is_editable: 0,
@@ -280,6 +281,8 @@ for spec in "gyms|${GYM_ID}" "exercise_definitions|${EDEF_ID}" \
   assert_jq 'length == 1' "step 1 service-role read ${table}.${row_id}"
 done
 echo "[sync-v2-push-roundtrip] step 1 ok — every row in every layer landed"
+service_select "exercise_definitions" "owner_user_id=eq.${USER_A_UUID}&id=eq.${EDEF_ID}&select=load_input_mode"
+assert_jq '.[0].load_input_mode == "total_load"' "step 1 exercise load mode landed"
 
 # ---------------------------------------------------------------------------
 # Step 2 — LWW newer wins. Push the SAME batch but bump every column,
@@ -298,7 +301,8 @@ NEWER_PAYLOAD="$(jq -nc \
               coordinate_accuracy_m: 5.0, coordinates_updated_at: $ts,
               created_at: $ts, updated_at: $ts, deleted_at: null}},
     {type: "exercise_definitions", id: $edef, client_updated_at_ms: $ts,
-     fields: {name: "Renamed Exercise", created_at: $ts, updated_at: $ts, deleted_at: null}},
+     fields: {name: "Renamed Exercise", load_input_mode: "per_side_load",
+              created_at: $ts, updated_at: $ts, deleted_at: null}},
     {type: "exercise_tag_definitions", id: $etd, client_updated_at_ms: $ts,
      fields: {exercise_definition_id: $edef, name: "Renamed Tag",
               normalized_name: "renamed tag",

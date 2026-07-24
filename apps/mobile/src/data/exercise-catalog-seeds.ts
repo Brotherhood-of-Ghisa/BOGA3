@@ -31,7 +31,7 @@ const SEED_RUNTIME_STATE_ID = 'primary';
  * is not monotone in a way the marker can compare). Bump this by one whenever
  * a catalog change needs to reach already-seeded devices.
  */
-export const CURRENT_APP_VERSION = 1;
+export const CURRENT_APP_VERSION = 2;
 
 /**
  * Catalog seed bundle version stamped by the first-install seeder. Aliased to
@@ -51,6 +51,7 @@ export type MuscleGroupSeed = {
 export type SystemExerciseDefinitionSeed = {
   id: string;
   name: string;
+  loadInputMode: 'total_load' | 'per_side_load';
 };
 
 // M6 seeds intentionally avoid stabilizer tagging to reduce false precision.
@@ -105,6 +106,7 @@ export type SystemExerciseCatalogSeedValidationIssue = {
   | 'duplicate_muscle_group_id'
   | 'duplicate_exercise_definition_id'
   | 'duplicate_exercise_definition_name'
+  | 'invalid_exercise_load_input_mode'
   | 'duplicate_mapping_pair'
   | 'invalid_mapping_weight'
   | 'invalid_mapping_role'
@@ -170,7 +172,7 @@ export const SYSTEM_MUSCLE_GROUP_SEEDS: MuscleGroupSeed[] = [
   { id: 'calves', displayName: 'Calves', familyName: 'Lower Legs', sortOrder: 18, isEditable: 0 },
 ];
 
-const SYSTEM_EXERCISE_DEFINITION_INPUTS: SystemExerciseDefinitionSeed[] = [
+const SYSTEM_EXERCISE_DEFINITION_INPUTS: Omit<SystemExerciseDefinitionSeed, 'loadInputMode'>[] = [
   { id: 'seed_barbell_bench_press', name: 'Barbell Bench Press' },
   { id: 'seed_incline_dumbbell_press', name: 'Incline Dumbbell Press' },
   { id: 'seed_seated_dumbbell_overhead_press', name: 'Seated Dumbbell Overhead Press' },
@@ -804,11 +806,60 @@ const M19_STARTER_EXERCISE_NAME_OVERRIDES: Record<string, string> = {
   seed_standing_machine_calf_raises: 'Standing Machine Calf Raise',
 };
 
+export const PER_SIDE_LOAD_SEED_IDS = new Set<string>([
+  'seed_incline_dumbbell_press',
+  'seed_seated_dumbbell_overhead_press',
+  'seed_dumbbell_lateral_raise',
+  'seed_dumbbell_biceps_curl',
+  'seed_dumbbell_fly',
+  'seed_dumbbell_bench_press',
+  'seed_dumbbell_row',
+  'seed_low_cable_one-arm_lateral_raises',
+  'seed_arnold_presses',
+  'seed_standing_dumbbell_presses',
+  'seed_landmine_press',
+  'seed_cable_flys',
+  'seed_decline_dumbbell_flys',
+  'seed_incline_dumbbell_flys',
+  'seed_cable_bench_presses',
+  'seed_incline_cable_bench_presses',
+  'seed_incline_dumbbell_bench_presses',
+  'seed_decline_dumbbell_bench_presses',
+  'seed_dumbbell_shrugs',
+  'seed_incline_dumbbell_rows',
+  'seed_dumbbell_one-arm_rows',
+  'seed_dumbbell_romanian_deadlifts',
+  'seed_close-grip_incline_dumbbell_bench_presses',
+  'seed_triceps_kickbacks',
+  'seed_alternating_incline_dumbbell_curls',
+  'seed_alternating_incline_hammer_curls',
+  'seed_concentration_curls',
+  'seed_dumbbell_preacher_curls',
+  'seed_hammer_curl',
+  'seed_hammer_preacher_curls',
+  'seed_high_cable_curls',
+  'seed_incline_dumbbell_curls',
+  'seed_incline_hammer_curls',
+  'seed_alternating_incline_dumbbell_twist_curls',
+  'seed_incline_dumbbell_twist_curls',
+  'seed_dumbbell_farmers_walk',
+  'seed_dumbbell_wrist_curls',
+  'seed_cable_hip_abductions',
+  'seed_single_leg_romanian_deadlift',
+  'seed_dumbbell_lunges',
+  'seed_bulgarian_split_squat',
+  'seed_dumbbell_bulgarian_split_squats',
+  'seed_one-leg_leg_extensions',
+  'seed_one-leg_leg_presses',
+  'seed_standing_leg_curls',
+]);
+
 export const SYSTEM_EXERCISE_DEFINITION_SEEDS: SystemExerciseDefinitionSeed[] =
   SYSTEM_EXERCISE_DEFINITION_INPUTS.filter((exercise) => M19_STARTER_EXERCISE_KEEP_IDS.has(exercise.id)).map(
     (exercise) => ({
       ...exercise,
       name: M19_STARTER_EXERCISE_NAME_OVERRIDES[exercise.id] ?? exercise.name,
+      loadInputMode: PER_SIDE_LOAD_SEED_IDS.has(exercise.id) ? 'per_side_load' : 'total_load',
     })
   );
 
@@ -4241,6 +4292,12 @@ export const validateSystemExerciseCatalogSeeds = (
   }
 
   for (const exercise of bundle.exerciseDefinitions) {
+    if (!['total_load', 'per_side_load'].includes(exercise.loadInputMode)) {
+      issues.push({
+        code: 'invalid_exercise_load_input_mode',
+        message: `Exercise ${exercise.id} has invalid load input mode ${String(exercise.loadInputMode)}`,
+      });
+    }
     if (!exerciseDocumentationById.has(exercise.id)) {
       issues.push({
         code: 'missing_exercise_documentation',
@@ -4526,6 +4583,7 @@ export const seedSystemExerciseCatalog = (database: LocalDatabase, now: Date = n
           target: exerciseDefinitions.id,
           set: {
             name: exerciseDefinition.name,
+            loadInputMode: exerciseDefinition.loadInputMode,
             updatedAt: now,
             localDirty: true,
             localUpdatedAtMs: seedStampMs,

@@ -1,0 +1,1 @@
+ALTER TABLE `exercise_definitions` ADD `load_input_mode` text DEFAULT 'total_load' NOT NULL CONSTRAINT "exercise_definitions_load_input_mode_valid" CHECK(`load_input_mode` in ('total_load', 'per_side_load'));

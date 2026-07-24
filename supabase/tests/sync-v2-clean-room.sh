@@ -225,10 +225,10 @@ for entity in "${ENTITIES[@]}"; do
 done
 pass "check 2.C — <table>_owner_received_idx present on every entity"
 
-# 2.D — zero CHECK constraints on every entity (§A.1 "no server validation").
+# 2.D — only the exact CHECK constraints allowed by §A.1.
 for entity in "${ENTITIES[@]}"; do
-  count="$(run_psql "
-    select count(*)
+  names="$(run_psql "
+    select coalesce(string_agg(con.conname, ',' order by con.conname), '')
       from pg_constraint con
       join pg_class c on c.oid = con.conrelid
       join pg_namespace n on n.oid = c.relnamespace
@@ -236,11 +236,15 @@ for entity in "${ENTITIES[@]}"; do
        and c.relname = '${entity}'
        and con.contype = 'c';
   ")"
-  if [[ "${count}" != "0" ]]; then
-    fail "${entity}: expected 0 CHECK constraints; got ${count}"
+  expected=""
+  if [[ "${entity}" == "exercise_definitions" ]]; then
+    expected="exercise_definitions_load_input_mode_valid"
+  fi
+  if [[ "${names}" != "${expected}" ]]; then
+    fail "${entity}: CHECK constraints '${names}'; expected '${expected}'"
   fi
 done
-pass "check 2.D — zero CHECK constraints on any of the nine entity tables"
+pass "check 2.D — only contract-allowed CHECK constraints are present"
 
 # -----------------------------------------------------------------------------
 # Check 3 — triggers + immutability function body.

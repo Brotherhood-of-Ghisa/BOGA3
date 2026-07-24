@@ -30,7 +30,10 @@ import { eq } from 'drizzle-orm';
 
 import type { LocalDatabase } from '@/src/data/bootstrap';
 import { __resetClockForTests } from '@/src/data/clock';
-import { createDrizzleExerciseCatalogStore } from '@/src/data/exercise-catalog';
+import {
+  createDrizzleExerciseCatalogStore,
+  createExerciseCatalogRepository,
+} from '@/src/data/exercise-catalog';
 import {
   SEED_CATALOG_BUNDLE_VERSION,
   SYSTEM_EXERCISE_DEFINITION_SEEDS,
@@ -182,6 +185,49 @@ describe('exercise_definitions write paths flip the dirty bit', () => {
 
     expect(updated?.localDirty).toBe(true);
     expect(updated?.localUpdatedAtMs ?? 0).toBeGreaterThan(created?.localUpdatedAtMs ?? 0);
+  });
+
+  it('persists and returns per-side load mode through repository create and edit', async () => {
+    seedMuscleGroup();
+    const repository = createExerciseCatalogRepository(store);
+
+    const created = await repository.saveExercise({
+      id: 'def-per-side',
+      name: 'Single-Arm Press',
+      loadInputMode: 'per_side_load',
+      mappings: [{ muscleGroupId: 'chest', weight: 1 }],
+      now: new Date('2026-05-29T10:00:00.000Z'),
+    });
+
+    expect(created.loadInputMode).toBe('per_side_load');
+    expect(
+      requireDatabase()
+        .select({ loadInputMode: exerciseDefinitions.loadInputMode })
+        .from(exerciseDefinitions)
+        .where(eq(exerciseDefinitions.id, created.id))
+        .get()?.loadInputMode
+    ).toBe('per_side_load');
+
+    const edited = await repository.saveExercise({
+      id: created.id,
+      name: 'Single-Arm Press (Edited)',
+      loadInputMode: 'per_side_load',
+      mappings: [{ muscleGroupId: 'chest', weight: 1 }],
+      now: new Date('2026-05-29T11:00:00.000Z'),
+    });
+
+    expect(edited).toMatchObject({
+      id: created.id,
+      name: 'Single-Arm Press (Edited)',
+      loadInputMode: 'per_side_load',
+    });
+    expect(
+      requireDatabase()
+        .select({ loadInputMode: exerciseDefinitions.loadInputMode })
+        .from(exerciseDefinitions)
+        .where(eq(exerciseDefinitions.id, created.id))
+        .get()?.loadInputMode
+    ).toBe('per_side_load');
   });
 
   it('marks the definition dirty and sets deletedAt on soft delete', async () => {

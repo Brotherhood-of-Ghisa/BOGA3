@@ -25,6 +25,12 @@ export const generatedMigrationBundle = {
     tag: "0002_abandoned_mister_fear",
     breakpoints: true,
   },
+  {
+    idx: 3,
+    when: 1784754901118,
+    tag: "0003_high_sprite",
+    breakpoints: true,
+  },
     ],
   },
   migrations: {
@@ -237,6 +243,8 @@ CREATE TABLE \`smoke_records\` (
 ALTER TABLE \`exercise_sets\` ADD \`planned_reps_value\` text;--> statement-breakpoint
 ALTER TABLE \`exercise_sets\` ADD \`planned_set_type\` text;--> statement-breakpoint
 ALTER TABLE \`exercise_sets\` ADD \`performance_status\` text;`,
+  m0003: `ALTER TABLE \`exercise_definitions\` ADD \`load_input_mode\` text DEFAULT 'total_load' NOT NULL CONSTRAINT "exercise_definitions_load_input_mode_valid" CHECK(\`load_input_mode\` in ('total_load', 'per_side_load'));
+`,
   },
 } as const;
 

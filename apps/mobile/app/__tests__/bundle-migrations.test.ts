@@ -96,11 +96,12 @@ describe('bundle-migration runtime loop', () => {
     fixture.close();
   });
 
-  it('ships an empty migration list for the first launch', () => {
-    expect(BUNDLE_MIGRATIONS).toHaveLength(0);
+  it('ships the M19 load-mode backfill as generation 2', () => {
+    expect(BUNDLE_MIGRATIONS).toHaveLength(1);
+    expect(BUNDLE_MIGRATIONS[0]?.appVersion).toBe(2);
   });
 
-  describe('empty list (the shipped first-launch behaviour)', () => {
+  describe('shipped migration behaviour', () => {
     it('advances a never-seeded marker (0) up to the current generation', () => {
       // A returning account whose first pull restored server rows: the seeder
       // no-op'd so the marker is still 0. The loop must carry it to current so a
@@ -126,6 +127,22 @@ describe('bundle-migration runtime loop', () => {
       runBundleMigrations(asLocalDatabase(fixture));
 
       expect(fixture.database.select().from(exerciseDefinitions).all()).toHaveLength(0);
+    });
+
+    it('backfills a per-side starter row, dirties it, and advances the marker atomically', () => {
+      fixture.database
+        .insert(exerciseDefinitions)
+        .values({ id: 'seed_dumbbell_bench_press', name: 'Dumbbell Bench Press' })
+        .run();
+      setMarker(fixture, 1);
+
+      runBundleMigrations(asLocalDatabase(fixture));
+
+      expect(readExerciseDefinition(fixture, 'seed_dumbbell_bench_press')).toMatchObject({
+        loadInputMode: 'per_side_load',
+        localDirty: true,
+      });
+      expect(readMarker(fixture)).toBe(2);
     });
   });
 

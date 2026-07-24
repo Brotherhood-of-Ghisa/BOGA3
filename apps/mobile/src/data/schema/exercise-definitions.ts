@@ -9,6 +9,9 @@ export const exerciseDefinitions = sqliteTable(
       .notNull()
       .default(sql`(lower(hex(randomblob(16))))`),
     name: text('name').notNull(),
+    loadInputMode: text('load_input_mode', { enum: ['total_load', 'per_side_load'] })
+      .notNull()
+      .default('total_load'),
     deletedAt: integer('deleted_at', { mode: 'timestamp_ms' }),
     localDirty: integer('local_dirty', { mode: 'boolean' }).notNull().default(false),
     localUpdatedAtMs: integer('local_updated_at_ms').notNull().default(0),
@@ -23,6 +26,10 @@ export const exerciseDefinitions = sqliteTable(
     nameIdx: index('exercise_definitions_name_idx').on(table.name),
     deletedAtIdx: index('exercise_definitions_deleted_at_idx').on(table.deletedAt),
     nameNonEmptyGuard: check('exercise_definitions_name_non_empty', sql`${table.name} <> ''`),
+    loadInputModeGuard: check(
+      'exercise_definitions_load_input_mode_valid',
+      sql`${table.loadInputMode} in ('total_load', 'per_side_load')`
+    ),
   })
 );
 

@@ -55,11 +55,14 @@ These invariants hold for every table below.
   `timestamptz` on these tables is `server_received_at` (server-set, the pull
   cursor axis — see B.4).
 - **No `origin_scope_id` / `origin_source_id`.** Every row is per-user.
-- **No server-side validation.** The client is the only writer; the server
+- **Minimal server-side validation.** The client is the only writer; the server
   validates nothing it cannot also be the cause of. Concretely:
     - **No CHECK constraints** on enum text (`sessions.status`,
       `exercise_sets.set_type`, `exercise_muscle_mappings.role`), numeric ranges
-      (`order_index >= 0`, `weight > 0`, …), or text content.
+      (`order_index >= 0`, `weight > 0`, …), or text content, except the
+      `exercise_definitions_load_input_mode_valid` CHECK introduced by M19. That
+      two-value semantic field is consumed directly by analytics, so invalid
+      values are rejected at both durable stores rather than interpreted.
     - **No NOT NULL beyond the wire envelope.** Domain columns are nullable when
       the client may legitimately write NULL. Structural columns
       (`owner_user_id`, `client_updated_at_ms`, the PK columns) stay NOT NULL.
@@ -100,9 +103,9 @@ These invariants hold for every table below.
 
 > **Build note (verified).** A.1's schema rules are confirmed against the
 > clean-room migration: composite PKs, `bigint` timestamps, `deleted_at bigint`
-> on all nine tables, zero CHECK constraints, no `extras` column, no `deleted`
+> on all nine tables, only the named M19 load-mode CHECK, no `extras` column, no `deleted`
 > boolean, and the non-unique form of every slot/pair index. The drift checker
-> independently asserts no-CHECK, no-`extras`, no-`deleted` (see A.7).
+> independently asserts the single named M19 CHECK, no-`extras`, no-`deleted` (see A.7).
 
 ### A.1.1 LWW and undelete semantics
 
@@ -272,11 +275,13 @@ Source: `apps/mobile/src/data/schema/exercise-definitions.ts`.
 | --- | --- | --- | --- | --- | --- |
 | `id` | `id` | `text` | NO | — | part of PK |
 | `name` | `name` | `text` | NO | yes (`exercise_definitions_name_idx`) | — |
+| `loadInputMode` | `load_input_mode` | `text` | NO | — | — |
 | `deletedAt` | `deleted_at` | `bigint` | YES | yes (`exercise_definitions_deleted_at_idx`) | — |
 | `createdAt` | `created_at` | `bigint` | NO | — | — |
 | `updatedAt` | `updated_at` | `bigint` | NO | — | — |
 
-PK `(owner_user_id, id)`. No CHECK constraints. `id` may be a slug
+PK `(owner_user_id, id)`. `load_input_mode` is constrained to `total_load` or
+`per_side_load`; it describes load distribution, not equipment. `id` may be a slug
 (`seed:bench-press`) or a hex token; the server treats it as opaque text.
 
 ### A.2.6 `exercise_muscle_mappings`
@@ -571,7 +576,7 @@ Location: `apps/mobile/scripts/check-sync-schema-drift.ts`. Command:
    counterpart warns, or fails under `--strict`). Then run the **4f sanity
    checks**: `<entity>_owner_received_idx` present; both structural triggers
    present; RLS enabled with the four named policies whose `qual`/`with_check`
-   hashes match the fixture; zero CHECK constraints; no `extras` column; no
+   hashes match the fixture; only the named M19 load-mode CHECK; no `extras` column; no
    `deleted` boolean.
 5. Run the A.7.7 topological FK-order assertion.
 

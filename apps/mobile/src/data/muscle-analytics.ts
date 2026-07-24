@@ -8,6 +8,10 @@ import {
 export type MuscleContributionRole = 'primary' | 'secondary' | 'stabilizer' | null;
 
 export type MuscleAnalyticsInput = {
+  exerciseDefinitions?: {
+    id: string;
+    loadInputMode: 'total_load' | 'per_side_load';
+  }[];
   sessions: { id: string; completedAt: Date }[];
   sessionExercises: {
     id: string;
@@ -27,6 +31,8 @@ export type MuscleAnalyticsInput = {
     exerciseDefinitionId: string;
     muscleGroupId: string;
     role: MuscleContributionRole;
+    /** Persisted for compatibility; muscle analytics derives its factor from role. */
+    weight?: number;
   }[];
   muscleGroups: {
     id: string;
@@ -98,6 +104,15 @@ export const computeMuscleSetVolume = (weightValue: string, repsValue: string): 
   return computeSetVolume(weight, reps);
 };
 
+export const computePerSideMuscleSetVolume = (
+  weightValue: string,
+  repsValue: string,
+  loadInputMode: 'total_load' | 'per_side_load'
+): number => {
+  const enteredLoadVolume = computeMuscleSetVolume(weightValue, repsValue);
+  return loadInputMode === 'total_load' ? enteredLoadVolume / 2 : enteredLoadVolume;
+};
+
 export const countMuscleAnalyticsWorkingSets = (input: MuscleAnalyticsInput): number => {
   const sessionIds = new Set(input.sessions.map((session) => session.id));
   const includedExerciseIds = new Set<string>();
@@ -154,6 +169,9 @@ export const collectMuscleSetContributions = (
   }
 
   const mappingsByExerciseDefinitionId = buildMappingsByExerciseDefinitionId(input);
+  const loadInputModeByExerciseDefinitionId = new Map(
+    (input.exerciseDefinitions ?? []).map((definition) => [definition.id, definition.loadInputMode])
+  );
   const contributions: MuscleSetContribution[] = [];
 
   for (const set of input.exerciseSets) {
@@ -166,7 +184,13 @@ export const collectMuscleSetContributions = (
     const mappings = mappingsByExerciseDefinitionId.get(exercise.exerciseDefinitionId) ?? [];
     if (mappings.length === 0) continue;
 
-    const setVolume = computeMuscleSetVolume(set.weightValue, set.repsValue);
+    const loadInputMode =
+      loadInputModeByExerciseDefinitionId.get(exercise.exerciseDefinitionId) ?? 'total_load';
+    const setVolume = computePerSideMuscleSetVolume(
+      set.weightValue,
+      set.repsValue,
+      loadInputMode
+    );
 
     for (const mapping of mappings) {
       const roleWeight = getMuscleContributionRoleWeight(mapping.role);
