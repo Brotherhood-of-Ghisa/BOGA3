@@ -56,6 +56,10 @@ export type ExerciseListItem = {
 };
 
 export type StatsViewMode = 'exercise' | 'muscle';
+export type MuscleHistoryMetric = Extract<
+  CalendarHeatmapMetric,
+  'totalVolume' | 'nearFailureCount'
+>;
 
 type DisplayMuscleFamily = {
   family: StatsMuscleFamilyPerformance;
@@ -131,7 +135,9 @@ export type StatsScreenShellProps = {
   isMuscleHistoryLoading: boolean;
   muscleHistoryErrorMessage: string | null;
   selectedMuscleHistoryWeekKey: string | null;
+  muscleHistoryMetric: MuscleHistoryMetric;
   muscleHistoryView: HeatmapView;
+  onSelectMuscleHistoryMetric: (metric: MuscleHistoryMetric) => void;
   onSelectMuscleHistoryView: (view: HeatmapView) => void;
   viewMode: StatsViewMode;
   onSelectViewMode: (mode: StatsViewMode) => void;
@@ -171,7 +177,9 @@ export function StatsScreenShell({
   isMuscleHistoryLoading,
   muscleHistoryErrorMessage,
   selectedMuscleHistoryWeekKey,
+  muscleHistoryMetric,
   muscleHistoryView,
+  onSelectMuscleHistoryMetric,
   onSelectMuscleHistoryView,
   viewMode,
   onSelectViewMode,
@@ -369,7 +377,9 @@ export function StatsScreenShell({
           isLoading={isMuscleHistoryLoading}
           errorMessage={muscleHistoryErrorMessage}
           selectedWeekKey={selectedMuscleHistoryWeekKey}
+          metric={muscleHistoryMetric}
           view={muscleHistoryView}
+          onSelectMetric={onSelectMuscleHistoryMetric}
           onSelectView={onSelectMuscleHistoryView}
           onDismiss={onDismissMuscleHistory}
           onSelectWeek={onSelectMuscleHistoryWeek}
@@ -597,9 +607,9 @@ const METRIC_LABELS: Record<CalendarHeatmapMetric, string> = {
   highestWeight: 'Top weight',
 };
 
-const MUSCLE_HISTORY_METRIC: CalendarHeatmapMetric = 'nearFailureCount';
-const MUSCLE_HISTORY_METRIC_OPTIONS: readonly { value: CalendarHeatmapMetric; label: string }[] = [
-  { value: MUSCLE_HISTORY_METRIC, label: METRIC_LABELS[MUSCLE_HISTORY_METRIC] },
+const MUSCLE_HISTORY_METRIC_OPTIONS: readonly { value: MuscleHistoryMetric; label: string }[] = [
+  { value: 'totalVolume', label: METRIC_LABELS.totalVolume },
+  { value: 'nearFailureCount', label: METRIC_LABELS.nearFailureCount },
 ];
 
 export type HeatmapView = 'weekly' | 'daily';
@@ -704,6 +714,7 @@ function HistoryHeatmap({
       testIDPrefix={testIDPrefix}
       metricLabel={METRIC_LABELS[metric]}
       formatValue={(value) => formatMetricNumber(value, metric)}
+      legendLabel={`${METRIC_LABELS[metric]} per day`}
     />
   ) : (
     <WeeklyHeatmap
@@ -722,7 +733,9 @@ function MuscleHistoryOverlay({
   isLoading,
   errorMessage,
   selectedWeekKey,
+  metric,
   view,
+  onSelectMetric,
   onSelectView,
   onDismiss,
   onSelectWeek,
@@ -734,7 +747,9 @@ function MuscleHistoryOverlay({
   isLoading: boolean;
   errorMessage: string | null;
   selectedWeekKey: string | null;
+  metric: MuscleHistoryMetric;
   view: HeatmapView;
+  onSelectMetric: (metric: MuscleHistoryMetric) => void;
   onSelectView: (view: HeatmapView) => void;
   onDismiss: () => void;
   onSelectWeek: (weekKey: string | null) => void;
@@ -782,8 +797,8 @@ function MuscleHistoryOverlay({
           <SegmentedChips
             accessibilityLabel="Select effort metric"
             options={MUSCLE_HISTORY_METRIC_OPTIONS}
-            value={MUSCLE_HISTORY_METRIC}
-            onChange={() => undefined}
+            value={metric}
+            onChange={onSelectMetric}
             testIDPrefix="stats-muscle-history-metric-chip"
             compact
           />
@@ -804,7 +819,7 @@ function MuscleHistoryOverlay({
           <WeekSelectionBanner
             weeklyEffort={weeklyEffort}
             selectedWeekKey={selectedWeekKey}
-            metric={MUSCLE_HISTORY_METRIC}
+            metric={metric}
           />
         ) : null}
 
@@ -839,7 +854,7 @@ function MuscleHistoryOverlay({
 
               <HistoryHeatmap
                 dailyMetrics={dailyMetrics}
-                metric={MUSCLE_HISTORY_METRIC}
+                metric={metric}
                 view={view}
                 selectedWeekKey={selectedWeekKey}
                 onSelectWeek={onSelectWeek}
@@ -1118,6 +1133,7 @@ export default function StatsRoute() {
   const [isMuscleHistoryLoading, setIsMuscleHistoryLoading] = useState(false);
   const [muscleHistoryErrorMessage, setMuscleHistoryErrorMessage] = useState<string | null>(null);
   const [selectedMuscleHistoryWeekKey, setSelectedMuscleHistoryWeekKey] = useState<string | null>(null);
+  const [muscleHistoryMetric, setMuscleHistoryMetric] = useState<MuscleHistoryMetric>('totalVolume');
   const [muscleHistoryView, setMuscleHistoryView] = useState<HeatmapView>('weekly');
   const muscleHistoryRequestIdRef = useRef(0);
 
@@ -1323,7 +1339,9 @@ export default function StatsRoute() {
       isMuscleHistoryLoading,
       muscleHistoryErrorMessage,
       selectedMuscleHistoryWeekKey,
+      muscleHistoryMetric,
       muscleHistoryView,
+      onSelectMuscleHistoryMetric: setMuscleHistoryMetric,
       onSelectMuscleHistoryView: setMuscleHistoryView,
       viewMode,
       onSelectViewMode: handleSelectViewMode,
@@ -1360,6 +1378,7 @@ export default function StatsRoute() {
       isMuscleHistoryLoading,
       muscleHistoryErrorMessage,
       selectedMuscleHistoryWeekKey,
+      muscleHistoryMetric,
       muscleHistoryView,
       viewMode,
       handleSelectViewMode,
