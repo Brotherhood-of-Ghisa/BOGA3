@@ -230,7 +230,11 @@ Guardrail command:
 7. Selected-day set rows are explanatory only: they show concise raw set values plus weighted effort, preserve existing warm-up exclusion/invalid-set zero-effort semantics from the shared analytics helper, and do not duplicate completed-session detail navigation or editing affordances.
 8. Certification markers are not rendered in the muscle-history overlay unless a real certification data source exists; v1 does not invent certification state.
 9. Dismissing the overlay clears only transient selected-muscle/date UI state and does not mutate sessions, exercises, tags, sync data, or durable preferences.
-10. The overlay renders only the `Near failure` metric chip and uses near-failure counts for its weekly and daily heatmap values; volume, estimated 1RM, and top weight are not selectable for muscle-level history.
+10. The overlay renders `Volume` and `Near failure` metric chips, defaults to
+    `Volume`, and uses the selected metric for both weekly and daily heatmap
+    values and detail. Muscle volume is the per-side, role-weighted aggregate
+    across the selected muscle IDs; estimated 1RM and top weight remain
+    unavailable for muscle-level history.
 11. The v1 overlay loads a capped one-year local completed-session history window for the selected muscle.
 
 ### 13. Exercise heatmap mode semantics (M17)
