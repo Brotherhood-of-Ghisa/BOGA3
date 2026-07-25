@@ -1,6 +1,7 @@
 import {
   aggregateSelectedMuscleDailyEffort,
   aggregateSelectedMuscleDailyEffortMetrics,
+  aggregateSelectedMuscleWeeklyEffort,
   getMuscleContributionRoleWeight,
   type MuscleAnalyticsInput,
 } from '@/src/data/muscle-analytics';
@@ -43,6 +44,66 @@ describe('per-side load semantics', () => {
     expect(contributionFor('total_load', '45') + contributionFor('per_side_load', '22')).toBe(
       44.5
     );
+  });
+
+  it('aggregates different exercises hitting the same muscle into daily and weekly volume', () => {
+    const input = buildAnalyticsInput({
+      sessions: [{ id: 'session', completedAt: new Date('2026-07-22T12:00:00Z') }],
+      exerciseDefinitions: [
+        { id: 'barbell-bench', loadInputMode: 'total_load' },
+        { id: 'dumbbell-bench', loadInputMode: 'per_side_load' },
+      ],
+      sessionExercises: [
+        {
+          id: 'barbell-bench-row',
+          sessionId: 'session',
+          exerciseDefinitionId: 'barbell-bench',
+        },
+        {
+          id: 'dumbbell-bench-row',
+          sessionId: 'session',
+          exerciseDefinitionId: 'dumbbell-bench',
+        },
+      ],
+      exerciseSets: [
+        {
+          id: 'barbell-set',
+          sessionExerciseId: 'barbell-bench-row',
+          setType: null,
+          weightValue: '45',
+          repsValue: '1',
+        },
+        {
+          id: 'dumbbell-set',
+          sessionExerciseId: 'dumbbell-bench-row',
+          setType: null,
+          weightValue: '22',
+          repsValue: '1',
+        },
+      ],
+      muscleMappings: [
+        {
+          exerciseDefinitionId: 'barbell-bench',
+          muscleGroupId: 'chest_sternal',
+          role: 'primary',
+        },
+        {
+          exerciseDefinitionId: 'dumbbell-bench',
+          muscleGroupId: 'chest_sternal',
+          role: 'primary',
+        },
+      ],
+    });
+    const daily = aggregateSelectedMuscleDailyEffort(input, {
+      muscleGroupIds: ['chest_sternal'],
+      timeZone: 'UTC',
+    });
+    const dailyMetrics = aggregateSelectedMuscleDailyEffortMetrics(daily);
+    const weekly = aggregateSelectedMuscleWeeklyEffort(daily);
+
+    expect(daily).toHaveLength(1);
+    expect(dailyMetrics[0]?.totalVolume).toBe(44.5);
+    expect(weekly[0]?.totalVolume).toBe(44.5);
   });
 
   it('treats a shared two-arm pullover load as total load', () => {
@@ -278,6 +339,17 @@ describe('aggregateSelectedMuscleDailyEffort', () => {
       exerciseDefinitionId: 'ex-press',
       exerciseName: 'Press',
     });
+  });
+
+  it('sums all selected member-muscle contributions for a muscle family', () => {
+    const daily = aggregateSelectedMuscleDailyEffort(buildAnalyticsInput(), {
+      muscleGroupIds: ['chest_sternal', 'triceps'],
+      timeZone: 'Europe/London',
+    });
+    const metrics = aggregateSelectedMuscleDailyEffortMetrics(daily);
+
+    const monday = metrics.find((entry) => entry.dateKey === '2026-03-30');
+    expect(monday?.totalVolume).toBe(900);
   });
 });
 

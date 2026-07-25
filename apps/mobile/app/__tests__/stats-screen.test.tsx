@@ -250,7 +250,9 @@ const buildShellProps = (
   isMuscleHistoryLoading: false,
   muscleHistoryErrorMessage: null,
   selectedMuscleHistoryWeekKey: null,
+  muscleHistoryMetric: 'totalVolume',
   muscleHistoryView: 'weekly',
+  onSelectMuscleHistoryMetric: jest.fn(),
   onSelectMuscleHistoryView: jest.fn(),
   viewMode: 'muscle',
   onSelectViewMode: jest.fn(),
@@ -521,7 +523,7 @@ describe('StatsScreenShell', () => {
     expect(onDismissMuscleHistory).toHaveBeenCalledTimes(1);
   });
 
-  it('renders only the Near failure metric chip in the muscle overlay', () => {
+  it('renders exactly Volume and Near failure metric chips in the muscle overlay', () => {
     renderStatsScreenShell({
       selectedMuscle: {
         muscleGroupIds: ['front_delts'],
@@ -531,10 +533,27 @@ describe('StatsScreenShell', () => {
       muscleHistoryWeeklyEffort: [buildWeeklyEffort()],
     });
 
+    expect(screen.getByTestId('stats-muscle-history-metric-chip-totalVolume')).toBeTruthy();
     expect(screen.getByTestId('stats-muscle-history-metric-chip-nearFailureCount')).toBeTruthy();
-    expect(screen.queryByTestId('stats-muscle-history-metric-chip-totalVolume')).toBeNull();
     expect(screen.queryByTestId('stats-muscle-history-metric-chip-estimatedRM1')).toBeNull();
     expect(screen.queryByTestId('stats-muscle-history-metric-chip-highestWeight')).toBeNull();
+  });
+
+  it('reports muscle-history metric changes', () => {
+    const onSelectMuscleHistoryMetric = jest.fn();
+    renderStatsScreenShell({
+      selectedMuscle: {
+        muscleGroupIds: ['front_delts'],
+        displayName: 'Front Delts',
+        familyName: 'Shoulders',
+      },
+      muscleHistoryWeeklyEffort: [buildWeeklyEffort()],
+      muscleHistoryMetric: 'totalVolume',
+      onSelectMuscleHistoryMetric,
+    });
+
+    fireEvent.press(screen.getByTestId('stats-muscle-history-metric-chip-nearFailureCount'));
+    expect(onSelectMuscleHistoryMetric).toHaveBeenCalledWith('nearFailureCount');
   });
 
   it('renders the Daily/Weekly view toggle and reports changes', () => {
@@ -557,8 +576,8 @@ describe('StatsScreenShell', () => {
     expect(onSelectMuscleHistoryView).toHaveBeenCalledWith('daily');
   });
 
-  it('selects a single day (not a week) and shows its detail in daily view', () => {
-    renderStatsScreenShell({
+  it('selects a single day and shows the selected muscle metric in daily view', () => {
+    const props = {
       selectedMuscle: {
         muscleGroupIds: ['front_delts'],
         displayName: 'Front Delts',
@@ -574,8 +593,16 @@ describe('StatsScreenShell', () => {
           highestWeight: 80,
         },
       ],
-      muscleHistoryView: 'daily',
-    });
+      muscleHistoryView: 'daily' as const,
+    };
+    const { rerender } = render(
+      <StatsScreenShell
+        {...buildShellProps({
+          ...props,
+          muscleHistoryMetric: 'totalVolume',
+        })}
+      />
+    );
 
     // The weekly rollup banner is hidden in daily view.
     expect(screen.queryByTestId('stats-muscle-history-week-banner')).toBeNull();
@@ -586,12 +613,27 @@ describe('StatsScreenShell', () => {
       'May 13, 2026'
     );
     expect(screen.getByTestId('stats-muscle-history-heatmap-day-detail-value')).toHaveTextContent(
+      /Volume: 1\.2k/
+    );
+    expect(screen.getByText('Volume per day')).toBeTruthy();
+
+    rerender(
+      <StatsScreenShell
+        {...buildShellProps({
+          ...props,
+          muscleHistoryMetric: 'nearFailureCount',
+        })}
+      />
+    );
+    fireEvent.press(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-05-13'));
+    expect(screen.getByTestId('stats-muscle-history-heatmap-day-detail-value')).toHaveTextContent(
       /Near failure: 2/
     );
+    expect(screen.getByText('Near failure per day')).toBeTruthy();
   });
 
-  it('shows the week selection banner with date range and metric value when a week is selected', () => {
-    renderStatsScreenShell({
+  it('shows the selected metric in the week selection banner', () => {
+    const props = {
       selectedMuscle: {
         muscleGroupIds: ['front_delts'],
         displayName: 'Front Delts',
@@ -599,11 +641,31 @@ describe('StatsScreenShell', () => {
       },
       muscleHistoryWeeklyEffort: [buildWeeklyEffort()],
       selectedMuscleHistoryWeekKey: '2026-05-11',
-    });
+    };
+    const { rerender } = render(
+      <StatsScreenShell
+        {...buildShellProps({
+          ...props,
+          muscleHistoryMetric: 'totalVolume',
+        })}
+      />
+    );
 
     const banner = screen.getByTestId('stats-muscle-history-week-banner');
     expect(banner).toBeTruthy();
     expect(screen.getByTestId('stats-muscle-history-week-banner-range')).toHaveTextContent(/May/);
+    expect(screen.getByTestId('stats-muscle-history-week-banner-value')).toHaveTextContent(
+      /Volume: 1\.1k/
+    );
+
+    rerender(
+      <StatsScreenShell
+        {...buildShellProps({
+          ...props,
+          muscleHistoryMetric: 'nearFailureCount',
+        })}
+      />
+    );
     expect(screen.getByTestId('stats-muscle-history-week-banner-value')).toHaveTextContent(
       /Near failure: 2/
     );
@@ -735,6 +797,15 @@ describe('StatsRoute', () => {
       end: expect.any(Date),
     });
     expect(screen.getByTestId('stats-muscle-history-heatmap')).toBeTruthy();
+    expect(
+      screen.getByTestId('stats-muscle-history-metric-chip-totalVolume').props.accessibilityState
+    ).toEqual({ selected: true });
+
+    fireEvent.press(screen.getByTestId('stats-muscle-history-metric-chip-nearFailureCount'));
+    expect(
+      screen.getByTestId('stats-muscle-history-metric-chip-nearFailureCount').props
+        .accessibilityState
+    ).toEqual({ selected: true });
   });
 
   it('shows an overlay error when selected-muscle heatmap data fails to load', async () => {

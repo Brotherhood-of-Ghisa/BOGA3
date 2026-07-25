@@ -54,7 +54,7 @@ Brief entrypoint map of the current mobile screens.
 - Key states (high level):
   - Stats summary loading/error/content states with period chips
   - actionable muscle rows in Stats summary; expanded muscle rows and collapsed single-muscle family headers open an in-route muscle-history overlay
-  - muscle-history overlay states for loading, error, no-history, populated near-failure heatmap with a single `Near failure` metric chip, selected positive-effort date with contributing exercise/set detail, and selected zero-effort date empty detail
+  - muscle-history overlay states for loading, error, no-history, populated heatmap with selectable `Volume` / `Near failure` metrics, selected positive-effort date with contributing exercise/set detail, and selected zero-effort date empty detail
   - **Heatmap viewMode** (M17): a "Heatmap" chip below the period chips switches the body to a flat exercise list sorted by all-time session count; tapping an exercise opens an in-route `ExerciseHistoryOverlay`
   - exercise-history overlay states: loading, error, no-history, populated `CalendarHeatmap` (365-day window), metric chip selection (Volume / Near failure / 1RM / Top weight), week-selection banner
 - Notes:
