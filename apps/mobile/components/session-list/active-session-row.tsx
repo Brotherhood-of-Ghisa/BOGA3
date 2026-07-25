@@ -52,7 +52,7 @@ export function ActiveSessionRow({
 
         <View style={styles.sessionRowActions}>
           <Pressable
-            accessibilityLabel="Complete active session"
+            accessibilityLabel="Review and complete active session"
             accessibilityRole="button"
             onPress={onComplete}
             style={[styles.iconActionButton, styles.completeButton]}

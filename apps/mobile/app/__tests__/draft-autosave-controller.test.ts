@@ -70,6 +70,25 @@ describe('draft autosave controller', () => {
     expect(persistDraft).toHaveBeenCalledTimes(1);
   });
 
+  it('flushes pending text immediately when an input is committed', async () => {
+    const persistDraft = jest.fn().mockResolvedValue(undefined);
+    const autosave = createDraftAutosaveController({ persistDraft });
+
+    autosave.markTextMutation();
+    jest.advanceTimersByTime(1_000);
+
+    await autosave.flushInputCommit();
+    await flushAsyncWork();
+
+    expect(persistDraft).toHaveBeenCalledTimes(1);
+    expect(persistDraft).toHaveBeenCalledWith('input-commit');
+
+    jest.advanceTimersByTime(10_000);
+    await flushAsyncWork();
+
+    expect(persistDraft).toHaveBeenCalledTimes(1);
+  });
+
   it('enforces the 10s dirty-state max flush interval during sustained typing', async () => {
     const persistDraft = jest.fn().mockResolvedValue(undefined);
     const autosave = createDraftAutosaveController({ persistDraft });

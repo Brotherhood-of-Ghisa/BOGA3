@@ -72,7 +72,8 @@ Brief entrypoint map of the current mobile screens.
   - in-route single gym editor owns private coordinate controls (`Save current location`, confirmation-gated replace, and confirmation-gated clear)
   - in-route exercise-tag add/manage modals (search/select/create, rename/delete/undelete, deleted-visibility toggle)
   - per-exercise collapsed-by-default `Past Records` bar below tags and above set rows; tapping expands inline loading/empty/error states plus metric label / selected record date / live `Current` / green `Max` rows for estimated `1RM`, volume, highest weight, and near-failure set count; left/right swipes anywhere on the expanded panel change the selected historical record, and max values derive from loaded records plus valid current metrics
-  - compact tap-to-edit set rows for normal and planned execution rows; editable weight fields label the scalar as `kg total` or `kg per side` from current exercise metadata; appended historical/program targets support planned, matched, modified, skipped, and added states without replacing the existing recorder chrome; newly imported unperformed planned rows show initial `Log` / `Skip` controls without the right-side quality control until the user logs, edits, or skips the target, then later log/skip status changes use right-to-left swipe; tapping a planned/skipped target to edit hydrates the actual fields from the plan, matched/modified classification defaults to prescribed volume rather than quality, and removable user-added rows delete via right-to-left swipe rather than visible row remove buttons
+  - compact tap-to-edit set rows for normal and planned execution rows; each exercise card identifies weight entry as `Total load` or `Per side`, while editable fields keep a compact `kg` suffix and make the full weight shell a focus target; appended historical/program targets support planned, matched, modified, skipped, and added states without replacing the existing recorder chrome; newly imported unperformed planned rows show initial `Log` / `Skip` controls without the right-side quality control until the user logs, edits, or skips the target, then later log/skip status changes use right-to-left swipe; tapping a planned/skipped target to edit hydrates the actual fields from the plan, matched/modified classification defaults to prescribed volume rather than quality, and removable user-added rows delete via right-to-left swipe rather than visible row remove buttons
+  - appending a historical plan automatically reveals and highlights the target exercise card once; later card layouts from editing, row expansion/collapse, or keyboard changes do not move the recorder viewport
   - foreground GPS gym assistance is hidden on the recorder surface: brand-new active-session start may preselect one confident saved-gym match, null state displays as `No gym`, and long-pressing the gym box explicitly retries detection without a persistent suggestion panel
 - Key exits:
   - `exercise-catalog` (`source=session-recorder&intent=manage` from exercise picker)
@@ -132,7 +133,21 @@ Brief entrypoint map of the current mobile screens.
   - in-place rerender between signed-out and signed-in states
   - back to `settings` (or previous route) via stack navigation
 
-8. `/completed-session/[sessionId]`
+8. `/sessions`
+- File: `apps/mobile/app/sessions.tsx`
+- Purpose:
+  - stack-based complete session list reached from the Stats Sessions card
+- Key states (high level):
+  - optional active-session row followed by completed-session history
+  - deleted-session visibility toggle and completed-session row actions
+  - active Resume and review/complete affordances both return to the existing
+    Log recorder so draft state and recorder cleanup rules remain authoritative
+- Key exits:
+  - `/session-recorder` via stack dismissal for active Resume or review/complete
+  - `/completed-session/<sessionId>` from a completed row
+  - `/session-recorder?mode=completed-edit&sessionId=<sessionId>` from completed edit
+
+9. `/completed-session/[sessionId]`
 - File: `apps/mobile/app/completed-session/[sessionId].tsx`
 - Purpose:
   - completed session detail viewer with edit/delete session actions and per-exercise block append actions
@@ -145,7 +160,7 @@ Brief entrypoint map of the current mobile screens.
   - `session-recorder` (edit)
   - `session-recorder` after successful per-exercise block append
 
-9. `/exercise-history`
+10. `/exercise-history`
 - File: `apps/mobile/app/exercise-history.tsx`
 - Purpose:
   - per-exercise performance history view (progression signals + per-tag drill-down for a single `exercise_definitions` row)
@@ -166,7 +181,7 @@ Brief entrypoint map of the current mobile screens.
 - Notes:
   - wraps the whole navigator in the route-layer auth guard (`apps/mobile/components/navigation/auth-route-guard.tsx`), which enforces login-on-start for configured signed-out sessions (neutral loading view while restoring, redirect to `/sign-in` when configured-but-signed-out, stand aside when auth is unconfigured, while allowing `/sign-in` and the dev/test-gated `/maestro-harness` route to render through)
   - immediately below the auth guard, wraps the navigator in the first-sync gate (`apps/mobile/src/sync/SyncGate.tsx`), which blocks a signed-in user behind a full-screen "Setting up your data…" block until `sync_runtime_state.bootstrap_completed_at` is set (then dismisses in place), and observes sync runtime state through the single shared scheduler-state accessor
-  - tab roots live inside the `(tabs)` route group (`apps/mobile/app/(tabs)/_layout.tsx`) with `headerShown: false`; the root stack registers the `(tabs)` group itself plus the `sign-in` screen and the detail screens (`exercise-history`, `profile`, `maestro-harness`, `completed-session/[sessionId]`)
+  - tab roots live inside the `(tabs)` route group (`apps/mobile/app/(tabs)/_layout.tsx`) with `headerShown: false`; the root stack registers the `(tabs)` group itself plus the `sign-in` screen and the detail screens (`exercise-history`, `sessions`, `profile`, `maestro-harness`, `completed-session/[sessionId]`)
   - completed-session route sets its title inside the route file
   - exercise-history route also sets its title inside the route file (resolved exercise name)
 

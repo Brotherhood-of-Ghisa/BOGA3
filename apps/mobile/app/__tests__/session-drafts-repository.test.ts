@@ -104,6 +104,92 @@ describe('session draft repository', () => {
     );
   });
 
+  it('round-trips fully blank and partial active sets without filtering rows or changing ids', async () => {
+    const store = createMockStore();
+    const repository = createSessionDraftRepository(store);
+    store.saveDraftGraph.mockResolvedValue({ sessionId: 'partial-session' });
+
+    const partialSets = [
+      { id: 'set-blank', repsValue: '', weightValue: '' },
+      { id: 'set-weight-only', repsValue: '', weightValue: '80' },
+      { id: 'set-zero-load', repsValue: '8', weightValue: '0' },
+    ];
+
+    await repository.persistDraftSnapshot({
+      sessionId: 'partial-session',
+      gymId: null,
+      startedAt: new Date('2026-02-20T10:00:00.000Z'),
+      exercises: [
+        {
+          id: 'exercise-partial',
+          exerciseDefinitionId: 'seed_barbell_bench_press',
+          name: 'Bench Press',
+          sets: partialSets,
+        },
+      ],
+    });
+
+    expect(store.saveDraftGraph).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId: 'partial-session',
+        exercises: [
+          expect.objectContaining({
+            id: 'exercise-partial',
+            sets: partialSets,
+          }),
+        ],
+      })
+    );
+
+    store.loadLatestDraftGraph.mockResolvedValue({
+      session: buildSessionRecord({ status: 'active', id: 'partial-session' }),
+      exercises: [
+        {
+          id: 'exercise-partial',
+          sessionId: 'partial-session',
+          exerciseDefinitionId: 'seed_barbell_bench_press',
+          orderIndex: 0,
+          name: 'Bench Press',
+          machineName: null,
+          sets: [
+            {
+              id: 'set-blank',
+              sessionExerciseId: 'exercise-partial',
+              orderIndex: 0,
+              repsValue: '',
+              weightValue: '',
+              setType: null,
+            },
+            {
+              id: 'set-weight-only',
+              sessionExerciseId: 'exercise-partial',
+              orderIndex: 1,
+              repsValue: '',
+              weightValue: '80',
+              setType: null,
+            },
+            {
+              id: 'set-zero-load',
+              sessionExerciseId: 'exercise-partial',
+              orderIndex: 2,
+              repsValue: '8',
+              weightValue: '0',
+              setType: null,
+            },
+          ],
+        },
+      ],
+    });
+
+    const draft = await repository.loadLatestDraftSnapshot();
+
+    expect(draft?.exercises[0]?.sets).toEqual([
+      expect.objectContaining({ id: 'set-blank', repsValue: '', weightValue: '' }),
+      expect.objectContaining({ id: 'set-weight-only', repsValue: '', weightValue: '80' }),
+      expect.objectContaining({ id: 'set-zero-load', repsValue: '8', weightValue: '0' }),
+    ]);
+  });
+
   it('loads a completed session graph by id with ordered exercises and sets', async () => {
     const store = createMockStore();
     const repository = createSessionDraftRepository(store);

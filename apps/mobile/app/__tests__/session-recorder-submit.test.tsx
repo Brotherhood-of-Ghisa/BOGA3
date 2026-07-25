@@ -229,6 +229,35 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
     });
   });
 
+  it('defaults blank weight to zero when positive reps are submitted', async () => {
+    render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
+
+    fireEvent.press(screen.getByText('Log new exercise'));
+    await addExerciseWithEmptySet('Barbell Squat');
+    fireEvent.changeText(screen.getByLabelText('Reps for exercise 1 set 1'), '5');
+    fireEvent.press(screen.getByText('Submit Session'));
+
+    expect(screen.queryByText('Remove incomplete sets and submit?')).toBeNull();
+    await waitFor(() => {
+      expect(mockPersistSessionDraftSnapshot).toHaveBeenCalledWith(
+        expect.objectContaining({
+          exercises: [
+            expect.objectContaining({
+              sets: [
+                expect.objectContaining({
+                  repsValue: '5',
+                  weightValue: '0',
+                }),
+              ],
+            }),
+          ],
+        })
+      );
+      expect(mockCompleteSessionDraft).toHaveBeenCalledWith('test-session');
+    });
+  });
+
   it('filters skipped and unperformed planned rows out of active submit persistence before completing', async () => {
     mockLoadLatestSessionDraftSnapshot.mockResolvedValueOnce(
       buildActiveDraftSnapshot({

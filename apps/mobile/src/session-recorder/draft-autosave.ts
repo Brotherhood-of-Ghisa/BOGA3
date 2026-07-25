@@ -8,6 +8,7 @@ export type DraftAutosaveLifecycleTrigger = 'screen-blur' | 'route-change' | 'ap
 export type DraftAutosaveWriteReason =
   | 'text-debounce'
   | 'structural-change'
+  | 'input-commit'
   | 'max-interval'
   | 'dispose'
   | `lifecycle-${DraftAutosaveLifecycleTrigger}`;
@@ -24,6 +25,7 @@ type AutosaveOptions = {
 export type DraftAutosaveController = {
   markTextMutation(): void;
   markStructuralMutation(): Promise<void>;
+  flushInputCommit(): Promise<void>;
   flushForLifecycle(trigger: DraftAutosaveLifecycleTrigger): Promise<void>;
   flushNow(): Promise<void>;
   dispose(options?: { flushDirty?: boolean }): Promise<void>;
@@ -133,6 +135,15 @@ export const createDraftAutosaveController = (options: AutosaveOptions): DraftAu
     return queuePersist(`lifecycle-${trigger}`);
   };
 
+  const flushInputCommit = () => {
+    if (disposed) {
+      return Promise.resolve();
+    }
+
+    clearTextDebounce();
+    return queuePersist('input-commit');
+  };
+
   const flushNow = () => {
     if (disposed) {
       return Promise.resolve();
@@ -164,6 +175,7 @@ export const createDraftAutosaveController = (options: AutosaveOptions): DraftAu
   return {
     markTextMutation,
     markStructuralMutation,
+    flushInputCommit,
     flushForLifecycle,
     flushNow,
     dispose,
