@@ -67,30 +67,7 @@ export function SessionsScreen({
   }, [activeSession]);
 
   const navigateToSessionRecorder = () => {
-    router.push('/session-recorder');
-  };
-
-  const completeActiveSession = () => {
-    if (dataClient && activeSession) {
-      return (async () => {
-        await dataClient.completeActiveSession(activeSession.id);
-        await reloadSessions();
-      })();
-    }
-
-    setSessions((currentSessions) =>
-      currentSessions.map((session) => {
-        if (session.status !== 'active' || session.deletedAt !== null) {
-          return session;
-        }
-
-        return {
-          ...session,
-          status: 'completed',
-          completedAt: '2026-02-20T18:15:00.000Z',
-        };
-      })
-    );
+    router.dismissTo('/session-recorder');
   };
 
   const discardActiveSession = () => {
@@ -161,9 +138,7 @@ export function SessionsScreen({
               session={activeSession}
               nowMs={activeDurationNowMs}
               onResume={navigateToSessionRecorder}
-              onComplete={() => {
-                void completeActiveSession();
-              }}
+              onComplete={navigateToSessionRecorder}
               onDelete={() => {
                 void discardActiveSession();
               }}

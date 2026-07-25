@@ -89,6 +89,11 @@ import {
 import { logEvent } from '@/src/logging';
 import { createDraftAutosaveController, type DraftAutosaveController } from '@/src/session-recorder/draft-autosave';
 import { createSessionRecorderLifecycleHelpers } from '@/src/session-recorder/lifecycle-helpers';
+import {
+  canonicalizeSetValues,
+  canonicalizeWeightForReps,
+  isPerformedSet,
+} from '@/src/session-recorder/set-semantics';
 
 const START_SESSION_GYM_DETECTION_TIMEOUT_MS = 1500;
 
@@ -267,17 +272,41 @@ const toPersistDraftExercises = (session: Session) =>
     exerciseDefinitionId: exercise.exerciseDefinitionId,
     name: exercise.name,
     machineName: exercise.machineName || null,
-    sets: exercise.sets.map((set) => ({
-      id: set.id,
-      repsValue: set.reps,
-      weightValue: set.weight,
-      setType: set.setType,
-      plannedRepsValue: set.plannedReps,
-      plannedWeightValue: set.plannedWeight,
-      plannedSetType: set.plannedSetType,
-      performanceStatus: set.performanceStatus,
-    })),
+    sets: exercise.sets.map((set) => {
+      const committedSet = canonicalizeSetValues(set);
+      return {
+        id: committedSet.id,
+        repsValue: committedSet.reps,
+        weightValue: committedSet.weight,
+        setType: committedSet.setType,
+        plannedRepsValue: committedSet.plannedReps,
+        plannedWeightValue: committedSet.plannedWeight,
+        plannedSetType: committedSet.plannedSetType,
+        performanceStatus: committedSet.performanceStatus,
+      };
+    }),
   }));
+
+const canonicalizeSessionSetWeights = (session: Session): Session => {
+  let sessionChanged = false;
+  const exercises = session.exercises.map((exercise) => {
+    let exerciseChanged = false;
+    const sets = exercise.sets.map((set) => {
+      const committedSet = canonicalizeSetValues(set);
+      exerciseChanged = exerciseChanged || committedSet !== set;
+      return committedSet;
+    });
+
+    if (!exerciseChanged) {
+      return exercise;
+    }
+
+    sessionChanged = true;
+    return { ...exercise, sets };
+  });
+
+  return sessionChanged ? { ...session, exercises } : session;
+};
 
 function createInitialState(): SessionRecorderState {
   return {
@@ -493,20 +522,11 @@ const PLANNED_SET_MATCH_MODE: PlannedSetMatchMode = 'volume';
 const hasPlannedTarget = (set: SessionSet): boolean =>
   set.plannedReps !== null || set.plannedWeight !== null || set.plannedSetType !== null;
 
-const hasPerformedActual = (set: SessionSet): boolean => {
-  if (set.reps.trim().length === 0) {
-    return false;
-  }
-
-  if (hasPlannedTarget(set) && (set.plannedWeight ?? '').trim().length === 0) {
-    return true;
-  }
-
-  return set.weight.trim().length > 0;
-};
+const hasPerformedActual = (set: SessionSet): boolean => isPerformedSet(set);
 
 const plannedSetVolumeMatches = (set: SessionSet): boolean =>
-  set.weight.trim() === (set.plannedWeight ?? '').trim() &&
+  canonicalizeWeightForReps(set.weight, set.reps).trim() ===
+    canonicalizeWeightForReps(set.plannedWeight ?? '', set.plannedReps ?? '').trim() &&
   set.reps.trim() === (set.plannedReps ?? '').trim();
 
 const plannedSetQualityMatches = (set: SessionSet): boolean =>
@@ -1036,7 +1056,7 @@ function removeIncompleteSets(session: Session): { session: Session; removedSets
       if (hasPlannedTarget(set)) {
         return true;
       }
-      const isComplete = set.reps.trim().length > 0 && set.weight.trim().length > 0;
+      const isComplete = isPerformedSet(set);
       if (!isComplete) {
         removedSets += 1;
       }
@@ -1077,7 +1097,17 @@ function removeExercisesWithNoSets(session: Session): { session: Session; remove
   };
 }
 
-export default function SessionRecorderScreen() {
+type SessionRecorderScreenProps = {
+  requestWeightInputFocus?: (input: TextInput | null) => void;
+};
+
+const focusWeightTextInput = (input: TextInput | null) => {
+  input?.focus();
+};
+
+export default function SessionRecorderScreen({
+  requestWeightInputFocus = focusWeightTextInput,
+}: SessionRecorderScreenProps = {}) {
   const router = useRouter();
   const navigation = useNavigation<any>();
   const params = useLocalSearchParams<{ mode?: string | string[]; sessionId?: string | string[] }>();
@@ -1166,8 +1196,10 @@ export default function SessionRecorderScreen() {
   const exerciseBlockHistoryRequestKeyRef = useRef<Record<string, string>>({});
   const exercisePickerPreselectionRequestKeyRef = useRef<string | null>(null);
   const focusedSetInputIdRef = useRef<string | null>(null);
+  const weightInputBySetIdRef = useRef<Record<string, TextInput | null>>({});
   const recorderScrollViewRef = useRef<ScrollView | null>(null);
   const exerciseCardYByExerciseIdRef = useRef<Record<string, number>>({});
+  const pendingExerciseCardScrollIdRef = useRef<string | null>(null);
   const horizontalSwipeStartXByKeyRef = useRef<Record<string, number>>({});
   const isMountedRef = useRef(true);
 
@@ -1444,20 +1476,22 @@ export default function SessionRecorderScreen() {
     useCallback(() => {
       reloadExerciseCatalogStats();
 
-      if (pendingExercisePickerRestoreTargetRef.current === undefined) {
-        return;
+      if (pendingExercisePickerRestoreTargetRef.current !== undefined) {
+        const selectionTargetId = pendingExercisePickerRestoreTargetRef.current;
+        pendingExercisePickerRestoreTargetRef.current = undefined;
+        setState((current) => ({
+          ...current,
+          exercisePickerVisible: true,
+          exerciseSelectionTargetId: selectionTargetId ?? null,
+          exerciseActionMenuVisible: false,
+          activeExerciseActionId: null,
+        }));
       }
 
-      const selectionTargetId = pendingExercisePickerRestoreTargetRef.current;
-      pendingExercisePickerRestoreTargetRef.current = undefined;
-      setState((current) => ({
-        ...current,
-        exercisePickerVisible: true,
-        exerciseSelectionTargetId: selectionTargetId ?? null,
-        exerciseActionMenuVisible: false,
-        activeExerciseActionId: null,
-      }));
-    }, [reloadExerciseCatalogStats])
+      return () => {
+        void lifecycleHelpers.onScreenBlur();
+      };
+    }, [lifecycleHelpers, reloadExerciseCatalogStats])
   );
 
   const markSessionStructuralMutation = useCallback(() => {
@@ -1537,6 +1571,13 @@ export default function SessionRecorderScreen() {
 
     if (focusedExerciseCardId && !activeExerciseIds.has(focusedExerciseCardId)) {
       setFocusedExerciseCardId(null);
+    }
+
+    if (
+      pendingExerciseCardScrollIdRef.current &&
+      !activeExerciseIds.has(pendingExerciseCardScrollIdRef.current)
+    ) {
+      pendingExerciseCardScrollIdRef.current = null;
     }
   }, [exerciseIdsKey, focusedExerciseCardId]);
 
@@ -2645,16 +2686,22 @@ export default function SessionRecorderScreen() {
     setExercisePickerSearchValue(value);
   };
 
-  const scrollToExerciseCard = useCallback((exerciseId: string) => {
-    const cardY = exerciseCardYByExerciseIdRef.current[exerciseId];
-    if (typeof cardY !== 'number') {
+  const consumePendingExerciseCardScroll = useCallback((exerciseId: string) => {
+    if (pendingExerciseCardScrollIdRef.current !== exerciseId) {
       return;
     }
 
-    recorderScrollViewRef.current?.scrollTo({
+    const cardY = exerciseCardYByExerciseIdRef.current[exerciseId];
+    const scrollView = recorderScrollViewRef.current;
+    if (typeof cardY !== 'number' || !scrollView) {
+      return;
+    }
+
+    scrollView.scrollTo({
       y: Math.max(cardY - 12, 0),
       animated: true,
     });
+    pendingExerciseCardScrollIdRef.current = null;
   }, []);
 
   const focusExerciseCard = useCallback((exerciseId: string | null) => {
@@ -2663,8 +2710,9 @@ export default function SessionRecorderScreen() {
     }
 
     setFocusedExerciseCardId(exerciseId);
-    requestAnimationFrame(() => scrollToExerciseCard(exerciseId));
-  }, [scrollToExerciseCard]);
+    pendingExerciseCardScrollIdRef.current = exerciseId;
+    requestAnimationFrame(() => consumePendingExerciseCardScroll(exerciseId));
+  }, [consumePendingExerciseCardScroll]);
 
   const selectExercisePreset = (exercisePresetId: string) => {
     const selectedExercisePreset = exercisePickerOptions.find((exercisePreset) => exercisePreset.id === exercisePresetId);
@@ -3005,9 +3053,27 @@ export default function SessionRecorderScreen() {
     if (focusedSetInputIdRef.current === setId) {
       focusedSetInputIdRef.current = null;
     }
-    if (focusedSetInputIdRef.current === null) {
-      collapseDisplayableSetRows();
-    }
+
+    requestAnimationFrame(() => {
+      if (!isMountedRef.current) {
+        return;
+      }
+
+      if (focusedSetInputIdRef.current === null) {
+        collapseDisplayableSetRows();
+
+        const currentState = stateRef.current;
+        const committedSession = canonicalizeSessionSetWeights(currentState.session);
+        if (committedSession !== currentState.session) {
+          const committedState = { ...currentState, session: committedSession };
+          stateRef.current = committedState;
+          setState(committedState);
+          markSessionTextMutation();
+        }
+      }
+
+      void autosaveController.flushInputCommit();
+    });
   };
 
   const updateSetField = (
@@ -3063,7 +3129,10 @@ export default function SessionRecorderScreen() {
                     ? {
                         ...set,
                         reps: set.plannedReps ?? set.reps,
-                        weight: set.plannedWeight ?? set.weight,
+                        weight: canonicalizeWeightForReps(
+                          set.plannedWeight ?? set.weight,
+                          set.plannedReps ?? set.reps
+                        ),
                         setType: normalizeSessionSetType(set.plannedSetType),
                         performanceStatus: null,
                       }
@@ -3498,7 +3567,8 @@ export default function SessionRecorderScreen() {
   };
 
   const beginSubmitFlow = (sessionCandidate: Session) => {
-    const { session: withoutIncompleteSets, removedSets } = removeIncompleteSets(sessionCandidate);
+    const committedSession = canonicalizeSessionSetWeights(sessionCandidate);
+    const { session: withoutIncompleteSets, removedSets } = removeIncompleteSets(committedSession);
     if (removedSets > 0) {
       setSubmitCleanupPrompt({
         step: 'incomplete-sets',
@@ -3805,17 +3875,14 @@ export default function SessionRecorderScreen() {
               : undefined,
           onLayout: (event) => {
             exerciseCardYByExerciseIdRef.current[exercise.id] = event.nativeEvent.layout.y;
-            if (focusedExerciseCardId === exercise.id) {
-              requestAnimationFrame(() => scrollToExerciseCard(exercise.id));
+            if (pendingExerciseCardScrollIdRef.current === exercise.id) {
+              requestAnimationFrame(() => consumePendingExerciseCardScroll(exercise.id));
             }
           },
           style: focusedExerciseCardId === exercise.id ? styles.focusedExerciseCard : null,
           testID: `session-exercise-card-${exerciseIndex + 1}`,
         })}
         renderSetRow={({ exercise, exerciseIndex, set, setIndex }) => {
-          const loadInputMode =
-            loadInputModeByExerciseDefinitionId.get(exercise.exerciseDefinitionId) ?? 'total_load';
-          const weightUnitLabel = loadInputMode === 'per_side_load' ? 'kg per side' : 'kg total';
           const rowState = getSetRowState(set);
           const isPlannedRow = hasPlannedTarget(set);
           const exerciseHasPlannedTargets = exercise.sets.some(hasPlannedTarget);
@@ -4117,18 +4184,26 @@ export default function SessionRecorderScreen() {
                 isActiveRow ? styles.setRowActive : null,
               ]}>
               <Text style={[styles.setRowGlyph, isMutedRow ? styles.compactSetMutedText : null]}>{rowGlyph}</Text>
-              <View
+              <Pressable
+                accessible={false}
                 style={[
                   styles.input,
                   styles.setWeightInputShell,
                   hasSetFieldValidationError('weight', set.weight) ? styles.inputInvalid : null,
                 ]}
-                testID={`set-weight-input-shell-${exerciseIndex + 1}-${setIndex + 1}`}>
+                testID={`set-weight-input-shell-${exerciseIndex + 1}-${setIndex + 1}`}
+                onPress={() => {
+                  focusedSetInputIdRef.current = set.id;
+                  requestWeightInputFocus(weightInputBySetIdRef.current[set.id]);
+                }}>
                 <TextInput
                   accessibilityLabel={`Weight for exercise ${exerciseIndex + 1} set ${setIndex + 1}`}
                   autoFocus={pendingFocusedWeightSetId === set.id}
                   inputMode="decimal"
                   keyboardType="decimal-pad"
+                  ref={(input) => {
+                    weightInputBySetIdRef.current[set.id] = input;
+                  }}
                   style={styles.setWeightTextInput}
                   value={set.weight}
                   onBlur={() => {
@@ -4146,9 +4221,9 @@ export default function SessionRecorderScreen() {
                   }}
                 />
                 <Text testID={`set-weight-unit-${exerciseIndex + 1}-${setIndex + 1}`} style={styles.setWeightUnitText}>
-                  {weightUnitLabel}
+                  kg
                 </Text>
-              </View>
+              </Pressable>
               <TextInput
                 accessibilityLabel={`Reps for exercise ${exerciseIndex + 1} set ${setIndex + 1}`}
                 inputMode="numeric"
@@ -4195,33 +4270,44 @@ export default function SessionRecorderScreen() {
             </Pressable>
           </View>
         )}
-        renderExerciseMeta={({ exercise, exerciseIndex }) => (
-          <View style={styles.exerciseTagSection}>
-            {exercise.sets.length > 0 ? (
-              <Text style={styles.exerciseSetSummaryText}>{getExerciseSetSummary(exercise.sets)}</Text>
-            ) : null}
-            <View style={styles.exerciseTagChipWrap}>
-              {exercise.tags.map((tag) => (
-                <View
-                  key={tag.assignmentId}
-                  style={[styles.exerciseTagChip, tag.deletedAt ? styles.exerciseTagChipDeleted : null]}>
-                  <Text numberOfLines={1} style={styles.exerciseTagChipText}>
-                    {tag.deletedAt ? `${tag.name} (deleted)` : tag.name}
-                  </Text>
-                  <Pressable
-                    accessibilityLabel={`Remove tag ${tag.name} from exercise ${exerciseIndex + 1}`}
-                    style={styles.exerciseTagChipRemoveButton}
-                    onPress={() => {
-                      void removeAssignedTagFromExercise(exercise.id, tag.tagDefinitionId);
-                    }}>
-                    <Text style={styles.exerciseTagChipRemoveButtonText}>X</Text>
-                  </Pressable>
-                </View>
-              ))}
+        renderExerciseMeta={({ exercise, exerciseIndex }) => {
+          const loadInputMode =
+            loadInputModeByExerciseDefinitionId.get(exercise.exerciseDefinitionId) ?? 'total_load';
+          const loadInputModeLabel = loadInputMode === 'per_side_load' ? 'Per side' : 'Total load';
+
+          return (
+            <View style={styles.exerciseTagSection}>
+              <Text
+                style={styles.exerciseLoadModeText}
+                testID={`exercise-load-mode-${exerciseIndex + 1}`}>
+                Weight entry: {loadInputModeLabel}
+              </Text>
+              {exercise.sets.length > 0 ? (
+                <Text style={styles.exerciseSetSummaryText}>{getExerciseSetSummary(exercise.sets)}</Text>
+              ) : null}
+              <View style={styles.exerciseTagChipWrap}>
+                {exercise.tags.map((tag) => (
+                  <View
+                    key={tag.assignmentId}
+                    style={[styles.exerciseTagChip, tag.deletedAt ? styles.exerciseTagChipDeleted : null]}>
+                    <Text numberOfLines={1} style={styles.exerciseTagChipText}>
+                      {tag.deletedAt ? `${tag.name} (deleted)` : tag.name}
+                    </Text>
+                    <Pressable
+                      accessibilityLabel={`Remove tag ${tag.name} from exercise ${exerciseIndex + 1}`}
+                      style={styles.exerciseTagChipRemoveButton}
+                      onPress={() => {
+                        void removeAssignedTagFromExercise(exercise.id, tag.tagDefinitionId);
+                      }}>
+                      <Text style={styles.exerciseTagChipRemoveButtonText}>X</Text>
+                    </Pressable>
+                  </View>
+                ))}
+              </View>
+              {renderExerciseBlockHistoryPanel(exercise, exerciseIndex)}
             </View>
-            {renderExerciseBlockHistoryPanel(exercise, exerciseIndex)}
-          </View>
-        )}
+          );
+        }}
         renderExerciseFooter={({ exercise, exerciseIndex }) => (
           <Pressable
             accessibilityLabel={`Add set to exercise ${exerciseIndex + 1}`}
@@ -5236,6 +5322,12 @@ const styles = StyleSheet.create({
   exerciseTagSection: {
     gap: 8,
   },
+  exerciseLoadModeText: {
+    fontSize: 12,
+    lineHeight: 15,
+    fontWeight: '600',
+    color: uiColors.textSecondary,
+  },
   exerciseSetSummaryText: {
     fontSize: 12,
     lineHeight: 15,
@@ -5594,7 +5686,7 @@ const styles = StyleSheet.create({
   },
   setWeightInputShell: {
     flex: 1,
-    minWidth: 0,
+    minWidth: 82,
     paddingVertical: 0,
     flexDirection: 'row',
     alignItems: 'center',
@@ -5602,7 +5694,7 @@ const styles = StyleSheet.create({
   },
   setWeightTextInput: {
     flex: 1,
-    minWidth: 0,
+    minWidth: 44,
     paddingVertical: 8,
     color: uiColors.textPrimary,
   },

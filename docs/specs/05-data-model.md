@@ -198,9 +198,17 @@ section states only the data-model-level invariants.
 5. `exercise_sets` metadata includes optional `set_type` (`warm_up | rir_0 | rir_1 | rir_2 | null`) and remains nullable for legacy/unspecified sets. `warm_up` is an effort/display classification, not a general stats exclusion flag: valid warm-up sets count toward volume, estimated 1RM, highest/top weight, heatmaps, and other strength/volume metrics, but do not count as near-failure sets.
 6. Planned workout execution targets are `in sync scope`: `exercise_sets.planned_weight_value`, `planned_reps_value`, `planned_set_type`, and `performance_status` are carried in the push/pull wire envelope so appended historical/program rows restore as planned targets rather than completed logs. Actual performed values remain in `weight_value`, `reps_value`, and `set_type`.
    - Active drafts may store planned/skipped target UI state. Completed workout history is actual-only for now: final active-session submit and completed-edit save remove skipped and otherwise unperformed planned rows before writing the completed payload, so only performed actual sets become completed workout data.
-7. `gyms` may include nullable coordinate metadata: `latitude`, `longitude`, `coordinate_accuracy_m`, and `coordinates_updated_at`. The sync impact decision is `in sync scope`; all four columns are carried verbatim by the `gyms` push/pull wire envelope, the first-full-pull bootstrap, and reinstall restore parity.
-8. Gym coordinate fields are either all null or all non-null. Valid ranges are latitude `-90..90`, longitude `-180..180`, accuracy `>= 0`, and non-negative `coordinates_updated_at` epoch milliseconds. Clearing saved coordinates sets all four coordinate fields to null. These ranges are client-enforced — the server runs no validation (contract §A.1).
-9. Muscle volume is recomputed per side from current exercise metadata. Each
+7. Active `exercise_sets` rows are lossless draft data: fully blank and partial
+   rows retain their IDs and order through save, hydration, and navigation.
+   When `reps_value` is a positive integer, blank `weight_value` is canonicalized
+   to `"0"` at input-commit, persistence, or completion boundaries and is a valid
+   performed zero-load set. Blank or invalid reps remain incomplete and require
+   explicit cleanup confirmation at completion. This is value normalization
+   within the existing string column and Sync v2 field; it introduces no schema
+   migration or wire-envelope change.
+8. `gyms` may include nullable coordinate metadata: `latitude`, `longitude`, `coordinate_accuracy_m`, and `coordinates_updated_at`. The sync impact decision is `in sync scope`; all four columns are carried verbatim by the `gyms` push/pull wire envelope, the first-full-pull bootstrap, and reinstall restore parity.
+9. Gym coordinate fields are either all null or all non-null. Valid ranges are latitude `-90..90`, longitude `-180..180`, accuracy `>= 0`, and non-negative `coordinates_updated_at` epoch milliseconds. Clearing saved coordinates sets all four coordinate fields to null. These ranges are client-enforced — the server runs no validation (contract §A.1).
+10. Muscle volume is recomputed per side from current exercise metadata. Each
    valid set starts with entered volume (`weight × reps`), halves that base for
    `total_load`, preserves it for `per_side_load`, then multiplies by the
    mapping role factor: `1` for primary and `0.5` for secondary. Persisted

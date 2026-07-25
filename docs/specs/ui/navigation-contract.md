@@ -101,14 +101,24 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
   - sign-in/sign-out change route state without redirecting away from `/profile`
   - inline auth/profile failures do not redirect away from `/profile` or block returning to local-only routes
 
-8. `/completed-session/[sessionId]`
+8. `/sessions`
+- File: `apps/mobile/app/sessions.tsx`
+- Params:
+  - none
+- Behavior:
+  - opened from the Stats Sessions summary card
+  - active Resume and review/complete both use `dismissTo('/session-recorder')`
+    to return to the existing Log recorder; `/sessions` never completes an
+    active session directly
+
+9. `/completed-session/[sessionId]`
 - File: `apps/mobile/app/completed-session/[sessionId].tsx`
 - Path params:
   - `sessionId` (required dynamic segment)
 - Query params:
   - `intent` (optional; `edit` redirects to `session-recorder` completed-edit mode)
 
-9. `/exercise-history`
+10. `/exercise-history`
 - File: `apps/mobile/app/exercise-history.tsx`
 - Query params:
   - `exerciseDefinitionId` (required; if missing, the screen renders an error state instead of crashing)
@@ -126,35 +136,41 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
    - Stats sub-view per-exercise picker opens the per-exercise history view
 3. `/stats-history` -> `/completed-session/<sessionId>`
    - History sub-view row tap (via the shared `HistoryList`)
-4. `/session-recorder` <-> `/stats-history` / `/exercise-catalog`
+4. `/stats-history` -> `/sessions`
+   - Stats Sessions summary card
+5. `/sessions` -> `/session-recorder`
+   - active Resume or review/complete dismisses the Sessions stack screen to the
+     existing Log recorder; completion continues through recorder validation and
+     cleanup rather than a direct repository status change
+6. `/session-recorder` <-> `/stats-history` / `/exercise-catalog`
    - tab switching via the shared bottom tray (`BottomTray` -> `TopLevelTabs`)
-5. `/completed-session/<sessionId>` -> `/session-recorder?mode=completed-edit&sessionId=<sessionId>`
+7. `/completed-session/<sessionId>` -> `/session-recorder?mode=completed-edit&sessionId=<sessionId>`
    - edit action
-6. `/completed-session/<sessionId>?intent=edit` -> `/session-recorder?mode=completed-edit&sessionId=<sessionId>`
+8. `/completed-session/<sessionId>?intent=edit` -> `/session-recorder?mode=completed-edit&sessionId=<sessionId>`
    - route-side redirect (`replace`)
-7. `/completed-session/<sessionId>` -> `/session-recorder`
+9. `/completed-session/<sessionId>` -> `/session-recorder`
    - successful append of one selected historical exercise block as planned target rows in the active recorder (creates an active session first when needed)
-8. `/session-recorder...` -> `/`
+10. `/session-recorder...` -> `/`
    - successful submit/save (`dismissTo('/')`, forwarded to `/stats-history` by the root alias)
-9. `/session-recorder` -> `/exercise-catalog?source=session-recorder&intent=manage`
+11. `/session-recorder` -> `/exercise-catalog?source=session-recorder&intent=manage`
    - exercise picker `Manage` action
-10. `/exercise-catalog?source=session-recorder...` -> `/session-recorder`
+12. `/exercise-catalog?source=session-recorder...` -> `/session-recorder`
    - explicit back action or post-save return (`router.back()`)
-11. (any tab root or detail screen rendering `TopLevelTabs`) -> `/settings`
+13. (any tab root or detail screen rendering `TopLevelTabs`) -> `/settings`
    - shared Settings cog in the bottom tray / top-level tab strip
-12. `/settings` -> `/profile`
+14. `/settings` -> `/profile`
    - settings destination row
-13. `/profile` -> `/profile`
+15. `/profile` -> `/profile`
    - in-place auth-state rerender on sign-in/sign-out; no route replacement
-14. `/exercise-history` -> `/completed-session/<sessionId>`
+16. `/exercise-history` -> `/completed-session/<sessionId>`
    - session card tap or all-time-best row tap
-15. (any guarded route) -> `/sign-in`
+17. (any guarded route) -> `/sign-in`
    - route-layer auth-guard redirect on a configured-but-no-session launch, or when a sync cycle reports "no signed-in user" (`<Redirect />`)
-16. `/sign-in` -> `/`
+18. `/sign-in` -> `/`
    - successful sign-in: the guard stops redirecting and the app proceeds to the normal route; an already-signed-in render of `/sign-in` also redirects to `/`
-17. (any signed-in route) -> first-sync block
+19. (any signed-in route) -> first-sync block
    - the first-sync gate (below the auth guard) renders a full-screen "Setting up your data…" block in place of the navigator while `sync_runtime_state.bootstrap_completed_at` is null for a signed-in user; this is render-substitution, not a route replacement (the URL is unchanged), and it dismisses in place once the flag is set
-18. first-sync block -> `/sign-in`
+20. first-sync block -> `/sign-in`
    - when the latest sync cycle outcome is `AUTH_REQUIRED`, the gate redirects to `/sign-in` (no Retry); the `/sign-in` route is exempt from the block so the redirect cannot loop
 
 Note:
@@ -165,7 +181,7 @@ Note:
 ## Header titles (current, high level)
 
 - Tab roots inside the `(tabs)` group (`stats-history`, `session-recorder`, `exercise-catalog`, `settings`) all run with `headerShown: false`; per-screen titles in `apps/mobile/app/(tabs)/_layout.tsx` are still declared for completeness but the visible tab bar is now `BottomTray` (composing `TopLevelTabs`) supplied via the `tabBar` prop. Detail screens that haven't yet moved into `(tabs)` (notably `exercise-history`) still render `TopLevelTabs` directly until they migrate.
-- Detail screens registered in the root stack (`exercise-history`, `profile`, `maestro-harness`, `completed-session/[sessionId]`) keep their native stack header behavior; titles are declared in `apps/mobile/app/_layout.tsx`
+- Detail screens registered in the root stack (`exercise-history`, `sessions`, `profile`, `maestro-harness`, `completed-session/[sessionId]`) keep their native stack header behavior; titles are declared in `apps/mobile/app/_layout.tsx`
 - `completed-session/[sessionId]` sets its title inside the route file (current title: `View Session`)
 - `exercise-history` sets its title inside the route file to the resolved exercise name (falls back to `Exercise History` when the summary is not yet available)
 

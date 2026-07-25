@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
-import { StyleSheet } from 'react-native';
+import { ScrollView, StyleSheet } from 'react-native';
 
 import { uiColors } from '@/components/ui';
 import SessionRecorderScreen from '../(tabs)/session-recorder';
@@ -10,6 +10,7 @@ import {
 
 const mockPush = jest.fn();
 const mockLogEvent = jest.fn();
+const mockRecorderScrollTo = ScrollView.prototype.scrollTo as jest.Mock;
 const mockFocusCallbacks = new Set<() => void | (() => void)>();
 let mockSearchParams: Record<string, string | undefined> = {};
 
@@ -487,6 +488,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     mockLoadSessionSnapshotById.mockResolvedValue(null);
     mockSaveExerciseCatalogExercise.mockClear();
     mockLogEvent.mockClear();
+    mockRecorderScrollTo.mockClear();
     __resetExerciseListPreferencesForTests();
     setExerciseListPreferences({ groupByMuscleFamily: false });
   });
@@ -506,7 +508,9 @@ describe('SessionRecorderScreen exercise interactions', () => {
     expect(screen.getByText('Barbell Squat')).toBeTruthy();
     expect(screen.queryByTestId('exercise-1-set-header')).toBeNull();
     expect(screen.getByLabelText('Weight for exercise 1 set 1')).toBeTruthy();
-    expect(screen.getByTestId('set-weight-unit-1-1')).toHaveTextContent('kg total');
+    expect(screen.getByTestId('exercise-load-mode-1')).toHaveTextContent('Weight entry: Total load');
+    expect(screen.getByTestId('set-weight-unit-1-1')).toHaveTextContent('kg');
+    expect(StyleSheet.flatten(screen.getByLabelText('Weight for exercise 1 set 1').props.style).minWidth).toBe(44);
     expect(screen.getByPlaceholderText('Reps')).toBeTruthy();
     expect(screen.getByLabelText('Weight for exercise 1 set 1').props.autoFocus).toBe(true);
     expect(screen.getByLabelText('Weight for exercise 1 set 1').props.selectTextOnFocus).toBeUndefined();
@@ -534,15 +538,22 @@ describe('SessionRecorderScreen exercise interactions', () => {
     await act(async () => {});
   });
 
-  it('labels per-side exercise weight entry without changing the scalar input', async () => {
-    render(<SessionRecorderScreen />);
+  it('labels per-side weight at card level, focuses from the shell, and keeps the scalar input', async () => {
+    const focusWeightInput = jest.fn();
+    render(<SessionRecorderScreen requestWeightInputFocus={focusWeightInput} />);
     await dismissEmptyStateIfPresent();
     fireEvent.press(screen.getByText('Log new exercise'));
     await selectExerciseFromPicker('Dumbbell Bench Press');
 
-    expect(screen.getByTestId('set-weight-unit-1-1')).toHaveTextContent('kg per side');
-    fireEvent.changeText(screen.getByLabelText('Weight for exercise 1 set 1'), '22');
-    expect(screen.getByLabelText('Weight for exercise 1 set 1').props.value).toBe('22');
+    const weightInput = screen.getByLabelText('Weight for exercise 1 set 1');
+    expect(screen.getByTestId('exercise-load-mode-1')).toHaveTextContent('Weight entry: Per side');
+    expect(screen.getByTestId('set-weight-unit-1-1')).toHaveTextContent('kg');
+    fireEvent.press(screen.getByTestId('set-weight-unit-1-1'));
+    expect(focusWeightInput).toHaveBeenCalledTimes(1);
+    fireEvent.press(screen.getByTestId('set-weight-input-shell-1-1'));
+    expect(focusWeightInput).toHaveBeenCalledTimes(2);
+    fireEvent.changeText(weightInput, '22');
+    expect(weightInput.props.value).toBe('22');
   });
 
   it('opens preselection for add-row picks, keeps Append plan disabled without valid history, and clears on search', async () => {
@@ -638,6 +649,59 @@ describe('SessionRecorderScreen exercise interactions', () => {
     expect(screen.getByTestId('planned-set-row-2-2')).toHaveTextContent(/5 reps/);
     expect(screen.getByLabelText('Log set 1 as planned')).toBeTruthy();
     expect(screen.getByLabelText('Skip set 2')).toBeTruthy();
+  });
+
+  it('scrolls to an appended plan once after layout and ignores later card layouts', async () => {
+    mockLoadSuggestedExercisePlan.mockResolvedValueOnce({
+      sessionId: 'history-session-1',
+      completedAt: new Date(2026, 5, 10, 18, 42),
+      sessionExerciseIds: ['history-exercise-1'],
+      sets: [
+        {
+          setId: 'history-set-1',
+          sessionExerciseId: 'history-exercise-1',
+          weightValue: '120',
+          repsValue: '5',
+          setType: null,
+        },
+      ],
+    });
+
+    render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
+
+    fireEvent.press(screen.getByText('Log new exercise'));
+    fireEvent.press(await screen.findByLabelText('Select exercise Barbell Squat'));
+    await screen.findByTestId('exercise-picker-plan-source');
+    fireEvent.press(screen.getByTestId('exercise-picker-append-plan-button'));
+
+    const appendedExerciseCard = screen.getByTestId('session-exercise-card-1');
+    expect(appendedExerciseCard.props.accessibilityState?.selected).toBe(true);
+    expect(mockRecorderScrollTo).not.toHaveBeenCalled();
+
+    fireEvent(appendedExerciseCard, 'layout', {
+      nativeEvent: {
+        layout: { height: 800, width: 320, x: 0, y: 640 },
+      },
+    });
+
+    await waitFor(() => {
+      expect(mockRecorderScrollTo).toHaveBeenCalledTimes(1);
+      expect(mockRecorderScrollTo).toHaveBeenCalledWith({
+        y: 628,
+        animated: true,
+      });
+    });
+
+    fireEvent(appendedExerciseCard, 'layout', {
+      nativeEvent: {
+        layout: { height: 840, width: 320, x: 0, y: 700 },
+      },
+    });
+    await act(async () => {});
+
+    expect(mockRecorderScrollTo).toHaveBeenCalledTimes(1);
+    expect(appendedExerciseCard.props.accessibilityState?.selected).toBe(true);
   });
 
   it('shows collapsible Past Records with date/current/max columns and swipe navigation', async () => {

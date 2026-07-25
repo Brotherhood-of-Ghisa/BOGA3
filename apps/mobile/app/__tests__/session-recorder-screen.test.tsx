@@ -371,6 +371,7 @@ describe('SessionRecorderScreen', () => {
     fireEvent.press(screen.getByLabelText('added set 3 for exercise 1: 185kg · 8 reps; quality RIR 1'));
     expect(screen.getByLabelText('Weight for exercise 1 set 3')).toBeTruthy();
     fireEvent(screen.getByLabelText('Weight for exercise 1 set 3'), 'blur');
+    await act(async () => {});
 
     fireEvent.press(screen.getByLabelText('Log set 1 as planned'));
     expect(screen.getByText('Set 1')).toBeTruthy();
@@ -496,7 +497,8 @@ describe('SessionRecorderScreen', () => {
     fireEvent.press(screen.getByLabelText('logged set 1 for exercise 1: 30kg · 8 reps; quality RIR 2'));
 
     expect(screen.getByLabelText('Weight for exercise 1 set 1')).toBeTruthy();
-    expect(screen.getByText('kg total')).toBeTruthy();
+    expect(screen.getByTestId('exercise-load-mode-1')).toHaveTextContent('Weight entry: Total load');
+    expect(screen.getByTestId('set-weight-unit-1-1')).toHaveTextContent('kg');
     expect(screen.getByPlaceholderText('Reps')).toBeTruthy();
     expect(screen.getByLabelText('Quality for exercise 1 set 1: RIR 2')).toBeTruthy();
 

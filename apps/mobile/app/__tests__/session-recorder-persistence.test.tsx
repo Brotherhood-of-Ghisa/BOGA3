@@ -8,6 +8,7 @@ import {
 
 let mockSearchParams: Record<string, string | undefined> = {};
 let mockBeforeRemoveListener: ((event: any) => void) | null = null;
+let mockFocusCleanup: (() => void) | null = null;
 const mockNavigationDispatch = jest.fn();
 const mockNavigationAddListener = jest.fn((eventName: string, listener: (event: any) => void) => {
   if (eventName === 'beforeRemove') {
@@ -94,7 +95,16 @@ jest.mock('@/src/data/exercise-catalog-stats', () => ({
 jest.mock('expo-router', () => ({
   useFocusEffect: (callback: () => void | (() => void)) => {
     const React = jest.requireActual('react');
-    React.useEffect(() => callback(), [callback]);
+    React.useEffect(() => {
+      const cleanup = callback();
+      mockFocusCleanup = typeof cleanup === 'function' ? cleanup : null;
+      return () => {
+        if (mockFocusCleanup === cleanup) {
+          mockFocusCleanup = null;
+        }
+        cleanup?.();
+      };
+    }, [callback]);
   },
   useLocalSearchParams: () => mockSearchParams,
   useNavigation: () => ({ addListener: mockNavigationAddListener, dispatch: mockNavigationDispatch }),
@@ -163,6 +173,7 @@ describe('SessionRecorderScreen persistence wiring', () => {
     jest.useFakeTimers();
     mockSearchParams = {};
     mockBeforeRemoveListener = null;
+    mockFocusCleanup = null;
     __resetExerciseListPreferencesForTests();
     setExerciseListPreferences({ groupByMuscleFamily: false });
     mockNavigationDispatch.mockReset();
@@ -303,6 +314,119 @@ describe('SessionRecorderScreen persistence wiring', () => {
         ],
       })
     );
+  });
+
+  it('flushes pending text when the recorder tab loses focus without unmounting', async () => {
+    render(<SessionRecorderScreen />);
+
+    await waitFor(() => {
+      expect(mockLoadLatestSessionDraftSnapshot).toHaveBeenCalledTimes(1);
+    });
+    await dismissEmptyStateIfPresent();
+
+    fireEvent.press(screen.getByText('Log new exercise'));
+    await addExerciseWithEmptySet('Barbell Squat');
+    await waitFor(() => {
+      expect(mockPersistSessionDraftSnapshot).toHaveBeenCalled();
+    });
+    mockPersistSessionDraftSnapshot.mockClear();
+
+    fireEvent.changeText(screen.getByLabelText('Weight for exercise 1 set 1'), '80');
+
+    await act(async () => {
+      jest.advanceTimersByTime(1_000);
+      await flushMicrotasks();
+    });
+    expect(mockPersistSessionDraftSnapshot).not.toHaveBeenCalled();
+
+    await act(async () => {
+      mockFocusCleanup?.();
+      await flushMicrotasks();
+    });
+
+    expect(mockPersistSessionDraftSnapshot).toHaveBeenCalledWith(
+      expect.objectContaining({
+        exercises: [
+          expect.objectContaining({
+            sets: [expect.objectContaining({ repsValue: '', weightValue: '80' })],
+          }),
+        ],
+      })
+    );
+  });
+
+  it('commits blank weight as zero and flushes pending reps when the row input blurs', async () => {
+    render(<SessionRecorderScreen />);
+
+    await waitFor(() => {
+      expect(mockLoadLatestSessionDraftSnapshot).toHaveBeenCalledTimes(1);
+    });
+    await dismissEmptyStateIfPresent();
+
+    fireEvent.press(screen.getByText('Log new exercise'));
+    await addExerciseWithEmptySet('Barbell Squat');
+    await waitFor(() => {
+      expect(mockPersistSessionDraftSnapshot).toHaveBeenCalled();
+    });
+    mockPersistSessionDraftSnapshot.mockClear();
+
+    const repsInput = screen.getByLabelText('Reps for exercise 1 set 1');
+    fireEvent.changeText(repsInput, '5');
+
+    await act(async () => {
+      jest.advanceTimersByTime(1_000);
+      await flushMicrotasks();
+    });
+    expect(mockPersistSessionDraftSnapshot).not.toHaveBeenCalled();
+
+    fireEvent(repsInput, 'blur');
+
+    await waitFor(() => {
+      expect(mockPersistSessionDraftSnapshot).toHaveBeenCalledTimes(1);
+    });
+    expect(mockPersistSessionDraftSnapshot).toHaveBeenCalledWith(
+      expect.objectContaining({
+        exercises: [
+          expect.objectContaining({
+            sets: [
+              expect.objectContaining({
+                repsValue: '5',
+                weightValue: '0',
+              }),
+            ],
+          }),
+        ],
+      })
+    );
+    expect(
+      screen.getByLabelText('logged set 1 for exercise 1: 0kg · 5 reps; quality none')
+    ).toBeTruthy();
+  });
+
+  it('does not inject zero while focus moves between inputs in the same row', async () => {
+    render(<SessionRecorderScreen />);
+
+    await waitFor(() => {
+      expect(mockLoadLatestSessionDraftSnapshot).toHaveBeenCalledTimes(1);
+    });
+    await dismissEmptyStateIfPresent();
+
+    fireEvent.press(screen.getByText('Log new exercise'));
+    await addExerciseWithEmptySet('Barbell Squat');
+
+    const repsInput = screen.getByLabelText('Reps for exercise 1 set 1');
+    const weightInput = screen.getByLabelText('Weight for exercise 1 set 1');
+    fireEvent(repsInput, 'focus');
+    fireEvent.changeText(repsInput, '5');
+    fireEvent(repsInput, 'blur');
+    fireEvent(weightInput, 'focus');
+
+    await act(async () => {
+      jest.advanceTimersByTime(20);
+      await flushMicrotasks();
+    });
+
+    expect(screen.getByLabelText('Weight for exercise 1 set 1').props.value).toBe('');
   });
 
   it('pauses completed-edit autosave while times are invalid and resumes when valid', async () => {
