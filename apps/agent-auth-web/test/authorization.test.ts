@@ -61,16 +61,39 @@ describe('agent authorization consent model', () => {
     expect(Object.keys(OAUTH_SCOPE_DISCLOSURES)).toEqual([...BOGA_OAUTH_SCOPES]);
     expect(OAUTH_SCOPE_DISCLOSURES.openid).toContain('OpenID ID token');
     expect(OAUTH_SCOPE_DISCLOSURES.profile).toContain('name and profile picture');
+    expect(OAUTH_SCOPE_DISCLOSURES.email).toContain('email address');
+    expect(OAUTH_SCOPE_DISCLOSURES.phone).toContain('phone number');
   });
 
-  it('rejects unexpected or additional identity scopes before approval', async () => {
+  it('accepts all identity scopes advertised by Supabase', async () => {
     const client = oauthClient({
       getAuthorizationDetails: vi.fn().mockResolvedValue({
         data: {
           authorization_id: 'valid_request_12345',
           client: { id: 'client-a', name: 'Coach Agent' },
           redirect_uri: 'https://client.example.test/callback',
-          scope: 'openid profile email',
+          scope: 'openid profile email phone',
+        },
+        error: null,
+      }),
+    });
+
+    await expect(loadConsentState(client, 'valid_request_12345')).resolves.toMatchObject({
+      details: {
+        scopes: ['openid', 'profile', 'email', 'phone'],
+      },
+      kind: 'consent',
+    });
+  });
+
+  it('rejects unknown or additional identity scopes before approval', async () => {
+    const client = oauthClient({
+      getAuthorizationDetails: vi.fn().mockResolvedValue({
+        data: {
+          authorization_id: 'valid_request_12345',
+          client: { id: 'client-a', name: 'Coach Agent' },
+          redirect_uri: 'https://client.example.test/callback',
+          scope: 'openid profile offline_access',
         },
         error: null,
       }),

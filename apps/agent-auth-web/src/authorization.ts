@@ -1,12 +1,14 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-export const BOGA_OAUTH_SCOPES = ['openid', 'profile'] as const;
+export const BOGA_OAUTH_SCOPES = ['openid', 'profile', 'email', 'phone'] as const;
 
 export type BogaOAuthScope = (typeof BOGA_OAUTH_SCOPES)[number];
 
 export const OAUTH_SCOPE_DISCLOSURES: Record<BogaOAuthScope, string> = {
   openid: 'Confirm your BoGa account identity and issue an OpenID ID token.',
   profile: 'Share standard profile claims such as your name and profile picture.',
+  email: 'Share your email address and whether it has been verified.',
+  phone: 'Share your phone number and whether it has been verified.',
 };
 
 export type ConsentDetails = {

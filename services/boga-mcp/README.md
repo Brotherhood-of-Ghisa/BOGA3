@@ -9,8 +9,10 @@ It has no database client, Supabase data credentials, SQL, or service-role key.
 
 - `POST /mcp` — authenticated MCP Streamable HTTP endpoint.
 - `GET /.well-known/oauth-protected-resource/mcp` — OAuth protected-resource
-  metadata for the MCP endpoint. It advertises exactly the `openid` and
-  `profile` scopes accepted and disclosed by the BoGa consent surface.
+  metadata for the MCP endpoint. It advertises the resource's required
+  `openid` and `profile` scopes; Supabase authorization-server discovery also
+  advertises the standard `email` and `phone` identity scopes, which the BoGa
+  consent surface accepts and discloses.
 - `GET /.well-known/oauth-authorization-server` — authorization-server
   metadata proxied from the configured Supabase Auth issuer.
 - `GET /health` — unauthenticated process health only; returns no user data.
