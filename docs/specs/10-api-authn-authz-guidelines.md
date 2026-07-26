@@ -31,6 +31,10 @@ This is the shortest operational summary. Use the "Further reading" section when
 10. Normal app access uses `anon` key + user JWT; never use `service_role` from mobile/client code.
 11. `service_role` is server-only/admin-only (provisioning, maintenance, tightly scoped backend tasks).
 12. API changes must include negative-path tests for unauthorized and cross-user access denial.
+13. Supabase OAuth tokens carry `client_id`. M21 agent tokens are read-only:
+    direct domain-table access and sync/profile/log writes require
+    `client_id IS NULL`; agent training reads go only through the dedicated
+    BoGa3 agent API.
 
 ## Practical guidance for API developers (backend)
 

@@ -79,6 +79,31 @@ runtime_rest_api_reachable() {
     >/dev/null 2>&1
 }
 
+ensure_agent_api_route_registered() {
+  [[ -d "${SUPABASE_DIR}/functions/agent-api" ]] || return 0
+
+  local status
+  status="$(
+    curl --silent --output /dev/null --write-out '%{http_code}' \
+      --max-time 5 \
+      -H "apikey: ${ANON_KEY}" \
+      "${API_URL}/functions/v1/agent-api/v1/agent/session" \
+      2>/dev/null || true
+  )"
+
+  if [[ "${status}" != "404" ]]; then
+    return 0
+  fi
+
+  # The local Edge Runtime snapshots function directories when its container is
+  # created. Recreate only this worktree's stack when a checkout adds agent-api
+  # after the runtime was already running; database volumes remain intact.
+  echo "[supabase] agent-api is absent from the running Edge Runtime; refreshing function routing"
+  run_supabase stop >/dev/null
+  "${SCRIPT_DIR}/local-runtime-up.sh"
+  load_supabase_status_env
+}
+
 apply_pending_local_migrations() {
   echo "[supabase] applying pending local migrations"
   run_supabase db push --local --include-all --yes >/dev/null
@@ -97,6 +122,7 @@ ensure_runtime_and_baseline() {
     load_supabase_status_env
   fi
 
+  ensure_agent_api_route_registered
   apply_pending_local_migrations
 
   if ! "${SCRIPT_DIR}/smoke-seed.sh"; then

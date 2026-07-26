@@ -13,7 +13,8 @@
  *      pg_proc / pg_trigger.
  *   4. Per entity (derived: every app_public table with `owner_user_id`):
  *      walk client→server and server→client; run §7.3 step 4f sanity checks
- *      (universal index, two triggers, four RLS policies w/ body hashes,
+ *      (universal index, two triggers, four owner RLS policies plus the
+ *      restrictive direct-app-only policy, all w/ body hashes,
  *      no CHECK, no `extras`, no `deleted` boolean).
  *   5. Run the §7.7 topo-order assertion against TOPO_LAYERS.
  *
@@ -248,6 +249,7 @@ interface PgIndex {
 
 interface PgPolicy {
   policyname: string;
+  permissive: 'PERMISSIVE' | 'RESTRICTIVE';
   cmd: string;
   qual: string | null;
   with_check: string | null;
@@ -335,7 +337,7 @@ async function pgTriggerNames(pg: PgClient, table: string): Promise<string[]> {
 async function pgPolicies(pg: PgClient, table: string): Promise<PgPolicy[]> {
   const r = await pg.query<PgPolicy>(
     `
-    select policyname, cmd, qual, with_check
+    select policyname, permissive, cmd, qual, with_check
       from pg_policies
      where schemaname = 'app_public'
        and tablename = $1
@@ -817,16 +819,17 @@ async function checkEntity(ctx: EntityContext): Promise<void> {
     addError(findings, `${entity}: missing trigger ${expectedImmut} (docs/specs/tech/sync-v2-server-contract.md §A.6.3)`);
   }
 
-  // ---- 4f sanity: RLS enabled with 4 owner policies and matching bodies --
+  // ---- 4f sanity: RLS enabled with owner + agent-boundary policies --------
   if (!rlsEnabled) {
     addError(findings, `${entity}: RLS not enabled (docs/specs/tech/sync-v2-server-contract.md §A.6.1)`);
   }
   const polByName = new Map(pgPols.map((p) => [p.policyname, p]));
   const expectedPolicies = [
-    { suffix: 'owner_select', cmd: 'SELECT', hasQual: true, hasWithCheck: false },
-    { suffix: 'owner_insert', cmd: 'INSERT', hasQual: false, hasWithCheck: true },
-    { suffix: 'owner_update', cmd: 'UPDATE', hasQual: true, hasWithCheck: true },
-    { suffix: 'owner_delete', cmd: 'DELETE', hasQual: true, hasWithCheck: false },
+    { suffix: 'owner_select', cmd: 'SELECT', permissive: 'PERMISSIVE', hasQual: true, hasWithCheck: false },
+    { suffix: 'owner_insert', cmd: 'INSERT', permissive: 'PERMISSIVE', hasQual: false, hasWithCheck: true },
+    { suffix: 'owner_update', cmd: 'UPDATE', permissive: 'PERMISSIVE', hasQual: true, hasWithCheck: true },
+    { suffix: 'owner_delete', cmd: 'DELETE', permissive: 'PERMISSIVE', hasQual: true, hasWithCheck: false },
+    { suffix: 'direct_app_only', cmd: 'ALL', permissive: 'RESTRICTIVE', hasQual: true, hasWithCheck: true },
   ];
 
   const policyFixtures: Record<string, PolicyFixture> = {};
@@ -836,6 +839,18 @@ async function checkEntity(ctx: EntityContext): Promise<void> {
     if (!pol) {
       addError(findings, `${entity}: missing RLS policy ${name} (docs/specs/tech/sync-v2-server-contract.md §A.6.1)`);
       continue;
+    }
+    if (
+      pol.cmd !== spec.cmd ||
+      pol.permissive !== spec.permissive ||
+      Boolean(pol.qual) !== spec.hasQual ||
+      Boolean(pol.with_check) !== spec.hasWithCheck
+    ) {
+      addError(
+        findings,
+        `${name}: expected ${spec.permissive} ${spec.cmd} policy with USING=${spec.hasQual} and WITH CHECK=${spec.hasWithCheck}; ` +
+          `got ${pol.permissive} ${pol.cmd} with USING=${Boolean(pol.qual)} and WITH CHECK=${Boolean(pol.with_check)}`
+      );
     }
     const qualHash = pol.qual ? sha256(normalise(pol.qual)) : null;
     const withCheckHash = pol.with_check ? sha256(normalise(pol.with_check)) : null;
@@ -861,7 +876,7 @@ async function checkEntity(ctx: EntityContext): Promise<void> {
           `${name}: policy USING-expression hash drifted.\n` +
             `  expected: ${expected.qual}\n` +
             `  actual:   ${qualHash}\n` +
-            `  Canonical body per docs/specs/tech/sync-v2-server-contract.md §A.6.1 is \`owner_user_id = auth.uid()\`.\n` +
+          `  Canonical bodies are documented in docs/specs/tech/sync-v2-server-contract.md §A.6.1.\n` +
             `  If intentional, --write-fixtures.`
         );
       }
@@ -871,7 +886,7 @@ async function checkEntity(ctx: EntityContext): Promise<void> {
           `${name}: policy WITH-CHECK expression hash drifted.\n` +
             `  expected: ${expected.with_check}\n` +
             `  actual:   ${withCheckHash}\n` +
-            `  Canonical body per docs/specs/tech/sync-v2-server-contract.md §A.6.1 is \`owner_user_id = auth.uid()\`.\n` +
+          `  Canonical bodies are documented in docs/specs/tech/sync-v2-server-contract.md §A.6.1.\n` +
             `  If intentional, --write-fixtures.`
         );
       }

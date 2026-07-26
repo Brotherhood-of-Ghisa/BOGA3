@@ -45,22 +45,15 @@ run_supabase start
 load_supabase_status_env
 HEALTH_URL="$(health_url)"
 
-if curl_health --max-time 2 >/dev/null; then
-  echo "[supabase] health function already responding at ${HEALTH_URL}"
-  sync_mobile_supabase_env
-  exit 0
-fi
-
 stop_functions_serve_if_running
 
-echo "[supabase] starting local edge function server (health)"
+echo "[supabase] starting local edge function server"
 if [[ -f "${FUNCTION_ENV_FILE}" ]]; then
   (
     cd "${REPO_ROOT}"
     nohup npx -y "supabase@${SUPABASE_CLI_VERSION}" functions serve \
       --no-verify-jwt \
       --env-file "${FUNCTION_ENV_FILE}" \
-      health \
       >"${FUNCTIONS_LOG_FILE}" 2>&1 &
     echo $! > "${FUNCTIONS_PID_FILE}"
   )
@@ -69,7 +62,6 @@ else
     cd "${REPO_ROOT}"
     nohup npx -y "supabase@${SUPABASE_CLI_VERSION}" functions serve \
       --no-verify-jwt \
-      health \
       >"${FUNCTIONS_LOG_FILE}" 2>&1 &
     echo $! > "${FUNCTIONS_PID_FILE}"
   )

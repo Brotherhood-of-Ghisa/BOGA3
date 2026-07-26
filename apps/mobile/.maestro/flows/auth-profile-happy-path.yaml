@@ -93,6 +93,23 @@ appId: com.dinoderek.mobile
     visible:
       id: "settings-screen"
     timeout: 15000
+# Connected agents is a signed-in-only Settings destination. Opening it against
+# real local Supabase proves the SDK grant-list path renders on-device; the
+# content assertion is independent of whether this fixture currently has zero
+# or more grants.
+- tapOn:
+    id: "settings-connected-agents-row"
+- extendedWaitUntil:
+    visible:
+      id: "connected-agents-screen"
+    timeout: 15000
+- assertVisible:
+    text: "Agents can read training data only.*"
+- tapOn: "Settings"
+- extendedWaitUntil:
+    visible:
+      id: "settings-screen"
+    timeout: 15000
 - tapOn:
     id: "settings-profile-row"
 - extendedWaitUntil:

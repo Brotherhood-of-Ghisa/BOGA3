@@ -34,6 +34,7 @@ Human-operator guide for local development, runtime operations, logs, and tests 
   - [Provision the dev accounts](#provision-the-dev-accounts)
   - [Sign in](#sign-in)
 - [Supabase: run locally and reset](#supabase-run-locally-and-reset)
+- [MCP Virtual Coach](#mcp-virtual-coach)
 - [Upgrading from v1 sync (one-time wipe)](#upgrading-from-v1-sync-one-time-wipe)
 - [Logs](#logs)
 - [Tests](#tests)
@@ -609,6 +610,86 @@ and the integration-test fixtures (`user_a` / `user_b`) — what each is for, ho
 to provision them, and how to sign in — are inventoried in
 [Log into a development database](#log-into-a-development-database). Use the dev
 accounts for manual work; the fixtures are mutated and wiped by the test suites.
+
+## MCP Virtual Coach
+
+### One-command local proof
+
+Run the complete OAuth-to-training-data smoke from the repository root:
+
+```bash
+./boga test mcp-smoke
+```
+
+The wrapper starts or reuses this worktree's slot-isolated Supabase, applies
+pending migrations, provisions the deterministic users, inserts a unique
+training fixture, completes a real dynamic-registration + authorization-code +
+PKCE consent flow, builds and starts `services/boga-mcp`, lists the four tools,
+calls each tool with the OAuth token, verifies the authorizing fixture IDs, and
+cleans up the grant, audit metadata, process, and fixture rows.
+
+To target another environment with an already-issued test token, supply all
+four values and point the MCP/API/OAuth service configuration at that
+environment before running the underlying smoke script:
+
+```bash
+BOGA_MCP_SMOKE_ACCESS_TOKEN='<test-access-token>' \
+BOGA_MCP_SMOKE_EXERCISE_ID='<owned-exercise-id>' \
+BOGA_MCP_SMOKE_SESSION_ID='<owned-session-id>' \
+BOGA_MCP_SMOKE_EXERCISE_QUERY='<owned-exercise-name>' \
+./scripts/smoke-boga-mcp.sh
+```
+
+The supplied-token form still starts the local MCP process with local endpoint
+defaults; use it only for a token issued by this worktree's local Supabase.
+Hosted smoke should run from the hosting platform or a dedicated operator
+client against the deployed URLs so discovery and TLS are tested as deployed.
+Never paste a token into a committed file, shell history, task note, or log.
+
+Focused checks:
+
+```bash
+./boga test agent-auth-web   # consent UI tests + production build + prod audit
+./boga test mcp-unit         # MCP schemas/translation/auth boundary + prod audit
+./boga test agent-api        # real local OAuth/API/RLS/revocation contract
+```
+
+### Connected agents and revocation
+
+In a signed-in mobile build, open **Settings → Connected agents**. Each active
+OAuth grant shows the requesting client name, grant time, and the most recent
+metadata-only access timestamp. **Revoke access** asks for confirmation and
+uses Supabase Auth grant revocation; subsequent MCP/API calls with the old token
+must return `401`.
+
+If the list fails, verify the mobile build targets the same Supabase project as
+the grant and inspect Auth/OAuth availability. If only **Last access** is
+unavailable, grant management remains usable; check the
+`public.agent_access_audit` migration and RLS through operator SQL.
+
+### Hosted rollout checklist
+
+No production host, DNS name, callback URL, or hosted project credentials are
+committed in this repository. An operator with those resources must:
+
+1. Apply the migration chain and deploy `agent-api` from the repository root
+   with `--no-verify-jwt`; the function performs stricter live validation.
+2. Deploy `apps/agent-auth-web/dist` on HTTPS with `/oauth/consent` SPA fallback,
+   using only the project URL and client-safe publishable key.
+3. Enable the Supabase OAuth server, configure its consent path, choose dynamic
+   registration or exact client registrations, and use asymmetric signing keys.
+4. Deploy `services/boga-mcp` on Node 20+ behind HTTPS with only
+   `BOGA_MCP_PUBLIC_URL`, `BOGA_AGENT_API_BASE_URL`, and `BOGA_OAUTH_ISSUER`
+   (plus optional runtime settings). Never inject database or service-role
+   credentials into this host.
+5. Configure ingress/body/rate limits and prevent authorization headers, query
+   state, and payload bodies from reaching logs.
+6. Verify protected-resource and authorization-server discovery, explicit
+   consent/deny, every tool, cross-owner denial, refresh/expiry, revocation, and
+   metadata-only audit in the hosted environment.
+
+Exact build/configuration details live in `apps/agent-auth-web/README.md`,
+`services/boga-mcp/README.md`, and `supabase/README.md`.
 
 ## Upgrading from v1 sync (one-time wipe)
 

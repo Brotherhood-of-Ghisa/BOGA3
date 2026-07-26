@@ -348,11 +348,11 @@ enabled = false
 # OAuth server configuration
 [auth.oauth_server]
 # Enable OAuth server functionality
-enabled = false
+enabled = true
 # Path for OAuth consent flow UI
 authorization_url_path = "/oauth/consent"
 # Allow dynamic client registration
-allow_dynamic_registration = false
+allow_dynamic_registration = true
 
 [edge_runtime]
 enabled = true
@@ -364,6 +364,14 @@ policy = "per_worker"
 inspector_port = {{INSPECTOR_PORT}}
 # The Deno major version to use.
 deno_version = 2
+
+# agent-api performs live Supabase Auth and OAuth-grant validation itself so it
+# can reject revoked grants immediately and return a consistent API envelope.
+[functions.agent-api]
+verify_jwt = false
+
+[functions.health]
+verify_jwt = false
 
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"

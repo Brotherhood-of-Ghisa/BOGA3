@@ -123,6 +123,21 @@ to deduplicate per device, so idempotency falls out of per-row LWW.
   - client-side `SELECT`, `UPDATE`, and `DELETE` are intentionally unavailable.
   - sync impact decision: `out of sync scope`; logs are operational diagnostics, not user-domain backup/restore data.
 
+### Agent access metadata (M21)
+
+- `public.agent_access_audit`
+  - minimal metadata-only audit for authenticated BoGa3 agent API requests;
+  - stores owner ID, OAuth client ID, tool/route name, timestamp, status,
+    request ID, and duration only;
+  - normal app sessions may read only their own rows; OAuth tokens cannot read
+    the table directly; service-side insert only;
+  - sync impact decision: `out of sync scope` because access audit is
+    operational/security metadata, not user training backup data.
+- `app_public.user_profiles.training_unit` and `time_zone`
+  - training-relevant API preferences in the auth/profile layer;
+  - sync impact decision: `out of sync scope` because `user_profiles` is
+    explicitly outside the nine-table Sync v2 mirror.
+
 ## Ownership and identity invariants
 
 1. User-owned backend rows are auth-scoped and backend-enforced (`RLS`/constraints).

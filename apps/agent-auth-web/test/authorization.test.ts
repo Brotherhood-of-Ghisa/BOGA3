@@ -1,0 +1,72 @@
+import { describe, expect, it, vi } from 'vitest';
+import type { SupabaseClient } from '@supabase/supabase-js';
+
+import {
+  authorizationIdFrom,
+  decideAuthorization,
+  loadConsentState,
+} from '../src/authorization.ts';
+
+const oauthClient = (overrides: Record<string, unknown> = {}) =>
+  ({
+    auth: {
+      oauth: {
+        approveAuthorization: vi.fn(),
+        denyAuthorization: vi.fn(),
+        getAuthorizationDetails: vi.fn(),
+        ...overrides,
+      },
+    },
+  }) as unknown as SupabaseClient;
+
+describe('agent authorization consent model', () => {
+  it('requires a bounded authorization identifier', () => {
+    expect(() => authorizationIdFrom(new URL('https://auth.example.test/oauth/consent')))
+      .toThrow('missing or invalid');
+    expect(
+      authorizationIdFrom(
+        new URL('https://auth.example.test/oauth/consent?authorization_id=valid_request_12345'),
+      ),
+    ).toBe('valid_request_12345');
+  });
+
+  it('returns only client and requested-scope consent details', async () => {
+    const client = oauthClient({
+      getAuthorizationDetails: vi.fn().mockResolvedValue({
+        data: {
+          authorization_id: 'valid_request_12345',
+          client: { id: 'client-a', name: 'Coach Agent' },
+          redirect_uri: 'https://client.example.test/callback',
+          scope: 'openid profile',
+          user: { email: 'private@example.test', id: 'user-a' },
+        },
+        error: null,
+      }),
+    });
+
+    await expect(loadConsentState(client, 'valid_request_12345')).resolves.toEqual({
+      details: {
+        authorizationId: 'valid_request_12345',
+        clientId: 'client-a',
+        clientName: 'Coach Agent',
+        scopes: ['openid', 'profile'],
+      },
+      kind: 'consent',
+    });
+  });
+
+  it('uses the Supabase SDK for approval and returns its validated redirect', async () => {
+    const approveAuthorization = vi.fn().mockResolvedValue({
+      data: { redirect_url: 'https://client.example.test/callback?code=abc' },
+      error: null,
+    });
+    const client = oauthClient({ approveAuthorization });
+
+    await expect(
+      decideAuthorization(client, 'valid_request_12345', 'approve'),
+    ).resolves.toBe('https://client.example.test/callback?code=abc');
+    expect(approveAuthorization).toHaveBeenCalledWith('valid_request_12345', {
+      skipBrowserRedirect: true,
+    });
+  });
+});
