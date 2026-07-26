@@ -29,6 +29,12 @@ export type MaxRepsAtWeight = {
   maxReps: number;
 };
 
+export type BestEstimatedOneRepMaxSet = {
+  weight: number;
+  reps: number;
+  estimatedOneRepMax: number;
+};
+
 /**
  * Weight is stored as text in the local schema but is logically a
  * non-negative number. The accepted shape mirrors the UI's
@@ -116,24 +122,38 @@ export const computeSetVolume = (weight: number, reps: number): number => {
 };
 
 /**
+ * Returns the eligible set with the highest Wathan 1RM estimate. Ties keep the
+ * first set in input order so callers get a stable source set for summaries.
+ */
+export const findBestEstimatedOneRepMaxSet = (
+  sets: CalculationSetInput[],
+  options?: CalculationOptions
+): BestEstimatedOneRepMaxSet | null => {
+  const parsed = collectParsedSets(sets, options);
+  let best: BestEstimatedOneRepMaxSet | null = null;
+  for (const set of parsed) {
+    const estimate = estimateOneRepMax(set.weight, set.reps);
+    if (estimate === null) continue;
+    if (best === null || estimate > best.estimatedOneRepMax) {
+      best = {
+        weight: set.weight,
+        reps: set.reps,
+        estimatedOneRepMax: estimate,
+      };
+    }
+  }
+  return best;
+};
+
+/**
  * Estimated 1RM for an exercise = the maximum per-set Wathan estimate
  * across the eligible sets. Returns `null` when no eligible set exists.
  */
 export const estimateExerciseOneRepMax = (
   sets: CalculationSetInput[],
   options?: CalculationOptions
-): number | null => {
-  const parsed = collectParsedSets(sets, options);
-  let best: number | null = null;
-  for (const set of parsed) {
-    const estimate = estimateOneRepMax(set.weight, set.reps);
-    if (estimate === null) continue;
-    if (best === null || estimate > best) {
-      best = estimate;
-    }
-  }
-  return best;
-};
+): number | null =>
+  findBestEstimatedOneRepMaxSet(sets, options)?.estimatedOneRepMax ?? null;
 
 export const computeExerciseVolume = (
   sets: CalculationSetInput[],

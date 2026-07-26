@@ -7,6 +7,7 @@ import {
   __resetExerciseListPreferencesForTests,
   setExerciseListPreferences,
 } from '@/src/exercise-catalog/list-preferences';
+import { estimateOneRepMax } from '@/src/exercise-calculations';
 
 const mockPush = jest.fn();
 const mockLogEvent = jest.fn();
@@ -991,10 +992,17 @@ describe('SessionRecorderScreen exercise interactions', () => {
     fireEvent.press(await screen.findByTestId('exercise-block-history-panel-1-collapsed'));
     expect(await screen.findByTestId('exercise-block-history-panel-1')).toHaveTextContent(/2d ago/);
 
+    fireEvent.press(screen.getByTestId('exercise-collapse-toggle-1'));
+    expect(
+      screen.getByTestId('exercise-collapse-toggle-1').props.accessibilityState.expanded
+    ).toBe(false);
     fireEvent.press(screen.getByLabelText('Exercise options 1'));
     fireEvent.press(screen.getByLabelText('Change exercise'));
     await selectExerciseFromPicker('Bench Press', { addEmpty: false });
     expect(screen.queryByTestId('exercise-picker-preselection-panel')).toBeNull();
+    expect(
+      screen.getByTestId('exercise-collapse-toggle-1').props.accessibilityState.expanded
+    ).toBe(true);
 
     await waitFor(() => {
       expect(mockLoadRecentExerciseBlocks).toHaveBeenLastCalledWith({
@@ -1530,5 +1538,125 @@ describe('SessionRecorderScreen exercise interactions', () => {
     expect(screen.queryByText('Deadlift')).toBeNull();
 
     await act(async () => {});
+  });
+
+  it('summarizes performed sets, failures, and a strict new PR when collapsed', async () => {
+    mockLoadRecentExerciseBlocks.mockResolvedValueOnce({
+      exerciseDefinitionId: 'seed_barbell_back_squat',
+      limit: null,
+      blocks: [
+        {
+          sessionId: 'squat-history',
+          completedAt: new Date('2026-05-24T10:00:00.000Z'),
+          daysAgo: 2,
+          sessionExerciseIds: ['se-squat'],
+          estimatedOneRepMax: 250.5,
+          totalVolume: 1500,
+          highestWeight: 205,
+          rirAtMostTwoSetCount: 3,
+        },
+      ],
+    });
+
+    render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
+
+    fireEvent.press(screen.getByText('Log new exercise'));
+    expect(await screen.findByLabelText('Select exercise Barbell Squat')).toBeTruthy();
+    await selectExerciseFromPicker('Barbell Squat');
+    await screen.findByTestId('exercise-block-history-panel-1-collapsed');
+
+    expect(screen.getByTestId('add-set-button-1')).toBeTruthy();
+    expect(screen.getByLabelText('Weight for exercise 1 set 1')).toBeTruthy();
+
+    const collapseToggle = screen.getByTestId('exercise-collapse-toggle-1');
+    expect(collapseToggle.props.accessibilityState.expanded).toBe(true);
+
+    fireEvent.press(collapseToggle);
+
+    expect(collapseToggle.props.accessibilityState.expanded).toBe(false);
+    expect(screen.queryByTestId('add-set-button-1')).toBeNull();
+    expect(screen.queryByLabelText('Weight for exercise 1 set 1')).toBeNull();
+    expect(screen.getByTestId('exercise-collapsed-summary-1-counts')).toHaveTextContent(
+      '0 sets (0 failures)'
+    );
+    expect(screen.queryByTestId('exercise-collapsed-summary-1-new-pr')).toBeNull();
+
+    fireEvent.press(collapseToggle);
+
+    expect(collapseToggle.props.accessibilityState.expanded).toBe(true);
+    expect(screen.getByTestId('add-set-button-1')).toBeTruthy();
+    expect(screen.getByLabelText('Weight for exercise 1 set 1')).toBeTruthy();
+
+    fireEvent.changeText(screen.getByLabelText('Weight for exercise 1 set 1'), '300');
+    fireEvent.changeText(screen.getByLabelText('Reps for exercise 1 set 1'), '5');
+    fireEvent.press(screen.getByTestId('set-quality-button-1-1'));
+    fireEvent.press(screen.getByTestId('set-quality-button-1-1'));
+    fireEvent.press(screen.getByLabelText('Add set to exercise 1'));
+    fireEvent.press(screen.getByTestId('set-quality-button-1-2'));
+
+    expect(screen.getByTestId('exercise-expanded-pr-1')).toHaveTextContent(
+      'PR: 300 kg × 5 reps · est. 1RM 350 kg'
+    );
+    expect(screen.getByTestId('exercise-expanded-pr-1').props.numberOfLines).toBe(1);
+
+    fireEvent.press(collapseToggle);
+
+    expect(screen.getByTestId('exercise-collapsed-summary-1-counts')).toHaveTextContent(
+      '2 sets (1 failure)'
+    );
+    expect(screen.getByTestId('exercise-collapsed-summary-1-new-pr')).toHaveTextContent(
+      'PR: 300 kg × 5 reps · est. 1RM 350 kg'
+    );
+    expect(screen.getByTestId('exercise-collapsed-summary-1-new-pr').props.numberOfLines).toBe(1);
+
+    fireEvent.press(collapseToggle);
+
+    expect(screen.queryByLabelText('Weight for exercise 1 set 2')).toBeNull();
+    expect(screen.getByTestId('set-row-pressable-1-2')).toBeTruthy();
+  });
+
+  it('does not label a tied estimate or a first recorded exercise as a new PR', async () => {
+    mockLoadRecentExerciseBlocks
+      .mockResolvedValueOnce({
+        exerciseDefinitionId: 'seed_barbell_back_squat',
+        limit: null,
+        blocks: [
+          {
+            sessionId: 'squat-history',
+            completedAt: new Date('2026-05-24T10:00:00.000Z'),
+            daysAgo: 2,
+            sessionExerciseIds: ['se-squat'],
+            estimatedOneRepMax: estimateOneRepMax(100, 5),
+            totalVolume: 500,
+            highestWeight: 100,
+            rirAtMostTwoSetCount: 0,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        exerciseDefinitionId: 'seed_barbell_bench_press',
+        limit: null,
+        blocks: [],
+      });
+
+    render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
+
+    fireEvent.press(screen.getByText('Log new exercise'));
+    await selectExerciseFromPicker('Barbell Squat');
+    await screen.findByTestId('exercise-block-history-panel-1-collapsed');
+    fireEvent.changeText(screen.getByLabelText('Weight for exercise 1 set 1'), '100');
+    fireEvent.changeText(screen.getByLabelText('Reps for exercise 1 set 1'), '5');
+    fireEvent.press(screen.getByTestId('exercise-collapse-toggle-1'));
+    expect(screen.queryByTestId('exercise-collapsed-summary-1-new-pr')).toBeNull();
+
+    fireEvent.press(screen.getByText('Log new exercise'));
+    await selectExerciseFromPicker('Bench Press');
+    await screen.findByTestId('exercise-block-history-panel-2-empty-collapsed');
+    fireEvent.changeText(screen.getByLabelText('Weight for exercise 2 set 1'), '100');
+    fireEvent.changeText(screen.getByLabelText('Reps for exercise 2 set 1'), '5');
+    fireEvent.press(screen.getByTestId('exercise-collapse-toggle-2'));
+    expect(screen.queryByTestId('exercise-collapsed-summary-2-new-pr')).toBeNull();
   });
 });

@@ -2,6 +2,7 @@ import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } fro
 import { useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import {
   AppState,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -28,7 +29,12 @@ import {
   ExerciseListContent,
   ExerciseListPreferenceControls,
 } from '@/components/exercise-catalog/exercise-list-controls';
-import { SessionContentLayout } from '@/components/session-recorder/session-content-layout';
+import {
+  ExerciseCardCollapsedSummary,
+  ExerciseCardPersonalRecordLine,
+  SessionContentLayout,
+  type ExerciseCardPersonalRecordSummary,
+} from '@/components/session-recorder/session-content-layout';
 import { uiColors } from '@/components/ui';
 import { getAuthSnapshot } from '@/src/auth';
 import {
@@ -75,6 +81,7 @@ import {
   computeExerciseVolume,
   computeMaxRepsByWeight,
   estimateExerciseOneRepMax,
+  findBestEstimatedOneRepMaxSet,
   parseCalculationSet,
 } from '@/src/exercise-calculations';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
@@ -562,6 +569,12 @@ const getSetRowState = (set: SessionSet): PlannedSetRowState => {
   return plannedSetMatches(set) ? 'matched' : 'modified';
 };
 
+const getPerformedExerciseSets = (sets: SessionSet[]): SessionSet[] =>
+  sets.filter((set) => {
+    const rowState = getSetRowState(set);
+    return rowState !== 'planned' && rowState !== 'skipped' && hasPerformedActual(set);
+  });
+
 const formatSetWeightLabel = (value: string | null | undefined): string => {
   const trimmed = (value ?? '').trim() || '0';
   return `${trimmed}kg`;
@@ -925,7 +938,7 @@ function SwipeableSetRow({
 const getCurrentExerciseBlockMetrics = (
   sets: SessionSet[]
 ): ExerciseBlockComparisonMetrics => {
-  const calculationSets = sets.map((set) => ({
+  const calculationSets = getPerformedExerciseSets(sets).map((set) => ({
     weightValue: set.weight,
     repsValue: set.reps,
     setType: normalizeSessionSetType(set.setType),
@@ -946,6 +959,35 @@ const getCurrentExerciseBlockMetrics = (
     highestWeight: maxRepsByWeight[0]?.weight ?? null,
     rirAtMostTwoSetCount,
   };
+};
+
+const getExerciseCardPersonalRecord = (
+  sets: SessionSet[],
+  panel: ExerciseBlockHistoryPanelState | undefined
+): ExerciseCardPersonalRecordSummary | null => {
+  if (!panel || panel.status !== 'success') {
+    return null;
+  }
+
+  const historicalBest = getNullableMetricMax(
+    panel.blocks.map((block) => block.estimatedOneRepMax)
+  );
+  if (historicalBest === null) {
+    return null;
+  }
+
+  const bestCurrentSet = findBestEstimatedOneRepMaxSet(
+    getPerformedExerciseSets(sets).map((set) => ({
+      weightValue: set.weight,
+      repsValue: set.reps,
+      setType: normalizeSessionSetType(set.setType),
+    }))
+  );
+  if (!bestCurrentSet || bestCurrentSet.estimatedOneRepMax <= historicalBest) {
+    return null;
+  }
+
+  return bestCurrentSet;
 };
 
 const hasSavedGymCoordinates = (location: SessionLocation) =>
@@ -1169,6 +1211,7 @@ export default function SessionRecorderScreen({
   const [isTagMutationInFlight, setIsTagMutationInFlight] = useState(false);
   const [activeSetTypePicker, setActiveSetTypePicker] = useState<SetTypePickerState | null>(null);
   const [expandedSetIds, setExpandedSetIds] = useState<Set<string>>(() => new Set());
+  const [collapsedExerciseIds, setCollapsedExerciseIds] = useState<Set<string>>(() => new Set());
   const [activeRowId, setActiveRowId] = useState<string | null>(null);
   const [lastAddedRowId, setLastAddedRowId] = useState<string | null>(null);
   const [pendingFocusedWeightSetId, setPendingFocusedWeightSetId] = useState<string | null>(null);
@@ -1579,6 +1622,13 @@ export default function SessionRecorderScreen({
     ) {
       pendingExerciseCardScrollIdRef.current = null;
     }
+
+    setCollapsedExerciseIds((current) => {
+      const next = new Set(
+        [...current].filter((exerciseId) => activeExerciseIds.has(exerciseId))
+      );
+      return next.size === current.size ? current : next;
+    });
   }, [exerciseIdsKey, focusedExerciseCardId]);
 
   const refreshAssignedTagsForExercise = useCallback(async (sessionExerciseId: string) => {
@@ -2704,15 +2754,65 @@ export default function SessionRecorderScreen({
     pendingExerciseCardScrollIdRef.current = null;
   }, []);
 
+  const expandExerciseCard = useCallback((exerciseId: string) => {
+    setCollapsedExerciseIds((current) => {
+      if (!current.has(exerciseId)) {
+        return current;
+      }
+      const next = new Set(current);
+      next.delete(exerciseId);
+      return next;
+    });
+  }, []);
+
+  const toggleExerciseCollapsed = useCallback((exerciseId: string) => {
+    const isCollapsed = collapsedExerciseIds.has(exerciseId);
+    if (isCollapsed) {
+      expandExerciseCard(exerciseId);
+      return;
+    }
+
+    const exercise = stateRef.current.session.exercises.find(
+      (candidate) => candidate.id === exerciseId
+    );
+    const exerciseSetIds = new Set(exercise?.sets.map((set) => set.id) ?? []);
+
+    Keyboard.dismiss();
+    focusedSetInputIdRef.current = null;
+    setExpandedSetIds((current) => {
+      const next = new Set(
+        [...current].filter((setId) => !exerciseSetIds.has(setId))
+      );
+      return next.size === current.size ? current : next;
+    });
+    setActiveRowId((current) => (current && exerciseSetIds.has(current) ? null : current));
+    setLastAddedRowId((current) => (current && exerciseSetIds.has(current) ? null : current));
+    setPendingFocusedWeightSetId((current) =>
+      current && exerciseSetIds.has(current) ? null : current
+    );
+    setActiveSetTypePicker((current) =>
+      current?.exerciseId === exerciseId ? null : current
+    );
+    void autosaveController.flushInputCommit();
+
+    setCollapsedExerciseIds((current) => {
+      const next = new Set(current);
+      next.add(exerciseId);
+      return next;
+    });
+  }, [autosaveController, collapsedExerciseIds, expandExerciseCard]);
+
   const focusExerciseCard = useCallback((exerciseId: string | null) => {
     if (!exerciseId) {
       return;
     }
 
+    expandExerciseCard(exerciseId);
+
     setFocusedExerciseCardId(exerciseId);
     pendingExerciseCardScrollIdRef.current = exerciseId;
     requestAnimationFrame(() => consumePendingExerciseCardScroll(exerciseId));
-  }, [consumePendingExerciseCardScroll]);
+  }, [consumePendingExerciseCardScroll, expandExerciseCard]);
 
   const selectExercisePreset = (exercisePresetId: string) => {
     const selectedExercisePreset = exercisePickerOptions.find((exercisePreset) => exercisePreset.id === exercisePresetId);
@@ -2774,7 +2874,8 @@ export default function SessionRecorderScreen({
   };
 
   const applySelectedExerciseSelection = (exerciseDefinitionId: string, exerciseName: string) => {
-    const isNewSessionExercise = !state.exerciseSelectionTargetId;
+    const selectionTargetId = state.exerciseSelectionTargetId;
+    const isNewSessionExercise = !selectionTargetId;
     const newSessionExercise = isNewSessionExercise ? createExercise(exerciseDefinitionId, exerciseName) : null;
 
     setState((current) => ({
@@ -2793,6 +2894,9 @@ export default function SessionRecorderScreen({
       exerciseSelectionTargetId: null,
     }));
     setPendingFocusedWeightSetId(newSessionExercise?.sets[0]?.id ?? null);
+    if (selectionTargetId) {
+      expandExerciseCard(selectionTargetId);
+    }
     setExercisePickerPreselection(null);
     exercisePickerPreselectionRequestKeyRef.current = null;
     clearSubmitFeedback();
@@ -3857,6 +3961,26 @@ export default function SessionRecorderScreen({
       ) : null}
 
       <SessionContentLayout<SessionSet, SessionExercise>
+        collapsedExerciseIds={collapsedExerciseIds}
+        onToggleExerciseCollapse={toggleExerciseCollapsed}
+        renderCollapsedExerciseSummary={({ exercise, exerciseIndex }) => {
+          const performedSets = getPerformedExerciseSets(exercise.sets);
+          const failureCount = performedSets.filter(
+            (set) => normalizeSessionSetType(set.setType) === 'rir_0'
+          ).length;
+
+          return (
+            <ExerciseCardCollapsedSummary
+              failureCount={failureCount}
+              newPersonalRecord={getExerciseCardPersonalRecord(
+                exercise.sets,
+                exerciseBlockHistoryByExerciseId[exercise.id]
+              )}
+              setCount={performedSets.length}
+              testID={`exercise-collapsed-summary-${exerciseIndex + 1}`}
+            />
+          );
+        }}
         showMetadataSection={routeMode !== 'completed-edit'}
         dateTimeValue={
           <View accessibilityLabel="Session date and time" style={styles.readOnlyInput}>
@@ -4287,6 +4411,13 @@ export default function SessionRecorderScreen({
               {exercise.sets.length > 0 ? (
                 <Text style={styles.exerciseSetSummaryText}>{getExerciseSetSummary(exercise.sets)}</Text>
               ) : null}
+              <ExerciseCardPersonalRecordLine
+                personalRecord={getExerciseCardPersonalRecord(
+                  exercise.sets,
+                  exerciseBlockHistoryByExerciseId[exercise.id]
+                )}
+                testID={`exercise-expanded-pr-${exerciseIndex + 1}`}
+              />
               <View style={styles.exerciseTagChipWrap}>
                 {exercise.tags.map((tag) => (
                   <View

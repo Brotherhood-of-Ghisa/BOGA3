@@ -4,6 +4,7 @@ import {
   computeSetVolume,
   estimateExerciseOneRepMax,
   estimateOneRepMax,
+  findBestEstimatedOneRepMaxSet,
   parseCalculationSet,
   parseSetReps,
   parseSetWeight,
@@ -179,6 +180,39 @@ describe('exercise calculations: estimateExerciseOneRepMax', () => {
     );
     expect(estimateExerciseOneRepMax([set('100', '5', 'warm_up')], { includeWarmUps: false })).toBeNull();
     expect(estimateExerciseOneRepMax([set('', '')])).toBeNull();
+  });
+});
+
+describe('exercise calculations: findBestEstimatedOneRepMaxSet', () => {
+  it('returns the source set for the highest eligible Wathan estimate', () => {
+    const result = findBestEstimatedOneRepMaxSet([
+      set('100', '5'),
+      set('110', '3'),
+      set('90', '8'),
+    ]);
+
+    expect(result).toEqual({
+      weight: 110,
+      reps: 3,
+      estimatedOneRepMax: estimateOneRepMax(110, 3),
+    });
+  });
+
+  it('ignores invalid and excluded warm-up sets', () => {
+    const result = findBestEstimatedOneRepMaxSet(
+      [set('', '5'), set('200', '1', 'warm_up'), set('100', '5')],
+      { includeWarmUps: false }
+    );
+
+    expect(result).toEqual({
+      weight: 100,
+      reps: 5,
+      estimatedOneRepMax: estimateOneRepMax(100, 5),
+    });
+  });
+
+  it('returns null when there is no eligible set', () => {
+    expect(findBestEstimatedOneRepMaxSet([set('', ''), set('0', '5')])).toBeNull();
   });
 });
 
