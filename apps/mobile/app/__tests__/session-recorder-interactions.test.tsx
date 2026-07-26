@@ -513,8 +513,8 @@ describe('SessionRecorderScreen exercise interactions', () => {
     expect(StyleSheet.flatten(screen.getByLabelText('Weight for exercise 1 set 1').props.style).minWidth).toBe(44);
     expect(screen.getByPlaceholderText('Reps')).toBeTruthy();
     expect(screen.getByLabelText('Weight for exercise 1 set 1').props.autoFocus).toBe(true);
-    expect(screen.getByLabelText('Weight for exercise 1 set 1').props.selectTextOnFocus).toBeUndefined();
-    expect(screen.getByLabelText('Reps for exercise 1 set 1').props.selectTextOnFocus).toBeUndefined();
+    expect(screen.getByLabelText('Weight for exercise 1 set 1').props.selectTextOnFocus).toBe(true);
+    expect(screen.getByLabelText('Reps for exercise 1 set 1').props.selectTextOnFocus).toBe(true);
     expect(screen.queryByText('No exercises logged yet.')).toBeNull();
     expect(screen.queryByText('No tags yet.')).toBeNull();
     expect(mockLogEvent).toHaveBeenCalledWith({
@@ -1091,7 +1091,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     expect(screen.getByText('135.5kg')).toBeTruthy();
     expect(screen.getByText('8 reps')).toBeTruthy();
     expect(screen.getByLabelText('Weight for exercise 1 set 2').props.autoFocus).toBe(true);
-    expect(screen.getByLabelText('Weight for exercise 1 set 2').props.selectTextOnFocus).toBeUndefined();
+    expect(screen.getByLabelText('Weight for exercise 1 set 2').props.selectTextOnFocus).toBe(true);
     expect(screen.getByLabelText('Weight for exercise 1 set 2').props.selection).toBeUndefined();
     expect(screen.getByLabelText('Weight for exercise 1 set 2').props.value).toBe('135.5');
     expect(screen.getByLabelText('Reps for exercise 1 set 2').props.value).toBe('8');
@@ -1201,7 +1201,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
 
     expect(screen.getByText('Custom Press')).toBeTruthy();
     expect(screen.getByLabelText('Weight for exercise 1 set 1').props.autoFocus).toBe(true);
-    expect(screen.getByLabelText('Weight for exercise 1 set 1').props.selectTextOnFocus).toBeUndefined();
+    expect(screen.getByLabelText('Weight for exercise 1 set 1').props.selectTextOnFocus).toBe(true);
 
     fireEvent.press(screen.getByLabelText('Add set to exercise 1'));
     expect(screen.getByLabelText('Weight for exercise 1 set 2')).toBeTruthy();
