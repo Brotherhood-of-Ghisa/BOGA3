@@ -85,7 +85,9 @@ docs_touched: "docs/specs/ui/ux-rules.md, docs/specs/ui/screen-map.md"
 Replace the per-row Sessions metric in the Stats / History exercise and muscle
 views with a compact set count whose parenthesized value is the number of
 near-failure sets, while preserving exercise metrics and guaranteeing that
-muscle volume continues to use the adopted BoGa3 calculation.
+muscle volume continues to use the adopted BoGa3 calculation. Previous-period
+comparisons must use absolute changes for count metrics and percentage-only
+changes for volume metrics.
 
 The intended row value is:
 
@@ -96,6 +98,14 @@ Sets
 
 where `12` is the valid performed-set count and `3` is the subset marked
 `rir_0`, `rir_1`, or `rir_2`.
+
+For a row whose previous period had `8` sets, `2` near-failure sets, and lower
+volume, the comparison display is:
+
+```text
+Sets change:  +4 (+1)
+Volume change: +17%
+```
 
 ## Scope
 
@@ -109,9 +119,11 @@ where `12` is the valid performed-set count and `3` is the subset marked
 - Keep exercise-row raw volume and estimated 1RM.
 - Rank the exercise list by set count descending, with exercise name as a
   deterministic tie-breaker, instead of sorting by a hidden session count.
-- Replace the muscle/family previous-period Sessions delta with a set-count
-  delta. The parenthesized near-failure value is the current-period count; it
-  does not need its own delta.
+- Replace the muscle/family previous-period Sessions delta with a combined
+  absolute count delta: `<set change> (<near-failure change>)`, with no
+  percentage.
+- Show muscle/family volume change as percentage only, without repeating the
+  absolute volume change.
 - Preserve the existing empty, loading, error, search, row-press, and overlay
   behavior.
 - Update focused aggregation/UI tests and the canonical UI docs.
@@ -155,19 +167,21 @@ where `12` is the valid performed-set count and `3` is the subset marked
      open the existing muscle-history overlay.
    - Success outcome: each row shows `Sets` as
      `<count> (<near-failure count>)` and `Volume`; the volume is the BoGa3
-     per-side, role-weighted value and the previous-period set/volume deltas
-     remain readable.
+     per-side, role-weighted value, the set/failure comparison is absolute, and
+     the volume comparison is percentage-only.
    - Failure/edge outcome: untrained rows show `0 (0)` and zero volume with the
      existing muted treatment; one physical set mapped to multiple muscles in
      the same family is not duplicated in the family set/failure count.
 
 ### Interaction + appearance notes
 
-- Use the exact compact numeric format `<sets> (<near failure>)`.
+- Use `<sets> (<near failure>)` for current counts and
+  `<set change> (<near-failure change>)` for their absolute comparison.
 - Keep labels short: `Sets`, `Volume`, and `1RM`.
 - Preserve the current card density, alignment, typography, and press targets.
 - Make accessibility copy explicit, for example
-  `12 sets, 3 near-failure sets`; parentheses must not be the only explanation.
+  `12 sets, 3 near-failure sets; up 4 sets and 1 near-failure set`; parentheses
+  must not be the only explanation.
 - Reuse `uiColors` and existing styles; no new raw literals.
 
 ## Counting and calculation contract
@@ -189,6 +203,30 @@ where `12` is the valid performed-set count and `3` is the subset marked
   member muscles, so one source set mapped to two muscles in the same family
   counts once for the family. Family volume remains the aggregate of the member
   muscle contributions.
+
+### Previous-period comparison display
+
+- Count metrics use signed absolute differences only:
+  `current count - previous count`.
+- The set/failure comparison mirrors the current-value structure:
+  `<signed set difference> (<signed near-failure difference>)`.
+- Examples:
+  - current `12 (3)`, previous `8 (2)` -> `+4 (+1)`
+  - current `6 (1)`, previous `8 (2)` -> `−2 (−1)`
+  - current `8 (1)`, previous `8 (2)` -> `±0 (−1)`
+- Count comparisons never include `%`, including when the previous count is
+  zero.
+- Volume comparisons use signed percentage change only and never include the
+  absolute volume difference:
+  `(current volume - previous volume) / previous volume × 100`.
+- Volume comparison edge cases:
+  - previous and current volume both zero -> `—`
+  - previous volume zero and current volume positive -> `new`
+  - previous volume positive and current volume zero -> `−100%`
+  - equal non-zero volumes -> `±0%`
+- Preserve the existing positive/negative/neutral/new visual tones, but derive
+  the displayed text from the metric kind rather than one universal delta
+  formatter.
 
 ### BoGa3 muscle volume
 
@@ -217,32 +255,36 @@ per-side normalization or muscle-role factors.
    unchanged.
 4. Exercise rows retain raw Volume and 1RM and sort by set count descending,
    then exercise name.
-5. Muscle and family rows display `Volume`, not `Total weight`, and their
-   previous-period deltas use set count plus volume.
-6. Set/failure counts follow the valid-set, warm-up, near-failure, mapping-role,
+5. Muscle and family rows display `Volume`, not `Total weight`.
+6. Set/failure comparisons show signed absolute changes in the exact structure
+   `<set change> (<near-failure change>)` and contain no percentages.
+7. Volume comparisons show percentage change only and contain no absolute volume
+   difference; zero-baseline cases follow the comparison contract above.
+8. Set/failure counts follow the valid-set, warm-up, near-failure, mapping-role,
    and family-deduplication rules above.
-7. Muscle volume follows the BoGa3 per-side/role formula above for both the
+9. Muscle volume follows the BoGa3 per-side/role formula above for both the
    current and previous periods.
-8. Tests prove `total_load`, `per_side_load`, primary, secondary, stabilizer,
+10. Tests prove `total_load`, `per_side_load`, primary, secondary, stabilizer,
    legacy mapping weight, warm-up, zero-load, invalid-set, and family
    deduplication behavior.
-9. Screen tests cover the exact row copy/value format, removal of per-row
-   Sessions, accessibility wording, zero/empty behavior, and unchanged row
-   navigation.
-10. Existing loading/error/search/overlay tests remain green.
-11. No raw color literals are introduced, and existing tokens/styles are reused.
-12. Canonical UI documentation describes the new row metrics and exercise-list
-   ordering.
+11. Screen/formatter tests cover positive, negative, unchanged, and
+    zero-baseline count/volume comparisons; the exact row copy/value format;
+    removal of per-row Sessions; accessibility wording; zero/empty behavior; and
+    unchanged row navigation.
+12. Existing loading/error/search/overlay tests remain green.
+13. No raw color literals are introduced, and existing tokens/styles are reused.
+14. Canonical UI documentation describes the new row metrics, comparison
+    grammar, and exercise-list ordering.
 
 ## Docs touched (required)
 
 - Planned docs/spec files to update:
   - `docs/specs/ui/ux-rules.md` - replace the current exercise-list
     session-count contract with set/near-failure display and document muscle-row
-    metric semantics.
+    metric plus absolute-count/percentage-volume comparison semantics.
   - `docs/specs/ui/screen-map.md` - update the `/stats-history` summary so the
     exercise and muscle views describe Sets, parenthesized near-failure count,
-    and Volume.
+    Volume, and the comparison grammar.
 - UI docs update required?: `yes`; this is an app-specific row-semantics change
   covered by trigger 4 in `docs/specs/ui/README.md`.
 - `docs/specs/ui/navigation-contract.md`: no update; routes, params, redirects,
@@ -279,8 +321,10 @@ per-side normalization or muscle-role factors.
     - retain or strengthen direct total-load/per-side and role-factor regression
       coverage where the Stats repository cases do not already prove it.
   - `apps/mobile/app/__tests__/stats-screen.test.tsx`
-    - exact labels/values, accessibility, exercise sorting, top-level Sessions
-      preservation, and unchanged empty/error/row-press behavior.
+    - exact labels/values, absolute set/failure deltas, percentage-only volume
+      deltas, zero-baseline formatting, accessibility, exercise sorting,
+      top-level Sessions preservation, and unchanged empty/error/row-press
+      behavior.
 - Targeted test command:
   - from `apps/mobile/`:
     `npm test -- --runInBand app/__tests__/exercise-catalog-stats.test.ts app/__tests__/stats-repository.test.ts app/__tests__/muscle-analytics.test.ts app/__tests__/stats-screen.test.tsx`
@@ -319,6 +363,10 @@ per-side normalization or muscle-role factors.
 - Prefer a shared pure formatter for `<sets> (<near failure>)` if both exercise
   and muscle rows need identical presentation/accessibility behavior; do not
   extract a global primitive for one screen.
+- Replace the current universal delta formatting path with metric-specific pure
+  formatting:
+  - count-pair delta -> signed absolute `<sets> (<near failure>)`
+  - volume delta -> percentage-only text with explicit zero-baseline handling
 - Rename ambiguous derived `totalWeight` fields to `totalVolume` within the
   touched Stats aggregation types if it keeps the patch coherent. This is an
   internal derived-data rename, not a stored-column change.
@@ -336,6 +384,10 @@ per-side normalization or muscle-role factors.
     `rir_0 | rir_1 | rir_2`.
   - The parenthesized count is a subset of the leading set count.
   - Warm-ups count in the leading number but not in parentheses.
+  - Absolute count changes retain their sign independently, so mixed movement
+    such as `+2 (−1)` is valid.
+  - `new` is the sole non-percentage volume comparison and is reserved for a
+    positive current volume over a zero previous-period volume.
 
 ## Mandatory verify gates
 
