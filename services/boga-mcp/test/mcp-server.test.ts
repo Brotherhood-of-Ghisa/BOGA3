@@ -9,7 +9,7 @@ import request from 'supertest';
 
 import { BogaAgentApi } from '../src/api-client.js';
 import type { BogaMcpConfig } from '../src/config.js';
-import { createBogaMcpApp } from '../src/server.js';
+import { BOGA_OAUTH_SCOPES, createBogaMcpApp } from '../src/server.js';
 
 const token = 'integration-access-token';
 const oauthMetadata: OAuthMetadata = {
@@ -233,6 +233,7 @@ describe('BoGa MCP server', () => {
     expect(metadata.body).toMatchObject({
       authorization_servers: [oauthMetadata.issuer],
       resource: config.resourceUrl.href,
+      scopes_supported: BOGA_OAUTH_SCOPES,
     });
 
     const unauthorized = await request(app).post('/mcp').send({

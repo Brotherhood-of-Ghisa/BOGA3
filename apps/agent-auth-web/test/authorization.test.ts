@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import {
+  BOGA_OAUTH_SCOPES,
+  OAUTH_SCOPE_DISCLOSURES,
   authorizationIdFrom,
   decideAuthorization,
   loadConsentState,
@@ -53,6 +55,30 @@ describe('agent authorization consent model', () => {
       },
       kind: 'consent',
     });
+  });
+
+  it('has a user-facing disclosure for every accepted identity scope', () => {
+    expect(Object.keys(OAUTH_SCOPE_DISCLOSURES)).toEqual([...BOGA_OAUTH_SCOPES]);
+    expect(OAUTH_SCOPE_DISCLOSURES.openid).toContain('OpenID ID token');
+    expect(OAUTH_SCOPE_DISCLOSURES.profile).toContain('name and profile picture');
+  });
+
+  it('rejects unexpected or additional identity scopes before approval', async () => {
+    const client = oauthClient({
+      getAuthorizationDetails: vi.fn().mockResolvedValue({
+        data: {
+          authorization_id: 'valid_request_12345',
+          client: { id: 'client-a', name: 'Coach Agent' },
+          redirect_uri: 'https://client.example.test/callback',
+          scope: 'openid profile email',
+        },
+        error: null,
+      }),
+    });
+
+    await expect(loadConsentState(client, 'valid_request_12345')).rejects.toThrow(
+      'unsupported identity permissions',
+    );
   });
 
   it('uses the Supabase SDK for approval and returns its validated redirect', async () => {

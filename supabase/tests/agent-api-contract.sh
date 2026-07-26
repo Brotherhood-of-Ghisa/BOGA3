@@ -466,6 +466,20 @@ RPC_WRITE_COUNT="$(run_psql "
 ")"
 [[ "${RPC_WRITE_COUNT}" == "0" ]] || fail "agent credential wrote through sync_push"
 
+app_public_request POST "rpc/dev_wipe_my_data" "${AGENT_ACCESS_TOKEN}" '{}'
+assert_non_2xx "agent developer wipe RPC"
+[[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.message')" == *"AGENT_FORBIDDEN"* ]] ||
+  fail "agent developer wipe RPC did not hit the explicit OAuth-client guard"
+WIPE_PROBE_COUNT="$(run_psql "
+  select
+    (select count(*) from app_public.gyms
+      where owner_user_id = '${USER_A_UUID}'::uuid and id = '${GYM_A}')
+    + (select count(*) from app_public.exercise_definitions
+      where owner_user_id = '${USER_A_UUID}'::uuid and id = '${EXERCISE_A}');
+")"
+[[ "${WIPE_PROBE_COUNT}" == "2" ]] ||
+  fail "agent developer wipe RPC removed owned training rows"
+
 request POST "${AGENT_API_BASE}/profile" "${AGENT_ACCESS_TOKEN}" "" '{}'
 assert_status "405" "agent API write method"
 

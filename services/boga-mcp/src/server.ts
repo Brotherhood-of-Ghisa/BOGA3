@@ -20,6 +20,8 @@ export type BogaMcpAppOptions = {
   oauthMetadata?: OAuthMetadata;
 };
 
+export const BOGA_OAUTH_SCOPES = ['openid', 'profile'] as const;
+
 export const loadOAuthMetadata = async (
   config: BogaMcpConfig,
   fetchImplementation: typeof fetch = fetch,
@@ -37,6 +39,13 @@ export const loadOAuthMetadata = async (
   const parsed = OAuthMetadataSchema.safeParse(await response.json());
   if (!parsed.success || parsed.data.issuer !== config.oauthIssuer.href) {
     throw new Error('OAuth metadata discovery returned an invalid issuer or schema.');
+  }
+  if (
+    !BOGA_OAUTH_SCOPES.every((scope) =>
+      parsed.data.scopes_supported?.includes(scope)
+    )
+  ) {
+    throw new Error('OAuth metadata discovery does not support the required BoGa scopes.');
   }
   return parsed.data;
 };
@@ -69,7 +78,7 @@ export const createBogaMcpApp = async (
     oauthMetadata,
     resourceName: 'BoGa Virtual Coach',
     resourceServerUrl: config.resourceUrl,
-    scopesSupported: oauthMetadata.scopes_supported ?? ['openid', 'profile'],
+    scopesSupported: [...BOGA_OAUTH_SCOPES],
   }));
 
   app.get('/health', (_request, response) => {

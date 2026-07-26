@@ -114,8 +114,10 @@ BoGa mobile Settings -> Supabase Auth listGrants/revokeGrant
    `owner_user_id = validated user.id`. Object lookup failure returns `404`
    regardless of whether the ID belongs to another user.
 4. OAuth tokens are denied direct select/insert/update/delete access by RLS.
-   Sync push, profile mutation, diagnostic insertion, and developer wipe paths
-   therefore remain unavailable to agent credentials.
+   Sync push, profile mutation, and diagnostic insertion remain unavailable to
+   agent credentials through that boundary; the `SECURITY DEFINER` developer
+   wipe RPC independently rejects non-null OAuth `client_id` claims because it
+   bypasses RLS.
 5. The MCP service never receives or exposes a service-role key and never has a
    Supabase database client. It forwards the bearer token only to the BoGa3
    agent API and never logs it.
@@ -292,9 +294,10 @@ Interaction and appearance:
   3. user-ID inputs are rejected;
   4. invalid/expired tokens return `401`;
   5. revoked grants immediately fail live validation;
-  6. agent tokens cannot call direct table writes or `sync_push`; the same
-     restrictive `client_id IS NULL` RLS boundary covers all synced tables,
-     profile, log, and developer application paths;
+  6. agent tokens cannot call direct table writes, `sync_push`, or
+     `dev_wipe_my_data`; restrictive `client_id IS NULL` RLS covers synced
+     tables, profile, and logs, while the privileged wipe RPC enforces the same
+     client boundary inside its `SECURITY DEFINER` body;
   7. inaccessible and nonexistent IDs are indistinguishable;
   8. pagination and maximum limits are enforced;
   9. profile output excludes email/account data;
@@ -359,10 +362,12 @@ hosted steps without operator access and final production domains:
 5. Decision: OAuth tokens receive no direct domain-table access. This is
    stricter than only denying writes and guarantees the required MCP -> API ->
    data path even if a caller knows the PostgREST URL.
-6. Decision: standard OAuth `email` scope may be required by Supabase, but the
-   BoGa API never returns email. Supabase does not yet support a custom
-   `training:read` scope; the consent UI must state the actual read-only
-   training-data capability clearly.
+6. Decision: the agent flow accepts only the standard OAuth `openid` and
+   `profile` scopes, discloses each requested identity permission before
+   approval, and rejects `email`, `phone`, or unknown/additional scopes. The
+   MCP protected-resource metadata advertises the same bounded pair. Supabase
+   does not yet support a custom `training:read` scope, so the consent UI also
+   states the actual read-only training-data capability clearly.
 7. Decision: `session_exercises.machine_name` is the only current equipment
    signal. No new equipment taxonomy or note model is introduced in this
    milestone.

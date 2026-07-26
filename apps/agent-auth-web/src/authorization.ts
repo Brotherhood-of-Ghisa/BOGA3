@@ -1,10 +1,19 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
+export const BOGA_OAUTH_SCOPES = ['openid', 'profile'] as const;
+
+export type BogaOAuthScope = (typeof BOGA_OAUTH_SCOPES)[number];
+
+export const OAUTH_SCOPE_DISCLOSURES: Record<BogaOAuthScope, string> = {
+  openid: 'Confirm your BoGa account identity and issue an OpenID ID token.',
+  profile: 'Share standard profile claims such as your name and profile picture.',
+};
+
 export type ConsentDetails = {
   authorizationId: string;
   clientId: string;
   clientName: string;
-  scopes: string[];
+  scopes: BogaOAuthScope[];
 };
 
 export type ConsentState =
@@ -18,6 +27,17 @@ const validRedirect = (raw: unknown): string => {
     throw new Error('Authorization redirect is not secure.');
   }
   return value.href;
+};
+
+const requestedScopesFrom = (raw: string): BogaOAuthScope[] => {
+  const scopes = [...new Set(raw.split(/\s+/).filter((scope) => scope.length > 0))];
+  const allowedScopes = new Set<string>(BOGA_OAUTH_SCOPES);
+  if (scopes.length === 0 || scopes.some((scope) => !allowedScopes.has(scope))) {
+    throw new Error(
+      'This agent requested unsupported identity permissions. Return to the agent and try again.',
+    );
+  }
+  return scopes as BogaOAuthScope[];
 };
 
 export const authorizationIdFrom = (url: URL): string => {
@@ -44,7 +64,7 @@ export const loadConsentState = async (
       authorizationId: data.authorization_id,
       clientId: data.client.id,
       clientName: data.client.name,
-      scopes: data.scope.split(/\s+/).filter((scope) => scope.length > 0),
+      scopes: requestedScopesFrom(data.scope),
     },
   };
 };

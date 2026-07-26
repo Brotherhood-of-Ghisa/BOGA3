@@ -35,6 +35,9 @@ This is the shortest operational summary. Use the "Further reading" section when
     direct domain-table access and sync/profile/log writes require
     `client_id IS NULL`; agent training reads go only through the dedicated
     BoGa3 agent API.
+14. Privileged application RPCs that bypass RLS, including `SECURITY DEFINER`
+    developer helpers, must independently reject non-null OAuth `client_id`
+    claims before executing any read or write body.
 
 ## Practical guidance for API developers (backend)
 

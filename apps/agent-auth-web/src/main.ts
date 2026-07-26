@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
 import {
+  OAUTH_SCOPE_DISCLOSURES,
   authorizationIdFrom,
   decideAuthorization,
   loadConsentState,
@@ -106,6 +107,12 @@ const renderSignIn = (authorizationId: string, errorMessage = ''): void => {
 };
 
 const renderConsent = (details: ConsentDetails): void => {
+  const identityPermissions = details.scopes
+    .map(
+      (scope) =>
+        `<li><strong>${escapeHtml(scope)}</strong> — ${escapeHtml(OAUTH_SCOPE_DISCLOSURES[scope])}</li>`,
+    )
+    .join('');
   root.innerHTML = pageShell(`
     <div class="consent-card">
       <p class="eyebrow">Read-only coaching access</p>
@@ -118,6 +125,8 @@ const renderConsent = (details: ConsentDetails): void => {
           <li>Your exercise library and muscle mappings</li>
           <li>Your recent workouts, exercise history, and personal records</li>
         </ul>
+        <p class="permission-title identity-permission-title">Identity permissions requested</p>
+        <ul>${identityPermissions}</ul>
       </div>
       <div class="denied-panel">
         <span class="denied-icon" aria-hidden="true">×</span>

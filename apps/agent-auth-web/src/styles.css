@@ -143,6 +143,10 @@ h1 {
   font-weight: 760;
 }
 
+.identity-permission-title {
+  margin-top: 18px;
+}
+
 ul {
   display: grid;
   gap: 9px;

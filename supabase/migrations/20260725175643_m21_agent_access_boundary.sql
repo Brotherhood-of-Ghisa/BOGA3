@@ -73,6 +73,86 @@ to authenticated
 using (((select auth.jwt()) ->> 'client_id') is null)
 with check (((select auth.jwt()) ->> 'client_id') is null);
 
+-- RLS does not protect this SECURITY DEFINER developer helper. Redefine it
+-- with the same owner/environment guards plus an explicit OAuth-client
+-- rejection before the environment check, so an agent token cannot reach the
+-- destructive body even where app.env permits wipes.
+create or replace function app_public.dev_wipe_my_data()
+returns bigint
+language plpgsql
+security definer
+set search_path = app_public
+as $func$
+declare
+  _uid       uuid;
+  _client_id text;
+  _env       text;
+  _total     bigint := 0;
+  _deleted   bigint;
+begin
+  _uid := auth.uid();
+  if _uid is null then
+    raise exception 'AUTH_REQUIRED: dev_wipe_my_data requires an authenticated user'
+      using errcode = 'P0001';
+  end if;
+
+  _client_id := (auth.jwt() ->> 'client_id');
+  if _client_id is not null then
+    raise exception 'AGENT_FORBIDDEN: OAuth clients cannot call dev_wipe_my_data'
+      using errcode = 'P0001';
+  end if;
+
+  _env := current_setting('app.env', true);
+  if _env is null or _env not in ('local', 'staging', 'dev') then
+    raise exception
+      'FORBIDDEN_ENV: dev_wipe_my_data is disabled outside local/staging/dev (app.env=%)',
+      coalesce(_env, '<unset>')
+      using errcode = 'P0001';
+  end if;
+
+  delete from app_public.session_exercise_tags where owner_user_id = _uid;
+  get diagnostics _deleted = row_count;
+  _total := _total + _deleted;
+
+  delete from app_public.exercise_sets where owner_user_id = _uid;
+  get diagnostics _deleted = row_count;
+  _total := _total + _deleted;
+
+  delete from app_public.session_exercises where owner_user_id = _uid;
+  get diagnostics _deleted = row_count;
+  _total := _total + _deleted;
+
+  delete from app_public.exercise_muscle_mappings where owner_user_id = _uid;
+  get diagnostics _deleted = row_count;
+  _total := _total + _deleted;
+
+  delete from app_public.muscle_groups where owner_user_id = _uid;
+  get diagnostics _deleted = row_count;
+  _total := _total + _deleted;
+
+  delete from app_public.exercise_tag_definitions where owner_user_id = _uid;
+  get diagnostics _deleted = row_count;
+  _total := _total + _deleted;
+
+  delete from app_public.sessions where owner_user_id = _uid;
+  get diagnostics _deleted = row_count;
+  _total := _total + _deleted;
+
+  delete from app_public.exercise_definitions where owner_user_id = _uid;
+  get diagnostics _deleted = row_count;
+  _total := _total + _deleted;
+
+  delete from app_public.gyms where owner_user_id = _uid;
+  get diagnostics _deleted = row_count;
+  _total := _total + _deleted;
+
+  return _total;
+end;
+$func$;
+
+comment on function app_public.dev_wipe_my_data() is
+  'Developer-only helper. Deletes every row owned by a normal app caller in local/staging/dev; SECURITY DEFINER and explicitly rejects OAuth client tokens.';
+
 create table if not exists public.agent_access_audit (
   id bigint generated always as identity primary key,
   owner_user_id uuid not null references auth.users (id) on delete cascade,

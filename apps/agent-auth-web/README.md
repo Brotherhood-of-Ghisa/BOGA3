@@ -6,6 +6,10 @@ issuance/refresh, expiry, and revocation; this app only signs the BoGa user in,
 shows the requesting client and read-only training-data disclosure, and calls
 the supported approve/deny methods.
 
+The consent surface accepts only the `openid` and `profile` identity scopes,
+renders both requested permissions before approval, and fails closed when a
+client requests `email`, `phone`, or any unknown/additional scope.
+
 It is a static Vite application. It contains only a Supabase project URL and
 client-safe publishable key. Never provide it a service-role/secret key.
 
