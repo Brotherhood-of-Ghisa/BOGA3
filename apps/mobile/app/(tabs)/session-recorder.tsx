@@ -31,6 +31,7 @@ import {
 } from '@/components/exercise-catalog/exercise-list-controls';
 import {
   ExerciseCardCollapsedSummary,
+  ExerciseCardPersonalRecordLine,
   SessionContentLayout,
   type ExerciseCardPersonalRecordSummary,
 } from '@/components/session-recorder/session-content-layout';
@@ -4408,6 +4409,13 @@ export default function SessionRecorderScreen({
               {exercise.sets.length > 0 ? (
                 <Text style={styles.exerciseSetSummaryText}>{getExerciseSetSummary(exercise.sets)}</Text>
               ) : null}
+              <ExerciseCardPersonalRecordLine
+                personalRecord={getExerciseCardPersonalRecord(
+                  exercise.sets,
+                  exerciseBlockHistoryByExerciseId[exercise.id]
+                )}
+                testID={`exercise-expanded-pr-${exerciseIndex + 1}`}
+              />
               <View style={styles.exerciseTagChipWrap}>
                 {exercise.tags.map((tag) => (
                   <View

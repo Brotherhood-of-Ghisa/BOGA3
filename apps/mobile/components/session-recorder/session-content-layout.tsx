@@ -27,6 +27,11 @@ type ExerciseCardCollapsedSummaryProps = {
   testID: string;
 };
 
+type ExerciseCardPersonalRecordLineProps = {
+  personalRecord?: ExerciseCardPersonalRecordSummary | null;
+  testID: string;
+};
+
 const formatCompactLoad = (value: number): string => {
   if (!Number.isFinite(value)) {
     return '-';
@@ -48,12 +53,31 @@ export function ExerciseCardCollapsedSummary({
       <UiText variant="subtitle" testID={`${testID}-counts`}>
         {`${setLabel} (${failureLabel})`}
       </UiText>
-      {newPersonalRecord ? (
-        <UiText style={styles.exerciseCollapsedPrText} testID={`${testID}-new-pr`}>
-          {`New PR: ${formatCompactLoad(newPersonalRecord.weight)} kg × ${newPersonalRecord.reps} reps · est. 1RM ${Math.round(newPersonalRecord.estimatedOneRepMax)} kg`}
-        </UiText>
-      ) : null}
+      <ExerciseCardPersonalRecordLine
+        personalRecord={newPersonalRecord}
+        testID={`${testID}-new-pr`}
+      />
     </View>
+  );
+}
+
+export function ExerciseCardPersonalRecordLine({
+  personalRecord,
+  testID,
+}: ExerciseCardPersonalRecordLineProps) {
+  if (!personalRecord) {
+    return null;
+  }
+
+  return (
+    <UiText
+      adjustsFontSizeToFit
+      minimumFontScale={0.7}
+      numberOfLines={1}
+      style={styles.exerciseCollapsedPrText}
+      testID={testID}>
+      {`PR: ${formatCompactLoad(personalRecord.weight)} kg × ${personalRecord.reps} reps · est. 1RM ${Math.round(personalRecord.estimatedOneRepMax)} kg`}
+    </UiText>
   );
 }
 
@@ -159,9 +183,14 @@ export function SessionContentLayout<
                   {exerciseDisplayName}
                 </UiText>
                 {onToggleExerciseCollapse ? (
-                  <UiText style={styles.collapseChevronText}>
-                    {isCollapsed ? '▾' : '▴'}
-                  </UiText>
+                  <View style={styles.collapseChevronCircle}>
+                    <View
+                      style={[
+                        styles.collapseChevron,
+                        isCollapsed ? styles.collapseChevronDown : styles.collapseChevronUp,
+                      ]}
+                    />
+                  </View>
                 ) : null}
               </View>
               {exercise.machineName?.trim() ? (
@@ -278,16 +307,40 @@ const styles = StyleSheet.create({
   },
   exerciseTitleRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: uiSpace.xs,
   },
   exerciseTitleText: {
     flex: 1,
     minWidth: 0,
   },
-  collapseChevronText: {
-    fontSize: 16,
-    color: uiColors.textMuted,
+  collapseChevronCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: uiColors.borderDefault,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: uiColors.surfaceDefault,
+  },
+  collapseChevron: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 7,
+    borderRightWidth: 7,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+  },
+  collapseChevronDown: {
+    borderTopWidth: 10,
+    borderTopColor: uiColors.actionPrimary,
+    transform: [{ translateY: 2 }],
+  },
+  collapseChevronUp: {
+    borderBottomWidth: 10,
+    borderBottomColor: uiColors.actionPrimary,
+    transform: [{ translateY: -2 }],
   },
   exerciseCollapsedSummary: {
     gap: uiSpace.xxs,

@@ -1595,14 +1595,20 @@ describe('SessionRecorderScreen exercise interactions', () => {
     fireEvent.press(screen.getByLabelText('Add set to exercise 1'));
     fireEvent.press(screen.getByTestId('set-quality-button-1-2'));
 
+    expect(screen.getByTestId('exercise-expanded-pr-1')).toHaveTextContent(
+      'PR: 300 kg × 5 reps · est. 1RM 350 kg'
+    );
+    expect(screen.getByTestId('exercise-expanded-pr-1').props.numberOfLines).toBe(1);
+
     fireEvent.press(collapseToggle);
 
     expect(screen.getByTestId('exercise-collapsed-summary-1-counts')).toHaveTextContent(
       '2 sets (1 failure)'
     );
     expect(screen.getByTestId('exercise-collapsed-summary-1-new-pr')).toHaveTextContent(
-      'New PR: 300 kg × 5 reps · est. 1RM 350 kg'
+      'PR: 300 kg × 5 reps · est. 1RM 350 kg'
     );
+    expect(screen.getByTestId('exercise-collapsed-summary-1-new-pr').props.numberOfLines).toBe(1);
 
     fireEvent.press(collapseToggle);
 

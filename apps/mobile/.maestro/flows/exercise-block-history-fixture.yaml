@@ -60,6 +60,9 @@ appId: com.dinoderek.mobile
     id: "set-quality-button-1-1"
 - hideKeyboard:
     optional: true
+- assertVisible:
+    id: "exercise-expanded-pr-1"
+- assertVisible: "PR: 300 kg × 5 reps · est. 1RM 350 kg"
 - takeScreenshot: "exercise-block-comparison-expanded"
 - tapOn:
     id: "exercise-collapse-toggle-1"
@@ -70,7 +73,7 @@ appId: com.dinoderek.mobile
 - assertVisible: "1 set (1 failure)"
 - assertVisible:
     id: "exercise-collapsed-summary-1-new-pr"
-- assertVisible: "New PR: 300 kg × 5 reps · est. 1RM 350 kg"
+- assertVisible: "PR: 300 kg × 5 reps · est. 1RM 350 kg"
 - takeScreenshot: "exercise-card-summary-new-pr"
 - tapOn:
     id: "exercise-collapse-toggle-1"
@@ -78,16 +81,16 @@ appId: com.dinoderek.mobile
     id: "exercise-block-history-panel-1"
 - tapOn: "Log new exercise"
 - tapOn: "Exercise filter input"
-- inputText: "lat pulldown"
+- inputText: "low cable one-arm"
 - hideKeyboard:
     optional: true
 - tapOn: "Select Exercise"
 - extendedWaitUntil:
     visible:
-      text: "Select exercise Lat Pulldown"
+      text: "Select exercise Low Cable One-Arm Lateral Raise"
     timeout: 15000
 - tapOn:
-    text: "Select exercise Lat Pulldown"
+    text: "Select exercise Low Cable One-Arm Lateral Raise"
 - tapOn:
     id: "exercise-picker-add-empty-set-button"
 - extendedWaitUntil:
