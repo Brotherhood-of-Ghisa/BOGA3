@@ -100,6 +100,8 @@ Brief entrypoint map of the current mobile screens.
     sync-status surface
 - Key states (high level):
   - one tappable account/profile card
+  - one signed-in-only Connected agents row; signed-out users do not see agent
+    permission management
   - a sync-status card (signed-in only) showing last successful sync time
     (`Never` until the first success), pending-change count (rows still waiting
     to push across the user-owned tables), network state (online/offline), and
@@ -113,9 +115,24 @@ Brief entrypoint map of the current mobile screens.
   - available from the shared settings utility action regardless of auth state
 - Key exits:
   - `profile`
+  - `connected-agents` (signed in only)
   - back to the previous route via stack navigation
 
-7. `/profile`
+7. `/connected-agents`
+- File: `apps/mobile/app/connected-agents.tsx`
+- Purpose:
+  - signed-in OAuth grant review and revocation for external coaching agents
+- Key states (high level):
+  - loading and concise no-connections empty states
+  - one card per active grant with client name, granted time, last-access time
+    (`Never` when no audit event exists), and explicit read-only capability copy
+  - inline load/revoke error with Retry; grant revocation remains usable if
+    optional last-access metadata cannot be loaded
+  - destructive confirmation before revocation and an in-flight disabled state
+- Key exits:
+  - back to `settings` (or previous route) via stack navigation
+
+8. `/profile`
 - File: `apps/mobile/app/profile.tsx`
 - Purpose:
   - auth-aware account route for sign-in, signed-in username/email/password management, and M13 sync controls/status
@@ -134,7 +151,7 @@ Brief entrypoint map of the current mobile screens.
   - in-place rerender between signed-out and signed-in states
   - back to `settings` (or previous route) via stack navigation
 
-8. `/sessions`
+9. `/sessions`
 - File: `apps/mobile/app/sessions.tsx`
 - Purpose:
   - stack-based complete session list reached from the Stats Sessions card
@@ -148,7 +165,7 @@ Brief entrypoint map of the current mobile screens.
   - `/completed-session/<sessionId>` from a completed row
   - `/session-recorder?mode=completed-edit&sessionId=<sessionId>` from completed edit
 
-9. `/completed-session/[sessionId]`
+10. `/completed-session/[sessionId]`
 - File: `apps/mobile/app/completed-session/[sessionId].tsx`
 - Purpose:
   - completed session detail viewer with edit/delete session actions and per-exercise block append actions
@@ -162,7 +179,7 @@ Brief entrypoint map of the current mobile screens.
   - `session-recorder` (edit)
   - `session-recorder` after successful per-exercise block append
 
-10. `/exercise-history`
+11. `/exercise-history`
 - File: `apps/mobile/app/exercise-history.tsx`
 - Purpose:
   - per-exercise performance history view (progression signals + per-tag drill-down for a single `exercise_definitions` row)
@@ -183,7 +200,7 @@ Brief entrypoint map of the current mobile screens.
 - Notes:
   - wraps the whole navigator in the route-layer auth guard (`apps/mobile/components/navigation/auth-route-guard.tsx`), which enforces login-on-start for configured signed-out sessions (neutral loading view while restoring, redirect to `/sign-in` when configured-but-signed-out, stand aside when auth is unconfigured, while allowing `/sign-in` and the dev/test-gated `/maestro-harness` route to render through)
   - immediately below the auth guard, wraps the navigator in the first-sync gate (`apps/mobile/src/sync/SyncGate.tsx`), which blocks a signed-in user behind a full-screen "Setting up your data…" block until `sync_runtime_state.bootstrap_completed_at` is set (then dismisses in place), and observes sync runtime state through the single shared scheduler-state accessor
-  - tab roots live inside the `(tabs)` route group (`apps/mobile/app/(tabs)/_layout.tsx`) with `headerShown: false`; the root stack registers the `(tabs)` group itself plus the `sign-in` screen and the detail screens (`exercise-history`, `sessions`, `profile`, `maestro-harness`, `completed-session/[sessionId]`)
+  - tab roots live inside the `(tabs)` route group (`apps/mobile/app/(tabs)/_layout.tsx`) with `headerShown: false`; the root stack registers the `(tabs)` group itself plus the `sign-in` screen and the detail screens (`exercise-history`, `sessions`, `profile`, `connected-agents`, `maestro-harness`, `completed-session/[sessionId]`)
   - completed-session route sets its title inside the route file
   - exercise-history route also sets its title inside the route file (resolved exercise name)
 

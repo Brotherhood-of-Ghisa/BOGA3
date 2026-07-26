@@ -53,7 +53,10 @@ jobs:
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: apps/mobile/package-lock.json
+          cache-dependency-path: |
+            apps/mobile/package-lock.json
+            apps/agent-auth-web/package-lock.json
+            services/boga-mcp/package-lock.json
 
       - name: Install dependencies
         run: npm ci
@@ -70,6 +73,16 @@ jobs:
       # timeout. Deliberately NOT `--forceExit`, which would hide the leak.
       - name: Test
         run: npm test
+        timeout-minutes: 5
+
+      - name: Agent authorization web
+        run: ./scripts/test-agent-auth-web.sh
+        working-directory: ${{ github.workspace }}
+        timeout-minutes: 5
+
+      - name: MCP server
+        run: ./scripts/test-boga-mcp.sh
+        working-directory: ${{ github.workspace }}
         timeout-minutes: 5
 
       # Authoritative open-handle guard: runs the suite serially with

@@ -11,7 +11,7 @@ Define the canonical repository structure, path ownership, and placement convent
 - Update this document in the same task/session when significant project-structure changes are made (for example new top-level folders, workspace moves, canonical test-location changes, or path-convention changes).
 - Minor file additions within an existing well-defined folder usually do not require updates.
 
-## Current repository structure (verified 2026-03-02)
+## Current repository structure (verified 2026-07-25)
 
 ```text
 /
@@ -19,6 +19,7 @@ Define the canonical repository structure, path ownership, and placement convent
   hooks/                        # Git hook sources installed into shared .git/hooks by setup scripts
   scripts/                       # Repo-level cross-workspace wrappers (quality gates, orchestration)
   apps/
+    agent-auth-web/              # Static Supabase OAuth consent application
     mobile/                      # Expo React Native app (current primary codebase)
       app/                       # Expo Router routes/screens
       app/__tests__/             # Current app-side test location (legacy/needs rationalization)
@@ -30,12 +31,14 @@ Define the canonical repository structure, path ownership, and placement convent
       .maestro/                  # Maestro flows + sample config
       scripts/                   # Mobile/maestro helper scripts
       artifacts/maestro/         # Maestro output artifacts, runtime state, and logs
+  services/
+    boga-mcp/                    # Public read-only MCP protocol/API adapter
   supabase/                      # Supabase backend root (M5 local runtime + backend assets)
     config.toml.template         # Checked-in Supabase local config template
     config.toml                  # Generated per-worktree local config (gitignored)
     migrations/                  # Postgres migrations
     seed.sql                     # Deterministic local seed fixtures
-    functions/                   # Edge Functions (including health smoke endpoint)
+    functions/                   # Edge Functions (health + dedicated agent API)
     scripts/                     # Backend local runtime/test wrapper scripts
     tests/                       # Backend-local smoke/integration test entrypoints
   docs/
@@ -51,6 +54,15 @@ Define the canonical repository structure, path ownership, and placement convent
 
 - `apps/mobile/`
   - owns the mobile app code, mobile-only tests, mobile SQLite schema artifacts, Maestro flows/config, and mobile test helper scripts.
+- `apps/agent-auth-web/`
+  - owns the static Supabase OAuth consent and sign-in surface. It may contain
+    only public Supabase browser configuration; protocol/token issuance stays
+    in Supabase Auth.
+- `services/boga-mcp/`
+  - owns the public MCP Streamable HTTP adapter, OAuth protected-resource
+    metadata, static tool contracts, and dedicated BoGa agent-API client.
+  - must never own database/Supabase data clients, SQL, a database URL, or a
+    service-role credential.
 - `apps/mobile/components/ui/`
   - owns the canonical mobile UI tokens + primitive components introduced in M8 for reuse across route screens and specialized shared components.
 - `apps/mobile/src/auth/`
@@ -61,6 +73,12 @@ Define the canonical repository structure, path ownership, and placement convent
 - `scripts/`
   - owns repo-level cross-workspace wrappers (for example standard local quality-gate commands).
   - owns BOGA worktree setup/orchestration/cleanup helpers (`worktree-create.sh`, `worktree-setup.sh`, `worktree-doctor.sh`, `worktree-sweep.sh`, `worktree-clean.sh`, `worktree-lib.sh`, `boga-config-init.sh`).
+  - owns cross-workspace MCP/consent test wrappers and the real OAuth-to-MCP
+    smoke harness.
+- `supabase/functions/agent-api/`
+  - owns the authenticated, read-only BoGa3 agent HTTP API. This is the only
+    service-role data boundary in the Virtual Coach flow; every query derives
+    and filters by the validated OAuth subject.
 - `hooks/`
   - owns checked-in Git hook source files.
   - hook files are installed into the shared `.git/hooks/` directory by `scripts/worktree-setup.sh`; they are not executed directly from this folder by Git.

@@ -43,8 +43,11 @@ What it does:
 
 1. Starts the Supabase local stack (`supabase start` via pinned `npx`).
 2. Opportunistically sweeps completed worktree Supabase infra before startup.
-3. Starts the local Edge Function server for `health` (background process).
-4. Waits until `GET /functions/v1/health` responds.
+3. Starts the local Edge Runtime for every function under
+   `supabase/functions/**` (including `health` and `agent-api`).
+4. Waits until `GET /functions/v1/health` responds. The shared baseline
+   preflight also refreshes this worktree's Edge Runtime when a previously
+   running stack has not yet registered a newly checked-out `agent-api`.
 
 For a physical device pointed at local Supabase over the Mac LAN IP:
 
@@ -229,6 +232,73 @@ Parallel-run note:
 - the sync/auth contract suites use per-run unique record IDs, so repeated runs in one slot do not collide.
 - tests require the deterministic fixture baseline to exist but do not require empty app tables.
 - run `./scripts/worktree-doctor.sh` when a backend suite appears to hit another worktree's local runtime.
+
+## M21 read-only agent API and OAuth boundary
+
+The Virtual Coach read path is:
+
+```text
+MCP client -> services/boga-mcp -> functions/v1/agent-api -> app_public
+```
+
+`agent-api` is the only BoGa data service available to OAuth agent tokens. On
+every request it validates the bearer token live with Supabase Auth, requires
+the validated JWT to contain an OAuth `client_id`, verifies that the matching
+user grant is still active, derives the owner only from the validated subject,
+and then performs an explicit owner-filtered service-role read. Its public
+routes are:
+
+- `GET /functions/v1/agent-api/v1/agent/session`
+- `GET /functions/v1/agent-api/v1/agent/profile`
+- `GET /functions/v1/agent-api/v1/agent/exercises`
+- `GET /functions/v1/agent-api/v1/agent/exercises/:id/context`
+- `GET /functions/v1/agent-api/v1/agent/workouts/recent`
+
+The function is configured with `verify_jwt = false` because it must perform
+live Auth and grant validation itself and return one stable API envelope.
+Disabling the gateway check does not make a route public: the function rejects
+missing, invalid, expired, normal-app, and revoked credentials before creating
+its service-role data client.
+
+The M21 migration adds restrictive RLS policies requiring `client_id IS NULL`
+for direct domain/profile/log access. An OAuth token therefore cannot use
+PostgREST, `sync_push`, app profile/log paths, or any application write route.
+The service role is confined to `agent-api`; it must never be injected into
+`services/boga-mcp` or `apps/agent-auth-web`.
+
+Run the real local authorization/API contract:
+
+```bash
+./boga test agent-api
+```
+
+The lane completes dynamic client registration and authorization code + PKCE
+consent, then proves owner isolation, bounded parameters, canonical
+calculations, invalid/expired/revoked rejection, direct RLS denial, sync-write
+denial, and metadata-only audit rows. Run the full protocol-to-data smoke with:
+
+```bash
+./boga test mcp-smoke
+```
+
+Hosted enablement:
+
+1. Link the target project and apply every migration:
+   `npx supabase@2.76.15 db push --linked --include-all`.
+2. From the repository root deploy the function:
+   `npx supabase@2.76.15 functions deploy agent-api --no-verify-jwt`.
+3. Keep `app_public` in the hosted exposed-schema list. Although agent OAuth
+   tokens have no direct access, the normal mobile app still uses this schema.
+4. Enable the Supabase OAuth server, configure `/oauth/consent`, choose the
+   dynamic-registration posture, and use asymmetric signing keys.
+5. Deploy the consent app and MCP service using their colocated READMEs.
+6. Run hosted discovery, consent, tool, cross-owner, revocation, and audit
+   checks. Do not use a local result as hosted proof.
+
+Supabase-hosted Edge Functions receive the project service role at runtime.
+Do not copy that value into repository files, the consent web build, or the MCP
+host. Restrict function logs from capturing `Authorization`, URL query state,
+or response payloads.
 
 ## Accessing `app_public` via REST (local/manual testing)
 

@@ -19,15 +19,23 @@ apps/mobile/src/sync/**	fast,backend,ios-sync-e2e	sync runtime
 apps/mobile/src/auth/**	fast,backend,ios-sync-e2e	auth / session wiring
 apps/mobile/src/data/**	fast,backend	data layer / client schema
 apps/mobile/drizzle/**	fast,backend	migration artifacts
+apps/mobile/scripts/check-sync-schema-drift*	fast,backend	sync drift checker
 apps/mobile/src/**	fast	mobile TS/JS logic
 apps/mobile/*.json	fast	mobile config (native dep change ⇒ also rebuild dev client + frontend, see spec 02)
 apps/mobile/*.ts	fast	mobile config
+apps/agent-auth-web/scripts/**	fast,mcp-smoke	agent OAuth local smoke helper
+apps/agent-auth-web/**	fast	agent OAuth consent web
+services/boga-mcp/**	fast,mcp-smoke	MCP protocol/API translation
 apps/mobile/scripts/maestro*	frontend,meta-tests	Maestro runtime / lane scripts (+ fixture-user rule)
 apps/mobile/.maestro/**	frontend,meta-tests	Maestro flows / config (+ fixture-user rule)
 supabase/migrations/**	backend	server schema / RLS / RPCs
 supabase/functions/**	backend	edge functions
 supabase/tests/**	backend	backend test bodies
 supabase/scripts/**	backend	backend wrappers / runtime scripts
+supabase/config.toml.template	backend	Supabase auth/runtime configuration
+scripts/smoke-boga-mcp.sh	mcp-smoke	MCP live smoke harness
+scripts/test-agent-auth-web.sh	agent-auth-web	agent consent web gate wrapper
+scripts/test-boga-mcp.sh	mcp-unit	MCP unit gate wrapper
 boga	docs-check,meta-tests	boga dispatcher
 scripts/lanes.tsv	docs-check	lane registry (regenerate the matrix: ./boga docs gen)
 scripts/triggers.tsv	docs-check,meta-tests	trigger registry
@@ -39,4 +47,5 @@ scripts/tests/**	meta-tests	meta-tooling tests
 .github/pull_request_template.md	docs-check,meta-tests	PR template (pr-check parses it)
 AGENTS.md	docs-check	agent entrypoint
 docs/**	docs-check	curated docs
-*.md	docs-check	markdown anywhere
+*.md	docs-check	root markdown
+**/*.md	docs-check	markdown anywhere

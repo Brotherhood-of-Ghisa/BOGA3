@@ -76,8 +76,10 @@ These invariants hold for every table below.
   uniqueness are **not** enforced as UNIQUE — they exist as **non-unique btree
   indexes** for query performance only. The invariants are client-enforced
   (Part B; see B.10).
-- **RLS:** `owner_user_id = auth.uid()` for select/insert/update/delete,
-  identical shape per table (A.6).
+- **RLS:** `owner_user_id = auth.uid()` for select/insert/update/delete plus a
+  restrictive `client_id IS NULL` policy, identical shape per table (A.6).
+  Normal BoGa app sessions have no OAuth `client_id` and retain sync access;
+  OAuth agent credentials cannot call the tables or sync RPCs directly.
 - **Typed columns only — no `extras jsonb`.** Every entity column lands as a
   typed server column. There is no `extras` blob anywhere (schema, wire,
   drift checker).
@@ -497,7 +499,19 @@ create policy <table>_owner_update on app_public.<table>
   using (owner_user_id = auth.uid()) with check (owner_user_id = auth.uid());
 create policy <table>_owner_delete on app_public.<table>
   for delete to authenticated using (owner_user_id = auth.uid());
+
+create policy <table>_direct_app_only on app_public.<table>
+  as restrictive for all to authenticated
+  using (((select auth.jwt()) ->> 'client_id') is null)
+  with check (((select auth.jwt()) ->> 'client_id') is null);
 ```
+
+The four permissive owner policies preserve the normal application contract.
+The restrictive policy is ANDed with them and distinguishes normal app sessions
+from Supabase OAuth agent sessions. Agent reads are available only through the
+dedicated BoGa3 API, which live-validates the OAuth grant and performs explicit
+owner-filtered service reads. This protects both direct table routes and the
+`security invoker` sync RPCs from agent-token use.
 
 ### A.6.2 Why no service-role policies
 
@@ -513,8 +527,9 @@ The push/pull RPCs are `security invoker` (see Build note below), so the
 > which is why the universal `authenticated` policies are sufficient and no
 > `service_role`/RPC-owner policy is needed. This text has been updated to match
 > the code. The drift checker asserts RLS is enabled with the four owner
-> policies, and SHA-256 hashes each policy's `qual`/`with_check` against a
-> checked-in fixture so an `owner_user_id = auth.uid()` → `true` regression
+> policies and the restrictive direct-app-only policy, and SHA-256 hashes each
+> policy's `qual`/`with_check` against a checked-in fixture so an
+> `owner_user_id = auth.uid()` → `true` regression or an OAuth-boundary removal
 > fails CI.
 
 ### A.6.3 Immutability of `owner_user_id`
