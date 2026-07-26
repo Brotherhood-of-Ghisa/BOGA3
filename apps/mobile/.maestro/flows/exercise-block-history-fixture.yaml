@@ -48,30 +48,34 @@ appId: com.dinoderek.mobile
     visible:
       id: "exercise-block-history-panel-1"
     timeout: 10000
-- assertVisible: "Previous"
 - assertVisible: "Current"
 - assertVisible: "Near failure"
-- assertVisible: "1/5"
 - tapOn: "Weight for exercise 1 set 1"
-- inputText: "200"
+- inputText: "300"
 - tapOn: "Reps for exercise 1 set 1"
 - inputText: "5"
+- tapOn:
+    id: "set-quality-button-1-1"
+- tapOn:
+    id: "set-quality-button-1-1"
 - hideKeyboard:
     optional: true
 - takeScreenshot: "exercise-block-comparison-expanded"
 - tapOn:
-    id: "exercise-block-history-panel-1-toggle"
+    id: "exercise-collapse-toggle-1"
 - extendedWaitUntil:
     visible:
-      id: "exercise-block-history-panel-1-collapsed"
+      id: "exercise-collapsed-summary-1-counts"
     timeout: 10000
-- takeScreenshot: "exercise-block-comparison-collapsed"
+- assertVisible: "1 set (1 failure)"
+- assertVisible:
+    id: "exercise-collapsed-summary-1-new-pr"
+- assertVisible: "New PR: 300 kg × 5 reps · est. 1RM 350 kg"
+- takeScreenshot: "exercise-card-summary-new-pr"
 - tapOn:
-    id: "exercise-block-history-panel-1-collapsed"
-- tapOn:
-    id: "exercise-block-history-panel-1-older"
-- assertVisible: "2/5"
-- takeScreenshot: "exercise-block-comparison-older"
+    id: "exercise-collapse-toggle-1"
+- assertVisible:
+    id: "exercise-block-history-panel-1"
 - tapOn: "Log new exercise"
 - tapOn: "Exercise filter input"
 - inputText: "lat pulldown"
@@ -90,11 +94,13 @@ appId: com.dinoderek.mobile
     visible:
       id: "exercise-block-history-panel-2-empty-collapsed"
     timeout: 30000
-- takeScreenshot: "exercise-block-history-empty-collapsed"
 - tapOn:
-    id: "exercise-block-history-panel-2-empty-collapsed"
+    id: "exercise-collapse-toggle-2"
 - extendedWaitUntil:
     visible:
-      id: "exercise-block-history-panel-2-empty"
+      id: "exercise-collapsed-summary-2-counts"
     timeout: 10000
-- takeScreenshot: "exercise-block-history-empty-expanded"
+- assertVisible: "0 sets (0 failures)"
+- assertNotVisible:
+    id: "exercise-collapsed-summary-2-new-pr"
+- takeScreenshot: "exercise-card-summary-empty-history"

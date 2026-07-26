@@ -14,6 +14,49 @@ export type SessionContentExerciseValue<TSet extends SessionContentSetValue = Se
   sets: TSet[];
 };
 
+export type ExerciseCardPersonalRecordSummary = {
+  weight: number;
+  reps: number;
+  estimatedOneRepMax: number;
+};
+
+type ExerciseCardCollapsedSummaryProps = {
+  setCount: number;
+  failureCount: number;
+  newPersonalRecord?: ExerciseCardPersonalRecordSummary | null;
+  testID: string;
+};
+
+const formatCompactLoad = (value: number): string => {
+  if (!Number.isFinite(value)) {
+    return '-';
+  }
+  return Number.isInteger(value) ? `${value}` : `${Number(value.toFixed(2))}`;
+};
+
+export function ExerciseCardCollapsedSummary({
+  setCount,
+  failureCount,
+  newPersonalRecord,
+  testID,
+}: ExerciseCardCollapsedSummaryProps) {
+  const setLabel = `${setCount} ${setCount === 1 ? 'set' : 'sets'}`;
+  const failureLabel = `${failureCount} ${failureCount === 1 ? 'failure' : 'failures'}`;
+
+  return (
+    <View style={styles.exerciseCollapsedSummary} testID={testID}>
+      <UiText variant="subtitle" testID={`${testID}-counts`}>
+        {`${setLabel} (${failureLabel})`}
+      </UiText>
+      {newPersonalRecord ? (
+        <UiText style={styles.exerciseCollapsedPrText} testID={`${testID}-new-pr`}>
+          {`New PR: ${formatCompactLoad(newPersonalRecord.weight)} kg × ${newPersonalRecord.reps} reps · est. 1RM ${Math.round(newPersonalRecord.estimatedOneRepMax)} kg`}
+        </UiText>
+      ) : null}
+    </View>
+  );
+}
+
 type ExerciseCardProps = Omit<ComponentProps<typeof UiSurface>, 'children'>;
 
 type SessionContentLayoutProps<
@@ -27,6 +70,10 @@ type SessionContentLayoutProps<
   emptyExercisesText?: string;
   collapsedExerciseIds?: Set<string>;
   onToggleExerciseCollapse?: (exerciseId: string) => void;
+  renderCollapsedExerciseSummary?: (input: {
+    exercise: TExercise;
+    exerciseIndex: number;
+  }) => ReactNode;
   renderSetRow: (input: {
     exercise: TExercise;
     exerciseIndex: number;
@@ -67,6 +114,7 @@ export function SessionContentLayout<
   emptyExercisesText = 'No exercises logged yet.',
   collapsedExerciseIds,
   onToggleExerciseCollapse,
+  renderCollapsedExerciseSummary,
   renderSetRow,
   renderSetHeader,
   renderExerciseHeaderAction,
@@ -97,6 +145,40 @@ export function SessionContentLayout<
         {exercises.map((exercise, exerciseIndex) => {
           const exerciseCardProps = getExerciseCardProps?.({ exercise, exerciseIndex });
           const isCollapsed = collapsedExerciseIds?.has(exercise.id) ?? false;
+          const exerciseDisplayName = exercise.name || `Exercise ${exerciseIndex + 1}`;
+          const headerText = (
+            <View style={styles.exerciseHeaderTextStack}>
+              <View style={styles.exerciseTitleRow}>
+                <UiText
+                  adjustsFontSizeToFit
+                  ellipsizeMode="clip"
+                  minimumFontScale={0.82}
+                  numberOfLines={2}
+                  style={styles.exerciseTitleText}
+                  variant="title">
+                  {exerciseDisplayName}
+                </UiText>
+                {onToggleExerciseCollapse ? (
+                  <UiText style={styles.collapseChevronText}>
+                    {isCollapsed ? '▾' : '▴'}
+                  </UiText>
+                ) : null}
+              </View>
+              {exercise.machineName?.trim() ? (
+                <UiText
+                  adjustsFontSizeToFit
+                  ellipsizeMode="clip"
+                  minimumFontScale={0.82}
+                  numberOfLines={1}
+                  variant="subtitle">
+                  {exercise.machineName.trim()}
+                </UiText>
+              ) : null}
+              {isCollapsed && renderCollapsedExerciseSummary
+                ? renderCollapsedExerciseSummary({ exercise, exerciseIndex })
+                : null}
+            </View>
+          );
 
           return (
             <UiSurface
@@ -104,48 +186,20 @@ export function SessionContentLayout<
               {...exerciseCardProps}
               style={[styles.exerciseCard, exerciseCardProps?.style]}>
               <View style={styles.exerciseCardHeader}>
-                <Pressable
-                  accessibilityHint={isCollapsed ? 'Tap to expand exercise' : 'Tap to collapse exercise'}
-                  accessibilityLabel={`Toggle collapse exercise ${exercise.name}`}
-                  accessibilityRole="button"
-                  accessibilityState={{ expanded: !isCollapsed }}
-                  disabled={!onToggleExerciseCollapse}
-                  style={styles.exerciseHeaderTitlePressable}
-                  testID={`exercise-collapse-toggle-${exerciseIndex + 1}`}
-                  onPress={() => onToggleExerciseCollapse?.(exercise.id)}>
-                  <View style={styles.exerciseHeaderTextStack}>
-                    <View style={styles.exerciseTitleRow}>
-                      <UiText
-                        adjustsFontSizeToFit
-                        ellipsizeMode="clip"
-                        minimumFontScale={0.82}
-                        numberOfLines={2}
-                        variant="title">
-                        {exercise.name || `Exercise ${exerciseIndex + 1}`}
-                      </UiText>
-                      {onToggleExerciseCollapse ? (
-                        <UiText style={styles.collapseChevronText}>
-                          {isCollapsed ? '▾' : '▴'}
-                        </UiText>
-                      ) : null}
-                    </View>
-                    {exercise.machineName?.trim() ? (
-                      <UiText
-                        adjustsFontSizeToFit
-                        ellipsizeMode="clip"
-                        minimumFontScale={0.82}
-                        numberOfLines={1}
-                        variant="subtitle">
-                        {exercise.machineName.trim()}
-                      </UiText>
-                    ) : null}
-                    {isCollapsed ? (
-                      <UiText variant="subtitle">
-                        {`${exercise.sets.length} ${exercise.sets.length === 1 ? 'set' : 'sets'}`}
-                      </UiText>
-                    ) : null}
-                  </View>
-                </Pressable>
+                {onToggleExerciseCollapse ? (
+                  <Pressable
+                    accessibilityHint={isCollapsed ? 'Tap to expand exercise' : 'Tap to collapse exercise'}
+                    accessibilityLabel={`${isCollapsed ? 'Expand' : 'Collapse'} exercise ${exerciseDisplayName}`}
+                    accessibilityRole="button"
+                    accessibilityState={{ expanded: !isCollapsed }}
+                    style={styles.exerciseHeaderTitlePressable}
+                    testID={`exercise-collapse-toggle-${exerciseIndex + 1}`}
+                    onPress={() => onToggleExerciseCollapse(exercise.id)}>
+                    {headerText}
+                  </Pressable>
+                ) : (
+                  <View style={styles.exerciseHeaderTitlePressable}>{headerText}</View>
+                )}
                 {renderExerciseHeaderAction ? renderExerciseHeaderAction({ exercise, exerciseIndex }) : null}
               </View>
 
@@ -214,6 +268,8 @@ const styles = StyleSheet.create({
   exerciseHeaderTitlePressable: {
     flex: 1,
     minWidth: 0,
+    minHeight: 44,
+    justifyContent: 'center',
   },
   exerciseHeaderTextStack: {
     flex: 1,
@@ -225,9 +281,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: uiSpace.xs,
   },
+  exerciseTitleText: {
+    flex: 1,
+    minWidth: 0,
+  },
   collapseChevronText: {
     fontSize: 16,
     color: uiColors.textMuted,
+  },
+  exerciseCollapsedSummary: {
+    gap: uiSpace.xxs,
+  },
+  exerciseCollapsedPrText: {
+    color: uiColors.heatmapBucket4,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '700',
   },
   setList: {
     gap: uiSpace.sm,

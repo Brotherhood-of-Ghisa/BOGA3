@@ -82,6 +82,10 @@ Use this section as the single source of truth for reusable UX patterns.
    - Intent: prevent accidental data loss in edit flows.
    - Usage: delete location/exercise/set actions.
    - Rules: clear destructive styling, confirm intent when risk is meaningful, and provide immediate feedback after action.
+4. Collapsible summary card pattern
+   - Intent: reduce vertical density while retaining the facts needed to identify and compare repeated content.
+   - Usage: exercise cards in active/completed-edit recording and completed-session detail.
+   - Rules: cards start expanded, the title region is a minimum-size accessible toggle, collapse hides detail without changing domain data, and the collapsed state shows only validated summary facts. Actions that require the hidden content to be visible must expand the card.
 
 ## Default appearance baseline (MVP)
 

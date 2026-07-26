@@ -91,6 +91,8 @@ Brief entrypoint inventory of the current reusable UI component set.
 - Purpose:
   - shared layout scaffold for session exercise/set content used by `session-recorder` and completed-session detail screens
   - supports optional per-exercise metadata injection (`renderExerciseMeta`) so recorder mode can render tag chips/actions without duplicating card structure
+  - supports optional per-exercise collapse state and a caller-provided collapsed-summary renderer while preserving header actions outside the hidden body
+  - exports `ExerciseCardCollapsedSummary` for the shared performed-set/failure presentation and optional live PR line
 
 6. `SessionSummaryLine`
 - File: `apps/mobile/components/session-list/session-summary-line.tsx`

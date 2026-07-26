@@ -189,6 +189,60 @@ describe('CompletedSessionDetailScreenShell', () => {
     expect(screen.queryByTestId('completed-session-detail-tags-exercise-1')).toBeNull();
   });
 
+  it('collapses each exercise to valid performed-set and failure counts', async () => {
+    const dataClient: CompletedSessionDetailDataClient = {
+      loadCompletedSession: jest.fn().mockResolvedValue({
+        ...COMPLETED_SESSION_DETAIL_FIXTURE,
+        exercises: COMPLETED_SESSION_DETAIL_FIXTURE.exercises.map((exercise, index) =>
+          index === 0
+            ? {
+                ...exercise,
+                sets: [
+                  ...exercise.sets,
+                  { id: 'set-invalid', weight: '', reps: '5', setType: 'rir_0' as const },
+                ],
+              }
+            : exercise
+        ),
+      }),
+      appendCompletedSessionExerciseAsPlanned: jest.fn().mockResolvedValue(undefined),
+      setCompletedSessionDeletedState: jest.fn().mockResolvedValue(undefined),
+    };
+
+    render(
+      <CompletedSessionDetailScreenShell
+        sessionId="completed-under-test"
+        dataClient={dataClient}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('completed-session-detail-screen')).toBeTruthy();
+    });
+
+    const collapseToggle = screen.getByTestId('exercise-collapse-toggle-1');
+    fireEvent.press(collapseToggle);
+
+    expect(collapseToggle.props.accessibilityState.expanded).toBe(false);
+    expect(
+      screen.getByTestId('completed-session-detail-collapsed-summary-exercise-1-counts')
+    ).toHaveTextContent('4 sets (1 failure)');
+    expect(
+      screen.queryByTestId('completed-session-detail-collapsed-summary-exercise-1-new-pr')
+    ).toBeNull();
+    expect(screen.queryByTestId('completed-session-detail-sets-table-header-exercise-1')).toBeNull();
+    expect(screen.queryByTestId('completed-session-detail-tags-exercise-1')).toBeNull();
+    expect(
+      screen.getByTestId('completed-session-detail-append-exercise-button-exercise-1')
+    ).toBeTruthy();
+
+    fireEvent.press(collapseToggle);
+
+    expect(collapseToggle.props.accessibilityState.expanded).toBe(true);
+    expect(screen.getByTestId('completed-session-detail-sets-table-header-exercise-1')).toBeTruthy();
+    expect(screen.getByTestId('completed-session-detail-tags-exercise-1')).toBeTruthy();
+  });
+
   it('edit action navigates to the recorder completed-edit UI', async () => {
     const dataClient: CompletedSessionDetailDataClient = {
       loadCompletedSession: jest.fn().mockResolvedValue({
