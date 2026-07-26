@@ -4204,6 +4204,7 @@ export default function SessionRecorderScreen({
                   ref={(input) => {
                     weightInputBySetIdRef.current[set.id] = input;
                   }}
+                  selectTextOnFocus
                   style={styles.setWeightTextInput}
                   value={set.weight}
                   onBlur={() => {
@@ -4230,6 +4231,7 @@ export default function SessionRecorderScreen({
                 keyboardType="number-pad"
                 placeholder="Reps"
                 placeholderTextColor={uiColors.textDisabled}
+                selectTextOnFocus
                 style={[
                   styles.input,
                   styles.setRowInput,
