@@ -217,7 +217,20 @@ export function CompletedSessionDetailScreenShell({
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [session, setSession] = useState<CompletedSessionDetailRecord | null>(null);
+  const [collapsedExerciseIds, setCollapsedExerciseIds] = useState<Set<string>>(() => new Set());
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
+
+  const toggleExerciseCollapsed = useCallback((exerciseId: string) => {
+    setCollapsedExerciseIds((current) => {
+      const next = new Set(current);
+      if (next.has(exerciseId)) {
+        next.delete(exerciseId);
+      } else {
+        next.add(exerciseId);
+      }
+      return next;
+    });
+  }, []);
   const [isTogglingDeletedState, setIsTogglingDeletedState] = useState(false);
 
   const reloadSession = useCallback(() => {
@@ -490,6 +503,8 @@ export function CompletedSessionDetailScreenShell({
         </View>
 
         <SessionContentLayout<CompletedSessionDetailSet, CompletedSessionDetailExercise>
+          collapsedExerciseIds={collapsedExerciseIds}
+          onToggleExerciseCollapse={toggleExerciseCollapsed}
           showMetadataSection={false}
           dateTimeValue={
             <View style={styles.readOnlyField}>

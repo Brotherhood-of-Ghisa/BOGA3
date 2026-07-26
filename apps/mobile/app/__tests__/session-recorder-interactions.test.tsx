@@ -1531,4 +1531,32 @@ describe('SessionRecorderScreen exercise interactions', () => {
 
     await act(async () => {});
   });
+
+  it('toggles exercise card collapse and expand state', async () => {
+    render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
+
+    fireEvent.press(screen.getByText('Log new exercise'));
+    expect(await screen.findByLabelText('Select exercise Barbell Squat')).toBeTruthy();
+    await selectExerciseFromPicker('Barbell Squat');
+
+    expect(screen.getByTestId('add-set-button-1')).toBeTruthy();
+    expect(screen.getByLabelText('Weight for exercise 1 set 1')).toBeTruthy();
+
+    const collapseToggle = screen.getByTestId('exercise-collapse-toggle-1');
+    expect(collapseToggle.props.accessibilityState.expanded).toBe(true);
+
+    fireEvent.press(collapseToggle);
+
+    expect(collapseToggle.props.accessibilityState.expanded).toBe(false);
+    expect(screen.queryByTestId('add-set-button-1')).toBeNull();
+    expect(screen.queryByLabelText('Weight for exercise 1 set 1')).toBeNull();
+    expect(screen.getByText('1 set')).toBeTruthy();
+
+    fireEvent.press(collapseToggle);
+
+    expect(collapseToggle.props.accessibilityState.expanded).toBe(true);
+    expect(screen.getByTestId('add-set-button-1')).toBeTruthy();
+    expect(screen.getByLabelText('Weight for exercise 1 set 1')).toBeTruthy();
+  });
 });

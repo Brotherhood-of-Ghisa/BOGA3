@@ -1169,6 +1169,7 @@ export default function SessionRecorderScreen({
   const [isTagMutationInFlight, setIsTagMutationInFlight] = useState(false);
   const [activeSetTypePicker, setActiveSetTypePicker] = useState<SetTypePickerState | null>(null);
   const [expandedSetIds, setExpandedSetIds] = useState<Set<string>>(() => new Set());
+  const [collapsedExerciseIds, setCollapsedExerciseIds] = useState<Set<string>>(() => new Set());
   const [activeRowId, setActiveRowId] = useState<string | null>(null);
   const [lastAddedRowId, setLastAddedRowId] = useState<string | null>(null);
   const [pendingFocusedWeightSetId, setPendingFocusedWeightSetId] = useState<string | null>(null);
@@ -2704,10 +2705,31 @@ export default function SessionRecorderScreen({
     pendingExerciseCardScrollIdRef.current = null;
   }, []);
 
+  const toggleExerciseCollapsed = useCallback((exerciseId: string) => {
+    setCollapsedExerciseIds((current) => {
+      const next = new Set(current);
+      if (next.has(exerciseId)) {
+        next.delete(exerciseId);
+      } else {
+        next.add(exerciseId);
+      }
+      return next;
+    });
+  }, []);
+
   const focusExerciseCard = useCallback((exerciseId: string | null) => {
     if (!exerciseId) {
       return;
     }
+
+    setCollapsedExerciseIds((current) => {
+      if (current.has(exerciseId)) {
+        const next = new Set(current);
+        next.delete(exerciseId);
+        return next;
+      }
+      return current;
+    });
 
     setFocusedExerciseCardId(exerciseId);
     pendingExerciseCardScrollIdRef.current = exerciseId;
@@ -3857,6 +3879,8 @@ export default function SessionRecorderScreen({
       ) : null}
 
       <SessionContentLayout<SessionSet, SessionExercise>
+        collapsedExerciseIds={collapsedExerciseIds}
+        onToggleExerciseCollapse={toggleExerciseCollapsed}
         showMetadataSection={routeMode !== 'completed-edit'}
         dateTimeValue={
           <View accessibilityLabel="Session date and time" style={styles.readOnlyInput}>
