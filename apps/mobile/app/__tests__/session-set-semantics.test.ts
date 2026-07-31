@@ -57,7 +57,7 @@ describe('session set semantics', () => {
     expect(hydrateSessionSetPerformanceStatus(null, { reps: '5', weight: '20' })).toBeNull();
     expect(hydrateSessionSetPerformanceStatus(null, { reps: '', weight: '' })).toBe('unperformed');
     expect(hydrateSessionSetPerformanceStatus('planned', { reps: '5', weight: '20' })).toBe('planned');
-    expect(hydrateSessionSetPerformanceStatus('skipped', { reps: '5', weight: '20' })).toBe('skipped');
+    expect(hydrateSessionSetPerformanceStatus('skipped', { reps: '5', weight: '20' })).toBe('planned');
     expect(hydrateSessionSetPerformanceStatus('unperformed', { reps: '5', weight: '20' })).toBe(
       'unperformed'
     );

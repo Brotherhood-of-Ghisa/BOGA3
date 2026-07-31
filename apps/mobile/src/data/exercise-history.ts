@@ -21,7 +21,11 @@ import {
   sessionExercises,
   sessions,
 } from './schema';
-import { normalizeSessionSetType, type SessionSetTypeValue } from './set-types';
+import {
+  isWorkingSessionSetType,
+  normalizeSessionSetType,
+  type SessionSetTypeValue,
+} from './set-types';
 import { computePeriodBounds, type StatsPeriodDays } from './stats';
 
 export type ExerciseHistoryPeriod = 'all' | StatsPeriodDays;
@@ -153,8 +157,6 @@ const ensureValidDate = (value: Date, label: string) => {
   }
 };
 
-const isWorkingSet = (setType: string | null) => setType !== 'warm_up';
-
 const groupBySessionExerciseId = <T extends { sessionExerciseId: string }>(
   rows: T[]
 ): Record<string, T[]> => {
@@ -204,19 +206,19 @@ const buildSessionEntry = (
     weightValue: row.weightValue,
     repsValue: row.repsValue,
     setType: normalizeSessionSetType(row.setType),
-    isWorking: isWorkingSet(row.setType),
+    isWorking: isWorkingSessionSetType(row.setType),
   }));
 
   const workingSetCount = sets.reduce((count, set) => (set.isWorking ? count + 1 : count), 0);
-  const workingSetInputs = orderedSets.map((row) => ({
+  const calculationInputs = orderedSets.map((row) => ({
     weightValue: row.weightValue,
     repsValue: row.repsValue,
     setType: row.setType,
   }));
 
-  const estimatedOneRepMax = estimateExerciseOneRepMax(workingSetInputs);
-  const totalVolume = computeExerciseVolume(workingSetInputs);
-  const topByWeight = computeMaxRepsByWeight(workingSetInputs);
+  const estimatedOneRepMax = estimateExerciseOneRepMax(calculationInputs);
+  const totalVolume = computeExerciseVolume(calculationInputs);
+  const topByWeight = computeMaxRepsByWeight(calculationInputs);
   const topWeightSet = topByWeight.length > 0
     ? { weight: topByWeight[0].weight, reps: topByWeight[0].maxReps }
     : null;

@@ -8,6 +8,7 @@ import {
   isConfirmedPerformedSet,
   type SessionSetPerformanceStatus,
 } from '@/src/session-recorder/set-semantics';
+import { isWorkingSessionSetType } from './set-types';
 
 export type MuscleContributionRole = 'primary' | 'secondary' | 'stabilizer' | null;
 
@@ -100,7 +101,8 @@ export const getMuscleContributionRoleWeight = (role: MuscleContributionRole): n
   return 0;
 };
 
-export const isMuscleAnalyticsWorkingSet = (_setType: string | null): boolean => true;
+export const isMuscleAnalyticsWorkingSet = (setType: string | null): boolean =>
+  isWorkingSessionSetType(setType);
 
 export const computeMuscleSetVolume = (weightValue: string, repsValue: string): number => {
   const weight = parseSetWeight(weightValue);
@@ -134,7 +136,8 @@ export const countMuscleAnalyticsWorkingSets = (input: MuscleAnalyticsInput): nu
         reps: set.repsValue,
         weight: set.weightValue,
         performanceStatus: set.performanceStatus,
-      })
+      }) &&
+      isMuscleAnalyticsWorkingSet(set.setType)
   ).length;
 };
 
@@ -303,44 +306,42 @@ export const aggregateSelectedMuscleDailyEffort = (
     .sort((left, right) => left.dateKey.localeCompare(right.dateKey));
 };
 
-export type CalendarHeatmapMetric = 'totalVolume' | 'nearFailureCount' | 'estimatedRM1' | 'highestWeight';
+export type CalendarHeatmapMetric = 'totalVolume' | 'workingSetCount' | 'estimatedRM1' | 'highestWeight';
 
 export type SelectedMuscleWeeklyEffort = {
   weekStartDateKey: string;
   monthKey: string;
   weekOfMonth: number;
   totalVolume: number;
-  nearFailureCount: number;
+  workingSetCount: number;
   estimatedRM1: number | null;
   highestWeight: number | null;
 };
 
-const NEAR_FAILURE_SET_TYPES = new Set(['rir_0', 'rir_1', 'rir_2']);
-
 /**
- * Per-day rollup of the four heatmap metrics (volume / near-failure / 1RM / top
+ * Per-day rollup of the four heatmap metrics (volume / working sets / 1RM / top
  * weight). Shared by the muscle and exercise daily heatmaps. `highestWeight` and
  * `estimatedRM1` are best-of values, so weekly cells can be derived from these by
- * summing volume/near-failure and taking the max of weight/1RM across the days.
+ * summing volume/working sets and taking the max of weight/1RM across the days.
  */
 export type DailyEffortMetrics = {
   dateKey: string;
   totalVolume: number;
-  nearFailureCount: number;
+  workingSetCount: number;
   estimatedRM1: number | null;
   highestWeight: number | null;
 };
 
 type EffortMetricAccumulator = {
   totalVolume: number;
-  nearFailureCount: number;
+  workingSetCount: number;
   bestRM1: number | null;
   highestWeight: number | null;
 };
 
 export const createEffortMetricAccumulator = (): EffortMetricAccumulator => ({
   totalVolume: 0,
-  nearFailureCount: 0,
+  workingSetCount: 0,
   bestRM1: null,
   highestWeight: null,
 });
@@ -352,8 +353,8 @@ export const accumulateContributionMetrics = (
 ): void => {
   acc.totalVolume += contribution.weightedVolume;
 
-  if (contribution.setType !== null && NEAR_FAILURE_SET_TYPES.has(contribution.setType)) {
-    acc.nearFailureCount += 1;
+  if (isWorkingSessionSetType(contribution.setType)) {
+    acc.workingSetCount += 1;
   }
 
   const weight = parseSetWeight(contribution.weightValue);
@@ -395,7 +396,7 @@ export const aggregateSelectedMuscleWeeklyEffort = (
     weekStartDateKey: string;
     monthKey: string;
     totalVolume: number;
-    nearFailureCount: number;
+    workingSetCount: number;
     bestRM1: number | null;
     highestWeight: number | null;
   };
@@ -412,7 +413,7 @@ export const aggregateSelectedMuscleWeeklyEffort = (
       weekStartDateKey,
       monthKey,
       totalVolume: 0,
-      nearFailureCount: 0,
+      workingSetCount: 0,
       bestRM1: null,
       highestWeight: null,
     };
@@ -445,7 +446,7 @@ export const aggregateSelectedMuscleWeeklyEffort = (
       monthKey: week.monthKey,
       weekOfMonth,
       totalVolume: week.totalVolume,
-      nearFailureCount: week.nearFailureCount,
+      workingSetCount: week.workingSetCount,
       estimatedRM1: week.bestRM1,
       highestWeight: week.highestWeight,
     });
@@ -470,7 +471,7 @@ export const aggregateSelectedMuscleDailyEffortMetrics = (
       return {
         dateKey: day.dateKey,
         totalVolume: acc.totalVolume,
-        nearFailureCount: acc.nearFailureCount,
+        workingSetCount: acc.workingSetCount,
         estimatedRM1: acc.bestRM1,
         highestWeight: acc.highestWeight,
       };

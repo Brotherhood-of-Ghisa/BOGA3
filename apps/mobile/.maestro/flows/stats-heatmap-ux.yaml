@@ -63,10 +63,10 @@ appId: com.dinoderek.mobile
 
 # Switch metrics while staying in Daily.
 - tapOn:
-    id: "stats-muscle-history-metric-chip-nearFailureCount"
-- takeScreenshot: "02c-chest-overlay-daily-near-failure"
+    id: "stats-muscle-history-metric-chip-workingSetCount"
+- takeScreenshot: "02c-chest-overlay-daily-working-sets"
 
-# Return to Weekly; the selected metric remains Near failure.
+# Return to Weekly; the selected metric remains W/sets.
 - tapOn:
     id: "stats-muscle-history-view-chip-weekly"
 - assertVisible:
@@ -75,7 +75,7 @@ appId: com.dinoderek.mobile
 # Tap the populated current-week cell to show a real selected-metric value.
 - tapOn:
     id: "stats-muscle-history-heatmap-cell-2026-07-20"
-- takeScreenshot: "03-week-selected-banner-near-failure"
+- takeScreenshot: "03-week-selected-banner-working-sets"
 
 # Assert banner appears
 - assertVisible:

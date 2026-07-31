@@ -58,7 +58,7 @@ export type ExerciseListItem = {
 export type StatsViewMode = 'exercise' | 'muscle';
 export type MuscleHistoryMetric = Extract<
   CalendarHeatmapMetric,
-  'totalVolume' | 'nearFailureCount'
+  'totalVolume' | 'workingSetCount'
 >;
 
 type DisplayMuscleFamily = {
@@ -205,7 +205,10 @@ export function StatsScreenShell({
     ? formatDelta(summary.current.totals.sessionCount, summary.previous.totals.sessionCount)
     : null;
   const setsDelta = summary
-    ? formatDelta(summary.current.totals.totalSets, summary.previous.totals.totalSets)
+    ? formatDelta(
+        summary.current.totals.workingSetCount,
+        summary.previous.totals.workingSetCount
+      )
     : null;
 
   const filteredFamilies = useMemo((): DisplayMuscleFamily[] => {
@@ -291,7 +294,7 @@ export function StatsScreenShell({
           <View style={styles.summaryCard} testID="stats-card-sets">
             <Text style={styles.summaryLabel}>Working sets</Text>
             <Text style={styles.summaryValue}>
-              {formatNumber(summary.current.totals.totalSets)}
+              {formatNumber(summary.current.totals.workingSetCount)}
             </Text>
             {setsDelta ? (
               <Text style={[styles.summaryDelta, deltaToneStyle(setsDelta.tone)]}>
@@ -595,21 +598,21 @@ const toFamilyHistoryTarget = (family: StatsMuscleFamilyPerformance): MuscleHist
 
 const EXERCISE_HISTORY_METRIC_OPTIONS: readonly { value: CalendarHeatmapMetric; label: string }[] = [
   { value: 'totalVolume', label: 'Volume' },
-  { value: 'nearFailureCount', label: 'Near failure' },
+  { value: 'workingSetCount', label: 'W/sets' },
   { value: 'estimatedRM1', label: '1RM' },
   { value: 'highestWeight', label: 'Top weight' },
 ];
 
 const METRIC_LABELS: Record<CalendarHeatmapMetric, string> = {
   totalVolume: 'Volume',
-  nearFailureCount: 'Near failure',
+  workingSetCount: 'W/sets',
   estimatedRM1: '1RM',
   highestWeight: 'Top weight',
 };
 
 const MUSCLE_HISTORY_METRIC_OPTIONS: readonly { value: MuscleHistoryMetric; label: string }[] = [
   { value: 'totalVolume', label: METRIC_LABELS.totalVolume },
-  { value: 'nearFailureCount', label: METRIC_LABELS.nearFailureCount },
+  { value: 'workingSetCount', label: METRIC_LABELS.workingSetCount },
 ];
 
 export type HeatmapView = 'weekly' | 'daily';
@@ -639,16 +642,16 @@ const formatWeekDateRange = (weekStartDateKey: string): string => {
 const formatMetricValue = (week: SelectedMuscleWeeklyEffort, metric: CalendarHeatmapMetric): string => {
   switch (metric) {
     case 'totalVolume': return formatTotalWeight(week.totalVolume);
-    case 'nearFailureCount': return String(week.nearFailureCount);
+    case 'workingSetCount': return String(week.workingSetCount);
     case 'estimatedRM1': return week.estimatedRM1 !== null ? formatTotalWeight(week.estimatedRM1) : '—';
     case 'highestWeight': return week.highestWeight !== null ? formatTotalWeight(week.highestWeight) : '—';
   }
 };
 
-// Formats a single value for the chosen metric (near-failure is a raw count;
+// Formats a single value for the chosen metric (working sets is a raw count;
 // the rest are weights). Used by the daily heatmap's per-day detail card.
 const formatMetricNumber = (value: number, metric: CalendarHeatmapMetric): string =>
-  metric === 'nearFailureCount' ? String(value) : formatTotalWeight(value);
+  metric === 'workingSetCount' ? String(value) : formatTotalWeight(value);
 
 function WeekSelectionBanner({
   weeklyEffort,

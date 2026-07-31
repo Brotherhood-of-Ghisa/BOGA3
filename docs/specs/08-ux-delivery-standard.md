@@ -89,7 +89,7 @@ Use this section as the single source of truth for reusable UX patterns.
 5. Explicit row confirmation pattern
    - Intent: keep entered/defaulted values separate from the user's assertion that a repeated item was actually completed.
    - Usage: normal and prescribed set rows in the active/completed-edit session recorder.
-   - Rules: use a dedicated mobile-sized checkbox-like target independent of row editing; show distinct unchecked and checked shapes so color is supplemental; confirm only valid values; allow confirmation to be undone without clearing values; exclude unchecked items from completion metrics; and require an explicit discard decision when valid unchecked work would be removed at submit/save.
+   - Rules: use a dedicated mobile-sized checkbox-like target independent of row editing; show distinct unchecked and checked shapes so color is supplemental; confirm only valid values; allow confirmation to be undone without clearing values; exclude unchecked items from completion metrics; require an explicit discard decision when valid unchecked work would be removed at submit/save; and keep source identity separate from confirmation status (for example, planned rows use a persistent semantic surface plus accessible source wording, while the hollow/tick control communicates performance).
 
 ## Default appearance baseline (MVP)
 

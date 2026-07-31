@@ -57,7 +57,7 @@ appId: com.dinoderek.mobile
       id: "exercise-block-history-panel-1"
     timeout: 10000
 - assertVisible: "Current"
-- assertVisible: "Near failure"
+- assertVisible: "Working sets"
 - tapOn:
     id: "set-row-pressable-1-1"
 - tapOn: "Weight for exercise 1 set 1"
@@ -84,7 +84,7 @@ appId: com.dinoderek.mobile
     visible:
       id: "exercise-collapsed-summary-1-counts"
     timeout: 10000
-- assertVisible: "1 set (1 failure)"
+- assertVisible: "1 set · 1 w/set"
 - assertVisible:
     id: "exercise-collapsed-summary-1-new-pr"
 - assertVisible: "PR: 300 kg × 5 reps · est. 1RM 350 kg"
@@ -123,7 +123,7 @@ appId: com.dinoderek.mobile
     visible:
       id: "exercise-collapsed-summary-2-counts"
     timeout: 10000
-- assertVisible: "0 sets (0 failures)"
+- assertVisible: "0 sets · 0 w/sets"
 - assertNotVisible:
     id: "exercise-collapsed-summary-2-new-pr"
 - takeScreenshot: "exercise-card-summary-empty-history"

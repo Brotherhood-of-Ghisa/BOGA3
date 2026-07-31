@@ -13,6 +13,7 @@ import {
   loadLocalGymById,
   loadSessionSnapshotById,
   appendCompletedSessionExerciseAsPlanned as appendCompletedSessionExerciseAsPlannedDraft,
+  isWorkingSessionSetType,
   normalizeSessionSetType,
   setSessionDeletedState,
   type SessionSetTypeValue,
@@ -541,13 +542,16 @@ export function CompletedSessionDetailScreenShell({
           onToggleExerciseCollapse={toggleExerciseCollapsed}
           renderCollapsedExerciseSummary={({ exercise }) => {
             const performedSets = getCompletedPerformedSets(exercise.sets);
-            const failureCount = performedSets.filter(
-              (set) => normalizeSessionSetType(set.setType) === 'rir_0'
+            const workingSetCount = performedSets.filter(
+              (set) => {
+                const setType = normalizeSessionSetType(set.setType);
+                return isWorkingSessionSetType(setType);
+              }
             ).length;
 
             return (
               <ExerciseCardCollapsedSummary
-                failureCount={failureCount}
+                workingSetCount={workingSetCount}
                 setCount={performedSets.length}
                 testID={`completed-session-detail-collapsed-summary-${exercise.id}`}
               />

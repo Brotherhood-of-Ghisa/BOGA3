@@ -63,6 +63,8 @@ jest.mock('@/src/data', () => ({
   loadLocalGymById: jest.fn(),
   loadSessionSnapshotById: jest.fn(),
   appendCompletedSessionExerciseAsPlanned: jest.fn(),
+  isWorkingSessionSetType: (value: unknown) =>
+    value === 'rir_0' || value === 'rir_1' || value === 'rir_2',
   normalizeSessionSetType: (value: unknown) =>
     value === 'warm_up' || value === 'rir_0' || value === 'rir_1' || value === 'rir_2' ? value : null,
   setSessionDeletedState: jest.fn(),
@@ -189,7 +191,7 @@ describe('CompletedSessionDetailScreenShell', () => {
     expect(screen.queryByTestId('completed-session-detail-tags-exercise-1')).toBeNull();
   });
 
-  it('collapses each exercise to valid performed-set and failure counts', async () => {
+  it('collapses each exercise to valid performed-set and working-set counts', async () => {
     const dataClient: CompletedSessionDetailDataClient = {
       loadCompletedSession: jest.fn().mockResolvedValue({
         ...COMPLETED_SESSION_DETAIL_FIXTURE,
@@ -233,7 +235,7 @@ describe('CompletedSessionDetailScreenShell', () => {
     expect(collapseToggle.props.accessibilityState.expanded).toBe(false);
     expect(
       screen.getByTestId('completed-session-detail-collapsed-summary-exercise-1-counts')
-    ).toHaveTextContent('4 sets (1 failure)');
+    ).toHaveTextContent('4 sets · 3 w/sets');
     expect(
       screen.queryByTestId('completed-session-detail-collapsed-summary-exercise-1-new-pr')
     ).toBeNull();

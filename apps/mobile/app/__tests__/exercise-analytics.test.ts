@@ -37,12 +37,12 @@ describe('aggregateExerciseWeeklyEffort', () => {
     expect(result).toHaveLength(1);
     const week = result[0];
     expect(week.totalVolume).toBe(500);
-    expect(week.nearFailureCount).toBe(1);
+    expect(week.workingSetCount).toBe(1);
     expect(week.highestWeight).toBe(100);
     expect(week.estimatedRM1).not.toBeNull();
   });
 
-  it('includes warm-up sets in all metrics except near failure', () => {
+  it('includes warm-up sets in all metrics except working sets', () => {
     const sessions = [
       makeSession('2026-05-18T10:00:00Z', [
         { setType: 'warm_up', weight: 60, reps: 10 },
@@ -52,17 +52,17 @@ describe('aggregateExerciseWeeklyEffort', () => {
     const result = aggregateExerciseWeeklyEffort(sessions, TZ);
     expect(result).toHaveLength(1);
     expect(result[0].totalVolume).toBe(60 * 10 + 500);
-    expect(result[0].nearFailureCount).toBe(1);
+    expect(result[0].workingSetCount).toBe(1);
     expect(result[0].highestWeight).toBe(100);
   });
 
-  it('excludes null setType sets from nearFailureCount but includes in volume', () => {
+  it('excludes null setType sets from workingSetCount but includes in volume', () => {
     const sessions = [
       makeSession('2026-05-18T10:00:00Z', [{ setType: null, weight: 80, reps: 8 }]),
     ];
     const result = aggregateExerciseWeeklyEffort(sessions, TZ);
     expect(result[0].totalVolume).toBe(640);
-    expect(result[0].nearFailureCount).toBe(0);
+    expect(result[0].workingSetCount).toBe(0);
   });
 
   it('merges two sessions in the same week', () => {
@@ -74,7 +74,7 @@ describe('aggregateExerciseWeeklyEffort', () => {
     const result = aggregateExerciseWeeklyEffort(sessions, TZ);
     expect(result).toHaveLength(1);
     expect(result[0].totalVolume).toBe(500 + 330);
-    expect(result[0].nearFailureCount).toBe(2);
+    expect(result[0].workingSetCount).toBe(2);
     expect(result[0].highestWeight).toBe(110);
     expect(result[0].weekStartDateKey).toBe('2026-05-18');
   });
@@ -189,7 +189,7 @@ describe('aggregateExerciseWeeklyEffort', () => {
     }
   });
 
-  it('counts nearFailureCount for rir_0, rir_1, rir_2 only', () => {
+  it('counts workingSetCount for rir_0, rir_1, rir_2 only', () => {
     const sessions = [
       makeSession('2026-05-18T10:00:00Z', [
         { setType: 'rir_0', weight: 100, reps: 5 },
@@ -200,7 +200,7 @@ describe('aggregateExerciseWeeklyEffort', () => {
       ]),
     ];
     const result = aggregateExerciseWeeklyEffort(sessions, TZ);
-    expect(result[0].nearFailureCount).toBe(3);
+    expect(result[0].workingSetCount).toBe(3);
   });
 
   it('excludes unconfirmed sets from weekly and daily effort', () => {
@@ -212,10 +212,10 @@ describe('aggregateExerciseWeeklyEffort', () => {
     ];
 
     expect(aggregateExerciseWeeklyEffort(sessions, TZ)[0]).toEqual(
-      expect.objectContaining({ totalVolume: 500, highestWeight: 100, nearFailureCount: 1 })
+      expect.objectContaining({ totalVolume: 500, highestWeight: 100, workingSetCount: 1 })
     );
     expect(aggregateExerciseDailyEffort(sessions, TZ)[0]).toEqual(
-      expect.objectContaining({ totalVolume: 500, highestWeight: 100, nearFailureCount: 1 })
+      expect.objectContaining({ totalVolume: 500, highestWeight: 100, workingSetCount: 1 })
     );
   });
 });
@@ -230,7 +230,7 @@ describe('aggregateExerciseDailyEffort', () => {
     expect(result.map((d) => d.dateKey)).toEqual(['2026-05-18', '2026-05-20']);
   });
 
-  it('rolls the four metrics per day and includes warm-ups outside near failure', () => {
+  it('rolls the four metrics per day and includes warm-ups outside working sets', () => {
     const sessions = [
       makeSession('2026-05-18T10:00:00Z', [
         { setType: 'warm_up', weight: 60, reps: 10 },
@@ -240,7 +240,7 @@ describe('aggregateExerciseDailyEffort', () => {
     ];
     const [day] = aggregateExerciseDailyEffort(sessions, TZ);
     expect(day.totalVolume).toBe(60 * 10 + 100 * 5 + 120 * 3);
-    expect(day.nearFailureCount).toBe(1);
+    expect(day.workingSetCount).toBe(1);
     expect(day.highestWeight).toBe(120);
     expect(day.estimatedRM1).not.toBeNull();
   });

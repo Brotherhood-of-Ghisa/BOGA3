@@ -14,6 +14,7 @@ import {
 import { bootstrapLocalDataLayer } from './bootstrap';
 import type { DailyEffortMetrics, SelectedMuscleWeeklyEffort } from './muscle-analytics';
 import { exerciseSets, sessionExercises, sessions } from './schema';
+import { isWorkingSessionSetType } from './set-types';
 
 // Same shape as SelectedMuscleWeeklyEffort; aliased to allow CalendarHeatmap reuse without casts.
 export type SelectedExerciseWeeklyEffort = SelectedMuscleWeeklyEffort;
@@ -29,8 +30,6 @@ export type ExerciseRawSession = {
   completedAt: Date;
   sets: ExerciseRawSet[];
 };
-
-const NEAR_FAILURE_SET_TYPES = new Set(['rir_0', 'rir_1', 'rir_2']);
 
 const formatLocalDateKey = (date: Date, timeZone: string | undefined): string => {
   if (timeZone === undefined) {
@@ -68,7 +67,7 @@ const startOfMondayWeek = (date: Date): Date => {
 
 type DayAccumulator = {
   totalVolume: number;
-  nearFailureCount: number;
+  workingSetCount: number;
   bestRM1: number | null;
   highestWeight: number | null;
 };
@@ -77,7 +76,7 @@ type WeekAccumulator = {
   weekStartDateKey: string;
   monthKey: string;
   totalVolume: number;
-  nearFailureCount: number;
+  workingSetCount: number;
   bestRM1: number | null;
   highestWeight: number | null;
 };
@@ -92,7 +91,7 @@ export const aggregateExerciseDailyEffort = (
     const dateKey = formatLocalDateKey(session.completedAt, timeZone);
     const day: DayAccumulator = dayMap.get(dateKey) ?? {
       totalVolume: 0,
-      nearFailureCount: 0,
+      workingSetCount: 0,
       bestRM1: null,
       highestWeight: null,
     };
@@ -116,8 +115,8 @@ export const aggregateExerciseDailyEffort = (
 
       day.totalVolume += weight * reps;
 
-      if (set.setType !== null && NEAR_FAILURE_SET_TYPES.has(set.setType)) {
-        day.nearFailureCount += 1;
+      if (isWorkingSessionSetType(set.setType)) {
+        day.workingSetCount += 1;
       }
 
       day.highestWeight =
@@ -138,7 +137,7 @@ export const aggregateExerciseDailyEffort = (
     .map(([dateKey, day]) => ({
       dateKey,
       totalVolume: day.totalVolume,
-      nearFailureCount: day.nearFailureCount,
+      workingSetCount: day.workingSetCount,
       estimatedRM1: day.bestRM1,
       highestWeight: day.highestWeight,
     }))
@@ -162,13 +161,13 @@ export const aggregateExerciseWeeklyEffort = (
       weekStartDateKey,
       monthKey,
       totalVolume: 0,
-      nearFailureCount: 0,
+      workingSetCount: 0,
       bestRM1: null,
       highestWeight: null,
     };
 
     acc.totalVolume += day.totalVolume;
-    acc.nearFailureCount += day.nearFailureCount;
+    acc.workingSetCount += day.workingSetCount;
 
     if (day.highestWeight !== null) {
       acc.highestWeight =
@@ -203,7 +202,7 @@ export const aggregateExerciseWeeklyEffort = (
       monthKey: week.monthKey,
       weekOfMonth,
       totalVolume: week.totalVolume,
-      nearFailureCount: week.nearFailureCount,
+      workingSetCount: week.workingSetCount,
       estimatedRM1: week.bestRM1,
       highestWeight: week.highestWeight,
     });

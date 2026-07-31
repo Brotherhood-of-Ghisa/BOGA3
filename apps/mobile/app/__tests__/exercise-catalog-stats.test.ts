@@ -25,16 +25,16 @@ const buildRawHistory = (
     { id: 'se-orphan', sessionId: 'session-recent', exerciseDefinitionId: null },
   ],
   exerciseSets: [
-    // Recent bench: 1 warm-up (excluded), 2 working
+    // Recent bench: 3 valid confirmed sets, of which only RIR 2 is a working set.
     { sessionExerciseId: 'se-recent-bench', weightValue: '60', repsValue: '10', setType: 'warm_up' },
     { sessionExerciseId: 'se-recent-bench', weightValue: '100', repsValue: '5', setType: null },
     { sessionExerciseId: 'se-recent-bench', weightValue: '100', repsValue: '4', setType: 'rir_2' },
-    // Recent curl: 1 working set
+    // Recent curl: 1 valid confirmed, unclassified set.
     { sessionExerciseId: 'se-recent-curl', weightValue: '20', repsValue: '12', setType: null },
-    // Mid bench (in 30d, not in 7d): 1 working set with invalid weight (should be skipped)
+    // Mid bench (in 30d, not in 7d): 1 invalid and 1 valid unclassified set.
     { sessionExerciseId: 'se-mid-bench', weightValue: '', repsValue: '8', setType: null },
     { sessionExerciseId: 'se-mid-bench', weightValue: '90', repsValue: '6', setType: null },
-    // Old squat (200 days ago, only in 1y / all): 1 working set
+    // Old squat (200 days ago, only in 1y / all): 1 valid unclassified set.
     { sessionExerciseId: 'se-old-squat', weightValue: '120', repsValue: '5', setType: null },
     // Orphan: should be ignored entirely (exerciseDefinitionId is null)
     { sessionExerciseId: 'se-orphan', weightValue: '50', repsValue: '10', setType: null },

@@ -16,10 +16,9 @@ import {
 
 import { bootstrapLocalDataLayer } from './bootstrap';
 import { exerciseSets, sessionExercises, sessions } from './schema';
-import { normalizeSessionSetType } from './set-types';
+import { isWorkingSessionSetType, normalizeSessionSetType } from './set-types';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-const RIR_AT_MOST_TWO_SET_TYPES = new Set(['rir_0', 'rir_1', 'rir_2']);
 
 export type ExerciseBlockHistorySessionRow = {
   sessionId: string;
@@ -50,7 +49,7 @@ export type ExerciseBlockHistoryBlock = {
   estimatedOneRepMax: number | null;
   totalVolume: number;
   highestWeight: number | null;
-  rirAtMostTwoSetCount: number;
+  workingSetCount: number;
 };
 
 export type ExerciseBlockHistorySummary = {
@@ -171,11 +170,11 @@ const computeDaysAgo = (completedAt: Date, now: Date): number => {
   return Math.max(0, Math.floor(diff / DAY_MS));
 };
 
-const countRirAtMostTwoSets = (setRows: ExerciseBlockHistorySetRow[]): number => {
+const countWorkingSets = (setRows: ExerciseBlockHistorySetRow[]): number => {
   let count = 0;
   for (const row of setRows) {
     const setType = normalizeSessionSetType(row.setType);
-    if (!setType || !RIR_AT_MOST_TWO_SET_TYPES.has(setType)) continue;
+    if (!isWorkingSessionSetType(setType)) continue;
     if (parseCalculationSet(row) === null) continue;
     count += 1;
   }
@@ -233,7 +232,7 @@ export const aggregateExerciseBlockHistory = (
       estimatedOneRepMax: estimateExerciseOneRepMax(calculationSets),
       totalVolume: computeExerciseVolume(calculationSets),
       highestWeight: maxRepsByWeight[0]?.weight ?? null,
-      rirAtMostTwoSetCount: countRirAtMostTwoSets(setRows),
+      workingSetCount: countWorkingSets(setRows),
     });
   }
 

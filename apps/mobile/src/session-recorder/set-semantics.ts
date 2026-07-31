@@ -43,7 +43,7 @@ export const hasValidActualValues = (set: SetValueInput): boolean => {
 
 /**
  * A valid legacy row with no explicit status is confirmed. Every non-null
- * status is intentionally not performed, including planned/skipped rows.
+ * status is intentionally not performed, including planned/legacy-skipped rows.
  */
 export const isConfirmedPerformedSet = (set: SetPerformanceInput): boolean =>
   hasValidActualValues(set) &&
@@ -65,6 +65,9 @@ export const hydrateSessionSetPerformanceStatus = (
   values: SetValueInput
 ): SessionSetPerformanceStatus => {
   const normalized = normalizeSessionSetPerformanceStatus(status);
+  if (normalized === 'skipped') {
+    return 'planned';
+  }
   return normalized === null && !hasValidActualValues(values) ? 'unperformed' : normalized;
 };
 

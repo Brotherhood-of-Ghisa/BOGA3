@@ -50,7 +50,7 @@ export type StatsMuscleFamilyPerformance = {
 
 export type StatsTotals = {
   sessionCount: number;
-  totalSets: number;
+  workingSetCount: number;
   muscleFamilies: StatsMuscleFamilyPerformance[];
 };
 
@@ -170,7 +170,7 @@ export const aggregateStats = (input: StatsAggregationInput): StatsTotals => {
 
   return {
     sessionCount: input.sessions.length,
-    totalSets: countMuscleAnalyticsWorkingSets(input),
+    workingSetCount: countMuscleAnalyticsWorkingSets(input),
     muscleFamilies,
   };
 };

@@ -8,7 +8,7 @@ import type { DailyEffortMetrics } from '@/src/data';
 
 const source = (over: Partial<HeatmapMetricSource> = {}): HeatmapMetricSource => ({
   totalVolume: 0,
-  nearFailureCount: 0,
+  workingSetCount: 0,
   estimatedRM1: null,
   highestWeight: null,
   ...over,
@@ -45,11 +45,11 @@ describe('getCalendarHeatmapBucket', () => {
 });
 
 describe('getMetricValue', () => {
-  it('treats non-positive volume / near-failure as no data', () => {
+  it('treats non-positive volume / working-set count as no data', () => {
     expect(getMetricValue(source({ totalVolume: 0 }), 'totalVolume')).toBeNull();
     expect(getMetricValue(source({ totalVolume: 120 }), 'totalVolume')).toBe(120);
-    expect(getMetricValue(source({ nearFailureCount: 0 }), 'nearFailureCount')).toBeNull();
-    expect(getMetricValue(source({ nearFailureCount: 3 }), 'nearFailureCount')).toBe(3);
+    expect(getMetricValue(source({ workingSetCount: 0 }), 'workingSetCount')).toBeNull();
+    expect(getMetricValue(source({ workingSetCount: 3 }), 'workingSetCount')).toBe(3);
   });
 
   it('passes through best-of metrics, including null', () => {
@@ -64,8 +64,8 @@ describe('buildHeatmapData', () => {
   const TODAY = '2026-06-05';
 
   const daily: DailyEffortMetrics[] = [
-    { dateKey: '2026-06-03', totalVolume: 100, nearFailureCount: 2, estimatedRM1: 50, highestWeight: 40 },
-    { dateKey: '2026-06-04', totalVolume: 300, nearFailureCount: 1, estimatedRM1: 55, highestWeight: 60 },
+    { dateKey: '2026-06-03', totalVolume: 100, workingSetCount: 2, estimatedRM1: 50, highestWeight: 40 },
+    { dateKey: '2026-06-04', totalVolume: 300, workingSetCount: 1, estimatedRM1: 55, highestWeight: 60 },
   ];
 
   it('spans a Monday-aligned 52-week window ending today', () => {
@@ -104,8 +104,8 @@ describe('buildHeatmapData', () => {
   it('with weeks: "all", spans from the earliest day in the data when it predates the default window', () => {
     // ~2 years before today — well outside the default 52-week window.
     const old: DailyEffortMetrics[] = [
-      { dateKey: '2024-07-10', totalVolume: 100, nearFailureCount: 0, estimatedRM1: null, highestWeight: null },
-      { dateKey: '2026-06-04', totalVolume: 300, nearFailureCount: 0, estimatedRM1: null, highestWeight: null },
+      { dateKey: '2024-07-10', totalVolume: 100, workingSetCount: 0, estimatedRM1: null, highestWeight: null },
+      { dateKey: '2026-06-04', totalVolume: 300, workingSetCount: 0, estimatedRM1: null, highestWeight: null },
     ];
     const data = buildHeatmapData(old, 'totalVolume', { todayDateKey: TODAY, weeks: 'all' });
     // Monday of 2024-07-10 (a Wednesday) is 2024-07-08.

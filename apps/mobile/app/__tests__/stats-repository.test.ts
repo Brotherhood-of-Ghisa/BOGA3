@@ -53,11 +53,11 @@ const flattenMuscles = (totals: ReturnType<typeof aggregateStats>) =>
   totals.muscleFamilies.flatMap((family) => family.muscles);
 
 describe('aggregateStats', () => {
-  it('includes warm-up sets in totals and counts orphan-exercise sets in total only', () => {
+  it('counts valid confirmed RIR 0-2 rows as working sets', () => {
     const totals = aggregateStats(buildAggregationInput());
 
     expect(totals.sessionCount).toBe(2);
-    expect(totals.totalSets).toBe(7);
+    expect(totals.workingSetCount).toBe(3);
   });
 
   it('excludes valid but unconfirmed sets from set and muscle totals', () => {
@@ -72,7 +72,7 @@ describe('aggregateStats', () => {
 
     const totals = aggregateStats(input);
     const byId = new Map(flattenMuscles(totals).map((entry) => [entry.muscleGroupId, entry]));
-    expect(totals.totalSets).toBe(7);
+    expect(totals.workingSetCount).toBe(3);
     expect(byId.get('chest_sternal')?.totalWeight).toBe(1800);
   });
 
@@ -146,7 +146,7 @@ describe('aggregateStats', () => {
     );
 
     expect(totals.sessionCount).toBe(0);
-    expect(totals.totalSets).toBe(0);
+    expect(totals.workingSetCount).toBe(0);
     expect(totals.muscleFamilies.every((family) => family.sessionCount === 0 && family.totalWeight === 0)).toBe(true);
     expect(flattenMuscles(totals)).toHaveLength(4);
   });

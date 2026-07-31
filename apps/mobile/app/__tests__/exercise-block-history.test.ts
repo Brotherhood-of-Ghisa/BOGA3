@@ -108,7 +108,7 @@ describe('aggregateExerciseBlockHistory', () => {
     const block = summary.blocks[0];
     expect(block.totalVolume).toBe(500 * 5 + 100 * 5 + 90 * 4);
     expect(block.highestWeight).toBe(500);
-    expect(block.rirAtMostTwoSetCount).toBe(1);
+    expect(block.workingSetCount).toBe(1);
     expect(block.estimatedOneRepMax).not.toBeNull();
   });
 
