@@ -12,8 +12,8 @@ don't restate it here.
 ## Run the gates (`./boga`, from anywhere in the repo)
 
 ```bash
-./boga test fast       # lint + typecheck + jest + backend fast smoke
-./boga test backend    # boots local Supabase, runs auth/RLS + sync-v2 contract suites + sync-infra
+./boga test fast       # mobile quality + docs/meta + consent/MCP unit + backend fast smoke
+./boga test backend    # local Supabase auth/agent/sync contracts + real MCP smoke
 ./boga test frontend   # boots the iOS simulator, runs Maestro smoke + data-smoke + auth-profile + sync e2e
 ./boga test --list     # every lane: name, gate, infra, CI?, command
 ./boga test <lane>     # one lane by name (e.g. ./boga test sync-push-contract)
@@ -84,28 +84,32 @@ get from `./boga timings` or a run.
 | --- | --- | --- | :--: | --- |
 | *Infra: none — CI runs these* | | | | |
 | lint | `./boga test lint` | `boga test fast` (frontend half) | ✅ | ~1.6s |
-| typecheck | `./boga test typecheck` | `boga test fast` (frontend half) | ✅ | ~2.9s |
-| jest-full | `./boga test jest-full` | `boga test fast` (frontend half) | ✅ | ~7.6s |
+| typecheck | `./boga test typecheck` | `boga test fast` (frontend half) | ✅ | ~3.0s |
+| jest-full | `./boga test jest-full` | `boga test fast` (frontend half) | ✅ | ~7.0s |
 | docs-check | `./boga test docs-check` | `boga test fast` (repo half) | ✅ | ~0.1s |
 | meta-tests | `./boga test meta-tests` | `boga test fast` (repo half) | ✅ | ~1.2s |
+| agent-auth-web | `./boga test agent-auth-web` | `boga test fast` (repo half) | ✅ | ~4.0s |
+| mcp-unit | `./boga test mcp-unit` | `boga test fast` (repo half) | ✅ | ~4.8s |
 | handles | `./boga test handles` | — (run by name) | ✅ | ~20s |
 | jest-sync | `./boga test jest-sync` | — (run by name) | ❌ | ~3.6s |
 | *Infra: local Supabase + Docker — CI-able, local-only today* | | | | |
 | backend-fast | `./boga test backend-fast` | `boga test fast` (backend half) | ❌ | ~32s |
 | auth-authz | `./boga test auth-authz` | `boga test backend` | ❌ | ~3.7s |
+| agent-api | `./boga test agent-api` | `boga test backend` | ❌ | ~4.6s |
 | sync-v2-schema | `./boga test sync-v2-schema` | `boga test backend` | ❌ | ~7.8s |
-| sync-push-contract | `./boga test sync-push-contract` | `boga test backend` | ❌ | ~4.1s |
-| sync-pull-contract | `./boga test sync-pull-contract` | `boga test backend` | ❌ | ~4.6s |
-| dev-wipe-my-data | `./boga test dev-wipe-my-data` | `boga test backend` | ❌ | ~3.5s |
+| sync-push-contract | `./boga test sync-push-contract` | `boga test backend` | ❌ | ~4.0s |
+| sync-pull-contract | `./boga test sync-pull-contract` | `boga test backend` | ❌ | ~4.3s |
+| dev-wipe-my-data | `./boga test dev-wipe-my-data` | `boga test backend` | ❌ | ~3.3s |
 | sync-drift | `./boga test sync-drift` | `boga test backend` | ❌ | ~27s |
-| sync-v2-e2e | `./boga test sync-v2-e2e` | `boga test backend` | ❌ | ~2.0m |
+| sync-v2-e2e | `./boga test sync-v2-e2e` | `boga test backend` | ❌ | ~1.7m |
 | sync-infra | `./boga test sync-infra` | `boga test backend` | ❌ | ~7.9s |
+| mcp-smoke | `./boga test mcp-smoke` | `boga test backend` | ❌ | ~6.5s |
 | *Infra: iOS simulator + Metro — never CI-able (+ local Supabase where noted)* | | | | |
-| ios-smoke | `./boga test ios-smoke` | `boga test frontend` | ❌ | ~52s |
+| ios-smoke | `./boga test ios-smoke` | `boga test frontend` | ❌ | ~54s |
 | ios-data-smoke | `./boga test ios-data-smoke` | `boga test frontend` | ❌ | ~1.1m |
 | ios-gates | `./boga test ios-gates` | — (run by name) | ❌ | ~2.3m |
 | ios-auth-profile *(+ local Supabase)* | `./boga test ios-auth-profile` | `boga test frontend` | ❌ | ~1.4m |
-| ios-sync-e2e *(+ local Supabase)* | `./boga test ios-sync-e2e` | `boga test frontend` | ❌ | ~1.8m |
+| ios-sync-e2e *(+ local Supabase)* | `./boga test ios-sync-e2e` | `boga test frontend` | ❌ | ~1.9m |
 
 † All-machine median of the recorded green runs (`docs/testing/timings/records/`); `N/A` = no measured data yet, **not** "instant" — run the lane to record it. Per-machine numbers: `./boga timings`.
 <!-- /boga:gen:lane-matrix -->
@@ -140,6 +144,8 @@ it on every PR). The table below is the human summary; keep both in sync.
 | `apps/mobile` UI screens / components / navigation (`app/**`, `components/**`) | `./boga test fast` **+** `./boga test frontend` |
 | Sync / boot / auth (`apps/mobile/src/sync/**`, `src/auth/**`, scheduler, data bootstrap/migrations, `drizzle/**`, sync RPCs) | `./boga test fast` **+** `./boga test backend` **+** `./boga test ios-sync-e2e` (the UI↔server e2e lane) |
 | Backend (`supabase/migrations/**`, `functions/**`, RLS/policies, sync RPCs) | `./boga test backend` |
+| Agent consent web (`apps/agent-auth-web/**`) | `./boga test fast` |
+| MCP server (`services/boga-mcp/**`) | `./boga test fast` **+** `./boga test mcp-smoke` |
 | Added/removed/upgraded a **native** dependency (iOS pod, native Expo module, or a native field / config plugin in `apps/mobile/app.config.ts`) | **First** `./boga ios build-client --force`, then `./boga test frontend` |
 
 Run the gate(s) for your change **to green before opening the PR**, and put the
@@ -150,12 +156,14 @@ boot with `Cannot find native module`.
 
 ## What CI runs
 
-CI (`.github/workflows/ci.yml`) runs **only the fast lane** — `lint`, `typecheck`,
-`test`, `test:handles` — in `apps/mobile`, with a 5-minute timeout per step.
-`test:handles` is the open-handle guard (`jest --detectOpenHandles`); CI runs it
-on every PR, so you only need it locally when you touched timers, sockets,
-subscriptions, or async teardown. `npm test` is deliberately bare `jest` (no
-`--forceExit`) so leaked handles surface — don't add it.
+CI (`.github/workflows/ci.yml`) runs every infra-free lane marked `CI? ✅`:
+mobile `lint`, `typecheck`, and `jest-full`; repository `docs-check` and
+`meta-tests`; the consent-web `agent-auth-web` lane; the MCP `mcp-unit` lane;
+and the extra `handles` guard. It installs each workspace from its own lockfile.
+`test:handles` is `jest --detectOpenHandles`; CI runs it on every PR, so you only
+need it locally when you touched timers, sockets, subscriptions, or async
+teardown. `npm test` is deliberately bare `jest` (no `--forceExit`) so leaked
+handles surface — don't add it.
 
 **Everything else is local-only** (see the `CI?` column in the lane matrix). The
 backend/sync-v2 suites are CI-*able* but kept local by choice; the Maestro iOS

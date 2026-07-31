@@ -2,7 +2,10 @@ import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-rou
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { SessionContentLayout } from '@/components/session-recorder/session-content-layout';
+import {
+  ExerciseCardCollapsedSummary,
+  SessionContentLayout,
+} from '@/components/session-recorder/session-content-layout';
 import { uiColors } from '@/components/ui';
 import {
   formatSessionListCompactDuration,
@@ -14,6 +17,7 @@ import {
   setSessionDeletedState,
   type SessionSetTypeValue,
 } from '@/src/data';
+import { parseCalculationSet } from '@/src/exercise-calculations';
 
 export type CompletedSessionDetailSet = {
   id: string;
@@ -95,6 +99,18 @@ const formatSetEffortLabel = (setType: SessionSetTypeValue): string => {
       return '-';
   }
 };
+
+const getCompletedPerformedSets = (
+  sets: CompletedSessionDetailSet[]
+): CompletedSessionDetailSet[] =>
+  sets.filter(
+    (set) =>
+      parseCalculationSet({
+        weightValue: set.weight,
+        repsValue: set.reps,
+        setType: set.setType,
+      }) !== null
+  );
 
 const DEFAULT_COMPLETED_SESSION_DETAILS: Record<string, CompletedSessionDetailRecord> = {
   'session-completed-1': {
@@ -217,7 +233,20 @@ export function CompletedSessionDetailScreenShell({
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [session, setSession] = useState<CompletedSessionDetailRecord | null>(null);
+  const [collapsedExerciseIds, setCollapsedExerciseIds] = useState<Set<string>>(() => new Set());
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
+
+  const toggleExerciseCollapsed = useCallback((exerciseId: string) => {
+    setCollapsedExerciseIds((current) => {
+      const next = new Set(current);
+      if (next.has(exerciseId)) {
+        next.delete(exerciseId);
+      } else {
+        next.add(exerciseId);
+      }
+      return next;
+    });
+  }, []);
   const [isTogglingDeletedState, setIsTogglingDeletedState] = useState(false);
 
   const reloadSession = useCallback(() => {
@@ -235,6 +264,7 @@ export function CompletedSessionDetailScreenShell({
     setIsLoading(true);
     setErrorMessage(null);
     setActionFeedback(null);
+    setCollapsedExerciseIds(new Set());
 
     dataClient
       .loadCompletedSession(sessionId)
@@ -490,6 +520,22 @@ export function CompletedSessionDetailScreenShell({
         </View>
 
         <SessionContentLayout<CompletedSessionDetailSet, CompletedSessionDetailExercise>
+          collapsedExerciseIds={collapsedExerciseIds}
+          onToggleExerciseCollapse={toggleExerciseCollapsed}
+          renderCollapsedExerciseSummary={({ exercise }) => {
+            const performedSets = getCompletedPerformedSets(exercise.sets);
+            const failureCount = performedSets.filter(
+              (set) => normalizeSessionSetType(set.setType) === 'rir_0'
+            ).length;
+
+            return (
+              <ExerciseCardCollapsedSummary
+                failureCount={failureCount}
+                setCount={performedSets.length}
+                testID={`completed-session-detail-collapsed-summary-${exercise.id}`}
+              />
+            );
+          }}
           showMetadataSection={false}
           dateTimeValue={
             <View style={styles.readOnlyField}>

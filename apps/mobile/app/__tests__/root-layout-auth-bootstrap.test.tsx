@@ -121,6 +121,7 @@ describe('RootLayout auth bootstrap wiring', () => {
     // Tab roots (incl. settings) live in the `(tabs)` group registered as a single screen
     expect(screen.getByTestId('screen-(tabs)')).toBeTruthy();
     expect(screen.getByTestId('screen-profile')).toBeTruthy();
+    expect(screen.getByTestId('screen-connected-agents')).toBeTruthy();
   });
 
   it('starts the sync scheduler on mount and fires the cold-launch nudge after boot', async () => {

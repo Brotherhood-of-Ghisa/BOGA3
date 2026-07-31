@@ -151,6 +151,33 @@ export default function SettingsScreen() {
         </UiSurface>
       </Pressable>
 
+      {user ? (
+        <Pressable
+          accessibilityHint="Opens the list of authorized coaching agents"
+          accessibilityLabel="Open Connected Agents"
+          onPress={() => router.push('/connected-agents')}
+          style={({ pressed }) => [styles.cardPressable, pressed ? styles.cardPressed : null]}
+          testID="settings-connected-agents-row">
+          <UiSurface style={styles.profileCard}>
+            <View style={styles.profileRow}>
+              <View style={styles.iconBadge}>
+                <UiText selectable={false} style={styles.iconGlyph} variant="labelStrong">
+                  AI
+                </UiText>
+              </View>
+              <View style={styles.profileCopy}>
+                <UiText selectable variant="labelStrong">
+                  Connected agents
+                </UiText>
+                <UiText selectable variant="bodyMuted">
+                  Review read-only training access and revoke connections.
+                </UiText>
+              </View>
+            </View>
+          </UiSurface>
+        </Pressable>
+      ) : null}
+
       <UiSurface style={styles.preferencesCard} testID="settings-preferences-card">
         <UiText selectable variant="labelStrong">
           Preferences

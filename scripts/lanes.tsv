@@ -17,8 +17,11 @@ typecheck	fast-frontend	none	yes	apps/mobile	npm run typecheck
 jest-full	fast-frontend	none	yes	apps/mobile	npm test
 docs-check	fast-repo	none	yes	.	./scripts/gen-docs.sh check
 meta-tests	fast-repo	none	yes	.	./scripts/tests/run-meta-tests.sh
+agent-auth-web	fast-repo	none	yes	.	./scripts/test-agent-auth-web.sh
+mcp-unit	fast-repo	none	yes	.	./scripts/test-boga-mcp.sh
 backend-fast	fast-backend	supabase	no	.	./supabase/scripts/run-suite.sh --no-baseline local-runtime-smoke.sh
 auth-authz	slow-backend	supabase	no	.	./supabase/scripts/run-suite.sh auth-authz-contract.sh
+agent-api	slow-backend	supabase	no	.	./supabase/scripts/run-suite.sh agent-api-contract.sh
 sync-v2-schema	slow-backend	supabase	no	.	./supabase/scripts/run-suite.sh sync-v2-schema-smoke.sh
 sync-push-contract	slow-backend	supabase	no	.	./supabase/scripts/run-suite.sh sync-push-contract.sh
 sync-pull-contract	slow-backend	supabase	no	.	./supabase/scripts/run-suite.sh sync-pull-contract.sh
@@ -26,6 +29,7 @@ dev-wipe-my-data	slow-backend	supabase	no	.	./supabase/scripts/run-suite.sh dev-
 sync-drift	slow-backend	supabase	no	apps/mobile	npm run check:sync-drift -- --strict
 sync-v2-e2e	slow-backend	supabase	no	.	./supabase/scripts/test-sync-v2-e2e.sh
 sync-infra	slow-backend	supabase	no	.	./supabase/scripts/test-sync-infra.sh
+mcp-smoke	slow-backend	supabase	no	.	./scripts/smoke-boga-mcp.sh
 ios-smoke	slow-frontend	ios	no	apps/mobile	./scripts/maestro-run-lane.sh smoke
 ios-data-smoke	slow-frontend	ios	no	apps/mobile	./scripts/maestro-run-lane.sh data-smoke
 ios-auth-profile	slow-frontend	ios+supabase	no	apps/mobile	./scripts/maestro-run-lane.sh auth-profile

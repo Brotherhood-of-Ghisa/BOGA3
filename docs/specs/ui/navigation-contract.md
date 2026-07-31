@@ -88,8 +88,23 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
   - reached from the shared bottom-tray Settings cog (available from every tab root and the detail screens that still render `TopLevelTabs` directly)
   - remains accessible while logged out; it does not require an authenticated session before opening `/profile`
   - routes to `/profile` from the `Profile` destination row
+  - while signed in, routes to `/connected-agents` from a separate Connected
+    agents destination row; the row is absent while signed out
 
-7. `/profile`
+7. `/connected-agents`
+- File: `apps/mobile/app/connected-agents.tsx`
+- Params:
+  - none
+- Behavior:
+  - reads only the current signed-in user's Supabase OAuth grants
+  - shows the most recent owner-visible metadata-only access timestamp when
+    available; audit lookup failure does not disable grant revocation
+  - asks for destructive confirmation before revoking a grant, then removes
+    the revoked grant in place
+  - auth guard requires a signed-in session; direct signed-out navigation
+    redirects to `/sign-in`
+
+8. `/profile`
 - File: `apps/mobile/app/profile.tsx`
 - Params:
   - none
@@ -101,7 +116,7 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
   - sign-in/sign-out change route state without redirecting away from `/profile`
   - inline auth/profile failures do not redirect away from `/profile` or block returning to local-only routes
 
-8. `/sessions`
+9. `/sessions`
 - File: `apps/mobile/app/sessions.tsx`
 - Params:
   - none
@@ -111,14 +126,14 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
     to return to the existing Log recorder; `/sessions` never completes an
     active session directly
 
-9. `/completed-session/[sessionId]`
+10. `/completed-session/[sessionId]`
 - File: `apps/mobile/app/completed-session/[sessionId].tsx`
 - Path params:
   - `sessionId` (required dynamic segment)
 - Query params:
   - `intent` (optional; `edit` redirects to `session-recorder` completed-edit mode)
 
-10. `/exercise-history`
+11. `/exercise-history`
 - File: `apps/mobile/app/exercise-history.tsx`
 - Query params:
   - `exerciseDefinitionId` (required; if missing, the screen renders an error state instead of crashing)
@@ -160,17 +175,21 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
    - shared Settings cog in the bottom tray / top-level tab strip
 14. `/settings` -> `/profile`
    - settings destination row
-15. `/profile` -> `/profile`
+15. `/settings` -> `/connected-agents`
+   - signed-in-only Connected agents destination row
+16. `/connected-agents` -> `/connected-agents`
+   - grant load, retry, and confirmed revocation update the route in place
+17. `/profile` -> `/profile`
    - in-place auth-state rerender on sign-in/sign-out; no route replacement
-16. `/exercise-history` -> `/completed-session/<sessionId>`
+18. `/exercise-history` -> `/completed-session/<sessionId>`
    - session card tap or all-time-best row tap
-17. (any guarded route) -> `/sign-in`
+19. (any guarded route) -> `/sign-in`
    - route-layer auth-guard redirect on a configured-but-no-session launch, or when a sync cycle reports "no signed-in user" (`<Redirect />`)
-18. `/sign-in` -> `/`
+20. `/sign-in` -> `/`
    - successful sign-in: the guard stops redirecting and the app proceeds to the normal route; an already-signed-in render of `/sign-in` also redirects to `/`
-19. (any signed-in route) -> first-sync block
+21. (any signed-in route) -> first-sync block
    - the first-sync gate (below the auth guard) renders a full-screen "Setting up your data…" block in place of the navigator while `sync_runtime_state.bootstrap_completed_at` is null for a signed-in user; this is render-substitution, not a route replacement (the URL is unchanged), and it dismisses in place once the flag is set
-20. first-sync block -> `/sign-in`
+22. first-sync block -> `/sign-in`
    - when the latest sync cycle outcome is `AUTH_REQUIRED`, the gate redirects to `/sign-in` (no Retry); the `/sign-in` route is exempt from the block so the redirect cannot loop
 
 Note:
@@ -181,7 +200,7 @@ Note:
 ## Header titles (current, high level)
 
 - Tab roots inside the `(tabs)` group (`stats-history`, `session-recorder`, `exercise-catalog`, `settings`) all run with `headerShown: false`; per-screen titles in `apps/mobile/app/(tabs)/_layout.tsx` are still declared for completeness but the visible tab bar is now `BottomTray` (composing `TopLevelTabs`) supplied via the `tabBar` prop. Detail screens that haven't yet moved into `(tabs)` (notably `exercise-history`) still render `TopLevelTabs` directly until they migrate.
-- Detail screens registered in the root stack (`exercise-history`, `sessions`, `profile`, `maestro-harness`, `completed-session/[sessionId]`) keep their native stack header behavior; titles are declared in `apps/mobile/app/_layout.tsx`
+- Detail screens registered in the root stack (`exercise-history`, `sessions`, `profile`, `connected-agents`, `maestro-harness`, `completed-session/[sessionId]`) keep their native stack header behavior; titles are declared in `apps/mobile/app/_layout.tsx`
 - `completed-session/[sessionId]` sets its title inside the route file (current title: `View Session`)
 - `exercise-history` sets its title inside the route file to the resolved exercise name (falls back to `Exercise History` when the summary is not yet available)
 

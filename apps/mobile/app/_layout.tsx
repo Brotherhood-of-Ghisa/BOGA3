@@ -73,6 +73,10 @@ export default function RootLayout() {
                 <Stack.Screen name="exercise-history" />
                 <Stack.Screen name="sessions" options={{ title: 'Sessions' }} />
                 <Stack.Screen name="profile" options={{ title: 'Profile' }} />
+                <Stack.Screen
+                  name="connected-agents"
+                  options={{ headerBackTitle: 'Settings', title: 'Connected agents' }}
+                />
                 <Stack.Screen name="dev-logs" options={{ title: 'Logs' }} />
                 <Stack.Screen name="maestro-harness" options={{ headerShown: false }} />
               </Stack>

@@ -113,6 +113,19 @@ describe('settings and profile routes', () => {
     expect(mockPush).toHaveBeenCalledWith('/profile');
   });
 
+  it('opens Connected agents for a signed-in user', () => {
+    mockUseAuth.mockReturnValue(
+      createAuthValue({
+        user: { email: 'member@example.test', id: 'user-1' },
+      }),
+    );
+    render(<SettingsRoute />);
+
+    fireEvent.press(screen.getByTestId('settings-connected-agents-row'));
+
+    expect(mockPush).toHaveBeenCalledWith('/connected-agents');
+  });
+
   it('renders the Preferences card and allows changing the date format setting', async () => {
     await ensureExerciseListPreferencesLoaded();
 
