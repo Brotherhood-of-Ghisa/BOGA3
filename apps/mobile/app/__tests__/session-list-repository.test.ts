@@ -1,4 +1,5 @@
 import {
+  countConfirmedSessionSets,
   createSessionListRepository,
   type SessionListStore,
   type SessionListStoreRecord,
@@ -25,6 +26,34 @@ const buildRecord = (overrides: Partial<SessionListStoreRecord> = {}): SessionLi
 });
 
 describe('session list repository', () => {
+  it('counts only valid explicitly confirmed sets in list summaries', () => {
+    const counts = countConfirmedSessionSets(
+      [
+        {
+          sessionExerciseId: 'se-1',
+          repsValue: '5',
+          weightValue: '100',
+          performanceStatus: null,
+        },
+        {
+          sessionExerciseId: 'se-1',
+          repsValue: '10',
+          weightValue: '500',
+          performanceStatus: 'unperformed',
+        },
+        {
+          sessionExerciseId: 'se-1',
+          repsValue: '',
+          weightValue: '100',
+          performanceStatus: null,
+        },
+      ],
+      new Map([['se-1', 'session-1']])
+    );
+
+    expect(counts.get('session-1')).toBe(1);
+  });
+
   it('surfaces the most recent active session and orders completed sessions by completedAt desc', async () => {
     const store = createMockStore();
     const repository = createSessionListRepository(store);

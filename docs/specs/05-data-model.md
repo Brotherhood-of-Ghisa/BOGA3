@@ -49,7 +49,7 @@ This document is project-level source of truth for what data exists and how it i
 - `gyms` (user-owned personal gym rows; nullable private coordinate metadata is in sync scope)
 - `sessions`
 - `session_exercises`
-- `exercise_sets` (actual logged `weight_value` / `reps_value` / `set_type`, plus optional planned target fields `planned_weight_value` / `planned_reps_value` / `planned_set_type` and `performance_status` for planned/skipped execution rows)
+- `exercise_sets` (actual entered `weight_value` / `reps_value` / `set_type`, plus optional planned target fields `planned_weight_value` / `planned_reps_value` / `planned_set_type` and `performance_status` for planned/skipped/unperformed execution state)
 - `exercise_definitions`
   - `load_input_mode` is required metadata with values `total_load` and
     `per_side_load`. It describes whether the entered scalar is a shared load
@@ -211,13 +211,16 @@ section states only the data-model-level invariants.
    user-owned entities listed in this document, with FK integrity preserved at every
    layer boundary (parents drain before children).
 5. `exercise_sets` metadata includes optional `set_type` (`warm_up | rir_0 | rir_1 | rir_2 | null`) and remains nullable for legacy/unspecified sets. `warm_up` is an effort/display classification, not a general stats exclusion flag: valid warm-up sets count toward volume, estimated 1RM, highest/top weight, heatmaps, and other strength/volume metrics, but do not count as near-failure sets.
-6. Planned workout execution targets are `in sync scope`: `exercise_sets.planned_weight_value`, `planned_reps_value`, `planned_set_type`, and `performance_status` are carried in the push/pull wire envelope so appended historical/program rows restore as planned targets rather than completed logs. Actual performed values remain in `weight_value`, `reps_value`, and `set_type`.
-   - Active drafts may store planned/skipped target UI state. Completed workout history is actual-only for now: final active-session submit and completed-edit save remove skipped and otherwise unperformed planned rows before writing the completed payload, so only performed actual sets become completed workout data.
+6. Planned workout execution targets and explicit performance state are `in sync scope`: `exercise_sets.planned_weight_value`, `planned_reps_value`, `planned_set_type`, and `performance_status` are carried in the existing push/pull wire envelope. `performance_status` is nullable unconstrained text and uses `planned`, `skipped`, and `unperformed`; a valid actual row with `null` is the confirmed/performed representation. This adds no column, server migration, or wire-envelope field.
+   - New empty and copied/defaulted active rows use `unperformed`, even when copied values are already valid. For upgrade compatibility, a pre-existing valid row with legacy `null` remains confirmed; a blank or partial legacy draft row with `null` hydrates as `unperformed` so later entry cannot silently confirm it.
+   - Active and completed-edit autosave preserve planned, skipped, and unperformed rows losslessly. Final active-session submit and completed-edit save write completed workout history from valid confirmed actual rows only. Entered valid unconfirmed rows require a specific discard confirmation; they are never promoted or discarded implicitly.
+   - Any reader with performed/completed semantics filters to valid actual values plus confirmed status. This includes recorder counts and live comparisons, session lists and completed detail, exercise catalog/history/records and suggested plans, muscle/exercise analytics and stats, and the agent coaching history API. Planned, skipped, unperformed, blank, partial, invalid, deleted, and tombstoned rows do not contribute.
 7. Active `exercise_sets` rows are lossless draft data: fully blank and partial
    rows retain their IDs and order through save, hydration, and navigation.
    When `reps_value` is a positive integer, blank `weight_value` is canonicalized
-   to `"0"` at input-commit, persistence, or completion boundaries and is a valid
-   performed zero-load set. Blank or invalid reps remain incomplete and require
+   to `"0"` at input-commit, persistence, or completion boundaries and supplies
+   valid actual values for a zero-load set; it becomes performed only after the
+   row is explicitly confirmed. Blank or invalid reps remain incomplete and require
    explicit cleanup confirmation at completion. This is value normalization
    within the existing string column and Sync v2 field; it introduces no schema
    migration or wire-envelope change.

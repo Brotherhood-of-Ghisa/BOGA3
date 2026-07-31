@@ -60,6 +60,22 @@ describe('aggregateStats', () => {
     expect(totals.totalSets).toBe(7);
   });
 
+  it('excludes valid but unconfirmed sets from set and muscle totals', () => {
+    const input = buildAggregationInput();
+    input.exerciseSets.push({
+      sessionExerciseId: 'se-1',
+      setType: 'rir_0',
+      weightValue: '500',
+      repsValue: '10',
+      performanceStatus: 'unperformed',
+    });
+
+    const totals = aggregateStats(input);
+    const byId = new Map(flattenMuscles(totals).map((entry) => [entry.muscleGroupId, entry]));
+    expect(totals.totalSets).toBe(7);
+    expect(byId.get('chest_sternal')?.totalWeight).toBe(1800);
+  });
+
   it('attributes total weight to muscles using role weights (primary=1, secondary=0.5, stabilizer=0)', () => {
     const totals = aggregateStats(buildAggregationInput());
 

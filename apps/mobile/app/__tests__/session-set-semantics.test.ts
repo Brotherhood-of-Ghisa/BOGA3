@@ -1,8 +1,12 @@
 import {
   canonicalizeSetValues,
   canonicalizeWeightForReps,
+  hasValidActualValues,
   hasPositiveIntegerReps,
+  hydrateSessionSetPerformanceStatus,
+  isConfirmedPerformedSet,
   isPerformedSet,
+  normalizeSessionSetPerformanceStatus,
 } from '@/src/session-recorder/set-semantics';
 
 describe('session set semantics', () => {
@@ -37,5 +41,30 @@ describe('session set semantics', () => {
     expect(isPerformedSet({ reps: '', weight: '20' })).toBe(false);
     expect(isPerformedSet({ reps: '0', weight: '20' })).toBe(false);
     expect(isPerformedSet({ reps: '2.5', weight: '20' })).toBe(false);
+  });
+
+  it('keeps valid actual values separate from explicit performance confirmation', () => {
+    expect(hasValidActualValues({ reps: '5', weight: '20' })).toBe(true);
+    expect(
+      isConfirmedPerformedSet({ reps: '5', weight: '20', performanceStatus: 'unperformed' })
+    ).toBe(false);
+    expect(
+      isConfirmedPerformedSet({ reps: '5', weight: '20', performanceStatus: null })
+    ).toBe(true);
+  });
+
+  it('hydrates legacy null rows by validity while preserving explicit statuses', () => {
+    expect(hydrateSessionSetPerformanceStatus(null, { reps: '5', weight: '20' })).toBeNull();
+    expect(hydrateSessionSetPerformanceStatus(null, { reps: '', weight: '' })).toBe('unperformed');
+    expect(hydrateSessionSetPerformanceStatus('planned', { reps: '5', weight: '20' })).toBe('planned');
+    expect(hydrateSessionSetPerformanceStatus('skipped', { reps: '5', weight: '20' })).toBe('skipped');
+    expect(hydrateSessionSetPerformanceStatus('unperformed', { reps: '5', weight: '20' })).toBe(
+      'unperformed'
+    );
+  });
+
+  it('normalizes unsupported persisted statuses to the legacy performed representation', () => {
+    expect(normalizeSessionSetPerformanceStatus('unperformed')).toBe('unperformed');
+    expect(normalizeSessionSetPerformanceStatus('unexpected')).toBeNull();
   });
 });

@@ -6,13 +6,19 @@ import {
 
 const makeSession = (
   isoDate: string,
-  sets: Array<{ setType: string | null; weight: number; reps: number }>
+  sets: {
+    setType: string | null;
+    weight: number;
+    reps: number;
+    performanceStatus?: 'planned' | 'skipped' | 'unperformed' | null;
+  }[]
 ): ExerciseRawSession => ({
   completedAt: new Date(isoDate),
   sets: sets.map((s) => ({
     setType: s.setType,
     weightValue: String(s.weight),
     repsValue: String(s.reps),
+    performanceStatus: s.performanceStatus,
   })),
 });
 
@@ -195,6 +201,22 @@ describe('aggregateExerciseWeeklyEffort', () => {
     ];
     const result = aggregateExerciseWeeklyEffort(sessions, TZ);
     expect(result[0].nearFailureCount).toBe(3);
+  });
+
+  it('excludes unconfirmed sets from weekly and daily effort', () => {
+    const sessions = [
+      makeSession('2026-05-18T10:00:00Z', [
+        { setType: 'rir_1', weight: 100, reps: 5, performanceStatus: null },
+        { setType: 'rir_0', weight: 500, reps: 10, performanceStatus: 'unperformed' },
+      ]),
+    ];
+
+    expect(aggregateExerciseWeeklyEffort(sessions, TZ)[0]).toEqual(
+      expect.objectContaining({ totalVolume: 500, highestWeight: 100, nearFailureCount: 1 })
+    );
+    expect(aggregateExerciseDailyEffort(sessions, TZ)[0]).toEqual(
+      expect.objectContaining({ totalVolume: 500, highestWeight: 100, nearFailureCount: 1 })
+    );
   });
 });
 

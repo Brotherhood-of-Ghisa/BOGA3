@@ -648,7 +648,9 @@ describe('SessionRecorderScreen exercise interactions', () => {
     expect(screen.getByTestId('planned-set-row-2-1')).toHaveTextContent(/10 reps/);
     expect(screen.getByTestId('planned-set-row-2-2')).toHaveTextContent(/120kg/);
     expect(screen.getByTestId('planned-set-row-2-2')).toHaveTextContent(/5 reps/);
-    expect(screen.getByLabelText('Log set 1 as planned')).toBeTruthy();
+    expect(screen.queryByText('Log')).toBeNull();
+    expect(screen.getByTestId('set-performance-control-2-1')).toHaveTextContent('○');
+    expect(screen.getByLabelText('Confirm exercise 2 set 1 performed')).toBeTruthy();
     expect(screen.getByLabelText('Skip set 2')).toBeTruthy();
   });
 
@@ -838,6 +840,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     fireEvent.press(firstSetTypeButton);
     fireEvent.changeText(screen.getByLabelText('Weight for exercise 1 set 1'), '500');
     fireEvent.changeText(screen.getByLabelText('Reps for exercise 1 set 1'), '5');
+    fireEvent.press(screen.getByTestId('set-performance-control-1-1'));
     expect(screen.getByTestId('exercise-block-history-panel-1-volume-current')).toHaveTextContent('2500');
     expect(screen.getByTestId('exercise-block-history-panel-1-highest-current')).toHaveTextContent('500');
     expect(screen.getByTestId('exercise-block-history-panel-1-rir-count-current')).toHaveTextContent('0');
@@ -847,6 +850,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     fireEvent.press(secondSetTypeButton);
     fireEvent.changeText(screen.getByLabelText('Weight for exercise 1 set 2'), '260');
     fireEvent.changeText(screen.getByLabelText('Reps for exercise 1 set 2'), '6');
+    fireEvent.press(screen.getByTestId('set-performance-control-1-2'));
 
     expect(screen.getByTestId('exercise-block-history-panel-1-volume-current')).toHaveTextContent('4060');
     expect(screen.getByTestId('exercise-block-history-panel-1-highest-current')).toHaveTextContent('500');
@@ -1592,8 +1596,10 @@ describe('SessionRecorderScreen exercise interactions', () => {
     fireEvent.changeText(screen.getByLabelText('Reps for exercise 1 set 1'), '5');
     fireEvent.press(screen.getByTestId('set-quality-button-1-1'));
     fireEvent.press(screen.getByTestId('set-quality-button-1-1'));
+    fireEvent.press(screen.getByTestId('set-performance-control-1-1'));
     fireEvent.press(screen.getByLabelText('Add set to exercise 1'));
     fireEvent.press(screen.getByTestId('set-quality-button-1-2'));
+    fireEvent.press(screen.getByTestId('set-performance-control-1-2'));
 
     expect(screen.getByTestId('exercise-expanded-pr-1')).toHaveTextContent(
       'PR: 300 kg × 5 reps · est. 1RM 350 kg'
@@ -1648,6 +1654,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     await screen.findByTestId('exercise-block-history-panel-1-collapsed');
     fireEvent.changeText(screen.getByLabelText('Weight for exercise 1 set 1'), '100');
     fireEvent.changeText(screen.getByLabelText('Reps for exercise 1 set 1'), '5');
+    fireEvent.press(screen.getByTestId('set-performance-control-1-1'));
     fireEvent.press(screen.getByTestId('exercise-collapse-toggle-1'));
     expect(screen.queryByTestId('exercise-collapsed-summary-1-new-pr')).toBeNull();
 
@@ -1656,6 +1663,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     await screen.findByTestId('exercise-block-history-panel-2-empty-collapsed');
     fireEvent.changeText(screen.getByLabelText('Weight for exercise 2 set 1'), '100');
     fireEvent.changeText(screen.getByLabelText('Reps for exercise 2 set 1'), '5');
+    fireEvent.press(screen.getByTestId('set-performance-control-2-1'));
     fireEvent.press(screen.getByTestId('exercise-collapse-toggle-2'));
     expect(screen.queryByTestId('exercise-collapsed-summary-2-new-pr')).toBeNull();
   });

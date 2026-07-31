@@ -8,6 +8,11 @@ import {
   parseSetReps,
   parseSetWeight,
 } from '@/src/exercise-calculations';
+import {
+  isConfirmedPerformedSet,
+  normalizeSessionSetPerformanceStatus,
+  type SessionSetPerformanceStatus,
+} from '@/src/session-recorder/set-semantics';
 
 import { bootstrapLocalDataLayer } from './bootstrap';
 import { exerciseSets, sessionExercises, sessions } from './schema';
@@ -34,6 +39,7 @@ export type ExerciseBlockHistorySetRow = {
   weightValue: string;
   repsValue: string;
   setType: string | null;
+  performanceStatus?: SessionSetPerformanceStatus;
 };
 
 export type ExerciseBlockHistoryBlock = {
@@ -177,7 +183,11 @@ const countRirAtMostTwoSets = (setRows: ExerciseBlockHistorySetRow[]): number =>
 };
 
 const isValidSuggestedPlanSet = (row: ExerciseBlockHistorySetRow): boolean =>
-  parseSetWeight(row.weightValue) !== null && parseSetReps(row.repsValue) !== null;
+  isConfirmedPerformedSet({
+    reps: row.repsValue,
+    weight: row.weightValue,
+    performanceStatus: row.performanceStatus,
+  }) && parseSetWeight(row.weightValue) !== null && parseSetReps(row.repsValue) !== null;
 
 export const aggregateExerciseBlockHistory = (
   input: ExerciseBlockHistoryAggregationInput
@@ -198,7 +208,16 @@ export const aggregateExerciseBlockHistory = (
 
     const setRows = matchingSessionExercises
       .flatMap((row) => input.setsBySessionExerciseId[row.sessionExerciseId] ?? [])
+      .filter((set) =>
+        isConfirmedPerformedSet({
+          reps: set.repsValue,
+          weight: set.weightValue,
+          performanceStatus: set.performanceStatus,
+        })
+      )
       .sort(compareSetOrder);
+    if (setRows.length === 0) continue;
+
     const calculationSets = setRows.map((row) => ({
       weightValue: row.weightValue,
       repsValue: row.repsValue,
@@ -353,6 +372,7 @@ export const createDrizzleExerciseBlockHistoryStore = (): ExerciseBlockHistorySt
         weightValue: exerciseSets.weightValue,
         repsValue: exerciseSets.repsValue,
         setType: exerciseSets.setType,
+        performanceStatus: exerciseSets.performanceStatus,
       })
       .from(exerciseSets)
       .where(
@@ -372,6 +392,7 @@ export const createDrizzleExerciseBlockHistoryStore = (): ExerciseBlockHistorySt
       weightValue: row.weightValue,
       repsValue: row.repsValue,
       setType: row.setType ?? null,
+      performanceStatus: normalizeSessionSetPerformanceStatus(row.performanceStatus),
     }));
   },
 });

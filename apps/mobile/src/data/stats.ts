@@ -21,6 +21,7 @@ import {
   sessionExercises,
   sessions,
 } from './schema';
+import { normalizeSessionSetPerformanceStatus } from '@/src/session-recorder/set-semantics';
 
 export type StatsPeriodDays = 7 | 30 | 90 | 365;
 
@@ -238,6 +239,7 @@ export const createDrizzleStatsStore = (): StatsStore => ({
               setType: exerciseSets.setType,
               weightValue: exerciseSets.weightValue,
               repsValue: exerciseSets.repsValue,
+              performanceStatus: exerciseSets.performanceStatus,
             })
             .from(exerciseSets)
             .where(
@@ -296,7 +298,10 @@ export const createDrizzleStatsStore = (): StatsStore => ({
       sessions: sessionsInPeriod,
       exerciseDefinitions: exerciseDefinitionRows,
       sessionExercises: sessionExerciseRows,
-      exerciseSets: exerciseSetRows,
+      exerciseSets: exerciseSetRows.map((set) => ({
+        ...set,
+        performanceStatus: normalizeSessionSetPerformanceStatus(set.performanceStatus),
+      })),
       muscleMappings: muscleMappingRows,
       muscleGroups: muscleGroupRows,
     };

@@ -4,6 +4,12 @@ import { bootstrapLocalDataLayer, type LocalDatabase } from './bootstrap';
 import { nowMonotonic } from './clock';
 import { exerciseSets, sessionExercises, sessionExerciseTags, sessions } from './schema';
 import { normalizeSessionSetType, type SessionSetTypeValue } from './set-types';
+import {
+  hydrateSessionSetPerformanceStatus,
+  isConfirmedPerformedSet,
+  normalizeSessionSetPerformanceStatus,
+  type SessionSetPerformanceStatus,
+} from '@/src/session-recorder/set-semantics';
 import { notifyLocalWrite } from '@/src/sync/write-nudge';
 
 export type SessionDraftStatus = 'active';
@@ -149,7 +155,7 @@ export type AppendCompletedSessionExerciseAsPlannedResult = {
   sessionId: string;
 };
 
-export type SessionSetPerformanceStatus = 'planned' | 'skipped' | null;
+export type { SessionSetPerformanceStatus } from '@/src/session-recorder/set-semantics';
 
 export type SessionPersistenceRecord = {
   id: string;
@@ -269,10 +275,6 @@ const normalizePersistedSessionStatus = (status: string): SessionPersistenceReco
 
 const normalizeDraftStatus = (status: SessionDraftStatus | undefined): SessionDraftStatus => status ?? 'active';
 
-const normalizeSetPerformanceStatus = (
-  status: string | null | undefined
-): SessionSetPerformanceStatus => (status === 'planned' || status === 'skipped' ? status : null);
-
 export const calculateSessionDurationSec = (startedAt: Date, completedAt: Date) => {
   ensureDate(startedAt, 'startedAt');
   ensureDate(completedAt, 'completedAt');
@@ -332,7 +334,10 @@ const mapDraftSnapshot = (graph: StoredDraftGraph): SessionDraftSnapshot => ({
       plannedRepsValue: set.plannedRepsValue ?? null,
       plannedWeightValue: set.plannedWeightValue ?? null,
       plannedSetType: normalizeSessionSetType(set.plannedSetType),
-      performanceStatus: normalizeSetPerformanceStatus(set.performanceStatus),
+      performanceStatus: hydrateSessionSetPerformanceStatus(set.performanceStatus, {
+        reps: set.repsValue,
+        weight: set.weightValue,
+      }),
     })),
   })),
 });
@@ -360,7 +365,10 @@ const mapSessionGraphSnapshot = (graph: StoredDraftGraph): SessionGraphSnapshot 
       plannedRepsValue: set.plannedRepsValue ?? null,
       plannedWeightValue: set.plannedWeightValue ?? null,
       plannedSetType: normalizeSessionSetType(set.plannedSetType),
-      performanceStatus: normalizeSetPerformanceStatus(set.performanceStatus),
+      performanceStatus: hydrateSessionSetPerformanceStatus(set.performanceStatus, {
+        reps: set.repsValue,
+        weight: set.weightValue,
+      }),
     })),
   })),
 });
@@ -413,7 +421,10 @@ const loadDraftGraphBySessionId = (database: LocalDatabase, sessionId: string): 
       plannedRepsValue: row.plannedRepsValue,
       plannedWeightValue: row.plannedWeightValue,
       plannedSetType: normalizeSessionSetType(row.plannedSetType),
-      performanceStatus: normalizeSetPerformanceStatus(row.performanceStatus),
+      performanceStatus: hydrateSessionSetPerformanceStatus(row.performanceStatus, {
+        reps: row.repsValue,
+        weight: row.weightValue,
+      }),
     });
     acc.set(row.sessionExerciseId, current);
     return acc;
@@ -652,8 +663,13 @@ const replaceSessionExerciseGraph = (
           : normalizeSessionSetType(set.plannedSetType);
       const nextPerformanceStatus =
         set.performanceStatus === undefined
-          ? normalizeSetPerformanceStatus(existingSet?.performanceStatus)
-          : normalizeSetPerformanceStatus(set.performanceStatus);
+          ? existingSet
+            ? hydrateSessionSetPerformanceStatus(existingSet.performanceStatus, {
+                reps: existingSet.repsValue,
+                weight: existingSet.weightValue,
+              })
+            : 'unperformed'
+          : normalizeSessionSetPerformanceStatus(set.performanceStatus);
 
       if (reuseSet) {
         keptSetIds.add(setId);
@@ -1087,22 +1103,35 @@ export const createSessionDraftRepository = (store: SessionDraftStore = createDr
       })),
     })) ?? [];
 
-    const plannedExercises = sourceGraph.exercises.map((exercise) => ({
-      id: createLocalEntityId('exercise'),
-      exerciseDefinitionId: exercise.exerciseDefinitionId,
-      name: exercise.name,
-      machineName: exercise.machineName,
-      sets: exercise.sets.map((set) => ({
-        id: createLocalEntityId('set'),
-        repsValue: '',
-        weightValue: '',
-        setType: null,
-        plannedRepsValue: set.repsValue,
-        plannedWeightValue: set.weightValue,
-        plannedSetType: set.setType,
-        performanceStatus: 'planned' as const,
-      })),
-    }));
+    const plannedExercises = sourceGraph.exercises
+      .map((exercise) => ({
+        id: createLocalEntityId('exercise'),
+        exerciseDefinitionId: exercise.exerciseDefinitionId,
+        name: exercise.name,
+        machineName: exercise.machineName,
+        sets: exercise.sets
+          .filter((set) =>
+            isConfirmedPerformedSet({
+              reps: set.repsValue,
+              weight: set.weightValue,
+              performanceStatus: set.performanceStatus,
+            })
+          )
+          .map((set) => ({
+            id: createLocalEntityId('set'),
+            repsValue: '',
+            weightValue: '',
+            setType: null,
+            plannedRepsValue: set.repsValue,
+            plannedWeightValue: set.weightValue,
+            plannedSetType: set.setType,
+            performanceStatus: 'planned' as const,
+          })),
+      }))
+      .filter((exercise) => exercise.sets.length > 0);
+    if (plannedExercises.length === 0) {
+      throw new Error(`Session ${sourceSessionId} has no confirmed performed sets`);
+    }
 
     const saved = await store.saveDraftGraph({
       sessionId: targetSessionId,
@@ -1140,16 +1169,27 @@ export const createSessionDraftRepository = (store: SessionDraftStore = createDr
     const targetSessionId = activeGraph?.session.id;
     const startedAt = activeGraph?.session.startedAt ?? now;
     const gymId = activeGraph?.session.gymId ?? sourceGraph.session.gymId;
-    const plannedSets = sourceExercise.sets.map((set) => ({
-      id: createLocalEntityId('set'),
-      repsValue: '',
-      weightValue: '',
-      setType: null,
-      plannedRepsValue: set.repsValue,
-      plannedWeightValue: set.weightValue,
-      plannedSetType: set.setType,
-      performanceStatus: 'planned' as const,
-    }));
+    const plannedSets = sourceExercise.sets
+      .filter((set) =>
+        isConfirmedPerformedSet({
+          reps: set.repsValue,
+          weight: set.weightValue,
+          performanceStatus: set.performanceStatus,
+        })
+      )
+      .map((set) => ({
+        id: createLocalEntityId('set'),
+        repsValue: '',
+        weightValue: '',
+        setType: null,
+        plannedRepsValue: set.repsValue,
+        plannedWeightValue: set.weightValue,
+        plannedSetType: set.setType,
+        performanceStatus: 'planned' as const,
+      }));
+    if (plannedSets.length === 0) {
+      throw new Error(`Exercise ${sourceSessionExerciseId} has no confirmed performed sets`);
+    }
     const existingExercises =
       activeGraph?.exercises.map((exercise) => ({
         id: exercise.id,

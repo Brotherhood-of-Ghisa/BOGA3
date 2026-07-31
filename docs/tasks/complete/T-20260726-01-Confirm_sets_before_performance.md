@@ -1,7 +1,7 @@
 ---
 task_id: T-20260726-01-Confirm_sets_before_performance
 milestone_id: "MVP"
-status: planned
+status: completed
 ui_impact: "yes"
 areas: "frontend|backend|cross-stack|docs"
 runtimes: "node|expo|maestro|supabase|docs"
@@ -16,8 +16,8 @@ docs_touched: "docs/specs/05-data-model.md, docs/specs/08-ux-delivery-standard.m
 
 - Task ID: `T-20260726-01-Confirm_sets_before_performance`
 - Title: Require explicit set confirmation before performance
-- Status: `planned`
-- Session date: 2026-07-26
+- Status: `completed`
+- Session date: 2026-07-31
 - Session interaction mode: `interactive`
 
 ## Parent references (required)
@@ -37,11 +37,13 @@ docs_touched: "docs/specs/05-data-model.md, docs/specs/08-ux-delivery-standard.m
 
 ## Context Freshness (required at session start; update before edits)
 
-- Verified current branch + HEAD commit:
-  `codex/set-performance-confirmation-task` at `91a7b88`.
+- Verified current branch + HEAD commit: `codex/set-performance-confirmation-task`
+  at `788cd80` after merging current
+  `origin/main` (`a50fd9f`) on 2026-07-31.
 - Start-of-session sync with `origin/main` completed?: `yes`; fetched
-  `origin/main` on 2026-07-26 and confirmed local `HEAD` matched at `91a7b88`
-  before creating the branch.
+  `origin/main` and merged its eight post-branch commits before implementation
+  so this task integrates with the current collapsible-card recorder and M21
+  baseline.
 - Parent refs opened in this session:
   - `AGENTS.md`
   - `docs/specs/README.md`
@@ -59,15 +61,17 @@ docs_touched: "docs/specs/05-data-model.md, docs/specs/08-ux-delivery-standard.m
   - `apps/mobile/app/__tests__/README.md`
 - Code/docs inventory freshness checks run:
   - Recorder set construction, row-state derivation, plan log/skip actions,
-    submission cleanup, autosave, and row rendering inspected on 2026-07-26.
+    submission cleanup, autosave, collapsed-card summaries, and row rendering
+    re-inspected on 2026-07-31 after the `origin/main` merge.
   - `performance_status` local persistence, normalization, Sync v2 mapping, and
-    server text-column contract inspected on 2026-07-26.
-  - Completed-history, live Past Records, analytics, session-list, and suggested
-    plan consumers inventoried on 2026-07-26.
-  - Recorder Jest coverage and Maestro data/sync logging flows inventoried on
-    2026-07-26.
+    server text-column contract re-inspected on 2026-07-31.
+  - Completed-history/detail, live Past Records, exercise catalog/history,
+    session-list, stats, muscle/exercise analytics, and suggested-plan consumers
+    inventoried on 2026-07-31.
+  - Recorder/repository/analytics/sync Jest coverage and Maestro data/sync
+    logging flows re-inventoried on 2026-07-31.
   - `./boga test for` run against the planned implementation paths on
-    2026-07-26; required union is `fast`, `backend`, `frontend`, `docs-check`,
+    2026-07-31; required union is `fast`, `backend`, `frontend`, `docs-check`,
     and `meta-tests` (the last two are included by the aggregate work but remain
     named for evidence).
 - Known stale references or assumptions:
@@ -382,19 +386,71 @@ must survive autosave, navigation, sync, completed-edit autosave, and restore.
 ## Evidence
 
 - Focused test commands/results:
+  - Focused Jest selection covering the 15 recorder, persistence, read-model,
+    completed-detail, and sync-wire suites listed above: `15` suites / `235`
+    tests passed.
+  - `exercise-block-history-fixture.yaml`: passed end to end, including planned
+    hollow rows, prescribed confirmation, modified actual values, and the
+    confirmed-only collapsed summary.
 - Confirmed-state persistence and Sync v2 round-trip evidence:
+  - Repository coverage proves legacy valid `null` rows remain confirmed,
+    invalid legacy rows hydrate as `unperformed`, and active/completed-edit
+    autosaves preserve valid unperformed values.
+  - `sync-cycle-wire.test.ts`, the real `sync-infra` mobile cycle in
+    `./boga test backend`, and `ios-sync-e2e` all passed with
+    `performance_status='unperformed'` preserved across wire, push/pull, local
+    hydration, and device restore.
 - Normal-row simulator screenshots/artifact paths:
+  - `apps/mobile/artifacts/maestro/ad-hoc/20260731-145643-43020/maestro-output/screenshots/set-performance-normal-invalid.png`
+  - `apps/mobile/artifacts/maestro/ad-hoc/20260731-145643-43020/maestro-output/screenshots/set-performance-normal-unconfirmed.png`
+  - `apps/mobile/artifacts/maestro/ad-hoc/20260731-145643-43020/maestro-output/screenshots/set-performance-normal-confirmed.png`
 - Appended-row simulator screenshots/artifact paths:
+  - `apps/mobile/artifacts/maestro/ad-hoc/20260731-150519-46235/maestro-output/screenshots/set-performance-appended-plan-unconfirmed.png`
+  - `apps/mobile/artifacts/maestro/ad-hoc/20260731-150519-46235/maestro-output/screenshots/set-performance-appended-plan-confirmed.png`
+  - `apps/mobile/artifacts/maestro/ad-hoc/20260731-150519-46235/maestro-output/screenshots/exercise-block-comparison-expanded.png`
 - Integrated gate results/artifact paths:
-- Manual verification summary:
+  - `./boga test fast`: PASS after the final source/flow edits; lint,
+    typecheck, all mobile Jest suites, local backend smoke, docs-check,
+    meta-tests, agent-auth web, and MCP unit/build passed.
+  - `./boga test backend`: PASS; auth/RLS, agent API, schema, push/pull,
+    dev-wipe, drift, Sync v2 integration, real mobile sync-infra, and MCP smoke
+    passed. Per-lane records are under `docs/testing/timings/records/` with the
+    `20260731T134355Z` through `20260731T134906Z` prefixes.
+  - `./boga test frontend`: PASS; `ios-smoke`, `ios-data-smoke`,
+    `ios-auth-profile`, and `ios-sync-e2e` passed. Artifact roots:
+    `20260731-144923-37499`, `20260731-145050-38615`,
+    `20260731-145217-40147`, and `20260731-145412-41700` under
+    `apps/mobile/artifacts/maestro/ad-hoc/`.
+  - Final affected-lane reruns: `ios-data-smoke` PASS at
+    `20260731-145643-43020`; targeted appended-plan fixture PASS at
+    `20260731-150519-46235`; targeted exercise-heatmap evidence flow PASS at
+    `20260731-152445-52368`.
+  - `./boga test for --diff origin/main...HEAD`: required union confirmed as
+    `fast`, `backend`, `frontend`, `docs-check`, and `meta-tests`, matching the
+    gates above.
+- Manual verification summary (required when CI is absent/partial): PASS.
+  Visually inspected the normal and prescribed-flow simulator captures. The
+  hollow control remains visible for invalid, entered-unconfirmed, planned, and
+  skipped states; the confirmed control is a green tick; appended rows have no
+  Log action; and the modified prescription/actual layout remains legible.
 - Deferred/manual hosted checks summary:
-  N/A unless implementation changes the stated no-deployment decision.
+  N/A. The existing nullable text column and Sync v2 field carry the new value;
+  no hosted schema, RPC, or deployment change is required.
 
 ## Completion note
 
-- What changed:
-- What tests ran:
-- What remains:
+- What changed: Added explicit persisted set confirmation, unified normal and
+  prescribed row controls, lossless unconfirmation/autosave, confirmed-only
+  completion and read models (including the agent API), explicit cleanup for
+  entered-unconfirmed work, updated Sync coverage, and authoritative UI/data
+  documentation.
+- What tests ran: Focused Jest selection (`15` suites / `235` tests), full
+  `fast`, `backend`, and `frontend` gates, final `ios-data-smoke`, targeted
+  appended-plan and exercise-heatmap Maestro fixtures, docs/meta checks, diff
+  integrity, final path-trigger mapping, and task closeout validation.
+- What remains: None.
+- Closeout result: PASS; the sole warning is the intentional absence of a
+  milestone reference for this user-requested correction.
 
 ## Status update checklist
 

@@ -133,6 +133,42 @@ describe('per-side load semantics', () => {
     expect(entries[0]?.contributions[0]?.weightedVolume).toBe(250);
     expect(entries[0]?.contributions[0]?.roleWeight).toBe(0.5);
   });
+
+  it('excludes valid but unconfirmed sets from muscle contributions', () => {
+    const input = buildAnalyticsInput({
+      sessions: [{ id: 'session', completedAt: new Date('2026-07-22T12:00:00Z') }],
+      exerciseDefinitions: [{ id: 'bench', loadInputMode: 'per_side_load' }],
+      sessionExercises: [{ id: 'se', sessionId: 'session', exerciseDefinitionId: 'bench' }],
+      exerciseSets: [
+        {
+          id: 'confirmed',
+          sessionExerciseId: 'se',
+          setType: null,
+          weightValue: '100',
+          repsValue: '5',
+          performanceStatus: null,
+        },
+        {
+          id: 'unconfirmed',
+          sessionExerciseId: 'se',
+          setType: null,
+          weightValue: '500',
+          repsValue: '10',
+          performanceStatus: 'unperformed',
+        },
+      ],
+      muscleMappings: [
+        { exerciseDefinitionId: 'bench', muscleGroupId: 'chest_sternal', role: 'primary' },
+      ],
+    });
+
+    const entries = aggregateSelectedMuscleDailyEffort(input, {
+      muscleGroupIds: ['chest_sternal'],
+      timeZone: 'UTC',
+    });
+    expect(entries[0]?.totalWeight).toBe(500);
+    expect(entries[0]?.contributions.map((entry) => entry.setId)).toEqual(['confirmed']);
+  });
 });
 
 const buildAnalyticsInput = (
@@ -262,7 +298,7 @@ describe('aggregateSelectedMuscleDailyEffort', () => {
     ]);
   });
 
-  it('preserves invalid-set zero volume and aggregates multiple sessions on one local day', () => {
+  it('excludes invalid sets while aggregating multiple sessions on one local day', () => {
     const entries = aggregateSelectedMuscleDailyEffort(buildAnalyticsInput(), {
       muscleGroupIds: ['chest_sternal'],
       timeZone: 'Europe/London',
@@ -271,16 +307,11 @@ describe('aggregateSelectedMuscleDailyEffort', () => {
     const monday = entries.find((entry) => entry.dateKey === '2026-03-30');
 
     expect(monday?.sessionCount).toBe(1);
-    expect(monday?.setCount).toBe(2);
+    expect(monday?.setCount).toBe(1);
     expect(monday?.totalWeight).toBe(600);
     expect(monday?.contributions.map((contribution) => contribution.setId)).toEqual([
       'set-monday-a-valid',
-      'set-monday-a-invalid',
     ]);
-    expect(
-      monday?.contributions.find((contribution) => contribution.setId === 'set-monday-a-invalid')
-        ?.setVolume
-    ).toBe(0);
   });
 
   it('rolls multiple selected-muscle sessions on the same local day into one daily entry', () => {
@@ -315,7 +346,7 @@ describe('aggregateSelectedMuscleDailyEffort', () => {
     const monday = entries.find((entry) => entry.dateKey === '2026-03-30');
 
     expect(monday?.sessionCount).toBe(2);
-    expect(monday?.setCount).toBe(3);
+    expect(monday?.setCount).toBe(2);
     expect(monday?.totalWeight).toBe(800);
   });
 

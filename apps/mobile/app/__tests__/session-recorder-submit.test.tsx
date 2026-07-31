@@ -206,6 +206,7 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
     await addExerciseWithEmptySet('Barbell Squat');
     fireEvent.changeText(screen.getByLabelText('Weight for exercise 1 set 1'), '0');
     fireEvent.changeText(screen.getByLabelText('Reps for exercise 1 set 1'), '5');
+    fireEvent.press(screen.getByTestId('set-performance-control-1-1'));
     fireEvent.press(screen.getByText('Submit Session'));
 
     expect(screen.queryByText('Session submitted (UI only)')).toBeNull();
@@ -236,6 +237,7 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
     fireEvent.press(screen.getByText('Log new exercise'));
     await addExerciseWithEmptySet('Barbell Squat');
     fireEvent.changeText(screen.getByLabelText('Reps for exercise 1 set 1'), '5');
+    fireEvent.press(screen.getByTestId('set-performance-control-1-1'));
     fireEvent.press(screen.getByText('Submit Session'));
 
     expect(screen.queryByText('Remove incomplete sets and submit?')).toBeNull();
@@ -258,7 +260,41 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
     });
   });
 
-  it('filters skipped and unperformed planned rows out of active submit persistence before completing', async () => {
+  it('requires explicit confirmation before discarding valid unperformed sets on submit', async () => {
+    render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
+
+    fireEvent.press(screen.getByText('Log new exercise'));
+    await addExerciseWithEmptySet('Barbell Squat');
+    fireEvent.changeText(screen.getByLabelText('Weight for exercise 1 set 1'), '225');
+    fireEvent.changeText(screen.getByLabelText('Reps for exercise 1 set 1'), '5');
+    fireEvent.press(screen.getByTestId('set-performance-control-1-1'));
+    fireEvent.press(screen.getByLabelText('Add set to exercise 1'));
+    fireEvent.changeText(screen.getByLabelText('Weight for exercise 1 set 2'), '205');
+
+    fireEvent.press(screen.getByText('Submit Session'));
+
+    expect(screen.getByText('Discard unconfirmed sets and submit?')).toBeTruthy();
+    expect(screen.getByText('Discard unconfirmed sets and submit')).toBeTruthy();
+    expect(mockCompleteSessionDraft).not.toHaveBeenCalled();
+
+    fireEvent.press(screen.getByText('Discard unconfirmed sets and submit'));
+
+    await waitFor(() => {
+      expect(mockCompleteSessionDraft).toHaveBeenCalledWith('test-session');
+    });
+    const persistCalls = mockPersistSessionDraftSnapshot.mock.calls;
+    const finalPayload = persistCalls[persistCalls.length - 1][0];
+    expect(finalPayload.exercises[0].sets).toEqual([
+      expect.objectContaining({
+        repsValue: '5',
+        weightValue: '225',
+        performanceStatus: null,
+      }),
+    ]);
+  });
+
+  it('filters skipped and untouched planned rows out of active submit persistence before completing', async () => {
     mockLoadLatestSessionDraftSnapshot.mockResolvedValueOnce(
       buildActiveDraftSnapshot({
         sessionId: 'planned-draft',
@@ -347,6 +383,7 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
     await addExerciseWithEmptySet('Barbell Squat');
     fireEvent.changeText(screen.getByLabelText('Weight for exercise 1 set 1'), '225');
     fireEvent.changeText(screen.getByLabelText('Reps for exercise 1 set 1'), '5');
+    fireEvent.press(screen.getByTestId('set-performance-control-1-1'));
     fireEvent.press(screen.getByText('Submit Session'));
 
     await waitFor(() => {
@@ -368,6 +405,7 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
     await addExerciseWithEmptySet('Barbell Squat');
     fireEvent.changeText(screen.getByLabelText('Weight for exercise 1 set 1'), '225');
     fireEvent.changeText(screen.getByLabelText('Reps for exercise 1 set 1'), '5');
+    fireEvent.press(screen.getByTestId('set-performance-control-1-1'));
     fireEvent.press(screen.getByLabelText('Add set to exercise 1'));
     fireEvent.changeText(screen.getByLabelText('Weight for exercise 1 set 2'), '205');
     fireEvent.changeText(screen.getByLabelText('Reps for exercise 1 set 2'), '');
@@ -454,9 +492,9 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Save Changes')).toBeTruthy();
-      expect(screen.getByLabelText('logged set 1 for exercise 1: 0kg · 5 reps; quality none')).toBeTruthy();
+      expect(screen.getByLabelText('confirmed set 1 for exercise 1: 0kg · 5 reps; quality none')).toBeTruthy();
     });
-    fireEvent.press(screen.getByLabelText('logged set 1 for exercise 1: 0kg · 5 reps; quality none'));
+    fireEvent.press(screen.getByLabelText('confirmed set 1 for exercise 1: 0kg · 5 reps; quality none'));
     expect(screen.getByLabelText('Weight for exercise 1 set 1').props.value).toBe('0');
 
     fireEvent.press(screen.getByText('Save Changes'));
@@ -483,7 +521,7 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
     expect(mockCompleteSessionDraft).not.toHaveBeenCalled();
   });
 
-  it('filters skipped and unperformed planned rows out of completed-edit save persistence', async () => {
+  it('filters skipped and untouched planned rows out of completed-edit save persistence', async () => {
     mockSearchParams = { mode: 'completed-edit', sessionId: 'completed-edit-1' };
     mockLoadSessionSnapshotById.mockResolvedValue(
       buildCompletedEditSnapshot({
@@ -719,7 +757,7 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
       expect(screen.getByDisplayValue('2026-02-25 10:45')).toBeTruthy();
     });
 
-    fireEvent.press(screen.getByLabelText('logged set 1 for exercise 1: 225kg · 5 reps; quality none'));
+    fireEvent.press(screen.getByLabelText('confirmed set 1 for exercise 1: 225kg · 5 reps; quality none'));
     expect(screen.queryByLabelText('Remove set 1 from exercise 1')).toBeNull();
     swipeLeft(screen.getByTestId('set-swipe-delete-1-1'));
     fireEvent.press(screen.getByText('Save Changes'));

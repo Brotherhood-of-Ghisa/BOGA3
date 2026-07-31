@@ -200,6 +200,13 @@ describe('CompletedSessionDetailScreenShell', () => {
                 sets: [
                   ...exercise.sets,
                   { id: 'set-invalid', weight: '', reps: '5', setType: 'rir_0' as const },
+                  {
+                    id: 'set-unconfirmed',
+                    weight: '500',
+                    reps: '10',
+                    setType: 'rir_0' as const,
+                    performanceStatus: 'unperformed' as const,
+                  },
                 ],
               }
             : exercise
@@ -232,6 +239,7 @@ describe('CompletedSessionDetailScreenShell', () => {
     ).toBeNull();
     expect(screen.queryByTestId('completed-session-detail-sets-table-header-exercise-1')).toBeNull();
     expect(screen.queryByTestId('completed-session-detail-tags-exercise-1')).toBeNull();
+    expect(screen.queryByText('500kg')).toBeNull();
     expect(
       screen.getByTestId('completed-session-detail-append-exercise-button-exercise-1')
     ).toBeTruthy();

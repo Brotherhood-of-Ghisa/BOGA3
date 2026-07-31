@@ -196,6 +196,7 @@ describe('sync cycle round-trip against a live endpoint', () => {
         orderIndex: 0,
         weightValue: '225',
         repsValue: '5',
+        performanceStatus: 'unperformed',
         localDirty: true,
         localUpdatedAtMs: ms + 4,
       })
@@ -373,6 +374,13 @@ describe('sync cycle round-trip against a live endpoint', () => {
         .where(eq(exerciseSets.id, ids.exerciseSet))
         .get()?.sessionExerciseId,
     ).toBe(ids.sessionExercise);
+    expect(
+      database
+        .select()
+        .from(exerciseSets)
+        .where(eq(exerciseSets.id, ids.exerciseSet))
+        .get()?.performanceStatus,
+    ).toBe('unperformed');
     expect(allFourClean()).toBe(true);
 
     // Each layer's cursor advanced (every layer drained at least one row).

@@ -210,6 +210,49 @@ describe('aggregateExerciseHistory', () => {
     expect(summary.allTimeBest).toEqual({ estimatedOneRepMax: null, topWeight: null });
   });
 
+  it('excludes unconfirmed sets and sessions that contain no confirmed sets', () => {
+    const sessions = [
+      sessionRow({
+        sessionId: 's-confirmed',
+        sessionExerciseId: 'se-confirmed',
+        completedAt: new Date('2026-05-15T16:00:00.000Z'),
+      }),
+      sessionRow({
+        sessionId: 's-unconfirmed',
+        sessionExerciseId: 'se-unconfirmed',
+        completedAt: new Date('2026-05-16T16:00:00.000Z'),
+      }),
+    ];
+    const summary = aggregateExerciseHistory(
+      buildInput({
+        sessionsInPeriod: sessions,
+        sessionsAllTime: sessions,
+        setsBySessionExerciseId: groupBy([
+          setRow({
+            setId: 'confirmed',
+            sessionExerciseId: 'se-confirmed',
+            orderIndex: 0,
+            weightValue: '100',
+            repsValue: '5',
+            performanceStatus: null,
+          }),
+          setRow({
+            setId: 'unconfirmed',
+            sessionExerciseId: 'se-unconfirmed',
+            orderIndex: 0,
+            weightValue: '500',
+            repsValue: '10',
+            performanceStatus: 'unperformed',
+          }),
+        ]),
+        tagsBySessionExerciseId: {},
+      })
+    );
+
+    expect(summary.sessions.map((entry) => entry.sessionId)).toEqual(['s-confirmed']);
+    expect(summary.allTimeBest.topWeight?.weight).toBe(100);
+  });
+
   it('surfaces deleted tags so chips remain visible for past assignments', () => {
     const summary = aggregateExerciseHistory(
       buildInput({
@@ -229,7 +272,7 @@ describe('aggregateExerciseHistory', () => {
     expect(benchEntry?.tagIds).toContain('tag-deleted');
   });
 
-  it('returns null estimated 1RM and zero volume when no set parses cleanly', () => {
+  it('omits history sessions when no confirmed set parses cleanly', () => {
     const summary = aggregateExerciseHistory(
       buildInput({
         sessionsInPeriod: [
@@ -245,11 +288,8 @@ describe('aggregateExerciseHistory', () => {
       })
     );
 
-    const entry = summary.sessions[0];
-    expect(entry.estimatedOneRepMax).toBeNull();
-    expect(entry.totalVolume).toBe(0);
-    expect(entry.topWeightSet).toBeNull();
-    expect(entry.workingSetCount).toBe(1); // set is non-warm-up
+    expect(summary.sessions).toEqual([]);
+    expect(summary.allTimeBest).toEqual({ estimatedOneRepMax: null, topWeight: null });
   });
 });
 

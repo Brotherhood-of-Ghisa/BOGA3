@@ -18,9 +18,6 @@ appId: com.dinoderek.mobile
     visible:
       id: "stats-history-screen"
     timeout: 30000
-- tapOn:
-    id: "stats-view-mode-chip"
-    optional: true
 - extendedWaitUntil:
     visible:
       id: "stats-exercise-list-empty"
@@ -72,6 +69,10 @@ appId: com.dinoderek.mobile
 - inputText: "100"
 - tapOn: "Reps for exercise 1 set 1"
 - inputText: "8"
+- hideKeyboard:
+    optional: true
+- tapOn:
+    id: "set-performance-control-1-1"
 - tapOn: "Submit Session"
 - tapOn:
     text: "Submit Session"
@@ -142,9 +143,9 @@ appId: com.dinoderek.mobile
     id: "stats-exercise-history-metric-chip-nearFailureCount"
 - takeScreenshot: "m17-05-metric-switch"
 
-# --- Dismiss via backdrop ---
+# --- Dismiss via the visible close control ---
 - tapOn:
-    id: "stats-exercise-history-backdrop"
+    id: "stats-exercise-history-close"
 - extendedWaitUntil:
     notVisible:
       id: "stats-exercise-history-overlay"

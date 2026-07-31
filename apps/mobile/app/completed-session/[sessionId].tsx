@@ -18,12 +18,17 @@ import {
   type SessionSetTypeValue,
 } from '@/src/data';
 import { parseCalculationSet } from '@/src/exercise-calculations';
+import {
+  isConfirmedPerformedSet,
+  type SessionSetPerformanceStatus,
+} from '@/src/session-recorder/set-semantics';
 
 export type CompletedSessionDetailSet = {
   id: string;
   weight: string;
   reps: string;
   setType: SessionSetTypeValue;
+  performanceStatus?: SessionSetPerformanceStatus;
 };
 
 export type CompletedSessionDetailExerciseTag = {
@@ -105,6 +110,7 @@ const getCompletedPerformedSets = (
 ): CompletedSessionDetailSet[] =>
   sets.filter(
     (set) =>
+      isConfirmedPerformedSet(set) &&
       parseCalculationSet({
         weightValue: set.weight,
         repsValue: set.reps,
@@ -209,6 +215,7 @@ export const DEFAULT_COMPLETED_SESSION_DETAIL_DATA_CLIENT: CompletedSessionDetai
             weight: set.weightValue,
             reps: set.repsValue,
             setType: normalizeSessionSetType(set.setType),
+            performanceStatus: set.performanceStatus,
           })),
         })),
       };
@@ -316,6 +323,16 @@ export function CompletedSessionDetailScreenShell({
   );
   const formattedCompletedAt = useMemo(
     () => (session ? formatDateTimeStamp(session.completedAt) : '—'),
+    [session]
+  );
+  const performedExercises = useMemo(
+    () =>
+      session?.exercises
+        .map((exercise) => ({
+          ...exercise,
+          sets: getCompletedPerformedSets(exercise.sets),
+        }))
+        .filter((exercise) => exercise.sets.length > 0) ?? [],
     [session]
   );
 
@@ -549,7 +566,7 @@ export function CompletedSessionDetailScreenShell({
               </Text>
             </View>
           }
-          exercises={session.exercises}
+          exercises={performedExercises}
           emptyExercisesText="No exercises logged in this session."
           renderExerciseHeaderAction={({ exercise }) => (
             <Pressable

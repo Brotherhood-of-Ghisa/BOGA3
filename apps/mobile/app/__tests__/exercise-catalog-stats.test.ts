@@ -72,7 +72,7 @@ describe('aggregateExerciseCatalogStats', () => {
     expect(curl?.sessionCount).toBe(1);
   });
 
-  it('skips unparseable weight/reps but still counts the exercise as everDone', () => {
+  it('does not count an exercise as done when it has no valid confirmed values', () => {
     const result = aggregateExerciseCatalogStats(
       {
         sessions: [{ id: 's1', completedAt: daysBefore(NOW, 1) }],
@@ -85,7 +85,7 @@ describe('aggregateExerciseCatalogStats', () => {
       30,
       NOW
     );
-    expect(result.everDoneIds.has('ex-only-bad')).toBe(true);
+    expect(result.everDoneIds.has('ex-only-bad')).toBe(false);
     expect(result.aggregatesById.has('ex-only-bad')).toBe(false);
   });
 
@@ -108,6 +108,41 @@ describe('aggregateExerciseCatalogStats', () => {
         totalVolume: 400,
       })
     );
+  });
+
+  it('does not mark an exercise done or aggregate volume from unconfirmed sets', () => {
+    const result = aggregateExerciseCatalogStats(
+      {
+        sessions: [{ id: 's1', completedAt: daysBefore(NOW, 1) }],
+        sessionExercises: [
+          { id: 'se-confirmed', sessionId: 's1', exerciseDefinitionId: 'ex-confirmed' },
+          { id: 'se-unconfirmed', sessionId: 's1', exerciseDefinitionId: 'ex-unconfirmed' },
+        ],
+        exerciseSets: [
+          {
+            sessionExerciseId: 'se-confirmed',
+            weightValue: '100',
+            repsValue: '5',
+            setType: null,
+            performanceStatus: null,
+          },
+          {
+            sessionExerciseId: 'se-unconfirmed',
+            weightValue: '500',
+            repsValue: '10',
+            setType: null,
+            performanceStatus: 'unperformed',
+          },
+        ],
+      },
+      30,
+      NOW
+    );
+
+    expect(result.everDoneIds.has('ex-confirmed')).toBe(true);
+    expect(result.everDoneIds.has('ex-unconfirmed')).toBe(false);
+    expect(result.aggregatesById.get('ex-confirmed')?.totalVolume).toBe(500);
+    expect(result.aggregatesById.has('ex-unconfirmed')).toBe(false);
   });
 
   it('ignores sessionExercises with null exerciseDefinitionId', () => {

@@ -4,6 +4,10 @@ import {
   parseSetReps,
   parseSetWeight,
 } from '@/src/exercise-calculations';
+import {
+  isConfirmedPerformedSet,
+  type SessionSetPerformanceStatus,
+} from '@/src/session-recorder/set-semantics';
 
 export type MuscleContributionRole = 'primary' | 'secondary' | 'stabilizer' | null;
 
@@ -26,6 +30,7 @@ export type MuscleAnalyticsInput = {
     setType: string | null;
     weightValue: string;
     repsValue: string;
+    performanceStatus?: SessionSetPerformanceStatus;
   }[];
   muscleMappings: {
     exerciseDefinitionId: string;
@@ -122,7 +127,15 @@ export const countMuscleAnalyticsWorkingSets = (input: MuscleAnalyticsInput): nu
     }
   }
 
-  return input.exerciseSets.filter((set) => includedExerciseIds.has(set.sessionExerciseId)).length;
+  return input.exerciseSets.filter(
+    (set) =>
+      includedExerciseIds.has(set.sessionExerciseId) &&
+      isConfirmedPerformedSet({
+        reps: set.repsValue,
+        weight: set.weightValue,
+        performanceStatus: set.performanceStatus,
+      })
+  ).length;
 };
 
 const buildMappingsByExerciseDefinitionId = (input: MuscleAnalyticsInput) => {
@@ -175,6 +188,16 @@ export const collectMuscleSetContributions = (
   const contributions: MuscleSetContribution[] = [];
 
   for (const set of input.exerciseSets) {
+    if (
+      !isConfirmedPerformedSet({
+        reps: set.repsValue,
+        weight: set.weightValue,
+        performanceStatus: set.performanceStatus,
+      })
+    ) {
+      continue;
+    }
+
     const exercise = sessionExerciseById.get(set.sessionExerciseId);
     if (!exercise || exercise.exerciseDefinitionId === null) continue;
 

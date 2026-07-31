@@ -99,7 +99,8 @@ import { createSessionRecorderLifecycleHelpers } from '@/src/session-recorder/li
 import {
   canonicalizeSetValues,
   canonicalizeWeightForReps,
-  isPerformedSet,
+  hasValidActualValues,
+  isConfirmedPerformedSet,
 } from '@/src/session-recorder/set-semantics';
 
 const START_SESSION_GYM_DETECTION_TIMEOUT_MS = 1500;
@@ -419,7 +420,7 @@ function createEmptySet(): SessionSet {
     plannedReps: null,
     plannedWeight: null,
     plannedSetType: null,
-    performanceStatus: null,
+    performanceStatus: 'unperformed',
   };
 }
 
@@ -436,7 +437,7 @@ function createSetFromPrevious(previousSet: SessionSet | undefined): SessionSet 
     plannedReps: null,
     plannedWeight: null,
     plannedSetType: null,
-    performanceStatus: null,
+    performanceStatus: 'unperformed',
   };
 }
 
@@ -529,7 +530,7 @@ const PLANNED_SET_MATCH_MODE: PlannedSetMatchMode = 'volume';
 const hasPlannedTarget = (set: SessionSet): boolean =>
   set.plannedReps !== null || set.plannedWeight !== null || set.plannedSetType !== null;
 
-const hasPerformedActual = (set: SessionSet): boolean => isPerformedSet(set);
+const hasPerformedActual = (set: SessionSet): boolean => isConfirmedPerformedSet(set);
 
 const plannedSetVolumeMatches = (set: SessionSet): boolean =>
   canonicalizeWeightForReps(set.weight, set.reps).trim() ===
@@ -562,7 +563,7 @@ const getSetRowState = (set: SessionSet): PlannedSetRowState => {
     return 'skipped';
   }
 
-  if (!hasPerformedActual(set)) {
+  if (!hasValidActualValues(set)) {
     return 'planned';
   }
 
@@ -570,10 +571,7 @@ const getSetRowState = (set: SessionSet): PlannedSetRowState => {
 };
 
 const getPerformedExerciseSets = (sets: SessionSet[]): SessionSet[] =>
-  sets.filter((set) => {
-    const rowState = getSetRowState(set);
-    return rowState !== 'planned' && rowState !== 'skipped' && hasPerformedActual(set);
-  });
+  sets.filter(hasPerformedActual);
 
 const formatSetWeightLabel = (value: string | null | undefined): string => {
   const trimmed = (value ?? '').trim() || '0';
@@ -590,21 +588,6 @@ const getPlannedSetLabel = (set: SessionSet): string =>
 
 const getActualSetLabel = (set: SessionSet): string =>
   `${formatSetWeightLabel(set.weight)} · ${formatSetRepsLabel(set.reps)}`;
-
-const getRowGlyph = (rowState: PlannedSetRowState, isAddedBeyondPlan: boolean): string => {
-  if (rowState === 'added' && !isAddedBeyondPlan) {
-    return '•';
-  }
-
-  const rowStateGlyph: Record<PlannedSetRowState, string> = {
-    planned: '○',
-    matched: '✓',
-    modified: '≈',
-    skipped: '−',
-    added: '+',
-  };
-  return rowStateGlyph[rowState];
-};
 
 const getSetQualityForRow = (set: SessionSet, rowState: PlannedSetRowState): SessionSetTypeValue =>
   rowState === 'planned' || rowState === 'skipped'
@@ -630,10 +613,7 @@ const resolveWithTimeout = async <T,>(promise: Promise<T>, timeoutMs: number, fa
 
 const getExerciseSetSummary = (sets: SessionSet[]): string => {
   const planned = sets.filter(hasPlannedTarget).length;
-  const performed = sets.filter((set) => {
-    const state = getSetRowState(set);
-    return state === 'matched' || state === 'modified' || state === 'added';
-  }).length;
+  const performed = sets.filter(hasPerformedActual).length;
   const skipped = sets.filter((set) => getSetRowState(set) === 'skipped').length;
 
   if (planned > 0) {
@@ -644,7 +624,7 @@ const getExerciseSetSummary = (sets: SessionSet[]): string => {
     return parts.join(' · ');
   }
 
-  return `${sets.length} set${sets.length === 1 ? '' : 's'}`;
+  return `${performed} performed`;
 };
 
 const sessionHasInvalidSetValues = (session: Session): boolean =>
@@ -686,7 +666,7 @@ function createExercise(exerciseDefinitionId: string, name: string): SessionExer
 }
 
 type SubmitCleanupPrompt = {
-  step: 'incomplete-sets' | 'empty-exercises';
+  step: 'incomplete-sets' | 'unconfirmed-sets' | 'empty-exercises';
   affectedCount: number;
   nextSession: Session;
 };
@@ -740,7 +720,7 @@ type ExerciseBlockMaxMetrics = {
   rirAtMostTwoSetCount: number;
 };
 type HorizontalSwipeDirection = 'left' | 'right';
-type SetSwipeActionType = 'delete' | 'log' | 'skip';
+type SetSwipeActionType = 'delete' | 'skip';
 
 type SwipeableSetRowProps = {
   actionType: SetSwipeActionType;
@@ -833,15 +813,12 @@ function SwipeableSetRow({
   onTouchSwipeEnd,
 }: SwipeableSetRowProps) {
   const translateX = useSharedValue(0);
-  const actionLabel =
-    actionType === 'log' ? 'Log' : actionType === 'skip' ? 'Skip' : 'Delete';
-  const actionGlyph = actionType === 'log' ? '✓' : actionType === 'skip' ? '↷' : '×';
+  const actionLabel = actionType === 'skip' ? 'Skip' : 'Delete';
+  const actionGlyph = actionType === 'skip' ? '↷' : '×';
   const actionBackgroundStyle =
     actionType === 'delete'
       ? styles.swipeDeleteBackground
-      : actionType === 'log'
-        ? styles.swipeLogBackground
-        : styles.swipeSkipBackground;
+      : styles.swipeSkipBackground;
 
   const closeRow = useCallback(() => {
     translateX.value = withTiming(0, { duration: 180 });
@@ -1095,10 +1072,10 @@ function removeIncompleteSets(session: Session): { session: Session; removedSets
 
   const exercises = session.exercises.map((exercise) => {
     const sets = exercise.sets.filter((set) => {
-      if (hasPlannedTarget(set)) {
+      if (set.performanceStatus === 'planned' || set.performanceStatus === 'skipped') {
         return true;
       }
-      const isComplete = isPerformedSet(set);
+      const isComplete = hasValidActualValues(set);
       if (!isComplete) {
         removedSets += 1;
       }
@@ -1110,6 +1087,31 @@ function removeIncompleteSets(session: Session): { session: Session; removedSets
       sets,
     };
   });
+
+  return {
+    session: {
+      ...session,
+      exercises,
+    },
+    removedSets,
+  };
+}
+
+function removeUnconfirmedSets(session: Session): { session: Session; removedSets: number } {
+  let removedSets = 0;
+
+  const exercises = session.exercises.map((exercise) => ({
+    ...exercise,
+    sets: exercise.sets.filter((set) => {
+      const isEnteredButUnconfirmed =
+        set.performanceStatus === 'unperformed' && hasValidActualValues(set);
+      if (isEnteredButUnconfirmed) {
+        removedSets += 1;
+        return false;
+      }
+      return true;
+    }),
+  }));
 
   return {
     session: {
@@ -2406,7 +2408,7 @@ export default function SessionRecorderScreen({
               return false;
             }
             const rowState = getSetRowState(set);
-            return hasPerformedActual(set) || rowState === 'planned' || rowState === 'skipped';
+            return hasValidActualValues(set) || rowState === 'planned' || rowState === 'skipped';
           })
           .map((set) => set.id)
       )
@@ -3107,7 +3109,7 @@ export default function SessionRecorderScreen({
     setLastAddedRowId(newSet.id);
     setExpandedSetIds((current) => {
       const next = new Set(current);
-      if (previousSet && (hasPerformedActual(previousSet) || getSetRowState(previousSet) === 'skipped')) {
+      if (previousSet && (hasValidActualValues(previousSet) || getSetRowState(previousSet) === 'skipped')) {
         next.delete(previousSet.id);
       }
       next.add(newSet.id);
@@ -3124,7 +3126,7 @@ export default function SessionRecorderScreen({
         exercise.sets
           .filter((set) => {
             const rowState = getSetRowState(set);
-            return hasPerformedActual(set) || rowState === 'planned' || rowState === 'skipped';
+            return hasValidActualValues(set) || rowState === 'planned' || rowState === 'skipped';
           })
           .map((set) => set.id)
       )
@@ -3218,8 +3220,40 @@ export default function SessionRecorderScreen({
     markSessionTextMutation();
   };
 
-  const markPlannedSetLogged = (exerciseId: string, setId: string) => {
+  const toggleSetPerformance = (exerciseId: string, setId: string) => {
     activateSetRow(setId);
+    const targetSet = stateRef.current.session.exercises
+      .find((exercise) => exercise.id === exerciseId)
+      ?.sets.find((set) => set.id === setId);
+    if (!targetSet) {
+      return;
+    }
+
+    const isCurrentlyPerformed = hasPerformedActual(targetSet);
+    const hasEnteredActualValues =
+      targetSet.reps.trim().length > 0 || targetSet.weight.trim().length > 0;
+    const usePlannedValues =
+      !isCurrentlyPerformed && hasPlannedTarget(targetSet) && !hasEnteredActualValues;
+    const nextReps = usePlannedValues
+      ? targetSet.plannedReps ?? targetSet.reps
+      : targetSet.reps;
+    const nextWeight = canonicalizeWeightForReps(
+      usePlannedValues ? targetSet.plannedWeight ?? targetSet.weight : targetSet.weight,
+      nextReps
+    );
+    const nextSetType = usePlannedValues
+      ? normalizeSessionSetType(targetSet.plannedSetType)
+      : normalizeSessionSetType(targetSet.setType);
+
+    if (
+      !isCurrentlyPerformed &&
+      !hasValidActualValues({ reps: nextReps, weight: nextWeight })
+    ) {
+      setExpandedSetIds(new Set([setId]));
+      clearSubmitFeedback();
+      return;
+    }
+
     setState((current) => ({
       ...current,
       session: {
@@ -3232,13 +3266,10 @@ export default function SessionRecorderScreen({
                   set.id === setId
                     ? {
                         ...set,
-                        reps: set.plannedReps ?? set.reps,
-                        weight: canonicalizeWeightForReps(
-                          set.plannedWeight ?? set.weight,
-                          set.plannedReps ?? set.reps
-                        ),
-                        setType: normalizeSessionSetType(set.plannedSetType),
-                        performanceStatus: null,
+                        reps: isCurrentlyPerformed ? set.reps : nextReps,
+                        weight: isCurrentlyPerformed ? set.weight : nextWeight,
+                        setType: isCurrentlyPerformed ? set.setType : nextSetType,
+                        performanceStatus: isCurrentlyPerformed ? 'unperformed' : null,
                       }
                     : set
                 ),
@@ -3247,11 +3278,13 @@ export default function SessionRecorderScreen({
         ),
       },
     }));
-    setExpandedSetIds((current) => {
-      const next = new Set(current);
-      next.delete(setId);
-      return next;
-    });
+    if (!isCurrentlyPerformed) {
+      setExpandedSetIds((current) => {
+        const next = new Set(current);
+        next.delete(setId);
+        return next;
+      });
+    }
     clearSubmitFeedback();
     markSessionTextMutation();
   };
@@ -3334,7 +3367,7 @@ export default function SessionRecorderScreen({
                             set.setType !== null
                               ? set.setType
                               : normalizeSessionSetType(set.plannedSetType),
-                          performanceStatus: null,
+                          performanceStatus: 'unperformed',
                         }
                       : set
                   ),
@@ -3682,7 +3715,18 @@ export default function SessionRecorderScreen({
       return;
     }
 
-    const completedHistorySession = toCompletedHistorySession(withoutIncompleteSets);
+    const { session: withoutUnconfirmedSets, removedSets: removedUnconfirmedSets } =
+      removeUnconfirmedSets(withoutIncompleteSets);
+    if (removedUnconfirmedSets > 0) {
+      setSubmitCleanupPrompt({
+        step: 'unconfirmed-sets',
+        affectedCount: removedUnconfirmedSets,
+        nextSession: withoutUnconfirmedSets,
+      });
+      return;
+    }
+
+    const completedHistorySession = toCompletedHistorySession(withoutUnconfirmedSets);
     const { session: withoutEmptyExercises, removedExercises } = removeExercisesWithNoSets(completedHistorySession);
     if (removedExercises > 0) {
       setSubmitCleanupPrompt({
@@ -3789,23 +3833,35 @@ export default function SessionRecorderScreen({
   const cleanupModalTitle =
     submitCleanupPrompt?.step === 'incomplete-sets'
       ? 'Remove incomplete sets and submit?'
-      : 'Remove exercises with no sets and submit?';
+      : submitCleanupPrompt?.step === 'unconfirmed-sets'
+        ? 'Discard unconfirmed sets and submit?'
+        : 'Remove exercises with no sets and submit?';
   const cleanupModalMessage =
     submitCleanupPrompt?.step === 'incomplete-sets'
       ? `${submitCleanupPrompt.affectedCount} incomplete set${
           submitCleanupPrompt.affectedCount === 1 ? '' : 's'
         } missing reps or weight will be removed.`
-      : `${submitCleanupPrompt?.affectedCount ?? 0} exercise${
-          submitCleanupPrompt?.affectedCount === 1 ? '' : 's'
-        } with no sets will be removed.`;
+      : submitCleanupPrompt?.step === 'unconfirmed-sets'
+        ? `${submitCleanupPrompt.affectedCount} set${
+            submitCleanupPrompt.affectedCount === 1 ? '' : 's'
+          } with entered values ${
+            submitCleanupPrompt.affectedCount === 1 ? 'is' : 'are'
+          } not confirmed and will be discarded.`
+        : `${submitCleanupPrompt?.affectedCount ?? 0} exercise${
+            submitCleanupPrompt?.affectedCount === 1 ? '' : 's'
+          } with no sets will be removed.`;
   const cleanupModalConfirmLabel =
     submitCleanupPrompt?.step === 'incomplete-sets'
       ? routeMode === 'completed-edit'
         ? 'Remove incomplete sets and save changes'
         : 'Remove incomplete sets and submit'
-      : routeMode === 'completed-edit'
-        ? 'Remove empty exercises and save changes'
-        : 'Remove empty exercises and submit';
+      : submitCleanupPrompt?.step === 'unconfirmed-sets'
+        ? routeMode === 'completed-edit'
+          ? 'Discard unconfirmed sets and save changes'
+          : 'Discard unconfirmed sets and submit'
+        : routeMode === 'completed-edit'
+          ? 'Remove empty exercises and save changes'
+          : 'Remove empty exercises and submit';
 
   const completedEditTimeValidationMessage =
     routeMode === 'completed-edit' ? getDateTimeValidationMessage(state.session.dateTime, completedEditEndDateTime) : null;
@@ -4012,16 +4068,18 @@ export default function SessionRecorderScreen({
           const exerciseHasPlannedTargets = exercise.sets.some(hasPlannedTarget);
           const isExpanded = expandedSetIds.has(set.id);
           const isAddedBeyondPlan = exerciseHasPlannedTargets && rowState === 'added';
+          const isConfirmedPerformed = hasPerformedActual(set);
           const isDisplayableRow =
             rowState === 'planned' ||
             rowState === 'skipped' ||
-            hasPerformedActual(set);
+            hasValidActualValues(set);
           const isCompactSetRow = isDisplayableRow && !isExpanded;
-          const rowGlyph = getRowGlyph(rowState, isAddedBeyondPlan);
           const compactQuality = getSetQualityForRow(set, rowState);
           const compactQualityAccessibilityLabel = getSetTypeAccessibilityLabel(compactQuality);
-          const showQualityControl = rowState !== 'planned';
-          const isMutedRow = rowState === 'planned' || rowState === 'skipped';
+          const showQualityControl =
+            set.performanceStatus !== 'planned' && set.performanceStatus !== 'skipped';
+          const isMutedRow =
+            set.performanceStatus === 'planned' || set.performanceStatus === 'skipped';
           const isActiveRow = activeRowId === set.id;
           const isLastAddedRow = activeRowId === null && lastAddedRowId === set.id;
           const plannedLabel = getPlannedSetLabel(set);
@@ -4032,7 +4090,7 @@ export default function SessionRecorderScreen({
               : rowState === 'added' || !isPlannedRow
                 ? actualLabel
                 : plannedLabel;
-          const stateLabel =
+          const planStateLabel =
             rowState === 'matched'
               ? 'matched planned set'
               : rowState === 'modified'
@@ -4043,18 +4101,13 @@ export default function SessionRecorderScreen({
                     ? 'planned set'
                     : isAddedBeyondPlan
                       ? 'added set'
-                      : 'logged set';
-          const swipeActionType: SetSwipeActionType = !isPlannedRow
-            ? 'delete'
-            : rowState === 'skipped'
-              ? 'log'
-              : 'skip';
+                      : 'set';
+          const stateLabel = rowState === 'skipped'
+            ? planStateLabel
+            : `${isConfirmedPerformed ? 'confirmed' : 'unconfirmed'} ${planStateLabel}`;
+          const swipeActionType: SetSwipeActionType = !isPlannedRow ? 'delete' : 'skip';
           const swipeActionKey = `set:${exercise.id}:${set.id}`;
           const runSetSwipeAction = () => {
-            if (swipeActionType === 'log') {
-              markPlannedSetLogged(exercise.id, set.id);
-              return;
-            }
             if (swipeActionType === 'skip') {
               markPlannedSetSkipped(exercise.id, set.id);
               return;
@@ -4070,6 +4123,34 @@ export default function SessionRecorderScreen({
           const handleSwipeAction = () => {
             runSetSwipeAction();
           };
+
+          const renderPerformanceControl = () => (
+            <Pressable
+              accessibilityHint={
+                isConfirmedPerformed
+                  ? 'Double tap to keep the values but mark this set unperformed.'
+                  : 'Double tap to confirm valid entered values as performed.'
+              }
+              accessibilityLabel={`${
+                isConfirmedPerformed ? 'Mark' : 'Confirm'
+              } exercise ${exerciseIndex + 1} set ${setIndex + 1} ${
+                isConfirmedPerformed ? 'unperformed' : 'performed'
+              }`}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: isConfirmedPerformed }}
+              hitSlop={6}
+              style={styles.setPerformanceControl}
+              testID={`set-performance-control-${exerciseIndex + 1}-${setIndex + 1}`}
+              onPress={() => toggleSetPerformance(exercise.id, set.id)}>
+              <Text
+                style={[
+                  styles.setPerformanceControlGlyph,
+                  isConfirmedPerformed ? styles.setPerformanceControlGlyphConfirmed : null,
+                ]}>
+                {isConfirmedPerformed ? '✓' : '○'}
+              </Text>
+            </Pressable>
+          );
 
           const renderQualityButton = (variant: 'compact' | 'edit') => {
             const displayedQuality =
@@ -4197,6 +4278,7 @@ export default function SessionRecorderScreen({
                     isLastAddedRow ? styles.setRowLastAdded : null,
                     isActiveRow ? styles.setRowActive : null,
                   ]}>
+                {renderPerformanceControl()}
                 <Pressable
                   accessibilityLabel={`${stateLabel} ${setIndex + 1} for exercise ${exerciseIndex + 1}: ${compactLabel}${showQualityControl ? `; quality ${compactQualityAccessibilityLabel}` : ''}`}
                   accessibilityHint="Double tap to edit actual values."
@@ -4204,14 +4286,6 @@ export default function SessionRecorderScreen({
                   style={styles.compactSetMainPressable}
                   testID={`set-row-pressable-${exerciseIndex + 1}-${setIndex + 1}`}
                   onPress={() => toggleSetExpandedForEditing(exercise.id, set.id)}>
-                  <Text
-                    adjustsFontSizeToFit
-                    ellipsizeMode="clip"
-                    minimumFontScale={0.75}
-                    numberOfLines={1}
-                    style={[styles.setRowGlyph, isMutedRow ? styles.compactSetMutedText : null]}>
-                    {rowGlyph}
-                  </Text>
                   {rowState === 'modified' ? (
                     <View style={styles.compactSetModifiedLayout}>
                       <Text
@@ -4242,27 +4316,8 @@ export default function SessionRecorderScreen({
                   )}
                 </Pressable>
                 {showQualityControl ? renderQualityButton('compact') : null}
-                {rowState === 'planned' ? (
+                {set.performanceStatus === 'planned' ? (
                   <View style={styles.compactSetActionRow}>
-                    <Pressable
-                      accessibilityLabel={`Log set ${setIndex + 1} as planned`}
-                      accessibilityRole="button"
-                      style={styles.plannedSetLogButton}
-                      onPress={() => {
-                        if (consumeTapIfAnotherSetIsExpanded(set.id)) {
-                          return;
-                        }
-                        markPlannedSetLogged(exercise.id, set.id);
-                      }}>
-                      <Text
-                        adjustsFontSizeToFit
-                        ellipsizeMode="clip"
-                        minimumFontScale={0.75}
-                        numberOfLines={1}
-                        style={styles.plannedSetLogButtonText}>
-                        Log
-                      </Text>
-                    </Pressable>
                     <Pressable
                       accessibilityLabel={`Skip set ${setIndex + 1}`}
                       accessibilityRole="button"
@@ -4283,6 +4338,8 @@ export default function SessionRecorderScreen({
                       </Text>
                     </Pressable>
                   </View>
+                ) : set.performanceStatus === 'skipped' ? (
+                  <Text style={styles.compactSetSkippedCue}>Skipped</Text>
                 ) : null}
                 </View>
               </SwipeableSetRow>
@@ -4307,7 +4364,7 @@ export default function SessionRecorderScreen({
                 isLastAddedRow ? styles.setRowLastAdded : null,
                 isActiveRow ? styles.setRowActive : null,
               ]}>
-              <Text style={[styles.setRowGlyph, isMutedRow ? styles.compactSetMutedText : null]}>{rowGlyph}</Text>
+              {renderPerformanceControl()}
               <Pressable
                 accessible={false}
                 style={[
@@ -5642,9 +5699,6 @@ const styles = StyleSheet.create({
   swipeDeleteBackground: {
     backgroundColor: uiColors.rowSwipeDeleteBackground,
   },
-  swipeLogBackground: {
-    backgroundColor: uiColors.actionPrimarySubtleBg,
-  },
   swipeSkipBackground: {
     backgroundColor: uiColors.rowSwipeSkipBackground,
   },
@@ -5684,7 +5738,7 @@ const styles = StyleSheet.create({
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfaceDefault,
     paddingHorizontal: 10,
-    paddingVertical: 8,
+    paddingVertical: 2,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
@@ -5704,13 +5758,21 @@ const styles = StyleSheet.create({
     backgroundColor: uiColors.rowActiveBackground,
     borderColor: uiColors.rowActiveBorder,
   },
-  setRowGlyph: {
-    width: 16,
-    fontSize: 14,
-    lineHeight: 16,
+  setPerformanceControl: {
+    width: 32,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  setPerformanceControlGlyph: {
+    fontSize: 22,
+    lineHeight: 24,
     fontWeight: '800',
-    color: uiColors.textPrimary,
+    color: uiColors.textSecondary,
     textAlign: 'center',
+  },
+  setPerformanceControlGlyphConfirmed: {
+    color: uiColors.actionSuccess,
   },
   compactSetMainPressable: {
     flex: 1,
@@ -5785,19 +5847,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
-  plannedSetLogButton: {
-    minHeight: 30,
-    borderRadius: 8,
-    paddingHorizontal: 9,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: uiColors.actionPrimary,
-  },
-  plannedSetLogButtonText: {
-    color: uiColors.surfaceDefault,
-    fontSize: 12,
-    fontWeight: '800',
-  },
   plannedSetSkipButton: {
     minHeight: 30,
     borderRadius: 8,
@@ -5809,6 +5858,11 @@ const styles = StyleSheet.create({
     backgroundColor: uiColors.surfaceDefault,
   },
   plannedSetSkipButtonText: {
+    color: uiColors.textSecondary,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  compactSetSkippedCue: {
     color: uiColors.textSecondary,
     fontSize: 12,
     fontWeight: '700',

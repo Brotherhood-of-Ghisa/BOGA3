@@ -1,4 +1,7 @@
 import type { SessionSetTypeValue } from '@/src/data/set-types';
+import type { SessionSetPerformanceStatus } from '@/src/session-recorder/set-semantics';
+
+export type { SessionSetPerformanceStatus } from '@/src/session-recorder/set-semantics';
 
 export type SessionSet = {
   id: string;
@@ -10,8 +13,6 @@ export type SessionSet = {
   plannedSetType: SessionSetTypeValue;
   performanceStatus: SessionSetPerformanceStatus;
 };
-
-export type SessionSetPerformanceStatus = 'planned' | 'skipped' | null;
 
 export type SessionExerciseTag = {
   assignmentId: string;

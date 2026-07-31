@@ -760,6 +760,7 @@ const loadSetsByBlock = async (
       )
       .eq('owner_user_id', userId)
       .is('deleted_at', null)
+      .is('performance_status', null)
       .in('session_exercise_id', ids)
       .order('order_index')
       .order('id')
@@ -860,7 +861,13 @@ const getExerciseContext = async (
     .filter((session) => blocksBySession.has(session.id))
     .map((session) => {
       const sessionBlocks = blocksBySession.get(session.id) ?? [];
-      const blockSets = sessionBlocks.flatMap((block) => setsByBlock.get(block.id) ?? []);
+      const blockSets = sessionBlocks
+        .flatMap((block) => setsByBlock.get(block.id) ?? [])
+        .filter(
+          (set) =>
+            parseSetWeight(set.weight_value) !== null &&
+            parseSetReps(set.reps_value) !== null,
+        );
       const inputs = calculationInputsFor(blockSets);
       return {
         session,
@@ -869,7 +876,8 @@ const getExerciseContext = async (
         volume: computeExerciseVolume(inputs),
         estimatedOneRepMax: estimateExerciseOneRepMax(inputs),
       };
-    });
+    })
+    .filter((row) => row.sets.length > 0);
 
   const allSets = performanceRows.flatMap((row) => row.sets);
   const allInputs = calculationInputsFor(allSets);

@@ -137,7 +137,7 @@ const SAMPLE_ROWS: Record<EntityTableName, Record<string, unknown>> = {
     plannedWeightValue: '100',
     plannedRepsValue: '10',
     plannedSetType: 'rir_1',
-    performanceStatus: 'planned',
+    performanceStatus: 'unperformed',
     createdAt: new Date('2026-05-29T08:00:00.000Z'),
     updatedAt: new Date('2026-05-29T08:30:00.000Z'),
     deletedAt: null,

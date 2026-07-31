@@ -3,6 +3,10 @@ import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { bootstrapLocalDataLayer } from './bootstrap';
 import { nowMonotonic } from './clock';
 import { exerciseSets, gyms, sessionExercises, sessions } from './schema';
+import {
+  isConfirmedPerformedSet,
+  normalizeSessionSetPerformanceStatus,
+} from '@/src/session-recorder/set-semantics';
 import { notifyLocalWrite } from '@/src/sync/write-nudge';
 
 type SessionLifecycleStatus = 'active' | 'completed';
@@ -124,6 +128,39 @@ const mapStoreSessionRow = (row: typeof sessions.$inferSelect, gymName: string |
   };
 };
 
+export type SessionListSetCountRow = {
+  sessionExerciseId: string;
+  repsValue: string;
+  weightValue: string;
+  performanceStatus: string | null;
+};
+
+export const countConfirmedSessionSets = (
+  setRows: SessionListSetCountRow[],
+  sessionIdByExerciseId: ReadonlyMap<string, string>
+): Map<string, number> => {
+  const setCountBySessionId = new Map<string, number>();
+  for (const setRow of setRows) {
+    if (
+      !isConfirmedPerformedSet({
+        reps: setRow.repsValue,
+        weight: setRow.weightValue,
+        performanceStatus: normalizeSessionSetPerformanceStatus(setRow.performanceStatus),
+      })
+    ) {
+      continue;
+    }
+
+    const sessionId = sessionIdByExerciseId.get(setRow.sessionExerciseId);
+    if (!sessionId) {
+      continue;
+    }
+
+    setCountBySessionId.set(sessionId, (setCountBySessionId.get(sessionId) ?? 0) + 1);
+  }
+  return setCountBySessionId;
+};
+
 export const createDrizzleSessionListStore = (): SessionListStore => ({
   async listSessionRecords() {
     const database = await bootstrapLocalDataLayer();
@@ -172,6 +209,9 @@ export const createDrizzleSessionListStore = (): SessionListStore => ({
         ? database
             .select({
               sessionExerciseId: exerciseSets.sessionExerciseId,
+              repsValue: exerciseSets.repsValue,
+              weightValue: exerciseSets.weightValue,
+              performanceStatus: exerciseSets.performanceStatus,
             })
             .from(exerciseSets)
             .where(
@@ -184,15 +224,7 @@ export const createDrizzleSessionListStore = (): SessionListStore => ({
             .all()
         : [];
 
-    const setCountBySessionId = new Map<string, number>();
-    for (const setRow of setRows) {
-      const sessionId = sessionIdByExerciseId.get(setRow.sessionExerciseId);
-      if (!sessionId) {
-        continue;
-      }
-
-      setCountBySessionId.set(sessionId, (setCountBySessionId.get(sessionId) ?? 0) + 1);
-    }
+    const setCountBySessionId = countConfirmedSessionSets(setRows, sessionIdByExerciseId);
 
     return sessionRows.map((row) => {
       const mapped = mapStoreSessionRow(row.session, row.gymName ?? null);

@@ -5,6 +5,11 @@ import {
   parseSetReps,
   parseSetWeight,
 } from '@/src/exercise-calculations';
+import {
+  isConfirmedPerformedSet,
+  normalizeSessionSetPerformanceStatus,
+  type SessionSetPerformanceStatus,
+} from '@/src/session-recorder/set-semantics';
 
 import { bootstrapLocalDataLayer } from './bootstrap';
 import type { DailyEffortMetrics, SelectedMuscleWeeklyEffort } from './muscle-analytics';
@@ -17,6 +22,7 @@ type ExerciseRawSet = {
   setType: string | null;
   weightValue: string;
   repsValue: string;
+  performanceStatus?: SessionSetPerformanceStatus;
 };
 
 export type ExerciseRawSession = {
@@ -90,8 +96,20 @@ export const aggregateExerciseDailyEffort = (
       bestRM1: null,
       highestWeight: null,
     };
+    let hasConfirmedSet = false;
 
     for (const set of session.sets) {
+      if (
+        !isConfirmedPerformedSet({
+          reps: set.repsValue,
+          weight: set.weightValue,
+          performanceStatus: set.performanceStatus,
+        })
+      ) {
+        continue;
+      }
+      hasConfirmedSet = true;
+
       const weight = parseSetWeight(set.weightValue);
       const reps = parseSetReps(set.repsValue);
       if (weight === null || reps === null) continue;
@@ -111,7 +129,9 @@ export const aggregateExerciseDailyEffort = (
       }
     }
 
-    dayMap.set(dateKey, day);
+    if (hasConfirmedSet) {
+      dayMap.set(dateKey, day);
+    }
   }
 
   return Array.from(dayMap.entries())
@@ -232,7 +252,8 @@ const loadExerciseRawSessions = async (
     .where(
       and(
         inArray(sessionExercises.sessionId, sessionIds),
-        eq(sessionExercises.exerciseDefinitionId, options.exerciseDefinitionId)
+        eq(sessionExercises.exerciseDefinitionId, options.exerciseDefinitionId),
+        isNull(sessionExercises.deletedAt)
       )
     )
     .all();
@@ -246,9 +267,15 @@ const loadExerciseRawSessions = async (
       setType: exerciseSets.setType,
       weightValue: exerciseSets.weightValue,
       repsValue: exerciseSets.repsValue,
+      performanceStatus: exerciseSets.performanceStatus,
     })
     .from(exerciseSets)
-    .where(inArray(exerciseSets.sessionExerciseId, sessionExerciseIds))
+    .where(
+      and(
+        inArray(exerciseSets.sessionExerciseId, sessionExerciseIds),
+        isNull(exerciseSets.deletedAt)
+      )
+    )
     .all();
 
   const completedAtBySessionId = new Map(
@@ -265,6 +292,7 @@ const loadExerciseRawSessions = async (
       setType: set.setType ?? null,
       weightValue: set.weightValue,
       repsValue: set.repsValue,
+      performanceStatus: normalizeSessionSetPerformanceStatus(set.performanceStatus),
     });
     setsByExerciseId.set(set.sessionExerciseId, existing);
   }

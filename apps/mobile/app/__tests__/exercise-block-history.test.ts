@@ -112,6 +112,42 @@ describe('aggregateExerciseBlockHistory', () => {
     expect(block.estimatedOneRepMax).not.toBeNull();
   });
 
+  it('excludes valid but unconfirmed sets from history metrics and plan suggestions', () => {
+    const input = {
+      now: new Date('2026-05-20T12:00:00.000Z'),
+      sessions: [
+        sessionRow({ sessionId: 'session-1', completedAt: new Date('2026-05-19T12:00:00.000Z') }),
+      ],
+      sessionExercises: [sessionExerciseRow({ sessionId: 'session-1', sessionExerciseId: 'se-1' })],
+      setsBySessionExerciseId: groupBySessionExerciseId([
+        setRow({
+          setId: 'confirmed',
+          sessionExerciseId: 'se-1',
+          orderIndex: 0,
+          weightValue: '100',
+          repsValue: '5',
+          performanceStatus: null,
+        }),
+        setRow({
+          setId: 'unconfirmed',
+          sessionExerciseId: 'se-1',
+          orderIndex: 1,
+          weightValue: '500',
+          repsValue: '10',
+          performanceStatus: 'unperformed',
+        }),
+      ]),
+    };
+
+    const summary = aggregateExerciseBlockHistory(input);
+    expect(summary.blocks[0]).toEqual(
+      expect.objectContaining({ totalVolume: 500, highestWeight: 100 })
+    );
+
+    const plan = selectSuggestedExercisePlanFromHistory(input);
+    expect(plan?.sets.map((set) => set.setId)).toEqual(['confirmed']);
+  });
+
   it('uses the best Wathan 1RM estimate across eligible sets', () => {
     const summary = aggregateExerciseBlockHistory({
       now: new Date('2026-05-20T12:00:00.000Z'),
@@ -132,7 +168,7 @@ describe('aggregateExerciseBlockHistory', () => {
     expect(summary.blocks[0].highestWeight).toBe(200);
   });
 
-  it('returns empty metrics when no eligible set parses cleanly', () => {
+  it('omits history blocks when no confirmed set parses cleanly', () => {
     const summary = aggregateExerciseBlockHistory({
       now: new Date('2026-05-20T12:00:00.000Z'),
       sessions: [
@@ -147,14 +183,7 @@ describe('aggregateExerciseBlockHistory', () => {
       ]),
     });
 
-    expect(summary.blocks[0]).toEqual(
-      expect.objectContaining({
-        estimatedOneRepMax: null,
-        totalVolume: 0,
-        highestWeight: null,
-        rirAtMostTwoSetCount: 0,
-      })
-    );
+    expect(summary.blocks).toEqual([]);
   });
 
   it('uses session id as a deterministic tie-breaker for identical completion times', () => {
@@ -169,7 +198,10 @@ describe('aggregateExerciseBlockHistory', () => {
         sessionExerciseRow({ sessionId: 'session-b', sessionExerciseId: 'se-b' }),
         sessionExerciseRow({ sessionId: 'session-a', sessionExerciseId: 'se-a' }),
       ],
-      setsBySessionExerciseId: {},
+      setsBySessionExerciseId: groupBySessionExerciseId([
+        setRow({ setId: 'set-b', sessionExerciseId: 'se-b', orderIndex: 0 }),
+        setRow({ setId: 'set-a', sessionExerciseId: 'se-a', orderIndex: 0 }),
+      ]),
     });
 
     expect(summary.blocks.map((block) => block.sessionId)).toEqual(['session-a', 'session-b']);
@@ -188,7 +220,11 @@ describe('aggregateExerciseBlockHistory', () => {
         sessionExerciseRow({ sessionId: 'newest', sessionExerciseId: 'se-newest' }),
         sessionExerciseRow({ sessionId: 'middle', sessionExerciseId: 'se-middle' }),
       ],
-      setsBySessionExerciseId: {},
+      setsBySessionExerciseId: groupBySessionExerciseId([
+        setRow({ setId: 'set-oldest', sessionExerciseId: 'se-oldest', orderIndex: 0 }),
+        setRow({ setId: 'set-newest', sessionExerciseId: 'se-newest', orderIndex: 0 }),
+        setRow({ setId: 'set-middle', sessionExerciseId: 'se-middle', orderIndex: 0 }),
+      ]),
     });
 
     expect(summary.limit).toBeNull();
@@ -209,7 +245,11 @@ describe('aggregateExerciseBlockHistory', () => {
         sessionExerciseRow({ sessionId: 'newest', sessionExerciseId: 'se-newest' }),
         sessionExerciseRow({ sessionId: 'middle', sessionExerciseId: 'se-middle' }),
       ],
-      setsBySessionExerciseId: {},
+      setsBySessionExerciseId: groupBySessionExerciseId([
+        setRow({ setId: 'set-oldest', sessionExerciseId: 'se-oldest', orderIndex: 0 }),
+        setRow({ setId: 'set-newest', sessionExerciseId: 'se-newest', orderIndex: 0 }),
+        setRow({ setId: 'set-middle', sessionExerciseId: 'se-middle', orderIndex: 0 }),
+      ]),
     });
 
     expect(summary.limit).toBe(2);
@@ -328,7 +368,10 @@ describe('createExerciseBlockHistoryRepository', () => {
     const store = buildStore({
       loadRecentCompletedSessionsForExercise: jest.fn().mockResolvedValue(sessions),
       loadSessionExercisesForSessions: jest.fn().mockResolvedValue(sessionExercises),
-      loadSetsForSessionExercises: jest.fn().mockResolvedValue([]),
+      loadSetsForSessionExercises: jest.fn().mockResolvedValue([
+        setRow({ setId: 'set-recent', sessionExerciseId: 'se-recent', orderIndex: 0 }),
+        setRow({ setId: 'set-older', sessionExerciseId: 'se-older', orderIndex: 0 }),
+      ]),
     });
 
     const repository = createExerciseBlockHistoryRepository(store);
