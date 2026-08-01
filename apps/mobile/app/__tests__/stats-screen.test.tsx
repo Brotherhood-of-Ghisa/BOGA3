@@ -434,52 +434,26 @@ describe('StatsScreenShell', () => {
     expect(screen.queryByTestId('stats-muscle-sessions-front_delts')).toBeNull();
   });
 
-  it('renders fixed-ramp failure bars in family and nested-muscle name cells only', () => {
+  it('colours each trained family and muscle row with one uniform failure shade', () => {
     const { rerender } = render(
       <StatsScreenShell {...buildShellProps({ periodDays: 7, viewMode: 'muscle' })} />
     );
 
-    expect(
-      screen.getByTestId('stats-family-failure-bar-shoulders', {
-        includeHiddenElements: true,
-      })
-    ).toHaveStyle({
-      width: '50%',
-      height: 32,
-      opacity: 0.58,
+    expect(screen.getByTestId('stats-family-header-shoulders')).toHaveStyle({
+      backgroundColor: uiColors.failureBackgroundFamily2,
+    });
+    expect(screen.getByTestId('stats-muscle-row-front_delts')).toHaveStyle({
+      backgroundColor: uiColors.failureBackgroundMuscle2,
     });
     expect(
-      screen.getByTestId('stats-muscle-failure-bar-front_delts', {
-        includeHiddenElements: true,
-      })
-    ).toHaveStyle({
-      width: '50%',
-    });
-    expect(
-      screen.queryByTestId('stats-muscle-failure-bar-rear_delts', {
-        includeHiddenElements: true,
-      })
+      screen.queryByTestId(/failure-bar/, { includeHiddenElements: true })
     ).toBeNull();
-    expect(
-      screen.getByTestId('stats-family-failure-bar-shoulders-stop-1', {
-        includeHiddenElements: true,
-      })
-    ).toHaveStyle({ backgroundColor: uiColors.heatmapBucket1 });
-    expect(
-      screen.getByTestId('stats-muscle-failure-bar-front_delts-stop-4', {
-        includeHiddenElements: true,
-      })
-    ).toHaveStyle({ backgroundColor: uiColors.failureIntensityMuscle4 });
 
     rerender(
       <StatsScreenShell {...buildShellProps({ periodDays: 30, viewMode: 'muscle' })} />
     );
-    expect(
-      screen.getByTestId('stats-family-failure-bar-shoulders', {
-        includeHiddenElements: true,
-      })
-    ).toHaveStyle({
-      width: `${computeFailureIntensityProgress(4, 30) * 100}%`,
+    expect(screen.getByTestId('stats-family-header-shoulders')).toHaveStyle({
+      backgroundColor: uiColors.failureBackgroundFamily1,
     });
 
     rerender(
@@ -505,14 +479,14 @@ describe('StatsScreenShell', () => {
     ).toBeNull();
   });
 
-  it('exposes set counts, deltas, and intensity scale in row accessibility labels', () => {
+  it('exposes set counts, deltas, and background intensity scale in row accessibility labels', () => {
     renderStatsScreenShell();
 
     expect(screen.getByTestId('stats-family-header-shoulders').props.accessibilityLabel).toContain(
       '10 sets, 4 near-failure sets. up 2 sets and up 1 near-failure sets'
     );
     expect(screen.getByTestId('stats-family-header-shoulders').props.accessibilityLabel).toContain(
-      'full width at 8 near-failure sets for the selected 7-day period'
+      'strongest shade at 8 near-failure sets for the selected 7-day period'
     );
     expect(screen.getByTestId('stats-muscle-row-front_delts').props.accessibilityLabel).toContain(
       '8 sets, 4 near-failure sets'

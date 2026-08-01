@@ -180,7 +180,7 @@ const buildMuscleRowAccessibilityLabel = ({
       'near-failure sets'
     )}`,
     `volume ${formatTotalWeight(volume)}, ${describeVolumeDifference(volumeDelta)}`,
-    `failure intensity reaches full width at ${formatNumber(
+    `failure background reaches its strongest shade at ${formatNumber(
       fullScaleFailureCount(periodDays)
     )} near-failure sets for the selected ${periodDays}-day period`,
   ].join('. ');
@@ -521,60 +521,40 @@ export function StatsScreenShell({
   );
 }
 
-const FAMILY_FAILURE_INTENSITY_RAMP = [
-  uiColors.heatmapBucket1,
-  uiColors.heatmapBucket2,
-  uiColors.heatmapBucket3,
-  uiColors.heatmapBucket4,
+const FAMILY_FAILURE_BACKGROUND_COLORS = [
+  uiColors.failureBackgroundFamily1,
+  uiColors.failureBackgroundFamily2,
+  uiColors.failureBackgroundFamily3,
+  uiColors.failureBackgroundFamily4,
 ] as const;
 
-const MUSCLE_FAILURE_INTENSITY_RAMP = [
-  uiColors.failureIntensityMuscle1,
-  uiColors.failureIntensityMuscle2,
-  uiColors.failureIntensityMuscle3,
-  uiColors.failureIntensityMuscle4,
+const MUSCLE_FAILURE_BACKGROUND_COLORS = [
+  uiColors.failureBackgroundMuscle1,
+  uiColors.failureBackgroundMuscle2,
+  uiColors.failureBackgroundMuscle3,
+  uiColors.failureBackgroundMuscle4,
 ] as const;
 
-function FailureIntensityNameCell({
+const selectFailureBackgroundColor = (
+  progress: number,
+  colors: readonly [string, string, string, string]
+): string | undefined => {
+  if (progress <= 0) return undefined;
+  const colorIndex = Math.min(colors.length - 1, Math.ceil(progress * colors.length) - 1);
+  return colors[colorIndex];
+};
+
+function SummaryNameCell({
   name,
-  progress,
-  ramp,
   textStyle,
   textTestID,
-  barTestID,
 }: {
   name: string;
-  progress: number;
-  ramp: readonly [string, string, string, string];
   textStyle: StyleProp<TextStyle>;
   textTestID?: string;
-  barTestID: string;
 }) {
-  const percentage = progress * 100;
   return (
-    <View style={styles.failureIntensityNameCell}>
-      {progress > 0 ? (
-        <View
-          accessible={false}
-          importantForAccessibility="no"
-          pointerEvents="none"
-          style={[styles.failureIntensityClip, { width: `${percentage}%` }]}
-          testID={barTestID}>
-          <View
-            style={[
-              styles.failureIntensityRamp,
-              { width: `${100 / progress}%` },
-            ]}>
-            {ramp.map((color, index) => (
-              <View
-                key={color}
-                style={[styles.failureIntensityRampStop, { backgroundColor: color }]}
-                testID={`${barTestID}-stop-${index + 1}`}
-              />
-            ))}
-          </View>
-        </View>
-      ) : null}
+    <View style={styles.summaryNameCell}>
       <Text
         adjustsFontSizeToFit
         ellipsizeMode="clip"
@@ -668,6 +648,10 @@ function MuscleFamilyCard({
   );
   const collapsed = isFamilyCollapsible(family);
   const collapsedMuscle = collapsed ? family.muscles[0] : null;
+  const familyFailureBackgroundColor = selectFailureBackgroundColor(
+    computeFailureIntensityProgress(family.nearFailureCount, periodDays),
+    FAMILY_FAILURE_BACKGROUND_COLORS
+  );
   const familyAccessibilityLabel = buildMuscleRowAccessibilityLabel({
     actionLabel: `Open ${family.familyName} history`,
     setCount: family.setCount,
@@ -680,13 +664,10 @@ function MuscleFamilyCard({
   });
   const headerContent = (
     <>
-      <FailureIntensityNameCell
+      <SummaryNameCell
         name={family.familyName}
-        progress={computeFailureIntensityProgress(family.nearFailureCount, periodDays)}
-        ramp={FAMILY_FAILURE_INTENSITY_RAMP}
         textStyle={[styles.familyName, familyUntrained && styles.muscleTextUntrained]}
         textTestID={`stats-family-name-${testIdSlug}`}
-        barTestID={`stats-family-failure-bar-${testIdSlug}`}
       />
       <View style={styles.familyMetrics}>
         <Metric
@@ -714,7 +695,13 @@ function MuscleFamilyCard({
           accessibilityRole="button"
           accessibilityLabel={familyAccessibilityLabel}
           onPress={() => onPressMuscleHistory(toMuscleHistoryTarget(collapsedMuscle))}
-          style={({ pressed }) => [styles.familyHeader, pressed && styles.actionableRowPressed]}
+          style={({ pressed }) => [
+            styles.familyHeader,
+            familyFailureBackgroundColor !== undefined && {
+              backgroundColor: familyFailureBackgroundColor,
+            },
+            pressed && styles.actionableRowPressed,
+          ]}
           testID={`stats-family-header-button-${collapsedMuscle.muscleGroupId}`}>
           {headerContent}
         </Pressable>
@@ -723,7 +710,13 @@ function MuscleFamilyCard({
           accessibilityRole="button"
           accessibilityLabel={familyAccessibilityLabel}
           onPress={() => onPressMuscleHistory(toFamilyHistoryTarget(family))}
-          style={({ pressed }) => [styles.familyHeader, pressed && styles.actionableRowPressed]}
+          style={({ pressed }) => [
+            styles.familyHeader,
+            familyFailureBackgroundColor !== undefined && {
+              backgroundColor: familyFailureBackgroundColor,
+            },
+            pressed && styles.actionableRowPressed,
+          ]}
           testID={`stats-family-header-${testIdSlug}`}>
           {headerContent}
         </Pressable>
@@ -743,6 +736,10 @@ function MuscleFamilyCard({
               muscle.totalVolume,
               previousMuscle?.totalVolume ?? 0
             );
+            const muscleFailureBackgroundColor = selectFailureBackgroundColor(
+              computeFailureIntensityProgress(muscle.nearFailureCount, periodDays),
+              MUSCLE_FAILURE_BACKGROUND_COLORS
+            );
             const muscleAccessibilityLabel = buildMuscleRowAccessibilityLabel({
               actionLabel: `Open ${muscle.displayName} history`,
               setCount: muscle.setCount,
@@ -759,20 +756,20 @@ function MuscleFamilyCard({
                 accessibilityLabel={muscleAccessibilityLabel}
                 key={muscle.muscleGroupId}
                 onPress={() => onPressMuscleHistory(toMuscleHistoryTarget(muscle))}
-                style={({ pressed }) => [styles.muscleRow, pressed && styles.actionableRowPressed]}
+                style={({ pressed }) => [
+                  styles.muscleRow,
+                  muscleFailureBackgroundColor !== undefined && {
+                    backgroundColor: muscleFailureBackgroundColor,
+                  },
+                  pressed && styles.actionableRowPressed,
+                ]}
                 testID={`stats-muscle-row-${muscle.muscleGroupId}`}>
-                <FailureIntensityNameCell
+                <SummaryNameCell
                   name={muscle.displayName}
-                  progress={computeFailureIntensityProgress(
-                    muscle.nearFailureCount,
-                    periodDays
-                  )}
-                  ramp={MUSCLE_FAILURE_INTENSITY_RAMP}
                   textStyle={[
                     styles.muscleName,
                     muscleUntrained && styles.muscleTextUntrained,
                   ]}
-                  barTestID={`stats-muscle-failure-bar-${muscle.muscleGroupId}`}
                 />
                 <View style={styles.muscleMetrics}>
                   <Metric
@@ -1782,32 +1779,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: uiColors.textPrimary,
-    zIndex: 1,
   },
-  failureIntensityNameCell: {
+  summaryNameCell: {
     flex: 1,
     minWidth: 0,
     alignSelf: 'stretch',
     justifyContent: 'center',
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  failureIntensityClip: {
-    position: 'absolute',
-    left: 0,
-    top: '50%',
-    height: 32,
-    transform: [{ translateY: -16 }],
-    overflow: 'hidden',
-    borderRadius: 8,
-    opacity: 0.58,
-  },
-  failureIntensityRamp: {
-    height: '100%',
-    flexDirection: 'row',
-  },
-  failureIntensityRampStop: {
-    flex: 1,
   },
   heatmapTransition: {
     position: 'relative',
@@ -1850,7 +1827,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     color: uiColors.textPrimary,
-    zIndex: 1,
   },
   muscleMetrics: {
     flexDirection: 'row',

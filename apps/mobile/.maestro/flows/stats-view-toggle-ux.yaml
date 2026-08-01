@@ -50,7 +50,7 @@ appId: com.dinoderek.mobile
     id: "stats-family-header-legs"
 - assertVisible:
     id: "stats-muscle-row-quads"
-- takeScreenshot: "02-muscle-failure-bars-7-days"
+- takeScreenshot: "02-muscle-failure-backgrounds-7-days"
 
 # --- 03: The same counts rescale for the 30-day period ---
 - tapOn:
@@ -61,7 +61,7 @@ appId: com.dinoderek.mobile
     timeout: 10000
 - assertVisible:
     id: "stats-muscle-row-quads"
-- takeScreenshot: "03-muscle-failure-bars-30-days"
+- takeScreenshot: "03-muscle-failure-backgrounds-30-days"
 
 # --- Switch back to exercise view via chip ---
 - tapOn:
