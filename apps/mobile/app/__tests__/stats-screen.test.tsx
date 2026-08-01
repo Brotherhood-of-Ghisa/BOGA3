@@ -6,9 +6,14 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-
 import {
   default as StatsRoute,
   StatsScreenShell,
+  computeFailureIntensityProgress,
   type StatsScreenShellProps,
   formatDelta,
+  formatSetCountPairDelta,
+  formatVolumeDelta,
+  sortExerciseListItems,
 } from '../(tabs)/stats-history';
+import { uiColors } from '@/components/ui';
 import type { SelectedMuscleWeeklyEffort, StatsSummary } from '@/src/data';
 
 jest.mock('@/src/data', () => ({
@@ -94,56 +99,63 @@ const buildSummary = (overrides: Partial<StatsSummary> = {}): StatsSummary => ({
         {
           familyName: 'Chest',
           sortOrder: 10,
-          sessionCount: 3,
-          totalWeight: 1800,
+          setCount: 12,
+          nearFailureCount: 3,
+          totalVolume: 1800,
           muscles: [
             {
               muscleGroupId: 'chest',
               displayName: 'Chest',
               familyName: 'Chest',
               sortOrder: 10,
-              sessionCount: 3,
-              totalWeight: 1800,
+              setCount: 12,
+              nearFailureCount: 3,
+              totalVolume: 1800,
             },
           ],
         },
         {
           familyName: 'Shoulders',
           sortOrder: 20,
-          sessionCount: 2,
-          totalWeight: 900,
+          setCount: 10,
+          nearFailureCount: 4,
+          totalVolume: 900,
           muscles: [
             {
               muscleGroupId: 'front_delts',
               displayName: 'Front Delts',
               familyName: 'Shoulders',
               sortOrder: 20,
-              sessionCount: 2,
-              totalWeight: 600,
+              setCount: 8,
+              nearFailureCount: 4,
+              totalVolume: 600,
             },
             {
               muscleGroupId: 'rear_delts',
               displayName: 'Rear Delts',
               familyName: 'Shoulders',
               sortOrder: 21,
-              sessionCount: 1,
-              totalWeight: 300,
+              setCount: 2,
+              nearFailureCount: 0,
+              totalVolume: 300,
             },
           ],
         },
         {
           familyName: 'Legs',
           sortOrder: 40,
-          sessionCount: 0,
-          totalWeight: 0,
+          setCount: 0,
+          nearFailureCount: 0,
+          totalVolume: 0,
           muscles: [
             {
               muscleGroupId: 'calves',
               displayName: 'Calves',
               familyName: 'Legs',
               sortOrder: 40,
-              sessionCount: 0,
-              totalWeight: 0,
+              setCount: 0,
+              nearFailureCount: 0,
+              totalVolume: 0,
             },
           ],
         },
@@ -163,56 +175,63 @@ const buildSummary = (overrides: Partial<StatsSummary> = {}): StatsSummary => ({
         {
           familyName: 'Chest',
           sortOrder: 10,
-          sessionCount: 2,
-          totalWeight: 1500,
+          setCount: 8,
+          nearFailureCount: 2,
+          totalVolume: 1500,
           muscles: [
             {
               muscleGroupId: 'chest',
               displayName: 'Chest',
               familyName: 'Chest',
               sortOrder: 10,
-              sessionCount: 2,
-              totalWeight: 1500,
+              setCount: 8,
+              nearFailureCount: 2,
+              totalVolume: 1500,
             },
           ],
         },
         {
           familyName: 'Shoulders',
           sortOrder: 20,
-          sessionCount: 1,
-          totalWeight: 600,
+          setCount: 8,
+          nearFailureCount: 3,
+          totalVolume: 600,
           muscles: [
             {
               muscleGroupId: 'front_delts',
               displayName: 'Front Delts',
               familyName: 'Shoulders',
               sortOrder: 20,
-              sessionCount: 1,
-              totalWeight: 400,
+              setCount: 6,
+              nearFailureCount: 3,
+              totalVolume: 400,
             },
             {
               muscleGroupId: 'rear_delts',
               displayName: 'Rear Delts',
               familyName: 'Shoulders',
               sortOrder: 21,
-              sessionCount: 1,
-              totalWeight: 200,
+              setCount: 2,
+              nearFailureCount: 0,
+              totalVolume: 200,
             },
           ],
         },
         {
           familyName: 'Legs',
           sortOrder: 40,
-          sessionCount: 0,
-          totalWeight: 0,
+          setCount: 0,
+          nearFailureCount: 0,
+          totalVolume: 0,
           muscles: [
             {
               muscleGroupId: 'calves',
               displayName: 'Calves',
               familyName: 'Legs',
               sortOrder: 40,
-              sessionCount: 0,
-              totalWeight: 0,
+              setCount: 0,
+              nearFailureCount: 0,
+              totalVolume: 0,
             },
           ],
         },
@@ -321,6 +340,67 @@ describe('formatDelta', () => {
   });
 });
 
+describe('stats row metric formatters', () => {
+  it('formats positive, negative, mixed, and unchanged set-count pairs as absolute changes', () => {
+    expect(formatSetCountPairDelta(12, 3, 8, 2)).toEqual({
+      text: '+4 (+1)',
+      tone: 'positive',
+    });
+    expect(formatSetCountPairDelta(6, 1, 8, 2)).toEqual({
+      text: '−2 (−1)',
+      tone: 'negative',
+    });
+    expect(formatSetCountPairDelta(8, 1, 8, 2)).toEqual({
+      text: '±0 (−1)',
+      tone: 'negative',
+    });
+    expect(formatSetCountPairDelta(8, 2, 8, 2)).toEqual({
+      text: '±0 (±0)',
+      tone: 'neutral',
+    });
+  });
+
+  it('formats volume as percentage-only change with explicit zero baselines', () => {
+    expect(formatVolumeDelta(0, 0)).toEqual({ text: '—', tone: 'neutral' });
+    expect(formatVolumeDelta(100, 0)).toEqual({ text: 'new', tone: 'new' });
+    expect(formatVolumeDelta(0, 100)).toEqual({ text: '−100%', tone: 'negative' });
+    expect(formatVolumeDelta(100, 100)).toEqual({ text: '±0%', tone: 'neutral' });
+    expect(formatVolumeDelta(117, 100)).toEqual({ text: '+17%', tone: 'positive' });
+  });
+});
+
+describe('computeFailureIntensityProgress', () => {
+  it.each([
+    [0, 7, 0],
+    [4, 7, 0.5],
+    [8, 7, 1],
+    [9, 7, 1],
+    [8, 30, 8 / (240 / 7)],
+    [34, 30, 34 / (240 / 7)],
+    [35, 30, 1],
+  ] as const)('scales %s failures across %s days', (failures, days, expected) => {
+    expect(computeFailureIntensityProgress(failures, days)).toBeCloseTo(expected, 6);
+  });
+
+  it('defensively clamps negative and non-finite values to zero', () => {
+    expect(computeFailureIntensityProgress(-1, 7)).toBe(0);
+    expect(computeFailureIntensityProgress(Number.NaN, 7)).toBe(0);
+    expect(computeFailureIntensityProgress(Number.POSITIVE_INFINITY, 7)).toBe(0);
+  });
+});
+
+describe('sortExerciseListItems', () => {
+  it('sorts by set count descending with exercise name as the tie-breaker', () => {
+    const sorted = sortExerciseListItems([
+      { id: 'z', name: 'Z Press', setCount: 4, nearFailureCount: 1, totalVolume: 10, estimatedOneRepMax: null },
+      { id: 'b', name: 'Bench Press', setCount: 7, nearFailureCount: 2, totalVolume: 10, estimatedOneRepMax: null },
+      { id: 'a', name: 'Arnold Press', setCount: 4, nearFailureCount: 0, totalVolume: 10, estimatedOneRepMax: null },
+    ]);
+
+    expect(sorted.map((item) => item.id)).toEqual(['b', 'a', 'z']);
+  });
+});
+
 describe('StatsScreenShell', () => {
   it('renders summary cards with deltas', () => {
     renderStatsScreenShell();
@@ -335,21 +415,110 @@ describe('StatsScreenShell', () => {
     expect(setsCard).toHaveTextContent(/\+8 \(\+27%\)/);
   });
 
-  it('renders family cards with sessions + total weight, including a previous-period delta', () => {
+  it('renders family and muscle rows with set/failure counts and percentage-only volume deltas', () => {
     renderStatsScreenShell();
 
-    // Shoulders: current 2 sessions / 900, previous 1 / 600 → +1 (+100%), +300 (+50%).
-    const shouldersSessions = screen.getByTestId('stats-family-sessions-shoulders');
-    expect(shouldersSessions).toHaveTextContent(/2/);
-    expect(shouldersSessions).toHaveTextContent(/\+1 \(\+100%\)/);
+    const shouldersSets = screen.getByTestId('stats-family-sets-shoulders');
+    expect(shouldersSets).toHaveTextContent(/10 \(4\)/);
+    expect(shouldersSets).toHaveTextContent(/\+2 \(\+1\)/);
+    expect(shouldersSets).not.toHaveTextContent('%');
 
-    const shouldersWeight = screen.getByTestId('stats-family-weight-shoulders');
-    expect(shouldersWeight).toHaveTextContent(/900/);
-    expect(shouldersWeight).toHaveTextContent(/\+300 \(\+50%\)/);
+    const shouldersVolume = screen.getByTestId('stats-family-volume-shoulders');
+    expect(shouldersVolume).toHaveTextContent(/900/);
+    expect(shouldersVolume).toHaveTextContent(/\+50%/);
+    expect(shouldersVolume).not.toHaveTextContent('+300');
 
     // Nested muscle row also carries its own delta.
-    const frontDeltsSessions = screen.getByTestId('stats-muscle-sessions-front_delts');
-    expect(frontDeltsSessions).toHaveTextContent(/\+1 \(\+100%\)/);
+    const frontDeltsSets = screen.getByTestId('stats-muscle-sets-front_delts');
+    expect(frontDeltsSets).toHaveTextContent(/8 \(4\)/);
+    expect(frontDeltsSets).toHaveTextContent(/\+2 \(\+1\)/);
+
+    expect(screen.queryByText('Total weight')).toBeNull();
+    expect(screen.queryByTestId('stats-family-sessions-shoulders')).toBeNull();
+    expect(screen.queryByTestId('stats-muscle-sessions-front_delts')).toBeNull();
+  });
+
+  it('renders fixed-ramp failure bars in family and nested-muscle name cells only', () => {
+    const { rerender } = render(
+      <StatsScreenShell {...buildShellProps({ periodDays: 7, viewMode: 'muscle' })} />
+    );
+
+    expect(
+      screen.getByTestId('stats-family-failure-bar-shoulders', {
+        includeHiddenElements: true,
+      })
+    ).toHaveStyle({
+      width: '50%',
+    });
+    expect(
+      screen.getByTestId('stats-muscle-failure-bar-front_delts', {
+        includeHiddenElements: true,
+      })
+    ).toHaveStyle({
+      width: '50%',
+    });
+    expect(
+      screen.queryByTestId('stats-muscle-failure-bar-rear_delts', {
+        includeHiddenElements: true,
+      })
+    ).toBeNull();
+    expect(
+      screen.getByTestId('stats-family-failure-bar-shoulders-stop-1', {
+        includeHiddenElements: true,
+      })
+    ).toHaveStyle({ backgroundColor: uiColors.heatmapBucket1 });
+    expect(
+      screen.getByTestId('stats-muscle-failure-bar-front_delts-stop-4', {
+        includeHiddenElements: true,
+      })
+    ).toHaveStyle({ backgroundColor: uiColors.failureIntensityMuscle4 });
+
+    rerender(
+      <StatsScreenShell {...buildShellProps({ periodDays: 30, viewMode: 'muscle' })} />
+    );
+    expect(
+      screen.getByTestId('stats-family-failure-bar-shoulders', {
+        includeHiddenElements: true,
+      })
+    ).toHaveStyle({
+      width: `${computeFailureIntensityProgress(4, 30) * 100}%`,
+    });
+
+    rerender(
+      <StatsScreenShell
+        {...buildShellProps({
+          periodDays: 7,
+          viewMode: 'exercise',
+          exerciseListItems: [
+            {
+              id: 'bench',
+              name: 'Bench Press',
+              setCount: 8,
+              nearFailureCount: 4,
+              totalVolume: 1000,
+              estimatedOneRepMax: 100,
+            },
+          ],
+        })}
+      />
+    );
+    expect(
+      screen.queryByTestId(/failure-bar/, { includeHiddenElements: true })
+    ).toBeNull();
+  });
+
+  it('exposes set counts, deltas, and intensity scale in row accessibility labels', () => {
+    renderStatsScreenShell();
+
+    expect(screen.getByTestId('stats-family-header-shoulders').props.accessibilityLabel).toContain(
+      '10 sets, 4 near-failure sets. up 2 sets and up 1 near-failure sets'
+    );
+    expect(screen.getByTestId('stats-family-header-shoulders').props.accessibilityLabel).toContain(
+      'full width at 8 near-failure sets for the selected 7-day period'
+    );
+    expect(screen.getByTestId('stats-muscle-row-front_delts').props.accessibilityLabel).toContain(
+      '8 sets, 4 near-failure sets'
+    );
   });
 
   it('collapses a family whose only muscle matches the family name', () => {
@@ -840,7 +1009,8 @@ describe('StatsScreenShell — view mode toggle', () => {
   const buildExerciseListItem = (id: string, name: string) => ({
     id,
     name,
-    sessionCount: 5,
+    setCount: 5,
+    nearFailureCount: 2,
     totalVolume: 2500,
     estimatedOneRepMax: 110,
   });
@@ -865,6 +1035,11 @@ describe('StatsScreenShell — view mode toggle', () => {
     expect(screen.getByTestId('stats-exercise-list')).toBeTruthy();
     expect(screen.getByTestId('stats-exercise-row-ex1')).toBeTruthy();
     expect(screen.getByTestId('stats-exercise-name-ex1')).toHaveTextContent('Bench Press');
+    expect(screen.getByTestId('stats-exercise-sets-ex1')).toHaveTextContent(/5 \(2\)/);
+    expect(screen.queryByTestId('stats-exercise-sessions-ex1')).toBeNull();
+    expect(screen.getByTestId('stats-exercise-row-ex1').props.accessibilityLabel).toContain(
+      '5 sets, 2 near-failure sets'
+    );
   });
 
   it('hides the stats scroll view when viewMode is exercise', () => {
@@ -969,6 +1144,8 @@ describe('StatsRoute — exercise heatmap integration', () => {
   const exerciseAggregate = {
     exerciseDefinitionId: 'bench-press',
     sessionCount: 8,
+    setCount: 12,
+    nearFailureCount: 4,
     totalVolume: 4000,
     estimatedOneRepMax: 120,
   };
@@ -1068,7 +1245,8 @@ describe('StatsScreenShell — search & filtering', () => {
   const buildExerciseListItem = (id: string, name: string) => ({
     id,
     name,
-    sessionCount: 5,
+    setCount: 5,
+    nearFailureCount: 2,
     totalVolume: 2500,
     estimatedOneRepMax: 110,
   });

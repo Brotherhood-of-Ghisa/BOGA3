@@ -50,12 +50,15 @@ Brief entrypoint map of the current mobile screens.
 3. `/stats-history`
 - File: `apps/mobile/app/(tabs)/stats-history.tsx`
 - Purpose:
-  - merged Stats / History tab with a top Stats ↔ History segmented toggle; the History sub-view reuses the shared `HistoryList` building block, and the Stats sub-view hosts the period chips and per-exercise picker that link out to `/exercise-history`
+  - merged Stats / History tab whose Stats surface switches between per-exercise and per-muscle summaries while preserving the top-level Sessions drill-down and in-route history overlays
 - Key states (high level):
   - Stats summary loading/error/content states with period chips
+  - per-exercise rows sorted by valid performed-set count then exercise name; each shows `Sets` as `<count> (<near-failure count>)`, raw `Volume`, and `1RM`, and opens an in-route exercise-history overlay
+  - per-muscle family and nested rows show the same set/near-failure count grammar plus per-side, role-weighted `Volume`; set comparisons are signed absolute pairs while volume comparisons are percentage-only with explicit zero-baseline states
+  - per-muscle family name cells use clipped green failure-intensity ramps and visible nested muscles use clipped light-yellow-to-orange ramps, scaled to eight near-failure sets per seven days; exact counts remain readable/accessibly labelled and the threshold is not a training target
   - actionable muscle rows in Stats summary; expanded muscle rows and collapsed single-muscle family headers open an in-route muscle-history overlay
   - muscle-history overlay states for loading, error, no-history, populated heatmap with selectable `Volume` / `W/sets` metrics, selected positive-effort date with contributing exercise/set detail, and selected zero-effort date empty detail
-  - **Heatmap viewMode** (M17): a "Heatmap" chip below the period chips switches the body to a flat exercise list sorted by all-time session count; tapping an exercise opens an in-route `ExerciseHistoryOverlay`
+  - **By Exercise mode** (M17): the view-mode chip switches the body to the flat exercise list; tapping an exercise opens an in-route `ExerciseHistoryOverlay`
   - exercise-history overlay states: loading, error, no-history, populated `CalendarHeatmap` (365-day window), metric chip selection (Volume / W/sets / 1RM / Top weight), week-selection banner
 - Notes:
   - tab root inside the `(tabs)` group with `headerShown: false`; the tab bar is `BottomTray` (composing `TopLevelTabs`) supplied via the `tabBar` prop in `(tabs)/_layout.tsx`.

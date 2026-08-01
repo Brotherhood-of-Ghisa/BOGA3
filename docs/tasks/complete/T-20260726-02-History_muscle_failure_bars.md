@@ -1,7 +1,7 @@
 ---
 task_id: T-20260726-02-History_muscle_failure_bars
 milestone_id: "MVP"
-status: planned
+status: completed
 ui_impact: "yes"
 areas: "frontend|docs"
 runtimes: "node|expo|maestro|docs"
@@ -16,18 +16,17 @@ docs_touched: "docs/specs/ui/ux-rules.md, docs/specs/ui/screen-map.md, docs/spec
 
 - Task ID: `T-20260726-02-History_muscle_failure_bars`
 - Title: Add failure-intensity bars to the By Muscle History view
-- Status: `planned`
+- Status: `completed`
 - File location rule:
-  - keep this active card at
-    `docs/tasks/T-20260726-02-History_muscle_failure_bars.md`
-  - move it to `docs/tasks/complete/` when completed or outdated
+  - completed card lives at
+    `docs/tasks/complete/T-20260726-02-History_muscle_failure_bars.md`
 - Session date: 2026-07-26
 - Session interaction mode: `interactive`
 - Required predecessor:
-  `docs/tasks/T-20260726-01-History_set_and_failure_counts.md`
+  `docs/tasks/complete/T-20260726-01-History_set_and_failure_counts.md`
 - Branch/PR contract:
   - implement this task after Task 1 on the same
-    `codex/history-set-failure-task-card` branch
+    `codex/history-set-failure-implementation` branch
   - do not create a second implementation branch or PR for this task
   - close both task cards only after the combined branch diff passes every gate
     required by either card
@@ -37,7 +36,7 @@ docs_touched: "docs/specs/ui/ux-rules.md, docs/specs/ui/screen-map.md, docs/spec
 - Project directives: `AGENTS.md`, `docs/specs/README.md`
 - Milestone spec: N/A - user-requested Stats / History refinement.
 - Predecessor task:
-  `docs/tasks/T-20260726-01-History_set_and_failure_counts.md`
+  `docs/tasks/complete/T-20260726-01-History_set_and_failure_counts.md`
 - Architecture: `docs/specs/03-technical-architecture.md`
 - Data model: `docs/specs/05-data-model.md`
 - Testing strategy: `docs/specs/06-testing-strategy.md`
@@ -48,13 +47,13 @@ docs_touched: "docs/specs/ui/ux-rules.md, docs/specs/ui/screen-map.md, docs/spec
 
 ## Context Freshness (required at session start; update before edits)
 
-- Verified current branch + HEAD commit:
-  `codex/history-set-failure-task-card` at
-  `578e8883bf80b82a00b03888f7d79030f4c33f95`.
+- Verified implementation branch + pre-implementation HEAD commit:
+  `codex/history-set-failure-implementation` at
+  `9396fe39bebf8ce17dbbee79de55c3cdbac98605`.
 - Start-of-session sync with `origin/main` completed?: `yes`; fetched
-  `origin/main` at `778ee24380892d8f1c1c1bb9a713448dc69611d0`.
-  The existing task-card branch was intentionally retained because the user
-  requires both History tasks on the same branch.
+  `origin/main` at `c643eae71275c58bb9ab68836cc09c3d202ffba0`,
+  created a fresh branch from that ref, and cherry-picked both task cards before
+  implementing them together.
 - Parent refs opened in this session:
   - `AGENTS.md`
   - `docs/specs/02-quality-and-test-gates.md`
@@ -67,7 +66,7 @@ docs_touched: "docs/specs/ui/ux-rules.md, docs/specs/ui/screen-map.md, docs/spec
   - `docs/specs/ui/screen-map.md`
   - `docs/specs/ui/components-catalog.md`
   - `docs/tasks/README.md`
-  - `docs/tasks/T-20260726-01-History_set_and_failure_counts.md`
+  - `docs/tasks/complete/T-20260726-01-History_set_and_failure_counts.md`
 - Code/docs inventory freshness checks run:
   - `apps/mobile/app/(tabs)/stats-history.tsx` inspected on 2026-07-26:
     family headers and nested muscle rows use separate name and metrics areas;
@@ -92,7 +91,7 @@ docs_touched: "docs/specs/ui/ux-rules.md, docs/specs/ui/screen-map.md, docs/spec
     accept every `StatsPeriodDays` value so future period options do not require
     a second visual contract.
 - Optional helper command:
-  - `./scripts/task-bootstrap.sh docs/tasks/T-20260726-02-History_muscle_failure_bars.md`
+  - `./scripts/task-bootstrap.sh docs/tasks/complete/T-20260726-02-History_muscle_failure_bars.md`
 
 ## Objective
 
@@ -295,8 +294,10 @@ barWidth = progress * 100%
     - zero/no-fill, full-width clamp, collapsed-family, and By Exercise absence
     - period-switch rescaling, accessibility wording, and unchanged row presses
   - `apps/mobile/.maestro/flows/stats-view-toggle-ux.yaml`
-    - retain By Exercise behavior, enter By Muscle, assert bar identifiers, and
-      capture the populated hierarchy at 7 and 30 days
+    - retain By Exercise behavior, enter By Muscle, assert the exact readable
+      count plus row identifiers, and capture the populated hierarchy at 7 and
+      30 days; the decorative bars themselves stay out of the accessibility
+      tree and are asserted structurally by the screen test
 - Targeted test command:
   - from `apps/mobile/`:
     `npm test -- --runInBand app/__tests__/stats-screen.test.tsx`
@@ -361,37 +362,64 @@ barWidth = progress * 100%
 - `./boga test docs-check`.
 - `./boga test for --diff origin/main...HEAD` and record the final
   combined-branch path-trigger explanation.
-- `./scripts/task-closeout-check.sh docs/tasks/T-20260726-02-History_muscle_failure_bars.md`
+- `./scripts/task-closeout-check.sh docs/tasks/complete/T-20260726-02-History_muscle_failure_bars.md`
 
 ## Evidence
 
-- Targeted Stats screen test result:
-- UI guardrail result:
-- `./boga test for` required-gate output:
-- `./boga test meta-tests` result:
-- `./boga test fast` result:
-- `./boga test backend` result:
-- `./boga test frontend` result and Maestro artifact paths:
-- `./boga test docs-check` result:
+- Targeted Stats screen test result: PASS as part of the focused 4-suite,
+  102-test run; covers exact 7-/30-day boundaries, clipping, hierarchy colors,
+  zero/full behavior, period rescaling, accessibility, and By Exercise absence.
+- UI guardrail result: PASS with 0 violations.
+- `./boga test for` required-gate output: `fast`, `backend`, `frontend`,
+  `docs-check`, and `meta-tests` required by the combined implementation diff.
+- `./boga test meta-tests` result: PASS - all 4 harness checks.
+- `./boga test fast` result: PASS - lint, typecheck, 109 Jest suites / 992
+  tests, runtime smoke, docs/meta checks, agent-auth web, and MCP units.
+- `./boga test backend` result: PASS - all local backend contract and smoke
+  lanes completed successfully for the combined Task 1 + Task 2 diff.
+- `./boga test frontend` result and Maestro artifact paths: PASS - all four
+  iOS lanes completed successfully:
+  - smoke: `apps/mobile/artifacts/maestro/ad-hoc/20260801-200946-60889`
+  - data smoke: `apps/mobile/artifacts/maestro/ad-hoc/20260801-201106-61926`
+  - auth/profile: `apps/mobile/artifacts/maestro/ad-hoc/20260801-201241-63223`
+  - sync e2e: `apps/mobile/artifacts/maestro/ad-hoc/20260801-201421-64619`
+- `./boga test docs-check` result: PASS.
 - UI/UX visual artifacts:
   - Last 7 days populated By Muscle view:
+    `apps/mobile/artifacts/maestro/T-20260726-history/20260801-194639-40473/maestro-output/screenshots/02-muscle-failure-bars-7-days.png`
   - Last 30 days populated By Muscle view:
-  - zero/full-width edge capture if separate:
-- UX Contract traceability:
-- Accessibility/manual contrast verification:
-- Manual verification summary (required when CI is absent/partial):
+    `apps/mobile/artifacts/maestro/T-20260726-history/20260801-194639-40473/maestro-output/screenshots/03-muscle-failure-bars-30-days.png`
+  - zero-fill rows are visible in the 7-day capture; full-width clamp and
+    overflow are covered by screen tests.
+- UX Contract traceability: family rows use the green ramp and deduplicated
+  family count; visible nested muscles use the yellow-to-orange ramp and their
+  own count; the same count visibly rescales from 7 to 30 days; By Exercise has
+  no bar; existing row and overlay interactions remain operational.
+- Accessibility/manual contrast verification: inspected both captures at the
+  implemented `0.28` fill opacity; dark name text remains readable over both
+  ramps, fills remain inside the name cell, and row labels expose the exact
+  near-failure count plus the period threshold while bars stay decorative.
+- Manual verification summary (required when CI is absent/partial): focused
+  Maestro flow passed and screenshots were inspected for fixed-ramp reveal,
+  hierarchy color distinction, period rescaling, text readability, clipping,
+  zero state, By Exercise absence, and both existing history overlays.
 - Deferred/manual hosted checks summary: N/A - no hosted-only behavior.
 
 ## Completion note
 
-- What changed:
-- What tests ran:
-- What remains:
+- What changed: added route-local clipped four-stop failure-intensity bars to
+  By Muscle name cells, using green family tokens and new semantic
+  yellow-to-orange muscle tokens, exact period scaling, decorative semantics,
+  and unchanged readable row content/interactions.
+- What tests ran: focused 102-test suite, UI guardrails, docs/meta checks,
+  `./boga test fast`, `./boga test backend`, and `./boga test frontend`, plus a
+  focused Maestro visual flow for both 7- and 30-day states and overlays.
+- What remains: none.
 
 ## Status update checklist (mandatory at closeout)
 
 - Implement and verify
-  `docs/tasks/T-20260726-01-History_set_and_failure_counts.md` first.
+  `docs/tasks/complete/T-20260726-01-History_set_and_failure_counts.md` first.
 - Update Status and frontmatter to `completed`, `blocked`, or `outdated`.
 - If completed or outdated, move this card to `docs/tasks/complete/` and update
   affected references in the same session.
@@ -404,4 +432,4 @@ barWidth = progress * 100%
 - Run the final combined-branch path-trigger query and every required local
   gate from both task cards.
 - Run
-  `./scripts/task-closeout-check.sh docs/tasks/T-20260726-02-History_muscle_failure_bars.md`.
+  `./scripts/task-closeout-check.sh docs/tasks/complete/T-20260726-02-History_muscle_failure_bars.md`.

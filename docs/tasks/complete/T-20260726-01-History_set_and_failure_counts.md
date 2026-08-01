@@ -1,7 +1,7 @@
 ---
 task_id: T-20260726-01-History_set_and_failure_counts
 milestone_id: "MVP"
-status: planned
+status: completed
 ui_impact: "yes"
 areas: "frontend|docs"
 runtimes: "node|expo|maestro|supabase|docs"
@@ -16,11 +16,10 @@ docs_touched: "docs/specs/ui/ux-rules.md, docs/specs/ui/screen-map.md"
 
 - Task ID: `T-20260726-01-History_set_and_failure_counts`
 - Title: Replace per-exercise and per-muscle sessions with set and failure counts
-- Status: `planned`
+- Status: `completed`
 - File location rule:
-  - keep this active card at
-    `docs/tasks/T-20260726-01-History_set_and_failure_counts.md`
-  - move it to `docs/tasks/complete/` when completed or outdated
+  - completed card lives at
+    `docs/tasks/complete/T-20260726-01-History_set_and_failure_counts.md`
 - Session date: 2026-07-26
 - Session interaction mode: `interactive`
 
@@ -37,11 +36,13 @@ docs_touched: "docs/specs/ui/ux-rules.md, docs/specs/ui/screen-map.md"
 
 ## Context Freshness (required at session start; update before edits)
 
-- Verified current branch + HEAD commit:
-  `codex/history-set-failure-task-card` at
-  `91a7b8800f35a00294dd8e4470722cfefa12a4fc`.
+- Verified implementation branch + pre-implementation HEAD commit:
+  `codex/history-set-failure-implementation` at
+  `9396fe39bebf8ce17dbbee79de55c3cdbac98605`.
 - Start-of-session sync with `origin/main` completed?: `yes`; fetched
-  `origin/main` and created the branch directly from the fetched ref.
+  `origin/main` at `c643eae71275c58bb9ab68836cc09c3d202ffba0`,
+  created a fresh branch from that ref, and cherry-picked the two task-card
+  commits before implementation.
 - Parent refs opened in this session:
   - `AGENTS.md`
   - `docs/specs/01-worktree-and-environment.md`
@@ -78,7 +79,7 @@ docs_touched: "docs/specs/ui/ux-rules.md, docs/specs/ui/screen-map.md"
   - The top-level Sessions summary card and `/sessions` drill-down are not
     per-exercise/per-muscle metrics and remain unchanged.
 - Optional helper command:
-  - `./scripts/task-bootstrap.sh docs/tasks/T-20260726-01-History_set_and_failure_counts.md`
+  - `./scripts/task-bootstrap.sh docs/tasks/complete/T-20260726-01-History_set_and_failure_counts.md`
 
 ## Objective
 
@@ -397,28 +398,51 @@ per-side normalization or muscle-role factors.
 - `./boga test backend`.
 - `./boga test frontend`.
 - `./boga test for` and record the final path-trigger explanation.
-- `./scripts/task-closeout-check.sh docs/tasks/T-20260726-01-History_set_and_failure_counts.md`
+- `./scripts/task-closeout-check.sh docs/tasks/complete/T-20260726-01-History_set_and_failure_counts.md`
 
 ## Evidence
 
-- Targeted test results:
-- `./boga test for` required-gate output:
-- `./boga test fast` result:
-- `./boga test backend` result:
-- `./boga test frontend` result and Maestro artifact paths:
+- Targeted test results: PASS - 4 suites and 102 tests covering exercise,
+  muscle/family aggregation, valid/invalid set semantics, exact row copy,
+  comparison formatters, sorting, accessibility, scale math, and bar rendering.
+- `./boga test for` required-gate output: `fast`, `backend`, `frontend`,
+  `docs-check`, and `meta-tests` required by the combined implementation diff.
+- `./boga test fast` result: PASS - lint, typecheck, 109 Jest suites / 992
+  tests, local runtime smoke, docs/meta checks, agent-auth web, and MCP units.
+- `./boga test backend` result: PASS - auth/API, Sync v2 schema and contracts,
+  drift, integration, infra, and MCP smoke lanes all completed successfully.
+- `./boga test frontend` result and Maestro artifact paths: PASS - all four
+  iOS lanes completed successfully:
+  - smoke: `apps/mobile/artifacts/maestro/ad-hoc/20260801-200946-60889`
+  - data smoke: `apps/mobile/artifacts/maestro/ad-hoc/20260801-201106-61926`
+  - auth/profile: `apps/mobile/artifacts/maestro/ad-hoc/20260801-201241-63223`
+  - sync e2e: `apps/mobile/artifacts/maestro/ad-hoc/20260801-201421-64619`
 - UI/UX visual artifacts:
   - populated per-exercise Stats / History view:
+    `apps/mobile/artifacts/maestro/T-20260726-history/20260801-194639-40473/maestro-output/screenshots/01-exercise-view-default.png`
   - populated per-muscle Stats / History view:
-  - zero/untrained row if captured separately:
-- UX Contract traceability:
-- Manual verification summary (required when CI is absent/partial):
+    `apps/mobile/artifacts/maestro/T-20260726-history/20260801-194639-40473/maestro-output/screenshots/02-muscle-failure-bars-7-days.png`
+  - zero/untrained rows are visible in the same 7-day muscle capture.
+- UX Contract traceability: exercise, muscle, and family rows render exact
+  `Sets` / `<count> (<near-failure>)` values; exercise rows retain raw Volume
+  and 1RM and sort by set count; muscle/family rows use deduplicated physical
+  set identities and the shared role-weighted per-side volume contributions.
+- Manual verification summary (required when CI is absent/partial): inspected
+  the populated exercise and muscle captures; confirmed readable set/failure
+  values and deltas, `Volume` labels, unchanged top summary, zero rows, row
+  hierarchy, and overlay navigation.
 - Deferred/manual hosted checks summary: N/A - no hosted-only behavior.
 
 ## Completion note
 
-- What changed:
-- What tests ran:
-- What remains:
+- What changed: replaced per-row Sessions with valid performed set and
+  near-failure counts, added family physical-set deduplication, retained the
+  adopted BoGa3 muscle-volume path, introduced metric-specific comparison
+  grammar, and documented the current Stats / History contract.
+- What tests ran: focused 102-test suite, UI guardrails, typecheck, docs/meta
+  checks, `./boga test fast`, `./boga test backend`, and
+  `./boga test frontend`, plus focused 7-/30-day Maestro visual verification.
+- What remains: none.
 
 ## Status update checklist (mandatory at closeout)
 
@@ -431,4 +455,4 @@ per-side normalization or muscle-role factors.
   data-model contracts; update the owning specs if it does.
 - Run the final path-trigger query and every required local gate.
 - Run
-  `./scripts/task-closeout-check.sh docs/tasks/T-20260726-01-History_set_and_failure_counts.md`.
+  `./scripts/task-closeout-check.sh docs/tasks/complete/T-20260726-01-History_set_and_failure_counts.md`.

@@ -12,6 +12,7 @@ import {
 
 import { bootstrapLocalDataLayer } from './bootstrap';
 import { exerciseSets, sessionExercises, sessions } from './schema';
+import { isWorkingSessionSetType } from './set-types';
 import { computePeriodBounds, type StatsPeriodDays } from './stats';
 
 export type ExerciseCatalogStatsPeriod = 'all' | StatsPeriodDays;
@@ -19,6 +20,8 @@ export type ExerciseCatalogStatsPeriod = 'all' | StatsPeriodDays;
 export type ExerciseAggregate = {
   exerciseDefinitionId: string;
   sessionCount: number;
+  setCount: number;
+  nearFailureCount: number;
   totalVolume: number;
   estimatedOneRepMax: number | null;
 };
@@ -253,6 +256,8 @@ export const aggregateExerciseCatalogStats = (
       aggregate = {
         exerciseDefinitionId: defId,
         sessionCount: 0,
+        setCount: 0,
+        nearFailureCount: 0,
         totalVolume: 0,
         estimatedOneRepMax: null,
       };
@@ -267,6 +272,11 @@ export const aggregateExerciseCatalogStats = (
     if (!sessionsSeen.has(link.sessionId)) {
       sessionsSeen.add(link.sessionId);
       aggregate.sessionCount += 1;
+    }
+
+    aggregate.setCount += 1;
+    if (isWorkingSessionSetType(set.setType)) {
+      aggregate.nearFailureCount += 1;
     }
 
     aggregate.totalVolume += parsed.weight * parsed.reps;

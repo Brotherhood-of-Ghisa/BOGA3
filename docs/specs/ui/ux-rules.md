@@ -243,15 +243,18 @@ Guardrail command:
     unavailable for muscle-level history.
 11. The v1 overlay loads a capped one-year local completed-session history window for the selected muscle.
 
-### 13. Exercise heatmap mode semantics (M17)
+### 13. Stats exercise/muscle history semantics
 
-1. The `Stats / History` screen exposes a **Heatmap** chip below the period chips (Last 7 days / Last 30 days). This chip acts as a view-mode toggle: pressing it switches the body between the muscle-stats table (`viewMode: 'stats'`) and the exercise list (`viewMode: 'heatmap'`).
-2. In Heatmap mode the exercise list is a flat list of exercises that have been trained at least once, sorted by all-time session count descending. Each row shows the exercise name, session count, volume, and estimated 1RM.
-3. Tapping an exercise row in Heatmap mode opens an in-route `ExerciseHistoryOverlay` — the same overlay card structure as the muscle-history overlay (occupies ~75% screen height, backdrop-dismissible).
+1. The `Stats / History` screen exposes a `By Muscle` / `By Exercise` view-mode chip beside the Last 7 days / Last 30 days period chips. Pressing it switches the body between the muscle summary and exercise list.
+2. In the per-exercise mode the list is flat and includes exercises trained at least once. Rows sort by valid performed-set count descending, then exercise name. Each row shows `Sets` as `<valid performed sets> (<near-failure sets>)`, raw exercise `Volume`, and estimated `1RM` when available. Near-failure means the valid performed `RIR 0` / `RIR 1` / `RIR 2` subset; warm-up, null, and unknown-quality rows remain in the leading set count but not the parenthesized count.
+3. Tapping an exercise row in per-exercise mode opens an in-route `ExerciseHistoryOverlay` — the same overlay card structure as the muscle-history overlay (occupies ~75% screen height, backdrop-dismissible).
 4. The `ExerciseHistoryOverlay` renders the reusable `CalendarHeatmap` component over a 365-day window for the selected exercise. It keeps the four metric chips (Volume / W/sets / 1RM / Top weight) plus the week-selection banner; unlike muscle-history, it remains a multi-metric exercise-specific view.
-5. The Heatmap chip active/inactive visual states use the `actionPrimary` / `actionPrimarySubtleBg` / `borderMuted` / `surfaceDefault` tokens; no raw color literals.
-6. Dismissing the exercise overlay returns to the exercise list in Heatmap mode. It clears only transient selected-exercise/week UI state and does not mutate any data.
+5. The view-mode chip uses the shared action, border, and surface tokens; no raw color literals.
+6. Dismissing the exercise overlay returns to the exercise list in per-exercise mode. It clears only transient selected-exercise/week UI state and does not mutate any data.
 7. Volume for exercise analytics is raw `weight × reps` (no muscle-role weighting). This differs from the muscle-history overlay where volume is role-weighted.
+8. In the per-muscle mode every family and visible nested-muscle row shows `Sets` in the same `<set count> (<near-failure count>)` form plus `Volume`. Family set counts union physical source-set identities across contributing primary/secondary muscles, so one set mapped to two muscles in one family counts once. Family volume still sums member-muscle contributions.
+9. Per-muscle previous-period set comparisons use signed absolute pairs (`+4 (+1)`, `−2 (−1)`, `±0 (−1)`) and never percentages. Volume comparisons use percentage only (`+17%`, `−100%`, `±0%`), with `—` for zero-to-zero and `new` for positive volume over a zero baseline. Muscle/family volume remains the shared per-side, role-weighted calculation.
+10. Per-muscle family name cells render a light-to-dark green failure-intensity ramp; visible nested-muscle name cells use the semantic light-yellow-to-orange ramp. Width is `clamp(nearFailureCount / (8 × periodDays / 7), 0, 1)`. The ramp is decorative, stays within the name cell, does not intercept presses or become an accessibility target, and supplements the readable near-failure count. Its full-width threshold is a display scale only—not a goal, recommendation, limit, or warning. Row accessibility copy states the exact near-failure count and selected-period threshold.
 
 ### 14. Documentation maintenance rule (UI semantics)
 

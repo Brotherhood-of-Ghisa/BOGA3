@@ -36,6 +36,7 @@ Brief entrypoint inventory of the current reusable UI component set.
 - Purpose:
   - single source of truth for shared UI token values (colors, spacing, radius, typography, border)
   - includes the shared semantic/status/overlay color palette used by current route screens after the M8 convergence refactor (Task `T-20260226-06`)
+  - includes `failureIntensityMuscle1` through `failureIntensityMuscle4`, the light-yellow-to-orange semantic ramp used by nested muscle rows in Stats / History; family rows reuse `heatmapBucket1` through `heatmapBucket4`
 
 2. `UiText`
 - File: `apps/mobile/components/ui/text.tsx`

@@ -49,6 +49,8 @@ export type MuscleAnalyticsInput = {
 };
 
 export type MuscleSetContribution = {
+  /** Stable identity of the physical source set within one aggregation run. */
+  setIdentity: string;
   muscleGroupId: string;
   role: MuscleContributionRole;
   roleWeight: number;
@@ -137,6 +139,8 @@ export const countMuscleAnalyticsWorkingSets = (input: MuscleAnalyticsInput): nu
         weight: set.weightValue,
         performanceStatus: set.performanceStatus,
       }) &&
+      parseSetWeight(set.weightValue) !== null &&
+      parseSetReps(set.repsValue) !== null &&
       isMuscleAnalyticsWorkingSet(set.setType)
   ).length;
 };
@@ -190,13 +194,15 @@ export const collectMuscleSetContributions = (
   );
   const contributions: MuscleSetContribution[] = [];
 
-  for (const set of input.exerciseSets) {
+  for (const [setIndex, set] of input.exerciseSets.entries()) {
     if (
       !isConfirmedPerformedSet({
         reps: set.repsValue,
         weight: set.weightValue,
         performanceStatus: set.performanceStatus,
-      })
+      }) ||
+      parseSetWeight(set.weightValue) === null ||
+      parseSetReps(set.repsValue) === null
     ) {
       continue;
     }
@@ -223,6 +229,7 @@ export const collectMuscleSetContributions = (
       if (roleWeight === 0) continue;
 
       contributions.push({
+        setIdentity: set.id !== undefined ? `id:${set.id}` : `row:${setIndex}`,
         muscleGroupId: mapping.muscleGroupId,
         role: mapping.role,
         roleWeight,

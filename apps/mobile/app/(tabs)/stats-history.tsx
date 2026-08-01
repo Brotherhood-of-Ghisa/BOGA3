@@ -1,6 +1,15 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  type StyleProp,
+  type TextStyle,
+} from 'react-native';
 
 import { DailyHeatmap, WeeklyHeatmap, buildHeatmapData } from '@/components/heatmaps';
 import { SegmentedChips, uiColors } from '@/components/ui';
@@ -50,7 +59,8 @@ export type ExerciseHeatmapTarget = {
 export type ExerciseListItem = {
   id: string;
   name: string;
-  sessionCount: number;
+  setCount: number;
+  nearFailureCount: number;
   totalVolume: number;
   estimatedOneRepMax: number | null;
 };
@@ -88,6 +98,113 @@ export const formatDelta = (current: number, previous: number): DeltaDisplay => 
     tone: diff > 0 ? 'positive' : 'negative',
   };
 };
+
+const formatSignedCount = (value: number): string => {
+  if (value === 0) return '±0';
+  return `${value > 0 ? '+' : '−'}${formatNumber(Math.abs(value))}`;
+};
+
+export const formatSetCountPair = (setCount: number, nearFailureCount: number): string =>
+  `${formatNumber(setCount)} (${formatNumber(nearFailureCount)})`;
+
+export const formatSetCountPairDelta = (
+  currentSetCount: number,
+  currentNearFailureCount: number,
+  previousSetCount: number,
+  previousNearFailureCount: number
+): DeltaDisplay => {
+  const setDifference = currentSetCount - previousSetCount;
+  const nearFailureDifference = currentNearFailureCount - previousNearFailureCount;
+  const toneDifference = setDifference === 0 ? nearFailureDifference : setDifference;
+  return {
+    text: `${formatSignedCount(setDifference)} (${formatSignedCount(nearFailureDifference)})`,
+    tone:
+      toneDifference > 0 ? 'positive' : toneDifference < 0 ? 'negative' : 'neutral',
+  };
+};
+
+export const formatVolumeDelta = (current: number, previous: number): DeltaDisplay => {
+  if (current === 0 && previous === 0) {
+    return { text: '—', tone: 'neutral' };
+  }
+  if (previous === 0) {
+    return { text: 'new', tone: 'new' };
+  }
+
+  const percentDifference = Math.round(((current - previous) / previous) * 100);
+  if (percentDifference === 0) {
+    return { text: '±0%', tone: 'neutral' };
+  }
+  return {
+    text: `${percentDifference > 0 ? '+' : '−'}${Math.abs(percentDifference)}%`,
+    tone: percentDifference > 0 ? 'positive' : 'negative',
+  };
+};
+
+export const fullScaleFailureCount = (periodDays: StatsPeriodDays): number =>
+  (8 * periodDays) / 7;
+
+export const computeFailureIntensityProgress = (
+  nearFailureCount: number,
+  periodDays: StatsPeriodDays
+): number => {
+  const fullScale = fullScaleFailureCount(periodDays);
+  if (!Number.isFinite(nearFailureCount) || nearFailureCount <= 0 || !Number.isFinite(fullScale)) {
+    return 0;
+  }
+  return Math.min(1, nearFailureCount / fullScale);
+};
+
+const describeCountDifference = (difference: number, label: string): string => {
+  if (difference > 0) return `up ${formatNumber(difference)} ${label}`;
+  if (difference < 0) return `down ${formatNumber(Math.abs(difference))} ${label}`;
+  return `no change in ${label}`;
+};
+
+const describeVolumeDifference = (delta: DeltaDisplay): string => {
+  if (delta.text === '—') return 'no volume in either period';
+  if (delta.text === 'new') return 'new volume this period';
+  if (delta.text === '±0%') return 'no percentage change in volume';
+  return `${delta.tone === 'positive' ? 'up' : 'down'} ${delta.text.replace(/[+−]/, '')} in volume`;
+};
+
+const buildMuscleRowAccessibilityLabel = ({
+  actionLabel,
+  setCount,
+  nearFailureCount,
+  previousSetCount,
+  previousNearFailureCount,
+  volume,
+  volumeDelta,
+  periodDays,
+}: {
+  actionLabel: string;
+  setCount: number;
+  nearFailureCount: number;
+  previousSetCount: number;
+  previousNearFailureCount: number;
+  volume: number;
+  volumeDelta: DeltaDisplay;
+  periodDays: StatsPeriodDays;
+}): string =>
+  [
+    actionLabel,
+    `${formatNumber(setCount)} sets, ${formatNumber(nearFailureCount)} near-failure sets`,
+    `${describeCountDifference(setCount - previousSetCount, 'sets')} and ${describeCountDifference(
+      nearFailureCount - previousNearFailureCount,
+      'near-failure sets'
+    )}`,
+    `volume ${formatTotalWeight(volume)}, ${describeVolumeDifference(volumeDelta)}`,
+    `failure intensity reaches full width at ${formatNumber(
+      fullScaleFailureCount(periodDays)
+    )} near-failure sets for the selected ${periodDays}-day period`,
+  ].join('. ');
+
+export const sortExerciseListItems = (items: ExerciseListItem[]): ExerciseListItem[] =>
+  [...items].sort((left, right) => {
+    if (left.setCount !== right.setCount) return right.setCount - left.setCount;
+    return left.name.localeCompare(right.name);
+  });
 
 const formatNumber = (value: number): string => {
   if (Number.isInteger(value)) {
@@ -365,6 +482,7 @@ export function StatsScreenShell({
               <MuscleFamilyList
                 families={filteredFamilies}
                 previousFamilies={summary.previous.totals.muscleFamilies}
+                periodDays={periodDays}
                 onPressMuscleHistory={onPressMuscleHistory}
               />
             )
@@ -410,13 +528,82 @@ export function StatsScreenShell({
   );
 }
 
+const FAMILY_FAILURE_INTENSITY_RAMP = [
+  uiColors.heatmapBucket1,
+  uiColors.heatmapBucket2,
+  uiColors.heatmapBucket3,
+  uiColors.heatmapBucket4,
+] as const;
+
+const MUSCLE_FAILURE_INTENSITY_RAMP = [
+  uiColors.failureIntensityMuscle1,
+  uiColors.failureIntensityMuscle2,
+  uiColors.failureIntensityMuscle3,
+  uiColors.failureIntensityMuscle4,
+] as const;
+
+function FailureIntensityNameCell({
+  name,
+  progress,
+  ramp,
+  textStyle,
+  textTestID,
+  barTestID,
+}: {
+  name: string;
+  progress: number;
+  ramp: readonly [string, string, string, string];
+  textStyle: StyleProp<TextStyle>;
+  textTestID?: string;
+  barTestID: string;
+}) {
+  const percentage = progress * 100;
+  return (
+    <View style={styles.failureIntensityNameCell}>
+      {progress > 0 ? (
+        <View
+          accessible={false}
+          importantForAccessibility="no"
+          pointerEvents="none"
+          style={[styles.failureIntensityClip, { width: `${percentage}%` }]}
+          testID={barTestID}>
+          <View
+            style={[
+              styles.failureIntensityRamp,
+              { width: `${100 / progress}%` },
+            ]}>
+            {ramp.map((color, index) => (
+              <View
+                key={color}
+                style={[styles.failureIntensityRampStop, { backgroundColor: color }]}
+                testID={`${barTestID}-stop-${index + 1}`}
+              />
+            ))}
+          </View>
+        </View>
+      ) : null}
+      <Text
+        adjustsFontSizeToFit
+        ellipsizeMode="clip"
+        minimumFontScale={0.82}
+        numberOfLines={2}
+        style={textStyle}
+        testID={textTestID}>
+        {name}
+      </Text>
+    </View>
+  );
+}
+
 function MuscleFamilyList({
   families,
   previousFamilies,
+  periodDays,
   onPressMuscleHistory,
 }: {
   families: DisplayMuscleFamily[];
   previousFamilies: StatsMuscleFamilyPerformance[];
+  periodDays: StatsPeriodDays;
   onPressMuscleHistory: (muscle: MuscleHistoryTarget) => void;
 }) {
   if (families.length === 0) {
@@ -446,6 +633,7 @@ function MuscleFamilyList({
           visibleMuscles={visibleMuscles}
           previousFamily={previousByFamilyName.get(family.familyName) ?? null}
           previousMusclesById={previousMusclesById}
+          periodDays={periodDays}
           onPressMuscleHistory={onPressMuscleHistory}
         />
       ))}
@@ -463,44 +651,63 @@ function MuscleFamilyCard({
   visibleMuscles,
   previousFamily,
   previousMusclesById,
+  periodDays,
   onPressMuscleHistory,
 }: {
   family: StatsMuscleFamilyPerformance;
   visibleMuscles: StatsMusclePerformance[];
   previousFamily: StatsMuscleFamilyPerformance | null;
   previousMusclesById: Map<string, StatsMusclePerformance>;
+  periodDays: StatsPeriodDays;
   onPressMuscleHistory: (muscle: MuscleHistoryTarget) => void;
 }) {
-  const familyUntrained = family.sessionCount === 0 && family.totalWeight === 0;
+  const familyUntrained = family.setCount === 0 && family.totalVolume === 0;
   const testIdSlug = family.familyName.toLowerCase().replace(/\s+/g, '-');
-  const sessionsDelta = formatDelta(family.sessionCount, previousFamily?.sessionCount ?? 0);
-  const weightDelta = formatDelta(family.totalWeight, previousFamily?.totalWeight ?? 0);
+  const setCountDelta = formatSetCountPairDelta(
+    family.setCount,
+    family.nearFailureCount,
+    previousFamily?.setCount ?? 0,
+    previousFamily?.nearFailureCount ?? 0
+  );
+  const volumeDelta = formatVolumeDelta(
+    family.totalVolume,
+    previousFamily?.totalVolume ?? 0
+  );
   const collapsed = isFamilyCollapsible(family);
   const collapsedMuscle = collapsed ? family.muscles[0] : null;
+  const familyAccessibilityLabel = buildMuscleRowAccessibilityLabel({
+    actionLabel: `Open ${family.familyName} history`,
+    setCount: family.setCount,
+    nearFailureCount: family.nearFailureCount,
+    previousSetCount: previousFamily?.setCount ?? 0,
+    previousNearFailureCount: previousFamily?.nearFailureCount ?? 0,
+    volume: family.totalVolume,
+    volumeDelta,
+    periodDays,
+  });
   const headerContent = (
     <>
-      <Text
-        adjustsFontSizeToFit
-        ellipsizeMode="clip"
-        minimumFontScale={0.82}
-        numberOfLines={2}
-        style={[styles.familyName, familyUntrained && styles.muscleTextUntrained]}
-        testID={`stats-family-name-${testIdSlug}`}>
-        {family.familyName}
-      </Text>
+      <FailureIntensityNameCell
+        name={family.familyName}
+        progress={computeFailureIntensityProgress(family.nearFailureCount, periodDays)}
+        ramp={FAMILY_FAILURE_INTENSITY_RAMP}
+        textStyle={[styles.familyName, familyUntrained && styles.muscleTextUntrained]}
+        textTestID={`stats-family-name-${testIdSlug}`}
+        barTestID={`stats-family-failure-bar-${testIdSlug}`}
+      />
       <View style={styles.familyMetrics}>
         <Metric
-          label="Sessions"
-          value={formatNumber(family.sessionCount)}
-          delta={sessionsDelta}
-          testID={`stats-family-sessions-${testIdSlug}`}
+          label="Sets"
+          value={formatSetCountPair(family.setCount, family.nearFailureCount)}
+          delta={setCountDelta}
+          testID={`stats-family-sets-${testIdSlug}`}
           muted={familyUntrained}
         />
         <Metric
-          label="Total weight"
-          value={formatTotalWeight(family.totalWeight)}
-          delta={weightDelta}
-          testID={`stats-family-weight-${testIdSlug}`}
+          label="Volume"
+          value={formatTotalWeight(family.totalVolume)}
+          delta={volumeDelta}
+          testID={`stats-family-volume-${testIdSlug}`}
           muted={familyUntrained}
         />
       </View>
@@ -512,7 +719,7 @@ function MuscleFamilyCard({
       {collapsedMuscle ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`Open ${collapsedMuscle.displayName} history`}
+          accessibilityLabel={familyAccessibilityLabel}
           onPress={() => onPressMuscleHistory(toMuscleHistoryTarget(collapsedMuscle))}
           style={({ pressed }) => [styles.familyHeader, pressed && styles.actionableRowPressed]}
           testID={`stats-family-header-button-${collapsedMuscle.muscleGroupId}`}>
@@ -521,7 +728,7 @@ function MuscleFamilyCard({
       ) : (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`Open ${family.familyName} history`}
+          accessibilityLabel={familyAccessibilityLabel}
           onPress={() => onPressMuscleHistory(toFamilyHistoryTarget(family))}
           style={({ pressed }) => [styles.familyHeader, pressed && styles.actionableRowPressed]}
           testID={`stats-family-header-${testIdSlug}`}>
@@ -531,46 +738,63 @@ function MuscleFamilyCard({
       {collapsed ? null : (
         <View style={styles.muscleList}>
           {visibleMuscles.map((muscle) => {
-            const muscleUntrained = muscle.sessionCount === 0 && muscle.totalWeight === 0;
+            const muscleUntrained = muscle.setCount === 0 && muscle.totalVolume === 0;
             const previousMuscle = previousMusclesById.get(muscle.muscleGroupId) ?? null;
-            const muscleSessionsDelta = formatDelta(
-              muscle.sessionCount,
-              previousMuscle?.sessionCount ?? 0
+            const muscleSetCountDelta = formatSetCountPairDelta(
+              muscle.setCount,
+              muscle.nearFailureCount,
+              previousMuscle?.setCount ?? 0,
+              previousMuscle?.nearFailureCount ?? 0
             );
-            const muscleWeightDelta = formatDelta(
-              muscle.totalWeight,
-              previousMuscle?.totalWeight ?? 0
+            const muscleVolumeDelta = formatVolumeDelta(
+              muscle.totalVolume,
+              previousMuscle?.totalVolume ?? 0
             );
+            const muscleAccessibilityLabel = buildMuscleRowAccessibilityLabel({
+              actionLabel: `Open ${muscle.displayName} history`,
+              setCount: muscle.setCount,
+              nearFailureCount: muscle.nearFailureCount,
+              previousSetCount: previousMuscle?.setCount ?? 0,
+              previousNearFailureCount: previousMuscle?.nearFailureCount ?? 0,
+              volume: muscle.totalVolume,
+              volumeDelta: muscleVolumeDelta,
+              periodDays,
+            });
             return (
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={`Open ${muscle.displayName} history`}
+                accessibilityLabel={muscleAccessibilityLabel}
                 key={muscle.muscleGroupId}
                 onPress={() => onPressMuscleHistory(toMuscleHistoryTarget(muscle))}
                 style={({ pressed }) => [styles.muscleRow, pressed && styles.actionableRowPressed]}
                 testID={`stats-muscle-row-${muscle.muscleGroupId}`}>
-                <Text
-                  style={[styles.muscleName, muscleUntrained && styles.muscleTextUntrained]}
-                  adjustsFontSizeToFit
-                  ellipsizeMode="clip"
-                  minimumFontScale={0.82}
-                  numberOfLines={2}>
-                  {muscle.displayName}
-                </Text>
+                <FailureIntensityNameCell
+                  name={muscle.displayName}
+                  progress={computeFailureIntensityProgress(
+                    muscle.nearFailureCount,
+                    periodDays
+                  )}
+                  ramp={MUSCLE_FAILURE_INTENSITY_RAMP}
+                  textStyle={[
+                    styles.muscleName,
+                    muscleUntrained && styles.muscleTextUntrained,
+                  ]}
+                  barTestID={`stats-muscle-failure-bar-${muscle.muscleGroupId}`}
+                />
                 <View style={styles.muscleMetrics}>
                   <Metric
-                    label="Sessions"
-                    value={formatNumber(muscle.sessionCount)}
-                    delta={muscleSessionsDelta}
-                    testID={`stats-muscle-sessions-${muscle.muscleGroupId}`}
+                    label="Sets"
+                    value={formatSetCountPair(muscle.setCount, muscle.nearFailureCount)}
+                    delta={muscleSetCountDelta}
+                    testID={`stats-muscle-sets-${muscle.muscleGroupId}`}
                     muted={muscleUntrained}
                     small
                   />
                   <Metric
-                    label="Total weight"
-                    value={formatTotalWeight(muscle.totalWeight)}
-                    delta={muscleWeightDelta}
-                    testID={`stats-muscle-weight-${muscle.muscleGroupId}`}
+                    label="Volume"
+                    value={formatTotalWeight(muscle.totalVolume)}
+                    delta={muscleVolumeDelta}
+                    testID={`stats-muscle-volume-${muscle.muscleGroupId}`}
                     muted={muscleUntrained}
                     small
                   />
@@ -904,7 +1128,15 @@ function ExerciseListView({
           <Pressable
             key={item.id}
             accessibilityRole="button"
-            accessibilityLabel={`Open ${item.name} heatmap`}
+            accessibilityLabel={`Open ${item.name} heatmap. ${formatNumber(
+              item.setCount
+            )} sets, ${formatNumber(item.nearFailureCount)} near-failure sets. Volume ${formatTotalWeight(
+              item.totalVolume
+            )}${
+              item.estimatedOneRepMax === null
+                ? ''
+                : `. Estimated one rep max ${formatTotalWeight(item.estimatedOneRepMax)}`
+            }`}
             onPress={() =>
               onPressExercise({ exerciseDefinitionId: item.id, displayName: item.name })
             }
@@ -921,9 +1153,9 @@ function ExerciseListView({
             </Text>
             <View style={styles.exerciseMetrics}>
               <Metric
-                label="Sessions"
-                value={formatNumber(item.sessionCount)}
-                testID={`stats-exercise-sessions-${item.id}`}
+                label="Sets"
+                value={formatSetCountPair(item.setCount, item.nearFailureCount)}
+                testID={`stats-exercise-sets-${item.id}`}
                 muted={false}
                 small
               />
@@ -1309,19 +1541,21 @@ export default function StatsRoute() {
   const exerciseListItems = useMemo<ExerciseListItem[]>(() => {
     const { exercises } = catalogSnapshot;
     const { aggregatesById, everDoneIds } = exerciseCatalogStats;
-    return exercises
-      .filter((ex) => everDoneIds.has(ex.id))
-      .map((ex) => {
-        const agg = aggregatesById.get(ex.id) ?? null;
-        return {
-          id: ex.id,
-          name: ex.name,
-          sessionCount: agg?.sessionCount ?? 0,
-          totalVolume: agg?.totalVolume ?? 0,
-          estimatedOneRepMax: agg?.estimatedOneRepMax ?? null,
-        };
-      })
-      .sort((a, b) => b.sessionCount - a.sessionCount);
+    return sortExerciseListItems(
+      exercises
+        .filter((ex) => everDoneIds.has(ex.id))
+        .map((ex) => {
+          const agg = aggregatesById.get(ex.id) ?? null;
+          return {
+            id: ex.id,
+            name: ex.name,
+            setCount: agg?.setCount ?? 0,
+            nearFailureCount: agg?.nearFailureCount ?? 0,
+            totalVolume: agg?.totalVolume ?? 0,
+            estimatedOneRepMax: agg?.estimatedOneRepMax ?? null,
+          };
+        })
+    );
   }, [catalogSnapshot, exerciseCatalogStats]);
 
   // useMemo prevents unnecessary re-renders of the shell when the route re-renders.
@@ -1516,8 +1750,30 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: uiColors.textPrimary,
-    flexShrink: 1,
+    zIndex: 1,
+  },
+  failureIntensityNameCell: {
+    flex: 1,
     minWidth: 0,
+    alignSelf: 'stretch',
+    justifyContent: 'center',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  failureIntensityClip: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    overflow: 'hidden',
+    opacity: 0.28,
+  },
+  failureIntensityRamp: {
+    height: '100%',
+    flexDirection: 'row',
+  },
+  failureIntensityRampStop: {
+    flex: 1,
   },
   familyMetrics: {
     flexDirection: 'row',
@@ -1542,8 +1798,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     color: uiColors.textPrimary,
-    flexShrink: 1,
-    minWidth: 0,
+    zIndex: 1,
   },
   muscleMetrics: {
     flexDirection: 'row',
