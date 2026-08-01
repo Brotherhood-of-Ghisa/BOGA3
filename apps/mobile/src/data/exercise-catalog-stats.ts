@@ -4,6 +4,11 @@ import {
   estimateOneRepMax,
   parseCalculationSet,
 } from '@/src/exercise-calculations';
+import {
+  isConfirmedPerformedSet,
+  normalizeSessionSetPerformanceStatus,
+  type SessionSetPerformanceStatus,
+} from '@/src/session-recorder/set-semantics';
 
 import { bootstrapLocalDataLayer } from './bootstrap';
 import { exerciseSets, sessionExercises, sessions } from './schema';
@@ -40,6 +45,7 @@ export type ExerciseCatalogStatsRawHistory = {
     weightValue: string;
     repsValue: string;
     setType: string | null;
+    performanceStatus?: SessionSetPerformanceStatus;
   }[];
 };
 
@@ -93,6 +99,7 @@ export const createDrizzleExerciseCatalogStatsStore = (): ExerciseCatalogStatsSt
               weightValue: exerciseSets.weightValue,
               repsValue: exerciseSets.repsValue,
               setType: exerciseSets.setType,
+              performanceStatus: exerciseSets.performanceStatus,
             })
             .from(exerciseSets)
             .where(
@@ -113,6 +120,7 @@ export const createDrizzleExerciseCatalogStatsStore = (): ExerciseCatalogStatsSt
         weightValue: row.weightValue,
         repsValue: row.repsValue,
         setType: row.setType ?? null,
+        performanceStatus: normalizeSessionSetPerformanceStatus(row.performanceStatus),
       })),
     };
   },
@@ -189,6 +197,16 @@ export const aggregateExerciseCatalogStats = (
   const recencyWindow = resolveRecencyScoringWindow(period, now);
 
   for (const set of raw.exerciseSets) {
+    if (
+      !isConfirmedPerformedSet({
+        reps: set.repsValue,
+        weight: set.weightValue,
+        performanceStatus: set.performanceStatus,
+      })
+    ) {
+      continue;
+    }
+
     const link = sessionExerciseById.get(set.sessionExerciseId);
     if (!link || link.exerciseDefinitionId === null) continue;
 

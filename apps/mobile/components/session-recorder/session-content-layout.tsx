@@ -22,7 +22,7 @@ export type ExerciseCardPersonalRecordSummary = {
 
 type ExerciseCardCollapsedSummaryProps = {
   setCount: number;
-  failureCount: number;
+  workingSetCount: number;
   newPersonalRecord?: ExerciseCardPersonalRecordSummary | null;
   testID: string;
 };
@@ -41,17 +41,17 @@ const formatCompactLoad = (value: number): string => {
 
 export function ExerciseCardCollapsedSummary({
   setCount,
-  failureCount,
+  workingSetCount,
   newPersonalRecord,
   testID,
 }: ExerciseCardCollapsedSummaryProps) {
   const setLabel = `${setCount} ${setCount === 1 ? 'set' : 'sets'}`;
-  const failureLabel = `${failureCount} ${failureCount === 1 ? 'failure' : 'failures'}`;
+  const workingSetLabel = `${workingSetCount} ${workingSetCount === 1 ? 'w/set' : 'w/sets'}`;
 
   return (
     <View style={styles.exerciseCollapsedSummary} testID={testID}>
       <UiText variant="subtitle" testID={`${testID}-counts`}>
-        {`${setLabel} (${failureLabel})`}
+        {`${setLabel} · ${workingSetLabel}`}
       </UiText>
       <ExerciseCardPersonalRecordLine
         personalRecord={newPersonalRecord}

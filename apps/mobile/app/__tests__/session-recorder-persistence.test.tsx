@@ -399,8 +399,17 @@ describe('SessionRecorderScreen persistence wiring', () => {
       })
     );
     expect(
-      screen.getByLabelText('logged set 1 for exercise 1: 0kg · 5 reps; quality none')
+      screen.getByLabelText('unconfirmed set 1 for exercise 1: 0kg · 5 reps; quality none')
     ).toBeTruthy();
+    expect(mockPersistSessionDraftSnapshot).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        exercises: [
+          expect.objectContaining({
+            sets: [expect.objectContaining({ performanceStatus: 'unperformed' })],
+          }),
+        ],
+      })
+    );
   });
 
   it('does not inject zero while focus moves between inputs in the same row', async () => {
@@ -431,7 +440,27 @@ describe('SessionRecorderScreen persistence wiring', () => {
 
   it('pauses completed-edit autosave while times are invalid and resumes when valid', async () => {
     mockSearchParams = { mode: 'completed-edit', sessionId: 'completed-edit-1' };
-    mockLoadSessionSnapshotById.mockResolvedValue(buildCompletedEditSnapshot());
+    mockLoadSessionSnapshotById.mockResolvedValue(
+      buildCompletedEditSnapshot({
+        exercises: [
+          {
+            id: 'exercise-1',
+            exerciseDefinitionId: 'seed_barbell_bench_press',
+            name: 'Bench Press',
+            machineName: null,
+            sets: [
+              {
+                id: 'set-1',
+                repsValue: '5',
+                weightValue: '225',
+                setType: null,
+                performanceStatus: 'unperformed',
+              },
+            ],
+          },
+        ],
+      })
+    );
 
     render(<SessionRecorderScreen />);
 
@@ -463,6 +492,11 @@ describe('SessionRecorderScreen persistence wiring', () => {
     expect(mockPersistCompletedSessionSnapshot.mock.calls[0][0]).toEqual(
       expect.objectContaining({
         sessionId: 'completed-edit-1',
+        exercises: [
+          expect.objectContaining({
+            sets: [expect.objectContaining({ performanceStatus: 'unperformed' })],
+          }),
+        ],
       })
     );
   });

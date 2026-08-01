@@ -21,14 +21,14 @@ export const HEAT_RAMP = [
 /** Structural subset of an effort row carrying the four selectable metrics. */
 export type HeatmapMetricSource = {
   totalVolume: number;
-  nearFailureCount: number;
+  workingSetCount: number;
   estimatedRM1: number | null;
   highestWeight: number | null;
 };
 
 /**
  * Returns the value for the selected metric, or `null` when there is nothing to
- * show (no volume / no near-failure work / missing 1RM or top weight).
+ * show (no volume / no working sets / missing 1RM or top weight).
  */
 export const getMetricValue = (
   source: HeatmapMetricSource,
@@ -37,8 +37,8 @@ export const getMetricValue = (
   switch (metric) {
     case 'totalVolume':
       return source.totalVolume > 0 ? source.totalVolume : null;
-    case 'nearFailureCount':
-      return source.nearFailureCount > 0 ? source.nearFailureCount : null;
+    case 'workingSetCount':
+      return source.workingSetCount > 0 ? source.workingSetCount : null;
     case 'estimatedRM1':
       return source.estimatedRM1;
     case 'highestWeight':

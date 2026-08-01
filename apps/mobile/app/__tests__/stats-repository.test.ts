@@ -53,11 +53,27 @@ const flattenMuscles = (totals: ReturnType<typeof aggregateStats>) =>
   totals.muscleFamilies.flatMap((family) => family.muscles);
 
 describe('aggregateStats', () => {
-  it('includes warm-up sets in totals and counts orphan-exercise sets in total only', () => {
+  it('counts valid confirmed RIR 0-2 rows as working sets', () => {
     const totals = aggregateStats(buildAggregationInput());
 
     expect(totals.sessionCount).toBe(2);
-    expect(totals.totalSets).toBe(7);
+    expect(totals.workingSetCount).toBe(3);
+  });
+
+  it('excludes valid but unconfirmed sets from set and muscle totals', () => {
+    const input = buildAggregationInput();
+    input.exerciseSets.push({
+      sessionExerciseId: 'se-1',
+      setType: 'rir_0',
+      weightValue: '500',
+      repsValue: '10',
+      performanceStatus: 'unperformed',
+    });
+
+    const totals = aggregateStats(input);
+    const byId = new Map(flattenMuscles(totals).map((entry) => [entry.muscleGroupId, entry]));
+    expect(totals.workingSetCount).toBe(3);
+    expect(byId.get('chest_sternal')?.totalWeight).toBe(1800);
   });
 
   it('attributes total weight to muscles using role weights (primary=1, secondary=0.5, stabilizer=0)', () => {
@@ -130,7 +146,7 @@ describe('aggregateStats', () => {
     );
 
     expect(totals.sessionCount).toBe(0);
-    expect(totals.totalSets).toBe(0);
+    expect(totals.workingSetCount).toBe(0);
     expect(totals.muscleFamilies.every((family) => family.sessionCount === 0 && family.totalWeight === 0)).toBe(true);
     expect(flattenMuscles(totals)).toHaveLength(4);
   });

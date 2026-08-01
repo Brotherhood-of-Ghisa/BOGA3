@@ -86,6 +86,10 @@ Use this section as the single source of truth for reusable UX patterns.
    - Intent: reduce vertical density while retaining the facts needed to identify and compare repeated content.
    - Usage: exercise cards in active/completed-edit recording and completed-session detail.
    - Rules: cards start expanded, the title region is a minimum-size accessible toggle, collapse hides detail without changing domain data, and the collapsed state shows only validated summary facts. Actions that require the hidden content to be visible must expand the card.
+5. Explicit row confirmation pattern
+   - Intent: keep entered/defaulted values separate from the user's assertion that a repeated item was actually completed.
+   - Usage: normal and prescribed set rows in the active/completed-edit session recorder.
+   - Rules: use a dedicated mobile-sized checkbox-like target independent of row editing; show distinct unchecked and checked shapes so color is supplemental; confirm only valid values; allow confirmation to be undone without clearing values; exclude unchecked items from completion metrics; require an explicit discard decision when valid unchecked work would be removed at submit/save; and keep source identity separate from confirmation status (for example, inactive planned rows use a semantic surface and accessible source wording remains available when the shared selected-row surface temporarily overrides it, while the hollow/tick control communicates performance).
 
 ## Default appearance baseline (MVP)
 

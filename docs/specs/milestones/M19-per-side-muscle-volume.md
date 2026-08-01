@@ -73,7 +73,7 @@ entered-load volume displays.
 - Source-of-truth docs updates for data model, sync contract, UI behavior, and
   testing expectations as implementation tasks make the behavior current.
 - Stats / History muscle overlays exposing the resulting per-side `Volume`
-  alongside `Near failure` in both daily and weekly heatmap views.
+  alongside `W/sets` in both daily and weekly heatmap views.
 
 ## Out of scope
 
@@ -101,7 +101,7 @@ entered-load volume displays.
 6. Updated project-level data model, sync contract, testing, and UI docs where
    behavior becomes source of truth.
 7. Muscle-history daily and weekly heatmaps with selectable `Volume` and
-   `Near failure` metrics, defaulting to `Volume`.
+   `W/sets` metrics, defaulting to `Volume`.
 
 ## Acceptance criteria
 
@@ -128,7 +128,7 @@ entered-load volume displays.
 12. Required local gates for each implementation slice are green before that
     slice is marked complete.
 13. Selecting a muscle or muscle family in Stats / History exposes `Volume` and
-    `Near failure`; daily and weekly volume use the M19 per-side, role-weighted
+    `W/sets`; daily and weekly volume use the M19 per-side, role-weighted
     aggregation across the selected muscle IDs, while muscle-level 1RM and Top
     weight remain unavailable.
 
@@ -145,7 +145,7 @@ Completed task cards for this milestone:
 7. `docs/tasks/complete/M19-T07-Update_stats_history_docs_and_ui_contracts.md` - Update source-of-truth docs for data, sync, stats, and UI behavior (`completed`).
 8. `docs/tasks/complete/M19-T08-Add_backend_and_sync_contract_coverage.md` - Add backend/schema/wire tests proving load-mode round trip and restore behavior (`completed`).
 9. `docs/tasks/complete/M19-T09-Run_full_feature_gates_and_close_milestone.md` - Run required fast, backend, and frontend gates and close the milestone (`completed`).
-10. `docs/tasks/complete/M19-T10-Expose_per_side_volume_in_muscle_history.md` - Expose per-side Volume alongside Near failure in muscle-history daily and weekly views (`completed`).
+10. `docs/tasks/complete/M19-T10-Expose_per_side_volume_in_muscle_history.md` - Expose per-side Volume alongside working sets in muscle-history daily and weekly views (`completed`).
 
 ## Risks / dependencies
 
@@ -169,7 +169,7 @@ Completed task cards for this milestone:
 - What changed: added durable exercise load semantics, deterministic seed/backfill
   metadata, per-side muscle analytics, editor controls, recorder labels, Sync v2
   round trips, and source-of-truth documentation. Corrective task `M19-T10`
-  exposes the resulting per-side Volume alongside Near failure in both daily and
+  exposes the resulting per-side Volume alongside working sets in both daily and
   weekly muscle history.
 - Verification summary: the original milestone's `./boga test fast`,
   `./boga test backend`, and `./boga test frontend` passed locally. The `M19-T10`

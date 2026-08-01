@@ -89,7 +89,7 @@ const buildSummary = (overrides: Partial<StatsSummary> = {}): StatsSummary => ({
     },
     totals: {
       sessionCount: 4,
-      totalSets: 38,
+      workingSetCount: 38,
       muscleFamilies: [
         {
           familyName: 'Chest',
@@ -158,7 +158,7 @@ const buildSummary = (overrides: Partial<StatsSummary> = {}): StatsSummary => ({
     },
     totals: {
       sessionCount: 3,
-      totalSets: 30,
+      workingSetCount: 30,
       muscleFamilies: [
         {
           familyName: 'Chest',
@@ -284,7 +284,7 @@ const buildWeeklyEffort = (): SelectedMuscleWeeklyEffort => ({
   monthKey: '2026-05',
   weekOfMonth: 2,
   totalVolume: 1100,
-  nearFailureCount: 2,
+  workingSetCount: 2,
   estimatedRM1: 150,
   highestWeight: 120,
 });
@@ -523,7 +523,7 @@ describe('StatsScreenShell', () => {
     expect(onDismissMuscleHistory).toHaveBeenCalledTimes(1);
   });
 
-  it('renders exactly Volume and Near failure metric chips in the muscle overlay', () => {
+  it('renders exactly Volume and W/sets metric chips in the muscle overlay', () => {
     renderStatsScreenShell({
       selectedMuscle: {
         muscleGroupIds: ['front_delts'],
@@ -534,7 +534,7 @@ describe('StatsScreenShell', () => {
     });
 
     expect(screen.getByTestId('stats-muscle-history-metric-chip-totalVolume')).toBeTruthy();
-    expect(screen.getByTestId('stats-muscle-history-metric-chip-nearFailureCount')).toBeTruthy();
+    expect(screen.getByTestId('stats-muscle-history-metric-chip-workingSetCount')).toBeTruthy();
     expect(screen.queryByTestId('stats-muscle-history-metric-chip-estimatedRM1')).toBeNull();
     expect(screen.queryByTestId('stats-muscle-history-metric-chip-highestWeight')).toBeNull();
   });
@@ -552,8 +552,8 @@ describe('StatsScreenShell', () => {
       onSelectMuscleHistoryMetric,
     });
 
-    fireEvent.press(screen.getByTestId('stats-muscle-history-metric-chip-nearFailureCount'));
-    expect(onSelectMuscleHistoryMetric).toHaveBeenCalledWith('nearFailureCount');
+    fireEvent.press(screen.getByTestId('stats-muscle-history-metric-chip-workingSetCount'));
+    expect(onSelectMuscleHistoryMetric).toHaveBeenCalledWith('workingSetCount');
   });
 
   it('renders the Daily/Weekly view toggle and reports changes', () => {
@@ -588,7 +588,7 @@ describe('StatsScreenShell', () => {
         {
           dateKey: '2026-05-13',
           totalVolume: 1200,
-          nearFailureCount: 2,
+          workingSetCount: 2,
           estimatedRM1: 95,
           highestWeight: 80,
         },
@@ -621,15 +621,15 @@ describe('StatsScreenShell', () => {
       <StatsScreenShell
         {...buildShellProps({
           ...props,
-          muscleHistoryMetric: 'nearFailureCount',
+          muscleHistoryMetric: 'workingSetCount',
         })}
       />
     );
     fireEvent.press(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-05-13'));
     expect(screen.getByTestId('stats-muscle-history-heatmap-day-detail-value')).toHaveTextContent(
-      /Near failure: 2/
+      /W\/sets: 2/
     );
-    expect(screen.getByText('Near failure per day')).toBeTruthy();
+    expect(screen.getByText('W/sets per day')).toBeTruthy();
   });
 
   it('shows the selected metric in the week selection banner', () => {
@@ -662,12 +662,12 @@ describe('StatsScreenShell', () => {
       <StatsScreenShell
         {...buildShellProps({
           ...props,
-          muscleHistoryMetric: 'nearFailureCount',
+          muscleHistoryMetric: 'workingSetCount',
         })}
       />
     );
     expect(screen.getByTestId('stats-muscle-history-week-banner-value')).toHaveTextContent(
-      /Near failure: 2/
+      /W\/sets: 2/
     );
   });
 
@@ -697,7 +697,7 @@ describe('StatsRoute', () => {
             ...buildSummary().current,
             totals: {
               sessionCount: 12,
-              totalSets: 100,
+              workingSetCount: 100,
               muscleFamilies: buildSummary().current.totals.muscleFamilies,
             },
           },
@@ -801,9 +801,9 @@ describe('StatsRoute', () => {
       screen.getByTestId('stats-muscle-history-metric-chip-totalVolume').props.accessibilityState
     ).toEqual({ selected: true });
 
-    fireEvent.press(screen.getByTestId('stats-muscle-history-metric-chip-nearFailureCount'));
+    fireEvent.press(screen.getByTestId('stats-muscle-history-metric-chip-workingSetCount'));
     expect(
-      screen.getByTestId('stats-muscle-history-metric-chip-nearFailureCount').props
+      screen.getByTestId('stats-muscle-history-metric-chip-workingSetCount').props
         .accessibilityState
     ).toEqual({ selected: true });
   });
@@ -911,7 +911,7 @@ describe('StatsScreenShell — view mode toggle', () => {
     });
 
     expect(screen.getByTestId('stats-exercise-history-metric-chip-totalVolume')).toBeTruthy();
-    expect(screen.getByTestId('stats-exercise-history-metric-chip-nearFailureCount')).toBeTruthy();
+    expect(screen.getByTestId('stats-exercise-history-metric-chip-workingSetCount')).toBeTruthy();
     expect(screen.getByTestId('stats-exercise-history-metric-chip-estimatedRM1')).toBeTruthy();
     expect(screen.getByTestId('stats-exercise-history-metric-chip-highestWeight')).toBeTruthy();
   });

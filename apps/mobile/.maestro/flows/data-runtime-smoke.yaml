@@ -57,15 +57,19 @@ appId: com.dinoderek.mobile
     text: "Select exercise Barbell Back Squat"
 - tapOn:
     id: "exercise-picker-add-empty-set-button"
+- takeScreenshot: "set-performance-normal-invalid"
 - tapOn: "Weight for exercise 1 set 1"
 - inputText: "135"
 - tapOn: "Reps for exercise 1 set 1"
 - inputText: "8"
-# The session has one complete set (weight + reps), so Submit goes straight
-# through with no "Remove incomplete/empty" confirmation dialog — the previous
-# optional re-tap + confirmation taps here were always absent (WARNED) and cost
-# ~7s. We assert the success screen directly; a missing/blocked submit fails the
-# extendedWaitUntil loudly.
+- hideKeyboard:
+    optional: true
+- takeScreenshot: "set-performance-normal-unconfirmed"
+- tapOn:
+    id: "set-performance-control-1-1"
+- takeScreenshot: "set-performance-normal-confirmed"
+# The session has one explicitly confirmed set, so Submit goes straight through
+# with no incomplete, unconfirmed, or empty-row confirmation dialog.
 - tapOn: "Submit Session"
 - extendedWaitUntil:
     visible:

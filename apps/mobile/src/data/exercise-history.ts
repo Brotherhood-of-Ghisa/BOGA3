@@ -5,6 +5,11 @@ import {
   computeMaxRepsByWeight,
   estimateExerciseOneRepMax,
 } from '@/src/exercise-calculations';
+import {
+  isConfirmedPerformedSet,
+  normalizeSessionSetPerformanceStatus,
+  type SessionSetPerformanceStatus,
+} from '@/src/session-recorder/set-semantics';
 
 import { bootstrapLocalDataLayer } from './bootstrap';
 import {
@@ -16,7 +21,11 @@ import {
   sessionExercises,
   sessions,
 } from './schema';
-import { normalizeSessionSetType, type SessionSetTypeValue } from './set-types';
+import {
+  isWorkingSessionSetType,
+  normalizeSessionSetType,
+  type SessionSetTypeValue,
+} from './set-types';
 import { computePeriodBounds, type StatsPeriodDays } from './stats';
 
 export type ExerciseHistoryPeriod = 'all' | StatsPeriodDays;
@@ -89,6 +98,7 @@ export type ExerciseHistorySetRow = {
   weightValue: string;
   repsValue: string;
   setType: string | null;
+  performanceStatus?: SessionSetPerformanceStatus;
 };
 
 export type ExerciseHistoryTagRow = {
@@ -147,8 +157,6 @@ const ensureValidDate = (value: Date, label: string) => {
   }
 };
 
-const isWorkingSet = (setType: string | null) => setType !== 'warm_up';
-
 const groupBySessionExerciseId = <T extends { sessionExerciseId: string }>(
   rows: T[]
 ): Record<string, T[]> => {
@@ -183,26 +191,34 @@ const buildSessionEntry = (
   setRows: ExerciseHistorySetRow[],
   tagRows: ExerciseHistoryTagRow[]
 ): ExerciseHistorySessionEntry => {
-  const orderedSets = [...setRows].sort(compareSetOrder);
+  const orderedSets = setRows
+    .filter((set) =>
+      isConfirmedPerformedSet({
+        reps: set.repsValue,
+        weight: set.weightValue,
+        performanceStatus: set.performanceStatus,
+      })
+    )
+    .sort(compareSetOrder);
   const sets: ExerciseHistorySetEntry[] = orderedSets.map((row) => ({
     setId: row.setId,
     orderIndex: row.orderIndex,
     weightValue: row.weightValue,
     repsValue: row.repsValue,
     setType: normalizeSessionSetType(row.setType),
-    isWorking: isWorkingSet(row.setType),
+    isWorking: isWorkingSessionSetType(row.setType),
   }));
 
   const workingSetCount = sets.reduce((count, set) => (set.isWorking ? count + 1 : count), 0);
-  const workingSetInputs = orderedSets.map((row) => ({
+  const calculationInputs = orderedSets.map((row) => ({
     weightValue: row.weightValue,
     repsValue: row.repsValue,
     setType: row.setType,
   }));
 
-  const estimatedOneRepMax = estimateExerciseOneRepMax(workingSetInputs);
-  const totalVolume = computeExerciseVolume(workingSetInputs);
-  const topByWeight = computeMaxRepsByWeight(workingSetInputs);
+  const estimatedOneRepMax = estimateExerciseOneRepMax(calculationInputs);
+  const totalVolume = computeExerciseVolume(calculationInputs);
+  const topByWeight = computeMaxRepsByWeight(calculationInputs);
   const topWeightSet = topByWeight.length > 0
     ? { weight: topByWeight[0].weight, reps: topByWeight[0].maxReps }
     : null;
@@ -305,21 +321,25 @@ export const aggregateExerciseHistory = (
     : input.sessionsInPeriod;
 
   const orderedSessionRows = [...filteredSessionRows].sort(compareCompletedDesc);
-  const sessions = orderedSessionRows.map((row) =>
-    buildSessionEntry(
-      row,
-      input.setsBySessionExerciseId[row.sessionExerciseId] ?? [],
-      input.tagsBySessionExerciseId[row.sessionExerciseId] ?? []
+  const sessions = orderedSessionRows
+    .map((row) =>
+      buildSessionEntry(
+        row,
+        input.setsBySessionExerciseId[row.sessionExerciseId] ?? [],
+        input.tagsBySessionExerciseId[row.sessionExerciseId] ?? []
+      )
     )
-  );
+    .filter((entry) => entry.sets.length > 0);
 
-  const allTimeEntries = input.sessionsAllTime.map((row) =>
-    buildSessionEntry(
-      row,
-      input.setsBySessionExerciseId[row.sessionExerciseId] ?? [],
-      input.tagsBySessionExerciseId[row.sessionExerciseId] ?? []
+  const allTimeEntries = input.sessionsAllTime
+    .map((row) =>
+      buildSessionEntry(
+        row,
+        input.setsBySessionExerciseId[row.sessionExerciseId] ?? [],
+        input.tagsBySessionExerciseId[row.sessionExerciseId] ?? []
+      )
     )
-  );
+    .filter((entry) => entry.sets.length > 0);
 
   return {
     exerciseDefinitionId: input.exerciseDefinition.id,
@@ -403,6 +423,7 @@ export const createDrizzleExerciseHistoryStore = (): ExerciseHistoryStore => ({
         weightValue: exerciseSets.weightValue,
         repsValue: exerciseSets.repsValue,
         setType: exerciseSets.setType,
+        performanceStatus: exerciseSets.performanceStatus,
       })
       .from(exerciseSets)
       .where(
@@ -421,6 +442,7 @@ export const createDrizzleExerciseHistoryStore = (): ExerciseHistoryStore => ({
       weightValue: row.weightValue,
       repsValue: row.repsValue,
       setType: row.setType ?? null,
+      performanceStatus: normalizeSessionSetPerformanceStatus(row.performanceStatus),
     }));
   },
   async loadTagsForSessionExercises({ sessionExerciseIds }) {

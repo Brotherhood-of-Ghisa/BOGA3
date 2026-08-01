@@ -47,9 +47,9 @@ export const uiColors = {
   heatmapSelectedBorder: '#0f5cc0',
   rowActiveBackground: '#eef5ff',
   rowActiveBorder: '#a9c7f5',
-  rowLastAddedBackground: '#f5f9ff',
+  rowPlannedBackground: '#e8eef7',
+  rowPlannedBorder: '#b8c7da',
   rowSwipeDeleteBackground: '#fff0f0',
-  rowSwipeSkipBackground: '#eef2f9',
   rowSwipeIcon: '#20324f',
   rowSwipeText: '#20324f',
 } as const;

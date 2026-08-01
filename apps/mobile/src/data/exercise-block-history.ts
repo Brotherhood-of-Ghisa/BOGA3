@@ -8,13 +8,17 @@ import {
   parseSetReps,
   parseSetWeight,
 } from '@/src/exercise-calculations';
+import {
+  isConfirmedPerformedSet,
+  normalizeSessionSetPerformanceStatus,
+  type SessionSetPerformanceStatus,
+} from '@/src/session-recorder/set-semantics';
 
 import { bootstrapLocalDataLayer } from './bootstrap';
 import { exerciseSets, sessionExercises, sessions } from './schema';
-import { normalizeSessionSetType } from './set-types';
+import { isWorkingSessionSetType, normalizeSessionSetType } from './set-types';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-const RIR_AT_MOST_TWO_SET_TYPES = new Set(['rir_0', 'rir_1', 'rir_2']);
 
 export type ExerciseBlockHistorySessionRow = {
   sessionId: string;
@@ -34,6 +38,7 @@ export type ExerciseBlockHistorySetRow = {
   weightValue: string;
   repsValue: string;
   setType: string | null;
+  performanceStatus?: SessionSetPerformanceStatus;
 };
 
 export type ExerciseBlockHistoryBlock = {
@@ -44,7 +49,7 @@ export type ExerciseBlockHistoryBlock = {
   estimatedOneRepMax: number | null;
   totalVolume: number;
   highestWeight: number | null;
-  rirAtMostTwoSetCount: number;
+  workingSetCount: number;
 };
 
 export type ExerciseBlockHistorySummary = {
@@ -165,11 +170,11 @@ const computeDaysAgo = (completedAt: Date, now: Date): number => {
   return Math.max(0, Math.floor(diff / DAY_MS));
 };
 
-const countRirAtMostTwoSets = (setRows: ExerciseBlockHistorySetRow[]): number => {
+const countWorkingSets = (setRows: ExerciseBlockHistorySetRow[]): number => {
   let count = 0;
   for (const row of setRows) {
     const setType = normalizeSessionSetType(row.setType);
-    if (!setType || !RIR_AT_MOST_TWO_SET_TYPES.has(setType)) continue;
+    if (!isWorkingSessionSetType(setType)) continue;
     if (parseCalculationSet(row) === null) continue;
     count += 1;
   }
@@ -177,7 +182,11 @@ const countRirAtMostTwoSets = (setRows: ExerciseBlockHistorySetRow[]): number =>
 };
 
 const isValidSuggestedPlanSet = (row: ExerciseBlockHistorySetRow): boolean =>
-  parseSetWeight(row.weightValue) !== null && parseSetReps(row.repsValue) !== null;
+  isConfirmedPerformedSet({
+    reps: row.repsValue,
+    weight: row.weightValue,
+    performanceStatus: row.performanceStatus,
+  }) && parseSetWeight(row.weightValue) !== null && parseSetReps(row.repsValue) !== null;
 
 export const aggregateExerciseBlockHistory = (
   input: ExerciseBlockHistoryAggregationInput
@@ -198,7 +207,16 @@ export const aggregateExerciseBlockHistory = (
 
     const setRows = matchingSessionExercises
       .flatMap((row) => input.setsBySessionExerciseId[row.sessionExerciseId] ?? [])
+      .filter((set) =>
+        isConfirmedPerformedSet({
+          reps: set.repsValue,
+          weight: set.weightValue,
+          performanceStatus: set.performanceStatus,
+        })
+      )
       .sort(compareSetOrder);
+    if (setRows.length === 0) continue;
+
     const calculationSets = setRows.map((row) => ({
       weightValue: row.weightValue,
       repsValue: row.repsValue,
@@ -214,7 +232,7 @@ export const aggregateExerciseBlockHistory = (
       estimatedOneRepMax: estimateExerciseOneRepMax(calculationSets),
       totalVolume: computeExerciseVolume(calculationSets),
       highestWeight: maxRepsByWeight[0]?.weight ?? null,
-      rirAtMostTwoSetCount: countRirAtMostTwoSets(setRows),
+      workingSetCount: countWorkingSets(setRows),
     });
   }
 
@@ -353,6 +371,7 @@ export const createDrizzleExerciseBlockHistoryStore = (): ExerciseBlockHistorySt
         weightValue: exerciseSets.weightValue,
         repsValue: exerciseSets.repsValue,
         setType: exerciseSets.setType,
+        performanceStatus: exerciseSets.performanceStatus,
       })
       .from(exerciseSets)
       .where(
@@ -372,6 +391,7 @@ export const createDrizzleExerciseBlockHistoryStore = (): ExerciseBlockHistorySt
       weightValue: row.weightValue,
       repsValue: row.repsValue,
       setType: row.setType ?? null,
+      performanceStatus: normalizeSessionSetPerformanceStatus(row.performanceStatus),
     }));
   },
 });

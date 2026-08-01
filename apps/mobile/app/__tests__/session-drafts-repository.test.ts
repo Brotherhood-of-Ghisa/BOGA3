@@ -97,7 +97,13 @@ describe('session draft repository', () => {
           expect.objectContaining({
             exerciseDefinitionId: 'seed_barbell_bench_press',
             name: 'Bench Press',
-            sets: [expect.objectContaining({ repsValue: '5', weightValue: '225' })],
+            sets: [
+              expect.objectContaining({
+                repsValue: '5',
+                weightValue: '225',
+                performanceStatus: null,
+              }),
+            ],
           }),
         ],
       })
@@ -184,10 +190,73 @@ describe('session draft repository', () => {
     const draft = await repository.loadLatestDraftSnapshot();
 
     expect(draft?.exercises[0]?.sets).toEqual([
-      expect.objectContaining({ id: 'set-blank', repsValue: '', weightValue: '' }),
-      expect.objectContaining({ id: 'set-weight-only', repsValue: '', weightValue: '80' }),
-      expect.objectContaining({ id: 'set-zero-load', repsValue: '8', weightValue: '0' }),
+      expect.objectContaining({
+        id: 'set-blank',
+        repsValue: '',
+        weightValue: '',
+        performanceStatus: 'unperformed',
+      }),
+      expect.objectContaining({
+        id: 'set-weight-only',
+        repsValue: '',
+        weightValue: '80',
+        performanceStatus: 'unperformed',
+      }),
+      expect.objectContaining({
+        id: 'set-zero-load',
+        repsValue: '8',
+        weightValue: '0',
+        performanceStatus: null,
+      }),
     ]);
+  });
+
+  it('round-trips explicit unperformed status for valid active and completed-edit sets', async () => {
+    const store = createMockStore();
+    const repository = createSessionDraftRepository(store);
+    store.saveDraftGraph.mockResolvedValue({ sessionId: 'session-unperformed' });
+    store.saveCompletedSessionGraph.mockResolvedValue({ sessionId: 'session-unperformed' });
+
+    const exercises = [
+      {
+        id: 'exercise-1',
+        exerciseDefinitionId: 'seed_barbell_bench_press',
+        name: 'Bench Press',
+        sets: [
+          {
+            id: 'set-1',
+            repsValue: '5',
+            weightValue: '225',
+            performanceStatus: 'unperformed' as const,
+          },
+        ],
+      },
+    ];
+
+    await repository.persistDraftSnapshot({
+      sessionId: 'session-unperformed',
+      gymId: null,
+      startedAt: new Date('2026-02-20T10:00:00.000Z'),
+      exercises,
+    });
+    await repository.persistCompletedSessionSnapshot({
+      sessionId: 'session-unperformed',
+      gymId: null,
+      startedAt: new Date('2026-02-20T10:00:00.000Z'),
+      completedAt: new Date('2026-02-20T10:30:00.000Z'),
+      exercises,
+    });
+
+    expect(store.saveDraftGraph).toHaveBeenCalledWith(
+      expect.objectContaining({
+        exercises: [expect.objectContaining({ sets: [expect.objectContaining({ performanceStatus: 'unperformed' })] })],
+      })
+    );
+    expect(store.saveCompletedSessionGraph).toHaveBeenCalledWith(
+      expect.objectContaining({
+        exercises: [expect.objectContaining({ sets: [expect.objectContaining({ performanceStatus: 'unperformed' })] })],
+      })
+    );
   });
 
   it('loads a completed session graph by id with ordered exercises and sets', async () => {
@@ -386,6 +455,16 @@ describe('session draft repository', () => {
               repsValue: '6',
               weightValue: '',
               setType: null,
+              performanceStatus: null,
+            },
+            {
+              id: 'source-set-unconfirmed',
+              sessionExerciseId: 'source-exercise-1',
+              orderIndex: 1,
+              repsValue: '10',
+              weightValue: '500',
+              setType: 'rir_0',
+              performanceStatus: 'unperformed',
             },
           ],
         },

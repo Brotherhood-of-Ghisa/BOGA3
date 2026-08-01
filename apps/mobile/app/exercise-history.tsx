@@ -383,7 +383,7 @@ function SessionCard({
         <SessionMetric label="Est 1RM" value={formatEstOneRm(entry.estimatedOneRepMax)} />
         <SessionMetric label="Top set" value={formatTopWeight(entry.topWeightSet)} />
         <SessionMetric label="Volume" value={formatVolume(entry.totalVolume)} />
-        <SessionMetric label="Sets" value={String(entry.workingSetCount)} />
+        <SessionMetric label="W/sets" value={String(entry.workingSetCount)} />
       </View>
 
       <View style={styles.setTableHeaderRow}>
@@ -395,7 +395,7 @@ function SessionCard({
       {entry.sets.map((set, index) => (
         <View
           key={set.setId}
-          style={[styles.setTableRow, !set.isWorking && styles.setTableRowWarmUp]}
+          style={[styles.setTableRow, !set.isWorking && styles.setTableRowNonWorking]}
           testID={`exercise-history-set-row-${set.setId}`}>
           <View style={[styles.setTableTypeCell, styles.setTableTypeBadgeWrap]}>
             {formatSetTypeBadge(set.setType) ? (
@@ -771,7 +771,7 @@ const styles = StyleSheet.create({
     gap: 8,
     backgroundColor: uiColors.surfaceDefault,
   },
-  setTableRowWarmUp: {
+  setTableRowNonWorking: {
     backgroundColor: uiColors.surfaceMuted,
   },
   setTableCell: {

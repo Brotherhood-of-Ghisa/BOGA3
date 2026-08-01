@@ -72,9 +72,9 @@ const mondayIndex = (date: Date): number => (date.getUTCDay() + 6) % 7;
 
 const startOfMondayWeek = (date: Date): Date => addUtcDays(date, -mondayIndex(date));
 
-// Volume + near-failure accumulate over the week; 1RM + top weight are best-of.
+// Volume + working sets accumulate over the week; 1RM + top weight are best-of.
 const isAdditiveMetric = (metric: CalendarHeatmapMetric): boolean =>
-  metric === 'totalVolume' || metric === 'nearFailureCount';
+  metric === 'totalVolume' || metric === 'workingSetCount';
 
 /**
  * Build the daily grid (full Monday-aligned 52-week span, rest days included) and

@@ -642,14 +642,23 @@ describe('SessionRecorderScreen exercise interactions', () => {
     expect(screen.queryByText('Select Exercise')).toBeNull();
     expect(screen.getByText('Bench Press')).toBeTruthy();
     expect(screen.getByText('Barbell Squat')).toBeTruthy();
-    expect(screen.getByTestId('session-exercise-card-2').props.accessibilityState?.selected).toBe(true);
+    const existingExerciseCard = screen.getByTestId('session-exercise-card-1');
+    const appendedExerciseCard = screen.getByTestId('session-exercise-card-2');
+    expect(appendedExerciseCard.props.accessibilityState?.selected).toBeUndefined();
+    expect(StyleSheet.flatten(appendedExerciseCard.props.style)).toMatchObject({
+      backgroundColor: StyleSheet.flatten(existingExerciseCard.props.style).backgroundColor,
+      borderColor: StyleSheet.flatten(existingExerciseCard.props.style).borderColor,
+    });
     expect(screen.getByLabelText('Exercise options 2')).toBeTruthy();
     expect(screen.getByTestId('planned-set-row-2-1')).toHaveTextContent(/0kg/);
     expect(screen.getByTestId('planned-set-row-2-1')).toHaveTextContent(/10 reps/);
     expect(screen.getByTestId('planned-set-row-2-2')).toHaveTextContent(/120kg/);
     expect(screen.getByTestId('planned-set-row-2-2')).toHaveTextContent(/5 reps/);
-    expect(screen.getByLabelText('Log set 1 as planned')).toBeTruthy();
-    expect(screen.getByLabelText('Skip set 2')).toBeTruthy();
+    expect(screen.queryByText('Log')).toBeNull();
+    expect(screen.getByTestId('set-performance-control-2-1')).toHaveTextContent('○');
+    expect(screen.getByLabelText('Confirm exercise 2 set 1 performed')).toBeTruthy();
+    expect(screen.queryByLabelText('Skip set 2')).toBeNull();
+    expect(screen.queryByTestId('planned-set-row-2-2-delete-action-background')).toBeNull();
   });
 
   it('scrolls to an appended plan once after layout and ignores later card layouts', async () => {
@@ -677,7 +686,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     fireEvent.press(screen.getByTestId('exercise-picker-append-plan-button'));
 
     const appendedExerciseCard = screen.getByTestId('session-exercise-card-1');
-    expect(appendedExerciseCard.props.accessibilityState?.selected).toBe(true);
+    expect(appendedExerciseCard.props.accessibilityState?.selected).toBeUndefined();
     expect(mockRecorderScrollTo).not.toHaveBeenCalled();
 
     fireEvent(appendedExerciseCard, 'layout', {
@@ -702,7 +711,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     await act(async () => {});
 
     expect(mockRecorderScrollTo).toHaveBeenCalledTimes(1);
-    expect(appendedExerciseCard.props.accessibilityState?.selected).toBe(true);
+    expect(appendedExerciseCard.props.accessibilityState?.selected).toBeUndefined();
   });
 
   it('shows collapsible Past Records with date/current/max columns and swipe navigation', async () => {
@@ -718,7 +727,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
           estimatedOneRepMax: 250.5,
           totalVolume: 1500,
           highestWeight: 205,
-          rirAtMostTwoSetCount: 3,
+          workingSetCount: 3,
         },
         {
           sessionId: 'session-old',
@@ -728,7 +737,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
           estimatedOneRepMax: 235,
           totalVolume: 1325,
           highestWeight: 195,
-          rirAtMostTwoSetCount: 1,
+          workingSetCount: 1,
         },
       ],
     });
@@ -760,16 +769,16 @@ describe('SessionRecorderScreen exercise interactions', () => {
     expect(screen.getByTestId('exercise-block-history-panel-1-est-1rm-date')).toHaveTextContent('250.5');
     expect(screen.getByTestId('exercise-block-history-panel-1-volume-date')).toHaveTextContent('1500');
     expect(screen.getByTestId('exercise-block-history-panel-1-highest-date')).toHaveTextContent('205');
-    expect(screen.getByText('Near failure')).toBeTruthy();
-    expect(screen.getByTestId('exercise-block-history-panel-1-rir-count-date')).toHaveTextContent('3');
+    expect(screen.getByText('Working sets')).toBeTruthy();
+    expect(screen.getByTestId('exercise-block-history-panel-1-working-set-count-date')).toHaveTextContent('3');
     expect(screen.getByTestId('exercise-block-history-panel-1-est-1rm-current')).toHaveTextContent('-');
     expect(screen.getByTestId('exercise-block-history-panel-1-volume-current')).toHaveTextContent('-');
     expect(screen.getByTestId('exercise-block-history-panel-1-highest-current')).toHaveTextContent('-');
-    expect(screen.getByTestId('exercise-block-history-panel-1-rir-count-current')).toHaveTextContent('0');
+    expect(screen.getByTestId('exercise-block-history-panel-1-working-set-count-current')).toHaveTextContent('0');
     expect(screen.getByTestId('exercise-block-history-panel-1-est-1rm-max')).toHaveTextContent('250.5');
     expect(screen.getByTestId('exercise-block-history-panel-1-volume-max')).toHaveTextContent('1500');
     expect(screen.getByTestId('exercise-block-history-panel-1-highest-max')).toHaveTextContent('205');
-    expect(screen.getByTestId('exercise-block-history-panel-1-rir-count-max')).toHaveTextContent('3');
+    expect(screen.getByTestId('exercise-block-history-panel-1-working-set-count-max')).toHaveTextContent('3');
     expect(StyleSheet.flatten(screen.getByTestId('exercise-block-history-panel-1-est-1rm-max').props.style).color).toBe(
       uiColors.heatmapBucket4
     );
@@ -779,7 +788,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     expect(StyleSheet.flatten(screen.getByTestId('exercise-block-history-panel-1-highest-max').props.style).color).toBe(
       uiColors.heatmapBucket4
     );
-    expect(StyleSheet.flatten(screen.getByTestId('exercise-block-history-panel-1-rir-count-max').props.style).color).toBe(
+    expect(StyleSheet.flatten(screen.getByTestId('exercise-block-history-panel-1-working-set-count-max').props.style).color).toBe(
       uiColors.heatmapBucket4
     );
     expect(screen.queryByTestId('exercise-block-history-panel-1-newer')).toBeNull();
@@ -822,7 +831,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
           estimatedOneRepMax: 250.5,
           totalVolume: 1500,
           highestWeight: 205,
-          rirAtMostTwoSetCount: 3,
+          workingSetCount: 3,
         },
       ],
     });
@@ -838,20 +847,22 @@ describe('SessionRecorderScreen exercise interactions', () => {
     fireEvent.press(firstSetTypeButton);
     fireEvent.changeText(screen.getByLabelText('Weight for exercise 1 set 1'), '500');
     fireEvent.changeText(screen.getByLabelText('Reps for exercise 1 set 1'), '5');
+    fireEvent.press(screen.getByTestId('set-performance-control-1-1'));
     expect(screen.getByTestId('exercise-block-history-panel-1-volume-current')).toHaveTextContent('2500');
     expect(screen.getByTestId('exercise-block-history-panel-1-highest-current')).toHaveTextContent('500');
-    expect(screen.getByTestId('exercise-block-history-panel-1-rir-count-current')).toHaveTextContent('0');
+    expect(screen.getByTestId('exercise-block-history-panel-1-working-set-count-current')).toHaveTextContent('0');
 
     fireEvent.press(screen.getByLabelText('Add set to exercise 1'));
     const secondSetTypeButton = screen.getByTestId('set-quality-button-1-2');
     fireEvent.press(secondSetTypeButton);
     fireEvent.changeText(screen.getByLabelText('Weight for exercise 1 set 2'), '260');
     fireEvent.changeText(screen.getByLabelText('Reps for exercise 1 set 2'), '6');
+    fireEvent.press(screen.getByTestId('set-performance-control-1-2'));
 
     expect(screen.getByTestId('exercise-block-history-panel-1-volume-current')).toHaveTextContent('4060');
     expect(screen.getByTestId('exercise-block-history-panel-1-highest-current')).toHaveTextContent('500');
     expect(screen.getByTestId('exercise-block-history-panel-1-est-1rm-current')).not.toHaveTextContent('-');
-    expect(screen.getByTestId('exercise-block-history-panel-1-rir-count-current')).toHaveTextContent('1');
+    expect(screen.getByTestId('exercise-block-history-panel-1-working-set-count-current')).toHaveTextContent('1');
     expect(screen.getByTestId('exercise-block-history-panel-1-est-1rm-date')).toHaveTextContent('250.5');
     expect(screen.getByTestId('exercise-block-history-panel-1-volume-max')).toHaveTextContent('4060');
     expect(screen.getByTestId('exercise-block-history-panel-1-highest-max')).toHaveTextContent('500');
@@ -879,7 +890,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
           estimatedOneRepMax: 250.5,
           totalVolume: 1500,
           highestWeight: 205,
-          rirAtMostTwoSetCount: 3,
+          workingSetCount: 3,
         },
       ],
     });
@@ -963,7 +974,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
             estimatedOneRepMax: 250,
             totalVolume: 1500,
             highestWeight: 205,
-            rirAtMostTwoSetCount: 3,
+            workingSetCount: 3,
           },
         ],
       })
@@ -979,7 +990,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
             estimatedOneRepMax: 190,
             totalVolume: 980,
             highestWeight: 165,
-            rirAtMostTwoSetCount: 2,
+            workingSetCount: 2,
           },
         ],
       });
@@ -1080,7 +1091,8 @@ describe('SessionRecorderScreen exercise interactions', () => {
   });
 
   it('defaults a new set from the previous set in the same exercise', async () => {
-    render(<SessionRecorderScreen />);
+    const selectAllWeightInput = jest.fn();
+    render(<SessionRecorderScreen requestWeightInputSelectAll={selectAllWeightInput} />);
     await dismissEmptyStateIfPresent();
 
     fireEvent.press(screen.getByText('Log new exercise'));
@@ -1098,12 +1110,23 @@ describe('SessionRecorderScreen exercise interactions', () => {
     expect(screen.getByText('Set 1')).toBeTruthy();
     expect(screen.getByText('135.5kg')).toBeTruthy();
     expect(screen.getByText('8 reps')).toBeTruthy();
-    expect(screen.getByLabelText('Weight for exercise 1 set 2').props.autoFocus).toBe(true);
-    expect(screen.getByLabelText('Weight for exercise 1 set 2').props.selectTextOnFocus).toBe(true);
-    expect(screen.getByLabelText('Weight for exercise 1 set 2').props.selection).toBeUndefined();
-    expect(screen.getByLabelText('Weight for exercise 1 set 2').props.value).toBe('135.5');
+    const copiedWeightInput = screen.getByLabelText('Weight for exercise 1 set 2');
+    expect(copiedWeightInput.props.autoFocus).toBe(true);
+    expect(copiedWeightInput.props.selectTextOnFocus).toBe(true);
+    expect(copiedWeightInput.props.selection).toBeUndefined();
+    expect(copiedWeightInput.props.value).toBe('135.5');
     expect(screen.getByLabelText('Reps for exercise 1 set 2').props.value).toBe('8');
     expect(screen.getAllByText('RIR 0')).toHaveLength(2);
+    expect(
+      StyleSheet.flatten(screen.getByTestId('set-row-surface-1-2').props.style)
+    ).toMatchObject({
+      backgroundColor: uiColors.rowActiveBackground,
+      borderColor: uiColors.rowActiveBorder,
+    });
+
+    fireEvent(copiedWeightInput, 'focus');
+    expect(selectAllWeightInput).toHaveBeenCalledTimes(1);
+    expect(selectAllWeightInput.mock.calls[0]?.[1]).toBe('135.5'.length);
 
     fireEvent(screen.getByLabelText('Reps for exercise 1 set 2'), 'focus');
     expect(screen.getByLabelText('Reps for exercise 1 set 2').props.selection).toBeUndefined();
@@ -1540,7 +1563,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     await act(async () => {});
   });
 
-  it('summarizes performed sets, failures, and a strict new PR when collapsed', async () => {
+  it('summarizes performed and working sets with a strict new PR when collapsed', async () => {
     mockLoadRecentExerciseBlocks.mockResolvedValueOnce({
       exerciseDefinitionId: 'seed_barbell_back_squat',
       limit: null,
@@ -1553,7 +1576,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
           estimatedOneRepMax: 250.5,
           totalVolume: 1500,
           highestWeight: 205,
-          rirAtMostTwoSetCount: 3,
+          workingSetCount: 3,
         },
       ],
     });
@@ -1578,7 +1601,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     expect(screen.queryByTestId('add-set-button-1')).toBeNull();
     expect(screen.queryByLabelText('Weight for exercise 1 set 1')).toBeNull();
     expect(screen.getByTestId('exercise-collapsed-summary-1-counts')).toHaveTextContent(
-      '0 sets (0 failures)'
+      '0 sets · 0 w/sets'
     );
     expect(screen.queryByTestId('exercise-collapsed-summary-1-new-pr')).toBeNull();
 
@@ -1592,8 +1615,10 @@ describe('SessionRecorderScreen exercise interactions', () => {
     fireEvent.changeText(screen.getByLabelText('Reps for exercise 1 set 1'), '5');
     fireEvent.press(screen.getByTestId('set-quality-button-1-1'));
     fireEvent.press(screen.getByTestId('set-quality-button-1-1'));
+    fireEvent.press(screen.getByTestId('set-performance-control-1-1'));
     fireEvent.press(screen.getByLabelText('Add set to exercise 1'));
     fireEvent.press(screen.getByTestId('set-quality-button-1-2'));
+    fireEvent.press(screen.getByTestId('set-performance-control-1-2'));
 
     expect(screen.getByTestId('exercise-expanded-pr-1')).toHaveTextContent(
       'PR: 300 kg × 5 reps · est. 1RM 350 kg'
@@ -1603,7 +1628,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     fireEvent.press(collapseToggle);
 
     expect(screen.getByTestId('exercise-collapsed-summary-1-counts')).toHaveTextContent(
-      '2 sets (1 failure)'
+      '2 sets · 2 w/sets'
     );
     expect(screen.getByTestId('exercise-collapsed-summary-1-new-pr')).toHaveTextContent(
       'PR: 300 kg × 5 reps · est. 1RM 350 kg'
@@ -1630,7 +1655,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
             estimatedOneRepMax: estimateOneRepMax(100, 5),
             totalVolume: 500,
             highestWeight: 100,
-            rirAtMostTwoSetCount: 0,
+            workingSetCount: 0,
           },
         ],
       })
@@ -1648,6 +1673,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     await screen.findByTestId('exercise-block-history-panel-1-collapsed');
     fireEvent.changeText(screen.getByLabelText('Weight for exercise 1 set 1'), '100');
     fireEvent.changeText(screen.getByLabelText('Reps for exercise 1 set 1'), '5');
+    fireEvent.press(screen.getByTestId('set-performance-control-1-1'));
     fireEvent.press(screen.getByTestId('exercise-collapse-toggle-1'));
     expect(screen.queryByTestId('exercise-collapsed-summary-1-new-pr')).toBeNull();
 
@@ -1656,6 +1682,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     await screen.findByTestId('exercise-block-history-panel-2-empty-collapsed');
     fireEvent.changeText(screen.getByLabelText('Weight for exercise 2 set 1'), '100');
     fireEvent.changeText(screen.getByLabelText('Reps for exercise 2 set 1'), '5');
+    fireEvent.press(screen.getByTestId('set-performance-control-2-1'));
     fireEvent.press(screen.getByTestId('exercise-collapse-toggle-2'));
     expect(screen.queryByTestId('exercise-collapsed-summary-2-new-pr')).toBeNull();
   });

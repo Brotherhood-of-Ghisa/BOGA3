@@ -170,10 +170,11 @@ appId: com.dinoderek.mobile
 - inputText: "135"
 - tapOn: "Reps for exercise 1 set 1"
 - inputText: "8"
-# One complete set (weight + reps) submits straight through — no
-# "Remove incomplete/empty" confirmation dialog renders, so the previous optional
-# re-tap/confirmation taps were always absent (~7s each, WARNED). Assert the
-# success screen directly; a blocked submit fails the extendedWaitUntil loudly.
+- hideKeyboard:
+    optional: true
+- tapOn:
+    id: "set-performance-control-1-1"
+# One explicitly confirmed set submits straight through with no cleanup dialog.
 - tapOn: "Submit Session"
 - extendedWaitUntil:
     visible:

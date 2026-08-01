@@ -1,16 +1,17 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 
+import { uiColors } from '@/components/ui';
+import {
+  __resetExerciseListPreferencesForTests,
+  setExerciseListPreferences,
+} from '@/src/exercise-catalog/list-preferences';
 import SessionRecorderScreen from '../(tabs)/session-recorder';
 
 const swipeLeft = (target: ReturnType<typeof screen.getByTestId>) => {
   fireEvent(target, 'touchStart', { nativeEvent: { pageX: 220 } });
   fireEvent(target, 'touchEnd', { nativeEvent: { pageX: 120 } });
 };
-import {
-  __resetExerciseListPreferencesForTests,
-  setExerciseListPreferences,
-} from '@/src/exercise-catalog/list-preferences';
 
 jest.mock('@/src/data', () => ({
   attachExerciseTagToSessionExercise: jest.fn().mockResolvedValue(undefined),
@@ -303,7 +304,7 @@ describe('SessionRecorderScreen', () => {
     expect(locationMock.matchNearestGymForPosition).not.toHaveBeenCalled();
   });
 
-  it('renders planned imported sets and supports log and skip actions', async () => {
+  it('keeps planned rows visually distinct and protected while manual rows remain deletable', async () => {
     dataMock.loadLatestSessionDraftSnapshot.mockResolvedValueOnce({
       sessionId: 'planned-draft',
       gymId: null,
@@ -367,50 +368,63 @@ describe('SessionRecorderScreen', () => {
     expect(screen.queryByText('RIR 2')).toBeNull();
     expect(screen.getByText('RIR 1')).toBeTruthy();
     expect(screen.queryByLabelText('Weight for exercise 1 set 3')).toBeNull();
+    expect(screen.getByTestId('set-performance-control-1-1')).toHaveTextContent('○');
+    expect(screen.getByTestId('set-performance-control-1-3')).toHaveTextContent('✓');
+    expect(
+      StyleSheet.flatten(screen.getByTestId('set-row-surface-1-1').props.style)
+        .backgroundColor
+    ).toBe(uiColors.rowPlannedBackground);
+    expect(screen.queryByLabelText('Skip set 1')).toBeNull();
+    expect(screen.queryByTestId('planned-set-row-1-1-delete-action-background')).toBeNull();
+    expect(screen.getByTestId('set-swipe-delete-1-3')).toBeTruthy();
 
-    fireEvent.press(screen.getByLabelText('added set 3 for exercise 1: 185kg · 8 reps; quality RIR 1'));
+    fireEvent.press(screen.getByLabelText('confirmed added set 3 for exercise 1: 185kg · 8 reps; quality RIR 1'));
     expect(screen.getByLabelText('Weight for exercise 1 set 3')).toBeTruthy();
     fireEvent(screen.getByLabelText('Weight for exercise 1 set 3'), 'blur');
     await act(async () => {});
 
-    fireEvent.press(screen.getByLabelText('Log set 1 as planned'));
+    fireEvent.press(screen.getByTestId('set-performance-control-1-1'));
     expect(screen.getByText('Set 1')).toBeTruthy();
     expect(screen.getByText('0kg')).toBeTruthy();
     expect(screen.getByText('6 reps')).toBeTruthy();
     expect(screen.getByText('2 planned · 2 performed')).toBeTruthy();
     expect(screen.getByLabelText('Quality for exercise 1 set 1: RIR 2')).toBeTruthy();
+    expect(
+      StyleSheet.flatten(screen.getByTestId('set-row-surface-1-1').props.style)
+    ).toMatchObject({
+      backgroundColor: uiColors.rowActiveBackground,
+      borderColor: uiColors.rowActiveBorder,
+    });
 
     expect(screen.queryByLabelText('Quality for exercise 1 set 2: none')).toBeNull();
-    fireEvent.press(screen.getByLabelText('Skip set 2'));
-    expect(screen.getByText('Set 2')).toBeTruthy();
-    expect(screen.getByText('30kg')).toBeTruthy();
-    expect(screen.getAllByText('8 reps').length).toBeGreaterThan(0);
-    expect(screen.queryByText('Skipped')).toBeNull();
-    expect(screen.getByText('2 planned · 2 performed · 1 skipped')).toBeTruthy();
-
-    fireEvent.press(screen.getByLabelText('added set 3 for exercise 1: 185kg · 8 reps; quality RIR 1'));
-    expect(screen.getByLabelText('Weight for exercise 1 set 3')).toBeTruthy();
-
-    fireEvent.press(screen.getByLabelText('skipped planned set 2 for exercise 1: 30kg · 8 reps; quality RIR 2'));
-    expect(screen.queryByLabelText('Weight for exercise 1 set 2')).toBeNull();
-    expect(screen.queryByLabelText('Weight for exercise 1 set 3')).toBeNull();
-
-    fireEvent.press(screen.getByLabelText('skipped planned set 2 for exercise 1: 30kg · 8 reps; quality RIR 2'));
+    expect(screen.queryByLabelText('Skip set 2')).toBeNull();
+    fireEvent.press(screen.getByLabelText('unconfirmed planned set 2 for exercise 1: 30kg · 8 reps'));
     expect(screen.getByLabelText('Weight for exercise 1 set 2').props.value).toBe('30');
     expect(screen.getByLabelText('Reps for exercise 1 set 2').props.value).toBe('8');
     expect(screen.getByLabelText('Quality for exercise 1 set 2: RIR 2')).toBeTruthy();
     expect(screen.queryByLabelText('Done editing set 2')).toBeNull();
-    expect(screen.queryByLabelText('Skip set 2')).toBeNull();
-    expect(screen.getByText('2 planned · 3 performed')).toBeTruthy();
+    expect(screen.getByText('2 planned · 2 performed')).toBeTruthy();
     fireEvent.changeText(screen.getByLabelText('Weight for exercise 1 set 2'), '35');
     expect(screen.getByLabelText('Weight for exercise 1 set 2').props.value).toBe('35');
+    fireEvent.press(screen.getByTestId('set-performance-control-1-2'));
+    expect(screen.getByText('2 planned · 3 performed')).toBeTruthy();
+    expect(
+      StyleSheet.flatten(screen.getByTestId('set-row-surface-1-2').props.style)
+        .backgroundColor
+    ).toBe(uiColors.rowActiveBackground);
+    expect(
+      StyleSheet.flatten(screen.getByTestId('set-row-surface-1-2').props.style)
+        .borderColor
+    ).toBe(uiColors.rowActiveBorder);
 
     swipeLeft(screen.getByTestId('planned-set-row-1-2'));
     expect(screen.getByText('Set 2')).toBeTruthy();
-    expect(screen.getByText('30kg')).toBeTruthy();
-    expect(screen.getAllByText('8 reps').length).toBeGreaterThan(0);
-    expect(screen.queryByText('Skipped')).toBeNull();
-    expect(screen.getByText('2 planned · 2 performed · 1 skipped')).toBeTruthy();
+    expect(screen.getByText('35kg')).toBeTruthy();
+    expect(screen.getByText('2 planned · 3 performed')).toBeTruthy();
+
+    swipeLeft(screen.getByTestId('set-swipe-delete-1-3'));
+    expect(screen.queryByText('185kg')).toBeNull();
+    expect(screen.getByText('2 planned · 2 performed')).toBeTruthy();
   });
 
   it('treats equal planned volume as matched even when quality changes', async () => {
@@ -447,7 +461,7 @@ describe('SessionRecorderScreen', () => {
     await act(async () => {});
 
     expect(screen.getByText('1 planned · 1 performed')).toBeTruthy();
-    expect(screen.getByLabelText('matched planned set 1 for exercise 1: 30kg · 8 reps; quality RIR 0')).toBeTruthy();
+    expect(screen.getByLabelText('confirmed matched planned set 1 for exercise 1: 30kg · 8 reps; quality RIR 0')).toBeTruthy();
     expect(screen.getByText('Set 1')).toBeTruthy();
     expect(screen.getByText('30kg')).toBeTruthy();
     expect(screen.getByText('8 reps')).toBeTruthy();
@@ -493,8 +507,21 @@ describe('SessionRecorderScreen', () => {
     expect(screen.getByText('8 reps')).toBeTruthy();
     expect(screen.getByText('RIR 2')).toBeTruthy();
     expect(screen.queryByLabelText('Weight for exercise 1 set 1')).toBeNull();
+    expect(screen.getByText('1 performed')).toBeTruthy();
+    expect(screen.getByTestId('set-performance-control-1-1')).toHaveTextContent('✓');
 
-    fireEvent.press(screen.getByLabelText('logged set 1 for exercise 1: 30kg · 8 reps; quality RIR 2'));
+    fireEvent.press(screen.getByTestId('set-performance-control-1-1'));
+    expect(screen.getByText('0 performed')).toBeTruthy();
+    expect(screen.getByTestId('set-performance-control-1-1')).toHaveTextContent('○');
+    expect(
+      screen.getByLabelText('unconfirmed set 1 for exercise 1: 30kg · 8 reps; quality RIR 2')
+    ).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('set-performance-control-1-1'));
+    expect(screen.getByText('1 performed')).toBeTruthy();
+    expect(screen.getByTestId('set-performance-control-1-1')).toHaveTextContent('✓');
+
+    fireEvent.press(screen.getByLabelText('confirmed set 1 for exercise 1: 30kg · 8 reps; quality RIR 2'));
 
     expect(screen.getByLabelText('Weight for exercise 1 set 1')).toBeTruthy();
     expect(screen.getByTestId('exercise-load-mode-1')).toHaveTextContent('Weight entry: Total load');
@@ -519,14 +546,14 @@ describe('SessionRecorderScreen', () => {
     expect(screen.getAllByText('30kg').length).toBeGreaterThanOrEqual(2);
     expect(screen.getAllByText('8 reps').length).toBeGreaterThanOrEqual(2);
 
-    fireEvent.press(screen.getByLabelText('logged set 1 for exercise 1: 30kg · 8 reps; quality RIR 2'));
+    fireEvent.press(screen.getByLabelText('confirmed set 1 for exercise 1: 30kg · 8 reps; quality RIR 2'));
     expect(screen.getByLabelText('Weight for exercise 1 set 1')).toBeTruthy();
 
-    fireEvent.press(screen.getByLabelText('logged set 2 for exercise 1: 30kg · 8 reps; quality RIR 2'));
+    fireEvent.press(screen.getByLabelText('unconfirmed set 2 for exercise 1: 30kg · 8 reps; quality RIR 2'));
     expect(screen.queryByLabelText('Weight for exercise 1 set 1')).toBeNull();
     expect(screen.queryByLabelText('Weight for exercise 1 set 2')).toBeNull();
 
-    fireEvent.press(screen.getByLabelText('logged set 2 for exercise 1: 30kg · 8 reps; quality RIR 2'));
+    fireEvent.press(screen.getByLabelText('unconfirmed set 2 for exercise 1: 30kg · 8 reps; quality RIR 2'));
     expect(screen.getByLabelText('Weight for exercise 1 set 2')).toBeTruthy();
   });
 

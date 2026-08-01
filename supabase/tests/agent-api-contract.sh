@@ -297,6 +297,7 @@ SESSION_A="agent-api-${RUN_TAG}-session-a"
 BLOCK_A="agent-api-${RUN_TAG}-block-a"
 SET_A1="agent-api-${RUN_TAG}-set-a1"
 SET_A2="agent-api-${RUN_TAG}-set-a2"
+SET_A3="agent-api-${RUN_TAG}-set-a3-unperformed"
 NOW_MS="$(($(date +%s) * 1000))"
 STARTED_MS="$((NOW_MS - 3600000))"
 COMPLETED_MS="$((NOW_MS - 3000000))"
@@ -344,9 +345,11 @@ run_psql "
        performance_status,created_at,updated_at,client_updated_at_ms)
     values
       ('${USER_A_UUID}'::uuid,'${SET_A1}','${BLOCK_A}',0,'100','8','working',
-       'matched',${NOW_MS},${NOW_MS},${NOW_MS}),
+       null,${NOW_MS},${NOW_MS},${NOW_MS}),
       ('${USER_A_UUID}'::uuid,'${SET_A2}','${BLOCK_A}',1,'105','5','working',
-       'failed',${NOW_MS},${NOW_MS},${NOW_MS});
+       null,${NOW_MS},${NOW_MS},${NOW_MS}),
+      ('${USER_A_UUID}'::uuid,'${SET_A3}','${BLOCK_A}',2,'200','10','working',
+       'unperformed',${NOW_MS},${NOW_MS},${NOW_MS});
   commit;
 " >/dev/null
 
@@ -384,6 +387,7 @@ printf '%s' "${RESPONSE_BODY}" | jq -e \
   --arg exercise "${EXERCISE_A}" '
     .data.exercise.id == $exercise
     and (.data.recent_performances[0].sets | length == 2)
+    and (.data.recent_performances[0].sets | map(.performance_status) | all(. == null))
     and .data.recent_performances[0].volume.unit == "kg_reps"
     and .data.personal_records.estimated_one_rep_max.unit == "kg"
     and (.data.last_performed_at | test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T"))

@@ -36,7 +36,15 @@ appId: com.dinoderek.mobile
 - tapOn:
     text: "Select exercise Barbell Back Squat"
 - tapOn:
-    id: "exercise-picker-add-empty-set-button"
+    id: "exercise-picker-append-plan-button"
+- extendedWaitUntil:
+    visible:
+      id: "planned-set-row-1-1"
+    timeout: 15000
+- takeScreenshot: "set-performance-appended-plan-unconfirmed"
+- tapOn:
+    id: "set-performance-control-1-1"
+- takeScreenshot: "set-performance-appended-plan-confirmed"
 - extendedWaitUntil:
     visible:
       id: "exercise-block-history-panel-1-collapsed"
@@ -49,17 +57,23 @@ appId: com.dinoderek.mobile
       id: "exercise-block-history-panel-1"
     timeout: 10000
 - assertVisible: "Current"
-- assertVisible: "Near failure"
+- assertVisible: "Working sets"
+- tapOn:
+    id: "set-row-pressable-1-1"
 - tapOn: "Weight for exercise 1 set 1"
+- eraseText
 - inputText: "300"
 - tapOn: "Reps for exercise 1 set 1"
+- eraseText
 - inputText: "5"
-- tapOn:
-    id: "set-quality-button-1-1"
 - tapOn:
     id: "set-quality-button-1-1"
 - hideKeyboard:
     optional: true
+- tapOn:
+    id: "set-performance-control-1-1"
+- tapOn:
+    id: "set-performance-control-1-1"
 - assertVisible:
     id: "exercise-expanded-pr-1"
 - assertVisible: "PR: 300 kg × 5 reps · est. 1RM 350 kg"
@@ -70,7 +84,7 @@ appId: com.dinoderek.mobile
     visible:
       id: "exercise-collapsed-summary-1-counts"
     timeout: 10000
-- assertVisible: "1 set (1 failure)"
+- assertVisible: "1 set · 1 w/set"
 - assertVisible:
     id: "exercise-collapsed-summary-1-new-pr"
 - assertVisible: "PR: 300 kg × 5 reps · est. 1RM 350 kg"
@@ -79,6 +93,12 @@ appId: com.dinoderek.mobile
     id: "exercise-collapse-toggle-1"
 - assertVisible:
     id: "exercise-block-history-panel-1"
+- scrollUntilVisible:
+    element:
+      text: "Log new exercise"
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
 - tapOn: "Log new exercise"
 - tapOn: "Exercise filter input"
 - inputText: "low cable one-arm"
@@ -103,7 +123,7 @@ appId: com.dinoderek.mobile
     visible:
       id: "exercise-collapsed-summary-2-counts"
     timeout: 10000
-- assertVisible: "0 sets (0 failures)"
+- assertVisible: "0 sets · 0 w/sets"
 - assertNotVisible:
     id: "exercise-collapsed-summary-2-new-pr"
 - takeScreenshot: "exercise-card-summary-empty-history"

@@ -22,18 +22,18 @@ import { buildHeatmapData } from '@/components/heatmaps';
 const dailyMetrics = await computeSelectedMuscleDailyEffortMetrics({ muscleGroupIds, start, end });
 // or computeSelectedExerciseDailyEffort({ exerciseDefinitionId, start, end })
 
-const data = buildHeatmapData(dailyMetrics, metric); // metric: 'totalVolume' | 'nearFailureCount' | 'estimatedRM1' | 'highestWeight'
+const data = buildHeatmapData(dailyMetrics, metric); // metric: 'totalVolume' | 'workingSetCount' | 'estimatedRM1' | 'highestWeight'
 ```
 
-`DailyEffortMetrics` (`{ dateKey, totalVolume, nearFailureCount, estimatedRM1,
+`DailyEffortMetrics` (`{ dateKey, totalVolume, workingSetCount, estimatedRM1,
 highestWeight }`) comes from the muscle/exercise analytics in `src/data`; the
 weekly effort the same screens already load powers the `WeekSelectionBanner`.
 The Muscle History overlay exposes per-side, role-weighted `totalVolume` and
-`nearFailureCount`; the Exercise History overlay exposes all four metrics using
+`workingSetCount`; the Exercise History overlay exposes all four metrics using
 entered-load exercise semantics.
 
 **Buckets** use max-of-window ratios (`getCalendarHeatmapBucket`), matching the rest
-of the stats screen. Volume / near-failure aggregate (sum) per week; 1RM / top weight
+of the stats screen. Volume / working sets aggregate (sum) per week; 1RM / top weight
 are best-of (max).
 
 ## Props & selection
