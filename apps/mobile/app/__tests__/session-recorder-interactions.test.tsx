@@ -1085,7 +1085,8 @@ describe('SessionRecorderScreen exercise interactions', () => {
   });
 
   it('defaults a new set from the previous set in the same exercise', async () => {
-    render(<SessionRecorderScreen />);
+    const selectAllWeightInput = jest.fn();
+    render(<SessionRecorderScreen requestWeightInputSelectAll={selectAllWeightInput} />);
     await dismissEmptyStateIfPresent();
 
     fireEvent.press(screen.getByText('Log new exercise'));
@@ -1103,12 +1104,23 @@ describe('SessionRecorderScreen exercise interactions', () => {
     expect(screen.getByText('Set 1')).toBeTruthy();
     expect(screen.getByText('135.5kg')).toBeTruthy();
     expect(screen.getByText('8 reps')).toBeTruthy();
-    expect(screen.getByLabelText('Weight for exercise 1 set 2').props.autoFocus).toBe(true);
-    expect(screen.getByLabelText('Weight for exercise 1 set 2').props.selectTextOnFocus).toBe(true);
-    expect(screen.getByLabelText('Weight for exercise 1 set 2').props.selection).toBeUndefined();
-    expect(screen.getByLabelText('Weight for exercise 1 set 2').props.value).toBe('135.5');
+    const copiedWeightInput = screen.getByLabelText('Weight for exercise 1 set 2');
+    expect(copiedWeightInput.props.autoFocus).toBe(true);
+    expect(copiedWeightInput.props.selectTextOnFocus).toBe(true);
+    expect(copiedWeightInput.props.selection).toBeUndefined();
+    expect(copiedWeightInput.props.value).toBe('135.5');
     expect(screen.getByLabelText('Reps for exercise 1 set 2').props.value).toBe('8');
     expect(screen.getAllByText('RIR 0')).toHaveLength(2);
+    expect(
+      StyleSheet.flatten(screen.getByTestId('set-row-surface-1-2').props.style)
+    ).toMatchObject({
+      backgroundColor: uiColors.rowActiveBackground,
+      borderColor: uiColors.rowActiveBorder,
+    });
+
+    fireEvent(copiedWeightInput, 'focus');
+    expect(selectAllWeightInput).toHaveBeenCalledTimes(1);
+    expect(selectAllWeightInput.mock.calls[0]?.[1]).toBe('135.5'.length);
 
     fireEvent(screen.getByLabelText('Reps for exercise 1 set 2'), 'focus');
     expect(screen.getByLabelText('Reps for exercise 1 set 2').props.selection).toBeUndefined();

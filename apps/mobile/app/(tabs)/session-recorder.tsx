@@ -1180,14 +1180,26 @@ function removeExercisesWithNoSets(session: Session): { session: Session; remove
 
 type SessionRecorderScreenProps = {
   requestWeightInputFocus?: (input: TextInput | null) => void;
+  requestWeightInputSelectAll?: (input: TextInput | null, valueLength: number) => void;
 };
 
 const focusWeightTextInput = (input: TextInput | null) => {
   input?.focus();
 };
 
+const selectAllWeightTextInput = (input: TextInput | null, valueLength: number) => {
+  if (!input || valueLength === 0) {
+    return;
+  }
+
+  requestAnimationFrame(() => {
+    input.setNativeProps({ selection: { start: 0, end: valueLength } });
+  });
+};
+
 export default function SessionRecorderScreen({
   requestWeightInputFocus = focusWeightTextInput,
+  requestWeightInputSelectAll = selectAllWeightTextInput,
 }: SessionRecorderScreenProps = {}) {
   const router = useRouter();
   const navigation = useNavigation<any>();
@@ -1252,7 +1264,6 @@ export default function SessionRecorderScreen({
   const [expandedSetIds, setExpandedSetIds] = useState<Set<string>>(() => new Set());
   const [collapsedExerciseIds, setCollapsedExerciseIds] = useState<Set<string>>(() => new Set());
   const [activeRowId, setActiveRowId] = useState<string | null>(null);
-  const [lastAddedRowId, setLastAddedRowId] = useState<string | null>(null);
   const [pendingFocusedWeightSetId, setPendingFocusedWeightSetId] = useState<string | null>(null);
   const [focusedExerciseCardId, setFocusedExerciseCardId] = useState<string | null>(null);
   const [isGpsDetectionInFlight, setIsGpsDetectionInFlight] = useState(false);
@@ -2408,7 +2419,6 @@ export default function SessionRecorderScreen({
 
   const clearSetRowMemory = useCallback((setId: string) => {
     setActiveRowId((current) => (current === setId ? null : current));
-    setLastAddedRowId((current) => (current === setId ? null : current));
   }, []);
 
   const moveExerciseBlockHistory = useCallback((exerciseId: string, direction: 'older' | 'newer') => {
@@ -2825,7 +2835,6 @@ export default function SessionRecorderScreen({
       return next.size === current.size ? current : next;
     });
     setActiveRowId((current) => (current && exerciseSetIds.has(current) ? null : current));
-    setLastAddedRowId((current) => (current && exerciseSetIds.has(current) ? null : current));
     setPendingFocusedWeightSetId((current) =>
       current && exerciseSetIds.has(current) ? null : current
     );
@@ -3143,7 +3152,6 @@ export default function SessionRecorderScreen({
       },
     }));
     setActiveRowId(newSet.id);
-    setLastAddedRowId(newSet.id);
     setExpandedSetIds((current) => {
       const next = new Set(current);
       if (previousSet && hasValidActualValues(previousSet)) {
@@ -4082,7 +4090,6 @@ export default function SessionRecorderScreen({
           const showQualityControl = rowState !== 'planned';
           const isMutedRow = rowState === 'planned';
           const isActiveRow = activeRowId === set.id;
-          const isLastAddedRow = activeRowId === null && lastAddedRowId === set.id;
           const plannedLabel = getPlannedSetLabel(set);
           const actualLabel = getActualSetLabel(set);
           const compactLabel =
@@ -4259,10 +4266,10 @@ export default function SessionRecorderScreen({
                 <View
                   style={[
                     styles.compactSetRow,
-                    isLastAddedRow ? styles.setRowLastAdded : null,
-                    isActiveRow ? styles.setRowActive : null,
                     isPlannedRow ? styles.setRowPlanned : null,
-                  ]}>
+                    isActiveRow ? styles.setRowActive : null,
+                  ]}
+                  testID={`set-row-surface-${exerciseIndex + 1}-${setIndex + 1}`}>
                 {renderPerformanceControl()}
                 <Pressable
                   accessibilityLabel={`${stateLabel} ${setIndex + 1} for exercise ${exerciseIndex + 1}: ${compactLabel}${showQualityControl ? `; quality ${compactQualityAccessibilityLabel}` : ''}`}
@@ -4321,10 +4328,10 @@ export default function SessionRecorderScreen({
             <View
               style={[
                 styles.setRow,
-                isLastAddedRow ? styles.setRowLastAdded : null,
-                isActiveRow ? styles.setRowActive : null,
                 isPlannedRow ? styles.setRowPlanned : null,
-              ]}>
+                isActiveRow ? styles.setRowActive : null,
+              ]}
+              testID={`set-row-surface-${exerciseIndex + 1}-${setIndex + 1}`}>
               {renderPerformanceControl()}
               <Pressable
                 accessible={false}
@@ -4358,6 +4365,13 @@ export default function SessionRecorderScreen({
                   }}
                   onFocus={() => {
                     focusSetInput(set.id);
+                    if (pendingFocusedWeightSetId === set.id) {
+                      requestWeightInputSelectAll(
+                        weightInputBySetIdRef.current[set.id],
+                        set.weight.length
+                      );
+                      setPendingFocusedWeightSetId(null);
+                    }
                   }}
                   onPressIn={() => {
                     focusedSetInputIdRef.current = set.id;
@@ -5700,9 +5714,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-  },
-  setRowLastAdded: {
-    backgroundColor: uiColors.rowLastAddedBackground,
   },
   setRowActive: {
     backgroundColor: uiColors.rowActiveBackground,

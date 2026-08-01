@@ -371,7 +371,7 @@ describe('SessionRecorderScreen', () => {
     expect(screen.getByTestId('set-performance-control-1-1')).toHaveTextContent('○');
     expect(screen.getByTestId('set-performance-control-1-3')).toHaveTextContent('✓');
     expect(
-      StyleSheet.flatten(screen.getByTestId('planned-set-row-1-1').props.children.props.style)
+      StyleSheet.flatten(screen.getByTestId('set-row-surface-1-1').props.style)
         .backgroundColor
     ).toBe(uiColors.rowPlannedBackground);
     expect(screen.queryByLabelText('Skip set 1')).toBeNull();
@@ -389,6 +389,12 @@ describe('SessionRecorderScreen', () => {
     expect(screen.getByText('6 reps')).toBeTruthy();
     expect(screen.getByText('2 planned · 2 performed')).toBeTruthy();
     expect(screen.getByLabelText('Quality for exercise 1 set 1: RIR 2')).toBeTruthy();
+    expect(
+      StyleSheet.flatten(screen.getByTestId('set-row-surface-1-1').props.style)
+    ).toMatchObject({
+      backgroundColor: uiColors.rowActiveBackground,
+      borderColor: uiColors.rowActiveBorder,
+    });
 
     expect(screen.queryByLabelText('Quality for exercise 1 set 2: none')).toBeNull();
     expect(screen.queryByLabelText('Skip set 2')).toBeNull();
@@ -403,9 +409,13 @@ describe('SessionRecorderScreen', () => {
     fireEvent.press(screen.getByTestId('set-performance-control-1-2'));
     expect(screen.getByText('2 planned · 3 performed')).toBeTruthy();
     expect(
-      StyleSheet.flatten(screen.getByTestId('planned-set-row-1-2').props.children.props.style)
+      StyleSheet.flatten(screen.getByTestId('set-row-surface-1-2').props.style)
         .backgroundColor
-    ).toBe(uiColors.rowPlannedBackground);
+    ).toBe(uiColors.rowActiveBackground);
+    expect(
+      StyleSheet.flatten(screen.getByTestId('set-row-surface-1-2').props.style)
+        .borderColor
+    ).toBe(uiColors.rowActiveBorder);
 
     swipeLeft(screen.getByTestId('planned-set-row-1-2'));
     expect(screen.getByText('Set 2')).toBeTruthy();
