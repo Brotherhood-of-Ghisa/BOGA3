@@ -76,32 +76,17 @@ type DisplayMuscleFamily = {
   visibleMuscles: StatsMusclePerformance[];
 };
 
-export const formatDelta = (current: number, previous: number): DeltaDisplay => {
-  if (current === 0 && previous === 0) {
-    return { text: '—', tone: 'neutral' };
-  }
-
-  if (previous === 0) {
-    return { text: `+${formatNumber(current)} (new)`, tone: 'new' };
-  }
-
-  const diff = current - previous;
-  if (diff === 0) {
-    return { text: '±0', tone: 'neutral' };
-  }
-
-  const pct = Math.round((diff / previous) * 100);
-  const sign = diff > 0 ? '+' : '−';
-  const magnitude = formatNumber(Math.abs(diff));
-  return {
-    text: `${sign}${magnitude} (${diff > 0 ? '+' : '−'}${Math.abs(pct)}%)`,
-    tone: diff > 0 ? 'positive' : 'negative',
-  };
-};
-
 const formatSignedCount = (value: number): string => {
   if (value === 0) return '±0';
   return `${value > 0 ? '+' : '−'}${formatNumber(Math.abs(value))}`;
+};
+
+export const formatCountDelta = (current: number, previous: number): DeltaDisplay => {
+  const difference = current - previous;
+  return {
+    text: formatSignedCount(difference),
+    tone: difference > 0 ? 'positive' : difference < 0 ? 'negative' : 'neutral',
+  };
 };
 
 export const formatSetCountPair = (setCount: number, nearFailureCount: number): string =>
@@ -319,11 +304,16 @@ export function StatsScreenShell({
   onSearchQueryChange,
 }: StatsScreenShellProps) {
   const sessionDelta = summary
-    ? formatDelta(summary.current.totals.sessionCount, summary.previous.totals.sessionCount)
+    ? formatCountDelta(
+        summary.current.totals.sessionCount,
+        summary.previous.totals.sessionCount
+      )
     : null;
   const setsDelta = summary
-    ? formatDelta(
+    ? formatSetCountPairDelta(
+        summary.current.totals.setCount,
         summary.current.totals.workingSetCount,
+        summary.previous.totals.setCount,
         summary.previous.totals.workingSetCount
       )
     : null;
@@ -409,9 +399,12 @@ export function StatsScreenShell({
           </Pressable>
 
           <View style={styles.summaryCard} testID="stats-card-sets">
-            <Text style={styles.summaryLabel}>Working sets</Text>
+            <Text style={styles.summaryLabel}>Sets (W/Sets)</Text>
             <Text style={styles.summaryValue}>
-              {formatNumber(summary.current.totals.workingSetCount)}
+              {formatSetCountPair(
+                summary.current.totals.setCount,
+                summary.current.totals.workingSetCount
+              )}
             </Text>
             {setsDelta ? (
               <Text style={[styles.summaryDelta, deltaToneStyle(setsDelta.tone)]}>
@@ -935,21 +928,60 @@ function HistoryHeatmap({
     () => buildHeatmapData(dailyMetrics, metric, { todayDateKey, weeks: 'all' }),
     [dailyMetrics, metric, todayDateKey]
   );
-  return view === 'daily' ? (
-    <DailyHeatmap
-      data={data}
-      testIDPrefix={testIDPrefix}
-      metricLabel={METRIC_LABELS[metric]}
-      formatValue={(value) => formatMetricNumber(value, metric)}
-      legendLabel={`${METRIC_LABELS[metric]} per day`}
-    />
-  ) : (
-    <WeeklyHeatmap
-      data={data}
-      selectedWeekKey={selectedWeekKey}
-      onSelectWeek={onSelectWeek}
-      testIDPrefix={testIDPrefix}
-    />
+  const formatDailyValue = useCallback(
+    (value: number) => formatMetricNumber(value, metric),
+    [metric]
+  );
+  const dailyHeatmap = useMemo(
+    () => (
+      <DailyHeatmap
+        data={data}
+        testIDPrefix={testIDPrefix}
+        metricLabel={METRIC_LABELS[metric]}
+        formatValue={formatDailyValue}
+        legendLabel={`${METRIC_LABELS[metric]} per day`}
+      />
+    ),
+    [data, formatDailyValue, metric, testIDPrefix]
+  );
+  const weeklyHeatmap = useMemo(
+    () => (
+      <WeeklyHeatmap
+        data={data}
+        selectedWeekKey={selectedWeekKey}
+        onSelectWeek={onSelectWeek}
+        testIDPrefix={testIDPrefix}
+      />
+    ),
+    [data, onSelectWeek, selectedWeekKey, testIDPrefix]
+  );
+  const dailyVisible = view === 'daily';
+
+  return (
+    <View style={styles.heatmapTransition}>
+      <View
+        accessibilityElementsHidden={!dailyVisible}
+        importantForAccessibility={dailyVisible ? 'auto' : 'no-hide-descendants'}
+        pointerEvents={dailyVisible ? 'auto' : 'none'}
+        style={[
+          styles.heatmapLayer,
+          dailyVisible ? styles.heatmapLayerActive : styles.heatmapLayerInactive,
+        ]}
+        testID={`${testIDPrefix}-heatmap-panel-daily`}>
+        {dailyHeatmap}
+      </View>
+      <View
+        accessibilityElementsHidden={dailyVisible}
+        importantForAccessibility={dailyVisible ? 'no-hide-descendants' : 'auto'}
+        pointerEvents={dailyVisible ? 'none' : 'auto'}
+        style={[
+          styles.heatmapLayer,
+          dailyVisible ? styles.heatmapLayerInactive : styles.heatmapLayerActive,
+        ]}
+        testID={`${testIDPrefix}-heatmap-panel-weekly`}>
+        {weeklyHeatmap}
+      </View>
+    </View>
   );
 }
 
@@ -1763,10 +1795,12 @@ const styles = StyleSheet.create({
   failureIntensityClip: {
     position: 'absolute',
     left: 0,
-    top: 0,
-    bottom: 0,
+    top: '50%',
+    height: 32,
+    transform: [{ translateY: -16 }],
     overflow: 'hidden',
-    opacity: 0.28,
+    borderRadius: 8,
+    opacity: 0.58,
   },
   failureIntensityRamp: {
     height: '100%',
@@ -1774,6 +1808,24 @@ const styles = StyleSheet.create({
   },
   failureIntensityRampStop: {
     flex: 1,
+  },
+  heatmapTransition: {
+    position: 'relative',
+  },
+  heatmapLayer: {
+    left: 0,
+    right: 0,
+    top: 0,
+  },
+  heatmapLayerActive: {
+    position: 'relative',
+    opacity: 1,
+    zIndex: 1,
+  },
+  heatmapLayerInactive: {
+    position: 'absolute',
+    opacity: 0,
+    zIndex: 0,
   },
   familyMetrics: {
     flexDirection: 'row',

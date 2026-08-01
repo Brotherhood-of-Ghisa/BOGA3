@@ -106,6 +106,17 @@ export const getMuscleContributionRoleWeight = (role: MuscleContributionRole): n
 export const isMuscleAnalyticsWorkingSet = (setType: string | null): boolean =>
   isWorkingSessionSetType(setType);
 
+const isMuscleAnalyticsPerformedSet = (
+  set: MuscleAnalyticsInput['exerciseSets'][number]
+): boolean =>
+  isConfirmedPerformedSet({
+    reps: set.repsValue,
+    weight: set.weightValue,
+    performanceStatus: set.performanceStatus,
+  }) &&
+  parseSetWeight(set.weightValue) !== null &&
+  parseSetReps(set.repsValue) !== null;
+
 export const computeMuscleSetVolume = (weightValue: string, repsValue: string): number => {
   const weight = parseSetWeight(weightValue);
   const reps = parseSetReps(repsValue);
@@ -134,14 +145,22 @@ export const countMuscleAnalyticsWorkingSets = (input: MuscleAnalyticsInput): nu
   return input.exerciseSets.filter(
     (set) =>
       includedExerciseIds.has(set.sessionExerciseId) &&
-      isConfirmedPerformedSet({
-        reps: set.repsValue,
-        weight: set.weightValue,
-        performanceStatus: set.performanceStatus,
-      }) &&
-      parseSetWeight(set.weightValue) !== null &&
-      parseSetReps(set.repsValue) !== null &&
+      isMuscleAnalyticsPerformedSet(set) &&
       isMuscleAnalyticsWorkingSet(set.setType)
+  ).length;
+};
+
+export const countMuscleAnalyticsPerformedSets = (input: MuscleAnalyticsInput): number => {
+  const sessionIds = new Set(input.sessions.map((session) => session.id));
+  const includedExerciseIds = new Set(
+    input.sessionExercises
+      .filter((exercise) => sessionIds.has(exercise.sessionId))
+      .map((exercise) => exercise.id)
+  );
+
+  return input.exerciseSets.filter(
+    (set) =>
+      includedExerciseIds.has(set.sessionExerciseId) && isMuscleAnalyticsPerformedSet(set)
   ).length;
 };
 
@@ -195,15 +214,7 @@ export const collectMuscleSetContributions = (
   const contributions: MuscleSetContribution[] = [];
 
   for (const [setIndex, set] of input.exerciseSets.entries()) {
-    if (
-      !isConfirmedPerformedSet({
-        reps: set.repsValue,
-        weight: set.weightValue,
-        performanceStatus: set.performanceStatus,
-      }) ||
-      parseSetWeight(set.weightValue) === null ||
-      parseSetReps(set.repsValue) === null
-    ) {
+    if (!isMuscleAnalyticsPerformedSet(set)) {
       continue;
     }
 

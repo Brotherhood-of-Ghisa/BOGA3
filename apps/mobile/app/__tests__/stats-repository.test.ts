@@ -53,10 +53,11 @@ const flattenMuscles = (totals: ReturnType<typeof aggregateStats>) =>
   totals.muscleFamilies.flatMap((family) => family.muscles);
 
 describe('aggregateStats', () => {
-  it('counts valid confirmed RIR 0-2 rows as working sets', () => {
+  it('counts all valid performed sets and the confirmed RIR 0-2 working subset', () => {
     const totals = aggregateStats(buildAggregationInput());
 
     expect(totals.sessionCount).toBe(2);
+    expect(totals.setCount).toBe(7);
     expect(totals.workingSetCount).toBe(3);
   });
 
@@ -72,6 +73,7 @@ describe('aggregateStats', () => {
 
     const totals = aggregateStats(input);
     const byId = new Map(flattenMuscles(totals).map((entry) => [entry.muscleGroupId, entry]));
+    expect(totals.setCount).toBe(7);
     expect(totals.workingSetCount).toBe(3);
     expect(byId.get('chest_sternal')?.totalVolume).toBe(1800);
     expect(byId.get('chest_sternal')?.setCount).toBe(4);
@@ -180,6 +182,8 @@ describe('aggregateStats', () => {
 
     const totals = aggregateStats(input);
     const chest = flattenMuscles(totals).find((entry) => entry.muscleGroupId === 'chest_sternal');
+    expect(totals.setCount).toBe(3);
+    expect(totals.workingSetCount).toBe(1);
     expect(chest).toMatchObject({ setCount: 3, nearFailureCount: 1, totalVolume: 200 });
   });
 
@@ -205,6 +209,7 @@ describe('aggregateStats', () => {
     );
 
     expect(totals.sessionCount).toBe(0);
+    expect(totals.setCount).toBe(0);
     expect(totals.workingSetCount).toBe(0);
     expect(
       totals.muscleFamilies.every(

@@ -59,5 +59,9 @@ optional `todayDateKey` (`opts.todayDateKey`) as a determinism seam for tests.
 - **Theme-driven:** colors/space come from `@/components/ui` tokens (`uiColors`,
   including `heatmapBucket1..4`). No hard-coded palette beyond the token ramp.
 - **No new dependencies.** Pure RN primitives (`View`, `Text`, `Pressable`).
+- **Warm switching:** the Stats overlay keeps both daily and weekly trees
+  mounted. Its inactive layer is transparent, non-interactive, and hidden from
+  accessibility, avoiding a one-year chart rebuild on every toggle while
+  preserving view-local selection and scroll state.
 - **RN ≥ 0.71** for flexbox `gap`. Dashed baseline (Weekly) renders on iOS; some
   Android versions fall back to solid (cosmetic).

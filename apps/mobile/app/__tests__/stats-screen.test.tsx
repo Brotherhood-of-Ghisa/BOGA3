@@ -8,7 +8,7 @@ import {
   StatsScreenShell,
   computeFailureIntensityProgress,
   type StatsScreenShellProps,
-  formatDelta,
+  formatCountDelta,
   formatSetCountPairDelta,
   formatVolumeDelta,
   sortExerciseListItems,
@@ -94,6 +94,7 @@ const buildSummary = (overrides: Partial<StatsSummary> = {}): StatsSummary => ({
     },
     totals: {
       sessionCount: 4,
+      setCount: 50,
       workingSetCount: 38,
       muscleFamilies: [
         {
@@ -170,6 +171,7 @@ const buildSummary = (overrides: Partial<StatsSummary> = {}): StatsSummary => ({
     },
     totals: {
       sessionCount: 3,
+      setCount: 40,
       workingSetCount: 30,
       muscleFamilies: [
         {
@@ -316,27 +318,18 @@ const captureUiEvidence = (name: string, tree: unknown) => {
   writeFileSync(path.join(evidenceDir, `${name}.json`), JSON.stringify(tree, null, 2));
 };
 
-describe('formatDelta', () => {
-  it('renders em-dash when both periods are zero', () => {
-    expect(formatDelta(0, 0)).toEqual({ text: '—', tone: 'neutral' });
+describe('formatCountDelta', () => {
+  it('renders an absolute neutral delta when both periods are equal', () => {
+    expect(formatCountDelta(0, 0)).toEqual({ text: '±0', tone: 'neutral' });
   });
 
-  it('renders the "new" tone when previous was zero but current is positive', () => {
-    expect(formatDelta(4, 0)).toEqual({ text: '+4 (new)', tone: 'new' });
+  it('renders only the absolute increase when the previous count was zero', () => {
+    expect(formatCountDelta(4, 0)).toEqual({ text: '+4', tone: 'positive' });
   });
 
-  it('renders positive delta with absolute and percent change', () => {
-    expect(formatDelta(8, 6)).toEqual({
-      text: '+2 (+33%)',
-      tone: 'positive',
-    });
-  });
-
-  it('renders negative delta with minus sign and percent change', () => {
-    const delta = formatDelta(3, 6);
-    expect(delta.tone).toBe('negative');
-    expect(delta.text).toContain('3');
-    expect(delta.text).toContain('50%');
+  it('renders positive and negative count deltas without percentages', () => {
+    expect(formatCountDelta(8, 6)).toEqual({ text: '+2', tone: 'positive' });
+    expect(formatCountDelta(3, 6)).toEqual({ text: '−3', tone: 'negative' });
   });
 });
 
@@ -402,17 +395,20 @@ describe('sortExerciseListItems', () => {
 });
 
 describe('StatsScreenShell', () => {
-  it('renders summary cards with deltas', () => {
+  it('renders summary cards with absolute count deltas only', () => {
     renderStatsScreenShell();
 
     const sessionsCard = screen.getByTestId('stats-card-sessions');
     expect(sessionsCard).toHaveTextContent(/Sessions/);
     expect(sessionsCard).toHaveTextContent(/4/);
-    expect(sessionsCard).toHaveTextContent(/\+1 \(\+33%\)/);
+    expect(sessionsCard).toHaveTextContent(/\+1/);
+    expect(sessionsCard).not.toHaveTextContent('%');
 
     const setsCard = screen.getByTestId('stats-card-sets');
-    expect(setsCard).toHaveTextContent(/38/);
-    expect(setsCard).toHaveTextContent(/\+8 \(\+27%\)/);
+    expect(setsCard).toHaveTextContent(/Sets \(W\/Sets\)/i);
+    expect(setsCard).toHaveTextContent(/50 \(38\)/);
+    expect(setsCard).toHaveTextContent(/\+10 \(\+8\)/);
+    expect(setsCard).not.toHaveTextContent('%');
   });
 
   it('renders family and muscle rows with set/failure counts and percentage-only volume deltas', () => {
@@ -449,6 +445,8 @@ describe('StatsScreenShell', () => {
       })
     ).toHaveStyle({
       width: '50%',
+      height: 32,
+      opacity: 0.58,
     });
     expect(
       screen.getByTestId('stats-muscle-failure-bar-front_delts', {
@@ -745,6 +743,61 @@ describe('StatsScreenShell', () => {
     expect(onSelectMuscleHistoryView).toHaveBeenCalledWith('daily');
   });
 
+  it('keeps both heatmap views warm so switching preserves the daily chart state', () => {
+    const dailyMetrics = [
+      {
+        dateKey: '2026-05-13',
+        totalVolume: 1200,
+        workingSetCount: 2,
+        estimatedRM1: 95,
+        highestWeight: 80,
+      },
+    ];
+    const sharedProps = {
+      selectedMuscle: {
+        muscleGroupIds: ['front_delts'],
+        displayName: 'Front Delts',
+        familyName: 'Shoulders',
+      },
+      muscleHistoryWeeklyEffort: [buildWeeklyEffort()],
+      muscleHistoryDailyMetrics: dailyMetrics,
+    };
+    const { rerender } = render(
+      <StatsScreenShell
+        {...buildShellProps({ ...sharedProps, muscleHistoryView: 'daily' })}
+      />
+    );
+
+    fireEvent.press(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-05-13'));
+    expect(screen.getByTestId('stats-muscle-history-heatmap-day-detail-date')).toHaveTextContent(
+      'May 13, 2026'
+    );
+
+    rerender(
+      <StatsScreenShell
+        {...buildShellProps({ ...sharedProps, muscleHistoryView: 'weekly' })}
+      />
+    );
+    expect(
+      screen.getByTestId('stats-muscle-history-heatmap-panel-daily', {
+        includeHiddenElements: true,
+      })
+    ).toHaveStyle({ position: 'absolute', opacity: 0 });
+    expect(screen.getByTestId('stats-muscle-history-heatmap-panel-weekly')).toHaveStyle({
+      position: 'relative',
+      opacity: 1,
+    });
+
+    rerender(
+      <StatsScreenShell
+        {...buildShellProps({ ...sharedProps, muscleHistoryView: 'daily' })}
+      />
+    );
+    expect(screen.getByTestId('stats-muscle-history-heatmap-day-detail-date')).toHaveTextContent(
+      'May 13, 2026'
+    );
+  });
+
   it('selects a single day and shows the selected muscle metric in daily view', () => {
     const props = {
       selectedMuscle: {
@@ -866,6 +919,7 @@ describe('StatsRoute', () => {
             ...buildSummary().current,
             totals: {
               sessionCount: 12,
+              setCount: 120,
               workingSetCount: 100,
               muscleFamilies: buildSummary().current.totals.muscleFamilies,
             },

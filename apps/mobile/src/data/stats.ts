@@ -6,6 +6,7 @@ import {
   aggregateSelectedMuscleDailyEffortMetrics,
   aggregateSelectedMuscleWeeklyEffort,
   collectMuscleSetContributions,
+  countMuscleAnalyticsPerformedSets,
   countMuscleAnalyticsWorkingSets,
   isMuscleAnalyticsWorkingSet,
   type AggregateSelectedMuscleDailyEffortOptions,
@@ -53,6 +54,7 @@ export type StatsMuscleFamilyPerformance = {
 
 export type StatsTotals = {
   sessionCount: number;
+  setCount: number;
   workingSetCount: number;
   muscleFamilies: StatsMuscleFamilyPerformance[];
 };
@@ -185,6 +187,7 @@ export const aggregateStats = (input: StatsAggregationInput): StatsTotals => {
 
   return {
     sessionCount: input.sessions.length,
+    setCount: countMuscleAnalyticsPerformedSets(input),
     workingSetCount: countMuscleAnalyticsWorkingSets(input),
     muscleFamilies,
   };

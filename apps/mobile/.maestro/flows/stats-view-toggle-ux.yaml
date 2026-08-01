@@ -23,6 +23,8 @@ appId: com.dinoderek.mobile
     id: "stats-card-sessions"
 - assertVisible:
     id: "stats-card-sets"
+- assertVisible:
+    text: ".*W/SETS.*"
 - takeScreenshot: "01-exercise-view-default"
 
 # --- Switch to muscle view via chip ---
@@ -83,6 +85,21 @@ appId: com.dinoderek.mobile
     visible:
       id: "stats-exercise-history-close"
     timeout: 15000
+- assertVisible:
+    text: "Weekly training load"
+- tapOn:
+    id: "stats-exercise-history-view-chip-daily"
+- extendedWaitUntil:
+    visible:
+      text: "Last 12 months"
+    timeout: 3000
+- takeScreenshot: "05-exercise-heatmap-daily"
+- tapOn:
+    id: "stats-exercise-history-view-chip-weekly"
+- extendedWaitUntil:
+    visible:
+      text: "Weekly training load"
+    timeout: 3000
 - takeScreenshot: "05-exercise-heatmap-overlay"
 
 # Dismiss exercise overlay via its accessible close control
@@ -112,6 +129,21 @@ appId: com.dinoderek.mobile
     visible:
       id: "stats-muscle-history-close"
     timeout: 15000
+- assertVisible:
+    text: "Weekly training load"
+- tapOn:
+    id: "stats-muscle-history-view-chip-daily"
+- extendedWaitUntil:
+    visible:
+      text: "Last 12 months"
+    timeout: 3000
+- takeScreenshot: "06-muscle-heatmap-daily"
+- tapOn:
+    id: "stats-muscle-history-view-chip-weekly"
+- extendedWaitUntil:
+    visible:
+      text: "Weekly training load"
+    timeout: 3000
 - takeScreenshot: "06-muscle-heatmap-overlay"
 
 # Close muscle overlay via close button

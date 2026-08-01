@@ -242,19 +242,24 @@ Guardrail command:
     across the selected muscle IDs; estimated 1RM and top weight remain
     unavailable for muscle-level history.
 11. The v1 overlay loads a capped one-year local completed-session history window for the selected muscle.
+12. Daily and weekly heatmap trees stay mounted while an overlay is open. The
+    inactive tree is transparent, non-interactive, and hidden from
+    accessibility, so switching views reuses the already-laid-out chart and
+    preserves its local selection/scroll state instead of drawing it again.
 
 ### 13. Stats exercise/muscle history semantics
 
 1. The `Stats / History` screen exposes a `By Muscle` / `By Exercise` view-mode chip beside the Last 7 days / Last 30 days period chips. Pressing it switches the body between the muscle summary and exercise list.
-2. In the per-exercise mode the list is flat and includes exercises trained at least once. Rows sort by valid performed-set count descending, then exercise name. Each row shows `Sets` as `<valid performed sets> (<near-failure sets>)`, raw exercise `Volume`, and estimated `1RM` when available. Near-failure means the valid performed `RIR 0` / `RIR 1` / `RIR 2` subset; warm-up, null, and unknown-quality rows remain in the leading set count but not the parenthesized count.
-3. Tapping an exercise row in per-exercise mode opens an in-route `ExerciseHistoryOverlay` — the same overlay card structure as the muscle-history overlay (occupies ~75% screen height, backdrop-dismissible).
-4. The `ExerciseHistoryOverlay` renders the reusable `CalendarHeatmap` component over a 365-day window for the selected exercise. It keeps the four metric chips (Volume / W/sets / 1RM / Top weight) plus the week-selection banner; unlike muscle-history, it remains a multi-metric exercise-specific view.
-5. The view-mode chip uses the shared action, border, and surface tokens; no raw color literals.
-6. Dismissing the exercise overlay returns to the exercise list in per-exercise mode. It clears only transient selected-exercise/week UI state and does not mutate any data.
-7. Volume for exercise analytics is raw `weight × reps` (no muscle-role weighting). This differs from the muscle-history overlay where volume is role-weighted.
-8. In the per-muscle mode every family and visible nested-muscle row shows `Sets` in the same `<set count> (<near-failure count>)` form plus `Volume`. Family set counts union physical source-set identities across contributing primary/secondary muscles, so one set mapped to two muscles in one family counts once. Family volume still sums member-muscle contributions.
-9. Per-muscle previous-period set comparisons use signed absolute pairs (`+4 (+1)`, `−2 (−1)`, `±0 (−1)`) and never percentages. Volume comparisons use percentage only (`+17%`, `−100%`, `±0%`), with `—` for zero-to-zero and `new` for positive volume over a zero baseline. Muscle/family volume remains the shared per-side, role-weighted calculation.
-10. Per-muscle family name cells render a light-to-dark green failure-intensity ramp; visible nested-muscle name cells use the semantic light-yellow-to-orange ramp. Width is `clamp(nearFailureCount / (8 × periodDays / 7), 0, 1)`. The ramp is decorative, stays within the name cell, does not intercept presses or become an accessibility target, and supplements the readable near-failure count. Its full-width threshold is a display scale only—not a goal, recommendation, limit, or warning. Row accessibility copy states the exact near-failure count and selected-period threshold.
+2. The summary keeps the actionable `Sessions` card and shows a second `Sets (W/Sets)` card as `<all valid performed sets> (<working sets>)`. Sessions use a signed absolute delta, and the set card uses a signed absolute pair; neither count card shows percentage change. Percentages are reserved for Volume comparisons.
+3. In the per-exercise mode the list is flat and includes exercises trained at least once. Rows sort by valid performed-set count descending, then exercise name. Each row shows `Sets` as `<valid performed sets> (<near-failure sets>)`, raw exercise `Volume`, and estimated `1RM` when available. Near-failure means the valid performed `RIR 0` / `RIR 1` / `RIR 2` subset; warm-up, null, and unknown-quality rows remain in the leading set count but not the parenthesized count.
+4. Tapping an exercise row in per-exercise mode opens an in-route `ExerciseHistoryOverlay` — the same overlay card structure as the muscle-history overlay (occupies ~75% screen height, backdrop-dismissible).
+5. The `ExerciseHistoryOverlay` renders the reusable daily/weekly heatmaps over a 365-day window for the selected exercise. It keeps the four metric chips (Volume / W/sets / 1RM / Top weight) plus the week-selection banner; unlike muscle-history, it remains a multi-metric exercise-specific view.
+6. The view-mode chip uses the shared action, border, and surface tokens; no raw color literals.
+7. Dismissing the exercise overlay returns to the exercise list in per-exercise mode. It clears only transient selected-exercise/week UI state and does not mutate any data.
+8. Volume for exercise analytics is raw `weight × reps` (no muscle-role weighting). This differs from the muscle-history overlay where volume is role-weighted.
+9. In the per-muscle mode every family and visible nested-muscle row shows `Sets` in the same `<set count> (<near-failure count>)` form plus `Volume`. Family set counts union physical source-set identities across contributing primary/secondary muscles, so one set mapped to two muscles in one family counts once. Family volume still sums member-muscle contributions.
+10. Per-muscle previous-period set comparisons use signed absolute pairs (`+4 (+1)`, `−2 (−1)`, `±0 (−1)`) and never percentages. Volume comparisons use percentage only (`+17%`, `−100%`, `±0%`), with `—` for zero-to-zero and `new` for positive volume over a zero baseline. Muscle/family volume remains the shared per-side, role-weighted calculation.
+11. Per-muscle family name cells render a light-to-dark green failure-intensity ramp; visible nested-muscle name cells use the semantic light-yellow-to-orange ramp. Width is `clamp(nearFailureCount / (8 × periodDays / 7), 0, 1)`. The fill is a clearly visible rounded band at `0.58` opacity behind the name. It is decorative, stays within the name cell, does not intercept presses or become an accessibility target, and supplements the readable near-failure count. Its full-width threshold is a display scale only—not a goal, recommendation, limit, or warning. Row accessibility copy states the exact near-failure count and selected-period threshold.
 
 ### 14. Documentation maintenance rule (UI semantics)
 

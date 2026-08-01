@@ -110,13 +110,12 @@ Brief entrypoint inventory of the current reusable UI component set.
 - Purpose:
   - completed-session history list with delete/undelete modal and deleted-visibility toggle, consumed by the `stats-history` History sub-view
 
-9. `CalendarHeatmap`
-- File: `apps/mobile/components/muscle-analytics/calendar-heatmap.tsx`
+9. `DailyHeatmap` / `WeeklyHeatmap`
+- Files: `apps/mobile/components/heatmaps/DailyHeatmap.tsx`, `apps/mobile/components/heatmaps/WeeklyHeatmap.tsx`
 - Purpose:
-  - reusable weekly-effort calendar heatmap component; used by both the M16 muscle-history overlay and the M17 exercise-history overlay
-  - accepts `SelectedMuscleWeeklyEffort[]` (also aliased as `SelectedExerciseWeeklyEffort` in M17 — identical shape) from `apps/mobile/src/data`
-  - renders Monday-through-Sunday columns, latest weeks first with 8 visible rows by default, token-backed zero/green/today/selected states, tappable cells, and date/effort accessibility labels
-  - `ExerciseHistoryOverlay` in `apps/mobile/app/(tabs)/stats-history.tsx` is screen-local and not catalogued here; it composes `CalendarHeatmap` with the same overlay card structure as `MuscleHistoryOverlay`
+  - reusable daily-cell and weekly-bar views over the same `HeatmapData`, used by both muscle- and exercise-history overlays
+  - renders horizontally scrollable one-year history with token-backed zero/green/today/selected states and tappable accessible cells
+  - the Stats overlay integration keeps both views mounted, with the inactive view transparent, non-interactive, and accessibility-hidden, so toggling does not rebuild the chart tree
 
 ### UI-supporting shared module (non-visual)
 
