@@ -1265,7 +1265,6 @@ export default function SessionRecorderScreen({
   const [collapsedExerciseIds, setCollapsedExerciseIds] = useState<Set<string>>(() => new Set());
   const [activeRowId, setActiveRowId] = useState<string | null>(null);
   const [pendingFocusedWeightSetId, setPendingFocusedWeightSetId] = useState<string | null>(null);
-  const [focusedExerciseCardId, setFocusedExerciseCardId] = useState<string | null>(null);
   const [isGpsDetectionInFlight, setIsGpsDetectionInFlight] = useState(false);
   const [pendingGymCoordinateAction, setPendingGymCoordinateAction] = useState<{
     gymId: string;
@@ -1662,10 +1661,6 @@ export default function SessionRecorderScreen({
       }
     }
 
-    if (focusedExerciseCardId && !activeExerciseIds.has(focusedExerciseCardId)) {
-      setFocusedExerciseCardId(null);
-    }
-
     if (
       pendingExerciseCardScrollIdRef.current &&
       !activeExerciseIds.has(pendingExerciseCardScrollIdRef.current)
@@ -1679,7 +1674,7 @@ export default function SessionRecorderScreen({
       );
       return next.size === current.size ? current : next;
     });
-  }, [exerciseIdsKey, focusedExerciseCardId]);
+  }, [exerciseIdsKey]);
 
   const refreshAssignedTagsForExercise = useCallback(async (sessionExerciseId: string) => {
     try {
@@ -2850,14 +2845,13 @@ export default function SessionRecorderScreen({
     });
   }, [autosaveController, collapsedExerciseIds, expandExerciseCard]);
 
-  const focusExerciseCard = useCallback((exerciseId: string | null) => {
+  const revealExerciseCard = useCallback((exerciseId: string | null) => {
     if (!exerciseId) {
       return;
     }
 
     expandExerciseCard(exerciseId);
 
-    setFocusedExerciseCardId(exerciseId);
     pendingExerciseCardScrollIdRef.current = exerciseId;
     requestAnimationFrame(() => consumePendingExerciseCardScroll(exerciseId));
   }, [consumePendingExerciseCardScroll, expandExerciseCard]);
@@ -3021,7 +3015,7 @@ export default function SessionRecorderScreen({
     setExercisePickerPreselection(null);
     exercisePickerPreselectionRequestKeyRef.current = null;
     setPendingFocusedWeightSetId(null);
-    focusExerciseCard(targetExerciseId);
+    revealExerciseCard(targetExerciseId);
     clearSubmitFeedback();
     markSessionStructuralMutation();
 
@@ -4063,17 +4057,12 @@ export default function SessionRecorderScreen({
         exercises={state.session.exercises}
         getExerciseCardProps={({ exercise, exerciseIndex }) => ({
           accessibilityLabel: `Exercise ${exerciseIndex + 1}: ${exercise.name}`,
-          accessibilityState:
-            focusedExerciseCardId === exercise.id
-              ? { selected: true }
-              : undefined,
           onLayout: (event) => {
             exerciseCardYByExerciseIdRef.current[exercise.id] = event.nativeEvent.layout.y;
             if (pendingExerciseCardScrollIdRef.current === exercise.id) {
               requestAnimationFrame(() => consumePendingExerciseCardScroll(exercise.id));
             }
           },
-          style: focusedExerciseCardId === exercise.id ? styles.focusedExerciseCard : null,
           testID: `session-exercise-card-${exerciseIndex + 1}`,
         })}
         renderSetRow={({ exercise, exerciseIndex, set, setIndex }) => {
@@ -5431,10 +5420,6 @@ const styles = StyleSheet.create({
     backgroundColor: uiColors.surfaceDefault,
     padding: 10,
     gap: 8,
-  },
-  focusedExerciseCard: {
-    borderColor: uiColors.actionPrimary,
-    backgroundColor: uiColors.surfaceInfo,
   },
   exerciseCardHeader: {
     flexDirection: 'row',

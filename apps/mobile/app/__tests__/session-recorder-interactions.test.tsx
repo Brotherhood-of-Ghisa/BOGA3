@@ -642,7 +642,13 @@ describe('SessionRecorderScreen exercise interactions', () => {
     expect(screen.queryByText('Select Exercise')).toBeNull();
     expect(screen.getByText('Bench Press')).toBeTruthy();
     expect(screen.getByText('Barbell Squat')).toBeTruthy();
-    expect(screen.getByTestId('session-exercise-card-2').props.accessibilityState?.selected).toBe(true);
+    const existingExerciseCard = screen.getByTestId('session-exercise-card-1');
+    const appendedExerciseCard = screen.getByTestId('session-exercise-card-2');
+    expect(appendedExerciseCard.props.accessibilityState?.selected).toBeUndefined();
+    expect(StyleSheet.flatten(appendedExerciseCard.props.style)).toMatchObject({
+      backgroundColor: StyleSheet.flatten(existingExerciseCard.props.style).backgroundColor,
+      borderColor: StyleSheet.flatten(existingExerciseCard.props.style).borderColor,
+    });
     expect(screen.getByLabelText('Exercise options 2')).toBeTruthy();
     expect(screen.getByTestId('planned-set-row-2-1')).toHaveTextContent(/0kg/);
     expect(screen.getByTestId('planned-set-row-2-1')).toHaveTextContent(/10 reps/);
@@ -680,7 +686,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     fireEvent.press(screen.getByTestId('exercise-picker-append-plan-button'));
 
     const appendedExerciseCard = screen.getByTestId('session-exercise-card-1');
-    expect(appendedExerciseCard.props.accessibilityState?.selected).toBe(true);
+    expect(appendedExerciseCard.props.accessibilityState?.selected).toBeUndefined();
     expect(mockRecorderScrollTo).not.toHaveBeenCalled();
 
     fireEvent(appendedExerciseCard, 'layout', {
@@ -705,7 +711,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     await act(async () => {});
 
     expect(mockRecorderScrollTo).toHaveBeenCalledTimes(1);
-    expect(appendedExerciseCard.props.accessibilityState?.selected).toBe(true);
+    expect(appendedExerciseCard.props.accessibilityState?.selected).toBeUndefined();
   });
 
   it('shows collapsible Past Records with date/current/max columns and swipe navigation', async () => {
