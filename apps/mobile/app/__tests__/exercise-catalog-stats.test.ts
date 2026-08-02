@@ -61,6 +61,44 @@ describe('aggregateExerciseCatalogStats', () => {
     expect(bench?.totalVolume).toBe(1500);
     // Best Wathan estimate of 100x5 vs 100x4 — 5 reps is higher
     expect(bench?.estimatedOneRepMax).toBeCloseTo(estimateOneRepMax(100, 5)!, 5);
+    expect(bench?.setCount).toBe(3);
+    expect(bench?.nearFailureCount).toBe(1);
+  });
+
+  it('counts valid performed sets and the RIR 0-2 near-failure subset', () => {
+    const result = aggregateExerciseCatalogStats(
+      {
+        sessions: [{ id: 's1', completedAt: daysBefore(NOW, 1) }],
+        sessionExercises: [
+          { id: 'se1', sessionId: 's1', exerciseDefinitionId: 'ex-counts' },
+        ],
+        exerciseSets: [
+          { sessionExerciseId: 'se1', weightValue: '0', repsValue: '10', setType: 'rir_0' },
+          { sessionExerciseId: 'se1', weightValue: '20', repsValue: '8', setType: 'rir_1' },
+          { sessionExerciseId: 'se1', weightValue: '20', repsValue: '7', setType: 'rir_2' },
+          { sessionExerciseId: 'se1', weightValue: '10', repsValue: '10', setType: 'warm_up' },
+          { sessionExerciseId: 'se1', weightValue: '10', repsValue: '10', setType: 'legacy' },
+          { sessionExerciseId: 'se1', weightValue: '-1', repsValue: '10', setType: 'rir_0' },
+          { sessionExerciseId: 'se1', weightValue: '10', repsValue: '1.5', setType: 'rir_0' },
+          {
+            sessionExerciseId: 'se1',
+            weightValue: '10',
+            repsValue: '10',
+            setType: 'rir_0',
+            performanceStatus: 'unperformed',
+          },
+        ],
+      },
+      30,
+      NOW
+    );
+
+    expect(result.aggregatesById.get('ex-counts')).toEqual(
+      expect.objectContaining({
+        setCount: 5,
+        nearFailureCount: 3,
+      })
+    );
   });
 
   it('counts distinct sessions per exercise definition within the period', () => {
@@ -105,6 +143,8 @@ describe('aggregateExerciseCatalogStats', () => {
     expect(result.aggregatesById.get('ex-warm-only')).toEqual(
       expect.objectContaining({
         sessionCount: 1,
+        setCount: 1,
+        nearFailureCount: 0,
         totalVolume: 400,
       })
     );

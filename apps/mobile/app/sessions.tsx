@@ -1,5 +1,6 @@
-import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useIsFocused } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import {
@@ -17,13 +18,13 @@ import { appendCompletedSessionAsPlanned } from '@/src/data';
 export type SessionsScreenProps = {
   dataClient?: SessionListDataClient;
   initialSessions?: SessionListItem[];
-  reloadToken?: number;
+  isFocused?: boolean;
 };
 
 export function SessionsScreen({
   dataClient,
   initialSessions = DEFAULT_SESSION_LIST_ITEMS,
-  reloadToken = 0,
+  isFocused = true,
 }: SessionsScreenProps) {
   const router = useRouter();
   const [showDeletedSessions, setShowDeletedSessions] = useState(false);
@@ -34,7 +35,7 @@ export function SessionsScreen({
       dataClient,
       initialSessions,
       showDeletedSessions,
-      reloadToken,
+      isFocused,
     });
 
   const activeSession = sessions.find(
@@ -164,16 +165,11 @@ export function SessionsScreen({
 }
 
 export default function SessionsRoute() {
-  const [reloadToken, setReloadToken] = useState(0);
-  useFocusEffect(
-    useCallback(() => {
-      setReloadToken((current) => current + 1);
-    }, [])
-  );
+  const isFocused = useIsFocused();
   return (
     <SessionsScreen
       dataClient={DEFAULT_SESSION_LIST_DATA_CLIENT}
-      reloadToken={reloadToken}
+      isFocused={isFocused}
     />
   );
 }

@@ -50,13 +50,34 @@ Brief entrypoint map of the current mobile screens.
 3. `/stats-history`
 - File: `apps/mobile/app/(tabs)/stats-history.tsx`
 - Purpose:
-  - merged Stats / History tab with a top Stats ↔ History segmented toggle; the History sub-view reuses the shared `HistoryList` building block, and the Stats sub-view hosts the period chips and per-exercise picker that link out to `/exercise-history`
+  - merged Stats / History tab whose Stats surface switches between per-exercise and per-muscle summaries while preserving the top-level Sessions drill-down and in-route history overlays
 - Key states (high level):
-  - Stats summary loading/error/content states with period chips
+  - Stats summary loading/error/content states with separate labelled control
+    rows: `Time range` keeps the 7-/30-day pills, and `Breakdown` keeps both
+    joined `By Exercise` / `By Muscle` choices visible with one selected
+  - top summary cards show `Sessions` and `Sets (W/Sets)` as absolute counts; their previous-period deltas never include percentages
+  - per-exercise history is a viewport-fitting table with compact, single-line
+    `Exercise`, `Sets`, `Vol`, and `1RM` headers; rows show aligned values, keep
+    the working-set count in parentheses, use `—` for unavailable 1RM, allow
+    exercise names to wrap without truncation, retain complete accessibility
+    wording, and open an in-route exercise-history overlay as one whole-row
+    action. Only exercises with at least one valid performed set in the selected
+    7-/30-day window appear.
+  - Exercise, Sets, and Vol are the only sort controls: default Sets high-to-low;
+    Exercise cycles most/least recently completed across all-time valid history;
+    Sets cycles all sets high/low then working sets high/low; and Vol cycles
+    high/low. The 1RM header is static. Missing recency stays last, and ties use
+    name then ID. Each sortable header reserves its inline indicator width so
+    labels do not move when selection changes; the active slot alone is visible
+    (`Recent` plus arrow for Exercise, arrow only for Sets/Vol). Accessibility
+    wording retains the complete sort mode and next action. Mounted sort choice
+    survives time-range, search, and Breakdown changes.
+  - per-muscle family and nested rows show the same set/near-failure count grammar plus per-side, role-weighted `Volume`; set comparisons are signed absolute pairs while volume comparisons are percentage-only with explicit zero-baseline states
+  - per-muscle family rows use uniform green failure-intensity backgrounds and visible nested-muscle rows use uniform warm backgrounds, selecting one shade per row and scaling to eight near-failure sets per seven days; exact counts remain readable/accessibly labelled and the threshold is not a training target
   - actionable muscle rows in Stats summary; expanded muscle rows and collapsed single-muscle family headers open an in-route muscle-history overlay
-  - muscle-history overlay states for loading, error, no-history, populated heatmap with selectable `Volume` / `W/sets` metrics, selected positive-effort date with contributing exercise/set detail, and selected zero-effort date empty detail
-  - **Heatmap viewMode** (M17): a "Heatmap" chip below the period chips switches the body to a flat exercise list sorted by all-time session count; tapping an exercise opens an in-route `ExerciseHistoryOverlay`
-  - exercise-history overlay states: loading, error, no-history, populated `CalendarHeatmap` (365-day window), metric chip selection (Volume / W/sets / 1RM / Top weight), week-selection banner
+  - muscle-history overlay states for loading, error, no-history, populated heatmap with selectable `Volume` / `W/sets` metrics, selected positive-effort date with contributing exercise/set detail, and selected zero-effort date empty detail; daily and weekly charts stay warm-mounted so switching is immediate and preserves chart-local state
+  - **By Exercise mode** (M17): the view-mode chip switches the body to the sortable exercise table; tapping an exercise data row opens an in-route `ExerciseHistoryOverlay`
+  - exercise-history overlay states: loading, error, no-history, populated daily/weekly heatmaps (365-day window), metric chip selection (Volume / W/sets / 1RM / Top weight), week-selection banner
 - Notes:
   - tab root inside the `(tabs)` group with `headerShown: false`; the tab bar is `BottomTray` (composing `TopLevelTabs`) supplied via the `tabBar` prop in `(tabs)/_layout.tsx`.
 
@@ -158,6 +179,8 @@ Brief entrypoint map of the current mobile screens.
   - stack-based complete session list reached from the Stats Sessions card
 - Key states (high level):
   - optional active-session row followed by completed-session history
+  - one focus-aware automatic history load on first presentation and on each
+    later focus reacquisition; filter and mutation refreshes remain explicit
   - deleted-session visibility toggle and completed-session row actions
   - active Resume and review/complete affordances both return to the existing
     Log recorder so draft state and recorder cleanup rules remain authoritative
@@ -165,6 +188,9 @@ Brief entrypoint map of the current mobile screens.
   - `/session-recorder` via stack dismissal for active Resume or review/complete
   - `/completed-session/<sessionId>` from a completed row
   - `/session-recorder?mode=completed-edit&sessionId=<sessionId>` from completed edit
+- Notes:
+  - the native stack header centers `Sessions` and uses the platform back arrow
+    without a text label, so the internal `(tabs)` group name is never exposed
 
 10. `/completed-session/[sessionId]`
 - File: `apps/mobile/app/completed-session/[sessionId].tsx`
@@ -202,6 +228,10 @@ Brief entrypoint map of the current mobile screens.
   - wraps the whole navigator in the route-layer auth guard (`apps/mobile/components/navigation/auth-route-guard.tsx`), which enforces login-on-start for configured signed-out sessions (neutral loading view while restoring, redirect to `/sign-in` when configured-but-signed-out, stand aside when auth is unconfigured, while allowing `/sign-in` and the dev/test-gated `/maestro-harness` route to render through)
   - immediately below the auth guard, wraps the navigator in the first-sync gate (`apps/mobile/src/sync/SyncGate.tsx`), which blocks a signed-in user behind a full-screen "Setting up your data…" block until `sync_runtime_state.bootstrap_completed_at` is set (then dismisses in place), and observes sync runtime state through the single shared scheduler-state accessor
   - tab roots live inside the `(tabs)` route group (`apps/mobile/app/(tabs)/_layout.tsx`) with `headerShown: false`; the root stack registers the `(tabs)` group itself plus the `sign-in` screen and the detail screens (`exercise-history`, `sessions`, `profile`, `connected-agents`, `maestro-harness`, `completed-session/[sessionId]`)
+  - the root stack opts `/sessions` into the native minimal back-button display
+    mode with a generic `Back` accessibility title, preserving normal platform
+    back behavior while hiding the previous route-group title visually and
+    from assistive technology
   - completed-session route sets its title inside the route file
   - exercise-history route also sets its title inside the route file (resolved exercise name)
 

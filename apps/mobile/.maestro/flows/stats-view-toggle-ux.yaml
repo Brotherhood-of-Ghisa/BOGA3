@@ -17,17 +17,67 @@ appId: com.dinoderek.mobile
     timeout: 30000
 
 # --- 01: Exercise view is shown by default ---
+- assertVisible: "Time range"
+- assertVisible: "Breakdown"
+- assertVisible:
+    id: "stats-period-chip-7"
+- assertVisible:
+    id: "stats-period-chip-30"
+- assertVisible:
+    id: "stats-view-mode-chip-exercise"
+- assertVisible:
+    id: "stats-view-mode-chip-muscle"
 - assertVisible:
     id: "stats-exercise-list"
+- assertVisible:
+    id: "stats-exercise-table-header"
+- assertVisible:
+    id: "stats-exercise-sort-exercise"
+- assertVisible:
+    id: "stats-exercise-sort-sets"
+- assertVisible:
+    id: "stats-exercise-sort-volume"
+- assertVisible:
+    id: "stats-exercise-header-oneRepMax"
+- assertVisible:
+    id: "stats-exercise-sort-sets-indicator"
+- assertNotVisible:
+    id: "stats-exercise-sort-status"
 - assertVisible:
     id: "stats-card-sessions"
 - assertVisible:
     id: "stats-card-sets"
+- assertVisible:
+    text: ".*W/SETS.*"
 - takeScreenshot: "01-exercise-view-default"
 
-# --- Switch to muscle view via chip ---
+# --- Exercise table headers drive local sorting without opening a row ---
 - tapOn:
-    id: "stats-view-mode-chip"
+    id: "stats-exercise-sort-sets"
+- assertVisible:
+    id: "stats-exercise-sort-sets-indicator"
+- tapOn:
+    id: "stats-exercise-sort-sets"
+- assertVisible:
+    id: "stats-exercise-sort-sets-indicator"
+- takeScreenshot: "01a-exercise-table-working-sets"
+
+- tapOn:
+    id: "stats-exercise-sort-exercise"
+- assertVisible: "Recent ↓"
+- takeScreenshot: "01b-exercise-table-most-recent"
+
+- tapOn:
+    id: "stats-exercise-sort-volume"
+- tapOn:
+    id: "stats-exercise-sort-volume"
+- assertVisible:
+    id: "stats-exercise-sort-volume-indicator"
+- takeScreenshot: "01c-exercise-table-volume-ascending"
+
+# --- Switch to muscle view via its explicit option ---
+- tapOn:
+    id: "stats-view-mode-chip-muscle"
 - extendedWaitUntil:
     visible:
       id: "stats-scroll"
@@ -38,64 +88,121 @@ appId: com.dinoderek.mobile
     id: "stats-card-sessions"
 - assertVisible:
     id: "stats-card-sets"
-- takeScreenshot: "02-muscle-view-with-summary-cards"
+- scrollUntilVisible:
+    element:
+      id: "stats-family-header-legs"
+    direction: DOWN
+- assertVisible:
+    text: ".*6 sets, 4 near-failure sets.*"
+- assertVisible:
+    id: "stats-family-header-legs"
+- assertVisible:
+    id: "stats-muscle-row-quads"
+- takeScreenshot: "02-muscle-failure-backgrounds-7-days"
 
-# --- Switch back to exercise view via chip ---
+# --- 03: The same counts rescale for the 30-day period ---
 - tapOn:
-    id: "stats-view-mode-chip"
+    id: "stats-period-chip-30"
+- extendedWaitUntil:
+    visible:
+      text: ".*10 sets, 7 near-failure sets.*"
+    timeout: 10000
+- assertVisible:
+    id: "stats-muscle-row-quads"
+- takeScreenshot: "03-muscle-failure-backgrounds-30-days"
+
+# --- Switch back to exercise view via its explicit option ---
+- tapOn:
+    id: "stats-view-mode-chip-exercise"
 - extendedWaitUntil:
     visible:
       id: "stats-exercise-list"
     timeout: 10000
 
-# --- 03: Exercise list is restored ---
+# --- 04: Exercise list is restored ---
 - assertVisible:
     id: "stats-exercise-list"
-- takeScreenshot: "03-back-to-exercise-view"
+- assertVisible:
+    id: "stats-exercise-row-seed_barbell_back_squat"
+- takeScreenshot: "04-back-to-exercise-view"
 
-# --- 04: Tap seeded exercise row to open heatmap overlay ---
+# --- 05: Tap seeded exercise row to open heatmap overlay ---
 - tapOn:
-    text: "Barbell Back Squat"
+    id: "stats-exercise-row-seed_barbell_back_squat"
 - extendedWaitUntil:
     visible:
-      id: "stats-exercise-history-overlay"
+      id: "stats-exercise-history-close"
     timeout: 15000
-- takeScreenshot: "04-exercise-heatmap-overlay"
-
-# Dismiss exercise overlay via backdrop
+- assertVisible:
+    text: "Weekly training load"
 - tapOn:
-    id: "stats-exercise-history-backdrop"
+    id: "stats-exercise-history-view-chip-daily"
+- extendedWaitUntil:
+    visible:
+      text: "Last 12 months"
+    timeout: 3000
+- takeScreenshot: "05-exercise-heatmap-daily"
+- tapOn:
+    id: "stats-exercise-history-view-chip-weekly"
+- extendedWaitUntil:
+    visible:
+      text: "Weekly training load"
+    timeout: 3000
+- takeScreenshot: "05-exercise-heatmap-overlay"
+
+# Dismiss exercise overlay via its accessible close control
+- tapOn:
+    id: "stats-exercise-history-close"
 - extendedWaitUntil:
     notVisible:
-      id: "stats-exercise-history-overlay"
+      id: "stats-exercise-history-close"
     timeout: 5000
 
 # --- Switch to muscle view for muscle overlay test ---
 - tapOn:
-    id: "stats-view-mode-chip"
+    id: "stats-view-mode-chip-muscle"
 - extendedWaitUntil:
     visible:
       id: "stats-scroll"
     timeout: 10000
 
-# --- 05: Tap Chest muscle to open muscle heatmap overlay ---
+# --- 06: Tap Chest muscle to open muscle heatmap overlay ---
+- scrollUntilVisible:
+    element:
+      id: "stats-family-header-button-chest"
+    direction: UP
 - tapOn:
-    text: "Chest"
+    id: "stats-family-header-button-chest"
 - extendedWaitUntil:
     visible:
-      id: "stats-muscle-history-overlay"
+      id: "stats-muscle-history-close"
     timeout: 15000
-- takeScreenshot: "05-muscle-heatmap-overlay"
+- assertVisible:
+    text: "Weekly training load"
+- tapOn:
+    id: "stats-muscle-history-view-chip-daily"
+- extendedWaitUntil:
+    visible:
+      text: "Last 12 months"
+    timeout: 3000
+- takeScreenshot: "06-muscle-heatmap-daily"
+- tapOn:
+    id: "stats-muscle-history-view-chip-weekly"
+- extendedWaitUntil:
+    visible:
+      text: "Weekly training load"
+    timeout: 3000
+- takeScreenshot: "06-muscle-heatmap-overlay"
 
 # Close muscle overlay via close button
 - tapOn:
     id: "stats-muscle-history-close"
 - extendedWaitUntil:
     notVisible:
-      id: "stats-muscle-history-overlay"
+      id: "stats-muscle-history-close"
     timeout: 5000
 
-# --- 06: Overlay dismissed, back to muscle view ---
+# --- 07: Overlay dismissed, back to muscle view ---
 - assertVisible:
     id: "stats-scroll"
-- takeScreenshot: "06-overlay-dismissed"
+- takeScreenshot: "07-overlay-dismissed"

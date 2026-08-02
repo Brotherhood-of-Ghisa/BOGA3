@@ -59,8 +59,12 @@ if [[ "${MAESTRO_METRO_CLEAR:-0}" == "1" ]]; then
 fi
 # $maestro_clear_flag is intentionally unquoted so an empty value adds no argument
 # (safe under `set -u`); the only value it ever holds is the single word --clear.
+# Invoke the worktree-local executable directly so EXPO_PID owns the Metro
+# listener. `npx expo` inserts npm/sh wrapper processes; stopping only that
+# recorded wrapper can orphan Metro and leave this slot's port occupied for the
+# next frontend lane.
 # shellcheck disable=SC2086
-CI=1 npx expo start --dev-client $maestro_clear_flag --host localhost --scheme "$SCHEME" --port "$EXPO_DEV_SERVER_PORT" >"$EXPO_LOG_FILE" 2>&1 &
+CI=1 "$APP_DIR/node_modules/.bin/expo" start --dev-client $maestro_clear_flag --host localhost --scheme "$SCHEME" --port "$EXPO_DEV_SERVER_PORT" >"$EXPO_LOG_FILE" 2>&1 &
 EXPO_PID=$!
 maestro_write_runtime_env "$RUNTIME_ENV_FILE"
 

@@ -1,6 +1,16 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  type StyleProp,
+  type TextStyle,
+  type ViewStyle,
+} from 'react-native';
 
 import { DailyHeatmap, WeeklyHeatmap, buildHeatmapData } from '@/components/heatmaps';
 import { SegmentedChips, uiColors } from '@/components/ui';
@@ -50,12 +60,48 @@ export type ExerciseHeatmapTarget = {
 export type ExerciseListItem = {
   id: string;
   name: string;
-  sessionCount: number;
+  setCount: number;
+  nearFailureCount: number;
   totalVolume: number;
   estimatedOneRepMax: number | null;
+  lastCompletedAt: Date | null;
+};
+
+export type ExerciseSortHeader = 'exercise' | 'sets' | 'volume';
+export type ExerciseSortMode =
+  | 'recency-desc'
+  | 'recency-asc'
+  | 'sets-desc'
+  | 'sets-asc'
+  | 'working-sets-desc'
+  | 'working-sets-asc'
+  | 'volume-desc'
+  | 'volume-asc';
+
+export const DEFAULT_EXERCISE_SORT_MODE: ExerciseSortMode = 'sets-desc';
+
+const EXERCISE_SORT_CYCLES: Record<ExerciseSortHeader, ExerciseSortMode[]> = {
+  exercise: ['recency-desc', 'recency-asc'],
+  sets: ['sets-desc', 'sets-asc', 'working-sets-desc', 'working-sets-asc'],
+  volume: ['volume-desc', 'volume-asc'],
+};
+
+const EXERCISE_SORT_HEADER_BY_MODE: Record<ExerciseSortMode, ExerciseSortHeader> = {
+  'recency-desc': 'exercise',
+  'recency-asc': 'exercise',
+  'sets-desc': 'sets',
+  'sets-asc': 'sets',
+  'working-sets-desc': 'sets',
+  'working-sets-asc': 'sets',
+  'volume-desc': 'volume',
+  'volume-asc': 'volume',
 };
 
 export type StatsViewMode = 'exercise' | 'muscle';
+const VIEW_MODE_OPTIONS = [
+  { value: 'exercise' as StatsViewMode, label: 'By Exercise' },
+  { value: 'muscle' as StatsViewMode, label: 'By Muscle' },
+] as const;
 export type MuscleHistoryMetric = Extract<
   CalendarHeatmapMetric,
   'totalVolume' | 'workingSetCount'
@@ -66,28 +112,210 @@ type DisplayMuscleFamily = {
   visibleMuscles: StatsMusclePerformance[];
 };
 
-export const formatDelta = (current: number, previous: number): DeltaDisplay => {
+const formatSignedCount = (value: number): string => {
+  if (value === 0) return '±0';
+  return `${value > 0 ? '+' : '−'}${formatNumber(Math.abs(value))}`;
+};
+
+export const formatCountDelta = (current: number, previous: number): DeltaDisplay => {
+  const difference = current - previous;
+  return {
+    text: formatSignedCount(difference),
+    tone: difference > 0 ? 'positive' : difference < 0 ? 'negative' : 'neutral',
+  };
+};
+
+export const formatSetCountPair = (setCount: number, nearFailureCount: number): string =>
+  `${formatNumber(setCount)} (${formatNumber(nearFailureCount)})`;
+
+export const formatSetCountPairDelta = (
+  currentSetCount: number,
+  currentNearFailureCount: number,
+  previousSetCount: number,
+  previousNearFailureCount: number
+): DeltaDisplay => {
+  const setDifference = currentSetCount - previousSetCount;
+  const nearFailureDifference = currentNearFailureCount - previousNearFailureCount;
+  const toneDifference = setDifference === 0 ? nearFailureDifference : setDifference;
+  return {
+    text: `${formatSignedCount(setDifference)} (${formatSignedCount(nearFailureDifference)})`,
+    tone:
+      toneDifference > 0 ? 'positive' : toneDifference < 0 ? 'negative' : 'neutral',
+  };
+};
+
+export const formatVolumeDelta = (current: number, previous: number): DeltaDisplay => {
   if (current === 0 && previous === 0) {
     return { text: '—', tone: 'neutral' };
   }
-
   if (previous === 0) {
-    return { text: `+${formatNumber(current)} (new)`, tone: 'new' };
+    return { text: 'new', tone: 'new' };
   }
 
-  const diff = current - previous;
-  if (diff === 0) {
-    return { text: '±0', tone: 'neutral' };
+  const percentDifference = Math.round(((current - previous) / previous) * 100);
+  if (percentDifference === 0) {
+    return { text: '±0%', tone: 'neutral' };
   }
-
-  const pct = Math.round((diff / previous) * 100);
-  const sign = diff > 0 ? '+' : '−';
-  const magnitude = formatNumber(Math.abs(diff));
   return {
-    text: `${sign}${magnitude} (${diff > 0 ? '+' : '−'}${Math.abs(pct)}%)`,
-    tone: diff > 0 ? 'positive' : 'negative',
+    text: `${percentDifference > 0 ? '+' : '−'}${Math.abs(percentDifference)}%`,
+    tone: percentDifference > 0 ? 'positive' : 'negative',
   };
 };
+
+export const fullScaleFailureCount = (periodDays: StatsPeriodDays): number =>
+  (8 * periodDays) / 7;
+
+export const computeFailureIntensityProgress = (
+  nearFailureCount: number,
+  periodDays: StatsPeriodDays
+): number => {
+  const fullScale = fullScaleFailureCount(periodDays);
+  if (!Number.isFinite(nearFailureCount) || nearFailureCount <= 0 || !Number.isFinite(fullScale)) {
+    return 0;
+  }
+  return Math.min(1, nearFailureCount / fullScale);
+};
+
+const describeCountDifference = (difference: number, label: string): string => {
+  if (difference > 0) return `up ${formatNumber(difference)} ${label}`;
+  if (difference < 0) return `down ${formatNumber(Math.abs(difference))} ${label}`;
+  return `no change in ${label}`;
+};
+
+const describeVolumeDifference = (delta: DeltaDisplay): string => {
+  if (delta.text === '—') return 'no volume in either period';
+  if (delta.text === 'new') return 'new volume this period';
+  if (delta.text === '±0%') return 'no percentage change in volume';
+  return `${delta.tone === 'positive' ? 'up' : 'down'} ${delta.text.replace(/[+−]/, '')} in volume`;
+};
+
+const buildMuscleRowAccessibilityLabel = ({
+  actionLabel,
+  setCount,
+  nearFailureCount,
+  previousSetCount,
+  previousNearFailureCount,
+  volume,
+  volumeDelta,
+  periodDays,
+}: {
+  actionLabel: string;
+  setCount: number;
+  nearFailureCount: number;
+  previousSetCount: number;
+  previousNearFailureCount: number;
+  volume: number;
+  volumeDelta: DeltaDisplay;
+  periodDays: StatsPeriodDays;
+}): string =>
+  [
+    actionLabel,
+    `${formatNumber(setCount)} sets, ${formatNumber(nearFailureCount)} near-failure sets`,
+    `${describeCountDifference(setCount - previousSetCount, 'sets')} and ${describeCountDifference(
+      nearFailureCount - previousNearFailureCount,
+      'near-failure sets'
+    )}`,
+    `volume ${formatTotalWeight(volume)}, ${describeVolumeDifference(volumeDelta)}`,
+    `failure background reaches its strongest shade at ${formatNumber(
+      fullScaleFailureCount(periodDays)
+    )} near-failure sets for the selected ${periodDays}-day period`,
+  ].join('. ');
+
+export const nextExerciseSortMode = (
+  activeMode: ExerciseSortMode,
+  pressedHeader: ExerciseSortHeader
+): ExerciseSortMode => {
+  const cycle = EXERCISE_SORT_CYCLES[pressedHeader];
+  if (EXERCISE_SORT_HEADER_BY_MODE[activeMode] !== pressedHeader) return cycle[0];
+
+  const currentIndex = cycle.indexOf(activeMode);
+  return cycle[(currentIndex + 1) % cycle.length];
+};
+
+export const describeExerciseSortMode = (mode: ExerciseSortMode): string => {
+  switch (mode) {
+    case 'recency-desc':
+      return 'Most recent exercise';
+    case 'recency-asc':
+      return 'Least recent exercise';
+    case 'sets-desc':
+      return 'Sets — high to low';
+    case 'sets-asc':
+      return 'Sets — low to high';
+    case 'working-sets-desc':
+      return 'Working sets — high to low';
+    case 'working-sets-asc':
+      return 'Working sets — low to high';
+    case 'volume-desc':
+      return 'Volume — high to low';
+    case 'volume-asc':
+      return 'Volume — low to high';
+  }
+};
+
+const compareExerciseIdentity = (left: ExerciseListItem, right: ExerciseListItem): number => {
+  const nameComparison = left.name.localeCompare(right.name);
+  return nameComparison === 0 ? left.id.localeCompare(right.id) : nameComparison;
+};
+
+const compareNumbers = (left: number, right: number, descending: boolean): number => {
+  if (left === right) return 0;
+  if (descending) return left > right ? -1 : 1;
+  return left < right ? -1 : 1;
+};
+
+const compareOptionalNumbers = (
+  left: number | null,
+  right: number | null,
+  descending: boolean
+): number => {
+  const validLeft = left !== null && Number.isFinite(left) ? left : null;
+  const validRight = right !== null && Number.isFinite(right) ? right : null;
+  if (validLeft === null && validRight === null) return 0;
+  if (validLeft === null) return 1;
+  if (validRight === null) return -1;
+  return compareNumbers(validLeft, validRight, descending);
+};
+
+const completedTimestamp = (item: ExerciseListItem): number | null => {
+  const timestamp = item.lastCompletedAt?.getTime() ?? null;
+  return timestamp !== null && Number.isFinite(timestamp) ? timestamp : null;
+};
+
+export const sortExerciseListItems = (
+  items: ExerciseListItem[],
+  mode: ExerciseSortMode = DEFAULT_EXERCISE_SORT_MODE
+): ExerciseListItem[] =>
+  [...items].sort((left, right) => {
+    let comparison = 0;
+    switch (mode) {
+      case 'recency-desc':
+        comparison = compareOptionalNumbers(completedTimestamp(left), completedTimestamp(right), true);
+        break;
+      case 'recency-asc':
+        comparison = compareOptionalNumbers(completedTimestamp(left), completedTimestamp(right), false);
+        break;
+      case 'sets-desc':
+        comparison = compareNumbers(left.setCount, right.setCount, true);
+        break;
+      case 'sets-asc':
+        comparison = compareNumbers(left.setCount, right.setCount, false);
+        break;
+      case 'working-sets-desc':
+        comparison = compareNumbers(left.nearFailureCount, right.nearFailureCount, true);
+        break;
+      case 'working-sets-asc':
+        comparison = compareNumbers(left.nearFailureCount, right.nearFailureCount, false);
+        break;
+      case 'volume-desc':
+        comparison = compareNumbers(left.totalVolume, right.totalVolume, true);
+        break;
+      case 'volume-asc':
+        comparison = compareNumbers(left.totalVolume, right.totalVolume, false);
+        break;
+    }
+    return comparison === 0 ? compareExerciseIdentity(left, right) : comparison;
+  });
 
 const formatNumber = (value: number): string => {
   if (Number.isInteger(value)) {
@@ -201,12 +429,20 @@ export function StatsScreenShell({
   searchQuery,
   onSearchQueryChange,
 }: StatsScreenShellProps) {
+  const [exerciseSortMode, setExerciseSortMode] = useState<ExerciseSortMode>(
+    DEFAULT_EXERCISE_SORT_MODE
+  );
   const sessionDelta = summary
-    ? formatDelta(summary.current.totals.sessionCount, summary.previous.totals.sessionCount)
+    ? formatCountDelta(
+        summary.current.totals.sessionCount,
+        summary.previous.totals.sessionCount
+      )
     : null;
   const setsDelta = summary
-    ? formatDelta(
+    ? formatSetCountPairDelta(
+        summary.current.totals.setCount,
         summary.current.totals.workingSetCount,
+        summary.previous.totals.setCount,
         summary.previous.totals.workingSetCount
       )
     : null;
@@ -240,36 +476,40 @@ export function StatsScreenShell({
 
   const filteredExerciseListItems = useMemo(() => {
     const query = searchQuery.toLowerCase().trim();
-    if (!query) return exerciseListItems;
-    return exerciseListItems.filter((item) =>
-      item.name.toLowerCase().includes(query)
-    );
-  }, [exerciseListItems, searchQuery]);
+    const filteredItems = query
+      ? exerciseListItems.filter((item) => item.name.toLowerCase().includes(query))
+      : exerciseListItems;
+    return sortExerciseListItems(filteredItems, exerciseSortMode);
+  }, [exerciseListItems, exerciseSortMode, searchQuery]);
+
+  const handlePressExerciseSortHeader = useCallback((header: ExerciseSortHeader) => {
+    setExerciseSortMode((activeMode) => nextExerciseSortMode(activeMode, header));
+  }, []);
 
   return (
     <View style={styles.screen} testID="stats-history-screen">
-      <View style={styles.headerRow}>
-        <SegmentedChips
-          accessibilityLabel="Select stats period"
-          options={PERIOD_OPTIONS}
-          value={periodDays}
-          onChange={onSelectPeriod}
-          testIDPrefix="stats-period-chip"
-        />
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={viewMode === 'muscle' ? 'Switch to exercise view' : 'Switch to muscle view'}
-          onPress={() => onSelectViewMode(viewMode === 'muscle' ? 'exercise' : 'muscle')}
-          style={styles.viewModeChip}
-          testID="stats-view-mode-chip">
-          <Text
-            adjustsFontSizeToFit
-            minimumFontScale={0.78}
-            numberOfLines={1}
-            style={styles.viewModeChipText}>
-            {viewMode === 'muscle' ? 'By Exercise' : 'By Muscle'}
-          </Text>
-        </Pressable>
+      <View style={styles.controlGroups}>
+        <View style={styles.controlGroup} testID="stats-time-range-controls">
+          <Text style={styles.controlLabel}>Time range</Text>
+          <SegmentedChips
+            accessibilityLabel="Select stats time range"
+            options={PERIOD_OPTIONS}
+            value={periodDays}
+            onChange={onSelectPeriod}
+            testIDPrefix="stats-period-chip"
+          />
+        </View>
+        <View style={styles.controlGroup} testID="stats-breakdown-controls">
+          <Text style={styles.controlLabel}>Breakdown</Text>
+          <SegmentedChips
+            accessibilityLabel="Select stats breakdown"
+            options={VIEW_MODE_OPTIONS}
+            value={viewMode}
+            onChange={onSelectViewMode}
+            testIDPrefix="stats-view-mode-chip"
+            variant="joined"
+          />
+        </View>
       </View>
 
       {summary ? (
@@ -292,9 +532,12 @@ export function StatsScreenShell({
           </Pressable>
 
           <View style={styles.summaryCard} testID="stats-card-sets">
-            <Text style={styles.summaryLabel}>Working sets</Text>
+            <Text style={styles.summaryLabel}>Sets (W/Sets)</Text>
             <Text style={styles.summaryValue}>
-              {formatNumber(summary.current.totals.workingSetCount)}
+              {formatSetCountPair(
+                summary.current.totals.setCount,
+                summary.current.totals.workingSetCount
+              )}
             </Text>
             {setsDelta ? (
               <Text style={[styles.summaryDelta, deltaToneStyle(setsDelta.tone)]}>
@@ -333,6 +576,8 @@ export function StatsScreenShell({
           items={filteredExerciseListItems}
           onPressExercise={onPressExerciseHistory}
           isFiltered={Boolean(searchQuery.trim())}
+          sortMode={exerciseSortMode}
+          onPressSortHeader={handlePressExerciseSortHeader}
         />
       ) : (
         <ScrollView
@@ -365,6 +610,7 @@ export function StatsScreenShell({
               <MuscleFamilyList
                 families={filteredFamilies}
                 previousFamilies={summary.previous.totals.muscleFamilies}
+                periodDays={periodDays}
                 onPressMuscleHistory={onPressMuscleHistory}
               />
             )
@@ -410,13 +656,62 @@ export function StatsScreenShell({
   );
 }
 
+const FAMILY_FAILURE_BACKGROUND_COLORS = [
+  uiColors.failureBackgroundFamily1,
+  uiColors.failureBackgroundFamily2,
+  uiColors.failureBackgroundFamily3,
+  uiColors.failureBackgroundFamily4,
+] as const;
+
+const MUSCLE_FAILURE_BACKGROUND_COLORS = [
+  uiColors.failureBackgroundMuscle1,
+  uiColors.failureBackgroundMuscle2,
+  uiColors.failureBackgroundMuscle3,
+  uiColors.failureBackgroundMuscle4,
+] as const;
+
+const selectFailureBackgroundColor = (
+  progress: number,
+  colors: readonly [string, string, string, string]
+): string | undefined => {
+  if (progress <= 0) return undefined;
+  const colorIndex = Math.min(colors.length - 1, Math.ceil(progress * colors.length) - 1);
+  return colors[colorIndex];
+};
+
+function SummaryNameCell({
+  name,
+  textStyle,
+  textTestID,
+}: {
+  name: string;
+  textStyle: StyleProp<TextStyle>;
+  textTestID?: string;
+}) {
+  return (
+    <View style={styles.summaryNameCell}>
+      <Text
+        adjustsFontSizeToFit
+        ellipsizeMode="clip"
+        minimumFontScale={0.82}
+        numberOfLines={2}
+        style={textStyle}
+        testID={textTestID}>
+        {name}
+      </Text>
+    </View>
+  );
+}
+
 function MuscleFamilyList({
   families,
   previousFamilies,
+  periodDays,
   onPressMuscleHistory,
 }: {
   families: DisplayMuscleFamily[];
   previousFamilies: StatsMuscleFamilyPerformance[];
+  periodDays: StatsPeriodDays;
   onPressMuscleHistory: (muscle: MuscleHistoryTarget) => void;
 }) {
   if (families.length === 0) {
@@ -446,6 +741,7 @@ function MuscleFamilyList({
           visibleMuscles={visibleMuscles}
           previousFamily={previousByFamilyName.get(family.familyName) ?? null}
           previousMusclesById={previousMusclesById}
+          periodDays={periodDays}
           onPressMuscleHistory={onPressMuscleHistory}
         />
       ))}
@@ -463,44 +759,64 @@ function MuscleFamilyCard({
   visibleMuscles,
   previousFamily,
   previousMusclesById,
+  periodDays,
   onPressMuscleHistory,
 }: {
   family: StatsMuscleFamilyPerformance;
   visibleMuscles: StatsMusclePerformance[];
   previousFamily: StatsMuscleFamilyPerformance | null;
   previousMusclesById: Map<string, StatsMusclePerformance>;
+  periodDays: StatsPeriodDays;
   onPressMuscleHistory: (muscle: MuscleHistoryTarget) => void;
 }) {
-  const familyUntrained = family.sessionCount === 0 && family.totalWeight === 0;
+  const familyUntrained = family.setCount === 0 && family.totalVolume === 0;
   const testIdSlug = family.familyName.toLowerCase().replace(/\s+/g, '-');
-  const sessionsDelta = formatDelta(family.sessionCount, previousFamily?.sessionCount ?? 0);
-  const weightDelta = formatDelta(family.totalWeight, previousFamily?.totalWeight ?? 0);
+  const setCountDelta = formatSetCountPairDelta(
+    family.setCount,
+    family.nearFailureCount,
+    previousFamily?.setCount ?? 0,
+    previousFamily?.nearFailureCount ?? 0
+  );
+  const volumeDelta = formatVolumeDelta(
+    family.totalVolume,
+    previousFamily?.totalVolume ?? 0
+  );
   const collapsed = isFamilyCollapsible(family);
   const collapsedMuscle = collapsed ? family.muscles[0] : null;
+  const familyFailureBackgroundColor = selectFailureBackgroundColor(
+    computeFailureIntensityProgress(family.nearFailureCount, periodDays),
+    FAMILY_FAILURE_BACKGROUND_COLORS
+  );
+  const familyAccessibilityLabel = buildMuscleRowAccessibilityLabel({
+    actionLabel: `Open ${family.familyName} history`,
+    setCount: family.setCount,
+    nearFailureCount: family.nearFailureCount,
+    previousSetCount: previousFamily?.setCount ?? 0,
+    previousNearFailureCount: previousFamily?.nearFailureCount ?? 0,
+    volume: family.totalVolume,
+    volumeDelta,
+    periodDays,
+  });
   const headerContent = (
     <>
-      <Text
-        adjustsFontSizeToFit
-        ellipsizeMode="clip"
-        minimumFontScale={0.82}
-        numberOfLines={2}
-        style={[styles.familyName, familyUntrained && styles.muscleTextUntrained]}
-        testID={`stats-family-name-${testIdSlug}`}>
-        {family.familyName}
-      </Text>
+      <SummaryNameCell
+        name={family.familyName}
+        textStyle={[styles.familyName, familyUntrained && styles.muscleTextUntrained]}
+        textTestID={`stats-family-name-${testIdSlug}`}
+      />
       <View style={styles.familyMetrics}>
         <Metric
-          label="Sessions"
-          value={formatNumber(family.sessionCount)}
-          delta={sessionsDelta}
-          testID={`stats-family-sessions-${testIdSlug}`}
+          label="Sets"
+          value={formatSetCountPair(family.setCount, family.nearFailureCount)}
+          delta={setCountDelta}
+          testID={`stats-family-sets-${testIdSlug}`}
           muted={familyUntrained}
         />
         <Metric
-          label="Total weight"
-          value={formatTotalWeight(family.totalWeight)}
-          delta={weightDelta}
-          testID={`stats-family-weight-${testIdSlug}`}
+          label="Volume"
+          value={formatTotalWeight(family.totalVolume)}
+          delta={volumeDelta}
+          testID={`stats-family-volume-${testIdSlug}`}
           muted={familyUntrained}
         />
       </View>
@@ -512,18 +828,30 @@ function MuscleFamilyCard({
       {collapsedMuscle ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`Open ${collapsedMuscle.displayName} history`}
+          accessibilityLabel={familyAccessibilityLabel}
           onPress={() => onPressMuscleHistory(toMuscleHistoryTarget(collapsedMuscle))}
-          style={({ pressed }) => [styles.familyHeader, pressed && styles.actionableRowPressed]}
+          style={({ pressed }) => [
+            styles.familyHeader,
+            familyFailureBackgroundColor !== undefined && {
+              backgroundColor: familyFailureBackgroundColor,
+            },
+            pressed && styles.actionableRowPressed,
+          ]}
           testID={`stats-family-header-button-${collapsedMuscle.muscleGroupId}`}>
           {headerContent}
         </Pressable>
       ) : (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`Open ${family.familyName} history`}
+          accessibilityLabel={familyAccessibilityLabel}
           onPress={() => onPressMuscleHistory(toFamilyHistoryTarget(family))}
-          style={({ pressed }) => [styles.familyHeader, pressed && styles.actionableRowPressed]}
+          style={({ pressed }) => [
+            styles.familyHeader,
+            familyFailureBackgroundColor !== undefined && {
+              backgroundColor: familyFailureBackgroundColor,
+            },
+            pressed && styles.actionableRowPressed,
+          ]}
           testID={`stats-family-header-${testIdSlug}`}>
           {headerContent}
         </Pressable>
@@ -531,46 +859,67 @@ function MuscleFamilyCard({
       {collapsed ? null : (
         <View style={styles.muscleList}>
           {visibleMuscles.map((muscle) => {
-            const muscleUntrained = muscle.sessionCount === 0 && muscle.totalWeight === 0;
+            const muscleUntrained = muscle.setCount === 0 && muscle.totalVolume === 0;
             const previousMuscle = previousMusclesById.get(muscle.muscleGroupId) ?? null;
-            const muscleSessionsDelta = formatDelta(
-              muscle.sessionCount,
-              previousMuscle?.sessionCount ?? 0
+            const muscleSetCountDelta = formatSetCountPairDelta(
+              muscle.setCount,
+              muscle.nearFailureCount,
+              previousMuscle?.setCount ?? 0,
+              previousMuscle?.nearFailureCount ?? 0
             );
-            const muscleWeightDelta = formatDelta(
-              muscle.totalWeight,
-              previousMuscle?.totalWeight ?? 0
+            const muscleVolumeDelta = formatVolumeDelta(
+              muscle.totalVolume,
+              previousMuscle?.totalVolume ?? 0
             );
+            const muscleFailureBackgroundColor = selectFailureBackgroundColor(
+              computeFailureIntensityProgress(muscle.nearFailureCount, periodDays),
+              MUSCLE_FAILURE_BACKGROUND_COLORS
+            );
+            const muscleAccessibilityLabel = buildMuscleRowAccessibilityLabel({
+              actionLabel: `Open ${muscle.displayName} history`,
+              setCount: muscle.setCount,
+              nearFailureCount: muscle.nearFailureCount,
+              previousSetCount: previousMuscle?.setCount ?? 0,
+              previousNearFailureCount: previousMuscle?.nearFailureCount ?? 0,
+              volume: muscle.totalVolume,
+              volumeDelta: muscleVolumeDelta,
+              periodDays,
+            });
             return (
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={`Open ${muscle.displayName} history`}
+                accessibilityLabel={muscleAccessibilityLabel}
                 key={muscle.muscleGroupId}
                 onPress={() => onPressMuscleHistory(toMuscleHistoryTarget(muscle))}
-                style={({ pressed }) => [styles.muscleRow, pressed && styles.actionableRowPressed]}
+                style={({ pressed }) => [
+                  styles.muscleRow,
+                  muscleFailureBackgroundColor !== undefined && {
+                    backgroundColor: muscleFailureBackgroundColor,
+                  },
+                  pressed && styles.actionableRowPressed,
+                ]}
                 testID={`stats-muscle-row-${muscle.muscleGroupId}`}>
-                <Text
-                  style={[styles.muscleName, muscleUntrained && styles.muscleTextUntrained]}
-                  adjustsFontSizeToFit
-                  ellipsizeMode="clip"
-                  minimumFontScale={0.82}
-                  numberOfLines={2}>
-                  {muscle.displayName}
-                </Text>
+                <SummaryNameCell
+                  name={muscle.displayName}
+                  textStyle={[
+                    styles.muscleName,
+                    muscleUntrained && styles.muscleTextUntrained,
+                  ]}
+                />
                 <View style={styles.muscleMetrics}>
                   <Metric
-                    label="Sessions"
-                    value={formatNumber(muscle.sessionCount)}
-                    delta={muscleSessionsDelta}
-                    testID={`stats-muscle-sessions-${muscle.muscleGroupId}`}
+                    label="Sets"
+                    value={formatSetCountPair(muscle.setCount, muscle.nearFailureCount)}
+                    delta={muscleSetCountDelta}
+                    testID={`stats-muscle-sets-${muscle.muscleGroupId}`}
                     muted={muscleUntrained}
                     small
                   />
                   <Metric
-                    label="Total weight"
-                    value={formatTotalWeight(muscle.totalWeight)}
-                    delta={muscleWeightDelta}
-                    testID={`stats-muscle-weight-${muscle.muscleGroupId}`}
+                    label="Volume"
+                    value={formatTotalWeight(muscle.totalVolume)}
+                    delta={muscleVolumeDelta}
+                    testID={`stats-muscle-volume-${muscle.muscleGroupId}`}
                     muted={muscleUntrained}
                     small
                   />
@@ -711,21 +1060,60 @@ function HistoryHeatmap({
     () => buildHeatmapData(dailyMetrics, metric, { todayDateKey, weeks: 'all' }),
     [dailyMetrics, metric, todayDateKey]
   );
-  return view === 'daily' ? (
-    <DailyHeatmap
-      data={data}
-      testIDPrefix={testIDPrefix}
-      metricLabel={METRIC_LABELS[metric]}
-      formatValue={(value) => formatMetricNumber(value, metric)}
-      legendLabel={`${METRIC_LABELS[metric]} per day`}
-    />
-  ) : (
-    <WeeklyHeatmap
-      data={data}
-      selectedWeekKey={selectedWeekKey}
-      onSelectWeek={onSelectWeek}
-      testIDPrefix={testIDPrefix}
-    />
+  const formatDailyValue = useCallback(
+    (value: number) => formatMetricNumber(value, metric),
+    [metric]
+  );
+  const dailyHeatmap = useMemo(
+    () => (
+      <DailyHeatmap
+        data={data}
+        testIDPrefix={testIDPrefix}
+        metricLabel={METRIC_LABELS[metric]}
+        formatValue={formatDailyValue}
+        legendLabel={`${METRIC_LABELS[metric]} per day`}
+      />
+    ),
+    [data, formatDailyValue, metric, testIDPrefix]
+  );
+  const weeklyHeatmap = useMemo(
+    () => (
+      <WeeklyHeatmap
+        data={data}
+        selectedWeekKey={selectedWeekKey}
+        onSelectWeek={onSelectWeek}
+        testIDPrefix={testIDPrefix}
+      />
+    ),
+    [data, onSelectWeek, selectedWeekKey, testIDPrefix]
+  );
+  const dailyVisible = view === 'daily';
+
+  return (
+    <View style={styles.heatmapTransition}>
+      <View
+        accessibilityElementsHidden={!dailyVisible}
+        importantForAccessibility={dailyVisible ? 'auto' : 'no-hide-descendants'}
+        pointerEvents={dailyVisible ? 'auto' : 'none'}
+        style={[
+          styles.heatmapLayer,
+          dailyVisible ? styles.heatmapLayerActive : styles.heatmapLayerInactive,
+        ]}
+        testID={`${testIDPrefix}-heatmap-panel-daily`}>
+        {dailyHeatmap}
+      </View>
+      <View
+        accessibilityElementsHidden={dailyVisible}
+        importantForAccessibility={dailyVisible ? 'no-hide-descendants' : 'auto'}
+        pointerEvents={dailyVisible ? 'none' : 'auto'}
+        style={[
+          styles.heatmapLayer,
+          dailyVisible ? styles.heatmapLayerInactive : styles.heatmapLayerActive,
+        ]}
+        testID={`${testIDPrefix}-heatmap-panel-weekly`}>
+        {weeklyHeatmap}
+      </View>
+    </View>
   );
 }
 
@@ -877,10 +1265,14 @@ function ExerciseListView({
   items,
   onPressExercise,
   isFiltered,
+  sortMode,
+  onPressSortHeader,
 }: {
   items: ExerciseListItem[];
   onPressExercise: (exercise: ExerciseHeatmapTarget) => void;
   isFiltered: boolean;
+  sortMode: ExerciseSortMode;
+  onPressSortHeader: (header: ExerciseSortHeader) => void;
 }) {
   if (items.length === 0) {
     return (
@@ -899,55 +1291,179 @@ function ExerciseListView({
       style={styles.scroll}
       contentContainerStyle={styles.scrollContent}
       testID="stats-exercise-list-scroll">
-      <View style={styles.familyList} testID="stats-exercise-list">
+      <View style={styles.exerciseTable} testID="stats-exercise-list">
+        <View style={styles.exerciseTableHeader} testID="stats-exercise-table-header">
+          <ExerciseSortHeaderCell
+            header="exercise"
+            label="Exercise"
+            sortMode={sortMode}
+            onPress={onPressSortHeader}
+            style={styles.exerciseNameCell}
+          />
+          <ExerciseSortHeaderCell
+            header="sets"
+            label="Sets"
+            sortMode={sortMode}
+            onPress={onPressSortHeader}
+            style={styles.exerciseSetsCell}
+            numeric
+          />
+          <ExerciseSortHeaderCell
+            header="volume"
+            label="Vol"
+            sortMode={sortMode}
+            onPress={onPressSortHeader}
+            style={styles.exerciseVolumeCell}
+            numeric
+          />
+          <View
+            accessibilityRole="header"
+            style={[
+              styles.exerciseHeaderCell,
+              styles.exerciseHeaderCellNumeric,
+              styles.exerciseOneRepMaxCell,
+            ]}
+            testID="stats-exercise-header-oneRepMax">
+            <Text numberOfLines={1} style={styles.exerciseHeaderLabel}>
+              1RM
+            </Text>
+          </View>
+        </View>
         {items.map((item) => (
           <Pressable
             key={item.id}
             accessibilityRole="button"
-            accessibilityLabel={`Open ${item.name} heatmap`}
+            accessibilityLabel={`Open ${item.name} heatmap. ${formatNumber(
+              item.setCount
+            )} sets, ${formatNumber(item.nearFailureCount)} working sets. Volume ${formatTotalWeight(
+              item.totalVolume
+            )}${
+              item.estimatedOneRepMax === null
+                ? '. Estimated one rep max unavailable'
+                : `. Estimated one rep max ${formatTotalWeight(item.estimatedOneRepMax)}`
+            }`}
             onPress={() =>
               onPressExercise({ exerciseDefinitionId: item.id, displayName: item.name })
             }
             style={({ pressed }) => [styles.exerciseRow, pressed && styles.actionableRowPressed]}
             testID={`stats-exercise-row-${item.id}`}>
             <Text
-              adjustsFontSizeToFit
-              ellipsizeMode="clip"
-              minimumFontScale={0.82}
-              numberOfLines={2}
-              style={styles.exerciseName}
+              style={[styles.exerciseName, styles.exerciseNameCell]}
               testID={`stats-exercise-name-${item.id}`}>
               {item.name}
             </Text>
-            <View style={styles.exerciseMetrics}>
-              <Metric
-                label="Sessions"
-                value={formatNumber(item.sessionCount)}
-                testID={`stats-exercise-sessions-${item.id}`}
-                muted={false}
-                small
-              />
-              <Metric
-                label="Volume"
-                value={formatTotalWeight(item.totalVolume)}
-                testID={`stats-exercise-volume-${item.id}`}
-                muted={false}
-                small
-              />
-              {item.estimatedOneRepMax !== null ? (
-                <Metric
-                  label="1RM"
-                  value={formatTotalWeight(item.estimatedOneRepMax)}
-                  testID={`stats-exercise-1rm-${item.id}`}
-                  muted={false}
-                  small
-                />
-              ) : null}
-            </View>
+            <Text
+              style={[styles.exerciseNumericCell, styles.exerciseSetsCell]}
+              testID={`stats-exercise-sets-${item.id}`}>
+              {formatSetCountPair(item.setCount, item.nearFailureCount)}
+            </Text>
+            <Text
+              style={[styles.exerciseNumericCell, styles.exerciseVolumeCell]}
+              testID={`stats-exercise-volume-${item.id}`}>
+              {formatTotalWeight(item.totalVolume)}
+            </Text>
+            <Text
+              style={[styles.exerciseNumericCell, styles.exerciseOneRepMaxCell]}
+              testID={`stats-exercise-1rm-${item.id}`}>
+              {item.estimatedOneRepMax === null
+                ? '—'
+                : formatTotalWeight(item.estimatedOneRepMax)}
+            </Text>
           </Pressable>
         ))}
       </View>
     </ScrollView>
+  );
+}
+
+const exerciseSortIndicator = (mode: ExerciseSortMode): string => {
+  switch (mode) {
+    case 'recency-desc':
+      return 'Recent ↓';
+    case 'recency-asc':
+      return 'Recent ↑';
+    case 'sets-desc':
+      return '↓';
+    case 'sets-asc':
+      return '↑';
+    case 'working-sets-desc':
+      return '↓';
+    case 'working-sets-asc':
+      return '↑';
+    case 'volume-desc':
+      return '↓';
+    case 'volume-asc':
+      return '↑';
+  }
+};
+
+const exerciseSortHeaderLabel = (header: ExerciseSortHeader): string => {
+  switch (header) {
+    case 'exercise':
+      return 'Exercise';
+    case 'sets':
+      return 'Sets and working sets';
+    case 'volume':
+      return 'Volume';
+  }
+};
+
+function ExerciseSortHeaderCell({
+  header,
+  label,
+  sortMode,
+  onPress,
+  style,
+  numeric = false,
+}: {
+  header: ExerciseSortHeader;
+  label: string;
+  sortMode: ExerciseSortMode;
+  onPress: (header: ExerciseSortHeader) => void;
+  style: StyleProp<ViewStyle>;
+  numeric?: boolean;
+}) {
+  const isActive = EXERCISE_SORT_HEADER_BY_MODE[sortMode] === header;
+  const nextMode = nextExerciseSortMode(sortMode, header);
+  const reservedIndicator = header === 'exercise' ? 'Recent ↓' : '↓';
+  const accessibilityLabel = isActive
+    ? `${exerciseSortHeaderLabel(header)}. Current sort: ${describeExerciseSortMode(
+        sortMode
+      )}. Activate to sort ${describeExerciseSortMode(nextMode)}.`
+    : `${exerciseSortHeaderLabel(header)}. Activate to sort ${describeExerciseSortMode(nextMode)}.`;
+
+  return (
+    <Pressable
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole="button"
+      accessibilityState={{ selected: isActive }}
+      onPress={() => onPress(header)}
+      style={({ pressed }) => [
+        styles.exerciseHeaderCell,
+        style,
+        numeric && styles.exerciseHeaderCellNumeric,
+        isActive && styles.exerciseHeaderCellActive,
+        pressed && styles.actionableRowPressed,
+      ]}
+      testID={`stats-exercise-sort-${header}`}>
+      <Text
+        numberOfLines={1}
+        style={[styles.exerciseHeaderLabel, numeric && styles.exerciseHeaderLabelNumeric]}>
+        {label}
+      </Text>
+      <Text
+        accessible={false}
+        style={[
+          styles.exerciseHeaderIndicator,
+          header === 'exercise'
+            ? styles.exerciseHeaderIndicatorRecency
+            : styles.exerciseHeaderIndicatorArrow,
+          !isActive && styles.exerciseHeaderIndicatorHidden,
+        ]}
+        testID={`stats-exercise-sort-${header}-indicator`}>
+        {isActive ? exerciseSortIndicator(sortMode) : reservedIndicator}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -1154,7 +1670,7 @@ export default function StatsRoute() {
 
   const catalogSnapshot = useExerciseCatalog();
   const { stats: exerciseCatalogStats, reload: reloadExerciseCatalogStats } =
-    useExerciseCatalogStats('all');
+    useExerciseCatalogStats(periodDays);
 
   const loadSummary = useCallback(async (period: StatsPeriodDays) => {
     setIsLoading(true);
@@ -1308,20 +1824,21 @@ export default function StatsRoute() {
 
   const exerciseListItems = useMemo<ExerciseListItem[]>(() => {
     const { exercises } = catalogSnapshot;
-    const { aggregatesById, everDoneIds } = exerciseCatalogStats;
+    const { aggregatesById, lastCompletedAtById } = exerciseCatalogStats;
     return exercises
-      .filter((ex) => everDoneIds.has(ex.id))
+      .filter((ex) => (aggregatesById.get(ex.id)?.setCount ?? 0) > 0)
       .map((ex) => {
         const agg = aggregatesById.get(ex.id) ?? null;
         return {
           id: ex.id,
           name: ex.name,
-          sessionCount: agg?.sessionCount ?? 0,
+          setCount: agg?.setCount ?? 0,
+          nearFailureCount: agg?.nearFailureCount ?? 0,
           totalVolume: agg?.totalVolume ?? 0,
           estimatedOneRepMax: agg?.estimatedOneRepMax ?? null,
+          lastCompletedAt: lastCompletedAtById.get(ex.id) ?? null,
         };
-      })
-      .sort((a, b) => b.sessionCount - a.sessionCount);
+      });
   }, [catalogSnapshot, exerciseCatalogStats]);
 
   // useMemo prevents unnecessary re-renders of the shell when the route re-renders.
@@ -1412,31 +1929,23 @@ const styles = StyleSheet.create({
     gap: 12,
     position: 'relative',
   },
-  headerRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    alignItems: 'center',
+  controlGroups: {
+    gap: 12,
   },
-  viewModeChip: {
-    width: 104,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: uiColors.borderMuted,
-    backgroundColor: uiColors.surfaceDefault,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    alignItems: 'center',
+  controlGroup: {
+    gap: 6,
   },
-  viewModeChipText: {
+  controlLabel: {
     fontSize: 13,
-    fontWeight: '600',
-    color: uiColors.textSecondary,
+    fontWeight: '700',
+    color: uiColors.textPrimary,
   },
   exerciseRow: {
-    gap: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 52,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
     borderBottomWidth: 1,
     borderBottomColor: uiColors.borderMuted,
   },
@@ -1444,13 +1953,85 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     color: uiColors.textPrimary,
-    alignSelf: 'stretch',
-    minWidth: 0,
   },
-  exerciseMetrics: {
+  exerciseTable: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: uiColors.borderMuted,
+    backgroundColor: uiColors.surfaceDefault,
+    overflow: 'hidden',
+  },
+  exerciseTableHeader: {
     flexDirection: 'row',
+    alignItems: 'stretch',
+    paddingHorizontal: 8,
+    backgroundColor: uiColors.surfaceMuted,
+    borderBottomWidth: 1,
+    borderBottomColor: uiColors.borderMuted,
+  },
+  exerciseHeaderCell: {
+    minHeight: 52,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    justifyContent: 'flex-start',
+    paddingHorizontal: 4,
+    paddingVertical: 4,
+  },
+  exerciseHeaderCellNumeric: {
     justifyContent: 'flex-end',
-    gap: 12,
+  },
+  exerciseHeaderCellActive: {
+    backgroundColor: uiColors.actionPrimarySubtleBg,
+  },
+  exerciseHeaderLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: uiColors.textPrimary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.25,
+  },
+  exerciseHeaderLabelNumeric: {
+    textAlign: 'right',
+  },
+  exerciseHeaderIndicator: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: uiColors.actionPrimary,
+  },
+  exerciseHeaderIndicatorRecency: {
+    width: 48,
+  },
+  exerciseHeaderIndicatorArrow: {
+    width: 10,
+    textAlign: 'center',
+  },
+  exerciseHeaderIndicatorHidden: {
+    opacity: 0,
+  },
+  exerciseNameCell: {
+    flex: 1,
+    minWidth: 0,
+    paddingHorizontal: 4,
+  },
+  exerciseSetsCell: {
+    width: 70,
+    paddingHorizontal: 4,
+  },
+  exerciseVolumeCell: {
+    width: 52,
+    paddingHorizontal: 4,
+  },
+  exerciseOneRepMaxCell: {
+    width: 42,
+    paddingHorizontal: 4,
+  },
+  exerciseNumericCell: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: uiColors.textPrimary,
+    textAlign: 'right',
+    fontVariant: ['tabular-nums'],
   },
   scroll: {
     flex: 1,
@@ -1516,8 +2097,30 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: uiColors.textPrimary,
-    flexShrink: 1,
+  },
+  summaryNameCell: {
+    flex: 1,
     minWidth: 0,
+    alignSelf: 'stretch',
+    justifyContent: 'center',
+  },
+  heatmapTransition: {
+    position: 'relative',
+  },
+  heatmapLayer: {
+    left: 0,
+    right: 0,
+    top: 0,
+  },
+  heatmapLayerActive: {
+    position: 'relative',
+    opacity: 1,
+    zIndex: 1,
+  },
+  heatmapLayerInactive: {
+    position: 'absolute',
+    opacity: 0,
+    zIndex: 0,
   },
   familyMetrics: {
     flexDirection: 'row',
@@ -1542,8 +2145,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     color: uiColors.textPrimary,
-    flexShrink: 1,
-    minWidth: 0,
   },
   muscleMetrics: {
     flexDirection: 'row',

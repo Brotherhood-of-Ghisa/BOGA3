@@ -6,7 +6,9 @@ import {
   aggregateSelectedMuscleDailyEffortMetrics,
   aggregateSelectedMuscleWeeklyEffort,
   collectMuscleSetContributions,
+  countMuscleAnalyticsPerformedSets,
   countMuscleAnalyticsWorkingSets,
+  isMuscleAnalyticsWorkingSet,
   type AggregateSelectedMuscleDailyEffortOptions,
   type DailyEffortMetrics,
   type MuscleAnalyticsInput,
@@ -36,20 +38,23 @@ export type StatsMusclePerformance = {
   displayName: string;
   familyName: string;
   sortOrder: number;
-  sessionCount: number;
-  totalWeight: number;
+  setCount: number;
+  nearFailureCount: number;
+  totalVolume: number;
 };
 
 export type StatsMuscleFamilyPerformance = {
   familyName: string;
   sortOrder: number;
-  sessionCount: number;
-  totalWeight: number;
+  setCount: number;
+  nearFailureCount: number;
+  totalVolume: number;
   muscles: StatsMusclePerformance[];
 };
 
 export type StatsTotals = {
   sessionCount: number;
+  setCount: number;
   workingSetCount: number;
   muscleFamilies: StatsMuscleFamilyPerformance[];
 };
@@ -105,33 +110,38 @@ const computePreviousPeriodBounds = (current: StatsPeriodBounds): StatsPeriodBou
 };
 
 export const aggregateStats = (input: StatsAggregationInput): StatsTotals => {
-  const totalWeightByMuscleId = new Map<string, number>();
-  const sessionsByMuscleId = new Map<string, Set<string>>();
+  type MuscleAccumulator = {
+    setIdentities: Set<string>;
+    nearFailureSetIdentities: Set<string>;
+    totalVolume: number;
+  };
+  const accumulatorsByMuscleId = new Map<string, MuscleAccumulator>();
 
   for (const contribution of collectMuscleSetContributions(input)) {
-    if (contribution.weightedVolume > 0) {
-      totalWeightByMuscleId.set(
-        contribution.muscleGroupId,
-        (totalWeightByMuscleId.get(contribution.muscleGroupId) ?? 0) +
-          contribution.weightedVolume
-      );
+    const accumulator = accumulatorsByMuscleId.get(contribution.muscleGroupId) ?? {
+      setIdentities: new Set<string>(),
+      nearFailureSetIdentities: new Set<string>(),
+      totalVolume: 0,
+    };
+    accumulator.setIdentities.add(contribution.setIdentity);
+    if (isMuscleAnalyticsWorkingSet(contribution.setType)) {
+      accumulator.nearFailureSetIdentities.add(contribution.setIdentity);
     }
-
-    const sessionsForMuscle =
-      sessionsByMuscleId.get(contribution.muscleGroupId) ?? new Set<string>();
-    sessionsForMuscle.add(contribution.sessionId);
-    sessionsByMuscleId.set(contribution.muscleGroupId, sessionsForMuscle);
+    accumulator.totalVolume += contribution.weightedVolume;
+    accumulatorsByMuscleId.set(contribution.muscleGroupId, accumulator);
   }
 
   const musclesByFamily = new Map<string, StatsMusclePerformance[]>();
   for (const group of input.muscleGroups) {
+    const accumulator = accumulatorsByMuscleId.get(group.id);
     const muscle: StatsMusclePerformance = {
       muscleGroupId: group.id,
       displayName: group.displayName,
       familyName: group.familyName,
       sortOrder: group.sortOrder,
-      sessionCount: sessionsByMuscleId.get(group.id)?.size ?? 0,
-      totalWeight: totalWeightByMuscleId.get(group.id) ?? 0,
+      setCount: accumulator?.setIdentities.size ?? 0,
+      nearFailureCount: accumulator?.nearFailureSetIdentities.size ?? 0,
+      totalVolume: accumulator?.totalVolume ?? 0,
     };
     const bucket = musclesByFamily.get(group.familyName) ?? [];
     bucket.push(muscle);
@@ -140,15 +150,21 @@ export const aggregateStats = (input: StatsAggregationInput): StatsTotals => {
 
   const muscleFamilies: StatsMuscleFamilyPerformance[] = Array.from(musclesByFamily.entries())
     .map(([familyName, muscles]) => {
-      const familySessionIds = new Set<string>();
-      let familyTotalWeight = 0;
+      const familySetIdentities = new Set<string>();
+      const familyNearFailureSetIdentities = new Set<string>();
+      let familyTotalVolume = 0;
       let familySortOrder = Number.POSITIVE_INFINITY;
       for (const muscle of muscles) {
-        familyTotalWeight += muscle.totalWeight;
+        familyTotalVolume += muscle.totalVolume;
         if (muscle.sortOrder < familySortOrder) familySortOrder = muscle.sortOrder;
-        const sessionIds = sessionsByMuscleId.get(muscle.muscleGroupId);
-        if (sessionIds) {
-          for (const id of sessionIds) familySessionIds.add(id);
+        const accumulator = accumulatorsByMuscleId.get(muscle.muscleGroupId);
+        if (accumulator) {
+          for (const identity of accumulator.setIdentities) {
+            familySetIdentities.add(identity);
+          }
+          for (const identity of accumulator.nearFailureSetIdentities) {
+            familyNearFailureSetIdentities.add(identity);
+          }
         }
       }
       const sortedMuscles = [...muscles].sort((left, right) => {
@@ -158,8 +174,9 @@ export const aggregateStats = (input: StatsAggregationInput): StatsTotals => {
       return {
         familyName,
         sortOrder: Number.isFinite(familySortOrder) ? familySortOrder : 0,
-        sessionCount: familySessionIds.size,
-        totalWeight: familyTotalWeight,
+        setCount: familySetIdentities.size,
+        nearFailureCount: familyNearFailureSetIdentities.size,
+        totalVolume: familyTotalVolume,
         muscles: sortedMuscles,
       };
     })
@@ -170,6 +187,7 @@ export const aggregateStats = (input: StatsAggregationInput): StatsTotals => {
 
   return {
     sessionCount: input.sessions.length,
+    setCount: countMuscleAnalyticsPerformedSets(input),
     workingSetCount: countMuscleAnalyticsWorkingSets(input),
     muscleFamilies,
   };

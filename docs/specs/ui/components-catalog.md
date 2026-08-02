@@ -36,6 +36,7 @@ Brief entrypoint inventory of the current reusable UI component set.
 - Purpose:
   - single source of truth for shared UI token values (colors, spacing, radius, typography, border)
   - includes the shared semantic/status/overlay color palette used by current route screens after the M8 convergence refactor (Task `T-20260226-06`)
+  - includes token-backed green family and warm individual-muscle background palettes for Stats / History failure intensity; each row selects one uniform shade from its palette
 
 2. `UiText`
 - File: `apps/mobile/components/ui/text.tsx`
@@ -55,7 +56,10 @@ Brief entrypoint inventory of the current reusable UI component set.
 5. `SegmentedChips`
 - File: `apps/mobile/components/ui/segmented-chips.tsx`
 - Purpose:
-  - pill-style segmented chip row used by the Stats/History view toggle and the stats period selector
+  - shared segmented choice row whose default `pills` presentation preserves
+    existing callers
+  - exposes an opt-in joined, equal-width variant used by the Stats / History
+    `Breakdown` control so both choices remain visibly grouped and accessible
 
 6. `ui` barrel exports
 - File: `apps/mobile/components/ui/index.ts`
@@ -109,13 +113,12 @@ Brief entrypoint inventory of the current reusable UI component set.
 - Purpose:
   - completed-session history list with delete/undelete modal and deleted-visibility toggle, consumed by the `stats-history` History sub-view
 
-9. `CalendarHeatmap`
-- File: `apps/mobile/components/muscle-analytics/calendar-heatmap.tsx`
+9. `DailyHeatmap` / `WeeklyHeatmap`
+- Files: `apps/mobile/components/heatmaps/DailyHeatmap.tsx`, `apps/mobile/components/heatmaps/WeeklyHeatmap.tsx`
 - Purpose:
-  - reusable weekly-effort calendar heatmap component; used by both the M16 muscle-history overlay and the M17 exercise-history overlay
-  - accepts `SelectedMuscleWeeklyEffort[]` (also aliased as `SelectedExerciseWeeklyEffort` in M17 — identical shape) from `apps/mobile/src/data`
-  - renders Monday-through-Sunday columns, latest weeks first with 8 visible rows by default, token-backed zero/green/today/selected states, tappable cells, and date/effort accessibility labels
-  - `ExerciseHistoryOverlay` in `apps/mobile/app/(tabs)/stats-history.tsx` is screen-local and not catalogued here; it composes `CalendarHeatmap` with the same overlay card structure as `MuscleHistoryOverlay`
+  - reusable daily-cell and weekly-bar views over the same `HeatmapData`, used by both muscle- and exercise-history overlays
+  - renders horizontally scrollable one-year history with token-backed zero/green/today/selected states and tappable accessible cells
+  - the Stats overlay integration keeps both views mounted, with the inactive view transparent, non-interactive, and accessibility-hidden, so toggling does not rebuild the chart tree
 
 ### UI-supporting shared module (non-visual)
 
@@ -129,7 +132,12 @@ Brief entrypoint inventory of the current reusable UI component set.
   - `apps/mobile/components/session-list/types.ts` — `SessionListItem`, `SessionListDataClient`, `DEFAULT_SESSION_LIST_ITEMS`, and the `formatCompactDuration` re-export
   - `apps/mobile/components/session-list/history-data.ts` — `DEFAULT_SESSION_LIST_DATA_CLIENT` and `useSessionListData` (loads/refreshes buckets via the data layer)
 - Purpose:
-  - shared data plumbing so any tab that needs the session list buckets (Stats/History, Log) can reuse the same hook and data client without re-implementing repository mapping
+  - shared data plumbing so any screen that needs the session list buckets can
+    reuse the same hook and data client without re-implementing repository
+    mapping
+  - the hook accepts focus enablement as its sole automatic-load trigger and
+    generations automatic/explicit requests so superseded or unmounted results
+    cannot update the consumer
 
 ## Excluded from this catalog (document elsewhere)
 

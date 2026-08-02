@@ -5,7 +5,7 @@ export default ({ config }: { config: ExpoConfig }) => ({
 
     name: process.env.APP_NAME ?? "Boga3",
     slug: "boga3",
-    version: "1.0.0",
+    version: "1.1.0",
     orientation: "portrait",
     icon: "./assets/images/icon.png",
     scheme: "boga3",
@@ -76,6 +76,7 @@ export default ({ config }: { config: ExpoConfig }) => ({
 
     extra: {
         env: process.env.APP_ENV,
+        releaseCodename: "Jemiliano",
         eas: {
             projectId: "3c00cd23-0946-4eb6-bbf0-4542879cd314"
         },

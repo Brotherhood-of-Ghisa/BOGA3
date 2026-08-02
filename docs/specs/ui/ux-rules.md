@@ -177,6 +177,10 @@ Document app-specific UI semantics and guardrails for the current mobile app.
    - explicit email-change pending-confirmation messaging instead of assuming immediate completion,
    - password field clearing after each authenticated password submit,
    - in-place signed-out/signed-in rerendering instead of a redirect loop.
+6. The `/sessions` list uses route focus as its single automatic refresh
+   trigger: the first focused presentation loads once, each later blur-to-focus
+   transition loads once, and filter or mutation refreshes remain explicit.
+   Superseded and unmounted requests cannot replace the newest visible result.
 
 ### 7. Completed-session detail screen semantics
 
@@ -242,16 +246,62 @@ Guardrail command:
     across the selected muscle IDs; estimated 1RM and top weight remain
     unavailable for muscle-level history.
 11. The v1 overlay loads a capped one-year local completed-session history window for the selected muscle.
+12. Daily and weekly heatmap trees stay mounted while an overlay is open. The
+    inactive tree is transparent, non-interactive, and hidden from
+    accessibility, so switching views reuses the already-laid-out chart and
+    preserves its local selection/scroll state instead of drawing it again.
 
-### 13. Exercise heatmap mode semantics (M17)
+### 13. Stats exercise/muscle history semantics
 
-1. The `Stats / History` screen exposes a **Heatmap** chip below the period chips (Last 7 days / Last 30 days). This chip acts as a view-mode toggle: pressing it switches the body between the muscle-stats table (`viewMode: 'stats'`) and the exercise list (`viewMode: 'heatmap'`).
-2. In Heatmap mode the exercise list is a flat list of exercises that have been trained at least once, sorted by all-time session count descending. Each row shows the exercise name, session count, volume, and estimated 1RM.
-3. Tapping an exercise row in Heatmap mode opens an in-route `ExerciseHistoryOverlay` — the same overlay card structure as the muscle-history overlay (occupies ~75% screen height, backdrop-dismissible).
-4. The `ExerciseHistoryOverlay` renders the reusable `CalendarHeatmap` component over a 365-day window for the selected exercise. It keeps the four metric chips (Volume / W/sets / 1RM / Top weight) plus the week-selection banner; unlike muscle-history, it remains a multi-metric exercise-specific view.
-5. The Heatmap chip active/inactive visual states use the `actionPrimary` / `actionPrimarySubtleBg` / `borderMuted` / `surfaceDefault` tokens; no raw color literals.
-6. Dismissing the exercise overlay returns to the exercise list in Heatmap mode. It clears only transient selected-exercise/week UI state and does not mutate any data.
-7. Volume for exercise analytics is raw `weight × reps` (no muscle-role weighting). This differs from the muscle-history overlay where volume is role-weighted.
+1. The `Stats / History` screen separates its dimensions into two labelled
+   rows: `Time range` contains the existing `Last 7 days` / `Last 30 days`
+   pills, while `Breakdown` contains a joined, equal-width `By Exercise` / `By
+   Muscle` toggle. Both breakdown choices remain visible, exactly one exposes
+   selected state, and `By Exercise` remains the default.
+2. The summary keeps the actionable `Sessions` card and shows a second `Sets (W/Sets)` card as `<all valid performed sets> (<working sets>)`. Sessions use a signed absolute delta, and the set card uses a signed absolute pair; neither count card shows percentage change. Percentages are reserved for Volume comparisons.
+3. In per-exercise mode, exercises with at least one valid performed set in the
+   selected 7-/30-day window render in one compact, viewport-fitting table with
+   shared, single-line `Exercise`, `Sets`, `Vol`, and `1RM` headers. Each data
+   row shows `<valid performed sets> (<working sets>)`, raw exercise volume, and
+   estimated 1RM; unavailable 1RM values render as `—`. Exercise names receive
+   the remaining flexible width and wrap to their full value rather than being
+   capped at an assumed line count.
+   A working set is the valid confirmed `RIR 0` / `RIR 1` / `RIR 2` subset;
+   warm-up, null, and unknown-quality rows remain in the leading set count but
+   not the parenthesized count. Whole data rows remain the only controls that
+   open exercise history; repeated per-row metric labels are omitted visually
+   but all values and their meanings remain in each row's accessibility label.
+4. `Exercise`, `Sets`, and `Vol` are the only exercise-sort controls; `1RM` is
+   a static column header. Initial order is `Sets — high to low`. Repeated
+   presses cycle `Exercise` through most then
+   least recent; `Sets` through sets high-to-low, sets low-to-high,
+   working sets high-to-low, then working sets low-to-high; and `Vol` through
+   high-to-low then low-to-high. Pressing a different sortable header always
+   starts that header's cycle at its first state. Recency comes from the
+   latest valid performed set in completed, non-deleted all-time history and is
+   independent of the selected 7-/30-day metric window. Missing recency remains
+   last in either direction; ties use exercise name then stable exercise ID
+   ascending.
+5. There is no separate sort-status label above the table. Each sortable header
+   reserves a fixed inline indicator slot so its label never moves when another
+   header becomes active. Only the active slot is visible in blue on the same
+   line: `Recent` plus an arrow for Exercise, or an arrow alone for Sets and Vol.
+   Each sortable header exposes button semantics, a mobile-sized touch target,
+   selected state when active, the complete current sort wording (including
+   Sets versus Working sets), and the next activation's outcome to assistive
+   technology; the interaction never relies on color or arrow direction alone.
+   Sort choice is volatile but survives time-range, search, and Breakdown
+   changes for the mounted screen, while each new metric result is sorted again
+   synchronously without data queries or mutation.
+6. Tapping an exercise row in per-exercise mode opens an in-route `ExerciseHistoryOverlay` — the same overlay card structure as the muscle-history overlay (occupies ~75% screen height, backdrop-dismissible).
+7. The `ExerciseHistoryOverlay` renders the reusable daily/weekly heatmaps over a 365-day window for the selected exercise. It keeps the four metric chips (Volume / W/sets / 1RM / Top weight) plus the week-selection banner; unlike muscle-history, it remains a multi-metric exercise-specific view.
+8. The Breakdown toggle uses the shared action, border, and surface tokens and
+   is visually distinct from the Time range pills; no raw color literals.
+9. Dismissing the exercise overlay returns to the exercise list in per-exercise mode. It clears only transient selected-exercise/week UI state and does not mutate any data.
+10. Volume for exercise analytics is raw `weight × reps` (no muscle-role weighting). This differs from the muscle-history overlay where volume is role-weighted.
+11. In the per-muscle mode every family and visible nested-muscle row shows `Sets` in the same `<set count> (<near-failure count>)` form plus `Volume`. Family set counts union physical source-set identities across contributing primary/secondary muscles, so one set mapped to two muscles in one family counts once. Family volume still sums member-muscle contributions.
+12. Per-muscle previous-period set comparisons use signed absolute pairs (`+4 (+1)`, `−2 (−1)`, `±0 (−1)`) and never percentages. Volume comparisons use percentage only (`+17%`, `−100%`, `±0%`), with `—` for zero-to-zero and `new` for positive volume over a zero baseline. Muscle/family volume remains the shared per-side, role-weighted calculation.
+13. Per-muscle family rows use a token-backed green failure-intensity background; visible nested-muscle rows use the semantic warm background palette. Each row receives one uniform shade selected from four levels using `clamp(nearFailureCount / (8 × periodDays / 7), 0, 1)`; there is no partial-width band or gradient. Rows with no near-failure sets keep the default surface. The background is decorative and supplements the readable near-failure count. Its strongest-shade threshold is a display scale only—not a goal, recommendation, limit, or warning. Row accessibility copy states the exact near-failure count and selected-period threshold.
 
 ### 14. Documentation maintenance rule (UI semantics)
 

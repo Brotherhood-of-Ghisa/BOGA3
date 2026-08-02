@@ -49,6 +49,8 @@ export type MuscleAnalyticsInput = {
 };
 
 export type MuscleSetContribution = {
+  /** Stable identity of the physical source set within one aggregation run. */
+  setIdentity: string;
   muscleGroupId: string;
   role: MuscleContributionRole;
   roleWeight: number;
@@ -104,6 +106,17 @@ export const getMuscleContributionRoleWeight = (role: MuscleContributionRole): n
 export const isMuscleAnalyticsWorkingSet = (setType: string | null): boolean =>
   isWorkingSessionSetType(setType);
 
+const isMuscleAnalyticsPerformedSet = (
+  set: MuscleAnalyticsInput['exerciseSets'][number]
+): boolean =>
+  isConfirmedPerformedSet({
+    reps: set.repsValue,
+    weight: set.weightValue,
+    performanceStatus: set.performanceStatus,
+  }) &&
+  parseSetWeight(set.weightValue) !== null &&
+  parseSetReps(set.repsValue) !== null;
+
 export const computeMuscleSetVolume = (weightValue: string, repsValue: string): number => {
   const weight = parseSetWeight(weightValue);
   const reps = parseSetReps(repsValue);
@@ -132,12 +145,22 @@ export const countMuscleAnalyticsWorkingSets = (input: MuscleAnalyticsInput): nu
   return input.exerciseSets.filter(
     (set) =>
       includedExerciseIds.has(set.sessionExerciseId) &&
-      isConfirmedPerformedSet({
-        reps: set.repsValue,
-        weight: set.weightValue,
-        performanceStatus: set.performanceStatus,
-      }) &&
+      isMuscleAnalyticsPerformedSet(set) &&
       isMuscleAnalyticsWorkingSet(set.setType)
+  ).length;
+};
+
+export const countMuscleAnalyticsPerformedSets = (input: MuscleAnalyticsInput): number => {
+  const sessionIds = new Set(input.sessions.map((session) => session.id));
+  const includedExerciseIds = new Set(
+    input.sessionExercises
+      .filter((exercise) => sessionIds.has(exercise.sessionId))
+      .map((exercise) => exercise.id)
+  );
+
+  return input.exerciseSets.filter(
+    (set) =>
+      includedExerciseIds.has(set.sessionExerciseId) && isMuscleAnalyticsPerformedSet(set)
   ).length;
 };
 
@@ -190,14 +213,8 @@ export const collectMuscleSetContributions = (
   );
   const contributions: MuscleSetContribution[] = [];
 
-  for (const set of input.exerciseSets) {
-    if (
-      !isConfirmedPerformedSet({
-        reps: set.repsValue,
-        weight: set.weightValue,
-        performanceStatus: set.performanceStatus,
-      })
-    ) {
+  for (const [setIndex, set] of input.exerciseSets.entries()) {
+    if (!isMuscleAnalyticsPerformedSet(set)) {
       continue;
     }
 
@@ -223,6 +240,7 @@ export const collectMuscleSetContributions = (
       if (roleWeight === 0) continue;
 
       contributions.push({
+        setIdentity: set.id !== undefined ? `id:${set.id}` : `row:${setIndex}`,
         muscleGroupId: mapping.muscleGroupId,
         role: mapping.role,
         roleWeight,

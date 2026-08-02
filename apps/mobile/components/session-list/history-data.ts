@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
   completeSessionDraft,
@@ -75,7 +75,7 @@ export type UseSessionListDataInput = {
   dataClient?: SessionListDataClient;
   initialSessions: SessionListItem[];
   showDeletedSessions: boolean;
-  reloadToken: number;
+  isFocused: boolean;
 };
 
 export type UseSessionListDataResult = {
@@ -90,70 +90,73 @@ export function useSessionListData({
   dataClient,
   initialSessions,
   showDeletedSessions,
-  reloadToken,
+  isFocused,
 }: UseSessionListDataInput): UseSessionListDataResult {
   const [sessions, setSessions] = useState<SessionListItem[]>(
     dataClient ? [] : initialSessions
   );
-  const [isLoadingSessions, setIsLoadingSessions] = useState(Boolean(dataClient));
+  const [isLoadingSessions, setIsLoadingSessions] = useState(
+    Boolean(dataClient && isFocused)
+  );
   const [loadErrorMessage, setLoadErrorMessage] = useState<string | null>(null);
+  const requestGenerationRef = useRef(0);
+  const isMountedRef = useRef(true);
+  const showDeletedSessionsRef = useRef(showDeletedSessions);
+
+  showDeletedSessionsRef.current = showDeletedSessions;
 
   useEffect(() => {
-    if (!dataClient) {
-      return;
-    }
-
-    let isCancelled = false;
-
-    setIsLoadingSessions(true);
-    setLoadErrorMessage(null);
-
-    dataClient
-      .loadSessions({ showDeletedSessions })
-      .then((loadedSessions) => {
-        if (isCancelled) {
-          return;
-        }
-
-        setSessions(loadedSessions);
-      })
-      .catch((error) => {
-        if (isCancelled) {
-          return;
-        }
-
-        setLoadErrorMessage(error instanceof Error ? error.message : 'Unable to load sessions');
-      })
-      .finally(() => {
-        if (isCancelled) {
-          return;
-        }
-
-        setIsLoadingSessions(false);
-      });
-
+    isMountedRef.current = true;
     return () => {
-      isCancelled = true;
+      isMountedRef.current = false;
+      requestGenerationRef.current += 1;
     };
-  }, [dataClient, showDeletedSessions, reloadToken]);
+  }, []);
 
-  const reloadSessions = async () => {
+  const reloadSessions = useCallback(async () => {
     if (!dataClient) {
       return;
     }
 
-    setIsLoadingSessions(true);
-    setLoadErrorMessage(null);
+    const requestGeneration = requestGenerationRef.current + 1;
+    requestGenerationRef.current = requestGeneration;
+
+    if (isMountedRef.current) {
+      setIsLoadingSessions(true);
+      setLoadErrorMessage(null);
+    }
 
     try {
-      const loadedSessions = await dataClient.loadSessions({ showDeletedSessions });
+      const loadedSessions = await dataClient.loadSessions({
+        showDeletedSessions: showDeletedSessionsRef.current,
+      });
+      if (!isMountedRef.current || requestGenerationRef.current !== requestGeneration) {
+        return;
+      }
       setSessions(loadedSessions);
     } catch (error) {
+      if (!isMountedRef.current || requestGenerationRef.current !== requestGeneration) {
+        return;
+      }
       setLoadErrorMessage(error instanceof Error ? error.message : 'Unable to load sessions');
     } finally {
-      setIsLoadingSessions(false);
+      if (isMountedRef.current && requestGenerationRef.current === requestGeneration) {
+        setIsLoadingSessions(false);
+      }
     }
-  };
+  }, [dataClient]);
+
+  useEffect(() => {
+    if (!dataClient || !isFocused) {
+      return;
+    }
+
+    void reloadSessions();
+
+    return () => {
+      requestGenerationRef.current += 1;
+    };
+  }, [dataClient, isFocused, reloadSessions, showDeletedSessions]);
 
   return {
     sessions,

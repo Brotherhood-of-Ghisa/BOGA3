@@ -1,17 +1,22 @@
 appId: com.dinoderek.mobile
 ---
-# No per-openLink Open/Continue/Close dismissal taps: the dev-client URL-scheme
-# trust dialog ("Open in <App>?") is pre-authorized in maestro-ios-launch.sh
-# (maestro_preauthorize_url_schemes seeds the schemeapproval record), location is
-# pre-granted (maestro_preauthorize_location), and the one-time expo-dev-client
-# menu sheet is dismissed by the warm-up before this flow runs — so none of those
-# dialogs render here. Each optional tap on an ABSENT element costs the full ~7s
-# optionalLookupTimeoutMs (measured: 3×7.1s + 1×7.0s + 1×7.1s ≈ 35s of dead wait
-# in the previous version), and every one was WARNED/absent on every run. If
-# pre-authorization ever regresses, the dialog blocks the next assertion and the
-# flow fails loudly (the correct signal) instead of silently absorbing ~7s/tap.
-- openLink: "${MAESTRO_IOS_DEV_CLIENT_URL}"
+# maestro-ios-launch.sh has already opened the dev-client URL and blocks until
+# Metro serves the entry bundle. Opening that URL again here races the harness
+# navigation below: the delayed reload can replace an in-progress recorder with
+# the initial Stats route and surface the one-time developer menu. The smoke lane
+# owns explicit dev-client launch coverage; this data lane starts with its
+# app-owned reset + teleport deep link.
 - openLink: "boga3://maestro-harness?reset=data&teleport=session-list"
+# A fresh dev-client install can defer its one-time onboarding sheet until the
+# first post-launch app interaction. `Continue` advances into the developer
+# menu, whose accessible `Close` control returns to the app; the accepted state
+# then persists for the recorder teleport below.
+- tapOn:
+    text: "Continue"
+    optional: true
+- tapOn:
+    text: "Close"
+    optional: true
 - extendedWaitUntil:
     visible:
       id: "stats-history-screen"
@@ -77,6 +82,16 @@ appId: com.dinoderek.mobile
     timeout: 30000
 - tapOn:
     id: "stats-card-sessions"
+- extendedWaitUntil:
+    visible:
+      id: "sessions-screen"
+    timeout: 10000
+- extendedWaitUntil:
+    notVisible:
+      id: "session-list-loading-state"
+    timeout: 10000
+- assertVisible: "Sessions"
+- assertNotVisible: "(tabs)"
 - assertVisible:
     id: "completed-history-scroll"
 - takeScreenshot: "04-data-runtime-smoke-success"

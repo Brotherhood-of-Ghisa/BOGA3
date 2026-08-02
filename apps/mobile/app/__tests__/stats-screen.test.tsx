@@ -6,9 +6,17 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-
 import {
   default as StatsRoute,
   StatsScreenShell,
+  computeFailureIntensityProgress,
   type StatsScreenShellProps,
-  formatDelta,
+  type ExerciseListItem,
+  describeExerciseSortMode,
+  formatCountDelta,
+  formatSetCountPairDelta,
+  formatVolumeDelta,
+  nextExerciseSortMode,
+  sortExerciseListItems,
 } from '../(tabs)/stats-history';
+import { uiColors } from '@/components/ui';
 import type { SelectedMuscleWeeklyEffort, StatsSummary } from '@/src/data';
 
 jest.mock('@/src/data', () => ({
@@ -76,9 +84,13 @@ const { __mockPush: mockPush, __triggerFocus: triggerFocus } = jest.requireMock(
   'expo-router'
 ) as { __mockPush: jest.Mock; __triggerFocus: () => void };
 
-const { __reload: mockReloadExerciseCatalogStats } = jest.requireMock(
-  '@/src/exercise-catalog/stats-cache'
-) as { __reload: jest.Mock };
+const {
+  __reload: mockReloadExerciseCatalogStats,
+  useExerciseCatalogStats: mockUseExerciseCatalogStats,
+} = jest.requireMock('@/src/exercise-catalog/stats-cache') as {
+  __reload: jest.Mock;
+  useExerciseCatalogStats: jest.Mock;
+};
 
 const buildSummary = (overrides: Partial<StatsSummary> = {}): StatsSummary => ({
   current: {
@@ -89,61 +101,69 @@ const buildSummary = (overrides: Partial<StatsSummary> = {}): StatsSummary => ({
     },
     totals: {
       sessionCount: 4,
+      setCount: 50,
       workingSetCount: 38,
       muscleFamilies: [
         {
           familyName: 'Chest',
           sortOrder: 10,
-          sessionCount: 3,
-          totalWeight: 1800,
+          setCount: 12,
+          nearFailureCount: 3,
+          totalVolume: 1800,
           muscles: [
             {
               muscleGroupId: 'chest',
               displayName: 'Chest',
               familyName: 'Chest',
               sortOrder: 10,
-              sessionCount: 3,
-              totalWeight: 1800,
+              setCount: 12,
+              nearFailureCount: 3,
+              totalVolume: 1800,
             },
           ],
         },
         {
           familyName: 'Shoulders',
           sortOrder: 20,
-          sessionCount: 2,
-          totalWeight: 900,
+          setCount: 10,
+          nearFailureCount: 4,
+          totalVolume: 900,
           muscles: [
             {
               muscleGroupId: 'front_delts',
               displayName: 'Front Delts',
               familyName: 'Shoulders',
               sortOrder: 20,
-              sessionCount: 2,
-              totalWeight: 600,
+              setCount: 8,
+              nearFailureCount: 4,
+              totalVolume: 600,
             },
             {
               muscleGroupId: 'rear_delts',
               displayName: 'Rear Delts',
               familyName: 'Shoulders',
               sortOrder: 21,
-              sessionCount: 1,
-              totalWeight: 300,
+              setCount: 2,
+              nearFailureCount: 0,
+              totalVolume: 300,
             },
           ],
         },
         {
           familyName: 'Legs',
           sortOrder: 40,
-          sessionCount: 0,
-          totalWeight: 0,
+          setCount: 0,
+          nearFailureCount: 0,
+          totalVolume: 0,
           muscles: [
             {
               muscleGroupId: 'calves',
               displayName: 'Calves',
               familyName: 'Legs',
               sortOrder: 40,
-              sessionCount: 0,
-              totalWeight: 0,
+              setCount: 0,
+              nearFailureCount: 0,
+              totalVolume: 0,
             },
           ],
         },
@@ -158,61 +178,69 @@ const buildSummary = (overrides: Partial<StatsSummary> = {}): StatsSummary => ({
     },
     totals: {
       sessionCount: 3,
+      setCount: 40,
       workingSetCount: 30,
       muscleFamilies: [
         {
           familyName: 'Chest',
           sortOrder: 10,
-          sessionCount: 2,
-          totalWeight: 1500,
+          setCount: 8,
+          nearFailureCount: 2,
+          totalVolume: 1500,
           muscles: [
             {
               muscleGroupId: 'chest',
               displayName: 'Chest',
               familyName: 'Chest',
               sortOrder: 10,
-              sessionCount: 2,
-              totalWeight: 1500,
+              setCount: 8,
+              nearFailureCount: 2,
+              totalVolume: 1500,
             },
           ],
         },
         {
           familyName: 'Shoulders',
           sortOrder: 20,
-          sessionCount: 1,
-          totalWeight: 600,
+          setCount: 8,
+          nearFailureCount: 3,
+          totalVolume: 600,
           muscles: [
             {
               muscleGroupId: 'front_delts',
               displayName: 'Front Delts',
               familyName: 'Shoulders',
               sortOrder: 20,
-              sessionCount: 1,
-              totalWeight: 400,
+              setCount: 6,
+              nearFailureCount: 3,
+              totalVolume: 400,
             },
             {
               muscleGroupId: 'rear_delts',
               displayName: 'Rear Delts',
               familyName: 'Shoulders',
               sortOrder: 21,
-              sessionCount: 1,
-              totalWeight: 200,
+              setCount: 2,
+              nearFailureCount: 0,
+              totalVolume: 200,
             },
           ],
         },
         {
           familyName: 'Legs',
           sortOrder: 40,
-          sessionCount: 0,
-          totalWeight: 0,
+          setCount: 0,
+          nearFailureCount: 0,
+          totalVolume: 0,
           muscles: [
             {
               muscleGroupId: 'calves',
               displayName: 'Calves',
               familyName: 'Legs',
               sortOrder: 40,
-              sessionCount: 0,
-              totalWeight: 0,
+              setCount: 0,
+              nearFailureCount: 0,
+              totalVolume: 0,
             },
           ],
         },
@@ -230,6 +258,7 @@ beforeEach(() => {
   mockComputeStatsSummary.mockReset();
   mockPush.mockReset();
   mockReloadExerciseCatalogStats.mockClear();
+  mockUseExerciseCatalogStats.mockClear();
 });
 
 const buildShellProps = (
@@ -297,59 +326,266 @@ const captureUiEvidence = (name: string, tree: unknown) => {
   writeFileSync(path.join(evidenceDir, `${name}.json`), JSON.stringify(tree, null, 2));
 };
 
-describe('formatDelta', () => {
-  it('renders em-dash when both periods are zero', () => {
-    expect(formatDelta(0, 0)).toEqual({ text: '—', tone: 'neutral' });
+describe('formatCountDelta', () => {
+  it('renders an absolute neutral delta when both periods are equal', () => {
+    expect(formatCountDelta(0, 0)).toEqual({ text: '±0', tone: 'neutral' });
   });
 
-  it('renders the "new" tone when previous was zero but current is positive', () => {
-    expect(formatDelta(4, 0)).toEqual({ text: '+4 (new)', tone: 'new' });
+  it('renders only the absolute increase when the previous count was zero', () => {
+    expect(formatCountDelta(4, 0)).toEqual({ text: '+4', tone: 'positive' });
   });
 
-  it('renders positive delta with absolute and percent change', () => {
-    expect(formatDelta(8, 6)).toEqual({
-      text: '+2 (+33%)',
+  it('renders positive and negative count deltas without percentages', () => {
+    expect(formatCountDelta(8, 6)).toEqual({ text: '+2', tone: 'positive' });
+    expect(formatCountDelta(3, 6)).toEqual({ text: '−3', tone: 'negative' });
+  });
+});
+
+describe('stats row metric formatters', () => {
+  it('formats positive, negative, mixed, and unchanged set-count pairs as absolute changes', () => {
+    expect(formatSetCountPairDelta(12, 3, 8, 2)).toEqual({
+      text: '+4 (+1)',
       tone: 'positive',
+    });
+    expect(formatSetCountPairDelta(6, 1, 8, 2)).toEqual({
+      text: '−2 (−1)',
+      tone: 'negative',
+    });
+    expect(formatSetCountPairDelta(8, 1, 8, 2)).toEqual({
+      text: '±0 (−1)',
+      tone: 'negative',
+    });
+    expect(formatSetCountPairDelta(8, 2, 8, 2)).toEqual({
+      text: '±0 (±0)',
+      tone: 'neutral',
     });
   });
 
-  it('renders negative delta with minus sign and percent change', () => {
-    const delta = formatDelta(3, 6);
-    expect(delta.tone).toBe('negative');
-    expect(delta.text).toContain('3');
-    expect(delta.text).toContain('50%');
+  it('formats volume as percentage-only change with explicit zero baselines', () => {
+    expect(formatVolumeDelta(0, 0)).toEqual({ text: '—', tone: 'neutral' });
+    expect(formatVolumeDelta(100, 0)).toEqual({ text: 'new', tone: 'new' });
+    expect(formatVolumeDelta(0, 100)).toEqual({ text: '−100%', tone: 'negative' });
+    expect(formatVolumeDelta(100, 100)).toEqual({ text: '±0%', tone: 'neutral' });
+    expect(formatVolumeDelta(117, 100)).toEqual({ text: '+17%', tone: 'positive' });
+  });
+});
+
+describe('computeFailureIntensityProgress', () => {
+  it.each([
+    [0, 7, 0],
+    [4, 7, 0.5],
+    [8, 7, 1],
+    [9, 7, 1],
+    [8, 30, 8 / (240 / 7)],
+    [34, 30, 34 / (240 / 7)],
+    [35, 30, 1],
+  ] as const)('scales %s failures across %s days', (failures, days, expected) => {
+    expect(computeFailureIntensityProgress(failures, days)).toBeCloseTo(expected, 6);
+  });
+
+  it('defensively clamps negative and non-finite values to zero', () => {
+    expect(computeFailureIntensityProgress(-1, 7)).toBe(0);
+    expect(computeFailureIntensityProgress(Number.NaN, 7)).toBe(0);
+    expect(computeFailureIntensityProgress(Number.POSITIVE_INFINITY, 7)).toBe(0);
+  });
+});
+
+describe('sortExerciseListItems', () => {
+  const item = (
+    id: string,
+    overrides: Partial<Omit<ExerciseListItem, 'id'>> = {}
+  ): ExerciseListItem => ({
+    id,
+    name: id,
+    setCount: 0,
+    nearFailureCount: 0,
+    totalVolume: 0,
+    estimatedOneRepMax: null,
+    lastCompletedAt: null,
+    ...overrides,
+  });
+
+  it('cycles each header exactly and starts a newly selected header at its first state', () => {
+    expect(nextExerciseSortMode('sets-desc', 'sets')).toBe('sets-asc');
+    expect(nextExerciseSortMode('sets-asc', 'sets')).toBe('working-sets-desc');
+    expect(nextExerciseSortMode('working-sets-desc', 'sets')).toBe('working-sets-asc');
+    expect(nextExerciseSortMode('working-sets-asc', 'sets')).toBe('sets-desc');
+
+    expect(nextExerciseSortMode('sets-desc', 'exercise')).toBe('recency-desc');
+    expect(nextExerciseSortMode('recency-desc', 'exercise')).toBe('recency-asc');
+    expect(nextExerciseSortMode('recency-asc', 'exercise')).toBe('recency-desc');
+    expect(nextExerciseSortMode('sets-asc', 'volume')).toBe('volume-desc');
+    expect(nextExerciseSortMode('volume-desc', 'volume')).toBe('volume-asc');
+    expect(nextExerciseSortMode('volume-asc', 'volume')).toBe('volume-desc');
+  });
+
+  it('formats unambiguous accessibility descriptions for every sort state', () => {
+    expect([
+      'recency-desc',
+      'recency-asc',
+      'sets-desc',
+      'sets-asc',
+      'working-sets-desc',
+      'working-sets-asc',
+      'volume-desc',
+      'volume-asc',
+    ].map((mode) => describeExerciseSortMode(mode as Parameters<typeof describeExerciseSortMode>[0])))
+      .toEqual([
+        'Most recent exercise',
+        'Least recent exercise',
+        'Sets — high to low',
+        'Sets — low to high',
+        'Working sets — high to low',
+        'Working sets — low to high',
+        'Volume — high to low',
+        'Volume — low to high',
+      ]);
+  });
+
+  it('sorts recency in both directions with equal and missing timestamps deterministic', () => {
+    const items = [
+      item('missing', { name: 'Missing' }),
+      item('older-b', { name: 'Same', lastCompletedAt: new Date('2026-01-01T00:00:00Z') }),
+      item('newest', { name: 'Newest', lastCompletedAt: new Date('2026-03-01T00:00:00Z') }),
+      item('older-a', { name: 'Same', lastCompletedAt: new Date('2026-01-01T00:00:00Z') }),
+    ];
+
+    expect(sortExerciseListItems(items, 'recency-desc').map(({ id }) => id)).toEqual([
+      'newest', 'older-a', 'older-b', 'missing',
+    ]);
+    expect(sortExerciseListItems(items, 'recency-asc').map(({ id }) => id)).toEqual([
+      'older-a', 'older-b', 'newest', 'missing',
+    ]);
+  });
+
+  it('sorts all-set, working-set, and volume values in both directions', () => {
+    const items = [
+      item('alpha', { name: 'Alpha', setCount: 8, nearFailureCount: 1, totalVolume: 300 }),
+      item('beta', { name: 'Beta', setCount: 4, nearFailureCount: 3, totalVolume: 100 }),
+      item('gamma', { name: 'Gamma', setCount: 6, nearFailureCount: 2, totalVolume: 200 }),
+    ];
+
+    expect(sortExerciseListItems(items, 'sets-desc').map(({ id }) => id)).toEqual(['alpha', 'gamma', 'beta']);
+    expect(sortExerciseListItems(items, 'sets-asc').map(({ id }) => id)).toEqual(['beta', 'gamma', 'alpha']);
+    expect(sortExerciseListItems(items, 'working-sets-desc').map(({ id }) => id)).toEqual(['beta', 'gamma', 'alpha']);
+    expect(sortExerciseListItems(items, 'working-sets-asc').map(({ id }) => id)).toEqual(['alpha', 'gamma', 'beta']);
+    expect(sortExerciseListItems(items, 'volume-desc').map(({ id }) => id)).toEqual(['alpha', 'gamma', 'beta']);
+    expect(sortExerciseListItems(items, 'volume-asc').map(({ id }) => id)).toEqual(['beta', 'gamma', 'alpha']);
+  });
+
+  it('uses name then ID tie-breakers and never mutates the input array', () => {
+    const items = [
+      item('z', { name: 'Same', setCount: 4 }),
+      item('b', { name: 'Bench Press', setCount: 7 }),
+      item('a', { name: 'Same', setCount: 4 }),
+    ];
+    const originalOrder = [...items];
+    const sorted = sortExerciseListItems(items);
+
+    expect(sorted.map(({ id }) => id)).toEqual(['b', 'a', 'z']);
+    expect(items).toEqual(originalOrder);
+    expect(sorted).not.toBe(items);
   });
 });
 
 describe('StatsScreenShell', () => {
-  it('renders summary cards with deltas', () => {
+  it('renders summary cards with absolute count deltas only', () => {
     renderStatsScreenShell();
 
     const sessionsCard = screen.getByTestId('stats-card-sessions');
     expect(sessionsCard).toHaveTextContent(/Sessions/);
     expect(sessionsCard).toHaveTextContent(/4/);
-    expect(sessionsCard).toHaveTextContent(/\+1 \(\+33%\)/);
+    expect(sessionsCard).toHaveTextContent(/\+1/);
+    expect(sessionsCard).not.toHaveTextContent('%');
 
     const setsCard = screen.getByTestId('stats-card-sets');
-    expect(setsCard).toHaveTextContent(/38/);
-    expect(setsCard).toHaveTextContent(/\+8 \(\+27%\)/);
+    expect(setsCard).toHaveTextContent(/Sets \(W\/Sets\)/i);
+    expect(setsCard).toHaveTextContent(/50 \(38\)/);
+    expect(setsCard).toHaveTextContent(/\+10 \(\+8\)/);
+    expect(setsCard).not.toHaveTextContent('%');
   });
 
-  it('renders family cards with sessions + total weight, including a previous-period delta', () => {
+  it('renders family and muscle rows with set/failure counts and percentage-only volume deltas', () => {
     renderStatsScreenShell();
 
-    // Shoulders: current 2 sessions / 900, previous 1 / 600 → +1 (+100%), +300 (+50%).
-    const shouldersSessions = screen.getByTestId('stats-family-sessions-shoulders');
-    expect(shouldersSessions).toHaveTextContent(/2/);
-    expect(shouldersSessions).toHaveTextContent(/\+1 \(\+100%\)/);
+    const shouldersSets = screen.getByTestId('stats-family-sets-shoulders');
+    expect(shouldersSets).toHaveTextContent(/10 \(4\)/);
+    expect(shouldersSets).toHaveTextContent(/\+2 \(\+1\)/);
+    expect(shouldersSets).not.toHaveTextContent('%');
 
-    const shouldersWeight = screen.getByTestId('stats-family-weight-shoulders');
-    expect(shouldersWeight).toHaveTextContent(/900/);
-    expect(shouldersWeight).toHaveTextContent(/\+300 \(\+50%\)/);
+    const shouldersVolume = screen.getByTestId('stats-family-volume-shoulders');
+    expect(shouldersVolume).toHaveTextContent(/900/);
+    expect(shouldersVolume).toHaveTextContent(/\+50%/);
+    expect(shouldersVolume).not.toHaveTextContent('+300');
 
     // Nested muscle row also carries its own delta.
-    const frontDeltsSessions = screen.getByTestId('stats-muscle-sessions-front_delts');
-    expect(frontDeltsSessions).toHaveTextContent(/\+1 \(\+100%\)/);
+    const frontDeltsSets = screen.getByTestId('stats-muscle-sets-front_delts');
+    expect(frontDeltsSets).toHaveTextContent(/8 \(4\)/);
+    expect(frontDeltsSets).toHaveTextContent(/\+2 \(\+1\)/);
+
+    expect(screen.queryByText('Total weight')).toBeNull();
+    expect(screen.queryByTestId('stats-family-sessions-shoulders')).toBeNull();
+    expect(screen.queryByTestId('stats-muscle-sessions-front_delts')).toBeNull();
+  });
+
+  it('colours each trained family and muscle row with one uniform failure shade', () => {
+    const { rerender } = render(
+      <StatsScreenShell {...buildShellProps({ periodDays: 7, viewMode: 'muscle' })} />
+    );
+
+    expect(screen.getByTestId('stats-family-header-shoulders')).toHaveStyle({
+      backgroundColor: uiColors.failureBackgroundFamily2,
+    });
+    expect(screen.getByTestId('stats-muscle-row-front_delts')).toHaveStyle({
+      backgroundColor: uiColors.failureBackgroundMuscle2,
+    });
+    expect(
+      screen.queryByTestId(/failure-bar/, { includeHiddenElements: true })
+    ).toBeNull();
+
+    rerender(
+      <StatsScreenShell {...buildShellProps({ periodDays: 30, viewMode: 'muscle' })} />
+    );
+    expect(screen.getByTestId('stats-family-header-shoulders')).toHaveStyle({
+      backgroundColor: uiColors.failureBackgroundFamily1,
+    });
+
+    rerender(
+      <StatsScreenShell
+        {...buildShellProps({
+          periodDays: 7,
+          viewMode: 'exercise',
+          exerciseListItems: [
+            {
+              id: 'bench',
+              name: 'Bench Press',
+              setCount: 8,
+              nearFailureCount: 4,
+              totalVolume: 1000,
+              estimatedOneRepMax: 100,
+              lastCompletedAt: null,
+            },
+          ],
+        })}
+      />
+    );
+    expect(
+      screen.queryByTestId(/failure-bar/, { includeHiddenElements: true })
+    ).toBeNull();
+  });
+
+  it('exposes set counts, deltas, and background intensity scale in row accessibility labels', () => {
+    renderStatsScreenShell();
+
+    expect(screen.getByTestId('stats-family-header-shoulders').props.accessibilityLabel).toContain(
+      '10 sets, 4 near-failure sets. up 2 sets and up 1 near-failure sets'
+    );
+    expect(screen.getByTestId('stats-family-header-shoulders').props.accessibilityLabel).toContain(
+      'strongest shade at 8 near-failure sets for the selected 7-day period'
+    );
+    expect(screen.getByTestId('stats-muscle-row-front_delts').props.accessibilityLabel).toContain(
+      '8 sets, 4 near-failure sets'
+    );
   });
 
   it('collapses a family whose only muscle matches the family name', () => {
@@ -576,6 +812,61 @@ describe('StatsScreenShell', () => {
     expect(onSelectMuscleHistoryView).toHaveBeenCalledWith('daily');
   });
 
+  it('keeps both heatmap views warm so switching preserves the daily chart state', () => {
+    const dailyMetrics = [
+      {
+        dateKey: '2026-05-13',
+        totalVolume: 1200,
+        workingSetCount: 2,
+        estimatedRM1: 95,
+        highestWeight: 80,
+      },
+    ];
+    const sharedProps = {
+      selectedMuscle: {
+        muscleGroupIds: ['front_delts'],
+        displayName: 'Front Delts',
+        familyName: 'Shoulders',
+      },
+      muscleHistoryWeeklyEffort: [buildWeeklyEffort()],
+      muscleHistoryDailyMetrics: dailyMetrics,
+    };
+    const { rerender } = render(
+      <StatsScreenShell
+        {...buildShellProps({ ...sharedProps, muscleHistoryView: 'daily' })}
+      />
+    );
+
+    fireEvent.press(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-05-13'));
+    expect(screen.getByTestId('stats-muscle-history-heatmap-day-detail-date')).toHaveTextContent(
+      'May 13, 2026'
+    );
+
+    rerender(
+      <StatsScreenShell
+        {...buildShellProps({ ...sharedProps, muscleHistoryView: 'weekly' })}
+      />
+    );
+    expect(
+      screen.getByTestId('stats-muscle-history-heatmap-panel-daily', {
+        includeHiddenElements: true,
+      })
+    ).toHaveStyle({ position: 'absolute', opacity: 0 });
+    expect(screen.getByTestId('stats-muscle-history-heatmap-panel-weekly')).toHaveStyle({
+      position: 'relative',
+      opacity: 1,
+    });
+
+    rerender(
+      <StatsScreenShell
+        {...buildShellProps({ ...sharedProps, muscleHistoryView: 'daily' })}
+      />
+    );
+    expect(screen.getByTestId('stats-muscle-history-heatmap-day-detail-date')).toHaveTextContent(
+      'May 13, 2026'
+    );
+  });
+
   it('selects a single day and shows the selected muscle metric in daily view', () => {
     const props = {
       selectedMuscle: {
@@ -697,6 +988,7 @@ describe('StatsRoute', () => {
             ...buildSummary().current,
             totals: {
               sessionCount: 12,
+              setCount: 120,
               workingSetCount: 100,
               muscleFamilies: buildSummary().current.totals.muscleFamilies,
             },
@@ -713,6 +1005,7 @@ describe('StatsRoute', () => {
     await waitFor(() => {
       expect(mockComputeStatsSummary).toHaveBeenCalledWith({ periodDays: 7 });
     });
+    expect(mockUseExerciseCatalogStats).toHaveBeenCalledWith(7);
     await waitFor(() => {
       expect(screen.getByTestId('stats-card-sessions')).toHaveTextContent(/4/);
     });
@@ -722,6 +1015,7 @@ describe('StatsRoute', () => {
     await waitFor(() => {
       expect(mockComputeStatsSummary).toHaveBeenLastCalledWith({ periodDays: 30 });
     });
+    expect(mockUseExerciseCatalogStats).toHaveBeenLastCalledWith(30);
     await waitFor(() => {
       expect(screen.getByTestId('stats-card-sessions')).toHaveTextContent(/12/);
     });
@@ -770,8 +1064,8 @@ describe('StatsRoute', () => {
       triggerFocus();
     });
 
-    await waitFor(() => expect(screen.getByTestId('stats-view-mode-chip')).toBeTruthy());
-    fireEvent.press(screen.getByTestId('stats-view-mode-chip'));
+    await waitFor(() => expect(screen.getByTestId('stats-view-mode-chip-muscle')).toBeTruthy());
+    fireEvent.press(screen.getByTestId('stats-view-mode-chip-muscle'));
 
     await waitFor(() => {
       expect(screen.getByTestId('stats-muscle-row-front_delts')).toBeTruthy();
@@ -818,8 +1112,8 @@ describe('StatsRoute', () => {
       triggerFocus();
     });
 
-    await waitFor(() => expect(screen.getByTestId('stats-view-mode-chip')).toBeTruthy());
-    fireEvent.press(screen.getByTestId('stats-view-mode-chip'));
+    await waitFor(() => expect(screen.getByTestId('stats-view-mode-chip-muscle')).toBeTruthy());
+    fireEvent.press(screen.getByTestId('stats-view-mode-chip-muscle'));
 
     await waitFor(() => {
       expect(screen.getByTestId('stats-family-header-button-chest')).toBeTruthy();
@@ -837,24 +1131,91 @@ describe('StatsRoute', () => {
 });
 
 describe('StatsScreenShell — view mode toggle', () => {
-  const buildExerciseListItem = (id: string, name: string) => ({
+  const buildExerciseListItem = (
+    id: string,
+    name: string,
+    overrides: Partial<ExerciseListItem> = {}
+  ): ExerciseListItem => ({
     id,
     name,
-    sessionCount: 5,
+    setCount: 5,
+    nearFailureCount: 2,
     totalVolume: 2500,
     estimatedOneRepMax: 110,
+    lastCompletedAt: null,
+    ...overrides,
   });
 
-  it('renders the view mode chip', () => {
-    renderStatsScreenShell();
-    expect(screen.getByTestId('stats-view-mode-chip')).toBeTruthy();
+  const sortedExerciseIds = (): string[] =>
+    screen
+      .getAllByTestId(/^stats-exercise-name-/)
+      .map((node) => String(node.props.testID).replace('stats-exercise-name-', ''));
+
+  it('renders separate labelled Time range and Breakdown control rows', () => {
+    renderStatsScreenShell({ viewMode: 'exercise' });
+
+    expect(screen.getByTestId('stats-time-range-controls')).toHaveTextContent(/Time range/);
+    expect(screen.getByTestId('stats-breakdown-controls')).toHaveTextContent(/Breakdown/);
+    expect(screen.getByTestId('stats-period-chip-7')).toHaveTextContent('Last 7 days');
+    expect(screen.getByTestId('stats-period-chip-30')).toHaveTextContent('Last 30 days');
+    expect(screen.getByTestId('stats-view-mode-chip-exercise')).toHaveTextContent('By Exercise');
+    expect(screen.getByTestId('stats-view-mode-chip-muscle')).toHaveTextContent('By Muscle');
   });
 
-  it('calls onSelectViewMode when view mode chip is pressed', () => {
+  it('exposes exactly one selected breakdown option and invokes each explicit choice once', () => {
     const onSelectViewMode = jest.fn();
-    renderStatsScreenShell({ onSelectViewMode });
-    fireEvent.press(screen.getByTestId('stats-view-mode-chip'));
+    const view = render(
+      <StatsScreenShell
+        {...buildShellProps({ viewMode: 'exercise', onSelectViewMode })}
+      />
+    );
+
+    expect(screen.getByTestId('stats-view-mode-chip-exercise').props.accessibilityState).toEqual({
+      selected: true,
+    });
+    expect(screen.getByTestId('stats-view-mode-chip-muscle').props.accessibilityState).toEqual({
+      selected: false,
+    });
+    fireEvent.press(screen.getByTestId('stats-view-mode-chip-exercise'));
+    expect(onSelectViewMode).not.toHaveBeenCalled();
+    fireEvent.press(screen.getByTestId('stats-view-mode-chip-muscle'));
     expect(onSelectViewMode).toHaveBeenCalledTimes(1);
+    expect(onSelectViewMode).toHaveBeenLastCalledWith('muscle');
+
+    view.rerender(
+      <StatsScreenShell
+        {...buildShellProps({ viewMode: 'muscle', onSelectViewMode })}
+      />
+    );
+    expect(screen.getByTestId('stats-view-mode-chip-exercise').props.accessibilityState).toEqual({
+      selected: false,
+    });
+    expect(screen.getByTestId('stats-view-mode-chip-muscle').props.accessibilityState).toEqual({
+      selected: true,
+    });
+    fireEvent.press(screen.getByTestId('stats-view-mode-chip-muscle'));
+    expect(onSelectViewMode).toHaveBeenCalledTimes(1);
+    fireEvent.press(screen.getByTestId('stats-view-mode-chip-exercise'));
+    expect(onSelectViewMode).toHaveBeenCalledTimes(2);
+    expect(onSelectViewMode).toHaveBeenLastCalledWith('exercise');
+  });
+
+  it('keeps period chips pill-shaped while Breakdown opts into the joined equal-width variant', () => {
+    renderStatsScreenShell({ viewMode: 'exercise' });
+
+    expect(screen.getByTestId('stats-period-chip-7')).toHaveStyle({ borderRadius: 999 });
+    expect(screen.getByTestId('stats-view-mode-chip-row')).toHaveStyle({
+      borderWidth: 1,
+      overflow: 'hidden',
+    });
+    expect(screen.getByTestId('stats-view-mode-chip-exercise')).toHaveStyle({
+      flex: 1,
+      borderRadius: 0,
+    });
+    expect(screen.getByTestId('stats-view-mode-chip-muscle')).toHaveStyle({
+      flex: 1,
+      borderRadius: 0,
+    });
   });
 
   it('shows the exercise list when viewMode is exercise', () => {
@@ -865,6 +1226,189 @@ describe('StatsScreenShell — view mode toggle', () => {
     expect(screen.getByTestId('stats-exercise-list')).toBeTruthy();
     expect(screen.getByTestId('stats-exercise-row-ex1')).toBeTruthy();
     expect(screen.getByTestId('stats-exercise-name-ex1')).toHaveTextContent('Bench Press');
+    expect(screen.getByTestId('stats-exercise-sets-ex1')).toHaveTextContent(/5 \(2\)/);
+    expect(screen.getByTestId('stats-exercise-volume-ex1')).toHaveTextContent('2.5k');
+    expect(screen.getByTestId('stats-exercise-1rm-ex1')).toHaveTextContent('110');
+    expect(screen.queryByTestId('stats-exercise-sessions-ex1')).toBeNull();
+    expect(screen.getByTestId('stats-exercise-row-ex1').props.accessibilityLabel).toContain(
+      '5 sets, 2 working sets'
+    );
+  });
+
+  it('renders one compact four-column header with the default Sets sort clearly active', () => {
+    renderStatsScreenShell({
+      viewMode: 'exercise',
+      exerciseListItems: [
+        buildExerciseListItem('missing', 'Long exercise name that may wrap', {
+          estimatedOneRepMax: null,
+        }),
+      ],
+    });
+
+    expect(screen.getByTestId('stats-exercise-table-header')).toBeTruthy();
+    expect(screen.getByText('Exercise')).toBeTruthy();
+    expect(screen.getByText('Sets')).toBeTruthy();
+    expect(screen.getByText('Vol')).toBeTruthy();
+    expect(screen.getByText('1RM')).toBeTruthy();
+    expect(screen.getByTestId('stats-exercise-header-oneRepMax').props.accessibilityRole).toBe(
+      'header'
+    );
+    expect(screen.queryByTestId('stats-exercise-sort-oneRepMax')).toBeNull();
+    expect(screen.queryByTestId('stats-exercise-sort-status')).toBeNull();
+    expect(screen.queryByText(/^Sorted by:/)).toBeNull();
+    expect(screen.getByTestId('stats-exercise-sort-sets').props.accessibilityState).toEqual({
+      selected: true,
+    });
+    expect(screen.getByTestId('stats-exercise-sort-sets').props.accessibilityLabel).toContain(
+      'Current sort: Sets — high to low. Activate to sort Sets — low to high.'
+    );
+    expect(screen.getByTestId('stats-exercise-sort-exercise').props.accessibilityLabel).toContain(
+      'Activate to sort Most recent exercise.'
+    );
+    expect(screen.getByTestId('stats-exercise-sort-sets')).toHaveStyle({
+      flexDirection: 'row',
+      minHeight: 52,
+    });
+    expect(screen.getByText('Sets').props.numberOfLines).toBe(1);
+    expect(screen.getByTestId('stats-exercise-1rm-missing')).toHaveTextContent('—');
+    expect(screen.getByTestId('stats-exercise-row-missing').props.accessibilityLabel).toContain(
+      'Estimated one rep max unavailable'
+    );
+    expect(screen.getByTestId('stats-exercise-sort-exercise-indicator')).toHaveStyle({
+      opacity: 0,
+      width: 48,
+    });
+    expect(screen.getByTestId('stats-exercise-sort-sets-indicator')).toHaveTextContent('↓');
+    expect(screen.getByTestId('stats-exercise-sort-sets-indicator')).toHaveStyle({ width: 10 });
+    expect(screen.getByTestId('stats-exercise-sort-volume-indicator')).toHaveStyle({
+      opacity: 0,
+      width: 10,
+    });
+    expect(screen.getByTestId('stats-exercise-name-missing').props.numberOfLines).toBeUndefined();
+  });
+
+  it('reorders rows and updates compact active indicators through every header cycle', () => {
+    const onPressExerciseHistory = jest.fn();
+    renderStatsScreenShell({
+      viewMode: 'exercise',
+      onPressExerciseHistory,
+      exerciseListItems: [
+        buildExerciseListItem('alpha', 'Alpha', {
+          setCount: 10,
+          nearFailureCount: 1,
+          totalVolume: 100,
+          estimatedOneRepMax: null,
+          lastCompletedAt: new Date('2026-01-01T00:00:00Z'),
+        }),
+        buildExerciseListItem('beta', 'Beta', {
+          setCount: 5,
+          nearFailureCount: 3,
+          totalVolume: 300,
+          estimatedOneRepMax: 90,
+          lastCompletedAt: new Date('2026-03-01T00:00:00Z'),
+        }),
+        buildExerciseListItem('gamma', 'Gamma', {
+          setCount: 7,
+          nearFailureCount: 2,
+          totalVolume: 200,
+          estimatedOneRepMax: 120,
+          lastCompletedAt: new Date('2026-02-01T00:00:00Z'),
+        }),
+      ],
+    });
+
+    expect(sortedExerciseIds()).toEqual(['alpha', 'gamma', 'beta']);
+    fireEvent.press(screen.getByTestId('stats-exercise-sort-sets'));
+    expect(sortedExerciseIds()).toEqual(['beta', 'gamma', 'alpha']);
+    expect(screen.getByTestId('stats-exercise-sort-sets').props.accessibilityLabel).toContain(
+      'Current sort: Sets — low to high'
+    );
+    expect(screen.getByTestId('stats-exercise-sort-sets-indicator')).toHaveTextContent('↑');
+    fireEvent.press(screen.getByTestId('stats-exercise-sort-sets'));
+    expect(screen.getByTestId('stats-exercise-sort-sets').props.accessibilityLabel).toContain(
+      'Current sort: Working sets — high to low'
+    );
+    expect(screen.getByTestId('stats-exercise-sort-sets-indicator')).toHaveTextContent('↓');
+    fireEvent.press(screen.getByTestId('stats-exercise-sort-sets'));
+    expect(sortedExerciseIds()).toEqual(['alpha', 'gamma', 'beta']);
+    expect(screen.getByTestId('stats-exercise-sort-sets').props.accessibilityLabel).toContain(
+      'Current sort: Working sets — low to high'
+    );
+    fireEvent.press(screen.getByTestId('stats-exercise-sort-sets'));
+    expect(screen.getByTestId('stats-exercise-sort-sets').props.accessibilityLabel).toContain(
+      'Current sort: Sets — high to low'
+    );
+
+    fireEvent.press(screen.getByTestId('stats-exercise-sort-exercise'));
+    expect(sortedExerciseIds()).toEqual(['beta', 'gamma', 'alpha']);
+    expect(screen.getByTestId('stats-exercise-sort-exercise-indicator')).toHaveTextContent(
+      'Recent ↓'
+    );
+    fireEvent.press(screen.getByTestId('stats-exercise-sort-exercise'));
+    expect(sortedExerciseIds()).toEqual(['alpha', 'gamma', 'beta']);
+    expect(screen.getByTestId('stats-exercise-sort-exercise-indicator')).toHaveTextContent(
+      'Recent ↑'
+    );
+
+    fireEvent.press(screen.getByTestId('stats-exercise-sort-volume'));
+    expect(sortedExerciseIds()).toEqual(['beta', 'gamma', 'alpha']);
+    fireEvent.press(screen.getByTestId('stats-exercise-sort-volume'));
+    expect(sortedExerciseIds()).toEqual(['alpha', 'gamma', 'beta']);
+
+    expect(screen.getByTestId('stats-exercise-sort-volume-indicator')).toHaveTextContent('↑');
+    expect(screen.getByTestId('stats-exercise-sort-exercise-indicator')).toHaveStyle({ opacity: 0 });
+    expect(onPressExerciseHistory).not.toHaveBeenCalled();
+    fireEvent.press(screen.getByTestId('stats-exercise-row-gamma'));
+    expect(onPressExerciseHistory).toHaveBeenCalledWith({
+      exerciseDefinitionId: 'gamma',
+      displayName: 'Gamma',
+    });
+  });
+
+  it('preserves sort state while new period data, search, and Breakdown props arrive', () => {
+    const initialItems = [
+      buildExerciseListItem('alpha', 'Alpha', { totalVolume: 100 }),
+      buildExerciseListItem('beta', 'Beta', { totalVolume: 300 }),
+    ];
+    const view = render(
+      <StatsScreenShell
+        {...buildShellProps({ viewMode: 'exercise', exerciseListItems: initialItems })}
+      />
+    );
+
+    fireEvent.press(screen.getByTestId('stats-exercise-sort-volume'));
+    expect(sortedExerciseIds()).toEqual(['beta', 'alpha']);
+
+    view.rerender(
+      <StatsScreenShell
+        {...buildShellProps({
+          viewMode: 'muscle',
+          periodDays: 30,
+          exerciseListItems: [
+            buildExerciseListItem('alpha', 'Alpha', { totalVolume: 500 }),
+            buildExerciseListItem('beta', 'Beta', { totalVolume: 50 }),
+          ],
+        })}
+      />
+    );
+    view.rerender(
+      <StatsScreenShell
+        {...buildShellProps({
+          viewMode: 'exercise',
+          periodDays: 30,
+          searchQuery: 'a',
+          exerciseListItems: [
+            buildExerciseListItem('alpha', 'Alpha', { totalVolume: 500 }),
+            buildExerciseListItem('beta', 'Beta', { totalVolume: 50 }),
+          ],
+        })}
+      />
+    );
+
+    expect(screen.getByTestId('stats-exercise-sort-volume').props.accessibilityLabel).toContain(
+      'Current sort: Volume — high to low'
+    );
+    expect(sortedExerciseIds()).toEqual(['alpha', 'beta']);
   });
 
   it('hides the stats scroll view when viewMode is exercise', () => {
@@ -969,6 +1513,8 @@ describe('StatsRoute — exercise heatmap integration', () => {
   const exerciseAggregate = {
     exerciseDefinitionId: 'bench-press',
     sessionCount: 8,
+    setCount: 12,
+    nearFailureCount: 4,
     totalVolume: 4000,
     estimatedOneRepMax: 120,
   };
@@ -1003,6 +1549,80 @@ describe('StatsRoute — exercise heatmap integration', () => {
     );
     expect(screen.getByTestId('stats-exercise-row-bench-press')).toBeTruthy();
     expect(screen.getByTestId('stats-exercise-name-bench-press')).toHaveTextContent('Bench Press');
+  });
+
+  it('excludes exercises without a performed set in the selected period', async () => {
+    (jest.requireMock('@/src/exercise-catalog/cache').useExerciseCatalog as jest.Mock).mockReturnValue({
+      status: 'ready',
+      exercises: [exerciseInCatalog, { id: 'old-row', name: 'Old Exercise', mappings: [] }],
+      muscleGroups: [],
+      muscleGroupsById: {},
+      lastError: null,
+    });
+    mockUseExerciseCatalogStats.mockReturnValue({
+      status: 'ready',
+      stats: {
+        aggregatesById: new Map([['bench-press', exerciseAggregate]]),
+        everDoneIds: new Set(['bench-press', 'old-row']),
+        lastCompletedAtById: new Map([
+          ['bench-press', new Date('2026-07-31T00:00:00Z')],
+          ['old-row', new Date('2026-01-01T00:00:00Z')],
+        ]),
+      },
+      lastError: null,
+      reload: jest.fn(),
+    });
+    mockComputeStatsSummary.mockResolvedValue(buildSummary());
+
+    render(<StatsRoute />);
+    await act(async () => { triggerFocus(); });
+    await waitFor(() => expect(screen.getByTestId('stats-exercise-row-bench-press')).toBeTruthy());
+
+    expect(screen.queryByTestId('stats-exercise-row-old-row')).toBeNull();
+    expect(mockUseExerciseCatalogStats).toHaveBeenCalledWith(7);
+  });
+
+  it('maps all-time completion timestamps into the route-local recency sort', async () => {
+    const squatAggregate = {
+      ...exerciseAggregate,
+      exerciseDefinitionId: 'squat',
+      setCount: 4,
+    };
+    (jest.requireMock('@/src/exercise-catalog/cache').useExerciseCatalog as jest.Mock).mockReturnValue({
+      status: 'ready',
+      exercises: [exerciseInCatalog, { id: 'squat', name: 'Squat', mappings: [] }],
+      muscleGroups: [],
+      muscleGroupsById: {},
+      lastError: null,
+    });
+    (jest.requireMock('@/src/exercise-catalog/stats-cache').useExerciseCatalogStats as jest.Mock).mockReturnValue({
+      status: 'ready',
+      stats: {
+        aggregatesById: new Map([
+          ['bench-press', exerciseAggregate],
+          ['squat', squatAggregate],
+        ]),
+        everDoneIds: new Set(['bench-press', 'squat']),
+        lastCompletedAtById: new Map([
+          ['bench-press', new Date('2026-01-01T00:00:00Z')],
+          ['squat', new Date('2026-03-01T00:00:00Z')],
+        ]),
+      },
+      lastError: null,
+      reload: jest.fn(),
+    });
+    mockComputeStatsSummary.mockResolvedValue(buildSummary());
+    render(<StatsRoute />);
+
+    await act(async () => { triggerFocus(); });
+    await waitFor(() => expect(screen.getByTestId('stats-exercise-row-squat')).toBeTruthy());
+    fireEvent.press(screen.getByTestId('stats-exercise-sort-exercise'));
+
+    expect(
+      screen
+        .getAllByTestId(/^stats-exercise-name-/)
+        .map((node) => String(node.props.testID).replace('stats-exercise-name-', ''))
+    ).toEqual(['squat', 'bench-press']);
   });
 
   it('loads exercise heatmap data and opens overlay when exercise row is tapped', async () => {
@@ -1068,9 +1688,11 @@ describe('StatsScreenShell — search & filtering', () => {
   const buildExerciseListItem = (id: string, name: string) => ({
     id,
     name,
-    sessionCount: 5,
+    setCount: 5,
+    nearFailureCount: 2,
     totalVolume: 2500,
     estimatedOneRepMax: 110,
+    lastCompletedAt: null,
   });
 
   it('renders search input with dynamic placeholder depending on viewMode', () => {
@@ -1204,7 +1826,7 @@ describe('StatsRoute — view mode toggle search query reset', () => {
     expect(screen.getByTestId('stats-search-input').props.value).toBe('Chest');
 
     // Switch view modes
-    fireEvent.press(screen.getByTestId('stats-view-mode-chip'));
+    fireEvent.press(screen.getByTestId('stats-view-mode-chip-muscle'));
     expect(screen.getByTestId('stats-search-input').props.value).toBe('');
   });
 });

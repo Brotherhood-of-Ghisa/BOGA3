@@ -56,7 +56,10 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 - Params:
   - none
 - Behavior:
-  - tab root inside the `(tabs)` group; renders the merged Stats / History view with a top Stats ↔ History segmented toggle (History sub-view reuses the shared `HistoryList`; Stats sub-view hosts the period chips and per-exercise picker that links out to `/exercise-history`)
+  - tab root inside the `(tabs)` group; renders the merged Stats / History view
+    with separate labelled `Time range` (7-/30-day pills) and `Breakdown`
+    (joined `By Exercise` / `By Muscle`) rows; both breakdown choices remain
+    visible and `By Exercise` is the default
   - M16 muscle-history overlay opens and dismisses as in-route UI state on this route; no path, query param, redirect, or screen-to-screen transition is added for the overlay.
 
 4. `/session-recorder`
@@ -122,6 +125,10 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
   - none
 - Behavior:
   - opened from the Stats Sessions summary card
+  - uses the native stack's minimal back-button display mode plus a generic
+    `Back` accessibility title: the platform back arrow remains, while `(tabs)`
+    and other previous-route labels are hidden visually and from assistive
+    technology
   - active Resume and review/complete both use `dismissTo('/session-recorder')`
     to return to the existing Log recorder; `/sessions` never completes an
     active session directly
@@ -200,7 +207,7 @@ Note:
 ## Header titles (current, high level)
 
 - Tab roots inside the `(tabs)` group (`stats-history`, `session-recorder`, `exercise-catalog`, `settings`) all run with `headerShown: false`; per-screen titles in `apps/mobile/app/(tabs)/_layout.tsx` are still declared for completeness but the visible tab bar is now `BottomTray` (composing `TopLevelTabs`) supplied via the `tabBar` prop. Detail screens that haven't yet moved into `(tabs)` (notably `exercise-history`) still render `TopLevelTabs` directly until they migrate.
-- Detail screens registered in the root stack (`exercise-history`, `sessions`, `profile`, `connected-agents`, `maestro-harness`, `completed-session/[sessionId]`) keep their native stack header behavior; titles are declared in `apps/mobile/app/_layout.tsx`
+- Detail screens registered in the root stack (`exercise-history`, `sessions`, `profile`, `connected-agents`, `maestro-harness`, `completed-session/[sessionId]`) keep their native stack header behavior; titles are declared in `apps/mobile/app/_layout.tsx`. `/sessions` specifically uses an arrow-only minimal back-button display mode with a generic `Back` accessibility title.
 - `completed-session/[sessionId]` sets its title inside the route file (current title: `View Session`)
 - `exercise-history` sets its title inside the route file to the resolved exercise name (falls back to `Exercise History` when the summary is not yet available)
 
