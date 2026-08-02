@@ -56,7 +56,10 @@ Brief entrypoint inventory of the current reusable UI component set.
 5. `SegmentedChips`
 - File: `apps/mobile/components/ui/segmented-chips.tsx`
 - Purpose:
-  - pill-style segmented chip row used by the Stats/History view toggle and the stats period selector
+  - shared segmented choice row whose default `pills` presentation preserves
+    existing callers
+  - exposes an opt-in joined, equal-width variant used by the Stats / History
+    `Breakdown` control so both choices remain visibly grouped and accessible
 
 6. `ui` barrel exports
 - File: `apps/mobile/components/ui/index.ts`
@@ -129,7 +132,12 @@ Brief entrypoint inventory of the current reusable UI component set.
   - `apps/mobile/components/session-list/types.ts` — `SessionListItem`, `SessionListDataClient`, `DEFAULT_SESSION_LIST_ITEMS`, and the `formatCompactDuration` re-export
   - `apps/mobile/components/session-list/history-data.ts` — `DEFAULT_SESSION_LIST_DATA_CLIENT` and `useSessionListData` (loads/refreshes buckets via the data layer)
 - Purpose:
-  - shared data plumbing so any tab that needs the session list buckets (Stats/History, Log) can reuse the same hook and data client without re-implementing repository mapping
+  - shared data plumbing so any screen that needs the session list buckets can
+    reuse the same hook and data client without re-implementing repository
+    mapping
+  - the hook accepts focus enablement as its sole automatic-load trigger and
+    generations automatic/explicit requests so superseded or unmounted results
+    cannot update the consumer
 
 ## Excluded from this catalog (document elsewhere)
 

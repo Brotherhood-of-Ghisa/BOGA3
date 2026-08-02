@@ -16,6 +16,7 @@ export type SegmentedChipsProps<TValue extends string | number> = {
   accessibilityLabel?: string;
   style?: StyleProp<ViewStyle>;
   compact?: boolean;
+  variant?: 'pills' | 'joined';
 };
 
 export function SegmentedChips<TValue extends string | number>({
@@ -26,14 +27,17 @@ export function SegmentedChips<TValue extends string | number>({
   accessibilityLabel,
   style,
   compact = false,
+  variant = 'pills',
 }: SegmentedChipsProps<TValue>) {
+  const isJoined = variant === 'joined';
+
   return (
     <View
       accessibilityRole="tablist"
       accessibilityLabel={accessibilityLabel}
-      style={[styles.row, style]}
+      style={[styles.row, isJoined && styles.rowJoined, style]}
       testID={`${testIDPrefix}-row`}>
-      {options.map((option) => {
+      {options.map((option, index) => {
         const selected = option.value === value;
         return (
           <Pressable
@@ -46,7 +50,13 @@ export function SegmentedChips<TValue extends string | number>({
                 onChange(option.value);
               }
             }}
-            style={[styles.chip, compact && styles.chipCompact, selected && styles.chipSelected]}
+            style={[
+              styles.chip,
+              compact && styles.chipCompact,
+              isJoined && styles.chipJoined,
+              isJoined && index > 0 && styles.chipJoinedDivider,
+              selected && styles.chipSelected,
+            ]}
             testID={`${testIDPrefix}-${option.value}`}>
             <Text style={[styles.chipText, compact && styles.chipTextCompact, selected && styles.chipTextSelected]}>
               {option.label}
@@ -63,6 +73,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
   },
+  rowJoined: {
+    gap: 0,
+    alignSelf: 'stretch',
+    overflow: 'hidden',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: uiColors.borderMuted,
+    backgroundColor: uiColors.surfaceDefault,
+  },
   chip: {
     borderRadius: 999,
     borderWidth: 1,
@@ -74,6 +93,18 @@ const styles = StyleSheet.create({
   chipCompact: {
     paddingHorizontal: 8,
     paddingVertical: 4,
+  },
+  chipJoined: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: 0,
+    borderWidth: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chipJoinedDivider: {
+    borderLeftWidth: 1,
+    borderLeftColor: uiColors.borderMuted,
   },
   chipSelected: {
     borderColor: uiColors.actionPrimary,

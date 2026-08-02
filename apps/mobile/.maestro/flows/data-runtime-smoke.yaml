@@ -77,6 +77,16 @@ appId: com.dinoderek.mobile
     timeout: 30000
 - tapOn:
     id: "stats-card-sessions"
+- extendedWaitUntil:
+    visible:
+      id: "sessions-screen"
+    timeout: 10000
+- extendedWaitUntil:
+    notVisible:
+      id: "session-list-loading-state"
+    timeout: 10000
+- assertVisible: "Sessions"
+- assertNotVisible: "(tabs)"
 - assertVisible:
     id: "completed-history-scroll"
 - takeScreenshot: "04-data-runtime-smoke-success"

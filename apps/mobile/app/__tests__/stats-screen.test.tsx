@@ -967,8 +967,8 @@ describe('StatsRoute', () => {
       triggerFocus();
     });
 
-    await waitFor(() => expect(screen.getByTestId('stats-view-mode-chip')).toBeTruthy());
-    fireEvent.press(screen.getByTestId('stats-view-mode-chip'));
+    await waitFor(() => expect(screen.getByTestId('stats-view-mode-chip-muscle')).toBeTruthy());
+    fireEvent.press(screen.getByTestId('stats-view-mode-chip-muscle'));
 
     await waitFor(() => {
       expect(screen.getByTestId('stats-muscle-row-front_delts')).toBeTruthy();
@@ -1015,8 +1015,8 @@ describe('StatsRoute', () => {
       triggerFocus();
     });
 
-    await waitFor(() => expect(screen.getByTestId('stats-view-mode-chip')).toBeTruthy());
-    fireEvent.press(screen.getByTestId('stats-view-mode-chip'));
+    await waitFor(() => expect(screen.getByTestId('stats-view-mode-chip-muscle')).toBeTruthy());
+    fireEvent.press(screen.getByTestId('stats-view-mode-chip-muscle'));
 
     await waitFor(() => {
       expect(screen.getByTestId('stats-family-header-button-chest')).toBeTruthy();
@@ -1043,16 +1043,71 @@ describe('StatsScreenShell — view mode toggle', () => {
     estimatedOneRepMax: 110,
   });
 
-  it('renders the view mode chip', () => {
-    renderStatsScreenShell();
-    expect(screen.getByTestId('stats-view-mode-chip')).toBeTruthy();
+  it('renders separate labelled Time range and Breakdown control rows', () => {
+    renderStatsScreenShell({ viewMode: 'exercise' });
+
+    expect(screen.getByTestId('stats-time-range-controls')).toHaveTextContent(/Time range/);
+    expect(screen.getByTestId('stats-breakdown-controls')).toHaveTextContent(/Breakdown/);
+    expect(screen.getByTestId('stats-period-chip-7')).toHaveTextContent('Last 7 days');
+    expect(screen.getByTestId('stats-period-chip-30')).toHaveTextContent('Last 30 days');
+    expect(screen.getByTestId('stats-view-mode-chip-exercise')).toHaveTextContent('By Exercise');
+    expect(screen.getByTestId('stats-view-mode-chip-muscle')).toHaveTextContent('By Muscle');
   });
 
-  it('calls onSelectViewMode when view mode chip is pressed', () => {
+  it('exposes exactly one selected breakdown option and invokes each explicit choice once', () => {
     const onSelectViewMode = jest.fn();
-    renderStatsScreenShell({ onSelectViewMode });
-    fireEvent.press(screen.getByTestId('stats-view-mode-chip'));
+    const view = render(
+      <StatsScreenShell
+        {...buildShellProps({ viewMode: 'exercise', onSelectViewMode })}
+      />
+    );
+
+    expect(screen.getByTestId('stats-view-mode-chip-exercise').props.accessibilityState).toEqual({
+      selected: true,
+    });
+    expect(screen.getByTestId('stats-view-mode-chip-muscle').props.accessibilityState).toEqual({
+      selected: false,
+    });
+    fireEvent.press(screen.getByTestId('stats-view-mode-chip-exercise'));
+    expect(onSelectViewMode).not.toHaveBeenCalled();
+    fireEvent.press(screen.getByTestId('stats-view-mode-chip-muscle'));
     expect(onSelectViewMode).toHaveBeenCalledTimes(1);
+    expect(onSelectViewMode).toHaveBeenLastCalledWith('muscle');
+
+    view.rerender(
+      <StatsScreenShell
+        {...buildShellProps({ viewMode: 'muscle', onSelectViewMode })}
+      />
+    );
+    expect(screen.getByTestId('stats-view-mode-chip-exercise').props.accessibilityState).toEqual({
+      selected: false,
+    });
+    expect(screen.getByTestId('stats-view-mode-chip-muscle').props.accessibilityState).toEqual({
+      selected: true,
+    });
+    fireEvent.press(screen.getByTestId('stats-view-mode-chip-muscle'));
+    expect(onSelectViewMode).toHaveBeenCalledTimes(1);
+    fireEvent.press(screen.getByTestId('stats-view-mode-chip-exercise'));
+    expect(onSelectViewMode).toHaveBeenCalledTimes(2);
+    expect(onSelectViewMode).toHaveBeenLastCalledWith('exercise');
+  });
+
+  it('keeps period chips pill-shaped while Breakdown opts into the joined equal-width variant', () => {
+    renderStatsScreenShell({ viewMode: 'exercise' });
+
+    expect(screen.getByTestId('stats-period-chip-7')).toHaveStyle({ borderRadius: 999 });
+    expect(screen.getByTestId('stats-view-mode-chip-row')).toHaveStyle({
+      borderWidth: 1,
+      overflow: 'hidden',
+    });
+    expect(screen.getByTestId('stats-view-mode-chip-exercise')).toHaveStyle({
+      flex: 1,
+      borderRadius: 0,
+    });
+    expect(screen.getByTestId('stats-view-mode-chip-muscle')).toHaveStyle({
+      flex: 1,
+      borderRadius: 0,
+    });
   });
 
   it('shows the exercise list when viewMode is exercise', () => {
@@ -1410,7 +1465,7 @@ describe('StatsRoute — view mode toggle search query reset', () => {
     expect(screen.getByTestId('stats-search-input').props.value).toBe('Chest');
 
     // Switch view modes
-    fireEvent.press(screen.getByTestId('stats-view-mode-chip'));
+    fireEvent.press(screen.getByTestId('stats-view-mode-chip-muscle'));
     expect(screen.getByTestId('stats-search-input').props.value).toBe('');
   });
 });

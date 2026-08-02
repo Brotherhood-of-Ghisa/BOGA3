@@ -17,6 +17,16 @@ appId: com.dinoderek.mobile
     timeout: 30000
 
 # --- 01: Exercise view is shown by default ---
+- assertVisible: "Time range"
+- assertVisible: "Breakdown"
+- assertVisible:
+    id: "stats-period-chip-7"
+- assertVisible:
+    id: "stats-period-chip-30"
+- assertVisible:
+    id: "stats-view-mode-chip-exercise"
+- assertVisible:
+    id: "stats-view-mode-chip-muscle"
 - assertVisible:
     id: "stats-exercise-list"
 - assertVisible:
@@ -27,9 +37,9 @@ appId: com.dinoderek.mobile
     text: ".*W/SETS.*"
 - takeScreenshot: "01-exercise-view-default"
 
-# --- Switch to muscle view via chip ---
+# --- Switch to muscle view via its explicit option ---
 - tapOn:
-    id: "stats-view-mode-chip"
+    id: "stats-view-mode-chip-muscle"
 - extendedWaitUntil:
     visible:
       id: "stats-scroll"
@@ -63,9 +73,9 @@ appId: com.dinoderek.mobile
     id: "stats-muscle-row-quads"
 - takeScreenshot: "03-muscle-failure-backgrounds-30-days"
 
-# --- Switch back to exercise view via chip ---
+# --- Switch back to exercise view via its explicit option ---
 - tapOn:
-    id: "stats-view-mode-chip"
+    id: "stats-view-mode-chip-exercise"
 - extendedWaitUntil:
     visible:
       id: "stats-exercise-list"
@@ -112,7 +122,7 @@ appId: com.dinoderek.mobile
 
 # --- Switch to muscle view for muscle overlay test ---
 - tapOn:
-    id: "stats-view-mode-chip"
+    id: "stats-view-mode-chip-muscle"
 - extendedWaitUntil:
     visible:
       id: "stats-scroll"

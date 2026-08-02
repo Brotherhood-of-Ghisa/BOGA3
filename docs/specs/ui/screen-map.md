@@ -52,7 +52,9 @@ Brief entrypoint map of the current mobile screens.
 - Purpose:
   - merged Stats / History tab whose Stats surface switches between per-exercise and per-muscle summaries while preserving the top-level Sessions drill-down and in-route history overlays
 - Key states (high level):
-  - Stats summary loading/error/content states with period chips
+  - Stats summary loading/error/content states with separate labelled control
+    rows: `Time range` keeps the 7-/30-day pills, and `Breakdown` keeps both
+    joined `By Exercise` / `By Muscle` choices visible with one selected
   - top summary cards show `Sessions` and `Sets (W/Sets)` as absolute counts; their previous-period deltas never include percentages
   - per-exercise rows sorted by valid performed-set count then exercise name; each shows `Sets` as `<count> (<near-failure count>)`, raw `Volume`, and `1RM`, and opens an in-route exercise-history overlay
   - per-muscle family and nested rows show the same set/near-failure count grammar plus per-side, role-weighted `Volume`; set comparisons are signed absolute pairs while volume comparisons are percentage-only with explicit zero-baseline states
@@ -162,6 +164,8 @@ Brief entrypoint map of the current mobile screens.
   - stack-based complete session list reached from the Stats Sessions card
 - Key states (high level):
   - optional active-session row followed by completed-session history
+  - one focus-aware automatic history load on first presentation and on each
+    later focus reacquisition; filter and mutation refreshes remain explicit
   - deleted-session visibility toggle and completed-session row actions
   - active Resume and review/complete affordances both return to the existing
     Log recorder so draft state and recorder cleanup rules remain authoritative
@@ -169,6 +173,9 @@ Brief entrypoint map of the current mobile screens.
   - `/session-recorder` via stack dismissal for active Resume or review/complete
   - `/completed-session/<sessionId>` from a completed row
   - `/session-recorder?mode=completed-edit&sessionId=<sessionId>` from completed edit
+- Notes:
+  - the native stack header centers `Sessions` and uses the platform back arrow
+    without a text label, so the internal `(tabs)` group name is never exposed
 
 10. `/completed-session/[sessionId]`
 - File: `apps/mobile/app/completed-session/[sessionId].tsx`
@@ -206,6 +213,10 @@ Brief entrypoint map of the current mobile screens.
   - wraps the whole navigator in the route-layer auth guard (`apps/mobile/components/navigation/auth-route-guard.tsx`), which enforces login-on-start for configured signed-out sessions (neutral loading view while restoring, redirect to `/sign-in` when configured-but-signed-out, stand aside when auth is unconfigured, while allowing `/sign-in` and the dev/test-gated `/maestro-harness` route to render through)
   - immediately below the auth guard, wraps the navigator in the first-sync gate (`apps/mobile/src/sync/SyncGate.tsx`), which blocks a signed-in user behind a full-screen "Setting up your data…" block until `sync_runtime_state.bootstrap_completed_at` is set (then dismisses in place), and observes sync runtime state through the single shared scheduler-state accessor
   - tab roots live inside the `(tabs)` route group (`apps/mobile/app/(tabs)/_layout.tsx`) with `headerShown: false`; the root stack registers the `(tabs)` group itself plus the `sign-in` screen and the detail screens (`exercise-history`, `sessions`, `profile`, `connected-agents`, `maestro-harness`, `completed-session/[sessionId]`)
+  - the root stack opts `/sessions` into the native minimal back-button display
+    mode with a generic `Back` accessibility title, preserving normal platform
+    back behavior while hiding the previous route-group title visually and
+    from assistive technology
   - completed-session route sets its title inside the route file
   - exercise-history route also sets its title inside the route file (resolved exercise name)
 

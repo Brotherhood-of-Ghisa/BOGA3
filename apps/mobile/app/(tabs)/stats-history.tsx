@@ -66,6 +66,10 @@ export type ExerciseListItem = {
 };
 
 export type StatsViewMode = 'exercise' | 'muscle';
+const VIEW_MODE_OPTIONS = [
+  { value: 'exercise' as StatsViewMode, label: 'By Exercise' },
+  { value: 'muscle' as StatsViewMode, label: 'By Muscle' },
+] as const;
 export type MuscleHistoryMetric = Extract<
   CalendarHeatmapMetric,
   'totalVolume' | 'workingSetCount'
@@ -355,28 +359,28 @@ export function StatsScreenShell({
 
   return (
     <View style={styles.screen} testID="stats-history-screen">
-      <View style={styles.headerRow}>
-        <SegmentedChips
-          accessibilityLabel="Select stats period"
-          options={PERIOD_OPTIONS}
-          value={periodDays}
-          onChange={onSelectPeriod}
-          testIDPrefix="stats-period-chip"
-        />
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={viewMode === 'muscle' ? 'Switch to exercise view' : 'Switch to muscle view'}
-          onPress={() => onSelectViewMode(viewMode === 'muscle' ? 'exercise' : 'muscle')}
-          style={styles.viewModeChip}
-          testID="stats-view-mode-chip">
-          <Text
-            adjustsFontSizeToFit
-            minimumFontScale={0.78}
-            numberOfLines={1}
-            style={styles.viewModeChipText}>
-            {viewMode === 'muscle' ? 'By Exercise' : 'By Muscle'}
-          </Text>
-        </Pressable>
+      <View style={styles.controlGroups}>
+        <View style={styles.controlGroup} testID="stats-time-range-controls">
+          <Text style={styles.controlLabel}>Time range</Text>
+          <SegmentedChips
+            accessibilityLabel="Select stats time range"
+            options={PERIOD_OPTIONS}
+            value={periodDays}
+            onChange={onSelectPeriod}
+            testIDPrefix="stats-period-chip"
+          />
+        </View>
+        <View style={styles.controlGroup} testID="stats-breakdown-controls">
+          <Text style={styles.controlLabel}>Breakdown</Text>
+          <SegmentedChips
+            accessibilityLabel="Select stats breakdown"
+            options={VIEW_MODE_OPTIONS}
+            value={viewMode}
+            onChange={onSelectViewMode}
+            testIDPrefix="stats-view-mode-chip"
+            variant="joined"
+          />
+        </View>
       </View>
 
       {summary ? (
@@ -1675,26 +1679,16 @@ const styles = StyleSheet.create({
     gap: 12,
     position: 'relative',
   },
-  headerRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    alignItems: 'center',
+  controlGroups: {
+    gap: 12,
   },
-  viewModeChip: {
-    width: 104,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: uiColors.borderMuted,
-    backgroundColor: uiColors.surfaceDefault,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    alignItems: 'center',
+  controlGroup: {
+    gap: 6,
   },
-  viewModeChipText: {
+  controlLabel: {
     fontSize: 13,
-    fontWeight: '600',
-    color: uiColors.textSecondary,
+    fontWeight: '700',
+    color: uiColors.textPrimary,
   },
   exerciseRow: {
     gap: 10,

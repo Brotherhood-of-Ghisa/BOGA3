@@ -177,6 +177,10 @@ Document app-specific UI semantics and guardrails for the current mobile app.
    - explicit email-change pending-confirmation messaging instead of assuming immediate completion,
    - password field clearing after each authenticated password submit,
    - in-place signed-out/signed-in rerendering instead of a redirect loop.
+6. The `/sessions` list uses route focus as its single automatic refresh
+   trigger: the first focused presentation loads once, each later blur-to-focus
+   transition loads once, and filter or mutation refreshes remain explicit.
+   Superseded and unmounted requests cannot replace the newest visible result.
 
 ### 7. Completed-session detail screen semantics
 
@@ -249,12 +253,17 @@ Guardrail command:
 
 ### 13. Stats exercise/muscle history semantics
 
-1. The `Stats / History` screen exposes a `By Muscle` / `By Exercise` view-mode chip beside the Last 7 days / Last 30 days period chips. Pressing it switches the body between the muscle summary and exercise list.
+1. The `Stats / History` screen separates its dimensions into two labelled
+   rows: `Time range` contains the existing `Last 7 days` / `Last 30 days`
+   pills, while `Breakdown` contains a joined, equal-width `By Exercise` / `By
+   Muscle` toggle. Both breakdown choices remain visible, exactly one exposes
+   selected state, and `By Exercise` remains the default.
 2. The summary keeps the actionable `Sessions` card and shows a second `Sets (W/Sets)` card as `<all valid performed sets> (<working sets>)`. Sessions use a signed absolute delta, and the set card uses a signed absolute pair; neither count card shows percentage change. Percentages are reserved for Volume comparisons.
 3. In the per-exercise mode the list is flat and includes exercises trained at least once. Rows sort by valid performed-set count descending, then exercise name. Each row shows `Sets` as `<valid performed sets> (<near-failure sets>)`, raw exercise `Volume`, and estimated `1RM` when available. Near-failure means the valid performed `RIR 0` / `RIR 1` / `RIR 2` subset; warm-up, null, and unknown-quality rows remain in the leading set count but not the parenthesized count.
 4. Tapping an exercise row in per-exercise mode opens an in-route `ExerciseHistoryOverlay` — the same overlay card structure as the muscle-history overlay (occupies ~75% screen height, backdrop-dismissible).
 5. The `ExerciseHistoryOverlay` renders the reusable daily/weekly heatmaps over a 365-day window for the selected exercise. It keeps the four metric chips (Volume / W/sets / 1RM / Top weight) plus the week-selection banner; unlike muscle-history, it remains a multi-metric exercise-specific view.
-6. The view-mode chip uses the shared action, border, and surface tokens; no raw color literals.
+6. The Breakdown toggle uses the shared action, border, and surface tokens and
+   is visually distinct from the Time range pills; no raw color literals.
 7. Dismissing the exercise overlay returns to the exercise list in per-exercise mode. It clears only transient selected-exercise/week UI state and does not mutate any data.
 8. Volume for exercise analytics is raw `weight × reps` (no muscle-role weighting). This differs from the muscle-history overlay where volume is role-weighted.
 9. In the per-muscle mode every family and visible nested-muscle row shows `Sets` in the same `<set count> (<near-failure count>)` form plus `Volume`. Family set counts union physical source-set identities across contributing primary/secondary muscles, so one set mapped to two muscles in one family counts once. Family volume still sums member-muscle contributions.

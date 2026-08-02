@@ -1,7 +1,7 @@
 ---
 task_id: T-20260802-01-Fix_sessions_loading_and_history_controls
 milestone_id: "MVP"
-status: planned
+status: completed
 ui_impact: "yes"
 areas: "frontend|docs"
 runtimes: "node|expo|maestro|docs"
@@ -16,7 +16,7 @@ docs_touched: "docs/specs/ui/ux-rules.md, docs/specs/ui/screen-map.md, docs/spec
 
 - Task ID: `T-20260802-01-Fix_sessions_loading_and_history_controls`
 - Title: Fix duplicate Sessions loading and regroup Stats / History controls
-- Status: `planned`
+- Status: `completed`
 - File location rule:
   - active card lives at
     `docs/tasks/T-20260802-01-Fix_sessions_loading_and_history_controls.md`
@@ -48,6 +48,15 @@ docs_touched: "docs/specs/ui/ux-rules.md, docs/specs/ui/screen-map.md, docs/spec
 
 ## Context Freshness (required at session start; update before edits)
 
+- Implementation-session refresh on 2026-08-02:
+  - verified `codex/history-set-failure-implementation` at task-card HEAD
+    `a6956e8f5b47797f8a78eb757730838c05ac5686` with a clean worktree;
+  - re-ran `./scripts/task-bootstrap.sh` successfully with all parent paths
+    present;
+  - re-ran `./boga test for --diff origin/main...HEAD`; the cumulative branch
+    requires `fast`, `backend`, `frontend`, `docs-check`, and `meta-tests`;
+  - re-opened `AGENTS.md`, the always-load specs, the testing/UX/Maestro specs,
+    the UI docs bundle, and `apps/mobile/app/__tests__/README.md` before edits.
 - Verified implementation branch + pre-task-card HEAD commit:
   `codex/history-set-failure-implementation` at
   `d4cfefed14bc06a755228fecd24622244b34e022`.
@@ -387,6 +396,63 @@ visible in a distinct two-option toggle.
   observed initial-load behavior, back-header copy, and both control groups.
 - Deferred/manual hosted checks: N/A.
 
+### Recorded implementation evidence (2026-08-02)
+
+- Focused Jest:
+  - `cd apps/mobile && npm test -- --runInBand app/__tests__/sessions-screen.test.tsx app/__tests__/stats-screen.test.tsx app/__tests__/root-layout-auth-bootstrap.test.tsx`
+  - PASS: 3 suites, 79 tests. Coverage asserts one initial focus load, one
+    blur/refocus load, one filter/mutation refresh, request supersession and
+    unmount invalidation, the native Sessions stack options, both labelled
+    Stats control groups, explicit selected states, and preserved search reset.
+- Focused static checks:
+  - `cd apps/mobile && npm run typecheck` — PASS.
+  - `cd apps/mobile && npm run lint:ui-guardrails` — PASS, 31 files checked and
+    0 violations.
+- Focused iOS simulator evidence on `BOGA wt1`
+  (`8EE7AAC8-0DD9-4EFA-852A-737A7C5746F8`):
+  - Stats flow PASS (1/1) at
+    `apps/mobile/artifacts/maestro/T-20260802-01/20260802-095945-16211`.
+    The exercise and muscle captures are
+    `maestro-output/screenshots/01-exercise-view-default.png` and
+    `maestro-output/screenshots/03-muscle-failure-backgrounds-30-days.png`.
+  - Sessions data-smoke PASS (1/1) at
+    `apps/mobile/artifacts/maestro/T-20260802-01/20260802-101018-29574`.
+    `maestro-output/screenshots/04-data-runtime-smoke-success.png` shows the
+    stable loaded list, centered `Sessions` title, and arrow-only back control;
+    its successful hierarchy assertion proves `(tabs)` is absent after the
+    generic `Back` accessibility title is applied.
+- Manual verification summary (required when CI is absent/partial): `BOGA wt1`
+  passed the Sessions no-regeneration/header-return check and both labelled
+  Stats control-group states.
+  - entered Sessions from the Stats `Sessions` card, observed one loading-to-
+    loaded presentation with no second list regeneration, and verified the
+    arrow-only header returned to Stats normally;
+  - verified separate visible `Time range` and `Breakdown` rows in both `By
+    Exercise` and `By Muscle` states, with both breakdown choices always
+    visible and the selected treatment switching once per explicit press.
+- Final cumulative lane selection:
+  - `./boga test for` — PASS; 24 changed paths require exactly `fast`,
+    `backend`, `frontend`, `docs-check`, and `meta-tests`.
+- Required local gates:
+  - `./boga test fast` — PASS; all sub-lanes green, including 109 Jest suites
+    and 1001 tests.
+  - `./boga test backend` — PASS; local Supabase auth/agent/sync contracts and
+    MCP smoke green.
+  - `./boga test frontend` — PASS; `ios-smoke`, `ios-data-smoke`,
+    `ios-auth-profile`, and `ios-sync-e2e` all green.
+  - `./boga test docs-check` — PASS.
+  - `./boga test meta-tests` — PASS, 4 files.
+- Environment recovery evidence:
+  - after a frontend attempt exhausted local disk while Maestro wrote a debug
+    log, `./boga doctor` passed every capability and worktree check; only
+    regenerable test/package caches were pruned, and the complete frontend gate
+    then passed from the first lane through sync e2e.
+- Closeout helper:
+  - `./scripts/task-closeout-check.sh docs/tasks/complete/T-20260802-01-Fix_sessions_loading_and_history_controls.md`
+    — PASS with the single expected warning that this user-requested MVP card
+    has no milestone spec (`Milestone spec: N/A` above).
+- Hosted/deployed verification: N/A; no hosted or deployment surface changed.
+
 ## Execution plan
 
 1. Bootstrap the card, re-open required parent refs, verify the current branch
@@ -419,9 +485,21 @@ visible in a distinct two-option toggle.
 
 ## Completion note
 
-- What changed: pending implementation.
-- What tests ran: pending implementation.
-- What remains: all work in this planned card.
+- What changed: completed the focus-safe Sessions loading/header refinement and
+  the labelled, explicit Stats dimension controls.
+  - made route focus the sole automatic Sessions history-load trigger, retained
+    explicit filter/mutation refreshes, and generation-guarded late requests;
+  - configured the Sessions native header as an arrow-only visual affordance
+    with a generic accessible back title, removing the internal route-group
+    label;
+  - split Stats dimensions into labelled `Time range` pills and a token-backed,
+    joined equal-width `Breakdown` control with both explicit choices;
+  - updated focused tests, Maestro flows, and all four canonical UI docs.
+- What tests ran: all focused checks, direct simulator flows, and every lane
+  selected by the final cumulative `./boga test for` result passed; exact
+  commands, counts, and artifact paths are recorded above.
+- What remains: nothing for this card. No schema, backend contract, hosted
+  smoke, dependency, branch, or PR follow-up is required.
 
 ## Status update checklist (mandatory at closeout)
 

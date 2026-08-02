@@ -11,6 +11,7 @@ const mockRequestSync = jest.fn();
 const mockStartSyncGateStateBridge = jest.fn();
 const mockStopSyncGateStateBridge = jest.fn();
 const mockRegisterBackgroundSyncTask = jest.fn<Promise<void>, unknown[]>(() => Promise.resolve());
+const mockStackScreen = jest.fn();
 
 jest.mock('@/src/data', () => ({
   bootstrapLocalDataLayer: (...args: unknown[]) => mockBootstrapLocalDataLayer(...args),
@@ -76,7 +77,10 @@ jest.mock('react-native-gesture-handler', () => {
 jest.mock('expo-router', () => {
   const { View: MockView } = jest.requireActual('react-native');
   const Stack = ({ children }: { children: ReactNode }) => <MockView testID="root-stack">{children}</MockView>;
-  const StackScreen = ({ name }: { name: string }) => <MockView testID={`screen-${name}`} />;
+  const StackScreen = ({ name, options }: { name: string; options?: unknown }) => {
+    mockStackScreen({ name, options });
+    return <MockView testID={`screen-${name}`} />;
+  };
 
   Stack.displayName = 'MockStack';
   StackScreen.displayName = 'MockStackScreen';
@@ -102,6 +106,7 @@ describe('RootLayout auth bootstrap wiring', () => {
     mockStartSyncGateStateBridge.mockReset();
     mockStopSyncGateStateBridge.mockReset();
     mockRegisterBackgroundSyncTask.mockReset();
+    mockStackScreen.mockReset();
     mockRegisterBackgroundSyncTask.mockResolvedValue(undefined);
     mockBootstrapLocalDataLayer.mockResolvedValue(undefined);
     mockBootstrapAuthState.mockResolvedValue(undefined);
@@ -122,6 +127,19 @@ describe('RootLayout auth bootstrap wiring', () => {
     expect(screen.getByTestId('screen-(tabs)')).toBeTruthy();
     expect(screen.getByTestId('screen-profile')).toBeTruthy();
     expect(screen.getByTestId('screen-connected-agents')).toBeTruthy();
+  });
+
+  it('uses an arrow-only native back affordance for the Sessions screen', () => {
+    render(<RootLayout />);
+
+    expect(mockStackScreen).toHaveBeenCalledWith({
+      name: 'sessions',
+      options: {
+        headerBackButtonDisplayMode: 'minimal',
+        headerBackTitle: 'Back',
+        title: 'Sessions',
+      },
+    });
   });
 
   it('starts the sync scheduler on mount and fires the cold-launch nudge after boot', async () => {

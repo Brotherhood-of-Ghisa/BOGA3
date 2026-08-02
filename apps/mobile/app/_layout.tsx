@@ -71,7 +71,14 @@ export default function RootLayout() {
                 <Stack.Screen name="sign-in" options={{ headerShown: false }} />
                 <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
                 <Stack.Screen name="exercise-history" />
-                <Stack.Screen name="sessions" options={{ title: 'Sessions' }} />
+                <Stack.Screen
+                  name="sessions"
+                  options={{
+                    headerBackButtonDisplayMode: 'minimal',
+                    headerBackTitle: 'Back',
+                    title: 'Sessions',
+                  }}
+                />
                 <Stack.Screen name="profile" options={{ title: 'Profile' }} />
                 <Stack.Screen
                   name="connected-agents"
