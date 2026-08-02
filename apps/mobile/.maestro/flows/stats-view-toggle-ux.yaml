@@ -38,8 +38,11 @@ appId: com.dinoderek.mobile
 - assertVisible:
     id: "stats-exercise-sort-volume"
 - assertVisible:
-    id: "stats-exercise-sort-oneRepMax"
-- assertVisible: "Sorted by: Sets — high to low"
+    id: "stats-exercise-header-oneRepMax"
+- assertVisible:
+    id: "stats-exercise-sort-sets-indicator"
+- assertNotVisible:
+    id: "stats-exercise-sort-status"
 - assertVisible:
     id: "stats-card-sessions"
 - assertVisible:
@@ -51,33 +54,26 @@ appId: com.dinoderek.mobile
 # --- Exercise table headers drive local sorting without opening a row ---
 - tapOn:
     id: "stats-exercise-sort-sets"
-- assertVisible: "Sorted by: Sets — low to high"
+- assertVisible:
+    id: "stats-exercise-sort-sets-indicator"
 - tapOn:
     id: "stats-exercise-sort-sets"
-- assertVisible: "Sorted by: Working sets — high to low"
-- assertVisible: "W/Sets ↓"
+- assertVisible:
+    id: "stats-exercise-sort-sets-indicator"
 - takeScreenshot: "01a-exercise-table-working-sets"
 
 - tapOn:
     id: "stats-exercise-sort-exercise"
-- assertVisible: "Sorted by: Most recent exercise"
 - assertVisible: "Recent ↓"
 - takeScreenshot: "01b-exercise-table-most-recent"
 
 - tapOn:
     id: "stats-exercise-sort-volume"
-- assertVisible: "Sorted by: Volume — high to low"
 - tapOn:
     id: "stats-exercise-sort-volume"
-- assertVisible: "Sorted by: Volume — low to high"
-- assertVisible: "Volume ↑"
+- assertVisible:
+    id: "stats-exercise-sort-volume-indicator"
 - takeScreenshot: "01c-exercise-table-volume-ascending"
-
-- tapOn:
-    id: "stats-exercise-sort-oneRepMax"
-- assertVisible: "Sorted by: 1RM — high to low"
-- assertVisible: "1RM ↓"
-- takeScreenshot: "01d-exercise-table-1rm"
 
 # --- Switch to muscle view via its explicit option ---
 - tapOn:

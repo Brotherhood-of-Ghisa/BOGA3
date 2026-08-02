@@ -56,16 +56,22 @@ Brief entrypoint map of the current mobile screens.
     rows: `Time range` keeps the 7-/30-day pills, and `Breakdown` keeps both
     joined `By Exercise` / `By Muscle` choices visible with one selected
   - top summary cards show `Sessions` and `Sets (W/Sets)` as absolute counts; their previous-period deltas never include percentages
-  - per-exercise history is a viewport-fitting table with shared `Exercise`,
-    `Sets (W/Sets)`, `Volume`, and `1RM` headers; rows show aligned values, use
-    `—` for unavailable 1RM, retain complete accessibility wording, and open an
-    in-route exercise-history overlay as one whole-row action
-  - table headers are the only sort controls: default Sets high-to-low;
+  - per-exercise history is a viewport-fitting table with compact, single-line
+    `Exercise`, `Sets`, `Vol`, and `1RM` headers; rows show aligned values, keep
+    the working-set count in parentheses, use `—` for unavailable 1RM, allow
+    exercise names to wrap without truncation, retain complete accessibility
+    wording, and open an in-route exercise-history overlay as one whole-row
+    action. Only exercises with at least one valid performed set in the selected
+    7-/30-day window appear.
+  - Exercise, Sets, and Vol are the only sort controls: default Sets high-to-low;
     Exercise cycles most/least recently completed across all-time valid history;
-    Sets cycles all sets high/low then working sets high/low; Volume and 1RM each
-    cycle high/low. Missing recency/1RM stay last, and ties use name then ID.
-    A polite status and active-header text/arrow state name the active sort;
-    mounted sort choice survives time-range, search, and Breakdown changes.
+    Sets cycles all sets high/low then working sets high/low; and Vol cycles
+    high/low. The 1RM header is static. Missing recency stays last, and ties use
+    name then ID. Each sortable header reserves its inline indicator width so
+    labels do not move when selection changes; the active slot alone is visible
+    (`Recent` plus arrow for Exercise, arrow only for Sets/Vol). Accessibility
+    wording retains the complete sort mode and next action. Mounted sort choice
+    survives time-range, search, and Breakdown changes.
   - per-muscle family and nested rows show the same set/near-failure count grammar plus per-side, role-weighted `Volume`; set comparisons are signed absolute pairs while volume comparisons are percentage-only with explicit zero-baseline states
   - per-muscle family rows use uniform green failure-intensity backgrounds and visible nested-muscle rows use uniform warm backgrounds, selecting one shade per row and scaling to eight near-failure sets per seven days; exact counts remain readable/accessibly labelled and the threshold is not a training target
   - actionable muscle rows in Stats summary; expanded muscle rows and collapsed single-muscle family headers open an in-route muscle-history overlay

@@ -259,31 +259,37 @@ Guardrail command:
    Muscle` toggle. Both breakdown choices remain visible, exactly one exposes
    selected state, and `By Exercise` remains the default.
 2. The summary keeps the actionable `Sessions` card and shows a second `Sets (W/Sets)` card as `<all valid performed sets> (<working sets>)`. Sessions use a signed absolute delta, and the set card uses a signed absolute pair; neither count card shows percentage change. Percentages are reserved for Volume comparisons.
-3. In per-exercise mode, exercises trained at least once render in one compact,
-   viewport-fitting table with shared `Exercise`, `Sets (W/Sets)`, `Volume`, and
-   `1RM` headers. Each data row shows `<valid performed sets> (<working sets>)`,
-   raw exercise volume, and estimated 1RM; unavailable 1RM values render as `—`.
+3. In per-exercise mode, exercises with at least one valid performed set in the
+   selected 7-/30-day window render in one compact, viewport-fitting table with
+   shared, single-line `Exercise`, `Sets`, `Vol`, and `1RM` headers. Each data
+   row shows `<valid performed sets> (<working sets>)`, raw exercise volume, and
+   estimated 1RM; unavailable 1RM values render as `—`. Exercise names receive
+   the remaining flexible width and wrap to their full value rather than being
+   capped at an assumed line count.
    A working set is the valid confirmed `RIR 0` / `RIR 1` / `RIR 2` subset;
    warm-up, null, and unknown-quality rows remain in the leading set count but
    not the parenthesized count. Whole data rows remain the only controls that
    open exercise history; repeated per-row metric labels are omitted visually
    but all values and their meanings remain in each row's accessibility label.
-4. The four table headers are the only exercise-sort controls. Initial order is
-   `Sets — high to low`. Repeated presses cycle `Exercise` through most then
-   least recent; `Sets (W/Sets)` through sets high-to-low, sets low-to-high,
-   working sets high-to-low, then working sets low-to-high; and `Volume` and
-   `1RM` through high-to-low then low-to-high. Pressing a different header
-   always starts that header's cycle at its first state. Recency comes from the
+4. `Exercise`, `Sets`, and `Vol` are the only exercise-sort controls; `1RM` is
+   a static column header. Initial order is `Sets — high to low`. Repeated
+   presses cycle `Exercise` through most then
+   least recent; `Sets` through sets high-to-low, sets low-to-high,
+   working sets high-to-low, then working sets low-to-high; and `Vol` through
+   high-to-low then low-to-high. Pressing a different sortable header always
+   starts that header's cycle at its first state. Recency comes from the
    latest valid performed set in completed, non-deleted all-time history and is
-   independent of the selected 7-/30-day metric window. Missing recency and 1RM
-   values remain last in either direction; ties use exercise name then stable
-   exercise ID ascending.
-5. A non-interactive, polite-live-region status directly above the table names
-   the active metric and direction (including `Sets` versus `Working sets`).
-   Only the active header shows a compact text-plus-arrow indicator. Every
-   header exposes button semantics, a mobile-sized touch target, selected state
-   when active, current sort wording when applicable, and the next activation's
-   outcome; the interaction never relies on color or arrow direction alone.
+   independent of the selected 7-/30-day metric window. Missing recency remains
+   last in either direction; ties use exercise name then stable exercise ID
+   ascending.
+5. There is no separate sort-status label above the table. Each sortable header
+   reserves a fixed inline indicator slot so its label never moves when another
+   header becomes active. Only the active slot is visible in blue on the same
+   line: `Recent` plus an arrow for Exercise, or an arrow alone for Sets and Vol.
+   Each sortable header exposes button semantics, a mobile-sized touch target,
+   selected state when active, the complete current sort wording (including
+   Sets versus Working sets), and the next activation's outcome to assistive
+   technology; the interaction never relies on color or arrow direction alone.
    Sort choice is volatile but survives time-range, search, and Breakdown
    changes for the mounted screen, while each new metric result is sorted again
    synchronously without data queries or mutation.
