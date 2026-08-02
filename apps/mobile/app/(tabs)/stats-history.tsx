@@ -9,6 +9,7 @@ import {
   View,
   type StyleProp,
   type TextStyle,
+  type ViewStyle,
 } from 'react-native';
 
 import { DailyHeatmap, WeeklyHeatmap, buildHeatmapData } from '@/components/heatmaps';
@@ -63,6 +64,42 @@ export type ExerciseListItem = {
   nearFailureCount: number;
   totalVolume: number;
   estimatedOneRepMax: number | null;
+  lastCompletedAt: Date | null;
+};
+
+export type ExerciseSortHeader = 'exercise' | 'sets' | 'volume' | 'oneRepMax';
+export type ExerciseSortMode =
+  | 'recency-desc'
+  | 'recency-asc'
+  | 'sets-desc'
+  | 'sets-asc'
+  | 'working-sets-desc'
+  | 'working-sets-asc'
+  | 'volume-desc'
+  | 'volume-asc'
+  | 'one-rep-max-desc'
+  | 'one-rep-max-asc';
+
+export const DEFAULT_EXERCISE_SORT_MODE: ExerciseSortMode = 'sets-desc';
+
+const EXERCISE_SORT_CYCLES: Record<ExerciseSortHeader, ExerciseSortMode[]> = {
+  exercise: ['recency-desc', 'recency-asc'],
+  sets: ['sets-desc', 'sets-asc', 'working-sets-desc', 'working-sets-asc'],
+  volume: ['volume-desc', 'volume-asc'],
+  oneRepMax: ['one-rep-max-desc', 'one-rep-max-asc'],
+};
+
+const EXERCISE_SORT_HEADER_BY_MODE: Record<ExerciseSortMode, ExerciseSortHeader> = {
+  'recency-desc': 'exercise',
+  'recency-asc': 'exercise',
+  'sets-desc': 'sets',
+  'sets-asc': 'sets',
+  'working-sets-desc': 'sets',
+  'working-sets-asc': 'sets',
+  'volume-desc': 'volume',
+  'volume-asc': 'volume',
+  'one-rep-max-desc': 'oneRepMax',
+  'one-rep-max-asc': 'oneRepMax',
 };
 
 export type StatsViewMode = 'exercise' | 'muscle';
@@ -189,10 +226,110 @@ const buildMuscleRowAccessibilityLabel = ({
     )} near-failure sets for the selected ${periodDays}-day period`,
   ].join('. ');
 
-export const sortExerciseListItems = (items: ExerciseListItem[]): ExerciseListItem[] =>
+export const nextExerciseSortMode = (
+  activeMode: ExerciseSortMode,
+  pressedHeader: ExerciseSortHeader
+): ExerciseSortMode => {
+  const cycle = EXERCISE_SORT_CYCLES[pressedHeader];
+  if (EXERCISE_SORT_HEADER_BY_MODE[activeMode] !== pressedHeader) return cycle[0];
+
+  const currentIndex = cycle.indexOf(activeMode);
+  return cycle[(currentIndex + 1) % cycle.length];
+};
+
+export const formatExerciseSortStatus = (mode: ExerciseSortMode): string => {
+  switch (mode) {
+    case 'recency-desc':
+      return 'Sorted by: Most recent exercise';
+    case 'recency-asc':
+      return 'Sorted by: Least recent exercise';
+    case 'sets-desc':
+      return 'Sorted by: Sets — high to low';
+    case 'sets-asc':
+      return 'Sorted by: Sets — low to high';
+    case 'working-sets-desc':
+      return 'Sorted by: Working sets — high to low';
+    case 'working-sets-asc':
+      return 'Sorted by: Working sets — low to high';
+    case 'volume-desc':
+      return 'Sorted by: Volume — high to low';
+    case 'volume-asc':
+      return 'Sorted by: Volume — low to high';
+    case 'one-rep-max-desc':
+      return 'Sorted by: 1RM — high to low';
+    case 'one-rep-max-asc':
+      return 'Sorted by: 1RM — low to high';
+  }
+};
+
+const compareExerciseIdentity = (left: ExerciseListItem, right: ExerciseListItem): number => {
+  const nameComparison = left.name.localeCompare(right.name);
+  return nameComparison === 0 ? left.id.localeCompare(right.id) : nameComparison;
+};
+
+const compareNumbers = (left: number, right: number, descending: boolean): number => {
+  if (left === right) return 0;
+  if (descending) return left > right ? -1 : 1;
+  return left < right ? -1 : 1;
+};
+
+const compareOptionalNumbers = (
+  left: number | null,
+  right: number | null,
+  descending: boolean
+): number => {
+  const validLeft = left !== null && Number.isFinite(left) ? left : null;
+  const validRight = right !== null && Number.isFinite(right) ? right : null;
+  if (validLeft === null && validRight === null) return 0;
+  if (validLeft === null) return 1;
+  if (validRight === null) return -1;
+  return compareNumbers(validLeft, validRight, descending);
+};
+
+const completedTimestamp = (item: ExerciseListItem): number | null => {
+  const timestamp = item.lastCompletedAt?.getTime() ?? null;
+  return timestamp !== null && Number.isFinite(timestamp) ? timestamp : null;
+};
+
+export const sortExerciseListItems = (
+  items: ExerciseListItem[],
+  mode: ExerciseSortMode = DEFAULT_EXERCISE_SORT_MODE
+): ExerciseListItem[] =>
   [...items].sort((left, right) => {
-    if (left.setCount !== right.setCount) return right.setCount - left.setCount;
-    return left.name.localeCompare(right.name);
+    let comparison = 0;
+    switch (mode) {
+      case 'recency-desc':
+        comparison = compareOptionalNumbers(completedTimestamp(left), completedTimestamp(right), true);
+        break;
+      case 'recency-asc':
+        comparison = compareOptionalNumbers(completedTimestamp(left), completedTimestamp(right), false);
+        break;
+      case 'sets-desc':
+        comparison = compareNumbers(left.setCount, right.setCount, true);
+        break;
+      case 'sets-asc':
+        comparison = compareNumbers(left.setCount, right.setCount, false);
+        break;
+      case 'working-sets-desc':
+        comparison = compareNumbers(left.nearFailureCount, right.nearFailureCount, true);
+        break;
+      case 'working-sets-asc':
+        comparison = compareNumbers(left.nearFailureCount, right.nearFailureCount, false);
+        break;
+      case 'volume-desc':
+        comparison = compareNumbers(left.totalVolume, right.totalVolume, true);
+        break;
+      case 'volume-asc':
+        comparison = compareNumbers(left.totalVolume, right.totalVolume, false);
+        break;
+      case 'one-rep-max-desc':
+        comparison = compareOptionalNumbers(left.estimatedOneRepMax, right.estimatedOneRepMax, true);
+        break;
+      case 'one-rep-max-asc':
+        comparison = compareOptionalNumbers(left.estimatedOneRepMax, right.estimatedOneRepMax, false);
+        break;
+    }
+    return comparison === 0 ? compareExerciseIdentity(left, right) : comparison;
   });
 
 const formatNumber = (value: number): string => {
@@ -307,6 +444,9 @@ export function StatsScreenShell({
   searchQuery,
   onSearchQueryChange,
 }: StatsScreenShellProps) {
+  const [exerciseSortMode, setExerciseSortMode] = useState<ExerciseSortMode>(
+    DEFAULT_EXERCISE_SORT_MODE
+  );
   const sessionDelta = summary
     ? formatCountDelta(
         summary.current.totals.sessionCount,
@@ -351,11 +491,15 @@ export function StatsScreenShell({
 
   const filteredExerciseListItems = useMemo(() => {
     const query = searchQuery.toLowerCase().trim();
-    if (!query) return exerciseListItems;
-    return exerciseListItems.filter((item) =>
-      item.name.toLowerCase().includes(query)
-    );
-  }, [exerciseListItems, searchQuery]);
+    const filteredItems = query
+      ? exerciseListItems.filter((item) => item.name.toLowerCase().includes(query))
+      : exerciseListItems;
+    return sortExerciseListItems(filteredItems, exerciseSortMode);
+  }, [exerciseListItems, exerciseSortMode, searchQuery]);
+
+  const handlePressExerciseSortHeader = useCallback((header: ExerciseSortHeader) => {
+    setExerciseSortMode((activeMode) => nextExerciseSortMode(activeMode, header));
+  }, []);
 
   return (
     <View style={styles.screen} testID="stats-history-screen">
@@ -447,6 +591,8 @@ export function StatsScreenShell({
           items={filteredExerciseListItems}
           onPressExercise={onPressExerciseHistory}
           isFiltered={Boolean(searchQuery.trim())}
+          sortMode={exerciseSortMode}
+          onPressSortHeader={handlePressExerciseSortHeader}
         />
       ) : (
         <ScrollView
@@ -1134,10 +1280,14 @@ function ExerciseListView({
   items,
   onPressExercise,
   isFiltered,
+  sortMode,
+  onPressSortHeader,
 }: {
   items: ExerciseListItem[];
   onPressExercise: (exercise: ExerciseHeatmapTarget) => void;
   isFiltered: boolean;
+  sortMode: ExerciseSortMode;
+  onPressSortHeader: (header: ExerciseSortHeader) => void;
 }) {
   if (items.length === 0) {
     return (
@@ -1156,18 +1306,57 @@ function ExerciseListView({
       style={styles.scroll}
       contentContainerStyle={styles.scrollContent}
       testID="stats-exercise-list-scroll">
-      <View style={styles.familyList} testID="stats-exercise-list">
+      <Text
+        accessibilityLiveRegion="polite"
+        style={styles.exerciseSortStatus}
+        testID="stats-exercise-sort-status">
+        {formatExerciseSortStatus(sortMode)}
+      </Text>
+      <View style={styles.exerciseTable} testID="stats-exercise-list">
+        <View style={styles.exerciseTableHeader} testID="stats-exercise-table-header">
+          <ExerciseSortHeaderCell
+            header="exercise"
+            label="Exercise"
+            sortMode={sortMode}
+            onPress={onPressSortHeader}
+            style={styles.exerciseNameCell}
+          />
+          <ExerciseSortHeaderCell
+            header="sets"
+            label="Sets (W/Sets)"
+            sortMode={sortMode}
+            onPress={onPressSortHeader}
+            style={styles.exerciseSetsCell}
+            numeric
+          />
+          <ExerciseSortHeaderCell
+            header="volume"
+            label="Volume"
+            sortMode={sortMode}
+            onPress={onPressSortHeader}
+            style={styles.exerciseVolumeCell}
+            numeric
+          />
+          <ExerciseSortHeaderCell
+            header="oneRepMax"
+            label="1RM"
+            sortMode={sortMode}
+            onPress={onPressSortHeader}
+            style={styles.exerciseOneRepMaxCell}
+            numeric
+          />
+        </View>
         {items.map((item) => (
           <Pressable
             key={item.id}
             accessibilityRole="button"
             accessibilityLabel={`Open ${item.name} heatmap. ${formatNumber(
               item.setCount
-            )} sets, ${formatNumber(item.nearFailureCount)} near-failure sets. Volume ${formatTotalWeight(
+            )} sets, ${formatNumber(item.nearFailureCount)} working sets. Volume ${formatTotalWeight(
               item.totalVolume
             )}${
               item.estimatedOneRepMax === null
-                ? ''
+                ? '. Estimated one rep max unavailable'
                 : `. Estimated one rep max ${formatTotalWeight(item.estimatedOneRepMax)}`
             }`}
             onPress={() =>
@@ -1176,43 +1365,126 @@ function ExerciseListView({
             style={({ pressed }) => [styles.exerciseRow, pressed && styles.actionableRowPressed]}
             testID={`stats-exercise-row-${item.id}`}>
             <Text
-              adjustsFontSizeToFit
-              ellipsizeMode="clip"
-              minimumFontScale={0.82}
               numberOfLines={2}
-              style={styles.exerciseName}
+              style={[styles.exerciseName, styles.exerciseNameCell]}
               testID={`stats-exercise-name-${item.id}`}>
               {item.name}
             </Text>
-            <View style={styles.exerciseMetrics}>
-              <Metric
-                label="Sets"
-                value={formatSetCountPair(item.setCount, item.nearFailureCount)}
-                testID={`stats-exercise-sets-${item.id}`}
-                muted={false}
-                small
-              />
-              <Metric
-                label="Volume"
-                value={formatTotalWeight(item.totalVolume)}
-                testID={`stats-exercise-volume-${item.id}`}
-                muted={false}
-                small
-              />
-              {item.estimatedOneRepMax !== null ? (
-                <Metric
-                  label="1RM"
-                  value={formatTotalWeight(item.estimatedOneRepMax)}
-                  testID={`stats-exercise-1rm-${item.id}`}
-                  muted={false}
-                  small
-                />
-              ) : null}
-            </View>
+            <Text
+              style={[styles.exerciseNumericCell, styles.exerciseSetsCell]}
+              testID={`stats-exercise-sets-${item.id}`}>
+              {formatSetCountPair(item.setCount, item.nearFailureCount)}
+            </Text>
+            <Text
+              style={[styles.exerciseNumericCell, styles.exerciseVolumeCell]}
+              testID={`stats-exercise-volume-${item.id}`}>
+              {formatTotalWeight(item.totalVolume)}
+            </Text>
+            <Text
+              style={[styles.exerciseNumericCell, styles.exerciseOneRepMaxCell]}
+              testID={`stats-exercise-1rm-${item.id}`}>
+              {item.estimatedOneRepMax === null
+                ? '—'
+                : formatTotalWeight(item.estimatedOneRepMax)}
+            </Text>
           </Pressable>
         ))}
       </View>
     </ScrollView>
+  );
+}
+
+const sortModeDescription = (mode: ExerciseSortMode): string =>
+  formatExerciseSortStatus(mode).replace('Sorted by: ', '');
+
+const exerciseSortIndicator = (mode: ExerciseSortMode): string => {
+  switch (mode) {
+    case 'recency-desc':
+      return 'Recent ↓';
+    case 'recency-asc':
+      return 'Recent ↑';
+    case 'sets-desc':
+      return 'Sets ↓';
+    case 'sets-asc':
+      return 'Sets ↑';
+    case 'working-sets-desc':
+      return 'W/Sets ↓';
+    case 'working-sets-asc':
+      return 'W/Sets ↑';
+    case 'volume-desc':
+      return 'Volume ↓';
+    case 'volume-asc':
+      return 'Volume ↑';
+    case 'one-rep-max-desc':
+      return '1RM ↓';
+    case 'one-rep-max-asc':
+      return '1RM ↑';
+  }
+};
+
+const exerciseSortHeaderLabel = (header: ExerciseSortHeader): string => {
+  switch (header) {
+    case 'exercise':
+      return 'Exercise';
+    case 'sets':
+      return 'Sets and working sets';
+    case 'volume':
+      return 'Volume';
+    case 'oneRepMax':
+      return '1RM';
+  }
+};
+
+function ExerciseSortHeaderCell({
+  header,
+  label,
+  sortMode,
+  onPress,
+  style,
+  numeric = false,
+}: {
+  header: ExerciseSortHeader;
+  label: string;
+  sortMode: ExerciseSortMode;
+  onPress: (header: ExerciseSortHeader) => void;
+  style: StyleProp<ViewStyle>;
+  numeric?: boolean;
+}) {
+  const isActive = EXERCISE_SORT_HEADER_BY_MODE[sortMode] === header;
+  const nextMode = nextExerciseSortMode(sortMode, header);
+  const accessibilityLabel = isActive
+    ? `${exerciseSortHeaderLabel(header)}. Current sort: ${sortModeDescription(
+        sortMode
+      )}. Activate to sort ${sortModeDescription(nextMode)}.`
+    : `${exerciseSortHeaderLabel(header)}. Activate to sort ${sortModeDescription(nextMode)}.`;
+
+  return (
+    <Pressable
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole="button"
+      accessibilityState={{ selected: isActive }}
+      onPress={() => onPress(header)}
+      style={({ pressed }) => [
+        styles.exerciseHeaderCell,
+        style,
+        numeric && styles.exerciseHeaderCellNumeric,
+        isActive && styles.exerciseHeaderCellActive,
+        pressed && styles.actionableRowPressed,
+      ]}
+      testID={`stats-exercise-sort-${header}`}>
+      <Text
+        numberOfLines={2}
+        style={[styles.exerciseHeaderLabel, numeric && styles.exerciseHeaderLabelNumeric]}>
+        {label}
+      </Text>
+      {isActive ? (
+        <Text
+          style={[styles.exerciseHeaderIndicator, numeric && styles.exerciseHeaderLabelNumeric]}
+          testID={`stats-exercise-sort-${header}-indicator`}>
+          {exerciseSortIndicator(sortMode)}
+        </Text>
+      ) : null}
+    </Pressable>
   );
 }
 
@@ -1573,22 +1845,21 @@ export default function StatsRoute() {
 
   const exerciseListItems = useMemo<ExerciseListItem[]>(() => {
     const { exercises } = catalogSnapshot;
-    const { aggregatesById, everDoneIds } = exerciseCatalogStats;
-    return sortExerciseListItems(
-      exercises
-        .filter((ex) => everDoneIds.has(ex.id))
-        .map((ex) => {
-          const agg = aggregatesById.get(ex.id) ?? null;
-          return {
-            id: ex.id,
-            name: ex.name,
-            setCount: agg?.setCount ?? 0,
-            nearFailureCount: agg?.nearFailureCount ?? 0,
-            totalVolume: agg?.totalVolume ?? 0,
-            estimatedOneRepMax: agg?.estimatedOneRepMax ?? null,
-          };
-        })
-    );
+    const { aggregatesById, everDoneIds, lastCompletedAtById } = exerciseCatalogStats;
+    return exercises
+      .filter((ex) => everDoneIds.has(ex.id))
+      .map((ex) => {
+        const agg = aggregatesById.get(ex.id) ?? null;
+        return {
+          id: ex.id,
+          name: ex.name,
+          setCount: agg?.setCount ?? 0,
+          nearFailureCount: agg?.nearFailureCount ?? 0,
+          totalVolume: agg?.totalVolume ?? 0,
+          estimatedOneRepMax: agg?.estimatedOneRepMax ?? null,
+          lastCompletedAt: lastCompletedAtById.get(ex.id) ?? null,
+        };
+      });
   }, [catalogSnapshot, exerciseCatalogStats]);
 
   // useMemo prevents unnecessary re-renders of the shell when the route re-renders.
@@ -1691,9 +1962,11 @@ const styles = StyleSheet.create({
     color: uiColors.textPrimary,
   },
   exerciseRow: {
-    gap: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 52,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
     borderBottomWidth: 1,
     borderBottomColor: uiColors.borderMuted,
   },
@@ -1701,13 +1974,78 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     color: uiColors.textPrimary,
-    alignSelf: 'stretch',
-    minWidth: 0,
   },
-  exerciseMetrics: {
+  exerciseSortStatus: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: uiColors.textSecondary,
+  },
+  exerciseTable: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: uiColors.borderMuted,
+    backgroundColor: uiColors.surfaceDefault,
+    overflow: 'hidden',
+  },
+  exerciseTableHeader: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 12,
+    alignItems: 'stretch',
+    paddingHorizontal: 8,
+    backgroundColor: uiColors.surfaceMuted,
+    borderBottomWidth: 1,
+    borderBottomColor: uiColors.borderMuted,
+  },
+  exerciseHeaderCell: {
+    minHeight: 52,
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+    paddingVertical: 4,
+  },
+  exerciseHeaderCellNumeric: {
+    alignItems: 'flex-end',
+  },
+  exerciseHeaderCellActive: {
+    backgroundColor: uiColors.actionPrimarySubtleBg,
+  },
+  exerciseHeaderLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: uiColors.textPrimary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.25,
+  },
+  exerciseHeaderLabelNumeric: {
+    textAlign: 'right',
+  },
+  exerciseHeaderIndicator: {
+    marginTop: 2,
+    fontSize: 9,
+    fontWeight: '700',
+    color: uiColors.actionPrimary,
+  },
+  exerciseNameCell: {
+    flex: 1,
+    minWidth: 0,
+    paddingHorizontal: 4,
+  },
+  exerciseSetsCell: {
+    width: 76,
+    paddingHorizontal: 4,
+  },
+  exerciseVolumeCell: {
+    width: 58,
+    paddingHorizontal: 4,
+  },
+  exerciseOneRepMaxCell: {
+    width: 46,
+    paddingHorizontal: 4,
+  },
+  exerciseNumericCell: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: uiColors.textPrimary,
+    textAlign: 'right',
+    fontVariant: ['tabular-nums'],
   },
   scroll: {
     flex: 1,

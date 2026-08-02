@@ -1,7 +1,7 @@
 ---
 task_id: T-20260802-02-History_exercise_sortable_table
 milestone_id: "MVP"
-status: planned
+status: completed
 ui_impact: "yes"
 areas: "frontend|docs"
 runtimes: "node|expo|maestro|docs"
@@ -16,7 +16,7 @@ docs_touched: "docs/specs/ui/ux-rules.md, docs/specs/ui/screen-map.md"
 
 - Task ID: `T-20260802-02-History_exercise_sortable_table`
 - Title: Make the Stats / History By Exercise display a sortable table
-- Status: `planned`
+- Status: `completed`
 - File location rule:
   - active card lives at
     `docs/tasks/T-20260802-02-History_exercise_sortable_table.md`
@@ -110,6 +110,18 @@ docs_touched: "docs/specs/ui/ux-rules.md, docs/specs/ui/screen-map.md"
     card is committed.
 - Optional helper command:
   - `./scripts/task-bootstrap.sh docs/tasks/T-20260802-02-History_exercise_sortable_table.md`
+
+### Implementation-session refresh (2026-08-02)
+
+- Verified the required existing branch at session start:
+  `codex/history-set-failure-implementation` at
+  `2207307bcdf68822b9ab868493ef204f9317eab5`.
+- Re-opened the mandatory quality, architecture, project-structure, UX,
+  Maestro-runtime, and UI bundle references before implementation.
+- `./boga doctor` passed after the frontend-runtime repair, including the
+  worktree simulator, Metro-port, Docker, and local-Supabase checks.
+- Final cumulative `./boga test for` selected exactly `fast`, `backend`,
+  `frontend`, `docs-check`, and `meta-tests`.
 
 ## Objective
 
@@ -469,6 +481,65 @@ adding a toolbar, menu, button row, or extra toggle.
   row-overlay behavior.
 - Deferred/manual hosted checks: N/A.
 
+### Recorded implementation evidence (2026-08-02)
+
+- Focused Jest:
+  - `cd apps/mobile && npm test -- --runInBand app/__tests__/stats-screen.test.tsx`
+  - PASS: 1 suite, 72 tests. Coverage includes all ten sort modes and cycle
+    wraparounds, cross-header resets, recency and 1RM null-last behavior, both
+    deterministic tie-breakers, input immutability, table/status/accessibility
+    semantics, mounted-state preservation, and row navigation after reorder.
+- Focused static checks:
+  - `cd apps/mobile && npm run typecheck` — PASS.
+  - `cd apps/mobile && npm run lint:ui-guardrails` — PASS with 0 violations.
+- Focused iOS simulator evidence on `BOGA wt1`
+  (`8EE7AAC8-0DD9-4EFA-852A-737A7C5746F8`):
+  - `stats-view-toggle-ux` PASS (1/1) at
+    `apps/mobile/artifacts/maestro/product-design-muscle-feedback-manual/20260802-stats`.
+  - inspected captures:
+    `maestro-output/screenshots/01-exercise-view-default.png`,
+    `01a-exercise-table-working-sets.png`,
+    `01b-exercise-table-most-recent.png`,
+    `01c-exercise-table-volume-ascending.png`, and
+    `01d-exercise-table-1rm.png`.
+  - the supported-width captures show aligned, non-overlapping headers and
+    metric columns, visible text-plus-arrow active states, the explicit status
+    for every sampled mode, and row reordering in the ascending Volume state.
+    The fixture has 1RM values for both rows, so missing `—` presentation and
+    null-last behavior are covered by the screen and pure tests instead.
+- Manual verification summary (required when CI is absent/partial): on
+  `BOGA wt1`, the default, Working sets, recency, ascending Volume, and 1RM
+  states fit the phone viewport without horizontal scrolling or column drift.
+  Header presses changed only sorting, the Volume transition visibly reordered
+  the rows, and the focused flow continued through exercise-row overlay
+  open/dismiss and Breakdown switching.
+- Final cumulative lane selection:
+  - `./boga test for` — PASS; 27 cumulative changed paths require exactly
+    `fast`, `backend`, `frontend`, `docs-check`, and `meta-tests`.
+- Required local gates:
+  - `./boga test fast` — PASS; all sub-lanes green, including 109 Jest suites
+    and 1010 tests.
+  - `./boga test backend` — PASS; local Supabase auth/RLS, agent API, sync
+    contracts/schema/drift/e2e/infra, and MCP smoke all green.
+  - `./boga test frontend` — PASS; `ios-smoke`, `ios-data-smoke`,
+    `ios-auth-profile`, and `ios-sync-e2e` all green.
+  - `./boga test docs-check` — PASS.
+  - `./boga test meta-tests` — PASS.
+- Frontend-runtime repair evidence:
+  - removed the redundant dev-client reopen from `data-runtime-smoke.yaml` and
+    explicitly dismiss the fresh-install Expo onboarding/developer-menu pair,
+    preventing a delayed reload from replacing the active harness route;
+  - launch Metro through the worktree-local Expo executable so teardown owns
+    the listener process and releases the slot port between frontend lanes;
+  - the full frontend suite subsequently passed from smoke through sync e2e.
+    These are test-harness reliability repairs only; product scope, runtime
+    dependencies, and native configuration are unchanged.
+- Closeout helper:
+  - `./scripts/task-closeout-check.sh docs/tasks/complete/T-20260802-02-History_exercise_sortable_table.md`
+    — PASS with the single expected warning that this user-requested MVP card
+    has no milestone spec (`Milestone spec: N/A` above).
+- Hosted/deployed verification: N/A; no hosted or deployment surface changed.
+
 ## Execution plan
 
 1. Bootstrap the card, refresh required parent refs and code inventory, verify
@@ -508,9 +579,20 @@ adding a toolbar, menu, button row, or extra toggle.
 
 ## Completion note
 
-- What changed: pending implementation.
-- What tests ran: pending implementation.
-- What remains: all work in this planned card.
+- What changed: completed the sortable By Exercise history table.
+  - replaced repeated row cards with one shared four-column header and aligned
+    exercise, set/working-set, volume, and 1RM values;
+  - added the specified ten-state local sort model, all-time completion
+    recency mapping, deterministic name/ID ties, null-last behavior, explicit
+    status and active-header indicators, and accessible current/next actions;
+  - preserved search, period, Breakdown, and whole-row overlay behavior;
+  - updated focused tests, Maestro evidence, canonical UI docs, and the two
+    frontend-harness points needed for reliable cumulative gate execution.
+- What tests ran: focused Jest/static checks, focused Stats Maestro evidence,
+  and every lane selected by the final cumulative `./boga test for` result
+  passed; exact commands, counts, and artifact paths are recorded above.
+- What remains: nothing for this card. No schema, backend contract, hosted
+  smoke, dependency, native configuration, branch, or PR follow-up is needed.
 
 ## Status update checklist (mandatory at closeout)
 

@@ -8,9 +8,12 @@ import {
   StatsScreenShell,
   computeFailureIntensityProgress,
   type StatsScreenShellProps,
+  type ExerciseListItem,
   formatCountDelta,
+  formatExerciseSortStatus,
   formatSetCountPairDelta,
   formatVolumeDelta,
+  nextExerciseSortMode,
   sortExerciseListItems,
 } from '../(tabs)/stats-history';
 import { uiColors } from '@/components/ui';
@@ -383,14 +386,122 @@ describe('computeFailureIntensityProgress', () => {
 });
 
 describe('sortExerciseListItems', () => {
-  it('sorts by set count descending with exercise name as the tie-breaker', () => {
-    const sorted = sortExerciseListItems([
-      { id: 'z', name: 'Z Press', setCount: 4, nearFailureCount: 1, totalVolume: 10, estimatedOneRepMax: null },
-      { id: 'b', name: 'Bench Press', setCount: 7, nearFailureCount: 2, totalVolume: 10, estimatedOneRepMax: null },
-      { id: 'a', name: 'Arnold Press', setCount: 4, nearFailureCount: 0, totalVolume: 10, estimatedOneRepMax: null },
-    ]);
+  const item = (
+    id: string,
+    overrides: Partial<Omit<ExerciseListItem, 'id'>> = {}
+  ): ExerciseListItem => ({
+    id,
+    name: id,
+    setCount: 0,
+    nearFailureCount: 0,
+    totalVolume: 0,
+    estimatedOneRepMax: null,
+    lastCompletedAt: null,
+    ...overrides,
+  });
 
-    expect(sorted.map((item) => item.id)).toEqual(['b', 'a', 'z']);
+  it('cycles each header exactly and starts a newly selected header at its first state', () => {
+    expect(nextExerciseSortMode('sets-desc', 'sets')).toBe('sets-asc');
+    expect(nextExerciseSortMode('sets-asc', 'sets')).toBe('working-sets-desc');
+    expect(nextExerciseSortMode('working-sets-desc', 'sets')).toBe('working-sets-asc');
+    expect(nextExerciseSortMode('working-sets-asc', 'sets')).toBe('sets-desc');
+
+    expect(nextExerciseSortMode('sets-desc', 'exercise')).toBe('recency-desc');
+    expect(nextExerciseSortMode('recency-desc', 'exercise')).toBe('recency-asc');
+    expect(nextExerciseSortMode('recency-asc', 'exercise')).toBe('recency-desc');
+    expect(nextExerciseSortMode('sets-asc', 'volume')).toBe('volume-desc');
+    expect(nextExerciseSortMode('volume-desc', 'volume')).toBe('volume-asc');
+    expect(nextExerciseSortMode('volume-asc', 'volume')).toBe('volume-desc');
+    expect(nextExerciseSortMode('volume-asc', 'oneRepMax')).toBe('one-rep-max-desc');
+    expect(nextExerciseSortMode('one-rep-max-desc', 'oneRepMax')).toBe('one-rep-max-asc');
+    expect(nextExerciseSortMode('one-rep-max-asc', 'oneRepMax')).toBe('one-rep-max-desc');
+  });
+
+  it('formats unambiguous status copy for every sort state', () => {
+    expect([
+      'recency-desc',
+      'recency-asc',
+      'sets-desc',
+      'sets-asc',
+      'working-sets-desc',
+      'working-sets-asc',
+      'volume-desc',
+      'volume-asc',
+      'one-rep-max-desc',
+      'one-rep-max-asc',
+    ].map((mode) => formatExerciseSortStatus(mode as Parameters<typeof formatExerciseSortStatus>[0])))
+      .toEqual([
+        'Sorted by: Most recent exercise',
+        'Sorted by: Least recent exercise',
+        'Sorted by: Sets — high to low',
+        'Sorted by: Sets — low to high',
+        'Sorted by: Working sets — high to low',
+        'Sorted by: Working sets — low to high',
+        'Sorted by: Volume — high to low',
+        'Sorted by: Volume — low to high',
+        'Sorted by: 1RM — high to low',
+        'Sorted by: 1RM — low to high',
+      ]);
+  });
+
+  it('sorts recency in both directions with equal and missing timestamps deterministic', () => {
+    const items = [
+      item('missing', { name: 'Missing' }),
+      item('older-b', { name: 'Same', lastCompletedAt: new Date('2026-01-01T00:00:00Z') }),
+      item('newest', { name: 'Newest', lastCompletedAt: new Date('2026-03-01T00:00:00Z') }),
+      item('older-a', { name: 'Same', lastCompletedAt: new Date('2026-01-01T00:00:00Z') }),
+    ];
+
+    expect(sortExerciseListItems(items, 'recency-desc').map(({ id }) => id)).toEqual([
+      'newest', 'older-a', 'older-b', 'missing',
+    ]);
+    expect(sortExerciseListItems(items, 'recency-asc').map(({ id }) => id)).toEqual([
+      'older-a', 'older-b', 'newest', 'missing',
+    ]);
+  });
+
+  it('sorts all-set, working-set, and volume values in both directions', () => {
+    const items = [
+      item('alpha', { name: 'Alpha', setCount: 8, nearFailureCount: 1, totalVolume: 300 }),
+      item('beta', { name: 'Beta', setCount: 4, nearFailureCount: 3, totalVolume: 100 }),
+      item('gamma', { name: 'Gamma', setCount: 6, nearFailureCount: 2, totalVolume: 200 }),
+    ];
+
+    expect(sortExerciseListItems(items, 'sets-desc').map(({ id }) => id)).toEqual(['alpha', 'gamma', 'beta']);
+    expect(sortExerciseListItems(items, 'sets-asc').map(({ id }) => id)).toEqual(['beta', 'gamma', 'alpha']);
+    expect(sortExerciseListItems(items, 'working-sets-desc').map(({ id }) => id)).toEqual(['beta', 'gamma', 'alpha']);
+    expect(sortExerciseListItems(items, 'working-sets-asc').map(({ id }) => id)).toEqual(['alpha', 'gamma', 'beta']);
+    expect(sortExerciseListItems(items, 'volume-desc').map(({ id }) => id)).toEqual(['alpha', 'gamma', 'beta']);
+    expect(sortExerciseListItems(items, 'volume-asc').map(({ id }) => id)).toEqual(['beta', 'gamma', 'alpha']);
+  });
+
+  it('keeps unavailable 1RM values last in both directions', () => {
+    const items = [
+      item('missing', { estimatedOneRepMax: null }),
+      item('high', { estimatedOneRepMax: 140 }),
+      item('low', { estimatedOneRepMax: 90 }),
+    ];
+
+    expect(sortExerciseListItems(items, 'one-rep-max-desc').map(({ id }) => id)).toEqual([
+      'high', 'low', 'missing',
+    ]);
+    expect(sortExerciseListItems(items, 'one-rep-max-asc').map(({ id }) => id)).toEqual([
+      'low', 'high', 'missing',
+    ]);
+  });
+
+  it('uses name then ID tie-breakers and never mutates the input array', () => {
+    const items = [
+      item('z', { name: 'Same', setCount: 4 }),
+      item('b', { name: 'Bench Press', setCount: 7 }),
+      item('a', { name: 'Same', setCount: 4 }),
+    ];
+    const originalOrder = [...items];
+    const sorted = sortExerciseListItems(items);
+
+    expect(sorted.map(({ id }) => id)).toEqual(['b', 'a', 'z']);
+    expect(items).toEqual(originalOrder);
+    expect(sorted).not.toBe(items);
   });
 });
 
@@ -469,6 +580,7 @@ describe('StatsScreenShell', () => {
               nearFailureCount: 4,
               totalVolume: 1000,
               estimatedOneRepMax: 100,
+              lastCompletedAt: null,
             },
           ],
         })}
@@ -1034,14 +1146,25 @@ describe('StatsRoute', () => {
 });
 
 describe('StatsScreenShell — view mode toggle', () => {
-  const buildExerciseListItem = (id: string, name: string) => ({
+  const buildExerciseListItem = (
+    id: string,
+    name: string,
+    overrides: Partial<ExerciseListItem> = {}
+  ): ExerciseListItem => ({
     id,
     name,
     setCount: 5,
     nearFailureCount: 2,
     totalVolume: 2500,
     estimatedOneRepMax: 110,
+    lastCompletedAt: null,
+    ...overrides,
   });
+
+  const sortedExerciseIds = (): string[] =>
+    screen
+      .getAllByTestId(/^stats-exercise-name-/)
+      .map((node) => String(node.props.testID).replace('stats-exercise-name-', ''));
 
   it('renders separate labelled Time range and Breakdown control rows', () => {
     renderStatsScreenShell({ viewMode: 'exercise' });
@@ -1119,10 +1242,180 @@ describe('StatsScreenShell — view mode toggle', () => {
     expect(screen.getByTestId('stats-exercise-row-ex1')).toBeTruthy();
     expect(screen.getByTestId('stats-exercise-name-ex1')).toHaveTextContent('Bench Press');
     expect(screen.getByTestId('stats-exercise-sets-ex1')).toHaveTextContent(/5 \(2\)/);
+    expect(screen.getByTestId('stats-exercise-volume-ex1')).toHaveTextContent('2.5k');
+    expect(screen.getByTestId('stats-exercise-1rm-ex1')).toHaveTextContent('110');
     expect(screen.queryByTestId('stats-exercise-sessions-ex1')).toBeNull();
     expect(screen.getByTestId('stats-exercise-row-ex1').props.accessibilityLabel).toContain(
-      '5 sets, 2 near-failure sets'
+      '5 sets, 2 working sets'
     );
+  });
+
+  it('renders one aligned four-column header with the default Sets sort clearly active', () => {
+    renderStatsScreenShell({
+      viewMode: 'exercise',
+      exerciseListItems: [
+        buildExerciseListItem('missing', 'Long exercise name that may wrap', {
+          estimatedOneRepMax: null,
+        }),
+      ],
+    });
+
+    expect(screen.getByTestId('stats-exercise-table-header')).toBeTruthy();
+    expect(screen.getByText('Exercise')).toBeTruthy();
+    expect(
+      screen.getByTestId('stats-exercise-sort-sets').findByProps({ children: 'Sets (W/Sets)' })
+    ).toBeTruthy();
+    expect(screen.getByText('Volume')).toBeTruthy();
+    expect(screen.getByText('1RM')).toBeTruthy();
+    expect(screen.getByTestId('stats-exercise-sort-status')).toHaveTextContent(
+      'Sorted by: Sets — high to low'
+    );
+    expect(screen.getByTestId('stats-exercise-sort-status').props.accessibilityLiveRegion).toBe(
+      'polite'
+    );
+    expect(screen.getByTestId('stats-exercise-sort-sets').props.accessibilityState).toEqual({
+      selected: true,
+    });
+    expect(screen.getByTestId('stats-exercise-sort-sets').props.accessibilityLabel).toContain(
+      'Current sort: Sets — high to low. Activate to sort Sets — low to high.'
+    );
+    expect(screen.getByTestId('stats-exercise-sort-exercise').props.accessibilityLabel).toContain(
+      'Activate to sort Most recent exercise.'
+    );
+    expect(screen.getByTestId('stats-exercise-sort-sets')).toHaveStyle({ minHeight: 52 });
+    expect(screen.getByTestId('stats-exercise-1rm-missing')).toHaveTextContent('—');
+    expect(screen.getByTestId('stats-exercise-row-missing').props.accessibilityLabel).toContain(
+      'Estimated one rep max unavailable'
+    );
+    expect(screen.queryByTestId('stats-exercise-sort-exercise-indicator')).toBeNull();
+    expect(screen.getByTestId('stats-exercise-sort-sets-indicator')).toHaveTextContent('Sets ↓');
+  });
+
+  it('reorders rows and updates status and active indicators through every header cycle', () => {
+    const onPressExerciseHistory = jest.fn();
+    renderStatsScreenShell({
+      viewMode: 'exercise',
+      onPressExerciseHistory,
+      exerciseListItems: [
+        buildExerciseListItem('alpha', 'Alpha', {
+          setCount: 10,
+          nearFailureCount: 1,
+          totalVolume: 100,
+          estimatedOneRepMax: null,
+          lastCompletedAt: new Date('2026-01-01T00:00:00Z'),
+        }),
+        buildExerciseListItem('beta', 'Beta', {
+          setCount: 5,
+          nearFailureCount: 3,
+          totalVolume: 300,
+          estimatedOneRepMax: 90,
+          lastCompletedAt: new Date('2026-03-01T00:00:00Z'),
+        }),
+        buildExerciseListItem('gamma', 'Gamma', {
+          setCount: 7,
+          nearFailureCount: 2,
+          totalVolume: 200,
+          estimatedOneRepMax: 120,
+          lastCompletedAt: new Date('2026-02-01T00:00:00Z'),
+        }),
+      ],
+    });
+
+    expect(sortedExerciseIds()).toEqual(['alpha', 'gamma', 'beta']);
+    fireEvent.press(screen.getByTestId('stats-exercise-sort-sets'));
+    expect(sortedExerciseIds()).toEqual(['beta', 'gamma', 'alpha']);
+    expect(screen.getByTestId('stats-exercise-sort-status')).toHaveTextContent(
+      'Sorted by: Sets — low to high'
+    );
+    fireEvent.press(screen.getByTestId('stats-exercise-sort-sets'));
+    expect(screen.getByTestId('stats-exercise-sort-status')).toHaveTextContent(
+      'Sorted by: Working sets — high to low'
+    );
+    expect(screen.getByTestId('stats-exercise-sort-sets-indicator')).toHaveTextContent('W/Sets ↓');
+    fireEvent.press(screen.getByTestId('stats-exercise-sort-sets'));
+    expect(sortedExerciseIds()).toEqual(['alpha', 'gamma', 'beta']);
+    expect(screen.getByTestId('stats-exercise-sort-status')).toHaveTextContent(
+      'Sorted by: Working sets — low to high'
+    );
+    fireEvent.press(screen.getByTestId('stats-exercise-sort-sets'));
+    expect(screen.getByTestId('stats-exercise-sort-status')).toHaveTextContent(
+      'Sorted by: Sets — high to low'
+    );
+
+    fireEvent.press(screen.getByTestId('stats-exercise-sort-exercise'));
+    expect(sortedExerciseIds()).toEqual(['beta', 'gamma', 'alpha']);
+    expect(screen.getByTestId('stats-exercise-sort-status')).toHaveTextContent(
+      'Sorted by: Most recent exercise'
+    );
+    fireEvent.press(screen.getByTestId('stats-exercise-sort-exercise'));
+    expect(sortedExerciseIds()).toEqual(['alpha', 'gamma', 'beta']);
+    expect(screen.getByTestId('stats-exercise-sort-status')).toHaveTextContent(
+      'Sorted by: Least recent exercise'
+    );
+
+    fireEvent.press(screen.getByTestId('stats-exercise-sort-volume'));
+    expect(sortedExerciseIds()).toEqual(['beta', 'gamma', 'alpha']);
+    fireEvent.press(screen.getByTestId('stats-exercise-sort-volume'));
+    expect(sortedExerciseIds()).toEqual(['alpha', 'gamma', 'beta']);
+
+    fireEvent.press(screen.getByTestId('stats-exercise-sort-oneRepMax'));
+    expect(sortedExerciseIds()).toEqual(['gamma', 'beta', 'alpha']);
+    fireEvent.press(screen.getByTestId('stats-exercise-sort-oneRepMax'));
+    expect(sortedExerciseIds()).toEqual(['beta', 'gamma', 'alpha']);
+    expect(screen.getByTestId('stats-exercise-sort-oneRepMax-indicator')).toHaveTextContent('1RM ↑');
+    expect(screen.queryByTestId('stats-exercise-sort-volume-indicator')).toBeNull();
+    expect(onPressExerciseHistory).not.toHaveBeenCalled();
+    fireEvent.press(screen.getByTestId('stats-exercise-row-gamma'));
+    expect(onPressExerciseHistory).toHaveBeenCalledWith({
+      exerciseDefinitionId: 'gamma',
+      displayName: 'Gamma',
+    });
+  });
+
+  it('preserves sort state while new period data, search, and Breakdown props arrive', () => {
+    const initialItems = [
+      buildExerciseListItem('alpha', 'Alpha', { totalVolume: 100 }),
+      buildExerciseListItem('beta', 'Beta', { totalVolume: 300 }),
+    ];
+    const view = render(
+      <StatsScreenShell
+        {...buildShellProps({ viewMode: 'exercise', exerciseListItems: initialItems })}
+      />
+    );
+
+    fireEvent.press(screen.getByTestId('stats-exercise-sort-volume'));
+    expect(sortedExerciseIds()).toEqual(['beta', 'alpha']);
+
+    view.rerender(
+      <StatsScreenShell
+        {...buildShellProps({
+          viewMode: 'muscle',
+          periodDays: 30,
+          exerciseListItems: [
+            buildExerciseListItem('alpha', 'Alpha', { totalVolume: 500 }),
+            buildExerciseListItem('beta', 'Beta', { totalVolume: 50 }),
+          ],
+        })}
+      />
+    );
+    view.rerender(
+      <StatsScreenShell
+        {...buildShellProps({
+          viewMode: 'exercise',
+          periodDays: 30,
+          searchQuery: 'a',
+          exerciseListItems: [
+            buildExerciseListItem('alpha', 'Alpha', { totalVolume: 500 }),
+            buildExerciseListItem('beta', 'Beta', { totalVolume: 50 }),
+          ],
+        })}
+      />
+    );
+
+    expect(screen.getByTestId('stats-exercise-sort-status')).toHaveTextContent(
+      'Sorted by: Volume — high to low'
+    );
+    expect(sortedExerciseIds()).toEqual(['alpha', 'beta']);
   });
 
   it('hides the stats scroll view when viewMode is exercise', () => {
@@ -1265,6 +1558,49 @@ describe('StatsRoute — exercise heatmap integration', () => {
     expect(screen.getByTestId('stats-exercise-name-bench-press')).toHaveTextContent('Bench Press');
   });
 
+  it('maps all-time completion timestamps into the route-local recency sort', async () => {
+    const squatAggregate = {
+      ...exerciseAggregate,
+      exerciseDefinitionId: 'squat',
+      setCount: 4,
+    };
+    (jest.requireMock('@/src/exercise-catalog/cache').useExerciseCatalog as jest.Mock).mockReturnValue({
+      status: 'ready',
+      exercises: [exerciseInCatalog, { id: 'squat', name: 'Squat', mappings: [] }],
+      muscleGroups: [],
+      muscleGroupsById: {},
+      lastError: null,
+    });
+    (jest.requireMock('@/src/exercise-catalog/stats-cache').useExerciseCatalogStats as jest.Mock).mockReturnValue({
+      status: 'ready',
+      stats: {
+        aggregatesById: new Map([
+          ['bench-press', exerciseAggregate],
+          ['squat', squatAggregate],
+        ]),
+        everDoneIds: new Set(['bench-press', 'squat']),
+        lastCompletedAtById: new Map([
+          ['bench-press', new Date('2026-01-01T00:00:00Z')],
+          ['squat', new Date('2026-03-01T00:00:00Z')],
+        ]),
+      },
+      lastError: null,
+      reload: jest.fn(),
+    });
+    mockComputeStatsSummary.mockResolvedValue(buildSummary());
+    render(<StatsRoute />);
+
+    await act(async () => { triggerFocus(); });
+    await waitFor(() => expect(screen.getByTestId('stats-exercise-row-squat')).toBeTruthy());
+    fireEvent.press(screen.getByTestId('stats-exercise-sort-exercise'));
+
+    expect(
+      screen
+        .getAllByTestId(/^stats-exercise-name-/)
+        .map((node) => String(node.props.testID).replace('stats-exercise-name-', ''))
+    ).toEqual(['squat', 'bench-press']);
+  });
+
   it('loads exercise heatmap data and opens overlay when exercise row is tapped', async () => {
     mockComputeStatsSummary.mockResolvedValue(buildSummary());
     mockComputeSelectedExerciseWeeklyEffort.mockResolvedValue([buildWeeklyEffort()]);
@@ -1332,6 +1668,7 @@ describe('StatsScreenShell — search & filtering', () => {
     nearFailureCount: 2,
     totalVolume: 2500,
     estimatedOneRepMax: 110,
+    lastCompletedAt: null,
   });
 
   it('renders search input with dynamic placeholder depending on viewMode', () => {

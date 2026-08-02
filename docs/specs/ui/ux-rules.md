@@ -259,16 +259,43 @@ Guardrail command:
    Muscle` toggle. Both breakdown choices remain visible, exactly one exposes
    selected state, and `By Exercise` remains the default.
 2. The summary keeps the actionable `Sessions` card and shows a second `Sets (W/Sets)` card as `<all valid performed sets> (<working sets>)`. Sessions use a signed absolute delta, and the set card uses a signed absolute pair; neither count card shows percentage change. Percentages are reserved for Volume comparisons.
-3. In the per-exercise mode the list is flat and includes exercises trained at least once. Rows sort by valid performed-set count descending, then exercise name. Each row shows `Sets` as `<valid performed sets> (<near-failure sets>)`, raw exercise `Volume`, and estimated `1RM` when available. Near-failure means the valid performed `RIR 0` / `RIR 1` / `RIR 2` subset; warm-up, null, and unknown-quality rows remain in the leading set count but not the parenthesized count.
-4. Tapping an exercise row in per-exercise mode opens an in-route `ExerciseHistoryOverlay` — the same overlay card structure as the muscle-history overlay (occupies ~75% screen height, backdrop-dismissible).
-5. The `ExerciseHistoryOverlay` renders the reusable daily/weekly heatmaps over a 365-day window for the selected exercise. It keeps the four metric chips (Volume / W/sets / 1RM / Top weight) plus the week-selection banner; unlike muscle-history, it remains a multi-metric exercise-specific view.
-6. The Breakdown toggle uses the shared action, border, and surface tokens and
+3. In per-exercise mode, exercises trained at least once render in one compact,
+   viewport-fitting table with shared `Exercise`, `Sets (W/Sets)`, `Volume`, and
+   `1RM` headers. Each data row shows `<valid performed sets> (<working sets>)`,
+   raw exercise volume, and estimated 1RM; unavailable 1RM values render as `—`.
+   A working set is the valid confirmed `RIR 0` / `RIR 1` / `RIR 2` subset;
+   warm-up, null, and unknown-quality rows remain in the leading set count but
+   not the parenthesized count. Whole data rows remain the only controls that
+   open exercise history; repeated per-row metric labels are omitted visually
+   but all values and their meanings remain in each row's accessibility label.
+4. The four table headers are the only exercise-sort controls. Initial order is
+   `Sets — high to low`. Repeated presses cycle `Exercise` through most then
+   least recent; `Sets (W/Sets)` through sets high-to-low, sets low-to-high,
+   working sets high-to-low, then working sets low-to-high; and `Volume` and
+   `1RM` through high-to-low then low-to-high. Pressing a different header
+   always starts that header's cycle at its first state. Recency comes from the
+   latest valid performed set in completed, non-deleted all-time history and is
+   independent of the selected 7-/30-day metric window. Missing recency and 1RM
+   values remain last in either direction; ties use exercise name then stable
+   exercise ID ascending.
+5. A non-interactive, polite-live-region status directly above the table names
+   the active metric and direction (including `Sets` versus `Working sets`).
+   Only the active header shows a compact text-plus-arrow indicator. Every
+   header exposes button semantics, a mobile-sized touch target, selected state
+   when active, current sort wording when applicable, and the next activation's
+   outcome; the interaction never relies on color or arrow direction alone.
+   Sort choice is volatile but survives time-range, search, and Breakdown
+   changes for the mounted screen, while each new metric result is sorted again
+   synchronously without data queries or mutation.
+6. Tapping an exercise row in per-exercise mode opens an in-route `ExerciseHistoryOverlay` — the same overlay card structure as the muscle-history overlay (occupies ~75% screen height, backdrop-dismissible).
+7. The `ExerciseHistoryOverlay` renders the reusable daily/weekly heatmaps over a 365-day window for the selected exercise. It keeps the four metric chips (Volume / W/sets / 1RM / Top weight) plus the week-selection banner; unlike muscle-history, it remains a multi-metric exercise-specific view.
+8. The Breakdown toggle uses the shared action, border, and surface tokens and
    is visually distinct from the Time range pills; no raw color literals.
-7. Dismissing the exercise overlay returns to the exercise list in per-exercise mode. It clears only transient selected-exercise/week UI state and does not mutate any data.
-8. Volume for exercise analytics is raw `weight × reps` (no muscle-role weighting). This differs from the muscle-history overlay where volume is role-weighted.
-9. In the per-muscle mode every family and visible nested-muscle row shows `Sets` in the same `<set count> (<near-failure count>)` form plus `Volume`. Family set counts union physical source-set identities across contributing primary/secondary muscles, so one set mapped to two muscles in one family counts once. Family volume still sums member-muscle contributions.
-10. Per-muscle previous-period set comparisons use signed absolute pairs (`+4 (+1)`, `−2 (−1)`, `±0 (−1)`) and never percentages. Volume comparisons use percentage only (`+17%`, `−100%`, `±0%`), with `—` for zero-to-zero and `new` for positive volume over a zero baseline. Muscle/family volume remains the shared per-side, role-weighted calculation.
-11. Per-muscle family rows use a token-backed green failure-intensity background; visible nested-muscle rows use the semantic warm background palette. Each row receives one uniform shade selected from four levels using `clamp(nearFailureCount / (8 × periodDays / 7), 0, 1)`; there is no partial-width band or gradient. Rows with no near-failure sets keep the default surface. The background is decorative and supplements the readable near-failure count. Its strongest-shade threshold is a display scale only—not a goal, recommendation, limit, or warning. Row accessibility copy states the exact near-failure count and selected-period threshold.
+9. Dismissing the exercise overlay returns to the exercise list in per-exercise mode. It clears only transient selected-exercise/week UI state and does not mutate any data.
+10. Volume for exercise analytics is raw `weight × reps` (no muscle-role weighting). This differs from the muscle-history overlay where volume is role-weighted.
+11. In the per-muscle mode every family and visible nested-muscle row shows `Sets` in the same `<set count> (<near-failure count>)` form plus `Volume`. Family set counts union physical source-set identities across contributing primary/secondary muscles, so one set mapped to two muscles in one family counts once. Family volume still sums member-muscle contributions.
+12. Per-muscle previous-period set comparisons use signed absolute pairs (`+4 (+1)`, `−2 (−1)`, `±0 (−1)`) and never percentages. Volume comparisons use percentage only (`+17%`, `−100%`, `±0%`), with `—` for zero-to-zero and `new` for positive volume over a zero baseline. Muscle/family volume remains the shared per-side, role-weighted calculation.
+13. Per-muscle family rows use a token-backed green failure-intensity background; visible nested-muscle rows use the semantic warm background palette. Each row receives one uniform shade selected from four levels using `clamp(nearFailureCount / (8 × periodDays / 7), 0, 1)`; there is no partial-width band or gradient. Rows with no near-failure sets keep the default surface. The background is decorative and supplements the readable near-failure count. Its strongest-shade threshold is a display scale only—not a goal, recommendation, limit, or warning. Row accessibility copy states the exact near-failure count and selected-period threshold.
 
 ### 14. Documentation maintenance rule (UI semantics)
 

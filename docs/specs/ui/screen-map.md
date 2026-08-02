@@ -56,12 +56,21 @@ Brief entrypoint map of the current mobile screens.
     rows: `Time range` keeps the 7-/30-day pills, and `Breakdown` keeps both
     joined `By Exercise` / `By Muscle` choices visible with one selected
   - top summary cards show `Sessions` and `Sets (W/Sets)` as absolute counts; their previous-period deltas never include percentages
-  - per-exercise rows sorted by valid performed-set count then exercise name; each shows `Sets` as `<count> (<near-failure count>)`, raw `Volume`, and `1RM`, and opens an in-route exercise-history overlay
+  - per-exercise history is a viewport-fitting table with shared `Exercise`,
+    `Sets (W/Sets)`, `Volume`, and `1RM` headers; rows show aligned values, use
+    `—` for unavailable 1RM, retain complete accessibility wording, and open an
+    in-route exercise-history overlay as one whole-row action
+  - table headers are the only sort controls: default Sets high-to-low;
+    Exercise cycles most/least recently completed across all-time valid history;
+    Sets cycles all sets high/low then working sets high/low; Volume and 1RM each
+    cycle high/low. Missing recency/1RM stay last, and ties use name then ID.
+    A polite status and active-header text/arrow state name the active sort;
+    mounted sort choice survives time-range, search, and Breakdown changes.
   - per-muscle family and nested rows show the same set/near-failure count grammar plus per-side, role-weighted `Volume`; set comparisons are signed absolute pairs while volume comparisons are percentage-only with explicit zero-baseline states
   - per-muscle family rows use uniform green failure-intensity backgrounds and visible nested-muscle rows use uniform warm backgrounds, selecting one shade per row and scaling to eight near-failure sets per seven days; exact counts remain readable/accessibly labelled and the threshold is not a training target
   - actionable muscle rows in Stats summary; expanded muscle rows and collapsed single-muscle family headers open an in-route muscle-history overlay
   - muscle-history overlay states for loading, error, no-history, populated heatmap with selectable `Volume` / `W/sets` metrics, selected positive-effort date with contributing exercise/set detail, and selected zero-effort date empty detail; daily and weekly charts stay warm-mounted so switching is immediate and preserves chart-local state
-  - **By Exercise mode** (M17): the view-mode chip switches the body to the flat exercise list; tapping an exercise opens an in-route `ExerciseHistoryOverlay`
+  - **By Exercise mode** (M17): the view-mode chip switches the body to the sortable exercise table; tapping an exercise data row opens an in-route `ExerciseHistoryOverlay`
   - exercise-history overlay states: loading, error, no-history, populated daily/weekly heatmaps (365-day window), metric chip selection (Volume / W/sets / 1RM / Top weight), week-selection banner
 - Notes:
   - tab root inside the `(tabs)` group with `headerShown: false`; the tab bar is `BottomTray` (composing `TopLevelTabs`) supplied via the `tabBar` prop in `(tabs)/_layout.tsx`.
