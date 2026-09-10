@@ -65,6 +65,9 @@ Define the canonical repository structure, path ownership, and placement convent
     service-role credential.
 - `apps/mobile/components/ui/`
   - owns the canonical mobile UI tokens + primitive components introduced in M8 for reuse across route screens and specialized shared components.
+- `apps/mobile/src/groups/` (M22)
+  - owns the non-UI group client: wire types, the typed group RPC client (the only mobile code that calls Supabase for groups), `group_cache` access, the pure stream view model, the group NetInfo hook, and the resource/action hooks screens use (`docs/specs/tech/groups-contract.md` §6.1).
+  - group screens under `app/**` consume it through `@/src/groups`; group code never runs inside the sync cycle and must not modify `src/sync/**` beyond the `group_cache` delete in the account wipe.
 - `apps/mobile/src/auth/`
   - owns shared mobile auth integration modules such as the Supabase client bootstrap, auth storage adapter, session service, and React provider/hook surface.
 - `apps/mobile/.maestro/`

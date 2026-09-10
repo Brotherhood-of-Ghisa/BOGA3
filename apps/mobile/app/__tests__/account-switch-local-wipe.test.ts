@@ -72,6 +72,7 @@ import {
   exerciseMuscleMappings,
   exerciseSets,
   exerciseTagDefinitions,
+  groupCache,
   gyms,
   muscleGroups,
   sessionExerciseTags,
@@ -215,6 +216,20 @@ describe('sign-out / account-switch local wipe', () => {
     await wipeLocalForAccountSwitch();
 
     expect(db().select().from(muscleGroups).all()).toHaveLength(0);
+  });
+
+  it('clears the local-only group_cache (the previous account must not see cached group data)', async () => {
+    db()
+      .insert(groupCache)
+      .values([
+        { cacheKey: 'groups:mine', userId: 'user-a', payloadJson: '{"groups":[]}', fetchedAtMs: 1 },
+        { cacheKey: 'stream:all', userId: 'user-a', payloadJson: '{"items":[]}', fetchedAtMs: 1 },
+      ])
+      .run();
+
+    await wipeLocalForAccountSwitch();
+
+    expect(db().select().from(groupCache).all()).toHaveLength(0);
   });
 
   it('issues no server call (and therefore no server delete)', async () => {

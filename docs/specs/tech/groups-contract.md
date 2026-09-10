@@ -1,11 +1,11 @@
 # Groups Contract (M22)
 
-> **Status: Partially built.** §2.1–§2.3, §3, and the membership/invite RPCs
-> of §4 are as-built (M22-T01,
+> **Status: Partially built.** As-built: §2.1–§2.3, §3, and the
+> membership/invite RPCs of §4 (M22-T01,
 > `supabase/migrations/20260910120000_m22_groups_membership.sql`, proven by
-> `./boga test groups-contract`). The share ledger, stream reads, metrics, and
-> mobile client are still planned. Each section gets an **As-built** note when
-> its implementation task lands; the milestone spec
+> `./boga test groups-contract`), and the mobile client §6.1–§6.2 (M22-T03).
+> The share ledger, stream reads, metrics, and UI are still planned. Each
+> section gets an **As-built** note when its implementation task lands; the milestone spec
 > (`docs/specs/milestones/M22-groups-and-foundations.md`) owns the product
 > requirements and this doc owns the technical contract.
 
@@ -478,6 +478,48 @@ NetInfo hook rather than changing `src/sync`.
 **Isolation.** Group code never runs inside the sync cycle, and every group
 RPC failure is caught in this module (C3.10.5, AC13).
 
+**As-built (M22-T03).** Public surface is the barrel `@/src/groups`.
+
+- **Network.** `sync-status.ts` exposes only a snapshot getter, so the module
+  adds `use-network-online.ts`: its own `NetInfo.addEventListener`, with the
+  scheduler's projection rule (online iff `isConnected === true`). It returns
+  `null` until the first report, and only `false` counts as offline.
+- **`api.ts`.**
+  - Functions: `listMyGroups`, `getGroup`, `getGroupStream({ groupId, before,
+    limit = 20 })`, `getGroupSessionDetail`, `previewGroupInvite`,
+    `createGroup`, `updateGroup`, `getGroupInviteCode`,
+    `regenerateGroupInviteCode`, `joinGroup`, `leaveGroup`,
+    `removeGroupMember`, `setGroupMemberRole`, `transferGroupOwnership`.
+  - `group_stream` always sends all three `p_*` args.
+  - The four membership writes resolve `void`, since §4.3 defines no result.
+  - Error mapping, in order:
+    - a message *prefix* `<TOKEN>` or `<TOKEN>: …` maps to that token, and
+      `message` is the text after it;
+    - postgrest-js transport failure (`status: 0`) or a thrown call maps to
+      `NETWORK`;
+    - anything else maps to `INTERNAL`, including an unconfigured client and a
+      payload missing its top-level contract keys (fail loud).
+- **`use-group-resource.ts`.**
+  - It takes `{ userId, cacheKey, fetcher, evictGroupIdOnNotFound? }`.
+    Screens pass `useAuth().user?.id`, and a `null` user disables it.
+  - It returns `{ data, lastUpdatedAtMs, hydrated, refreshing, offline, error,
+    lostAccess, refresh }`.
+  - It skips the request while NetInfo reports offline. Concurrent refreshes
+    share one request, and a response for a stale `(user, key)` is dropped.
+  - `NOT_FOUND` deletes its own key, plus `evictGroup(id)` when an id is
+    given.
+- **`use-group-action.ts`.**
+  - It returns `{ run, pending, error, offline, reset }`.
+  - `run` resolves `{ ok: true, value } | { ok: false, error }` and never
+    rejects.
+  - The offline refusal is `NETWORK` with `GROUP_OFFLINE_ACTION_MESSAGE`.
+  - It never touches `group_cache`: callers `refresh()` after a success.
+- **View model.** Completed status uses `formatCompactDuration` from the
+  session list, so the example renders "Completed · 1h 5m" rather than
+  "1h 05m". A completed item with a null `duration_sec` derives it from the
+  timestamps, else reads "Completed". Volume is `5,230.5 kg`, with at most two
+  decimals.
+
 ### 6.2 Local cache — `group_cache` (local-only SQLite)
 
 The schema file is `apps/mobile/src/data/schema/group-cache.ts`, with a Drizzle
@@ -500,6 +542,25 @@ migration via `npm run db:generate`.
   `stream:<id>`, and every `session:*` entry. A successful All refresh replaces
   `stream:all`, which no longer contains that group. The group screen shows
   "You're no longer a member of this group."
+
+**As-built (M22-T03).**
+
+- **Schema and migration.** `apps/mobile/src/data/schema/group-cache.ts`,
+  exported from the schema index, with migration
+  `apps/mobile/drizzle/0004_optimal_umar.sql` (FK-free, bundled).
+- **`src/groups/cache.ts`.**
+  - Every function takes the drizzle handle, so it runs on expo-sqlite and on
+    the in-memory fixture alike: `readGroupCache`, `writeGroupCache` (an
+    upsert on `cache_key` that also replaces the owner),
+    `deleteGroupCacheEntry`, `evictGroup`, and `wipeGroupCache`.
+  - `groupCacheKeys` builds the keys above.
+  - A read for a different `user_id` returns null.
+  - A corrupt `payload_json` throws, and the resource hook surfaces it as
+    `INTERNAL`.
+- **Wipe.** `wipeLocalTables` deletes `group_cache` inside its existing
+  transaction.
+- **Stream caches.** They hold whatever page the screen's fetcher returns. The
+  first-page-only rule is the fetcher's contract, not enforced by the cache.
 
 ### 6.3 Routes
 

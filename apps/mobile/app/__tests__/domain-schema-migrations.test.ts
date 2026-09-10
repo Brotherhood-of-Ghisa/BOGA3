@@ -126,8 +126,9 @@ describe('domain schema and runtime migrations', () => {
   it('keeps the squashed v2 baseline as m0000 and appends feature migrations after it', () => {
     // The history was squashed to a single v2 baseline (`m0000`); forward feature
     // migrations append after it. The first follow-up is the local sync
-    // quarantine table; planned set targets append after that.
-    expect(localRuntimeMigrations.journal.entries).toHaveLength(4);
+    // quarantine table; planned set targets append after that; the M22 local
+    // group cache is m0004.
+    expect(localRuntimeMigrations.journal.entries).toHaveLength(5);
     expect(localRuntimeMigrations.journal.entries[0]).toMatchObject({
       idx: 0,
       tag: expect.stringMatching(/^0000_/),
@@ -144,7 +145,23 @@ describe('domain schema and runtime migrations', () => {
       idx: 3,
       tag: expect.stringMatching(/^0003_/),
     });
-    expect(Object.keys(localRuntimeMigrations.migrations)).toEqual(['m0000', 'm0001', 'm0002', 'm0003']);
+    expect(localRuntimeMigrations.journal.entries[4]).toMatchObject({
+      idx: 4,
+      tag: expect.stringMatching(/^0004_/),
+    });
+    expect(Object.keys(localRuntimeMigrations.migrations)).toEqual(['m0000', 'm0001', 'm0002', 'm0003', 'm0004']);
+  });
+
+  it('creates the local-only group cache table in the m0004 follow-up migration', () => {
+    const groupCacheMigration = localRuntimeMigrations.migrations.m0004;
+    expect(groupCacheMigration).toContain('CREATE TABLE `group_cache`');
+    expect(groupCacheMigration).toContain('`cache_key` text PRIMARY KEY NOT NULL');
+    expect(groupCacheMigration).toContain('`user_id` text NOT NULL');
+    expect(groupCacheMigration).toContain('`payload_json` text NOT NULL');
+    expect(groupCacheMigration).toContain('`fetched_at_ms` integer NOT NULL');
+    // A disposable cache of server-authoritative data: FK-free (spec 05 local
+    // integrity rule 2) and out of sync scope.
+    expect(groupCacheMigration).not.toContain('FOREIGN KEY');
   });
 
   it('creates the local sync quarantine table in the m0001 follow-up migration', () => {
