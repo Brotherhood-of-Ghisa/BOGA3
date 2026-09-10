@@ -119,8 +119,43 @@ Screens, routes, and the tab (`M22-T04`, `T05`). The server (`M22-T01`,
 
 ## Evidence
 
+Branch `m22-t03-mobile-groups-client`, rebased on `origin/main` 9cb5d80
+(#266). Results below are measured runs on this machine (`./boga timings`).
+
+- `npx jest groups account-switch-local-wipe domain-schema-migrations`:
+  9 suites and 102 tests passed.
+- Infra-free lanes on the rebased branch, each exit 0: `lint`, `typecheck`,
+  `jest-full` (114 suites, 1085 tests), `docs-check`, `meta-tests`,
+  `agent-auth-web`, `mcp-unit`. `mcp-unit` now finds 0 production
+  vulnerabilities, so the audit failure is fixed by #266.
+- `./boga test handles` passed: 114 suites, 1085 tests, exit 0, no open
+  handles. It took 15.6m and ran on the pre-rebase commit; #266 changed only
+  tooling. The duration is inflated by host CPU contention (load average
+  above 100).
+- `ios-smoke` passed: `smoke-launch` in 7s
+  (`apps/mobile/artifacts/maestro/ad-hoc/20260910-221914-25920`).
+- `ios-data-smoke` run 1 failed on a harness timeout, not an app failure
+  (`…/ad-hoc/20260910-222037-29457`).
+  - Steps 0–25 passed: data-reset boot with all migrations including m0004,
+    and the recorder with the seeded catalog.
+  - Step 26, tap "Reps for exercise 1 set 1", hung for 900s at load average
+    about 112. The field is visible and focused in the failure screenshot.
+  - Rerun: see the Completion note.
+- **Blocked by infrastructure:** `backend-fast` (inside `boga test fast`),
+  `boga test backend`, `ios-auth-profile`, and `ios-sync-e2e`.
+  - The OrbStack Docker API is wedged: `/_ping` on
+    `~/.orbstack/run/docker.sock` times out, and a watcher saw no recovery in
+    30 min.
+  - `orb status` reports Running.
+  - It was not restarted, because other worktrees' Supabase stacks share it.
+
 ## Completion note
 
-- What changed:
-- What tests ran:
-- What remains:
+- What changed: `apps/mobile/src/groups/**`, the `group_cache` schema with
+  migration 0004, the `group_cache` delete in `wipeLocalTables`, and jest
+  suites `groups-*`. Docs: spec 05, spec 09, and the groups-contract §6.1–§6.2
+  As-built notes.
+- What tests ran: see Evidence.
+- What remains: run `boga test backend`, the full `boga test fast`
+  (backend half), `ios-auth-profile`, and `ios-sync-e2e` once Docker is
+  healthy. Open the PR after those are green.
