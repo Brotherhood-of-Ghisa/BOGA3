@@ -3,13 +3,13 @@
 # maestro-run-lane.sh — uniform runner for the per-lane iOS Maestro wrappers.
 #
 # Replaces the one-file-per-lane wrappers (maestro-ios-smoke.sh, -data-smoke.sh,
-# -auth-profile.sh, -sync-e2e.sh): the per-lane differences are DATA (flows,
+# -auth-profile.sh, -sync-e2e.sh; groups-e2e was added directly here): the per-lane differences are DATA (flows,
 # reset strategy, whether the app must see local Supabase, fixture user), kept
 # in the case block below. The shared-provision combined runner
 # (maestro-ios-gates.sh) keeps its own script — it is a different execution
 # model, not a thin wrapper.
 #
-#   ./scripts/maestro-run-lane.sh smoke|data-smoke|auth-profile|sync-e2e
+#   ./scripts/maestro-run-lane.sh smoke|data-smoke|auth-profile|sync-e2e|groups-e2e
 #
 # Canonical lane names / gate membership: scripts/lanes.tsv (run via
 # `./boga test ios-smoke` etc.; the npm test:e2e:ios:* scripts also land here).
@@ -21,7 +21,8 @@ APP_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 REPO_ROOT="$(cd -- "$APP_DIR/../.." && pwd)"
 
 lane="${1:-}"
-[[ -n "$lane" ]] || { echo "usage: $0 smoke|data-smoke|auth-profile|sync-e2e" >&2; exit 2; }
+LANES="smoke|data-smoke|auth-profile|sync-e2e|groups-e2e"
+[[ -n "$lane" ]] || { echo "usage: $0 $LANES" >&2; exit 2; }
 
 run_flow() {
   local reset="$1" scenario="$2" flow="$3"
@@ -109,8 +110,31 @@ case "$lane" in
     run_flow full "First-run log and remote round-trip" sync-first-run-log-and-roundtrip.yaml
     ;;
 
+  # The two-user groups e2e lane (M22; docs/specs/tech/groups-contract.md §8):
+  # the device signs in as user_c and drives the real group UI, while the flow
+  # scripts the counterparty user_d over HTTP (runScript
+  # .maestro/scripts/groups-counterparty.js: join, sync_push, removed-member
+  # read). Both fixtures are dedicated to this flow (docs/specs/11); the
+  # counterparty is bound through a MAESTRO_*_COUNTERPARTY_* var, which
+  # scripts/tests/maestro-fixture-users.test.sh counts as a claimed fixture.
+  # groups-fixture-reset.sh first hard-deletes both users' groups and sync rows
+  # (service role), so repeated runs in one slot need no Supabase reset.
+  groups-e2e)
+    export_local_supabase_env
+    "$REPO_ROOT/supabase/scripts/groups-fixture-reset.sh"
+    MAESTRO_GROUPS_DEVICE_EMAIL="$USER_C_EMAIL" \
+    MAESTRO_GROUPS_DEVICE_PASSWORD="$USER_C_PASSWORD" \
+    MAESTRO_GROUPS_DEVICE_USERNAME="$USER_C_USERNAME" \
+    MAESTRO_GROUPS_COUNTERPARTY_EMAIL="$USER_D_EMAIL" \
+    MAESTRO_GROUPS_COUNTERPARTY_PASSWORD="$USER_D_PASSWORD" \
+    MAESTRO_GROUPS_COUNTERPARTY_USERNAME="$USER_D_USERNAME" \
+    MAESTRO_GROUPS_SUPABASE_URL="$EXPO_PUBLIC_SUPABASE_URL" \
+    MAESTRO_GROUPS_SUPABASE_ANON_KEY="$EXPO_PUBLIC_SUPABASE_ANON_KEY" \
+    run_flow full "Two-user groups stream" groups-two-user-stream.yaml
+    ;;
+
   *)
-    echo "[maestro-run-lane] unknown lane: $lane (smoke|data-smoke|auth-profile|sync-e2e)" >&2
+    echo "[maestro-run-lane] unknown lane: $lane ($LANES)" >&2
     exit 2
     ;;
 esac

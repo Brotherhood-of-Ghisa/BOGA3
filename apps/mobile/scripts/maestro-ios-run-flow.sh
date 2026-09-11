@@ -88,9 +88,16 @@ maestro_load_runtime_env "$MAESTRO_RUNTIME_ENV_FILE"
 # warm-up invocation (which used to cost a duplicate XCUITest driver install, and
 # on the signed-out auth/sync lanes burned ~45s waiting on a never-shown screen).
 
+# The run copy mirrors .maestro/'s layout (flows/ beside scripts/): Maestro
+# resolves a flow's `runScript` files relative to the flow, so a flow's
+# `../scripts/*.js` must resolve the same way from the copy.
 flow_basename="$(basename -- "$FLOW_SOURCE")"
-MAESTRO_FLOW_FILE="$MAESTRO_ARTIFACT_ROOT/$flow_basename"
+MAESTRO_FLOW_FILE="$MAESTRO_ARTIFACT_ROOT/flows/$flow_basename"
 maestro_prepare_flow_copy "$FLOW_SOURCE" "$MAESTRO_FLOW_FILE" "$MAESTRO_IOS_DEV_CLIENT_BUNDLE_ID"
+flow_scripts_dir="$(dirname -- "$FLOW_SOURCE")/../scripts"
+if [[ -d "$flow_scripts_dir" ]]; then
+  cp -R "$flow_scripts_dir" "$MAESTRO_ARTIFACT_ROOT/scripts"
+fi
 maestro_write_runtime_env "$MAESTRO_RUNTIME_ENV_FILE"
 
 # Build --env flags for vars used by flow ${VAR} expressions. Maestro 2.x does
@@ -103,7 +110,15 @@ for _var in \
   MAESTRO_AUTH_PROFILE_PASSWORD \
   MAESTRO_AUTH_PROFILE_USERNAME \
   MAESTRO_ROUNDTRIP_EMAIL \
-  MAESTRO_ROUNDTRIP_PASSWORD
+  MAESTRO_ROUNDTRIP_PASSWORD \
+  MAESTRO_GROUPS_DEVICE_EMAIL \
+  MAESTRO_GROUPS_DEVICE_PASSWORD \
+  MAESTRO_GROUPS_DEVICE_USERNAME \
+  MAESTRO_GROUPS_COUNTERPARTY_EMAIL \
+  MAESTRO_GROUPS_COUNTERPARTY_PASSWORD \
+  MAESTRO_GROUPS_COUNTERPARTY_USERNAME \
+  MAESTRO_GROUPS_SUPABASE_URL \
+  MAESTRO_GROUPS_SUPABASE_ANON_KEY
 do
   if [[ -n "${!_var+set}" ]]; then
     maestro_env_flags+=(-e "${_var}=${!_var}")
