@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=20"
+    "node": ">=24"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
@@ -27,7 +27,7 @@
     "supertest": "7.1.4",
     "tsx": "4.20.3",
     "typescript": "5.9.2",
-    "vitest": "3.2.7"
+    "vitest": "4.1.11"
   },
   "overrides": {
     "@hono/node-server": "2.0.11"

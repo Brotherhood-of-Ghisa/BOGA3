@@ -78,7 +78,7 @@ discovers and invokes all four tools, verifies fixture IDs, and cleans up. See
 
 1. Complete the hosted Supabase and consent-site steps in
    `apps/agent-auth-web/README.md` and `supabase/README.md`.
-2. Build with Node 20 or newer: `npm ci && npm run build`.
+2. Build with Node 24 or newer: `npm ci && npm run build`.
 3. Run `npm start` behind an HTTPS ingress that preserves `Authorization`,
    `Host`, and `x-request-id`.
 4. Set the three required URLs above. Configure only the expected public proxy
