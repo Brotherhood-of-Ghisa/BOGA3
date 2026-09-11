@@ -54,3 +54,5 @@ export {
   type GroupActionState,
 } from './use-group-action';
 export { projectNetInfoOnline, useNetworkOnline } from './use-network-online';
+export { evictGroupFromDevice } from './evict-local';
+export * from './write-view-model';

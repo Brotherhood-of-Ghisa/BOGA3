@@ -233,34 +233,73 @@ Brief entrypoint map of the current mobile screens.
   - the fourth tab: a newest-first stream of group members' sessions and membership events, filtered by `All` or one group
 - Key states (high level):
   - signed-out / auth-unconfigured sign-in-required card (no group RPC runs)
-  - no-groups explanatory empty state (its Create / Join actions arrive in M22-T05)
+  - no-groups explanatory empty state with `Create group` / `Join with a code` (the header Join / Create row is hidden then)
+  - header actions: `My groups`, then a `Join group` / `Create group` row
   - cached stream first, then refreshed on focus, every 30 s, and on pull-to-refresh; older pages load online at the end of the list
   - offline marker over cached data; offline empty state with no cache; inline error or error state with `Retry`
 - Key exits:
-  - `/group-session/<memberId>/<sessionId>` (session card), `/group/<groupId>` (membership item), `/group/mine` (header)
+  - `/group-session/<memberId>/<sessionId>` (session card), `/group/<groupId>` (membership item), `/group/mine` (header), `/group/new`, `/group/join` (header or empty state)
 
 13. `/group/mine`
 - File: `apps/mobile/app/group/mine.tsx`
 - Purpose:
   - My groups: each active membership with its description, member count, and my role
 - Key states (high level):
-  - sign-in-required / empty / offline / error states as on the tab; pull-to-refresh
+  - sign-in-required / empty (with `Create group` / `Join with a code`) / offline / error states as on the tab; pull-to-refresh
 - Key exits:
-  - `/group/<groupId>` (row tap)
+  - `/group/<groupId>` (row tap); `/group/new`, `/group/join` (empty state)
 
 14. `/group/[groupId]`
 - File: `apps/mobile/app/group/[groupId]/index.tsx`
 - Purpose:
-  - the group screen: header (name, description, member count, my role) and a joined `Stream` / `Members` segment; read-only until M22-T05 adds role actions
+  - the group screen: header (name, description, member count, my role), owner/admin `Invite` (primary) + `Edit`, and a joined `Stream` / `Members` segment
 - Key states (high level):
   - loading / offline / error; members in server order (owner, admins, members, then username)
+  - a member row with actions for my role (§4.3) shows a chevron and opens the in-route member action sheet; Remove / Transfer confirm first
+  - under the member list: danger `Leave group` (admin, member, confirmed) or, for the owner, "Transfer ownership before leaving"
+  - an inline notice for each write outcome ("alex was removed." / the failure, nothing changed); FORBIDDEN / NOT_FOUND also refresh
   - lost access after `NOT_FOUND`: "You're no longer a member of this group", with cached data hidden
 - Key exits:
   - `/group-session/<memberId>/<sessionId>` (session card); membership items here do not navigate
+  - `/group/<groupId>/invite`, `/group/<groupId>/edit`; after a successful leave, back to `/groups`
 - Notes:
   - sets its stack title to the group name once loaded
 
-15. `/group-session/[memberId]/[sessionId]`
+15. `/group/new` (M22-T05)
+- File: `apps/mobile/app/group/new.tsx`
+- Purpose:
+  - create a group: the inline username gate first when the username is blank, then the shared name / description form
+- Key states (high level):
+  - inline field validation (name 1–50, description ≤280); the write's failure above `Create group`, nothing created; server `USERNAME_REQUIRED` re-opens the gate with the draft kept
+- Key exits:
+  - `/group/<newGroupId>` (replaces the form) as owner
+
+16. `/group/join` (M22-T05)
+- File: `apps/mobile/app/group/join.tsx`
+- Purpose:
+  - join by code: the username gate if needed, the code field, a preview (name, member count), then `Join group`
+- Key states (high level):
+  - a link's code is prefilled and previewed at once; "This invite code isn't valid." for an unknown or regenerated code; already a member shows `Open group`
+- Key exits:
+  - `/group/<groupId>` (replaces the join screen) after joining or when already a member
+
+17. `/group/[groupId]/invite` (M22-T05)
+- File: `apps/mobile/app/group/[groupId]/invite.tsx`
+- Purpose:
+  - owner/admin invite: the code (large, selectable, testID `group-invite-code`) and its `boga3://` link, `Share invite` (core `Share.share`), and danger `Regenerate code` behind a confirmation
+- Key states (high level):
+  - the code loads online only (never cached); members, or a server `FORBIDDEN`, see "Invites are for admins"; a failed regenerate keeps the old code
+
+18. `/group/[groupId]/edit` (M22-T05)
+- File: `apps/mobile/app/group/[groupId]/edit.tsx`
+- Purpose:
+  - owner/admin edit of name and description with the shared form, prefilled from the cached group
+- Key states (high level):
+  - members see "You can't edit this group"; a failed save shows above `Save changes` and changes nothing
+- Key exits:
+  - back to `/group/<groupId>` after saving
+
+19. `/group-session/[memberId]/[sessionId]`
 - File: `apps/mobile/app/group-session/[memberId]/[sessionId].tsx`
 - Purpose:
   - read-only friend's session view composing `SessionContentLayout`: member, status, start/end, location, and exercise cards with performed sets (`Set`, `Weight`, `Reps`, `Effort`)

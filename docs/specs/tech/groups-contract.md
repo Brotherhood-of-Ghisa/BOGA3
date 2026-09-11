@@ -10,8 +10,10 @@
 > - §6.1–§6.2, the mobile client (M22-T03).
 > - §6.3/§7, the read-side UI: the Groups tab, My groups, the group screen, and
 >   the friend's session view (M22-T04).
+> - §6.3/§7, the write UI: create, edit, join (deep link), invite, member
+>   actions, leave, and the username gate (M22-T05).
 >
-> The create/join/invite/manage UI (M22-T05) is still planned. Each section gets an **As-built** note when its
+> The two-user Maestro lane (M22-T06) is still planned. Each section gets an **As-built** note when its
 > implementation task lands; the milestone spec
 > (`docs/specs/milestones/M22-groups-and-foundations.md`) owns the product
 > requirements and this doc owns the technical contract.
@@ -758,6 +760,52 @@ join, edit, and invite routes, and every action, are M22-T05.
 - **Signed out or unconfigured.** `GroupsSignInRequired` renders on every
   group route and no group RPC runs.
 
+**As-built (M22-T05).** The write routes ship: `/group/new`, `/group/join`,
+`/group/[groupId]/edit`, and `/group/[groupId]/invite`, plus the role actions
+on the group screen and the Create / Join actions on the tab.
+
+- **Rules module.** `src/groups/write-view-model.ts` (barrel-exported) holds
+  the pure rules the screens use:
+  - `groupMemberActionsFor(myRole, myUserId, target)` is the §4.3 matrix:
+    owner → admin offers Remove admin, Transfer, Remove; owner → member
+    offers Make admin, Transfer, Remove; admin → member offers Remove; every
+    other pair (self, the owner, admin → admin, any member) offers nothing.
+    Jest walks every pair.
+  - `canManageGroup` (Invite, Edit: owner, admin) and `canLeaveGroup`
+    (not owner).
+  - `validateGroupDetails` mirrors §2.1 (trimmed name 1–50, description ≤280,
+    blank → null).
+  - `groupInviteLink` and `buildGroupInviteShareMessage` produce the share
+    text: the group name, the code, and `boga3://group/join?code=…`.
+  - `describeGroupWriteError` supplies the on-screen wording per token.
+- **Writes.** Every write, and the gate's `saveUsername`, runs through
+  `useGroupAction`: offline refusal, no queue. A transport `NETWORK` reads
+  "Couldn't reach the server. Nothing was changed". After a success the
+  screen `refresh()`es its resources; the member writes' `group_get` payload
+  is not written to the cache directly.
+- **Leave.** On success `evictGroupFromDevice` (`src/groups/evict-local.ts`)
+  evicts the group's cache entries, and the screen `dismissTo('/groups')`s.
+  A failed eviction is logged (`group.evict_failed`) and left to the next
+  `NOT_FOUND`.
+- **Invite.** `group_invite_get` runs online on each visit and is never
+  cached, so no `invite:*` cache key exists. `FORBIDDEN` shows "Invites are
+  for admins".
+- **Join.** The `code` query param is prefilled and previewed once the gate
+  is satisfied. `already_member` shows `Open group` and does not call
+  `group_join`. `INVITE_INVALID` reads "This invite code isn't valid." and
+  drops the preview. Create and join `router.replace` to the group.
+- **Username gate.** `components/groups/username-gate.tsx`. A profile that
+  fails to load does not block the form: the server's `USERNAME_REQUIRED`
+  re-opens the gate, and the create draft is kept.
+- **Confirmation.** Remove, Transfer, Leave, and Regenerate use `Alert.alert`
+  with a destructive button. The member action sheet is an in-route `Modal`.
+- **Known limitation, unchanged.** An invite link opened while signed out
+  loses the code at `/sign-in`.
+- **Evidence.** Jest: `groups-write-screens.test.tsx`,
+  `groups-write-view-model.test.ts`, and the real-router
+  `groups-join-deep-link.test.tsx`. On-device screenshots against local
+  Supabase are listed on the M22-T05 card.
+
 ## 7. Freshness and offline
 
 - **Refresh cadence.** On focus, every 30 s while the screen is focused, and on
@@ -777,7 +825,7 @@ join, edit, and invite routes, and every action, are M22-T05.
 
 - **Pull-to-refresh.** Every group list and screen uses `RefreshControl`.
   `usePullToRefresh` shows the spinner only for a user pull; the focus and
-  poll refreshes stay silent (`ui/ux-rules.md` §14, 08 patterns 6–8).
+  poll refreshes stay silent (`ui/ux-rules.md` §14, 08 patterns 6–8; writes: pattern 9).
 - **Offline marker.** `GroupOfflineBanner` renders
   `formatOfflineMarker(lastUpdatedAtMs)` in local `HH:MM` whenever the
   resource is `offline` (NetInfo reports offline, or the last refresh failed

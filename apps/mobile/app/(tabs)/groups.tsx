@@ -9,6 +9,7 @@ import {
   GroupOfflineBanner,
   GroupStateView,
   GroupStreamList,
+  GroupsEmptyActions,
   GroupsEmptyState,
   GroupsSignInRequired,
   groupScreenStyles,
@@ -68,9 +69,26 @@ function GroupsTabContent({ userId }: { userId: string }) {
         <UiText style={styles.title} variant="title">
           Groups
         </UiText>
-        {/* M22-T05 adds the Create group / Join group actions beside My groups. */}
         <UiButton label="My groups" onPress={() => router.push('/group/mine')} testID="groups-my-groups-button" variant="secondary" />
       </View>
+      {/* With no groups the empty state carries Create / Join instead. */}
+      {groups?.length === 0 ? null : (
+        <View style={groupScreenStyles.actionRow}>
+          <UiButton
+            label="Join group"
+            onPress={() => router.push('/group/join')}
+            style={groupScreenStyles.actionRowItem}
+            testID="groups-join-button"
+            variant="secondary"
+          />
+          <UiButton
+            label="Create group"
+            onPress={() => router.push('/group/new')}
+            style={groupScreenStyles.actionRowItem}
+            testID="groups-create-button"
+          />
+        </View>
+      )}
       {offline ? <GroupOfflineBanner lastUpdatedAtMs={stream.lastUpdatedAtMs ?? mine.lastUpdatedAtMs} /> : null}
       {inlineError && hasAnyData ? <GroupInlineError error={inlineError} onRetry={onRefresh} testID="groups-inline-error" /> : null}
       {groups && groups.length > 0 ? (
@@ -88,8 +106,9 @@ function GroupsTabContent({ userId }: { userId: string }) {
         testID="groups-screen">
         {header}
         {groups?.length === 0 ? (
-          // M22-T05 fills this slot with the Create group / Join group buttons.
-          <GroupsEmptyState testID="groups-empty-state" />
+          <GroupsEmptyState testID="groups-empty-state">
+            <GroupsEmptyActions testIDPrefix="groups-empty" />
+          </GroupsEmptyState>
         ) : (
           <GroupMissingDataState
             error={inlineError}

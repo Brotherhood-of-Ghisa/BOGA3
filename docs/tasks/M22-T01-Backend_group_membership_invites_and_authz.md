@@ -1,7 +1,7 @@
 ---
 task_id: M22-T01-Backend_group_membership_invites_and_authz
 milestone_id: "M22"
-status: in_progress
+status: completed
 ui_impact: "no"
 areas: "backend"
 runtimes: "supabase|sql"
@@ -15,7 +15,7 @@ docs_touched: "docs/specs/tech/groups-contract.md, docs/specs/05-data-model.md, 
 ## Task metadata
 
 - Task ID: `M22-T01-Backend_group_membership_invites_and_authz`
-- Status: `in_progress`
+- Status: `completed`
 - Depends on: none (design merged)
 - Parallel with: `M22-T03`
 

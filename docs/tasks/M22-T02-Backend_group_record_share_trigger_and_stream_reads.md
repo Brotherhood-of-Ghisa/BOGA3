@@ -1,7 +1,7 @@
 ---
 task_id: M22-T02-Backend_group_record_share_trigger_and_stream_reads
 milestone_id: "M22"
-status: in_progress
+status: completed
 ui_impact: "no"
 areas: "backend"
 runtimes: "supabase|sql|node"
@@ -15,7 +15,7 @@ docs_touched: "docs/specs/tech/groups-contract.md, docs/specs/tech/sync-v2-serve
 ## Task metadata
 
 - Task ID: `M22-T02-Backend_group_record_share_trigger_and_stream_reads`
-- Status: `in_progress`
+- Status: `completed`
 - Depends on: `M22-T01` (tables, helpers, and the `groups-contract` lane)
 - Parallel with: `M22-T04`, `M22-T05` (after `M22-T03`)
 

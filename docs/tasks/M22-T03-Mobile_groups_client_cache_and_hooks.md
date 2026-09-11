@@ -1,7 +1,7 @@
 ---
 task_id: M22-T03-Mobile_groups_client_cache_and_hooks
 milestone_id: "M22"
-status: in_progress
+status: completed
 ui_impact: "no"
 areas: "frontend"
 runtimes: "node|expo"
@@ -15,7 +15,7 @@ docs_touched: "docs/specs/tech/groups-contract.md, docs/specs/05-data-model.md, 
 ## Task metadata
 
 - Task ID: `M22-T03-Mobile_groups_client_cache_and_hooks`
-- Status: `in_progress`
+- Status: `completed`
 - Depends on: none. It codes against the contract types, and RPCs are mocked
   in jest.
 - Parallel with: `M22-T01`

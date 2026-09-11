@@ -27,7 +27,7 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
   - on a non-`AUTH_REQUIRED` cycle error it shows the error message and a single Retry that fires exactly one cycle; when the latest cycle outcome is `AUTH_REQUIRED` it redirects to `/sign-in` and renders no Retry;
   - it stands aside (renders through) when there is no session or auth is unconfigured, so an unconfigured/local build is never trapped behind a block nothing will lift; the `/sign-in` and `/maestro-harness` routes are exempt so redirects and harness setup cannot loop.
 - Tab roots live inside the `(tabs)` route group at `apps/mobile/app/(tabs)/` and share a tab layout at `apps/mobile/app/(tabs)/_layout.tsx`. The group name is parenthesised so it does not appear in URLs (e.g. `/session-recorder` resolves to `app/(tabs)/session-recorder.tsx`).
-- Tab roots have `headerShown: false`; detail screens (`exercise-history`, `profile`, `completed-session/[sessionId]`, `maestro-harness`, and the M22 group routes `group/mine`, `group/[groupId]`, `group-session/[memberId]/[sessionId]`) remain outside `(tabs)/` and keep their existing native header behavior.
+- Tab roots have `headerShown: false`; detail screens (`exercise-history`, `profile`, `completed-session/[sessionId]`, `maestro-harness`, and the M22 group routes `group/mine`, `group/new`, `group/join`, `group/[groupId]`, `group/[groupId]/edit`, `group/[groupId]/invite`, `group-session/[memberId]/[sessionId]`) remain outside `(tabs)/` and keep their existing native header behavior.
 - Navigation is currently string-path based (no centralized typed route helper layer)
 
 ## Route + param summary (current)
@@ -170,7 +170,26 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 - Behavior:
   - the `Stream` / `Members` segment is in-route state
 
-15. `/group-session/[memberId]/[sessionId]`
+15. `/group/new` (M22-T05)
+- File: `apps/mobile/app/group/new.tsx`
+- Params:
+  - none
+
+16. `/group/join` (M22-T05)
+- File: `apps/mobile/app/group/join.tsx`
+- Query params:
+  - `code` (optional): prefills the code field and runs the preview once the username gate is satisfied
+- Deep link:
+  - `boga3://group/join?code=XXXXXXXX` (the invite share link) opens this route; the static `group/join` segment wins over `group/[groupId]` (jest `groups-join-deep-link.test.tsx`)
+  - a new link while the screen is open remounts it with the new code
+  - known limitation: opening the link while signed out goes through `/sign-in` and lands on `/`, dropping the code (no return-to); reopening the link works
+
+17. `/group/[groupId]/edit` and `/group/[groupId]/invite` (M22-T05)
+- Files: `apps/mobile/app/group/[groupId]/edit.tsx`, `apps/mobile/app/group/[groupId]/invite.tsx`
+- Path params:
+  - `groupId` (required dynamic segment)
+
+18. `/group-session/[memberId]/[sessionId]`
 - File: `apps/mobile/app/group-session/[memberId]/[sessionId].tsx`
 - Path params:
   - `memberId`, `sessionId` (both required; a missing value renders "This session is no longer available")
@@ -233,6 +252,16 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
    - stream session-card tap (`router.push`)
 26. `/groups` (signed out, auth configured) -> `/sign-in`
    - `Sign in` action on the sign-in-required card
+27. `/groups` / `/group/mine` -> `/group/new`, `/group/join`
+   - `Create group` / `Join group` header actions on the tab; the empty-state `Create group` / `Join with a code` on both (`router.push`)
+28. `/group/new` -> `/group/<groupId>`; `/group/join` -> `/group/<groupId>`
+   - after create, join, or `Open group` when already a member (`router.replace`, so Back returns to where the flow started)
+29. `/group/<groupId>` -> `/group/<groupId>/invite`, `/group/<groupId>/edit`
+   - owner/admin `Invite` / `Edit` header actions; edit returns with `router.back()` after saving
+30. `/group/<groupId>` -> `/groups`
+   - after a successful leave (`router.dismissTo('/groups')`); the tab's focus refresh drops the group from the chips
+31. (external) `boga3://group/join?code=…` -> `/group/join?code=…`
+   - the invite link
 
 Note:
 
@@ -245,7 +274,7 @@ Note:
 - Detail screens registered in the root stack (`exercise-history`, `sessions`, `profile`, `connected-agents`, `maestro-harness`, `completed-session/[sessionId]`) keep their native stack header behavior; titles are declared in `apps/mobile/app/_layout.tsx`. `/sessions` specifically uses an arrow-only minimal back-button display mode with a generic `Back` accessibility title.
 - `completed-session/[sessionId]` sets its title inside the route file (current title: `View Session`)
 - `exercise-history` sets its title inside the route file to the resolved exercise name (falls back to `Exercise History` when the summary is not yet available)
-- M22 group routes declare `My groups`, `Group`, and `Session` in `apps/mobile/app/_layout.tsx` (back title `Back`); the group screen replaces `Group` with the group's name once loaded
+- M22 group routes declare `My groups`, `New group`, `Join group`, `Group`, `Edit group`, `Invite`, and `Session` in `apps/mobile/app/_layout.tsx` (back title `Back`); the group screen replaces `Group` with the group's name once loaded
 
 ## Documentation boundary
 

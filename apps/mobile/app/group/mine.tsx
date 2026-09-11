@@ -6,6 +6,7 @@ import {
   GroupMissingDataState,
   GroupOfflineBanner,
   GroupSummaryRow,
+  GroupsEmptyActions,
   GroupsEmptyState,
   GroupsSignInRequired,
   groupScreenStyles,
@@ -35,8 +36,9 @@ function MyGroupsContent({ userId }: { userId: string }) {
     <FlatList
       ListEmptyComponent={
         groups ? (
-          // M22-T05 fills this slot with the Create group / Join group buttons.
-          <GroupsEmptyState testID="group-mine-empty-state" />
+          <GroupsEmptyState testID="group-mine-empty-state">
+            <GroupsEmptyActions testIDPrefix="group-mine-empty" />
+          </GroupsEmptyState>
         ) : (
           <GroupMissingDataState error={inlineError} offline={mine.offline} onRetry={onRefresh} testIDPrefix="group-mine" />
         )

@@ -318,6 +318,9 @@ Guardrail command:
 4. Stream session cards are collapsed summaries with no expand; the whole card opens the friend's session view. Membership items are light rows that open their group, and are inert on that group's own screen. Group chips wrap onto more lines rather than scrolling sideways.
 5. The friend's session view is read-only (no edit, delete, or append; only the shared title-region collapse), and an active session reads `In progress`.
 6. Signed-out or auth-unconfigured builds show a sign-in-required card on every group route, and no group RPC runs.
+7. Group writes are online-only (M22-T05; contract §7, C3.10.3). Every write — create, edit, join, regenerate, promote / demote, transfer, remove, leave, and the gate's username save — goes through `useGroupAction`: when NetInfo reports offline it is refused before any request with `You're offline. Connect to the internet and try again.`; a transport failure reads `Couldn't reach the server. Nothing was changed — try again when you're online.` Nothing is queued or retried, and the screen's data is unchanged. The message shows inline beside the action (form: above the submit button; group screen / invite: a notice under the header).
+8. Role gating follows contract §4.3 exactly (`groupMemberActionsFor`): members see no Invite, Edit, or member actions; admins can remove members only; the owner can promote, demote, transfer, and remove anyone else, and sees "Transfer ownership before leaving" instead of Leave. Remove, Transfer, Leave, and Regenerate ask for confirmation (`Alert.alert`, destructive style); promote and demote do not. A server `FORBIDDEN` / `NOT_FOUND` on a member write shows inline and refreshes the group.
+9. Create and join run the inline username gate first when the username is blank; a server `USERNAME_REQUIRED` re-opens it with a notice and keeps the entered form values.
 
 ### 15. Documentation maintenance rule (UI semantics)
 

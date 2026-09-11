@@ -128,10 +128,15 @@ Brief entrypoint inventory of the current reusable UI component set.
   - `GroupFilterChips` — `All` + per-group `SegmentedChips`, wrapping rather than scrolling sideways
   - `GroupStreamList` — `FlatList` with `RefreshControl`, online older-page loading, and a Retry footer
   - `GroupOfflineBanner` — the `Offline · last updated HH:MM` marker
-  - `GroupMemberRow`, `GroupSummaryRow` — Members-segment and My groups rows
+  - `GroupMemberRow`, `GroupSummaryRow` — Members-segment and My groups rows; `GroupMemberRow` takes an optional `onPress` (set only when my role offers actions on that member) and then shows a chevron
+  - `GroupMemberActionSheet` (M22-T05) — in-route bottom `Modal` for one member offering exactly `groupMemberActionsFor(myRole, me, member)` (contract §4.3): `Make admin` / `Remove admin` (secondary), `Transfer ownership` / `Remove from group` (danger; the caller confirms with `Alert.alert`), `Cancel`. testIDs `group-member-actions-sheet`, `group-member-action-<action>`
+  - `UsernameGate` + `useUsernameGate(userId)` (M22-T05) — the inline username field shown before create / join when the profile username is blank (`loadUserProfile` / `saveUsername`); errors inline under the field; `require(notice)` re-opens it on a server `USERNAME_REQUIRED`; a profile that fails to load does not block the form
+  - `GroupDetailsForm` (M22-T05) — the shared create / edit form: name (1–50) and optional description (≤280, counter) with inline validation, the write's failure above the submit button
+  - `GroupWriteNotice` (M22-T05) — inline error / success outcome of a group write
+  - `GroupsEmptyActions` (M22-T05) — the empty state's `Create group` / `Join with a code` buttons
   - `FriendSessionContent` — the friend's session body composing `SessionContentLayout` read-only
-  - `GroupStateView`, `GroupsEmptyState` (children slot for M22-T05 actions), `GroupMissingDataState`, `GroupInlineError`, `GroupsSignInRequired` — feature-scoped state panels (not the pending generic `EmptyState`)
-  - `usePullToRefresh`, `groupScreenStyles` — pull spinner state and the shared page shell
+  - `GroupStateView`, `GroupsEmptyState` (children slot for `GroupsEmptyActions`), `GroupMissingDataState`, `GroupInlineError`, `GroupsSignInRequired` — feature-scoped state panels (not the pending generic `EmptyState`)
+  - `usePullToRefresh`, `groupScreenStyles`, `groupFormStyles` — pull spinner state, the shared page shell and action row, and the write-form field styles
 
 ### UI-supporting shared module (non-visual)
 
