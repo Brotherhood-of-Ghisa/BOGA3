@@ -1,7 +1,7 @@
 ---
 task_id: M22-T06-Two_user_groups_Maestro_lane
 milestone_id: "M22"
-status: planned
+status: in_progress
 ui_impact: "no"
 areas: "cross-stack"
 runtimes: "maestro|supabase|node"
@@ -15,7 +15,7 @@ docs_touched: "docs/specs/06-testing-strategy.md, docs/specs/02-quality-and-test
 ## Task metadata
 
 - Task ID: `M22-T06-Two_user_groups_Maestro_lane`
-- Status: `planned`
+- Status: `in_progress`
 - Depends on: `M22-T02`, `M22-T04`, `M22-T05`
 
 ## Parent references (required)
