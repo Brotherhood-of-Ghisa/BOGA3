@@ -1,26 +1,30 @@
 #!/usr/bin/env bash
 
-# groups-contract.sh — M22 group membership / invites / authorization contract.
+# groups-contract.sh — M22 group domain contract.
 #
-# Contract: docs/specs/tech/groups-contract.md §2.1–§2.3, §3, §4 (membership
-# half; the share ledger and stream reads are M22-T02). Proves, against the
+# Contract: docs/specs/tech/groups-contract.md §2–§5, §8. Proves, against the
 # real local Supabase stack through PostgREST:
 #
 #   - catalog ground rules: RLS on + no policies + no direct grants, no
 #     `owner_user_id` column, no FK into the Sync v2 tables, helpers not
 #     client-executable, every function SECURITY DEFINER with a pinned
-#     search_path;
+#     search_path, the share trigger's shape and posture;
 #   - every membership/invite RPC success path and every error token;
 #   - the role matrix (member / admin / owner), leave / rejoin periods,
 #     removal, ownership transfer;
 #   - invite normalization and regeneration;
 #   - non-member ≡ nonexistent (byte-identical NOT_FOUND bodies);
+#   - (M22-T02) the metric parity vectors against the SQL helpers; the share
+#     rule, flow-through, PR highlights, stream order/dedupe/pagination/scope,
+#     and friend-session detail — all driven by real `sync_push` calls; share
+#     trigger failure isolation and self-heal;
 #   - AUTH_REQUIRED (anon) and AGENT_FORBIDDEN (client_id token) on every RPC;
-#   - direct PostgREST select/insert/update/delete denial on all three tables.
+#   - direct PostgREST select/insert/update/delete denial on all four tables.
 #
-# Hermetic: every run provisions its own five users (owner, admin, member,
-# outsider, joiner) with a per-run tag, never reads fixture users, and deletes
-# its users and groups on exit. Repeated runs in one slot pass without a reset.
+# Hermetic: every run provisions its own seven users (owner, admin, member,
+# outsider, joiner, athlete, viewer) with a per-run tag, never reads fixture
+# users, and deletes its users, groups, and diagnostics rows on exit. Repeated
+# runs in one slot pass without a reset.
 
 set -euo pipefail
 
@@ -67,14 +71,20 @@ CODE_RE='^[0-9A-HJKMNP-TV-Z]{8}$'
 MISSING_GROUP="$(node -e 'process.stdout.write(require("node:crypto").randomUUID())')"
 
 RUN_USER_IDS=()
+FORCE_FAIL_CONSTRAINT="groups_contract_force_share_failure"
 
 cleanup() {
+  # Always remove the failure-isolation probe constraint, even if the run died
+  # between adding and dropping it.
+  run_psql "set client_min_messages = warning;
+            alter table app_public.group_session_shares drop constraint if exists ${FORCE_FAIL_CONSTRAINT};" >/dev/null
   [[ ${#RUN_USER_IDS[@]} -gt 0 ]] || return 0
   local ids
   ids="$(printf "'%s'::uuid," "${RUN_USER_IDS[@]}")"
   ids="${ids%,}"
   run_psql "
     begin;
+      delete from public.app_logs where event = 'group.share_failed' and user_id in (${ids});
       delete from app_public.groups
        where created_by in (${ids})
           or id in (select group_id from app_public.group_memberships where user_id in (${ids}));
@@ -222,19 +232,19 @@ mint_token() {
 echo "[groups-contract] run ${RUN_TAG}: catalog ground rules"
 # =============================================================================
 
-GROUP_TABLES="'groups','group_memberships','group_invites'"
+GROUP_TABLES="'groups','group_memberships','group_invites','group_session_shares'"
 SYNC_TABLES="'gyms','exercise_definitions','muscle_groups','exercise_tag_definitions','sessions','exercise_muscle_mappings','session_exercises','exercise_sets','session_exercise_tags'"
 
 [[ "$(run_psql "
   select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
    where n.nspname = 'app_public' and c.relname in (${GROUP_TABLES})
-     and c.relkind = 'r' and c.relrowsecurity;")" == "3" ]] ||
-  fail "RLS is not enabled on all three group tables"
+     and c.relkind = 'r' and c.relrowsecurity;")" == "4" ]] ||
+  fail "RLS is not enabled on all four group tables"
 [[ "$(run_psql "select count(*) from pg_policies where schemaname = 'app_public' and tablename in (${GROUP_TABLES});")" == "0" ]] ||
   fail "group tables must have no RLS policies"
 [[ "$(run_psql "
   select count(*) from unnest(array['anon','authenticated']) r(role)
-   cross join unnest(array['groups','group_memberships','group_invites']) t(name)
+   cross join unnest(array['groups','group_memberships','group_invites','group_session_shares']) t(name)
    where has_table_privilege(r.role, 'app_public.' || t.name, 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER');")" == "0" ]] ||
   fail "anon/authenticated hold a direct privilege on a group table"
 [[ "$(run_psql "select count(*) from information_schema.columns
@@ -250,10 +260,13 @@ SYNC_TABLES="'gyms','exercise_definitions','muscle_groups','exercise_tag_definit
   fail "a group table has an FK into a Sync v2 table (ground rule 2)"
 
 RPCS=(group_list_mine group_get group_invite_preview group_invite_get group_create group_update
-  group_invite_regenerate group_join group_leave group_remove_member group_set_role group_transfer_ownership)
+  group_invite_regenerate group_join group_leave group_remove_member group_set_role group_transfer_ownership
+  group_stream group_session_detail)
 HELPERS=(group_require_app_user group_active_role group_require_member group_require_username
   group_validate_name group_validate_description group_normalize_invite_code group_generate_invite_code
-  group_write_invite_code group_summary_json group_members_json group_detail_json group_require_target)
+  group_write_invite_code group_summary_json group_members_json group_detail_json group_require_target
+  group_share_session group_js_trim group_parse_reps group_parse_weight group_e1rm group_performed_sets
+  group_member_ref_json group_session_card_json)
 rpc_list="$(printf "'%s'," "${RPCS[@]}")"
 helper_list="$(printf "'%s'," "${HELPERS[@]}")"
 [[ "$(run_psql "
@@ -270,7 +283,19 @@ helper_list="$(printf "'%s'," "${HELPERS[@]}")"
      and not has_function_privilege('anon', p.oid, 'EXECUTE')
      and not has_function_privilege('authenticated', p.oid, 'EXECUTE');")" == "${#HELPERS[@]}" ]] ||
   fail "every internal group helper must be search_path-pinned and not client-executable"
-pass "RLS on, no policies, no grants, no owner_user_id, no Sync v2 FK, function posture"
+# The share trigger: AFTER INSERT OR UPDATE, FOR EACH ROW (tgtype ROW=1 |
+# INSERT=4 | UPDATE=16 = 21, no BEFORE bit), enabled, on app_public.sessions,
+# calling the SECURITY DEFINER group_share_session.
+[[ "$(run_psql "
+  select count(*) from pg_trigger t
+    join pg_proc p on p.oid = t.tgfoid
+   where t.tgrelid = 'app_public.sessions'::regclass
+     and t.tgname = 'sessions_group_share_session'
+     and not t.tgisinternal and t.tgenabled = 'O' and t.tgtype = 21
+     and p.proname = 'group_share_session' and p.prosecdef
+     and 'search_path=app_public, pg_temp' = any(p.proconfig);")" == "1" ]] ||
+  fail "sessions_group_share_session must be an enabled AFTER INSERT OR UPDATE row trigger calling SECURITY DEFINER group_share_session"
+pass "RLS on, no policies, no grants, no owner_user_id, no Sync v2 FK, function and trigger posture"
 
 [[ "$(run_psql "select app_public.group_normalize_invite_code(E' ab-cd\toil- ');")" == "ABCD011" ]] ||
   fail "invite normalizer must upper-case, strip whitespace/dashes, and map O→0, I/L→1"
@@ -299,12 +324,16 @@ provision ADMIN admin
 provision MEMBER member
 provision OUTSIDER outsider
 provision JOINER joiner
+provision ATHLETE athlete
+provision VIEWER viewer
 set_username "${OWNER_UID}" "owner-${RUN_TAG}"
 set_username "${ADMIN_UID}" "admin-${RUN_TAG}"
 set_username "${MEMBER_UID}" "Z-member-${RUN_TAG}"
 set_username "${JOINER_UID}" ""   # profile row with a null username
+set_username "${ATHLETE_UID}" "athlete-${RUN_TAG}"
+set_username "${VIEWER_UID}" "viewer-${RUN_TAG}"
 # OUTSIDER has no profile row at all.
-pass "five users provisioned (tag ${RUN_TAG})"
+pass "seven users provisioned (tag ${RUN_TAG})"
 
 # =============================================================================
 echo "[groups-contract] group_create"
@@ -693,6 +722,580 @@ check "soft-deleted group is not listed" '.groups == []'
 pass "soft-deleted groups are invisible"
 
 # =============================================================================
+# M22-T02: the group record (contract §2.4–§2.5, §4.2, §5)
+# =============================================================================
+
+# --- metric parity vectors (§5.3) ----------------------------------------------
+echo "[groups-contract] metric parity vectors vs SQL helpers"
+
+VECTORS_FILE="${SUPABASE_DIR}/tests/fixtures/group-set-metric-vectors.json"
+[[ -f "${VECTORS_FILE}" ]] || fail "missing ${VECTORS_FILE}"
+jq -e '(.vectors | length) >= 30 and any(.vectors[]; has("sql"))' "${VECTORS_FILE}" >/dev/null ||
+  fail "vectors file must hold >= 30 rows including a pinned SQL divergence"
+VECTORS_JSON="$(jq -c '.' "${VECTORS_FILE}")"
+[[ "${VECTORS_JSON}" != *'$vec$'* ]] || fail "vectors file must not contain the \$vec\$ quote tag"
+# A row's SQL expectation is the row merged with its `sql` override. e1rm
+# tolerance: 1e-9, relative above 1 (exp() may differ by an ulp between V8 and libm).
+vector_mismatches="$(run_psql "
+  with v as (
+    select r.ord, r.v || coalesce(r.v -> 'sql', '{}'::jsonb) as e
+      from jsonb_array_elements(\$vec\$${VECTORS_JSON}\$vec\$::jsonb -> 'vectors') with ordinality r(v, ord)
+  ),
+  p as (
+    select v.ord, v.e, pr.reps, pw.weight,
+           (v.e ->> 'performance_status' is null
+            or v.e ->> 'performance_status' not in ('planned', 'skipped', 'unperformed'))
+           and pr.reps is not null and pw.weight is not null as performed
+      from v
+      cross join lateral (select app_public.group_parse_reps(v.e ->> 'reps_value') as reps) pr
+      cross join lateral (select app_public.group_parse_weight(v.e ->> 'weight_value', pr.reps) as weight) pw
+  ),
+  c as (
+    select p.*,
+           case when p.performed then p.weight * p.reps end as volume,
+           case when p.performed then app_public.group_e1rm(p.weight, p.reps) end as e1rm
+      from p
+  )
+  select (c.e ->> 'name') || ': performed=' || c.performed || ' weight=' || coalesce(c.weight::text, 'null')
+         || ' reps=' || coalesce(c.reps::text, 'null') || ' volume=' || coalesce(c.volume::text, 'null')
+         || ' e1rm=' || coalesce(c.e1rm::text, 'null')
+    from c
+   where c.performed is distinct from (c.e ->> 'performed')::boolean
+      or c.reps is distinct from (c.e ->> 'reps')::integer
+      or c.weight is distinct from (c.e ->> 'weight')::double precision
+      or c.volume is distinct from (c.e ->> 'volume')::double precision
+      or (c.e1rm is null) <> (c.e -> 'e1rm' = 'null'::jsonb)
+      or abs(c.e1rm - (c.e ->> 'e1rm')::double precision)
+           > 1e-9 * greatest(1, abs((c.e ->> 'e1rm')::double precision));")"
+[[ -z "${vector_mismatches}" ]] || fail "SQL helpers disagree with the parity vectors:
+${vector_mismatches}"
+[[ "$(run_psql "select app_public.group_parse_weight(repeat('9', 100000), 5) is null
+                   and app_public.group_parse_weight('0.' || repeat('0', 100000) || '1', 5) = 0
+                   and app_public.group_parse_reps(repeat('9', 100000)) is null
+                   and app_public.group_e1rm(999999999999999, 2147483647) > 0;")" == "t" ]] ||
+  fail "SQL helpers must not raise on extreme inputs"
+pass "SQL helpers match all $(jq '.vectors | length' "${VECTORS_FILE}") vectors; extreme inputs never raise"
+
+# --- sync_push fixtures ----------------------------------------------------------
+
+CUAM="$(run_psql "select floor(extract(epoch from clock_timestamp()) * 1000)::bigint;")"
+next_cuam() { CUAM=$((CUAM + 1)); }
+
+# e_def <id> <name> <cuam>
+e_def() {
+  jq -nc --arg id "$1" --arg name "$2" --argjson c "$3" \
+    '{type: "exercise_definitions", id: $id, client_updated_at_ms: $c,
+      fields: {name: $name, created_at: $c, updated_at: $c, deleted_at: null}}'
+}
+# e_gym <id> <name> <cuam> — carries coordinates so the no-GPS assertions bite.
+e_gym() {
+  jq -nc --arg id "$1" --arg name "$2" --argjson c "$3" \
+    '{type: "gyms", id: $id, client_updated_at_ms: $c,
+      fields: {name: $name, latitude: 51.5007, longitude: -0.1246, coordinate_accuracy_m: 12.5,
+               coordinates_updated_at: $c, created_at: $c, updated_at: $c, deleted_at: null}}'
+}
+# e_session <id> <started_ms> <status> <completed_ms|null> <duration|null> <deleted_ms|null> <cuam> [gym]
+e_session() {
+  jq -nc --arg id "$1" --argjson s "$2" --arg st "$3" --argjson done "$4" --argjson dur "$5" \
+    --argjson del "$6" --argjson c "$7" --arg gym "${8:-}" \
+    '{type: "sessions", id: $id, client_updated_at_ms: $c,
+      fields: {gym_id: (if $gym == "" then null else $gym end), status: $st, started_at: $s,
+               completed_at: $done, duration_sec: $dur, created_at: $s, updated_at: $c, deleted_at: $del}}'
+}
+# e_se <id> <session> <definition|""> <order> <name> <cuam> [deleted_ms]
+e_se() {
+  jq -nc --arg id "$1" --arg sess "$2" --arg def "$3" --argjson o "$4" --arg name "$5" \
+    --argjson c "$6" --argjson del "${7:-null}" \
+    '{type: "session_exercises", id: $id, client_updated_at_ms: $c,
+      fields: {session_id: $sess, exercise_definition_id: (if $def == "" then null else $def end),
+               order_index: $o, name: $name, machine_name: ("Machine " + $name),
+               created_at: $c, updated_at: $c, deleted_at: $del}}'
+}
+# e_set <id> <session_exercise> <order> <weight> <reps> <status|""> <cuam> [deleted_ms] [set_type]
+e_set() {
+  jq -nc --arg id "$1" --arg se "$2" --argjson o "$3" --arg w "$4" --arg r "$5" --arg ps "$6" \
+    --argjson c "$7" --argjson del "${8:-null}" --arg t "${9:-working}" \
+    '{type: "exercise_sets", id: $id, client_updated_at_ms: $c,
+      fields: {session_exercise_id: $se, order_index: $o, weight_value: $w, reps_value: $r,
+               set_type: $t, planned_weight_value: null, planned_reps_value: null, planned_set_type: null,
+               performance_status: (if $ps == "" then null else $ps end),
+               created_at: $c, updated_at: $c, deleted_at: $del}}'
+}
+# push <token> <context> <entity-json>...
+push() {
+  local token="$1" context="$2"
+  shift 2
+  rpc "${token}" sync_push "$(printf '%s\n' "$@" | jq -sc '{entities: .}')"
+  expect_ok "sync_push: ${context}"
+  check "sync_push ack: ${context}" '.ok == true'
+}
+# stream <token> <group|""> [before-json] [limit]
+stream() {
+  rpc "$1" group_stream "$(jq -nc --arg g "$2" --argjson b "${3:-null}" --argjson l "${4:-null}" \
+    '{p_group_id: (if $g == "" then null else $g end), p_before: $b, p_limit: $l}')"
+}
+# detail <token> <member> <session>
+detail() {
+  rpc "$1" group_session_detail "$(jq -nc --arg m "$2" --arg s "$3" '{p_member_user_id: $m, p_session_id: $s}')"
+}
+# shares_of <session>: comma-joined group ids holding a share of the athlete's session, in G_A,G_B order.
+shares_of() {
+  run_psql "select coalesce(string_agg(t.tag, ',' order by t.tag), '')
+              from (select case group_id when '${GA}' then 'A' when '${GB}' then 'B' else group_id::text end as tag
+                      from app_public.group_session_shares
+                     where member_user_id = '${ATHLETE_UID}' and session_id = '$1') t;"
+}
+# period_ms <group> <user> <joined_at|ended_at> <floor|ceil>: latest period's boundary in epoch ms.
+period_ms() {
+  run_psql "select $4(extract(epoch from $3) * 1000)::bigint from app_public.group_memberships
+             where group_id = '$1' and user_id = '$2' order by joined_at desc limit 1;"
+}
+now_floor_ms() { run_psql "select floor(extract(epoch from clock_timestamp()) * 1000)::bigint;"; }
+
+T="t02-${RUN_TAG}"
+HOUR=3600000
+DAY=86400000
+DEF_A="${T}-def-bench"
+DEF_B="${T}-def-row"
+DEF_C="${T}-def-squat"
+GYM="${T}-gym"
+GYM_NAME="Athlete Gym ${RUN_TAG}"
+
+# --- groups and memberships --------------------------------------------------------
+echo "[groups-contract] share rule (real sync_push; §2.5)"
+
+rpc "${OWNER_TOKEN}" group_create "$(b_create "Record A ${RUN_TAG}" "")"
+expect_ok "owner creates record group A"
+GA="$(jq -r '.group_id' <<<"${BODY}")"
+rpc "${OWNER_TOKEN}" group_create "$(b_create "Record B ${RUN_TAG}" "")"
+expect_ok "owner creates record group B"
+GB="$(jq -r '.group_id' <<<"${BODY}")"
+rpc "${OWNER_TOKEN}" group_invite_get "$(b_group "${GA}")"
+expect_ok "invite A"
+CODE_A="$(jq -r '.code' <<<"${BODY}")"
+rpc "${OWNER_TOKEN}" group_invite_get "$(b_group "${GB}")"
+expect_ok "invite B"
+CODE_B="$(jq -r '.code' <<<"${BODY}")"
+rpc "${VIEWER_TOKEN}" group_join "$(b_code "${CODE_A}")"
+expect_ok "viewer joins A"
+rpc "${VIEWER_TOKEN}" group_join "$(b_code "${CODE_B}")"
+expect_ok "viewer joins B"
+
+# Personal history, all started long before any membership: never shared, but
+# it is the athlete's full PR history (§5.2).
+next_cuam
+push "${ATHLETE_TOKEN}" "catalog + history" \
+  "$(e_def "${DEF_A}" "Bench ${RUN_TAG}" "${CUAM}")" \
+  "$(e_def "${DEF_B}" "Row ${RUN_TAG}" "${CUAM}")" \
+  "$(e_def "${DEF_C}" "Squat ${RUN_TAG}" "${CUAM}")" \
+  "$(e_gym "${GYM}" "${GYM_NAME}" "${CUAM}")"
+HIST_BASE="$(( $(now_floor_ms) - 30 * DAY ))"
+next_cuam
+push "${ATHLETE_TOKEN}" "history sessions" \
+  "$(e_session "${T}-h1" "${HIST_BASE}" completed "$((HIST_BASE + HOUR))" 3600 null "${CUAM}")" \
+  "$(e_se "${T}-h1-a" "${T}-h1" "${DEF_A}" 0 "Bench" "${CUAM}")" \
+  "$(e_set "${T}-h1-a1" "${T}-h1-a" 0 100 5 "" "${CUAM}")" \
+  "$(e_session "${T}-hactive" "$((HIST_BASE + DAY))" active null null null "${CUAM}")" \
+  "$(e_se "${T}-hactive-a" "${T}-hactive" "${DEF_A}" 0 "Bench" "${CUAM}")" \
+  "$(e_set "${T}-hactive-a1" "${T}-hactive-a" 0 150 5 "" "${CUAM}")" \
+  "$(e_session "${T}-hdel" "$((HIST_BASE + 2 * DAY))" completed "$((HIST_BASE + 2 * DAY + HOUR))" 3600 "$((HIST_BASE + 3 * DAY))" "${CUAM}")" \
+  "$(e_se "${T}-hdel-a" "${T}-hdel" "${DEF_A}" 0 "Bench" "${CUAM}")" \
+  "$(e_set "${T}-hdel-a1" "${T}-hdel-a" 0 150 5 "" "${CUAM}")" \
+  "$(e_se "${T}-hdel-c" "${T}-hdel" "${DEF_C}" 1 "Squat" "${CUAM}")" \
+  "$(e_set "${T}-hdel-c1" "${T}-hdel-c" 0 50 5 "" "${CUAM}")" \
+  "$(e_session "${T}-hnodone" "$((HIST_BASE + 4 * DAY))" completed null null null "${CUAM}")" \
+  "$(e_se "${T}-hnodone-a" "${T}-hnodone" "${DEF_A}" 0 "Bench" "${CUAM}")" \
+  "$(e_set "${T}-hnodone-a1" "${T}-hnodone-a" 0 150 5 "" "${CUAM}")"
+
+rpc "${ATHLETE_TOKEN}" group_join "$(b_code "${CODE_B}")"
+expect_ok "athlete joins B"
+T_B_ONLY="$(period_ms "${GB}" "${ATHLETE_UID}" joined_at ceil)"
+rpc "${ATHLETE_TOKEN}" group_join "$(b_code "${CODE_A}")"
+expect_ok "athlete joins A"
+JOIN_A_MS="$(period_ms "${GA}" "${ATHLETE_UID}" joined_at ceil)"
+JOIN_B_MS="$(period_ms "${GB}" "${ATHLETE_UID}" joined_at floor)"
+[[ "${JOIN_A_MS}" -gt "$((T_B_ONLY + 1))" ]] ||
+  fail "join A (${JOIN_A_MS}) must be later than the B-only instant (${T_B_ONLY}); clock gap too small"
+
+# Offline-late: started before joining either group, first pushed after both joins.
+next_cuam
+push "${ATHLETE_TOKEN}" "pre-join session" \
+  "$(e_session "${T}-pre" "$((JOIN_B_MS - 60000))" completed "$((JOIN_B_MS - 1000))" 59 null "${CUAM}")"
+[[ "$(shares_of "${T}-pre")" == "" ]] || fail "a session started before joining must never be shared"
+# Started while a member of B only, pushed after joining A: shared into B only.
+push "${ATHLETE_TOKEN}" "B-only session" \
+  "$(e_session "${T}-bonly" "${T_B_ONLY}" completed "$((T_B_ONLY + 1))" 0 null "${CUAM}")"
+[[ "$(shares_of "${T}-bonly")" == "B" ]] ||
+  fail "a session started before joining A must not be shared into A, got '$(shares_of "${T}-bonly")'"
+pass "offline-late sessions are shared only into groups the athlete was in at started_at"
+
+# --- flow-through (#17, #18) --------------------------------------------------------
+echo "[groups-contract] flow-through: active → sets → completed → edit → tombstone → undelete"
+
+S1="${T}-s1"
+S1_START="$((JOIN_A_MS + 1))"
+next_cuam
+push "${ATHLETE_TOKEN}" "S1 active with one set" \
+  "$(e_session "${S1}" "${S1_START}" active null null null "${CUAM}" "${GYM}")" \
+  "$(e_se "${S1}-a" "${S1}" "${DEF_A}" 0 "Athlete Bench ${RUN_TAG}" "${CUAM}")" \
+  "$(e_set "${S1}-a1" "${S1}-a" 0 100 5 "" "${CUAM}")"
+[[ "$(shares_of "${S1}")" == "A,B" ]] || fail "S1 must be shared into both groups, got '$(shares_of "${S1}")'"
+S1_KEY="${ATHLETE_UID}:${S1}"
+
+# card <context> <jq-filter> [args]: asserts on VIEWER's All-stream card for S1.
+card() {
+  local context="$1" filter="$2"
+  shift 2
+  stream "${VIEWER_TOKEN}" "" null 50
+  expect_ok "viewer stream (${context})"
+  check "${context}" "[.items[] | select(.key == \$k)] | length == 1 and (.[0] | ${filter})" --arg k "${S1_KEY}" "$@"
+}
+
+card "active card: training now, one set, no PR on an equal lift" \
+  '.status == "active" and .completed_at_ms == null and .duration_sec == null
+   and .started_at_ms == $s and .sort_at_ms == $s and .session_id == $sid
+   and .member == {user_id: $u, username: $un} and .gym_name == $gym
+   and .metrics == {performed_sets: 1, total_volume_kg: 500, exercise_count: 1}
+   and .highlights.prs == []' \
+  --argjson s "${S1_START}" --arg sid "${S1}" --arg u "${ATHLETE_UID}" \
+  --arg un "athlete-${RUN_TAG}" --arg gym "${GYM_NAME}"
+
+next_cuam
+push "${ATHLETE_TOKEN}" "S1 more sets" \
+  "$(e_set "${S1}-a2" "${S1}-a" 1 110 5 planned "${CUAM}")" \
+  "$(e_set "${S1}-a3" "${S1}-a" 2 110 "" "" "${CUAM}")" \
+  "$(e_set "${S1}-a4" "${S1}-a" 3 200 5 "" "${CUAM}" "${CUAM}")" \
+  "$(e_se "${S1}-b" "${S1}" "${DEF_B}" 1 "Athlete Row" "${CUAM}")" \
+  "$(e_set "${S1}-b1" "${S1}-b" 0 80 5 "" "${CUAM}" null warm_up)" \
+  "$(e_se "${S1}-c" "${S1}" "${DEF_C}" 2 "Athlete Squat" "${CUAM}")" \
+  "$(e_set "${S1}-c1" "${S1}-c" 0 60 5 "" "${CUAM}")" \
+  "$(e_se "${S1}-n" "${S1}" "" 3 "Athlete Freeform" "${CUAM}")" \
+  "$(e_set "${S1}-n1" "${S1}-n" 0 40 10 "" "${CUAM}")" \
+  "$(e_se "${S1}-e" "${S1}" "${DEF_B}" 4 "Athlete Planned Only" "${CUAM}")" \
+  "$(e_set "${S1}-e1" "${S1}-e" 0 50 5 unperformed "${CUAM}")" \
+  "$(e_se "${S1}-t" "${S1}" "${DEF_B}" 5 "Athlete Removed" "${CUAM}" "${CUAM}")" \
+  "$(e_set "${S1}-t1" "${S1}-t" 0 300 5 "" "${CUAM}")"
+card "more sets: performed-only metrics (planned/blank/tombstoned excluded, warm-up included)" \
+  '.status == "active"
+   and .metrics == {performed_sets: 4, total_volume_kg: 1600, exercise_count: 4}
+   and .highlights.prs == []'
+
+next_cuam
+push "${ATHLETE_TOKEN}" "S1 completed" \
+  "$(e_session "${S1}" "${S1_START}" completed "$((S1_START + HOUR))" 3600 null "${CUAM}" "${GYM}")"
+card "completed card" \
+  '.status == "completed" and .completed_at_ms == $done and .duration_sec == 3600
+   and .metrics.performed_sets == 4' \
+  --argjson done "$((S1_START + HOUR))"
+
+next_cuam
+push "${ATHLETE_TOKEN}" "S1 edit bench 100 → 102.5" \
+  "$(e_set "${S1}-a1" "${S1}-a" 0 102.5 5 "" "${CUAM}")"
+card "edit flows through: volume and a strict PR over completed earlier history only" \
+  '.metrics == {performed_sets: 4, total_volume_kg: 1612.5, exercise_count: 4}
+   and (.highlights.prs | length) == 1
+   and (.highlights.prs[0] | .exercise_name == $name and .weight_kg == 102.5 and .reps == 5
+        and ((.e1rm_kg - 119.49706792346896) | fabs) < 1e-9)' \
+  --arg name "Athlete Bench ${RUN_TAG}"
+
+next_cuam
+push "${ATHLETE_TOKEN}" "S1 tombstone" \
+  "$(e_session "${S1}" "${S1_START}" completed "$((S1_START + HOUR))" 3600 "${CUAM}" "${CUAM}" "${GYM}")"
+stream "${VIEWER_TOKEN}" "" null 50
+expect_ok "viewer stream after tombstone"
+check "a tombstoned session's card is hidden" '[.items[] | select(.key == $k)] == []' --arg k "${S1_KEY}"
+detail "${VIEWER_TOKEN}" "${ATHLETE_UID}" "${S1}"
+expect_error NOT_FOUND "detail of a tombstoned session"
+TOMB_BODY="${BODY}"
+[[ "$(shares_of "${S1}")" == "A,B" ]] || fail "a tombstone must keep the share rows"
+
+next_cuam
+push "${ATHLETE_TOKEN}" "S1 undelete" \
+  "$(e_session "${S1}" "${S1_START}" completed "$((S1_START + HOUR))" 3600 null "${CUAM}" "${GYM}")"
+card "undelete restores the card" \
+  '.status == "completed" and .metrics.total_volume_kg == 1612.5 and (.highlights.prs | length) == 1'
+detail "${VIEWER_TOKEN}" "${ATHLETE_UID}" "${S1}"
+expect_ok "detail after undelete"
+pass "active/sets/completed/edit/tombstone/undelete all flow through"
+
+# --- PR rule (§5.2) -----------------------------------------------------------------
+echo "[groups-contract] PR highlight rule"
+
+# A completed session started AFTER S1 does not count as S1's history, but S1
+# (completed, earlier) counts as its history: 150 > max(100, 102.5) is a PR.
+LATER="${T}-later"
+next_cuam
+push "${ATHLETE_TOKEN}" "later-started completed session" \
+  "$(e_session "${LATER}" "$((S1_START + 2 * HOUR))" completed "$((S1_START + 3 * HOUR))" 3600 null "${CUAM}")" \
+  "$(e_se "${LATER}-a" "${LATER}" "${DEF_A}" 0 "Later Bench" "${CUAM}")" \
+  "$(e_set "${LATER}-a1" "${LATER}-a" 0 150 5 "" "${CUAM}")" \
+  "$(e_set "${LATER}-a2" "${LATER}-a" 1 150 5 "" "${CUAM}")" \
+  "$(e_se "${LATER}-c" "${LATER}" "${DEF_C}" 1 "Later Squat" "${CUAM}")" \
+  "$(e_set "${LATER}-c1" "${LATER}-c" 0 60 5 "" "${CUAM}")"
+card "S1's PR ignores later-started, active, deleted, and completed_at-less history" \
+  '(.highlights.prs | map(.exercise_name)) == [$name] and .highlights.prs[0].weight_kg == 102.5' \
+  --arg name "Athlete Bench ${RUN_TAG}"
+stream "${VIEWER_TOKEN}" "" null 50
+expect_ok "viewer stream with the later session"
+check "later session: PR over earlier completed history (ties → lowest order), equal squat is no PR" \
+  '[.items[] | select(.key == $k)] | length == 1
+   and (.[0].highlights.prs == [{exercise_name: "Later Bench", weight_kg: 150, reps: 5,
+                                 e1rm_kg: .[0].highlights.prs[0].e1rm_kg}])
+   and .[0].metrics == {performed_sets: 3, total_volume_kg: 1800, exercise_count: 2}' \
+  --arg k "${ATHLETE_UID}:${LATER}"
+pass "PR: strict >, equal is not a PR, no history → no PR, only earlier completed non-deleted sessions count"
+
+# --- detail (§4.2) -------------------------------------------------------------------
+echo "[groups-contract] group_session_detail"
+
+detail "${VIEWER_TOKEN}" "${ATHLETE_UID}" "${S1}"
+expect_ok "viewer detail of S1"
+check "detail: performed sets only, exercises without performed sets omitted, member's own names" \
+  '.session | .session_id == $sid and .member == {user_id: $u, username: $un}
+   and .gym_name == $gym and .status == "completed" and .duration_sec == 3600
+   and .started_at_ms == $s and .completed_at_ms == ($s + 3600000)
+   and (.exercises | map(.name)) == [$bench, "Athlete Row", "Athlete Squat", "Athlete Freeform"]
+   and (.exercises | map(.order_index)) == [0, 1, 2, 3]
+   and .exercises[0] == {session_exercise_id: ($sid + "-a"), name: $bench, machine_name: ("Machine " + $bench),
+                         order_index: 0,
+                         sets: [{set_id: ($sid + "-a1"), order_index: 0, weight_kg: 102.5, reps: 5, set_type: "working"}]}
+   and .exercises[1].sets == [{set_id: ($sid + "-b1"), order_index: 0, weight_kg: 80, reps: 5, set_type: "warm_up"}]
+   and (.exercises | map(.sets | length)) == [1, 1, 1, 1]' \
+  --arg sid "${S1}" --arg u "${ATHLETE_UID}" --arg un "athlete-${RUN_TAG}" --arg gym "${GYM_NAME}" \
+  --argjson s "${S1_START}" --arg bench "Athlete Bench ${RUN_TAG}"
+check "detail carries no GPS field at any depth" \
+  '[.. | objects | keys[]] | map(select(test("lat|lon|coordinate|accuracy"))) == []'
+check "detail keys are exactly the contract shape" \
+  '(.session | keys) == ["completed_at_ms","duration_sec","exercises","gym_name","member","session_id","started_at_ms","status"]
+   and (.session.exercises[0] | keys) == ["machine_name","name","order_index","session_exercise_id","sets"]
+   and (.session.exercises[0].sets[0] | keys) == ["order_index","reps","set_id","set_type","weight_kg"]'
+stream "${VIEWER_TOKEN}" "" null 50
+expect_ok "viewer stream for the GPS check"
+check "stream carries no GPS field at any depth" \
+  '[.. | objects | keys[]] | map(select(test("lat|lon|coordinate|accuracy"))) == []'
+
+detail "${ATHLETE_TOKEN}" "${ATHLETE_UID}" "${S1}"
+expect_ok "the athlete may open their own shared session"
+detail "${OUTSIDER_TOKEN}" "${ATHLETE_UID}" "${S1}"
+expect_error NOT_FOUND "non-member detail"
+NM_BODY="${BODY}"
+NM_STATUS="${STATUS}"
+detail "${VIEWER_TOKEN}" "${ATHLETE_UID}" "${T}-does-not-exist"
+expect_error NOT_FOUND "detail of a nonexistent session"
+[[ "${STATUS}" == "${NM_STATUS}" && "${BODY}" == "${NM_BODY}" && "${TOMB_BODY}" == "${NM_BODY}" ]] ||
+  fail "detail: non-member, nonexistent, and tombstoned responses differ"
+detail "${VIEWER_TOKEN}" "${ATHLETE_UID}" "${T}-pre"
+expect_error NOT_FOUND "detail of an existing but unshared session"
+[[ "${BODY}" == "${NM_BODY}" ]] || fail "detail: an unshared session must look nonexistent"
+detail "${VIEWER_TOKEN}" "${MISSING_GROUP}" "${S1}"
+expect_error NOT_FOUND "detail with a nonexistent member"
+pass "detail: shape, performed-only, no GPS, non-member ≡ nonexistent ≡ tombstoned ≡ unshared"
+
+# --- leave / push-after-leave / post-leave / rejoin (§2.5) ----------------------------
+echo "[groups-contract] share rule across leave and rejoin"
+
+LATE="${T}-late"
+LATE_START="$(now_floor_ms)"
+[[ "${LATE_START}" -gt "${JOIN_A_MS}" ]] || fail "late session start must fall inside the membership"
+rpc "${ATHLETE_TOKEN}" group_leave "$(b_group "${GB}")"
+expect_ok "athlete leaves B"
+LEAVE_B_CEIL="$(period_ms "${GB}" "${ATHLETE_UID}" ended_at ceil)"
+[[ "$(period_ms "${GB}" "${ATHLETE_UID}" ended_at floor)" -gt "${LATE_START}" ]] ||
+  fail "leave (${LEAVE_B_CEIL}) must be later than the late session start (${LATE_START})"
+next_cuam
+push "${ATHLETE_TOKEN}" "session started as a member, pushed after leaving B" \
+  "$(e_session "${LATE}" "${LATE_START}" active null null null "${CUAM}")"
+[[ "$(shares_of "${LATE}")" == "A,B" ]] ||
+  fail "a session started while a member but pushed after leaving is shared, got '$(shares_of "${LATE}")'"
+AFTER="${T}-after"
+AFTER_START="$((LEAVE_B_CEIL + 1))"
+push "${ATHLETE_TOKEN}" "session started after leaving B" \
+  "$(e_session "${AFTER}" "${AFTER_START}" active null null null "${CUAM}")"
+[[ "$(shares_of "${AFTER}")" == "A" ]] ||
+  fail "a session started after leaving B must not be shared into B, got '$(shares_of "${AFTER}")'"
+stream "${VIEWER_TOKEN}" "${GB}" null 50
+expect_ok "viewer B stream after the athlete left"
+check "shares made before leaving stay visible; post-leave sessions are absent" \
+  '(.items | map(select(.kind == "session") | .session_id)) as $ids
+   | ($ids | index($s1)) != null and ($ids | index($late)) != null
+     and ($ids | index($after)) == null and ($ids | index($bonly)) != null' \
+  --arg s1 "${S1}" --arg late "${LATE}" --arg after "${AFTER}" --arg bonly "${T}-bonly"
+
+rpc "${ATHLETE_TOKEN}" group_join "$(b_code "${CODE_B}")"
+expect_ok "athlete rejoins B"
+REJOIN_B_MS="$(period_ms "${GB}" "${ATHLETE_UID}" joined_at ceil)"
+[[ "$(period_ms "${GB}" "${ATHLETE_UID}" joined_at floor)" -gt "${AFTER_START}" ]] ||
+  fail "rejoin must be later than the gap session start (${AFTER_START}); clock gap too small"
+REJOIN="${T}-rejoin"
+next_cuam
+push "${ATHLETE_TOKEN}" "session after rejoining, plus a re-push of the gap session" \
+  "$(e_session "${REJOIN}" "$((REJOIN_B_MS + 1))" active null null null "${CUAM}")" \
+  "$(e_session "${AFTER}" "${AFTER_START}" completed "$((AFTER_START + 1000))" 1 null "${CUAM}")"
+[[ "$(shares_of "${REJOIN}")" == "A,B" ]] || fail "rejoining shares new sessions again"
+[[ "$(shares_of "${AFTER}")" == "A" ]] || fail "a session started between periods stays unshared on its next write"
+pass "push-after-leave shared, post-leave not shared, earlier shares kept, rejoin shares again"
+
+# --- failure isolation + self-heal (§2.5) -----------------------------------------------
+echo "[groups-contract] share trigger failure isolation"
+
+FAILS="${T}-fail"
+run_psql "alter table app_public.group_session_shares add constraint ${FORCE_FAIL_CONSTRAINT} check (false) not valid;" >/dev/null
+next_cuam
+push "${ATHLETE_TOKEN}" "push while the share insert is forced to fail" \
+  "$(e_session "${FAILS}" "$(now_floor_ms)" active null null null "${CUAM}")" \
+  "$(e_se "${FAILS}-a" "${FAILS}" "${DEF_A}" 0 "Bench" "${CUAM}")" \
+  "$(e_set "${FAILS}-a1" "${FAILS}-a" 0 60 5 "" "${CUAM}")"
+FAIL_CUAM="${CUAM}"
+rest GET "${ATHLETE_TOKEN}" sessions "select=id,status,client_updated_at_ms&id=eq.${FAILS}"
+expect_ok "owner reads the session written during the failure"
+check "sync_push committed the session despite the trigger failure" \
+  '. == [{id: $id, status: "active", client_updated_at_ms: $c}]' --arg id "${FAILS}" --argjson c "${FAIL_CUAM}"
+[[ "$(shares_of "${FAILS}")" == "" ]] || fail "the forced failure must have prevented the share"
+[[ "$(run_psql "select count(*) from public.app_logs
+                 where event = 'group.share_failed' and user_id = '${ATHLETE_UID}'
+                   and level = 'error' and source = 'database'
+                   and context = jsonb_build_object('session_id', '${FAILS}', 'sqlstate', '23514')
+                   and message = 'group share trigger failed; the session write committed';")" == "1" ]] ||
+  fail "expected exactly one sanitized group.share_failed row (session_id + sqlstate only)"
+run_psql "alter table app_public.group_session_shares drop constraint ${FORCE_FAIL_CONSTRAINT};" >/dev/null
+next_cuam
+push "${ATHLETE_TOKEN}" "next autosave after the fault is removed" \
+  "$(e_session "${FAILS}" "$(run_psql "select started_at from app_public.sessions where owner_user_id = '${ATHLETE_UID}' and id = '${FAILS}';")" active null null null "${CUAM}")"
+[[ "$(shares_of "${FAILS}")" == "A,B" ]] || fail "the next write must self-heal the missed share, got '$(shares_of "${FAILS}")'"
+pass "forced trigger failure: sync_push commits, owner reads the row, share_failed logged, next push self-heals"
+
+# --- stream: order, dedupe, pagination, scope, membership items, removal ----------------
+echo "[groups-contract] group_stream"
+
+# The viewer logs a session with the same started_at as S1: a sort_at_ms tie
+# the keyset must break by kind then key.
+next_cuam
+push "${VIEWER_TOKEN}" "viewer session tied with S1" \
+  "$(e_session "${T}-v1" "${S1_START}" active null null null "${CUAM}")"
+
+stream "${VIEWER_TOKEN}" "" null 50
+expect_ok "viewer All stream (one page)"
+FULL="${BODY}"
+check "All: has_more false, next_cursor null on the last page" '.has_more == false and .next_cursor == null'
+check "All: ordered by sort_at_ms desc, kind asc, key desc" '
+  def before($a; $b): ($a.sort_at_ms > $b.sort_at_ms)
+    or ($a.sort_at_ms == $b.sort_at_ms and (($a.kind < $b.kind) or ($a.kind == $b.kind and $a.key > $b.key)));
+  .items as $xs | ($xs | length) > 10 and all(range(0; ($xs | length) - 1); before($xs[.]; $xs[. + 1]))'
+check "All: S1 appears once, listing both groups (dedupe, AC14)" \
+  '[.items[] | select(.key == $k)] | length == 1
+   and (.[0].groups == [{group_id: $a, name: $an}, {group_id: $b, name: $bn}])' \
+  --arg k "${S1_KEY}" --arg a "${GA}" --arg an "Record A ${RUN_TAG}" --arg b "${GB}" --arg bn "Record B ${RUN_TAG}"
+check "All: the S1 / viewer-session tie is present and adjacent" \
+  '[.items[] | select(.sort_at_ms == $s) | .key] | length == 2' --argjson s "${S1_START}"
+check "All: unshared sessions never appear" \
+  '[.items[] | select(.kind == "session") | .session_id] as $ids
+   | all([$pre, $h1]; . as $x | ($ids | index($x)) == null)' \
+  --arg pre "${T}-pre" --arg h1 "${T}-h1"
+check "All: membership items for joined and left, keyed <membership_id>:joined|ended" '
+  [.items[] | select(.kind == "membership")] as $ms
+  | ($ms | all(.key | test("^[0-9a-f-]{36}:(joined|ended)$")))
+    and ($ms | all((.event == "joined") == (.key | endswith(":joined"))))
+    and ([$ms[] | select(.member.user_id == $ath and .group.group_id == $b) | .event] | sort) == ["joined","joined","left"]
+    and ([$ms[] | select(.member.user_id == $ath and .group.group_id == $a) | .event]) == ["joined"]
+    and ($ms[0] | keys) == ["event","group","key","kind","member","sort_at_ms"]' \
+  --arg ath "${ATHLETE_UID}" --arg a "${GA}" --arg b "${GB}"
+check "session card keys are exactly the contract shape" '
+  [.items[] | select(.kind == "session")][0] | keys == ["completed_at_ms","duration_sec","groups","gym_name",
+    "highlights","key","kind","member","metrics","session_id","sort_at_ms","started_at_ms","status"]'
+
+rpc "${VIEWER_TOKEN}" group_stream '{}'
+expect_ok "viewer stream with every argument defaulted"
+check "defaults: All scope and p_limit 20" \
+  '(.items | map(.key)) == ($full.items[:20] | map(.key)) and .has_more == (($full.items | length) > 20)' \
+  --argjson full "${FULL}"
+
+# paginate <limit>: walks every page with next_cursor; prints the concatenated keys.
+paginate() {
+  local limit="$1" cursor="null" pages=0 keys="[]"
+  while :; do
+    stream "${VIEWER_TOKEN}" "" "${cursor}" "${limit}"
+    expect_ok "viewer All page (limit ${limit}, page ${pages})"
+    check "page size <= limit" '(.items | length) <= $l' --argjson l "${limit}"
+    keys="$(jq -c --argjson acc "${keys}" '$acc + (.items | map(.key))' <<<"${BODY}")"
+    pages=$((pages + 1))
+    [[ "${pages}" -le 200 ]] || fail "pagination did not terminate"
+    if [[ "$(jq -r '.has_more' <<<"${BODY}")" == "true" ]]; then
+      check "has_more implies a full page and a cursor" \
+        '(.items | length) == $l and .next_cursor == (.items[-1] | {sort_at_ms, kind, key})' --argjson l "${limit}"
+      cursor="$(jq -c '.next_cursor' <<<"${BODY}")"
+    else
+      check "the last page has no cursor" '.next_cursor == null'
+      break
+    fi
+  done
+  [[ "${pages}" -gt 1 ]] || fail "limit ${limit} must need more than one page"
+  printf '%s' "${keys}"
+}
+FULL_KEYS="$(jq -c '.items | map(.key)' <<<"${FULL}")"
+for limit in 1 3; do
+  PAGED_KEYS="$(paginate "${limit}")"
+  [[ "${PAGED_KEYS}" == "${FULL_KEYS}" ]] ||
+    fail "keyset pagination (limit ${limit}) repeated or skipped items: ${PAGED_KEYS} vs ${FULL_KEYS}"
+done
+pass "stream order, dedupe, and keyset pagination (limits 1 and 3) with no repeats or gaps"
+
+stream "${VIEWER_TOKEN}" "${GA}" null 50
+expect_ok "viewer A-scope stream"
+check "per-group scope: only group A's cards and membership items" '
+  all(.items[]; if .kind == "session" then .groups == [{group_id: $a, name: $an}] else .group.group_id == $a end)
+  and ([.items[] | select(.kind == "session") | .session_id] | index($bonly)) == null
+  and ([.items[] | select(.kind == "session") | .session_id] | index($after)) != null' \
+  --arg a "${GA}" --arg an "Record A ${RUN_TAG}" --arg bonly "${T}-bonly" --arg after "${AFTER}"
+
+# Cursor and limit validation (VALIDATION after the membership check).
+for bad in '"x"' '[]' '{}' '{"sort_at_ms":"1","kind":"session","key":"k"}' '{"sort_at_ms":1.5,"kind":"session","key":"k"}' \
+  '{"sort_at_ms":1,"kind":"other","key":"k"}' '{"sort_at_ms":1,"kind":"session","key":""}' \
+  '{"sort_at_ms":1,"kind":"session","key":7}' '{"sort_at_ms":1,"kind":"session","key":"k","extra":1}'; do
+  stream "${VIEWER_TOKEN}" "" "${bad}" 5
+  expect_error VALIDATION "cursor ${bad}"
+done
+for bad in 0 51 -1; do
+  stream "${VIEWER_TOKEN}" "" null "${bad}"
+  expect_error VALIDATION "p_limit ${bad}"
+done
+stream "${OUTSIDER_TOKEN}" "${GA}" null 0
+expect_error NOT_FOUND "a non-member's bad p_limit reports NOT_FOUND first"
+stream "${OUTSIDER_TOKEN}" "${GA}" null 5
+expect_error NOT_FOUND "non-member A-scope stream"
+NM_BODY="${BODY}"
+stream "${OUTSIDER_TOKEN}" "${MISSING_GROUP}" null 5
+expect_error NOT_FOUND "nonexistent group stream"
+[[ "${BODY}" == "${NM_BODY}" ]] || fail "stream: non-member and nonexistent group responses differ"
+stream "${OUTSIDER_TOKEN}" "" null 5
+expect_ok "a user with no groups streams All"
+check "no groups → empty stream" '. == {items: [], next_cursor: null, has_more: false}'
+pass "scope, VALIDATION for bad cursors/limits, NOT_FOUND for non-members"
+
+# Removal (AC11): the viewer loses B.
+rpc "${OWNER_TOKEN}" group_remove_member "$(b_target "${GB}" "${VIEWER_UID}")"
+expect_ok "owner removes the viewer from B"
+stream "${VIEWER_TOKEN}" "${GB}" null 5
+expect_error NOT_FOUND "removed member's B-scope stream"
+[[ "${BODY}" == "${NM_BODY}" ]] || fail "removed member's NOT_FOUND must match a nonexistent group"
+stream "${VIEWER_TOKEN}" "" null 50
+expect_ok "removed member's All stream"
+check "All excludes the group the caller was removed from" '
+  all(.items[]; if .kind == "session" then (.groups | map(.group_id) | index($b)) == null else .group.group_id != $b end)
+  and ([.items[] | select(.key == $k)][0].groups | map(.group_id)) == [$a]
+  and ([.items[] | select(.kind == "session") | .session_id] | index($bonly)) == null' \
+  --arg a "${GA}" --arg b "${GB}" --arg k "${S1_KEY}" --arg bonly "${T}-bonly"
+detail "${VIEWER_TOKEN}" "${ATHLETE_UID}" "${T}-bonly"
+expect_error NOT_FOUND "removed member's detail of a B-only session"
+detail "${VIEWER_TOKEN}" "${ATHLETE_UID}" "${S1}"
+expect_ok "removed member still sees S1 through group A"
+stream "${OWNER_TOKEN}" "${GB}" null 50
+expect_ok "owner B-scope stream"
+check "the owner sees the removal as a membership item" \
+  '[.items[] | select(.kind == "membership" and .member.user_id == $v) | .event] | sort == ["joined","removed"]' \
+  --arg v "${VIEWER_UID}"
+pass "removed caller: NOT_FOUND for the group, All excludes it (AC11); removal item recorded"
+
+# =============================================================================
 echo "[groups-contract] AUTH_REQUIRED and AGENT_FORBIDDEN on every RPC"
 # =============================================================================
 
@@ -714,6 +1317,8 @@ RPC_BODIES=(
   "group_remove_member|$(b_target "${G}" "${OWNER_UID}")"
   "group_set_role|$(b_role "${G}" "${OWNER_UID}" admin)"
   "group_transfer_ownership|$(b_target "${G}" "${OWNER_UID}")"
+  "group_stream|$(jq -nc '{p_group_id: null, p_before: null, p_limit: null}')"
+  "group_session_detail|$(jq -nc --arg m "${ATHLETE_UID}" --arg s "${S1}" '{p_member_user_id: $m, p_session_id: $s}')"
 )
 [[ ${#RPC_BODIES[@]} -eq ${#RPCS[@]} ]] || fail "RPC_BODIES must cover every RPC"
 for entry in "${RPC_BODIES[@]}"; do
@@ -733,6 +1338,9 @@ pass "every RPC: AGENT_FORBIDDEN for client_id tokens, AUTH_REQUIRED for anon"
 rpc "${ADMIN_TOKEN}" group_active_role "$(jq -nc --arg g "${G}" --arg u "${ADMIN_UID}" '{p_group_id: $g, p_user_id: $u}')"
 [[ ! "${STATUS}" =~ ^2 ]] || fail "internal helper group_active_role must not be callable by clients"
 check "internal helper call must be a permission denial (42501)" '.code == "42501"'
+rpc "${VIEWER_TOKEN}" group_session_card_json "$(jq -nc --arg m "${ATHLETE_UID}" --arg s "${S1}" '{p_member: $m, p_session_id: $s, p_groups: []}')"
+[[ ! "${STATUS}" =~ ^2 ]] || fail "internal helper group_session_card_json must not be callable by clients"
+check "card helper call must be a permission denial (42501)" '.code == "42501"'
 pass "internal helpers are not reachable through PostgREST"
 
 # =============================================================================
@@ -751,9 +1359,10 @@ expect_denied_or_empty() {
 }
 
 MEMBERSHIP_ROWS_BEFORE="$(run_psql "select count(*) from app_public.group_memberships where group_id = '${G}';")"
+SHARE_ROWS_BEFORE="$(run_psql "select count(*) || ':' || sum(session_started_at) from app_public.group_session_shares where group_id = '${GA}';")"
 for bearer_label in authenticated anon; do
-  if [[ "${bearer_label}" == "authenticated" ]]; then bearer="${ADMIN_TOKEN}"; else bearer="${ANON_KEY}"; fi
-  for table in groups group_memberships group_invites; do
+  if [[ "${bearer_label}" == "authenticated" ]]; then bearer="${ATHLETE_TOKEN}"; else bearer="${ANON_KEY}"; fi
+  for table in groups group_memberships group_invites group_session_shares; do
     rest GET "${bearer}" "${table}" "select=*"
     expect_denied_or_empty "${bearer_label} select ${table}"
     # Every insert/update payload names real columns, so only a privilege
@@ -771,6 +1380,11 @@ for bearer_label in authenticated anon; do
         row="$(jq -nc --arg g "${SOLO}" '{group_id: $g, code: "ZZZZZZZZ"}')"
         patch='{"code":"ZZZZZZZZ"}'
         filter="group_id=eq.${G}" ;;
+      group_session_shares)
+        row="$(jq -nc --arg g "${GA}" --arg u "${ATHLETE_UID}" --arg s "${T}-pre" \
+          '{group_id: $g, member_user_id: $u, session_id: $s, session_started_at: 0}')"
+        patch='{"session_started_at":0}'
+        filter="group_id=eq.${GA}" ;;
     esac
     rest POST "${bearer}" "${table}" "" "${row}"
     [[ ! "${STATUS}" =~ ^2 ]] || fail "${bearer_label} insert into ${table} must be denied"
@@ -795,6 +1409,8 @@ BODY=""
   fail "direct PostgREST update/delete changed or removed the invite"
 [[ "$(run_psql "select count(*) from app_public.group_invites where code = 'ZZZZZZZZ';")" == "0" ]] ||
   fail "direct PostgREST insert/update wrote an invite code"
-pass "select/insert/update/delete denied (42501) for authenticated and anon on all three tables"
+[[ "$(run_psql "select count(*) || ':' || sum(session_started_at) from app_public.group_session_shares where group_id = '${GA}';")" == "${SHARE_ROWS_BEFORE}" ]] ||
+  fail "direct PostgREST insert/update/delete changed the share ledger"
+pass "select/insert/update/delete denied (42501) for authenticated and anon on all four tables"
 
 echo "[groups-contract] PASS (run ${RUN_TAG})"

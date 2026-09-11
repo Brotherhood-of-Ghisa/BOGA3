@@ -1,7 +1,7 @@
 ---
 task_id: M22-T02-Backend_group_record_share_trigger_and_stream_reads
 milestone_id: "M22"
-status: planned
+status: in_progress
 ui_impact: "no"
 areas: "backend"
 runtimes: "supabase|sql|node"
@@ -15,7 +15,7 @@ docs_touched: "docs/specs/tech/groups-contract.md, docs/specs/tech/sync-v2-serve
 ## Task metadata
 
 - Task ID: `M22-T02-Backend_group_record_share_trigger_and_stream_reads`
-- Status: `planned`
+- Status: `in_progress`
 - Depends on: `M22-T01` (tables, helpers, and the `groups-contract` lane)
 - Parallel with: `M22-T04`, `M22-T05` (after `M22-T03`)
 
@@ -139,8 +139,53 @@ Mobile client and UI (`M22-T03`–`T05`). Realtime. Any change to `sync_push`,
 
 ## Evidence
 
+All runs are on branch `m22-t02-backend-group-record`, rebased onto
+`782c663` (M22-T03), at tip `7095fd1`.
+
+- **`./boga test groups-contract`** passed twice in a row on the rebased tip:
+  standalone in 16.6 s, then again inside `backend`. Every new T02 section ran
+  and asserted: vectors, share rule, flow-through, PR rule, detail,
+  leave/rejoin, failure isolation, stream, and removal.
+- **Non-vacuity.** Mutating the PR rule `>` to `>=` in
+  `group_session_card_json` makes the lane fail at "no PR on an equal lift".
+  The function was then restored, and its md5 was verified.
+- **Parity vectors.** The SQL helpers match all 40 rows, with 0 mismatches;
+  the jest `group-set-metric-vectors.test.ts` passes 42 tests.
+- **`./boga test backend`** passed in 4:09. All 11 lanes passed:
+  - `auth-authz`, `groups-contract`, `agent-api`, `sync-v2-schema`;
+  - `sync-push-contract`, `sync-pull-contract`, `dev-wipe-my-data`;
+  - `sync-drift --strict` (errors=0 warnings=0);
+  - `sync-v2-e2e`, `sync-infra` (6 suites / 13 tests), `mcp-smoke`.
+
+  The drift log's `✗ exercise_sets … "notes"` line is
+  `sync-v2-drift-synthetic`'s intended negative case.
+- **`./boga test fast`** passed in 1:14. All 8 lanes passed: `lint`,
+  `typecheck`, `jest-full` (115 suites / 1128 tests), `backend-fast`,
+  `docs-check`, `meta-tests`, `agent-auth-web`, `mcp-unit`.
+- **`./boga test frontend`**: exit 0 for all 4 lanes at `7095fd1`: `ios-smoke` 1.0m (`/20260911-124837-42393`), `ios-data-smoke` 1.1m (`/20260911-124939-44819`), `ios-auth-profile` 1.2m (`/20260911-125051-47286`), `ios-sync-e2e` 1.8m (`/20260911-125203-49417`).
+- **Timings** (`./boga timings`): all 23 lanes green at `7095fd1`. `groups-contract` 16s median over 5 runs; backend: `sync-v2-e2e` 2.2m, `sync-drift` 40s, `sync-infra` 11s, `mcp-smoke` 11s, `backend-fast` 45s; fast: `jest-full` 12s.
+
 ## Completion note
 
-- What changed:
-- What tests ran:
-- What remains:
+- **What changed:**
+  - `supabase/migrations/20260911120000_m22_group_record.sql` adds:
+    - the `group_session_shares` ledger;
+    - the failure-isolated `sessions_group_share_session` trigger;
+    - the metric helpers `group_js_trim`, `group_parse_reps`,
+      `group_parse_weight`, `group_e1rm`, and `group_performed_sets`;
+    - the `group_stream` and `group_session_detail` RPCs.
+  - Parity vectors are in `supabase/tests/fixtures/group-set-metric-vectors.json`,
+    with the jest parity test beside them.
+  - `supabase/tests/groups-contract.sh` is extended.
+  - As-built notes are in `groups-contract.md` §2.4–§2.5, §4.2, and §5, in
+    sync contract §B.11, and in the spec 05 inventory.
+- **What tests ran:** the evidence above.
+- **Deviations** (recorded in the contract §5 as-built):
+  - An unknown `performance_status` counts as performed, mirroring
+    `normalizeSessionSetPerformanceStatus`.
+  - Two SQL-side bounds keep the helpers from ever raising, each pinned as a
+    `sql` override: reps above int4, and weights `>= 1e15`.
+  - The e1RM tolerance is relative above 1.
+- **What remains:** the mobile UI and the `ios-groups-e2e` Maestro lane
+  (M22-T04/T05). No new index was added; recording a query-plan-driven index is
+  deferred until a plan shows the need.

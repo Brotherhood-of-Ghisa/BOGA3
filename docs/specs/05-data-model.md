@@ -175,9 +175,25 @@ to deduplicate per device, so idempotency falls out of per-row LWW.
     entities (contract §1.1). The nine Sync v2 tables and their owner-only RLS
     are unchanged, and `sync-drift --strict` stays green because no group
     table carries `owner_user_id`.
-- **Planned (M22-T02):** `group_session_shares` (the group record — a
-  server-written share ledger read through from members' own Sync v2 rows),
-  `out of sync scope`.
+- **As-built (M22-T02, `supabase/migrations/20260911120000_m22_group_record.sql`):**
+  - `app_public.group_session_shares` is the group record: one row per
+    `(group_id, member_user_id, session_id)`, plus `session_started_at` and
+    `shared_at`.
+  - It is written only by the `sessions_group_share_session` trigger on
+    `app_public.sessions`, from session `started_at` vs. membership periods.
+    Its rows are additive and permanent.
+  - Group reads (`group_stream`, `group_session_detail`) read content through
+    from the member's own Sync v2 rows, performed sets only. They never copy
+    rows and never read GPS columns.
+  - It follows the same posture as the other group tables: RLS on, no
+    policies, no client grants, no `owner_user_id`, and no FK into Sync v2
+    tables. A hard-deleted session leaves a dangling ledger row that reads
+    ignore.
+  - Sync impact decision: `out of sync scope`. It is server-authoritative with
+    no per-owner LWW semantics. The only Sync v2 touch point is the
+    failure-isolated `AFTER INSERT OR UPDATE` trigger on `sessions`, which can
+    never abort `sync_push`. `sync_push`, `sync_pull`, the nine tables, and the
+    wire envelope are unchanged (`sync-v2-server-contract.md` §B.11).
 - **As-built (M22-T03):** the mobile `group_cache` table (local-only,
   disposable; see *Local schema inventory*), `out of sync scope`.
 

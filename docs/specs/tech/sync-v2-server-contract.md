@@ -1235,6 +1235,11 @@ apply (B.4.5).
 
 - Server-side retention/GC of `deleted_at IS NOT NULL` rows (stored as regular
   rows in v2).
-- Group domain (M22, planned — `groups-contract.md`). Groups, memberships, invites, and the group session record are server-authoritative and reached only through group RPCs, outside the Sync v2 9-table mirror engine. The one touch point is an `AFTER INSERT OR UPDATE` trigger on `app_public.sessions` that records shares; it is failure-isolated so it can never abort `sync_push` (`groups-contract.md` §2.5). Group tables carry no `owner_user_id` column, so they stay out of the drift checker's entity set (§A.7.3).
+- Group domain (M22 — `groups-contract.md`). Groups, memberships, invites, and the group session record are server-authoritative and reached only through group RPCs, outside the Sync v2 9-table mirror engine. The one touch point is an `AFTER INSERT OR UPDATE` trigger on `app_public.sessions` that records shares; it is failure-isolated so it can never abort `sync_push` (`groups-contract.md` §2.5). Group tables carry no `owner_user_id` column, so they stay out of the drift checker's entity set (§A.7.3).
+  **As-built (M22-T02).** The touch point is trigger `sessions_group_share_session`, which calls `app_public.group_share_session()` (`security definer`, `search_path = app_public, pg_temp`), in `supabase/migrations/20260911120000_m22_group_record.sql`. What did not change:
+  - `sync_push`, `sync_pull`, the nine tables, their RLS, and the wire envelope are unchanged;
+  - the two structural triggers (§A.1, §A.6.3) are untouched, and the drift checker's 4f checks, which look only for those two by name, still pass.
+
+  Any failure inside the trigger body is caught and logged as `group.share_failed` in `public.app_logs`, so the push commits regardless. A LWW no-op push does not fire it, since no row is updated.
 - Web client and MCP read paths against the typed schema (they consume Part A's
   schema directly with no Part B protocol involvement).
