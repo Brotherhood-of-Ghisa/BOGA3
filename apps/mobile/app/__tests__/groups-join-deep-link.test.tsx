@@ -53,14 +53,14 @@ afterEach(() => {
 });
 
 it('opens /group/join?code=ABCD2345 on the Join screen with the code prefilled and previewed', async () => {
-  renderRouter(
+  const router = renderRouter(
     { 'group/join': JoinGroupRoute, 'group/[groupId]/index': GroupScreenRoute },
     { initialUrl: '/group/join?code=ABCD2345' },
   );
 
   expect(await screen.findByTestId('group-join-preview-name')).toHaveTextContent('Garage Gym');
-  expect(screen).toHavePathname('/group/join');
-  expect(screen).toHaveSearchParams({ code: 'ABCD2345' });
+  expect(router.getPathname()).toBe('/group/join');
+  expect(router.getSearchParams()).toEqual({ code: 'ABCD2345' });
   expect(screen.getByTestId('group-join-code-input').props.value).toBe('ABCD2345');
   expect(groupsApi.previewGroupInvite).toHaveBeenCalledWith('ABCD2345');
 });
