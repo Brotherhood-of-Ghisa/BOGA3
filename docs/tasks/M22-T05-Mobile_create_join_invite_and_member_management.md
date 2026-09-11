@@ -1,7 +1,7 @@
 ---
 task_id: M22-T05-Mobile_create_join_invite_and_member_management
 milestone_id: "M22"
-status: in_progress
+status: completed
 ui_impact: "yes"
 areas: "frontend"
 runtimes: "node|expo|maestro"
@@ -15,7 +15,7 @@ docs_touched: "docs/specs/ui/screen-map.md, docs/specs/ui/navigation-contract.md
 ## Task metadata
 
 - Task ID: `M22-T05-Mobile_create_join_invite_and_member_management`
-- Status: `in_progress`
+- Status: `completed`
 - Depends on: `M22-T04` (screens to extend), `M22-T03`
 
 ## Parent references (required)

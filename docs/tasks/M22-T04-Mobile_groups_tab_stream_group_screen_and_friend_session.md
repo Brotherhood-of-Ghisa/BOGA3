@@ -1,7 +1,7 @@
 ---
 task_id: M22-T04-Mobile_groups_tab_stream_group_screen_and_friend_session
 milestone_id: "M22"
-status: in_progress
+status: completed
 ui_impact: "yes"
 areas: "frontend"
 runtimes: "node|expo|maestro"
@@ -15,7 +15,7 @@ docs_touched: "docs/specs/ui/screen-map.md, docs/specs/ui/navigation-contract.md
 ## Task metadata
 
 - Task ID: `M22-T04-Mobile_groups_tab_stream_group_screen_and_friend_session`
-- Status: `in_progress`
+- Status: `completed`
 - Depends on: `M22-T03`
 - Precedes: `M22-T05`, which adds the create, join, invite, and manage
   actions onto these screens
