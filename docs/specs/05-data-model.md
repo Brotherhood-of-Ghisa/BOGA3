@@ -138,21 +138,30 @@ to deduplicate per device, so idempotency falls out of per-row LWW.
   - sync impact decision: `out of sync scope` because `user_profiles` is
     explicitly outside the nine-table Sync v2 mirror.
 
-### Group domain (M22 — planned, not yet built)
+### Group domain (M22)
 
 - The earlier M18 group text is superseded (M18 is `outdated`).
-- The planned model is defined in `docs/specs/tech/groups-contract.md` §2:
-  `groups`, `group_memberships` (one row per membership period),
-  `group_invites`, and `group_session_shares`. `group_session_shares` is the
-  group record, a server-written share ledger whose content is read through
-  from members' own Sync v2 rows.
-- Planned sync impact decision: `out of sync scope`. These are
-  server-authoritative, multi-reader rows accessed only through group RPCs. The
-  nine Sync v2 tables and their owner-only RLS are unchanged. The planned
-  mobile `group_cache` table is a local-only, disposable cache, also
+- Contract: `docs/specs/tech/groups-contract.md` §2.
+- **As-built (M22-T01, `supabase/migrations/20260910120000_m22_groups_membership.sql`):**
+  - `app_public.groups` — group header (`name`, `description`, `created_by`,
+    timestamps, reserved `deleted_at`). Ownership is a membership role, not a
+    column on this row.
+  - `app_public.group_memberships` — one row per membership **period**
+    (`role`, `joined_at`, `ended_at`, `end_reason`, `ended_by`), with at most
+    one active period per user per group and at most one active owner.
+  - `app_public.group_invites` — one active 8-character code per group.
+  - All three: RLS on, no policies, no `anon`/`authenticated` privileges
+    (access only through `app_public.group_*` RPCs); no `owner_user_id` column;
+    no FK into the nine Sync v2 tables.
+  - Sync impact decision: `out of sync scope`. These are server-authoritative,
+    multi-reader rows with no per-owner LWW semantics, so they cannot be Sync v2
+    entities (contract §1.1). The nine Sync v2 tables and their owner-only RLS
+    are unchanged, and `sync-drift --strict` stays green because no group
+    table carries `owner_user_id`.
+- **Planned (M22-T02/T03):** `group_session_shares` (the group record — a
+  server-written share ledger read through from members' own Sync v2 rows) and
+  the mobile `group_cache` table (local-only, disposable). Both are
   `out of sync scope`.
-- This section is replaced with the as-built inventory when the M22 schema
-  lands.
 
 ## Ownership and identity invariants
 

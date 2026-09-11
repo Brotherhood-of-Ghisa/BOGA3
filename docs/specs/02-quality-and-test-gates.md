@@ -95,6 +95,7 @@ get from `./boga timings` or a run.
 | *Infra: local Supabase + Docker — CI-able, local-only today* | | | | |
 | backend-fast | `./boga test backend-fast` | `boga test fast` (backend half) | ❌ | ~32s |
 | auth-authz | `./boga test auth-authz` | `boga test backend` | ❌ | ~3.7s |
+| groups-contract | `./boga test groups-contract` | `boga test backend` | ❌ | ~11s |
 | agent-api | `./boga test agent-api` | `boga test backend` | ❌ | ~4.6s |
 | sync-v2-schema | `./boga test sync-v2-schema` | `boga test backend` | ❌ | ~7.8s |
 | sync-push-contract | `./boga test sync-push-contract` | `boga test backend` | ❌ | ~4.0s |

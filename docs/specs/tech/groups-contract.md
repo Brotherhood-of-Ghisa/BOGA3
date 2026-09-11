@@ -1,8 +1,11 @@
 # Groups Contract (M22)
 
-> **Status: Planned (M22 technical design).** Nothing here is built yet. Each
-> section gets an **As-built** note when its implementation task lands; until
-> then the milestone spec
+> **Status: Partially built.** §2.1–§2.3, §3, and the membership/invite RPCs
+> of §4 are as-built (M22-T01,
+> `supabase/migrations/20260910120000_m22_groups_membership.sql`, proven by
+> `./boga test groups-contract`). The share ledger, stream reads, metrics, and
+> mobile client are still planned. Each section gets an **As-built** note when
+> its implementation task lands; the milestone spec
 > (`docs/specs/milestones/M22-groups-and-foundations.md`) owns the product
 > requirements and this doc owns the technical contract.
 
@@ -121,6 +124,24 @@ leaderboard marking reads the same rows.
   `O→0` and `I`/`L→1`.
 - **Invites are multi-use and never expire** (C3.5.2).
 
+**As-built (M22-T01, §2.1–§2.3).** The three tables ship in
+`supabase/migrations/20260910120000_m22_groups_membership.sql` with the columns,
+partial unique indexes, and index above, plus these constraints:
+
+- `groups`: name trimmed, 1–50 chars; description null or trimmed, 1–280
+  chars (the RPCs store a blank description as null).
+- `group_memberships`: `role` and `end_reason` value checks; `ended_at` and
+  `end_reason` null together; `ended_at >= joined_at`; `ended_by` set only on
+  an ended period (FK → `auth.users on delete set null`).
+- `group_invites`: `code ~ '^[0-9A-HJKMNP-TV-Z]{8}$'`; `created_by` FK →
+  `auth.users on delete set null`. The generator maps each of 8
+  `extensions.gen_random_bytes` bytes `% 32` onto the alphabet (uniform, since
+  256 is a multiple of 32) and retries a code collision up to 5 times before
+  raising `INTERNAL`.
+- `service_role` keeps `select/insert/update/delete` on all three for
+  server-side maintenance (fixture cleanup); `anon` and `authenticated` have
+  none.
+
 ### 2.4 `group_session_shares` — the group record
 
 | Column | Type | Notes |
@@ -218,6 +239,17 @@ on conflict (group_id, member_user_id, session_id)
 - **Usernames.** Co-member usernames are read inside the RPCs from
   `app_public.user_profiles`, whose owner-only RLS is unchanged.
   `USERNAME_REQUIRED` is raised when `nullif(btrim(username), '') is null`.
+
+**As-built (M22-T01, §3).** Every client RPC is `security definer`,
+`search_path = app_public, pg_temp`, execute revoked from `public` and granted to
+`anon`, `authenticated`, and `service_role`. The internal helpers
+(`group_require_app_user`, `group_active_role`, `group_require_member`,
+`group_require_username`, `group_require_target`, the name/description
+validators, the invite normalizer/generator/writer, and the JSON builders) have
+the same pinned `search_path` and no client execute grant. `group_active_role`
+rejects a `client_id` claim itself (spec 10 rule 17), in addition to the
+preamble every RPC runs first. `groups-contract` asserts this posture from the
+catalog.
 
 ## 4. RPC contract
 
@@ -337,6 +369,35 @@ Writes raise:
 - `NOT_FOUND` when the target is not an active member, or the caller is not;
 - `FORBIDDEN` when the caller's role is insufficient;
 - `VALIDATION` when a rule is violated (for example removing yourself).
+
+**As-built (M22-T01).** Every RPC in §4.2 `group_list_mine` / `group_get` /
+`group_invite_preview` and every §4.3 write ships in
+`supabase/migrations/20260910120000_m22_groups_membership.sql`.
+
+- **Return shapes the table above left open** (fixed here; the mobile client
+  types against these):
+
+  | RPC | Returns |
+  | --- | --- |
+  | `group_leave` | `{ group_id }` |
+  | `group_remove_member`, `group_set_role`, `group_transfer_ownership` | `{ group: GroupSummary, members: Member[] }` — the `group_get` payload after the change, from the caller's view (after a transfer, `my_role` is `admin`) |
+
+- **Check order.** Preamble (`AUTH_REQUIRED`, then `AGENT_FORBIDDEN`) → caller
+  membership (`NOT_FOUND`) → caller role (`FORBIDDEN`) → input and target
+  (`VALIDATION`, then target `NOT_FOUND`). A member calling a privileged write
+  therefore gets `FORBIDDEN` even with a bad target. `group_create` and
+  `group_join` check `USERNAME_REQUIRED` before validating the name or code.
+- **`group_update`** replaces both fields: a null or blank `p_description`
+  clears the description. Names and descriptions are stored trimmed.
+- **`group_invite_preview`** needs no username (any app user may look before
+  setting one); `group_join` does.
+- **NOT_FOUND bodies** for a non-member and a nonexistent or soft-deleted group
+  are byte-identical (`NOT_FOUND: group not found`); a missing target member is
+  `NOT_FOUND: member not found`.
+- **Ordering.** `group_list_mine` sorts by `lower(name)`, then `name`, then
+  `group_id`; `group_get` members break ties by `user_id` after the §4.2 order.
+- **Serialization.** Mutating RPCs lock the `groups` row (`for update`) before
+  any role check; `group_join` locks it while resolving the code.
 
 ## 5. Stream-card metrics and highlights
 

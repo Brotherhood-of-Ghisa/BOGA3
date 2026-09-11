@@ -38,7 +38,7 @@ This is the shortest operational summary. Use the "Further reading" section when
 14. Privileged application RPCs that bypass RLS, including `SECURITY DEFINER`
     developer helpers, must independently reject non-null OAuth `client_id`
     claims before executing any read or write body.
-15. Group domain authorization (M22, planned — `docs/specs/tech/groups-contract.md` §3) is DB-enforced through `SECURITY DEFINER` RPCs. Group tables have RLS enabled with no permissive client policies and no direct client privileges. Every read and write goes through an `app_public.group_*` RPC that derives the caller from `auth.uid()` and checks active membership and role inside the function. Private source entities (`exercise_definitions`, `sessions`, …) keep their owner-only RLS unchanged. Co-members read a member's shared sessions only through those RPCs.
+15. Group domain authorization (M22 — `docs/specs/tech/groups-contract.md` §3; membership half as-built in M22-T01, proven by `./boga test groups-contract`) is DB-enforced through `SECURITY DEFINER` RPCs. Group tables have RLS enabled with no permissive client policies and no direct client privileges. Every read and write goes through an `app_public.group_*` RPC that derives the caller from `auth.uid()` and checks active membership and role inside the function. Private source entities (`exercise_definitions`, `sessions`, …) keep their owner-only RLS unchanged. Co-members read a member's shared sessions only through those RPCs.
 16. **RLS recursion prevention.** Group membership and role lookups MUST use `SECURITY DEFINER` helpers with `SET search_path = app_public, pg_temp`. If a later phase adds RLS policies on group tables (for example for Realtime), those policies must call the helpers. Direct subqueries on `group_memberships` inside `group_memberships` policies are prohibited (Postgres `42P17`).
 17. Every group RPC and `SECURITY DEFINER` group helper must independently reject non-null OAuth `client_id` claims (rule 14; error `AGENT_FORBIDDEN`), which preserves the M21 agent access boundary: agent tokens get no group access.
 18. Group non-membership and nonexistence must be indistinguishable to the caller (`NOT_FOUND`). A member whose role disallows an action gets `FORBIDDEN`.
@@ -50,7 +50,7 @@ This is the shortest operational summary. Use the "Further reading" section when
 - Validate custom API inputs at the boundary (Edge Function/server handler) and rely on DB constraints for invariants.
 - Do not expose `auth` schema via API surfaces.
 - Treat `owner_user_id` as immutable after insert unless a task explicitly defines a safe migration/admin path.
-- **Group domain (M22, planned)**:
+- **Group domain (M22)**:
   - Encapsulate membership and role checks in `SECURITY DEFINER` helpers with `search_path = app_public, pg_temp`, which guards against schema injection. These helpers bypass RLS, so their callers must filter explicitly by the caller's active membership.
   - Group tables must not carry an `owner_user_id` column. The Sync v2 drift checker treats every such `app_public` table as a synced entity.
   - Group reads return only performed sets and never GPS columns (`docs/specs/tech/groups-contract.md` §4–§5).
@@ -136,6 +136,11 @@ flowchart TD
 - For mobile auth bootstrap/session work, cover the no-session, stored-session, and sign-out/session-clear paths before moving to profile UI tasks.
 - For M11 profile changes, add local-Supabase contract coverage for `user_profiles` owner read/update/insert behavior plus mobile tests for username/email/password mutation states.
 - For final M11 auth/profile proof, run the real iOS simulator happy path against local Supabase using the deterministic fixture credentials exposed by `supabase/scripts/auth-fixture-constants.sh`.
+- For group-domain changes (M22), extend `./boga test groups-contract`
+  (`supabase/tests/groups-contract.sh`). It provisions its own per-run users
+  rather than `user_a`/`user_b`, and covers the role matrix, non-member ≡
+  nonexistent `NOT_FOUND`, `AUTH_REQUIRED`/`AGENT_FORBIDDEN` on every RPC, and
+  direct-table denial.
 - Required test coverage for auth-sensitive API changes:
   - success path
   - unauthenticated denial
