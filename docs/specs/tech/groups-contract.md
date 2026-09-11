@@ -1,11 +1,16 @@
 # Groups Contract (M22)
 
-> **Status: Partially built.** As-built: §2.1–§2.3, §3, and the
-> membership/invite RPCs of §4 (M22-T01,
-> `supabase/migrations/20260910120000_m22_groups_membership.sql`, proven by
-> `./boga test groups-contract`), and the mobile client §6.1–§6.2 (M22-T03).
-> The share ledger, stream reads, metrics, and UI are still planned. Each
-> section gets an **As-built** note when its implementation task lands; the milestone spec
+> **Status: Partially built.** As-built:
+>
+> - §2–§5, the server half: the membership/invite RPCs (M22-T01,
+>   `supabase/migrations/20260910120000_m22_groups_membership.sql`) and the
+>   share ledger, trigger, stream/detail reads, and metrics (M22-T02,
+>   `supabase/migrations/20260911120000_m22_group_record.sql`). Both are proven
+>   by `./boga test groups-contract`.
+> - §6.1–§6.2, the mobile client (M22-T03).
+>
+> The UI is still planned. Each section gets an **As-built** note when its
+> implementation task lands; the milestone spec
 > (`docs/specs/milestones/M22-groups-and-foundations.md`) owns the product
 > requirements and this doc owns the technical contract.
 
@@ -209,6 +214,31 @@ on conflict (group_id, member_user_id, session_id)
   of **their own** sessions enter groups they belong to or belonged to, which
   is accepted.
 
+**As-built (M22-T02, §2.4–§2.5).** `supabase/migrations/20260911120000_m22_group_record.sql`.
+
+- **Ledger.** `group_session_shares` has the columns, PK, and two indexes of
+  §2.4. It follows ground rules 1–4: RLS on, no policies, no `anon` or
+  `authenticated` privileges, and `service_role` keeps
+  `select/insert/update/delete`. No other index was added.
+- **Trigger.** It is `sessions_group_share_session`, declared `AFTER INSERT OR
+  UPDATE … FOR EACH ROW` and calling `app_public.group_share_session()`
+  (`security definer`, `search_path = app_public, pg_temp`). The insert is the
+  §2.5 statement verbatim. `sync_push`'s LWW no-op, where the incoming row is
+  not newer, does not update the row, so the trigger does not fire. Self-heal
+  therefore happens on the session's next *accepted* write.
+- **Failure isolation.** The whole insert runs in a nested `begin … exception
+  when others`. On failure it writes one `public.app_logs` row: `level
+  'error'`, `source 'database'`, `event 'group.share_failed'`, a fixed
+  `message`, `user_id` = the session owner, and `context = {session_id,
+  sqlstate}`. `SQLERRM` is never logged, because constraint errors echo row
+  values. If that log insert itself fails, a second handler emits `raise
+  warning` to the server log. The trigger returns normally in every case.
+- **Proven** by `groups-contract` through real `sync_push` calls. A temporary
+  `check (false) not valid` constraint on the ledger forces the failure, and
+  the lane's exit trap always drops it. Under that fault, `sync_push` returns
+  200 and the owner reads the row. Exactly one sanitized row is logged
+  (`sqlstate` `23514`), and the next push creates the share.
+
 ## 3. Authorization model
 
 - **No direct table access.** The four tables have RLS enabled, no permissive
@@ -350,6 +380,47 @@ order_index, sets: [{ set_id, order_index, weight_kg, reps, set_type }] }] }`.
 - `name` is the member's own exercise name (`session_exercises.name`).
 - No GPS columns are ever read.
 
+**As-built (M22-T02, §4.2 stream and detail).** Built in
+`supabase/migrations/20260911120000_m22_group_record.sql`. The shapes are
+exactly as above; `groups-contract` asserts the key sets.
+
+- **Signature.** `group_stream(p_group_id uuid default null, p_before jsonb
+  default null, p_limit integer default null)` is `volatile`, like `group_get`.
+  `group_session_detail(p_member_user_id uuid, p_session_id text)` is `stable`.
+  Both follow the §3 posture: `security definer`, a pinned `search_path`, and
+  execute granted to `anon`, `authenticated`, and `service_role`.
+- **Check order.** The preamble (`AUTH_REQUIRED`, then `AGENT_FORBIDDEN`) runs
+  first. Then comes scope membership: a non-member, nonexistent, or deleted
+  group gives `NOT_FOUND: group not found`. Only then does validation run. A
+  non-member sending a bad `p_limit` therefore gets `NOT_FOUND`.
+- **Cursor.** `p_before` must be a JSON object with exactly the keys
+  `sort_at_ms`, `kind`, and `key`:
+  - `sort_at_ms` is an integral JSON number;
+  - `kind` is `membership` or `session`;
+  - `key` is a non-empty string.
+
+  Anything else, and a `p_limit` outside `1..50`, gives `VALIDATION`. A JSON
+  `null` counts as no cursor. `next_cursor` is the last item's
+  `{sort_at_ms, kind, key}` when `has_more`, else `null`.
+- **Ordering.** `kind` and `key` compare in the `"C"` collation, so the order
+  is byte order. It is identical in SQL and on the client.
+- **Keys and timestamps.**
+  - Membership keys are `<membership_id>:joined` and `<membership_id>:ended`;
+    the ended item carries `event` `left` or `removed`.
+  - Membership `sort_at_ms` is `floor(epoch_ms(joined_at | ended_at))`.
+  - A session card's `sort_at_ms` is the live `sessions.started_at`, not the
+    ledger copy.
+- **Cards.** `groups` lists the caller's in-scope, non-deleted groups holding
+  the share, ordered by `lower(name)`, then `name`, then `id`. `gym_name` is
+  the member's gym name while that gym row is not tombstoned. `member` is
+  `{ user_id, username }`, with `username` null when blank.
+- **Cost.** PR history is computed only for the page's cards.
+- **Detail.** A tombstoned session, a nonexistent one, a session never shared,
+  and a caller who is not a member of any group holding the share all get the
+  same `NOT_FOUND: session not found` body. The athlete may open their own
+  shared session. `weight_kg` and `reps` are the parsed values: a blank weight
+  with valid reps is `0`.
+
 ### 4.3 Writes
 
 | RPC | Allowed | Effect / returns |
@@ -456,6 +527,48 @@ volume, e1rm}`.
   agree.
 - Divergent exotic strings (for example `1e3`, which the UI cannot enter) are
   pinned explicitly in the vectors.
+
+**As-built (M22-T02, §5).** The helpers are in
+`supabase/migrations/20260911120000_m22_group_record.sql`, the 40 vectors in
+`supabase/tests/fixtures/group-set-metric-vectors.json`, and the jest side in
+`apps/mobile/app/__tests__/group-set-metric-vectors.test.ts`.
+
+- **Parsing parity.**
+  - Trimming uses `group_js_trim`, an explicit set of JS `String.prototype.trim`
+    code points (ASCII whitespace, NBSP, U+1680, U+2000–U+200A, LS, PS,
+    U+202F, U+205F, U+3000, BOM). This is not `btrim`, and not the
+    locale-dependent `[[:space:]]`.
+  - Digits are `[0-9]`, since JS `\d` is ASCII-only.
+  - `group_parse_weight` parses with `float8in`, which, like JS `Number`, is
+    correctly rounded.
+- **Performed predicate.** A set is performed when `performance_status is null
+  or not in ('planned','skipped','unperformed')`. This mirrors
+  `normalizeSessionSetPerformanceStatus` as used by
+  `exercise-block-history.ts`: an unknown status value normalizes to `null`,
+  so the set is performed. The rule in §5.1, `performance_status is null`, is
+  refined to that, and a vector pins it.
+- **The helpers never raise.** One member's malformed row therefore cannot
+  break a group read. Two deliberate SQL bounds keep every product and sum
+  finite and JSON-representable. Each is pinned as a vector with a `sql`
+  override and a `divergence` reason:
+  - reps above 2147483647 (`integer`) parse to `null`;
+  - weights `>= 1e15` (16 or more integer digits) parse to `null`.
+
+  A very long fraction that underflows parses to `0`, as in JS. `group_e1rm`
+  uses denominator `48.8` exactly above 600 reps. JS evaluates it to the same
+  double there, and `exp()` would otherwise raise on underflow.
+- **e1RM tolerance.** It is `1e-9`, relative above 1:
+  `|Δ| <= 1e-9 · max(1, |e1rm|)`. `exp()` may differ by an ulp between V8 and
+  libm, and the 1e15-scale vectors need the relative form. Weight, reps,
+  volume, and `performed` are compared exactly.
+- **Vector semantics.**
+  - `weight` and `reps` are the parser outputs, independent of status.
+  - `volume` and `e1rm` are set only when the set is performed.
+  - The SQL lane asserts each row merged with its `sql` override; jest asserts
+    the top-level values.
+- **Card values.** They follow §5.2. The PR tie-break is `(e1rm desc,
+  session-exercise order_index, set order_index, set id)`. `prs` is ordered by
+  the best set's exercise `order_index`.
 
 ## 6. Mobile client architecture
 
