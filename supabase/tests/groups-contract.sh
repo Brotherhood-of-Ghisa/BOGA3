@@ -840,9 +840,10 @@ detail() {
 }
 # shares_of <session>: comma-joined group ids holding a share of the athlete's session, in G_A,G_B order.
 shares_of() {
-  run_psql "select coalesce(string_agg(case group_id when '${GA}' then 'A' when '${GB}' then 'B' else group_id::text end, ',' order by 1), '')
-              from app_public.group_session_shares
-             where member_user_id = '${ATHLETE_UID}' and session_id = '$1';"
+  run_psql "select coalesce(string_agg(t.tag, ',' order by t.tag), '')
+              from (select case group_id when '${GA}' then 'A' when '${GB}' then 'B' else group_id::text end as tag
+                      from app_public.group_session_shares
+                     where member_user_id = '${ATHLETE_UID}' and session_id = '$1') t;"
 }
 # period_ms <group> <user> <joined_at|ended_at> <floor|ceil>: latest period's boundary in epoch ms.
 period_ms() {
