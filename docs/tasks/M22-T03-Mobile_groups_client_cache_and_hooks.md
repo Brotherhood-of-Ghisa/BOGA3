@@ -120,34 +120,26 @@ Screens, routes, and the tab (`M22-T04`, `T05`). The server (`M22-T01`,
 ## Evidence
 
 Branch `m22-t03-mobile-groups-client`, rebased on `origin/main` 9cb5d80
-(#266). Results below are measured runs on this machine (`./boga timings`).
+(#266). Gate results are for commit `498b52d` (membership-write typing
+update) unless noted. Durations are measured records (`./boga timings`,
+`docs/testing/timings/records/`).
 
 - `npx jest groups account-switch-local-wipe domain-schema-migrations`:
-  9 suites and 102 tests passed.
-- Infra-free lanes on the rebased branch, each exit 0: `lint`, `typecheck`,
-  `jest-full` (114 suites, 1085 tests), `docs-check`, `meta-tests`,
-  `agent-auth-web`, `mcp-unit`. `mcp-unit` now finds 0 production
-  vulnerabilities, so the audit failure is fixed by #266.
-- `./boga test handles` passed: 114 suites, 1085 tests, exit 0, no open
-  handles. It took 15.6m and ran on the pre-rebase commit; #266 changed only
-  tooling. The duration is inflated by host CPU contention (load average
-  above 100).
-- `ios-smoke` passed: `smoke-launch` in 7s
-  (`apps/mobile/artifacts/maestro/ad-hoc/20260910-221914-25920`).
-- `ios-data-smoke` run 1 failed on a harness timeout, not an app failure
-  (`…/ad-hoc/20260910-222037-29457`).
-  - Steps 0–25 passed: data-reset boot with all migrations including m0004,
-    and the recorder with the seeded catalog.
-  - Step 26, tap "Reps for exercise 1 set 1", hung for 900s at load average
-    about 112. The field is visible and focused in the failure screenshot.
-  - Rerun: see the Completion note.
-- **Blocked by infrastructure:** `backend-fast` (inside `boga test fast`),
-  `boga test backend`, `ios-auth-profile`, and `ios-sync-e2e`.
-  - The OrbStack Docker API is wedged: `/_ping` on
-    `~/.orbstack/run/docker.sock` times out, and a watcher saw no recovery in
-    30 min.
-  - `orb status` reports Running.
-  - It was not restarted, because other worktrees' Supabase stacks share it.
+  9 suites and 103 tests passed.
+- `./boga test fast`: exit 0.
+  - `lint` 1.4s, `typecheck` 3.2s, `jest-full` 6.2s (114 suites, 1086
+    tests).
+  - `backend-fast` 1.2m, `docs-check` 0.1s, `meta-tests` 1.3s.
+  - `agent-auth-web` 2.7s (6 tests), `mcp-unit` 4.0s (5 tests).
+- `./boga test handles`: exit 0, 114 suites, 1086 tests, no open handles,
+  23.2s.
+- `./boga test backend`: exit 0 for all 11 lanes: `auth-authz` 7.9s, `agent-api` 6.6s, `sync-v2-schema` 7.5s, `sync-push-contract` 6.0s, `sync-pull-contract` 6.2s, `dev-wipe-my-data`, `sync-drift` 39s (`--strict`), `sync-v2-e2e` 2.2m, `sync-infra` 10s, `mcp-smoke` 8.7s.
+- `./boga test frontend`: exit 0 for all 4 lanes: `ios-smoke` 1/1 flow (`/20260911-121423-53218`); `ios-data-smoke` 1/1 flow, 1.1m, migration m0004 applied on device (`/20260911-121458-55387`); `ios-auth-profile` 1/1 flow, 1.2m (`/20260911-121607-58515`); `ios-sync-e2e` 1/1 flow, 1.7m, account wipe with `group_cache` (`/20260911-121720-61182`).
+- Earlier run (commit 5d16550, before the typing update): `ios-smoke` passed
+  (`apps/mobile/artifacts/maestro/ad-hoc/20260910-221914-25920`), and
+  `ios-data-smoke` hit a 900s harness timeout at host load average about 112
+  (`…/ad-hoc/20260910-222037-29457`). The OrbStack Docker API then hung, and
+  the remaining Docker lanes were deferred until it recovered.
 
 ## Completion note
 
@@ -155,7 +147,11 @@ Branch `m22-t03-mobile-groups-client`, rebased on `origin/main` 9cb5d80
   migration 0004, the `group_cache` delete in `wipeLocalTables`, and jest
   suites `groups-*`. Docs: spec 05, spec 09, and the groups-contract §6.1–§6.2
   As-built notes.
+- Membership-write results follow the M22-T01 as-built §4.3. `leaveGroup`
+  resolves `{ group_id }`. `removeGroupMember`, `setGroupMemberRole`, and
+  `transferGroupOwnership` resolve the `group_get` payload
+  `{ group, members }`. Each is shape-checked, and the contract §6.1
+  As-built note records this.
 - What tests ran: see Evidence.
-- What remains: run `boga test backend`, the full `boga test fast`
-  (backend half), `ios-auth-profile`, and `ios-sync-e2e` once Docker is
-  healthy. Open the PR after those are green.
+- What remains: review and merge. The screens (`M22-T04`, `T05`) consume
+  these hooks.
