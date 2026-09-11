@@ -111,8 +111,59 @@ Offline toggling in the simulator; offline is proven in jest in `T03`–`T05`.
 
 ## Evidence
 
+Gates ran on `efcf89a` (rebased on `origin/main` `366e4b8`), foreground, one at
+a time, on this machine. Artifact roots are local, under `apps/mobile/artifacts/maestro/ad-hoc/`.
+
+| Gate | Result | Evidence |
+| --- | --- | --- |
+| `./boga test ios-groups-e2e` run A | ✅ flow 53s | `apps/mobile/artifacts/maestro/ad-hoc/20260911-194701-34563/` |
+| `./boga test ios-groups-e2e` run B (right after A, no Supabase reset) | ✅ flow 52s | `apps/mobile/artifacts/maestro/ad-hoc/20260911-194827-36774/`; its reset deleted run A's 1 group + 577 sync rows |
+| `./boga test fast` | ✅ jest 122 suites / 1220 tests; meta-tests 5/5 | — |
+| `./boga test handles` | ✅ 1220 tests | — |
+| `./boga test backend` | ✅ every lane incl. `groups-contract`, `sync-drift --strict`, `mcp-smoke` | — |
+| `./boga test ios-smoke` | ✅ | `apps/mobile/artifacts/maestro/ad-hoc/20260911-194142-25481/` |
+| `./boga test ios-data-smoke` | ✅ first attempt | `apps/mobile/artifacts/maestro/ad-hoc/20260911-194224-27062/` |
+| `./boga test ios-auth-profile` | ✅ | `apps/mobile/artifacts/maestro/ad-hoc/20260911-194340-29370/` |
+| `./boga test ios-sync-e2e` | ✅ | `apps/mobile/artifacts/maestro/ad-hoc/20260911-194504-31766/` |
+
+- **AC1 screenshots** (each run, `maestro-output/*/groups-two-user-stream/takeScreenshot/`):
+  `groups-01-username-prompt`, `-02-group-created`, `-03-invite-code`,
+  `-04-counterparty-joined`, `-05-training-now-card`,
+  `-06-completed-edited-card`, `-07-friend-view-read-only`,
+  `-08-counterparty-removed`, `-09-removed-member-not-found`. Step 9's
+  assertion is the script's: `group_stream` → `HTTP 400 NOT_FOUND: group not
+  found` (logged in `maestro-debug/**/maestro.log`).
+- **AC2.** Runs A and B above passed back to back in slot 2; the baseline
+  reported "reusing existing instance without reset" both times.
+- **AC3.** `meta-tests` green; `maestro-fixture-users.test.sh` self-tests the
+  counterparty rule on 5 synthetic trees, then checks the repo: 3 sign-in flows
+  + 1 scripted counterparty, each on a unique fixture.
+- **AC4, measured latency** (`GROUPS_E2E_LATENCY`: last `sync_push` returned →
+  the card's wait succeeded after one pull-to-refresh; includes the 800 ms
+  swipe and Maestro's polling). Observed, not promised:
+
+  | Run | Active card | Completed + edited card |
+  | --- | --- | --- |
+  | A | 2114 ms | 1986 ms |
+  | B | 1966 ms | 1973 ms |
+
+- **AC5.** Maestro `runScript` HTTP worked; the split-flow fallback was not used.
+- **Durations** (`./boga timings`, this machine): `ios-groups-e2e` median 1.4m
+  over 4 green runs (1.4m–1.5m).
+- **Triggers decision.** Added `supabase/migrations/*group*` and
+  `apps/mobile/src/groups/**` → `ios-groups-e2e`, plus the fixture reset
+  script. Group routes and components already require `frontend`, which now
+  includes the lane. A group migration whose name lacks "group" would not match
+  the glob; it still requires `backend`.
+
 ## Completion note
 
-- What changed:
-- What tests ran:
-- What remains:
+- What changed: fixtures `user_c`/`user_d`; `supabase/scripts/groups-fixture-reset.sh`;
+  lane `ios-groups-e2e` (runner case, `lanes.tsv` row, npm `test:e2e:ios:groups`,
+  env allowlist, and a flow copy that mirrors `.maestro/` so `runScript` paths
+  resolve); flow `groups-two-user-stream.yaml` + `.maestro/scripts/groups-counterparty.js`;
+  the fixture-user meta-test counts scripted counterparties; docs 02 (regenerated),
+  06, 09, 11, README-maestro, AGENTS, `triggers.tsv`, groups-contract §8 as-built.
+  No app code changed.
+- What tests ran: see Evidence.
+- What remains: review and merge; M22-T07 closeout.
