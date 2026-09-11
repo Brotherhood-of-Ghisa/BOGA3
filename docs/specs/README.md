@@ -25,6 +25,7 @@ gaps — `04`, `07` — from retired docs; gaps are intentional, do not renumber
 - `docs/specs/milestones/M21-boga-mcp-virtual-coach.md`: In-progress read-only, explicitly authorized MCP virtual-coach access through dedicated BoGa3 API routes.
 - `docs/specs/milestones/M22-groups-and-foundations.md`: Planned groups, invites, members/roles, and the group stream of co-members' sessions (first server→other-user data flow).
 - `docs/specs/milestones/M23-session-planning-and-programmes.md`: Planned local-first session planning and ordered programmes, with separately authorized MCP creation through the agent API.
+- `docs/specs/milestones/M24-current-session-insights-and-pr-celebration.md`: Planned live current-session muscle load, exercise-specific PR celebration/sharing, and a PR-first completion summary that hands off to seven-day muscle analysis.
 - `docs/specs/tech/README.md`: Index of subsystem-level technical deep-dive docs.
 - `docs/specs/tech/groups-contract.md`: Planned (M22) group domain contract — share-ledger schema, share rule, group RPCs, stream metrics, mobile group client.
 - `docs/specs/tech/sync-v2-server-contract.md`: Authoritative sync-v2 server contract — schema / LWW / RLS (Part A) and push/pull RPC wire contract (Part B).
