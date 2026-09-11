@@ -1,33 +1,15 @@
-import * as Application from 'expo-application';
-import Constants from 'expo-constants';
 import { Platform } from 'react-native';
+
+import { readLoggingRuntimeMetadata } from '@/src/utils/runtime-metadata';
 
 import { getLoggingUserId } from './currentUser';
 import { sanitizeContext } from './sanitize';
 import { nextLogSeq } from './buffer';
 import type { LogEventParams, LogRecord } from './types';
 
-const normalizeOptionalString = (value: unknown): string | null =>
-  typeof value === 'string' && value.trim() ? value : null;
-
-const readExpoConfigValue = (key: string): string | null => {
-  const expoConfig = Constants.expoConfig as
-    | {
-        extra?: Record<string, unknown>;
-        version?: string | null;
-      }
-    | null
-    | undefined;
-  const value = key === 'version' ? expoConfig?.version : expoConfig?.extra?.[key];
-  return normalizeOptionalString(value);
-};
-
 const captureClientMetadata = () => ({
   clientPlatform: Platform.OS,
-  clientAppVersion:
-    normalizeOptionalString(Application.nativeApplicationVersion) ?? readExpoConfigValue('version'),
-  clientBuildNumber: normalizeOptionalString(Application.nativeBuildVersion),
-  clientVariant: readExpoConfigValue('env'),
+  ...readLoggingRuntimeMetadata(),
 });
 
 /**

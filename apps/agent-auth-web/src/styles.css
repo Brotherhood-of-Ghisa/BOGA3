@@ -126,7 +126,8 @@ h1 {
 }
 
 .permission-panel,
-.denied-panel {
+.denied-panel,
+.endpoint-panel {
   border-radius: 16px;
 }
 
@@ -134,6 +135,40 @@ h1 {
   padding: 20px 20px 17px;
   color: #334a3e;
   background: #f1f7f1;
+}
+
+.endpoint-panel {
+  padding: 18px 20px;
+  color: #334a3e;
+  background: #f1f7f1;
+}
+
+.endpoint-panel code {
+  display: block;
+  overflow-wrap: anywhere;
+  color: #1f4f34;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  user-select: all;
+}
+
+.setup-steps {
+  display: grid;
+  gap: 15px;
+  margin: 24px 0 0;
+  padding-left: 24px;
+  color: #334a3e;
+  line-height: 1.5;
+}
+
+.setup-steps li {
+  padding-left: 4px;
+}
+
+.setup-steps li::marker {
+  color: #2d6847;
+  font-weight: 760;
 }
 
 .permission-title {

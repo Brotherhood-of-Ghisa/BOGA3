@@ -86,7 +86,10 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 - Behavior:
   - reached from the shared bottom-tray Settings cog (available from every tab root and the detail screens that still render `TopLevelTabs` directly)
   - remains accessible while logged out; it does not require an authenticated session before opening `/profile`
-  - routes to `/profile` from the `Profile` destination row
+  - routes to `/profile` from the `Account` destination row
+  - opens the configured first-party `/connect` setup page in the system browser
+    from `Connect an AI coach`; this external transition carries no OAuth state,
+    session, callback, user identifier, or token, and launch failures stay inline
   - while signed in, routes to `/connected-agents` from a separate Connected
     agents destination row; the row is absent while signed out
 
@@ -177,22 +180,24 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 13. (any tab root or detail screen rendering `TopLevelTabs`) -> `/settings`
    - shared Settings cog in the bottom tray / top-level tab strip
 14. `/settings` -> `/profile`
-   - settings destination row
-15. `/settings` -> `/connected-agents`
+   - Account destination row
+15. `/settings` -> first-party `/connect` (system browser)
+   - public MCP setup guidance; OAuth begins later in the user's MCP client
+16. `/settings` -> `/connected-agents`
    - signed-in-only Connected agents destination row
-16. `/connected-agents` -> `/connected-agents`
+17. `/connected-agents` -> `/connected-agents`
    - grant load, retry, and confirmed revocation update the route in place
-17. `/profile` -> `/profile`
+18. `/profile` -> `/profile`
    - in-place auth-state rerender on sign-in/sign-out; no route replacement
-18. `/exercise-history` -> `/completed-session/<sessionId>`
+19. `/exercise-history` -> `/completed-session/<sessionId>`
    - session card tap or all-time-best row tap
-19. (any guarded route) -> `/sign-in`
+20. (any guarded route) -> `/sign-in`
    - route-layer auth-guard redirect on a configured-but-no-session launch, or when a sync cycle reports "no signed-in user" (`<Redirect />`)
-20. `/sign-in` -> `/`
+21. `/sign-in` -> `/`
    - successful sign-in: the guard stops redirecting and the app proceeds to the normal route; an already-signed-in render of `/sign-in` also redirects to `/`
-21. (any signed-in route) -> first-sync block
+22. (any signed-in route) -> first-sync block
    - the first-sync gate (below the auth guard) renders a full-screen "Setting up your data…" block in place of the navigator while `sync_runtime_state.bootstrap_completed_at` is null for a signed-in user; this is render-substitution, not a route replacement (the URL is unchanged), and it dismisses in place once the flag is set
-22. first-sync block -> `/sign-in`
+23. first-sync block -> `/sign-in`
    - when the latest sync cycle outcome is `AUTH_REQUIRED`, the gate redirects to `/sign-in` (no Retry); the `/sign-in` route is exempt from the block so the redirect cannot loop
 
 Note:
