@@ -6,6 +6,7 @@ import { formatCompactDuration } from '@/src/data/session-list';
 
 import type {
   GroupMembershipEvent,
+  GroupRole,
   GroupSummary,
   StreamItem,
   StreamMembershipItem,
@@ -93,6 +94,42 @@ export const formatMembershipSentence = (event: GroupMembershipEvent, username: 
   }
 };
 
+const pad2 = (value: number): string => `${value}`.padStart(2, '0');
+
+/** Local wall-clock `HH:MM` (the offline marker's "last updated"). */
+export const formatClockTime = (epochMs: number): string => {
+  const date = new Date(epochMs);
+  return `${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+};
+
+/** Local `M/D HH:MM`, the session list's start-time shape (stream cards). */
+export const formatStreamStartedAt = (epochMs: number): string => {
+  const date = new Date(epochMs);
+  return `${date.getMonth() + 1}/${date.getDate()} ${formatClockTime(epochMs)}`;
+};
+
+/** Local `YYYY-MM-DD HH:MM`, the View Session header shape (friend's session view). */
+export const formatGroupDateTime = (epochMs: number): string => {
+  const date = new Date(epochMs);
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())} ${formatClockTime(epochMs)}`;
+};
+
+/** Contract §7 offline marker: "Offline · last updated HH:MM" ("Offline" with nothing cached). */
+export const formatOfflineMarker = (lastUpdatedAtMs: number | null): string =>
+  lastUpdatedAtMs === null ? 'Offline' : `Offline · last updated ${formatClockTime(lastUpdatedAtMs)}`;
+
+export const GROUP_ROLE_LABELS: Record<GroupRole, string> = { owner: 'Owner', admin: 'Admin', member: 'Member' };
+
+const MY_ROLE_SENTENCES: Record<GroupRole, string> = {
+  owner: "You're the owner",
+  admin: "You're an admin",
+  member: "You're a member",
+};
+
+export const formatMyRole = (role: GroupRole): string => MY_ROLE_SENTENCES[role];
+
+export const formatMemberCount = (count: number): string => pluralize(count, 'member', 'members');
+
 export type StreamSessionCardViewModel = {
   kind: 'session';
   key: string;
@@ -101,6 +138,7 @@ export type StreamSessionCardViewModel = {
   memberName: string;
   isTrainingNow: boolean;
   statusLabel: string;
+  startedAtLabel: string;
   gymName: string | null;
   groupNames: string[];
   setsLabel: string;
@@ -113,6 +151,7 @@ export type StreamMembershipViewModel = {
   kind: 'membership';
   key: string;
   sentence: string;
+  groupId: string;
   groupName: string;
 };
 
@@ -126,6 +165,7 @@ const buildSessionCard = (item: StreamSessionItem): StreamSessionCardViewModel =
   memberName: formatMemberName(item.member.username),
   isTrainingNow: item.status === 'active',
   statusLabel: formatSessionStatusLabel(item),
+  startedAtLabel: formatStreamStartedAt(item.started_at_ms),
   gymName: item.gym_name,
   groupNames: item.groups.map((group) => group.name),
   setsLabel: formatSetCount(item.metrics.performed_sets),
@@ -138,6 +178,7 @@ const buildMembershipItem = (item: StreamMembershipItem): StreamMembershipViewMo
   kind: 'membership',
   key: item.key,
   sentence: formatMembershipSentence(item.event, item.member.username),
+  groupId: item.group.group_id,
   groupName: item.group.name,
 });
 

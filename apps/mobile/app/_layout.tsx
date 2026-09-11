@@ -85,6 +85,13 @@ export default function RootLayout() {
                   options={{ headerBackTitle: 'Settings', title: 'Connected agents' }}
                 />
                 <Stack.Screen name="dev-logs" options={{ title: 'Logs' }} />
+                <Stack.Screen name="group/mine" options={{ headerBackTitle: 'Back', title: 'My groups' }} />
+                {/* The group screen replaces this title with the group's name once loaded. */}
+                <Stack.Screen name="group/[groupId]/index" options={{ headerBackTitle: 'Back', title: 'Group' }} />
+                <Stack.Screen
+                  name="group-session/[memberId]/[sessionId]"
+                  options={{ headerBackTitle: 'Back', title: 'Session' }}
+                />
                 <Stack.Screen name="maestro-harness" options={{ headerShown: false }} />
               </Stack>
             </SyncGate>

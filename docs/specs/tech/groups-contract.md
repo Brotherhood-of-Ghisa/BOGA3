@@ -8,8 +8,10 @@
 >   `supabase/migrations/20260911120000_m22_group_record.sql`). Both are proven
 >   by `./boga test groups-contract`.
 > - §6.1–§6.2, the mobile client (M22-T03).
+> - §6.3/§7, the read-side UI: the Groups tab, My groups, the group screen, and
+>   the friend's session view (M22-T04).
 >
-> The UI is still planned. Each section gets an **As-built** note when its
+> The create/join/invite/manage UI (M22-T05) is still planned. Each section gets an **As-built** note when its
 > implementation task lands; the milestone spec
 > (`docs/specs/milestones/M22-groups-and-foundations.md`) owns the product
 > requirements and this doc owns the technical contract.
@@ -718,6 +720,44 @@ migration via `npm run db:generate`.
   `/sign-in` and lands on `/`, which drops the code, because the auth guard has
   no return-to. Reopening the link works.
 
+**As-built (M22-T04).** The read side ships: `/groups`, `/group/mine`,
+`/group/[groupId]`, and `/group-session/[memberId]/[sessionId]`. The create,
+join, edit, and invite routes, and every action, are M22-T05.
+
+- **Tab.** `TopLevelTabs` gains `groups` after Exercises and before the cog.
+  `resolveActiveTab` is exported from `app/(tabs)/_layout.tsx` and
+  unit-tested. Titles `My groups`, `Group` (replaced by the group name once
+  loaded), and `Session` are registered in `app/_layout.tsx`.
+- **UI.** `apps/mobile/components/groups/*` (catalogued in
+  `ui/components-catalog.md`).
+  - `src/groups/use-group-stream.ts` (`useGroupStream`) pages the stream. The
+    first page is cache-first through `useGroupResource`. Older pages load
+    online on end-of-list and are never cached. A refresh keeps loaded older
+    items only when they sort after the new first page's boundary
+    (`mergeStreamPages`), so a deletion in an older page shows once the screen
+    remounts.
+  - View-model additions: the membership `groupId`, the card
+    `startedAtLabel` (local `M/D HH:MM`), `formatOfflineMarker`,
+    `formatMyRole`, `formatMemberCount`, `GROUP_ROLE_LABELS`, and
+    `formatGroupDateTime`.
+- **Groups tab.**
+  - The header holds `My groups`, and M22-T05 adds Create / Join beside it.
+  - Chips show once My groups has loaded at least one group. A selected
+    group that leaves My groups, or whose stream returns `NOT_FOUND`, falls
+    back to All.
+  - `group_list_mine` returning no groups shows the empty state
+    (`groups-empty-state`, children slot for the T05 buttons).
+- **Group screen.** Members render in server order. Membership items there
+  do not navigate. `NOT_FOUND` from `group_get` or `group_stream` shows the
+  lost-access state, and both hooks evict (`evictGroupIdOnNotFound`).
+- **Friend's session view.** `FriendSessionContent` composes
+  `SessionContentLayout` and `ExerciseCardCollapsedSummary`.
+  - Rows are `Set / Weight (kg) / Reps / Effort`. Status reads `In progress`
+    or `Completed · <duration>`.
+  - No `completed-session-detail-*` owner testID renders, which jest asserts.
+- **Signed out or unconfigured.** `GroupsSignInRequired` renders on every
+  group route and no group RPC runs.
+
 ## 7. Freshness and offline
 
 - **Refresh cadence.** On focus, every 30 s while the screen is focused, and on
@@ -732,6 +772,21 @@ migration via `npm run db:generate`.
   stays visible. With no cache, an offline empty state is shown (C3.10.4).
 - **Writes are online-only.** Offline attempts show a clear error and change
   nothing (C3.10.3, AC12).
+
+**As-built (M22-T04).**
+
+- **Pull-to-refresh.** Every group list and screen uses `RefreshControl`.
+  `usePullToRefresh` shows the spinner only for a user pull; the focus and
+  poll refreshes stay silent (`ui/ux-rules.md` §14, 08 patterns 6–8).
+- **Offline marker.** `GroupOfflineBanner` renders
+  `formatOfflineMarker(lastUpdatedAtMs)` in local `HH:MM` whenever the
+  resource is `offline` (NetInfo reports offline, or the last refresh failed
+  with `NETWORK`). The tab uses the stream's timestamp, falling back to My
+  groups'. With no cache, `<prefix>-offline-empty-state` renders.
+- **Older pages.** They are not requested while offline. A failure shows a
+  footer with `Retry`.
+- **Evidence.** Jest (`groups-screens.test.tsx`) covers the offline marker.
+  Simulator network cannot be toggled reliably (§8).
 
 ## 8. Test plan
 

@@ -87,6 +87,7 @@ export type ExerciseHistoryScreenShellProps = {
   onPressStatsHistory: () => void;
   onPressLog: () => void;
   onPressExercises: () => void;
+  onPressGroups: () => void;
   onPressSettings: () => void;
 };
 
@@ -103,6 +104,7 @@ export function ExerciseHistoryScreenShell({
   onPressStatsHistory,
   onPressLog,
   onPressExercises,
+  onPressGroups,
   onPressSettings,
 }: ExerciseHistoryScreenShellProps) {
   const tagOptions = summary?.tagOptions ?? [];
@@ -222,6 +224,7 @@ export function ExerciseHistoryScreenShell({
         onPressStatsHistory={onPressStatsHistory}
         onPressLog={onPressLog}
         onPressExercises={onPressExercises}
+        onPressGroups={onPressGroups}
         onPressSettings={onPressSettings}
       />
     </View>
@@ -517,6 +520,7 @@ export default function ExerciseHistoryRoute() {
         onPressStatsHistory={() => router.push('/stats-history')}
         onPressLog={() => router.push('/session-recorder')}
         onPressExercises={() => router.push('/exercise-catalog')}
+        onPressGroups={() => router.push('/groups')}
         onPressSettings={() => router.push('/settings')}
       />
     </>

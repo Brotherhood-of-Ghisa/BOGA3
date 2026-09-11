@@ -71,7 +71,7 @@ Brief entrypoint inventory of the current reusable UI component set.
 1. `TopLevelTabs`
 - File: `apps/mobile/components/navigation/top-level-tabs.tsx`
 - Purpose:
-  - app-specific top-level `Stats/History`, `Log`, `Exercises` tab strip with a right-side `Settings` utility action; used as the body of `BottomTray` inside `(tabs)/_layout.tsx`, and rendered directly by detail screens (`exercise-history`) until they migrate into the tabs group
+  - app-specific top-level `History`, `Log`, `Exercises`, `Groups` tab strip with a right-side `Settings` utility action (fixed 12 pt labels so four tabs fit a 375 pt phone); used as the body of `BottomTray` inside `(tabs)/_layout.tsx`, and rendered directly by detail screens (`exercise-history`) until they migrate into the tabs group
 
 2. `BottomTray`
 - File: `apps/mobile/components/navigation/bottom-tray.tsx`
@@ -119,6 +119,19 @@ Brief entrypoint inventory of the current reusable UI component set.
   - reusable daily-cell and weekly-bar views over the same `HeatmapData`, used by both muscle- and exercise-history overlays
   - renders horizontally scrollable one-year history with token-backed zero/green/today/selected states and tappable accessible cells
   - the Stats overlay integration keeps both views mounted, with the inactive view transparent, non-interactive, and accessibility-hidden, so toggling does not rebuild the chart tree
+
+10. Group components (M22)
+- Folder: `apps/mobile/components/groups/` (barrel `index.ts`); data comes from `@/src/groups` hooks and the pure view model
+- Purpose:
+  - `GroupStreamSessionCard` — the stream card (member, status pill, start · gym, sets · kg · exercises, PR lines, group names in All); one press target
+  - `GroupStreamMembershipItem` — "X joined / left the group / was removed" row; pressable only where it opens another screen
+  - `GroupFilterChips` — `All` + per-group `SegmentedChips`, wrapping rather than scrolling sideways
+  - `GroupStreamList` — `FlatList` with `RefreshControl`, online older-page loading, and a Retry footer
+  - `GroupOfflineBanner` — the `Offline · last updated HH:MM` marker
+  - `GroupMemberRow`, `GroupSummaryRow` — Members-segment and My groups rows
+  - `FriendSessionContent` — the friend's session body composing `SessionContentLayout` read-only
+  - `GroupStateView`, `GroupsEmptyState` (children slot for M22-T05 actions), `GroupMissingDataState`, `GroupInlineError`, `GroupsSignInRequired` — feature-scoped state panels (not the pending generic `EmptyState`)
+  - `usePullToRefresh`, `groupScreenStyles` — pull spinner state and the shared page shell
 
 ### UI-supporting shared module (non-visual)
 

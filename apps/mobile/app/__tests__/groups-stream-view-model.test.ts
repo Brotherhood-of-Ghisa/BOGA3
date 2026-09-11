@@ -9,7 +9,13 @@ import {
   buildStreamFilterChips,
   buildStreamItemViewModel,
   buildStreamViewModel,
+  formatClockTime,
+  formatGroupDateTime,
   formatKg,
+  formatMemberCount,
+  formatMyRole,
+  formatOfflineMarker,
+  formatStreamStartedAt,
   formatMemberName,
   formatMembershipSentence,
   formatSessionStatusLabel,
@@ -121,6 +127,7 @@ describe('group stream view model', () => {
         memberName: 'dana',
         isTrainingNow: false,
         statusLabel: 'Completed · 1h 5m',
+        startedAtLabel: formatStreamStartedAt(1_757_500_000_000),
         gymName: 'Iron Temple',
         groupNames: ['Crew', 'Gym pals'],
         setsLabel: '12 sets',
@@ -161,7 +168,28 @@ describe('group stream view model', () => {
       ]);
 
       expect(models.map((model) => model.key)).toEqual(['u2:s1', 'm1:ended', 'm1:joined']);
-      expect(models[1]).toEqual({ kind: 'membership', key: 'm1:ended', sentence: 'dana left the group', groupName: 'Crew' });
+      expect(models[1]).toEqual({ kind: 'membership', key: 'm1:ended', sentence: 'dana left the group', groupId: 'g1', groupName: 'Crew' });
+    });
+  });
+
+  describe('time, offline marker, and role wording', () => {
+    const at = new Date(2026, 8, 7, 6, 4).getTime();
+
+    it('formats local times for cards, the friend view, and the offline marker (contract §7)', () => {
+      expect(formatClockTime(at)).toBe('06:04');
+      expect(formatStreamStartedAt(at)).toBe('9/7 06:04');
+      expect(formatGroupDateTime(at)).toBe('2026-09-07 06:04');
+      expect(formatOfflineMarker(at)).toBe('Offline · last updated 06:04');
+      expect(formatOfflineMarker(null)).toBe('Offline');
+    });
+
+    it('words member counts and my role', () => {
+      expect([formatMemberCount(1), formatMemberCount(3)]).toEqual(['1 member', '3 members']);
+      expect(['owner', 'admin', 'member'].map((role) => formatMyRole(role as 'owner'))).toEqual([
+        "You're the owner",
+        "You're an admin",
+        "You're a member",
+      ]);
     });
   });
 

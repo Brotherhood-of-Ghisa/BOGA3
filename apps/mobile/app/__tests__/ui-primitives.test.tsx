@@ -17,6 +17,7 @@ describe('UI primitives', () => {
         onPressStatsHistory={onPressStatsHistory}
         onPressLog={onPressLog}
         onPressExercises={onPressExercises}
+        onPressGroups={jest.fn()}
         onPressSettings={onPressSettings}
       />
     );
@@ -80,6 +81,7 @@ describe('UI primitives', () => {
         onPressStatsHistory={jest.fn()}
         onPressLog={jest.fn()}
         onPressExercises={jest.fn()}
+        onPressGroups={jest.fn()}
         onPressSettings={jest.fn()}
       />
     );

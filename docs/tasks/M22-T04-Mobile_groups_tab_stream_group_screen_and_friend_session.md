@@ -1,7 +1,7 @@
 ---
 task_id: M22-T04-Mobile_groups_tab_stream_group_screen_and_friend_session
 milestone_id: "M22"
-status: planned
+status: in_progress
 ui_impact: "yes"
 areas: "frontend"
 runtimes: "node|expo|maestro"
@@ -15,7 +15,7 @@ docs_touched: "docs/specs/ui/screen-map.md, docs/specs/ui/navigation-contract.md
 ## Task metadata
 
 - Task ID: `M22-T04-Mobile_groups_tab_stream_group_screen_and_friend_session`
-- Status: `planned`
+- Status: `in_progress`
 - Depends on: `M22-T03`
 - Precedes: `M22-T05`, which adds the create, join, invite, and manage
   actions onto these screens
@@ -159,8 +159,77 @@ actions land in `T05`; this task leaves their slots.
 
 ## Evidence
 
+- Jest (`apps/mobile/app/__tests__/groups-screens.test.tsx`, 21 tests; RPCs
+  mocked, real `group_cache` on the in-memory SQLite fixture):
+  - Flow 1: cache-first render, then newest-first cards and membership items;
+    card fields; All/one-group chips (AC14); pull-to-refresh; the offline
+    marker `Offline · last updated 09:05` over cached cards (AC12); the
+    offline empty state; the error state plus Retry, and the inline error;
+    infinite scroll.
+  - Flow 2: the friend view shows kg, reps, and effort; `In progress` plus
+    pull-to-refresh; `NOT_FOUND` → "no longer available" plus eviction;
+    offline with cache. No owner testIDs render (AC6).
+  - Flow 3: header, stream, members in role/username order; lost access
+    hides and evicts the cache (C3.6.8).
+  - Flow 4: signed out and unconfigured (no RPC); empty state; the fourth tab
+    plus `resolveActiveTab`.
+- Gates at `2a27df6` (rebased on `origin/main` with M22-T02), all green:
+  - `./boga test fast`: all lanes exit 0, `backend-fast` 46.6 s;
+  - `./boga test handles`: exit 0, 25.5 s;
+  - `boga test frontend`, under `apps/mobile/artifacts/maestro/ad-hoc/`:
+    - `ios-smoke`: `20260911-152422-6498`;
+    - `ios-data-smoke`: `20260911-152513-8394`;
+    - `ios-auth-profile`: `20260911-152801-14150`;
+    - `ios-sync-e2e`: flow 1 m 15 s, `20260911-153003-17114`.
+  - Earlier pre-rebase runs were also green.
+- Screenshots (`apps/mobile/artifacts/m22-t04-screenshots/`, gitignored):
+  - `m22t04-se-02-groups-signed-out-tab-bar.png`: the signed-out state on an
+    iPhone SE (3rd gen, 375 pt).
+  - `m22t04-se-01-tab-bar-history.png`: the tab bar on the SE.
+  - `m22t04-default-tab-bar-pre-fix.png`: the default simulator.
+  - **Small-phone result:** at first the labels clipped ("Histor", "Exerci",
+    "Group"; even "Exercis" on the default simulator). `UiButton`'s
+    shrink-to-fit does not engage on-device.
+  - The adjustment, in `top-level-tabs.tsx`:
+    - tab labels are a fixed `uiTypography.size.sm` (12), stretched and
+      centered;
+    - tab padding is `uiSpace.xxs` and the row gap `uiSpace.xs`;
+    - cog padding is `uiSpace.sm`.
+  - The re-capture shows all four labels whole on the SE:
+    `m22t04-se-0{1,2}-*-final.png` (run
+    `artifacts/maestro/m22-t04-screens/20260911-151511-96341`). The
+    `-post-fix` captures are the intermediate attempt.
+- **Real backend** (signed in as fixture `user_a`, local Supabase; run
+  `m22-t04-screens/20260911-153208-19752`):
+  - `m22t04-02-groups-empty-real-backend.png` (empty state);
+  - `m22t04-02b-my-groups-empty-real-backend.png`.
+- **Fixture-rendered** (same signed-in session; the four read RPCs swapped
+  for fixtures by a temporary, uncommitted patch to `src/groups/api.ts`,
+  since there is no seeded group data yet; run
+  `m22-t04-screens/20260911-153318-22457`):
+  - `m22t04-03-stream-all.png`;
+  - `m22t04-04-stream-one-group.png`;
+  - `m22t04-05-offline-marker.png` (the second All fetch fails with
+    `NETWORK`);
+  - `m22t04-06-friend-view.png`;
+  - `m22t04-07-group-screen-stream.png`;
+  - `m22t04-08-group-screen-members.png`.
+  - The two-user lane (M22-T06) adds real-data captures.
+- Harness notes:
+  - Shared Docker hung for about 1 h mid-task, so runs paused until it
+    recovered.
+  - Two SE attempts stalled on the Maestro XCUITest driver, and the retries
+    passed.
+  - After the harness teleport, an iOS 26 stale tab frame made a tap on
+    `top-level-tab-groups` land on Log. The screenshot flows open
+    `boga3://groups` instead.
+
 ## Completion note
 
-- What changed:
-- What tests ran:
-- What remains:
+- What changed: the Groups tab, My groups, the group screen, and the friend's
+  session view (read-only); `components/groups/*`; `useGroupStream`
+  (paging); view-model formatters; the fourth tab; UI docs, 08 patterns 6–8,
+  and the contract §6.3/§7 as-built notes.
+- What tests ran: see Evidence.
+- What remains: review and merge; real-data captures come with M22-T06.
+- M22-T05 adds the create/join/invite/manage actions into the left slots.

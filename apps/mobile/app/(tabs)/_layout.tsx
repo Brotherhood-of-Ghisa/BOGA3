@@ -9,9 +9,10 @@ import { TopLevelTabs, type TopLevelTabKey } from '@/components/navigation/top-l
 const STATS_HISTORY_ROUTE = '/stats-history';
 const SESSION_RECORDER_ROUTE = '/session-recorder';
 const EXERCISE_CATALOG_ROUTE = '/exercise-catalog';
+const GROUPS_ROUTE = '/groups';
 const SETTINGS_ROUTE = '/settings';
 
-function resolveActiveTab(segments: string[]): TopLevelTabKey {
+export function resolveActiveTab(segments: string[]): TopLevelTabKey {
   // expo-router segments look like ['(tabs)', '<route-name>'] inside the group.
   const last = segments[segments.length - 1] ?? '';
   switch (last) {
@@ -19,6 +20,8 @@ function resolveActiveTab(segments: string[]): TopLevelTabKey {
       return 'log';
     case 'exercise-catalog':
       return 'exercises';
+    case 'groups':
+      return 'groups';
     case 'stats-history':
     default:
       return 'stats-history';
@@ -37,6 +40,7 @@ function TabsBottomTray() {
         onPressStatsHistory={() => router.push(STATS_HISTORY_ROUTE)}
         onPressLog={() => router.push(SESSION_RECORDER_ROUTE)}
         onPressExercises={() => router.push(EXERCISE_CATALOG_ROUTE)}
+        onPressGroups={() => router.push(GROUPS_ROUTE)}
         onPressSettings={() => router.push(SETTINGS_ROUTE)}
       />
     </BottomTray>
@@ -53,6 +57,7 @@ export default function TabsLayout() {
           <Tabs.Screen name="stats-history" options={{ title: 'History' }} />
           <Tabs.Screen name="session-recorder" options={{ title: 'Session Recorder' }} />
           <Tabs.Screen name="exercise-catalog" options={{ title: 'Exercise Catalog' }} />
+          <Tabs.Screen name="groups" options={{ title: 'Groups' }} />
           <Tabs.Screen name="settings" options={{ title: 'Settings', href: null }} />
         </Tabs>
       </TrayVisibilityProvider>
