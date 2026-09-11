@@ -86,8 +86,12 @@ export default function RootLayout() {
                 />
                 <Stack.Screen name="dev-logs" options={{ title: 'Logs' }} />
                 <Stack.Screen name="group/mine" options={{ headerBackTitle: 'Back', title: 'My groups' }} />
+                <Stack.Screen name="group/new" options={{ headerBackTitle: 'Back', title: 'New group' }} />
+                <Stack.Screen name="group/join" options={{ headerBackTitle: 'Back', title: 'Join group' }} />
                 {/* The group screen replaces this title with the group's name once loaded. */}
                 <Stack.Screen name="group/[groupId]/index" options={{ headerBackTitle: 'Back', title: 'Group' }} />
+                <Stack.Screen name="group/[groupId]/edit" options={{ headerBackTitle: 'Back', title: 'Edit group' }} />
+                <Stack.Screen name="group/[groupId]/invite" options={{ headerBackTitle: 'Back', title: 'Invite' }} />
                 <Stack.Screen
                   name="group-session/[memberId]/[sessionId]"
                   options={{ headerBackTitle: 'Back', title: 'Session' }}

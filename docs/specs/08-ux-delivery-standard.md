@@ -102,6 +102,10 @@ Use this section as the single source of truth for reusable UX patterns.
    - Intent: an explicit, familiar refresh for server-backed lists that also refresh automatically.
    - Usage: group lists and screens (`RefreshControl`).
    - Rules: only a user pull shows the spinner; automatic refreshes (focus, polling) stay silent; a failed pull surfaces through the offline marker or the inline error with `Retry`, never a blocking dialog.
+9. Online-only write pattern
+   - Intent: writes to shared server data either happen now or visibly do not happen — never silently queued.
+   - Usage: every group write (`src/groups/use-group-action.ts`, `components/groups/write-notice.tsx`).
+   - Rules: refuse before any request when offline; show the failure inline next to the action saying nothing changed; keep the screen's data and form input as they were; no queue, no automatic retry; destructive writes confirm first (pattern 3). Wording and scope: `ui/ux-rules.md` §14.
 
 ## Default appearance baseline (MVP)
 

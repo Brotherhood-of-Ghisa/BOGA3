@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import type { ReactNode } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
@@ -53,12 +54,28 @@ export function GroupInlineError({ error, onRetry, testID }: { error: GroupApiEr
 export const GROUPS_EMPTY_BODY =
   "Groups let a few friends follow each other's training. Sessions you log after joining a group show up in its stream.";
 
-/** No groups yet. `children` is the slot for the Create / Join actions (M22-T05). */
+/** No groups yet. `children` is the slot for the Create / Join actions (`GroupsEmptyActions`). */
 export function GroupsEmptyState({ testID, children }: { testID: string; children?: ReactNode }) {
   return (
     <GroupStateView body={GROUPS_EMPTY_BODY} testID={testID} title="No groups yet">
       {children}
     </GroupStateView>
+  );
+}
+
+/** The empty state's primary actions: Create group, then Join group. testIDs `<prefix>-create-button` / `-join-button`. */
+export function GroupsEmptyActions({ testIDPrefix }: { testIDPrefix: string }) {
+  const router = useRouter();
+  return (
+    <View style={styles.emptyActions}>
+      <UiButton label="Create group" onPress={() => router.push('/group/new')} testID={`${testIDPrefix}-create-button`} />
+      <UiButton
+        label="Join with a code"
+        onPress={() => router.push('/group/join')}
+        testID={`${testIDPrefix}-join-button`}
+        variant="secondary"
+      />
+    </View>
   );
 }
 
@@ -107,6 +124,9 @@ const styles = StyleSheet.create({
   card: {
     padding: uiSpace.xxl,
     gap: uiSpace.md,
+  },
+  emptyActions: {
+    gap: uiSpace.sm,
   },
   loading: {
     alignItems: 'center',
