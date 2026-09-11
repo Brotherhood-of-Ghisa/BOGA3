@@ -31,6 +31,12 @@ export const generatedMigrationBundle = {
     tag: "0003_high_sprite",
     breakpoints: true,
   },
+  {
+    idx: 4,
+    when: 1789068887537,
+    tag: "0004_optimal_umar",
+    breakpoints: true,
+  },
     ],
   },
   migrations: {
@@ -244,6 +250,13 @@ ALTER TABLE \`exercise_sets\` ADD \`planned_reps_value\` text;--> statement-brea
 ALTER TABLE \`exercise_sets\` ADD \`planned_set_type\` text;--> statement-breakpoint
 ALTER TABLE \`exercise_sets\` ADD \`performance_status\` text;`,
   m0003: `ALTER TABLE \`exercise_definitions\` ADD \`load_input_mode\` text DEFAULT 'total_load' NOT NULL CONSTRAINT "exercise_definitions_load_input_mode_valid" CHECK(\`load_input_mode\` in ('total_load', 'per_side_load'));
+`,
+  m0004: `CREATE TABLE \`group_cache\` (
+	\`cache_key\` text PRIMARY KEY NOT NULL,
+	\`user_id\` text NOT NULL,
+	\`payload_json\` text NOT NULL,
+	\`fetched_at_ms\` integer NOT NULL
+);
 `,
   },
 } as const;

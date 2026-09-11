@@ -26,6 +26,7 @@ import {
   exerciseMuscleMappings,
   exerciseSets,
   exerciseTagDefinitions,
+  groupCache,
   gyms,
   muscleGroups,
   sessionExerciseTags,
@@ -44,6 +45,8 @@ import {
  *   session_exercise_tags, exercise_sets, session_exercises, sessions,
  *   gyms, exercise_tag_definitions, exercise_muscle_mappings,
  *   exercise_definitions, muscle_groups.
+ * Plus the local-only, FK-free `group_cache` (the previous account's cached
+ * group RPC payloads; groups contract §6.2).
  *
  * What it resets on the singleton runtime-state row:
  *   - bootstrap_completed_at → null  (so the first-cycle bootstrapper re-runs
@@ -78,6 +81,7 @@ const wipeLocalTables = (database: LocalDatabase): void => {
     transaction.delete(exerciseMuscleMappings).run();
     transaction.delete(exerciseDefinitions).run();
     transaction.delete(muscleGroups).run();
+    transaction.delete(groupCache).run();
 
     transaction
       .update(syncRuntimeState)

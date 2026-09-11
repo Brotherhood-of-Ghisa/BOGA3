@@ -1,0 +1,242 @@
+// Cache-first group read hook (`docs/specs/tech/groups-contract.md` §6.1, §7).
+//
+//   - renders the cached payload for (user, cacheKey) first;
+//   - refreshes on focus, every 30 s while focused, and on `refresh()`;
+//   - `offline` is true when the device is offline or the last refresh failed
+//     with `NETWORK`; cached data and `lastUpdatedAtMs` stay;
+//   - `NOT_FOUND` evicts the entry (plus the group's entries when
+//     `evictGroupIdOnNotFound` is set) and surfaces `lostAccess`;
+//   - it never throws into render: every failure is a typed `error` state.
+//
+// Group code never runs inside the sync cycle (C3.10.5): this hook only reads
+// NetInfo and the local cache and calls the group RPC it is given.
+
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
+
+import { bootstrapLocalDataLayer } from '@/src/data/bootstrap';
+
+import { GroupApiError, toGroupApiError } from './api';
+import { deleteGroupCacheEntry, evictGroup, readGroupCache, writeGroupCache } from './cache';
+import { useNetworkOnline } from './use-network-online';
+
+export const GROUP_RESOURCE_POLL_INTERVAL_MS = 30_000;
+
+export type GroupResourceOptions<T> = {
+  /** Signed-in user id (`useAuth().user?.id`). Null disables reads and fetches. */
+  userId: string | null;
+  /** `groupCacheKeys.*`. Null disables reads and fetches. */
+  cacheKey: string | null;
+  /** The group RPC to run on refresh (an `api.ts` read). */
+  fetcher: () => Promise<T>;
+  /** On `NOT_FOUND`, also evict this group's entries (`evictGroup`). */
+  evictGroupIdOnNotFound?: string | null;
+  pollIntervalMs?: number;
+};
+
+export type GroupResourceState<T> = {
+  data: T | null;
+  /** Epoch-ms of the payload in `data` (cache or last successful refresh). */
+  lastUpdatedAtMs: number | null;
+  /** True once the cache read for the current (user, key) has settled. */
+  hydrated: boolean;
+  refreshing: boolean;
+  offline: boolean;
+  /** The latest failure, cleared by the next successful refresh. */
+  error: GroupApiError | null;
+  /** The last refresh returned `NOT_FOUND`: the caller is no longer a member (or it never existed). */
+  lostAccess: boolean;
+  /** Pull-to-refresh. Never rejects. */
+  refresh: () => Promise<void>;
+};
+
+type InternalState<T> = {
+  data: T | null;
+  lastUpdatedAtMs: number | null;
+  hydrated: boolean;
+  refreshing: boolean;
+  networkFailed: boolean;
+  error: GroupApiError | null;
+  lostAccess: boolean;
+};
+
+const initialState = <T>(): InternalState<T> => ({
+  data: null,
+  lastUpdatedAtMs: null,
+  hydrated: false,
+  refreshing: false,
+  networkFailed: false,
+  error: null,
+  lostAccess: false,
+});
+
+export function useGroupResource<T>({
+  userId,
+  cacheKey,
+  fetcher,
+  evictGroupIdOnNotFound = null,
+  pollIntervalMs = GROUP_RESOURCE_POLL_INTERVAL_MS,
+}: GroupResourceOptions<T>): GroupResourceState<T> {
+  const online = useNetworkOnline();
+  const [state, setState] = useState<InternalState<T>>(initialState);
+
+  const identity = userId && cacheKey ? `${userId}\u0000${cacheKey}` : null;
+  const identityRef = useRef<string | null>(identity);
+  const fetcherRef = useRef(fetcher);
+  const onlineRef = useRef(online);
+  const inFlightRef = useRef<Promise<void> | null>(null);
+
+  useEffect(() => {
+    fetcherRef.current = fetcher;
+  }, [fetcher]);
+
+  useEffect(() => {
+    onlineRef.current = online;
+  }, [online]);
+
+  // Hydrate from the cache whenever the (user, key) identity changes.
+  useEffect(() => {
+    identityRef.current = identity;
+    inFlightRef.current = null;
+    setState(initialState<T>());
+
+    if (!userId || !cacheKey || identity === null) {
+      setState({ ...initialState<T>(), hydrated: true });
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const database = await bootstrapLocalDataLayer();
+        const entry = readGroupCache<T>(database, cacheKey, userId);
+        if (cancelled) return;
+        setState((previous) => {
+          // A refresh that already landed is fresher than the cache: keep it.
+          const keepFresher =
+            entry === null ||
+            (previous.lastUpdatedAtMs !== null && previous.lastUpdatedAtMs >= entry.fetchedAtMs);
+          return keepFresher
+            ? { ...previous, hydrated: true }
+            : { ...previous, hydrated: true, data: entry.payload, lastUpdatedAtMs: entry.fetchedAtMs };
+        });
+      } catch (error) {
+        if (cancelled) return;
+        setState((previous) => ({ ...previous, hydrated: true, error: toGroupApiError(error) }));
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [identity, userId, cacheKey]);
+
+  const refresh = useCallback((): Promise<void> => {
+    if (!userId || !cacheKey || identity === null) {
+      return Promise.resolve();
+    }
+    if (inFlightRef.current) {
+      return inFlightRef.current;
+    }
+    // Known offline: no request; `offline` is already derived from NetInfo.
+    if (onlineRef.current === false) {
+      return Promise.resolve();
+    }
+
+    const isCurrent = () => identityRef.current === identity;
+
+    const run = (async () => {
+      setState((previous) => ({ ...previous, refreshing: true }));
+
+      let payload: T;
+      try {
+        payload = await fetcherRef.current();
+      } catch (caught) {
+        const error = toGroupApiError(caught);
+        if (!isCurrent()) return;
+
+        if (error.code === 'NOT_FOUND') {
+          let evictionError: GroupApiError | null = null;
+          try {
+            const database = await bootstrapLocalDataLayer();
+            deleteGroupCacheEntry(database, cacheKey);
+            if (evictGroupIdOnNotFound) {
+              evictGroup(database, evictGroupIdOnNotFound);
+            }
+          } catch (evictCaught) {
+            evictionError = toGroupApiError(evictCaught);
+          }
+          if (!isCurrent()) return;
+          setState((previous) => ({
+            ...previous,
+            data: null,
+            lastUpdatedAtMs: null,
+            refreshing: false,
+            networkFailed: false,
+            lostAccess: true,
+            error: evictionError ?? error,
+          }));
+          return;
+        }
+
+        setState((previous) => ({
+          ...previous,
+          refreshing: false,
+          networkFailed: error.code === 'NETWORK',
+          error,
+        }));
+        return;
+      }
+
+      if (!isCurrent()) return;
+      const fetchedAtMs = Date.now();
+      setState((previous) => ({
+        ...previous,
+        data: payload,
+        lastUpdatedAtMs: fetchedAtMs,
+        refreshing: false,
+        networkFailed: false,
+        lostAccess: false,
+        error: null,
+      }));
+
+      try {
+        const database = await bootstrapLocalDataLayer();
+        writeGroupCache(database, { cacheKey, userId, payload, fetchedAtMs });
+      } catch (writeCaught) {
+        if (!isCurrent()) return;
+        setState((previous) => ({ ...previous, error: toGroupApiError(writeCaught) }));
+      }
+    })().finally(() => {
+      if (inFlightRef.current === run) {
+        inFlightRef.current = null;
+      }
+    });
+
+    inFlightRef.current = run;
+    return run;
+  }, [identity, userId, cacheKey, evictGroupIdOnNotFound]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void refresh();
+      const handle = setInterval(() => {
+        void refresh();
+      }, pollIntervalMs);
+      return () => {
+        clearInterval(handle);
+      };
+    }, [refresh, pollIntervalMs]),
+  );
+
+  return {
+    data: state.data,
+    lastUpdatedAtMs: state.lastUpdatedAtMs,
+    hydrated: state.hydrated,
+    refreshing: state.refreshing,
+    offline: online === false || state.networkFailed,
+    error: state.error,
+    lostAccess: state.lostAccess,
+    refresh,
+  };
+}

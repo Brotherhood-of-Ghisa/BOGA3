@@ -14,6 +14,7 @@ export {
   type NewExerciseMuscleMapping,
 } from './exercise-muscle-mappings';
 export { exerciseSets, type ExerciseSet, type NewExerciseSet } from './exercise-sets';
+export { groupCache, type GroupCacheRecord, type NewGroupCacheRecord } from './group-cache';
 export { gyms, type Gym, type NewGym } from './gyms';
 export { muscleGroups, type MuscleGroup, type NewMuscleGroup } from './muscle-groups';
 export {

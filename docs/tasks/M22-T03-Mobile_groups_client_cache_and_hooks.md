@@ -1,7 +1,7 @@
 ---
 task_id: M22-T03-Mobile_groups_client_cache_and_hooks
 milestone_id: "M22"
-status: planned
+status: in_progress
 ui_impact: "no"
 areas: "frontend"
 runtimes: "node|expo"
@@ -15,7 +15,7 @@ docs_touched: "docs/specs/tech/groups-contract.md, docs/specs/05-data-model.md, 
 ## Task metadata
 
 - Task ID: `M22-T03-Mobile_groups_client_cache_and_hooks`
-- Status: `planned`
+- Status: `in_progress`
 - Depends on: none. It codes against the contract types, and RPCs are mocked
   in jest.
 - Parallel with: `M22-T01`
@@ -119,8 +119,39 @@ Screens, routes, and the tab (`M22-T04`, `T05`). The server (`M22-T01`,
 
 ## Evidence
 
+Branch `m22-t03-mobile-groups-client`, rebased on `origin/main` 9cb5d80
+(#266). Gate results are for commit `498b52d` (membership-write typing
+update) unless noted. Durations are measured records (`./boga timings`,
+`docs/testing/timings/records/`).
+
+- `npx jest groups account-switch-local-wipe domain-schema-migrations`:
+  9 suites and 103 tests passed.
+- `./boga test fast`: exit 0.
+  - `lint` 1.4s, `typecheck` 3.2s, `jest-full` 6.2s (114 suites, 1086
+    tests).
+  - `backend-fast` 1.2m, `docs-check` 0.1s, `meta-tests` 1.3s.
+  - `agent-auth-web` 2.7s (6 tests), `mcp-unit` 4.0s (5 tests).
+- `./boga test handles`: exit 0, 114 suites, 1086 tests, no open handles,
+  23.2s.
+- `./boga test backend`: exit 0 for all 11 lanes: `auth-authz` 7.9s, `agent-api` 6.6s, `sync-v2-schema` 7.5s, `sync-push-contract` 6.0s, `sync-pull-contract` 6.2s, `dev-wipe-my-data`, `sync-drift` 39s (`--strict`), `sync-v2-e2e` 2.2m, `sync-infra` 10s, `mcp-smoke` 8.7s.
+- `./boga test frontend`: exit 0 for all 4 lanes: `ios-smoke` 1/1 flow (`/20260911-121423-53218`); `ios-data-smoke` 1/1 flow, 1.1m, migration m0004 applied on device (`/20260911-121458-55387`); `ios-auth-profile` 1/1 flow, 1.2m (`/20260911-121607-58515`); `ios-sync-e2e` 1/1 flow, 1.7m, account wipe with `group_cache` (`/20260911-121720-61182`).
+- Earlier run (commit 5d16550, before the typing update): `ios-smoke` passed
+  (`apps/mobile/artifacts/maestro/ad-hoc/20260910-221914-25920`), and
+  `ios-data-smoke` hit a 900s harness timeout at host load average about 112
+  (`…/ad-hoc/20260910-222037-29457`). The OrbStack Docker API then hung, and
+  the remaining Docker lanes were deferred until it recovered.
+
 ## Completion note
 
-- What changed:
-- What tests ran:
-- What remains:
+- What changed: `apps/mobile/src/groups/**`, the `group_cache` schema with
+  migration 0004, the `group_cache` delete in `wipeLocalTables`, and jest
+  suites `groups-*`. Docs: spec 05, spec 09, and the groups-contract §6.1–§6.2
+  As-built notes.
+- Membership-write results follow the M22-T01 as-built §4.3. `leaveGroup`
+  resolves `{ group_id }`. `removeGroupMember`, `setGroupMemberRole`, and
+  `transferGroupOwnership` resolve the `group_get` payload
+  `{ group, members }`. Each is shape-checked, and the contract §6.1
+  As-built note records this.
+- What tests ran: see Evidence.
+- What remains: review and merge. The screens (`M22-T04`, `T05`) consume
+  these hooks.

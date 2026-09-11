@@ -66,6 +66,23 @@ This document is project-level source of truth for what data exists and how it i
 - `sync_runtime_state` (singleton row; see *Local sync bookkeeping* below)
 - `sync_quarantine` — local-only push-side quarantine bookkeeping for dirty rows
   whose required FK parents are missing locally. Never synced and FK-free.
+- `group_cache` (M22) — local-only, disposable cache of server-authoritative
+  group RPC results: `cache_key` PK, `user_id`, `payload_json`,
+  `fetched_at_ms` (`apps/mobile/src/data/schema/group-cache.ts`, migration
+  `0004`). Reads return nothing unless `user_id` matches the signed-in user.
+  Sync impact decision: `out of sync scope` — no dirty columns, no FKs, no
+  server counterpart, so it is outside the drift checker like
+  `sync_quarantine`. Guardrails: FK-free (local integrity rule 2), cleared by
+  the sign-out / account-switch wipe, and evicted per group on `NOT_FOUND`
+  (`docs/specs/tech/groups-contract.md` §6.2).
+
+### Sign-out / account-switch wipe
+
+`wipeLocalTables` (`apps/mobile/src/sync/account-wipe.ts`) deletes, in one
+transaction, the nine user-owned entity tables (child before parent) and
+`group_cache`, then resets `bootstrap_completed_at`, `pull_cursor`, and
+`applied_seed_migration_app_version` on the `sync_runtime_state` row. It keeps
+`last_emitted_ms` and issues no server delete.
 
 ### Local sync bookkeeping (Sync v2)
 
@@ -158,10 +175,11 @@ to deduplicate per device, so idempotency falls out of per-row LWW.
     entities (contract §1.1). The nine Sync v2 tables and their owner-only RLS
     are unchanged, and `sync-drift --strict` stays green because no group
     table carries `owner_user_id`.
-- **Planned (M22-T02/T03):** `group_session_shares` (the group record — a
-  server-written share ledger read through from members' own Sync v2 rows) and
-  the mobile `group_cache` table (local-only, disposable). Both are
+- **Planned (M22-T02):** `group_session_shares` (the group record — a
+  server-written share ledger read through from members' own Sync v2 rows),
   `out of sync scope`.
+- **As-built (M22-T03):** the mobile `group_cache` table (local-only,
+  disposable; see *Local schema inventory*), `out of sync scope`.
 
 ## Ownership and identity invariants
 
@@ -338,8 +356,9 @@ also asserts the hardcoded topological table order in
 `docs/specs/tech/sync-v2-server-contract.md` §A.7.7) — adding a new entity table
 or FK without updating that list also fails the gate.
 
-This rule does NOT apply to: `smoke_records`, `sync_runtime_state`, or
-`sync_quarantine` (test/runtime scaffolding and local sync bookkeeping) — these
+This rule does NOT apply to: `smoke_records`, `sync_runtime_state`,
+`sync_quarantine`, or `group_cache` (test/runtime scaffolding, local sync
+bookkeeping, and the disposable group cache) — these
 have no server counterpart and are out of the checker's scope, which introspects
 only the nine `app_public.<entity>` mirror tables. Nor does it apply to the two
 local-only sync-bookkeeping columns (`local_dirty`, `local_updated_at_ms`) on
