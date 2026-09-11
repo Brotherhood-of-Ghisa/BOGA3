@@ -202,17 +202,33 @@ appId: com.dinoderek.mobile
 # below; refresh-button is exercised next.
 - assertVisible:
     id: "settings-sync-status-last-success"
+- scrollUntilVisible:
+    element:
+      id: "settings-sync-status-network"
+    direction: DOWN
 - assertVisible:
     id: "settings-sync-status-network"
+- scrollUntilVisible:
+    element:
+      id: "settings-sync-status-error"
+    direction: DOWN
 - assertVisible:
     id: "settings-sync-status-error"
 # Tap Refresh: fires a real full sync cycle (push the dirty delta + pull).
+- scrollUntilVisible:
+    element:
+      id: "settings-sync-status-refresh-button"
+    direction: DOWN
 - tapOn:
     id: "settings-sync-status-refresh-button"
 # Wait until "Pending changes" reads exactly 0 — the logged exercise's local
 # dirty rows have all been accepted by the server. The combined id+text matcher
 # targets the dirty-count field specifically so an unrelated "0" elsewhere cannot
 # satisfy it. If the push never completes, this times out (correct failure).
+- scrollUntilVisible:
+    element:
+      id: "settings-sync-status-dirty-count"
+    direction: UP
 - extendedWaitUntil:
     visible:
       id: "settings-sync-status-dirty-count"

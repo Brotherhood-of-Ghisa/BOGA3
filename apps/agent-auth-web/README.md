@@ -1,10 +1,20 @@
 # BoGa agent authorization web
 
-`apps/agent-auth-web` is the public consent surface used by the Supabase OAuth
-2.1 server. Supabase owns protocol validation, authorization codes, PKCE, token
-issuance/refresh, expiry, and revocation; this app only signs the BoGa user in,
-shows the requesting client and read-only training-data disclosure, and calls
-the supported approve/deny methods.
+`apps/agent-auth-web` is the public connection and consent surface for BoGa's
+MCP-compatible AI coaching integration. Its routes have deliberately separate
+responsibilities:
+
+- `/` and `/connect` show standalone public setup guidance, the canonical MCP
+  endpoint, the read-only boundary, and the in-app revocation path. They neither
+  create a Supabase client nor inspect OAuth state and never ask for a password.
+- `/oauth/consent` is entered only after an MCP client starts OAuth. It requires
+  a valid `authorization_id` before sign-in, consent lookup, approval, or denial;
+  missing/invalid state remains a fail-closed error with return-to-client help.
+
+Supabase owns protocol validation, authorization codes, PKCE, token
+issuance/refresh, expiry, and revocation. On the consent route this app only
+signs the BoGa user in, shows the requesting client and read-only training-data
+disclosure, and calls the supported approve/deny methods.
 
 The consent surface accepts the four identity scopes currently advertised by
 the Supabase OAuth server: `openid`, `profile`, `email`, and `phone`. It renders
@@ -25,9 +35,10 @@ npm run build
 npm run dev
 ```
 
-Set `VITE_SUPABASE_URL` to the target Supabase API origin and
+For the `/oauth/consent` route, set `VITE_SUPABASE_URL` to the target Supabase API origin and
 `VITE_SUPABASE_PUBLISHABLE_KEY` to its client-safe publishable key. Vite embeds
 both values into the public bundle, so neither variable may contain a secret.
+The public setup routes render independently of those values.
 
 `scripts/mint-local-oauth.ts` is test tooling, not production UI. The repository
 smoke harness uses it to exercise dynamic registration, authorization code +
@@ -63,11 +74,13 @@ The fallback is required so a direct request to `/oauth/consent` serves
    npx wrangler deploy
    ```
 
-3. Confirm both the root URL and the consent route return the app:
+3. Confirm the public setup routes and the consent route return the app:
 
    ```bash
    curl --fail --head \
      https://sparkling-violet-dc56.sboschianpest.workers.dev/
+   curl --fail --head \
+     https://sparkling-violet-dc56.sboschianpest.workers.dev/connect
    curl --fail --head \
      https://sparkling-violet-dc56.sboschianpest.workers.dev/oauth/consent
    ```
@@ -99,6 +112,13 @@ The fallback is required so a direct request to `/oauth/consent` serves
    **Authentication > OAuth Apps** and register its exact callback URL.
 
 ### Connect MCP clients
+
+The mobile Settings link defaults to
+`https://sparkling-violet-dc56.sboschianpest.workers.dev/connect`. Builds may
+replace that public, non-secret value with
+`EXPO_PUBLIC_BOGA_AGENT_CONNECT_URL`; the configured URL must be HTTPS, end at
+`/connect`, and contain no credentials, query parameters, or fragment. Deploy
+and verify the setup page before releasing a mobile build that links to it.
 
 Use the public Streamable HTTP MCP endpoint in every client:
 

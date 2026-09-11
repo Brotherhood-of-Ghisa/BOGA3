@@ -1,29 +1,36 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 import {
   OAUTH_SCOPE_DISCLOSURES,
-  authorizationIdFrom,
   decideAuthorization,
   loadConsentState,
   type ConsentDetails,
 } from './authorization.ts';
+import { agentAuthEntryRouteFrom } from './entry-route.ts';
+import { BOGA_PUBLIC_MCP_ENDPOINT } from './setup.ts';
 import './styles.css';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim();
-const publishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim();
-if (!supabaseUrl || !publishableKey) {
-  throw new Error('BoGa authorization is not configured.');
-}
-
-const client = createClient(supabaseUrl, publishableKey, {
-  auth: {
-    autoRefreshToken: true,
-    detectSessionInUrl: true,
-    persistSession: true,
-  },
-});
 const root = document.querySelector<HTMLElement>('#app');
 if (!root) throw new Error('Application root is missing.');
+
+let client: SupabaseClient | null = null;
+
+const getClient = (): SupabaseClient => {
+  if (client) return client;
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim();
+  const publishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim();
+  if (!supabaseUrl || !publishableKey) {
+    throw new Error('BoGa authorization is not configured.');
+  }
+  client = createClient(supabaseUrl, publishableKey, {
+    auth: {
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      persistSession: true,
+    },
+  });
+  return client;
+};
 
 const escapeHtml = (value: string): string =>
   value.replace(
@@ -69,6 +76,33 @@ const renderError = (message: string): void => {
   `);
 };
 
+const renderSetup = (): void => {
+  root.innerHTML = pageShell(`
+    <div class="consent-card setup-card">
+      <p class="eyebrow">AI coach setup</p>
+      <h1>Connect BoGa to your AI coach</h1>
+      <p class="lede">Use an MCP-compatible client to give your coach read-only access to your training history.</p>
+
+      <div class="endpoint-panel">
+        <p class="permission-title">BoGa MCP server</p>
+        <code>${escapeHtml(BOGA_PUBLIC_MCP_ENDPOINT)}</code>
+      </div>
+
+      <ol class="setup-steps">
+        <li><strong>Add the server address</strong> to your MCP client as a remote HTTP connection.</li>
+        <li><strong>Choose Connect or Auth in the client.</strong> Your client starts OAuth and opens BoGa in the browser.</li>
+        <li><strong>Sign in and review access.</strong> Only approve the client you intended to connect.</li>
+      </ol>
+
+      <div class="denied-panel">
+        <span class="denied-icon" aria-hidden="true">✓</span>
+        <p><strong>Your coach can only read training data.</strong> It cannot create, edit, or delete your workouts, exercises, or sets.</p>
+      </div>
+      <p class="revoke-note">To disconnect later, open BoGa → Settings → Connected agents and revoke the connection.</p>
+    </div>
+  `);
+};
+
 const renderSignIn = (authorizationId: string, errorMessage = ''): void => {
   root.innerHTML = pageShell(`
     <div class="consent-card">
@@ -97,7 +131,7 @@ const renderSignIn = (authorizationId: string, errorMessage = ''): void => {
     const password = String(fields.get('password') ?? '');
     const button = form.querySelector<HTMLButtonElement>('button');
     if (button) button.disabled = true;
-    const { error } = await client.auth.signInWithPassword({ email, password });
+    const { error } = await getClient().auth.signInWithPassword({ email, password });
     if (error) {
       renderSignIn(authorizationId, 'The email or password was not accepted.');
       return;
@@ -146,7 +180,7 @@ const renderConsent = (details: ConsentDetails): void => {
     });
     try {
       const redirectUrl = await decideAuthorization(
-        client,
+        getClient(),
         details.authorizationId,
         decision,
       );
@@ -166,7 +200,7 @@ const renderConsent = (details: ConsentDetails): void => {
 const showConsent = async (authorizationId: string): Promise<void> => {
   renderStatus('Loading connection details…');
   try {
-    const state = await loadConsentState(client, authorizationId);
+    const state = await loadConsentState(getClient(), authorizationId);
     if (state.kind === 'redirect') {
       window.location.assign(state.redirectUrl);
       return;
@@ -178,19 +212,37 @@ const showConsent = async (authorizationId: string): Promise<void> => {
 };
 
 const start = async (): Promise<void> => {
-  let authorizationId: string;
+  let entryRoute;
   try {
-    authorizationId = authorizationIdFrom(new URL(window.location.href));
+    entryRoute = agentAuthEntryRouteFrom(new URL(window.location.href));
   } catch (error) {
     renderError(error instanceof Error ? error.message : 'Authorization request failed.');
     return;
   }
-  const { data, error } = await client.auth.getSession();
-  if (error || !data.session) {
-    renderSignIn(authorizationId);
+
+  if (entryRoute.kind === 'setup') {
+    renderSetup();
     return;
   }
-  await showConsent(authorizationId);
+  if (entryRoute.kind === 'unsupported') {
+    renderError('This page does not exist.');
+    return;
+  }
+
+  let consentClient: SupabaseClient;
+  try {
+    consentClient = getClient();
+  } catch (error) {
+    renderError(error instanceof Error ? error.message : 'Authorization request failed.');
+    return;
+  }
+
+  const { data, error } = await consentClient.auth.getSession();
+  if (error || !data.session) {
+    renderSignIn(entryRoute.authorizationId);
+    return;
+  }
+  await showConsent(entryRoute.authorizationId);
 };
 
 renderStatus('Preparing a secure connection…');

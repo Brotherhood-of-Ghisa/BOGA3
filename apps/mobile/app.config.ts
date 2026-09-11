@@ -1,5 +1,8 @@
 import { ExpoConfig } from 'expo/config';
 
+const DEFAULT_BOGA_AGENT_CONNECT_URL =
+    "https://sparkling-violet-dc56.sboschianpest.workers.dev/connect";
+
 export default ({ config }: { config: ExpoConfig }) => ({
     ...config,
 
@@ -77,6 +80,9 @@ export default ({ config }: { config: ExpoConfig }) => ({
     extra: {
         env: process.env.APP_ENV,
         releaseCodename: "Jemiliano",
+        bogaAgentConnectUrl:
+            process.env.EXPO_PUBLIC_BOGA_AGENT_CONNECT_URL?.trim() ||
+            DEFAULT_BOGA_AGENT_CONNECT_URL,
         eas: {
             projectId: "3c00cd23-0946-4eb6-bbf0-4542879cd314"
         },

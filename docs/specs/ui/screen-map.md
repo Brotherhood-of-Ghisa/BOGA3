@@ -118,12 +118,16 @@ Brief entrypoint map of the current mobile screens.
 6. `/settings`
 - File: `apps/mobile/app/(tabs)/settings.tsx`
 - Purpose:
-  - account/settings entry screen for the auth/profile flow, plus the signed-in
-    sync-status surface
+  - account, AI-coaching setup, preferences, sync, and installed-release
+    information in one scrollable support surface
 - Key states (high level):
-  - one tappable account/profile card
-  - one signed-in-only Connected agents row; signed-out users do not see agent
-    permission management
+  - visible `Settings` heading, then Account, AI coaching, Preferences, Data &
+    sync, About, and development-only Developer tools sections in that order
+  - Account routes to `/profile`, showing the signed-in email when available or
+    concise signed-out guidance otherwise
+  - AI coaching always offers an external `Connect an AI coach` setup link and
+    states the read-only/revocable boundary; browser-launch failure stays inline
+    and retryable. The separate Connected agents row is signed-in only.
   - a sync-status card (signed-in only) showing last successful sync time
     (`Never` until the first success), pending-change count (rows still waiting
     to push across the user-owned tables), network state (online/offline), and
@@ -132,12 +136,16 @@ Brief entrypoint map of the current mobile screens.
     focused. Card/fields carry stable testIDs (`settings-sync-status-card`,
     `settings-sync-status-last-success`, `settings-sync-status-dirty-count`,
     `settings-sync-status-network`, `settings-sync-status-error`).
-  - a developer-tools card (`isDevMode()` only), separate from the sync-status
-    card, with the local/remote wipe affordances
+  - signed-out Data & sync guidance instead of usable sync controls
+  - About shows installed native version/build where available, optional release
+    codename, and Preview/Local flavor only outside production
+  - a developer-tools card (`isDevMode()` only), last and separate from the
+    sync-status card, with the local/remote wipe affordances
   - available from the shared settings utility action regardless of auth state
 - Key exits:
   - `profile`
   - `connected-agents` (signed in only)
+  - the first-party public `/connect` page in the system browser
   - back to the previous route via stack navigation
 
 7. `/connected-agents`

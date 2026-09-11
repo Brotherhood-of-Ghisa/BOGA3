@@ -1,4 +1,5 @@
 import { useRouter } from 'expo-router';
+import * as Linking from 'expo-linking';
 import { useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
@@ -11,7 +12,9 @@ import {
   wipeRemoteForCurrentUser,
 } from '@/src/sync/dev-affordances';
 import { useExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
+import { getAgentConnectUrl } from '@/src/utils/agent-connect';
 import { isDevMode } from '@/src/utils/isDevMode';
+import { formatVersionBuild, readAppRuntimeMetadata } from '@/src/utils/runtime-metadata';
 
 type DevFeedback = { tone: 'success' | 'error'; message: string } | null;
 
@@ -19,6 +22,9 @@ export default function SettingsScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const [listPreferences, setListPreferences] = useExerciseListPreferences();
+  const [connectError, setConnectError] = useState<string | null>(null);
+  const runtimeMetadata = readAppRuntimeMetadata();
+  const versionBuild = formatVersionBuild(runtimeMetadata);
 
   const [isResetting, setIsResetting] = useState(false);
   const [resetFeedback, setResetFeedback] = useState<DevFeedback>(null);
@@ -28,6 +34,15 @@ export default function SettingsScreen() {
 
   const [isWipingRemote, setIsWipingRemote] = useState(false);
   const [wipeRemoteFeedback, setWipeRemoteFeedback] = useState<DevFeedback>(null);
+
+  const handleConnectAgent = async () => {
+    setConnectError(null);
+    try {
+      await Linking.openURL(getAgentConnectUrl());
+    } catch {
+      setConnectError('Couldn’t open the setup page. Try again.');
+    }
+  };
 
   const handleDevReset = async () => {
     setIsResetting(true);
@@ -126,182 +141,291 @@ export default function SettingsScreen() {
       keyboardShouldPersistTaps="handled"
       style={styles.screen}
       testID="settings-screen">
-      <Pressable
-        accessibilityHint="Opens your profile account screen"
-        accessibilityLabel="Open Account Profile"
-        onPress={() => router.push('/profile')}
-        style={({ pressed }) => [styles.cardPressable, pressed ? styles.cardPressed : null]}
-        testID="settings-profile-row">
-        <UiSurface style={styles.profileCard}>
-          <View style={styles.profileRow}>
-            <View style={styles.iconBadge}>
-              <UiText selectable={false} style={styles.iconGlyph} variant="labelStrong">
-                👤
-              </UiText>
-            </View>
-            <View style={styles.profileCopy}>
-              <UiText selectable variant="labelStrong">
-                Profile
-              </UiText>
-              <UiText selectable variant="bodyMuted">
-                Sign in, review your account email, and sign out.
-              </UiText>
-            </View>
-          </View>
-        </UiSurface>
-      </Pressable>
+      <UiText accessibilityRole="header" selectable style={styles.screenTitle} variant="title">
+        Settings
+      </UiText>
 
-      {user ? (
+      <View style={styles.section} testID="settings-section-account">
+        <UiText accessibilityRole="header" selectable variant="title">
+          Account
+        </UiText>
         <Pressable
-          accessibilityHint="Opens the list of authorized coaching agents"
-          accessibilityLabel="Open Connected Agents"
-          onPress={() => router.push('/connected-agents')}
+          accessibilityHint="Opens your account screen"
+          accessibilityLabel="Open Account"
+          accessibilityRole="button"
+          onPress={() => router.push('/profile')}
           style={({ pressed }) => [styles.cardPressable, pressed ? styles.cardPressed : null]}
-          testID="settings-connected-agents-row">
-          <UiSurface style={styles.profileCard}>
-            <View style={styles.profileRow}>
+          testID="settings-profile-row">
+          <UiSurface style={styles.destinationCard}>
+            <View style={styles.destinationRow}>
               <View style={styles.iconBadge}>
                 <UiText selectable={false} style={styles.iconGlyph} variant="labelStrong">
-                  AI
+                  👤
                 </UiText>
               </View>
-              <View style={styles.profileCopy}>
+              <View style={styles.destinationCopy}>
                 <UiText selectable variant="labelStrong">
-                  Connected agents
+                  Account
                 </UiText>
                 <UiText selectable variant="bodyMuted">
-                  Review read-only training access and revoke connections.
+                  {user?.email?.trim() || 'Sign in and manage your account.'}
                 </UiText>
               </View>
             </View>
           </UiSurface>
         </Pressable>
-      ) : null}
+      </View>
 
-      <UiSurface style={styles.preferencesCard} testID="settings-preferences-card">
-        <UiText selectable variant="labelStrong">
-          Preferences
+      <View style={styles.section} testID="settings-section-ai-coaching">
+        <UiText accessibilityRole="header" selectable variant="title">
+          AI coaching
         </UiText>
         <UiText selectable variant="bodyMuted">
-          Configure how dates and other details are displayed throughout BOGA.
+          Coaches get read-only training access that you can revoke at any time.
         </UiText>
-        <View style={styles.preferenceGroup}>
-          <UiText selectable variant="labelStrong" style={styles.preferenceLabel}>
-            Date Format
+        <Pressable
+          accessibilityHint="Opens setup instructions in your system browser"
+          accessibilityLabel="Connect an AI coach, opens in browser"
+          accessibilityRole="link"
+          onPress={() => {
+            void handleConnectAgent();
+          }}
+          style={({ pressed }) => [styles.cardPressable, pressed ? styles.cardPressed : null]}
+          testID="settings-connect-agent-row">
+          <UiSurface style={styles.destinationCard}>
+            <View style={styles.destinationRow}>
+              <View style={styles.iconBadge}>
+                <UiText selectable={false} style={styles.iconGlyph} variant="labelStrong">
+                  AI
+                </UiText>
+              </View>
+              <View style={styles.destinationCopy}>
+                <UiText selectable variant="labelStrong">
+                  Connect an AI coach ↗
+                </UiText>
+                <UiText selectable variant="bodyMuted">
+                  See setup instructions for your MCP-compatible client.
+                </UiText>
+              </View>
+            </View>
+          </UiSurface>
+        </Pressable>
+        {connectError ? (
+          <UiText
+            accessibilityLiveRegion="polite"
+            selectable
+            style={styles.inlineErrorText}
+            testID="settings-connect-agent-error"
+            variant="bodyMuted">
+            {connectError}
           </UiText>
-          <View style={styles.preferenceRow}>
-            {(['DD-MM-YYYY', 'MM-DD-YYYY', 'YYYY-MM-DD'] as const).map((format) => {
-              const selected = listPreferences.dateFormat === format;
-              return (
-                <Pressable
-                  key={format}
-                  accessibilityLabel={`Set date format to ${format}`}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected }}
-                  style={[styles.prefButton, selected && styles.prefButtonSelected]}
-                  onPress={() => setListPreferences({ dateFormat: format })}
-                  testID={`settings-date-format-${format}`}>
-                  <UiText style={[styles.prefButtonText, selected && styles.prefButtonTextSelected]}>
-                    {format}
+        ) : null}
+
+        {user ? (
+          <Pressable
+            accessibilityHint="Opens the list of authorized coaching agents"
+            accessibilityLabel="Open Connected Agents"
+            accessibilityRole="button"
+            onPress={() => router.push('/connected-agents')}
+            style={({ pressed }) => [styles.cardPressable, pressed ? styles.cardPressed : null]}
+            testID="settings-connected-agents-row">
+            <UiSurface style={styles.destinationCard}>
+              <View style={styles.destinationRow}>
+                <View style={styles.iconBadge}>
+                  <UiText selectable={false} style={styles.iconGlyph} variant="labelStrong">
+                    ✓
                   </UiText>
-                </Pressable>
-              );
-            })}
+                </View>
+                <View style={styles.destinationCopy}>
+                  <UiText selectable variant="labelStrong">
+                    Connected agents
+                  </UiText>
+                  <UiText selectable variant="bodyMuted">
+                    Review access and revoke existing connections.
+                  </UiText>
+                </View>
+              </View>
+            </UiSurface>
+          </Pressable>
+        ) : null}
+      </View>
+
+      <View style={styles.section} testID="settings-section-preferences">
+        <UiText accessibilityRole="header" selectable variant="title">
+          Preferences
+        </UiText>
+        <UiSurface style={styles.preferencesCard} testID="settings-preferences-card">
+          <UiText selectable variant="bodyMuted">
+            Configure how dates and other details are displayed throughout BoGa.
+          </UiText>
+          <View style={styles.preferenceGroup}>
+            <UiText selectable variant="labelStrong" style={styles.preferenceLabel}>
+              Date format
+            </UiText>
+            <View style={styles.preferenceRow}>
+              {(['DD-MM-YYYY', 'MM-DD-YYYY', 'YYYY-MM-DD'] as const).map((format) => {
+                const selected = listPreferences.dateFormat === format;
+                return (
+                  <Pressable
+                    key={format}
+                    accessibilityLabel={`Set date format to ${format}`}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    style={[styles.prefButton, selected && styles.prefButtonSelected]}
+                    onPress={() => setListPreferences({ dateFormat: format })}
+                    testID={`settings-date-format-${format}`}>
+                    <UiText
+                      style={[styles.prefButtonText, selected && styles.prefButtonTextSelected]}>
+                      {format}
+                    </UiText>
+                  </Pressable>
+                );
+              })}
+            </View>
           </View>
-        </View>
-      </UiSurface>
+        </UiSurface>
+      </View>
 
-      {user ? <SyncStatusPanel /> : null}
+      <View style={styles.section} testID="settings-section-data-sync">
+        <UiText accessibilityRole="header" selectable variant="title">
+          Data &amp; sync
+        </UiText>
+        {user ? (
+          <SyncStatusPanel />
+        ) : (
+          <UiSurface style={styles.quietCard} testID="settings-sync-signed-out-card">
+            <UiText selectable variant="bodyMuted">
+              Sign in through Account to sync your training data.
+            </UiText>
+          </UiSurface>
+        )}
+      </View>
 
-      {isDevMode() ? (
-        <UiSurface style={styles.devCard} testID="settings-dev-tools-card">
-          <UiText selectable variant="labelStrong">
-            Developer tools
-          </UiText>
-          <UiText selectable variant="bodyMuted">
-            View the in-app logs captured this session (all levels). Errors and warnings also sync
-            to the backend once signed in.
-          </UiText>
-          <UiButton
-            accessibilityLabel="Open the in-app log viewer"
-            label="View logs"
-            onPress={() => router.push('/dev-logs')}
-            testID="settings-dev-logs-button"
-            variant="secondary"
-          />
-
-          <UiText selectable variant="bodyMuted">
-            Wipe every local table and re-run the exercise catalog seeder. Available only in
-            development builds — does nothing in release.
-          </UiText>
-          <UiButton
-            accessibilityLabel="Reset local data and re-seed exercise catalog"
-            disabled={isResetting}
-            label={isResetting ? 'Resetting…' : 'Reset local data and re-seed'}
-            onPress={confirmDevReset}
-            testID="settings-dev-reset-button"
-            variant="secondary"
-          />
-          {resetFeedback ? (
-            <UiText
-              selectable
-              style={resetFeedback.tone === 'success' ? styles.devSuccessText : styles.devErrorText}
-              testID="settings-dev-reset-feedback"
-              variant="bodyMuted">
-              {resetFeedback.message}
+      <View style={styles.section} testID="settings-section-about">
+        <UiText accessibilityRole="header" selectable variant="title">
+          About
+        </UiText>
+        <UiSurface style={styles.aboutCard} testID="settings-about-card">
+          {versionBuild ? (
+            <UiText selectable testID="settings-about-version" variant="bodyMuted">
+              {versionBuild}
             </UiText>
           ) : null}
-
-          <UiText selectable variant="bodyMuted">
-            Drop the local database and re-bootstrap. Sync re-pulls your server state into a clean
-            local store.
-          </UiText>
-          <UiButton
-            accessibilityLabel="Wipe local database and re-bootstrap"
-            disabled={isWipingLocal}
-            label={isWipingLocal ? 'Wiping…' : 'Wipe local & re-bootstrap'}
-            onPress={() => {
-              void handleWipeLocal();
-            }}
-            testID="settings-dev-wipe-local-button"
-            variant="secondary"
-          />
-          {wipeLocalFeedback ? (
-            <UiText
-              selectable
-              style={
-                wipeLocalFeedback.tone === 'success' ? styles.devSuccessText : styles.devErrorText
-              }
-              testID="settings-dev-wipe-local-feedback"
-              variant="bodyMuted">
-              {wipeLocalFeedback.message}
+          {runtimeMetadata.releaseCodename ? (
+            <UiText selectable testID="settings-about-release" variant="bodyMuted">
+              Release {runtimeMetadata.releaseCodename}
             </UiText>
           ) : null}
-
-          <UiText selectable variant="bodyMuted">
-            Delete every row on the server owned by your account, then wipe local. Useful for
-            testing the bootstrap flow against an empty server.
-          </UiText>
-          <UiButton
-            accessibilityLabel="Wipe remote data owned by my account"
-            disabled={isWipingRemote}
-            label={isWipingRemote ? 'Wiping…' : 'Wipe remote (my data)'}
-            onPress={confirmWipeRemote}
-            testID="settings-dev-wipe-remote-button"
-            variant="danger"
-          />
-          {wipeRemoteFeedback ? (
-            <UiText
-              selectable
-              style={
-                wipeRemoteFeedback.tone === 'success' ? styles.devSuccessText : styles.devErrorText
-              }
-              testID="settings-dev-wipe-remote-feedback"
-              variant="bodyMuted">
-              {wipeRemoteFeedback.message}
+          {runtimeMetadata.displayFlavor ? (
+            <UiText selectable testID="settings-about-flavor" variant="bodyMuted">
+              Flavor {runtimeMetadata.displayFlavor === 'preview' ? 'Preview' : 'Local'}
+            </UiText>
+          ) : null}
+          {!versionBuild && !runtimeMetadata.releaseCodename && !runtimeMetadata.displayFlavor ? (
+            <UiText selectable variant="bodyMuted">
+              Release information unavailable
             </UiText>
           ) : null}
         </UiSurface>
+      </View>
+
+      {isDevMode() ? (
+        <View style={styles.section} testID="settings-section-developer-tools">
+          <UiText accessibilityRole="header" selectable variant="title">
+            Developer tools
+          </UiText>
+          <UiSurface style={styles.devCard} testID="settings-dev-tools-card">
+            <UiText selectable variant="bodyMuted">
+              View the in-app logs captured this session (all levels). Errors and warnings also
+              sync to the backend once signed in.
+            </UiText>
+            <UiButton
+              accessibilityLabel="Open the in-app log viewer"
+              label="View logs"
+              onPress={() => router.push('/dev-logs')}
+              testID="settings-dev-logs-button"
+              variant="secondary"
+            />
+
+            <UiText selectable variant="bodyMuted">
+              Wipe every local table and re-run the exercise catalog seeder. Available only in
+              development builds — does nothing in release.
+            </UiText>
+            <UiButton
+              accessibilityLabel="Reset local data and re-seed exercise catalog"
+              disabled={isResetting}
+              label={isResetting ? 'Resetting…' : 'Reset local data and re-seed'}
+              onPress={confirmDevReset}
+              testID="settings-dev-reset-button"
+              variant="secondary"
+            />
+            {resetFeedback ? (
+              <UiText
+                selectable
+                style={
+                  resetFeedback.tone === 'success' ? styles.devSuccessText : styles.devErrorText
+                }
+                testID="settings-dev-reset-feedback"
+                variant="bodyMuted">
+                {resetFeedback.message}
+              </UiText>
+            ) : null}
+
+            <UiText selectable variant="bodyMuted">
+              Drop the local database and re-bootstrap. Sync re-pulls your server state into a
+              clean local store.
+            </UiText>
+            <UiButton
+              accessibilityLabel="Wipe local database and re-bootstrap"
+              disabled={isWipingLocal}
+              label={isWipingLocal ? 'Wiping…' : 'Wipe local & re-bootstrap'}
+              onPress={() => {
+                void handleWipeLocal();
+              }}
+              testID="settings-dev-wipe-local-button"
+              variant="secondary"
+            />
+            {wipeLocalFeedback ? (
+              <UiText
+                selectable
+                style={
+                  wipeLocalFeedback.tone === 'success'
+                    ? styles.devSuccessText
+                    : styles.devErrorText
+                }
+                testID="settings-dev-wipe-local-feedback"
+                variant="bodyMuted">
+                {wipeLocalFeedback.message}
+              </UiText>
+            ) : null}
+
+            <UiText selectable variant="bodyMuted">
+              Delete every row on the server owned by your account, then wipe local. Useful for
+              testing the bootstrap flow against an empty server.
+            </UiText>
+            <UiButton
+              accessibilityLabel="Wipe remote data owned by my account"
+              disabled={isWipingRemote}
+              label={isWipingRemote ? 'Wiping…' : 'Wipe remote (my data)'}
+              onPress={confirmWipeRemote}
+              testID="settings-dev-wipe-remote-button"
+              variant="danger"
+            />
+            {wipeRemoteFeedback ? (
+              <UiText
+                selectable
+                style={
+                  wipeRemoteFeedback.tone === 'success'
+                    ? styles.devSuccessText
+                    : styles.devErrorText
+                }
+                testID="settings-dev-wipe-remote-feedback"
+                variant="bodyMuted">
+                {wipeRemoteFeedback.message}
+              </UiText>
+            ) : null}
+          </UiSurface>
+        </View>
       ) : null}
     </ScrollView>
   );
@@ -316,17 +440,24 @@ const styles = StyleSheet.create({
     padding: uiSpace.screen,
     gap: uiSpace.xxl,
   },
+  screenTitle: {
+    fontSize: 24,
+    lineHeight: 30,
+  },
+  section: {
+    gap: uiSpace.md,
+  },
   cardPressable: {
     width: '100%',
   },
   cardPressed: {
     opacity: 0.94,
   },
-  profileCard: {
+  destinationCard: {
     padding: uiSpace.xxl,
     gap: uiSpace.lg,
   },
-  profileRow: {
+  destinationRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: uiSpace.lg,
@@ -345,7 +476,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     lineHeight: 20,
   },
-  profileCopy: {
+  destinationCopy: {
     flex: 1,
     gap: uiSpace.sm,
   },
@@ -359,6 +490,9 @@ const styles = StyleSheet.create({
     color: uiColors.textAccentMuted,
   },
   devErrorText: {
+    color: uiColors.actionDangerText,
+  },
+  inlineErrorText: {
     color: uiColors.actionDangerText,
   },
   preferencesCard: {
@@ -397,5 +531,13 @@ const styles = StyleSheet.create({
   prefButtonTextSelected: {
     color: uiColors.actionPrimary,
     fontWeight: '700',
+  },
+  quietCard: {
+    padding: uiSpace.xxl,
+  },
+  aboutCard: {
+    padding: uiSpace.xxl,
+    gap: uiSpace.sm,
+    backgroundColor: uiColors.surfaceMuted,
   },
 });

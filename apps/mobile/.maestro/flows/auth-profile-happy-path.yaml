@@ -93,10 +93,29 @@ appId: com.dinoderek.mobile
     visible:
       id: "settings-screen"
     timeout: 15000
+- assertVisible: "Settings"
+- assertVisible: "Account"
+- assertVisible: "AI coaching"
+- takeScreenshot: "06-settings-sections-top"
+- scrollUntilVisible:
+    element:
+      id: "settings-about-card"
+    direction: DOWN
+- assertVisible:
+    id: "settings-about-version"
+- assertVisible:
+    id: "settings-about-release"
+- assertVisible:
+    id: "settings-about-flavor"
+- takeScreenshot: "07-settings-about-metadata"
 # Connected agents is a signed-in-only Settings destination. Opening it against
 # real local Supabase proves the SDK grant-list path renders on-device; the
 # content assertion is independent of whether this fixture currently has zero
 # or more grants.
+- scrollUntilVisible:
+    element:
+      id: "settings-connected-agents-row"
+    direction: UP
 - tapOn:
     id: "settings-connected-agents-row"
 - extendedWaitUntil:
@@ -110,6 +129,10 @@ appId: com.dinoderek.mobile
     visible:
       id: "settings-screen"
     timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: "settings-profile-row"
+    direction: UP
 - tapOn:
     id: "settings-profile-row"
 - extendedWaitUntil:
