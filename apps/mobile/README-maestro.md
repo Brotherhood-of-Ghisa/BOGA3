@@ -138,6 +138,12 @@ Data-runtime smoke lane:
 TASK_ID=T-20260301-05 npm run test:e2e:ios:data-smoke
 ```
 
+Two-user groups lane (local Supabase; resets its fixtures first):
+
+```bash
+TASK_ID=ad-hoc npm run test:e2e:ios:groups
+```
+
 Combined lane (smoke + data-runtime-smoke sharing one sim + Metro):
 
 ```bash
@@ -163,7 +169,9 @@ cd ../..
 
 Every Supabase-backed flow that signs in uses its **own** fixture user — no
 sharing: `auth-profile-happy-path` → `user_a`, `sync-first-run-log-and-roundtrip`
-→ `user_b`. The lanes reuse one local Supabase without reset between runs, so a
+→ `user_b`, `groups-two-user-stream` → `user_c` (device) + `user_d` (a
+counterparty scripted over HTTP from `.maestro/scripts/groups-counterparty.js`,
+bound through `MAESTRO_GROUPS_COUNTERPARTY_EMAIL`). The lanes reuse one local Supabase without reset between runs, so a
 shared user would leak state between flows and flake them. Adding a sign-in flow
 means adding a fixture user in `supabase/scripts/auth-fixture-constants.sh` and
 wiring it in `scripts/maestro-run-lane.sh`. Enforced by

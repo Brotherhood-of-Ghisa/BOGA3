@@ -25,7 +25,7 @@ place each under `docs/specs/**`, routed from here.
    ```bash
    ./boga test fast       # mobile + docs/meta + consent/MCP unit + backend fast smoke
    ./boga test backend    # local Supabase: auth/agent/sync contracts + MCP smoke
-   ./boga test frontend   # iOS sim: Maestro smoke + data-smoke + auth-profile + sync e2e
+   ./boga test frontend   # iOS sim: Maestro smoke + data-smoke + auth-profile + sync e2e + groups e2e
    ```
 
    | You changed… | Run |
@@ -34,6 +34,7 @@ place each under `docs/specs/**`, routed from here.
    | UI screens / components / navigation | `boga test fast` + `boga test frontend` |
    | Sync / boot / auth (`src/sync/**`, `src/auth/**`, scheduler, drizzle/migrations) | `boga test fast` + `boga test backend` + `boga test ios-sync-e2e` (UI↔server e2e) |
    | Backend (`supabase/migrations/**`, functions, RLS, sync RPCs) | `boga test backend` |
+   | Groups (`src/groups/**`, `supabase/migrations/*group*`) | the rows above + `boga test ios-groups-e2e` (two-user e2e) |
    | Agent consent web (`apps/agent-auth-web/**`) | `boga test fast` |
    | MCP service (`services/boga-mcp/**`) | `boga test fast` + `boga test mcp-smoke` |
    | Native dependency / config-plugin change | `./boga ios build-client --force` first, then `boga test frontend` (see `02`) |
