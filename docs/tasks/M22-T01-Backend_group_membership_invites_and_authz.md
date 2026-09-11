@@ -1,7 +1,7 @@
 ---
 task_id: M22-T01-Backend_group_membership_invites_and_authz
 milestone_id: "M22"
-status: planned
+status: in_progress
 ui_impact: "no"
 areas: "backend"
 runtimes: "supabase|sql"
@@ -15,7 +15,7 @@ docs_touched: "docs/specs/tech/groups-contract.md, docs/specs/05-data-model.md, 
 ## Task metadata
 
 - Task ID: `M22-T01-Backend_group_membership_invites_and_authz`
-- Status: `planned`
+- Status: `in_progress`
 - Depends on: none (design merged)
 - Parallel with: `M22-T03`
 
@@ -139,8 +139,49 @@ Ship the membership half of the group domain on the server:
 
 ## Evidence
 
+- 2026-09-10: blocked on a hung OrbStack Docker engine; only docs-check,
+  meta-tests, and `bash -n` + `shellcheck -S warning` ran. Docker recovered on
+  2026-09-11 and every lane below ran on this machine (5d033a37).
+- `./boga test groups-contract`: green 4 times in one slot without a reset (the
+  first run applied the migration; runs 3 and 4 back-to-back after the test
+  was tightened; run 5 inside the backend gate). `./boga timings`: 4 runs,
+  median 11s, range 11–12s.
+- `./boga test backend`: exit 0, all 11 lanes green. `sync-drift --strict`
+  introspected 9 entity tables with `errors=0 warnings=0`, so no group table
+  is read as a Sync v2 entity (AC7). `sync-infra`: 13/13 passed.
+  `mcp-smoke`: 4 tools discovered and called. Medians: auth-authz 5.9s,
+  agent-api 6.6s, sync-v2-schema 7.0s, sync-push-contract 6.1s,
+  sync-pull-contract 6.0s, dev-wipe-my-data 5.2s, sync-drift 38s, sync-v2-e2e
+  2.2m, sync-infra 11s, mcp-smoke 11s.
+- `./boga test fast`: exit 0, with jest-full 1010/1010. The backend-fast
+  health smoke passed, docs-check was OK, and agent-auth-web and mcp-unit
+  reported 0 audit vulnerabilities. Medians: lint 3.9s, typecheck 3.0s,
+  jest-full 12s, meta-tests 2.4s, agent-auth-web 2.9s, mcp-unit 4.5s,
+  backend-fast 46s.
+- `./boga test docs-check` green after the spec 02 row edit.
+- `./boga test for --diff origin/main` requires `backend` + `docs-check` only.
+
 ## Completion note
 
-- What changed:
-- What tests ran:
-- What remains:
+- What changed: migration `supabase/migrations/20260910120000_m22_groups_membership.sql`
+  (3 tables, helpers, 12 RPCs); lane body `supabase/tests/groups-contract.sh`;
+  `groups-contract` row in `scripts/lanes.tsv`; spec 02 regenerated; spec 05,
+  06, 10 and `groups-contract.md` as-built notes (incl. the write-RPC return
+  shapes the contract left open).
+- Fixes after the first real run: the migration applied and passed as
+  written, with no SQL change. The test was tightened where it could pass
+  without proving anything:
+  - Direct-table denial now requires a `42501` body on every non-2xx.
+  - Every PATCH names a real column. The `group_memberships` PATCH used
+    `created_at`, which that table lacks, so PostgREST rejected it with
+    `PGRST204`.
+  - The post-write check is now per table: the old summed count could not
+    detect one table changing.
+  - The `group_active_role` client_id probe and the helper-RPC probe now
+    assert `AGENT_FORBIDDEN` and `42501` rather than any failure.
+- Spec 02: only the new lane row was added. A full `./boga docs gen` would
+  also rewrite other lanes' medians from gitignored local timing records, and
+  docs-check ignores that column.
+- What tests ran: see Evidence.
+- What remains: coordinator review and merge (status stays `in_progress`
+  until merge).
