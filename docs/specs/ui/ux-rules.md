@@ -72,7 +72,7 @@ Document app-specific UI semantics and guardrails for the current mobile app.
 1. Current user-facing screens use vertical layouts with no horizontal scrolling on phone widths.
 2. Page backgrounds are muted light surfaces (`surfacePage`-like behavior), with card/panel surfaces layered on top.
 3. Spacing rhythm is already close to 8pt increments (common values cluster around `8/10/12/14/16/20`) and should remain consistent.
-4. Bottom tab navigation (`BottomTray` composing `TopLevelTabs`) remains visible on tab roots (`stats-history`, `session-recorder`, `exercise-catalog`) across primary states (including loading/error in `exercise-catalog`), and detail screens that still render `TopLevelTabs` directly (e.g. `exercise-history`) preserve the same strip.
+4. Bottom tab navigation (`BottomTray` composing `TopLevelTabs`) remains visible on tab roots (`stats-history`, `session-recorder`, `exercise-catalog`, `groups`) across primary states (including loading/error in `exercise-catalog`), and detail screens that still render `TopLevelTabs` directly (e.g. `exercise-history`) preserve the same strip.
 
 ### 4. List and row interaction conventions
 
@@ -310,7 +310,16 @@ Guardrail command:
 12. Per-muscle previous-period set comparisons use signed absolute pairs (`+4 (+1)`, `−2 (−1)`, `±0 (−1)`) and never percentages. Volume comparisons use percentage only (`+17%`, `−100%`, `±0%`), with `—` for zero-to-zero and `new` for positive volume over a zero baseline. Muscle/family volume remains the shared per-side, role-weighted calculation.
 13. Per-muscle family rows use a token-backed green failure-intensity background; visible nested-muscle rows use the semantic warm background palette. Each row receives one uniform shade selected from four levels using `clamp(nearFailureCount / (8 × periodDays / 7), 0, 1)`; there is no partial-width band or gradient. Rows with no near-failure sets keep the default surface. The background is decorative and supplements the readable near-failure count. Its strongest-shade threshold is a display scale only—not a goal, recommendation, limit, or warning. Row accessibility copy states the exact near-failure count and selected-period threshold.
 
-### 14. Documentation maintenance rule (UI semantics)
+### 14. Group screens: freshness, pull-to-refresh, and the offline marker (M22)
+
+1. Pull-to-refresh (`RefreshControl`, first used in M22) is the explicit refresh on the group stream lists, My groups, the group screen, and the friend's session view. Only a user pull shows the spinner; the on-focus and 30 s poll refreshes run silently (`components/groups/use-pull-to-refresh.ts`).
+2. Group data renders cache-first. When the device is offline or the last refresh failed with `NETWORK`, a warning-surface banner reads `Offline · last updated HH:MM` above the still-visible cached data. With nothing cached, the area shows an offline empty state rather than a spinner.
+3. A non-network failure shows inline with `Retry` beside data that is still shown, or as a whole-area state with `Retry` when nothing is cached. `NOT_FOUND` is lost access, not an error: the group screen reads `You're no longer a member of this group` and the friend view `This session is no longer available`, and cached data is hidden.
+4. Stream session cards are collapsed summaries with no expand; the whole card opens the friend's session view. Membership items are light rows that open their group, and are inert on that group's own screen. Group chips wrap onto more lines rather than scrolling sideways.
+5. The friend's session view is read-only (no edit, delete, or append; only the shared title-region collapse), and an active session reads `In progress`.
+6. Signed-out or auth-unconfigured builds show a sign-in-required card on every group route, and no group RPC runs.
+
+### 15. Documentation maintenance rule (UI semantics)
 
 1. If a task changes current UI semantics (action roles, state treatment, modal conventions, list interactions, validation behavior), update this file in the same task/session.
 2. If the change is route-path/param/transition related, update `navigation-contract.md` in the same task.

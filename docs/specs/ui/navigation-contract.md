@@ -27,7 +27,7 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
   - on a non-`AUTH_REQUIRED` cycle error it shows the error message and a single Retry that fires exactly one cycle; when the latest cycle outcome is `AUTH_REQUIRED` it redirects to `/sign-in` and renders no Retry;
   - it stands aside (renders through) when there is no session or auth is unconfigured, so an unconfigured/local build is never trapped behind a block nothing will lift; the `/sign-in` and `/maestro-harness` routes are exempt so redirects and harness setup cannot loop.
 - Tab roots live inside the `(tabs)` route group at `apps/mobile/app/(tabs)/` and share a tab layout at `apps/mobile/app/(tabs)/_layout.tsx`. The group name is parenthesised so it does not appear in URLs (e.g. `/session-recorder` resolves to `app/(tabs)/session-recorder.tsx`).
-- Tab roots have `headerShown: false`; detail screens (`exercise-history`, `profile`, `completed-session/[sessionId]`, `maestro-harness`) remain outside `(tabs)/` and keep their existing native header behavior.
+- Tab roots have `headerShown: false`; detail screens (`exercise-history`, `profile`, `completed-session/[sessionId]`, `maestro-harness`, and the M22 group routes `group/mine`, `group/[groupId]`, `group-session/[memberId]/[sessionId]`) remain outside `(tabs)/` and keep their existing native header behavior.
 - Navigation is currently string-path based (no centralized typed route helper layer)
 
 ## Route + param summary (current)
@@ -149,6 +149,32 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
   - period and tag chip changes reload the summary in place; the route does not update its URL query string when these change
   - missing/invalid `exerciseDefinitionId` shows the in-screen error state and does not crash
 
+12. `/groups` (M22)
+- File: `apps/mobile/app/(tabs)/groups.tsx`
+- Params:
+  - none
+- Behavior:
+  - fourth tab root (`TopLevelTabs` key `groups`, testID `top-level-tab-groups`, mapped in `resolveActiveTab`)
+  - the `All` / per-group chip selection is in-route state, not a query param
+  - signed out or auth-unconfigured renders a sign-in-required card in place; configured builds offer `Sign in` (`/sign-in`)
+
+13. `/group/mine`
+- File: `apps/mobile/app/group/mine.tsx`
+- Params:
+  - none
+
+14. `/group/[groupId]`
+- File: `apps/mobile/app/group/[groupId]/index.tsx`
+- Path params:
+  - `groupId` (required dynamic segment; a missing value renders the lost-access state)
+- Behavior:
+  - the `Stream` / `Members` segment is in-route state
+
+15. `/group-session/[memberId]/[sessionId]`
+- File: `apps/mobile/app/group-session/[memberId]/[sessionId].tsx`
+- Path params:
+  - `memberId`, `sessionId` (both required; a missing value renders "This session is no longer available")
+
 ## Allowed route transitions (current high-level flows)
 
 1. `/` -> `/stats-history`
@@ -163,8 +189,8 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
    - active Resume or review/complete dismisses the Sessions stack screen to the
      existing Log recorder; completion continues through recorder validation and
      cleanup rather than a direct repository status change
-6. `/session-recorder` <-> `/stats-history` / `/exercise-catalog`
-   - tab switching via the shared bottom tray (`BottomTray` -> `TopLevelTabs`)
+6. `/session-recorder` <-> `/stats-history` / `/exercise-catalog` / `/groups`
+   - tab switching via the shared bottom tray (`BottomTray` -> `TopLevelTabs`); `exercise-history` also reaches `/groups` through its directly rendered `TopLevelTabs`
 7. `/completed-session/<sessionId>` -> `/session-recorder?mode=completed-edit&sessionId=<sessionId>`
    - edit action
 8. `/completed-session/<sessionId>?intent=edit` -> `/session-recorder?mode=completed-edit&sessionId=<sessionId>`
@@ -199,6 +225,14 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
    - the first-sync gate (below the auth guard) renders a full-screen "Setting up your data…" block in place of the navigator while `sync_runtime_state.bootstrap_completed_at` is null for a signed-in user; this is render-substitution, not a route replacement (the URL is unchanged), and it dismisses in place once the flag is set
 23. first-sync block -> `/sign-in`
    - when the latest sync cycle outcome is `AUTH_REQUIRED`, the gate redirects to `/sign-in` (no Retry); the `/sign-in` route is exempt from the block so the redirect cannot loop
+23. `/groups` -> `/group/mine`
+   - `My groups` header action
+24. `/groups` -> `/group/<groupId>`; `/group/mine` -> `/group/<groupId>`
+   - membership-item tap on the tab; row tap in My groups (membership items on the group screen itself do not navigate)
+25. `/groups` / `/group/<groupId>` -> `/group-session/<memberId>/<sessionId>`
+   - stream session-card tap (`router.push`)
+26. `/groups` (signed out, auth configured) -> `/sign-in`
+   - `Sign in` action on the sign-in-required card
 
 Note:
 
@@ -211,6 +245,7 @@ Note:
 - Detail screens registered in the root stack (`exercise-history`, `sessions`, `profile`, `connected-agents`, `maestro-harness`, `completed-session/[sessionId]`) keep their native stack header behavior; titles are declared in `apps/mobile/app/_layout.tsx`. `/sessions` specifically uses an arrow-only minimal back-button display mode with a generic `Back` accessibility title.
 - `completed-session/[sessionId]` sets its title inside the route file (current title: `View Session`)
 - `exercise-history` sets its title inside the route file to the resolved exercise name (falls back to `Exercise History` when the summary is not yet available)
+- M22 group routes declare `My groups`, `Group`, and `Session` in `apps/mobile/app/_layout.tsx` (back title `Back`); the group screen replaces `Group` with the group's name once loaded
 
 ## Documentation boundary
 

@@ -131,6 +131,7 @@ describe('ExerciseHistoryScreenShell', () => {
         onPressStatsHistory={jest.fn()}
         onPressLog={jest.fn()}
         onPressExercises={jest.fn()}
+        onPressGroups={jest.fn()}
         onPressSettings={jest.fn()}
       />
     );
@@ -157,6 +158,7 @@ describe('ExerciseHistoryScreenShell', () => {
         onPressStatsHistory={jest.fn()}
         onPressLog={jest.fn()}
         onPressExercises={jest.fn()}
+        onPressGroups={jest.fn()}
         onPressSettings={jest.fn()}
       />
     );
@@ -182,6 +184,7 @@ describe('ExerciseHistoryScreenShell', () => {
         onPressStatsHistory={jest.fn()}
         onPressLog={jest.fn()}
         onPressExercises={jest.fn()}
+        onPressGroups={jest.fn()}
         onPressSettings={jest.fn()}
       />
     );
@@ -213,6 +216,7 @@ describe('ExerciseHistoryScreenShell', () => {
         onPressStatsHistory={jest.fn()}
         onPressLog={jest.fn()}
         onPressExercises={jest.fn()}
+        onPressGroups={jest.fn()}
         onPressSettings={jest.fn()}
       />
     );
@@ -236,6 +240,7 @@ describe('ExerciseHistoryScreenShell', () => {
         onPressStatsHistory={jest.fn()}
         onPressLog={jest.fn()}
         onPressExercises={jest.fn()}
+        onPressGroups={jest.fn()}
         onPressSettings={jest.fn()}
       />
     );
@@ -258,6 +263,7 @@ describe('ExerciseHistoryScreenShell', () => {
         onPressStatsHistory={jest.fn()}
         onPressLog={jest.fn()}
         onPressExercises={jest.fn()}
+        onPressGroups={jest.fn()}
         onPressSettings={jest.fn()}
       />
     );
@@ -368,6 +374,7 @@ describe('ExerciseHistoryScreenShell — deleted tag visibility', () => {
         onPressStatsHistory={jest.fn()}
         onPressLog={jest.fn()}
         onPressExercises={jest.fn()}
+        onPressGroups={jest.fn()}
         onPressSettings={jest.fn()}
       />
     );
@@ -389,6 +396,7 @@ describe('ExerciseHistoryScreenShell — deleted tag visibility', () => {
         onPressStatsHistory={jest.fn()}
         onPressLog={jest.fn()}
         onPressExercises={jest.fn()}
+        onPressGroups={jest.fn()}
         onPressSettings={jest.fn()}
       />
     );

@@ -42,6 +42,12 @@ export {
   type GroupResourceState,
 } from './use-group-resource';
 export {
+  compareStreamOrder,
+  mergeStreamPages,
+  useGroupStream,
+  type GroupStreamState,
+} from './use-group-stream';
+export {
   GROUP_OFFLINE_ACTION_MESSAGE,
   useGroupAction,
   type GroupActionResult,

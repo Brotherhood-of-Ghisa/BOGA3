@@ -90,6 +90,18 @@ Use this section as the single source of truth for reusable UX patterns.
    - Intent: keep entered/defaulted values separate from the user's assertion that a repeated item was actually completed.
    - Usage: normal and prescribed set rows in the active/completed-edit session recorder.
    - Rules: use a dedicated mobile-sized checkbox-like target independent of row editing; show distinct unchecked and checked shapes so color is supplemental; confirm only valid values; allow confirmation to be undone without clearing values; exclude unchecked items from completion metrics; require an explicit discard decision when valid unchecked work would be removed at submit/save; and keep source identity separate from confirmation status (for example, inactive planned rows use a semantic surface and accessible source wording remains available when the shared selected-row surface temporarily overrides it, while the hollow/tick control communicates performance).
+6. Stream card pattern
+   - Intent: scan other people's recent activity at a glance and drill into one item.
+   - Usage: group stream session cards (`components/groups/stream-session-card.tsx`).
+   - Rules: a collapsed summary card (pattern 4) with no expand; the whole card is one accessible press target that navigates to the detail; show who, a status pill (text, not color alone — "Training now" or "Completed · duration"), when/where, and the validated summary metrics; newest first; secondary events (joined / left) are lighter rows, not cards.
+7. Offline marker pattern
+   - Intent: keep cached server data usable offline without hiding that it may be stale.
+   - Usage: every group read screen (`components/groups/offline-banner.tsx`).
+   - Rules: a warning-surface banner above the content reads `Offline · last updated HH:MM` (local time of the cached payload); cached data stays visible; with no cache, show an offline empty state instead of a spinner; the marker clears on the next successful refresh.
+8. Pull-to-refresh pattern
+   - Intent: an explicit, familiar refresh for server-backed lists that also refresh automatically.
+   - Usage: group lists and screens (`RefreshControl`).
+   - Rules: only a user pull shows the spinner; automatic refreshes (focus, polling) stay silent; a failed pull surfaces through the offline marker or the inline error with `Retry`, never a blocking dialog.
 
 ## Default appearance baseline (MVP)
 

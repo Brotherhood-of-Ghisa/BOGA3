@@ -31,7 +31,7 @@ exports[`UI primitives matches the current top-level tabs snapshot after primiti
       {
         "flex": 1,
         "flexDirection": "row",
-        "gap": 8,
+        "gap": 4,
       }
     }
   >
@@ -86,7 +86,9 @@ exports[`UI primitives matches the current top-level tabs snapshot after primiti
           null,
           null,
           null,
-          undefined,
+          {
+            "paddingHorizontal": 2,
+          },
         ]
       }
       testID="top-level-tab-stats-history"
@@ -107,7 +109,11 @@ exports[`UI primitives matches the current top-level tabs snapshot after primiti
               "fontSize": 13,
               "fontWeight": "600",
             },
-            undefined,
+            {
+              "alignSelf": "stretch",
+              "fontSize": 12,
+              "textAlign": "center",
+            },
           ]
         }
       >
@@ -165,7 +171,9 @@ exports[`UI primitives matches the current top-level tabs snapshot after primiti
           null,
           null,
           null,
-          undefined,
+          {
+            "paddingHorizontal": 2,
+          },
         ]
       }
       testID="top-level-tab-log"
@@ -186,7 +194,11 @@ exports[`UI primitives matches the current top-level tabs snapshot after primiti
               "fontSize": 13,
               "fontWeight": "600",
             },
-            undefined,
+            {
+              "alignSelf": "stretch",
+              "fontSize": 12,
+              "textAlign": "center",
+            },
           ]
         }
       >
@@ -244,7 +256,9 @@ exports[`UI primitives matches the current top-level tabs snapshot after primiti
           {},
           null,
           null,
-          undefined,
+          {
+            "paddingHorizontal": 2,
+          },
         ]
       }
       testID="top-level-tab-exercises"
@@ -265,11 +279,100 @@ exports[`UI primitives matches the current top-level tabs snapshot after primiti
               "fontSize": 13,
               "fontWeight": "700",
             },
-            undefined,
+            {
+              "alignSelf": "stretch",
+              "fontSize": 12,
+              "textAlign": "center",
+            },
           ]
         }
       >
         Exercises
+      </Text>
+    </View>
+    <View
+      accessibilityLabel="Open Groups"
+      accessibilityRole="tab"
+      accessibilityState={
+        {
+          "busy": undefined,
+          "checked": undefined,
+          "disabled": false,
+          "expanded": undefined,
+          "selected": false,
+        }
+      }
+      accessibilityValue={
+        {
+          "max": undefined,
+          "min": undefined,
+          "now": undefined,
+          "text": undefined,
+        }
+      }
+      accessible={true}
+      collapsable={false}
+      focusable={true}
+      onBlur={[Function]}
+      onClick={[Function]}
+      onFocus={[Function]}
+      onResponderGrant={[Function]}
+      onResponderMove={[Function]}
+      onResponderRelease={[Function]}
+      onResponderTerminate={[Function]}
+      onResponderTerminationRequest={[Function]}
+      onStartShouldSetResponder={[Function]}
+      style={
+        [
+          {
+            "alignItems": "center",
+            "borderRadius": 8,
+            "justifyContent": "center",
+            "minHeight": 42,
+            "paddingHorizontal": 10,
+            "paddingVertical": 9,
+          },
+          {
+            "backgroundColor": "#f4f7fb",
+            "borderColor": "#dbe3ef",
+            "borderWidth": 1,
+            "flex": 1,
+          },
+          null,
+          null,
+          null,
+          {
+            "paddingHorizontal": 2,
+          },
+        ]
+      }
+      testID="top-level-tab-groups"
+    >
+      <Text
+        adjustsFontSizeToFit={true}
+        ellipsizeMode="clip"
+        minimumFontScale={0.75}
+        numberOfLines={1}
+        selectable={false}
+        style={
+          [
+            {
+              "color": "#122033",
+            },
+            {
+              "color": "#20324f",
+              "fontSize": 13,
+              "fontWeight": "600",
+            },
+            {
+              "alignSelf": "stretch",
+              "fontSize": 12,
+              "textAlign": "center",
+            },
+          ]
+        }
+      >
+        Groups
       </Text>
     </View>
   </View>
@@ -325,7 +428,7 @@ exports[`UI primitives matches the current top-level tabs snapshot after primiti
         null,
         {
           "minWidth": 46,
-          "paddingHorizontal": 12,
+          "paddingHorizontal": 8,
         },
       ]
     }

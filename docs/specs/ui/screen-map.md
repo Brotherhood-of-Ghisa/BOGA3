@@ -225,7 +225,50 @@ Brief entrypoint map of the current mobile screens.
   - dynamic stack title set inside the route file to the resolved exercise name (falls back to `Exercise History`)
 - Key exits:
   - `/completed-session/<sessionId>` from session card tap or from the all-time-best card rows
-  - `stats-history` / `session-recorder` / `exercise-catalog` / `settings` via the shared bottom tray (`TopLevelTabs` plus the Settings cog)
+  - `stats-history` / `session-recorder` / `exercise-catalog` / `groups` / `settings` via the shared bottom tray (`TopLevelTabs` plus the Settings cog)
+
+12. `/groups` (M22)
+- File: `apps/mobile/app/(tabs)/groups.tsx`
+- Purpose:
+  - the fourth tab: a newest-first stream of group members' sessions and membership events, filtered by `All` or one group
+- Key states (high level):
+  - signed-out / auth-unconfigured sign-in-required card (no group RPC runs)
+  - no-groups explanatory empty state (its Create / Join actions arrive in M22-T05)
+  - cached stream first, then refreshed on focus, every 30 s, and on pull-to-refresh; older pages load online at the end of the list
+  - offline marker over cached data; offline empty state with no cache; inline error or error state with `Retry`
+- Key exits:
+  - `/group-session/<memberId>/<sessionId>` (session card), `/group/<groupId>` (membership item), `/group/mine` (header)
+
+13. `/group/mine`
+- File: `apps/mobile/app/group/mine.tsx`
+- Purpose:
+  - My groups: each active membership with its description, member count, and my role
+- Key states (high level):
+  - sign-in-required / empty / offline / error states as on the tab; pull-to-refresh
+- Key exits:
+  - `/group/<groupId>` (row tap)
+
+14. `/group/[groupId]`
+- File: `apps/mobile/app/group/[groupId]/index.tsx`
+- Purpose:
+  - the group screen: header (name, description, member count, my role) and a joined `Stream` / `Members` segment; read-only until M22-T05 adds role actions
+- Key states (high level):
+  - loading / offline / error; members in server order (owner, admins, members, then username)
+  - lost access after `NOT_FOUND`: "You're no longer a member of this group", with cached data hidden
+- Key exits:
+  - `/group-session/<memberId>/<sessionId>` (session card); membership items here do not navigate
+- Notes:
+  - sets its stack title to the group name once loaded
+
+15. `/group-session/[memberId]/[sessionId]`
+- File: `apps/mobile/app/group-session/[memberId]/[sessionId].tsx`
+- Purpose:
+  - read-only friend's session view composing `SessionContentLayout`: member, status, start/end, location, and exercise cards with performed sets (`Set`, `Weight`, `Reps`, `Effort`)
+- Key states (high level):
+  - `In progress` for an active session; cache-first with the offline marker; pull-to-refresh
+  - `NOT_FOUND`: "This session is no longer available", and the cached detail is evicted
+- Notes:
+  - no edit, delete, or append; `completed-session/[sessionId]` is neither reused nor modified
 
 ## Route shell (not a user-facing screen)
 
@@ -235,7 +278,7 @@ Brief entrypoint map of the current mobile screens.
 - Notes:
   - wraps the whole navigator in the route-layer auth guard (`apps/mobile/components/navigation/auth-route-guard.tsx`), which enforces login-on-start for configured signed-out sessions (neutral loading view while restoring, redirect to `/sign-in` when configured-but-signed-out, stand aside when auth is unconfigured, while allowing `/sign-in` and the dev/test-gated `/maestro-harness` route to render through)
   - immediately below the auth guard, wraps the navigator in the first-sync gate (`apps/mobile/src/sync/SyncGate.tsx`), which blocks a signed-in user behind a full-screen "Setting up your data…" block until `sync_runtime_state.bootstrap_completed_at` is set (then dismisses in place), and observes sync runtime state through the single shared scheduler-state accessor
-  - tab roots live inside the `(tabs)` route group (`apps/mobile/app/(tabs)/_layout.tsx`) with `headerShown: false`; the root stack registers the `(tabs)` group itself plus the `sign-in` screen and the detail screens (`exercise-history`, `sessions`, `profile`, `connected-agents`, `maestro-harness`, `completed-session/[sessionId]`)
+  - tab roots live inside the `(tabs)` route group (`apps/mobile/app/(tabs)/_layout.tsx`) with `headerShown: false`; the root stack registers the `(tabs)` group itself plus the `sign-in` screen and the detail screens (`exercise-history`, `sessions`, `profile`, `connected-agents`, `maestro-harness`, `completed-session/[sessionId]`, and the M22 `group/mine`, `group/[groupId]/index`, `group-session/[memberId]/[sessionId]`)
   - the root stack opts `/sessions` into the native minimal back-button display
     mode with a generic `Back` accessibility title, preserving normal platform
     back behavior while hiding the previous route-group title visually and
@@ -245,7 +288,7 @@ Brief entrypoint map of the current mobile screens.
 
 2. `apps/mobile/app/(tabs)/_layout.tsx`
 - Purpose:
-  - tab group layout that owns the tab roots (`stats-history`, `session-recorder`, `exercise-catalog`) plus `settings` (in-group but reached via the cog, not as a tab)
+  - tab group layout that owns the tab roots (`stats-history`, `session-recorder`, `exercise-catalog`, `groups`) plus `settings` (in-group but reached via the cog, not as a tab)
 - Notes:
   - all tab roots have `headerShown: false`
   - the system tab bar is supplied via `tabBar={() => <BottomTray>…</BottomTray>}`: the `BottomTray` component (from `apps/mobile/components/navigation/bottom-tray.tsx`) wraps `TopLevelTabs` and exposes a drag handle to collapse to a peek strip. Screens can imperatively expand/collapse via `useTrayVisibility()`; initial state is `expanded`. Snap math is unit-tested in `apps/mobile/src/navigation/tray-snap.ts`.
