@@ -677,7 +677,7 @@ committed in this repository. An operator with those resources must:
    using only the project URL and client-safe publishable key.
 3. Enable the Supabase OAuth server, configure its consent path, choose dynamic
    registration or exact client registrations, and use asymmetric signing keys.
-4. Deploy `services/boga-mcp` on Node 20+ behind HTTPS with only
+4. Deploy `services/boga-mcp` on Node 24+ behind HTTPS with only
    `BOGA_MCP_PUBLIC_URL`, `BOGA_AGENT_API_BASE_URL`, and `BOGA_OAUTH_ISSUER`
    (plus optional runtime settings). Never inject database or service-role
    credentials into this host.
