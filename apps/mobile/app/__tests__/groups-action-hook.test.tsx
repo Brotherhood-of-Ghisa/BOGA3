@@ -112,14 +112,16 @@ describe('useGroupAction', () => {
   });
 
   it('attempts the call while NetInfo has not reported yet (unknown is not offline)', async () => {
-    mockRpc.mockResolvedValueOnce({ data: null, error: null, status: 200 });
+    mockRpc.mockResolvedValueOnce({ data: { group_id: 'g1' }, error: null, status: 200 });
     const { result } = renderHook(() => useGroupAction(leaveGroup));
 
+    let outcome!: Awaited<ReturnType<typeof result.current.run>>;
     await act(async () => {
-      await result.current.run('g1');
+      outcome = await result.current.run('g1');
     });
 
     expect(mockRpc).toHaveBeenCalledWith('group_leave', { p_group_id: 'g1' });
+    expect(outcome).toEqual({ ok: true, value: { group_id: 'g1' } });
   });
 
   it('exposes pending while the RPC is in flight', async () => {

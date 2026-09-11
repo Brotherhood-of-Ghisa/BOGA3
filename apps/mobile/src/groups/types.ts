@@ -137,6 +137,13 @@ export type GroupCreateResult = { group_id: string };
 export type GroupUpdateResult = { group: GroupSummary };
 export type GroupInviteCodeResult = { code: string };
 export type GroupJoinResult = { group_id: string; joined: boolean };
+/** `group_leave`: the group the caller left. */
+export type GroupLeaveResult = { group_id: string };
+/**
+ * `group_remove_member`, `group_set_role`, `group_transfer_ownership`: the
+ * post-write `group_get` payload (M22-T01 as-built, contract §4.3).
+ */
+export type GroupMemberWriteResult = GroupGetResult;
 
 // ---- Errors -----------------------------------------------------------------
 

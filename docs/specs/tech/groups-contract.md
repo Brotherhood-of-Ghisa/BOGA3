@@ -491,7 +491,11 @@ RPC failure is caught in this module (C3.10.5, AC13).
     `regenerateGroupInviteCode`, `joinGroup`, `leaveGroup`,
     `removeGroupMember`, `setGroupMemberRole`, `transferGroupOwnership`.
   - `group_stream` always sends all three `p_*` args.
-  - The four membership writes resolve `void`, since §4.3 defines no result.
+  - Membership writes follow the M22-T01 as-built results: `leaveGroup`
+    resolves `{ group_id }`, and `removeGroupMember`, `setGroupMemberRole`,
+    and `transferGroupOwnership` resolve the `group_get` payload
+    `{ group, members }` (`GroupMemberWriteResult`). Each is shape-checked
+    like the reads.
   - Error mapping, in order:
     - a message *prefix* `<TOKEN>` or `<TOKEN>: …` maps to that token, and
       `message` is the text after it;

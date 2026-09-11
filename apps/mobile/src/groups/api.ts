@@ -18,7 +18,9 @@ import {
   type GroupInviteCodeResult,
   type GroupInvitePreviewResult,
   type GroupJoinResult,
+  type GroupLeaveResult,
   type GroupListMineResult,
+  type GroupMemberWriteResult,
   type GroupServerErrorCode,
   type GroupSessionDetailResult,
   type GroupStreamResult,
@@ -220,25 +222,36 @@ export const joinGroup = async (code: string): Promise<GroupJoinResult> =>
     isString(r.group_id) && typeof r.joined === 'boolean',
   );
 
-// The four membership writes below have no result the client consumes (the
-// contract defines only their effect); success is "no error".
+// Membership writes (M22-T01 as-built, contract §4.3): `group_leave` returns
+// `{ group_id }`; the three member-management writes return the post-write
+// `group_get` payload `{ group, members }`.
 
-export const leaveGroup = async (groupId: string): Promise<void> => {
-  await callGroupRpc('group_leave', { p_group_id: groupId });
-};
+const isGroupGetPayload = (r: Record<string, unknown>): boolean => isRecord(r.group) && Array.isArray(r.members);
 
-export const removeGroupMember = async (groupId: string, userId: string): Promise<void> => {
-  await callGroupRpc('group_remove_member', { p_group_id: groupId, p_user_id: userId });
-};
+export const leaveGroup = async (groupId: string): Promise<GroupLeaveResult> =>
+  expectShape('group_leave', await callGroupRpc('group_leave', { p_group_id: groupId }), (r) => isString(r.group_id));
+
+export const removeGroupMember = async (groupId: string, userId: string): Promise<GroupMemberWriteResult> =>
+  expectShape(
+    'group_remove_member',
+    await callGroupRpc('group_remove_member', { p_group_id: groupId, p_user_id: userId }),
+    isGroupGetPayload,
+  );
 
 export const setGroupMemberRole = async (
   groupId: string,
   userId: string,
   role: 'admin' | 'member',
-): Promise<void> => {
-  await callGroupRpc('group_set_role', { p_group_id: groupId, p_user_id: userId, p_role: role });
-};
+): Promise<GroupMemberWriteResult> =>
+  expectShape(
+    'group_set_role',
+    await callGroupRpc('group_set_role', { p_group_id: groupId, p_user_id: userId, p_role: role }),
+    isGroupGetPayload,
+  );
 
-export const transferGroupOwnership = async (groupId: string, userId: string): Promise<void> => {
-  await callGroupRpc('group_transfer_ownership', { p_group_id: groupId, p_user_id: userId });
-};
+export const transferGroupOwnership = async (groupId: string, userId: string): Promise<GroupMemberWriteResult> =>
+  expectShape(
+    'group_transfer_ownership',
+    await callGroupRpc('group_transfer_ownership', { p_group_id: groupId, p_user_id: userId }),
+    isGroupGetPayload,
+  );

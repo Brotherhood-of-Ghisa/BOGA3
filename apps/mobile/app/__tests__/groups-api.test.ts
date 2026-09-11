@@ -35,6 +35,13 @@ import {
 } from '@/src/groups';
 
 const summary = { group_id: 'g1', name: 'Crew', description: null, member_count: 2, my_role: 'owner' as const };
+const groupGetPayload = {
+  group: summary,
+  members: [
+    { user_id: 'u1', username: 'dino', role: 'owner' as const },
+    { user_id: 'u2', username: null, role: 'admin' as const },
+  ],
+};
 
 describe('groups api client', () => {
   const mockRpc = jest.fn();
@@ -144,27 +151,33 @@ describe('groups api client', () => {
         data: { group_id: 'g1', joined: true },
         expected: { group_id: 'g1', joined: true },
       },
-      { rpc: 'group_leave', invoke: () => leaveGroup('g1'), args: { p_group_id: 'g1' }, data: null, expected: undefined },
+      {
+        rpc: 'group_leave',
+        invoke: () => leaveGroup('g1'),
+        args: { p_group_id: 'g1' },
+        data: { group_id: 'g1' },
+        expected: { group_id: 'g1' },
+      },
       {
         rpc: 'group_remove_member',
         invoke: () => removeGroupMember('g1', 'u2'),
         args: { p_group_id: 'g1', p_user_id: 'u2' },
-        data: null,
-        expected: undefined,
+        data: groupGetPayload,
+        expected: groupGetPayload,
       },
       {
         rpc: 'group_set_role',
         invoke: () => setGroupMemberRole('g1', 'u2', 'admin'),
         args: { p_group_id: 'g1', p_user_id: 'u2', p_role: 'admin' },
-        data: null,
-        expected: undefined,
+        data: groupGetPayload,
+        expected: groupGetPayload,
       },
       {
         rpc: 'group_transfer_ownership',
         invoke: () => transferGroupOwnership('g1', 'u2'),
         args: { p_group_id: 'g1', p_user_id: 'u2' },
-        data: null,
-        expected: undefined,
+        data: groupGetPayload,
+        expected: groupGetPayload,
       },
     ];
 
@@ -255,6 +268,20 @@ describe('groups api client', () => {
 
       respond({ group_id: 'g1' });
       await expectRejectsWith(joinGroup('ABCD2345'), 'INTERNAL');
+    });
+
+    it('fails loud with INTERNAL when a membership-write payload is missing its contract keys', async () => {
+      respond(null);
+      await expectRejectsWith(leaveGroup('g1'), 'INTERNAL', 'group_leave returned an unexpected payload.');
+
+      respond({ group: summary });
+      await expectRejectsWith(removeGroupMember('g1', 'u2'), 'INTERNAL');
+
+      respond({ members: [] });
+      await expectRejectsWith(setGroupMemberRole('g1', 'u2', 'member'), 'INTERNAL');
+
+      respond({ group_id: 'g1' });
+      await expectRejectsWith(transferGroupOwnership('g1', 'u2'), 'INTERNAL');
     });
   });
 
