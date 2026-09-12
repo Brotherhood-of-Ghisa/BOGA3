@@ -42,14 +42,16 @@ export function SessionMuscleLoad({
   onRetry,
 }: SessionMuscleLoadProps) {
   const [isSheetVisible, setIsSheetVisible] = useState(false);
+  const shouldRender =
+    visible && performedSetCount > 0 && !(catalogState === 'ready' && summary?.state === 'empty');
 
   useEffect(() => {
-    if (!visible) {
+    if (!shouldRender) {
       setIsSheetVisible(false);
     }
-  }, [visible]);
+  }, [shouldRender]);
 
-  if (!visible) {
+  if (!shouldRender) {
     return null;
   }
 
@@ -110,7 +112,7 @@ export function SessionMuscleLoad({
       <Modal
         animationType="slide"
         transparent
-        visible={visible && isSheetVisible}
+        visible={shouldRender && isSheetVisible}
         onRequestClose={() => setIsSheetVisible(false)}>
         <View style={styles.sheetContainer} testID="session-muscle-load-sheet">
           <Pressable

@@ -321,21 +321,17 @@ export function CompletedSessionDetailScreenShell({
     setErrorMessage(null);
     setActionFeedback(null);
     setCollapsedExerciseIds(new Set());
+    setPersonalRecords([]);
+    setSelectedPersonalRecordIndex(0);
+    setPersonalRecordShareErrors({});
 
-    Promise.all([
-      dataClient.loadCompletedSession(sessionId),
-      presentation === 'completion' && dataClient.loadPersonalRecords
-        ? dataClient.loadPersonalRecords(sessionId)
-        : Promise.resolve([]),
-    ])
-      .then(([loadedSession, loadedPersonalRecords]) => {
+    void dataClient
+      .loadCompletedSession(sessionId)
+      .then((loadedSession) => {
         if (cancelled) {
           return;
         }
         setSession(loadedSession);
-        setPersonalRecords(loadedPersonalRecords ?? []);
-        setSelectedPersonalRecordIndex(0);
-        setPersonalRecordShareErrors({});
       })
       .catch((error) => {
         if (cancelled) {
@@ -349,6 +345,21 @@ export function CompletedSessionDetailScreenShell({
         }
         setIsLoading(false);
       });
+
+    if (presentation === 'completion' && dataClient.loadPersonalRecords) {
+      void dataClient
+        .loadPersonalRecords(sessionId)
+        .then((loadedPersonalRecords) => {
+          if (!cancelled) {
+            setPersonalRecords(loadedPersonalRecords ?? []);
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setPersonalRecords([]);
+          }
+        });
+    }
 
     return () => {
       cancelled = true;

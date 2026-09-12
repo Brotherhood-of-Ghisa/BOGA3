@@ -40,6 +40,16 @@ const unmappedSummary: CurrentSessionMuscleSummary = {
   muscles: [],
 };
 
+const emptySummary: CurrentSessionMuscleSummary = {
+  state: 'empty',
+  performedSetCount: 0,
+  workingSetCount: 0,
+  mappedSetCount: 0,
+  unmappedSetCount: 0,
+  contributingMuscleCount: 0,
+  muscles: [],
+};
+
 describe('SessionMuscleLoad', () => {
   it('stays absent until performed work exists', () => {
     render(
@@ -48,6 +58,22 @@ describe('SessionMuscleLoad', () => {
         performedSetCount={0}
         summary={null}
         visible={false}
+        workingSetCount={0}
+        onRetry={jest.fn()}
+      />
+    );
+
+    expect(screen.queryByTestId('session-muscle-load-row')).toBeNull();
+    expect(screen.queryByTestId('session-muscle-load-sheet')).toBeNull();
+  });
+
+  it('stays absent when a completion caller passes an explicit empty summary', () => {
+    render(
+      <SessionMuscleLoad
+        catalogState="ready"
+        performedSetCount={0}
+        summary={emptySummary}
+        visible
         workingSetCount={0}
         onRetry={jest.fn()}
       />

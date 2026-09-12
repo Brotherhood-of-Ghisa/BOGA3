@@ -201,6 +201,57 @@ describe('CompletedSessionDetailScreenShell', () => {
     expect(screen.queryByText('Append')).toBeNull();
   });
 
+  it('keeps completion available when optional PR loading fails', async () => {
+    const dataClient: CompletedSessionDetailDataClient = {
+      loadCompletedSession: jest.fn().mockResolvedValue(COMPLETED_SESSION_DETAIL_FIXTURE),
+      loadPersonalRecords: jest.fn().mockRejectedValue(new Error('PR history unavailable')),
+      appendCompletedSessionExerciseAsPlanned: jest.fn().mockResolvedValue(undefined),
+      setCompletedSessionDeletedState: jest.fn().mockResolvedValue(undefined),
+    };
+
+    render(
+      <CompletedSessionDetailScreenShell
+        dataClient={dataClient}
+        presentation="completion"
+        sessionId="completed-under-test"
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('session-completion-presentation')).toBeTruthy();
+    });
+    expect(screen.queryByTestId('completed-session-detail-error')).toBeNull();
+    expect(screen.queryByTestId('session-completion-personal-records')).toBeNull();
+    expect(screen.getByTestId('session-completion-done')).toBeTruthy();
+  });
+
+  it('omits empty completion muscle load without removing the completion exits', async () => {
+    const dataClient: CompletedSessionDetailDataClient = {
+      loadCompletedSession: jest.fn().mockResolvedValue({
+        ...COMPLETED_SESSION_DETAIL_FIXTURE,
+        exercises: [],
+      }),
+      loadPersonalRecords: jest.fn().mockResolvedValue([]),
+      appendCompletedSessionExerciseAsPlanned: jest.fn().mockResolvedValue(undefined),
+      setCompletedSessionDeletedState: jest.fn().mockResolvedValue(undefined),
+    };
+
+    render(
+      <CompletedSessionDetailScreenShell
+        dataClient={dataClient}
+        presentation="completion"
+        sessionId="completed-under-test"
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('58m · 0 exercises · 0 sets')).toBeTruthy();
+    });
+    expect(screen.queryByTestId('session-muscle-load-surface')).toBeNull();
+    expect(screen.getByTestId('session-completion-view-muscle-load')).toBeTruthy();
+    expect(screen.getByTestId('session-completion-done')).toBeTruthy();
+  });
+
   it('exposes and retries the Maestro-only catalog failure evidence state', async () => {
     const dataClient: CompletedSessionDetailDataClient = {
       loadCompletedSession: jest.fn().mockResolvedValue(COMPLETED_SESSION_DETAIL_FIXTURE),

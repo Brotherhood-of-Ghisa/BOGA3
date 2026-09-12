@@ -1,7 +1,12 @@
 import { and, asc, eq, inArray, isNotNull, isNull, lt, or } from 'drizzle-orm';
 
 import { bootstrapLocalDataLayer } from '@/src/data/bootstrap';
-import { exerciseSets, sessionExercises, sessions } from '@/src/data/schema';
+import {
+  exerciseDefinitions,
+  exerciseSets,
+  sessionExercises,
+  sessions,
+} from '@/src/data/schema';
 import { normalizeSessionSetPerformanceStatus } from '@/src/session-recorder/set-semantics';
 
 import {
@@ -78,13 +83,22 @@ export const createDrizzleSessionInsightsStore = (): SessionInsightsStore => ({
         sessionId: sessionExercises.sessionId,
         orderIndex: sessionExercises.orderIndex,
         exerciseDefinitionId: sessionExercises.exerciseDefinitionId,
-        exerciseName: sessionExercises.name,
+        capturedExerciseName: sessionExercises.name,
+        currentExerciseName: exerciseDefinitions.name,
         deletedAt: sessionExercises.deletedAt,
       })
       .from(sessionExercises)
+      .leftJoin(
+        exerciseDefinitions,
+        eq(sessionExercises.exerciseDefinitionId, exerciseDefinitions.id)
+      )
       .where(and(inArray(sessionExercises.sessionId, sessionIds), isNull(sessionExercises.deletedAt)))
       .orderBy(asc(sessionExercises.orderIndex), asc(sessionExercises.id))
-      .all();
+      .all()
+      .map(({ capturedExerciseName, currentExerciseName, ...row }) => ({
+        ...row,
+        exerciseName: currentExerciseName ?? capturedExerciseName,
+      }));
   },
 
   async loadExerciseSets(sessionExerciseIds) {

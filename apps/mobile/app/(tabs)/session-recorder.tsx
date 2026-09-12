@@ -982,12 +982,16 @@ const getCurrentExerciseBlockMetrics = (
   };
 };
 
-const toSessionInsightExercises = (session: Session): SessionInsightExerciseInput[] =>
+const toSessionInsightExercises = (
+  session: Session,
+  currentExerciseNameByDefinitionId: ReadonlyMap<string, string>
+): SessionInsightExerciseInput[] =>
   session.exercises.map((exercise, exerciseIndex) => ({
     id: exercise.id,
     orderIndex: exerciseIndex,
     exerciseDefinitionId: exercise.exerciseDefinitionId,
-    exerciseName: exercise.name,
+    exerciseName:
+      currentExerciseNameByDefinitionId.get(exercise.exerciseDefinitionId) ?? exercise.name,
     sets: exercise.sets.map((set, setIndex) => ({
       id: set.id,
       orderIndex: setIndex,
@@ -3895,9 +3899,13 @@ export default function SessionRecorderScreen({
     Boolean(completedEditTimeValidationMessage) &&
     (completedEditStartTouched || completedEditEndTouched || completedEditSubmitAttempted);
   const hasInvalidSetValues = useMemo(() => sessionHasInvalidSetValues(state.session), [state.session]);
+  const currentExerciseNameByDefinitionId = useMemo(
+    () => new Map(exerciseCatalog.exercises.map((exercise) => [exercise.id, exercise.name])),
+    [exerciseCatalog.exercises]
+  );
   const currentSessionInsightExercises = useMemo(
-    () => toSessionInsightExercises(state.session),
-    [state.session]
+    () => toSessionInsightExercises(state.session, currentExerciseNameByDefinitionId),
+    [currentExerciseNameByDefinitionId, state.session]
   );
   const currentSessionPerformedSetCount = useMemo(
     () =>

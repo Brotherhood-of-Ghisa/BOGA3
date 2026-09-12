@@ -219,8 +219,9 @@ Brief entrypoint map of the current mobile screens.
   - loading / error / not-found / detail
   - `presentation=completion` changes only the presentation: compact completion
     context; an omitted, single, or one-at-a-time paged `Personal records`
-    section; shared session muscle load; seven-day muscle-analysis handoff; and
-    Done. Edit/delete/append actions are hidden in this mode
+    section whose optional load cannot block the completion; shared session
+    muscle load when performed work exists; seven-day muscle-analysis handoff;
+    and Done. Edit/delete/append actions are hidden in this mode
   - completion loading/error/not-found/deleted-target states expose one safe
     Stats / History exit; the native back affordance/gesture is suppressed and
     Android system back replaces to Stats / History

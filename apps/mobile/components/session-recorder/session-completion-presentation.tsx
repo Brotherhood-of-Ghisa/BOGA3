@@ -115,16 +115,18 @@ export function SessionCompletionPresentation({
         </View>
       ) : null}
 
-      <View style={styles.section}>
-        <SessionMuscleLoad
-          catalogState={muscleCatalogState}
-          onRetry={onRetryMuscleCatalog}
-          performedSetCount={performedSetCount}
-          summary={muscleSummary}
-          visible
-          workingSetCount={workingSetCount}
-        />
-      </View>
+      {performedSetCount > 0 ? (
+        <View style={styles.section}>
+          <SessionMuscleLoad
+            catalogState={muscleCatalogState}
+            onRetry={onRetryMuscleCatalog}
+            performedSetCount={performedSetCount}
+            summary={muscleSummary}
+            visible
+            workingSetCount={workingSetCount}
+          />
+        </View>
+      ) : null}
 
       <View style={styles.actions}>
         <UiButton

@@ -124,7 +124,7 @@ Document app-specific UI semantics and guardrails for the current mobile app.
     - Active and completed-edit autosave preserve every set row, including fully blank, partial, valid unconfirmed, and planned rows, with stable identity, values, quality, confirmation status, and order across input blur, tab/route navigation, hydration, sync, and restore. Legacy persisted `skipped` planned rows hydrate as untouched planned rows. Blank or invalid reps remain incomplete; valid unconfirmed rows remain excluded from performed semantics. Completion uses separate explicit cleanup decisions for incomplete rows and entered-but-unconfirmed rows. The `/sessions` active-session completion affordance returns to the recorder so it cannot bypass this cleanup flow.
     - Exercise cards start expanded and their title region toggles a volatile collapsed state, with a top-aligned circular chevron control that uses the same primary-blue emphasis as the adjacent `#` action; the overflow action remains muted. Collapsing dismisses the keyboard and closes editable rows or set-quality pickers inside that exercise without changing set data; replacing the exercise definition or appending a plan expands its target card.
     - A collapsed exercise shows `<confirmed performed sets> · <working sets>` (for example `4 sets · 2 w/sets`). Blank, partial, invalid, planned, warm-up, null-quality, and valid-but-unconfirmed rows do not contribute to the working-set count; valid confirmed warm-up or null-quality rows still contribute to the performed-set count.
-    - Active mode shows an exercise-scoped success-surface `New PR` treatment, both expanded and collapsed, only when the shared current-session helper finds that exercise definition's best valid confirmed-set Wathan estimate strictly exceeds its maximum eligible loaded completed-history estimate. It includes the owning exercise name in expanded form plus the best entered weight, reps, and rounded estimated 1RM in both forms; multiple exercises qualify independently, while multiple qualifying sets for one exercise produce one best-set treatment.
+    - Active mode shows an exercise-scoped success-surface `New PR` treatment, both expanded and collapsed, only when the shared current-session helper finds that exercise definition's best valid confirmed-set Wathan estimate strictly exceeds its maximum eligible loaded completed-history estimate. It resolves the owning exercise name from current catalog metadata, includes that name in expanded form plus the best entered weight, reps, and rounded estimated 1RM in both forms; multiple exercises qualify independently, while multiple qualifying sets for one exercise produce one best-set treatment.
     - Expanded cards place `New PR` below the performed-set count and above `Past Records`, with `Share PR for <exercise>` opening the platform text share boundary; cancellation changes nothing, launch failure appears inline and remains retryable, and the payload contains only the visible exercise/load/reps/estimated-1RM facts. Collapsed cards place the non-interactive treatment below the set/working-set summary so the title toggle has no nested action. Editing below the prior best, unconfirming, or deleting the qualifying set removes the treatment immediately. Ties, first-ever exercises with no historical maximum, loading/empty/error history, and completed-edit mode show no PR treatment.
 12. Active `session-recorder` muscle load is progressive and session-scoped:
     - no row or instructional placeholder appears before the first valid confirmed performed set, and completed-edit mode does not show this current-session signal;
@@ -209,10 +209,13 @@ Document app-specific UI semantics and guardrails for the current mobile app.
    completed session, not durable celebration state and not a historical-detail
    variant. Its order is compact `Session complete` context, `Personal records`
    only when present, one PR at a time in exercise order with stable `N of M`
-   paging, `Session muscle load`, the seven-day muscle action, then Done.
+   paging, `Session muscle load` only when performed work exists, the seven-day
+   muscle action, then Done. Personal-record history is optional enrichment: its
+   loading or failure never blocks the stored completion context or exits.
 8. Completion reuses the same PR and muscle calculations and the same sharing
    boundary as the live recorder. Share cancellation is silent; launch failure
-   remains inline and retryable for the selected PR.
+   remains inline and retryable for the selected PR. PR names resolve from the
+   current linked exercise-definition metadata.
 9. Completion hides edit/delete/append. Done and safe back replace to Stats /
    History, while the analysis action replaces to seven-day By Muscle. A
    missing, deleted, or failed target exposes one safe return and never opens a
