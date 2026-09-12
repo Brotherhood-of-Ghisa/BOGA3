@@ -14,9 +14,9 @@
 >   actions, leave, and the username gate (M22-T05).
 > - §8, the two-user Maestro lane `ios-groups-e2e` (M22-T06).
 >
-> This doc owns the technical contract. The product requirements and
-> decisions it implements are recorded in the shipped milestone spec, now
-> history at `docs/specs/milestones/archive/M22-groups-and-foundations.md`.
+> This doc owns the technical contract and is the durable record of what M22
+> built. The M22 milestone spec (product requirements and acceptance criteria)
+> was deleted after shipping; git history and PR #280 keep it.
 
 This doc covers:
 
@@ -30,7 +30,7 @@ It is not the source for these:
 
 | Topic | Source |
 | --- | --- |
-| Product requirements and acceptance | the M22 milestone spec |
+| Product requirements and acceptance | the M22 milestone spec (git history) |
 | Sync v2 | `sync-v2-server-contract.md` |
 | The authN/authZ baseline | `docs/specs/10-api-authn-authz-guidelines.md` |
 

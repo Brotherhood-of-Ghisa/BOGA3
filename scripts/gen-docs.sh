@@ -162,7 +162,7 @@ else:
 CURATED = []
 for base, dirs, files in os.walk(os.path.join(root, "docs")):
     rel = os.path.relpath(base, root)
-    if any(rel.startswith(p) for p in ("docs/plans", "docs/tasks", "docs/brainstorms")):
+    if any(rel.startswith(p) for p in ("docs/plans", "docs/brainstorms")):
         continue
     CURATED += [os.path.join(base, f) for f in files if f.endswith(".md")]
 CURATED += [os.path.join(root, p) for p in (

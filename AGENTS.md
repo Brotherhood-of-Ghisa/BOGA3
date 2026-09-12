@@ -82,14 +82,20 @@ per-feature coverage policies live next to the tests they govern (e.g.
 Product and domain details are maintained in the specs above — do not duplicate
 them here.
 
-## Ignore plans, tasks, and brainstorms unless you are executing one
+## Planning is optional and ephemeral
 
-`docs/plans/**`, `docs/tasks/**`, and `docs/brainstorms/**` are working notes,
-not source-of-truth. They include completed, superseded, and abandoned material
-that will mislead you if you treat it as current. **Do not read them, and do not
-let them steer your work, unless the user explicitly points you at a specific
-plan/task to execute or to brainstorm in.** Source-of-truth lives in
-`docs/specs/**`, `AGENTS.md`, and `RUNBOOK.md`.
+How work is planned is the user's choice: no plan, a single plan doc, a
+milestone with task cards, or anything else. Milestones and task cards are one
+optional workflow (`docs/plans/README.md`). Every planning doc lives under
+`docs/plans/**` and is deleted once its work ships; git history keeps it.
+Durable decisions belong in `docs/specs/**`, and a PR updates the owning spec
+when it ships the decision.
+
+`docs/plans/**` and `docs/brainstorms/**` are working notes, not
+source-of-truth, and may be stale. **Do not read them, and do not let them
+steer your work, unless the user points you at a specific plan, task, or
+brainstorm.** Source-of-truth lives in `docs/specs/**`, `AGENTS.md`, and
+`RUNBOOK.md`.
 
 ## Pull requests
 

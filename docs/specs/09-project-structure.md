@@ -42,11 +42,10 @@ Define the canonical repository structure, path ownership, and placement convent
     scripts/                     # Backend local runtime/test wrapper scripts
     tests/                       # Backend-local smoke/integration test entrypoints
   docs/
-    specs/                       # Project/milestone/task process and technical specs
+    specs/                       # Source of truth: product, architecture, testing, and technical specs
       ui/                        # Canonical UI discovery/audit/guardrail docs (M8+)
       tech/                      # Subsystem-level technical deep-dive docs (M13+)
-    tasks/                       # Active task cards
-      complete/                  # Completed task-card archive
+    plans/                       # Optional, ephemeral planning docs (any shape; deleted when shipped)
     brainstorms/                 # Working notes and brainstorming docs
 ```
 
@@ -88,14 +87,14 @@ Define the canonical repository structure, path ownership, and placement convent
 - `apps/mobile/artifacts/maestro/`
   - owns generated Maestro runtime artifacts, screenshots, and lifecycle logs (`runtime.env`, `provision.log`, `launch.log`, `teardown.log`, `expo-start.log`, `maestro-junit.xml`).
 - `docs/specs/`
-  - owns project policy, architecture/testing strategy, milestone specs, and templates.
+  - owns project policy, product, architecture/testing strategy, and technical contracts (the durable source of truth).
 - `docs/specs/ui/`
   - owns authoritative UI discovery/audit/guardrail documentation produced in M8+ tasks.
 - `docs/specs/tech/`
   - owns subsystem-level technical deep-dive docs that complement (but do not replace) top-level architecture/testing docs.
-- `docs/tasks/`
-  - owns active per-session execution task cards (`planned`, `in_progress`, `blocked`).
-  - completed or outdated cards are deleted at closeout; git history keeps them.
+- `docs/plans/`
+  - owns optional, ephemeral planning docs in whatever shape the user chooses (a single plan, or `milestones/` + `tasks/` from the starter templates in `templates/`). See `docs/plans/README.md`.
+  - not source of truth. A planning doc is deleted once its work ships; git history keeps it.
 - `docs/brainstorms/`
   - owns non-authoritative ideation notes (helpful context, not source of truth).
 - `supabase/`
@@ -112,8 +111,8 @@ Define the canonical repository structure, path ownership, and placement convent
 - `docs/specs/tech/` (introduced in M13)
   - canonical location for subsystem-level technical deep dives (for example client sync engine internals, failure handling, and maintenance contracts).
   - keep deep-dive docs concise, source-linked, and update them in the same task when subsystem behavior materially changes.
-- `docs/tasks/` closeout
-  - there is no in-repo archive for task cards: delete a card in the same change that marks it `completed` or `outdated` (git history keeps it).
+- `docs/plans/` lifecycle
+  - there is no in-repo archive for plans, milestones, or task cards: delete them in the change that ships or abandons their work (git history keeps them). Durable decisions move into the owning `docs/specs/**` doc in the PR that ships them.
 - `apps/mobile/.maestro/flows`
   - remains the canonical location for Maestro flow definitions.
 - `apps/mobile/.maestro/maestro.env.sample`
