@@ -172,9 +172,6 @@ appId: com.dinoderek.mobile
 - assertVisible:
     id: "group-stream-session-card-${output.groupsCardKey}-metrics"
     text: "3 sets · 1,500 kg · 2 exercises"
-# Equal to the pre-join Bench history: not a PR (strictly greater only).
-- assertNotVisible:
-    id: "group-stream-session-card-${output.groupsCardKey}-pr-0"
 # The pre-join session (started a day before joining) is never shared.
 - assertNotVisible:
     id: "group-stream-session-card-${output.groupsHistoryCardKey}"
@@ -202,9 +199,6 @@ appId: com.dinoderek.mobile
 - assertVisible:
     id: "group-stream-session-card-${output.groupsCardKey}-status"
     text: "Completed · 45m"
-- assertVisible:
-    id: "group-stream-session-card-${output.groupsCardKey}-pr-0"
-    text: "PR · Bench Press 102.5 kg × 5"
 - takeScreenshot: "groups-06-completed-edited-card"
 
 # --- 7. The friend's view: exercises and performed sets, no owner actions -------

@@ -37,6 +37,12 @@ export const generatedMigrationBundle = {
     tag: "0004_optimal_umar",
     breakpoints: true,
   },
+  {
+    idx: 5,
+    when: 1789232947730,
+    tag: "0005_clear_group_cache",
+    breakpoints: true,
+  },
     ],
   },
   migrations: {
@@ -257,6 +263,11 @@ ALTER TABLE \`exercise_sets\` ADD \`performance_status\` text;`,
 	\`payload_json\` text NOT NULL,
 	\`fetched_at_ms\` integer NOT NULL
 );
+`,
+  m0005: `-- Group payloads changed shape (raw set rows instead of server metrics; groups
+-- contract §4.2, §5). group_cache is a disposable cache of server data, so it is
+-- emptied once rather than rendering a payload in the old shape.
+DELETE FROM \`group_cache\`;
 `,
   },
 } as const;

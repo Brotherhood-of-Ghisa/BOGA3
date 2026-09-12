@@ -46,11 +46,6 @@ export function GroupStreamSessionCard({ card, showGroupNames, onPress }: GroupS
         <UiText testID={`${testID}-metrics`} variant="label">
           {`${card.setsLabel} · ${card.volumeLabel} · ${card.exercisesLabel}`}
         </UiText>
-        {card.prLabels.map((label, index) => (
-          <UiText key={`${card.key}-pr-${index}`} style={styles.pr} testID={`${testID}-pr-${index}`}>
-            {label}
-          </UiText>
-        ))}
         {showGroupNames && card.groupNames.length > 0 ? (
           <UiText numberOfLines={1} style={styles.groups} testID={`${testID}-groups`} variant="bodyMuted">
             {card.groupNames.join(', ')}
@@ -94,10 +89,6 @@ const styles = StyleSheet.create({
   },
   statusLiveText: {
     color: uiColors.textSuccess,
-  },
-  pr: {
-    color: uiColors.heatmapBucket4,
-    fontWeight: '700',
   },
   groups: {
     fontSize: 12,

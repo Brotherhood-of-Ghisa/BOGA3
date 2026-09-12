@@ -93,8 +93,25 @@ const completedItem = (overrides: Partial<StreamSessionItem> = {}): StreamSessio
   started_at_ms: T0,
   completed_at_ms: T0 + 3_900_000,
   duration_sec: 3900,
-  metrics: { performed_sets: 12, total_volume_kg: 5230.5, exercise_count: 4 },
-  highlights: { prs: [{ exercise_name: 'Bench Press', weight_kg: 100, reps: 5, e1rm_kg: 112.4 }] },
+  exercises: [
+    {
+      session_exercise_id: 'ex-1',
+      name: 'Bench Press',
+      machine_name: null,
+      order_index: 0,
+      sets: [
+        { set_id: 'b-1', order_index: 0, weight_value: '100', reps_value: '5', set_type: 'working', performance_status: null },
+        { set_id: 'b-2', order_index: 1, weight_value: '102.5', reps_value: '5', set_type: 'working', performance_status: null },
+      ],
+    },
+    {
+      session_exercise_id: 'ex-2',
+      name: 'Barbell Row',
+      machine_name: null,
+      order_index: 1,
+      sets: [{ set_id: 'r-1', order_index: 0, weight_value: '60', reps_value: '10', set_type: 'warm_up', performance_status: null }],
+    },
+  ],
   ...overrides,
 });
 
@@ -108,7 +125,6 @@ const liveItem = completedItem({
   started_at_ms: T0 + 60_000,
   completed_at_ms: null,
   duration_sec: null,
-  highlights: { prs: [] },
 });
 
 const joinedItem: StreamMembershipItem = {
@@ -153,8 +169,9 @@ const sessionDetail = (overrides: Partial<GroupSessionDetailResult['session']> =
         machine_name: 'Flat bench',
         order_index: 0,
         sets: [
-          { set_id: 'set-1', order_index: 0, weight_kg: 60, reps: 10, set_type: 'warm_up' },
-          { set_id: 'set-2', order_index: 1, weight_kg: 102.5, reps: 5, set_type: 'rir_1' },
+          { set_id: 'set-1', order_index: 0, weight_value: '60', reps_value: '10', set_type: 'warm_up', performance_status: null },
+          { set_id: 'set-2', order_index: 1, weight_value: '102.5', reps_value: '5', set_type: 'rir_1', performance_status: null },
+          { set_id: 'set-3', order_index: 2, weight_value: '110', reps_value: '5', set_type: 'rir_1', performance_status: 'planned' },
         ],
       },
     ],
@@ -249,8 +266,7 @@ describe('Groups tab', () => {
     expect(completed.getByText('alex')).toBeTruthy();
     expect(completed.getByText('Completed · 1h 5m')).toBeTruthy();
     expect(completed.getByText('9/11 09:05 · Iron Temple')).toBeTruthy();
-    expect(completed.getByText('12 sets · 5,230.5 kg · 4 exercises')).toBeTruthy();
-    expect(completed.getByText('PR · Bench Press 100 kg × 5')).toBeTruthy();
+    expect(completed.getByText('3 sets · 1,612.5 kg · 2 exercises')).toBeTruthy();
     expect(completed.getByText('Garage Gym')).toBeTruthy();
     expect(within(screen.getByTestId(cardID('friend-2:s-2'))).getByText('Training now')).toBeTruthy();
     expect(screen.getByText('Unnamed member joined')).toBeTruthy();
@@ -447,6 +463,8 @@ describe("Friend's session view", () => {
     const working = within(screen.getByTestId('group-session-set-row-set-2'));
     expect(working.getByText('102.5 kg')).toBeTruthy();
     expect(working.getByText('RIR 1')).toBeTruthy();
+    // The server sends the planned set too; the device shows performed sets only.
+    expect(screen.queryByTestId('group-session-set-row-set-3')).toBeNull();
     expect(screen.getByText('Bench Press')).toBeTruthy();
     expect(screen.getByText('alex')).toBeTruthy();
     expect(screen.getByText('Completed · 1h 5m')).toBeTruthy();

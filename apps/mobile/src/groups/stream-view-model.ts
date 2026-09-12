@@ -1,16 +1,16 @@
 // Pure presentation for the group stream (`docs/specs/tech/groups-contract.md`
-// §6.1): card status, kg metric formatting, membership sentences, and filter
-// chips. No React, no I/O.
+// §6.1): card status, card metrics (computed on the device, §5) and their kg
+// formatting, membership sentences, and filter chips. No React, no I/O.
 
 import { formatCompactDuration } from '@/src/data/session-list';
 
+import { computeGroupSessionMetrics } from './session-metrics';
 import type {
   GroupMembershipEvent,
   GroupRole,
   GroupSummary,
   StreamItem,
   StreamMembershipItem,
-  StreamPrHighlight,
   StreamSessionItem,
 } from './types';
 
@@ -73,9 +73,6 @@ const pluralize = (count: number, singular: string, plural: string): string =>
 
 export const formatSetCount = (count: number): string => pluralize(count, 'set', 'sets');
 export const formatExerciseCount = (count: number): string => pluralize(count, 'exercise', 'exercises');
-
-export const formatPrHighlight = (pr: StreamPrHighlight): string =>
-  `PR · ${pr.exercise_name} ${formatKg(pr.weight_kg)} kg × ${pr.reps}`;
 
 /** C7.3 wording: "X joined", "X left the group", "X was removed". */
 export const formatMembershipSentence = (event: GroupMembershipEvent, username: string | null): string => {
@@ -144,7 +141,6 @@ export type StreamSessionCardViewModel = {
   setsLabel: string;
   volumeLabel: string;
   exercisesLabel: string;
-  prLabels: string[];
 };
 
 export type StreamMembershipViewModel = {
@@ -157,22 +153,24 @@ export type StreamMembershipViewModel = {
 
 export type StreamItemViewModel = StreamSessionCardViewModel | StreamMembershipViewModel;
 
-const buildSessionCard = (item: StreamSessionItem): StreamSessionCardViewModel => ({
-  kind: 'session',
-  key: item.key,
-  memberUserId: item.member.user_id,
-  sessionId: item.session_id,
-  memberName: formatMemberName(item.member.username),
-  isTrainingNow: item.status === 'active',
-  statusLabel: formatSessionStatusLabel(item),
-  startedAtLabel: formatStreamStartedAt(item.started_at_ms),
-  gymName: item.gym_name,
-  groupNames: item.groups.map((group) => group.name),
-  setsLabel: formatSetCount(item.metrics.performed_sets),
-  volumeLabel: formatVolumeKg(item.metrics.total_volume_kg),
-  exercisesLabel: formatExerciseCount(item.metrics.exercise_count),
-  prLabels: item.highlights.prs.map(formatPrHighlight),
-});
+const buildSessionCard = (item: StreamSessionItem): StreamSessionCardViewModel => {
+  const metrics = computeGroupSessionMetrics(item.exercises);
+  return {
+    kind: 'session',
+    key: item.key,
+    memberUserId: item.member.user_id,
+    sessionId: item.session_id,
+    memberName: formatMemberName(item.member.username),
+    isTrainingNow: item.status === 'active',
+    statusLabel: formatSessionStatusLabel(item),
+    startedAtLabel: formatStreamStartedAt(item.started_at_ms),
+    gymName: item.gym_name,
+    groupNames: item.groups.map((group) => group.name),
+    setsLabel: formatSetCount(metrics.performedSets),
+    volumeLabel: formatVolumeKg(metrics.totalVolumeKg),
+    exercisesLabel: formatExerciseCount(metrics.exerciseCount),
+  };
+};
 
 const buildMembershipItem = (item: StreamMembershipItem): StreamMembershipViewModel => ({
   kind: 'membership',

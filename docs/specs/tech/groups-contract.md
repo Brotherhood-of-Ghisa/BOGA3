@@ -4,7 +4,7 @@
 >
 > - §2–§5, the server half: the membership/invite RPCs (M22-T01,
 >   `supabase/migrations/20260910120000_m22_groups_membership.sql`) and the
->   share ledger, trigger, stream/detail reads, and metrics (M22-T02,
+>   share ledger, trigger, and stream/detail reads (M22-T02,
 >   `supabase/migrations/20260911120000_m22_group_record.sql`). Both are proven
 >   by `./boga test groups-contract`.
 > - §6.1–§6.2, the mobile client (M22-T03).
@@ -13,6 +13,9 @@
 > - §6.3/§7, the write UI: create, edit, join (deep link), invite, member
 >   actions, leave, and the username gate (M22-T05).
 > - §8, the two-user Maestro lane `ios-groups-e2e` (M22-T06).
+> - Post-M22: group reads return raw set rows, card metrics are computed on
+>   the viewing device, and PR highlights are deferred (§4.2, §5, §9;
+>   `supabase/migrations/20260912120000_m22_group_raw_sets.sql`).
 >
 > This doc owns the technical contract. The product requirements and
 > decisions it implements are recorded in the shipped milestone spec, now
@@ -63,7 +66,7 @@ Realtime in M22.
 | The client pushes a separate group projection | A second write path with its own offline retry. It risks personal sync, and the server already holds every row. |
 | Assemble the stream by querying members' sessions by membership window | Rejected by #16. The ledger also gives the stream a stable index. |
 | Make group rows Sync v2 entities | Sync v2 is per-owner LWW under `owner_user_id = auth.uid()` (contract §A.1). Multi-reader, server-authoritative rows do not fit it (contract §B.11). |
-| An Edge Function group API (the M21 pattern) to reuse the TS calc module | It adds a deploy surface and a service-role boundary where authorization lives in app code. SQL RPCs keep authorization in the database (spec 10 rule 2). Metric drift is controlled by shared vectors (§5.3). |
+| An Edge Function group API (the M21 pattern) to reuse the TS calc module | It adds a deploy surface and a service-role boundary where authorization lives in app code. SQL RPCs keep authorization in the database (spec 10 rule 2). The TS calc module is reused on the viewing device instead (§5). |
 
 ## 2. Server schema (`app_public`)
 
@@ -355,8 +358,7 @@ members, then by username case-insensitively with nulls last (C3.6.1).
   "gym_name": "…|null",
   "status": "active|completed",
   "started_at_ms": 0, "completed_at_ms": 0, "duration_sec": 0,   // nullable while active
-  "metrics": { "performed_sets": 12, "total_volume_kg": 5230.5, "exercise_count": 4 },
-  "highlights": { "prs": [{ "exercise_name": "…", "weight_kg": 100, "reps": 5, "e1rm_kg": 112.4 }] } }
+  "exercises": [ /* SessionExercise, as in SessionDetail below */ ] }
 // membership item — joined at joined_at; left/removed at ended_at
 { "kind": "membership", "key": "<membership_id>:joined|ended",
   "sort_at_ms": 0, "event": "joined|left|removed",
@@ -376,11 +378,15 @@ session must not be deleted. Otherwise the result is `NOT_FOUND`.
 **`group_session_detail` shape.** `SessionDetail` =
 `{ member, session_id, gym_name, status, started_at_ms, completed_at_ms,
 duration_sec, exercises: [{ session_exercise_id, name, machine_name,
-order_index, sets: [{ set_id, order_index, weight_kg, reps, set_type }] }] }`.
+order_index, sets: [{ set_id, order_index, weight_value, reps_value, set_type,
+performance_status }] }] }`.
 
 - Exercises and sets are in `order_index` order.
-- **Only performed sets** (§5.1) are returned (A4.2). Tombstoned exercises and
-  sets are omitted, and so are exercises with no performed set.
+- **Every live set, raw.** Tombstoned exercises and sets are omitted. Every
+  other set is returned as synced (`weight_value` and `reps_value` text,
+  `performance_status`), planned, skipped, and blank ones included. The
+  viewing device decides what is performed (§5), so "performed sets only"
+  (A4.2) is a display rule, not a server filter.
 - `name` is the member's own exercise name (`session_exercises.name`).
 - No GPS columns are ever read.
 
@@ -418,12 +424,18 @@ exactly as above; `groups-contract` asserts the key sets.
   the share, ordered by `lower(name)`, then `name`, then `id`. `gym_name` is
   the member's gym name while that gym row is not tombstoned. `member` is
   `{ user_id, username }`, with `username` null when blank.
-- **Cost.** PR history is computed only for the page's cards.
 - **Detail.** A tombstoned session, a nonexistent one, a session never shared,
   and a caller who is not a member of any group holding the share all get the
   same `NOT_FOUND: session not found` body. The athlete may open their own
-  shared session. `weight_kg` and `reps` are the parsed values: a blank weight
-  with valid reps is `0`.
+  shared session.
+
+**As-built (post-M22, raw sets).**
+`supabase/migrations/20260912120000_m22_group_raw_sets.sql` rebuilds the card
+and detail bodies on one internal helper, `group_session_exercises_json(member,
+session)`, so both carry the same `exercises` array. It drops the M22-T02 SQL
+mirrors of the TS parsers: `group_js_trim`, `group_parse_reps`,
+`group_parse_weight`, `group_e1rm`, and `group_performed_sets`.
+`groups-contract` asserts the raw shapes.
 
 ### 4.3 Writes
 
@@ -474,105 +486,42 @@ Writes raise:
 - **Serialization.** Mutating RPCs lock the `groups` row (`for update`) before
   any role check; `group_join` locks it while resolving the code.
 
-## 5. Stream-card metrics and highlights
+## 5. Stream-card metrics (computed on the viewing device)
 
-### 5.1 Performed-set predicate and parsing (SQL mirrors of the canonical TS)
+Group reads return raw set rows (§4.2). Every set rule runs on the viewing
+device, in `apps/mobile/src/groups/session-metrics.ts`, through the canonical
+TS the recorder uses. Nothing is mirrored in SQL.
 
-| SQL helper (immutable, internal) | Mirrors |
-| --- | --- |
-| `group_parse_reps(text) → int` — trimmed, `^\d+$`, `> 0`, else null | `parseSetReps` (`apps/mobile/src/exercise-calculations/index.ts`) |
-| `group_parse_weight(text, reps int) → float8` — blank with valid reps → `0`; else trimmed, `^\d*\.?\d*$`, at least one digit, `>= 0`, else null | `canonicalizeWeightForReps` + `parseSetWeight` |
-| `group_e1rm(weight float8, reps int) → float8` — Wathan `100·w / (48.8 + 53.8·e^(−0.075·r))`; null when `w <= 0` | `estimateOneRepMax` |
-
-A set is **performed** when all of these hold:
-
-- `exercise_sets.deleted_at is null`;
-- its `session_exercise` is not deleted;
-- `performance_status is null`;
-- both parsers return non-null.
-
-This mirrors `isConfirmedPerformedSet` (`apps/mobile/src/session-recorder/set-semantics.ts`)
-and spec 05 Sync v2 #6.
-
-### 5.2 Card values
-
-- **`performed_sets`** — the count of performed sets.
-- **`total_volume_kg`** — Σ `weight × reps` over performed sets. Warm-ups are
-  included. The value is the entered scalar with no per-side normalization
+- **Performed.** A set is performed when `isConfirmedPerformedSet`
+  (`apps/mobile/src/session-recorder/set-semantics.ts`) holds for its raw
+  values and its status after `normalizeSessionSetPerformanceStatus`, and
+  `parseCalculationSet` (`apps/mobile/src/exercise-calculations/index.ts`)
+  parses it after `canonicalizeWeightForReps`. So a blank weight with valid
+  reps is 0 kg, an unknown status counts as performed, and a value the
+  recorder cannot produce (for example `1e3`) does not.
+- **Sets** — the count of performed sets.
+- **Volume** — Σ `computeSetVolume(weight, reps)` over performed sets. Warm-ups
+  are included. The value is the entered scalar with no per-side normalization
   (spec 05 Sync v2 #5, #10).
-- **`exercise_count`** — non-deleted session exercises with at least one
-  performed set.
-- **PR highlight.** This mirrors the recorder's `getExerciseCardPersonalRecord`
-  (`apps/mobile/app/(tabs)/session-recorder.tsx`), the brainstorm C3.7.2
-  default. For each session exercise with a non-null `exercise_definition_id`
-  D:
-  - **current** is its best-e1RM performed set. Ties go to the lowest
-    `order_index`.
-  - **history** is the maximum e1RM over the member's performed sets on D in
-    their other sessions. Only sessions with status `completed`, non-deleted,
-    a non-null `completed_at`, and an earlier `started_at` count. This is the
-    member's full history, not only what was shared.
-  - **It is a PR iff history exists and current > history.**
-  - A session reports at most one PR per D: the best one.
-  - For an active session this equals the recorder's live rule, since nothing
-    completed can start later. For a past session it means "a PR when logged,
-    given current data". Edits to earlier sessions flow through.
+- **Exercises** — live session exercises with at least one performed set.
+- **Friend's session view** — the same performed sets; exercises with none are
+  omitted.
 
-### 5.3 Parity vectors
+**Why the device.** M22 first computed these in SQL helpers that mirrored the
+TS parsers, held in parity by shared test vectors. That duplicated set
+semantics in two languages, and the PR rule had no parity guard at all. The
+device now reuses the recorder's code. The cost: a co-member's device receives
+every live set, planned and skipped ones included, although the UI shows
+performed sets only.
 
-`supabase/tests/fixtures/group-set-metric-vectors.json` holds rows of the form
-`{weight_value, reps_value, performance_status, performed, weight, reps,
-volume, e1rm}`.
+**PR highlights are deferred** (§9). The M22 rule compared a session's best
+e1RM with the member's full completed history, including sessions never shared
+into the group (§2.5), so the viewer cannot compute it from shared data.
 
-- A jest test asserts that the canonical TS functions produce every vector.
-- The `groups-contract` lane asserts that the SQL helpers do (e1RM within
-  `1e-9`).
-- A semantics change on either side fails until both sides and the vectors
-  agree.
-- Divergent exotic strings (for example `1e3`, which the UI cannot enter) are
-  pinned explicitly in the vectors.
-
-**As-built (M22-T02, §5).** The helpers are in
-`supabase/migrations/20260911120000_m22_group_record.sql`, the 40 vectors in
-`supabase/tests/fixtures/group-set-metric-vectors.json`, and the jest side in
-`apps/mobile/app/__tests__/group-set-metric-vectors.test.ts`.
-
-- **Parsing parity.**
-  - Trimming uses `group_js_trim`, an explicit set of JS `String.prototype.trim`
-    code points (ASCII whitespace, NBSP, U+1680, U+2000–U+200A, LS, PS,
-    U+202F, U+205F, U+3000, BOM). This is not `btrim`, and not the
-    locale-dependent `[[:space:]]`.
-  - Digits are `[0-9]`, since JS `\d` is ASCII-only.
-  - `group_parse_weight` parses with `float8in`, which, like JS `Number`, is
-    correctly rounded.
-- **Performed predicate.** A set is performed when `performance_status is null
-  or not in ('planned','skipped','unperformed')`. This mirrors
-  `normalizeSessionSetPerformanceStatus` as used by
-  `exercise-block-history.ts`: an unknown status value normalizes to `null`,
-  so the set is performed. The rule in §5.1, `performance_status is null`, is
-  refined to that, and a vector pins it.
-- **The helpers never raise.** One member's malformed row therefore cannot
-  break a group read. Two deliberate SQL bounds keep every product and sum
-  finite and JSON-representable. Each is pinned as a vector with a `sql`
-  override and a `divergence` reason:
-  - reps above 2147483647 (`integer`) parse to `null`;
-  - weights `>= 1e15` (16 or more integer digits) parse to `null`.
-
-  A very long fraction that underflows parses to `0`, as in JS. `group_e1rm`
-  uses denominator `48.8` exactly above 600 reps. JS evaluates it to the same
-  double there, and `exp()` would otherwise raise on underflow.
-- **e1RM tolerance.** It is `1e-9`, relative above 1:
-  `|Δ| <= 1e-9 · max(1, |e1rm|)`. `exp()` may differ by an ulp between V8 and
-  libm, and the 1e15-scale vectors need the relative form. Weight, reps,
-  volume, and `performed` are compared exactly.
-- **Vector semantics.**
-  - `weight` and `reps` are the parser outputs, independent of status.
-  - `volume` and `e1rm` are set only when the set is performed.
-  - The SQL lane asserts each row merged with its `sql` override; jest asserts
-    the top-level values.
-- **Card values.** They follow §5.2. The PR tie-break is `(e1rm desc,
-  session-exercise order_index, set order_index, set id)`. `prs` is ordered by
-  the best set's exercise `order_index`.
+**As-built (post-M22).** `session-metrics.ts` exports `toGroupPerformedSet`,
+`selectGroupPerformedExercises`, and `computeGroupSessionMetrics`; the stream
+view model and `FriendSessionContent` use them. Jest:
+`apps/mobile/app/__tests__/groups-session-metrics.test.ts`.
 
 ## 6. Mobile client architecture
 
@@ -583,7 +532,8 @@ volume, e1rm}`.
 | `types.ts` | Wire types (§4) |
 | `api.ts` | One typed wrapper per RPC. It maps PostgREST errors to `GroupApiError { code, message }` by token prefix, and transport failures to `NETWORK`. It is the only code that calls Supabase for groups. |
 | `cache.ts` | Read and write for `group_cache`, `evictGroup(groupId)`, and `wipeGroupCache()` |
-| `stream-view-model.ts` | Pure presentation: status ("Training now" while `active` — indefinite, C7.2 — or "Completed · 1h 05m"), metric formatting in kg, membership sentences ("X joined", "X left the group", "X was removed" — C7.3), and filter chips |
+| `session-metrics.ts` | Card metrics and the friend view's performed sets, computed from raw set rows with the recorder's TS (§5) |
+| `stream-view-model.ts` | Pure presentation: status ("Training now" while `active` — indefinite, C7.2 — or "Completed · 1h 05m"), card metrics from `session-metrics.ts` formatted in kg, membership sentences ("X joined", "X left the group", "X was removed" — C7.3), and filter chips |
 | `use-group-resource.ts` | A cache-first hook. It refreshes on focus, every 30 s while focused, and on pull-to-refresh, and returns `{ data, lastUpdatedAtMs, refreshing, offline, error, refresh }`. |
 | `use-group-action.ts` | Runs one write RPC. It fails fast with the offline message when offline and never queues (C3.10.3). |
 
@@ -682,6 +632,9 @@ migration via `npm run db:generate`.
   transaction.
 - **Stream caches.** They hold whatever page the screen's fetcher returns. The
   first-page-only rule is the fetcher's contract, not enforced by the cache.
+- **Shape change (post-M22).** `apps/mobile/drizzle/0005_clear_group_cache.sql`
+  deletes every row once, so a payload cached in the old metrics shape is never
+  rendered by the raw-set client.
 
 ### 6.3 Routes
 
@@ -854,7 +807,8 @@ on the group screen and the Create / Join actions on the tab.
     - removed-member `NOT_FOUND` (AC11);
     - direct-table denial for every group table (AC9);
     - `AGENT_FORBIDDEN` for a token carrying `client_id`;
-    - the metric vectors (§5.3);
+    - the raw card and detail payloads: every live set as synced, tombstones
+      omitted (§4.2);
     - share-trigger failure isolation: a forced trigger failure still commits
       `sync_push` and writes `group.share_failed`.
 - **Existing lanes.** `sync-drift --strict` stays green, which proves ground
@@ -869,7 +823,7 @@ on the group screen and the Create / Join actions on the tab.
   - screens, with role-gated action visibility, the username gate, the invite
     and share flows, the friend view without owner actions, and the offline
     error on writes (AC12, AC13);
-  - TS parity against the vectors.
+  - device-side metrics (§5): the performed rule, parsing, and card values.
 - **Maestro lane `ios-groups-e2e`** (new; slow-frontend; iOS + local Supabase).
   - Flow `groups-two-user-stream.yaml` runs as device user **`user_c`**. The
     scripted counterparty **`user_d`** is driven from the flow with Maestro
@@ -907,8 +861,8 @@ on the group screen and the Create / Join actions on the tab.
     back from the counterparty's own "joined" stream item, so host/VM clock
     skew cannot push it before the join. `push-complete-edit` completes it
     (45 min), then edits the first set to 102.5 kg in a later push. The card
-    then shows `Completed · 45m`, `1,512.5 kg`, and `PR · Bench Press 102.5 kg × 5`
-    (a strict e1RM gain over the unshared history, §5.2). The flow also
+    then shows `Completed · 45m` and `1,512.5 kg`, computed on the device (§5).
+    The flow also
     asserts that the history session has no card (§2.5) and that the card
     stays after removal (#4).
   - **Device IDs.** The flow learns the group, member, and session ids from the
@@ -939,3 +893,8 @@ on the group screen and the Create / Join actions on the tab.
   group exercise (spec 05 local integrity rule 2).
 - **Phase 5 certification** pins the attested set value in its own row. The
   read-through model does not change.
+- **PR highlights** on stream cards. The M22 rule (a strict Wathan e1RM gain
+  over the member's full completed history) needs history that is never shared
+  into the group, so the viewer cannot compute it from shared data. Decide the
+  mechanism with the PR work — for example, the athlete's device syncs a
+  per-session PR summary — without reintroducing SQL mirrors of the TS set rules.
