@@ -21,7 +21,11 @@ procedure is the backstop. The lifecycle it backs up is in
 2. **Never touch work in progress without an explicit yes.** An OPEN PR, no PR,
    or a detached HEAD means someone may still be working there.
 3. **Never touch the dev stack** (`BOGA-dev`) or the main checkout's slot 0.
-4. **Run from the main checkout**, not from a worktree you are about to remove.
+4. **Run from a checkout you are not removing** (your own worktree or the main
+   checkout), never from inside a worktree on the plan.
+5. **Save before forcing.** Before `--force` on a worktree with uncommitted
+   changes the human chose to discard, save `git -C <path> diff HEAD --binary`
+   to a patch file and report where it is.
 5. **Report exactly what you removed**, with the before/after `ls`.
 
 ## Steps
@@ -43,6 +47,8 @@ PR state), Supabase stacks in Docker with no lease, and prunable git worktrees.
 | Lease, worktree path missing | `./boga worktree release --slot <N> --force` |
 | Lease, PR **OPEN**, no PR, or detached HEAD | **Keep.** List it and ask the human about each one |
 | Supabase stack with no lease (not `BOGA-dev`) | `./boga worktree release --project-id <id> --force` |
+| Worktree with no lease, PR **MERGED** or **CLOSED**, no uncommitted changes | `git worktree remove --force <path>` (and release its stack by `--project-id` if one exists) |
+| Worktree with no lease, anything else (open/no PR, uncommitted changes) | **Keep.** List it and ask the human |
 | Prunable git worktree | `git worktree prune` |
 | Docker resources of other projects (not `BOGA*`) | Report only; they are not this repo's |
 
