@@ -1,7 +1,7 @@
 ---
 task_id: M24-T03-Exercise_PR_celebration_and_sharing
 milestone_id: "M24"
-status: planned
+status: completed
 ui_impact: "yes"
 areas: "frontend"
 runtimes: "node|expo|maestro"
@@ -15,7 +15,7 @@ docs_touched: "docs/specs/ui/screen-map.md, docs/specs/ui/components-catalog.md,
 ## Task metadata
 
 - Task ID: `M24-T03-Exercise_PR_celebration_and_sharing`
-- Status: `planned`
+- Status: `completed`
 - Depends on: `M24-T01`, `M24-T02`
 
 ## Parent references
@@ -124,8 +124,34 @@ deep links, certification, first-ever-as-PR, and persisted achievements.
 
 ## Evidence
 
+- Focused Jest/RNTL passed 50 tests across `session-insights.test.ts` and
+  `session-recorder-interactions.test.tsx`, covering stable payload formatting,
+  share cancellation, native launch failure/retry, strict/tied/no-baseline
+  classification, immediate qualifying-set reversal, and two independently
+  rendered/shared PR exercises.
+- Final `./boga test fast` passed: lint/typecheck, 124 Jest suites (1,245
+  tests), backend-fast, docs/meta, agent-auth-web, and MCP unit lanes.
+- Final `./boga test frontend` passed all five iOS lanes. Artifact roots:
+  `apps/mobile/artifacts/maestro/M24-T03-final/20260912-182236-61297`,
+  `20260912-182320-62431`, `20260912-182452-63943`,
+  `20260912-182630-65524`, and `20260912-182827-67308`.
+- The extended history-backed PR scenario passed on the configured 402x874 pt
+  phone and a temporary 375x667 pt iPhone SE simulator. Expanded, collapsed,
+  two-PR, retryable-error, platform-share-sheet, and no-PR captures are under
+  `apps/mobile/artifacts/maestro/M24-T03/20260912-181044-54140/maestro-output/screenshots/`
+  and
+  `apps/mobile/artifacts/maestro/M24-T03-small/20260912-181851-57633/maestro-output/screenshots/`.
+  The native sheet was dismissed by its standard downward gesture without
+  selecting a destination.
+
 ## Completion note
 
-- What changed:
-- What tests ran:
-- What remains:
+- What changed: replaced recorder-local PR arithmetic with the shared T01
+  helper; added a tokenized expanded/collapsed exercise celebration, stable
+  platform-text sharing, silent cancellation, inline retryable launch failure,
+  independent multi-exercise handling, and a developer-only one-shot Maestro
+  share-failure control for deterministic evidence. Updated the history-backed
+  Maestro path and canonical UI docs.
+- What tests ran: focused Jest/RNTL, `./boga test fast`, `./boga test frontend`,
+  and the extended PR Maestro scenario on large and small phone viewports.
+- What remains: M24-T04 and M24-T05.

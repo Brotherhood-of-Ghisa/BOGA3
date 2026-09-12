@@ -107,11 +107,13 @@ export const resolveMaestroHarnessTeleportHref = ({
   mode,
   intent,
   sessionId,
+  maestroShare,
 }: {
   target: MaestroHarnessTeleportTarget | null;
   mode?: string | null;
   intent?: string | null;
   sessionId?: string | null;
+  maestroShare?: string | null;
 }) => {
   switch (target) {
     case 'session-list':
@@ -123,6 +125,7 @@ export const resolveMaestroHarnessTeleportHref = ({
       return withQuery('/session-recorder', {
         mode: mode === 'completed-edit' ? mode : null,
         sessionId,
+        maestroShare: maestroShare === 'fail-once' ? maestroShare : null,
       });
     case 'exercise-catalog':
       return withQuery('/exercise-catalog', {

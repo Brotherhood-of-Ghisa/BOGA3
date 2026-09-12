@@ -26,3 +26,4 @@ export {
   type SessionInsightsStore,
   type SessionInsightSetRow,
 } from './repository';
+export { buildPersonalRecordShareMessage, sharePersonalRecord } from './sharing';

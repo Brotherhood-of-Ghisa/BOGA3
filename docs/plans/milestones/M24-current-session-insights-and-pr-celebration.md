@@ -292,7 +292,7 @@ the relevant sync contract in the same change.
 2. `docs/plans/tasks/M24-T02-Live_recorder_muscle_load.md` - add the compact recorder
    muscle-load row, detail sheet, and edge states. (`completed`)
 3. `docs/plans/tasks/M24-T03-Exercise_PR_celebration_and_sharing.md` - upgrade the live
-   exercise PR treatment and add platform text sharing. (`planned`)
+   exercise PR treatment and add platform text sharing. (`completed`)
 4. `docs/plans/tasks/M24-T04-Completion_summary_and_analytics_handoff.md` - add the
    completion presentation, multiple-PR handling, and seven-day muscle deep
    link. (`planned`)

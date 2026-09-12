@@ -1,7 +1,9 @@
 import {
   createCompletedSessionInsightsRepository,
+  buildPersonalRecordShareMessage,
   deriveExercisePersonalRecord,
   deriveSessionPersonalRecords,
+  sharePersonalRecord,
   summarizeCurrentSessionMuscleLoad,
   type CurrentSessionMuscleSummaryInput,
   type PersonalRecordSessionInput,
@@ -61,6 +63,36 @@ const completedSession = (
   deletedAt: null,
   exercises: [],
   ...overrides,
+});
+
+describe('personal record sharing', () => {
+  const personalRecord = {
+    exerciseDefinitionId: 'bench',
+    exerciseName: 'Bench Press',
+    sessionExerciseId: 'bench-row',
+    sessionExerciseOrderIndex: 0,
+    setId: 'bench-set',
+    setOrderIndex: 0,
+    weight: 102.5,
+    reps: 5,
+    estimatedOneRepMax: 119.58,
+    historicalBestEstimatedOneRepMax: 115,
+  };
+
+  it('builds a stable text-only payload from the visible PR facts', () => {
+    expect(buildPersonalRecordShareMessage(personalRecord)).toBe(
+      'New PR: Bench Press — 102.5 kg × 5 reps · estimated 1RM 120 kg.'
+    );
+  });
+
+  it('launches the injected platform share boundary and treats dismissal as a no-op', async () => {
+    const share = jest.fn().mockResolvedValue({ action: 'dismissedAction' });
+
+    await expect(sharePersonalRecord(personalRecord, share)).resolves.toBeUndefined();
+    expect(share).toHaveBeenCalledWith({
+      message: 'New PR: Bench Press — 102.5 kg × 5 reps · estimated 1RM 120 kg.',
+    });
+  });
 });
 
 describe('summarizeCurrentSessionMuscleLoad', () => {

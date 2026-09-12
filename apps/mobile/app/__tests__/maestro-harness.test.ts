@@ -139,8 +139,11 @@ describe('maestro harness helpers', () => {
         target: 'session-recorder',
         mode: 'completed-edit',
         sessionId: 'session-123',
+        maestroShare: 'fail-once',
       })
-    ).toBe('/session-recorder?mode=completed-edit&sessionId=session-123');
+    ).toBe(
+      '/session-recorder?mode=completed-edit&sessionId=session-123&maestroShare=fail-once'
+    );
 
     expect(
       resolveMaestroHarnessTeleportHref({
