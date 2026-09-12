@@ -70,12 +70,52 @@ appId: com.dinoderek.mobile
 - hideKeyboard:
     optional: true
 - takeScreenshot: "set-performance-normal-unconfirmed"
+- assertNotVisible:
+    id: "session-muscle-load-row"
 - tapOn:
     id: "set-performance-control-1-1"
 - takeScreenshot: "set-performance-normal-confirmed"
+- scrollUntilVisible:
+    element:
+      id: "session-muscle-load-row"
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
+- assertVisible: "4 muscles · 1 set (0 working)"
+- takeScreenshot: "session-muscle-load-populated"
+- tapOn:
+    id: "session-muscle-load-row"
+- extendedWaitUntil:
+    visible:
+      text: "Close session muscle load"
+    timeout: 10000
+- assertVisible:
+    id: "session-muscle-load-muscle-quads"
+- takeScreenshot: "session-muscle-load-sheet"
+- tapOn: "Close session muscle load"
+- scrollUntilVisible:
+    element:
+      id: "set-performance-control-1-1"
+    direction: UP
+    visibilityPercentage: 100
+    centerElement: true
+- tapOn:
+    id: "set-performance-control-1-1"
+- assertNotVisible:
+    id: "session-muscle-load-row"
+- takeScreenshot: "session-muscle-load-reversed"
+- tapOn:
+    id: "set-performance-control-1-1"
 # The session has one explicitly confirmed set, so Submit goes straight through
 # with no incomplete, unconfirmed, or empty-row confirmation dialog.
-- tapOn: "Submit Session"
+- scrollUntilVisible:
+    element:
+      id: "session-recorder-submit-button"
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
+- tapOn:
+    id: "session-recorder-submit-button"
 - extendedWaitUntil:
     visible:
       id: "stats-history-screen"

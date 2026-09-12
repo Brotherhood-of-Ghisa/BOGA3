@@ -1461,6 +1461,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
       expect(screen.getByText('Save Changes')).toBeTruthy();
       expect(screen.getByText('Bench Press')).toBeTruthy();
     });
+    expect(screen.queryByTestId('session-muscle-load-row')).toBeNull();
 
     fireEvent.press(screen.getByText('Log new exercise'));
     fireEvent.press(screen.getByLabelText('Open inline exercise create'));
@@ -1685,5 +1686,31 @@ describe('SessionRecorderScreen exercise interactions', () => {
     fireEvent.press(screen.getByTestId('set-performance-control-2-1'));
     fireEvent.press(screen.getByTestId('exercise-collapse-toggle-2'));
     expect(screen.queryByTestId('exercise-collapsed-summary-2-new-pr')).toBeNull();
+  });
+
+  it('reveals live session muscle load after confirmation and removes it on reversal', async () => {
+    render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
+
+    expect(screen.queryByTestId('session-muscle-load-row')).toBeNull();
+    fireEvent.press(screen.getByText('Log new exercise'));
+    await selectExerciseFromPicker('Bench Press');
+    fireEvent.changeText(screen.getByLabelText('Weight for exercise 1 set 1'), '100');
+    fireEvent.changeText(screen.getByLabelText('Reps for exercise 1 set 1'), '10');
+
+    expect(screen.queryByTestId('session-muscle-load-row')).toBeNull();
+    fireEvent.press(screen.getByTestId('set-performance-control-1-1'));
+
+    expect(screen.getByTestId('session-muscle-load-row-status')).toHaveTextContent(
+      '2 muscles · 1 set (0 working)'
+    );
+    fireEvent.press(screen.getByTestId('session-muscle-load-row'));
+    expect(screen.getByText('500 weighted kg·reps')).toBeTruthy();
+    expect(screen.getByText('250 weighted kg·reps')).toBeTruthy();
+    fireEvent.press(screen.getByLabelText('Close session muscle load'));
+
+    fireEvent.press(screen.getByTestId('set-performance-control-1-1'));
+    expect(screen.queryByTestId('session-muscle-load-row')).toBeNull();
+    expect(screen.queryByTestId('session-muscle-load-sheet')).toBeNull();
   });
 });

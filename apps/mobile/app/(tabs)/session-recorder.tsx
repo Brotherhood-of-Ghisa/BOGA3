@@ -35,6 +35,7 @@ import {
   SessionContentLayout,
   type ExerciseCardPersonalRecordSummary,
 } from '@/components/session-recorder/session-content-layout';
+import { SessionMuscleLoad } from '@/components/session-recorder/session-muscle-load';
 import { uiColors } from '@/components/ui';
 import { getAuthSnapshot } from '@/src/auth';
 import {
@@ -90,7 +91,7 @@ import {
   findBestEstimatedOneRepMaxSet,
   parseCalculationSet,
 } from '@/src/exercise-calculations';
-import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
+import { ensureExerciseCatalogLoaded, useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import { buildExerciseListModel, type ExerciseListItem } from '@/src/exercise-catalog/list-model';
 import { useExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
 import { useExerciseCatalogStats } from '@/src/exercise-catalog/stats-cache';
@@ -108,6 +109,7 @@ import {
   hasValidActualValues,
   isConfirmedPerformedSet,
 } from '@/src/session-recorder/set-semantics';
+import { summarizeCurrentSessionMuscleLoad } from '@/src/session-insights';
 
 const START_SESSION_GYM_DETECTION_TIMEOUT_MS = 1500;
 
@@ -3887,6 +3889,69 @@ export default function SessionRecorderScreen({
     Boolean(completedEditTimeValidationMessage) &&
     (completedEditStartTouched || completedEditEndTouched || completedEditSubmitAttempted);
   const hasInvalidSetValues = useMemo(() => sessionHasInvalidSetValues(state.session), [state.session]);
+  const currentSessionPerformedSetCount = useMemo(
+    () =>
+      state.session.exercises.reduce(
+        (count, exercise) => count + exercise.sets.filter(hasPerformedActual).length,
+        0
+      ),
+    [state.session.exercises]
+  );
+  const currentSessionWorkingSetCount = useMemo(
+    () =>
+      state.session.exercises.reduce(
+        (count, exercise) =>
+          count +
+          exercise.sets.filter(
+            (set) => hasPerformedActual(set) && isWorkingSessionSetType(set.setType)
+          ).length,
+        0
+      ),
+    [state.session.exercises]
+  );
+  const currentSessionMuscleSummary = useMemo(() => {
+    if (routeMode !== 'active' || exerciseCatalog.status !== 'ready') {
+      return null;
+    }
+
+    return summarizeCurrentSessionMuscleLoad({
+      sessionId: persistedSessionIdRef.current ?? 'active-session',
+      sessionAt: parseSessionDateTime(state.session.dateTime) ?? new Date(0),
+      exercises: state.session.exercises.map((exercise, exerciseIndex) => ({
+        id: exercise.id,
+        orderIndex: exerciseIndex,
+        exerciseDefinitionId: exercise.exerciseDefinitionId,
+        exerciseName: exercise.name,
+        sets: exercise.sets.map((set, setIndex) => ({
+          id: set.id,
+          orderIndex: setIndex,
+          weightValue: set.weight,
+          repsValue: set.reps,
+          setType: set.setType,
+          performanceStatus: set.performanceStatus,
+        })),
+      })),
+      exerciseDefinitions: exerciseCatalog.exercises.map((exercise) => ({
+        id: exercise.id,
+        loadInputMode: exercise.loadInputMode ?? 'total_load',
+      })),
+      muscleMappings: exerciseCatalog.exercises.flatMap((exercise) =>
+        exercise.mappings.map((mapping) => ({
+          exerciseDefinitionId: exercise.id,
+          muscleGroupId: mapping.muscleGroupId,
+          role: mapping.role,
+          weight: mapping.weight,
+        }))
+      ),
+      muscleGroups: exerciseCatalog.muscleGroups,
+    });
+  }, [exerciseCatalog.exercises, exerciseCatalog.muscleGroups, exerciseCatalog.status, routeMode, state.session]);
+  const currentSessionMuscleCatalogState =
+    exerciseCatalog.status === 'error'
+      ? 'error'
+      : exerciseCatalog.status === 'ready'
+        ? 'ready'
+        : 'loading';
   const isSubmitDisabled =
     (routeMode === 'completed-edit' && Boolean(completedEditTimeValidationMessage)) || hasInvalidSetValues;
   const gymButtonLabel = selectedGym ? selectedGym.name : 'No gym';
@@ -4472,6 +4537,17 @@ export default function SessionRecorderScreen({
           </Pressable>
         )}
         renderEmptyState={(text) => <Text style={styles.emptyText}>{text}</Text>}
+      />
+
+      <SessionMuscleLoad
+        catalogState={currentSessionMuscleCatalogState}
+        performedSetCount={currentSessionPerformedSetCount}
+        summary={currentSessionMuscleSummary}
+        visible={routeMode === 'active' && currentSessionPerformedSetCount > 0}
+        workingSetCount={currentSessionWorkingSetCount}
+        onRetry={() => {
+          void ensureExerciseCatalogLoaded();
+        }}
       />
 
       <Pressable

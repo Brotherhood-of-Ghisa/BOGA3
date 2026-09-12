@@ -1,7 +1,7 @@
 ---
 task_id: M24-T02-Live_recorder_muscle_load
 milestone_id: "M24"
-status: planned
+status: completed
 ui_impact: "yes"
 areas: "frontend"
 runtimes: "node|expo|maestro"
@@ -15,7 +15,7 @@ docs_touched: "docs/specs/ui/screen-map.md, docs/specs/ui/components-catalog.md,
 ## Task metadata
 
 - Task ID: `M24-T02-Live_recorder_muscle_load`
-- Status: `planned`
+- Status: `completed`
 - Depends on: `M24-T01`
 
 ## Parent references
@@ -126,8 +126,34 @@ schema/backend/sync work, and fatigue/readiness interpretation.
 
 ## Evidence
 
+- Focused Jest/RNTL: `session-muscle-load.test.tsx` plus
+  `session-recorder-interactions.test.tsx` passed (36 tests), covering absent,
+  mapped, partial, unmapped, loading-error/retry, sheet dismissal,
+  completed-edit exclusion, and live reversal states.
+- `./boga test fast` passed: lint/typecheck, 124 Jest suites (1,241 tests),
+  backend-fast, docs/meta, agent-auth-web, and MCP unit lanes.
+- `./boga test frontend` passed all five iOS lanes. Artifact roots:
+  `apps/mobile/artifacts/maestro/M24-T02/20260912-172256-26633`,
+  `20260912-172340-27789`, `20260912-172513-29291`,
+  `20260912-172649-30841`, and `20260912-172846-32629`.
+- The extended data-runtime flow passed on both the configured 402x874 pt phone
+  and a temporary 375x667 pt iPhone SE simulator. Populated-row, open-sheet,
+  and reversal captures are under
+  `apps/mobile/artifacts/maestro/M24-T02/20260912-172340-27789/maestro-output/screenshots/`
+  and
+  `apps/mobile/artifacts/maestro/M24-T02-small/20260912-171959-23011/maestro-output/screenshots/`.
+- Unmapped and catalog-error/retry visual-state structure is covered by focused
+  RNTL assertions; the real-device mapped/reversal captures exercise the same
+  shared component and tokenized layout.
+
 ## Completion note
 
-- What changed:
-- What tests ran:
-- What remains:
+- What changed: added the active-recorder session muscle row and in-route detail
+  sheet over the T01 calculation, including accessible exact values,
+  session-relative bars, partial/unmapped states, non-blocking catalog retry,
+  and immediate recomputation/close on reversal. Extended the data-runtime
+  Maestro flow and canonical UI docs.
+- What tests ran: focused Jest/RNTL, `./boga test fast`,
+  `./boga test frontend`, and the data-runtime flow on large and small phone
+  viewports.
+- What remains: M24-T03 through M24-T05.

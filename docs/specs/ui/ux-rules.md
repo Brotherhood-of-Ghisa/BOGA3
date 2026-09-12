@@ -125,19 +125,26 @@ Document app-specific UI semantics and guardrails for the current mobile app.
     - Exercise cards start expanded and their title region toggles a volatile collapsed state, with a top-aligned circular chevron control that uses the same primary-blue emphasis as the adjacent `#` action; the overflow action remains muted. Collapsing dismisses the keyboard and closes editable rows or set-quality pickers inside that exercise without changing set data; replacing the exercise definition or appending a plan expands its target card.
     - A collapsed exercise shows `<confirmed performed sets> · <working sets>` (for example `4 sets · 2 w/sets`). Blank, partial, invalid, planned, warm-up, null-quality, and valid-but-unconfirmed rows do not contribute to the working-set count; valid confirmed warm-up or null-quality rows still contribute to the performed-set count.
     - An active/completed-edit exercise shows the single-line summary `PR: <weight> kg × <reps> reps · est. 1RM <rounded kg> kg`, both expanded and collapsed, only when its best valid current Wathan estimate strictly exceeds the maximum loaded completed-history estimate. Expanded cards place it directly below the performed-set count and above `Past Records`; collapsed cards place it below the set/working-set summary. Ties, first-ever exercises with no historical maximum, and loading/empty/error history states show no PR line.
-12. The shared exercise editor dismisses the text keyboard before opening primary/secondary muscle selectors, and selector lists remain keyboard-aware so all muscle-group options stay reachable on iOS. It exposes a two-choice `Total load` / `Per side` control, preselects the stored value while editing, and defaults new custom exercises to total load.
-13. In `session-recorder`, GPS gym detection is quiet assistance:
+12. Active `session-recorder` muscle load is progressive and session-scoped:
+    - no row or instructional placeholder appears before the first valid confirmed performed set, and completed-edit mode does not show this current-session signal;
+    - the row sits outside exercise cards above recorder-wide actions, reports physical performed/working-set counts plus leading contributing muscles, and opens an in-route sheet without changing recorder edit or scroll state;
+    - the sheet lists every contributing muscle by weighted volume, with an exact text value and a decorative bar relative only to the largest muscle load in this session; the bars never communicate recovery, readiness, prescription, or targets;
+    - confirmed unmapped work is an explicit `No mapped muscle load` state, distinct from pre-confirmation absence; partial mapping identifies the unmapped physical-set count;
+    - catalog/mapping failure is a compact unavailable state with Retry and stays non-blocking for entry, autosave, and submission;
+    - confirming, editing, unconfirming, and deleting recompute from current in-memory state; when the final performed set is reversed, both the row and any open sheet vanish immediately.
+13. The shared exercise editor dismisses the text keyboard before opening primary/secondary muscle selectors, and selector lists remain keyboard-aware so all muscle-group options stay reachable on iOS. It exposes a two-choice `Total load` / `Per side` control, preselects the stored value while editing, and defaults new custom exercises to total load.
+14. In `session-recorder`, GPS gym detection is quiet assistance:
     - the default recorder surface shows only the gym box, with no visible Detect button or persistent GPS suggestion panel,
     - brand-new active-session creation may run one foreground location read and preselect a gym only when exactly one saved gym confidently matches,
     - restoring an active draft and completed-edit mode do not run startup GPS detection,
     - short-pressing the gym box opens the picker, while long-pressing it explicitly retries GPS detection for the current active session,
     - permission denial, unavailable services, low accuracy, no match, ambiguous match, and read failures leave the current gym unchanged,
     - manual gym selection and `No gym` are always authoritative unless the user later long-presses to retry GPS detection.
-14. In `session-recorder`, the gym picker includes `No gym` as a null session-gym option:
+15. In `session-recorder`, the gym picker includes `No gym` as a null session-gym option:
     - it maps to nullable `session.locationId` / persisted `gym_id`,
     - it is not a `gyms` row and is not editable, archived, synced, or shown in Manage,
     - active-session null gym state displays as `No gym`, not as an unresolved choose prompt.
-15. In `session-recorder` gym management, private coordinate controls live in the single gym editor:
+16. In `session-recorder` gym management, private coordinate controls live in the single gym editor:
     - each managed gym shows only coordinate presence (`GPS saved` / `No GPS coordinates`) rather than latitude/longitude precision,
     - Manage rows expose list-management actions only (edit, archive/unarchive, archived visibility), not coordinate mutation actions,
     - `Save current location` in the single gym editor reads foreground location and persists only when accuracy is acceptable,
@@ -145,7 +152,7 @@ Document app-specific UI semantics and guardrails for the current mobile app.
     - replacing or clearing existing coordinates remains confirmation-gated in the single gym editor,
     - permission denial, unavailable services, low accuracy, and persistence failures stay inline in the editor and leave existing coordinates unchanged,
     - clearing coordinates removes the gym from GPS matching until coordinates are saved again.
-16. In `session-recorder`, each logged exercise card loads a volatile `Past Records` comparison panel keyed by `exercise_definition_id`:
+17. In `session-recorder`, each logged exercise card loads a volatile `Past Records` comparison panel keyed by `exercise_definition_id`:
     - the panel sits below assigned tag chips and above editable set rows,
     - the panel starts collapsed as a slim `Past Records` bar; tapping the bar expands it, and tapping the expanded header collapses it again without a separate Hide/Show button,
     - if a set row is editable, the first tap on the `Past Records` bar only collapses that row; a second tap opens the panel,
