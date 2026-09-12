@@ -35,6 +35,7 @@ ios-smoke	slow-frontend	ios	no	apps/mobile	./scripts/maestro-run-lane.sh smoke
 ios-data-smoke	slow-frontend	ios	no	apps/mobile	./scripts/maestro-run-lane.sh data-smoke
 ios-auth-profile	slow-frontend	ios+supabase	no	apps/mobile	./scripts/maestro-run-lane.sh auth-profile
 ios-sync-e2e	slow-frontend	ios+supabase	no	apps/mobile	./scripts/maestro-run-lane.sh sync-e2e
+ios-groups-e2e	slow-frontend	ios+supabase	no	apps/mobile	./scripts/maestro-run-lane.sh groups-e2e
 handles	extra	none	yes	apps/mobile	npm run test:handles
 ios-gates	extra	ios	no	apps/mobile	./scripts/maestro-ios-gates.sh
 jest-sync	extra	none	no	apps/mobile	npm run test:sync

@@ -71,7 +71,7 @@ Define the canonical repository structure, path ownership, and placement convent
 - `apps/mobile/src/auth/`
   - owns shared mobile auth integration modules such as the Supabase client bootstrap, auth storage adapter, session service, and React provider/hook surface.
 - `apps/mobile/.maestro/`
-  - owns committed Maestro flow definitions and the checked-in sample config file (`maestro.env.sample`).
+  - owns committed Maestro flow definitions (`flows/`), their `runScript` helpers (`scripts/`, e.g. the scripted counterparty of the two-user groups flow), and the checked-in sample config file (`maestro.env.sample`).
   - the per-worktree file `apps/mobile/.maestro/maestro.env.local` is canonical but remains untracked/local-only.
 - `scripts/`
   - owns repo-level cross-workspace wrappers (for example standard local quality-gate commands).

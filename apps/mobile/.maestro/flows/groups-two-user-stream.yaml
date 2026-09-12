@@ -1,0 +1,291 @@
+appId: com.dinoderek.mobile
+---
+# Two-user groups end to end (M22; docs/specs/tech/groups-contract.md §8, lane
+# ios-groups-e2e). The device signs in as fixture user_c and drives the real
+# group UI against local Supabase. The counterparty, fixture user_d, is
+# scripted over HTTP from ../scripts/groups-counterparty.js (GoTrue sign-in,
+# group_join, sync_push, group_stream) — the same RPCs its own app would call.
+#
+# ISOLATION: user_c and user_d are dedicated to this flow (docs/specs/11,
+# enforced by scripts/tests/maestro-fixture-users.test.sh; the counterparty
+# counts through its MAESTRO_*_COUNTERPARTY_EMAIL var). The lane runner's
+# groups-fixture-reset.sh hard-deletes both users' groups and sync rows and
+# clears user_c's username before every run, so the username gate always
+# prompts and repeated runs in one slot need no Supabase reset.
+#
+# Every "after a refresh" below is one pull-to-refresh on the group screen; the
+# counterparty script logs the sync_push -> card-visible time (AC4 evidence).
+
+# --- Boot + sign in as user_c (pattern: auth-profile-happy-path.yaml) ---------
+# clearState relaunches a wiped dev client that lost its Metro connection:
+# re-open the dev-client URL, then dismiss the expo-dev-client intro (Continue)
+# and dev menu (Close) that the wipe resurfaces. See auth-profile-happy-path.yaml
+# for the iOS-26 accessibility-churn rationale behind waits and retries.
+- launchApp:
+    clearState: true
+- openLink: "${MAESTRO_IOS_DEV_CLIENT_URL}"
+- extendedWaitUntil:
+    visible:
+      text: "Continue"
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 4000
+- retry:
+    maxRetries: 3
+    commands:
+      - tapOn:
+          text: "Continue"
+- retry:
+    maxRetries: 3
+    commands:
+      - tapOn:
+          text: "Close"
+- extendedWaitUntil:
+    visible:
+      id: "sign-in-screen"
+    timeout: 60000
+- tapOn:
+    id: "sign-in-email-input"
+- inputText: "${MAESTRO_GROUPS_DEVICE_EMAIL}"
+- tapOn:
+    id: "sign-in-password-input"
+- inputText: "${MAESTRO_GROUPS_DEVICE_PASSWORD}"
+- tapOn:
+    id: "sign-in-submit-button"
+- assertNotVisible:
+    id: "sign-in-screen"
+# Lift the first-sync gate and land on a normal route in one harness link.
+- openLink: "boga3://maestro-harness?bootstrap=complete&teleport=session-list"
+- extendedWaitUntil:
+    visible:
+      id: "stats-history-screen"
+    timeout: 60000
+- runScript:
+    file: ../scripts/groups-counterparty.js
+    env:
+      STEP: sign-in
+      SUPABASE_URL: ${MAESTRO_GROUPS_SUPABASE_URL}
+      SUPABASE_ANON_KEY: ${MAESTRO_GROUPS_SUPABASE_ANON_KEY}
+      EMAIL: ${MAESTRO_GROUPS_COUNTERPARTY_EMAIL}
+      PASSWORD: ${MAESTRO_GROUPS_COUNTERPARTY_PASSWORD}
+
+# --- 1. The username prompt ---------------------------------------------------
+# Open Groups by deep link: on iOS 26 a tab tap right after a harness teleport
+# can land on the wrong tab.
+- openLink: "boga3://groups"
+- extendedWaitUntil:
+    visible:
+      id: "groups-empty-state"
+    timeout: 30000
+- tapOn:
+    id: "groups-empty-create-button"
+- extendedWaitUntil:
+    visible:
+      id: "group-username-gate"
+    timeout: 15000
+- takeScreenshot: "groups-01-username-prompt"
+- tapOn:
+    id: "group-username-input"
+- inputText: "${MAESTRO_GROUPS_DEVICE_USERNAME}"
+- tapOn:
+    id: "group-username-save"
+
+# --- 2. Create a group --------------------------------------------------------
+- extendedWaitUntil:
+    visible:
+      id: "group-form-name-input"
+    timeout: 15000
+- tapOn:
+    id: "group-form-name-input"
+- inputText: "Maestro Groups E2E"
+- tapOn:
+    id: "group-form-submit"
+- extendedWaitUntil:
+    visible:
+      id: "group-screen-name"
+      text: "Maestro Groups E2E"
+    timeout: 15000
+- assertVisible:
+    id: "group-screen-meta"
+    text: "1 member · You're the owner"
+- takeScreenshot: "groups-02-group-created"
+
+# --- 3. Read the invite code off the screen -------------------------------------
+- tapOn:
+    id: "group-screen-invite-button"
+- extendedWaitUntil:
+    visible:
+      id: "group-invite-code"
+    timeout: 15000
+- copyTextFrom:
+    id: "group-invite-code"
+- takeScreenshot: "groups-03-invite-code"
+
+# --- 4. The counterparty joins; "joined" after a refresh ------------------------
+- runScript:
+    file: ../scripts/groups-counterparty.js
+    env:
+      STEP: join
+      CODE: ${maestro.copiedText}
+- openLink: "boga3://group/${output.groupsGroupId}"
+- extendedWaitUntil:
+    visible:
+      id: "group-screen-stream-list"
+    timeout: 15000
+- swipe:
+    start: "50%, 45%"
+    end: "50%, 85%"
+    duration: 800
+- extendedWaitUntil:
+    visible:
+      text: "${MAESTRO_GROUPS_COUNTERPARTY_USERNAME} joined"
+    timeout: 15000
+- assertVisible:
+    id: "group-screen-meta"
+    text: "2 members · You're the owner"
+- takeScreenshot: "groups-04-counterparty-joined"
+
+# --- 5. Active session -> one "Training now" card with its metrics ---------------
+- runScript:
+    file: ../scripts/groups-counterparty.js
+    env:
+      STEP: push-active
+- swipe:
+    start: "50%, 45%"
+    end: "50%, 85%"
+    duration: 800
+- extendedWaitUntil:
+    visible:
+      id: "group-stream-session-card-${output.groupsCardKey}"
+    timeout: 15000
+- runScript:
+    file: ../scripts/groups-counterparty.js
+    env:
+      STEP: latency
+      LABEL: active
+- assertVisible:
+    id: "group-stream-session-card-${output.groupsCardKey}-status"
+    text: "Training now"
+- assertVisible:
+    id: "group-stream-session-card-${output.groupsCardKey}-member"
+    text: "${MAESTRO_GROUPS_COUNTERPARTY_USERNAME}"
+- assertVisible:
+    id: "group-stream-session-card-${output.groupsCardKey}-metrics"
+    text: "3 sets · 1,500 kg · 2 exercises"
+# Equal to the pre-join Bench history: not a PR (strictly greater only).
+- assertNotVisible:
+    id: "group-stream-session-card-${output.groupsCardKey}-pr-0"
+# The pre-join session (started a day before joining) is never shared.
+- assertNotVisible:
+    id: "group-stream-session-card-${output.groupsHistoryCardKey}"
+- takeScreenshot: "groups-05-training-now-card"
+
+# --- 6. Completed, then edited -> the same card, completed + updated metrics ----
+- runScript:
+    file: ../scripts/groups-counterparty.js
+    env:
+      STEP: push-complete-edit
+- swipe:
+    start: "50%, 45%"
+    end: "50%, 85%"
+    duration: 800
+- extendedWaitUntil:
+    visible:
+      id: "group-stream-session-card-${output.groupsCardKey}-metrics"
+      text: "3 sets · 1,512.5 kg · 2 exercises"
+    timeout: 15000
+- runScript:
+    file: ../scripts/groups-counterparty.js
+    env:
+      STEP: latency
+      LABEL: completed-edited
+- assertVisible:
+    id: "group-stream-session-card-${output.groupsCardKey}-status"
+    text: "Completed · 45m"
+- assertVisible:
+    id: "group-stream-session-card-${output.groupsCardKey}-pr-0"
+    text: "PR · Bench Press 102.5 kg × 5"
+- takeScreenshot: "groups-06-completed-edited-card"
+
+# --- 7. The friend's view: exercises and performed sets, no owner actions -------
+- tapOn:
+    id: "group-stream-session-card-${output.groupsCardKey}"
+- extendedWaitUntil:
+    visible:
+      id: "group-session-header"
+    timeout: 15000
+- assertVisible:
+    id: "group-session-member"
+    text: "${MAESTRO_GROUPS_COUNTERPARTY_USERNAME}"
+- assertVisible:
+    id: "group-session-status"
+    text: "Completed · 45m"
+# Exercise titles sit inside the shared layout's collapse toggle, whose
+# accessibility label is what iOS exposes.
+- assertVisible:
+    id: "exercise-collapse-toggle-1"
+    text: "Collapse exercise Bench Press"
+- assertVisible:
+    id: "exercise-collapse-toggle-2"
+    text: "Collapse exercise Barbell Row"
+- assertVisible:
+    id: "group-session-set-row-${output.groupsFirstSetId}"
+- assertNotVisible:
+    id: "completed-session-detail-action-bar"
+- assertNotVisible:
+    id: "completed-session-detail-edit-button"
+- assertNotVisible:
+    id: "completed-session-detail-delete-button"
+- takeScreenshot: "groups-07-friend-view-read-only"
+
+# --- 8. The device removes the counterparty -> "was removed" -------------------
+- openLink: "boga3://group/${output.groupsGroupId}"
+- extendedWaitUntil:
+    visible:
+      id: "group-screen-segment-members"
+    timeout: 15000
+- tapOn:
+    id: "group-screen-segment-members"
+- tapOn:
+    id: "group-member-row-${output.groupsCounterpartyUserId}"
+- extendedWaitUntil:
+    visible:
+      id: "group-member-actions-sheet"
+    timeout: 10000
+- tapOn:
+    id: "group-member-action-remove"
+# The native confirmation Alert's destructive button.
+- extendedWaitUntil:
+    visible:
+      text: "Remove"
+    timeout: 10000
+- tapOn:
+    text: "Remove"
+# The feedback View carries the testID; its sentence is a child text.
+- extendedWaitUntil:
+    visible:
+      id: "group-screen-action-feedback"
+    timeout: 15000
+- assertVisible: "${MAESTRO_GROUPS_COUNTERPARTY_USERNAME} was removed\\."
+- assertVisible:
+    id: "group-screen-meta"
+    text: "1 member · You're the owner"
+- assertNotVisible:
+    id: "group-member-row-${output.groupsCounterpartyUserId}"
+- tapOn:
+    id: "group-screen-segment-stream"
+- extendedWaitUntil:
+    visible:
+      text: "${MAESTRO_GROUPS_COUNTERPARTY_USERNAME} was removed"
+    timeout: 15000
+# What the removed member shared stays in the group record (decision #4).
+- assertVisible:
+    id: "group-stream-session-card-${output.groupsCardKey}"
+- takeScreenshot: "groups-08-counterparty-removed"
+
+# --- 9. The removed counterparty's next read is NOT_FOUND (AC11) ----------------
+- runScript:
+    file: ../scripts/groups-counterparty.js
+    env:
+      STEP: assert-removed
+- takeScreenshot: "groups-09-removed-member-not-found"

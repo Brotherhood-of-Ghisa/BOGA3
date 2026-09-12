@@ -214,8 +214,16 @@ Responsibility split:
   - performs cleanup using the emitted runtime state, including Expo process shutdown, app termination, simulator shutdown by default, and restoring the developer's `.env.local`.
 - `maestro-run-lane.sh`
   - the high-level per-lane entrypoint (`smoke` / `data-smoke` / `auth-profile` /
-    `sync-e2e`); holds each lane's data (flows, reset strategy, Supabase config,
-    fixture user) and calls the shared toolkit via `maestro-ios-run-flow.sh`.
+    `sync-e2e` / `groups-e2e`); holds each lane's data (flows, reset strategy,
+    Supabase config, fixture users, pre-run fixture reset) and calls the shared
+    toolkit via `maestro-ios-run-flow.sh`.
+- `maestro-ios-run-flow.sh`
+  - runs one flow from a per-run copy at `<artifact-root>/flows/<flow>.yaml`
+    (with the dev client's `appId`), and copies `.maestro/scripts/` to
+    `<artifact-root>/scripts/`, so a flow's `runScript` paths
+    (`../scripts/*.js`) resolve identically from the source and the copy.
+  - forwards to `maestro test -e` only an explicit allowlist of env vars; a
+    lane that adds flow variables must add them there.
 - `maestro-ios-gates.sh`
   - additive combined entrypoint (`npm run test:e2e:ios:gates`) that provisions/launches/warms once and runs the smoke and data-runtime-smoke flows back-to-back against that single sim + Metro, then tears down once. It composes the same provision/launch/warm/teardown helpers; it does not duplicate runtime orchestration and does not replace the standalone gates. Reset semantics are preserved: provision performs the `full` reset for smoke, and data-runtime-smoke self-resets data in-flow via its `?reset=data` harness deep links.
 
@@ -313,9 +321,9 @@ Priority rule:
 Every lane runs the same dev-client build; whether it behaves as a local-only
 (infra-free) app or a Supabase-configured one is decided entirely by the
 `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY` that Metro inlines
-from `apps/mobile/.env.local` at bundle time. Concretely: the `auth-profile` and
-`sync-e2e` lanes (`test:e2e:ios:auth-profile`, `test:e2e:ios:sync`) are the
-Supabase-backed iOS lanes — they provision a local Supabase baseline and export
+from `apps/mobile/.env.local` at bundle time. Concretely: the `auth-profile`,
+`sync-e2e`, and `groups-e2e` lanes (`test:e2e:ios:auth-profile`,
+`test:e2e:ios:sync`, `test:e2e:ios:groups`) are the Supabase-backed iOS lanes — they provision a local Supabase baseline and export
 those vars; `smoke`, `data-runtime-smoke`, and the combined `gates` lane are
 deliberately **infra-free** (they export none, so the inlined values are empty).
 (Which lanes take which shape, and why, is testing policy — see
@@ -327,7 +335,8 @@ Every Maestro flow that signs in owns a **dedicated** auth fixture user; no two
 flows share one. The pool is defined in
 `supabase/scripts/auth-fixture-constants.sh` (`user_a`, `user_b`, …) and bound to
 a flow by `maestro-run-lane.sh` (`auth-profile-happy-path` → `user_a`,
-`sync-first-run-log-and-roundtrip` → `user_b`). This is load-bearing: the lanes
+`sync-first-run-log-and-roundtrip` → `user_b`, `groups-two-user-stream` →
+`user_c` on the device and `user_d` as its scripted counterparty). This is load-bearing: the lanes
 reuse one local Supabase **without reset between runs**, so a shared user would
 let one flow's residual server state (a partial catalog, a logged workout) leak
 into another flow's pull and flake it. Self-signup is disabled, so the pool is
@@ -337,6 +346,23 @@ the runner. The rule is enforced by
 `scripts/tests/maestro-fixture-users.test.sh` (the `meta-tests` lane, which the
 trigger registry runs on any `.maestro/**` or `maestro*` change): it fails if two
 sign-in flows resolve to the same fixture.
+
+**Scripted counterparties.** A flow that needs a second user drives it over
+HTTP from `runScript` (`.maestro/scripts/*.js`) instead of a second device
+(`groups-two-user-stream`: `user_d` joins, pushes sessions through `sync_push`,
+and checks it lost access). Rules:
+
+1. The counterparty is a dedicated fixture, bound by the runner through a
+   `MAESTRO_<LANE>_COUNTERPARTY_EMAIL` var that the flow references (in its
+   `runScript` `env:`). The meta-test claims it like a device user: it may not
+   be shared with any other flow, nor be the flow's own device user.
+2. Values reach the script only through the flow's `runScript` `env:` block
+   (the vars are on the `maestro-ios-run-flow.sh` allowlist); the script keeps
+   cross-step state in Maestro's `output` and throws on any unexpected
+   response, failing the step.
+3. The lane resets both users' server state with the service role before the
+   run (e.g. `supabase/scripts/groups-fixture-reset.sh`), so the flow is
+   hermetic without a Supabase reset.
 
 `apps/mobile/.env.local` is one per-worktree file that local-Supabase startup
 (`supabase/scripts/local-runtime-up.sh`) writes, that Expo's dev server reads

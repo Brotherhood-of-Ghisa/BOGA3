@@ -194,7 +194,7 @@ restating them.
    create, edit, join (deep link), invite and share, the username gate, and
    members and roles (`completed`).
 6. `docs/tasks/M22-T06-Two_user_groups_Maestro_lane.md` — the `ios-groups-e2e`
-   lane with fixture users `user_c`/`user_d` (`planned`).
+   lane with fixture users `user_c`/`user_d` (`in_progress`).
 7. `docs/tasks/M22-T07-Milestone_closeout.md` — the full gate run, the AC
    matrix, the as-built specs, and the archive (`planned`).
 

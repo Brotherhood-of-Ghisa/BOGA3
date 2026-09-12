@@ -19,5 +19,15 @@ echo "[supabase] provisioning local auth fixtures (controlled users only)"
   --fixture-key "${USER_B_FIXTURE_KEY}" \
   --email-confirm true
 
+"${SCRIPT_DIR}/auth-provision-user.sh" \
+  --email "${USER_C_EMAIL}" \
+  --password "${USER_C_PASSWORD}" \
+  --email-confirm true
+
+"${SCRIPT_DIR}/auth-provision-user.sh" \
+  --email "${USER_D_EMAIL}" \
+  --password "${USER_D_PASSWORD}" \
+  --email-confirm true
+
 echo "[supabase] local auth fixture provisioning complete"
 

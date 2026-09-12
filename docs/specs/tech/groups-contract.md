@@ -893,6 +893,39 @@ on the group screen and the Create / Join actions on the tab.
     9. The script asserts the counterparty's `group_stream` returns
        `NOT_FOUND`.
   - Evidence comes from its screenshots and JUnit output.
+- **As-built (M22-T06, Maestro lane).** Lane `ios-groups-e2e`
+  (`maestro-run-lane.sh groups-e2e`, gate `slow-frontend`, so part of
+  `boga test frontend`); flow `apps/mobile/.maestro/flows/groups-two-user-stream.yaml`.
+  - **Counterparty.** `apps/mobile/.maestro/scripts/groups-counterparty.js`, one
+    `runScript` file with steps `sign-in`, `join`, `push-active`,
+    `push-complete-edit`, `latency`, and `assert-removed`. Maestro's JS HTTP
+    proved workable, so the card's split-flow fallback was not needed.
+  - **Data.** `push-active` sends one `sync_push`: a Bench definition, a
+    completed history session started a day before the join, and the live
+    session (Bench 100×5 ×2, Row 50×10: `3 sets · 1,500 kg · 2 exercises`).
+    The live session starts at `max(now, joined_at + 1 s)`, reading `joined_at`
+    back from the counterparty's own "joined" stream item, so host/VM clock
+    skew cannot push it before the join. `push-complete-edit` completes it
+    (45 min), then edits the first set to 102.5 kg in a later push. The card
+    then shows `Completed · 45m`, `1,512.5 kg`, and `PR · Bench Press 102.5 kg × 5`
+    (a strict e1RM gain over the unshared history, §5.2). The flow also
+    asserts that the history session has no card (§2.5) and that the card
+    stays after removal (#4).
+  - **Device IDs.** The flow learns the group, member, and session ids from the
+    script's `output` (the join's `group_id`, GoTrue's user id, the pushed
+    session id) and addresses the §6.3 testIDs and `boga3://group/<id>` with
+    them. The invite code is read with `copyTextFrom` on `group-invite-code`;
+    iOS may return its accessibility label, which the script normalizes.
+  - **Hermetic.** `supabase/scripts/groups-fixture-reset.sh` runs before each
+    run with the service role. It deletes every group `user_c`/`user_d` created
+    or belongs to (cascading §2.2–§2.4), deletes both users' Sync v2 rows
+    child-first, clears `user_c`'s profile so the gate prompts, and sets
+    `user_d`'s username. `dev_wipe_my_data` is not used: it needs `app.env`,
+    which the local REST path does not set.
+  - **Latency.** The script logs `GROUPS_E2E_LATENCY` (`sync_push` → card
+    visible after one pull-to-refresh, including Maestro's polling) to
+    `maestro-debug/**/maestro.log`. The observed values are on the M22-T06
+    card; they are observed data, not a promise (§7).
 - **Offline behaviour (AC12, AC13)** is proven in jest. Simulator network
   cannot be toggled reliably from Maestro.
 
