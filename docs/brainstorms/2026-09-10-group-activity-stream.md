@@ -1,10 +1,9 @@
 # Brainstorm — Groups, group exercises, leaderboards, and the group stream
 
 - Date: 2026-09-10
-- Status: `adopted — M22 shipped; phases 2–5 pending` (2026-09-12). Part A/C
-  decisions carried into M22 are recorded in
-  `docs/specs/milestones/archive/M22-groups-and-foundations.md` and
-  `docs/specs/tech/groups-contract.md`. **[default]** = proposal awaiting confirmation;
+- Status: `adopted — M22 shipped; phases 2–5 pending` (2026-09-12). What M22
+  built is recorded in `docs/specs/tech/groups-contract.md`; the M22 milestone
+  spec was deleted after shipping (git history). **[default]** = proposal awaiting confirmation;
   **[open]** = needs discussion; **[unreviewed]** = drafted, not yet reviewed.
 - Branch: `claude/group-activity-stream-221a5c`
 - Not source-of-truth. Adopted content graduates into `docs/specs/**`
@@ -44,7 +43,7 @@
 | 22 | 2026-09-10 | C7.2: an in-progress session shows **"training now" indefinitely** while active (no staleness cutoff). |
 | 23 | 2026-09-10 | C7.3: removal shows as **"X was removed"** (leaving: "X left the group"). |
 | 24 | 2026-09-10 | C7.4: invite code visible/shareable by **owner and admins only**. |
-| 25 | 2026-09-10 | M22 adopted: `docs/specs/milestones/archive/M22-groups-and-foundations.md` + technical design `docs/specs/tech/groups-contract.md`. M18 marked `outdated`. |
+| 25 | 2026-09-10 | M22 adopted: `docs/plans/milestones/M22-groups-and-foundations.md` + technical design `docs/specs/tech/groups-contract.md`. M18 marked `outdated`. |
 
 ---
 
@@ -267,8 +266,8 @@ proposals.
 - Proposed milestone ID: `M22` (next free after M21).
 - Status: `draft` — product-level spec. Technical design and the task
   breakdown come after sign-off.
-- Destination when adopted: `docs/specs/milestones/archive/M22-groups-and-foundations.md`
-  (template `docs/specs/templates/milestone-spec-template.md`).
+- Destination when adopted: `docs/plans/milestones/M22-groups-and-foundations.md`
+  (template `docs/plans/templates/milestone-spec-template.md`).
 
 ## C1. Objective
 
@@ -541,7 +540,7 @@ text in specs 05, 10, and the sync contract §B.11.
 | Logged exercise keeps its own display name | `session_exercises.name` (+ `machine_name`) | contract §A.2.3 |
 | Stable set identity across saves | yes | spec 05 §Sync v2 #7 |
 | Confirmed-set semantics | only valid, confirmed actual rows count as performed | spec 05 §Sync v2 #6 |
-| Standard catalogue identity | `seed_*` slug ids, identical for every user (393 seed rows in the bundle file; M20 plans to prune) | `apps/mobile/src/data/exercise-catalog-seeds.ts`, `docs/specs/milestones/M20-prune-starter-exercise-catalog.md` |
+| Standard catalogue identity | `seed_*` slug ids, identical for every user (393 seed rows in the bundle file; M20 plans to prune) | `apps/mobile/src/data/exercise-catalog-seeds.ts`, `docs/plans/milestones/M20-prune-starter-exercise-catalog.md` |
 | Exercise edits | in place, same id (a renamed seed keeps its `seed_*` id) | `apps/mobile/src/data/exercise-catalog.ts:181-217` |
 | Weight units | none in app; implicitly kg; server `training_unit` constrained to `'kg'` | `supabase/migrations/20260725175643_m21_agent_access_boundary.sql:12-18` |
 | Usernames | optional (`username text`, nullable), not unique; owner-only RLS | `supabase/migrations/20260304153000_m11_user_profiles.sql:11-47` |

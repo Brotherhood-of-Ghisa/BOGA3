@@ -30,7 +30,7 @@ Document boundary:
 1. Maintain a living `UX patterns` section in this document.
 2. Reuse existing patterns by default before introducing new interaction/visual patterns.
 3. If a task introduces a new pattern, updating the `UX patterns` section is required in the same task.
-4. If a task intentionally deviates from an existing pattern, record rationale and impact in the task card.
+4. If a task intentionally deviates from an existing pattern, record rationale and impact in the PR body (Deviations).
 
 ## UX quality principles
 
@@ -42,10 +42,11 @@ Document boundary:
 
 ## Required task-level UX contract
 
-For UI/UX tasks, include a `UX Contract` section in the task card.  
-For non-UX tasks, remove the `UX Contract` section from the task card.
+For UI/UX work, write a `UX Contract` before building: in the plan or task
+card if the work has one (`docs/plans/`, optional), otherwise in the PR body.
+Non-UX work needs none.
 
-Each UI task card UX contract must include:
+Each UX contract must include:
 
 1. Key user flows (minimal template):
    - One small block per flow:
@@ -57,7 +58,7 @@ Each UI task card UX contract must include:
 2. Interaction + appearance notes (lightweight):
    - Keep this compact (prefer <= 5 bullets total).
 3. Evidence + completion notes:
-   - Fill under the task card `Evidence` and `Completion note` headers.
+   - Record them in the PR body (Tests / Deviations), with screenshots linked.
    - Follow the verification expectations in `docs/specs/02-quality-and-test-gates.md`.
 
 Notes:
@@ -173,4 +174,4 @@ Do not mark a UI task complete if any are true:
 
 1. This standard complements `docs/specs/06-testing-strategy.md` and the `AGENTS.md` workflow router.
 2. For app-specific UI inventory/navigation/component docs, use `docs/specs/ui/README.md` and the linked UI docs bundle.
-3. If a UI task needs exceptions, record them explicitly in that task card with reason and impact.
+3. If UI work needs exceptions, record them explicitly in the PR body with reason and impact.
