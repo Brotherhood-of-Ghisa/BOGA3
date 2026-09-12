@@ -53,7 +53,7 @@ This is the shortest operational summary. Use the "Further reading" section when
 - **Group domain (M22)**:
   - Encapsulate membership and role checks in `SECURITY DEFINER` helpers with `search_path = app_public, pg_temp`, which guards against schema injection. These helpers bypass RLS, so their callers must filter explicitly by the caller's active membership.
   - Group tables must not carry an `owner_user_id` column. The Sync v2 drift checker treats every such `app_public` table as a synced entity.
-  - Group reads return only performed sets and never GPS columns (`docs/specs/tech/groups-contract.md` §4–§5).
+  - Group reads return a shared session's live set rows raw (planned and skipped included; "performed sets only" is a display rule on the device) and never GPS columns (`docs/specs/tech/groups-contract.md` §4–§5).
 
 ## Practical guidance for API consumers (mobile/app)
 

@@ -12,6 +12,7 @@ import {
   formatKg,
   formatMemberName,
   formatSessionStatusLabel,
+  selectGroupPerformedExercises,
   type GroupSessionDetail,
 } from '@/src/groups';
 
@@ -29,7 +30,8 @@ const IN_PROGRESS_LABEL = 'In progress';
 /**
  * The friend's session body (C3.8): the View Session layout
  * (`SessionContentLayout`) with read-only rows and NO owner actions — no
- * edit, delete, or append. Performed sets only (the server returns no others).
+ * edit, delete, or append. Performed sets only: the server returns every live
+ * set raw, and the device selects the performed ones (contract §5).
  */
 export function FriendSessionContent({ session }: { session: GroupSessionDetail }) {
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(() => new Set());
@@ -43,16 +45,16 @@ export function FriendSessionContent({ session }: { session: GroupSessionDetail 
 
   const exercises = useMemo<FriendExercise[]>(
     () =>
-      session.exercises.map((exercise) => ({
-        id: exercise.session_exercise_id,
+      selectGroupPerformedExercises(session.exercises).map((exercise) => ({
+        id: exercise.sessionExerciseId,
         name: exercise.name,
-        machineName: exercise.machine_name,
+        machineName: exercise.machineName,
         sets: exercise.sets.map((set) => ({
-          id: set.set_id,
-          weightLabel: `${formatKg(set.weight_kg)} kg`,
+          id: set.setId,
+          weightLabel: `${formatKg(set.weightKg)} kg`,
           reps: set.reps,
-          effortLabel: formatGroupSetEffort(set.set_type),
-          working: isWorkingSessionSetType(normalizeSessionSetType(set.set_type)),
+          effortLabel: formatGroupSetEffort(set.setType),
+          working: isWorkingSessionSetType(normalizeSessionSetType(set.setType)),
         })),
       })),
     [session],

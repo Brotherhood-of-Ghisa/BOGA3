@@ -123,7 +123,7 @@ Brief entrypoint inventory of the current reusable UI component set.
 10. Group components (M22)
 - Folder: `apps/mobile/components/groups/` (barrel `index.ts`); data comes from `@/src/groups` hooks and the pure view model
 - Purpose:
-  - `GroupStreamSessionCard` — the stream card (member, status pill, start · gym, sets · kg · exercises, PR lines, group names in All); one press target
+  - `GroupStreamSessionCard` — the stream card (member, status pill, start · gym, sets · kg · exercises computed on the device, group names in All); one press target
   - `GroupStreamMembershipItem` — "X joined / left the group / was removed" row; pressable only where it opens another screen
   - `GroupFilterChips` — `All` + per-group `SegmentedChips`, wrapping rather than scrolling sideways
   - `GroupStreamList` — `FlatList` with `RefreshControl`, online older-page loading, and a Retry footer

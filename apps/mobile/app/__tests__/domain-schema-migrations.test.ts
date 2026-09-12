@@ -127,8 +127,8 @@ describe('domain schema and runtime migrations', () => {
     // The history was squashed to a single v2 baseline (`m0000`); forward feature
     // migrations append after it. The first follow-up is the local sync
     // quarantine table; planned set targets append after that; the M22 local
-    // group cache is m0004.
-    expect(localRuntimeMigrations.journal.entries).toHaveLength(5);
+    // group cache is m0004, and m0005 empties it for the raw-set payload shape.
+    expect(localRuntimeMigrations.journal.entries).toHaveLength(6);
     expect(localRuntimeMigrations.journal.entries[0]).toMatchObject({
       idx: 0,
       tag: expect.stringMatching(/^0000_/),
@@ -149,7 +149,25 @@ describe('domain schema and runtime migrations', () => {
       idx: 4,
       tag: expect.stringMatching(/^0004_/),
     });
-    expect(Object.keys(localRuntimeMigrations.migrations)).toEqual(['m0000', 'm0001', 'm0002', 'm0003', 'm0004']);
+    expect(localRuntimeMigrations.journal.entries[5]).toMatchObject({
+      idx: 5,
+      tag: expect.stringMatching(/^0005_/),
+    });
+    expect(Object.keys(localRuntimeMigrations.migrations)).toEqual([
+      'm0000',
+      'm0001',
+      'm0002',
+      'm0003',
+      'm0004',
+      'm0005',
+    ]);
+  });
+
+  it('empties the group cache once in m0005 (groups contract §6.2 shape change)', () => {
+    const clearMigration = localRuntimeMigrations.migrations.m0005;
+    expect(clearMigration).toContain('DELETE FROM `group_cache`');
+    // Data only: the table itself is unchanged.
+    expect(clearMigration).not.toMatch(/CREATE|ALTER|DROP/);
   });
 
   it('creates the local-only group cache table in the m0004 follow-up migration', () => {

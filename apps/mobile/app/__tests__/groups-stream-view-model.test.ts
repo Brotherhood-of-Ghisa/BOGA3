@@ -20,11 +20,27 @@ import {
   formatMembershipSentence,
   formatSessionStatusLabel,
   formatVolumeKg,
+  type GroupSessionSet,
   type StreamMembershipItem,
   type StreamSessionItem,
 } from '@/src/groups';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+const rawSet = (
+  setId: string,
+  weight: string,
+  reps: string,
+  overrides: Partial<GroupSessionSet> = {},
+): GroupSessionSet => ({
+  set_id: setId,
+  order_index: 0,
+  weight_value: weight,
+  reps_value: reps,
+  set_type: 'working',
+  performance_status: null,
+  ...overrides,
+});
 
 const sessionItem = (overrides: Partial<StreamSessionItem> = {}): StreamSessionItem => ({
   kind: 'session',
@@ -41,8 +57,20 @@ const sessionItem = (overrides: Partial<StreamSessionItem> = {}): StreamSessionI
   started_at_ms: 1_757_500_000_000,
   completed_at_ms: 1_757_503_900_000,
   duration_sec: 3_900,
-  metrics: { performed_sets: 12, total_volume_kg: 5230.5, exercise_count: 4 },
-  highlights: { prs: [{ exercise_name: 'Bench Press', weight_kg: 100, reps: 5, e1rm_kg: 112.4 }] },
+  exercises: [
+    {
+      session_exercise_id: 'e1',
+      name: 'Bench Press',
+      machine_name: null,
+      order_index: 0,
+      sets: [
+        rawSet('s1', '102.5', '5'),
+        rawSet('s2', '110', '5', { order_index: 1, performance_status: 'planned' }),
+        rawSet('s3', '60', '10', { order_index: 2, set_type: 'warm_up' }),
+      ],
+    },
+    { session_exercise_id: 'e2', name: 'Barbell Row', machine_name: null, order_index: 1, sets: [rawSet('s4', '80', '8')] },
+  ],
   ...overrides,
 });
 
@@ -118,7 +146,7 @@ describe('group stream view model', () => {
   });
 
   describe('item view models', () => {
-    it('builds a session card with status, metrics, groups, and PR labels', () => {
+    it('builds a session card with status, device-computed metrics, and groups', () => {
       expect(buildStreamItemViewModel(sessionItem())).toEqual({
         kind: 'session',
         key: 'u2:s1',
@@ -130,10 +158,9 @@ describe('group stream view model', () => {
         startedAtLabel: formatStreamStartedAt(1_757_500_000_000),
         gymName: 'Iron Temple',
         groupNames: ['Crew', 'Gym pals'],
-        setsLabel: '12 sets',
-        volumeLabel: '5,230.5 kg',
-        exercisesLabel: '4 exercises',
-        prLabels: ['PR · Bench Press 100 kg × 5'],
+        setsLabel: '3 sets',
+        volumeLabel: '1,752.5 kg',
+        exercisesLabel: '2 exercises',
       });
     });
 
@@ -144,8 +171,9 @@ describe('group stream view model', () => {
           completed_at_ms: null,
           duration_sec: null,
           member: { user_id: 'u2', username: null },
-          metrics: { performed_sets: 1, total_volume_kg: 60, exercise_count: 1 },
-          highlights: { prs: [] },
+          exercises: [
+            { session_exercise_id: 'e1', name: 'Curl', machine_name: null, order_index: 0, sets: [rawSet('s1', '60', '1')] },
+          ],
         }),
       );
 
@@ -156,7 +184,6 @@ describe('group stream view model', () => {
         setsLabel: '1 set',
         exercisesLabel: '1 exercise',
         volumeLabel: '60 kg',
-        prLabels: [],
       });
     });
 

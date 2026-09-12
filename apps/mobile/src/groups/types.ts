@@ -33,19 +33,6 @@ export type GroupMemberRef = {
 
 export type GroupSessionStatus = 'active' | 'completed';
 
-export type StreamSessionMetrics = {
-  performed_sets: number;
-  total_volume_kg: number;
-  exercise_count: number;
-};
-
-export type StreamPrHighlight = {
-  exercise_name: string;
-  weight_kg: number;
-  reps: number;
-  e1rm_kg: number;
-};
-
 export type StreamSessionItem = {
   kind: 'session';
   /** `<member_user_id>:<session_id>` */
@@ -63,8 +50,8 @@ export type StreamSessionItem = {
   completed_at_ms: number | null;
   /** Null while active. */
   duration_sec: number | null;
-  metrics: StreamSessionMetrics;
-  highlights: { prs: StreamPrHighlight[] };
+  /** Every live exercise and set, raw; the device computes the card metrics (§5). */
+  exercises: GroupSessionExercise[];
 };
 
 export type GroupMembershipEvent = 'joined' | 'left' | 'removed';
@@ -88,12 +75,14 @@ export type StreamCursor = {
   key: string;
 };
 
+/** A live set row as synced: raw text values, no parsing or performed filter (§4.2). */
 export type GroupSessionSet = {
   set_id: string;
   order_index: number;
-  weight_kg: number;
-  reps: number;
+  weight_value: string;
+  reps_value: string;
   set_type: string | null;
+  performance_status: string | null;
 };
 
 export type GroupSessionExercise = {
@@ -102,7 +91,7 @@ export type GroupSessionExercise = {
   name: string;
   machine_name: string | null;
   order_index: number;
-  /** Performed sets only, in `order_index` order. */
+  /** Every live set, in `order_index` order; the device selects the performed ones (§5). */
   sets: GroupSessionSet[];
 };
 

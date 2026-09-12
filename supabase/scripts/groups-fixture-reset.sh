@@ -10,8 +10,8 @@
 #   2. hard-deletes both users' Sync v2 rows (the tables `dev_wipe_my_data`
 #      covers, child-first because each REST call is its own transaction), so
 #      each run starts from an empty server: the device takes the first-sign-in
-#      seed path and the counterparty has no session history (no PR highlight
-#      from an earlier run). `dev_wipe_my_data` itself is not usable here: it
+#      seed path and the counterparty has no session history from an earlier
+#      run. `dev_wipe_my_data` itself is not usable here: it
 #      refuses unless `app.env` is set, which the local stack's REST path does
 #      not set;
 #   3. clears user_c's profile row (the create screen's username gate must

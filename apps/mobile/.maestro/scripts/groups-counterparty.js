@@ -185,8 +185,8 @@ var steps = {
     console.log(TAG + ' joined group ' + joined.group_id + ' with code ' + code);
   },
 
-  // One push: a completed pre-join history session (never shared, but it is
-  // Bench history for the PR rule, §5.2) and the live, active session.
+  // One push: a completed pre-join history session (never shared: the flow
+  // asserts it has no card, §2.5) and the live, active session.
   'push-active': function () {
     var cuam = nextClientUpdatedAt();
     var startedAt = Math.max(Date.now(), output.groupsJoinedAtMs + 1000);
@@ -220,7 +220,7 @@ var steps = {
   },
 
   // Complete the session (45 min), then — a separate, later write — edit the
-  // first bench set 100 → 102.5 kg: a strict e1RM PR over the history session.
+  // first bench set 100 → 102.5 kg, which the card's volume must reflect.
   'push-complete-edit': function () {
     var startedAt = output.groupsSessionStartedAt;
     push([sessionEntity(output.groupsSessionId, startedAt, nextClientUpdatedAt(), startedAt + DURATION_SEC * 1000)]);
