@@ -229,9 +229,38 @@ T03 ──► T04 ──► T05 ─────┼──► T06 ──► T07
 
 ## Completion note (fill when milestone closes)
 
-- What changed:
-- Verification summary:
-- What remains:
+- What changed: T01–T06 shipped (PRs #268 T01, #270 T02, #269 T03, #274 T04,
+  #277 T05, #278 T06). The group domain is as-built in
+  `docs/specs/tech/groups-contract.md`, and the product decisions are in
+  `00-product.md`. T07 archived this spec and M18.
+- Verification summary: each AC is mapped to its proof below. `C` is
+  `supabase/tests/groups-contract.sh`, `J` is `apps/mobile/app/__tests__/`,
+  and `M` is `apps/mobile/.maestro/flows/groups-two-user-stream.yaml`. The
+  full gate run is recorded in the M22-T07 card.
+
+  | AC | Proof | Kind |
+  | --- | --- | --- |
+  | 1 | C:339 `group_create`; J/groups-write-screens.test.tsx:193; M:93 | server + unit + e2e |
+  | 2 | C:343, C:435 `USERNAME_REQUIRED`; J/groups-write-screens.test.tsx:193, :237, :305; M:72 (gate before create) | server + unit + e2e |
+  | 3 | C:395–445; J/groups-write-screens.test.tsx:265, :352; J/groups-join-deep-link.test.tsx:55; M:113 + counterparty join over HTTP | server + unit + e2e (joiner's UI unit-only) |
+  | 4 | C:561 `INVITE_INVALID` after regenerate; J/groups-write-screens.test.tsx:283, :333 | server + unit |
+  | 5 | C:954–999; parity vectors C:729 ↔ J/group-set-metric-vectors.test.ts:94; J/groups-screens.test.tsx:228; M:148–208 (same card goes from Training now to Completed + PR) | server + unit + e2e |
+  | 6 | C:1049 (performed sets, no GPS); J/groups-screens.test.tsx:441; M:210 | server + unit + e2e |
+  | 7 | C:920 (offline-late), C:1095–1136 (leave/rejoin); M:178, M:281 | server + e2e |
+  | 8 | C:991–1018 (edit, tombstone, undelete); J/groups-screens.test.tsx:464, :477; M:183 (edit) | server + unit + e2e (edit only) |
+  | 9 | C:586 (non-member ≡ nonexistent), C:1080, C:1262, C:1299 (anon/agent), C:1347 (direct PostgREST denied), C:232 (RLS, no grants) | server |
+  | 10 | C:478–558, C:679 `OWNER_MUST_TRANSFER`; J/groups-write-view-model.test.ts:41; J/groups-write-screens.test.tsx:474–557 | server + unit |
+  | 11 | C:653, C:1274; J/groups-resource-hook.test.tsx:330; J/groups-screens.test.tsx:411; M:241 (removed member's `group_stream` → `NOT_FOUND`) | server + unit + e2e (API side) |
+  | 12 | J/groups-screens.test.tsx:297, :309, :486; J/groups-action-hook.test.tsx:66; J/groups-write-screens.test.tsx:227, :319, :594 | unit |
+  | 13 | C:1139 (forced share failure: `sync_push ok`, self-heals); J/domain-schema-migrations.test.ts:155 | server — **mobile gap → `docs/tasks/T-20260912-01-Groups_mobile_sync_isolation_test.md`** |
+  | 14 | C:1184 (All dedupe), C:1243 (per-group scope); J/groups-screens.test.tsx:266 | server + unit |
+  | 15 | the full local gate run on the T07 PR head (M22-T07 card, Evidence) | gate run |
+
+- What remains: the AC13 mobile follow-up card above. Weaker-but-covered
+  spots, not follow-ups: AC12 is proven by unit tests only (there is no device
+  offline run), and the joiner's UI (AC3) and the removed member's UI (AC11)
+  are exercised over HTTP in the e2e lane, not on screen. Known limitation
+  (see Risks): invite links opened while signed out lose the code at sign-in.
 
 ## Status update checklist (mandatory during task closeout)
 

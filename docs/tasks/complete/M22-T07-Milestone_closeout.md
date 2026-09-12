@@ -56,8 +56,45 @@ and archive the milestone.
 
 ## Evidence
 
+Every gate ran on `c9121e7`, directly on top of `origin/main` `27c2c7e` (T06
+merged). They ran in the foreground, one at a time, in slot 4 on this machine.
+The commit that follows adds only this evidence text and the milestone
+completion note (docs only), and `docs-check` was re-run on it. Artifact roots
+are local, under `apps/mobile/artifacts/maestro/ad-hoc/`.
+
+| Gate | Result | Evidence |
+| --- | --- | --- |
+| `./boga test fast` | ✅ jest 122 suites / 1220 tests; lint, typecheck, docs-check, meta-tests, backend-fast, agent-auth-web, and mcp-unit all exit 0 | timing records `docs/testing/timings/records/*slot4*` |
+| `./boga test handles` | ✅ 1220 tests, no open handles | — |
+| `./boga test backend` | ✅ exit 0, including `groups-contract` PASS (trigger failure isolation `ok`), sync-v2 e2e 10/10, `sync-drift`, `mcp-smoke` | — |
+| `./boga test ios-smoke` | ✅ | `20260912-155047-69632/` |
+| `./boga test ios-data-smoke` | ✅ first attempt | `20260912-155145-71042/` |
+| `./boga test ios-auth-profile` | ✅ | `20260912-155309-73437/` |
+| `./boga test ios-sync-e2e` | ✅ | `20260912-155429-75414/` |
+| `./boga test ios-groups-e2e` | ✅ | `20260912-155704-78681/`; `GROUPS_E2E_LATENCY` active 2122 ms, completed-edited 2013 ms (observed) |
+
+- **Timings** (`./boga timings`, median, this machine): ios-smoke 58s,
+  ios-data-smoke 1.1m, ios-auth-profile 1.3m, ios-sync-e2e 2.3m,
+  ios-groups-e2e 1.5m, handles 51s, groups-contract 17s, backend-fast 44s.
+- **`./boga test for --diff origin/main`** requires only `docs-check`, since
+  this is a docs-only diff. The full run above is this card's AC1.
+- **Acceptance matrix**: the completion note of
+  `docs/specs/milestones/archive/M22-groups-and-foundations.md`. One gap:
+  AC13 on mobile, filed as
+  `docs/tasks/T-20260912-01-Groups_mobile_sync_isolation_test.md`.
+
 ## Completion note
 
 - What changed:
-- What tests ran:
-- What remains:
+  - Specs: `00-product` (group decisions); `03` (both group rows `Adopted`,
+    with as-built sources); `10`, `tech/README`, and `groups-contract` (status
+    as-built; product ownership moves to `00`); `06` (the `groups-contract`
+    lane description now covers the record half); `README` and the `AGENTS`
+    routing row.
+  - Archive: the M22 and M18 specs moved to `milestones/archive/`.
+  - Task cards: M22 T01–T07 and M18 T03–T15 (`outdated`) moved to
+    `docs/tasks/complete/`.
+  - The brainstorm is marked adopted.
+  - `05` needed no edit: its group section was already as-built.
+- What tests ran: see Evidence.
+- What remains: `T-20260912-01` (the mobile AC13 proof).
