@@ -1,7 +1,7 @@
 ---
-task_id: M18-T03-Add_Supabase_migrations_for_groups_and_group_memberships
+task_id: M18-T05-Add_private_to_group_exercise_mapping_table
 milestone_id: "M18"
-status: planned
+status: outdated
 ui_impact: "no"
 areas: "backend"
 runtimes: "supabase|sql"
@@ -10,13 +10,13 @@ gates_slow: "./boga test backend"
 docs_touched: "docs/specs/05-data-model.md"
 ---
 
-# M18-T03-Add_Supabase_migrations_for_groups_and_group_memberships
+# M18-T05-Add_private_to_group_exercise_mapping_table
 
 ## Task metadata
 
-- Task ID: M18-T03-Add_Supabase_migrations_for_groups_and_group_memberships
-- Title: Add Supabase migrations for groups and group memberships
-- Status: `planned`
+- Task ID: M18-T05-Add_private_to_group_exercise_mapping_table
+- Title: Add private-to-group exercise mapping table
+- Status: `outdated` (superseded by M22; never executed)
 - File location rule:
   - author active cards in `docs/tasks/<task-id>.md`
   - move the file to `docs/tasks/complete/<task-id>.md` when `Status` becomes `completed` or `outdated`
@@ -26,7 +26,7 @@ docs_touched: "docs/specs/05-data-model.md"
 ## Parent references
 
 - Project directives: `docs/specs/README.md`
-- Milestone spec: `docs/specs/milestones/M18-group-exercise-catalogue-private-mapping.md`
+- Milestone spec: `docs/specs/milestones/archive/M18-group-exercise-catalogue-private-mapping.md`
 - Architecture: `docs/specs/03-technical-architecture.md`
 - Data model: `docs/specs/05-data-model.md`
 - Testing strategy: `docs/specs/06-testing-strategy.md`
@@ -37,16 +37,16 @@ docs_touched: "docs/specs/05-data-model.md"
 - Verified current branch + HEAD commit: fill during task kickoff.
 - Start-of-session sync with `origin/main` completed?: `N/A` for planned card creation; verify during task kickoff.
 - Parent refs opened in this session:
-  - `docs/specs/milestones/M18-group-exercise-catalogue-private-mapping.md`
+  - `docs/specs/milestones/archive/M18-group-exercise-catalogue-private-mapping.md`
 - Code/docs inventory freshness checks run:
   - Task is planned only; run schema/runtime/UI inventory commands during implementation kickoff as applicable.
 - Known stale references or assumptions: none recorded at card creation.
 - Optional helper command:
-  - `./scripts/task-bootstrap.sh docs/tasks/M18-T03-Add_Supabase_migrations_for_groups_and_group_memberships.md`
+  - `./scripts/task-bootstrap.sh docs/tasks/complete/M18-T05-Add_private_to_group_exercise_mapping_table.md`
 
 ## Objective
 
-Implement backend tables for groups and memberships, including owner/admin/member roles and constraints.
+Implement per-user private exercise to group exercise mappings without exposing private source rows to other members.
 
 ## Scope
 
@@ -76,7 +76,7 @@ Implement backend tables for groups and memberships, including owner/admin/membe
 ## Docs touched
 
 - Planned docs/spec files to update and why:
-  - docs/specs/05-data-model.md - update backend schema inventory; docs/specs/10-api-authn-authz-guidelines.md - document role/ownership policy.
+  - docs/specs/05-data-model.md - add mapping entity and privacy invariant; docs/specs/10-api-authn-authz-guidelines.md - document mapping RLS rules.
 
 ## Testing and verification approach
 

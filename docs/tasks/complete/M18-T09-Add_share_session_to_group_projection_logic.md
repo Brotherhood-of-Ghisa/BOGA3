@@ -1,22 +1,22 @@
 ---
-task_id: M18-T04-Add_group_exercise_catalogue_tables
+task_id: M18-T09-Add_share_session_to_group_projection_logic
 milestone_id: "M18"
-status: planned
+status: outdated
 ui_impact: "no"
-areas: "backend"
-runtimes: "supabase|sql"
-gates_fast: "./boga test backend"
+areas: "cross-stack"
+runtimes: "node|supabase|sql"
+gates_fast: "./boga test fast"
 gates_slow: "./boga test backend"
 docs_touched: "docs/specs/05-data-model.md"
 ---
 
-# M18-T04-Add_group_exercise_catalogue_tables
+# M18-T09-Add_share_session_to_group_projection_logic
 
 ## Task metadata
 
-- Task ID: M18-T04-Add_group_exercise_catalogue_tables
-- Title: Add group exercise catalogue tables
-- Status: `planned`
+- Task ID: M18-T09-Add_share_session_to_group_projection_logic
+- Title: Add share-session-to-group projection logic
+- Status: `outdated` (superseded by M22; never executed)
 - File location rule:
   - author active cards in `docs/tasks/<task-id>.md`
   - move the file to `docs/tasks/complete/<task-id>.md` when `Status` becomes `completed` or `outdated`
@@ -26,7 +26,7 @@ docs_touched: "docs/specs/05-data-model.md"
 ## Parent references
 
 - Project directives: `docs/specs/README.md`
-- Milestone spec: `docs/specs/milestones/M18-group-exercise-catalogue-private-mapping.md`
+- Milestone spec: `docs/specs/milestones/archive/M18-group-exercise-catalogue-private-mapping.md`
 - Architecture: `docs/specs/03-technical-architecture.md`
 - Data model: `docs/specs/05-data-model.md`
 - Testing strategy: `docs/specs/06-testing-strategy.md`
@@ -37,16 +37,16 @@ docs_touched: "docs/specs/05-data-model.md"
 - Verified current branch + HEAD commit: fill during task kickoff.
 - Start-of-session sync with `origin/main` completed?: `N/A` for planned card creation; verify during task kickoff.
 - Parent refs opened in this session:
-  - `docs/specs/milestones/M18-group-exercise-catalogue-private-mapping.md`
+  - `docs/specs/milestones/archive/M18-group-exercise-catalogue-private-mapping.md`
 - Code/docs inventory freshness checks run:
   - Task is planned only; run schema/runtime/UI inventory commands during implementation kickoff as applicable.
 - Known stale references or assumptions: none recorded at card creation.
 - Optional helper command:
-  - `./scripts/task-bootstrap.sh docs/tasks/M18-T04-Add_group_exercise_catalogue_tables.md`
+  - `./scripts/task-bootstrap.sh docs/tasks/complete/M18-T09-Add_share_session_to_group_projection_logic.md`
 
 ## Objective
 
-Implement group-scoped exercise catalogue storage governed by group roles.
+Project completed private sessions into group-visible shared session data using mapped group exercises.
 
 ## Scope
 
@@ -76,12 +76,12 @@ Implement group-scoped exercise catalogue storage governed by group roles.
 ## Docs touched
 
 - Planned docs/spec files to update and why:
-  - docs/specs/05-data-model.md - add group catalogue entity semantics; docs/specs/10-api-authn-authz-guidelines.md - document catalogue write permissions.
+  - docs/specs/05-data-model.md - add projection entity semantics; docs/specs/10-api-authn-authz-guidelines.md - document projection read/write rules; docs/specs/06-testing-strategy.md - document privacy/projection coverage if new tests are added.
 
 ## Testing and verification approach
 
 - Planned checks/commands:
-  - `./boga test backend`
+  - `./boga test fast`
   - `./boga test backend`
 - Test layers covered: targeted unit/integration/contract/E2E coverage as appropriate to this slice.
 - Execution triggers: run required gates before marking task complete.
@@ -96,7 +96,7 @@ Implement group-scoped exercise catalogue storage governed by group roles.
 
 ## Mandatory verify gates
 
-- Standard local fast gate: `./boga test backend`
+- Standard local fast gate: `./boga test fast`
 - Standard local slow gate: `./boga test backend`
 - Additional gate(s), if any: run `./boga test for --diff <range>` before closeout and follow its output.
 

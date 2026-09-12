@@ -1,22 +1,22 @@
 ---
-task_id: M18-T13-Build_admin_review_queue_for_exercise_requests
+task_id: M18-T10-Build_group_catalogue_admin_UI
 milestone_id: "M18"
-status: planned
+status: outdated
 ui_impact: "yes"
-areas: "frontend|backend"
-runtimes: "expo|node|maestro|supabase"
+areas: "frontend"
+runtimes: "expo|node|maestro"
 gates_fast: "./boga test fast"
 gates_slow: "./boga test frontend"
 docs_touched: "docs/specs/ui/screen-map.md"
 ---
 
-# M18-T13-Build_admin_review_queue_for_exercise_requests
+# M18-T10-Build_group_catalogue_admin_UI
 
 ## Task metadata
 
-- Task ID: M18-T13-Build_admin_review_queue_for_exercise_requests
-- Title: Build admin review queue for exercise requests
-- Status: `planned`
+- Task ID: M18-T10-Build_group_catalogue_admin_UI
+- Title: Build group catalogue admin UI
+- Status: `outdated` (superseded by M22; never executed)
 - File location rule:
   - author active cards in `docs/tasks/<task-id>.md`
   - move the file to `docs/tasks/complete/<task-id>.md` when `Status` becomes `completed` or `outdated`
@@ -26,7 +26,7 @@ docs_touched: "docs/specs/ui/screen-map.md"
 ## Parent references
 
 - Project directives: `docs/specs/README.md`
-- Milestone spec: `docs/specs/milestones/M18-group-exercise-catalogue-private-mapping.md`
+- Milestone spec: `docs/specs/milestones/archive/M18-group-exercise-catalogue-private-mapping.md`
 - Architecture: `docs/specs/03-technical-architecture.md`
 - Data model: `docs/specs/05-data-model.md`
 - Testing strategy: `docs/specs/06-testing-strategy.md`
@@ -39,16 +39,16 @@ docs_touched: "docs/specs/ui/screen-map.md"
 - Verified current branch + HEAD commit: fill during task kickoff.
 - Start-of-session sync with `origin/main` completed?: `N/A` for planned card creation; verify during task kickoff.
 - Parent refs opened in this session:
-  - `docs/specs/milestones/M18-group-exercise-catalogue-private-mapping.md`
+  - `docs/specs/milestones/archive/M18-group-exercise-catalogue-private-mapping.md`
 - Code/docs inventory freshness checks run:
   - Task is planned only; run schema/runtime/UI inventory commands during implementation kickoff as applicable.
 - Known stale references or assumptions: none recorded at card creation.
 - Optional helper command:
-  - `./scripts/task-bootstrap.sh docs/tasks/M18-T13-Build_admin_review_queue_for_exercise_requests.md`
+  - `./scripts/task-bootstrap.sh docs/tasks/complete/M18-T10-Build_group_catalogue_admin_UI.md`
 
 ## Objective
 
-Build owner/admin review queue for pending group exercise creation requests.
+Build owner/admin UI for viewing and maintaining a group exercise catalogue.
 
 ## Scope
 
@@ -92,7 +92,7 @@ Build owner/admin review queue for pending group exercise creation requests.
 ## Docs touched
 
 - Planned docs/spec files to update and why:
-  - docs/specs/ui/screen-map.md - document review queue; docs/specs/ui/navigation-contract.md - document admin transitions; docs/specs/10-api-authn-authz-guidelines.md - align review actions with admin permissions.
+  - docs/specs/ui/screen-map.md - add/administer new screen behavior; docs/specs/ui/navigation-contract.md - document new routes/transitions; docs/specs/ui/components-catalog.md - update if reusable components are introduced.
 
 - UI docs update required?: `yes`
 - Tokens/primitives compliance statement:

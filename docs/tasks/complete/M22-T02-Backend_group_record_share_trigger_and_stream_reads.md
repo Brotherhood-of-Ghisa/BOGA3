@@ -21,7 +21,7 @@ docs_touched: "docs/specs/tech/groups-contract.md, docs/specs/tech/sync-v2-serve
 
 ## Parent references (required)
 
-- Milestone spec: `docs/specs/milestones/M22-groups-and-foundations.md`
+- Milestone spec: `docs/specs/milestones/archive/M22-groups-and-foundations.md`
 - **Contract:** `docs/specs/tech/groups-contract.md`
   - §2.4–§2.5: shares, the rule, the trigger, failure isolation;
   - §4.2: `group_stream` and `group_session_detail`;

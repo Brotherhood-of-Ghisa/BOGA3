@@ -1,6 +1,6 @@
 # Groups Contract (M22)
 
-> **Status: Partially built.** As-built:
+> **Status: As-built (M22 shipped).**
 >
 > - §2–§5, the server half: the membership/invite RPCs (M22-T01,
 >   `supabase/migrations/20260910120000_m22_groups_membership.sql`) and the
@@ -12,11 +12,11 @@
 >   the friend's session view (M22-T04).
 > - §6.3/§7, the write UI: create, edit, join (deep link), invite, member
 >   actions, leave, and the username gate (M22-T05).
+> - §8, the two-user Maestro lane `ios-groups-e2e` (M22-T06).
 >
-> The two-user Maestro lane (M22-T06) is still planned. Each section gets an **As-built** note when its
-> implementation task lands; the milestone spec
-> (`docs/specs/milestones/M22-groups-and-foundations.md`) owns the product
-> requirements and this doc owns the technical contract.
+> This doc owns the technical contract; the group product decisions live in
+> `docs/specs/00-product.md`. The shipped milestone spec is history at
+> `docs/specs/milestones/archive/M22-groups-and-foundations.md`.
 
 This doc covers:
 

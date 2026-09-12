@@ -1,22 +1,22 @@
 ---
-task_id: M18-T05-Add_private_to_group_exercise_mapping_table
+task_id: M18-T15-Add_seed_dev_data_and_QA_scenarios
 milestone_id: "M18"
-status: planned
-ui_impact: "no"
-areas: "backend"
-runtimes: "supabase|sql"
-gates_fast: "./boga test backend"
-gates_slow: "./boga test backend"
-docs_touched: "docs/specs/05-data-model.md"
+status: outdated
+ui_impact: "yes"
+areas: "cross-stack"
+runtimes: "supabase|expo|maestro|docs"
+gates_fast: "./boga test fast"
+gates_slow: "./boga test frontend"
+docs_touched: "docs/specs/06-testing-strategy.md"
 ---
 
-# M18-T05-Add_private_to_group_exercise_mapping_table
+# M18-T15-Add_seed_dev_data_and_QA_scenarios
 
 ## Task metadata
 
-- Task ID: M18-T05-Add_private_to_group_exercise_mapping_table
-- Title: Add private-to-group exercise mapping table
-- Status: `planned`
+- Task ID: M18-T15-Add_seed_dev_data_and_QA_scenarios
+- Title: Add seed/dev data and QA scenarios
+- Status: `outdated` (superseded by M22; never executed)
 - File location rule:
   - author active cards in `docs/tasks/<task-id>.md`
   - move the file to `docs/tasks/complete/<task-id>.md` when `Status` becomes `completed` or `outdated`
@@ -26,27 +26,29 @@ docs_touched: "docs/specs/05-data-model.md"
 ## Parent references
 
 - Project directives: `docs/specs/README.md`
-- Milestone spec: `docs/specs/milestones/M18-group-exercise-catalogue-private-mapping.md`
+- Milestone spec: `docs/specs/milestones/archive/M18-group-exercise-catalogue-private-mapping.md`
 - Architecture: `docs/specs/03-technical-architecture.md`
 - Data model: `docs/specs/05-data-model.md`
 - Testing strategy: `docs/specs/06-testing-strategy.md`
 - Project structure: `docs/specs/09-project-structure.md`
+- UX standard: `docs/specs/08-ux-delivery-standard.md`
+- UI docs bundle index: `docs/specs/ui/README.md`
 
 ## Context Freshness
 
 - Verified current branch + HEAD commit: fill during task kickoff.
 - Start-of-session sync with `origin/main` completed?: `N/A` for planned card creation; verify during task kickoff.
 - Parent refs opened in this session:
-  - `docs/specs/milestones/M18-group-exercise-catalogue-private-mapping.md`
+  - `docs/specs/milestones/archive/M18-group-exercise-catalogue-private-mapping.md`
 - Code/docs inventory freshness checks run:
   - Task is planned only; run schema/runtime/UI inventory commands during implementation kickoff as applicable.
 - Known stale references or assumptions: none recorded at card creation.
 - Optional helper command:
-  - `./scripts/task-bootstrap.sh docs/tasks/M18-T05-Add_private_to_group_exercise_mapping_table.md`
+  - `./scripts/task-bootstrap.sh docs/tasks/complete/M18-T15-Add_seed_dev_data_and_QA_scenarios.md`
 
 ## Objective
 
-Implement per-user private exercise to group exercise mappings without exposing private source rows to other members.
+Add development fixtures and QA scenarios for group owner/admin/member flows.
 
 ## Scope
 
@@ -63,8 +65,22 @@ Implement per-user private exercise to group exercise mappings without exposing 
 
 ## UI Impact
 
-- UI Impact?: `no`
-- No direct UI impact planned for this slice; remove UI-only sections if implementation remains non-UI.
+- UI Impact?: `yes`
+- Keep UX/UI parent references and fill the UX Contract before implementation.
+
+## UX Contract
+
+### Key user flows
+
+1. Flow name: To be defined during task kickoff.
+   - Trigger:
+   - Steps:
+   - Success outcome:
+   - Failure/edge outcome:
+
+### Interaction + appearance notes
+
+- Reuse existing UI tokens/primitives and group-navigation patterns where available.
 
 ## Acceptance criteria
 
@@ -76,13 +92,21 @@ Implement per-user private exercise to group exercise mappings without exposing 
 ## Docs touched
 
 - Planned docs/spec files to update and why:
-  - docs/specs/05-data-model.md - add mapping entity and privacy invariant; docs/specs/10-api-authn-authz-guidelines.md - document mapping RLS rules.
+  - docs/specs/06-testing-strategy.md - document QA scenario coverage if formalized; docs/specs/ui/screen-map.md - update only if QA reveals screen contract changes; RUNBOOK.md - update if new local-dev commands or fixtures are added.
+
+- UI docs update required?: `yes`
+- Tokens/primitives compliance statement:
+  - Reuse plan: Use documented UI primitives/tokens for buttons, forms, lists, panels, and empty/error states.
+  - Exceptions: none planned.
+- UI artifacts/screenshots expectation:
+  - Required by `docs/specs/08-ux-delivery-standard.md` or task scope?: `yes`
+  - Planned captures/artifacts: happy path plus relevant edge/error flow.
 
 ## Testing and verification approach
 
 - Planned checks/commands:
-  - `./boga test backend`
-  - `./boga test backend`
+  - `./boga test fast`
+  - `./boga test frontend`
 - Test layers covered: targeted unit/integration/contract/E2E coverage as appropriate to this slice.
 - Execution triggers: run required gates before marking task complete.
 - Slow-gate triggers: backend for schema/RLS/projection changes; frontend for UI route/screen changes.
@@ -96,8 +120,8 @@ Implement per-user private exercise to group exercise mappings without exposing 
 
 ## Mandatory verify gates
 
-- Standard local fast gate: `./boga test backend`
-- Standard local slow gate: `./boga test backend`
+- Standard local fast gate: `./boga test fast`
+- Standard local slow gate: `./boga test frontend`
 - Additional gate(s), if any: run `./boga test for --diff <range>` before closeout and follow its output.
 
 ## Evidence

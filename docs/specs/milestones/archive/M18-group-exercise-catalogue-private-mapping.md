@@ -6,14 +6,14 @@
 - Title: Milestone: Group Exercise Catalogue and Private Exercise Mapping
 - Status: `outdated`
 
-> **Superseded by M22** (`docs/specs/milestones/M22-groups-and-foundations.md`,
+> **Superseded by M22** (`docs/specs/milestones/archive/M22-groups-and-foundations.md`,
 > technical design `docs/specs/tech/groups-contract.md`). Groups are now
 > specified from the product vision in
 > `docs/brainstorms/2026-09-10-group-activity-stream.md`. Notable reversals:
 > all of a member's sets are visible to their groups (not only mapped
 > exercises), and shared sessions are live read-through records, not static
 > snapshots. Group exercises and links arrive in a later phase. The M18 task
-> cards (`docs/tasks/M18-T03`…`T15`) are not to be executed. This file is
+> cards (`docs/tasks/complete/M18-T03`…`T15`) are not to be executed. This file is
 > retained only as history.
 
 ## Parent references
@@ -96,19 +96,19 @@ Introduce the first group-sharing domain slice: a user can create a private grou
 
 1. `docs/tasks/complete/M18-T01-Audit_existing_exercise_session_schema_and_privacy_assumptions.md` - Audit existing exercise/session schema and privacy assumptions (`completed`).
 2. `docs/tasks/complete/M18-T02-Design_group_domain_data_model.md` - Design group/domain data model (`completed`).
-3. `docs/tasks/M18-T03-Add_Supabase_migrations_for_groups_and_group_memberships.md` - Add Supabase migrations for groups and group memberships (`planned`).
-4. `docs/tasks/M18-T04-Add_group_exercise_catalogue_tables.md` - Add group exercise catalogue tables (`planned`).
-5. `docs/tasks/M18-T05-Add_private_to_group_exercise_mapping_table.md` - Add private-to-group exercise mapping table (`planned`).
-6. `docs/tasks/M18-T06-Add_group_exercise_request_table_and_lifecycle_states.md` - Add group exercise request table and lifecycle states (`planned`).
-7. `docs/tasks/M18-T07-Add_RLS_policies_for_groups_members_admins_mappings_requests.md` - Add RLS policies for groups, members, admins, mappings, requests (`planned`).
-8. `docs/tasks/M18-T08-Add_service_layer_for_group_catalogue_and_mappings.md` - Add service layer for group catalogue and mappings (`planned`).
-9. `docs/tasks/M18-T09-Add_share_session_to_group_projection_logic.md` - Add share-session-to-group projection logic (`planned`).
-10. `docs/tasks/M18-T10-Build_group_catalogue_admin_UI.md` - Build group catalogue admin UI (`planned`).
-11. `docs/tasks/M18-T11-Build_user_mapping_UI.md` - Build user mapping UI (`planned`).
-12. `docs/tasks/M18-T12-Build_unmapped_exercise_flow_during_sharing.md` - Build unmapped exercise flow during sharing (`planned`).
-13. `docs/tasks/M18-T13-Build_admin_review_queue_for_exercise_requests.md` - Build admin review queue for exercise requests (`planned`).
-14. `docs/tasks/M18-T14-Add_tests_for_privacy_and_projection_behaviour.md` - Add tests for privacy and projection behaviour (`planned`).
-15. `docs/tasks/M18-T15-Add_seed_dev_data_and_QA_scenarios.md` - Add seed/dev data and QA scenarios (`planned`).
+3. `docs/tasks/complete/M18-T03-Add_Supabase_migrations_for_groups_and_group_memberships.md` - Add Supabase migrations for groups and group memberships (`planned`).
+4. `docs/tasks/complete/M18-T04-Add_group_exercise_catalogue_tables.md` - Add group exercise catalogue tables (`planned`).
+5. `docs/tasks/complete/M18-T05-Add_private_to_group_exercise_mapping_table.md` - Add private-to-group exercise mapping table (`planned`).
+6. `docs/tasks/complete/M18-T06-Add_group_exercise_request_table_and_lifecycle_states.md` - Add group exercise request table and lifecycle states (`planned`).
+7. `docs/tasks/complete/M18-T07-Add_RLS_policies_for_groups_members_admins_mappings_requests.md` - Add RLS policies for groups, members, admins, mappings, requests (`planned`).
+8. `docs/tasks/complete/M18-T08-Add_service_layer_for_group_catalogue_and_mappings.md` - Add service layer for group catalogue and mappings (`planned`).
+9. `docs/tasks/complete/M18-T09-Add_share_session_to_group_projection_logic.md` - Add share-session-to-group projection logic (`planned`).
+10. `docs/tasks/complete/M18-T10-Build_group_catalogue_admin_UI.md` - Build group catalogue admin UI (`planned`).
+11. `docs/tasks/complete/M18-T11-Build_user_mapping_UI.md` - Build user mapping UI (`planned`).
+12. `docs/tasks/complete/M18-T12-Build_unmapped_exercise_flow_during_sharing.md` - Build unmapped exercise flow during sharing (`planned`).
+13. `docs/tasks/complete/M18-T13-Build_admin_review_queue_for_exercise_requests.md` - Build admin review queue for exercise requests (`planned`).
+14. `docs/tasks/complete/M18-T14-Add_tests_for_privacy_and_projection_behaviour.md` - Add tests for privacy and projection behaviour (`planned`).
+15. `docs/tasks/complete/M18-T15-Add_seed_dev_data_and_QA_scenarios.md` - Add seed/dev data and QA scenarios (`planned`).
 
 ## Risks / dependencies
 

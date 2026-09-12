@@ -26,7 +26,7 @@ docs_touched: "docs/specs/05-data-model.md"
 ## Parent references
 
 - Project directives: `docs/specs/README.md`
-- Milestone spec: `docs/specs/milestones/M18-group-exercise-catalogue-private-mapping.md`
+- Milestone spec: `docs/specs/milestones/archive/M18-group-exercise-catalogue-private-mapping.md`
 - Architecture: `docs/specs/03-technical-architecture.md`
 - Data model: `docs/specs/05-data-model.md`
 - Testing strategy: `docs/specs/06-testing-strategy.md`
@@ -37,12 +37,12 @@ docs_touched: "docs/specs/05-data-model.md"
 - Verified current branch + HEAD commit: fill during task kickoff.
 - Start-of-session sync with `origin/main` completed?: `N/A` for planned card creation; verify during task kickoff.
 - Parent refs opened in this session:
-  - `docs/specs/milestones/M18-group-exercise-catalogue-private-mapping.md`
+  - `docs/specs/milestones/archive/M18-group-exercise-catalogue-private-mapping.md`
 - Code/docs inventory freshness checks run:
   - Task is planned only; run schema/runtime/UI inventory commands during implementation kickoff as applicable.
 - Known stale references or assumptions: none recorded at card creation.
 - Optional helper command:
-  - `./scripts/task-bootstrap.sh docs/tasks/M18-T02-Design_group_domain_data_model.md`
+  - `./scripts/task-bootstrap.sh docs/tasks/complete/M18-T02-Design_group_domain_data_model.md`
 
 ## Objective
 

@@ -1,22 +1,22 @@
 ---
-task_id: M18-T14-Add_tests_for_privacy_and_projection_behaviour
+task_id: M18-T06-Add_group_exercise_request_table_and_lifecycle_states
 milestone_id: "M18"
-status: planned
+status: outdated
 ui_impact: "no"
-areas: "backend|cross-stack"
-runtimes: "node|supabase|sql"
-gates_fast: "./boga test fast"
+areas: "backend"
+runtimes: "supabase|sql"
+gates_fast: "./boga test backend"
 gates_slow: "./boga test backend"
-docs_touched: "docs/specs/06-testing-strategy.md"
+docs_touched: "docs/specs/05-data-model.md"
 ---
 
-# M18-T14-Add_tests_for_privacy_and_projection_behaviour
+# M18-T06-Add_group_exercise_request_table_and_lifecycle_states
 
 ## Task metadata
 
-- Task ID: M18-T14-Add_tests_for_privacy_and_projection_behaviour
-- Title: Add tests for privacy and projection behaviour
-- Status: `planned`
+- Task ID: M18-T06-Add_group_exercise_request_table_and_lifecycle_states
+- Title: Add group exercise request table and lifecycle states
+- Status: `outdated` (superseded by M22; never executed)
 - File location rule:
   - author active cards in `docs/tasks/<task-id>.md`
   - move the file to `docs/tasks/complete/<task-id>.md` when `Status` becomes `completed` or `outdated`
@@ -26,7 +26,7 @@ docs_touched: "docs/specs/06-testing-strategy.md"
 ## Parent references
 
 - Project directives: `docs/specs/README.md`
-- Milestone spec: `docs/specs/milestones/M18-group-exercise-catalogue-private-mapping.md`
+- Milestone spec: `docs/specs/milestones/archive/M18-group-exercise-catalogue-private-mapping.md`
 - Architecture: `docs/specs/03-technical-architecture.md`
 - Data model: `docs/specs/05-data-model.md`
 - Testing strategy: `docs/specs/06-testing-strategy.md`
@@ -37,16 +37,16 @@ docs_touched: "docs/specs/06-testing-strategy.md"
 - Verified current branch + HEAD commit: fill during task kickoff.
 - Start-of-session sync with `origin/main` completed?: `N/A` for planned card creation; verify during task kickoff.
 - Parent refs opened in this session:
-  - `docs/specs/milestones/M18-group-exercise-catalogue-private-mapping.md`
+  - `docs/specs/milestones/archive/M18-group-exercise-catalogue-private-mapping.md`
 - Code/docs inventory freshness checks run:
   - Task is planned only; run schema/runtime/UI inventory commands during implementation kickoff as applicable.
 - Known stale references or assumptions: none recorded at card creation.
 - Optional helper command:
-  - `./scripts/task-bootstrap.sh docs/tasks/M18-T14-Add_tests_for_privacy_and_projection_behaviour.md`
+  - `./scripts/task-bootstrap.sh docs/tasks/complete/M18-T06-Add_group_exercise_request_table_and_lifecycle_states.md`
 
 ## Objective
 
-Add automated coverage for group privacy, RLS denials, mapping behavior, and share projection output.
+Implement group exercise creation request storage and status transitions.
 
 ## Scope
 
@@ -76,12 +76,12 @@ Add automated coverage for group privacy, RLS denials, mapping behavior, and sha
 ## Docs touched
 
 - Planned docs/spec files to update and why:
-  - docs/specs/06-testing-strategy.md - document new coverage/suites if introduced; docs/specs/02-quality-and-test-gates.md - update only if lane registry/triggers change.
+  - docs/specs/05-data-model.md - add request lifecycle; docs/specs/10-api-authn-authz-guidelines.md - document member submit and admin review permissions.
 
 ## Testing and verification approach
 
 - Planned checks/commands:
-  - `./boga test fast`
+  - `./boga test backend`
   - `./boga test backend`
 - Test layers covered: targeted unit/integration/contract/E2E coverage as appropriate to this slice.
 - Execution triggers: run required gates before marking task complete.
@@ -96,7 +96,7 @@ Add automated coverage for group privacy, RLS denials, mapping behavior, and sha
 
 ## Mandatory verify gates
 
-- Standard local fast gate: `./boga test fast`
+- Standard local fast gate: `./boga test backend`
 - Standard local slow gate: `./boga test backend`
 - Additional gate(s), if any: run `./boga test for --diff <range>` before closeout and follow its output.
 

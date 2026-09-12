@@ -1,7 +1,7 @@
 ---
 task_id: M22-T06-Two_user_groups_Maestro_lane
 milestone_id: "M22"
-status: in_progress
+status: completed
 ui_impact: "no"
 areas: "cross-stack"
 runtimes: "maestro|supabase|node"
@@ -15,12 +15,12 @@ docs_touched: "docs/specs/06-testing-strategy.md, docs/specs/02-quality-and-test
 ## Task metadata
 
 - Task ID: `M22-T06-Two_user_groups_Maestro_lane`
-- Status: `in_progress`
+- Status: `completed` (merged as PR #278, `27c2c7e`)
 - Depends on: `M22-T02`, `M22-T04`, `M22-T05`
 
 ## Parent references (required)
 
-- Milestone spec: `docs/specs/milestones/M22-groups-and-foundations.md` (AC15)
+- Milestone spec: `docs/specs/milestones/archive/M22-groups-and-foundations.md` (AC15)
 - **Contract:** `docs/specs/tech/groups-contract.md` §8, the Maestro lane
   bullet
 - Maestro contract: `docs/specs/11-maestro-runtime-and-testing-conventions.md`

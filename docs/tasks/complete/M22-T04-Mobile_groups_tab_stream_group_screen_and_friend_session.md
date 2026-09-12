@@ -22,7 +22,7 @@ docs_touched: "docs/specs/ui/screen-map.md, docs/specs/ui/navigation-contract.md
 
 ## Parent references (required)
 
-- Milestone spec: `docs/specs/milestones/M22-groups-and-foundations.md` (FR 2,
+- Milestone spec: `docs/specs/milestones/archive/M22-groups-and-foundations.md` (FR 2,
   6, 7, 8, 9)
 - **Contract:** `docs/specs/tech/groups-contract.md`
   - §6.3: routes, tab, and friend view;

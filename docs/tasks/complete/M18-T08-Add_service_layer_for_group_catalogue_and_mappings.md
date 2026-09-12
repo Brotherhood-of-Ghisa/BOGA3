@@ -1,22 +1,22 @@
 ---
-task_id: M18-T12-Build_unmapped_exercise_flow_during_sharing
+task_id: M18-T08-Add_service_layer_for_group_catalogue_and_mappings
 milestone_id: "M18"
-status: planned
-ui_impact: "yes"
-areas: "frontend|cross-stack"
-runtimes: "expo|node|maestro|supabase"
+status: outdated
+ui_impact: "no"
+areas: "frontend|backend"
+runtimes: "node|supabase"
 gates_fast: "./boga test fast"
-gates_slow: "./boga test frontend"
-docs_touched: "docs/specs/ui/screen-map.md"
+gates_slow: "./boga test backend"
+docs_touched: "docs/specs/03-technical-architecture.md"
 ---
 
-# M18-T12-Build_unmapped_exercise_flow_during_sharing
+# M18-T08-Add_service_layer_for_group_catalogue_and_mappings
 
 ## Task metadata
 
-- Task ID: M18-T12-Build_unmapped_exercise_flow_during_sharing
-- Title: Build unmapped exercise flow during sharing
-- Status: `planned`
+- Task ID: M18-T08-Add_service_layer_for_group_catalogue_and_mappings
+- Title: Add service layer for group catalogue and mappings
+- Status: `outdated` (superseded by M22; never executed)
 - File location rule:
   - author active cards in `docs/tasks/<task-id>.md`
   - move the file to `docs/tasks/complete/<task-id>.md` when `Status` becomes `completed` or `outdated`
@@ -26,29 +26,27 @@ docs_touched: "docs/specs/ui/screen-map.md"
 ## Parent references
 
 - Project directives: `docs/specs/README.md`
-- Milestone spec: `docs/specs/milestones/M18-group-exercise-catalogue-private-mapping.md`
+- Milestone spec: `docs/specs/milestones/archive/M18-group-exercise-catalogue-private-mapping.md`
 - Architecture: `docs/specs/03-technical-architecture.md`
 - Data model: `docs/specs/05-data-model.md`
 - Testing strategy: `docs/specs/06-testing-strategy.md`
 - Project structure: `docs/specs/09-project-structure.md`
-- UX standard: `docs/specs/08-ux-delivery-standard.md`
-- UI docs bundle index: `docs/specs/ui/README.md`
 
 ## Context Freshness
 
 - Verified current branch + HEAD commit: fill during task kickoff.
 - Start-of-session sync with `origin/main` completed?: `N/A` for planned card creation; verify during task kickoff.
 - Parent refs opened in this session:
-  - `docs/specs/milestones/M18-group-exercise-catalogue-private-mapping.md`
+  - `docs/specs/milestones/archive/M18-group-exercise-catalogue-private-mapping.md`
 - Code/docs inventory freshness checks run:
   - Task is planned only; run schema/runtime/UI inventory commands during implementation kickoff as applicable.
 - Known stale references or assumptions: none recorded at card creation.
 - Optional helper command:
-  - `./scripts/task-bootstrap.sh docs/tasks/M18-T12-Build_unmapped_exercise_flow_during_sharing.md`
+  - `./scripts/task-bootstrap.sh docs/tasks/complete/M18-T08-Add_service_layer_for_group_catalogue_and_mappings.md`
 
 ## Objective
 
-Build share-time handling for exercises that lack group mappings.
+Add typed mobile service calls for group catalogue lookup and private-to-group mapping management.
 
 ## Scope
 
@@ -65,22 +63,8 @@ Build share-time handling for exercises that lack group mappings.
 
 ## UI Impact
 
-- UI Impact?: `yes`
-- Keep UX/UI parent references and fill the UX Contract before implementation.
-
-## UX Contract
-
-### Key user flows
-
-1. Flow name: To be defined during task kickoff.
-   - Trigger:
-   - Steps:
-   - Success outcome:
-   - Failure/edge outcome:
-
-### Interaction + appearance notes
-
-- Reuse existing UI tokens/primitives and group-navigation patterns where available.
+- UI Impact?: `no`
+- No direct UI impact planned for this slice; remove UI-only sections if implementation remains non-UI.
 
 ## Acceptance criteria
 
@@ -92,21 +76,13 @@ Build share-time handling for exercises that lack group mappings.
 ## Docs touched
 
 - Planned docs/spec files to update and why:
-  - docs/specs/ui/screen-map.md - document share flow states; docs/specs/ui/navigation-contract.md - document transitions; docs/specs/05-data-model.md - keep share decisions aligned with projection model.
-
-- UI docs update required?: `yes`
-- Tokens/primitives compliance statement:
-  - Reuse plan: Use documented UI primitives/tokens for buttons, forms, lists, panels, and empty/error states.
-  - Exceptions: none planned.
-- UI artifacts/screenshots expectation:
-  - Required by `docs/specs/08-ux-delivery-standard.md` or task scope?: `yes`
-  - Planned captures/artifacts: happy path plus relevant edge/error flow.
+  - docs/specs/03-technical-architecture.md - document service boundary if adopted; docs/specs/05-data-model.md - keep service assumptions aligned with schema.
 
 ## Testing and verification approach
 
 - Planned checks/commands:
   - `./boga test fast`
-  - `./boga test frontend`
+  - `./boga test backend`
 - Test layers covered: targeted unit/integration/contract/E2E coverage as appropriate to this slice.
 - Execution triggers: run required gates before marking task complete.
 - Slow-gate triggers: backend for schema/RLS/projection changes; frontend for UI route/screen changes.
@@ -121,7 +97,7 @@ Build share-time handling for exercises that lack group mappings.
 ## Mandatory verify gates
 
 - Standard local fast gate: `./boga test fast`
-- Standard local slow gate: `./boga test frontend`
+- Standard local slow gate: `./boga test backend`
 - Additional gate(s), if any: run `./boga test for --diff <range>` before closeout and follow its output.
 
 ## Evidence

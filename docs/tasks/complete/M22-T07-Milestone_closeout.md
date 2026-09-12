@@ -1,7 +1,7 @@
 ---
 task_id: M22-T07-Milestone_closeout
 milestone_id: "M22"
-status: planned
+status: completed
 ui_impact: "no"
 areas: "docs"
 runtimes: "docs"
@@ -15,12 +15,12 @@ docs_touched: "docs/specs/00-product.md, docs/specs/03-technical-architecture.md
 ## Task metadata
 
 - Task ID: `M22-T07-Milestone_closeout`
-- Status: `planned`
+- Status: `completed` (on merge; filed in `complete/` with the milestone archive)
 - Depends on: `M22-T01` … `M22-T06` merged
 
 ## Parent references (required)
 
-- Milestone spec: `docs/specs/milestones/M22-groups-and-foundations.md`
+- Milestone spec: `docs/specs/milestones/archive/M22-groups-and-foundations.md`
 - Contract: `docs/specs/tech/groups-contract.md`
 - Milestone archive rule: `docs/specs/milestones/README.md`
 

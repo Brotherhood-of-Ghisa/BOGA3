@@ -20,7 +20,7 @@ docs_touched: "docs/specs/ui/screen-map.md, docs/specs/ui/navigation-contract.md
 
 ## Parent references (required)
 
-- Milestone spec: `docs/specs/milestones/M22-groups-and-foundations.md` (FR 1,
+- Milestone spec: `docs/specs/milestones/archive/M22-groups-and-foundations.md` (FR 1,
   3, 4, 5, 9; C7.4)
 - **Contract:** `docs/specs/tech/groups-contract.md`
   - §4.3: the write RPCs and role matrix;

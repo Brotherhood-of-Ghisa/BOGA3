@@ -1,22 +1,22 @@
 ---
-task_id: M18-T10-Build_group_catalogue_admin_UI
+task_id: M18-T07-Add_RLS_policies_for_groups_members_admins_mappings_requests
 milestone_id: "M18"
-status: planned
-ui_impact: "yes"
-areas: "frontend"
-runtimes: "expo|node|maestro"
-gates_fast: "./boga test fast"
-gates_slow: "./boga test frontend"
-docs_touched: "docs/specs/ui/screen-map.md"
+status: outdated
+ui_impact: "no"
+areas: "backend"
+runtimes: "supabase|sql"
+gates_fast: "./boga test backend"
+gates_slow: "./boga test backend"
+docs_touched: "docs/specs/10-api-authn-authz-guidelines.md"
 ---
 
-# M18-T10-Build_group_catalogue_admin_UI
+# M18-T07-Add_RLS_policies_for_groups_members_admins_mappings_requests
 
 ## Task metadata
 
-- Task ID: M18-T10-Build_group_catalogue_admin_UI
-- Title: Build group catalogue admin UI
-- Status: `planned`
+- Task ID: M18-T07-Add_RLS_policies_for_groups_members_admins_mappings_requests
+- Title: Add RLS policies for groups, members, admins, mappings, requests
+- Status: `outdated` (superseded by M22; never executed)
 - File location rule:
   - author active cards in `docs/tasks/<task-id>.md`
   - move the file to `docs/tasks/complete/<task-id>.md` when `Status` becomes `completed` or `outdated`
@@ -26,29 +26,27 @@ docs_touched: "docs/specs/ui/screen-map.md"
 ## Parent references
 
 - Project directives: `docs/specs/README.md`
-- Milestone spec: `docs/specs/milestones/M18-group-exercise-catalogue-private-mapping.md`
+- Milestone spec: `docs/specs/milestones/archive/M18-group-exercise-catalogue-private-mapping.md`
 - Architecture: `docs/specs/03-technical-architecture.md`
 - Data model: `docs/specs/05-data-model.md`
 - Testing strategy: `docs/specs/06-testing-strategy.md`
 - Project structure: `docs/specs/09-project-structure.md`
-- UX standard: `docs/specs/08-ux-delivery-standard.md`
-- UI docs bundle index: `docs/specs/ui/README.md`
 
 ## Context Freshness
 
 - Verified current branch + HEAD commit: fill during task kickoff.
 - Start-of-session sync with `origin/main` completed?: `N/A` for planned card creation; verify during task kickoff.
 - Parent refs opened in this session:
-  - `docs/specs/milestones/M18-group-exercise-catalogue-private-mapping.md`
+  - `docs/specs/milestones/archive/M18-group-exercise-catalogue-private-mapping.md`
 - Code/docs inventory freshness checks run:
   - Task is planned only; run schema/runtime/UI inventory commands during implementation kickoff as applicable.
 - Known stale references or assumptions: none recorded at card creation.
 - Optional helper command:
-  - `./scripts/task-bootstrap.sh docs/tasks/M18-T10-Build_group_catalogue_admin_UI.md`
+  - `./scripts/task-bootstrap.sh docs/tasks/complete/M18-T07-Add_RLS_policies_for_groups_members_admins_mappings_requests.md`
 
 ## Objective
 
-Build owner/admin UI for viewing and maintaining a group exercise catalogue.
+Enforce backend authorization for all new group-domain tables.
 
 ## Scope
 
@@ -65,22 +63,8 @@ Build owner/admin UI for viewing and maintaining a group exercise catalogue.
 
 ## UI Impact
 
-- UI Impact?: `yes`
-- Keep UX/UI parent references and fill the UX Contract before implementation.
-
-## UX Contract
-
-### Key user flows
-
-1. Flow name: To be defined during task kickoff.
-   - Trigger:
-   - Steps:
-   - Success outcome:
-   - Failure/edge outcome:
-
-### Interaction + appearance notes
-
-- Reuse existing UI tokens/primitives and group-navigation patterns where available.
+- UI Impact?: `no`
+- No direct UI impact planned for this slice; remove UI-only sections if implementation remains non-UI.
 
 ## Acceptance criteria
 
@@ -92,21 +76,13 @@ Build owner/admin UI for viewing and maintaining a group exercise catalogue.
 ## Docs touched
 
 - Planned docs/spec files to update and why:
-  - docs/specs/ui/screen-map.md - add/administer new screen behavior; docs/specs/ui/navigation-contract.md - document new routes/transitions; docs/specs/ui/components-catalog.md - update if reusable components are introduced.
-
-- UI docs update required?: `yes`
-- Tokens/primitives compliance statement:
-  - Reuse plan: Use documented UI primitives/tokens for buttons, forms, lists, panels, and empty/error states.
-  - Exceptions: none planned.
-- UI artifacts/screenshots expectation:
-  - Required by `docs/specs/08-ux-delivery-standard.md` or task scope?: `yes`
-  - Planned captures/artifacts: happy path plus relevant edge/error flow.
+  - docs/specs/10-api-authn-authz-guidelines.md - update normative RLS rules; docs/specs/06-testing-strategy.md - document required auth/RLS negative tests if new lanes or suites are added.
 
 ## Testing and verification approach
 
 - Planned checks/commands:
-  - `./boga test fast`
-  - `./boga test frontend`
+  - `./boga test backend`
+  - `./boga test backend`
 - Test layers covered: targeted unit/integration/contract/E2E coverage as appropriate to this slice.
 - Execution triggers: run required gates before marking task complete.
 - Slow-gate triggers: backend for schema/RLS/projection changes; frontend for UI route/screen changes.
@@ -120,8 +96,8 @@ Build owner/admin UI for viewing and maintaining a group exercise catalogue.
 
 ## Mandatory verify gates
 
-- Standard local fast gate: `./boga test fast`
-- Standard local slow gate: `./boga test frontend`
+- Standard local fast gate: `./boga test backend`
+- Standard local slow gate: `./boga test backend`
 - Additional gate(s), if any: run `./boga test for --diff <range>` before closeout and follow its output.
 
 ## Evidence

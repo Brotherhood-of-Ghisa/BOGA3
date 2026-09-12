@@ -1,22 +1,22 @@
 ---
-task_id: M18-T08-Add_service_layer_for_group_catalogue_and_mappings
+task_id: M18-T14-Add_tests_for_privacy_and_projection_behaviour
 milestone_id: "M18"
-status: planned
+status: outdated
 ui_impact: "no"
-areas: "frontend|backend"
-runtimes: "node|supabase"
+areas: "backend|cross-stack"
+runtimes: "node|supabase|sql"
 gates_fast: "./boga test fast"
 gates_slow: "./boga test backend"
-docs_touched: "docs/specs/03-technical-architecture.md"
+docs_touched: "docs/specs/06-testing-strategy.md"
 ---
 
-# M18-T08-Add_service_layer_for_group_catalogue_and_mappings
+# M18-T14-Add_tests_for_privacy_and_projection_behaviour
 
 ## Task metadata
 
-- Task ID: M18-T08-Add_service_layer_for_group_catalogue_and_mappings
-- Title: Add service layer for group catalogue and mappings
-- Status: `planned`
+- Task ID: M18-T14-Add_tests_for_privacy_and_projection_behaviour
+- Title: Add tests for privacy and projection behaviour
+- Status: `outdated` (superseded by M22; never executed)
 - File location rule:
   - author active cards in `docs/tasks/<task-id>.md`
   - move the file to `docs/tasks/complete/<task-id>.md` when `Status` becomes `completed` or `outdated`
@@ -26,7 +26,7 @@ docs_touched: "docs/specs/03-technical-architecture.md"
 ## Parent references
 
 - Project directives: `docs/specs/README.md`
-- Milestone spec: `docs/specs/milestones/M18-group-exercise-catalogue-private-mapping.md`
+- Milestone spec: `docs/specs/milestones/archive/M18-group-exercise-catalogue-private-mapping.md`
 - Architecture: `docs/specs/03-technical-architecture.md`
 - Data model: `docs/specs/05-data-model.md`
 - Testing strategy: `docs/specs/06-testing-strategy.md`
@@ -37,16 +37,16 @@ docs_touched: "docs/specs/03-technical-architecture.md"
 - Verified current branch + HEAD commit: fill during task kickoff.
 - Start-of-session sync with `origin/main` completed?: `N/A` for planned card creation; verify during task kickoff.
 - Parent refs opened in this session:
-  - `docs/specs/milestones/M18-group-exercise-catalogue-private-mapping.md`
+  - `docs/specs/milestones/archive/M18-group-exercise-catalogue-private-mapping.md`
 - Code/docs inventory freshness checks run:
   - Task is planned only; run schema/runtime/UI inventory commands during implementation kickoff as applicable.
 - Known stale references or assumptions: none recorded at card creation.
 - Optional helper command:
-  - `./scripts/task-bootstrap.sh docs/tasks/M18-T08-Add_service_layer_for_group_catalogue_and_mappings.md`
+  - `./scripts/task-bootstrap.sh docs/tasks/complete/M18-T14-Add_tests_for_privacy_and_projection_behaviour.md`
 
 ## Objective
 
-Add typed mobile service calls for group catalogue lookup and private-to-group mapping management.
+Add automated coverage for group privacy, RLS denials, mapping behavior, and share projection output.
 
 ## Scope
 
@@ -76,7 +76,7 @@ Add typed mobile service calls for group catalogue lookup and private-to-group m
 ## Docs touched
 
 - Planned docs/spec files to update and why:
-  - docs/specs/03-technical-architecture.md - document service boundary if adopted; docs/specs/05-data-model.md - keep service assumptions aligned with schema.
+  - docs/specs/06-testing-strategy.md - document new coverage/suites if introduced; docs/specs/02-quality-and-test-gates.md - update only if lane registry/triggers change.
 
 ## Testing and verification approach
 

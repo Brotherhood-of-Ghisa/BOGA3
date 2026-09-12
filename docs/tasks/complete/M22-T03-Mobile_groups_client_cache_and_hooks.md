@@ -22,7 +22,7 @@ docs_touched: "docs/specs/tech/groups-contract.md, docs/specs/05-data-model.md, 
 
 ## Parent references (required)
 
-- Milestone spec: `docs/specs/milestones/M22-groups-and-foundations.md`
+- Milestone spec: `docs/specs/milestones/archive/M22-groups-and-foundations.md`
 - **Contract:** `docs/specs/tech/groups-contract.md`
   - §4: the wire shapes and error tokens;
   - §6.1: the module layout;
