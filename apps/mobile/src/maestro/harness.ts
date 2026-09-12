@@ -108,6 +108,7 @@ export const resolveMaestroHarnessTeleportHref = ({
   intent,
   sessionId,
   maestroShare,
+  maestroCatalog,
   presentation,
 }: {
   target: MaestroHarnessTeleportTarget | null;
@@ -115,6 +116,7 @@ export const resolveMaestroHarnessTeleportHref = ({
   intent?: string | null;
   sessionId?: string | null;
   maestroShare?: string | null;
+  maestroCatalog?: string | null;
   presentation?: string | null;
 }) => {
   switch (target) {
@@ -140,6 +142,7 @@ export const resolveMaestroHarnessTeleportHref = ({
             intent,
             presentation: presentation === 'completion' ? presentation : null,
             maestroShare: maestroShare === 'fail-once' ? maestroShare : null,
+            maestroCatalog: maestroCatalog === 'fail-once' ? maestroCatalog : null,
           }) as Href)
         : null;
     default:

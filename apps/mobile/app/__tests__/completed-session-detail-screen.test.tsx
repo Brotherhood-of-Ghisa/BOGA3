@@ -201,6 +201,35 @@ describe('CompletedSessionDetailScreenShell', () => {
     expect(screen.queryByText('Append')).toBeNull();
   });
 
+  it('exposes and retries the Maestro-only catalog failure evidence state', async () => {
+    const dataClient: CompletedSessionDetailDataClient = {
+      loadCompletedSession: jest.fn().mockResolvedValue(COMPLETED_SESSION_DETAIL_FIXTURE),
+      loadPersonalRecords: jest.fn().mockResolvedValue([]),
+      appendCompletedSessionExerciseAsPlanned: jest.fn().mockResolvedValue(undefined),
+      setCompletedSessionDeletedState: jest.fn().mockResolvedValue(undefined),
+    };
+
+    render(
+      <CompletedSessionDetailScreenShell
+        dataClient={dataClient}
+        presentation="completion"
+        sessionId="completed-under-test"
+        shouldFailNextMaestroCatalog
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('session-muscle-load-row-status')).toHaveTextContent(
+        'Unavailable · 5 sets (3 working)'
+      );
+    });
+
+    fireEvent.press(screen.getByLabelText('Retry session muscle load'));
+    expect(screen.getByTestId('session-muscle-load-row-status')).toHaveTextContent(
+      '1 muscle · 5 sets (3 working)'
+    );
+  });
+
   it('pages multiple PRs deterministically and shares each selected record independently', async () => {
     const personalRecords = [
       {

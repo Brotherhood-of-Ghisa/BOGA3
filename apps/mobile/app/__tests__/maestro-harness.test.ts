@@ -159,9 +159,10 @@ describe('maestro harness helpers', () => {
         sessionId: 'session-123',
         presentation: 'completion',
         maestroShare: 'fail-once',
+        maestroCatalog: 'fail-once',
       })
     ).toBe(
-      '/completed-session/session-123?presentation=completion&maestroShare=fail-once'
+      '/completed-session/session-123?presentation=completion&maestroShare=fail-once&maestroCatalog=fail-once'
     );
 
     expect(

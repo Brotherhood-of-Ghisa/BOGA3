@@ -82,6 +82,7 @@ export type CompletedSessionDetailScreenShellProps = {
   initialMode?: 'view' | 'edit';
   presentation?: 'detail' | 'completion';
   shouldFailNextMaestroShare?: boolean;
+  shouldFailNextMaestroCatalog?: boolean;
   sharePersonalRecordAction?: typeof sharePersonalRecord;
 };
 
@@ -267,6 +268,7 @@ export function CompletedSessionDetailScreenShell({
   initialMode = 'view',
   presentation = 'detail',
   shouldFailNextMaestroShare = false,
+  shouldFailNextMaestroCatalog = false,
   sharePersonalRecordAction = sharePersonalRecord,
 }: CompletedSessionDetailScreenShellProps) {
   const router = useRouter();
@@ -280,8 +282,15 @@ export function CompletedSessionDetailScreenShell({
     Record<string, string | null>
   >({});
   const hasFailedMaestroShareRef = useRef(false);
+  const [isMaestroCatalogFailureActive, setIsMaestroCatalogFailureActive] = useState(
+    shouldFailNextMaestroCatalog
+  );
   const [collapsedExerciseIds, setCollapsedExerciseIds] = useState<Set<string>>(() => new Set());
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
+
+  useEffect(() => {
+    setIsMaestroCatalogFailureActive(shouldFailNextMaestroCatalog);
+  }, [shouldFailNextMaestroCatalog]);
 
   const toggleExerciseCollapsed = useCallback((exerciseId: string) => {
     setCollapsedExerciseIds((current) => {
@@ -596,7 +605,7 @@ export function CompletedSessionDetailScreenShell({
           exerciseCount={performedExercises.length}
           gymName={session.gymName}
           muscleCatalogState={
-            exerciseCatalog.status === 'error'
+            isMaestroCatalogFailureActive || exerciseCatalog.status === 'error'
               ? 'error'
               : exerciseCatalog.status === 'ready'
                 ? 'ready'
@@ -613,6 +622,10 @@ export function CompletedSessionDetailScreenShell({
             setSelectedPersonalRecordIndex((current) => Math.max(0, current - 1))
           }
           onRetryMuscleCatalog={() => {
+            if (isMaestroCatalogFailureActive) {
+              setIsMaestroCatalogFailureActive(false);
+              return;
+            }
             void ensureExerciseCatalogLoaded();
           }}
           onSharePersonalRecord={handleSharePersonalRecord}
@@ -891,12 +904,15 @@ export default function CompletedSessionDetailRoute() {
     intent?: string | string[];
     presentation?: string | string[];
     maestroShare?: string | string[];
+    maestroCatalog?: string | string[];
   }>();
   const sessionId = coerceRouteParam(params.sessionId);
   const intent = coerceRouteParam(params.intent);
   const presentation = resolveCompletedSessionPresentation(params.presentation);
   const shouldFailNextMaestroShare =
     isDevMode() && coerceRouteParam(params.maestroShare) === 'fail-once';
+  const shouldFailNextMaestroCatalog =
+    isDevMode() && coerceRouteParam(params.maestroCatalog) === 'fail-once';
   const initialMode = 'view';
 
   useEffect(() => {
@@ -920,6 +936,7 @@ export default function CompletedSessionDetailRoute() {
       initialMode={initialMode}
       presentation={presentation}
       sessionId={sessionId}
+      shouldFailNextMaestroCatalog={shouldFailNextMaestroCatalog}
       shouldFailNextMaestroShare={shouldFailNextMaestroShare}
     />
   );

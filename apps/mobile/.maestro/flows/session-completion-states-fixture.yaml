@@ -21,7 +21,7 @@ appId: com.dinoderek.mobile
     id: "session-completion-pr-pager"
 - takeScreenshot: "session-completion-one-pr"
 
-- openLink: "boga3://maestro-harness?fixture=exercise-block-history&teleport=completed-session&sessionId=maestro_m24_completion_no_pr&presentation=completion"
+- openLink: "boga3://maestro-harness?fixture=exercise-block-history&teleport=completed-session&sessionId=maestro_m24_completion_no_pr&presentation=completion&maestroCatalog=fail-once"
 - tapOn:
     text: "Open"
     optional: true
@@ -33,6 +33,20 @@ appId: com.dinoderek.mobile
 - assertNotVisible: "Personal records"
 - assertVisible:
     id: "session-muscle-load-row"
+- assertVisible: "Unavailable · 1 set (1 working)"
+- takeScreenshot: "session-completion-catalog-error"
+- tapOn:
+    id: "session-muscle-load-row"
+- extendedWaitUntil:
+    visible: "Muscle load unavailable"
+    timeout: 10000
+- assertVisible: ".*Workout logging, autosave, and submission are unaffected.*"
+- takeScreenshot: "session-completion-catalog-error-detail"
+- tapOn: "Close session muscle load"
+- tapOn: "Retry session muscle load"
+- extendedWaitUntil:
+    visible: "4 muscles · 1 set (1 working)"
+    timeout: 10000
 - takeScreenshot: "session-completion-no-pr"
 - scrollUntilVisible:
     element:
