@@ -35,6 +35,7 @@ export default function MaestroHarnessScreen() {
     intent?: string | string[];
     sessionId?: string | string[];
     maestroShare?: string | string[];
+    presentation?: string | string[];
   }>();
   const [status, setStatus] = useState<HarnessStatus>({
     kind: 'running',
@@ -65,6 +66,7 @@ export default function MaestroHarnessScreen() {
   const intentParam = coerceMaestroHarnessQueryParam(params.intent);
   const sessionIdParam = coerceMaestroHarnessQueryParam(params.sessionId);
   const maestroShareParam = coerceMaestroHarnessQueryParam(params.maestroShare);
+  const presentationParam = coerceMaestroHarnessQueryParam(params.presentation);
 
   useEffect(() => {
     let cancelled = false;
@@ -83,6 +85,7 @@ export default function MaestroHarnessScreen() {
       intentParam,
       sessionIdParam,
       maestroShareParam,
+      presentationParam,
     ]);
     if (lastRunKeyRef.current === runKey) {
       return;
@@ -110,6 +113,7 @@ export default function MaestroHarnessScreen() {
       intent: intentParam,
       sessionId: sessionIdParam,
       maestroShare: maestroShareParam,
+      presentation: presentationParam,
     });
 
     void (async () => {
@@ -159,7 +163,7 @@ export default function MaestroHarnessScreen() {
     return () => {
       cancelled = true;
     };
-  }, [resetParam, fixtureParam, bootstrapParam, gateParam, teleportParam, modeParam, intentParam, sessionIdParam, maestroShareParam, router]);
+  }, [resetParam, fixtureParam, bootstrapParam, gateParam, teleportParam, modeParam, intentParam, sessionIdParam, maestroShareParam, presentationParam, router]);
 
   return (
     <View style={styles.screen} testID="maestro-harness-screen">

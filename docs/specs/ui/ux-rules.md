@@ -205,12 +205,27 @@ Document app-specific UI semantics and guardrails for the current mobile app.
 4. Completed-session exercise cards show assigned tags as chips under the exercise title only when one or more tags exist; no tag placeholder is shown when there are none.
 5. Completed-session set tables show historical set effort from `set_type` as `W-Up`, `RIR 0`, `RIR 1`, `RIR 2`, or `-` for unspecified sets.
 6. Completed-session exercise cards start expanded and use the same title-region collapse affordance. Their collapsed summary shows valid performed-set and working-set counts (`RIR 0`/`RIR 1`/`RIR 2`); the header-level `Append` action remains available. Historical cards do not label a workout as a new PR because this viewer does not compute an as-of-session history comparison.
+7. `presentation=completion` is a post-submit presentation of the stored
+   completed session, not durable celebration state and not a historical-detail
+   variant. Its order is compact `Session complete` context, `Personal records`
+   only when present, one PR at a time in exercise order with stable `N of M`
+   paging, `Session muscle load`, the seven-day muscle action, then Done.
+8. Completion reuses the same PR and muscle calculations and the same sharing
+   boundary as the live recorder. Share cancellation is silent; launch failure
+   remains inline and retryable for the selected PR.
+9. Completion hides edit/delete/append. Done and safe back replace to Stats /
+   History, while the analysis action replaces to seven-day By Muscle. A
+   missing, deleted, or failed target exposes one safe return and never opens a
+   recorder copy.
 
 ### 8. Navigation/query semantics (UI-facing rule)
 
 1. Route mode/state changes that affect screen behavior (for example `session-recorder` completed-edit mode) must be documented in `docs/specs/ui/navigation-contract.md`.
 2. Route alias behavior (`/` -> `stats-history`) should be treated as a navigation entry alias, not a unique screen design.
 3. `exercise-catalog` supports recorder-entry query semantics (`source=session-recorder`, `intent=manage`) for the manage flow, while recorder `Add new` uses the same exercise editor inside the recorder route.
+4. Stats / History accepts validated initial `period=7|30` and
+   `breakdown=exercise|muscle` values. Absent or invalid values retain the
+   seven-day / By Exercise defaults; in-screen changes remain volatile state.
 
 ### 9. UI guardrail enforcement (current enforced rule)
 

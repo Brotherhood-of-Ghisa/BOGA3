@@ -51,10 +51,16 @@ Brief entrypoint map of the current mobile screens.
 - File: `apps/mobile/app/(tabs)/stats-history.tsx`
 - Purpose:
   - merged Stats / History tab whose Stats surface switches between per-exercise and per-muscle summaries while preserving the top-level Sessions drill-down and in-route history overlays
+- Query params:
+  - `period` (optional; `7` or `30`; absent/invalid values default to `7`)
+  - `breakdown` (optional; `exercise` or `muscle`; absent/invalid values default to `exercise`)
 - Key states (high level):
   - Stats summary loading/error/content states with separate labelled control
     rows: `Time range` keeps the 7-/30-day pills, and `Breakdown` keeps both
     joined `By Exercise` / `By Muscle` choices visible with one selected
+  - valid query values set the initial controls, including the completion
+    handoff at `?period=7&breakdown=muscle`; later control changes remain
+    in-route state and do not rewrite the query string
   - top summary cards show `Sessions` and `Sets (W/Sets)` as absolute counts; their previous-period deltas never include percentages
   - per-exercise history is a viewport-fitting table with compact, single-line
     `Exercise`, `Sets`, `Vol`, and `1RM` headers; rows show aligned values, keep
@@ -101,7 +107,11 @@ Brief entrypoint map of the current mobile screens.
   - foreground GPS gym assistance is hidden on the recorder surface: brand-new active-session start may preselect one confident saved-gym match, null state displays as `No gym`, and long-pressing the gym box explicitly retries detection without a persistent suggestion panel
 - Key exits:
   - `exercise-catalog` (`source=session-recorder&intent=manage` from exercise picker)
-  - dismisses to `/` on submit/save success
+  - active submit replaces to
+    `/completed-session/<sessionId>?presentation=completion` only after local
+    persistence and completion succeed
+  - completed-edit save replaces directly to `/stats-history` and does not
+    replay completion
 
 5. `/exercise-catalog`
 - File: `apps/mobile/app/(tabs)/exercise-catalog.tsx`
@@ -207,6 +217,13 @@ Brief entrypoint map of the current mobile screens.
   - completed session detail viewer with edit/delete session actions and per-exercise block append actions
 - Key states (high level):
   - loading / error / not-found / detail
+  - `presentation=completion` changes only the presentation: compact completion
+    context; an omitted, single, or one-at-a-time paged `Personal records`
+    section; shared session muscle load; seven-day muscle-analysis handoff; and
+    Done. Edit/delete/append actions are hidden in this mode
+  - completion loading/error/not-found/deleted-target states expose one safe
+    Stats / History exit; the native back affordance/gesture is suppressed and
+    Android system back replaces to Stats / History
   - read-only exercise cards include a set table with `Set`, `Weight`, `Reps`, and `Effort`
   - exercise-card titles toggle an expanded/collapsed state; collapsed cards show valid performed-set and working-set counts while keeping `Append` available
   - each exercise card header exposes `Append` to copy that one historical block as planned target rows into the active recorder
@@ -214,6 +231,8 @@ Brief entrypoint map of the current mobile screens.
 - Key exits:
   - `session-recorder` (edit)
   - `session-recorder` after successful per-exercise block append
+  - `/stats-history` from completion Done/back
+  - `/stats-history?period=7&breakdown=muscle` from the completion analysis action
 
 11. `/exercise-history`
 - File: `apps/mobile/app/exercise-history.tsx`

@@ -108,12 +108,14 @@ export const resolveMaestroHarnessTeleportHref = ({
   intent,
   sessionId,
   maestroShare,
+  presentation,
 }: {
   target: MaestroHarnessTeleportTarget | null;
   mode?: string | null;
   intent?: string | null;
   sessionId?: string | null;
   maestroShare?: string | null;
+  presentation?: string | null;
 }) => {
   switch (target) {
     case 'session-list':
@@ -133,7 +135,13 @@ export const resolveMaestroHarnessTeleportHref = ({
         source: 'maestro-harness',
       });
     case 'completed-session':
-      return sessionId ? (withQuery(`/completed-session/${sessionId}`, { intent }) as Href) : null;
+      return sessionId
+        ? (withQuery(`/completed-session/${sessionId}`, {
+            intent,
+            presentation: presentation === 'completion' ? presentation : null,
+            maestroShare: maestroShare === 'fail-once' ? maestroShare : null,
+          }) as Href)
+        : null;
     default:
       return null;
   }

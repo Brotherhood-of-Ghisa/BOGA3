@@ -3706,7 +3706,11 @@ export default function SessionRecorderScreen({
       persistedSessionIdRef.current = null;
       hasSessionMutationRef.current = false;
       setHasActiveSession(false);
-      router.replace('/stats-history');
+      router.replace(
+        `/completed-session/${persisted.sessionId}?presentation=completion${
+          shouldFailNextMaestroShare ? '&maestroShare=fail-once' : ''
+        }`
+      );
     })().catch(() => {
       // Keep recorder screen state available for retry if persistence/complete/navigation fails.
     });

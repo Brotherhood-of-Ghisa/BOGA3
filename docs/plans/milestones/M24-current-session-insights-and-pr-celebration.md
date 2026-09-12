@@ -295,7 +295,7 @@ the relevant sync contract in the same change.
    exercise PR treatment and add platform text sharing. (`completed`)
 4. `docs/plans/tasks/M24-T04-Completion_summary_and_analytics_handoff.md` - add the
    completion presentation, multiple-PR handling, and seven-day muscle deep
-   link. (`planned`)
+   link. (`completed`)
 5. `docs/plans/tasks/M24-T05-Milestone_closeout.md` - run merged-flow QA, capture
    evidence, reconcile canonical docs, and archive M24. (`planned`)
 

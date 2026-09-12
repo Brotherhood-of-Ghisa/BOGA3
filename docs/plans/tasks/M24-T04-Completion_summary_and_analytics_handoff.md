@@ -1,7 +1,7 @@
 ---
 task_id: M24-T04-Completion_summary_and_analytics_handoff
 milestone_id: "M24"
-status: planned
+status: complete
 ui_impact: "yes"
 areas: "frontend"
 runtimes: "node|expo|maestro"
@@ -15,7 +15,7 @@ docs_touched: "docs/specs/ui/screen-map.md, docs/specs/ui/navigation-contract.md
 ## Task metadata
 
 - Task ID: `M24-T04-Completion_summary_and_analytics_handoff`
-- Status: `planned`
+- Status: `complete`
 - Depends on: `M24-T02`, `M24-T03`
 
 ## Parent references
@@ -141,8 +141,34 @@ share media, changes to heatmaps, and replay after completed-session editing.
 
 ## Evidence
 
+- `./boga test fast` — green: 124 suites, 1,255 tests, one snapshot, backend
+  fast smoke, docs/meta, agent-auth web, and MCP unit lanes.
+- `./boga test frontend` — green under `TASK_ID=M24-T04-frontend-final-2`:
+  iOS smoke, data-smoke, auth-profile, sync round-trip, and groups two-user
+  flows; artifacts in
+  `apps/mobile/artifacts/maestro/M24-T04-frontend-final-2/`.
+- Large-phone golden completion path — green:
+  `apps/mobile/artifacts/maestro/M24-T04-golden-green/20260912-185720-79924/`.
+- Small-phone golden completion path — green on iPhone SE (3rd generation):
+  `apps/mobile/artifacts/maestro/M24-T04-golden-small/20260912-190252-82772/`.
+- Large-phone zero/one/many, unmapped, and safe-exit states — green:
+  `apps/mobile/artifacts/maestro/M24-T04-states-rerun/20260912-184724-75556/`.
+- Small-phone completion-state flow — green:
+  `apps/mobile/artifacts/maestro/M24-T04-states-small/20260912-190048-81607/`.
+- Focused completed-session RNTL suite — green: 24 tests covering completion
+  hierarchy, multiple-PR paging/share recovery, Done, Android back, catalog
+  error retry, deleted/error safe exits, and unchanged detail behavior.
+
 ## Completion note
 
-- What changed:
-- What tests ran:
-- What remains:
+- What changed: active-session submit now opens a validated completion
+  presentation on the existing completed-session route. It reuses the T01
+  calculation boundary and T02/T03 insight components for zero/one/many PRs,
+  per-record sharing, current-session muscle load, safe Done/back behavior, and
+  a validated seven-day By Muscle Stats handoff. Normal detail and completed-edit
+  navigation remain unchanged. Existing submit-based Maestro lanes were updated
+  to traverse the required completion step, and cold-start data smoke now retries
+  the full deep-link handshake.
+- What tests ran: `./boga test fast`; `./boga test frontend`; focused completed
+  detail RNTL; large and small M24 state flows; large and small M24 golden flows.
+- What remains: nothing for T04.
