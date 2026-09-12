@@ -70,10 +70,11 @@ PATH="/opt/homebrew/opt/openjdk/bin:$HOME/.maestro/bin:$PATH" JAVA_HOME="/opt/ho
 
 ## Worktree setup and isolation
 
-Worktree setup, the environment sequence, and teardown are in
-`docs/specs/01-worktree-and-environment.md` (always-load quickref). The full
-isolation contract — slot/port model, every script, and the cleanup completion
-signals — is in `docs/specs/12-worktree-config-and-isolation.md`.
+The worktree lifecycle — open (`./boga worktree create` / `start`), PR opened
+(`./boga db down`, `./boga pr wait`), and merged (`./boga worktree release`) — is
+in `docs/specs/01-worktree-and-environment.md`. The slot-lease and isolation
+contract is `docs/specs/12-worktree-config-and-isolation.md`; clearing leftovers
+from dead sessions is `docs/procedures/worktree-cleanup.md`.
 
 Operator rules:
 
@@ -530,8 +531,9 @@ Stop runtime:
 ./supabase/scripts/local-runtime-down.sh
 ```
 
-Worktree teardown — stopping, sweeping orphans, and cleaning a completed slot
-(`worktree-sweep` / `worktree-clean`): `docs/specs/01-worktree-and-environment.md`.
+Worktree teardown once its PR merges (`./boga worktree release`):
+`docs/specs/01-worktree-and-environment.md`. Leftovers from dead sessions:
+`docs/procedures/worktree-cleanup.md`.
 
 Reset DB (migrations + seed):
 

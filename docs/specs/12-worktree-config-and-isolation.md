@@ -1,74 +1,57 @@
 # Worktree Config and Isolation
 
-> **Owns:** the worktree slot model, port derivation, and isolation deep contract. **Not here:** everyday setup/teardown → `01`. **Load when:** worktree internals, slot collisions, or cross-worktree bugs.
+> **Owns:** the slot-lease model, port derivation, isolation contract, and the agent-owned worktree lifecycle. **Not here:** the everyday command sequence → `01`; leftover/orphan cleanup → [`docs/procedures/worktree-cleanup.md`](../procedures/worktree-cleanup.md). **Load when:** worktree internals, slot/lease errors, cross-worktree bugs, or changing lifecycle commands.
 
 ## Purpose
 
-Define the BOGA contract for running multiple local agents or humans on the same machine using `git worktree`, with isolated tests, Supabase infrastructure, Expo/Metro runtime, iOS simulator targets, and dependency/build state.
-
-This document is authoritative for local worktree runtime isolation. Operational commands live in `RUNBOOK.md`.
+Define how several agents (and humans) run on one machine via `git worktree`, each
+with its own local Supabase stack, ports, Expo/Metro port, iOS simulator, and
+dependency install — and who creates and destroys each of those, and when.
 
 ## Status
 
-- Date: `2026-04-25`
-- Status: implemented baseline
+- Date: `2026-09-12`
+- Status: agent-owned lifecycle. Replaces the automatic sweep, the post-checkout
+  hook, and implicit setup (see [Removed mechanisms](#removed-mechanisms-do-not-reintroduce)).
 
-This is the deep contract. The everyday ordered setup/teardown sequence lives in
-the always-load quickref `01-worktree-and-environment.md`; the per-script reference
-is the *Scripts (setup + teardown)* section below.
+## Design principles
 
-## Non-negotiable placement contract
+1. **Explicit.** A worktree gets a slot only from `./boga worktree start`. Nothing
+   allocates, repairs, or frees a slot implicitly.
+2. **Fail hard.** Every command that uses per-slot resources refuses to run
+   without a valid lease. It never sets one up on the fly.
+3. **Owner-only teardown.** Only the agent that owns a worktree releases it. No
+   script inspects another worktree and decides it is finished.
+4. **GitHub is the only "done" signal.** `release` asks `gh` for the PR state.
+   Git ancestry and remote-branch existence are never used — squash merges make
+   them wrong in both directions.
+5. **Leftovers are a human-confirmed procedure, not a background reaper.**
 
-BOGA worktrees must not be nested inside another BOGA checkout.
+## Placement contract
 
-Supported default layout:
+BOGA worktrees must not be nested inside another BOGA checkout. Nested checkouts
+let Node, Metro, Jest, TypeScript, and watchers walk into a parent's
+`node_modules`/`tsconfig` or into sibling worktrees; the failures present as
+cross-worktree flakiness, not path errors.
 
-```text
-~/Projects/boga/boga1                 # main checkout
-~/Projects/boga-worktrees/<name>      # linked worktrees
-```
+- `./boga worktree create` places new worktrees under `$BOGA_WORKTREE_ROOT`
+  (default `~/Projects/boga-worktrees`).
+- `./boga worktree start`, `./boga worktree doctor`, and every runtime entrypoint
+  (Supabase helpers, Maestro helpers, `./boga test`) refuse a nested layout.
+- Exempt by design: agent-harness worktrees at `<checkout>/.claude/worktrees/<name>/`
+  (gitignored, no root `node_modules` to walk into). They still need a slot lease.
+- One-off diagnostics only: `BOGA_ALLOW_NESTED_WORKTREE=1`.
 
-Unsupported layout:
-
-```text
-~/Projects/boga/boga1/worktrees/<name>
-~/Projects/boga/boga1/.worktrees/<name>
-~/Projects/boga/boga1/apps/<name>
-~/Projects/boga/boga1/docs/<name>
-```
-
-Reason:
-
-- nested checkouts let tools walk from a child worktree into a parent checkout;
-- Node, Metro, Jest, Vitest, TypeScript, and watcher tools can accidentally see parent `node_modules`, parent `tsconfig` files, or sibling child worktrees;
-- these failures are subtle and usually present as cross-worktree test flakiness or stale builds rather than obvious path errors.
-
-Enforcement:
-
-- `scripts/worktree-create.sh` always creates worktrees under `$BOGA_WORKTREE_ROOT` or `~/Projects/boga-worktrees`;
-- `scripts/worktree-setup.sh` refuses nested BOGA checkouts by default;
-- `scripts/worktree-doctor.sh` reports nested layout and exits non-zero;
-- runtime entrypoints such as Supabase helpers, Maestro helpers, and repo quality wrappers source the shared guard and refuse unsafe nested layouts.
-
-This is harness-independent. Codex App, Codex CLI, Claude Code CLI, and other agent tools may create worktrees differently, but BOGA setup/runtime commands still enforce the same rule before services or tests start.
-
-Temporary override for one-off diagnostics:
-
-```bash
-BOGA_ALLOW_NESTED_WORKTREE=1 ./scripts/worktree-doctor.sh
-```
-
-Do not use that override for normal development, test execution, or agent work.
+Never work around nested placement with watcher, Jest, Metro, or TypeScript
+excludes — the layout is the bug.
 
 ## Configuration tiers
 
 | Tier | Location | Lifecycle | Contents |
 | --- | --- | --- | --- |
-| Machine-global | `~/.config/boga/` | Seeded once per machine by `scripts/boga-config-init.sh` (invoked by setup) | Hosted Supabase credentials, optional Supabase CLI version override, shared Edge Function identity defaults |
-| Per-worktree | Gitignored files inside each worktree | Generated by setup | `.worktree-slot`, `supabase/config.toml`, `apps/mobile/.env.local`, `apps/mobile/.maestro/maestro.env.local` |
-| Checked-in | Tracked in git | Committed | `supabase/config.toml.template`, example env files, setup scripts, hook source |
-
-Machine-global shape:
+| Machine-global | `~/.config/boga/` | Seeded once per machine by `scripts/boga-config-init.sh` (run by `start`) | Hosted Supabase credentials, optional Supabase CLI version override, shared Edge Function identity defaults, slot registry |
+| Per-worktree | Gitignored files inside each worktree | Written by `./boga worktree start` | `.worktree-slot`, `supabase/config.toml`, `apps/mobile/.env.local`, `apps/mobile/.maestro/maestro.env.local` |
+| Checked-in | Tracked in git | Committed | `supabase/config.toml.template`, example env files, lifecycle scripts |
 
 ```text
 ~/.config/boga/
@@ -79,13 +62,9 @@ Machine-global shape:
     env.shared
   worktrees/
     slots/
-      <slot>                 # slot, project_id, path, common_git_dir, updated_at
-    slot-allocation.lock/
-    runtime-locks/
-      <slot>.lock/           # cleanup safety lock
+      <slot>                 # the lease: slot, project_id, path, common_git_dir, updated_at
+    slot-allocation.lock/    # held only while `start` picks a slot
 ```
-
-Current local env mapping:
 
 | Worktree path | Backing target | Notes |
 | --- | --- | --- |
@@ -93,28 +72,46 @@ Current local env mapping:
 | `supabase/.env.local` | `~/.config/boga/supabase/cli.env` | Optional `SUPABASE_CLI_VERSION` override; the repo pin is `BOGA_SUPABASE_CLI_DEFAULT_VERSION` in `scripts/worktree-lib.sh` and versions below `BOGA_SUPABASE_CLI_MIN_VERSION` are rejected (see `RUNBOOK.md`) |
 | `supabase/functions/.env.local` | `~/.config/boga/edge-functions/env.shared` | Shared local Edge Function identity defaults |
 | `apps/mobile/.env.local` | Worktree-local generated file | The mobile app's Supabase config (`EXPO_PUBLIC_SUPABASE_*`), synced from `supabase status -o env` by local runtime startup. The Maestro runner pins it per lane and restores it after each run — see `docs/specs/11-maestro-runtime-and-testing-conventions.md`. |
-| `apps/mobile/.maestro/maestro.env.local` | Worktree-local generated file | Owns Expo port, simulator identity, and slot-scoped dev-client build cache |
+| `apps/mobile/.maestro/maestro.env.local` | Worktree-local generated file | Expo port and slot-named simulator |
 
-## Slot model
+## Slot lease model
 
-Each initialized worktree receives a stable slot stored in:
+A **slot** is an integer that selects a block of host ports. Slot `0` belongs to
+the main checkout (the non-linked worktree) and uses project id `BOGA`; linked
+worktrees get `1..99`. Slot `100` is reserved for the dedicated dev stack.
+
+A **lease** is two files that must agree:
+
+- `<worktree>/.worktree-slot` contains `N`;
+- `~/.config/boga/worktrees/slots/N` exists and its `path=` is this worktree's
+  absolute path.
 
 ```text
-<worktree-root>/.worktree-slot
+slot=7
+project_id=BOGA-m22-t02-wt7
+path=/Users/<you>/Projects/boga-worktrees/m22-t02
+common_git_dir=/Users/<you>/Projects/BOGA3/.git
+updated_at=2026-09-12T10:00:00Z
 ```
 
-Slot allocation is serialized by a machine-level lock under `~/.config/boga/worktrees/slot-allocation.lock`.
+Rules:
 
-Supported range:
+1. Only `./boga worktree start` creates a lease. It takes the lowest `N` whose
+   registry file does not exist, under `slot-allocation.lock`.
+2. Only `./boga worktree release` deletes a lease. Nothing else deletes, rewrites,
+   or "repairs" another worktree's registry file.
+3. Every lease-requiring command calls `boga_require_slot_lease`
+   (`scripts/worktree-lib.sh`) first and exits non-zero when the lease is missing
+   or names another path, printing the fix (`./boga worktree start`, or the
+   cleanup procedure for a conflict).
 
-```text
-0..99
-```
-
-Slot `0` preserves the original local Supabase port block for the main checkout and uses project id `BOGA`.
-Higher slots offset local ports and use readable project ids derived from the worktree directory name.
-Slot `100` is **reserved** (outside the allocatable range) for the main checkout's
-dedicated dev stack — see [Dedicated dev stack (BOGA-dev)](#dedicated-dev-stack-boga-dev).
+Lease-requiring commands: `./boga test` (every gate and lane, `fast` included),
+`./boga db *`, `./boga ios *`, `./boga env *`, every `supabase/scripts/*` helper
+(via `_common.sh`), every Maestro script (via `maestro-env.sh`), and
+`scripts/dev/dev-lan.sh` / `dev-remote.sh`. Exempt (read-only or
+lifecycle): `./boga test --list`, `./boga test for`, `./boga pr *`,
+`./boga docs *`, `./boga timings`, `./boga doctor`, `./boga worktree *`. CI calls
+the lane scripts directly, never through `./boga`, so it needs no lease.
 
 Port formulas:
 
@@ -130,16 +127,15 @@ INSPECTOR_PORT = 8183  + (slot * 10)
 EXPO_DEV_PORT  = 8082  + slot
 ```
 
-Project id:
+Project id (Docker label `com.supabase.cli.project`, container and volume names):
 
 ```text
 slot 0: BOGA
 slot N: BOGA-<worktree-directory-name>-wt<N>
 ```
 
-The worktree directory name is sanitized to letters, numbers, and hyphens before use.
-The slot suffix keeps Docker labels, containers, and volumes unique even when two
-worktree roots share a similar human-readable name.
+The directory name is sanitized to letters, numbers, and hyphens. The slot suffix
+keeps labels unique even when two worktree directories share a name.
 
 Isolation outcomes:
 
@@ -150,31 +146,20 @@ Isolation outcomes:
 | Supabase data | Separate Docker volumes per `project_id` |
 | Edge Function serve state | Worktree-local `supabase/.temp` plus slot-derived API/inspector ports |
 | Metro/Expo | `EXPO_DEV_SERVER_PORT` in worktree-local Maestro env |
-| iOS simulator | Dedicated `IOS_SIM_UDID` or slot-named simulator from worktree-local Maestro env |
-| Mobile dependencies | Worktree-local `apps/mobile/node_modules`; symlinked `node_modules` is refused by runtime guards |
-| iOS dev-client build cache | Intentionally **shared** (not isolated): a single host-local cache at `~/.cache/boga/maestro/ios-dev-client`, reused across all worktrees; rebuild with `--force` after a native change |
+| iOS simulator | Slot-named simulator (`BOGA wt<slot>`) or a dedicated `IOS_SIM_UDID` from worktree-local Maestro env |
+| Mobile dependencies | Worktree-local `apps/mobile/node_modules`; a symlinked `node_modules` is refused by runtime guards |
+| iOS dev-client build cache | Intentionally **shared**: one host-local cache at `~/.cache/boga/maestro/ios-dev-client`; rebuild with `--force` after a native change |
 
 ## Supabase config generation
 
-The Supabase CLI requires concrete integer ports in `config.toml`, so the checked-in file is a template:
-
-```text
-supabase/config.toml.template
-```
-
-Generated local file:
-
-```text
-supabase/config.toml
-```
-
-Rules:
+The Supabase CLI needs concrete ports, so the checked-in file is
+`supabase/config.toml.template` and the generated file is `supabase/config.toml`.
 
 1. `supabase/config.toml` is gitignored.
-2. `scripts/worktree-setup.sh` writes it from the template and the current slot.
-3. `supabase/scripts/_common.sh` regenerates it when missing or older than the template.
-4. If a linked worktree has no slot, `_common.sh` runs setup before starting Supabase.
-5. Nested worktree layout is checked before generation or Supabase startup.
+2. Only `./boga worktree start` writes it (re-running `start` regenerates it).
+3. `supabase/scripts/_common.sh` refuses to run when it is missing or older than
+   the template, and tells you to re-run `./boga worktree start`.
+4. Placement is checked before generation or Supabase startup.
 
 ## Dedicated dev stack (BOGA-dev)
 
@@ -192,256 +177,184 @@ local Supabase for that session:
 | Lifecycle | `boga db dev` (baseline: up + migrate + seed dev users, no reset), `boga db dev-up\|dev-down\|dev-reset` | `boga db up\|down\|reset\|baseline` |
 | Used by | `dev-lan.sh` / `dev-remote.sh` (they `export BOGA_MOBILE_DEV_DB=1`) | the gates and `boga test *` |
 
-Slot 100 is **reserved** — outside the allocatable `0..99` range, so its ports
-never collide with a real worktree and stay under 65535. The Supabase helpers in
-`supabase/scripts/_common.sh` follow `BOGA_SUPABASE_WORKDIR`: setting it (via
-`engage_dev_stack` in `dev-stack-lib.sh`) re-points `run_supabase`,
-`load_supabase_status_env`, and auth provisioning at the dev stack, so the dev
-scripts reuse the slot-0 machinery without a parallel copy. Dev scripts refuse to
-run unless the active `project_id` is `BOGA-dev` (`dev_stack_assert_engaged`),
-and the gates never set the var — so neither side can target the other's stack.
+Slot 100 is outside the leasable `0..99` range, so its ports never collide with a
+worktree. The Supabase helpers in `supabase/scripts/_common.sh` follow
+`BOGA_SUPABASE_WORKDIR`: setting it (via `engage_dev_stack` in
+`dev-stack-lib.sh`) re-points `run_supabase`, `load_supabase_status_env`, and auth
+provisioning at the dev stack. Dev scripts refuse to run unless the active
+`project_id` is `BOGA-dev` (`dev_stack_assert_engaged`), and the gates never set
+the var — so neither side can target the other's stack.
 
-**Sweep exemption (mandatory):** `BOGA-dev` is deliberately not backed by a
-`git worktree`, so `worktree-sweep.sh` would classify it as an orphan and evict
-it before the next `local-runtime-up.sh`. The sweep special-cases the dev
-project id to **KEEP** (regression test:
-`scripts/tests/worktree-sweep-dev-exemption.test.sh`). Rebuild the dev stack
-explicitly with `boga db dev-reset` (drops all dev data) when wanted.
+The dev stack has no lease. `./boga worktree ls` lists it as the dev stack, and
+nothing removes it except `boga db dev-reset`. The dev scripts still require the
+main checkout's slot-0 lease, like every other runtime command. This is
+main-checkout-only; linked worktrees use their own slot stack for everything.
 
-This is main-checkout-only; linked worktrees are short-lived and already
-slot-isolated, so they keep using their own slot stack for everything.
+## Worktree lifecycle (agent-owned)
 
-## Hook behavior
+The owner is the agent (or human) working in the worktree. Each step is one
+command, run by the owner, at a defined moment.
 
-The checked-in hook source is:
+### 1. Open
 
-```text
-hooks/post-checkout
-```
+- New worktree: `./boga worktree create <branch> [--name <dir>] [--from <ref>]`.
+  It runs `git fetch origin main`, adds the worktree under the worktree root on a
+  new branch from `origin/main` (or from `--from <ref>`, the explicit override),
+  then runs `start` inside it.
+- A worktree your harness already made (Claude desktop, Codex,
+  `.claude/worktrees/`): run `./boga worktree start` inside it.
 
-`scripts/worktree-setup.sh` installs a symlink into the shared git hooks directory. Git runs `post-checkout` during `git worktree add` when the previous HEAD is the null ref. The hook then runs:
+`./boga worktree start [--base <ref>]`:
 
-```bash
-./scripts/worktree-setup.sh
-```
+1. Checks placement.
+2. **No `.worktree-slot` yet (a new lease):** runs `git fetch origin main` and
+   fails unless `HEAD` contains `origin/main`
+   (`git merge-base --is-ancestor origin/main HEAD`), printing
+   `git rebase origin/main` as the fix. `--base <ref>` checks against `<ref>`
+   instead — use it only when told to branch from something else. Then takes the
+   lowest free slot.
+3. **`.worktree-slot` already present (re-running):** keeps that slot. It
+   re-creates the registry file if it is absent, and fails if another path
+   holds slot `N`. It does not repeat the base check — a mid-task worktree is
+   not re-based by re-running `start`.
+4. Seeds `~/.config/boga/` (first run on a machine), writes
+   `supabase/config.toml`, `apps/mobile/.maestro/maestro.env.local`, and the
+   shared-config symlinks, then prints the slot, project id, and ports.
 
-The hook is a convenience, not the only enforcement point. Agent harnesses may bypass hooks, use custom hook paths, or create worktrees directly. BOGA runtime scripts still validate placement and setup before running services.
+Gates still install `apps/mobile` dependencies when they are missing; that is
+per-worktree and needs no lease logic.
 
-## Scripts (setup + teardown)
+### 2. Work
 
-The everyday ordered sequence is in `01-worktree-and-environment.md`; this is the
-per-script reference.
+Gates, `boga db`, `boga ios`, Supabase scripts, and Maestro all require the
+lease. The stack starts on first use (`./boga db up` or a gate that needs it).
 
-Setup:
+### 3. PR opened
 
-- `scripts/worktree-create.sh <branch>` — create a non-nested linked worktree under `$BOGA_WORKTREE_ROOT` (default `~/Projects/boga-worktrees`), then run setup inside it.
-- `scripts/worktree-setup.sh` — assign the slot, generate `supabase/config.toml` + `apps/mobile/.maestro/maestro.env.local`, symlink shared env, install the post-checkout hook. Idempotent. `--generate-config-only` regenerates only the config (requires an existing slot); `--slot <n>` / `--force-slot` override allocation.
-- `scripts/boga-config-init.sh` — seed the machine-global tier `~/.config/boga/` from the repo `.example` files. Run automatically by setup; idempotent.
-- `scripts/worktree-doctor.sh` — read-only diagnostics (slot, expected vs actual ports, config, symlinks, `node_modules`, port listeners); changes nothing, exits non-zero on any problem.
-- `scripts/worktree-lib.sh` — shared library sourced by the others (slot/port formulas, project-id, placement + runtime guards). Not run directly.
-- `supabase/scripts/local-runtime-up.sh` — start this slot's Supabase stack, serve the `health` function, sync `apps/mobile/.env.local`; opportunistically sweeps completed slots first.
-- `supabase/scripts/ensure-local-runtime-baseline.sh` — idempotent: bring the stack up if down, then migrate + seed + provision auth fixtures (used by the slow gates; lock-serialized).
-- `supabase/scripts/reset-local.sh` — `supabase db reset` (re-run migrations + seed) for this slot.
+1. `./boga db down` — stops this slot's containers and keeps the volumes. A
+   stopped stack is not restarted when Docker/OrbStack restarts.
+2. `./boga pr wait` — run it in the background with your harness's facility. It
+   polls the PR for the current branch via `gh` every 60 s (`--interval <s>`),
+   printing nothing until it exits: `0` MERGED, `3` CLOSED without merge, `2` no
+   PR for this branch, `1` `gh` error. It costs no tokens while waiting.
+3. Review feedback: resume work (`./boga db up` or any gate restarts the stack),
+   push, `./boga db down` again, and restart `./boga pr wait`.
 
-Teardown:
+### 4. Merged or closed
 
-- `supabase/scripts/local-runtime-down.sh` — stop this slot's Supabase + health server. Docker containers and volumes persist for a fast restart.
-- `scripts/worktree-clean.sh --slot <n> --supabase --remove-registry` — remove a specific slot's Docker containers/volumes/networks and its registry file. Refuses the current slot without `--force`; serialized by a per-slot runtime lock. **Fail-loud:** if `--supabase` cleanup cannot run (Docker unavailable), it refuses to remove the registry and exits non-zero — dropping the only pointer to a surviving stack is exactly how an unreclaimable orphan is born.
-- `scripts/worktree-sweep.sh` — reap completed/orphaned slots: calls `worktree-clean.sh` per completed slot, reaps dead-agent git worktrees, and (unless `--no-supabase`) makes a Docker-ground-truth pass that evicts any Supabase stack no live worktree backs — matched by project-id, so it reclaims a stack left behind by a deleted worktree even when its slot number was later reused and even when it squats on the current slot's ports. Runs automatically before every `local-runtime-up.sh`. Completion signals and knobs are in *Completed worktree cleanup* below.
-  - `--report` — read-only fleet report. Enumerates **every** Supabase stack present in Docker (the ground truth the registry scan can miss), correlates each to a live worktree via the worktree's own `.worktree-slot`, and prints a KEEP/EVICT verdict + reason per stack. Changes nothing.
-  - `--prune-orphans` — docker-ground-truth eviction. Removes, by exact label, every Supabase stack that no live worktree backs (orphans whose dir/registry is gone, dead-agent and abandoned-agent worktrees), plus any stale registry file. A live agent lock and non-agent (human) checkouts are never touched. Opt-in; honours `--dry-run`.
+`./boga worktree release [--force] [--keep-worktree]`, run by the owner:
 
-Manual iOS dev-client loop using this worktree's port and simulator:
-`cd apps/mobile && npm run start:ios:dev-client`.
+1. Asks `gh` for the PR state of the worktree's branch and refuses unless it is
+   MERGED or CLOSED (`--force` overrides: no PR, open PR, or detached HEAD).
+2. Removes every Docker container, volume, and network labelled
+   `com.supabase.cli.project=<project_id>` (exact label from the lease). If
+   Docker is unavailable it fails and keeps the lease, so the stack stays
+   findable.
+3. Deletes the registry file (the lease).
+4. Runs `git worktree remove --force <path>` unless `--keep-worktree`. The branch
+   is not deleted.
 
-## Completed worktree cleanup
+`release` refuses slot 0. For the cleanup procedure it also accepts a target:
+`--slot <N>` (a lease whose owner is gone) and `--project-id <id>` (a Docker
+stack with no lease).
 
-For infrastructure cleanup, `completed` is a mechanical local-state definition driven by the registry, on-disk worktree state, and the configured remote main branch.
+### 5. Leftovers
 
-A registered worktree slot is completed when all of these are true:
+Sessions die before step 4: they get archived, stopped, or the app quits. No
+automatic cleanup exists, by design. `./boga worktree ls` prints every lease,
+every Supabase stack in Docker, and every prunable git worktree, with each PR's
+state. [`docs/procedures/worktree-cleanup.md`](../procedures/worktree-cleanup.md)
+is the procedure any agent follows to clear them with the human's confirmation.
 
-1. It has a registry file under `~/.config/boga/worktrees/slots/<slot>`.
-2. It is not the current worktree slot.
-3. The registry file is older than the cleanup grace period (`BOGA_WORKTREE_SWEEP_GRACE_SECONDS`, default `600`).
-4. One of these is true:
-   - the registered path no longer exists;
-   - the registered path exists but is no longer a BOGA repo root;
-   - the registry was created by the same shared git worktree group as the current checkout, and the registered path is no longer listed by `git worktree list --porcelain`;
-   - the registry was created by the same shared git worktree group, the registered path is still listed by `git worktree list --porcelain`, but it is locked by an agent PID that is no longer running (a *dead-agent* worktree — see below);
-   - the registered worktree's checked-out branch HEAD is reachable from the configured remote main (default `origin/main`);
-   - the registered worktree's checked-out branch no longer exists on the configured remote (default `origin`).
+## Commands
 
-A **live** lock is a hard veto on the merge-detection signals: if the registered
-worktree is still locked by an agent PID that is alive, the slot is never marked
-completed, whatever its branch state. An agent mid-task frequently has not pushed
-its branch yet, so `branch-deleted-on-<remote>` (and a squash-merge that orphans
-the local HEAD) would otherwise false-positive and tear the agent's Supabase
-stack out from under it. The veto runs before merge detection.
+| Command | Does | Lease needed |
+| --- | --- | --- |
+| `./boga worktree create <branch>` | New worktree from `origin/main` (`--from` to override), then `start` in it | — |
+| `./boga worktree start` | Base check (new lease only), reserve slot, generate config | — |
+| `./boga worktree ls` | Read-only: leases, Docker stacks, prunable worktrees, PR states | — |
+| `./boga worktree release` | PR must be merged/closed; delete stack, lease, worktree | — |
+| `./boga worktree doctor` | Read-only diagnostics: placement, lease, ports, config, symlinks, deps | — |
+| `./boga db down` | Stop this slot's stack (volumes kept) | ✅ |
+| `./boga pr wait` | Block until this branch's PR merges or closes | — |
 
-The dead-agent signal closes a leak: an agent worktree is locked with a reason
-of the form `claude agent <name> (pid <N> start <date>)` (older harness versions
-emit `(pid <N>)`; both are parsed). If that agent dies without removing its
-worktree, the directory stays on disk, stays in `git worktree list`, and its
-pushed branch is typically neither merged nor deleted on the remote — so none of
-the other signals fire and the slot (with any Supabase stack) lingers forever.
-The sweep detects the dead PID via `git worktree list --porcelain` and treats the
-slot as completed. Because `worktree-clean.sh` only handles Supabase + the
-registry file, the sweep first **reaps the abandoned git worktree itself** —
-`git worktree unlock` then `git worktree remove --force` (falling back to
-`git worktree prune`) — before the infra cleanup, so the slot is fully reclaimed.
-Only the abandoned working tree is discarded; the branch ref is left intact, so
-committed history survives. The signal is on by default and can be disabled with
-`--no-dead-lock-detection` (or `BOGA_WORKTREE_SWEEP_DETECT_DEAD_LOCKS=0`); a lock
-whose reason carries no `(pid <N>)` marker (e.g. a manual lock) is never reaped.
+Scripts behind them: `scripts/worktree-{create,start,ls,release,doctor}.sh`,
+`scripts/pr-wait.sh`, and the shared library `scripts/worktree-lib.sh` (slot and
+port formulas, project id, placement and lease guards; sourced, never run).
 
-The signal above is registry-driven: it only sees worktrees that still have a
-slot registry file. A dead-agent worktree whose registry was already removed (or
-never written — agent worktrees under `<repo>/.claude/worktrees/` do not run
-their own Supabase stack and need no slot) is invisible to it, leaving the git
-worktree registration dangling. After the registry scan, a **second prune pass**
-walks `git worktree list --porcelain` and reaps any worktree still locked by a
-dead PID that has no registry file. The current checkout and registry-backed
-worktrees are skipped — the latter belong to the registry-driven loop, so the
-prune pass never bypasses the grace period. This pass is governed by the same
-`--no-dead-lock-detection` / `BOGA_WORKTREE_SWEEP_DETECT_DEAD_LOCKS` switch.
+Supabase runtime helpers (unchanged, lease-checked): `supabase/scripts/local-runtime-up.sh`
+(start stack, serve functions, sync `apps/mobile/.env.local`),
+`ensure-local-runtime-baseline.sh` (idempotent up + migrate + seed + auth
+fixtures, lock-serialized), `reset-local.sh`, `local-runtime-down.sh`.
 
-The branch-merged and branch-deleted signals are referred to as *merge detection*. They are on by default and can be disabled with `--no-merge-detection` (or `BOGA_WORKTREE_SWEEP_DETECT_MERGED=0`). To make them accurate, the sweep performs a single `git fetch --prune --quiet <remote> <main-branch>` at start-up (timeout `BOGA_WORKTREE_SWEEP_FETCH_TIMEOUT_SECONDS`, default `10`). Skip the fetch with `--no-fetch`; the sweep will then rely on cached remote-tracking refs. If the fetch fails or the remote main ref is missing afterwards, merge detection is disabled for that run only and the legacy on-disk signals still apply.
+## Removed mechanisms (do not reintroduce)
 
-Configurable knobs (env or flag):
+Each of these guessed, or acted on another worktree's resources, and each
+misfired. The table records why, so they are not re-added.
 
-- remote name: `BOGA_WORKTREE_SWEEP_REMOTE` / `--remote` (default `origin`)
-- main branch: `BOGA_WORKTREE_SWEEP_MAIN_BRANCH` / `--main-branch` (default `main`)
-- enable / disable merge detection: `BOGA_WORKTREE_SWEEP_DETECT_MERGED` / `--no-merge-detection`
-- enable / disable dead-agent-lock detection: `BOGA_WORKTREE_SWEEP_DETECT_DEAD_LOCKS` / `--no-dead-lock-detection`
-- enable / disable pre-scan fetch: `BOGA_WORKTREE_SWEEP_FETCH` / `--no-fetch`
-
-If a registered path still exists and still looks like a valid BOGA checkout from another git clone/worktree group, and merge detection cannot confirm completion via the signals above, the sweep keeps it. This prevents one checkout from destroying another still-existing checkout's local Supabase data.
-
-Squash-merge note: with squash merges, the merged branch's original HEAD is no longer an ancestor of main, so `branch-merged-into-<remote>/<main>` will not fire. In that case the sweep relies on `branch-deleted-on-<remote>`, which requires the remote to delete merged branches automatically (e.g. GitHub's "Automatically delete head branches" repo setting).
-
-Registry-driven blindness and the ground-truth pass: the completion signals and
-the per-slot cleaner key off the slot registry, which is keyed by **slot number**
-(one file per slot). A Supabase stack whose registry file is gone — removed early,
-never written, or **overwritten when its slot number was reused by another
-worktree** — becomes invisible to the registry scan: no completion signal can
-fire, so it leaks. The classic leak is a deleted worktree whose stack outlived it
-and whose slot was then handed to a new worktree; the new worktree's registry now
-occupies that slot number, and the orphan's stack squats on the same ports
-(`Bind for 0.0.0.0:<port> failed: port is already allocated`).
-
-To close this, every run works from **Docker ground truth** (every
-`com.supabase.cli.project` label on a container or volume) instead of the
-registry, and maps each stack back to a live worktree by **project-id** — never
-by slot number alone, so a stack sharing the current slot's number but a different
-project-id is correctly recognised as an orphan. After the registry scan, the
-automatic sweep evicts every stack with **no live `git worktree list` entry**
-(true orphans), including a same-slot squatter; the live worktree's own stack is
-matched by project-id and kept, and its slot registry is never deleted even though
-the orphan reused its slot number. `--report` prints the full fleet with a
-KEEP/EVICT verdict (changes nothing), and `--prune-orphans` (preview with
-`--dry-run`) is the wider explicit form — it also evicts dead-agent and
-abandoned-agent stacks, which the automatic pass defers to the grace-honouring
-registry loop. All forms apply the live-lock veto and never touch a non-agent
-(human) checkout's stack.
-
-Cleanup scope:
-
-- `scripts/worktree-sweep.sh` scans completed slots and calls `scripts/worktree-clean.sh`.
-- For slots completed via the dead-agent-lock signal, `scripts/worktree-sweep.sh` additionally reaps the abandoned git worktree (`git worktree unlock` + `git worktree remove --force`) before invoking `scripts/worktree-clean.sh`; the other signals assume the git worktree was already removed by whoever finished the work.
-- After the registry scan, `scripts/worktree-sweep.sh` runs a prune pass that reaps registry-less worktrees still locked by a dead PID (git worktree only — these carry no Supabase stack). This catches dead-agent worktrees whose registry was already cleaned but whose git worktree registration was left dangling.
-- Then (unless `--no-supabase`) `scripts/worktree-sweep.sh` runs a Docker-ground-truth orphan pass: it evicts, by exact project-id label, every Supabase stack with no live `git worktree list` entry — the registry-blind leak above — removing its containers/volumes/networks and any stale registry file. A stack squatting on the current slot's number but carrying a different project-id is reclaimed; the current worktree's own stack is matched by project-id and kept, and the current slot's registry is never deleted. Dead/abandoned-agent stacks (which still have a worktree entry) are deferred to the registry loop and its grace period; use `--prune-orphans` to evict those too.
-- `scripts/worktree-clean.sh --supabase` removes Docker containers, volumes, and networks labelled with the registry-recorded Supabase project id, plus the legacy `scaffolding[-wtN]` id for older local state.
-- `scripts/worktree-clean.sh --remove-registry` removes the completed slot registry file after cleanup.
-- Cleanup never targets the current slot unless explicitly forced in the manual cleaner.
-- Slot runtime locks under `~/.config/boga/worktrees/runtime-locks/` prevent concurrent cleanup attempts for the same slot.
-
-Default cleanup is Supabase-only. It intentionally does not remove iOS simulators or dev-client caches yet.
+| Removed | Why |
+| --- | --- |
+| `hooks/post-checkout` (auto-setup on `git worktree add`) | Allocated slots for every harness worktree, wanted or not, and hid which step created a lease |
+| Implicit setup in `_common.sh`, `./boga` (`ensure_mobile_deps`), `worktree-create.sh` (main checkout), `dev-lan.sh`, `dev-remote.sh` | A missing lease was silently papered over instead of failing |
+| `worktree-setup.sh` deleting registry files it judged stale | Freed live slots for reuse, so a second worktree could take a slot already in use |
+| `worktree-sweep.sh`: automatic run before every stack start, merge/branch-deleted signals, grace period, dead-agent-PID reaping, orphan pass, `BOGA-dev` exemption | Squash merges never matched "HEAD in main", so merged stacks leaked. Fresh and unpushed worktrees did match "merged" or "branch deleted", so live stacks and leases were destroyed by another worktree's gate run (2026-09-10/11) |
+| `worktree-clean.sh` and its per-slot runtime lock | Replaced by the owner's `release` |
+| Slot exemption for `.claude/worktrees/` | One rule for every worktree; agent worktrees run the same gates |
 
 ## Harness rules
 
-These rules apply equally to humans, Codex App, Codex CLI, Claude Code CLI, and any other local agent harness.
+These apply equally to humans, Codex, Claude Code, and any other harness.
 
-1. Prefer `./scripts/worktree-create.sh` when the harness lets you control worktree creation.
-2. If a harness creates a worktree itself, immediately run `./scripts/worktree-setup.sh` inside the resulting worktree.
-3. If setup refuses nested placement, remove that worktree and recreate it under `$BOGA_WORKTREE_ROOT` or `~/Projects/boga-worktrees`.
-4. Do not work around nested placement by changing watcher config, Jest config, Metro config, or TypeScript excludes. The layout is the bug.
-5. Do not share `apps/mobile/node_modules` across worktrees.
-6. Do not share one `IOS_SIM_UDID` across concurrent Maestro/manual simulator sessions.
-7. Do not run destructive Supabase commands (`reset-local`, stack restart) in one worktree while another test suite is actively using that same slot.
+1. Open with `./boga worktree create`, or run `./boga worktree start` first
+   thing in a harness-made worktree.
+2. If placement is refused, remove that worktree and recreate it under
+   `$BOGA_WORKTREE_ROOT` (or `~/Projects/boga-worktrees`).
+3. Never share `apps/mobile/node_modules` or one `IOS_SIM_UDID` across worktrees.
+4. Never run destructive Supabase commands (`reset-local`, stack restart) on a
+   slot another suite is using.
+5. Never release, stop, or delete another worktree's stack or lease, except
+   through the cleanup procedure with the human's confirmation.
 
 ## Failure hypotheses for agents
 
-When cross-worktree behavior is suspicious, check these first:
-
-1. Nested worktree placement:
-   - run `./scripts/worktree-doctor.sh`;
-   - if nested, recreate the worktree outside the checkout.
-2. Duplicate slot:
-   - inspect `.worktree-slot`;
-   - inspect `~/.config/boga/worktrees/slots/`;
-   - rerun `./scripts/worktree-setup.sh`.
-3. Stale generated Supabase config:
-   - compare `supabase/config.toml.template` and `supabase/config.toml`;
-   - run `./scripts/worktree-setup.sh --generate-config-only`.
-4. Wrong Supabase runtime:
-   - run `bash -lc 'source supabase/scripts/_common.sh && run_supabase status -o env'` from the worktree;
-   - confirm ports match `./scripts/worktree-doctor.sh`.
-5. Duplicate Metro port:
-   - inspect `apps/mobile/.maestro/maestro.env.local`;
-   - confirm `EXPO_DEV_SERVER_PORT = 8082 + slot`.
-6. Duplicate simulator:
-   - inspect `IOS_SIM_UDID`;
-   - each parallel worktree should use a distinct simulator UDID.
-7. Shared dependencies/build artifacts:
-   - `apps/mobile/node_modules` must be a real directory in the worktree, not a symlink;
-   - generated Maestro env defaults the iOS dev-client build cache to a slot-scoped path.
-8. Parent/sibling scan symptoms:
-   - Vitest/Jest/TypeScript/Metro seeing files from another worktree almost always means nested layout or an over-broad watch root.
-9. Orphaned Supabase data:
-   - run `./scripts/worktree-sweep.sh --report` to see every Docker stack with a KEEP/EVICT verdict (this catches registry-less stacks the next item cannot);
-   - run `./scripts/worktree-sweep.sh --dry-run`; if the slot is completed, run `./scripts/worktree-sweep.sh` or let the next `./supabase/scripts/local-runtime-up.sh` clean it opportunistically;
-   - for stacks with no registry/worktree backing them, run `./scripts/worktree-sweep.sh --prune-orphans --dry-run` then `--prune-orphans` to reclaim them by Docker label.
+1. **"No slot lease"**: run `./boga worktree start`. **"Slot N is leased to
+   <other path>"**: your `.worktree-slot` is stale. Run `./boga worktree ls`; if
+   the other path is a leftover, clear it with the cleanup procedure, otherwise
+   delete your `.worktree-slot` and run `./boga worktree start --base HEAD` for a
+   new slot (a mid-task worktree keeps its current base).
+2. **Nested placement**: `./boga worktree doctor`; recreate outside the checkout.
+3. **Stale Supabase config**: re-run `./boga worktree start`.
+4. **Wrong Supabase runtime**: from the worktree,
+   `bash -lc 'source supabase/scripts/_common.sh && run_supabase status -o env'`;
+   compare ports with `./boga worktree doctor`.
+5. **Port already allocated at stack start**: `./boga worktree ls` shows which
+   stack holds that slot's ports; clear leftovers via the cleanup procedure.
+6. **Duplicate Metro port or simulator**: check `apps/mobile/.maestro/maestro.env.local`
+   (`EXPO_DEV_SERVER_PORT = 8082 + slot`, one simulator per worktree).
+7. **Shared dependencies**: `apps/mobile/node_modules` must be a real directory.
+8. **Docker commands hang while `orb status` says Running**: check
+   `pmset -g log | grep -E "Clamshell|FullWake"`. OrbStack pauses its VM while
+   the Mac sleeps (lid closed), and background agents still run in brief dark
+   wakes. Keep the Mac awake for unattended runs; do not restart OrbStack.
 
 ## Verification contract
 
-Minimum verification for this subsystem:
-
-1. Main checkout:
-   - run `./scripts/worktree-setup.sh`;
-   - confirm slot `0`, original Supabase ports, and valid `supabase/config.toml`.
-2. Linked worktree:
-   - create with `./scripts/worktree-create.sh <branch>`;
-   - confirm non-nested path under worktree root;
-   - confirm unique slot and generated config.
-3. Parallel Supabase:
-   - start Supabase in two worktrees;
-   - confirm no Docker port collision and distinct project ids.
-4. Backend tests:
-   - run `./scripts/quality-fast.sh backend` in two worktrees;
-   - confirm each uses its own Supabase project/ports.
-5. Frontend dependency isolation:
-   - run `cd apps/mobile && npm install` per worktree;
-   - confirm no `apps/mobile/node_modules` symlink.
-6. Manual simulator loop:
-   - run `cd apps/mobile && npm run start:ios:dev-client`;
-   - confirm it uses the worktree's Expo port and simulator target.
-7. Negative placement check:
-   - create or simulate a nested BOGA checkout;
-   - confirm `./scripts/worktree-setup.sh` and runtime guards fail before services start.
-8. Completed-worktree cleanup check:
-   - create a disposable linked worktree and initialize it;
-   - remove the worktree;
-   - run `BOGA_WORKTREE_SWEEP_GRACE_SECONDS=0 ./scripts/worktree-sweep.sh --dry-run`;
-   - confirm the removed slot is detected as completed and the current slot is kept.
+1. Main checkout: `./boga worktree start` → slot `0`, original ports, valid config.
+2. Linked worktree: `./boga worktree create <branch>` → non-nested path, lowest
+   free slot, lease file with this path, generated config.
+3. Base check: in a worktree whose `HEAD` lacks the latest `origin/main`,
+   `start` without `.worktree-slot` fails; `--base <ref>` passes.
+4. Fail-hard: remove the registry file, then `./boga test fast` and
+   `./supabase/scripts/local-runtime-up.sh` both exit non-zero naming the fix.
+5. Parallel Supabase: two worktrees start stacks with distinct project ids and no
+   port collision.
+6. Release: an open-PR worktree refuses without `--force`; a merged one removes
+   its containers, volumes, networks, lease, and worktree, and nothing else.
+7. Placement: a nested checkout is refused before any service starts.
 
 ## Docs maintenance
 
-Update this file and the operational runbooks when any of these change:
-
-- slot range or port formulas;
-- worktree placement rules;
-- generated config paths;
-- setup/create/doctor command surfaces;
-- cleanup/sweep command surfaces;
-- runtime guard ownership;
-- Supabase, Expo, Maestro, simulator, or dependency isolation behavior.
+Update this file, `01`, the cleanup procedure, and `AGENTS.md` rule 5 in the same
+change when any of these change: slot range or port formulas, placement rules,
+generated config paths, lifecycle command surfaces, lease rules, or Supabase,
+Expo, Maestro, simulator, or dependency isolation behavior.

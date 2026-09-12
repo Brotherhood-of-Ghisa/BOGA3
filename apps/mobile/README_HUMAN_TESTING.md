@@ -24,11 +24,11 @@ xcrun simctl list devices >/dev/null
 maestro --version
 ```
 
-3. From the repo root, initialize the checkout/worktree:
+3. From the repo root, take this checkout's slot lease:
 
 ```bash
 cd ../..
-./scripts/worktree-setup.sh
+./boga worktree start
 cd apps/mobile
 ```
 

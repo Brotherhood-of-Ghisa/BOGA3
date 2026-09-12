@@ -39,8 +39,8 @@ place each under `docs/specs/**`, routed from here.
    | MCP service (`services/boga-mcp/**`) | `boga test fast` + `boga test mcp-smoke` |
    | Native dependency / config-plugin change | `./boga ios build-client --force` first, then `boga test frontend` (see `02`) |
 
-   The gates self-bootstrap deps and the local Supabase stack; Docker must be
-   running for the slow lanes. Full lane matrix, CI posture, and the dev-client
+   Once the worktree holds a slot lease (rule 5), the gates bootstrap deps and
+   the local Supabase stack themselves; Docker must be running for the slow lanes. Full lane matrix, CI posture, and the dev-client
    rebuild rule: `docs/specs/02-quality-and-test-gates.md`.
 
 4. **The sync-infra and sync-e2e lanes run locally — do not defer them.** Each
@@ -48,10 +48,20 @@ place each under `docs/specs/**`, routed from here.
    `SYNC_TEST_SUPABASE_URL`/`SYNC_TEST_SUPABASE_ANON_KEY` themselves. There is
    no remote-only test lane in this repo.
 
-5. **Worktrees:** never nest a BOGA worktree inside another checkout; never
-   share `apps/mobile/node_modules` or an iOS simulator across worktrees. The
-   gates self-bootstrap deps and the stack — lifecycle commands and repair only
-   when needed: `./boga worktree create|setup|doctor|clean|sweep` (spec `01`).
+5. **You own your worktree from open to merge.** Nothing cleans up after you
+   (spec `01`; contract `12`):
+   - **Open:** `./boga worktree create <branch>` (new worktree from the latest
+     `origin/main`), or `./boga worktree start` inside a worktree your harness
+     made. It fails unless the worktree contains the latest `origin/main`; pass
+     `--base`/`--from <ref>` only when told to. Every `./boga test|db|ios|env`
+     command, Supabase script, and Maestro run fails hard without this slot lease.
+   - **PR opened:** `./boga db down`, then run `./boga pr wait` in the background.
+   - **PR merged or closed** (`pr wait` exits): `./boga worktree release`.
+   - **Leftovers from dead sessions:** follow
+     `docs/procedures/worktree-cleanup.md` — it asks the human before removing
+     anything.
+   - Never nest a worktree inside another checkout; never share
+     `apps/mobile/node_modules` or an iOS simulator across worktrees.
 
 ## Always load (every session)
 
@@ -69,7 +79,8 @@ place each under `docs/specs/**`, routed from here.
 | Auth / RLS / backend API | `docs/specs/10-api-authn-authz-guidelines.md`, `supabase/README.md` |
 | Groups (group tables/RPCs, share trigger, `src/groups`, group screens) | `docs/specs/tech/groups-contract.md`, `docs/specs/10-api-authn-authz-guidelines.md` |
 | Maestro / iOS e2e flows or harness | `docs/specs/11-maestro-runtime-and-testing-conventions.md`, `apps/mobile/README-maestro.md` |
-| Worktree lifecycle (create / tear down / repair) or isolation / slot bugs | `docs/specs/01-worktree-and-environment.md` (everyday), `docs/specs/12-worktree-config-and-isolation.md` (deep contract) |
+| Worktree lifecycle (open / release / repair), slot-lease errors, or isolation bugs | `docs/specs/01-worktree-and-environment.md` (everyday), `docs/specs/12-worktree-config-and-isolation.md` (deep contract) |
+| Cleaning up leftover worktrees, leases, or Supabase stacks | `docs/procedures/worktree-cleanup.md` (follow it step by step) |
 | Deep testing strategy / adding or changing a test lane | `docs/specs/06-testing-strategy.md` |
 | Data import (GymBook / JSON) | `apps/mobile/scripts/import/BOGA_IMPORT_JSON_CONTRACT.md` |
 | Human local-dev ops (run/build/debug, logs, reset) | `RUNBOOK.md` |

@@ -430,21 +430,18 @@ This document keeps only the cross-cutting policies below.
   Runtime bootstrap is serialized per worktree via a lock in
   `ensure-local-runtime-baseline.sh`. Avoid manual destructive operations
   (`db reset`, stack restart) in a worktree while another suite uses that slot. Use
-  `./scripts/worktree-doctor.sh` if a backend suite appears to hit the wrong local
+  `./boga worktree doctor` if a backend suite appears to hit the wrong local
   Supabase instance.
 
 ## Worktree isolation testing policy
 
-- Worktree setup and runtime isolation are owned by
+- The worktree lifecycle, slot lease, and runtime isolation are owned by
   `docs/specs/12-worktree-config-and-isolation.md`.
-- Before running local gates in a linked worktree, initialize it with
-  `./scripts/worktree-setup.sh`. Diagnostic entrypoint: `./scripts/worktree-doctor.sh`.
-  Completed-worktree Supabase cleanup: `./scripts/worktree-sweep.sh` (also run
-  opportunistically by `./supabase/scripts/local-runtime-up.sh` before starting the
-  current slot; limited to non-current slots past the grace period that match a
-  completion signal enumerated in spec 12 — merge-into-main and branch-deleted
-  signals are on by default, disable with `--no-merge-detection` or
-  `BOGA_WORKTREE_SWEEP_DETECT_MERGED=0`).
+- Every local gate requires this worktree's slot lease: run `./boga worktree start`
+  first; gates, Supabase helpers, and Maestro scripts fail hard without it.
+  Diagnostic entrypoint: `./boga worktree doctor`. No gate cleans up other
+  worktrees; the owner runs `./boga worktree release` after its PR merges, and
+  leftovers follow `docs/procedures/worktree-cleanup.md`.
 - Placement rule: BOGA worktrees must not be nested inside another BOGA checkout;
   quality wrappers and runtime helpers fail before starting services when nested
   placement is detected.
