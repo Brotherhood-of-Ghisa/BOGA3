@@ -101,8 +101,8 @@ echo "[dev-baseline] seeding rich imported history for ${DEV_RICH_HISTORY_EMAIL}
 if [[ ! -x "${SCRIPT_DIR}/../../apps/mobile/node_modules/.bin/tsx" ]]; then
   cat >&2 <<'MSG'
 [dev-baseline] mobile dependencies missing; rich-history seed tooling needs tsx.
-[dev-baseline] Run the worktree setup/bootstrap first, then retry:
-[dev-baseline]     ./boga worktree setup
+[dev-baseline] Install this worktree's mobile dependencies, then retry:
+[dev-baseline]     (cd apps/mobile && npm install)
 MSG
   exit 1
 fi

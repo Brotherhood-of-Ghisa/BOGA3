@@ -6,51 +6,30 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SUPABASE_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 REPO_ROOT="$(cd "${SUPABASE_DIR}/.." && pwd)"
 
-if [[ -f "${REPO_ROOT}/scripts/worktree-lib.sh" ]]; then
-  # shellcheck disable=SC1091
-  source "${REPO_ROOT}/scripts/worktree-lib.sh"
-  boga_validate_worktree_placement "${REPO_ROOT}" || exit 1
-fi
+# shellcheck disable=SC1091
+source "${REPO_ROOT}/scripts/worktree-lib.sh"
 
-ensure_worktree_runtime_config() {
-  local setup_script="${REPO_ROOT}/scripts/worktree-setup.sh"
+# Fail hard without this worktree's slot lease (docs/specs/12): nothing here
+# sets one up or repairs config on the fly — `./boga worktree start` does.
+boga_require_slot_lease "${REPO_ROOT}" || exit 1
+
+require_worktree_runtime_config() {
   local template_file="${SUPABASE_DIR}/config.toml.template"
   local config_file="${SUPABASE_DIR}/config.toml"
 
-  if [[ ! -x "${setup_script}" ]]; then
-    [[ -f "${config_file}" ]] || {
-      echo "supabase/config.toml not found and ${setup_script} is unavailable." >&2
-      exit 1
-    }
-    return 0
+  if [[ ! -f "${config_file}" ]]; then
+    echo "[supabase] ${config_file} is missing; run ./boga worktree start" >&2
+    exit 1
   fi
-
-  if [[ ! -f "${REPO_ROOT}/.worktree-slot" ]]; then
-    "${setup_script}" >/dev/null
-    return 0
-  fi
-
-  if [[ -f "${template_file}" ]]; then
-    if [[ ! -f "${config_file}" ]]; then
-      echo "[supabase] config.toml missing; regenerating from template" >&2
-      "${setup_script}" --generate-config-only
-    elif [[ "${template_file}" -nt "${config_file}" ]]; then
-      echo "[supabase] config.toml.template is newer; regenerating config.toml" >&2
-      "${setup_script}" --generate-config-only
-    fi
-  elif [[ ! -f "${config_file}" ]]; then
-    echo "supabase/config.toml not found and no config.toml.template exists. Run ./scripts/worktree-setup.sh." >&2
+  if [[ -f "${template_file}" && "${template_file}" -nt "${config_file}" ]]; then
+    echo "[supabase] ${config_file} is older than its template; run ./boga worktree start" >&2
     exit 1
   fi
 }
 
-ensure_worktree_runtime_config
+require_worktree_runtime_config
 
-if declare -F boga_worktree_slot_or_default >/dev/null 2>&1; then
-  WORKTREE_SLOT="$(boga_worktree_slot_or_default "${REPO_ROOT}")"
-else
-  WORKTREE_SLOT=0
-fi
+WORKTREE_SLOT="$(boga_read_slot_file "${REPO_ROOT}")"
 export WORKTREE_SLOT
 
 # Resolve before sourcing the override file below: it may also assign
@@ -135,7 +114,7 @@ resolve_db_container() {
   project_id="$(worktree_project_id)"
   if [[ -z "${project_id}" ]]; then
     echo "[resolve_db_container] could not read project_id from ${SUPABASE_DIR}/config.toml;" \
-         "run ./scripts/worktree-setup.sh to generate this worktree's config." >&2
+         "run ./boga worktree start to generate this worktree's config." >&2
     return 1
   fi
 

@@ -25,12 +25,14 @@ the canonical lane names everywhere: this doc, the timing records, `boga`).
 The legacy `./scripts/quality-fast.sh` / `./scripts/quality-slow.sh` forward to
 `boga` with their old argument forms.
 
-Each script bootstraps what it needs (idempotent) and `cd`s into the right
+Every `./boga test` run (gate or lane, `fast` included) first requires this
+worktree's slot lease from `./boga worktree start` and fails hard without it.
+Each lane then bootstraps what it needs (idempotent) and `cd`s into the right
 workspace — installing deps if missing and booting/seeding the local Supabase, so
 you do not set env vars or provision infrastructure by hand (Docker must be running
 for the slow lanes). (`npm run …` scripts live only in `apps/mobile/package.json` —
 there is no root `package.json` — but invoke the gates above, not the raw scripts.)
-New-worktree setup, prerequisites, and teardown: `01-worktree-and-environment.md`.
+Worktree lifecycle (open, PR, release) and prerequisites: `01-worktree-and-environment.md`.
 
 ## This dev environment runs EVERY gate — "not in CI" ≠ "can't run here"
 

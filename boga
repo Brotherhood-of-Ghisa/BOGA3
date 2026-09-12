@@ -12,15 +12,19 @@
 #   boga test <lane> --dry-run                 # print the command, don't run
 #   boga test for [--diff <range>] [paths...]  # which gates does a change require?
 #   boga pr check --body <file|->              # validate a PR body's Tests table
+#   boga pr wait [--interval <s>]              # block until this branch's PR merges/closes
 #   boga doctor                                # can THIS machine run every lane?
 #   boga docs gen|check                        # (re)generate / drift-check derived doc blocks
 #   boga timings [lane]                        # measured durations (never guess)
-#   boga worktree create|setup|clean|sweep|doctor
-#   boga db up|down|reset|baseline             # slot-0 stack (gates)
+#   boga worktree create|start|ls|release|doctor   # agent-owned lifecycle (spec 01)
+#   boga db up|down|reset|baseline             # this slot's stack (gates)
 #   boga db dev|dev-up|dev-down|dev-reset       # dedicated dev stack (BOGA-dev), isolated from gates
 #   boga ios build-client|start
 #   boga env lan|hosted|tailscale
 #   boga task bootstrap|closeout
+#
+# `test` (except --list / for), `db`, `ios`, and `env` fail hard without this
+# worktree's slot lease: run `boga worktree start` first.
 #
 # Legacy entrypoints ./scripts/quality-fast.sh and ./scripts/quality-slow.sh
 # forward here.
@@ -38,7 +42,11 @@ source "${REPO_ROOT}/scripts/lane-timing.sh"
 source "${REPO_ROOT}/scripts/java-env.sh"
 
 usage() {
-  sed -n '3,23p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  awk 'NR > 2 && /^#/ { sub(/^# ?/, ""); print; next } NR > 2 { exit }' "${BASH_SOURCE[0]}"
+}
+
+require_lease() {
+  boga_require_slot_lease "${REPO_ROOT}" || exit 1
 }
 
 fail() {
@@ -62,8 +70,7 @@ lane_lookup() {
 ensure_mobile_deps() {
   [[ -f "${REPO_ROOT}/apps/mobile/package.json" ]] || return 0
   if [[ ! -d "${REPO_ROOT}/apps/mobile/node_modules" ]]; then
-    echo "[boga] mobile dependencies missing; running worktree setup (idempotent)"
-    "${REPO_ROOT}/scripts/worktree-setup.sh"
+    echo "[boga] mobile dependencies missing; installing (worktree-local)"
     (cd "${REPO_ROOT}/apps/mobile" && npm install)
   fi
 }
@@ -92,7 +99,6 @@ run_gate() {
   shift
   local gates=("$@")
   local row matched=0
-  boga_validate_runtime_worktree "${REPO_ROOT}" || exit 1
   for gate in "${gates[@]}"; do
     while IFS= read -r row; do
       matched=1
@@ -117,6 +123,7 @@ cmd_test() {
     esac
   done
   [[ -n "${target}" ]] || fail "usage: boga test <gate|lane|--list|for> [--dry-run]"
+  [[ "${target}" == "--list" ]] || require_lease
 
   case "${target}" in
     --list)
@@ -154,7 +161,8 @@ cmd_doctor() {
       ok=1
     fi
   }
-  check "docker daemon (local Supabase lanes)" docker info
+  check "docker daemon answers within 10s (local Supabase lanes)" boga_run_with_timeout 10 docker info
+  check "gh authenticated (worktree release / pr wait)" gh auth status
   check "iOS simulators (Maestro lanes)" xcrun simctl list devices available
   check "maestro CLI (Maestro lanes)" maestro --version
   check "xcodebuild (dev-client build)" xcodebuild -version
@@ -184,7 +192,8 @@ case "${cmd}" in
     sub="${1:-}"; shift || true
     case "${sub}" in
       check) exec "${REPO_ROOT}/scripts/pr-check.sh" "$@" ;;
-      *) fail "usage: boga pr check --body <file|-> [--diff <range>] [--strict]" ;;
+      wait)  exec "${REPO_ROOT}/scripts/pr-wait.sh" "$@" ;;
+      *) fail "usage: boga pr check --body <file|-> [--diff <range>] [--strict] | boga pr wait [--interval <s>]" ;;
     esac
     ;;
   docs)
@@ -198,11 +207,12 @@ case "${cmd}" in
   worktree)
     sub="${1:-}"; shift || true
     case "${sub}" in
-      create|setup|clean|sweep|doctor) dispatch_script "${REPO_ROOT}/scripts/worktree-${sub}.sh" "$@" ;;
-      *) fail "usage: boga worktree create|setup|clean|sweep|doctor" ;;
+      create|start|ls|release|doctor) dispatch_script "${REPO_ROOT}/scripts/worktree-${sub}.sh" "$@" ;;
+      *) fail "usage: boga worktree create|start|ls|release|doctor   (lifecycle: docs/specs/01-worktree-and-environment.md)" ;;
     esac
     ;;
   db)
+    require_lease
     sub="${1:-}"; shift || true
     case "${sub}" in
       up)       dispatch_script "${REPO_ROOT}/supabase/scripts/local-runtime-up.sh" "$@" ;;
@@ -217,6 +227,7 @@ case "${cmd}" in
     esac
     ;;
   ios)
+    require_lease
     sub="${1:-}"; shift || true
     case "${sub}" in
       build-client) dispatch_script "${REPO_ROOT}/apps/mobile/scripts/maestro-ios-dev-client-build.sh" "$@" ;;
@@ -225,6 +236,7 @@ case "${cmd}" in
     esac
     ;;
   env)
+    require_lease
     sub="${1:-}"; shift || true
     case "${sub}" in
       lan)       dispatch_script "${REPO_ROOT}/scripts/dev/use-local-mobile-lan-env.sh" "$@" ;;

@@ -8,10 +8,8 @@ REPO_ROOT="$(cd -- "$APP_DIR/../.." && pwd)"
 MAESTRO_SAMPLE_ENV_FILE="$APP_DIR/.maestro/maestro.env.sample"
 MAESTRO_LOCAL_ENV_FILE="$APP_DIR/.maestro/maestro.env.local"
 
-if [[ -f "$REPO_ROOT/scripts/worktree-lib.sh" ]]; then
-  # shellcheck disable=SC1091
-  source "$REPO_ROOT/scripts/worktree-lib.sh"
-fi
+# shellcheck disable=SC1091
+source "$REPO_ROOT/scripts/worktree-lib.sh"
 if [[ -f "$REPO_ROOT/scripts/java-env.sh" ]]; then
   # shellcheck disable=SC1091
   source "$REPO_ROOT/scripts/java-env.sh"
@@ -39,15 +37,14 @@ maestro_require_command() {
 
 maestro_require_local_env_file() {
   [[ -f "$MAESTRO_SAMPLE_ENV_FILE" ]] || maestro_fail "Missing checked-in Maestro sample config: $MAESTRO_SAMPLE_ENV_FILE"
-  [[ -f "$MAESTRO_LOCAL_ENV_FILE" ]] || maestro_fail "Missing $MAESTRO_LOCAL_ENV_FILE. Run './scripts/worktree-setup.sh' from the repo root, then set IOS_SIM_UDID or IOS_SIM_DEVICE for this workspace."
+  [[ -f "$MAESTRO_LOCAL_ENV_FILE" ]] || maestro_fail "Missing $MAESTRO_LOCAL_ENV_FILE. Run './boga worktree start' from the repo root, then set IOS_SIM_UDID or IOS_SIM_DEVICE for this workspace if needed."
 }
 
 maestro_source_env() {
   local env_file
 
-  if declare -F boga_validate_runtime_worktree >/dev/null 2>&1; then
-    boga_validate_runtime_worktree "$REPO_ROOT" || exit 1
-  fi
+  # Fail hard without this worktree's slot lease (docs/specs/12).
+  boga_require_slot_lease "$REPO_ROOT" || exit 1
 
   maestro_require_local_env_file
 
@@ -102,7 +99,7 @@ maestro_source_env() {
   export MAESTRO_RESET_STRATEGY
   export MAESTRO_KEEP_SIMULATOR_BOOTED
 
-  [[ -n "$EXPO_DEV_SERVER_PORT" ]] || maestro_fail "Missing EXPO_DEV_SERVER_PORT. Run './scripts/worktree-setup.sh' from the repo root or set it in $MAESTRO_LOCAL_ENV_FILE."
+  [[ -n "$EXPO_DEV_SERVER_PORT" ]] || maestro_fail "Missing EXPO_DEV_SERVER_PORT. Run './boga worktree start' from the repo root or set it in $MAESTRO_LOCAL_ENV_FILE."
 }
 
 maestro_trim() {

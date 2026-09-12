@@ -45,6 +45,10 @@ scripts/triggers.tsv	docs-check,meta-tests	trigger registry
 scripts/gen-docs.sh	docs-check,meta-tests	docs generator/checker
 scripts/test-for.sh	meta-tests	trigger matcher
 scripts/pr-check.sh	meta-tests	PR Tests-table checker
+scripts/worktree-*	meta-tests	worktree lifecycle scripts (lifecycle meta-test)
+scripts/worktree-lib.sh	fast,backend,frontend	slot-lease / placement guard sourced by every runtime entrypoint
+scripts/pr-wait.sh	meta-tests	PR merge waiter (lifecycle meta-test)
+scripts/boga-config-init.sh	meta-tests	machine config seeding (run by worktree start)
 scripts/tests/**	meta-tests	meta-tooling tests
 .github/workflows/**	docs-check	CI definition (update spec 02 CI posture)
 .github/pull_request_template.md	docs-check,meta-tests	PR template (pr-check parses it)

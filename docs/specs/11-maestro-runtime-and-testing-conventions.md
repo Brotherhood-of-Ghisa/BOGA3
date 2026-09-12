@@ -163,7 +163,7 @@ Worktree setup note:
   single canonical root (`$HOME/.cache/boga/maestro/ios-dev-client`), never keyed
   by worktree slot. A freshly set-up worktree therefore reuses an already-built
   client instead of rebuilding from scratch.
-- `./scripts/worktree-setup.sh` no longer writes a per-slot build root into
+- `./boga worktree start` does not write a per-slot build root into
   `apps/mobile/.maestro/maestro.env.local`. The canonical shared root is owned by
   `apps/mobile/scripts/maestro-env.sh`, and the `.app` path is derived from it, so
   the build-write path and the cache-lookup path can never diverge. Only the

@@ -29,7 +29,7 @@ Useful checks:
 
 ```bash
 cd /Users/sboschi/Code/BOGA3
-./scripts/worktree-setup.sh
+./boga worktree start
 
 cd apps/mobile
 npm install

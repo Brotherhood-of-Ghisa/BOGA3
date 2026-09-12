@@ -1,64 +1,61 @@
 # Environment & Worktree Setup (Quickref)
 
-> **Owns:** everyday worktree setup/teardown commands. **Not here:** slot/port/isolation deep contract → `12`; gates → `02`. **Load when:** creating, tearing down, or repairing a worktree environment.
+> **Owns:** the everyday worktree lifecycle commands. **Not here:** slot-lease/port/isolation contract → `12`; leftover cleanup → [`docs/procedures/worktree-cleanup.md`](../procedures/worktree-cleanup.md); gates → `02`. **Load when:** opening, finishing, or repairing a worktree.
 
-How to take a git worktree from nothing to a working environment, and how to tear
-it down. Load on demand (worktree lifecycle/repair). The full isolation contract —
-slot model, port formulas, every flag — is the conditional deep companion
-`12-worktree-config-and-isolation.md`. Gates are `02-quality-and-test-gates.md`.
+This repo runs several agents and humans in parallel via `git worktree`. Each
+worktree holds one **slot lease**: its own Supabase ports and `project_id`,
+Expo/Metro port, and iOS simulator. The agent that opens a worktree owns it until
+its PR merges. **Worktrees must live outside any other BOGA checkout — never
+nested.**
 
-This repo runs multiple agents/humans in parallel via `git worktree`; each worktree
-is one isolated **slot** with its own Supabase ports + `project_id`, Expo/Metro
-port, and iOS simulator. **Worktrees must live outside any other BOGA checkout —
-never nested.**
-
-## Set up a new worktree
-
-From the main checkout:
+## Lifecycle (every worktree, every agent)
 
 ```bash
-./scripts/worktree-create.sh <branch>      # creates a non-nested worktree under ~/Projects/boga-worktrees and runs setup inside it
-cd <new worktree path>
-cd apps/mobile && npm install && cd ../..  # isolated deps — NOT done by setup
-./supabase/scripts/local-runtime-up.sh     # boots THIS slot's local Supabase + writes apps/mobile/.env.local  (needs Docker)
-./scripts/worktree-doctor.sh               # optional: verify slot / ports / config
+# 1. Open: a new worktree branched from the latest origin/main
+./boga worktree create <branch>
+#    …or, inside a worktree your harness already created
+./boga worktree start
+
+# 2. Work: every ./boga test|db|ios command fails hard without the lease
+./boga test fast
+
+# 3. PR opened: stop the stack, then wait for the PR in the background
+./boga db down
+./boga pr wait                # exits 0 merged, 3 closed, 2 no PR
+
+# 4. Merged or closed: delete stack + lease + worktree
+./boga worktree release
 ```
 
-`worktree-setup.sh` (run automatically by `worktree-create.sh`, idempotent if you
-re-run it) assigns the slot, generates `supabase/config.toml` and
-`apps/mobile/.maestro/maestro.env.local`, symlinks the shared machine config, and
-installs the post-checkout hook. The first time on a machine it also seeds the
-shared config tier `~/.config/boga/` via `boga-config-init.sh`; those shared files
-only need real credentials for **hosted** Supabase — local dev works without them.
+- `start` fails unless the worktree contains the latest `origin/main`; the fix it
+  prints is `git rebase origin/main`. Pass `--base <ref>` (or `create --from <ref>`)
+  only when told to branch from something else. Re-running `start` keeps the slot
+  and regenerates config.
+- Review feedback after step 3: work again (any gate restarts the stack), push,
+  `./boga db down`, restart `./boga pr wait`.
+- `release` refuses an open PR unless `--force`; `--keep-worktree` keeps the
+  checkout.
+- A session that died before step 4 leaves leftovers. `./boga worktree ls` shows
+  them; clear them with [`docs/procedures/worktree-cleanup.md`](../procedures/worktree-cleanup.md).
 
-You rarely run any of this by hand: **the quality gates self-bootstrap** deps and
-the local Supabase stack (see `02`). For iOS/Maestro, build the shared dev-client
-once — `cd apps/mobile && ./scripts/maestro-ios-dev-client-build.sh` (when to
-rebuild: `02`).
+## Machine prerequisites (once)
 
-Machine prerequisites (once): Docker running, Node, Xcode + simulators, Maestro,
-`jq`. A "command not found" / "infra unavailable" error is a bootstrap gap —
-re-run `./scripts/worktree-setup.sh` and retry; it is not a missing tool.
+Docker running, Node, Xcode + simulators, Maestro, `jq`, and an authenticated
+`gh`. `./boga doctor` checks them; a FAIL is a bootstrap gap to fix, not a skip.
 The repo pins the Supabase CLI (`BOGA_SUPABASE_CLI_DEFAULT_VERSION` in
 `scripts/worktree-lib.sh`); do not pin an older `SUPABASE_CLI_VERSION` in
 `~/.config/boga/supabase/cli.env`. CLIs below `BOGA_SUPABASE_CLI_MIN_VERSION`
 need `deno.land` at every edge-runtime start and fail `supabase start` with
-`Error status 502` when it is unreachable — `./boga doctor` fails on such a pin
-(details: `RUNBOOK.md`).
+`Error status 502` when it is unreachable (details: `RUNBOOK.md`).
 
-## Tear down a worktree
+The shared config tier `~/.config/boga/` is seeded by the first `start` on a
+machine; its files need real credentials only for **hosted** Supabase.
 
-```bash
-./supabase/scripts/local-runtime-down.sh                              # stop THIS slot's Supabase (containers persist for fast restart)
-git worktree remove --force <path>                                    # from the main checkout, once you are done with it
-./scripts/worktree-clean.sh --slot <n> --supabase --remove-registry  # remove that slot's Docker stack + registry file
-```
+## Dependencies and the iOS dev client
 
-Orphans from already-deleted worktrees are reaped by `./scripts/worktree-sweep.sh`
-(also run automatically before every `local-runtime-up.sh`; 600 s grace; preview
-with `--dry-run`). `worktree-clean.sh` refuses the current slot without `--force`.
+Gates install `apps/mobile` dependencies when they are missing (isolated per
+worktree — never symlink or share `node_modules`). For iOS/Maestro, build the
+shared dev client once: `./boga ios build-client` (when to rebuild: `02`).
 
-Never share `apps/mobile/node_modules` or one iOS simulator across worktrees.
-
-Slot/port formulas, the completion signals the sweep uses, every flag, and the
-per-script reference live in `12-worktree-config-and-isolation.md`.
+Slot and port formulas, lease rules, every flag, and the removed mechanisms live
+in `12-worktree-config-and-isolation.md`.

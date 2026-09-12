@@ -8,12 +8,6 @@ source "${SCRIPT_DIR}/_common.sh"
 
 ensure_tmp_dir
 
-if [[ -x "${REPO_ROOT}/scripts/worktree-sweep.sh" ]]; then
-  echo "[supabase] sweeping completed worktree Supabase infra before startup"
-  "${REPO_ROOT}/scripts/worktree-sweep.sh" --current-slot "${WORKTREE_SLOT:-0}" \
-    || echo "[supabase] warning: worktree sweep failed; continuing current runtime startup" >&2
-fi
-
 sync_mobile_supabase_env() {
   local mobile_dir="${REPO_ROOT}/apps/mobile"
   local env_file="${mobile_dir}/.env.local"

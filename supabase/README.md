@@ -18,7 +18,8 @@ This folder is the backend root for M5 (`Supabase` local-first development and t
 
 ## Local environment configuration strategy
 
-- Run `./scripts/worktree-setup.sh` from the repo root before local runtime use.
+- Run `./boga worktree start` from the repo root first: every script here fails
+  without this worktree's slot lease (`docs/specs/12-worktree-config-and-isolation.md`).
 - Checked-in Supabase config is `supabase/config.toml.template`.
 - Generated per-worktree config is `supabase/config.toml` and is gitignored.
 - Local script overrides: `supabase/.env.local`
@@ -43,10 +44,9 @@ For an iOS Simulator, run from repo root:
 What it does:
 
 1. Starts the Supabase local stack (`supabase start` via pinned `npx`).
-2. Opportunistically sweeps completed worktree Supabase infra before startup.
-3. Starts the local Edge Runtime for every function under
+2. Starts the local Edge Runtime for every function under
    `supabase/functions/**` (including `health` and `agent-api`).
-4. Waits until `GET /functions/v1/health` responds. The shared baseline
+3. Waits until `GET /functions/v1/health` responds. The shared baseline
    preflight also refreshes this worktree's Edge Runtime when a previously
    running stack has not yet registered a newly checked-out `agent-api`.
 
@@ -68,10 +68,11 @@ Stop the local runtime:
 ./supabase/scripts/local-runtime-down.sh
 ```
 
-Sweep completed/orphaned worktree Supabase infra:
+Remove this worktree's stack, lease, and checkout once its PR merges or closes
+(leftovers from dead sessions: `docs/procedures/worktree-cleanup.md`):
 
 ```bash
-./scripts/worktree-sweep.sh
+./boga worktree release
 ```
 
 ## Deterministic local reset/seed path
@@ -232,7 +233,7 @@ Parallel-run note:
 - each initialized BOGA worktree gets readable Supabase `project_id`, slot-derived ports, containers, and database volume.
 - the sync/auth contract suites use per-run unique record IDs, so repeated runs in one slot do not collide.
 - tests require the deterministic fixture baseline to exist but do not require empty app tables.
-- run `./scripts/worktree-doctor.sh` when a backend suite appears to hit another worktree's local runtime.
+- run `./boga worktree doctor` when a backend suite appears to hit another worktree's local runtime.
 
 ## M21 read-only agent API and OAuth boundary
 

@@ -10,7 +10,7 @@ MOBILE_ENV_FILE="${REPO_ROOT}/apps/mobile/.env.local"
 
 if [[ ! -f "${HOSTED_ENV_FILE}" ]]; then
   echo "[supabase] hosted env file not found: ${HOSTED_ENV_FILE}" >&2
-  echo "[supabase] run ./scripts/worktree-setup.sh, then fill hosted credentials in supabase/.env.hosted" >&2
+  echo "[supabase] run ./boga worktree start, then fill hosted credentials in supabase/.env.hosted" >&2
   exit 1
 fi
 

@@ -48,11 +48,10 @@ TS_METRO_HTTPS_PORT=8443
 # ensure-dev-baseline below both honor this flag. See docs/specs/12.
 export BOGA_MOBILE_DEV_DB=1
 
-# 1. Ensure this worktree has a generated Supabase config (slot/project_id/ports).
-if [[ ! -f "$REPO_ROOT/supabase/config.toml" ]]; then
-  echo "[dev-remote] no supabase/config.toml — running worktree setup"
-  "$REPO_ROOT/scripts/worktree-setup.sh"
-fi
+# 1. Require this checkout's slot lease (docs/specs/12); never set one up on the fly.
+# shellcheck disable=SC1091
+source "$REPO_ROOT/scripts/worktree-lib.sh"
+boga_require_slot_lease "$REPO_ROOT" || exit 1
 
 # 2. Ensure isolated mobile deps (never symlinked/shared between worktrees).
 if [[ ! -d "$MOBILE_DIR/node_modules" ]]; then
