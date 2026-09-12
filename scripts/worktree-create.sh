@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 
+# ./boga worktree create — a new linked worktree branched from the latest
+# origin/main (or --from), placed outside every BOGA checkout, then
+# `./boga worktree start` inside it. Contract:
+# docs/specs/12-worktree-config-and-isolation.md.
+
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -9,23 +14,25 @@ source "$SCRIPT_DIR/worktree-lib.sh"
 
 BRANCH_NAME=""
 WORKTREE_NAME=""
-START_POINT="HEAD"
+START_POINT=""
 DETACH=0
 ROOT_OVERRIDE=""
 
 usage() {
   cat <<'EOF'
 Usage:
-  ./scripts/worktree-create.sh [options] <branch-name>
+  ./boga worktree create [options] <branch-name>
 
-Creates a linked git worktree outside the current BOGA checkout, then runs
-./scripts/worktree-setup.sh in that worktree.
+Fetches origin main, creates a linked worktree under the worktree root on a new
+branch from origin/main, then runs ./boga worktree start in it. An existing
+local branch is checked out as-is (start then requires it to contain origin/main).
 
 Options:
-  --name <name>       Directory name under the worktree root.
-  --from <ref>        Start point for a new branch (default: HEAD).
+  --name <name>       Directory name under the worktree root (default: the branch name).
+  --from <ref>        Start point instead of origin/main (explicit override; start
+                      then checks against <ref>).
   --root <path>       Worktree parent directory (default: $BOGA_WORKTREE_ROOT or ~/Projects/boga-worktrees).
-  --detach            Create a detached worktree at --from instead of a branch.
+  --detach            Create a detached worktree at --from (or origin/main).
   -h, --help          Show this help text.
 EOF
 }
@@ -90,7 +97,14 @@ fi
 
 boga_validate_worktree_placement "$REPO_ROOT" || exit 1
 
-"$SCRIPT_DIR/worktree-setup.sh" >/dev/null
+START_ARGS=()
+if [[ -n "$START_POINT" ]]; then
+  START_ARGS=(--base "$START_POINT")
+else
+  echo "[worktree-create] fetching origin main"
+  git -C "$REPO_ROOT" fetch --quiet origin main
+  START_POINT="origin/main"
+fi
 
 WORKTREE_PARENT="${ROOT_OVERRIDE:-$(boga_worktree_root)}"
 mkdir -p "$WORKTREE_PARENT"
@@ -116,17 +130,14 @@ if [[ "$DETACH" == "1" ]]; then
 elif git -C "$REPO_ROOT" show-ref --verify --quiet "refs/heads/$BRANCH_NAME"; then
   git -C "$REPO_ROOT" worktree add "$WORKTREE_PATH" "$BRANCH_NAME"
 else
-  git -C "$REPO_ROOT" worktree add -b "$BRANCH_NAME" "$WORKTREE_PATH" "$START_POINT"
+  git -C "$REPO_ROOT" worktree add --no-track -b "$BRANCH_NAME" "$WORKTREE_PATH" "$START_POINT"
 fi
 
-"$WORKTREE_PATH/scripts/worktree-setup.sh"
+"$WORKTREE_PATH/scripts/worktree-start.sh" "${START_ARGS[@]+"${START_ARGS[@]}"}"
 
 cat <<EOF
 [worktree-create] ready
   path:   $WORKTREE_PATH
   branch: ${BRANCH_NAME:-detached}
-
-Next:
-  cd "$WORKTREE_PATH"
-  cd apps/mobile && npm install
+  next:   cd "$WORKTREE_PATH"
 EOF

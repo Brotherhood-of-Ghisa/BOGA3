@@ -1,12 +1,10 @@
 #!/usr/bin/env bash
 
 # run-meta-tests.sh — infra-free self-tests for the repo meta-tooling
-# (gen-docs.sh, test-for.sh, pr-check.sh) and the Maestro fixture-user rule.
+# (gen-docs.sh, test-for.sh, pr-check.sh), the Maestro fixture-user rule, and
+# the worktree lifecycle (temp git repos + stub gh/docker).
 # Runs as the `meta-tests` lane (fast gate, repo half; see scripts/lanes.tsv)
 # and in CI.
-#
-# The worktree-sweep tests in this directory are NOT run here — they exercise
-# real git/registry state and remain manual.
 
 set -euo pipefail
 
@@ -18,6 +16,7 @@ TESTS=(
   "pr-check.test.sh"
   "maestro-fixture-users.test.sh"
   "supabase-cli-version.test.sh"
+  "worktree-lifecycle.test.sh"
 )
 
 failed=0

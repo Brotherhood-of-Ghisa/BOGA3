@@ -207,12 +207,13 @@ command, run by the owner, at a defined moment.
 `./boga worktree start [--base <ref>]`:
 
 1. Checks placement.
-2. **No `.worktree-slot` yet (a new lease):** runs `git fetch origin main` and
-   fails unless `HEAD` contains `origin/main`
+2. **No `.worktree-slot` yet (a new lease):** in a linked worktree, runs
+   `git fetch origin main` and fails unless `HEAD` contains `origin/main`
    (`git merge-base --is-ancestor origin/main HEAD`), printing
    `git rebase origin/main` as the fix. `--base <ref>` checks against `<ref>`
    instead — use it only when told to branch from something else. Then takes the
-   lowest free slot.
+   lowest free slot in `1..99`. The main checkout always takes slot `0`, with no
+   base check.
 3. **`.worktree-slot` already present (re-running):** keeps that slot. It
    re-creates the registry file if it is absent, and fails if another path
    holds slot `N`. It does not repeat the base check — a mid-task worktree is

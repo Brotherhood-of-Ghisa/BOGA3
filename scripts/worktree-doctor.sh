@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 
+# ./boga worktree doctor — read-only diagnostics for this worktree: placement,
+# slot lease, expected vs configured ports, shared-config symlinks, deps.
+# Changes nothing; exits non-zero on any failure.
+
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -67,20 +71,18 @@ else
   fail "worktree placement is unsafe"
 fi
 
-if [[ -f "$REPO_ROOT/.worktree-slot" ]]; then
-  if slot="$(boga_read_slot_file "$REPO_ROOT")"; then
-    ok "slot file: $slot"
-  else
-    fail "invalid .worktree-slot"
-    slot="0"
-  fi
+if slot="$(boga_read_slot_file "$REPO_ROOT" 2>/dev/null)"; then
+  ok "slot file: $slot"
 else
-  if boga_is_linked_git_worktree "$REPO_ROOT"; then
-    fail "linked worktree is missing .worktree-slot; run ./scripts/worktree-setup.sh"
-  else
-    slot="0"
-    warn "no .worktree-slot; non-linked checkout defaults to slot 0"
-  fi
+  fail "no valid .worktree-slot; run ./boga worktree start"
+  slot="0"
+fi
+
+if lease_error="$(boga_require_slot_lease "$REPO_ROOT" 2>&1)"; then
+  ok "slot lease valid: $(boga_registry_file "$slot")"
+else
+  fail "slot lease invalid:"
+  printf '       %s\n' "$lease_error" >&2
 fi
 
 echo "  expected project_id: $(boga_project_id_for_slot "$slot" "$REPO_ROOT")"
@@ -100,18 +102,21 @@ if [[ -f "$CONFIG_FILE" ]]; then
 
   [[ "$project_id" == "$(boga_project_id_for_slot "$slot" "$REPO_ROOT")" ]] \
     && ok "supabase project_id matches slot" \
-    || fail "supabase project_id '$project_id' does not match slot $slot"
+    || fail "supabase project_id '$project_id' does not match slot $slot; run ./boga worktree start"
   [[ "$api_port" == "$(boga_port_for_slot api "$slot")" ]] \
     && ok "supabase api port matches slot" \
-    || fail "supabase api port '$api_port' does not match slot $slot"
+    || fail "supabase api port '$api_port' does not match slot $slot; run ./boga worktree start"
   [[ "$db_port" == "$(boga_port_for_slot db "$slot")" ]] \
     && ok "supabase db port matches slot" \
-    || fail "supabase db port '$db_port' does not match slot $slot"
+    || fail "supabase db port '$db_port' does not match slot $slot; run ./boga worktree start"
   [[ "$studio_port" == "$(boga_port_for_slot studio "$slot")" ]] \
     && ok "supabase studio port matches slot" \
-    || fail "supabase studio port '$studio_port' does not match slot $slot"
+    || fail "supabase studio port '$studio_port' does not match slot $slot; run ./boga worktree start"
+  if [[ -f "$REPO_ROOT/supabase/config.toml.template" && "$REPO_ROOT/supabase/config.toml.template" -nt "$CONFIG_FILE" ]]; then
+    fail "supabase/config.toml is older than its template; run ./boga worktree start"
+  fi
 else
-  fail "missing supabase/config.toml; run ./scripts/worktree-setup.sh"
+  fail "missing supabase/config.toml; run ./boga worktree start"
 fi
 
 for local_file in \
@@ -123,7 +128,7 @@ for local_file in \
   elif [[ -e "$local_file" ]]; then
     warn "non-symlink local config file: $local_file"
   else
-    fail "missing local config path: $local_file"
+    fail "missing local config path: $local_file; run ./boga worktree start"
   fi
 done
 
@@ -142,7 +147,7 @@ if [[ -f "$MAESTRO_ENV" ]]; then
     warn "Maestro env exists but may not use expected Expo port $(boga_port_for_slot expo "$slot")"
   fi
 else
-  fail "missing $MAESTRO_ENV"
+  fail "missing $MAESTRO_ENV; run ./boga worktree start"
 fi
 
 if [[ -L "$REPO_ROOT/apps/mobile/node_modules" ]]; then
@@ -150,7 +155,7 @@ if [[ -L "$REPO_ROOT/apps/mobile/node_modules" ]]; then
 elif [[ -d "$REPO_ROOT/apps/mobile/node_modules" ]]; then
   ok "apps/mobile/node_modules is worktree-local"
 else
-  warn "apps/mobile/node_modules is missing; run 'cd apps/mobile && npm install' before frontend gates"
+  warn "apps/mobile/node_modules is missing; gates install it on first run"
 fi
 
 check_port_listener "Supabase API" "$(boga_port_for_slot api "$slot")"

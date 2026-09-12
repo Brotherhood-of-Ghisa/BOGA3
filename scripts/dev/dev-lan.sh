@@ -34,13 +34,10 @@ MOBILE_DIR="$REPO_ROOT/apps/mobile"
 # ensure-dev-baseline below both honor this flag. See docs/specs/12.
 export BOGA_MOBILE_DEV_DB=1
 
-# 1. Ensure this worktree has a generated Supabase config (slot/project_id/ports).
-#    A fresh worktree created via worktree-create.sh already has this; the guard
-#    only fires for a checkout that was never set up.
-if [[ ! -f "$REPO_ROOT/supabase/config.toml" ]]; then
-  echo "[dev-lan] no supabase/config.toml — running worktree setup"
-  "$REPO_ROOT/scripts/worktree-setup.sh"
-fi
+# 1. Require this checkout's slot lease (docs/specs/12); never set one up on the fly.
+# shellcheck disable=SC1091
+source "$REPO_ROOT/scripts/worktree-lib.sh"
+boga_require_slot_lease "$REPO_ROOT" || exit 1
 
 # 2. Ensure isolated mobile deps. Per the worktree contract these must be
 #    installed in-place and never symlinked/shared between worktrees.
