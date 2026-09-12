@@ -4,7 +4,7 @@
 
 - Milestone ID: `M24`
 - Title: Current-session insights and PR celebration
-- Status: `planned`
+- Status: `in_progress`
 
 ## Parent references
 
@@ -288,7 +288,7 @@ the relevant sync contract in the same change.
 
 1. `docs/plans/tasks/M24-T01-Session_insight_calculation_contract.md` - build the
    shared current-session muscle and as-of-session PR derivation with unit tests.
-   (`planned`)
+   (`completed`)
 2. `docs/plans/tasks/M24-T02-Live_recorder_muscle_load.md` - add the compact recorder
    muscle-load row, detail sheet, and edge states. (`planned`)
 3. `docs/plans/tasks/M24-T03-Exercise_PR_celebration_and_sharing.md` - upgrade the live
