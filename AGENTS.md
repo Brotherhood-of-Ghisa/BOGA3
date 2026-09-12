@@ -67,7 +67,7 @@ place each under `docs/specs/**`, routed from here.
 | Data model / schema / migrations / sync scope | `docs/specs/05-data-model.md` |
 | Sync (data model, server schema, push/pull RPC, drift) | `docs/specs/05-data-model.md`, `docs/specs/tech/sync-v2-server-contract.md` |
 | Auth / RLS / backend API | `docs/specs/10-api-authn-authz-guidelines.md`, `supabase/README.md` |
-| Groups (group tables/RPCs, share trigger, `src/groups`, group screens) | `docs/specs/tech/groups-contract.md`, `docs/specs/milestones/M22-groups-and-foundations.md`, `docs/specs/10-api-authn-authz-guidelines.md` |
+| Groups (group tables/RPCs, share trigger, `src/groups`, group screens) | `docs/specs/tech/groups-contract.md`, `docs/specs/10-api-authn-authz-guidelines.md` |
 | Maestro / iOS e2e flows or harness | `docs/specs/11-maestro-runtime-and-testing-conventions.md`, `apps/mobile/README-maestro.md` |
 | Worktree lifecycle (create / tear down / repair) or isolation / slot bugs | `docs/specs/01-worktree-and-environment.md` (everyday), `docs/specs/12-worktree-config-and-isolation.md` (deep contract) |
 | Deep testing strategy / adding or changing a test lane | `docs/specs/06-testing-strategy.md` |

@@ -38,7 +38,7 @@ Verification:
 Closeout:
 - Fill in the task card completion note.
 - Mark the task card completed, blocked, or outdated as appropriate.
-- Move completed or outdated task cards to docs/tasks/complete/ in the same session.
+- Delete completed or outdated task cards in the same session (git history keeps them).
 ```
 
 ## Short version

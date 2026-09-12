@@ -1,7 +1,10 @@
 # Brainstorm — Groups, group exercises, leaderboards, and the group stream
 
 - Date: 2026-09-10
-- Status: `ready for review` (2026-09-10). **[default]** = proposal awaiting confirmation;
+- Status: `adopted — M22 shipped; phases 2–5 pending` (2026-09-12). Part A/C
+  decisions carried into M22 are recorded in
+  `docs/specs/milestones/archive/M22-groups-and-foundations.md` and
+  `docs/specs/tech/groups-contract.md`. **[default]** = proposal awaiting confirmation;
   **[open]** = needs discussion; **[unreviewed]** = drafted, not yet reviewed.
 - Branch: `claude/group-activity-stream-221a5c`
 - Not source-of-truth. Adopted content graduates into `docs/specs/**`
@@ -41,7 +44,7 @@
 | 22 | 2026-09-10 | C7.2: an in-progress session shows **"training now" indefinitely** while active (no staleness cutoff). |
 | 23 | 2026-09-10 | C7.3: removal shows as **"X was removed"** (leaving: "X left the group"). |
 | 24 | 2026-09-10 | C7.4: invite code visible/shareable by **owner and admins only**. |
-| 25 | 2026-09-10 | M22 adopted: `docs/specs/milestones/M22-groups-and-foundations.md` + technical design `docs/specs/tech/groups-contract.md`. M18 marked `outdated`. |
+| 25 | 2026-09-10 | M22 adopted: `docs/specs/milestones/archive/M22-groups-and-foundations.md` + technical design `docs/specs/tech/groups-contract.md`. M18 marked `outdated`. |
 
 ---
 
@@ -264,7 +267,7 @@ proposals.
 - Proposed milestone ID: `M22` (next free after M21).
 - Status: `draft` — product-level spec. Technical design and the task
   breakdown come after sign-off.
-- Destination when adopted: `docs/specs/milestones/M22-groups-and-foundations.md`
+- Destination when adopted: `docs/specs/milestones/archive/M22-groups-and-foundations.md`
   (template `docs/specs/templates/milestone-spec-template.md`).
 
 ## C1. Objective
