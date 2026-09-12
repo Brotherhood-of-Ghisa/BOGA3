@@ -2,7 +2,8 @@
 
 - Date: 2026-09-10
 - Status: `adopted — M22 shipped; phases 2–5 pending` (2026-09-12). Part A/C
-  decisions carried into M22 now live in `docs/specs/00-product.md` and
+  decisions carried into M22 are recorded in
+  `docs/specs/milestones/archive/M22-groups-and-foundations.md` and
   `docs/specs/tech/groups-contract.md`. **[default]** = proposal awaiting confirmation;
   **[open]** = needs discussion; **[unreviewed]** = drafted, not yet reviewed.
 - Branch: `claude/group-activity-stream-221a5c`

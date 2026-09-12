@@ -27,7 +27,7 @@ So for example: `M33-T04-Do_Something.md`
 - Status: `planned | in_progress | completed | blocked | outdated`
 - File location rule:
   - author active cards in `docs/tasks/<task-id>.md`
-  - move the file to `docs/tasks/complete/<task-id>.md` when `Status` becomes `completed` or `outdated`
+  - delete the file when `Status` becomes `completed` or `outdated` (git history keeps it)
 - Session date:
 - Session interaction mode: `interactive (default) | non_interactive`
 
@@ -183,7 +183,7 @@ UI task acceptance boilerplate (include/adapt when `UI Impact = yes`; remove for
 ## Status update checklist (mandatory at closeout)
 
 - Update `Status` to `completed`, `blocked`, or `outdated`.
-- If `Status = completed` or `outdated`, move the task card to `docs/tasks/complete/` and update affected references in the same session.
+- If `Status = completed` or `outdated`, delete the task card and update affected references in the same session.
 - Ensure completion note is filled before handoff.
 - If the task changed significant cross-cutting behavior, ensure the relevant project-level docs (`03`, `04`, `05`, `06`) were updated in the same session rather than only the milestone/task docs.
 - For UI/UX tasks, update the relevant `docs/specs/ui/*.md` files (or record explicit `no update` rationale) and keep entries synthetic/overview-first.

@@ -50,7 +50,7 @@ List planned task cards for this milestone.
 
 Rule:
 - use `docs/tasks/<task-id>.md` for active/planned/blocked cards
-- update references to `docs/tasks/complete/<task-id>.md` once a task card is completed and moved
+- mark a task's entry `completed` when its card is deleted at closeout (git history keeps the card)
 
 ## Risks / dependencies
 

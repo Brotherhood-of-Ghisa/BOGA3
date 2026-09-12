@@ -14,9 +14,9 @@
 >   actions, leave, and the username gate (M22-T05).
 > - §8, the two-user Maestro lane `ios-groups-e2e` (M22-T06).
 >
-> This doc owns the technical contract; the group product decisions live in
-> `docs/specs/00-product.md`. The shipped milestone spec is history at
-> `docs/specs/milestones/archive/M22-groups-and-foundations.md`.
+> This doc owns the technical contract. The product requirements and
+> decisions it implements are recorded in the shipped milestone spec, now
+> history at `docs/specs/milestones/archive/M22-groups-and-foundations.md`.
 
 This doc covers:
 

@@ -231,12 +231,12 @@ T03 ──► T04 ──► T05 ─────┼──► T06 ──► T07
 
 - What changed: T01–T06 shipped (PRs #268 T01, #270 T02, #269 T03, #274 T04,
   #277 T05, #278 T06). The group domain is as-built in
-  `docs/specs/tech/groups-contract.md`, and the product decisions are in
-  `00-product.md`. T07 archived this spec and M18.
+  `docs/specs/tech/groups-contract.md`. T07 (PR #280) archived this spec and
+  M18.
 - Verification summary: each AC is mapped to its proof below. `C` is
   `supabase/tests/groups-contract.sh`, `J` is `apps/mobile/app/__tests__/`,
   and `M` is `apps/mobile/.maestro/flows/groups-two-user-stream.yaml`. The
-  full gate run is recorded in the M22-T07 card.
+  full gate run is recorded in PR #280.
 
   | AC | Proof | Kind |
   | --- | --- | --- |
@@ -254,7 +254,7 @@ T03 ──► T04 ──► T05 ─────┼──► T06 ──► T07
   | 12 | J/groups-screens.test.tsx:297, :309, :486; J/groups-action-hook.test.tsx:66; J/groups-write-screens.test.tsx:227, :319, :594 | unit |
   | 13 | C:1139 (forced share failure: `sync_push ok`, self-heals); J/domain-schema-migrations.test.ts:155 | server — **mobile gap → `docs/tasks/T-20260912-01-Groups_mobile_sync_isolation_test.md`** |
   | 14 | C:1184 (All dedupe), C:1243 (per-group scope); J/groups-screens.test.tsx:266 | server + unit |
-  | 15 | the full local gate run on the T07 PR head (M22-T07 card, Evidence) | gate run |
+  | 15 | the full local gate run on `c9121e7` (PR #280, Tests): fast, handles, backend, and all five iOS lanes, including `ios-groups-e2e` | gate run |
 
 - What remains: the AC13 mobile follow-up card above. Weaker-but-covered
   spots, not follow-ups: AC12 is proven by unit tests only (there is no device

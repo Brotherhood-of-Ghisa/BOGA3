@@ -95,8 +95,7 @@ Define the canonical repository structure, path ownership, and placement convent
   - owns subsystem-level technical deep-dive docs that complement (but do not replace) top-level architecture/testing docs.
 - `docs/tasks/`
   - owns active per-session execution task cards (`planned`, `in_progress`, `blocked`).
-- `docs/tasks/complete/`
-  - owns completed task cards after closeout.
+  - completed or outdated cards are deleted at closeout; git history keeps them.
 - `docs/brainstorms/`
   - owns non-authoritative ideation notes (helpful context, not source of truth).
 - `supabase/`
@@ -113,9 +112,8 @@ Define the canonical repository structure, path ownership, and placement convent
 - `docs/specs/tech/` (introduced in M13)
   - canonical location for subsystem-level technical deep dives (for example client sync engine internals, failure handling, and maintenance contracts).
   - keep deep-dive docs concise, source-linked, and update them in the same task when subsystem behavior materially changes.
-- `docs/tasks/complete/`
-  - canonical archive location for task cards whose status is `completed`.
-  - move a task card here in the same session that marks it `completed`.
+- `docs/tasks/` closeout
+  - there is no in-repo archive for task cards: delete a card in the same change that marks it `completed` or `outdated` (git history keeps it).
 - `apps/mobile/.maestro/flows`
   - remains the canonical location for Maestro flow definitions.
 - `apps/mobile/.maestro/maestro.env.sample`
