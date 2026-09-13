@@ -21,6 +21,9 @@ apps/mobile/src/data/**	fast,backend	data layer / client schema
 apps/mobile/drizzle/**	fast,backend	migration artifacts
 apps/mobile/scripts/check-sync-schema-drift*	fast,backend	sync drift checker
 apps/mobile/src/groups/**	fast,ios-groups-e2e	group client (two-user e2e lane)
+apps/mobile/src/groups/set-facts.ts	groups-leaderboards	group set rules the group-eval function loads
+apps/mobile/src/exercise-calculations/**	groups-leaderboards	calculations the group-eval function loads
+apps/mobile/src/session-recorder/set-semantics.ts	groups-leaderboards	set semantics the group-eval function loads
 apps/mobile/src/**	fast	mobile TS/JS logic
 apps/mobile/*.json	fast	mobile config (native dep change ⇒ also rebuild dev client + frontend, see spec 02)
 apps/mobile/*.ts	fast	mobile config
@@ -33,7 +36,9 @@ supabase/migrations/**	backend	server schema / RLS / RPCs
 supabase/migrations/*group*	ios-groups-e2e	group schema / RPCs (two-user e2e lane)
 supabase/scripts/groups-fixture-reset.sh	ios-groups-e2e	groups e2e fixture reset
 supabase/functions/**	backend	edge functions
+supabase/functions/group-eval/**	groups-leaderboards	group evaluator function
 supabase/tests/**	backend	backend test bodies
+supabase/tests/lib/**	groups-contract,groups-leaderboards	shared group lane fixtures
 supabase/scripts/**	backend	backend wrappers / runtime scripts
 supabase/config.toml.template	backend	Supabase auth/runtime configuration
 scripts/smoke-boga-mcp.sh	mcp-smoke	MCP live smoke harness

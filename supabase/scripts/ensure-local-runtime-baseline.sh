@@ -79,26 +79,35 @@ runtime_rest_api_reachable() {
     >/dev/null 2>&1
 }
 
-ensure_agent_api_route_registered() {
-  [[ -d "${SUPABASE_DIR}/functions/agent-api" ]] || return 0
+# <function dir> <probe path under /functions/v1>: neither probe ever answers 404
+# once its function is served (agent-api → 401, group-eval GET → 405).
+FUNCTION_ROUTE_PROBES=(
+  "agent-api agent-api/v1/agent/session"
+  "group-eval group-eval"
+)
 
-  local status
-  status="$(
-    curl --silent --output /dev/null --write-out '%{http_code}' \
-      --max-time 5 \
-      -H "apikey: ${ANON_KEY}" \
-      "${API_URL}/functions/v1/agent-api/v1/agent/session" \
-      2>/dev/null || true
-  )"
+ensure_function_routes_registered() {
+  local probe name path status missing=""
+  for probe in "${FUNCTION_ROUTE_PROBES[@]}"; do
+    name="${probe%% *}"
+    path="${probe#* }"
+    [[ -d "${SUPABASE_DIR}/functions/${name}" ]] || continue
+    status="$(
+      curl --silent --output /dev/null --write-out '%{http_code}' \
+        --max-time 5 \
+        -H "apikey: ${ANON_KEY}" \
+        "${API_URL}/functions/v1/${path}" \
+        2>/dev/null || true
+    )"
+    [[ "${status}" == "404" ]] && missing="${missing} ${name}"
+  done
 
-  if [[ "${status}" != "404" ]]; then
-    return 0
-  fi
+  [[ -n "${missing}" ]] || return 0
 
   # The local Edge Runtime snapshots function directories when its container is
-  # created. Recreate only this worktree's stack when a checkout adds agent-api
+  # created. Recreate only this worktree's stack when a checkout adds a function
   # after the runtime was already running; database volumes remain intact.
-  echo "[supabase] agent-api is absent from the running Edge Runtime; refreshing function routing"
+  echo "[supabase]${missing} absent from the running Edge Runtime; refreshing function routing"
   run_supabase stop >/dev/null
   "${SCRIPT_DIR}/local-runtime-up.sh"
   load_supabase_status_env
@@ -122,8 +131,12 @@ ensure_runtime_and_baseline() {
     load_supabase_status_env
   fi
 
-  ensure_agent_api_route_registered
+  ensure_function_routes_registered
   apply_pending_local_migrations
+
+  # The group evaluator's pg_net kick needs this stack's in-network URL (Vault;
+  # a db reset clears it). Idempotent.
+  "${SCRIPT_DIR}/group-eval-configure.sh"
 
   if ! "${SCRIPT_DIR}/smoke-seed.sh"; then
     if (( runtime_was_running == 1 )); then

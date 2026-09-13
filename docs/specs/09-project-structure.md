@@ -68,6 +68,7 @@ Define the canonical repository structure, path ownership, and placement convent
 - `apps/mobile/src/groups/` (M22)
   - owns the non-UI group client: wire types, the typed group RPC client (the only mobile code that calls Supabase for groups), `group_cache` access, the pure stream view model, the group NetInfo hook, and the resource/action hooks screens use (`docs/specs/tech/groups-contract.md` §6.1).
   - group screens under `app/**` consume it through `@/src/groups`; group code never runs inside the sync cycle and must not modify `src/sync/**` beyond the `group_cache` delete in the account wipe.
+  - `set-facts.ts` (M25) is the one implementation of the group set rules, shared with the `group-eval` Edge Function, which loads it by relative path: it may import only by relative `.ts` specifier (never `@/`), and only modules that follow the same rule.
 - `apps/mobile/src/exercise-core/` (M25)
   - owns `ExerciseCore` (`{ name, loadInputMode }`), the load-mode list, and `validateExerciseCore`: the one rule set that personal exercises (`src/data/exercise-catalog.ts`) and group exercises (`src/groups/api.ts`) share. It also owns `exercise-core-vectors.json`, which `groups-contract` runs against the server as well.
   - imports nothing, so an Edge Function can load it by relative path.
@@ -91,6 +92,10 @@ Define the canonical repository structure, path ownership, and placement convent
   - owns the authenticated, read-only BoGa3 agent HTTP API. This is the only
     service-role data boundary in the Virtual Coach flow; every query derives
     and filters by the validated OAuth subject.
+- `supabase/functions/group-eval/` (M25)
+  - owns the group evaluator: it drains `group_eval_queue` for the pg_net kick and pg_cron sweep, normalizes shared sets with `apps/mobile/src/groups/set-facts.ts`, and writes only through the service-role-only `group_eval_*` RPCs (`docs/specs/tech/groups-contract.md` §2.10). It has no client-facing API.
+- `supabase/tests/lib/`
+  - owns helpers sourced by more than one backend lane body (for example `groups-fixtures.sh`, shared by `groups-contract` and `groups-leaderboards`); files here are never lane bodies themselves.
 - `docs/procedures/`
   - owns step-by-step procedures that any agent harness follows when `AGENTS.md` routes to them (for example `worktree-cleanup.md`). A procedure states when to run it, its rules, and exact commands; the contracts it applies stay in `docs/specs/**`.
 - `apps/mobile/artifacts/maestro/`
