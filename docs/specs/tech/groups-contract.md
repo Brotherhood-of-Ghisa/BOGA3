@@ -20,6 +20,11 @@
 >   stream item and `group_stream` reads only that table; the wire contract
 >   is unchanged (§2.6, §4.2;
 >   `supabase/migrations/20260913153000_m25_group_events.sql`).
+> - M25 step 2, group exercises (M25-T01): the `group_exercises` table and its
+>   RPCs (§2.7, §4.4;
+>   `supabase/migrations/20260913121000_m25_group_exercises.sql`), proven by
+>   `./boga test groups-contract`, and the client wrappers plus the shared
+>   `ExerciseCore` validator (§6.1).
 >
 > This doc owns the technical contract and is the durable record of what M22
 > built. The M22 milestone spec (product requirements and acceptance criteria)
@@ -337,6 +342,39 @@ Indexes:
   share trigger has the same next-write limit, and there the share itself is
   missing.
 
+### 2.7 `group_exercises` — the group's exercise catalogue (M25-T01)
+
+A group exercise is a comparison identity: members log their own exercises and
+link them to it. It holds only the fields it shares with a personal exercise,
+the `ExerciseCore` `{ name, loadInputMode }`, plus the standard exercise it was
+copied from. Personal exercises stay the Sync v2 `exercise_definitions`; the
+two stores share one TS type and validator (M25 design decision T1).
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | `uuid` PK | `group_exercise_id` on the wire |
+| `group_id` | `uuid not null` → `groups(id) on delete cascade` | |
+| `name` | `text not null` | Non-empty and JS-trimmed (`String#trim`) |
+| `load_input_mode` | `text not null` | `in ('total_load','per_side_load')` |
+| `source_exercise_id` | `text null` | The standard seed id it was copied from (e.g. `seed_barbell_bench_press`). Null for a custom exercise. Trimmed, 1–100 characters. No FK (rule 2). |
+| `archived_at` | `timestamptz null` | Null means active. Archived keeps its links and a read-only board and is not offered for new links (D8). |
+| `created_by` | `uuid null` → `auth.users(id) on delete set null` | |
+| `created_at`, `updated_at` | `timestamptz not null default now()` | |
+
+**As-built (M25-T01).** `supabase/migrations/20260913121000_m25_group_exercises.sql`.
+
+- It follows ground rules 1–5. Index `(group_id)`. `service_role` keeps
+  `select/insert/update/delete`.
+- **Trim parity.** Postgres `btrim` strips spaces only. The name CHECK and the
+  RPCs therefore use `group_exercise_trim`, a regex over the ECMAScript
+  WhiteSpace + LineTerminator set, which is exactly what `String#trim` strips.
+  The shared vectors `apps/mobile/src/exercise-core/exercise-core-vectors.json`
+  run in jest against `validateExerciseCore` and in `groups-contract` against
+  `group_exercise_create` and the CHECKs, so device and server cannot drift.
+- **No length cap on `name` and no uniqueness**, like `exercise_definitions`.
+  The same standard exercise can be copied twice, and two group exercises may
+  share a name.
+
 ## 3. Authorization model
 
 - **No direct table access.** The group tables have RLS enabled, no permissive
@@ -395,7 +433,7 @@ matches the token prefix.
 | `AGENT_FORBIDDEN` | OAuth (agent) token |
 | `NOT_FOUND` | Group, session, or member not visible to the caller (non-member ≡ nonexistent) |
 | `FORBIDDEN` | Caller is a member, but their role disallows the action |
-| `VALIDATION` | Bad input (name/description bounds, `p_limit`, cursor shape, role value, target is self) |
+| `VALIDATION` | Bad input (name/description bounds, `p_limit`, cursor shape, role value, target is self; an exercise name, load mode, or source id; editing an archived exercise) |
 | `USERNAME_REQUIRED` | Create or join without a non-blank username |
 | `INVITE_INVALID` | Unknown or regenerated code, or the group is deleted |
 | `OWNER_MUST_TRANSFER` | The owner tried to leave |
@@ -602,6 +640,44 @@ Writes raise:
 - **Serialization.** Mutating RPCs lock the `groups` row (`for update`) before
   any role check; `group_join` locks it while resolving the code.
 
+### 4.4 Group exercises (M25-T01)
+
+```jsonc
+// GroupExercise
+{ "group_exercise_id": "uuid", "name": "…", "load_input_mode": "total_load|per_side_load",
+  "source_exercise_id": "seed_…|null",
+  "archived_at_ms": 1757500000000 }   // null while active
+```
+
+| RPC | Allowed | Effect / returns |
+| --- | --- | --- |
+| `group_exercise_list(p_group_id)` | active member | `{ exercises: GroupExercise[] }`, archived ones included. Active first, then `lower(name)`, `name`, id. |
+| `group_exercise_create(p_group_id, p_name, p_load_input_mode, p_source_exercise_id)` | owner, admin | A null source is a custom exercise; otherwise it is a copy whose name and mode the client supplies from its seed data. Returns `{ exercise }`. |
+| `group_exercise_update(p_group_id, p_exercise_id, p_name, p_load_input_mode)` | owner, admin | Replaces both fields; the source id never changes. Archived exercises are read-only (`VALIDATION`). Returns `{ exercise }`. |
+| `group_exercise_archive(p_group_id, p_exercise_id)` | owner, admin | Sets `archived_at`. Idempotent: the first `archived_at` is kept. Returns `{ exercise }`. |
+| `group_exercise_unarchive(p_group_id, p_exercise_id)` | owner, admin | Clears `archived_at`. Idempotent. Returns `{ exercise }`. |
+
+**As-built (M25-T01).**
+
+- **Posture** as §3: `security definer`, pinned `search_path`, execute granted
+  to `anon`, `authenticated`, and `service_role`. The internal helpers
+  (`group_exercise_trim`, `group_exercise_validate_name`,
+  `group_exercise_validate_load_input_mode`,
+  `group_exercise_validate_source_id`, `group_exercise_require_manager`,
+  `group_exercise_require`, `group_exercise_json`) have no client grant.
+- **Check order** as §4.3:
+  1. the preamble;
+  2. caller membership, `NOT_FOUND: group not found` (writes lock the group row);
+  3. role, `FORBIDDEN`;
+  4. input, `VALIDATION`: the name, then the load mode, then the source id;
+  5. target, `NOT_FOUND: group exercise not found` (an exercise of another
+     group looks nonexistent);
+  6. archived, `VALIDATION` (update only).
+- **Messages.** `VALIDATION: exercise name is required`, `VALIDATION:
+  load_input_mode must be total_load or per_side_load`, `VALIDATION:
+  source_exercise_id must be 1–100 characters after trimming`, and
+  `VALIDATION: an archived group exercise is read-only; unarchive it first`.
+
 ## 5. Stream-card metrics (computed on the viewing device)
 
 Group reads return raw set rows (§4.2). Every set rule runs on the viewing
@@ -674,6 +750,15 @@ RPC failure is caught in this module (C3.10.5, AC13).
     `regenerateGroupInviteCode`, `joinGroup`, `leaveGroup`,
     `removeGroupMember`, `setGroupMemberRole`, `transferGroupOwnership`.
   - `group_stream` always sends all three `p_*` args.
+  - Group exercises (M25-T01): `listGroupExercises`,
+    `createGroupExercise(groupId, { name, loadInputMode, sourceExerciseId })`,
+    `updateGroupExercise`, `archiveGroupExercise`, `unarchiveGroupExercise`,
+    and `groupExerciseCore` (a `GroupExercise` → `ExerciseCore`). Create and
+    update run `validateExerciseCore` (`apps/mobile/src/exercise-core`)
+    first. A rejection is a local `VALIDATION` carrying the validator's
+    message, with no request; otherwise the trimmed name is sent. The
+    personal repository (`saveExercise` in `src/data/exercise-catalog.ts`)
+    validates through the same function.
   - Membership writes follow the M22-T01 as-built results: `leaveGroup`
     resolves `{ group_id }`, and `removeGroupMember`, `setGroupMemberRole`,
     and `transferGroupOwnership` resolve the `group_get` payload
@@ -926,7 +1011,11 @@ on the group screen and the Create / Join actions on the tab.
     - the raw card and detail payloads: every live set as synced, tombstones
       omitted (§4.2);
     - share-trigger failure isolation: a forced trigger failure still commits
-      `sync_push` and writes `group.share_failed`.
+      `sync_push` and writes `group.share_failed`;
+    - (M25-T01) group exercises: the shared `ExerciseCore` vectors through
+      `group_exercise_create` and the table CHECKs, source-id bounds, the
+      owner/admin/member/non-member/removed matrix, another group's exercise
+      as a target, update, and the archive round trip.
 - **Existing lanes.** `sync-drift --strict` stays green, which proves ground
   rules 1–2. The sync push, pull, and e2e lanes stay unchanged and green.
 - **Jest:**

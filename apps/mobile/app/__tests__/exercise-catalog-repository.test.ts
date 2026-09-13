@@ -54,6 +54,25 @@ describe('exercise catalog repository', () => {
     });
   });
 
+  it('validates name and load mode through the shared ExerciseCore rules', async () => {
+    const store = createMockStore();
+    const repository = createExerciseCatalogRepository(store);
+    store.listMuscleGroups.mockResolvedValue([{ id: 'chest', displayName: 'Chest', familyName: 'Chest', sortOrder: 0 }]);
+    store.saveExercise.mockResolvedValue({ id: 'exercise-1', name: 'Bench', loadInputMode: 'total_load', deletedAt: null, mappings: [] });
+    const mappings = [{ muscleGroupId: 'chest', weight: 1 }];
+
+    await expect(repository.saveExercise({ name: ' \t\u00a0', mappings })).rejects.toThrow('Exercise name is required');
+    await expect(
+      repository.saveExercise({ name: 'Bench', loadInputMode: 'kg' as never, mappings })
+    ).rejects.toThrow('Weight entry must be total load or per side');
+    expect(store.saveExercise).not.toHaveBeenCalled();
+
+    await repository.saveExercise({ name: '\u00a0Bench\n', mappings });
+    expect(store.saveExercise).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'Bench', loadInputMode: 'total_load' })
+    );
+  });
+
   it('lists exercises with explicit includeDeleted defaults', async () => {
     const store = createMockStore();
     const repository = createExerciseCatalogRepository(store);

@@ -4,6 +4,7 @@ import { bootstrapLocalDataLayer, type LocalDatabase } from './bootstrap';
 import { nowMonotonic } from './clock';
 import { exerciseDefinitions, exerciseMuscleMappings, muscleGroups } from './schema';
 import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidation';
+import { validateExerciseCore, type LoadInputMode } from '@/src/exercise-core';
 import { notifyLocalWrite } from '@/src/sync/write-nudge';
 
 export type ExerciseCatalogMuscleGroup = {
@@ -23,7 +24,7 @@ export type ExerciseCatalogExerciseMuscleMapping = {
 export type ExerciseCatalogExercise = {
   id: string;
   name: string;
-  loadInputMode?: 'total_load' | 'per_side_load';
+  loadInputMode?: LoadInputMode;
   deletedAt: Date | null;
   mappings: ExerciseCatalogExerciseMuscleMapping[];
 };
@@ -35,7 +36,7 @@ export type ListExerciseCatalogExercisesOptions = {
 export type SaveExerciseCatalogExerciseInput = {
   id?: string;
   name: string;
-  loadInputMode?: 'total_load' | 'per_side_load';
+  loadInputMode?: LoadInputMode;
   mappings: {
     muscleGroupId: string;
     weight: number;
@@ -53,7 +54,7 @@ export type SetExerciseCatalogExerciseDeletedStateInput = {
 type DrizzleExerciseRow = {
   id: string;
   name: string;
-  loadInputMode: 'total_load' | 'per_side_load';
+  loadInputMode: LoadInputMode;
   deletedAt: Date | null;
 };
 
@@ -63,7 +64,7 @@ export type ExerciseCatalogStore = {
   saveExercise(input: {
     id?: string;
     name: string;
-    loadInputMode?: 'total_load' | 'per_side_load';
+    loadInputMode?: LoadInputMode;
     mappings: {
       muscleGroupId: string;
       weight: number;
@@ -378,10 +379,13 @@ export const createExerciseCatalogRepository = (store: ExerciseCatalogStore = cr
       });
     },
     async saveExercise(input: SaveExerciseCatalogExerciseInput): Promise<ExerciseCatalogExercise> {
-    const name = input.name.trim();
-    if (!name) {
-      throw new Error('Exercise name is required');
+    // The shared ExerciseCore rules, which group exercises apply too. An
+    // omitted mode keeps the store's `total_load` default.
+    const core = validateExerciseCore({ name: input.name, loadInputMode: input.loadInputMode ?? 'total_load' });
+    if (!core.ok) {
+      throw new Error(core.message);
     }
+    const { name, loadInputMode } = core.value;
 
     if (input.mappings.length < 1) {
       throw new Error('At least one muscle link is required');
@@ -417,7 +421,7 @@ export const createExerciseCatalogRepository = (store: ExerciseCatalogStore = cr
       return store.saveExercise({
         id: input.id,
         name,
-        loadInputMode: input.loadInputMode,
+        loadInputMode,
         mappings: normalizedMappings,
         now,
       });

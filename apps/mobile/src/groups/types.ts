@@ -1,6 +1,8 @@
-// Wire types for the M22 group RPCs (`docs/specs/tech/groups-contract.md` §4).
+// Wire types for the group RPCs (`docs/specs/tech/groups-contract.md` §4).
 // Field names are the server's snake_case JSON keys, unchanged: these types
 // describe payloads exactly as they arrive and are cached.
+
+import type { LoadInputMode } from '@/src/exercise-core';
 
 export type GroupRole = 'owner' | 'admin' | 'member';
 
@@ -133,6 +135,24 @@ export type GroupLeaveResult = { group_id: string };
  * post-write `group_get` payload (M22-T01 as-built, contract §4.3).
  */
 export type GroupMemberWriteResult = GroupGetResult;
+
+// ---- Group exercises (M25-T01, contract §4.4) ------------------------------
+
+/** A group's comparison exercise. Its `name` + `load_input_mode` are an `ExerciseCore`. */
+export type GroupExercise = {
+  group_exercise_id: string;
+  name: string;
+  load_input_mode: LoadInputMode;
+  /** The standard-catalogue id it was copied from (e.g. `seed_barbell_bench_press`); null for a custom exercise. */
+  source_exercise_id: string | null;
+  /** Null while active. Archived: keeps its links and a read-only board, not offered for new links (D8). */
+  archived_at_ms: number | null;
+};
+
+/** `group_exercise_list`: active first, then by name case-insensitively; archived ones flagged by `archived_at_ms`. */
+export type GroupExerciseListResult = { exercises: GroupExercise[] };
+/** `group_exercise_create`, `_update`, `_archive`, `_unarchive`: the exercise after the write. */
+export type GroupExerciseWriteResult = { exercise: GroupExercise };
 
 // ---- Errors -----------------------------------------------------------------
 

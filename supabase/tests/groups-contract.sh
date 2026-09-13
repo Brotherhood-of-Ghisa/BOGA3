@@ -19,11 +19,15 @@
 #     — all driven by real `sync_push` calls; share trigger failure isolation
 #     and self-heal;
 #   - AUTH_REQUIRED (anon) and AGENT_FORBIDDEN (client_id token) on every RPC;
-#   - direct PostgREST select/insert/update/delete denial on all four tables;
+#   - direct PostgREST select/insert/update/delete denial on every group table;
 #   - (M25-T02) the persistent stream `group_events`: catalog posture, one item
 #     per membership edge and per share, no duplicates on re-push, event
 #     trigger failure isolation and self-heal, and a backfill that rebuilds
 #     every user's stream byte-identical.
+#   - (M25-T01) group exercises: the shared ExerciseCore vectors
+#     (apps/mobile/src/exercise-core/exercise-core-vectors.json) through
+#     group_exercise_create and the table CHECKs, the role matrix, targets,
+#     update, and the archive round trip.
 #
 # Hermetic: every run provisions its own seven users (owner, admin, member,
 # outsider, joiner, athlete, viewer) with a per-run tag, never reads fixture
@@ -239,19 +243,19 @@ mint_token() {
 echo "[groups-contract] run ${RUN_TAG}: catalog ground rules"
 # =============================================================================
 
-GROUP_TABLES="'groups','group_memberships','group_invites','group_session_shares'"
+GROUP_TABLES="'groups','group_memberships','group_invites','group_session_shares','group_exercises'"
 SYNC_TABLES="'gyms','exercise_definitions','muscle_groups','exercise_tag_definitions','sessions','exercise_muscle_mappings','session_exercises','exercise_sets','session_exercise_tags'"
 
 [[ "$(run_psql "
   select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
    where n.nspname = 'app_public' and c.relname in (${GROUP_TABLES})
-     and c.relkind = 'r' and c.relrowsecurity;")" == "4" ]] ||
-  fail "RLS is not enabled on all four group tables"
+     and c.relkind = 'r' and c.relrowsecurity;")" == "5" ]] ||
+  fail "RLS is not enabled on all five group tables"
 [[ "$(run_psql "select count(*) from pg_policies where schemaname = 'app_public' and tablename in (${GROUP_TABLES});")" == "0" ]] ||
   fail "group tables must have no RLS policies"
 [[ "$(run_psql "
   select count(*) from unnest(array['anon','authenticated']) r(role)
-   cross join unnest(array['groups','group_memberships','group_invites','group_session_shares']) t(name)
+   cross join unnest(array['groups','group_memberships','group_invites','group_session_shares','group_exercises']) t(name)
    where has_table_privilege(r.role, 'app_public.' || t.name, 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER');")" == "0" ]] ||
   fail "anon/authenticated hold a direct privilege on a group table"
 [[ "$(run_psql "select count(*) from information_schema.columns
@@ -268,11 +272,14 @@ SYNC_TABLES="'gyms','exercise_definitions','muscle_groups','exercise_tag_definit
 
 RPCS=(group_list_mine group_get group_invite_preview group_invite_get group_create group_update
   group_invite_regenerate group_join group_leave group_remove_member group_set_role group_transfer_ownership
-  group_stream group_session_detail)
+  group_stream group_session_detail
+  group_exercise_list group_exercise_create group_exercise_update group_exercise_archive group_exercise_unarchive)
 HELPERS=(group_require_app_user group_active_role group_require_member group_require_username
   group_validate_name group_validate_description group_normalize_invite_code group_generate_invite_code
   group_write_invite_code group_summary_json group_members_json group_detail_json group_require_target
-  group_share_session group_session_exercises_json group_member_ref_json group_session_card_json)
+  group_share_session group_session_exercises_json group_member_ref_json group_session_card_json
+  group_exercise_trim group_exercise_validate_name group_exercise_validate_load_input_mode
+  group_exercise_validate_source_id group_exercise_require_manager group_exercise_require group_exercise_json)
 rpc_list="$(printf "'%s'," "${RPCS[@]}")"
 helper_list="$(printf "'%s'," "${HELPERS[@]}")"
 [[ "$(run_psql "
@@ -1223,6 +1230,276 @@ check "the owner sees the removal as a membership item" \
 pass "removed caller: NOT_FOUND for the group, All excludes it (AC11); removal item recorded"
 
 # =============================================================================
+# M25-T01: group exercises (contract §2.6, §4.4)
+# =============================================================================
+echo "[groups-contract] group exercises: shared ExerciseCore vectors (RPC and CHECKs)"
+
+VECTORS_FILE="${SUPABASE_DIR}/../apps/mobile/src/exercise-core/exercise-core-vectors.json"
+[[ -f "${VECTORS_FILE}" ]] || fail "shared ExerciseCore vectors missing: ${VECTORS_FILE}"
+# The server message per validator issue; an exact match also proves "name first".
+ISSUE_MESSAGES='{"name_required":"VALIDATION: exercise name is required",
+  "load_input_mode_invalid":"VALIDATION: load_input_mode must be total_load or per_side_load"}'
+
+# b_gx_create <group> <name> <mode> [source] — an empty source sends null.
+b_gx_create() {
+  jq -nc --arg g "$1" --arg n "$2" --arg m "$3" --arg s "${4:-}" \
+    '{p_group_id: $g, p_name: $n, p_load_input_mode: $m, p_source_exercise_id: (if $s == "" then null else $s end)}'
+}
+b_gx_update() {
+  jq -nc --arg g "$1" --arg e "$2" --arg n "$3" --arg m "$4" \
+    '{p_group_id: $g, p_exercise_id: $e, p_name: $n, p_load_input_mode: $m}'
+}
+b_gx() { jq -nc --arg g "$1" --arg e "$2" '{p_group_id: $g, p_exercise_id: $e}'; }
+
+rpc "${OWNER_TOKEN}" group_create "$(b_create "Vectors ${RUN_TAG}" "")"
+expect_ok "owner creates the vectors group"
+GV="$(jq -r '.group_id' <<<"${BODY}")"
+
+VECTOR_COUNT=0
+while IFS= read -r vector; do
+  label="$(jq -r '.label' <<<"${vector}")"
+  rpc "${OWNER_TOKEN}" group_exercise_create \
+    "$(jq -c --arg g "${GV}" '{p_group_id: $g, p_name: .name, p_load_input_mode: .loadInputMode, p_source_exercise_id: null}' <<<"${vector}")"
+  if jq -e '.expect | has("name")' <<<"${vector}" >/dev/null; then
+    expect_ok "vector '${label}'"
+    check "vector '${label}': stored as validateExerciseCore normalizes it" \
+      '.exercise.name == $v.expect.name and .exercise.load_input_mode == $v.loadInputMode' --argjson v "${vector}"
+  else
+    expect_error VALIDATION "vector '${label}'"
+    check "vector '${label}': the validator's issue" \
+      '.message == $m[$v.expect.issue]' --argjson v "${vector}" --argjson m "${ISSUE_MESSAGES}"
+  fi
+  VECTOR_COUNT=$((VECTOR_COUNT + 1))
+done < <(jq -c '.cases[]' "${VECTORS_FILE}")
+[[ "${VECTOR_COUNT}" -gt 10 ]] || fail "expected more than 10 shared vectors, got ${VECTOR_COUNT}"
+
+# The CHECKs, per vector (rolled back): the raw input is storable iff it is
+# already what the validator would store, and the validator's output always is.
+VECTORS_JSON="$(jq -c '.cases' "${VECTORS_FILE}")"
+if ! check_out="$(run_psql "
+  begin;
+  do \$do\$
+  declare
+    _c jsonb;
+    _accepted boolean;
+    _bad text[] := '{}';
+  begin
+    for _c in select value from jsonb_array_elements(\$vec\$${VECTORS_JSON}\$vec\$::jsonb) loop
+      begin
+        insert into app_public.group_exercises (group_id, name, load_input_mode)
+        values ('${GV}', _c ->> 'name', _c ->> 'loadInputMode');
+        _accepted := true;
+      exception when check_violation or not_null_violation then
+        _accepted := false;
+      end;
+      if _accepted is distinct from
+         (((_c -> 'expect') ? 'name') and (_c ->> 'name') = (_c -> 'expect' ->> 'name')) then
+        _bad := _bad || (_c ->> 'label');
+      end if;
+      if (_c -> 'expect') ? 'name' then
+        insert into app_public.group_exercises (group_id, name, load_input_mode)
+        values ('${GV}', _c -> 'expect' ->> 'name', _c ->> 'loadInputMode');
+      end if;
+    end loop;
+    if cardinality(_bad) > 0 then
+      raise exception 'CHECK parity broken for: %', array_to_string(_bad, '; ');
+    end if;
+  end
+  \$do\$;
+  rollback;" 2>&1)"; then
+  fail "group_exercises CHECKs disagree with the shared vectors: ${check_out}"
+fi
+
+# expect_check_violation <context> <values for (group_id, name, load_input_mode, source_exercise_id)>
+expect_check_violation() {
+  local out
+  if out="$(run_psql "begin;
+      insert into app_public.group_exercises (group_id, name, load_input_mode, source_exercise_id) values ($2);
+      rollback;" 2>&1)"; then
+    fail "$1: the CHECK must reject it"
+  fi
+  [[ "${out}" == *"violates check constraint"* ]] || fail "$1: expected a CHECK violation, got: ${out}"
+}
+expect_check_violation "empty source_exercise_id" "'${GV}', 'Bench', 'total_load', ''"
+expect_check_violation "untrimmed source_exercise_id" "'${GV}', 'Bench', 'total_load', E'seed_x\\t'"
+expect_check_violation "101-char source_exercise_id" "'${GV}', 'Bench', 'total_load', repeat('s', 101)"
+[[ "$(run_psql "begin;
+    insert into app_public.group_exercises (group_id, name, load_input_mode, source_exercise_id)
+    values ('${GV}', 'Bench', 'total_load', repeat('s', 100)) returning 'stored';
+    rollback;")" == "stored" ]] || fail "a 100-char source_exercise_id must be storable"
+
+# NBSP as octal UTF-8 bytes: macOS bash 3.2 has no $'\u…'.
+rpc "${OWNER_TOKEN}" group_exercise_create \
+  "$(b_gx_create "${GV}" "Copy" total_load "$(printf '\302\240 seed_barbell_bench_press\t')")"
+expect_ok "create with a padded source id"
+check "the source id is JS-trimmed" '.exercise.source_exercise_id == "seed_barbell_bench_press"'
+rpc "${OWNER_TOKEN}" group_exercise_create "$(b_gx_create "${GV}" "Copy" total_load "   ")"
+expect_error VALIDATION "create with a blank source id"
+check "blank source id message" '.message | startswith("VALIDATION: source_exercise_id must be")'
+rpc "${OWNER_TOKEN}" group_exercise_create "$(b_gx_create "${GV}" "Copy" total_load "$(repeat_char s 101)")"
+expect_error VALIDATION "create with a 101-char source id"
+pass "shared vectors: RPC normalization and issues and the CHECKs agree with validateExerciseCore; source id bounds"
+
+echo "[groups-contract] group exercises: roles, list, targets, update, archive"
+
+rpc "${OWNER_TOKEN}" group_create "$(b_create "Exercises ${RUN_TAG}" "")"
+expect_ok "owner creates the exercises group"
+GX="$(jq -r '.group_id' <<<"${BODY}")"
+rpc "${OWNER_TOKEN}" group_invite_get "$(b_group "${GX}")"
+expect_ok "exercises group invite"
+CODE_X="$(jq -r '.code' <<<"${BODY}")"
+for label in ADMIN MEMBER JOINER; do
+  token_var="${label}_TOKEN"
+  rpc "${!token_var}" group_join "$(b_code "${CODE_X}")"
+  expect_ok "$(lower "${label}") joins the exercises group"
+  check "$(lower "${label}") joined" '.joined == true'
+done
+rpc "${OWNER_TOKEN}" group_set_role "$(b_role "${GX}" "${ADMIN_UID}" admin)"
+expect_ok "owner promotes admin in the exercises group"
+
+rpc "${MEMBER_TOKEN}" group_exercise_list "$(b_group "${GX}")"
+expect_ok "member lists an empty catalogue"
+check "an empty catalogue" '. == {exercises: []}'
+
+rpc "${OWNER_TOKEN}" group_exercise_create "$(b_gx_create "${GX}" "  Bench ${RUN_TAG}  " total_load)"
+expect_ok "owner creates a custom exercise"
+check "create returns { exercise: GroupExercise }: trimmed, custom, active" \
+  '(keys == ["exercise"])
+   and (.exercise | keys == ["archived_at_ms","group_exercise_id","load_input_mode","name","source_exercise_id"])
+   and .exercise.name == $n and .exercise.load_input_mode == "total_load"
+   and .exercise.source_exercise_id == null and .exercise.archived_at_ms == null' --arg n "Bench ${RUN_TAG}"
+GX_BENCH="$(jq -r '.exercise.group_exercise_id' <<<"${BODY}")"
+[[ "${GX_BENCH}" =~ ${UUID_RE} ]] || fail "group_exercise_id must be a uuid"
+[[ "$(run_psql "select group_id = '${GX}' and created_by = '${OWNER_UID}'
+                 from app_public.group_exercises where id = '${GX_BENCH}';")" == "t" ]] ||
+  fail "a created exercise must belong to its group and record created_by"
+
+rpc "${ADMIN_TOKEN}" group_exercise_create \
+  "$(b_gx_create "${GX}" "Barbell Back Squat" per_side_load seed_barbell_back_squat)"
+expect_ok "admin copies a standard exercise"
+check "a copy keeps the standard id, name, and load mode" \
+  '.exercise | .name == "Barbell Back Squat" and .load_input_mode == "per_side_load"
+   and .source_exercise_id == "seed_barbell_back_squat" and .archived_at_ms == null'
+GX_SQUAT="$(jq -r '.exercise.group_exercise_id' <<<"${BODY}")"
+rpc "${ADMIN_TOKEN}" group_exercise_create "$(b_gx_create "${GX}" "alpha Row" total_load)"
+expect_ok "admin creates a custom exercise"
+GX_ROW="$(jq -r '.exercise.group_exercise_id' <<<"${BODY}")"
+
+rpc "${MEMBER_TOKEN}" group_exercise_create "$(b_gx_create "${GX}" "Member ${RUN_TAG}" total_load)"
+expect_error FORBIDDEN "member creates"
+rpc "${MEMBER_TOKEN}" group_exercise_create "$(b_gx_create "${GX}" "" kg)"
+expect_error FORBIDDEN "member creates with bad input (role before VALIDATION)"
+rpc "${MEMBER_TOKEN}" group_exercise_update "$(b_gx_update "${GX}" "${GX_BENCH}" "Hijack" total_load)"
+expect_error FORBIDDEN "member updates"
+rpc "${MEMBER_TOKEN}" group_exercise_update "$(b_gx_update "${GX}" "${MISSING_GROUP}" "Hijack" total_load)"
+expect_error FORBIDDEN "member updates a nonexistent exercise (role before target)"
+rpc "${MEMBER_TOKEN}" group_exercise_archive "$(b_gx "${GX}" "${GX_BENCH}")"
+expect_error FORBIDDEN "member archives"
+rpc "${MEMBER_TOKEN}" group_exercise_unarchive "$(b_gx "${GX}" "${GX_BENCH}")"
+expect_error FORBIDDEN "member unarchives"
+[[ "$(run_psql "select count(*) || ':' || bool_and(archived_at is null) || ':' || bool_and(name not like 'Hijack%')
+                 from app_public.group_exercises where group_id = '${GX}';")" == "3:true:true" ]] ||
+  fail "a forbidden write changed the catalogue"
+
+rpc "${MEMBER_TOKEN}" group_exercise_list "$(b_group "${GX}")"
+expect_ok "member lists the catalogue"
+check "list: every exercise, by name case-insensitively" \
+  '(.exercises | map(.group_exercise_id)) == [$row, $squat, $bench] and all(.exercises[]; .archived_at_ms == null)' \
+  --arg row "${GX_ROW}" --arg squat "${GX_SQUAT}" --arg bench "${GX_BENCH}"
+pass "owner and admin create and copy; a member reads the catalogue and gets FORBIDDEN on every write"
+
+rpc "${OUTSIDER_TOKEN}" group_exercise_list "$(b_group "${GX}")"
+expect_error NOT_FOUND "outsider lists"
+NM_BODY="${BODY}"
+rpc "${OUTSIDER_TOKEN}" group_exercise_list "$(b_group "${MISSING_GROUP}")"
+expect_error NOT_FOUND "list of a nonexistent group"
+[[ "${BODY}" == "${NM_BODY}" ]] || fail "group_exercise_list: non-member and nonexistent responses differ"
+for entry in \
+  "group_exercise_create|$(b_gx_create "${GX}" "Outsider" total_load)" \
+  "group_exercise_update|$(b_gx_update "${GX}" "${GX_BENCH}" "Outsider" total_load)" \
+  "group_exercise_archive|$(b_gx "${GX}" "${GX_BENCH}")" \
+  "group_exercise_unarchive|$(b_gx "${GX}" "${GX_BENCH}")"; do
+  rpc "${OUTSIDER_TOKEN}" "${entry%%|*}" "${entry#*|}"
+  expect_error NOT_FOUND "outsider ${entry%%|*}"
+  [[ "${BODY}" == "${NM_BODY}" ]] || fail "outsider ${entry%%|*}: NOT_FOUND must match a nonexistent group"
+done
+rpc "${OWNER_TOKEN}" group_remove_member "$(b_target "${GX}" "${JOINER_UID}")"
+expect_ok "owner removes the joiner from the exercises group"
+rpc "${JOINER_TOKEN}" group_exercise_list "$(b_group "${GX}")"
+expect_error NOT_FOUND "removed member lists"
+[[ "${BODY}" == "${NM_BODY}" ]] || fail "removed member's NOT_FOUND must match a nonexistent group"
+pass "non-member ≡ nonexistent ≡ removed member: byte-identical NOT_FOUND on every group-exercise RPC"
+
+rpc "${ADMIN_TOKEN}" group_exercise_update "$(b_gx_update "${GX}" "${MISSING_GROUP}" "Nope" total_load)"
+expect_error NOT_FOUND "update a nonexistent exercise"
+check "a missing exercise has its own NOT_FOUND" '.message == "NOT_FOUND: group exercise not found"'
+TARGET_BODY="${BODY}"
+GV_EXERCISE="$(run_psql "select id from app_public.group_exercises where group_id = '${GV}' order by id limit 1;")"
+[[ "${GV_EXERCISE}" =~ ${UUID_RE} ]] || fail "the vectors group must hold an exercise"
+for entry in \
+  "group_exercise_update|$(b_gx_update "${GX}" "${GV_EXERCISE}" "Nope" total_load)" \
+  "group_exercise_archive|$(b_gx "${GX}" "${GV_EXERCISE}")" \
+  "group_exercise_unarchive|$(b_gx "${GX}" "${GV_EXERCISE}")"; do
+  rpc "${ADMIN_TOKEN}" "${entry%%|*}" "${entry#*|}"
+  expect_error NOT_FOUND "${entry%%|*} of another group's exercise"
+  [[ "${BODY}" == "${TARGET_BODY}" ]] || fail "${entry%%|*}: another group's exercise must look nonexistent"
+done
+rpc "${ADMIN_TOKEN}" group_exercise_update "$(b_gx_update "${GX}" "${MISSING_GROUP}" "" total_load)"
+expect_error VALIDATION "input is validated before the target"
+pass "targets: another group's exercise ≡ nonexistent (NOT_FOUND: group exercise not found)"
+
+rpc "${ADMIN_TOKEN}" group_exercise_update "$(b_gx_update "${GX}" "${GX_BENCH}" " Bench (comp) ${RUN_TAG} " per_side_load)"
+expect_ok "admin renames and changes the load mode"
+check "update replaces the trimmed name and the load mode, keeping id and source" \
+  '.exercise == {group_exercise_id: $id, name: $n, load_input_mode: "per_side_load",
+                 source_exercise_id: null, archived_at_ms: null}' \
+  --arg id "${GX_BENCH}" --arg n "Bench (comp) ${RUN_TAG}"
+rpc "${OWNER_TOKEN}" group_exercise_update "$(b_gx_update "${GX}" "${GX_SQUAT}" "Barbell Back Squat" total_load)"
+expect_ok "owner changes the copy's load mode"
+check "a copy keeps its standard id through an update" \
+  '.exercise.source_exercise_id == "seed_barbell_back_squat" and .exercise.load_input_mode == "total_load"'
+rpc "${ADMIN_TOKEN}" group_exercise_update "$(b_gx_update "${GX}" "${GX_BENCH}" $' \t' total_load)"
+expect_error VALIDATION "update with a blank name"
+rpc "${ADMIN_TOKEN}" group_exercise_update "$(b_gx_update "${GX}" "${GX_BENCH}" "Bench" per_side)"
+expect_error VALIDATION "update with an unknown load mode"
+pass "update: rename and load-mode change by owner and admin; VALIDATION for bad input"
+
+rpc "${ADMIN_TOKEN}" group_exercise_archive "$(b_gx "${GX}" "${GX_ROW}")"
+expect_ok "admin archives"
+ARCHIVED_MS="$(jq -r '.exercise.archived_at_ms' <<<"${BODY}")"
+[[ "${ARCHIVED_MS}" =~ ^[0-9]{13}$ ]] || fail "archive must set archived_at_ms, got ${ARCHIVED_MS}"
+check "archive keeps the rest of the exercise" \
+  '.exercise | .group_exercise_id == $id and .name == "alpha Row" and .load_input_mode == "total_load"' \
+  --arg id "${GX_ROW}"
+rpc "${OWNER_TOKEN}" group_exercise_archive "$(b_gx "${GX}" "${GX_ROW}")"
+expect_ok "archive again"
+check "archive is idempotent (the first archived_at is kept)" '.exercise.archived_at_ms == $ms' --argjson ms "${ARCHIVED_MS}"
+rpc "${MEMBER_TOKEN}" group_exercise_list "$(b_group "${GX}")"
+expect_ok "member lists after the archive"
+check "an archived exercise stays listed, flagged, after the active ones" \
+  '(.exercises | map(.group_exercise_id)) == [$squat, $bench, $row]
+   and (.exercises | map(.archived_at_ms != null)) == [false, false, true]
+   and .exercises[2].archived_at_ms == $ms' \
+  --arg row "${GX_ROW}" --arg squat "${GX_SQUAT}" --arg bench "${GX_BENCH}" --argjson ms "${ARCHIVED_MS}"
+rpc "${ADMIN_TOKEN}" group_exercise_update "$(b_gx_update "${GX}" "${GX_ROW}" "Row" total_load)"
+expect_error VALIDATION "update an archived exercise"
+check "an archived exercise is read-only" '.message | startswith("VALIDATION: an archived group exercise is read-only")'
+rpc "${OWNER_TOKEN}" group_exercise_unarchive "$(b_gx "${GX}" "${GX_ROW}")"
+expect_ok "owner unarchives"
+check "unarchive clears archived_at_ms and keeps the exercise" \
+  '.exercise == {group_exercise_id: $id, name: "alpha Row", load_input_mode: "total_load",
+                 source_exercise_id: null, archived_at_ms: null}' --arg id "${GX_ROW}"
+rpc "${ADMIN_TOKEN}" group_exercise_unarchive "$(b_gx "${GX}" "${GX_ROW}")"
+expect_ok "unarchive again"
+check "unarchive is idempotent" '.exercise.archived_at_ms == null'
+rpc "${MEMBER_TOKEN}" group_exercise_list "$(b_group "${GX}")"
+expect_ok "member lists after the unarchive"
+check "the round trip restores the active list" \
+  '(.exercises | map(.group_exercise_id)) == [$row, $squat, $bench] and all(.exercises[]; .archived_at_ms == null)' \
+  --arg row "${GX_ROW}" --arg squat "${GX_SQUAT}" --arg bench "${GX_BENCH}"
+pass "archive/unarchive round trip: flagged in the list, read-only while archived, both idempotent"
+
+# =============================================================================
 echo "[groups-contract] AUTH_REQUIRED and AGENT_FORBIDDEN on every RPC"
 # =============================================================================
 
@@ -1246,6 +1523,11 @@ RPC_BODIES=(
   "group_transfer_ownership|$(b_target "${G}" "${OWNER_UID}")"
   "group_stream|$(jq -nc '{p_group_id: null, p_before: null, p_limit: null}')"
   "group_session_detail|$(jq -nc --arg m "${ATHLETE_UID}" --arg s "${S1}" '{p_member_user_id: $m, p_session_id: $s}')"
+  "group_exercise_list|$(b_group "${GX}")"
+  "group_exercise_create|$(b_gx_create "${GX}" "Agent ${RUN_TAG}" total_load)"
+  "group_exercise_update|$(b_gx_update "${GX}" "${GX_BENCH}" "Agent ${RUN_TAG}" total_load)"
+  "group_exercise_archive|$(b_gx "${GX}" "${GX_BENCH}")"
+  "group_exercise_unarchive|$(b_gx "${GX}" "${GX_BENCH}")"
 )
 [[ ${#RPC_BODIES[@]} -eq ${#RPCS[@]} ]] || fail "RPC_BODIES must cover every RPC"
 for entry in "${RPC_BODIES[@]}"; do
@@ -1260,6 +1542,9 @@ done
   fail "a rejected agent/anon call changed the group"
 [[ "$(run_psql "select count(*) from app_public.groups where name = 'Agent ${RUN_TAG}';")" == "0" ]] ||
   fail "a rejected agent/anon group_create wrote a row"
+[[ "$(run_psql "select count(*) from app_public.group_exercises
+                 where name = 'Agent ${RUN_TAG}' or (id = '${GX_BENCH}' and archived_at is not null);")" == "0" ]] ||
+  fail "a rejected agent/anon group-exercise call wrote or archived a row"
 pass "every RPC: AGENT_FORBIDDEN for client_id tokens, AUTH_REQUIRED for anon"
 
 rpc "${ADMIN_TOKEN}" group_active_role "$(jq -nc --arg g "${G}" --arg u "${ADMIN_UID}" '{p_group_id: $g, p_user_id: $u}')"
@@ -1287,9 +1572,14 @@ expect_denied_or_empty() {
 
 MEMBERSHIP_ROWS_BEFORE="$(run_psql "select count(*) from app_public.group_memberships where group_id = '${G}';")"
 SHARE_ROWS_BEFORE="$(run_psql "select count(*) || ':' || sum(session_started_at) from app_public.group_session_shares where group_id = '${GA}';")"
+exercise_rows() {
+  run_psql "select string_agg(id || ':' || name || ':' || load_input_mode || ':' || coalesce(archived_at::text, '-'), ',' order by id)
+              from app_public.group_exercises where group_id = '${GX}';"
+}
+EXERCISE_ROWS_BEFORE="$(exercise_rows)"
 for bearer_label in authenticated anon; do
   if [[ "${bearer_label}" == "authenticated" ]]; then bearer="${ATHLETE_TOKEN}"; else bearer="${ANON_KEY}"; fi
-  for table in groups group_memberships group_invites group_session_shares; do
+  for table in groups group_memberships group_invites group_session_shares group_exercises; do
     rest GET "${bearer}" "${table}" "select=*"
     expect_denied_or_empty "${bearer_label} select ${table}"
     # Every insert/update payload names real columns, so only a privilege
@@ -1312,6 +1602,10 @@ for bearer_label in authenticated anon; do
           '{group_id: $g, member_user_id: $u, session_id: $s, session_started_at: 0}')"
         patch='{"session_started_at":0}'
         filter="group_id=eq.${GA}" ;;
+      group_exercises)
+        row="$(jq -nc --arg g "${GX}" --arg n "Direct ${RUN_TAG}" '{group_id: $g, name: $n, load_input_mode: "total_load"}')"
+        patch="$(jq -nc --arg n "Hijack ${RUN_TAG}" '{name: $n}')"
+        filter="group_id=eq.${GX}" ;;
     esac
     rest POST "${bearer}" "${table}" "" "${row}"
     [[ ! "${STATUS}" =~ ^2 ]] || fail "${bearer_label} insert into ${table} must be denied"
@@ -1338,7 +1632,9 @@ BODY=""
   fail "direct PostgREST insert/update wrote an invite code"
 [[ "$(run_psql "select count(*) || ':' || sum(session_started_at) from app_public.group_session_shares where group_id = '${GA}';")" == "${SHARE_ROWS_BEFORE}" ]] ||
   fail "direct PostgREST insert/update/delete changed the share ledger"
-pass "select/insert/update/delete denied (42501) for authenticated and anon on all four tables"
+[[ "$(exercise_rows)" == "${EXERCISE_ROWS_BEFORE}" ]] ||
+  fail "direct PostgREST insert/update/delete changed the group exercises"
+pass "select/insert/update/delete denied (42501) for authenticated and anon on all five tables"
 
 # =============================================================================
 echo "[groups-contract] persistent stream: group_events (M25-T02)"
