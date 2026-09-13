@@ -529,3 +529,103 @@ describe('Edit exercise route', () => {
     expect(await screen.findByTestId('group-exercise-edit-forbidden')).toBeTruthy();
   });
 });
+
+describe('Every exercise write: offline refusal and server failure (AC6)', () => {
+  const pickBench = () => {
+    fireEvent.changeText(screen.getByTestId('group-standard-exercise-search'), 'barbell bench');
+    fireEvent.press(screen.getByTestId('group-standard-exercise-seed_barbell_bench_press'));
+  };
+
+  const pressSubmit = async () => {
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('group-exercise-form-submit'));
+    });
+  };
+
+  it('archive: a server failure shows inline and changes nothing', async () => {
+    const alert = alertSpy();
+    api.archiveGroupExercise.mockRejectedValue(new GroupApiError('NETWORK', 'Network request failed.'));
+    await openExercisesAs('owner');
+    fireEvent.press(screen.getByTestId('group-exercise-row-ge-row'));
+    fireEvent.press(screen.getByTestId('group-exercise-action-archive'));
+    await pressAlertButton(alert, 'Archive');
+    expect(api.archiveGroupExercise).toHaveBeenCalledWith(GROUP_ID, 'ge-row');
+    expect(screen.getByTestId('group-exercises-action-feedback')).toHaveTextContent(GROUP_WRITE_UNREACHABLE_MESSAGE);
+    expect(screen.queryByTestId('group-exercise-archived-ge-row')).toBeNull();
+  });
+
+  it('unarchive: refused offline with no RPC', async () => {
+    await openExercisesAs('owner');
+    emitNetInfo(false);
+    fireEvent.press(screen.getByTestId('group-exercise-row-ge-old'));
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('group-exercise-action-unarchive'));
+    });
+    expect(api.unarchiveGroupExercise).not.toHaveBeenCalled();
+    expect(screen.getByTestId('group-exercises-action-feedback')).toHaveTextContent(GROUP_OFFLINE_ACTION_MESSAGE);
+  });
+
+  it('a demoted admin loses Add exercise and the row actions after FORBIDDEN', async () => {
+    api.unarchiveGroupExercise.mockRejectedValue(new GroupApiError('FORBIDDEN', 'forbidden'));
+    await openExercisesAs('admin');
+    // Demoted on the server meanwhile: the refresh after the refusal returns a member.
+    api.getGroup.mockResolvedValue(detailFor('member'));
+    fireEvent.press(screen.getByTestId('group-exercise-row-ge-old'));
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('group-exercise-action-unarchive'));
+    });
+    await screen.findByText(META.member);
+    expect(screen.queryByTestId('group-exercises-add-button')).toBeNull();
+    fireEvent.press(screen.getByTestId('group-exercise-row-ge-row'));
+    expect(screen.queryByTestId('group-exercise-actions-sheet')).toBeNull();
+  });
+
+  it('catalogue add: refused offline with no RPC, keeping the pick', async () => {
+    render(<NewGroupExerciseRoute />);
+    await screen.findByTestId('group-exercise-source-row');
+    emitNetInfo(false);
+    pickBench();
+    await pressSubmit();
+    expect(api.createGroupExercise).not.toHaveBeenCalled();
+    expect(screen.getByTestId('group-exercise-form-error')).toHaveTextContent(GROUP_OFFLINE_ACTION_MESSAGE);
+    expect(screen.getByTestId('group-exercise-form-note')).toBeTruthy();
+  });
+
+  it('catalogue add: a server failure shows "nothing changed" and stays', async () => {
+    api.createGroupExercise.mockRejectedValue(new GroupApiError('NETWORK', 'Network request failed.'));
+    render(<NewGroupExerciseRoute />);
+    await screen.findByTestId('group-exercise-source-row');
+    pickBench();
+    await pressSubmit();
+    expect(screen.getByTestId('group-exercise-form-error')).toHaveTextContent(GROUP_WRITE_UNREACHABLE_MESSAGE);
+    expect(mockRouter.back).not.toHaveBeenCalled();
+  });
+
+  describe('rename', () => {
+    beforeEach(() => {
+      seedCache(groupCacheKeys.group(GROUP_ID), detailFor('owner'));
+      seedCache(groupCacheKeys.groupExercises(GROUP_ID), LIST);
+      mockParams = { groupId: GROUP_ID, exerciseId: 'ge-row' };
+    });
+
+    it('is refused offline with no RPC and keeps the edit', async () => {
+      render(<EditGroupExerciseRoute />);
+      const nameInput = await screen.findByTestId('group-exercise-form-name-input');
+      emitNetInfo(false);
+      fireEvent.changeText(nameInput, 'Seated Cable Row');
+      await pressSubmit();
+      expect(api.updateGroupExercise).not.toHaveBeenCalled();
+      expect(screen.getByTestId('group-exercise-form-error')).toHaveTextContent(GROUP_OFFLINE_ACTION_MESSAGE);
+      expect(screen.getByTestId('group-exercise-form-name-input').props.value).toBe('Seated Cable Row');
+    });
+
+    it('shows a transport failure as "nothing changed" and stays', async () => {
+      api.updateGroupExercise.mockRejectedValue(new GroupApiError('NETWORK', 'Network request failed.'));
+      render(<EditGroupExerciseRoute />);
+      await screen.findByTestId('group-exercise-form');
+      await pressSubmit();
+      expect(screen.getByTestId('group-exercise-form-error')).toHaveTextContent(GROUP_WRITE_UNREACHABLE_MESSAGE);
+      expect(mockRouter.back).not.toHaveBeenCalled();
+    });
+  });
+});

@@ -1220,9 +1220,11 @@ E0.1–E0.3).
     `/group/[groupId]/exercises/[exerciseId]/edit` (both fields, prefilled
     from the cached list; an archived exercise shows a read-only state) and
     `Archive` (confirmed) on an active row, `Unarchive` on an archived one.
-  - Every write runs through `useGroupAction`. `FORBIDDEN`, `NOT_FOUND`, and
-    `VALIDATION` also refresh the group and the list; the wording is
-    `describeGroupExerciseWriteError`.
+  - Every write runs through `useGroupAction`, worded by
+    `describeGroupExerciseWriteError`. On the Exercises page and the edit
+    route a `FORBIDDEN`, `NOT_FOUND`, or `VALIDATION` refusal also refreshes
+    the group and the list. The add route refreshes the group on `FORBIDDEN` /
+    `NOT_FOUND`; the list refreshes when the group screen regains focus.
 - **Shared form.** `ExerciseCoreFields`
   (`components/exercise-core/exercise-core-fields.tsx`: the name and the
   `Total load` / `Per side` control, labelled by `LOAD_INPUT_MODE_LABELS` in

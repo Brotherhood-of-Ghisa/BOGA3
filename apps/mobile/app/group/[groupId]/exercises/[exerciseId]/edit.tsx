@@ -70,7 +70,7 @@ function EditGroupExerciseContent({ userId, groupId, exerciseId }: { userId: str
   const onSubmit = async (core: ExerciseCore) => {
     const result = await update.run(core);
     if (result.ok) {
-      await exercises.refresh();
+      // The group screen's Exercises segment refreshes on focus.
       router.back();
       return;
     }

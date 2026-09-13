@@ -190,12 +190,12 @@ appId: com.dinoderek.mobile
     timeout: 15000
 - tapOn:
     id: "group-exercise-source-custom"
+# Pick the weight entry before typing: on iOS, dismissing the keyboard can submit the form.
+- tapOn:
+    id: "group-exercise-form-load-mode-per_side_load"
 - tapOn:
     id: "group-exercise-form-name-input"
 - inputText: "Sled Push"
-- hideKeyboard:
-- tapOn:
-    id: "group-exercise-form-load-mode-per_side_load"
 - tapOn:
     id: "group-exercise-form-submit"
 - extendedWaitUntil:
@@ -220,7 +220,6 @@ appId: com.dinoderek.mobile
     id: "group-exercise-form-name-input"
 - eraseText: 40
 - inputText: "Prowler Push"
-- hideKeyboard:
 - tapOn:
     id: "group-exercise-form-submit"
 - extendedWaitUntil:

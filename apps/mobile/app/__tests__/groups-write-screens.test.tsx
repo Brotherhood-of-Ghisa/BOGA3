@@ -621,3 +621,34 @@ describe('Members screen: role-gated member actions and leave (flows 4–5)', ()
     expect(screen.getByTestId('group-members-action-feedback')).toHaveTextContent(GROUP_OFFLINE_ACTION_MESSAGE);
   });
 });
+
+describe('Members screen: lost access and missing data (AC2)', () => {
+  beforeEach(() => {
+    mockParams = { groupId: GROUP_ID };
+  });
+
+  it("NOT_FOUND shows \"You're no longer a member\", hides the list, and evicts the cached group", async () => {
+    writeGroupCache(fixture.database, { cacheKey: groupCacheKeys.group(GROUP_ID), userId: USER_ID, payload: detailFor('member'), fetchedAtMs: 1 });
+    api.getGroup.mockRejectedValue(new GroupApiError('NOT_FOUND', 'group not found'));
+    render(<GroupMembersRoute />);
+    expect(await screen.findByTestId('group-members-lost-access')).toBeTruthy();
+    expect(screen.queryByTestId('group-members-list')).toBeNull();
+    await waitFor(() => expect(readGroupCache(fixture.database, groupCacheKeys.group(GROUP_ID), USER_ID)).toBeNull());
+  });
+
+  it('shows the offline empty state when the read fails with NETWORK and nothing is cached', async () => {
+    api.getGroup.mockRejectedValue(new GroupApiError('NETWORK', 'Network request failed.'));
+    render(<GroupMembersRoute />);
+    expect(await screen.findByTestId('group-members-offline-empty-state')).toBeTruthy();
+  });
+
+  it('shows the error state with Retry on a non-network failure', async () => {
+    api.getGroup.mockRejectedValueOnce(new GroupApiError('INTERNAL', 'Something broke.'));
+    render(<GroupMembersRoute />);
+    expect(await screen.findByTestId('group-members-error-state')).toBeTruthy();
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('group-members-error-state-retry'));
+    });
+    expect(await screen.findByTestId('group-members-list')).toBeTruthy();
+  });
+});
