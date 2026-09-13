@@ -22,7 +22,7 @@
 >   `supabase/migrations/20260913153000_m25_group_events.sql`).
 > - M25 step 2, group exercises (M25-T01): the `group_exercises` table and its
 >   RPCs (§2.7, §4.4;
->   `supabase/migrations/20260913121000_m25_group_exercises.sql`), proven by
+>   `supabase/migrations/20260913160000_m25_group_exercises.sql`), proven by
 >   `./boga test groups-contract`, and the client wrappers plus the shared
 >   `ExerciseCore` validator (§6.1).
 >
@@ -361,7 +361,7 @@ two stores share one TS type and validator (M25 design decision T1).
 | `created_by` | `uuid null` → `auth.users(id) on delete set null` | |
 | `created_at`, `updated_at` | `timestamptz not null default now()` | |
 
-**As-built (M25-T01).** `supabase/migrations/20260913121000_m25_group_exercises.sql`.
+**As-built (M25-T01).** `supabase/migrations/20260913160000_m25_group_exercises.sql`.
 
 - It follows ground rules 1–5. Index `(group_id)`. `service_role` keeps
   `select/insert/update/delete`.

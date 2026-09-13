@@ -1235,7 +1235,7 @@ check "the owner sees the removal as a membership item" \
 pass "removed caller: NOT_FOUND for the group, All excludes it (AC11); removal item recorded"
 
 # =============================================================================
-# M25-T01: group exercises (contract §2.6, §4.4)
+# M25-T01: group exercises (contract §2.7, §4.4)
 # =============================================================================
 echo "[groups-contract] group exercises: shared ExerciseCore vectors (RPC and CHECKs)"
 

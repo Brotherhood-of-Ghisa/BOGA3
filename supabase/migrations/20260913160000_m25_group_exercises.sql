@@ -1,6 +1,6 @@
 -- M25-T01: group exercises — a group's own catalogue of comparison exercises.
 --
--- Contract: docs/specs/tech/groups-contract.md §2.6 (table), §4.4 (RPCs).
+-- Contract: docs/specs/tech/groups-contract.md §2.7 (table), §4.4 (RPCs).
 -- One domain type, two stores (M25 design T1): personal exercises stay the
 -- Sync v2 `exercise_definitions`; a group exercise lives here, is written only
 -- by the SECURITY DEFINER RPCs below (owner/admin), and is read by any active
