@@ -70,7 +70,9 @@ create unique index group_events_joined_uniq
 create unique index group_events_ended_uniq
   on app_public.group_events (membership_id)
   where kind in ('left', 'removed');
--- Stream order and keyset cursor within a group (sort_at_ms desc, then kind).
+-- A group's items by stored position. It serves membership items and the
+-- M25-T05 kinds; session items sort by the live started_at (§4.2), so the
+-- read still builds every in-scope item before ordering, as M22 did.
 create index group_events_stream_idx
   on app_public.group_events (group_id, sort_at_ms desc, kind);
 -- The session trigger's lookup of a member's session across groups.

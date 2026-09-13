@@ -286,7 +286,10 @@ Indexes:
 - unique `(group_id, member_user_id, session_id) where kind = 'session'`;
 - unique `(membership_id) where kind = 'joined'`;
 - unique `(membership_id) where kind in ('left','removed')`;
-- `(group_id, sort_at_ms desc, kind)` for the stream order and cursor;
+- `(group_id, sort_at_ms desc, kind)`: a group's items by stored position.
+  It serves membership items and the M25-T05 kinds. Session items sort by the
+  live `started_at`, so `group_stream` still builds every in-scope item
+  before ordering, as M22 did;
 - `(member_user_id, session_id) where kind = 'session'` for the session trigger.
 
 **Writers.**
@@ -315,11 +318,24 @@ Indexes:
   - It is not failure-isolated: the item commits or fails with the
     membership change.
   - Role changes, ownership transfers, and a no-op join write nothing.
+  - The item's position is fixed when it is written. That is correct
+    because no RPC edits `joined_at`, and an ended period is never reopened
+    or re-ended. A future writer that changes those columns must also move
+    the item.
 - **Backfill.** `group_events_backfill()` is internal, idempotent, and returns
   the rows inserted. It writes one `session` item per share row, at the live
   `started_at` (else the ledger copy), and one `joined` plus, for an ended
   period, one `left`/`removed` per membership period. The migration runs it
-  once, and it can be re-run as a repair.
+  once.
+- **Repair for `group.event_failed`.** The next accepted write of the session
+  heals a missed item. Until then the share exists but the stream hides the
+  card, and `group_session_detail` still opens it. A write that fails on a
+  session's last write, for example its completion, is never healed by a later
+  write. For every `group.event_failed` row, run
+  `select app_public.group_events_backfill();` as the service role or
+  `postgres`. It is idempotent and inserts only the missing items. The §2.5
+  share trigger has the same next-write limit, and there the share itself is
+  missing.
 
 ## 3. Authorization model
 
