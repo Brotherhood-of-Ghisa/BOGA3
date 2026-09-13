@@ -226,9 +226,7 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
         })
       );
       expect(mockCompleteSessionDraft).toHaveBeenCalledWith('test-session');
-      expect(mockReplace).toHaveBeenCalledWith(
-        '/completed-session/test-session?presentation=completion'
-      );
+      expect(mockReplace).toHaveBeenCalledWith('/stats-history');
     });
   });
 
@@ -377,7 +375,7 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
     expect(JSON.stringify(finalPayload)).not.toContain('set-planned');
   });
 
-  it('replaces the recorder with the completed-session presentation after submit', async () => {
+  it('clears the stack back to the root list on submit so the list header has no back button', async () => {
     render(<SessionRecorderScreen />);
     await dismissEmptyStateIfPresent();
 
@@ -393,9 +391,7 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
       expect(mockCompleteSessionDraft).toHaveBeenCalledWith('test-session');
     });
 
-    expect(mockReplace).toHaveBeenCalledWith(
-      '/completed-session/test-session?presentation=completion'
-    );
+    expect(mockReplace).toHaveBeenCalledWith('/stats-history');
     expect(mockDismissAll).not.toHaveBeenCalled();
   });
 
@@ -428,9 +424,7 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
     await waitFor(() => {
       expect(mockPersistSessionDraftSnapshot).toHaveBeenCalled();
       expect(mockCompleteSessionDraft).toHaveBeenCalledWith('test-session');
-      expect(mockReplace).toHaveBeenCalledWith(
-        '/completed-session/test-session?presentation=completion'
-      );
+      expect(mockReplace).toHaveBeenCalledWith('/stats-history');
     });
   });
 
@@ -451,9 +445,7 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
     await waitFor(() => {
       expect(mockPersistSessionDraftSnapshot).toHaveBeenCalled();
       expect(mockCompleteSessionDraft).toHaveBeenCalledWith('test-session');
-      expect(mockReplace).toHaveBeenCalledWith(
-        '/completed-session/test-session?presentation=completion'
-      );
+      expect(mockReplace).toHaveBeenCalledWith('/stats-history');
     });
   });
 

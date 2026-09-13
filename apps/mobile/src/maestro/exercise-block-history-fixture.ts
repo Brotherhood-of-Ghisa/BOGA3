@@ -1,14 +1,7 @@
 import { inArray } from 'drizzle-orm';
 
 import { bootstrapLocalDataLayer, type LocalDatabase } from '@/src/data';
-import {
-  exerciseDefinitions,
-  exerciseSets,
-  gyms,
-  sessionExercises,
-  sessions,
-} from '@/src/data/schema';
-import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidation';
+import { exerciseSets, gyms, sessionExercises, sessions } from '@/src/data/schema';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const MINUTE_MS = 60 * 1000;
@@ -21,11 +14,6 @@ export const EXERCISE_BLOCK_HISTORY_FIXTURE = {
   secondaryExerciseName: 'Barbell Bench Press',
   noHistoryExerciseId: 'seed_lat_pulldown',
   noHistoryExerciseName: 'Lat Pulldown',
-  onePrCompletionSessionId: 'maestro_m24_completion_one_pr',
-  noPrCompletionSessionId: 'maestro_m24_completion_no_pr',
-  unmappedCompletionSessionId: 'maestro_m24_completion_unmapped',
-  unmappedExerciseId: 'maestro_m24_unmapped_exercise',
-  unmappedExerciseName: 'Unmapped Carry',
 } as const;
 
 type FixtureSessionInput = {
@@ -54,69 +42,6 @@ const completedAtForDaysAgo = (now: Date, daysAgo: number) =>
   new Date(now.getTime() - daysAgo * DAY_MS);
 
 const sessionInputs: FixtureSessionInput[] = [
-  {
-    id: EXERCISE_BLOCK_HISTORY_FIXTURE.onePrCompletionSessionId,
-    daysAgo: 0.3,
-    exerciseBlocks: [
-      {
-        id: 'maestro_m24_completion_one_pr_squat',
-        exerciseDefinitionId: EXERCISE_BLOCK_HISTORY_FIXTURE.primaryExerciseId,
-        name: EXERCISE_BLOCK_HISTORY_FIXTURE.primaryExerciseName,
-        orderIndex: 0,
-        sets: [
-          {
-            id: 'maestro_m24_completion_one_pr_squat_set',
-            orderIndex: 0,
-            weightValue: '275',
-            repsValue: '5',
-            setType: 'rir_1',
-          },
-        ],
-      },
-    ],
-  },
-  {
-    id: EXERCISE_BLOCK_HISTORY_FIXTURE.noPrCompletionSessionId,
-    daysAgo: 0.25,
-    exerciseBlocks: [
-      {
-        id: 'maestro_m24_completion_no_pr_squat',
-        exerciseDefinitionId: EXERCISE_BLOCK_HISTORY_FIXTURE.primaryExerciseId,
-        name: EXERCISE_BLOCK_HISTORY_FIXTURE.primaryExerciseName,
-        orderIndex: 0,
-        sets: [
-          {
-            id: 'maestro_m24_completion_no_pr_squat_set',
-            orderIndex: 0,
-            weightValue: '225',
-            repsValue: '5',
-            setType: 'rir_2',
-          },
-        ],
-      },
-    ],
-  },
-  {
-    id: EXERCISE_BLOCK_HISTORY_FIXTURE.unmappedCompletionSessionId,
-    daysAgo: 0.2,
-    exerciseBlocks: [
-      {
-        id: 'maestro_m24_completion_unmapped_exercise',
-        exerciseDefinitionId: EXERCISE_BLOCK_HISTORY_FIXTURE.unmappedExerciseId,
-        name: EXERCISE_BLOCK_HISTORY_FIXTURE.unmappedExerciseName,
-        orderIndex: 0,
-        sets: [
-          {
-            id: 'maestro_m24_completion_unmapped_set',
-            orderIndex: 0,
-            weightValue: '100',
-            repsValue: '5',
-            setType: 'rir_1',
-          },
-        ],
-      },
-    ],
-  },
   {
     id: 'maestro_exercise_block_history_squat_1',
     daysAgo: 1,
@@ -389,18 +314,6 @@ export const buildExerciseBlockHistoryFixtureRows = (now: Date = new Date()) => 
 
   return {
     gym,
-    exerciseDefinitions: [
-      {
-        id: EXERCISE_BLOCK_HISTORY_FIXTURE.unmappedExerciseId,
-        name: EXERCISE_BLOCK_HISTORY_FIXTURE.unmappedExerciseName,
-        loadInputMode: 'total_load' as const,
-        deletedAt: null,
-        localDirty: false,
-        localUpdatedAtMs: 0,
-        createdAt: now,
-        updatedAt: now,
-      },
-    ],
     sessions: sessionRows,
     sessionExercises: sessionExerciseRows,
     exerciseSets: setRows,
@@ -427,17 +340,12 @@ export const seedExerciseBlockHistoryFixture = async ({
       .run();
     tx.delete(sessions).where(inArray(sessions.id, sessionIds)).run();
     tx.delete(gyms).where(inArray(gyms.id, [rows.gym.id])).run();
-    tx.delete(exerciseDefinitions)
-      .where(inArray(exerciseDefinitions.id, rows.exerciseDefinitions.map((row) => row.id)))
-      .run();
 
     tx.insert(gyms).values(rows.gym).run();
-    tx.insert(exerciseDefinitions).values(rows.exerciseDefinitions).run();
     tx.insert(sessions).values(rows.sessions).run();
     tx.insert(sessionExercises).values(rows.sessionExercises).run();
     tx.insert(exerciseSets).values(rows.exerciseSets).run();
   });
-  invalidateExerciseCatalogCache();
 
   return {
     ...EXERCISE_BLOCK_HISTORY_FIXTURE,

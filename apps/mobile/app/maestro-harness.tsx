@@ -34,9 +34,6 @@ export default function MaestroHarnessScreen() {
     mode?: string | string[];
     intent?: string | string[];
     sessionId?: string | string[];
-    maestroShare?: string | string[];
-    maestroCatalog?: string | string[];
-    presentation?: string | string[];
   }>();
   const [status, setStatus] = useState<HarnessStatus>({
     kind: 'running',
@@ -66,9 +63,6 @@ export default function MaestroHarnessScreen() {
   const modeParam = coerceMaestroHarnessQueryParam(params.mode);
   const intentParam = coerceMaestroHarnessQueryParam(params.intent);
   const sessionIdParam = coerceMaestroHarnessQueryParam(params.sessionId);
-  const maestroShareParam = coerceMaestroHarnessQueryParam(params.maestroShare);
-  const maestroCatalogParam = coerceMaestroHarnessQueryParam(params.maestroCatalog);
-  const presentationParam = coerceMaestroHarnessQueryParam(params.presentation);
 
   useEffect(() => {
     let cancelled = false;
@@ -86,9 +80,6 @@ export default function MaestroHarnessScreen() {
       modeParam,
       intentParam,
       sessionIdParam,
-      maestroShareParam,
-      maestroCatalogParam,
-      presentationParam,
     ]);
     if (lastRunKeyRef.current === runKey) {
       return;
@@ -115,9 +106,6 @@ export default function MaestroHarnessScreen() {
       mode: modeParam,
       intent: intentParam,
       sessionId: sessionIdParam,
-      maestroShare: maestroShareParam,
-      maestroCatalog: maestroCatalogParam,
-      presentation: presentationParam,
     });
 
     void (async () => {
@@ -167,7 +155,7 @@ export default function MaestroHarnessScreen() {
     return () => {
       cancelled = true;
     };
-  }, [resetParam, fixtureParam, bootstrapParam, gateParam, teleportParam, modeParam, intentParam, sessionIdParam, maestroShareParam, maestroCatalogParam, presentationParam, router]);
+  }, [resetParam, fixtureParam, bootstrapParam, gateParam, teleportParam, modeParam, intentParam, sessionIdParam, router]);
 
   return (
     <View style={styles.screen} testID="maestro-harness-screen">

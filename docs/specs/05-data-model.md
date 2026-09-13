@@ -305,10 +305,7 @@ section states only the data-model-level invariants.
    and stabilizer mappings do not contribute. One-arm/one-leg rows imply both
    sides were performed in v1. Exercise history, records, highest weight, and
    estimated 1RM remain based on the entered scalar and do not use per-side
-   normalization or muscle-role factors. Live and completion personal-record
-   presentation resolves its exercise name from the current linked
-   `exercise_definitions` row, falling back to the captured session-exercise
-   name only for an unlinked legacy row.
+   normalization or muscle-role factors.
 11. `exercise_group_links` (M25) is `in sync scope`: a member links one of their
    own exercises to a group exercise, and the link backs up, syncs, and works
    offline like the rest of their data (contract §A.2.10). Its id is

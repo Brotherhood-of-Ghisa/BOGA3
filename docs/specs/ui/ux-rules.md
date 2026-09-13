@@ -124,28 +124,20 @@ Document app-specific UI semantics and guardrails for the current mobile app.
     - Active and completed-edit autosave preserve every set row, including fully blank, partial, valid unconfirmed, and planned rows, with stable identity, values, quality, confirmation status, and order across input blur, tab/route navigation, hydration, sync, and restore. Legacy persisted `skipped` planned rows hydrate as untouched planned rows. Blank or invalid reps remain incomplete; valid unconfirmed rows remain excluded from performed semantics. Completion uses separate explicit cleanup decisions for incomplete rows and entered-but-unconfirmed rows. The `/sessions` active-session completion affordance returns to the recorder so it cannot bypass this cleanup flow.
     - Exercise cards start expanded and their title region toggles a volatile collapsed state, with a top-aligned circular chevron control that uses the same primary-blue emphasis as the adjacent `#` action; the overflow action remains muted. Collapsing dismisses the keyboard and closes editable rows or set-quality pickers inside that exercise without changing set data; replacing the exercise definition or appending a plan expands its target card.
     - A collapsed exercise shows `<confirmed performed sets> · <working sets>` (for example `4 sets · 2 w/sets`). Blank, partial, invalid, planned, warm-up, null-quality, and valid-but-unconfirmed rows do not contribute to the working-set count; valid confirmed warm-up or null-quality rows still contribute to the performed-set count.
-    - Active mode shows an exercise-scoped success-surface `New PR` treatment, both expanded and collapsed, only when the shared current-session helper finds that exercise definition's best valid confirmed-set Wathan estimate strictly exceeds its maximum eligible loaded completed-history estimate. It resolves the owning exercise name from current catalog metadata, includes that name in expanded form plus the best entered weight, reps, and rounded estimated 1RM in both forms; multiple exercises qualify independently, while multiple qualifying sets for one exercise produce one best-set treatment.
-    - Expanded cards place `New PR` below the performed-set count and above `Past Records`, with `Share PR for <exercise>` opening the platform text share boundary; cancellation changes nothing, launch failure appears inline and remains retryable, and the payload contains only the visible exercise/load/reps/estimated-1RM facts. Collapsed cards place the non-interactive treatment below the set/working-set summary so the title toggle has no nested action. Editing below the prior best, unconfirming, or deleting the qualifying set removes the treatment immediately. Ties, first-ever exercises with no historical maximum, loading/empty/error history, and completed-edit mode show no PR treatment.
-12. Active `session-recorder` muscle load is progressive and session-scoped:
-    - no row or instructional placeholder appears before the first valid confirmed performed set, and completed-edit mode does not show this current-session signal;
-    - the row sits outside exercise cards above recorder-wide actions, reports physical performed/working-set counts plus leading contributing muscles, and opens an in-route sheet without changing recorder edit or scroll state;
-    - the sheet lists every contributing muscle by weighted volume, with an exact text value and a decorative bar relative only to the largest muscle load in this session; the bars never communicate recovery, readiness, prescription, or targets;
-    - confirmed unmapped work is an explicit `No mapped muscle load` state, distinct from pre-confirmation absence; partial mapping identifies the unmapped physical-set count;
-    - catalog/mapping failure is a compact unavailable state with Retry and stays non-blocking for entry, autosave, and submission;
-    - confirming, editing, unconfirming, and deleting recompute from current in-memory state; when the final performed set is reversed, both the row and any open sheet vanish immediately.
-13. The shared exercise editor dismisses the text keyboard before opening primary/secondary muscle selectors, and selector lists remain keyboard-aware so all muscle-group options stay reachable on iOS. It exposes a two-choice `Total load` / `Per side` control, preselects the stored value while editing, and defaults new custom exercises to total load.
-14. In `session-recorder`, GPS gym detection is quiet assistance:
+    - An active/completed-edit exercise shows the single-line summary `PR: <weight> kg × <reps> reps · est. 1RM <rounded kg> kg`, both expanded and collapsed, only when its best valid current Wathan estimate strictly exceeds the maximum loaded completed-history estimate. Expanded cards place it directly below the performed-set count and above `Past Records`; collapsed cards place it below the set/working-set summary. Ties, first-ever exercises with no historical maximum, and loading/empty/error history states show no PR line.
+12. The shared exercise editor dismisses the text keyboard before opening primary/secondary muscle selectors, and selector lists remain keyboard-aware so all muscle-group options stay reachable on iOS. It exposes a two-choice `Total load` / `Per side` control, preselects the stored value while editing, and defaults new custom exercises to total load.
+13. In `session-recorder`, GPS gym detection is quiet assistance:
     - the default recorder surface shows only the gym box, with no visible Detect button or persistent GPS suggestion panel,
     - brand-new active-session creation may run one foreground location read and preselect a gym only when exactly one saved gym confidently matches,
     - restoring an active draft and completed-edit mode do not run startup GPS detection,
     - short-pressing the gym box opens the picker, while long-pressing it explicitly retries GPS detection for the current active session,
     - permission denial, unavailable services, low accuracy, no match, ambiguous match, and read failures leave the current gym unchanged,
     - manual gym selection and `No gym` are always authoritative unless the user later long-presses to retry GPS detection.
-15. In `session-recorder`, the gym picker includes `No gym` as a null session-gym option:
+14. In `session-recorder`, the gym picker includes `No gym` as a null session-gym option:
     - it maps to nullable `session.locationId` / persisted `gym_id`,
     - it is not a `gyms` row and is not editable, archived, synced, or shown in Manage,
     - active-session null gym state displays as `No gym`, not as an unresolved choose prompt.
-16. In `session-recorder` gym management, private coordinate controls live in the single gym editor:
+15. In `session-recorder` gym management, private coordinate controls live in the single gym editor:
     - each managed gym shows only coordinate presence (`GPS saved` / `No GPS coordinates`) rather than latitude/longitude precision,
     - Manage rows expose list-management actions only (edit, archive/unarchive, archived visibility), not coordinate mutation actions,
     - `Save current location` in the single gym editor reads foreground location and persists only when accuracy is acceptable,
@@ -153,7 +145,7 @@ Document app-specific UI semantics and guardrails for the current mobile app.
     - replacing or clearing existing coordinates remains confirmation-gated in the single gym editor,
     - permission denial, unavailable services, low accuracy, and persistence failures stay inline in the editor and leave existing coordinates unchanged,
     - clearing coordinates removes the gym from GPS matching until coordinates are saved again.
-17. In `session-recorder`, each logged exercise card loads a volatile `Past Records` comparison panel keyed by `exercise_definition_id`:
+16. In `session-recorder`, each logged exercise card loads a volatile `Past Records` comparison panel keyed by `exercise_definition_id`:
     - the panel sits below assigned tag chips and above editable set rows,
     - the panel starts collapsed as a slim `Past Records` bar; tapping the bar expands it, and tapping the expanded header collapses it again without a separate Hide/Show button,
     - if a set row is editable, the first tap on the `Past Records` bar only collapses that row; a second tap opens the panel,
@@ -205,30 +197,12 @@ Document app-specific UI semantics and guardrails for the current mobile app.
 4. Completed-session exercise cards show assigned tags as chips under the exercise title only when one or more tags exist; no tag placeholder is shown when there are none.
 5. Completed-session set tables show historical set effort from `set_type` as `W-Up`, `RIR 0`, `RIR 1`, `RIR 2`, or `-` for unspecified sets.
 6. Completed-session exercise cards start expanded and use the same title-region collapse affordance. Their collapsed summary shows valid performed-set and working-set counts (`RIR 0`/`RIR 1`/`RIR 2`); the header-level `Append` action remains available. Historical cards do not label a workout as a new PR because this viewer does not compute an as-of-session history comparison.
-7. `presentation=completion` is a post-submit presentation of the stored
-   completed session, not durable celebration state and not a historical-detail
-   variant. Its order is compact `Session complete` context, `Personal records`
-   only when present, one PR at a time in exercise order with stable `N of M`
-   paging, `Session muscle load` only when performed work exists, the seven-day
-   muscle action, then Done. Personal-record history is optional enrichment: its
-   loading or failure never blocks the stored completion context or exits.
-8. Completion reuses the same PR and muscle calculations and the same sharing
-   boundary as the live recorder. Share cancellation is silent; launch failure
-   remains inline and retryable for the selected PR. PR names resolve from the
-   current linked exercise-definition metadata.
-9. Completion hides edit/delete/append. Done and safe back replace to Stats /
-   History, while the analysis action replaces to seven-day By Muscle. A
-   missing, deleted, or failed target exposes one safe return and never opens a
-   recorder copy.
 
 ### 8. Navigation/query semantics (UI-facing rule)
 
 1. Route mode/state changes that affect screen behavior (for example `session-recorder` completed-edit mode) must be documented in `docs/specs/ui/navigation-contract.md`.
 2. Route alias behavior (`/` -> `stats-history`) should be treated as a navigation entry alias, not a unique screen design.
 3. `exercise-catalog` supports recorder-entry query semantics (`source=session-recorder`, `intent=manage`) for the manage flow, while recorder `Add new` uses the same exercise editor inside the recorder route.
-4. Stats / History accepts validated initial `period=7|30` and
-   `breakdown=exercise|muscle` values. Absent or invalid values retain the
-   seven-day / By Exercise defaults; in-screen changes remain volatile state.
 
 ### 9. UI guardrail enforcement (current enforced rule)
 
