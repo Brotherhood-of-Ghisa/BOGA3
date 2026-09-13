@@ -20,11 +20,11 @@ import {
   buildLinkScreenModel,
   describeLinkRetroactivity,
   describeUnlinkConfirm,
-  useGroupExerciseLinking,
   type LinkScreenAvailableRow,
   type LinkScreenLinkedRow,
   type LinkableExercise,
 } from '@/src/groups';
+import { useGroupExerciseLinking } from '@/src/groups/use-group-exercise-linking';
 
 const coerceParam = (value: string | string[] | undefined): string | null => {
   const raw = Array.isArray(value) ? value[0] : value;
