@@ -91,12 +91,6 @@ appId: com.dinoderek.mobile
     optional: true
 - extendedWaitUntil:
     visible:
-      id: "session-completion-presentation"
-    timeout: 30000
-- tapOn:
-    id: "session-completion-done"
-- extendedWaitUntil:
-    visible:
       id: "stats-history-screen"
     timeout: 30000
 - tapOn:

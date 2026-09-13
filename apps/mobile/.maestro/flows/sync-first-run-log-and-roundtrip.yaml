@@ -178,14 +178,6 @@ appId: com.dinoderek.mobile
 - tapOn: "Submit Session"
 - extendedWaitUntil:
     visible:
-      id: "session-completion-presentation"
-    timeout: 30000
-# M24 inserts a durable completion presentation before returning to Stats. Use
-# its explicit exit so the sync round-trip remains realistic after submission.
-- tapOn:
-    id: "session-completion-done"
-- extendedWaitUntil:
-    visible:
       id: "stats-history-screen"
     timeout: 30000
 - takeScreenshot: "18-first-run-roundtrip-logged"

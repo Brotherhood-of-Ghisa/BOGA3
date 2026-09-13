@@ -107,17 +107,11 @@ export const resolveMaestroHarnessTeleportHref = ({
   mode,
   intent,
   sessionId,
-  maestroShare,
-  maestroCatalog,
-  presentation,
 }: {
   target: MaestroHarnessTeleportTarget | null;
   mode?: string | null;
   intent?: string | null;
   sessionId?: string | null;
-  maestroShare?: string | null;
-  maestroCatalog?: string | null;
-  presentation?: string | null;
 }) => {
   switch (target) {
     case 'session-list':
@@ -129,7 +123,6 @@ export const resolveMaestroHarnessTeleportHref = ({
       return withQuery('/session-recorder', {
         mode: mode === 'completed-edit' ? mode : null,
         sessionId,
-        maestroShare: maestroShare === 'fail-once' ? maestroShare : null,
       });
     case 'exercise-catalog':
       return withQuery('/exercise-catalog', {
@@ -137,14 +130,7 @@ export const resolveMaestroHarnessTeleportHref = ({
         source: 'maestro-harness',
       });
     case 'completed-session':
-      return sessionId
-        ? (withQuery(`/completed-session/${sessionId}`, {
-            intent,
-            presentation: presentation === 'completion' ? presentation : null,
-            maestroShare: maestroShare === 'fail-once' ? maestroShare : null,
-            maestroCatalog: maestroCatalog === 'fail-once' ? maestroCatalog : null,
-          }) as Href)
-        : null;
+      return sessionId ? (withQuery(`/completed-session/${sessionId}`, { intent }) as Href) : null;
     default:
       return null;
   }
