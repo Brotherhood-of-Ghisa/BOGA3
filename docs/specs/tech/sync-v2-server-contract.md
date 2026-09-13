@@ -178,7 +178,7 @@ below.
 > **Build note (verified).** All three universal columns, the
 > `<table>_owner_received_idx` index, and both triggers exist on all ten
 > tables (nine from the clean-room migration, `exercise_group_links` from
-> `20260913150000_m25_exercise_group_links.sql`); the drift checker asserts the
+> `20260913170000_m25_exercise_group_links.sql`); the drift checker asserts the
 > index and both triggers per entity.
 
 ### A.2.1 `gyms`
@@ -388,7 +388,7 @@ cross the wire (A.3).
 ### A.2.10 `exercise_group_links`
 
 Source: `apps/mobile/src/data/schema/exercise-group-links.ts`; server migration
-`20260913150000_m25_exercise_group_links.sql` (M25). A member's link from one
+`20260913170000_m25_exercise_group_links.sql` (M25). A member's link from one
 of their own exercises to a group exercise. It is the member's own data, so it
 is a Sync v2 entity like the other nine — not a group table. A **Layer 1**
 entity: its only FK parent is `exercise_definitions` (Layer 0).
