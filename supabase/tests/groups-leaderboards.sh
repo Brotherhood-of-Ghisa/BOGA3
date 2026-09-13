@@ -57,6 +57,9 @@ FORCE_EVAL_CONSTRAINT="groups_lb_force_eval_failure"
 
 RUN_USER_IDS=()
 ORIGINAL_KICK_URL="$(run_psql "select coalesce(app_public.group_eval_config('group_eval_url'), '');")"
+ORIGINAL_SWEEP_ACTIVE="$(run_psql "select active from cron.job where jobname = 'group-eval-sweep';")"
+[[ "${ORIGINAL_SWEEP_ACTIVE}" == "t" || "${ORIGINAL_SWEEP_ACTIVE}" == "f" ]] ||
+  fail "the migration did not schedule the group-eval-sweep cron job"
 EVAL_SECRET="$(run_psql "select app_public.group_eval_config('group_eval_secret');")"
 [[ -n "${EVAL_SECRET}" ]] || fail "the migration did not create the group_eval_secret Vault secret"
 
@@ -70,7 +73,7 @@ cleanup() {
             alter table app_public.group_eval_queue drop constraint if exists ${FORCE_ENQUEUE_CONSTRAINT};
             alter table app_public.group_set_facts drop constraint if exists ${FORCE_EVAL_CONSTRAINT};" >/dev/null
   set_kick_url "${ORIGINAL_KICK_URL}"
-  set_sweep_active true
+  if [[ "${ORIGINAL_SWEEP_ACTIVE}" == "t" ]]; then set_sweep_active true; else set_sweep_active false; fi
   [[ ${#RUN_USER_IDS[@]} -gt 0 ]] || return 0
   local ids
   ids="$(printf "'%s'::uuid," "${RUN_USER_IDS[@]}")"
@@ -200,8 +203,10 @@ set_username "${OWNER_UID}" "lb_owner_${RUN_TAG//-/_}"
 set_username "${ATHLETE_UID}" "lb_athlete_${RUN_TAG//-/_}"
 set_username "${OTHER_UID}" "lb_other_${RUN_TAG//-/_}"
 
-# Direct-drain mode for the run; the exit trap restores the URL.
+# Direct-drain mode for the run, with the sweep paused so it never races a
+# manual drain; the exit trap restores both.
 set_kick_url ""
+set_sweep_active false
 
 rpc "${OWNER_TOKEN}" group_create "$(jq -nc --arg n "LB ${RUN_TAG}" '{p_name: $n, p_description: null}')"
 expect_ok "group_create G"
@@ -365,9 +370,12 @@ push "${ATHLETE_TOKEN}" "shared session S1" \
   "$(e_set "${T}-b7" "${SE_B}" 6 1e3 5 "" "${CUAM}")" \
   "$(e_set "${T}-b8" "${SE_B}" 7 100 2.5 "" "${CUAM}")" \
   "$(e_set "${T}-b9" "${SE_B}" 8 60 10 "" "${CUAM}" "${DEL}" warm_up)" \
+  "$(e_set "${T}-ba" "${SE_B}" 9 "" "" "" "${CUAM}")" \
+  "$(e_set "${T}-bb" "${SE_B}" 10 100 10000000000 "" "${CUAM}")" \
   "$(e_set "${T}-d1" "${SE_D}" 0 30 10 "" "${CUAM}")" \
   "$(e_set "${T}-g1" "${SE_G}" 0 50 5 "" "${CUAM}")"
-expect_sql "a 15-row push coalesces into one session job" "$(printf '%s' "select count(*) from app_public.group_eval_queue where member_user_id = '${ATHLETE_UID}';")" "1"
+expect_sql "a 17-row push coalesces into one session job" \
+  "select count(*) from app_public.group_eval_queue where member_user_id = '${ATHLETE_UID}';" "1"
 [[ "$(queue_of)" == "session:${S1}:set" ]] || fail "queue after S1: got '$(queue_of)'"
 
 drain_ok "S1"
@@ -389,6 +397,10 @@ expect_fact b6 "true:true:90:3:$(e1rm 90 3)"
 expect_fact b7 "false:true:-:-:-"
 expect_fact b8 "false:true:-:-:-"
 expect_fact b9 "true:false:60:10:$(e1rm 60 10)"
+expect_fact ba "false:true:-:-:-"
+# Any reps text the TS parser accepts must be storable, or the job would fail
+# on every retry.
+expect_fact bb "true:true:100:10000000000:$(e1rm 100 10000000000)"
 expect_fact d1 "true:true:30:10:$(e1rm 30 10)"
 expect_fact g1 "true:false:50:5:$(e1rm 50 5)"
 expect_sql "every S1 fact: position, session start, rules version, SQL fingerprint of the raw row" \
@@ -399,7 +411,7 @@ expect_sql "every S1 fact: position, session start, rules version, SQL fingerpri
                                                                 es.performance_status, es.deleted_at))
      from app_public.group_set_facts f
      join app_public.exercise_sets es on es.owner_user_id = f.member_user_id and es.id = f.set_id
-    where f.member_user_id = '${ATHLETE_UID}';" "11:true"
+    where f.member_user_id = '${ATHLETE_UID}';" "13:true"
 expect_sql "exercise identity and order carried per set" \
   "select string_agg(set_id || '=' || coalesce(exercise_definition_id, '-') || '@' || exercise_order_index, ',' order by set_id)
      from app_public.group_set_facts where member_user_id = '${ATHLETE_UID}' and set_id in ('${T}-b1', '${T}-d1', '${T}-g1');" \
@@ -430,6 +442,26 @@ push_b1 105
 drain_ok "b1 undelete"
 expect_fact b1 "true:true:105:5:$(e1rm 105 5)"
 [[ "$(fingerprint_of "${T}-b1")" == "${FP_105}" ]] || fail "an undelete must restore the fingerprint"
+
+# The fingerprint covers exactly weight, reps, status, and deleted_at.
+next_cuam
+push "${ATHLETE_TOKEN}" "b1 set type + order" "$(e_set "${T}-b1" "${SE_B}" 20 105 "5 " "" "${CUAM}" null rir_1)"
+drain_ok "b1 set type + order"
+[[ "$(fingerprint_of "${T}-b1")" == "${FP_105}" ]] || fail "set type and order must not change the fingerprint"
+expect_sql "b1 carries its new order" \
+  "select set_order_index from app_public.group_set_facts where member_user_id = '${ATHLETE_UID}' and set_id = '${T}-b1';" "20"
+next_cuam
+push "${ATHLETE_TOKEN}" "b1 reps" "$(e_set "${T}-b1" "${SE_B}" 0 105 6 "" "${CUAM}")"
+drain_ok "b1 reps"
+[[ "$(fingerprint_of "${T}-b1")" != "${FP_105}" ]] || fail "a reps edit must change the fingerprint"
+next_cuam
+push "${ATHLETE_TOKEN}" "b1 status" "$(e_set "${T}-b1" "${SE_B}" 0 105 "5 " planned "${CUAM}")"
+drain_ok "b1 status"
+[[ "$(fingerprint_of "${T}-b1")" != "${FP_105}" ]] || fail "a status edit must change the fingerprint"
+expect_fact b1 "false:true:-:-:-"
+push_b1 105
+drain_ok "b1 restored"
+[[ "$(fingerprint_of "${T}-b1")" == "${FP_105}" ]] || fail "restoring the raw values must restore the fingerprint"
 
 FP_D1="$(fingerprint_of "${T}-d1")"
 next_cuam
@@ -538,6 +570,7 @@ expect_sql "a claimed job is leased" "select claimed_until > now() from app_publ
 push_b1 111
 expect_sql "a push during the claim bumps the generation" \
   "select generation = ${GEN} + 1 from app_public.group_eval_queue where id = ${JOB_ID};" "t"
+FACT_BEFORE="$(fact "${T}-b1")"
 expect_sql "complete with the claimed generation keeps the newer work" \
   "select app_public.group_eval_complete(${JOB_ID}, ${GEN},
             (select jsonb_agg(to_jsonb(f) - 'member_user_id' - 'session_id' - 'evaluated_at')
@@ -545,6 +578,7 @@ expect_sql "complete with the claimed generation keeps the newer work" \
               where f.member_user_id = '${ATHLETE_UID}' and f.session_id = '${S1}')) ->> 'completed';" "false"
 expect_sql "the job is released, not deleted" \
   "select claimed_until is null from app_public.group_eval_queue where id = ${JOB_ID};" "t"
+[[ "$(fact "${T}-b1")" == "${FACT_BEFORE}" ]] || fail "a stale complete must write nothing"
 drain_ok "after generation guard"
 expect_fact b1 "true:true:111:5:$(e1rm 111 5)"
 pass "a re-enqueue during a claim is never lost"
@@ -624,24 +658,45 @@ set_kick_url ""
 drain_ok "after unreachable kick"
 expect_fact b1 "true:true:116:5:$(e1rm 116 5)"
 pass "an unreachable kick URL: sync_push committed, the job waits for a drain"
+
+# A kick that raises at call time (pg_net rejects a malformed URL
+# synchronously): still one attempt and one row per transaction.
+set_kick_url "not a url"
+next_cuam
+push "${ATHLETE_TOKEN}" "three rows under a failing kick" \
+  "$(e_set "${T}-b1" "${SE_B}" 0 117 "5 " "" "${CUAM}")" \
+  "$(e_set "${T}-b2" "${SE_B}" 1 "" 9 "" "${CUAM}")" \
+  "$(e_set "${T}-b6" "${SE_B}" 5 91 3 future_status "${CUAM}")"
+rest GET "${ATHLETE_TOKEN}" exercise_sets "select=weight_value&id=eq.${T}-b1"
+check "the pushed rows committed under a failing kick" '.[0].weight_value == "117"'
+expect_sql "exactly one sanitized kick failure row for the push" \
+  "select count(*) || '|' || min((select string_agg(k, ',' order by k) from jsonb_object_keys(context) k))
+          || '|' || min(message)
+     from public.app_logs where user_id = '${ATHLETE_UID}' and event = 'group.eval_kick_failed';" \
+  "1|sqlstate|group evaluator kick failed; the sync write committed and the sweep will retry"
+[[ "$(queue_of)" == "session:${S1}:set" ]] || fail "a failing kick must leave the job queued: got '$(queue_of)'"
+set_kick_url ""
+drain_ok "after failing kick"
+expect_fact b1 "true:true:117:5:$(e1rm 117 5)"
+pass "a kick that raises: sync_push committed, one attempt and one row per push, the job waits"
 expect_sql "no enqueue failures beyond the forced one" "select count(*) from public.app_logs
-  where user_id = '${ATHLETE_UID}' and event in ('group.eval_enqueue_failed', 'group.eval_kick_failed');" "1"
+  where user_id = '${ATHLETE_UID}' and event = 'group.eval_enqueue_failed';" "1"
 
 # =============================================================================
 echo "[${LANE_LABEL}] sweep and pg_net"
 # =============================================================================
 
-push_b1 117
+push_b1 118
 [[ "$(queue_of)" == "session:${S1}:set" ]] || fail "a missed kick leaves the job pending: got '$(queue_of)'"
 set_kick_url "${LOCAL_KICK_URL}"
+# The cron job is paused for the run; this is the call it makes every 30 s.
 expect_sql "the sweep kicks when claimable work exists" "select app_public.group_eval_sweep();" "t"
 wait_until "the sweep drains the missed kick" \
   "select not exists (select 1 from app_public.group_eval_queue where member_user_id = '${ATHLETE_UID}')
       and exists (select 1 from app_public.group_set_facts where member_user_id = '${ATHLETE_UID}'
-                   and set_id = '${T}-b1' and weight_kg = 117);" 30
+                   and set_id = '${T}-b1' and weight_kg = 118);" 30
 pass "the sweep drains a missed kick"
 
-set_sweep_active false
 SEQ_BEFORE="$(run_psql "select last_value from net.http_request_queue_id_seq;")"
 next_cuam
 SMOKE=("$(e_session "${S3}" $(( START + 120000 )) active null null null "${CUAM}")" "$(e_se "${T}-s3-se" "${S3}" "${DEF_ROW}" 0 Row "${CUAM}")")
@@ -653,7 +708,6 @@ SEQ_AFTER="$(run_psql "select last_value from net.http_request_queue_id_seq;")"
 [[ $(( SEQ_AFTER - SEQ_BEFORE )) -eq 1 ]] || fail "one pg_net request per push: got $(( SEQ_AFTER - SEQ_BEFORE ))"
 wait_until "the kick drains the push" \
   "select count(*) = 30 from app_public.group_set_facts where member_user_id = '${ATHLETE_UID}' and session_id = '${S3}';" 30
-set_sweep_active true
 set_kick_url ""
 pass "pg_net smoke: one kick for a 32-row push, facts appear without a direct call"
 
@@ -663,10 +717,10 @@ echo "[${LANE_LABEL}] a member who left"
 
 rpc "${ATHLETE_TOKEN}" group_leave "$(jq -nc --arg g "${GID}" '{p_group_id: $g}')"
 expect_ok "athlete leaves G"
-push_b1 118
+push_b1 119
 drain_ok "after leaving"
 expect_mine "a member who left has no live targets" "[{key: \"${S1}\", kind: \"session\", outcome: \"completed\", causes: [\"set\"], targets: []}]"
-expect_fact b1 "true:true:118:5:$(e1rm 118 5)"
+expect_fact b1 "true:true:119:5:$(e1rm 119 5)"
 pass "a former member's shared sessions are still normalized, but resolve no target"
 
 echo "[${LANE_LABEL}] passed (run ${RUN_TAG})"

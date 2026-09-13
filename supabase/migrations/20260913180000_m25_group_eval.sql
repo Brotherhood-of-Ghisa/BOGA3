@@ -71,8 +71,11 @@ create table app_public.group_set_facts (
   set_order_index        integer not null,
   performed              boolean not null,
   live                   boolean not null,
+  -- Wide enough for any finite value the TS rules accept (reps is any JS
+  -- integer the recorder's parser takes), so no client text can make a job
+  -- fail on every retry.
   weight_kg              double precision null,
-  reps                   integer null,
+  reps                   numeric null,
   e1rm_kg                double precision null,
   achieved_at_ms         bigint not null,
   fingerprint            text not null,
@@ -93,6 +96,9 @@ create index group_set_facts_member_session
   on app_public.group_set_facts (member_user_id, session_id);
 create index group_set_facts_member_exercise
   on app_public.group_set_facts (member_user_id, exercise_definition_id);
+-- Every drain asks for facts older than the TS rules version; normally none.
+create index group_set_facts_rules_version
+  on app_public.group_set_facts (rules_version);
 
 alter table app_public.group_eval_queue enable row level security;
 alter table app_public.group_set_facts enable row level security;
@@ -310,7 +316,9 @@ $$;
 
 -- At most one kick per transaction (a 200-row push fires hundreds of row
 -- triggers), isolated from the enqueue that preceded it: a kick failure never
--- rolls back the queued work, and the sweep retries it.
+-- rolls back the queued work, and the sweep retries it. The flag is set
+-- outside the isolated block, so a kick that fails is not retried (and logged)
+-- once per remaining row.
 create function app_public.group_eval_kick_once(p_user_id uuid)
 returns void
 language plpgsql
@@ -324,8 +332,8 @@ begin
   if coalesce(current_setting('app.group_eval_kicked', true), '') = 'on' then
     return;
   end if;
+  perform set_config('app.group_eval_kicked', 'on', true);
   begin
-    perform set_config('app.group_eval_kicked', 'on', true);
     perform app_public.group_eval_kick();
   exception when others then
     get stacked diagnostics _sqlstate = returned_sqlstate;
@@ -735,11 +743,12 @@ as $$
     left join app_public.sessions s on s.owner_user_id = p_member_user_id and s.id = p_session_id;
 $$;
 
--- Finish one claimed job. A session job replaces the session's facts with
--- p_facts (the TS normalization of group_eval_session_rows). Both kinds resolve
--- their live targets and call the apply seam. The job is deleted only when no
--- re-enqueue bumped its generation since the claim; otherwise it is released
--- to run again with the newer work.
+-- Finish one claimed job. When a re-enqueue bumped its generation since the
+-- claim, p_facts is a stale snapshot: the job is released to run again with
+-- the newer work and nothing is written. Otherwise a session job replaces the
+-- session's facts with p_facts (the TS normalization of
+-- group_eval_session_rows), both kinds resolve their live targets and call the
+-- apply seam, and the job is deleted.
 create function app_public.group_eval_complete(p_job_id bigint, p_generation bigint, p_facts jsonb)
 returns jsonb
 language plpgsql
@@ -752,11 +761,15 @@ declare
   _defs text[];
   _targets jsonb;
   _target record;
-  _completed boolean;
 begin
   select q.* into _job from app_public.group_eval_queue q where q.id = p_job_id for update;
   if not found then
     raise exception 'NOT_FOUND: evaluator job not found' using errcode = 'P0001';
+  end if;
+
+  if _job.generation <> p_generation then
+    update app_public.group_eval_queue set claimed_until = null where id = _job.id;
+    return jsonb_build_object('job_id', _job.id, 'completed', false, 'targets', '[]'::jsonb);
   end if;
 
   if _job.kind = 'session' then
@@ -793,7 +806,7 @@ begin
       from jsonb_to_recordset(p_facts) as r(
         set_id text, session_exercise_id text, exercise_definition_id text,
         exercise_order_index integer, set_order_index integer, performed boolean, live boolean,
-        weight_kg double precision, reps integer, e1rm_kg double precision,
+        weight_kg double precision, reps numeric, e1rm_kg double precision,
         achieved_at_ms bigint, fingerprint text, rules_version integer)
     on conflict (member_user_id, set_id) do update set
       session_id             = excluded.session_id,
@@ -828,14 +841,8 @@ begin
     perform app_public.group_eval_apply(_target.group_id, _job.member_user_id, _target.group_exercise_id, _job.causes);
   end loop;
 
-  _completed := _job.generation = p_generation;
-  if _completed then
-    delete from app_public.group_eval_queue where id = _job.id;
-  else
-    update app_public.group_eval_queue set claimed_until = null where id = _job.id;
-  end if;
-
-  return jsonb_build_object('job_id', _job.id, 'completed', _completed, 'targets', _targets);
+  delete from app_public.group_eval_queue where id = _job.id;
+  return jsonb_build_object('job_id', _job.id, 'completed', true, 'targets', _targets);
 end;
 $$;
 
@@ -855,7 +862,7 @@ begin
   update app_public.group_eval_queue q
      set attempts      = q.attempts + 1,
          claimed_until = null,
-         available_at  = now() + make_interval(secs => least(300, power(2, q.attempts + 1))),
+         available_at  = now() + make_interval(secs => least(300, power(2, least(q.attempts + 1, 9)))),
          last_sqlstate = _code
    where q.id = p_job_id
   returning q.* into _job;
@@ -890,6 +897,11 @@ begin
     select distinct f.member_user_id, f.session_id
       from app_public.group_set_facts f
      where f.rules_version < p_rules_version
+       -- A fact whose share is gone (group hard-deleted) can never be
+       -- requeued; skipping it keeps the batch from sticking on it.
+       and exists (
+         select 1 from app_public.group_session_shares sh
+          where sh.member_user_id = f.member_user_id and sh.session_id = f.session_id)
        and not exists (
          select 1 from app_public.group_eval_queue q
           where q.kind = 'session' and q.member_user_id = f.member_user_id and q.session_id = f.session_id)

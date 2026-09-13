@@ -417,7 +417,7 @@ invisible.
 | `exercise_order_index`, `set_order_index` | Tie-break order after `achieved_at_ms` (P7) |
 | `performed` | The recorder's rule (§5), run in TS by the evaluator |
 | `live` | Set, exercise, and session all untombstoned |
-| `weight_kg`, `reps`, `e1rm_kg` | Null unless performed. They are in the member's **entered** load mode; conversion to the group exercise's mode is SQL (T05, D6). `e1rm_kg` is Wathan (`estimateOneRepMax`), null at 0 kg. |
+| `weight_kg`, `reps`, `e1rm_kg` | Null unless performed. They are in the member's **entered** load mode; conversion to the group exercise's mode is SQL (T05, D6). `e1rm_kg` is Wathan (`estimateOneRepMax`), null at 0 kg. `reps` is `numeric` so that any value the TS parser accepts can be stored; no client text can fail a job on every retry. |
 | `achieved_at_ms` | `sessions.started_at` |
 | `fingerprint` | `group_set_fingerprint(weight_value, reps_value, performance_status, deleted_at)`: md5 over the raw values. It interprets nothing, so certification (T06) can compare a live row without the evaluator. |
 | `rules_version` | `GROUP_EVAL_RULES_VERSION` of the TS that wrote it |
@@ -460,8 +460,10 @@ commits.
 
 - **Kick.** After an enqueue, `group_eval_kick_once` sends at most one
   `net.http_post` per transaction, flagged by the transaction-local setting
-  `app.group_eval_kicked`. It runs in a block of its own, so a kick failure
-  (`group.eval_kick_failed`) never rolls back the queued work. pg_net sends
+  `app.group_eval_kicked`. The flag is set outside the kick's own isolated
+  block, so a kick that raises is attempted and logged
+  (`group.eval_kick_failed`) once per push, not once per row, and never rolls
+  back the queued work. pg_net sends
   after commit, so a rolled-back push sends nothing.
 - **Sweep.** The pg_cron job `group-eval-sweep` runs `select
   app_public.group_eval_sweep()` every `30 seconds`. It kicks once when
@@ -487,10 +489,10 @@ service-role key, a service-role boundary with no client API. One drain:
    with `live` and `fingerprint` in one snapshot. `normalizeGroupSetFacts`
    (TS) returns the facts.
 4. `group_eval_complete(job, generation, facts)`:
-   - replaces the session's facts;
-   - resolves live targets;
-   - calls `group_eval_apply` per target;
-   - deletes the job, or releases it when the generation moved.
+   - if the generation moved since the claim, the facts are a stale
+     snapshot: it releases the job without writing anything;
+   - otherwise it replaces the session's facts, resolves live targets, calls
+     `group_eval_apply` per target, and deletes the job.
 
    On any error, `group_eval_fail(job, sqlstate)` applies the backoff and
    writes one `group.eval_failed` row with `context = {job_id, kind,
