@@ -6,10 +6,10 @@
  *
  * The push side of sync only ships rows whose dirty bit is set; a write path
  * that forgets to flip the bit silently drops the user's edit from sync. This
- * file asserts the contract once per entity table (all nine), exercising the
+ * file asserts the contract once per entity table (all ten), exercising the
  * canonical create / update / soft-delete path the app actually uses and then
  * asserting the persisted row has `local_dirty = 1` and a positive monotonic
- * `local_updated_at_ms`. The nine per-entity checks together cover the whole
+ * `local_updated_at_ms`. The ten per-entity checks together cover the whole
  * entity surface. `muscle_groups` has no user-facing write path this iteration
  * (it is system-seeded only), so its write path is the starter-catalog seeder —
  * which must land its rows dirty just like the rest of the catalog.
@@ -56,10 +56,12 @@ import {
   SYSTEM_MUSCLE_GROUP_SEEDS,
   seedSystemExerciseCatalog,
 } from '@/src/data/exercise-catalog-seeds';
+import { linkExercise, unlinkExercise } from '@/src/data/exercise-group-links';
 import { createDrizzleExerciseTagStore } from '@/src/data/exercise-tags';
 import { upsertLocalGym } from '@/src/data/local-gyms';
 import {
   exerciseDefinitions,
+  exerciseGroupLinks,
   exerciseMuscleMappings,
   exerciseSets,
   exerciseTagDefinitions,
@@ -209,6 +211,37 @@ describe('every entity write path flips the dirty bit in the write transaction',
       .get();
     expect(row?.localDirty).toBe(true);
     expect(row?.localUpdatedAtMs ?? 0).toBeGreaterThan(0);
+  });
+
+  it('exercise_group_links — link and unlink each flip local_dirty and stamp a newer timestamp', async () => {
+    seedExerciseDefinition();
+
+    const linked = await linkExercise(
+      EXERCISE_DEFINITION_ID,
+      'group-1',
+      'group-exercise-1',
+      new Date('2026-05-30T10:00:00.000Z'),
+    );
+    const afterLink = db()
+      .select()
+      .from(exerciseGroupLinks)
+      .where(eq(exerciseGroupLinks.id, linked.id))
+      .get();
+    expect(afterLink?.localDirty).toBe(true);
+    expect(afterLink?.localUpdatedAtMs ?? 0).toBeGreaterThan(0);
+
+    // Model a clean post-push state, then unlink (a tombstone write).
+    db().update(exerciseGroupLinks).set({ localDirty: false }).run();
+    await unlinkExercise(EXERCISE_DEFINITION_ID, 'group-1', new Date('2026-05-30T11:00:00.000Z'));
+
+    const afterUnlink = db()
+      .select()
+      .from(exerciseGroupLinks)
+      .where(eq(exerciseGroupLinks.id, linked.id))
+      .get();
+    expect(afterUnlink?.localDirty).toBe(true);
+    expect(afterUnlink?.deletedAt).not.toBeNull();
+    expect(afterUnlink?.localUpdatedAtMs ?? 0).toBeGreaterThan(afterLink?.localUpdatedAtMs ?? 0);
   });
 
   it('sessions — soft delete flips local_dirty and sets deleted_at', async () => {

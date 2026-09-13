@@ -24,6 +24,28 @@
         "with_check": "9cd3efb159268fa52203986eada98c92c3de5a1319c11486dfec73ab0a29f7a8"
       }
     },
+    "exercise_group_links": {
+      "owner_select": {
+        "qual": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186",
+        "with_check": null
+      },
+      "owner_insert": {
+        "qual": null,
+        "with_check": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186"
+      },
+      "owner_update": {
+        "qual": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186",
+        "with_check": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186"
+      },
+      "owner_delete": {
+        "qual": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186",
+        "with_check": null
+      },
+      "direct_app_only": {
+        "qual": "9cd3efb159268fa52203986eada98c92c3de5a1319c11486dfec73ab0a29f7a8",
+        "with_check": "9cd3efb159268fa52203986eada98c92c3de5a1319c11486dfec73ab0a29f7a8"
+      }
+    },
     "exercise_muscle_mappings": {
       "owner_select": {
         "qual": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186",

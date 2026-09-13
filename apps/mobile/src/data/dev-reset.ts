@@ -7,6 +7,7 @@ import {
 } from './exercise-catalog-seeds';
 import {
   exerciseDefinitions,
+  exerciseGroupLinks,
   exerciseMuscleMappings,
   exerciseSets,
   exerciseTagDefinitions,
@@ -77,6 +78,7 @@ export const resetLocalDataAndReseed = async (
     tx.delete(gyms).run();
     tx.delete(exerciseTagDefinitions).run();
     tx.delete(exerciseMuscleMappings).run();
+    tx.delete(exerciseGroupLinks).run();
     tx.delete(exerciseDefinitions).run();
     tx.delete(muscleGroups).run();
   });

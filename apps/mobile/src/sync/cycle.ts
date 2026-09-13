@@ -532,6 +532,14 @@ const ENTITY_FIELDS: Record<EntityTableName, FieldSpec[]> = {
     TS('updated_at', 'updatedAt'),
     TS('deleted_at', 'deletedAt'),
   ],
+  exercise_group_links: [
+    SC('exercise_definition_id', 'exerciseDefinitionId'),
+    SC('group_id', 'groupId'),
+    SC('group_exercise_id', 'groupExerciseId'),
+    TS('created_at', 'createdAt'),
+    TS('updated_at', 'updatedAt'),
+    TS('deleted_at', 'deletedAt'),
+  ],
   session_exercises: [
     SC('session_id', 'sessionId'),
     SC('exercise_definition_id', 'exerciseDefinitionId'),
@@ -572,6 +580,7 @@ const ENTITY_TABLES: Record<EntityTableName, (typeof schema)[keyof typeof schema
   exercise_tag_definitions: schema.exerciseTagDefinitions,
   sessions: schema.sessions,
   exercise_muscle_mappings: schema.exerciseMuscleMappings,
+  exercise_group_links: schema.exerciseGroupLinks,
   session_exercises: schema.sessionExercises,
   exercise_sets: schema.exerciseSets,
   session_exercise_tags: schema.sessionExerciseTags,

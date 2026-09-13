@@ -135,7 +135,7 @@ RUN_TAG="$(printf '%s' "${RUN_TAG}" | tr -c 'a-zA-Z0-9-' '-')"
 cleanup_rows() {
   for table in session_exercise_tags exercise_sets session_exercises \
                exercise_muscle_mappings exercise_tag_definitions sessions \
-               muscle_groups exercise_definitions gyms; do
+               exercise_group_links muscle_groups exercise_definitions gyms; do
     http_request DELETE \
       "${API_URL}/rest/v1/${table}?owner_user_id=in.(${USER_A_UUID},${USER_B_UUID})&id=like.pd-${RUN_TAG}-%" \
       "${SERVICE_ROLE_KEY}" >/dev/null 2>&1 || true
@@ -155,7 +155,8 @@ sync_pull() {
 # strictly increase by row so the pull cursor order is deterministic.
 #
 # Layer 0: 2 gyms + 2 exercise_definitions + 2 muscle_groups = 6 rows
-# Layer 1: 2 sessions + 2 exercise_muscle_mappings + 2 exercise_tag_definitions = 6 rows
+# Layer 1: 2 sessions + 2 exercise_muscle_mappings + 2 exercise_tag_definitions
+#          + 2 exercise_group_links = 8 rows
 # Layer 2: 2 session_exercises = 2 rows
 # Layer 3: 2 exercise_sets + 2 session_exercise_tags = 4 rows
 # + 1 tombstone row (deleted_at non-null) in gyms.
@@ -231,6 +232,18 @@ SEED_PAYLOAD="$(jq -nc \
      fields: {exercise_definition_id: ("pd-" + $tag + "-ed-2"),
               name: "Light", normalized_name: "light",
               created_at: ($b + 110), updated_at: ($b + 110), deleted_at: null}},
+    # exercise_group_links ids are the client-derived
+    # `<group_id>:<exercise_definition_id>`; group_id is plain text (no FK).
+    {type: "exercise_group_links", id: ("pd-" + $tag + "-grp-1:pd-" + $tag + "-ed-1"),
+     client_updated_at_ms: ($b + 112),
+     fields: {exercise_definition_id: ("pd-" + $tag + "-ed-1"),
+              group_id: ("pd-" + $tag + "-grp-1"), group_exercise_id: "gex-1",
+              created_at: ($b + 112), updated_at: ($b + 112), deleted_at: null}},
+    {type: "exercise_group_links", id: ("pd-" + $tag + "-grp-1:pd-" + $tag + "-ed-2"),
+     client_updated_at_ms: ($b + 114),
+     fields: {exercise_definition_id: ("pd-" + $tag + "-ed-2"),
+              group_id: ("pd-" + $tag + "-grp-1"), group_exercise_id: "gex-2",
+              created_at: ($b + 114), updated_at: ($b + 114), deleted_at: null}},
 
     # Layer 2
     {type: "session_exercises", id: ("pd-" + $tag + "-sx-1"), client_updated_at_ms: ($b + 120),
@@ -299,7 +312,7 @@ all_seed_ids_for() {
 }
 
 LAYER0_FILTER='(.type == "gyms" or .type == "exercise_definitions" or .type == "muscle_groups")'
-LAYER1_FILTER='(.type == "sessions" or .type == "exercise_muscle_mappings" or .type == "exercise_tag_definitions")'
+LAYER1_FILTER='(.type == "sessions" or .type == "exercise_muscle_mappings" or .type == "exercise_tag_definitions" or .type == "exercise_group_links")'
 LAYER2_FILTER='(.type == "session_exercises")'
 LAYER3_FILTER='(.type == "exercise_sets" or .type == "session_exercise_tags")'
 

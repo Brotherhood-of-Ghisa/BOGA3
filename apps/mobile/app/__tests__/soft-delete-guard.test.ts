@@ -9,7 +9,7 @@
  * re-seeds the row, resurrecting data the user deleted.
  *
  * This test scans every TypeScript source file under `src/` (excluding tests)
- * for a Drizzle `.delete(<entity>)` call against one of the eight syncable
+ * for a Drizzle `.delete(<entity>)` call against one of the ten syncable
  * entity tables, and fails if one appears outside the small set of exempt
  * sites. The exempt sites are wholesale local-table wipes (the dev reset) and
  * test/maestro fixtures — they are not per-row user deletes, and the deletion
@@ -19,8 +19,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-// The eight syncable entities, by the Drizzle table variable name used in
-// source (the identifier passed to `.delete(...)`).
+// The ten syncable entities, by the Drizzle table variable name used in
+// source (the identifier passed to `.delete(...)`). A hard delete of an
+// `exercise_group_links` row would drop the unlink tombstone and resurrect the
+// link on the next pull.
 const SYNCABLE_ENTITY_TABLE_VARIABLES = [
   'gyms',
   'sessions',
@@ -30,6 +32,8 @@ const SYNCABLE_ENTITY_TABLE_VARIABLES = [
   'exerciseMuscleMappings',
   'exerciseTagDefinitions',
   'sessionExerciseTags',
+  'muscleGroups',
+  'exerciseGroupLinks',
 ] as const;
 
 const SRC_ROOT = path.resolve(__dirname, '..', '..', 'src');

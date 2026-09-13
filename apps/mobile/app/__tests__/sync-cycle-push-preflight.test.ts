@@ -21,6 +21,7 @@ import type { LogEventParams } from '@/src/logging/logEvent';
 import { __resetClockForTests, PRIMARY_RUNTIME_STATE_ID, type Transaction } from '@/src/data/clock';
 import {
   exerciseDefinitions,
+  exerciseGroupLinks,
   exerciseSets,
   exerciseTagDefinitions,
   gyms,
@@ -190,6 +191,20 @@ const insertSessionExerciseTag = (
     .run();
 };
 
+const insertGroupLink = (exerciseDefinitionId: string, groupId: string, ms: number, dirty = true): void => {
+  database
+    .insert(exerciseGroupLinks)
+    .values({
+      id: `${groupId}:${exerciseDefinitionId}`,
+      exerciseDefinitionId,
+      groupId,
+      groupExerciseId: `gx-${groupId}`,
+      localDirty: dirty,
+      localUpdatedAtMs: ms,
+    })
+    .run();
+};
+
 const preflight = () =>
   database.transaction((tx) => {
     const batch = selectPushBatch(tx as Transaction, BATCH_CAP);
@@ -255,6 +270,27 @@ describe('findPushBatchFkViolations', () => {
       ]),
     );
     expect(violations).toHaveLength(2);
+  });
+
+  it('flags a dirty exercise_group_link whose exercise_definitions parent is missing', () => {
+    plantOrphan(() => insertGroupLink('def-missing', 'grp-1', 100));
+
+    expect(preflight()).toEqual([
+      {
+        childType: 'exercise_group_links',
+        childId: 'grp-1:def-missing',
+        parentType: 'exercise_definitions',
+        parentIdField: 'exercise_definition_id',
+        parentId: 'def-missing',
+      },
+    ]);
+  });
+
+  it('never treats a link group_id / group_exercise_id as an FK (no group row exists locally)', () => {
+    insertExerciseDefinition('def-1', 10);
+    insertGroupLink('def-1', 'grp-without-any-local-row', 20);
+
+    expect(preflight()).toEqual([]);
   });
 
   it('passes a valid dirty parent+child graph that pushes in the same batch', () => {

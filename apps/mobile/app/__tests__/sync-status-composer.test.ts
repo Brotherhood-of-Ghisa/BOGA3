@@ -4,7 +4,7 @@
  * The sync-status composer: it folds the scheduler's production status, the
  * runtime-state row, and a dirty-row count into the single snapshot the Settings
  * surface renders. These tests pin two things against a real in-memory database:
- *  1. the dirty count sums `local_dirty = 1` rows across all nine entity tables
+ *  1. the dirty count sums `local_dirty = 1` rows across all ten entity tables
  *     (and excludes clean rows), and
  *  2. the snapshot carries the scheduler's last-success time, error, network
  *     state, the auth-required flag, and the bootstrap-completed flag.
@@ -34,6 +34,7 @@ jest.mock('@/src/sync/auth-required-signal', () => ({
 import { PRIMARY_RUNTIME_STATE_ID } from '@/src/data/clock';
 import {
   exerciseDefinitions,
+  exerciseGroupLinks,
   exerciseMuscleMappings,
   exerciseSets,
   exerciseTagDefinitions,
@@ -70,7 +71,7 @@ afterEach(() => {
   fixture.close();
 });
 
-describe('dirty-row count across the nine entity tables', () => {
+describe('dirty-row count across the ten entity tables', () => {
   it('is zero on an empty database', async () => {
     const status = await getSyncStatus();
     expect(status.dirtyCount).toBe(0);
@@ -113,6 +114,15 @@ describe('dirty-row count across the nine entity tables', () => {
       localDirty: true,
     });
 
+    // One dirty exercise-group link (Layer 1).
+    await db.insert(exerciseGroupLinks).values({
+      id: 'grp-1:def-1',
+      exerciseDefinitionId: 'def-1',
+      groupId: 'grp-1',
+      groupExerciseId: 'gx-1',
+      localDirty: true,
+    });
+
     // One dirty session (Layer 1).
     await db.insert(sessions).values({
       id: 'sess-1',
@@ -141,9 +151,9 @@ describe('dirty-row count across the nine entity tables', () => {
     });
 
     const status = await getSyncStatus();
-    // 2 gyms + 1 def + 1 muscle group + 1 tag-def + 1 mapping + 1 session
-    // + 1 se + 1 set + 1 se-tag = 10
-    expect(status.dirtyCount).toBe(10);
+    // 2 gyms + 1 def + 1 muscle group + 1 tag-def + 1 mapping + 1 link
+    // + 1 session + 1 se + 1 set + 1 se-tag = 11
+    expect(status.dirtyCount).toBe(11);
   });
 
   it('counts a dirty muscle_groups row like every other synced entity', async () => {

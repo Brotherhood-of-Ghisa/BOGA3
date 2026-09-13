@@ -13,6 +13,11 @@ export {
   type ExerciseMuscleMapping,
   type NewExerciseMuscleMapping,
 } from './exercise-muscle-mappings';
+export {
+  exerciseGroupLinks,
+  type ExerciseGroupLink,
+  type NewExerciseGroupLink,
+} from './exercise-group-links';
 export { exerciseSets, type ExerciseSet, type NewExerciseSet } from './exercise-sets';
 export { groupCache, type GroupCacheRecord, type NewGroupCacheRecord } from './group-cache';
 export { gyms, type Gym, type NewGym } from './gyms';
