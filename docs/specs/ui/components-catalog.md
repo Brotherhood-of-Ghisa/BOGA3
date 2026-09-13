@@ -107,41 +107,53 @@ Brief entrypoint inventory of the current reusable UI component set.
 7. `ExercisePersonalRecordCelebration`
 - File: `apps/mobile/components/session-recorder/exercise-personal-record-celebration.tsx`
 - Purpose:
-  - reusable, exercise-scoped success surface for a shared `ExercisePersonalRecord`, with screenshot-complete exercise, best-set, and rounded estimated-1RM facts in expanded or collapsed form
-  - expanded form owns the precisely labelled `Share PR` action and accessible retryable launch error; the platform-text payload and share boundary live in `apps/mobile/src/session-insights/sharing.ts`
+  - reusable, non-interactive exercise-scoped success surface for a shared `ExercisePersonalRecord`, with exercise, best-set, and rounded estimated-1RM facts in expanded, collapsed, or compact-completion form
 
 8. `SessionCompletionPresentation`
 - File: `apps/mobile/components/session-recorder/session-completion-presentation.tsx`
 - Purpose:
-  - reusable post-submit composition for compact session context, optional
-    exercise-ordered PR paging, the shared `SessionMuscleLoad`, seven-day muscle
-    analysis handoff, and Done
-  - keeps one screenshot-complete `ExercisePersonalRecordCelebration` visible at
-    a time and exposes stable `N of M`, Previous, and Next controls when needed
+  - reusable post-submit composition for every compact PR, session totals,
+    per-exercise volume comparison, the shared `SessionMuscleLoad`, session-image
+    share preview, seven-day muscle analysis handoff, and Done
+  - keeps all PRs visible together instead of paging them
 
-9. `SessionSummaryLine`
+9. `ExerciseVolumeComparisonRow`
+- File: `apps/mobile/components/session-recorder/exercise-volume-comparison.tsx`
+- Purpose:
+  - presents exercise name, performed/working-set counts, current entered volume
+    versus median, and descriptive P5/P95 range or explicit sparse-history state
+  - reused by in-app completion and the captured share card
+
+10. `SessionSharePreview` / `SessionShareCard`
+- File: `apps/mobile/components/session-recorder/session-share-preview.tsx`
+- Purpose:
+  - previews the exact privacy-limited session card captured to PNG and opens the
+    native image share sheet with inline retry and temporary-file cleanup
+  - includes all PRs and exercise comparisons, but never gym/location data
+
+11. `SessionSummaryLine`
 - File: `apps/mobile/components/session-list/session-summary-line.tsx`
 - Purpose:
   - shared two-line summary row (date/duration/gym + sets/exercises) reused by `ActiveSessionRow` and `HistoryList`, and available to the upcoming Stats/History and Log tabs
 
-10. `ActiveSessionRow`
+12. `ActiveSessionRow`
 - File: `apps/mobile/components/session-list/active-session-row.tsx`
 - Purpose:
   - active-session row plus its overflow menu (resume / complete / delete) used by the Log tab
 
-11. `HistoryList`
+13. `HistoryList`
 - File: `apps/mobile/components/session-list/history-list.tsx`
 - Purpose:
   - completed-session history list with delete/undelete modal and deleted-visibility toggle, consumed by the `stats-history` History sub-view
 
-12. `DailyHeatmap` / `WeeklyHeatmap`
+14. `DailyHeatmap` / `WeeklyHeatmap`
 - Files: `apps/mobile/components/heatmaps/DailyHeatmap.tsx`, `apps/mobile/components/heatmaps/WeeklyHeatmap.tsx`
 - Purpose:
   - reusable daily-cell and weekly-bar views over the same `HeatmapData`, used by both muscle- and exercise-history overlays
   - renders horizontally scrollable one-year history with token-backed zero/green/today/selected states and tappable accessible cells
   - the Stats overlay integration keeps both views mounted, with the inactive view transparent, non-interactive, and accessibility-hidden, so toggling does not rebuild the chart tree
 
-13. Group components (M22)
+15. Group components (M22)
 - Folder: `apps/mobile/components/groups/` (barrel `index.ts`); data comes from `@/src/groups` hooks and the pure view model
 - Purpose:
   - `GroupStreamSessionCard` — the stream card (member, status pill, start · gym, sets · kg · exercises computed on the device, group names in All); one press target

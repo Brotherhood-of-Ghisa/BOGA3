@@ -1,9 +1,11 @@
 import {
+  calculateLinearPercentile,
+  captureSessionShareImage,
   createCompletedSessionInsightsRepository,
-  buildPersonalRecordShareMessage,
   deriveExercisePersonalRecord,
+  deriveSessionExerciseVolumeComparisons,
   deriveSessionPersonalRecords,
-  sharePersonalRecord,
+  shareSessionImage,
   summarizeCurrentSessionMuscleLoad,
   type CurrentSessionMuscleSummaryInput,
   type PersonalRecordSessionInput,
@@ -11,6 +13,17 @@ import {
   type SessionInsightsStore,
 } from '@/src/session-insights';
 import { estimateOneRepMax } from '@/src/exercise-calculations';
+import { captureRef } from 'react-native-view-shot';
+
+jest.mock('react-native-view-shot', () => ({
+  captureRef: jest.fn().mockResolvedValue('file:///tmp/boga-session.png'),
+  releaseCapture: jest.fn(),
+}));
+
+jest.mock('expo-sharing', () => ({
+  isAvailableAsync: jest.fn().mockResolvedValue(true),
+  shareAsync: jest.fn().mockResolvedValue(undefined),
+}));
 
 const AT = new Date('2026-09-12T10:00:00.000Z');
 
@@ -65,33 +78,41 @@ const completedSession = (
   ...overrides,
 });
 
-describe('personal record sharing', () => {
-  const personalRecord = {
-    exerciseDefinitionId: 'bench',
-    exerciseName: 'Bench Press',
-    sessionExerciseId: 'bench-row',
-    sessionExerciseOrderIndex: 0,
-    setId: 'bench-set',
-    setOrderIndex: 0,
-    weight: 102.5,
-    reps: 5,
-    estimatedOneRepMax: 119.58,
-    historicalBestEstimatedOneRepMax: 115,
-  };
-
-  it('builds a stable text-only payload from the visible PR facts', () => {
-    expect(buildPersonalRecordShareMessage(personalRecord)).toBe(
-      'New PR: Bench Press — 102.5 kg × 5 reps · estimated 1RM 120 kg.'
+describe('session image sharing', () => {
+  it('captures an adaptive-height PNG at a fixed 1080 pixel width', async () => {
+    await expect(
+      captureSessionShareImage({} as never, { width: 360, height: 720 })
+    ).resolves.toBe('file:///tmp/boga-session.png');
+    expect(captureRef).toHaveBeenCalledWith(
+      {},
+      expect.objectContaining({ format: 'png', result: 'tmpfile', width: 1080, height: 2160 })
     );
   });
 
-  it('launches the injected platform share boundary and treats dismissal as a no-op', async () => {
-    const share = jest.fn().mockResolvedValue({ action: 'dismissedAction' });
+  it('shares only the captured local PNG and treats native dismissal as a no-op', async () => {
+    const client = {
+      isAvailableAsync: jest.fn().mockResolvedValue(true),
+      shareAsync: jest.fn().mockResolvedValue(undefined),
+    };
 
-    await expect(sharePersonalRecord(personalRecord, share)).resolves.toBeUndefined();
-    expect(share).toHaveBeenCalledWith({
-      message: 'New PR: Bench Press — 102.5 kg × 5 reps · estimated 1RM 120 kg.',
+    await expect(shareSessionImage('file:///tmp/session.png', client)).resolves.toBeUndefined();
+    expect(client.shareAsync).toHaveBeenCalledWith('file:///tmp/session.png', {
+      dialogTitle: 'Share your BOGA session',
+      mimeType: 'image/png',
+      UTI: 'public.png',
     });
+  });
+
+  it('fails clearly when image sharing is unavailable', async () => {
+    const client = {
+      isAvailableAsync: jest.fn().mockResolvedValue(false),
+      shareAsync: jest.fn(),
+    };
+
+    await expect(shareSessionImage('file:///tmp/session.png', client)).rejects.toThrow(
+      'Image sharing is unavailable'
+    );
+    expect(client.shareAsync).not.toHaveBeenCalled();
   });
 });
 
@@ -290,6 +311,190 @@ describe('summarizeCurrentSessionMuscleLoad', () => {
     expect(() =>
       summarizeCurrentSessionMuscleLoad(muscleInput({ sessionAt: new Date('invalid') }))
     ).toThrow('sessionAt must be a valid Date');
+  });
+});
+
+describe('deriveSessionExerciseVolumeComparisons', () => {
+  it('uses linear interpolation for odd, even, and tail percentiles', () => {
+    expect(calculateLinearPercentile([100, 200, 300], 0.5)).toBe(200);
+    expect(calculateLinearPercentile([100, 200, 300, 400], 0.5)).toBe(250);
+    expect(calculateLinearPercentile([100, 200], 0.05)).toBe(105);
+    expect(calculateLinearPercentile([100, 200], 0.95)).toBe(195);
+  });
+
+  it('combines repeated target blocks, includes warm-ups, and excludes invalid work', () => {
+    const target = completedSession({
+      sessionId: 'target',
+      exercises: [
+        insightExercise({
+          id: 'target-bench-a',
+          orderIndex: 2,
+          exerciseDefinitionId: 'bench',
+          exerciseName: 'Bench Press',
+          sets: [
+            insightSet('warm-up', { weightValue: '100', repsValue: '5', setType: 'warm_up' }),
+            insightSet('unconfirmed', {
+              weightValue: '900',
+              repsValue: '5',
+              setType: 'rir_0',
+              performanceStatus: 'unperformed',
+            }),
+          ],
+        }),
+        insightExercise({
+          id: 'target-bench-b',
+          orderIndex: 4,
+          exerciseDefinitionId: 'bench',
+          exerciseName: 'Bench Press',
+          sets: [
+            insightSet('working', { weightValue: '120', repsValue: '5', setType: 'rir_1' }),
+            insightSet('deleted', { weightValue: '500', repsValue: '5', deletedAt: AT }),
+          ],
+        }),
+      ],
+    });
+    const history = [500, 700, 900].map((volume, index) =>
+      completedSession({
+        sessionId: `history-${index}`,
+        completedAt: new Date(`2026-09-0${index + 1}T10:00:00.000Z`),
+        exercises: [
+          insightExercise({
+            id: `history-bench-${index}`,
+            exerciseDefinitionId: 'bench',
+            exerciseName: 'Bench Press',
+            sets: [insightSet(`history-set-${index}`, { weightValue: `${volume}`, repsValue: '1' })],
+          }),
+        ],
+      })
+    );
+
+    expect(
+      deriveSessionExerciseVolumeComparisons({ targetSession: target, historicalSessions: history })
+    ).toEqual([
+      {
+        exerciseDefinitionId: 'bench',
+        exerciseName: 'Bench Press',
+        sessionExerciseIds: ['target-bench-a', 'target-bench-b'],
+        sessionExerciseOrderIndex: 2,
+        setCount: 2,
+        workingSetCount: 1,
+        currentVolume: 1100,
+        historicalSessionCount: 3,
+        medianVolume: 700,
+        percentile5Volume: 520,
+        percentile95Volume: 880,
+        state: 'distribution',
+      },
+    ]);
+  });
+
+  it('does not compare unlinked legacy exercises by display name', () => {
+    const target = completedSession({
+      sessionId: 'target',
+      exercises: [
+        insightExercise({
+          id: 'legacy-target',
+          exerciseDefinitionId: null,
+          exerciseName: 'Legacy Press',
+          sets: [insightSet('target-set')],
+        }),
+      ],
+    });
+    const history = completedSession({
+      sessionId: 'history',
+      completedAt: new Date('2026-09-01T10:00:00.000Z'),
+      exercises: [
+        insightExercise({
+          id: 'legacy-history',
+          exerciseDefinitionId: null,
+          exerciseName: 'Legacy Press',
+          sets: [insightSet('history-set')],
+        }),
+      ],
+    });
+
+    expect(
+      deriveSessionExerciseVolumeComparisons({ targetSession: target, historicalSessions: [history] })
+    ).toEqual([
+      expect.objectContaining({
+        exerciseDefinitionId: null,
+        currentVolume: 500,
+        historicalSessionCount: 0,
+        medianVolume: null,
+        state: 'no-history',
+      }),
+    ]);
+  });
+
+  it('distinguishes a single baseline from a constant historical distribution', () => {
+    const target = completedSession({
+      sessionId: 'target',
+      exercises: [
+        insightExercise({
+          id: 'target-bench',
+          exerciseDefinitionId: 'bench',
+          sets: [insightSet('target-set', { weightValue: '0' })],
+        }),
+      ],
+    });
+    const makeHistory = (sessionId: string, day: string) =>
+      completedSession({
+        sessionId,
+        completedAt: new Date(`2026-09-${day}T10:00:00.000Z`),
+        exercises: [
+          insightExercise({
+            id: `${sessionId}-bench`,
+            exerciseDefinitionId: 'bench',
+            sets: [insightSet(`${sessionId}-set`, { weightValue: '0' })],
+          }),
+        ],
+      });
+
+    const single = deriveSessionExerciseVolumeComparisons({
+      targetSession: target,
+      historicalSessions: [makeHistory('one', '01')],
+    })[0];
+    const constant = deriveSessionExerciseVolumeComparisons({
+      targetSession: target,
+      historicalSessions: [makeHistory('one', '01'), makeHistory('two', '02')],
+    })[0];
+
+    expect(single).toEqual(expect.objectContaining({ state: 'single-baseline', medianVolume: 0 }));
+    expect(constant).toEqual(
+      expect.objectContaining({ state: 'constant-baseline', medianVolume: 0 })
+    );
+  });
+
+  it('excludes future, same-time later-id, active, and deleted sessions', () => {
+    const target = completedSession({
+      sessionId: 'target',
+      exercises: [
+        insightExercise({
+          id: 'target-bench',
+          exerciseDefinitionId: 'bench',
+          sets: [insightSet('target-set')],
+        }),
+      ],
+    });
+    const disallowed = [
+      completedSession({ sessionId: 'future', completedAt: new Date('2026-09-13T10:00:00.000Z') }),
+      completedSession({ sessionId: 'z-same-time' }),
+      completedSession({ sessionId: 'active', status: 'active', completedAt: null }),
+      completedSession({ sessionId: 'deleted', deletedAt: AT }),
+    ].map((session) => ({
+      ...session,
+      exercises: [
+        insightExercise({
+          id: `${session.sessionId}-bench`,
+          exerciseDefinitionId: 'bench',
+          sets: [insightSet(`${session.sessionId}-set`)],
+        }),
+      ],
+    }));
+
+    expect(
+      deriveSessionExerciseVolumeComparisons({ targetSession: target, historicalSessions: disallowed })[0]
+    ).toEqual(expect.objectContaining({ historicalSessionCount: 0, state: 'no-history' }));
   });
 });
 
@@ -532,7 +737,7 @@ describe('createCompletedSessionInsightsRepository', () => {
     const store = buildStore();
     const repository = createCompletedSessionInsightsRepository(store);
 
-    await expect(repository.loadPersonalRecords('missing')).resolves.toBeNull();
+    await expect(repository.loadInsights('missing')).resolves.toBeNull();
     expect(store.loadEarlierCompletedSessions).not.toHaveBeenCalled();
     expect(store.loadSessionExercises).not.toHaveBeenCalled();
   });
@@ -577,14 +782,23 @@ describe('createCompletedSessionInsightsRepository', () => {
     });
     const repository = createCompletedSessionInsightsRepository(store);
 
-    const records = await repository.loadPersonalRecords('target');
+    const insights = await repository.loadInsights('target');
 
     expect(store.loadEarlierCompletedSessions).toHaveBeenCalledWith({
       completedAt: AT,
       targetSessionId: 'target',
     });
-    expect(records).toEqual([
-      expect.objectContaining({ exerciseDefinitionId: 'bench', setId: 'target-set' }),
-    ]);
+    expect(insights).toEqual({
+      personalRecords: [
+        expect.objectContaining({ exerciseDefinitionId: 'bench', setId: 'target-set' }),
+      ],
+      exerciseVolumeComparisons: [
+        expect.objectContaining({
+          exerciseDefinitionId: 'bench',
+          currentVolume: 550,
+          medianVolume: 500,
+        }),
+      ],
+    });
   });
 });

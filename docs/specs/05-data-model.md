@@ -309,6 +309,14 @@ section states only the data-model-level invariants.
    presentation resolves its exercise name from the current linked
    `exercise_definitions` row, falling back to the captured session-exercise
    name only for an unlinked legacy row.
+   Completed-session exercise-volume comparisons remain a read-time projection,
+   not persisted data. They sum entered `weight × reps` across valid confirmed
+   sets (including warm-ups), combine repeated blocks by linked exercise
+   definition, and compare only with earlier completed, nondeleted sessions for
+   that definition. P5, median, and P95 use linear interpolation over the prior
+   per-session totals; unlinked legacy rows stay isolated and report no history.
+   The generated session-share PNG and its temporary file URI are likewise not
+   database or sync entities.
 11. `exercise_group_links` (M25) is `in sync scope`: a member links one of their
    own exercises to a group exercise, and the link backs up, syncs, and works
    offline like the rest of their data (contract §A.2.10). Its id is

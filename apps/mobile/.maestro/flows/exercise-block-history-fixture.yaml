@@ -84,25 +84,6 @@ appId: com.dinoderek.mobile
 - assertVisible: "New PR"
 - assertVisible: "300 kg × 5 reps · est. 1RM 350 kg"
 - takeScreenshot: "exercise-block-comparison-expanded"
-- tapOn: "Share PR for Barbell Back Squat"
-- extendedWaitUntil:
-    visible:
-      id: "exercise-expanded-pr-1-share-error"
-    timeout: 10000
-- takeScreenshot: "exercise-pr-share-error"
-- tapOn: "Share PR for Barbell Back Squat"
-- extendedWaitUntil:
-    visible: "Copy"
-    timeout: 10000
-- takeScreenshot: "exercise-pr-platform-share-sheet"
-# Swipe the system sheet down; no share destination is selected.
-- swipe:
-    start: "50%,55%"
-    end: "50%,95%"
-    duration: 500
-- extendedWaitUntil:
-    notVisible: "Copy"
-    timeout: 10000
 - scrollUntilVisible:
     element:
       id: "exercise-expanded-pr-1"
@@ -238,21 +219,59 @@ appId: com.dinoderek.mobile
 - assertVisible: "Session complete"
 - assertVisible: "Personal records"
 - assertVisible:
-    id: "session-completion-pr-position"
-- assertVisible: "Barbell Back Squat"
-- takeScreenshot: "session-completion-multiple-prs-first"
-- tapOn: "Share PR for Barbell Back Squat"
+    id: "session-completion-pr-seed_barbell_back_squat"
+- assertVisible:
+    id: "session-completion-pr-seed_barbell_bench_press"
+- assertNotVisible:
+    id: "session-completion-pr-pager"
+- takeScreenshot: "session-completion-multiple-prs-all"
+- scrollUntilVisible:
+    element:
+      id: "session-completion-context"
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
+- assertVisible:
+    id: "session-completion-working-sets"
+- scrollUntilVisible:
+    element:
+      id: "session-completion-exercise-volume"
+    direction: DOWN
+    visibilityPercentage: 80
+    centerElement: true
+- assertVisible: "Exercise volume"
+- scrollUntilVisible:
+    element:
+      id: "session-completion-share-session"
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
+- tapOn:
+    id: "session-completion-share-session"
 - extendedWaitUntil:
     visible:
-      id: "session-completion-pr-seed_barbell_back_squat-share-error"
+      id: "session-share-card"
     timeout: 10000
-- takeScreenshot: "session-completion-share-error"
-- tapOn: "Share PR for Barbell Back Squat"
+- assertVisible:
+    id: "session-share-card-pr-seed_barbell_back_squat"
+- assertVisible:
+    id: "session-share-card-pr-seed_barbell_bench_press"
+- assertVisible: "2 personal records"
+- takeScreenshot: "session-share-preview-all-prs"
+- tapOn:
+    id: "session-share-image"
+- extendedWaitUntil:
+    visible:
+      id: "session-share-error"
+    timeout: 10000
+- takeScreenshot: "session-share-image-error"
+- tapOn:
+    id: "session-share-image"
 - extendedWaitUntil:
     visible: "Copy"
     timeout: 10000
-- takeScreenshot: "session-completion-platform-share-sheet"
-# Dismiss without selecting a destination; this proves launch/cancel only.
+- takeScreenshot: "session-share-platform-share-sheet"
+# Dismiss without selecting a destination; this proves image launch/cancel only.
 - swipe:
     start: "50%,55%"
     end: "50%,95%"
@@ -260,11 +279,12 @@ appId: com.dinoderek.mobile
 - extendedWaitUntil:
     notVisible: "Copy"
     timeout: 10000
-- tapOn: "Next personal record"
-- assertVisible:
-    id: "session-completion-pr-position"
-- assertVisible: "Barbell Bench Press"
-- takeScreenshot: "session-completion-multiple-prs-second"
+- tapOn:
+    id: "session-share-cancel"
+- extendedWaitUntil:
+    notVisible:
+      id: "session-share-close"
+    timeout: 10000
 - scrollUntilVisible:
     element:
       id: "session-muscle-load-row"

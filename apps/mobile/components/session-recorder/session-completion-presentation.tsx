@@ -1,28 +1,33 @@
+import { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
-import { UiButton, UiSurface, UiText, uiColors, uiSpace } from '@/components/ui';
-import type { CurrentSessionMuscleSummary, ExercisePersonalRecord } from '@/src/session-insights';
+import { UiButton, UiSurface, UiText, uiColors, uiSpace, uiTypography } from '@/components/ui';
+import type {
+  CurrentSessionMuscleSummary,
+  ExercisePersonalRecord,
+  ExerciseVolumeComparison,
+} from '@/src/session-insights';
 
 import { ExercisePersonalRecordCelebration } from './exercise-personal-record-celebration';
+import { ExerciseVolumeComparisonRow } from './exercise-volume-comparison';
 import {
   SessionMuscleLoad,
   type SessionMuscleLoadCatalogState,
 } from './session-muscle-load';
+import { SessionSharePreview } from './session-share-preview';
 
 type SessionCompletionPresentationProps = {
+  completedAt: string;
   durationDisplay: string;
   exerciseCount: number;
   gymName: string | null;
   performedSetCount: number;
   workingSetCount: number;
   personalRecords: ExercisePersonalRecord[];
-  selectedPersonalRecordIndex: number;
-  personalRecordShareError: string | null;
+  exerciseVolumeComparisons: ExerciseVolumeComparison[];
   muscleSummary: CurrentSessionMuscleSummary | null;
   muscleCatalogState: SessionMuscleLoadCatalogState;
-  onPreviousPersonalRecord: () => void;
-  onNextPersonalRecord: () => void;
-  onSharePersonalRecord: (personalRecord: ExercisePersonalRecord) => void;
+  shouldFailNextShare?: boolean;
   onRetryMuscleCatalog: () => void;
   onViewMuscleLoad: () => void;
   onDone: () => void;
@@ -32,120 +37,140 @@ const formatCount = (count: number, singular: string): string =>
   `${count} ${count === 1 ? singular : `${singular}s`}`;
 
 export function SessionCompletionPresentation({
+  completedAt,
   durationDisplay,
   exerciseCount,
   gymName,
   performedSetCount,
   workingSetCount,
   personalRecords,
-  selectedPersonalRecordIndex,
-  personalRecordShareError,
+  exerciseVolumeComparisons,
   muscleSummary,
   muscleCatalogState,
-  onPreviousPersonalRecord,
-  onNextPersonalRecord,
-  onSharePersonalRecord,
+  shouldFailNextShare = false,
   onRetryMuscleCatalog,
   onViewMuscleLoad,
   onDone,
 }: SessionCompletionPresentationProps) {
-  const selectedPersonalRecord = personalRecords[selectedPersonalRecordIndex] ?? null;
-  const hasMultiplePersonalRecords = personalRecords.length > 1;
-  const positionLabel = `${selectedPersonalRecordIndex + 1} of ${personalRecords.length}`;
+  const [isSharePreviewOpen, setIsSharePreviewOpen] = useState(false);
 
   return (
-    <ScrollView
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-      testID="session-completion-presentation">
-      <UiSurface style={styles.completeSurface} testID="session-completion-context">
-        <UiText style={styles.completeEyebrow} variant="labelStrong">
-          Session complete
-        </UiText>
-        <UiText variant="title">
-          {`${durationDisplay} · ${formatCount(exerciseCount, 'exercise')} · ${formatCount(
-            performedSetCount,
-            'set'
-          )}`}
-        </UiText>
-        {gymName?.trim() ? <UiText variant="bodyMuted">{gymName}</UiText> : null}
-      </UiSurface>
-
-      {selectedPersonalRecord ? (
-        <View style={styles.section} testID="session-completion-personal-records">
-          <View style={styles.sectionHeadingRow}>
+    <>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        testID="session-completion-presentation">
+        {personalRecords.length > 0 ? (
+          <View style={styles.section} testID="session-completion-personal-records">
             <UiText variant="title">Personal records</UiText>
-            {hasMultiplePersonalRecords ? (
-              <UiText
-                accessibilityLabel={`Personal record ${positionLabel}`}
-                testID="session-completion-pr-position"
-                variant="label">
-                {positionLabel}
-              </UiText>
-            ) : null}
-          </View>
-          <ExercisePersonalRecordCelebration
-            key={selectedPersonalRecord.setId}
-            onShare={() => onSharePersonalRecord(selectedPersonalRecord)}
-            personalRecord={selectedPersonalRecord}
-            shareError={personalRecordShareError}
-            testID={`session-completion-pr-${selectedPersonalRecord.exerciseDefinitionId}`}
-            variant="expanded"
-          />
-          {hasMultiplePersonalRecords ? (
-            <View style={styles.pager} testID="session-completion-pr-pager">
-              <UiButton
-                accessibilityLabel="Previous personal record"
-                disabled={selectedPersonalRecordIndex === 0}
-                label="Previous"
-                style={styles.pagerButton}
-                variant="secondary"
-                onPress={onPreviousPersonalRecord}
-              />
-              <UiButton
-                accessibilityLabel="Next personal record"
-                disabled={selectedPersonalRecordIndex === personalRecords.length - 1}
-                label="Next"
-                style={styles.pagerButton}
-                variant="secondary"
-                onPress={onNextPersonalRecord}
-              />
+            <View style={styles.personalRecordStack}>
+              {personalRecords.map((personalRecord) => (
+                <ExercisePersonalRecordCelebration
+                  key={personalRecord.setId}
+                  personalRecord={personalRecord}
+                  testID={`session-completion-pr-${personalRecord.exerciseDefinitionId}`}
+                  variant="compact"
+                />
+              ))}
             </View>
-          ) : null}
-        </View>
-      ) : null}
+          </View>
+        ) : null}
 
-      {performedSetCount > 0 ? (
         <View style={styles.section}>
-          <SessionMuscleLoad
-            catalogState={muscleCatalogState}
-            onRetry={onRetryMuscleCatalog}
-            performedSetCount={performedSetCount}
-            summary={muscleSummary}
-            visible
-            workingSetCount={workingSetCount}
+          <UiText variant="title">Session summary</UiText>
+          <UiSurface style={styles.completeSurface} testID="session-completion-context">
+            <UiText variant="labelStrong">
+              {`${durationDisplay} · ${formatCount(exerciseCount, 'exercise')} · ${formatCount(
+                performedSetCount,
+                'set'
+              )}`}
+            </UiText>
+            <UiText
+              style={styles.summarySecondary}
+              testID="session-completion-working-sets"
+              variant="bodyMuted">
+              {`${formatCount(workingSetCount, 'working set')}${
+                gymName?.trim() ? ` · ${gymName}` : ''
+              }`}
+            </UiText>
+          </UiSurface>
+        </View>
+
+        {exerciseVolumeComparisons.length > 0 ? (
+          <View style={styles.section} testID="session-completion-exercise-volume">
+            <View style={styles.sectionHeadingRow}>
+              <UiText variant="title">Exercise volume</UiText>
+              <UiText style={styles.sectionHint} variant="bodyMuted">
+                Session vs history
+              </UiText>
+            </View>
+            <View style={styles.exerciseStack}>
+              {exerciseVolumeComparisons.map((comparison) => (
+                <ExerciseVolumeComparisonRow
+                  key={`${comparison.exerciseDefinitionId ?? 'legacy'}-${comparison.sessionExerciseIds.join('-')}`}
+                  comparison={comparison}
+                  testID={`session-completion-exercise-${comparison.sessionExerciseIds[0]}`}
+                />
+              ))}
+            </View>
+          </View>
+        ) : null}
+
+        {performedSetCount > 0 ? (
+          <View style={styles.section}>
+            <SessionMuscleLoad
+              catalogState={muscleCatalogState}
+              onRetry={onRetryMuscleCatalog}
+              performedSetCount={performedSetCount}
+              summary={muscleSummary}
+              visible
+              workingSetCount={workingSetCount}
+            />
+          </View>
+        ) : null}
+
+        <View style={styles.actions}>
+          <UiButton
+            accessibilityHint="Opens a preview of the complete session image."
+            accessibilityLabel="Share session"
+            label="Share session"
+            testID="session-completion-share-session"
+            onPress={() => setIsSharePreviewOpen(true)}
+          />
+          <UiButton
+            accessibilityHint="Opens Stats with the last seven days shown by muscle."
+            accessibilityLabel="View 7-day muscle load"
+            label="View 7-day muscle load"
+            testID="session-completion-view-muscle-load"
+            variant="secondary"
+            onPress={onViewMuscleLoad}
+          />
+          <UiButton
+            accessibilityHint="Returns to Stats and History."
+            accessibilityLabel="Done with session completion"
+            label="Done"
+            testID="session-completion-done"
+            variant="secondary"
+            onPress={onDone}
           />
         </View>
-      ) : null}
+      </ScrollView>
 
-      <View style={styles.actions}>
-        <UiButton
-          accessibilityHint="Opens Stats with the last seven days shown by muscle."
-          accessibilityLabel="View 7-day muscle load"
-          label="View 7-day muscle load"
-          testID="session-completion-view-muscle-load"
-          onPress={onViewMuscleLoad}
-        />
-        <UiButton
-          accessibilityHint="Returns to Stats and History."
-          accessibilityLabel="Done with session completion"
-          label="Done"
-          testID="session-completion-done"
-          variant="secondary"
-          onPress={onDone}
-        />
-      </View>
-    </ScrollView>
+      <SessionSharePreview
+        onClose={() => setIsSharePreviewOpen(false)}
+        shouldFailNextShare={shouldFailNextShare}
+        snapshot={{
+          completedAt,
+          durationDisplay,
+          exerciseCount,
+          performedSetCount,
+          workingSetCount,
+          personalRecords,
+          exerciseVolumeComparisons,
+        }}
+        visible={isSharePreviewOpen}
+      />
+    </>
   );
 }
 
@@ -159,27 +184,32 @@ const styles = StyleSheet.create({
   completeSurface: {
     padding: uiSpace.xl,
     gap: uiSpace.xs,
-    borderColor: uiColors.borderSuccess,
-    backgroundColor: uiColors.surfaceSuccess,
+    borderColor: uiColors.borderMuted,
+    backgroundColor: uiColors.surfaceDefault,
   },
-  completeEyebrow: {
-    color: uiColors.textSuccess,
+  summarySecondary: {
+    color: uiColors.textSecondary,
   },
   section: {
     gap: uiSpace.md,
   },
+  personalRecordStack: {
+    gap: uiSpace.sm,
+  },
+  exerciseStack: {
+    gap: uiSpace.sm,
+  },
   sectionHeadingRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'baseline',
     justifyContent: 'space-between',
     gap: uiSpace.md,
   },
-  pager: {
-    flexDirection: 'row',
-    gap: uiSpace.sm,
-  },
-  pagerButton: {
-    flex: 1,
+  sectionHint: {
+    flexShrink: 1,
+    textAlign: 'right',
+    fontSize: uiTypography.size.xs,
+    color: uiColors.textSecondary,
   },
   actions: {
     gap: uiSpace.sm,

@@ -1,14 +1,12 @@
 import { StyleSheet, View } from 'react-native';
 
-import { UiButton, UiSurface, UiText, uiColors, uiSpace } from '@/components/ui';
+import { UiSurface, UiText, uiColors, uiSpace, uiTypography } from '@/components/ui';
 import type { ExercisePersonalRecord } from '@/src/session-insights';
 
 type ExercisePersonalRecordCelebrationProps = {
   personalRecord: ExercisePersonalRecord;
-  variant: 'expanded' | 'collapsed';
+  variant: 'expanded' | 'collapsed' | 'compact';
   testID: string;
-  shareError?: string | null;
-  onShare?: () => void;
 };
 
 const formatLoad = (value: number): string =>
@@ -18,8 +16,6 @@ export function ExercisePersonalRecordCelebration({
   personalRecord,
   variant,
   testID,
-  shareError,
-  onShare,
 }: ExercisePersonalRecordCelebrationProps) {
   const fact = `${formatLoad(personalRecord.weight)} kg × ${personalRecord.reps} reps · est. 1RM ${Math.round(
     personalRecord.estimatedOneRepMax
@@ -28,10 +24,16 @@ export function ExercisePersonalRecordCelebration({
   return (
     <UiSurface
       accessibilityLabel={
-        variant === 'collapsed' ? `New PR for ${personalRecord.exerciseName}. ${fact}` : undefined
+        variant === 'collapsed' || variant === 'compact'
+          ? `New PR for ${personalRecord.exerciseName}. ${fact}`
+          : undefined
       }
-      accessible={variant === 'collapsed'}
-      style={[styles.surface, variant === 'collapsed' ? styles.collapsedSurface : null]}
+      accessible={variant === 'collapsed' || variant === 'compact'}
+      style={[
+        styles.surface,
+        variant === 'collapsed' ? styles.collapsedSurface : null,
+        variant === 'compact' ? styles.compactSurface : null,
+      ]}
       testID={testID}>
       <View style={styles.headingRow}>
         <UiText style={styles.celebrationTitle} variant="labelStrong">
@@ -46,24 +48,14 @@ export function ExercisePersonalRecordCelebration({
           {personalRecord.exerciseName}
         </UiText>
       ) : null}
+      {variant === 'compact' ? (
+        <UiText numberOfLines={2} style={styles.compactExerciseName} variant="labelStrong">
+          {personalRecord.exerciseName}
+        </UiText>
+      ) : null}
       <UiText numberOfLines={2} style={styles.fact} variant="label">
         {fact}
       </UiText>
-      {variant === 'expanded' && onShare ? (
-        <UiButton
-          accessibilityHint="Opens the platform share sheet with this personal record as text."
-          accessibilityLabel={`Share PR for ${personalRecord.exerciseName}`}
-          label="Share PR"
-          style={styles.shareButton}
-          variant="secondary"
-          onPress={onShare}
-        />
-      ) : null}
-      {variant === 'expanded' && shareError ? (
-        <UiText accessibilityLiveRegion="polite" style={styles.shareError} testID={`${testID}-share-error`}>
-          {shareError}
-        </UiText>
-      ) : null}
     </UiSurface>
   );
 }
@@ -79,6 +71,11 @@ const styles = StyleSheet.create({
     marginTop: uiSpace.xs,
     padding: uiSpace.sm,
   },
+  compactSurface: {
+    paddingHorizontal: uiSpace.md,
+    paddingVertical: uiSpace.sm,
+    gap: uiSpace.xxs,
+  },
   headingRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -93,12 +90,7 @@ const styles = StyleSheet.create({
   fact: {
     color: uiColors.textAccentStrong,
   },
-  shareButton: {
-    alignSelf: 'flex-start',
-    marginTop: uiSpace.xs,
-    minWidth: 110,
-  },
-  shareError: {
-    color: uiColors.actionDangerText,
+  compactExerciseName: {
+    fontSize: uiTypography.size.base,
   },
 });

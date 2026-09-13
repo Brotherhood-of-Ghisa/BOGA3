@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
-import { ScrollView, Share, StyleSheet } from 'react-native';
+import { ScrollView, StyleSheet } from 'react-native';
 
 import { uiColors } from '@/components/ui';
 import SessionRecorderScreen from '../(tabs)/session-recorder';
@@ -1642,9 +1642,9 @@ describe('SessionRecorderScreen exercise interactions', () => {
     fireEvent.press(screen.getByTestId('set-performance-control-1-2'));
 
     expect(screen.getByTestId('exercise-expanded-pr-1')).toHaveTextContent(
-      'New PR★Barbell Squat300 kg × 5 reps · est. 1RM 350 kgShare PR'
+      'New PR★Barbell Squat300 kg × 5 reps · est. 1RM 350 kg'
     );
-    expect(screen.getByLabelText('Share PR for Barbell Squat')).toBeTruthy();
+    expect(screen.queryByLabelText('Share PR for Barbell Squat')).toBeNull();
 
     fireEvent.press(collapseToggle);
 
@@ -1662,56 +1662,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     expect(screen.getByTestId('set-row-pressable-1-2')).toBeTruthy();
   });
 
-  it('shares the visible PR payload, keeps cancellation silent, and retries an inline launch failure', async () => {
-    mockLoadRecentExerciseBlocks.mockResolvedValueOnce({
-      exerciseDefinitionId: 'seed_barbell_back_squat',
-      limit: null,
-      blocks: [
-        {
-          sessionId: 'squat-history',
-          completedAt: new Date('2026-05-24T10:00:00.000Z'),
-          daysAgo: 2,
-          sessionExerciseIds: ['se-squat'],
-          estimatedOneRepMax: 200,
-          totalVolume: 1200,
-          highestWeight: 180,
-          workingSetCount: 2,
-        },
-      ],
-    });
-    const share = jest
-      .spyOn(Share, 'share')
-      .mockRejectedValueOnce(new Error('native share unavailable'))
-      .mockResolvedValueOnce({ action: Share.dismissedAction });
-
-    render(<SessionRecorderScreen />);
-    await dismissEmptyStateIfPresent();
-    fireEvent.press(screen.getByText('Log new exercise'));
-    await selectExerciseFromPicker('Barbell Squat');
-    await screen.findByTestId('exercise-block-history-panel-1-collapsed');
-    fireEvent.changeText(screen.getByLabelText('Weight for exercise 1 set 1'), '300');
-    fireEvent.changeText(screen.getByLabelText('Reps for exercise 1 set 1'), '5');
-    fireEvent.press(screen.getByTestId('set-performance-control-1-1'));
-
-    fireEvent.press(screen.getByLabelText('Share PR for Barbell Squat'));
-    expect(await screen.findByTestId('exercise-expanded-pr-1-share-error')).toHaveTextContent(
-      "Couldn't open the share sheet. Try again."
-    );
-    expect(share).toHaveBeenLastCalledWith({
-      message: 'New PR: Barbell Squat — 300 kg × 5 reps · estimated 1RM 350 kg.',
-    });
-
-    fireEvent.press(screen.getByLabelText('Share PR for Barbell Squat'));
-    await waitFor(() => {
-      expect(screen.queryByTestId('exercise-expanded-pr-1-share-error')).toBeNull();
-    });
-    expect(share).toHaveBeenCalledTimes(2);
-    fireEvent.press(screen.getByTestId('set-performance-control-1-1'));
-    expect(screen.queryByTestId('exercise-expanded-pr-1')).toBeNull();
-    share.mockRestore();
-  });
-
-  it('uses the current catalog name for a PR restored from a renamed exercise', async () => {
+  it('uses the current catalog name for a non-interactive PR restored from a renamed exercise', async () => {
     mockSetExerciseName('seed_barbell_back_squat', 'High Bar Squat');
     mockLoadLatestSessionDraftSnapshot.mockResolvedValueOnce({
       sessionId: 'active-session',
@@ -1754,21 +1705,13 @@ describe('SessionRecorderScreen exercise interactions', () => {
         },
       ],
     });
-    const share = jest.spyOn(Share, 'share').mockResolvedValue({ action: Share.dismissedAction });
-
     render(<SessionRecorderScreen />);
 
-    const shareButton = await screen.findByLabelText('Share PR for High Bar Squat');
-    expect(screen.getByText('High Bar Squat')).toBeTruthy();
-    fireEvent.press(shareButton);
-    await waitFor(() => expect(share).toHaveBeenCalledTimes(1));
-    expect(share).toHaveBeenCalledWith({
-      message: 'New PR: High Bar Squat — 300 kg × 5 reps · estimated 1RM 350 kg.',
-    });
-    share.mockRestore();
+    expect(await screen.findByText('High Bar Squat')).toBeTruthy();
+    expect(screen.queryByLabelText('Share PR for High Bar Squat')).toBeNull();
   });
 
-  it('renders and shares two exercise-scoped PRs independently', async () => {
+  it('renders two exercise-scoped PRs independently without per-PR share actions', async () => {
     mockLoadRecentExerciseBlocks
       .mockResolvedValueOnce({
         exerciseDefinitionId: 'seed_barbell_back_squat',
@@ -1802,10 +1745,6 @@ describe('SessionRecorderScreen exercise interactions', () => {
           },
         ],
       });
-    const share = jest
-      .spyOn(Share, 'share')
-      .mockResolvedValue({ action: Share.sharedAction });
-
     render(<SessionRecorderScreen />);
     await dismissEmptyStateIfPresent();
     fireEvent.press(screen.getByText('Log new exercise'));
@@ -1824,13 +1763,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
 
     expect(screen.getByTestId('exercise-expanded-pr-1')).toHaveTextContent(/Barbell Squat/);
     expect(screen.getByTestId('exercise-expanded-pr-2')).toHaveTextContent(/Bench Press/);
-    fireEvent.press(screen.getByLabelText('Share PR for Barbell Squat'));
-    fireEvent.press(screen.getByLabelText('Share PR for Bench Press'));
-
-    await waitFor(() => expect(share).toHaveBeenCalledTimes(2));
-    expect(share.mock.calls[0]?.[0].message).toContain('Barbell Squat');
-    expect(share.mock.calls[1]?.[0].message).toContain('Bench Press');
-    share.mockRestore();
+    expect(screen.queryByText('Share PR')).toBeNull();
   });
 
   it('does not label a tied estimate or a first recorded exercise as a new PR', async () => {

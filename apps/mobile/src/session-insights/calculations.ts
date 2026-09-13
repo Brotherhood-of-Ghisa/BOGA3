@@ -105,6 +105,34 @@ export type SessionPersonalRecordsInput = {
   historicalSessions: PersonalRecordSessionInput[];
 };
 
+export type ExerciseVolumeComparisonState =
+  | 'no-history'
+  | 'single-baseline'
+  | 'constant-baseline'
+  | 'distribution';
+
+export type ExerciseVolumeComparison = {
+  exerciseDefinitionId: string | null;
+  exerciseName: string;
+  sessionExerciseIds: string[];
+  sessionExerciseOrderIndex: number;
+  setCount: number;
+  workingSetCount: number;
+  currentVolume: number;
+  historicalSessionCount: number;
+  medianVolume: number | null;
+  percentile5Volume: number | null;
+  percentile95Volume: number | null;
+  state: ExerciseVolumeComparisonState;
+};
+
+export type SessionExerciseVolumeComparisonsInput = SessionPersonalRecordsInput;
+
+export type CompletedSessionInsights = {
+  personalRecords: ExercisePersonalRecord[];
+  exerciseVolumeComparisons: ExerciseVolumeComparison[];
+};
+
 const isValidDate = (value: Date): boolean => !Number.isNaN(value.getTime());
 
 const ensureValidDate = (value: Date, label: string): void => {
@@ -135,6 +163,30 @@ const isEligiblePerformedSet = (set: SessionInsightSetInput): boolean =>
   }) &&
   parseSetWeight(set.weightValue) !== null &&
   parseSetReps(set.repsValue) !== null;
+
+const isWorkingSetType = (setType: string | null): boolean =>
+  setType === 'rir_0' || setType === 'rir_1' || setType === 'rir_2';
+
+export const calculateLinearPercentile = (sortedValues: number[], percentile: number): number => {
+  if (sortedValues.length === 0) {
+    throw new Error('Percentile requires at least one value');
+  }
+  if (percentile < 0 || percentile > 1 || !Number.isFinite(percentile)) {
+    throw new Error('Percentile must be between 0 and 1');
+  }
+
+  const position = (sortedValues.length - 1) * percentile;
+  const lowerIndex = Math.floor(position);
+  const upperIndex = Math.ceil(position);
+  const lowerValue = sortedValues[lowerIndex];
+  const upperValue = sortedValues[upperIndex];
+  if (lowerValue === undefined || upperValue === undefined) {
+    throw new Error('Percentile values must be sorted finite numbers');
+  }
+  if (lowerIndex === upperIndex) return lowerValue;
+
+  return lowerValue + (upperValue - lowerValue) * (position - lowerIndex);
+};
 
 export const adaptCurrentSessionToMuscleAnalyticsInput = (
   input: CurrentSessionMuscleSummaryInput
@@ -394,3 +446,139 @@ export const deriveSessionPersonalRecords = (
 
   return records;
 };
+
+type ExerciseVolumeObservation = {
+  exerciseDefinitionId: string | null;
+  exerciseName: string;
+  sessionExerciseIds: string[];
+  sessionExerciseOrderIndex: number;
+  setCount: number;
+  workingSetCount: number;
+  volume: number;
+};
+
+const collectExerciseVolumeObservations = (
+  exercises: SessionInsightExerciseInput[]
+): ExerciseVolumeObservation[] => {
+  const observationsByIdentity = new Map<string, ExerciseVolumeObservation>();
+
+  for (const exercise of [...exercises]
+    .filter((candidate) => (candidate.deletedAt ?? null) === null)
+    .sort(compareExerciseOrder)) {
+    const eligibleSets = [...exercise.sets]
+      .filter(isEligiblePerformedSet)
+      .sort(compareSetOrder);
+    if (eligibleSets.length === 0) continue;
+
+    const identity = exercise.exerciseDefinitionId
+      ? `definition:${exercise.exerciseDefinitionId}`
+      : `legacy:${exercise.id}`;
+    const current = observationsByIdentity.get(identity) ?? {
+      exerciseDefinitionId: exercise.exerciseDefinitionId,
+      exerciseName: exercise.exerciseName,
+      sessionExerciseIds: [],
+      sessionExerciseOrderIndex: exercise.orderIndex,
+      setCount: 0,
+      workingSetCount: 0,
+      volume: 0,
+    };
+
+    current.sessionExerciseIds.push(exercise.id);
+    current.setCount += eligibleSets.length;
+    current.workingSetCount += eligibleSets.filter((set) => isWorkingSetType(set.setType)).length;
+    current.volume += eligibleSets.reduce((sum, set) => {
+      const weight = parseSetWeight(set.weightValue);
+      const reps = parseSetReps(set.repsValue);
+      return weight === null || reps === null ? sum : sum + weight * reps;
+    }, 0);
+    observationsByIdentity.set(identity, current);
+  }
+
+  return Array.from(observationsByIdentity.values()).sort((left, right) => {
+    if (left.sessionExerciseOrderIndex !== right.sessionExerciseOrderIndex) {
+      return left.sessionExerciseOrderIndex - right.sessionExerciseOrderIndex;
+    }
+    return left.sessionExerciseIds[0]?.localeCompare(right.sessionExerciseIds[0] ?? '') ?? 0;
+  });
+};
+
+export const deriveSessionExerciseVolumeComparisons = (
+  input: SessionExerciseVolumeComparisonsInput
+): ExerciseVolumeComparison[] => {
+  const target = input.targetSession;
+  if (
+    target.status !== 'completed' ||
+    target.completedAt === null ||
+    (target.deletedAt ?? null) !== null
+  ) {
+    return [];
+  }
+  ensureValidDate(target.completedAt, 'target completedAt');
+
+  const historicalVolumesByDefinition = new Map<string, number[]>();
+  for (const session of input.historicalSessions) {
+    if (
+      session.status !== 'completed' ||
+      session.completedAt === null ||
+      (session.deletedAt ?? null) !== null
+    ) {
+      continue;
+    }
+    ensureValidDate(session.completedAt, 'historical completedAt');
+    if (compareSessionOrder(session, target) >= 0) continue;
+
+    for (const observation of collectExerciseVolumeObservations(session.exercises)) {
+      if (!observation.exerciseDefinitionId) continue;
+      const bucket = historicalVolumesByDefinition.get(observation.exerciseDefinitionId) ?? [];
+      bucket.push(observation.volume);
+      historicalVolumesByDefinition.set(observation.exerciseDefinitionId, bucket);
+    }
+  }
+
+  return collectExerciseVolumeObservations(target.exercises).map((observation) => {
+    const { volume, ...exerciseSummary } = observation;
+    const historicalVolumes = observation.exerciseDefinitionId
+      ? [...(historicalVolumesByDefinition.get(observation.exerciseDefinitionId) ?? [])].sort(
+          (left, right) => left - right
+        )
+      : [];
+    if (historicalVolumes.length === 0) {
+      return {
+        ...exerciseSummary,
+        currentVolume: volume,
+        historicalSessionCount: 0,
+        medianVolume: null,
+        percentile5Volume: null,
+        percentile95Volume: null,
+        state: 'no-history' as const,
+      };
+    }
+
+    const medianVolume = calculateLinearPercentile(historicalVolumes, 0.5);
+    const percentile5Volume = calculateLinearPercentile(historicalVolumes, 0.05);
+    const percentile95Volume = calculateLinearPercentile(historicalVolumes, 0.95);
+    const state: ExerciseVolumeComparisonState =
+      historicalVolumes.length === 1
+        ? 'single-baseline'
+        : percentile5Volume === percentile95Volume
+          ? 'constant-baseline'
+          : 'distribution';
+
+    return {
+      ...exerciseSummary,
+      currentVolume: volume,
+      historicalSessionCount: historicalVolumes.length,
+      medianVolume,
+      percentile5Volume,
+      percentile95Volume,
+      state,
+    };
+  });
+};
+
+export const deriveCompletedSessionInsights = (
+  input: SessionPersonalRecordsInput
+): CompletedSessionInsights => ({
+  personalRecords: deriveSessionPersonalRecords(input),
+  exerciseVolumeComparisons: deriveSessionExerciseVolumeComparisons(input),
+});

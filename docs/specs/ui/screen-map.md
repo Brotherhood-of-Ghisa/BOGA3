@@ -99,7 +99,7 @@ Brief entrypoint map of the current mobile screens.
   - in-route single gym editor owns private coordinate controls (`Save current location`, confirmation-gated replace, and confirmation-gated clear)
   - in-route exercise-tag add/manage modals (search/select/create, rename/delete/undelete, deleted-visibility toggle)
   - per-exercise collapsed-by-default `Past Records` bar below tags and above set rows; tapping expands inline loading/empty/error states plus metric label / selected record date / live `Current` / green `Max` rows for estimated `1RM`, volume, highest weight, and working-set count; left/right swipes anywhere on the expanded panel change the selected historical record, and max values derive from loaded records plus valid current metrics
-  - exercise cards start expanded and their title region toggles a volatile collapsed summary showing valid performed-set and working-set counts (`RIR 0`/`RIR 1`/`RIR 2`); when the shared current-session insight helper finds a strict Wathan-estimate improvement over loaded completed history, the owning exercise alone shows a success-surface `New PR` treatment with its best set and rounded estimated 1RM in both states, while the expanded treatment adds an exercise-labelled platform-text `Share PR` action with retryable inline launch failure; cancellation is silent, qualifying-set reversal removes the treatment immediately, and collapse closes in-card editing while replacement and appended-plan reveal expand the target card
+  - exercise cards start expanded and their title region toggles a volatile collapsed summary showing valid performed-set and working-set counts (`RIR 0`/`RIR 1`/`RIR 2`); when the shared current-session insight helper finds a strict Wathan-estimate improvement over loaded completed history, the owning exercise alone shows a non-interactive success-surface `New PR` treatment with its best set and rounded estimated 1RM in both states; qualifying-set reversal removes the treatment immediately, and collapse closes in-card editing while replacement and appended-plan reveal expand the target card
   - active mode reveals a session-scoped `Session muscle load` row above recorder-wide actions only after valid confirmed work exists; it reports physical performed/working-set counts and leading mapped muscles, and opens an in-route detail sheet with exact weighted volumes and session-relative bars; unmapped work and retryable catalog failure are explicit, while reversal removes the row/sheet immediately and completed-edit mode remains unchanged
   - compact tap-to-edit set rows for normal and planned execution rows, each with an independently tappable left confirmation checkbox: a hollow circle is unperformed and a success-green tick is valid confirmed actual work; new/copy rows remain hollow even with valid copied values, and tapping a tick again retains values while removing the set from performed metrics; each exercise card identifies weight entry as `Total load` or `Per side`, while editable fields keep a compact `kg` suffix and make the full weight shell a focus target; adding a copied row focuses its weight and selects the full copied value; appended historical/program targets use a semantic soft blue-grey planned-row background/border while inactive, and selected appended/manual rows share one light-blue background and blue border, with no separate last-added tint, `Plan` badge, `Skip`, `Log`, or planned-row swipe action; tapping a planned body hydrates unconfirmed actual fields from the plan, and only removable user-added rows swipe to delete
   - active/completed-edit autosave preserves unconfirmed rows and values, while submit/save includes confirmed actual rows only; valid entered unconfirmed rows trigger a dedicated discard confirmation instead of being promoted or silently removed
@@ -217,11 +217,13 @@ Brief entrypoint map of the current mobile screens.
   - completed session detail viewer with edit/delete session actions and per-exercise block append actions
 - Key states (high level):
   - loading / error / not-found / detail
-  - `presentation=completion` changes only the presentation: compact completion
-    context; an omitted, single, or one-at-a-time paged `Personal records`
-    section whose optional load cannot block the completion; shared session
-    muscle load when performed work exists; seven-day muscle-analysis handoff;
-    and Done. Edit/delete/append actions are hidden in this mode
+  - `presentation=completion` changes only the presentation: all compact
+    `Personal records` cards first; a session summary including working sets;
+    per-exercise current volume versus median and descriptive P5/P95 range;
+    shared session muscle load when performed work exists; previewed PNG session
+    sharing; seven-day muscle-analysis handoff; and Done. Optional historical
+    enrichment cannot block completion, and share output excludes gym/location.
+    Edit/delete/append actions are hidden in this mode
   - completion loading/error/not-found/deleted-target states expose one safe
     Stats / History exit; the native back affordance/gesture is suppressed and
     Android system back replaces to Stats / History

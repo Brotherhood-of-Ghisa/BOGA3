@@ -109,7 +109,6 @@ import {
 } from '@/src/session-recorder/set-semantics';
 import {
   deriveExercisePersonalRecord,
-  sharePersonalRecord,
   summarizeCurrentSessionMuscleLoad,
   type ExercisePersonalRecord,
   type SessionInsightExerciseInput,
@@ -1210,7 +1209,6 @@ export default function SessionRecorderScreen({
   const routeSessionId = coerceRouteParam(params.sessionId);
   const shouldFailNextMaestroShare =
     isDevMode() && coerceRouteParam(params.maestroShare) === 'fail-once';
-  const hasFailedMaestroShareRef = useRef(false);
 
   const [state, setState] = useState<SessionRecorderState>(createInitialState);
   const [submitCleanupPrompt, setSubmitCleanupPrompt] = useState<SubmitCleanupPrompt | null>(null);
@@ -1280,9 +1278,6 @@ export default function SessionRecorderScreen({
   const [pendingNewGymCoordinates, setPendingNewGymCoordinates] = useState<GymCoordinateDraft | null>(null);
   const [exerciseBlockHistoryByExerciseId, setExerciseBlockHistoryByExerciseId] = useState<
     Record<string, ExerciseBlockHistoryPanelState>
-  >({});
-  const [personalRecordShareErrorByExerciseId, setPersonalRecordShareErrorByExerciseId] = useState<
-    Record<string, string>
   >({});
   const stateRef = useRef(state);
   const completedEditEndDateTimeRef = useRef<string | null>(completedEditEndDateTime);
@@ -3975,40 +3970,6 @@ export default function SessionRecorderScreen({
 
     return personalRecords;
   }, [currentSessionInsightExercises, exerciseBlockHistoryByExerciseId, routeMode, state.session.exercises]);
-  useEffect(() => {
-    setPersonalRecordShareErrorByExerciseId((current) => {
-      const nextEntries = Object.entries(current).filter(([exerciseId]) =>
-        currentSessionPersonalRecordByExerciseId.has(exerciseId)
-      );
-      if (nextEntries.length === Object.keys(current).length) {
-        return current;
-      }
-      return Object.fromEntries(nextEntries);
-    });
-  }, [currentSessionPersonalRecordByExerciseId]);
-  const shareCurrentPersonalRecord = useCallback(
-    async (exerciseId: string, personalRecord: ExercisePersonalRecord) => {
-      setPersonalRecordShareErrorByExerciseId((current) => {
-        if (!(exerciseId in current)) return current;
-        const next = { ...current };
-        delete next[exerciseId];
-        return next;
-      });
-      try {
-        if (shouldFailNextMaestroShare && !hasFailedMaestroShareRef.current) {
-          hasFailedMaestroShareRef.current = true;
-          throw new Error('Maestro share launch failure');
-        }
-        await sharePersonalRecord(personalRecord);
-      } catch {
-        setPersonalRecordShareErrorByExerciseId((current) => ({
-          ...current,
-          [exerciseId]: "Couldn't open the share sheet. Try again.",
-        }));
-      }
-    },
-    [shouldFailNextMaestroShare]
-  );
   const currentSessionMuscleCatalogState =
     exerciseCatalog.status === 'error'
       ? 'error'
@@ -4561,12 +4522,8 @@ export default function SessionRecorderScreen({
               {personalRecord ? (
                 <ExercisePersonalRecordCelebration
                   personalRecord={personalRecord}
-                  shareError={personalRecordShareErrorByExerciseId[exercise.id]}
                   testID={`exercise-expanded-pr-${exerciseIndex + 1}`}
                   variant="expanded"
-                  onShare={() => {
-                    void shareCurrentPersonalRecord(exercise.id, personalRecord);
-                  }}
                 />
               ) : null}
               <View style={styles.exerciseTagChipWrap}>

@@ -125,7 +125,7 @@ Document app-specific UI semantics and guardrails for the current mobile app.
     - Exercise cards start expanded and their title region toggles a volatile collapsed state, with a top-aligned circular chevron control that uses the same primary-blue emphasis as the adjacent `#` action; the overflow action remains muted. Collapsing dismisses the keyboard and closes editable rows or set-quality pickers inside that exercise without changing set data; replacing the exercise definition or appending a plan expands its target card.
     - A collapsed exercise shows `<confirmed performed sets> · <working sets>` (for example `4 sets · 2 w/sets`). Blank, partial, invalid, planned, warm-up, null-quality, and valid-but-unconfirmed rows do not contribute to the working-set count; valid confirmed warm-up or null-quality rows still contribute to the performed-set count.
     - Active mode shows an exercise-scoped success-surface `New PR` treatment, both expanded and collapsed, only when the shared current-session helper finds that exercise definition's best valid confirmed-set Wathan estimate strictly exceeds its maximum eligible loaded completed-history estimate. It resolves the owning exercise name from current catalog metadata, includes that name in expanded form plus the best entered weight, reps, and rounded estimated 1RM in both forms; multiple exercises qualify independently, while multiple qualifying sets for one exercise produce one best-set treatment.
-    - Expanded cards place `New PR` below the performed-set count and above `Past Records`, with `Share PR for <exercise>` opening the platform text share boundary; cancellation changes nothing, launch failure appears inline and remains retryable, and the payload contains only the visible exercise/load/reps/estimated-1RM facts. Collapsed cards place the non-interactive treatment below the set/working-set summary so the title toggle has no nested action. Editing below the prior best, unconfirming, or deleting the qualifying set removes the treatment immediately. Ties, first-ever exercises with no historical maximum, loading/empty/error history, and completed-edit mode show no PR treatment.
+    - Expanded cards place `New PR` below the performed-set count and above `Past Records`; both expanded and collapsed treatments are non-interactive because sharing is session-scoped after submission. Collapsed cards place the treatment below the set/working-set summary so the title toggle has no nested action. Editing below the prior best, unconfirming, or deleting the qualifying set removes the treatment immediately. Ties, first-ever exercises with no historical maximum, loading/empty/error history, and completed-edit mode show no PR treatment.
 12. Active `session-recorder` muscle load is progressive and session-scoped:
     - no row or instructional placeholder appears before the first valid confirmed performed set, and completed-edit mode does not show this current-session signal;
     - the row sits outside exercise cards above recorder-wide actions, reports physical performed/working-set counts plus leading contributing muscles, and opens an in-route sheet without changing recorder edit or scroll state;
@@ -207,16 +207,26 @@ Document app-specific UI semantics and guardrails for the current mobile app.
 6. Completed-session exercise cards start expanded and use the same title-region collapse affordance. Their collapsed summary shows valid performed-set and working-set counts (`RIR 0`/`RIR 1`/`RIR 2`); the header-level `Append` action remains available. Historical cards do not label a workout as a new PR because this viewer does not compute an as-of-session history comparison.
 7. `presentation=completion` is a post-submit presentation of the stored
    completed session, not durable celebration state and not a historical-detail
-   variant. Its order is compact `Session complete` context, `Personal records`
-   only when present, one PR at a time in exercise order with stable `N of M`
-   paging, `Session muscle load` only when performed work exists, the seven-day
-   muscle action, then Done. Personal-record history is optional enrichment: its
-   loading or failure never blocks the stored completion context or exits.
-8. Completion reuses the same PR and muscle calculations and the same sharing
-   boundary as the live recorder. Share cancellation is silent; launch failure
-   remains inline and retryable for the selected PR. PR names resolve from the
-   current linked exercise-definition metadata.
-9. Completion hides edit/delete/append. Done and safe back replace to Stats /
+   variant. Its order is every compact `Personal records` card when present,
+   `Session summary`, one `Exercise volume` card per performed exercise,
+   `Session muscle load` when performed work exists, session sharing, the
+   seven-day muscle action, then Done. The session summary includes total
+   performed and working sets. Personal-record/comparison history is optional
+   enrichment: its loading or failure never blocks stored context or exits, and
+   current exercise rows still render with an explicit no-history state.
+8. Completion reuses the shared PR and muscle calculations. Exercise-volume
+   cards show the exercise name with smaller performed/working-set counts,
+   current raw volume versus historical median, and a horizontal P5–P95 range
+   with median/current markers when a distribution exists. Single/equal
+   baselines and no-history rows use explicit non-distribution states; range
+   bars are descriptive context, never targets or readiness guidance.
+9. `Share session` opens a preview of the exact session-summary image before
+   sharing. The captured PNG contains session/date/count totals, working sets,
+   every PR, and every exercise comparison; it excludes gym/location data.
+   Nothing is uploaded or published by BOGA. Native-sheet cancellation is
+   silent, capture/launch failure is inline and retryable, and temporary image
+   cleanup cannot turn a completed share into an error.
+10. Completion hides edit/delete/append. Done and safe back replace to Stats /
    History, while the analysis action replaces to seven-day By Muscle. A
    missing, deleted, or failed target exposes one safe return and never opens a
    recorder copy.

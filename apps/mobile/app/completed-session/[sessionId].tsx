@@ -1,5 +1,5 @@
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { BackHandler, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { SessionCompletionPresentation } from '@/components/session-recorder/session-completion-presentation';
@@ -30,10 +30,10 @@ import {
   type SessionSetPerformanceStatus,
 } from '@/src/session-recorder/set-semantics';
 import {
-  loadCompletedSessionPersonalRecords,
-  sharePersonalRecord,
+  deriveSessionExerciseVolumeComparisons,
+  loadCompletedSessionInsights,
   summarizeCurrentSessionMuscleLoad,
-  type ExercisePersonalRecord,
+  type CompletedSessionInsights,
 } from '@/src/session-insights';
 
 export type CompletedSessionDetailSet = {
@@ -71,7 +71,7 @@ export type CompletedSessionDetailRecord = {
 
 export type CompletedSessionDetailDataClient = {
   loadCompletedSession(sessionId: string): Promise<CompletedSessionDetailRecord | null>;
-  loadPersonalRecords?(sessionId: string): Promise<ExercisePersonalRecord[] | null>;
+  loadInsights?(sessionId: string): Promise<CompletedSessionInsights | null>;
   appendCompletedSessionExerciseAsPlanned(sessionId: string, sessionExerciseId: string): Promise<void>;
   setCompletedSessionDeletedState(sessionId: string, isDeleted: boolean): Promise<void>;
 };
@@ -83,7 +83,6 @@ export type CompletedSessionDetailScreenShellProps = {
   presentation?: 'detail' | 'completion';
   shouldFailNextMaestroShare?: boolean;
   shouldFailNextMaestroCatalog?: boolean;
-  sharePersonalRecordAction?: typeof sharePersonalRecord;
 };
 
 function formatDateTimeStamp(isoTimestamp: string): string {
@@ -251,8 +250,8 @@ export const DEFAULT_COMPLETED_SESSION_DETAIL_DATA_CLIENT: CompletedSessionDetai
 
     return DEFAULT_COMPLETED_SESSION_DETAILS[sessionId] ?? null;
   },
-  async loadPersonalRecords(sessionId) {
-    return loadCompletedSessionPersonalRecords(sessionId);
+  async loadInsights(sessionId) {
+    return loadCompletedSessionInsights(sessionId);
   },
   async appendCompletedSessionExerciseAsPlanned(sessionId, sessionExerciseId) {
     await appendCompletedSessionExerciseAsPlannedDraft(sessionId, sessionExerciseId);
@@ -269,19 +268,13 @@ export function CompletedSessionDetailScreenShell({
   presentation = 'detail',
   shouldFailNextMaestroShare = false,
   shouldFailNextMaestroCatalog = false,
-  sharePersonalRecordAction = sharePersonalRecord,
 }: CompletedSessionDetailScreenShellProps) {
   const router = useRouter();
   const exerciseCatalog = useExerciseCatalog();
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [session, setSession] = useState<CompletedSessionDetailRecord | null>(null);
-  const [personalRecords, setPersonalRecords] = useState<ExercisePersonalRecord[]>([]);
-  const [selectedPersonalRecordIndex, setSelectedPersonalRecordIndex] = useState(0);
-  const [personalRecordShareErrors, setPersonalRecordShareErrors] = useState<
-    Record<string, string | null>
-  >({});
-  const hasFailedMaestroShareRef = useRef(false);
+  const [completedInsights, setCompletedInsights] = useState<CompletedSessionInsights | null>(null);
   const [isMaestroCatalogFailureActive, setIsMaestroCatalogFailureActive] = useState(
     shouldFailNextMaestroCatalog
   );
@@ -321,9 +314,7 @@ export function CompletedSessionDetailScreenShell({
     setErrorMessage(null);
     setActionFeedback(null);
     setCollapsedExerciseIds(new Set());
-    setPersonalRecords([]);
-    setSelectedPersonalRecordIndex(0);
-    setPersonalRecordShareErrors({});
+    setCompletedInsights(null);
 
     void dataClient
       .loadCompletedSession(sessionId)
@@ -346,17 +337,17 @@ export function CompletedSessionDetailScreenShell({
         setIsLoading(false);
       });
 
-    if (presentation === 'completion' && dataClient.loadPersonalRecords) {
+    if (presentation === 'completion' && dataClient.loadInsights) {
       void dataClient
-        .loadPersonalRecords(sessionId)
-        .then((loadedPersonalRecords) => {
+        .loadInsights(sessionId)
+        .then((loadedInsights) => {
           if (!cancelled) {
-            setPersonalRecords(loadedPersonalRecords ?? []);
+            setCompletedInsights(loadedInsights);
           }
         })
         .catch(() => {
           if (!cancelled) {
-            setPersonalRecords([]);
+            setCompletedInsights(null);
           }
         });
     }
@@ -453,6 +444,33 @@ export function CompletedSessionDetailScreenShell({
     });
   }, [exerciseCatalog.exercises, exerciseCatalog.muscleGroups, exerciseCatalog.status, session]);
 
+  const fallbackExerciseVolumeComparisons = useMemo(() => {
+    if (!session) return [];
+    return deriveSessionExerciseVolumeComparisons({
+      targetSession: {
+        sessionId: session.id,
+        status: 'completed',
+        completedAt: new Date(session.completedAt),
+        deletedAt: session.deletedAt ? new Date(session.deletedAt) : null,
+        exercises: session.exercises.map((exercise, exerciseIndex) => ({
+          id: exercise.id,
+          orderIndex: exerciseIndex,
+          exerciseDefinitionId: exercise.exerciseDefinitionId ?? null,
+          exerciseName: exercise.name,
+          sets: exercise.sets.map((set, setIndex) => ({
+            id: set.id,
+            orderIndex: setIndex,
+            weightValue: set.weight,
+            repsValue: set.reps,
+            setType: set.setType,
+            performanceStatus: set.performanceStatus,
+          })),
+        })),
+      },
+      historicalSessions: [],
+    });
+  }, [session]);
+
   const handleSafeExit = useCallback(() => {
     router.replace('/stats-history');
   }, [router]);
@@ -468,29 +486,6 @@ export function CompletedSessionDetailScreenShell({
     });
     return () => subscription.remove();
   }, [handleSafeExit, presentation]);
-
-  const handleSharePersonalRecord = useCallback(
-    (personalRecord: ExercisePersonalRecord) => {
-      setPersonalRecordShareErrors((current) => ({
-        ...current,
-        [personalRecord.setId]: null,
-      }));
-      void (async () => {
-        if (shouldFailNextMaestroShare && !hasFailedMaestroShareRef.current) {
-          hasFailedMaestroShareRef.current = true;
-          throw new Error('Share is temporarily unavailable. Try again.');
-        }
-        await sharePersonalRecordAction(personalRecord);
-      })().catch((error) => {
-        setPersonalRecordShareErrors((current) => ({
-          ...current,
-          [personalRecord.setId]:
-            error instanceof Error ? error.message : 'Unable to share this personal record.',
-        }));
-      });
-    },
-    [sharePersonalRecordAction, shouldFailNextMaestroShare]
-  );
 
   const safeExitButton =
     presentation === 'completion' ? (
@@ -607,13 +602,19 @@ export function CompletedSessionDetailScreenShell({
   }
 
   if (presentation === 'completion') {
-    const selectedPersonalRecord = personalRecords[selectedPersonalRecordIndex] ?? null;
+    const personalRecords = completedInsights?.personalRecords ?? [];
+    const exerciseVolumeComparisons =
+      completedInsights && completedInsights.exerciseVolumeComparisons.length > 0
+        ? completedInsights.exerciseVolumeComparisons
+        : fallbackExerciseVolumeComparisons;
     return (
       <>
         <Stack.Screen options={stackOptions} />
         <SessionCompletionPresentation
+          completedAt={session.completedAt}
           durationDisplay={session.durationDisplay}
           exerciseCount={performedExercises.length}
+          exerciseVolumeComparisons={exerciseVolumeComparisons}
           gymName={session.gymName}
           muscleCatalogState={
             isMaestroCatalogFailureActive || exerciseCatalog.status === 'error'
@@ -624,14 +625,6 @@ export function CompletedSessionDetailScreenShell({
           }
           muscleSummary={sessionMuscleSummary}
           onDone={handleSafeExit}
-          onNextPersonalRecord={() =>
-            setSelectedPersonalRecordIndex((current) =>
-              Math.min(personalRecords.length - 1, current + 1)
-            )
-          }
-          onPreviousPersonalRecord={() =>
-            setSelectedPersonalRecordIndex((current) => Math.max(0, current - 1))
-          }
           onRetryMuscleCatalog={() => {
             if (isMaestroCatalogFailureActive) {
               setIsMaestroCatalogFailureActive(false);
@@ -639,14 +632,10 @@ export function CompletedSessionDetailScreenShell({
             }
             void ensureExerciseCatalogLoaded();
           }}
-          onSharePersonalRecord={handleSharePersonalRecord}
           onViewMuscleLoad={() => router.replace('/stats-history?period=7&breakdown=muscle')}
           performedSetCount={performedSetCount}
-          personalRecordShareError={
-            selectedPersonalRecord ? personalRecordShareErrors[selectedPersonalRecord.setId] ?? null : null
-          }
           personalRecords={personalRecords}
-          selectedPersonalRecordIndex={selectedPersonalRecordIndex}
+          shouldFailNextShare={shouldFailNextMaestroShare}
           workingSetCount={workingSetCount}
         />
       </>

@@ -16,9 +16,24 @@ appId: com.dinoderek.mobile
     timeout: 30000
 - assertVisible: "Session complete"
 - assertVisible: "Personal records"
-- assertVisible: "Barbell Back Squat"
+- assertVisible:
+    id: "session-completion-pr-seed_barbell_back_squat"
 - assertNotVisible:
     id: "session-completion-pr-pager"
+- scrollUntilVisible:
+    element:
+      id: "session-completion-context"
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
+- assertVisible:
+    id: "session-completion-working-sets"
+- scrollUntilVisible:
+    element:
+      id: "session-completion-exercise-maestro_m24_completion_one_pr_squat"
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
 - takeScreenshot: "session-completion-one-pr"
 
 - openLink: "boga3://maestro-harness?fixture=exercise-block-history&teleport=completed-session&sessionId=maestro_m24_completion_no_pr&presentation=completion&maestroCatalog=fail-once"

@@ -10,8 +10,8 @@ import {
 import { normalizeSessionSetPerformanceStatus } from '@/src/session-recorder/set-semantics';
 
 import {
-  deriveSessionPersonalRecords,
-  type ExercisePersonalRecord,
+  deriveCompletedSessionInsights,
+  type CompletedSessionInsights,
   type PersonalRecordSessionInput,
   type SessionInsightExerciseInput,
   type SessionInsightSetInput,
@@ -36,7 +36,7 @@ export type SessionInsightsStore = {
 };
 
 export type CompletedSessionInsightsRepository = {
-  loadPersonalRecords(sessionId: string): Promise<ExercisePersonalRecord[] | null>;
+  loadInsights(sessionId: string): Promise<CompletedSessionInsights | null>;
 };
 
 const toSessionRow = (row: typeof sessions.$inferSelect): SessionInsightSessionRow => ({
@@ -164,7 +164,7 @@ const buildSessionGraphs = (
 export const createCompletedSessionInsightsRepository = (
   store: SessionInsightsStore = createDrizzleSessionInsightsStore()
 ): CompletedSessionInsightsRepository => ({
-  async loadPersonalRecords(sessionId) {
+  async loadInsights(sessionId) {
     const target = await store.loadTargetSession(sessionId);
     if (
       !target ||
@@ -188,7 +188,7 @@ export const createCompletedSessionInsightsRepository = (
     const targetGraph = graphs.find((session) => session.sessionId === target.sessionId);
     if (!targetGraph) return null;
 
-    return deriveSessionPersonalRecords({
+    return deriveCompletedSessionInsights({
       targetSession: targetGraph,
       historicalSessions: graphs.filter((session) => session.sessionId !== target.sessionId),
     });
@@ -197,5 +197,4 @@ export const createCompletedSessionInsightsRepository = (
 
 const defaultCompletedSessionInsightsRepository = createCompletedSessionInsightsRepository();
 
-export const loadCompletedSessionPersonalRecords =
-  defaultCompletedSessionInsightsRepository.loadPersonalRecords;
+export const loadCompletedSessionInsights = defaultCompletedSessionInsightsRepository.loadInsights;
