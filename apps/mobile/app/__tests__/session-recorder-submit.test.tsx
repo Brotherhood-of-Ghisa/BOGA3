@@ -226,7 +226,9 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
         })
       );
       expect(mockCompleteSessionDraft).toHaveBeenCalledWith('test-session');
-      expect(mockReplace).toHaveBeenCalledWith('/stats-history');
+      expect(mockReplace).toHaveBeenCalledWith(
+        '/completed-session/test-session?presentation=completion'
+      );
     });
   });
 
@@ -375,7 +377,7 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
     expect(JSON.stringify(finalPayload)).not.toContain('set-planned');
   });
 
-  it('clears the stack back to the root list on submit so the list header has no back button', async () => {
+  it('replaces the recorder with the completed-session presentation after submit', async () => {
     render(<SessionRecorderScreen />);
     await dismissEmptyStateIfPresent();
 
@@ -391,7 +393,9 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
       expect(mockCompleteSessionDraft).toHaveBeenCalledWith('test-session');
     });
 
-    expect(mockReplace).toHaveBeenCalledWith('/stats-history');
+    expect(mockReplace).toHaveBeenCalledWith(
+      '/completed-session/test-session?presentation=completion'
+    );
     expect(mockDismissAll).not.toHaveBeenCalled();
   });
 
@@ -424,7 +428,9 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
     await waitFor(() => {
       expect(mockPersistSessionDraftSnapshot).toHaveBeenCalled();
       expect(mockCompleteSessionDraft).toHaveBeenCalledWith('test-session');
-      expect(mockReplace).toHaveBeenCalledWith('/stats-history');
+      expect(mockReplace).toHaveBeenCalledWith(
+        '/completed-session/test-session?presentation=completion'
+      );
     });
   });
 
@@ -445,7 +451,9 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
     await waitFor(() => {
       expect(mockPersistSessionDraftSnapshot).toHaveBeenCalled();
       expect(mockCompleteSessionDraft).toHaveBeenCalledWith('test-session');
-      expect(mockReplace).toHaveBeenCalledWith('/stats-history');
+      expect(mockReplace).toHaveBeenCalledWith(
+        '/completed-session/test-session?presentation=completion'
+      );
     });
   });
 

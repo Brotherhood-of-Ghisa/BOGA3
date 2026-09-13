@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
-import { ScrollView, StyleSheet } from 'react-native';
+import { ScrollView, Share, StyleSheet } from 'react-native';
 
 import { uiColors } from '@/components/ui';
 import SessionRecorderScreen from '../(tabs)/session-recorder';
@@ -8,6 +8,7 @@ import {
   setExerciseListPreferences,
 } from '@/src/exercise-catalog/list-preferences';
 import { estimateOneRepMax } from '@/src/exercise-calculations';
+import { __resetExerciseCatalogCacheForTests } from '@/src/exercise-catalog/cache';
 
 const mockPush = jest.fn();
 const mockLogEvent = jest.fn();
@@ -262,6 +263,7 @@ jest.mock('@/src/data', () => {
     blocks: [],
   }));
   const loadSuggestedExercisePlan = jest.fn().mockResolvedValue(null);
+  const loadLatestSessionDraftSnapshot = jest.fn().mockResolvedValue(null);
 
   return {
     ExerciseTagDomainError,
@@ -291,7 +293,7 @@ jest.mock('@/src/data', () => {
     loadRecentExerciseBlocks,
     loadSuggestedExercisePlan,
     loadLocalGymById: jest.fn().mockResolvedValue(null),
-    loadLatestSessionDraftSnapshot: jest.fn().mockResolvedValue(null),
+    loadLatestSessionDraftSnapshot,
     loadSessionSnapshotById: jest.fn().mockResolvedValue(null),
     persistCompletedSessionSnapshot,
     persistSessionDraftSnapshot,
@@ -303,8 +305,8 @@ jest.mock('@/src/data', () => {
   };
 });
 
-jest.mock('@/src/data/exercise-catalog', () => ({
-  listExerciseCatalogExercises: jest.fn().mockResolvedValue([
+jest.mock('@/src/data/exercise-catalog', () => {
+  const exercises = [
     {
       id: 'seed_barbell_back_squat',
       name: 'Barbell Squat',
@@ -341,27 +343,37 @@ jest.mock('@/src/data/exercise-catalog', () => ({
       deletedAt: null,
       mappings: [{ id: 'map-overhead-press-delts', muscleGroupId: 'delts_front', weight: 1, role: 'primary' }],
     },
-  ]),
-  listExerciseCatalogMuscleGroups: jest.fn().mockResolvedValue([
-    { id: 'chest', displayName: 'Chest', familyName: 'Chest', sortOrder: 0 },
-    { id: 'triceps', displayName: 'Triceps', familyName: 'Arms', sortOrder: 1 },
-    { id: 'delts_front', displayName: 'Front Delts', familyName: 'Shoulders', sortOrder: 2 },
-    { id: 'quads', displayName: 'Quads', familyName: 'Legs', sortOrder: 3 },
-    { id: 'hamstrings', displayName: 'Hamstrings', familyName: 'Legs', sortOrder: 4 },
-  ]),
-  saveExerciseCatalogExercise: jest.fn().mockImplementation(async (input: any) => ({
-    id: input.id ?? 'custom-exercise-1',
-    name: input.name.trim(),
-    loadInputMode: input.loadInputMode,
-    deletedAt: null,
-    mappings: input.mappings.map((mapping: any, index: number) => ({
-      id: `map-${index + 1}`,
-      muscleGroupId: mapping.muscleGroupId,
-      weight: mapping.weight,
-      role: mapping.role,
+  ];
+
+  return {
+    __setExerciseNameForTests: (exerciseDefinitionId: string, name: string) => {
+      const exercise = exercises.find((candidate) => candidate.id === exerciseDefinitionId);
+      if (exercise) {
+        exercise.name = name;
+      }
+    },
+    listExerciseCatalogExercises: jest.fn().mockImplementation(async () => exercises),
+    listExerciseCatalogMuscleGroups: jest.fn().mockResolvedValue([
+      { id: 'chest', displayName: 'Chest', familyName: 'Chest', sortOrder: 0 },
+      { id: 'triceps', displayName: 'Triceps', familyName: 'Arms', sortOrder: 1 },
+      { id: 'delts_front', displayName: 'Front Delts', familyName: 'Shoulders', sortOrder: 2 },
+      { id: 'quads', displayName: 'Quads', familyName: 'Legs', sortOrder: 3 },
+      { id: 'hamstrings', displayName: 'Hamstrings', familyName: 'Legs', sortOrder: 4 },
+    ]),
+    saveExerciseCatalogExercise: jest.fn().mockImplementation(async (input: any) => ({
+      id: input.id ?? 'custom-exercise-1',
+      name: input.name.trim(),
+      loadInputMode: input.loadInputMode,
+      deletedAt: null,
+      mappings: input.mappings.map((mapping: any, index: number) => ({
+        id: `map-${index + 1}`,
+        muscleGroupId: mapping.muscleGroupId,
+        weight: mapping.weight,
+        role: mapping.role,
+      })),
     })),
-  })),
-}));
+  };
+});
 
 jest.mock('@/src/data/exercise-catalog-stats', () => ({
   loadExerciseCatalogStatsRawHistory: jest.fn().mockResolvedValue({
@@ -407,6 +419,7 @@ const {
   __setListAssignedTagsFailureCount: mockSetListAssignedTagsFailureCount,
   attachExerciseTagToSessionExercise: mockAttachExerciseTagToSessionExercise,
   createExerciseTagDefinition: mockCreateExerciseTagDefinition,
+  loadLatestSessionDraftSnapshot: mockLoadLatestSessionDraftSnapshot,
   loadRecentExerciseBlocks: mockLoadRecentExerciseBlocks,
   loadSuggestedExercisePlan: mockLoadSuggestedExercisePlan,
   loadSessionSnapshotById: mockLoadSessionSnapshotById,
@@ -415,14 +428,17 @@ const {
   __setListAssignedTagsFailureCount: (count: number) => void;
   attachExerciseTagToSessionExercise: jest.Mock;
   createExerciseTagDefinition: jest.Mock;
+  loadLatestSessionDraftSnapshot: jest.Mock;
   loadRecentExerciseBlocks: jest.Mock;
   loadSuggestedExercisePlan: jest.Mock;
   loadSessionSnapshotById: jest.Mock;
 };
 
-const { saveExerciseCatalogExercise: mockSaveExerciseCatalogExercise } = jest.requireMock(
-  '@/src/data/exercise-catalog'
-) as {
+const {
+  __setExerciseNameForTests: mockSetExerciseName,
+  saveExerciseCatalogExercise: mockSaveExerciseCatalogExercise,
+} = jest.requireMock('@/src/data/exercise-catalog') as {
+  __setExerciseNameForTests: (exerciseDefinitionId: string, name: string) => void;
   saveExerciseCatalogExercise: jest.Mock;
 };
 
@@ -485,11 +501,15 @@ describe('SessionRecorderScreen exercise interactions', () => {
     }));
     mockLoadSuggestedExercisePlan.mockReset();
     mockLoadSuggestedExercisePlan.mockResolvedValue(null);
+    mockLoadLatestSessionDraftSnapshot.mockReset();
+    mockLoadLatestSessionDraftSnapshot.mockResolvedValue(null);
     mockLoadSessionSnapshotById.mockReset();
     mockLoadSessionSnapshotById.mockResolvedValue(null);
     mockSaveExerciseCatalogExercise.mockClear();
     mockLogEvent.mockClear();
     mockRecorderScrollTo.mockClear();
+    __resetExerciseCatalogCacheForTests();
+    mockSetExerciseName('seed_barbell_back_squat', 'Barbell Squat');
     __resetExerciseListPreferencesForTests();
     setExerciseListPreferences({ groupByMuscleFamily: false });
   });
@@ -1461,6 +1481,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
       expect(screen.getByText('Save Changes')).toBeTruthy();
       expect(screen.getByText('Bench Press')).toBeTruthy();
     });
+    expect(screen.queryByTestId('session-muscle-load-row')).toBeNull();
 
     fireEvent.press(screen.getByText('Log new exercise'));
     fireEvent.press(screen.getByLabelText('Open inline exercise create'));
@@ -1621,9 +1642,9 @@ describe('SessionRecorderScreen exercise interactions', () => {
     fireEvent.press(screen.getByTestId('set-performance-control-1-2'));
 
     expect(screen.getByTestId('exercise-expanded-pr-1')).toHaveTextContent(
-      'PR: 300 kg × 5 reps · est. 1RM 350 kg'
+      'New PR★Barbell Squat300 kg × 5 reps · est. 1RM 350 kgShare PR'
     );
-    expect(screen.getByTestId('exercise-expanded-pr-1').props.numberOfLines).toBe(1);
+    expect(screen.getByLabelText('Share PR for Barbell Squat')).toBeTruthy();
 
     fireEvent.press(collapseToggle);
 
@@ -1631,14 +1652,185 @@ describe('SessionRecorderScreen exercise interactions', () => {
       '2 sets · 2 w/sets'
     );
     expect(screen.getByTestId('exercise-collapsed-summary-1-new-pr')).toHaveTextContent(
-      'PR: 300 kg × 5 reps · est. 1RM 350 kg'
+      'New PR★300 kg × 5 reps · est. 1RM 350 kg'
     );
-    expect(screen.getByTestId('exercise-collapsed-summary-1-new-pr').props.numberOfLines).toBe(1);
+    expect(screen.queryByLabelText('Share PR for Barbell Squat')).toBeNull();
 
     fireEvent.press(collapseToggle);
 
     expect(screen.queryByLabelText('Weight for exercise 1 set 2')).toBeNull();
     expect(screen.getByTestId('set-row-pressable-1-2')).toBeTruthy();
+  });
+
+  it('shares the visible PR payload, keeps cancellation silent, and retries an inline launch failure', async () => {
+    mockLoadRecentExerciseBlocks.mockResolvedValueOnce({
+      exerciseDefinitionId: 'seed_barbell_back_squat',
+      limit: null,
+      blocks: [
+        {
+          sessionId: 'squat-history',
+          completedAt: new Date('2026-05-24T10:00:00.000Z'),
+          daysAgo: 2,
+          sessionExerciseIds: ['se-squat'],
+          estimatedOneRepMax: 200,
+          totalVolume: 1200,
+          highestWeight: 180,
+          workingSetCount: 2,
+        },
+      ],
+    });
+    const share = jest
+      .spyOn(Share, 'share')
+      .mockRejectedValueOnce(new Error('native share unavailable'))
+      .mockResolvedValueOnce({ action: Share.dismissedAction });
+
+    render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
+    fireEvent.press(screen.getByText('Log new exercise'));
+    await selectExerciseFromPicker('Barbell Squat');
+    await screen.findByTestId('exercise-block-history-panel-1-collapsed');
+    fireEvent.changeText(screen.getByLabelText('Weight for exercise 1 set 1'), '300');
+    fireEvent.changeText(screen.getByLabelText('Reps for exercise 1 set 1'), '5');
+    fireEvent.press(screen.getByTestId('set-performance-control-1-1'));
+
+    fireEvent.press(screen.getByLabelText('Share PR for Barbell Squat'));
+    expect(await screen.findByTestId('exercise-expanded-pr-1-share-error')).toHaveTextContent(
+      "Couldn't open the share sheet. Try again."
+    );
+    expect(share).toHaveBeenLastCalledWith({
+      message: 'New PR: Barbell Squat — 300 kg × 5 reps · estimated 1RM 350 kg.',
+    });
+
+    fireEvent.press(screen.getByLabelText('Share PR for Barbell Squat'));
+    await waitFor(() => {
+      expect(screen.queryByTestId('exercise-expanded-pr-1-share-error')).toBeNull();
+    });
+    expect(share).toHaveBeenCalledTimes(2);
+    fireEvent.press(screen.getByTestId('set-performance-control-1-1'));
+    expect(screen.queryByTestId('exercise-expanded-pr-1')).toBeNull();
+    share.mockRestore();
+  });
+
+  it('uses the current catalog name for a PR restored from a renamed exercise', async () => {
+    mockSetExerciseName('seed_barbell_back_squat', 'High Bar Squat');
+    mockLoadLatestSessionDraftSnapshot.mockResolvedValueOnce({
+      sessionId: 'active-session',
+      gymId: null,
+      status: 'active',
+      startedAt: new Date('2026-09-12T09:00:00.000Z'),
+      createdAt: new Date('2026-09-12T09:00:00.000Z'),
+      updatedAt: new Date('2026-09-12T09:30:00.000Z'),
+      exercises: [
+        {
+          id: 'restored-squat',
+          exerciseDefinitionId: 'seed_barbell_back_squat',
+          name: 'Captured Squat Name',
+          machineName: null,
+          sets: [
+            {
+              id: 'restored-squat-set',
+              repsValue: '5',
+              weightValue: '300',
+              setType: 'rir_0',
+              performanceStatus: null,
+            },
+          ],
+        },
+      ],
+    });
+    mockLoadRecentExerciseBlocks.mockResolvedValueOnce({
+      exerciseDefinitionId: 'seed_barbell_back_squat',
+      limit: null,
+      blocks: [
+        {
+          sessionId: 'squat-history',
+          completedAt: new Date('2026-09-10T10:00:00.000Z'),
+          daysAgo: 2,
+          sessionExerciseIds: ['historical-squat'],
+          estimatedOneRepMax: 200,
+          totalVolume: 1200,
+          highestWeight: 180,
+          workingSetCount: 2,
+        },
+      ],
+    });
+    const share = jest.spyOn(Share, 'share').mockResolvedValue({ action: Share.dismissedAction });
+
+    render(<SessionRecorderScreen />);
+
+    const shareButton = await screen.findByLabelText('Share PR for High Bar Squat');
+    expect(screen.getByText('High Bar Squat')).toBeTruthy();
+    fireEvent.press(shareButton);
+    await waitFor(() => expect(share).toHaveBeenCalledTimes(1));
+    expect(share).toHaveBeenCalledWith({
+      message: 'New PR: High Bar Squat — 300 kg × 5 reps · estimated 1RM 350 kg.',
+    });
+    share.mockRestore();
+  });
+
+  it('renders and shares two exercise-scoped PRs independently', async () => {
+    mockLoadRecentExerciseBlocks
+      .mockResolvedValueOnce({
+        exerciseDefinitionId: 'seed_barbell_back_squat',
+        limit: null,
+        blocks: [
+          {
+            sessionId: 'squat-history',
+            completedAt: new Date('2026-05-24T10:00:00.000Z'),
+            daysAgo: 2,
+            sessionExerciseIds: ['se-squat'],
+            estimatedOneRepMax: 200,
+            totalVolume: 1200,
+            highestWeight: 180,
+            workingSetCount: 2,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        exerciseDefinitionId: 'seed_barbell_bench_press',
+        limit: null,
+        blocks: [
+          {
+            sessionId: 'bench-history',
+            completedAt: new Date('2026-05-23T10:00:00.000Z'),
+            daysAgo: 3,
+            sessionExerciseIds: ['se-bench'],
+            estimatedOneRepMax: 150,
+            totalVolume: 800,
+            highestWeight: 135,
+            workingSetCount: 2,
+          },
+        ],
+      });
+    const share = jest
+      .spyOn(Share, 'share')
+      .mockResolvedValue({ action: Share.sharedAction });
+
+    render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
+    fireEvent.press(screen.getByText('Log new exercise'));
+    await selectExerciseFromPicker('Barbell Squat');
+    await screen.findByTestId('exercise-block-history-panel-1-collapsed');
+    fireEvent.changeText(screen.getByLabelText('Weight for exercise 1 set 1'), '300');
+    fireEvent.changeText(screen.getByLabelText('Reps for exercise 1 set 1'), '5');
+    fireEvent.press(screen.getByTestId('set-performance-control-1-1'));
+
+    fireEvent.press(screen.getByText('Log new exercise'));
+    await selectExerciseFromPicker('Bench Press');
+    await screen.findByTestId('exercise-block-history-panel-2-collapsed');
+    fireEvent.changeText(screen.getByLabelText('Weight for exercise 2 set 1'), '200');
+    fireEvent.changeText(screen.getByLabelText('Reps for exercise 2 set 1'), '5');
+    fireEvent.press(screen.getByTestId('set-performance-control-2-1'));
+
+    expect(screen.getByTestId('exercise-expanded-pr-1')).toHaveTextContent(/Barbell Squat/);
+    expect(screen.getByTestId('exercise-expanded-pr-2')).toHaveTextContent(/Bench Press/);
+    fireEvent.press(screen.getByLabelText('Share PR for Barbell Squat'));
+    fireEvent.press(screen.getByLabelText('Share PR for Bench Press'));
+
+    await waitFor(() => expect(share).toHaveBeenCalledTimes(2));
+    expect(share.mock.calls[0]?.[0].message).toContain('Barbell Squat');
+    expect(share.mock.calls[1]?.[0].message).toContain('Bench Press');
+    share.mockRestore();
   });
 
   it('does not label a tied estimate or a first recorded exercise as a new PR', async () => {
@@ -1685,5 +1877,31 @@ describe('SessionRecorderScreen exercise interactions', () => {
     fireEvent.press(screen.getByTestId('set-performance-control-2-1'));
     fireEvent.press(screen.getByTestId('exercise-collapse-toggle-2'));
     expect(screen.queryByTestId('exercise-collapsed-summary-2-new-pr')).toBeNull();
+  });
+
+  it('reveals live session muscle load after confirmation and removes it on reversal', async () => {
+    render(<SessionRecorderScreen />);
+    await dismissEmptyStateIfPresent();
+
+    expect(screen.queryByTestId('session-muscle-load-row')).toBeNull();
+    fireEvent.press(screen.getByText('Log new exercise'));
+    await selectExerciseFromPicker('Bench Press');
+    fireEvent.changeText(screen.getByLabelText('Weight for exercise 1 set 1'), '100');
+    fireEvent.changeText(screen.getByLabelText('Reps for exercise 1 set 1'), '10');
+
+    expect(screen.queryByTestId('session-muscle-load-row')).toBeNull();
+    fireEvent.press(screen.getByTestId('set-performance-control-1-1'));
+
+    expect(screen.getByTestId('session-muscle-load-row-status')).toHaveTextContent(
+      '2 muscles · 1 set (0 working)'
+    );
+    fireEvent.press(screen.getByTestId('session-muscle-load-row'));
+    expect(screen.getByText('500 weighted kg·reps')).toBeTruthy();
+    expect(screen.getByText('250 weighted kg·reps')).toBeTruthy();
+    fireEvent.press(screen.getByLabelText('Close session muscle load'));
+
+    fireEvent.press(screen.getByTestId('set-performance-control-1-1'));
+    expect(screen.queryByTestId('session-muscle-load-row')).toBeNull();
+    expect(screen.queryByTestId('session-muscle-load-sheet')).toBeNull();
   });
 });

@@ -6,21 +6,25 @@ appId: com.dinoderek.mobile
 # the initial Stats route and surface the one-time developer menu. The smoke lane
 # owns explicit dev-client launch coverage; this data lane starts with its
 # app-owned reset + teleport deep link.
-- openLink: "boga3://maestro-harness?reset=data&teleport=session-list"
 # A fresh dev-client install can defer its one-time onboarding sheet until the
-# first post-launch app interaction. `Continue` advances into the developer
-# menu, whose accessible `Close` control returns to the app; the accepted state
-# then persists for the recorder teleport below.
-- tapOn:
-    text: "Continue"
-    optional: true
-- tapOn:
-    text: "Close"
-    optional: true
-- extendedWaitUntil:
-    visible:
-      id: "stats-history-screen"
-    timeout: 30000
+# first post-launch app interaction. Retry the whole cold-start handshake: iOS
+# can occasionally remain on SpringBoard while the newly installed scheme is
+# still registering. `Continue` advances into the developer menu, whose
+# accessible `Close` control returns to the app.
+- retry:
+    maxRetries: 3
+    commands:
+      - openLink: "boga3://maestro-harness?reset=data&teleport=session-list"
+      - tapOn:
+          text: "Continue"
+          optional: true
+      - tapOn:
+          text: "Close"
+          optional: true
+      - extendedWaitUntil:
+          visible:
+            id: "stats-history-screen"
+          timeout: 30000
 - takeScreenshot: "03-data-runtime-smoke-start"
 - openLink: "boga3://maestro-harness?reset=data&teleport=session-recorder"
 - extendedWaitUntil:
@@ -70,12 +74,60 @@ appId: com.dinoderek.mobile
 - hideKeyboard:
     optional: true
 - takeScreenshot: "set-performance-normal-unconfirmed"
+- assertNotVisible:
+    id: "session-muscle-load-row"
 - tapOn:
     id: "set-performance-control-1-1"
 - takeScreenshot: "set-performance-normal-confirmed"
+- scrollUntilVisible:
+    element:
+      id: "session-muscle-load-row"
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
+- assertVisible: "4 muscles · 1 set (0 working)"
+- takeScreenshot: "session-muscle-load-populated"
+- tapOn:
+    id: "session-muscle-load-row"
+- extendedWaitUntil:
+    visible:
+      text: "Close session muscle load"
+    timeout: 10000
+- assertVisible:
+    id: "session-muscle-load-muscle-quads"
+- takeScreenshot: "session-muscle-load-sheet"
+- tapOn: "Close session muscle load"
+- scrollUntilVisible:
+    element:
+      id: "set-performance-control-1-1"
+    direction: UP
+    visibilityPercentage: 100
+    centerElement: true
+- tapOn:
+    id: "set-performance-control-1-1"
+- assertNotVisible:
+    id: "session-muscle-load-row"
+- takeScreenshot: "session-muscle-load-reversed"
+- tapOn:
+    id: "set-performance-control-1-1"
 # The session has one explicitly confirmed set, so Submit goes straight through
 # with no incomplete, unconfirmed, or empty-row confirmation dialog.
-- tapOn: "Submit Session"
+- scrollUntilVisible:
+    element:
+      id: "session-recorder-submit-button"
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
+- tapOn:
+    id: "session-recorder-submit-button"
+- extendedWaitUntil:
+    visible:
+      id: "session-completion-presentation"
+    timeout: 30000
+# M24 makes completion a mandatory post-submit presentation. Exercise the
+# explicit Done exit before continuing this lane's history persistence checks.
+- tapOn:
+    id: "session-completion-done"
 - extendedWaitUntil:
     visible:
       id: "stats-history-screen"

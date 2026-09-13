@@ -293,7 +293,10 @@ section states only the data-model-level invariants.
    and stabilizer mappings do not contribute. One-arm/one-leg rows imply both
    sides were performed in v1. Exercise history, records, highest weight, and
    estimated 1RM remain based on the entered scalar and do not use per-side
-   normalization or muscle-role factors.
+   normalization or muscle-role factors. Live and completion personal-record
+   presentation resolves its exercise name from the current linked
+   `exercise_definitions` row, falling back to the captured session-exercise
+   name only for an unlinked legacy row.
 
 ### Wire envelope (Sync v2)
 

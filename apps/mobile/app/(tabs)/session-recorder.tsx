@@ -31,10 +31,10 @@ import {
 } from '@/components/exercise-catalog/exercise-list-controls';
 import {
   ExerciseCardCollapsedSummary,
-  ExerciseCardPersonalRecordLine,
   SessionContentLayout,
-  type ExerciseCardPersonalRecordSummary,
 } from '@/components/session-recorder/session-content-layout';
+import { ExercisePersonalRecordCelebration } from '@/components/session-recorder/exercise-personal-record-celebration';
+import { SessionMuscleLoad } from '@/components/session-recorder/session-muscle-load';
 import { uiColors } from '@/components/ui';
 import { getAuthSnapshot } from '@/src/auth';
 import {
@@ -87,10 +87,9 @@ import {
   computeExerciseVolume,
   computeMaxRepsByWeight,
   estimateExerciseOneRepMax,
-  findBestEstimatedOneRepMaxSet,
   parseCalculationSet,
 } from '@/src/exercise-calculations';
-import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
+import { ensureExerciseCatalogLoaded, useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import { buildExerciseListModel, type ExerciseListItem } from '@/src/exercise-catalog/list-model';
 import { useExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
 import { useExerciseCatalogStats } from '@/src/exercise-catalog/stats-cache';
@@ -108,6 +107,14 @@ import {
   hasValidActualValues,
   isConfirmedPerformedSet,
 } from '@/src/session-recorder/set-semantics';
+import {
+  deriveExercisePersonalRecord,
+  sharePersonalRecord,
+  summarizeCurrentSessionMuscleLoad,
+  type ExercisePersonalRecord,
+  type SessionInsightExerciseInput,
+} from '@/src/session-insights';
+import { isDevMode } from '@/src/utils/isDevMode';
 
 const START_SESSION_GYM_DETECTION_TIMEOUT_MS = 1500;
 
@@ -975,34 +982,25 @@ const getCurrentExerciseBlockMetrics = (
   };
 };
 
-const getExerciseCardPersonalRecord = (
-  sets: SessionSet[],
-  panel: ExerciseBlockHistoryPanelState | undefined
-): ExerciseCardPersonalRecordSummary | null => {
-  if (!panel || panel.status !== 'success') {
-    return null;
-  }
-
-  const historicalBest = getNullableMetricMax(
-    panel.blocks.map((block) => block.estimatedOneRepMax)
-  );
-  if (historicalBest === null) {
-    return null;
-  }
-
-  const bestCurrentSet = findBestEstimatedOneRepMaxSet(
-    getPerformedExerciseSets(sets).map((set) => ({
+const toSessionInsightExercises = (
+  session: Session,
+  currentExerciseNameByDefinitionId: ReadonlyMap<string, string>
+): SessionInsightExerciseInput[] =>
+  session.exercises.map((exercise, exerciseIndex) => ({
+    id: exercise.id,
+    orderIndex: exerciseIndex,
+    exerciseDefinitionId: exercise.exerciseDefinitionId,
+    exerciseName:
+      currentExerciseNameByDefinitionId.get(exercise.exerciseDefinitionId) ?? exercise.name,
+    sets: exercise.sets.map((set, setIndex) => ({
+      id: set.id,
+      orderIndex: setIndex,
       weightValue: set.weight,
       repsValue: set.reps,
-      setType: normalizeSessionSetType(set.setType),
-    }))
-  );
-  if (!bestCurrentSet || bestCurrentSet.estimatedOneRepMax <= historicalBest) {
-    return null;
-  }
-
-  return bestCurrentSet;
-};
+      setType: set.setType,
+      performanceStatus: set.performanceStatus,
+    })),
+  }));
 
 const hasSavedGymCoordinates = (location: SessionLocation) =>
   typeof location.latitude === 'number' &&
@@ -1203,9 +1201,16 @@ export default function SessionRecorderScreen({
 }: SessionRecorderScreenProps = {}) {
   const router = useRouter();
   const navigation = useNavigation<any>();
-  const params = useLocalSearchParams<{ mode?: string | string[]; sessionId?: string | string[] }>();
+  const params = useLocalSearchParams<{
+    mode?: string | string[];
+    sessionId?: string | string[];
+    maestroShare?: string | string[];
+  }>();
   const routeMode = coerceRouteParam(params.mode) === 'completed-edit' ? 'completed-edit' : 'active';
   const routeSessionId = coerceRouteParam(params.sessionId);
+  const shouldFailNextMaestroShare =
+    isDevMode() && coerceRouteParam(params.maestroShare) === 'fail-once';
+  const hasFailedMaestroShareRef = useRef(false);
 
   const [state, setState] = useState<SessionRecorderState>(createInitialState);
   const [submitCleanupPrompt, setSubmitCleanupPrompt] = useState<SubmitCleanupPrompt | null>(null);
@@ -1275,6 +1280,9 @@ export default function SessionRecorderScreen({
   const [pendingNewGymCoordinates, setPendingNewGymCoordinates] = useState<GymCoordinateDraft | null>(null);
   const [exerciseBlockHistoryByExerciseId, setExerciseBlockHistoryByExerciseId] = useState<
     Record<string, ExerciseBlockHistoryPanelState>
+  >({});
+  const [personalRecordShareErrorByExerciseId, setPersonalRecordShareErrorByExerciseId] = useState<
+    Record<string, string>
   >({});
   const stateRef = useRef(state);
   const completedEditEndDateTimeRef = useRef<string | null>(completedEditEndDateTime);
@@ -3702,7 +3710,11 @@ export default function SessionRecorderScreen({
       persistedSessionIdRef.current = null;
       hasSessionMutationRef.current = false;
       setHasActiveSession(false);
-      router.replace('/stats-history');
+      router.replace(
+        `/completed-session/${persisted.sessionId}?presentation=completion${
+          shouldFailNextMaestroShare ? '&maestroShare=fail-once' : ''
+        }`
+      );
     })().catch(() => {
       // Keep recorder screen state available for retry if persistence/complete/navigation fails.
     });
@@ -3887,6 +3899,122 @@ export default function SessionRecorderScreen({
     Boolean(completedEditTimeValidationMessage) &&
     (completedEditStartTouched || completedEditEndTouched || completedEditSubmitAttempted);
   const hasInvalidSetValues = useMemo(() => sessionHasInvalidSetValues(state.session), [state.session]);
+  const currentExerciseNameByDefinitionId = useMemo(
+    () => new Map(exerciseCatalog.exercises.map((exercise) => [exercise.id, exercise.name])),
+    [exerciseCatalog.exercises]
+  );
+  const currentSessionInsightExercises = useMemo(
+    () => toSessionInsightExercises(state.session, currentExerciseNameByDefinitionId),
+    [currentExerciseNameByDefinitionId, state.session]
+  );
+  const currentSessionPerformedSetCount = useMemo(
+    () =>
+      state.session.exercises.reduce(
+        (count, exercise) => count + exercise.sets.filter(hasPerformedActual).length,
+        0
+      ),
+    [state.session.exercises]
+  );
+  const currentSessionWorkingSetCount = useMemo(
+    () =>
+      state.session.exercises.reduce(
+        (count, exercise) =>
+          count +
+          exercise.sets.filter(
+            (set) => hasPerformedActual(set) && isWorkingSessionSetType(set.setType)
+          ).length,
+        0
+      ),
+    [state.session.exercises]
+  );
+  const currentSessionMuscleSummary = useMemo(() => {
+    if (routeMode !== 'active' || exerciseCatalog.status !== 'ready') {
+      return null;
+    }
+
+    return summarizeCurrentSessionMuscleLoad({
+      sessionId: persistedSessionIdRef.current ?? 'active-session',
+      sessionAt: parseSessionDateTime(state.session.dateTime) ?? new Date(0),
+      exercises: currentSessionInsightExercises,
+      exerciseDefinitions: exerciseCatalog.exercises.map((exercise) => ({
+        id: exercise.id,
+        loadInputMode: exercise.loadInputMode ?? 'total_load',
+      })),
+      muscleMappings: exerciseCatalog.exercises.flatMap((exercise) =>
+        exercise.mappings.map((mapping) => ({
+          exerciseDefinitionId: exercise.id,
+          muscleGroupId: mapping.muscleGroupId,
+          role: mapping.role,
+          weight: mapping.weight,
+        }))
+      ),
+      muscleGroups: exerciseCatalog.muscleGroups,
+    });
+  }, [currentSessionInsightExercises, exerciseCatalog.exercises, exerciseCatalog.muscleGroups, exerciseCatalog.status, routeMode, state.session.dateTime]);
+  const currentSessionPersonalRecordByExerciseId = useMemo(() => {
+    const personalRecords = new Map<string, ExercisePersonalRecord>();
+    if (routeMode !== 'active') {
+      return personalRecords;
+    }
+
+    for (const exercise of state.session.exercises) {
+      const panel = exerciseBlockHistoryByExerciseId[exercise.id];
+      if (!panel || panel.status !== 'success') continue;
+      const historicalBestEstimatedOneRepMax = getNullableMetricMax(
+        panel.blocks.map((block) => block.estimatedOneRepMax)
+      );
+      const personalRecord = deriveExercisePersonalRecord({
+        exerciseDefinitionId: exercise.exerciseDefinitionId,
+        exercises: currentSessionInsightExercises,
+        historicalBestEstimatedOneRepMax,
+      });
+      if (personalRecord && personalRecord.sessionExerciseId === exercise.id) {
+        personalRecords.set(exercise.id, personalRecord);
+      }
+    }
+
+    return personalRecords;
+  }, [currentSessionInsightExercises, exerciseBlockHistoryByExerciseId, routeMode, state.session.exercises]);
+  useEffect(() => {
+    setPersonalRecordShareErrorByExerciseId((current) => {
+      const nextEntries = Object.entries(current).filter(([exerciseId]) =>
+        currentSessionPersonalRecordByExerciseId.has(exerciseId)
+      );
+      if (nextEntries.length === Object.keys(current).length) {
+        return current;
+      }
+      return Object.fromEntries(nextEntries);
+    });
+  }, [currentSessionPersonalRecordByExerciseId]);
+  const shareCurrentPersonalRecord = useCallback(
+    async (exerciseId: string, personalRecord: ExercisePersonalRecord) => {
+      setPersonalRecordShareErrorByExerciseId((current) => {
+        if (!(exerciseId in current)) return current;
+        const next = { ...current };
+        delete next[exerciseId];
+        return next;
+      });
+      try {
+        if (shouldFailNextMaestroShare && !hasFailedMaestroShareRef.current) {
+          hasFailedMaestroShareRef.current = true;
+          throw new Error('Maestro share launch failure');
+        }
+        await sharePersonalRecord(personalRecord);
+      } catch {
+        setPersonalRecordShareErrorByExerciseId((current) => ({
+          ...current,
+          [exerciseId]: "Couldn't open the share sheet. Try again.",
+        }));
+      }
+    },
+    [shouldFailNextMaestroShare]
+  );
+  const currentSessionMuscleCatalogState =
+    exerciseCatalog.status === 'error'
+      ? 'error'
+      : exerciseCatalog.status === 'ready'
+        ? 'ready'
+        : 'loading';
   const isSubmitDisabled =
     (routeMode === 'completed-edit' && Boolean(completedEditTimeValidationMessage)) || hasInvalidSetValues;
   const gymButtonLabel = selectedGym ? selectedGym.name : 'No gym';
@@ -4036,10 +4164,7 @@ export default function SessionRecorderScreen({
           return (
             <ExerciseCardCollapsedSummary
               workingSetCount={workingSetCount}
-              newPersonalRecord={getExerciseCardPersonalRecord(
-                exercise.sets,
-                exerciseBlockHistoryByExerciseId[exercise.id]
-              )}
+              newPersonalRecord={currentSessionPersonalRecordByExerciseId.get(exercise.id)}
               setCount={performedSets.length}
               testID={`exercise-collapsed-summary-${exerciseIndex + 1}`}
             />
@@ -4421,6 +4546,7 @@ export default function SessionRecorderScreen({
           const loadInputMode =
             loadInputModeByExerciseDefinitionId.get(exercise.exerciseDefinitionId) ?? 'total_load';
           const loadInputModeLabel = loadInputMode === 'per_side_load' ? 'Per side' : 'Total load';
+          const personalRecord = currentSessionPersonalRecordByExerciseId.get(exercise.id);
 
           return (
             <View style={styles.exerciseTagSection}>
@@ -4432,13 +4558,17 @@ export default function SessionRecorderScreen({
               {exercise.sets.length > 0 ? (
                 <Text style={styles.exerciseSetSummaryText}>{getExerciseSetSummary(exercise.sets)}</Text>
               ) : null}
-              <ExerciseCardPersonalRecordLine
-                personalRecord={getExerciseCardPersonalRecord(
-                  exercise.sets,
-                  exerciseBlockHistoryByExerciseId[exercise.id]
-                )}
-                testID={`exercise-expanded-pr-${exerciseIndex + 1}`}
-              />
+              {personalRecord ? (
+                <ExercisePersonalRecordCelebration
+                  personalRecord={personalRecord}
+                  shareError={personalRecordShareErrorByExerciseId[exercise.id]}
+                  testID={`exercise-expanded-pr-${exerciseIndex + 1}`}
+                  variant="expanded"
+                  onShare={() => {
+                    void shareCurrentPersonalRecord(exercise.id, personalRecord);
+                  }}
+                />
+              ) : null}
               <View style={styles.exerciseTagChipWrap}>
                 {exercise.tags.map((tag) => (
                   <View
@@ -4472,6 +4602,17 @@ export default function SessionRecorderScreen({
           </Pressable>
         )}
         renderEmptyState={(text) => <Text style={styles.emptyText}>{text}</Text>}
+      />
+
+      <SessionMuscleLoad
+        catalogState={currentSessionMuscleCatalogState}
+        performedSetCount={currentSessionPerformedSetCount}
+        summary={currentSessionMuscleSummary}
+        visible={routeMode === 'active' && currentSessionPerformedSetCount > 0}
+        workingSetCount={currentSessionWorkingSetCount}
+        onRetry={() => {
+          void ensureExerciseCatalogLoaded();
+        }}
       />
 
       <Pressable
