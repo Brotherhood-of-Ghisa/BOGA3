@@ -19,7 +19,11 @@
 #     — all driven by real `sync_push` calls; share trigger failure isolation
 #     and self-heal;
 #   - AUTH_REQUIRED (anon) and AGENT_FORBIDDEN (client_id token) on every RPC;
-#   - direct PostgREST select/insert/update/delete denial on all four tables.
+#   - direct PostgREST select/insert/update/delete denial on all four tables;
+#   - (M25-T02) the persistent stream `group_events`: catalog posture, one item
+#     per membership edge and per share, no duplicates on re-push, event
+#     trigger failure isolation and self-heal, and a backfill that rebuilds
+#     every user's stream byte-identical.
 #
 # Hermetic: every run provisions its own seven users (owner, admin, member,
 # outsider, joiner, athlete, viewer) with a per-run tag, never reads fixture
@@ -72,19 +76,22 @@ MISSING_GROUP="$(node -e 'process.stdout.write(require("node:crypto").randomUUID
 
 RUN_USER_IDS=()
 FORCE_FAIL_CONSTRAINT="groups_contract_force_share_failure"
+FORCE_EVENT_FAIL_CONSTRAINT="groups_contract_force_event_failure"
 
 cleanup() {
-  # Always remove the failure-isolation probe constraint, even if the run died
-  # between adding and dropping it.
+  # Always remove the failure-isolation probe constraints, even if the run died
+  # between adding and dropping them.
   run_psql "set client_min_messages = warning;
-            alter table app_public.group_session_shares drop constraint if exists ${FORCE_FAIL_CONSTRAINT};" >/dev/null
+            alter table app_public.group_session_shares drop constraint if exists ${FORCE_FAIL_CONSTRAINT};
+            alter table app_public.group_events drop constraint if exists ${FORCE_EVENT_FAIL_CONSTRAINT};" >/dev/null
   [[ ${#RUN_USER_IDS[@]} -gt 0 ]] || return 0
   local ids
   ids="$(printf "'%s'::uuid," "${RUN_USER_IDS[@]}")"
   ids="${ids%,}"
   run_psql "
     begin;
-      delete from public.app_logs where event = 'group.share_failed' and user_id in (${ids});
+      delete from public.app_logs
+       where event in ('group.share_failed', 'group.event_failed') and user_id in (${ids});
       delete from app_public.groups
        where created_by in (${ids})
           or id in (select group_id from app_public.group_memberships where user_id in (${ids}));
@@ -1332,5 +1339,293 @@ BODY=""
 [[ "$(run_psql "select count(*) || ':' || sum(session_started_at) from app_public.group_session_shares where group_id = '${GA}';")" == "${SHARE_ROWS_BEFORE}" ]] ||
   fail "direct PostgREST insert/update/delete changed the share ledger"
 pass "select/insert/update/delete denied (42501) for authenticated and anon on all four tables"
+
+# =============================================================================
+echo "[groups-contract] persistent stream: group_events (M25-T02)"
+# =============================================================================
+
+RUN_IDS_SQL="$(printf "'%s'::uuid," "${RUN_USER_IDS[@]}")"
+RUN_IDS_SQL="${RUN_IDS_SQL%,}"
+RUN_GROUPS_SQL="select id from app_public.groups
+                 where created_by in (${RUN_IDS_SQL})
+                    or id in (select group_id from app_public.group_memberships where user_id in (${RUN_IDS_SQL}))"
+
+[[ "$(run_psql "select relrowsecurity from pg_class where oid = 'app_public.group_events'::regclass;")" == "t" ]] ||
+  fail "RLS is not enabled on group_events"
+[[ "$(run_psql "select count(*) from pg_policies where schemaname = 'app_public' and tablename = 'group_events';")" == "0" ]] ||
+  fail "group_events must have no RLS policies"
+[[ "$(run_psql "
+  select count(*) from unnest(array['anon','authenticated']) r(role)
+   where has_table_privilege(r.role, 'app_public.group_events', 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER');")" == "0" ]] ||
+  fail "anon/authenticated hold a direct privilege on group_events"
+[[ "$(run_psql "select count(*) from information_schema.columns
+   where table_schema = 'app_public' and table_name = 'group_events' and column_name = 'owner_user_id';")" == "0" ]] ||
+  fail "group_events carries an owner_user_id column (ground rule 1)"
+[[ "$(run_psql "
+  select count(*) from pg_constraint con
+    join pg_class r on r.oid = con.confrelid
+    join pg_namespace n on n.oid = r.relnamespace
+   where con.contype = 'f' and con.conrelid = 'app_public.group_events'::regclass
+     and n.nspname = 'app_public' and r.relname in (${SYNC_TABLES});")" == "0" ]] ||
+  fail "group_events has an FK into a Sync v2 table (ground rule 2)"
+[[ "$(run_psql "
+  select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'app_public'
+     and p.proname in ('group_event_session', 'group_event_membership', 'group_events_backfill')
+     and p.prosecdef and 'search_path=app_public, pg_temp' = any(p.proconfig)
+     and not has_function_privilege('anon', p.oid, 'EXECUTE')
+     and not has_function_privilege('authenticated', p.oid, 'EXECUTE');")" == "3" ]] ||
+  fail "the group_events writers must be SECURITY DEFINER, search_path-pinned, and not client-executable"
+# Both triggers are enabled AFTER INSERT OR UPDATE row triggers (tgtype 21).
+# The session one must sort after the share trigger (same-event triggers fire
+# in name order) so it sees the shares the same write created; the membership
+# one fires on INSERT and on UPDATE OF ended_at only.
+[[ "$(run_psql "
+  select count(*) from pg_trigger t join pg_proc p on p.oid = t.tgfoid
+   where t.tgrelid = 'app_public.sessions'::regclass
+     and t.tgname = 'sessions_group_stream_event'
+     and not t.tgisinternal and t.tgenabled = 'O' and t.tgtype = 21
+     and p.proname = 'group_event_session'
+     and t.tgname collate \"C\" > 'sessions_group_share_session';")" == "1" ]] ||
+  fail "sessions_group_stream_event must be an enabled AFTER INSERT OR UPDATE row trigger firing after the share trigger"
+[[ "$(run_psql "
+  select count(*) from pg_trigger t join pg_proc p on p.oid = t.tgfoid
+   where t.tgrelid = 'app_public.group_memberships'::regclass
+     and t.tgname = 'group_memberships_stream_event'
+     and not t.tgisinternal and t.tgenabled = 'O' and t.tgtype = 21
+     and p.proname = 'group_event_membership'
+     and t.tgattr::text = (select attnum::text from pg_attribute
+                            where attrelid = 'app_public.group_memberships'::regclass and attname = 'ended_at');")" == "1" ]] ||
+  fail "group_memberships_stream_event must be an enabled AFTER INSERT OR UPDATE OF ended_at row trigger"
+# The kind CHECK: the reserved M25-T05 kinds are accepted, anything else is not.
+for reserved in record record_voided link unlink lead_change; do
+  run_psql "begin;
+            insert into app_public.group_events (group_id, kind, member_user_id, sort_at_ms)
+            values ('${GA}', '${reserved}', '${ATHLETE_UID}', 0);
+            rollback;" >/dev/null || fail "the kind CHECK must accept the reserved kind ${reserved}"
+done
+if run_psql "insert into app_public.group_events (group_id, kind, member_user_id, sort_at_ms)
+             values ('${GA}', 'bogus', '${ATHLETE_UID}', 0);" >/dev/null 2>&1; then
+  fail "the kind CHECK must reject an unknown kind"
+fi
+EVENT_ROWS_BEFORE="$(run_psql "select count(*) from app_public.group_events where group_id in (${RUN_GROUPS_SQL});")"
+for bearer_label in authenticated anon; do
+  if [[ "${bearer_label}" == "authenticated" ]]; then bearer="${ATHLETE_TOKEN}"; else bearer="${ANON_KEY}"; fi
+  rest GET "${bearer}" group_events "select=*"
+  expect_denied_or_empty "${bearer_label} select group_events"
+  rest POST "${bearer}" group_events "" \
+    "$(jq -nc --arg g "${GA}" --arg u "${ATHLETE_UID}" '{group_id: $g, kind: "joined", member_user_id: $u, sort_at_ms: 0}')"
+  [[ ! "${STATUS}" =~ ^2 ]] || fail "${bearer_label} insert into group_events must be denied"
+  check "${bearer_label} insert into group_events must be denied with 42501 (HTTP ${STATUS})" '.code == "42501"'
+  rest PATCH "${bearer}" group_events "group_id=eq.${GA}" '{"sort_at_ms":0}'
+  expect_denied_or_empty "${bearer_label} update group_events"
+  rest DELETE "${bearer}" group_events "group_id=eq.${GA}"
+  expect_denied_or_empty "${bearer_label} delete group_events"
+done
+BODY=""
+[[ "$(run_psql "select count(*) from app_public.group_events where group_id in (${RUN_GROUPS_SQL});")" == "${EVENT_ROWS_BEFORE}" ]] ||
+  fail "direct PostgREST access changed group_events"
+pass "group_events: RLS on, no policies, no grants, no owner_user_id, no Sync v2 FK, writer/trigger posture, kind CHECK"
+
+# --- session writer: one item per group, no duplicates on re-push -------------------------
+# session_events <session>: "<item count>:<distinct sort_at_ms>" for the athlete's session.
+session_events() {
+  run_psql "select count(*) || ':' || coalesce(string_agg(distinct sort_at_ms::text, ','), '')
+              from app_public.group_events
+             where kind = 'session' and member_user_id = '${ATHLETE_UID}' and session_id = '$1';"
+}
+S_EV="${T}-ev"
+S_EV_START="$(now_floor_ms)"
+next_cuam
+S_EV_ROW="$(e_session "${S_EV}" "${S_EV_START}" active null null null "${CUAM}")"
+push "${ATHLETE_TOKEN}" "newly shared session" "${S_EV_ROW}"
+[[ "$(shares_of "${S_EV}")" == "A,B" ]] || fail "the new session must be shared into A and B"
+[[ "$(session_events "${S_EV}")" == "2:${S_EV_START}" ]] ||
+  fail "a newly shared session writes one session item per group, got '$(session_events "${S_EV}")'"
+push "${ATHLETE_TOKEN}" "identical re-push (LWW no-op)" "${S_EV_ROW}"
+next_cuam
+push "${ATHLETE_TOKEN}" "newer re-push of the same session" \
+  "$(e_session "${S_EV}" "${S_EV_START}" active null null null "${CUAM}")"
+[[ "$(session_events "${S_EV}")" == "2:${S_EV_START}" ]] ||
+  fail "a re-push must not duplicate session items, got '$(session_events "${S_EV}")'"
+S_EV_MOVED="$((S_EV_START + 5000))"
+next_cuam
+push "${ATHLETE_TOKEN}" "started_at edited" \
+  "$(e_session "${S_EV}" "${S_EV_MOVED}" active null null null "${CUAM}")"
+[[ "$(session_events "${S_EV}")" == "2:${S_EV_MOVED}" ]] ||
+  fail "a started_at edit keeps one item per group and moves their stored position, got '$(session_events "${S_EV}")'"
+stream "${OWNER_TOKEN}" "${GA}" null 50
+expect_ok "owner A stream after the started_at edit"
+check "the card sorts at the live started_at" \
+  '[.items[] | select(.key == $k)] | length == 1 and .[0].sort_at_ms == $s' \
+  --arg k "${ATHLETE_UID}:${S_EV}" --argjson s "${S_EV_MOVED}"
+pass "a newly shared session writes one item per group; re-pushes never duplicate; started_at edits move it"
+
+# --- event trigger failure isolation + self-heal (§2.5 pattern) ---------------------------
+echo "[groups-contract] stream event trigger failure isolation"
+
+S_EVF="${T}-evfail"
+run_psql "alter table app_public.group_events add constraint ${FORCE_EVENT_FAIL_CONSTRAINT} check (false) not valid;" >/dev/null
+next_cuam
+push "${ATHLETE_TOKEN}" "push while the stream event insert is forced to fail" \
+  "$(e_session "${S_EVF}" "$(now_floor_ms)" active null null null "${CUAM}")"
+EVF_CUAM="${CUAM}"
+rest GET "${ATHLETE_TOKEN}" sessions "select=id,status,client_updated_at_ms&id=eq.${S_EVF}"
+expect_ok "owner reads the session written during the event failure"
+check "sync_push committed the session despite the event trigger failure" \
+  '. == [{id: $id, status: "active", client_updated_at_ms: $c}]' --arg id "${S_EVF}" --argjson c "${EVF_CUAM}"
+[[ "$(shares_of "${S_EVF}")" == "A,B" ]] || fail "an event failure must not roll back the share"
+[[ "$(session_events "${S_EVF}")" == "0:" ]] || fail "the forced failure must have prevented the session items"
+[[ "$(run_psql "select count(*) from public.app_logs
+                 where event = 'group.event_failed' and user_id = '${ATHLETE_UID}'
+                   and level = 'error' and source = 'database'
+                   and context = jsonb_build_object('session_id', '${S_EVF}', 'sqlstate', '23514')
+                   and message = 'group stream event trigger failed; the session write committed';")" == "1" ]] ||
+  fail "expected exactly one sanitized group.event_failed row (session_id + sqlstate only)"
+[[ "$(run_psql "select count(*) from public.app_logs
+                 where event = 'group.share_failed' and context ->> 'session_id' = '${S_EVF}';")" == "0" ]] ||
+  fail "an event failure must not be logged as a share failure"
+stream "${OWNER_TOKEN}" "${GA}" null 50
+expect_ok "owner A stream during the event failure"
+check "a session with no item is not in the stream" '[.items[] | select(.key == $k)] == []' \
+  --arg k "${ATHLETE_UID}:${S_EVF}"
+run_psql "alter table app_public.group_events drop constraint ${FORCE_EVENT_FAIL_CONSTRAINT};" >/dev/null
+next_cuam
+push "${ATHLETE_TOKEN}" "next autosave after the event fault is removed" \
+  "$(e_session "${S_EVF}" "$(run_psql "select started_at from app_public.sessions where owner_user_id = '${ATHLETE_UID}' and id = '${S_EVF}';")" active null null null "${CUAM}")"
+[[ "$(session_events "${S_EVF}" | cut -d: -f1)" == "2" ]] ||
+  fail "the next write must self-heal the missed items, got '$(session_events "${S_EVF}")'"
+stream "${OWNER_TOKEN}" "${GA}" null 50
+expect_ok "owner A stream after self-heal"
+check "the self-healed session appears" '[.items[] | select(.key == $k)] | length == 1' \
+  --arg k "${ATHLETE_UID}:${S_EVF}"
+pass "forced event failure: sync_push commits, share kept, event_failed logged, next push self-heals the item"
+
+# --- membership writers: one item per edge ----------------------------------------------
+# membership_events <group>: the group's membership items in write order, as
+# kind:member-tag[:actor-tag].
+membership_events() {
+  run_psql "
+    select coalesce(string_agg(
+             e.kind || ':' || case e.member_user_id when '${OWNER_UID}' then 'owner'
+                                                   when '${OUTSIDER_UID}' then 'outsider'
+                                                   when '${ATHLETE_UID}' then 'athlete' else '?' end
+               || case when e.actor_user_id is null then ''
+                       when e.actor_user_id = '${OWNER_UID}' then ':owner' else ':?' end,
+             ',' order by e.occurred_at, e.kind), '')
+      from app_public.group_events e
+     where e.group_id = '$1' and e.kind in ('joined', 'left', 'removed');"
+}
+rpc "${OWNER_TOKEN}" group_create "$(b_create "Events ${RUN_TAG}" "")"
+expect_ok "owner creates the events group"
+GE="$(jq -r '.group_id' <<<"${BODY}")"
+[[ "$(membership_events "${GE}")" == "joined:owner" ]] || fail "group_create must write exactly the owner's joined item"
+rpc "${OWNER_TOKEN}" group_invite_get "$(b_group "${GE}")"
+expect_ok "events group invite"
+CODE_E="$(jq -r '.code' <<<"${BODY}")"
+set_username "${OUTSIDER_UID}" "outsider-${RUN_TAG}"
+rpc "${OUTSIDER_TOKEN}" group_join "$(b_code "${CODE_E}")"
+expect_ok "outsider joins the events group"
+rpc "${OUTSIDER_TOKEN}" group_join "$(b_code "${CODE_E}")"
+expect_ok "outsider re-joins while active (no-op)"
+check "a join while active is a no-op" '.joined == false'
+rpc "${OWNER_TOKEN}" group_set_role "$(b_role "${GE}" "${OUTSIDER_UID}" admin)"
+expect_ok "owner promotes the outsider"
+rpc "${OWNER_TOKEN}" group_set_role "$(b_role "${GE}" "${OUTSIDER_UID}" member)"
+expect_ok "owner demotes the outsider"
+[[ "$(membership_events "${GE}")" == "joined:owner,joined:outsider" ]] ||
+  fail "join writes one item; a no-op join and role changes write none, got '$(membership_events "${GE}")'"
+rpc "${OUTSIDER_TOKEN}" group_leave "$(b_group "${GE}")"
+expect_ok "outsider leaves the events group"
+rpc "${OUTSIDER_TOKEN}" group_join "$(b_code "${CODE_E}")"
+expect_ok "outsider rejoins the events group"
+rpc "${OWNER_TOKEN}" group_remove_member "$(b_target "${GE}" "${OUTSIDER_UID}")"
+expect_ok "owner removes the outsider"
+rpc "${ATHLETE_TOKEN}" group_join "$(b_code "${CODE_E}")"
+expect_ok "athlete joins the events group"
+rpc "${OWNER_TOKEN}" group_transfer_ownership "$(b_target "${GE}" "${ATHLETE_UID}")"
+expect_ok "owner transfers the events group to the athlete"
+[[ "$(membership_events "${GE}")" == \
+   "joined:owner,joined:outsider,left:outsider,joined:outsider,removed:outsider:owner,joined:athlete" ]] ||
+  fail "leave/rejoin/remove/join write one item each (removed carries the remover); transfer writes none, got '$(membership_events "${GE}")'"
+[[ "$(run_psql "
+  select count(*) from app_public.group_events e
+    join app_public.group_memberships m on m.id = e.membership_id
+   where e.group_id = '${GE}'
+     and e.sort_at_ms <> floor(extract(epoch from case when e.kind = 'joined' then m.joined_at else m.ended_at end) * 1000)::bigint;")" == "0" ]] ||
+  fail "membership items must sit at floor(epoch ms) of their period's joined_at / ended_at"
+pass "membership RPCs write exactly one item per edge (joined/left/removed); no-op join, set_role, transfer write none"
+
+# --- backfill: one item per share and per membership edge; streams rebuild byte-identical -
+echo "[groups-contract] group_events backfill"
+
+# events_vs_sources: "<expected>:<actual>:<missing>:<extra>" over the run's
+# groups, where expected is one session item per share row and one joined plus
+# (when ended) one left/removed item per membership period, with their
+# positions and actors.
+events_vs_sources() {
+  run_psql "
+    with rg as (${RUN_GROUPS_SQL}),
+    expected as (
+      select sh.group_id, 'session'::text as kind, sh.member_user_id, sh.session_id,
+             null::uuid as membership_id, null::uuid as actor_user_id,
+             coalesce(s.started_at, sh.session_started_at) as sort_at_ms
+        from app_public.group_session_shares sh
+        left join app_public.sessions s on s.owner_user_id = sh.member_user_id and s.id = sh.session_id
+       where sh.group_id in (select id from rg)
+      union all
+      select m.group_id, 'joined', m.user_id, null, m.id, null,
+             floor(extract(epoch from m.joined_at) * 1000)::bigint
+        from app_public.group_memberships m where m.group_id in (select id from rg)
+      union all
+      select m.group_id, m.end_reason, m.user_id, null, m.id,
+             case when m.end_reason = 'removed' then m.ended_by end,
+             floor(extract(epoch from m.ended_at) * 1000)::bigint
+        from app_public.group_memberships m where m.group_id in (select id from rg) and m.ended_at is not null
+    ),
+    actual as (
+      select e.group_id, e.kind, e.member_user_id, e.session_id, e.membership_id, e.actor_user_id, e.sort_at_ms
+        from app_public.group_events e where e.group_id in (select id from rg)
+    )
+    select (select count(*) from expected) || ':' || (select count(*) from actual) || ':'
+        || (select count(*) from (select * from expected except all select * from actual) x) || ':'
+        || (select count(*) from (select * from actual except all select * from expected) y);"
+}
+# stream_all <token>: every All item, walked with next_cursor at limit 50.
+stream_all() {
+  local token="$1" cursor="null" items="[]" pages=0
+  while :; do
+    stream "${token}" "" "${cursor}" 50
+    expect_ok "All stream walk"
+    items="$(jq -c --argjson acc "${items}" '$acc + .items' <<<"${BODY}")"
+    pages=$((pages + 1))
+    [[ "${pages}" -le 50 ]] || fail "stream walk did not terminate"
+    [[ "$(jq -r '.has_more' <<<"${BODY}")" == "true" ]] || break
+    cursor="$(jq -c '.next_cursor' <<<"${BODY}")"
+  done
+  printf '%s' "${items}"
+}
+
+LIVE_COUNTS="$(events_vs_sources)"
+LIVE_N="${LIVE_COUNTS%%:*}"
+[[ "${LIVE_N}" -gt 20 && "${LIVE_COUNTS}" == "${LIVE_N}:${LIVE_N}:0:0" ]] ||
+  fail "the live writers must have produced exactly one item per share and per membership edge, got ${LIVE_COUNTS}"
+SNAP_OWNER="$(stream_all "${OWNER_TOKEN}")"
+SNAP_ATHLETE="$(stream_all "${ATHLETE_TOKEN}")"
+SNAP_VIEWER="$(stream_all "${VIEWER_TOKEN}")"
+[[ "$(jq 'length' <<<"${SNAP_OWNER}")" -gt 20 ]] || fail "the owner's All stream should hold the run's items"
+
+run_psql "delete from app_public.group_events where group_id in (${RUN_GROUPS_SQL});" >/dev/null
+[[ "$(stream_all "${OWNER_TOKEN}")" == "[]" ]] || fail "group_stream must read only group_events"
+BACKFILLED="$(run_psql "select app_public.group_events_backfill();")"
+[[ "${BACKFILLED}" == "${LIVE_N}" ]] ||
+  fail "the backfill must insert exactly one item per share and membership edge (${LIVE_N}), inserted ${BACKFILLED}"
+[[ "$(events_vs_sources)" == "${LIVE_N}:${LIVE_N}:0:0" ]] ||
+  fail "backfilled items must match the ledger and membership periods, got $(events_vs_sources)"
+[[ "$(run_psql "select app_public.group_events_backfill();")" == "0" ]] || fail "the backfill must be idempotent"
+[[ "$(stream_all "${OWNER_TOKEN}")" == "${SNAP_OWNER}" ]] || fail "owner's All stream differs after the backfill"
+[[ "$(stream_all "${ATHLETE_TOKEN}")" == "${SNAP_ATHLETE}" ]] || fail "athlete's All stream differs after the backfill"
+[[ "$(stream_all "${VIEWER_TOKEN}")" == "${SNAP_VIEWER}" ]] || fail "viewer's All stream differs after the backfill"
+pass "backfill: one item per share and per membership edge, idempotent; three users' streams rebuild byte-identical"
 
 echo "[groups-contract] PASS (run ${RUN_TAG})"

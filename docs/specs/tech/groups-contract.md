@@ -16,6 +16,10 @@
 > - Post-M22: group reads return raw set rows, card metrics are computed on
 >   the viewing device, and PR highlights are deferred (§4.2, §5, §9;
 >   `supabase/migrations/20260912120000_m22_group_raw_sets.sql`).
+> - M25-T02: the stream is persistent. `group_events` holds one row per
+>   stream item and `group_stream` reads only that table; the wire contract
+>   is unchanged (§2.6, §4.2;
+>   `supabase/migrations/20260913153000_m25_group_events.sql`).
 >
 > This doc owns the technical contract and is the durable record of what M22
 > built. The M22 milestone spec (product requirements and acceptance criteria)
@@ -52,6 +56,14 @@ through** from the member's own Sync v2 rows at request time.
 | #18 edits and deletes flow through | Same: reads see the live rows. A tombstoned session is hidden, and an undelete reappears. |
 | #19 membership at logging time | Shares are decided by session `started_at` vs. membership periods (§2.5). When the server received the row is irrelevant. |
 | Groups never break personal sync | No client sync change and no second push path. The trigger is failure-isolated (§2.5). |
+
+The **group stream** (M25) is persistent: `app_public.group_events` has one
+row per stream item, written once when the item happens and never deleted
+by the app (§2.6). A `session` item marks that a session was shared into a
+group. The card's content, position (`started_at`), and visibility are still
+read live from the member's rows, so #17 and #18 hold unchanged. Membership
+items are written with the membership change. Later item kinds (records,
+voids, links) are added to the same table, so there is no read-time merge.
 
 All group access goes through `SECURITY DEFINER` RPCs (§3, §4). The group
 tables are deny-all to direct client access. Devices **pull** (on focus, a
@@ -246,9 +258,88 @@ on conflict (group_id, member_user_id, session_id)
   200 and the owner reads the row. Exactly one sanitized row is logged
   (`sqlstate` `23514`), and the next push creates the share.
 
+### 2.6 `group_events` — the stream (M25)
+
+Each stream item is one row. It is written once, when the item happens, and
+the app never deletes it. It follows ground rules 1–5: RLS on, no policies,
+no `anon` or `authenticated` privileges, and `service_role` keeps
+`select/insert/update/delete`.
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | `uuid` PK | |
+| `group_id` | `uuid not null` → `groups(id) on delete cascade` | |
+| `kind` | `text not null` | CHECK `in ('session','joined','left','removed','record','record_voided','link','unlink','lead_change')`. The last five are reserved for M25-T05. |
+| `member_user_id` | `uuid not null` → `auth.users(id) on delete cascade` | The athlete (`session`) or the member (membership kinds) |
+| `actor_user_id` | `uuid null` → `auth.users(id) on delete set null` | `removed`: the remover. Null for the other current kinds. |
+| `session_id` | `text null` | `session`: `sessions.id` in the member's keyspace (no FK, rule 2) |
+| `membership_id` | `uuid null` → `group_memberships(id) on delete cascade` | Membership kinds: the period, whose id prefixes the item key |
+| `sort_at_ms` | `bigint not null` | Membership kinds: `floor(epoch_ms(joined_at \| ended_at))`. `session`: a copy of `sessions.started_at` that the session trigger keeps current. The read uses the live value (§4.2). |
+| `occurred_at` | `timestamptz not null default now()` | When the item happened. The backfill uses `shared_at`, `joined_at`, or `ended_at`. |
+
+Shape CHECKs: a `session` row has `session_id` and no `membership_id` or
+actor. A membership row has `membership_id` and no `session_id`, and only
+`removed` has an actor.
+
+Indexes:
+
+- unique `(group_id, member_user_id, session_id) where kind = 'session'`;
+- unique `(membership_id) where kind = 'joined'`;
+- unique `(membership_id) where kind in ('left','removed')`;
+- `(group_id, sort_at_ms desc, kind)`: a group's items by stored position.
+  It serves membership items and the M25-T05 kinds. Session items sort by the
+  live `started_at`, so `group_stream` still builds every in-scope item
+  before ordering, as M22 did;
+- `(member_user_id, session_id) where kind = 'session'` for the session trigger.
+
+**Writers.**
+
+- **`session`.** The trigger `sessions_group_stream_event` runs `AFTER INSERT
+  OR UPDATE … FOR EACH ROW` on `app_public.sessions` and calls
+  `group_event_session()` (`security definer`, pinned `search_path`).
+  - Same-event triggers fire in name order, so it runs after
+    `sessions_group_share_session` and sees the shares that write created.
+  - It inserts one item per ledger row for `(owner, session)` `on conflict do
+    nothing`, then moves the items' `sort_at_ms` when `started_at` changed.
+  - It reads the ledger rather than "this write created a share". A missed
+    item is therefore created on the session's next accepted write, like the
+    share itself (§2.5 self-heal).
+  - **Failure isolation** follows the §2.5 pattern. On failure it writes one
+    `public.app_logs` row (`event 'group.event_failed'`, a fixed `message`,
+    `context = {session_id, sqlstate}`, never `SQLERRM`), falls back to
+    `raise warning`, and always returns normally. The §2.5 share trigger is
+    unchanged, and an event failure never rolls back a share.
+- **`joined` / `left` / `removed`.** The trigger
+  `group_memberships_stream_event` runs `AFTER INSERT OR UPDATE OF ended_at`
+  and calls `group_event_membership()`.
+  - An inserted period (`group_create`, `group_join`) writes `joined`.
+  - Ending a period (`group_leave`, `group_remove_member`) writes `left` or
+    `removed`; `removed` carries `ended_by` as the actor.
+  - It is not failure-isolated: the item commits or fails with the
+    membership change.
+  - Role changes, ownership transfers, and a no-op join write nothing.
+  - The item's position is fixed when it is written. That is correct
+    because no RPC edits `joined_at`, and an ended period is never reopened
+    or re-ended. A future writer that changes those columns must also move
+    the item.
+- **Backfill.** `group_events_backfill()` is internal, idempotent, and returns
+  the rows inserted. It writes one `session` item per share row, at the live
+  `started_at` (else the ledger copy), and one `joined` plus, for an ended
+  period, one `left`/`removed` per membership period. The migration runs it
+  once.
+- **Repair for `group.event_failed`.** The next accepted write of the session
+  heals a missed item. Until then the share exists but the stream hides the
+  card, and `group_session_detail` still opens it. A write that fails on a
+  session's last write, for example its completion, is never healed by a later
+  write. For every `group.event_failed` row, run
+  `select app_public.group_events_backfill();` as the service role or
+  `postgres`. It is idempotent and inserts only the missing items. The §2.5
+  share trigger has the same next-write limit, and there the share itself is
+  missing.
+
 ## 3. Authorization model
 
-- **No direct table access.** The four tables have RLS enabled, no permissive
+- **No direct table access.** The group tables have RLS enabled, no permissive
   policies, and `revoke all … from anon, authenticated`. Direct PostgREST
   reads return nothing or are denied (AC9).
 - **RPC-only access.** Every group operation is an `app_public.group_*`
@@ -436,6 +527,31 @@ session)`, so both carry the same `exercises` array. It drops the M22-T02 SQL
 mirrors of the TS parsers: `group_js_trim`, `group_parse_reps`,
 `group_parse_weight`, `group_e1rm`, and `group_performed_sets`.
 `groups-contract` asserts the raw shapes.
+
+**As-built (M25-T02, persistent stream).**
+`supabase/migrations/20260913153000_m25_group_events.sql` rebuilds
+`group_stream` on `group_events` (§2.6). It no longer reads
+`group_session_shares` or `group_memberships` for items; scope still comes
+from the caller's active periods. The signature, check order, cursor
+validation, order, keys, shapes, and grants are all unchanged.
+
+- **Session items.** In-scope `session` rows are grouped by `(member,
+  session)`, which dedupes All. They are inner-joined to the live session:
+  `sort_at_ms` is the live `started_at`, and a missing or tombstoned session is
+  hidden. `groups` lists the in-scope, non-deleted groups holding an item.
+- **Membership items.** They come from `joined` / `left` / `removed` rows at
+  their stored `sort_at_ms`, keyed `<membership_id>:joined` or
+  `<membership_id>:ended`. `event` is the row's kind.
+- **Reserved kinds** (M25-T05) are not stream items until `group_stream` is
+  taught their shape.
+- `group_session_detail` still authorizes through the share ledger.
+- **Proven** by `groups-contract`. Every M22 stream assertion passes
+  unchanged. New assertions cover:
+  - the table's posture;
+  - one item per membership edge and per share, with no duplicates on
+    re-push;
+  - event trigger failure isolation and self-heal;
+  - a backfill that rebuilds three users' full All streams byte-identical.
 
 ### 4.3 Writes
 
