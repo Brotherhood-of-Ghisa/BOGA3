@@ -77,7 +77,9 @@ revoke all on table app_public.group_exercises from public, anon, authenticated;
 grant select, insert, update, delete on table app_public.group_exercises to service_role;
 
 -- -----------------------------------------------------------------------------
--- Internal helpers (not granted to clients)
+-- Internal helpers (not granted to clients). None is SECURITY DEFINER: each
+-- runs only inside the definer RPCs below, so spec 10 rule 17 (a definer
+-- helper must reject client_id itself) does not apply.
 -- -----------------------------------------------------------------------------
 
 -- Trimmed, non-empty name or VALIDATION (ExerciseCore `name_required`).
@@ -141,7 +143,6 @@ create function app_public.group_exercise_require_manager(p_group_id uuid, p_use
 returns text
 language plpgsql
 volatile
-security definer
 set search_path = app_public, pg_temp
 as $$
 declare
@@ -161,7 +162,6 @@ create function app_public.group_exercise_require(p_group_id uuid, p_exercise_id
 returns app_public.group_exercises
 language plpgsql
 volatile
-security definer
 set search_path = app_public, pg_temp
 as $$
 declare
@@ -186,7 +186,6 @@ create function app_public.group_exercise_json(p_exercise app_public.group_exerc
 returns jsonb
 language sql
 stable
-security definer
 set search_path = app_public, pg_temp
 as $$
   select jsonb_build_object(

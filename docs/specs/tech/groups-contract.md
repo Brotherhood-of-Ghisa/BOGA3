@@ -664,14 +664,15 @@ Writes raise:
   (`group_exercise_trim`, `group_exercise_validate_name`,
   `group_exercise_validate_load_input_mode`,
   `group_exercise_validate_source_id`, `group_exercise_require_manager`,
-  `group_exercise_require`, `group_exercise_json`) have no client grant.
+  `group_exercise_require`, `group_exercise_json`) have no client grant, and
+  none is `security definer`: they run only inside the RPCs.
 - **Check order** as §4.3:
   1. the preamble;
   2. caller membership, `NOT_FOUND: group not found` (writes lock the group row);
   3. role, `FORBIDDEN`;
   4. input, `VALIDATION`: the name, then the load mode, then the source id;
-  5. target, `NOT_FOUND: group exercise not found` (an exercise of another
-     group looks nonexistent);
+  5. target, `NOT_FOUND: group exercise not found`, locking the exercise row
+     `for update` (an exercise of another group looks nonexistent);
   6. archived, `VALIDATION` (update only).
 - **Messages.** `VALIDATION: exercise name is required`, `VALIDATION:
   load_input_mode must be total_load or per_side_load`, `VALIDATION:
