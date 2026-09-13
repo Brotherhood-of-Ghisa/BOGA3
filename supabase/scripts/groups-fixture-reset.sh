@@ -106,7 +106,7 @@ expect_2xx "verify fixture memberships are gone"
 # 2. Sync v2 rows (service role), children before the rows they reference.
 sync_rows=0
 for table in session_exercise_tags exercise_sets session_exercises exercise_muscle_mappings \
-  exercise_tag_definitions sessions exercise_definitions muscle_groups gyms; do
+  exercise_tag_definitions sessions exercise_group_links exercise_definitions muscle_groups gyms; do
   http DELETE "${REST}/${table}?owner_user_id=in.(${USERS})" "${SERVICE_ROLE_KEY}" "" \
     "Prefer: return=representation"
   expect_2xx "delete fixture ${table}"

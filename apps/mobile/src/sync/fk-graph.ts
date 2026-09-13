@@ -66,6 +66,11 @@ export const SYNCABLE_FK_GRAPH: Partial<Record<EntityTableName, readonly SyncFkE
     { parentIdField: 'exercise_definition_id', parentType: 'exercise_definitions', required: true },
     { parentIdField: 'muscle_group_id', parentType: 'muscle_groups', required: true },
   ],
+  // `group_id` / `group_exercise_id` are deliberately absent: they are plain
+  // text with no FK (group tables are not syncable parents).
+  exercise_group_links: [
+    { parentIdField: 'exercise_definition_id', parentType: 'exercise_definitions', required: true },
+  ],
   session_exercises: [
     { parentIdField: 'session_id', parentType: 'sessions', required: true },
     { parentIdField: 'exercise_definition_id', parentType: 'exercise_definitions', required: false },
@@ -91,6 +96,7 @@ const PARENT_TABLES: Record<EntityTableName, (typeof schema)[keyof typeof schema
   exercise_tag_definitions: schema.exerciseTagDefinitions,
   sessions: schema.sessions,
   exercise_muscle_mappings: schema.exerciseMuscleMappings,
+  exercise_group_links: schema.exerciseGroupLinks,
   session_exercises: schema.sessionExercises,
   exercise_sets: schema.exerciseSets,
   session_exercise_tags: schema.sessionExerciseTags,

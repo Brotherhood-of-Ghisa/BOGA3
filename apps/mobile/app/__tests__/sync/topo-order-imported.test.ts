@@ -62,10 +62,12 @@ describe('the cycle and scheduler import the layer partition, never redefine it'
 });
 
 describe('the single source of truth has the expected shape', () => {
-  it('declares exactly four layers spanning the nine entity types', () => {
+  it('declares exactly four layers spanning the ten entity types', () => {
     expect(TOPO_LAYERS).toHaveLength(4);
     const flat = TOPO_LAYERS.flat();
-    expect(new Set(flat).size).toBe(9);
+    expect(new Set(flat).size).toBe(10);
+    // exercise_group_links sits in Layer 1, after its exercise_definitions parent.
+    expect(TOPO_LAYERS[1]).toContain('exercise_group_links');
     // Layer 0 anchors the FK graph (no outbound entity FKs).
     expect([...TOPO_LAYERS[0]].sort()).toEqual([
       'exercise_definitions',

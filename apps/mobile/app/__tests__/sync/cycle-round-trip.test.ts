@@ -89,7 +89,10 @@ jest.mock('@/src/auth/supabase', () =>
 
 import { SYSTEM_MUSCLE_GROUP_SEEDS } from '@/src/data/exercise-catalog-seeds';
 import { PRIMARY_RUNTIME_STATE_ID, type Transaction } from '@/src/data/clock';
+import { linkExercise, listLinks, unlinkExercise } from '@/src/data/exercise-group-links';
 import {
+  exerciseDefinitions,
+  exerciseGroupLinks,
   exerciseSets,
   gyms,
   muscleGroups,
@@ -109,6 +112,8 @@ interface ChainIds {
   session: string;
   sessionExercise: string;
   exerciseSet: string;
+  exerciseDefinition: string;
+  group: string;
 }
 
 // A fresh, globally-unique id set per `it`. The suite no longer wipes the
@@ -126,6 +131,8 @@ const makeChainIds = (): ChainIds => {
     session: `${run}-session`,
     sessionExercise: `${run}-sx`,
     exerciseSet: `${run}-set`,
+    exerciseDefinition: `${run}-def`,
+    group: `${run}-grp`,
   };
 };
 
@@ -407,6 +414,55 @@ describe('sync cycle round-trip against a live endpoint', () => {
     // No row was re-dirtied, and the cursors did not move (no new rows landed).
     expect(readCursorMap()).toEqual(cursorAfterDrain);
   }, 45_000);
+
+  it('round-trips an exercise_group_links row: link, unlink tombstone, relink undeletes the same id', async () => {
+    // The link's only FK parent is the member's own exercise definition
+    // (Layer 0); the group columns are plain text with no server group row.
+    database
+      .insert(exerciseDefinitions)
+      .values({
+        id: ids.exerciseDefinition,
+        name: 'Link Press',
+        localDirty: true,
+        localUpdatedAtMs: Date.now(),
+      })
+      .run();
+    const linkId = `${ids.group}:${ids.exerciseDefinition}`;
+    const readLink = () =>
+      database.select().from(exerciseGroupLinks).where(eq(exerciseGroupLinks.id, linkId)).get();
+
+    // 1. Link → push → wiped client re-pulls the link (Layer 1) after its parent.
+    await linkExercise(ids.exerciseDefinition, ids.group, 'gx-1');
+    await runSyncCycle();
+    expect(readLink()?.localDirty).toBe(false);
+    wipeLocalStore();
+    await runSyncCycle();
+    expect(readLink()).toMatchObject({
+      exerciseDefinitionId: ids.exerciseDefinition,
+      groupId: ids.group,
+      groupExerciseId: 'gx-1',
+      deletedAt: null,
+      localDirty: false,
+    });
+
+    // 2. Unlink → the tombstone syncs and survives a wiped re-pull.
+    await unlinkExercise(ids.exerciseDefinition, ids.group);
+    await runSyncCycle();
+    wipeLocalStore();
+    await runSyncCycle();
+    expect(readLink()?.deletedAt).not.toBeNull();
+    expect((await listLinks()).some((link) => link.id === linkId)).toBe(false);
+
+    // 3. Relink → the same id is undeleted server-side (LWW, contract §A.1.1.3).
+    await linkExercise(ids.exerciseDefinition, ids.group, 'gx-2');
+    await runSyncCycle();
+    wipeLocalStore();
+    await runSyncCycle();
+    expect(readLink()).toMatchObject({ groupExerciseId: 'gx-2', deletedAt: null, localDirty: false });
+    expect(
+      database.select().from(exerciseGroupLinks).all().filter((row) => row.groupId === ids.group),
+    ).toHaveLength(1);
+  }, 90_000);
 
   it('re-pushes a row edited in every in-flight window, then converges losing nothing (push-in-flight race)', async () => {
     seedDirtyChain();

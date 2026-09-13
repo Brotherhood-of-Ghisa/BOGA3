@@ -8,8 +8,8 @@
 # Scenarios covered:
 #   1. Snapshot pull (cursor=null)
 #   2. Paginated drain (limit=2 over 5 rows)
-#   3. Layer→type mapping integrity (all four layers, all eight entities;
-#      asserts the §B.4.4 partition: pairwise disjoint, union = all 8)
+#   3. Layer→type mapping integrity (all four layers, all ten entities;
+#      asserts the §B.4.4 partition: pairwise disjoint, union = all 10)
 #   4. RLS isolation (user_a vs user_b)
 #   5. Tombstones included (rows with deleted_at != null appear in the pull)
 #   6. Empty page after drain (next_cursor echoes the input cursor)
@@ -226,6 +226,7 @@ cleanup_run_rows() {
     delete from app_public.exercise_muscle_mappings where id like 'pull-${RUN_TAG}-%';
     delete from app_public.muscle_groups where id like 'pull-${RUN_TAG}-%';
     delete from app_public.sessions where id like 'pull-${RUN_TAG}-%';
+    delete from app_public.exercise_group_links where id like 'pull-${RUN_TAG}-%';
     delete from app_public.exercise_tag_definitions where id like 'pull-${RUN_TAG}-%';
     delete from app_public.exercise_definitions where id like 'pull-${RUN_TAG}-%';
     delete from app_public.gyms where id like 'pull-${RUN_TAG}-%';
@@ -354,7 +355,7 @@ cleanup_run_rows
 # Seed at least one row of EVERY entity type for user A, with a fully-
 # connected FK chain. Pull each layer (0..3) with cursor=null, limit=100.
 # Assert each layer's response `type` set equals exactly the §B.4.4 mapping;
-# union = all eight; pairwise disjoint.
+# union = all ten; pairwise disjoint.
 # -----------------------------------------------------------------------------
 
 echo "[sync-pull-contract] scenario 3: layer→type mapping integrity"
@@ -368,7 +369,8 @@ run_psql_sql "
   insert into app_public.muscle_groups (owner_user_id, id, display_name, family_name, sort_order, is_editable, created_at, updated_at, client_updated_at_ms)
     values ('${USER_A_UUID}'::uuid, 'pull-${RUN_TAG}-l0-mg', 'Pectorals', 'chest', 0, 0, ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
 
-  -- Layer 1: sessions, exercise_muscle_mappings, exercise_tag_definitions.
+  -- Layer 1: sessions, exercise_muscle_mappings, exercise_tag_definitions,
+  -- exercise_group_links.
   -- exercise_tag_definitions lives here (not Layer 0) per the corrected
   -- partition in docs/specs/tech/sync-v2-server-contract.md §B.3.4.1: it FKs
   -- into exercise_definitions (Layer 0), so §A.7.7's no-intra-layer-FK rule
@@ -379,6 +381,10 @@ run_psql_sql "
     values ('${USER_A_UUID}'::uuid, 'pull-${RUN_TAG}-l1-emm', 'pull-${RUN_TAG}-l0-ed', 'pull-${RUN_TAG}-l0-mg', 1.0, ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
   insert into app_public.exercise_tag_definitions (owner_user_id, id, exercise_definition_id, name, normalized_name, created_at, updated_at, client_updated_at_ms)
     values ('${USER_A_UUID}'::uuid, 'pull-${RUN_TAG}-l1-etd', 'pull-${RUN_TAG}-l0-ed', 'Tag', 'tag', ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
+  -- exercise_group_links: id is the client-derived <group_id>:<exercise_definition_id>;
+  -- group_id is plain text (no FK), its only FK parent is exercise_definitions (Layer 0).
+  insert into app_public.exercise_group_links (owner_user_id, id, exercise_definition_id, group_id, group_exercise_id, created_at, updated_at, client_updated_at_ms)
+    values ('${USER_A_UUID}'::uuid, 'pull-${RUN_TAG}-l1-grp:pull-${RUN_TAG}-l0-ed', 'pull-${RUN_TAG}-l0-ed', 'pull-${RUN_TAG}-l1-grp', 'gex', ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
 
   -- Layer 2: session_exercises.
   insert into app_public.session_exercises (owner_user_id, id, session_id, exercise_definition_id, order_index, name, created_at, updated_at, client_updated_at_ms)
@@ -404,8 +410,8 @@ L0_TYPES="$(printf '%s' "${REQUEST_BODY}" | jq -c '[.entities[] | select(.id | s
 sync_pull '{"layer":1,"cursor":null,"limit":200}'
 assert_status "200" "scenario 3 layer 1 status"
 L1_TYPES="$(printf '%s' "${REQUEST_BODY}" | jq -c '[.entities[] | select(.id | startswith("pull-'"${RUN_TAG}"'-")) | .type] | unique | sort')"
-[[ "${L1_TYPES}" == '["exercise_muscle_mappings","exercise_tag_definitions","sessions"]' ]] \
-  || fail "scenario 3 layer 1: expected {sessions, exercise_muscle_mappings, exercise_tag_definitions}, got ${L1_TYPES}"
+[[ "${L1_TYPES}" == '["exercise_group_links","exercise_muscle_mappings","exercise_tag_definitions","sessions"]' ]] \
+  || fail "scenario 3 layer 1: expected {sessions, exercise_muscle_mappings, exercise_tag_definitions, exercise_group_links}, got ${L1_TYPES}"
 
 sync_pull '{"layer":2,"cursor":null,"limit":200}'
 assert_status "200" "scenario 3 layer 2 status"
@@ -419,7 +425,7 @@ L3_TYPES="$(printf '%s' "${REQUEST_BODY}" | jq -c '[.entities[] | select(.id | s
 [[ "${L3_TYPES}" == '["exercise_sets","session_exercise_tags"]' ]] \
   || fail "scenario 3 layer 3: expected {exercise_sets, session_exercise_tags}, got ${L3_TYPES}"
 
-# Union equals all nine; pairwise disjoint (jq computes both at once).
+# Union equals all ten; pairwise disjoint (jq computes both at once).
 UNION_AND_DISJOINT="$(jq -nc \
   --argjson l0 "${L0_TYPES}" \
   --argjson l1 "${L1_TYPES}" \
@@ -431,16 +437,16 @@ UNION_AND_DISJOINT="$(jq -nc \
       total_count: ($all | length),
       unique_count: ($all | unique | length)
     }')"
-EXPECTED_UNION='["exercise_definitions","exercise_muscle_mappings","exercise_sets","exercise_tag_definitions","gyms","muscle_groups","session_exercise_tags","session_exercises","sessions"]'
+EXPECTED_UNION='["exercise_definitions","exercise_group_links","exercise_muscle_mappings","exercise_sets","exercise_tag_definitions","gyms","muscle_groups","session_exercise_tags","session_exercises","sessions"]'
 ACTUAL_UNION="$(printf '%s' "${UNION_AND_DISJOINT}" | jq -c '.union_sorted')"
 TOTAL_COUNT="$(printf '%s' "${UNION_AND_DISJOINT}" | jq -r '.total_count')"
 UNIQUE_COUNT="$(printf '%s' "${UNION_AND_DISJOINT}" | jq -r '.unique_count')"
 [[ "${ACTUAL_UNION}" == "${EXPECTED_UNION}" ]] \
-  || fail "scenario 3 union: expected all nine, got ${ACTUAL_UNION}"
-[[ "${TOTAL_COUNT}" == "9" ]] \
-  || fail "scenario 3 total: expected 9 entity-type slots across layers, got ${TOTAL_COUNT}"
-[[ "${UNIQUE_COUNT}" == "9" ]] \
-  || fail "scenario 3 disjoint: expected 9 unique entity types (pairwise-disjoint), got ${UNIQUE_COUNT}"
+  || fail "scenario 3 union: expected all ten, got ${ACTUAL_UNION}"
+[[ "${TOTAL_COUNT}" == "10" ]] \
+  || fail "scenario 3 total: expected 10 entity-type slots across layers, got ${TOTAL_COUNT}"
+[[ "${UNIQUE_COUNT}" == "10" ]] \
+  || fail "scenario 3 disjoint: expected 10 unique entity types (pairwise-disjoint), got ${UNIQUE_COUNT}"
 
 pass "scenario 3: layer→type mapping integrity (topological partition per the server contract §B.4.4)"
 

@@ -8,6 +8,7 @@ import {
 } from '@/src/data/exercise-catalog-seeds';
 import {
   exerciseDefinitions,
+  exerciseGroupLinks,
   exerciseMuscleMappings,
   exerciseSets,
   exerciseTagDefinitions,
@@ -24,6 +25,7 @@ type FakeRow = Record<string, unknown>;
 type FakeState = {
   muscleGroups: FakeRow[];
   exerciseDefinitions: FakeRow[];
+  exerciseGroupLinks: FakeRow[];
   exerciseMuscleMappings: FakeRow[];
   exerciseSets: FakeRow[];
   exerciseTagDefinitions: FakeRow[];
@@ -40,6 +42,7 @@ const createFakeDatabase = () => {
   const state: FakeState = {
     muscleGroups: [],
     exerciseDefinitions: [],
+    exerciseGroupLinks: [],
     exerciseMuscleMappings: [],
     exerciseSets: [],
     exerciseTagDefinitions: [],
@@ -53,6 +56,7 @@ const createFakeDatabase = () => {
   const tableRows = new Map<object, FakeRow[]>([
     [muscleGroups, state.muscleGroups],
     [exerciseDefinitions, state.exerciseDefinitions],
+    [exerciseGroupLinks, state.exerciseGroupLinks],
     [exerciseMuscleMappings, state.exerciseMuscleMappings],
     [exerciseSets, state.exerciseSets],
     [exerciseTagDefinitions, state.exerciseTagDefinitions],
@@ -188,6 +192,7 @@ describe('resetLocalDataAndReseed (dev reset path)', () => {
     fake.state.sessions.push({ id: 'session-1', gymId: 'gym-1' });
     fake.state.sessionExercises.push({ id: 'sx-1', sessionId: 'session-1' });
     fake.state.exerciseSets.push({ id: 'set-1', sessionExerciseId: 'sx-1' });
+    fake.state.exerciseGroupLinks.push({ id: 'grp-1:def-1', exerciseDefinitionId: 'def-1' });
 
     expect(fake.state.exerciseDefinitions.length).toBe(SYSTEM_EXERCISE_DEFINITION_SEEDS.length);
     expect(fake.state.gyms.length).toBe(1);
@@ -208,6 +213,7 @@ describe('resetLocalDataAndReseed (dev reset path)', () => {
     expect(fake.state.exerciseSets.length).toBe(0);
     expect(fake.state.sessionExerciseTags.length).toBe(0);
     expect(fake.state.exerciseTagDefinitions.length).toBe(0);
+    expect(fake.state.exerciseGroupLinks.length).toBe(0);
 
     // Catalog is repopulated from the canonical seed bundle.
     expect(fake.state.muscleGroups.length).toBe(SYSTEM_MUSCLE_GROUP_SEEDS.length);

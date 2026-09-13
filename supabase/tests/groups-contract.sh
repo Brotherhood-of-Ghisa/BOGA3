@@ -244,7 +244,7 @@ echo "[groups-contract] run ${RUN_TAG}: catalog ground rules"
 # =============================================================================
 
 GROUP_TABLES="'groups','group_memberships','group_invites','group_session_shares','group_exercises'"
-SYNC_TABLES="'gyms','exercise_definitions','muscle_groups','exercise_tag_definitions','sessions','exercise_muscle_mappings','session_exercises','exercise_sets','session_exercise_tags'"
+SYNC_TABLES="'gyms','exercise_definitions','muscle_groups','exercise_tag_definitions','sessions','exercise_muscle_mappings','session_exercises','exercise_sets','session_exercise_tags','exercise_group_links'"
 
 [[ "$(run_psql "
   select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace

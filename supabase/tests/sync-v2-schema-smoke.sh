@@ -6,14 +6,14 @@
 # migration in supabase/migrations/<ts>_sync_v2_clean_room.sql produced exactly
 # the shape docs/specs/tech/sync-v2-server-contract.md Part A prescribes:
 #
-#   - All nine v2 entity tables exist in app_public.
+#   - All ten v2 entity tables exist in app_public.
 #   - Every v1 sync server object name is absent from information_schema /
 #     pg_catalog.
 #   - RLS is enabled on every entity table and the four named policies are
 #     present.
 #   - Each entity carries the two universal triggers
 #     (<table>_touch_server_received_at, <table>_owner_user_id_immutable).
-#   - The nine cross-entity FKs are present with condeferrable=true,
+#   - The ten cross-entity FKs are present with condeferrable=true,
 #     condeferred=true, and the expected on-delete actions.
 #   - Only the M19 load-input-mode CHECK exists; all other entity CHECKs are absent.
 #
@@ -90,7 +90,7 @@ pass() {
 }
 
 # -----------------------------------------------------------------------------
-# 1. All nine v2 entity tables exist in app_public.
+# 1. All ten v2 entity tables exist in app_public.
 # -----------------------------------------------------------------------------
 
 ENTITIES=(
@@ -103,6 +103,7 @@ ENTITIES=(
   session_exercises
   exercise_sets
   session_exercise_tags
+  exercise_group_links
 )
 
 for entity in "${ENTITIES[@]}"; do
@@ -116,7 +117,7 @@ for entity in "${ENTITIES[@]}"; do
     fail "expected app_public.${entity} to exist (got count=${count})"
   fi
 done
-pass "all nine v2 entity tables present"
+pass "all ten v2 entity tables present"
 
 # -----------------------------------------------------------------------------
 # 2. Every v1 sync server object name is absent.
@@ -218,7 +219,7 @@ done
 pass "both universal triggers present on every entity table"
 
 # -----------------------------------------------------------------------------
-# 5. The nine deferrable composite FKs.
+# 5. The ten deferrable composite FKs.
 #
 # Map: <constraint_name>|<expected_confdeltype>
 #   confdeltype values: 'a' = no action, 'c' = cascade, 'n' = set null,
@@ -233,6 +234,7 @@ pass "both universal triggers present on every entity table"
 #   exercise_tag_definitions_exercise_definition_fk  on delete cascade    -> c
 #   session_exercise_tags_session_exercise_fk        on delete cascade    -> c
 #   session_exercise_tags_exercise_tag_definition_fk on delete cascade    -> c
+#   exercise_group_links_exercise_definition_fk      on delete no action  -> a
 # -----------------------------------------------------------------------------
 
 FK_EXPECTATIONS=(
@@ -245,6 +247,7 @@ FK_EXPECTATIONS=(
   "exercise_tag_definitions|exercise_tag_definitions_exercise_definition_fk|c"
   "session_exercise_tags|session_exercise_tags_session_exercise_fk|c"
   "session_exercise_tags|session_exercise_tags_exercise_tag_definition_fk|c"
+  "exercise_group_links|exercise_group_links_exercise_definition_fk|a"
 )
 
 for spec in "${FK_EXPECTATIONS[@]}"; do
@@ -279,7 +282,7 @@ for spec in "${FK_EXPECTATIONS[@]}"; do
     fail "${fk_name}: expected confdeltype=${expected_delete}, got '${confdeltype}'"
   fi
 done
-pass "nine composite FKs present with condeferrable=t, condeferred=t, expected on-delete actions"
+pass "ten composite FKs present with condeferrable=t, condeferred=t, expected on-delete actions"
 
 # -----------------------------------------------------------------------------
 # 6. Only the M19 load-input-mode CHECK is allowed (contract §A.1).

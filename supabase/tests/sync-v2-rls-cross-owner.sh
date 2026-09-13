@@ -4,7 +4,7 @@
 #
 # Sets up rows for two fixture users (A and B), then with user A's JWT
 # exercises SELECT / INSERT / UPDATE / DELETE against user B's rows on every
-# one of the nine v2 entity tables. All four operations must either:
+# one of the ten v2 entity tables. All four operations must either:
 #
 #   - return zero rows (SELECT, UPDATE, DELETE under PostgREST + RLS),
 #   - or fail with an RLS-deny status / response shape (INSERT with a
@@ -80,6 +80,7 @@ ENTITIES=(
   session_exercises
   exercise_sets
   session_exercise_tags
+  exercise_group_links
 )
 
 # -----------------------------------------------------------------------------
@@ -150,8 +151,10 @@ NOW_MS="$(($(date +%s) * 1000))"
 # exercise_tag_definition, a session referencing the gym, an
 # exercise_muscle_mapping referencing the exercise_definition + muscle_group, a
 # session_exercise referencing the session + exercise_definition, an exercise_set
-# referencing the session_exercise, and a session_exercise_tag referencing the
-# session_exercise + exercise_tag_definition.
+# referencing the session_exercise, a session_exercise_tag referencing the
+# session_exercise + exercise_tag_definition, and an exercise_group_link
+# referencing the exercise_definition (its group_id is plain text, no FK; the
+# id is the client's deterministic `<group_id>:<exercise_definition_id>`).
 GYM_ID="rls-${RUN_TAG}-bgym"
 EDEF_ID="rls-${RUN_TAG}-bedef"
 MG_ID="rls-${RUN_TAG}-bmg"
@@ -161,6 +164,8 @@ EMM_ID="rls-${RUN_TAG}-bemm"
 SX_ID="rls-${RUN_TAG}-bsx"
 SET_ID="rls-${RUN_TAG}-bset"
 SXTAG_ID="rls-${RUN_TAG}-bsxtag"
+GRP_ID="rls-${RUN_TAG}-bgrp"
+EGL_ID="${GRP_ID}:${EDEF_ID}"
 
 # Build per-entity ID map so we know which ID to target for each table.
 declare -a ROW_IDS=(
@@ -173,11 +178,13 @@ declare -a ROW_IDS=(
   "${SX_ID}"
   "${SET_ID}"
   "${SXTAG_ID}"
+  "${EGL_ID}"
 )
 
 cleanup_rows() {
   run_psql_sql "
     delete from app_public.session_exercise_tags    where id = '${SXTAG_ID}';
+    delete from app_public.exercise_group_links     where id = '${EGL_ID}';
     delete from app_public.exercise_sets            where id = '${SET_ID}';
     delete from app_public.session_exercises        where id = '${SX_ID}';
     delete from app_public.exercise_muscle_mappings where id = '${EMM_ID}';
@@ -252,6 +259,12 @@ run_psql_sql "
        created_at, client_updated_at_ms)
     values ('${USER_B_UUID}'::uuid, '${SXTAG_ID}', '${SX_ID}', '${ETD_ID}',
             ${NOW_MS}, ${NOW_MS});
+
+    insert into app_public.exercise_group_links
+      (owner_user_id, id, exercise_definition_id, group_id, group_exercise_id,
+       created_at, updated_at, client_updated_at_ms)
+    values ('${USER_B_UUID}'::uuid, '${EGL_ID}', '${EDEF_ID}', '${GRP_ID}', 'rls-${RUN_TAG}-bgex',
+            ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
   commit;
 " >/dev/null
 
@@ -353,6 +366,13 @@ insert_payload_for() {
         '{owner_user_id: $owner, id: $id, session_exercise_id: $sx,
           exercise_tag_definition_id: $etd, client_updated_at_ms: $ts, created_at: $ts}'
       ;;
+    exercise_group_links)
+      jq -nc --arg owner "${USER_B_UUID}" --arg id "rls-inject-${RUN_TAG}-$1" \
+        --arg edef "${EDEF_ID}" --arg grp "${GRP_ID}" --argjson ts "${NOW_MS}" \
+        '{owner_user_id: $owner, id: $id, exercise_definition_id: $edef,
+          group_id: $grp, group_exercise_id: "injected",
+          client_updated_at_ms: $ts, created_at: $ts, updated_at: $ts}'
+      ;;
   esac
 }
 
@@ -367,6 +387,7 @@ target_row_id_for() {
     session_exercises)        echo "${SX_ID}" ;;
     exercise_sets)            echo "${SET_ID}" ;;
     session_exercise_tags)    echo "${SXTAG_ID}" ;;
+    exercise_group_links)     echo "${EGL_ID}" ;;
   esac
 }
 

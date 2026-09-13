@@ -93,7 +93,7 @@ Ground rules for every group table:
    entity tables as "every `app_public` table with `owner_user_id`" (contract
    §A.7.3), so such a column would be misread as an unsynced entity. Group
    tables use `user_id`, `member_user_id`, and `created_by` instead.
-2. **No FK into the nine Sync v2 tables.** This keeps the §A.7.7 topological
+2. **No FK into the Sync v2 tables.** This keeps the §A.7.7 topological
    assertion scoped to entity tables. Reads inner-join the live session rows,
    so a dangling ledger row (session hard-deleted by `dev_wipe_my_data` or
    account deletion) is invisible.

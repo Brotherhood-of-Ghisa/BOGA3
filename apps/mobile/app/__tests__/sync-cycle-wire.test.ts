@@ -1,5 +1,5 @@
 /**
- * Wire-serialisation round-trip coverage: for every one of the nine entity
+ * Wire-serialisation round-trip coverage: for every one of the ten entity
  * types, a representative row serialised to the wire envelope and back through
  * the database round-trips its typed columns intact. Confirms the local-only
  * bookkeeping columns never reach the wire, and that timestamp columns
@@ -40,6 +40,7 @@ const TABLES: Record<EntityTableName, (typeof schema)[keyof typeof schema]> = {
   exercise_tag_definitions: schema.exerciseTagDefinitions,
   sessions: schema.sessions,
   exercise_muscle_mappings: schema.exerciseMuscleMappings,
+  exercise_group_links: schema.exerciseGroupLinks,
   session_exercises: schema.sessionExercises,
   exercise_sets: schema.exerciseSets,
   session_exercise_tags: schema.sessionExerciseTags,
@@ -115,6 +116,15 @@ const SAMPLE_ROWS: Record<EntityTableName, Record<string, unknown>> = {
     createdAt: new Date('2026-05-29T08:00:00.000Z'),
     updatedAt: new Date('2026-05-29T08:30:00.000Z'),
     deletedAt: null,
+  },
+  exercise_group_links: {
+    id: 'grp-wire:def-1',
+    exerciseDefinitionId: 'def-1',
+    groupId: 'grp-wire',
+    groupExerciseId: 'gx-wire',
+    createdAt: new Date('2026-05-29T08:00:00.000Z'),
+    updatedAt: new Date('2026-05-29T08:30:00.000Z'),
+    deletedAt: new Date('2026-05-29T10:00:00.000Z'),
   },
   session_exercises: {
     id: 'sx-wire',
@@ -225,6 +235,23 @@ describe('entityToWire / wireToEntity round-trip', () => {
     expect(typeof wire.fields.deleted_at).toBe('number');
     expect(wire.fields).not.toHaveProperty('local_dirty');
     expect(wire.fields).not.toHaveProperty('local_updated_at_ms');
+  });
+
+  it('emits the three exercise_group_links columns and never a group FK beyond them', () => {
+    const wire = entityToWire(SAMPLE_ROWS.exercise_group_links, 'exercise_group_links');
+    expect(Object.keys(wire.fields).sort()).toEqual([
+      'created_at',
+      'deleted_at',
+      'exercise_definition_id',
+      'group_exercise_id',
+      'group_id',
+      'updated_at',
+    ]);
+    expect(wire.fields).toMatchObject({
+      exercise_definition_id: 'def-1',
+      group_id: 'grp-wire',
+      group_exercise_id: 'gx-wire',
+    });
   });
 
   it('reconstructs timestamp columns as Date values and scalars verbatim', () => {

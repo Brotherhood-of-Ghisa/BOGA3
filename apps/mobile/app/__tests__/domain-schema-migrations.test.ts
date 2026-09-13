@@ -127,8 +127,9 @@ describe('domain schema and runtime migrations', () => {
     // The history was squashed to a single v2 baseline (`m0000`); forward feature
     // migrations append after it. The first follow-up is the local sync
     // quarantine table; planned set targets append after that; the M22 local
-    // group cache is m0004, and m0005 empties it for the raw-set payload shape.
-    expect(localRuntimeMigrations.journal.entries).toHaveLength(6);
+    // group cache is m0004, m0005 empties it for the raw-set payload shape, and
+    // the M25 exercise_group_links synced entity is m0006.
+    expect(localRuntimeMigrations.journal.entries).toHaveLength(7);
     expect(localRuntimeMigrations.journal.entries[0]).toMatchObject({
       idx: 0,
       tag: expect.stringMatching(/^0000_/),
@@ -153,6 +154,10 @@ describe('domain schema and runtime migrations', () => {
       idx: 5,
       tag: expect.stringMatching(/^0005_/),
     });
+    expect(localRuntimeMigrations.journal.entries[6]).toMatchObject({
+      idx: 6,
+      tag: expect.stringMatching(/^0006_/),
+    });
     expect(Object.keys(localRuntimeMigrations.migrations)).toEqual([
       'm0000',
       'm0001',
@@ -160,7 +165,22 @@ describe('domain schema and runtime migrations', () => {
       'm0003',
       'm0004',
       'm0005',
+      'm0006',
     ]);
+  });
+
+  it('creates the exercise_group_links synced entity in the m0006 follow-up migration', () => {
+    const linksMigration = localRuntimeMigrations.migrations.m0006;
+    expect(linksMigration).toContain('CREATE TABLE `exercise_group_links`');
+    // The only FK is the synced exercise_definitions parent (spec 05 local
+    // integrity rule 2); group_id / group_exercise_id carry no FK.
+    expect(linksMigration).toContain(
+      'FOREIGN KEY (`exercise_definition_id`) REFERENCES `exercise_definitions`(`id`) ON UPDATE no action ON DELETE no action'
+    );
+    expect(linksMigration.match(/FOREIGN KEY/g)).toHaveLength(1);
+    expect(linksMigration).toContain('`local_dirty` integer DEFAULT false NOT NULL');
+    expect(linksMigration).toContain('`local_updated_at_ms` integer DEFAULT 0 NOT NULL');
+    expect(linksMigration).toContain('exercise_group_links_id_deterministic');
   });
 
   it('empties the group cache once in m0005 (groups contract §6.2 shape change)', () => {

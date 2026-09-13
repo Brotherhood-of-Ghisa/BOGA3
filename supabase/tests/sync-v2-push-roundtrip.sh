@@ -16,6 +16,11 @@
 #   - FK closure failure: an orphan-child push (session_exercises whose
 #     session_id is neither in the batch nor on the server) returns the
 #     FK_VIOLATION error envelope and no rows from the batch land.
+#   - exercise_group_links lifecycle: a tombstone (deleted_at) at a newer cuam
+#     lands; an undelete of the SAME id at a still-newer cuam restores it; a
+#     link whose group_id / group_exercise_id reference no group row is
+#     accepted (no FK on the group columns); an FK-orphan link (unknown
+#     exercise_definition_id) is rejected with FK_VIOLATION and does not land.
 #
 # This is integration-level on top of the per-feature push contract suite
 # (sync-push-contract.sh) — it exercises the multi-layer ordering + LWW +
@@ -186,7 +191,7 @@ BASE_MS="$(($(date +%s) * 1000))"
 # we list layer-3 first, layer-2, layer-1, layer-0 last so the deferrable-FK
 # path is exercised inside one transaction (mirroring the push contract
 # suite's deferrable-FK scenarios, but with all four topological layers and
-# all nine types in one call rather than just the four-row chain).
+# all ten types in one call rather than just the four-row chain).
 GYM_ID="rt-${RUN_TAG}-gym"
 EDEF_ID="rt-${RUN_TAG}-edef"
 MG_ID="rt-${RUN_TAG}-mg"
@@ -196,6 +201,11 @@ EMM_ID="rt-${RUN_TAG}-emm"
 SX_ID="rt-${RUN_TAG}-sx"
 SET_ID="rt-${RUN_TAG}-set"
 SXTAG_ID="rt-${RUN_TAG}-sxtag"
+# exercise_group_links id is the client-derived `<group_id>:<exercise_definition_id>`.
+# group_id is plain text (no FK, no group row needed) and is chosen so the id
+# still starts with the rt-${RUN_TAG}- prefix the cleanup `like` matches.
+GRP_ID="rt-${RUN_TAG}-grp"
+EGL_ID="${GRP_ID}:${EDEF_ID}"
 ORPHAN_SX_ID="rt-${RUN_TAG}-orphan-sx"
 MISSING_PARENT_SESS_ID="rt-${RUN_TAG}-doesnotexist-sess"
 
@@ -207,6 +217,7 @@ cleanup_rows() {
   service_delete "muscle_groups"            "owner_user_id=eq.${USER_A_UUID}&id=like.rt-${RUN_TAG}-%" >/dev/null
   service_delete "exercise_tag_definitions" "owner_user_id=eq.${USER_A_UUID}&id=like.rt-${RUN_TAG}-%" >/dev/null
   service_delete "sessions"                 "owner_user_id=eq.${USER_A_UUID}&id=like.rt-${RUN_TAG}-%" >/dev/null
+  service_delete "exercise_group_links"     "owner_user_id=eq.${USER_A_UUID}&id=like.rt-${RUN_TAG}-%" >/dev/null
   service_delete "exercise_definitions"     "owner_user_id=eq.${USER_A_UUID}&id=like.rt-${RUN_TAG}-%" >/dev/null
   service_delete "gyms"                     "owner_user_id=eq.${USER_A_UUID}&id=like.rt-${RUN_TAG}-%" >/dev/null
 }
@@ -215,7 +226,7 @@ trap cleanup_rows EXIT
 
 # ---------------------------------------------------------------------------
 # Step 1 — multi-layer multi-row batch in NON-topological order. All four
-# layers, all nine entity types in a single push.
+# layers, all ten entity types in a single push.
 # ---------------------------------------------------------------------------
 echo "[sync-v2-push-roundtrip] step 1 — multi-layer batch in non-topological order"
 
@@ -224,9 +235,16 @@ BATCH_PAYLOAD="$(jq -nc \
   --arg gym "${GYM_ID}" --arg edef "${EDEF_ID}" --arg mg "${MG_ID}" --arg etd "${ETD_ID}" \
   --arg sess "${SESS_ID}" --arg emm "${EMM_ID}" --arg sx "${SX_ID}" \
   --arg set "${SET_ID}" --arg sxtag "${SXTAG_ID}" \
+  --arg egl "${EGL_ID}" --arg grp "${GRP_ID}" \
   --argjson ts "${T1}" \
   '{entities: [
-    # Layer 3 first.
+    # Layer 1 exercise_group_links leads the array: it precedes its Layer-0
+    # exercise_definitions parent.
+    {type: "exercise_group_links", id: $egl, client_updated_at_ms: $ts,
+     fields: {exercise_definition_id: $edef, group_id: $grp,
+              group_exercise_id: "rt-gex-1",
+              created_at: $ts, updated_at: $ts, deleted_at: null}},
+    # Layer 3.
     {type: "exercise_sets", id: $set, client_updated_at_ms: $ts,
      fields: {session_exercise_id: $sx, order_index: 0,
               weight_value: "100", reps_value: "8", set_type: "rir_2",
@@ -275,7 +293,8 @@ for spec in "gyms|${GYM_ID}" "exercise_definitions|${EDEF_ID}" \
             "muscle_groups|${MG_ID}" \
             "exercise_tag_definitions|${ETD_ID}" "sessions|${SESS_ID}" \
             "exercise_muscle_mappings|${EMM_ID}" "session_exercises|${SX_ID}" \
-            "exercise_sets|${SET_ID}" "session_exercise_tags|${SXTAG_ID}"; do
+            "exercise_sets|${SET_ID}" "session_exercise_tags|${SXTAG_ID}" \
+            "exercise_group_links|${EGL_ID}"; do
   IFS='|' read -r table row_id <<<"${spec}"
   service_select "${table}" "owner_user_id=eq.${USER_A_UUID}&id=eq.${row_id}&select=id"
   assert_jq 'length == 1' "step 1 service-role read ${table}.${row_id}"
@@ -294,6 +313,7 @@ NEWER_PAYLOAD="$(jq -nc \
   --arg gym "${GYM_ID}" --arg edef "${EDEF_ID}" --arg mg "${MG_ID}" --arg etd "${ETD_ID}" \
   --arg sess "${SESS_ID}" --arg emm "${EMM_ID}" --arg sx "${SX_ID}" \
   --arg set "${SET_ID}" --arg sxtag "${SXTAG_ID}" \
+  --arg egl "${EGL_ID}" --arg grp "${GRP_ID}" \
   --argjson ts "${T2}" \
   '{entities: [
     {type: "gyms", id: $gym, client_updated_at_ms: $ts,
@@ -325,20 +345,27 @@ NEWER_PAYLOAD="$(jq -nc \
               created_at: $ts, updated_at: $ts, deleted_at: null}},
     {type: "session_exercise_tags", id: $sxtag, client_updated_at_ms: $ts,
      fields: {session_exercise_id: $sx, exercise_tag_definition_id: $etd,
-              created_at: $ts, deleted_at: null}}
+              created_at: $ts, deleted_at: null}},
+    {type: "exercise_group_links", id: $egl, client_updated_at_ms: $ts,
+     fields: {exercise_definition_id: $edef, group_id: $grp,
+              group_exercise_id: "rt-gex-2",
+              created_at: $ts, updated_at: $ts, deleted_at: null}}
   ]}')"
 
 sync_push "${USER_A_TOKEN}" "${NEWER_PAYLOAD}"
 assert_status "200" "step 2 newer-wins push"
 assert_jq '.ok == true' "step 2 newer-wins ack"
 
-# Probe: gyms.name flipped, sessions.status flipped, exercise_sets.weight_value flipped.
+# Probe: gyms.name flipped, sessions.status flipped, exercise_sets.weight_value
+# flipped, exercise_group_links.group_exercise_id flipped.
 service_select "gyms" "owner_user_id=eq.${USER_A_UUID}&id=eq.${GYM_ID}&select=name,client_updated_at_ms"
 assert_jq --argjson ts "${T2}" '.[0].name == "Renamed Gym" and .[0].client_updated_at_ms == $ts' "step 2 gyms LWW overwrote"
 service_select "sessions" "owner_user_id=eq.${USER_A_UUID}&id=eq.${SESS_ID}&select=status,duration_sec,client_updated_at_ms"
 assert_jq --argjson ts "${T2}" '.[0].status == "completed" and .[0].duration_sec == 3600 and .[0].client_updated_at_ms == $ts' "step 2 sessions LWW overwrote"
 service_select "exercise_sets" "owner_user_id=eq.${USER_A_UUID}&id=eq.${SET_ID}&select=weight_value,reps_value,set_type,client_updated_at_ms"
 assert_jq --argjson ts "${T2}" '.[0].weight_value == "120" and .[0].reps_value == "5" and .[0].set_type == "rir_0" and .[0].client_updated_at_ms == $ts' "step 2 exercise_sets LWW overwrote"
+service_select "exercise_group_links" "owner_user_id=eq.${USER_A_UUID}&id=eq.${EGL_ID}&select=group_exercise_id,client_updated_at_ms"
+assert_jq --argjson ts "${T2}" '.[0].group_exercise_id == "rt-gex-2" and .[0].client_updated_at_ms == $ts' "step 2 exercise_group_links LWW overwrote"
 
 # ---------------------------------------------------------------------------
 # Step 3 — LWW older loses. Push the original T1 payload again. ack ok:true,
@@ -400,5 +427,89 @@ assert_body_contains "FK_VIOLATION" "step 5 FK_VIOLATION token in body"
 # Confirm zero rows landed under the orphan id.
 service_select "session_exercises" "owner_user_id=eq.${USER_A_UUID}&id=eq.${ORPHAN_SX_ID}&select=id"
 assert_jq 'length == 0' "step 5 orphan row absent from server"
+
+# ---------------------------------------------------------------------------
+# Step 6 — exercise_group_links lifecycle. Unlink is a tombstone and relink
+# undeletes the SAME deterministic id (server contract §A.1.1.3); the group
+# columns carry no FK; the exercise_definition_id FK is enforced.
+# ---------------------------------------------------------------------------
+echo "[sync-v2-push-roundtrip] step 6 — exercise_group_links tombstone, undelete, FK"
+
+# 6a. Tombstone at a newer cuam lands.
+T6_TOMB=$((BASE_MS + 6000))
+TOMB_PAYLOAD="$(jq -nc --arg egl "${EGL_ID}" --arg edef "${EDEF_ID}" --arg grp "${GRP_ID}" \
+  --argjson created "${T2}" --argjson ts "${T6_TOMB}" \
+  '{entities: [
+    {type: "exercise_group_links", id: $egl, client_updated_at_ms: $ts,
+     fields: {exercise_definition_id: $edef, group_id: $grp,
+              group_exercise_id: "rt-gex-2",
+              created_at: $created, updated_at: $ts, deleted_at: $ts}}
+  ]}')"
+sync_push "${USER_A_TOKEN}" "${TOMB_PAYLOAD}"
+assert_status "200" "step 6a link tombstone push"
+assert_jq '.ok == true' "step 6a link tombstone ack"
+service_select "exercise_group_links" "owner_user_id=eq.${USER_A_UUID}&id=eq.${EGL_ID}&select=deleted_at,client_updated_at_ms"
+assert_jq --argjson ts "${T6_TOMB}" '.[0].deleted_at == $ts and .[0].client_updated_at_ms == $ts' \
+  "step 6a link tombstone landed (deleted_at set at the newer cuam)"
+
+# 6b. Undelete of the SAME id at a still-newer cuam, with a changed
+# group_exercise_id, restores the row.
+T6_UNDELETE=$((BASE_MS + 7000))
+UNDELETE_PAYLOAD="$(jq -nc --arg egl "${EGL_ID}" --arg edef "${EDEF_ID}" --arg grp "${GRP_ID}" \
+  --argjson created "${T2}" --argjson ts "${T6_UNDELETE}" \
+  '{entities: [
+    {type: "exercise_group_links", id: $egl, client_updated_at_ms: $ts,
+     fields: {exercise_definition_id: $edef, group_id: $grp,
+              group_exercise_id: "rt-gex-3",
+              created_at: $created, updated_at: $ts, deleted_at: null}}
+  ]}')"
+sync_push "${USER_A_TOKEN}" "${UNDELETE_PAYLOAD}"
+assert_status "200" "step 6b link undelete push"
+assert_jq '.ok == true' "step 6b link undelete ack"
+service_select "exercise_group_links" "owner_user_id=eq.${USER_A_UUID}&id=eq.${EGL_ID}&select=deleted_at,group_exercise_id,client_updated_at_ms"
+assert_jq --argjson ts "${T6_UNDELETE}" \
+  'length == 1 and .[0].deleted_at == null and .[0].group_exercise_id == "rt-gex-3" and .[0].client_updated_at_ms == $ts' \
+  "step 6b link undelete restored the same id (deleted_at null, new group_exercise_id)"
+
+# 6c. group_id / group_exercise_id are plain text with no FK: a link naming a
+# group and group exercise that exist nowhere on the server is accepted.
+# (Group ids are uuids, so this text id cannot name any group row.)
+NOGRP_ID="rt-${RUN_TAG}-nogrp"
+NOGRP_EGL_ID="${NOGRP_ID}:${EDEF_ID}"
+T6_NOGRP=$((BASE_MS + 7100))
+NOGRP_PAYLOAD="$(jq -nc --arg egl "${NOGRP_EGL_ID}" --arg edef "${EDEF_ID}" --arg grp "${NOGRP_ID}" \
+  --arg gex "rt-${RUN_TAG}-nogex" --argjson ts "${T6_NOGRP}" \
+  '{entities: [
+    {type: "exercise_group_links", id: $egl, client_updated_at_ms: $ts,
+     fields: {exercise_definition_id: $edef, group_id: $grp,
+              group_exercise_id: $gex,
+              created_at: $ts, updated_at: $ts, deleted_at: null}}
+  ]}')"
+sync_push "${USER_A_TOKEN}" "${NOGRP_PAYLOAD}"
+assert_status "200" "step 6c link to a non-existent group push"
+assert_jq '.ok == true' "step 6c link to a non-existent group accepted (no FK on group columns)"
+service_select "exercise_group_links" "owner_user_id=eq.${USER_A_UUID}&id=eq.${NOGRP_EGL_ID}&select=group_id,group_exercise_id"
+assert_jq --arg grp "${NOGRP_ID}" --arg gex "rt-${RUN_TAG}-nogex" \
+  'length == 1 and .[0].group_id == $grp and .[0].group_exercise_id == $gex' \
+  "step 6c link to a non-existent group landed"
+
+# 6d. FK-orphan link: exercise_definition_id names an exercise that is neither
+# in the batch nor on the server → FK_VIOLATION; the row does not land.
+MISSING_EDEF_ID="rt-${RUN_TAG}-doesnotexist-edef"
+ORPHAN_EGL_ID="${GRP_ID}:${MISSING_EDEF_ID}"
+T6_ORPHAN=$((BASE_MS + 7200))
+ORPHAN_EGL_PAYLOAD="$(jq -nc --arg egl "${ORPHAN_EGL_ID}" --arg edef "${MISSING_EDEF_ID}" --arg grp "${GRP_ID}" \
+  --argjson ts "${T6_ORPHAN}" \
+  '{entities: [
+    {type: "exercise_group_links", id: $egl, client_updated_at_ms: $ts,
+     fields: {exercise_definition_id: $edef, group_id: $grp,
+              group_exercise_id: "rt-gex-orphan",
+              created_at: $ts, updated_at: $ts, deleted_at: null}}
+  ]}')"
+sync_push "${USER_A_TOKEN}" "${ORPHAN_EGL_PAYLOAD}"
+assert_non_2xx "step 6d FK-orphan link rejected"
+assert_body_contains "FK_VIOLATION" "step 6d FK_VIOLATION token in body"
+service_select "exercise_group_links" "owner_user_id=eq.${USER_A_UUID}&id=eq.${ORPHAN_EGL_ID}&select=id"
+assert_jq 'length == 0' "step 6d FK-orphan link absent from server"
 
 echo "[sync-v2-push-roundtrip] all assertions passed"

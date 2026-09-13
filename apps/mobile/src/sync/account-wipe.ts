@@ -23,6 +23,7 @@ import { bootstrapLocalDataLayer, type LocalDatabase } from '@/src/data/bootstra
 import { PRIMARY_RUNTIME_STATE_ID, type Transaction } from '@/src/data/clock';
 import {
   exerciseDefinitions,
+  exerciseGroupLinks,
   exerciseMuscleMappings,
   exerciseSets,
   exerciseTagDefinitions,
@@ -39,12 +40,14 @@ import {
  * Clears every per-user local table and resets the singleton sync-accounting
  * row, in a single transaction, on the supplied database handle.
  *
- * What it clears (the nine syncable, per-user entity tables, deleted in
+ * What it clears (the ten syncable, per-user entity tables, deleted in
  * child-before-parent order so foreign keys stay satisfied even if a future
  * schema change drops a cascade):
  *   session_exercise_tags, exercise_sets, session_exercises, sessions,
  *   gyms, exercise_tag_definitions, exercise_muscle_mappings,
- *   exercise_definitions, muscle_groups.
+ *   exercise_group_links, exercise_definitions, muscle_groups.
+ * (`exercise_group_links` has a `no action` FK into `exercise_definitions`, so
+ * it must be deleted first.)
  * Plus the local-only, FK-free `group_cache` (the previous account's cached
  * group RPC payloads; groups contract §6.2).
  *
@@ -79,6 +82,7 @@ const wipeLocalTables = (database: LocalDatabase): void => {
     transaction.delete(gyms).run();
     transaction.delete(exerciseTagDefinitions).run();
     transaction.delete(exerciseMuscleMappings).run();
+    transaction.delete(exerciseGroupLinks).run();
     transaction.delete(exerciseDefinitions).run();
     transaction.delete(muscleGroups).run();
     transaction.delete(groupCache).run();

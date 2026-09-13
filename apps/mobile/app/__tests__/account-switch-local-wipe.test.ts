@@ -8,7 +8,7 @@
  * restore.
  *
  * The wipe must, on the singleton runtime-state row:
- *   - clear all rows from the nine syncable entity tables (muscle_groups
+ *   - clear all rows from the ten syncable entity tables (muscle_groups
  *     included — it is now a synced entity, recovered for the next account via
  *     the generic first-sign-in pull);
  *   - reset bootstrap_completed_at → null;
@@ -69,6 +69,7 @@ import { getRequiredSupabaseMobileClient } from '@/src/auth/supabase';
 import { PRIMARY_RUNTIME_STATE_ID } from '@/src/data/clock';
 import {
   exerciseDefinitions,
+  exerciseGroupLinks,
   exerciseMuscleMappings,
   exerciseSets,
   exerciseTagDefinitions,
@@ -82,13 +83,14 @@ import {
 } from '@/src/data/schema';
 import { wipeLocalForAccountSwitch } from '@/src/sync/account-wipe';
 
-// The nine syncable, per-user entity tables the wipe must clear, paired with a
+// The ten syncable, per-user entity tables the wipe must clear, paired with a
 // label for readable assertions.
 const ENTITY_TABLES = [
   ['muscle_groups', muscleGroups],
   ['gyms', gyms],
   ['exercise_definitions', exerciseDefinitions],
   ['exercise_muscle_mappings', exerciseMuscleMappings],
+  ['exercise_group_links', exerciseGroupLinks],
   ['exercise_tag_definitions', exerciseTagDefinitions],
   ['sessions', sessions],
   ['session_exercises', sessionExercises],
@@ -102,7 +104,7 @@ const db = (): TestDatabase => fixture.database;
 
 const PRESERVED_LAST_EMITTED_MS = 1_700_000_555_000;
 
-/** Inserts one minimal row into each of the nine syncable entity tables. */
+/** Inserts one minimal row into each of the ten syncable entity tables. */
 const seedEveryEntityTable = (): void => {
   db()
     .insert(muscleGroups)
@@ -110,6 +112,10 @@ const seedEveryEntityTable = (): void => {
     .run();
   db().insert(gyms).values({ id: 'gym-1', name: 'Iron Temple' }).run();
   db().insert(exerciseDefinitions).values({ id: 'def-1', name: 'Bench Press' }).run();
+  db()
+    .insert(exerciseGroupLinks)
+    .values({ id: 'grp-1:def-1', exerciseDefinitionId: 'def-1', groupId: 'grp-1', groupExerciseId: 'gx-1' })
+    .run();
   db()
     .insert(exerciseMuscleMappings)
     .values({ id: 'map-1', exerciseDefinitionId: 'def-1', muscleGroupId: 'chest', weight: 1 })
@@ -183,7 +189,7 @@ describe('sign-out / account-switch local wipe', () => {
     mockClientState.client = null;
   });
 
-  it('clears every one of the nine syncable entity tables', async () => {
+  it('clears every one of the ten syncable entity tables', async () => {
     for (const [label, table] of ENTITY_TABLES) {
       expect([label, countRows(table)]).toEqual([label, 1]);
     }

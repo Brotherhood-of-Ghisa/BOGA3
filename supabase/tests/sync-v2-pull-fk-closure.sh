@@ -21,7 +21,8 @@
 # Also asserts the layer→type partition exactly matches the topological
 # mapping in the server contract §B.4.4:
 #   Layer 0: gyms, exercise_definitions, muscle_groups
-#   Layer 1: sessions, exercise_muscle_mappings, exercise_tag_definitions
+#   Layer 1: sessions, exercise_muscle_mappings, exercise_tag_definitions,
+#            exercise_group_links
 #   Layer 2: session_exercises
 #   Layer 3: exercise_sets, session_exercise_tags
 
@@ -109,7 +110,7 @@ RUN_TAG="$(printf '%s' "${RUN_TAG}" | tr -c 'a-zA-Z0-9-' '-')"
 cleanup_rows() {
   for table in session_exercise_tags exercise_sets session_exercises \
                exercise_muscle_mappings exercise_tag_definitions sessions \
-               muscle_groups exercise_definitions gyms; do
+               exercise_group_links muscle_groups exercise_definitions gyms; do
     http_request DELETE \
       "${API_URL}/rest/v1/${table}?owner_user_id=eq.${USER_A_UUID}&id=like.fkc-${RUN_TAG}-%" \
       "${SERVICE_ROLE_KEY}" >/dev/null 2>&1 || true
@@ -141,12 +142,13 @@ FK_EDGES=(
   "exercise_tag_definitions|exercise_definition_id|exercise_definitions"
   "session_exercise_tags|session_exercise_id|session_exercises"
   "session_exercise_tags|exercise_tag_definition_id|exercise_tag_definitions"
+  "exercise_group_links|exercise_definition_id|exercise_definitions"
 )
 
 # Per-layer expected type set per the server contract §B.4.4 partition.
 # Sorted lex so we can compare against `jq | unique | sort`.
 LAYER_TYPES_0='["exercise_definitions","gyms","muscle_groups"]'
-LAYER_TYPES_1='["exercise_muscle_mappings","exercise_tag_definitions","sessions"]'
+LAYER_TYPES_1='["exercise_group_links","exercise_muscle_mappings","exercise_tag_definitions","sessions"]'
 LAYER_TYPES_2='["session_exercises"]'
 LAYER_TYPES_3='["exercise_sets","session_exercise_tags"]'
 
@@ -164,11 +166,15 @@ EMM_ID="fkc-${RUN_TAG}-emm"
 SX_ID="fkc-${RUN_TAG}-sx"
 SET_ID="fkc-${RUN_TAG}-set"
 SXTAG_ID="fkc-${RUN_TAG}-sxtag"
+# Client-derived `<group_id>:<exercise_definition_id>`; group_id is plain text.
+GRP_ID="fkc-${RUN_TAG}-grp"
+EGL_ID="${GRP_ID}:${ED_ID}"
 
 PAYLOAD="$(jq -nc \
   --arg gym "${GYM_ID}" --arg ed "${ED_ID}" --arg mg "${MG_ID}" --arg etd "${ETD_ID}" \
   --arg sess "${SESS_ID}" --arg emm "${EMM_ID}" --arg sx "${SX_ID}" \
   --arg set "${SET_ID}" --arg sxtag "${SXTAG_ID}" \
+  --arg egl "${EGL_ID}" --arg grp "${GRP_ID}" \
   --argjson ts "${BASE_MS}" \
   '{entities: [
     {type: "gyms", id: $gym, client_updated_at_ms: ($ts + 1),
@@ -202,7 +208,11 @@ PAYLOAD="$(jq -nc \
               created_at: $ts, updated_at: $ts, deleted_at: null}},
     {type: "session_exercise_tags", id: $sxtag, client_updated_at_ms: ($ts + 8),
      fields: {session_exercise_id: $sx, exercise_tag_definition_id: $etd,
-              created_at: $ts, deleted_at: null}}
+              created_at: $ts, deleted_at: null}},
+    {type: "exercise_group_links", id: $egl, client_updated_at_ms: ($ts + 9),
+     fields: {exercise_definition_id: $ed, group_id: $grp,
+              group_exercise_id: "gex",
+              created_at: $ts, updated_at: $ts, deleted_at: null}}
   ]}')"
 
 http_request POST "${API_URL}/rest/v1/rpc/sync_push" "${USER_A_TOKEN}" "${PAYLOAD}"
@@ -219,7 +229,7 @@ SEEN_IDS='[]'  # JSON array of {type, id} pairs.
 
 drain_layer_and_check() {
   local layer="$1" expected_types_sorted="$2"
-  # Pull all rows for this layer (limit 200 covers everything in our 9-row seed).
+  # Pull all rows for this layer (limit 200 covers everything in our 10-row seed).
   local body
   body="$(jq -nc --argjson layer "${layer}" '{layer: $layer, cursor: null, limit: 200}')"
   http_request POST "${API_URL}/rest/v1/rpc/sync_pull" "${USER_A_TOKEN}" "${body}"
@@ -303,14 +313,14 @@ drain_layer_and_check 1 "${LAYER_TYPES_1}"
 drain_layer_and_check 2 "${LAYER_TYPES_2}"
 drain_layer_and_check 3 "${LAYER_TYPES_3}"
 
-# Final sanity: SEEN_IDS holds all nine of our seed rows.
+# Final sanity: SEEN_IDS holds all ten of our seed rows.
 TOTAL_SEEN="$(printf '%s' "${SEEN_IDS}" | jq 'length')"
-if [[ "${TOTAL_SEEN}" != "9" ]]; then
-  fail "after draining all four layers SEEN_IDS holds ${TOTAL_SEEN} rows, expected 9 (one per entity type)"
+if [[ "${TOTAL_SEEN}" != "10" ]]; then
+  fail "after draining all four layers SEEN_IDS holds ${TOTAL_SEEN} rows, expected 10 (one per entity type)"
 fi
 
 pass "FK closure — fully-connected dataset drained layer-by-layer with zero forward FK references"
-pass "FK closure — nine entity types partition exactly across the four layers"
+pass "FK closure — ten entity types partition exactly across the four layers"
 
 # ---------------------------------------------------------------------------
 # Step 3 — pull every layer one more time as a sanity check that the
