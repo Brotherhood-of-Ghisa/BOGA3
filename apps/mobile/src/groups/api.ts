@@ -9,11 +9,15 @@
 //     → `INTERNAL`.
 
 import { getRequiredSupabaseMobileClient } from '@/src/auth/supabase';
+import { validateExerciseCore, type ExerciseCore } from '@/src/exercise-core';
 
 import {
   GROUP_SERVER_ERROR_CODES,
   type GroupCreateResult,
   type GroupErrorCode,
+  type GroupExercise,
+  type GroupExerciseListResult,
+  type GroupExerciseWriteResult,
   type GroupGetResult,
   type GroupInviteCodeResult,
   type GroupInvitePreviewResult,
@@ -98,7 +102,12 @@ export type GroupRpcName =
   | 'group_leave'
   | 'group_remove_member'
   | 'group_set_role'
-  | 'group_transfer_ownership';
+  | 'group_transfer_ownership'
+  | 'group_exercise_list'
+  | 'group_exercise_create'
+  | 'group_exercise_update'
+  | 'group_exercise_archive'
+  | 'group_exercise_unarchive';
 
 type RpcResponse = { data: unknown; error: RpcErrorLike | null; status?: number | null };
 
@@ -254,4 +263,87 @@ export const transferGroupOwnership = async (groupId: string, userId: string): P
     'group_transfer_ownership',
     await callGroupRpc('group_transfer_ownership', { p_group_id: groupId, p_user_id: userId }),
     isGroupGetPayload,
+  );
+
+// ---- Group exercises (M25-T01, contract §4.4) -----------------------------------
+
+/** The `ExerciseCore` of a group exercise, e.g. to prefill the shared exercise form. */
+export const groupExerciseCore = (exercise: GroupExercise): ExerciseCore => ({
+  name: exercise.name,
+  loadInputMode: exercise.load_input_mode,
+});
+
+/**
+ * Runs the shared validator before any network call; a rejection is a local
+ * `VALIDATION` with the validator's message. Sends the normalized (trimmed) name.
+ */
+const requireExerciseCore = (core: ExerciseCore): ExerciseCore => {
+  const result = validateExerciseCore(core);
+  if (!result.ok) {
+    throw new GroupApiError('VALIDATION', result.message);
+  }
+  return result.value;
+};
+
+const isExerciseWritePayload = (r: Record<string, unknown>): boolean =>
+  isRecord(r.exercise) && isString(r.exercise.group_exercise_id);
+
+export const listGroupExercises = async (groupId: string): Promise<GroupExerciseListResult> =>
+  expectShape('group_exercise_list', await callGroupRpc('group_exercise_list', { p_group_id: groupId }), (r) =>
+    Array.isArray(r.exercises),
+  );
+
+export type CreateGroupExerciseInput = ExerciseCore & {
+  /** The standard-catalogue id this copies (its name and load mode come from the client's seed data); null = custom. */
+  sourceExerciseId: string | null;
+};
+
+export const createGroupExercise = async (
+  groupId: string,
+  { sourceExerciseId, ...core }: CreateGroupExerciseInput,
+): Promise<GroupExerciseWriteResult> => {
+  const { name, loadInputMode } = requireExerciseCore(core);
+  return expectShape(
+    'group_exercise_create',
+    await callGroupRpc('group_exercise_create', {
+      p_group_id: groupId,
+      p_name: name,
+      p_load_input_mode: loadInputMode,
+      p_source_exercise_id: sourceExerciseId,
+    }),
+    isExerciseWritePayload,
+  );
+};
+
+/** Rename and/or change the load mode (full replacement of both). Archived exercises are read-only server-side. */
+export const updateGroupExercise = async (
+  groupId: string,
+  groupExerciseId: string,
+  core: ExerciseCore,
+): Promise<GroupExerciseWriteResult> => {
+  const { name, loadInputMode } = requireExerciseCore(core);
+  return expectShape(
+    'group_exercise_update',
+    await callGroupRpc('group_exercise_update', {
+      p_group_id: groupId,
+      p_exercise_id: groupExerciseId,
+      p_name: name,
+      p_load_input_mode: loadInputMode,
+    }),
+    isExerciseWritePayload,
+  );
+};
+
+export const archiveGroupExercise = async (groupId: string, groupExerciseId: string): Promise<GroupExerciseWriteResult> =>
+  expectShape(
+    'group_exercise_archive',
+    await callGroupRpc('group_exercise_archive', { p_group_id: groupId, p_exercise_id: groupExerciseId }),
+    isExerciseWritePayload,
+  );
+
+export const unarchiveGroupExercise = async (groupId: string, groupExerciseId: string): Promise<GroupExerciseWriteResult> =>
+  expectShape(
+    'group_exercise_unarchive',
+    await callGroupRpc('group_exercise_unarchive', { p_group_id: groupId, p_exercise_id: groupExerciseId }),
+    isExerciseWritePayload,
   );

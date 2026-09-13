@@ -16,13 +16,17 @@ jest.mock('@/src/auth/supabase', () => ({
 import {
   GROUP_SERVER_ERROR_CODES,
   GroupApiError,
+  archiveGroupExercise,
   createGroup,
+  createGroupExercise,
   getGroup,
   getGroupInviteCode,
   getGroupSessionDetail,
   getGroupStream,
+  groupExerciseCore,
   joinGroup,
   leaveGroup,
+  listGroupExercises,
   listMyGroups,
   previewGroupInvite,
   regenerateGroupInviteCode,
@@ -30,7 +34,9 @@ import {
   setGroupMemberRole,
   toGroupApiError,
   transferGroupOwnership,
+  unarchiveGroupExercise,
   updateGroup,
+  updateGroupExercise,
   type GroupErrorCode,
 } from '@/src/groups';
 
@@ -41,6 +47,14 @@ const groupGetPayload = {
     { user_id: 'u1', username: 'dino', role: 'owner' as const },
     { user_id: 'u2', username: null, role: 'admin' as const },
   ],
+};
+
+const groupExercise = {
+  group_exercise_id: 'ge1',
+  name: 'Bench',
+  load_input_mode: 'total_load' as const,
+  source_exercise_id: null,
+  archived_at_ms: null,
 };
 
 describe('groups api client', () => {
@@ -179,6 +193,58 @@ describe('groups api client', () => {
         data: groupGetPayload,
         expected: groupGetPayload,
       },
+      {
+        rpc: 'group_exercise_list',
+        invoke: () => listGroupExercises('g1'),
+        args: { p_group_id: 'g1' },
+        data: { exercises: [groupExercise] },
+        expected: { exercises: [groupExercise] },
+      },
+      {
+        rpc: 'group_exercise_create',
+        invoke: () => createGroupExercise('g1', { name: '  Bench \t', loadInputMode: 'total_load', sourceExerciseId: null }),
+        args: { p_group_id: 'g1', p_name: 'Bench', p_load_input_mode: 'total_load', p_source_exercise_id: null },
+        data: { exercise: groupExercise },
+        expected: { exercise: groupExercise },
+      },
+      {
+        rpc: 'group_exercise_create',
+        invoke: () =>
+          createGroupExercise('g1', {
+            name: 'Barbell Back Squat',
+            loadInputMode: 'per_side_load',
+            sourceExerciseId: 'seed_barbell_back_squat',
+          }),
+        args: {
+          p_group_id: 'g1',
+          p_name: 'Barbell Back Squat',
+          p_load_input_mode: 'per_side_load',
+          p_source_exercise_id: 'seed_barbell_back_squat',
+        },
+        data: { exercise: groupExercise },
+        expected: { exercise: groupExercise },
+      },
+      {
+        rpc: 'group_exercise_update',
+        invoke: () => updateGroupExercise('g1', 'ge1', { name: ' Bench (comp) ', loadInputMode: 'per_side_load' }),
+        args: { p_group_id: 'g1', p_exercise_id: 'ge1', p_name: 'Bench (comp)', p_load_input_mode: 'per_side_load' },
+        data: { exercise: groupExercise },
+        expected: { exercise: groupExercise },
+      },
+      {
+        rpc: 'group_exercise_archive',
+        invoke: () => archiveGroupExercise('g1', 'ge1'),
+        args: { p_group_id: 'g1', p_exercise_id: 'ge1' },
+        data: { exercise: { ...groupExercise, archived_at_ms: 1757500000000 } },
+        expected: { exercise: { ...groupExercise, archived_at_ms: 1757500000000 } },
+      },
+      {
+        rpc: 'group_exercise_unarchive',
+        invoke: () => unarchiveGroupExercise('g1', 'ge1'),
+        args: { p_group_id: 'g1', p_exercise_id: 'ge1' },
+        data: { exercise: groupExercise },
+        expected: { exercise: groupExercise },
+      },
     ];
 
     it.each(cases)('$rpc calls app_public.$rpc with its p_* args', async ({ rpc, invoke, args, data, expected }) => {
@@ -282,6 +348,45 @@ describe('groups api client', () => {
 
       respond({ group_id: 'g1' });
       await expectRejectsWith(transferGroupOwnership('g1', 'u2'), 'INTERNAL');
+    });
+  });
+
+  describe('group exercises', () => {
+    it.each([
+      [
+        'a blank name',
+        () => createGroupExercise('g1', { name: ' \t\u00a0', loadInputMode: 'total_load', sourceExerciseId: null }),
+        'Exercise name is required',
+      ],
+      [
+        'an unknown load mode',
+        () => updateGroupExercise('g1', 'ge1', { name: 'Bench', loadInputMode: 'kg' as never }),
+        'Weight entry must be total load or per side',
+      ],
+    ])('rejects %s through the shared validator as a local VALIDATION, without calling rpc', async (_label, invoke, message) => {
+      await expectRejectsWith(invoke(), 'VALIDATION', message);
+      expect(mockRpc).not.toHaveBeenCalled();
+    });
+
+    it('maps a group exercise back to its ExerciseCore', () => {
+      expect(groupExerciseCore({ ...groupExercise, load_input_mode: 'per_side_load' })).toEqual({
+        name: 'Bench',
+        loadInputMode: 'per_side_load',
+      });
+    });
+
+    it('fails loud with INTERNAL when an exercise payload is missing its contract keys', async () => {
+      respond({ exercises: null });
+      await expectRejectsWith(listGroupExercises('g1'), 'INTERNAL', 'group_exercise_list returned an unexpected payload.');
+
+      respond({ exercise: {} });
+      await expectRejectsWith(archiveGroupExercise('g1', 'ge1'), 'INTERNAL', 'group_exercise_archive returned an unexpected payload.');
+
+      respond({ group_exercise_id: 'ge1' });
+      await expectRejectsWith(
+        createGroupExercise('g1', { name: 'Bench', loadInputMode: 'total_load', sourceExerciseId: null }),
+        'INTERNAL',
+      );
     });
   });
 

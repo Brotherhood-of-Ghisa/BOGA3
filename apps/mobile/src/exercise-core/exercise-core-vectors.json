@@ -1,0 +1,23 @@
+{
+  "_comment": "Shared ExerciseCore validation vectors. jest (exercise-core.test.ts) runs them against validateExerciseCore; supabase/tests/groups-contract.sh runs them against group_exercise_create and the group_exercises CHECKs. expect.name = the stored (trimmed) name; expect.issue = the rejection, checked name first.",
+  "cases": [
+    {"label": "plain name", "name": "Bench Press", "loadInputMode": "total_load", "expect": {"name": "Bench Press"}},
+    {"label": "per-side mode", "name": "Dumbbell Press", "loadInputMode": "per_side_load", "expect": {"name": "Dumbbell Press"}},
+    {"label": "surrounding spaces trimmed", "name": "   Bench  ", "loadInputMode": "total_load", "expect": {"name": "Bench"}},
+    {"label": "JS whitespace set trimmed", "name": "\u00a0\t\n\u000b\f\r\u2003\u3000\ufeffRow\u2028\u2029\u202f\u205f\u1680 ", "loadInputMode": "total_load", "expect": {"name": "Row"}},
+    {"label": "inner whitespace and case kept", "name": " Close  grip\tBENCH ", "loadInputMode": "total_load", "expect": {"name": "Close  grip\tBENCH"}},
+    {"label": "non-ASCII name", "name": "Développé couché", "loadInputMode": "total_load", "expect": {"name": "Développé couché"}},
+    {"label": "NEL is not JS whitespace", "name": "\u0085Squat\u0085", "loadInputMode": "total_load", "expect": {"name": "\u0085Squat\u0085"}},
+    {"label": "Zs range endpoints trimmed", "name": "\u2000Row\u200a", "loadInputMode": "total_load", "expect": {"name": "Row"}},
+    {"label": "zero-width space is not JS whitespace", "name": "\u200bRow\u200b", "loadInputMode": "total_load", "expect": {"name": "\u200bRow\u200b"}},
+    {"label": "Mongolian vowel separator is not JS whitespace", "name": "\u180eRow\u180e", "loadInputMode": "total_load", "expect": {"name": "\u180eRow\u180e"}},
+    {"label": "empty name", "name": "", "loadInputMode": "total_load", "expect": {"issue": "name_required"}},
+    {"label": "whitespace-only name", "name": " \t\u00a0\u3000\ufeff ", "loadInputMode": "total_load", "expect": {"issue": "name_required"}},
+    {"label": "null name", "name": null, "loadInputMode": "total_load", "expect": {"issue": "name_required"}},
+    {"label": "unknown mode", "name": "Bench", "loadInputMode": "kg", "expect": {"issue": "load_input_mode_invalid"}},
+    {"label": "mode is case-sensitive", "name": "Bench", "loadInputMode": "TOTAL_LOAD", "expect": {"issue": "load_input_mode_invalid"}},
+    {"label": "mode is not trimmed", "name": "Bench", "loadInputMode": " total_load", "expect": {"issue": "load_input_mode_invalid"}},
+    {"label": "null mode", "name": "Bench", "loadInputMode": null, "expect": {"issue": "load_input_mode_invalid"}},
+    {"label": "name checked before mode", "name": "  ", "loadInputMode": "kg", "expect": {"issue": "name_required"}}
+  ]
+}
