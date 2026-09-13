@@ -84,6 +84,11 @@ are rebundled.
 
 ## Build Locally
 
+This builds the `dev` profile: an internal/ad hoc physical-phone development
+client. It can be installed directly on registered devices or uploaded for a
+shareable ad hoc install link, but it is not store-signed and must not be
+submitted to App Store Connect.
+
 Run from `apps/mobile`:
 
 ```bash
@@ -238,6 +243,10 @@ npx eas-cli upload \
 
 Share the generated URL with the teammate.
 
+Do not submit `boga3-dev.ipa` to App Store Connect. It was built with the
+internal/ad hoc `dev` profile, so App Store Connect rejects it as an internal
+distribution build.
+
 iOS ad hoc signing is device-bound. Uploading an IPA hosts the exact signed
 build; it does not add new phones to the provisioning profile. If the teammate's
 iPhone was already listed when the IPA was built, the EAS link should install.
@@ -282,6 +291,29 @@ This build is a development client. The teammate still needs access to Metro:
   `Start Metro For The Phone`.
 - Remote teammate: start Metro with the `--tunnel` command in
   `Start Metro For The Phone`.
+
+## Build A Store-Signed Preview IPA
+
+When you need a dev-client build of `com.phano.boga3.dev` for App Store
+Connect/TestFlight, build and submit the `preview` profile instead. It uses
+store signing while keeping the dev bundle ID:
+
+```bash
+cd /Users/sboschi/Code/BOGA3/apps/mobile
+mkdir -p ../../artifacts/builds
+
+npx eas-cli build \
+  --platform ios \
+  --profile preview \
+  --local \
+  --non-interactive \
+  --output ../../artifacts/builds/boga3-preview.ipa
+
+npx eas-cli submit \
+  --platform ios \
+  --profile preview \
+  --path ../../artifacts/builds/boga3-preview.ipa
+```
 
 ## Troubleshooting
 

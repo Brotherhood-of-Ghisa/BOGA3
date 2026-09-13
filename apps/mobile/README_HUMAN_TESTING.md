@@ -81,15 +81,19 @@ Contract summary:
 
 - Shared build root: `$HOME/.cache/boga/maestro/ios-dev-client`
 - Default `.app` path: `$HOME/.cache/boga/maestro/ios-dev-client/mobile-dev-client.app`
-- Rebuild inputs: `app.json`, `eas.json`, `package.json`, `package-lock.json`
+- Rebuild policy: the cache is reused when present and is not fingerprinted by
+  JS/config/dependency inputs. Force a rebuild with `--force` after native
+  dependency, config-plugin, or native `app.config.ts` changes.
 
 Manual install into the booted simulator:
 
 ```bash
 open -a Simulator
 xcrun simctl boot "iPhone 17 Pro" || true
-xcrun simctl install booted "$(./scripts/maestro-ios-dev-client-build.sh --print-app-path)"
-xcrun simctl launch booted com.dinoderek.mobile
+APP_PATH="$(./scripts/maestro-ios-dev-client-build.sh --print-app-path)"
+BUNDLE_ID="$(plutil -extract CFBundleIdentifier raw -o - "$APP_PATH/Info.plist")"
+xcrun simctl install booted "$APP_PATH"
+xcrun simctl launch booted "$BUNDLE_ID"
 ```
 
 After install, start Metro for the dev client with the worktree config:

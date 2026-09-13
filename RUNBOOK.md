@@ -111,7 +111,7 @@ After native dependency or config-plugin changes, rebuild the dev client before 
 
 ```bash
 cd apps/mobile
-./scripts/maestro-ios-dev-client-build.sh
+./scripts/maestro-ios-dev-client-build.sh --force
 ```
 
 For GPS/location flows on iOS Simulator, choose a simulated location before testing:
