@@ -296,6 +296,11 @@ helper_list="$(printf "'%s'," "${HELPERS[@]}")"
      and not has_function_privilege('anon', p.oid, 'EXECUTE')
      and not has_function_privilege('authenticated', p.oid, 'EXECUTE');")" == "${#HELPERS[@]}" ]] ||
   fail "every internal group helper must be search_path-pinned and not client-executable"
+[[ "$(run_psql "
+  select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'app_public' and p.prosecdef
+     and p.proname in ('group_exercise_require_manager', 'group_exercise_require', 'group_exercise_json');")" == "0" ]] ||
+  fail "the group-exercise helpers run only inside the definer RPCs and must not be SECURITY DEFINER"
 # The share trigger: AFTER INSERT OR UPDATE, FOR EACH ROW (tgtype ROW=1 |
 # INSERT=4 | UPDATE=16 = 21, no BEFORE bit), enabled, on app_public.sessions,
 # calling the SECURITY DEFINER group_share_session.
