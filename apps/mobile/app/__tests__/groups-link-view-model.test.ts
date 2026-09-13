@@ -19,6 +19,7 @@ import {
   describeLoadModeNote,
   describeUnlinkConfirm,
   filterPickSheetChoices,
+  groupExercisesLoaded,
   nameMatchScore,
   resolvePickerGroupSelection,
   suggestExerciseForGroupExercise,
@@ -65,6 +66,16 @@ const link = (exerciseDefinitionId: string, groupId: string, groupExerciseId: st
   exerciseDefinitionId,
   groupId,
   groupExerciseId,
+});
+
+describe('groupExercisesLoaded', () => {
+  it('needs my groups and at least one cached list (or no groups at all)', () => {
+    expect(groupExercisesLoaded(null)).toBe(false);
+    expect(groupExercisesLoaded([])).toBe(true);
+    // groups:mine cached, no group-exercises:<id> yet (right after the upgrade).
+    expect(groupExercisesLoaded([{ ...IRON, exercises: null }, { ...TUESDAY, exercises: null }])).toBe(false);
+    expect(groupExercisesLoaded([{ ...IRON, exercises: null }, TUESDAY])).toBe(true);
+  });
 });
 
 describe('notes', () => {

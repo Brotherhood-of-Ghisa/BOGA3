@@ -244,6 +244,25 @@ describe('pick sheet (E0.2)', () => {
     expect(await screen.findByLabelText('Exercise options 1')).toBeTruthy();
   });
 
+  it('offline: Link and add writes the link locally and adds the exercise', async () => {
+    mockLinkExercise.mockResolvedValue({} as never);
+    mockLinkingState = { ...linkingState(), offline: true };
+    await openPicker();
+    toggleGroups();
+    fireEvent.press(screen.getByTestId('exercise-picker-group-row-gx-bench'));
+    await screen.findByTestId('group-pick-sheet');
+    const refreshCallsBefore = (mockLinkingState.refresh as jest.Mock).mock.calls.length;
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('group-pick-sheet-confirm'));
+    });
+
+    expect(mockLinkExercise).toHaveBeenCalledWith('seed_barbell_bench_press', 'g-iron', 'gx-bench');
+    expect(await screen.findByLabelText('Exercise options 1')).toBeTruthy();
+    // The link is a local write: nothing asks the server.
+    expect((mockLinkingState.refresh as jest.Mock).mock.calls.length).toBe(refreshCallsBefore);
+  });
+
   it('a failed link shows inline and adds nothing', async () => {
     mockLinkExercise.mockRejectedValue(new Error('disk full'));
     await openPicker();

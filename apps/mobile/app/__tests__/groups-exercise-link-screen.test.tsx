@@ -240,6 +240,41 @@ describe('Link screen', () => {
     expect(await screen.findByTestId('exercise-link-linked-row-gx-bench')).toBeTruthy();
     expect(api.listMyGroups).not.toHaveBeenCalled();
     expect(api.listGroupExercises).not.toHaveBeenCalled();
+    // The offline marker covers NETWORK; no second error next to it.
+    expect(screen.queryByTestId('exercise-link-inline-error')).toBeNull();
+  });
+
+  it('offline: Unlink tombstones locally with no group RPC', async () => {
+    goOffline();
+    warmCache();
+    await linkExercise('seed_barbell_bench_press', 'g-iron', 'gx-bench');
+    const alertSpy = jest.spyOn(Alert, 'alert');
+    await renderScreen();
+
+    const unlinkButton = await screen.findByTestId('exercise-link-unlink-gx-bench');
+    api.listMyGroups.mockClear();
+    api.listGroupExercises.mockClear();
+    fireEvent.press(unlinkButton);
+    const buttons = alertSpy.mock.calls[0][2] as { text: string; onPress?: () => void }[];
+    await act(async () => {
+      buttons.find((button) => button.text === 'Unlink')?.onPress?.();
+    });
+
+    expect(liveLinks()).toEqual([]);
+    await waitFor(() => expect(screen.queryByTestId('exercise-link-linked-row-gx-bench')).toBeNull());
+    expect(screen.getByTestId('exercise-link-link-gx-bench')).toBeTruthy();
+    expect(api.listMyGroups).not.toHaveBeenCalled();
+    expect(api.listGroupExercises).not.toHaveBeenCalled();
+  });
+
+  it('offline with my groups cached but no exercise lists yet: the "Connect once" state, not an empty list', async () => {
+    goOffline();
+    writeGroupCache(fixture.database, { cacheKey: groupCacheKeys.mine, userId: USER_ID, payload: MINE, fetchedAtMs: 1 });
+    await renderScreen();
+
+    expect(await screen.findByTestId('exercise-link-offline-empty-state')).toBeTruthy();
+    expect(screen.queryByTestId('exercise-link-empty')).toBeNull();
+    expect(screen.queryByTestId('exercise-link-inline-error')).toBeNull();
   });
 
   it('offline with nothing cached: my links still render from the local table, with placeholder names', async () => {
@@ -280,6 +315,12 @@ describe('Link screen', () => {
       expect(readGroupCache(fixture.database, groupCacheKeys.groupExercises('g-tue'), USER_ID)).toBeNull(),
     );
     expect(liveLinks().map((row) => row.id)).toEqual(['g-tue:seed_barbell_bench_press']);
+    // Dropped from the cached groups too, so the link stays inactive after a restart.
+    expect(
+      readGroupCache<GroupListMineResult>(fixture.database, groupCacheKeys.mine, USER_ID)?.payload.groups.map(
+        (group) => group.group_id,
+      ),
+    ).toEqual(['g-iron']);
     // The group left my list, so the link reads as inactive.
     const row = await screen.findByTestId('exercise-link-linked-row-gx-tue-bench');
     await waitFor(() => expect(within(row).getByText('inactive — not a member')).toBeTruthy());

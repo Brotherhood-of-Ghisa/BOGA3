@@ -10,6 +10,7 @@ import {
   GroupsSignInRequired,
   groupFormStyles,
   groupScreenStyles,
+  pickInlineError,
   usePullToRefresh,
 } from '@/components/groups';
 import { UiButton, UiSurface, UiText, uiColors, uiSpace } from '@/components/ui';
@@ -20,6 +21,7 @@ import {
   buildLinkScreenModel,
   describeLinkRetroactivity,
   describeUnlinkConfirm,
+  groupExercisesLoaded,
   type LinkScreenAvailableRow,
   type LinkScreenLinkedRow,
   type LinkableExercise,
@@ -71,6 +73,22 @@ function ExerciseLinkContent({ userId }: { userId: string }) {
 
   const catalogLoading = catalog.status === 'idle' || catalog.status === 'loading';
   const title = exercise ? `Link "${exercise.name}"` : 'Link exercise';
+  // The offline marker already covers NETWORK (as on every group screen).
+  const inlineError = pickInlineError(linking.error);
+  const loaded = groupExercisesLoaded(linking.catalogs);
+
+  if (catalog.status === 'error') {
+    return (
+      <View style={[groupScreenStyles.screen, groupScreenStyles.content]}>
+        <Stack.Screen options={{ title }} />
+        <GroupStateView
+          body={catalog.lastError ?? 'Try again in a moment.'}
+          testID="exercise-link-catalog-error"
+          title="Couldn't load your exercises"
+        />
+      </View>
+    );
+  }
 
   if (!exerciseDefinitionId || (!catalogLoading && !exercise)) {
     return (
@@ -149,8 +167,8 @@ function ExerciseLinkContent({ userId }: { userId: string }) {
           {notice.text}
         </UiText>
       ) : null}
-      {linking.catalogs && linking.error ? (
-        <GroupInlineError error={linking.error} onRetry={onRefresh} testID="exercise-link-inline-error" />
+      {loaded && inlineError ? (
+        <GroupInlineError error={inlineError} onRetry={onRefresh} testID="exercise-link-inline-error" />
       ) : null}
 
       {model.linked.length > 0 ? (
@@ -184,15 +202,15 @@ function ExerciseLinkContent({ userId }: { userId: string }) {
           testID="exercise-link-deleted-state"
           title="Restore this exercise to link it"
         />
-      ) : linking.catalogs === null ? (
+      ) : !loaded ? (
         linking.offline ? (
           <GroupStateView
             body="Your links are saved on this device; group exercises appear once you're online."
             testID="exercise-link-offline-empty-state"
             title="Connect once to load your groups' exercises"
           />
-        ) : linking.error ? (
-          <GroupInlineError error={linking.error} onRetry={onRefresh} testID="exercise-link-error-state" />
+        ) : inlineError ? (
+          <GroupInlineError error={inlineError} onRetry={onRefresh} testID="exercise-link-error-state" />
         ) : (
           <GroupLoadingState testID="exercise-link-loading-groups" />
         )
@@ -229,7 +247,7 @@ function ExerciseLinkContent({ userId }: { userId: string }) {
           ) : null}
           {offeredCount === 0 ? (
             <UiText testID="exercise-link-empty" variant="bodyMuted">
-              {linking.catalogs.length === 0
+              {(linking.catalogs?.length ?? 0) === 0
                 ? "You're not in any groups yet."
                 : query.trim().length > 0
                   ? 'No group exercises match.'

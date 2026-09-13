@@ -29,8 +29,10 @@ import { GroupExercisePickSheet, type GroupExercisePickTarget } from '@/componen
 import { PickerGroupSectionList, PickerGroupsToggle } from '@/components/groups/picker-group-section';
 import { createExerciseWithGroupLink, linkExercise } from '@/src/data/exercise-group-links';
 import { buildAddAsNewPrefill } from '@/src/groups/add-as-new';
+import { pickInlineError } from '@/components/groups/group-state-view';
 import {
   buildPickerGroupSections,
+  groupExercisesLoaded,
   resolvePickerGroupSelection,
   type LinkableExercise,
   type PickerGroupRow,
@@ -1681,14 +1683,13 @@ export default function SessionRecorderScreen({
       exercisePickerGroupsOnly,
     ]
   );
-  const exercisePickerGroupEmptyText =
-    groupLinking.catalogs === null
-      ? groupLinking.offline
-        ? "Connect once to load your groups' exercises."
-        : groupLinking.error
-          ? "Couldn't load your groups' exercises."
-          : 'Loading group exercises...'
-      : 'No group exercises match.';
+  const exercisePickerGroupEmptyText = !groupExercisesLoaded(groupLinking.catalogs)
+    ? groupLinking.offline
+      ? "Connect once to load your groups' exercises."
+      : pickInlineError(groupLinking.error)
+        ? "Couldn't load your groups' exercises."
+        : 'Loading group exercises...'
+    : 'No group exercises match.';
 
   const exerciseIdsKey = useMemo(
     () => state.session.exercises.map((exercise) => exercise.id).join('|'),
@@ -5183,6 +5184,7 @@ export default function SessionRecorderScreen({
         visible={addAsNewTarget !== null}
         editingExercise={null}
         prefill={addAsNewPrefill}
+        title="Add as new exercise"
         onSave={saveAddAsNewExercise}
         onRequestClose={closeAddAsNew}
         onSaved={handleAddAsNewSaved}

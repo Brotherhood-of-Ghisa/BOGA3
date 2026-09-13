@@ -211,9 +211,18 @@ export function useGroupExerciseLinking({ userId }: { userId: string | null }): 
       let error: GroupApiError | null = null;
       let networkFailed = false;
       let catalogs: GroupExerciseCatalog[] = [];
+      // A group whose list says NOT_FOUND is gone for me: keep it out of the
+      // cached `groups:mine` too, so its links stay inactive after a restart.
+      const lostGroupIds = new Set(
+        results.filter(({ error: groupError }) => groupError?.code === 'NOT_FOUND').map(({ group }) => group.group_id),
+      );
+      const stillMine: GroupListMineResult = {
+        ...mine,
+        groups: mine.groups.filter((group) => !lostGroupIds.has(group.group_id)),
+      };
       try {
         const database = await bootstrapLocalDataLayer();
-        writeGroupCache(database, { cacheKey: groupCacheKeys.mine, userId, payload: mine, fetchedAtMs });
+        writeGroupCache(database, { cacheKey: groupCacheKeys.mine, userId, payload: stillMine, fetchedAtMs });
         for (const { group, result, error: groupError } of results) {
           if (result) {
             writeGroupCache(database, {
@@ -240,7 +249,7 @@ export function useGroupExerciseLinking({ userId }: { userId: string | null }): 
         }
       } catch (caught) {
         error = toGroupApiError(caught);
-        catalogs = mine.groups.map((group) => ({ groupId: group.group_id, groupName: group.name, exercises: null }));
+        catalogs = stillMine.groups.map((group) => ({ groupId: group.group_id, groupName: group.name, exercises: null }));
       }
 
       if (!isCurrent()) return;

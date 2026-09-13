@@ -33,6 +33,17 @@ export type GroupExerciseCatalog = {
   exercises: GroupExercise[] | null;
 };
 
+/**
+ * True once group exercises can be offered: my groups are known and at least
+ * one group's list is cached (or I'm in no groups). A known `groups:mine` with
+ * no cached list yet — the state right after the upgrade that added
+ * `group-exercises:<id>` — still reads as not loaded.
+ */
+export const groupExercisesLoaded = (
+  catalogs: readonly GroupExerciseCatalog[] | null,
+): catalogs is GroupExerciseCatalog[] =>
+  catalogs !== null && (catalogs.length === 0 || catalogs.some((catalog) => catalog.exercises !== null));
+
 export const PLACEHOLDER_GROUP_EXERCISE_NAME = 'Group exercise';
 export const PLACEHOLDER_GROUP_NAME = 'A group';
 export const NOT_LINKED_LABEL = 'not linked';

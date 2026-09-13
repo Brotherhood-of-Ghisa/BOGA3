@@ -1147,9 +1147,14 @@ E0.1–E0.3).
   RPCs, so the online-only write rule (C3.10.3) does not apply to them.
 - **`use-group-exercise-linking.ts`.** `useGroupExerciseLinking({ userId })` is
   the cache-first hook: it reads `groups:mine` and each `group-exercises:<id>`,
-  refreshes them on focus and on `refresh()` (per-group `listGroupExercises`;
-  `NOT_FOUND` → `evictGroup`), and reloads links on focus and on
-  `reloadLinks()`. `useGroupLinkingUserId()` reads the auth store directly
+  refreshes them on focus, when the recorder picker opens, and on `refresh()`
+  (pull-to-refresh) — no 30 s poll, since these lists change rarely and the
+  screens are not live views — with per-group `listGroupExercises`. A group
+  whose list returns `NOT_FOUND` is evicted (`evictGroup`) and left out of the
+  cached `groups:mine`. Links reload on focus and on `reloadLinks()`. A
+  `groups:mine` with no cached list yet reads as not loaded
+  (`groupExercisesLoaded`), so offline shows "Connect once…"; NETWORK errors
+  are left to the offline marker (`pickInlineError`). `useGroupLinkingUserId()` reads the auth store directly
   (signed in and configured, else null), so the recorder and catalogue need no
   `AuthProvider`; a null user disables everything, NetInfo included
   (`useNetworkOnline(enabled)`).
