@@ -130,8 +130,10 @@ appId: com.dinoderek.mobile
     visible:
       id: "exercise-picker-group-row-${output.linkGroupExerciseId}"
     timeout: 30000
+# The row is one accessible press target, so iOS exposes its label, not the
+# child texts; Maestro matches the whole label.
 - assertVisible:
-    text: "linked: Barbell Bench Press"
+    text: "Group exercise Comp Bench in Link Crew, linked: Barbell Bench Press"
 - takeScreenshot: "groups-link-03-picker-search"
 - tapOn:
     id: "exercise-picker-group-row-${output.linkGroupExerciseId}"
@@ -139,6 +141,9 @@ appId: com.dinoderek.mobile
     visible:
       text: "Exercise options 1"
     timeout: 15000
+# My own exercise (not the group exercise's name) was added to the session.
 - assertVisible:
-    text: "Barbell Bench Press"
+    text: ".*Barbell Bench Press.*"
+- assertNotVisible:
+    text: ".*Comp Bench.*"
 - takeScreenshot: "groups-link-04-added"
