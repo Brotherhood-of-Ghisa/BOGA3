@@ -27,7 +27,7 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
   - on a non-`AUTH_REQUIRED` cycle error it shows the error message and a single Retry that fires exactly one cycle; when the latest cycle outcome is `AUTH_REQUIRED` it redirects to `/sign-in` and renders no Retry;
   - it stands aside (renders through) when there is no session or auth is unconfigured, so an unconfigured/local build is never trapped behind a block nothing will lift; the `/sign-in` and `/maestro-harness` routes are exempt so redirects and harness setup cannot loop.
 - Tab roots live inside the `(tabs)` route group at `apps/mobile/app/(tabs)/` and share a tab layout at `apps/mobile/app/(tabs)/_layout.tsx`. The group name is parenthesised so it does not appear in URLs (e.g. `/session-recorder` resolves to `app/(tabs)/session-recorder.tsx`).
-- Tab roots have `headerShown: false`; detail screens (`exercise-history`, `profile`, `completed-session/[sessionId]`, `maestro-harness`, and the M22 group routes `group/mine`, `group/new`, `group/join`, `group/[groupId]`, `group/[groupId]/edit`, `group/[groupId]/invite`, `group-session/[memberId]/[sessionId]`) remain outside `(tabs)/` and keep their existing native header behavior.
+- Tab roots have `headerShown: false`; detail screens (`exercise-history`, `profile`, `completed-session/[sessionId]`, `maestro-harness`, and the M22 group routes `group/mine`, `group/new`, `group/join`, `group/[groupId]`, `group/[groupId]/edit`, `group/[groupId]/invite`, `group-session/[memberId]/[sessionId]`, and the M25 `exercise-link`) remain outside `(tabs)/` and keep their existing native header behavior.
 - Navigation is currently string-path based (no centralized typed route helper layer)
 
 ## Route + param summary (current)
@@ -194,6 +194,14 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 - Path params:
   - `memberId`, `sessionId` (both required; a missing value renders "This session is no longer available")
 
+19. `/exercise-link` (M25-T07)
+- File: `apps/mobile/app/exercise-link.tsx`
+- Query params:
+  - `exerciseDefinitionId` (required; one of my exercises. Missing or unknown renders "This exercise isn't available" instead of crashing). Built by `exerciseLinkHref(id)` (`apps/mobile/src/navigation/routes.ts`)
+- Behavior:
+  - signed out or auth-unconfigured renders the group sign-in-required card
+  - search, Link, Unlink (confirmed), and pull-to-refresh are in-route state; the route never navigates on its own
+
 ## Allowed route transitions (current high-level flows)
 
 1. `/` -> `/stats-history`
@@ -262,11 +270,18 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
    - after a successful leave (`router.dismissTo('/groups')`); the tab's focus refresh drops the group from the chips
 31. (external) `boga3://group/join?code=…` -> `/group/join?code=…`
    - the invite link
+36. `/exercise-catalog` -> `/exercise-link?exerciseDefinitionId=<id>` (M25-T07)
+   - Exercise Actions `⋮` `Link to group exercise…` (`router.push`; signed in only, disabled for a deleted exercise)
+37. `/session-recorder` -> `/exercise-link?exerciseDefinitionId=<id>` (M25-T07)
+   - exercise card `•••` `Link to group exercise…` (`router.push`; signed in only); the open session is untouched
+38. `/exercise-link` -> previous route
+   - native back only
 
 Note:
 
 - Modal opens/closes are in-route UI state transitions, not route transitions.
 - `session-recorder` exercise picker `Add new` now opens an in-route exercise editor modal rather than navigating to `/exercise-catalog`.
+- The recorder's group pick sheet (M25-T07) and its `Add as new` editor are in-route modals too: the picker hides while either is open and returns on cancel.
 
 ## Header titles (current, high level)
 
@@ -275,6 +290,7 @@ Note:
 - `completed-session/[sessionId]` sets its title inside the route file (current title: `View Session`)
 - `exercise-history` sets its title inside the route file to the resolved exercise name (falls back to `Exercise History` when the summary is not yet available)
 - M22 group routes declare `My groups`, `New group`, `Join group`, `Group`, `Edit group`, `Invite`, and `Session` in `apps/mobile/app/_layout.tsx` (back title `Back`); the group screen replaces `Group` with the group's name once loaded
+- `exercise-link` (M25-T07) declares `Link exercise` in `apps/mobile/app/_layout.tsx` (back title `Back`) and replaces it with `Link "<exercise name>"` once the exercise resolves
 
 ## Documentation boundary
 

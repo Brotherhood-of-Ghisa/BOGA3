@@ -63,5 +63,12 @@ export {
   type GroupActionState,
 } from './use-group-action';
 export { projectNetInfoOnline, useNetworkOnline } from './use-network-online';
+export * from './link-view-model';
+export {
+  readCachedGroupExerciseCatalogs,
+  useGroupExerciseLinking,
+  useGroupLinkingUserId,
+  type GroupExerciseLinkingState,
+} from './use-group-exercise-linking';
 export { evictGroupFromDevice } from './evict-local';
 export * from './write-view-model';

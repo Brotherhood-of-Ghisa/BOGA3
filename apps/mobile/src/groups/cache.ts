@@ -19,6 +19,8 @@ export const groupCacheKeys = {
   streamAll: 'stream:all',
   stream: (groupId: string) => `stream:${groupId}`,
   session: (memberUserId: string, sessionId: string) => `session:${memberUserId}:${sessionId}`,
+  /** `group_exercise_list` payload (M25 design §7). */
+  groupExercises: (groupId: string) => `group-exercises:${groupId}`,
 } as const;
 
 const SESSION_KEY_PATTERN = 'session:%';
@@ -77,16 +79,22 @@ export const deleteGroupCacheEntry = (database: GroupCacheDatabase, cacheKey: st
 };
 
 /**
- * Access loss (C3.6.8): removes `group:<id>`, `stream:<id>`, and every
- * `session:*` entry. Session entries are not group-scoped (a session can be
- * shared into several groups), so all of them go.
+ * Access loss (C3.6.8): removes `group:<id>`, `stream:<id>`,
+ * `group-exercises:<id>`, and every `session:*` entry. Session entries are not
+ * group-scoped (a session can be shared into several groups), so all of them
+ * go. The member's `exercise_group_links` rows are synced data and are never
+ * touched here.
  */
 export const evictGroup = (database: GroupCacheDatabase, groupId: string): void => {
   database
     .delete(groupCache)
     .where(
       or(
-        inArray(groupCache.cacheKey, [groupCacheKeys.group(groupId), groupCacheKeys.stream(groupId)]),
+        inArray(groupCache.cacheKey, [
+          groupCacheKeys.group(groupId),
+          groupCacheKeys.stream(groupId),
+          groupCacheKeys.groupExercises(groupId),
+        ]),
         like(groupCache.cacheKey, SESSION_KEY_PATTERN),
       ),
     )

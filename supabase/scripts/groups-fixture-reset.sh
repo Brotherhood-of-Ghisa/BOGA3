@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 
 # groups-fixture-reset.sh — returns the ios-groups-e2e fixture users (user_c,
-# the device user; user_d, the scripted counterparty) to a known server state,
-# so the lane is hermetic across repeated runs in one slot without a reset:
+# the two-user flow's device user; user_d, its scripted counterparty; user_e,
+# the linking flow's device user) to a known server state, so the lane is
+# hermetic across repeated runs in one slot without a reset:
 #
 #   1. hard-deletes, with the service role, every group either user created or
 #      has any membership period in (memberships, invites, and share-ledger
@@ -15,7 +16,8 @@
 #      refuses unless `app.env` is set, which the local stack's REST path does
 #      not set;
 #   3. clears user_c's profile row (the create screen's username gate must
-#      prompt) and sets user_d's username (group_join requires one).
+#      prompt) and sets user_d's and user_e's usernames (group_join and
+#      group_create require one).
 #
 # Contract: docs/specs/tech/groups-contract.md §8 (Maestro lane);
 # docs/specs/11-maestro-runtime-and-testing-conventions.md (fixture users).
@@ -82,7 +84,8 @@ user_id_of() {
 
 C_UID="$(user_id_of "${USER_C_EMAIL}" "${USER_C_PASSWORD}")"
 D_UID="$(user_id_of "${USER_D_EMAIL}" "${USER_D_PASSWORD}")"
-USERS="${C_UID},${D_UID}"
+E_UID="$(user_id_of "${USER_E_EMAIL}" "${USER_E_PASSWORD}")"
+USERS="${C_UID},${D_UID},${E_UID}"
 REST="${API_URL}/rest/v1"
 
 # 1. Groups (service role; no client can touch these tables directly).
@@ -113,13 +116,19 @@ for table in session_exercise_tags exercise_sets session_exercises exercise_musc
   sync_rows=$((sync_rows + $(jq 'length' <<<"${BODY}")))
 done
 
-# 3. Usernames: user_c has none (gate prompts); user_d has one (join needs it).
+# 3. Usernames: user_c has none (gate prompts); user_d has one (join needs it);
+#    user_e has one (its flow's setup script creates a group).
 http DELETE "${REST}/user_profiles?id=eq.${C_UID}" "${SERVICE_ROLE_KEY}"
 expect_2xx "clear user_c profile"
 http POST "${REST}/user_profiles?on_conflict=id" "${SERVICE_ROLE_KEY}" \
   "$(jq -nc --arg id "${D_UID}" --arg u "${USER_D_USERNAME}" '{id: $id, username: $u}')" \
   "Prefer: resolution=merge-duplicates,return=minimal"
 expect_2xx "set user_d username"
+http POST "${REST}/user_profiles?on_conflict=id" "${SERVICE_ROLE_KEY}" \
+  "$(jq -nc --arg id "${E_UID}" --arg u "${USER_E_USERNAME}" '{id: $id, username: $u}')" \
+  "Prefer: resolution=merge-duplicates,return=minimal"
+expect_2xx "set user_e username"
 
-echo "[groups-fixture-reset] user_c=${C_UID} user_d=${D_UID}: deleted ${group_count} group(s);" \
-  "deleted ${sync_rows} sync row(s); user_c username cleared, user_d username=${USER_D_USERNAME}"
+echo "[groups-fixture-reset] user_c=${C_UID} user_d=${D_UID} user_e=${E_UID}: deleted ${group_count} group(s);" \
+  "deleted ${sync_rows} sync row(s); user_c username cleared, user_d username=${USER_D_USERNAME}," \
+  "user_e username=${USER_E_USERNAME}"

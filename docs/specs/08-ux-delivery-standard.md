@@ -107,6 +107,10 @@ Use this section as the single source of truth for reusable UX patterns.
    - Intent: writes to shared server data either happen now or visibly do not happen — never silently queued.
    - Usage: every group write (`src/groups/use-group-action.ts`, `components/groups/write-notice.tsx`).
    - Rules: refuse before any request when offline; show the failure inline next to the action saying nothing changed; keep the screen's data and form input as they were; no queue, no automatic retry; destructive writes confirm first (pattern 3). Wording and scope: `ui/ux-rules.md` §14.
+10. Secondary-source search section pattern
+   - Intent: let a search reach items from another source without crowding the default list.
+   - Usage: the recorder exercise picker's `From your groups` section and `Groups` toggle (M25-T07; `components/groups/picker-group-section.tsx`).
+   - Rules: the default (empty-search) list never shows the secondary source; with search text its matches follow the user's own matches under a labelled section header; a toggle beside the search box narrows the list to the secondary source only (and lists all of it when the search is empty); each row states its relationship to the user's own data in text ("linked: …" / "not linked"), not color alone; picking a row resolves to the user's own item or opens an explicit choice sheet.
 
 ## Default appearance baseline (MVP)
 

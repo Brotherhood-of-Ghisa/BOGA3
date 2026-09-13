@@ -21,3 +21,10 @@ export USER_C_USERNAME="maestro-user-c"
 export USER_D_EMAIL="user_d.local@example.test"
 export USER_D_PASSWORD="ScaffoldingUserD!234"
 export USER_D_USERNAME="maestro-user-d"
+
+# M25-T07 group-exercise linking flow (ios-groups-e2e, groups-link-exercise.yaml):
+# user_e is its device user, dedicated to that flow (spec 11 fixture rule);
+# groups-fixture-reset.sh resets its group and sync state. No fixture key.
+export USER_E_EMAIL="user_e.local@example.test"
+export USER_E_PASSWORD="ScaffoldingUserE!234"
+export USER_E_USERNAME="maestro-user-e"

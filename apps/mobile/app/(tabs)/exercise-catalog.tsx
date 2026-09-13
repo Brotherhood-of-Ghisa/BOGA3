@@ -21,6 +21,8 @@ import {
 } from '@/src/exercise-catalog/list-model';
 import { useExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
 import { useExerciseCatalogStats } from '@/src/exercise-catalog/stats-cache';
+import { useGroupLinkingUserId } from '@/src/groups/use-group-exercise-linking';
+import { exerciseLinkHref } from '@/src/navigation/routes';
 
 const coerceRouteParam = (value: string | string[] | undefined): string | null => {
   if (Array.isArray(value)) {
@@ -73,6 +75,8 @@ export default function ExerciseCatalogScreen() {
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [listPreferences, setListPreferences] = useExerciseListPreferences();
+  // Signed in only: linking needs my groups' exercises (M25-T07).
+  const groupLinkingUserId = useGroupLinkingUserId();
 
   const catalog = useExerciseCatalog();
   const isLoading = catalog.status === 'idle' || catalog.status === 'loading';
@@ -516,6 +520,24 @@ export default function ExerciseCatalogScreen() {
               }}>
               <Text style={styles.actionMenuButtonText}>Edit</Text>
             </Pressable>
+            {groupLinkingUserId ? (
+              <Pressable
+                accessibilityLabel="Link to group exercise from actions"
+                accessibilityState={{ disabled: Boolean(exerciseActionMenuTarget?.deletedAt) }}
+                style={styles.actionMenuButton}
+                testID="exercise-action-link-group"
+                // A soft-deleted exercise is never linked from the UI (M25-T07 (b)).
+                disabled={Boolean(exerciseActionMenuTarget?.deletedAt)}
+                onPress={() => {
+                  const target = exerciseActionMenuTarget;
+                  setExerciseActionMenuTarget(null);
+                  if (target && !target.deletedAt) {
+                    router.push(exerciseLinkHref(target.id));
+                  }
+                }}>
+                <Text style={styles.actionMenuButtonText}>Link to group exercise…</Text>
+              </Pressable>
+            ) : null}
             {exerciseActionMenuTarget?.deletedAt ? (
               <Pressable
                 accessibilityLabel="Undelete exercise from actions"
