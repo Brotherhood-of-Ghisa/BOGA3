@@ -93,6 +93,15 @@ export default function RootLayout() {
                 <Stack.Screen name="group/[groupId]/index" options={{ headerBackTitle: 'Back', title: 'Group' }} />
                 <Stack.Screen name="group/[groupId]/edit" options={{ headerBackTitle: 'Back', title: 'Edit group' }} />
                 <Stack.Screen name="group/[groupId]/invite" options={{ headerBackTitle: 'Back', title: 'Invite' }} />
+                <Stack.Screen name="group/[groupId]/members" options={{ headerBackTitle: 'Back', title: 'Members' }} />
+                <Stack.Screen
+                  name="group/[groupId]/exercises/new"
+                  options={{ headerBackTitle: 'Back', title: 'Add exercise' }}
+                />
+                <Stack.Screen
+                  name="group/[groupId]/exercises/[exerciseId]/edit"
+                  options={{ headerBackTitle: 'Back', title: 'Edit exercise' }}
+                />
                 <Stack.Screen
                   name="group-session/[memberId]/[sessionId]"
                   options={{ headerBackTitle: 'Back', title: 'Session' }}

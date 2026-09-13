@@ -1,11 +1,17 @@
 export { FriendSessionContent, formatGroupSetEffort } from './friend-session-content';
+export { GroupActionSheet, type GroupActionSheetItem } from './group-action-sheet';
+export { GroupExerciseForm } from './group-exercise-form';
 export { GroupExercisePickSheet, type GroupExercisePickTarget } from './group-exercise-pick-sheet';
+export { GroupExerciseRow } from './group-exercise-row';
+export { GroupExercisesPage } from './group-exercises-page';
 export { GroupFilterChips } from './group-filter-chips';
 export { PickerGroupSectionList, PickerGroupsToggle } from './picker-group-section';
+export { StandardExercisePicker } from './standard-exercise-picker';
 export {
   GROUPS_EMPTY_BODY,
   GroupInlineError,
   GroupLoadingState,
+  GroupLostAccessState,
   GroupMissingDataState,
   GroupStateView,
   GroupsEmptyActions,

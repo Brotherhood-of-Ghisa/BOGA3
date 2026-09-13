@@ -72,6 +72,7 @@ Define the canonical repository structure, path ownership, and placement convent
 - `apps/mobile/src/exercise-core/` (M25)
   - owns `ExerciseCore` (`{ name, loadInputMode }`), the load-mode list, and `validateExerciseCore`: the one rule set that personal exercises (`src/data/exercise-catalog.ts`) and group exercises (`src/groups/api.ts`) share. It also owns `exercise-core-vectors.json`, which `groups-contract` runs against the server as well.
   - imports nothing, so an Edge Function can load it by relative path.
+  - its editor fields (`ExerciseCoreFields`) live in `apps/mobile/components/exercise-core/`, rendered by the personal exercise editor and the group exercise form (M25-T08).
 - `apps/mobile/src/auth/`
   - owns shared mobile auth integration modules such as the Supabase client bootstrap, auth storage adapter, session service, and React provider/hook surface.
 - `apps/mobile/src/session-insights/`

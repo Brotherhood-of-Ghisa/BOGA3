@@ -9,11 +9,12 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 
+import { ExerciseCoreFields } from '@/components/exercise-core/exercise-core-fields';
 import { uiColors } from '@/components/ui';
+import { validateExerciseCore } from '@/src/exercise-core';
 import {
   saveExerciseCatalogExercise,
   type ExerciseCatalogExercise,
@@ -255,11 +256,12 @@ export function ExerciseEditorModal({
         parsedMappings: { muscleGroupId: string; weight: number; role: ExerciseCatalogExerciseMuscleMapping['role'] }[];
       }
     | { ok: false } => {
-    const trimmedName = exerciseName.trim();
     const nextValidation = createBlankValidationState();
 
-    if (!trimmedName) {
-      nextValidation.nameError = 'Exercise name is required.';
+    // The shared ExerciseCore rules (same validator as group exercises and `saveExercise`).
+    const core = validateExerciseCore({ name: exerciseName, loadInputMode });
+    if (!core.ok && core.issue === 'name_required') {
+      nextValidation.nameError = core.message;
     }
 
     if (!primaryMuscleGroupId) {
@@ -365,62 +367,21 @@ export function ExerciseEditorModal({
                 contentInsetAdjustmentBehavior="automatic"
                 contentContainerStyle={styles.modalScrollContent}
                 keyboardShouldPersistTaps="handled">
-                <Text style={styles.fieldLabel}>Exercise name</Text>
-                <TextInput
-                  accessibilityLabel="Exercise definition name"
-                  testID="exercise-editor-name-input"
+                <ExerciseCoreFields
                   autoFocus
-                  autoCorrect={false}
-                  multiline={false}
-                  numberOfLines={1}
-                  placeholder="Exercise name"
-                  scrollEnabled
-                  style={[
-                    styles.input,
-                    styles.exerciseNameInput,
-                    validation.nameError ? styles.inputError : null,
-                  ]}
-                  value={exerciseName}
-                  onChangeText={(nextValue) => {
+                  loadInputMode={loadInputMode}
+                  name={exerciseName}
+                  nameError={validation.nameError}
+                  onChangeLoadInputMode={setLoadInputMode}
+                  onChangeName={(nextValue) => {
                     setExerciseName(nextValue);
                     if (validation.nameError) {
                       setValidation((current) => ({ ...current, nameError: null }));
                     }
                     setSaveError(null);
                   }}
+                  testIDPrefix="exercise-editor"
                 />
-                {validation.nameError ? (
-                  <Text selectable style={styles.errorText}>
-                    {validation.nameError}
-                  </Text>
-                ) : null}
-
-                <Text style={styles.fieldLabel}>Weight entry</Text>
-                <View style={styles.loadModeRow}>
-                  {([
-                    ['total_load', 'Total load'],
-                    ['per_side_load', 'Per side'],
-                  ] as const).map(([mode, label]) => {
-                    const selected = loadInputMode === mode;
-                    return (
-                      <Pressable
-                        key={mode}
-                        accessibilityLabel={`${label} weight entry`}
-                        accessibilityRole="button"
-                        accessibilityState={{ selected }}
-                        testID={`exercise-editor-load-mode-${mode}`}
-                        style={[styles.loadModeButton, selected ? styles.loadModeButtonSelected : null]}
-                        onPress={() => setLoadInputMode(mode)}>
-                        <Text style={[styles.loadModeButtonText, selected ? styles.loadModeButtonTextSelected : null]}>
-                          {label}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-                <Text style={styles.helperText}>
-                  Choose whether the weight you enter is shared across both sides or already represents one side.
-                </Text>
 
                 <Text style={styles.fieldLabel}>Primary muscle</Text>
                 <Pressable
@@ -645,18 +606,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: uiColors.textSecondary,
   },
-  input: {
-    borderWidth: 1,
-    borderColor: uiColors.borderDefault,
-    borderRadius: 8,
-    backgroundColor: uiColors.surfaceDefault,
-    paddingHorizontal: 10,
-    paddingVertical: 9,
-  },
-  exerciseNameInput: {
-    height: 42,
-    overflow: 'hidden',
-  },
   inputError: {
     borderColor: uiColors.actionDanger,
   },
@@ -671,32 +620,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: uiColors.actionDanger,
     fontWeight: '500',
-  },
-  loadModeRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  loadModeButton: {
-    flex: 1,
-    minHeight: 42,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: uiColors.borderDefault,
-    borderRadius: 8,
-    backgroundColor: uiColors.surfaceDefault,
-    paddingHorizontal: 10,
-  },
-  loadModeButtonSelected: {
-    borderColor: uiColors.actionPrimary,
-    backgroundColor: uiColors.actionPrimarySubtleBg,
-  },
-  loadModeButtonText: {
-    color: uiColors.textSecondary,
-    fontWeight: '600',
-  },
-  loadModeButtonTextSelected: {
-    color: uiColors.actionPrimary,
   },
   pickerButton: {
     borderWidth: 1,

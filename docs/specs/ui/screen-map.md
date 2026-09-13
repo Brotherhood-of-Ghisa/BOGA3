@@ -281,18 +281,48 @@ Brief entrypoint map of the current mobile screens.
 14. `/group/[groupId]`
 - File: `apps/mobile/app/group/[groupId]/index.tsx`
 - Purpose:
-  - the group screen: header (name, description, member count, my role), owner/admin `Invite` (primary) + `Edit`, and a joined `Stream` / `Members` segment
+  - the group screen: header (name, description, the member count · my role line, which opens Members, and owner/admin `Invite` (primary) + `Edit`), then a joined `Stream` / `Exercises` / `Leaderboards` segment (M25-T08; product D10, D14)
 - Key states (high level):
-  - loading / offline / error; members in server order (owner, admins, members, then username)
-  - a member row with actions for my role (§4.3) shows a chevron and opens the in-route member action sheet; Remove / Transfer confirm first
-  - under the member list: danger `Leave group` (admin, member, confirmed) or, for the owner, "Transfer ownership before leaving"
-  - an inline notice for each write outcome ("alex was removed." / the failure, nothing changed); FORBIDDEN / NOT_FOUND also refresh
-  - lost access after `NOT_FOUND`: "You're no longer a member of this group", with cached data hidden
+  - loading / offline / error; the offline banner and inline error follow the open segment
+  - Exercises: active exercises, then archived ones marked `Archived`, each with its weight entry and my local link status (`Linked: …` / `Not linked`); owner/admin `Add exercise` and a row sheet (`Rename`, `Archive` with confirmation, or `Unarchive`), which members never see; "No group exercises yet" when empty; each write's outcome as an inline notice
+  - Leaderboards: an empty state until M25-T09
+  - lost access after `NOT_FOUND` on any of its reads: "You're no longer a member of this group", with cached data hidden
 - Key exits:
   - `/group-session/<memberId>/<sessionId>` (session card); membership items here do not navigate
-  - `/group/<groupId>/invite`, `/group/<groupId>/edit`; after a successful leave, back to `/groups`
+  - `/group/<groupId>/members` (member count), `/group/<groupId>/invite`, `/group/<groupId>/edit`
+  - `/group/<groupId>/exercises/new` (`Add exercise`), `/group/<groupId>/exercises/<exerciseId>/edit` (`Rename`)
 - Notes:
   - sets its stack title to the group name once loaded
+
+14a. `/group/[groupId]/members` (M25-T08)
+- File: `apps/mobile/app/group/[groupId]/members.tsx`
+- Purpose:
+  - the member list behind the group header's member count (D14): members in server order (owner, admins, members, then username)
+- Key states (high level):
+  - a member row with actions for my role (§4.3) shows a chevron and opens the in-route member action sheet; Remove / Transfer confirm first
+  - under the list: danger `Leave group` (admin, member, confirmed) or, for the owner, "Transfer ownership before leaving"
+  - an inline notice for each write outcome ("alex was removed." / the failure, nothing changed); FORBIDDEN / NOT_FOUND also refresh
+  - offline / error / lost-access states as on the group screen
+- Key exits:
+  - back to `/group/<groupId>`; after a successful leave, `/groups`
+
+14b. `/group/[groupId]/exercises/new` (M25-T08)
+- File: `apps/mobile/app/group/[groupId]/exercises/new.tsx`
+- Purpose:
+  - owner/admin add a group exercise: `From catalogue` (search the bundled standard exercises and pick one, which prefills the form) or `Custom`, through the shared name + weight-entry fields
+- Key states (high level):
+  - inline "Exercise name is required"; the write's failure above `Add exercise`, nothing created, draft kept; members see "You can't add exercises"
+- Key exits:
+  - back to `/group/<groupId>` (Exercises, refreshed on focus) after adding
+
+14c. `/group/[groupId]/exercises/[exerciseId]/edit` (M25-T08)
+- File: `apps/mobile/app/group/[groupId]/exercises/[exerciseId]/edit.tsx`
+- Purpose:
+  - owner/admin rename a group exercise or change its weight entry, prefilled from the cached list
+- Key states (high level):
+  - archived: "Archived exercises can't be edited"; not in the list: "This exercise is no longer available"; members: "You can't edit this exercise"; a failed save shows above `Save changes` and changes nothing
+- Key exits:
+  - back to `/group/<groupId>` after saving
 
 15. `/group/new` (M22-T05)
 - File: `apps/mobile/app/group/new.tsx`

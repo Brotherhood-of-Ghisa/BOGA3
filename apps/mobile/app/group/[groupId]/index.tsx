@@ -1,78 +1,50 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Alert, RefreshControl, ScrollView, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 
 import {
+  GroupExercisesPage,
   GroupInlineError,
-  GroupMemberActionSheet,
-  GroupMemberRow,
+  GroupLostAccessState,
   GroupMissingDataState,
   GroupOfflineBanner,
   GroupStateView,
   GroupStreamList,
-  GroupWriteNotice,
   GroupsSignInRequired,
   groupScreenStyles,
   pickInlineError,
   usePullToRefresh,
 } from '@/components/groups';
-import { SegmentedChips, UiButton, UiSurface, UiText, uiSpace } from '@/components/ui';
+import { SegmentedChips, UiButton, UiText, uiColors, uiSpace } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import {
-  OWNER_LEAVE_NOTICE,
-  canLeaveGroup,
   canManageGroup,
-  describeGroupWriteError,
-  evictGroupFromDevice,
   formatMemberCount,
   formatMyRole,
   getGroup,
   groupCacheKeys,
-  groupMemberActionConfirmation,
-  groupMemberActionSuccessMessage,
-  groupMemberActionsFor,
-  leaveGroup,
-  removeGroupMember,
-  setGroupMemberRole,
-  transferGroupOwnership,
-  useGroupAction,
+  listGroupExercises,
   useGroupResource,
   useGroupStream,
+  type GroupExerciseListResult,
   type GroupGetResult,
-  type GroupMember,
-  type GroupMemberAction,
 } from '@/src/groups';
 
-type GroupScreenSegment = 'stream' | 'members';
+type GroupScreenSegment = 'stream' | 'exercises' | 'leaderboards';
 
 const SEGMENT_OPTIONS = [
   { value: 'stream', label: 'Stream' },
-  { value: 'members', label: 'Members' },
+  { value: 'exercises', label: 'Exercises' },
+  { value: 'leaderboards', label: 'Leaderboards' },
 ] as const;
 
 const firstParam = (value: string | string[] | undefined): string | null =>
   (Array.isArray(value) ? value[0] : value) ?? null;
 
-type Feedback = { tone: 'error' | 'success'; message: string };
-
-/** One §4.3 member write. Each resolves the post-write `group_get` payload. */
-const runMemberWrite = (groupId: string, action: GroupMemberAction, userId: string) => {
-  switch (action) {
-    case 'make-admin':
-      return setGroupMemberRole(groupId, userId, 'admin');
-    case 'remove-admin':
-      return setGroupMemberRole(groupId, userId, 'member');
-    case 'transfer-ownership':
-      return transferGroupOwnership(groupId, userId);
-    case 'remove':
-      return removeGroupMember(groupId, userId);
-  }
-};
-
 /**
- * The group screen (groups contract §6.3): header with the role-gated Invite /
- * Edit actions, then Stream and Members. Member rows open the per-member
- * action sheet (§4.3 role matrix); Leave sits under the member list.
+ * The group screen (groups contract §6.3; product D10, D14): header with the
+ * role-gated Invite / Edit actions and the member count, which opens the
+ * Members screen; then Stream · Exercises · Leaderboards.
  */
 export default function GroupScreenRoute() {
   const { isConfigured, user } = useAuth();
@@ -89,11 +61,7 @@ export default function GroupScreenRoute() {
 function LostAccessState() {
   return (
     <View style={[groupScreenStyles.screen, groupScreenStyles.content]}>
-      <GroupStateView
-        body="Its stream and members are no longer available to you."
-        testID="group-screen-lost-access"
-        title="You're no longer a member of this group"
-      />
+      <GroupLostAccessState testID="group-screen-lost-access" />
     </View>
   );
 }
@@ -109,65 +77,35 @@ function GroupScreenContent({ userId, groupId }: { userId: string; groupId: stri
   });
   const stream = useGroupStream({ userId, groupId });
   const [segment, setSegment] = useState<GroupScreenSegment>('stream');
-  const [sheetMember, setSheetMember] = useState<GroupMember | null>(null);
-  const [feedback, setFeedback] = useState<Feedback | null>(null);
-  const memberWrite = useGroupAction(runMemberWrite);
-  const leave = useGroupAction(leaveGroup);
+  const exercisesFetcher = useCallback(() => listGroupExercises(groupId), [groupId]);
+  // Read only while the Exercises segment is open; the cached list renders at once when it is reopened.
+  const exercises = useGroupResource<GroupExerciseListResult>({
+    userId,
+    cacheKey: segment === 'exercises' ? groupCacheKeys.groupExercises(groupId) : null,
+    fetcher: exercisesFetcher,
+    evictGroupIdOnNotFound: groupId,
+  });
 
   const refreshGroup = group.refresh;
   const refreshStream = stream.refresh;
-  const refreshAll = useCallback(() => Promise.all([refreshGroup(), refreshStream()]), [refreshGroup, refreshStream]);
+  const refreshExercises = exercises.refresh;
+  const refreshAll = useCallback(
+    () => Promise.all([refreshGroup(), refreshStream(), refreshExercises()]),
+    [refreshGroup, refreshStream, refreshExercises],
+  );
   const { pulling, onRefresh } = usePullToRefresh(refreshAll);
 
-  const performMemberAction = async (action: GroupMemberAction, member: GroupMember) => {
-    setFeedback(null);
-    const result = await memberWrite.run(groupId, action, member.user_id);
-    if (result.ok) {
-      setFeedback({ tone: 'success', message: groupMemberActionSuccessMessage(action, member) });
-      // The list updates in place; the stream picks up "X was removed".
-      void refreshAll();
-      return;
-    }
-    setFeedback({ tone: 'error', message: describeGroupWriteError(result.error) });
-    if (result.error.code === 'FORBIDDEN' || result.error.code === 'NOT_FOUND') {
-      void refreshAll();
-    }
-  };
-
-  const onSelectMemberAction = (action: GroupMemberAction, member: GroupMember) => {
-    setSheetMember(null);
-    const confirmation = groupMemberActionConfirmation(action, member);
-    if (!confirmation) {
-      void performMemberAction(action, member);
-      return;
-    }
-    Alert.alert(confirmation.title, confirmation.message, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: confirmation.confirmLabel, style: 'destructive', onPress: () => void performMemberAction(action, member) },
-    ]);
-  };
-
-  const performLeave = async () => {
-    setFeedback(null);
-    const result = await leave.run(groupId);
-    if (result.ok) {
-      await evictGroupFromDevice(groupId);
-      // Back to the Groups tab, whose focus refresh drops this group from the chips and My groups.
-      router.dismissTo('/groups');
-      return;
-    }
-    setFeedback({ tone: 'error', message: describeGroupWriteError(result.error) });
-  };
-
-  // C3.6.8: after removal, hide everything cached (the hook already evicted it).
-  if (group.lostAccess || stream.lostAccess) {
+  // C3.6.8: after removal, hide everything cached (the hooks already evicted it).
+  if (group.lostAccess || stream.lostAccess || exercises.lostAccess) {
     return <LostAccessState />;
   }
 
-  const data = group.data;
-  const offline = group.offline || stream.offline;
-  const inlineError = pickInlineError(group.error, stream.error);
+  const segmentResource = segment === 'stream' ? stream : segment === 'exercises' ? exercises : null;
+  const offline = group.offline || (segmentResource?.offline ?? false);
+  const inlineError = pickInlineError(group.error, segmentResource?.error ?? null);
+  const lastUpdatedAtMs = (segment === 'exercises' ? exercises.lastUpdatedAtMs : null) ?? group.lastUpdatedAtMs;
   const refreshControl = <RefreshControl onRefresh={onRefresh} refreshing={pulling} />;
+  const data = group.data;
 
   if (!data) {
     return (
@@ -178,13 +116,7 @@ function GroupScreenContent({ userId, groupId }: { userId: string; groupId: stri
   }
 
   const summary = data.group;
-  const confirmLeave = () => {
-    Alert.alert(`Leave ${summary.name}?`, "You'll stop seeing its stream. Sessions you already shared stay in the group.", [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Leave', style: 'destructive', onPress: () => void performLeave() },
-    ]);
-  };
-  const sheetActions = sheetMember ? groupMemberActionsFor(summary.my_role, userId, sheetMember) : [];
+  const memberLine = `${formatMemberCount(summary.member_count)} · ${formatMyRole(summary.my_role)}`;
 
   const header = (
     <View style={groupScreenStyles.header}>
@@ -194,9 +126,21 @@ function GroupScreenContent({ userId, groupId }: { userId: string; groupId: stri
           {summary.name}
         </UiText>
         {summary.description ? <UiText variant="bodyMuted">{summary.description}</UiText> : null}
-        <UiText testID="group-screen-meta" variant="subtitle">
-          {`${formatMemberCount(summary.member_count)} · ${formatMyRole(summary.my_role)}`}
-        </UiText>
+        {/* D14: members live behind the member count. */}
+        <Pressable
+          accessibilityHint="Opens the member list"
+          accessibilityLabel={`Members, ${memberLine}`}
+          accessibilityRole="button"
+          onPress={() => router.push(`/group/${groupId}/members`)}
+          style={styles.membersLink}
+          testID="group-screen-members-link">
+          <UiText testID="group-screen-meta" variant="subtitle">
+            {memberLine}
+          </UiText>
+          <UiText style={styles.chevron} variant="label">
+            ›
+          </UiText>
+        </Pressable>
         {canManageGroup(summary.my_role) ? (
           <View style={[groupScreenStyles.actionRow, { marginTop: uiSpace.sm }]}>
             {/* Invite is the prominent action for owners and admins (C3.3.2); members never see it (C7.4). */}
@@ -216,8 +160,7 @@ function GroupScreenContent({ userId, groupId }: { userId: string; groupId: stri
           </View>
         ) : null}
       </View>
-      {feedback ? <GroupWriteNotice message={feedback.message} testID="group-screen-action-feedback" tone={feedback.tone} /> : null}
-      {offline ? <GroupOfflineBanner lastUpdatedAtMs={group.lastUpdatedAtMs} /> : null}
+      {offline ? <GroupOfflineBanner lastUpdatedAtMs={lastUpdatedAtMs} /> : null}
       {inlineError ? <GroupInlineError error={inlineError} onRetry={onRefresh} testID="group-screen-inline-error" /> : null}
       <SegmentedChips
         onChange={setSegment}
@@ -229,43 +172,31 @@ function GroupScreenContent({ userId, groupId }: { userId: string; groupId: stri
     </View>
   );
 
-  if (segment === 'members') {
+  if (segment === 'exercises') {
     return (
       <ScrollView contentContainerStyle={groupScreenStyles.content} refreshControl={refreshControl} style={groupScreenStyles.screen}>
         {header}
-        <UiSurface style={{ paddingHorizontal: uiSpace.lg }} testID="group-screen-members">
-          {/* Server order: owner, admins, members, then username (contract §4.2). */}
-          {data.members.map((member) => (
-            <GroupMemberRow
-              isMe={member.user_id === userId}
-              key={member.user_id}
-              member={member}
-              onPress={
-                !memberWrite.pending && groupMemberActionsFor(summary.my_role, userId, member).length > 0
-                  ? setSheetMember
-                  : undefined
-              }
-            />
-          ))}
-        </UiSurface>
-        {canLeaveGroup(summary.my_role) ? (
-          <UiButton
-            disabled={leave.pending}
-            label={leave.pending ? 'Leaving…' : 'Leave group'}
-            onPress={confirmLeave}
-            testID="group-screen-leave-button"
-            variant="danger"
-          />
-        ) : (
-          <UiText testID="group-screen-owner-leave-notice" variant="bodyMuted">
-            {`${OWNER_LEAVE_NOTICE}. Open a member to make them the owner.`}
-          </UiText>
-        )}
-        <GroupMemberActionSheet
-          actions={sheetActions}
-          member={sheetMember}
-          onClose={() => setSheetMember(null)}
-          onSelect={onSelectMemberAction}
+        <GroupExercisesPage
+          error={inlineError}
+          exercises={exercises}
+          groupId={groupId}
+          myRole={summary.my_role}
+          offline={offline}
+          onRetry={onRefresh}
+          refreshGroup={refreshGroup}
+        />
+      </ScrollView>
+    );
+  }
+
+  if (segment === 'leaderboards') {
+    return (
+      <ScrollView contentContainerStyle={groupScreenStyles.content} refreshControl={refreshControl} style={groupScreenStyles.screen}>
+        {header}
+        <GroupStateView
+          body="Each group exercise will get a podium and full boards for Weight and e1RM, on certified and on all sets."
+          testID="group-screen-leaderboards-empty"
+          title="Leaderboards are coming soon"
         />
       </ScrollView>
     );
@@ -290,3 +221,16 @@ function GroupScreenContent({ userId, groupId }: { userId: string; groupId: stri
     />
   );
 }
+
+const styles = StyleSheet.create({
+  membersLink: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: uiSpace.xs,
+    alignSelf: 'flex-start',
+  },
+  chevron: {
+    color: uiColors.textSecondary,
+  },
+});

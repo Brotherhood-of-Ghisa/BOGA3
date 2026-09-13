@@ -69,6 +69,7 @@ import { SIGN_IN_ROUTE } from '@/src/navigation/routes';
 import GroupsTabRoute from '../(tabs)/groups';
 import { resolveActiveTab } from '../(tabs)/_layout';
 import GroupScreenRoute from '../group/[groupId]/index';
+import GroupMembersRoute from '../group/[groupId]/members';
 import MyGroupsRoute from '../group/mine';
 import GroupSessionRoute from '../group-session/[memberId]/[sessionId]';
 
@@ -403,7 +404,7 @@ describe('Group screen', () => {
     mockParams = { groupId: 'group-a' };
   });
 
-  it('shows the header, the group stream, and members sorted by role then username', async () => {
+  it('shows the header and the group stream', async () => {
     api.getGroupStream.mockResolvedValue(page([completedItem(), joinedItem]));
     render(<GroupScreenRoute />);
     expect(await screen.findByTestId('group-screen-name')).toBeTruthy();
@@ -415,8 +416,14 @@ describe('Group screen', () => {
     // Already on this group: membership items do not navigate.
     fireEvent.press(screen.getByTestId('group-stream-membership-m-1:joined'));
     expect(mockPush).not.toHaveBeenCalled();
+    // D14: members live behind the header member count.
+    fireEvent.press(screen.getByTestId('group-screen-members-link'));
+    expect(mockPush).toHaveBeenCalledWith('/group/group-a/members');
+  });
 
-    fireEvent.press(screen.getByTestId('group-screen-segment-members'));
+  it('the Members screen lists members sorted by role then username', async () => {
+    render(<GroupMembersRoute />);
+    await screen.findByTestId('group-members-list');
     const rows = screen.getAllByTestId(/^group-member-row-/).map((node) => node.props.testID as string);
     expect(rows).toEqual(['group-member-row-user-me', 'group-member-row-u-admin', 'group-member-row-friend-1', 'group-member-row-u-anon']);
     expect(screen.getByText('me (you)')).toBeTruthy();
