@@ -1,8 +1,10 @@
 import * as mockReact from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { BackHandler } from 'react-native';
 
 import CompletedSessionDetailRoute, {
   CompletedSessionDetailScreenShell,
+  resolveCompletedSessionPresentation,
   type CompletedSessionDetailDataClient,
   type CompletedSessionDetailRecord,
 } from '../completed-session/[sessionId]';
@@ -70,6 +72,39 @@ jest.mock('@/src/data', () => ({
   setSessionDeletedState: jest.fn(),
 }));
 
+const mockEnsureExerciseCatalogLoaded = jest.fn().mockResolvedValue(undefined);
+let mockExerciseCatalogState = {
+  status: 'ready' as 'loading' | 'ready' | 'error',
+  exercises: [
+    {
+      id: 'bench-press',
+      name: 'Bench Press',
+      loadInputMode: 'total_load',
+      deletedAt: null,
+      mappings: [{ id: 'mapping-chest', muscleGroupId: 'chest', role: 'primary', weight: 1 }],
+    },
+    {
+      id: 'lat-pulldown',
+      name: 'Lat Pulldown',
+      loadInputMode: 'total_load',
+      deletedAt: null,
+      mappings: [],
+    },
+  ],
+  muscleGroups: [{ id: 'chest', displayName: 'Chest', familyName: 'Chest', sortOrder: 1 }],
+  muscleGroupsById: {},
+  lastError: null as Error | null,
+};
+
+jest.mock('@/src/exercise-catalog/cache', () => ({
+  ensureExerciseCatalogLoaded: () => mockEnsureExerciseCatalogLoaded(),
+  useExerciseCatalog: () => mockExerciseCatalogState,
+}));
+
+jest.mock('@/src/utils/isDevMode', () => ({
+  isDevMode: () => true,
+}));
+
 const {
   loadLocalGymById: mockLoadLocalGymById,
   loadSessionSnapshotById: mockLoadSessionSnapshotById,
@@ -88,6 +123,7 @@ const COMPLETED_SESSION_DETAIL_FIXTURE: CompletedSessionDetailRecord = {
   exercises: [
     {
       id: 'exercise-1',
+      exerciseDefinitionId: 'bench-press',
       name: 'Bench Press',
       machineName: 'Flat Bench',
       tags: [
@@ -103,6 +139,7 @@ const COMPLETED_SESSION_DETAIL_FIXTURE: CompletedSessionDetailRecord = {
     },
     {
       id: 'exercise-2',
+      exerciseDefinitionId: 'lat-pulldown',
       name: 'Lat Pulldown',
       machineName: 'Cable',
       tags: [],
@@ -122,6 +159,334 @@ describe('CompletedSessionDetailScreenShell', () => {
     mockDismissTo.mockReset();
     mockReplace.mockReset();
     mockLatestFocusCallback = null;
+    mockEnsureExerciseCatalogLoaded.mockClear();
+    mockExerciseCatalogState = {
+      ...mockExerciseCatalogState,
+      status: 'ready',
+      lastError: null,
+    };
+  });
+
+  it('validates completion presentation route values', () => {
+    expect(resolveCompletedSessionPresentation('completion')).toBe('completion');
+    expect(resolveCompletedSessionPresentation(['completion'])).toBe('completion');
+    expect(resolveCompletedSessionPresentation('unexpected')).toBe('detail');
+    expect(resolveCompletedSessionPresentation(undefined)).toBe('detail');
+  });
+
+  it('renders the no-PR completion hierarchy and hides ordinary detail actions', async () => {
+    const dataClient: CompletedSessionDetailDataClient = {
+      loadCompletedSession: jest.fn().mockResolvedValue(COMPLETED_SESSION_DETAIL_FIXTURE),
+      loadPersonalRecords: jest.fn().mockResolvedValue([]),
+      appendCompletedSessionExerciseAsPlanned: jest.fn().mockResolvedValue(undefined),
+      setCompletedSessionDeletedState: jest.fn().mockResolvedValue(undefined),
+    };
+
+    render(
+      <CompletedSessionDetailScreenShell
+        dataClient={dataClient}
+        presentation="completion"
+        sessionId="completed-under-test"
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('session-completion-presentation')).toBeTruthy();
+    });
+    expect(screen.getByText('Session complete')).toBeTruthy();
+    expect(screen.getByText('58m · 2 exercises · 5 sets')).toBeTruthy();
+    expect(screen.queryByTestId('session-completion-personal-records')).toBeNull();
+    expect(screen.getByTestId('session-muscle-load-surface')).toBeTruthy();
+    expect(screen.queryByTestId('completed-session-detail-action-bar')).toBeNull();
+    expect(screen.queryByText('Append')).toBeNull();
+  });
+
+  it('keeps completion available when optional PR loading fails', async () => {
+    const dataClient: CompletedSessionDetailDataClient = {
+      loadCompletedSession: jest.fn().mockResolvedValue(COMPLETED_SESSION_DETAIL_FIXTURE),
+      loadPersonalRecords: jest.fn().mockRejectedValue(new Error('PR history unavailable')),
+      appendCompletedSessionExerciseAsPlanned: jest.fn().mockResolvedValue(undefined),
+      setCompletedSessionDeletedState: jest.fn().mockResolvedValue(undefined),
+    };
+
+    render(
+      <CompletedSessionDetailScreenShell
+        dataClient={dataClient}
+        presentation="completion"
+        sessionId="completed-under-test"
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('session-completion-presentation')).toBeTruthy();
+    });
+    expect(screen.queryByTestId('completed-session-detail-error')).toBeNull();
+    expect(screen.queryByTestId('session-completion-personal-records')).toBeNull();
+    expect(screen.getByTestId('session-completion-done')).toBeTruthy();
+  });
+
+  it('omits empty completion muscle load without removing the completion exits', async () => {
+    const dataClient: CompletedSessionDetailDataClient = {
+      loadCompletedSession: jest.fn().mockResolvedValue({
+        ...COMPLETED_SESSION_DETAIL_FIXTURE,
+        exercises: [],
+      }),
+      loadPersonalRecords: jest.fn().mockResolvedValue([]),
+      appendCompletedSessionExerciseAsPlanned: jest.fn().mockResolvedValue(undefined),
+      setCompletedSessionDeletedState: jest.fn().mockResolvedValue(undefined),
+    };
+
+    render(
+      <CompletedSessionDetailScreenShell
+        dataClient={dataClient}
+        presentation="completion"
+        sessionId="completed-under-test"
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('58m · 0 exercises · 0 sets')).toBeTruthy();
+    });
+    expect(screen.queryByTestId('session-muscle-load-surface')).toBeNull();
+    expect(screen.getByTestId('session-completion-view-muscle-load')).toBeTruthy();
+    expect(screen.getByTestId('session-completion-done')).toBeTruthy();
+  });
+
+  it('exposes and retries the Maestro-only catalog failure evidence state', async () => {
+    const dataClient: CompletedSessionDetailDataClient = {
+      loadCompletedSession: jest.fn().mockResolvedValue(COMPLETED_SESSION_DETAIL_FIXTURE),
+      loadPersonalRecords: jest.fn().mockResolvedValue([]),
+      appendCompletedSessionExerciseAsPlanned: jest.fn().mockResolvedValue(undefined),
+      setCompletedSessionDeletedState: jest.fn().mockResolvedValue(undefined),
+    };
+
+    render(
+      <CompletedSessionDetailScreenShell
+        dataClient={dataClient}
+        presentation="completion"
+        sessionId="completed-under-test"
+        shouldFailNextMaestroCatalog
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('session-muscle-load-row-status')).toHaveTextContent(
+        'Unavailable · 5 sets (3 working)'
+      );
+    });
+
+    fireEvent.press(screen.getByLabelText('Retry session muscle load'));
+    expect(screen.getByTestId('session-muscle-load-row-status')).toHaveTextContent(
+      '1 muscle · 5 sets (3 working)'
+    );
+  });
+
+  it('pages multiple PRs deterministically and shares each selected record independently', async () => {
+    const personalRecords = [
+      {
+        exerciseDefinitionId: 'bench-press',
+        exerciseName: 'Bench Press',
+        sessionExerciseId: 'exercise-1',
+        sessionExerciseOrderIndex: 0,
+        setId: 'set-2',
+        setOrderIndex: 1,
+        weight: 185,
+        reps: 8,
+        estimatedOneRepMax: 234.33,
+        historicalBestEstimatedOneRepMax: 220,
+      },
+      {
+        exerciseDefinitionId: 'lat-pulldown',
+        exerciseName: 'Lat Pulldown',
+        sessionExerciseId: 'exercise-2',
+        sessionExerciseOrderIndex: 1,
+        setId: 'set-5',
+        setOrderIndex: 0,
+        weight: 120,
+        reps: 12,
+        estimatedOneRepMax: 168,
+        historicalBestEstimatedOneRepMax: 150,
+      },
+    ];
+    const shareAction = jest
+      .fn()
+      .mockRejectedValueOnce(new Error('Share is unavailable'))
+      .mockResolvedValue(undefined);
+    const dataClient: CompletedSessionDetailDataClient = {
+      loadCompletedSession: jest.fn().mockResolvedValue(COMPLETED_SESSION_DETAIL_FIXTURE),
+      loadPersonalRecords: jest.fn().mockResolvedValue(personalRecords),
+      appendCompletedSessionExerciseAsPlanned: jest.fn().mockResolvedValue(undefined),
+      setCompletedSessionDeletedState: jest.fn().mockResolvedValue(undefined),
+    };
+
+    render(
+      <CompletedSessionDetailScreenShell
+        dataClient={dataClient}
+        presentation="completion"
+        sessionId="completed-under-test"
+        sharePersonalRecordAction={shareAction}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('session-completion-pr-position')).toHaveTextContent('1 of 2');
+    });
+    expect(screen.getByText('Bench Press')).toBeTruthy();
+
+    fireEvent.press(screen.getByLabelText('Share PR for Bench Press'));
+    await waitFor(() => expect(screen.getByText('Share is unavailable')).toBeTruthy());
+
+    fireEvent.press(screen.getByLabelText('Share PR for Bench Press'));
+    await waitFor(() => expect(shareAction).toHaveBeenCalledTimes(2));
+
+    fireEvent.press(screen.getByLabelText('Next personal record'));
+    expect(screen.getByTestId('session-completion-pr-position')).toHaveTextContent('2 of 2');
+    expect(screen.getByText('Lat Pulldown')).toBeTruthy();
+    expect(screen.queryByText('Share is unavailable')).toBeNull();
+  });
+
+  it('replaces to Stats for both completion exits', async () => {
+    const dataClient: CompletedSessionDetailDataClient = {
+      loadCompletedSession: jest.fn().mockResolvedValue(COMPLETED_SESSION_DETAIL_FIXTURE),
+      loadPersonalRecords: jest.fn().mockResolvedValue([]),
+      appendCompletedSessionExerciseAsPlanned: jest.fn().mockResolvedValue(undefined),
+      setCompletedSessionDeletedState: jest.fn().mockResolvedValue(undefined),
+    };
+    const view = render(
+      <CompletedSessionDetailScreenShell
+        dataClient={dataClient}
+        presentation="completion"
+        sessionId="completed-under-test"
+      />
+    );
+
+    await waitFor(() => expect(screen.getByTestId('session-completion-done')).toBeTruthy());
+    fireEvent.press(screen.getByTestId('session-completion-view-muscle-load'));
+    expect(mockReplace).toHaveBeenCalledWith('/stats-history?period=7&breakdown=muscle');
+
+    view.unmount();
+    mockReplace.mockClear();
+    render(
+      <CompletedSessionDetailScreenShell
+        dataClient={dataClient}
+        presentation="completion"
+        sessionId="completed-under-test"
+      />
+    );
+    await waitFor(() => expect(screen.getByTestId('session-completion-done')).toBeTruthy());
+    fireEvent.press(screen.getByTestId('session-completion-done'));
+    expect(mockReplace).toHaveBeenCalledWith('/stats-history');
+  });
+
+  it('replaces to Stats when Android hardware back is pressed during completion', async () => {
+    let hardwareBackHandler: Parameters<typeof BackHandler.addEventListener>[1] | null = null;
+    const remove = jest.fn();
+    const addEventListenerSpy = jest
+      .spyOn(BackHandler, 'addEventListener')
+      .mockImplementation((_eventName, handler) => {
+        hardwareBackHandler = handler;
+        return { remove };
+      });
+    const dataClient: CompletedSessionDetailDataClient = {
+      loadCompletedSession: jest.fn().mockResolvedValue(COMPLETED_SESSION_DETAIL_FIXTURE),
+      loadPersonalRecords: jest.fn().mockResolvedValue([]),
+      appendCompletedSessionExerciseAsPlanned: jest.fn().mockResolvedValue(undefined),
+      setCompletedSessionDeletedState: jest.fn().mockResolvedValue(undefined),
+    };
+
+    const view = render(
+      <CompletedSessionDetailScreenShell
+        dataClient={dataClient}
+        presentation="completion"
+        sessionId="completed-under-test"
+      />
+    );
+
+    await waitFor(() => expect(screen.getByTestId('session-completion-done')).toBeTruthy());
+    expect(hardwareBackHandler).not.toBeNull();
+    act(() => {
+      expect(hardwareBackHandler?.()).toBe(true);
+    });
+    expect(mockReplace).toHaveBeenCalledWith('/stats-history');
+
+    view.unmount();
+    expect(remove).toHaveBeenCalled();
+    addEventListenerSpy.mockRestore();
+  });
+
+  it('shows recoverable catalog-error content during completion', async () => {
+    mockExerciseCatalogState = {
+      ...mockExerciseCatalogState,
+      status: 'error',
+      lastError: new Error('Catalog unavailable'),
+    };
+    const dataClient: CompletedSessionDetailDataClient = {
+      loadCompletedSession: jest.fn().mockResolvedValue(COMPLETED_SESSION_DETAIL_FIXTURE),
+      loadPersonalRecords: jest.fn().mockResolvedValue([]),
+      appendCompletedSessionExerciseAsPlanned: jest.fn().mockResolvedValue(undefined),
+      setCompletedSessionDeletedState: jest.fn().mockResolvedValue(undefined),
+    };
+
+    render(
+      <CompletedSessionDetailScreenShell
+        dataClient={dataClient}
+        presentation="completion"
+        sessionId="completed-under-test"
+      />
+    );
+
+    await waitFor(() => expect(screen.getByText(/Unavailable ·/)).toBeTruthy());
+    fireEvent.press(screen.getByLabelText('Retry session muscle load'));
+    expect(mockEnsureExerciseCatalogLoaded).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('session-completion-done')).toBeTruthy();
+  });
+
+  it('offers one safe exit when a completion target is deleted', async () => {
+    const dataClient: CompletedSessionDetailDataClient = {
+      loadCompletedSession: jest.fn().mockResolvedValue({
+        ...COMPLETED_SESSION_DETAIL_FIXTURE,
+        deletedAt: '2026-02-21T10:00:00.000Z',
+      }),
+      loadPersonalRecords: jest.fn().mockResolvedValue(null),
+      appendCompletedSessionExerciseAsPlanned: jest.fn().mockResolvedValue(undefined),
+      setCompletedSessionDeletedState: jest.fn().mockResolvedValue(undefined),
+    };
+
+    render(
+      <CompletedSessionDetailScreenShell
+        dataClient={dataClient}
+        presentation="completion"
+        sessionId="completed-under-test"
+      />
+    );
+
+    await waitFor(() => expect(screen.getByTestId('completed-session-detail-empty')).toBeTruthy());
+    expect(screen.getByTestId('session-completion-safe-exit')).toBeTruthy();
+    expect(screen.queryByTestId('session-completion-presentation')).toBeNull();
+    fireEvent.press(screen.getByTestId('session-completion-safe-exit'));
+    expect(mockReplace).toHaveBeenCalledWith('/stats-history');
+  });
+
+  it('offers one safe exit when completion loading fails', async () => {
+    const dataClient: CompletedSessionDetailDataClient = {
+      loadCompletedSession: jest.fn().mockRejectedValue(new Error('Storage unavailable')),
+      loadPersonalRecords: jest.fn().mockResolvedValue([]),
+      appendCompletedSessionExerciseAsPlanned: jest.fn().mockResolvedValue(undefined),
+      setCompletedSessionDeletedState: jest.fn().mockResolvedValue(undefined),
+    };
+
+    render(
+      <CompletedSessionDetailScreenShell
+        dataClient={dataClient}
+        presentation="completion"
+        sessionId="completed-under-test"
+      />
+    );
+
+    await waitFor(() => expect(screen.getByTestId('completed-session-detail-error')).toBeTruthy());
+    expect(screen.getByText('Storage unavailable')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('session-completion-safe-exit'));
+    expect(mockReplace).toHaveBeenCalledWith('/stats-history');
   });
 
   it('renders loading then a recorder-like read-only detail on success', async () => {

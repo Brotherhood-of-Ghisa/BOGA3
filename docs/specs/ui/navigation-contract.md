@@ -53,13 +53,16 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 
 3. `/stats-history`
 - File: `apps/mobile/app/(tabs)/stats-history.tsx`
-- Params:
-  - none
+- Query params:
+  - `period` (optional; validated `7 | 30`, default `7`)
+  - `breakdown` (optional; validated `exercise | muscle`, default `exercise`)
 - Behavior:
   - tab root inside the `(tabs)` group; renders the merged Stats / History view
     with separate labelled `Time range` (7-/30-day pills) and `Breakdown`
     (joined `By Exercise` / `By Muscle`) rows; both breakdown choices remain
     visible and `By Exercise` is the default
+  - query values select only the initial control state; invalid values fall
+    back to the same seven-day / By Exercise defaults
   - M16 muscle-history overlay opens and dismisses as in-route UI state on this route; no path, query param, redirect, or screen-to-screen transition is added for the overlay.
 
 4. `/session-recorder`
@@ -138,6 +141,12 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
   - `sessionId` (required dynamic segment)
 - Query params:
   - `intent` (optional; `edit` redirects to `session-recorder` completed-edit mode)
+  - `presentation` (optional; only `completion` selects the post-submit
+    completion presentation; absent/invalid values preserve normal detail)
+- Behavior:
+  - completion mode hides historical edit/delete/append actions, disables the
+    native back affordance/gesture, and gives Done, Android system back, and
+    unavailable-target states a replacing exit to `/stats-history`
 
 11. `/exercise-history`
 - File: `apps/mobile/app/exercise-history.tsx`
@@ -216,51 +225,57 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
    - route-side redirect (`replace`)
 9. `/completed-session/<sessionId>` -> `/session-recorder`
    - successful append of one selected historical exercise block as planned target rows in the active recorder (creates an active session first when needed)
-10. `/session-recorder...` -> `/`
-   - successful submit/save (`dismissTo('/')`, forwarded to `/stats-history` by the root alias)
-11. `/session-recorder` -> `/exercise-catalog?source=session-recorder&intent=manage`
+10. `/session-recorder` -> `/completed-session/<sessionId>?presentation=completion`
+   - successful active submit after persistence and completion both succeed
+11. `/session-recorder?mode=completed-edit...` -> `/stats-history`
+   - successful completed-session save; completion is not replayed
+12. `/completed-session/<sessionId>?presentation=completion` -> `/stats-history`
+   - Done, safe back, or unavailable-target exit (`replace`)
+13. `/completed-session/<sessionId>?presentation=completion` -> `/stats-history?period=7&breakdown=muscle`
+   - `View 7-day muscle load` (`replace`)
+14. `/session-recorder` -> `/exercise-catalog?source=session-recorder&intent=manage`
    - exercise picker `Manage` action
-12. `/exercise-catalog?source=session-recorder...` -> `/session-recorder`
+15. `/exercise-catalog?source=session-recorder...` -> `/session-recorder`
    - explicit back action or post-save return (`router.back()`)
-13. (any tab root or detail screen rendering `TopLevelTabs`) -> `/settings`
+16. (any tab root or detail screen rendering `TopLevelTabs`) -> `/settings`
    - shared Settings cog in the bottom tray / top-level tab strip
-14. `/settings` -> `/profile`
+17. `/settings` -> `/profile`
    - Account destination row
-15. `/settings` -> first-party `/connect` (system browser)
+18. `/settings` -> first-party `/connect` (system browser)
    - public MCP setup guidance; OAuth begins later in the user's MCP client
-16. `/settings` -> `/connected-agents`
+19. `/settings` -> `/connected-agents`
    - signed-in-only Connected agents destination row
-17. `/connected-agents` -> `/connected-agents`
+20. `/connected-agents` -> `/connected-agents`
    - grant load, retry, and confirmed revocation update the route in place
-18. `/profile` -> `/profile`
+21. `/profile` -> `/profile`
    - in-place auth-state rerender on sign-in/sign-out; no route replacement
-19. `/exercise-history` -> `/completed-session/<sessionId>`
+22. `/exercise-history` -> `/completed-session/<sessionId>`
    - session card tap or all-time-best row tap
-20. (any guarded route) -> `/sign-in`
+23. (any guarded route) -> `/sign-in`
    - route-layer auth-guard redirect on a configured-but-no-session launch, or when a sync cycle reports "no signed-in user" (`<Redirect />`)
-21. `/sign-in` -> `/`
+24. `/sign-in` -> `/`
    - successful sign-in: the guard stops redirecting and the app proceeds to the normal route; an already-signed-in render of `/sign-in` also redirects to `/`
-22. (any signed-in route) -> first-sync block
+25. (any signed-in route) -> first-sync block
    - the first-sync gate (below the auth guard) renders a full-screen "Setting up your data…" block in place of the navigator while `sync_runtime_state.bootstrap_completed_at` is null for a signed-in user; this is render-substitution, not a route replacement (the URL is unchanged), and it dismisses in place once the flag is set
-23. first-sync block -> `/sign-in`
+26. first-sync block -> `/sign-in`
    - when the latest sync cycle outcome is `AUTH_REQUIRED`, the gate redirects to `/sign-in` (no Retry); the `/sign-in` route is exempt from the block so the redirect cannot loop
-23. `/groups` -> `/group/mine`
+27. `/groups` -> `/group/mine`
    - `My groups` header action
-24. `/groups` -> `/group/<groupId>`; `/group/mine` -> `/group/<groupId>`
+28. `/groups` -> `/group/<groupId>`; `/group/mine` -> `/group/<groupId>`
    - membership-item tap on the tab; row tap in My groups (membership items on the group screen itself do not navigate)
-25. `/groups` / `/group/<groupId>` -> `/group-session/<memberId>/<sessionId>`
+29. `/groups` / `/group/<groupId>` -> `/group-session/<memberId>/<sessionId>`
    - stream session-card tap (`router.push`)
-26. `/groups` (signed out, auth configured) -> `/sign-in`
+30. `/groups` (signed out, auth configured) -> `/sign-in`
    - `Sign in` action on the sign-in-required card
-27. `/groups` / `/group/mine` -> `/group/new`, `/group/join`
+31. `/groups` / `/group/mine` -> `/group/new`, `/group/join`
    - `Create group` / `Join group` header actions on the tab; the empty-state `Create group` / `Join with a code` on both (`router.push`)
-28. `/group/new` -> `/group/<groupId>`; `/group/join` -> `/group/<groupId>`
+32. `/group/new` -> `/group/<groupId>`; `/group/join` -> `/group/<groupId>`
    - after create, join, or `Open group` when already a member (`router.replace`, so Back returns to where the flow started)
-29. `/group/<groupId>` -> `/group/<groupId>/invite`, `/group/<groupId>/edit`
+33. `/group/<groupId>` -> `/group/<groupId>/invite`, `/group/<groupId>/edit`
    - owner/admin `Invite` / `Edit` header actions; edit returns with `router.back()` after saving
-30. `/group/<groupId>` -> `/groups`
+34. `/group/<groupId>` -> `/groups`
    - after a successful leave (`router.dismissTo('/groups')`); the tab's focus refresh drops the group from the chips
-31. (external) `boga3://group/join?code=…` -> `/group/join?code=…`
+35. (external) `boga3://group/join?code=…` -> `/group/join?code=…`
    - the invite link
 
 Note:
@@ -272,7 +287,7 @@ Note:
 
 - Tab roots inside the `(tabs)` group (`stats-history`, `session-recorder`, `exercise-catalog`, `settings`) all run with `headerShown: false`; per-screen titles in `apps/mobile/app/(tabs)/_layout.tsx` are still declared for completeness but the visible tab bar is now `BottomTray` (composing `TopLevelTabs`) supplied via the `tabBar` prop. Detail screens that haven't yet moved into `(tabs)` (notably `exercise-history`) still render `TopLevelTabs` directly until they migrate.
 - Detail screens registered in the root stack (`exercise-history`, `sessions`, `profile`, `connected-agents`, `maestro-harness`, `completed-session/[sessionId]`) keep their native stack header behavior; titles are declared in `apps/mobile/app/_layout.tsx`. `/sessions` specifically uses an arrow-only minimal back-button display mode with a generic `Back` accessibility title.
-- `completed-session/[sessionId]` sets its title inside the route file (current title: `View Session`)
+- `completed-session/[sessionId]` sets its title inside the route file (`View Session`, or `Session complete` for completion presentation)
 - `exercise-history` sets its title inside the route file to the resolved exercise name (falls back to `Exercise History` when the summary is not yet available)
 - M22 group routes declare `My groups`, `New group`, `Join group`, `Group`, `Edit group`, `Invite`, and `Session` in `apps/mobile/app/_layout.tsx` (back title `Back`); the group screen replaces `Group` with the group's name once loaded
 

@@ -11,7 +11,7 @@ Define the canonical repository structure, path ownership, and placement convent
 - Update this document in the same task/session when significant project-structure changes are made (for example new top-level folders, workspace moves, canonical test-location changes, or path-convention changes).
 - Minor file additions within an existing well-defined folder usually do not require updates.
 
-## Current repository structure (verified 2026-07-25)
+## Current repository structure (verified 2026-09-12)
 
 ```text
 /
@@ -26,6 +26,7 @@ Define the canonical repository structure, path ownership, and placement convent
         ui/                      # Canonical UI tokens + primitives foundation (M8+)
       src/                       # Non-route app code (domain/data/helpers)
         auth/                    # Shared mobile auth client/session/provider modules (M11+)
+        session-insights/        # Pure session muscle-load/PR derivation, adapters, and sharing
       drizzle/                   # Mobile local DB schema/migrations artifacts
       .maestro/                  # Maestro flows + sample config
       scripts/                   # Mobile/maestro helper scripts
@@ -72,6 +73,12 @@ Define the canonical repository structure, path ownership, and placement convent
   - imports nothing, so an Edge Function can load it by relative path.
 - `apps/mobile/src/auth/`
   - owns shared mobile auth integration modules such as the Supabase client bootstrap, auth storage adapter, session service, and React provider/hook surface.
+- `apps/mobile/src/session-insights/`
+  - owns the shared pure calculations for current-session muscle load and strict
+    exercise PRs, the completed-session repository adapter, and the platform-text
+    share payload/action used by recorder and completion presentation.
+  - remains derived-only: it owns no schema, durable achievement/share state,
+    backend API, or sync envelope.
 - `apps/mobile/.maestro/`
   - owns committed Maestro flow definitions (`flows/`), their `runScript` helpers (`scripts/`, e.g. the scripted counterparty of the two-user groups flow), and the checked-in sample config file (`maestro.env.sample`).
   - the per-worktree file `apps/mobile/.maestro/maestro.env.local` is canonical but remains untracked/local-only.
