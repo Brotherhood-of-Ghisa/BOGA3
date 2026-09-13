@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Keyboard, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { UiSurface, UiText, uiColors, uiRadius, uiSpace } from '@/components/ui';
 import { LOAD_INPUT_MODE_LABELS } from '@/src/exercise-core';
