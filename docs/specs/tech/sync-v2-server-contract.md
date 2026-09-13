@@ -422,6 +422,11 @@ PK `(owner_user_id, id)`. No CHECK constraints (A.1).
 - **No server reaction yet.** Nothing on the server reads these rows beyond
   `sync_pull`; the group evaluator's enqueue trigger is added separately and must
   stay failure-isolated from `sync_push` (B.11).
+- **Only the member's client writes these rows.** Server-side code (the group
+  evaluator included) reads links but never writes them. Any future writer must
+  keep the `<group_id>:<exercise_definition_id>` id form: a pulled row that
+  breaks the local CHECK fails the layer-1 page apply (INTERNAL), and pull
+  cannot advance past it.
 
 ## A.3 Local schema additions (mechanism)
 

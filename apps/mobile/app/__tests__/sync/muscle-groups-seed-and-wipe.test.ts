@@ -11,7 +11,7 @@
  *   2. There is no standalone every-boot muscle-group seed: the boot path seeds
  *      the taxonomy only through `seedSystemExerciseCatalog`, and no
  *      `seedMuscleGroups` export survives in the data layer.
- *   3. The local account wipe clears `muscle_groups` like the other eight entity
+ *   3. The local account wipe clears `muscle_groups` like the other nine entity
  *      tables (it is recovered for the next account via the generic first-sign-in
  *      pull) and issues no server delete.
  *   4. Foreign-key enforcement is LIVE before the taxonomy is seeded — the app

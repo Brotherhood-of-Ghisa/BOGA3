@@ -30,10 +30,11 @@ const requireId = (value: string, label: string): string => {
 /**
  * The deterministic link id: one row per (group, personal exercise), so a
  * personal exercise links to at most one group exercise per group. Relinking
- * reuses this id, which is the contract's undelete path (§A.1.1.3).
+ * reuses this id, which is the contract's undelete path (§A.1.1.3). Inputs are
+ * trimmed, matching what `linkExercise` stores.
  */
 export const exerciseGroupLinkId = (groupId: string, exerciseDefinitionId: string): string =>
-  `${groupId}:${exerciseDefinitionId}`;
+  `${groupId.trim()}:${exerciseDefinitionId.trim()}`;
 
 const linkColumns = {
   id: exerciseGroupLinks.id,
