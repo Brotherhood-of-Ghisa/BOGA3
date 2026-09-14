@@ -46,6 +46,7 @@ describe('group cache', () => {
     expect(groupCacheKeys.streamAll).toBe('stream:all');
     expect(groupCacheKeys.stream('g1')).toBe('stream:g1');
     expect(groupCacheKeys.session('u2', 's1')).toBe('session:u2:s1');
+    expect(groupCacheKeys.groupExercises('g1')).toBe('group-exercises:g1');
   });
 
   it('round-trips a payload and its fetch time for the owning user', () => {
@@ -82,19 +83,21 @@ describe('group cache', () => {
     expect(() => readGroupCache(db(), 'groups:mine', 'user-1')).toThrow(SyntaxError);
   });
 
-  it('evictGroup removes group:<id>, stream:<id>, and every session:* entry, and nothing else', () => {
+  it('evictGroup removes group:<id>, stream:<id>, group-exercises:<id>, and every session:* entry, and nothing else', () => {
     put(groupCacheKeys.mine);
     put(groupCacheKeys.streamAll);
     put(groupCacheKeys.group('g1'));
     put(groupCacheKeys.stream('g1'));
+    put(groupCacheKeys.groupExercises('g1'));
     put(groupCacheKeys.group('g2'));
     put(groupCacheKeys.stream('g2'));
+    put(groupCacheKeys.groupExercises('g2'));
     put(groupCacheKeys.session('u2', 's1'));
     put(groupCacheKeys.session('u3', 's9'), 'user-2');
 
     evictGroup(db(), 'g1');
 
-    expect(allKeys()).toEqual(['group:g2', 'groups:mine', 'stream:all', 'stream:g2']);
+    expect(allKeys()).toEqual(['group-exercises:g2', 'group:g2', 'groups:mine', 'stream:all', 'stream:g2']);
   });
 
   it('deleteGroupCacheEntry removes exactly one key', () => {

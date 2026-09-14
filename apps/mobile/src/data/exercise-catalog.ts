@@ -1,7 +1,7 @@
 import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 
 import { bootstrapLocalDataLayer, type LocalDatabase } from './bootstrap';
-import { nowMonotonic } from './clock';
+import { nowMonotonic, type Transaction } from './clock';
 import { exerciseDefinitions, exerciseMuscleMappings, muscleGroups } from './schema';
 import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidation';
 import { validateExerciseCore, type LoadInputMode } from '@/src/exercise-core';
@@ -160,6 +160,165 @@ const listExerciseGraphs = async (
   return exerciseRows.map((exerciseRow) => mapExerciseGraph(exerciseRow, mappingRows));
 };
 
+export type ExerciseGraphWrite = {
+  id: string;
+  name: string;
+  loadInputMode: LoadInputMode;
+  mappings: {
+    muscleGroupId: string;
+    weight: number;
+    role: 'primary' | 'secondary' | 'stabilizer' | null;
+  }[];
+  now: Date;
+};
+
+/** A new local `exercise_definitions` id. */
+export const createLocalExerciseId = (): string => createLocalId('exercise-definition');
+
+/**
+ * Writes one exercise definition and reconciles its muscle-link rows inside the
+ * caller's transaction: inserts the definition, or updates (and revives) an
+ * existing one. Every written row is dirtied; the caller nudges after commit.
+ * Input must already be normalized (`normalizeExerciseGraphInput`).
+ */
+export const writeExerciseGraph = (tx: Transaction, input: ExerciseGraphWrite): void => {
+  const exerciseId = input.id;
+  const existing = tx
+    .select({ id: exerciseDefinitions.id })
+    .from(exerciseDefinitions)
+    .where(eq(exerciseDefinitions.id, exerciseId))
+    .get();
+
+  if (existing) {
+    tx.update(exerciseDefinitions)
+      .set({
+        name: input.name,
+        loadInputMode: input.loadInputMode,
+        deletedAt: null,
+        updatedAt: input.now,
+        localDirty: true,
+        localUpdatedAtMs: nowMonotonic(tx),
+      })
+      .where(eq(exerciseDefinitions.id, exerciseId))
+      .run();
+  } else {
+    tx.insert(exerciseDefinitions)
+      .values({
+        id: exerciseId,
+        name: input.name,
+        loadInputMode: input.loadInputMode,
+        deletedAt: null,
+        createdAt: input.now,
+        updatedAt: input.now,
+        localDirty: true,
+        localUpdatedAtMs: nowMonotonic(tx),
+      })
+      .run();
+  }
+
+  // Reconcile the muscle-link rows against the new payload instead of
+  // hard-deleting and re-inserting. A removed link is kept as a tombstone
+  // (`deleted_at` set) so the deletion pushes to the server and survives a
+  // reinstall; its row still occupies the unique
+  // (exercise_definition_id, muscle_group_id) slot, so a link to the same
+  // muscle group is revived in place rather than inserted afresh (which
+  // would collide). The whole set rides the same push batch.
+  const existingMappings = tx
+    .select({
+      id: exerciseMuscleMappings.id,
+      muscleGroupId: exerciseMuscleMappings.muscleGroupId,
+    })
+    .from(exerciseMuscleMappings)
+    .where(eq(exerciseMuscleMappings.exerciseDefinitionId, exerciseId))
+    .all();
+  const existingMappingByMuscleGroupId = new Map(
+    existingMappings.map((mapping) => [mapping.muscleGroupId, mapping.id])
+  );
+  const nextMuscleGroupIds = new Set(input.mappings.map((mapping) => mapping.muscleGroupId));
+
+  for (const existingMapping of existingMappings) {
+    if (nextMuscleGroupIds.has(existingMapping.muscleGroupId)) {
+      continue;
+    }
+    tx.update(exerciseMuscleMappings)
+      .set({
+        deletedAt: input.now,
+        updatedAt: input.now,
+        localDirty: true,
+        localUpdatedAtMs: nowMonotonic(tx),
+      })
+      .where(eq(exerciseMuscleMappings.id, existingMapping.id))
+      .run();
+  }
+
+  for (const mapping of input.mappings) {
+    const existingMappingId = existingMappingByMuscleGroupId.get(mapping.muscleGroupId);
+    if (existingMappingId) {
+      tx.update(exerciseMuscleMappings)
+        .set({
+          weight: mapping.weight,
+          role: mapping.role,
+          deletedAt: null,
+          updatedAt: input.now,
+          localDirty: true,
+          localUpdatedAtMs: nowMonotonic(tx),
+        })
+        .where(eq(exerciseMuscleMappings.id, existingMappingId))
+        .run();
+      continue;
+    }
+
+    tx.insert(exerciseMuscleMappings)
+      .values({
+        id: createLocalId('exercise-muscle-mapping'),
+        exerciseDefinitionId: exerciseId,
+        muscleGroupId: mapping.muscleGroupId,
+        weight: mapping.weight,
+        role: mapping.role,
+        deletedAt: null,
+        createdAt: input.now,
+        updatedAt: input.now,
+        localDirty: true,
+        localUpdatedAtMs: nowMonotonic(tx),
+      })
+      .run();
+  }
+};
+
+/** Re-projects one saved exercise and its live muscle links. Throws when the row is missing. */
+export const readExerciseGraph = (database: LocalDatabase, exerciseId: string): ExerciseCatalogExercise => {
+  const exerciseRow = database
+    .select({
+      id: exerciseDefinitions.id,
+      name: exerciseDefinitions.name,
+      loadInputMode: exerciseDefinitions.loadInputMode,
+      deletedAt: exerciseDefinitions.deletedAt,
+    })
+    .from(exerciseDefinitions)
+    .where(eq(exerciseDefinitions.id, exerciseId))
+    .get() as DrizzleExerciseRow | undefined;
+
+  const mappingRows = database
+    .select({
+      id: exerciseMuscleMappings.id,
+      exerciseDefinitionId: exerciseMuscleMappings.exerciseDefinitionId,
+      muscleGroupId: exerciseMuscleMappings.muscleGroupId,
+      weight: exerciseMuscleMappings.weight,
+      role: exerciseMuscleMappings.role,
+    })
+    .from(exerciseMuscleMappings)
+    .where(
+      and(
+        eq(exerciseMuscleMappings.exerciseDefinitionId, exerciseId),
+        isNull(exerciseMuscleMappings.deletedAt)
+      )
+    )
+    .orderBy(asc(exerciseMuscleMappings.muscleGroupId))
+    .all();
+
+  return mapExerciseGraph(exerciseRow, mappingRows);
+};
+
 export const createDrizzleExerciseCatalogStore = (): ExerciseCatalogStore => ({
   async listMuscleGroups() {
     const database = await bootstrapLocalDataLayer();
@@ -181,147 +340,24 @@ export const createDrizzleExerciseCatalogStore = (): ExerciseCatalogStore => ({
   },
   async saveExercise(input) {
     const database = await bootstrapLocalDataLayer();
-    const exerciseId = input.id ?? createLocalId('exercise-definition');
+    const exerciseId = input.id ?? createLocalExerciseId();
 
     database.transaction((tx) => {
-      const existing = tx
-        .select({ id: exerciseDefinitions.id })
-        .from(exerciseDefinitions)
-        .where(eq(exerciseDefinitions.id, exerciseId))
-        .get();
-
-      if (existing) {
-        tx.update(exerciseDefinitions)
-          .set({
-            name: input.name,
-            loadInputMode: input.loadInputMode ?? 'total_load',
-            deletedAt: null,
-            updatedAt: input.now,
-            localDirty: true,
-            localUpdatedAtMs: nowMonotonic(tx),
-          })
-          .where(eq(exerciseDefinitions.id, exerciseId))
-          .run();
-      } else {
-        tx.insert(exerciseDefinitions)
-          .values({
-            id: exerciseId,
-            name: input.name,
-            loadInputMode: input.loadInputMode ?? 'total_load',
-            deletedAt: null,
-            createdAt: input.now,
-            updatedAt: input.now,
-            localDirty: true,
-            localUpdatedAtMs: nowMonotonic(tx),
-          })
-          .run();
-      }
-
-      // Reconcile the muscle-link rows against the new payload instead of
-      // hard-deleting and re-inserting. A removed link is kept as a tombstone
-      // (`deleted_at` set) so the deletion pushes to the server and survives a
-      // reinstall; its row still occupies the unique
-      // (exercise_definition_id, muscle_group_id) slot, so a link to the same
-      // muscle group is revived in place rather than inserted afresh (which
-      // would collide). The whole set rides the same push batch.
-      const existingMappings = tx
-        .select({
-          id: exerciseMuscleMappings.id,
-          muscleGroupId: exerciseMuscleMappings.muscleGroupId,
-        })
-        .from(exerciseMuscleMappings)
-        .where(eq(exerciseMuscleMappings.exerciseDefinitionId, exerciseId))
-        .all();
-      const existingMappingByMuscleGroupId = new Map(
-        existingMappings.map((mapping) => [mapping.muscleGroupId, mapping.id])
-      );
-      const nextMuscleGroupIds = new Set(input.mappings.map((mapping) => mapping.muscleGroupId));
-
-      for (const existing of existingMappings) {
-        if (nextMuscleGroupIds.has(existing.muscleGroupId)) {
-          continue;
-        }
-        tx.update(exerciseMuscleMappings)
-          .set({
-            deletedAt: input.now,
-            updatedAt: input.now,
-            localDirty: true,
-            localUpdatedAtMs: nowMonotonic(tx),
-          })
-          .where(eq(exerciseMuscleMappings.id, existing.id))
-          .run();
-      }
-
-      for (const mapping of input.mappings) {
-        const existingMappingId = existingMappingByMuscleGroupId.get(mapping.muscleGroupId);
-        if (existingMappingId) {
-          tx.update(exerciseMuscleMappings)
-            .set({
-              weight: mapping.weight,
-              role: mapping.role,
-              deletedAt: null,
-              updatedAt: input.now,
-              localDirty: true,
-              localUpdatedAtMs: nowMonotonic(tx),
-            })
-            .where(eq(exerciseMuscleMappings.id, existingMappingId))
-            .run();
-          continue;
-        }
-
-        const mappingId = createLocalId('exercise-muscle-mapping');
-        tx.insert(exerciseMuscleMappings)
-          .values({
-            id: mappingId,
-            exerciseDefinitionId: exerciseId,
-            muscleGroupId: mapping.muscleGroupId,
-            weight: mapping.weight,
-            role: mapping.role,
-            deletedAt: null,
-            createdAt: input.now,
-            updatedAt: input.now,
-            localDirty: true,
-            localUpdatedAtMs: nowMonotonic(tx),
-          })
-          .run();
-      }
+      writeExerciseGraph(tx, {
+        id: exerciseId,
+        name: input.name,
+        loadInputMode: input.loadInputMode ?? 'total_load',
+        mappings: input.mappings,
+        now: input.now,
+      });
     });
 
     // Post-commit: the definition and its muscle-link rows were dirtied in the
     // transaction above; one nudge per save asks the scheduler to push the batch
-    // soon. The reads below only re-project the saved graph for the return value.
+    // soon. The read below only re-projects the saved graph for the return value.
     notifyLocalWrite();
 
-    const exerciseRow = database
-      .select({
-        id: exerciseDefinitions.id,
-        name: exerciseDefinitions.name,
-        loadInputMode: exerciseDefinitions.loadInputMode,
-        deletedAt: exerciseDefinitions.deletedAt,
-      })
-      .from(exerciseDefinitions)
-      .where(eq(exerciseDefinitions.id, exerciseId))
-      .get() as DrizzleExerciseRow | undefined;
-
-    const mappingRows = database
-      .select({
-        id: exerciseMuscleMappings.id,
-        exerciseDefinitionId: exerciseMuscleMappings.exerciseDefinitionId,
-        muscleGroupId: exerciseMuscleMappings.muscleGroupId,
-        weight: exerciseMuscleMappings.weight,
-        role: exerciseMuscleMappings.role,
-      })
-      .from(exerciseMuscleMappings)
-      .where(
-        and(
-          eq(exerciseMuscleMappings.exerciseDefinitionId, exerciseId),
-          isNull(exerciseMuscleMappings.deletedAt)
-        )
-      )
-      .orderBy(asc(exerciseMuscleMappings.muscleGroupId))
-      .all();
-
-    return mapExerciseGraph(exerciseRow, mappingRows);
+    return readExerciseGraph(database, exerciseId);
   },
   async setExerciseDeletedState(input) {
     const database = await bootstrapLocalDataLayer();
@@ -352,6 +388,59 @@ const assertFiniteDate = (value: Date) => {
 
 const deriveRoleFromWeight = (weight: number): 'primary' | 'secondary' => (weight > 0.75 ? 'primary' : 'secondary');
 
+// The shared ExerciseCore rules, which group exercises apply too. An omitted
+// mode keeps the `total_load` default.
+const normalizeExerciseCoreForSave = (input: Pick<SaveExerciseCatalogExerciseInput, 'name' | 'loadInputMode' | 'mappings'>) => {
+  const core = validateExerciseCore({ name: input.name, loadInputMode: input.loadInputMode ?? 'total_load' });
+  if (!core.ok) {
+    throw new Error(core.message);
+  }
+  if (input.mappings.length < 1) {
+    throw new Error('At least one muscle link is required');
+  }
+  return core.value;
+};
+
+/**
+ * Validates and normalizes a personal exercise save (name and load mode through
+ * the shared ExerciseCore validator, at least one known, unique, in-range muscle
+ * link, a valid `now`). Throws on the first problem. Every personal exercise
+ * write goes through this, including `createExerciseWithGroupLink`.
+ */
+export const normalizeExerciseGraphInput = (
+  input: Omit<SaveExerciseCatalogExerciseInput, 'id'>,
+  knownMuscleIds: ReadonlySet<string>
+): Omit<ExerciseGraphWrite, 'id'> => {
+  const { name, loadInputMode } = normalizeExerciseCoreForSave(input);
+
+  const now = input.now ?? new Date();
+  assertFiniteDate(now);
+
+  const seenMuscleIds = new Set<string>();
+  const mappings = input.mappings.map((mapping, index) => {
+    if (seenMuscleIds.has(mapping.muscleGroupId)) {
+      throw new Error(`Duplicate muscle link at index ${index}: ${mapping.muscleGroupId}`);
+    }
+    seenMuscleIds.add(mapping.muscleGroupId);
+
+    if (!knownMuscleIds.has(mapping.muscleGroupId)) {
+      throw new Error(`Unknown muscle group: ${mapping.muscleGroupId}`);
+    }
+
+    if (!Number.isFinite(mapping.weight) || mapping.weight <= 0 || mapping.weight > 1) {
+      throw new Error(`Invalid muscle weight for ${mapping.muscleGroupId}: ${mapping.weight}`);
+    }
+
+    return {
+      muscleGroupId: mapping.muscleGroupId,
+      weight: mapping.weight,
+      role: mapping.role ?? deriveRoleFromWeight(mapping.weight),
+    };
+  });
+
+  return { name, loadInputMode, mappings, now };
+};
+
 export const createExerciseCatalogRepository = (store: ExerciseCatalogStore = createDrizzleExerciseCatalogStore()) => {
   const persistDeletedState = async (input: SetExerciseCatalogExerciseDeletedStateInput): Promise<void> => {
     const trimmedId = input.id.trim();
@@ -379,52 +468,12 @@ export const createExerciseCatalogRepository = (store: ExerciseCatalogStore = cr
       });
     },
     async saveExercise(input: SaveExerciseCatalogExerciseInput): Promise<ExerciseCatalogExercise> {
-    // The shared ExerciseCore rules, which group exercises apply too. An
-    // omitted mode keeps the store's `total_load` default.
-    const core = validateExerciseCore({ name: input.name, loadInputMode: input.loadInputMode ?? 'total_load' });
-    if (!core.ok) {
-      throw new Error(core.message);
-    }
-    const { name, loadInputMode } = core.value;
+      // Cheap checks first, so an invalid name never reads the muscle groups.
+      normalizeExerciseCoreForSave(input);
+      const knownMuscleIds = new Set((await store.listMuscleGroups()).map((muscleGroup) => muscleGroup.id));
+      const graph = normalizeExerciseGraphInput(input, knownMuscleIds);
 
-    if (input.mappings.length < 1) {
-      throw new Error('At least one muscle link is required');
-    }
-
-    const now = input.now ?? new Date();
-    assertFiniteDate(now);
-
-    const knownMuscleIds = new Set((await store.listMuscleGroups()).map((muscleGroup) => muscleGroup.id));
-    const seenMuscleIds = new Set<string>();
-
-    const normalizedMappings = input.mappings.map((mapping, index) => {
-      if (seenMuscleIds.has(mapping.muscleGroupId)) {
-        throw new Error(`Duplicate muscle link at index ${index}: ${mapping.muscleGroupId}`);
-      }
-      seenMuscleIds.add(mapping.muscleGroupId);
-
-      if (!knownMuscleIds.has(mapping.muscleGroupId)) {
-        throw new Error(`Unknown muscle group: ${mapping.muscleGroupId}`);
-      }
-
-      if (!Number.isFinite(mapping.weight) || mapping.weight <= 0 || mapping.weight > 1) {
-        throw new Error(`Invalid muscle weight for ${mapping.muscleGroupId}: ${mapping.weight}`);
-      }
-
-      return {
-        muscleGroupId: mapping.muscleGroupId,
-        weight: mapping.weight,
-        role: mapping.role ?? deriveRoleFromWeight(mapping.weight),
-      };
-    });
-
-      return store.saveExercise({
-        id: input.id,
-        name,
-        loadInputMode,
-        mappings: normalizedMappings,
-        now,
-      });
+      return store.saveExercise({ id: input.id, ...graph });
     },
     async setExerciseDeletedState(input: SetExerciseCatalogExerciseDeletedStateInput): Promise<void> {
       await persistDeletedState(input);

@@ -424,6 +424,14 @@ PK `(owner_user_id, id)`. No CHECK constraints (A.1).
   and new group target for the group evaluator (`groups-contract.md` §2.10).
   It can never abort `sync_push` (B.11). Group ids that are not uuids, or that
   name no group exercise of that group, are skipped silently.
+- **Client writers (M25-T07).** `apps/mobile/src/data/exercise-group-links.ts`
+  exposes `linkExerciseInTransaction(tx, …)`, the tx-scoped writer that
+  `linkExercise` wraps, so a link can commit with other local writes;
+  `createExerciseWithGroupLink` uses it to write a new exercise, its muscle
+  links, and its link in one transaction ("Add as new"). The repository accepts
+  any local exercise, soft-deleted ones included (pulled rows and LWW undeletes
+  apply as-is, and such a link is inert); the UI never offers a soft-deleted
+  exercise for linking.
 - **Only the member's client writes these rows.** Server-side code (the group
   evaluator included) reads links but never writes them. Any future writer must
   keep the `<group_id>:<exercise_definition_id>` id form: a pulled row that

@@ -1,0 +1,149 @@
+appId: com.dinoderek.mobile
+---
+# Group-exercise linking end to end (M25-T07; product E0.1, E0.3; lane
+# ios-groups-e2e). The device signs in as fixture user_e and drives the real UI
+# against local Supabase:
+#
+#   1. catalogue ⋮ "Link to group exercise…" → Link screen → Link (the group
+#      exercise is suggested: it was copied from the standard exercise the
+#      member's seeded "Barbell Bench Press" is);
+#   2. recorder picker search finds the group exercise under "From your
+#      groups" as "linked: Barbell Bench Press";
+#   3. picking it adds the member's own exercise to the session.
+#
+# Server setup runs as user_e itself over HTTP (../scripts/groups-link-setup.js:
+# group_create + group_exercise_create), the same RPCs an admin's app calls.
+#
+# ISOLATION: user_e is dedicated to this flow (docs/specs/11, enforced by
+# scripts/tests/maestro-fixture-users.test.sh). The lane runner's
+# groups-fixture-reset.sh hard-deletes user_e's groups and sync rows (links
+# included) and sets its username before every run.
+
+# --- Boot + sign in as user_e (pattern: groups-two-user-stream.yaml) ----------
+- launchApp:
+    clearState: true
+- openLink: "${MAESTRO_IOS_DEV_CLIENT_URL}"
+- extendedWaitUntil:
+    visible:
+      text: "Continue"
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 4000
+- retry:
+    maxRetries: 3
+    commands:
+      - tapOn:
+          text: "Continue"
+- retry:
+    maxRetries: 3
+    commands:
+      - tapOn:
+          text: "Close"
+- extendedWaitUntil:
+    visible:
+      id: "sign-in-screen"
+    timeout: 60000
+- tapOn:
+    id: "sign-in-email-input"
+- inputText: "${MAESTRO_GROUPS_LINK_DEVICE_EMAIL}"
+- tapOn:
+    id: "sign-in-password-input"
+- inputText: "${MAESTRO_GROUPS_LINK_DEVICE_PASSWORD}"
+- tapOn:
+    id: "sign-in-submit-button"
+- assertNotVisible:
+    id: "sign-in-screen"
+# Lift the first-sync gate (the seeded catalogue is local by now) and land on a
+# normal route in one harness link.
+- openLink: "boga3://maestro-harness?bootstrap=complete&teleport=session-list"
+- extendedWaitUntil:
+    visible:
+      id: "stats-history-screen"
+    timeout: 60000
+- runScript:
+    file: ../scripts/groups-link-setup.js
+    env:
+      SUPABASE_URL: ${MAESTRO_GROUPS_SUPABASE_URL}
+      SUPABASE_ANON_KEY: ${MAESTRO_GROUPS_SUPABASE_ANON_KEY}
+      EMAIL: ${MAESTRO_GROUPS_LINK_DEVICE_EMAIL}
+      PASSWORD: ${MAESTRO_GROUPS_LINK_DEVICE_PASSWORD}
+
+# --- 1. Catalogue ⋮ → Link screen → Link --------------------------------------
+- openLink: "boga3://maestro-harness?teleport=exercise-catalog"
+- extendedWaitUntil:
+    visible:
+      text: "Exercise catalog options"
+    timeout: 30000
+# The grouping preference is shared by the catalogue and the picker; a flat list
+# makes every search result a direct row (grouped sections start collapsed).
+- tapOn: "Exercise catalog options"
+- tapOn:
+    text: "Turn grouping off"
+    optional: true
+- tapOn: "Close filters"
+- tapOn: "Exercise filter input"
+- inputText: "Barbell Bench Press"
+- hideKeyboard:
+    optional: true
+- extendedWaitUntil:
+    visible:
+      text: "Exercise actions Barbell Bench Press"
+    timeout: 15000
+- tapOn: "Exercise actions Barbell Bench Press"
+- tapOn:
+    id: "exercise-action-link-group"
+# The Link screen loads my groups' exercises online; the copy of the same
+# standard exercise is offered under Suggested.
+- extendedWaitUntil:
+    visible:
+      id: "exercise-link-link-${output.linkGroupExerciseId}"
+    timeout: 30000
+- takeScreenshot: "groups-link-01-link-screen"
+- tapOn:
+    id: "exercise-link-link-${output.linkGroupExerciseId}"
+- extendedWaitUntil:
+    visible:
+      id: "exercise-link-linked-row-${output.linkGroupExerciseId}"
+    timeout: 15000
+- assertVisible:
+    text: "Your past Barbell Bench Press sets shared with Link Crew will count."
+- takeScreenshot: "groups-link-02-linked"
+
+# --- 2. Recorder picker search → From your groups → add -----------------------
+- openLink: "boga3://maestro-harness?teleport=session-recorder"
+- extendedWaitUntil:
+    visible:
+      id: "start-session-button"
+    timeout: 30000
+- tapOn:
+    id: "start-session-button"
+- extendedWaitUntil:
+    visible:
+      id: "session-recorder-screen"
+    timeout: 30000
+- tapOn: "Log new exercise"
+- tapOn: "Exercise filter input"
+- inputText: "Comp Bench"
+- hideKeyboard:
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "exercise-picker-group-row-${output.linkGroupExerciseId}"
+    timeout: 30000
+# The row is one accessible press target, so iOS exposes its label, not the
+# child texts; Maestro matches the whole label.
+- assertVisible:
+    text: "Group exercise Comp Bench in Link Crew, linked: Barbell Bench Press"
+- takeScreenshot: "groups-link-03-picker-search"
+- tapOn:
+    id: "exercise-picker-group-row-${output.linkGroupExerciseId}"
+- extendedWaitUntil:
+    visible:
+      text: "Exercise options 1"
+    timeout: 15000
+# My own exercise (not the group exercise's name) was added to the session.
+- assertVisible:
+    text: ".*Barbell Bench Press.*"
+- assertNotVisible:
+    text: ".*Comp Bench.*"
+- takeScreenshot: "groups-link-04-added"

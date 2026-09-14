@@ -21,13 +21,6 @@ when it is ready, refreshed against what T01–T03 actually built. Milestone:
 - AC: self-certify, non-record set, non-member, withdraw, admin cancel,
   re-certify after cancel, void on edit and on delete.
 
-## M25-T07 — Mobile linking (frontend; deps T01, T03)
-
-- Product E0.1–E0.3, D9, D13; design §7. Picker search "From your groups"
-  section + Groups toggle; pick sheet with suggestion; Link screen from the
-  catalogue ⋮ and recorder ••• menus; weight-entry conversion note.
-- UI docs: screen-map, navigation-contract (Link screen), components catalog.
-
 ## M25-T08 — Mobile group page (frontend; deps T01, T02)
 
 - Product P5, E0.4, D10, D14. Segments Stream · Exercises · Leaderboards

@@ -24,7 +24,21 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { ExerciseEditorModal } from '@/components/exercise-catalog/exercise-editor-modal';
+import { ExerciseEditorModal, type ExerciseEditorSaveInput } from '@/components/exercise-catalog/exercise-editor-modal';
+import { GroupExercisePickSheet, type GroupExercisePickTarget } from '@/components/groups/group-exercise-pick-sheet';
+import { PickerGroupSectionList, PickerGroupsToggle } from '@/components/groups/picker-group-section';
+import { createExerciseWithGroupLink, linkExercise } from '@/src/data/exercise-group-links';
+import { buildAddAsNewPrefill } from '@/src/groups/add-as-new';
+import { pickInlineError } from '@/components/groups/group-state-view';
+import {
+  buildPickerGroupSections,
+  groupExercisesLoaded,
+  resolvePickerGroupSelection,
+  type LinkableExercise,
+  type PickerGroupRow,
+} from '@/src/groups/link-view-model';
+import { useGroupExerciseLinking, useGroupLinkingUserId } from '@/src/groups/use-group-exercise-linking';
+import { exerciseLinkHref } from '@/src/navigation/routes';
 import {
   ExerciseListContent,
   ExerciseListPreferenceControls,
@@ -1202,6 +1216,17 @@ export default function SessionRecorderScreen({
   requestWeightInputSelectAll = selectAllWeightTextInput,
 }: SessionRecorderScreenProps = {}) {
   const router = useRouter();
+  // M25-T07 linking: signed in only. Links are local synced rows; group
+  // exercise names come from `group_cache` (design §7).
+  const groupLinkingUserId = useGroupLinkingUserId();
+  const groupLinking = useGroupExerciseLinking({ userId: groupLinkingUserId });
+  const [exercisePickerGroupsOnly, setExercisePickerGroupsOnly] = useState(false);
+  const [groupPickTarget, setGroupPickTarget] = useState<GroupExercisePickTarget | null>(null);
+  const [addAsNewTarget, setAddAsNewTarget] = useState<GroupExercisePickTarget | null>(null);
+  const addAsNewPrefill = useMemo(
+    () => (addAsNewTarget ? buildAddAsNewPrefill(addAsNewTarget.groupExercise) : null),
+    [addAsNewTarget]
+  );
   const navigation = useNavigation<any>();
   const params = useLocalSearchParams<{ mode?: string | string[]; sessionId?: string | string[] }>();
   const routeMode = coerceRouteParam(params.mode) === 'completed-edit' ? 'completed-edit' : 'active';
@@ -1640,6 +1665,31 @@ export default function SessionRecorderScreen({
       exercisePickerSearchValue,
     ]
   );
+  // "From your groups" (E0.1): only with search text or the Groups toggle on.
+  const exercisePickerGroupSections = useMemo(
+    () =>
+      buildPickerGroupSections({
+        catalogs: groupLinking.catalogs,
+        links: groupLinking.links,
+        exercises: exercisePickerOptions,
+        query: exercisePickerSearchValue,
+        groupsOnly: exercisePickerGroupsOnly,
+      }),
+    [
+      groupLinking.catalogs,
+      groupLinking.links,
+      exercisePickerOptions,
+      exercisePickerSearchValue,
+      exercisePickerGroupsOnly,
+    ]
+  );
+  const exercisePickerGroupEmptyText = !groupExercisesLoaded(groupLinking.catalogs)
+    ? groupLinking.offline
+      ? "Connect once to load your groups' exercises."
+      : pickInlineError(groupLinking.error)
+        ? "Couldn't load your groups' exercises."
+        : 'Loading group exercises...'
+    : 'No group exercises match.';
 
   const exerciseIdsKey = useMemo(
     () => state.session.exercises.map((exercise) => exercise.id).join('|'),
@@ -2753,6 +2803,9 @@ export default function SessionRecorderScreen({
       exerciseActionMenuVisible: false,
       activeExerciseActionId: null,
     }));
+    setExercisePickerGroupsOnly(false);
+    void groupLinking.reloadLinks();
+    void groupLinking.refresh();
     setExercisePickerSearchValue('');
     setExercisePickerPreselection(null);
     exercisePickerPreselectionRequestKeyRef.current = null;
@@ -2768,6 +2821,7 @@ export default function SessionRecorderScreen({
     setExercisePickerPreselection(null);
     exercisePickerPreselectionRequestKeyRef.current = null;
     setIsExercisePickerOptionsVisible(false);
+    setExercisePickerGroupsOnly(false);
   };
 
   const clearExercisePickerPreselection = () => {
@@ -3071,6 +3125,98 @@ export default function SessionRecorderScreen({
   const handleInlineExerciseCreated = async (exercise: ExerciseCatalogExercise) => {
     setIsExerciseCreateModalVisible(false);
     applySelectedExerciseSelection(exercise.id, exercise.name);
+  };
+
+  // ---- M25-T07: group exercises in the picker (E0.1) and the pick sheet (E0.2).
+
+  const toggleExercisePickerGroupsOnly = () => {
+    clearExercisePickerPreselection();
+    setExercisePickerGroupsOnly((current) => !current);
+  };
+
+  const selectPickerGroupRow = (row: PickerGroupRow) => {
+    const selection = resolvePickerGroupSelection(row);
+    if (selection.kind === 'add') {
+      applySelectedExerciseSelection(selection.exercise.id, selection.exercise.name);
+      return;
+    }
+    // Like the inline create editor: hide the picker while the sheet is open.
+    clearExercisePickerPreselection();
+    setState((current) => ({ ...current, exercisePickerVisible: false }));
+    setGroupPickTarget({
+      groupId: row.groupId,
+      groupName: row.groupName,
+      groupExercise: row.groupExercise,
+      mode: selection.kind === 'choose-linked' ? 'choose-linked' : 'link',
+      linkedExercises: row.linkedExercises,
+    });
+  };
+
+  const returnToExercisePicker = () => {
+    setState((current) => ({ ...current, exercisePickerVisible: true }));
+  };
+
+  const closeGroupPickSheet = () => {
+    setGroupPickTarget(null);
+    returnToExercisePicker();
+  };
+
+  const addExerciseFromGroupPickSheet = (exercise: LinkableExercise) => {
+    setGroupPickTarget(null);
+    applySelectedExerciseSelection(exercise.id, exercise.name);
+  };
+
+  // A local write, so it works offline; a failure rejects into the sheet's inline error.
+  const linkAndAddFromGroupPickSheet = async (exercise: LinkableExercise) => {
+    const target = groupPickTarget;
+    if (!target) {
+      return;
+    }
+    await linkExercise(exercise.id, target.groupId, target.groupExercise.group_exercise_id);
+    void groupLinking.reloadLinks();
+    setGroupPickTarget(null);
+    applySelectedExerciseSelection(exercise.id, exercise.name);
+  };
+
+  const openAddAsNewFromGroupPickSheet = () => {
+    setAddAsNewTarget(groupPickTarget);
+    setGroupPickTarget(null);
+  };
+
+  const closeAddAsNew = () => {
+    setAddAsNewTarget(null);
+    returnToExercisePicker();
+  };
+
+  // "Add as new": the exercise and its link commit in one local transaction.
+  const saveAddAsNewExercise = async (input: ExerciseEditorSaveInput): Promise<ExerciseCatalogExercise> => {
+    const target = addAsNewTarget;
+    if (!target) {
+      throw new Error('No group exercise selected.');
+    }
+    const { exercise } = await createExerciseWithGroupLink(input, {
+      groupId: target.groupId,
+      groupExerciseId: target.groupExercise.group_exercise_id,
+    });
+    return exercise;
+  };
+
+  const handleAddAsNewSaved = (exercise: ExerciseCatalogExercise) => {
+    setAddAsNewTarget(null);
+    void groupLinking.reloadLinks();
+    applySelectedExerciseSelection(exercise.id, exercise.name);
+  };
+
+  const activeActionExerciseDefinitionId =
+    state.session.exercises.find((exercise) => exercise.id === state.activeExerciseActionId)?.exerciseDefinitionId ??
+    null;
+
+  const linkActiveExerciseFromMenu = () => {
+    const exerciseDefinitionId = activeActionExerciseDefinitionId;
+    dismissExerciseActionMenu();
+    if (exerciseDefinitionId) {
+      router.push(exerciseLinkHref(exerciseDefinitionId));
+    }
   };
 
   const openExerciseActionMenu = (exerciseId: string) => {
@@ -4851,15 +4997,20 @@ export default function SessionRecorderScreen({
                 </Pressable>
               </View>
             </View>
-            <TextInput
-              accessibilityLabel="Exercise filter input"
-              autoCapitalize="none"
-              autoCorrect={false}
-              placeholder="Filter by exercise or muscle group"
-              style={styles.input}
-              value={exercisePickerSearchValue}
-              onChangeText={updateExercisePickerSearchValue}
-            />
+            <View style={styles.exercisePickerSearchRow}>
+              <TextInput
+                accessibilityLabel="Exercise filter input"
+                autoCapitalize="none"
+                autoCorrect={false}
+                placeholder="Filter by exercise or muscle group"
+                style={[styles.input, styles.exercisePickerSearchInput]}
+                value={exercisePickerSearchValue}
+                onChangeText={updateExercisePickerSearchValue}
+              />
+              {groupLinkingUserId ? (
+                <PickerGroupsToggle active={exercisePickerGroupsOnly} onToggle={toggleExercisePickerGroupsOnly} />
+              ) : null}
+            </View>
             {isExercisePickerOptionsVisible ? (
               <View style={styles.exercisePickerOptionsPanel}>
                 <ExerciseListPreferenceControls
@@ -4971,26 +5122,38 @@ export default function SessionRecorderScreen({
                 </>
               ) : null}
               {!isExerciseCatalogLoading && !exerciseCatalogLoadError && !exercisePickerPreselection ? (
-                <>
-                  <ExerciseListContent
-                    mode={exercisePickerListModel.mode}
-                    items={exercisePickerListModel.items}
-                    sections={exercisePickerListModel.sections}
-                    expandedFamilies={expandedExercisePickerFamilies}
-                    emptyText={
-                      exercisePickerOptions.length === 0
-                        ? 'No active exercises available.'
-                        : 'No exercises match that filter.'
-                    }
-                    onToggleFamily={toggleExercisePickerFamily}
-                    onPressExercise={selectExerciseListItem}
-                  />
-                  {exercisePickerListModel.items.length === 0 && exercisePickerListModel.mode === 'grouped' ? (
-                    <Text style={styles.emptyText}>
-                      {exercisePickerOptions.length === 0 ? 'No active exercises available.' : 'No exercises match that filter.'}
+                exercisePickerGroupsOnly ? (
+                  exercisePickerGroupSections.length > 0 ? (
+                    <PickerGroupSectionList sections={exercisePickerGroupSections} onPressRow={selectPickerGroupRow} />
+                  ) : (
+                    <Text style={styles.emptyText} testID="exercise-picker-group-empty">
+                      {exercisePickerGroupEmptyText}
                     </Text>
-                  ) : null}
-                </>
+                  )
+                ) : (
+                  <>
+                    <ExerciseListContent
+                      mode={exercisePickerListModel.mode}
+                      items={exercisePickerListModel.items}
+                      sections={exercisePickerListModel.sections}
+                      expandedFamilies={expandedExercisePickerFamilies}
+                      emptyText={
+                        exercisePickerOptions.length === 0
+                          ? 'No active exercises available.'
+                          : 'No exercises match that filter.'
+                      }
+                      onToggleFamily={toggleExercisePickerFamily}
+                      onPressExercise={selectExerciseListItem}
+                    />
+                    {exercisePickerListModel.items.length === 0 && exercisePickerListModel.mode === 'grouped' ? (
+                      <Text style={styles.emptyText}>
+                        {exercisePickerOptions.length === 0 ? 'No active exercises available.' : 'No exercises match that filter.'}
+                      </Text>
+                    ) : null}
+                    {/* After my own matches (E0.1); empty without search text. */}
+                    <PickerGroupSectionList sections={exercisePickerGroupSections} onPressRow={selectPickerGroupRow} />
+                  </>
+                )
               ) : null}
             </ScrollView>
 
@@ -5005,6 +5168,26 @@ export default function SessionRecorderScreen({
         onSaved={(exercise) => {
           void handleInlineExerciseCreated(exercise);
         }}
+      />
+
+      <GroupExercisePickSheet
+        target={groupPickTarget}
+        exercises={exercisePickerOptions}
+        links={groupLinking.links}
+        onRequestClose={closeGroupPickSheet}
+        onAddExercise={addExerciseFromGroupPickSheet}
+        onLinkAndAdd={linkAndAddFromGroupPickSheet}
+        onAddAsNew={openAddAsNewFromGroupPickSheet}
+      />
+
+      <ExerciseEditorModal
+        visible={addAsNewTarget !== null}
+        editingExercise={null}
+        prefill={addAsNewPrefill}
+        title="Add as new exercise"
+        onSave={saveAddAsNewExercise}
+        onRequestClose={closeAddAsNew}
+        onSaved={handleAddAsNewSaved}
       />
 
       <Modal
@@ -5242,6 +5425,15 @@ export default function SessionRecorderScreen({
               onPress={changeActiveExerciseFromMenu}>
               <Text style={styles.actionMenuSecondaryButtonText}>Change exercise</Text>
             </Pressable>
+            {groupLinkingUserId && activeActionExerciseDefinitionId ? (
+              <Pressable
+                accessibilityLabel="Link to group exercise"
+                style={styles.actionMenuSecondaryButton}
+                testID="exercise-action-link-group"
+                onPress={linkActiveExerciseFromMenu}>
+                <Text style={styles.actionMenuSecondaryButtonText}>Link to group exercise…</Text>
+              </Pressable>
+            ) : null}
             <Pressable style={styles.dangerActionButton} onPress={removeActiveExerciseFromMenu}>
               <Text style={styles.dangerActionButtonText}>Remove exercise</Text>
             </Pressable>
@@ -5254,6 +5446,14 @@ export default function SessionRecorderScreen({
 }
 
 const styles = StyleSheet.create({
+  exercisePickerSearchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  exercisePickerSearchInput: {
+    flex: 1,
+  },
   keyboardAvoidingRoot: {
     flex: 1,
   },

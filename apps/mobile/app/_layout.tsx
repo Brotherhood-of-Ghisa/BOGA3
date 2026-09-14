@@ -85,6 +85,7 @@ export default function RootLayout() {
                   options={{ headerBackTitle: 'Settings', title: 'Connected agents' }}
                 />
                 <Stack.Screen name="dev-logs" options={{ title: 'Logs' }} />
+                <Stack.Screen name="exercise-link" options={{ headerBackTitle: 'Back', title: 'Link exercise' }} />
                 <Stack.Screen name="group/mine" options={{ headerBackTitle: 'Back', title: 'My groups' }} />
                 <Stack.Screen name="group/new" options={{ headerBackTitle: 'Back', title: 'New group' }} />
                 <Stack.Screen name="group/join" options={{ headerBackTitle: 'Back', title: 'Join group' }} />

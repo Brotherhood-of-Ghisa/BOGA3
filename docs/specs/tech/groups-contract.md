@@ -970,7 +970,7 @@ migration via `npm run db:generate`.
 
 | Column | Type | Notes |
 | --- | --- | --- |
-| `cache_key` | `text` PK | `groups:mine`, `group:<id>`, `stream:all`, `stream:<groupId>`, `session:<memberId>:<sessionId>` |
+| `cache_key` | `text` PK | `groups:mine`, `group:<id>`, `stream:all`, `stream:<groupId>`, `session:<memberId>:<sessionId>`, `group-exercises:<groupId>` (M25-T07) |
 | `user_id` | `text not null` | The account the payload belongs to. Reads require a match with `useAuth().user.id`. |
 | `payload_json` | `text not null` | The last successful RPC result |
 | `fetched_at_ms` | `integer not null` | Drives "last updated" |
@@ -982,7 +982,9 @@ migration via `npm run db:generate`.
 - **Wiped on sign-out and account switch:** one `delete` is added to
   `wipeLocalTables` (`apps/mobile/src/sync/account-wipe.ts`).
 - **Access loss (C3.6.8).** A `NOT_FOUND` on a group evicts `group:<id>`,
-  `stream:<id>`, and every `session:*` entry. A successful All refresh replaces
+  `stream:<id>`, `group-exercises:<id>` (M25-T07), and every `session:*`
+  entry. The member's `exercise_group_links` rows are synced data and are never
+  evicted. A successful All refresh replaces
   `stream:all`, which no longer contains that group. The group screen shows
   "You're no longer a member of this group."
 
@@ -1020,6 +1022,7 @@ migration via `npm run db:generate`.
 | `/group/[groupId]/edit` | `app/group/[groupId]/edit.tsx` | Edit name and description |
 | `/group/[groupId]/invite` | `app/group/[groupId]/invite.tsx` | Invite code with Share and Regenerate |
 | `/group-session/[memberId]/[sessionId]` | `app/group-session/[memberId]/[sessionId].tsx` | Friend's session view |
+| `/exercise-link?exerciseDefinitionId=` | `app/exercise-link.tsx` | Link screen (M25-T07): link one of my exercises to my groups' exercises |
 
 - **Groups tab.** It shows the stream with **All** and per-group chips, header
   actions My groups / Create group / Join group, and the empty, signed-out, and
@@ -1130,6 +1133,49 @@ on the group screen and the Create / Join actions on the tab.
   `groups-write-view-model.test.ts`, and the real-router
   `groups-join-deep-link.test.tsx`. On-device screenshots against local
   Supabase are listed on the M22-T05 card.
+
+**As-built (M25-T07): linking.** Members link their exercises to group
+exercises from picker search, a pick sheet, and the Link screen (product
+E0.1–E0.3).
+
+- **Where each fact is read.** Linked-state comes from the local synced
+  `exercise_group_links` (`listLinks()`), so it renders offline and right after
+  a local write. Group and group-exercise names come from `group_cache`
+  (`groups:mine` and `group-exercises:<groupId>`, the `group_exercise_list`
+  payload); a missing entry shows `Group exercise` / `A group`. Only cached
+  group exercises can be linked. Link and unlink are local writes, not group
+  RPCs, so the online-only write rule (C3.10.3) does not apply to them.
+- **`use-group-exercise-linking.ts`.** `useGroupExerciseLinking({ userId })` is
+  the cache-first hook: it reads `groups:mine` and each `group-exercises:<id>`,
+  refreshes them on focus, when the recorder picker opens, and on `refresh()`
+  (pull-to-refresh) — no 30 s poll, since these lists change rarely and the
+  screens are not live views — with per-group `listGroupExercises`. A group
+  whose list returns `NOT_FOUND` is evicted (`evictGroup`) and left out of the
+  cached `groups:mine`. Links reload on focus and on `reloadLinks()`. A
+  `groups:mine` with no cached list yet reads as not loaded
+  (`groupExercisesLoaded`), so offline shows "Connect once…"; NETWORK errors
+  are left to the offline marker (`pickInlineError`). `useGroupLinkingUserId()` reads the auth store directly
+  (signed in and configured, else null), so the recorder and catalogue need no
+  `AuthProvider`; a null user disables everything, NetInfo included
+  (`useNetworkOnline(enabled)`).
+- **`link-view-model.ts`.** The pure rules: the picker's `From your groups`
+  sections (only with search text or the `Groups` toggle; archived and
+  uncached lists left out; a link from a deleted exercise doesn't count), the
+  pick sheet (suggestion = my live exercise whose id is the group exercise's
+  `source_exercise_id`, else the best name match, never one already linked in
+  that group), the Link screen's Linked / Suggested / All sections (one link per
+  group shows `already linked in <group>`; links into a group I left read
+  `inactive — not a member`; archived targets read `archived`), and the
+  retroactivity, unlink, and weight-entry notes. `add-as-new.ts` builds the
+  editor prefill (name, load mode, and the source seed's muscle mappings).
+- **Soft-deleted exercises** are never offered: the catalogue item is disabled,
+  the pick sheet lists live exercises only, and the Link screen shows "Restore
+  this exercise to link it" (unlink still works). The repository stays
+  permissive (sync contract §A.2.10).
+- **Evidence.** Jest: `groups-link-view-model.test.ts`,
+  `groups-exercise-link-screen.test.tsx`, `session-recorder-group-picker.test.tsx`,
+  `exercise-catalog-link-menu.test.tsx`, `exercise-group-links-add-as-new.test.ts`;
+  Maestro `groups-link-exercise.yaml` (§8).
 
 ## 7. Freshness and offline
 
@@ -1245,6 +1291,15 @@ on the group screen and the Create / Join actions on the tab.
     9. The script asserts the counterparty's `group_stream` returns
        `NOT_FOUND`.
   - Evidence comes from its screenshots and JUnit output.
+- **Linking flow (M25-T07).** The lane then runs
+  `groups-link-exercise.yaml` as its own device user **`user_e`** (reset with
+  the others by `groups-fixture-reset.sh`, which also sets its username).
+  `.maestro/scripts/groups-link-setup.js` signs in as `user_e` over HTTP and
+  calls `group_create` and `group_exercise_create` (a copy of
+  `seed_barbell_bench_press`). The device then links its seeded "Barbell Bench
+  Press" from the catalogue `⋮` Link screen (offered under Suggested), finds the
+  group exercise in recorder picker search as "linked: Barbell Bench Press",
+  and adds it to the session (`groups-link-01`…`04`).
 - **As-built (M22-T06, Maestro lane).** Lane `ios-groups-e2e`
   (`maestro-run-lane.sh groups-e2e`, gate `slow-frontend`, so part of
   `boga test frontend`); flow `apps/mobile/.maestro/flows/groups-two-user-stream.yaml`.

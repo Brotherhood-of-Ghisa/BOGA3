@@ -34,11 +34,29 @@ type EditorValidationState = {
 
 type MuscleSelectorMode = 'primary' | 'secondary' | null;
 
+/** Initial values for a new exercise (M25-T07 "Add as new" from a group exercise). */
+export type ExerciseEditorPrefill = {
+  name: string;
+  loadInputMode: 'total_load' | 'per_side_load';
+  mappings: Pick<ExerciseCatalogExerciseMuscleMapping, 'muscleGroupId' | 'weight' | 'role'>[];
+};
+
+export type ExerciseEditorSaveInput = {
+  name: string;
+  loadInputMode: 'total_load' | 'per_side_load';
+  mappings: { muscleGroupId: string; weight: number; role: ExerciseCatalogExerciseMuscleMapping['role'] }[];
+};
+
 type ExerciseEditorModalProps = {
   visible: boolean;
   editingExercise: ExerciseCatalogExercise | null;
   onRequestClose: () => void;
   onSaved: (exercise: ExerciseCatalogExercise) => void;
+  /** Prefills a new exercise (ignored while `editingExercise` is set). */
+  prefill?: ExerciseEditorPrefill | null;
+  /** Replaces the default save (`saveExerciseCatalogExercise`); a rejection shows inline like any save error. */
+  onSave?: (input: ExerciseEditorSaveInput) => Promise<ExerciseCatalogExercise>;
+  title?: string;
 };
 
 const PRIMARY_MUSCLE_WEIGHT = 1;
@@ -95,6 +113,9 @@ export function ExerciseEditorModal({
   editingExercise,
   onRequestClose,
   onSaved,
+  prefill = null,
+  onSave,
+  title,
 }: ExerciseEditorModalProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [muscleSelectorMode, setMuscleSelectorMode] = useState<MuscleSelectorMode>(null);
@@ -128,6 +149,18 @@ export function ExerciseEditorModal({
       setLoadInputMode(editingExercise.loadInputMode ?? 'total_load');
       setPrimaryMuscleGroupId(nextSelections.primaryMuscleGroupId);
       setSecondaryMuscleRows(nextSelections.secondaryMuscleRows);
+    } else if (prefill) {
+      const nextSelections = buildEditorMuscleSelectionsFromExercise({
+        id: '',
+        name: prefill.name,
+        loadInputMode: prefill.loadInputMode,
+        deletedAt: null,
+        mappings: prefill.mappings.map((mapping) => ({ ...mapping, id: '' })),
+      });
+      setExerciseName(prefill.name);
+      setLoadInputMode(prefill.loadInputMode);
+      setPrimaryMuscleGroupId(nextSelections.primaryMuscleGroupId);
+      setSecondaryMuscleRows(nextSelections.secondaryMuscleRows);
     } else {
       setExerciseName('');
       setLoadInputMode('total_load');
@@ -138,7 +171,7 @@ export function ExerciseEditorModal({
     setMuscleSelectorMode(null);
     setValidation(createBlankValidationState());
     setSaveError(null);
-  }, [editingExercise, visible]);
+  }, [editingExercise, prefill, visible]);
 
   const selectedSecondaryMuscleIds = new Set(secondaryMuscleRows.map((row) => row.muscleGroupId));
   const availablePrimaryMuscleGroupsForSelector = muscleGroups.filter(
@@ -152,7 +185,7 @@ export function ExerciseEditorModal({
   const selectorOptions =
     muscleSelectorMode === 'primary' ? availablePrimaryMuscleGroupsForSelector : availableSecondaryMuscleGroupsForSelector;
   const selectorTitle = muscleSelectorMode === 'primary' ? 'Select primary muscle' : 'Add secondary muscle';
-  const editorTitle = editingExercise ? 'Edit Exercise' : 'Create Exercise';
+  const editorTitle = title ?? (editingExercise ? 'Edit Exercise' : 'Create Exercise');
 
   const openMuscleSelector = (mode: Exclude<MuscleSelectorMode, null>) => {
     Keyboard.dismiss();
@@ -284,12 +317,10 @@ export function ExerciseEditorModal({
 
     setIsSaving(true);
     try {
-      const savedExercise = await saveExerciseCatalogExercise({
-        id: editingExercise?.id ?? undefined,
-        name: exerciseName,
-        loadInputMode,
-        mappings: result.parsedMappings,
-      });
+      const input = { name: exerciseName, loadInputMode, mappings: result.parsedMappings };
+      const savedExercise = onSave
+        ? await onSave(input)
+        : await saveExerciseCatalogExercise({ id: editingExercise?.id ?? undefined, ...input });
       onSaved(savedExercise);
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : 'Unable to save exercise.');
