@@ -692,6 +692,29 @@ committed in this repository. An operator with those resources must:
 Exact build/configuration details live in `apps/agent-auth-web/README.md`,
 `services/boga-mcp/README.md`, and `supabase/README.md`.
 
+### Group evaluator (hosted)
+
+The M25 group evaluator (`docs/specs/tech/groups-contract.md` §2.10) needs one
+deploy and one setting per hosted project:
+
+1. Apply the migration chain. It enables `pg_net` and `pg_cron`, schedules
+   `group-eval-sweep`, and generates the kick secret in Vault.
+2. Deploy the function from the repository root:
+   `bash -lc 'source supabase/scripts/_common.sh && run_supabase functions deploy group-eval --no-verify-jwt'`.
+   It loads `apps/mobile/src/groups/set-facts.ts` by relative path, so deploy
+   from a full checkout. The function has no secrets of its own: it checks the
+   caller's `x-group-eval-secret` against Vault.
+3. Point the kick at it in the SQL Editor:
+   `select app_public.group_eval_set_url('https://<project-ref>.supabase.co/functions/v1/group-eval');`.
+   Until this is set, nothing drains the queue. Changes keep queuing, and
+   `sync_push` is unaffected.
+4. Verify it. After a member syncs a session shared into a group, rows appear
+   in `app_public.group_set_facts` within seconds, and `group_eval_queue`
+   drains to empty.
+
+Locally, the shared baseline sets the URL for you
+(`supabase/scripts/group-eval-configure.sh`).
+
 ## Upgrading from v1 sync (one-time wipe)
 
 If you are picking up a v2 sync build against an installation that
@@ -713,6 +736,12 @@ NOT update in place.
 - Expo/dev-client logs: terminal where `npm run start:ios:dev-client` or `npx expo start --dev-client` is running.
 - Production diagnostic rows: Supabase Dashboard / SQL Editor query against `public.app_logs`. Mobile clients can insert rows only; use operator credentials for inspection.
   - Group triage. Filter on `source = 'database'` with `event = 'group.share_failed'` or `event = 'group.event_failed'`. `group.share_failed` means the share trigger failed and `group.event_failed` means the stream-item trigger failed. In both cases the session write committed. `context` is `{session_id, sqlstate}` and `user_id` is the session owner. The session's next accepted write heals both. For an `event_failed` session that won't be written again, run `select app_public.group_events_backfill();` in the SQL Editor. It is idempotent and inserts only missing items (`docs/specs/tech/groups-contract.md` §2.6).
+  - **Group evaluator triage** (`docs/specs/tech/groups-contract.md` §2.10). Filter `source = 'database'` on these events; `user_id` is the member.
+    - `group.eval_enqueue_failed`: an enqueue trigger failed, and the sync write committed. `context` is `{table, row_id, sqlstate}`. The member's next accepted write of that session or link re-enqueues it.
+    - `group.eval_kick_failed`: the pg_net kick failed. The `group-eval-sweep` cron job (every 30 s) retries it.
+    - `group.eval_failed`: a job failed and stays queued with backoff. `context` is `{job_id, kind, sqlstate}`. Inspect `app_public.group_eval_queue` (`attempts`, `last_sqlstate`) for a job that keeps failing.
+    - To drain now, run `select app_public.group_eval_kick();`.
+    - If the queue grows and nothing drains, check `select app_public.group_eval_config('group_eval_url');` and the `group-eval` function logs.
   - Sync-health triage: filter `source = 'sync'`, `event = 'sync.cycle_result'` to see each cycle's classified outcome (`converged` / `auth_required` / `retryable_error` / `structural_error`) with its error code and a sanitized message — a run of non-`converged` outcomes means the scheduler is ticking but not converging (dirty rows are not draining), distinct from the scheduler cadence transitions logged under `sync_scheduler_*`. Pull-side local FK failures additionally log `source = 'database'`, `event = 'sync.pull_local_fk_violation'`. Push-side FK closure preflight now **quarantines** a local orphan dirty row (one that would fail `sync_push`) instead of wedging the whole push: it logs `source = 'sync'`, `event = 'sync.row_quarantined'` (level `warn`) with the orphan's entity type/id, parent type, the missing FK column, and the unresolved parent id, and `event = 'sync.push_continued_after_quarantine'` (level `info`) with the pushed/quarantined row counts confirming the valid rows still drained. The quarantined row is recorded in the device-local `sync_quarantine` table (not in `app_logs`) and is skipped by every subsequent push until repaired (parent restored or child removed); `getSyncStatus().blockedRowCount` reports how many rows are currently quarantined. A recurring `sync.row_quarantined` for the same id means an unrepaired structural orphan — repair the row's FK parent locally to release it; there is no user-facing repair UI yet, and the app performs no automatic destructive local graph repair.
 - Maestro run artifacts/logs:
   - root: `apps/mobile/artifacts/maestro/<task-id-or-ad-hoc>/<timestamp>/`

@@ -1,16 +1,12 @@
 // Stream-card metrics and the friend view's performed sets, computed on the
 // viewing device from the raw set rows the group reads return
 // (`docs/specs/tech/groups-contract.md` §5). "Performed" and the parsed numbers
-// come from the recorder's own rules (`isConfirmedPerformedSet` and the
-// exercise-calculations parsers), so no set semantics are restated here or in SQL.
+// come from `parseGroupPerformedSet` (`set-facts.ts`), the same rule the
+// server-side evaluator runs, so no set semantics are restated here or in SQL.
 
-import { computeSetVolume, parseCalculationSet } from '@/src/exercise-calculations';
-import {
-  canonicalizeWeightForReps,
-  isConfirmedPerformedSet,
-  normalizeSessionSetPerformanceStatus,
-} from '@/src/session-recorder/set-semantics';
+import { computeSetVolume } from '@/src/exercise-calculations';
 
+import { parseGroupPerformedSet } from './set-facts';
 import type { GroupSessionExercise, GroupSessionSet } from './types';
 
 export type GroupPerformedSet = {
@@ -41,21 +37,14 @@ export type GroupSessionMetrics = {
  * recorder's input cannot produce (for example `1e3`) is not performed.
  */
 export const toGroupPerformedSet = (set: GroupSessionSet): GroupPerformedSet | null => {
-  const performanceStatus = normalizeSessionSetPerformanceStatus(set.performance_status);
-  if (!isConfirmedPerformedSet({ weight: set.weight_value, reps: set.reps_value, performanceStatus })) {
-    return null;
-  }
-  const parsed = parseCalculationSet({
-    weightValue: canonicalizeWeightForReps(set.weight_value, set.reps_value),
-    repsValue: set.reps_value,
-  });
+  const parsed = parseGroupPerformedSet(set);
   if (parsed === null) {
     return null;
   }
   return {
     setId: set.set_id,
     orderIndex: set.order_index,
-    weightKg: parsed.weight,
+    weightKg: parsed.weightKg,
     reps: parsed.reps,
     setType: set.set_type,
   };

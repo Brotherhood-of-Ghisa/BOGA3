@@ -42,6 +42,7 @@ export {
   type GroupCacheEntry,
 } from './cache';
 export * from './session-metrics';
+export * from './set-facts';
 export * from './stream-view-model';
 export {
   GROUP_RESOURCE_POLL_INTERVAL_MS,
