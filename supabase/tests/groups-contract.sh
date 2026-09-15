@@ -1526,12 +1526,18 @@ RUN_GROUPS_SQL="select id from app_public.groups
      and t.tgattr::text = (select attnum::text from pg_attribute
                             where attrelid = 'app_public.group_memberships'::regclass and attname = 'ended_at');")" == "1" ]] ||
   fail "group_memberships_stream_event must be an enabled AFTER INSERT OR UPDATE OF ended_at row trigger"
-# The kind CHECK: the reserved M25-T05 kinds are accepted, anything else is not.
-for reserved in record record_voided link unlink lead_change; do
-  run_psql "begin;
-            insert into app_public.group_events (group_id, kind, member_user_id, sort_at_ms)
-            values ('${GA}', '${reserved}', '${ATHLETE_UID}', 0);
-            rollback;" >/dev/null || fail "the kind CHECK must accept the reserved kind ${reserved}"
+# The kind CHECK accepts the M25-T05 kinds, and each has a shape CHECK
+# (contract §2.11): a bare row of one fails that shape CHECK, never the kind
+# CHECK. Anything else fails the kind CHECK.
+for board_kind in record record_voided link unlink lead_change; do
+  shape="${board_kind}"
+  [[ "${board_kind}" == "unlink" ]] && shape="link"
+  if OUT="$(run_psql "insert into app_public.group_events (group_id, kind, member_user_id, sort_at_ms)
+                      values ('${GA}', '${board_kind}', '${ATHLETE_UID}', 0);" 2>&1)"; then
+    fail "a bare ${board_kind} row must fail its shape CHECK"
+  fi
+  [[ "${OUT}" == *"group_events_${shape}_shape_check"* ]] ||
+    fail "a bare ${board_kind} row must fail group_events_${shape}_shape_check, not the kind CHECK: ${OUT}"
 done
 if run_psql "insert into app_public.group_events (group_id, kind, member_user_id, sort_at_ms)
              values ('${GA}', 'bogus', '${ATHLETE_UID}', 0);" >/dev/null 2>&1; then
