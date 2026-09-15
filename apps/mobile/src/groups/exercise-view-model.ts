@@ -26,6 +26,12 @@ export type GroupExerciseRowViewModel = {
   archived: boolean;
   /** `Linked: A, B` / `Linked` / `Not linked`; null while my links are still loading. */
   linkStatus: string | null;
+  /**
+   * Offer "Link your exercise" (E0.4): my links are loaded, none of my
+   * exercises is linked to it, and it is active (archived ones are not offered
+   * for new links, D8).
+   */
+  linkable: boolean;
 };
 
 export const NOT_LINKED_STATUS = 'Not linked';
@@ -60,17 +66,24 @@ export const buildGroupExerciseRows = (
     names.push(link.exerciseName);
     namesByTarget.set(link.groupExerciseId, names);
   }
-  const rows = exercises.map(
-    (exercise): GroupExerciseRowViewModel => ({
+  const rows = exercises.map((exercise): GroupExerciseRowViewModel => {
+    const archived = exercise.archived_at_ms !== null;
+    const linkedNames = namesByTarget.get(exercise.group_exercise_id) ?? [];
+    return {
       groupExerciseId: exercise.group_exercise_id,
       name: exercise.name,
       loadInputModeLabel: LOAD_INPUT_MODE_LABELS[exercise.load_input_mode],
-      archived: exercise.archived_at_ms !== null,
-      linkStatus: links === null ? null : formatGroupExerciseLinkStatus(namesByTarget.get(exercise.group_exercise_id) ?? []),
-    }),
-  );
+      archived,
+      linkStatus: links === null ? null : formatGroupExerciseLinkStatus(linkedNames),
+      linkable: links !== null && !archived && linkedNames.length === 0,
+    };
+  });
   return [...rows.filter((row) => !row.archived), ...rows.filter((row) => row.archived)];
 };
+
+/** The notice after "Link your exercise" links one of mine (a local write). */
+export const groupExerciseLinkedMessage = (exerciseName: string, groupExerciseName: string): string =>
+  `Linked ${exerciseName} to ${groupExerciseName}.`;
 
 // ---- Actions (contract §4.4: owner, admin) --------------------------------------
 

@@ -1,53 +1,76 @@
 // My live links into one group, read from the local synced rows (M25-T03,
 // `exercise_group_links`), so the Exercises segment shows link status offline.
-// Reloads on every focus: links change on other screens (the Link screen,
-// M25-T07) and sync can pull new ones.
+// Reloads on every focus (links change on other screens — the Link screen,
+// M25-T07 — and sync can pull new ones) and after a link written here.
+// It also hands the pick sheet my exercises and all my live links, which it
+// needs for its suggestion and the one-link-per-group rule.
 
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { listExerciseCatalogExercises } from '@/src/data/exercise-catalog';
 import { listLinks } from '@/src/data/exercise-group-links';
 
 import type { MyGroupExerciseLink } from './exercise-view-model';
+import type { LinkRef, LinkableExercise } from './link-view-model';
 
 export type MyGroupExerciseLinksState = {
-  /** Null until the first read settles, and after a failed read. */
+  /** My links into this group; null until the first read settles, and after a failed read. */
   links: MyGroupExerciseLink[] | null;
+  /** Every exercise of mine (deleted ones included; the pick sheet offers live ones only). */
+  exercises: LinkableExercise[];
+  /** All my live links, in every group. */
+  allLinks: LinkRef[];
   /** The local read failed; the screen says so rather than showing "Not linked". */
   failed: boolean;
+  /** Re-reads after a local link write. Never rejects. */
+  reload: () => Promise<void>;
 };
 
+type LoadedState = Omit<MyGroupExerciseLinksState, 'reload'>;
+
 export function useMyGroupExerciseLinks(groupId: string): MyGroupExerciseLinksState {
-  const [state, setState] = useState<MyGroupExerciseLinksState>({ links: null, failed: false });
+  const [state, setState] = useState<LoadedState>({ links: null, exercises: [], allLinks: [], failed: false });
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  const reload = useCallback(async () => {
+    try {
+      const [links, exercises] = await Promise.all([listLinks(), listExerciseCatalogExercises({ includeDeleted: true })]);
+      if (!mountedRef.current) return;
+      const names = new Map(exercises.map((exercise) => [exercise.id, exercise.name]));
+      setState({
+        links: links
+          .filter((link) => link.groupId === groupId)
+          .map((link) => ({
+            groupExerciseId: link.groupExerciseId,
+            exerciseName: names.get(link.exerciseDefinitionId) ?? null,
+          })),
+        exercises: exercises.map(({ id, name, loadInputMode, deletedAt }) => ({ id, name, loadInputMode, deletedAt })),
+        allLinks: links.map(({ exerciseDefinitionId, groupId: linkGroupId, groupExerciseId }) => ({
+          exerciseDefinitionId,
+          groupId: linkGroupId,
+          groupExerciseId,
+        })),
+        failed: false,
+      });
+    } catch {
+      if (!mountedRef.current) return;
+      setState((current) => ({ ...current, links: null, failed: true }));
+    }
+  }, [groupId]);
 
   useFocusEffect(
     useCallback(() => {
-      let active = true;
-      void Promise.all([listLinks(), listExerciseCatalogExercises({ includeDeleted: true })]).then(
-        ([links, exercises]) => {
-          if (!active) return;
-          const names = new Map(exercises.map((exercise) => [exercise.id, exercise.name]));
-          setState({
-            links: links
-              .filter((link) => link.groupId === groupId)
-              .map((link) => ({
-                groupExerciseId: link.groupExerciseId,
-                exerciseName: names.get(link.exerciseDefinitionId) ?? null,
-              })),
-            failed: false,
-          });
-        },
-        () => {
-          if (!active) return;
-          setState({ links: null, failed: true });
-        },
-      );
-      return () => {
-        active = false;
-      };
-    }, [groupId]),
+      void reload();
+    }, [reload]),
   );
 
-  return state;
+  return { ...state, reload };
 }

@@ -30,6 +30,10 @@ type Option = { kind: 'suggested' } | { kind: 'other'; exerciseId: string | null
  * while logging asks which of my exercises it is — the suggestion, another of
  * my live exercises, or a new one — then links (a local write, so it works
  * offline) and adds my exercise to the session. An in-route `Modal`.
+ *
+ * `purpose="link-only"` (M25-T08; product E0.4, the group page's "Link your
+ * exercise") confirms with `Link`: the caller only links, and nothing is added
+ * to a session. The target is always `mode: 'link'` there.
  */
 export function GroupExercisePickSheet({
   target,
@@ -39,17 +43,20 @@ export function GroupExercisePickSheet({
   onAddExercise,
   onLinkAndAdd,
   onAddAsNew,
+  purpose = 'add-to-session',
 }: {
   target: GroupExercisePickTarget | null;
   exercises: LinkableExercise[];
   links: LinkRef[];
   onRequestClose: () => void;
-  /** Adds an already linked exercise (`choose-linked`). */
-  onAddExercise: (exercise: LinkableExercise) => void;
-  /** Links then adds; a rejection shows inline and nothing is added. */
+  /** Adds an already linked exercise (`choose-linked`; not used by `link-only`). */
+  onAddExercise?: (exercise: LinkableExercise) => void;
+  /** Links, then (unless `link-only`) adds; a rejection shows inline and nothing is added. */
   onLinkAndAdd: (exercise: LinkableExercise) => Promise<void>;
   /** Opens the prefilled editor for "Add as new". */
   onAddAsNew: () => void;
+  /** `add-to-session` (the recorder, default) or `link-only` (the group page). */
+  purpose?: 'add-to-session' | 'link-only';
 }) {
   const model = useMemo(
     () =>
@@ -125,7 +132,7 @@ export function GroupExercisePickSheet({
                   <UiButton
                     key={exercise.id}
                     label={exercise.name}
-                    onPress={() => onAddExercise(exercise)}
+                    onPress={() => onAddExercise?.(exercise)}
                     testID={`group-pick-sheet-linked-${exercise.id}`}
                     variant="secondary"
                   />
@@ -208,7 +215,7 @@ export function GroupExercisePickSheet({
               ) : null}
               <UiButton
                 disabled={pending || (option.kind !== 'add-new' && !chosen)}
-                label={option.kind === 'add-new' ? 'Create exercise…' : 'Link and add'}
+                label={option.kind === 'add-new' ? 'Create exercise…' : purpose === 'link-only' ? 'Link' : 'Link and add'}
                 onPress={() => void confirm()}
                 testID="group-pick-sheet-confirm"
               />

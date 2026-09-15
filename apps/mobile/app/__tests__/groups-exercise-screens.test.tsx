@@ -61,8 +61,18 @@ jest.mock('@/src/groups/api', () => ({
   unarchiveGroupExercise: jest.fn(),
 }));
 
+// Link writes are the real repository on the fixture; only the sync nudge and
+// the Add-as-new graph write (covered by exercise-group-links-add-as-new.test.ts) are stubbed.
+jest.mock('@/src/sync/write-nudge', () => ({ notifyLocalWrite: jest.fn() }));
+jest.mock('@/src/data/exercise-group-links', () => ({
+  ...jest.requireActual('@/src/data/exercise-group-links'),
+  createExerciseWithGroupLink: jest.fn(),
+}));
+
 import { SYSTEM_EXERCISE_DEFINITION_SEEDS } from '@/src/data/exercise-catalog-seeds';
-import { exerciseDefinitions, exerciseGroupLinks } from '@/src/data/schema';
+import { createExerciseWithGroupLink } from '@/src/data/exercise-group-links';
+import { exerciseDefinitions, exerciseGroupLinks, sessions } from '@/src/data/schema';
+import { __resetExerciseCatalogCacheForTests } from '@/src/exercise-catalog/cache';
 import {
   GROUP_OFFLINE_ACTION_MESSAGE,
   GROUP_WRITE_UNREACHABLE_MESSAGE,
@@ -170,6 +180,7 @@ beforeEach(() => {
   api.getGroup.mockResolvedValue(detailFor('owner'));
   api.getGroupStream.mockResolvedValue({ items: [], next_cursor: null, has_more: false });
   api.listGroupExercises.mockResolvedValue(LIST);
+  __resetExerciseCatalogCacheForTests();
 });
 
 afterEach(() => {
@@ -627,5 +638,94 @@ describe('Every exercise write: offline refusal and server failure (AC6)', () =>
       expect(screen.getByTestId('group-exercise-form-error')).toHaveTextContent(GROUP_WRITE_UNREACHABLE_MESSAGE);
       expect(mockRouter.back).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('Link your exercise (E0.4, link-only pick sheet)', () => {
+  const liveLinks = () =>
+    fixture.database
+      .select()
+      .from(exerciseGroupLinks)
+      .all()
+      .filter((row) => row.deletedAt === null);
+
+  it.each<GroupRole>(['member', 'owner'])(
+    '%s: offered on an active row none of mine is linked to, not on a linked or an archived row',
+    async (role) => {
+      addMyExercise('def-comp', 'Bench (comp grip)');
+      addLink(GROUP_ID, 'def-comp', 'ge-bench');
+      await openExercisesAs(role);
+      expect(await screen.findByTestId('group-exercise-link-button-ge-row')).toBeTruthy();
+      expect(screen.queryByTestId('group-exercise-link-button-ge-bench')).toBeNull();
+      expect(screen.queryByTestId('group-exercise-link-button-ge-old')).toBeNull();
+    },
+  );
+
+  it('links my suggested exercise with "Link", starts no session, and the row reads Linked', async () => {
+    addMyExercise('seed_barbell_bench_press', 'Barbell Bench Press');
+    await openExercisesAs('member');
+    fireEvent.press(await screen.findByTestId('group-exercise-link-button-ge-bench'));
+    expect(await screen.findByTestId('group-pick-sheet')).toBeTruthy();
+    // The copy's source seed is my exercise: suggested and preselected.
+    expect(screen.getByTestId('group-pick-sheet-option-suggested').props.accessibilityState).toMatchObject({ checked: true });
+    expect(screen.getByTestId('group-pick-sheet-confirm')).toHaveTextContent('Link');
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('group-pick-sheet-confirm'));
+    });
+
+    expect(liveLinks()).toEqual([
+      expect.objectContaining({ id: `${GROUP_ID}:seed_barbell_bench_press`, groupId: GROUP_ID, groupExerciseId: 'ge-bench' }),
+    ]);
+    expect(fixture.database.select().from(sessions).all()).toHaveLength(0);
+    expect(screen.queryByTestId('group-pick-sheet')).toBeNull();
+    await waitFor(() =>
+      expect(screen.getByTestId('group-exercise-link-status-ge-bench')).toHaveTextContent('Linked: Barbell Bench Press'),
+    );
+    expect(screen.queryByTestId('group-exercise-link-button-ge-bench')).toBeNull();
+    expect(screen.getByTestId('group-exercises-action-feedback')).toHaveTextContent('Linked Barbell Bench Press to Bench Press.');
+  });
+
+  it('links offline: a local write needs no connection', async () => {
+    addMyExercise('seed_barbell_bench_press', 'Barbell Bench Press');
+    await openExercisesAs('member');
+    emitNetInfo(false);
+    fireEvent.press(await screen.findByTestId('group-exercise-link-button-ge-bench'));
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('group-pick-sheet-confirm'));
+    });
+    expect(liveLinks()).toHaveLength(1);
+    await waitFor(() =>
+      expect(screen.getByTestId('group-exercise-link-status-ge-bench')).toHaveTextContent('Linked: Barbell Bench Press'),
+    );
+  });
+
+  it('Add as new opens the prefilled editor and creates my exercise with its link, adding nothing to a session', async () => {
+    const create = jest.mocked(createExerciseWithGroupLink);
+    create.mockResolvedValue({
+      exercise: { id: 'ex-new', name: 'Bench Press', loadInputMode: 'total_load', deletedAt: null, mappings: [] },
+      link: {} as never,
+    });
+    await openExercisesAs('member');
+    fireEvent.press(await screen.findByTestId('group-exercise-link-button-ge-bench'));
+    // None of my exercises matches, so Add as new is preselected.
+    expect(screen.getByTestId('group-pick-sheet-option-add-new').props.accessibilityState).toMatchObject({ checked: true });
+    fireEvent.press(screen.getByTestId('group-pick-sheet-confirm'));
+
+    expect(await screen.findByTestId('exercise-editor-name-input')).toHaveProp('value', 'Bench Press');
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('Save exercise definition'));
+    });
+
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'Bench Press',
+        loadInputMode: 'total_load',
+        mappings: expect.arrayContaining([expect.objectContaining({ muscleGroupId: 'chest', role: 'primary' })]),
+      }),
+      { groupId: GROUP_ID, groupExerciseId: 'ge-bench' },
+    );
+    expect(fixture.database.select().from(sessions).all()).toHaveLength(0);
+    expect(screen.getByTestId('group-exercises-action-feedback')).toHaveTextContent('Linked Bench Press to Bench Press.');
   });
 });

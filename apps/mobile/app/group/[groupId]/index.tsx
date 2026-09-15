@@ -180,6 +180,7 @@ function GroupScreenContent({ userId, groupId }: { userId: string; groupId: stri
           error={inlineError}
           exercises={exercises}
           groupId={groupId}
+          groupName={summary.name}
           myRole={summary.my_role}
           offline={offline}
           onRetry={onRefresh}

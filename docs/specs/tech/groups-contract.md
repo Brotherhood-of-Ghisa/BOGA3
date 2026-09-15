@@ -1231,9 +1231,13 @@ E0.1–E0.3).
   `src/exercise-core`) renders in the personal exercise editor and in the
   group exercise form. Both validate the name through `validateExerciseCore`.
 - **Leaderboards** is an empty state with no read until M25-T09.
-- **Not built yet.** "Link your exercise" on an unlinked row (E0.4) is meant
-  to open the M25-T07 pick sheet without adding anything to a session. That
-  sheet only offers "Link and add" today, so the row shows its status only.
+- **Link your exercise** (E0.4). An active row none of my exercises is
+  linked to shows `Link your exercise` to every member; archived rows are not
+  offered (D8). It opens the M25-T07 pick sheet with `purpose="link-only"`: the
+  confirm reads `Link`, links locally (`linkExercise`, so it works offline),
+  and adds nothing to a session. "Add as new" opens the prefilled editor, and
+  `createExerciseWithGroupLink` writes the exercise and its link in one local
+  transaction. My links then reload, so the row reads `Linked: …`.
 - **Evidence.** Jest: `groups-exercise-screens.test.tsx`,
   `groups-exercise-view-model.test.ts`, `groups-cache.test.ts`, and the
   member cases moved to the Members route in `groups-write-screens.test.tsx`.
@@ -1398,9 +1402,10 @@ E0.1–E0.3).
 - **As-built (M25-T08, flow extension).** Step 2 and 4 assert the header
   member count through `group-screen-members-link`. New step 4b: the device
   (owner) copies `seed_barbell_bench_press`, creates a custom per-side
-  exercise, renames it, and archives the copy (confirmed), asserting each row
-  by its accessibility label (`<name>, <weight entry>[, archived], Not
-  linked`). The counterparty's `assert-exercises` step then reads the same two
+  exercise, renames it, links the copy to the device's own seeded Barbell Bench Press
+  through `Link your exercise` (the suggested exercise), and archives the copy
+  (confirmed), asserting each row
+  by its accessibility label (`<name>, <weight entry>[, archived], <link status>`). The counterparty's `assert-exercises` step then reads the same two
   exercises through `group_exercise_list` as a member. Step 8 opens Members
   from the header. No new fixture user; `groups-fixture-reset.sh` already
   deletes the groups, which cascades to `group_exercises`.

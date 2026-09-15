@@ -1,8 +1,14 @@
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Alert, View } from 'react-native';
 
+import {
+  ExerciseEditorModal,
+  type ExerciseEditorSaveInput,
+} from '@/components/exercise-catalog/exercise-editor-modal';
 import { UiButton, UiSurface, uiSpace } from '@/components/ui';
+import type { ExerciseCatalogExercise } from '@/src/data/exercise-catalog';
+import { createExerciseWithGroupLink, linkExercise } from '@/src/data/exercise-group-links';
 import { LOAD_INPUT_MODE_LABELS } from '@/src/exercise-core';
 import {
   GROUP_EXERCISE_ACTION_LABELS,
@@ -13,6 +19,7 @@ import {
   groupExerciseActionSuccessMessage,
   groupExerciseActionsFor,
   groupExerciseArchiveConfirmation,
+  groupExerciseLinkedMessage,
   unarchiveGroupExercise,
   useGroupAction,
   useMyGroupExerciseLinks,
@@ -22,9 +29,12 @@ import {
   type GroupExerciseListResult,
   type GroupResourceState,
   type GroupRole,
+  type LinkableExercise,
 } from '@/src/groups';
+import { buildAddAsNewPrefill } from '@/src/groups/add-as-new';
 
 import { GroupActionSheet } from './group-action-sheet';
+import { GroupExercisePickSheet, type GroupExercisePickTarget } from './group-exercise-pick-sheet';
 import { GroupExerciseRow } from './group-exercise-row';
 import { GroupMissingDataState, GroupStateView } from './group-state-view';
 import { GroupWriteNotice } from './write-notice';
@@ -33,6 +43,7 @@ type Feedback = { tone: 'error' | 'success'; message: string };
 
 type GroupExercisesPageProps = {
   groupId: string;
+  groupName: string;
   myRole: GroupRole;
   /** `group_exercise_list` through `useGroupResource` (`group-exercises:<groupId>`), owned by the group screen. */
   exercises: GroupResourceState<GroupExerciseListResult>;
@@ -48,17 +59,32 @@ const runArchiveWrite = (groupId: string, action: 'archive' | 'unarchive', group
 
 /**
  * The group page's Exercises segment (product E0.4; contract §4.4): the
- * group's exercises with my local link status, and for the owner and admins
- * Add exercise plus a per-row sheet (Rename, Archive / Unarchive). Writes are
- * online-only (08 pattern 9); Archive confirms first.
+ * group's exercises with my local link status and, on an active row none of
+ * mine is linked to, "Link your exercise" for every member — the M25-T07 pick
+ * sheet in link-only mode (a local write, so it works offline; nothing is
+ * added to a session). The owner and admins also get Add exercise and a
+ * per-row sheet (Rename, Archive / Unarchive): online-only writes (08
+ * pattern 9); Archive confirms first.
  */
-export function GroupExercisesPage({ groupId, myRole, exercises, offline, error, onRetry, refreshGroup }: GroupExercisesPageProps) {
+export function GroupExercisesPage({
+  groupId,
+  groupName,
+  myRole,
+  exercises,
+  offline,
+  error,
+  onRetry,
+  refreshGroup,
+}: GroupExercisesPageProps) {
   const router = useRouter();
   const links = useMyGroupExerciseLinks(groupId);
   const [sheetExercise, setSheetExercise] = useState<GroupExercise | null>(null);
+  const [pickTarget, setPickTarget] = useState<GroupExercisePickTarget | null>(null);
+  const [addAsNewTarget, setAddAsNewTarget] = useState<GroupExercise | null>(null);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const archiveWrite = useGroupAction(runArchiveWrite);
   const canManage = canManageGroup(myRole);
+  const addAsNewPrefill = useMemo(() => (addAsNewTarget ? buildAddAsNewPrefill(addAsNewTarget) : null), [addAsNewTarget]);
 
   const performArchiveWrite = async (action: 'archive' | 'unarchive', exercise: GroupExercise) => {
     setFeedback(null);
@@ -92,6 +118,45 @@ export function GroupExercisesPage({ groupId, myRole, exercises, offline, error,
       return;
     }
     void performArchiveWrite('unarchive', exercise);
+  };
+
+  const openLink = (exercise: GroupExercise) => {
+    setFeedback(null);
+    setPickTarget({ groupId, groupName, groupExercise: exercise, mode: 'link', linkedExercises: [] });
+  };
+
+  // A local write, so it works offline; a failure rejects into the sheet's inline error.
+  const linkFromSheet = async (exercise: LinkableExercise) => {
+    const target = pickTarget;
+    if (!target) return;
+    await linkExercise(exercise.id, groupId, target.groupExercise.group_exercise_id);
+    setPickTarget(null);
+    await links.reload();
+    setFeedback({ tone: 'success', message: groupExerciseLinkedMessage(exercise.name, target.groupExercise.name) });
+  };
+
+  const openAddAsNew = () => {
+    setAddAsNewTarget(pickTarget?.groupExercise ?? null);
+    setPickTarget(null);
+  };
+
+  // "Add as new": my exercise and its link commit in one local transaction.
+  const saveAddAsNew = async (input: ExerciseEditorSaveInput): Promise<ExerciseCatalogExercise> => {
+    const target = addAsNewTarget;
+    if (!target) {
+      throw new Error('No group exercise selected.');
+    }
+    const { exercise } = await createExerciseWithGroupLink(input, { groupId, groupExerciseId: target.group_exercise_id });
+    return exercise;
+  };
+
+  const onAddAsNewSaved = (exercise: ExerciseCatalogExercise) => {
+    const target = addAsNewTarget;
+    setAddAsNewTarget(null);
+    void links.reload();
+    if (target) {
+      setFeedback({ tone: 'success', message: groupExerciseLinkedMessage(exercise.name, target.name) });
+    }
   };
 
   if (!exercises.data) {
@@ -130,17 +195,17 @@ export function GroupExercisesPage({ groupId, myRole, exercises, offline, error,
         <>
           {addButton}
           <UiSurface style={{ paddingHorizontal: uiSpace.lg }} testID="group-exercises-list">
-            {rows.map((row) => (
-              <GroupExerciseRow
-                key={row.groupExerciseId}
-                onPress={
-                  canManage && !archiveWrite.pending
-                    ? () => setSheetExercise(byId.get(row.groupExerciseId) ?? null)
-                    : undefined
-                }
-                row={row}
-              />
-            ))}
+            {rows.map((row) => {
+              const exercise = byId.get(row.groupExerciseId) ?? null;
+              return (
+                <GroupExerciseRow
+                  key={row.groupExerciseId}
+                  onLink={row.linkable && exercise ? () => openLink(exercise) : undefined}
+                  onPress={canManage && !archiveWrite.pending ? () => setSheetExercise(exercise) : undefined}
+                  row={row}
+                />
+              );
+            })}
           </UiSurface>
         </>
       )}
@@ -164,6 +229,24 @@ export function GroupExercisesPage({ groupId, myRole, exercises, offline, error,
         testIDPrefix="group-exercise-actions"
         title={sheetExercise?.name ?? ''}
         visible={sheetExercise !== null}
+      />
+      <GroupExercisePickSheet
+        exercises={links.exercises}
+        links={links.allLinks}
+        onAddAsNew={openAddAsNew}
+        onLinkAndAdd={linkFromSheet}
+        onRequestClose={() => setPickTarget(null)}
+        purpose="link-only"
+        target={pickTarget}
+      />
+      <ExerciseEditorModal
+        editingExercise={null}
+        onRequestClose={() => setAddAsNewTarget(null)}
+        onSave={saveAddAsNew}
+        onSaved={onAddAsNewSaved}
+        prefill={addAsNewPrefill}
+        title="Add as new exercise"
+        visible={addAsNewTarget !== null}
       />
     </View>
   );

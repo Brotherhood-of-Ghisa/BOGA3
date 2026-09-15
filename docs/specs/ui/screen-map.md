@@ -284,7 +284,7 @@ Brief entrypoint map of the current mobile screens.
   - the group screen: header (name, description, the member count · my role line, which opens Members, and owner/admin `Invite` (primary) + `Edit`), then a joined `Stream` / `Exercises` / `Leaderboards` segment (M25-T08; product D10, D14)
 - Key states (high level):
   - loading / offline / error; the offline banner and inline error follow the open segment
-  - Exercises: active exercises, then archived ones marked `Archived`, each with its weight entry and my local link status (`Linked: …` / `Not linked`); owner/admin `Add exercise` and a row sheet (`Rename`, `Archive` with confirmation, or `Unarchive`), which members never see; "No group exercises yet" when empty; each write's outcome as an inline notice
+  - Exercises: active exercises, then archived ones marked `Archived`, each with its weight entry and my local link status (`Linked: …` / `Not linked`); an active row none of mine is linked to offers `Link your exercise` to every member (the M25-T07 pick sheet, link-only); owner/admin `Add exercise` and a row sheet (`Rename`, `Archive` with confirmation, or `Unarchive`), which members never see; "No group exercises yet" when empty; each write's outcome as an inline notice
   - Leaderboards: an empty state until M25-T09
   - lost access after `NOT_FOUND` on any of its reads: "You're no longer a member of this group", with cached data hidden
 - Key exits:

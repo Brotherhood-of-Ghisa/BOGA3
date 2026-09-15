@@ -150,7 +150,8 @@ appId: com.dinoderek.mobile
 # --- 4b. Exercises page (M25-T08): the owner adds, renames, and archives --------
 # The device (the owner) copies a standard exercise and creates a custom one,
 # renames the custom one, and archives the copy, which moves it to the bottom
-# marked Archived. The device has no links, so both read "Not linked". An owner's
+# marked Archived. Before archiving, it links the copy to its own seeded
+# "Barbell Bench Press" through "Link your exercise" (E0.4). An owner's
 # row is one pressable element, so it is found by its joined accessibility label
 # ("<name>, <weight entry>[, archived], <link status>"); its testID carries the
 # server-generated id.
@@ -226,9 +227,26 @@ appId: com.dinoderek.mobile
     visible:
       text: "Prowler Push, Per side, Not linked"
     timeout: 15000
+# Link your exercise (E0.4): the copy suggests the device's own seeded "Barbell
+# Bench Press"; Link writes the link locally and starts no session.
+- tapOn:
+    text: "Link your exercise to Barbell Bench Press"
+- extendedWaitUntil:
+    visible:
+      id: "group-pick-sheet-option-suggested"
+    timeout: 10000
+- assertVisible:
+    id: "group-pick-sheet-retroactivity"
+- takeScreenshot: "groups-04b-2-pick-sheet-link-only"
+- tapOn:
+    id: "group-pick-sheet-confirm"
+- extendedWaitUntil:
+    visible:
+      text: "Barbell Bench Press, Total load, Linked: Barbell Bench Press"
+    timeout: 15000
 # Archive the standard copy; the native confirmation Alert's destructive button.
 - tapOn:
-    text: "Barbell Bench Press, Total load, Not linked"
+    text: "Barbell Bench Press, Total load, Linked: Barbell Bench Press"
 - extendedWaitUntil:
     visible:
       id: "group-exercise-action-archive"
@@ -248,9 +266,9 @@ appId: com.dinoderek.mobile
 - assertVisible: "Barbell Bench Press was archived\\."
 - extendedWaitUntil:
     visible:
-      text: "Barbell Bench Press, Total load, archived, Not linked"
+      text: "Barbell Bench Press, Total load, archived, Linked: Barbell Bench Press"
     timeout: 15000
-- takeScreenshot: "groups-04b-2-exercise-renamed-archived"
+- takeScreenshot: "groups-04b-3-exercise-linked-renamed-archived"
 # A member (the counterparty) reads the same list over group_exercise_list.
 - runScript:
     file: ../scripts/groups-counterparty.js

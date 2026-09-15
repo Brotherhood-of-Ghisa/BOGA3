@@ -73,13 +73,27 @@ describe('buildGroupExerciseRows', () => {
         loadInputModeLabel: 'Total load',
         archived: false,
         linkStatus: 'Linked: Bench (comp grip), Bench (hotel gym)',
+        linkable: false,
       },
-      { groupExerciseId: 'ge-row', name: 'Cable Row', loadInputModeLabel: 'Per side', archived: false, linkStatus: 'Not linked' },
+      {
+        groupExerciseId: 'ge-row',
+        name: 'Cable Row',
+        loadInputModeLabel: 'Per side',
+        archived: false,
+        linkStatus: 'Not linked',
+        linkable: true,
+      },
     ]);
   });
 
   it('leaves the status out while my links are still loading', () => {
     expect(buildGroupExerciseRows([bench], null)[0].linkStatus).toBeNull();
+  });
+
+  it('offers "Link your exercise" only on active rows none of mine is linked to, once links have loaded (E0.4, D8)', () => {
+    expect(buildGroupExerciseRows([bench, old], []).map((r) => r.linkable)).toEqual([true, false]);
+    expect(buildGroupExerciseRows([bench], [{ groupExerciseId: 'ge-bench', exerciseName: null }])[0].linkable).toBe(false);
+    expect(buildGroupExerciseRows([bench], null)[0].linkable).toBe(false);
   });
 });
 
