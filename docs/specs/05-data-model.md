@@ -205,6 +205,16 @@ to deduplicate per device, so idempotency falls out of per-row LWW.
   so unlike the tables above it is `in sync scope` — the tenth Sync v2 entity
   (Sync v2 data-model contract #11). It points at group rows only by plain-text
   id; no group table became a synced parent.
+- **As-built (M25-T05, `supabase/migrations/20260914120000_m25_group_boards.sql`):**
+  `app_public.group_board_entries` (one row per group exercise, member,
+  metric, and certified flag: the member's best counting set, converted to
+  the group exercise's load mode) and `app_public.group_board_state` (the
+  exercises linked at the last evaluation). `group_events` gains the record,
+  void, link, and lead-change columns. Both new tables follow the group
+  posture (RLS on, no policies, no client grants, no `owner_user_id`, no FK
+  into Sync v2 tables). Sync impact decision: `out of sync scope`; they are
+  server-authoritative and written only by the group evaluator
+  (`docs/specs/tech/groups-contract.md` §2.11).
 
 ## Ownership and identity invariants
 
