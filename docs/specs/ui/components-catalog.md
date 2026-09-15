@@ -97,31 +97,67 @@ Brief entrypoint inventory of the current reusable UI component set.
   - shared layout scaffold for session exercise/set content used by `session-recorder` and completed-session detail screens
   - supports optional per-exercise metadata injection (`renderExerciseMeta`) so recorder mode can render tag chips/actions without duplicating card structure
   - supports optional per-exercise collapse state and a caller-provided collapsed-summary renderer while preserving header actions outside the hidden body
-  - exports `ExerciseCardCollapsedSummary` for the shared performed-set/working-set presentation and optional live PR line
+  - exports `ExerciseCardCollapsedSummary` for the shared performed-set/working-set presentation and optional collapsed `ExercisePersonalRecordCelebration`
 
-6. `SessionSummaryLine`
+6. `SessionMuscleLoad`
+- File: `apps/mobile/components/session-recorder/session-muscle-load.tsx`
+- Purpose:
+  - reusable active-session compact summary and in-route detail sheet over the shared current-session muscle calculation
+  - owns mapped, partially mapped, unmapped, catalog loading/error/retry, accessible exact-volume, relative-bar, dismissal, and reversal-close presentation while the recorder route supplies live counts and data
+
+7. `ExercisePersonalRecordCelebration`
+- File: `apps/mobile/components/session-recorder/exercise-personal-record-celebration.tsx`
+- Purpose:
+  - reusable, non-interactive exercise-scoped success surface for a shared `ExercisePersonalRecord`, with exercise, best-set, and rounded estimated-1RM facts in expanded, collapsed, or compact-completion form
+
+8. `SessionCompletionPresentation`
+- File: `apps/mobile/components/session-recorder/session-completion-presentation.tsx`
+- Purpose:
+  - shared post-submit and historical-summary composition with one consolidated
+    totals/muscle-working-set card, every compact PR, every per-exercise volume
+    comparison, and the session-image share preview
+  - muscle chips are informational views rather than analytics links; Done is
+    supplied only by the post-submit caller, while historical navigation stays
+    in the route header
+  - keeps all PRs visible together instead of paging them
+
+9. `ExerciseVolumeComparisonRow`
+- File: `apps/mobile/components/session-recorder/exercise-volume-comparison.tsx`
+- Purpose:
+  - presents exercise name, performed/working-set counts, current entered volume
+    versus median, and descriptive P5/P95 range or explicit sparse-history state
+  - reused by in-app completion and the captured share card
+
+10. `SessionSharePreview` / `SessionShareCard`
+- File: `apps/mobile/components/session-recorder/session-share-preview.tsx`
+- Purpose:
+  - previews the exact privacy-limited session card captured to PNG and opens the
+    native image share sheet with inline retry and temporary-file cleanup
+  - includes all PRs and exercise comparisons, but never gym/location data
+
+11. `SessionSummaryLine`
 - File: `apps/mobile/components/session-list/session-summary-line.tsx`
 - Purpose:
   - shared two-line summary row (date/duration/gym + sets/exercises) reused by `ActiveSessionRow` and `HistoryList`, and available to the upcoming Stats/History and Log tabs
 
-7. `ActiveSessionRow`
+12. `ActiveSessionRow`
 - File: `apps/mobile/components/session-list/active-session-row.tsx`
 - Purpose:
   - active-session row plus its overflow menu (resume / complete / delete) used by the Log tab
 
-8. `HistoryList`
+13. `HistoryList`
 - File: `apps/mobile/components/session-list/history-list.tsx`
 - Purpose:
   - completed-session history list with delete/undelete modal and deleted-visibility toggle, consumed by the `stats-history` History sub-view
 
-9. `DailyHeatmap` / `WeeklyHeatmap`
+14. `DailyHeatmap` / `WeeklyHeatmap`
 - Files: `apps/mobile/components/heatmaps/DailyHeatmap.tsx`, `apps/mobile/components/heatmaps/WeeklyHeatmap.tsx`
 - Purpose:
   - reusable daily-cell and weekly-bar views over the same `HeatmapData`, used by both muscle- and exercise-history overlays
   - renders horizontally scrollable one-year history with token-backed zero/green/today/selected states and tappable accessible cells
   - the Stats overlay integration keeps both views mounted, with the inactive view transparent, non-interactive, and accessibility-hidden, so toggling does not rebuild the chart tree
 
-10. Group components (M22)
+15. Group components (M22)
 - Folder: `apps/mobile/components/groups/` (barrel `index.ts`); data comes from `@/src/groups` hooks and the pure view model
 - Purpose:
   - `GroupStreamSessionCard` — the stream card (member, status pill, start · gym, sets · kg · exercises computed on the device, group names in All); one press target

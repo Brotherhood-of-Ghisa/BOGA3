@@ -97,6 +97,20 @@ describe('SessionsScreen active-session navigation', () => {
       expect(dataClient.loadSessions).toHaveBeenCalledTimes(1);
     });
   });
+
+  it('opens a completed History row in completed-edit mode by default', async () => {
+    const dataClient = buildDataClient();
+    dataClient.loadSessions.mockResolvedValue([completedSession]);
+    render(<SessionsScreen dataClient={dataClient} />);
+
+    fireEvent.press(
+      await screen.findByTestId(`completed-session-open-button-${completedSession.id}`)
+    );
+
+    expect(mockPush).toHaveBeenCalledWith(
+      `/session-recorder?mode=completed-edit&sessionId=${completedSession.id}`
+    );
+  });
 });
 
 describe('SessionsScreen focus-aware loading', () => {

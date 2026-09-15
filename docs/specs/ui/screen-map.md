@@ -51,10 +51,16 @@ Brief entrypoint map of the current mobile screens.
 - File: `apps/mobile/app/(tabs)/stats-history.tsx`
 - Purpose:
   - merged Stats / History tab whose Stats surface switches between per-exercise and per-muscle summaries while preserving the top-level Sessions drill-down and in-route history overlays
+- Query params:
+  - `period` (optional; `7` or `30`; absent/invalid values default to `7`)
+  - `breakdown` (optional; `exercise` or `muscle`; absent/invalid values default to `exercise`)
 - Key states (high level):
   - Stats summary loading/error/content states with separate labelled control
     rows: `Time range` keeps the 7-/30-day pills, and `Breakdown` keeps both
     joined `By Exercise` / `By Muscle` choices visible with one selected
+  - valid query values set the initial controls, including the completion
+    handoff at `?period=7&breakdown=muscle`; later control changes remain
+    in-route state and do not rewrite the query string
   - top summary cards show `Sessions` and `Sets (W/Sets)` as absolute counts; their previous-period deltas never include percentages
   - per-exercise history is a viewport-fitting table with compact, single-line
     `Exercise`, `Sets`, `Vol`, and `1RM` headers; rows show aligned values, keep
@@ -93,7 +99,8 @@ Brief entrypoint map of the current mobile screens.
   - in-route single gym editor owns private coordinate controls (`Save current location`, confirmation-gated replace, and confirmation-gated clear)
   - in-route exercise-tag add/manage modals (search/select/create, rename/delete/undelete, deleted-visibility toggle)
   - per-exercise collapsed-by-default `Past Records` bar below tags and above set rows; tapping expands inline loading/empty/error states plus metric label / selected record date / live `Current` / green `Max` rows for estimated `1RM`, volume, highest weight, and working-set count; left/right swipes anywhere on the expanded panel change the selected historical record, and max values derive from loaded records plus valid current metrics
-  - exercise cards start expanded and their title region toggles a volatile collapsed summary showing valid performed-set and working-set counts (`RIR 0`/`RIR 1`/`RIR 2`), plus a live Wathan-based `New PR` line only for a strict improvement over loaded completed history; collapse closes in-card editing, while replacement and appended-plan reveal expand the target card
+  - exercise cards start expanded and their title region toggles a volatile collapsed summary showing valid performed-set and working-set counts (`RIR 0`/`RIR 1`/`RIR 2`); when the shared current-session insight helper finds a strict Wathan-estimate improvement over loaded completed history, the owning exercise alone shows a non-interactive success-surface `New PR` treatment with its best set and rounded estimated 1RM in both states; qualifying-set reversal removes the treatment immediately, and collapse closes in-card editing while replacement and appended-plan reveal expand the target card
+  - active mode reveals a session-scoped `Session muscle load` row above recorder-wide actions only after valid confirmed work exists; it reports physical performed/working-set counts and leading mapped muscles, and opens an in-route detail sheet with exact weighted volumes and session-relative bars; unmapped work and retryable catalog failure are explicit, while reversal removes the row/sheet immediately and completed-edit mode remains unchanged
   - compact tap-to-edit set rows for normal and planned execution rows, each with an independently tappable left confirmation checkbox: a hollow circle is unperformed and a success-green tick is valid confirmed actual work; new/copy rows remain hollow even with valid copied values, and tapping a tick again retains values while removing the set from performed metrics; each exercise card identifies weight entry as `Total load` or `Per side`, while editable fields keep a compact `kg` suffix and make the full weight shell a focus target; adding a copied row focuses its weight and selects the full copied value; appended historical/program targets use a semantic soft blue-grey planned-row background/border while inactive, and selected appended/manual rows share one light-blue background and blue border, with no separate last-added tint, `Plan` badge, `Skip`, `Log`, or planned-row swipe action; tapping a planned body hydrates unconfirmed actual fields from the plan, and only removable user-added rows swipe to delete
   - active/completed-edit autosave preserves unconfirmed rows and values, while submit/save includes confirmed actual rows only; valid entered unconfirmed rows trigger a dedicated discard confirmation instead of being promoted or silently removed
   - appending a historical plan automatically expands and scrolls to the target exercise card once without giving it distinct selected styling; later card layouts from editing, row expansion/collapse, or keyboard changes do not move the recorder viewport
@@ -102,7 +109,11 @@ Brief entrypoint map of the current mobile screens.
   - the exercise card `•••` menu adds `Link to group exercise…` (signed in)
 - Key exits:
   - `exercise-catalog` (`source=session-recorder&intent=manage` from exercise picker)
-  - dismisses to `/` on submit/save success
+  - active submit replaces to
+    `/completed-session/<sessionId>?presentation=completion` only after local
+    persistence and completion succeed
+  - completed-edit save replaces directly to `/stats-history` and does not
+    replay completion
   - `/exercise-link?exerciseDefinitionId=<id>` (`•••` `Link to group exercise…`)
 
 5. `/exercise-catalog`
@@ -199,8 +210,8 @@ Brief entrypoint map of the current mobile screens.
     Log recorder so draft state and recorder cleanup rules remain authoritative
 - Key exits:
   - `/session-recorder` via stack dismissal for active Resume or review/complete
-  - `/completed-session/<sessionId>` from a completed row
-  - `/session-recorder?mode=completed-edit&sessionId=<sessionId>` from completed edit
+  - `/session-recorder?mode=completed-edit&sessionId=<sessionId>` from a
+    completed row or its explicit Edit action
 - Notes:
   - the native stack header centers `Sessions` and uses the platform back arrow
     without a text label, so the internal `(tabs)` group name is never exposed
@@ -211,6 +222,17 @@ Brief entrypoint map of the current mobile screens.
   - completed session detail viewer with edit/delete session actions and per-exercise block append actions
 - Key states (high level):
   - loading / error / not-found / detail
+  - `presentation=completion` and `presentation=summary` reuse the same content:
+    one labelled totals card with informational per-muscle working-set counts,
+    all compact `Personal records`, per-exercise current volume versus median
+    and descriptive P5/P95 range, and previewed PNG session sharing. Neither
+    presentation links to muscle analytics. Optional historical enrichment
+    cannot block either summary, and share output excludes gym/location.
+    Edit/delete/append actions are hidden in both modes; only post-submit
+    completion renders Done
+  - completion loading/error/not-found/deleted-target states expose one safe
+    Stats / History exit; the native back affordance/gesture is suppressed and
+    Android system back replaces to Stats / History
   - read-only exercise cards include a set table with `Set`, `Weight`, `Reps`, and `Effort`
   - exercise-card titles toggle an expanded/collapsed state; collapsed cards show valid performed-set and working-set counts while keeping `Append` available
   - each exercise card header exposes `Append` to copy that one historical block as planned target rows into the active recorder
@@ -218,6 +240,8 @@ Brief entrypoint map of the current mobile screens.
 - Key exits:
   - `session-recorder` (edit)
   - `session-recorder` after successful per-exercise block append
+  - `/stats-history` from completion Done/back
+  - `/sessions` or completed-edit mode from historical-summary header actions
 
 11. `/exercise-history`
 - File: `apps/mobile/app/exercise-history.tsx`

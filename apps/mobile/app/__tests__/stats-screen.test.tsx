@@ -15,6 +15,8 @@ import {
   formatVolumeDelta,
   nextExerciseSortMode,
   sortExerciseListItems,
+  resolveStatsInitialBreakdown,
+  resolveStatsInitialPeriod,
 } from '../(tabs)/stats-history';
 import { uiColors } from '@/components/ui';
 import type { SelectedMuscleWeeklyEffort, StatsSummary } from '@/src/data';
@@ -53,15 +55,20 @@ jest.mock('@/src/exercise-catalog/stats-cache', () => {
 jest.mock('expo-router', () => {
   const mockPush = jest.fn();
   let latestFocusCallback: (() => void) | null = null;
+  let localSearchParams: Record<string, string | string[] | undefined> = {};
 
   return {
     useRouter: () => ({ push: mockPush }),
+    useLocalSearchParams: () => localSearchParams,
     useFocusEffect: (callback: () => void) => {
       latestFocusCallback = callback;
     },
     __mockPush: mockPush,
     __triggerFocus: () => {
       latestFocusCallback?.();
+    },
+    __setLocalSearchParams: (next: Record<string, string | string[] | undefined>) => {
+      localSearchParams = next;
     },
   };
 });
@@ -80,9 +87,17 @@ const {
   computeStatsSummary: jest.Mock;
 };
 
-const { __mockPush: mockPush, __triggerFocus: triggerFocus } = jest.requireMock(
+const {
+  __mockPush: mockPush,
+  __triggerFocus: triggerFocus,
+  __setLocalSearchParams: setLocalSearchParams,
+} = jest.requireMock(
   'expo-router'
-) as { __mockPush: jest.Mock; __triggerFocus: () => void };
+) as {
+  __mockPush: jest.Mock;
+  __triggerFocus: () => void;
+  __setLocalSearchParams: (next: Record<string, string | string[] | undefined>) => void;
+};
 
 const {
   __reload: mockReloadExerciseCatalogStats,
@@ -251,6 +266,7 @@ const buildSummary = (overrides: Partial<StatsSummary> = {}): StatsSummary => ({
 });
 
 beforeEach(() => {
+  setLocalSearchParams({});
   mockComputeSelectedExerciseWeeklyEffort.mockReset();
   mockComputeSelectedExerciseDailyEffort.mockReset().mockResolvedValue([]);
   mockComputeSelectedMuscleWeeklyEffort.mockReset();
@@ -979,6 +995,34 @@ describe('StatsScreenShell', () => {
 });
 
 describe('StatsRoute', () => {
+  it('validates initial period and breakdown query values', () => {
+    expect(resolveStatsInitialPeriod('30')).toBe(30);
+    expect(resolveStatsInitialPeriod(['7'])).toBe(7);
+    expect(resolveStatsInitialPeriod('all')).toBe(7);
+    expect(resolveStatsInitialBreakdown('muscle')).toBe('muscle');
+    expect(resolveStatsInitialBreakdown(['exercise'])).toBe('exercise');
+    expect(resolveStatsInitialBreakdown('unknown')).toBe('exercise');
+  });
+
+  it('uses valid route values as the initial Stats controls', async () => {
+    setLocalSearchParams({ period: '30', breakdown: 'muscle' });
+    mockComputeStatsSummary.mockResolvedValue(buildSummary());
+
+    render(<StatsRoute />);
+
+    await act(async () => {
+      triggerFocus();
+    });
+
+    await waitFor(() => {
+      expect(mockComputeStatsSummary).toHaveBeenCalledWith({ periodDays: 30 });
+    });
+    expect(screen.getByTestId('stats-period-chip-30').props.accessibilityState.selected).toBe(true);
+    expect(screen.getByTestId('stats-view-mode-chip-muscle').props.accessibilityState.selected).toBe(
+      true
+    );
+  });
+
   it('loads the summary on focus and re-loads when the period changes', async () => {
     mockComputeStatsSummary
       .mockResolvedValueOnce(buildSummary())

@@ -139,8 +139,11 @@ describe('maestro harness helpers', () => {
         target: 'session-recorder',
         mode: 'completed-edit',
         sessionId: 'session-123',
+        maestroShare: 'fail-once',
       })
-    ).toBe('/session-recorder?mode=completed-edit&sessionId=session-123');
+    ).toBe(
+      '/session-recorder?mode=completed-edit&sessionId=session-123&maestroShare=fail-once'
+    );
 
     expect(
       resolveMaestroHarnessTeleportHref({
@@ -149,6 +152,18 @@ describe('maestro harness helpers', () => {
         sessionId: 'session-123',
       })
     ).toBe('/completed-session/session-123?intent=edit');
+
+    expect(
+      resolveMaestroHarnessTeleportHref({
+        target: 'completed-session',
+        sessionId: 'session-123',
+        presentation: 'completion',
+        maestroShare: 'fail-once',
+        maestroCatalog: 'fail-once',
+      })
+    ).toBe(
+      '/completed-session/session-123?presentation=completion&maestroShare=fail-once&maestroCatalog=fail-once'
+    );
 
     expect(
       resolveMaestroHarnessTeleportHref({

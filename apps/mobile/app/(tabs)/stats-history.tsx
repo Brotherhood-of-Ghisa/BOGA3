@@ -1,4 +1,4 @@
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   Pressable,
@@ -102,6 +102,17 @@ const VIEW_MODE_OPTIONS = [
   { value: 'exercise' as StatsViewMode, label: 'By Exercise' },
   { value: 'muscle' as StatsViewMode, label: 'By Muscle' },
 ] as const;
+
+const firstRouteParam = (value: string | string[] | undefined): string | undefined =>
+  Array.isArray(value) ? value[0] : value;
+
+export const resolveStatsInitialPeriod = (
+  value: string | string[] | undefined
+): StatsPeriodDays => (firstRouteParam(value) === '30' ? 30 : 7);
+
+export const resolveStatsInitialBreakdown = (
+  value: string | string[] | undefined
+): StatsViewMode => (firstRouteParam(value) === 'muscle' ? 'muscle' : 'exercise');
 export type MuscleHistoryMetric = Extract<
   CalendarHeatmapMetric,
   'totalVolume' | 'workingSetCount'
@@ -1642,7 +1653,13 @@ function Metric({
 
 export default function StatsRoute() {
   const router = useRouter();
-  const [periodDays, setPeriodDays] = useState<StatsPeriodDays>(7);
+  const params = useLocalSearchParams<{
+    period?: string | string[];
+    breakdown?: string | string[];
+  }>();
+  const [periodDays, setPeriodDays] = useState<StatsPeriodDays>(() =>
+    resolveStatsInitialPeriod(params.period)
+  );
   const [summary, setSummary] = useState<StatsSummary | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -1656,7 +1673,9 @@ export default function StatsRoute() {
   const [muscleHistoryView, setMuscleHistoryView] = useState<HeatmapView>('weekly');
   const muscleHistoryRequestIdRef = useRef(0);
 
-  const [viewMode, setViewMode] = useState<StatsViewMode>('exercise');
+  const [viewMode, setViewMode] = useState<StatsViewMode>(() =>
+    resolveStatsInitialBreakdown(params.breakdown)
+  );
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedExercise, setSelectedExercise] = useState<ExerciseHeatmapTarget | null>(null);
   const [exerciseHistoryWeeklyEffort, setExerciseHistoryWeeklyEffort] = useState<SelectedExerciseWeeklyEffort[]>([]);

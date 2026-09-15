@@ -2,6 +2,8 @@ import { Fragment, type ComponentProps, type ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { UiSurface, UiText, uiColors, uiSpace } from '@/components/ui';
+import { ExercisePersonalRecordCelebration } from '@/components/session-recorder/exercise-personal-record-celebration';
+import type { ExercisePersonalRecord } from '@/src/session-insights';
 
 export type SessionContentSetValue = {
   id: string;
@@ -14,29 +16,11 @@ export type SessionContentExerciseValue<TSet extends SessionContentSetValue = Se
   sets: TSet[];
 };
 
-export type ExerciseCardPersonalRecordSummary = {
-  weight: number;
-  reps: number;
-  estimatedOneRepMax: number;
-};
-
 type ExerciseCardCollapsedSummaryProps = {
   setCount: number;
   workingSetCount: number;
-  newPersonalRecord?: ExerciseCardPersonalRecordSummary | null;
+  newPersonalRecord?: ExercisePersonalRecord | null;
   testID: string;
-};
-
-type ExerciseCardPersonalRecordLineProps = {
-  personalRecord?: ExerciseCardPersonalRecordSummary | null;
-  testID: string;
-};
-
-const formatCompactLoad = (value: number): string => {
-  if (!Number.isFinite(value)) {
-    return '-';
-  }
-  return Number.isInteger(value) ? `${value}` : `${Number(value.toFixed(2))}`;
 };
 
 export function ExerciseCardCollapsedSummary({
@@ -53,31 +37,14 @@ export function ExerciseCardCollapsedSummary({
       <UiText variant="subtitle" testID={`${testID}-counts`}>
         {`${setLabel} · ${workingSetLabel}`}
       </UiText>
-      <ExerciseCardPersonalRecordLine
-        personalRecord={newPersonalRecord}
-        testID={`${testID}-new-pr`}
-      />
+      {newPersonalRecord ? (
+        <ExercisePersonalRecordCelebration
+          personalRecord={newPersonalRecord}
+          testID={`${testID}-new-pr`}
+          variant="collapsed"
+        />
+      ) : null}
     </View>
-  );
-}
-
-export function ExerciseCardPersonalRecordLine({
-  personalRecord,
-  testID,
-}: ExerciseCardPersonalRecordLineProps) {
-  if (!personalRecord) {
-    return null;
-  }
-
-  return (
-    <UiText
-      adjustsFontSizeToFit
-      minimumFontScale={0.7}
-      numberOfLines={1}
-      style={styles.exerciseCollapsedPrText}
-      testID={testID}>
-      {`PR: ${formatCompactLoad(personalRecord.weight)} kg × ${personalRecord.reps} reps · est. 1RM ${Math.round(personalRecord.estimatedOneRepMax)} kg`}
-    </UiText>
   );
 }
 
@@ -344,12 +311,6 @@ const styles = StyleSheet.create({
   },
   exerciseCollapsedSummary: {
     gap: uiSpace.xxs,
-  },
-  exerciseCollapsedPrText: {
-    color: uiColors.heatmapBucket4,
-    fontSize: 12,
-    lineHeight: 16,
-    fontWeight: '700',
   },
   setList: {
     gap: uiSpace.sm,

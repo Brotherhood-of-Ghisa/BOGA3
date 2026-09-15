@@ -1,12 +1,13 @@
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { BackHandler, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { SessionCompletionPresentation } from '@/components/session-recorder/session-completion-presentation';
 import {
   ExerciseCardCollapsedSummary,
   SessionContentLayout,
 } from '@/components/session-recorder/session-content-layout';
-import { uiColors } from '@/components/ui';
+import { UiButton, uiColors } from '@/components/ui';
 import {
   formatSessionListCompactDuration,
   listSessionExerciseAssignedTags,
@@ -19,10 +20,18 @@ import {
   type SessionSetTypeValue,
 } from '@/src/data';
 import { parseCalculationSet } from '@/src/exercise-calculations';
+import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
+import { isDevMode } from '@/src/utils/isDevMode';
 import {
   isConfirmedPerformedSet,
   type SessionSetPerformanceStatus,
 } from '@/src/session-recorder/set-semantics';
+import {
+  deriveSessionExerciseVolumeComparisons,
+  loadCompletedSessionInsights,
+  summarizeCurrentSessionMuscleLoad,
+  type CompletedSessionInsights,
+} from '@/src/session-insights';
 
 export type CompletedSessionDetailSet = {
   id: string;
@@ -40,6 +49,7 @@ export type CompletedSessionDetailExerciseTag = {
 
 export type CompletedSessionDetailExercise = {
   id: string;
+  exerciseDefinitionId?: string | null;
   name: string;
   machineName: string | null;
   tags: CompletedSessionDetailExerciseTag[];
@@ -58,6 +68,7 @@ export type CompletedSessionDetailRecord = {
 
 export type CompletedSessionDetailDataClient = {
   loadCompletedSession(sessionId: string): Promise<CompletedSessionDetailRecord | null>;
+  loadInsights?(sessionId: string): Promise<CompletedSessionInsights | null>;
   appendCompletedSessionExerciseAsPlanned(sessionId: string, sessionExerciseId: string): Promise<void>;
   setCompletedSessionDeletedState(sessionId: string, isDeleted: boolean): Promise<void>;
 };
@@ -66,6 +77,9 @@ export type CompletedSessionDetailScreenShellProps = {
   sessionId?: string | null;
   dataClient?: CompletedSessionDetailDataClient;
   initialMode?: 'view' | 'edit';
+  presentation?: 'detail' | 'completion' | 'summary';
+  shouldFailNextMaestroShare?: boolean;
+  shouldFailNextMaestroCatalog?: boolean;
 };
 
 function formatDateTimeStamp(isoTimestamp: string): string {
@@ -90,6 +104,13 @@ function coerceRouteParam(value: string | string[] | undefined): string | null {
 
   return value ?? null;
 }
+
+export const resolveCompletedSessionPresentation = (
+  value: string | string[] | undefined
+): 'detail' | 'completion' | 'summary' => {
+  const presentation = coerceRouteParam(value);
+  return presentation === 'completion' || presentation === 'summary' ? presentation : 'detail';
+};
 
 const formatSetEffortLabel = (setType: SessionSetTypeValue): string => {
   switch (setType) {
@@ -130,6 +151,7 @@ const DEFAULT_COMPLETED_SESSION_DETAILS: Record<string, CompletedSessionDetailRe
     exercises: [
       {
         id: 'm7-detail-ex-1',
+        exerciseDefinitionId: null,
         name: 'Bench Press',
         machineName: 'Flat Bench',
         tags: [],
@@ -140,6 +162,7 @@ const DEFAULT_COMPLETED_SESSION_DETAILS: Record<string, CompletedSessionDetailRe
       },
       {
         id: 'm7-detail-ex-2',
+        exerciseDefinitionId: null,
         name: 'Lat Pulldown',
         machineName: 'Cable',
         tags: [],
@@ -160,6 +183,7 @@ const DEFAULT_COMPLETED_SESSION_DETAILS: Record<string, CompletedSessionDetailRe
     exercises: [
       {
         id: 'm7-detail-ex-3',
+        exerciseDefinitionId: null,
         name: 'Leg Press',
         machineName: 'Hammer Strength',
         tags: [],
@@ -208,6 +232,7 @@ export const DEFAULT_COMPLETED_SESSION_DETAIL_DATA_CLIENT: CompletedSessionDetai
         deletedAt: sessionGraph.deletedAt ? sessionGraph.deletedAt.toISOString() : null,
         exercises: sessionGraph.exercises.map((exercise) => ({
           id: exercise.id,
+          exerciseDefinitionId: exercise.exerciseDefinitionId,
           name: exercise.name,
           machineName: exercise.machineName,
           tags: tagsBySessionExerciseId.get(exercise.id) ?? [],
@@ -224,6 +249,9 @@ export const DEFAULT_COMPLETED_SESSION_DETAIL_DATA_CLIENT: CompletedSessionDetai
 
     return DEFAULT_COMPLETED_SESSION_DETAILS[sessionId] ?? null;
   },
+  async loadInsights(sessionId) {
+    return loadCompletedSessionInsights(sessionId);
+  },
   async appendCompletedSessionExerciseAsPlanned(sessionId, sessionExerciseId) {
     await appendCompletedSessionExerciseAsPlannedDraft(sessionId, sessionExerciseId);
   },
@@ -236,11 +264,16 @@ export function CompletedSessionDetailScreenShell({
   sessionId,
   dataClient = DEFAULT_COMPLETED_SESSION_DETAIL_DATA_CLIENT,
   initialMode = 'view',
+  presentation = 'detail',
+  shouldFailNextMaestroShare = false,
+  shouldFailNextMaestroCatalog = false,
 }: CompletedSessionDetailScreenShellProps) {
   const router = useRouter();
+  const exerciseCatalog = useExerciseCatalog();
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [session, setSession] = useState<CompletedSessionDetailRecord | null>(null);
+  const [completedInsights, setCompletedInsights] = useState<CompletedSessionInsights | null>(null);
   const [collapsedExerciseIds, setCollapsedExerciseIds] = useState<Set<string>>(() => new Set());
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
 
@@ -273,8 +306,9 @@ export function CompletedSessionDetailScreenShell({
     setErrorMessage(null);
     setActionFeedback(null);
     setCollapsedExerciseIds(new Set());
+    setCompletedInsights(null);
 
-    dataClient
+    void dataClient
       .loadCompletedSession(sessionId)
       .then((loadedSession) => {
         if (cancelled) {
@@ -295,10 +329,25 @@ export function CompletedSessionDetailScreenShell({
         setIsLoading(false);
       });
 
+    if (presentation !== 'detail' && dataClient.loadInsights) {
+      void dataClient
+        .loadInsights(sessionId)
+        .then((loadedInsights) => {
+          if (!cancelled) {
+            setCompletedInsights(loadedInsights);
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setCompletedInsights(null);
+          }
+        });
+    }
+
     return () => {
       cancelled = true;
     };
-  }, [dataClient, sessionId]);
+  }, [dataClient, presentation, sessionId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -336,6 +385,154 @@ export function CompletedSessionDetailScreenShell({
         .filter((exercise) => exercise.sets.length > 0) ?? [],
     [session]
   );
+  const performedSetCount = useMemo(
+    () => performedExercises.reduce((count, exercise) => count + exercise.sets.length, 0),
+    [performedExercises]
+  );
+  const workingSetCount = useMemo(
+    () =>
+      performedExercises.reduce(
+        (count, exercise) =>
+          count + exercise.sets.filter((set) => isWorkingSessionSetType(set.setType)).length,
+        0
+      ),
+    [performedExercises]
+  );
+  const sessionMuscleSummary = useMemo(() => {
+    if (!session || exerciseCatalog.status !== 'ready') {
+      return null;
+    }
+
+    return summarizeCurrentSessionMuscleLoad({
+      sessionId: session.id,
+      sessionAt: new Date(session.completedAt),
+      exercises: session.exercises.map((exercise, exerciseIndex) => ({
+        id: exercise.id,
+        orderIndex: exerciseIndex,
+        exerciseDefinitionId: exercise.exerciseDefinitionId ?? null,
+        exerciseName: exercise.name,
+        sets: exercise.sets.map((set, setIndex) => ({
+          id: set.id,
+          orderIndex: setIndex,
+          weightValue: set.weight,
+          repsValue: set.reps,
+          setType: set.setType,
+          performanceStatus: set.performanceStatus,
+        })),
+      })),
+      exerciseDefinitions: exerciseCatalog.exercises.map((exercise) => ({
+        id: exercise.id,
+        loadInputMode: exercise.loadInputMode ?? 'total_load',
+      })),
+      muscleMappings: exerciseCatalog.exercises.flatMap((exercise) =>
+        exercise.mappings.map((mapping) => ({
+          exerciseDefinitionId: exercise.id,
+          muscleGroupId: mapping.muscleGroupId,
+          role: mapping.role,
+          weight: mapping.weight,
+        }))
+      ),
+      muscleGroups: exerciseCatalog.muscleGroups,
+    });
+  }, [exerciseCatalog.exercises, exerciseCatalog.muscleGroups, exerciseCatalog.status, session]);
+
+  const fallbackExerciseVolumeComparisons = useMemo(() => {
+    if (!session) return [];
+    return deriveSessionExerciseVolumeComparisons({
+      targetSession: {
+        sessionId: session.id,
+        status: 'completed',
+        completedAt: new Date(session.completedAt),
+        deletedAt: session.deletedAt ? new Date(session.deletedAt) : null,
+        exercises: session.exercises.map((exercise, exerciseIndex) => ({
+          id: exercise.id,
+          orderIndex: exerciseIndex,
+          exerciseDefinitionId: exercise.exerciseDefinitionId ?? null,
+          exerciseName: exercise.name,
+          sets: exercise.sets.map((set, setIndex) => ({
+            id: set.id,
+            orderIndex: setIndex,
+            weightValue: set.weight,
+            repsValue: set.reps,
+            setType: set.setType,
+            performanceStatus: set.performanceStatus,
+          })),
+        })),
+      },
+      historicalSessions: [],
+    });
+  }, [session]);
+
+  const handleCompletionExit = useCallback(() => {
+    router.replace('/stats-history');
+  }, [router]);
+
+  const handleSummaryHistoryExit = useCallback(() => {
+    router.replace('/sessions');
+  }, [router]);
+
+  const handleSummaryEdit = useCallback(() => {
+    router.back();
+  }, [router]);
+
+  useEffect(() => {
+    if (presentation === 'detail') {
+      return undefined;
+    }
+
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (presentation === 'completion') {
+        handleCompletionExit();
+      } else {
+        handleSummaryHistoryExit();
+      }
+      return true;
+    });
+    return () => subscription.remove();
+  }, [handleCompletionExit, handleSummaryHistoryExit, presentation]);
+
+  const safeExitButton =
+    presentation !== 'detail' ? (
+      <UiButton
+        accessibilityLabel={
+          presentation === 'completion' ? 'Back to Stats and History' : 'Back to Session History'
+        }
+        label={presentation === 'completion' ? 'Back to Stats and History' : 'Back to Session History'}
+        testID="session-completion-safe-exit"
+        onPress={presentation === 'completion' ? handleCompletionExit : handleSummaryHistoryExit}
+      />
+    ) : null;
+
+  const stackOptions =
+    presentation === 'completion'
+      ? { title: 'Session complete', headerBackVisible: false, gestureEnabled: false }
+      : presentation === 'summary'
+        ? {
+            title: 'Session summary',
+            headerBackVisible: false,
+            gestureEnabled: false,
+            headerLeft: () => (
+              <Pressable
+                accessibilityLabel="Back to Session History"
+                accessibilityRole="button"
+                hitSlop={8}
+                onPress={handleSummaryHistoryExit}
+                testID="session-summary-history-button">
+                <Text style={styles.headerActionText}>History</Text>
+              </Pressable>
+            ),
+            headerRight: () => (
+              <Pressable
+                accessibilityLabel="Edit session"
+                accessibilityRole="button"
+                hitSlop={8}
+                onPress={handleSummaryEdit}
+                testID="session-summary-edit-button">
+                <Text style={styles.headerActionText}>Edit</Text>
+              </Pressable>
+            ),
+          }
+        : { title: 'View Session' };
 
   const handleEdit = () => {
     if (!session) {
@@ -401,9 +598,10 @@ export function CompletedSessionDetailScreenShell({
   if (isLoading) {
     return (
       <>
-        <Stack.Screen options={{ title: 'View Session' }} />
+        <Stack.Screen options={stackOptions} />
         <View style={styles.centerState} testID="completed-session-detail-loading">
           <Text style={styles.stateTitle}>Loading session...</Text>
+          {safeExitButton}
         </View>
       </>
     );
@@ -412,23 +610,58 @@ export function CompletedSessionDetailScreenShell({
   if (errorMessage) {
     return (
       <>
-        <Stack.Screen options={{ title: 'View Session' }} />
+        <Stack.Screen options={stackOptions} />
         <View style={styles.centerState} testID="completed-session-detail-error">
           <Text style={styles.stateTitle}>Unable to load session</Text>
           <Text style={styles.stateBody}>{errorMessage}</Text>
+          {safeExitButton}
         </View>
       </>
     );
   }
 
-  if (!sessionId || !session) {
+  if (!sessionId || !session || (presentation === 'completion' && session.deletedAt !== null)) {
     return (
       <>
-        <Stack.Screen options={{ title: 'View Session' }} />
+        <Stack.Screen options={stackOptions} />
         <View style={styles.centerState} testID="completed-session-detail-empty">
           <Text style={styles.stateTitle}>Session not found</Text>
           <Text style={styles.stateBody}>This completed session could not be loaded.</Text>
+          {safeExitButton}
         </View>
+      </>
+    );
+  }
+
+  if (presentation === 'completion' || presentation === 'summary') {
+    const personalRecords = completedInsights?.personalRecords ?? [];
+    const exerciseVolumeComparisons =
+      completedInsights && completedInsights.exerciseVolumeComparisons.length > 0
+        ? completedInsights.exerciseVolumeComparisons
+        : fallbackExerciseVolumeComparisons;
+    return (
+      <>
+        <Stack.Screen options={stackOptions} />
+        <SessionCompletionPresentation
+          completedAt={session.completedAt}
+          durationDisplay={session.durationDisplay}
+          exerciseCount={performedExercises.length}
+          exerciseVolumeComparisons={exerciseVolumeComparisons}
+          gymName={session.gymName}
+          muscleCatalogState={
+            shouldFailNextMaestroCatalog || exerciseCatalog.status === 'error'
+              ? 'error'
+              : exerciseCatalog.status === 'ready'
+                ? 'ready'
+                : 'loading'
+          }
+          muscleSummary={shouldFailNextMaestroCatalog ? null : sessionMuscleSummary}
+          onDone={presentation === 'completion' ? handleCompletionExit : undefined}
+          performedSetCount={performedSetCount}
+          personalRecords={personalRecords}
+          shouldFailNextShare={shouldFailNextMaestroShare}
+          workingSetCount={workingSetCount}
+        />
       </>
     );
   }
@@ -690,9 +923,20 @@ export function CompletedSessionDetailScreenShell({
 
 export default function CompletedSessionDetailRoute() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ sessionId?: string | string[]; intent?: string | string[] }>();
+  const params = useLocalSearchParams<{
+    sessionId?: string | string[];
+    intent?: string | string[];
+    presentation?: string | string[];
+    maestroShare?: string | string[];
+    maestroCatalog?: string | string[];
+  }>();
   const sessionId = coerceRouteParam(params.sessionId);
   const intent = coerceRouteParam(params.intent);
+  const presentation = resolveCompletedSessionPresentation(params.presentation);
+  const shouldFailNextMaestroShare =
+    isDevMode() && coerceRouteParam(params.maestroShare) === 'fail-once';
+  const shouldFailNextMaestroCatalog =
+    isDevMode() && coerceRouteParam(params.maestroCatalog) === 'fail-once';
   const initialMode = 'view';
 
   useEffect(() => {
@@ -711,7 +955,15 @@ export default function CompletedSessionDetailRoute() {
     );
   }
 
-  return <CompletedSessionDetailScreenShell sessionId={sessionId} initialMode={initialMode} />;
+  return (
+    <CompletedSessionDetailScreenShell
+      initialMode={initialMode}
+      presentation={presentation}
+      sessionId={sessionId}
+      shouldFailNextMaestroCatalog={shouldFailNextMaestroCatalog}
+      shouldFailNextMaestroShare={shouldFailNextMaestroShare}
+    />
+  );
 }
 
 const styles = StyleSheet.create({
@@ -741,6 +993,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: uiColors.textSecondary,
     textAlign: 'center',
+  },
+  headerActionText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: uiColors.actionPrimary,
   },
   headerCard: {
     borderRadius: 14,

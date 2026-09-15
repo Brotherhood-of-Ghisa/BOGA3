@@ -1,0 +1,125 @@
+appId: com.dinoderek.mobile
+---
+- openLink: "boga3://maestro-harness?reset=data&fixture=exercise-block-history&teleport=completed-session&sessionId=maestro_m24_completion_one_pr&presentation=completion"
+- tapOn:
+    text: "Open"
+    optional: true
+- tapOn:
+    text: "Continue"
+    optional: true
+- tapOn:
+    text: "Close"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "session-completion-presentation"
+    timeout: 30000
+- assertVisible: "Session complete"
+- assertVisible: "Personal records"
+- assertVisible:
+    id: "session-completion-pr-seed_barbell_back_squat"
+- assertNotVisible:
+    id: "session-completion-pr-pager"
+- scrollUntilVisible:
+    element:
+      id: "session-completion-context"
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
+- assertVisible:
+    id: "session-completion-sets"
+- assertVisible:
+    id: "session-completion-muscle-quads"
+- scrollUntilVisible:
+    element:
+      id: "session-completion-exercise-maestro_m24_completion_one_pr_squat"
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
+- takeScreenshot: "session-completion-one-pr"
+
+- openLink: "boga3://maestro-harness?fixture=exercise-block-history&teleport=completed-session&sessionId=maestro_m24_completion_no_pr&presentation=completion&maestroCatalog=fail-once"
+- tapOn:
+    text: "Open"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "session-completion-presentation"
+    timeout: 30000
+- assertVisible: "Session complete"
+- assertNotVisible: "Personal records"
+- assertVisible:
+    id: "session-completion-muscle-empty-state"
+- assertVisible: "Muscle breakdown unavailable."
+- assertNotVisible: "Retry session muscle load"
+- assertNotVisible:
+    id: "session-completion-view-muscle-load"
+- takeScreenshot: "session-completion-catalog-error"
+- scrollUntilVisible:
+    element:
+      id: "session-completion-done"
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
+- tapOn:
+    id: "session-completion-done"
+- extendedWaitUntil:
+    visible:
+      id: "stats-history-screen"
+    timeout: 30000
+- takeScreenshot: "session-completion-safe-done"
+
+- openLink: "boga3://maestro-harness?fixture=exercise-block-history&teleport=completed-session&sessionId=maestro_m24_completion_unmapped&presentation=completion"
+- tapOn:
+    text: "Open"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "session-completion-presentation"
+    timeout: 30000
+- assertVisible: "Session complete"
+- assertNotVisible: "Personal records"
+- assertVisible: "No mapped working sets for this session."
+- assertNotVisible:
+    id: "session-completion-view-muscle-load"
+- takeScreenshot: "session-completion-unmapped"
+
+- openLink: "boga3://maestro-harness?fixture=exercise-block-history&teleport=session-recorder&mode=completed-edit&sessionId=maestro_m24_completion_one_pr"
+- tapOn:
+    text: "Open"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "completed-edit-navigation-bar"
+    timeout: 30000
+- assertVisible: "Edit session"
+- tapOn:
+    id: "completed-edit-summary-button"
+- extendedWaitUntil:
+    visible:
+      id: "session-completion-presentation"
+    timeout: 30000
+- assertVisible: "Session summary"
+- assertVisible:
+    id: "session-completion-exercise-maestro_m24_completion_one_pr_squat"
+- assertNotVisible:
+    id: "session-completion-done"
+- assertNotVisible:
+    id: "session-completion-view-muscle-load"
+- takeScreenshot: "session-summary-from-history-top"
+- scrollUntilVisible:
+    element:
+      id: "session-completion-share-session"
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
+- assertVisible:
+    id: "session-completion-share-session"
+- takeScreenshot: "session-summary-from-history"
+- tapOn:
+    id: "session-summary-edit-button"
+- extendedWaitUntil:
+    visible:
+      id: "completed-edit-navigation-bar"
+    timeout: 30000
+- takeScreenshot: "session-summary-back-to-edit"

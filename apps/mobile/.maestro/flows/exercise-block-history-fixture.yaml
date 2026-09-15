@@ -1,6 +1,6 @@
 appId: com.dinoderek.mobile
 ---
-- openLink: "boga3://maestro-harness?reset=data&fixture=exercise-block-history&teleport=session-recorder"
+- openLink: "boga3://maestro-harness?reset=data&fixture=exercise-block-history&teleport=session-recorder&maestroShare=fail-once"
 - tapOn:
     text: "Open"
     optional: true
@@ -28,7 +28,6 @@ appId: com.dinoderek.mobile
 - inputText: "back squat"
 - hideKeyboard:
     optional: true
-- tapOn: "Select Exercise"
 - extendedWaitUntil:
     visible:
       text: "Select exercise Barbell Back Squat"
@@ -74,25 +73,39 @@ appId: com.dinoderek.mobile
     id: "set-performance-control-1-1"
 - tapOn:
     id: "set-performance-control-1-1"
+- scrollUntilVisible:
+    element:
+      id: "exercise-expanded-pr-1"
+    direction: UP
+    visibilityPercentage: 100
+    centerElement: true
 - assertVisible:
     id: "exercise-expanded-pr-1"
-- assertVisible: "PR: 300 kg × 5 reps · est. 1RM 350 kg"
+- assertVisible: "New PR"
+- assertVisible: "300 kg × 5 reps · est. 1RM 350 kg"
 - takeScreenshot: "exercise-block-comparison-expanded"
+- scrollUntilVisible:
+    element:
+      id: "exercise-expanded-pr-1"
+    direction: UP
+    visibilityPercentage: 80
+    centerElement: true
+- scrollUntilVisible:
+    element:
+      id: "exercise-collapse-toggle-1"
+    direction: UP
+    visibilityPercentage: 100
+    centerElement: true
 - tapOn:
     id: "exercise-collapse-toggle-1"
 - extendedWaitUntil:
     visible:
       id: "exercise-collapsed-summary-1-counts"
     timeout: 10000
-- assertVisible: "1 set · 1 w/set"
+- assertVisible: "1 set · 0 w/sets"
 - assertVisible:
     id: "exercise-collapsed-summary-1-new-pr"
-- assertVisible: "PR: 300 kg × 5 reps · est. 1RM 350 kg"
 - takeScreenshot: "exercise-card-summary-new-pr"
-- tapOn:
-    id: "exercise-collapse-toggle-1"
-- assertVisible:
-    id: "exercise-block-history-panel-1"
 - scrollUntilVisible:
     element:
       text: "Log new exercise"
@@ -101,10 +114,66 @@ appId: com.dinoderek.mobile
     centerElement: true
 - tapOn: "Log new exercise"
 - tapOn: "Exercise filter input"
-- inputText: "low cable one-arm"
+- eraseText
+- inputText: "Barbell Bench Press"
+- extendedWaitUntil:
+    visible:
+      text: "Select exercise Barbell Bench Press"
+    timeout: 15000
+- tapOn:
+    text: "Select exercise Barbell Bench Press"
+- tapOn:
+    id: "exercise-picker-add-empty-set-button"
+- extendedWaitUntil:
+    visible:
+      id: "exercise-block-history-panel-2-collapsed"
+    timeout: 30000
+- tapOn: "Weight for exercise 2 set 1"
+- inputText: "300"
+- tapOn: "Reps for exercise 2 set 1"
+- inputText: "5"
 - hideKeyboard:
     optional: true
-- tapOn: "Select Exercise"
+- tapOn:
+    id: "set-performance-control-2-1"
+- scrollUntilVisible:
+    element:
+      id: "exercise-expanded-pr-2"
+    direction: UP
+    visibilityPercentage: 100
+    centerElement: true
+- assertVisible: "Barbell Bench Press"
+- assertVisible: "300 kg × 5 reps · est. 1RM 350 kg"
+- scrollUntilVisible:
+    element:
+      id: "exercise-collapse-toggle-2"
+    direction: UP
+    visibilityPercentage: 100
+    centerElement: true
+- tapOn:
+    id: "exercise-collapse-toggle-2"
+- extendedWaitUntil:
+    visible:
+      id: "exercise-collapsed-summary-2-new-pr"
+    timeout: 10000
+- scrollUntilVisible:
+    element:
+      id: "exercise-collapsed-summary-1-new-pr"
+    direction: UP
+    visibilityPercentage: 100
+- assertVisible:
+    id: "exercise-collapsed-summary-2-new-pr"
+- takeScreenshot: "exercise-card-summary-two-prs"
+- scrollUntilVisible:
+    element:
+      text: "Log new exercise"
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
+- tapOn: "Log new exercise"
+- tapOn: "Exercise filter input"
+- eraseText
+- inputText: "low cable one-arm"
 - extendedWaitUntil:
     visible:
       text: "Select exercise Low Cable One-Arm Lateral Raise"
@@ -115,15 +184,120 @@ appId: com.dinoderek.mobile
     id: "exercise-picker-add-empty-set-button"
 - extendedWaitUntil:
     visible:
-      id: "exercise-block-history-panel-2-empty-collapsed"
+      id: "exercise-block-history-panel-3-empty-collapsed"
     timeout: 30000
 - tapOn:
-    id: "exercise-collapse-toggle-2"
+    id: "exercise-collapse-toggle-3"
 - extendedWaitUntil:
     visible:
-      id: "exercise-collapsed-summary-2-counts"
+      id: "exercise-collapsed-summary-3-counts"
     timeout: 10000
 - assertVisible: "0 sets · 0 w/sets"
 - assertNotVisible:
-    id: "exercise-collapsed-summary-2-new-pr"
+    id: "exercise-collapsed-summary-3-new-pr"
 - takeScreenshot: "exercise-card-summary-empty-history"
+- scrollUntilVisible:
+    element:
+      id: "session-recorder-submit-button"
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
+- tapOn:
+    id: "session-recorder-submit-button"
+- extendedWaitUntil:
+    visible: "Remove incomplete sets and submit?"
+    timeout: 10000
+- tapOn: "Remove incomplete sets and submit"
+- extendedWaitUntil:
+    visible: "Remove exercises with no sets and submit?"
+    timeout: 10000
+- tapOn: "Remove empty exercises and submit"
+- extendedWaitUntil:
+    visible:
+      id: "session-completion-presentation"
+    timeout: 30000
+- assertVisible: "Session complete"
+- assertVisible: "Personal records"
+- assertVisible:
+    id: "session-completion-pr-seed_barbell_back_squat"
+- assertVisible:
+    id: "session-completion-pr-seed_barbell_bench_press"
+- assertNotVisible:
+    id: "session-completion-pr-pager"
+- takeScreenshot: "session-completion-multiple-prs-all"
+- scrollUntilVisible:
+    element:
+      id: "session-completion-context"
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
+- assertVisible:
+    id: "session-completion-sets"
+- scrollUntilVisible:
+    element:
+      id: "session-completion-exercise-volume"
+    direction: DOWN
+    visibilityPercentage: 80
+    centerElement: true
+- assertVisible: "Exercise volume"
+- scrollUntilVisible:
+    element:
+      id: "session-completion-share-session"
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
+- tapOn:
+    id: "session-completion-share-session"
+- waitForAnimationToEnd
+- takeScreenshot: "session-share-preview-all-prs"
+- tapOn:
+    point: "50%,89%"
+- waitForAnimationToEnd
+- takeScreenshot: "session-share-image-error"
+- tapOn:
+    point: "50%,89%"
+- extendedWaitUntil:
+    visible: "Copy"
+    timeout: 10000
+- takeScreenshot: "session-share-platform-share-sheet"
+# Dismiss without selecting a destination; this proves image launch/cancel only.
+- swipe:
+    start: "50%,55%"
+    end: "50%,95%"
+    duration: 500
+- extendedWaitUntil:
+    notVisible: "Copy"
+    timeout: 10000
+- tapOn:
+    point: "50%,95%"
+- extendedWaitUntil:
+    visible:
+      id: "session-completion-share-session"
+    timeout: 10000
+- scrollUntilVisible:
+    element:
+      id: "session-completion-context"
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
+- assertVisible:
+    id: "session-completion-muscle-breakdown"
+- assertVisible: "No mapped working sets for this session."
+- assertNotVisible:
+    id: "session-muscle-load-row"
+- assertNotVisible:
+    id: "session-completion-view-muscle-load"
+- takeScreenshot: "session-completion-consolidated-summary"
+- scrollUntilVisible:
+    element:
+      id: "session-completion-done"
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
+- tapOn:
+    id: "session-completion-done"
+- extendedWaitUntil:
+    visible:
+      id: "stats-history-screen"
+    timeout: 30000
+- takeScreenshot: "session-completion-done"

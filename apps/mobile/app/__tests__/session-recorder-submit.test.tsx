@@ -94,6 +94,7 @@ jest.mock('@/src/data/exercise-catalog', () => ({
 
 jest.mock('expo-router', () => {
   const mockReplace = jest.fn();
+  const mockPush = jest.fn();
   const mockDismissTo = jest.fn();
   const mockDismissAll = jest.fn();
   return {
@@ -107,9 +108,10 @@ jest.mock('expo-router', () => {
       replace: mockReplace,
       dismissTo: mockDismissTo,
       dismissAll: mockDismissAll,
-      push: jest.fn(),
+      push: mockPush,
     }),
     __mockReplace: mockReplace,
+    __mockPush: mockPush,
     __mockDismissTo: mockDismissTo,
     __mockDismissAll: mockDismissAll,
   };
@@ -131,10 +133,12 @@ const {
 
 const {
   __mockReplace: mockReplace,
+  __mockPush: mockPush,
   __mockDismissTo: mockDismissTo,
   __mockDismissAll: mockDismissAll,
 } = jest.requireMock('expo-router') as {
   __mockReplace: jest.Mock;
+  __mockPush: jest.Mock;
   __mockDismissTo: jest.Mock;
   __mockDismissAll: jest.Mock;
 };
@@ -196,6 +200,7 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
     mockPersistSessionDraftSnapshot.mockClear();
     mockCompleteSessionDraft.mockClear();
     mockReplace.mockClear();
+    mockPush.mockClear();
     mockDismissTo.mockClear();
     mockDismissAll.mockClear();
   });
@@ -228,7 +233,9 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
         })
       );
       expect(mockCompleteSessionDraft).toHaveBeenCalledWith('test-session');
-      expect(mockReplace).toHaveBeenCalledWith('/stats-history');
+      expect(mockReplace).toHaveBeenCalledWith(
+        '/completed-session/test-session?presentation=completion'
+      );
     });
   });
 
@@ -377,7 +384,7 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
     expect(JSON.stringify(finalPayload)).not.toContain('set-planned');
   });
 
-  it('clears the stack back to the root list on submit so the list header has no back button', async () => {
+  it('replaces the recorder with the completed-session presentation after submit', async () => {
     render(<SessionRecorderScreen />);
     await dismissEmptyStateIfPresent();
 
@@ -393,7 +400,9 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
       expect(mockCompleteSessionDraft).toHaveBeenCalledWith('test-session');
     });
 
-    expect(mockReplace).toHaveBeenCalledWith('/stats-history');
+    expect(mockReplace).toHaveBeenCalledWith(
+      '/completed-session/test-session?presentation=completion'
+    );
     expect(mockDismissAll).not.toHaveBeenCalled();
   });
 
@@ -426,7 +435,9 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
     await waitFor(() => {
       expect(mockPersistSessionDraftSnapshot).toHaveBeenCalled();
       expect(mockCompleteSessionDraft).toHaveBeenCalledWith('test-session');
-      expect(mockReplace).toHaveBeenCalledWith('/stats-history');
+      expect(mockReplace).toHaveBeenCalledWith(
+        '/completed-session/test-session?presentation=completion'
+      );
     });
   });
 
@@ -447,7 +458,9 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
     await waitFor(() => {
       expect(mockPersistSessionDraftSnapshot).toHaveBeenCalled();
       expect(mockCompleteSessionDraft).toHaveBeenCalledWith('test-session');
-      expect(mockReplace).toHaveBeenCalledWith('/stats-history');
+      expect(mockReplace).toHaveBeenCalledWith(
+        '/completed-session/test-session?presentation=completion'
+      );
     });
   });
 
@@ -707,6 +720,26 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
     });
 
     expect(mockCompleteSessionDraft).not.toHaveBeenCalled();
+  });
+
+  it('opens the shared summary from the completed-edit header', async () => {
+    mockSearchParams = { mode: 'completed-edit', sessionId: 'completed-edit-1' };
+    mockLoadSessionSnapshotById.mockResolvedValue(buildCompletedEditSnapshot());
+
+    render(<SessionRecorderScreen />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('completed-edit-navigation-bar')).toBeTruthy();
+      expect(screen.getByTestId('completed-edit-summary-button')).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByTestId('completed-edit-summary-button'));
+
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith(
+        '/completed-session/completed-edit-1?presentation=summary'
+      );
+    });
   });
 
   it('uses completed-edit cleanup prompt labels for incomplete sets and saves changes after confirmation', async () => {
