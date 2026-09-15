@@ -206,15 +206,19 @@ Document app-specific UI semantics and guardrails for the current mobile app.
 5. Completed-session set tables show historical set effort from `set_type` as `W-Up`, `RIR 0`, `RIR 1`, `RIR 2`, or `-` for unspecified sets.
 6. Completed-session exercise cards start expanded and use the same title-region collapse affordance. Their collapsed summary shows valid performed-set and working-set counts (`RIR 0`/`RIR 1`/`RIR 2`); the header-level `Append` action remains available. Historical cards do not label a workout as a new PR because this viewer does not compute an as-of-session history comparison.
 7. `presentation=completion` is a post-submit presentation of the stored
-   completed session, not durable celebration state and not a historical-detail
-   variant. Its order is every compact `Personal records` card when present,
-   `Session summary`, one `Exercise volume` card per performed exercise,
-   `Session muscle load` when performed work exists, session sharing, the
-   seven-day muscle action, then Done. The session summary includes total
-   performed and working sets. Personal-record/comparison history is optional
-   enrichment: its loading or failure never blocks stored context or exits, and
-   current exercise rows still render with an explicit no-history state.
-8. Completion reuses the shared PR and muscle calculations. Exercise-volume
+   completed session, not durable celebration state. Its order is `Session
+   Summary`, every compact `Personal records` card when present, one `Exercise
+   volume` card per performed exercise, session sharing, then Done. The single
+   summary card contains explicitly labelled duration, exercise, performed-set,
+   working-set, and gym values plus non-interactive per-muscle chips whose
+   bracketed value is the number of physical working sets mapped to that muscle.
+   It never links to muscle analytics. Personal-record/comparison history is
+   optional enrichment: its loading or failure never blocks stored context or
+   exits, and current exercise rows still render with an explicit no-history
+   state.
+8. Completion and `presentation=summary` from completed-session History reuse
+   the same summary presentation, PR calculation, muscle calculation,
+   exercise-volume rows, and Share action. Exercise-volume
    cards show the exercise name with smaller performed/working-set counts,
    current raw volume versus historical median, and a horizontal P5–P95 range
    with median/current markers when a distribution exists. Single/equal
@@ -227,9 +231,13 @@ Document app-specific UI semantics and guardrails for the current mobile app.
    silent, capture/launch failure is inline and retryable, and temporary image
    cleanup cannot turn a completed share into an error.
 10. Completion hides edit/delete/append. Done and safe back replace to Stats /
-   History, while the analysis action replaces to seven-day By Muscle. A
-   missing, deleted, or failed target exposes one safe return and never opens a
-   recorder copy.
+    History. A completed row in Session History opens completed-edit mode by
+    default; its `Summary` action saves pending valid edits before pushing
+    `presentation=summary`, whose `History` action replaces to the list and
+    whose `Edit` action pops to the live editor. The historical summary omits Done; all summary
+    content and Share behavior remain identical to post-submit completion. A
+    missing, deleted, or failed target exposes one safe return and never opens a
+    recorder copy.
 
 ### 8. Navigation/query semantics (UI-facing rule)
 

@@ -92,6 +92,7 @@ jest.mock('@/src/data/exercise-catalog', () => ({
 
 jest.mock('expo-router', () => {
   const mockReplace = jest.fn();
+  const mockPush = jest.fn();
   const mockDismissTo = jest.fn();
   const mockDismissAll = jest.fn();
   return {
@@ -105,9 +106,10 @@ jest.mock('expo-router', () => {
       replace: mockReplace,
       dismissTo: mockDismissTo,
       dismissAll: mockDismissAll,
-      push: jest.fn(),
+      push: mockPush,
     }),
     __mockReplace: mockReplace,
+    __mockPush: mockPush,
     __mockDismissTo: mockDismissTo,
     __mockDismissAll: mockDismissAll,
   };
@@ -129,10 +131,12 @@ const {
 
 const {
   __mockReplace: mockReplace,
+  __mockPush: mockPush,
   __mockDismissTo: mockDismissTo,
   __mockDismissAll: mockDismissAll,
 } = jest.requireMock('expo-router') as {
   __mockReplace: jest.Mock;
+  __mockPush: jest.Mock;
   __mockDismissTo: jest.Mock;
   __mockDismissAll: jest.Mock;
 };
@@ -194,6 +198,7 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
     mockPersistSessionDraftSnapshot.mockClear();
     mockCompleteSessionDraft.mockClear();
     mockReplace.mockClear();
+    mockPush.mockClear();
     mockDismissTo.mockClear();
     mockDismissAll.mockClear();
   });
@@ -713,6 +718,26 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
     });
 
     expect(mockCompleteSessionDraft).not.toHaveBeenCalled();
+  });
+
+  it('opens the shared summary from the completed-edit header', async () => {
+    mockSearchParams = { mode: 'completed-edit', sessionId: 'completed-edit-1' };
+    mockLoadSessionSnapshotById.mockResolvedValue(buildCompletedEditSnapshot());
+
+    render(<SessionRecorderScreen />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('completed-edit-navigation-bar')).toBeTruthy();
+      expect(screen.getByTestId('completed-edit-summary-button')).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByTestId('completed-edit-summary-button'));
+
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith(
+        '/completed-session/completed-edit-1?presentation=summary'
+      );
+    });
   });
 
   it('uses completed-edit cleanup prompt labels for incomplete sets and saves changes after confirmation', async () => {

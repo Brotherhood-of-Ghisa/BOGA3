@@ -2,6 +2,7 @@ import {
   collectMuscleSetContributions,
   countMuscleAnalyticsPerformedSets,
   countMuscleAnalyticsWorkingSets,
+  isMuscleAnalyticsWorkingSet,
   type MuscleAnalyticsInput,
   type MuscleContributionRole,
 } from '@/src/data/muscle-analytics';
@@ -59,8 +60,13 @@ export type CurrentSessionMuscleSummaryInput = {
 };
 
 export type SessionMuscleLoadEntry = SessionInsightMuscleGroup & {
+  workingSetCount: number;
   weightedVolume: number;
   relativeVolume: number;
+};
+
+export type SessionMuscleWorkingSetEntry = SessionInsightMuscleGroup & {
+  workingSetCount: number;
 };
 
 export type CurrentSessionMuscleSummary = {
@@ -71,6 +77,7 @@ export type CurrentSessionMuscleSummary = {
   unmappedSetCount: number;
   contributingMuscleCount: number;
   muscles: SessionMuscleLoadEntry[];
+  workingSetsByMuscle: SessionMuscleWorkingSetEntry[];
 };
 
 export type ExercisePersonalRecordInput = {
@@ -239,6 +246,7 @@ export const summarizeCurrentSessionMuscleLoad = (
       .map((contribution) => contribution.setIdentity)
   );
   const weightedVolumeByMuscle = new Map<string, number>();
+  const workingSetIdentitiesByMuscle = new Map<string, Set<string>>();
 
   for (const contribution of contributions) {
     if (!muscleGroupById.has(contribution.muscleGroupId)) continue;
@@ -247,6 +255,13 @@ export const summarizeCurrentSessionMuscleLoad = (
       (weightedVolumeByMuscle.get(contribution.muscleGroupId) ?? 0) +
         contribution.weightedVolume
     );
+
+    if (isMuscleAnalyticsWorkingSet(contribution.setType)) {
+      const workingSetIdentities =
+        workingSetIdentitiesByMuscle.get(contribution.muscleGroupId) ?? new Set<string>();
+      workingSetIdentities.add(contribution.setIdentity);
+      workingSetIdentitiesByMuscle.set(contribution.muscleGroupId, workingSetIdentities);
+    }
   }
 
   const positiveMuscles = Array.from(weightedVolumeByMuscle, ([muscleGroupId, weightedVolume]) => ({
@@ -260,12 +275,35 @@ export const summarizeCurrentSessionMuscleLoad = (
   const muscles = positiveMuscles
     .map(({ muscleGroup, weightedVolume }) => ({
       ...muscleGroup,
+      workingSetCount: workingSetIdentitiesByMuscle.get(muscleGroup.id)?.size ?? 0,
       weightedVolume,
       relativeVolume: weightedVolume / largestWeightedVolume,
     }))
     .sort((left, right) => {
       if (left.weightedVolume !== right.weightedVolume) {
         return right.weightedVolume - left.weightedVolume;
+      }
+      if (left.sortOrder !== right.sortOrder) return left.sortOrder - right.sortOrder;
+      const nameDifference = left.displayName.localeCompare(right.displayName);
+      return nameDifference !== 0 ? nameDifference : left.id.localeCompare(right.id);
+    });
+  const workingSetsByMuscle = Array.from(
+    workingSetIdentitiesByMuscle,
+    ([muscleGroupId, setIdentities]) => ({
+      muscleGroup: muscleGroupById.get(muscleGroupId),
+      workingSetCount: setIdentities.size,
+    })
+  )
+    .filter(
+      (
+        entry
+      ): entry is { muscleGroup: SessionInsightMuscleGroup; workingSetCount: number } =>
+        entry.muscleGroup !== undefined && entry.workingSetCount > 0
+    )
+    .map(({ muscleGroup, workingSetCount }) => ({ ...muscleGroup, workingSetCount }))
+    .sort((left, right) => {
+      if (left.workingSetCount !== right.workingSetCount) {
+        return right.workingSetCount - left.workingSetCount;
       }
       if (left.sortOrder !== right.sortOrder) return left.sortOrder - right.sortOrder;
       const nameDifference = left.displayName.localeCompare(right.displayName);
@@ -281,6 +319,7 @@ export const summarizeCurrentSessionMuscleLoad = (
     unmappedSetCount: Math.max(0, performedSetCount - mappedSetCount),
     contributingMuscleCount: muscles.length,
     muscles,
+    workingSetsByMuscle,
   };
 };
 

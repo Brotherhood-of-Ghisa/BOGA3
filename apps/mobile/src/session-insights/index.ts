@@ -21,6 +21,7 @@ export {
   type SessionInsightSetInput,
   type SessionExerciseVolumeComparisonsInput,
   type SessionMuscleLoadEntry,
+  type SessionMuscleWorkingSetEntry,
   type SessionPersonalRecordsInput,
 } from './calculations';
 export {

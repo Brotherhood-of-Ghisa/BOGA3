@@ -160,9 +160,10 @@ Focused feature evidence can use `maestro-ios-run-flow.sh` without adding a new
 aggregate lane. `exercise-block-history-fixture.yaml` is the current-session
 insights golden path: live mapped load, PR appearance/reversal, simultaneous
 multi-PR completion, session/working-set and exercise-volume summaries, image
-share preview plus retryable native-sheet launch/cancellation, and the seven-day
-By Muscle handoff. `session-completion-states-fixture.yaml` covers one-PR, no-PR,
-retryable catalog-error, unmapped, and safe-exit completion states.
+share preview plus retryable native-sheet launch/cancellation, the consolidated
+non-interactive muscle-set breakdown, and Done. `session-completion-states-fixture.yaml`
+covers one-PR, no-PR catalog-error, unmapped, safe-exit completion, and the
+completed-edit to historical-summary round trip.
 Run both on the supported small and large phone viewports when closing changes to
 these presentations; their timestamped artifact roots and screenshots are the
 visual evidence.

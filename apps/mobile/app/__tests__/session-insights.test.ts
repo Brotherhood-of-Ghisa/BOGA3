@@ -141,6 +141,7 @@ describe('summarizeCurrentSessionMuscleLoad', () => {
       unmappedSetCount: 0,
       contributingMuscleCount: 0,
       muscles: [],
+      workingSetsByMuscle: [],
     });
   });
 
@@ -208,13 +209,58 @@ describe('summarizeCurrentSessionMuscleLoad', () => {
       contributingMuscleCount: 3,
     });
     expect(summary.muscles).toEqual([
-      expect.objectContaining({ id: 'chest', weightedVolume: 750, relativeVolume: 1 }),
-      expect.objectContaining({ id: 'triceps', weightedVolume: 375, relativeVolume: 0.5 }),
+      expect.objectContaining({
+        id: 'chest',
+        workingSetCount: 1,
+        weightedVolume: 750,
+        relativeVolume: 1,
+      }),
+      expect.objectContaining({
+        id: 'triceps',
+        workingSetCount: 1,
+        weightedVolume: 375,
+        relativeVolume: 0.5,
+      }),
       expect.objectContaining({
         id: 'biceps',
+        workingSetCount: 1,
         weightedVolume: 250,
         relativeVolume: 1 / 3,
       }),
+    ]);
+    expect(summary.workingSetsByMuscle).toEqual([
+      expect.objectContaining({ id: 'biceps', workingSetCount: 1 }),
+      expect.objectContaining({ id: 'chest', workingSetCount: 1 }),
+      expect.objectContaining({ id: 'triceps', workingSetCount: 1 }),
+    ]);
+  });
+
+  it('counts mapped working sets independently from entered load volume', () => {
+    const summary = summarizeCurrentSessionMuscleLoad(
+      muscleInput({
+        exerciseDefinitions: [{ id: 'bodyweight', loadInputMode: 'total_load' }],
+        exercises: [
+          insightExercise({
+            id: 'bodyweight-row',
+            exerciseDefinitionId: 'bodyweight',
+            sets: [
+              insightSet('zero-load-working', {
+                weightValue: '0',
+                repsValue: '10',
+                setType: 'rir_2',
+              }),
+            ],
+          }),
+        ],
+        muscleMappings: [
+          { exerciseDefinitionId: 'bodyweight', muscleGroupId: 'chest', role: 'primary' },
+        ],
+      })
+    );
+
+    expect(summary.muscles).toEqual([]);
+    expect(summary.workingSetsByMuscle).toEqual([
+      expect.objectContaining({ id: 'chest', workingSetCount: 1 }),
     ]);
   });
 

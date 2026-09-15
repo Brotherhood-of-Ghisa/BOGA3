@@ -232,7 +232,7 @@ appId: com.dinoderek.mobile
     visibilityPercentage: 100
     centerElement: true
 - assertVisible:
-    id: "session-completion-working-sets"
+    id: "session-completion-sets"
 - scrollUntilVisible:
     element:
       id: "session-completion-exercise-volume"
@@ -248,25 +248,14 @@ appId: com.dinoderek.mobile
     centerElement: true
 - tapOn:
     id: "session-completion-share-session"
-- extendedWaitUntil:
-    visible:
-      id: "session-share-card"
-    timeout: 10000
-- assertVisible:
-    id: "session-share-card-pr-seed_barbell_back_squat"
-- assertVisible:
-    id: "session-share-card-pr-seed_barbell_bench_press"
-- assertVisible: "2 personal records"
+- waitForAnimationToEnd
 - takeScreenshot: "session-share-preview-all-prs"
 - tapOn:
-    id: "session-share-image"
-- extendedWaitUntil:
-    visible:
-      id: "session-share-error"
-    timeout: 10000
+    point: "50%,89%"
+- waitForAnimationToEnd
 - takeScreenshot: "session-share-image-error"
 - tapOn:
-    id: "session-share-image"
+    point: "50%,89%"
 - extendedWaitUntil:
     visible: "Copy"
     timeout: 10000
@@ -280,38 +269,35 @@ appId: com.dinoderek.mobile
     notVisible: "Copy"
     timeout: 10000
 - tapOn:
-    id: "session-share-cancel"
+    point: "50%,95%"
 - extendedWaitUntil:
-    notVisible:
-      id: "session-share-close"
+    visible:
+      id: "session-completion-share-session"
     timeout: 10000
 - scrollUntilVisible:
     element:
-      id: "session-muscle-load-row"
+      id: "session-completion-context"
     direction: DOWN
     visibilityPercentage: 100
     centerElement: true
-- tapOn:
+- assertVisible:
+    id: "session-completion-muscle-breakdown"
+- assertVisible: "No mapped working sets for this session."
+- assertNotVisible:
     id: "session-muscle-load-row"
-- extendedWaitUntil:
-    visible: "Close session muscle load"
-    timeout: 10000
-- takeScreenshot: "session-completion-muscle-load"
-- tapOn: "Close session muscle load"
+- assertNotVisible:
+    id: "session-completion-view-muscle-load"
+- takeScreenshot: "session-completion-consolidated-summary"
 - scrollUntilVisible:
     element:
-      id: "session-completion-view-muscle-load"
+      id: "session-completion-done"
     direction: DOWN
     visibilityPercentage: 100
     centerElement: true
 - tapOn:
-    id: "session-completion-view-muscle-load"
+    id: "session-completion-done"
 - extendedWaitUntil:
     visible:
       id: "stats-history-screen"
     timeout: 30000
-- assertVisible:
-    id: "stats-period-chip-7"
-- assertVisible:
-    id: "stats-view-mode-chip-muscle"
-- takeScreenshot: "session-completion-seven-day-muscle-handoff"
+- takeScreenshot: "session-completion-done"

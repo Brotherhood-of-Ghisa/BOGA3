@@ -112,9 +112,12 @@ Brief entrypoint inventory of the current reusable UI component set.
 8. `SessionCompletionPresentation`
 - File: `apps/mobile/components/session-recorder/session-completion-presentation.tsx`
 - Purpose:
-  - reusable post-submit composition for every compact PR, session totals,
-    per-exercise volume comparison, the shared `SessionMuscleLoad`, session-image
-    share preview, seven-day muscle analysis handoff, and Done
+  - shared post-submit and historical-summary composition with one consolidated
+    totals/muscle-working-set card, every compact PR, every per-exercise volume
+    comparison, and the session-image share preview
+  - muscle chips are informational views rather than analytics links; Done is
+    supplied only by the post-submit caller, while historical navigation stays
+    in the route header
   - keeps all PRs visible together instead of paging them
 
 9. `ExerciseVolumeComparisonRow`

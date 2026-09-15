@@ -16,6 +16,7 @@ const mappedSummary: CurrentSessionMuscleSummary = {
       displayName: 'Chest',
       familyName: 'Chest',
       sortOrder: 0,
+      workingSetCount: 2,
       weightedVolume: 1200,
       relativeVolume: 1,
     },
@@ -24,8 +25,25 @@ const mappedSummary: CurrentSessionMuscleSummary = {
       displayName: 'Triceps',
       familyName: 'Arms',
       sortOrder: 1,
+      workingSetCount: 2,
       weightedVolume: 375.5,
       relativeVolume: 0.312916,
+    },
+  ],
+  workingSetsByMuscle: [
+    {
+      id: 'chest',
+      displayName: 'Chest',
+      familyName: 'Chest',
+      sortOrder: 0,
+      workingSetCount: 2,
+    },
+    {
+      id: 'triceps',
+      displayName: 'Triceps',
+      familyName: 'Arms',
+      sortOrder: 1,
+      workingSetCount: 2,
     },
   ],
 };
@@ -38,6 +56,7 @@ const unmappedSummary: CurrentSessionMuscleSummary = {
   unmappedSetCount: 1,
   contributingMuscleCount: 0,
   muscles: [],
+  workingSetsByMuscle: [],
 };
 
 const emptySummary: CurrentSessionMuscleSummary = {
@@ -48,6 +67,7 @@ const emptySummary: CurrentSessionMuscleSummary = {
   unmappedSetCount: 0,
   contributingMuscleCount: 0,
   muscles: [],
+  workingSetsByMuscle: [],
 };
 
 describe('SessionMuscleLoad', () => {

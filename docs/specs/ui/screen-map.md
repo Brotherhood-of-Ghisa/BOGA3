@@ -205,8 +205,8 @@ Brief entrypoint map of the current mobile screens.
     Log recorder so draft state and recorder cleanup rules remain authoritative
 - Key exits:
   - `/session-recorder` via stack dismissal for active Resume or review/complete
-  - `/completed-session/<sessionId>` from a completed row
-  - `/session-recorder?mode=completed-edit&sessionId=<sessionId>` from completed edit
+  - `/session-recorder?mode=completed-edit&sessionId=<sessionId>` from a
+    completed row or its explicit Edit action
 - Notes:
   - the native stack header centers `Sessions` and uses the platform back arrow
     without a text label, so the internal `(tabs)` group name is never exposed
@@ -217,13 +217,14 @@ Brief entrypoint map of the current mobile screens.
   - completed session detail viewer with edit/delete session actions and per-exercise block append actions
 - Key states (high level):
   - loading / error / not-found / detail
-  - `presentation=completion` changes only the presentation: all compact
-    `Personal records` cards first; a session summary including working sets;
-    per-exercise current volume versus median and descriptive P5/P95 range;
-    shared session muscle load when performed work exists; previewed PNG session
-    sharing; seven-day muscle-analysis handoff; and Done. Optional historical
-    enrichment cannot block completion, and share output excludes gym/location.
-    Edit/delete/append actions are hidden in this mode
+  - `presentation=completion` and `presentation=summary` reuse the same content:
+    one labelled totals card with informational per-muscle working-set counts,
+    all compact `Personal records`, per-exercise current volume versus median
+    and descriptive P5/P95 range, and previewed PNG session sharing. Neither
+    presentation links to muscle analytics. Optional historical enrichment
+    cannot block either summary, and share output excludes gym/location.
+    Edit/delete/append actions are hidden in both modes; only post-submit
+    completion renders Done
   - completion loading/error/not-found/deleted-target states expose one safe
     Stats / History exit; the native back affordance/gesture is suppressed and
     Android system back replaces to Stats / History
@@ -235,7 +236,7 @@ Brief entrypoint map of the current mobile screens.
   - `session-recorder` (edit)
   - `session-recorder` after successful per-exercise block append
   - `/stats-history` from completion Done/back
-  - `/stats-history?period=7&breakdown=muscle` from the completion analysis action
+  - `/sessions` or completed-edit mode from historical-summary header actions
 
 11. `/exercise-history`
 - File: `apps/mobile/app/exercise-history.tsx`

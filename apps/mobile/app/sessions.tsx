@@ -123,10 +123,6 @@ export function SessionsScreen({
     })();
   };
 
-  const navigateToCompletedSessionDetail = (sessionId: string) => {
-    router.push(`/completed-session/${sessionId}`);
-  };
-
   return (
     <View style={styles.screen} testID="sessions-screen">
       <View style={styles.pinnedTopRegion}>
@@ -155,7 +151,7 @@ export function SessionsScreen({
         showDeletedSessions={showDeletedSessions}
         onToggleShowDeletedSessions={() => setShowDeletedSessions((current) => !current)}
         showGlobalEmptyState={showGlobalEmptyState}
-        onOpenCompletedSession={navigateToCompletedSessionDetail}
+        onOpenCompletedSession={openCompletedSessionEdit}
         onSetCompletedSessionDeleted={setCompletedSessionDeleted}
         onEditCompletedSession={openCompletedSessionEdit}
         onAppendCompletedSession={appendCompletedSession}

@@ -20,10 +20,7 @@ import {
   type SessionSetTypeValue,
 } from '@/src/data';
 import { parseCalculationSet } from '@/src/exercise-calculations';
-import {
-  ensureExerciseCatalogLoaded,
-  useExerciseCatalog,
-} from '@/src/exercise-catalog/cache';
+import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import { isDevMode } from '@/src/utils/isDevMode';
 import {
   isConfirmedPerformedSet,
@@ -80,7 +77,7 @@ export type CompletedSessionDetailScreenShellProps = {
   sessionId?: string | null;
   dataClient?: CompletedSessionDetailDataClient;
   initialMode?: 'view' | 'edit';
-  presentation?: 'detail' | 'completion';
+  presentation?: 'detail' | 'completion' | 'summary';
   shouldFailNextMaestroShare?: boolean;
   shouldFailNextMaestroCatalog?: boolean;
 };
@@ -110,8 +107,10 @@ function coerceRouteParam(value: string | string[] | undefined): string | null {
 
 export const resolveCompletedSessionPresentation = (
   value: string | string[] | undefined
-): 'detail' | 'completion' =>
-  coerceRouteParam(value) === 'completion' ? 'completion' : 'detail';
+): 'detail' | 'completion' | 'summary' => {
+  const presentation = coerceRouteParam(value);
+  return presentation === 'completion' || presentation === 'summary' ? presentation : 'detail';
+};
 
 const formatSetEffortLabel = (setType: SessionSetTypeValue): string => {
   switch (setType) {
@@ -275,15 +274,8 @@ export function CompletedSessionDetailScreenShell({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [session, setSession] = useState<CompletedSessionDetailRecord | null>(null);
   const [completedInsights, setCompletedInsights] = useState<CompletedSessionInsights | null>(null);
-  const [isMaestroCatalogFailureActive, setIsMaestroCatalogFailureActive] = useState(
-    shouldFailNextMaestroCatalog
-  );
   const [collapsedExerciseIds, setCollapsedExerciseIds] = useState<Set<string>>(() => new Set());
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
-
-  useEffect(() => {
-    setIsMaestroCatalogFailureActive(shouldFailNextMaestroCatalog);
-  }, [shouldFailNextMaestroCatalog]);
 
   const toggleExerciseCollapsed = useCallback((exerciseId: string) => {
     setCollapsedExerciseIds((current) => {
@@ -337,7 +329,7 @@ export function CompletedSessionDetailScreenShell({
         setIsLoading(false);
       });
 
-    if (presentation === 'completion' && dataClient.loadInsights) {
+    if (presentation !== 'detail' && dataClient.loadInsights) {
       void dataClient
         .loadInsights(sessionId)
         .then((loadedInsights) => {
@@ -471,36 +463,76 @@ export function CompletedSessionDetailScreenShell({
     });
   }, [session]);
 
-  const handleSafeExit = useCallback(() => {
+  const handleCompletionExit = useCallback(() => {
     router.replace('/stats-history');
   }, [router]);
 
+  const handleSummaryHistoryExit = useCallback(() => {
+    router.replace('/sessions');
+  }, [router]);
+
+  const handleSummaryEdit = useCallback(() => {
+    router.back();
+  }, [router]);
+
   useEffect(() => {
-    if (presentation !== 'completion') {
+    if (presentation === 'detail') {
       return undefined;
     }
 
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-      handleSafeExit();
+      if (presentation === 'completion') {
+        handleCompletionExit();
+      } else {
+        handleSummaryHistoryExit();
+      }
       return true;
     });
     return () => subscription.remove();
-  }, [handleSafeExit, presentation]);
+  }, [handleCompletionExit, handleSummaryHistoryExit, presentation]);
 
   const safeExitButton =
-    presentation === 'completion' ? (
+    presentation !== 'detail' ? (
       <UiButton
-        accessibilityLabel="Back to Stats and History"
-        label="Back to Stats and History"
+        accessibilityLabel={
+          presentation === 'completion' ? 'Back to Stats and History' : 'Back to Session History'
+        }
+        label={presentation === 'completion' ? 'Back to Stats and History' : 'Back to Session History'}
         testID="session-completion-safe-exit"
-        onPress={handleSafeExit}
+        onPress={presentation === 'completion' ? handleCompletionExit : handleSummaryHistoryExit}
       />
     ) : null;
 
   const stackOptions =
     presentation === 'completion'
       ? { title: 'Session complete', headerBackVisible: false, gestureEnabled: false }
-      : { title: 'View Session' };
+      : presentation === 'summary'
+        ? {
+            title: 'Session summary',
+            headerBackVisible: false,
+            gestureEnabled: false,
+            headerLeft: () => (
+              <Pressable
+                accessibilityLabel="Back to Session History"
+                accessibilityRole="button"
+                hitSlop={8}
+                onPress={handleSummaryHistoryExit}
+                testID="session-summary-history-button">
+                <Text style={styles.headerActionText}>History</Text>
+              </Pressable>
+            ),
+            headerRight: () => (
+              <Pressable
+                accessibilityLabel="Edit session"
+                accessibilityRole="button"
+                hitSlop={8}
+                onPress={handleSummaryEdit}
+                testID="session-summary-edit-button">
+                <Text style={styles.headerActionText}>Edit</Text>
+              </Pressable>
+            ),
+          }
+        : { title: 'View Session' };
 
   const handleEdit = () => {
     if (!session) {
@@ -601,7 +633,7 @@ export function CompletedSessionDetailScreenShell({
     );
   }
 
-  if (presentation === 'completion') {
+  if (presentation === 'completion' || presentation === 'summary') {
     const personalRecords = completedInsights?.personalRecords ?? [];
     const exerciseVolumeComparisons =
       completedInsights && completedInsights.exerciseVolumeComparisons.length > 0
@@ -617,22 +649,14 @@ export function CompletedSessionDetailScreenShell({
           exerciseVolumeComparisons={exerciseVolumeComparisons}
           gymName={session.gymName}
           muscleCatalogState={
-            isMaestroCatalogFailureActive || exerciseCatalog.status === 'error'
+            shouldFailNextMaestroCatalog || exerciseCatalog.status === 'error'
               ? 'error'
               : exerciseCatalog.status === 'ready'
                 ? 'ready'
                 : 'loading'
           }
-          muscleSummary={sessionMuscleSummary}
-          onDone={handleSafeExit}
-          onRetryMuscleCatalog={() => {
-            if (isMaestroCatalogFailureActive) {
-              setIsMaestroCatalogFailureActive(false);
-              return;
-            }
-            void ensureExerciseCatalogLoaded();
-          }}
-          onViewMuscleLoad={() => router.replace('/stats-history?period=7&breakdown=muscle')}
+          muscleSummary={shouldFailNextMaestroCatalog ? null : sessionMuscleSummary}
+          onDone={presentation === 'completion' ? handleCompletionExit : undefined}
           performedSetCount={performedSetCount}
           personalRecords={personalRecords}
           shouldFailNextShare={shouldFailNextMaestroShare}
@@ -969,6 +993,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: uiColors.textSecondary,
     textAlign: 'center',
+  },
+  headerActionText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: uiColors.actionPrimary,
   },
   headerCard: {
     borderRadius: 14,

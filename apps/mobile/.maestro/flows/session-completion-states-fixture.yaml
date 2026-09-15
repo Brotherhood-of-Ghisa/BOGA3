@@ -27,7 +27,9 @@ appId: com.dinoderek.mobile
     visibilityPercentage: 100
     centerElement: true
 - assertVisible:
-    id: "session-completion-working-sets"
+    id: "session-completion-sets"
+- assertVisible:
+    id: "session-completion-muscle-quads"
 - scrollUntilVisible:
     element:
       id: "session-completion-exercise-maestro_m24_completion_one_pr_squat"
@@ -47,22 +49,12 @@ appId: com.dinoderek.mobile
 - assertVisible: "Session complete"
 - assertNotVisible: "Personal records"
 - assertVisible:
-    id: "session-muscle-load-row"
-- assertVisible: "Unavailable · 1 set (1 working)"
+    id: "session-completion-muscle-empty-state"
+- assertVisible: "Muscle breakdown unavailable."
+- assertNotVisible: "Retry session muscle load"
+- assertNotVisible:
+    id: "session-completion-view-muscle-load"
 - takeScreenshot: "session-completion-catalog-error"
-- tapOn:
-    id: "session-muscle-load-row"
-- extendedWaitUntil:
-    visible: "Muscle load unavailable"
-    timeout: 10000
-- assertVisible: ".*Workout logging, autosave, and submission are unaffected.*"
-- takeScreenshot: "session-completion-catalog-error-detail"
-- tapOn: "Close session muscle load"
-- tapOn: "Retry session muscle load"
-- extendedWaitUntil:
-    visible: "4 muscles · 1 set (1 working)"
-    timeout: 10000
-- takeScreenshot: "session-completion-no-pr"
 - scrollUntilVisible:
     element:
       id: "session-completion-done"
@@ -87,12 +79,47 @@ appId: com.dinoderek.mobile
     timeout: 30000
 - assertVisible: "Session complete"
 - assertNotVisible: "Personal records"
-- assertVisible: "No mapped muscle load · 1 set (1 working)"
+- assertVisible: "No mapped working sets for this session."
+- assertNotVisible:
+    id: "session-completion-view-muscle-load"
 - takeScreenshot: "session-completion-unmapped"
+
+- openLink: "boga3://maestro-harness?fixture=exercise-block-history&teleport=session-recorder&mode=completed-edit&sessionId=maestro_m24_completion_one_pr"
 - tapOn:
-    id: "session-muscle-load-row"
+    text: "Open"
+    optional: true
 - extendedWaitUntil:
-    visible: "Close session muscle load"
-    timeout: 10000
-- assertVisible: "The performed exercises do not currently contribute to muscle analytics."
-- takeScreenshot: "session-completion-unmapped-detail"
+    visible:
+      id: "completed-edit-navigation-bar"
+    timeout: 30000
+- assertVisible: "Edit session"
+- tapOn:
+    id: "completed-edit-summary-button"
+- extendedWaitUntil:
+    visible:
+      id: "session-completion-presentation"
+    timeout: 30000
+- assertVisible: "Session summary"
+- assertVisible:
+    id: "session-completion-exercise-maestro_m24_completion_one_pr_squat"
+- assertNotVisible:
+    id: "session-completion-done"
+- assertNotVisible:
+    id: "session-completion-view-muscle-load"
+- takeScreenshot: "session-summary-from-history-top"
+- scrollUntilVisible:
+    element:
+      id: "session-completion-share-session"
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
+- assertVisible:
+    id: "session-completion-share-session"
+- takeScreenshot: "session-summary-from-history"
+- tapOn:
+    id: "session-summary-edit-button"
+- extendedWaitUntil:
+    visible:
+      id: "completed-edit-navigation-bar"
+    timeout: 30000
+- takeScreenshot: "session-summary-back-to-edit"

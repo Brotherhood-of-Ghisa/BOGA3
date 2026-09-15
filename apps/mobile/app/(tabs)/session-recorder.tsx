@@ -1222,6 +1222,7 @@ export default function SessionRecorderScreen({
   const [completedEditStartTouched, setCompletedEditStartTouched] = useState(false);
   const [completedEditEndTouched, setCompletedEditEndTouched] = useState(false);
   const [completedEditSubmitAttempted, setCompletedEditSubmitAttempted] = useState(false);
+  const [isOpeningCompletedSummary, setIsOpeningCompletedSummary] = useState(false);
   const [exercisePickerSearchValue, setExercisePickerSearchValue] = useState('');
   const [exercisePickerPreselection, setExercisePickerPreselection] =
     useState<ExercisePickerPreselectionState | null>(null);
@@ -3978,6 +3979,39 @@ export default function SessionRecorderScreen({
         : 'loading';
   const isSubmitDisabled =
     (routeMode === 'completed-edit' && Boolean(completedEditTimeValidationMessage)) || hasInvalidSetValues;
+  const openCompletedSessionSummary = useCallback(() => {
+    if (
+      routeMode !== 'completed-edit' ||
+      !routeSessionId ||
+      isSubmitDisabled ||
+      isOpeningCompletedSummary
+    ) {
+      return;
+    }
+
+    setIsOpeningCompletedSummary(true);
+    void autosaveController
+      .flushNow()
+      .then(() => {
+        hasSessionMutationRef.current = false;
+        router.push(`/completed-session/${routeSessionId}?presentation=summary`);
+      })
+      .catch(() => {
+        setCompletedEditAutosaveNotice(
+          'Unable to save changes before opening the summary. Try again.'
+        );
+      })
+      .finally(() => {
+        setIsOpeningCompletedSummary(false);
+      });
+  }, [
+    autosaveController,
+    isOpeningCompletedSummary,
+    isSubmitDisabled,
+    routeMode,
+    routeSessionId,
+    router,
+  ]);
   const gymButtonLabel = selectedGym ? selectedGym.name : 'No gym';
   const canLongPressRetryGymDetection = routeMode !== 'completed-edit' && hasActiveSession;
   const gymSelectionControl = (
@@ -4056,6 +4090,43 @@ export default function SessionRecorderScreen({
         onScrollBeginDrag={collapseDisplayableSetRows}
         ref={recorderScrollViewRef}
         testID="session-recorder-screen">
+      {routeMode === 'completed-edit' ? (
+        <View style={styles.completedEditNavigationBar} testID="completed-edit-navigation-bar">
+          <Pressable
+            accessibilityLabel="Back to Session History"
+            accessibilityRole="button"
+            hitSlop={8}
+            onPress={() => router.replace('/sessions')}
+            style={styles.completedEditNavigationAction}
+            testID="completed-edit-history-button">
+            <Text style={styles.completedEditNavigationActionText}>History</Text>
+          </Pressable>
+          <Text style={styles.completedEditNavigationTitle}>Edit session</Text>
+          <Pressable
+            accessibilityLabel="Show session summary"
+            accessibilityRole="button"
+            accessibilityState={{
+              busy: isOpeningCompletedSummary,
+              disabled: isSubmitDisabled || isOpeningCompletedSummary,
+            }}
+            disabled={isSubmitDisabled || isOpeningCompletedSummary}
+            hitSlop={8}
+            onPress={openCompletedSessionSummary}
+            style={styles.completedEditNavigationAction}
+            testID="completed-edit-summary-button">
+            <Text
+              style={[
+                styles.completedEditNavigationActionText,
+                isSubmitDisabled || isOpeningCompletedSummary
+                  ? styles.completedEditNavigationActionTextDisabled
+                  : null,
+              ]}>
+              {isOpeningCompletedSummary ? 'Opening…' : 'Summary'}
+            </Text>
+          </Pressable>
+        </View>
+      ) : null}
+
       {routeMode === 'completed-edit' ? (
         <View style={styles.completedEditMetadataCard}>
           <View style={styles.completedEditMetadataRow}>
@@ -5397,6 +5468,38 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: uiColors.textSecondary,
     textAlign: 'center',
+  },
+  completedEditNavigationBar: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderBottomColor: uiColors.borderMuted,
+    backgroundColor: uiColors.surfacePage,
+    paddingHorizontal: 2,
+    paddingBottom: 10,
+  },
+  completedEditNavigationAction: {
+    width: 76,
+    minHeight: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  completedEditNavigationActionText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: uiColors.actionPrimary,
+  },
+  completedEditNavigationActionTextDisabled: {
+    color: uiColors.textDisabled,
+  },
+  completedEditNavigationTitle: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 17,
+    fontWeight: '700',
+    color: uiColors.textPrimary,
   },
   completedEditMetadataCard: {
     borderRadius: 12,
