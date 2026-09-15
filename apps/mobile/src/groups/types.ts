@@ -70,10 +70,16 @@ export type StreamMembershipItem = {
 
 export type StreamItem = StreamSessionItem | StreamMembershipItem;
 
-/** The last item's ordering triple; a page returns items strictly after it. */
+/** Server stream kinds this build does not render; `getGroupStream` drops them (M25-T05). */
+export type UnrenderedStreamKind = 'record' | 'record_voided' | 'link';
+
+/**
+ * The last item's ordering triple; a page returns items strictly after it. The
+ * server's `next_cursor` may name an item kind this build drops.
+ */
 export type StreamCursor = {
   sort_at_ms: number;
-  kind: StreamItem['kind'];
+  kind: StreamItem['kind'] | UnrenderedStreamKind;
   key: string;
 };
 

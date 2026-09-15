@@ -4,15 +4,6 @@ Each section below becomes its own card (`docs/plans/tasks/M25-T0N-*.md`)
 when it is ready, refreshed against what T01–T03 actually built. Milestone:
 `docs/plans/milestones/M25-group-exercises-and-leaderboards.md`.
 
-## M25-T05 — Boards and events (backend; deps T04)
-
-- Design §4–§5 (T6–T8). `group_board_entries`; per-(group, member, group
-  exercise) recompute + diff under an advisory lock; events `record`,
-  `record_voided`, `link`, `unlink`, `lead_change{reason}`; provisional rule
-  for active sessions; archived boards frozen; read RPCs: podium page, full
-  board (paged), history (paged); stream returns the new kinds.
-- AC: every row of the §5 change table, as contract tests.
-
 ## M25-T06 — Certification (backend; deps T05)
 
 - Design §6. `group_certifications`; certify / withdraw / cancel RPCs;

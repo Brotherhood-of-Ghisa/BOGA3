@@ -85,6 +85,29 @@ describe('groups api client', () => {
     }
   };
 
+  it('drops stream items of kinds this build does not render, keeping the server cursor (M25-T05)', async () => {
+    const session = { kind: 'session', key: 'u:s', sort_at_ms: 9 };
+    const membership = { kind: 'membership', key: 'm:joined', sort_at_ms: 7, event: 'joined' };
+    const cursor = { sort_at_ms: 5, kind: 'record', key: 'e3' };
+    respond({
+      items: [
+        { kind: 'record', key: 'e1', sort_at_ms: 9 },
+        session,
+        { kind: 'record_voided', key: 'e2', sort_at_ms: 8 },
+        membership,
+        { kind: 'link', key: 'e3', sort_at_ms: 5, event: 'link' },
+      ],
+      next_cursor: cursor,
+      has_more: true,
+    });
+
+    await expect(getGroupStream({ groupId: null })).resolves.toEqual({
+      items: [session, membership],
+      next_cursor: cursor,
+      has_more: true,
+    });
+  });
+
   describe('one typed wrapper per RPC', () => {
     const cases: {
       rpc: string;

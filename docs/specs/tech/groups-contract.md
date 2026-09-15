@@ -29,11 +29,16 @@
 >   triggers, the set facts, the `group-eval` Edge Function, and the pg_net
 >   kick with its pg_cron sweep (§2.8–§2.10;
 >   `supabase/migrations/20260913180000_m25_group_eval.sql`), proven by
->   `./boga test groups-leaderboards`. Boards and record events (M25-T05) fill
->   the apply seam.
+>   `./boga test groups-leaderboards`.
 > - M25-T08, the group page: Stream · Exercises · Leaderboards, Members behind
 >   the header's member count, and the Exercises page with owner/admin add,
 >   copy, rename, and archive (§6.2 `group-exercises:<groupId>`, §6.3, §8).
+> - M25 step 2, boards and events (M25-T05): the apply recomputes and diffs
+>   `group_board_entries`, writes `record`, `record_voided`, `link`/`unlink`,
+>   and `lead_change` events, and serves the board and history reads; the
+>   stream returns the new kinds (§2.6, §2.10, §2.11, §4.2, §4.5;
+>   `supabase/migrations/20260914120000_m25_group_boards.sql`), proven by the
+>   `groups-boards.sh` body of `./boga test groups-leaderboards`.
 >
 > This doc owns the technical contract and is the durable record of what M22
 > built. The M22 milestone spec (product requirements and acceptance criteria)
@@ -283,7 +288,7 @@ no `anon` or `authenticated` privileges, and `service_role` keeps
 | --- | --- | --- |
 | `id` | `uuid` PK | |
 | `group_id` | `uuid not null` → `groups(id) on delete cascade` | |
-| `kind` | `text not null` | CHECK `in ('session','joined','left','removed','record','record_voided','link','unlink','lead_change')`. The last five are reserved for M25-T05. |
+| `kind` | `text not null` | CHECK `in ('session','joined','left','removed','record','record_voided','link','unlink','lead_change')`. The evaluator writes the last five (M25-T05, §2.11); `lead_change` rows are board history, never stream items. |
 | `member_user_id` | `uuid not null` → `auth.users(id) on delete cascade` | The athlete (`session`) or the member (membership kinds) |
 | `actor_user_id` | `uuid null` → `auth.users(id) on delete set null` | `removed`: the remover. Null for the other current kinds. |
 | `session_id` | `text null` | `session`: `sessions.id` in the member's keyspace (no FK, rule 2) |
@@ -520,9 +525,23 @@ failed, jobs[] }`, each job carrying its `outcome` and live `targets`.
   written after the archive from applying; after unarchive, every link
   counts.
 
-**Apply seam.** `group_eval_apply(group, member, group_exercise, causes)` is
-an intentional no-op. M25-T05 replaces its body with recompute, diff, and
-events (design §5).
+**Apply (M25-T05).** `group_eval_apply(group, member, group_exercise,
+causes)` recomputes the target's board entries from facts, diffs them, and
+writes events (§2.11). T04 shipped it as a no-op seam.
+
+**Catch-up enqueues (M25-T05).** Both use the §2.10 isolation pattern
+(`group_board_enqueue_links`: one `group.eval_enqueue_failed` row on
+failure, never raises) and cause `link`:
+
+- `group_exercise_unarchive`, when it actually unarchives, queues a target
+  job for every live link into the exercise and every target with board
+  state there;
+- the trigger `group_memberships_board_catch_up` (`AFTER INSERT` on
+  `group_memberships`) does the same for the new member in that group, so a
+  rejoin applies link changes and edits made while away. It is not named
+  `*group*eval_enqueue`, which is the five Sync v2 triggers.
+
+Archive and leave queue nothing: the board freezes.
 
 **Posture.**
 
@@ -547,6 +566,144 @@ sets `allowImportingTsExtensions` so Deno loads it by relative path, as
 - `group.eval_failed`: the job retries with backoff. Check
   `group_eval_queue.last_sqlstate` for poison jobs.
 - Manual drain: `select app_public.group_eval_kick();`.
+
+### 2.11 Boards and board events (M25-T05)
+
+`supabase/migrations/20260914120000_m25_group_boards.sql`. Design decisions
+T6–T8. Both tables follow ground rules 1–5.
+
+**`group_board_entries`**: PK `(group_exercise_id, member_user_id, metric,
+certified)`, plus `group_id`. `metric` is `weight` or `e1rm`. `certified` is
+always `false` until M25-T06 writes Certified entries. Each row holds the
+member's best counting set for that board:
+
+- `value_kg`: the ranked value, a `numeric` rounded to 6 places with trailing
+  zeros trimmed, so comparisons and cursors are exact;
+- `weight_kg`, `e1rm_kg` (converted), `reps`, `entered_weight_kg` (as
+  logged), `load_factor` (`0.5 | 1 | 2`);
+- the winning fact's `set_id`, `session_id`, `session_exercise_id`,
+  `exercise_definition_id`, `achieved_at_ms`, orders, and `fingerprint`.
+
+Index `(group_exercise_id, metric, certified, value_kg desc, achieved_at_ms,
+member_user_id)` is the rank order.
+
+**`group_board_state`**: PK `(group_exercise_id, member_user_id)`. It holds
+`linked_definition_ids`, the member's live linked exercises at the last
+apply, for link attribution.
+
+**Rules.**
+
+- **Counting set** of `(G, M, GX)`: a performed, live fact whose Sync v2
+  set row still exists, whose session is shared into G, and whose exercise
+  has a live link to `(G, GX)`. The Weight board needs `weight_kg > 0`
+  (a 0 kg set is not weight lifted; bodyweight metrics are out of scope);
+  the e1RM board needs a non-null `e1rm_kg`.
+- **Conversion (D6).** The factor compares the member's exercise's current
+  `load_input_mode` with the group exercise's: the same mode gives 1, per
+  side → total gives 2, total → per side gives 0.5. It applies to weight and
+  e1RM, and record detection uses converted values.
+- **A member's best**: highest `value_kg`, then the earlier `achieved_at_ms`,
+  `exercise_order_index`, `set_order_index`, `set_id` (P7).
+- **Rank**: `value_kg desc, achieved_at_ms asc, member_user_id asc`, strict
+  1..n. Former members keep their entries, are ranked, and read `former`
+  (P7); their targets are not live, so the entries freeze. Archived boards
+  freeze the same way (D8).
+
+**The apply** (`group_eval_apply`), per target, in order:
+
+1. `pg_advisory_xact_lock(25005, hashtext(group_id))` serializes every apply
+   in a group. A session job applies targets in `group_id` order, so locks
+   are taken in one order.
+2. Snapshot the old All entries, old #1 and rank per board, and
+   `prev_links`; recompute the new entries and `cur_links`.
+3. **Provisional records (T8).** A record is provisional while its session
+   row has `status = 'active'` (tombstoned or not).
+   - One whose set still counts and still beats `previous_value_kg` on a
+     listed board is updated in place: values, fingerprint, the boards it
+     still beats (each keeping its `previous_value_kg`), `group_record`, and
+     the leader snapshot of its lead changes.
+   - Otherwise it is deleted with its `lead_change` rows, and no void is
+     written. The boards it listed fall back to its `previous_value_kg` as
+     the baseline for record detection (step 5), so a real PR logged after a
+     typo in the same session still becomes a record.
+   - Either way, a `lead_change` it caused is deleted once the member no
+     longer leads that board at the corrected value.
+
+   These are the only deletes of stream rows.
+4. **Voids.** A final record is voided when its lift no longer stands:
+   - fact missing or not live: `record_voided{deleted}`;
+   - not performed, or a listed board's converted value changed (a weight
+     or reps edit, or a load-mode change): `record_voided{edited}`.
+
+   An edit that leaves every listed value unchanged (a whitespace edit, a
+   status equivalent to performed) voids nothing. Unlinking never voids:
+   the lift happened.
+5. **Attribution, per All metric**, old winner O vs new winner N:
+   - N's exercise is not in `prev_links`, and N's set was created
+     (`exercise_sets.created_at`) before its link's `updated_at`: **link**.
+     A set logged after linking counts as logging, so a whole session pushed
+     together with its link still gets records;
+   - O's exercise is not in `cur_links`: **unlink**;
+   - N beats the baseline, or there is none (D1): **record**. The baseline
+     is O's value, or the `previous_value_kg` of a provisional record
+     retracted in step 3;
+   - otherwise the entry fell or vanished: **void** fallback.
+6. Write the entries and the state, then the events:
+   - the voids, with each voided board's current leader;
+   - one `record` per new-best set, listing the boards it beat, with
+     `previous_value_kg` (the baseline) and `group_record` (the member is #1
+     after the apply).
+     - A replacement for a record voided in this apply also lists that
+       record's boards that the set still holds at the same value, with
+       their original `previous_value_kg`. A reps-only edit therefore keeps
+       the Weight card.
+     - A surviving provisional record of the same set absorbs the board
+       instead, keeping each listed board's `previous_value_kg`;
+   - one `link` item if any link effect occurred, and one `unlink` item if
+     any unlink effect occurred, with `effects` per metric. A link that
+     moves no entry writes nothing, and link effects never write a `record`
+     (P16);
+   - one `lead_change` per All board whose #1 member moved. "Before" is the
+     old #1, or, when step 3 deleted the board's latest lead change, that
+     row's `previous`. Its `reason` is `record`, `void`, or `link`, and it
+     points at the causing event (`related_event_id`, when one exists).
+7. `causes = {rules}` exactly is a silent recompute: entries and state only.
+
+**`group_events` columns added.** `seq` (identity, unique: the history
+order), `group_exercise_id`, `set_id`, `metric`, `certified`, `reason`,
+`related_event_id` (→ `group_events`, `on delete cascade`), and `payload`.
+Each kind has a shape CHECK, and the step-1 kinds carry none of the new
+columns. Indexes: one `record_voided` per record, the target's records, a
+board's history, and `related_event_id`.
+
+| Kind | `sort_at_ms` | `payload` |
+| --- | --- | --- |
+| `record` | the session's `started_at` when written | `{ boards: [{ metric, value_kg, previous_value_kg, group_record }], weight_kg, reps, e1rm_kg, entered_weight_kg, load_factor, fingerprint, achieved_at_ms, session_exercise_id, exercise_definition_id }` |
+| `record_voided` | when written | `{ record: { weight_kg, reps, e1rm_kg }, leaders: [{ metric, leader: Holder\|null }] }` |
+| `link`, `unlink` | when written | `{ exercise_definition_ids, effects: [{ metric, before: { rank, value_kg }\|null, after: … }] }` |
+| `lead_change` | when written | `{ leader: Holder\|null, previous: Holder\|null }`; `member_user_id` is the member whose change caused it, and a null `leader` means the board emptied |
+
+`Holder = { member_user_id, value_kg, weight_kg, reps, e1rm_kg,
+achieved_at_ms, set_id, session_id }`.
+
+**Posture.** `group_eval_apply` and every `group_board_*` helper are
+owner-only (no `service_role` either). The three reads (§4.5) are the only
+client surface.
+
+**Known limits.**
+
+- A silent rules recompute can move #1 without a history row.
+- A soft-deleted exercise's link still counts on the boards. The T07 client
+  never offers such an exercise for linking.
+- A retracted provisional lead change rolls "before" back only when it was
+  the board's latest history row. An older one leaves a later row's
+  `previous` naming the retracted holder.
+- Link attribution compares client clocks: the set's `created_at` and the
+  link's `updated_at`. Skew between two devices can turn a link effect into
+  a record, or the reverse.
+- There is no `group_board_state` backfill. The first apply of a target
+  without state treats every counting set from before its link as a link
+  effect, which is correct while M25 has no live boards.
 
 ## 3. Authorization model
 
@@ -753,8 +910,8 @@ validation, order, keys, shapes, and grants are all unchanged.
 - **Membership items.** They come from `joined` / `left` / `removed` rows at
   their stored `sort_at_ms`, keyed `<membership_id>:joined` or
   `<membership_id>:ended`. `event` is the row's kind.
-- **Reserved kinds** (M25-T05) are not stream items until `group_stream` is
-  taught their shape.
+- **Board kinds** (M25-T05) are stream items as of the T05 as-built below;
+  `lead_change` never is.
 - `group_session_detail` still authorizes through the share ledger.
 - **Proven** by `groups-contract`. Every M22 stream assertion passes
   unchanged. New assertions cover:
@@ -763,6 +920,44 @@ validation, order, keys, shapes, and grants are all unchanged.
     re-push;
   - event trigger failure isolation and self-heal;
   - a backfill that rebuilds three users' full All streams byte-identical.
+
+**As-built (M25-T05, board items).**
+`supabase/migrations/20260914120000_m25_group_boards.sql` rebuilds
+`group_stream` with three more wire kinds. The order, scope, check order, and
+the session and membership items are unchanged. `lead_change` rows are never
+items (T6).
+
+- **Cursor.** `kind` accepts `link`, `membership`, `record`,
+  `record_voided`, and `session`.
+- **Keys.** The event id. Items are per group: All does not dedupe them.
+- **`record`** sorts at its session's live `started_at` while the row exists
+  (tombstoned included), else at its stored position. A voided record stays
+  visible (D15).
+
+  ```jsonc
+  { "kind": "record", "key", "sort_at_ms", "group": { "group_id", "name" },
+    "member": { "user_id", "username" },
+    "group_exercise": { "group_exercise_id", "name", "load_input_mode" },
+    "session_id", "set_id", "weight_kg", "reps", "e1rm_kg",   // converted (D6)
+    "entered_weight_kg", "load_factor", "achieved_at_ms",
+    "boards": [{ "metric", "value_kg", "previous_value_kg", "group_record" }],
+    "provisional",                                            // session active
+    "voided": { "key", "reason": "edited|deleted", "occurred_at_ms" } | null,
+    "certified": false }                                      // M25-T06
+  ```
+
+- **`record_voided`**: `{ kind, key, sort_at_ms, group, member,
+  group_exercise, record_key, reason, record: { weight_kg, reps, e1rm_kg },
+  leaders: [{ metric, leader: Holder + member | null }] }`, sorted when
+  written.
+- **`link`**: `{ kind: "link", key, sort_at_ms, event: "link" | "unlink",
+  group, member, group_exercise, exercises: [{ exercise_definition_id, name }],
+  effects: [{ metric, before: { rank, value_kg } | null, after: … }] }`,
+  sorted when written. `name` is read live from the member's
+  `exercise_definitions` (null if gone): they chose to link that exercise
+  into the group.
+- **Clients.** A build that doesn't render a kind drops it in `getGroupStream`
+  (§6.1). Paging uses the server's `next_cursor`, so it walks past them.
 
 ### 4.3 Writes
 
@@ -852,6 +1047,47 @@ Writes raise:
   source_exercise_id must be 1–100 characters after trimming`, and
   `VALIDATION: an archived group exercise is read-only; unarchive it first`.
 
+### 4.5 Boards (M25-T05)
+
+```jsonc
+// BoardRow
+{ "rank": 1, "member": { "user_id", "username" }, "former": false,
+  "value_kg": 142.5, "weight_kg": 140, "reps": 1, "e1rm_kg": 142.5,   // converted (D6)
+  "entered_weight_kg": 70, "load_factor": 2,                           // as logged
+  "achieved_at_ms": 0, "session_id": "…", "set_id": "…",
+  "exercise_name": "Bench (comp grip)|null",                          // live session_exercises.name
+  "certified": false }                                                 // M25-T06
+```
+
+| RPC | Returns |
+| --- | --- |
+| `group_board_podiums(p_group_id, p_metric default 'e1rm', p_certified default true)` | `{ metric, certified, exercises: [{ exercise: GroupExercise, podium: BoardRow[≤3], me: BoardRow\|null, entry_count, all_entry_count }] }`, every group exercise in the `group_exercise_list` order. `me` is the caller's row whenever ranked; `all_entry_count` counts the same metric on All. |
+| `group_board(p_group_id, p_group_exercise_id, p_metric default 'e1rm', p_certified default false, p_after, p_limit)` | `{ exercise, metric, certified, rows: BoardRow[], next_cursor, has_more }`. `p_limit` `1..100`, default `50`. Ranks are absolute. |
+| `group_board_history(p_group_id, p_group_exercise_id, p_metric default 'e1rm', p_certified default false, p_before, p_limit)` | `{ items: [{ key, seq, occurred_at_ms, reason, leader, previous, related }], next_cursor: { seq }\|null, has_more }`, newest first. `leader` and `previous` are `Holder + member`, or null. `related` summarizes the causing event: `{ kind: 'record', key, set_id, weight_kg, reps, e1rm_kg }`, `{ kind: 'record_voided', key, reason, record }`, `{ kind: 'link', key, event, exercises }`, or null. `p_limit` `1..50`, default `20`. |
+
+**As-built (M25-T05).**
+
+- **Posture** as §3: `security definer`, a pinned `search_path`, execute
+  granted to `anon`, `authenticated`, and `service_role`. The helpers
+  (`group_board_*`, `group_stream_event_json`) have no grant at all.
+- **Check order:**
+  1. the preamble;
+  2. membership, `NOT_FOUND: group not found` (non-member ≡ former ≡
+     removed ≡ nonexistent);
+  3. `VALIDATION`: `p_metric must be weight or e1rm`, `p_certified is
+     required`, then `p_limit`, then the cursor;
+  4. the target, `NOT_FOUND: group exercise not found` (another group's
+     exercise looks nonexistent). There is no lock: reads never block the
+     evaluator.
+- **Cursors.** `group_board`'s `p_after` is exactly `{ value_kg (number),
+  achieved_at_ms (integral), member_user_id (uuid) }`, the last row of the
+  previous page in the rank order. `group_board_history`'s `p_before` is
+  exactly `{ seq }` (a non-negative integral number). Anything else, or a
+  JSON value of the wrong type, is `VALIDATION`; JSON `null` means no
+  cursor.
+- **Archived** exercises are readable and sort last in the podiums.
+- **Mobile.** No client wrapper yet; M25-T09 adds the reads.
+
 ## 5. Stream-card metrics (computed on the viewing device)
 
 Group reads return raw set rows (§4.2). Every set rule runs on the viewing
@@ -927,6 +1163,11 @@ RPC failure is caught in this module (C3.10.5, AC13).
     `regenerateGroupInviteCode`, `joinGroup`, `leaveGroup`,
     `removeGroupMember`, `setGroupMemberRole`, `transferGroupOwnership`.
   - `group_stream` always sends all three `p_*` args.
+  - **Unrendered kinds (M25-T05).** `getGroupStream` drops every item whose
+    `kind` is not `session` or `membership` (`record`, `record_voided`,
+    `link`, §4.2) before callers or the cache see it, and keeps the server's
+    `next_cursor`. `StreamCursor.kind` therefore also admits those kinds
+    (`UnrenderedStreamKind`). M25-T10 renders them and widens the set.
   - Group exercises (M25-T01): `listGroupExercises`,
     `createGroupExercise(groupId, { name, loadInputMode, sourceExerciseId })`,
     `updateGroupExercise`, `archiveGroupExercise`, `unarchiveGroupExercise`,
@@ -1324,6 +1565,25 @@ E0.1–E0.3).
     - the sweep, and a pg_net smoke (one kick for a 32-row push).
   - **Hermetic.** It restores the URL, the sweep job, and the probe
     constraints on exit.
+- **Boards body `groups-boards.sh`** (M25-T05; the second body of the
+  `groups-leaderboards` lane, same direct-drain mode and shared fixtures).
+  Per-run users: athlete, rival, a rejoining member, owner, and outsider.
+  - **Change table.** One section per row of the design's board change
+    table: new best (with first set and group-record flag), void on edit
+    down / unperformed / delete, edit up, session delete and undelete, link /
+    unlink / retarget (no record cards), Certified boards empty, load-mode
+    rescale, leave (former, still ranked), archive and unarchive catch-up,
+    and the silent rules recompute.
+  - **Rules.** The provisional rule (update in place, silent drop, void only
+    once complete), D6 both directions with the entered value kept, P7 ties
+    (earlier date, then exercise order, then set order), and rejoin catch-up.
+  - **Serialization and isolation.** While the group's advisory lock is held
+    from another session, an apply under `lock_timeout` fails with a lock
+    timeout. A forced apply failure fails the job (kept, retried) while
+    `sync_push` commits.
+  - **Reads and stream.** The three board reads' shapes, podium order, board
+    and history keyset paging, and every error token; `group_stream`'s board
+    items, their shapes, and cursor paging that is independent of page size.
 - **Existing lanes.** `sync-drift --strict` stays green, which proves ground
   rules 1–2. The sync push, pull, and e2e lanes stay unchanged and green.
 - **Jest:**

@@ -30,6 +30,7 @@ import {
   type GroupStreamResult,
   type GroupUpdateResult,
   type StreamCursor,
+  type StreamItem,
 } from './types';
 
 export class GroupApiError extends Error {
@@ -170,16 +171,27 @@ export type GroupStreamRequest = {
   limit?: number;
 };
 
+/** The stream item kinds this build renders; the server may send more (M25-T05). */
+const RENDERED_STREAM_KINDS: ReadonlySet<string> = new Set<StreamItem['kind']>(['session', 'membership']);
+
+/**
+ * One stream page. Items of a kind this build does not render (`record`,
+ * `record_voided`, `link` — contract §4.2) are dropped here, so no screen or
+ * cache ever sees them; `next_cursor` is the server's, so paging still walks
+ * past them.
+ */
 export const getGroupStream = async ({
   groupId,
   before = null,
   limit = GROUP_STREAM_DEFAULT_LIMIT,
-}: GroupStreamRequest): Promise<GroupStreamResult> =>
-  expectShape(
+}: GroupStreamRequest): Promise<GroupStreamResult> => {
+  const page = expectShape<GroupStreamResult>(
     'group_stream',
     await callGroupRpc('group_stream', { p_group_id: groupId, p_before: before, p_limit: limit }),
     (r) => Array.isArray(r.items) && typeof r.has_more === 'boolean',
   );
+  return { ...page, items: page.items.filter((item) => RENDERED_STREAM_KINDS.has(item.kind)) };
+};
 
 export const getGroupSessionDetail = async (memberUserId: string, sessionId: string): Promise<GroupSessionDetailResult> =>
   expectShape(
