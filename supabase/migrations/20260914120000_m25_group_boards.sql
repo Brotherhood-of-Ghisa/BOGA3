@@ -302,6 +302,31 @@ as $$
    limit 1;
 $$;
 
+-- Would the member lead a board with this entry? Compared with every other
+-- member's entry in the rank order (value desc, earlier achieved_at_ms,
+-- member id). False when the member has no entry.
+create function app_public.group_board_would_lead(
+  p_group_exercise_id uuid,
+  p_metric text,
+  p_member_user_id uuid,
+  p_value_kg numeric,
+  p_achieved_at_ms bigint
+)
+returns boolean
+language sql
+stable
+set search_path = app_public, pg_temp
+as $$
+  select p_value_kg is not null and not exists (
+    select 1 from app_public.group_board_entries e
+     where e.group_exercise_id = p_group_exercise_id and e.metric = p_metric and not e.certified
+       and e.member_user_id <> p_member_user_id
+       and (e.value_kg > p_value_kg
+            or (e.value_kg = p_value_kg
+                and (e.achieved_at_ms < p_achieved_at_ms
+                     or (e.achieved_at_ms = p_achieved_at_ms and e.member_user_id < p_member_user_id)))));
+$$;
+
 -- A member's 1-based rank on a board, or null when unranked.
 create function app_public.group_board_rank(p_group_exercise_id uuid, p_metric text, p_certified boolean, p_member_user_id uuid)
 returns integer
@@ -354,7 +379,12 @@ security definer
 set search_path = app_public, pg_temp
 as $$
 declare
-  _silent        boolean := coalesce(p_causes <@ array['rules']::text[], false);
+  _silent        boolean := coalesce(cardinality(p_causes) > 0 and p_causes <@ array['rules']::text[], false);
+  _baseline_by   jsonb := '{}'::jsonb;
+  _retract_prev  jsonb := '{}'::jsonb;
+  _carry         jsonb := '[]'::jsonb;
+  _delete_record boolean;
+  _lc            record;
   _now_ms        bigint := floor(extract(epoch from now()) * 1000)::bigint;
   _metrics       text[] := array['weight', 'e1rm'];
   _metric        text;
@@ -457,33 +487,44 @@ begin
            and (jsonb_typeof(b -> 'previous_value_kg') = 'null' or x.v > (b ->> 'previous_value_kg')::numeric);
       end if;
 
-      if jsonb_array_length(_boards) = 0 then
-        -- The board's latest history row goes with the record: "before" rolls
-        -- back to that row's previous leader.
-        foreach _metric in array _metrics loop
-          select lc.payload -> 'previous' into _before
-            from app_public.group_events lc
-           where lc.kind = 'lead_change' and lc.group_exercise_id = p_group_exercise_id
-             and lc.metric = _metric and not lc.certified
-           order by lc.seq desc
-           limit 1;
-          if found and exists (
-            select 1 from app_public.group_events lc
-             where lc.kind = 'lead_change' and lc.group_exercise_id = p_group_exercise_id
-               and lc.metric = _metric and not lc.certified and lc.related_event_id = _rec.id
-               and lc.seq = (select max(l2.seq) from app_public.group_events l2
-                              where l2.kind = 'lead_change' and l2.group_exercise_id = p_group_exercise_id
-                                and l2.metric = _metric and not l2.certified)) then
-            _rollback_by := _rollback_by || jsonb_build_object(_metric, _before);
+      _delete_record := jsonb_array_length(_boards) = 0;
+
+      -- Its lead changes go with the record, or when the member no longer
+      -- leads that board at the corrected value. When one was the board's
+      -- latest history row, "before" rolls back to that row's previous leader.
+      for _lc in
+        select lc.id, lc.metric, lc.seq, lc.payload
+          from app_public.group_events lc
+         where lc.kind = 'lead_change' and lc.related_event_id = _rec.id
+      loop
+        if _delete_record or not app_public.group_board_would_lead(
+             p_group_exercise_id, _lc.metric, p_member_user_id,
+             (_new_by -> _lc.metric ->> 'value_kg')::numeric,
+             (_new_by -> _lc.metric ->> 'achieved_at_ms')::bigint) then
+          if _lc.seq = (select max(l2.seq) from app_public.group_events l2
+                         where l2.kind = 'lead_change' and l2.group_exercise_id = p_group_exercise_id
+                           and l2.metric = _lc.metric and not l2.certified) then
+            _rollback_by := _rollback_by || jsonb_build_object(_lc.metric, _lc.payload -> 'previous');
           end if;
-        end loop;
+          delete from app_public.group_events where id = _lc.id;
+        end if;
+      end loop;
+
+      if _delete_record then
+        -- Record detection falls back to the best the record was set against.
+        select _retract_prev || coalesce(jsonb_object_agg(b ->> 'metric', b -> 'previous_value_kg'), '{}'::jsonb)
+          into _retract_prev
+          from jsonb_array_elements(_rec.payload -> 'boards') b
+         where _old_by -> (b ->> 'metric') ->> 'set_id' = _rec.set_id;
         delete from app_public.group_events where id = _rec.id;
       else
         update app_public.group_events
            set payload = payload || jsonb_build_object(
                  'boards', _boards, 'weight_kg', coalesce(_c.weight_kg, 0), 'reps', _c.reps,
                  'e1rm_kg', _c.e1rm_kg, 'entered_weight_kg', _c.entered_weight_kg,
-                 'load_factor', _c.load_factor, 'fingerprint', _c.fingerprint)
+                 'load_factor', _c.load_factor, 'fingerprint', _c.fingerprint,
+                 'achieved_at_ms', _c.achieved_at_ms, 'session_exercise_id', _c.session_exercise_id,
+                 'exercise_definition_id', _c.exercise_definition_id)
          where id = _rec.id;
         _kept := _kept || _rec.id;
       end if;
@@ -492,8 +533,9 @@ begin
     -- 4. Final records whose set is gone or changed.
     for _rec in
       select e.id, e.set_id, e.session_id, e.payload, f.set_id as fact_set_id, f.live, f.performed,
-             f.fingerprint, es.id as row_id,
-             app_public.group_board_load_factor(d.load_input_mode, _group_mode) as factor
+             es.id as row_id,
+             case when f.weight_kg > 0 then app_public.group_board_kg(f.weight_kg, x.factor) end as cur_weight_kg,
+             app_public.group_board_kg(f.e1rm_kg, x.factor) as cur_e1rm_kg
         from app_public.group_events e
         left join app_public.group_set_facts f
           on f.member_user_id = e.member_user_id and f.set_id = e.set_id
@@ -501,6 +543,9 @@ begin
           on es.owner_user_id = e.member_user_id and es.id = e.set_id
         left join app_public.exercise_definitions d
           on d.owner_user_id = f.member_user_id and d.id = f.exercise_definition_id
+        cross join lateral (
+          select app_public.group_board_load_factor(d.load_input_mode, _group_mode) as factor
+        ) x
        where e.kind = 'record'
          and e.group_exercise_id = p_group_exercise_id
          and e.member_user_id = p_member_user_id
@@ -509,11 +554,15 @@ begin
          and not exists (select 1 from app_public.sessions s
                           where s.owner_user_id = p_member_user_id and s.id = e.session_id and s.status = 'active')
     loop
+      -- Value-based: the lift no longer stands on a board the card lists. A
+      -- raw edit that changes no listed value (whitespace, an equivalent
+      -- status) voids nothing; a load-mode change moves every value.
       _reason := case
         when _rec.fact_set_id is null or _rec.row_id is null or not _rec.live then 'deleted'
-        when not _rec.performed
-          or _rec.fingerprint is distinct from (_rec.payload ->> 'fingerprint')
-          or _rec.factor is distinct from (_rec.payload ->> 'load_factor')::numeric then 'edited'
+        when not _rec.performed or exists (
+          select 1 from jsonb_array_elements(_rec.payload -> 'boards') b
+           where (case b ->> 'metric' when 'weight' then _rec.cur_weight_kg else _rec.cur_e1rm_kg end)
+                 is distinct from (b ->> 'value_kg')::numeric) then 'edited'
       end;
       if _reason is not null then
         _voids := _voids || jsonb_build_array(jsonb_build_object(
@@ -527,6 +576,14 @@ begin
       _o := _old_by -> _metric;
       _n := _new_by -> _metric;
       _class := null;
+      -- The baseline a new winner must beat (here in _before, which the lead
+      -- change step reuses): the old winner's value, or the previous best of
+      -- a provisional record retracted in step 3.
+      _before := case when _retract_prev ? _metric then _retract_prev -> _metric else _o -> 'value_kg' end;
+      if _before is not null and jsonb_typeof(_before) = 'null' then
+        _before := null;
+      end if;
+      _baseline_by := _baseline_by || jsonb_build_object(_metric, coalesce(_before, 'null'::jsonb));
       if _o is null and _n is null then
         _class := null;
       elsif _o is not null and _n is not null and _o ->> 'set_id' = _n ->> 'set_id'
@@ -545,7 +602,7 @@ begin
         _class := 'link';
       elsif _o is not null and not ((_o ->> 'exercise_definition_id') = any(_cur_links)) then
         _class := 'unlink';
-      elsif _n is not null and (_o is null or (_n ->> 'value_kg')::numeric > (_o ->> 'value_kg')::numeric) then
+      elsif _n is not null and (_before is null or (_n ->> 'value_kg')::numeric > (_before #>> '{}')::numeric) then
         _class := 'record';
       else
         _class := 'void';
@@ -602,23 +659,47 @@ begin
     _void_ids := _void_ids || jsonb_build_object(_rec.v ->> 'set_id', _id);
   end loop;
 
-  -- Records: one per new best set, listing the boards it beat. A surviving
-  -- provisional record of the same set absorbs the board instead.
+  -- Records: one per new best set, listing the boards it beat against the
+  -- baseline. A replacement for a record voided just now also lists that
+  -- record's boards the set still holds at the same value (with their
+  -- original previous best), so a reps-only edit keeps the Weight card. A
+  -- surviving provisional record of the same set absorbs the board instead.
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'set_id', v ->> 'set_id', 'metric', b ->> 'metric', 'previous_value_kg', b -> 'previous_value_kg')),
+           '[]'::jsonb)
+    into _carry
+    from jsonb_array_elements(_voids) v
+    cross join lateral jsonb_array_elements(v -> 'payload' -> 'boards') b
+   where _new_by -> (b ->> 'metric') ->> 'set_id' = v ->> 'set_id'
+     and (_new_by -> (b ->> 'metric') ->> 'value_kg')::numeric = (b ->> 'value_kg')::numeric
+     and coalesce(_class_by ->> (b ->> 'metric'), '') <> 'record';
+
   for _set_id in
-    select distinct _new_by -> m ->> 'set_id'
-      from unnest(_metrics) m
-     where _class_by ->> m = 'record'
+    select _new_by -> m ->> 'set_id' from unnest(_metrics) m where _class_by ->> m = 'record'
+    union
+    select c ->> 'set_id' from jsonb_array_elements(_carry) c
   loop
-    select coalesce(jsonb_agg(jsonb_build_object(
-             'metric', m,
-             'value_kg', (_new_by -> m -> 'value_kg'),
-             'previous_value_kg', coalesce(_old_by -> m -> 'value_kg', 'null'::jsonb),
-             'group_record', (app_public.group_board_leader(p_group_exercise_id, m, false)).member_user_id
-                               = p_member_user_id)
-             order by m), '[]'::jsonb)
+    select coalesce(jsonb_agg(x.board order by x.board ->> 'metric'), '[]'::jsonb)
       into _boards
-      from unnest(_metrics) m
-     where _class_by ->> m = 'record' and _new_by -> m ->> 'set_id' = _set_id;
+      from (
+        select jsonb_build_object(
+                 'metric', m,
+                 'value_kg', (_new_by -> m -> 'value_kg'),
+                 'previous_value_kg', coalesce(_baseline_by -> m, 'null'::jsonb),
+                 'group_record', (app_public.group_board_leader(p_group_exercise_id, m, false)).member_user_id
+                                   = p_member_user_id) as board
+          from unnest(_metrics) m
+         where _class_by ->> m = 'record' and _new_by -> m ->> 'set_id' = _set_id
+        union all
+        select jsonb_build_object(
+                 'metric', c ->> 'metric',
+                 'value_kg', (_new_by -> (c ->> 'metric') -> 'value_kg'),
+                 'previous_value_kg', c -> 'previous_value_kg',
+                 'group_record', (app_public.group_board_leader(p_group_exercise_id, c ->> 'metric', false)).member_user_id
+                                   = p_member_user_id)
+          from jsonb_array_elements(_carry) c
+         where c ->> 'set_id' = _set_id
+      ) x;
 
     select e.id into _id
       from app_public.group_events e
@@ -630,20 +711,28 @@ begin
      limit 1;
 
     if found then
+      -- A board the record already lists keeps its previous best (the
+      -- baseline it was set against); only its value and flag refresh. A
+      -- board it doesn't list yet is appended.
       update app_public.group_events e
          set payload = e.payload || jsonb_build_object('boards', (
-               select coalesce(jsonb_agg(b order by b ->> 'metric'), '[]'::jsonb)
+               select coalesce(jsonb_agg(all_boards.b order by all_boards.b ->> 'metric'), '[]'::jsonb)
                  from (
-                   select b from jsonb_array_elements(e.payload -> 'boards') b
-                    where not exists (select 1 from jsonb_array_elements(_boards) nb
-                                       where nb ->> 'metric' = b ->> 'metric')
+                   select case when l.nb is null then b
+                               else b || jsonb_build_object('value_kg', l.nb -> 'value_kg',
+                                                            'group_record', l.nb -> 'group_record') end as b
+                     from jsonb_array_elements(e.payload -> 'boards') b
+                     left join lateral (
+                       select nb from jsonb_array_elements(_boards) nb where nb ->> 'metric' = b ->> 'metric'
+                     ) l on true
                    union all
                    select nb from jsonb_array_elements(_boards) nb
-                 ) all_boards(b)))
+                    where not exists (select 1 from jsonb_array_elements(e.payload -> 'boards') ob
+                                       where ob ->> 'metric' = nb ->> 'metric')
+                 ) all_boards))
        where e.id = _id;
     else
-      _n := (select _new_by -> m from unnest(_metrics) m
-              where _class_by ->> m = 'record' and _new_by -> m ->> 'set_id' = _set_id limit 1);
+      _n := (select _new_by -> m from unnest(_metrics) m where _new_by -> m ->> 'set_id' = _set_id limit 1);
       insert into app_public.group_events (
         group_id, kind, member_user_id, session_id, set_id, group_exercise_id, sort_at_ms, payload)
       values (
@@ -1441,6 +1530,7 @@ begin
     'group_board_holder_json(app_public.group_board_entries)',
     'group_board_leader(uuid, text, boolean)',
     'group_board_rank(uuid, text, boolean, uuid)',
+    'group_board_would_lead(uuid, text, uuid, numeric, bigint)',
     'group_board_enqueue_links(uuid, uuid, uuid, text, text)',
     'group_board_on_membership()',
     'group_board_validate(text, boolean)',

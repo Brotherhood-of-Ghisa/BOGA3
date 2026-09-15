@@ -691,6 +691,30 @@ expect_sql "T8 the same record is updated in place, with its lead change" \
           (select payload -> 'leader' ->> 'value_kg' from app_public.group_events
             where related_event_id = '${PREC}' and kind = 'lead_change' and metric = 'weight');" "1000:1000"
 
+expect_sql "T8 an in-place edit keeps the record's previous best" \
+  "select b ->> 'previous_value_kg' from jsonb_array_elements((select payload -> 'boards' from app_public.group_events
+                                                                where id = '${PREC}')) b
+    where b ->> 'metric' = 'weight';" "80"
+
+set_edit "${ATHLETE_TOKEN}" "${T}-spa" pa1 0 95 5
+drain "T8 fixed to a value that still beats the previous best"
+expect_since "${GXP}" "" "T8 a fix that still beats the previous best writes no event"
+expect_sql "T8 the card stays at the corrected value, against the same previous best, and still leads" \
+  "select (payload ->> 'weight_kg') || ':'
+          || (select b ->> 'previous_value_kg' from jsonb_array_elements(payload -> 'boards') b where b ->> 'metric' = 'weight')
+          || ':' || (select lc.payload -> 'leader' ->> 'value_kg' from app_public.group_events lc
+                      where lc.related_event_id = '${PREC}' and lc.kind = 'lead_change' and lc.metric = 'weight')
+     from app_public.group_events where id = '${PREC}';" "95:80:95"
+
+set_edit "${ATHLETE_TOKEN}" "${T}-spa" pa1 0 85 5
+drain "T8 fixed below the rival but above the previous best"
+expect_since "${GXP}" "" "T8 losing #1 through a provisional fix writes no event"
+expect_sql "T8 the record stays; its lead changes are retracted" \
+  "select (select count(*) from app_public.group_events where id = '${PREC}') || ':'
+          || (select count(*) from app_public.group_events where related_event_id = '${PREC}');" "1:0"
+[[ "$(latest "${GXP}" lead_change "payload -> 'leader' ->> 'member_user_id'")" == "${RIVAL_UID}" ]] ||
+  fail "T8 a retracted lead change leaves history ending with the rival's lead"
+
 set_edit "${ATHLETE_TOKEN}" "${T}-spa" pa1 0 70 5
 drain "T8 typo fixed below the previous best"
 expect_since "${GXP}" "" "T8 a fix below the previous best writes no void"
@@ -712,6 +736,78 @@ set_edit "${ATHLETE_TOKEN}" "${T}-spa" pa1 0 70 5
 drain "T8 edit after completion"
 expect_since "${GXP}" "record_voided:edited@A,lead_change:void:weight@A,lead_change:void:e1rm@A" "T8 once complete, an edit voids"
 pass "T8: provisional records update or drop silently; voids only once the session completes"
+
+# =============================================================================
+echo "[${LANE_LABEL}] provisional retraction restores the baseline"
+# =============================================================================
+
+GXQ="$(gx "T8 baseline" total_load)"
+DAQ="${T}-dAQ"; DRQ="${T}-dRQ"
+def "${ATHLETE_TOKEN}" "${DAQ}" total_load
+link "${ATHLETE_TOKEN}" "${DAQ}" "${GID}" "${GXQ}"
+def "${RIVAL_TOKEN}" "${DRQ}" total_load
+link "${RIVAL_TOKEN}" "${DRQ}" "${GID}" "${GXQ}"
+next_session_at
+sess "${ATHLETE_TOKEN}" "${T}-sq0" completed "${DAQ}" "q0:120:5"
+next_session_at
+sess "${RIVAL_TOKEN}" "${T}-sqr" completed "${DRQ}" "qr1:125:5"
+drain "baseline setup"
+
+mark
+next_session_at
+SQA_AT="${SESSION_AT}"
+sess "${ATHLETE_TOKEN}" "${T}-sqa" active "${DAQ}" "q1:200:5"
+drain "typo record"
+expect_since "${GXQ}" "record@A,lead_change:record:weight@A,lead_change:record:e1rm@A" "a provisional typo record"
+mark
+set_edit "${ATHLETE_TOKEN}" "${T}-sqa" q2 1 150 5
+drain "a real set below the typo"
+expect_since "${GXQ}" "" "a set below the typo is not a record yet"
+mark
+set_edit "${ATHLETE_TOKEN}" "${T}-sqa" q1 0 200 5 "" "$(now_ms)"
+drain "the typo deleted"
+expect_since "${GXQ}" "record@A,lead_change:record:weight@A,lead_change:record:e1rm@A" \
+  "deleting the typo makes the real set a record against the pre-session best"
+[[ "$(boards_of "${GXQ}")" == "e1rm:$(e1rm 120 5):true,weight:120:true" ]] ||
+  fail "the record is measured against the pre-session best: $(boards_of "${GXQ}")"
+[[ "$(latest "${GXQ}" lead_change "payload -> 'previous' ->> 'member_user_id'")" == "${RIVAL_UID}" ]] ||
+  fail "the lead change rolls back past the retracted typo to the rival"
+QREC="$(latest "${GXQ}" record "id")"
+
+mark
+session_row "${ATHLETE_TOKEN}" "${T}-sqa" "${SQA_AT}" active "$(now_ms)"
+drain "active session tombstoned"
+expect_since "${GXQ}" "" "tombstoning an active session writes no void"
+expect_sql "its provisional record and lead changes are gone" \
+  "select count(*) from app_public.group_events where id = '${QREC}' or related_event_id = '${QREC}';" "0"
+expect_entry "${GXQ}" A weight "120@q0" "fallback after the tombstoned session"
+[[ "$(latest "${GXQ}" lead_change "payload -> 'leader' ->> 'member_user_id'")" == "${RIVAL_UID}" ]] ||
+  fail "history again ends with the rival's lead"
+pass "provisional retraction restores the baseline; a tombstoned active session drops silently"
+
+# =============================================================================
+echo "[${LANE_LABEL}] value-based voids"
+# =============================================================================
+
+GXS="$(gx "value voids" total_load)"
+DAS="${T}-dAS"
+def "${ATHLETE_TOKEN}" "${DAS}" total_load
+link "${ATHLETE_TOKEN}" "${DAS}" "${GID}" "${GXS}"
+next_session_at
+sess "${ATHLETE_TOKEN}" "${T}-ss" completed "${DAS}" "s1:100:5"
+drain "value voids setup"
+mark
+set_edit "${ATHLETE_TOKEN}" "${T}-ss" s1 0 "100 " 5
+drain "whitespace-only edit"
+expect_since "${GXS}" "" "an edit that leaves every value unchanged voids nothing"
+mark
+set_edit "${ATHLETE_TOKEN}" "${T}-ss" s1 0 100 3
+drain "reps-only edit"
+expect_since "${GXS}" "record_voided:edited@A,record@A" "a reps edit voids the card and re-records the board it still holds"
+[[ "$(boards_of "${GXS}")" == "weight:null:true" ]] ||
+  fail "the replacement lists the unchanged Weight board: $(boards_of "${GXS}")"
+expect_entry "${GXS}" A e1rm "$(e1rm 100 3)@s1" "the e1RM entry follows the edit"
+pass "voids follow values: a whitespace edit voids nothing; a reps edit keeps the Weight card"
 
 # =============================================================================
 echo "[${LANE_LABEL}] ties (P7)"
@@ -909,8 +1005,22 @@ pass "reads: podiums, board and history paging, AUTH_REQUIRED / AGENT_FORBIDDEN 
 echo "[${LANE_LABEL}] group_stream: record, record_voided, link items"
 # =============================================================================
 
-rpc "${ATHLETE_TOKEN}" group_stream "$(jq -nc --arg g "${GID}" '{p_group_id: $g, p_before: null, p_limit: 50}')"
-expect_ok "stream"
+# all_items: every item of the athlete's G stream as one array in BODY. The
+# stream runs to several pages, so the checks below look at every page.
+all_items() {
+  local cursor=null acc='[]'
+  while :; do
+    rpc "${ATHLETE_TOKEN}" group_stream \
+      "$(jq -nc --arg g "${GID}" --argjson b "${cursor}" '{p_group_id: $g, p_before: $b, p_limit: 50}')"
+    expect_ok "stream page"
+    acc="$(jq -c --argjson a "${acc}" '$a + .items' <<<"${BODY}")"
+    [[ "$(jq -r '.has_more' <<<"${BODY}")" == "true" ]] || break
+    cursor="$(jq -c '.next_cursor' <<<"${BODY}")"
+  done
+  BODY="${acc}"
+}
+all_items
+BODY="$(jq -c '{items: .}' <<<"${BODY}")"
 check "only the five wire kinds; lead_change is never a stream item" \
   '[.items[].kind] | unique | all(. as $k | ["link","membership","record","record_voided","session"] | index($k))'
 check "the T05 kinds are present" \
@@ -926,19 +1036,6 @@ check "record_voided item shape" \
 check "link item shape" \
   '[.items[] | select(.kind == "link")][0]
    | keys == ["effects","event","exercises","group","group_exercise","key","kind","member","sort_at_ms"]'
-# all_items: every item of the athlete's G stream as one array in BODY.
-all_items() {
-  local cursor=null acc='[]'
-  while :; do
-    rpc "${ATHLETE_TOKEN}" group_stream \
-      "$(jq -nc --arg g "${GID}" --argjson b "${cursor}" '{p_group_id: $g, p_before: $b, p_limit: 50}')"
-    expect_ok "stream page"
-    acc="$(jq -c --argjson a "${acc}" '$a + .items' <<<"${BODY}")"
-    [[ "$(jq -r '.has_more' <<<"${BODY}")" == "true" ]] || break
-    cursor="$(jq -c '.next_cursor' <<<"${BODY}")"
-  done
-  BODY="${acc}"
-}
 all_items
 check_args "a link item names the member's exercise, read live" --arg x "${GX5}" --arg d "${DA5}" \
   '[.[] | select(.kind == "link" and .event == "link" and .group_exercise.group_exercise_id == $x)][0].exercises

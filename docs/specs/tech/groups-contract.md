@@ -617,30 +617,48 @@ apply, for link attribution.
 2. Snapshot the old All entries, old #1 and rank per board, and
    `prev_links`; recompute the new entries and `cur_links`.
 3. **Provisional records (T8).** A record is provisional while its session
-   row has `status = 'active'` (tombstoned or not). One whose set still
-   counts and still beats `previous_value_kg` on a listed board is updated
-   in place (values, fingerprint, boards, `group_record`, and the leader
-   snapshot of its lead changes). Otherwise it is deleted with its
-   `lead_change` rows (cascade), and no void is written. This is the only
-   delete of a stream row.
-4. **Voids.** A final record whose fact is missing or not live gets
-   `record_voided{deleted}`. One that is not performed, has a new
-   fingerprint, or has a new load factor gets `record_voided{edited}`.
-   Unlinking never voids: the lift happened.
+   row has `status = 'active'` (tombstoned or not).
+   - One whose set still counts and still beats `previous_value_kg` on a
+     listed board is updated in place: values, fingerprint, the boards it
+     still beats (each keeping its `previous_value_kg`), `group_record`, and
+     the leader snapshot of its lead changes.
+   - Otherwise it is deleted with its `lead_change` rows, and no void is
+     written. The boards it listed fall back to its `previous_value_kg` as
+     the baseline for record detection (step 5), so a real PR logged after a
+     typo in the same session still becomes a record.
+   - Either way, a `lead_change` it caused is deleted once the member no
+     longer leads that board at the corrected value.
+
+   These are the only deletes of stream rows.
+4. **Voids.** A final record is voided when its lift no longer stands:
+   - fact missing or not live: `record_voided{deleted}`;
+   - not performed, or a listed board's converted value changed (a weight
+     or reps edit, or a load-mode change): `record_voided{edited}`.
+
+   An edit that leaves every listed value unchanged (a whitespace edit, a
+   status equivalent to performed) voids nothing. Unlinking never voids:
+   the lift happened.
 5. **Attribution, per All metric**, old winner O vs new winner N:
    - N's exercise is not in `prev_links`, and N's set was created
      (`exercise_sets.created_at`) before its link's `updated_at`: **link**.
      A set logged after linking counts as logging, so a whole session pushed
      together with its link still gets records;
    - O's exercise is not in `cur_links`: **unlink**;
-   - N beats O, or there is no O (D1): **record**;
+   - N beats the baseline, or there is none (D1): **record**. The baseline
+     is O's value, or the `previous_value_kg` of a provisional record
+     retracted in step 3;
    - otherwise the entry fell or vanished: **void** fallback.
 6. Write the entries and the state, then the events:
    - the voids, with each voided board's current leader;
    - one `record` per new-best set, listing the boards it beat, with
-     `previous_value_kg` and `group_record` (the member is #1 after the
-     apply). A surviving provisional record of the same set absorbs the
-     board instead;
+     `previous_value_kg` (the baseline) and `group_record` (the member is #1
+     after the apply).
+     - A replacement for a record voided in this apply also lists that
+       record's boards that the set still holds at the same value, with
+       their original `previous_value_kg`. A reps-only edit therefore keeps
+       the Weight card.
+     - A surviving provisional record of the same set absorbs the board
+       instead, keeping each listed board's `previous_value_kg`;
    - one `link` item if any link effect occurred, and one `unlink` item if
      any unlink effect occurred, with `effects` per metric. A link that
      moves no entry writes nothing, and link effects never write a `record`
@@ -677,6 +695,15 @@ client surface.
 - A silent rules recompute can move #1 without a history row.
 - A soft-deleted exercise's link still counts on the boards. The T07 client
   never offers such an exercise for linking.
+- A retracted provisional lead change rolls "before" back only when it was
+  the board's latest history row. An older one leaves a later row's
+  `previous` naming the retracted holder.
+- Link attribution compares client clocks: the set's `created_at` and the
+  link's `updated_at`. Skew between two devices can turn a link effect into
+  a record, or the reverse.
+- There is no `group_board_state` backfill. The first apply of a target
+  without state treats every counting set from before its link as a link
+  effect, which is correct while M25 has no live boards.
 
 ## 3. Authorization model
 
