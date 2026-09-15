@@ -1,5 +1,7 @@
 export { FriendSessionContent, formatGroupSetEffort } from './friend-session-content';
+export { GroupExercisePickSheet, type GroupExercisePickTarget } from './group-exercise-pick-sheet';
 export { GroupFilterChips } from './group-filter-chips';
+export { PickerGroupSectionList, PickerGroupsToggle } from './picker-group-section';
 export {
   GROUPS_EMPTY_BODY,
   GroupInlineError,

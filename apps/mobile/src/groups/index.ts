@@ -42,6 +42,7 @@ export {
   type GroupCacheEntry,
 } from './cache';
 export * from './session-metrics';
+export * from './set-facts';
 export * from './stream-view-model';
 export {
   GROUP_RESOURCE_POLL_INTERVAL_MS,
@@ -62,5 +63,9 @@ export {
   type GroupActionState,
 } from './use-group-action';
 export { projectNetInfoOnline, useNetworkOnline } from './use-network-online';
+export * from './link-view-model';
+// `use-group-exercise-linking.ts` is imported by path, not from this barrel: it
+// reads the auth store (`@/src/auth`), and the barrel must stay loadable without
+// initializing auth (the group API and hook tests mock the Supabase client).
 export { evictGroupFromDevice } from './evict-local';
 export * from './write-view-model';

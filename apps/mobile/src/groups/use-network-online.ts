@@ -14,15 +14,19 @@ export const projectNetInfoOnline = (state: Pick<NetInfoState, 'isConnected'>): 
  * (unknown). Callers treat only `false` as offline, so an unknown state never
  * blocks a request; a real transport failure still surfaces as `NETWORK`.
  */
-export const useNetworkOnline = (): boolean | null => {
+export const useNetworkOnline = (enabled = true): boolean | null => {
   const [online, setOnline] = useState<boolean | null>(null);
 
+  // `enabled = false` (a signed-out caller) never subscribes, so screens that
+  // host optional group UI don't touch NetInfo until they need it.
   useEffect(
     () =>
-      NetInfo.addEventListener((state) => {
-        setOnline(projectNetInfoOnline(state));
-      }),
-    [],
+      enabled
+        ? NetInfo.addEventListener((state) => {
+            setOnline(projectNetInfoOnline(state));
+          })
+        : undefined,
+    [enabled],
   );
 
   return online;

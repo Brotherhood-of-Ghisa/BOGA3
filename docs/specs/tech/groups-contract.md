@@ -25,6 +25,12 @@
 >   `supabase/migrations/20260913160000_m25_group_exercises.sql`), proven by
 >   `./boga test groups-contract`, and the client wrappers plus the shared
 >   `ExerciseCore` validator (§6.1).
+> - M25 step 2, the evaluator pipeline (M25-T04): the queue, the enqueue
+>   triggers, the set facts, the `group-eval` Edge Function, and the pg_net
+>   kick with its pg_cron sweep (§2.8–§2.10;
+>   `supabase/migrations/20260913180000_m25_group_eval.sql`), proven by
+>   `./boga test groups-leaderboards`. Boards and record events (M25-T05) fill
+>   the apply seam.
 >
 > This doc owns the technical contract and is the durable record of what M22
 > built. The M22 milestone spec (product requirements and acceptance criteria)
@@ -374,6 +380,170 @@ two stores share one TS type and validator (M25 design decision T1).
 - **No length cap on `name` and no uniqueness**, like `exercise_definitions`.
   The same standard exercise can be copied twice, and two group exercises may
   share a name.
+
+### 2.8 `group_eval_queue` — evaluator work (M25-T04)
+
+Every change that can move a board reaches this queue. One row is one pending
+unit of work, coalesced on its natural key. It follows ground rules 1–5.
+
+| Kind | Key (partial unique index) | Work |
+| --- | --- | --- |
+| `session` | `(member_user_id, session_id)` | Re-normalize the session's sets into facts, then re-apply its live targets |
+| `target` | `(member_user_id, group_id, group_exercise_id)` | Re-apply one board target; no re-normalization |
+
+| Column | Notes |
+| --- | --- |
+| `id` | `bigint` identity |
+| `member_user_id` | → `auth.users on delete cascade` |
+| `group_id`, `group_exercise_id` | Target jobs only; → `groups` / `group_exercises` `on delete cascade` |
+| `causes` | `text[]`, the union of `set`, `link`, `load_mode`, `rules`. T05 reads it: link-caused changes produce no record cards (P16). |
+| `generation` | Bumped by every re-enqueue. `group_eval_complete` deletes a job only if it is unchanged since the claim. |
+| `attempts`, `available_at`, `last_sqlstate` | Failure backoff: 2 s, 4 s, … capped at 5 min |
+| `claimed_until` | A 2-minute lease |
+
+A re-enqueue merges `causes`, bumps `generation`, and makes the job available
+now. The job is never dropped: a failure only delays it.
+
+### 2.9 `group_set_facts` — normalized sets (M25-T04)
+
+One row per set of every **shared** session, keyed `(member_user_id,
+set_id)`. It follows ground rules 1–5: no FK into the Sync v2 rows, so
+consumers inner-join the live rows and a fact left by a hard delete is
+invisible.
+
+| Column | Notes |
+| --- | --- |
+| `session_id`, `session_exercise_id`, `exercise_definition_id` | Where the set was logged. A null exercise id never counts. |
+| `exercise_order_index`, `set_order_index` | Tie-break order after `achieved_at_ms` (P7) |
+| `performed` | The recorder's rule (§5), run in TS by the evaluator |
+| `live` | Set, exercise, and session all untombstoned |
+| `weight_kg`, `reps`, `e1rm_kg` | Null unless performed. They are in the member's **entered** load mode; conversion to the group exercise's mode is SQL (T05, D6). `e1rm_kg` is Wathan (`estimateOneRepMax`), null at 0 kg. `reps` is `numeric` so that any value the TS parser accepts can be stored; no client text can fail a job on every retry. |
+| `achieved_at_ms` | `sessions.started_at` |
+| `fingerprint` | `group_set_fingerprint(weight_value, reps_value, performance_status, deleted_at)`: md5 over the raw values. It interprets nothing, so certification (T06) can compare a live row without the evaluator. |
+| `rules_version` | `GROUP_EVAL_RULES_VERSION` of the TS that wrote it |
+
+Facts cover every set of a shared session, linked or not, so a new link is
+a target re-apply with no re-normalization (P4).
+
+### 2.10 The evaluator (M25-T04)
+
+`supabase/migrations/20260913180000_m25_group_eval.sql`,
+`supabase/functions/group-eval/`, `apps/mobile/src/groups/set-facts.ts`.
+
+**Enqueue triggers.** Each follows the §2.5 isolation pattern. The enqueue
+runs in its own `begin … exception` block. A failure writes one
+`group.eval_enqueue_failed` row with `context = {table, row_id, sqlstate}`
+and never `SQLERRM`, and the trigger returns normally. `sync_push` always
+commits.
+
+| Trigger | Fires | Enqueues |
+| --- | --- | --- |
+| `sessions_group_z_eval_enqueue` | `AFTER INSERT OR UPDATE`; `z_` sorts it after the share and stream triggers | a session job, if a share row exists |
+| `session_exercises_group_eval_enqueue` | `AFTER INSERT OR UPDATE` | the session job (and the old session's, if moved), if shared |
+| `exercise_sets_group_eval_enqueue` | `AFTER INSERT OR UPDATE` | the session job through its session exercise, if shared |
+| `exercise_definitions_group_eval_enqueue` | `AFTER UPDATE OF load_input_mode`, when changed | a target job per live link (`load_mode`) |
+| `exercise_group_links_group_eval_enqueue` | `AFTER INSERT OR UPDATE` | target jobs for the new and, if moved, the old target (`link`) |
+
+- **Inert link values.** Link `group_id` / `group_exercise_id` are plain text
+  (sync §A.2.10) and pass through `group_eval_try_uuid`. A target job is
+  written only when the group exercise exists in that group. A non-uuid,
+  unknown, or foreign target is therefore skipped silently: no job and no
+  failure row.
+- **No `DELETE` triggers.** Hard deletes (`dev_wipe_my_data`, account
+  deletion) leave facts that consumers never see. The session's next
+  evaluation drops facts for sets that vanished.
+- **The evaluator reads links and never writes them.** A server-written row
+  that breaks the id form would stall the member's pull (sync §A.2.10). The
+  lane asserts that only `sync_push` and `dev_wipe_my_data` write the table.
+
+**Invocation.**
+
+- **Kick.** After an enqueue, `group_eval_kick_once` sends at most one
+  `net.http_post` per transaction, flagged by the transaction-local setting
+  `app.group_eval_kicked`. The flag is set outside the kick's own isolated
+  block, so a kick that raises is attempted and logged
+  (`group.eval_kick_failed`) once per push, not once per row, and never rolls
+  back the queued work. pg_net sends
+  after commit, so a rolled-back push sends nothing.
+- **Sweep.** The pg_cron job `group-eval-sweep` runs `select
+  app_public.group_eval_sweep()` every `30 seconds`. It kicks once when
+  claimable work exists: never claimed, lease expired, or backoff elapsed.
+- **Configuration.** Both values live in Vault. `group_eval_secret` is
+  generated by the migration. `group_eval_url` is set with
+  `app_public.group_eval_set_url(url)`: locally by
+  `supabase/scripts/group-eval-configure.sh`, which the shared baseline runs
+  (`http://kong:8000/functions/v1/group-eval`), and on a hosted project per
+  `RUNBOOK.md`. An unset URL means no kick; the queue waits.
+
+**`group-eval`.** `verify_jwt = false`, because its caller is Postgres. It
+returns 405 for anything but `POST` and 401 unless `x-group-eval-secret`
+matches `group_eval_check_secret`. It reaches Postgres with the injected
+service-role key, a service-role boundary with no client API. One drain:
+
+1. `group_eval_requeue_rules(GROUP_EVAL_RULES_VERSION, 50)` re-queues, with
+   cause `rules`, sessions whose facts are older. Rules changes are silent
+   recomputes.
+2. Up to 10 rounds of `group_eval_claim(20)` (`for update skip locked`, sets
+   the lease).
+3. For a session job, `group_eval_session_rows` returns every set row raw,
+   with `live` and `fingerprint` in one snapshot. `normalizeGroupSetFacts`
+   (TS) returns the facts.
+4. `group_eval_complete(job, generation, facts)`:
+   - if the generation moved since the claim, the facts are a stale
+     snapshot: it releases the job without writing anything;
+   - otherwise it replaces the session's facts, resolves live targets, calls
+     `group_eval_apply` per target, and deletes the job.
+
+   On any error, `group_eval_fail(job, sqlstate)` applies the backoff and
+   writes one `group.eval_failed` row with `context = {job_id, kind,
+   sqlstate}`, or `EVALX` for a non-database error. The rest of the drain
+   continues.
+
+The reply is `{ rules_version, rules_requeued, claimed, completed, requeued,
+failed, jobs[] }`, each job carrying its `outcome` and live `targets`.
+
+**Live targets** (`group_eval_target_is_live`,
+`group_eval_session_targets`):
+
+- **Session job.** Every group holding a share of the session × every live
+  link of the member into that group from an exercise in the session. The
+  exercises are taken before and after this evaluation, so a changed
+  exercise re-applies the target it left.
+- **Target job.** The target itself. Unlink and retarget therefore re-apply
+  the board the link left.
+- **A target is live only if** the member is currently active in a
+  non-deleted group (P4, P7) and the group exercise belongs to that group and
+  is not archived. Archived boards are frozen (D8). That also keeps a link
+  written after the archive from applying; after unarchive, every link
+  counts.
+
+**Apply seam.** `group_eval_apply(group, member, group_exercise, causes)` is
+an intentional no-op. M25-T05 replaces its body with recompute, diff, and
+events (design §5).
+
+**Posture.**
+
+- Every function pins `search_path = app_public, pg_temp`.
+- `service_role` executes only `group_eval_check_secret`, `_claim`,
+  `_session_rows`, `_complete`, `_fail`, and `_requeue_rules`. `anon` and
+  `authenticated` execute none. Everything else is owner-only: the triggers,
+  enqueue, kick, sweep, config, targets, apply, and fingerprint.
+
+**One implementation of the set rules.** `set-facts.ts` holds
+`parseGroupPerformedSet`. The device's `toGroupPerformedSet` (§5) delegates
+to it, so card metrics and facts cannot diverge. The file imports nothing
+through `@/`, and its imports name their `.ts` files. The mobile tsconfig
+sets `allowImportingTsExtensions` so Deno loads it by relative path, as
+`agent-api` loads `exercise-calculations`.
+
+**Repair.**
+
+- `group.eval_enqueue_failed`: the member's next accepted write of that
+  session or link re-enqueues it.
+- `group.eval_kick_failed` and missed kicks: the sweep covers them.
+- `group.eval_failed`: the job retries with backoff. Check
+  `group_eval_queue.last_sqlstate` for poison jobs.
+- Manual drain: `select app_public.group_eval_kick();`.
 
 ## 3. Authorization model
 
@@ -800,7 +970,7 @@ migration via `npm run db:generate`.
 
 | Column | Type | Notes |
 | --- | --- | --- |
-| `cache_key` | `text` PK | `groups:mine`, `group:<id>`, `stream:all`, `stream:<groupId>`, `session:<memberId>:<sessionId>` |
+| `cache_key` | `text` PK | `groups:mine`, `group:<id>`, `stream:all`, `stream:<groupId>`, `session:<memberId>:<sessionId>`, `group-exercises:<groupId>` (M25-T07) |
 | `user_id` | `text not null` | The account the payload belongs to. Reads require a match with `useAuth().user.id`. |
 | `payload_json` | `text not null` | The last successful RPC result |
 | `fetched_at_ms` | `integer not null` | Drives "last updated" |
@@ -812,7 +982,9 @@ migration via `npm run db:generate`.
 - **Wiped on sign-out and account switch:** one `delete` is added to
   `wipeLocalTables` (`apps/mobile/src/sync/account-wipe.ts`).
 - **Access loss (C3.6.8).** A `NOT_FOUND` on a group evicts `group:<id>`,
-  `stream:<id>`, and every `session:*` entry. A successful All refresh replaces
+  `stream:<id>`, `group-exercises:<id>` (M25-T07), and every `session:*`
+  entry. The member's `exercise_group_links` rows are synced data and are never
+  evicted. A successful All refresh replaces
   `stream:all`, which no longer contains that group. The group screen shows
   "You're no longer a member of this group."
 
@@ -850,6 +1022,7 @@ migration via `npm run db:generate`.
 | `/group/[groupId]/edit` | `app/group/[groupId]/edit.tsx` | Edit name and description |
 | `/group/[groupId]/invite` | `app/group/[groupId]/invite.tsx` | Invite code with Share and Regenerate |
 | `/group-session/[memberId]/[sessionId]` | `app/group-session/[memberId]/[sessionId].tsx` | Friend's session view |
+| `/exercise-link?exerciseDefinitionId=` | `app/exercise-link.tsx` | Link screen (M25-T07): link one of my exercises to my groups' exercises |
 
 - **Groups tab.** It shows the stream with **All** and per-group chips, header
   actions My groups / Create group / Join group, and the empty, signed-out, and
@@ -961,6 +1134,49 @@ on the group screen and the Create / Join actions on the tab.
   `groups-join-deep-link.test.tsx`. On-device screenshots against local
   Supabase are listed on the M22-T05 card.
 
+**As-built (M25-T07): linking.** Members link their exercises to group
+exercises from picker search, a pick sheet, and the Link screen (product
+E0.1–E0.3).
+
+- **Where each fact is read.** Linked-state comes from the local synced
+  `exercise_group_links` (`listLinks()`), so it renders offline and right after
+  a local write. Group and group-exercise names come from `group_cache`
+  (`groups:mine` and `group-exercises:<groupId>`, the `group_exercise_list`
+  payload); a missing entry shows `Group exercise` / `A group`. Only cached
+  group exercises can be linked. Link and unlink are local writes, not group
+  RPCs, so the online-only write rule (C3.10.3) does not apply to them.
+- **`use-group-exercise-linking.ts`.** `useGroupExerciseLinking({ userId })` is
+  the cache-first hook: it reads `groups:mine` and each `group-exercises:<id>`,
+  refreshes them on focus, when the recorder picker opens, and on `refresh()`
+  (pull-to-refresh) — no 30 s poll, since these lists change rarely and the
+  screens are not live views — with per-group `listGroupExercises`. A group
+  whose list returns `NOT_FOUND` is evicted (`evictGroup`) and left out of the
+  cached `groups:mine`. Links reload on focus and on `reloadLinks()`. A
+  `groups:mine` with no cached list yet reads as not loaded
+  (`groupExercisesLoaded`), so offline shows "Connect once…"; NETWORK errors
+  are left to the offline marker (`pickInlineError`). `useGroupLinkingUserId()` reads the auth store directly
+  (signed in and configured, else null), so the recorder and catalogue need no
+  `AuthProvider`; a null user disables everything, NetInfo included
+  (`useNetworkOnline(enabled)`).
+- **`link-view-model.ts`.** The pure rules: the picker's `From your groups`
+  sections (only with search text or the `Groups` toggle; archived and
+  uncached lists left out; a link from a deleted exercise doesn't count), the
+  pick sheet (suggestion = my live exercise whose id is the group exercise's
+  `source_exercise_id`, else the best name match, never one already linked in
+  that group), the Link screen's Linked / Suggested / All sections (one link per
+  group shows `already linked in <group>`; links into a group I left read
+  `inactive — not a member`; archived targets read `archived`), and the
+  retroactivity, unlink, and weight-entry notes. `add-as-new.ts` builds the
+  editor prefill (name, load mode, and the source seed's muscle mappings).
+- **Soft-deleted exercises** are never offered: the catalogue item is disabled,
+  the pick sheet lists live exercises only, and the Link screen shows "Restore
+  this exercise to link it" (unlink still works). The repository stays
+  permissive (sync contract §A.2.10).
+- **Evidence.** Jest: `groups-link-view-model.test.ts`,
+  `groups-exercise-link-screen.test.tsx`, `session-recorder-group-picker.test.tsx`,
+  `exercise-catalog-link-menu.test.tsx`, `exercise-group-links-add-as-new.test.ts`;
+  Maestro `groups-link-exercise.yaml` (§8).
+
 ## 7. Freshness and offline
 
 - **Refresh cadence.** On focus, every 30 s while the screen is focused, and on
@@ -1017,6 +1233,28 @@ on the group screen and the Create / Join actions on the tab.
       `group_exercise_create` and the table CHECKs, source-id bounds, the
       owner/admin/member/non-member/removed matrix, another group's exercise
       as a target, update, and the archive round trip.
+- **Backend lane `groups-leaderboards`** (M25-T04;
+  `supabase/tests/groups-leaderboards.sh`; slow-backend gate; local Supabase
+  with the Edge Runtime, pg_net, and pg_cron).
+  - **Direct-drain mode.** It unsets the kick URL for the run and POSTs to
+    `group-eval` itself, so the assertions are deterministic. Only the sweep
+    and pg_net smoke sections turn the kick on.
+  - **Shared fixtures.** It shares `supabase/tests/lib/groups-fixtures.sh`
+    with `groups-contract` (users, HTTP, `sync_push` builders).
+  - **Coverage:**
+    - §2.8–§2.10 posture;
+    - facts through real pushes: the §5 fixtures, the per-side entered mode,
+      e1RM, `live` and fingerprint through edits, tombstones, undeletes, and
+      a hard delete;
+    - no job for an unshared session;
+    - every target and inert-link case, archive and unarchive, load mode,
+      retarget, and unlink;
+    - coalescing, the generation guard, lease expiry, and the rules requeue;
+    - forced enqueue, kick, and job failures with `sync_push` still
+      committing;
+    - the sweep, and a pg_net smoke (one kick for a 32-row push).
+  - **Hermetic.** It restores the URL, the sweep job, and the probe
+    constraints on exit.
 - **Existing lanes.** `sync-drift --strict` stays green, which proves ground
   rules 1–2. The sync push, pull, and e2e lanes stay unchanged and green.
 - **Jest:**
@@ -1053,6 +1291,15 @@ on the group screen and the Create / Join actions on the tab.
     9. The script asserts the counterparty's `group_stream` returns
        `NOT_FOUND`.
   - Evidence comes from its screenshots and JUnit output.
+- **Linking flow (M25-T07).** The lane then runs
+  `groups-link-exercise.yaml` as its own device user **`user_e`** (reset with
+  the others by `groups-fixture-reset.sh`, which also sets its username).
+  `.maestro/scripts/groups-link-setup.js` signs in as `user_e` over HTTP and
+  calls `group_create` and `group_exercise_create` (a copy of
+  `seed_barbell_bench_press`). The device then links its seeded "Barbell Bench
+  Press" from the catalogue `⋮` Link screen (offered under Suggested), finds the
+  group exercise in recorder picker search as "linked: Barbell Bench Press",
+  and adds it to the session (`groups-link-01`…`04`).
 - **As-built (M22-T06, Maestro lane).** Lane `ios-groups-e2e`
   (`maestro-run-lane.sh groups-e2e`, gate `slow-frontend`, so part of
   `boga test frontend`); flow `apps/mobile/.maestro/flows/groups-two-user-stream.yaml`.

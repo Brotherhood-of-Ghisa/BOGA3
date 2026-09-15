@@ -336,7 +336,8 @@ flows share one. The pool is defined in
 `supabase/scripts/auth-fixture-constants.sh` (`user_a`, `user_b`, …) and bound to
 a flow by `maestro-run-lane.sh` (`auth-profile-happy-path` → `user_a`,
 `sync-first-run-log-and-roundtrip` → `user_b`, `groups-two-user-stream` →
-`user_c` on the device and `user_d` as its scripted counterparty). This is load-bearing: the lanes
+`user_c` on the device and `user_d` as its scripted counterparty,
+`groups-link-exercise` → `user_e`). This is load-bearing: the lanes
 reuse one local Supabase **without reset between runs**, so a shared user would
 let one flow's residual server state (a partial catalog, a logged workout) leak
 into another flow's pull and flake it. Self-signup is disabled, so the pool is

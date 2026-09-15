@@ -83,6 +83,7 @@ Brief entrypoint inventory of the current reusable UI component set.
 - File: `apps/mobile/components/exercise-catalog/exercise-editor-modal.tsx`
 - Purpose:
   - shared create/edit exercise editor modal reused by `exercise-catalog` and `session-recorder` add-new flow
+  - optional `prefill` (name, weight entry, muscles for a new exercise), `onSave` (replaces the default save; a rejection shows inline), and `title` (M25-T07: the recorder's group `Add as new` prefills from the group exercise and saves through `createExerciseWithGroupLink`); the fields are unchanged
 
 4. `ExerciseListContent` / `ExerciseListPreferenceControls`
 - File: `apps/mobile/components/exercise-catalog/exercise-list-controls.tsx`
@@ -171,6 +172,8 @@ Brief entrypoint inventory of the current reusable UI component set.
   - `GroupWriteNotice` (M22-T05) — inline error / success outcome of a group write
   - `GroupsEmptyActions` (M22-T05) — the empty state's `Create group` / `Join with a code` buttons
   - `FriendSessionContent` — the friend's session body composing `SessionContentLayout` read-only
+  - `PickerGroupSectionList`, `PickerGroupsToggle` (M25-T07) — the recorder picker's `From your groups` section (rows `exercise-picker-group-row-<groupExerciseId>`, status text "linked: …" / "not linked") and the `Groups` switch beside the filter (`exercise-picker-groups-toggle`); 08 pattern 10
+  - `GroupExercisePickSheet` (M25-T07) — in-route bottom `Modal` for an unlinked group exercise: suggestion, `Choose another of your exercises…` (search; exercises already linked in the group are disabled with the reason), `Add "<name>" as a new exercise`, the retroactivity and weight-entry notes, `Link and add` with an inline error; in `choose-linked` mode it lists my linked exercises to add. testIDs `group-pick-sheet`, `group-pick-sheet-option-*`, `group-pick-sheet-choice-<id>`, `group-pick-sheet-confirm`
   - `GroupStateView`, `GroupsEmptyState` (children slot for `GroupsEmptyActions`), `GroupMissingDataState`, `GroupInlineError`, `GroupsSignInRequired` — feature-scoped state panels (not the pending generic `EmptyState`)
   - `usePullToRefresh`, `groupScreenStyles`, `groupFormStyles` — pull spinner state, the shared page shell and action row, and the write-form field styles
 

@@ -4,19 +4,6 @@ Each section below becomes its own card (`docs/plans/tasks/M25-T0N-*.md`)
 when it is ready, refreshed against what T01–T03 actually built. Milestone:
 `docs/plans/milestones/M25-group-exercises-and-leaderboards.md`.
 
-## M25-T04 — Evaluator pipeline (backend; deps T01, T02, T03)
-
-- Design §3 (T3, T4, import constraint). `group_eval_queue`, failure-isolated
-  enqueue triggers (sessions, session_exercises, exercise_sets,
-  exercise_definitions load mode, exercise_group_links), `pg_net` kick +
-  `pg_cron` sweep, `group-eval` Edge Function normalizing sets into
-  `group_set_facts` with the app's TS, `rules_version`.
-- New lane `groups-leaderboards` (slow-backend) with direct-drain mode, shared
-  fixture helper, registered in `scripts/lanes.tsv` + spec `02` (design §8, T9).
-- AC: a pushed set yields the right facts (performed rule, parsing, per-side
-  mode, fingerprint); a forced evaluator/enqueue failure never breaks
-  `sync_push`; the sweep drains a missed kick.
-
 ## M25-T05 — Boards and events (backend; deps T04)
 
 - Design §4–§5 (T6–T8). `group_board_entries`; per-(group, member, group
@@ -33,13 +20,6 @@ when it is ready, refreshed against what T01–T03 actually built. Milestone:
   `lead_change{certification}`.
 - AC: self-certify, non-record set, non-member, withdraw, admin cancel,
   re-certify after cancel, void on edit and on delete.
-
-## M25-T07 — Mobile linking (frontend; deps T01, T03)
-
-- Product E0.1–E0.3, D9, D13; design §7. Picker search "From your groups"
-  section + Groups toggle; pick sheet with suggestion; Link screen from the
-  catalogue ⋮ and recorder ••• menus; weight-entry conversion note.
-- UI docs: screen-map, navigation-contract (Link screen), components catalog.
 
 ## M25-T08 — Mobile group page (frontend; deps T01, T02)
 

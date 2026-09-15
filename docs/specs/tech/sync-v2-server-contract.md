@@ -419,9 +419,19 @@ PK `(owner_user_id, id)`. No CHECK constraints (A.1).
   constraint (B.10 #7). Unlink sets `deleted_at`; relink re-emits the same id
   with `deleted_at = null` and the new `group_exercise_id` — undelete by LWW
   (A.1.1.3). Retargeting within a group is an ordinary field change.
-- **No server reaction yet.** Nothing on the server reads these rows beyond
-  `sync_pull`; the group evaluator's enqueue trigger is added separately and must
-  stay failure-isolated from `sync_push` (B.11).
+- **Server reaction (M25-T04).** The failure-isolated trigger
+  `exercise_group_links_group_eval_enqueue` queues a re-evaluation of the old
+  and new group target for the group evaluator (`groups-contract.md` §2.10).
+  It can never abort `sync_push` (B.11). Group ids that are not uuids, or that
+  name no group exercise of that group, are skipped silently.
+- **Client writers (M25-T07).** `apps/mobile/src/data/exercise-group-links.ts`
+  exposes `linkExerciseInTransaction(tx, …)`, the tx-scoped writer that
+  `linkExercise` wraps, so a link can commit with other local writes;
+  `createExerciseWithGroupLink` uses it to write a new exercise, its muscle
+  links, and its link in one transaction ("Add as new"). The repository accepts
+  any local exercise, soft-deleted ones included (pulled rows and LWW undeletes
+  apply as-is, and such a link is inert); the UI never offers a soft-deleted
+  exercise for linking.
 - **Only the member's client writes these rows.** Server-side code (the group
   evaluator included) reads links but never writes them. Any future writer must
   keep the `<group_id>:<exercise_definition_id>` id form: a pulled row that
@@ -1294,5 +1304,12 @@ apply (B.4.5).
   - the two structural triggers (§A.1, §A.6.3) are untouched, and the drift checker's 4f checks, which look only for those two by name, still pass.
 
   Any failure inside the trigger body is caught and logged as `group.share_failed` in `public.app_logs`, so the push commits regardless. A LWW no-op push does not fire it, since no row is updated.
+  **As-built (M25-T02, M25-T04): more touch points, same rule.**
+  - `sessions_group_stream_event` (M25-T02) writes stream items.
+  - The group evaluator's enqueue triggers (M25-T04, `supabase/migrations/20260913180000_m25_group_eval.sql`) run `AFTER INSERT OR UPDATE` on `sessions` (`sessions_group_z_eval_enqueue`), `session_exercises`, `exercise_sets`, and `exercise_group_links`, and `AFTER UPDATE OF load_input_mode` on `exercise_definitions`.
+    - Each is `security definer` with a pinned `search_path`. Each only upserts into the server-only `group_eval_queue` and sends at most one `pg_net` request per transaction.
+    - Each catches every failure. It logs `group.eval_enqueue_failed` or `group.eval_kick_failed` and returns normally, so `sync_push` commits.
+    - None writes a Sync v2 table, and none fires on `DELETE`.
+  - The wire contract, RLS, the structural triggers, and the drift checker's entity set are unchanged: the queue and `group_set_facts` have no `owner_user_id` and no Sync v2 FK. `groups-leaderboards` forces the enqueue and kick failures through real `sync_push` calls.
 - Web client and MCP read paths against the typed schema (they consume Part A's
   schema directly with no Part B protocol involvement).

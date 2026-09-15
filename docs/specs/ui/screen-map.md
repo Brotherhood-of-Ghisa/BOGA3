@@ -105,6 +105,8 @@ Brief entrypoint map of the current mobile screens.
   - active/completed-edit autosave preserves unconfirmed rows and values, while submit/save includes confirmed actual rows only; valid entered unconfirmed rows trigger a dedicated discard confirmation instead of being promoted or silently removed
   - appending a historical plan automatically expands and scrolls to the target exercise card once without giving it distinct selected styling; later card layouts from editing, row expansion/collapse, or keyboard changes do not move the recorder viewport
   - foreground GPS gym assistance is hidden on the recorder surface: brand-new active-session start may preselect one confident saved-gym match, null state displays as `No gym`, and long-pressing the gym box explicitly retries detection without a persistent suggestion panel
+  - group exercises in the picker (M25-T07, signed in only): the default list is unchanged; with search text a `From your groups` section follows my own matches, and a `Groups` toggle beside the filter narrows the list to group exercises (all of them, by group, when the search is empty). Rows read `linked: <my exercise>` or `not linked` (from local links, so offline too; names from `group_cache`). A linked row adds my exercise; an unlinked row opens the in-route pick sheet (suggestion · `Choose another of your exercises…` · `Add "<name>" as a new exercise`, then `Link and add`); `Add as new` opens the exercise editor prefilled from the group exercise and saves the exercise and its link in one local transaction
+  - the exercise card `•••` menu adds `Link to group exercise…` (signed in)
 - Key exits:
   - `exercise-catalog` (`source=session-recorder&intent=manage` from exercise picker)
   - active submit replaces to
@@ -112,6 +114,7 @@ Brief entrypoint map of the current mobile screens.
     persistence and completion succeed
   - completed-edit save replaces directly to `/stats-history` and does not
     replay completion
+  - `/exercise-link?exerciseDefinitionId=<id>` (`•••` `Link to group exercise…`)
 
 5. `/exercise-catalog`
 - File: `apps/mobile/app/(tabs)/exercise-catalog.tsx`
@@ -122,8 +125,10 @@ Brief entrypoint map of the current mobile screens.
   - shared exercise-list content with local shared preferences for grouping/date range/recents, default grouped `90d` recents-on-top behavior, taxonomy-ordered collapsible muscle-family headers, text filtering across exercise names + primary muscle display/family terms that preserves collapsed/expanded group state, and per-row stats for the selected range
   - in-route editor/action/delete modals
   - catalog-only muscle, deleted visibility (`Show deleted` / `Hide deleted`), and never-done visibility filters via top-level options kebab menu
+  - the row `⋮` Exercise Actions menu offers `Edit`, `Link to group exercise…` (M25-T07; signed in only, disabled for a deleted exercise), and `Delete` / `Undelete`
 - Key exits:
   - `session-recorder` after save when opened from recorder-origin manage flow
+  - `/exercise-link?exerciseDefinitionId=<id>` (`⋮` `Link to group exercise…`)
   - `stats-history` / `session-recorder` via the shared bottom tray (`TopLevelTabs`)
 
 6. `/settings`
@@ -333,6 +338,20 @@ Brief entrypoint map of the current mobile screens.
 - Notes:
   - no edit, delete, or append; `completed-session/[sessionId]` is neither reused nor modified
 
+20. `/exercise-link` (M25-T07)
+- File: `apps/mobile/app/exercise-link.tsx`
+- Purpose:
+  - the Link screen for one of my exercises: link it to my groups' exercises or unlink it (product E0.3)
+- Key states (high level):
+  - sign-in-required when signed out; "This exercise isn't available" for a missing/unknown id
+  - `Linked` (my links, from the local synced table: `Unlink` confirms first; a link into a group I left reads `inactive — not a member`, one to an archived group exercise `archived`; missing cache entries show `Group exercise` / `A group`), then a search over group exercises only, `Suggested` (same standard exercise, then name matches), and `All group exercises` by group; one link per group, so the rest of that group shows `already linked in <group>`; archived group exercises are never offered
+  - `Link` and `Unlink` are local writes (work offline); a success line repeats the retroactivity note; the load-mode note shows when weight entry differs
+  - a deleted exercise shows "Restore this exercise to link it" (links still listed and unlinkable); offline with nothing cached shows "Connect once to load your groups' exercises"; offline marker and pull-to-refresh as on the group screens
+- Key exits:
+  - back to the catalogue or the recorder (native back)
+- Notes:
+  - sets its stack title to `Link "<exercise name>"` once the exercise resolves
+
 ## Route shell (not a user-facing screen)
 
 1. `apps/mobile/app/_layout.tsx`
@@ -341,7 +360,7 @@ Brief entrypoint map of the current mobile screens.
 - Notes:
   - wraps the whole navigator in the route-layer auth guard (`apps/mobile/components/navigation/auth-route-guard.tsx`), which enforces login-on-start for configured signed-out sessions (neutral loading view while restoring, redirect to `/sign-in` when configured-but-signed-out, stand aside when auth is unconfigured, while allowing `/sign-in` and the dev/test-gated `/maestro-harness` route to render through)
   - immediately below the auth guard, wraps the navigator in the first-sync gate (`apps/mobile/src/sync/SyncGate.tsx`), which blocks a signed-in user behind a full-screen "Setting up your data…" block until `sync_runtime_state.bootstrap_completed_at` is set (then dismisses in place), and observes sync runtime state through the single shared scheduler-state accessor
-  - tab roots live inside the `(tabs)` route group (`apps/mobile/app/(tabs)/_layout.tsx`) with `headerShown: false`; the root stack registers the `(tabs)` group itself plus the `sign-in` screen and the detail screens (`exercise-history`, `sessions`, `profile`, `connected-agents`, `maestro-harness`, `completed-session/[sessionId]`, and the M22 `group/mine`, `group/[groupId]/index`, `group-session/[memberId]/[sessionId]`)
+  - tab roots live inside the `(tabs)` route group (`apps/mobile/app/(tabs)/_layout.tsx`) with `headerShown: false`; the root stack registers the `(tabs)` group itself plus the `sign-in` screen and the detail screens (`exercise-history`, `sessions`, `profile`, `connected-agents`, `maestro-harness`, `completed-session/[sessionId]`, the M22 `group/mine`, `group/[groupId]/index`, `group-session/[memberId]/[sessionId]`, and the M25 `exercise-link`)
   - the root stack opts `/sessions` into the native minimal back-button display
     mode with a generic `Back` accessibility title, preserving normal platform
     back behavior while hiding the previous route-group title visually and

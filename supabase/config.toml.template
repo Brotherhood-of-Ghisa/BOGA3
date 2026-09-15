@@ -373,6 +373,11 @@ verify_jwt = false
 [functions.health]
 verify_jwt = false
 
+# group-eval is called only by Postgres (the pg_net kick and pg_cron sweep) and
+# authenticates that caller itself with the Vault-held x-group-eval-secret.
+[functions.group-eval]
+verify_jwt = false
+
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 

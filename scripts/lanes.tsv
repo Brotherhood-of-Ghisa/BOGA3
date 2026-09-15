@@ -22,6 +22,7 @@ mcp-unit	fast-repo	none	yes	.	./scripts/test-boga-mcp.sh
 backend-fast	fast-backend	supabase	no	.	./supabase/scripts/run-suite.sh --no-baseline local-runtime-smoke.sh
 auth-authz	slow-backend	supabase	no	.	./supabase/scripts/run-suite.sh auth-authz-contract.sh
 groups-contract	slow-backend	supabase	no	.	./supabase/scripts/run-suite.sh groups-contract.sh
+groups-leaderboards	slow-backend	supabase	no	.	./supabase/scripts/run-suite.sh groups-leaderboards.sh
 agent-api	slow-backend	supabase	no	.	./supabase/scripts/run-suite.sh agent-api-contract.sh
 sync-v2-schema	slow-backend	supabase	no	.	./supabase/scripts/run-suite.sh sync-v2-schema-smoke.sh
 sync-push-contract	slow-backend	supabase	no	.	./supabase/scripts/run-suite.sh sync-push-contract.sh

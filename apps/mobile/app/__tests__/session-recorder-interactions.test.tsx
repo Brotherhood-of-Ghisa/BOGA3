@@ -36,6 +36,8 @@ jest.mock('@/src/auth', () => ({
       id: 'user-1',
     },
   }),
+  // M25-T07 group linking reads the auth store; no `isConfigured` keeps it off.
+  subscribeToAuthState: () => () => undefined,
 }));
 
 jest.mock('@/src/data', () => {
