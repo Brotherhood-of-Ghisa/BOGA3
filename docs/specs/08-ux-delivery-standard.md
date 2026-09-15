@@ -18,12 +18,15 @@ Document boundary:
 
 1. This document (`08`) owns cross-task UX process, task contract expectations, UX quality principles, and reusable UX patterns.
 2. `docs/specs/ui/**` owns current app-specific UI reality (routes, navigation behavior, reusable UI component inventory, app-specific semantics/guardrails).
-3. UI docs under `docs/specs/ui/**` should stay synthetic/overview-first and source-linked:
+3. `docs/specs/ui/ai-design-policy.md` owns design-source selection, accepted
+   design targets, artifact boundaries, generated-code integration, and visual
+   comparison requirements for human- or AI-assisted design work.
+4. UI docs under `docs/specs/ui/**` should stay synthetic/overview-first and source-linked:
    - summarize what exists and why it matters,
    - avoid duplicating source-file prop/API details unless a compact contract summary is needed.
-4. If a UI task changes app-specific UI behavior/docs, update the relevant `docs/specs/ui/*.md` files in the same session.
+5. If a UI task changes app-specific UI behavior/docs, update the relevant `docs/specs/ui/*.md` files in the same session.
    - Use `docs/specs/ui/README.md` (`Maintenance rules`) as the canonical trigger map for which UI docs to update.
-5. Update this document in the same task only when the change affects shared UX process/pattern standards (not just one screen/component implementation).
+6. Update this document in the same task only when the change affects shared UX process/pattern standards (not just one screen/component implementation).
 
 ## UX consistency and pattern management
 
@@ -45,6 +48,9 @@ Document boundary:
 For UI/UX work, write a `UX Contract` before building: in the plan or task
 card if the work has one (`docs/plans/`, optional), otherwise in the PR body.
 Non-UX work needs none.
+
+For a significant UI task, record the accepted design target defined by
+`docs/specs/ui/ai-design-policy.md` beside the UX Contract.
 
 Each UX contract must include:
 

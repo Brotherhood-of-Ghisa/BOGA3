@@ -6,6 +6,8 @@ This folder is the authoritative, app-specific UI documentation bundle for the c
 
 - Use these docs for current behavior, route contracts, and reusable UI component/primitives usage.
 - Use `docs/specs/08-ux-delivery-standard.md` for process/policy expectations across UI tasks.
+- Use `ai-design-policy.md` for provider-neutral design sources, handoff, and
+  visual acceptance.
 
 (The one-time M8 audit snapshots — `repo-discovery-baseline.md`,
 `ui-pattern-audit.md` — were deleted 2026-06-10: dated 2026-02-26, they had
@@ -18,6 +20,10 @@ drifted from the code and predated several UI milestones. Git history has them.)
 
 ## Bundle map
 
+- `ai-design-policy.md`
+  - canonical policy for accepted design targets, external artifacts,
+    repository authority, generated design code, visual verification, and
+    conflict/commit boundaries
 - `ux-rules.md`
   - authoritative semantic UI rules and guardrails grounded in current behavior
 - `screen-map.md`
@@ -45,6 +51,8 @@ Task templates/task cards may summarize these triggers for convenience, but shou
    - Update `docs/specs/08-ux-delivery-standard.md` only if the change is a cross-task/process-level UX rule
 5. New UI docs added in this folder:
    - Add them to this index and keep descriptions concise
+6. Design-source, artifact-boundary, or visual-acceptance policy changed:
+   - Update `ai-design-policy.md`; do not copy its rules into tool-specific files
 
 ## Authoring style (required)
 
