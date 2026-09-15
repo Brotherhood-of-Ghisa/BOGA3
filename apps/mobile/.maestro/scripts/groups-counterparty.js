@@ -237,6 +237,29 @@ var steps = {
     console.log(TAG + ' GROUPS_E2E_LATENCY ' + LABEL + ' sync_push->card visible: ' + elapsed + ' ms');
   },
 
+  // M25-T08: a member reads the exercises the owner added on the device — the
+  // renamed custom one (active, per side, no source) first, then the archived
+  // standard copy (it keeps its seed id).
+  'assert-exercises': function () {
+    var list = rpcOk(output.groupsToken, 'group_exercise_list', { p_group_id: output.groupsGroupId });
+    var got = (list.exercises || []).map(function (exercise) {
+      return {
+        name: exercise.name,
+        load_input_mode: exercise.load_input_mode,
+        source_exercise_id: exercise.source_exercise_id,
+        archived: exercise.archived_at_ms !== null,
+      };
+    });
+    var want = [
+      { name: 'Prowler Push', load_input_mode: 'per_side_load', source_exercise_id: null, archived: false },
+      { name: 'Barbell Bench Press', load_input_mode: 'total_load', source_exercise_id: 'seed_barbell_bench_press', archived: true },
+    ];
+    if (JSON.stringify(got) !== JSON.stringify(want)) {
+      fail('expected group exercises ' + JSON.stringify(want) + ', got ' + JSON.stringify(got));
+    }
+    console.log(TAG + ' member reads the group exercises: ' + JSON.stringify(got));
+  },
+
   // AC11: once removed, the counterparty's next read of the group is NOT_FOUND.
   'assert-removed': function () {
     var result = rpc(output.groupsToken, 'group_stream', { p_group_id: output.groupsGroupId, p_before: null, p_limit: 20 });

@@ -13,6 +13,12 @@ export const LOAD_INPUT_MODES = ['total_load', 'per_side_load'] as const;
 
 export type LoadInputMode = (typeof LOAD_INPUT_MODES)[number];
 
+/** How each load mode reads in the shared editor fields and on group exercise rows. */
+export const LOAD_INPUT_MODE_LABELS: Record<LoadInputMode, string> = {
+  total_load: 'Total load',
+  per_side_load: 'Per side',
+};
+
 export type ExerciseCore = {
   name: string;
   loadInputMode: LoadInputMode;

@@ -105,9 +105,11 @@ appId: com.dinoderek.mobile
       id: "group-screen-name"
       text: "Maestro Groups E2E"
     timeout: 15000
+# The member count is a press target (D14, M25-T08); iOS exposes it as one
+# element whose label joins its texts.
 - assertVisible:
-    id: "group-screen-meta"
-    text: "1 member · You're the owner"
+    id: "group-screen-members-link"
+    text: "Members, 1 member · You're the owner"
 - takeScreenshot: "groups-02-group-created"
 
 # --- 3. Read the invite code off the screen -------------------------------------
@@ -141,9 +143,143 @@ appId: com.dinoderek.mobile
       text: "${MAESTRO_GROUPS_COUNTERPARTY_USERNAME} joined"
     timeout: 15000
 - assertVisible:
-    id: "group-screen-meta"
-    text: "2 members · You're the owner"
+    id: "group-screen-members-link"
+    text: "Members, 2 members · You're the owner"
 - takeScreenshot: "groups-04-counterparty-joined"
+
+# --- 4b. Exercises page (M25-T08): the owner adds, renames, and archives --------
+# The device (the owner) copies a standard exercise and creates a custom one,
+# renames the custom one, and archives the copy, which moves it to the bottom
+# marked Archived. Before archiving, it links the copy to its own seeded
+# "Barbell Bench Press" through "Link your exercise" (E0.4). An owner's
+# row is one pressable element, so it is found by its joined accessibility label
+# ("<name>, <weight entry>[, archived], <link status>"); its testID carries the
+# server-generated id.
+- tapOn:
+    id: "group-screen-segment-exercises"
+- extendedWaitUntil:
+    visible:
+      id: "group-exercises-add-button"
+    timeout: 15000
+- tapOn:
+    id: "group-exercises-add-button"
+- extendedWaitUntil:
+    visible:
+      id: "group-standard-exercise-search"
+    timeout: 15000
+- tapOn:
+    id: "group-standard-exercise-search"
+- inputText: "barbell bench"
+# Picking a standard exercise dismisses the keyboard and prefills the form.
+- tapOn:
+    id: "group-standard-exercise-seed_barbell_bench_press"
+- extendedWaitUntil:
+    visible:
+      id: "group-exercise-form-note"
+    timeout: 10000
+- tapOn:
+    id: "group-exercise-form-submit"
+- extendedWaitUntil:
+    visible:
+      text: "Barbell Bench Press, Total load, Not linked"
+    timeout: 15000
+- tapOn:
+    id: "group-exercises-add-button"
+- extendedWaitUntil:
+    visible:
+      id: "group-exercise-source-custom"
+    timeout: 15000
+- tapOn:
+    id: "group-exercise-source-custom"
+# Pick the weight entry before typing: on iOS, dismissing the keyboard can submit the form.
+- tapOn:
+    id: "group-exercise-form-load-mode-per_side_load"
+- tapOn:
+    id: "group-exercise-form-name-input"
+- inputText: "Sled Push"
+- tapOn:
+    id: "group-exercise-form-submit"
+- extendedWaitUntil:
+    visible:
+      text: "Sled Push, Per side, Not linked"
+    timeout: 15000
+- takeScreenshot: "groups-04b-1-exercises-added"
+# Rename the custom exercise.
+- tapOn:
+    text: "Sled Push, Per side, Not linked"
+- extendedWaitUntil:
+    visible:
+      id: "group-exercise-action-rename"
+    timeout: 10000
+- tapOn:
+    id: "group-exercise-action-rename"
+- extendedWaitUntil:
+    visible:
+      id: "group-exercise-form-name-input"
+    timeout: 15000
+- tapOn:
+    id: "group-exercise-form-name-input"
+- eraseText: 40
+- inputText: "Prowler Push"
+- tapOn:
+    id: "group-exercise-form-submit"
+- extendedWaitUntil:
+    visible:
+      text: "Prowler Push, Per side, Not linked"
+    timeout: 15000
+# Link your exercise (E0.4): the copy suggests the device's own seeded "Barbell
+# Bench Press"; Link writes the link locally and starts no session.
+- tapOn:
+    text: "Link your exercise to Barbell Bench Press"
+- extendedWaitUntil:
+    visible:
+      id: "group-pick-sheet-option-suggested"
+    timeout: 10000
+- assertVisible:
+    id: "group-pick-sheet-retroactivity"
+- takeScreenshot: "groups-04b-2-pick-sheet-link-only"
+- tapOn:
+    id: "group-pick-sheet-confirm"
+- extendedWaitUntil:
+    visible:
+      text: "Barbell Bench Press, Total load, Linked: Barbell Bench Press"
+    timeout: 15000
+# Archive the standard copy; the native confirmation Alert's destructive button.
+- tapOn:
+    text: "Barbell Bench Press, Total load, Linked: Barbell Bench Press"
+- extendedWaitUntil:
+    visible:
+      id: "group-exercise-action-archive"
+    timeout: 10000
+- tapOn:
+    id: "group-exercise-action-archive"
+- extendedWaitUntil:
+    visible:
+      text: "Archive"
+    timeout: 10000
+- tapOn:
+    text: "Archive"
+- extendedWaitUntil:
+    visible:
+      id: "group-exercises-action-feedback"
+    timeout: 15000
+- assertVisible: "Barbell Bench Press was archived\\."
+- extendedWaitUntil:
+    visible:
+      text: "Barbell Bench Press, Total load, archived, Linked: Barbell Bench Press"
+    timeout: 15000
+- takeScreenshot: "groups-04b-3-exercise-linked-renamed-archived"
+# A member (the counterparty) reads the same list over group_exercise_list.
+- runScript:
+    file: ../scripts/groups-counterparty.js
+    env:
+      STEP: assert-exercises
+- tapOn:
+    id: "group-screen-segment-stream"
+- extendedWaitUntil:
+    visible:
+      id: "group-screen-stream-list"
+    timeout: 15000
 
 # --- 5. Active session -> one "Training now" card with its metrics ---------------
 - runScript:
@@ -234,12 +370,17 @@ appId: com.dinoderek.mobile
 
 # --- 8. The device removes the counterparty -> "was removed" -------------------
 - openLink: "boga3://group/${output.groupsGroupId}"
+# Members live behind the header's member count (D14, M25-T08).
 - extendedWaitUntil:
     visible:
-      id: "group-screen-segment-members"
+      id: "group-screen-members-link"
     timeout: 15000
 - tapOn:
-    id: "group-screen-segment-members"
+    id: "group-screen-members-link"
+- extendedWaitUntil:
+    visible:
+      id: "group-members-list"
+    timeout: 15000
 - tapOn:
     id: "group-member-row-${output.groupsCounterpartyUserId}"
 - extendedWaitUntil:
@@ -258,16 +399,19 @@ appId: com.dinoderek.mobile
 # The feedback View carries the testID; its sentence is a child text.
 - extendedWaitUntil:
     visible:
-      id: "group-screen-action-feedback"
+      id: "group-members-action-feedback"
     timeout: 15000
 - assertVisible: "${MAESTRO_GROUPS_COUNTERPARTY_USERNAME} was removed\\."
 - assertVisible:
-    id: "group-screen-meta"
+    id: "group-members-meta"
     text: "1 member · You're the owner"
 - assertNotVisible:
     id: "group-member-row-${output.groupsCounterpartyUserId}"
-- tapOn:
-    id: "group-screen-segment-stream"
+- openLink: "boga3://group/${output.groupsGroupId}"
+- extendedWaitUntil:
+    visible:
+      id: "group-screen-stream-list"
+    timeout: 15000
 - extendedWaitUntil:
     visible:
       text: "${MAESTRO_GROUPS_COUNTERPARTY_USERNAME} was removed"

@@ -27,7 +27,7 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
   - on a non-`AUTH_REQUIRED` cycle error it shows the error message and a single Retry that fires exactly one cycle; when the latest cycle outcome is `AUTH_REQUIRED` it redirects to `/sign-in` and renders no Retry;
   - it stands aside (renders through) when there is no session or auth is unconfigured, so an unconfigured/local build is never trapped behind a block nothing will lift; the `/sign-in` and `/maestro-harness` routes are exempt so redirects and harness setup cannot loop.
 - Tab roots live inside the `(tabs)` route group at `apps/mobile/app/(tabs)/` and share a tab layout at `apps/mobile/app/(tabs)/_layout.tsx`. The group name is parenthesised so it does not appear in URLs (e.g. `/session-recorder` resolves to `app/(tabs)/session-recorder.tsx`).
-- Tab roots have `headerShown: false`; detail screens (`exercise-history`, `profile`, `completed-session/[sessionId]`, `maestro-harness`, and the M22 group routes `group/mine`, `group/new`, `group/join`, `group/[groupId]`, `group/[groupId]/edit`, `group/[groupId]/invite`, `group-session/[memberId]/[sessionId]`, and the M25 `exercise-link`) remain outside `(tabs)/` and keep their existing native header behavior.
+- Tab roots have `headerShown: false`; detail screens (`exercise-history`, `profile`, `completed-session/[sessionId]`, `maestro-harness`, and the M22 group routes `group/mine`, `group/new`, `group/join`, `group/[groupId]`, `group/[groupId]/edit`, `group/[groupId]/invite`, `group-session/[memberId]/[sessionId]`, the M25 `exercise-link`, and the M25-T08 routes `group/[groupId]/members`, `group/[groupId]/exercises/new`, `group/[groupId]/exercises/[exerciseId]/edit`) remain outside `(tabs)/` and keep their existing native header behavior.
 - Navigation is mostly string-path based; `apps/mobile/src/navigation/routes.ts` holds a few route constants and builders (`SIGN_IN_ROUTE`, `MAESTRO_HARNESS_ROUTE`, and the M25 `exerciseLinkHref(id)`), not a full typed route layer
 
 ## Route + param summary (current)
@@ -185,7 +185,7 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 - Path params:
   - `groupId` (required dynamic segment; a missing value renders the lost-access state)
 - Behavior:
-  - the `Stream` / `Members` segment is in-route state
+  - the `Stream` / `Exercises` / `Leaderboards` segment is in-route state, Stream first (M25-T08); Members is its own route behind the header member count
 
 15. `/group/new` (M22-T05)
 - File: `apps/mobile/app/group/new.tsx`
@@ -205,6 +205,19 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 - Files: `apps/mobile/app/group/[groupId]/edit.tsx`, `apps/mobile/app/group/[groupId]/invite.tsx`
 - Path params:
   - `groupId` (required dynamic segment)
+
+17a. `/group/[groupId]/members` (M25-T08)
+- File: `apps/mobile/app/group/[groupId]/members.tsx`
+- Path params:
+  - `groupId` (required dynamic segment; a missing value renders the lost-access state)
+
+17b. `/group/[groupId]/exercises/new` and `/group/[groupId]/exercises/[exerciseId]/edit` (M25-T08)
+- Files: `apps/mobile/app/group/[groupId]/exercises/new.tsx`, `apps/mobile/app/group/[groupId]/exercises/[exerciseId]/edit.tsx`
+- Path params:
+  - `groupId` (required dynamic segment)
+  - `exerciseId` (edit; required): the `group_exercise_id`; one missing from the cached list renders "This exercise is no longer available"
+- Behavior:
+  - the add screen's `From catalogue` / `Custom` choice is in-route state
 
 18. `/group-session/[memberId]/[sessionId]`
 - File: `apps/mobile/app/group-session/[memberId]/[sessionId].tsx`
@@ -291,16 +304,20 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
    - after create, join, or `Open group` when already a member (`router.replace`, so Back returns to where the flow started)
 34. `/group/<groupId>` -> `/group/<groupId>/invite`, `/group/<groupId>/edit`
    - owner/admin `Invite` / `Edit` header actions; edit returns with `router.back()` after saving
-35. `/group/<groupId>` -> `/groups`
+35. `/group/<groupId>/members` -> `/groups`
    - after a successful leave (`router.dismissTo('/groups')`); the tab's focus refresh drops the group from the chips
 36. (external) `boga3://group/join?code=…` -> `/group/join?code=…`
    - the invite link
-36. `/exercise-catalog` -> `/exercise-link?exerciseDefinitionId=<id>` (M25-T07)
+37. `/exercise-catalog` -> `/exercise-link?exerciseDefinitionId=<id>` (M25-T07)
    - Exercise Actions `⋮` `Link to group exercise…` (`router.push`; signed in only, disabled for a deleted exercise)
-37. `/session-recorder` -> `/exercise-link?exerciseDefinitionId=<id>` (M25-T07)
+38. `/session-recorder` -> `/exercise-link?exerciseDefinitionId=<id>` (M25-T07)
    - exercise card `•••` `Link to group exercise…` (`router.push`; signed in only); the open session is untouched
-38. `/exercise-link` -> previous route
+39. `/exercise-link` -> previous route
    - native back only
+40. `/group/<groupId>` -> `/group/<groupId>/members` (M25-T08)
+   - the header's member-count line (`router.push`); Back returns to the group screen
+41. `/group/<groupId>` -> `/group/<groupId>/exercises/new`, `/group/<groupId>/exercises/<exerciseId>/edit` (M25-T08)
+   - owner/admin `Add exercise` and the exercise sheet's `Rename` (`router.push`); both return with `router.back()` after saving, and the Exercises segment refreshes on focus
 
 Note:
 
@@ -316,6 +333,7 @@ Note:
 - `exercise-history` sets its title inside the route file to the resolved exercise name (falls back to `Exercise History` when the summary is not yet available)
 - M22 group routes declare `My groups`, `New group`, `Join group`, `Group`, `Edit group`, `Invite`, and `Session` in `apps/mobile/app/_layout.tsx` (back title `Back`); the group screen replaces `Group` with the group's name once loaded
 - `exercise-link` (M25-T07) declares `Link exercise` in `apps/mobile/app/_layout.tsx` (back title `Back`) and replaces it with `Link "<exercise name>"` once the exercise resolves
+- M25-T08 adds `Members`, `Add exercise`, and `Edit exercise` for the group routes in `apps/mobile/app/_layout.tsx` (back title `Back`)
 
 ## Documentation boundary
 

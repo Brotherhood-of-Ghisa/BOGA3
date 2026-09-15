@@ -30,6 +30,17 @@ export function GroupStateView({ testID, title, body, actionLabel, onAction, act
   );
 }
 
+/** `NOT_FOUND` on a group read (C3.6.8): cached data is hidden (the hook already evicted it). */
+export function GroupLostAccessState({ testID }: { testID: string }) {
+  return (
+    <GroupStateView
+      body="Its stream and members are no longer available to you."
+      testID={testID}
+      title="You're no longer a member of this group"
+    />
+  );
+}
+
 export function GroupLoadingState({ testID }: { testID: string }) {
   return (
     <View style={styles.loading} testID={testID}>

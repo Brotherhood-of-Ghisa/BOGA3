@@ -85,6 +85,7 @@ import * as groupsApi from '@/src/groups/api';
 import GroupsTabRoute from '../(tabs)/groups';
 import EditGroupRoute from '../group/[groupId]/edit';
 import GroupScreenRoute from '../group/[groupId]/index';
+import GroupMembersRoute from '../group/[groupId]/members';
 import GroupInviteRoute from '../group/[groupId]/invite';
 import JoinGroupRoute from '../group/join';
 import MyGroupsRoute from '../group/mine';
@@ -452,16 +453,42 @@ describe('Edit group (flow 5)', () => {
   });
 });
 
-describe('Group screen: role-gated actions and members (flows 4–5)', () => {
+const metaFor = (role: GroupRole) =>
+  role === 'owner' ? "4 members · You're the owner" : role === 'admin' ? "4 members · You're an admin" : "4 members · You're a member";
+
+describe('Group screen: role-gated header actions (flow 4)', () => {
+  beforeEach(() => {
+    mockParams = { groupId: GROUP_ID };
+  });
+
+  it.each<GroupRole>(['owner', 'admin'])('%s: Invite and Edit push their routes', async (role) => {
+    api.getGroup.mockResolvedValue(detailFor(role));
+    render(<GroupScreenRoute />);
+    await screen.findByText(metaFor(role));
+    fireEvent.press(screen.getByTestId('group-screen-invite-button'));
+    expect(mockRouter.push).toHaveBeenLastCalledWith(`/group/${GROUP_ID}/invite`);
+    fireEvent.press(screen.getByTestId('group-screen-edit-button'));
+    expect(mockRouter.push).toHaveBeenLastCalledWith(`/group/${GROUP_ID}/edit`);
+  });
+
+  it('member: no Invite or Edit (C7.4)', async () => {
+    api.getGroup.mockResolvedValue(detailFor('member'));
+    render(<GroupScreenRoute />);
+    await screen.findByText(metaFor('member'));
+    expect(screen.queryByTestId('group-screen-invite-button')).toBeNull();
+    expect(screen.queryByTestId('group-screen-edit-button')).toBeNull();
+  });
+});
+
+describe('Members screen: role-gated member actions and leave (flows 4–5)', () => {
   beforeEach(() => {
     mockParams = { groupId: GROUP_ID };
   });
 
   const renderAs = async (role: GroupRole) => {
     api.getGroup.mockResolvedValue(detailFor(role));
-    render(<GroupScreenRoute />);
-    await screen.findByText(role === 'owner' ? "4 members · You're the owner" : role === 'admin' ? "4 members · You're an admin" : "4 members · You're a member");
-    fireEvent.press(screen.getByTestId('group-screen-segment-members'));
+    render(<GroupMembersRoute />);
+    await screen.findByText(metaFor(role));
   };
 
   const sheetActions = () =>
@@ -471,12 +498,10 @@ describe('Group screen: role-gated actions and members (flows 4–5)', () => {
 
   const openSheet = (userId: string) => fireEvent.press(screen.getByTestId(`group-member-row-${userId}`));
 
-  it('owner: Invite and Edit, no Leave but the transfer notice; each other member offers exactly the §4.3 actions', async () => {
+  it('owner: no Leave but the transfer notice; each other member offers exactly the §4.3 actions', async () => {
     await renderAs('owner');
-    expect(screen.getByTestId('group-screen-invite-button')).toBeTruthy();
-    expect(screen.getByTestId('group-screen-edit-button')).toBeTruthy();
-    expect(screen.queryByTestId('group-screen-leave-button')).toBeNull();
-    expect(screen.getByTestId('group-screen-owner-leave-notice')).toHaveTextContent(/Transfer ownership before leaving/);
+    expect(screen.queryByTestId('group-members-leave-button')).toBeNull();
+    expect(screen.getByTestId('group-members-owner-leave-notice')).toHaveTextContent(/Transfer ownership before leaving/);
 
     openSheet('u-admin');
     expect(sheetActions()).toEqual(['remove-admin', 'transfer-ownership', 'remove']);
@@ -486,17 +511,11 @@ describe('Group screen: role-gated actions and members (flows 4–5)', () => {
     fireEvent.press(screen.getByTestId('group-member-actions-cancel'));
     openSheet(USER_ID);
     expect(screen.queryByTestId('group-member-actions-sheet')).toBeNull();
-
-    fireEvent.press(screen.getByTestId('group-screen-invite-button'));
-    expect(mockRouter.push).toHaveBeenLastCalledWith(`/group/${GROUP_ID}/invite`);
-    fireEvent.press(screen.getByTestId('group-screen-edit-button'));
-    expect(mockRouter.push).toHaveBeenLastCalledWith(`/group/${GROUP_ID}/edit`);
   });
 
-  it('admin: Invite, Edit, Leave; can remove members only', async () => {
+  it('admin: Leave; can remove members only', async () => {
     await renderAs('admin');
-    expect(screen.getByTestId('group-screen-invite-button')).toBeTruthy();
-    expect(screen.getByTestId('group-screen-leave-button')).toBeTruthy();
+    expect(screen.getByTestId('group-members-leave-button')).toBeTruthy();
     openSheet('u-member');
     expect(sheetActions()).toEqual(['remove']);
     fireEvent.press(screen.getByTestId('group-member-actions-cancel'));
@@ -510,7 +529,7 @@ describe('Group screen: role-gated actions and members (flows 4–5)', () => {
     await renderAs('member');
     expect(screen.queryByTestId('group-screen-invite-button')).toBeNull();
     expect(screen.queryByTestId('group-screen-edit-button')).toBeNull();
-    expect(screen.getByTestId('group-screen-leave-button')).toBeTruthy();
+    expect(screen.getByTestId('group-members-leave-button')).toBeTruthy();
     for (const userId of ['u-owner', 'u-admin', 'u-member']) {
       openSheet(userId);
       expect(screen.queryByTestId('group-member-actions-sheet')).toBeNull();
@@ -526,7 +545,7 @@ describe('Group screen: role-gated actions and members (flows 4–5)', () => {
       fireEvent.press(screen.getByTestId('group-member-action-make-admin'));
     });
     expect(api.setGroupMemberRole).toHaveBeenCalledWith(GROUP_ID, 'u-member', 'admin');
-    expect(screen.getByTestId('group-screen-action-feedback')).toHaveTextContent('alex is now an admin.');
+    expect(screen.getByTestId('group-members-action-feedback')).toHaveTextContent('alex is now an admin.');
     await waitFor(() => expect(api.getGroup.mock.calls.length).toBeGreaterThan(reads));
   });
 
@@ -546,7 +565,7 @@ describe('Group screen: role-gated actions and members (flows 4–5)', () => {
     fireEvent.press(screen.getByTestId('group-member-action-remove'));
     await pressAlertButton(alert, 'Remove');
     expect(api.removeGroupMember).toHaveBeenCalledWith(GROUP_ID, 'u-member');
-    expect(screen.getByTestId('group-screen-action-feedback')).toHaveTextContent('alex was removed.');
+    expect(screen.getByTestId('group-members-action-feedback')).toHaveTextContent('alex was removed.');
 
     openSheet('u-admin');
     fireEvent.press(screen.getByTestId('group-member-action-transfer-ownership'));
@@ -562,7 +581,7 @@ describe('Group screen: role-gated actions and members (flows 4–5)', () => {
     await act(async () => {
       fireEvent.press(screen.getByTestId('group-member-action-remove-admin'));
     });
-    expect(screen.getByTestId('group-screen-action-feedback')).toHaveTextContent(/not allowed to do that any more/);
+    expect(screen.getByTestId('group-members-action-feedback')).toHaveTextContent(/not allowed to do that any more/);
     await waitFor(() => expect(api.getGroup.mock.calls.length).toBeGreaterThan(reads));
   });
 
@@ -574,7 +593,7 @@ describe('Group screen: role-gated actions and members (flows 4–5)', () => {
     fireEvent.press(screen.getByTestId('group-member-action-remove'));
     await pressAlertButton(alert, 'Remove');
     expect(api.removeGroupMember).not.toHaveBeenCalled();
-    expect(screen.getByTestId('group-screen-action-feedback')).toHaveTextContent(GROUP_OFFLINE_ACTION_MESSAGE);
+    expect(screen.getByTestId('group-members-action-feedback')).toHaveTextContent(GROUP_OFFLINE_ACTION_MESSAGE);
   });
 
   it('Leave confirms, evicts the group cache, and returns to the Groups tab', async () => {
@@ -583,7 +602,7 @@ describe('Group screen: role-gated actions and members (flows 4–5)', () => {
     await renderAs('member');
     await waitFor(() => expect(readGroupCache(fixture.database, groupCacheKeys.group(GROUP_ID), USER_ID)).not.toBeNull());
 
-    fireEvent.press(screen.getByTestId('group-screen-leave-button'));
+    fireEvent.press(screen.getByTestId('group-members-leave-button'));
     expect(alert).toHaveBeenLastCalledWith('Leave Garage Gym?', expect.any(String), expect.any(Array));
     await pressAlertButton(alert, 'Leave');
     expect(api.leaveGroup).toHaveBeenCalledWith(GROUP_ID);
@@ -595,10 +614,41 @@ describe('Group screen: role-gated actions and members (flows 4–5)', () => {
     const alert = alertSpy();
     await renderAs('member');
     emitNetInfo(false);
-    fireEvent.press(screen.getByTestId('group-screen-leave-button'));
+    fireEvent.press(screen.getByTestId('group-members-leave-button'));
     await pressAlertButton(alert, 'Leave');
     expect(api.leaveGroup).not.toHaveBeenCalled();
     expect(mockRouter.dismissTo).not.toHaveBeenCalled();
-    expect(screen.getByTestId('group-screen-action-feedback')).toHaveTextContent(GROUP_OFFLINE_ACTION_MESSAGE);
+    expect(screen.getByTestId('group-members-action-feedback')).toHaveTextContent(GROUP_OFFLINE_ACTION_MESSAGE);
+  });
+});
+
+describe('Members screen: lost access and missing data (AC2)', () => {
+  beforeEach(() => {
+    mockParams = { groupId: GROUP_ID };
+  });
+
+  it("NOT_FOUND shows \"You're no longer a member\", hides the list, and evicts the cached group", async () => {
+    writeGroupCache(fixture.database, { cacheKey: groupCacheKeys.group(GROUP_ID), userId: USER_ID, payload: detailFor('member'), fetchedAtMs: 1 });
+    api.getGroup.mockRejectedValue(new GroupApiError('NOT_FOUND', 'group not found'));
+    render(<GroupMembersRoute />);
+    expect(await screen.findByTestId('group-members-lost-access')).toBeTruthy();
+    expect(screen.queryByTestId('group-members-list')).toBeNull();
+    await waitFor(() => expect(readGroupCache(fixture.database, groupCacheKeys.group(GROUP_ID), USER_ID)).toBeNull());
+  });
+
+  it('shows the offline empty state when the read fails with NETWORK and nothing is cached', async () => {
+    api.getGroup.mockRejectedValue(new GroupApiError('NETWORK', 'Network request failed.'));
+    render(<GroupMembersRoute />);
+    expect(await screen.findByTestId('group-members-offline-empty-state')).toBeTruthy();
+  });
+
+  it('shows the error state with Retry on a non-network failure', async () => {
+    api.getGroup.mockRejectedValueOnce(new GroupApiError('INTERNAL', 'Something broke.'));
+    render(<GroupMembersRoute />);
+    expect(await screen.findByTestId('group-members-error-state')).toBeTruthy();
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('group-members-error-state-retry'));
+    });
+    expect(await screen.findByTestId('group-members-list')).toBeTruthy();
   });
 });

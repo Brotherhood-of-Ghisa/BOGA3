@@ -31,6 +31,9 @@
 >   `supabase/migrations/20260913180000_m25_group_eval.sql`), proven by
 >   `./boga test groups-leaderboards`. Boards and record events (M25-T05) fill
 >   the apply seam.
+> - M25-T08, the group page: Stream · Exercises · Leaderboards, Members behind
+>   the header's member count, and the Exercises page with owner/admin add,
+>   copy, rename, and archive (§6.2 `group-exercises:<groupId>`, §6.3, §8).
 >
 > This doc owns the technical contract and is the durable record of what M22
 > built. The M22 milestone spec (product requirements and acceptance criteria)
@@ -899,6 +902,9 @@ view model and `FriendSessionContent` use them. Jest:
 | `stream-view-model.ts` | Pure presentation: status ("Training now" while `active` — indefinite, C7.2 — or "Completed · 1h 05m"), card metrics from `session-metrics.ts` formatted in kg, membership sentences ("X joined", "X left the group", "X was removed" — C7.3), and filter chips |
 | `use-group-resource.ts` | A cache-first hook. It refreshes on focus, every 30 s while focused, and on pull-to-refresh, and returns `{ data, lastUpdatedAtMs, refreshing, offline, error, refresh }`. |
 | `use-group-action.ts` | Runs one write RPC. It fails fast with the offline message when offline and never queues (C3.10.3). |
+| `exercise-view-model.ts` | (M25-T08) Exercises-segment rows and link-status wording, the owner/admin exercise action matrix, write wording, and the standard-exercise search |
+| `use-my-group-exercise-links.ts` | (M25-T08) My live local links into one group with my exercise names, reloaded on focus and after a local link (only the latest read lands); also my exercises and all my links for the pick sheet |
+| `use-mounted-ref.ts` | (M25-T08) `useMountedRef`: a write that finishes after its screen unmounted must not navigate |
 
 **Network state.** The hook reuses the sync scheduler's NetInfo projection
 through the existing sync-status accessor (`apps/mobile/src/sync/sync-status.ts`)
@@ -970,7 +976,7 @@ migration via `npm run db:generate`.
 
 | Column | Type | Notes |
 | --- | --- | --- |
-| `cache_key` | `text` PK | `groups:mine`, `group:<id>`, `stream:all`, `stream:<groupId>`, `session:<memberId>:<sessionId>`, `group-exercises:<groupId>` (M25-T07) |
+| `cache_key` | `text` PK | `groups:mine`, `group:<id>`, `stream:all`, `stream:<groupId>`, `session:<memberId>:<sessionId>`, `group-exercises:<groupId>` (M25-T07; the Exercises segment reads it too, M25-T08) |
 | `user_id` | `text not null` | The account the payload belongs to. Reads require a match with `useAuth().user.id`. |
 | `payload_json` | `text not null` | The last successful RPC result |
 | `fetched_at_ms` | `integer not null` | Drives "last updated" |
@@ -1021,6 +1027,9 @@ migration via `npm run db:generate`.
 | `/group/[groupId]` | `app/group/[groupId]/index.tsx` | Group screen |
 | `/group/[groupId]/edit` | `app/group/[groupId]/edit.tsx` | Edit name and description |
 | `/group/[groupId]/invite` | `app/group/[groupId]/invite.tsx` | Invite code with Share and Regenerate |
+| `/group/[groupId]/members` | `app/group/[groupId]/members.tsx` | (M25-T08) Members, from the header's member count |
+| `/group/[groupId]/exercises/new` | `app/group/[groupId]/exercises/new.tsx` | (M25-T08) Add a group exercise: standard copy or custom |
+| `/group/[groupId]/exercises/[exerciseId]/edit` | `app/group/[groupId]/exercises/[exerciseId]/edit.tsx` | (M25-T08) Rename a group exercise or change its weight entry |
 | `/group-session/[memberId]/[sessionId]` | `app/group-session/[memberId]/[sessionId].tsx` | Friend's session view |
 | `/exercise-link?exerciseDefinitionId=` | `app/exercise-link.tsx` | Link screen (M25-T07): link one of my exercises to my groups' exercises |
 
@@ -1029,6 +1038,8 @@ migration via `npm run db:generate`.
   offline states.
 - **Group screen.** Its header shows name, description, member count, and my
   role. Stream and Members sit behind a segment. Role actions follow §4.3.
+  M25-T08 replaces the segment with Stream · Exercises · Leaderboards and
+  moves Members to its own route (as-built below).
 - **Friend's session view.** It is read-only and has no edit, delete, or
   append.
 - **Tab.** A fourth `TopLevelTabs` button: key `groups`, label "Groups", testID
@@ -1176,6 +1187,64 @@ E0.1–E0.3).
   `groups-exercise-link-screen.test.tsx`, `session-recorder-group-picker.test.tsx`,
   `exercise-catalog-link-menu.test.tsx`, `exercise-group-links-add-as-new.test.ts`;
   Maestro `groups-link-exercise.yaml` (§8).
+
+**As-built (M25-T08, group page).** Product D10, D14, and E0.4; M25 design
+§1 and §7.
+
+- **Segments.** `/group/[groupId]` is `Stream` / `Exercises` /
+  `Leaderboards` (in-route state, Stream first). Members moved to its own
+  route, `/group/[groupId]/members`, opened from the header's member count
+  (`group-screen-members-link`). It holds the member rows, the §4.3 action
+  sheet, Leave, and the owner's transfer notice unchanged, on the same
+  `group:<id>` resource.
+- **Exercises.** `group_exercise_list` runs through `useGroupResource` under
+  `group-exercises:<groupId>` (§6.2). The group screen enables it only while
+  the segment is open (a `null` key otherwise), so the Stream segment never
+  polls it.
+  - Rows (`buildGroupExerciseRows`, `src/groups/exercise-view-model.ts`):
+    active exercises, then archived ones marked `Archived`, each in server
+    order with its weight entry.
+  - My status comes from my local `exercise_group_links` rows
+    (`useMyGroupExerciseLinks`: `listLinks()` filtered to the group, names
+    from my local catalogue including deleted exercises, reloaded on focus),
+    so it shows offline: `Linked: A, B`, `Linked` when the linked exercise is
+    not on this device, or `Not linked`. A failed local read shows a notice
+    instead of any status.
+- **Owner/admin actions** (`groupExerciseActionsFor`; members get none, and
+  the server enforces `FORBIDDEN` regardless).
+  - `Add exercise` → `/group/[groupId]/exercises/new`. `From catalogue`
+    searches the bundled `SYSTEM_EXERCISE_DEFINITION_SEEDS`
+    (`searchStandardExercises`, every word must match, 30 shown at a time)
+    and prefills the form. The seed id is sent as `p_source_exercise_id` even
+    when the name is edited. `Custom` sends null.
+  - A row opens a sheet: `Rename` →
+    `/group/[groupId]/exercises/[exerciseId]/edit` (both fields, prefilled from the cached list and following a fresher
+    read until you edit them; an archived exercise shows a read-only state) and
+    `Archive` (confirmed) on an active row, `Unarchive` on an archived one.
+  - Every write runs through `useGroupAction`, worded by
+    `describeGroupExerciseWriteError`. On the Exercises page and the edit
+    route a `FORBIDDEN`, `NOT_FOUND`, or `VALIDATION` refusal also refreshes
+    the group and the list. The add route refreshes the group on `FORBIDDEN` /
+    `NOT_FOUND`; the list refreshes when the group screen regains focus.
+  - A save that finishes after you already left the add or edit screen
+    does not navigate (`useMountedRef`), so Back is never applied twice.
+- **Shared form.** `ExerciseCoreFields`
+  (`components/exercise-core/exercise-core-fields.tsx`: the name and the
+  `Total load` / `Per side` control, labelled by `LOAD_INPUT_MODE_LABELS` in
+  `src/exercise-core`) renders in the personal exercise editor and in the
+  group exercise form. Both validate the name through `validateExerciseCore`.
+- **Leaderboards** is an empty state with no read until M25-T09.
+- **Link your exercise** (E0.4). An active row none of my exercises is
+  linked to shows `Link your exercise` to every member; archived rows are not
+  offered (D8). It opens the M25-T07 pick sheet with `purpose="link-only"`: the
+  confirm reads `Link`, links locally (`linkExercise`, so it works offline),
+  and adds nothing to a session. "Add as new" opens the prefilled editor, and
+  `createExerciseWithGroupLink` writes the exercise and its link in one local
+  transaction. My links then reload, so the row reads `Linked: …`.
+- **Evidence.** Jest: `groups-exercise-screens.test.tsx`,
+  `groups-exercise-view-model.test.ts`, `groups-cache.test.ts`, and the
+  member cases moved to the Members route in `groups-write-screens.test.tsx`.
+  Maestro: step 4b of `groups-two-user-stream.yaml` (§8).
 
 ## 7. Freshness and offline
 
@@ -1333,6 +1402,18 @@ E0.1–E0.3).
     visible after one pull-to-refresh, including Maestro's polling) to
     `maestro-debug/**/maestro.log`. The observed values are on the M22-T06
     card; they are observed data, not a promise (§7).
+- **As-built (M25-T08, flow extension).** Step 2 and 4 assert the header
+  member count through `group-screen-members-link`. New step 4b: the device
+  (owner) copies `seed_barbell_bench_press`, creates a custom per-side
+  exercise, renames it, links the copy to the device's own seeded Barbell Bench Press
+  through `Link your exercise` (the suggested exercise), and archives the copy
+  (confirmed), asserting each row
+  by its accessibility label (`<name>, <weight entry>[, archived], <link status>`). The counterparty's `assert-exercises` step then reads the same two
+  exercises through `group_exercise_list` as a member. Step 8 opens Members
+  from the header. No new fixture user. `groups-fixture-reset.sh` deletes the groups
+  (cascading to `group_exercises`) and user_c's Sync v2 rows child-first,
+  including the `exercise_group_links` row step 4b creates; `clearState`
+  wipes the device.
 - **Offline behaviour (AC12, AC13)** is proven in jest. Simulator network
   cannot be toggled reliably from Maestro.
 

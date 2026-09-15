@@ -21,13 +21,6 @@ when it is ready, refreshed against what T01–T03 actually built. Milestone:
 - AC: self-certify, non-record set, non-member, withdraw, admin cancel,
   re-certify after cancel, void on edit and on delete.
 
-## M25-T08 — Mobile group page (frontend; deps T01, T02)
-
-- Product P5, E0.4, D10, D14. Segments Stream · Exercises · Leaderboards
-  (Leaderboards empty-state until T09); members behind the header member
-  count; Exercises page with link status and admin add / copy standard /
-  rename / archive using the shared `ExerciseCore` form.
-
 ## M25-T09 — Mobile leaderboards (frontend; deps T05, T08)
 
 - Product P6–P9, E1.1–E1.3, D11, D12. Podium cards (Certified · e1RM, "You:

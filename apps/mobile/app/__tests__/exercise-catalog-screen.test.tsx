@@ -228,6 +228,26 @@ describe('ExerciseCatalogScreen', () => {
     expect(mockSaveExercise).not.toHaveBeenCalled();
   });
 
+  it('renders the shared ExerciseCore fields and blocks a blank name with the shared validator message', async () => {
+    mockListExercises.mockResolvedValue([]);
+
+    render(<ExerciseCatalogScreen />);
+
+    await screen.findByLabelText('Create new exercise');
+
+    fireEvent.press(screen.getByLabelText('Create new exercise'));
+    await screen.findByText('Create Exercise');
+    // M25-T08: the fields come from ExerciseCoreFields and keep the editor's testIDs.
+    expect(screen.getByTestId('exercise-editor-name-input')).toBeTruthy();
+    expect(screen.getByTestId('exercise-editor-load-mode-total_load').props.accessibilityState).toMatchObject({ selected: true });
+    expect(screen.getByTestId('exercise-editor-load-mode-per_side_load').props.accessibilityState).toMatchObject({ selected: false });
+    fireEvent.changeText(screen.getByTestId('exercise-editor-name-input'), ' \t ');
+    fireEvent.press(screen.getByLabelText('Save exercise definition'));
+
+    expect(screen.getByTestId('exercise-editor-name-error')).toHaveTextContent('Exercise name is required');
+    expect(mockSaveExercise).not.toHaveBeenCalled();
+  });
+
   it('dismisses the keyboard and uses keyboard-aware scrolling for the muscle selector', async () => {
     const dismissKeyboard = jest.spyOn(Keyboard, 'dismiss').mockImplementation(jest.fn());
     mockListExercises.mockResolvedValue([]);
