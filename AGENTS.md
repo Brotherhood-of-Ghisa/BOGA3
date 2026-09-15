@@ -63,6 +63,14 @@ place each under `docs/specs/**`, routed from here.
    - Never nest a worktree inside another checkout; never share
      `apps/mobile/node_modules` or an iOS simulator across worktrees.
 
+## Design work (all contributors and agents)
+
+For every significant UI/design task, load and follow
+`docs/specs/ui/ai-design-policy.md`. It is the single provider-neutral policy
+for accepted design targets, external-artifact vs repository authority,
+generated-code integration, screenshot comparison, conflict reporting, and
+commit boundaries.
+
 ## Always load (every session)
 
 - `docs/specs/02-quality-and-test-gates.md` — the full gate/lane reference.
@@ -73,7 +81,7 @@ place each under `docs/specs/**`, routed from here.
 
 | If your task touches… | Also load |
 | --- | --- |
-| UI / screens / components / navigation | `docs/specs/08-ux-delivery-standard.md`, `docs/specs/ui/README.md` (index → load only the bundle docs you need) |
+| UI / screens / components / navigation | `docs/specs/08-ux-delivery-standard.md`, `docs/specs/ui/README.md`, `docs/specs/ui/ai-design-policy.md` |
 | Data model / schema / migrations / sync scope | `docs/specs/05-data-model.md` |
 | Sync (data model, server schema, push/pull RPC, drift) | `docs/specs/05-data-model.md`, `docs/specs/tech/sync-v2-server-contract.md` |
 | Auth / RLS / backend API | `docs/specs/10-api-authn-authz-guidelines.md`, `supabase/README.md` |
