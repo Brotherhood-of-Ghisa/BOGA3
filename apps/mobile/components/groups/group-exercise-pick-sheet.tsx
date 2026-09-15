@@ -25,6 +25,29 @@ export type GroupExercisePickTarget = {
 
 type Option = { kind: 'suggested' } | { kind: 'other'; exerciseId: string | null } | { kind: 'add-new' };
 
+type GroupExercisePickSheetProps = {
+  target: GroupExercisePickTarget | null;
+  exercises: LinkableExercise[];
+  links: LinkRef[];
+  onRequestClose: () => void;
+  /** Links, then (unless `link-only`) adds; a rejection shows inline and nothing is added. */
+  onLinkAndAdd: (exercise: LinkableExercise) => Promise<void>;
+  /** Opens the prefilled editor for "Add as new". */
+  onAddAsNew: () => void;
+} & (
+  | {
+      /** The recorder (default): the confirm reads `Link and add`. */
+      purpose?: 'add-to-session';
+      /** Adds an already linked exercise (`choose-linked`). */
+      onAddExercise: (exercise: LinkableExercise) => void;
+    }
+  | {
+      /** The group page: the confirm reads `Link`; its targets are always `mode: 'link'`. */
+      purpose: 'link-only';
+      onAddExercise?: never;
+    }
+);
+
 /**
  * The pick sheet (M25-T07; product E0.2): picking an unlinked group exercise
  * while logging asks which of my exercises it is — the suggestion, another of
@@ -35,29 +58,9 @@ type Option = { kind: 'suggested' } | { kind: 'other'; exerciseId: string | null
  * exercise") confirms with `Link`: the caller only links, and nothing is added
  * to a session. The target is always `mode: 'link'` there.
  */
-export function GroupExercisePickSheet({
-  target,
-  exercises,
-  links,
-  onRequestClose,
-  onAddExercise,
-  onLinkAndAdd,
-  onAddAsNew,
-  purpose = 'add-to-session',
-}: {
-  target: GroupExercisePickTarget | null;
-  exercises: LinkableExercise[];
-  links: LinkRef[];
-  onRequestClose: () => void;
-  /** Adds an already linked exercise (`choose-linked`; not used by `link-only`). */
-  onAddExercise?: (exercise: LinkableExercise) => void;
-  /** Links, then (unless `link-only`) adds; a rejection shows inline and nothing is added. */
-  onLinkAndAdd: (exercise: LinkableExercise) => Promise<void>;
-  /** Opens the prefilled editor for "Add as new". */
-  onAddAsNew: () => void;
-  /** `add-to-session` (the recorder, default) or `link-only` (the group page). */
-  purpose?: 'add-to-session' | 'link-only';
-}) {
+export function GroupExercisePickSheet(props: GroupExercisePickSheetProps) {
+  const { target, exercises, links, onRequestClose, onLinkAndAdd, onAddAsNew } = props;
+  const purpose = props.purpose ?? 'add-to-session';
   const model = useMemo(
     () =>
       target && target.mode === 'link'
@@ -132,7 +135,9 @@ export function GroupExercisePickSheet({
                   <UiButton
                     key={exercise.id}
                     label={exercise.name}
-                    onPress={() => onAddExercise?.(exercise)}
+                    onPress={() => {
+                      if (props.purpose !== 'link-only') props.onAddExercise(exercise);
+                    }}
                     testID={`group-pick-sheet-linked-${exercise.id}`}
                     variant="secondary"
                   />

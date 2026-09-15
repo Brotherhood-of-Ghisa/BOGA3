@@ -23,6 +23,7 @@ import {
   updateGroupExercise,
   useGroupAction,
   useGroupResource,
+  useMountedRef,
   type GroupExerciseListResult,
   type GroupGetResult,
 } from '@/src/groups';
@@ -66,9 +67,12 @@ function EditGroupExerciseContent({ userId, groupId, exerciseId }: { userId: str
     evictGroupIdOnNotFound: groupId,
   });
   const update = useGroupAction((core: ExerciseCore) => updateGroupExercise(groupId, exerciseId, core));
+  const mounted = useMountedRef();
 
   const onSubmit = async (core: ExerciseCore) => {
     const result = await update.run(core);
+    // Back during a slow save already left this screen: going back again would pop the group screen.
+    if (!mounted.current) return;
     if (result.ok) {
       // The group screen's Exercises segment refreshes on focus.
       router.back();

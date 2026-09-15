@@ -23,6 +23,7 @@ import {
   groupCacheKeys,
   useGroupAction,
   useGroupResource,
+  useMountedRef,
   type CreateGroupExerciseInput,
   type GroupGetResult,
   type StandardExerciseOption,
@@ -67,10 +68,13 @@ function NewGroupExerciseContent({ userId, groupId }: { userId: string; groupId:
   const [source, setSource] = useState<ExerciseSource>('catalogue');
   const [picked, setPicked] = useState<StandardExerciseOption | null>(null);
   const create = useGroupAction((input: CreateGroupExerciseInput) => createGroupExercise(groupId, input));
+  const mounted = useMountedRef();
 
   const onSubmit = async (core: ExerciseCore) => {
     const sourceExerciseId = source === 'catalogue' ? (picked?.sourceExerciseId ?? null) : null;
     const result = await create.run({ ...core, sourceExerciseId });
+    // Back during a slow save already left this screen: going back again would pop the group screen.
+    if (!mounted.current) return;
     if (result.ok) {
       // The group screen's Exercises segment refreshes on focus.
       router.back();

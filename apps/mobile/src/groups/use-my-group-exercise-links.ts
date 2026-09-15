@@ -32,6 +32,7 @@ type LoadedState = Omit<MyGroupExerciseLinksState, 'reload'>;
 export function useMyGroupExerciseLinks(groupId: string): MyGroupExerciseLinksState {
   const [state, setState] = useState<LoadedState>({ links: null, exercises: [], allLinks: [], failed: false });
   const mountedRef = useRef(true);
+  const seqRef = useRef(0);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -41,9 +42,11 @@ export function useMyGroupExerciseLinks(groupId: string): MyGroupExerciseLinksSt
   }, []);
 
   const reload = useCallback(async () => {
+    // Only the latest read may land: an older one finishing last would show pre-link state.
+    const seq = ++seqRef.current;
     try {
       const [links, exercises] = await Promise.all([listLinks(), listExerciseCatalogExercises({ includeDeleted: true })]);
-      if (!mountedRef.current) return;
+      if (!mountedRef.current || seq !== seqRef.current) return;
       const names = new Map(exercises.map((exercise) => [exercise.id, exercise.name]));
       setState({
         links: links
@@ -61,7 +64,7 @@ export function useMyGroupExerciseLinks(groupId: string): MyGroupExerciseLinksSt
         failed: false,
       });
     } catch {
-      if (!mountedRef.current) return;
+      if (!mountedRef.current || seq !== seqRef.current) return;
       setState((current) => ({ ...current, links: null, failed: true }));
     }
   }, [groupId]);

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { ExerciseCoreFields } from '@/components/exercise-core/exercise-core-fields';
 import { UiButton, UiSurface, UiText } from '@/components/ui';
@@ -8,7 +8,7 @@ import { groupFormStyles } from './screen-styles';
 import { GroupWriteNotice } from './write-notice';
 
 type GroupExerciseFormProps = {
-  /** Prefill (a standard copy or the exercise being renamed). Remount with a new `key` to reset. */
+  /** Prefill (a standard copy or the exercise being renamed); followed until the user edits. Remount with a new `key` to reset. */
   initialCore?: ExerciseCore;
   /** A line above the fields, e.g. which standard exercise this copies. */
   note?: string | null;
@@ -39,6 +39,15 @@ export function GroupExerciseForm({
   const [name, setName] = useState(initialCore.name);
   const [loadInputMode, setLoadInputMode] = useState<LoadInputMode>(initialCore.loadInputMode);
   const [showErrors, setShowErrors] = useState(false);
+  // Until the user edits, follow the prefill: a fresher server read that lands
+  // after the cached render replaces it, so Save never sends stale fields.
+  const [dirty, setDirty] = useState(false);
+  useEffect(() => {
+    if (!dirty) {
+      setName(initialCore.name);
+      setLoadInputMode(initialCore.loadInputMode);
+    }
+  }, [dirty, initialCore.name, initialCore.loadInputMode]);
   const validation = validateExerciseCore({ name, loadInputMode });
   const nameError = showErrors && !validation.ok && validation.issue === 'name_required' ? validation.message : null;
 
@@ -59,8 +68,14 @@ export function GroupExerciseForm({
         loadInputMode={loadInputMode}
         name={name}
         nameError={nameError}
-        onChangeLoadInputMode={setLoadInputMode}
-        onChangeName={setName}
+        onChangeLoadInputMode={(mode) => {
+          setDirty(true);
+          setLoadInputMode(mode);
+        }}
+        onChangeName={(next) => {
+          setDirty(true);
+          setName(next);
+        }}
         testIDPrefix="group-exercise-form"
       />
       {errorMessage ? <GroupWriteNotice message={errorMessage} testID="group-exercise-form-error" tone="error" /> : null}

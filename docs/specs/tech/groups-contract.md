@@ -903,7 +903,8 @@ view model and `FriendSessionContent` use them. Jest:
 | `use-group-resource.ts` | A cache-first hook. It refreshes on focus, every 30 s while focused, and on pull-to-refresh, and returns `{ data, lastUpdatedAtMs, refreshing, offline, error, refresh }`. |
 | `use-group-action.ts` | Runs one write RPC. It fails fast with the offline message when offline and never queues (C3.10.3). |
 | `exercise-view-model.ts` | (M25-T08) Exercises-segment rows and link-status wording, the owner/admin exercise action matrix, write wording, and the standard-exercise search |
-| `use-my-group-exercise-links.ts` | (M25-T08) My live local links into one group with my exercise names, reloaded on focus |
+| `use-my-group-exercise-links.ts` | (M25-T08) My live local links into one group with my exercise names, reloaded on focus and after a local link (only the latest read lands); also my exercises and all my links for the pick sheet |
+| `use-mounted-ref.ts` | (M25-T08) `useMountedRef`: a write that finishes after its screen unmounted must not navigate |
 
 **Network state.** The hook reuses the sync scheduler's NetInfo projection
 through the existing sync-status accessor (`apps/mobile/src/sync/sync-status.ts`)
@@ -1217,14 +1218,16 @@ E0.1–E0.3).
     and prefills the form. The seed id is sent as `p_source_exercise_id` even
     when the name is edited. `Custom` sends null.
   - A row opens a sheet: `Rename` →
-    `/group/[groupId]/exercises/[exerciseId]/edit` (both fields, prefilled
-    from the cached list; an archived exercise shows a read-only state) and
+    `/group/[groupId]/exercises/[exerciseId]/edit` (both fields, prefilled from the cached list and following a fresher
+    read until you edit them; an archived exercise shows a read-only state) and
     `Archive` (confirmed) on an active row, `Unarchive` on an archived one.
   - Every write runs through `useGroupAction`, worded by
     `describeGroupExerciseWriteError`. On the Exercises page and the edit
     route a `FORBIDDEN`, `NOT_FOUND`, or `VALIDATION` refusal also refreshes
     the group and the list. The add route refreshes the group on `FORBIDDEN` /
     `NOT_FOUND`; the list refreshes when the group screen regains focus.
+  - A save that finishes after you already left the add or edit screen
+    does not navigate (`useMountedRef`), so Back is never applied twice.
 - **Shared form.** `ExerciseCoreFields`
   (`components/exercise-core/exercise-core-fields.tsx`: the name and the
   `Total load` / `Per side` control, labelled by `LOAD_INPUT_MODE_LABELS` in
@@ -1407,8 +1410,10 @@ E0.1–E0.3).
   (confirmed), asserting each row
   by its accessibility label (`<name>, <weight entry>[, archived], <link status>`). The counterparty's `assert-exercises` step then reads the same two
   exercises through `group_exercise_list` as a member. Step 8 opens Members
-  from the header. No new fixture user; `groups-fixture-reset.sh` already
-  deletes the groups, which cascades to `group_exercises`.
+  from the header. No new fixture user. `groups-fixture-reset.sh` deletes the groups
+  (cascading to `group_exercises`) and user_c's Sync v2 rows child-first,
+  including the `exercise_group_links` row step 4b creates; `clearState`
+  wipes the device.
 - **Offline behaviour (AC12, AC13)** is proven in jest. Simulator network
   cannot be toggled reliably from Maestro.
 

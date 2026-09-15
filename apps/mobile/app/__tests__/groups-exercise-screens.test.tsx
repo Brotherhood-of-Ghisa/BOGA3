@@ -65,11 +65,14 @@ jest.mock('@/src/groups/api', () => ({
 // the Add-as-new graph write (covered by exercise-group-links-add-as-new.test.ts) are stubbed.
 jest.mock('@/src/sync/write-nudge', () => ({ notifyLocalWrite: jest.fn() }));
 jest.mock('@/src/data/exercise-group-links', () => ({
+  // One module object for named and namespace imports, so a test can spy on linkExercise.
+  __esModule: true,
   ...jest.requireActual('@/src/data/exercise-group-links'),
   createExerciseWithGroupLink: jest.fn(),
 }));
 
 import { SYSTEM_EXERCISE_DEFINITION_SEEDS } from '@/src/data/exercise-catalog-seeds';
+import * as linksRepo from '@/src/data/exercise-group-links';
 import { createExerciseWithGroupLink } from '@/src/data/exercise-group-links';
 import { exerciseDefinitions, exerciseGroupLinks, sessions } from '@/src/data/schema';
 import { __resetExerciseCatalogCacheForTests } from '@/src/exercise-catalog/cache';
@@ -649,7 +652,7 @@ describe('Link your exercise (E0.4, link-only pick sheet)', () => {
       .all()
       .filter((row) => row.deletedAt === null);
 
-  it.each<GroupRole>(['member', 'owner'])(
+  it.each<GroupRole>(['member', 'admin', 'owner'])(
     '%s: offered on an active row none of mine is linked to, not on a linked or an archived row',
     async (role) => {
       addMyExercise('def-comp', 'Bench (comp grip)');
@@ -727,5 +730,131 @@ describe('Link your exercise (E0.4, link-only pick sheet)', () => {
     );
     expect(fixture.database.select().from(sessions).all()).toHaveLength(0);
     expect(screen.getByTestId('group-exercises-action-feedback')).toHaveTextContent('Linked Bench Press to Bench Press.');
+  });
+});
+
+describe('Link your exercise: failure and "Choose another" (review follow-up)', () => {
+  const liveLinks = () =>
+    fixture.database
+      .select()
+      .from(exerciseGroupLinks)
+      .all()
+      .filter((row) => row.deletedAt === null);
+
+  it('a failed link shows inline in the sheet, keeps it open, and writes nothing', async () => {
+    addMyExercise('seed_barbell_bench_press', 'Barbell Bench Press');
+    jest.spyOn(linksRepo, 'linkExercise').mockRejectedValueOnce(new Error('Disk is full.'));
+    await openExercisesAs('member');
+    fireEvent.press(await screen.findByTestId('group-exercise-link-button-ge-bench'));
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('group-pick-sheet-confirm'));
+    });
+    expect(screen.getByTestId('group-pick-sheet-error')).toHaveTextContent('Disk is full.');
+    expect(screen.getByTestId('group-pick-sheet')).toBeTruthy();
+    expect(liveLinks()).toHaveLength(0);
+    expect(screen.queryByTestId('group-exercises-action-feedback')).toBeNull();
+    expect(screen.getByTestId('group-exercise-link-button-ge-bench')).toBeTruthy();
+  });
+
+  it('Choose another: my exercise already linked in this group is unavailable; another links, and the first stays put', async () => {
+    addMyExercise('def-a', 'Bench A');
+    addMyExercise('def-b', 'Sled B');
+    addLink(GROUP_ID, 'def-a', 'ge-bench');
+    await openExercisesAs('member');
+    fireEvent.press(await screen.findByTestId('group-exercise-link-button-ge-row'));
+    fireEvent.press(screen.getByTestId('group-pick-sheet-option-other'));
+    const taken = screen.getByTestId('group-pick-sheet-choice-def-a');
+    expect(taken.props.accessibilityState).toMatchObject({ disabled: true });
+    expect(taken.props.accessibilityLabel).toBe('Bench A, already linked in Garage Gym');
+    fireEvent.press(screen.getByTestId('group-pick-sheet-choice-def-b'));
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('group-pick-sheet-confirm'));
+    });
+    expect(liveLinks().map((link) => [link.exerciseDefinitionId, link.groupExerciseId]).sort()).toEqual([
+      ['def-a', 'ge-bench'],
+      ['def-b', 'ge-row'],
+    ]);
+  });
+});
+
+describe('Add / edit exercise: stale prefill and late navigation (review follow-up)', () => {
+  const deferred = <T,>() => {
+    let resolve!: (value: T) => void;
+    const promise = new Promise<T>((res) => {
+      resolve = res;
+    });
+    return { promise, resolve };
+  };
+
+  const FRESH_ROW: GroupExercise = { ...ROW, name: 'Seated Row', load_input_mode: 'total_load' };
+
+  const renderEditWithPendingList = () => {
+    seedCache(groupCacheKeys.group(GROUP_ID), detailFor('owner'));
+    seedCache(groupCacheKeys.groupExercises(GROUP_ID), LIST);
+    const fresh = deferred<GroupExerciseListResult>();
+    api.listGroupExercises.mockReturnValue(fresh.promise);
+    mockParams = { groupId: GROUP_ID, exerciseId: 'ge-row' };
+    render(<EditGroupExerciseRoute />);
+    return fresh;
+  };
+
+  it('the rename form adopts a fresher list that lands after the cached render, so Save sends the fresh fields', async () => {
+    api.updateGroupExercise.mockResolvedValue({ exercise: FRESH_ROW });
+    const fresh = renderEditWithPendingList();
+    expect((await screen.findByTestId('group-exercise-form-name-input')).props.value).toBe('Cable Row');
+
+    await act(async () => {
+      fresh.resolve({ exercises: [BENCH, FRESH_ROW, OLD] });
+    });
+    await waitFor(() => expect(screen.getByTestId('group-exercise-form-name-input').props.value).toBe('Seated Row'));
+    expect(screen.getByTestId('group-exercise-form-load-mode-total_load').props.accessibilityState).toMatchObject({ selected: true });
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('group-exercise-form-submit'));
+    });
+    expect(api.updateGroupExercise).toHaveBeenCalledWith(GROUP_ID, 'ge-row', { name: 'Seated Row', loadInputMode: 'total_load' });
+  });
+
+  it('keeps what the user typed when a fresher list lands afterwards', async () => {
+    const fresh = renderEditWithPendingList();
+    fireEvent.changeText(await screen.findByTestId('group-exercise-form-name-input'), 'My Row');
+    await act(async () => {
+      fresh.resolve({ exercises: [BENCH, FRESH_ROW, OLD] });
+    });
+    expect(screen.getByTestId('group-exercise-form-name-input').props.value).toBe('My Row');
+  });
+
+  it('add: a save that finishes after the user left does not navigate back again', async () => {
+    const pending = deferred<{ exercise: GroupExercise }>();
+    api.createGroupExercise.mockReturnValue(pending.promise);
+    render(<NewGroupExerciseRoute />);
+    await screen.findByTestId('group-exercise-source-row');
+    fireEvent.press(screen.getByTestId('group-exercise-source-custom'));
+    fireEvent.changeText(screen.getByTestId('group-exercise-form-name-input'), 'Sled Push');
+    fireEvent.press(screen.getByTestId('group-exercise-form-submit'));
+    expect(api.createGroupExercise).toHaveBeenCalled();
+    // The user taps the header Back while the request is in flight.
+    screen.unmount();
+    await act(async () => {
+      pending.resolve({ exercise: ROW });
+    });
+    expect(mockRouter.back).not.toHaveBeenCalled();
+  });
+
+  it('rename: a save that finishes after the user left does not navigate back again', async () => {
+    const pending = deferred<{ exercise: GroupExercise }>();
+    api.updateGroupExercise.mockReturnValue(pending.promise);
+    seedCache(groupCacheKeys.group(GROUP_ID), detailFor('owner'));
+    seedCache(groupCacheKeys.groupExercises(GROUP_ID), LIST);
+    mockParams = { groupId: GROUP_ID, exerciseId: 'ge-row' };
+    render(<EditGroupExerciseRoute />);
+    await screen.findByTestId('group-exercise-form');
+    fireEvent.press(screen.getByTestId('group-exercise-form-submit'));
+    expect(api.updateGroupExercise).toHaveBeenCalled();
+    screen.unmount();
+    await act(async () => {
+      pending.resolve({ exercise: ROW });
+    });
+    expect(mockRouter.back).not.toHaveBeenCalled();
   });
 });

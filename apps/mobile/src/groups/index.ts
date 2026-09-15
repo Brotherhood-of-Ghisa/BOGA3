@@ -71,3 +71,4 @@ export { evictGroupFromDevice } from './evict-local';
 export * from './write-view-model';
 export * from './exercise-view-model';
 export { useMyGroupExerciseLinks, type MyGroupExerciseLinksState } from './use-my-group-exercise-links';
+export { useMountedRef } from './use-mounted-ref';
