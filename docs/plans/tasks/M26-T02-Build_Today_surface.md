@@ -1,0 +1,113 @@
+---
+task_id: M26-T02-Build_Today_surface
+milestone_id: "M26"
+status: planned
+ui_impact: "yes"
+areas: "docs|frontend"
+runtimes: "docs|node|expo|maestro|supabase"
+gates_fast: "./boga test fast"
+gates_slow: "./boga test frontend; conditional ./boga test ios-groups-e2e when group paths change"
+docs_touched: "docs/specs/ui/screen-map.md, docs/specs/ui/navigation-contract.md, docs/specs/ui/ux-rules.md"
+---
+
+# M26-T02 — Build the Today surface
+
+## Task metadata
+
+- Status: `planned`
+- Session interaction mode: `interactive`
+- Parent milestone: `docs/plans/milestones/M26-four-tab-navigation.md`
+- Depends on: M26-T01
+- UI Impact: `yes`
+
+## Context freshness at task start
+
+- Run the task bootstrap helper and record branch/HEAD.
+- Reread required specs and the test README before edits.
+- Inventory current group-stream components/hooks, session-history query/list,
+  active-draft access, and planning read interface. Reuse them rather than this
+  card's examples if APIs have moved.
+
+## Objective
+
+Create Today as the default orientation surface: what is happening socially,
+what personal session is next, and what the user did recently.
+
+## Figma guidance
+
+- [Primary prototype](https://www.figma.com/proto/mrItXBs0wGf0mHEJy8fPqQ/BOGA-%C2%B7-Scalable-navigation-proposals?node-id=0-1&p=f&t=semh9yQSkSY6O3h6-0&scaling=min-zoom&content-scaling=fixed&starting-point-node-id=8%3A737&show-proto-sidebar=1)
+- Frames: `01 Today · Default`, `06 Today · Active session`.
+- The prototype shows hierarchy and actions; actual group/session facts come
+  from existing models and preserve their loading/offline/auth semantics.
+
+## UX contract
+
+### Start the next planned session
+
+- Trigger: open Today with a launchable next planned session and no active one.
+- Steps: review the plan summary and press its primary start action.
+- Success outcome: the plan is materialized through the existing planning
+  interface and the recorder opens with planned work.
+- Failure/edge outcome: launch failure is shown inline and does not create a
+  duplicate/partial active session.
+
+### Resume an active session
+
+- Trigger: open Today while an active draft exists.
+- Steps: Today promotes the live session above the planned CTA; press Resume.
+- Success outcome: the existing draft opens in the recorder.
+- Failure/edge outcome: stale/missing draft state refreshes safely and falls
+  back to the normal Today composition.
+
+### Review activity
+
+- Trigger: scan social activity or recent sessions.
+- Steps: open a group activity item or the full personal-history affordance.
+- Success outcome: navigate to the existing group/session detail destination.
+- Failure/edge outcome: signed-out, offline-with-cache, offline-without-cache,
+  empty-group, and empty-history states remain explicit and non-blocking.
+
+## Scope
+
+- Compose active/next-plan, group activity, and recent-session modules.
+- Define ordering and empty/loading/error states.
+- Link snapshots to full group and Progress destinations.
+- Keep Today concise; it is not a replacement for full feeds or history.
+
+Out of scope: group discovery/admin, plan editing, or new activity aggregation.
+
+## Acceptance criteria
+
+1. Active session takes priority over the next planned-session CTA.
+2. Starting/resuming uses existing repositories/materialization and cannot
+   create a second active session.
+3. Social activity shows only joined-group/current-user-visible data and keeps
+   existing offline/auth patterns.
+4. Recent sessions are a bounded snapshot with a clear path to Progress.
+5. Empty Today remains useful: it offers the valid next action without fake
+   content or invented metrics.
+6. Happy, launch-failure, empty, and offline/auth states have coverage and
+   screenshots.
+7. Existing primitives/tokens and group/session shared components are reused.
+
+## Implementation notes
+
+- Expected areas: new Today tab route/component plus shared composition helpers.
+- Group cards should reuse the stream-card and offline-marker patterns.
+- Do not add a cross-domain Today database query if existing resource hooks can
+  compose the sections independently.
+
+## Verification
+
+- Unit/integration: section priority, planned launch, active resume, bounded
+  recents, group empty/auth/offline states.
+- Maestro: Today -> planned recorder; Today -> group detail; Today -> Progress.
+- Gates: `./boga test fast`, `./boga test frontend`; also
+  `./boga test ios-groups-e2e` if group-owned paths change.
+
+## Completion note
+
+- What changed:
+- What tests ran:
+- Visual evidence:
+- What remains:
