@@ -165,6 +165,7 @@ describe('Train screen', () => {
     render(<TrainScreen initialSessions={[]} sessionEntry={sessionEntry()} />);
 
     expect(screen.getByTestId('train-planning-unavailable')).toBeTruthy();
+    expect(screen.getByText('Watch this space 👀')).toBeTruthy();
     expect(screen.getByTestId('train-start-empty-button')).not.toBeDisabled();
     expect(screen.queryByTestId('train-manage-planning-button')).toBeNull();
   });

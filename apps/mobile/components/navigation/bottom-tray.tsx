@@ -259,7 +259,7 @@ const styles = StyleSheet.create({
     backgroundColor: uiColors.borderInputStrong,
   },
   body: {
-    // Leaves the inner TopLevelTabs / tab bar to manage its own surface.
+    // Leaves the inner MainTabs / tab bar to manage its own surface.
   },
 });
 

@@ -1,7 +1,7 @@
 ---
 task_id: M26-T06-Cut_over_routes_and_preserve_compatibility
 milestone_id: "M26"
-status: planned
+status: completed
 ui_impact: "yes"
 areas: "docs|frontend"
 runtimes: "docs|node|expo|maestro|supabase"
@@ -14,7 +14,7 @@ docs_touched: "docs/specs/ui/screen-map.md, docs/specs/ui/navigation-contract.md
 
 ## Task metadata
 
-- Status: `planned`
+- Status: `completed`
 - Session interaction mode: `interactive`
 - Parent milestone: `docs/plans/milestones/M26-four-tab-navigation.md`
 - Depends on: M26-T01 through M26-T05
@@ -22,11 +22,12 @@ docs_touched: "docs/specs/ui/screen-map.md, docs/specs/ui/navigation-contract.md
 
 ## Context freshness at task start
 
-- Run the task bootstrap helper and record branch/HEAD.
-- Reread required specs and every relevant test README.
-- Run current route/call-site inventories and `./boga test for` before editing.
-- Verify all four destination tasks are complete and the planning action is real;
-  do not cut over around missing functionality.
+- Branch/starting HEAD: `m26-option-c-navigation @ 23c88426`.
+- Reread required specs, design policy, UX delivery standard, Maestro contract,
+  and the mobile test README; inventoried current routes/call sites before edit.
+- The user approved cutting over with the honest `Watch this space 👀`
+  planning placeholder. Empty start and active resume remain real and usable;
+  no dead planner action or invented plan data is exposed.
 
 ## Objective
 
@@ -93,6 +94,16 @@ Out of scope: removing compatibility paths solely for code tidiness.
   screen.
 - Keep auth and first-sync gates route-agnostic except for intentional exemptions.
 
+## Docs touched
+
+- UI docs update required?: yes — `docs/specs/ui/navigation-contract.md`,
+  `screen-map.md`, `components-catalog.md`, and `ux-rules.md` now describe the
+  production four-tab shell and preserved route ownership.
+- Tokens/primitives compliance statement: reused `BottomTray`, `MainTabs`, and
+  existing token-backed button/surface primitives; no raw color exception.
+- UI artifacts/screenshots expectation: standard and 375 pt root/recorder
+  capture sets are mandatory and recorded below.
+
 ## Verification
 
 - Unit/integration: root redirect, active tab mapping, every compatibility path,
@@ -104,8 +115,32 @@ Out of scope: removing compatibility paths solely for code tidiness.
 
 ## Completion note
 
-- What changed:
+- What changed: the root and production shell now use exactly Today, Train,
+  Progress, and More; recorder routes suppress persistent navigation; Settings
+  moved under More; completion and completed-edit exits use Progress.
 - Compatibility table/result:
-- What tests ran:
-- Visual evidence:
-- What remains:
+
+  | Existing entry | Decision |
+  | --- | --- |
+  | `/` | redirect to canonical `/today` |
+  | `/stats-history` | preserve exact dashboard/history UI; select Progress |
+  | `/session-recorder` | preserve path/params; hide persistent navigation |
+  | `/exercise-catalog`, `/groups`, `/settings` | preserve direct paths; select More |
+  | group invite/detail routes | preserve paths, params, and native-stack behavior |
+  | completed-session edit/summary | preserve params; safe completion exits go to Progress |
+  | `/exercise-history` | preserve params/native header; render MainTabs with Progress selected |
+
+- What tests ran: focused navigation/surface/detail tests; typecheck; UI
+  guardrails; lint; `./boga test for`; `./boga test fast` (141 mobile suites,
+  1,460 tests, plus backend-fast/docs/meta/auth-web/MCP); and `./boga test
+  frontend` (all six iOS flows) are green.
+- Visual evidence: the standard shell capture set is under
+  `apps/mobile/artifacts/maestro/M26-T06-shell-final/20260916-154152-79676/`.
+  The animation-settled 375 pt set is under
+  `apps/mobile/artifacts/maestro/M26-T06-shell-small/20260916-152438-63910/`.
+  Both show all four labels; the recorder captures show no persistent bar.
+- Manual verification summary (required when CI is absent/partial): inspected
+  all five standard and all five 375 pt captures; the four tabs fit, selected
+  states are clear, and the focused recorder has no tray.
+- What remains: no T06 implementation work. T07 keeps the milestone open only
+  until the eventual closing PR records evidence and deletes ephemeral plans.

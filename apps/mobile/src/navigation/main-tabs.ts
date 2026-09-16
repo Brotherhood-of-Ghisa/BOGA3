@@ -10,12 +10,7 @@ export type MainTabDefinition = {
   href: `/${MainTabKey}`;
 };
 
-/**
- * Canonical M26 top-level navigation model.
- *
- * T01 keeps this model dormant while the four destination surfaces are built.
- * The production shell continues to use the legacy tabs until the M26 cutover.
- */
+/** Canonical M26 top-level navigation model. */
 export const MAIN_TAB_DEFINITIONS: readonly MainTabDefinition[] = [
   {
     key: 'today',
@@ -47,12 +42,20 @@ export const MAIN_TAB_DEFINITIONS: readonly MainTabDefinition[] = [
   },
 ] as const;
 
+const MAIN_TAB_BY_KEY = Object.fromEntries(
+  MAIN_TAB_DEFINITIONS.map((tab) => [tab.key, tab]),
+) as Readonly<Record<MainTabKey, MainTabDefinition>>;
+
+export function mainTabHref(tab: MainTabKey): MainTabDefinition['href'] {
+  return MAIN_TAB_BY_KEY[tab].href;
+}
+
 const SEGMENT_TO_MAIN_TAB: Readonly<Record<string, MainTabKey>> = {
   today: 'today',
   train: 'train',
   progress: 'progress',
   more: 'more',
-  // Legacy tab roots keep an explicit ownership mapping during migration.
+  // Preserved legacy roots keep an explicit canonical owner.
   'session-recorder': 'train',
   'stats-history': 'progress',
   'exercise-catalog': 'more',
@@ -88,7 +91,7 @@ export function isMainNavigationSuppressed(segments: readonly string[]): boolean
 }
 
 /**
- * A single visibility contract for the future shell. Root/detail navigators can
+ * A single visibility contract for the production shell. Root/detail navigators can
  * stay tabless by returning null; recognized tab-owned routes render the bar
  * unless they are focused recorder work.
  */

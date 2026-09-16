@@ -39,6 +39,10 @@ Accepted target record (reviewed 2026-09-16):
 - Authority boundary: Figma governs hierarchy and intended transitions for
   these states; repository contracts govern production behavior, data,
   accessibility, tokens, and error/offline/auth semantics.
+- Approved dependency exception (2026-09-16): M26 may cut over before M23
+  planning ships. Today and Train must present the honest, intentionally light
+  `Watch this space 👀` placeholder; empty-session start and active-session
+  resume remain functional. No route, plan, or analytics data may be guessed.
 
 The Figma prototype is interaction and information-architecture guidance, not
 permission to invent product data. In particular, Progress must reuse the
@@ -117,11 +121,13 @@ navigation bar on `main`.
    `Progress`, and `More`, in that order, and fits the supported small-phone
    viewport without clipped labels or horizontal scrolling.
 2. `/` lands on Today after auth/first-sync gates complete.
-3. Today exposes joined-group activity, the next planned session, and recent
-   sessions; an active session replaces the planned CTA with an unambiguous
-   resume action.
-4. Train can start an empty session, start the next planned session, resume an
-   active session, and enter plan management without duplicating planner logic.
+3. Today exposes joined-group activity and recent sessions; an active session
+   exposes an unambiguous resume action. Until M23 ships, its personal-planning
+   slot uses the approved `Watch this space 👀` placeholder rather than fake
+   plan data.
+4. Train can start an empty session and resume an active session without
+   creating a second draft. Until M23 ships, planned start and plan management
+   use the same approved placeholder behind a typed integration seam.
 5. Progress preserves the existing Stats / History dashboard, full session
    history, exercise/muscle breakdowns, and daily/weekly heat maps. No new
    analytics are added.
@@ -142,25 +148,25 @@ navigation bar on `main`.
 ## Task breakdown
 
 1. **Completed:** inactive four-tab route/navigation foundation.
-2. **In progress:** Today composes real active/recent session and joined-group
-   data; planned-session production wiring waits on M23's unshipped interface.
-3. **In progress:** Train owns guarded empty start and active resume through a
-   shared Today/Train coordinator; planned start and management wait on M23's
-   unshipped interface.
+2. **Completed:** Today composes real active/recent session and joined-group
+   data; the planning slot uses the approved placeholder until M23 ships.
+3. **Completed:** Train owns guarded empty start and active resume through a
+   shared Today/Train coordinator; its typed planning seam renders the approved
+   placeholder until M23 ships.
 4. **Completed:** Progress reuses the existing Stats / History implementation,
    session history, and daily/weekly heat maps without adding analytics.
 5. **Completed:** More organizes the existing group, MCP/agent, exercise
    database, settings/account, and development-only destinations.
-6. `docs/plans/tasks/M26-T06-Cut_over_routes_and_preserve_compatibility.md` — switch the default shell and preserve old entry points.
-7. `docs/plans/tasks/M26-T07-Validate_and_close_four_tab_navigation.md` — run cross-flow validation, gates, docs review, and closeout.
+6. **Completed:** `docs/plans/tasks/M26-T06-Cut_over_routes_and_preserve_compatibility.md` — switch the default shell and preserve old entry points.
+7. **In progress:** `docs/plans/tasks/M26-T07-Validate_and_close_four_tab_navigation.md` — validation is green; final plan deletion belongs to the eventual closing PR.
 
 ## Dependencies and ordering
 
 - T01 precedes every surface task.
 - T02–T05 can be developed independently after T01, but T06 waits for all four.
-- T03 consumes the planning route/materialization interface; if that interface
-  is not yet available, T03 may land an adapter but T06 must not cut over with a
-  dead or misleading planning action.
+- T03 exposes a typed planning integration seam. The user-approved placeholder
+  makes that dependency explicit and permits T06 to cut over before M23,
+  provided empty start and active resume remain functional.
 - T02 and T05 reuse group read/action surfaces. Changes under
   `apps/mobile/src/groups/**` trigger the groups-specific contract and iOS
   lanes in addition to the normal navigation gates.

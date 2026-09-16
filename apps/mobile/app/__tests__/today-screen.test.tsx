@@ -278,6 +278,7 @@ describe('Today screen', () => {
     render(<TodayScreen initialSessions={[]} socialState={socialState()} />);
 
     expect(screen.getByTestId('today-plan-unavailable')).toBeTruthy();
+    expect(screen.getByText('Watch this space 👀')).toBeTruthy();
     fireEvent.press(screen.getByTestId('today-open-train-button'));
     expect(mockPush).toHaveBeenCalledWith('/train');
   });

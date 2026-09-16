@@ -530,7 +530,7 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
           ],
         })
       );
-      expect(mockReplace).toHaveBeenCalledWith('/stats-history');
+      expect(mockReplace).toHaveBeenCalledWith('/progress');
     });
     expect(screen.queryByText('Remove incomplete sets and submit?')).toBeNull();
     expect(mockCompleteSessionDraft).not.toHaveBeenCalled();
@@ -716,7 +716,7 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
           completedAt: new Date(2026, 1, 25, 10, 50, 0, 0),
         })
       );
-      expect(mockReplace).toHaveBeenCalledWith('/stats-history');
+      expect(mockReplace).toHaveBeenCalledWith('/progress');
     });
 
     expect(mockCompleteSessionDraft).not.toHaveBeenCalled();
@@ -776,7 +776,7 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
 
     await waitFor(() => {
       expect(mockPersistCompletedSessionSnapshot).toHaveBeenCalled();
-      expect(mockReplace).toHaveBeenCalledWith('/stats-history');
+      expect(mockReplace).toHaveBeenCalledWith('/progress');
     });
     expect(mockCompleteSessionDraft).not.toHaveBeenCalled();
   });
@@ -803,7 +803,7 @@ describe('SessionRecorderScreen submit cleanup flow', () => {
 
     await waitFor(() => {
       expect(mockPersistCompletedSessionSnapshot).toHaveBeenCalled();
-      expect(mockReplace).toHaveBeenCalledWith('/stats-history');
+      expect(mockReplace).toHaveBeenCalledWith('/progress');
     });
     expect(mockCompleteSessionDraft).not.toHaveBeenCalled();
   });

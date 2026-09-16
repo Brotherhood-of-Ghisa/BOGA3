@@ -11,10 +11,7 @@ type MainTabsProps = {
   onSelect: (tab: MainTabKey) => void;
 };
 
-/**
- * Dormant M26 four-tab presentation. T06 will connect it to the production tab
- * shell after all four destination surfaces and compatibility paths are ready.
- */
+/** Production four-tab presentation for the M26 ownership model. */
 export function MainTabs({ activeTab, onSelect }: MainTabsProps) {
   return (
     <UiSurface accessibilityRole="tablist" style={styles.shell} testID="main-bottom-tabs">

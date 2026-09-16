@@ -1,7 +1,7 @@
 ---
 task_id: M26-T07-Validate_and_close_four_tab_navigation
 milestone_id: "M26"
-status: planned
+status: in_progress
 ui_impact: "yes"
 areas: "docs|frontend|cross-stack"
 runtimes: "docs|node|expo|maestro|supabase"
@@ -14,7 +14,7 @@ docs_touched: "docs/specs/ui/*.md as required by final audit; milestone/task doc
 
 ## Task metadata
 
-- Status: `planned`
+- Status: `in_progress`
 - Session interaction mode: `interactive`
 - Parent milestone: `docs/plans/milestones/M26-four-tab-navigation.md`
 - Depends on: M26-T06
@@ -22,11 +22,10 @@ docs_touched: "docs/specs/ui/*.md as required by final audit; milestone/task doc
 
 ## Context freshness at task start
 
-- Run the task bootstrap helper and record branch/HEAD.
-- Reread required specs, UI bundle, all relevant test READMEs, and the completed
-  M26 PR summaries.
-- Run fresh route, screen, shared-component, and test inventories; treat this
-  card as a checklist, not implementation truth.
+- Branch/starting HEAD: `m26-option-c-navigation @ 23c88426`.
+- Reread required specs, UI bundle, design policy, Maestro contract, and the
+  mobile test README; audited fresh route/component/test inventories and the
+  complete branch diff rather than relying on this card.
 
 ## Objective
 
@@ -66,9 +65,10 @@ as a follow-up only when it is not a stop-ship defect.
 ## Acceptance criteria
 
 1. All milestone acceptance criteria are mapped to code/tests/evidence.
-2. Critical journeys pass: planned start, empty start, planner entry, active
-   resume, Progress dashboard/history/heat maps, group entry, exercise database,
-   settings/account, and tab switching.
+2. Critical journeys pass: planning placeholder, empty start, active resume,
+   Progress dashboard/history/heat maps, group entry, exercise database,
+   settings/account, and tab switching. Planned start/management remain M23
+   work behind the approved typed seam.
 3. Empty, signed-out, offline, invalid-param, and failed-write/launch states
    provide explicit feedback.
 4. VoiceOver labels/roles, focus order, touch targets, and color-independent
@@ -85,10 +85,10 @@ as a follow-up only when it is not a stop-ship defect.
 
 | Journey | Automated expectation | Visual evidence |
 | --- | --- | --- |
-| Today -> planned session | Maestro + materialization assertion | default Today + planned recorder |
+| Today planning slot | UI assertion: approved placeholder, no fake data | default Today |
 | Today/Train -> active resume | Maestro + one-draft assertion | active Today + focused recorder |
 | Train -> empty session | Maestro + repository assertion | Train + empty recorder |
-| Train -> planning | route/interaction assertion | Start and Planning states |
+| Train planning slot | UI assertion: approved placeholder, no dead action | Train start state |
 | Progress -> history | Maestro + route/data assertion | dashboard + full history |
 | Progress -> heat map | Maestro + existing-metric assertion | daily and weekly heat map |
 | More -> groups | Maestro + auth/offline assertion | hub + groups state |
@@ -107,8 +107,21 @@ as a follow-up only when it is not a stop-ship defect.
 
 ## Completion note
 
-- What changed:
-- Contract-to-evidence mapping:
-- What tests ran:
-- Visual evidence:
-- Follow-ups:
+- What changed: audited all M26 acceptance criteria, corrected canonical UI
+  docs, added route/detail and Maestro coverage, and recorded the user-approved
+  planning-placeholder deviation.
+- Contract-to-evidence mapping: `main-tabs.test.tsx` proves canonical order,
+  ownership, and recorder suppression; Today/Train tests cover placeholder,
+  empty start, active resume, and failure states; existing Stats tests prove
+  Progress is the unchanged dashboard/heatmap implementation; More and group
+  suites cover secondary destinations; compatibility exits and params remain in
+  their existing screen suites.
+- What tests ran: `./boga test for`, `./boga test fast`, and `./boga test
+  frontend` are green. Fast includes the required docs-check and meta-tests.
+- Visual evidence: standard-phone captures are under
+  `apps/mobile/artifacts/maestro/M26-T06-shell-final/20260916-154152-79676/`; final
+  animation-settled 375 pt captures are under
+  `apps/mobile/artifacts/maestro/M26-T06-shell-small/20260916-152438-63910/`.
+- Follow-ups: the eventual closing PR must record these artifacts in its body
+  and delete the ephemeral M26 plan/cards. M23 replaces the typed unavailable
+  planning state; neither item is additional M26 implementation work.

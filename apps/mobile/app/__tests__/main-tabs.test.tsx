@@ -5,6 +5,7 @@ import {
   MAIN_TAB_DEFINITIONS,
   MAIN_TAB_KEYS,
   isMainNavigationSuppressed,
+  mainTabHref,
   resolveMainTab,
   shouldShowMainNavigation,
 } from '@/src/navigation/main-tabs';
@@ -20,6 +21,12 @@ describe('M26 main tab model', () => {
     ]);
     expect(new Set(MAIN_TAB_DEFINITIONS.map((tab) => tab.testID)).size).toBe(4);
     expect(new Set(MAIN_TAB_DEFINITIONS.map((tab) => tab.accessibilityLabel)).size).toBe(4);
+    expect(MAIN_TAB_KEYS.map(mainTabHref)).toEqual([
+      '/today',
+      '/train',
+      '/progress',
+      '/more',
+    ]);
   });
 
   it('maps canonical, nested, and legacy routes to their future owner', () => {
@@ -63,5 +70,13 @@ describe('MainTabs', () => {
     }
 
     expect(onSelect.mock.calls.map(([tab]) => tab)).toEqual(MAIN_TAB_KEYS);
+  });
+
+  it('fits four production tabs without the legacy utility-button fifth column', () => {
+    render(<MainTabs activeTab="more" onSelect={jest.fn()} />);
+
+    expect(screen.getByTestId('main-bottom-tabs')).toBeTruthy();
+    expect(screen.getAllByRole('tab')).toHaveLength(4);
+    expect(screen.queryByLabelText('Open Settings')).toBeNull();
   });
 });

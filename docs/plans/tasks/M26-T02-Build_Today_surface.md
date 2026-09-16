@@ -1,7 +1,7 @@
 ---
 task_id: M26-T02-Build_Today_surface
 milestone_id: "M26"
-status: in_progress
+status: completed
 ui_impact: "yes"
 areas: "docs|frontend"
 runtimes: "docs|node|expo|maestro|supabase"
@@ -14,7 +14,7 @@ docs_touched: "docs/specs/ui/screen-map.md, docs/specs/ui/navigation-contract.md
 
 ## Task metadata
 
-- Status: `in_progress`
+- Status: `completed`
 - Session interaction mode: `interactive`
 - Parent milestone: `docs/plans/milestones/M26-four-tab-navigation.md`
 - Depends on: M26-T01
@@ -43,14 +43,14 @@ what personal session is next, and what the user did recently.
 
 ## UX contract
 
-### Start the next planned session
+### Personal planning before M23
 
-- Trigger: open Today with a launchable next planned session and no active one.
-- Steps: review the plan summary and press its primary start action.
-- Success outcome: the plan is materialized through the existing planning
-  interface and the recorder opens with planned work.
-- Failure/edge outcome: launch failure is shown inline and does not create a
-  duplicate/partial active session.
+- Trigger: open Today with no active session before the planning milestone has
+  shipped its read/materialization interface.
+- Steps: review the planning slot and choose Train if an empty workout is useful.
+- Success outcome: the slot reads `Watch this space 👀`, explains that
+  personal planning is warming up, and routes to the functional Train hub.
+- Failure/edge outcome: no plan, schedule, route, or metric is synthesized.
 
 ### Resume an active session
 
@@ -79,9 +79,9 @@ Out of scope: group discovery/admin, plan editing, or new activity aggregation.
 
 ## Acceptance criteria
 
-1. Active session takes priority over the next planned-session CTA.
-2. Starting/resuming uses existing repositories/materialization and cannot
-   create a second active session.
+1. Active session takes priority over the planning placeholder.
+2. Resuming uses the existing repository and cannot create a second active
+   session; future planned launch remains behind the shared typed coordinator.
 3. Social activity shows only joined-group/current-user-visible data and keeps
    existing offline/auth patterns.
 4. Recent sessions are a bounded snapshot with a clear path to Progress.
@@ -98,17 +98,36 @@ Out of scope: group discovery/admin, plan editing, or new activity aggregation.
 - Do not add a cross-domain Today database query if existing resource hooks can
   compose the sections independently.
 
+## Docs touched
+
+- UI docs update required?: yes — `docs/specs/ui/screen-map.md`,
+  `navigation-contract.md`, and `ux-rules.md` describe Today ownership, states,
+  exits, and the approved placeholder.
+- Tokens/primitives compliance statement: reused existing UI tokens, buttons,
+  surfaces, text, and group/session components; no raw color exception.
+- UI artifacts/screenshots expectation: required standard and 375 pt captures
+  are recorded by the M26 shell verification flow.
+
 ## Verification
 
-- Unit/integration: section priority, planned launch, active resume, bounded
+- Unit/integration: section priority, planning placeholder, active resume, bounded
   recents, group empty/auth/offline states.
-- Maestro: Today -> planned recorder; Today -> group detail; Today -> Progress.
+- Maestro: Today shell/tab switching; Today -> group detail; Today -> Progress.
 - Gates: `./boga test fast`, `./boga test frontend`; also
   `./boga test ios-groups-e2e` if group-owned paths change.
 
 ## Completion note
 
-- What changed:
-- What tests ran:
-- Visual evidence:
-- What remains:
+- What changed: Today composes existing active/recent-session and joined-group
+  sources, prioritizes active resume, and uses the approved `Watch this space
+  👀` planning placeholder without inventing M23 data.
+- What tests ran: focused Today/group/navigation tests, mobile typecheck and
+  lint, `./boga test fast`, and `./boga test frontend` were green during the
+  surface task; cutover gates are rerun in T06/T07.
+- Visual evidence: Today appears in the M26 standard and small-phone Maestro
+  capture sets recorded by the milestone verification tasks.
+- Manual verification summary (required when CI is absent/partial): inspected
+  standard and 375 pt Today captures; hierarchy, placeholder, and four-tab bar
+  are visible without clipping.
+- What remains: M23 will replace the typed unavailable state with its canonical
+  plan query/materializer when that contract ships; this is not an M26 blocker.

@@ -1,6 +1,6 @@
 import { Redirect } from 'expo-router';
 
-// Root `/` redirects to the merged Stats/History tab.
+// Root `/` enters the M26 orientation surface after auth/first-sync gates.
 export default function IndexRedirect() {
-  return <Redirect href="/stats-history" />;
+  return <Redirect href="/today" />;
 }

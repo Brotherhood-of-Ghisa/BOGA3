@@ -345,12 +345,12 @@ function TodayPlanCard({
       actionTestID="today-open-train-button"
       body={
         unavailable
-          ? 'Personal planning is not available yet. You can still start an empty workout from Train.'
+          ? 'Personal planning is warming up. Empty workouts are ready now in Train.'
           : 'Nothing is scheduled. Open Train to start an empty workout or manage your plan.'
       }
       onAction={onOpenTrain}
       testID={unavailable ? 'today-plan-unavailable' : 'today-plan-empty'}
-      title="No workout planned"
+      title={unavailable ? 'Watch this space 👀' : 'No workout planned'}
     />
   );
 }

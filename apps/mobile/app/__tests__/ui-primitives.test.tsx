@@ -1,43 +1,33 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 
-import { TopLevelTabs } from '@/components/navigation/top-level-tabs';
+import { MainTabs } from '@/components/navigation/main-tabs';
 import { UiButton, UiSurface, UiText, uiColors, uiRadius } from '@/components/ui';
 
 describe('UI primitives', () => {
   it('renders semantic tab buttons with selected accessibility state and press handling', () => {
-    const onPressStatsHistory = jest.fn();
-    const onPressLog = jest.fn();
-    const onPressExercises = jest.fn();
-    const onPressSettings = jest.fn();
+    const onSelect = jest.fn();
 
-    render(
-      <TopLevelTabs
-        activeTab="stats-history"
-        onPressStatsHistory={onPressStatsHistory}
-        onPressLog={onPressLog}
-        onPressExercises={onPressExercises}
-        onPressGroups={jest.fn()}
-        onPressSettings={onPressSettings}
-      />
-    );
+    render(<MainTabs activeTab="today" onSelect={onSelect} />);
 
-    const statsHistoryTab = screen.getByLabelText('Open History');
-    const logTab = screen.getByLabelText('Open Log');
-    const exercisesTab = screen.getByLabelText('Open Exercises');
-    const settingsButton = screen.getByLabelText('Open Settings');
+    const todayTab = screen.getByLabelText('Open Today');
+    const trainTab = screen.getByLabelText('Open Train');
+    const progressTab = screen.getByLabelText('Open Progress');
+    const moreTab = screen.getByLabelText('Open More');
 
-    expect(statsHistoryTab.props.accessibilityState.selected).toBe(true);
-    expect(logTab.props.accessibilityState.selected).toBe(false);
-    expect(exercisesTab.props.accessibilityState.selected).toBe(false);
+    expect(todayTab.props.accessibilityState.selected).toBe(true);
+    expect(trainTab.props.accessibilityState.selected).toBe(false);
+    expect(progressTab.props.accessibilityState.selected).toBe(false);
+    expect(moreTab.props.accessibilityState.selected).toBe(false);
 
-    fireEvent.press(logTab);
-    fireEvent.press(exercisesTab);
-    fireEvent.press(settingsButton);
-    expect(onPressLog).toHaveBeenCalledTimes(1);
-    expect(onPressExercises).toHaveBeenCalledTimes(1);
-    expect(onPressSettings).toHaveBeenCalledTimes(1);
-    expect(onPressStatsHistory).not.toHaveBeenCalled();
+    fireEvent.press(trainTab);
+    fireEvent.press(progressTab);
+    fireEvent.press(moreTab);
+    expect(onSelect.mock.calls.map(([tab]) => tab)).toEqual([
+      'train',
+      'progress',
+      'more',
+    ]);
   });
 
   it('does not fire onPress for disabled buttons', () => {
@@ -76,14 +66,7 @@ describe('UI primitives', () => {
 
   it('matches the current top-level tabs snapshot after primitive migration', () => {
     const { toJSON } = render(
-      <TopLevelTabs
-        activeTab="exercises"
-        onPressStatsHistory={jest.fn()}
-        onPressLog={jest.fn()}
-        onPressExercises={jest.fn()}
-        onPressGroups={jest.fn()}
-        onPressSettings={jest.fn()}
-      />
+      <MainTabs activeTab="progress" onSelect={jest.fn()} />
     );
 
     expect(toJSON()).toMatchSnapshot();

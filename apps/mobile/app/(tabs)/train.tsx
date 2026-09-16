@@ -248,9 +248,9 @@ function TrainPlanningCard({
   if (planningState.status === 'unavailable') {
     return (
       <GroupStateView
-        body="Personal planning is not available yet. Empty workouts remain fully available above."
+        body="Personal planning is warming up. Empty workouts are ready above."
         testID="train-planning-unavailable"
-        title="Planning is not available"
+        title="Watch this space 👀"
       />
     );
   }

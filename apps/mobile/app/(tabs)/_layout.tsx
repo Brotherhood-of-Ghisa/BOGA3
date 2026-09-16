@@ -4,44 +4,32 @@ import { StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BottomTray, TrayVisibilityProvider } from '@/components/navigation/bottom-tray';
-import { TopLevelTabs, type TopLevelTabKey } from '@/components/navigation/top-level-tabs';
-
-const STATS_HISTORY_ROUTE = '/stats-history';
-const SESSION_RECORDER_ROUTE = '/session-recorder';
-const EXERCISE_CATALOG_ROUTE = '/exercise-catalog';
-const GROUPS_ROUTE = '/groups';
-const SETTINGS_ROUTE = '/settings';
-
-export function resolveActiveTab(segments: string[]): TopLevelTabKey {
-  // expo-router segments look like ['(tabs)', '<route-name>'] inside the group.
-  const last = segments[segments.length - 1] ?? '';
-  switch (last) {
-    case 'session-recorder':
-      return 'log';
-    case 'exercise-catalog':
-      return 'exercises';
-    case 'groups':
-      return 'groups';
-    case 'stats-history':
-    default:
-      return 'stats-history';
-  }
-}
+import { MainTabs } from '@/components/navigation/main-tabs';
+import {
+  mainTabHref,
+  resolveMainTab,
+  shouldShowMainNavigation,
+} from '@/src/navigation/main-tabs';
 
 function TabsBottomTray() {
   const router = useRouter();
   const segments = useSegments();
-  const activeTab = useMemo(() => resolveActiveTab(segments as string[]), [segments]);
+  const routeSegments = segments as string[];
+  const activeTab = useMemo(() => resolveMainTab(routeSegments), [routeSegments]);
+  const isVisible = useMemo(
+    () => shouldShowMainNavigation(routeSegments),
+    [routeSegments],
+  );
+
+  if (!activeTab || !isVisible) {
+    return null;
+  }
 
   return (
     <BottomTray>
-      <TopLevelTabs
+      <MainTabs
         activeTab={activeTab}
-        onPressStatsHistory={() => router.push(STATS_HISTORY_ROUTE)}
-        onPressLog={() => router.push(SESSION_RECORDER_ROUTE)}
-        onPressExercises={() => router.push(EXERCISE_CATALOG_ROUTE)}
-        onPressGroups={() => router.push(GROUPS_ROUTE)}
-        onPressSettings={() => router.push(SETTINGS_ROUTE)}
+        onSelect={(tab) => router.push(mainTabHref(tab))}
       />
     </BottomTray>
   );
@@ -54,17 +42,17 @@ export default function TabsLayout() {
         <Tabs
           screenOptions={{ headerShown: false }}
           tabBar={() => <TabsBottomTray />}>
-          <Tabs.Screen name="stats-history" options={{ title: 'History' }} />
-          <Tabs.Screen name="session-recorder" options={{ title: 'Session Recorder' }} />
-          <Tabs.Screen name="exercise-catalog" options={{ title: 'Exercise Catalog' }} />
-          <Tabs.Screen name="groups" options={{ title: 'Groups' }} />
+          <Tabs.Screen name="today" options={{ title: 'Today' }} />
+          <Tabs.Screen name="train" options={{ title: 'Train' }} />
+          <Tabs.Screen name="progress" options={{ title: 'Progress' }} />
+          <Tabs.Screen name="more" options={{ title: 'More' }} />
+          {/* Preserved compatibility roots remain directly addressable but are
+              owned by the four canonical destinations rather than visible. */}
+          <Tabs.Screen name="stats-history" options={{ title: 'History', href: null }} />
+          <Tabs.Screen name="session-recorder" options={{ title: 'Session Recorder', href: null }} />
+          <Tabs.Screen name="exercise-catalog" options={{ title: 'Exercise Catalog', href: null }} />
+          <Tabs.Screen name="groups" options={{ title: 'Groups', href: null }} />
           <Tabs.Screen name="settings" options={{ title: 'Settings', href: null }} />
-          {/* M26 route adapters stay out of the production tab bar until the
-              four destination surfaces are ready for the T06 cutover. */}
-          <Tabs.Screen name="today" options={{ title: 'Today', href: null }} />
-          <Tabs.Screen name="train" options={{ title: 'Train', href: null }} />
-          <Tabs.Screen name="progress" options={{ title: 'Progress', href: null }} />
-          <Tabs.Screen name="more" options={{ title: 'More', href: null }} />
         </Tabs>
       </TrayVisibilityProvider>
     </SafeAreaView>

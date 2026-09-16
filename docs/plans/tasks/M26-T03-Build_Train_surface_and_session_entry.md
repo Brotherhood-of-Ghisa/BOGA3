@@ -1,7 +1,7 @@
 ---
 task_id: M26-T03-Build_Train_surface_and_session_entry
 milestone_id: "M26"
-status: in_progress
+status: completed
 ui_impact: "yes"
 areas: "docs|frontend"
 runtimes: "docs|node|expo|maestro"
@@ -14,10 +14,11 @@ docs_touched: "docs/specs/ui/screen-map.md, docs/specs/ui/navigation-contract.md
 
 ## Task metadata
 
-- Status: `in_progress`
+- Status: `completed`
 - Session interaction mode: `interactive`
 - Parent milestone: `docs/plans/milestones/M26-four-tab-navigation.md`
-- Depends on: M26-T01 and a stable planning materialization/management interface
+- Depends on: M26-T01; M23 replaces the approved placeholder through the typed
+  planning seam when its stable materialization/management interface ships
 - UI Impact: `yes`
 
 ## Context freshness at task start
@@ -57,14 +58,14 @@ the recorder focused and preventing conflicting active sessions.
 - Failure/edge outcome: creation failure is inline/retryable and no duplicate
   draft is persisted.
 
-### Start planned training
+### Planned training before M23
 
-- Trigger: press the next planned-session row.
-- Steps: materialize the plan once, then open its active draft.
-- Success outcome: prescribed rows and source semantics match the planning
-  contract.
-- Failure/edge outcome: missing/stale/already-used plan resolves safely and the
-  user is not placed in an incorrect empty session.
+- Trigger: review Train before the planning dependency ships.
+- Steps: use empty training now or review the planning placeholder.
+- Success outcome: Train reads `Watch this space 👀`, keeps empty start
+  functional, and exposes no dead plan-management control.
+- Failure/edge outcome: no plan or route is guessed; the typed ready-state path
+  remains available for M23's future materializer.
 
 ### Manage planning or resume
 
@@ -86,12 +87,12 @@ Out of scope: planner data/schema/programme implementation or recorder redesign.
 
 ## Acceptance criteria
 
-1. Empty and planned launch create at most one active session.
+1. Empty and future planned launch create at most one active session.
 2. An active session replaces/guards all new-session actions with Resume.
-3. Planned session materialization preserves existing planned/performed
-   semantics and failure cleanup.
-4. Planner entry uses the canonical planning route/API and has a useful empty
-   or unavailable state.
+3. Future planned session materialization is accepted only through the typed
+   coordinator seam; M26 does not synthesize it.
+4. Before M23, planning has the approved useful unavailable placeholder and no
+   dead or guessed management route.
 5. Recorder hides persistent tabs while active and restores navigation on the
    defined exit/submit path.
 6. Contextual exercise selection remains in the recorder; exercise-database
@@ -105,12 +106,24 @@ Out of scope: planner data/schema/programme implementation or recorder redesign.
 - Preserve completed-edit and append-historical-block entry modes.
 - Do not change sync cadence merely because the route or tab label changes.
 
+## Docs touched
+
+- UI docs update required?: yes — `docs/specs/ui/screen-map.md`,
+  `navigation-contract.md`, and `ux-rules.md` describe Train ownership,
+  guarded entry, focused recorder behavior, and the approved placeholder.
+- Tokens/primitives compliance statement: reused existing UI tokens, buttons,
+  surfaces, text, recorder repository, and session-list primitives; no raw
+  color exception.
+- UI artifacts/screenshots expectation: required standard and 375 pt Train and
+  recorder captures are recorded by M26 verification.
+
 ## Verification
 
-- Unit/integration: empty launch, planned launch, existing draft, stale plan,
+- Unit/integration: empty launch, typed planned-launch seam, existing draft,
+  unavailable placeholder,
   persistence failure, completed-edit compatibility.
-- Maestro: Train -> empty recorder; Train -> planned recorder; Train -> planner;
-  active Today/Train -> recorder -> submit/exit.
+- Maestro: Train -> empty recorder; active Today/Train -> recorder -> submit/exit;
+  visual coverage for the planning placeholder.
 - Gates: `./boga test fast`, `./boga test frontend`, plus path-triggered lanes.
 
 ## Completion note
@@ -129,6 +142,10 @@ Out of scope: planner data/schema/programme implementation or recorder redesign.
   `apps/mobile/artifacts/maestro/M26-T03-visual/20260916-141511-34834/`;
   corresponding 375 pt captures are under
   `apps/mobile/artifacts/maestro/M26-T03-visual-small/20260916-142040-37748/`.
+- Manual verification summary (required when CI is absent/partial): inspected
+  standard and 375 pt Train/recorder captures; empty start remains usable and
+  the recorder has no persistent tabs.
 - What remains: M23 must provide the canonical plan query, materializer, and
   management route before planned-start/management production wiring can be
-  completed. The four-tab shell must not cut over with a dead planning action.
+  completed. The user approved the `Watch this space 👀` placeholder as the
+  honest interim state, so it does not block the four-tab cutover.

@@ -38,11 +38,12 @@ Document app-specific UI semantics and guardrails for the current mobile app.
      - delete session
      - soft-delete exercise
      - remove destructive menu actions
-4. Tab actions (`TopLevelTabs`) are navigation controls, not generic primary actions.
+4. Tab actions (`MainTabs`) are navigation controls, not generic primary actions.
    - They use tab semantics (`accessibilityRole="tab"` / tablist) and active-state visuals.
-5. The right-side `Settings` affordance inside `TopLevelTabs` is a utility action, not a third tab.
-   - It remains visually lighter than the active Sessions/Exercises tabs and opens the stack-based settings flow.
-   - It remains available while logged out so account access never blocks the local-first tracker entry routes.
+5. Persistent navigation contains exactly Today, Train, Progress, and More.
+   - Settings is an internal row under More, not a fifth tab or utility button.
+   - More and Settings remain available while logged out so account access never
+     blocks the local-first tracker entry routes.
 6. Settings and More distinguish internal destinations from public setup links.
    - Internal rows use button/navigation semantics and stay in the app.
    - `Connect an AI coach` visibly carries an external indicator, uses link
@@ -59,8 +60,9 @@ Document app-specific UI semantics and guardrails for the current mobile app.
      offline/error patterns and is limited to the two newest visible items.
    - Recent personal activity is limited to the three newest non-deleted
      completed sessions; full history remains owned by Progress.
-   - When the separate planning dependency is absent, Today says so explicitly
-     and offers Train; it never invents a scheduled session or metric.
+   - When the separate planning dependency is absent, Today uses the approved
+     `Watch this space 👀` placeholder and offers Train; it never invents a
+     scheduled session or metric.
 8. Train is the personal-training entry hub, while the recorder remains focused
    on performing one workout.
    - Active-session detection must succeed before Train exposes any new-session
@@ -75,8 +77,9 @@ Document app-specific UI semantics and guardrails for the current mobile app.
      repository before opening the recorder. A failed write stays inline and
      retryable.
    - Planning loading/error/empty/ready/unavailable states are explicit. Until
-     the planning dependency ships, production shows unavailable while leaving
-     empty training usable; it does not guess a management route or plan.
+     the planning dependency ships, production shows the approved `Watch this
+     space 👀` placeholder while leaving empty training usable; it does not
+     guess a management route or plan.
    - Exercise selection remains contextual inside the recorder. Exercise-
      database administration remains owned by More, not Train.
 
@@ -101,14 +104,18 @@ Document app-specific UI semantics and guardrails for the current mobile app.
 1. Current user-facing screens use vertical layouts with no horizontal scrolling on phone widths.
 2. Page backgrounds are muted light surfaces (`surfacePage`-like behavior), with card/panel surfaces layered on top.
 3. Spacing rhythm is already close to 8pt increments (common values cluster around `8/10/12/14/16/20`) and should remain consistent.
-4. Bottom tab navigation (`BottomTray` composing `TopLevelTabs`) remains visible on tab roots (`stats-history`, `session-recorder`, `exercise-catalog`, `groups`) across primary states (including loading/error in `exercise-catalog`), and detail screens that still render `TopLevelTabs` directly (e.g. `exercise-history`) preserve the same strip.
+4. Bottom tab navigation (`BottomTray` composing `MainTabs`) remains visible on
+   canonical roots (`today`, `train`, `progress`, `more`) and recognized
+   preserved roots. The active/completed-edit recorder suppresses the tray so
+   training stays focused. `exercise-history` renders the same `MainTabs`
+   directly and selects Progress.
 
 ### 4. List and row interaction conventions
 
 1. Pressable list rows commonly separate:
    - main row press target (open/edit primary action)
    - trailing kebab/icon action for secondary actions
-2. This split interaction pattern is used in `exercise-catalog` and in the shared `HistoryList` / `ActiveSessionRow` building blocks (consumed by the `stats-history` History sub-view and the Log tab), and should be preserved during refactors unless behavior intentionally changes.
+2. This split interaction pattern is used in `exercise-catalog` and in the shared `HistoryList` / `ActiveSessionRow` building blocks (consumed by Progress/`stats-history` and session-list flows), and should be preserved during refactors unless behavior intentionally changes.
 3. Deleted/archived visibility is controlled via toggles and state hints, not separate routes.
 4. In `exercise-catalog`, deleted exercises remain in list history when deleted visibility is enabled, show explicit `Deleted` state, and expose `Undelete` from row actions.
 5. `exercise-catalog` top actions use compact icon buttons (`+` create, kebab options), and deleted visibility toggle lives under the top-level options menu.
@@ -201,7 +208,7 @@ Document app-specific UI semantics and guardrails for the current mobile app.
 ### 6. Loading, empty, error, and feedback state handling
 
 1. Whole-screen loading/error states are used when route data cannot render meaningful content yet.
-   - `exercise-catalog`: centered state + bottom tabs remain visible
+   - `exercise-catalog`: centered state + More-selected bottom tabs remain visible
    - `completed-session/[sessionId]`: centered state variants with route title preserved
 2. In-section state panels are used inside the shared `HistoryList` (loading/error/empty) consumed by the `stats-history` History sub-view.
 3. Inline helper/success/error text is used for form feedback and post-action feedback (`exercise-catalog`, completed-session action bar).
@@ -259,8 +266,8 @@ Document app-specific UI semantics and guardrails for the current mobile app.
    Nothing is uploaded or published by BOGA. Native-sheet cancellation is
    silent, capture/launch failure is inline and retryable, and temporary image
    cleanup cannot turn a completed share into an error.
-10. Completion hides edit/delete/append. Done and safe back replace to Stats /
-    History. A completed row in Session History opens completed-edit mode by
+10. Completion hides edit/delete/append. Done and safe back replace to Progress.
+    A completed row in Session History opens completed-edit mode by
     default; its `Summary` action saves pending valid edits before pushing
     `presentation=summary`, whose `History` action replaces to the list and
     whose `Edit` action pops to the live editor. The historical summary omits Done; all summary
@@ -271,7 +278,9 @@ Document app-specific UI semantics and guardrails for the current mobile app.
 ### 8. Navigation/query semantics (UI-facing rule)
 
 1. Route mode/state changes that affect screen behavior (for example `session-recorder` completed-edit mode) must be documented in `docs/specs/ui/navigation-contract.md`.
-2. Route alias behavior (`/` -> `stats-history`) should be treated as a navigation entry alias, not a unique screen design.
+2. Route alias behavior (`/` -> `/today`) should be treated as a navigation
+   entry alias, not a unique screen design. `/stats-history` remains a preserved
+   Progress-owned path rather than a second tab.
 3. `exercise-catalog` supports recorder-entry query semantics (`source=session-recorder`, `intent=manage`) for the manage flow, while recorder `Add new` uses the same exercise editor inside the recorder route.
 4. Stats / History accepts validated initial `period=7|30` and
    `breakdown=exercise|muscle` values. Absent or invalid values retain the

@@ -34,10 +34,21 @@ appId: com.dinoderek.mobile
     timeout: 30000
 - takeScreenshot: "01-dev-wipe-local-start"
 
-# Open Settings and confirm the developer-tools card is present. Its visibility
-# proves the developer-mode gate evaluates true on this build.
+# Open More -> Settings and confirm the developer-tools card is present. Its
+# visibility proves the developer-mode gate evaluates true on this build.
+- waitForAnimationToEnd:
+    timeout: 4000
+- retry:
+    maxRetries: 3
+    commands:
+      - tapOn:
+          id: "top-level-tab-more"
+      - extendedWaitUntil:
+          visible:
+            id: "more-screen"
+          timeout: 15000
 - tapOn:
-    id: "top-level-settings-button"
+    id: "more-settings-row"
 - assertVisible:
     id: "settings-screen"
 - extendedWaitUntil:

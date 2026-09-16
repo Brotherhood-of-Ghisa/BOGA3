@@ -8,13 +8,45 @@ appId: com.dinoderek.mobile
 # costs the full ~7s optionalLookupTimeoutMs (measured) and they were all
 # WARNED/absent on every run. If pre-authorization regresses, the next assertion
 # fails loudly rather than silently absorbing ~7s/tap.
-- takeScreenshot: "01-app-launch"
 - openLink: "${MAESTRO_IOS_DEV_CLIENT_URL}"
-- openLink: "boga3://maestro-harness?teleport=session-list"
+- extendedWaitUntil:
+    visible:
+      id: "today-screen"
+    timeout: 30000
+# Production launch lands on Today, and all four approved destinations switch
+# through the persistent shell in canonical order.
+- assertVisible:
+    id: "main-bottom-tabs"
+- takeScreenshot: "01-m26-today"
+- tapOn:
+    id: "top-level-tab-train"
+- assertVisible:
+    id: "train-screen"
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: "02-m26-train"
+- tapOn:
+    id: "top-level-tab-progress"
 - extendedWaitUntil:
     visible:
       id: "stats-history-screen"
     timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: "03-m26-progress"
+- tapOn:
+    id: "top-level-tab-more"
+- assertVisible:
+    id: "more-screen"
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: "04-m26-more"
+- tapOn:
+    id: "top-level-tab-today"
+- assertVisible:
+    id: "today-screen"
+- waitForAnimationToEnd:
+    timeout: 4000
 - openLink: "boga3://maestro-harness?teleport=session-recorder"
 - extendedWaitUntil:
     visible:
@@ -29,4 +61,6 @@ appId: com.dinoderek.mobile
           visible:
             text: "No exercises logged yet."
           timeout: 30000
-- takeScreenshot: "02-session-recorder-visible"
+- assertNotVisible:
+    id: "main-bottom-tabs"
+- takeScreenshot: "05-m26-recorder-focused"
