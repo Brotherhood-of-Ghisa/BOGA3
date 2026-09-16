@@ -39,6 +39,12 @@
 >   stream returns the new kinds (§2.6, §2.10, §2.11, §4.2, §4.5;
 >   `supabase/migrations/20260914120000_m25_group_boards.sql`), proven by the
 >   `groups-boards.sh` body of `./boga test groups-leaderboards`.
+> - M25 step 2, certification (M25-T06): `group_certifications`, the certify /
+>   withdraw / cancel RPCs, evaluator voids on a fingerprint mismatch,
+>   Certified entries and `lead_change{certification}`, and `certified` on
+>   the board and stream reads (§2.11, §2.12, §4.2, §4.5, §4.6;
+>   `supabase/migrations/20260916120000_m25_group_certification.sql`), proven
+>   by the `groups-certification.sh` body of `./boga test groups-leaderboards`.
 >
 > This doc owns the technical contract and is the durable record of what M22
 > built. The M22 milestone spec (product requirements and acceptance criteria)
@@ -404,7 +410,7 @@ unit of work, coalesced on its natural key. It follows ground rules 1–5.
 | `id` | `bigint` identity |
 | `member_user_id` | → `auth.users on delete cascade` |
 | `group_id`, `group_exercise_id` | Target jobs only; → `groups` / `group_exercises` `on delete cascade` |
-| `causes` | `text[]`, the union of `set`, `link`, `load_mode`, `rules`. T05 reads it: link-caused changes produce no record cards (P16). |
+| `causes` | `text[]`, the union of `set`, `link`, `load_mode`, `rules`, and (M25-T06) `certification`. T05 reads it: `{rules}` alone is a silent recompute (§2.11). |
 | `generation` | Bumped by every re-enqueue. `group_eval_complete` deletes a job only if it is unchanged since the claim. |
 | `attempts`, `available_at`, `last_sqlstate` | Failure backoff: 2 s, 4 s, … capped at 5 min |
 | `claimed_until` | A 2-minute lease |
@@ -573,9 +579,9 @@ sets `allowImportingTsExtensions` so Deno loads it by relative path, as
 T6–T8. Both tables follow ground rules 1–5.
 
 **`group_board_entries`**: PK `(group_exercise_id, member_user_id, metric,
-certified)`, plus `group_id`. `metric` is `weight` or `e1rm`. `certified` is
-always `false` until M25-T06 writes Certified entries. Each row holds the
-member's best counting set for that board:
+certified)`, plus `group_id`. `metric` is `weight` or `e1rm`. The
+`certified = true` rows are the Certified boards (M25-T06, below). Each row
+holds the member's best counting set for that board:
 
 - `value_kg`: the ranked value, a `numeric` rounded to 6 places with trailing
   zeros trimmed, so comparisons and cursors are exact;
@@ -589,7 +595,8 @@ member_user_id)` is the rank order.
 
 **`group_board_state`**: PK `(group_exercise_id, member_user_id)`. It holds
 `linked_definition_ids`, the member's live linked exercises at the last
-apply, for link attribution.
+apply, for link attribution, and (M25-T06) `certification_ids`, the target's
+active certification ids at the last apply, for certification attribution.
 
 **Rules.**
 
@@ -669,6 +676,39 @@ apply, for link attribution.
      points at the causing event (`related_event_id`, when one exists).
 7. `causes = {rules}` exactly is a silent recompute: entries and state only.
 
+**Certified boards (M25-T06).** The same apply, under the same lock, also:
+
+0. snapshots each Certified board's #1 from the stored entries, before
+   anything else changes;
+1. **voids** (`end_reason = 'voided'`, `ended_by` null) every active
+   certification of the target whose set no longer stands as pinned: its
+   fact is missing or not `live` (a set or session tombstone), its Sync v2
+   row is gone, or `fact.fingerprint <> pinned_fingerprint` (an edit of
+   weight, reps, or status). Undelete never revives one. Unlink, retarget,
+   and a load-mode change void nothing: the certification stops or keeps
+   counting with its set;
+2. recomputes the member's `certified = true` entries with the All rules,
+   restricted to counting sets holding an active certification on `(GX, M,
+   set)` pinned to the fact's fingerprint;
+3. writes one `lead_change` with `certified = true` per Certified board whose
+   #1 member moved. `reason` is `certification` when the target's active
+   certification ids differ from `group_board_state.certification_ids`
+   (given, ended, or voided in step 1), with `payload.certification_id`
+   naming the certification that moved it (M's new entry's when M took #1,
+   else the one on M's old entry's set) and no `related_event_id`.
+   Otherwise it takes the All attribution for that metric (`link` for link
+   and unlink, `record`, `void`, pointing at that event), falling back to
+   `certification`.
+
+Steps 0–2 and the state run in silent applies too; step 3 does not. The
+apply reads stored Certified entries for #1, so the lead change for an
+ended certification is written once, by the lifter's own apply.
+
+**Valid Certified entry (reads).** A `certified = true` entry counts in the
+reads only while an active certification on `(GX, M, set)` is pinned to the
+entry's fingerprint. Withdraw and cancel therefore leave the Certified
+reads at once, before any apply.
+
 **`group_events` columns added.** `seq` (identity, unique: the history
 order), `group_exercise_id`, `set_id`, `metric`, `certified`, `reason`,
 `related_event_id` (→ `group_events`, `on delete cascade`), and `payload`.
@@ -701,9 +741,54 @@ client surface.
 - Link attribution compares client clocks: the set's `created_at` and the
   link's `updated_at`. Skew between two devices can turn a link effect into
   a record, or the reverse.
+- **Frozen Certified boards (M25-T06).** A former lifter's or archived
+  exercise's target never applies. A certification ended there leaves the
+  reads at once, but the member's next-best certified set is not promoted,
+  no `lead_change` is written, and a set edited while frozen is not voided,
+  until a catch-up (rejoin, unarchive) re-applies the target. The stored
+  entry stays until then.
+- A Certified board can move with no certification change (a load-mode
+  rescale); that lead change takes the All attribution, or `certification`
+  when the All board didn't change.
 - There is no `group_board_state` backfill. The first apply of a target
   without state treats every counting set from before its link as a link
   effect, which is correct while M25 has no live boards.
+
+### 2.12 `group_certifications` (M25-T06)
+
+`supabase/migrations/20260916120000_m25_group_certification.sql`. Product
+P10–P13, D3–D5. It follows ground rules 1–5.
+
+| Column | Notes |
+| --- | --- |
+| `id` | `uuid` PK, `certification_id` on the wire |
+| `group_id` | → `groups` `on delete cascade` |
+| `group_exercise_id` | → `group_exercises` `on delete cascade`: the board target the set was a record set of |
+| `member_user_id` | The lifter. → `auth.users` `on delete cascade` |
+| `set_id`, `session_id` | In the lifter's keyspace (no FK, rule 2) |
+| `certified_by` | → `auth.users` `on delete set null`. CHECK it is not the lifter. |
+| `pinned_fingerprint` | `group_set_fingerprint` of the live set row at certify time (§2.9) |
+| `pinned_weight_value`, `pinned_reps_value`, `pinned_performance_status` | The raw synced values it attested |
+| `weight_kg`, `reps`, `e1rm_kg` | The converted values the certifier was shown (the record set's entry or record payload) |
+| `certified_at` | |
+| `ended_at`, `end_reason`, `ended_by` | `end_reason in ('withdrawn','cancelled','voided')`; `ended_at` and `end_reason` null together; `ended_at >= certified_at`; `ended_by` (→ `auth.users on delete set null`) only on a withdrawn or cancelled row |
+
+- Unique `(group_exercise_id, member_user_id, set_id) where ended_at is
+  null`: one active certification per set per board target (one is enough,
+  P10). Index `(group_id)`.
+- An ended row is never reopened; certifying again inserts a new row (D4).
+- **Writers.** The §4.6 RPCs (insert, withdraw, cancel) and the apply's voids
+  (§2.11). No trigger on a Sync v2 table: `sync_push` is untouched.
+- **Enqueue.** Every insert or end calls `group_certification_enqueue`: a
+  target job (cause `certification`) for the lifter's board, then
+  `group_eval_kick_once`. The enqueue runs in its own `begin … exception`
+  block; a failure writes one `group.eval_enqueue_failed` row with `context
+  = {table: 'group_certifications', row_id, sqlstate}` and the certification
+  still commits. Repair: any later job for the target (a push, a link, another
+  certification) recomputes the Certified entries, and the reads never count
+  an ended certification meanwhile.
+- **Posture.** The `group_certification_*` helpers and `group_board_compute`
+  have no grant at all; only the three RPCs are client-callable.
 
 ## 3. Authorization model
 
@@ -767,6 +852,7 @@ matches the token prefix.
 | `USERNAME_REQUIRED` | Create or join without a non-blank username |
 | `INVITE_INVALID` | Unknown or regenerated code, or the group is deleted |
 | `OWNER_MUST_TRANSFER` | The owner tried to leave |
+| `CONFLICT` | (M25-T06) The state moved on since the caller saw it: certifying a set edited or deleted ahead of the evaluator. Refresh and retry. |
 
 Client-only codes: `NETWORK` for transport failure, and `INTERNAL` for
 anything unrecognized.
@@ -943,8 +1029,15 @@ items (T6).
     "boards": [{ "metric", "value_kg", "previous_value_kg", "group_record" }],
     "provisional",                                            // session active
     "voided": { "key", "reason": "edited|deleted", "occurred_at_ms" } | null,
-    "certified": false }                                      // M25-T06
+    "certified": true,                                        // M25-T06
+    "certification": { "certification_id", "certified_by": { "user_id", "username" } | null,
+                       "certified_at_ms" } | null }
   ```
+
+  `certified` / `certification` (M25-T06) read the active certification of
+  `(group exercise, member, set)` pinned to the record payload's
+  fingerprint, so a voided record reads uncertified once its certification
+  is voided.
 
 - **`record_voided`**: `{ kind, key, sort_at_ms, group, member,
   group_exercise, record_key, reason, record: { weight_kg, reps, e1rm_kg },
@@ -1056,14 +1149,21 @@ Writes raise:
   "entered_weight_kg": 70, "load_factor": 2,                           // as logged
   "achieved_at_ms": 0, "session_id": "…", "set_id": "…",
   "exercise_name": "Bench (comp grip)|null",                          // live session_exercises.name
-  "certified": false }                                                 // M25-T06
+  "certified": true,                                                   // M25-T06
+  "certification": { "certification_id", "certified_by": { "user_id", "username" } | null,
+                     "certified_at_ms" } | null }
 ```
+
+`certified` and `certification` (M25-T06) read the active certification of
+the row's `(group exercise, member, set)` pinned to the entry's fingerprint,
+on All and Certified boards alike. Certified boards, their ranks, and the
+podium's `entry_count` and `me` count only valid Certified entries (§2.11).
 
 | RPC | Returns |
 | --- | --- |
 | `group_board_podiums(p_group_id, p_metric default 'e1rm', p_certified default true)` | `{ metric, certified, exercises: [{ exercise: GroupExercise, podium: BoardRow[≤3], me: BoardRow\|null, entry_count, all_entry_count }] }`, every group exercise in the `group_exercise_list` order. `me` is the caller's row whenever ranked; `all_entry_count` counts the same metric on All. |
 | `group_board(p_group_id, p_group_exercise_id, p_metric default 'e1rm', p_certified default false, p_after, p_limit)` | `{ exercise, metric, certified, rows: BoardRow[], next_cursor, has_more }`. `p_limit` `1..100`, default `50`. Ranks are absolute. |
-| `group_board_history(p_group_id, p_group_exercise_id, p_metric default 'e1rm', p_certified default false, p_before, p_limit)` | `{ items: [{ key, seq, occurred_at_ms, reason, leader, previous, related }], next_cursor: { seq }\|null, has_more }`, newest first. `leader` and `previous` are `Holder + member`, or null. `related` summarizes the causing event: `{ kind: 'record', key, set_id, weight_kg, reps, e1rm_kg }`, `{ kind: 'record_voided', key, reason, record }`, `{ kind: 'link', key, event, exercises }`, or null. `p_limit` `1..50`, default `20`. |
+| `group_board_history(p_group_id, p_group_exercise_id, p_metric default 'e1rm', p_certified default false, p_before, p_limit)` | `{ items: [{ key, seq, occurred_at_ms, reason, leader, previous, related }], next_cursor: { seq }\|null, has_more }`, newest first. `leader` and `previous` are `Holder + member`, or null. `related` summarizes the causing event: `{ kind: 'record', key, set_id, weight_kg, reps, e1rm_kg }`, `{ kind: 'record_voided', key, reason, record }`, `{ kind: 'link', key, event, exercises }`, `{ kind: 'certification', key, event: 'certified'\|'withdrawn'\|'cancelled'\|'voided', certified_by, ended_by, set_id, weight_kg, reps, e1rm_kg }` (M25-T06, from `payload.certification_id`, read live), or null. `p_limit` `1..50`, default `20`. |
 
 **As-built (M25-T05).**
 
@@ -1087,6 +1187,58 @@ Writes raise:
   cursor.
 - **Archived** exercises are readable and sort last in the podiums.
 - **Mobile.** No client wrapper yet; M25-T09 adds the reads.
+
+### 4.6 Certification (M25-T06)
+
+```jsonc
+// Certification
+{ "certification_id", "group_id", "group_exercise_id",
+  "member": { "user_id", "username" }, "set_id", "session_id",
+  "certified_by": { "user_id", "username" } | null, "certified_at_ms",
+  "pinned": { "weight_value", "reps_value", "performance_status",   // raw, as synced
+              "weight_kg", "reps", "e1rm_kg" },                     // converted, as shown
+  "ended_at_ms": 0 | null, "end_reason": "withdrawn|cancelled|voided" | null,
+  "ended_by": { "user_id", "username" } | null }
+```
+
+| RPC | Allowed | Returns |
+| --- | --- | --- |
+| `group_certify(p_group_id, p_group_exercise_id, p_member_user_id, p_set_id)` | any current member except the lifter | `{ certification, created }` |
+| `group_certification_withdraw(p_group_id, p_certification_id)` | the certifier | `{ certification }` |
+| `group_certification_cancel(p_group_id, p_certification_id)` | owner, admin (any certification) | `{ certification }` |
+
+**As-built (M25-T06).** Posture as §3. Each RPC locks the `groups` row; none
+takes the board advisory lock.
+
+- **`group_certify` check order:**
+  1. the preamble;
+  2. membership, `NOT_FOUND: group not found`;
+  3. `VALIDATION: p_member_user_id and p_set_id are required`, then
+     `VALIDATION: you cannot certify your own set`;
+  4. `NOT_FOUND: group exercise not found`; an archived exercise gets
+     `VALIDATION: an archived group exercise is read-only; unarchive it first`
+     (D8);
+  5. the lifter is not a current member: `NOT_FOUND: member not found`;
+  6. **record set (D3):** a current All entry of the set, else a non-voided
+     `record` event; otherwise `NOT_FOUND: record set not found` (a
+     non-record, unknown, or another member's set look the same);
+  7. **idempotent:** an active certification of the set on the target,
+     whoever gave it, is returned with `created: false` (P10);
+  8. the lifter's live set row must exist and carry the record set's
+     fingerprint (the entry's, else the record payload's), else `CONFLICT:
+     the set changed; refresh and try again`;
+  9. insert, pinning the live row's raw values; enqueue (§2.12).
+- **Withdraw / cancel check order:** the preamble; membership (`NOT_FOUND:
+  group not found`); cancel only, `FORBIDDEN: only the owner or an admin can
+  cancel a certification`; `VALIDATION: p_certification_id is required`;
+  `NOT_FOUND: certification not found` (another group's looks nonexistent);
+  withdraw only, `FORBIDDEN: only the certifier can withdraw a certification`
+  (admins cancel instead). An ended certification is returned unchanged (the
+  first end is kept); otherwise `ended_at`, `end_reason`, `ended_by =
+  caller`, and enqueue.
+- Withdraw and cancel work on frozen targets (§2.11 known limits).
+- **Mobile.** No client wrapper yet; M25-T10 adds the RPCs and maps
+  `CONFLICT`.
 
 ## 5. Stream-card metrics (computed on the viewing device)
 
@@ -1571,7 +1723,7 @@ E0.1–E0.3).
   - **Change table.** One section per row of the design's board change
     table: new best (with first set and group-record flag), void on edit
     down / unperformed / delete, edit up, session delete and undelete, link /
-    unlink / retarget (no record cards), Certified boards empty, load-mode
+    unlink / retarget (no record cards), no certification → Certified boards empty, load-mode
     rescale, leave (former, still ranked), archive and unarchive catch-up,
     and the silent rules recompute.
   - **Rules.** The provisional rule (update in place, silent drop, void only
@@ -1584,6 +1736,31 @@ E0.1–E0.3).
   - **Reads and stream.** The three board reads' shapes, podium order, board
     and history keyset paging, and every error token; `group_stream`'s board
     items, their shapes, and cursor paging that is independent of page size.
+- **Certification body `groups-certification.sh`** (M25-T06; the third body
+  of `groups-leaderboards`, same direct-drain mode and shared fixtures).
+  Per-run users: owner, admin, athlete, rival, certifier, a removed member,
+  and an outsider.
+  - **Rejections.** `AUTH_REQUIRED`, `AGENT_FORBIDDEN`, non-member and removed
+    `NOT_FOUND` on all three RPCs, self-certify, missing ids, another group's
+    exercise, archived, a non-record / unknown / other member's set, a
+    non-member lifter, a former lifter, and `CONFLICT` for an edit ahead of
+    the evaluator.
+  - **Lifecycle.** Certify with its pinned values (idempotent for a second
+    certifier), withdraw (certifier only, idempotent), admin and owner cancel
+    (member `FORBIDDEN`, idempotent), and re-certify after cancel (D4).
+  - **Voids.** Edits in completed and active sessions, set and session
+    tombstones, and no revival on undelete. Unlink/relink (reason `link`), a
+    load-mode rescale, and a rules recompute void nothing.
+  - **Reads.** Certified entries and `lead_change{certification}` with its
+    `certification_id`; `BoardRow`, podium, and stream `certified` /
+    `certification`; history `related`; an ended certification leaving the
+    Certified reads before any apply, on a frozen board too.
+  - **Isolation.** A forced enqueue failure commits the certification with
+    one sanitized `group.eval_enqueue_failed` row; the next target job
+    repairs the entry.
+  - **Posture.** The table (RLS, no policies or grants, direct denial), the
+    RPC grants and `security definer`, no internal grants, and no trigger on
+    a Sync v2 table.
 - **Existing lanes.** `sync-drift --strict` stays green, which proves ground
   rules 1–2. The sync push, pull, and e2e lanes stay unchanged and green.
 - **Jest:**
@@ -1685,8 +1862,7 @@ E0.1–E0.3).
 - **Phase 3 links** are member-owned rows the server needs for leaderboards,
   and their sync-scope decision is made there. They may not use a local FK to a
   group exercise (spec 05 local integrity rule 2).
-- **Phase 5 certification** pins the attested set value in its own row. The
-  read-through model does not change.
+- **Phase 5 certification** shipped in M25-T06 (§2.12, §4.6).
 - **PR highlights** on stream cards. The M22 rule (a strict Wathan e1RM gain
   over the member's full completed history) needs history that is never shared
   into the group, so the viewer cannot compute it from shared data. Decide the
