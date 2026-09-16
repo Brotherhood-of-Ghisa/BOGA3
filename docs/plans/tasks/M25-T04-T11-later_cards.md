@@ -4,14 +4,6 @@ Each section below becomes its own card (`docs/plans/tasks/M25-T0N-*.md`)
 when it is ready, refreshed against what T01–T03 actually built. Milestone:
 `docs/plans/milestones/M25-group-exercises-and-leaderboards.md`.
 
-## M25-T06 — Certification (backend; deps T05)
-
-- Design §6. `group_certifications`; certify / withdraw / cancel RPCs;
-  record-set check; voiding on fingerprint mismatch; Certified boards and
-  `lead_change{certification}`.
-- AC: self-certify, non-record set, non-member, withdraw, admin cancel,
-  re-certify after cancel, void on edit and on delete.
-
 ## M25-T09 — Mobile leaderboards (frontend; deps T05, T08)
 
 - Product P6–P9, E1.1–E1.3, D11, D12. Podium cards (Certified · e1RM, "You:
