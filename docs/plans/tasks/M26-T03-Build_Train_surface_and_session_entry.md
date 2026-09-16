@@ -1,7 +1,7 @@
 ---
 task_id: M26-T03-Build_Train_surface_and_session_entry
 milestone_id: "M26"
-status: planned
+status: in_progress
 ui_impact: "yes"
 areas: "docs|frontend"
 runtimes: "docs|node|expo|maestro"
@@ -14,7 +14,7 @@ docs_touched: "docs/specs/ui/screen-map.md, docs/specs/ui/navigation-contract.md
 
 ## Task metadata
 
-- Status: `planned`
+- Status: `in_progress`
 - Session interaction mode: `interactive`
 - Parent milestone: `docs/plans/milestones/M26-four-tab-navigation.md`
 - Depends on: M26-T01 and a stable planning materialization/management interface
@@ -22,12 +22,16 @@ docs_touched: "docs/specs/ui/screen-map.md, docs/specs/ui/navigation-contract.md
 
 ## Context freshness at task start
 
-- Run the task bootstrap helper and record branch/HEAD.
-- Reread required specs and the recorder test README before edits.
-- Confirm the planning milestone's shipped route and materialization API at
-  task start; do not encode a guessed route from this card.
-- Inventory current active-draft guard, session-recorder params, history-plan
-  append behavior, and catalog picker return behavior.
+- Branch: `m26-option-c-navigation`; starting HEAD: `157a6e71`.
+- Required project, UI, design-policy, gate, architecture, and structure specs
+  were reread before implementation.
+- The planning milestone has not shipped a route, read model, or
+  materialization API. Train therefore exposes a typed integration seam and an
+  honest unavailable state; it does not encode a guessed planner route or
+  synthesize plan data.
+- Existing active-draft discovery, recorder persistence, recorder route
+  parameters, completed-edit behavior, and catalog return behavior were
+  inventoried before the shared entry coordinator was added.
 
 ## Objective
 
@@ -111,7 +115,20 @@ Out of scope: planner data/schema/programme implementation or recorder redesign.
 
 ## Completion note
 
-- What changed:
-- What tests ran:
-- Visual evidence:
-- What remains:
+- What changed: Train now has real loading/error, empty-start, active-resume,
+  and typed planning states. Today and Train share one serializing
+  active-draft recheck before empty or planned materialization, and the default
+  empty path persists through the existing recorder repository.
+- What tests ran: UI guardrails and mobile typecheck; 20 focused
+  coordinator/Train/Today tests; `./boga test fast` (141 mobile suites / 1,458
+  tests plus backend-fast, docs/meta, auth-web, and MCP lanes); and
+  `./boga test frontend` (iOS smoke, data smoke, auth/profile, sync round trip,
+  two-user group stream, and group exercise linking) are green.
+- Visual evidence: standard Train start, recorder, and active-resume captures
+  are under
+  `apps/mobile/artifacts/maestro/M26-T03-visual/20260916-141511-34834/`;
+  corresponding 375 pt captures are under
+  `apps/mobile/artifacts/maestro/M26-T03-visual-small/20260916-142040-37748/`.
+- What remains: M23 must provide the canonical plan query, materializer, and
+  management route before planned-start/management production wiring can be
+  completed. The four-tab shell must not cut over with a dead planning action.

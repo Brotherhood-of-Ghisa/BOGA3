@@ -33,11 +33,13 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
   `apps/mobile/src/navigation/main-tabs.ts` for `Today / Train / Progress /
   More`. The production tab bar and `/` redirect remain unchanged until the
   milestone cutover. The routes are registered with `href: null`, so they do
-  not appear in the current tab bar. `/train` remains a temporary direct-route
-  adapter to `/session-recorder`.
+  not appear in the current tab bar.
   `/today` now renders its real overview by composing the existing active/recent
   session repository and joined-group stream; the planning slot reports the
   current unavailable dependency instead of inventing plan data.
+  `/train` now renders its real session-entry hub. Today and Train share one
+  coordinator that rechecks for an active draft and serializes empty/planned
+  launch requests before persistence or materialization.
   `/progress` now renders the exact existing Stats / History implementation;
   `/stats-history` remains available with unchanged behavior as its legacy path.
   `/more` now renders the secondary-feature hub while remaining hidden from
@@ -67,20 +69,33 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
     missing-data, and inline-error states; item taps use the existing group and
     friend-session routes
   - an active session replaces the planned-session action and resumes at
-    `/session-recorder`; recent rows open `/completed-session/[sessionId]` and
-    the section-level action opens `/progress`
+    `/session-recorder`; any future ready plan is launched through the shared
+    active-draft coordinator; recent rows open
+    `/completed-session/[sessionId]` and the section-level action opens
+    `/progress`
   - until the separate planning milestone ships a read/materialization API, the
     planning slot states that planning is unavailable and links to `/train`;
     no scheduled data or materialization behavior is synthesized
   - remains hidden from the production tab strip until the M26 cutover
 
-1c. `/train` (M26 dormant adapter)
+1c. `/train` (M26 dormant canonical route)
 - File: `apps/mobile/app/(tabs)/train.tsx`
 - Params:
   - none
 - Behavior:
-  - direct-only migration adapter registered as a hidden tab screen (`href:
-    null`); redirects to `/session-recorder` until its real hub ships
+  - loads the existing session-list repository while focused and blocks every
+    launch action until active-draft detection succeeds
+  - an active draft replaces empty/planned actions with one Resume action to
+    `/session-recorder`
+  - with no draft, `Start empty workout` rechecks for an active session,
+    persists one empty active draft through the existing recorder repository,
+    and then opens `/session-recorder`; simultaneous entry requests share the
+    same in-flight result, and persistence failure is inline and retryable
+  - exposes typed loading/error/empty/ready/unavailable planning states; a
+    ready plan supplies its own materializer and management callback, while the
+    current production state reports the unshipped planning dependency without
+    blocking empty training or guessing a route
+  - remains hidden from the production tab strip until the M26 cutover
 
 1d. `/progress` (M26 dormant canonical route)
 - File: `apps/mobile/app/(tabs)/progress.tsx`

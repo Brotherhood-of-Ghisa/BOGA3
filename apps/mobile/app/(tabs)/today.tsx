@@ -36,6 +36,11 @@ import {
   type StreamItem,
 } from '@/src/groups';
 import { SIGN_IN_ROUTE } from '@/src/navigation/routes';
+import {
+  DEFAULT_SESSION_ENTRY_COORDINATOR,
+  type PlannedSessionMaterializer,
+  type SessionEntryCoordinator,
+} from '@/src/session-entry';
 
 const RECENT_SESSION_LIMIT = 3;
 const SOCIAL_ACTIVITY_LIMIT = 2;
@@ -49,7 +54,7 @@ export type TodayPlanState =
       status: 'ready';
       title: string;
       detail: string;
-      start: () => Promise<void> | void;
+      materialize: PlannedSessionMaterializer;
     };
 
 export type TodaySocialState =
@@ -70,6 +75,7 @@ export type TodayScreenProps = {
   initialSessions?: SessionListItem[];
   isFocused?: boolean;
   planState?: TodayPlanState;
+  sessionEntry?: Pick<SessionEntryCoordinator, 'startPlannedOrResume'>;
   socialState: TodaySocialState;
 };
 
@@ -78,6 +84,7 @@ export function TodayScreen({
   initialSessions = DEFAULT_SESSION_LIST_ITEMS,
   isFocused = true,
   planState = { status: 'unavailable' },
+  sessionEntry = DEFAULT_SESSION_ENTRY_COORDINATOR,
   socialState,
 }: TodayScreenProps) {
   const router = useRouter();
@@ -117,7 +124,8 @@ export function TodayScreen({
     setIsStartingPlan(true);
     setPlanLaunchError(null);
     try {
-      await planState.start();
+      await sessionEntry.startPlannedOrResume(planState.materialize);
+      router.push('/session-recorder');
     } catch {
       setPlanLaunchError("Couldn't start this planned session. Try again.");
     } finally {

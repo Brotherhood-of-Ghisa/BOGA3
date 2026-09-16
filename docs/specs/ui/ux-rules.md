@@ -61,6 +61,24 @@ Document app-specific UI semantics and guardrails for the current mobile app.
      completed sessions; full history remains owned by Progress.
    - When the separate planning dependency is absent, Today says so explicitly
      and offers Train; it never invents a scheduled session or metric.
+8. Train is the personal-training entry hub, while the recorder remains focused
+   on performing one workout.
+   - Active-session detection must succeed before Train exposes any new-session
+     action; a detection error is retryable and does not assume that no draft
+     exists.
+   - An active draft replaces empty and planned start actions with one Resume
+     action.
+   - Today and Train use the same session-entry coordinator. It rechecks the
+     active draft at press time and serializes competing requests so an empty
+     or planned action cannot create a second concurrent session.
+   - Empty start persists one blank active draft through the existing recorder
+     repository before opening the recorder. A failed write stays inline and
+     retryable.
+   - Planning loading/error/empty/ready/unavailable states are explicit. Until
+     the planning dependency ships, production shows unavailable while leaving
+     empty training usable; it does not guess a management route or plan.
+   - Exercise selection remains contextual inside the recorder. Exercise-
+     database administration remains owned by More, not Train.
 
 ### 2. Modal and overlay semantics
 

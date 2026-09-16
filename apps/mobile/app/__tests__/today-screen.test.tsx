@@ -11,6 +11,7 @@ jest.mock('expo-router', () => ({
 import type { SessionListDataClient, SessionListItem } from '@/components/session-list';
 import { GroupApiError, type StreamItem } from '@/src/groups';
 import { SIGN_IN_ROUTE } from '@/src/navigation/routes';
+import type { SessionEntryCoordinator } from '@/src/session-entry';
 
 import {
   TodayScreen,
@@ -87,13 +88,22 @@ const dataClient = (sessions: SessionListItem[]): jest.Mocked<SessionListDataCli
   appendCompletedSessionAsPlanned: jest.fn().mockResolvedValue(undefined),
 });
 
+const sessionEntry = (): jest.Mocked<
+  Pick<SessionEntryCoordinator, 'startPlannedOrResume'>
+> => ({
+  startPlannedOrResume: jest
+    .fn()
+    .mockResolvedValue({ kind: 'started', sessionId: 'planned-session' }),
+});
+
 describe('Today screen', () => {
   beforeEach(() => {
     mockPush.mockReset();
   });
 
   it('promotes an active session and replaces the planned-session action', async () => {
-    const startPlan = jest.fn();
+    const materialize = jest.fn();
+    const entry = sessionEntry();
     render(
       <TodayScreen
         dataClient={dataClient([activeSession])}
@@ -101,8 +111,9 @@ describe('Today screen', () => {
           status: 'ready',
           title: 'Lower body',
           detail: '4 exercises',
-          start: startPlan,
+          materialize,
         }}
+        sessionEntry={entry}
         socialState={socialState()}
       />,
     );
@@ -111,43 +122,60 @@ describe('Today screen', () => {
 
     expect(screen.getByTestId('today-active-session-card')).toBeTruthy();
     expect(screen.queryByTestId('today-start-planned-session-button')).toBeNull();
-    expect(startPlan).not.toHaveBeenCalled();
+    expect(entry.startPlannedOrResume).not.toHaveBeenCalled();
     expect(mockPush).toHaveBeenCalledWith('/session-recorder');
   });
 
   it('starts a ready plan once while its materializer is in flight', async () => {
-    let resolveStart!: () => void;
-    const start = jest.fn(
-      () => new Promise<void>((resolve) => {
+    let resolveStart!: (value: { kind: 'started'; sessionId: string }) => void;
+    const entry = sessionEntry();
+    entry.startPlannedOrResume.mockImplementation(
+      () => new Promise((resolve) => {
         resolveStart = resolve;
       }),
     );
+    const materialize = jest.fn().mockResolvedValue({ sessionId: 'planned-session' });
     const planState: TodayPlanState = {
       status: 'ready',
       title: 'Upper body',
       detail: 'Bench press · Row · Pull-up',
-      start,
+      materialize,
     };
     render(
-      <TodayScreen initialSessions={[]} planState={planState} socialState={socialState()} />,
+      <TodayScreen
+        initialSessions={[]}
+        planState={planState}
+        sessionEntry={entry}
+        socialState={socialState()}
+      />,
     );
 
     const action = screen.getByTestId('today-start-planned-session-button');
     fireEvent.press(action);
     fireEvent.press(action);
 
-    expect(start).toHaveBeenCalledTimes(1);
+    expect(entry.startPlannedOrResume).toHaveBeenCalledTimes(1);
+    expect(entry.startPlannedOrResume).toHaveBeenCalledWith(materialize);
     expect(screen.getByText('Starting…')).toBeTruthy();
-    resolveStart();
+    resolveStart({ kind: 'started', sessionId: 'planned-session' });
     await waitFor(() => expect(screen.getByText('Start planned workout')).toBeTruthy());
+    expect(mockPush).toHaveBeenCalledWith('/session-recorder');
   });
 
   it('keeps a failed planned launch retryable and inline', async () => {
-    const start = jest.fn().mockRejectedValue(new Error('materialization failed'));
+    const entry = sessionEntry();
+    entry.startPlannedOrResume.mockRejectedValue(new Error('materialization failed'));
+    const materialize = jest.fn().mockResolvedValue({ sessionId: 'planned-session' });
     render(
       <TodayScreen
         initialSessions={[]}
-        planState={{ status: 'ready', title: 'Upper body', detail: '3 exercises', start }}
+        planState={{
+          status: 'ready',
+          title: 'Upper body',
+          detail: '3 exercises',
+          materialize,
+        }}
+        sessionEntry={entry}
         socialState={socialState()}
       />,
     );
@@ -158,7 +186,7 @@ describe('Today screen', () => {
       "Couldn't start this planned session. Try again.",
     );
     fireEvent.press(screen.getByTestId('today-start-planned-session-button'));
-    await waitFor(() => expect(start).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(entry.startPlannedOrResume).toHaveBeenCalledTimes(2));
   });
 
   it('shows a bounded newest-first recent snapshot and opens existing destinations', () => {

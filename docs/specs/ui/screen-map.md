@@ -43,14 +43,25 @@ Brief entrypoint map of the current mobile screens.
     `/completed-session/[sessionId]`, `/progress`, and `/sign-in`
   - hidden from the production tab bar until the M26 cutover
 
-1c. `/train` (M26 dormant adapter)
+1c. `/train` (M26 dormant canonical route)
 - File: `apps/mobile/app/(tabs)/train.tsx`
 - Purpose:
-  - reserves the approved Train route while its hub is implemented
+  - single entry surface for starting or resuming personal training and, once
+    its separate dependency ships, managing personal planning
 - Key states (high level):
-  - no unique UI yet; redirects to `/session-recorder`
+  - active-session loading and retryable load error; start actions remain
+    absent until the app knows that no active draft exists
+  - active draft with one Resume action and no competing empty/planned action
+  - no active draft with empty-workout start plus retryable inline persistence
+    failure
+  - planning loading/error/empty/ready/unavailable states; production uses the
+    honest unavailable state until M23 supplies a plan read/materialization and
+    management interface
 - Key exits:
-  - `/session-recorder`; hidden from the production tab bar until the cutover
+  - `/session-recorder` after guarded empty/planned launch or active resume;
+    a future planner exit is supplied by the planning integration rather than
+    guessed here
+  - hidden from the production tab bar until the cutover
 
 1d. `/progress` (M26-T04 dormant canonical route)
 - File: `apps/mobile/app/(tabs)/progress.tsx`
