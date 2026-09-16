@@ -43,13 +43,16 @@ Document app-specific UI semantics and guardrails for the current mobile app.
 5. The right-side `Settings` affordance inside `TopLevelTabs` is a utility action, not a third tab.
    - It remains visually lighter than the active Sessions/Exercises tabs and opens the stack-based settings flow.
    - It remains available while logged out so account access never blocks the local-first tracker entry routes.
-6. Settings distinguishes internal destinations from public setup links.
+6. Settings and More distinguish internal destinations from public setup links.
    - Internal rows use button/navigation semantics and stay in the app.
    - `Connect an AI coach` visibly carries an external indicator, uses link
      semantics plus an external-browser accessibility hint, and opens only the
      configured first-party `/connect` page with no OAuth or session state.
-   - A failed browser launch leaves Settings usable, shows concise inline
+   - A failed browser launch leaves the current screen usable, shows concise inline
      feedback beside the link, and keeps the same action retryable.
+   - More groups real destinations under Community, Tools, and Library &
+     account; account-bound rows are omitted without a user and
+     developer-only rows use `isDevMode()`.
 
 ### 2. Modal and overlay semantics
 

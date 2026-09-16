@@ -22,16 +22,16 @@ Brief entrypoint map of the current mobile screens.
 - Notes:
   - no unique UI; renders an `expo-router` `Redirect` to the merged Stats/History tab
 
-1b. `/today`, `/train`, `/more` (M26 dormant adapters)
-- Files: `apps/mobile/app/(tabs)/today.tsx`, `train.tsx`, `more.tsx`
+1b. `/today`, `/train` (M26 dormant adapters)
+- Files: `apps/mobile/app/(tabs)/today.tsx`, `train.tsx`
 - Purpose:
   - reserve the approved four-tab route names while their real surfaces are
     implemented independently
 - Key states (high level):
   - no unique UI yet; each route redirects to the closest existing destination
-    (`stats-history`, `session-recorder`, and `settings`, respectively)
+    (`stats-history` and `session-recorder`, respectively)
 - Key exits:
-  - the redirect target; all three are hidden from the production tab bar until
+  - the redirect target; both are hidden from the production tab bar until
     the M26 cutover
 
 1c. `/progress` (M26-T04 dormant canonical route)
@@ -46,6 +46,23 @@ Brief entrypoint map of the current mobile screens.
   - existing Sessions drill-down and in-route exercise/muscle history overlays
   - hidden from the production tab bar until the M26 cutover;
     `/stats-history` remains available as the legacy path
+
+1d. `/more` (M26-T05 dormant canonical route)
+- File: `apps/mobile/app/(tabs)/more.tsx`
+- Purpose:
+  - scalable home for secondary capabilities that should not expand the
+    persistent tab bar
+- Key states (high level):
+  - Community links to existing group discovery and administration
+  - Tools links to MCP setup and connected-agent management; connected agents
+    is omitted without a user, developer logs is omitted outside `isDevMode`,
+    and an external-browser failure is shown inline without disabling the hub
+  - Library & account links to existing exercise-database management and
+    Settings/account
+- Key exits:
+  - `/groups`, `/connected-agents`, `/dev-logs`, `/exercise-catalog`, and
+    `/settings`, plus the first-party external MCP setup page
+  - hidden from the production tab bar until the M26 cutover
 
 2. `/sign-in`
 - File: `apps/mobile/app/sign-in.tsx`

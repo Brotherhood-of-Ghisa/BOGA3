@@ -36,9 +36,10 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
   not appear in the current tab bar. Temporary direct-route adapters remain for:
   - `/today` -> `/stats-history`
   - `/train` -> `/session-recorder`
-  - `/more` -> `/settings`
   `/progress` now renders the exact existing Stats / History implementation;
   `/stats-history` remains available with unchanged behavior as its legacy path.
+  `/more` now renders the secondary-feature hub while remaining hidden from
+  the current tab bar.
   The model maps legacy tab roots to their future owner and defines recorder
   routes as focused work that suppresses future persistent navigation; this
   visibility rule is not connected to the production shell yet.
@@ -52,15 +53,15 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 - Behavior:
   - renders an `expo-router` `Redirect` to `/stats-history`
 
-1b. `/today`, `/train`, `/more` (M26 dormant adapters)
-- Files: `apps/mobile/app/(tabs)/today.tsx`, `train.tsx`, `more.tsx`
+1b. `/today`, `/train` (M26 dormant adapters)
+- Files: `apps/mobile/app/(tabs)/today.tsx`, `train.tsx`
 - Params:
   - none
 - Behavior:
   - direct-only migration adapters registered as hidden tab screens (`href:
     null`); the current tab strip has no entry points to them
   - redirect to the existing destinations listed in the router baseline above
-  - replaced by their real surfaces in M26-T02, T03, and T05 before the T06
+  - replaced by their real surfaces in M26-T02 and T03 before the T06
     production cutover
 
 1c. `/progress` (M26 dormant canonical route)
@@ -73,6 +74,20 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
     states, session drill-downs, and exercise/muscle heat maps are identical
   - remains hidden from the production tab strip until the M26 cutover
   - `/stats-history` stays available as the unchanged legacy path
+
+1d. `/more` (M26 dormant canonical route)
+- File: `apps/mobile/app/(tabs)/more.tsx`
+- Params:
+  - none
+- Behavior:
+  - groups real secondary destinations under Community, Tools, and Library &
+    account without copying their feature logic
+  - internal rows open `/groups`, `/connected-agents`, `/dev-logs`,
+    `/exercise-catalog`, or `/settings`; connected agents requires a current
+    user and developer logs requires `isDevMode()`
+  - `Connect an AI coach` opens the same first-party MCP setup URL as Settings
+    in the system browser and reports launch failure inline
+  - remains hidden from the production tab strip until the M26 cutover
 
 2. `/sign-in`
 - File: `apps/mobile/app/sign-in.tsx`

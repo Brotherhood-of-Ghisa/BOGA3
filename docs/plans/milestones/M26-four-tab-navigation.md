@@ -146,7 +146,8 @@ navigation bar on `main`.
 3. `docs/plans/tasks/M26-T03-Build_Train_surface_and_session_entry.md` — centralize session launch/resume and planner entry under Train.
 4. **Completed:** Progress reuses the existing Stats / History implementation,
    session history, and daily/weekly heat maps without adding analytics.
-5. `docs/plans/tasks/M26-T05-Build_More_hub.md` — organize secondary capabilities under More.
+5. **Completed:** More organizes the existing group, MCP/agent, exercise
+   database, settings/account, and development-only destinations.
 6. `docs/plans/tasks/M26-T06-Cut_over_routes_and_preserve_compatibility.md` — switch the default shell and preserve old entry points.
 7. `docs/plans/tasks/M26-T07-Validate_and_close_four_tab_navigation.md` — run cross-flow validation, gates, docs review, and closeout.
 
