@@ -353,9 +353,13 @@ expect_sql "${TABLE}: no FK into a Sync v2 table" \
       and exists (select 1 from information_schema.columns col
                    where col.table_schema = 'app_public' and col.table_name = t.relname
                      and col.column_name = 'owner_user_id');" "0"
-expect_sql "${TABLE}: no trigger on any Sync v2 table calls a certification function" \
+expect_sql "${TABLE}: no trigger on a Sync v2 table touches certifications" \
   "select count(*) from pg_trigger tg join pg_proc p on p.oid = tg.tgfoid
-    where not tg.tgisinternal and p.proname like 'group\\_certif%';" "0"
+    where not tg.tgisinternal
+      and (p.proname like 'group\\_certif%' or p.prosrc like '%group_certif%')
+      and exists (select 1 from information_schema.columns col join pg_class c on c.oid = tg.tgrelid
+                   where col.table_schema = 'app_public' and col.table_name = c.relname
+                     and col.column_name = 'owner_user_id');" "0"
 for bearer in "${ATHLETE_TOKEN}" "${ANON_KEY}"; do
   rest GET "${bearer}" "${TABLE}" "select=*"
   if [[ "${STATUS}" =~ ^2 ]]; then
@@ -366,6 +370,7 @@ for bearer in "${ATHLETE_TOKEN}" "${ANON_KEY}"; do
 done
 rest POST "${CERTIFIER_TOKEN}" "${TABLE}" "" "$(jq -nc --arg g "${GID}" '{group_id: $g}')"
 [[ ! "${STATUS}" =~ ^2 ]] || fail "direct insert into ${TABLE} must be denied"
+check "direct insert into ${TABLE} must be a 42501 denial (HTTP ${STATUS})" '.code == "42501"'
 
 CERT_FNS="p.proname like 'group\\_certif%'"
 expect_sql "every certification function pins search_path" \
@@ -400,15 +405,18 @@ pass "table, grants, direct-access denial, no Sync v2 trigger, RPC posture"
 echo "[${LANE_LABEL}] rejections: auth, membership, input, target, record set"
 # =============================================================================
 
+AGENT_TOKEN="$(mint_token "${CERTIFIER_TOKEN}" "ct-agent-client")"
+ANY_ID="$(q "$(run_psql "select gen_random_uuid();")")"
 certify "${ANON_KEY}" "${RIVAL_UID}" r1
 expect_error AUTH_REQUIRED "certify without a user"
-AGENT_TOKEN="$(mint_token "${CERTIFIER_TOKEN}" "ct-agent-client")"
 certify "${AGENT_TOKEN}" "${RIVAL_UID}" r1
 expect_error AGENT_FORBIDDEN "certify with an agent token"
-withdraw "${AGENT_TOKEN}" "$(q "$(run_psql "select gen_random_uuid();")")"
-expect_error AGENT_FORBIDDEN "withdraw with an agent token"
-cancel "${ANON_KEY}" "$(q "$(run_psql "select gen_random_uuid();")")"
-expect_error AUTH_REQUIRED "cancel without a user"
+for fn in withdraw cancel; do
+  "${fn}" "${ANON_KEY}" "${ANY_ID}"
+  expect_error AUTH_REQUIRED "${fn} without a user"
+  "${fn}" "${AGENT_TOKEN}" "${ANY_ID}"
+  expect_error AGENT_FORBIDDEN "${fn} with an agent token"
+done
 
 RANDOM_ID="$(q "$(run_psql "select gen_random_uuid();")")"
 for who in OUTSIDER REMOVED; do
@@ -605,6 +613,12 @@ set_edit "${ATHLETE_TOKEN}" "${T}-s1" a1 0 91 1
 certify "${CERTIFIER_TOKEN}" "${ATHLETE_UID}" a1
 expect_message "CONFLICT: the set changed; refresh and try again" "certify a set edited ahead of the evaluator"
 drain "a1 edit"
+expect_sql "a1's record is voided and a1 holds no entry" \
+  "select count(*) filter (where kind = 'record_voided') || ':' ||
+          (select count(*) from app_public.group_board_entries where group_exercise_id = '${GX}' and set_id = '${T}-a1')
+     from app_public.group_events where group_exercise_id = '${GX}' and set_id = '${T}-a1';" "1:0"
+certify "${CERTIFIER_TOKEN}" "${ATHLETE_UID}" a1
+expect_message "NOT_FOUND: record set not found" "a voided record set that holds no entry"
 
 mark
 set_edit "${RIVAL_TOKEN}" "${T}-r1s" r1 0 96 1
@@ -621,6 +635,7 @@ check_args "every record item of r1 now reads uncertified" --arg s "${T}-r1" \
   '[.items[] | select(.kind == "record" and .set_id == $s)] | length == 2 and all(.certified == false and .certification == null)'
 
 next_session_at
+S3_AT="${SESSION_AT}"
 sess "${ATHLETE_TOKEN}" "${T}-s3" active "${DA}" "a4:110:1"
 drain "a4 (active)"
 certify "${CERTIFIER_TOKEN}" "${ATHLETE_UID}" a4
@@ -628,10 +643,15 @@ expect_ok "certify a provisional record"
 A4_CERT="$(jq -er '.certification.certification_id' <<<"${BODY}")"
 drain "certify a4"
 expect_centry A weight "110@a4" "a provisional record set can be certified"
+mark
 set_edit "${ATHLETE_TOKEN}" "${T}-s3" a4 0 111 1
 drain "a4 edit (still active)"
 [[ "$(cert_col "${A4_CERT}" end_reason)" == "voided" ]] || fail "an edit in an active session voids too"
 expect_centry A weight "" "no Certified entry after the void"
+expect_csince "certification:weight@A,certification:e1rm@A" "the active-session void moves #1"
+stream "${ATHLETE_TOKEN}"
+check_args "the provisional record reads uncertified after the void" --arg s "${T}-a4" \
+  '[.items[] | select(.kind == "record" and .set_id == $s)] | length == 1 and all(.certified == false)'
 pass "void on edit: completed and active sessions, lead_change{certification}, reads; CONFLICT before the apply"
 
 # =============================================================================
@@ -675,11 +695,19 @@ echo "[${LANE_LABEL}] non-voiding changes: unlink / relink, load mode, rules rec
 next_session_at
 sess "${RIVAL_TOKEN}" "${T}-r3s" completed "${DR}" "r3:98:1"
 drain "r3"
+set_edit "${RIVAL_TOKEN}" "${T}-r3s" r3 0 97 1
+drain "r3 edited down (still R's best)"
+expect_sql "r3's only record is voided, and r3 still holds R's entry" \
+  "select (select count(*) from app_public.group_events r where r.group_exercise_id = '${GX}' and r.kind = 'record'
+             and r.set_id = '${T}-r3'
+             and not exists (select 1 from app_public.group_events v where v.related_event_id = r.id and v.kind = 'record_voided'))
+          || ':' || (select count(*) from app_public.group_board_entries
+                      where group_exercise_id = '${GX}' and set_id = '${T}-r3' and not certified);" "0:2"
 certify "${CERTIFIER_TOKEN}" "${RIVAL_UID}" r3
-expect_ok "certify r3"
+expect_ok "a voided record set that still holds an entry is a record set"
 R3_CERT="$(jq -er '.certification.certification_id' <<<"${BODY}")"
 drain "certify r3"
-expect_centry R weight "98@r3" "certified r3"
+expect_centry R weight "97@r3" "certified r3"
 
 mark
 link "${RIVAL_TOKEN}" "${DR}" deleted
@@ -694,20 +722,22 @@ expect_sql "the Certified lead change points at the unlink item" \
 mark
 link "${RIVAL_TOKEN}" "${DR}"
 drain "relink"
-expect_centry R weight "98@r3" "relinking restores the certified entry"
+expect_centry R weight "97@r3" "relinking restores the certified entry"
 expect_csince "link:weight@R,link:e1rm@R" "relink moves #1 with reason link"
 
 def "${RIVAL_TOKEN}" "${DR}" per_side_load
 drain "load mode"
 [[ "$(active_certs r3)" == "1" ]] || fail "a load-mode change voids nothing"
-expect_centry R weight "196@r3" "a load-mode change rescales the certified value (D6)"
+expect_centry R weight "194@r3" "a load-mode change rescales the certified value (D6)"
 
-run_psql "update app_public.group_board_entries set value_kg = 1
-           where group_exercise_id = '${GX}' and member_user_id = '${RIVAL_UID}' and certified and metric = 'weight';" >/dev/null
+# Delete R's Certified entries: a non-silent apply would now see the board
+# move to R and write lead changes; the silent recompute must not.
+run_psql "delete from app_public.group_board_entries
+           where group_exercise_id = '${GX}' and member_user_id = '${RIVAL_UID}' and certified;" >/dev/null
 mark
 expect_sql "a rules bump requeues evaluated sessions" "select app_public.group_eval_requeue_rules(2, 1000) >= 1;" "t"
 drain "rules"
-expect_centry R weight "196@r3" "the rules recompute corrects Certified entries"
+expect_centry R weight "194@r3" "the rules recompute restores Certified entries"
 [[ "$(active_certs r3)" == "1" ]] || fail "a rules recompute voids nothing that still matches"
 expect_sql "the rules recompute writes no event" \
   "select count(*) from app_public.group_events where group_id = '${GID}' and seq > ${MARK};" "0"
@@ -731,8 +761,27 @@ podiums "${ATHLETE_TOKEN}"
 check_args "the podium count ignores it" --arg x "${GX}" \
   '[.exercises[] | select(.exercise.group_exercise_id == $x)][0].entry_count == 0'
 drain "after cancel (frozen: no apply)"
-expect_centry R weight "196@r3" "the frozen stored entry stays until a catch-up"
+expect_centry R weight "194@r3" "the frozen stored entry stays until a catch-up"
 pass "frozen: certify rejected, cancel immediate on the reads"
+
+# =============================================================================
+echo "[${LANE_LABEL}] a standing record keeps its fingerprint current"
+# =============================================================================
+
+session_row "${ATHLETE_TOKEN}" "${T}-s3" "${S3_AT}" completed
+drain "s3 completed"
+mark
+set_edit "${ATHLETE_TOKEN}" "${T}-s3" a4 0 "111.0" 1
+drain "a4 raw edit, same value"
+expect_sql "a raw edit that changes no value voids nothing" \
+  "select count(*) from app_public.group_events where group_exercise_id = '${GX}' and seq > ${MARK};" "0"
+expect_sql "the standing record's fingerprint follows the fact" \
+  "select r.payload ->> 'fingerprint' = f.fingerprint
+     from app_public.group_events r
+     join app_public.group_set_facts f on f.member_user_id = r.member_user_id and f.set_id = r.set_id
+    where r.group_exercise_id = '${GX}' and r.kind = 'record' and r.set_id = '${T}-a4'
+      and not exists (select 1 from app_public.group_events v where v.related_event_id = r.id and v.kind = 'record_voided');" "t"
+pass "a raw edit keeps the record and refreshes its fingerprint"
 
 # =============================================================================
 echo "[${LANE_LABEL}] failure isolation: a failed enqueue never fails the certification"
@@ -753,11 +802,17 @@ expect_sql "no job was queued" \
   "select count(*) from app_public.group_eval_queue where member_user_id = '${ATHLETE_UID}';" "0"
 drain "nothing queued"
 expect_centry A weight "" "no apply ran"
+mark
 next_cuam
 push "${ATHLETE_TOKEN}" "repair push" "$(e_set "${T}-a5" "${T}-s3-se" 1 20 1 "" "${CUAM}")"
 drain "repair"
 expect_centry A weight "111@a4" "the next job for the target repairs the Certified entry"
-pass "a failed enqueue logs once and commits; the next job repairs"
+expect_csince "certification:weight@A,certification:e1rm@A" \
+  "A takes #1 although former member R's stale, cancelled entry is still stored"
+stream "${ATHLETE_TOKEN}"
+check_args "the raw-edited record reads certified (fingerprint current)" --arg s "${T}-a4" --arg id "${A4_CERT2}" \
+  '[.items[] | select(.kind == "record" and .set_id == $s)][0] | .certified == true and .certification.certification_id == $id'
+pass "a failed enqueue logs once and commits; the next job repairs; a frozen stale entry masks no lead change"
 
 COMPLETED=1
 echo "[${LANE_LABEL}] passed (run ${RUN_TAG})"

@@ -643,7 +643,9 @@ active certification ids at the last apply, for certification attribution.
      or reps edit, or a load-mode change): `record_voided{edited}`.
 
    An edit that leaves every listed value unchanged (a whitespace edit, a
-   status equivalent to performed) voids nothing. Unlinking never voids:
+   status equivalent to performed) voids nothing; since M25-T06 it refreshes
+   the record's `payload.fingerprint`, so certification matches the set as
+   it now is. Unlinking never voids:
    the lift happened.
 5. **Attribution, per All metric**, old winner O vs new winner N:
    - N's exercise is not in `prev_links`, and N's set was created
@@ -678,8 +680,12 @@ active certification ids at the last apply, for certification attribution.
 
 **Certified boards (M25-T06).** The same apply, under the same lock, also:
 
-0. snapshots each Certified board's #1 from the stored entries, before
-   anything else changes;
+0. snapshots each Certified board's #1 from the stored entries
+   (`group_board_certified_leader`), before anything else changes. Another
+   member's entry whose certification has ended is still counted while their
+   target is live (their own apply writes that lead change, exactly once),
+   and skipped when their target is frozen (a former member), whose apply
+   never runs;
 1. **voids** (`end_reason = 'voided'`, `ended_by` null) every active
    certification of the target whose set no longer stands as pinned: its
    fact is missing or not `live` (a set or session tombstone), its Sync v2
@@ -688,21 +694,21 @@ active certification ids at the last apply, for certification attribution.
    and a load-mode change void nothing: the certification stops or keeps
    counting with its set;
 2. recomputes the member's `certified = true` entries with the All rules,
-   restricted to counting sets holding an active certification on `(GX, M,
-   set)` pinned to the fact's fingerprint;
+   restricted to counting sets holding one of the active certifications read
+   after step 1 (the ids written to `certification_ids`), pinned to the
+   fact's fingerprint;
 3. writes one `lead_change` with `certified = true` per Certified board whose
    #1 member moved. `reason` is `certification` when the target's active
    certification ids differ from `group_board_state.certification_ids`
    (given, ended, or voided in step 1), with `payload.certification_id`
    naming the certification that moved it (M's new entry's when M took #1,
    else the one on M's old entry's set) and no `related_event_id`.
-   Otherwise it takes the All attribution for that metric (`link` for link
-   and unlink, `record`, `void`, pointing at that event), falling back to
+   Otherwise it takes the All attribution for that metric (`link` or `void`,
+   pointing at that event; `record` with no `related_event_id`, so step 3's
+   provisional retraction only ever touches All history), falling back to
    `certification`.
 
-Steps 0–2 and the state run in silent applies too; step 3 does not. The
-apply reads stored Certified entries for #1, so the lead change for an
-ended certification is written once, by the lifter's own apply.
+Steps 0–2 and the state run in silent applies too; step 3 does not.
 
 **Valid Certified entry (reads).** A `certified = true` entry counts in the
 reads only while an active certification on `(GX, M, set)` is pinned to the
@@ -746,7 +752,13 @@ client surface.
   reads at once, but the member's next-best certified set is not promoted,
   no `lead_change` is written, and a set edited while frozen is not voided,
   until a catch-up (rejoin, unarchive) re-applies the target. The stored
-  entry stays until then.
+  entry stays until then. Other members' applies skip it (step 0), so their
+  lead changes are still written; on a rejoin, the returning member's own
+  apply can then write a second lead change for the same move.
+- A withdraw or cancel racing a void of the same certification can deadlock
+  with the apply; Postgres aborts one side. If the RPC's enqueue is the
+  victim, it logs a `group.eval_enqueue_failed` row and the state still
+  converges (the apply's job re-applies the target).
 - A Certified board can move with no certification change (a load-mode
   rescale); that lead change takes the All attribution, or `certification`
   when the All board didn't change.
@@ -779,7 +791,7 @@ P10–P13, D3–D5. It follows ground rules 1–5.
 - An ended row is never reopened; certifying again inserts a new row (D4).
 - **Writers.** The §4.6 RPCs (insert, withdraw, cancel) and the apply's voids
   (§2.11). No trigger on a Sync v2 table: `sync_push` is untouched.
-- **Enqueue.** Every insert or end calls `group_certification_enqueue`: a
+- **Enqueue.** Every RPC insert or end calls `group_certification_enqueue`: a
   target job (cause `certification`) for the lifter's board, then
   `group_eval_kick_once`. The enqueue runs in its own `begin … exception`
   block; a failure writes one `group.eval_enqueue_failed` row with `context
@@ -1758,9 +1770,12 @@ E0.1–E0.3).
   - **Isolation.** A forced enqueue failure commits the certification with
     one sanitized `group.eval_enqueue_failed` row; the next target job
     repairs the entry.
-  - **Posture.** The table (RLS, no policies or grants, direct denial), the
-    RPC grants and `security definer`, no internal grants, and no trigger on
-    a Sync v2 table.
+  - **Posture.** The table (RLS, no policies or grants, direct `42501`
+    denial), the RPC grants and `security definer`, no internal grants, and no
+    trigger on a Sync v2 table whose function touches certifications.
+  - **Frozen masking.** A former member's stale Certified entry does not hide
+    another member's `lead_change{certification}`; a raw edit that keeps a
+    record's values refreshes its fingerprint.
 - **Existing lanes.** `sync-drift --strict` stays green, which proves ground
   rules 1–2. The sync push, pull, and e2e lanes stay unchanged and green.
 - **Jest:**

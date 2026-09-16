@@ -83,15 +83,18 @@ alter table app_public.group_board_state
 -- 2. Board helpers
 -- -----------------------------------------------------------------------------
 
--- T05's compute gains the Certified variant: the same rules, restricted to
--- counting sets with an active certification pinned to the fact's fingerprint.
+-- T05's compute gains the Certified variant: null p_certification_ids is the
+-- All board; otherwise the same rules restricted to counting sets holding one
+-- of those certifications, pinned to the fact's fingerprint. The apply passes
+-- the ids it read, so its entries and its certification_ids state agree even
+-- when an RPC commits a certification mid-apply.
 drop function app_public.group_board_compute(uuid, uuid, uuid);
 
 create function app_public.group_board_compute(
   p_group_id uuid,
   p_member_user_id uuid,
   p_group_exercise_id uuid,
-  p_certified boolean
+  p_certification_ids uuid[]
 )
 returns table (
   metric                 text,
@@ -117,11 +120,12 @@ set search_path = app_public, pg_temp
 as $$
   with c as (
     select * from app_public.group_board_counting(p_group_id, p_member_user_id, p_group_exercise_id) x
-     where not p_certified
+     where p_certification_ids is null
         or exists (
           select 1 from app_public.group_certifications gc
-           where gc.group_exercise_id = p_group_exercise_id and gc.member_user_id = p_member_user_id
-             and gc.set_id = x.set_id and gc.ended_at is null and gc.pinned_fingerprint = x.fingerprint)
+           where gc.id = any(p_certification_ids)
+             and gc.group_exercise_id = p_group_exercise_id and gc.member_user_id = p_member_user_id
+             and gc.set_id = x.set_id and gc.pinned_fingerprint = x.fingerprint)
   ), candidates as (
     select 'weight'::text as metric, c.weight_kg as value_kg, c.* from c where c.weight_kg is not null
     union all
@@ -224,6 +228,33 @@ as $$
    where c.id = p_certification_id;
 $$;
 
+-- The #1 Certified entry as the apply sees it: stored entries, so an ended
+-- certification still leads until its lifter's own apply writes the lead
+-- change (exactly once). Another member's invalid entry is skipped when their
+-- target is frozen (former member): that apply never runs, and the stale
+-- entry would otherwise hide every lead change on the board.
+create function app_public.group_board_certified_leader(
+  p_group_id uuid,
+  p_group_exercise_id uuid,
+  p_metric text,
+  p_member_user_id uuid
+)
+returns app_public.group_board_entries
+language sql
+stable
+set search_path = app_public, pg_temp
+as $$
+  select e.*
+    from app_public.group_board_entries e
+   where e.group_exercise_id = p_group_exercise_id and e.metric = p_metric and e.certified
+     and (e.member_user_id = p_member_user_id
+          or (app_public.group_certification_matching(
+                p_group_exercise_id, e.member_user_id, e.set_id, e.fingerprint)).id is not null
+          or app_public.group_eval_target_is_live(e.member_user_id, p_group_id, p_group_exercise_id))
+   order by e.value_kg desc, e.achieved_at_ms, e.member_user_id
+   limit 1;
+$$;
+
 -- -----------------------------------------------------------------------------
 -- 3. The apply (contract §2.11): T05's recompute and diff, plus
 --      0. snapshot the Certified #1 per metric (stored entries);
@@ -309,7 +340,8 @@ begin
    where e.group_exercise_id = p_group_exercise_id and e.member_user_id = p_member_user_id and e.certified;
   foreach _metric in array _metrics loop
     _old_c_leader_by := _old_c_leader_by || jsonb_build_object(_metric,
-      app_public.group_board_holder_json(app_public.group_board_leader(p_group_exercise_id, _metric, true)));
+      app_public.group_board_holder_json(
+        app_public.group_board_certified_leader(p_group_id, p_group_exercise_id, _metric, p_member_user_id)));
   end loop;
 
   -- T06: void every active certification whose set no longer stands as pinned:
@@ -362,7 +394,7 @@ begin
   end loop;
 
   select coalesce(jsonb_object_agg(c.metric, to_jsonb(c)), '{}'::jsonb) into _new_by
-    from app_public.group_board_compute(p_group_id, p_member_user_id, p_group_exercise_id, false) c;
+    from app_public.group_board_compute(p_group_id, p_member_user_id, p_group_exercise_id, null) c;
 
   if not _silent then
     -- 3. Provisional records.
@@ -405,7 +437,7 @@ begin
       for _lc in
         select lc.id, lc.metric, lc.seq, lc.payload
           from app_public.group_events lc
-         where lc.kind = 'lead_change' and lc.related_event_id = _rec.id
+         where lc.kind = 'lead_change' and not lc.certified and lc.related_event_id = _rec.id
       loop
         if _delete_record or not app_public.group_board_would_lead(
              p_group_exercise_id, _lc.metric, p_member_user_id,
@@ -443,7 +475,7 @@ begin
     -- 4. Final records whose set is gone or changed.
     for _rec in
       select e.id, e.set_id, e.session_id, e.payload, f.set_id as fact_set_id, f.live, f.performed,
-             es.id as row_id,
+             f.fingerprint as fact_fingerprint, es.id as row_id,
              case when f.weight_kg > 0 then app_public.group_board_kg(f.weight_kg, x.factor) end as cur_weight_kg,
              app_public.group_board_kg(f.e1rm_kg, x.factor) as cur_e1rm_kg
         from app_public.group_events e
@@ -478,6 +510,13 @@ begin
         _voids := _voids || jsonb_build_array(jsonb_build_object(
           'id', _rec.id, 'set_id', _rec.set_id, 'session_id', _rec.session_id,
           'reason', _reason, 'payload', _rec.payload));
+      elsif _rec.fact_fingerprint is distinct from _rec.payload ->> 'fingerprint' then
+        -- T06: the record stands (no listed value changed) but its raw values
+        -- did: keep its fingerprint current, so certify and the stream match
+        -- the set as it is now.
+        update app_public.group_events
+           set payload = payload || jsonb_build_object('fingerprint', _rec.fact_fingerprint)
+         where id = _rec.id;
       end if;
     end loop;
 
@@ -534,7 +573,7 @@ begin
   select p_group_id, p_group_exercise_id, p_member_user_id, c.metric, false, c.value_kg, c.weight_kg, c.reps,
          c.e1rm_kg, c.entered_weight_kg, c.load_factor, c.set_id, c.session_id, c.session_exercise_id,
          c.exercise_definition_id, c.achieved_at_ms, c.exercise_order_index, c.set_order_index, c.fingerprint, now()
-    from app_public.group_board_compute(p_group_id, p_member_user_id, p_group_exercise_id, false) c;
+    from app_public.group_board_compute(p_group_id, p_member_user_id, p_group_exercise_id, null) c;
 
   -- T06: the Certified entries, from certified counting sets only.
   delete from app_public.group_board_entries e
@@ -547,7 +586,7 @@ begin
   select p_group_id, p_group_exercise_id, p_member_user_id, c.metric, true, c.value_kg, c.weight_kg, c.reps,
          c.e1rm_kg, c.entered_weight_kg, c.load_factor, c.set_id, c.session_id, c.session_exercise_id,
          c.exercise_definition_id, c.achieved_at_ms, c.exercise_order_index, c.set_order_index, c.fingerprint, now()
-    from app_public.group_board_compute(p_group_id, p_member_user_id, p_group_exercise_id, true) c;
+    from app_public.group_board_compute(p_group_id, p_member_user_id, p_group_exercise_id, _cur_certs) c;
 
   insert into app_public.group_board_state as s (
     group_id, group_exercise_id, member_user_id, linked_definition_ids, certification_ids, applied_at)
@@ -759,7 +798,8 @@ begin
   -- All attribution for the metric (link / record / void), else `certification`.
   foreach _metric in array _metrics loop
     _before := _old_c_leader_by -> _metric;
-    _after := app_public.group_board_holder_json(app_public.group_board_leader(p_group_exercise_id, _metric, true));
+    _after := app_public.group_board_holder_json(
+      app_public.group_board_certified_leader(p_group_id, p_group_exercise_id, _metric, p_member_user_id));
     if (_before ->> 'member_user_id') is distinct from (_after ->> 'member_user_id') then
       _class := _class_by ->> _metric;
       _cert_id := null;
@@ -782,8 +822,9 @@ begin
         end if;
       else
         _reason := case _class when 'void' then 'void' when 'record' then 'record' else 'link' end;
+        -- Never a record: a provisional record's retraction (step 3) owns only
+        -- All history.
         _related := case _class
-          when 'record' then (_record_ids ->> _metric)::uuid
           when 'void' then (_void_ids ->> (_old_c_by -> _metric ->> 'set_id'))::uuid
           when 'link' then _link_id
           when 'unlink' then _unlink_id
@@ -1118,21 +1159,20 @@ begin
     'exercises', coalesce((
       select jsonb_agg(jsonb_build_object(
                'exercise', app_public.group_exercise_json(ge),
-               'podium', coalesce((
-                 select jsonb_agg(r.row_json order by r.rank)
-                   from app_public.group_board_ranked(p_group_id, ge.id, p_metric, p_certified) r
-                  where r.rank <= 3), '[]'::jsonb),
-               'me', (
-                 select r.row_json
-                   from app_public.group_board_ranked(p_group_id, ge.id, p_metric, p_certified) r
-                  where r.member_user_id = _uid),
-               'entry_count', (
-                 select count(*) from app_public.group_board_ranked(p_group_id, ge.id, p_metric, p_certified)),
+               'podium', coalesce(b.podium, '[]'::jsonb),
+               'me', b.me,
+               'entry_count', b.entry_count,
                'all_entry_count', (
                  select count(*) from app_public.group_board_entries e
                   where e.group_exercise_id = ge.id and e.metric = p_metric and not e.certified))
                order by (ge.archived_at is not null), lower(ge.name), ge.name, ge.id)
         from app_public.group_exercises ge
+        cross join lateral (
+          select jsonb_agg(r.row_json order by r.rank) filter (where r.rank <= 3) as podium,
+                 (array_agg(r.row_json) filter (where r.member_user_id = _uid))[1] as me,
+                 count(*) as entry_count
+            from app_public.group_board_ranked(p_group_id, ge.id, p_metric, p_certified) r
+        ) b
        where ge.group_id = p_group_id
     ), '[]'::jsonb)
   );
@@ -1307,7 +1347,8 @@ declare
 begin
   -- Internal: owner (postgres) only.
   foreach _sig in array array[
-    'group_board_compute(uuid, uuid, uuid, boolean)',
+    'group_board_compute(uuid, uuid, uuid, uuid[])',
+    'group_board_certified_leader(uuid, uuid, text, uuid)',
     'group_certification_matching(uuid, uuid, text, text)',
     'group_certification_ref_json(app_public.group_certifications)',
     'group_certification_json(app_public.group_certifications)',
