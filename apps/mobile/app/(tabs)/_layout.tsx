@@ -59,6 +59,12 @@ export default function TabsLayout() {
           <Tabs.Screen name="exercise-catalog" options={{ title: 'Exercise Catalog' }} />
           <Tabs.Screen name="groups" options={{ title: 'Groups' }} />
           <Tabs.Screen name="settings" options={{ title: 'Settings', href: null }} />
+          {/* M26 route adapters stay out of the production tab bar until the
+              four destination surfaces are ready for the T06 cutover. */}
+          <Tabs.Screen name="today" options={{ title: 'Today', href: null }} />
+          <Tabs.Screen name="train" options={{ title: 'Train', href: null }} />
+          <Tabs.Screen name="progress" options={{ title: 'Progress', href: null }} />
+          <Tabs.Screen name="more" options={{ title: 'More', href: null }} />
         </Tabs>
       </TrayVisibilityProvider>
     </SafeAreaView>

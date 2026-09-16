@@ -22,6 +22,20 @@ Brief entrypoint map of the current mobile screens.
 - Notes:
   - no unique UI; renders an `expo-router` `Redirect` to the merged Stats/History tab
 
+1b. `/today`, `/train`, `/progress`, `/more` (M26-T01 dormant adapters)
+- Files: `apps/mobile/app/(tabs)/today.tsx`, `train.tsx`, `progress.tsx`,
+  `more.tsx`
+- Purpose:
+  - reserve the approved four-tab route names while their real surfaces are
+    implemented independently
+- Key states (high level):
+  - no unique UI in T01; each route redirects to the closest existing
+    destination (`stats-history`, `session-recorder`, `stats-history`, and
+    `settings`, respectively)
+- Key exits:
+  - the redirect target; all four are hidden from the production tab bar until
+    the M26 cutover
+
 2. `/sign-in`
 - File: `apps/mobile/app/sign-in.tsx`
 - Purpose:

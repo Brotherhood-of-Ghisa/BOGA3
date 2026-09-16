@@ -79,6 +79,18 @@ Brief entrypoint inventory of the current reusable UI component set.
   - collapsible bottom navigation tray that wraps `TopLevelTabs`; exposes a drag handle (React Native `PanResponder` + `Animated`) to collapse to a peek strip and `useTrayVisibility()` hook plus `TrayVisibilityProvider` so screens can imperatively expand/collapse
   - snap math lives in the pure helper `apps/mobile/src/navigation/tray-snap.ts` so it can be unit-tested without gesture plumbing
 
+2b. `MainTabs` (M26-T01 dormant foundation)
+- File: `apps/mobile/components/navigation/main-tabs.tsx`
+- Purpose:
+  - token-backed, accessible four-tab presentation for `Today`, `Train`,
+    `Progress`, and `More`, driven by the single declarative model in
+    `apps/mobile/src/navigation/main-tabs.ts`
+  - remains disconnected from the production `(tabs)` shell until all four
+    destination surfaces and legacy-route adapters are ready for M26-T06
+  - the non-visual model owns canonical order, labels, routes, test IDs,
+    canonical/legacy ownership resolution, unknown-route null fallback, and
+    focused-recorder navigation suppression
+
 3. `ExerciseEditorModal`
 - File: `apps/mobile/components/exercise-catalog/exercise-editor-modal.tsx`
 - Purpose:

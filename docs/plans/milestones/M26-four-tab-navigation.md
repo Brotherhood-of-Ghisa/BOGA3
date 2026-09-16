@@ -4,7 +4,7 @@
 
 - Milestone ID: `M26`
 - Title: Four-tab navigation and home surfaces
-- Status: `planned`
+- Status: `in_progress`
 - Delivery branch: `m26-option-c-navigation`
 
 ## Parent references
@@ -141,7 +141,7 @@ navigation bar on `main`.
 
 ## Task breakdown
 
-1. `docs/plans/tasks/M26-T01-Add_four_tab_navigation_foundation.md` — introduce the inactive four-tab route/navigation foundation.
+1. **Completed:** inactive four-tab route/navigation foundation.
 2. `docs/plans/tasks/M26-T02-Build_Today_surface.md` — compose the default and active Today states.
 3. `docs/plans/tasks/M26-T03-Build_Train_surface_and_session_entry.md` — centralize session launch/resume and planner entry under Train.
 4. `docs/plans/tasks/M26-T04-Rehome_existing_Progress_surfaces.md` — expose existing analytics, history, and heat maps through Progress.

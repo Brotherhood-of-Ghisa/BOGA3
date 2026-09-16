@@ -28,7 +28,19 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
   - it stands aside (renders through) when there is no session or auth is unconfigured, so an unconfigured/local build is never trapped behind a block nothing will lift; the `/sign-in` and `/maestro-harness` routes are exempt so redirects and harness setup cannot loop.
 - Tab roots live inside the `(tabs)` route group at `apps/mobile/app/(tabs)/` and share a tab layout at `apps/mobile/app/(tabs)/_layout.tsx`. The group name is parenthesised so it does not appear in URLs (e.g. `/session-recorder` resolves to `app/(tabs)/session-recorder.tsx`).
 - Tab roots have `headerShown: false`; detail screens (`exercise-history`, `profile`, `completed-session/[sessionId]`, `maestro-harness`, and the M22 group routes `group/mine`, `group/new`, `group/join`, `group/[groupId]`, `group/[groupId]/edit`, `group/[groupId]/invite`, `group-session/[memberId]/[sessionId]`, the M25 `exercise-link`, and the M25-T08 routes `group/[groupId]/members`, `group/[groupId]/exercises/new`, `group/[groupId]/exercises/[exerciseId]/edit`) remain outside `(tabs)/` and keep their existing native header behavior.
-- Navigation is mostly string-path based; `apps/mobile/src/navigation/routes.ts` holds a few route constants and builders (`SIGN_IN_ROUTE`, `MAESTRO_HARNESS_ROUTE`, and the M25 `exerciseLinkHref(id)`), not a full typed route layer
+- Navigation is mostly string-path based; `apps/mobile/src/navigation/routes.ts` holds a few route constants and builders (`SIGN_IN_ROUTE`, `MAESTRO_HARNESS_ROUTE`, and the M25 `exerciseLinkHref(id)`), not a full typed route layer.
+- M26-T01 adds a dormant, typed four-tab model in
+  `apps/mobile/src/navigation/main-tabs.ts` for `Today / Train / Progress /
+  More`. The production tab bar and `/` redirect remain unchanged until the
+  milestone cutover. Temporary direct-route adapters are registered with
+  `href: null`, so they do not appear in the current tab bar:
+  - `/today` -> `/stats-history`
+  - `/train` -> `/session-recorder`
+  - `/progress` -> `/stats-history`
+  - `/more` -> `/settings`
+  The model maps legacy tab roots to their future owner and defines recorder
+  routes as focused work that suppresses future persistent navigation; this
+  visibility rule is not connected to the production shell yet.
 
 ## Route + param summary (current)
 
@@ -38,6 +50,18 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
   - none
 - Behavior:
   - renders an `expo-router` `Redirect` to `/stats-history`
+
+1b. `/today`, `/train`, `/progress`, `/more` (M26 dormant adapters)
+- Files: `apps/mobile/app/(tabs)/today.tsx`, `train.tsx`, `progress.tsx`,
+  `more.tsx`
+- Params:
+  - none
+- Behavior:
+  - direct-only migration adapters registered as hidden tab screens (`href:
+    null`); the current tab strip has no entry points to them
+  - redirect to the existing destinations listed in the router baseline above
+  - replaced by their real surfaces in M26-T02 through T05 before the T06
+    production cutover
 
 2. `/sign-in`
 - File: `apps/mobile/app/sign-in.tsx`
