@@ -18,6 +18,7 @@ import {
   resolveStatsInitialBreakdown,
   resolveStatsInitialPeriod,
 } from '../(tabs)/stats-history';
+import ProgressRoute from '../(tabs)/progress';
 import { uiColors } from '@/components/ui';
 import type { SelectedMuscleWeeklyEffort, StatsSummary } from '@/src/data';
 
@@ -341,6 +342,12 @@ const captureUiEvidence = (name: string, tree: unknown) => {
   mkdirSync(evidenceDir, { recursive: true });
   writeFileSync(path.join(evidenceDir, `${name}.json`), JSON.stringify(tree, null, 2));
 };
+
+describe('Progress route parity', () => {
+  it('uses the existing Stats / History implementation without an analytics fork', () => {
+    expect(ProgressRoute).toBe(StatsRoute);
+  });
+});
 
 describe('formatCountDelta', () => {
   it('renders an absolute neutral delta when both periods are equal', () => {

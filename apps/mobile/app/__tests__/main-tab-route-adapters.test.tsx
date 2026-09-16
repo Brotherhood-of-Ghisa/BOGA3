@@ -1,7 +1,6 @@
 import { render, screen } from '@testing-library/react-native';
 
 import MoreRouteAdapter from '../(tabs)/more';
-import ProgressRouteAdapter from '../(tabs)/progress';
 import TodayRouteAdapter from '../(tabs)/today';
 import TrainRouteAdapter from '../(tabs)/train';
 
@@ -18,7 +17,6 @@ describe('M26 dormant route adapters', () => {
   it.each([
     ['Today', TodayRouteAdapter, '/stats-history'],
     ['Train', TrainRouteAdapter, '/session-recorder'],
-    ['Progress', ProgressRouteAdapter, '/stats-history'],
     ['More', MoreRouteAdapter, '/settings'],
   ])('%s preserves access to an existing destination before cutover', (_name, Route, href) => {
     render(<Route />);

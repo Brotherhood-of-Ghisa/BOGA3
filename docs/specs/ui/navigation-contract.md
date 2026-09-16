@@ -32,12 +32,13 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 - M26-T01 adds a dormant, typed four-tab model in
   `apps/mobile/src/navigation/main-tabs.ts` for `Today / Train / Progress /
   More`. The production tab bar and `/` redirect remain unchanged until the
-  milestone cutover. Temporary direct-route adapters are registered with
-  `href: null`, so they do not appear in the current tab bar:
+  milestone cutover. The routes are registered with `href: null`, so they do
+  not appear in the current tab bar. Temporary direct-route adapters remain for:
   - `/today` -> `/stats-history`
   - `/train` -> `/session-recorder`
-  - `/progress` -> `/stats-history`
   - `/more` -> `/settings`
+  `/progress` now renders the exact existing Stats / History implementation;
+  `/stats-history` remains available with unchanged behavior as its legacy path.
   The model maps legacy tab roots to their future owner and defines recorder
   routes as focused work that suppresses future persistent navigation; this
   visibility rule is not connected to the production shell yet.
@@ -51,17 +52,27 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 - Behavior:
   - renders an `expo-router` `Redirect` to `/stats-history`
 
-1b. `/today`, `/train`, `/progress`, `/more` (M26 dormant adapters)
-- Files: `apps/mobile/app/(tabs)/today.tsx`, `train.tsx`, `progress.tsx`,
-  `more.tsx`
+1b. `/today`, `/train`, `/more` (M26 dormant adapters)
+- Files: `apps/mobile/app/(tabs)/today.tsx`, `train.tsx`, `more.tsx`
 - Params:
   - none
 - Behavior:
   - direct-only migration adapters registered as hidden tab screens (`href:
     null`); the current tab strip has no entry points to them
   - redirect to the existing destinations listed in the router baseline above
-  - replaced by their real surfaces in M26-T02 through T05 before the T06
+  - replaced by their real surfaces in M26-T02, T03, and T05 before the T06
     production cutover
+
+1c. `/progress` (M26 dormant canonical route)
+- File: `apps/mobile/app/(tabs)/progress.tsx`
+- Query params:
+  - the same optional `period` and `breakdown` values as `/stats-history`
+- Behavior:
+  - re-exports the current `/stats-history` route implementation rather than
+    redirecting or copying it, so all controls, metrics, loading/error/empty
+    states, session drill-downs, and exercise/muscle heat maps are identical
+  - remains hidden from the production tab strip until the M26 cutover
+  - `/stats-history` stays available as the unchanged legacy path
 
 2. `/sign-in`
 - File: `apps/mobile/app/sign-in.tsx`

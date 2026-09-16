@@ -1,6 +1,6 @@
-import { Redirect } from 'expo-router';
-
-/** Temporary M26 adapter until Progress owns Stats / History in T04. */
-export default function ProgressRouteAdapter() {
-  return <Redirect href="/stats-history" />;
-}
+/**
+ * Progress is a route-level alias of the existing Stats / History screen.
+ * Keeping one implementation preserves every metric, heat map, and drill-down
+ * while `/stats-history` remains available as a compatibility path.
+ */
+export { default } from './stats-history';
