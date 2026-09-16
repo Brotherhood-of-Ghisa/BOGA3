@@ -13,6 +13,12 @@ import { validateExerciseCore, type ExerciseCore } from '@/src/exercise-core';
 
 import {
   GROUP_SERVER_ERROR_CODES,
+  type GroupBoardCursor,
+  type GroupBoardHistoryCursor,
+  type GroupBoardHistoryResult,
+  type GroupBoardMetric,
+  type GroupBoardPodiumsResult,
+  type GroupBoardResult,
   type GroupCreateResult,
   type GroupErrorCode,
   type GroupExercise,
@@ -108,7 +114,10 @@ export type GroupRpcName =
   | 'group_exercise_create'
   | 'group_exercise_update'
   | 'group_exercise_archive'
-  | 'group_exercise_unarchive';
+  | 'group_exercise_unarchive'
+  | 'group_board_podiums'
+  | 'group_board'
+  | 'group_board_history';
 
 type RpcResponse = { data: unknown; error: RpcErrorLike | null; status?: number | null };
 
@@ -358,4 +367,92 @@ export const unarchiveGroupExercise = async (groupId: string, groupExerciseId: s
     'group_exercise_unarchive',
     await callGroupRpc('group_exercise_unarchive', { p_group_id: groupId, p_exercise_id: groupExerciseId }),
     isExerciseWritePayload,
+  );
+
+// ---- Boards (M25-T05, contract §4.5) --------------------------------------------
+
+export const GROUP_BOARD_DEFAULT_LIMIT = 50;
+export const GROUP_BOARD_HISTORY_DEFAULT_LIMIT = 20;
+
+const GROUP_EXERCISE_NOT_FOUND_MESSAGE = 'group exercise not found';
+
+/**
+ * `NOT_FOUND: group exercise not found` (the board's target is not in the
+ * group) as opposed to `NOT_FOUND: group not found` (access lost, §4.5 check
+ * order). Only the latter may evict the group.
+ */
+export const isGroupExerciseNotFound = (error: unknown): boolean =>
+  isGroupApiError(error) &&
+  error.code === 'NOT_FOUND' &&
+  error.message.trim().toLowerCase() === GROUP_EXERCISE_NOT_FOUND_MESSAGE;
+
+/** The podium page: every group exercise on Certified · e1RM (P8, D11). */
+export const getGroupBoardPodiums = async (groupId: string): Promise<GroupBoardPodiumsResult> =>
+  expectShape(
+    'group_board_podiums',
+    await callGroupRpc('group_board_podiums', { p_group_id: groupId, p_metric: 'e1rm', p_certified: true }),
+    (r) => Array.isArray(r.exercises),
+  );
+
+export type GroupBoardView = {
+  groupId: string;
+  groupExerciseId: string;
+  metric: GroupBoardMetric;
+  certified: boolean;
+};
+
+export type GroupBoardRequest = GroupBoardView & {
+  /** Null = first page; otherwise the previous page's `next_cursor`, verbatim. */
+  after?: GroupBoardCursor | null;
+  /** `1..100`; defaults to 50. */
+  limit?: number;
+};
+
+export const getGroupBoard = async ({
+  groupId,
+  groupExerciseId,
+  metric,
+  certified,
+  after = null,
+  limit = GROUP_BOARD_DEFAULT_LIMIT,
+}: GroupBoardRequest): Promise<GroupBoardResult> =>
+  expectShape(
+    'group_board',
+    await callGroupRpc('group_board', {
+      p_group_id: groupId,
+      p_group_exercise_id: groupExerciseId,
+      p_metric: metric,
+      p_certified: certified,
+      p_after: after,
+      p_limit: limit,
+    }),
+    (r) => isRecord(r.exercise) && Array.isArray(r.rows) && typeof r.has_more === 'boolean',
+  );
+
+export type GroupBoardHistoryRequest = GroupBoardView & {
+  /** Null = newest page; otherwise the previous page's `next_cursor`, verbatim. */
+  before?: GroupBoardHistoryCursor | null;
+  /** `1..50`; defaults to 20. */
+  limit?: number;
+};
+
+export const getGroupBoardHistory = async ({
+  groupId,
+  groupExerciseId,
+  metric,
+  certified,
+  before = null,
+  limit = GROUP_BOARD_HISTORY_DEFAULT_LIMIT,
+}: GroupBoardHistoryRequest): Promise<GroupBoardHistoryResult> =>
+  expectShape(
+    'group_board_history',
+    await callGroupRpc('group_board_history', {
+      p_group_id: groupId,
+      p_group_exercise_id: groupExerciseId,
+      p_metric: metric,
+      p_certified: certified,
+      p_before: before,
+      p_limit: limit,
+    }),
+    (r) => Array.isArray(r.items) && typeof r.has_more === 'boolean',
   );

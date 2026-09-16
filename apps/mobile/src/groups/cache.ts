@@ -21,6 +21,8 @@ export const groupCacheKeys = {
   session: (memberUserId: string, sessionId: string) => `session:${memberUserId}:${sessionId}`,
   /** `group_exercise_list` payload (M25 design §7). */
   groupExercises: (groupId: string) => `group-exercises:${groupId}`,
+  /** `group_board_podiums` payload on Certified · e1RM (M25 design §7). Full boards and history are never cached. */
+  boards: (groupId: string) => `boards:${groupId}`,
 } as const;
 
 const SESSION_KEY_PATTERN = 'session:%';
@@ -80,7 +82,7 @@ export const deleteGroupCacheEntry = (database: GroupCacheDatabase, cacheKey: st
 
 /**
  * Access loss (C3.6.8): removes `group:<id>`, `stream:<id>`,
- * `group-exercises:<id>`, and every `session:*` entry. Session entries are not
+ * `group-exercises:<id>`, `boards:<id>`, and every `session:*` entry. Session entries are not
  * group-scoped (a session can be shared into several groups), so all of them
  * go. The member's `exercise_group_links` rows are synced data and are never
  * touched here.
@@ -94,6 +96,7 @@ export const evictGroup = (database: GroupCacheDatabase, groupId: string): void 
           groupCacheKeys.group(groupId),
           groupCacheKeys.stream(groupId),
           groupCacheKeys.groupExercises(groupId),
+          groupCacheKeys.boards(groupId),
         ]),
         like(groupCache.cacheKey, SESSION_KEY_PATTERN),
       ),

@@ -1,10 +1,14 @@
 export { FriendSessionContent, formatGroupSetEffort } from './friend-session-content';
 export { GroupActionSheet, type GroupActionSheetItem } from './group-action-sheet';
+export { GroupBoardHistoryItem } from './group-board-history-item';
+export { GroupBoardRow } from './group-board-row';
 export { GroupExerciseForm } from './group-exercise-form';
 export { GroupExercisePickSheet, type GroupExercisePickTarget } from './group-exercise-pick-sheet';
 export { GroupExerciseRow } from './group-exercise-row';
 export { GroupExercisesPage } from './group-exercises-page';
 export { GroupFilterChips } from './group-filter-chips';
+export { GroupLeaderboardsPage, GroupPodiumCard } from './group-leaderboards-page';
+export { GroupPagesFooter } from './group-pages-footer';
 export { PickerGroupSectionList, PickerGroupsToggle } from './picker-group-section';
 export { StandardExercisePicker } from './standard-exercise-picker';
 export {
