@@ -215,6 +215,14 @@ to deduplicate per device, so idempotency falls out of per-row LWW.
   into Sync v2 tables). Sync impact decision: `out of sync scope`; they are
   server-authoritative and written only by the group evaluator
   (`docs/specs/tech/groups-contract.md` §2.11).
+- **As-built (M25-T06, `supabase/migrations/20260916120000_m25_group_certification.sql`):**
+  `app_public.group_certifications` (one row per certification of a member's
+  record set: the certifier, the pinned fingerprint and raw values, and
+  `ended_at` / `end_reason` / `ended_by`), plus `group_board_state.certification_ids`.
+  Same group posture (RLS on, no policies, no client grants, no `owner_user_id`,
+  no FK into Sync v2 tables). Sync impact decision: `out of sync scope`; written
+  only by the certification RPCs and the group evaluator
+  (`docs/specs/tech/groups-contract.md` §2.12).
 
 ## Ownership and identity invariants
 
