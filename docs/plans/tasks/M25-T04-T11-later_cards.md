@@ -4,11 +4,6 @@ Each section below becomes its own card (`docs/plans/tasks/M25-T0N-*.md`)
 when it is ready, refreshed against what T01–T03 actually built. Milestone:
 `docs/plans/milestones/M25-group-exercises-and-leaderboards.md`.
 
-## M25-T09 — Mobile leaderboards (frontend; deps T05, T08)
-
-- Product P6–P9, E1.1–E1.3, D11, D12. Podium cards (Certified · e1RM, "You:
-  Nth"), full board with both toggles, history list with reasons.
-
 ## M25-T10 — Mobile stream items and certify (frontend; deps T06, T09)
 
 - Product P10–P17, E2, E3, D15, D16. Record / record-removed / link items,

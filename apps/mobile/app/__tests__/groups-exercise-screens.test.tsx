@@ -55,6 +55,7 @@ jest.mock('@/src/groups/api', () => ({
   getGroup: jest.fn(),
   getGroupStream: jest.fn(),
   listGroupExercises: jest.fn(),
+  getGroupBoardPodiums: jest.fn(),
   createGroupExercise: jest.fn(),
   updateGroupExercise: jest.fn(),
   archiveGroupExercise: jest.fn(),
@@ -206,10 +207,11 @@ describe('Group page segments (D10, D14)', () => {
     expect(mockRouter.push).toHaveBeenCalledWith(`/group/${GROUP_ID}/members`);
   });
 
-  it('Leaderboards is an empty state and reads nothing (T09 fills it)', async () => {
+  it('Leaderboards does not read the exercise list (its podiums: groups-leaderboards-screens.test.tsx)', async () => {
+    api.getGroupBoardPodiums.mockResolvedValue({ metric: 'e1rm', certified: true, exercises: [] });
     await openGroupAs('owner');
     fireEvent.press(screen.getByTestId('group-screen-segment-leaderboards'));
-    expect(screen.getByTestId('group-screen-leaderboards-empty')).toHaveTextContent(/Leaderboards are coming soon/);
+    expect(await screen.findByTestId('group-leaderboards-empty')).toBeTruthy();
     expect(api.listGroupExercises).not.toHaveBeenCalled();
   });
 

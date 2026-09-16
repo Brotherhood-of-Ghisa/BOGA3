@@ -368,6 +368,62 @@ appId: com.dinoderek.mobile
     id: "completed-session-detail-delete-button"
 - takeScreenshot: "groups-07-friend-view-read-only"
 
+# --- 7b. Leaderboards (M25-T09): podiums, full board, history ---------------------
+# The counterparty links its Bench Press to the active custom exercise (Prowler
+# Push, per side); the script waits until the evaluator has written the board.
+# Podium cards and board rows are one accessibility element each, found by their
+# joined labels (product E1.1–E1.3).
+- runScript:
+    file: ../scripts/groups-counterparty.js
+    env:
+      STEP: link-board
+- openLink: "boga3://group/${output.groupsGroupId}"
+- extendedWaitUntil:
+    visible:
+      id: "group-screen-segment-leaderboards"
+    timeout: 15000
+- tapOn:
+    id: "group-screen-segment-leaderboards"
+# Certified boards are empty until M25-T06: the uncertified count shows instead.
+- extendedWaitUntil:
+    visible:
+      text: "Prowler Push, Certified · e1RM, No certified sets yet · 1 uncertified"
+    timeout: 20000
+# The archived copy sits last; nothing is shared under it.
+- assertVisible:
+    text: "Barbell Bench Press, archived, Certified · e1RM, No sets yet"
+- takeScreenshot: "groups-07b-1-podiums"
+- tapOn:
+    text: "Prowler Push, Certified · e1RM, No certified sets yet · 1 uncertified"
+- extendedWaitUntil:
+    visible:
+      id: "group-board-see-all-button"
+    timeout: 15000
+- assertVisible: "No certified sets yet"
+- takeScreenshot: "groups-07b-2-board-certified-empty"
+- tapOn:
+    id: "group-board-see-all-button"
+- extendedWaitUntil:
+    visible:
+      text: "1st, ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME}, .* e1RM, 51\\.25 kg × 5, .*, uncertified"
+    timeout: 15000
+- takeScreenshot: "groups-07b-3-board-all-e1rm"
+# Weight: 102.5 kg total logged, converted to 51.25 kg per side (D6).
+- tapOn:
+    id: "group-board-metric-weight"
+- extendedWaitUntil:
+    visible:
+      text: "1st, ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME}, 51\\.25 kg × 5, .*, uncertified"
+    timeout: 15000
+- takeScreenshot: "groups-07b-4-board-all-weight"
+- tapOn:
+    id: "group-board-history-button"
+- extendedWaitUntil:
+    visible:
+      text: ".*, ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME} took #1 · 51\\.25 kg \\(linked Bench Press\\)"
+    timeout: 15000
+- takeScreenshot: "groups-07b-5-history-link"
+
 # --- 8. The device removes the counterparty -> "was removed" -------------------
 - openLink: "boga3://group/${output.groupsGroupId}"
 # Members live behind the header's member count (D14, M25-T08).
@@ -420,6 +476,14 @@ appId: com.dinoderek.mobile
 - assertVisible:
     id: "group-stream-session-card-${output.groupsCardKey}"
 - takeScreenshot: "groups-08-counterparty-removed"
+
+# --- 8b. A removed member stays ranked, marked former (P7, M25-T09) -------------
+- openLink: "boga3://group/${output.groupsGroupId}/leaderboards/${output.groupsBoardExerciseId}?metric=weight&scope=all"
+- extendedWaitUntil:
+    visible:
+      text: "1st, ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME} \\(former\\), 51\\.25 kg × 5, .*, uncertified"
+    timeout: 15000
+- takeScreenshot: "groups-08b-board-former-member"
 
 # --- 9. The removed counterparty's next read is NOT_FOUND (AC11) ----------------
 - runScript:

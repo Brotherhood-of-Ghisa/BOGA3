@@ -1198,7 +1198,12 @@ podium's `entry_count` and `me` count only valid Certified entries (§2.11).
   JSON value of the wrong type, is `VALIDATION`; JSON `null` means no
   cursor.
 - **Archived** exercises are readable and sort last in the podiums.
-- **Mobile.** No client wrapper yet; M25-T09 adds the reads.
+- **Mobile (M25-T09).** `getGroupBoardPodiums(groupId)` (always e1RM ·
+  Certified), `getGroupBoard({ …, after, limit = 50 })`, and
+  `getGroupBoardHistory({ …, before, limit = 20 })` in `src/groups/api.ts`
+  send every `p_*` arg and pass cursors back verbatim. `isGroupExerciseNotFound`
+  matches `NOT_FOUND: group exercise not found`, so only a group `NOT_FOUND`
+  evicts (§6.2).
 
 ### 4.6 Certification (M25-T06)
 
@@ -1305,6 +1310,8 @@ view model and `FriendSessionContent` use them. Jest:
 | `exercise-view-model.ts` | (M25-T08) Exercises-segment rows and link-status wording, the owner/admin exercise action matrix, write wording, and the standard-exercise search |
 | `use-my-group-exercise-links.ts` | (M25-T08) My live local links into one group with my exercise names, reloaded on focus and after a local link (only the latest read lands); also my exercises and all my links for the pick sheet |
 | `use-mounted-ref.ts` | (M25-T08) `useMountedRef`: a write that finishes after its screen unmounted must not navigate |
+| `board-view-model.ts` | (M25-T09) Podium cards, full-board rows, history sentences, the board's `metric` / `scope` params and paths, ordinal / date / kg formatting |
+| `use-group-online-pages.ts` | (M25-T09) Online-only paged reads (full board, history): no cache, no poll, cursor paging, first-seen dedupe, lost access vs exercise missing |
 
 **Network state.** The hook reuses the sync scheduler's NetInfo projection
 through the existing sync-status accessor (`apps/mobile/src/sync/sync-status.ts`)
@@ -1381,7 +1388,7 @@ migration via `npm run db:generate`.
 
 | Column | Type | Notes |
 | --- | --- | --- |
-| `cache_key` | `text` PK | `groups:mine`, `group:<id>`, `stream:all`, `stream:<groupId>`, `session:<memberId>:<sessionId>`, `group-exercises:<groupId>` (M25-T07; the Exercises segment reads it too, M25-T08) |
+| `cache_key` | `text` PK | `groups:mine`, `group:<id>`, `stream:all`, `stream:<groupId>`, `session:<memberId>:<sessionId>`, `group-exercises:<groupId>` (M25-T07; the Exercises segment reads it too, M25-T08), `boards:<groupId>` (M25-T09: the podium page on Certified · e1RM; full boards and history are never cached) |
 | `user_id` | `text not null` | The account the payload belongs to. Reads require a match with `useAuth().user.id`. |
 | `payload_json` | `text not null` | The last successful RPC result |
 | `fetched_at_ms` | `integer not null` | Drives "last updated" |
@@ -1393,7 +1400,7 @@ migration via `npm run db:generate`.
 - **Wiped on sign-out and account switch:** one `delete` is added to
   `wipeLocalTables` (`apps/mobile/src/sync/account-wipe.ts`).
 - **Access loss (C3.6.8).** A `NOT_FOUND` on a group evicts `group:<id>`,
-  `stream:<id>`, `group-exercises:<id>` (M25-T07), and every `session:*`
+  `stream:<id>`, `group-exercises:<id>` (M25-T07), `boards:<id>` (M25-T09), and every `session:*`
   entry. The member's `exercise_group_links` rows are synced data and are never
   evicted. A successful All refresh replaces
   `stream:all`, which no longer contains that group. The group screen shows
@@ -1437,6 +1444,8 @@ migration via `npm run db:generate`.
 | `/group/[groupId]/exercises/[exerciseId]/edit` | `app/group/[groupId]/exercises/[exerciseId]/edit.tsx` | (M25-T08) Rename a group exercise or change its weight entry |
 | `/group-session/[memberId]/[sessionId]` | `app/group-session/[memberId]/[sessionId].tsx` | Friend's session view |
 | `/exercise-link?exerciseDefinitionId=` | `app/exercise-link.tsx` | Link screen (M25-T07): link one of my exercises to my groups' exercises |
+| `/group/[groupId]/leaderboards/[exerciseId]?metric=&scope=` | `app/group/[groupId]/leaderboards/[exerciseId]/index.tsx` | (M25-T09) Full board with the Weight / e1RM × Certified / All toggles |
+| `/group/[groupId]/leaderboards/[exerciseId]/history?metric=&scope=` | `app/group/[groupId]/leaderboards/[exerciseId]/history.tsx` | (M25-T09) The board's lead-change history |
 
 - **Groups tab.** It shows the stream with **All** and per-group chips, header
   actions My groups / Create group / Join group, and the empty, signed-out, and
@@ -1638,7 +1647,7 @@ E0.1–E0.3).
   `Total load` / `Per side` control, labelled by `LOAD_INPUT_MODE_LABELS` in
   `src/exercise-core`) renders in the personal exercise editor and in the
   group exercise form. Both validate the name through `validateExerciseCore`.
-- **Leaderboards** is an empty state with no read until M25-T09.
+- **Leaderboards** was an empty state until M25-T09 (as-built below).
 - **Link your exercise** (E0.4). An active row none of my exercises is
   linked to shows `Link your exercise` to every member; archived rows are not
   offered (D8). It opens the M25-T07 pick sheet with `purpose="link-only"`: the
@@ -1650,6 +1659,51 @@ E0.1–E0.3).
   `groups-exercise-view-model.test.ts`, `groups-cache.test.ts`, and the
   member cases moved to the Members route in `groups-write-screens.test.tsx`.
   Maestro: step 4b of `groups-two-user-stream.yaml` (§8).
+
+**As-built (M25-T09): leaderboards.** Product P6–P9, D11, D12, E1.1–E1.3; M25
+design §7.
+
+- **Podium page** (the Leaderboards segment, `GroupLeaderboardsPage`).
+  `group_board_podiums` runs through `useGroupResource` under
+  `boards:<groupId>`, enabled only while the segment is open, like Exercises.
+  One card per group exercise in server order (archived last, tagged
+  `Archived`), labelled `Certified · e1RM`, with up to three rows (rank, name,
+  value, date; my row reads `You`).
+  - `You: Nth` shows only below 3rd, and `You: not ranked` only on a non-empty
+    board I am not on.
+  - An empty podium reads `No certified sets yet · N uncertified` (N =
+    `all_entry_count`), or `No sets yet`.
+  - A card opens `/group/<id>/leaderboards/<exerciseId>`. No exercises:
+    `No group exercises yet`.
+- **Full board.** `?metric=weight|e1rm&scope=certified|all`; anything else
+  opens e1RM · Certified. The two joined toggles switch in place; `History`
+  sits in the header and carries the toggles.
+  - Rows: rank, `You` / name, ` (former)`, value, date. e1RM rows show the estimate
+    with the set behind it (`140 kg × 1`); Weight rows show the set. On All
+    only, `✓` or `○ uncertified`.
+  - Empty Certified: `No certified sets yet` with `See all sets` (the board
+    payload has no uncertified count). Empty All: `No sets yet`.
+  - Rows are not pressable yet: the row detail is M25-T10.
+- **History.** Newest first, one sentence per lead change: `L set the first
+  record · v`, `L took #1 · v (from P, pv)`, `… (linked A)`, `… (P unlinked
+  A)`, `L now #1 · v (P's pv removed — set edited|deleted)` (`You're now #1` for me), `No one holds #1
+  (…)`, `… (certified by C)` and, for an ended certification (M25-T06 `related`),
+  `L now #1 · v (P's pv certification withdrawn|cancelled|voided)`; an unknown reason reads `L took #1 · v`. A void reads
+  "now #1": an item does not say whether L held #1 before. Values are kg
+  on both metrics (no reps).
+- **Online pages** (`useGroupOnlinePages`). The board and history are never
+  cached. The first page loads on mount, on a toggle change, on focus, and on
+  pull-to-refresh, with no 30 s poll; a refresh discards older pages.
+  End-of-list sends `next_cursor` verbatim, never offline; a failure shows a
+  `Retry` footer. Rows are deduplicated first-seen (by member, or history
+  `key`). With nothing loaded, offline shows the offline empty state; loaded
+  rows stay with the marker. A group `NOT_FOUND` evicts and shows lost access;
+  an exercise `NOT_FOUND` shows "This exercise isn't in this group" and evicts
+  nothing.
+- **Evidence.** Jest: `groups-board-api.test.ts`,
+  `groups-board-view-model.test.ts`, `groups-online-pages.test.tsx`,
+  `groups-leaderboards-screens.test.tsx`, `groups-cache.test.ts`. Maestro:
+  steps 7b and 8b of `groups-two-user-stream.yaml` (§8).
 
 ## 7. Freshness and offline
 
@@ -1866,6 +1920,16 @@ E0.1–E0.3).
   (cascading to `group_exercises`) and user_c's Sync v2 rows child-first,
   including the `exercise_group_links` row step 4b creates; `clearState`
   wipes the device.
+- **As-built (M25-T09, flow extension).** New step 7b: the counterparty's
+  `link-board` step pushes an `exercise_group_links` row linking its Bench
+  Press (total load) to the active custom `Prowler Push` (per side), then polls
+  `group_board` until the evaluator has written the row (51.25 kg × 5, factor
+  0.5, uncertified) and logs the push → board latency. The device opens
+  Leaderboards (`No certified sets yet · 1 uncertified`, the archived copy's
+  `No sets yet`), the board (Certified empty → `See all sets`), toggles Weight,
+  and opens History (`… took #1 · 51.25 kg (linked Bench Press)`). New step 8b,
+  after the removal, deep-links to the All · Weight board and asserts the row
+  reads `(former)`.
 - **Offline behaviour (AC12, AC13)** is proven in jest. Simulator network
   cannot be toggled reliably from Maestro.
 

@@ -20,6 +20,7 @@
 //   output.groupsCardKey             "<user_d>:<session>" (stream card testIDs)
 //   output.groupsHistoryCardKey      the pre-join session's would-be card key
 //   output.groupsFirstSetId          first set of the live session (friend view)
+//   output.groupsBoardExerciseId     the active custom group exercise user_d links to (M25-T09)
 //
 // Any unexpected response throws, which fails the Maestro step.
 
@@ -258,6 +259,74 @@ var steps = {
       fail('expected group exercises ' + JSON.stringify(want) + ', got ' + JSON.stringify(got));
     }
     console.log(TAG + ' member reads the group exercises: ' + JSON.stringify(got));
+  },
+
+  // M25-T09: user_d links its pushed Bench Press (total load) to the device's
+  // active custom group exercise, Prowler Push (per side), with a sync_push like
+  // its own app would. Its completed sets from before the link then count as a
+  // link effect (contract §2.11). Waits until the evaluator has written the
+  // board, so the device's reads are deterministic: best 102.5 kg × 5 logged,
+  // converted ×0.5 to 51.25 kg per side (D6), uncertified.
+  'link-board': function () {
+    var list = rpcOk(output.groupsToken, 'group_exercise_list', { p_group_id: output.groupsGroupId });
+    var targets = (list.exercises || []).filter(function (exercise) {
+      return exercise.name === 'Prowler Push' && exercise.archived_at_ms === null;
+    });
+    if (targets.length !== 1) {
+      fail('expected one active Prowler Push, got ' + JSON.stringify(list.exercises));
+    }
+    var groupExerciseId = targets[0].group_exercise_id;
+    output.groupsBoardExerciseId = groupExerciseId;
+
+    var cuam = nextClientUpdatedAt();
+    var definitionId = output.groupsSessionId + '-def-bench';
+    push([
+      entity('exercise_group_links', output.groupsGroupId + ':' + definitionId, cuam, {
+        exercise_definition_id: definitionId,
+        group_id: output.groupsGroupId,
+        group_exercise_id: groupExerciseId,
+        created_at: cuam,
+        updated_at: cuam,
+        deleted_at: null,
+      }),
+    ]);
+
+    // The pg_net kick normally applies within seconds; the pg_cron sweep (30 s)
+    // backs it up. runScript has no sleep, so this polls until a row, the
+    // deadline, or the poll cap. push() stamps groupsPushedAtMs, so the latency
+    // below is from the link push.
+    var deadline = Date.now() + 90 * 1000;
+    var polls = 0;
+    var board;
+    for (;;) {
+      polls += 1;
+      board = rpcOk(output.groupsToken, 'group_board', {
+        p_group_id: output.groupsGroupId,
+        p_group_exercise_id: groupExerciseId,
+        p_metric: 'weight',
+        p_certified: false,
+        p_after: null,
+        p_limit: 10,
+      });
+      if (board.rows && board.rows.length > 0) break;
+      if (Date.now() > deadline || polls >= 3000) {
+        fail('no board row after the link push (' + polls + ' polls)');
+      }
+    }
+    var row = board.rows[0];
+    if (
+      board.rows.length !== 1 ||
+      row.member.user_id !== output.groupsCounterpartyUserId ||
+      Number(row.weight_kg) !== 51.25 ||
+      Number(row.reps) !== 5 ||
+      Number(row.load_factor) !== 0.5 ||
+      row.certified !== false
+    ) {
+      fail('unexpected Weight · All board: ' + JSON.stringify(board.rows));
+    }
+    console.log(
+      TAG + ' GROUPS_E2E_LATENCY board sync_push->board row: ' + (Date.now() - output.groupsPushedAtMs) + ' ms (' + polls + ' polls)',
+    );
   },
 
   // AC11: once removed, the counterparty's next read of the group is NOT_FOUND.
