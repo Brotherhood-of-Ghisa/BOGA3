@@ -24,21 +24,29 @@
 ## Milestone objective
 
 A person can plan one future training session or an ordered programme of
-several sessions, sync those plans across devices, and start a plan in the
-existing recorder. A separately authorized coaching agent can inspect the
-upcoming queue, page through exact performed-workout history, and create the
-same plan structures through MCP. Human and agent creation converge on one
-domain model; neither route can mutate performed workout history.
+several sessions, sync those plans across devices, and use either a complete
+plan or one exercise block in the existing recorder. Planned work is additive:
+the person can pull the next squat block from a programme into an otherwise
+freeform session, perform unrelated exercises, and explicitly complete that
+block so the programme exposes the next one. A separately authorized coaching
+agent can inspect the upcoming queue, page through exact performed-workout
+history, and create the same plan structures through MCP. Human and agent
+creation converge on one domain model; neither route can mutate performed
+workout history or advance programme progress.
 
 ## Boundary decisions
 
 1. **Plans are a separate synced domain.** Do not add `planned` to
    `sessions.status`. The existing `sessions` graph remains performed workout
-   state (`active | completed`), while plan rows remain absent from history,
-   analytics, records, and group activity until a person starts one.
-2. **Starting is materialization, not a status flip.** Starting a plan creates
-   one active `sessions -> session_exercises -> exercise_sets` graph and opens
-   the existing recorder. It does not make the recorder understand plan rows.
+   state (`active | completed`). Plan rows always remain absent from history,
+   analytics, records, and group activity; only confirmed actual rows in the
+   materialized performed graph can contribute there.
+2. **Using planned work is materialization, not a recorder mode.** Starting a
+   complete plan materializes all of its available blocks; adding one block
+   materializes only that `session_plan_exercises` row and its target sets. Both
+   paths create ordinary `session_exercises -> exercise_sets` rows that the
+   existing recorder already understands. Plan rows never become live recorder
+   state.
 3. **One model, two writers.** The mobile planner writes locally and syncs in
    the normal way. The agent API writes the same server rows atomically; the
    phone receives them through normal `sync_pull`.
@@ -61,13 +69,23 @@ domain model; neither route can mutate performed workout history.
    returned page is not acceptable. Existing response-size and rate limits
    remain safety boundaries, but callers must be able to continue reading
    without losing qualifying history.
+8. **The exercise block is the unit of consumption and progress.** One plan
+   block is one `session_plan_exercises` row plus its ordered target sets. A
+   person may attach one block to an existing active session or create a new
+   session from it; other planned blocks and freeform recorder work are
+   unaffected. Attaching never advances the programme. Only explicit Complete
+   or Skip resolves the block. Block identity belongs to the performed exercise
+   card and source-set identity belongs to each materialized planned set, so
+   manual warm-ups and planned work may coexist and reorder inside one card.
 
 ## Product behavior
 
 ### One-off plans
 
 - A signed-in person can create, edit, reschedule, duplicate, and delete an
-  unstarted plan, including while offline.
+  unused plan, including while offline. After partial use, attached/resolved
+  blocks are immutable while future unattached blocks remain editable under the
+  lifecycle rules locked by T01.
 - A plan has a title, an optional gym, an optional scheduled date/time, one or
   more ordered exercises, and one or more ordered target sets per exercise.
 - No scheduled time means the plan appears in an **Unscheduled** queue rather
@@ -85,30 +103,81 @@ domain model; neither route can mutate performed workout history.
   session plans.
 - Each session can be scheduled or unscheduled and has its own complete
   exercise/set targets.
-- People can create and edit the programme and its unstarted plans as one
-  coherent flow. Reordering changes programme order, not scheduled time.
-- Starting one programme session does not automatically start, reschedule, or
-  generate another. Later sessions remain ordinary plans.
+- People can create and edit the programme and its unused/future blocks as one
+  coherent flow. Reordering changes programme order, not scheduled time and
+  cannot rewrite already attached/resolved source identity.
+- Each planned exercise is also an independently consumable block. A squat
+  wave may therefore contain one squat block in each ordered child plan while
+  the person's performed sessions contain any other work they choose.
+- The programme exposes the earliest unresolved block in programme-order then
+  exercise-order. People may also select another available block explicitly;
+  V1 has one ordered stream and does not infer independent tracks from exercise
+  names.
+- Starting one complete programme session or attaching one of its blocks does
+  not automatically start, reschedule, generate, or resolve another block.
+  Future unresolved blocks remain planned work.
 
-### Starting a plan
+### Using a complete plan or one block
 
-1. The person taps **Start** on an unstarted plan.
-2. If another active session exists, BoGa routes to **Resume** and does not
-   merge, replace, or silently complete it.
-3. Otherwise one local transaction creates the active performed graph:
-   - the session retains the selected gym and a backlink to the source plan;
-   - each planned exercise becomes a `session_exercises` snapshot;
-   - each target set copies weight/reps/type into the existing
-     `exercise_sets.planned_*` fields;
-   - actual weight and reps remain blank and `performance_status` starts as
-     `planned`.
-4. Deterministic IDs derived from the owner, plan, entity kind, and source-row
-   ID make a retry or simultaneous start of the same plan converge on the same
-   performed graph. A server uniqueness guard allows at most one non-deleted
-   session for a source plan.
-5. The source plan becomes `started` and immutable. It remains available for
-   future planned-versus-performed comparison rather than being overwritten by
-   recorder edits.
+1. **Start all** is a convenience for a complete plan. With no active session,
+   one local transaction creates the active session and materializes every
+   available block. If another active session exists, BoGa offers Resume and
+   does not merge, replace, or silently complete it; the person can instead add
+   individual blocks to that active session.
+2. **Add block** materializes exactly one source block. If a session is active,
+   the block is appended to it. Otherwise BoGa creates an active session using
+   the source plan's gym and appends the block. The rest of the session remains
+   freeform and no other plan block is consumed.
+3. Add block may attach to an existing compatible `session_exercises` row for
+   the same exercise definition. An explicitly selected compatible card wins;
+   otherwise exactly one unsourced match is selected automatically. With no
+   match BoGa creates a card, and with multiple possible matches it asks rather
+   than guessing. A performed exercise card may reference at most one source
+   plan block, while manual sets may remain on that card.
+4. `session_exercises.source_plan_exercise_id` identifies the source block.
+   Each materialized target row copies weight/reps/type into the existing
+   `exercise_sets.planned_*` fields and records its source in
+   `exercise_sets.source_plan_set_id`; manual rows leave that field null. Actual
+   weight and reps remain blank and `performance_status` starts as `planned`.
+   On an existing card, copied targets take the next dense performed order
+   indexes after its current live sets while retaining their source-target
+   order, so existing warm-ups remain above them by default.
+   Deterministic IDs plus partial uniqueness guards allow at most one live
+   performed exercise per source block and one live performed set per source
+   target. Whole-plan starts additionally set `sessions.source_plan_id`;
+   individual-block sessions leave it null. Retries and competing devices must
+   converge without two live uses.
+5. Attaching a block does not resolve it. The source block remains `pending`
+   until the person explicitly marks it **Complete** after at least one valid
+   confirmed source-derived set, or explicitly **Skip**s it without claiming
+   performance. Manual warm-ups alone cannot complete it, while target
+   deviations on a source-derived row never prevent completion. Complete/Skip
+   sets the block's resolution timestamp and is the only event that advances
+   the programme; an attached-but-unresolved block remains current.
+6. Parent plan/programme labels (`planned | in_progress | completed`) are
+   derived from block attachment and resolution rather than stored as a
+   whole-plan `started` flag. Attached/resolved source blocks and their targets
+   are immutable snapshots; future unattached blocks remain editable. Recorder
+   edits never overwrite the source targets.
+
+### Ordering manual and planned sets
+
+- Performed-set order is independent of immutable source-plan order. Reordering
+  changes only `exercise_sets.order_index` in the performed graph; it never
+  changes `source_plan_set_id`, planned target values, confirmation state, or
+  the source `session_plan_sets.order_index`.
+- A person may add manual warm-up or other sets before or after attachment and
+  move any performed row above, below, or between source-derived rows. This
+  covers both warm-ups-first then Add block and Add block first then warm-ups;
+  newly added manual rows use the recorder's normal append behavior until moved.
+- Reordering is a new recorder capability with lightweight playlist-style
+  direct manipulation: each movable set has a compact, low-emphasis grab
+  handle, and dragging it lifts the row and shows its insertion position. It
+  requires no separate reorder mode and does not add always-visible Move
+  buttons to every row. VoiceOver custom actions and keyboard/overflow
+  fallbacks expose Move earlier/Move later so drag is not the only accessible
+  path. Autosave, sync, hydration, completion, and completed-edit preserve the
+  resulting performed order and every row's provenance.
 
 ### Agent history reads
 
@@ -141,20 +210,35 @@ domain model; neither route can mutate performed workout history.
 
 ## Data and sync contract
 
-M23 expands Sync v2 from nine to thirteen user-owned entity types.
+M23 expands Sync v2 from ten to fourteen user-owned entity types.
 
 | Entity | Purpose | Important fields / rules |
 | --- | --- | --- |
 | `training_programmes` | Named container for an ordered series. | `name`, optional `description`, normal sync/timestamp/tombstone fields. |
-| `session_plans` | One future session, standalone or in a programme. | Optional `programme_id` and `gym_id`; `title`; optional `scheduled_for`; optional `programme_order_index`; `status = planned | started`; provenance `human | agent`; normal sync/timestamp/tombstone fields. |
-| `session_plan_exercises` | Ordered exercise snapshots for a plan. | `session_plan_id`, optional owned `exercise_definition_id`, `order_index`, `name`, optional `machine_name`; normal sync/timestamp/tombstone fields. |
+| `session_plans` | One future session, standalone or in a programme. | Optional `programme_id` and `gym_id`; `title`; optional `scheduled_for`; optional `programme_order_index`; provenance `human | agent`; derived lifecycle from child blocks; normal sync/timestamp/tombstone fields. |
+| `session_plan_exercises` | Ordered, independently consumable plan blocks. | `session_plan_id`, optional owned `exercise_definition_id`, `order_index`, `name`, optional `machine_name`; `progress_status = pending | completed | skipped`; nullable `resolved_at`; normal sync/timestamp/tombstone fields. Agent create inputs may only create `pending` blocks. |
 | `session_plan_sets` | Ordered targets for one planned exercise. | `session_plan_exercise_id`, `order_index`, optional non-negative `target_weight_value`, positive `target_reps`, optional `target_set_type`; normal sync/timestamp/tombstone fields. |
 
 Additional performed-domain field:
 
 - `sessions.source_plan_id` is nullable, references the same owner's
   `session_plans` row, and has a partial uniqueness constraint for non-deleted
-  rows. Existing/manual sessions leave it null.
+  rows. It is set only by whole-plan Start; manual and individual-block starts
+  leave it null.
+- `session_exercises.source_plan_exercise_id` is nullable, references the same
+  owner's `session_plan_exercises` row, and has a partial uniqueness constraint
+  for non-deleted rows. It is the block-level provenance and retry boundary;
+  existing/manual exercise blocks leave it null.
+- `exercise_sets.source_plan_set_id` is nullable, references the same owner's
+  `session_plan_sets` row, and has a partial uniqueness constraint for
+  non-deleted rows. It preserves source identity independently of performed
+  set ordering; existing/manual sets leave it null.
+
+A non-null source-set link is valid only when its performed set belongs to a
+`session_exercises` row sourced from that plan set's parent block. An unsourced
+exercise card cannot contain source-derived sets; a sourced card may freely mix
+matching source-derived rows with null-linked manual rows. T01 must lock the
+database/sync enforcement shape for this cross-level invariant.
 
 All server primary and foreign keys remain owner-scoped composites. Every new
 sync table uses the existing direct-app-only OAuth RLS policy, explicit table
@@ -166,11 +250,15 @@ The expected five-layer topology is:
 
 ```text
 L0  gyms, exercise_definitions, muscle_groups, training_programmes
-L1  session_plans, exercise_muscle_mappings, exercise_tag_definitions
+L1  session_plans, exercise_muscle_mappings, exercise_tag_definitions, exercise_group_links
 L2  sessions, session_plan_exercises
 L3  session_exercises, session_plan_sets
 L4  exercise_sets, session_exercise_tags
 ```
+
+The new `exercise_sets.source_plan_set_id -> session_plan_sets` edge is from L4
+to L3, so it does not add an entity or another layer; the expected count remains
+fourteen entities in five layers.
 
 The schema task must confirm this graph against the actual foreign keys and
 update the canonical topology if an implementation detail changes it. It also
@@ -290,7 +378,9 @@ pageable exercise history, recent-workout indexing, and exact workout detail to
 formulate a suggestion, then create it only after the user has enabled plan
 access. A recommendation that depends on older history must drain the relevant
 cursor; it must not present a preview page as the person's complete history.
-There is no server-hosted model or adaptive recommendation engine in M23.
+Agent creation always writes `pending` blocks. Agents cannot attach, complete,
+skip, or otherwise advance them. There is no server-hosted model or adaptive
+recommendation engine in M23.
 
 ## Mobile UX contract
 
@@ -300,12 +390,35 @@ There is no server-hosted model or adaptive recommendation engine in M23.
   with clearly separated **Active**, **Upcoming**, **Unscheduled**, and
   **Completed** sections.
 - `/session-plan/new` creates a one-off plan.
-- `/session-plan/[planId]` views and edits an unstarted plan and offers Start,
-  Duplicate, and Delete. A started plan is read-only and links to its session.
+- `/session-plan/[planId]` views and edits a plan, offers Start all, Duplicate,
+  and Delete where lifecycle permits, and offers Add block on each available
+  exercise block. Attached/resolved blocks are read-only and link to their
+  performed session; future unattached blocks remain editable.
 - `/programme/new` creates a programme and its ordered sessions.
-- `/programme/[programmeId]` views/edits the programme and opens each plan.
-- Starting dismisses into the existing `/session-recorder`; an active-session
-  conflict routes to the existing recorder Resume state.
+- `/programme/[programmeId]` views/edits the programme, identifies the next
+  unresolved block, opens each plan, and can add an available block to the
+  active recorder.
+- The recorder's exercise picker adds **From programme** alongside empty-entry
+  and completed-history reuse. The existing historical **Append plan** wording
+  becomes **Repeat last** so it cannot be confused with authored plans.
+- Start all dismisses into the existing `/session-recorder`; an active-session
+  conflict routes to Resume. Add block appends to that active recorder instead
+  of treating it as a conflict, or creates an active session when none exists.
+  It attaches to an explicitly selected compatible same-exercise card, uses the
+  only unambiguous unsourced match, or creates a new card. Multiple compatible
+  cards require a choice.
+- A programme-sourced exercise card identifies its source block, and each
+  planned set identifies its source target independently from manual sets on
+  the same card. The card exposes Complete block when it has a valid confirmed
+  source-derived set. Completion is explicit, target mismatch is allowed, and
+  the recorder remains open for arbitrary freeform work. Skip is a distinct
+  programme action and never records work.
+- The recorder gives each movable set a subtle playlist-style grab handle for
+  direct reordering, without a separate mode or persistent up/down button
+  clutter. Equivalent Move earlier/Move later accessibility actions remain
+  available. A person can therefore add warm-ups before or after planned sets
+  and move them above the working sets without losing block or per-set source
+  identity.
 
 Planner implementation belongs in a dedicated `apps/mobile/src/session-planner/`
 domain module instead of adding a third mode to the recorder. UI composes the
@@ -320,16 +433,27 @@ to the canonical UI docs in the same task that ships them.
 - scheduled and unscheduled empty states;
 - sync-restored agent-created plan;
 - validation errors located at the relevant plan, exercise, or set;
-- started/read-only state;
-- active-session conflict with a single Resume action;
+- available, attached, completed, and skipped block states plus derived plan
+  progress;
+- active-session Start-all conflict with a single Resume action;
+- block addition to an existing active session, mixed with freeform exercises;
+- block attachment to a selected or unambiguous compatible exercise card,
+  including a required choice when more than one card is compatible;
+- manual warm-ups before planned attachment and manual warm-ups added after
+  attachment then reordered above planned sets, all within one exercise card;
+- attached-but-unresolved state that does not expose the next block;
 - agent provenance that does not overpower the plan title;
-- destructive confirmation for deleting an unstarted plan or programme.
+- destructive confirmation for deleting an eligible unused plan or programme.
 
 ## In scope
 
-1. The four-entity synced planning graph and `sessions.source_plan_id`.
-2. Local repositories, validation, materialization, and deterministic retry.
-3. One-off planner and programme flows on mobile.
+1. The four-entity synced planning graph, `sessions.source_plan_id`,
+   `session_exercises.source_plan_exercise_id`, and
+   `exercise_sets.source_plan_set_id`.
+2. Local repositories, validation, whole-plan and single-block
+   materialization, same-exercise card selection, performed-set reordering,
+   explicit Complete/Skip, and deterministic retry.
+3. One-off planner, programme, and recorder block-consumption flows on mobile.
 4. Upcoming/unscheduled plan presentation in Sessions.
 5. Per-connected-agent planning permission and Connected Agents control.
 6. Three planning API routes, two exact-history API routes, five new MCP tools,
@@ -341,11 +465,12 @@ to the canonical UI docs in the same task that ships them.
 ## Out of scope
 
 Calendar views or calendar-provider integration; recurrence rules; reminders
-or push notifications; templating beyond programmes; automatic progression or
-wave calculations; adaptive recommendation services; collaborative/shared
-plans; programme adherence analytics; plan-versus-actual analytics UI; agent
-editing/deleting plans; agent starting sessions; and any agent mutation of
-active, completed, or deleted workout history.
+or push notifications; templating beyond programmes; automatic load/rep
+progression or wave calculations; inferred multi-exercise programme tracks;
+adaptive recommendation services; collaborative/shared plans; programme
+adherence analytics; plan-versus-actual analytics UI; agent editing/deleting,
+attaching, completing, or skipping plan blocks; agent starting sessions; and
+any agent mutation of active, completed, or deleted workout history.
 
 ## Deliverables
 
@@ -353,8 +478,11 @@ active, completed, or deleted workout history.
    columns, constraints, wire shapes, validation limits, errors, state
    transitions, deterministic-ID recipe, and agent route schemas.
 2. SQLite and Supabase schema/migration work for the four planning entities
-   and performed-session backlink, including the complete Sync v2 expansion.
-3. `apps/mobile/src/session-planner/` repositories and plan materializer.
+   and performed session/block/set provenance fields, including the complete
+   Sync v2 expansion.
+3. `apps/mobile/src/session-planner/` repositories, whole-plan/block
+   materializers, performed-set reordering, and explicit block-resolution
+   operations.
 4. One-off planner screens and Sessions planning sections.
 5. Programme authoring and programme detail screens.
 6. App-owned agent permission, receipt storage, planning API routes/RPCs,
@@ -369,64 +497,83 @@ active, completed, or deleted workout history.
 
 ## Acceptance criteria
 
-1. A person can create, edit, reschedule, duplicate, and delete an unstarted
+1. A person can create, edit, reschedule, duplicate, and delete an unused
    one-off plan locally, including offline.
 2. A person can create a named programme containing multiple ordered plans;
-   each retains its own schedule, gym, exercises, and targets.
+   each retains its own schedule, gym, ordered exercise blocks, and targets.
 3. First sync/reinstall restores programmes and plans with order, snapshots,
-   schedules, targets, lifecycle, and provenance intact.
-4. Starting a plan creates exactly one active performed graph, copies targets
-   into the existing `planned_*` fields, leaves actuals blank, and opens the
-   recorder.
-5. Starting while another session is active never merges or replaces it and
-   presents Resume. Retrying or starting the same plan on two devices does not
-   create a duplicate session graph.
-6. Planned and cancelled/deleted plan rows do not appear in completed history,
-   stats, records, or group streams. Once performed, the actual session behaves
-   exactly like any other session in those surfaces.
-7. Filtered exercise search can page through every matching owned exercise
+   schedules, targets, block resolution, and provenance intact.
+4. A person can Start all with no active session or add exactly one available
+   block to an existing/new active session. Each path copies targets into the
+   existing `planned_*` fields, leaves actuals blank, and opens or resumes the
+   ordinary recorder without consuming unrelated blocks. Add block attaches to
+   an explicitly selected compatible same-exercise card, otherwise uses the
+   single unambiguous unsourced match or creates a card.
+5. Start all while another session is active never merges or replaces it and
+   presents Resume. Add block never guesses between multiple compatible cards,
+   never overwrites another block's provenance, and local retry or competing-
+   device attachment converges on at most one live performed exercise for each
+   source block and one live performed set for each source target.
+6. Attaching a block does not advance programme progress. Explicit Complete
+   after at least one valid confirmed source-derived set advances despite
+   target deviations; manual warm-ups alone do not. Explicit Skip advances
+   without creating performed work. The next unresolved block is deterministic.
+7. Planned, pending, skipped, and deleted plan rows do not appear in completed
+   history, stats, records, or group streams. A session may mix sourced blocks
+   and arbitrary freeform exercises, including manual and planned sets on the
+   same exercise card. Reordering those performed sets preserves their planned
+   or manual provenance; confirmed actual work behaves exactly like any other
+   session in those surfaces.
+8. Filtered exercise search can page through every matching owned exercise
    without silent intermediate candidate caps, including fixtures beyond the
    current 1,000-row mapping/equipment boundaries.
-8. Exercise-history and workout-detail cursors drain every qualifying performed
+9. Exercise-history and workout-detail cursors drain every qualifying performed
    set exactly once in deterministic order; lifetime records, history counts,
    last-performed time, and workout totals remain exact and do not change with
    page size.
-9. The existing context and recent-workout tools label embedded collections as
+10. The existing context and recent-workout tools label embedded collections as
    previews and provide a complete continuation path. No response uses a bare
    `history_truncated`/`truncated` flag as the only way to report omitted data.
-10. An existing or newly connected agent without current plan permission gets
+11. An existing or newly connected agent without current plan permission gets
    `PLAN_PERMISSION_REQUIRED` from all new plan tools and retains access only
    to the read-only tools.
-11. An authorized agent can atomically create one valid plan and one valid
-   multi-session programme; those server-created rows are pullable by the
-   owner's phone.
-12. Same-key/same-payload retries return the same IDs without duplicates;
+12. An authorized agent can atomically create one valid plan and one valid
+   multi-session programme containing pending blocks; those server-created rows
+   are pullable by the owner's phone, but the agent cannot attach or resolve
+   them.
+13. Same-key/same-payload retries return the same IDs without duplicates;
    same-key/different-payload and concurrent conflicts return stable results.
-13. Missing/foreign exercise, session, or gym IDs, cross-owner reads, identity inputs,
+14. Missing/foreign exercise, session, or gym IDs, cross-owner reads, identity inputs,
     malformed targets, oversized graphs, and partial programme failures expose
     no foreign data and create no partial rows.
-14. Disabling permission or revoking the OAuth grant blocks the next plan
+15. Disabling permission or revoking the OAuth grant blocks the next plan
     request. Re-authorizing the same client does not revive an old permission.
-15. Agent routes and direct OAuth database access cannot create, edit, delete,
-    start, or otherwise mutate performed sessions.
-16. Audit rows contain only the approved metadata fields and never plan
+16. Agent routes and direct OAuth database access cannot create, edit, delete,
+    attach, complete, skip, start, or otherwise mutate performed sessions or
+    human-controlled plan progress.
+17. Audit rows contain only the approved metadata fields and never plan
     payload content or credentials.
-17. The planning UI meets the UX standard, uses shared tokens/primitives,
+18. The planning UI meets the UX standard, uses shared tokens/primitives,
     documents routes/components/patterns, and has required screenshots and
-    accessibility coverage.
-18. All path-triggered local gates and the milestone closeout gate set are
+    accessibility coverage, including same-card block/freeform use, ambiguous
+    card selection, and lightweight playlist-style performed-set reordering
+    with equivalent non-drag accessibility actions.
+19. All path-triggered local gates and the milestone closeout gate set are
     green, with measured timing evidence from `./boga timings` only.
 
 ## Verification strategy
 
 - **Unit:** repository CRUD and validation, programme ordering, target
-  normalization, active-session conflict, materialization mapping,
+  normalization, full-plan and single-block materialization, active-session
+  append versus Start-all conflict, compatible-card selection and ambiguity,
+  manual/planned set provenance and reordering, explicit Complete/Skip,
   deterministic retries, filter-bound cursor validation, page-size-independent
   exact aggregates, API/MCP schemas, annotations, response parsing, and error
   translation.
-- **Sync:** schema drift over thirteen entities, the five-layer FK graph,
+- **Sync:** schema drift over fourteen entities, the five-layer FK graph,
   push/pull round trips, server-created plan pulls, tombstones, first-sync
-  restore, dirty counts, wipe coverage, and plan/session backlink behavior.
+  restore, dirty counts, wipe coverage, session/block/set provenance fields,
+  performed-set order, and block-resolution behavior.
 - **Backend authorization and reads:** default-denied/current-grant-matched
   permission, app-only toggle RLS, owner isolation, strict body limits, atomic
   RPCs, idempotency receipts, revocation, direct OAuth denial, actual-session
@@ -438,13 +585,16 @@ active, completed, or deleted workout history.
   workout detail; verify exact records/totals; prove default plan denial; enable
   permission; create a plan and programme; repeat a key; reject a conflicting
   key; revoke; and verify resulting database rows.
-- **Maestro:** create and start a one-off plan, create a programme, render a
-  server-seeded plan after sync, handle active-session conflict, and capture
-  required UI states.
+- **Maestro:** create and Start all for a one-off plan, create a programme,
+  add its next block to a squat card that already contains warm-ups, then cover
+  the inverse order by adding warm-ups after planned sets and moving them above,
+  log another exercise freely, complete the block and expose the next one,
+  render a server-seeded plan after sync, handle ambiguous card choice and the
+  Start-all active-session conflict, and capture required UI states.
 - **Seam rule:** do not build one brittle MCP-process-to-Maestro mega-test.
   MCP smoke proves protocol-to-database writes, sync integration proves a
   server-created plan reaches the client model, and Maestro proves that a
-  synced/seeded plan renders and starts correctly.
+  synced/seeded plan renders and materializes correctly.
 
 ## Rollout order
 
@@ -471,15 +621,19 @@ Each card is intended to be one reviewable PR.
    exact product, schema, lifecycle, validation, API, and error contracts
    (`planned`).
 2. `docs/plans/tasks/M23-T02-Synced_session_plan_schema_and_server_contract.md` —
-   add the four synced entities, performed-session backlink, and full Sync v2
-   expansion (`planned`).
+   add the four synced entities, performed session/block/set provenance, and
+   full Sync v2 expansion (`planned`).
 3. `docs/plans/tasks/M23-T03-Mobile_plan_repository_and_session_materialization.md`
-   — local repositories, validation, deterministic materialization, and
-   active-session conflict handling (`planned`).
+   — local repositories, validation, deterministic whole-plan/block
+   materialization, compatible-card selection, performed-set reordering,
+   explicit resolution, and active-session behavior
+   (`planned`).
 4. `docs/plans/tasks/M23-T04-Mobile_one_off_session_planner.md` — Sessions planning
-   sections plus one-off create/view/edit/start/duplicate/delete UX (`planned`).
+   sections plus one-off create/view/edit/start/add-block/duplicate/delete and
+   recorder block/reordering UX (`planned`).
 5. `docs/plans/tasks/M23-T05-Mobile_training_programmes.md` — programme create,
-   order, edit, detail, and child-plan flows (`planned`).
+   order, edit, detail, next-block, Complete/Skip, and child-plan flows
+   (`planned`).
 6. `docs/plans/tasks/M23-T06-Agent_plan_permission_and_write_API.md` — current-grant
    permission, idempotency receipts, atomic agent API writes, and Connected
    Agents control (`planned`).
@@ -493,12 +647,12 @@ Each card is intended to be one reviewable PR.
 Dependency graph (parallel where arrows allow):
 
 ```text
-T01 ──► T02 ──► T03 ──► T04 ──┐
-              │      └──► T05 ─┼──► T07 ──► T08
-              └────────► T06 ──┘
+T01 ──► T02 ──► T03 ──► T04 ──► T05 ──┐
+              └────────► T06 ──────────┼──► T07 ──► T08
 ```
 
-- T04 and T05 can proceed in parallel after the repository/materializer lands.
+- T04 owns the shared plan-block recorder interaction; T05 builds programme
+  selection/progress on that surface after T04 lands.
 - T06 can proceed after the server schema exists and in parallel with mobile
   planner UI.
 - T07 integrates only after both the API and human-facing plan path exist.
@@ -507,9 +661,11 @@ T01 ──► T02 ──► T03 ──► T04 ──┐
 
 - **Sync expansion is cross-cutting.** Missing any registry, cursor, wipe, FK,
   drift, or restore site can strand data. T02 owns an explicit inventory and
-  thirteen-entity round trip.
-- **Start is a multi-device race.** Deterministic IDs plus server uniqueness
-  are both required; either alone leaves a duplicate or conflict path.
+  fourteen-entity round trip.
+- **Block attachment is a multi-device race.** Deterministic block/set IDs plus
+  server uniqueness are both required; either alone leaves duplicate live uses
+  or ambiguous completion. T01 must specify how two devices attaching the same
+  block to different active sessions converge.
 - **Agent consent can be misunderstood.** The mobile toggle must name the
   client and disclose upcoming-plan reads as well as creation. OAuth consent
   copy must not claim that the base grant itself permits writes.
@@ -524,9 +680,16 @@ T01 ──► T02 ──► T03 ──► T04 ──┐
 - **Plans could leak into analytics.** Keeping them in separate tables avoids
   most risk; regression assertions still cover history, records, stats, and
   groups.
+- **Same-exercise attachment or reordering can erase provenance.** Add block
+  only targets an explicitly selected or single unambiguous compatible,
+  unsourced exercise card; otherwise it creates or asks. Block provenance stays
+  on `session_exercises`, set provenance stays on each source-derived
+  `exercise_sets` row, and reordering changes only performed `order_index`.
+  Manual rows keep a null source-set link.
 - **Programme editing can become a general scheduler.** V1 remains an ordered
-  collection with optional dates. Recurrence, auto-progression, calendar, and
-  notifications stay out of scope.
+  collection with optional dates and one deterministic block stream. Inferred
+  tracks, recurrence, auto-progression, calendar, and notifications stay out
+  of scope.
 - **Older-client compatibility needs proof.** T01/T02 must either prove that
   older pull clients safely ignore unknown entities or document a coordinated
   release requirement before code ships.

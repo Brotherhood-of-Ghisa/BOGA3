@@ -42,20 +42,25 @@ all completed task cards.
    `./boga test frontend` on the closeout commit. Confirm the aggregates include
    `mcp-smoke`, `ios-sync-e2e`, and `ios-session-plans-e2e`; run any missing
    named lane explicitly. Record `./boga timings`, never estimates.
-3. **Acceptance matrix.** Map M23 AC1–AC15 to exact automated tests, local
+3. **Acceptance matrix.** Map M23 AC1–AC19 to exact automated tests, local
    artifact roots, screenshots, or hosted evidence. Any gap becomes a follow-up
    card and keeps the milestone open rather than being silently accepted.
 4. **Product and architecture.** `00-product.md` and
    `03-technical-architecture.md` describe the shipped human/agent plan
-   boundary, programme semantics, and materialization path with as-built links.
+   boundary, block-level programme semantics, freeform coexistence, explicit
+   progress, and whole-plan/block materialization paths with as-built links.
 5. **Data, sync, and auth.** `05-data-model.md`,
    `tech/sync-v2-server-contract.md`, and `10-api-authn-authz-guidelines.md`
-   contain the thirteen-entity/five-layer model, backlink, RLS, current-grant
-   permission, receipt, service-role boundary, and direct-agent denials.
+   contain the fourteen-entity/five-layer model, all three performed source
+   links, independent performed/source set ordering, block progress, RLS,
+   current-grant permission, receipt, service-role boundary, and direct-agent
+   denials.
 6. **Runtime and UX docs.** Specs `06`, `09`, and the relevant `ui/*` and `08`
    sections match the actual modules, routes, components, states, lanes,
-   fixtures, and evidence policy. Service/agent/Supabase READMEs advertise no
-   obsolete "exactly four tools" or universally read-only claim.
+   fixtures, compatible-card behavior, lightweight playlist-style performed-set
+   reordering plus non-drag accessibility actions, and evidence policy.
+   Service/agent/Supabase READMEs advertise no obsolete "exactly four tools" or
+   universally read-only claim.
 7. **Contract truth.** `tech/session-planning-contract.md` is marked as-built,
    links to implementation/tests, and lists every deliberate deviation. No
    active source-of-truth doc describes M23 behavior as merely planned.

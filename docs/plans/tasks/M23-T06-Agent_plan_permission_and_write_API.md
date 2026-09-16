@@ -52,7 +52,8 @@ create plan graphs, while keeping performed workout tables unreachable.
   contract key, payload hash, bounded result, timestamps, uniqueness, RLS, and
   no training payload.
 - Service-role-only atomic SQL functions for one plan and one whole programme,
-  with owner/reference checks and all-or-nothing writes.
+  with owner/reference checks, pending-only source blocks, and all-or-nothing
+  writes.
 - Extend `agent-api` with bounded `GET /v1/agent/session-plans`,
   `POST /v1/agent/session-plans`, and `POST /v1/agent/programmes`.
 - Live token and grant validation followed by matching permission/grant
@@ -67,7 +68,8 @@ create plan graphs, while keeping performed workout tables unreachable.
 
 ### Out of scope
 
-MCP tool registration (`M23-T07`); agent edits/deletes/starts; direct agent
+MCP tool registration (`M23-T07`); agent edits/deletes, plan/block attachment,
+Complete/Skip, session starts, or any other progress mutation; direct agent
 database access; a custom OAuth application scope; hosted recommendation logic.
 
 ## UX Contract
@@ -111,18 +113,21 @@ database access; a custom OAuth application scope; hosted recommendation logic.
 3. Disable and live grant revocation block the next request. Re-authorizing the
    same client yields a new grant timestamp and cannot inherit the old enable.
 4. GET returns only the validated owner's bounded upcoming/unscheduled plans,
-   stable ordering/cursors, safe snapshots, and no deleted or foreign data.
+   stable ordering/cursors, safe snapshots, block progress/next-block state,
+   and no deleted or foreign data.
 5. Each POST validates the exact contract schema and owner references, creates
-   its whole graph in one transaction, marks provenance as agent/client, and
-   writes no performed-session row.
+   its whole graph with pending blocks in one transaction, marks provenance as
+   agent/client, and writes no performed session/exercise/set row, performed
+   source link, or progress resolution.
 6. A child validation or SQL failure leaves no programme, plan, child, receipt,
    or other partial plan-domain row.
 7. Same key/hash returns the original IDs; same key/different hash returns
    `409 IDEMPOTENCY_CONFLICT`; concurrent same-key calls converge.
 8. Request fields resembling user/owner identity are rejected, and a foreign
    gym/exercise produces the same safe error as a nonexistent ID.
-9. Direct OAuth PostgREST, `sync_push`, and performed-session mutations remain
-   denied. The service-role key appears only in the Edge Function environment.
+9. Direct OAuth PostgREST, `sync_push`, performed-session mutations, and block
+   attachment/resolution remain denied. The service-role key appears only in
+   the Edge Function environment.
 10. Audit success and failure rows contain approved metadata only; logs and
     receipts contain no bearer token or plan payload.
 11. Connected Agents UI implements all three flows, preserves revoke behavior,

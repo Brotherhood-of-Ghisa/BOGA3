@@ -32,9 +32,9 @@ docs_touched: "services/boga-mcp/README.md, supabase/functions/agent-api/README.
 
 ## Objective
 
-Expose the plan capabilities through MCP and prove the complete behavior across
-protocol, authorization, database, sync, and mobile UI using stable seam tests
-rather than one brittle mega-test.
+Expose exact coaching-history reads and plan capabilities through MCP, then
+prove the complete behavior across protocol, authorization, database, sync,
+and mobile UI using stable seam tests rather than one brittle mega-test.
 
 ## Scope
 
@@ -43,7 +43,13 @@ rather than one brittle mega-test.
 - Extend the MCP API client with bounded GET and JSON POST support, response
   validation, request IDs, timeouts, content type, redirects disabled, and
   stable upstream error translation.
+- Add the exact, keyset-paginated exercise-history and workout-detail agent API
+  routes, and upgrade exercise search/context/recent-workout reads to the
+  milestone's complete-filter/exact-aggregate contract before exposing them as
+  coaching inputs.
 - Register:
+  - `get_exercise_history`;
+  - `get_workout_detail`;
   - `get_upcoming_session_plans`;
   - `create_session_plan`;
   - `create_training_programme`.
@@ -51,17 +57,28 @@ rather than one brittle mega-test.
   closed-world annotations in the contract. No user identity input and no
   arbitrary exercise snapshot text when an owned exercise ID is required.
 - Update server instructions and docs from "exactly four read-only tools" to
-  seven tools with a separately authorized create-only planning boundary.
-- Extend `mcp-smoke` to prove discovery, default denial, permission enable,
+  nine tools: six read-only tools plus a separately authorized three-tool
+  create-only planning boundary.
+- Extend `mcp-smoke` to drain exact multi-page exercise/workout history and
+  prove discovery, default plan denial, permission enable, pending-only
   plan/programme creation, receipt replay/conflict, row ownership, no performed
-  rows, audit metadata, disable, and revoke.
+  rows, performed provenance links, or resolved blocks, audit metadata,
+  disable, and revoke.
 - Complete the server-created-plan pull fixture in sync integration if T02 left
   only the wire-level seed.
 - Add `ios-session-plans-e2e`:
   - isolated local Supabase fixture and simulator state;
-  - human one-off create/start and programme create/order;
-  - server-seeded agent-provenance plan pulled into the app and started;
-  - active-session conflict and required screenshots;
+  - human one-off create/Start all and programme create/order;
+  - add manual squat warm-ups first, attach the next programme squat block to
+    that same card, change/perform its targets, log an unrelated exercise
+    freely, explicitly complete it, and verify the next block;
+  - cover the inverse order by attaching planned squat sets first, adding manual
+    warm-ups later, moving them above the planned rows with the playlist-style
+    grab handle, and verifying order plus block/set provenance after reload;
+  - create multiple compatible squat cards and verify the chooser writes
+    nothing until the target card is selected;
+  - server-seeded agent-provenance plan pulled into the app and materialized;
+  - Start-all active-session conflict, block retry, and required screenshots;
   - lane/trigger registry, fixture ownership, generated gate docs, and test
     strategy/runtime documentation.
 - Run and record hosted discovery, permission, create, pull/inspection, retry,
@@ -76,34 +93,44 @@ repository's bounded contract posture.
 
 ## Acceptance criteria
 
-1. Tool discovery exposes exactly the existing four read-only tools plus the
-   three named planning tools with correct titles, descriptions, strict schemas,
-   and annotations.
-2. The MCP client serializes valid bodies, never forwards caller identity,
+1. Tool discovery exposes exactly the existing four tools plus the two exact-
+   history reads and three named planning tools, for nine total, with correct
+   titles, descriptions, strict schemas, and annotations.
+2. Exercise-history and workout-detail routes/tools drain every qualifying row
+   exactly once; search filters have no hidden intermediate cap; exact context
+   and workout aggregates are invariant under page size and match shared mobile
+   calculation vectors.
+3. The MCP client serializes valid bodies, never forwards caller identity,
    preserves the idempotency key, rejects malformed upstream envelopes, and
    maps timeout/auth/permission/validation/conflict/server failures stably.
-3. Protocol smoke proves an old/default grant cannot call any plan tool, then
-   enables one client and creates one plan plus a multi-session programme.
-4. Smoke verifies exact graph ownership/order/targets/provenance, zero new
-   performed rows, same-key replay, different-payload conflict, metadata-only
-   audit, disable denial, and revoke denial.
-5. Sync integration proves a server-created graph pulls in five-layer FK-safe
-   order and survives first-sync restore without becoming locally dirty.
-6. `ios-session-plans-e2e` proves human create/start, programme ordering,
-   server-created plan visibility/start, and active conflict on a real simulator
-   against the slot-isolated local backend.
-7. The new lane passes twice in one slot without relying on another worktree,
+4. Protocol smoke drains the exact-history tools, proves an old/default grant
+   cannot call any plan tool, then enables one client and creates one plan plus
+   a multi-session programme whose blocks are all pending.
+5. Smoke verifies exact graph ownership/order/targets/provenance, zero new
+   performed rows or performed source links, same-key replay, different-payload
+   conflict, metadata-only audit, disable denial, and revoke denial.
+6. Sync integration proves a server-created graph pulls in fourteen-entity,
+   five-layer FK-safe order and survives first-sync restore without becoming
+   locally dirty. Session/block/set source fields and performed set ordering
+   round-trip independently.
+7. `ios-session-plans-e2e` proves human create/Start all, programme ordering,
+   server-created plan visibility, single-block attachment in an active freeform
+   session, warm-ups-first same-card attachment, planned-first warm-up
+   reordering, ambiguous-card choice, target deviation, explicit completion/
+   next-block advance, Skip with no performed rows, retry, and Start-all
+   conflict on a real simulator against the slot-isolated local backend.
+8. The new lane passes twice in one slot without relying on another worktree,
    shared simulator, remote backend, or manual database cleanup.
-8. Existing read-only MCP outputs and direct OAuth denial remain unchanged.
-9. Spec 02 is regenerated; specs 06/11 describe the lane, fixture, seam
+9. Existing read-only MCP outputs and direct OAuth denial remain unchanged.
+10. Spec 02 is regenerated; specs 06/11 describe the lane, fixture, seam
    strategy, and trigger posture; service/backend READMEs are operationally true.
-10. Hosted smoke has recorded evidence or a precise T08 owner, environment,
+11. Hosted smoke has recorded evidence or a precise T08 owner, environment,
     commands/checks, and release trigger. Local evidence is never presented as
     hosted proof.
 
 ## Docs touched (required)
 
-- `services/boga-mcp/README.md`: seven-tool inventory, permission and mutation
+- `services/boga-mcp/README.md`: nine-tool inventory, permission and mutation
   behavior, schemas/examples, and deployment smoke.
 - `supabase/functions/agent-api/README.md`, `supabase/README.md`: final route,
   permission, receipt, deployment, and smoke instructions.
