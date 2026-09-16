@@ -121,6 +121,7 @@ const row = (rank: number, userId: string, username: string, overrides: Partial<
   set_id: `set-${userId}`,
   exercise_name: 'Bench',
   certified: false,
+  certification: null,
   ...overrides,
 });
 

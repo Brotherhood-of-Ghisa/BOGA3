@@ -296,6 +296,9 @@ export const describeHistorySentence = (item: GroupBoardHistoryItem, myUserId: s
   }
 
   if (!leader) {
+    if (reason === 'certification' && related?.kind === 'certification' && related.event !== 'certified' && previous) {
+      return `No one holds #1 (${holderPossessive(previous, myUserId)} ${formatBoardKg(previous.value_kg)} certification ${related.event})`;
+    }
     return 'No one holds #1';
   }
 
@@ -316,7 +319,21 @@ export const describeHistorySentence = (item: GroupBoardHistoryItem, myUserId: s
   }
 
   if (reason === 'certification') {
-    return `${tookFirst(leader, myUserId)} (certified)`;
+    const event = related?.kind === 'certification' ? related.event : null;
+    if (event === 'withdrawn' || event === 'cancelled' || event === 'voided') {
+      const lost = previous
+        ? `${holderPossessive(previous, myUserId)} ${formatBoardKg(previous.value_kg)} certification ${event}`
+        : `a certification ${event}`;
+      const now = isMe(leader.member_user_id, myUserId)
+        ? `You're now #1 · ${formatBoardKg(leader.value_kg)}`
+        : `${holderName(leader, myUserId)} now #1 · ${formatBoardKg(leader.value_kg)}`;
+      return `${now} (${lost})`;
+    }
+    const certifier =
+      related?.kind === 'certification' && related.certified_by
+        ? ` by ${related.certified_by.user_id === myUserId ? 'you' : formatMemberName(related.certified_by.username)}`
+        : '';
+    return `${tookFirst(leader, myUserId)} (certified${certifier})`;
   }
 
   return tookFirst(leader, myUserId);

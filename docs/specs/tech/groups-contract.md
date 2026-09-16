@@ -1672,7 +1672,7 @@ design §7.
   - `You: Nth` shows only below 3rd, and `You: not ranked` only on a non-empty
     board I am not on.
   - An empty podium reads `No certified sets yet · N uncertified` (N =
-    `all_entry_count`), or `No sets yet`. Until M25-T06 every card reads this.
+    `all_entry_count`), or `No sets yet`.
   - A card opens `/group/<id>/leaderboards/<exerciseId>`. No exercises:
     `No group exercises yet`.
 - **Full board.** `?metric=weight|e1rm&scope=certified|all`; anything else
@@ -1687,7 +1687,8 @@ design §7.
 - **History.** Newest first, one sentence per lead change: `L set the first
   record · v`, `L took #1 · v (from P, pv)`, `… (linked A)`, `… (P unlinked
   A)`, `L now #1 · v (P's pv removed — set edited|deleted)` (`You're now #1` for me), `No one holds #1
-  (…)`, `… (certified)`; an unknown reason reads `L took #1 · v`. A void reads
+  (…)`, `… (certified by C)` and, for an ended certification (M25-T06 `related`),
+  `L now #1 · v (P's pv certification withdrawn|cancelled|voided)`; an unknown reason reads `L took #1 · v`. A void reads
   "now #1": an item does not say whether L held #1 before. Values are kg
   on both metrics (no reps).
 - **Online pages** (`useGroupOnlinePages`). The board and history are never

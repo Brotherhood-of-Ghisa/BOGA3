@@ -51,6 +51,7 @@ const row = (rank: number, userId: string, username: string | null, overrides: P
   set_id: `set-${userId}`,
   exercise_name: 'Bench',
   certified: false,
+  certification: null,
   ...overrides,
 });
 
@@ -217,6 +218,20 @@ describe('history sentences (E1.3)', () => {
     set_id: `set-${userId}`,
     session_id: `s-${userId}`,
   });
+  const certification = (
+    event: 'certified' | 'withdrawn' | 'cancelled' | 'voided',
+    certifier: string | null,
+  ): GroupBoardHistoryItem['related'] => ({
+    kind: 'certification',
+    key: 'c1',
+    event,
+    certified_by: certifier ? { user_id: `id-${certifier}`, username: certifier } : null,
+    ended_by: null,
+    set_id: 'set-u1',
+    weight_kg: 140,
+    reps: 1,
+    e1rm_kg: 142.5,
+  });
   const DAVE = holder('u1', 'Dave', 142.5);
   const SAM = holder('u2', 'Sam', 138);
 
@@ -281,7 +296,22 @@ describe('history sentences (E1.3)', () => {
       },
       "No one holds #1 (Dave's 142.5 kg removed — set deleted)",
     ],
-    ['a certification', { reason: 'certification', previous: SAM }, 'Dave took #1 · 142.5 kg (certified)'],
+    ['a certification with no related event', { reason: 'certification', previous: SAM }, 'Dave took #1 · 142.5 kg (certified)'],
+    [
+      'a certification given',
+      { reason: 'certification', previous: SAM, related: certification('certified', 'Kim') },
+      'Dave took #1 · 142.5 kg (certified by Kim)',
+    ],
+    [
+      'a certification withdrawn',
+      { reason: 'certification', leader: SAM, previous: DAVE, related: certification('withdrawn', 'Kim') },
+      "Sam now #1 · 138 kg (Dave's 142.5 kg certification withdrawn)",
+    ],
+    [
+      'a voided certification that empties the Certified board',
+      { reason: 'certification', leader: null, previous: DAVE, related: certification('voided', null) },
+      "No one holds #1 (Dave's 142.5 kg certification voided)",
+    ],
     ['an unknown reason', { reason: 'dispute', previous: SAM }, 'Dave took #1 · 142.5 kg'],
     ['a link with no related event', { reason: 'link', related: null }, 'Dave took #1 · 142.5 kg'],
   ])('%s', (_label, overrides, expected) => {

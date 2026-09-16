@@ -183,8 +183,17 @@ export type BoardRow = {
   set_id: string;
   /** The member's live `session_exercises.name`, or null. */
   exercise_name: string | null;
-  /** Always false until M25-T06. */
+  /** An active certification pinned to this row's set (M25-T06), on All and Certified alike. */
   certified: boolean;
+  certification: GroupBoardCertificationRef | null;
+};
+
+/** The active certification behind a certified row (M25-T06, §4.5). */
+export type GroupBoardCertificationRef = {
+  certification_id: string;
+  /** Null when the certifier's account is gone. */
+  certified_by: GroupMemberRef | null;
+  certified_at_ms: number;
 };
 
 export type GroupBoardPodiumExercise = {
@@ -247,6 +256,18 @@ export type GroupBoardHistoryRelated =
       key: string;
       event: 'link' | 'unlink';
       exercises: { exercise_definition_id: string; name: string | null }[];
+    }
+  | {
+      /** M25-T06: the certification that moved a Certified board, read live. */
+      kind: 'certification';
+      key: string;
+      event: 'certified' | 'withdrawn' | 'cancelled' | 'voided';
+      certified_by: GroupMemberRef | null;
+      ended_by: GroupMemberRef | null;
+      set_id: string;
+      weight_kg: number;
+      reps: number;
+      e1rm_kg: number | null;
     };
 
 /** Known lead-change reasons; a later server may send more, which render a fallback sentence. */
