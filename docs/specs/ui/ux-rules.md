@@ -53,6 +53,14 @@ Document app-specific UI semantics and guardrails for the current mobile app.
    - More groups real destinations under Community, Tools, and Library &
      account; account-bound rows are omitted without a user and
      developer-only rows use `isDevMode()`.
+7. Today is a bounded overview, not a second full feed or history screen.
+   - An active draft replaces the planned-session action and exposes Resume.
+   - Joined-group activity reuses the group stream cards, membership rows, and
+     offline/error patterns and is limited to the two newest visible items.
+   - Recent personal activity is limited to the three newest non-deleted
+     completed sessions; full history remains owned by Progress.
+   - When the separate planning dependency is absent, Today says so explicitly
+     and offers Train; it never invents a scheduled session or metric.
 
 ### 2. Modal and overlay semantics
 

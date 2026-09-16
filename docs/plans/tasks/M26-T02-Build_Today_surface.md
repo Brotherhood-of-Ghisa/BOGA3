@@ -1,7 +1,7 @@
 ---
 task_id: M26-T02-Build_Today_surface
 milestone_id: "M26"
-status: planned
+status: in_progress
 ui_impact: "yes"
 areas: "docs|frontend"
 runtimes: "docs|node|expo|maestro|supabase"
@@ -14,7 +14,7 @@ docs_touched: "docs/specs/ui/screen-map.md, docs/specs/ui/navigation-contract.md
 
 ## Task metadata
 
-- Status: `planned`
+- Status: `in_progress`
 - Session interaction mode: `interactive`
 - Parent milestone: `docs/plans/milestones/M26-four-tab-navigation.md`
 - Depends on: M26-T01
@@ -22,11 +22,12 @@ docs_touched: "docs/specs/ui/screen-map.md, docs/specs/ui/navigation-contract.md
 
 ## Context freshness at task start
 
-- Run the task bootstrap helper and record branch/HEAD.
-- Reread required specs and the test README before edits.
-- Inventory current group-stream components/hooks, session-history query/list,
-  active-draft access, and planning read interface. Reuse them rather than this
-  card's examples if APIs have moved.
+- Verified branch + HEAD at task start: `m26-option-c-navigation @ 96198790`.
+- Reread the required UI/test specs and `apps/mobile/app/__tests__/README.md`.
+- Inventoried the current group stream, session list/active draft, and planning
+  surfaces. The first two are shipped; no planning read/materialization API or
+  route exists on `main` or the M23 planning branch, so that dependency remains
+  explicit rather than being guessed.
 
 ## Objective
 

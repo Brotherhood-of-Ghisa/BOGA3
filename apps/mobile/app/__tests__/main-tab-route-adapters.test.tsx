@@ -1,6 +1,5 @@
 import { render, screen } from '@testing-library/react-native';
 
-import TodayRouteAdapter from '../(tabs)/today';
 import TrainRouteAdapter from '../(tabs)/train';
 
 jest.mock('expo-router', () => {
@@ -14,7 +13,6 @@ jest.mock('expo-router', () => {
 
 describe('M26 dormant route adapters', () => {
   it.each([
-    ['Today', TodayRouteAdapter, '/stats-history'],
     ['Train', TrainRouteAdapter, '/session-recorder'],
   ])('%s preserves access to an existing destination before cutover', (_name, Route, href) => {
     render(<Route />);

@@ -142,7 +142,8 @@ navigation bar on `main`.
 ## Task breakdown
 
 1. **Completed:** inactive four-tab route/navigation foundation.
-2. `docs/plans/tasks/M26-T02-Build_Today_surface.md` — compose the default and active Today states.
+2. **In progress:** Today composes real active/recent session and joined-group
+   data; planned-session production wiring waits on M23's unshipped interface.
 3. `docs/plans/tasks/M26-T03-Build_Train_surface_and_session_entry.md` — centralize session launch/resume and planner entry under Train.
 4. **Completed:** Progress reuses the existing Stats / History implementation,
    session history, and daily/weekly heat maps without adding analytics.

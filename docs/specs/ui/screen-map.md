@@ -22,19 +22,37 @@ Brief entrypoint map of the current mobile screens.
 - Notes:
   - no unique UI; renders an `expo-router` `Redirect` to the merged Stats/History tab
 
-1b. `/today`, `/train` (M26 dormant adapters)
-- Files: `apps/mobile/app/(tabs)/today.tsx`, `train.tsx`
+1b. `/today` (M26 dormant canonical route)
+- File: `apps/mobile/app/(tabs)/today.tsx`
 - Purpose:
-  - reserve the approved four-tab route names while their real surfaces are
-    implemented independently
+  - concise orientation surface for current personal training, joined-group
+    activity, and recent completed sessions
 - Key states (high level):
-  - no unique UI yet; each route redirects to the closest existing destination
-    (`stats-history` and `session-recorder`, respectively)
+  - an active draft takes priority and exposes one resume action; without one,
+    the planning slot renders ready/loading/empty/error/unavailable states
+  - group activity is bounded to two newest joined-group-visible items and
+    preserves auth-unavailable, signed-out, cached/offline, missing-data,
+    empty, and inline-error behavior from the existing group stream
+  - recent activity is bounded to the three newest non-deleted completed
+    sessions and preserves repository loading/error/empty behavior
+  - the production planning state is explicitly unavailable until the separate
+    planning milestone supplies its read/materialization interface
 - Key exits:
-  - the redirect target; both are hidden from the production tab bar until
-    the M26 cutover
+  - `/session-recorder`, `/train`, `/groups`, `/group/[groupId]`,
+    `/group-session/[memberId]/[sessionId]`,
+    `/completed-session/[sessionId]`, `/progress`, and `/sign-in`
+  - hidden from the production tab bar until the M26 cutover
 
-1c. `/progress` (M26-T04 dormant canonical route)
+1c. `/train` (M26 dormant adapter)
+- File: `apps/mobile/app/(tabs)/train.tsx`
+- Purpose:
+  - reserves the approved Train route while its hub is implemented
+- Key states (high level):
+  - no unique UI yet; redirects to `/session-recorder`
+- Key exits:
+  - `/session-recorder`; hidden from the production tab bar until the cutover
+
+1d. `/progress` (M26-T04 dormant canonical route)
 - File: `apps/mobile/app/(tabs)/progress.tsx`
 - Purpose:
   - canonical future entry to the current Stats / History dashboard without
@@ -47,7 +65,7 @@ Brief entrypoint map of the current mobile screens.
   - hidden from the production tab bar until the M26 cutover;
     `/stats-history` remains available as the legacy path
 
-1d. `/more` (M26-T05 dormant canonical route)
+1e. `/more` (M26-T05 dormant canonical route)
 - File: `apps/mobile/app/(tabs)/more.tsx`
 - Purpose:
   - scalable home for secondary capabilities that should not expand the

@@ -33,9 +33,11 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
   `apps/mobile/src/navigation/main-tabs.ts` for `Today / Train / Progress /
   More`. The production tab bar and `/` redirect remain unchanged until the
   milestone cutover. The routes are registered with `href: null`, so they do
-  not appear in the current tab bar. Temporary direct-route adapters remain for:
-  - `/today` -> `/stats-history`
-  - `/train` -> `/session-recorder`
+  not appear in the current tab bar. `/train` remains a temporary direct-route
+  adapter to `/session-recorder`.
+  `/today` now renders its real overview by composing the existing active/recent
+  session repository and joined-group stream; the planning slot reports the
+  current unavailable dependency instead of inventing plan data.
   `/progress` now renders the exact existing Stats / History implementation;
   `/stats-history` remains available with unchanged behavior as its legacy path.
   `/more` now renders the secondary-feature hub while remaining hidden from
@@ -53,18 +55,34 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 - Behavior:
   - renders an `expo-router` `Redirect` to `/stats-history`
 
-1b. `/today`, `/train` (M26 dormant adapters)
-- Files: `apps/mobile/app/(tabs)/today.tsx`, `train.tsx`
+1b. `/today` (M26 dormant canonical route)
+- File: `apps/mobile/app/(tabs)/today.tsx`
 - Params:
   - none
 - Behavior:
-  - direct-only migration adapters registered as hidden tab screens (`href:
-    null`); the current tab strip has no entry points to them
-  - redirect to the existing destinations listed in the router baseline above
-  - replaced by their real surfaces in M26-T02 and T03 before the T06
-    production cutover
+  - composes an active-session resume or planning state, a bounded joined-group
+    stream snapshot, and the three most recent non-deleted completed sessions
+    from the existing feature hooks/repository
+  - group activity preserves signed-out, auth-unavailable, cached/offline,
+    missing-data, and inline-error states; item taps use the existing group and
+    friend-session routes
+  - an active session replaces the planned-session action and resumes at
+    `/session-recorder`; recent rows open `/completed-session/[sessionId]` and
+    the section-level action opens `/progress`
+  - until the separate planning milestone ships a read/materialization API, the
+    planning slot states that planning is unavailable and links to `/train`;
+    no scheduled data or materialization behavior is synthesized
+  - remains hidden from the production tab strip until the M26 cutover
 
-1c. `/progress` (M26 dormant canonical route)
+1c. `/train` (M26 dormant adapter)
+- File: `apps/mobile/app/(tabs)/train.tsx`
+- Params:
+  - none
+- Behavior:
+  - direct-only migration adapter registered as a hidden tab screen (`href:
+    null`); redirects to `/session-recorder` until its real hub ships
+
+1d. `/progress` (M26 dormant canonical route)
 - File: `apps/mobile/app/(tabs)/progress.tsx`
 - Query params:
   - the same optional `period` and `breakdown` values as `/stats-history`
@@ -75,7 +93,7 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
   - remains hidden from the production tab strip until the M26 cutover
   - `/stats-history` stays available as the unchanged legacy path
 
-1d. `/more` (M26 dormant canonical route)
+1e. `/more` (M26 dormant canonical route)
 - File: `apps/mobile/app/(tabs)/more.tsx`
 - Params:
   - none
