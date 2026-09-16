@@ -44,20 +44,21 @@ export const parseBoardScopeParam = (value: string | string[] | undefined | null
 export const formatBoardViewLabel = (metric: GroupBoardMetric, scope: GroupBoardScope): string =>
   `${BOARD_SCOPE_LABELS[scope]} · ${BOARD_METRIC_LABELS[metric]}`;
 
+/** The full board; with a view, its toggles as the query (typed-route template literals). */
 export const groupBoardPath = (
   groupId: string,
   groupExerciseId: string,
   view?: { metric: GroupBoardMetric; scope: GroupBoardScope },
-): string => {
-  const base = `/group/${groupId}/leaderboards/${groupExerciseId}`;
-  return view ? `${base}?metric=${view.metric}&scope=${view.scope}` : base;
-};
+) =>
+  view
+    ? (`/group/${groupId}/leaderboards/${groupExerciseId}?metric=${view.metric}&scope=${view.scope}` as const)
+    : (`/group/${groupId}/leaderboards/${groupExerciseId}` as const);
 
 export const groupBoardHistoryPath = (
   groupId: string,
   groupExerciseId: string,
   view: { metric: GroupBoardMetric; scope: GroupBoardScope },
-): string => `/group/${groupId}/leaderboards/${groupExerciseId}/history?metric=${view.metric}&scope=${view.scope}`;
+) => `/group/${groupId}/leaderboards/${groupExerciseId}/history?metric=${view.metric}&scope=${view.scope}` as const;
 
 // ---- Formatting -----------------------------------------------------------------
 
