@@ -228,6 +228,34 @@ describe('useGroupOnlinePages', () => {
     expect(result.current.hasMore).toBe(false);
   });
 
+  it('a failed refresh that overtook an older page clears its spinner', async () => {
+    let resolveMore: (value: Page) => void = () => undefined;
+    const fetchPage = jest
+      .fn<Promise<Page>, [Cursor | null]>()
+      .mockResolvedValueOnce(page(['a'], 'a'))
+      .mockImplementationOnce(() => new Promise<Page>((resolve) => (resolveMore = resolve)))
+      .mockRejectedValueOnce(new GroupApiError('NETWORK', 'down'));
+    const { result } = renderPages({ viewKey: 'v1', fetchPage });
+    await flush();
+
+    let more: Promise<void> = Promise.resolve();
+    act(() => {
+      more = result.current.loadMore();
+    });
+    expect(result.current.loadingMore).toBe(true);
+    await act(async () => {
+      await result.current.refresh();
+    });
+    await act(async () => {
+      resolveMore(page(['b'], null));
+      await more;
+    });
+
+    expect(result.current.loadingMore).toBe(false);
+    expect(result.current.offline).toBe(true);
+    expect(ids(result.current.items)).toEqual(['a']);
+  });
+
   it('a failed next page keeps the rows and retries the same cursor', async () => {
     const fetchPage = jest
       .fn<Promise<Page>, [Cursor | null]>()

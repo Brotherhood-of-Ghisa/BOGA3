@@ -292,7 +292,9 @@ var steps = {
     ]);
 
     // The pg_net kick normally applies within seconds; the pg_cron sweep (30 s)
-    // backs it up. runScript has no sleep, so this polls until the deadline.
+    // backs it up. runScript has no sleep, so this polls until a row, the
+    // deadline, or the poll cap. push() stamps groupsPushedAtMs, so the latency
+    // below is from the link push.
     var deadline = Date.now() + 90 * 1000;
     var polls = 0;
     var board;
@@ -307,8 +309,8 @@ var steps = {
         p_limit: 10,
       });
       if (board.rows && board.rows.length > 0) break;
-      if (Date.now() > deadline) {
-        fail('no board row 90 s after the link push (' + polls + ' polls)');
+      if (Date.now() > deadline || polls >= 3000) {
+        fail('no board row after the link push (' + polls + ' polls)');
       }
     }
     var row = board.rows[0];

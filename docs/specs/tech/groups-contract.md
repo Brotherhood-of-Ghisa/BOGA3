@@ -1647,7 +1647,7 @@ E0.1–E0.3).
   `Total load` / `Per side` control, labelled by `LOAD_INPUT_MODE_LABELS` in
   `src/exercise-core`) renders in the personal exercise editor and in the
   group exercise form. Both validate the name through `validateExerciseCore`.
-- **Leaderboards** is an empty state with no read until M25-T09 (as-built below).
+- **Leaderboards** was an empty state until M25-T09 (as-built below).
 - **Link your exercise** (E0.4). An active row none of my exercises is
   linked to shows `Link your exercise` to every member; archived rows are not
   offered (D8). It opens the M25-T07 pick sheet with `purpose="link-only"`: the
@@ -1678,7 +1678,7 @@ design §7.
 - **Full board.** `?metric=weight|e1rm&scope=certified|all`; anything else
   opens e1RM · Certified. The two joined toggles switch in place; `History`
   sits in the header and carries the toggles.
-  - Rows: rank, `You` / name, ` (former)`, date. e1RM rows show the estimate
+  - Rows: rank, `You` / name, ` (former)`, value, date. e1RM rows show the estimate
     with the set behind it (`140 kg × 1`); Weight rows show the set. On All
     only, `✓` or `○ uncertified`.
   - Empty Certified: `No certified sets yet` with `See all sets` (the board
@@ -1686,9 +1686,10 @@ design §7.
   - Rows are not pressable yet: the row detail is M25-T10.
 - **History.** Newest first, one sentence per lead change: `L set the first
   record · v`, `L took #1 · v (from P, pv)`, `… (linked A)`, `… (P unlinked
-  A)`, `L now #1 · v (P's pv removed — set edited|deleted)`, `No one holds #1
+  A)`, `L now #1 · v (P's pv removed — set edited|deleted)` (`You're now #1` for me), `No one holds #1
   (…)`, `… (certified)`; an unknown reason reads `L took #1 · v`. A void reads
-  "now #1": an item does not say whether L held #1 before.
+  "now #1": an item does not say whether L held #1 before. Values are kg
+  on both metrics (no reps).
 - **Online pages** (`useGroupOnlinePages`). The board and history are never
   cached. The first page loads on mount, on a toggle change, on focus, and on
   pull-to-refresh, with no 30 s poll; a refresh discards older pages.
