@@ -173,6 +173,10 @@ Brief entrypoint inventory of the current reusable UI component set.
   - `GroupExerciseForm` (M25-T08) — the add / edit group-exercise form over `ExerciseCoreFields`, validated by `validateExerciseCore`, with the write's failure above the submit button
   - `StandardExercisePicker` (M25-T08) — search and list of the bundled standard exercises to copy into a group
   - `GroupLostAccessState` (M25-T08) — the shared "You're no longer a member of this group" panel
+  - `GroupLeaderboardsPage`, `GroupPodiumCard` (M25-T09) — the Leaderboards segment: one whole-card press target per group exercise (name, view label, `Archived` tag, up to three podium rows, empty label, `You: …`). testIDs `group-leaderboards-page`, `group-leaderboards-empty`, `group-podium-card-<exerciseId>` with `-name`, `-view`, `-archived`, `-row-<rank>`, `-empty`, `-you`
+  - `GroupBoardRow` (M25-T09) — one full-board row as a single accessibility element (rank, member, value, e1RM detail, date, ✓ / ○ on All); my row on the muted panel. testID `group-board-row-<rank>` with `-member`, `-value`, `-detail`, `-date`, `-mark`
+  - `GroupBoardHistoryItem` (M25-T09) — one lead change: date and sentence. testID `group-board-history-item-<seq>` with `-date`, `-sentence`
+  - `GroupPagesFooter` (M25-T09) — the footer of an online paged list: a spinner, or the failure with `Retry` (`<prefix>-loading-more`, `-load-more-error`, `-load-more-retry`)
   - `UsernameGate` + `useUsernameGate(userId)` (M22-T05) — the inline username field shown before create / join when the profile username is blank (`loadUserProfile` / `saveUsername`); errors inline under the field; `require(notice)` re-opens it on a server `USERNAME_REQUIRED`; a profile that fails to load does not block the form
   - `GroupDetailsForm` (M22-T05) — the shared create / edit form: name (1–50) and optional description (≤280, counter) with inline validation, the write's failure above the submit button
   - `GroupWriteNotice` (M22-T05) — inline error / success outcome of a group write
