@@ -390,9 +390,13 @@ function TodaySocialSnapshot({
   }
 
   const inlineError = pickInlineError(socialState.error);
-  const viewModels = buildStreamViewModel(
-    socialState.items.slice(0, SOCIAL_ACTIVITY_LIMIT),
-  );
+  // Today is a compact orientation surface, not a second copy of the full
+  // Groups feed. Keep its established session/membership snapshot even when
+  // the group stream adds richer event kinds such as records and links.
+  const snapshotItems = socialState.items
+    .filter((item) => item.kind === 'session' || item.kind === 'membership')
+    .slice(0, SOCIAL_ACTIVITY_LIMIT);
+  const viewModels = buildStreamViewModel(snapshotItems);
 
   return (
     <View style={styles.list}>
@@ -424,23 +428,29 @@ function TodaySocialSnapshot({
           title="No group activity yet"
         />
       ) : (
-        viewModels.map((item) =>
-          item.kind === 'session' ? (
-            <GroupStreamSessionCard
-              card={item}
-              key={item.key}
-              onPress={(card) => onOpenSession(card.memberUserId, card.sessionId)}
-              showGroupNames
-            />
-          ) : (
-            <GroupStreamMembershipItem
-              item={item}
-              key={item.key}
-              onPress={(membership) => onOpenGroup(membership.groupId)}
-              showGroupName
-            />
-          ),
-        )
+        viewModels.map((item) => {
+          if (item.kind === 'session') {
+            return (
+              <GroupStreamSessionCard
+                card={item}
+                key={item.key}
+                onPress={(card) => onOpenSession(card.memberUserId, card.sessionId)}
+                showGroupNames
+              />
+            );
+          }
+          if (item.kind === 'membership') {
+            return (
+              <GroupStreamMembershipItem
+                item={item}
+                key={item.key}
+                onPress={(membership) => onOpenGroup(membership.groupId)}
+                showGroupName
+              />
+            );
+          }
+          return null;
+        })
       )}
     </View>
   );

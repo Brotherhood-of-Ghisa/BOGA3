@@ -69,6 +69,22 @@ const membershipItem: StreamItem = {
   member: { user_id: 'member-2', username: 'Bea' },
 };
 
+const linkItem: StreamItem = {
+  kind: 'link',
+  key: 'link-1',
+  sort_at_ms: Date.parse('2026-09-16T11:00:00.000Z'),
+  event: 'link',
+  group: { group_id: 'group-3', name: 'Evening Crew' },
+  member: { user_id: 'member-4', username: 'Dana' },
+  group_exercise: {
+    group_exercise_id: 'group-exercise-1',
+    name: 'Bench Press',
+    load_input_mode: 'total_load',
+  },
+  exercises: [{ exercise_definition_id: 'exercise-1', name: 'Bench Press' }],
+  effects: [],
+};
+
 const socialState = (items: StreamItem[] = []): TodaySocialState => ({
   status: 'available',
   hasData: true,
@@ -210,11 +226,12 @@ describe('Today screen', () => {
     expect(mockPush).toHaveBeenNthCalledWith(2, '/progress');
   });
 
-  it('bounds joined-group activity and routes its two supported item kinds', () => {
+  it('bounds joined-group activity to its two supported item kinds', () => {
     render(
       <TodayScreen
         initialSessions={[]}
         socialState={socialState([
+          linkItem,
           streamSession('member-1:session-1', 'member-1', 'session-1'),
           membershipItem,
           streamSession('member-3:session-3', 'member-3', 'session-3'),
@@ -224,6 +241,7 @@ describe('Today screen', () => {
 
     expect(screen.getByTestId('group-stream-session-card-member-1:session-1')).toBeTruthy();
     expect(screen.getByTestId('group-stream-membership-membership-1:joined')).toBeTruthy();
+    expect(screen.queryByTestId('group-stream-link-link-1')).toBeNull();
     expect(screen.queryByTestId('group-stream-session-card-member-3:session-3')).toBeNull();
 
     fireEvent.press(screen.getByTestId('group-stream-session-card-member-1:session-1'));

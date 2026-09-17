@@ -30,9 +30,10 @@ Brief entrypoint map of the current mobile screens.
 - Key states (high level):
   - an active draft takes priority and exposes one resume action; without one,
     the planning slot renders ready/loading/empty/error/unavailable states
-  - group activity is bounded to two newest joined-group-visible items and
-    preserves auth-unavailable, signed-out, cached/offline, missing-data,
-    empty, and inline-error behavior from the existing group stream
+  - group activity is bounded to the two newest session or membership items
+    visible to the user's joined groups; richer record/link events remain in
+    the full Groups feed, while Today preserves auth-unavailable, signed-out,
+    cached/offline, missing-data, empty, and inline-error behavior
   - recent activity is bounded to the three newest non-deleted completed
     sessions and preserves repository loading/error/empty behavior
   - until the separate planning milestone supplies its read/materialization
