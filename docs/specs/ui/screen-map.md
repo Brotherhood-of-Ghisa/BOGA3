@@ -260,6 +260,7 @@ Brief entrypoint map of the current mobile screens.
 - File: `apps/mobile/app/(tabs)/groups.tsx`
 - Purpose:
   - the fourth tab: a newest-first stream of group members' sessions and membership events, filtered by `All` or one group
+  - (M25-T10) record cards sit directly below their session card, whose `N records` label counts them; record-removed and link items are light rows; a record card opens the row detail sheet and offers `Certify` inline (each names its group in All)
 - Key states (high level):
   - signed-out / auth-unconfigured sign-in-required card (no group RPC runs)
   - no-groups explanatory empty state with `Create group` / `Join with a code` (the header Join / Create row is hidden then)
@@ -268,6 +269,7 @@ Brief entrypoint map of the current mobile screens.
   - offline marker over cached data; offline empty state with no cache; inline error or error state with `Retry`
 - Key exits:
   - `/group-session/<memberId>/<sessionId>` (session card), `/group/<groupId>` (membership item), `/group/mine` (header), `/group/new`, `/group/join` (header or empty state)
+  - the in-route row detail sheet (record card), whose `View full session` opens `/group-session/<memberId>/<sessionId>`
 
 13. `/group/mine`
 - File: `apps/mobile/app/group/mine.tsx`
@@ -286,9 +288,10 @@ Brief entrypoint map of the current mobile screens.
   - loading / offline / error; the offline banner and inline error follow the open segment
   - Exercises: active exercises, then archived ones marked `Archived`, each with its weight entry and my local link status (`Linked: …` / `Not linked`); an active row none of mine is linked to offers `Link your exercise` to every member (the M25-T07 pick sheet, link-only); owner/admin `Add exercise` and a row sheet (`Rename`, `Archive` with confirmation, or `Unarchive`), which members never see; "No group exercises yet" when empty; each write's outcome as an inline notice
   - Leaderboards (M25-T09): one podium card per group exercise on `Certified · e1RM` (top 3 with `You` on my row, `You: Nth` below the podium, `You: not ranked`, `No certified sets yet · N uncertified` / `No sets yet`), archived exercises last marked `Archived`; "No group exercises yet" when empty; cached, so it shows offline
-  - lost access after `NOT_FOUND` on any of its reads: "You're no longer a member of this group", with cached data hidden
+  - Stream (M25-T10): record cards, record-removed and link items as on the Groups tab, without group names; the row detail sheet from a record card
+  - lost access after `NOT_FOUND` on any of its reads, or on a certification write: "You're no longer a member of this group", with cached data hidden
 - Key exits:
-  - `/group-session/<memberId>/<sessionId>` (session card); membership items here do not navigate
+  - `/group-session/<memberId>/<sessionId>` (session card, or the sheet's `View full session`); membership, record-removed, and link items here do not navigate
   - `/group/<groupId>/members` (member count), `/group/<groupId>/invite`, `/group/<groupId>/edit`
   - `/group/<groupId>/exercises/new` (`Add exercise`), `/group/<groupId>/exercises/<exerciseId>/edit` (`Rename`)
   - `/group/<groupId>/leaderboards/<exerciseId>` (podium card)
@@ -333,10 +336,12 @@ Brief entrypoint map of the current mobile screens.
   - `Archived · read-only` under the name; empty Certified: "No certified sets yet" with `See all sets`; empty All: "No sets yet"
   - rows read online and paged (never cached): offline with nothing loaded shows the offline empty state, loaded rows stay with the offline marker, a failed next page shows `Retry`
   - lost access (group `NOT_FOUND`); "This exercise isn't in this group" (exercise `NOT_FOUND`)
+  - (M25-T10) a row opens the row detail sheet: value (with e1RM), the as-logged value when converted, date and gym, `Logged as "…"`, the certification line, and `Certify` / `Remove my certification` / `Cancel certification` as my relationship allows; a write refetches the first page
 - Key exits:
   - `History` → `/group/<groupId>/leaderboards/<exerciseId>/history`; back to the group screen
+  - the sheet's `View full session` → `/group-session/<memberId>/<sessionId>`
 - Notes:
-  - sets its stack title to the exercise name once loaded; rows are not pressable until M25-T10
+  - sets its stack title to the exercise name once loaded
 
 14e. `/group/[groupId]/leaderboards/[exerciseId]/history` (M25-T09)
 - File: `apps/mobile/app/group/[groupId]/leaderboards/[exerciseId]/history.tsx`

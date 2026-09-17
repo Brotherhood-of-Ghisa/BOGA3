@@ -867,7 +867,8 @@ matches the token prefix.
 | `CONFLICT` | (M25-T06) The state moved on since the caller saw it: certifying a set edited or deleted ahead of the evaluator. Refresh and retry. |
 
 Client-only codes: `NETWORK` for transport failure, and `INTERNAL` for
-anything unrecognized.
+anything unrecognized. The mobile client maps every token above, `CONFLICT`
+included (M25-T10).
 
 ### 4.1 Shared shapes
 
@@ -1062,7 +1063,8 @@ items (T6).
   `exercise_definitions` (null if gone): they chose to link that exercise
   into the group.
 - **Clients.** A build that doesn't render a kind drops it in `getGroupStream`
-  (§6.1). Paging uses the server's `next_cursor`, so it walks past them.
+  (§6.1). Paging uses the server's `next_cursor`, so it walks past them. Since
+  M25-T10 the mobile client renders all five kinds.
 
 ### 4.3 Writes
 
@@ -1254,8 +1256,14 @@ takes the board advisory lock.
   first end is kept); otherwise `ended_at`, `end_reason`, `ended_by =
   caller`, and enqueue.
 - Withdraw and cancel work on frozen targets (§2.11 known limits).
-- **Mobile.** No client wrapper yet; M25-T10 adds the RPCs and maps
-  `CONFLICT`.
+- **Mobile (M25-T10).** `certifyGroupSet({ groupId, groupExerciseId,
+  memberUserId, setId })`, `withdrawGroupCertification(groupId,
+  certificationId)`, and `cancelGroupCertification(groupId, certificationId)`
+  in `src/groups/api.ts` send every `p_*` arg; the shape checks are a
+  `certification` with a string `certification_id` (plus a boolean `created`
+  on certify). `CONFLICT` maps from its token. `isGroupNotFound`,
+  `isRecordSetNotFound`, `isCertificationNotFound`, and `isGroupMemberNotFound`
+  match the messages above, so only `group not found` evicts.
 
 ## 5. Stream-card metrics (computed on the viewing device)
 
@@ -1312,6 +1320,8 @@ view model and `FriendSessionContent` use them. Jest:
 | `use-mounted-ref.ts` | (M25-T08) `useMountedRef`: a write that finishes after its screen unmounted must not navigate |
 | `board-view-model.ts` | (M25-T09) Podium cards, full-board rows, history sentences, the board's `metric` / `scope` params and paths, ordinal / date / kg formatting |
 | `use-group-online-pages.ts` | (M25-T09) Online-only paged reads (full board, history): no cache, no poll, cursor paging, first-seen dedupe, lost access vs exercise missing |
+| `record-set-view-model.ts` | (M25-T10) The row detail model built from a board row or a stream record, `recordSetActionsFor` (certify / withdraw / cancel), the sheet's lines, and the wording of every certification outcome |
+| `use-record-set-certification.ts` | (M25-T10) The three certification writes through `useGroupAction`: per-set pending and notice, the returned certification shown until the host re-reads, host refresh after a success or a data-moved failure, eviction on group `NOT_FOUND` |
 
 **Network state.** The hook reuses the sync scheduler's NetInfo projection
 through the existing sync-status accessor (`apps/mobile/src/sync/sync-status.ts`)
@@ -1334,11 +1344,12 @@ RPC failure is caught in this module (C3.10.5, AC13).
     `regenerateGroupInviteCode`, `joinGroup`, `leaveGroup`,
     `removeGroupMember`, `setGroupMemberRole`, `transferGroupOwnership`.
   - `group_stream` always sends all three `p_*` args.
-  - **Unrendered kinds (M25-T05).** `getGroupStream` drops every item whose
-    `kind` is not `session` or `membership` (`record`, `record_voided`,
-    `link`, §4.2) before callers or the cache see it, and keeps the server's
-    `next_cursor`. `StreamCursor.kind` therefore also admits those kinds
-    (`UnrenderedStreamKind`). M25-T10 renders them and widens the set.
+  - **Stream kinds (M25-T05, M25-T10).** `getGroupStream` keeps `session`,
+    `membership`, `record`, `record_voided`, and `link` items and drops any
+    other kind before callers or the cache see it, keeping the server's
+    `next_cursor`; `StreamCursor.kind` admits any string. Items of a known
+    kind are trusted as typed (the shapes are asserted server-side by
+    `groups-leaderboards`).
   - Group exercises (M25-T01): `listGroupExercises`,
     `createGroupExercise(groupId, { name, loadInputMode, sourceExerciseId })`,
     `updateGroupExercise`, `archiveGroupExercise`, `unarchiveGroupExercise`,
@@ -1427,6 +1438,10 @@ migration via `npm run db:generate`.
 - **Shape change (post-M22).** `apps/mobile/drizzle/0005_clear_group_cache.sql`
   deletes every row once, so a payload cached in the old metrics shape is never
   rendered by the raw-set client.
+- **No clear for the board kinds (M25-T10).** A `stream:*` entry written
+  before M25-T10 is the same top-level shape with the board kinds filtered
+  out: a valid subset of the new payload. It renders as is and is replaced on
+  the next refresh, so there is no clear migration.
 
 ### 6.3 Routes
 
@@ -1704,6 +1719,80 @@ design §7.
   `groups-board-view-model.test.ts`, `groups-online-pages.test.tsx`,
   `groups-leaderboards-screens.test.tsx`, `groups-cache.test.ts`. Maestro:
   steps 7b and 8b of `groups-two-user-stream.yaml` (§8).
+  Rows became pressable in M25-T10 (below).
+
+**As-built (M25-T10): stream record items, row detail, certify.** Product
+P10–P18, D3–D5, D15, D16, E2, E3; M25 design §4, §6.
+
+- **Stream items** (`buildStreamViewModel(items, myUserId)`).
+  - A `record` whose session card is among the loaded items is emitted
+    directly below that card, in server order; otherwise it stays where the
+    server put it (the server sorts it just above its session: same
+    `sort_at_ms`, `kind` ascending). The session card's `recordsLabel` (`1
+    record` / `N records`) counts those records, non-voided, deduplicated by
+    `set_id`. It is a label, not a link.
+  - Record card (`GroupStreamRecordCard`): `<name> — group record` when any
+    listed board has `group_record`, else `— PR`; `<exercise>  140 kg × 1`,
+    plus ` · e1RM 142.5 kg` when an e1RM board is listed; badges per board,
+    Weight then e1RM, `PR · <metric>` then `Group record · <metric>`;
+    `Session in progress` while provisional; `○ Not certified yet`, `✓
+    Certified by <name|you>` (`✓ Certified` when the certifier is gone), or
+    `Voided · set edited|deleted` (the voided card on the muted panel, status
+    first). `Certify` shows when not voided, not certified, and not mine; the
+    group name shows in All.
+  - `record_voided` and `link` are light rows (`GroupStreamSentenceItem`),
+    not pressable: `dave's Bench Press record removed (140 kg × 1) — set
+    edited · Now #1 on Weight: sam 138 kg · No one holds #1 on e1RM`; `dave
+    linked A, B to Bench Press — now #1 on Weight and e1RM` (or `— now #2 on
+    Weight, #1 on e1RM`, `off the <metric> board`; `unlinked … from`; a null
+    exercise name reads `an exercise`). My name reads `You` / `Your`.
+- **Row detail sheet** (`RecordSetSheet`, an in-route `Modal`), opened from a
+  record card or a full-board row (`GroupBoardRow` is now a press target). It
+  shows `<name> · <group exercise>`, `140 kg × 1 (e1RM 142.5 kg)`, the
+  as-logged value when `load_factor` is 2 (`Logged 70 kg per side · counted
+  as 140 kg total`) or 0.5 (`Logged 140 kg total · counted as 70 kg per
+  side`), `12 Sep 2026 · <gym>`, `Logged as "<name>"` (the board row's
+  `exercise_name`, else the session detail's exercise holding the set), the
+  provisional line, the certification line (`… · 12 Sep`), the lifter's `Other
+  members can certify this set.`, and `View full session`
+  (`/group-session/<member>/<session>`; hidden for a `deleted` void or a
+  session `NOT_FOUND`). Gym and logged-as come from `group_session_detail`
+  through `useGroupResource` under `session:<memberId>:<sessionId>` (shared
+  with the friend view, no group eviction). The sheet follows the live stream
+  item or board row it was opened on, so a refresh shows the server's state.
+- **Actions** (`recordSetActionsFor(detail, myUserId, myRole)`):
+  - `certify`: uncertified, not voided, not archived (board payloads only;
+    the server refuses a stream record's archived target), not a former
+    member, and I am not the lifter;
+  - `withdraw` (`Remove my certification`): I am the certifier;
+  - `cancel` (`Cancel certification`): owner or admin, not the certifier.
+  My role comes from `group:<groupId>` on the group screen and the full board
+  (which now reads it, cache-first) and from `groups:mine` on the Groups tab;
+  unknown hides `Cancel`.
+- **Writes** (`useRecordSetCertification`, one per host: the stream list or
+  the board route). Offline is refused before any request, nothing is queued
+  or retried, and `group_cache` is never written by a write. Certify does not
+  confirm; withdraw and cancel confirm with `Alert.alert` (destructive). The
+  notice shows in the sheet, or on the card for an inline Certify:
+  `Certified. Certified boards update in a few seconds.`, `Already certified
+  by <name>.` (`created: false`), `Your certification was removed.`,
+  `Certification cancelled.`, or `This certification was already removed.`
+  (an already-ended certification comes back unchanged). The returned
+  certification shows at once, until the host's data changes.
+  - After a success, and after `CONFLICT` (`This set changed since it loaded.
+    Nothing was certified — refresh and try again.`), record set / member /
+    certification / group exercise `NOT_FOUND`, `FORBIDDEN`, or `VALIDATION`
+    (archived: `This exercise is archived. Its boards are read-only.`), the
+    host re-reads: the group screen its group and stream (the podiums
+    refresh when their segment opens), the Groups tab My groups and the
+    stream, the board its first page.
+  - A group `NOT_FOUND` evicts the group (`evictGroupFromDevice`) and the
+    host's re-read shows lost access.
+- **Evidence.** Jest: `groups-certification-api.test.ts`,
+  `groups-record-set-view-model.test.ts`, `groups-record-set-sheet.test.tsx`,
+  `groups-stream-view-model.test.ts`, `groups-api.test.ts`,
+  `groups-leaderboards-screens.test.tsx`. Maestro: steps 7b and 8b of
+  `groups-two-user-stream.yaml` (§8).
 
 ## 7. Freshness and offline
 
@@ -1718,7 +1807,8 @@ design §7.
   device is offline or the last refresh failed with `NETWORK`. The cached data
   stays visible. With no cache, an offline empty state is shown (C3.10.4).
 - **Writes are online-only.** Offline attempts show a clear error and change
-  nothing (C3.10.3, AC12).
+  nothing (C3.10.3, AC12). Certify, withdraw, and cancel (M25-T10) follow the
+  same rule (P18).
 
 **As-built (M22-T04).**
 
@@ -1930,6 +2020,13 @@ design §7.
   and opens History (`… took #1 · 51.25 kg (linked Bench Press)`). New step 8b,
   after the removal, deep-links to the All · Weight board and asserts the row
   reads `(former)`.
+- **As-built (M25-T10, flow extension).** Step 7b first waits for the stream's
+  link item (`<user_d> linked Bench Press to Prowler Push — now #1 on Weight
+  and e1RM`), then, on All · Weight, opens row 1's detail sheet: `Logged 102.5
+  kg total · counted as 51.25 kg per side`, `Logged as "Bench Press"`, `○ Not
+  certified yet`, and `Certify` for the owner, closed without certifying. Step
+  8b opens the former member's row: no `Certify`. No new fixture user or
+  counterparty step; certifying on device is M25-T11.
 - **Offline behaviour (AC12, AC13)** is proven in jest. Simulator network
   cannot be toggled reliably from Maestro.
 

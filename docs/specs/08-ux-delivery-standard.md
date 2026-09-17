@@ -117,6 +117,10 @@ Use this section as the single source of truth for reusable UX patterns.
    - Intent: let a search reach items from another source without crowding the default list.
    - Usage: the recorder exercise picker's `From your groups` section and `Groups` toggle (M25-T07; `components/groups/picker-group-section.tsx`).
    - Rules: the default (empty-search) list never shows the secondary source; with search text its matches follow the user's own matches under a labelled section header; a toggle beside the search box narrows the list to the secondary source only (and lists all of it when the search is empty); each row states its relationship to the user's own data in text ("linked: …" / "not linked"), not color alone; picking a row resolves to the user's own item or opens an explicit choice sheet.
+11. Record set detail sheet pattern
+   - Intent: one place to read and act on a shared record set, wherever it is shown.
+   - Usage: stream record cards and full-board rows (M25-T10; `components/groups/record-set-sheet.tsx`).
+   - Rules: every surface showing a record set opens the same in-route sheet; the sheet shows the ranked value, the as-logged value when converted, when and where, and the certification state in text; its actions come from one pure rule over my role and my relationship to the set (`recordSetActionsFor`), never from the surface; a surface may offer the sheet's non-destructive primary action inline, sharing the same write state; writes follow pattern 9 and removals confirm (pattern 3); after a write the host re-reads, and the sheet shows the server's returned state meanwhile.
 
 ## Default appearance baseline (MVP)
 
