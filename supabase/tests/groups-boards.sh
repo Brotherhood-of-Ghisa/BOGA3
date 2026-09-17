@@ -78,9 +78,16 @@ cleanup() {
   " >/dev/null
 }
 
+# Bash 3.2 hands the EXIT trap status 0 after an unbound-variable abort, so a
+# run that never reached its last line fails here instead of passing.
+COMPLETED=0
 cleanup_on_exit() {
   local status=$?
   trap - EXIT
+  if [[ ${status} -eq 0 && ${COMPLETED} -ne 1 ]]; then
+    echo "[${LANE_LABEL}] FAIL: the run stopped before completing" >&2
+    status=1
+  fi
   if ! cleanup; then
     echo "[${LANE_LABEL}] FAIL: cleanup of run ${RUN_TAG} failed" >&2
     [[ ${status} -ne 0 ]] || status=1
@@ -99,7 +106,7 @@ check_args() {
   shift
   local -a args=()
   while [[ "${1:-}" == "--arg" ]]; do args+=("$1" "$2" "$3"); shift 3; done
-  check "${context}" "$1" "${args[@]}"
+  check "${context}" "$1" ${args[@]+"${args[@]}"}
 }
 
 expect_sql() {
@@ -1088,4 +1095,5 @@ history "${AWAY_TOKEN}" "${GX1}" weight false
 expect_error NOT_FOUND "a removed member cannot read history"
 pass "R8: leaving freezes entries (former, still ranked); removed and former members get NOT_FOUND"
 
+COMPLETED=1
 echo "[${LANE_LABEL}] passed (run ${RUN_TAG})"

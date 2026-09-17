@@ -203,7 +203,20 @@ cleanup_rows() {
   " >/dev/null 2>&1 || true
 }
 cleanup_rows
-trap cleanup_rows EXIT
+# Bash 3.2 hands the EXIT trap status 0 after an unbound-variable abort, so a
+# run that never reached its last line fails here instead of passing.
+COMPLETED=0
+cleanup_on_exit() {
+  local status=$?
+  trap - EXIT
+  if [[ ${status} -eq 0 && ${COMPLETED} -ne 1 ]]; then
+    echo "[sync-v2-deferrable-fk] FAIL: the run stopped before completing" >&2
+    status=1
+  fi
+  cleanup_rows
+  exit "${status}"
+}
+trap cleanup_on_exit EXIT
 
 # Single transaction; child first, parents last. If any per-statement FK check
 # fires immediately the script will exit with the psql error.
@@ -306,4 +319,5 @@ if [[ "${neg_rc}" == "0" ]]; then
 fi
 pass "deferrable-fk B — negative control: IMMEDIATE FKs reject the same orphan insert (rc=${neg_rc})"
 
+COMPLETED=1
 echo "[sync-v2-deferrable-fk] all assertions passed"

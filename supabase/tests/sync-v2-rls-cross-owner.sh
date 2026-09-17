@@ -196,7 +196,20 @@ cleanup_rows() {
   " >/dev/null 2>&1 || true
 }
 cleanup_rows
-trap cleanup_rows EXIT
+# Bash 3.2 hands the EXIT trap status 0 after an unbound-variable abort, so a
+# run that never reached its last line fails here instead of passing.
+COMPLETED=0
+cleanup_on_exit() {
+  local status=$?
+  trap - EXIT
+  if [[ ${status} -eq 0 && ${COMPLETED} -ne 1 ]]; then
+    echo "[sync-v2-rls] FAIL: the run stopped before completing" >&2
+    status=1
+  fi
+  cleanup_rows
+  exit "${status}"
+}
+trap cleanup_on_exit EXIT
 
 # Seed user B's complete FK chain via direct SQL (bypassing RLS so we can
 # install rows under another user's owner_user_id deterministically). This is
@@ -458,4 +471,5 @@ done
 
 pass "rls — A's JWT cannot SELECT/INSERT/UPDATE/DELETE B's rows on any probed entity table"
 
+COMPLETED=1
 echo "[sync-v2-rls] all assertions passed"

@@ -56,7 +56,20 @@ restore_schema_file() {
   fi
   HERMETIC_RESTORED=1
 }
-trap restore_schema_file EXIT
+# Bash 3.2 hands the EXIT trap status 0 after an unbound-variable abort, so a
+# run that never reached its last line fails here instead of passing.
+COMPLETED=0
+cleanup_on_exit() {
+  local status=$?
+  trap - EXIT
+  if [[ ${status} -eq 0 && ${COMPLETED} -ne 1 ]]; then
+    echo "[sync-v2-drift-synthetic] FAIL: the run stopped before completing" >&2
+    status=1
+  fi
+  restore_schema_file
+  exit "${status}"
+}
+trap cleanup_on_exit EXIT
 
 # Append a `notes` text column to the schema definition. The original file
 # defines the columns inside `sqliteTable('exercise_sets', { ... })`. We
@@ -152,4 +165,5 @@ fi
 rm -f "${POS_OUTPUT_FILE}"
 pass "drift positive — drift checker exits 0 on the as-built tree"
 
+COMPLETED=1
 echo "[sync-v2-drift-synthetic] all assertions passed"
