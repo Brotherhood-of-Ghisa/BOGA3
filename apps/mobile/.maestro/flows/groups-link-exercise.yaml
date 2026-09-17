@@ -76,11 +76,55 @@ appId: com.dinoderek.mobile
     timeout: 30000
 # The grouping preference is shared by the catalogue and the picker; a flat list
 # makes every search result a direct row (grouped sections start collapsed).
-- tapOn: "Exercise catalog options"
-- tapOn:
-    text: "Turn grouping off"
-    optional: true
-- tapOn: "Close filters"
+#
+# Every step below retries until its effect is visible, not merely until the tap
+# lands: right after the teleport the screen is still settling (iOS 26 AX churn),
+# and a tap Maestro reports as done can be swallowed — the panel never opens and
+# the flow used to fail later on "Close filters". Each tap is guarded by `when`
+# so a retry never re-taps once the effect happened (a second ⋮ tap would hit
+# the modal's dismiss overlay; a second grouping tap would turn grouping back on).
+- extendedWaitUntil:
+    visible:
+      text: "Exercise filter input"
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 4000
+- retry:
+    maxRetries: 3
+    commands:
+      - runFlow:
+          when:
+            notVisible: "Close filters"
+          commands:
+            - tapOn: "Exercise catalog options"
+      - extendedWaitUntil:
+          visible:
+            text: "Close filters"
+          timeout: 5000
+- retry:
+    maxRetries: 3
+    commands:
+      - runFlow:
+          when:
+            visible: "Turn grouping off"
+          commands:
+            - tapOn: "Turn grouping off"
+      - extendedWaitUntil:
+          visible:
+            text: "Turn grouping on"
+          timeout: 5000
+- retry:
+    maxRetries: 3
+    commands:
+      - runFlow:
+          when:
+            visible: "Close filters"
+          commands:
+            - tapOn: "Close filters"
+      - extendedWaitUntil:
+          notVisible:
+            text: "Close filters"
+          timeout: 5000
 - tapOn: "Exercise filter input"
 - inputText: "Barbell Bench Press"
 - hideKeyboard:
