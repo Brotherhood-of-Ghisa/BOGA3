@@ -5,6 +5,8 @@ export {
   GROUP_STREAM_DEFAULT_LIMIT,
   GroupApiError,
   archiveGroupExercise,
+  cancelGroupCertification,
+  certifyGroupSet,
   createGroup,
   createGroupExercise,
   getGroup,
@@ -16,7 +18,11 @@ export {
   getGroupStream,
   groupExerciseCore,
   isGroupApiError,
+  isCertificationNotFound,
   isGroupExerciseNotFound,
+  isGroupMemberNotFound,
+  isGroupNotFound,
+  isRecordSetNotFound,
   joinGroup,
   leaveGroup,
   listGroupExercises,
@@ -32,6 +38,8 @@ export {
   unarchiveGroupExercise,
   updateGroup,
   updateGroupExercise,
+  withdrawGroupCertification,
+  type CertifyGroupSetInput,
   type CreateGroupExerciseInput,
   type GroupBoardHistoryRequest,
   type GroupBoardRequest,
@@ -88,3 +96,12 @@ export {
   type GroupOnlinePagesOptions,
   type GroupOnlinePagesState,
 } from './use-group-online-pages';
+export * from './record-set-view-model';
+export {
+  applyWrittenCertification,
+  recordSetKey,
+  useRecordSetCertification,
+  type RecordSetCertificationOptions,
+  type RecordSetCertificationState,
+  type RecordSetWriteNotice,
+} from './use-record-set-certification';

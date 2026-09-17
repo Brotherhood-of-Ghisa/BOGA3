@@ -140,13 +140,16 @@ function GroupsTabContent({ userId }: { userId: string }) {
     <GroupStreamList
       emptyState={emptyState}
       header={header}
+      onCertificationChanged={() => void refreshAll()}
       onPressMembership={(item) => router.push(`/group/${item.groupId}`)}
       onPressSession={(card) => router.push(`/group-session/${card.memberUserId}/${card.sessionId}`)}
       onRefresh={onRefresh}
       pulling={pulling}
+      roleForGroup={(groupId) => groups?.find((group) => group.group_id === groupId)?.my_role ?? null}
       showGroupNames={selectedGroupId === null}
       stream={stream}
       testID="groups-stream-list"
+      userId={userId}
     />
   );
 }

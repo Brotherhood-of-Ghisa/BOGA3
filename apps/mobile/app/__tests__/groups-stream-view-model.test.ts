@@ -161,6 +161,7 @@ describe('group stream view model', () => {
         setsLabel: '3 sets',
         volumeLabel: '1,752.5 kg',
         exercisesLabel: '2 exercises',
+        recordsLabel: null,
       });
     });
 
