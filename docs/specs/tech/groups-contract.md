@@ -438,9 +438,9 @@ invisible.
 | `exercise_order_index`, `set_order_index` | Tie-break order after `achieved_at_ms` (P7) |
 | `performed` | The recorder's rule (§5), run in TS by the evaluator |
 | `live` | Set, exercise, and session all untombstoned |
-| `weight_kg`, `reps`, `e1rm_kg` | Null unless performed. They are in the member's **entered** load mode; conversion to the group exercise's mode is SQL (T05, D6). `e1rm_kg` is Wathan (`estimateOneRepMax`), null at 0 kg. `reps` is `numeric` so that any value the TS parser accepts can be stored; no client text can fail a job on every retry. |
+| `weight_kg`, `reps`, `e1rm_kg` | Null unless performed. They are in the member's **entered** load mode; conversion to the group exercise's mode is SQL (M25-T05, D6). `e1rm_kg` is Wathan (`estimateOneRepMax`), null at 0 kg. `reps` is `numeric` so that any value the TS parser accepts can be stored; no client text can fail a job on every retry. |
 | `achieved_at_ms` | `sessions.started_at` |
-| `fingerprint` | `group_set_fingerprint(weight_value, reps_value, performance_status, deleted_at)`: md5 over the raw values. It interprets nothing, so certification (T06) can compare a live row without the evaluator. |
+| `fingerprint` | `group_set_fingerprint(weight_value, reps_value, performance_status, deleted_at)`: md5 over the raw values. It interprets nothing, so certification (M25-T06) can compare a live row without the evaluator. |
 | `rules_version` | `GROUP_EVAL_RULES_VERSION` of the TS that wrote it |
 
 Facts cover every set of a shared session, linked or not, so a new link is
@@ -2048,7 +2048,9 @@ P10–P18, D3–D5, D15, D16, E2, E3; M25 design §4, §6.
     `groupsRecordKey`, `groupsRecordSessionCardKey`, and `groupsRecordSetId`.
     After the device certifies, `await-certified` polls the Certified · e1RM
     `group_board` until row 1 is that set, certified by someone other than
-    the lifter. Both steps fail on a 90 s deadline, like `link-board`.
+    the lifter. Like `link-board`, both poll every 250 ms (a busy wait:
+    `runScript` has no sleep) and fail after 90 s, longer than the 30 s
+    `pg_cron` sweep.
   - **Device.** The record card (`group-stream-record-card-<key>`: `—
     group record`, `Prowler Push  55 kg × 5 · e1RM … kg`, `○ Not certified
     yet`) and its session card's `1 record`. Tapping the card's `Certify`
@@ -2064,9 +2066,10 @@ P10–P18, D3–D5, D15, D16, E2, E3; M25 design §4, §6.
     the groups cascades to `group_certifications` (and the M25 boards,
     events, and exercises); two consecutive lane runs in one slot pass.
   - **Latency** (`GROUPS_E2E_LATENCY` in `maestro.log`): `record
-    sync_push->record item` and `certify->certified board`, the latter from
-    the script step's start, after the device tap. Observed on the M25-T11
-    PR; data, not a promise (§7).
+    sync_push->record item`, and `certify->certified board`, measured from
+    the certification's server `certified_at` (so it includes the device's
+    steps up to the script, and any host/VM clock skew). Observed on the
+    M25-T11 PR; data, not a promise (§7).
 - **Offline behaviour (AC12, AC13)** is proven in jest. Simulator network
   cannot be toggled reliably from Maestro.
 
@@ -2089,10 +2092,12 @@ P10–P18, D3–D5, D15, D16, E2, E3; M25 design §4, §6.
 
 ## 10. Product rules (M25)
 
-The M25 product spec's numbered rules, graduated when M25 closed so the P#,
-D#, and E# references in this doc and `03`, `05`, `06`, and `ui/*` resolve.
-Each line is the rule; the as-built sections are the contract. The narrative
-sketches are in git history (deleted by the M25-T11 PR).
+The M25 product spec's numbered rules and the technical design's decisions,
+graduated when M25 closed so the P#, D#, E#, T#, and "M25 design §N"
+references in this doc, `06`, `ui/*`, the code comments, and the M25
+migrations resolve. Each line is the rule; the as-built sections are the
+contract. The narrative sketches and design trade-offs are in git history
+(deleted by the M25-T11 PR).
 
 **Rules (P).**
 
@@ -2154,3 +2159,42 @@ sketches are in git history (deleted by the M25-T11 PR).
 | E1.3 | History: one sentence per lead change, newest first | §6.3 M25-T09 |
 | E2 | Row detail sheet shared by board rows and record cards: value, as logged, date · gym, logged as, certification line and actions, View full session | §6.3 M25-T10 |
 | E3 | Stream record card with its session: title, value, badges, certification status, inline Certify | §6.3 M25-T10 |
+
+**Design decisions (T).** From the M25 technical design.
+
+| # | Decision | Where |
+| --- | --- | --- |
+| T1 | Group exercises are a separate `group_exercises` store sharing the TS domain type (`ExerciseCore`) with personal exercises | §2.7, §6.1 |
+| T2 | Links are the Sync v2 entity `exercise_group_links` with a deterministic id | `sync-v2-server-contract.md` A.2.10 |
+| T3 | The maths runs in the `group-eval` Edge Function, reusing the app's TS; records appear after sync | §2.10, `03` |
+| T4 | Invocation: a `pg_net` kick from the enqueue trigger, backed by a `pg_cron` sweep | §2.8, §2.10, `03` |
+| T5 | The stream is one persistent `group_events` table; session cards read their content live | §2.6, §4.2 |
+| T6 | Lead changes are history only; voids and link changes get their own stream items | §2.11 |
+| T7 | Boards are materialized, always recomputed per member and diffed | §2.11 |
+| T8 | In-progress records are provisional; voids are written only for completed sessions | §2.11 step 3 |
+| T9 | Evaluator tests are the `groups-leaderboards` slow-backend lane with direct drain; the Maestro lane gets one certify extension | §8 |
+
+**Design sections → contract.** "M25 design §N" in comments and migrations
+maps to: §0 overview → §1 and §2.6–§2.12; §1 group exercises → §2.7, §4.4;
+§2 links → A.2.10, §6.1; §3 evaluator runtime → §2.8–§2.10; §4 stream →
+§2.6, §4.2, §6.3 (M25-T10); §5 boards, edits, deletes → §2.11 and the
+change table below; §6 certification → §2.12, §4.6; §7
+mobile → §6.2, §6.3; §8 evaluator testing → §8; §9 decisions → the T table
+above; §10 specs to update → done by M25-T11.
+
+**Board change table (design §5; rows R1–R10, one `groups-boards.sh` section
+each).** The evaluator recomputes a member's entries and derives events from
+the diff plus the cause (T7; rules in §2.11).
+
+| # | Change | Board effect | Events |
+| --- | --- | --- | --- |
+| R1 | A new set beats my best | entry improves | `record`; `lead_change{record}` if #1 moves |
+| R2 | A record set edited down, unperformed, or deleted | entry falls back to my next best | `record_voided`; `lead_change{void}` if #1 moves |
+| R3 | A record set edited up | same set, higher value | void the old record and write a new `record` |
+| R4 | Session deleted / undeleted | its sets leave / return | voids / fresh records on return |
+| R5 | Link / unlink (retarget) | entries appear, change, or drop | `link` / `unlink`; `lead_change{link}`; no record cards (P16) |
+| R6 | Certification given / withdrawn / cancelled / voided | Certified entries change | `lead_change{certification}` if #1 moves (§2.11 Certified boards) |
+| R7 | `load_input_mode` changed | my linked sets rescale | treated like an edit (§2.11 step 4) |
+| R8 | Member leaves | none (P7) | — |
+| R9 | Group exercise archived | entries frozen (D8) | — |
+| R10 | `rules_version` bump | recompute | none (silent) |

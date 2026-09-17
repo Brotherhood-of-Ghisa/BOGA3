@@ -4,7 +4,10 @@ appId: com.dinoderek.mobile
 # ios-groups-e2e). The device signs in as fixture user_c and drives the real
 # group UI against local Supabase. The counterparty, fixture user_d, is
 # scripted over HTTP from ../scripts/groups-counterparty.js (GoTrue sign-in,
-# group_join, sync_push, group_stream) — the same RPCs its own app would call.
+# group_join, sync_push, group_stream, group_exercise_list, group_board) — the
+# same RPCs its own app would call. M25 steps: 4b group exercises (T08), 7b
+# leaderboards and the row detail (T09/T10), 7c a record card certified on the
+# device and the Certified boards (T11), 8b the former member's row.
 #
 # ISOLATION: user_c and user_d are dedicated to this flow (docs/specs/11,
 # enforced by scripts/tests/maestro-fixture-users.test.sh; the counterparty

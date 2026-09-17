@@ -135,6 +135,18 @@ function setEntity(id, sessionExerciseId, orderIndex, weight, reps, cuam) {
   });
 }
 
+// runScript has no sleep: busy-wait so a poll loop's deadline is real time,
+// not a poll count (a local RPC round trip is only a few ms).
+var POLL_INTERVAL_MS = 250;
+var POLL_DEADLINE_MS = 90 * 1000;
+
+function pause(ms) {
+  var until = Date.now() + ms;
+  while (Date.now() < until) {
+    // spin
+  }
+}
+
 function push(entities) {
   var result = rpc(output.groupsToken, 'sync_push', { entities: entities });
   if (result.status !== 200 || !result.body || result.body.ok !== true) {
@@ -295,10 +307,9 @@ var steps = {
     ]);
 
     // The pg_net kick normally applies within seconds; the pg_cron sweep (30 s)
-    // backs it up. runScript has no sleep, so this polls until a row, the
-    // deadline, or the poll cap. push() stamps groupsPushedAtMs, so the latency
-    // below is from the link push.
-    var deadline = Date.now() + 90 * 1000;
+    // backs it up. Polls every POLL_INTERVAL_MS until a row or the deadline.
+    // push() stamps groupsPushedAtMs, so the latency below is from the link push.
+    var deadline = Date.now() + POLL_DEADLINE_MS;
     var polls = 0;
     var board;
     for (;;) {
@@ -312,9 +323,10 @@ var steps = {
         p_limit: 10,
       });
       if (board.rows && board.rows.length > 0) break;
-      if (Date.now() > deadline || polls >= 3000) {
+      if (Date.now() > deadline) {
         fail('no board row after the link push (' + polls + ' polls)');
       }
+      pause(POLL_INTERVAL_MS);
     }
     var row = board.rows[0];
     if (
@@ -351,7 +363,7 @@ var steps = {
     output.groupsRecordSetId = setId;
     output.groupsRecordSessionCardKey = output.groupsCounterpartyUserId + ':' + sessionId;
 
-    var deadline = Date.now() + 90 * 1000;
+    var deadline = Date.now() + POLL_DEADLINE_MS;
     var polls = 0;
     var record = null;
     var items = [];
@@ -366,9 +378,10 @@ var steps = {
         record = found[0];
         break;
       }
-      if (Date.now() > deadline || polls >= 3000) {
+      if (Date.now() > deadline) {
         fail('no final record item for ' + setId + ' after the push (' + polls + ' polls); stream: ' + JSON.stringify(items));
       }
+      pause(POLL_INTERVAL_MS);
     }
     var boards = (record.boards || [])
       .map(function (board) {
@@ -399,7 +412,7 @@ var steps = {
   // Maestro steps between the tap and this script).
   'await-certified': function () {
     var startedAt = Date.now();
-    var deadline = startedAt + 90 * 1000;
+    var deadline = startedAt + POLL_DEADLINE_MS;
     var polls = 0;
     var board;
     for (;;) {
@@ -414,9 +427,10 @@ var steps = {
       });
       var rows = board.rows || [];
       if (rows.length > 0 && rows[0].set_id === output.groupsRecordSetId) break;
-      if (Date.now() > deadline || polls >= 3000) {
+      if (Date.now() > deadline) {
         fail('no Certified · e1RM row for ' + output.groupsRecordSetId + ' (' + polls + ' polls); rows: ' + JSON.stringify(rows));
       }
+      pause(POLL_INTERVAL_MS);
     }
     var row = board.rows[0];
     var by = row.certification && row.certification.certified_by;
@@ -430,11 +444,16 @@ var steps = {
     ) {
       fail('unexpected Certified · e1RM board: ' + JSON.stringify(board.rows));
     }
+    // Measured from the certification's server certified_at_ms (the local
+    // stack's clock; host/VM skew applies), so it includes the device steps
+    // between the tap and this script.
     console.log(
       TAG +
-        ' GROUPS_E2E_LATENCY certify->certified board (from this step start, after the device tap): ' +
+        ' GROUPS_E2E_LATENCY certify->certified board: ' +
+        (Date.now() - Number(row.certification.certified_at_ms)) +
+        ' ms since certified_at (this step: ' +
         (Date.now() - startedAt) +
-        ' ms (' +
+        ' ms, ' +
         polls +
         ' polls)',
     );
