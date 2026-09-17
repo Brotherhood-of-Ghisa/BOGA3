@@ -29,6 +29,7 @@ trap 'rm -rf "${TMP}"' EXIT
 cat >"${TMP}/guarded.sh" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
+unset UNSET_BY_DESIGN
 COMPLETED=0
 cleanup_on_exit() {
   local status=$?
@@ -39,7 +40,9 @@ cleanup_on_exit() {
   exit "${status}"
 }
 trap cleanup_on_exit EXIT
-f() { local -a a=(); echo "${a[@]}"; }
+# An unset name aborts under set -u on every bash (bash >= 4.4 no longer treats
+# an empty "${a[@]}" as unbound, so that trigger only fires on 3.2).
+f() { echo "${UNSET_BY_DESIGN}"; }
 [[ "${1:-}" == "abort" ]] && f
 COMPLETED=1
 echo "passed"
