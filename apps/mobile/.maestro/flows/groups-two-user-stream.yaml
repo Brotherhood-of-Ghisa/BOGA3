@@ -428,7 +428,7 @@ appId: com.dinoderek.mobile
 - takeScreenshot: "groups-07b-4-board-all-weight"
 # The row detail (E2, M25-T10): the converted value with the as-logged one, the
 # lifter's exercise, and Certify for the owner (not the lifter). Certifying is
-# M25-T11's extension.
+# step 7c (M25-T11).
 - tapOn:
     text: "1st, ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME}, 51\\.25 kg × 5, .*, uncertified"
 - extendedWaitUntil:
