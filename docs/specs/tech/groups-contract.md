@@ -1,6 +1,6 @@
-# Groups Contract (M22)
+# Groups Contract
 
-> **Status: As-built (M22 shipped).**
+> **Status: As-built (M22 and M25 shipped).**
 >
 > - §2–§5, the server half: the membership/invite RPCs (M22-T01,
 >   `supabase/migrations/20260910120000_m22_groups_membership.sql`) and the
@@ -46,9 +46,16 @@
 >   `supabase/migrations/20260916120000_m25_group_certification.sql`), proven
 >   by the `groups-certification.sh` body of `./boga test groups-leaderboards`.
 >
+> - M25-T11: the two-user Maestro lane certifies a record set on device and
+>   asserts the Certified boards (§8), and M25 closed. Its product rules and
+>   decisions (P#, D#, E#, cited throughout) are §10.
+>
 > This doc owns the technical contract and is the durable record of what M22
-> built. The M22 milestone spec (product requirements and acceptance criteria)
-> was deleted after shipping; git history and PR #280 keep it.
+> and M25 built. The M22 milestone spec (product requirements and acceptance
+> criteria) was deleted after shipping; git history and PR #280 keep it. The
+> M25 milestone, product spec, and technical design were deleted by M25-T11;
+> their durable rules are §10 and the as-built sections, and git history keeps
+> the narrative.
 
 This doc covers:
 
@@ -62,7 +69,7 @@ It is not the source for these:
 
 | Topic | Source |
 | --- | --- |
-| Product requirements and acceptance | the M22 milestone spec (git history) |
+| Product requirements and acceptance | M22: the milestone spec (git history). M25: §10 here; the sketches are in git history |
 | Sync v2 | `sync-v2-server-contract.md` |
 | The authN/authZ baseline | `docs/specs/10-api-authn-authz-guidelines.md` |
 
@@ -1794,7 +1801,8 @@ P10–P18, D3–D5, D15, D16, E2, E3; M25 design §4, §6.
 - **Evidence.** Jest: `groups-certification-api.test.ts`,
   `groups-record-set-view-model.test.ts`, `groups-record-set-sheet.test.tsx`,
   `groups-stream-view-model.test.ts`, `groups-api.test.ts`,
-  `groups-leaderboards-screens.test.tsx`. Maestro: steps 7b and 8b of
+  `groups-leaderboards-screens.test.tsx`. Maestro: steps 7b, 7c (M25-T11:
+  record card, certify, Certified boards), and 8b of
   `groups-two-user-stream.yaml` (§8).
 
 ## 7. Freshness and offline
@@ -2029,21 +2037,120 @@ P10–P18, D3–D5, D15, D16, E2, E3; M25 design §4, §6.
   kg total · counted as 51.25 kg per side`, `Logged as "Bench Press"`, `○ Not
   certified yet`, and `Certify` for the owner, closed without certifying. Step
   8b opens the former member's row: no `Certify`. No new fixture user or
-  counterparty step; certifying on device is M25-T11.
+  counterparty step; certifying on device followed in M25-T11 (below).
+- **As-built (M25-T11, flow extension).** New step 7c, after 7b's History and
+  before the removal (a former member's set can't be certified, §4.6):
+  - **Counterparty.** `push-record` pushes a new completed session on the
+    already-linked Bench Press: one set of 110 kg × 5, created after the link,
+    so §2.11 step 5 attributes a `record` (55 kg × 5 per side, a group record
+    on Weight and e1RM). It polls `group_stream` until the record item is
+    final (not provisional), asserts its payload, and outputs
+    `groupsRecordKey`, `groupsRecordSessionCardKey`, and `groupsRecordSetId`.
+    After the device certifies, `await-certified` polls the Certified · e1RM
+    `group_board` until row 1 is that set, certified by someone other than
+    the lifter. Both steps fail on a 90 s deadline, like `link-board`.
+  - **Device.** The record card (`group-stream-record-card-<key>`: `—
+    group record`, `Prowler Push  55 kg × 5 · e1RM … kg`, `○ Not certified
+    yet`) and its session card's `1 record`. Tapping the card's `Certify`
+    shows the notice and `✓ Certified by you`, and hides `Certify`. After
+    `await-certified`: the podium's Certified · e1RM row 1, the Certified
+    e1RM and Weight boards, the Certified history `… took #1 · 55 kg
+    (certified by you)`, and on All · Weight the `certified` row whose sheet
+    reads `✓ Certified by you · …` and offers `Remove my certification`, not
+    `Certify`. Step 8b's former row is now the certified 55 kg × 5 set.
+  - Withdraw and cancel are not tapped on device; `groups-certification.sh`
+    and jest cover them.
+  - **Hermetic.** No new fixture user. `groups-fixture-reset.sh` deleting
+    the groups cascades to `group_certifications` (and the M25 boards,
+    events, and exercises); two consecutive lane runs in one slot pass.
+  - **Latency** (`GROUPS_E2E_LATENCY` in `maestro.log`): `record
+    sync_push->record item` and `certify->certified board`, the latter from
+    the script step's start, after the device tap. Observed on the M25-T11
+    PR; data, not a promise (§7).
 - **Offline behaviour (AC12, AC13)** is proven in jest. Simulator network
   cannot be toggled reliably from Maestro.
 
-## 9. Not in M22 (carried forward)
+## 9. Not built (carried forward)
 
 - **Phase 2 live follow** needs either membership-scoped RLS `SELECT` policies
   for Realtime `postgres_changes` or a broadcast channel. That is decided in
   that milestone.
-- **Phase 3 links** are member-owned rows the server needs for leaderboards,
-  and their sync-scope decision is made there. They may not use a local FK to a
-  group exercise (spec 05 local integrity rule 2).
-- **Phase 5 certification** shipped in M25-T06 (§2.12, §4.6).
 - **PR highlights** on stream cards. The M22 rule (a strict Wathan e1RM gain
   over the member's full completed history) needs history that is never shared
   into the group, so the viewer cannot compute it from shared data. Decide the
   mechanism with the PR work — for example, the athlete's device syncs a
   per-session PR summary — without reintroducing SQL mirrors of the TS set rules.
+  M25 record cards (§4.2) are group-board records, not these history PRs.
+- **Out of M25 scope (P19):** group gyms and gym filters, time-windowed boards,
+  bodyweight or reps-only metrics, member proposals for group exercises,
+  disputes, and push notifications.
+- Phases 3 (links, §2.7, `sync-v2-server-contract.md` A.2.10), 4 (boards,
+  §2.10–§2.11), and 5 (certification, §2.12, §4.6) shipped in M25.
+
+## 10. Product rules (M25)
+
+The M25 product spec's numbered rules, graduated when M25 closed so the P#,
+D#, and E# references in this doc and `03`, `05`, `06`, and `ui/*` resolve.
+Each line is the rule; the as-built sections are the contract. The narrative
+sketches are in git history (deleted by the M25-T11 PR).
+
+**Rules (P).**
+
+| # | Rule |
+| --- | --- |
+| P1 | Owners and admins add group exercises (a copy of a standard exercise, or custom: name + weight entry), rename, and archive them. Archived: links and boards kept read-only, no new links (§2.7, §4.4). |
+| P2 | A set counts for a group exercise only through a link from the exercise it was logged under. Several of my exercises may link to one group exercise; each of mine links to at most one per group (`sync-v2-server-contract.md` A.2.10). |
+| P3 | Group exercises never appear in the default picker or catalogue lists: only in search, the Link screen, and the group page (E0). |
+| P4 | Links are retroactive: every shared set of the exercise counts; unlinking removes them. Links survive leaving and are inactive until rejoin. |
+| P5 | The group page is Stream · Exercises · Leaderboards; Members sits behind the header's member count. |
+| P6 | Four boards per group exercise: Weight (heaviest for ≥ 1 rep) / e1RM × Certified / All. |
+| P7 | One row per member (best set on that board): rank, name, value, date. Both scopes ranked; ties go to the earlier date; former members stay listed, marked former. |
+| P8 | Leaderboards page: one podium card per group exercise on Certified · e1RM; tapping opens the full board (E1). |
+| P9 | Each board has a history of who took #1, when, and with what (E1.3). |
+| P10 | Only a record set (a board row or a record card) can be certified, by any current member other than the lifter. One certification is enough. |
+| P11 | A certifier can remove their own certification; owners and admins can cancel any. No disputes. A cancelled set can be certified again. |
+| P12 | A certification attests the weight × reps it saw; an edit or delete of the set voids it. |
+| P13 | Certify from a board row or a stream record card: the same row detail (E2). |
+| P14 | A shared set that beats the lifter's own best on a group exercise gets a record card; #1 in the group marks it a group record. A first counting set is a record. Cards appear while the session is in progress. |
+| P15 | One card per record set, listing every board it broke; records are measured on All; certifying updates the card. |
+| P16 | Sets that start counting because of a link produce no record cards; one link (or unlink) item says what changed. |
+| P17 | A voided record keeps its card, marked voided, and a record-removed item says who now holds the record. Lead changes from voids, links, and certifications appear in history with that reason. |
+| P18 | Certify and admin actions need a connection and fail clearly offline. Logging and linking work offline and affect boards once synced. |
+| P19 | Out of scope: see §9. |
+
+**Decisions (D).**
+
+| # | Decision |
+| --- | --- |
+| D1 | A member's first counting set on a group exercise is a record. |
+| D2 | Record cards appear during an in-progress session, as sets sync (provisional, §2.11). |
+| D3 | Only record sets (board rows, record cards) can be certified. |
+| D4 | A certification cancelled by an admin can be given again (a new row). |
+| D5 | No claims, no disputes; one certification suffices; admins can cancel. |
+| D6 | A weight-entry mismatch is converted to the group exercise's mode (per side × 2 = total; total ÷ 2 = per side) on Weight and e1RM; record detection uses converted values. |
+| D7 | Superseded by D9. |
+| D8 | Archiving keeps links and a read-only board; the exercise is no longer offered for new links. |
+| D9 | Group exercises stay out of the default picker and catalogue lists; they appear in picker search (after my matches), on the Link screen, and on the group page's Exercises. |
+| D10 | Group page = Stream · Exercises · Leaderboards. |
+| D11 | Leaderboards page: one podium card per exercise on Certified · e1RM; full board on tap with both toggles. |
+| D12 | Leaderboard history = lead changes per board only. |
+| D13 | Picker search: group matches in a bottom section, plus a Groups toggle for group exercises only. |
+| D14 | Members live in the group-page header (tap the member count). |
+| D15 | A voided record keeps its card (marked voided) and adds a record-removed item; the lead change appears in history. |
+| D16 | A link or unlink that moves the boards adds a link item; the lead changes appear in history. |
+| D17 | Links are the member's own synced data: linking works offline. |
+
+**Experiences (E).** As built in §6.3.
+
+| # | Experience | As-built |
+| --- | --- | --- |
+| E0 | Linking, out of the way: every path ends at the Link screen or, while logging, the pick sheet | §6.3 M25-T07 |
+| E0.1 | Picker search: a `From your groups` section after my matches, plus a Groups toggle | §6.3 M25-T07 |
+| E0.2 | Pick sheet for an unlinked group exercise: suggested exercise, choose another, or add as new | §6.3 M25-T07 |
+| E0.3 | Link screen from the catalogue `⋮` / recorder `•••` menus: Linked, Suggested, All | §6.3 M25-T07 |
+| E0.4 | Group page Exercises: my link status per row, `Link your exercise` | §6.3 M25-T08 |
+| E1 / E1.1 | Leaderboards page: podium cards on Certified · e1RM, `You: Nth`, archived last | §6.3 M25-T09 |
+| E1.2 | Full board: Weight/e1RM × Certified/All toggles in place, ✓ / ○ on All, rows open E2 | §6.3 M25-T09, M25-T10 |
+| E1.3 | History: one sentence per lead change, newest first | §6.3 M25-T09 |
+| E2 | Row detail sheet shared by board rows and record cards: value, as logged, date · gym, logged as, certification line and actions, View full session | §6.3 M25-T10 |
+| E3 | Stream record card with its session: title, value, badges, certification status, inline Certify | §6.3 M25-T10 |
