@@ -21,6 +21,9 @@
 //   output.groupsHistoryCardKey      the pre-join session's would-be card key
 //   output.groupsFirstSetId          first set of the live session (friend view)
 //   output.groupsBoardExerciseId     the active custom group exercise user_d links to (M25-T09)
+//   output.groupsRecordKey           the record item's key (record card testIDs, M25-T11)
+//   output.groupsRecordSessionCardKey "<user_d>:<record session>" (its session card, M25-T11)
+//   output.groupsRecordSetId         the record set (M25-T11)
 //
 // Any unexpected response throws, which fails the Maestro step.
 
@@ -130,6 +133,18 @@ function setEntity(id, sessionExerciseId, orderIndex, weight, reps, cuam) {
     updated_at: cuam,
     deleted_at: null,
   });
+}
+
+// runScript has no sleep: busy-wait so a poll loop's deadline is real time,
+// not a poll count (a local RPC round trip is only a few ms).
+var POLL_INTERVAL_MS = 250;
+var POLL_DEADLINE_MS = 90 * 1000;
+
+function pause(ms) {
+  var until = Date.now() + ms;
+  while (Date.now() < until) {
+    // spin
+  }
 }
 
 function push(entities) {
@@ -292,10 +307,9 @@ var steps = {
     ]);
 
     // The pg_net kick normally applies within seconds; the pg_cron sweep (30 s)
-    // backs it up. runScript has no sleep, so this polls until a row, the
-    // deadline, or the poll cap. push() stamps groupsPushedAtMs, so the latency
-    // below is from the link push.
-    var deadline = Date.now() + 90 * 1000;
+    // backs it up. Polls every POLL_INTERVAL_MS until a row or the deadline.
+    // push() stamps groupsPushedAtMs, so the latency below is from the link push.
+    var deadline = Date.now() + POLL_DEADLINE_MS;
     var polls = 0;
     var board;
     for (;;) {
@@ -309,9 +323,10 @@ var steps = {
         p_limit: 10,
       });
       if (board.rows && board.rows.length > 0) break;
-      if (Date.now() > deadline || polls >= 3000) {
+      if (Date.now() > deadline) {
         fail('no board row after the link push (' + polls + ' polls)');
       }
+      pause(POLL_INTERVAL_MS);
     }
     var row = board.rows[0];
     if (
@@ -326,6 +341,121 @@ var steps = {
     }
     console.log(
       TAG + ' GROUPS_E2E_LATENCY board sync_push->board row: ' + (Date.now() - output.groupsPushedAtMs) + ' ms (' + polls + ' polls)',
+    );
+  },
+
+  // M25-T11: a new completed session on the already-linked Bench Press, one set
+  // of 110 kg × 5 total. Its sets are created after the link, so the evaluator
+  // attributes a record, not a link effect (contract §2.11 step 5): 55 kg × 5
+  // per side, beating 51.25 kg on Weight and e1RM, a group record on both.
+  // Waits until the stream returns the final (non-provisional) record item.
+  'push-record': function () {
+    var cuam = nextClientUpdatedAt();
+    var startedAt = Math.max(Date.now(), output.groupsJoinedAtMs + 1000);
+    var sessionId = output.groupsSessionId + '-record';
+    var exerciseId = sessionId + '-bench';
+    var setId = sessionId + '-set-1';
+    push([
+      sessionEntity(sessionId, startedAt, cuam, startedAt + DURATION_SEC * 1000),
+      sessionExerciseEntity(exerciseId, sessionId, output.groupsSessionId + '-def-bench', 0, 'Bench Press', cuam),
+      setEntity(setId, exerciseId, 0, '110', '5', cuam),
+    ]);
+    output.groupsRecordSetId = setId;
+    output.groupsRecordSessionCardKey = output.groupsCounterpartyUserId + ':' + sessionId;
+
+    var deadline = Date.now() + POLL_DEADLINE_MS;
+    var polls = 0;
+    var record = null;
+    var items = [];
+    for (;;) {
+      polls += 1;
+      var stream = rpcOk(output.groupsToken, 'group_stream', { p_group_id: output.groupsGroupId, p_before: null, p_limit: 50 });
+      items = stream.items || [];
+      var found = items.filter(function (item) {
+        return item.kind === 'record' && item.set_id === setId && item.provisional === false;
+      });
+      if (found.length > 0) {
+        record = found[0];
+        break;
+      }
+      if (Date.now() > deadline) {
+        fail('no final record item for ' + setId + ' after the push (' + polls + ' polls); stream: ' + JSON.stringify(items));
+      }
+      pause(POLL_INTERVAL_MS);
+    }
+    var boards = (record.boards || [])
+      .map(function (board) {
+        return board.metric + ':' + board.group_record;
+      })
+      .sort()
+      .join(',');
+    if (
+      Number(record.weight_kg) !== 55 ||
+      Number(record.reps) !== 5 ||
+      Number(record.load_factor) !== 0.5 ||
+      boards !== 'e1rm:true,weight:true' ||
+      record.voided !== null ||
+      record.certified !== false
+    ) {
+      fail('unexpected record item: ' + JSON.stringify(record));
+    }
+    output.groupsRecordKey = record.key;
+    console.log(
+      TAG + ' GROUPS_E2E_LATENCY record sync_push->record item: ' + (Date.now() - output.groupsPushedAtMs) + ' ms (' + polls + ' polls)',
+    );
+  },
+
+  // M25-T11: after the device certified the record set, wait until the
+  // evaluator has written the Certified · e1RM entry (certify -> pg_net kick ->
+  // apply), so the device's board reads are deterministic. The script cannot
+  // see the tap, so the latency is from this step's start (it includes the
+  // Maestro steps between the tap and this script).
+  'await-certified': function () {
+    var startedAt = Date.now();
+    var deadline = startedAt + POLL_DEADLINE_MS;
+    var polls = 0;
+    var board;
+    for (;;) {
+      polls += 1;
+      board = rpcOk(output.groupsToken, 'group_board', {
+        p_group_id: output.groupsGroupId,
+        p_group_exercise_id: output.groupsBoardExerciseId,
+        p_metric: 'e1rm',
+        p_certified: true,
+        p_after: null,
+        p_limit: 10,
+      });
+      var rows = board.rows || [];
+      if (rows.length > 0 && rows[0].set_id === output.groupsRecordSetId) break;
+      if (Date.now() > deadline) {
+        fail('no Certified · e1RM row for ' + output.groupsRecordSetId + ' (' + polls + ' polls); rows: ' + JSON.stringify(rows));
+      }
+      pause(POLL_INTERVAL_MS);
+    }
+    var row = board.rows[0];
+    var by = row.certification && row.certification.certified_by;
+    if (
+      board.rows.length !== 1 ||
+      row.member.user_id !== output.groupsCounterpartyUserId ||
+      Number(row.weight_kg) !== 55 ||
+      row.certified !== true ||
+      !by ||
+      by.user_id === output.groupsCounterpartyUserId
+    ) {
+      fail('unexpected Certified · e1RM board: ' + JSON.stringify(board.rows));
+    }
+    // Measured from the certification's server certified_at_ms (the local
+    // stack's clock; host/VM skew applies), so it includes the device steps
+    // between the tap and this script.
+    console.log(
+      TAG +
+        ' GROUPS_E2E_LATENCY certify->certified board: ' +
+        (Date.now() - Number(row.certification.certified_at_ms)) +
+        ' ms since certified_at (this step: ' +
+        (Date.now() - startedAt) +
+        ' ms, ' +
+        polls +
+        ' polls)',
     );
   },
 

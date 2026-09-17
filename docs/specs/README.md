@@ -20,7 +20,7 @@ gaps — `04`, `07` — from retired docs; gaps are intentional, do not renumber
 - `docs/specs/11-maestro-runtime-and-testing-conventions.md`: Authoritative Maestro iOS runtime/testing contract and documentation ownership model.
 - `docs/specs/12-worktree-config-and-isolation.md`: Slot-lease model, port derivation, per-worktree isolation, and the agent-owned lifecycle contract (with the removed cleanup mechanisms and why).
 - `docs/specs/tech/README.md`: Index of subsystem-level technical deep-dive docs.
-- `docs/specs/tech/groups-contract.md`: As-built (M22) group domain contract — share-ledger schema, share rule, group RPCs, stream metrics, mobile group client.
+- `docs/specs/tech/groups-contract.md`: As-built (M22, M25) group domain contract — share-ledger schema, share rule, group RPCs, stream metrics, group exercises, the evaluator, boards, certification, mobile group client, and the M25 product rules (§10).
 - `docs/specs/tech/sync-v2-server-contract.md`: Authoritative sync-v2 server contract — schema / LWW / RLS (Part A) and push/pull RPC wire contract (Part B).
 
 Planning docs (milestones, task cards, plans, and their templates) are not
