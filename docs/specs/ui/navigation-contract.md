@@ -27,7 +27,7 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
   - on a non-`AUTH_REQUIRED` cycle error it shows the error message and a single Retry that fires exactly one cycle; when the latest cycle outcome is `AUTH_REQUIRED` it redirects to `/sign-in` and renders no Retry;
   - it stands aside (renders through) when there is no session or auth is unconfigured, so an unconfigured/local build is never trapped behind a block nothing will lift; the `/sign-in` and `/maestro-harness` routes are exempt so redirects and harness setup cannot loop.
 - Tab roots live inside the `(tabs)` route group at `apps/mobile/app/(tabs)/` and share a tab layout at `apps/mobile/app/(tabs)/_layout.tsx`. The group name is parenthesised so it does not appear in URLs (e.g. `/session-recorder` resolves to `app/(tabs)/session-recorder.tsx`).
-- Tab roots have `headerShown: false`; detail screens (`exercise-history`, `profile`, `completed-session/[sessionId]`, `maestro-harness`, and the M22 group routes `group/mine`, `group/new`, `group/join`, `group/[groupId]`, `group/[groupId]/edit`, `group/[groupId]/invite`, `group-session/[memberId]/[sessionId]`, the M25 `exercise-link`, and the M25-T08 routes `group/[groupId]/members`, `group/[groupId]/exercises/new`, `group/[groupId]/exercises/[exerciseId]/edit`) remain outside `(tabs)/` and keep their existing native header behavior.
+- Tab roots have `headerShown: false`; detail screens (`exercise-history`, `profile`, `completed-session/[sessionId]`, `maestro-harness`, and the M22 group routes `group/mine`, `group/new`, `group/join`, `group/[groupId]`, `group/[groupId]/edit`, `group/[groupId]/invite`, `group-session/[memberId]/[sessionId]`, the M25 `exercise-link`, the M25-T08 routes `group/[groupId]/members`, `group/[groupId]/exercises/new`, `group/[groupId]/exercises/[exerciseId]/edit`, and the M25-T09 `group/[groupId]/leaderboards/[exerciseId]` and `…/history`) remain outside `(tabs)/` and keep their existing native header behavior.
 - Navigation is mostly string-path based; `apps/mobile/src/navigation/routes.ts` holds a few route constants and builders (`SIGN_IN_ROUTE`, `MAESTRO_HARNESS_ROUTE`, and the M25 `exerciseLinkHref(id)`), not a full typed route layer.
 - The production shell is the typed four-tab model in
   `apps/mobile/src/navigation/main-tabs.ts`: `Today / Train / Progress / More`.
@@ -302,6 +302,15 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 - Behavior:
   - the add screen's `From catalogue` / `Custom` choice is in-route state
 
+17c. `/group/[groupId]/leaderboards/[exerciseId]` and `/group/[groupId]/leaderboards/[exerciseId]/history` (M25-T09)
+- Files: `apps/mobile/app/group/[groupId]/leaderboards/[exerciseId]/index.tsx`, `apps/mobile/app/group/[groupId]/leaderboards/[exerciseId]/history.tsx`
+- Path params:
+  - `groupId`, `exerciseId` (the `group_exercise_id`; required; a missing value renders the lost-access state)
+- Query params:
+  - `metric` = `weight` | `e1rm` and `scope` = `certified` | `all`; missing or anything else means `e1rm` / `certified` (the podium card's view)
+- Behavior:
+  - on the board the toggles are in-route state initialised from the query; they are not written back to the URL, and `History` passes the current toggles in its query
+
 18. `/group-session/[memberId]/[sessionId]`
 - File: `apps/mobile/app/group-session/[memberId]/[sessionId].tsx`
 - Path params:
@@ -403,12 +412,19 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
    - the header's member-count line (`router.push`); Back returns to the group screen
 41. `/group/<groupId>` -> `/group/<groupId>/exercises/new`, `/group/<groupId>/exercises/<exerciseId>/edit` (M25-T08)
    - owner/admin `Add exercise` and the exercise sheet's `Rename` (`router.push`); both return with `router.back()` after saving, and the Exercises segment refreshes on focus
+42. `/group/<groupId>` -> `/group/<groupId>/leaderboards/<exerciseId>` (M25-T09)
+   - a podium card on the Leaderboards segment (`router.push`, no query: e1RM · Certified)
+43. `/group/<groupId>/leaderboards/<exerciseId>` -> `/group/<groupId>/leaderboards/<exerciseId>/history?metric=&scope=` (M25-T09)
+   - the header `History` button with the current toggles; Back returns to the board, which reloads its first page on focus
+44. `/groups`, `/group/<groupId>`, `/group/<groupId>/leaderboards/<exerciseId>` -> `/group-session/<memberId>/<sessionId>` (M25-T10)
+   - the row detail sheet's `View full session` (the sheet closes, then `router.push`); the sheet itself is in-route state opened from a record card or a full-board row
 
 Note:
 
 - Modal opens/closes are in-route UI state transitions, not route transitions.
 - `session-recorder` exercise picker `Add new` now opens an in-route exercise editor modal rather than navigating to `/exercise-catalog`.
 - The recorder's group pick sheet (M25-T07) and its `Add as new` editor are in-route modals too: the picker hides while either is open and returns on cancel.
+- The record set row detail sheet (M25-T10) is an in-route modal on the Groups tab, the group screen's Stream, and the full board; certification writes and their confirmation `Alert`s stay on the same route.
 
 ## Header titles (current, high level)
 

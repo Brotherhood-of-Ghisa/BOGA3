@@ -78,9 +78,16 @@ cleanup() {
   " >/dev/null
 }
 
+# Bash 3.2 hands the EXIT trap status 0 after an unbound-variable abort, so a
+# run that never reached its last line fails here instead of passing.
+COMPLETED=0
 cleanup_on_exit() {
   local status=$?
   trap - EXIT
+  if [[ ${status} -eq 0 && ${COMPLETED} -ne 1 ]]; then
+    echo "[${LANE_LABEL}] FAIL: the run stopped before completing" >&2
+    status=1
+  fi
   if ! cleanup; then
     echo "[${LANE_LABEL}] FAIL: cleanup of run ${RUN_TAG} failed" >&2
     [[ ${status} -ne 0 ]] || status=1
@@ -99,7 +106,7 @@ check_args() {
   shift
   local -a args=()
   while [[ "${1:-}" == "--arg" ]]; do args+=("$1" "$2" "$3"); shift 3; done
-  check "${context}" "$1" "${args[@]}"
+  check "${context}" "$1" ${args[@]+"${args[@]}"}
 }
 
 expect_sql() {
@@ -563,7 +570,7 @@ expect_entry "${GX5}" A weight "" "R5 retarget: no entry left on the old board"
 pass "R5: link, unlink, retarget → link/unlink items, lead_change{link}, no records"
 
 # =============================================================================
-echo "[${LANE_LABEL}] R6 — certification (T06): Certified boards stay empty"
+echo "[${LANE_LABEL}] R6 — no certification: Certified boards stay empty (certification: groups-certification.sh)"
 # =============================================================================
 
 expect_sql "R6 no Certified entry exists" \
@@ -575,7 +582,7 @@ check_args "R6 Certified podiums are empty, with the All count for the empty sta
   '.metric == "e1rm" and .certified == true
    and all(.exercises[]; .podium == [] and .me == null and .entry_count == 0)
    and ([.exercises[] | select(.exercise.group_exercise_id == $x)][0].all_entry_count == 2)'
-pass "R6: no Certified entries; Certified podiums empty (T06 fills them)"
+pass "R6: uncertified sets make no Certified entries; Certified podiums empty"
 
 # =============================================================================
 echo "[${LANE_LABEL}] R7 — load_input_mode changed (D6 conversion)"
@@ -919,10 +926,10 @@ check_args "podium rows, me, and the BoardRow shape" --arg x "${GX1}" --arg r "$
   '([.exercises[] | select(.exercise.group_exercise_id == $x)][0]) as $e
    | [$e.podium[].member.user_id] == [$r, $a] and $e.me.rank == 2 and $e.me.member.user_id == $a
    and $e.entry_count == 2
-   and ($e.podium[0] | keys) == ["achieved_at_ms","certified","e1rm_kg","entered_weight_kg","exercise_name","former",
-                                 "load_factor","member","rank","reps","session_id","set_id","value_kg","weight_kg"]
+   and ($e.podium[0] | keys) == ["achieved_at_ms","certification","certified","e1rm_kg","entered_weight_kg","exercise_name",
+                                 "former","load_factor","member","rank","reps","session_id","set_id","value_kg","weight_kg"]
    and $e.podium[0].value_kg == 110 and $e.podium[0].reps == 3 and $e.podium[0].exercise_name == "Lift"
-   and $e.podium[0].certified == false'
+   and $e.podium[0].certified == false and $e.podium[0].certification == null'
 check "podium exercise order: active first, archived last" \
   '[.exercises[].exercise.archived_at_ms == null] | . == (sort | reverse)'
 
@@ -1027,9 +1034,9 @@ check "the T05 kinds are present" \
   '([.items[].kind] | unique) as $k | ($k | index("record")) and ($k | index("record_voided")) and ($k | index("link"))'
 check "record item shape; it sorts at its session start" \
   '[.items[] | select(.kind == "record")][0]
-   | (keys == ["achieved_at_ms","boards","certified","e1rm_kg","entered_weight_kg","group","group_exercise","key","kind",
-               "load_factor","member","provisional","reps","session_id","set_id","sort_at_ms","voided","weight_kg"])
-     and .sort_at_ms == .achieved_at_ms and .certified == false and (.group_exercise | keys) == ["group_exercise_id","load_input_mode","name"]'
+   | (keys == ["achieved_at_ms","boards","certification","certified","e1rm_kg","entered_weight_kg","group","group_exercise",
+               "key","kind","load_factor","member","provisional","reps","session_id","set_id","sort_at_ms","voided","weight_kg"])
+     and .sort_at_ms == .achieved_at_ms and .certified == false and .certification == null and (.group_exercise | keys) == ["group_exercise_id","load_input_mode","name"]'
 check "record_voided item shape" \
   '[.items[] | select(.kind == "record_voided")][0]
    | keys == ["group","group_exercise","key","kind","leaders","member","reason","record","record_key","sort_at_ms"]'
@@ -1088,4 +1095,5 @@ history "${AWAY_TOKEN}" "${GX1}" weight false
 expect_error NOT_FOUND "a removed member cannot read history"
 pass "R8: leaving freezes entries (former, still ranked); removed and former members get NOT_FOUND"
 
+COMPLETED=1
 echo "[${LANE_LABEL}] passed (run ${RUN_TAG})"

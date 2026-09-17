@@ -93,9 +93,16 @@ cleanup() {
   " >/dev/null
 }
 
+# Bash 3.2 hands the EXIT trap status 0 after an unbound-variable abort, so a
+# run that never reached its last line fails here instead of passing.
+COMPLETED=0
 cleanup_on_exit() {
   local status=$?
   trap - EXIT
+  if [[ ${status} -eq 0 && ${COMPLETED} -ne 1 ]]; then
+    echo "[${LANE_LABEL}] FAIL: the run stopped before completing" >&2
+    status=1
+  fi
   if ! cleanup; then
     echo "[groups-contract] FAIL: cleanup of run ${RUN_TAG} users/groups failed" >&2
     [[ ${status} -ne 0 ]] || status=1
@@ -1763,4 +1770,5 @@ BACKFILLED="$(run_psql "select app_public.group_events_backfill();")"
 [[ "$(stream_all "${VIEWER_TOKEN}")" == "${SNAP_VIEWER}" ]] || fail "viewer's All stream differs after the backfill"
 pass "backfill: one item per share and per membership edge, idempotent; three users' streams rebuild byte-identical"
 
+COMPLETED=1
 echo "[groups-contract] PASS (run ${RUN_TAG})"

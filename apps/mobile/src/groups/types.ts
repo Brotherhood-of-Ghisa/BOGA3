@@ -68,18 +68,92 @@ export type StreamMembershipItem = {
   member: GroupMemberRef;
 };
 
-export type StreamItem = StreamSessionItem | StreamMembershipItem;
+/** A record set's board entry as the record event listed it (§2.11). */
+export type StreamRecordBoard = {
+  metric: GroupBoardMetric;
+  value_kg: number;
+  /** The member's previous best on that board; null for a first counting set (D1). */
+  previous_value_kg: number | null;
+  /** The member was #1 on that board right after the apply. */
+  group_record: boolean;
+};
 
-/** Server stream kinds this build does not render; `getGroupStream` drops them (M25-T05). */
-export type UnrenderedStreamKind = 'record' | 'record_voided' | 'link';
+export type StreamGroupExerciseRef = {
+  group_exercise_id: string;
+  name: string;
+  load_input_mode: LoadInputMode;
+};
+
+export type StreamRecordVoidReason = 'edited' | 'deleted';
+
+/** A record card (M25-T05, §4.2): one per record set, per group; sorted at its session's start. */
+export type StreamRecordItem = {
+  kind: 'record';
+  /** The event id. */
+  key: string;
+  sort_at_ms: number;
+  group: GroupRef;
+  member: GroupMemberRef;
+  group_exercise: StreamGroupExerciseRef;
+  session_id: string;
+  set_id: string;
+  /** Converted to the group exercise's mode (D6). */
+  weight_kg: number;
+  reps: number;
+  e1rm_kg: number | null;
+  /** As logged, before conversion. */
+  entered_weight_kg: number;
+  load_factor: number;
+  achieved_at_ms: number;
+  boards: StreamRecordBoard[];
+  /** The session is still active: the card may update or disappear silently (T8). */
+  provisional: boolean;
+  /** Voided records stay visible (D15). */
+  voided: { key: string; reason: StreamRecordVoidReason; occurred_at_ms: number } | null;
+  /** An active certification pinned to the record's fingerprint (M25-T06). */
+  certified: boolean;
+  certification: GroupBoardCertificationRef | null;
+};
+
+/** "Record removed" (D15): a record set was edited down or deleted; names each board's new holder. */
+export type StreamRecordVoidedItem = {
+  kind: 'record_voided';
+  key: string;
+  sort_at_ms: number;
+  group: GroupRef;
+  member: GroupMemberRef;
+  group_exercise: StreamGroupExerciseRef;
+  record_key: string;
+  reason: StreamRecordVoidReason;
+  record: { weight_kg: number; reps: number; e1rm_kg: number | null };
+  leaders: { metric: GroupBoardMetric; leader: BoardHolder | null }[];
+};
+
+export type StreamLinkEffectSide = { rank: number; value_kg: number } | null;
+
+/** A link or unlink that moved the member's boards (P16, D16). */
+export type StreamLinkItem = {
+  kind: 'link';
+  key: string;
+  sort_at_ms: number;
+  event: 'link' | 'unlink';
+  group: GroupRef;
+  member: GroupMemberRef;
+  group_exercise: StreamGroupExerciseRef;
+  /** `name` is read live from the member's exercise; null if it is gone. */
+  exercises: { exercise_definition_id: string; name: string | null }[];
+  effects: { metric: GroupBoardMetric; before: StreamLinkEffectSide; after: StreamLinkEffectSide }[];
+};
+
+export type StreamItem = StreamSessionItem | StreamMembershipItem | StreamRecordItem | StreamRecordVoidedItem | StreamLinkItem;
 
 /**
- * The last item's ordering triple; a page returns items strictly after it. The
- * server's `next_cursor` may name an item kind this build drops.
+ * The last item's ordering triple; a page returns items strictly after it. A
+ * later server may name a kind this build drops, which still pages.
  */
 export type StreamCursor = {
   sort_at_ms: number;
-  kind: StreamItem['kind'] | UnrenderedStreamKind;
+  kind: StreamItem['kind'] | (string & {});
   key: string;
 };
 
@@ -160,6 +234,171 @@ export type GroupExerciseListResult = { exercises: GroupExercise[] };
 /** `group_exercise_create`, `_update`, `_archive`, `_unarchive`: the exercise after the write. */
 export type GroupExerciseWriteResult = { exercise: GroupExercise };
 
+// ---- Boards (M25-T05, contract §4.5) -----------------------------------------
+
+export type GroupBoardMetric = 'weight' | 'e1rm';
+
+/** One member's best counting set on a board, at its absolute rank. Values are converted to the group exercise's mode (D6). */
+export type BoardRow = {
+  rank: number;
+  member: GroupMemberRef;
+  /** No longer an active member; still ranked (P7). */
+  former: boolean;
+  /** The ranked value: `weight_kg` on Weight, `e1rm_kg` on e1RM. */
+  value_kg: number;
+  weight_kg: number;
+  reps: number;
+  e1rm_kg: number | null;
+  /** As logged, before conversion. */
+  entered_weight_kg: number;
+  load_factor: number;
+  achieved_at_ms: number;
+  session_id: string;
+  set_id: string;
+  /** The member's live `session_exercises.name`, or null. */
+  exercise_name: string | null;
+  /** An active certification pinned to this row's set (M25-T06), on All and Certified alike. */
+  certified: boolean;
+  certification: GroupBoardCertificationRef | null;
+};
+
+/** The active certification behind a certified row (M25-T06, §4.5). */
+export type GroupBoardCertificationRef = {
+  certification_id: string;
+  /** Null when the certifier's account is gone. */
+  certified_by: GroupMemberRef | null;
+  certified_at_ms: number;
+};
+
+export type GroupBoardPodiumExercise = {
+  exercise: GroupExercise;
+  /** Ranks 1–3 at most. */
+  podium: BoardRow[];
+  /** The caller's row whenever ranked. */
+  me: BoardRow | null;
+  entry_count: number;
+  /** The same metric on All. */
+  all_entry_count: number;
+};
+
+/** `group_board_podiums`: every group exercise in `group_exercise_list` order (archived last). */
+export type GroupBoardPodiumsResult = {
+  metric: GroupBoardMetric;
+  certified: boolean;
+  exercises: GroupBoardPodiumExercise[];
+};
+
+/** The last row of a `group_board` page, in rank order. Sent back verbatim as `p_after`. */
+export type GroupBoardCursor = {
+  value_kg: number;
+  achieved_at_ms: number;
+  member_user_id: string;
+};
+
+export type GroupBoardResult = {
+  exercise: GroupExercise;
+  metric: GroupBoardMetric;
+  certified: boolean;
+  rows: BoardRow[];
+  next_cursor: GroupBoardCursor | null;
+  has_more: boolean;
+};
+
+/** A board holder (`Holder` + member, §2.11). */
+export type BoardHolder = {
+  member_user_id: string;
+  member: GroupMemberRef;
+  value_kg: number;
+  weight_kg: number;
+  reps: number;
+  e1rm_kg: number | null;
+  achieved_at_ms: number;
+  set_id: string;
+  session_id: string;
+};
+
+export type GroupBoardHistoryRelated =
+  | { kind: 'record'; key: string; set_id: string; weight_kg: number; reps: number; e1rm_kg: number | null }
+  | {
+      kind: 'record_voided';
+      key: string;
+      reason: 'edited' | 'deleted';
+      record: { weight_kg: number; reps: number; e1rm_kg: number | null };
+    }
+  | {
+      kind: 'link';
+      key: string;
+      event: 'link' | 'unlink';
+      exercises: { exercise_definition_id: string; name: string | null }[];
+    }
+  | {
+      /** M25-T06: the certification that moved a Certified board, read live. */
+      kind: 'certification';
+      key: string;
+      event: 'certified' | 'withdrawn' | 'cancelled' | 'voided';
+      certified_by: GroupMemberRef | null;
+      ended_by: GroupMemberRef | null;
+      set_id: string;
+      weight_kg: number;
+      reps: number;
+      e1rm_kg: number | null;
+    };
+
+/** Known lead-change reasons; a later server may send more, which render a fallback sentence. */
+export type GroupBoardHistoryReason = 'record' | 'void' | 'link' | 'certification';
+
+export type GroupBoardHistoryItem = {
+  key: string;
+  seq: number;
+  occurred_at_ms: number;
+  reason: GroupBoardHistoryReason | (string & {});
+  /** Null when the board emptied. */
+  leader: BoardHolder | null;
+  previous: BoardHolder | null;
+  related: GroupBoardHistoryRelated | null;
+};
+
+export type GroupBoardHistoryCursor = { seq: number };
+
+export type GroupBoardHistoryResult = {
+  items: GroupBoardHistoryItem[];
+  next_cursor: GroupBoardHistoryCursor | null;
+  has_more: boolean;
+};
+
+// ---- Certification (M25-T06, contract §4.6) ---------------------------------------
+
+export type GroupCertificationEndReason = 'withdrawn' | 'cancelled' | 'voided';
+
+export type GroupCertification = {
+  certification_id: string;
+  group_id: string;
+  group_exercise_id: string;
+  /** The lifter. */
+  member: GroupMemberRef;
+  set_id: string;
+  session_id: string;
+  /** Null when the certifier's account is gone. */
+  certified_by: GroupMemberRef | null;
+  certified_at_ms: number;
+  pinned: {
+    weight_value: string;
+    reps_value: string;
+    performance_status: string | null;
+    weight_kg: number;
+    reps: number;
+    e1rm_kg: number | null;
+  };
+  ended_at_ms: number | null;
+  end_reason: GroupCertificationEndReason | null;
+  ended_by: GroupMemberRef | null;
+};
+
+/** `group_certify`: `created: false` = an active certification already existed (P10), returned as is. */
+export type GroupCertifyResult = { certification: GroupCertification; created: boolean };
+/** `group_certification_withdraw` / `_cancel`: an already-ended certification is returned unchanged. */
+export type GroupCertificationEndResult = { certification: GroupCertification };
+
 // ---- Errors -----------------------------------------------------------------
 
 /** Tokens the server raises as `'<TOKEN>: <message>'` (contract §4). */
@@ -172,6 +411,8 @@ export const GROUP_SERVER_ERROR_CODES = [
   'USERNAME_REQUIRED',
   'INVITE_INVALID',
   'OWNER_MUST_TRANSFER',
+  /** M25-T06: the state moved on since the caller saw it (certifying a set edited ahead of the evaluator). */
+  'CONFLICT',
 ] as const;
 
 export type GroupServerErrorCode = (typeof GROUP_SERVER_ERROR_CODES)[number];

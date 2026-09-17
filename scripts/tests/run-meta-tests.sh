@@ -16,6 +16,7 @@ TESTS=(
   "pr-check.test.sh"
   "maestro-fixture-users.test.sh"
   "supabase-cli-version.test.sh"
+  "supabase-exit-trap-guard.test.sh"
   "worktree-lifecycle.test.sh"
 )
 

@@ -1311,5 +1311,6 @@ apply (B.4.5).
     - Each catches every failure. It logs `group.eval_enqueue_failed` or `group.eval_kick_failed` and returns normally, so `sync_push` commits.
     - None writes a Sync v2 table, and none fires on `DELETE`.
   - The wire contract, RLS, the structural triggers, and the drift checker's entity set are unchanged: the queue and `group_set_facts` have no `owner_user_id` and no Sync v2 FK. `groups-leaderboards` forces the enqueue and kick failures through real `sync_push` calls.
+  - M25-T06 certification adds no touch point: `group_certifications` is written by group RPCs and the evaluator only, and no trigger on a Sync v2 table calls it (`groups-certification.sh` asserts this).
 - Web client and MCP read paths against the typed schema (they consume Part A's
   schema directly with no Part B protocol involvement).

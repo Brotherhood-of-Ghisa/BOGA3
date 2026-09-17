@@ -237,7 +237,20 @@ cleanup_run_rows
 
 # Always clean up on exit so a partial test run doesn't leave residue that
 # breaks the next invocation.
-trap cleanup_run_rows EXIT
+# Bash 3.2 hands the EXIT trap status 0 after an unbound-variable abort, so a
+# run that never reached its last line fails here instead of passing.
+COMPLETED=0
+cleanup_on_exit() {
+  local status=$?
+  trap - EXIT
+  if [[ ${status} -eq 0 && ${COMPLETED} -ne 1 ]]; then
+    echo "[sync-pull-contract] FAIL: the run stopped before completing" >&2
+    status=1
+  fi
+  cleanup_run_rows
+  exit "${status}"
+}
+trap cleanup_on_exit EXIT
 
 # Common epoch ms for created_at/updated_at/client_updated_at_ms fields.
 NOW_MS="$(($(date +%s) * 1000))"
@@ -634,4 +647,5 @@ assert_status "200" "scenario 10 status"
 assert_jq '.error.code == "AUTH_REQUIRED"' "scenario 10 AUTH_REQUIRED envelope"
 pass "scenario 10: AUTH_REQUIRED"
 
+COMPLETED=1
 echo "[sync-pull-contract] all scenarios passed"

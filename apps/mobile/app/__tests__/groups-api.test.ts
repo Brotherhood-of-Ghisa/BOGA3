@@ -85,24 +85,21 @@ describe('groups api client', () => {
     }
   };
 
-  it('drops stream items of kinds this build does not render, keeping the server cursor (M25-T05)', async () => {
+  it('keeps record, record_voided, and link items; drops a kind this build does not know, keeping the server cursor (M25-T10)', async () => {
     const session = { kind: 'session', key: 'u:s', sort_at_ms: 9 };
+    const record = { kind: 'record', key: 'e1', sort_at_ms: 9 };
+    const voided = { kind: 'record_voided', key: 'e2', sort_at_ms: 8 };
     const membership = { kind: 'membership', key: 'm:joined', sort_at_ms: 7, event: 'joined' };
-    const cursor = { sort_at_ms: 5, kind: 'record', key: 'e3' };
+    const link = { kind: 'link', key: 'e3', sort_at_ms: 5, event: 'link' };
+    const cursor = { sort_at_ms: 4, kind: 'future_kind', key: 'e4' };
     respond({
-      items: [
-        { kind: 'record', key: 'e1', sort_at_ms: 9 },
-        session,
-        { kind: 'record_voided', key: 'e2', sort_at_ms: 8 },
-        membership,
-        { kind: 'link', key: 'e3', sort_at_ms: 5, event: 'link' },
-      ],
+      items: [record, session, voided, membership, link, { kind: 'future_kind', key: 'e4', sort_at_ms: 4 }],
       next_cursor: cursor,
       has_more: true,
     });
 
     await expect(getGroupStream({ groupId: null })).resolves.toEqual({
-      items: [session, membership],
+      items: [record, session, voided, membership, link],
       next_cursor: cursor,
       has_more: true,
     });

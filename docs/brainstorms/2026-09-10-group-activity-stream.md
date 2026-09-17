@@ -1,8 +1,8 @@
 # Brainstorm — Groups, group exercises, leaderboards, and the group stream
 
 - Date: 2026-09-10
-- Status: `adopted — M22 shipped; phases 2–5 pending` (2026-09-12). What M22
-  built is recorded in `docs/specs/tech/groups-contract.md`; the M22 milestone
+- Status: `adopted — M22 shipped; phases 3–5 shipped in M25; phase 2 (live follow) pending` (2026-09-17). What M22
+  and M25 built is recorded in `docs/specs/tech/groups-contract.md` (M25 product rules: §10); the M22 milestone
   spec was deleted after shipping (git history). **[default]** = proposal awaiting confirmation;
   **[open]** = needs discussion; **[unreviewed]** = drafted, not yet reviewed.
 - Branch: `claude/group-activity-stream-221a5c`

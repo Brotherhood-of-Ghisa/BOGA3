@@ -102,6 +102,15 @@ export default function RootLayout() {
                   name="group/[groupId]/exercises/[exerciseId]/edit"
                   options={{ headerBackTitle: 'Back', title: 'Edit exercise' }}
                 />
+                {/* The board replaces this title with the group exercise's name once loaded. */}
+                <Stack.Screen
+                  name="group/[groupId]/leaderboards/[exerciseId]/index"
+                  options={{ headerBackTitle: 'Back', title: 'Leaderboard' }}
+                />
+                <Stack.Screen
+                  name="group/[groupId]/leaderboards/[exerciseId]/history"
+                  options={{ headerBackTitle: 'Back', title: 'History' }}
+                />
                 <Stack.Screen
                   name="group-session/[memberId]/[sessionId]"
                   options={{ headerBackTitle: 'Back', title: 'Session' }}

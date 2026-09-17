@@ -5,6 +5,7 @@ import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-n
 import {
   GroupExercisesPage,
   GroupInlineError,
+  GroupLeaderboardsPage,
   GroupLostAccessState,
   GroupMissingDataState,
   GroupOfflineBanner,
@@ -22,10 +23,12 @@ import {
   formatMemberCount,
   formatMyRole,
   getGroup,
+  getGroupBoardPodiums,
   groupCacheKeys,
   listGroupExercises,
   useGroupResource,
   useGroupStream,
+  type GroupBoardPodiumsResult,
   type GroupExerciseListResult,
   type GroupGetResult,
 } from '@/src/groups';
@@ -86,24 +89,36 @@ function GroupScreenContent({ userId, groupId }: { userId: string; groupId: stri
     evictGroupIdOnNotFound: groupId,
   });
 
+  const boardsFetcher = useCallback(() => getGroupBoardPodiums(groupId), [groupId]);
+  // The podium page (M25-T09): cache-first, read only while the Leaderboards segment is open.
+  const boards = useGroupResource<GroupBoardPodiumsResult>({
+    userId,
+    cacheKey: segment === 'leaderboards' ? groupCacheKeys.boards(groupId) : null,
+    fetcher: boardsFetcher,
+    evictGroupIdOnNotFound: groupId,
+  });
+
   const refreshGroup = group.refresh;
   const refreshStream = stream.refresh;
   const refreshExercises = exercises.refresh;
+  const refreshBoards = boards.refresh;
   const refreshAll = useCallback(
-    () => Promise.all([refreshGroup(), refreshStream(), refreshExercises()]),
-    [refreshGroup, refreshStream, refreshExercises],
+    () => Promise.all([refreshGroup(), refreshStream(), refreshExercises(), refreshBoards()]),
+    [refreshGroup, refreshStream, refreshExercises, refreshBoards],
   );
   const { pulling, onRefresh } = usePullToRefresh(refreshAll);
 
   // C3.6.8: after removal, hide everything cached (the hooks already evicted it).
-  if (group.lostAccess || stream.lostAccess || exercises.lostAccess) {
+  if (group.lostAccess || stream.lostAccess || exercises.lostAccess || boards.lostAccess) {
     return <LostAccessState />;
   }
 
-  const segmentResource = segment === 'stream' ? stream : segment === 'exercises' ? exercises : null;
-  const offline = group.offline || (segmentResource?.offline ?? false);
-  const inlineError = pickInlineError(group.error, segmentResource?.error ?? null);
-  const lastUpdatedAtMs = (segment === 'exercises' ? exercises.lastUpdatedAtMs : null) ?? group.lastUpdatedAtMs;
+  const segmentResource = segment === 'stream' ? stream : segment === 'exercises' ? exercises : boards;
+  const offline = group.offline || segmentResource.offline;
+  const inlineError = pickInlineError(group.error, segmentResource.error);
+  const segmentUpdatedAtMs =
+    segment === 'exercises' ? exercises.lastUpdatedAtMs : segment === 'leaderboards' ? boards.lastUpdatedAtMs : null;
+  const lastUpdatedAtMs = segmentUpdatedAtMs ?? group.lastUpdatedAtMs;
   const refreshControl = <RefreshControl onRefresh={onRefresh} refreshing={pulling} />;
   const data = group.data;
 
@@ -194,10 +209,13 @@ function GroupScreenContent({ userId, groupId }: { userId: string; groupId: stri
     return (
       <ScrollView contentContainerStyle={groupScreenStyles.content} refreshControl={refreshControl} style={groupScreenStyles.screen}>
         {header}
-        <GroupStateView
-          body="Each group exercise will get a podium and full boards for Weight and e1RM, on certified and on all sets."
-          testID="group-screen-leaderboards-empty"
-          title="Leaderboards are coming soon"
+        <GroupLeaderboardsPage
+          boards={boards}
+          error={inlineError}
+          groupId={groupId}
+          offline={offline}
+          onRetry={onRefresh}
+          userId={userId}
         />
       </ScrollView>
     );
@@ -213,12 +231,15 @@ function GroupScreenContent({ userId, groupId }: { userId: string; groupId: stri
         )
       }
       header={header}
+      onCertificationChanged={() => void refreshAll()}
       onPressSession={(card) => router.push(`/group-session/${card.memberUserId}/${card.sessionId}`)}
       onRefresh={onRefresh}
       pulling={pulling}
+      roleForGroup={() => summary.my_role}
       showGroupNames={false}
       stream={stream}
       testID="group-screen-stream-list"
+      userId={userId}
     />
   );
 }

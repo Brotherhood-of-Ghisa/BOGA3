@@ -13,6 +13,14 @@ import { validateExerciseCore, type ExerciseCore } from '@/src/exercise-core';
 
 import {
   GROUP_SERVER_ERROR_CODES,
+  type GroupBoardCursor,
+  type GroupBoardHistoryCursor,
+  type GroupBoardHistoryResult,
+  type GroupBoardMetric,
+  type GroupBoardPodiumsResult,
+  type GroupBoardResult,
+  type GroupCertificationEndResult,
+  type GroupCertifyResult,
   type GroupCreateResult,
   type GroupErrorCode,
   type GroupExercise,
@@ -108,7 +116,13 @@ export type GroupRpcName =
   | 'group_exercise_create'
   | 'group_exercise_update'
   | 'group_exercise_archive'
-  | 'group_exercise_unarchive';
+  | 'group_exercise_unarchive'
+  | 'group_board_podiums'
+  | 'group_board'
+  | 'group_board_history'
+  | 'group_certify'
+  | 'group_certification_withdraw'
+  | 'group_certification_cancel';
 
 type RpcResponse = { data: unknown; error: RpcErrorLike | null; status?: number | null };
 
@@ -171,14 +185,20 @@ export type GroupStreamRequest = {
   limit?: number;
 };
 
-/** The stream item kinds this build renders; the server may send more (M25-T05). */
-const RENDERED_STREAM_KINDS: ReadonlySet<string> = new Set<StreamItem['kind']>(['session', 'membership']);
+/** The stream item kinds this build renders (M25-T10: all five); a later server may send more. */
+const RENDERED_STREAM_KINDS: ReadonlySet<string> = new Set<StreamItem['kind']>([
+  'session',
+  'membership',
+  'record',
+  'record_voided',
+  'link',
+]);
 
 /**
- * One stream page. Items of a kind this build does not render (`record`,
- * `record_voided`, `link` — contract §4.2) are dropped here, so no screen or
- * cache ever sees them; `next_cursor` is the server's, so paging still walks
- * past them.
+ * One stream page. Items of a kind this build does not know are dropped here,
+ * so no screen or cache ever sees them; `next_cursor` is the server's, so paging
+ * still walks past them. Items of a known kind are trusted as typed (the server
+ * shapes are asserted by `groups-leaderboards`).
  */
 export const getGroupStream = async ({
   groupId,
@@ -358,4 +378,155 @@ export const unarchiveGroupExercise = async (groupId: string, groupExerciseId: s
     'group_exercise_unarchive',
     await callGroupRpc('group_exercise_unarchive', { p_group_id: groupId, p_exercise_id: groupExerciseId }),
     isExerciseWritePayload,
+  );
+
+// ---- Boards (M25-T05, contract §4.5) --------------------------------------------
+
+export const GROUP_BOARD_DEFAULT_LIMIT = 50;
+export const GROUP_BOARD_HISTORY_DEFAULT_LIMIT = 20;
+
+const isNotFoundMessage = (error: unknown, message: string): boolean =>
+  isGroupApiError(error) && error.code === 'NOT_FOUND' && error.message.trim().toLowerCase() === message;
+
+/**
+ * `NOT_FOUND: group exercise not found` (the board's target is not in the
+ * group) as opposed to `NOT_FOUND: group not found` (access lost, §4.5 check
+ * order). Only the latter may evict the group.
+ */
+export const isGroupExerciseNotFound = (error: unknown): boolean => isNotFoundMessage(error, 'group exercise not found');
+
+/** `NOT_FOUND: group not found`: the caller is not (or no longer) a member. The only `NOT_FOUND` that evicts. */
+export const isGroupNotFound = (error: unknown): boolean => isNotFoundMessage(error, 'group not found');
+
+/** `NOT_FOUND: record set not found` (§4.6 step 6): the set is not, or no longer, a record set. */
+export const isRecordSetNotFound = (error: unknown): boolean => isNotFoundMessage(error, 'record set not found');
+
+/** `NOT_FOUND: certification not found`. */
+export const isCertificationNotFound = (error: unknown): boolean => isNotFoundMessage(error, 'certification not found');
+
+/** `NOT_FOUND: member not found`: the lifter is no longer a current member. */
+export const isGroupMemberNotFound = (error: unknown): boolean => isNotFoundMessage(error, 'member not found');
+
+/** The podium page: every group exercise on Certified · e1RM (P8, D11). */
+export const getGroupBoardPodiums = async (groupId: string): Promise<GroupBoardPodiumsResult> =>
+  expectShape(
+    'group_board_podiums',
+    await callGroupRpc('group_board_podiums', { p_group_id: groupId, p_metric: 'e1rm', p_certified: true }),
+    (r) => Array.isArray(r.exercises),
+  );
+
+export type GroupBoardView = {
+  groupId: string;
+  groupExerciseId: string;
+  metric: GroupBoardMetric;
+  certified: boolean;
+};
+
+export type GroupBoardRequest = GroupBoardView & {
+  /** Null = first page; otherwise the previous page's `next_cursor`, verbatim. */
+  after?: GroupBoardCursor | null;
+  /** `1..100`; defaults to 50. */
+  limit?: number;
+};
+
+export const getGroupBoard = async ({
+  groupId,
+  groupExerciseId,
+  metric,
+  certified,
+  after = null,
+  limit = GROUP_BOARD_DEFAULT_LIMIT,
+}: GroupBoardRequest): Promise<GroupBoardResult> =>
+  expectShape(
+    'group_board',
+    await callGroupRpc('group_board', {
+      p_group_id: groupId,
+      p_group_exercise_id: groupExerciseId,
+      p_metric: metric,
+      p_certified: certified,
+      p_after: after,
+      p_limit: limit,
+    }),
+    (r) => isRecord(r.exercise) && Array.isArray(r.rows) && typeof r.has_more === 'boolean',
+  );
+
+export type GroupBoardHistoryRequest = GroupBoardView & {
+  /** Null = newest page; otherwise the previous page's `next_cursor`, verbatim. */
+  before?: GroupBoardHistoryCursor | null;
+  /** `1..50`; defaults to 20. */
+  limit?: number;
+};
+
+export const getGroupBoardHistory = async ({
+  groupId,
+  groupExerciseId,
+  metric,
+  certified,
+  before = null,
+  limit = GROUP_BOARD_HISTORY_DEFAULT_LIMIT,
+}: GroupBoardHistoryRequest): Promise<GroupBoardHistoryResult> =>
+  expectShape(
+    'group_board_history',
+    await callGroupRpc('group_board_history', {
+      p_group_id: groupId,
+      p_group_exercise_id: groupExerciseId,
+      p_metric: metric,
+      p_certified: certified,
+      p_before: before,
+      p_limit: limit,
+    }),
+    (r) => Array.isArray(r.items) && typeof r.has_more === 'boolean',
+  );
+
+// ---- Certification (M25-T06, contract §4.6) --------------------------------------
+
+const isCertificationPayload = (r: Record<string, unknown>): boolean =>
+  isRecord(r.certification) && isString(r.certification.certification_id);
+
+export type CertifyGroupSetInput = {
+  groupId: string;
+  groupExerciseId: string;
+  /** The lifter. */
+  memberUserId: string;
+  setId: string;
+};
+
+/** Certify a record set (P10). Any current member except the lifter; idempotent (`created: false`). */
+export const certifyGroupSet = async ({
+  groupId,
+  groupExerciseId,
+  memberUserId,
+  setId,
+}: CertifyGroupSetInput): Promise<GroupCertifyResult> =>
+  expectShape(
+    'group_certify',
+    await callGroupRpc('group_certify', {
+      p_group_id: groupId,
+      p_group_exercise_id: groupExerciseId,
+      p_member_user_id: memberUserId,
+      p_set_id: setId,
+    }),
+    (r) => isCertificationPayload(r) && typeof r.created === 'boolean',
+  );
+
+/** The certifier removes their own certification (P11). */
+export const withdrawGroupCertification = async (
+  groupId: string,
+  certificationId: string,
+): Promise<GroupCertificationEndResult> =>
+  expectShape(
+    'group_certification_withdraw',
+    await callGroupRpc('group_certification_withdraw', { p_group_id: groupId, p_certification_id: certificationId }),
+    isCertificationPayload,
+  );
+
+/** The owner or an admin cancels any certification (P11, D5). */
+export const cancelGroupCertification = async (
+  groupId: string,
+  certificationId: string,
+): Promise<GroupCertificationEndResult> =>
+  expectShape(
+    'group_certification_cancel',
+    await callGroupRpc('group_certification_cancel', { p_group_id: groupId, p_certification_id: certificationId }),
+    isCertificationPayload,
   );

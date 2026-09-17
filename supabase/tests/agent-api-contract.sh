@@ -263,8 +263,16 @@ cleanup() {
   " >/dev/null 2>&1 || true
 }
 
+# Bash 3.2 hands the EXIT trap status 0 after an unbound-variable abort, so a
+# run that never reached its last line fails here instead of passing.
+COMPLETED=0
 cleanup_with_status() {
   local status="$?"
+  trap - EXIT
+  if [[ ${status} -eq 0 && ${COMPLETED} -ne 1 ]]; then
+    echo "[agent-api-test] FAIL: the run stopped before completing" >&2
+    status=1
+  fi
   cleanup
   exit "${status}"
 }
@@ -519,4 +527,5 @@ request POST "${API_URL}/auth/v1/token?grant_type=refresh_token" \
   "$(jq -nc --arg refresh_token "${AGENT_REFRESH_TOKEN}" '{refresh_token:$refresh_token}')"
 assert_non_2xx "revoked refresh token"
 
+COMPLETED=1
 echo "[agent-api-test] PASS"
