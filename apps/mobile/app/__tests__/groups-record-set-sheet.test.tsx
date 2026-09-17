@@ -60,6 +60,7 @@ jest.mock('@/src/groups/api', () => ({
   getGroupStream: jest.fn(),
   getGroupSessionDetail: jest.fn(),
   getGroupBoard: jest.fn(),
+  listMyGroups: jest.fn(),
   certifyGroupSet: jest.fn(),
   withdrawGroupCertification: jest.fn(),
   cancelGroupCertification: jest.fn(),
@@ -79,6 +80,7 @@ import {
 } from '@/src/groups';
 import * as groupsApi from '@/src/groups/api';
 
+import GroupsTabRoute from '../(tabs)/groups';
 import GroupScreenRoute from '../group/[groupId]/index';
 import GroupBoardRoute from '../group/[groupId]/leaderboards/[exerciseId]/index';
 
@@ -267,6 +269,19 @@ describe('certify from the card (E3)', () => {
     expect(cacheKeys()).toEqual([groupCacheKeys.group(GROUP_ID), groupCacheKeys.stream(GROUP_ID)]);
   });
 
+  it('a stream read that lands with the pre-write state does not undo the shown certification', async () => {
+    api.certifyGroupSet.mockResolvedValue({ certification: certificationPayload(), created: true });
+    await openGroupStream();
+    // The re-read after the write is stale (e.g. a poll already in flight when the write committed).
+    const streamCalls = api.getGroupStream.mock.calls.length;
+    await act(async () => {
+      fireEvent.press(screen.getByTestId(`${RECORD_CARD}-certify`));
+    });
+    await waitFor(() => expect(api.getGroupStream.mock.calls.length).toBeGreaterThan(streamCalls));
+    await waitFor(() => expect(screen.getByTestId(`${RECORD_CARD}-status`)).toHaveTextContent('✓ Certified by you'));
+    expect(screen.queryByTestId(`${RECORD_CARD}-certify`)).toBeNull();
+  });
+
   it('CONFLICT: says nothing was certified and re-reads the stream', async () => {
     api.certifyGroupSet.mockRejectedValue(new GroupApiError('CONFLICT', 'the set changed; refresh and try again'));
     await openGroupStream();
@@ -360,6 +375,27 @@ describe('the row detail sheet (E2)', () => {
     await openSheet();
     expect(screen.queryByTestId('group-record-sheet-cancel')).toBeNull();
     expect(screen.queryByTestId('group-record-sheet-withdraw')).toBeNull();
+  });
+
+  it('as owner: a confirmed Cancel certification ends it', async () => {
+    const other = { certification_id: 'cert-9', certified_by: { user_id: 'u3', username: 'sam' }, certified_at_ms: RECORD_AT_MS };
+    api.getGroup.mockResolvedValue(groupPayload('owner'));
+    api.getGroupStream.mockResolvedValue(page([recordItem({ certified: true, certification: other }), sessionCardItem()]));
+    api.cancelGroupCertification.mockResolvedValue({
+      certification: certificationPayload({
+        certification_id: 'cert-9',
+        certified_by: other.certified_by,
+        ended_at_ms: 3,
+        end_reason: 'cancelled',
+        ended_by: { user_id: ME, username: 'me' },
+      }),
+    });
+    await openSheet();
+    fireEvent.press(await screen.findByTestId('group-record-sheet-cancel'));
+    await confirmAlert();
+    expect(api.cancelGroupCertification).toHaveBeenCalledWith(GROUP_ID, 'cert-9');
+    expect(await screen.findByTestId('group-record-sheet-notice')).toHaveTextContent('Certification cancelled.');
+    expect(screen.getByTestId('group-record-sheet-status')).toHaveTextContent('○ Not certified yet');
   });
 
   it('as admin: Cancel certification confirms, and FORBIDDEN (role changed) refreshes', async () => {
@@ -459,6 +495,33 @@ describe('full-board rows open the sheet (card AC8)', () => {
     fireEvent.press(screen.getByTestId('group-record-sheet-close'));
 
     fireEvent.press(screen.getByTestId('group-board-row-2'));
+    expect(await screen.findByTestId('group-record-sheet-cancel')).toBeTruthy();
+  });
+});
+
+describe('the Groups tab (All)', () => {
+  it('names the group on record cards, takes my role from My groups, and refreshes the All stream after a write', async () => {
+    const other = { certification_id: 'cert-9', certified_by: { user_id: 'u3', username: 'sam' }, certified_at_ms: RECORD_AT_MS };
+    api.listMyGroups.mockResolvedValue({
+      groups: [{ group_id: GROUP_ID, name: 'Crew', description: null, member_count: 3, my_role: 'admin' }],
+    });
+    api.getGroupStream.mockResolvedValue(
+      page([recordItem(), sessionCardItem(), recordItem({ key: 'ev-cert', set_id: 'set-9', session_id: 's9', certified: true, certification: other })]),
+    );
+    api.certifyGroupSet.mockResolvedValue({ certification: certificationPayload(), created: true });
+    render(<GroupsTabRoute />);
+
+    expect(await screen.findByTestId(`${RECORD_CARD}-group`)).toHaveTextContent('Crew');
+    expect(api.getGroupStream).toHaveBeenCalledWith({ groupId: null });
+
+    const streamCalls = api.getGroupStream.mock.calls.length;
+    await act(async () => {
+      fireEvent.press(screen.getByTestId(`${RECORD_CARD}-certify`));
+    });
+    await waitFor(() => expect(api.getGroupStream.mock.calls.length).toBeGreaterThan(streamCalls));
+    expect(api.getGroupStream).toHaveBeenLastCalledWith({ groupId: null });
+
+    fireEvent.press(screen.getByTestId('group-stream-record-card-ev-cert-open'));
     expect(await screen.findByTestId('group-record-sheet-cancel')).toBeTruthy();
   });
 });

@@ -99,9 +99,12 @@ export {
 export * from './record-set-view-model';
 export {
   applyWrittenCertification,
+  WRITTEN_CERTIFICATION_HOLD_MS,
   recordSetKey,
   useRecordSetCertification,
+  writtenCertificationSettled,
   type RecordSetCertificationOptions,
   type RecordSetCertificationState,
   type RecordSetWriteNotice,
+  type WrittenCertification,
 } from './use-record-set-certification';

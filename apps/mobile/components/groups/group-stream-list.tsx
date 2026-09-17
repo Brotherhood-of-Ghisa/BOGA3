@@ -8,6 +8,7 @@ import {
   recordSetFromStreamRecord,
   recordSetKey,
   useRecordSetCertification,
+  writtenCertificationSettled,
   type GroupRole,
   type GroupStreamState,
   type RecordSetDetail,
@@ -78,11 +79,18 @@ export function GroupStreamList({
     return live && live.kind === 'record' ? recordSetFromStreamRecord(live) : sheetSnapshot.detail;
   }, [sheetSnapshot, stream.items]);
 
-  // New stream data carries the write; stop overriding it.
+  // Show the write's result until the stream agrees with it. A read already in
+  // flight when the write committed can land with the old state, so a mere
+  // change of items is not enough (see `writtenCertificationSettled`).
   const { clearWritten, written, reset } = certification;
   useEffect(() => {
-    clearWritten();
-  }, [stream.items, clearWritten]);
+    if (!written) return;
+    const live = stream.items.find(
+      (item) => item.kind === 'record' && recordSetKey(recordSetFromStreamRecord(item)) === written.setKey,
+    );
+    const liveCertification = live && live.kind === 'record' ? (live.certified ? live.certification : null) : undefined;
+    if (writtenCertificationSettled(written, liveCertification)) clearWritten();
+  }, [stream.items, written, clearWritten]);
 
   const viewModels = useMemo(() => {
     const models = buildStreamViewModel(stream.items, userId);

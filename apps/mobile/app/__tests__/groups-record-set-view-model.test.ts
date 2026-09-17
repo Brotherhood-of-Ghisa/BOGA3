@@ -17,6 +17,8 @@ import {
   recordSetFromBoardRow,
   recordSetFromStreamRecord,
   shouldRefreshAfterCertificationError,
+  WRITTEN_CERTIFICATION_HOLD_MS,
+  writtenCertificationSettled,
   GROUP_OFFLINE_ACTION_MESSAGE,
   type BoardRow,
   type GroupExercise,
@@ -272,5 +274,22 @@ describe('write outcomes', () => {
       expect(describeCertificationError(error, action, lifter)).toBe(message);
       expect(shouldRefreshAfterCertificationError(error)).toBe(refresh);
     }
+  });
+});
+
+describe('the written certification settles', () => {
+  const written = { setKey: 'ge:u2:set-1', certification: CERT, writtenAtMs: 1_000 };
+  const cleared = { ...written, certification: null };
+
+  it('once the host data agrees, or the set is not loaded and the hold has passed', () => {
+    expect(writtenCertificationSettled(written, CERT, 1_001)).toBe(true);
+    expect(writtenCertificationSettled(cleared, null, 1_001)).toBe(true);
+    // A stale read (still uncertified, or a different certification) does not settle it yet.
+    expect(writtenCertificationSettled(written, null, 1_001)).toBe(false);
+    expect(writtenCertificationSettled(cleared, CERT, 1_001)).toBe(false);
+    expect(writtenCertificationSettled(written, { ...CERT, certification_id: 'other' }, 1_001)).toBe(false);
+    expect(writtenCertificationSettled(written, undefined, 1_001)).toBe(false);
+    // After the hold the host's data wins.
+    expect(writtenCertificationSettled(written, null, 1_000 + WRITTEN_CERTIFICATION_HOLD_MS + 1)).toBe(true);
   });
 });

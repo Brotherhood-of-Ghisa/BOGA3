@@ -1778,7 +1778,10 @@ P10–P18, D3–D5, D15, D16, E2, E3; M25 design §4, §6.
   by <name>.` (`created: false`), `Your certification was removed.`,
   `Certification cancelled.`, or `This certification was already removed.`
   (an already-ended certification comes back unchanged). The returned
-  certification shows at once, until the host's data changes.
+  certification shows at once, until the host's data for that set agrees
+  with it, or 45 s pass (`writtenCertificationSettled`): a read already in
+  flight when the write committed can land with the old state. Pending state
+  is per set.
   - After a success, and after `CONFLICT` (`This set changed since it loaded.
     Nothing was certified — refresh and try again.`), record set / member /
     certification / group exercise `NOT_FOUND`, `FORBIDDEN`, or `VALIDATION`

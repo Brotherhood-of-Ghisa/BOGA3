@@ -44,7 +44,7 @@ export type RecordSetCertificationState = {
   certify: (detail: RecordSetDetail) => Promise<void>;
   withdraw: (detail: RecordSetDetail) => Promise<void>;
   cancel: (detail: RecordSetDetail) => Promise<void>;
-  /** The set a write is running for, or null. One write at a time per host. */
+  /** The set the latest write is running for, or null. */
   pendingSetKey: string | null;
   /** The last outcome, inline beside the actions. */
   notice: RecordSetWriteNotice | null;
@@ -53,11 +53,42 @@ export type RecordSetCertificationState = {
    * made on (`setKey`); `undefined` until then. Shown instead of the host's
    * (possibly not yet refreshed) data.
    */
-  written: { setKey: string; certification: GroupBoardCertificationRef | null } | undefined;
+  written: WrittenCertification | undefined;
   /** Clears the notice and the written certification. */
   reset: () => void;
   /** Clears only the written certification (the host's data has caught up). */
   clearWritten: () => void;
+};
+
+export type WrittenCertification = {
+  setKey: string;
+  certification: GroupBoardCertificationRef | null;
+  writtenAtMs: number;
+};
+
+/**
+ * How long the written certification may disagree with the host's data before
+ * the host's data wins: a read already in flight when the write committed can
+ * land with the old state, but the next poll (30 s) reads after the write, so a
+ * later change made elsewhere shows at most one poll late.
+ */
+export const WRITTEN_CERTIFICATION_HOLD_MS = 45_000;
+
+/**
+ * Whether the host's live data for the written set has caught up with (or,
+ * after the hold, superseded) the written certification. `live` is the set's
+ * certification in the host's current data (`undefined` when the set is not
+ * loaded).
+ */
+export const writtenCertificationSettled = (
+  written: WrittenCertification,
+  live: GroupBoardCertificationRef | null | undefined,
+  nowMs: number = Date.now(),
+): boolean => {
+  if (live !== undefined && (live?.certification_id ?? null) === (written.certification?.certification_id ?? null)) {
+    return true;
+  }
+  return nowMs - written.writtenAtMs > WRITTEN_CERTIFICATION_HOLD_MS;
 };
 
 /** One board target's set: certification is per (group exercise, member, set). */
@@ -103,13 +134,17 @@ export function useRecordSetCertification({
         memberUserId: detail.member.user_id,
         setId: detail.setId,
       });
-      if (mounted.current) setPendingSetKey(null);
+      if (mounted.current) setPendingSetKey((key) => (key === recordSetKey(detail) ? null : key));
       if (!result.ok) {
         await fail(result.error, 'certify', detail);
         return;
       }
       if (mounted.current) {
-        setWritten({ setKey: recordSetKey(detail), certification: certificationRefFrom(result.value.certification) });
+        setWritten({
+          setKey: recordSetKey(detail),
+          certification: certificationRefFrom(result.value.certification),
+          writtenAtMs: Date.now(),
+        });
         setNotice({ tone: 'success', message: describeCertifySuccess(result.value, myUserId), setKey: recordSetKey(detail) });
       }
       onChanged();
@@ -127,13 +162,17 @@ export function useRecordSetCertification({
       setPendingSetKey(recordSetKey(detail));
       const run = action === 'withdraw' ? runWithdraw : runCancel;
       const result = await run(detail.groupId, certificationId);
-      if (mounted.current) setPendingSetKey(null);
+      if (mounted.current) setPendingSetKey((key) => (key === recordSetKey(detail) ? null : key));
       if (!result.ok) {
         await fail(result.error, action, detail);
         return;
       }
       if (mounted.current) {
-        setWritten({ setKey: recordSetKey(detail), certification: certificationRefFrom(result.value.certification) });
+        setWritten({
+          setKey: recordSetKey(detail),
+          certification: certificationRefFrom(result.value.certification),
+          writtenAtMs: Date.now(),
+        });
         setNotice({
           tone: 'success',
           message: describeCertificationEndSuccess(action, result.value.certification, myUserId),

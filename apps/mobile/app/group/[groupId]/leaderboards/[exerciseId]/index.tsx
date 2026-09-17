@@ -30,9 +30,11 @@ import {
   parseBoardMetricParam,
   parseBoardScopeParam,
   recordSetFromBoardRow,
+  recordSetKey,
   useGroupOnlinePages,
   useGroupResource,
   useRecordSetCertification,
+  writtenCertificationSettled,
   type BoardRow,
   type GroupBoardCursor,
   type GroupBoardMetric,
@@ -150,7 +152,17 @@ function GroupBoardContent({ userId, groupId, exerciseId, initialMetric, initial
     () => (liveSheetRow && exercise ? recordSetFromBoardRow(groupId, exercise, liveSheetRow) : null),
     [liveSheetRow, exercise, groupId],
   );
-  const { reset: resetCertification } = certification;
+  const { reset: resetCertification, written, clearWritten } = certification;
+  // Show the write's result until the board agrees with it (a read in flight at write time can land stale).
+  useEffect(() => {
+    if (!written) return;
+    const live = board.items.find(
+      (row) => recordSetKey({ groupExerciseId: exerciseId, member: row.member, setId: row.set_id }) === written.setKey,
+    );
+    if (writtenCertificationSettled(written, live ? (live.certified ? live.certification : null) : undefined)) {
+      clearWritten();
+    }
+  }, [board.items, written, clearWritten, exerciseId]);
   const openRow = useCallback(
     (memberId: string) => {
       const row = board.items.find((item) => item.member.user_id === memberId);
