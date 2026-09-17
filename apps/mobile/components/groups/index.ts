@@ -24,6 +24,7 @@ export {
 } from './group-state-view';
 export { GroupStreamList } from './group-stream-list';
 export { GroupSummaryRow } from './group-summary-row';
+export { RecordSetSheet } from './record-set-sheet';
 export { GroupDetailsForm } from './group-details-form';
 export { GroupMemberActionSheet } from './member-action-sheet';
 export { GroupMemberRow } from './member-row';
@@ -31,6 +32,8 @@ export { GroupOfflineBanner } from './offline-banner';
 export { groupFormStyles, groupScreenStyles } from './screen-styles';
 export { GroupsSignInRequired } from './sign-in-required';
 export { GroupStreamMembershipItem } from './stream-membership-item';
+export { GroupStreamRecordCard } from './stream-record-card';
+export { GroupStreamSentenceItem } from './stream-sentence-item';
 export { GroupStreamSessionCard } from './stream-session-card';
 export { usePullToRefresh } from './use-pull-to-refresh';
 export { UsernameGate, useUsernameGate, type UsernameGateState, type UsernameGateStatus } from './username-gate';

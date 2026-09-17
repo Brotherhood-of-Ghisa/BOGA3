@@ -331,12 +331,15 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
    - a podium card on the Leaderboards segment (`router.push`, no query: e1RM · Certified)
 43. `/group/<groupId>/leaderboards/<exerciseId>` -> `/group/<groupId>/leaderboards/<exerciseId>/history?metric=&scope=` (M25-T09)
    - the header `History` button with the current toggles; Back returns to the board, which reloads its first page on focus
+44. `/groups`, `/group/<groupId>`, `/group/<groupId>/leaderboards/<exerciseId>` -> `/group-session/<memberId>/<sessionId>` (M25-T10)
+   - the row detail sheet's `View full session` (the sheet closes, then `router.push`); the sheet itself is in-route state opened from a record card or a full-board row
 
 Note:
 
 - Modal opens/closes are in-route UI state transitions, not route transitions.
 - `session-recorder` exercise picker `Add new` now opens an in-route exercise editor modal rather than navigating to `/exercise-catalog`.
 - The recorder's group pick sheet (M25-T07) and its `Add as new` editor are in-route modals too: the picker hides while either is open and returns on cancel.
+- The record set row detail sheet (M25-T10) is an in-route modal on the Groups tab, the group screen's Stream, and the full board; certification writes and their confirmation `Alert`s stay on the same route.
 
 ## Header titles (current, high level)
 

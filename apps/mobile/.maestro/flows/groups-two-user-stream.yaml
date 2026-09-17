@@ -382,6 +382,13 @@ appId: com.dinoderek.mobile
     visible:
       id: "group-screen-segment-leaderboards"
     timeout: 15000
+# The link moved the boards, so the stream gets a link item (P16, M25-T10); no
+# record card, since the sets predate the link.
+- extendedWaitUntil:
+    visible:
+      text: "${MAESTRO_GROUPS_COUNTERPARTY_USERNAME} linked Bench Press to Prowler Push — now #1 on Weight and e1RM"
+    timeout: 15000
+- takeScreenshot: "groups-07b-6-stream-link-item"
 - tapOn:
     id: "group-screen-segment-leaderboards"
 # Certified boards are empty until M25-T06: the uncertified count shows instead.
@@ -416,6 +423,33 @@ appId: com.dinoderek.mobile
       text: "1st, ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME}, 51\\.25 kg × 5, .*, uncertified"
     timeout: 15000
 - takeScreenshot: "groups-07b-4-board-all-weight"
+# The row detail (E2, M25-T10): the converted value with the as-logged one, the
+# lifter's exercise, and Certify for the owner (not the lifter). Certifying is
+# M25-T11's extension.
+- tapOn:
+    text: "1st, ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME}, 51\\.25 kg × 5, .*, uncertified"
+- extendedWaitUntil:
+    visible:
+      id: "group-record-sheet"
+    timeout: 10000
+- assertVisible:
+    id: "group-record-sheet-logged"
+    text: "Logged 102\\.5 kg total · counted as 51\\.25 kg per side"
+- extendedWaitUntil:
+    visible:
+      id: "group-record-sheet-logged-as"
+      text: "Logged as \"Bench Press\""
+    timeout: 15000
+- assertVisible:
+    id: "group-record-sheet-status"
+    text: "○ Not certified yet"
+- assertVisible:
+    id: "group-record-sheet-certify"
+- takeScreenshot: "groups-07b-7-row-detail"
+- tapOn:
+    id: "group-record-sheet-close"
+- assertNotVisible:
+    id: "group-record-sheet"
 - tapOn:
     id: "group-board-history-button"
 - extendedWaitUntil:
@@ -484,6 +518,21 @@ appId: com.dinoderek.mobile
       text: "1st, ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME} \\(former\\), 51\\.25 kg × 5, .*, uncertified"
     timeout: 15000
 - takeScreenshot: "groups-08b-board-former-member"
+# A former member's set can't be certified (§4.6 step 5): the sheet offers no Certify.
+- tapOn:
+    text: "1st, ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME} \\(former\\), 51\\.25 kg × 5, .*, uncertified"
+- extendedWaitUntil:
+    visible:
+      id: "group-record-sheet"
+    timeout: 10000
+- assertVisible:
+    id: "group-record-sheet-status"
+    text: "○ Not certified yet"
+- assertNotVisible:
+    id: "group-record-sheet-certify"
+- takeScreenshot: "groups-08b-2-row-detail-former"
+- tapOn:
+    id: "group-record-sheet-close"
 
 # --- 9. The removed counterparty's next read is NOT_FOUND (AC11) ----------------
 - runScript:

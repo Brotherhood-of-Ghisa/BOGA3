@@ -231,12 +231,15 @@ function GroupScreenContent({ userId, groupId }: { userId: string; groupId: stri
         )
       }
       header={header}
+      onCertificationChanged={() => void refreshAll()}
       onPressSession={(card) => router.push(`/group-session/${card.memberUserId}/${card.sessionId}`)}
       onRefresh={onRefresh}
       pulling={pulling}
+      roleForGroup={() => summary.my_role}
       showGroupNames={false}
       stream={stream}
       testID="group-screen-stream-list"
+      userId={userId}
     />
   );
 }

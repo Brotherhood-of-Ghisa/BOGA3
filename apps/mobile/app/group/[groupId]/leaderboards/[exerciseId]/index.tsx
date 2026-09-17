@@ -11,6 +11,7 @@ import {
   GroupPagesFooter,
   GroupStateView,
   GroupsSignInRequired,
+  RecordSetSheet,
   groupScreenStyles,
   pickInlineError,
   usePullToRefresh,
@@ -22,17 +23,25 @@ import {
   BOARD_SCOPE_LABELS,
   NO_SETS_LABEL,
   buildBoardRow,
+  getGroup,
   getGroupBoard,
   groupBoardHistoryPath,
+  groupCacheKeys,
   parseBoardMetricParam,
   parseBoardScopeParam,
+  recordSetFromBoardRow,
+  recordSetKey,
   useGroupOnlinePages,
+  useGroupResource,
+  useRecordSetCertification,
+  writtenCertificationSettled,
   type BoardRow,
   type GroupBoardCursor,
   type GroupBoardMetric,
   type GroupBoardResult,
   type GroupBoardScope,
   type GroupExercise,
+  type GroupGetResult,
 } from '@/src/groups';
 
 const METRIC_OPTIONS = [
@@ -123,6 +132,47 @@ function GroupBoardContent({ userId, groupId, exerciseId, initialMetric, initial
   });
   const { pulling, onRefresh } = usePullToRefresh(board.refresh);
 
+  // My role, for Cancel certification in the row detail (cache-first, shared with the group screen).
+  const groupFetcher = useCallback(() => getGroup(groupId), [groupId]);
+  const group = useGroupResource<GroupGetResult>({
+    userId,
+    cacheKey: groupCacheKeys.group(groupId),
+    fetcher: groupFetcher,
+    evictGroupIdOnNotFound: groupId,
+  });
+
+  // The row detail sheet (E2, M25-T10). It follows its member's live row, so the
+  // refresh after a write shows the server's state; the snapshot covers a row
+  // that left the loaded pages.
+  const refreshBoard = board.refresh;
+  const certification = useRecordSetCertification({ myUserId: userId, onChanged: refreshBoard, onLostAccess: refreshBoard });
+  const [sheetRow, setSheetRow] = useState<BoardRow | null>(null);
+  const liveSheetRow = sheetRow ? (board.items.find((row) => row.member.user_id === sheetRow.member.user_id) ?? sheetRow) : null;
+  const sheetDetail = useMemo(
+    () => (liveSheetRow && exercise ? recordSetFromBoardRow(groupId, exercise, liveSheetRow) : null),
+    [liveSheetRow, exercise, groupId],
+  );
+  const { reset: resetCertification, written, clearWritten } = certification;
+  // Show the write's result until the board agrees with it (a read in flight at write time can land stale).
+  useEffect(() => {
+    if (!written) return;
+    const live = board.items.find(
+      (row) => recordSetKey({ groupExerciseId: exerciseId, member: row.member, setId: row.set_id }) === written.setKey,
+    );
+    if (writtenCertificationSettled(written, live ? (live.certified ? live.certification : null) : undefined)) {
+      clearWritten();
+    }
+  }, [board.items, written, clearWritten, exerciseId]);
+  const openRow = useCallback(
+    (memberId: string) => {
+      const row = board.items.find((item) => item.member.user_id === memberId);
+      if (!row) return;
+      resetCertification();
+      setSheetRow(row);
+    },
+    [board.items, resetCertification],
+  );
+
   // Keep the exercise's name in the header while a toggle reloads the rows.
   useEffect(() => {
     if (board.firstPage) {
@@ -135,7 +185,7 @@ function GroupBoardContent({ userId, groupId, exerciseId, initialMetric, initial
     [board.items, metric, scope, userId],
   );
 
-  if (board.lostAccess) {
+  if (board.lostAccess || group.lostAccess) {
     return (
       <View style={[groupScreenStyles.screen, groupScreenStyles.content]}>
         <GroupLostAccessState testID="group-board-lost-access" />
@@ -222,28 +272,37 @@ function GroupBoardContent({ userId, groupId, exerciseId, initialMetric, initial
   }
 
   return (
-    <FlatList
-      ListEmptyComponent={emptyState}
-      ListFooterComponent={
-        <GroupPagesFooter
-          loadMoreError={board.loadMoreError}
-          loadingMore={board.loadingMore}
-          noun="rows"
-          onRetry={() => void board.loadMore()}
-          testIDPrefix="group-board"
-        />
-      }
-      ListHeaderComponent={header}
-      contentContainerStyle={groupScreenStyles.content}
-      data={rows}
-      keyExtractor={(row) => row.key}
-      onEndReached={() => void board.loadMore()}
-      onEndReachedThreshold={0.5}
-      refreshControl={<RefreshControl onRefresh={onRefresh} refreshing={pulling} />}
-      renderItem={({ item }) => <GroupBoardRow row={item} />}
-      style={groupScreenStyles.screen}
-      testID="group-board-list"
-    />
+    <>
+      <FlatList
+        ListEmptyComponent={emptyState}
+        ListFooterComponent={
+          <GroupPagesFooter
+            loadMoreError={board.loadMoreError}
+            loadingMore={board.loadingMore}
+            noun="rows"
+            onRetry={() => void board.loadMore()}
+            testIDPrefix="group-board"
+          />
+        }
+        ListHeaderComponent={header}
+        contentContainerStyle={groupScreenStyles.content}
+        data={rows}
+        keyExtractor={(row) => row.key}
+        onEndReached={() => void board.loadMore()}
+        onEndReachedThreshold={0.5}
+        refreshControl={<RefreshControl onRefresh={onRefresh} refreshing={pulling} />}
+        renderItem={({ item }) => <GroupBoardRow onPress={(row) => openRow(row.key)} row={item} />}
+        style={groupScreenStyles.screen}
+        testID="group-board-list"
+      />
+      <RecordSetSheet
+        certification={certification}
+        detail={sheetDetail}
+        myRole={group.data?.group.my_role ?? null}
+        onClose={() => setSheetRow(null)}
+        userId={userId}
+      />
+    </>
   );
 }
 

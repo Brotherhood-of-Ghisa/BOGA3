@@ -21,7 +21,7 @@ export function GroupStreamSessionCard({ card, showGroupNames, onPress }: GroupS
   return (
     <Pressable
       accessibilityHint="Opens the session"
-      accessibilityLabel={`${card.memberName}, ${card.statusLabel}, ${context}`}
+      accessibilityLabel={[card.memberName, card.statusLabel, context, card.recordsLabel].filter(Boolean).join(', ')}
       accessibilityRole="button"
       onPress={() => onPress(card)}
       style={({ pressed }) => (pressed ? styles.pressed : null)}
@@ -46,6 +46,11 @@ export function GroupStreamSessionCard({ card, showGroupNames, onPress }: GroupS
         <UiText testID={`${testID}-metrics`} variant="label">
           {`${card.setsLabel} · ${card.volumeLabel} · ${card.exercisesLabel}`}
         </UiText>
+        {card.recordsLabel ? (
+          <UiText testID={`${testID}-records`} variant="label">
+            {card.recordsLabel}
+          </UiText>
+        ) : null}
         {showGroupNames && card.groupNames.length > 0 ? (
           <UiText numberOfLines={1} style={styles.groups} testID={`${testID}-groups`} variant="bodyMuted">
             {card.groupNames.join(', ')}

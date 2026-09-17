@@ -161,6 +161,9 @@ const cacheKeys = () =>
     .map((entry) => entry.cacheKey)
     .sort();
 
+/** The board route also reads `group:<groupId>` for my role (M25-T10 row detail); board rows themselves are never cached. */
+const cacheKeysBesidesGroup = () => cacheKeys().filter((key) => key !== groupCacheKeys.group(GROUP_ID));
+
 const emitNetInfo = (isConnected: boolean) => {
   act(() => {
     for (const listener of mockNetInfoListeners) listener({ isConnected });
@@ -335,7 +338,7 @@ describe('Full board (E1.2)', () => {
     expect(api.getGroupBoard).toHaveBeenNthCalledWith(3, expect.objectContaining({ after: cursor }));
     // The duplicate Dave row from the shifted page renders once.
     expect(screen.getAllByTestId('group-board-row-1')).toHaveLength(1);
-    expect(cacheKeys()).toEqual([]);
+    expect(cacheKeysBesidesGroup()).toEqual([]);
   });
 
   it('shows "Archived · read-only" on an archived exercise', async () => {
@@ -348,6 +351,7 @@ describe('Full board (E1.2)', () => {
   it('group NOT_FOUND evicts and shows lost access', async () => {
     seedCache(groupCacheKeys.boards(GROUP_ID), PODIUMS);
     api.getGroupBoard.mockRejectedValue(new GroupApiError('NOT_FOUND', 'group not found'));
+    api.getGroup.mockRejectedValue(new GroupApiError('NOT_FOUND', 'group not found'));
     openBoard();
     expect(await screen.findByTestId('group-board-lost-access')).toBeTruthy();
     await waitFor(() => expect(cacheKeys()).toEqual([]));
@@ -358,7 +362,7 @@ describe('Full board (E1.2)', () => {
     api.getGroupBoard.mockRejectedValue(new GroupApiError('NOT_FOUND', 'group exercise not found'));
     openBoard();
     expect(await screen.findByTestId('group-board-exercise-missing')).toHaveTextContent(/This exercise isn't in this group/);
-    expect(cacheKeys()).toEqual([groupCacheKeys.boards(GROUP_ID)]);
+    expect(cacheKeysBesidesGroup()).toEqual([groupCacheKeys.boards(GROUP_ID)]);
   });
 
   it('offline with nothing loaded: the offline empty state; a toggle while offline requests nothing', async () => {
