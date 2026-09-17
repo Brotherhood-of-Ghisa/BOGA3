@@ -458,6 +458,117 @@ appId: com.dinoderek.mobile
     timeout: 15000
 - takeScreenshot: "groups-07b-5-history-link"
 
+# --- 7c. A record card, certified on the device (M25-T11) ------------------------
+# The counterparty logs a new best on the linked Bench Press (110 kg × 5 total =
+# 55 kg × 5 per side) in a new session; the script waits for the final record
+# item. Its set was created after the link, so it is a record, not a link effect
+# (contract §2.11). Certifying must precede step 8: a former member's set can't be
+# certified (§4.6).
+- runScript:
+    file: ../scripts/groups-counterparty.js
+    env:
+      STEP: push-record
+- openLink: "boga3://group/${output.groupsGroupId}"
+- extendedWaitUntil:
+    visible:
+      id: "group-screen-stream-list"
+    timeout: 15000
+- swipe:
+    start: "50%, 45%"
+    end: "50%, 85%"
+    duration: 800
+- extendedWaitUntil:
+    visible:
+      id: "group-stream-record-card-${output.groupsRecordKey}-title"
+      text: "${MAESTRO_GROUPS_COUNTERPARTY_USERNAME} — group record"
+    timeout: 15000
+- assertVisible:
+    id: "group-stream-record-card-${output.groupsRecordKey}-value"
+    text: "Prowler Push\\s+55 kg × 5 · e1RM .* kg"
+- assertVisible:
+    id: "group-stream-record-card-${output.groupsRecordKey}-status"
+    text: "○ Not certified yet"
+- assertVisible:
+    id: "group-stream-session-card-${output.groupsRecordSessionCardKey}-records"
+    text: "1 record"
+- takeScreenshot: "groups-07c-1-record-card"
+# Certify from the card (D3: a record set). The notice shows at once; the card
+# reads the returned certification until the host's re-read agrees.
+- tapOn:
+    id: "group-stream-record-card-${output.groupsRecordKey}-certify"
+# The notice View carries the testID; its sentence is a child text.
+- extendedWaitUntil:
+    visible:
+      id: "group-stream-record-card-${output.groupsRecordKey}-notice"
+    timeout: 15000
+- assertVisible: "Certified\\. Certified boards update in a few seconds\\."
+- extendedWaitUntil:
+    visible:
+      id: "group-stream-record-card-${output.groupsRecordKey}-status"
+      text: "✓ Certified by you"
+    timeout: 15000
+- assertNotVisible:
+    id: "group-stream-record-card-${output.groupsRecordKey}-certify"
+- takeScreenshot: "groups-07c-2-certified-card"
+# The Certified entry waits for the evaluator: the script polls until it exists,
+# so the board reads below never race the apply.
+- runScript:
+    file: ../scripts/groups-counterparty.js
+    env:
+      STEP: await-certified
+- tapOn:
+    id: "group-screen-segment-leaderboards"
+- extendedWaitUntil:
+    visible:
+      text: "Prowler Push, Certified · e1RM, 1st ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME} .* kg .*"
+    timeout: 20000
+- takeScreenshot: "groups-07c-3-podium-certified"
+- tapOn:
+    text: "Prowler Push, Certified · e1RM, 1st ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME} .* kg .*"
+- extendedWaitUntil:
+    visible:
+      text: "1st, ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME}, .* kg e1RM, 55 kg × 5, .*"
+    timeout: 15000
+- tapOn:
+    id: "group-board-metric-weight"
+- extendedWaitUntil:
+    visible:
+      text: "1st, ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME}, 55 kg × 5, .*"
+    timeout: 15000
+- takeScreenshot: "groups-07c-4-board-certified-weight"
+- tapOn:
+    id: "group-board-history-button"
+- extendedWaitUntil:
+    visible:
+      text: ".*, ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME} took #1 · 55 kg \\(certified by you\\)"
+    timeout: 15000
+- takeScreenshot: "groups-07c-5-history-certified"
+# On All the row is marked certified; its sheet offers the certifier's withdraw,
+# not Certify. Withdraw/cancel taps are covered by groups-certification.sh + jest.
+- openLink: "boga3://group/${output.groupsGroupId}/leaderboards/${output.groupsBoardExerciseId}?metric=weight&scope=all"
+- extendedWaitUntil:
+    visible:
+      text: "1st, ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME}, 55 kg × 5, .*, certified"
+    timeout: 15000
+- tapOn:
+    text: "1st, ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME}, 55 kg × 5, .*, certified"
+- extendedWaitUntil:
+    visible:
+      id: "group-record-sheet"
+    timeout: 10000
+- assertVisible:
+    id: "group-record-sheet-status"
+    text: "✓ Certified by you · .*"
+- assertVisible:
+    id: "group-record-sheet-withdraw"
+- assertNotVisible:
+    id: "group-record-sheet-certify"
+- takeScreenshot: "groups-07c-6-row-detail-certified"
+- tapOn:
+    id: "group-record-sheet-close"
+- assertNotVisible:
+    id: "group-record-sheet"
+
 # --- 8. The device removes the counterparty -> "was removed" -------------------
 - openLink: "boga3://group/${output.groupsGroupId}"
 # Members live behind the header's member count (D14, M25-T08).
@@ -515,19 +626,20 @@ appId: com.dinoderek.mobile
 - openLink: "boga3://group/${output.groupsGroupId}/leaderboards/${output.groupsBoardExerciseId}?metric=weight&scope=all"
 - extendedWaitUntil:
     visible:
-      text: "1st, ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME} \\(former\\), 51\\.25 kg × 5, .*, uncertified"
+      text: "1st, ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME} \\(former\\), 55 kg × 5, .*, certified"
     timeout: 15000
 - takeScreenshot: "groups-08b-board-former-member"
-# A former member's set can't be certified (§4.6 step 5): the sheet offers no Certify.
+# A former member's set can't be certified (§4.6 step 5): the sheet offers no
+# Certify. The certification given in 7c still stands (P7: former entries stay).
 - tapOn:
-    text: "1st, ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME} \\(former\\), 51\\.25 kg × 5, .*, uncertified"
+    text: "1st, ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME} \\(former\\), 55 kg × 5, .*, certified"
 - extendedWaitUntil:
     visible:
       id: "group-record-sheet"
     timeout: 10000
 - assertVisible:
     id: "group-record-sheet-status"
-    text: "○ Not certified yet"
+    text: "✓ Certified by you · .*"
 - assertNotVisible:
     id: "group-record-sheet-certify"
 - takeScreenshot: "groups-08b-2-row-detail-former"
