@@ -222,7 +222,20 @@ cleanup_rows() {
   service_delete "gyms"                     "owner_user_id=eq.${USER_A_UUID}&id=like.rt-${RUN_TAG}-%" >/dev/null
 }
 cleanup_rows
-trap cleanup_rows EXIT
+# Bash 3.2 hands the EXIT trap status 0 after an unbound-variable abort, so a
+# run that never reached its last line fails here instead of passing.
+COMPLETED=0
+cleanup_on_exit() {
+  local status=$?
+  trap - EXIT
+  if [[ ${status} -eq 0 && ${COMPLETED} -ne 1 ]]; then
+    echo "[sync-v2-push-roundtrip] FAIL: the run stopped before completing" >&2
+    status=1
+  fi
+  cleanup_rows
+  exit "${status}"
+}
+trap cleanup_on_exit EXIT
 
 # ---------------------------------------------------------------------------
 # Step 1 — multi-layer multi-row batch in NON-topological order. All four
@@ -512,4 +525,5 @@ assert_body_contains "FK_VIOLATION" "step 6d FK_VIOLATION token in body"
 service_select "exercise_group_links" "owner_user_id=eq.${USER_A_UUID}&id=eq.${ORPHAN_EGL_ID}&select=id"
 assert_jq 'length == 0' "step 6d FK-orphan link absent from server"
 
+COMPLETED=1
 echo "[sync-v2-push-roundtrip] all assertions passed"

@@ -142,7 +142,20 @@ cleanup_rows() {
   done
 }
 cleanup_rows
-trap cleanup_rows EXIT
+# Bash 3.2 hands the EXIT trap status 0 after an unbound-variable abort, so a
+# run that never reached its last line fails here instead of passing.
+COMPLETED=0
+cleanup_on_exit() {
+  local status=$?
+  trap - EXIT
+  if [[ ${status} -eq 0 && ${COMPLETED} -ne 1 ]]; then
+    echo "[sync-v2-pull-drain] FAIL: the run stopped before completing" >&2
+    status=1
+  fi
+  cleanup_rows
+  exit "${status}"
+}
+trap cleanup_on_exit EXIT
 
 sync_push() { http_request POST "${API_URL}/rest/v1/rpc/sync_push" "$1" "$2"; }
 sync_pull() {
@@ -437,4 +450,5 @@ for layer in 0 1 2 3; do
 done
 pass "round-trip — user B's pulls return zero of A's rows on all four layers"
 
+COMPLETED=1
 echo "[sync-v2-pull-drain] all assertions passed"
