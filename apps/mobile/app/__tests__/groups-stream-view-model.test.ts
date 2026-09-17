@@ -1,7 +1,9 @@
 /**
  * Pure stream presentation (groups contract §6.1): C7.2 status wording, C7.3
- * membership sentences, the "Unnamed member" fallback, kg formatting, and the
- * filter chips.
+ * membership sentences, the "Unnamed member" fallback, kg formatting, the
+ * filter chips, and (M25-T10, card AC3) record cards, record-removed and link
+ * sentences, records grouped under their session card, and paging over every
+ * item kind.
  */
 
 import {
@@ -20,10 +22,15 @@ import {
   formatMembershipSentence,
   formatSessionStatusLabel,
   formatVolumeKg,
+  mergeStreamPages,
   type GroupSessionSet,
+  type StreamRecordCardViewModel,
+  type StreamSessionCardViewModel,
   type StreamMembershipItem,
   type StreamSessionItem,
 } from '@/src/groups';
+
+import { holder, linkItem, recordItem, sessionCardItem, voidedItem } from './helpers/group-record-fixtures';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -241,6 +248,193 @@ describe('group stream view model', () => {
 
     it('is only All when the user has no groups', () => {
       expect(buildStreamFilterChips([], null)).toEqual([{ key: 'all', label: 'All', groupId: null, selected: true }]);
+    });
+  });
+});
+
+describe('board stream items (M25-T10)', () => {
+  const card = (item: Parameters<typeof buildStreamItemViewModel>[0], me: string | null = 'me') =>
+    buildStreamItemViewModel(item, me) as StreamRecordCardViewModel;
+  const sentence = (item: Parameters<typeof buildStreamItemViewModel>[0], me: string | null = 'me') =>
+    (buildStreamItemViewModel(item, me) as { sentence: string }).sentence;
+
+  describe('record cards (E3, P14, P15)', () => {
+    it('titles a group record, lists badges Weight then e1RM, and shows the e1RM value', () => {
+      expect(card(recordItem())).toMatchObject({
+        kind: 'record',
+        title: 'dave — group record',
+        exerciseLabel: 'Bench Press',
+        valueLabel: '140 kg × 1 · e1RM 142.5 kg',
+        badges: ['PR · Weight', 'Group record · Weight', 'PR · e1RM'],
+        statusLabel: '○ Not certified yet',
+        provisionalLabel: null,
+        voided: false,
+        canCertify: true,
+        groupId: 'g1',
+        groupName: 'Crew',
+      });
+    });
+
+    it('a PR without an e1RM board shows the set only; my own record reads You and offers no Certify', () => {
+      const mine = card(
+        recordItem({
+          member: { user_id: 'me', username: 'me' },
+          boards: [{ metric: 'weight', value_kg: 140, previous_value_kg: null, group_record: false }],
+        }),
+      );
+      expect(mine).toMatchObject({ title: 'You — PR', valueLabel: '140 kg × 1', badges: ['PR · Weight'], canCertify: false });
+      expect(card(recordItem(), null).canCertify).toBe(false);
+    });
+
+    it('words certified by another member, by me, and by a deleted account', () => {
+      const certified = (certifiedBy: { user_id: string; username: string | null } | null) =>
+        card(
+          recordItem({
+            certified: true,
+            certification: { certification_id: 'c1', certified_by: certifiedBy, certified_at_ms: 1 },
+          }),
+        );
+      expect(certified({ user_id: 'u3', username: 'sam' })).toMatchObject({ statusLabel: '✓ Certified by sam', canCertify: false });
+      expect(certified({ user_id: 'me', username: 'me' }).statusLabel).toBe('✓ Certified by you');
+      expect(certified({ user_id: 'u3', username: null }).statusLabel).toBe('✓ Certified by Unnamed member');
+      expect(certified(null).statusLabel).toBe('✓ Certified');
+    });
+
+    it('marks provisional and voided cards; a voided card is never certifiable', () => {
+      expect(card(recordItem({ provisional: true })).provisionalLabel).toBe('Session in progress');
+      for (const reason of ['edited', 'deleted'] as const) {
+        expect(
+          card(recordItem({ provisional: true, voided: { key: 'v1', reason, occurred_at_ms: 2 }, certified: true })),
+        ).toMatchObject({ statusLabel: `Voided · set ${reason}`, voided: true, canCertify: false, provisionalLabel: null });
+      }
+    });
+  });
+
+  describe('record-removed sentences (D15)', () => {
+    it('names each board\'s new holder, Weight first, or nobody', () => {
+      expect(sentence(voidedItem())).toBe(
+        "dave's Bench Press record removed (140 kg × 1) — set edited · Now #1 on Weight: sam 138 kg · No one holds #1 on e1RM",
+      );
+    });
+
+    it('reads Your / You for me and words a deleted set', () => {
+      expect(
+        sentence(
+          voidedItem({
+            member: { user_id: 'me', username: 'me' },
+            reason: 'deleted',
+            leaders: [{ metric: 'e1rm', leader: holder('me', 'me', 120.25) }],
+          }),
+        ),
+      ).toBe('Your Bench Press record removed (140 kg × 1) — set deleted · Now #1 on e1RM: You 120.25 kg');
+    });
+  });
+
+  describe('link sentences (P16)', () => {
+    it('merges a shared rank across both metrics', () => {
+      expect(sentence(linkItem())).toBe('dave linked Bench (comp grip) to Bench Press — now #1 on Weight and e1RM');
+    });
+
+    it('lists mixed ranks and boards left, and words an unlink', () => {
+      expect(
+        sentence(
+          linkItem({
+            exercises: [
+              { exercise_definition_id: 'a', name: 'Bench' },
+              { exercise_definition_id: 'b', name: null },
+            ],
+            effects: [
+              { metric: 'e1rm', before: null, after: { rank: 1, value_kg: 150 } },
+              { metric: 'weight', before: null, after: { rank: 2, value_kg: 140 } },
+            ],
+          }),
+        ),
+      ).toBe('dave linked Bench, an exercise to Bench Press — now #2 on Weight, #1 on e1RM');
+      expect(
+        sentence(
+          linkItem({
+            event: 'unlink',
+            member: { user_id: 'me', username: 'me' },
+            exercises: [],
+            effects: [
+              { metric: 'weight', before: { rank: 1, value_kg: 140 }, after: null },
+              { metric: 'e1rm', before: { rank: 1, value_kg: 142.5 }, after: { rank: 3, value_kg: 120 } },
+            ],
+          }),
+        ),
+      ).toBe('You unlinked an exercise from Bench Press — now #3 on e1RM, off the Weight board');
+      expect(sentence(linkItem({ effects: [] }))).toBe('dave linked Bench (comp grip) to Bench Press');
+    });
+
+    it('carries the group for All', () => {
+      expect(buildStreamItemViewModel(linkItem(), 'me')).toMatchObject({ kind: 'link', key: 'ev-link-1', groupId: 'g1', groupName: 'Crew' });
+      expect(buildStreamItemViewModel(voidedItem(), 'me')).toMatchObject({ kind: 'record_voided', groupName: 'Crew' });
+    });
+  });
+
+  describe('records sit under their session card (E3)', () => {
+    it('moves loaded records below their session, keeps orphans in place, and counts non-voided record sets', () => {
+      const first = recordItem({ key: 'r1', set_id: 'set-1' });
+      const sameSetOtherGroup = recordItem({ key: 'r2', set_id: 'set-1', group: { group_id: 'g2', name: 'Pals' } });
+      const second = recordItem({ key: 'r3', set_id: 'set-2' });
+      const voidedRecord = recordItem({ key: 'r4', set_id: 'set-3', voided: { key: 'v', reason: 'deleted', occurred_at_ms: 1 } });
+      const orphan = recordItem({ key: 'r5', session_id: 's-gone' });
+      const models = buildStreamViewModel(
+        [linkItem(), first, sameSetOtherGroup, second, voidedRecord, sessionCardItem(), orphan, voidedItem()],
+        'me',
+      );
+
+      expect(models.map((model) => `${model.kind}:${model.key}`)).toEqual([
+        'link:ev-link-1',
+        'session:u2:s1',
+        'record:r1',
+        'record:r2',
+        'record:r3',
+        'record:r4',
+        'record:r5',
+        'record_voided:ev-void-1',
+      ]);
+      expect((models[1] as StreamSessionCardViewModel).recordsLabel).toBe('2 records');
+    });
+
+    it('reads "1 record", and nothing without records', () => {
+      const one = buildStreamViewModel([recordItem(), sessionCardItem()], 'me');
+      expect((one[0] as StreamSessionCardViewModel).recordsLabel).toBe('1 record');
+      const none = buildStreamViewModel([sessionCardItem()], 'me');
+      expect((none[0] as StreamSessionCardViewModel).recordsLabel).toBeNull();
+    });
+
+    it('leaves records before their session card is paged in where the server put them', () => {
+      const models = buildStreamViewModel([sessionCardItem({ key: 'u9:s9', member: { user_id: 'u9', username: 'x' }, session_id: 's9' }), recordItem()], 'me');
+      expect(models.map((model) => model.kind)).toEqual(['session', 'record']);
+    });
+  });
+
+  describe('paging over every kind (card AC2)', () => {
+    it('an old cached first page without board kinds merges with an older page that has them', () => {
+      const oldCached = {
+        items: [sessionCardItem({ key: 'u2:s2', session_id: 's2', sort_at_ms: 9_000 })],
+        next_cursor: { sort_at_ms: 9_000, kind: 'session', key: 'u2:s2' },
+        has_more: true,
+      };
+      const older = {
+        items: [
+          sessionCardItem({ key: 'u2:s2', session_id: 's2', sort_at_ms: 9_000 }),
+          linkItem({ sort_at_ms: 8_000 }),
+          recordItem({ sort_at_ms: 7_000 }),
+          sessionCardItem({ sort_at_ms: 7_000 }),
+        ],
+        cursor: null,
+        hasMore: false,
+      };
+      const merged = mergeStreamPages(oldCached, older);
+      expect(merged.map((item) => `${item.kind}:${item.key}`)).toEqual([
+        'session:u2:s2',
+        'link:ev-link-1',
+        'record:ev-record-1',
+        'session:u2:s1',
+      ]);
+      expect(buildStreamViewModel(merged, 'me').map((model) => model.kind)).toEqual(['session', 'link', 'session', 'record']);
     });
   });
 });
