@@ -25,7 +25,7 @@ export default ({ config }: { config: ExpoConfig }) => ({
     },
 
     android: {
-        package: process.env.ANDROID_PACKAGE,
+        package: process.env.ANDROID_PACKAGE ?? "com.phano.boga3.dev",
         adaptiveIcon: {
             backgroundColor: "#E6F4FE",
             foregroundImage: "./assets/images/android-icon-foreground.png",

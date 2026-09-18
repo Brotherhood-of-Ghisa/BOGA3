@@ -40,6 +40,20 @@ source "${REPO_ROOT}/scripts/worktree-lib.sh"
 source "${REPO_ROOT}/scripts/lane-timing.sh"
 # shellcheck disable=SC1091
 source "${REPO_ROOT}/scripts/java-env.sh"
+if [[ -f "${REPO_ROOT}/scripts/android-env.sh" ]]; then
+  # shellcheck disable=SC1091
+  source "${REPO_ROOT}/scripts/android-env.sh"
+else
+  if [[ -z "${ANDROID_HOME:-}" ]]; then
+    for candidate in "${HOME}/Android/Sdk" /opt/android-sdk /usr/lib/android-sdk; do
+      [[ -d "${candidate}" ]] && export ANDROID_HOME="${candidate}" && break
+    done
+  fi
+  if [[ -n "${ANDROID_HOME:-}" && -d "${ANDROID_HOME}" ]]; then
+    [[ -d "${ANDROID_HOME}/platform-tools" && ":$PATH:" != *":${ANDROID_HOME}/platform-tools:"* ]] && export PATH="${ANDROID_HOME}/platform-tools:${PATH}"
+    [[ -d "${ANDROID_HOME}/emulator" && ":$PATH:" != *":${ANDROID_HOME}/emulator:"* ]] && export PATH="${ANDROID_HOME}/emulator:${PATH}"
+  fi
+fi
 
 usage() {
   awk 'NR > 2 && /^#/ { sub(/^# ?/, ""); print; next } NR > 2 { exit }' "${BASH_SOURCE[0]}"
@@ -163,9 +177,30 @@ cmd_doctor() {
   }
   check "docker daemon answers within 10s (local Supabase lanes)" boga_run_with_timeout 10 docker info
   check "gh authenticated (worktree release / pr wait)" gh auth status
-  check "iOS simulators (Maestro lanes)" xcrun simctl list devices available
-  check "maestro CLI (Maestro lanes)" maestro --version
-  check "xcodebuild (dev-client build)" xcodebuild -version
+  if [[ "$(uname -s)" == "Darwin" ]]; then
+    check "iOS simulators (Maestro lanes)" xcrun simctl list devices available
+    check "maestro CLI (Maestro lanes)" maestro --version
+    check "xcodebuild (dev-client build)" xcodebuild -version
+  else
+    echo "  N/A  iOS simulators (Linux host — macOS-only, matching CI)"
+    echo "  N/A  maestro CLI (Linux host — iOS E2E lanes unavailable)"
+    echo "  N/A  xcodebuild (Linux host — macOS-only)"
+    check "Android SDK (ANDROID_HOME)" test -n "${ANDROID_HOME:-}" -a -d "${ANDROID_HOME:-}"
+    check "adb (Android platform tools)" adb version
+    check "emulator (Android emulator CLI)" emulator -version
+    check "java (Android / build runtime)" java -version
+    check_android_target() {
+      local avds
+      avds="$(emulator -list-avds 2>/dev/null || true)"
+      if [[ -n "${avds}" ]]; then
+        return 0
+      fi
+      local dev_count
+      dev_count="$(adb devices 2>/dev/null | grep -v "List of devices" | grep -c "device$" || true)"
+      (( dev_count > 0 ))
+    }
+    check "Android device target (AVD created or device connected)" check_android_target
+  fi
   check "node" node --version
   check "jq (worktree tooling)" jq --version
   if [[ -x "${REPO_ROOT}/scripts/worktree-doctor.sh" ]]; then

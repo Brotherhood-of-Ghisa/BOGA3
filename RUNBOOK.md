@@ -20,6 +20,10 @@ Human-operator guide for local development, runtime operations, logs, and tests 
   - [Dev-client loop (matches Maestro runtime)](#dev-client-loop-matches-maestro-runtime)
   - [Wipe the app completely on the Simulator](#wipe-the-app-completely-on-the-simulator)
   - [Automated uninstall/reinstall via smoke lane](#automated-uninstallreinstall-via-smoke-lane)
+- [Run the app on the Android Emulator](#run-the-app-on-the-android-emulator)
+  - [Prerequisites (Android)](#prerequisites-android)
+  - [Dev-client loop (matches native runtime)](#dev-client-loop-matches-native-runtime)
+  - [Wipe the app on the Android Emulator](#wipe-the-app-on-the-android-emulator)
 - [Run a development build on a physical iPhone](#run-a-development-build-on-a-physical-iphone)
   - [One-stop: dev-lan.sh](#one-stop-dev-lansh)
   - [Outside the LAN (Tailscale): dev-remote.sh](#outside-the-lan-tailscale-dev-remotesh)
@@ -169,6 +173,61 @@ The smoke runner uses a full reset path and reinstalls automatically:
 cd apps/mobile
 TASK_ID=ad-hoc npm run test:e2e:ios:smoke
 ```
+
+## Run the app on the Android Emulator
+
+### Prerequisites (Android)
+
+- Android SDK (`ANDROID_HOME`) with platform-tools and emulator CLI.
+- Java 17 or 21 (Gradle 8.x is compatible with Java 17 and 21; Java 25+ is rejected by Gradle).
+- An AVD configured (e.g. `Pixel_10_Pro`).
+
+Check capability on Linux hosts:
+
+```bash
+./boga doctor
+```
+
+### Dev-client loop (matches native runtime)
+
+1. Boot the emulator:
+
+```bash
+emulator -avd Pixel_10_Pro &
+adb wait-for-device
+```
+
+2. Forward ports for Metro and local Supabase:
+
+```bash
+adb reverse tcp:8081 tcp:8081
+adb reverse tcp:55431 tcp:55431   # match your slot's Supabase API port if using local backend
+```
+
+3. Build and launch the development build:
+
+```bash
+cd apps/mobile
+npx expo run:android
+```
+
+Alternatively, to compile without bundling in the same process:
+
+```bash
+cd apps/mobile
+npx expo run:android --no-bundler
+npx expo start --dev-client --port 8081
+```
+
+### Wipe the app on the Android Emulator
+
+To clear the SQLite database and app sandbox:
+
+```bash
+adb shell pm clear com.phano.boga3.dev
+```
+
+Or via the emulator GUI: `Settings` → `Apps` → `BOGA3` → `Storage` → `Clear Storage`.
 
 ## Run a development build on a physical iPhone
 
