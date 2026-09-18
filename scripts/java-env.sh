@@ -18,7 +18,7 @@ find_compatible_java() {
     /opt/android-studio/jbr
   )
 
-  # First pass: look for Java 17 or 21 (Gradle 8.x compatible)
+  # Look strictly for Java 17 or 21 (Gradle 8.x compatible)
   local java_home ver
   for java_home in "${candidates[@]}"; do
     [[ -x "${java_home}/bin/java" ]] || continue
@@ -30,13 +30,6 @@ find_compatible_java() {
     fi
   done
 
-  # Second pass: fallback to any available java_home
-  for java_home in "${candidates[@]}"; do
-    [[ -x "${java_home}/bin/java" ]] || continue
-    export JAVA_HOME="${java_home}"
-    export PATH="${JAVA_HOME}/bin:${PATH}"
-    return 0
-  done
   return 1
 }
 

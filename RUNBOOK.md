@@ -182,10 +182,11 @@ TASK_ID=ad-hoc npm run test:e2e:ios:smoke
 - Java 17 or 21 (Gradle 8.x is compatible with Java 17 and 21; Java 25+ is rejected by Gradle).
 - An AVD configured (e.g. `Pixel_10_Pro`).
 
-Check capability on Linux hosts:
+Check capability:
 
 ```bash
-./boga doctor
+./boga doctor --android
+# or: ./boga android doctor
 ```
 
 ### Dev-client loop (matches native runtime)
@@ -197,26 +198,35 @@ emulator -avd Pixel_10_Pro &
 adb wait-for-device
 ```
 
-2. Forward ports for Metro and local Supabase:
+2. Boot the dedicated human-development backend (`BOGA-dev`, port 65431, isolated from test gates):
 
 ```bash
-adb reverse tcp:8081 tcp:8081
-adb reverse tcp:55431 tcp:55431   # match your slot's Supabase API port if using local backend
+./boga db dev-up
 ```
 
-3. Build and launch the development build:
+3. Source the worktree's assigned Metro port (`8082 + slot`) and reverse ports on the emulator:
+
+```bash
+source apps/mobile/.maestro/maestro.env.local
+adb reverse tcp:"${EXPO_DEV_SERVER_PORT}" tcp:"${EXPO_DEV_SERVER_PORT}"
+adb reverse tcp:65431 tcp:65431
+```
+
+*(Note: if testing against a slot's test gate stack instead of `BOGA-dev`, forward that slot's `API_PORT` from `apps/mobile/.env.local` — `55431 + 100 * slot`).*
+
+4. Build and launch the development build:
 
 ```bash
 cd apps/mobile
-npx expo run:android
+npx expo run:android --port "${EXPO_DEV_SERVER_PORT}"
 ```
 
 Alternatively, to compile without bundling in the same process:
 
 ```bash
 cd apps/mobile
-npx expo run:android --no-bundler
-npx expo start --dev-client --port 8081
+npx expo run:android --no-bundler --port "${EXPO_DEV_SERVER_PORT}"
+npx expo start --dev-client --port "${EXPO_DEV_SERVER_PORT}"
 ```
 
 ### Wipe the app on the Android Emulator

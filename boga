@@ -13,7 +13,8 @@
 #   boga test for [--diff <range>] [paths...]  # which gates does a change require?
 #   boga pr check --body <file|->              # validate a PR body's Tests table
 #   boga pr wait [--interval <s>]              # block until this branch's PR merges/closes
-#   boga doctor                                # can THIS machine run every lane?
+#   boga doctor [--android]                    # can THIS machine run every lane (or Android dev)?
+#   boga android doctor                        # verify Android SDK, emulator, and Java 17/21
 #   boga docs gen|check                        # (re)generate / drift-check derived doc blocks
 #   boga timings [lane]                        # measured durations (never guess)
 #   boga worktree create|start|ls|release|doctor   # agent-owned lifecycle (spec 01)
@@ -163,7 +164,48 @@ cmd_test() {
   esac
 }
 
+cmd_android_doctor() {
+  echo "[boga doctor --android] Android capability checks"
+  local ok=0
+  check() {
+    local label="$1"; shift
+    if "$@" >/dev/null 2>&1; then
+      echo "  OK   ${label}"
+    else
+      echo "  FAIL ${label}  (fix this, then Android builds run)"
+      ok=1
+    fi
+  }
+  check "Android SDK (ANDROID_HOME)" test -n "${ANDROID_HOME:-}" -a -d "${ANDROID_HOME:-}"
+  check "adb (Android platform tools)" adb version
+  check "emulator (Android emulator CLI)" emulator -version
+  check_java_version() {
+    local ver
+    ver="$(java -version 2>&1 | head -n 1 | awk -F '"' '{print $2}' | cut -d'.' -f1)"
+    [[ "$ver" == "17" || "$ver" == "21" ]]
+  }
+  check "java runtime is Java 17 or 21 (Gradle 8.x compatible)" check_java_version
+  check_android_target() {
+    local avds
+    avds="$(emulator -list-avds 2>/dev/null || true)"
+    if [[ -n "${avds}" ]]; then
+      return 0
+    fi
+    local dev_count
+    dev_count="$(adb devices 2>/dev/null | grep -v "List of devices" | grep -c "device$" || true)"
+    (( dev_count > 0 ))
+  }
+  check "Android device target (AVD created or device connected)" check_android_target
+  return "${ok}"
+}
+
 cmd_doctor() {
+  local target="${1:-}"
+  if [[ "${target}" == "--android" || "${target}" == "android" ]]; then
+    cmd_android_doctor
+    return $?
+  fi
+
   echo "[boga doctor] capability checks — a FAIL is a bootstrap gap to fix, not a reason to skip a lane"
   local ok=0
   check() {
@@ -177,30 +219,9 @@ cmd_doctor() {
   }
   check "docker daemon answers within 10s (local Supabase lanes)" boga_run_with_timeout 10 docker info
   check "gh authenticated (worktree release / pr wait)" gh auth status
-  if [[ "$(uname -s)" == "Darwin" ]]; then
-    check "iOS simulators (Maestro lanes)" xcrun simctl list devices available
-    check "maestro CLI (Maestro lanes)" maestro --version
-    check "xcodebuild (dev-client build)" xcodebuild -version
-  else
-    echo "  N/A  iOS simulators (Linux host — macOS-only, matching CI)"
-    echo "  N/A  maestro CLI (Linux host — iOS E2E lanes unavailable)"
-    echo "  N/A  xcodebuild (Linux host — macOS-only)"
-    check "Android SDK (ANDROID_HOME)" test -n "${ANDROID_HOME:-}" -a -d "${ANDROID_HOME:-}"
-    check "adb (Android platform tools)" adb version
-    check "emulator (Android emulator CLI)" emulator -version
-    check "java (Android / build runtime)" java -version
-    check_android_target() {
-      local avds
-      avds="$(emulator -list-avds 2>/dev/null || true)"
-      if [[ -n "${avds}" ]]; then
-        return 0
-      fi
-      local dev_count
-      dev_count="$(adb devices 2>/dev/null | grep -v "List of devices" | grep -c "device$" || true)"
-      (( dev_count > 0 ))
-    }
-    check "Android device target (AVD created or device connected)" check_android_target
-  fi
+  check "iOS simulators (Maestro lanes)" xcrun simctl list devices available
+  check "maestro CLI (Maestro lanes)" maestro --version
+  check "xcodebuild (dev-client build)" xcodebuild -version
   check "node" node --version
   check "jq (worktree tooling)" jq --version
   if [[ -x "${REPO_ROOT}/scripts/worktree-doctor.sh" ]]; then
@@ -222,7 +243,14 @@ shift || true
 
 case "${cmd}" in
   test)     cmd_test "$@" ;;
-  doctor)   cmd_doctor ;;
+  doctor)   cmd_doctor "$@" ;;
+  android)
+    sub="${1:-doctor}"; shift || true
+    case "${sub}" in
+      doctor) cmd_android_doctor "$@" ;;
+      *) fail "usage: boga android doctor" ;;
+    esac
+    ;;
   pr)
     sub="${1:-}"; shift || true
     case "${sub}" in

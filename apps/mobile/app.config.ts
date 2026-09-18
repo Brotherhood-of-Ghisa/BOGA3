@@ -3,6 +3,22 @@ import { ExpoConfig } from 'expo/config';
 const DEFAULT_BOGA_AGENT_CONNECT_URL =
     "https://sparkling-violet-dc56.sboschianpest.workers.dev/connect";
 
+function resolveAndroidPackage(): string {
+    if (process.env.ANDROID_PACKAGE) {
+        return process.env.ANDROID_PACKAGE;
+    }
+    // Fail closed: production builds must never silently inherit the dev package ID.
+    if (
+        process.env.IOS_BUNDLE_ID === "com.phano.boga3" ||
+        (process.env.APP_ENV === "prod" && process.env.IOS_BUNDLE_ID !== "com.phano.boga3.dev")
+    ) {
+        throw new Error(
+            "ANDROID_PACKAGE must be explicitly defined for production builds (expected com.phano.boga3)."
+        );
+    }
+    return "com.phano.boga3.dev";
+}
+
 export default ({ config }: { config: ExpoConfig }) => ({
     ...config,
 
@@ -25,7 +41,7 @@ export default ({ config }: { config: ExpoConfig }) => ({
     },
 
     android: {
-        package: process.env.ANDROID_PACKAGE ?? "com.phano.boga3.dev",
+        package: resolveAndroidPackage(),
         adaptiveIcon: {
             backgroundColor: "#E6F4FE",
             foregroundImage: "./assets/images/android-icon-foreground.png",
