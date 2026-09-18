@@ -12,10 +12,10 @@ jest.mock('expo-router', () => {
 });
 
 describe('IndexScreen', () => {
-  it('redirects the root `/` route to `/stats-history`', () => {
+  it('redirects the root `/` route to `/today`', () => {
     const { getByTestId } = render(<IndexScreen />);
     const redirectNode = getByTestId('index-redirect');
-    expect(redirectNode.props.children).toBe('/stats-history');
+    expect(redirectNode.props.children).toBe('/today');
   });
 
   it('does not render the legacy session-list shell at the root', () => {

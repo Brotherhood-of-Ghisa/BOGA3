@@ -23,7 +23,9 @@ Brief entrypoint inventory of the current reusable UI component set.
 - `apps/mobile/components/session-recorder/`
   - shared session-recorder/session-detail UI composition components and supporting UI modules
 - `apps/mobile/components/session-list/`
-  - shared building blocks originally extracted from the retired session-list screen (summary line, active-session row, history list, data hook); now consumed by the `stats-history` History sub-view and the Log tab
+  - shared building blocks originally extracted from the retired session-list
+    screen (summary line, active-session row, history list, data hook); now
+    consumed by Progress/`stats-history`, Today, and session-list flows
 - `apps/mobile/components/muscle-analytics/`
   - shared muscle analytics UI components for Stats/History surfaces
 
@@ -68,16 +70,24 @@ Brief entrypoint inventory of the current reusable UI component set.
 
 ### Specialized shared components (reusable, not generic primitives)
 
-1. `TopLevelTabs`
-- File: `apps/mobile/components/navigation/top-level-tabs.tsx`
-- Purpose:
-  - app-specific top-level `History`, `Log`, `Exercises`, `Groups` tab strip with a right-side `Settings` utility action (fixed 12 pt labels so four tabs fit a 375 pt phone); used as the body of `BottomTray` inside `(tabs)/_layout.tsx`, and rendered directly by detail screens (`exercise-history`) until they migrate into the tabs group
-
-2. `BottomTray`
+1. `BottomTray`
 - File: `apps/mobile/components/navigation/bottom-tray.tsx`
 - Purpose:
-  - collapsible bottom navigation tray that wraps `TopLevelTabs`; exposes a drag handle (React Native `PanResponder` + `Animated`) to collapse to a peek strip and `useTrayVisibility()` hook plus `TrayVisibilityProvider` so screens can imperatively expand/collapse
+  - collapsible bottom navigation tray that wraps `MainTabs`; exposes a drag handle (React Native `PanResponder` + `Animated`) to collapse to a peek strip and `useTrayVisibility()` hook plus `TrayVisibilityProvider` so screens can imperatively expand/collapse
+  - omitted entirely in focused recorder contexts by the route-aware tab layout
   - snap math lives in the pure helper `apps/mobile/src/navigation/tray-snap.ts` so it can be unit-tested without gesture plumbing
+
+2. `MainTabs`
+- File: `apps/mobile/components/navigation/main-tabs.tsx`
+- Purpose:
+  - token-backed, accessible four-tab presentation for `Today`, `Train`,
+    `Progress`, and `More`, driven by the single declarative model in
+    `apps/mobile/src/navigation/main-tabs.ts`
+  - production navigation body inside `BottomTray` and the matching direct
+    navigation strip on the `exercise-history` detail screen
+  - the non-visual model owns canonical order, labels, routes, test IDs,
+    canonical/legacy ownership resolution, unknown-route null fallback, and
+    focused-recorder navigation suppression
 
 3. `ExerciseEditorModal`
 - File: `apps/mobile/components/exercise-catalog/exercise-editor-modal.tsx`
@@ -138,12 +148,14 @@ Brief entrypoint inventory of the current reusable UI component set.
 11. `SessionSummaryLine`
 - File: `apps/mobile/components/session-list/session-summary-line.tsx`
 - Purpose:
-  - shared two-line summary row (date/duration/gym + sets/exercises) reused by `ActiveSessionRow` and `HistoryList`, and available to the upcoming Stats/History and Log tabs
+  - shared two-line summary row (date/duration/gym + sets/exercises) reused by
+    `ActiveSessionRow`, `HistoryList`, Today recents, and Progress history
 
 12. `ActiveSessionRow`
 - File: `apps/mobile/components/session-list/active-session-row.tsx`
 - Purpose:
-  - active-session row plus its overflow menu (resume / complete / delete) used by the Log tab
+  - active-session row plus its overflow menu (resume / complete / delete) used
+    by session-list consumers
 
 13. `HistoryList`
 - File: `apps/mobile/components/session-list/history-list.tsx`
@@ -219,7 +231,7 @@ Brief entrypoint inventory of the current reusable UI component set.
 - Route-level screen shells (for example `CompletedSessionDetailScreenShell`, `ExerciseHistoryScreenShell`)
   - Document in `docs/specs/ui/screen-map.md` and `docs/specs/ui/navigation-contract.md`
   - Reason: they are route composition/test helpers, not reusable UI building blocks
-  - `ExerciseHistoryScreenShell` is exported separately from `apps/mobile/app/exercise-history.tsx` so the per-exercise history surface can be wired from any future route (currently entered from `/stats-history`); the component remains a route-level shell, not a reusable primitive
+  - `ExerciseHistoryScreenShell` is exported separately from `apps/mobile/app/exercise-history.tsx` so the per-exercise history surface can be wired from any future route (currently entered from Progress and the preserved `/stats-history` path); the component remains a route-level shell, not a reusable primitive
 
 ## Pending / planned (not current components)
 
@@ -237,7 +249,10 @@ Reference: the M8 UI pattern audit (deleted 2026-06-10; in git history)
 ## Refactor convergence notes (Task `T-20260226-06`)
 
 1. Current user-facing route screens now consume `uiTokens.colors` for route-level screen styles (including modal scrims and status surfaces) instead of screen-local raw color literals.
-2. No reusable primitives were removed in Task `T-20260226-06`; existing shared primitives/components (`UiButton`, `UiText`, `UiSurface`, `TopLevelTabs`, `BottomTray`, `SessionContentLayout`) remain the canonical reuse surface.
+2. The later M26 navigation cutover replaced the retired `TopLevelTabs` with
+   `MainTabs`; current shared primitives/components (`UiButton`, `UiText`,
+   `UiSurface`, `MainTabs`, `BottomTray`, `SessionContentLayout`) remain the
+   canonical reuse surface.
 3. Some repeated button/row/modal patterns remain route-local one-offs to avoid behavioral churn; they stay tracked as candidate primitives in the pending list above.
 
 ## Maintenance rule

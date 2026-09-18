@@ -3836,7 +3836,7 @@ export default function SessionRecorderScreen({
         hasSessionMutationRef.current = false;
         // Both routes live in the same (tabs) Stack screen, so dismissTo finds nothing to pop;
         // use replace to actually switch the active tab to Stats/History.
-        router.replace('/stats-history');
+        router.replace('/progress');
         return;
       }
 

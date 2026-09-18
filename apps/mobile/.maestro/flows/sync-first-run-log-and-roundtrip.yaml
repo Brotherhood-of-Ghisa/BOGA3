@@ -96,7 +96,7 @@ appId: com.dinoderek.mobile
     id: "sign-in-card"
 # No data screen may render before sign-in.
 - assertNotVisible:
-    id: "stats-history-screen"
+    id: "today-screen"
 - takeScreenshot: "16-first-run-roundtrip-signed-out"
 
 # Sign in as the fixture user. The auth layer fires a real requestSync() on a
@@ -116,7 +116,7 @@ appId: com.dinoderek.mobile
 # progress. A generous window absorbs sim/Metro warm-up.
 - extendedWaitUntil:
     visible:
-      id: "stats-history-screen"
+      id: "today-screen"
     timeout: 90000
 - assertNotVisible:
     id: "sync-gate-block"
@@ -191,11 +191,22 @@ appId: com.dinoderek.mobile
 - takeScreenshot: "18-first-run-roundtrip-logged"
 
 # === Phase C: force a sync, prove the logged delta uploaded (Pending -> 0) ===
-# Poll for the settings screen rather than asserting it immediately after the tap:
+# Open More, then poll for Settings rather than asserting it immediately:
 # the transition can lag a beat on a cold-JIT first render, and extendedWaitUntil
 # rides that out (an immediate assert is what flaked the auth lane once).
+- waitForAnimationToEnd:
+    timeout: 4000
+- retry:
+    maxRetries: 3
+    commands:
+      - tapOn:
+          id: "top-level-tab-more"
+      - extendedWaitUntil:
+          visible:
+            id: "more-screen"
+          timeout: 15000
 - tapOn:
-    id: "top-level-settings-button"
+    id: "more-settings-row"
 - extendedWaitUntil:
     visible:
       id: "settings-screen"
@@ -290,13 +301,24 @@ appId: com.dinoderek.mobile
 # Gate lifts off the real re-pull cycle and lands on the data screen.
 - extendedWaitUntil:
     visible:
-      id: "stats-history-screen"
+      id: "today-screen"
     timeout: 90000
 - assertNotVisible:
     id: "sync-gate-block"
 # Open the sessions history. After a full local wipe the only source of any
 # session is the remote DB, so a restored "1 exercise" session row proves the
 # logged workout is in the remote database.
+- waitForAnimationToEnd:
+    timeout: 4000
+- retry:
+    maxRetries: 3
+    commands:
+      - tapOn:
+          id: "top-level-tab-progress"
+      - extendedWaitUntil:
+          visible:
+            id: "stats-history-screen"
+          timeout: 30000
 - tapOn:
     id: "stats-card-sessions"
 - assertVisible:

@@ -18,9 +18,79 @@ Brief entrypoint map of the current mobile screens.
 1. `/` (alias)
 - File: `apps/mobile/app/index.tsx`
 - Purpose:
-  - default app entry route that redirects to `/stats-history`
+  - default app entry route that redirects to `/today`
 - Notes:
-  - no unique UI; renders an `expo-router` `Redirect` to the merged Stats/History tab
+  - no unique UI; renders an `expo-router` `Redirect` to the Today tab
+
+1b. `/today` (canonical tab)
+- File: `apps/mobile/app/(tabs)/today.tsx`
+- Purpose:
+  - concise orientation surface for current personal training, joined-group
+    activity, and recent completed sessions
+- Key states (high level):
+  - an active draft takes priority and exposes one resume action; without one,
+    the planning slot renders ready/loading/empty/error/unavailable states
+  - group activity is bounded to the two newest session or membership items
+    visible to the user's joined groups; richer record/link events remain in
+    the full Groups feed, while Today preserves auth-unavailable, signed-out,
+    cached/offline, missing-data, empty, and inline-error behavior
+  - recent activity is bounded to the three newest non-deleted completed
+    sessions and preserves repository loading/error/empty behavior
+  - until the separate planning milestone supplies its read/materialization
+    interface, the planning slot uses the approved `Watch this space 👀`
+    placeholder and links to Train without inventing plan data
+- Key exits:
+  - `/session-recorder`, `/train`, `/groups`, `/group/[groupId]`,
+    `/group-session/[memberId]/[sessionId]`,
+    `/completed-session/[sessionId]`, `/progress`, and `/sign-in`
+
+1c. `/train` (canonical tab)
+- File: `apps/mobile/app/(tabs)/train.tsx`
+- Purpose:
+  - single entry surface for starting or resuming personal training and, once
+    its separate dependency ships, managing personal planning
+- Key states (high level):
+  - active-session loading and retryable load error; start actions remain
+    absent until the app knows that no active draft exists
+  - active draft with one Resume action and no competing empty/planned action
+  - no active draft with empty-workout start plus retryable inline persistence
+    failure
+  - planning loading/error/empty/ready/unavailable states; production uses the
+    approved `Watch this space 👀` placeholder until M23 supplies a plan
+    read/materialization and management interface
+- Key exits:
+  - `/session-recorder` after guarded empty/planned launch or active resume;
+    a future planner exit is supplied by the planning integration rather than
+    guessed here
+
+1d. `/progress` (canonical tab)
+- File: `apps/mobile/app/(tabs)/progress.tsx`
+- Purpose:
+  - canonical entry to the current Stats / History dashboard without
+    adding or changing any analytics
+- Key states (high level):
+  - exactly the existing `/stats-history` loading, error, empty, dashboard,
+    exercise/muscle breakdown, and daily/weekly heat-map states
+- Key exits:
+  - existing Sessions drill-down and in-route exercise/muscle history overlays
+  - `/stats-history` remains available as the preserved legacy path and selects
+    Progress in the shared navigation
+
+1e. `/more` (canonical tab)
+- File: `apps/mobile/app/(tabs)/more.tsx`
+- Purpose:
+  - scalable home for secondary capabilities that should not expand the
+    persistent tab bar
+- Key states (high level):
+  - Community links to existing group discovery and administration
+  - Tools links to MCP setup and connected-agent management; connected agents
+    is omitted without a user, developer logs is omitted outside `isDevMode`,
+    and an external-browser failure is shown inline without disabling the hub
+  - Library & account links to existing exercise-database management and
+    Settings/account
+- Key exits:
+  - `/groups`, `/connected-agents`, `/dev-logs`, `/exercise-catalog`, and
+    `/settings`, plus the first-party external MCP setup page
 
 2. `/sign-in`
 - File: `apps/mobile/app/sign-in.tsx`
@@ -50,7 +120,9 @@ Brief entrypoint map of the current mobile screens.
 3. `/stats-history`
 - File: `apps/mobile/app/(tabs)/stats-history.tsx`
 - Purpose:
-  - merged Stats / History tab whose Stats surface switches between per-exercise and per-muscle summaries while preserving the top-level Sessions drill-down and in-route history overlays
+  - preserved Progress-owned path whose merged Stats / History surface switches
+    between per-exercise and per-muscle summaries while preserving the Sessions
+    drill-down and in-route history overlays
 - Query params:
   - `period` (optional; `7` or `30`; absent/invalid values default to `7`)
   - `breakdown` (optional; `exercise` or `muscle`; absent/invalid values default to `exercise`)
@@ -85,7 +157,10 @@ Brief entrypoint map of the current mobile screens.
   - **By Exercise mode** (M17): the view-mode chip switches the body to the sortable exercise table; tapping an exercise data row opens an in-route `ExerciseHistoryOverlay`
   - exercise-history overlay states: loading, error, no-history, populated daily/weekly heatmaps (365-day window), metric chip selection (Volume / W/sets / 1RM / Top weight), week-selection banner
 - Notes:
-  - tab root inside the `(tabs)` group with `headerShown: false`; the tab bar is `BottomTray` (composing `TopLevelTabs`) supplied via the `tabBar` prop in `(tabs)/_layout.tsx`.
+  - preserved tab-group route with `headerShown: false`; its exact existing UI
+    is also exposed canonically at `/progress`. `BottomTray` composes
+    `MainTabs`, maps this route to Progress, and is supplied via the `tabBar`
+    prop in `(tabs)/_layout.tsx`.
 
 4. `/session-recorder`
 - File: `apps/mobile/app/(tabs)/session-recorder.tsx`
@@ -112,8 +187,10 @@ Brief entrypoint map of the current mobile screens.
   - active submit replaces to
     `/completed-session/<sessionId>?presentation=completion` only after local
     persistence and completion succeed
-  - completed-edit save replaces directly to `/stats-history` and does not
+  - completed-edit save replaces directly to `/progress` and does not
     replay completion
+  - the persistent four-tab navigation is hidden in active and completed-edit
+    recorder modes
   - `/exercise-link?exerciseDefinitionId=<id>` (`•••` `Link to group exercise…`)
 
 5. `/exercise-catalog`
@@ -129,7 +206,7 @@ Brief entrypoint map of the current mobile screens.
 - Key exits:
   - `session-recorder` after save when opened from recorder-origin manage flow
   - `/exercise-link?exerciseDefinitionId=<id>` (`⋮` `Link to group exercise…`)
-  - `stats-history` / `session-recorder` via the shared bottom tray (`TopLevelTabs`)
+  - the preserved route is owned by More in the shared `MainTabs` tray
 
 6. `/settings`
 - File: `apps/mobile/app/(tabs)/settings.tsx`
@@ -157,7 +234,8 @@ Brief entrypoint map of the current mobile screens.
     codename, and Preview/Local flavor only outside production
   - a developer-tools card (`isDevMode()` only), last and separate from the
     sync-status card, with the local/remote wipe affordances
-  - available from the shared settings utility action regardless of auth state
+  - available from the Settings row under More regardless of auth state; the
+    direct `/settings` path remains valid
 - Key exits:
   - `profile`
   - `connected-agents` (signed in only)
@@ -207,7 +285,7 @@ Brief entrypoint map of the current mobile screens.
     later focus reacquisition; filter and mutation refreshes remain explicit
   - deleted-session visibility toggle and completed-session row actions
   - active Resume and review/complete affordances both return to the existing
-    Log recorder so draft state and recorder cleanup rules remain authoritative
+    recorder so draft state and recorder cleanup rules remain authoritative
 - Key exits:
   - `/session-recorder` via stack dismissal for active Resume or review/complete
   - `/session-recorder?mode=completed-edit&sessionId=<sessionId>` from a
@@ -231,8 +309,8 @@ Brief entrypoint map of the current mobile screens.
     Edit/delete/append actions are hidden in both modes; only post-submit
     completion renders Done
   - completion loading/error/not-found/deleted-target states expose one safe
-    Stats / History exit; the native back affordance/gesture is suppressed and
-    Android system back replaces to Stats / History
+    Progress exit; the native back affordance/gesture is suppressed and Android
+    system back replaces to Progress
   - read-only exercise cards include a set table with `Set`, `Weight`, `Reps`, and `Effort`
   - exercise-card titles toggle an expanded/collapsed state; collapsed cards show valid performed-set and working-set counts while keeping `Append` available
   - each exercise card header exposes `Append` to copy that one historical block as planned target rows into the active recorder
@@ -240,7 +318,7 @@ Brief entrypoint map of the current mobile screens.
 - Key exits:
   - `session-recorder` (edit)
   - `session-recorder` after successful per-exercise block append
-  - `/stats-history` from completion Done/back
+  - `/progress` from completion Done/back
   - `/sessions` or completed-edit mode from historical-summary header actions
 
 11. `/exercise-history`
@@ -254,12 +332,14 @@ Brief entrypoint map of the current mobile screens.
   - dynamic stack title set inside the route file to the resolved exercise name (falls back to `Exercise History`)
 - Key exits:
   - `/completed-session/<sessionId>` from session card tap or from the all-time-best card rows
-  - `stats-history` / `session-recorder` / `exercise-catalog` / `groups` / `settings` via the shared bottom tray (`TopLevelTabs` plus the Settings cog)
+  - Today / Train / Progress / More via the shared `MainTabs`; Progress is
+    selected for this analytics detail context
 
 12. `/groups` (M22)
 - File: `apps/mobile/app/(tabs)/groups.tsx`
 - Purpose:
-  - the fourth tab: a newest-first stream of group members' sessions and membership events, filtered by `All` or one group
+  - preserved More-owned route: a newest-first stream of group members'
+    sessions and membership events, filtered by `All` or one group
   - (M25-T10) record cards sit directly below their session card, whose `N records` label counts them; record-removed and link items are light rows; a record card opens the row detail sheet and offers `Certify` inline (each names its group in All)
 - Key states (high level):
   - signed-out / auth-unconfigured sign-in-required card (no group RPC runs)
@@ -428,10 +508,18 @@ Brief entrypoint map of the current mobile screens.
 
 2. `apps/mobile/app/(tabs)/_layout.tsx`
 - Purpose:
-  - tab group layout that owns the tab roots (`stats-history`, `session-recorder`, `exercise-catalog`, `groups`) plus `settings` (in-group but reached via the cog, not as a tab)
+  - tab group layout that owns the canonical roots (`today`, `train`,
+    `progress`, `more`) plus preserved legacy roots (`stats-history`,
+    `session-recorder`, `exercise-catalog`, `groups`, `settings`)
 - Notes:
   - all tab roots have `headerShown: false`
-  - the system tab bar is supplied via `tabBar={() => <BottomTray>…</BottomTray>}`: the `BottomTray` component (from `apps/mobile/components/navigation/bottom-tray.tsx`) wraps `TopLevelTabs` and exposes a drag handle to collapse to a peek strip. Screens can imperatively expand/collapse via `useTrayVisibility()`; initial state is `expanded`. Snap math is unit-tested in `apps/mobile/src/navigation/tray-snap.ts`.
+  - the system tab bar is supplied via `tabBar`: `BottomTray` wraps exactly four
+    `MainTabs` destinations and exposes a drag handle to collapse to a peek
+    strip. Preserved roots are registered with `href: null`, resolve to their
+    canonical owner, and remain directly addressable; recorder routes suppress
+    the tray entirely. Screens can imperatively expand/collapse via
+    `useTrayVisibility()`; initial state is `expanded`. Snap math is unit-tested
+    in `apps/mobile/src/navigation/tray-snap.ts`.
 
 ## Documentation boundary
 

@@ -75,20 +75,30 @@ appId: com.dinoderek.mobile
     visible:
       id: "stats-history-screen"
     timeout: 60000
-# Now signed in: open Profile and exercise the account affordances.
+# Now signed in: open More -> Settings -> Profile and exercise the account affordances.
 # Use extendedWaitUntil (poll) rather than a bare assertVisible after each
 # navigating tap: the tab/screen transition can lag a beat on the cold-JIT first
 # render (an immediate assert raced it and flaked once), and polling rides that
-  # out without padding the run. iOS 26 occasionally reports a stale
-  # accessibility frame for the settings cog after the harness teleport and taps
-  # the Exercises tab instead; tap the visible cog region once the bottom nav is
-  # present so this remains a harness fix, not a product navigation change.
+  # out without padding the run. The harness teleport can leave the tab scene
+  # sliding for a beat even after its content is visible, so settle it before
+  # resolving and tapping a tab element.
 - extendedWaitUntil:
     visible:
-      id: "top-level-bottom-tabs"
+      id: "main-bottom-tabs"
     timeout: 15000
+- waitForAnimationToEnd:
+    timeout: 4000
+- retry:
+    maxRetries: 3
+    commands:
+      - tapOn:
+          id: "top-level-tab-more"
+      - extendedWaitUntil:
+          visible:
+            id: "more-screen"
+          timeout: 15000
 - tapOn:
-    point: "88%,94%"
+    id: "more-settings-row"
 - extendedWaitUntil:
     visible:
       id: "settings-screen"

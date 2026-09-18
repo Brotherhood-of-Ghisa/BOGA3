@@ -558,7 +558,7 @@ describe('CompletedSessionDetailScreenShell', () => {
     await waitFor(() => expect(screen.getByTestId('session-completion-done')).toBeTruthy());
     expect(screen.queryByTestId('session-completion-view-muscle-load')).toBeNull();
     fireEvent.press(screen.getByTestId('session-completion-done'));
-    expect(mockReplace).toHaveBeenCalledWith('/stats-history');
+    expect(mockReplace).toHaveBeenCalledWith('/progress');
   });
 
   it('replaces to Stats when Android hardware back is pressed during completion', async () => {
@@ -593,7 +593,7 @@ describe('CompletedSessionDetailScreenShell', () => {
     act(() => {
       expect(hardwareBackHandler?.()).toBe(true);
     });
-    expect(mockReplace).toHaveBeenCalledWith('/stats-history');
+    expect(mockReplace).toHaveBeenCalledWith('/progress');
 
     view.unmount();
     expect(remove).toHaveBeenCalled();
@@ -657,7 +657,7 @@ describe('CompletedSessionDetailScreenShell', () => {
     expect(screen.getByTestId('session-completion-safe-exit')).toBeTruthy();
     expect(screen.queryByTestId('session-completion-presentation')).toBeNull();
     fireEvent.press(screen.getByTestId('session-completion-safe-exit'));
-    expect(mockReplace).toHaveBeenCalledWith('/stats-history');
+    expect(mockReplace).toHaveBeenCalledWith('/progress');
   });
 
   it('offers one safe exit when completion loading fails', async () => {
@@ -682,7 +682,7 @@ describe('CompletedSessionDetailScreenShell', () => {
     await waitFor(() => expect(screen.getByTestId('completed-session-detail-error')).toBeTruthy());
     expect(screen.getByText('Storage unavailable')).toBeTruthy();
     fireEvent.press(screen.getByTestId('session-completion-safe-exit'));
-    expect(mockReplace).toHaveBeenCalledWith('/stats-history');
+    expect(mockReplace).toHaveBeenCalledWith('/progress');
   });
 
   it('renders loading then a recorder-like read-only detail on success', async () => {

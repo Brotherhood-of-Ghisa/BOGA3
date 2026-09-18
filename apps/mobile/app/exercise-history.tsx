@@ -2,7 +2,7 @@ import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-rou
 import { useCallback, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { TopLevelTabs, type TopLevelTabKey } from '@/components/navigation/top-level-tabs';
+import { MainTabs } from '@/components/navigation/main-tabs';
 import { uiColors } from '@/components/ui';
 import {
   loadExercisePerformanceHistory,
@@ -11,6 +11,7 @@ import {
   type ExerciseHistorySummary,
   type ExerciseHistoryTagOption,
 } from '@/src/data';
+import { mainTabHref, type MainTabKey } from '@/src/navigation/main-tabs';
 
 const PERIOD_OPTIONS: { value: ExerciseHistoryPeriod; label: string }[] = [
   { value: 7, label: '7 days' },
@@ -83,12 +84,8 @@ export type ExerciseHistoryScreenShellProps = {
   onSelectPeriod: (period: ExerciseHistoryPeriod) => void;
   onSelectTag: (tagDefinitionId: string | null) => void;
   onPressSession: (sessionId: string) => void;
-  activeTopTab?: TopLevelTabKey;
-  onPressStatsHistory: () => void;
-  onPressLog: () => void;
-  onPressExercises: () => void;
-  onPressGroups: () => void;
-  onPressSettings: () => void;
+  activeMainTab?: MainTabKey;
+  onSelectMainTab: (tab: MainTabKey) => void;
 };
 
 export function ExerciseHistoryScreenShell({
@@ -100,12 +97,8 @@ export function ExerciseHistoryScreenShell({
   onSelectPeriod,
   onSelectTag,
   onPressSession,
-  activeTopTab = 'stats-history',
-  onPressStatsHistory,
-  onPressLog,
-  onPressExercises,
-  onPressGroups,
-  onPressSettings,
+  activeMainTab = 'progress',
+  onSelectMainTab,
 }: ExerciseHistoryScreenShellProps) {
   const tagOptions = summary?.tagOptions ?? [];
 
@@ -219,14 +212,7 @@ export function ExerciseHistoryScreenShell({
         </ScrollView>
       </View>
 
-      <TopLevelTabs
-        activeTab={activeTopTab}
-        onPressStatsHistory={onPressStatsHistory}
-        onPressLog={onPressLog}
-        onPressExercises={onPressExercises}
-        onPressGroups={onPressGroups}
-        onPressSettings={onPressSettings}
-      />
+      <MainTabs activeTab={activeMainTab} onSelect={onSelectMainTab} />
     </View>
   );
 }
@@ -517,11 +503,7 @@ export default function ExerciseHistoryRoute() {
         onSelectPeriod={handleSelectPeriod}
         onSelectTag={handleSelectTag}
         onPressSession={(sessionId) => router.push(`/completed-session/${sessionId}`)}
-        onPressStatsHistory={() => router.push('/stats-history')}
-        onPressLog={() => router.push('/session-recorder')}
-        onPressExercises={() => router.push('/exercise-catalog')}
-        onPressGroups={() => router.push('/groups')}
-        onPressSettings={() => router.push('/settings')}
+        onSelectMainTab={(tab) => router.push(mainTabHref(tab))}
       />
     </>
   );

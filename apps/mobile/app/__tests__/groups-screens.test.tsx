@@ -48,7 +48,7 @@ jest.mock('@/src/groups/api', () => ({
   getGroupSessionDetail: jest.fn(),
 }));
 
-import { TopLevelTabs } from '@/components/navigation/top-level-tabs';
+import { MainTabs } from '@/components/navigation/main-tabs';
 import {
   GroupApiError,
   groupCacheKeys,
@@ -65,9 +65,9 @@ import {
 } from '@/src/groups';
 import * as groupsApi from '@/src/groups/api';
 import { SIGN_IN_ROUTE } from '@/src/navigation/routes';
+import { resolveMainTab } from '@/src/navigation/main-tabs';
 
 import GroupsTabRoute from '../(tabs)/groups';
-import { resolveActiveTab } from '../(tabs)/_layout';
 import GroupScreenRoute from '../group/[groupId]/index';
 import GroupMembersRoute from '../group/[groupId]/members';
 import MyGroupsRoute from '../group/mine';
@@ -517,24 +517,17 @@ describe("Friend's session view", () => {
   });
 });
 
-describe('Top-level Groups tab', () => {
-  it('renders a fourth Groups tab that is selectable and maps to the groups route', () => {
-    const onPressGroups = jest.fn();
+describe('Groups ownership in the main navigation', () => {
+  it('selects More for the preserved groups route', () => {
+    const onSelect = jest.fn();
     render(
-      <TopLevelTabs
-        activeTab="groups"
-        onPressExercises={jest.fn()}
-        onPressGroups={onPressGroups}
-        onPressLog={jest.fn()}
-        onPressSettings={jest.fn()}
-        onPressStatsHistory={jest.fn()}
-      />,
+      <MainTabs activeTab="more" onSelect={onSelect} />,
     );
-    const tab = screen.getByTestId('top-level-tab-groups');
+    const tab = screen.getByTestId('top-level-tab-more');
     expect(tab.props.accessibilityState).toMatchObject({ selected: true });
     fireEvent.press(tab);
-    expect(onPressGroups).toHaveBeenCalledTimes(1);
-    expect(resolveActiveTab(['(tabs)', 'groups'])).toBe('groups');
-    expect(resolveActiveTab(['(tabs)', 'stats-history'])).toBe('stats-history');
+    expect(onSelect).toHaveBeenCalledWith('more');
+    expect(resolveMainTab(['(tabs)', 'groups'])).toBe('more');
+    expect(resolveMainTab(['(tabs)', 'stats-history'])).toBe('progress');
   });
 });

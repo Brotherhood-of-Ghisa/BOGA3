@@ -128,11 +128,7 @@ describe('ExerciseHistoryScreenShell', () => {
         onSelectPeriod={jest.fn()}
         onSelectTag={jest.fn()}
         onPressSession={jest.fn()}
-        onPressStatsHistory={jest.fn()}
-        onPressLog={jest.fn()}
-        onPressExercises={jest.fn()}
-        onPressGroups={jest.fn()}
-        onPressSettings={jest.fn()}
+        onSelectMainTab={jest.fn()}
       />
     );
 
@@ -155,11 +151,7 @@ describe('ExerciseHistoryScreenShell', () => {
         onSelectPeriod={onSelectPeriod}
         onSelectTag={jest.fn()}
         onPressSession={jest.fn()}
-        onPressStatsHistory={jest.fn()}
-        onPressLog={jest.fn()}
-        onPressExercises={jest.fn()}
-        onPressGroups={jest.fn()}
-        onPressSettings={jest.fn()}
+        onSelectMainTab={jest.fn()}
       />
     );
 
@@ -181,11 +173,7 @@ describe('ExerciseHistoryScreenShell', () => {
         onSelectPeriod={jest.fn()}
         onSelectTag={onSelectTag}
         onPressSession={jest.fn()}
-        onPressStatsHistory={jest.fn()}
-        onPressLog={jest.fn()}
-        onPressExercises={jest.fn()}
-        onPressGroups={jest.fn()}
-        onPressSettings={jest.fn()}
+        onSelectMainTab={jest.fn()}
       />
     );
 
@@ -213,11 +201,7 @@ describe('ExerciseHistoryScreenShell', () => {
         onSelectPeriod={jest.fn()}
         onSelectTag={jest.fn()}
         onPressSession={jest.fn()}
-        onPressStatsHistory={jest.fn()}
-        onPressLog={jest.fn()}
-        onPressExercises={jest.fn()}
-        onPressGroups={jest.fn()}
-        onPressSettings={jest.fn()}
+        onSelectMainTab={jest.fn()}
       />
     );
 
@@ -237,11 +221,7 @@ describe('ExerciseHistoryScreenShell', () => {
         onSelectPeriod={jest.fn()}
         onSelectTag={jest.fn()}
         onPressSession={jest.fn()}
-        onPressStatsHistory={jest.fn()}
-        onPressLog={jest.fn()}
-        onPressExercises={jest.fn()}
-        onPressGroups={jest.fn()}
-        onPressSettings={jest.fn()}
+        onSelectMainTab={jest.fn()}
       />
     );
 
@@ -260,11 +240,7 @@ describe('ExerciseHistoryScreenShell', () => {
         onSelectPeriod={jest.fn()}
         onSelectTag={jest.fn()}
         onPressSession={onPressSession}
-        onPressStatsHistory={jest.fn()}
-        onPressLog={jest.fn()}
-        onPressExercises={jest.fn()}
-        onPressGroups={jest.fn()}
-        onPressSettings={jest.fn()}
+        onSelectMainTab={jest.fn()}
       />
     );
 
@@ -320,6 +296,22 @@ describe('ExerciseHistoryRoute', () => {
     expect(expoRouterMock.__mockPush).toHaveBeenCalledWith('/completed-session/session-newest');
   });
 
+  it('routes the detail navigation strip through the canonical four-tab model', async () => {
+    mockLoad.mockResolvedValueOnce(buildSummary());
+    render(<ExerciseHistoryRoute />);
+
+    await act(async () => {
+      expoRouterMock.__triggerFocus();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('top-level-tab-more')).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByTestId('top-level-tab-more'));
+    expect(expoRouterMock.__mockPush).toHaveBeenCalledWith('/more');
+  });
+
   it('surfaces an error when loadExercisePerformanceHistory returns null', async () => {
     mockLoad.mockResolvedValueOnce(null);
     render(<ExerciseHistoryRoute />);
@@ -371,11 +363,7 @@ describe('ExerciseHistoryScreenShell — deleted tag visibility', () => {
         onSelectPeriod={jest.fn()}
         onSelectTag={jest.fn()}
         onPressSession={jest.fn()}
-        onPressStatsHistory={jest.fn()}
-        onPressLog={jest.fn()}
-        onPressExercises={jest.fn()}
-        onPressGroups={jest.fn()}
-        onPressSettings={jest.fn()}
+        onSelectMainTab={jest.fn()}
       />
     );
 
@@ -393,11 +381,7 @@ describe('ExerciseHistoryScreenShell — deleted tag visibility', () => {
         onSelectPeriod={jest.fn()}
         onSelectTag={jest.fn()}
         onPressSession={jest.fn()}
-        onPressStatsHistory={jest.fn()}
-        onPressLog={jest.fn()}
-        onPressExercises={jest.fn()}
-        onPressGroups={jest.fn()}
-        onPressSettings={jest.fn()}
+        onSelectMainTab={jest.fn()}
       />
     );
 

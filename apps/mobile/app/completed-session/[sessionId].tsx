@@ -464,7 +464,7 @@ export function CompletedSessionDetailScreenShell({
   }, [session]);
 
   const handleCompletionExit = useCallback(() => {
-    router.replace('/stats-history');
+    router.replace('/progress');
   }, [router]);
 
   const handleSummaryHistoryExit = useCallback(() => {

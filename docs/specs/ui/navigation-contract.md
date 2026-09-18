@@ -27,8 +27,26 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
   - on a non-`AUTH_REQUIRED` cycle error it shows the error message and a single Retry that fires exactly one cycle; when the latest cycle outcome is `AUTH_REQUIRED` it redirects to `/sign-in` and renders no Retry;
   - it stands aside (renders through) when there is no session or auth is unconfigured, so an unconfigured/local build is never trapped behind a block nothing will lift; the `/sign-in` and `/maestro-harness` routes are exempt so redirects and harness setup cannot loop.
 - Tab roots live inside the `(tabs)` route group at `apps/mobile/app/(tabs)/` and share a tab layout at `apps/mobile/app/(tabs)/_layout.tsx`. The group name is parenthesised so it does not appear in URLs (e.g. `/session-recorder` resolves to `app/(tabs)/session-recorder.tsx`).
-- Tab roots have `headerShown: false`; detail screens (`exercise-history`, `profile`, `completed-session/[sessionId]`, `maestro-harness`, and the M22 group routes `group/mine`, `group/new`, `group/join`, `group/[groupId]`, `group/[groupId]/edit`, `group/[groupId]/invite`, `group-session/[memberId]/[sessionId]`, the M25 `exercise-link`, and the M25-T08 routes `group/[groupId]/members`, `group/[groupId]/exercises/new`, `group/[groupId]/exercises/[exerciseId]/edit`, and the M25-T09 `group/[groupId]/leaderboards/[exerciseId]` and `…/history`) remain outside `(tabs)/` and keep their existing native header behavior.
-- Navigation is mostly string-path based; `apps/mobile/src/navigation/routes.ts` holds a few route constants and builders (`SIGN_IN_ROUTE`, `MAESTRO_HARNESS_ROUTE`, and the M25 `exerciseLinkHref(id)`), not a full typed route layer
+- Tab roots have `headerShown: false`; detail screens (`exercise-history`, `profile`, `completed-session/[sessionId]`, `maestro-harness`, and the M22 group routes `group/mine`, `group/new`, `group/join`, `group/[groupId]`, `group/[groupId]/edit`, `group/[groupId]/invite`, `group-session/[memberId]/[sessionId]`, the M25 `exercise-link`, the M25-T08 routes `group/[groupId]/members`, `group/[groupId]/exercises/new`, `group/[groupId]/exercises/[exerciseId]/edit`, and the M25-T09 `group/[groupId]/leaderboards/[exerciseId]` and `…/history`) remain outside `(tabs)/` and keep their existing native header behavior.
+- Navigation is mostly string-path based; `apps/mobile/src/navigation/routes.ts` holds a few route constants and builders (`SIGN_IN_ROUTE`, `MAESTRO_HARNESS_ROUTE`, and the M25 `exerciseLinkHref(id)`), not a full typed route layer.
+- The production shell is the typed four-tab model in
+  `apps/mobile/src/navigation/main-tabs.ts`: `Today / Train / Progress / More`.
+  `MainTabs`, inside the existing collapsible `BottomTray`, renders exactly
+  those destinations. Canonical routes are visible; preserved roots are
+  registered with `href: null` and map to their canonical owner when opened
+  directly.
+  `/today` now renders its real overview by composing the existing active/recent
+  session repository and joined-group stream; the planning slot reports the
+  current unavailable dependency instead of inventing plan data.
+  `/train` now renders its real session-entry hub. Today and Train share one
+  coordinator that rechecks for an active draft and serializes empty/planned
+  launch requests before persistence or materialization.
+  `/progress` now renders the exact existing Stats / History implementation;
+  `/stats-history` remains available with unchanged behavior as its legacy path.
+  `/more` renders the secondary-feature hub.
+  The model maps legacy roots to their current owner. Recorder routes are
+  focused work and suppress persistent navigation; recognized root routes show
+  one selected canonical destination.
 
 ## Route + param summary (current)
 
@@ -37,7 +55,68 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 - Params:
   - none
 - Behavior:
-  - renders an `expo-router` `Redirect` to `/stats-history`
+  - renders an `expo-router` `Redirect` to `/today`
+
+1b. `/today` (canonical tab)
+- File: `apps/mobile/app/(tabs)/today.tsx`
+- Params:
+  - none
+- Behavior:
+  - composes an active-session resume or planning state, a bounded joined-group
+    stream snapshot, and the three most recent non-deleted completed sessions
+    from the existing feature hooks/repository
+  - group activity preserves signed-out, auth-unavailable, cached/offline,
+    missing-data, and inline-error states; item taps use the existing group and
+    friend-session routes
+  - an active session replaces the planned-session action and resumes at
+    `/session-recorder`; any future ready plan is launched through the shared
+    active-draft coordinator; recent rows open
+    `/completed-session/[sessionId]` and the section-level action opens
+    `/progress`
+  - until the separate planning milestone ships a read/materialization API, the
+    planning slot uses the approved `Watch this space 👀` placeholder and links
+    to `/train`; no scheduled data or materialization behavior is synthesized
+
+1c. `/train` (canonical tab)
+- File: `apps/mobile/app/(tabs)/train.tsx`
+- Params:
+  - none
+- Behavior:
+  - loads the existing session-list repository while focused and blocks every
+    launch action until active-draft detection succeeds
+  - an active draft replaces empty/planned actions with one Resume action to
+    `/session-recorder`
+  - with no draft, `Start empty workout` rechecks for an active session,
+    persists one empty active draft through the existing recorder repository,
+    and then opens `/session-recorder`; simultaneous entry requests share the
+    same in-flight result, and persistence failure is inline and retryable
+  - exposes typed loading/error/empty/ready/unavailable planning states; a
+    ready plan supplies its own materializer and management callback, while the
+    current production state uses the approved `Watch this space 👀` placeholder
+    without blocking empty training or guessing a route
+
+1d. `/progress` (canonical tab)
+- File: `apps/mobile/app/(tabs)/progress.tsx`
+- Query params:
+  - the same optional `period` and `breakdown` values as `/stats-history`
+- Behavior:
+  - re-exports the current `/stats-history` route implementation rather than
+    redirecting or copying it, so all controls, metrics, loading/error/empty
+    states, session drill-downs, and exercise/muscle heat maps are identical
+  - `/stats-history` stays available as the unchanged legacy path
+
+1e. `/more` (canonical tab)
+- File: `apps/mobile/app/(tabs)/more.tsx`
+- Params:
+  - none
+- Behavior:
+  - groups real secondary destinations under Community, Tools, and Library &
+    account without copying their feature logic
+  - internal rows open `/groups`, `/connected-agents`, `/dev-logs`,
+    `/exercise-catalog`, or `/settings`; connected agents requires a current
+    user and developer logs requires `isDevMode()`
+  - `Connect an AI coach` opens the same first-party MCP setup URL as Settings
+    in the system browser and reports launch failure inline
 
 2. `/sign-in`
 - File: `apps/mobile/app/sign-in.tsx`
@@ -57,7 +136,8 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
   - `period` (optional; validated `7 | 30`, default `7`)
   - `breakdown` (optional; validated `exercise | muscle`, default `exercise`)
 - Behavior:
-  - tab root inside the `(tabs)` group; renders the merged Stats / History view
+  - preserved Progress-owned route inside the `(tabs)` group; renders the merged
+    Stats / History view
     with separate labelled `Time range` (7-/30-day pills) and `Breakdown`
     (joined `By Exercise` / `By Muscle`) rows; both breakdown choices remain
     visible and `By Exercise` is the default
@@ -75,6 +155,9 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
   - completed-edit is the default destination for a completed Session History
     row; its `Summary` action flushes valid pending edits before pushing
     `/completed-session/<sessionId>?presentation=summary`
+  - the persistent shell is hidden in active and completed-edit modes; a
+    successful active submit opens the completion presentation, while a
+    successful completed edit replaces to `/progress`
   - client sync cadence is route-independent: the foreground scheduler (`apps/mobile/src/sync/scheduler.ts`) never reads the active route; recorder writes reach it only through the same post-commit write nudge (`apps/mobile/src/sync/write-nudge.ts`) as every other repo mutation, so renaming this route has no sync impact
 
 5. `/exercise-catalog`
@@ -90,7 +173,7 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 - Params:
   - none
 - Behavior:
-  - reached from the shared bottom-tray Settings cog (available from every tab root and the detail screens that still render `TopLevelTabs` directly)
+  - reached from the Settings row under `/more`; the direct path remains valid
   - remains accessible while logged out; it does not require an authenticated session before opening `/profile`
   - routes to `/profile` from the `Account` destination row
   - opens the configured first-party `/connect` setup page in the system browser
@@ -135,7 +218,7 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
     and other previous-route labels are hidden visually and from assistive
     technology
   - active Resume and review/complete both use `dismissTo('/session-recorder')`
-    to return to the existing Log recorder; `/sessions` never completes an
+    to return to the existing recorder; `/sessions` never completes an
     active session directly
 
 10. `/completed-session/[sessionId]`
@@ -150,7 +233,7 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 - Behavior:
   - completion mode hides historical edit/delete/append actions, disables the
     native back affordance/gesture, and gives Done, Android system back, and
-    unavailable-target states a replacing exit to `/stats-history`
+    unavailable-target states a replacing exit to `/progress`
   - historical summary mode uses the same content and Share action without
     Done; explicit `History` and `Edit` header actions replace to `/sessions`
     and the still-mounted completed editor, and Android system back replaces to
@@ -171,7 +254,7 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 - Params:
   - none
 - Behavior:
-  - fourth tab root (`TopLevelTabs` key `groups`, testID `top-level-tab-groups`, mapped in `resolveActiveTab`)
+  - preserved direct route owned by the canonical More tab
   - the `All` / per-group chip selection is in-route state, not a query param
   - signed out or auth-unconfigured renders a sign-in-required card in place; configured builds offer `Sign in` (`/sign-in`)
 
@@ -243,20 +326,22 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 
 ## Allowed route transitions (current high-level flows)
 
-1. `/` -> `/stats-history`
+1. `/` -> `/today`
    - root redirect (renders `<Redirect />`)
-2. `/stats-history` -> `/exercise-history?exerciseDefinitionId=<id>`
+2. `/progress` or `/stats-history` -> `/exercise-history?exerciseDefinitionId=<id>`
    - Stats sub-view per-exercise picker opens the per-exercise history view
 3. `/sessions` -> `/session-recorder?mode=completed-edit&sessionId=<sessionId>`
    - completed Session History row tap (via the shared `HistoryList`)
-4. `/stats-history` -> `/sessions`
+4. `/progress` or `/stats-history` -> `/sessions`
    - Stats Sessions summary card
 5. `/sessions` -> `/session-recorder`
    - active Resume or review/complete dismisses the Sessions stack screen to the
-     existing Log recorder; completion continues through recorder validation and
+     existing recorder; completion continues through recorder validation and
      cleanup rather than a direct repository status change
-6. `/session-recorder` <-> `/stats-history` / `/exercise-catalog` / `/groups`
-   - tab switching via the shared bottom tray (`BottomTray` -> `TopLevelTabs`); `exercise-history` also reaches `/groups` through its directly rendered `TopLevelTabs`
+6. `/today` <-> `/train` <-> `/progress` <-> `/more`
+   - canonical switching via the shared bottom tray (`BottomTray` ->
+     `MainTabs`); preserved `/stats-history`, `/exercise-catalog`, `/groups`,
+     and `/settings` roots select Progress or More without becoming tabs
 7. `/completed-session/<sessionId>` -> `/session-recorder?mode=completed-edit&sessionId=<sessionId>`
    - edit action
 8. `/completed-session/<sessionId>?intent=edit` -> `/session-recorder?mode=completed-edit&sessionId=<sessionId>`
@@ -265,9 +350,9 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
    - successful append of one selected historical exercise block as planned target rows in the active recorder (creates an active session first when needed)
 10. `/session-recorder` -> `/completed-session/<sessionId>?presentation=completion`
    - successful active submit after persistence and completion both succeed
-11. `/session-recorder?mode=completed-edit...` -> `/stats-history`
+11. `/session-recorder?mode=completed-edit...` -> `/progress`
    - successful completed-session save; completion is not replayed
-12. `/completed-session/<sessionId>?presentation=completion` -> `/stats-history`
+12. `/completed-session/<sessionId>?presentation=completion` -> `/progress`
    - Done, safe back, or unavailable-target exit (`replace`)
 13. `/session-recorder?mode=completed-edit...` -> `/completed-session/<sessionId>?presentation=summary`
    - `Summary` after flushing pending valid edits (`push`)
@@ -277,8 +362,8 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
    - exercise picker `Manage` action
 16. `/exercise-catalog?source=session-recorder...` -> `/session-recorder`
    - explicit back action or post-save return (`router.back()`)
-17. (any tab root or detail screen rendering `TopLevelTabs`) -> `/settings`
-   - shared Settings cog in the bottom tray / top-level tab strip
+17. `/more` -> `/settings`
+   - Settings destination row; `/settings` remains directly addressable
 18. `/settings` -> `/profile`
    - Account destination row
 19. `/settings` -> first-party `/connect` (system browser)
@@ -343,7 +428,11 @@ Note:
 
 ## Header titles (current, high level)
 
-- Tab roots inside the `(tabs)` group (`stats-history`, `session-recorder`, `exercise-catalog`, `settings`) all run with `headerShown: false`; per-screen titles in `apps/mobile/app/(tabs)/_layout.tsx` are still declared for completeness but the visible tab bar is now `BottomTray` (composing `TopLevelTabs`) supplied via the `tabBar` prop. Detail screens that haven't yet moved into `(tabs)` (notably `exercise-history`) still render `TopLevelTabs` directly until they migrate.
+- Routes inside the `(tabs)` group run with `headerShown: false`; per-screen
+  titles in `apps/mobile/app/(tabs)/_layout.tsx` are declared for completeness.
+  The visible shell is `BottomTray` composing `MainTabs`; it is suppressed on
+  `/session-recorder`. `exercise-history` keeps its native stack header and
+  renders `MainTabs` with Progress selected.
 - Detail screens registered in the root stack (`exercise-history`, `sessions`, `profile`, `connected-agents`, `maestro-harness`, `completed-session/[sessionId]`) keep their native stack header behavior; titles are declared in `apps/mobile/app/_layout.tsx`. `/sessions` specifically uses an arrow-only minimal back-button display mode with a generic `Back` accessibility title.
 - `completed-session/[sessionId]` sets its title inside the route file (`View Session`, `Session complete`, or `Session summary`)
 - `exercise-history` sets its title inside the route file to the resolved exercise name (falls back to `Exercise History` when the summary is not yet available)
