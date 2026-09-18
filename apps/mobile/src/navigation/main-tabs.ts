@@ -85,16 +85,15 @@ export function resolveMainTab(segments: readonly string[]): MainTabKey | null {
   return null;
 }
 
-/** Focused recorder work owns the full viewport and suppresses persistent tabs. */
-export function isMainNavigationSuppressed(segments: readonly string[]): boolean {
+/** Focused recorder work defaults the persistent tray to its collapsed peek state. */
+export function shouldCollapseMainNavigation(segments: readonly string[]): boolean {
   return normalizedRouteSegments(segments).includes('session-recorder');
 }
 
 /**
  * A single visibility contract for the production shell. Root/detail navigators can
- * stay tabless by returning null; recognized tab-owned routes render the bar
- * unless they are focused recorder work.
+ * stay tabless by returning null; every recognized tab-owned route renders the bar.
  */
 export function shouldShowMainNavigation(segments: readonly string[]): boolean {
-  return !isMainNavigationSuppressed(segments) && resolveMainTab(segments) !== null;
+  return resolveMainTab(segments) !== null;
 }

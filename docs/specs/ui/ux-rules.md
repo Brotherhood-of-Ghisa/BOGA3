@@ -39,7 +39,8 @@ Document app-specific UI semantics and guardrails for the current mobile app.
      - soft-delete exercise
      - remove destructive menu actions
 4. Tab actions (`MainTabs`) are navigation controls, not generic primary actions.
-   - They use tab semantics (`accessibilityRole="tab"` / tablist) and active-state visuals.
+   - They use tab semantics (`accessibilityRole="tab"` / tablist), active-state
+     visuals, and equal-width flex targets across the available tray width.
 5. Persistent navigation contains exactly Today, Train, Progress, and More.
    - Settings is an internal row under More, not a fifth tab or utility button.
    - More and Settings remain available while logged out so account access never
@@ -54,6 +55,9 @@ Document app-specific UI semantics and guardrails for the current mobile app.
    - More groups real destinations under Community, Tools, and Library &
      account; account-bound rows are omitted without a user and
      developer-only rows use `isDevMode()`.
+   - Each More row's accessible name includes its visible description. Tab-owned
+     destinations carry `source=more` and show an explicit `Back to More` action;
+     direct routes and non-More origins do not claim that history.
 7. Today is a bounded overview, not a second full feed or history screen.
    - An active draft replaces the planned-session action and exposes Resume.
    - Joined-group activity reuses the group stream cards, membership rows, and
@@ -76,6 +80,10 @@ Document app-specific UI semantics and guardrails for the current mobile app.
    - Empty start persists one blank active draft through the existing recorder
      repository before opening the recorder. A failed write stays inline and
      retryable.
+   - A still-mounted recorder drains any queued autosave and rechecks the
+     persisted active draft on focus so a draft created from Today or Train is
+     rendered immediately; a mutation made while that read is pending blocks
+     only the stale result from replacing live input.
    - Planning loading/error/empty/ready/unavailable states are explicit. Until
      the planning dependency ships, production shows the approved `Watch this
      space 👀` placeholder while leaving empty training usable; it does not
@@ -106,8 +114,9 @@ Document app-specific UI semantics and guardrails for the current mobile app.
 3. Spacing rhythm is already close to 8pt increments (common values cluster around `8/10/12/14/16/20`) and should remain consistent.
 4. Bottom tab navigation (`BottomTray` composing `MainTabs`) remains visible on
    canonical roots (`today`, `train`, `progress`, `more`) and recognized
-   preserved roots. The active/completed-edit recorder suppresses the tray so
-   training stays focused. `exercise-history` renders the same `MainTabs`
+   preserved roots. Entering the active/completed-edit recorder collapses the
+   tray to its always-visible peek handle so training stays focused without
+   removing navigation access. `exercise-history` renders the same `MainTabs`
    directly and selects Progress.
 
 ### 4. List and row interaction conventions

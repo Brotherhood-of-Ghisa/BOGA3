@@ -47,6 +47,7 @@ const styles = StyleSheet.create({
     gap: uiSpace.xs,
   },
   tabButton: {
+    flex: 1,
     paddingHorizontal: uiSpace.xxs,
   },
   tabLabel: {

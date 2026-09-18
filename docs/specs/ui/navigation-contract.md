@@ -45,8 +45,8 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
   `/stats-history` remains available with unchanged behavior as its legacy path.
   `/more` renders the secondary-feature hub.
   The model maps legacy roots to their current owner. Recorder routes are
-  focused work and suppress persistent navigation; recognized root routes show
-  one selected canonical destination.
+  focused work and collapse persistent navigation to its peek handle; every
+  recognized root route keeps one selected canonical destination mounted.
 
 ## Route + param summary (current)
 
@@ -112,9 +112,11 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 - Behavior:
   - groups real secondary destinations under Community, Tools, and Library &
     account without copying their feature logic
-  - internal rows open `/groups`, `/connected-agents`, `/dev-logs`,
-    `/exercise-catalog`, or `/settings`; connected agents requires a current
-    user and developer logs requires `isDevMode()`
+  - internal rows open `/groups?source=more`, `/connected-agents`, `/dev-logs`,
+    `/exercise-catalog?source=more`, or `/settings?source=more`; the source
+    marker gives tab-owned destinations an explicit `Back to More` action,
+    connected agents requires a current user, and developer logs requires
+    `isDevMode()`
   - `Connect an AI coach` opens the same first-party MCP setup URL as Settings
     in the system browser and reports launch failure inline
 
@@ -155,7 +157,10 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
   - completed-edit is the default destination for a completed Session History
     row; its `Summary` action flushes valid pending edits before pushing
     `/completed-session/<sessionId>?presentation=summary`
-  - the persistent shell is hidden in active and completed-edit modes; a
+  - active mode rechecks the latest persisted draft whenever the mounted route
+    regains focus, but never overwrites in-memory recorder mutations
+  - the persistent shell defaults to its collapsed peek handle in active and
+    completed-edit modes, so it can still be expanded for tab navigation; a
     successful active submit opens the completion presentation, while a
     successful completed edit replaces to `/progress`
   - client sync cadence is route-independent: the foreground scheduler (`apps/mobile/src/sync/scheduler.ts`) never reads the active route; recorder writes reach it only through the same post-commit write nudge (`apps/mobile/src/sync/write-nudge.ts`) as every other repo mutation, so renaming this route has no sync impact
@@ -163,17 +168,21 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 5. `/exercise-catalog`
 - File: `apps/mobile/app/(tabs)/exercise-catalog.tsx`
 - Query params:
-  - `source` (optional; `session-recorder` enables recorder-return affordances)
+  - `source` (optional; `session-recorder` enables recorder-return affordances;
+    `more` shows an explicit `Back to More` action)
   - `intent` (optional; `add` auto-opens create editor once on initial load)
 - Behavior:
   - when opened from recorder, saving an exercise returns via `router.back()`
+  - when opened from More, `Back to More` replaces to `/more`; the direct route
+    remains valid without that action
 
 6. `/settings`
 - File: `apps/mobile/app/(tabs)/settings.tsx`
-- Params:
-  - none
+- Query params:
+  - `source` (optional; `more` shows an explicit `Back to More` action)
 - Behavior:
-  - reached from the Settings row under `/more`; the direct path remains valid
+  - reached from the Settings row under `/more`; `Back to More` replaces to the
+    hub when source-marked, while the direct path remains valid
   - remains accessible while logged out; it does not require an authenticated session before opening `/profile`
   - routes to `/profile` from the `Account` destination row
   - opens the configured first-party `/connect` setup page in the system browser
@@ -251,10 +260,12 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 
 12. `/groups` (M22)
 - File: `apps/mobile/app/(tabs)/groups.tsx`
-- Params:
-  - none
+- Query params:
+  - `source` (optional; `more` shows an explicit `Back to More` action)
 - Behavior:
   - preserved direct route owned by the canonical More tab
+  - when opened from More, `Back to More` replaces to `/more`; Today/direct
+    entry does not synthesize that origin
   - the `All` / per-group chip selection is in-route state, not a query param
   - signed out or auth-unconfigured renders a sign-in-required card in place; configured builds offer `Sign in` (`/sign-in`)
 
@@ -362,8 +373,9 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
    - exercise picker `Manage` action
 16. `/exercise-catalog?source=session-recorder...` -> `/session-recorder`
    - explicit back action or post-save return (`router.back()`)
-17. `/more` -> `/settings`
-   - Settings destination row; `/settings` remains directly addressable
+17. `/more` -> `/settings?source=more`, `/exercise-catalog?source=more`, or `/groups?source=more`
+   - tab-owned destination rows carry their hub origin and expose `Back to More`;
+     each unmarked direct route remains addressable
 18. `/settings` -> `/profile`
    - Account destination row
 19. `/settings` -> first-party `/connect` (system browser)

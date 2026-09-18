@@ -194,7 +194,8 @@ export function TrainScreen({
               Personal planning
             </UiText>
             <TrainPlanningCard
-              isLaunching={launchKind !== null}
+              disabled={launchKind !== null}
+              isStarting={launchKind === 'planned'}
               launchError={launchError?.kind === 'planned' ? launchError.message : null}
               onStart={(materialize) => {
                 void openRecorder('planned', () =>
@@ -211,12 +212,14 @@ export function TrainScreen({
 }
 
 function TrainPlanningCard({
-  isLaunching,
+  disabled,
+  isStarting,
   launchError,
   onStart,
   planningState,
 }: {
-  isLaunching: boolean;
+  disabled: boolean;
+  isStarting: boolean;
   launchError: string | null;
   onStart: (materialize: PlannedSessionMaterializer) => void;
   planningState: TrainPlanningState;
@@ -290,13 +293,13 @@ function TrainPlanningCard({
       </View>
       <View style={styles.actionStack}>
         <UiButton
-          disabled={isLaunching}
-          label={isLaunching ? 'Starting…' : 'Start planned workout'}
+          disabled={disabled}
+          label={isStarting ? 'Starting…' : 'Start planned workout'}
           onPress={() => onStart(planningState.materialize)}
           testID="train-start-planned-button"
         />
         <UiButton
-          disabled={isLaunching}
+          disabled={disabled}
           label="Manage planning"
           onPress={planningState.openManager}
           testID="train-manage-planning-button"

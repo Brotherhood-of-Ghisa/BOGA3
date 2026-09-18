@@ -1311,6 +1311,7 @@ export default function SessionRecorderScreen({
   const persistenceHydratedRef = useRef(false);
   const autosaveRef = useRef<DraftAutosaveController | null>(null);
   const hasSessionMutationRef = useRef(false);
+  const sessionMutationVersionRef = useRef(0);
   const replayingBeforeRemoveActionRef = useRef(false);
   const pendingExercisePickerRestoreTargetRef = useRef<string | null | undefined>(undefined);
   const suppressSetTypeCyclePressRef = useRef(false);
@@ -1541,34 +1542,6 @@ export default function SessionRecorderScreen({
       };
     }
 
-    void loadLatestSessionDraftSnapshot()
-      .then((snapshot) => {
-        if (cancelled || hasSessionMutationRef.current) {
-          return;
-        }
-
-        if (!snapshot) {
-          setHasActiveSession(false);
-          return;
-        }
-
-        persistedSessionIdRef.current = snapshot.sessionId;
-        setState((current) => ({
-          ...current,
-          session: mapDraftSnapshotToSession(snapshot),
-        }));
-        setHasActiveSession(true);
-      })
-      .catch(() => {
-        // Keep the recorder usable even if local restore fails; autosave writes can still recreate state.
-      })
-      .finally(() => {
-        if (!cancelled) {
-          persistenceHydratedRef.current = true;
-          setIsPersistenceHydrated(true);
-        }
-      });
-
     return () => {
       cancelled = true;
     };
@@ -1595,7 +1568,48 @@ export default function SessionRecorderScreen({
 
   useFocusEffect(
     useCallback(() => {
+      let cancelled = false;
       reloadExerciseCatalogStats();
+
+      if (routeMode === 'active') {
+        const mutationVersionAtFocus = sessionMutationVersionRef.current;
+        void (async () => {
+          try {
+            // A fast tab round-trip can refocus before the blur flush finishes.
+            // Drain that queue before reading so the snapshot is never older than
+            // the recorder state that just lost focus.
+            await autosaveController.flushNow();
+            const snapshot = await loadLatestSessionDraftSnapshot();
+            if (
+              cancelled ||
+              sessionMutationVersionRef.current !== mutationVersionAtFocus
+            ) {
+              return;
+            }
+
+            hasSessionMutationRef.current = false;
+            if (!snapshot) {
+              persistedSessionIdRef.current = null;
+              setHasActiveSession(false);
+              return;
+            }
+
+            persistedSessionIdRef.current = snapshot.sessionId;
+            setState((current) => ({
+              ...current,
+              session: mapDraftSnapshotToSession(snapshot),
+            }));
+            setHasActiveSession(true);
+          } catch {
+            // Keep the recorder usable if restore fails; a later focus retries the read.
+          } finally {
+            if (!cancelled) {
+              persistenceHydratedRef.current = true;
+              setIsPersistenceHydrated(true);
+            }
+          }
+        })();
+      }
 
       if (pendingExercisePickerRestoreTargetRef.current !== undefined) {
         const selectionTargetId = pendingExercisePickerRestoreTargetRef.current;
@@ -1610,13 +1624,15 @@ export default function SessionRecorderScreen({
       }
 
       return () => {
+        cancelled = true;
         void lifecycleHelpers.onScreenBlur();
       };
-    }, [lifecycleHelpers, reloadExerciseCatalogStats])
+    }, [autosaveController, lifecycleHelpers, reloadExerciseCatalogStats, routeMode])
   );
 
   const markSessionStructuralMutation = useCallback(() => {
     hasSessionMutationRef.current = true;
+    sessionMutationVersionRef.current += 1;
     if (!persistenceHydratedRef.current) {
       return;
     }
@@ -1626,6 +1642,7 @@ export default function SessionRecorderScreen({
 
   const markSessionTextMutation = useCallback(() => {
     hasSessionMutationRef.current = true;
+    sessionMutationVersionRef.current += 1;
     if (!persistenceHydratedRef.current) {
       return;
     }

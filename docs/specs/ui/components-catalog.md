@@ -74,7 +74,8 @@ Brief entrypoint inventory of the current reusable UI component set.
 - File: `apps/mobile/components/navigation/bottom-tray.tsx`
 - Purpose:
   - collapsible bottom navigation tray that wraps `MainTabs`; exposes a drag handle (React Native `PanResponder` + `Animated`) to collapse to a peek strip and `useTrayVisibility()` hook plus `TrayVisibilityProvider` so screens can imperatively expand/collapse
-  - omitted entirely in focused recorder contexts by the route-aware tab layout
+  - remains mounted in focused recorder contexts and collapses to its peek
+    handle on recorder entry
   - snap math lives in the pure helper `apps/mobile/src/navigation/tray-snap.ts` so it can be unit-tested without gesture plumbing
 
 2. `MainTabs`
@@ -87,21 +88,28 @@ Brief entrypoint inventory of the current reusable UI component set.
     navigation strip on the `exercise-history` detail screen
   - the non-visual model owns canonical order, labels, routes, test IDs,
     canonical/legacy ownership resolution, unknown-route null fallback, and
-    focused-recorder navigation suppression
+    focused-recorder collapse behavior
 
-3. `ExerciseEditorModal`
+3. `MoreHubBackButton`
+- File: `apps/mobile/components/navigation/more-hub-back-button.tsx`
+- Purpose:
+  - source-aware `Back to More` action shared by the tab-owned Groups, Exercise
+    Catalog, and Settings destinations; renders only for `source=more` and
+    replaces to the hub
+
+4. `ExerciseEditorModal`
 - File: `apps/mobile/components/exercise-catalog/exercise-editor-modal.tsx`
 - Purpose:
   - shared create/edit exercise editor modal reused by `exercise-catalog` and `session-recorder` add-new flow
   - optional `prefill` (name, weight entry, muscles for a new exercise), `onSave` (replaces the default save; a rejection shows inline), and `title` (M25-T07: the recorder's group `Add as new` prefills from the group exercise and saves through `createExerciseWithGroupLink`); the fields are unchanged
 
-4. `ExerciseListContent` / `ExerciseListPreferenceControls`
+5. `ExerciseListContent` / `ExerciseListPreferenceControls`
 - File: `apps/mobile/components/exercise-catalog/exercise-list-controls.tsx`
 - Purpose:
   - shared exercise list row/header rendering and shared grouping/date-range/recents controls for `exercise-catalog` and the `session-recorder` exercise picker
   - composes the non-visual list model/preference modules under `apps/mobile/src/exercise-catalog/` so both surfaces share grouping, filtering, sorting, row stats, collapsed-group state behavior, and local-only preference behavior while each route keeps its surface-specific actions
 
-5. `SessionContentLayout`
+6. `SessionContentLayout`
 - File: `apps/mobile/components/session-recorder/session-content-layout.tsx`
 - Purpose:
   - shared layout scaffold for session exercise/set content used by `session-recorder` and completed-session detail screens
@@ -109,18 +117,18 @@ Brief entrypoint inventory of the current reusable UI component set.
   - supports optional per-exercise collapse state and a caller-provided collapsed-summary renderer while preserving header actions outside the hidden body
   - exports `ExerciseCardCollapsedSummary` for the shared performed-set/working-set presentation and optional collapsed `ExercisePersonalRecordCelebration`
 
-6. `SessionMuscleLoad`
+7. `SessionMuscleLoad`
 - File: `apps/mobile/components/session-recorder/session-muscle-load.tsx`
 - Purpose:
   - reusable active-session compact summary and in-route detail sheet over the shared current-session muscle calculation
   - owns mapped, partially mapped, unmapped, catalog loading/error/retry, accessible exact-volume, relative-bar, dismissal, and reversal-close presentation while the recorder route supplies live counts and data
 
-7. `ExercisePersonalRecordCelebration`
+8. `ExercisePersonalRecordCelebration`
 - File: `apps/mobile/components/session-recorder/exercise-personal-record-celebration.tsx`
 - Purpose:
   - reusable, non-interactive exercise-scoped success surface for a shared `ExercisePersonalRecord`, with exercise, best-set, and rounded estimated-1RM facts in expanded, collapsed, or compact-completion form
 
-8. `SessionCompletionPresentation`
+9. `SessionCompletionPresentation`
 - File: `apps/mobile/components/session-recorder/session-completion-presentation.tsx`
 - Purpose:
   - shared post-submit and historical-summary composition with one consolidated
@@ -131,38 +139,38 @@ Brief entrypoint inventory of the current reusable UI component set.
     in the route header
   - keeps all PRs visible together instead of paging them
 
-9. `ExerciseVolumeComparisonRow`
+10. `ExerciseVolumeComparisonRow`
 - File: `apps/mobile/components/session-recorder/exercise-volume-comparison.tsx`
 - Purpose:
   - presents exercise name, performed/working-set counts, current entered volume
     versus median, and descriptive P5/P95 range or explicit sparse-history state
   - reused by in-app completion and the captured share card
 
-10. `SessionSharePreview` / `SessionShareCard`
+11. `SessionSharePreview` / `SessionShareCard`
 - File: `apps/mobile/components/session-recorder/session-share-preview.tsx`
 - Purpose:
   - previews the exact privacy-limited session card captured to PNG and opens the
     native image share sheet with inline retry and temporary-file cleanup
   - includes all PRs and exercise comparisons, but never gym/location data
 
-11. `SessionSummaryLine`
+12. `SessionSummaryLine`
 - File: `apps/mobile/components/session-list/session-summary-line.tsx`
 - Purpose:
   - shared two-line summary row (date/duration/gym + sets/exercises) reused by
     `ActiveSessionRow`, `HistoryList`, Today recents, and Progress history
 
-12. `ActiveSessionRow`
+13. `ActiveSessionRow`
 - File: `apps/mobile/components/session-list/active-session-row.tsx`
 - Purpose:
   - active-session row plus its overflow menu (resume / complete / delete) used
     by session-list consumers
 
-13. `HistoryList`
+14. `HistoryList`
 - File: `apps/mobile/components/session-list/history-list.tsx`
 - Purpose:
   - completed-session history list with delete/undelete modal and deleted-visibility toggle, consumed by the `stats-history` History sub-view
 
-14. `DailyHeatmap` / `WeeklyHeatmap`
+15. `DailyHeatmap` / `WeeklyHeatmap`
 - Files: `apps/mobile/components/heatmaps/DailyHeatmap.tsx`, `apps/mobile/components/heatmaps/WeeklyHeatmap.tsx`
 - Purpose:
   - reusable daily-cell and weekly-bar views over the same `HeatmapData`, used by both muscle- and exercise-history overlays

@@ -26,10 +26,11 @@ jest.mock('@react-native-community/netinfo', () => ({
 }));
 
 const mockPush = jest.fn();
+const mockReplace = jest.fn();
 let mockParams: Record<string, string> = {};
 
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ push: mockPush, back: jest.fn() }),
+  useRouter: () => ({ push: mockPush, back: jest.fn(), replace: mockReplace }),
   useLocalSearchParams: () => mockParams,
   useFocusEffect: (callback: () => void | (() => void)) => {
     mockReact.useEffect(() => callback(), [callback]);
@@ -220,6 +221,15 @@ afterEach(() => {
 });
 
 describe('Groups tab', () => {
+  it('returns explicitly to More when groups was launched from the hub', () => {
+    mockParams = { source: 'more' };
+    render(<GroupsTabRoute />);
+
+    fireEvent.press(screen.getByTestId('back-to-more-button'));
+
+    expect(mockReplace).toHaveBeenCalledWith('/more');
+  });
+
   it('shows the sign-in-required state when signed out or unconfigured, and calls no group RPC', () => {
     mockUseAuth.mockReturnValue({ isConfigured: true, user: null });
     render(<GroupsTabRoute />);

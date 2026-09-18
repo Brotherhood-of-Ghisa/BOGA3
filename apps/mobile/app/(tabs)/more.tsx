@@ -66,7 +66,7 @@ export default function MoreScreen() {
                 <View key={destination.key} style={styles.destinationItem}>
                   <Pressable
                     accessibilityHint={destination.accessibilityHint}
-                    accessibilityLabel={destination.accessibilityLabel}
+                    accessibilityLabel={`${destination.label}. ${destination.description}`}
                     accessibilityRole={external ? 'link' : 'button'}
                     onPress={() => {
                       void openDestination(destination);

@@ -14,6 +14,7 @@ const mockWipeRemoteForCurrentUser = jest.fn();
 const mockAlert = jest.fn();
 
 jest.mock('expo-router', () => ({
+  useLocalSearchParams: () => ({}),
   useRouter: () => ({ push: mockPush }),
   // The sync-status panel uses focus to refresh; in tests run the effect once.
   useFocusEffect: (callback: () => void | (() => void)) => {

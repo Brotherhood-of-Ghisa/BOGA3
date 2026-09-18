@@ -1,4 +1,5 @@
 import { useRouter } from 'expo-router';
+import type { ReactNode } from 'react';
 import { View } from 'react-native';
 
 import { SIGN_IN_ROUTE } from '@/src/navigation/routes';
@@ -7,10 +8,17 @@ import { GroupStateView } from './group-state-view';
 import { groupScreenStyles } from './screen-styles';
 
 /** Signed out or auth-unconfigured (C3.2.5): groups need an account. */
-export function GroupsSignInRequired({ isConfigured }: { isConfigured: boolean }) {
+export function GroupsSignInRequired({
+  isConfigured,
+  leading,
+}: {
+  isConfigured: boolean;
+  leading?: ReactNode;
+}) {
   const router = useRouter();
   return (
     <View style={[groupScreenStyles.screen, groupScreenStyles.content]}>
+      {leading}
       <GroupStateView
         actionLabel={isConfigured ? 'Sign in' : undefined}
         actionTestID="groups-sign-in-button"

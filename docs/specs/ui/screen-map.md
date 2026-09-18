@@ -189,8 +189,10 @@ Brief entrypoint map of the current mobile screens.
     persistence and completion succeed
   - completed-edit save replaces directly to `/progress` and does not
     replay completion
-  - the persistent four-tab navigation is hidden in active and completed-edit
-    recorder modes
+  - active mode rehydrates a newly persisted draft whenever the mounted route
+    regains focus, unless in-memory recorder mutations must be preserved
+  - the persistent four-tab navigation stays mounted but defaults to its
+    collapsed peek handle in active and completed-edit recorder modes
   - `/exercise-link?exerciseDefinitionId=<id>` (`•••` `Link to group exercise…`)
 
 5. `/exercise-catalog`
@@ -206,6 +208,7 @@ Brief entrypoint map of the current mobile screens.
 - Key exits:
   - `session-recorder` after save when opened from recorder-origin manage flow
   - `/exercise-link?exerciseDefinitionId=<id>` (`⋮` `Link to group exercise…`)
+  - explicit `Back to More` when opened with `source=more`
   - the preserved route is owned by More in the shared `MainTabs` tray
 
 6. `/settings`
@@ -235,8 +238,10 @@ Brief entrypoint map of the current mobile screens.
   - a developer-tools card (`isDevMode()` only), last and separate from the
     sync-status card, with the local/remote wipe affordances
   - available from the Settings row under More regardless of auth state; the
-    direct `/settings` path remains valid
+    row adds `source=more` and an explicit `Back to More`; the direct
+    `/settings` path remains valid without it
 - Key exits:
+  - `more` via the source-aware explicit return action
   - `profile`
   - `connected-agents` (signed in only)
   - the first-party public `/connect` page in the system browser
@@ -348,6 +353,8 @@ Brief entrypoint map of the current mobile screens.
   - cached stream first, then refreshed on focus, every 30 s, and on pull-to-refresh; older pages load online at the end of the list
   - offline marker over cached data; offline empty state with no cache; inline error or error state with `Retry`
 - Key exits:
+  - explicit `Back to More` when opened with `source=more`; Today/direct entry
+    does not show that origin-specific action
   - `/group-session/<memberId>/<sessionId>` (session card), `/group/<groupId>` (membership item), `/group/mine` (header), `/group/new`, `/group/join` (header or empty state)
   - the in-route row detail sheet (record card), whose `View full session` opens `/group-session/<memberId>/<sessionId>`
 
@@ -516,10 +523,11 @@ Brief entrypoint map of the current mobile screens.
   - the system tab bar is supplied via `tabBar`: `BottomTray` wraps exactly four
     `MainTabs` destinations and exposes a drag handle to collapse to a peek
     strip. Preserved roots are registered with `href: null`, resolve to their
-    canonical owner, and remain directly addressable; recorder routes suppress
-    the tray entirely. Screens can imperatively expand/collapse via
-    `useTrayVisibility()`; initial state is `expanded`. Snap math is unit-tested
-    in `apps/mobile/src/navigation/tray-snap.ts`.
+    canonical owner, and remain directly addressable; recorder routes keep the
+    tray mounted but collapse it to the peek handle on entry. Screens can
+    imperatively expand/collapse via `useTrayVisibility()`; initial state is
+    `expanded`. Snap math is unit-tested in
+    `apps/mobile/src/navigation/tray-snap.ts`.
 
 ## Documentation boundary
 

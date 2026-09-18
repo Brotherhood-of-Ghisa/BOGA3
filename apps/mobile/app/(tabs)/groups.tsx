@@ -16,6 +16,7 @@ import {
   pickInlineError,
   usePullToRefresh,
 } from '@/components/groups';
+import { MoreHubBackButton } from '@/components/navigation/more-hub-back-button';
 import { UiButton, UiText, uiSpace } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import {
@@ -30,7 +31,12 @@ import {
 export default function GroupsTabRoute() {
   const { isConfigured, user } = useAuth();
   if (!isConfigured || !user) {
-    return <GroupsSignInRequired isConfigured={isConfigured} />;
+    return (
+      <GroupsSignInRequired
+        isConfigured={isConfigured}
+        leading={<MoreHubBackButton />}
+      />
+    );
   }
   return <GroupsTabContent userId={user.id} />;
 }
@@ -65,6 +71,7 @@ function GroupsTabContent({ userId }: { userId: string }) {
 
   const header = (
     <View style={groupScreenStyles.header}>
+      <MoreHubBackButton />
       <View style={styles.titleRow}>
         <UiText style={styles.title} variant="title">
           Groups

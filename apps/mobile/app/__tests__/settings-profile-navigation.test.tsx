@@ -1,6 +1,8 @@
 /* eslint-disable import/first */
 
 const mockPush = jest.fn();
+const mockReplace = jest.fn();
+let mockSearchParams: Record<string, string> = {};
 const mockUseAuth = jest.fn();
 const mockLoadUserProfile = jest.fn();
 const mockSaveUsername = jest.fn();
@@ -8,8 +10,10 @@ const mockResetLocalDataAndReseed = jest.fn();
 const mockAlert = jest.fn();
 
 jest.mock('expo-router', () => ({
+  useLocalSearchParams: () => mockSearchParams,
   useRouter: () => ({
     push: mockPush,
+    replace: mockReplace,
   }),
 }));
 
@@ -94,6 +98,8 @@ const createProfileRecord = (overrides: Partial<{ createdAt: string; id: string;
 describe('settings and profile routes', () => {
   beforeEach(() => {
     mockPush.mockReset();
+    mockReplace.mockReset();
+    mockSearchParams = {};
     // Default to a signed-out-but-ready auth snapshot so the Settings screen can
     // read `user` without crashing; profile tests override the return value.
     mockUseAuth.mockReset().mockReturnValue(createAuthValue());
@@ -111,6 +117,15 @@ describe('settings and profile routes', () => {
     fireEvent.press(screen.getByTestId('settings-profile-row'));
 
     expect(mockPush).toHaveBeenCalledWith('/profile');
+  });
+
+  it('returns explicitly to More when settings was launched from the hub', () => {
+    mockSearchParams = { source: 'more' };
+    render(<SettingsRoute />);
+
+    fireEvent.press(screen.getByTestId('back-to-more-button'));
+
+    expect(mockReplace).toHaveBeenCalledWith('/more');
   });
 
   it('opens Connected agents for a signed-in user', () => {

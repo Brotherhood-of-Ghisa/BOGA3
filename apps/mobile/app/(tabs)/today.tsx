@@ -1,6 +1,6 @@
 import { useIsFocused } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import {
@@ -16,6 +16,11 @@ import {
   DEFAULT_SESSION_LIST_DATA_CLIENT,
   DEFAULT_SESSION_LIST_ITEMS,
   SessionSummaryLine,
+  formatCompactDuration,
+  formatDateTimeStamp,
+  formatExerciseCount,
+  formatLocationLabel,
+  formatSetCount,
   useSessionListData,
   type SessionListDataClient,
   type SessionListItem,
@@ -44,6 +49,21 @@ import {
 
 const RECENT_SESSION_LIMIT = 3;
 const SOCIAL_ACTIVITY_LIMIT = 2;
+
+const completedSessionAccessibilityLabel = (session: SessionListItem): string => {
+  const duration = session.durationDisplay || formatCompactDuration(session.durationSec);
+  const location = formatLocationLabel(session.gymName);
+
+  return [
+    `Completed session on ${formatDateTimeStamp(session.completedAt ?? session.startedAt)}`,
+    duration,
+    formatSetCount(session.setCount),
+    formatExerciseCount(session.exerciseCount),
+    location ? `at ${location}` : null,
+  ]
+    .filter((part): part is string => part !== null)
+    .join(', ');
+};
 
 export type TodayPlanState =
   | { status: 'unavailable' }
@@ -98,22 +118,26 @@ export function TodayScreen({
     isFocused,
   });
 
-  const activeSession = sessions.find(
-    (session) => session.status === 'active' && session.deletedAt === null,
-  );
-  const recentSessions = sessions
-    .filter(
-      (session) =>
-        session.status === 'completed' &&
-        session.deletedAt === null &&
-        session.completedAt !== null,
-    )
-    .sort(
-      (left, right) =>
-        new Date(right.completedAt ?? 0).getTime() -
-        new Date(left.completedAt ?? 0).getTime(),
-    )
-    .slice(0, RECENT_SESSION_LIMIT);
+  const { activeSession, recentSessions } = useMemo(() => {
+    const active = sessions.find(
+      (session) => session.status === 'active' && session.deletedAt === null,
+    );
+    const recent = sessions
+      .filter(
+        (session) =>
+          session.status === 'completed' &&
+          session.deletedAt === null &&
+          session.completedAt !== null,
+      )
+      .sort(
+        (left, right) =>
+          new Date(right.completedAt ?? 0).getTime() -
+          new Date(left.completedAt ?? 0).getTime(),
+      )
+      .slice(0, RECENT_SESSION_LIMIT);
+
+    return { activeSession: active, recentSessions: recent };
+  }, [sessions]);
 
   const startPlan = async () => {
     if (planState.status !== 'ready' || planLaunchInFlightRef.current) {
@@ -239,7 +263,7 @@ export function TodayScreen({
             {recentSessions.map((session) => (
               <Pressable
                 accessibilityHint="Opens the completed session"
-                accessibilityLabel={`Open completed session ${session.id}`}
+                accessibilityLabel={completedSessionAccessibilityLabel(session)}
                 accessibilityRole="button"
                 key={session.id}
                 onPress={() => router.push(`/completed-session/${session.id}`)}
