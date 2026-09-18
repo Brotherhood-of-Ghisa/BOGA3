@@ -198,16 +198,19 @@ emulator -avd Pixel_10_Pro &
 adb wait-for-device
 ```
 
-2. Boot the dedicated human-development backend (`BOGA-dev`, port 65431, isolated from test gates):
+2. Boot the dedicated human-development backend (`BOGA-dev`, port 65431), provision dev accounts, and configure the mobile app environment:
 
 ```bash
-./boga db dev-up
+./boga env dev
 ```
 
-3. Source the worktree's assigned Metro port (`8082 + slot`) and reverse ports on the emulator:
+*(This runs the dev baseline via `./boga db dev`, seeds dev accounts `a@dev.local`/`b@dev.local`, and writes `EXPO_PUBLIC_SUPABASE_URL=http://127.0.0.1:65431` and the dev stack `ANON_KEY` to `apps/mobile/.env.local`. Equivalent manual steps: run `./boga db dev`, then write `EXPO_PUBLIC_SUPABASE_URL=http://127.0.0.1:65431` and the dev-stack anon key to `apps/mobile/.env.local` or export them into your shell.)*
+
+3. Source the worktree's assigned Metro port (`8082 + slot`), pin the Supabase env into your shell, and reverse ports on the emulator:
 
 ```bash
 source apps/mobile/.maestro/maestro.env.local
+source scripts/dev/export-mobile-supabase-env.sh apps/mobile/.env.local
 adb reverse tcp:"${EXPO_DEV_SERVER_PORT}" tcp:"${EXPO_DEV_SERVER_PORT}"
 adb reverse tcp:65431 tcp:65431
 ```

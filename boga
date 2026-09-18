@@ -21,7 +21,7 @@
 #   boga db up|down|reset|baseline             # this slot's stack (gates)
 #   boga db dev|dev-up|dev-down|dev-reset       # dedicated dev stack (BOGA-dev), isolated from gates
 #   boga ios build-client|start
-#   boga env lan|hosted|tailscale
+#   boga env dev|lan|hosted|tailscale
 #   boga task bootstrap|closeout
 #
 # `test` (except --list / for), `db`, `ios`, and `env` fail hard without this
@@ -179,12 +179,23 @@ cmd_android_doctor() {
   check "Android SDK (ANDROID_HOME)" test -n "${ANDROID_HOME:-}" -a -d "${ANDROID_HOME:-}"
   check "adb (Android platform tools)" adb version
   check "emulator (Android emulator CLI)" emulator -version
-  check_java_version() {
+  check_gradle_java() {
+    local java_bin=""
+    if [[ -n "${JAVA_HOME:-}" ]]; then
+      if [[ ! -d "${JAVA_HOME}" || ! -x "${JAVA_HOME}/bin/java" ]]; then
+        return 1
+      fi
+      java_bin="${JAVA_HOME}/bin/java"
+    elif command -v java >/dev/null 2>&1; then
+      java_bin="$(command -v java)"
+    else
+      return 1
+    fi
     local ver
-    ver="$(java -version 2>&1 | head -n 1 | awk -F '"' '{print $2}' | cut -d'.' -f1)"
+    ver="$("${java_bin}" -version 2>&1 | head -n 1 | awk -F '"' '{print $2}' | cut -d'.' -f1)"
     [[ "$ver" == "17" || "$ver" == "21" ]]
   }
-  check "java runtime is Java 17 or 21 (Gradle 8.x compatible)" check_java_version
+  check "java runtime for Gradle is Java 17 or 21 (JAVA_HOME / PATH)" check_gradle_java
   check_android_target() {
     local avds
     avds="$(emulator -list-avds 2>/dev/null || true)"
@@ -303,9 +314,10 @@ case "${cmd}" in
     sub="${1:-}"; shift || true
     case "${sub}" in
       lan)       dispatch_script "${REPO_ROOT}/scripts/dev/use-local-mobile-lan-env.sh" "$@" ;;
+      dev)       dispatch_script "${REPO_ROOT}/scripts/dev/use-local-mobile-dev-env.sh" "$@" ;;
       hosted)    dispatch_script "${REPO_ROOT}/scripts/dev/use-hosted-mobile-env.sh" "$@" ;;
       tailscale) dispatch_script "${REPO_ROOT}/scripts/dev/use-local-mobile-tailscale-env.sh" "$@" ;;
-      *) fail "usage: boga env lan|hosted|tailscale   (full phone sessions: scripts/dev/dev-lan.sh on-LAN, scripts/dev/dev-remote.sh over Tailscale)" ;;
+      *) fail "usage: boga env dev|lan|hosted|tailscale   (full phone sessions: scripts/dev/dev-lan.sh on-LAN, scripts/dev/dev-remote.sh over Tailscale)" ;;
     esac
     ;;
   task)
