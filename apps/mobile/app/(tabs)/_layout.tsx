@@ -8,6 +8,7 @@ import { MainTabs } from '@/components/navigation/main-tabs';
 import {
   mainTabHref,
   resolveMainTab,
+  shouldCollapseMainNavigation,
   shouldShowMainNavigation,
 } from '@/src/navigation/main-tabs';
 
@@ -20,13 +21,17 @@ function TabsBottomTray() {
     () => shouldShowMainNavigation(routeSegments),
     [routeSegments],
   );
+  const collapseOnEntry = useMemo(
+    () => shouldCollapseMainNavigation(routeSegments),
+    [routeSegments],
+  );
 
   if (!activeTab || !isVisible) {
     return null;
   }
 
   return (
-    <BottomTray>
+    <BottomTray collapseOnEntry={collapseOnEntry}>
       <MainTabs
         activeTab={activeTab}
         onSelect={(tab) => router.push(mainTabHref(tab))}

@@ -41,16 +41,21 @@ const TrayVisibilityContext = createContext<TrayVisibilityContextValue | null>(n
 
 export function TrayVisibilityProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<TraySnapState>('expanded');
+  const expand = useCallback(() => setState('expanded'), []);
+  const collapse = useCallback(() => setState('collapsed'), []);
+  const toggle = useCallback(
+    () => setState((current) => (current === 'expanded' ? 'collapsed' : 'expanded')),
+    []
+  );
 
   const value = useMemo<TrayVisibilityContextValue>(
     () => ({
       state,
-      expand: () => setState('expanded'),
-      collapse: () => setState('collapsed'),
-      toggle: () =>
-        setState((current) => (current === 'expanded' ? 'collapsed' : 'expanded')),
+      expand,
+      collapse,
+      toggle,
     }),
-    [state]
+    [collapse, expand, state, toggle]
   );
 
   return (
@@ -77,6 +82,7 @@ export function useTrayVisibility(): TrayVisibilityContextValue {
 
 type BottomTrayProps = {
   children: ReactNode;
+  collapseOnEntry?: boolean;
 };
 
 /**
@@ -89,8 +95,9 @@ type BottomTrayProps = {
  * collapse via `useTrayVisibility()`. Initial state is `expanded`; the tray
  * does not persist across app restarts (out of scope for this task).
  */
-export function BottomTray({ children }: BottomTrayProps) {
+export function BottomTray({ children, collapseOnEntry = false }: BottomTrayProps) {
   const { state, expand, collapse } = useTrayVisibility();
+  const previousCollapseOnEntryRef = useRef(false);
   // The custom tab bar does not receive React Navigation's safe-area inset
   // (the (tabs) layout only applies the top edge), so without this the tray
   // hugs the device's bottom edge / home indicator. Reserve the bottom inset
@@ -108,6 +115,13 @@ export function BottomTray({ children }: BottomTrayProps) {
   }, [state]);
 
   const containerHeight = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (collapseOnEntry && !previousCollapseOnEntryRef.current) {
+      collapse();
+    }
+    previousCollapseOnEntryRef.current = collapseOnEntry;
+  }, [collapse, collapseOnEntry]);
 
   const resolveTargetHeight = useCallback((target: TraySnapState) => {
     if (target === 'collapsed') return PEEK_HEIGHT;

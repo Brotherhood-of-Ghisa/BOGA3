@@ -61,6 +61,15 @@ appId: com.dinoderek.mobile
           visible:
             text: "No exercises logged yet."
           timeout: 30000
-- assertNotVisible:
-    id: "main-bottom-tabs"
-- takeScreenshot: "05-m26-recorder-focused"
+- assertVisible:
+    id: "bottom-tray-handle"
+- assertVisible: "Expand navigation tray"
+- takeScreenshot: "05-m26-recorder-focused-collapsed"
+- tapOn:
+    id: "bottom-tray-handle"
+- assertVisible: "Collapse navigation tray"
+- extendedWaitUntil:
+    visible:
+      id: "main-bottom-tabs"
+    timeout: 4000
+- takeScreenshot: "06-m26-recorder-navigation-expanded"

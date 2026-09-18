@@ -28,6 +28,7 @@ const mockIsDevMode = jest.fn();
 const mockUseAuth = jest.fn();
 
 jest.mock('expo-router', () => ({
+  useLocalSearchParams: () => ({}),
   useRouter: () => ({ push: mockPush }),
 }));
 

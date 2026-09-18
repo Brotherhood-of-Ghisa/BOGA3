@@ -219,6 +219,10 @@ appId: com.dinoderek.mobile
 # check the standalone settings-sync-status flow used to own (its field-content
 # assertions live in jest sync-status-panel.test.tsx). dirty-count is asserted
 # below; refresh-button is exercised next.
+- scrollUntilVisible:
+    element:
+      id: "settings-sync-status-last-success"
+    direction: DOWN
 - assertVisible:
     id: "settings-sync-status-last-success"
 - scrollUntilVisible:

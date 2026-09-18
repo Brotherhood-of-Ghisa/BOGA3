@@ -52,10 +52,10 @@ describe('More screen', () => {
   });
 
   it.each([
-    ['more-groups-row', '/groups'],
+    ['more-groups-row', '/groups?source=more'],
     ['more-connected-agents-row', '/connected-agents'],
-    ['more-exercise-database-row', '/exercise-catalog'],
-    ['more-settings-row', '/settings'],
+    ['more-exercise-database-row', '/exercise-catalog?source=more'],
+    ['more-settings-row', '/settings?source=more'],
   ])('opens %s at its existing route', (testID, route) => {
     render(<MoreScreen />);
 
@@ -69,12 +69,23 @@ describe('More screen', () => {
 
     const row = screen.getByTestId('more-connect-agent-row');
     expect(row.props.accessibilityRole).toBe('link');
-    expect(row.props.accessibilityLabel).toContain('opens in browser');
+    expect(row.props.accessibilityLabel).toBe(
+      'Connect an AI coach. Set up an MCP-compatible coach with read-only training access.',
+    );
+    expect(row.props.accessibilityHint).toContain('system browser');
     fireEvent.press(row);
 
     await waitFor(() => {
       expect(mockOpenURL).toHaveBeenCalledWith('https://example.test/connect');
     });
+  });
+
+  it('includes each destination description in its screen-reader label', () => {
+    render(<MoreScreen />);
+
+    expect(screen.getByTestId('more-exercise-database-row').props.accessibilityLabel).toBe(
+      'Exercise database. Search, create, edit, archive, and restore exercises.',
+    );
   });
 
   it('shows an inline error when the MCP setup page cannot open', async () => {

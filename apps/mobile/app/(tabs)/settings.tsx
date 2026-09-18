@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { SyncStatusPanel } from '@/components/sync-status/sync-status-panel';
+import { MoreHubBackButton } from '@/components/navigation/more-hub-back-button';
 import { UiButton, UiSurface, UiText, uiBorder, uiColors, uiRadius, uiSpace } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import { resetLocalDataAndReseed } from '@/src/data';
@@ -141,6 +142,7 @@ export default function SettingsScreen() {
       keyboardShouldPersistTaps="handled"
       style={styles.screen}
       testID="settings-screen">
+      <MoreHubBackButton />
       <UiText accessibilityRole="header" selectable style={styles.screenTitle} variant="title">
         Settings
       </UiText>

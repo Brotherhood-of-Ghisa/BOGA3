@@ -83,6 +83,7 @@ exports[`UI primitives matches the current top-level tabs snapshot after primiti
           null,
           null,
           {
+            "flex": 1,
             "paddingHorizontal": 2,
           },
         ]
@@ -168,6 +169,7 @@ exports[`UI primitives matches the current top-level tabs snapshot after primiti
           null,
           null,
           {
+            "flex": 1,
             "paddingHorizontal": 2,
           },
         ]
@@ -253,6 +255,7 @@ exports[`UI primitives matches the current top-level tabs snapshot after primiti
           null,
           null,
           {
+            "flex": 1,
             "paddingHorizontal": 2,
           },
         ]
@@ -338,6 +341,7 @@ exports[`UI primitives matches the current top-level tabs snapshot after primiti
           null,
           null,
           {
+            "flex": 1,
             "paddingHorizontal": 2,
           },
         ]

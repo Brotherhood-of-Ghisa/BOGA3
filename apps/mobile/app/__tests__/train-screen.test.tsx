@@ -95,6 +95,32 @@ describe('Train screen', () => {
     await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/session-recorder'));
   });
 
+  it('disables planned launch without relabeling it while an empty launch is running', () => {
+    const entry = sessionEntry();
+    entry.startEmptyOrResume.mockImplementation(() => new Promise(() => undefined));
+    render(
+      <TrainScreen
+        initialSessions={[]}
+        planningState={{
+          status: 'ready',
+          title: 'Upper body',
+          detail: '3 exercises',
+          materialize: jest.fn(),
+          openManager: jest.fn(),
+        }}
+        sessionEntry={entry}
+      />,
+    );
+
+    fireEvent.press(screen.getByTestId('train-start-empty-button'));
+
+    expect(screen.getByTestId('train-start-planned-button')).toBeDisabled();
+    expect(screen.getByTestId('train-start-planned-button')).toHaveTextContent(
+      'Start planned workout',
+    );
+    expect(screen.getByTestId('train-start-empty-button')).toHaveTextContent('Starting…');
+  });
+
   it('shows empty-launch failure inline and keeps the action retryable', async () => {
     const entry = sessionEntry();
     entry.startEmptyOrResume.mockRejectedValue(new Error('write failed'));

@@ -3,6 +3,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { ExerciseEditorModal } from '@/components/exercise-catalog/exercise-editor-modal';
+import { MoreHubBackButton } from '@/components/navigation/more-hub-back-button';
 import {
   ExerciseListContent,
   ExerciseListPreferenceControls,
@@ -287,6 +288,7 @@ export default function ExerciseCatalogScreen() {
   return (
     <View style={styles.screen}>
       <View style={styles.pinnedTopRegion}>
+        <MoreHubBackButton />
         <View style={styles.topActionRow}>
           <TextInput
             accessibilityLabel="Exercise filter input"

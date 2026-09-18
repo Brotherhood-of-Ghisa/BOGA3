@@ -7,18 +7,17 @@ export type MoreDestinationKey =
   | 'settings';
 
 export type MoreRoute =
-  | '/groups'
+  | '/groups?source=more'
   | '/connected-agents'
   | '/dev-logs'
-  | '/exercise-catalog'
-  | '/settings';
+  | '/exercise-catalog?source=more'
+  | '/settings?source=more';
 
 export type MoreDestination = {
   key: MoreDestinationKey;
   label: string;
   description: string;
   glyph: string;
-  accessibilityLabel: string;
   accessibilityHint: string;
   testID: `more-${MoreDestinationKey}-row`;
   action: { type: 'route'; href: MoreRoute } | { type: 'connect-agent' };
@@ -42,10 +41,9 @@ const MORE_SECTIONS: readonly MoreSection[] = [
         label: 'Groups',
         description: 'Join, create, and manage your training groups.',
         glyph: 'G',
-        accessibilityLabel: 'Open Groups',
         accessibilityHint: 'Opens group discovery and management',
         testID: 'more-groups-row',
-        action: { type: 'route', href: '/groups' },
+        action: { type: 'route', href: '/groups?source=more' },
       },
     ],
   },
@@ -58,7 +56,6 @@ const MORE_SECTIONS: readonly MoreSection[] = [
         label: 'Connect an AI coach',
         description: 'Set up an MCP-compatible coach with read-only training access.',
         glyph: 'AI',
-        accessibilityLabel: 'Connect an AI coach, opens in browser',
         accessibilityHint: 'Opens MCP setup instructions in your system browser',
         testID: 'more-connect-agent-row',
         action: { type: 'connect-agent' },
@@ -68,7 +65,6 @@ const MORE_SECTIONS: readonly MoreSection[] = [
         label: 'Connected agents',
         description: 'Review and revoke coaching access.',
         glyph: '✓',
-        accessibilityLabel: 'Open Connected Agents',
         accessibilityHint: 'Opens the list of authorized coaching agents',
         testID: 'more-connected-agents-row',
         action: { type: 'route', href: '/connected-agents' },
@@ -79,7 +75,6 @@ const MORE_SECTIONS: readonly MoreSection[] = [
         label: 'Developer logs',
         description: 'Inspect in-app diagnostic events for this session.',
         glyph: '</>',
-        accessibilityLabel: 'Open Developer Logs',
         accessibilityHint: 'Opens the development-only in-app log viewer',
         testID: 'more-developer-logs-row',
         action: { type: 'route', href: '/dev-logs' },
@@ -96,20 +91,18 @@ const MORE_SECTIONS: readonly MoreSection[] = [
         label: 'Exercise database',
         description: 'Search, create, edit, archive, and restore exercises.',
         glyph: 'DB',
-        accessibilityLabel: 'Open Exercise Database',
         accessibilityHint: 'Opens exercise database management',
         testID: 'more-exercise-database-row',
-        action: { type: 'route', href: '/exercise-catalog' },
+        action: { type: 'route', href: '/exercise-catalog?source=more' },
       },
       {
         key: 'settings',
         label: 'Settings & account',
         description: 'Manage your profile, preferences, sync, and app data.',
         glyph: '⚙',
-        accessibilityLabel: 'Open Settings and Account',
         accessibilityHint: 'Opens settings and account management',
         testID: 'more-settings-row',
-        action: { type: 'route', href: '/settings' },
+        action: { type: 'route', href: '/settings?source=more' },
       },
     ],
   },

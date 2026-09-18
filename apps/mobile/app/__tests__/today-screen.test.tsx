@@ -218,6 +218,12 @@ describe('Today screen', () => {
     expect(screen.getByTestId('today-recent-session-session-3')).toBeTruthy();
     expect(screen.getByTestId('today-recent-session-session-2')).toBeTruthy();
     expect(screen.queryByTestId('today-recent-session-session-1')).toBeNull();
+    expect(
+      screen.getByTestId('today-recent-session-session-4').props.accessibilityLabel,
+    ).toBe('Completed session on 9/16 10:00, 1h, 6 sets, 2 exercises, at Iron House');
+    expect(
+      screen.getByTestId('today-recent-session-session-4').props.accessibilityLabel,
+    ).not.toContain('session-4');
 
     fireEvent.press(screen.getByTestId('today-recent-session-session-4'));
     fireEvent.press(screen.getByTestId('today-view-progress-button'));

@@ -9,6 +9,7 @@ jest.mock('expo-linking', () => ({
 }));
 
 jest.mock('expo-router', () => ({
+  useLocalSearchParams: () => ({}),
   useRouter: () => ({ push: mockPush }),
 }));
 

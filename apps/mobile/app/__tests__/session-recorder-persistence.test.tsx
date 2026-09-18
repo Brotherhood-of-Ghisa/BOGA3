@@ -8,6 +8,7 @@ import {
 
 let mockSearchParams: Record<string, string | undefined> = {};
 let mockBeforeRemoveListener: ((event: any) => void) | null = null;
+let mockFocusCallback: (() => void | (() => void)) | null = null;
 let mockFocusCleanup: (() => void) | null = null;
 const mockNavigationDispatch = jest.fn();
 const mockNavigationAddListener = jest.fn((eventName: string, listener: (event: any) => void) => {
@@ -96,9 +97,13 @@ jest.mock('expo-router', () => ({
   useFocusEffect: (callback: () => void | (() => void)) => {
     const React = jest.requireActual('react');
     React.useEffect(() => {
+      mockFocusCallback = callback;
       const cleanup = callback();
       mockFocusCleanup = typeof cleanup === 'function' ? cleanup : null;
       return () => {
+        if (mockFocusCallback === callback) {
+          mockFocusCallback = null;
+        }
         if (mockFocusCleanup === cleanup) {
           mockFocusCleanup = null;
         }
@@ -126,6 +131,15 @@ const {
 const flushMicrotasks = async () => {
   await Promise.resolve();
   await Promise.resolve();
+};
+
+const refocusRecorder = async () => {
+  await act(async () => {
+    mockFocusCleanup?.();
+    const cleanup = mockFocusCallback?.();
+    mockFocusCleanup = typeof cleanup === 'function' ? cleanup : null;
+    await flushMicrotasks();
+  });
 };
 
 const dismissEmptyStateIfPresent = async () => {
@@ -168,11 +182,34 @@ const buildCompletedEditSnapshot = (overrides: Partial<any> = {}) => ({
   ...overrides,
 });
 
+const buildActiveDraftSnapshot = (overrides: Partial<any> = {}) => ({
+  sessionId: 'active-focus-draft',
+  gymId: null,
+  status: 'active',
+  startedAt: new Date('2026-09-18T10:00:00.000Z'),
+  completedAt: null,
+  durationSec: null,
+  deletedAt: null,
+  createdAt: new Date('2026-09-18T10:00:00.000Z'),
+  updatedAt: new Date('2026-09-18T10:00:00.000Z'),
+  exercises: [
+    {
+      id: 'focus-exercise-1',
+      exerciseDefinitionId: 'seed_barbell_bench_press',
+      name: 'Bench Press',
+      machineName: null,
+      sets: [],
+    },
+  ],
+  ...overrides,
+});
+
 describe('SessionRecorderScreen persistence wiring', () => {
   beforeEach(() => {
     jest.useFakeTimers();
     mockSearchParams = {};
     mockBeforeRemoveListener = null;
+    mockFocusCallback = null;
     mockFocusCleanup = null;
     __resetExerciseListPreferencesForTests();
     setExerciseListPreferences({ groupByMuscleFamily: false });
@@ -195,6 +232,75 @@ describe('SessionRecorderScreen persistence wiring', () => {
   afterEach(() => {
     jest.runOnlyPendingTimers();
     jest.useRealTimers();
+  });
+
+  it('rehydrates a newly persisted active draft when the mounted recorder regains focus', async () => {
+    render(<SessionRecorderScreen />);
+
+    await waitFor(() => {
+      expect(mockLoadLatestSessionDraftSnapshot).toHaveBeenCalledTimes(1);
+    });
+    expect(screen.getByTestId('start-session-button')).toBeTruthy();
+
+    mockLoadLatestSessionDraftSnapshot.mockResolvedValue(buildActiveDraftSnapshot());
+    await refocusRecorder();
+
+    expect(mockLoadLatestSessionDraftSnapshot).toHaveBeenCalledTimes(2);
+    expect(await screen.findByText('Bench Press')).toBeTruthy();
+    expect(screen.queryByTestId('start-session-button')).toBeNull();
+  });
+
+  it('rehydrates the persisted draft after earlier recorder mutations', async () => {
+    render(<SessionRecorderScreen />);
+
+    await waitFor(() => {
+      expect(mockLoadLatestSessionDraftSnapshot).toHaveBeenCalledTimes(1);
+    });
+    await dismissEmptyStateIfPresent();
+    fireEvent.press(screen.getByText('Log new exercise'));
+    await addExerciseWithEmptySet('Barbell Squat');
+    await waitFor(() => expect(mockPersistSessionDraftSnapshot).toHaveBeenCalled());
+
+    mockLoadLatestSessionDraftSnapshot.mockClear();
+    mockLoadLatestSessionDraftSnapshot.mockResolvedValue(
+      buildActiveDraftSnapshot({ sessionId: 'persisted-session-1' }),
+    );
+    await refocusRecorder();
+
+    expect(mockLoadLatestSessionDraftSnapshot).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('Bench Press')).toBeTruthy();
+    expect(screen.queryByText('Barbell Squat')).toBeNull();
+  });
+
+  it('does not overwrite a mutation made while focus rehydration is pending', async () => {
+    render(<SessionRecorderScreen />);
+
+    await waitFor(() => {
+      expect(mockLoadLatestSessionDraftSnapshot).toHaveBeenCalledTimes(1);
+    });
+    await dismissEmptyStateIfPresent();
+
+    let resolveFocusSnapshot: (value: any) => void = () => {
+      throw new Error('Expected active-draft loader promise resolver');
+    };
+    mockLoadLatestSessionDraftSnapshot.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveFocusSnapshot = resolve;
+        }),
+    );
+    await refocusRecorder();
+    await waitFor(() => expect(mockLoadLatestSessionDraftSnapshot).toHaveBeenCalledTimes(2));
+
+    fireEvent.press(screen.getByText('Log new exercise'));
+    await addExerciseWithEmptySet('Barbell Squat');
+    await act(async () => {
+      resolveFocusSnapshot(buildActiveDraftSnapshot());
+      await flushMicrotasks();
+    });
+
+    expect(screen.getByText('Barbell Squat')).toBeTruthy();
+    expect(screen.queryByText('Bench Press')).toBeNull();
   });
 
   it('persists structural edits immediately and text edits with the existing 3s debounce SLA', async () => {

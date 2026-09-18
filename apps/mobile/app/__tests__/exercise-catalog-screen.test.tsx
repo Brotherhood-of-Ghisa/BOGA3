@@ -17,11 +17,15 @@ import { __resetExerciseListPreferencesForTests } from '@/src/exercise-catalog/l
 import { loadExerciseCatalogStatsRawHistory } from '@/src/data/exercise-catalog-stats';
 import { __resetExerciseCatalogStatsCacheForTests } from '@/src/exercise-catalog/stats-cache';
 
+const mockReplace = jest.fn();
+let mockSearchParams: Record<string, string> = {};
+
 jest.mock('expo-router', () => ({
-  useLocalSearchParams: () => ({}),
+  useLocalSearchParams: () => mockSearchParams,
   useRouter: () => ({
     push: jest.fn(),
     back: jest.fn(),
+    replace: mockReplace,
   }),
   useFocusEffect: (_callback: () => void | (() => void)) => {
     // no-op in tests; the focus effect only reloads stats which we already mock
@@ -62,6 +66,8 @@ const expandFamily = async (familyName: string, count: number) => {
 
 describe('ExerciseCatalogScreen', () => {
   beforeEach(() => {
+    mockReplace.mockReset();
+    mockSearchParams = {};
     mockListMuscleGroups.mockReset();
     mockListExercises.mockReset();
     mockSaveExercise.mockReset();
@@ -84,6 +90,16 @@ describe('ExerciseCatalogScreen', () => {
       { id: 'quads', displayName: 'Quads', familyName: 'Legs', sortOrder: 3 },
       { id: 'back', displayName: 'Back', familyName: 'Back', sortOrder: 4 },
     ]);
+  });
+
+  it('returns explicitly to More when the catalog was launched from the hub', async () => {
+    mockSearchParams = { source: 'more' };
+    mockListExercises.mockResolvedValue([]);
+    render(<ExerciseCatalogScreen />);
+
+    fireEvent.press(await screen.findByTestId('back-to-more-button'));
+
+    expect(mockReplace).toHaveBeenCalledWith('/more');
   });
 
   afterEach(() => {
