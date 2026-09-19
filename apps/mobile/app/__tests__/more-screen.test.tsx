@@ -52,7 +52,7 @@ describe('More screen', () => {
   });
 
   it.each([
-    ['more-groups-row', '/groups?source=more'],
+    ['more-groups-row', '/groups'],
     ['more-connected-agents-row', '/connected-agents'],
     ['more-exercise-database-row', '/exercise-catalog?source=more'],
     ['more-settings-row', '/settings?source=more'],

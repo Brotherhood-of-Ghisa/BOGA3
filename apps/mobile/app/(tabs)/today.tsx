@@ -9,6 +9,7 @@ import {
   GroupOfflineBanner,
   GroupStateView,
   GroupStreamMembershipItem,
+  GroupStreamRecordCard,
   GroupStreamSessionCard,
   pickInlineError,
 } from '@/components/groups';
@@ -36,6 +37,7 @@ import {
 import { useAuth } from '@/src/auth';
 import {
   buildStreamViewModel,
+  groupsStreamPath,
   useGroupStream,
   type GroupApiError,
   type StreamItem,
@@ -48,7 +50,7 @@ import {
 } from '@/src/session-entry';
 
 const RECENT_SESSION_LIMIT = 3;
-const SOCIAL_ACTIVITY_LIMIT = 2;
+const SOCIAL_ACTIVITY_LIMIT = 3;
 
 const completedSessionAccessibilityLabel = (session: SessionListItem): string => {
   const duration = session.durationDisplay || formatCompactDuration(session.durationSec);
@@ -215,7 +217,7 @@ export function TodayScreen({
           title="Group activity"
         />
         <TodaySocialSnapshot
-          onOpenGroup={(groupId) => router.push(`/group/${groupId}`)}
+          onOpenGroup={(groupId) => router.push(groupsStreamPath(groupId))}
           onOpenSession={(memberId, sessionId) =>
             router.push(`/group-session/${memberId}/${sessionId}`)
           }
@@ -415,10 +417,10 @@ function TodaySocialSnapshot({
 
   const inlineError = pickInlineError(socialState.error);
   // Today is a compact orientation surface, not a second copy of the full
-  // Groups feed. Keep its established session/membership snapshot even when
-  // the group stream adds richer event kinds such as records and links.
+  // Groups feed: sessions, records and membership changes only. Records are
+  // read-only here; certifying happens on the Groups screen they open.
   const snapshotItems = socialState.items
-    .filter((item) => item.kind === 'session' || item.kind === 'membership')
+    .filter((item) => item.kind === 'session' || item.kind === 'record' || item.kind === 'membership')
     .slice(0, SOCIAL_ACTIVITY_LIMIT);
   const viewModels = buildStreamViewModel(snapshotItems);
 
@@ -447,7 +449,7 @@ function TodaySocialSnapshot({
         />
       ) : viewModels.length === 0 ? (
         <GroupStateView
-          body="Sessions and membership updates from groups you've joined will appear here."
+          body="Sessions, records and membership updates from groups you've joined will appear here."
           testID="today-social-empty"
           title="No group activity yet"
         />
@@ -460,6 +462,17 @@ function TodaySocialSnapshot({
                 key={item.key}
                 onPress={(card) => onOpenSession(card.memberUserId, card.sessionId)}
                 showGroupNames
+              />
+            );
+          }
+          if (item.kind === 'record') {
+            return (
+              <GroupStreamRecordCard
+                card={item}
+                key={item.key}
+                onPress={(card) => onOpenGroup(card.record.group.group_id)}
+                pressHint="Opens the group"
+                showGroupName
               />
             );
           }

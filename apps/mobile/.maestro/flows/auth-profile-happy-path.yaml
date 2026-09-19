@@ -134,7 +134,8 @@ appId: com.dinoderek.mobile
     timeout: 15000
 - assertVisible:
     text: "Agents can read training data only.*"
-- tapOn: "Settings"
+# The native back item is arrow-only; its accessibility label is "Back".
+- tapOn: "Back"
 - extendedWaitUntil:
     visible:
       id: "settings-screen"

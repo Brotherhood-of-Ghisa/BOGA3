@@ -156,12 +156,17 @@ afterEach(() => {
 });
 
 describe('Groups tab and My groups actions', () => {
-  it('offers Join / Create in the header, and pushes their routes', async () => {
+  it('keeps Join / Create off the Groups screen and on My groups', async () => {
     render(<GroupsTabRoute />);
     await screen.findByTestId('groups-stream-empty');
-    fireEvent.press(screen.getByTestId('groups-create-button'));
+    expect(screen.queryByTestId('groups-create-button')).toBeNull();
+    expect(screen.queryByTestId('groups-join-button')).toBeNull();
+
+    screen.unmount();
+    render(<MyGroupsRoute />);
+    fireEvent.press(await screen.findByTestId('group-mine-create-button'));
     expect(mockRouter.push).toHaveBeenLastCalledWith('/group/new');
-    fireEvent.press(screen.getByTestId('groups-join-button'));
+    fireEvent.press(screen.getByTestId('group-mine-join-button'));
     expect(mockRouter.push).toHaveBeenLastCalledWith('/group/join');
   });
 
@@ -169,7 +174,6 @@ describe('Groups tab and My groups actions', () => {
     api.listMyGroups.mockResolvedValue({ groups: [] });
     render(<GroupsTabRoute />);
     const empty = within(await screen.findByTestId('groups-empty-state'));
-    expect(screen.queryByTestId('groups-create-button')).toBeNull();
     fireEvent.press(empty.getByTestId('groups-empty-create-button'));
     expect(mockRouter.push).toHaveBeenLastCalledWith('/group/new');
     fireEvent.press(empty.getByTestId('groups-empty-join-button'));

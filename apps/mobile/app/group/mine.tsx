@@ -14,9 +14,13 @@ import {
   usePullToRefresh,
 } from '@/components/groups';
 import { useAuth } from '@/src/auth';
+import { UiButton } from '@/components/ui';
 import { groupCacheKeys, listMyGroups, useGroupResource, type GroupListMineResult } from '@/src/groups';
 
-/** My groups (groups contract §6.3): every active membership, sorted by name. */
+/**
+ * My groups (groups contract §6.3): every active membership, sorted by name,
+ * with Join / Create. A row opens the group's management page.
+ */
 export default function MyGroupsRoute() {
   const { isConfigured, user } = useAuth();
   if (!isConfigured || !user) {
@@ -45,6 +49,24 @@ function MyGroupsContent({ userId }: { userId: string }) {
       }
       ListHeaderComponent={
         <View style={groupScreenStyles.header}>
+          {/* With no groups the empty state carries Create / Join instead. */}
+          {groups && groups.length > 0 ? (
+            <View style={groupScreenStyles.actionRow}>
+              <UiButton
+                label="Join group"
+                onPress={() => router.push('/group/join')}
+                style={groupScreenStyles.actionRowItem}
+                testID="group-mine-join-button"
+                variant="secondary"
+              />
+              <UiButton
+                label="Create group"
+                onPress={() => router.push('/group/new')}
+                style={groupScreenStyles.actionRowItem}
+                testID="group-mine-create-button"
+              />
+            </View>
+          ) : null}
           {mine.offline ? <GroupOfflineBanner lastUpdatedAtMs={mine.lastUpdatedAtMs} /> : null}
           {groups && inlineError ? (
             <GroupInlineError error={inlineError} onRetry={onRefresh} testID="group-mine-inline-error" />

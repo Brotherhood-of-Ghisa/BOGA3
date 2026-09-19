@@ -11,11 +11,13 @@ type GroupStreamRecordCardProps = {
   showGroupName: boolean;
   /** Opens the row detail sheet (E2). */
   onPress: (card: StreamRecordCardViewModel) => void;
-  /** Certify from the card (E3): the same write as the sheet's. */
-  onCertify: (card: StreamRecordCardViewModel) => void;
-  certifying: boolean;
+  /** What a press does, for screen readers. */
+  pressHint?: string;
+  /** Certify from the card (E3): the same write as the sheet's. Omitted for a read-only card (Today). */
+  onCertify?: (card: StreamRecordCardViewModel) => void;
+  certifying?: boolean;
   /** The last certification outcome for this card's set. */
-  notice: RecordSetWriteNotice | null;
+  notice?: RecordSetWriteNotice | null;
 };
 
 /**
@@ -26,12 +28,20 @@ type GroupStreamRecordCardProps = {
  * accessibility element) and certifies without opening it. A voided card stays,
  * on the muted surface, with its status first (D15).
  */
-export function GroupStreamRecordCard({ card, showGroupName, onPress, onCertify, certifying, notice }: GroupStreamRecordCardProps) {
+export function GroupStreamRecordCard({
+  card,
+  showGroupName,
+  onPress,
+  pressHint = 'Opens the set',
+  onCertify,
+  certifying = false,
+  notice = null,
+}: GroupStreamRecordCardProps) {
   const testID = `group-stream-record-card-${card.key}`;
   return (
     <UiSurface style={styles.card} testID={testID} variant={card.voided ? 'panelMuted' : 'card'}>
       <Pressable
-        accessibilityHint="Opens the set"
+        accessibilityHint={pressHint}
         accessibilityLabel={card.accessibilityLabel}
         accessibilityRole="button"
         onPress={() => onPress(card)}
@@ -71,7 +81,7 @@ export function GroupStreamRecordCard({ card, showGroupName, onPress, onCertify,
           </UiText>
         ) : null}
       </Pressable>
-      {card.canCertify ? (
+      {card.canCertify && onCertify ? (
         <UiButton
           disabled={certifying}
           label="Certify"

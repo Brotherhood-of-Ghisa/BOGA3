@@ -29,12 +29,15 @@ jest.mock('@react-native-community/netinfo', () => ({
   default: {
     addEventListener: (listener: MockNetInfoListener) => {
       mockNetInfoListeners.add(listener);
+      // Tests that need "offline" from the first render set it before rendering.
+      if (mockInitialOnline !== null) listener({ isConnected: mockInitialOnline });
       return () => {
         mockNetInfoListeners.delete(listener);
       };
     },
   },
 }));
+let mockInitialOnline: boolean | null = null;
 
 const mockRouter = { push: jest.fn(), replace: jest.fn(), back: jest.fn(), dismissTo: jest.fn() };
 let mockParams: Record<string, string> = {};
@@ -163,7 +166,6 @@ const openGroupAs = async (role: GroupRole) => {
 
 const openExercisesAs = async (role: GroupRole) => {
   await openGroupAs(role);
-  fireEvent.press(screen.getByTestId('group-screen-segment-exercises'));
   await screen.findByTestId('group-exercises-list');
 };
 
@@ -179,6 +181,7 @@ beforeEach(() => {
   jest.restoreAllMocks();
   fixture = createInMemoryDatabase();
   mockNetInfoListeners.clear();
+  mockInitialOnline = null;
   mockParams = { groupId: GROUP_ID };
   mockUseAuth.mockReturnValue({ isConfigured: true, user: { id: USER_ID } });
   api.getGroup.mockResolvedValue(detailFor('owner'));
@@ -191,36 +194,20 @@ afterEach(() => {
   fixture.close();
 });
 
-describe('Group page segments (D10, D14)', () => {
-  it('shows Stream · Exercises · Leaderboards and no Members segment; Stream is the default', async () => {
+describe('Group page (D10, D14)', () => {
+  it('is for managing the group: the header, then its Exercises; no segments, stream or leaderboards', async () => {
     await openGroupAs('member');
-    expect(screen.getByTestId('group-screen-segment-stream')).toBeTruthy();
-    expect(screen.getByTestId('group-screen-segment-exercises')).toBeTruthy();
-    expect(screen.getByTestId('group-screen-segment-leaderboards')).toBeTruthy();
-    expect(screen.queryByTestId('group-screen-segment-members')).toBeNull();
-    expect(await screen.findByTestId('group-screen-stream-empty')).toBeTruthy();
+    expect(screen.getByTestId('group-screen-exercises-title')).toBeTruthy();
+    expect(await screen.findByTestId('group-exercises-list')).toBeTruthy();
+    expect(screen.queryByTestId('group-screen-segment-row')).toBeNull();
+    expect(api.getGroupStream).not.toHaveBeenCalled();
+    expect(api.getGroupBoardPodiums).not.toHaveBeenCalled();
   });
 
   it('opens the Members screen from the header member count', async () => {
     await openGroupAs('member');
     fireEvent.press(screen.getByTestId('group-screen-members-link'));
     expect(mockRouter.push).toHaveBeenCalledWith(`/group/${GROUP_ID}/members`);
-  });
-
-  it('Leaderboards does not read the exercise list (its podiums: groups-leaderboards-screens.test.tsx)', async () => {
-    api.getGroupBoardPodiums.mockResolvedValue({ metric: 'e1rm', certified: true, exercises: [] });
-    await openGroupAs('owner');
-    fireEvent.press(screen.getByTestId('group-screen-segment-leaderboards'));
-    expect(await screen.findByTestId('group-leaderboards-empty')).toBeTruthy();
-    expect(api.listGroupExercises).not.toHaveBeenCalled();
-  });
-
-  it('does not read the exercise list until the Exercises segment opens', async () => {
-    await openGroupAs('owner');
-    expect(api.listGroupExercises).not.toHaveBeenCalled();
-    fireEvent.press(screen.getByTestId('group-screen-segment-exercises'));
-    await screen.findByTestId('group-exercises-list');
-    expect(api.listGroupExercises).toHaveBeenCalledWith(GROUP_ID);
   });
 });
 
@@ -274,7 +261,6 @@ describe('Exercises page (E0.4)', () => {
   it('empty list: admins see Add exercise, members are told admins add them', async () => {
     api.listGroupExercises.mockResolvedValue({ exercises: [] });
     await openGroupAs('member');
-    fireEvent.press(screen.getByTestId('group-screen-segment-exercises'));
     expect(await screen.findByTestId('group-exercises-empty')).toHaveTextContent(/Admins add exercises here/);
     expect(screen.queryByTestId('group-exercises-add-button')).toBeNull();
   });
@@ -282,37 +268,35 @@ describe('Exercises page (E0.4)', () => {
   it('empty list as owner offers Add exercise in the empty state', async () => {
     api.listGroupExercises.mockResolvedValue({ exercises: [] });
     await openGroupAs('owner');
-    fireEvent.press(screen.getByTestId('group-screen-segment-exercises'));
     const empty = await screen.findByTestId('group-exercises-empty');
     expect(within(empty).getByTestId('group-exercises-add-button')).toBeTruthy();
   });
 
-  it('renders the cached list under the offline marker when offline, with no request', async () => {
+  it('renders the cached list under the offline marker when offline', async () => {
     seedCache(groupCacheKeys.group(GROUP_ID), detailFor('owner'));
     seedCache(groupCacheKeys.groupExercises(GROUP_ID), LIST);
+    mockInitialOnline = false;
+    api.getGroup.mockRejectedValue(new GroupApiError('NETWORK', 'Network request failed.'));
+    api.listGroupExercises.mockRejectedValue(new GroupApiError('NETWORK', 'Network request failed.'));
     render(<GroupScreenRoute />);
     await screen.findByText(META.owner);
-    emitNetInfo(false);
-    api.listGroupExercises.mockClear();
-    fireEvent.press(screen.getByTestId('group-screen-segment-exercises'));
     await screen.findByTestId('group-exercises-list');
-    expect(screen.getByText(/Offline · last updated 09:05/)).toBeTruthy();
-    expect(api.listGroupExercises).not.toHaveBeenCalled();
+    expect(await screen.findByText(/Offline · last updated 09:05/)).toBeTruthy();
   });
 
   it('shows the offline empty state when offline with nothing cached', async () => {
+    seedCache(groupCacheKeys.group(GROUP_ID), detailFor('owner'));
+    mockInitialOnline = false;
+    api.listGroupExercises.mockRejectedValue(new GroupApiError('NETWORK', 'Network request failed.'));
     await openGroupAs('owner');
-    emitNetInfo(false);
-    fireEvent.press(screen.getByTestId('group-screen-segment-exercises'));
     expect(await screen.findByTestId('group-screen-exercises-offline-empty-state')).toBeTruthy();
-    expect(api.listGroupExercises).not.toHaveBeenCalled();
   });
 
   it("NOT_FOUND on the list shows \"You're no longer a member\" and evicts the cached list", async () => {
     seedCache(groupCacheKeys.groupExercises(GROUP_ID), LIST);
     api.listGroupExercises.mockRejectedValue(new GroupApiError('NOT_FOUND', 'group not found'));
-    await openGroupAs('owner');
-    fireEvent.press(screen.getByTestId('group-screen-segment-exercises'));
+    api.getGroup.mockResolvedValue(detailFor('owner'));
+    render(<GroupScreenRoute />);
     expect(await screen.findByTestId('group-screen-lost-access')).toBeTruthy();
     await waitFor(() => expect(readGroupCache(fixture.database, groupCacheKeys.groupExercises(GROUP_ID), USER_ID)).toBeNull());
   });

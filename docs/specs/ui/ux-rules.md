@@ -55,13 +55,17 @@ Document app-specific UI semantics and guardrails for the current mobile app.
    - More groups real destinations under Community, Tools, and Library &
      account; account-bound rows are omitted without a user and
      developer-only rows use `isDevMode()`.
-   - Each More row's accessible name includes its visible description. Tab-owned
-     destinations carry `source=more` and show an explicit `Back to More` action;
-     direct routes and non-More origins do not claim that history.
+   - Each More row's accessible name includes its visible description. The
+     Exercise Catalog and Settings rows carry `source=more` and show an explicit
+     `Back to More` action; direct routes and non-More origins do not claim that
+     history. Groups looks the same however it is opened.
 7. Today is a bounded overview, not a second full feed or history screen.
    - An active draft replaces the planned-session action and exposes Resume.
-   - Joined-group activity reuses the group stream cards, membership rows, and
-     offline/error patterns and is limited to the two newest visible items.
+   - Joined-group activity reuses the group stream session cards, record cards,
+     membership rows, and offline/error patterns and is limited to the three
+     newest session, record, or membership items. Records show whether or not
+     they are certified, read-only (no `Certify`); a record or membership row
+     opens the Groups screen on its group.
    - Recent personal activity is limited to the three newest non-deleted
      completed sessions; full history remains owned by Progress.
    - When the separate planning dependency is absent, Today uses the approved
@@ -403,16 +407,16 @@ Guardrail command:
 
 ### 14. Group screens: freshness, pull-to-refresh, and the offline marker (M22)
 
-1. Pull-to-refresh (`RefreshControl`, first used in M22) is the explicit refresh on the group stream lists, My groups, the group screen, and the friend's session view. Only a user pull shows the spinner; the on-focus and 30 s poll refreshes run silently (`components/groups/use-pull-to-refresh.ts`).
+1. Pull-to-refresh (`RefreshControl`, first used in M22) is the explicit refresh on the Groups screen, My groups, the group screen, and the friend's session view. Only a user pull shows the spinner; the on-focus and 30 s poll refreshes run silently (`components/groups/use-pull-to-refresh.ts`).
 2. Group data renders cache-first. When the device is offline or the last refresh failed with `NETWORK`, a warning-surface banner reads `Offline · last updated HH:MM` above the still-visible cached data. With nothing cached, the area shows an offline empty state rather than a spinner.
 3. A non-network failure shows inline with `Retry` beside data that is still shown, or as a whole-area state with `Retry` when nothing is cached. `NOT_FOUND` is lost access, not an error: the group screen reads `You're no longer a member of this group` and the friend view `This session is no longer available`, and cached data is hidden.
-4. Stream session cards are collapsed summaries with no expand; the whole card opens the friend's session view. Membership items are light rows that open their group, and are inert on that group's own screen. Group chips wrap onto more lines rather than scrolling sideways. (M25-T10) A record card sits directly below its session card (the session card reads `N records`); where its session card is not loaded it stays in stream order. Record-removed and link items are light rows that never navigate. Record state is text: `PR · Weight`, `Group record · e1RM`, `Session in progress`, `○ Not certified yet`, `✓ Certified by …`, `Voided · set edited|deleted`.
+4. Stream session cards are collapsed summaries with no expand; the whole card opens the friend's session view. Membership items are light rows that do not navigate on the Groups screen (it already shows their group); on Today they open the Groups screen on their group. The Groups screen always shows exactly one group: its chips (no `All`) wrap onto more lines rather than scrolling sideways, and managing a group is reached only through `My groups`. (M25-T10) A record card sits directly below its session card (the session card reads `N records`); where its session card is not loaded it stays in stream order. Record-removed and link items are light rows that never navigate. Record state is text: `PR · Weight`, `Group record · e1RM`, `Session in progress`, `○ Not certified yet`, `✓ Certified by …`, `Voided · set edited|deleted`.
 5. The friend's session view is read-only (no edit, delete, or append; only the shared title-region collapse), and an active session reads `In progress`.
 6. Signed-out or auth-unconfigured builds show a sign-in-required card on every group route, and no group RPC runs.
 7. Group writes are online-only (M22-T05; contract §7, C3.10.3). Every write — create, edit, join, regenerate, promote / demote, transfer, remove, leave, and the gate's username save — goes through `useGroupAction`: when NetInfo reports offline it is refused before any request with `You're offline. Connect to the internet and try again.`; a transport failure reads `Couldn't reach the server. Nothing was changed — try again when you're online.` Nothing is queued or retried, and the screen's data is unchanged. The message shows inline beside the action (form: above the submit button; group screen / invite: a notice under the header).
 8. Role gating follows contract §4.3 exactly (`groupMemberActionsFor`): members see no Invite, Edit, or member actions; admins can remove members only; the owner can promote, demote, transfer, and remove anyone else, and sees "Transfer ownership before leaving" instead of Leave. Remove, Transfer, Leave, and Regenerate ask for confirmation (`Alert.alert`, destructive style); promote and demote do not. A server `FORBIDDEN` / `NOT_FOUND` on a member write shows inline and refreshes the group.
 9. Create and join run the inline username gate first when the username is blank; a server `USERNAME_REQUIRED` re-opens it with a notice and keeps the entered form values.
-10. The group screen (M25-T08) is `Stream` / `Exercises` / `Leaderboards`. Members open from the header's member-count line (a press target with a chevron), not a segment.
+10. The group screen is for managing the group: the header, then its `Exercises` (no segments). The stream and leaderboards are the Groups screen's `Stream` / `Leaderboards` segment. Members open from the header's member-count line (a press target with a chevron), not a segment.
 11. On Exercises every member sees each group exercise's weight entry and their own link status, read from their local links so it shows offline (`Linked: …` / `Not linked`); archived exercises sit at the bottom marked `Archived`. An active exercise none of theirs is linked to offers `Link your exercise`: the pick sheet with a `Link` confirm, which adds nothing to a session and works offline (a local write). Only the owner and admins see `Add exercise` and the row sheet (`Rename`, `Archive`, or `Unarchive` on an archived row). Archive confirms first (`Alert.alert`, destructive style); rename and unarchive do not. Exercise writes follow rule 7. A server `FORBIDDEN` / `NOT_FOUND` / `VALIDATION` shows inline; the Exercises page and the edit screen then refresh the group and the list, and the add screen refreshes the group (the list refreshes when the group screen regains focus).
 12. Leaderboards (M25-T09). The segment shows one podium card per group exercise on `Certified · e1RM`, cached like the other group screens (rule 2); the whole card opens the full board. State is text, never color alone: my rows read `You`, a former member `(former)`, archived exercises `Archived`, and on All each row `✓` or `○ uncertified`. An empty Certified podium reads `No certified sets yet · N uncertified`; an empty Certified board offers `See all sets`.
 13. Full boards and their history are online-only reads: never cached, no 30 s poll (they refresh on open, a toggle change, focus, and pull), paged on end-of-list with a `Retry` footer after a failed page. With nothing loaded offline they show the offline empty state; rows already loaded stay with the offline marker. A missing group exercise reads "This exercise isn't in this group" and is not lost access.

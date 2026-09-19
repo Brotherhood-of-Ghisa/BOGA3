@@ -12,6 +12,7 @@ const mockStartSyncGateStateBridge = jest.fn();
 const mockStopSyncGateStateBridge = jest.fn();
 const mockRegisterBackgroundSyncTask = jest.fn<Promise<void>, unknown[]>(() => Promise.resolve());
 const mockStackScreen = jest.fn();
+const mockStack = jest.fn();
 
 jest.mock('@/src/data', () => ({
   bootstrapLocalDataLayer: (...args: unknown[]) => mockBootstrapLocalDataLayer(...args),
@@ -76,7 +77,10 @@ jest.mock('react-native-gesture-handler', () => {
 
 jest.mock('expo-router', () => {
   const { View: MockView } = jest.requireActual('react-native');
-  const Stack = ({ children }: { children: ReactNode }) => <MockView testID="root-stack">{children}</MockView>;
+  const Stack = ({ children, screenOptions }: { children: ReactNode; screenOptions?: unknown }) => {
+    mockStack({ screenOptions });
+    return <MockView testID="root-stack">{children}</MockView>;
+  };
   const StackScreen = ({ name, options }: { name: string; options?: unknown }) => {
     mockStackScreen({ name, options });
     return <MockView testID={`screen-${name}`} />;
@@ -129,16 +133,18 @@ describe('RootLayout auth bootstrap wiring', () => {
     expect(screen.getByTestId('screen-connected-agents')).toBeTruthy();
   });
 
-  it('uses an arrow-only native back affordance for the Sessions screen', () => {
+  it('gives every detail screen an arrow-only native back affordance', () => {
     render(<RootLayout />);
 
+    expect(mockStack).toHaveBeenCalledWith({
+      screenOptions: { headerBackButtonDisplayMode: 'minimal' },
+    });
+    // The back item's hidden label (read by VoiceOver) is the previous title: never "(tabs)".
+    expect(mockStackScreen).toHaveBeenCalledWith({ name: '(tabs)', options: { headerShown: false, title: 'Back' } });
+    expect(mockStackScreen).toHaveBeenCalledWith({ name: 'sessions', options: { title: 'Sessions' } });
     expect(mockStackScreen).toHaveBeenCalledWith({
-      name: 'sessions',
-      options: {
-        headerBackButtonDisplayMode: 'minimal',
-        headerBackTitle: 'Back',
-        title: 'Sessions',
-      },
+      name: 'group-session/[memberId]/[sessionId]',
+      options: { title: 'Session' },
     });
   });
 

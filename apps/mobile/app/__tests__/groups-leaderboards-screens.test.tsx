@@ -55,6 +55,7 @@ jest.mock('@/src/auth', () => ({ useAuth: () => mockUseAuth() }));
 jest.mock('@/src/groups/api', () => ({
   ...jest.requireActual('@/src/groups/api'),
   getGroup: jest.fn(),
+  listMyGroups: jest.fn(),
   getGroupStream: jest.fn(),
   listGroupExercises: jest.fn(),
   getGroupBoardPodiums: jest.fn(),
@@ -67,6 +68,7 @@ import {
   GroupApiError,
   groupCacheKeys,
   readGroupCache,
+  setLastViewedGroupId,
   writeGroupCache,
   type BoardHolder,
   type BoardRow,
@@ -78,7 +80,7 @@ import {
 } from '@/src/groups';
 import * as groupsApi from '@/src/groups/api';
 
-import GroupScreenRoute from '../group/[groupId]/index';
+import GroupsTabRoute from '../(tabs)/groups';
 import GroupBoardRoute from '../group/[groupId]/leaderboards/[exerciseId]/index';
 import GroupBoardHistoryRoute from '../group/[groupId]/leaderboards/[exerciseId]/history';
 
@@ -176,7 +178,9 @@ beforeEach(() => {
   mockNetInfoListeners.clear();
   mockInitialOnline = null;
   mockUseAuth.mockReturnValue({ isConfigured: true, user: { id: USER_ID } });
+  setLastViewedGroupId(null);
   api.getGroup.mockResolvedValue(detail);
+  api.listMyGroups.mockResolvedValue({ groups: [detail.group] });
   api.getGroupStream.mockResolvedValue({ items: [], next_cursor: null, has_more: false });
   api.listGroupExercises.mockResolvedValue({ exercises: [BENCH, OLD] });
   api.getGroupBoardPodiums.mockResolvedValue(PODIUMS);
@@ -188,21 +192,20 @@ afterEach(() => {
   fixture.close();
 });
 
-describe('Leaderboards segment (E1.1)', () => {
+describe('Groups screen Leaderboards segment (E1.1)', () => {
   const openLeaderboards = async () => {
     mockParams = { groupId: GROUP_ID };
-    render(<GroupScreenRoute />);
-    await screen.findByTestId('group-screen-name');
-    fireEvent.press(screen.getByTestId('group-screen-segment-leaderboards'));
+    render(<GroupsTabRoute />);
+    fireEvent.press(await screen.findByTestId('groups-segment-leaderboards'));
   };
 
   it('reads podiums only once the segment opens, caches them under boards:<groupId>, and renders the cards', async () => {
     mockParams = { groupId: GROUP_ID };
-    render(<GroupScreenRoute />);
-    await screen.findByTestId('group-screen-name');
+    render(<GroupsTabRoute />);
+    await screen.findByTestId('groups-segment-leaderboards');
     expect(api.getGroupBoardPodiums).not.toHaveBeenCalled();
 
-    fireEvent.press(screen.getByTestId('group-screen-segment-leaderboards'));
+    fireEvent.press(screen.getByTestId('groups-segment-leaderboards'));
     const bench = await screen.findByTestId(`group-podium-card-${EXERCISE_ID}`);
     expect(api.getGroupBoardPodiums).toHaveBeenCalledWith(GROUP_ID);
 
@@ -226,7 +229,7 @@ describe('Leaderboards segment (E1.1)', () => {
   });
 
   it('offline: renders cached podiums with the offline marker, and requests nothing', async () => {
-    seedCache(groupCacheKeys.group(GROUP_ID), detail);
+    seedCache(groupCacheKeys.mine, { groups: [detail.group] });
     seedCache(groupCacheKeys.boards(GROUP_ID), PODIUMS);
     mockInitialOnline = false;
     await openLeaderboards();
@@ -237,22 +240,22 @@ describe('Leaderboards segment (E1.1)', () => {
   });
 
   it('offline with no cached podiums: the offline empty state', async () => {
-    seedCache(groupCacheKeys.group(GROUP_ID), detail);
+    seedCache(groupCacheKeys.mine, { groups: [detail.group] });
     mockInitialOnline = false;
     await openLeaderboards();
     expect(await screen.findByTestId('group-leaderboards-offline-empty-state')).toBeTruthy();
   });
 
-  it('NOT_FOUND shows lost access and evicts the group', async () => {
+  it('NOT_FOUND evicts the podiums and re-reads My groups, which drops the group', async () => {
     await openLeaderboards();
     await screen.findByTestId(`group-podium-card-${EXERCISE_ID}`);
     api.getGroupBoardPodiums.mockRejectedValue(new GroupApiError('NOT_FOUND', 'group not found'));
-    api.getGroup.mockRejectedValue(new GroupApiError('NOT_FOUND', 'group not found'));
+    api.listMyGroups.mockResolvedValue({ groups: [] });
 
-    fireEvent(screen.getByTestId('group-screen-segment-stream'), 'press');
-    fireEvent.press(screen.getByTestId('group-screen-segment-leaderboards'));
+    fireEvent(screen.getByTestId('groups-segment-stream'), 'press');
+    fireEvent.press(screen.getByTestId('groups-segment-leaderboards'));
 
-    expect(await screen.findByTestId('group-screen-lost-access')).toBeTruthy();
+    expect(await screen.findByTestId('groups-empty-state')).toBeTruthy();
     await waitFor(() => expect(cacheKeys()).not.toContain(groupCacheKeys.boards(GROUP_ID)));
   });
 });
