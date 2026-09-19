@@ -76,7 +76,7 @@ codebase areas/changes should trigger it — by path/area). Infrastructure value
 | Script | Purpose | Infrastructure | When to run (paths/areas) |
 |---|---|---|---|
 | `npm run lint` | `expo lint` (ESLint flat config). Enforces the repo lint rules, including the `no-restricted-globals` ban on `__DEV__` (use `isDevMode()` instead). | none | Any `apps/mobile/**` source change. Part of the fast gate (`./boga test fast`) and CI. |
-| `npm run lint:ui-guardrails` | Standalone guardrail (`scripts/check-ui-guardrails.js`): flags raw color literals (hex / `rgb(a)`) in `apps/mobile/app/**` and `components/**`. NOT wired into `lint`, ESLint, any gate wrapper, or CI — invoke it directly. | none | UI/styling changes under `apps/mobile/app/**` or `apps/mobile/components/**` where the design-token guardrail matters. |
+| `npm run lint:ui-guardrails` | Design-token guardrail (`scripts/check-ui-guardrails.js`) over `apps/mobile/app/**` and `components/**`. Blocks raw color literals (hex / `rgb(a)`) outright; holds raw `fontSize` / spacing / `borderRadius` counts to the budgets in `scripts/ui-guardrails.config.js`, which fail both over AND under so they can only fall (`--update-budgets` lowers them; `--verbose` lists violations). Separate from ESLint — it is the `ui-guardrails` lane of the fast gate and a CI step, not part of `npm run lint`. | none | Any `apps/mobile/app/**` or `apps/mobile/components/**` change. Part of the fast gate (`./boga test fast`) and CI. |
 | `npm run typecheck` | Regenerates router types (`router:types`) then `tsc --noEmit`. | none | Any `apps/mobile/**` TS change. Part of the fast gate (`./boga test fast`) and CI. |
 | `npm test` | Full Jest unit/integration suite. Bare `jest` — deliberately **no `--forceExit`** (see *Unit-test hang safety*). Excludes infra-dependent sync tests (they live behind `test:sync:infra`). | none | Any `apps/mobile/**` change. Part of the fast gate (`./boga test fast`) and CI. |
 | `npm run test:sync` | `jest app/__tests__/sync` — the sync-focused subset (still infra-free; the infra-dependent files in that dir fail fast without an endpoint and are normally run via `test:sync:infra`). | none | Targeted feedback while editing mobile sync code under `apps/mobile/app/__tests__/sync/**` or the sync runtime it covers. |
@@ -181,7 +181,7 @@ visual evidence.
   are all infra-free lanes marked CI-enabled in the registry.
 - **Not in CI:** the iOS Maestro slow gates (`boga test frontend`) and the
   local-Supabase agent/sync/MCP contract suites (`boga test backend`) are local-only,
-  along with `lint:ui-guardrails` and `db:generate:canary`. **Local-only means you
+  along with `db:generate:canary`. **Local-only means you
   run them on your dev machine — not that they can't be run: this environment boots
   the iOS simulator and local Supabase (verify + run per
   `02-quality-and-test-gates.md`). Do not record a slow gate as "deferred" because

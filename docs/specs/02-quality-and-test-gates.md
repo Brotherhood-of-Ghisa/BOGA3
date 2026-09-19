@@ -88,6 +88,7 @@ get from `./boga timings` or a run.
 | lint | `./boga test lint` | `boga test fast` (frontend half) | ✅ | ~1.6s |
 | typecheck | `./boga test typecheck` | `boga test fast` (frontend half) | ✅ | ~2.9s |
 | jest-full | `./boga test jest-full` | `boga test fast` (frontend half) | ✅ | ~7.6s |
+| ui-guardrails | `./boga test ui-guardrails` | `boga test fast` (frontend half) | ✅ | ~0.4s |
 | docs-check | `./boga test docs-check` | `boga test fast` (repo half) | ✅ | ~0.1s |
 | meta-tests | `./boga test meta-tests` | `boga test fast` (repo half) | ✅ | ~1.2s |
 | agent-auth-web | `./boga test agent-auth-web` | `boga test fast` (repo half) | ✅ | ~3.3s |

@@ -12,7 +12,13 @@ export default ({ config }: { config: ExpoConfig }) => ({
     orientation: "portrait",
     icon: "./assets/images/icon.png",
     scheme: "boga3",
-    userInterfaceStyle: "automatic",
+    // Light-only by decision (2026-09-19). Dark mode is explicitly not a
+    // product goal, and "automatic" is not free: it hands the OS-owned
+    // chrome — Alert.alert dialogs, the keyboard, native pickers — a dark
+    // appearance over an app that renders one light theme. Pinning "light"
+    // keeps that chrome consistent with the tokens in
+    // components/ui/tokens.ts, which have no dark variants.
+    userInterfaceStyle: "light",
     newArchEnabled: true,
 
     ios: {
