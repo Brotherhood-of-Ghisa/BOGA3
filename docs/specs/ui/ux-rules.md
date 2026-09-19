@@ -299,17 +299,78 @@ Document app-specific UI semantics and guardrails for the current mobile app.
    `breakdown=exercise|muscle` values. Absent or invalid values retain the
    seven-day / By Exercise defaults; in-screen changes remain volatile state.
 
-### 9. UI guardrail enforcement (current enforced rule)
+### 9. UI guardrail enforcement (current enforced rules)
+
+Enforced by `apps/mobile/scripts/check-ui-guardrails.js`, which runs as the
+`ui-guardrails` lane of `boga test fast` and as a CI step. It scans
+`apps/mobile/app/**/*.tsx` and `apps/mobile/components/**/*.tsx`, excluding
+tests, snapshots and stories.
+
+**Zero-tolerance rule (blocks on sight):**
 
 1. Do not add raw color literals (`#hex`, `rgb(...)`, `rgba(...)`) directly in screen/component `.tsx` files.
 2. Use UI tokens from `apps/mobile/components/ui/tokens.ts` directly or through primitives in `apps/mobile/components/ui/`.
 3. Temporary exceptions require an explicit allowlist entry and rationale in `apps/mobile/scripts/ui-guardrails.config.js`.
 4. As of Task `T-20260226-06`, the current route screens (`stats-history`, `session-recorder`, `exercise-catalog`, `completed-session/[sessionId]`) no longer require raw-color allowlist exceptions.
 
-Guardrail command:
+**Ratchet rules (budgeted, may only fall):**
 
-- Run from `apps/mobile/`: `npm run lint:ui-guardrails`
-- Audit mode: `npm run lint:ui-guardrails -- --include-allowlisted`
+5. `rawFontSize`, `rawSpacing` and `rawRadius` flag numeric literals for
+   `fontSize`, the `padding`/`margin`/`gap` family, and the `borderRadius`
+   family. Use `uiTypography.size.*`, `uiSpace.*` and `uiRadius.*` instead.
+6. Each carries a `budget` in `apps/mobile/scripts/ui-guardrails.config.js`
+   equal to the count that exists today. The check fails when a change goes
+   **over** budget, and equally when it drops **under** budget without lowering
+   the number — so a budget only ever travels downwards.
+7. **Raising a budget is never the fix for a failure.** After removing raw
+   values, lower the budget with `--update-budgets` (below) in the same change.
+8. `0` is not counted for spacing or radius: it is the absence of the value, not
+   a point on the scale.
+
+Guardrail commands (run from `apps/mobile/`):
+
+- `npm run lint:ui-guardrails`
+- Audit mode (colour): `npm run lint:ui-guardrails -- --include-allowlisted`
+- Per-violation detail for the ratchet rules: `npm run lint:ui-guardrails -- --verbose`
+- Lower budgets after a cleanup: `npm run lint:ui-guardrails -- --update-budgets`
+
+### 9a. Token scale decisions (targets for the ratchet)
+
+The ratchet budgets exist because the scales below are not yet what the app
+uses. These are the agreed targets; migration is incremental and each step
+lowers a budget.
+
+1. **Body text is 14px.** Decided 2026-09-19. `uiTypography.size.base` stays at
+   14; larger body was considered for gym-floor legibility and rejected in
+   favour of density in the recorder.
+2. **Type collapses to 7 sizes** — `11, 12, 13, 14, 16, 18, 24`. Today 14
+   distinct sizes ship. `9` and `10` fold up into `11` (a legibility gain);
+   `15` and `17` fold to `14`/`16`; `20`, `22` and `26` fold to `18`/`24`.
+3. **Uppercase is one role.** Only the 11px micro-label role uses
+   `textTransform: 'uppercase'`; it is not applied at other sizes.
+4. **Every text role declares a line-height.** Today 42 of ~197 text styles set
+   one, so vertical rhythm is font-dependent.
+5. **Radius collapses to 3 values** — `8` (controls), `12` (surfaces), `999`
+   (pills). Today 10 distinct radii ship; `8` and `12` already carry the
+   majority.
+6. **Spacing targets 6 steps** — `4, 8, 12, 16, 24, 32`. Today's `uiSpace`
+   interleaves `10`, `14` and `20`, which makes every value on-scale and the
+   scale non-constraining.
+7. **Elevation is a missing axis.** There are no shadows anywhere; every
+   surface is a 1px border on white, which is why page cards, modals, sheets
+   and the tab tray read as one flat layer. Three levels are intended: flat
+   (border only), raised (card), overlay (sheet/modal).
+
+### 9b. Appearance: light only
+
+1. The app ships **one light theme**. Dark mode is explicitly not a product
+   goal (decided 2026-09-19), and `uiColors` carries no dark variants.
+2. `app.config.ts` therefore pins `userInterfaceStyle: "light"`. It must not be
+   set back to `"automatic"` while the tokens are single-theme: `"automatic"`
+   hands the OS-owned chrome — `Alert.alert` dialogs, the keyboard, native
+   pickers — a dark appearance over light app content.
+3. `app/_layout.tsx` keeps `<StatusBar style="dark" />` (dark glyphs on the
+   light surface), which is consistent with the above.
 
 ### 10. Exercise-tag interaction semantics
 

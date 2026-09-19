@@ -15,6 +15,7 @@
 lint	fast-frontend	none	yes	apps/mobile	npm run lint
 typecheck	fast-frontend	none	yes	apps/mobile	npm run typecheck
 jest-full	fast-frontend	none	yes	apps/mobile	npm test
+ui-guardrails	fast-frontend	none	yes	apps/mobile	npm run lint:ui-guardrails
 docs-check	fast-repo	none	yes	.	./scripts/gen-docs.sh check
 meta-tests	fast-repo	none	yes	.	./scripts/tests/run-meta-tests.sh
 agent-auth-web	fast-repo	none	yes	.	./scripts/test-agent-auth-web.sh
