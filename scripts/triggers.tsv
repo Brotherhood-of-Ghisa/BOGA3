@@ -25,8 +25,8 @@ apps/mobile/src/groups/set-facts.ts	groups-leaderboards	group set rules the grou
 apps/mobile/src/exercise-calculations/**	groups-leaderboards	calculations the group-eval function loads
 apps/mobile/src/session-recorder/set-semantics.ts	groups-leaderboards	set semantics the group-eval function loads
 apps/mobile/src/**	fast	mobile TS/JS logic
-apps/mobile/*.json	fast	mobile config (native dep change ⇒ also rebuild dev client + frontend, see spec 02)
-apps/mobile/*.ts	fast	mobile config
+apps/mobile/*.json	fast	mobile config (native iOS dep change ⇒ also rebuild dev client + frontend, see spec 02)
+apps/mobile/*.ts	fast	mobile config (iOS native field change ⇒ rebuild dev client + frontend; Android-only fields exempt, see spec 02)
 apps/agent-auth-web/scripts/**	fast,mcp-smoke	agent OAuth local smoke helper
 apps/agent-auth-web/**	fast	agent OAuth consent web
 services/boga-mcp/**	fast,mcp-smoke	MCP protocol/API translation

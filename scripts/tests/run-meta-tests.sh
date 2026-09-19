@@ -2,7 +2,8 @@
 
 # run-meta-tests.sh — infra-free self-tests for the repo meta-tooling
 # (gen-docs.sh, test-for.sh, pr-check.sh), the Maestro fixture-user rule, and
-# the worktree lifecycle (temp git repos + stub gh/docker).
+# the worktree lifecycle (temp git repos + stub gh/docker), and Android
+# launchers (stub adb/Expo/JDK).
 # Runs as the `meta-tests` lane (fast gate, repo half; see scripts/lanes.tsv)
 # and in CI.
 
@@ -18,6 +19,7 @@ TESTS=(
   "supabase-cli-version.test.sh"
   "supabase-exit-trap-guard.test.sh"
   "worktree-lifecycle.test.sh"
+  "android-launcher.test.sh"
 )
 
 failed=0

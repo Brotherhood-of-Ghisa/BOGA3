@@ -20,6 +20,10 @@ Human-operator guide for local development, runtime operations, logs, and tests 
   - [Dev-client loop (matches Maestro runtime)](#dev-client-loop-matches-maestro-runtime)
   - [Wipe the app completely on the Simulator](#wipe-the-app-completely-on-the-simulator)
   - [Automated uninstall/reinstall via smoke lane](#automated-uninstallreinstall-via-smoke-lane)
+- [Run the app on the Android Emulator](#run-the-app-on-the-android-emulator)
+  - [Prerequisites (Android)](#prerequisites-android)
+  - [Dev-client loop (matches native runtime)](#dev-client-loop-matches-native-runtime)
+  - [Wipe the app on the Android Emulator](#wipe-the-app-on-the-android-emulator)
 - [Run a development build on a physical iPhone](#run-a-development-build-on-a-physical-iphone)
   - [One-stop: dev-lan.sh](#one-stop-dev-lansh)
   - [Outside the LAN (Tailscale): dev-remote.sh](#outside-the-lan-tailscale-dev-remotesh)
@@ -169,6 +173,94 @@ The smoke runner uses a full reset path and reinstalls automatically:
 cd apps/mobile
 TASK_ID=ad-hoc npm run test:e2e:ios:smoke
 ```
+
+## Run the app on the Android Emulator
+
+### Prerequisites (Android)
+
+- Android SDK with platform-tools and emulator CLI. The helper honors `ANDROID_HOME`,
+  then a valid legacy `ANDROID_SDK_ROOT`, then standard install locations including
+  `~/Library/Android/sdk` on macOS and `~/Android/Sdk` on Linux.
+- Java 17 or 21 (Gradle 8.x is compatible with Java 17 and 21; Java 25+ is rejected by Gradle).
+- An AVD configured (e.g. `Pixel_10_Pro`).
+
+Before running Android or Gradle commands directly in your shell (such as `emulator`, `adb`, or `npx expo run:android`), source the repository's Android and Java environment helpers in your current shell:
+
+```bash
+source scripts/android-env.sh
+source scripts/java-env.sh
+```
+
+This ensures `ANDROID_HOME`, `adb`, and `emulator` are on your `PATH`, and sets `JAVA_HOME` to a compatible JDK (17 or 21, clearing any incompatible Java 25+). (Note: `./boga` commands such as `./boga android run` source these automatically).
+
+Check capability:
+
+```bash
+./boga doctor --android
+# or: ./boga android doctor
+```
+
+### Dev-client loop (matches native runtime)
+
+1. Ensure your shell environment is set and boot the emulator:
+
+```bash
+source scripts/android-env.sh
+source scripts/java-env.sh
+emulator -avd Pixel_10_Pro &
+adb wait-for-device
+```
+
+2. Configure the backend and mobile app environment:
+
+- **Main checkout (slot 0):** Boot the dedicated human-development backend (`BOGA-dev`, port 65431), provision dev accounts, and write `apps/mobile/.env.local`:
+  ```bash
+  ./boga env dev
+  ```
+  *(This runs the dev baseline via `./boga db dev`, seeds dev accounts `a@dev.local`/`b@dev.local`, and writes `EXPO_PUBLIC_SUPABASE_URL=http://127.0.0.1:65431` and the dev stack `ANON_KEY` to `apps/mobile/.env.local`.)*
+
+- **Linked worktrees (slot > 0):** Per spec 12, linked worktrees must not use `BOGA-dev`. Boot the worktree's isolated slot stack:
+  ```bash
+  ./boga db up
+  ```
+  *(This boots the worktree's slot-isolated Supabase on port `55431 + 100 * slot` and automatically configures `apps/mobile/.env.local`.)*
+
+3. Build and launch the development build:
+
+```bash
+./boga android run
+```
+
+The launcher evaluates the worktree's generated Metro port (`8082 + slot`),
+validates it, pins the Supabase values from `apps/mobile/.env.local`, and runs
+`adb reverse` for Metro and the local API port in `EXPO_PUBLIC_SUPABASE_URL`.
+That selects port 65431 for `BOGA-dev` or the actual slot port in a linked
+worktree; hosted/LAN backends need no API reverse. Keep one Android target
+connected, or select it with `ANDROID_SERIAL`.
+
+Alternatively, split compilation and Metro into two terminals:
+
+```bash
+# Terminal 1 (compile & launch):
+./boga android run --no-bundler
+
+# Terminal 2 (start Metro bundler):
+./boga android start
+```
+
+Both commands configure the matching reverse ports. To override Metro, pass
+`--port 8099` (or `--port=8099`) to both commands; the same port is passed to
+Expo and `adb reverse`.
+
+### Wipe the app on the Android Emulator
+
+To clear the SQLite database and app sandbox:
+
+```bash
+adb shell pm clear com.phano.boga3.dev
+```
+
+Or via the emulator GUI: `Settings` → `Apps` → `BOGA3` → `Storage` → `Clear Storage`.
 
 ## Run a development build on a physical iPhone
 

@@ -13,14 +13,15 @@
 #   boga test for [--diff <range>] [paths...]  # which gates does a change require?
 #   boga pr check --body <file|->              # validate a PR body's Tests table
 #   boga pr wait [--interval <s>]              # block until this branch's PR merges/closes
-#   boga doctor                                # can THIS machine run every lane?
+#   boga doctor [--android]                    # can THIS machine run every lane (or Android dev)?
+#   boga android doctor|run|start              # verify Android environment or run dev client
 #   boga docs gen|check                        # (re)generate / drift-check derived doc blocks
 #   boga timings [lane]                        # measured durations (never guess)
 #   boga worktree create|start|ls|release|doctor   # agent-owned lifecycle (spec 01)
 #   boga db up|down|reset|baseline             # this slot's stack (gates)
 #   boga db dev|dev-up|dev-down|dev-reset       # dedicated dev stack (BOGA-dev), isolated from gates
 #   boga ios build-client|start
-#   boga env lan|hosted|tailscale
+#   boga env dev|lan|hosted|tailscale
 #   boga task bootstrap|closeout
 #
 # `test` (except --list / for), `db`, `ios`, and `env` fail hard without this
@@ -40,6 +41,10 @@ source "${REPO_ROOT}/scripts/worktree-lib.sh"
 source "${REPO_ROOT}/scripts/lane-timing.sh"
 # shellcheck disable=SC1091
 source "${REPO_ROOT}/scripts/java-env.sh"
+if [[ -f "${REPO_ROOT}/scripts/android-env.sh" ]]; then
+  # shellcheck disable=SC1091
+  source "${REPO_ROOT}/scripts/android-env.sh"
+fi
 
 usage() {
   awk 'NR > 2 && /^#/ { sub(/^# ?/, ""); print; next } NR > 2 { exit }' "${BASH_SOURCE[0]}"
@@ -149,7 +154,114 @@ cmd_test() {
   esac
 }
 
+cmd_android_doctor() {
+  echo "[boga doctor --android] Android capability checks"
+  local ok=0
+  check() {
+    local label="$1"; shift
+    if "$@" >/dev/null 2>&1; then
+      echo "  OK   ${label}"
+    else
+      echo "  FAIL ${label}  (fix this, then Android builds run)"
+      ok=1
+    fi
+  }
+  check "Android SDK (ANDROID_HOME)" test -n "${ANDROID_HOME:-}" -a -d "${ANDROID_HOME:-}"
+  check "adb (Android platform tools)" adb version
+  check "emulator (Android emulator CLI)" emulator -version
+  check_gradle_java() {
+    local java_bin=""
+    if [[ -n "${JAVA_HOME:-}" ]]; then
+      if [[ ! -d "${JAVA_HOME}" || ! -x "${JAVA_HOME}/bin/java" ]]; then
+        return 1
+      fi
+      java_bin="${JAVA_HOME}/bin/java"
+    elif command -v java >/dev/null 2>&1; then
+      java_bin="$(command -v java)"
+    else
+      return 1
+    fi
+    local ver
+    ver="$("${java_bin}" -version 2>&1 | head -n 1 | awk -F '"' '{print $2}' | cut -d'.' -f1)"
+    [[ "$ver" == "17" || "$ver" == "21" ]]
+  }
+  check "java runtime for Gradle is Java 17 or 21 (JAVA_HOME / PATH)" check_gradle_java
+  check_android_target() {
+    local avds
+    avds="$(emulator -list-avds 2>/dev/null || true)"
+    if [[ -n "${avds}" ]]; then
+      return 0
+    fi
+    local dev_count
+    dev_count="$(adb devices 2>/dev/null | grep -v "List of devices" | grep -c "device$" || true)"
+    (( dev_count > 0 ))
+  }
+  check "Android device target (AVD created or device connected)" check_android_target
+  return "${ok}"
+}
+
+cmd_android_launch() {
+  local action="$1"
+  shift
+  ensure_mobile_deps
+  local mobile_dir="${REPO_ROOT}/apps/mobile"
+  local slot port
+  slot="$(boga_read_slot_file "${REPO_ROOT}")"
+  port="$(boga_port_for_slot expo "${slot}")"
+  local maestro_env="${mobile_dir}/.maestro/maestro.env.local"
+  if [[ -f "${maestro_env}" ]]; then
+    # This trusted, generated file contains shell defaults, not dotenv values.
+    # Keep its iOS-specific settings out of this launcher.
+    port="$(source "${maestro_env}"; printf '%s' "${EXPO_DEV_SERVER_PORT:-${port}}")"
+  else
+    port="${EXPO_DEV_SERVER_PORT:-${port}}"
+  fi
+  local expo_args=()
+  while (( $# )); do
+    case "$1" in
+      --port) (( $# >= 2 )) || fail "--port requires a number"; port="$2"; shift 2 ;;
+      --port=*) port="${1#--port=}"; shift ;;
+      *) expo_args+=("$1"); shift ;;
+    esac
+  done
+  [[ "${port}" =~ ^[0-9]{1,5}$ ]] && (( 10#${port} >= 1 && 10#${port} <= 65535 )) \
+    || fail "Android Metro port must be a number from 1 to 65535 (got '${port}')"
+  export EXPO_DEV_SERVER_PORT="${port}"
+  if [[ -f "${mobile_dir}/.env.local" ]]; then
+    # shellcheck disable=SC1091
+    source "${REPO_ROOT}/scripts/dev/export-mobile-supabase-env.sh" "${mobile_dir}/.env.local"
+  fi
+  local api_port
+  api_port="$(node -e '
+    const value = process.env.EXPO_PUBLIC_SUPABASE_URL;
+    if (!value) process.exit(0);
+    const url = new URL(value);
+    if (["127.0.0.1", "localhost", "[::1]"].includes(url.hostname)) {
+      console.log(url.port || (url.protocol === "https:" ? "443" : "80"));
+    }
+  ')" || fail "Invalid EXPO_PUBLIC_SUPABASE_URL"
+  command -v adb >/dev/null 2>&1 || fail "adb is missing; run ./boga doctor --android"
+  adb reverse "tcp:${port}" "tcp:${port}" \
+    || fail "Could not forward Metro; boot/connect one Android target (or set ANDROID_SERIAL)"
+  if [[ -n "${api_port}" ]]; then
+    adb reverse "tcp:${api_port}" "tcp:${api_port}" \
+      || fail "Could not forward the local Supabase API port ${api_port}"
+  fi
+  echo "[boga android ${action}] launching Expo (Metro port ${port})"
+  if [[ "${action}" == "run" ]]; then
+    (cd "${mobile_dir}" && exec npx expo run:android --port "${port}" ${expo_args[@]+"${expo_args[@]}"})
+  else
+    (cd "${mobile_dir}" && exec npx expo start --dev-client --port "${port}" ${expo_args[@]+"${expo_args[@]}"})
+  fi
+}
+
 cmd_doctor() {
+  local target="${1:-}"
+  if [[ "${target}" == "--android" || "${target}" == "android" ]]; then
+    cmd_android_doctor
+    return $?
+  fi
+
   echo "[boga doctor] capability checks — a FAIL is a bootstrap gap to fix, not a reason to skip a lane"
   local ok=0
   check() {
@@ -187,7 +299,15 @@ shift || true
 
 case "${cmd}" in
   test)     cmd_test "$@" ;;
-  doctor)   cmd_doctor ;;
+  doctor)   cmd_doctor "$@" ;;
+  android)
+    sub="${1:-doctor}"; shift || true
+    case "${sub}" in
+      doctor) cmd_android_doctor "$@" ;;
+      run|start) require_lease; cmd_android_launch "${sub}" "$@" ;;
+      *) fail "usage: boga android doctor | run [--no-bundler] [...] | start [...]" ;;
+    esac
+    ;;
   pr)
     sub="${1:-}"; shift || true
     case "${sub}" in
@@ -240,9 +360,10 @@ case "${cmd}" in
     sub="${1:-}"; shift || true
     case "${sub}" in
       lan)       dispatch_script "${REPO_ROOT}/scripts/dev/use-local-mobile-lan-env.sh" "$@" ;;
+      dev)       dispatch_script "${REPO_ROOT}/scripts/dev/use-local-mobile-dev-env.sh" "$@" ;;
       hosted)    dispatch_script "${REPO_ROOT}/scripts/dev/use-hosted-mobile-env.sh" "$@" ;;
       tailscale) dispatch_script "${REPO_ROOT}/scripts/dev/use-local-mobile-tailscale-env.sh" "$@" ;;
-      *) fail "usage: boga env lan|hosted|tailscale   (full phone sessions: scripts/dev/dev-lan.sh on-LAN, scripts/dev/dev-remote.sh over Tailscale)" ;;
+      *) fail "usage: boga env dev|lan|hosted|tailscale   (full phone sessions: scripts/dev/dev-lan.sh on-LAN, scripts/dev/dev-remote.sh over Tailscale)" ;;
     esac
     ;;
   task)

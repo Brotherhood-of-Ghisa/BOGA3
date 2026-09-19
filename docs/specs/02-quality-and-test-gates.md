@@ -153,19 +153,22 @@ it on every PR). The table below is the human summary; keep both in sync.
 | Group evaluator (`supabase/functions/group-eval/**`, the TS it loads: `src/groups/set-facts.ts`, `src/exercise-calculations/**`, `src/session-recorder/set-semantics.ts`) | the rows above **+** `./boga test groups-leaderboards` (already inside `boga test backend`) |
 | Agent consent web (`apps/agent-auth-web/**`) | `./boga test fast` |
 | MCP server (`services/boga-mcp/**`) | `./boga test fast` **+** `./boga test mcp-smoke` |
-| Added/removed/upgraded a **native** dependency (iOS pod, native Expo module, or a native field / config plugin in `apps/mobile/app.config.ts`) | **First** `./boga ios build-client --force`, then `./boga test frontend` |
+| Added/removed/upgraded a **native iOS** dependency (iOS pod, native Expo module, or an iOS-affecting native field / config plugin in `apps/mobile/app.config.ts`) | **First** `./boga ios build-client --force`, then `./boga test frontend` |
 
 Run the gate(s) for your change **to green before opening the PR**, and put the
 evidence (command output / Maestro artifact path) in the PR. A pure-JS or
 config-only change never needs the dev-client rebuild (Metro bundles it at
-runtime); a native change always does, or every worktree's Maestro run fails at
-boot with `Cannot find native module`.
+runtime); a native iOS change always does, or every worktree's Maestro run fails at
+boot with `Cannot find native module`. Android-only fields in `app.config.ts` (e.g.
+`android.package`, Android icons) do not alter the iOS dev-client binary or affect
+iOS Maestro lanes and are exempt from the iOS dev-client rebuild and frontend gate.
 
 ## What CI runs
 
 CI (`.github/workflows/ci.yml`) runs every infra-free lane marked `CI? ✅`:
 mobile `lint`, `typecheck`, and `jest-full`; repository `docs-check` and
-`meta-tests`; the consent-web `agent-auth-web` lane; the MCP `mcp-unit` lane;
+`meta-tests` (including stubbed Android launcher/SDK regression fixtures);
+the consent-web `agent-auth-web` lane; the MCP `mcp-unit` lane;
 and the extra `handles` guard. It installs each workspace from its own lockfile.
 `test:handles` is `jest --detectOpenHandles`; CI runs it on every PR, so you only
 need it locally when you touched timers, sockets, subscriptions, or async

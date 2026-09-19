@@ -140,8 +140,8 @@ it. Instead, native-cache freshness is the author's responsibility:
 - **When you add, remove, or upgrade a NATIVE dependency** — any package that
   ships an iOS pod / native Expo module (for example `expo-task-manager`,
   `expo-background-task`, `expo-network`, or anything added via `npx expo install`
-  that has native code), or you change a config plugin / native field in
-  `app.config.ts` — you MUST force a rebuild of the shared dev client before
+  that has native code), or you change a config plugin / native iOS field in
+  `app.config.ts` (Android-only fields like `android.package` are exempt) — you MUST force a rebuild of the shared dev client before
   running the iOS Maestro gates:
 
   ```bash
