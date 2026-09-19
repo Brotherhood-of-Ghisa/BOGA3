@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { uiColors } from '@/components/ui';
+import { uiColors, uiRadius, uiSpace, uiTypography } from '@/components/ui';
 import { LOAD_INPUT_MODES, LOAD_INPUT_MODE_LABELS, type LoadInputMode } from '@/src/exercise-core';
 
 type ExerciseCoreFieldsProps = {
@@ -84,19 +84,19 @@ export function ExerciseCoreFields({
 
 const styles = StyleSheet.create({
   root: {
-    gap: 10,
+    gap: uiSpace.md,
   },
   fieldLabel: {
-    fontSize: 12,
+    fontSize: uiTypography.size.sm,
     fontWeight: '600',
     color: uiColors.textSecondary,
   },
   input: {
     borderWidth: 1,
     borderColor: uiColors.borderDefault,
-    borderRadius: 8,
+    borderRadius: uiRadius.sm,
     backgroundColor: uiColors.surfaceDefault,
-    paddingHorizontal: 10,
+    paddingHorizontal: uiSpace.md,
     paddingVertical: 9,
   },
   nameInput: {
@@ -107,17 +107,17 @@ const styles = StyleSheet.create({
     borderColor: uiColors.actionDanger,
   },
   helperText: {
-    fontSize: 13,
+    fontSize: uiTypography.size.md,
     color: uiColors.textSecondary,
   },
   errorText: {
-    fontSize: 13,
+    fontSize: uiTypography.size.md,
     color: uiColors.actionDanger,
     fontWeight: '500',
   },
   loadModeRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: uiSpace.sm,
   },
   loadModeButton: {
     flex: 1,
@@ -126,9 +126,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: uiColors.borderDefault,
-    borderRadius: 8,
+    borderRadius: uiRadius.sm,
     backgroundColor: uiColors.surfaceDefault,
-    paddingHorizontal: 10,
+    paddingHorizontal: uiSpace.md,
   },
   loadModeButtonSelected: {
     borderColor: uiColors.actionPrimary,

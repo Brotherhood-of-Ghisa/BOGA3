@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { uiColors } from '@/components/ui';
+import { uiColors, uiRadius, uiSpace, uiTypography } from '@/components/ui';
 
 import { SessionSummaryLine } from './session-summary-line';
 import type { SessionListItem } from './types';
@@ -101,12 +101,12 @@ export function ActiveSessionRow({
 
 const styles = StyleSheet.create({
   sessionRow: {
-    borderRadius: 12,
+    borderRadius: uiRadius.lg,
     borderWidth: 1,
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfaceDefault,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    paddingHorizontal: uiSpace.md,
+    paddingVertical: uiSpace.sm,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
@@ -127,7 +127,7 @@ const styles = StyleSheet.create({
   iconActionButton: {
     width: 28,
     height: 28,
-    borderRadius: 8,
+    borderRadius: uiRadius.sm,
     borderWidth: 1,
     paddingHorizontal: 0,
     paddingVertical: 0,
@@ -144,7 +144,7 @@ const styles = StyleSheet.create({
   },
   iconGlyphText: {
     color: uiColors.actionNeutralSubtleText,
-    fontSize: 14,
+    fontSize: uiTypography.size.base,
     fontWeight: '700',
     lineHeight: 16,
   },
@@ -155,7 +155,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: uiSpace.screen,
   },
   modalOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -164,17 +164,17 @@ const styles = StyleSheet.create({
   modalPanel: {
     width: '100%',
     maxWidth: 360,
-    borderRadius: 14,
+    borderRadius: uiRadius.xl,
     borderWidth: 1,
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfaceDefault,
-    padding: 14,
-    gap: 10,
+    padding: uiSpace.xl,
+    gap: uiSpace.md,
   },
   modalActionButton: {
-    borderRadius: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 10,
+    borderRadius: uiRadius.md,
+    paddingHorizontal: uiSpace.sm,
+    paddingVertical: uiSpace.md,
     alignItems: 'center',
     justifyContent: 'center',
   },

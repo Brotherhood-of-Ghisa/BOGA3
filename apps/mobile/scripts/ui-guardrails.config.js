@@ -27,15 +27,15 @@ module.exports = {
 
   ratchetRules: {
     rawFontSize: {
-      budget: 196,
+      budget: 36,
       allowlistedFiles: [],
     },
     rawSpacing: {
-      budget: 416,
+      budget: 78,
       allowlistedFiles: [],
     },
     rawRadius: {
-      budget: 130,
+      budget: 11,
       allowlistedFiles: [],
     },
   },

@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { UiButton, UiSurface, UiText, uiColors, uiRadius, uiSpace } from '@/components/ui';
+import { UiButton, UiSurface, UiText, uiColors, uiRadius, uiSpace, uiTypography } from '@/components/ui';
 import type { RecordSetWriteNotice, StreamRecordCardViewModel } from '@/src/groups';
 
 import { GroupWriteNotice } from './write-notice';
@@ -120,6 +120,6 @@ const styles = StyleSheet.create({
     paddingVertical: uiSpace.xxs,
   },
   group: {
-    fontSize: 12,
+    fontSize: uiTypography.size.sm,
   },
 });

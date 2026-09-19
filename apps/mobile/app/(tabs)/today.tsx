@@ -26,14 +26,7 @@ import {
   type SessionListDataClient,
   type SessionListItem,
 } from '@/components/session-list';
-import {
-  UiButton,
-  UiSurface,
-  UiText,
-  uiColors,
-  uiRadius,
-  uiSpace,
-} from '@/components/ui';
+import { UiButton, UiSurface, UiText, uiColors, uiRadius, uiSpace, uiTypography } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import {
   buildStreamViewModel,
@@ -566,7 +559,7 @@ const styles = StyleSheet.create({
     gap: uiSpace.sm,
   },
   screenTitle: {
-    fontSize: 24,
+    fontSize: uiTypography.size.xxl,
     lineHeight: 30,
   },
   section: {
@@ -586,7 +579,7 @@ const styles = StyleSheet.create({
     paddingVertical: uiSpace.xs,
   },
   sectionActionText: {
-    fontSize: 12,
+    fontSize: uiTypography.size.sm,
   },
   card: {
     padding: uiSpace.xxl,

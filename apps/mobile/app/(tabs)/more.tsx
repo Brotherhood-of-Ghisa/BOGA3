@@ -3,14 +3,7 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
-import {
-  UiSurface,
-  UiText,
-  uiBorder,
-  uiColors,
-  uiRadius,
-  uiSpace,
-} from '@/components/ui';
+import { UiSurface, UiText, uiBorder, uiColors, uiRadius, uiSpace, uiTypography } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import {
   getMoreSections,
@@ -134,7 +127,7 @@ const styles = StyleSheet.create({
     gap: uiSpace.sm,
   },
   screenTitle: {
-    fontSize: 24,
+    fontSize: uiTypography.size.xxl,
     lineHeight: 30,
   },
   section: {

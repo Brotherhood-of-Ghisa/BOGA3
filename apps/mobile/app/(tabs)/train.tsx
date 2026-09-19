@@ -12,7 +12,7 @@ import {
   type SessionListDataClient,
   type SessionListItem,
 } from '@/components/session-list';
-import { UiButton, UiSurface, UiText, uiColors, uiRadius, uiSpace } from '@/components/ui';
+import { UiButton, UiSurface, UiText, uiColors, uiRadius, uiSpace, uiTypography } from '@/components/ui';
 import {
   DEFAULT_SESSION_ENTRY_COORDINATOR,
   type PlannedSessionMaterializer,
@@ -334,7 +334,7 @@ const styles = StyleSheet.create({
     gap: uiSpace.sm,
   },
   screenTitle: {
-    fontSize: 24,
+    fontSize: uiTypography.size.xxl,
     lineHeight: 30,
   },
   section: {
