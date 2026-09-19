@@ -74,6 +74,7 @@ and increase its report count.
 | --- | --- | --- | --- | ---: | --- | --- | --- |
 | `FB-001` | Session History | Open the read-oriented summary before details/edit | S3 | 1 | Source-confirmed | accept | `ACT-001` |
 | `FB-002` | Active session insights | Match the useful exercise/muscle completion summary instead of relative muscle-load bars | S3 | 1 | Source-confirmed | accept | `ACT-002` |
+| `FB-003` | Train → new empty workout | Restore GPS gym preselection on the canonical session-entry path | S2 | 1 | Source-confirmed | accept | `ACT-003` |
 
 Severity definitions:
 
@@ -264,6 +265,100 @@ or `no_action`.
 - Follow-up owner/task/PR: not yet assigned; create from `ACT-002` before this
   feedback round closes.
 
+### FB-003 — Restore GPS gym preselection through Train
+
+- Status: `decided`
+- First reported: `2026-09-19`
+- Source/context: post-merge review of the build 13 navigation changes
+- Report count: `1`
+- Area / screen / flow: Today → Train → Start empty workout → recorder
+- User impact: a new workout opens with no gym even when foreground location
+  permission, a confident saved-gym coordinate match, and the existing automatic
+  detector are all available. The workout remains usable, but the user must
+  retry detection or select the gym manually.
+- Frequency: `every time` a brand-new empty workout starts through Train
+- Severity: `S2`
+- Device and iOS version: not applicable to the source review; device
+  verification is pending
+- Confirmed app version/build: `1.1.0 (13)` source at
+  `prod-ios-v1.1.0-b13`
+- Network/account/data preconditions: no active draft; at least one saved gym
+  with coordinates; foreground location permission and an accurate current
+  position
+- User wording, paraphrased: post-merge review requested a check that recent
+  merges had not broken the GPS gym detector.
+- Evidence links or local artifact paths:
+  - PR `#295` made Train the canonical new-session entry and its coordinator
+    persists an empty draft with `gymId: null` before opening the recorder.
+  - `apps/mobile/app/(tabs)/session-recorder.tsx` still performs the bounded GPS
+    match only in its legacy empty-state `Start Session` handler. Hydrating the
+    draft created by Train intentionally skips that startup detector.
+  - The matcher, foreground-location service, permission configuration, and
+    manual long-press retry remain present. Five focused suites covering those
+    units and both screens passed on current `main` (56 tests); the missing
+    coverage is the canonical Train → coordinator → recorder integration.
+
+#### Reproduction
+
+1. Save coordinates for a gym and use a matching device or simulator location.
+2. Ensure no active workout draft exists, then open Today → Train.
+3. Choose `Start empty workout` and observe the gym field in the recorder.
+
+- Expected: creation of the brand-new active session performs one bounded
+  foreground-location read and preselects the single confident saved-gym match.
+- Actual: the entry coordinator persists the draft with `gymId: null`; the
+  recorder restores that draft and therefore never runs startup detection.
+- Reproduced on tagged build?: `not_yet` on device; confirmed in the exact
+  tagged source because PR `#295` is an ancestor of `prod-ios-v1.1.0-b13`.
+- Reproduced on current `main`?: `not_yet` on device; confirmed in source at
+  `b1a175e7`.
+- Existing workaround: long-press the gym field to retry GPS detection, or
+  select the gym manually.
+- Suspected component or path:
+  `apps/mobile/src/session-entry/coordinator.ts`,
+  `apps/mobile/app/(tabs)/train.tsx`,
+  `apps/mobile/app/(tabs)/session-recorder.tsx`
+- Related feedback IDs, issues, tasks, or PRs: PR `#295`, PR `#303`, `ACT-003`
+
+#### Proposed action
+
+- Decision: `accept`
+- Proposal:
+  1. Move GPS-aware blank-draft creation behind one shared session-entry
+     operation used by the canonical Train path and any retained legacy start
+     affordance.
+  2. Preserve the existing contract: one foreground read, a `1,500 ms` bound,
+     pure saved-gym matching, best-effort coordinate refresh, and immediate
+     fallback to `gymId: null` on permission denial, timeout, no match, or
+     location failure.
+  3. Preserve the one-active-draft lock so location work cannot create a second
+     session or overwrite an active one.
+  4. Keep resume and planned-workout materialisation behaviour unchanged unless
+     their gym-selection contract is separately reviewed.
+- Why this action: it restores the documented automatic gym-selection behaviour
+  at the point that now owns new-session creation, while avoiding duplicate GPS
+  implementations and keeping workout start non-blocking.
+- Smallest safe scope: centralise GPS-aware creation for brand-new empty drafts
+  and route Train through it; do not change matching thresholds, permission
+  configuration, gym-coordinate management, sync, or planned workouts.
+- Risks and edge cases: permission prompts, slow or stale fixes, no match,
+  multiple nearby matches, archived gyms, coordinate-refresh failure, duplicate
+  location reads, and races with an existing active draft.
+- Verification needed: coordinator coverage for matched and every fallback
+  result; a Train integration test that does not mock the detection behaviour
+  away; retained recorder-start regression coverage; and a production-navigation
+  Maestro flow using a saved gym plus simulator location to assert preselection.
+- Required gates: `./boga test fast` and `./boga test frontend` because the fix
+  changes mobile session-entry logic and the canonical UI flow; derive any
+  additional lane from `./boga test for` when the implementation paths are
+  final.
+- Docs/spec updates needed: none if the implementation only restores the
+  existing contract in `docs/specs/ui/ux-rules.md`; update ownership wording if
+  the shared session-entry boundary changes the durable architecture.
+- Target: later `1.1.0` build (`14+`)
+- Follow-up owner/task/PR: not yet assigned; create from `ACT-003` before this
+  feedback round closes.
+
 ## UI impact checkpoint
 
 - This feedback card changes documentation only, so its own `ui_impact` remains
@@ -272,6 +367,9 @@ or `no_action`.
   each needs a UX Contract, a pinned accepted target, and the visual evidence
   required by `docs/specs/08-ux-delivery-standard.md` and
   `docs/specs/ui/ai-design-policy.md`.
+- `ACT-003` restores an existing documented interaction rather than introducing
+  a new visual target. Its implementation still needs flow evidence showing the
+  automatically selected gym and the non-blocking fallback state.
 - The proposals above reuse current repository screens as internal design
   references; they do not make those proposals authoritative product behaviour
   until the follow-up is approved and implemented.
@@ -332,7 +430,8 @@ decision.
 | Action ID | Feedback IDs | Proposed action | Priority | Target build/version | Owner | Status | Verification |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `ACT-001` | `FB-001` | Open History on Summary; expose deterministic Details/Edit actions | High | `1.1.0` build `14+` | Unassigned | proposed | Navigation tests, frontend gate, History-flow screenshots |
-| `ACT-002` | `FB-002` | Reuse completion-style live exercise/muscle summary and retire relative bars | Medium | `1.1.0` build `14+` | Unassigned | Insight/component tests, frontend gate, live/completion screenshots |
+| `ACT-002` | `FB-002` | Reuse completion-style live exercise/muscle summary and retire relative bars | Medium | `1.1.0` build `14+` | Unassigned | proposed | Insight/component tests, frontend gate, live/completion screenshots |
+| `ACT-003` | `FB-003` | Route canonical empty-session creation through the bounded GPS gym detector | High | `1.1.0` build `14+` | Unassigned | proposed | Entry integration tests, frontend gate, GPS-preselection flow evidence |
 
 Action status values: `proposed`, `approved`, `in_progress`, `shipped`,
 `verified`, `deferred`, or `rejected`.
