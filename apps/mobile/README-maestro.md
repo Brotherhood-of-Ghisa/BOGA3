@@ -112,7 +112,7 @@ The cached `.app` is reused whenever it exists. A rebuild only happens when the 
 > If you add, remove, or upgrade a **native** dependency — anything that ships an
 > iOS pod / native Expo module (e.g. `expo-task-manager`, `expo-background-task`,
 > `expo-network`, or anything from `npx expo install` with native code), or change
-> a config plugin / native field in `app.config.ts` — you **must** run
+> a config plugin / native iOS field in `app.config.ts` (Android-only fields exempt) — you **must** run
 > `./scripts/maestro-ios-dev-client-build.sh --force` before the iOS gates.
 > Otherwise the gate reuses the old binary, which lacks the new native module, and
 > every flow fails at boot with `Cannot find native module '<X>'`. Pure-JS or

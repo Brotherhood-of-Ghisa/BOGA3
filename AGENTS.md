@@ -37,7 +37,7 @@ place each under `docs/specs/**`, routed from here.
    | Groups (`src/groups/**`, `supabase/migrations/*group*`) | the rows above + `boga test ios-groups-e2e` (two-user e2e) |
    | Agent consent web (`apps/agent-auth-web/**`) | `boga test fast` |
    | MCP service (`services/boga-mcp/**`) | `boga test fast` + `boga test mcp-smoke` |
-   | Native dependency / config-plugin change | `./boga ios build-client --force` first, then `boga test frontend` (see `02`) |
+   | Native iOS dependency / config-plugin change | `./boga ios build-client --force` first, then `boga test frontend` (see `02`) |
 
    Once the worktree holds a slot lease (rule 5), the gates bootstrap deps and
    the local Supabase stack themselves; Docker must be running for the slow lanes. Full lane matrix, CI posture, and the dev-client

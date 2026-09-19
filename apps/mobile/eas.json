@@ -14,7 +14,8 @@
       "env": {
         "APP_ENV": "prod",
         "APP_NAME": "Boga3 Preview",
-        "IOS_BUNDLE_ID": "com.phano.boga3.dev"
+        "IOS_BUNDLE_ID": "com.phano.boga3.dev",
+        "ANDROID_PACKAGE": "com.phano.boga3.dev"
       }
     },
     "dev": {
@@ -24,7 +25,8 @@
       "env": {
         "APP_ENV": "dev",
         "APP_NAME": "Boga3 Dev",
-        "IOS_BUNDLE_ID": "com.phano.boga3.dev"
+        "IOS_BUNDLE_ID": "com.phano.boga3.dev",
+        "ANDROID_PACKAGE": "com.phano.boga3.dev"
       }
     },
     "prod": {
@@ -36,7 +38,8 @@
       "env": {
         "APP_ENV": "prod",
         "APP_NAME": "Boga3",
-        "IOS_BUNDLE_ID": "com.phano.boga3"
+        "IOS_BUNDLE_ID": "com.phano.boga3",
+        "ANDROID_PACKAGE": "com.phano.boga3"
       }
     }
   },

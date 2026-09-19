@@ -9,6 +9,11 @@ no reason to run these.
   IP, starts Expo/Metro over LAN.
 - `use-local-mobile-lan-env.sh` — just the env half of the above (also
   `./boga env lan`).
+- `use-local-mobile-dev-env.sh` — point the mobile app at the local dev stack
+  (`BOGA-dev`, port 65431) after running the dev baseline (also `./boga env dev`).
+  Note: per spec 12, `BOGA-dev` is strictly reserved for slot 0 (the main
+  checkout); linked worktrees (slot > 0) must use their own isolated slot
+  stack (`./boga db up`).
 - `use-hosted-mobile-env.sh` — point the mobile app at hosted Supabase using
   credentials from `supabase/.env.hosted` (also `./boga env hosted`).
 - `tag-dev-ios.sh` / `tag-preview-ios.sh` — release bookkeeping for local iOS
