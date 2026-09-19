@@ -167,7 +167,8 @@ iOS Maestro lanes and are exempt from the iOS dev-client rebuild and frontend ga
 
 CI (`.github/workflows/ci.yml`) runs every infra-free lane marked `CI? ✅`:
 mobile `lint`, `typecheck`, and `jest-full`; repository `docs-check` and
-`meta-tests`; the consent-web `agent-auth-web` lane; the MCP `mcp-unit` lane;
+`meta-tests` (including stubbed Android launcher/SDK regression fixtures);
+the consent-web `agent-auth-web` lane; the MCP `mcp-unit` lane;
 and the extra `handles` guard. It installs each workspace from its own lockfile.
 `test:handles` is `jest --detectOpenHandles`; CI runs it on every PR, so you only
 need it locally when you touched timers, sockets, subscriptions, or async

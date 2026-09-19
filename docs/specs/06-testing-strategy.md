@@ -113,7 +113,7 @@ legacy `./scripts/quality-fast.sh` / `./scripts/quality-slow.sh` forward here.
 | Lane | Purpose | When to run |
 |---|---|---|
 | `docs-check` | `gen-docs.sh check`: generated doc blocks current (lane matrix; median column exempt from staleness), lane-name citations valid, relative `.md` links resolve, spec ownership headers present. | Any docs/registry/CI-definition change. Part of `boga test fast` and CI. |
-| `meta-tests` | `scripts/tests/run-meta-tests.sh`: fixture-based self-tests for `gen-docs.sh`, `test-for.sh` (trigger matcher), and `pr-check.sh` (PR Tests-table checker). | Any change to the meta-tooling under `scripts/`. Part of `boga test fast` and CI. |
+| `meta-tests` | `scripts/tests/run-meta-tests.sh`: fixture-based self-tests for `gen-docs.sh`, `test-for.sh` (trigger matcher), `pr-check.sh` (PR Tests-table checker), and the Android launchers (SDK discovery, evaluated Metro ports, matching local API reverse, argument forwarding and failure paths with stub adb/Expo). | Any change to the meta-tooling under `scripts/`. Part of `boga test fast` and CI. |
 | `agent-auth-web` | `scripts/test-agent-auth-web.sh`: clean locked install, production-dependency audit, consent authorization-state tests, typecheck, and Vite production build. | Any `apps/agent-auth-web/**` change. Part of `boga test fast` and CI. |
 | `mcp-unit` | `scripts/test-boga-mcp.sh`: clean locked install, production-dependency audit, typecheck, MCP discovery/tool translation/security-contract tests, and production build. | Any `services/boga-mcp/**` change. Part of `boga test fast` and CI. |
 

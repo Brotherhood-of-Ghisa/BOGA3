@@ -3,6 +3,8 @@
 # Resolve ANDROID_HOME and add platform-tools / emulator to PATH if available.
 if [[ -z "${ANDROID_HOME:-}" ]]; then
   for candidate in \
+    "${ANDROID_SDK_ROOT:-}" \
+    "${HOME}/Library/Android/sdk" \
     "${HOME}/Android/Sdk" \
     /opt/android-sdk \
     /usr/lib/android-sdk; do

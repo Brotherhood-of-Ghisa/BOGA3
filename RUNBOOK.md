@@ -178,7 +178,9 @@ TASK_ID=ad-hoc npm run test:e2e:ios:smoke
 
 ### Prerequisites (Android)
 
-- Android SDK (`ANDROID_HOME`) with platform-tools and emulator CLI.
+- Android SDK with platform-tools and emulator CLI. The helper honors `ANDROID_HOME`,
+  then a valid legacy `ANDROID_SDK_ROOT`, then standard install locations including
+  `~/Library/Android/sdk` on macOS and `~/Android/Sdk` on Linux.
 - Java 17 or 21 (Gradle 8.x is compatible with Java 17 and 21; Java 25+ is rejected by Gradle).
 - An AVD configured (e.g. `Pixel_10_Pro`).
 
@@ -223,42 +225,32 @@ adb wait-for-device
   ```
   *(This boots the worktree's slot-isolated Supabase on port `55431 + 100 * slot` and automatically configures `apps/mobile/.env.local`.)*
 
-3. Source the worktree's assigned Metro port (`8082 + slot`), pin the Supabase env into your shell, and reverse ports on the emulator:
-
-```bash
-source apps/mobile/.maestro/maestro.env.local
-source scripts/dev/export-mobile-supabase-env.sh apps/mobile/.env.local
-adb reverse tcp:"${EXPO_DEV_SERVER_PORT}" tcp:"${EXPO_DEV_SERVER_PORT}"
-# Reverse Supabase API port (65431 for slot 0 dev stack, or 55431 + 100 * slot for worktrees):
-adb reverse tcp:"${API_PORT:-65431}" tcp:"${API_PORT:-65431}"
-```
-
-4. Build and launch the development build:
-
-Using the repository launcher (handles environment sourcing and slot port detection automatically):
+3. Build and launch the development build:
 
 ```bash
 ./boga android run
 ```
 
-Or directly using Expo (in a shell where `scripts/android-env.sh` and `scripts/java-env.sh` were sourced):
+The launcher evaluates the worktree's generated Metro port (`8082 + slot`),
+validates it, pins the Supabase values from `apps/mobile/.env.local`, and runs
+`adb reverse` for Metro and the local API port in `EXPO_PUBLIC_SUPABASE_URL`.
+That selects port 65431 for `BOGA-dev` or the actual slot port in a linked
+worktree; hosted/LAN backends need no API reverse. Keep one Android target
+connected, or select it with `ANDROID_SERIAL`.
 
-```bash
-cd apps/mobile
-npx expo run:android --port "${EXPO_DEV_SERVER_PORT}"
-```
-
-Alternatively, to compile without bundling in the same process:
+Alternatively, split compilation and Metro into two terminals:
 
 ```bash
 # Terminal 1 (compile & launch):
 ./boga android run --no-bundler
-# (or: cd apps/mobile && npx expo run:android --no-bundler --port "${EXPO_DEV_SERVER_PORT}")
 
 # Terminal 2 (start Metro bundler):
 ./boga android start
-# (or: cd apps/mobile && npx expo start --dev-client --port "${EXPO_DEV_SERVER_PORT}")
 ```
+
+Both commands configure the matching reverse ports. To override Metro, pass
+`--port 8099` (or `--port=8099`) to both commands; the same port is passed to
+Expo and `adb reverse`.
 
 ### Wipe the app on the Android Emulator
 
