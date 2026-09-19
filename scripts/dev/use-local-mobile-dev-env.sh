@@ -9,6 +9,18 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 source "${REPO_ROOT}/scripts/worktree-lib.sh"
 boga_require_slot_lease "${REPO_ROOT}" || exit 1
 
+slot="$(boga_read_slot_file "${REPO_ROOT}")" || {
+  echo "[supabase] missing .worktree-slot file; run ./boga worktree start first" >&2
+  exit 1
+}
+if [[ "${slot}" != "0" ]]; then
+  slot_api_port="$(boga_port_for_slot api "${slot}")"
+  echo "[supabase] 'boga env dev' targets the main checkout's dedicated BOGA-dev stack (slot 0 only)." >&2
+  echo "[supabase] Linked worktrees (slot ${slot}) must use their own isolated slot stack (API port ${slot_api_port})." >&2
+  echo "[supabase] Boot your worktree's stack with './boga db up' (which automatically configures apps/mobile/.env.local)." >&2
+  exit 1
+fi
+
 # shellcheck disable=SC1091
 source "${REPO_ROOT}/supabase/scripts/_common.sh"
 # shellcheck disable=SC1091

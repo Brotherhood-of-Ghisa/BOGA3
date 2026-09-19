@@ -14,7 +14,7 @@
 #   boga pr check --body <file|->              # validate a PR body's Tests table
 #   boga pr wait [--interval <s>]              # block until this branch's PR merges/closes
 #   boga doctor [--android]                    # can THIS machine run every lane (or Android dev)?
-#   boga android doctor                        # verify Android SDK, emulator, and Java 17/21
+#   boga android doctor|run|start              # verify Android environment or run dev client
 #   boga docs gen|check                        # (re)generate / drift-check derived doc blocks
 #   boga timings [lane]                        # measured durations (never guess)
 #   boga worktree create|start|ls|release|doctor   # agent-owned lifecycle (spec 01)
@@ -210,6 +210,66 @@ cmd_android_doctor() {
   return "${ok}"
 }
 
+cmd_android_run() {
+  ensure_mobile_deps
+  local mobile_dir="${REPO_ROOT}/apps/mobile"
+  local port="8082"
+  local slot
+  if slot="$(boga_read_slot_file "${REPO_ROOT}" 2>/dev/null)"; then
+    port="$(boga_port_for_slot expo "${slot}")"
+  fi
+  local maestro_env="${mobile_dir}/.maestro/maestro.env.local"
+  if [[ -f "${maestro_env}" ]]; then
+    local env_port
+    env_port="$(awk -F'=' '/^EXPO_DEV_SERVER_PORT=/ {print $2; exit}' "${maestro_env}" | tr -d '"'\'' ')"
+    [[ -n "${env_port}" ]] && port="${env_port}"
+  fi
+  local has_port=0
+  for arg in "$@"; do
+    [[ "${arg}" == "--port" || "${arg}" == --port=* ]] && has_port=1 && break
+  done
+  if [[ -f "${mobile_dir}/.env.local" && -f "${REPO_ROOT}/scripts/dev/export-mobile-supabase-env.sh" ]]; then
+    # shellcheck disable=SC1091
+    source "${REPO_ROOT}/scripts/dev/export-mobile-supabase-env.sh" "${mobile_dir}/.env.local"
+  fi
+  echo "[boga android run] compiling and launching dev build (port ${port})"
+  if (( has_port )); then
+    (cd "${mobile_dir}" && exec npx expo run:android "$@")
+  else
+    (cd "${mobile_dir}" && exec npx expo run:android --port "${port}" "$@")
+  fi
+}
+
+cmd_android_start() {
+  ensure_mobile_deps
+  local mobile_dir="${REPO_ROOT}/apps/mobile"
+  local port="8082"
+  local slot
+  if slot="$(boga_read_slot_file "${REPO_ROOT}" 2>/dev/null)"; then
+    port="$(boga_port_for_slot expo "${slot}")"
+  fi
+  local maestro_env="${mobile_dir}/.maestro/maestro.env.local"
+  if [[ -f "${maestro_env}" ]]; then
+    local env_port
+    env_port="$(awk -F'=' '/^EXPO_DEV_SERVER_PORT=/ {print $2; exit}' "${maestro_env}" | tr -d '"'\'' ')"
+    [[ -n "${env_port}" ]] && port="${env_port}"
+  fi
+  local has_port=0
+  for arg in "$@"; do
+    [[ "${arg}" == "--port" || "${arg}" == --port=* ]] && has_port=1 && break
+  done
+  if [[ -f "${mobile_dir}/.env.local" && -f "${REPO_ROOT}/scripts/dev/export-mobile-supabase-env.sh" ]]; then
+    # shellcheck disable=SC1091
+    source "${REPO_ROOT}/scripts/dev/export-mobile-supabase-env.sh" "${mobile_dir}/.env.local"
+  fi
+  echo "[boga android start] starting Expo Metro bundler for Android (port ${port})"
+  if (( has_port )); then
+    (cd "${mobile_dir}" && exec npx expo start --dev-client "$@")
+  else
+    (cd "${mobile_dir}" && exec npx expo start --dev-client --port "${port}" "$@")
+  fi
+}
+
 cmd_doctor() {
   local target="${1:-}"
   if [[ "${target}" == "--android" || "${target}" == "android" ]]; then
@@ -259,7 +319,9 @@ case "${cmd}" in
     sub="${1:-doctor}"; shift || true
     case "${sub}" in
       doctor) cmd_android_doctor "$@" ;;
-      *) fail "usage: boga android doctor" ;;
+      run)    require_lease; cmd_android_run "$@" ;;
+      start)  require_lease; cmd_android_start "$@" ;;
+      *) fail "usage: boga android doctor | run [--no-bundler] [...] | start [...]" ;;
     esac
     ;;
   pr)

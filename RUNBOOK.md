@@ -182,6 +182,15 @@ TASK_ID=ad-hoc npm run test:e2e:ios:smoke
 - Java 17 or 21 (Gradle 8.x is compatible with Java 17 and 21; Java 25+ is rejected by Gradle).
 - An AVD configured (e.g. `Pixel_10_Pro`).
 
+Before running Android or Gradle commands directly in your shell (such as `emulator`, `adb`, or `npx expo run:android`), source the repository's Android and Java environment helpers in your current shell:
+
+```bash
+source scripts/android-env.sh
+source scripts/java-env.sh
+```
+
+This ensures `ANDROID_HOME`, `adb`, and `emulator` are on your `PATH`, and sets `JAVA_HOME` to a compatible JDK (17 or 21, clearing any incompatible Java 25+). (Note: `./boga` commands such as `./boga android run` source these automatically).
+
 Check capability:
 
 ```bash
@@ -191,20 +200,28 @@ Check capability:
 
 ### Dev-client loop (matches native runtime)
 
-1. Boot the emulator:
+1. Ensure your shell environment is set and boot the emulator:
 
 ```bash
+source scripts/android-env.sh
+source scripts/java-env.sh
 emulator -avd Pixel_10_Pro &
 adb wait-for-device
 ```
 
-2. Boot the dedicated human-development backend (`BOGA-dev`, port 65431), provision dev accounts, and configure the mobile app environment:
+2. Configure the backend and mobile app environment:
 
-```bash
-./boga env dev
-```
+- **Main checkout (slot 0):** Boot the dedicated human-development backend (`BOGA-dev`, port 65431), provision dev accounts, and write `apps/mobile/.env.local`:
+  ```bash
+  ./boga env dev
+  ```
+  *(This runs the dev baseline via `./boga db dev`, seeds dev accounts `a@dev.local`/`b@dev.local`, and writes `EXPO_PUBLIC_SUPABASE_URL=http://127.0.0.1:65431` and the dev stack `ANON_KEY` to `apps/mobile/.env.local`.)*
 
-*(This runs the dev baseline via `./boga db dev`, seeds dev accounts `a@dev.local`/`b@dev.local`, and writes `EXPO_PUBLIC_SUPABASE_URL=http://127.0.0.1:65431` and the dev stack `ANON_KEY` to `apps/mobile/.env.local`. Equivalent manual steps: run `./boga db dev`, then write `EXPO_PUBLIC_SUPABASE_URL=http://127.0.0.1:65431` and the dev-stack anon key to `apps/mobile/.env.local` or export them into your shell.)*
+- **Linked worktrees (slot > 0):** Per spec 12, linked worktrees must not use `BOGA-dev`. Boot the worktree's isolated slot stack:
+  ```bash
+  ./boga db up
+  ```
+  *(This boots the worktree's slot-isolated Supabase on port `55431 + 100 * slot` and automatically configures `apps/mobile/.env.local`.)*
 
 3. Source the worktree's assigned Metro port (`8082 + slot`), pin the Supabase env into your shell, and reverse ports on the emulator:
 
@@ -212,12 +229,19 @@ adb wait-for-device
 source apps/mobile/.maestro/maestro.env.local
 source scripts/dev/export-mobile-supabase-env.sh apps/mobile/.env.local
 adb reverse tcp:"${EXPO_DEV_SERVER_PORT}" tcp:"${EXPO_DEV_SERVER_PORT}"
-adb reverse tcp:65431 tcp:65431
+# Reverse Supabase API port (65431 for slot 0 dev stack, or 55431 + 100 * slot for worktrees):
+adb reverse tcp:"${API_PORT:-65431}" tcp:"${API_PORT:-65431}"
 ```
 
-*(Note: if testing against a slot's test gate stack instead of `BOGA-dev`, forward that slot's `API_PORT` from `apps/mobile/.env.local` — `55431 + 100 * slot`).*
-
 4. Build and launch the development build:
+
+Using the repository launcher (handles environment sourcing and slot port detection automatically):
+
+```bash
+./boga android run
+```
+
+Or directly using Expo (in a shell where `scripts/android-env.sh` and `scripts/java-env.sh` were sourced):
 
 ```bash
 cd apps/mobile
@@ -227,9 +251,13 @@ npx expo run:android --port "${EXPO_DEV_SERVER_PORT}"
 Alternatively, to compile without bundling in the same process:
 
 ```bash
-cd apps/mobile
-npx expo run:android --no-bundler --port "${EXPO_DEV_SERVER_PORT}"
-npx expo start --dev-client --port "${EXPO_DEV_SERVER_PORT}"
+# Terminal 1 (compile & launch):
+./boga android run --no-bundler
+# (or: cd apps/mobile && npx expo run:android --no-bundler --port "${EXPO_DEV_SERVER_PORT}")
+
+# Terminal 2 (start Metro bundler):
+./boga android start
+# (or: cd apps/mobile && npx expo start --dev-client --port "${EXPO_DEV_SERVER_PORT}")
 ```
 
 ### Wipe the app on the Android Emulator
