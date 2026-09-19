@@ -175,7 +175,7 @@ export function GroupExercisesPage({
   const sheetActions = sheetExercise ? groupExerciseActionsFor(myRole, sheetExercise) : [];
 
   return (
-    <View style={{ gap: uiSpace.lg }} testID="group-screen-exercises">
+    <View style={{ gap: uiSpace.md }} testID="group-screen-exercises">
       {feedback ? <GroupWriteNotice message={feedback.message} testID="group-exercises-action-feedback" tone={feedback.tone} /> : null}
       {links.failed ? (
         <GroupWriteNotice
@@ -194,7 +194,7 @@ export function GroupExercisesPage({
       ) : (
         <>
           {addButton}
-          <UiSurface style={{ paddingHorizontal: uiSpace.lg }} testID="group-exercises-list">
+          <UiSurface style={{ paddingHorizontal: uiSpace.md }} testID="group-exercises-list">
             {rows.map((row) => {
               const exercise = byId.get(row.groupExerciseId) ?? null;
               return (

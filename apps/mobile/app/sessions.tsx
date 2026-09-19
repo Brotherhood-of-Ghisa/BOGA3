@@ -174,8 +174,8 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: uiColors.surfacePage,
-    padding: uiSpace.xxl,
-    gap: uiSpace.lg,
+    padding: uiSpace.lg,
+    gap: uiSpace.md,
   },
   pinnedTopRegion: {
     gap: uiSpace.sm,

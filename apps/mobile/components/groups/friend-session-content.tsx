@@ -130,8 +130,8 @@ export function FriendSessionContent({ session }: { session: GroupSessionDetail 
 
 const styles = StyleSheet.create({
   headerCard: {
-    padding: uiSpace.xl,
-    gap: uiSpace.lg,
+    padding: uiSpace.lg,
+    gap: uiSpace.md,
   },
   headerRow: {
     flexDirection: 'row',
@@ -152,7 +152,7 @@ const styles = StyleSheet.create({
   },
   metricCell: {
     width: '46%',
-    gap: uiSpace.xxs,
+    gap: uiSpace.xs,
   },
   setRow: {
     flexDirection: 'row',

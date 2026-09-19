@@ -198,7 +198,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: uiSpace.screen,
+    padding: uiSpace.xl,
     backgroundColor: uiColors.surfacePage,
   },
   card: {

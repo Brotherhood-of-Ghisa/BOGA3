@@ -577,15 +577,15 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: uiColors.surfacePage,
-    padding: uiSpace.xxl,
-    gap: uiSpace.lg,
+    padding: uiSpace.lg,
+    gap: uiSpace.md,
   },
   scroll: {
     flex: 1,
   },
   content: {
-    gap: 6,
-    paddingBottom: uiSpace.lg,
+    gap: uiSpace.sm,
+    paddingBottom: uiSpace.md,
   },
   pinnedTopRegion: {
     gap: uiSpace.sm,
@@ -623,7 +623,7 @@ const styles = StyleSheet.create({
     borderColor: uiColors.actionPrimary,
   },
   createExerciseButtonText: {
-    fontSize: 26,
+    fontSize: uiTypography.size.xxl,
     lineHeight: 26,
     color: uiColors.surfaceDefault,
     fontWeight: '700',
@@ -631,7 +631,7 @@ const styles = StyleSheet.create({
   activeFilterChipsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
+    gap: uiSpace.sm,
   },
   activeFilterChip: {
     fontSize: uiTypography.size.xs,
@@ -652,7 +652,7 @@ const styles = StyleSheet.create({
     backgroundColor: uiColors.surfaceDefault,
     color: uiColors.textPrimary,
     paddingHorizontal: uiSpace.md,
-    paddingVertical: 9,
+    paddingVertical: uiSpace.sm,
     minHeight: 42,
   },
   filterInputInline: {
@@ -663,22 +663,22 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 24,
-    borderRadius: uiRadius.lg,
+    padding: uiSpace.xl,
+    borderRadius: uiRadius.md,
     borderWidth: 1,
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfaceDefault,
   },
   stateText: {
-    fontSize: 15,
+    fontSize: uiTypography.size.base,
     color: uiColors.textPrimary,
   },
   section: {
-    borderRadius: uiRadius.lg,
+    borderRadius: uiRadius.md,
     borderWidth: 1,
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfaceDefault,
-    padding: uiSpace.xl,
+    padding: uiSpace.lg,
     gap: uiSpace.md,
   },
   feedbackCard: {
@@ -730,18 +730,18 @@ const styles = StyleSheet.create({
   modalRoot: {
     flex: 1,
     justifyContent: 'center',
-    padding: uiSpace.xxl,
+    padding: uiSpace.lg,
   },
   modalOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: uiColors.overlayScrim,
   },
   actionMenuCard: {
-    borderRadius: uiRadius.xl,
+    borderRadius: uiRadius.md,
     borderWidth: 1,
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfaceDefault,
-    padding: uiSpace.xl,
+    padding: uiSpace.lg,
     gap: uiSpace.sm,
   },
   actionMenuButton: {
@@ -750,7 +750,7 @@ const styles = StyleSheet.create({
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfaceDefault,
     paddingVertical: uiSpace.md,
-    paddingHorizontal: uiSpace.lg,
+    paddingHorizontal: uiSpace.md,
     minHeight: 42,
     justifyContent: 'center',
     alignItems: 'center',
@@ -774,11 +774,11 @@ const styles = StyleSheet.create({
     color: uiColors.textPrimary,
   },
   filtersModalCard: {
-    borderRadius: uiRadius.xl,
+    borderRadius: uiRadius.md,
     borderWidth: 1,
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfaceDefault,
-    padding: uiSpace.xl,
+    padding: uiSpace.lg,
     gap: uiSpace.sm,
     maxHeight: '85%',
   },
@@ -792,8 +792,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfaceDefault,
-    paddingHorizontal: uiSpace.lg,
-    paddingVertical: 6,
+    paddingHorizontal: uiSpace.md,
+    paddingVertical: uiSpace.sm,
   },
   filtersCloseButtonText: {
     color: uiColors.textPrimary,
@@ -812,13 +812,13 @@ const styles = StyleSheet.create({
     color: uiColors.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 0.4,
-    marginTop: 6,
+    marginTop: uiSpace.sm,
   },
   filtersSectionHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 6,
+    marginTop: uiSpace.sm,
   },
   filtersClearLink: {
     fontSize: uiTypography.size.sm,
@@ -828,7 +828,7 @@ const styles = StyleSheet.create({
   filtersPillRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
+    gap: uiSpace.sm,
   },
   filterPill: {
     borderRadius: uiRadius.full,
@@ -836,7 +836,7 @@ const styles = StyleSheet.create({
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfaceDefault,
     paddingHorizontal: uiSpace.md,
-    paddingVertical: 5,
+    paddingVertical: uiSpace.xs,
   },
   filterPillSelected: {
     backgroundColor: uiColors.actionPrimarySubtleBg,

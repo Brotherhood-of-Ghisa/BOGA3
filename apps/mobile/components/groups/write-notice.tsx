@@ -28,7 +28,7 @@ const styles = StyleSheet.create({
   notice: {
     borderRadius: uiRadius.md,
     borderWidth: 1,
-    paddingHorizontal: uiSpace.lg,
+    paddingHorizontal: uiSpace.md,
     paddingVertical: uiSpace.sm,
   },
   error: {

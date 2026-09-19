@@ -184,8 +184,8 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: uiSpace.xxl,
-    paddingHorizontal: 24,
+    gap: uiSpace.lg,
+    paddingHorizontal: uiSpace.xl,
     backgroundColor: uiColors.surfacePage,
   },
   message: {

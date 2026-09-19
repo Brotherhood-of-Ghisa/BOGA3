@@ -38,7 +38,7 @@ export function MainTabs({ activeTab, onSelect }: MainTabsProps) {
 const styles = StyleSheet.create({
   shell: {
     borderColor: uiColors.borderMuted,
-    borderRadius: uiRadius.xl,
+    borderRadius: uiRadius.md,
     backgroundColor: uiColors.surfaceDefault,
     padding: uiSpace.sm,
   },
@@ -48,7 +48,7 @@ const styles = StyleSheet.create({
   },
   tabButton: {
     flex: 1,
-    paddingHorizontal: uiSpace.xxs,
+    paddingHorizontal: uiSpace.xs,
   },
   tabLabel: {
     alignSelf: 'stretch',

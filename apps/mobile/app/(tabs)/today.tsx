@@ -551,9 +551,9 @@ const styles = StyleSheet.create({
     backgroundColor: uiColors.surfacePage,
   },
   content: {
-    padding: uiSpace.screen,
-    paddingBottom: uiSpace.screen,
-    gap: uiSpace.xxl,
+    padding: uiSpace.xl,
+    paddingBottom: uiSpace.xl,
+    gap: uiSpace.lg,
   },
   intro: {
     gap: uiSpace.sm,
@@ -582,8 +582,8 @@ const styles = StyleSheet.create({
     fontSize: uiTypography.size.sm,
   },
   card: {
-    padding: uiSpace.xxl,
-    gap: uiSpace.lg,
+    padding: uiSpace.lg,
+    gap: uiSpace.md,
   },
   activeCard: {
     borderColor: uiColors.borderSuccess,
@@ -597,7 +597,7 @@ const styles = StyleSheet.create({
   },
   recentCard: {
     minHeight: 62,
-    paddingHorizontal: uiSpace.lg,
+    paddingHorizontal: uiSpace.md,
     paddingVertical: uiSpace.md,
     flexDirection: 'row',
     alignItems: 'center',
@@ -608,7 +608,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   chevron: {
-    fontSize: 22,
+    fontSize: uiTypography.size.xxl,
     lineHeight: 24,
     color: uiColors.textSecondary,
   },

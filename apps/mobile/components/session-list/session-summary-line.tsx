@@ -107,7 +107,7 @@ export function SessionSummaryLine({
 
 const styles = StyleSheet.create({
   summaryLines: {
-    gap: uiSpace.xxs,
+    gap: uiSpace.xs,
     minHeight: 34,
   },
   summaryRow: {

@@ -366,14 +366,14 @@ const styles = StyleSheet.create({
     minHeight: 0,
   },
   historyScrollContent: {
-    gap: uiSpace.lg,
-    paddingBottom: uiSpace.xxl,
+    gap: uiSpace.md,
+    paddingBottom: uiSpace.lg,
   },
   sectionHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: uiSpace.lg,
+    gap: uiSpace.md,
   },
   sectionTitle: {
     fontSize: uiTypography.size.xl,
@@ -381,14 +381,14 @@ const styles = StyleSheet.create({
     color: uiColors.textPrimary,
   },
   emptyPanel: {
-    borderRadius: uiRadius.lg,
+    borderRadius: uiRadius.md,
     borderWidth: 1,
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfacePage,
-    padding: uiSpace.lg,
+    padding: uiSpace.md,
   },
   sessionRow: {
-    borderRadius: uiRadius.lg,
+    borderRadius: uiRadius.md,
     borderWidth: 1,
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfaceDefault,
@@ -396,7 +396,7 @@ const styles = StyleSheet.create({
     paddingVertical: uiSpace.sm,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: uiSpace.sm,
   },
   deletedCompletedRow: {
     borderColor: uiColors.actionDangerSubtleBorder,
@@ -440,7 +440,7 @@ const styles = StyleSheet.create({
     borderColor: uiColors.actionNeutralSubtleBorder,
     backgroundColor: uiColors.actionNeutralSubtleBg,
     paddingHorizontal: uiSpace.md,
-    paddingVertical: 6,
+    paddingVertical: uiSpace.sm,
   },
   toggleButtonText: {
     color: uiColors.actionNeutralSubtleText,
@@ -448,12 +448,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   globalEmptyState: {
-    borderRadius: uiRadius.xl,
+    borderRadius: uiRadius.md,
     borderWidth: 1,
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfaceDefault,
-    padding: uiSpace.xxl,
-    gap: 6,
+    padding: uiSpace.lg,
+    gap: uiSpace.sm,
     alignItems: 'center',
   },
   globalEmptyTitle: {
@@ -465,7 +465,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: uiSpace.screen,
+    padding: uiSpace.xl,
   },
   modalOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -474,11 +474,11 @@ const styles = StyleSheet.create({
   modalPanel: {
     width: '100%',
     maxWidth: 360,
-    borderRadius: uiRadius.xl,
+    borderRadius: uiRadius.md,
     borderWidth: 1,
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfaceDefault,
-    padding: uiSpace.xl,
+    padding: uiSpace.lg,
     gap: uiSpace.md,
   },
   modalActionRow: {

@@ -62,7 +62,7 @@ export function ExercisePersonalRecordCelebration({
 
 const styles = StyleSheet.create({
   surface: {
-    padding: uiSpace.lg,
+    padding: uiSpace.md,
     gap: uiSpace.xs,
     borderColor: uiColors.borderSuccess,
     backgroundColor: uiColors.surfaceSuccess,
@@ -74,7 +74,7 @@ const styles = StyleSheet.create({
   compactSurface: {
     paddingHorizontal: uiSpace.md,
     paddingVertical: uiSpace.sm,
-    gap: uiSpace.xxs,
+    gap: uiSpace.xs,
   },
   headingRow: {
     flexDirection: 'row',

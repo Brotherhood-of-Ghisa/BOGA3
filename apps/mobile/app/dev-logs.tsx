@@ -153,15 +153,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: uiSpace.md,
-    padding: uiSpace.screen,
+    padding: uiSpace.xl,
   },
   listContent: {
-    paddingHorizontal: uiSpace.screen,
-    paddingBottom: uiSpace.xxl,
+    paddingHorizontal: uiSpace.xl,
+    paddingBottom: uiSpace.lg,
     gap: uiSpace.md,
   },
   rowCard: {
-    padding: uiSpace.lg,
+    padding: uiSpace.md,
   },
   row: {
     gap: uiSpace.sm,
@@ -195,11 +195,11 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: uiSpace.screen,
+    padding: uiSpace.xl,
     backgroundColor: uiColors.surfacePage,
   },
   emptyText: {
     textAlign: 'center',
-    paddingVertical: uiSpace.xxl,
+    paddingVertical: uiSpace.lg,
   },
 });

@@ -1,7 +1,7 @@
 import { Fragment, type ComponentProps, type ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { UiSurface, UiText, uiColors, uiSpace } from '@/components/ui';
+import { UiSurface, UiText, uiColors, uiRadius, uiSpace } from '@/components/ui';
 import { ExercisePersonalRecordCelebration } from '@/components/session-recorder/exercise-personal-record-celebration';
 import type { ExercisePersonalRecord } from '@/src/session-insights';
 
@@ -236,8 +236,8 @@ export function SessionContentLayout<
 
 const styles = StyleSheet.create({
   section: {
-    padding: uiSpace.lg,
-    gap: uiSpace.lg,
+    padding: uiSpace.md,
+    gap: uiSpace.md,
   },
   topRow: {
     flexDirection: 'row',
@@ -246,10 +246,10 @@ const styles = StyleSheet.create({
   },
   rowField: {
     flex: 1,
-    gap: uiSpace.sm - 2,
+    gap: uiSpace.sm,
   },
   exerciseList: {
-    gap: uiSpace.lg,
+    gap: uiSpace.md,
   },
   exerciseCard: {
     padding: uiSpace.md,
@@ -270,7 +270,7 @@ const styles = StyleSheet.create({
   exerciseHeaderTextStack: {
     flex: 1,
     minWidth: 0,
-    gap: uiSpace.xxs,
+    gap: uiSpace.xs,
   },
   exerciseTitleRow: {
     flexDirection: 'row',
@@ -284,7 +284,7 @@ const styles = StyleSheet.create({
   collapseChevronCircle: {
     width: 32,
     height: 32,
-    borderRadius: 16,
+    borderRadius: uiRadius.md,
     borderWidth: 1,
     borderColor: uiColors.borderDefault,
     alignItems: 'center',
@@ -310,7 +310,7 @@ const styles = StyleSheet.create({
     transform: [{ translateY: -2 }],
   },
   exerciseCollapsedSummary: {
-    gap: uiSpace.xxs,
+    gap: uiSpace.xs,
   },
   setList: {
     gap: uiSpace.sm,

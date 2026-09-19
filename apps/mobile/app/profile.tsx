@@ -555,21 +555,21 @@ const styles = StyleSheet.create({
     backgroundColor: uiColors.surfacePage,
   },
   content: {
-    padding: uiSpace.screen,
-    gap: uiSpace.xxl,
+    padding: uiSpace.xl,
+    gap: uiSpace.lg,
   },
   card: {
-    padding: uiSpace.xxl,
-    gap: uiSpace.xxl,
+    padding: uiSpace.lg,
+    gap: uiSpace.lg,
   },
   infoCard: {
-    padding: uiSpace.xxl,
+    padding: uiSpace.lg,
     gap: uiSpace.sm,
     backgroundColor: uiColors.surfaceInfo,
     borderColor: uiColors.actionPrimarySubtleBorder,
   },
   warningCard: {
-    padding: uiSpace.xxl,
+    padding: uiSpace.lg,
     gap: uiSpace.sm,
     borderColor: uiColors.borderWarning,
     backgroundColor: uiColors.surfaceWarning,
@@ -581,7 +581,7 @@ const styles = StyleSheet.create({
     gap: uiSpace.sm,
   },
   profilePanel: {
-    gap: uiSpace.xl,
+    gap: uiSpace.lg,
   },
   profileActionRow: {
     flexDirection: 'row',
@@ -600,8 +600,8 @@ const styles = StyleSheet.create({
   },
   valueRow: {
     alignItems: 'flex-start',
-    paddingHorizontal: uiSpace.xxl,
-    paddingVertical: uiSpace.lg,
+    paddingHorizontal: uiSpace.lg,
+    paddingVertical: uiSpace.md,
     borderBottomWidth: uiBorder.width,
     borderBottomColor: uiColors.borderMuted,
     gap: uiSpace.xs,
@@ -618,7 +618,7 @@ const styles = StyleSheet.create({
     textAlign: 'left',
   },
   editFields: {
-    gap: uiSpace.xl,
+    gap: uiSpace.lg,
   },
   editActionRow: {
     flexDirection: 'row',
@@ -626,7 +626,7 @@ const styles = StyleSheet.create({
     gap: uiSpace.sm,
   },
   fieldGroup: {
-    gap: uiSpace.xl,
+    gap: uiSpace.lg,
   },
   fieldBlock: {
     gap: uiSpace.sm,
@@ -638,13 +638,13 @@ const styles = StyleSheet.create({
     backgroundColor: uiColors.surfaceDefault,
     color: uiColors.textPrimary,
     minHeight: 48,
-    paddingHorizontal: uiSpace.xxl,
-    paddingVertical: uiSpace.lg,
+    paddingHorizontal: uiSpace.lg,
+    paddingVertical: uiSpace.md,
     fontSize: uiTypography.size.base,
   },
   feedbackCard: {
-    paddingHorizontal: uiSpace.xxl,
-    paddingVertical: uiSpace.xl,
+    paddingHorizontal: uiSpace.lg,
+    paddingVertical: uiSpace.lg,
   },
   errorCard: {
     borderColor: uiColors.actionDangerSubtleBorder,

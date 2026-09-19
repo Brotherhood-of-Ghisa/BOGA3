@@ -20,7 +20,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: uiColors.borderWarning,
     backgroundColor: uiColors.surfaceWarning,
-    paddingHorizontal: uiSpace.lg,
+    paddingHorizontal: uiSpace.md,
     paddingVertical: uiSpace.sm,
   },
   text: {

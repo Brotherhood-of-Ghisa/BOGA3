@@ -97,8 +97,8 @@ export function GroupStreamRecordCard({
 
 const styles = StyleSheet.create({
   card: {
-    marginLeft: uiSpace.lg,
-    padding: uiSpace.lg,
+    marginLeft: uiSpace.md,
+    padding: uiSpace.md,
     gap: uiSpace.sm,
   },
   summary: {
@@ -117,7 +117,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: uiColors.borderMuted,
     paddingHorizontal: uiSpace.sm,
-    paddingVertical: uiSpace.xxs,
+    paddingVertical: uiSpace.xs,
   },
   group: {
     fontSize: uiTypography.size.sm,

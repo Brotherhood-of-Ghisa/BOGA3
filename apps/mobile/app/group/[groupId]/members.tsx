@@ -179,7 +179,7 @@ function GroupMembersContent({ userId, groupId }: { userId: string; groupId: str
       {feedback ? <GroupWriteNotice message={feedback.message} testID="group-members-action-feedback" tone={feedback.tone} /> : null}
       {group.offline ? <GroupOfflineBanner lastUpdatedAtMs={group.lastUpdatedAtMs} /> : null}
       {inlineError ? <GroupInlineError error={inlineError} onRetry={onRefresh} testID="group-members-inline-error" /> : null}
-      <UiSurface style={{ paddingHorizontal: uiSpace.lg }} testID="group-members-list">
+      <UiSurface style={{ paddingHorizontal: uiSpace.md }} testID="group-members-list">
         {/* Server order: owner, admins, members, then username (contract §4.2). */}
         {data.members.map((member) => (
           <GroupMemberRow

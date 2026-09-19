@@ -5644,26 +5644,26 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    padding: uiSpace.screen,
-    gap: uiSpace.screen,
+    padding: uiSpace.xl,
+    gap: uiSpace.xl,
   },
   loadingState: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: uiSpace.screen,
+    padding: uiSpace.xl,
     gap: uiSpace.sm,
     backgroundColor: uiColors.surfacePage,
   },
   emptyStateScreen: {
     flex: 1,
-    padding: uiSpace.xxl,
-    gap: uiSpace.xxl,
+    padding: uiSpace.lg,
+    gap: uiSpace.lg,
     backgroundColor: uiColors.surfacePage,
   },
   startSessionButton: {
     borderRadius: uiRadius.md,
-    paddingHorizontal: uiSpace.lg,
+    paddingHorizontal: uiSpace.md,
     paddingVertical: uiSpace.md,
     alignItems: 'center',
     justifyContent: 'center',
@@ -5694,7 +5694,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfacePage,
-    paddingHorizontal: uiSpace.xxs,
+    paddingHorizontal: uiSpace.xs,
     paddingBottom: uiSpace.md,
   },
   completedEditNavigationAction: {
@@ -5704,7 +5704,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   completedEditNavigationActionText: {
-    fontSize: 15,
+    fontSize: uiTypography.size.base,
     fontWeight: '600',
     color: uiColors.actionPrimary,
   },
@@ -5714,20 +5714,20 @@ const styles = StyleSheet.create({
   completedEditNavigationTitle: {
     flex: 1,
     textAlign: 'center',
-    fontSize: 17,
+    fontSize: uiTypography.size.lg,
     fontWeight: '700',
     color: uiColors.textPrimary,
   },
   completedEditMetadataCard: {
-    borderRadius: uiRadius.lg,
+    borderRadius: uiRadius.md,
     borderWidth: 1,
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfaceDefault,
-    padding: uiSpace.lg,
-    gap: 6,
+    padding: uiSpace.md,
+    gap: uiSpace.sm,
   },
   completedEditMetadataRow: {
-    gap: 6,
+    gap: uiSpace.sm,
   },
   completedEditMetadataRowDivider: {
     borderTopWidth: 1,
@@ -5750,7 +5750,7 @@ const styles = StyleSheet.create({
     borderColor: uiColors.borderWarning,
     backgroundColor: uiColors.surfaceWarning,
     paddingHorizontal: uiSpace.md,
-    paddingVertical: 9,
+    paddingVertical: uiSpace.sm,
   },
   completedEditSaveBlockedNoticeText: {
     fontSize: uiTypography.size.sm,
@@ -5763,11 +5763,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   section: {
-    padding: uiSpace.lg,
-    borderRadius: uiRadius.lg,
+    padding: uiSpace.md,
+    borderRadius: uiRadius.md,
     borderWidth: 1,
     borderColor: uiColors.borderDefault,
-    gap: uiSpace.lg,
+    gap: uiSpace.md,
     backgroundColor: uiColors.surfaceMuted,
   },
   topRow: {
@@ -5777,7 +5777,7 @@ const styles = StyleSheet.create({
   },
   rowField: {
     flex: 1,
-    gap: 6,
+    gap: uiSpace.sm,
   },
   label: {
     fontSize: uiTypography.size.md,
@@ -5789,7 +5789,7 @@ const styles = StyleSheet.create({
     borderRadius: uiRadius.sm,
     backgroundColor: uiColors.surfaceDefault,
     paddingHorizontal: uiSpace.md,
-    paddingVertical: 9,
+    paddingVertical: uiSpace.sm,
   },
   readOnlyInput: {
     borderWidth: 1,
@@ -5829,7 +5829,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   exerciseList: {
-    gap: uiSpace.lg,
+    gap: uiSpace.md,
   },
   exerciseCard: {
     borderWidth: 1,
@@ -5853,7 +5853,7 @@ const styles = StyleSheet.create({
   exerciseMenuButton: {
     width: 32,
     height: 32,
-    borderRadius: 16,
+    borderRadius: uiRadius.md,
     borderWidth: 1,
     borderColor: uiColors.borderDefault,
     alignItems: 'center',
@@ -5869,12 +5869,12 @@ const styles = StyleSheet.create({
   exerciseHeaderActionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: uiSpace.sm,
   },
   exerciseIconButton: {
     width: 32,
     height: 32,
-    borderRadius: 16,
+    borderRadius: uiRadius.md,
     borderWidth: 1,
     borderColor: uiColors.borderDefault,
     alignItems: 'center',
@@ -5905,7 +5905,7 @@ const styles = StyleSheet.create({
   exerciseTagChipWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
+    gap: uiSpace.sm,
     alignItems: 'center',
   },
   exerciseTagChip: {
@@ -5933,7 +5933,7 @@ const styles = StyleSheet.create({
   exerciseTagChipRemoveButton: {
     width: 18,
     height: 18,
-    borderRadius: 9,
+    borderRadius: uiRadius.sm,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: uiColors.surfaceDefault,
@@ -5941,7 +5941,7 @@ const styles = StyleSheet.create({
     borderColor: uiColors.actionPrimarySubtleBorder,
   },
   exerciseTagChipRemoveButtonText: {
-    fontSize: 10,
+    fontSize: uiTypography.size.xs,
     lineHeight: 12,
     fontWeight: '700',
     color: uiColors.textMuted,
@@ -5957,7 +5957,7 @@ const styles = StyleSheet.create({
   },
   exerciseBlockHistoryPanelCollapsed: {
     minHeight: 34,
-    paddingVertical: 7,
+    paddingVertical: uiSpace.sm,
     justifyContent: 'center',
   },
   exerciseBlockHistoryHeader: {
@@ -5971,7 +5971,7 @@ const styles = StyleSheet.create({
   },
   exerciseBlockHistoryHeadingText: {
     flex: 1,
-    gap: uiSpace.xxs,
+    gap: uiSpace.xs,
   },
   exerciseBlockHistoryTitle: {
     fontSize: uiTypography.size.sm,
@@ -6014,7 +6014,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     flexBasis: '45%',
     minWidth: 92,
-    gap: uiSpace.xxs,
+    gap: uiSpace.xs,
   },
   exerciseBlockHistoryMetricLabel: {
     flex: 1,
@@ -6034,7 +6034,7 @@ const styles = StyleSheet.create({
     color: uiColors.textPrimary,
   },
   exerciseBlockHistoryComparisonTable: {
-    gap: 6,
+    gap: uiSpace.sm,
   },
   exerciseBlockHistoryComparisonRow: {
     flexDirection: 'row',
@@ -6072,7 +6072,7 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     alignItems: 'flex-end',
     justifyContent: 'center',
-    paddingRight: uiSpace.xl,
+    paddingRight: uiSpace.lg,
   },
   swipeDeleteBackground: {
     backgroundColor: uiColors.rowSwipeDeleteBackground,
@@ -6081,7 +6081,7 @@ const styles = StyleSheet.create({
     minWidth: 60,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 1,
+    gap: uiSpace.xs,
   },
   swipeActionIcon: {
     fontSize: uiTypography.size.lg,
@@ -6103,7 +6103,7 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
     backgroundColor: uiColors.surfacePage,
     paddingHorizontal: uiSpace.sm,
-    paddingVertical: 6,
+    paddingVertical: uiSpace.sm,
     gap: uiSpace.sm,
   },
   compactSetRow: {
@@ -6113,7 +6113,7 @@ const styles = StyleSheet.create({
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfaceDefault,
     paddingHorizontal: uiSpace.md,
-    paddingVertical: uiSpace.xxs,
+    paddingVertical: uiSpace.xs,
     flexDirection: 'row',
     alignItems: 'center',
     gap: uiSpace.sm,
@@ -6133,7 +6133,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   setPerformanceControlGlyph: {
-    fontSize: 22,
+    fontSize: uiTypography.size.xxl,
     lineHeight: 24,
     fontWeight: '800',
     color: uiColors.textSecondary,
@@ -6154,19 +6154,19 @@ const styles = StyleSheet.create({
     minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: uiSpace.xl,
+    gap: uiSpace.lg,
   },
   compactSetModifiedLayout: {
     flex: 1,
     minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: uiSpace.xl,
+    gap: uiSpace.lg,
   },
   compactSetModifiedStack: {
     flex: 1,
     minWidth: 0,
-    gap: uiSpace.xxs,
+    gap: uiSpace.xs,
   },
   compactSetValueLine: {
     flexDirection: 'row',
@@ -6242,7 +6242,7 @@ const styles = StyleSheet.create({
     backgroundColor: uiColors.surfaceDefault,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 7,
+    paddingHorizontal: uiSpace.sm,
   },
   setQualityButtonCompact: {
     height: 30,
@@ -6287,8 +6287,8 @@ const styles = StyleSheet.create({
     borderColor: uiColors.borderSuccess,
     borderRadius: uiRadius.md,
     backgroundColor: uiColors.surfaceSuccess,
-    padding: uiSpace.lg,
-    gap: 6,
+    padding: uiSpace.md,
+    gap: uiSpace.sm,
   },
   successTitle: {
     fontSize: uiTypography.size.lg,
@@ -6320,7 +6320,7 @@ const styles = StyleSheet.create({
   modalContainer: {
     flex: 1,
     justifyContent: 'center',
-    padding: uiSpace.xxl,
+    padding: uiSpace.lg,
   },
   modalBackdrop: {
     ...StyleSheet.absoluteFillObject,
@@ -6328,10 +6328,10 @@ const styles = StyleSheet.create({
   },
   modalCard: {
     maxHeight: '90%',
-    borderRadius: uiRadius.lg,
+    borderRadius: uiRadius.md,
     backgroundColor: uiColors.surfaceDefault,
-    padding: uiSpace.xxl,
-    gap: uiSpace.lg,
+    padding: uiSpace.lg,
+    gap: uiSpace.md,
   },
   exercisePickerModalCard: {
     height: '80%',
@@ -6340,7 +6340,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: uiSpace.lg,
+    gap: uiSpace.md,
   },
   exercisePickerHeaderActionRow: {
     flexDirection: 'row',
@@ -6376,8 +6376,8 @@ const styles = StyleSheet.create({
     borderColor: uiColors.borderMuted,
     borderRadius: uiRadius.sm,
     backgroundColor: uiColors.surfacePage,
-    padding: uiSpace.lg,
-    gap: uiSpace.lg,
+    padding: uiSpace.md,
+    gap: uiSpace.md,
   },
   exercisePickerPreselectionTitle: {
     fontSize: uiTypography.size.lg,
@@ -6406,7 +6406,7 @@ const styles = StyleSheet.create({
     maxHeight: 238,
   },
   exercisePickerPlanSetListContent: {
-    gap: 6,
+    gap: uiSpace.sm,
   },
   exercisePickerPlanSetRow: {
     minHeight: 34,
@@ -6415,7 +6415,7 @@ const styles = StyleSheet.create({
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfaceDefault,
     paddingHorizontal: uiSpace.md,
-    paddingVertical: 7,
+    paddingVertical: uiSpace.sm,
     flexDirection: 'row',
     alignItems: 'center',
     gap: uiSpace.sm,
@@ -6450,9 +6450,9 @@ const styles = StyleSheet.create({
     height: '80%',
   },
   setTypeModalCard: {
-    borderRadius: uiRadius.lg,
+    borderRadius: uiRadius.md,
     backgroundColor: uiColors.surfaceDefault,
-    padding: uiSpace.xxl,
+    padding: uiSpace.lg,
     gap: uiSpace.md,
   },
   setTypePickerOption: {
@@ -6496,13 +6496,13 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   confirmationModalCard: {
-    borderRadius: uiRadius.lg,
+    borderRadius: uiRadius.md,
     backgroundColor: uiColors.surfaceDefault,
-    padding: uiSpace.xxl,
-    gap: uiSpace.lg,
+    padding: uiSpace.lg,
+    gap: uiSpace.md,
   },
   confirmationTitle: {
-    fontSize: 20,
+    fontSize: uiTypography.size.xl,
     fontWeight: '700',
     color: uiColors.textPrimary,
   },
@@ -6536,9 +6536,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   actionMenuCard: {
-    borderRadius: uiRadius.lg,
+    borderRadius: uiRadius.md,
     backgroundColor: uiColors.surfaceDefault,
-    padding: uiSpace.xxl,
+    padding: uiSpace.lg,
     gap: uiSpace.md,
   },
   actionMenuSecondaryButton: {
@@ -6554,7 +6554,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   modalTitle: {
-    fontSize: 22,
+    fontSize: uiTypography.size.xxl,
     fontWeight: '700',
   },
   tagPickerActionRow: {
@@ -6569,7 +6569,7 @@ const styles = StyleSheet.create({
   tagActionButton: {
     flex: 0,
     minWidth: 74,
-    paddingHorizontal: uiSpace.lg,
+    paddingHorizontal: uiSpace.md,
   },
   tagActionButtonDisabled: {
     backgroundColor: uiColors.actionPrimaryDisabled,
@@ -6586,7 +6586,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: uiColors.borderDefault,
     borderRadius: uiRadius.sm,
-    paddingHorizontal: uiSpace.lg,
+    paddingHorizontal: uiSpace.md,
     paddingVertical: uiSpace.md,
     backgroundColor: uiColors.surfaceDefault,
   },
@@ -6643,7 +6643,7 @@ const styles = StyleSheet.create({
     borderColor: uiColors.borderDefault,
     borderRadius: uiRadius.sm,
     paddingHorizontal: uiSpace.md,
-    paddingVertical: 9,
+    paddingVertical: uiSpace.sm,
   },
   manageRowHeader: {
     flexDirection: 'row',
@@ -6658,7 +6658,7 @@ const styles = StyleSheet.create({
     borderColor: uiColors.borderDefault,
     borderRadius: uiRadius.sm,
     paddingHorizontal: uiSpace.md,
-    paddingVertical: 9,
+    paddingVertical: uiSpace.sm,
   },
   manageRowDeleted: {
     backgroundColor: uiColors.surfaceMuted,
@@ -6689,7 +6689,7 @@ const styles = StyleSheet.create({
     backgroundColor: uiColors.actionPrimary,
   },
   manageTagEditorIconButtonText: {
-    fontSize: 15,
+    fontSize: uiTypography.size.base,
     fontWeight: '700',
     color: uiColors.surfaceDefault,
   },
@@ -6725,12 +6725,12 @@ const styles = StyleSheet.create({
   },
   manageRowTitle: {
     flex: 1,
-    fontSize: 15,
+    fontSize: uiTypography.size.base,
     fontWeight: '600',
   },
   manageRowTitleStack: {
     flex: 1,
-    gap: 3,
+    gap: uiSpace.xs,
     minWidth: 0,
   },
   gymCoordinateStatus: {
@@ -6744,7 +6744,7 @@ const styles = StyleSheet.create({
     borderColor: uiColors.borderDefault,
     borderRadius: uiRadius.sm,
     paddingHorizontal: uiSpace.md,
-    paddingVertical: 9,
+    paddingVertical: uiSpace.sm,
     backgroundColor: uiColors.surfaceMuted,
   },
   gymCoordinateFeedback: {
@@ -6764,7 +6764,7 @@ const styles = StyleSheet.create({
     borderColor: uiColors.borderWarning,
     backgroundColor: uiColors.surfaceWarning,
     paddingHorizontal: uiSpace.md,
-    paddingVertical: 9,
+    paddingVertical: uiSpace.sm,
   },
   gymCoordinateConfirmText: {
     fontSize: uiTypography.size.sm,
@@ -6833,7 +6833,7 @@ const styles = StyleSheet.create({
     borderRadius: uiRadius.sm,
     borderWidth: 1,
     borderColor: uiColors.actionPrimary,
-    paddingHorizontal: uiSpace.lg,
+    paddingHorizontal: uiSpace.md,
     paddingVertical: uiSpace.sm,
     alignItems: 'center',
   },
@@ -6843,7 +6843,7 @@ const styles = StyleSheet.create({
   },
   inlineArchiveButton: {
     borderRadius: uiRadius.sm,
-    paddingHorizontal: uiSpace.lg,
+    paddingHorizontal: uiSpace.md,
     paddingVertical: uiSpace.sm,
     alignItems: 'center',
   },

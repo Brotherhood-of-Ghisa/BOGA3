@@ -63,7 +63,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: uiSpace.lg,
+    gap: uiSpace.md,
     backgroundColor: uiColors.surfacePage,
   },
   loadingLabel: {

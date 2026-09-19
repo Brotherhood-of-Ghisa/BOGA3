@@ -313,17 +313,19 @@ tests, snapshots and stories.
 3. Temporary exceptions require an explicit allowlist entry and rationale in `apps/mobile/scripts/ui-guardrails.config.js`.
 4. As of Task `T-20260226-06`, the current route screens (`stats-history`, `session-recorder`, `exercise-catalog`, `completed-session/[sessionId]`) no longer require raw-color allowlist exceptions.
 
-**Ratchet rules (budgeted, may only fall):**
+**Ratchet rules — all now at budget `0`:**
 
 5. `rawFontSize`, `rawSpacing` and `rawRadius` flag numeric literals for
    `fontSize`, the `padding`/`margin`/`gap` family, and the `borderRadius`
    family. Use `uiTypography.size.*`, `uiSpace.*` and `uiRadius.*` instead.
-6. Each carries a `budget` in `apps/mobile/scripts/ui-guardrails.config.js`
-   equal to the count that exists today. The check fails when a change goes
-   **over** budget, and equally when it drops **under** budget without lowering
-   the number — so a budget only ever travels downwards.
-7. **Raising a budget is never the fix for a failure.** After removing raw
-   values, lower the budget with `--update-budgets` (below) in the same change.
+6. Each carries a `budget` in `apps/mobile/scripts/ui-guardrails.config.js`.
+   They started at 196 / 416 / 130 and reached **0**, so in practice all four
+   rules are now zero-tolerance. The mechanism stays: the check fails when a
+   change goes **over** budget, and equally when it drops **under** budget
+   without lowering the number.
+7. **Raising a budget is never the fix for a failure.** If a screen genuinely
+   needs a value the scale does not have, that is a case for changing the
+   scale in `tokens.ts` — not for reintroducing a literal.
 8. `0` is not counted for spacing or radius: it is the absence of the value, not
    a point on the scale.
 
@@ -334,32 +336,36 @@ Guardrail commands (run from `apps/mobile/`):
 - Per-violation detail for the ratchet rules: `npm run lint:ui-guardrails -- --verbose`
 - Lower budgets after a cleanup: `npm run lint:ui-guardrails -- --update-budgets`
 
-### 9a. Token scale decisions (targets for the ratchet)
+### 9a. The token scales (current, enforced)
 
-The ratchet budgets exist because the scales below are not yet what the app
-uses. These are the agreed targets; migration is incremental and each step
-lowers a budget.
+Every value below is what `apps/mobile/components/ui/tokens.ts` holds, and the
+guardrail keeps screens on them.
 
-1. **Body text is 14px.** Decided 2026-09-19. `uiTypography.size.base` stays at
-   14; larger body was considered for gym-floor legibility and rejected in
-   favour of density in the recorder.
-2. **Type collapses to 7 sizes** — `11, 12, 13, 14, 16, 18, 24`. Today 14
-   distinct sizes ship. `9` and `10` fold up into `11` (a legibility gain);
-   `15` and `17` fold to `14`/`16`; `20`, `22` and `26` fold to `18`/`24`.
-3. **Uppercase is one role.** Only the 11px micro-label role uses
-   `textTransform: 'uppercase'`; it is not applied at other sizes.
-4. **Every text role declares a line-height.** Today 42 of ~197 text styles set
-   one, so vertical rhythm is font-dependent.
-5. **Radius collapses to 3 values** — `8` (controls), `12` (surfaces), `999`
-   (pills). Today 10 distinct radii ship; `8` and `12` already carry the
-   majority.
-6. **Spacing targets 6 steps** — `4, 8, 12, 16, 24, 32`. Today's `uiSpace`
-   interleaves `10`, `14` and `20`, which makes every value on-scale and the
-   scale non-constraining.
-7. **Elevation is a missing axis.** There are no shadows anywhere; every
-   surface is a 1px border on white, which is why page cards, modals, sheets
-   and the tab tray read as one flat layer. Three levels are intended: flat
-   (border only), raised (card), overlay (sheet/modal).
+1. **Type: 7 sizes.** `xs 11 · sm 12 · md 13 · base 14 · lg 16 · xl 18 · xxl 24`.
+   Down from the 14 distinct sizes that used to ship. `base` stays at **14px**
+   by decision (2026-09-19): density in the recorder was chosen over
+   gym-floor legibility. `9` and `10` folded up into `11`, `15` into `14`,
+   `17` into `16`, `20` into `18`, and `22`/`26` into `24`.
+2. **Every size has a line-height**, in `uiTypography.lineHeight`, keyed to the
+   same names: `15 · 16 · 18 · 20 · 22 · 24 · 30`. `UiText`'s prose variants
+   apply them, so vertical rhythm no longer depends on the platform font's
+   own leading.
+3. **Uppercase is one role.** Reserve `textTransform: 'uppercase'` for 11px
+   micro-labels; do not apply it at other sizes.
+4. **Spacing: 6 steps.** `xs 4 · sm 8 · md 12 · lg 16 · xl 24 · xxl 32`. The
+   old scale interleaved `2 / 10 / 14 / 20` with the 4/8/12/16 rhythm, which
+   made every value on-scale and the scale non-constraining. The retired
+   `xxs` (2) and `screen` (20) keys are gone — page gutters use `xl`.
+5. **Radius: 3 values.** `sm 8` for controls, `md 12` for surfaces,
+   `full 999` for pills. Down from 10 distinct radii. If two radii sit side by
+   side and the difference cannot be named, there is only one radius.
+6. **Elevation: 3 levels**, in `uiElevation` — `flat` (border only, and
+   deliberately an empty object so it adds no style keys), `raised` (cards
+   above the page), `overlay` (sheets and modals). Opt in through
+   `UiSurface`'s `elevation` prop; the default is `flat`, so nothing changed
+   by adding it. **Applying `raised` / `overlay` to specific surfaces is still
+   open** — it is the fix for page cards, modals, sheets and the tab tray all
+   reading as one flat layer, and it wants a look on device before it lands.
 
 ### 9b. Appearance: light only
 

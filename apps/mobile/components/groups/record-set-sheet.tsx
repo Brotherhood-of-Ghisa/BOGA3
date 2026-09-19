@@ -177,17 +177,17 @@ const styles = StyleSheet.create({
   },
   panel: {
     maxHeight: '85%',
-    borderTopLeftRadius: uiRadius.xl,
-    borderTopRightRadius: uiRadius.xl,
+    borderTopLeftRadius: uiRadius.md,
+    borderTopRightRadius: uiRadius.md,
     backgroundColor: uiColors.surfaceDefault,
   },
   body: {
     gap: uiSpace.sm,
-    padding: uiSpace.screen,
-    paddingBottom: uiSpace.screen * 2,
+    padding: uiSpace.xl,
+    paddingBottom: uiSpace.xl * 2,
   },
   status: {
-    gap: uiSpace.xxs,
+    gap: uiSpace.xs,
     paddingTop: uiSpace.xs,
   },
 });

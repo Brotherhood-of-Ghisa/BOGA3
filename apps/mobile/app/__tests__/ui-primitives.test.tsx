@@ -60,7 +60,7 @@ describe('UI primitives', () => {
     const surfaceStyle = StyleSheet.flatten(surface.props.style);
     const textStyle = StyleSheet.flatten(text.props.style);
 
-    expect(surfaceStyle.borderRadius).toBe(uiRadius.lg);
+    expect(surfaceStyle.borderRadius).toBe(uiRadius.md);
     expect(textStyle.color).toBe(uiColors.textMuted);
   });
 

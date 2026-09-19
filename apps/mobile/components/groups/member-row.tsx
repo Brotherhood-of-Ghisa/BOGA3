@@ -73,6 +73,6 @@ const styles = StyleSheet.create({
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfacePage,
     paddingHorizontal: uiSpace.sm,
-    paddingVertical: uiSpace.xxs,
+    paddingVertical: uiSpace.xs,
   },
 });

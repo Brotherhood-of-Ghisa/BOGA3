@@ -100,7 +100,7 @@ const styles = StyleSheet.create({
   text: {
     flex: 1,
     minWidth: 0,
-    gap: uiSpace.xxs,
+    gap: uiSpace.xs,
   },
   chevron: {
     color: uiColors.textSecondary,
@@ -111,7 +111,7 @@ const styles = StyleSheet.create({
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfacePage,
     paddingHorizontal: uiSpace.sm,
-    paddingVertical: uiSpace.xxs,
+    paddingVertical: uiSpace.xs,
   },
   linkButton: {
     alignSelf: 'flex-start',
