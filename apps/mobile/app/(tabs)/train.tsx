@@ -326,9 +326,9 @@ const styles = StyleSheet.create({
     backgroundColor: uiColors.surfacePage,
   },
   content: {
-    padding: uiSpace.screen,
-    paddingBottom: uiSpace.screen,
-    gap: uiSpace.xxl,
+    padding: uiSpace.xl,
+    paddingBottom: uiSpace.xl,
+    gap: uiSpace.lg,
   },
   intro: {
     gap: uiSpace.sm,
@@ -341,8 +341,8 @@ const styles = StyleSheet.create({
     gap: uiSpace.md,
   },
   card: {
-    padding: uiSpace.xxl,
-    gap: uiSpace.lg,
+    padding: uiSpace.lg,
+    gap: uiSpace.md,
   },
   activeCard: {
     borderColor: uiColors.borderSuccess,

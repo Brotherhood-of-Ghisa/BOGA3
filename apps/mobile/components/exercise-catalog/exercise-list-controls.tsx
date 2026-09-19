@@ -246,12 +246,12 @@ const styles = StyleSheet.create({
     color: uiColors.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 0.4,
-    marginTop: 6,
+    marginTop: uiSpace.sm,
   },
   pillRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
+    gap: uiSpace.sm,
   },
   filterPill: {
     borderRadius: uiRadius.full,
@@ -259,7 +259,7 @@ const styles = StyleSheet.create({
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfaceDefault,
     paddingHorizontal: uiSpace.md,
-    paddingVertical: 5,
+    paddingVertical: uiSpace.xs,
   },
   filterPillSelected: {
     backgroundColor: uiColors.actionPrimarySubtleBg,
@@ -279,7 +279,7 @@ const styles = StyleSheet.create({
     color: uiColors.textSecondary,
   },
   groupSection: {
-    gap: 6,
+    gap: uiSpace.sm,
   },
   groupHeader: {
     minHeight: 34,
@@ -304,12 +304,12 @@ const styles = StyleSheet.create({
   exerciseListRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: uiSpace.sm,
     borderWidth: 1,
     borderColor: uiColors.borderMuted,
     borderRadius: uiRadius.sm,
     paddingHorizontal: uiSpace.sm,
-    paddingVertical: 7,
+    paddingVertical: uiSpace.sm,
     backgroundColor: uiColors.surfaceDefault,
   },
   exerciseListRowMainPressable: {
@@ -317,12 +317,12 @@ const styles = StyleSheet.create({
   },
   exerciseListRowTextStack: {
     flex: 1,
-    gap: 1,
+    gap: uiSpace.xs,
   },
   exerciseListRowTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: uiSpace.sm,
   },
   exerciseListRowTitle: {
     flexShrink: 1,
@@ -340,17 +340,17 @@ const styles = StyleSheet.create({
     fontSize: uiTypography.size.xs,
     color: uiColors.textAccentMuted,
     fontWeight: '600',
-    marginTop: uiSpace.xxs,
+    marginTop: uiSpace.xs,
   },
   deletedExerciseChip: {
-    fontSize: 9,
+    fontSize: uiTypography.size.xs,
     fontWeight: '700',
     color: uiColors.textWarning,
     borderWidth: 1,
     borderColor: uiColors.borderWarning,
     backgroundColor: uiColors.surfaceWarning,
     borderRadius: uiRadius.full,
-    paddingHorizontal: 6,
-    paddingVertical: uiSpace.xxs,
+    paddingHorizontal: uiSpace.sm,
+    paddingVertical: uiSpace.xs,
   },
 });

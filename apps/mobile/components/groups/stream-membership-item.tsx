@@ -45,8 +45,8 @@ const styles = StyleSheet.create({
   row: {
     minHeight: 44,
     justifyContent: 'center',
-    gap: uiSpace.xxs,
-    paddingHorizontal: uiSpace.lg,
+    gap: uiSpace.xs,
+    paddingHorizontal: uiSpace.md,
     paddingVertical: uiSpace.sm,
     borderLeftWidth: 3,
     borderLeftColor: uiColors.borderMuted,

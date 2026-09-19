@@ -561,7 +561,7 @@ const styles = StyleSheet.create({
   modalRoot: {
     flex: 1,
     justifyContent: 'center',
-    padding: uiSpace.xxl,
+    padding: uiSpace.lg,
   },
   modalOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -569,12 +569,12 @@ const styles = StyleSheet.create({
   },
   modalCard: {
     height: '80%',
-    borderRadius: uiRadius.xl,
+    borderRadius: uiRadius.md,
     borderWidth: 1,
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfaceDefault,
-    padding: uiSpace.xl,
-    gap: uiSpace.lg,
+    padding: uiSpace.lg,
+    gap: uiSpace.md,
   },
   modalHeaderRow: {
     flexDirection: 'row',
@@ -592,14 +592,14 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 24,
+    padding: uiSpace.xl,
   },
   modalScroll: {
     flex: 1,
   },
   modalScrollContent: {
     gap: uiSpace.md,
-    paddingBottom: 6,
+    paddingBottom: uiSpace.sm,
   },
   fieldLabel: {
     fontSize: uiTypography.size.sm,
@@ -628,7 +628,7 @@ const styles = StyleSheet.create({
     backgroundColor: uiColors.surfaceDefault,
     minHeight: 42,
     paddingHorizontal: uiSpace.md,
-    paddingVertical: 9,
+    paddingVertical: uiSpace.sm,
     flexDirection: 'row',
     alignItems: 'center',
     gap: uiSpace.sm,
@@ -658,17 +658,17 @@ const styles = StyleSheet.create({
     backgroundColor: uiColors.surfaceMuted,
     paddingHorizontal: uiSpace.sm,
     paddingVertical: uiSpace.sm,
-    gap: 6,
+    gap: uiSpace.sm,
   },
   secondaryMuscleRowControls: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: uiSpace.sm,
   },
   secondaryMuscleLabelCell: {
     flex: 1,
     minWidth: 0,
-    gap: 1,
+    gap: uiSpace.xs,
   },
   secondaryMuscleRowTitle: {
     fontSize: uiTypography.size.sm,
@@ -724,7 +724,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: uiSpace.md,
-    paddingHorizontal: uiSpace.lg,
+    paddingHorizontal: uiSpace.md,
     minHeight: 42,
   },
   primaryButtonText: {
@@ -734,25 +734,25 @@ const styles = StyleSheet.create({
   selectorOverlayLayer: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
-    padding: uiSpace.lg,
+    padding: uiSpace.md,
   },
   selectorOverlayBackdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: uiColors.overlayScrimSoft,
-    borderRadius: uiRadius.xl,
+    borderRadius: uiRadius.md,
   },
   selectorOverlayCard: {
     height: '80%',
-    borderRadius: uiRadius.xl,
+    borderRadius: uiRadius.md,
     borderWidth: 1,
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfaceDefault,
-    padding: uiSpace.xl,
+    padding: uiSpace.lg,
     gap: uiSpace.md,
   },
   selectorList: {
     gap: uiSpace.sm,
-    paddingBottom: 24,
+    paddingBottom: uiSpace.xl,
   },
   selectorListRow: {
     borderWidth: 1,
@@ -768,7 +768,7 @@ const styles = StyleSheet.create({
   selectorListRowTextStack: {
     flex: 1,
     minWidth: 0,
-    gap: 1,
+    gap: uiSpace.xs,
   },
   selectorListRowTitle: {
     fontSize: uiTypography.size.md,
@@ -792,7 +792,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: uiSpace.md,
-    paddingHorizontal: uiSpace.lg,
+    paddingHorizontal: uiSpace.md,
     minHeight: 42,
     flex: 1,
   },

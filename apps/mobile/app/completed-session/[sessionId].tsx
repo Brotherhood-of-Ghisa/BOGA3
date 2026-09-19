@@ -968,17 +968,17 @@ export default function CompletedSessionDetailRoute() {
 
 const styles = StyleSheet.create({
   content: {
-    padding: uiSpace.screen,
-    gap: uiSpace.xxl,
+    padding: uiSpace.xl,
+    gap: uiSpace.lg,
     backgroundColor: uiColors.surfacePage,
   },
   stickyActionBarWrap: {
     backgroundColor: uiColors.surfacePage,
-    paddingBottom: uiSpace.xxs,
+    paddingBottom: uiSpace.xs,
   },
   centerState: {
     flex: 1,
-    padding: uiSpace.screen,
+    padding: uiSpace.xl,
     alignItems: 'center',
     justifyContent: 'center',
     gap: uiSpace.sm,
@@ -1000,12 +1000,12 @@ const styles = StyleSheet.create({
     color: uiColors.actionPrimary,
   },
   headerCard: {
-    borderRadius: uiRadius.xl,
+    borderRadius: uiRadius.md,
     borderWidth: 1,
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfaceDefault,
-    padding: uiSpace.xl,
-    gap: uiSpace.lg,
+    padding: uiSpace.lg,
+    gap: uiSpace.md,
   },
   metricGrid: {
     flexDirection: 'row',
@@ -1014,7 +1014,7 @@ const styles = StyleSheet.create({
   },
   metricCell: {
     width: '48%',
-    gap: uiSpace.xxs,
+    gap: uiSpace.xs,
   },
   metricLabel: {
     color: uiColors.textSecondary,
@@ -1027,17 +1027,17 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   actionBarCard: {
-    borderRadius: uiRadius.xl,
+    borderRadius: uiRadius.md,
     borderWidth: 1,
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfaceDefault,
     padding: uiSpace.md,
-    gap: 6,
+    gap: uiSpace.sm,
   },
   actionBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: uiSpace.sm,
   },
   actionBarButton: {
     flex: 1,
@@ -1090,7 +1090,7 @@ const styles = StyleSheet.create({
   exerciseAppendButton: {
     borderRadius: uiRadius.md,
     paddingHorizontal: uiSpace.md,
-    paddingVertical: 7,
+    paddingVertical: uiSpace.sm,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
@@ -1103,7 +1103,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   editModeBanner: {
-    borderRadius: uiRadius.lg,
+    borderRadius: uiRadius.md,
     borderWidth: 1,
     borderColor: uiColors.actionPrimarySubtleBorder,
     backgroundColor: uiColors.surfaceInfo,
@@ -1137,7 +1137,7 @@ const styles = StyleSheet.create({
     borderRadius: uiRadius.sm,
     backgroundColor: uiColors.surfaceDefault,
     paddingHorizontal: uiSpace.md,
-    paddingVertical: 9,
+    paddingVertical: uiSpace.sm,
     color: uiColors.textPrimary,
     fontWeight: '600',
   },
@@ -1164,7 +1164,7 @@ const styles = StyleSheet.create({
     borderRadius: uiRadius.sm,
     backgroundColor: uiColors.surfaceDefault,
     paddingHorizontal: uiSpace.sm,
-    paddingVertical: 7,
+    paddingVertical: uiSpace.sm,
     color: uiColors.textPrimary,
     fontWeight: '600',
   },
@@ -1178,7 +1178,7 @@ const styles = StyleSheet.create({
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfacePage,
     paddingHorizontal: uiSpace.sm,
-    paddingVertical: 6,
+    paddingVertical: uiSpace.sm,
     gap: uiSpace.sm,
   },
   setTableRow: {
@@ -1188,7 +1188,7 @@ const styles = StyleSheet.create({
     borderColor: uiColors.borderMuted,
     borderTopWidth: 0,
     paddingHorizontal: uiSpace.sm,
-    paddingVertical: 7,
+    paddingVertical: uiSpace.sm,
     gap: uiSpace.sm,
     backgroundColor: uiColors.surfaceDefault,
   },
@@ -1218,7 +1218,7 @@ const styles = StyleSheet.create({
   exerciseTagChipWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
+    gap: uiSpace.sm,
     alignItems: 'center',
   },
   exerciseTagChip: {

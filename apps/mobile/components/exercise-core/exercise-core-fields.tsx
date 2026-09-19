@@ -97,7 +97,7 @@ const styles = StyleSheet.create({
     borderRadius: uiRadius.sm,
     backgroundColor: uiColors.surfaceDefault,
     paddingHorizontal: uiSpace.md,
-    paddingVertical: 9,
+    paddingVertical: uiSpace.sm,
   },
   nameInput: {
     height: 42,

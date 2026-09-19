@@ -315,6 +315,6 @@ const styles = StyleSheet.create({
   titleText: {
     flex: 1,
     minWidth: 0,
-    gap: uiSpace.xxs,
+    gap: uiSpace.xs,
   },
 });

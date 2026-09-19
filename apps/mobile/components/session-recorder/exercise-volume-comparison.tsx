@@ -164,7 +164,7 @@ export function ExerciseVolumeComparisonRow({
 
 const styles = StyleSheet.create({
   surface: {
-    padding: uiSpace.lg,
+    padding: uiSpace.md,
     gap: uiSpace.sm,
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfaceDefault,

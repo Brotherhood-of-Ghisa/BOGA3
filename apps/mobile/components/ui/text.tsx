@@ -34,29 +34,35 @@ const styles = StyleSheet.create({
 const variantStyles = StyleSheet.create({
   body: {
     fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
     color: uiColors.textPrimary,
   },
   bodyMuted: {
     fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
     color: uiColors.textMuted,
   },
   label: {
     fontSize: uiTypography.size.md,
+    lineHeight: uiTypography.lineHeight.md,
     fontWeight: uiTypography.weight.semibold,
     color: uiColors.textPrimary,
   },
   labelStrong: {
     fontSize: uiTypography.size.md,
+    lineHeight: uiTypography.lineHeight.md,
     fontWeight: uiTypography.weight.bold,
     color: uiColors.textPrimary,
   },
   title: {
     fontSize: uiTypography.size.lg,
+    lineHeight: uiTypography.lineHeight.lg,
     fontWeight: uiTypography.weight.bold,
     color: uiColors.textPrimary,
   },
   subtitle: {
     fontSize: uiTypography.size.sm,
+    lineHeight: uiTypography.lineHeight.sm,
     fontWeight: uiTypography.weight.semibold,
     color: uiColors.textSecondary,
   },

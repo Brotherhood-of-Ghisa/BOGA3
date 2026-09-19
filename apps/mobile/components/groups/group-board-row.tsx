@@ -61,7 +61,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: uiSpace.md,
-    padding: uiSpace.lg,
+    padding: uiSpace.md,
   },
   rank: {
     minWidth: 28,
@@ -70,10 +70,10 @@ const styles = StyleSheet.create({
   body: {
     flex: 1,
     minWidth: 0,
-    gap: uiSpace.xxs,
+    gap: uiSpace.xs,
   },
   trailing: {
     alignItems: 'flex-end',
-    gap: uiSpace.xxs,
+    gap: uiSpace.xs,
   },
 });

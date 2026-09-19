@@ -6,14 +6,16 @@
 //    `app/**` or `components/**` blocks on sight. `allowlistedFiles` is the
 //    escape hatch and is meant to stay empty.
 //
-// 2. `ratchetRules` — type, spacing and radius. These started well above zero
-//    (see docs/specs/ui/ux-rules.md §3), so each carries a `budget` equal to
-//    the number of raw values that exist right now. The check fails when a
-//    change puts the count OVER budget, and equally when it drops UNDER budget
-//    without lowering the number — so the budget only ever travels downwards.
+// 2. `ratchetRules` — type, spacing and radius. These started at 196 / 416 /
+//    130 and have reached 0, so in practice all four rules are now
+//    zero-tolerance. The mechanism stays: the check fails when a change puts
+//    the count OVER budget, and equally when it drops UNDER budget without
+//    lowering the number — so a budget only ever travels downwards.
 //
-//    Raising a budget is never the fix for a failure. To lower one after
-//    removing raw values, run from `apps/mobile/`:
+//    Raising a budget is never the fix for a failure. If a screen genuinely
+//    needs a value the scale lacks, change the scale in components/ui/tokens.ts
+//    (and ux-rules.md §9a) rather than reintroducing a literal. To lower a
+//    budget after removing raw values, run from `apps/mobile/`:
 //
 //      npm run lint:ui-guardrails -- --update-budgets
 //
@@ -27,15 +29,15 @@ module.exports = {
 
   ratchetRules: {
     rawFontSize: {
-      budget: 36,
+      budget: 0,
       allowlistedFiles: [],
     },
     rawSpacing: {
-      budget: 78,
+      budget: 0,
       allowlistedFiles: [],
     },
     rawRadius: {
-      budget: 11,
+      budget: 0,
       allowlistedFiles: [],
     },
   },

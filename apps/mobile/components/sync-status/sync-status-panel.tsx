@@ -171,14 +171,14 @@ const resolveErrorText = (status: SyncStatusSnapshot | null): string => {
 
 const styles = StyleSheet.create({
   card: {
-    padding: uiSpace.xxl,
+    padding: uiSpace.lg,
     gap: uiSpace.md,
   },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    gap: uiSpace.lg,
+    gap: uiSpace.md,
   },
   fieldLabel: {
     flexShrink: 0,

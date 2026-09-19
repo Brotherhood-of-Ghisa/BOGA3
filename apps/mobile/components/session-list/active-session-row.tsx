@@ -101,7 +101,7 @@ export function ActiveSessionRow({
 
 const styles = StyleSheet.create({
   sessionRow: {
-    borderRadius: uiRadius.lg,
+    borderRadius: uiRadius.md,
     borderWidth: 1,
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfaceDefault,
@@ -109,7 +109,7 @@ const styles = StyleSheet.create({
     paddingVertical: uiSpace.sm,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: uiSpace.sm,
   },
   activeSessionRow: {
     borderColor: uiColors.borderSuccess,
@@ -122,7 +122,7 @@ const styles = StyleSheet.create({
   sessionRowActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: uiSpace.sm,
   },
   iconActionButton: {
     width: 28,
@@ -155,7 +155,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: uiSpace.screen,
+    padding: uiSpace.xl,
   },
   modalOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -164,11 +164,11 @@ const styles = StyleSheet.create({
   modalPanel: {
     width: '100%',
     maxWidth: 360,
-    borderRadius: uiRadius.xl,
+    borderRadius: uiRadius.md,
     borderWidth: 1,
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfaceDefault,
-    padding: uiSpace.xl,
+    padding: uiSpace.lg,
     gap: uiSpace.md,
   },
   modalActionButton: {

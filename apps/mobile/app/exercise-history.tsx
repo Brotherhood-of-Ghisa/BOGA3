@@ -513,13 +513,13 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: uiColors.surfacePage,
-    padding: uiSpace.xxl,
-    gap: uiSpace.xxl,
+    padding: uiSpace.lg,
+    gap: uiSpace.lg,
   },
   contentRegion: {
     flex: 1,
     minHeight: 0,
-    gap: uiSpace.lg,
+    gap: uiSpace.md,
   },
   periodChipsRow: {
     flexDirection: 'row',
@@ -532,7 +532,7 @@ const styles = StyleSheet.create({
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfaceDefault,
     paddingHorizontal: uiSpace.md,
-    paddingVertical: 6,
+    paddingVertical: uiSpace.sm,
   },
   periodChipSelected: {
     borderColor: uiColors.actionPrimary,
@@ -556,7 +556,7 @@ const styles = StyleSheet.create({
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfaceDefault,
     paddingHorizontal: uiSpace.md,
-    paddingVertical: 5,
+    paddingVertical: uiSpace.xs,
     maxWidth: 220,
   },
   tagChipSelected: {
@@ -580,16 +580,16 @@ const styles = StyleSheet.create({
     minHeight: 0,
   },
   scrollContent: {
-    gap: uiSpace.lg,
-    paddingBottom: uiSpace.xxl,
+    gap: uiSpace.md,
+    paddingBottom: uiSpace.lg,
   },
   statePanel: {
-    borderRadius: uiRadius.lg,
+    borderRadius: uiRadius.md,
     borderWidth: 1,
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfaceDefault,
-    padding: uiSpace.xxl,
-    gap: 6,
+    padding: uiSpace.lg,
+    gap: uiSpace.sm,
   },
   stateTitle: {
     fontSize: uiTypography.size.base,
@@ -613,11 +613,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   bestCard: {
-    borderRadius: uiRadius.xl,
+    borderRadius: uiRadius.md,
     borderWidth: 1,
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfaceDefault,
-    padding: uiSpace.lg,
+    padding: uiSpace.md,
     gap: uiSpace.sm,
   },
   bestCardTitle: {
@@ -632,13 +632,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfacePage,
-    paddingHorizontal: uiSpace.lg,
+    paddingHorizontal: uiSpace.md,
     paddingVertical: uiSpace.md,
   },
   bestRowInner: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: uiSpace.lg,
+    gap: uiSpace.md,
   },
   bestRowLabel: {
     flex: 1,
@@ -647,7 +647,7 @@ const styles = StyleSheet.create({
     color: uiColors.textSecondary,
   },
   bestRowPrimary: {
-    fontSize: 15,
+    fontSize: uiTypography.size.base,
     fontWeight: '700',
     color: uiColors.textPrimary,
   },
@@ -657,11 +657,11 @@ const styles = StyleSheet.create({
     color: uiColors.textSecondary,
   },
   sessionCard: {
-    borderRadius: uiRadius.xl,
+    borderRadius: uiRadius.md,
     borderWidth: 1,
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfaceDefault,
-    padding: uiSpace.lg,
+    padding: uiSpace.md,
     gap: uiSpace.md,
   },
   sessionCardHeader: {
@@ -685,7 +685,7 @@ const styles = StyleSheet.create({
   sessionTagWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
+    gap: uiSpace.sm,
   },
   sessionTagChip: {
     borderWidth: 1,
@@ -713,10 +713,10 @@ const styles = StyleSheet.create({
   },
   sessionMetric: {
     minWidth: 90,
-    gap: uiSpace.xxs,
+    gap: uiSpace.xs,
   },
   sessionMetricLabel: {
-    fontSize: 10,
+    fontSize: uiTypography.size.xs,
     color: uiColors.textSecondary,
     fontWeight: '700',
     textTransform: 'uppercase',
@@ -737,7 +737,7 @@ const styles = StyleSheet.create({
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfacePage,
     paddingHorizontal: uiSpace.sm,
-    paddingVertical: 6,
+    paddingVertical: uiSpace.sm,
     gap: uiSpace.sm,
   },
   setTableHeaderCell: {
@@ -753,7 +753,7 @@ const styles = StyleSheet.create({
     borderColor: uiColors.borderMuted,
     borderTopWidth: 0,
     paddingHorizontal: uiSpace.sm,
-    paddingVertical: 7,
+    paddingVertical: uiSpace.sm,
     gap: uiSpace.sm,
     backgroundColor: uiColors.surfaceDefault,
   },
@@ -778,15 +778,15 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   setTableTypeBadge: {
-    fontSize: 10,
+    fontSize: uiTypography.size.xs,
     fontWeight: '700',
     color: uiColors.actionPrimary,
     borderWidth: 1,
     borderColor: uiColors.actionPrimarySubtleBorder,
     backgroundColor: uiColors.actionPrimarySubtleBg,
-    borderRadius: 6,
+    borderRadius: uiRadius.sm,
     paddingHorizontal: uiSpace.xs,
-    paddingVertical: uiSpace.xxs,
+    paddingVertical: uiSpace.xs,
   },
   setTableTypeBadgeWarmUp: {
     color: uiColors.textWarning,
@@ -794,7 +794,7 @@ const styles = StyleSheet.create({
     borderColor: uiColors.borderWarning,
   },
   setTableTypeBadgeEmpty: {
-    fontSize: 10,
+    fontSize: uiTypography.size.xs,
     fontWeight: '600',
     color: uiColors.textSecondary,
   },

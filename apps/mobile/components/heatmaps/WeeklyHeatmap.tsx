@@ -5,7 +5,7 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { LayoutChangeEvent, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { uiColors, uiSpace } from '@/components/ui';
+import { uiColors, uiRadius, uiSpace, uiTypography } from '@/components/ui';
 
 import { HEAT_RAMP } from './heatmap-metric';
 import type { HeatmapData } from './heatmapData';
@@ -96,7 +96,7 @@ export function WeeklyHeatmap({
           showsHorizontalScrollIndicator={false}
           onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: false })}>
           {/* paddingTop leaves room for the selected-week marker (top: -14) above the bars */}
-          <View style={{ width: contentW, paddingTop: uiSpace.xl }}>
+          <View style={{ width: contentW, paddingTop: uiSpace.lg }}>
             {/* chart */}
             <View style={{ height: MAXH }}>
               <View style={styles.bars}>
@@ -115,7 +115,7 @@ export function WeeklyHeatmap({
                         style={{
                           width: cell,
                           height: h,
-                          borderRadius: 3,
+                          borderRadius: uiRadius.sm,
                           backgroundColor: w.level ? HEAT_RAMP[w.level] : uiColors.heatmapNeutralBg,
                           borderWidth: w.isCurrentWeek || on ? 1.6 : 0,
                           borderColor: w.isCurrentWeek
@@ -165,7 +165,7 @@ export function WeeklyHeatmap({
                   }}>
                   <Text
                     style={{
-                      fontSize: 9,
+                      fontSize: uiTypography.size.xs,
                       fontWeight: '700',
                       color:
                         weeks[selectedIndex]?.isCurrentWeek ? accent : uiColors.textSecondary,
@@ -201,7 +201,7 @@ export function WeeklyHeatmap({
               style={{
                 width: 12,
                 height: 12,
-                borderRadius: 3,
+                borderRadius: uiRadius.sm,
                 backgroundColor: color,
                 borderWidth: i === 0 ? StyleSheet.hairlineWidth : 0,
                 borderColor: uiColors.heatmapNeutralBorder,
@@ -221,10 +221,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'baseline',
-    marginBottom: 18,
+    marginBottom: uiSpace.lg,
   },
-  h1: { fontSize: 15, fontWeight: '600', color: uiColors.textPrimary },
-  muted: { fontSize: 10, color: uiColors.textMuted },
+  h1: { fontSize: uiTypography.size.base, fontWeight: '600', color: uiColors.textPrimary },
+  muted: { fontSize: uiTypography.size.xs, color: uiColors.textMuted },
   baseline: {
     position: 'absolute',
     left: 0,
@@ -243,15 +243,15 @@ const styles = StyleSheet.create({
   baseLabel: {
     position: 'absolute',
     right: 0,
-    fontSize: 9,
+    fontSize: uiTypography.size.xs,
     color: uiColors.textSecondary,
     backgroundColor: 'transparent',
-    paddingHorizontal: uiSpace.xxs,
+    paddingHorizontal: uiSpace.xs,
   },
   bars: { flexDirection: 'row', alignItems: 'flex-end', height: '100%' },
   axis: {
     position: 'relative',
-    marginTop: 5,
+    marginTop: uiSpace.xs,
     height: 22,
     borderTopWidth: 1,
     borderColor: uiColors.borderMuted,
@@ -260,7 +260,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 4,
     width: 32,
-    fontSize: 10,
+    fontSize: uiTypography.size.xs,
     lineHeight: 16,
     color: uiColors.textMuted,
   },
@@ -268,9 +268,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: uiSpace.xl,
+    marginTop: uiSpace.lg,
   },
-  legendRamp: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  legendRamp: { flexDirection: 'row', alignItems: 'center', gap: uiSpace.sm },
 });
 
 export default WeeklyHeatmap;

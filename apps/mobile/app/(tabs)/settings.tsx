@@ -439,8 +439,8 @@ const styles = StyleSheet.create({
     backgroundColor: uiColors.surfacePage,
   },
   content: {
-    padding: uiSpace.screen,
-    gap: uiSpace.xxl,
+    padding: uiSpace.xl,
+    gap: uiSpace.lg,
   },
   screenTitle: {
     fontSize: uiTypography.size.xxl,
@@ -456,13 +456,13 @@ const styles = StyleSheet.create({
     opacity: 0.94,
   },
   destinationCard: {
-    padding: uiSpace.xxl,
-    gap: uiSpace.lg,
+    padding: uiSpace.lg,
+    gap: uiSpace.md,
   },
   destinationRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: uiSpace.lg,
+    gap: uiSpace.md,
   },
   iconBadge: {
     width: 44,
@@ -475,7 +475,7 @@ const styles = StyleSheet.create({
     backgroundColor: uiColors.surfaceInfo,
   },
   iconGlyph: {
-    fontSize: 20,
+    fontSize: uiTypography.size.xl,
     lineHeight: 20,
   },
   destinationCopy: {
@@ -483,7 +483,7 @@ const styles = StyleSheet.create({
     gap: uiSpace.sm,
   },
   devCard: {
-    padding: uiSpace.xxl,
+    padding: uiSpace.lg,
     gap: uiSpace.md,
     borderColor: uiColors.borderWarning,
     backgroundColor: uiColors.surfaceWarning,
@@ -498,7 +498,7 @@ const styles = StyleSheet.create({
     color: uiColors.actionDangerText,
   },
   preferencesCard: {
-    padding: uiSpace.xxl,
+    padding: uiSpace.lg,
     gap: uiSpace.md,
   },
   preferenceGroup: {
@@ -518,7 +518,7 @@ const styles = StyleSheet.create({
     borderWidth: uiBorder.width,
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfaceDefault,
-    paddingHorizontal: uiSpace.lg,
+    paddingHorizontal: uiSpace.md,
     paddingVertical: uiSpace.sm,
   },
   prefButtonSelected: {
@@ -535,10 +535,10 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   quietCard: {
-    padding: uiSpace.xxl,
+    padding: uiSpace.lg,
   },
   aboutCard: {
-    padding: uiSpace.xxl,
+    padding: uiSpace.lg,
     gap: uiSpace.sm,
     backgroundColor: uiColors.surfaceMuted,
   },

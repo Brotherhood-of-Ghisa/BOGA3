@@ -119,9 +119,9 @@ const styles = StyleSheet.create({
     backgroundColor: uiColors.surfacePage,
   },
   content: {
-    padding: uiSpace.screen,
-    paddingBottom: uiSpace.screen,
-    gap: uiSpace.xxl,
+    padding: uiSpace.xl,
+    paddingBottom: uiSpace.xl,
+    gap: uiSpace.lg,
   },
   intro: {
     gap: uiSpace.sm,
@@ -147,11 +147,11 @@ const styles = StyleSheet.create({
   },
   destinationCard: {
     minHeight: 76,
-    paddingHorizontal: uiSpace.xxl,
-    paddingVertical: uiSpace.lg,
+    paddingHorizontal: uiSpace.lg,
+    paddingVertical: uiSpace.md,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: uiSpace.lg,
+    gap: uiSpace.md,
   },
   iconBadge: {
     width: 42,
@@ -164,7 +164,7 @@ const styles = StyleSheet.create({
     backgroundColor: uiColors.surfaceInfo,
   },
   iconGlyph: {
-    fontSize: 15,
+    fontSize: uiTypography.size.base,
     lineHeight: 18,
     color: uiColors.actionPrimary,
   },
@@ -173,7 +173,7 @@ const styles = StyleSheet.create({
     gap: uiSpace.xs,
   },
   destinationIndicator: {
-    fontSize: 22,
+    fontSize: uiTypography.size.xxl,
     lineHeight: 24,
     color: uiColors.textSecondary,
   },

@@ -78,10 +78,10 @@ const styles = StyleSheet.create({
   },
   panel: {
     gap: uiSpace.sm,
-    padding: uiSpace.screen,
-    paddingBottom: uiSpace.screen * 2,
-    borderTopLeftRadius: uiRadius.xl,
-    borderTopRightRadius: uiRadius.xl,
+    padding: uiSpace.xl,
+    paddingBottom: uiSpace.xl * 2,
+    borderTopLeftRadius: uiRadius.md,
+    borderTopRightRadius: uiRadius.md,
     backgroundColor: uiColors.surfaceDefault,
   },
 });

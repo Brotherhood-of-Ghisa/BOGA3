@@ -77,7 +77,7 @@ const styles = StyleSheet.create({
     gap: 0,
     alignSelf: 'stretch',
     overflow: 'hidden',
-    borderRadius: uiRadius.lg,
+    borderRadius: uiRadius.md,
     borderWidth: uiBorder.width,
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfaceDefault,
@@ -87,7 +87,7 @@ const styles = StyleSheet.create({
     borderWidth: uiBorder.width,
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfaceDefault,
-    paddingHorizontal: uiSpace.xl,
+    paddingHorizontal: uiSpace.lg,
     paddingVertical: uiSpace.sm,
   },
   chipCompact: {

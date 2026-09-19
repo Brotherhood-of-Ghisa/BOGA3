@@ -321,11 +321,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: uiSpace.md,
-    padding: uiSpace.lg,
+    padding: uiSpace.md,
   },
   rowText: {
     flex: 1,
-    gap: uiSpace.xxs,
+    gap: uiSpace.xs,
   },
   successText: {
     color: uiColors.textSuccess,

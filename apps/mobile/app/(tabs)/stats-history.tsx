@@ -1944,15 +1944,15 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: uiColors.surfacePage,
-    padding: uiSpace.xxl,
-    gap: uiSpace.lg,
+    padding: uiSpace.lg,
+    gap: uiSpace.md,
     position: 'relative',
   },
   controlGroups: {
-    gap: uiSpace.lg,
+    gap: uiSpace.md,
   },
   controlGroup: {
-    gap: 6,
+    gap: uiSpace.sm,
   },
   controlLabel: {
     fontSize: uiTypography.size.md,
@@ -1974,7 +1974,7 @@ const styles = StyleSheet.create({
     color: uiColors.textPrimary,
   },
   exerciseTable: {
-    borderRadius: uiRadius.lg,
+    borderRadius: uiRadius.md,
     borderWidth: 1,
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfaceDefault,
@@ -1992,7 +1992,7 @@ const styles = StyleSheet.create({
     minHeight: 52,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
+    gap: uiSpace.xs,
     justifyContent: 'flex-start',
     paddingHorizontal: uiSpace.xs,
     paddingVertical: uiSpace.xs,
@@ -2004,7 +2004,7 @@ const styles = StyleSheet.create({
     backgroundColor: uiColors.actionPrimarySubtleBg,
   },
   exerciseHeaderLabel: {
-    fontSize: 10,
+    fontSize: uiTypography.size.xs,
     fontWeight: '700',
     color: uiColors.textPrimary,
     textTransform: 'uppercase',
@@ -2014,7 +2014,7 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   exerciseHeaderIndicator: {
-    fontSize: 9,
+    fontSize: uiTypography.size.xs,
     fontWeight: '700',
     color: uiColors.actionPrimary,
   },
@@ -2057,20 +2057,20 @@ const styles = StyleSheet.create({
     minHeight: 0,
   },
   scrollContent: {
-    gap: uiSpace.xxl,
-    paddingBottom: uiSpace.xxl,
+    gap: uiSpace.lg,
+    paddingBottom: uiSpace.lg,
   },
   summaryGrid: {
     flexDirection: 'row',
-    gap: uiSpace.lg,
+    gap: uiSpace.md,
   },
   summaryCard: {
     flex: 1,
-    borderRadius: uiRadius.lg,
+    borderRadius: uiRadius.md,
     borderWidth: 1,
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfaceDefault,
-    padding: uiSpace.lg,
+    padding: uiSpace.md,
     gap: uiSpace.xs,
   },
   summaryCardPressed: {
@@ -2084,7 +2084,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   summaryValue: {
-    fontSize: 26,
+    fontSize: uiTypography.size.xxl,
     fontWeight: '700',
     color: uiColors.textPrimary,
   },
@@ -2093,10 +2093,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   familyList: {
-    gap: uiSpace.lg,
+    gap: uiSpace.md,
   },
   familyCard: {
-    borderRadius: uiRadius.lg,
+    borderRadius: uiRadius.md,
     borderWidth: 1,
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfaceDefault,
@@ -2106,9 +2106,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: uiSpace.lg,
-    paddingVertical: uiSpace.lg,
-    gap: uiSpace.lg,
+    paddingHorizontal: uiSpace.md,
+    paddingVertical: uiSpace.md,
+    gap: uiSpace.md,
     borderBottomWidth: 1,
     borderBottomColor: uiColors.borderMuted,
   },
@@ -2143,10 +2143,10 @@ const styles = StyleSheet.create({
   },
   familyMetrics: {
     flexDirection: 'row',
-    gap: uiSpace.xxl,
+    gap: uiSpace.lg,
   },
   muscleList: {
-    paddingHorizontal: uiSpace.lg,
+    paddingHorizontal: uiSpace.md,
     paddingVertical: uiSpace.xs,
   },
   muscleRow: {
@@ -2155,7 +2155,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: uiSpace.sm,
     paddingHorizontal: uiSpace.xs,
-    gap: uiSpace.lg,
+    gap: uiSpace.md,
   },
   actionableRowPressed: {
     opacity: 0.7,
@@ -2167,7 +2167,7 @@ const styles = StyleSheet.create({
   },
   muscleMetrics: {
     flexDirection: 'row',
-    gap: uiSpace.lg,
+    gap: uiSpace.md,
   },
   muscleTextUntrained: {
     color: uiColors.textSecondary,
@@ -2177,14 +2177,14 @@ const styles = StyleSheet.create({
     minWidth: 60,
   },
   metricLabel: {
-    fontSize: 10,
+    fontSize: uiTypography.size.xs,
     fontWeight: '600',
     color: uiColors.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 0.4,
   },
   metricLabelSmall: {
-    fontSize: 9,
+    fontSize: uiTypography.size.xs,
     fontWeight: '600',
     color: uiColors.textSecondary,
     textTransform: 'uppercase',
@@ -2194,16 +2194,16 @@ const styles = StyleSheet.create({
     color: uiColors.textSecondary,
   },
   metricValue: {
-    fontSize: 15,
+    fontSize: uiTypography.size.base,
     fontWeight: '700',
     color: uiColors.textPrimary,
-    marginTop: uiSpace.xxs,
+    marginTop: uiSpace.xs,
   },
   metricValueSmall: {
     fontSize: uiTypography.size.md,
     fontWeight: '600',
     color: uiColors.textPrimary,
-    marginTop: uiSpace.xxs,
+    marginTop: uiSpace.xs,
   },
   metricValueMuted: {
     color: uiColors.textSecondary,
@@ -2211,20 +2211,20 @@ const styles = StyleSheet.create({
   metricDelta: {
     fontSize: uiTypography.size.xs,
     fontWeight: '600',
-    marginTop: uiSpace.xxs,
+    marginTop: uiSpace.xs,
   },
   metricDeltaSmall: {
-    fontSize: 10,
+    fontSize: uiTypography.size.xs,
     fontWeight: '600',
-    marginTop: uiSpace.xxs,
+    marginTop: uiSpace.xs,
   },
   statePanel: {
-    borderRadius: uiRadius.lg,
+    borderRadius: uiRadius.md,
     borderWidth: 1,
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfaceDefault,
-    padding: uiSpace.xxl,
-    gap: 6,
+    padding: uiSpace.lg,
+    gap: uiSpace.sm,
   },
   stateTitle: {
     fontSize: uiTypography.size.base,
@@ -2238,7 +2238,7 @@ const styles = StyleSheet.create({
   overlayRoot: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'flex-end',
-    padding: uiSpace.xxl,
+    padding: uiSpace.lg,
   },
   overlayBackdrop: {
     ...StyleSheet.absoluteFillObject,
@@ -2246,7 +2246,7 @@ const styles = StyleSheet.create({
   },
   overlayCard: {
     height: '75%',
-    borderRadius: uiRadius.lg,
+    borderRadius: uiRadius.md,
     borderWidth: 1,
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfaceDefault,
@@ -2258,14 +2258,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     borderBottomWidth: 1,
     borderBottomColor: uiColors.borderMuted,
-    paddingHorizontal: uiSpace.xxl,
-    paddingVertical: uiSpace.lg,
-    gap: uiSpace.lg,
+    paddingHorizontal: uiSpace.lg,
+    paddingVertical: uiSpace.md,
+    gap: uiSpace.md,
   },
   overlayTitleGroup: {
     flexShrink: 1,
     minWidth: 0,
-    gap: uiSpace.xxs,
+    gap: uiSpace.xs,
   },
   overlayEyebrow: {
     fontSize: uiTypography.size.xs,
@@ -2282,7 +2282,7 @@ const styles = StyleSheet.create({
   overlayCloseButton: {
     width: 32,
     height: 32,
-    borderRadius: 16,
+    borderRadius: uiRadius.md,
     borderWidth: 1,
     borderColor: uiColors.actionNeutralSubtleBorder,
     backgroundColor: uiColors.actionNeutralSubtleBg,
@@ -2295,13 +2295,13 @@ const styles = StyleSheet.create({
     color: uiColors.actionNeutralSubtleText,
   },
   overlayMetricSelector: {
-    paddingHorizontal: uiSpace.xxl,
+    paddingHorizontal: uiSpace.lg,
     paddingVertical: uiSpace.md,
     borderBottomWidth: 1,
     borderBottomColor: uiColors.borderMuted,
   },
   overlayViewSelector: {
-    paddingHorizontal: uiSpace.xxl,
+    paddingHorizontal: uiSpace.lg,
     paddingTop: uiSpace.md,
     paddingBottom: uiSpace.md,
   },
@@ -2309,7 +2309,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: uiSpace.xxl,
+    paddingHorizontal: uiSpace.lg,
     paddingVertical: uiSpace.sm,
     borderBottomWidth: 1,
     borderBottomColor: uiColors.borderMuted,
@@ -2333,16 +2333,16 @@ const styles = StyleSheet.create({
     color: uiColors.textSecondary,
   },
   overlayContent: {
-    padding: uiSpace.xxl,
-    gap: uiSpace.xxl,
+    padding: uiSpace.lg,
+    gap: uiSpace.lg,
   },
   overlayStatePanel: {
-    borderRadius: uiRadius.lg,
+    borderRadius: uiRadius.md,
     borderWidth: 1,
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfaceInfo,
-    padding: uiSpace.lg,
-    gap: 6,
+    padding: uiSpace.md,
+    gap: uiSpace.sm,
   },
   deltaPositive: {
     color: uiColors.textSuccess,
@@ -2364,8 +2364,8 @@ const styles = StyleSheet.create({
     backgroundColor: uiColors.surfaceDefault,
     color: uiColors.textPrimary,
     paddingLeft: uiSpace.md,
-    paddingRight: 36,
-    paddingVertical: 9,
+    paddingRight: uiSpace.xxl,
+    paddingVertical: uiSpace.sm,
     minHeight: 42,
     fontSize: uiTypography.size.base,
   },

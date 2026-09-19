@@ -214,25 +214,25 @@ const styles = StyleSheet.create({
     backgroundColor: uiColors.surfacePage,
   },
   content: {
-    padding: uiSpace.screen,
-    gap: uiSpace.lg,
+    padding: uiSpace.xl,
+    gap: uiSpace.md,
   },
   intro: {
     gap: uiSpace.sm,
     marginBottom: uiSpace.sm,
   },
   card: {
-    padding: uiSpace.xxl,
+    padding: uiSpace.lg,
     gap: uiSpace.sm,
   },
   agentCard: {
-    padding: uiSpace.xxl,
-    gap: uiSpace.lg,
+    padding: uiSpace.lg,
+    gap: uiSpace.md,
   },
   agentHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: uiSpace.lg,
+    gap: uiSpace.md,
   },
   agentBadge: {
     width: 42,
@@ -246,7 +246,7 @@ const styles = StyleSheet.create({
   },
   agentTitle: {
     flex: 1,
-    gap: uiSpace.xxs,
+    gap: uiSpace.xs,
   },
   metadata: {
     borderTopWidth: uiBorder.width,
@@ -261,7 +261,7 @@ const styles = StyleSheet.create({
     gap: uiSpace.md,
   },
   errorCard: {
-    padding: uiSpace.xxl,
+    padding: uiSpace.lg,
     gap: uiSpace.md,
     borderColor: uiColors.actionDangerSubtleBorder,
     backgroundColor: uiColors.actionDangerSubtleBg,
