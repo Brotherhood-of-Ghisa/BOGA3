@@ -6,23 +6,23 @@ import { buildStreamFilterChips, type GroupSummary } from '@/src/groups';
 type GroupFilterChipsProps = {
   groups: Pick<GroupSummary, 'group_id' | 'name'>[];
   selectedGroupId: string | null;
-  onChange: (groupId: string | null) => void;
+  onChange: (groupId: string) => void;
 };
 
 /**
- * All + one chip per group. Chips wrap onto more lines rather than scrolling
- * sideways (08 baseline: no horizontal scrolling). testIDs:
- * `groups-stream-filter-all`, `groups-stream-filter-<groupId>`.
+ * One chip per group; exactly one is selected. Chips wrap onto more lines
+ * rather than scrolling sideways (08 baseline: no horizontal scrolling).
+ * testIDs: `groups-stream-filter-<groupId>`.
  */
 export function GroupFilterChips({ groups, selectedGroupId, onChange }: GroupFilterChipsProps) {
   const chips = buildStreamFilterChips(groups, selectedGroupId);
-  const selectedKey = chips.find((chip) => chip.selected)?.key ?? 'all';
+  const selectedKey = chips.find((chip) => chip.selected)?.key ?? '';
 
   return (
     <SegmentedChips
-      accessibilityLabel="Filter the stream by group"
+      accessibilityLabel="Choose a group"
       compact
-      onChange={(key) => onChange(chips.find((chip) => chip.key === key)?.groupId ?? null)}
+      onChange={onChange}
       options={chips.map((chip) => ({ value: chip.key, label: chip.label }))}
       style={styles.row}
       testIDPrefix="groups-stream-filter"

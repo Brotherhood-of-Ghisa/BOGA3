@@ -66,8 +66,9 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
     stream snapshot, and the three most recent non-deleted completed sessions
     from the existing feature hooks/repository
   - group activity preserves signed-out, auth-unavailable, cached/offline,
-    missing-data, and inline-error states; item taps use the existing group and
-    friend-session routes
+    missing-data, and inline-error states; a session card opens the
+    friend-session route, while a record card or membership row opens
+    `/groups?groupId=<groupId>` (records are read-only here, with no Certify)
   - an active session replaces the planned-session action and resumes at
     `/session-recorder`; any future ready plan is launched through the shared
     active-draft coordinator; recent rows open
@@ -112,9 +113,10 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 - Behavior:
   - groups real secondary destinations under Community, Tools, and Library &
     account without copying their feature logic
-  - internal rows open `/groups?source=more`, `/connected-agents`, `/dev-logs`,
+  - internal rows open `/groups`, `/connected-agents`, `/dev-logs`,
     `/exercise-catalog?source=more`, or `/settings?source=more`; the source
-    marker gives tab-owned destinations an explicit `Back to More` action,
+    marker gives the Exercise Catalog and Settings an explicit `Back to More`
+    action (Groups looks the same however it is opened),
     connected agents requires a current user, and developer logs requires
     `isDevMode()`
   - `Connect an AI coach` opens the same first-party MCP setup URL as Settings
@@ -222,10 +224,9 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
   - none
 - Behavior:
   - opened from the Stats Sessions summary card
-  - uses the native stack's minimal back-button display mode plus a generic
-    `Back` accessibility title: the platform back arrow remains, while `(tabs)`
-    and other previous-route labels are hidden visually and from assistive
-    technology
+  - uses the root stack's minimal back-button display mode (below): the
+    platform back arrow remains, while `(tabs)` and other previous-route labels
+    are hidden
   - active Resume and review/complete both use `dismissTo('/session-recorder')`
     to return to the existing recorder; `/sessions` never completes an
     active session directly
@@ -261,12 +262,16 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 12. `/groups` (M22)
 - File: `apps/mobile/app/(tabs)/groups.tsx`
 - Query params:
-  - `source` (optional; `more` shows an explicit `Back to More` action)
+  - `groupId` (optional): selects that group when it is in My groups
 - Behavior:
-  - preserved direct route owned by the canonical More tab
-  - when opened from More, `Back to More` replaces to `/more`; Today/direct
-    entry does not synthesize that origin
-  - the `All` / per-group chip selection is in-route state, not a query param
+  - preserved direct route owned by the canonical More tab; it looks the same
+    from More, Today, or a direct link (no `Back to More`)
+  - one group at a time, picked with the group chips (no `All`): the
+    `groupId` param, else the group last shown this app session, else the
+    first group by name; the chip and the `Stream` / `Leaderboards` segment
+    are in-route state after that
+  - managing groups (join, create, the group page) lives behind the header's
+    `My groups`; nothing on this screen opens the group page
   - signed out or auth-unconfigured renders a sign-in-required card in place; configured builds offer `Sign in` (`/sign-in`)
 
 13. `/group/mine`
@@ -279,7 +284,10 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 - Path params:
   - `groupId` (required dynamic segment; a missing value renders the lost-access state)
 - Behavior:
-  - the `Stream` / `Exercises` / `Leaderboards` segment is in-route state, Stream first (M25-T08); Members is its own route behind the header member count
+  - management only: the header (name, description, member count, role-gated
+    `Invite` / `Edit`), then the group's Exercises; Members is its own route
+    behind the header member count. The stream and leaderboards live on
+    `/groups`
 
 15. `/group/new` (M22-T05)
 - File: `apps/mobile/app/group/new.tsx`
@@ -373,9 +381,9 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
    - exercise picker `Manage` action
 16. `/exercise-catalog?source=session-recorder...` -> `/session-recorder`
    - explicit back action or post-save return (`router.back()`)
-17. `/more` -> `/settings?source=more`, `/exercise-catalog?source=more`, or `/groups?source=more`
-   - tab-owned destination rows carry their hub origin and expose `Back to More`;
-     each unmarked direct route remains addressable
+17. `/more` -> `/settings?source=more`, `/exercise-catalog?source=more`, or `/groups`
+   - Settings and Exercise Catalog rows carry their hub origin and expose
+     `Back to More`; each unmarked direct route remains addressable
 18. `/settings` -> `/profile`
    - Account destination row
 19. `/settings` -> first-party `/connect` (system browser)
@@ -398,14 +406,15 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
    - when the latest sync cycle outcome is `AUTH_REQUIRED`, the gate redirects to `/sign-in` (no Retry); the `/sign-in` route is exempt from the block so the redirect cannot loop
 28. `/groups` -> `/group/mine`
    - `My groups` header action
-29. `/groups` -> `/group/<groupId>`; `/group/mine` -> `/group/<groupId>`
-   - membership-item tap on the tab; row tap in My groups (membership items on the group screen itself do not navigate)
-30. `/groups` / `/group/<groupId>` -> `/group-session/<memberId>/<sessionId>`
+29. `/group/mine` -> `/group/<groupId>`
+   - row tap in My groups, the only way to the group page from the Groups
+     screen (stream membership items do not navigate)
+30. `/groups` / `/today` -> `/group-session/<memberId>/<sessionId>`
    - stream session-card tap (`router.push`)
 31. `/groups` (signed out, auth configured) -> `/sign-in`
    - `Sign in` action on the sign-in-required card
 32. `/groups` / `/group/mine` -> `/group/new`, `/group/join`
-   - `Create group` / `Join group` header actions on the tab; the empty-state `Create group` / `Join with a code` on both (`router.push`)
+   - `Join group` / `Create group` actions on My groups; the empty-state `Create group` / `Join with a code` on both (`router.push`)
 33. `/group/new` -> `/group/<groupId>`; `/group/join` -> `/group/<groupId>`
    - after create, join, or `Open group` when already a member (`router.replace`, so Back returns to where the flow started)
 34. `/group/<groupId>` -> `/group/<groupId>/invite`, `/group/<groupId>/edit`
@@ -424,19 +433,21 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
    - the header's member-count line (`router.push`); Back returns to the group screen
 41. `/group/<groupId>` -> `/group/<groupId>/exercises/new`, `/group/<groupId>/exercises/<exerciseId>/edit` (M25-T08)
    - owner/admin `Add exercise` and the exercise sheet's `Rename` (`router.push`); both return with `router.back()` after saving, and the Exercises segment refreshes on focus
-42. `/group/<groupId>` -> `/group/<groupId>/leaderboards/<exerciseId>` (M25-T09)
-   - a podium card on the Leaderboards segment (`router.push`, no query: e1RM · Certified)
+42. `/groups` -> `/group/<groupId>/leaderboards/<exerciseId>` (M25-T09)
+   - a podium card on the Groups screen's Leaderboards segment (`router.push`, no query: e1RM · Certified)
 43. `/group/<groupId>/leaderboards/<exerciseId>` -> `/group/<groupId>/leaderboards/<exerciseId>/history?metric=&scope=` (M25-T09)
    - the header `History` button with the current toggles; Back returns to the board, which reloads its first page on focus
-44. `/groups`, `/group/<groupId>`, `/group/<groupId>/leaderboards/<exerciseId>` -> `/group-session/<memberId>/<sessionId>` (M25-T10)
+44. `/groups`, `/group/<groupId>/leaderboards/<exerciseId>` -> `/group-session/<memberId>/<sessionId>` (M25-T10)
    - the row detail sheet's `View full session` (the sheet closes, then `router.push`); the sheet itself is in-route state opened from a record card or a full-board row
+45. `/today` -> `/groups?groupId=<groupId>`
+   - a Group activity record card or membership row
 
 Note:
 
 - Modal opens/closes are in-route UI state transitions, not route transitions.
 - `session-recorder` exercise picker `Add new` now opens an in-route exercise editor modal rather than navigating to `/exercise-catalog`.
 - The recorder's group pick sheet (M25-T07) and its `Add as new` editor are in-route modals too: the picker hides while either is open and returns on cancel.
-- The record set row detail sheet (M25-T10) is an in-route modal on the Groups tab, the group screen's Stream, and the full board; certification writes and their confirmation `Alert`s stay on the same route.
+- The record set row detail sheet (M25-T10) is an in-route modal on the Groups screen's Stream and the full board; certification writes and their confirmation `Alert`s stay on the same route.
 
 ## Header titles (current, high level)
 
@@ -445,12 +456,12 @@ Note:
   The visible shell is `BottomTray` composing `MainTabs`; it is suppressed on
   `/session-recorder`. `exercise-history` keeps its native stack header and
   renders `MainTabs` with Progress selected.
-- Detail screens registered in the root stack (`exercise-history`, `sessions`, `profile`, `connected-agents`, `maestro-harness`, `completed-session/[sessionId]`) keep their native stack header behavior; titles are declared in `apps/mobile/app/_layout.tsx`. `/sessions` specifically uses an arrow-only minimal back-button display mode with a generic `Back` accessibility title.
+- Detail screens registered in the root stack (`exercise-history`, `sessions`, `profile`, `connected-agents`, `maestro-harness`, `completed-session/[sessionId]`) keep their native stack header behavior; titles are declared in `apps/mobile/app/_layout.tsx`. The root stack's `screenOptions` give every detail screen an arrow-only back affordance (`headerBackButtonDisplayMode: 'minimal'`, no custom `headerBackTitle`, which react-native-screens would render as a custom item that ignores the display mode and morphs its label in during the push); the system chevron reads "Back" to VoiceOver.
 - `completed-session/[sessionId]` sets its title inside the route file (`View Session`, `Session complete`, or `Session summary`)
 - `exercise-history` sets its title inside the route file to the resolved exercise name (falls back to `Exercise History` when the summary is not yet available)
-- M22 group routes declare `My groups`, `New group`, `Join group`, `Group`, `Edit group`, `Invite`, and `Session` in `apps/mobile/app/_layout.tsx` (back title `Back`); the group screen replaces `Group` with the group's name once loaded
-- `exercise-link` (M25-T07) declares `Link exercise` in `apps/mobile/app/_layout.tsx` (back title `Back`) and replaces it with `Link "<exercise name>"` once the exercise resolves
-- M25-T08 adds `Members`, `Add exercise`, and `Edit exercise` for the group routes in `apps/mobile/app/_layout.tsx` (back title `Back`)
+- M22 group routes declare `My groups`, `New group`, `Join group`, `Group`, `Edit group`, `Invite`, and `Session` in `apps/mobile/app/_layout.tsx`; the group screen replaces `Group` with the group's name once loaded
+- `exercise-link` (M25-T07) declares `Link exercise` in `apps/mobile/app/_layout.tsx` and replaces it with `Link "<exercise name>"` once the exercise resolves
+- M25-T08 adds `Members`, `Add exercise`, and `Edit exercise` for the group routes in `apps/mobile/app/_layout.tsx`
 
 ## Documentation boundary
 

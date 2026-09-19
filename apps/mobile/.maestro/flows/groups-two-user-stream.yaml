@@ -16,8 +16,13 @@ appId: com.dinoderek.mobile
 # clears user_c's username before every run, so the username gate always
 # prompts and repeated runs in one slot need no Supabase reset.
 #
-# Every "after a refresh" below is one pull-to-refresh on the group screen; the
-# counterparty script logs the sync_push -> card-visible time (AC4 evidence).
+# The stream and leaderboards live on the Groups screen
+# (boga3://groups?groupId=<id>, Stream · Leaderboards); the group page
+# (boga3://group/<id>) is management only: members, invite, exercises. Every
+# "after a refresh" below leaves the Groups screen for My groups and returns,
+# so the screen re-reads on focus (a synthetic swipe does not reliably fire
+# pull-to-refresh on iOS 26); the counterparty script logs the sync_push ->
+# card-visible time (AC4 evidence).
 
 # --- Boot + sign in as user_c (pattern: auth-profile-happy-path.yaml) ---------
 # clearState relaunches a wiped dev client that lost its Metro connection:
@@ -132,23 +137,37 @@ appId: com.dinoderek.mobile
     env:
       STEP: join
       CODE: ${maestro.copiedText}
-- openLink: "boga3://group/${output.groupsGroupId}"
+- openLink: "boga3://groups?groupId=${output.groupsGroupId}"
 - extendedWaitUntil:
     visible:
-      id: "group-screen-stream-list"
+      id: "groups-stream-list"
     timeout: 15000
-- swipe:
-    start: "50%, 45%"
-    end: "50%, 85%"
-    duration: 800
+- assertVisible:
+    id: "groups-stream-filter-${output.groupsGroupId}"
+- assertNotVisible:
+    id: "groups-stream-filter-all"
+# Refresh: leave for My groups and come back (the Groups screen re-reads on focus).
+- openLink: "boga3://group/mine"
+- extendedWaitUntil:
+    visible:
+      id: "group-mine-list"
+    timeout: 15000
+- openLink: "boga3://groups?groupId=${output.groupsGroupId}"
+- extendedWaitUntil:
+    visible:
+      id: "groups-stream-list"
+    timeout: 15000
 - extendedWaitUntil:
     visible:
       text: "${MAESTRO_GROUPS_COUNTERPARTY_USERNAME} joined"
     timeout: 15000
-- assertVisible:
-    id: "group-screen-members-link"
-    text: "Members, 2 members · You're the owner"
 - takeScreenshot: "groups-04-counterparty-joined"
+- openLink: "boga3://group/${output.groupsGroupId}"
+- extendedWaitUntil:
+    visible:
+      id: "group-screen-members-link"
+      text: "Members, 2 members · You're the owner"
+    timeout: 15000
 
 # --- 4b. Exercises page (M25-T08): the owner adds, renames, and archives --------
 # The device (the owner) copies a standard exercise and creates a custom one,
@@ -158,8 +177,7 @@ appId: com.dinoderek.mobile
 # row is one pressable element, so it is found by its joined accessibility label
 # ("<name>, <weight entry>[, archived], <link status>"); its testID carries the
 # server-generated id.
-- tapOn:
-    id: "group-screen-segment-exercises"
+# The group page shows its exercises under the header (no segments).
 - extendedWaitUntil:
     visible:
       id: "group-exercises-add-button"
@@ -277,11 +295,10 @@ appId: com.dinoderek.mobile
     file: ../scripts/groups-counterparty.js
     env:
       STEP: assert-exercises
-- tapOn:
-    id: "group-screen-segment-stream"
+- openLink: "boga3://groups?groupId=${output.groupsGroupId}"
 - extendedWaitUntil:
     visible:
-      id: "group-screen-stream-list"
+      id: "groups-stream-list"
     timeout: 15000
 
 # --- 5. Active session -> one "Training now" card with its metrics ---------------
@@ -289,10 +306,17 @@ appId: com.dinoderek.mobile
     file: ../scripts/groups-counterparty.js
     env:
       STEP: push-active
-- swipe:
-    start: "50%, 45%"
-    end: "50%, 85%"
-    duration: 800
+# Refresh: leave for My groups and come back (the Groups screen re-reads on focus).
+- openLink: "boga3://group/mine"
+- extendedWaitUntil:
+    visible:
+      id: "group-mine-list"
+    timeout: 15000
+- openLink: "boga3://groups?groupId=${output.groupsGroupId}"
+- extendedWaitUntil:
+    visible:
+      id: "groups-stream-list"
+    timeout: 15000
 - extendedWaitUntil:
     visible:
       id: "group-stream-session-card-${output.groupsCardKey}"
@@ -321,10 +345,17 @@ appId: com.dinoderek.mobile
     file: ../scripts/groups-counterparty.js
     env:
       STEP: push-complete-edit
-- swipe:
-    start: "50%, 45%"
-    end: "50%, 85%"
-    duration: 800
+# Refresh: leave for My groups and come back (the Groups screen re-reads on focus).
+- openLink: "boga3://group/mine"
+- extendedWaitUntil:
+    visible:
+      id: "group-mine-list"
+    timeout: 15000
+- openLink: "boga3://groups?groupId=${output.groupsGroupId}"
+- extendedWaitUntil:
+    visible:
+      id: "groups-stream-list"
+    timeout: 15000
 - extendedWaitUntil:
     visible:
       id: "group-stream-session-card-${output.groupsCardKey}-metrics"
@@ -380,10 +411,21 @@ appId: com.dinoderek.mobile
     file: ../scripts/groups-counterparty.js
     env:
       STEP: link-board
-- openLink: "boga3://group/${output.groupsGroupId}"
+- openLink: "boga3://groups?groupId=${output.groupsGroupId}"
 - extendedWaitUntil:
     visible:
-      id: "group-screen-segment-leaderboards"
+      id: "groups-segment-leaderboards"
+    timeout: 15000
+# Refresh: leave for My groups and come back (the Groups screen re-reads on focus).
+- openLink: "boga3://group/mine"
+- extendedWaitUntil:
+    visible:
+      id: "group-mine-list"
+    timeout: 15000
+- openLink: "boga3://groups?groupId=${output.groupsGroupId}"
+- extendedWaitUntil:
+    visible:
+      id: "groups-stream-list"
     timeout: 15000
 # The link moved the boards, so the stream gets a link item (P16, M25-T10); no
 # record card, since the sets predate the link.
@@ -393,7 +435,7 @@ appId: com.dinoderek.mobile
     timeout: 15000
 - takeScreenshot: "groups-07b-6-stream-link-item"
 - tapOn:
-    id: "group-screen-segment-leaderboards"
+    id: "groups-segment-leaderboards"
 # Certified boards are empty until M25-T06: the uncertified count shows instead.
 - extendedWaitUntil:
     visible:
@@ -471,15 +513,43 @@ appId: com.dinoderek.mobile
     file: ../scripts/groups-counterparty.js
     env:
       STEP: push-record
-- openLink: "boga3://group/${output.groupsGroupId}"
+# Today's Group activity shows the record, read-only (no Certify); it opens
+# the Groups screen on the record's group.
+- openLink: "boga3://today"
+- scrollUntilVisible:
+    element:
+      id: "group-stream-record-card-${output.groupsRecordKey}-title"
+      text: "${MAESTRO_GROUPS_COUNTERPARTY_USERNAME} — group record"
+    direction: DOWN
+    timeout: 20000
+- assertNotVisible:
+    id: "group-stream-record-card-${output.groupsRecordKey}-certify"
+- takeScreenshot: "groups-07c-0-today-record"
+- tapOn:
+    id: "group-stream-record-card-${output.groupsRecordKey}-open"
+# The link names the group already shown (same ?groupId=), so the screen keeps
+# its last segment (Leaderboards, from 7b): pick Stream explicitly.
 - extendedWaitUntil:
     visible:
-      id: "group-screen-stream-list"
+      id: "groups-segment-stream"
     timeout: 15000
-- swipe:
-    start: "50%, 45%"
-    end: "50%, 85%"
-    duration: 800
+- tapOn:
+    id: "groups-segment-stream"
+- extendedWaitUntil:
+    visible:
+      id: "groups-stream-list"
+    timeout: 15000
+# Refresh: leave for My groups and come back (the Groups screen re-reads on focus).
+- openLink: "boga3://group/mine"
+- extendedWaitUntil:
+    visible:
+      id: "group-mine-list"
+    timeout: 15000
+- openLink: "boga3://groups?groupId=${output.groupsGroupId}"
+- extendedWaitUntil:
+    visible:
+      id: "groups-stream-list"
+    timeout: 15000
 - extendedWaitUntil:
     visible:
       id: "group-stream-record-card-${output.groupsRecordKey}-title"
@@ -520,7 +590,7 @@ appId: com.dinoderek.mobile
     env:
       STEP: await-certified
 - tapOn:
-    id: "group-screen-segment-leaderboards"
+    id: "groups-segment-leaderboards"
 - extendedWaitUntil:
     visible:
       text: "Prowler Push, Certified · e1RM, 1st ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME} .* kg .*"
@@ -611,10 +681,27 @@ appId: com.dinoderek.mobile
     text: "1 member · You're the owner"
 - assertNotVisible:
     id: "group-member-row-${output.groupsCounterpartyUserId}"
-- openLink: "boga3://group/${output.groupsGroupId}"
+- openLink: "boga3://groups?groupId=${output.groupsGroupId}"
 - extendedWaitUntil:
     visible:
-      id: "group-screen-stream-list"
+      id: "groups-segment-stream"
+    timeout: 15000
+- tapOn:
+    id: "groups-segment-stream"
+- extendedWaitUntil:
+    visible:
+      id: "groups-stream-list"
+    timeout: 15000
+# Refresh: leave for My groups and come back (the Groups screen re-reads on focus).
+- openLink: "boga3://group/mine"
+- extendedWaitUntil:
+    visible:
+      id: "group-mine-list"
+    timeout: 15000
+- openLink: "boga3://groups?groupId=${output.groupsGroupId}"
+- extendedWaitUntil:
+    visible:
+      id: "groups-stream-list"
     timeout: 15000
 - extendedWaitUntil:
     visible:

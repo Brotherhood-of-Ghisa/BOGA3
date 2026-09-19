@@ -30,9 +30,11 @@ Brief entrypoint map of the current mobile screens.
 - Key states (high level):
   - an active draft takes priority and exposes one resume action; without one,
     the planning slot renders ready/loading/empty/error/unavailable states
-  - group activity is bounded to the two newest session or membership items
-    visible to the user's joined groups; richer record/link events remain in
-    the full Groups feed, while Today preserves auth-unavailable, signed-out,
+  - group activity is bounded to the three newest session, record, or
+    membership items visible to the user's joined groups (certified or not);
+    record cards are read-only here (no `Certify`) and open the Groups screen
+    on their group, as membership rows do; link and record-removed items stay
+    in the full Groups feed. Today preserves auth-unavailable, signed-out,
     cached/offline, missing-data, empty, and inline-error behavior
   - recent activity is bounded to the three newest non-deleted completed
     sessions and preserves repository loading/error/empty behavior
@@ -343,45 +345,49 @@ Brief entrypoint map of the current mobile screens.
 12. `/groups` (M22)
 - File: `apps/mobile/app/(tabs)/groups.tsx`
 - Purpose:
-  - preserved More-owned route: a newest-first stream of group members'
-    sessions and membership events, filtered by `All` or one group
-  - (M25-T10) record cards sit directly below their session card, whose `N records` label counts them; record-removed and link items are light rows; a record card opens the row detail sheet and offers `Certify` inline (each names its group in All)
+  - preserved More-owned route: one group at a time, chosen with the group
+    chips (no `All`; `?groupId=`, else the group last shown, else the first),
+    with a joined `Stream` / `Leaderboards` segment
+  - Stream: a newest-first stream of the group's sessions, records, and
+    membership events; (M25-T10) record cards sit directly below their session
+    card, whose `N records` label counts them; record-removed and link items
+    are light rows; a record card opens the row detail sheet and offers
+    `Certify` inline
+  - Leaderboards (M25-T09): the group's podium cards (see the group screen
+    history below for their states)
 - Key states (high level):
   - signed-out / auth-unconfigured sign-in-required card (no group RPC runs)
-  - no-groups explanatory empty state with `Create group` / `Join with a code` (the header Join / Create row is hidden then)
-  - header actions: `My groups`, then a `Join group` / `Create group` row
+  - no-groups explanatory empty state with `Create group` / `Join with a code`
+  - header: the `Groups` title with `My groups` beside it; the same however it
+    is opened (no `Back to More`)
   - cached stream first, then refreshed on focus, every 30 s, and on pull-to-refresh; older pages load online at the end of the list
   - offline marker over cached data; offline empty state with no cache; inline error or error state with `Retry`
 - Key exits:
-  - explicit `Back to More` when opened with `source=more`; Today/direct entry
-    does not show that origin-specific action
-  - `/group-session/<memberId>/<sessionId>` (session card), `/group/<groupId>` (membership item), `/group/mine` (header), `/group/new`, `/group/join` (header or empty state)
+  - `/group-session/<memberId>/<sessionId>` (session card), `/group/mine` (header), `/group/new`, `/group/join` (empty state); membership items do not navigate
+  - `/group/<groupId>/leaderboards/<exerciseId>` (podium card)
   - the in-route row detail sheet (record card), whose `View full session` opens `/group-session/<memberId>/<sessionId>`
 
 13. `/group/mine`
 - File: `apps/mobile/app/group/mine.tsx`
 - Purpose:
-  - My groups: each active membership with its description, member count, and my role
+  - My groups: `Join group` / `Create group`, then each active membership with its description, member count, and my role; the way into a group's management page
 - Key states (high level):
-  - sign-in-required / empty (with `Create group` / `Join with a code`) / offline / error states as on the tab; pull-to-refresh
+  - sign-in-required / empty (with `Create group` / `Join with a code` instead of the action row) / offline / error states as on the tab; pull-to-refresh
 - Key exits:
-  - `/group/<groupId>` (row tap); `/group/new`, `/group/join` (empty state)
+  - `/group/<groupId>` (row tap); `/group/new`, `/group/join` (action row or empty state)
 
 14. `/group/[groupId]`
 - File: `apps/mobile/app/group/[groupId]/index.tsx`
 - Purpose:
-  - the group screen: header (name, description, the member count · my role line, which opens Members, and owner/admin `Invite` (primary) + `Edit`), then a joined `Stream` / `Exercises` / `Leaderboards` segment (M25-T08; product D10, D14)
+  - the group screen, for managing the group: header (name, description, the member count · my role line, which opens Members, and owner/admin `Invite` (primary) + `Edit`), then the group's `Exercises` (product D14). The stream and leaderboards moved to the Groups screen
 - Key states (high level):
-  - loading / offline / error; the offline banner and inline error follow the open segment
+  - loading / offline / error
   - Exercises: active exercises, then archived ones marked `Archived`, each with its weight entry and my local link status (`Linked: …` / `Not linked`); an active row none of mine is linked to offers `Link your exercise` to every member (the M25-T07 pick sheet, link-only); owner/admin `Add exercise` and a row sheet (`Rename`, `Archive` with confirmation, or `Unarchive`), which members never see; "No group exercises yet" when empty; each write's outcome as an inline notice
-  - Leaderboards (M25-T09): one podium card per group exercise on `Certified · e1RM` (top 3 with `You` on my row, `You: Nth` below the podium, `You: not ranked`, `No certified sets yet · N uncertified` / `No sets yet`), archived exercises last marked `Archived`; "No group exercises yet" when empty; cached, so it shows offline
-  - Stream (M25-T10): record cards, record-removed and link items as on the Groups tab, without group names; the row detail sheet from a record card
-  - lost access after `NOT_FOUND` on any of its reads, or on a certification write: "You're no longer a member of this group", with cached data hidden
+  - Leaderboards podium states (M25-T09, now on the Groups screen): one podium card per group exercise on `Certified · e1RM` (top 3 with `You` on my row, `You: Nth` below the podium, `You: not ranked`, `No certified sets yet · N uncertified` / `No sets yet`), archived exercises last marked `Archived`; "No group exercises yet" when empty; cached, so it shows offline
+  - lost access after `NOT_FOUND` on the group or its exercises: "You're no longer a member of this group", with cached data hidden
 - Key exits:
-  - `/group-session/<memberId>/<sessionId>` (session card, or the sheet's `View full session`); membership, record-removed, and link items here do not navigate
   - `/group/<groupId>/members` (member count), `/group/<groupId>/invite`, `/group/<groupId>/edit`
   - `/group/<groupId>/exercises/new` (`Add exercise`), `/group/<groupId>/exercises/<exerciseId>/edit` (`Rename`)
-  - `/group/<groupId>/leaderboards/<exerciseId>` (podium card)
 - Notes:
   - sets its stack title to the group name once loaded
 
@@ -506,10 +512,10 @@ Brief entrypoint map of the current mobile screens.
   - wraps the whole navigator in the route-layer auth guard (`apps/mobile/components/navigation/auth-route-guard.tsx`), which enforces login-on-start for configured signed-out sessions (neutral loading view while restoring, redirect to `/sign-in` when configured-but-signed-out, stand aside when auth is unconfigured, while allowing `/sign-in` and the dev/test-gated `/maestro-harness` route to render through)
   - immediately below the auth guard, wraps the navigator in the first-sync gate (`apps/mobile/src/sync/SyncGate.tsx`), which blocks a signed-in user behind a full-screen "Setting up your data…" block until `sync_runtime_state.bootstrap_completed_at` is set (then dismisses in place), and observes sync runtime state through the single shared scheduler-state accessor
   - tab roots live inside the `(tabs)` route group (`apps/mobile/app/(tabs)/_layout.tsx`) with `headerShown: false`; the root stack registers the `(tabs)` group itself plus the `sign-in` screen and the detail screens (`exercise-history`, `sessions`, `profile`, `connected-agents`, `maestro-harness`, `completed-session/[sessionId]`, the M22 `group/mine`, `group/[groupId]/index`, `group-session/[memberId]/[sessionId]`, and the M25 `exercise-link`)
-  - the root stack opts `/sessions` into the native minimal back-button display
-    mode with a generic `Back` accessibility title, preserving normal platform
-    back behavior while hiding the previous route-group title visually and
-    from assistive technology
+  - the root stack gives every detail screen the native minimal back-button
+    display mode (no custom back title), preserving normal platform back
+    behavior while hiding the previous route-group title; the arrow-only
+    button slides in with the screen instead of morphing a label in
   - completed-session route sets its title inside the route file
   - exercise-history route also sets its title inside the route file (resolved exercise name)
 

@@ -61,6 +61,7 @@ export {
 export * from './session-metrics';
 export * from './set-facts';
 export * from './stream-view-model';
+export * from './last-viewed-group';
 export {
   GROUP_RESOURCE_POLL_INTERVAL_MS,
   useGroupResource,

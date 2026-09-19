@@ -93,9 +93,9 @@ Brief entrypoint inventory of the current reusable UI component set.
 3. `MoreHubBackButton`
 - File: `apps/mobile/components/navigation/more-hub-back-button.tsx`
 - Purpose:
-  - source-aware `Back to More` action shared by the tab-owned Groups, Exercise
-    Catalog, and Settings destinations; renders only for `source=more` and
-    replaces to the hub
+  - source-aware `Back to More` action shared by the tab-owned Exercise
+    Catalog and Settings destinations; renders only for `source=more` and
+    replaces to the hub (Groups does not use it)
 
 4. `ExerciseEditorModal`
 - File: `apps/mobile/components/exercise-catalog/exercise-editor-modal.tsx`
@@ -182,21 +182,21 @@ Brief entrypoint inventory of the current reusable UI component set.
 - Purpose:
   - `GroupStreamSessionCard` — the stream card (member, status pill, start · gym, sets · kg · exercises computed on the device, the `N records` label (M25-T10, `-records`), group names in All); one press target
   - `GroupStreamMembershipItem` — "X joined / left the group / was removed" row; pressable only where it opens another screen
-  - `GroupFilterChips` — `All` + per-group `SegmentedChips`, wrapping rather than scrolling sideways
+  - `GroupFilterChips` — one `SegmentedChips` chip per group, exactly one selected (no `All`), wrapping rather than scrolling sideways; the Groups screen's group selector
   - `GroupStreamList` — `FlatList` with `RefreshControl`, online older-page loading, and a Retry footer; (M25-T10) it renders every stream kind and owns the one certification write state (`useRecordSetCertification`) shared by the inline `Certify` buttons and the row detail sheet
-  - `GroupStreamRecordCard` (M25-T10) — a record card under its session card (indented): title (`dave — group record` / `— PR`), group exercise and value, board badges, `Session in progress`, the status (`○ Not certified yet` / `✓ Certified by …` / `Voided · set …`, first and on the muted panel when voided), and the group in All; the summary is one press target (opens the sheet), and `Certify` sits beside it with its inline notice. testID `group-stream-record-card-<key>` with `-open`, `-title`, `-value`, `-provisional`, `-status`, `-group`, `-certify`, `-notice`
+  - `GroupStreamRecordCard` (M25-T10) — a record card under its session card (indented): title (`dave — group record` / `— PR`), group exercise and value, board badges, `Session in progress`, the status (`○ Not certified yet` / `✓ Certified by …` / `Voided · set …`, first and on the muted panel when voided), and its group where names are shown (Today); the summary is one press target (opens the sheet, or on Today the Groups screen via `pressHint`), and `Certify` sits beside it with its inline notice. Without `onCertify` (Today) the card is read-only. testID `group-stream-record-card-<key>` with `-open`, `-title`, `-value`, `-provisional`, `-status`, `-group`, `-certify`, `-notice`
   - `GroupStreamSentenceItem` (M25-T10) — a record-removed or link item: a light row with one sentence, not pressable. testIDs `group-stream-record-removed-<key>` / `group-stream-link-<key>` with `-sentence`
   - `RecordSetSheet` (M25-T10) — the row detail (E2) shared by record cards and board rows: an in-route bottom `Modal` with the value, logged, date · gym, logged-as, provisional and status lines, the lifter note, the write notice, the actions my relationship allows (`Certify` primary; `Remove my certification` / `Cancel certification` danger, confirmed with `Alert.alert`), `View full session`, and `Close`. Gym and logged-as come from the `session:<memberId>:<sessionId>` resource. testIDs `group-record-sheet` with `-overlay`, `-title`, `-value`, `-logged`, `-date`, `-logged-as`, `-provisional`, `-status`, `-lifter-note`, `-notice`, `-certify`, `-withdraw`, `-cancel`, `-view-session`, `-close`
   - `GroupOfflineBanner` — the `Offline · last updated HH:MM` marker
   - `GroupMemberRow`, `GroupSummaryRow` — Members-screen and My groups rows; `GroupMemberRow` takes an optional `onPress` (set only when my role offers actions on that member) and then shows a chevron
   - `GroupMemberActionSheet` (M22-T05) — `GroupActionSheet` for one member offering exactly `groupMemberActionsFor(myRole, me, member)` (contract §4.3): `Make admin` / `Remove admin` (secondary), `Transfer ownership` / `Remove from group` (danger; the caller confirms with `Alert.alert`), `Cancel`. testIDs `group-member-actions-sheet`, `group-member-action-<action>`
   - `GroupActionSheet` (M25-T08) — the in-route bottom `Modal` behind both action sheets: title, optional subtitle, one button per action (danger when destructive), `Cancel`. testIDs `<prefix>-sheet` / `-overlay` / `-cancel` and `<actionPrefix>-<key>`
-  - `GroupExercisesPage` (M25-T08) — the group screen's Exercises segment: rows, empty and missing-data states, owner/admin `Add exercise`, and the exercise sheet (`Rename` / `Archive` / `Unarchive`)
+  - `GroupExercisesPage` (M25-T08) — the group screen's Exercises section: rows, empty and missing-data states, owner/admin `Add exercise`, and the exercise sheet (`Rename` / `Archive` / `Unarchive`)
   - `GroupExerciseRow` (M25-T08) — name, weight entry, my link status (`Linked: …` / `Not linked`), and an `Archived` badge; pressable with a chevron for owner/admin only; an optional `Link your exercise` button (`group-exercise-link-button-<id>`) sits outside that press target
   - `GroupExerciseForm` (M25-T08) — the add / edit group-exercise form over `ExerciseCoreFields`, validated by `validateExerciseCore`, with the write's failure above the submit button
   - `StandardExercisePicker` (M25-T08) — search and list of the bundled standard exercises to copy into a group
   - `GroupLostAccessState` (M25-T08) — the shared "You're no longer a member of this group" panel
-  - `GroupLeaderboardsPage`, `GroupPodiumCard` (M25-T09) — the Leaderboards segment: one whole-card press target per group exercise (name, view label, `Archived` tag, up to three podium rows, empty label, `You: …`). testIDs `group-leaderboards-page`, `group-leaderboards-empty`, `group-podium-card-<exerciseId>` with `-name`, `-view`, `-archived`, `-row-<rank>`, `-empty`, `-you`
+  - `GroupLeaderboardsPage`, `GroupPodiumCard` (M25-T09) — the Groups screen's Leaderboards segment: one whole-card press target per group exercise (name, view label, `Archived` tag, up to three podium rows, empty label, `You: …`). testIDs `group-leaderboards-page`, `group-leaderboards-empty`, `group-podium-card-<exerciseId>` with `-name`, `-view`, `-archived`, `-row-<rank>`, `-empty`, `-you`
   - `GroupBoardRow` (M25-T09) — one full-board row as a single accessibility element (rank, member, value, e1RM detail, date, ✓ / ○ on All); my row on the muted panel; (M25-T10) a press target that opens the row detail sheet. testID `group-board-row-<rank>` with `-member`, `-value`, `-detail`, `-date`, `-mark`
   - `GroupBoardHistoryItem` (M25-T09) — one lead change: date and sentence. testID `group-board-history-item-<seq>` with `-date`, `-sentence`
   - `GroupPagesFooter` (M25-T09) — the footer of an online paged list: a spinner, or the failure with `Retry` (`<prefix>-loading-more`, `-load-more-error`, `-load-more-retry`)

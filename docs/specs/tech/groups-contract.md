@@ -49,6 +49,11 @@
 > - M25-T11: the two-user Maestro lane certifies a record set on device and
 >   asserts the Certified boards (§8), and M25 closed. Its product rules and
 >   decisions (P#, D#, E#, cited throughout) are §10.
+> - Post-M25 groups UI iteration: the Groups screen shows one group at a
+>   time (no All) with Stream · Leaderboards, the group page is management
+>   only (header + Exercises), Join / Create moved to My groups, and Today's
+>   Group activity includes record cards (§6.3 "As-built (groups UI
+>   iteration)"; P5 and D10 amended in §10).
 >
 > This doc owns the technical contract and is the durable record of what M22
 > and M25 built. The M22 milestone spec (product requirements and acceptance
@@ -1805,6 +1810,51 @@ P10–P18, D3–D5, D15, D16, E2, E3; M25 design §4, §6.
   record card, certify, Certified boards), and 8b of
   `groups-two-user-stream.yaml` (§8).
 
+**As-built (groups UI iteration, post-M25).** Supersedes the Groups tab,
+group screen, and Today details above where they differ. No server change.
+
+- **Groups screen** (`/groups`, `app/(tabs)/groups.tsx`). One group at a
+  time: `GroupFilterChips` shows one chip per group and no `All`
+  (`buildStreamFilterChips`). The selection is `resolveSelectedGroupId(groups,
+  ?groupId, last viewed)`, else the first group by name; the last viewed id
+  is in-memory only (`src/groups/last-viewed-group.ts`) and ignored once it
+  leaves My groups. Header: the `Groups` title with `My groups` beside it, the
+  same from More, Today, or a link (no `Back to More`; More opens `/groups`).
+  Below the chips a joined `Stream` · `Leaderboards` segment: the Stream is
+  `useGroupStream({ groupId })` (`stream:<groupId>`; nothing is read until a
+  group is selected), the Leaderboards segment is `GroupLeaderboardsPage` on
+  `boards:<groupId>`, read only while open. Membership items do not navigate;
+  nothing on the screen opens the group page. A stream or podium `NOT_FOUND`
+  re-reads My groups, so the lost group's chip goes and the selection moves.
+  Pull-to-refresh re-reads My groups, the stream, and the open podiums.
+- **My groups** (`/group/mine`) holds `Join group` / `Create group` above the
+  list (the empty state keeps its own actions) and is the only way from the
+  Groups screen to a group page.
+- **Group page** (`/group/<id>`) is management only: the header (name,
+  description, member count → Members, owner/admin `Invite` / `Edit`), then an
+  `Exercises` title and `GroupExercisesPage`, read on mount
+  (`group-exercises:<id>`). No stream or podium reads; lost access follows
+  `group_get` or `group_exercise_list` `NOT_FOUND`.
+- **Today** (`/today`, the `stream:all` read). Group activity keeps
+  `session`, `record`, and `membership` items (certified or not) and shows the
+  newest three after `buildStreamViewModel` attaches records below their
+  session card. Record cards are read-only (`GroupStreamRecordCard` without
+  `onCertify`), name their group, and, like membership rows, open
+  `groupsStreamPath(groupId)` = `/groups?groupId=<id>`, where Certify lives.
+- **Back affordance.** The root stack's `screenOptions` set
+  `headerBackButtonDisplayMode: 'minimal'` with no custom `headerBackTitle`
+  on every detail screen (group routes included): react-native-screens turns a
+  custom back title into a custom item that ignores the display mode and
+  morphs its label in during the push from the headerless tabs.
+- **Evidence.** Jest: `groups-screens.test.tsx`, `groups-write-screens.test.tsx`,
+  `groups-exercise-screens.test.tsx`, `groups-leaderboards-screens.test.tsx`,
+  `groups-record-set-sheet.test.tsx`, `groups-stream-view-model.test.ts`,
+  `today-screen.test.tsx`, `more-screen.test.tsx`,
+  `root-layout-auth-bootstrap.test.tsx`. Maestro: `groups-two-user-stream.yaml`
+  (stream and leaderboards through `boga3://groups?groupId=<id>`, the group
+  page for members and exercises, and new step 7c-0: the record on Today,
+  read-only, opening the Groups screen).
+
 ## 7. Freshness and offline
 
 - **Refresh cadence.** On focus, every 30 s while the screen is focused, and on
@@ -2006,7 +2056,10 @@ P10–P18, D3–D5, D15, D16, E2, E3; M25 design §4, §6.
     `user_d`'s username. `dev_wipe_my_data` is not used: it needs `app.env`,
     which the local REST path does not set.
   - **Latency.** The script logs `GROUPS_E2E_LATENCY` (`sync_push` → card
-    visible after one pull-to-refresh, including Maestro's polling) to
+    visible after one refresh, including Maestro's polling; since the groups UI
+    iteration the flow refreshes the Groups screen by opening My groups and
+    returning, which re-reads on focus, because a synthetic swipe does not
+    reliably fire `RefreshControl` on the iOS 26 simulator) to
     `maestro-debug/**/maestro.log`. The observed values are on the M22-T06
     card; they are observed data, not a promise (§7).
 - **As-built (M25-T08, flow extension).** Step 2 and 4 assert the header
@@ -2107,7 +2160,7 @@ contract. The narrative sketches and design trade-offs are in git history
 | P2 | A set counts for a group exercise only through a link from the exercise it was logged under. Several of my exercises may link to one group exercise; each of mine links to at most one per group (`sync-v2-server-contract.md` A.2.10). |
 | P3 | Group exercises never appear in the default picker or catalogue lists: only in search, the Link screen, and the group page (E0). |
 | P4 | Links are retroactive: every shared set of the exercise counts; unlinking removes them. Links survive leaving and are inactive until rejoin. |
-| P5 | The group page is Stream · Exercises · Leaderboards; Members sits behind the header's member count. |
+| P5 | The group page is for managing the group: its header and Exercises; Members sits behind the header's member count. The stream and leaderboards are the Groups screen's Stream · Leaderboards, one group at a time (amended post-M25; was Stream · Exercises · Leaderboards). |
 | P6 | Four boards per group exercise: Weight (heaviest for ≥ 1 rep) / e1RM × Certified / All. |
 | P7 | One row per member (best set on that board): rank, name, value, date. Both scopes ranked; ties go to the earlier date; former members stay listed, marked former. |
 | P8 | Leaderboards page: one podium card per group exercise on Certified · e1RM; tapping opens the full board (E1). |
@@ -2136,7 +2189,7 @@ contract. The narrative sketches and design trade-offs are in git history
 | D7 | Superseded by D9. |
 | D8 | Archiving keeps links and a read-only board; the exercise is no longer offered for new links. |
 | D9 | Group exercises stay out of the default picker and catalogue lists; they appear in picker search (after my matches), on the Link screen, and on the group page's Exercises. |
-| D10 | Group page = Stream · Exercises · Leaderboards. |
+| D10 | Group page = header + Exercises (management); Groups screen = one group, Stream · Leaderboards (amended post-M25). |
 | D11 | Leaderboards page: one podium card per exercise on Certified · e1RM; full board on tap with both toggles. |
 | D12 | Leaderboard history = lead changes per board only. |
 | D13 | Picker search: group matches in a bottom section, plus a Groups toggle for group exercises only. |

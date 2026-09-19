@@ -7,7 +7,7 @@ export type MoreDestinationKey =
   | 'settings';
 
 export type MoreRoute =
-  | '/groups?source=more'
+  | '/groups'
   | '/connected-agents'
   | '/dev-logs'
   | '/exercise-catalog?source=more'
@@ -43,7 +43,7 @@ const MORE_SECTIONS: readonly MoreSection[] = [
         glyph: 'G',
         accessibilityHint: 'Opens group discovery and management',
         testID: 'more-groups-row',
-        action: { type: 'route', href: '/groups?source=more' },
+        action: { type: 'route', href: '/groups' },
       },
     ],
   },

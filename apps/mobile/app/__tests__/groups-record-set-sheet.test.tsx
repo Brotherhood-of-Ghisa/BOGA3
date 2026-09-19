@@ -77,11 +77,11 @@ import {
   type GroupRole,
   type GroupStreamResult,
   type StreamItem,
+  setLastViewedGroupId,
 } from '@/src/groups';
 import * as groupsApi from '@/src/groups/api';
 
 import GroupsTabRoute from '../(tabs)/groups';
-import GroupScreenRoute from '../group/[groupId]/index';
 import GroupBoardRoute from '../group/[groupId]/leaderboards/[exerciseId]/index';
 
 import {
@@ -103,6 +103,12 @@ const groupPayload = (role: GroupRole = 'member'): GroupGetResult => ({
   group: { group_id: GROUP_ID, name: 'Crew', description: null, member_count: 3, my_role: role },
   members: [{ user_id: ME, username: 'me', role }],
 });
+
+/** My role, as the Groups screen (My groups) and the board route (the group) read it. */
+const mockMyRole = (role: GroupRole) => {
+  api.getGroup.mockResolvedValue(groupPayload(role));
+  api.listMyGroups.mockResolvedValue({ groups: [groupPayload(role).group] });
+};
 
 const page = (items: StreamItem[]): GroupStreamResult => ({ items, next_cursor: null, has_more: false });
 
@@ -131,7 +137,8 @@ beforeEach(() => {
   mockNetInfoListeners.clear();
   mockInitialOnline = null;
   mockUseAuth.mockReturnValue({ isConfigured: true, user: { id: ME } });
-  api.getGroup.mockResolvedValue(groupPayload());
+  setLastViewedGroupId(null);
+  mockMyRole('member');
   api.getGroupStream.mockResolvedValue(page([linkItem(), recordItem(), sessionCardItem()]));
   api.getGroupSessionDetail.mockResolvedValue({ session: sessionCardItem() });
   api.getGroupBoard.mockResolvedValue({
@@ -150,7 +157,7 @@ afterEach(() => {
 
 const openGroupStream = async () => {
   mockParams = { groupId: GROUP_ID };
-  render(<GroupScreenRoute />);
+  render(<GroupsTabRoute />);
   return screen.findByTestId(RECORD_CARD);
 };
 
@@ -183,7 +190,7 @@ describe('stream items (E3, D15, P16)', () => {
     expect(screen.queryByTestId(`${RECORD_CARD}-group`)).toBeNull();
 
     // Order: link, session, its record, the orphaned voided record, the removed row.
-    const list = screen.getByTestId('group-screen-stream-list');
+    const list = screen.getByTestId('groups-stream-list');
     const ids = new Set([
       'group-stream-link-ev-link-1',
       'group-stream-session-card-u2:s1',
@@ -215,9 +222,14 @@ describe('stream items (E3, D15, P16)', () => {
 
   it('a cached page from before record items renders offline', async () => {
     mockInitialOnline = false;
-    api.getGroup.mockRejectedValue(new GroupApiError('NETWORK', 'Network request failed.'));
+    api.listMyGroups.mockRejectedValue(new GroupApiError('NETWORK', 'Network request failed.'));
     api.getGroupStream.mockRejectedValue(new GroupApiError('NETWORK', 'Network request failed.'));
-    writeGroupCache(fixture.database, { cacheKey: groupCacheKeys.group(GROUP_ID), userId: ME, payload: groupPayload(), fetchedAtMs: RECORD_AT_MS });
+    writeGroupCache(fixture.database, {
+      cacheKey: groupCacheKeys.mine,
+      userId: ME,
+      payload: { groups: [groupPayload().group] },
+      fetchedAtMs: RECORD_AT_MS,
+    });
     writeGroupCache(fixture.database, {
       cacheKey: groupCacheKeys.stream(GROUP_ID),
       userId: ME,
@@ -225,7 +237,7 @@ describe('stream items (E3, D15, P16)', () => {
       fetchedAtMs: RECORD_AT_MS,
     });
     mockParams = { groupId: GROUP_ID };
-    render(<GroupScreenRoute />);
+    render(<GroupsTabRoute />);
     expect(await screen.findByTestId('group-stream-session-card-u2:s1')).toBeTruthy();
     expect(screen.queryByTestId('group-stream-session-card-u2:s1-records')).toBeNull();
     expect(screen.getByTestId('groups-offline-banner')).toBeTruthy();
@@ -266,7 +278,7 @@ describe('certify from the card (E3)', () => {
     await waitFor(() => expect(api.getGroupStream.mock.calls.length).toBeGreaterThan(streamCalls));
     expect(screen.queryByTestId('group-record-sheet')).toBeNull();
     // The write itself caches nothing: only the reads' own keys exist.
-    expect(cacheKeys()).toEqual([groupCacheKeys.group(GROUP_ID), groupCacheKeys.stream(GROUP_ID)]);
+    expect(cacheKeys()).toEqual([groupCacheKeys.mine, groupCacheKeys.stream(GROUP_ID)].sort());
   });
 
   it('a stream read that lands with the pre-write state does not undo the shown certification', async () => {
@@ -295,16 +307,16 @@ describe('certify from the card (E3)', () => {
     await waitFor(() => expect(api.getGroupStream.mock.calls.length).toBeGreaterThan(streamCalls));
   });
 
-  it('group NOT_FOUND: evicts the group and shows lost access', async () => {
+  it('group NOT_FOUND: evicts the group, and My groups no longer lists it', async () => {
     api.certifyGroupSet.mockRejectedValue(new GroupApiError('NOT_FOUND', 'group not found'));
     await openGroupStream();
-    api.getGroup.mockRejectedValue(new GroupApiError('NOT_FOUND', 'group not found'));
+    api.listMyGroups.mockResolvedValue({ groups: [] });
     api.getGroupStream.mockRejectedValue(new GroupApiError('NOT_FOUND', 'group not found'));
     await act(async () => {
       fireEvent.press(screen.getByTestId(`${RECORD_CARD}-certify`));
     });
-    expect(await screen.findByTestId('group-screen-lost-access')).toBeTruthy();
-    await waitFor(() => expect(cacheKeys()).toEqual([]));
+    expect(await screen.findByTestId('groups-empty-state')).toBeTruthy();
+    await waitFor(() => expect(cacheKeys()).toEqual([groupCacheKeys.mine]));
   });
 });
 
@@ -379,7 +391,7 @@ describe('the row detail sheet (E2)', () => {
 
   it('as owner: a confirmed Cancel certification ends it', async () => {
     const other = { certification_id: 'cert-9', certified_by: { user_id: 'u3', username: 'sam' }, certified_at_ms: RECORD_AT_MS };
-    api.getGroup.mockResolvedValue(groupPayload('owner'));
+    mockMyRole('owner');
     api.getGroupStream.mockResolvedValue(page([recordItem({ certified: true, certification: other }), sessionCardItem()]));
     api.cancelGroupCertification.mockResolvedValue({
       certification: certificationPayload({
@@ -400,18 +412,18 @@ describe('the row detail sheet (E2)', () => {
 
   it('as admin: Cancel certification confirms, and FORBIDDEN (role changed) refreshes', async () => {
     const other = { certification_id: 'cert-9', certified_by: { user_id: 'u3', username: 'sam' }, certified_at_ms: RECORD_AT_MS };
-    api.getGroup.mockResolvedValue(groupPayload('admin'));
+    mockMyRole('admin');
     api.getGroupStream.mockResolvedValue(page([recordItem({ certified: true, certification: other }), sessionCardItem()]));
     api.cancelGroupCertification.mockRejectedValue(new GroupApiError('FORBIDDEN', 'only the owner or an admin can cancel a certification'));
     await openSheet();
-    const groupCalls = api.getGroup.mock.calls.length;
+    const groupCalls = api.listMyGroups.mock.calls.length;
 
     fireEvent.press(await screen.findByTestId('group-record-sheet-cancel'));
     expect(alertSpy).toHaveBeenCalledWith('Cancel this certification?', expect.any(String), expect.any(Array));
     await confirmAlert();
     expect(api.cancelGroupCertification).toHaveBeenCalledWith(GROUP_ID, 'cert-9');
     expect(await screen.findByTestId('group-record-sheet-notice')).toHaveTextContent('Only owners and admins can cancel a certification.');
-    await waitFor(() => expect(api.getGroup.mock.calls.length).toBeGreaterThan(groupCalls));
+    await waitFor(() => expect(api.listMyGroups.mock.calls.length).toBeGreaterThan(groupCalls));
   });
 });
 
@@ -473,7 +485,7 @@ describe('full-board rows open the sheet (card AC8)', () => {
   });
 
   it('a former member\'s row offers no Certify; an admin sees Cancel on a certified row', async () => {
-    api.getGroup.mockResolvedValue(groupPayload('admin'));
+    mockMyRole('admin');
     api.getGroupBoard.mockResolvedValue(
       boardWith([
         converted({ former: true }),
@@ -499,27 +511,27 @@ describe('full-board rows open the sheet (card AC8)', () => {
   });
 });
 
-describe('the Groups tab (All)', () => {
-  it('names the group on record cards, takes my role from My groups, and refreshes the All stream after a write', async () => {
+describe('the Groups screen', () => {
+  it('takes my role from My groups and refreshes the selected group after a write', async () => {
     const other = { certification_id: 'cert-9', certified_by: { user_id: 'u3', username: 'sam' }, certified_at_ms: RECORD_AT_MS };
-    api.listMyGroups.mockResolvedValue({
-      groups: [{ group_id: GROUP_ID, name: 'Crew', description: null, member_count: 3, my_role: 'admin' }],
-    });
+    mockMyRole('admin');
     api.getGroupStream.mockResolvedValue(
       page([recordItem(), sessionCardItem(), recordItem({ key: 'ev-cert', set_id: 'set-9', session_id: 's9', certified: true, certification: other })]),
     );
     api.certifyGroupSet.mockResolvedValue({ certification: certificationPayload(), created: true });
     render(<GroupsTabRoute />);
 
-    expect(await screen.findByTestId(`${RECORD_CARD}-group`)).toHaveTextContent('Crew');
-    expect(api.getGroupStream).toHaveBeenCalledWith({ groupId: null });
+    await screen.findByTestId(RECORD_CARD);
+    // One group's stream names no group.
+    expect(screen.queryByTestId(`${RECORD_CARD}-group`)).toBeNull();
+    expect(api.getGroupStream).toHaveBeenCalledWith({ groupId: GROUP_ID });
 
     const streamCalls = api.getGroupStream.mock.calls.length;
     await act(async () => {
       fireEvent.press(screen.getByTestId(`${RECORD_CARD}-certify`));
     });
     await waitFor(() => expect(api.getGroupStream.mock.calls.length).toBeGreaterThan(streamCalls));
-    expect(api.getGroupStream).toHaveBeenLastCalledWith({ groupId: null });
+    expect(api.getGroupStream).toHaveBeenLastCalledWith({ groupId: GROUP_ID });
 
     fireEvent.press(screen.getByTestId('group-stream-record-card-ev-cert-open'));
     expect(await screen.findByTestId('group-record-sheet-cancel')).toBeTruthy();

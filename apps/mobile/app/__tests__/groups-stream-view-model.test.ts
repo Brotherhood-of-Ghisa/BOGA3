@@ -17,6 +17,8 @@ import {
   formatMemberCount,
   formatMyRole,
   formatOfflineMarker,
+  groupsStreamPath,
+  resolveSelectedGroupId,
   formatStreamStartedAt,
   formatMemberName,
   formatMembershipSentence,
@@ -234,20 +236,27 @@ describe('group stream view model', () => {
       { group_id: 'g2', name: 'Gym pals' },
     ];
 
-    it('is All plus one chip per group, with All selected by default', () => {
-      expect(buildStreamFilterChips(groups, null)).toEqual([
-        { key: 'all', label: 'All', groupId: null, selected: true },
-        { key: 'g1', label: 'Crew', groupId: 'g1', selected: false },
+    it('is one chip per group, with no All chip', () => {
+      expect(buildStreamFilterChips(groups, 'g1')).toEqual([
+        { key: 'g1', label: 'Crew', groupId: 'g1', selected: true },
         { key: 'g2', label: 'Gym pals', groupId: 'g2', selected: false },
       ]);
+      expect(buildStreamFilterChips([], null)).toEqual([]);
     });
 
     it('selects the chosen group', () => {
-      expect(buildStreamFilterChips(groups, 'g2').map((chip) => chip.selected)).toEqual([false, false, true]);
+      expect(buildStreamFilterChips(groups, 'g2').map((chip) => chip.selected)).toEqual([false, true]);
     });
 
-    it('is only All when the user has no groups', () => {
-      expect(buildStreamFilterChips([], null)).toEqual([{ key: 'all', label: 'All', groupId: null, selected: true }]);
+    it('resolves the shown group: the first candidate still in My groups, else the first group', () => {
+      expect(resolveSelectedGroupId(groups, 'g2', 'g1')).toBe('g2');
+      expect(resolveSelectedGroupId(groups, 'gone', 'g2')).toBe('g2');
+      expect(resolveSelectedGroupId(groups, null, undefined)).toBe('g1');
+      expect(resolveSelectedGroupId([], 'g1')).toBeNull();
+    });
+
+    it('links to the Groups screen with a group selected', () => {
+      expect(groupsStreamPath('g2')).toBe('/groups?groupId=g2');
     });
   });
 });

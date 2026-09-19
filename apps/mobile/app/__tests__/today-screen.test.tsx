@@ -13,6 +13,8 @@ import { GroupApiError, type StreamItem } from '@/src/groups';
 import { SIGN_IN_ROUTE } from '@/src/navigation/routes';
 import type { SessionEntryCoordinator } from '@/src/session-entry';
 
+import { recordItem } from './helpers/group-record-fixtures';
+
 import {
   TodayScreen,
   type TodayPlanState,
@@ -232,13 +234,14 @@ describe('Today screen', () => {
     expect(mockPush).toHaveBeenNthCalledWith(2, '/progress');
   });
 
-  it('bounds joined-group activity to its two supported item kinds', () => {
+  it('bounds joined-group activity to sessions, records and membership changes', () => {
     render(
       <TodayScreen
         initialSessions={[]}
         socialState={socialState([
           linkItem,
           streamSession('member-1:session-1', 'member-1', 'session-1'),
+          recordItem({ member: { user_id: 'member-1', username: 'Alex' }, session_id: 'session-1' }),
           membershipItem,
           streamSession('member-3:session-3', 'member-3', 'session-3'),
         ])}
@@ -246,15 +249,20 @@ describe('Today screen', () => {
     );
 
     expect(screen.getByTestId('group-stream-session-card-member-1:session-1')).toBeTruthy();
+    expect(screen.getByTestId('group-stream-record-card-ev-record-1')).toBeTruthy();
     expect(screen.getByTestId('group-stream-membership-membership-1:joined')).toBeTruthy();
     expect(screen.queryByTestId('group-stream-link-link-1')).toBeNull();
     expect(screen.queryByTestId('group-stream-session-card-member-3:session-3')).toBeNull();
+    // Read-only on Today: certifying happens on the Groups screen.
+    expect(screen.queryByTestId('group-stream-record-card-ev-record-1-certify')).toBeNull();
 
     fireEvent.press(screen.getByTestId('group-stream-session-card-member-1:session-1'));
+    fireEvent.press(screen.getByTestId('group-stream-record-card-ev-record-1-open'));
     fireEvent.press(screen.getByTestId('group-stream-membership-membership-1:joined'));
 
     expect(mockPush).toHaveBeenNthCalledWith(1, '/group-session/member-1/session-1');
-    expect(mockPush).toHaveBeenNthCalledWith(2, '/group/group-2');
+    expect(mockPush).toHaveBeenNthCalledWith(2, '/groups?groupId=g1');
+    expect(mockPush).toHaveBeenNthCalledWith(3, '/groups?groupId=group-2');
   });
 
   it('keeps signed-out and offline-without-cache group states explicit', () => {

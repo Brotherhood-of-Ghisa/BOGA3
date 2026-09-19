@@ -16,6 +16,15 @@ import { startSyncGateStateBridge, stopSyncGateStateBridge } from '@/src/sync/sy
 import { requestSync, startSyncScheduler, stopSyncScheduler } from '@/src/sync/scheduler';
 import { SyncGate } from '@/src/sync/SyncGate';
 
+/**
+ * Arrow-only native back affordance on every detail screen. No custom
+ * `headerBackTitle`: react-native-screens then builds a custom back item that
+ * ignores the display mode and morphs its label in during the push. The
+ * hidden back label (still read by VoiceOver) is the previous screen's title,
+ * so the headerless `(tabs)` group is titled "Back" rather than "(tabs)".
+ */
+const ROOT_STACK_SCREEN_OPTIONS = { headerBackButtonDisplayMode: 'minimal' } as const;
+
 export default function RootLayout() {
   useEffect(() => {
     // The scheduler must wire first. A wiring failure here re-throws and crashes
@@ -66,54 +75,47 @@ export default function RootLayout() {
         <AuthProvider>
           <AuthRouteGuard>
             <SyncGate>
-              <Stack>
+              <Stack screenOptions={ROOT_STACK_SCREEN_OPTIONS}>
                 <Stack.Screen name="index" options={{ headerShown: false }} />
                 <Stack.Screen name="sign-in" options={{ headerShown: false }} />
-                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                <Stack.Screen name="(tabs)" options={{ headerShown: false, title: 'Back' }} />
                 <Stack.Screen name="exercise-history" />
-                <Stack.Screen
-                  name="sessions"
-                  options={{
-                    headerBackButtonDisplayMode: 'minimal',
-                    headerBackTitle: 'Back',
-                    title: 'Sessions',
-                  }}
-                />
+                <Stack.Screen name="sessions" options={{ title: 'Sessions' }} />
                 <Stack.Screen name="profile" options={{ title: 'Profile' }} />
                 <Stack.Screen
                   name="connected-agents"
-                  options={{ headerBackTitle: 'Settings', title: 'Connected agents' }}
+                  options={{ title: 'Connected agents' }}
                 />
                 <Stack.Screen name="dev-logs" options={{ title: 'Logs' }} />
-                <Stack.Screen name="exercise-link" options={{ headerBackTitle: 'Back', title: 'Link exercise' }} />
-                <Stack.Screen name="group/mine" options={{ headerBackTitle: 'Back', title: 'My groups' }} />
-                <Stack.Screen name="group/new" options={{ headerBackTitle: 'Back', title: 'New group' }} />
-                <Stack.Screen name="group/join" options={{ headerBackTitle: 'Back', title: 'Join group' }} />
+                <Stack.Screen name="exercise-link" options={{ title: 'Link exercise' }} />
+                <Stack.Screen name="group/mine" options={{ title: 'My groups' }} />
+                <Stack.Screen name="group/new" options={{ title: 'New group' }} />
+                <Stack.Screen name="group/join" options={{ title: 'Join group' }} />
                 {/* The group screen replaces this title with the group's name once loaded. */}
-                <Stack.Screen name="group/[groupId]/index" options={{ headerBackTitle: 'Back', title: 'Group' }} />
-                <Stack.Screen name="group/[groupId]/edit" options={{ headerBackTitle: 'Back', title: 'Edit group' }} />
-                <Stack.Screen name="group/[groupId]/invite" options={{ headerBackTitle: 'Back', title: 'Invite' }} />
-                <Stack.Screen name="group/[groupId]/members" options={{ headerBackTitle: 'Back', title: 'Members' }} />
+                <Stack.Screen name="group/[groupId]/index" options={{ title: 'Group' }} />
+                <Stack.Screen name="group/[groupId]/edit" options={{ title: 'Edit group' }} />
+                <Stack.Screen name="group/[groupId]/invite" options={{ title: 'Invite' }} />
+                <Stack.Screen name="group/[groupId]/members" options={{ title: 'Members' }} />
                 <Stack.Screen
                   name="group/[groupId]/exercises/new"
-                  options={{ headerBackTitle: 'Back', title: 'Add exercise' }}
+                  options={{ title: 'Add exercise' }}
                 />
                 <Stack.Screen
                   name="group/[groupId]/exercises/[exerciseId]/edit"
-                  options={{ headerBackTitle: 'Back', title: 'Edit exercise' }}
+                  options={{ title: 'Edit exercise' }}
                 />
                 {/* The board replaces this title with the group exercise's name once loaded. */}
                 <Stack.Screen
                   name="group/[groupId]/leaderboards/[exerciseId]/index"
-                  options={{ headerBackTitle: 'Back', title: 'Leaderboard' }}
+                  options={{ title: 'Leaderboard' }}
                 />
                 <Stack.Screen
                   name="group/[groupId]/leaderboards/[exerciseId]/history"
-                  options={{ headerBackTitle: 'Back', title: 'History' }}
+                  options={{ title: 'History' }}
                 />
                 <Stack.Screen
                   name="group-session/[memberId]/[sessionId]"
-                  options={{ headerBackTitle: 'Back', title: 'Session' }}
+                  options={{ title: 'Session' }}
                 />
                 <Stack.Screen name="maestro-harness" options={{ headerShown: false }} />
               </Stack>

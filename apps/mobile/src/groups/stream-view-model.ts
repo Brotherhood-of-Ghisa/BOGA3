@@ -23,7 +23,6 @@ import type {
 
 export const UNNAMED_MEMBER_LABEL = 'Unnamed member';
 export const TRAINING_NOW_LABEL = 'Training now';
-export const ALL_GROUPS_CHIP_LABEL = 'All';
 
 /** A member's display name; a null or blank username falls back to "Unnamed member". */
 export const formatMemberName = (username: string | null | undefined): string => {
@@ -421,21 +420,38 @@ export const buildStreamViewModel = (items: StreamItem[], myUserId: string | nul
 export type StreamFilterChip = {
   key: string;
   label: string;
-  /** Null for the All chip. */
-  groupId: string | null;
+  groupId: string;
   selected: boolean;
 };
 
-/** "All" first, then one chip per group in the given order (the server sorts by name). */
+/** One chip per group in the given order (the server sorts by name). There is no All chip. */
 export const buildStreamFilterChips = (
   groups: Pick<GroupSummary, 'group_id' | 'name'>[],
   selectedGroupId: string | null,
-): StreamFilterChip[] => [
-  { key: 'all', label: ALL_GROUPS_CHIP_LABEL, groupId: null, selected: selectedGroupId === null },
-  ...groups.map((group) => ({
+): StreamFilterChip[] =>
+  groups.map((group) => ({
     key: group.group_id,
     label: group.name,
     groupId: group.group_id,
     selected: group.group_id === selectedGroupId,
-  })),
-];
+  }));
+
+/**
+ * The Groups screen always shows one group: the first of `candidates` (a
+ * deep-linked group, then the last one viewed) that is still in My groups,
+ * else the first group. Null only when there are no groups.
+ */
+export const resolveSelectedGroupId = (
+  groups: Pick<GroupSummary, 'group_id'>[],
+  ...candidates: (string | null | undefined)[]
+): string | null => {
+  for (const candidate of candidates) {
+    if (candidate && groups.some((group) => group.group_id === candidate)) {
+      return candidate;
+    }
+  }
+  return groups[0]?.group_id ?? null;
+};
+
+/** The Groups screen with one group selected (Today links, membership items). */
+export const groupsStreamPath = (groupId: string) => `/groups?groupId=${groupId}` as const;
