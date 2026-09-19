@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { UiSurface, UiText, uiColors, uiRadius, uiSpace } from '@/components/ui';
+import { UiSurface, UiText, uiColors, uiRadius, uiSpace, uiTypography } from '@/components/ui';
 import type { StreamSessionCardViewModel } from '@/src/groups';
 
 type GroupStreamSessionCardProps = {
@@ -96,6 +96,6 @@ const styles = StyleSheet.create({
     color: uiColors.textSuccess,
   },
   groups: {
-    fontSize: 12,
+    fontSize: uiTypography.size.sm,
   },
 });

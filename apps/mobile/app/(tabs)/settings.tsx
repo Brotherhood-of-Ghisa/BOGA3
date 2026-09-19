@@ -5,7 +5,7 @@ import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { SyncStatusPanel } from '@/components/sync-status/sync-status-panel';
 import { MoreHubBackButton } from '@/components/navigation/more-hub-back-button';
-import { UiButton, UiSurface, UiText, uiBorder, uiColors, uiRadius, uiSpace } from '@/components/ui';
+import { UiButton, UiSurface, UiText, uiBorder, uiColors, uiRadius, uiSpace, uiTypography } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import { resetLocalDataAndReseed } from '@/src/data';
 import {
@@ -443,7 +443,7 @@ const styles = StyleSheet.create({
     gap: uiSpace.xxl,
   },
   screenTitle: {
-    fontSize: 24,
+    fontSize: uiTypography.size.xxl,
     lineHeight: 30,
   },
   section: {
@@ -506,7 +506,7 @@ const styles = StyleSheet.create({
     marginTop: uiSpace.sm,
   },
   preferenceLabel: {
-    fontSize: 13,
+    fontSize: uiTypography.size.md,
   },
   preferenceRow: {
     flexDirection: 'row',
@@ -526,7 +526,7 @@ const styles = StyleSheet.create({
     borderColor: uiColors.actionPrimary,
   },
   prefButtonText: {
-    fontSize: 12,
+    fontSize: uiTypography.size.sm,
     fontWeight: '600',
     color: uiColors.textPrimary,
   },

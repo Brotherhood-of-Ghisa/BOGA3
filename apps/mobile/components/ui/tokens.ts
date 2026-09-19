@@ -89,6 +89,7 @@ export const uiTypography = {
     base: 14,
     lg: 16,
     xl: 18,
+    xxl: 24,
   },
   weight: {
     regular: '400',

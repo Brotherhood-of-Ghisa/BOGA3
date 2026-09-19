@@ -6,7 +6,7 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { LayoutChangeEvent, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { uiColors } from '@/components/ui';
+import { uiColors, uiRadius, uiSpace, uiTypography } from '@/components/ui';
 
 import { HEAT_RAMP } from './heatmap-metric';
 import type { DayCell, HeatmapData } from './heatmapData';
@@ -238,15 +238,15 @@ export function DailyHeatmap({
 }
 
 const styles = StyleSheet.create({
-  wrap: { paddingTop: 4, paddingBottom: 8 },
+  wrap: { paddingTop: uiSpace.xs, paddingBottom: uiSpace.sm },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'baseline',
-    marginBottom: 16,
+    marginBottom: uiSpace.xxl,
   },
   h1: { fontSize: 15, fontWeight: '600', color: uiColors.textPrimary },
-  muted: { fontSize: 12, color: uiColors.textMuted },
+  muted: { fontSize: uiTypography.size.sm, color: uiColors.textMuted },
   body: { flexDirection: 'row' },
   scroll: { flex: 1 },
   axis: { height: 18, position: 'relative' },
@@ -262,13 +262,13 @@ const styles = StyleSheet.create({
   grid: { flexDirection: 'row' },
   wd: { fontSize: 9, color: uiColors.textMuted, textAlign: 'center' },
   detail: {
-    marginTop: 14,
+    marginTop: uiSpace.xl,
     backgroundColor: uiColors.surfaceMuted,
     borderWidth: 1,
     borderColor: uiColors.borderMuted,
-    borderRadius: 10,
+    borderRadius: uiRadius.md,
     paddingVertical: 11,
-    paddingHorizontal: 14,
+    paddingHorizontal: uiSpace.xl,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -280,14 +280,14 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.4,
   },
-  detailTitle: { fontSize: 15, fontWeight: '600', color: uiColors.textPrimary, marginTop: 2 },
-  detailRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  detailVal: { fontSize: 14, fontWeight: '600' },
+  detailTitle: { fontSize: 15, fontWeight: '600', color: uiColors.textPrimary, marginTop: uiSpace.xxs },
+  detailRight: { flexDirection: 'row', alignItems: 'center', gap: uiSpace.sm },
+  detailVal: { fontSize: uiTypography.size.base, fontWeight: '600' },
   legend: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 14,
+    marginTop: uiSpace.xl,
   },
   legendRamp: { flexDirection: 'row', alignItems: 'center', gap: 6 },
 });

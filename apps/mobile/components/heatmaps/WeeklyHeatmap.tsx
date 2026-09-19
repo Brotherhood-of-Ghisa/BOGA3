@@ -5,7 +5,7 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { LayoutChangeEvent, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { uiColors } from '@/components/ui';
+import { uiColors, uiSpace } from '@/components/ui';
 
 import { HEAT_RAMP } from './heatmap-metric';
 import type { HeatmapData } from './heatmapData';
@@ -96,7 +96,7 @@ export function WeeklyHeatmap({
           showsHorizontalScrollIndicator={false}
           onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: false })}>
           {/* paddingTop leaves room for the selected-week marker (top: -14) above the bars */}
-          <View style={{ width: contentW, paddingTop: 14 }}>
+          <View style={{ width: contentW, paddingTop: uiSpace.xl }}>
             {/* chart */}
             <View style={{ height: MAXH }}>
               <View style={styles.bars}>
@@ -216,7 +216,7 @@ export function WeeklyHeatmap({
 }
 
 const styles = StyleSheet.create({
-  wrap: { paddingTop: 4, paddingBottom: 8 },
+  wrap: { paddingTop: uiSpace.xs, paddingBottom: uiSpace.sm },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -237,7 +237,7 @@ const styles = StyleSheet.create({
   dash: {
     width: 5,
     height: 1.5,
-    marginRight: 4,
+    marginRight: uiSpace.xs,
     backgroundColor: uiColors.textMuted,
   },
   baseLabel: {
@@ -246,7 +246,7 @@ const styles = StyleSheet.create({
     fontSize: 9,
     color: uiColors.textSecondary,
     backgroundColor: 'transparent',
-    paddingHorizontal: 2,
+    paddingHorizontal: uiSpace.xxs,
   },
   bars: { flexDirection: 'row', alignItems: 'flex-end', height: '100%' },
   axis: {
@@ -268,7 +268,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 14,
+    marginTop: uiSpace.xl,
   },
   legendRamp: { flexDirection: 'row', alignItems: 'center', gap: 6 },
 });
