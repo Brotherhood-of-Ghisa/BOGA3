@@ -122,7 +122,7 @@ const styles = StyleSheet.create({
     opacity: 0.92,
   },
   card: {
-    padding: uiSpace.lg,
+    padding: uiSpace.md,
     gap: uiSpace.sm,
   },
   titleRow: {
@@ -140,7 +140,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: uiColors.borderMuted,
     paddingHorizontal: uiSpace.sm,
-    paddingVertical: uiSpace.xxs,
+    paddingVertical: uiSpace.xs,
   },
   podiumRow: {
     flexDirection: 'row',

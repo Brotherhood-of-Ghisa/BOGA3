@@ -62,25 +62,27 @@ export const uiColors = {
   rowSwipeText: '#20324f',
 } as const;
 
+// Six steps. The previous scale interleaved 2/10/14/20 with the 4/8/12/16
+// rhythm, which made every value on-scale and the scale non-constraining.
 export const uiSpace = {
-  xxs: 2,
   xs: 4,
   sm: 8,
-  md: 10,
-  lg: 12,
-  xl: 14,
-  xxl: 16,
-  screen: 20,
+  md: 12,
+  lg: 16,
+  xl: 24,
+  xxl: 32,
 } as const;
 
+// Three values, each with a job. If two radii sit side by side and the
+// difference cannot be named, there is only one radius.
 export const uiRadius = {
   sm: 8,
-  md: 10,
-  lg: 12,
-  xl: 14,
+  md: 12,
   full: 999,
 } as const;
 
+// Seven sizes, down from the fourteen that used to ship. `base` stays at 14:
+// density in the recorder was chosen over gym-floor legibility.
 export const uiTypography = {
   size: {
     xs: 11,
@@ -89,6 +91,18 @@ export const uiTypography = {
     base: 14,
     lg: 16,
     xl: 18,
+    xxl: 24,
+  },
+  // One line-height per size, so vertical rhythm stops depending on whatever
+  // leading the platform font happens to supply. Keyed to `size`.
+  lineHeight: {
+    xs: 15,
+    sm: 16,
+    md: 18,
+    base: 20,
+    lg: 22,
+    xl: 24,
+    xxl: 30,
   },
   weight: {
     regular: '400',
@@ -102,14 +116,40 @@ export const uiBorder = {
   width: 1,
 } as const;
 
+// The layering vocabulary the app had none of: every surface — page card,
+// modal, sheet, action menu, tab tray — was a 1px border on white, which is
+// why they all read as one flat layer. Opt-in via `UiSurface`'s `elevation`
+// prop; `flat` is the default and matches previous rendering exactly.
+export const uiElevation = {
+  // Deliberately empty: `flat` must add no style keys at all, so the default
+  // render tree is byte-identical to before elevation existed.
+  flat: {},
+  raised: {
+    shadowColor: '#122033',
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  overlay: {
+    shadowColor: '#122033',
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 12,
+  },
+} as const;
+
 export const uiTokens = {
   colors: uiColors,
   space: uiSpace,
   radius: uiRadius,
   typography: uiTypography,
   border: uiBorder,
+  elevation: uiElevation,
 } as const;
 
 export type UiColorToken = keyof typeof uiColors;
 export type UiSpaceToken = keyof typeof uiSpace;
 export type UiRadiusToken = keyof typeof uiRadius;
+export type UiElevationToken = keyof typeof uiElevation;

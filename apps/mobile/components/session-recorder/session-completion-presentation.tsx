@@ -228,22 +228,22 @@ export function SessionCompletionPresentation({
 
 const styles = StyleSheet.create({
   content: {
-    padding: uiSpace.screen,
-    paddingBottom: uiSpace.xxl,
-    gap: uiSpace.xl,
+    padding: uiSpace.xl,
+    paddingBottom: uiSpace.lg,
+    gap: uiSpace.lg,
     backgroundColor: uiColors.surfacePage,
   },
   completeSurface: {
-    padding: uiSpace.xl,
-    gap: uiSpace.xl,
+    padding: uiSpace.lg,
+    gap: uiSpace.lg,
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfaceDefault,
   },
   summaryGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    columnGap: uiSpace.xxl,
-    rowGap: uiSpace.xl,
+    columnGap: uiSpace.lg,
+    rowGap: uiSpace.lg,
   },
   summaryMetric: {
     width: '45%',
@@ -260,7 +260,7 @@ const styles = StyleSheet.create({
   muscleBreakdown: {
     borderTopWidth: uiBorder.width,
     borderTopColor: uiColors.borderMuted,
-    paddingTop: uiSpace.xl,
+    paddingTop: uiSpace.lg,
     gap: uiSpace.sm,
   },
   muscleChipWrap: {

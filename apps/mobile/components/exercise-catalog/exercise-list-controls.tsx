@@ -1,7 +1,7 @@
 import { memo, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { uiColors } from '@/components/ui';
+import { uiColors, uiRadius, uiSpace, uiTypography } from '@/components/ui';
 import {
   EXERCISE_LIST_DATE_RANGE_OPTIONS,
   type ExerciseListItem,
@@ -238,35 +238,35 @@ function getFamilyGroupTestId(familyName: string): string {
 
 const styles = StyleSheet.create({
   controlsRoot: {
-    gap: 8,
+    gap: uiSpace.sm,
   },
   sectionLabel: {
-    fontSize: 12,
+    fontSize: uiTypography.size.sm,
     fontWeight: '700',
     color: uiColors.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 0.4,
-    marginTop: 6,
+    marginTop: uiSpace.sm,
   },
   pillRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
+    gap: uiSpace.sm,
   },
   filterPill: {
-    borderRadius: 999,
+    borderRadius: uiRadius.full,
     borderWidth: 1,
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfaceDefault,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingHorizontal: uiSpace.md,
+    paddingVertical: uiSpace.xs,
   },
   filterPillSelected: {
     backgroundColor: uiColors.actionPrimarySubtleBg,
     borderColor: uiColors.actionPrimary,
   },
   filterPillText: {
-    fontSize: 12,
+    fontSize: uiTypography.size.sm,
     fontWeight: '600',
     color: uiColors.textPrimary,
   },
@@ -275,26 +275,26 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   helperText: {
-    fontSize: 13,
+    fontSize: uiTypography.size.md,
     color: uiColors.textSecondary,
   },
   groupSection: {
-    gap: 6,
+    gap: uiSpace.sm,
   },
   groupHeader: {
     minHeight: 34,
-    borderRadius: 8,
+    borderRadius: uiRadius.sm,
     borderWidth: 1,
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfaceMuted,
-    paddingHorizontal: 10,
+    paddingHorizontal: uiSpace.md,
     justifyContent: 'center',
   },
   groupHeaderDisabled: {
     opacity: 0.62,
   },
   groupHeaderText: {
-    fontSize: 12,
+    fontSize: uiTypography.size.sm,
     fontWeight: '700',
     color: uiColors.textPrimary,
   },
@@ -304,12 +304,12 @@ const styles = StyleSheet.create({
   exerciseListRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: uiSpace.sm,
     borderWidth: 1,
     borderColor: uiColors.borderMuted,
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 7,
+    borderRadius: uiRadius.sm,
+    paddingHorizontal: uiSpace.sm,
+    paddingVertical: uiSpace.sm,
     backgroundColor: uiColors.surfaceDefault,
   },
   exerciseListRowMainPressable: {
@@ -317,40 +317,40 @@ const styles = StyleSheet.create({
   },
   exerciseListRowTextStack: {
     flex: 1,
-    gap: 1,
+    gap: uiSpace.xs,
   },
   exerciseListRowTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: uiSpace.sm,
   },
   exerciseListRowTitle: {
     flexShrink: 1,
     minWidth: 0,
-    fontSize: 13,
+    fontSize: uiTypography.size.md,
     fontWeight: '600',
     color: uiColors.textPrimary,
   },
   exerciseListRowMuscleSummary: {
-    fontSize: 11,
+    fontSize: uiTypography.size.xs,
     color: uiColors.textSecondary,
     fontWeight: '600',
   },
   exerciseListRowStats: {
-    fontSize: 11,
+    fontSize: uiTypography.size.xs,
     color: uiColors.textAccentMuted,
     fontWeight: '600',
-    marginTop: 2,
+    marginTop: uiSpace.xs,
   },
   deletedExerciseChip: {
-    fontSize: 9,
+    fontSize: uiTypography.size.xs,
     fontWeight: '700',
     color: uiColors.textWarning,
     borderWidth: 1,
     borderColor: uiColors.borderWarning,
     backgroundColor: uiColors.surfaceWarning,
-    borderRadius: 999,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    borderRadius: uiRadius.full,
+    paddingHorizontal: uiSpace.sm,
+    paddingVertical: uiSpace.xs,
   },
 });

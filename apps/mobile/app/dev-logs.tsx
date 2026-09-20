@@ -3,7 +3,6 @@ import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 
 import {
   SegmentedChips,
-  type SegmentedChipOption,
   UiButton,
   UiSurface,
   UiText,
@@ -11,6 +10,8 @@ import {
   uiColors,
   uiRadius,
   uiSpace,
+  uiTypography,
+  type SegmentedChipOption,
 } from '@/components/ui';
 import {
   clearRecentLogs,
@@ -152,15 +153,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: uiSpace.md,
-    padding: uiSpace.screen,
+    padding: uiSpace.xl,
   },
   listContent: {
-    paddingHorizontal: uiSpace.screen,
-    paddingBottom: uiSpace.xxl,
+    paddingHorizontal: uiSpace.xl,
+    paddingBottom: uiSpace.lg,
     gap: uiSpace.md,
   },
   rowCard: {
-    padding: uiSpace.lg,
+    padding: uiSpace.md,
   },
   row: {
     gap: uiSpace.sm,
@@ -171,16 +172,16 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   level: {
-    fontSize: 12,
+    fontSize: uiTypography.size.sm,
     fontWeight: '700',
     letterSpacing: 0.5,
   },
   time: {
-    fontSize: 12,
+    fontSize: uiTypography.size.sm,
   },
   context: {
     fontFamily: 'Courier',
-    fontSize: 12,
+    fontSize: uiTypography.size.sm,
     color: uiColors.textSecondary,
     borderTopWidth: uiBorder.width,
     borderTopColor: uiColors.borderMuted,
@@ -188,17 +189,17 @@ const styles = StyleSheet.create({
     borderRadius: uiRadius.sm,
   },
   contextHint: {
-    fontSize: 12,
+    fontSize: uiTypography.size.sm,
   },
   empty: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: uiSpace.screen,
+    padding: uiSpace.xl,
     backgroundColor: uiColors.surfacePage,
   },
   emptyText: {
     textAlign: 'center',
-    paddingVertical: uiSpace.xxl,
+    paddingVertical: uiSpace.lg,
   },
 });

@@ -28,7 +28,13 @@ export default ({ config }: { config: ExpoConfig }) => ({
     orientation: "portrait",
     icon: "./assets/images/icon.png",
     scheme: "boga3",
-    userInterfaceStyle: "automatic",
+    // Light-only by decision (2026-09-19). Dark mode is explicitly not a
+    // product goal, and "automatic" is not free: it hands the OS-owned
+    // chrome — Alert.alert dialogs, the keyboard, native pickers — a dark
+    // appearance over an app that renders one light theme. Pinning "light"
+    // keeps that chrome consistent with the tokens in
+    // components/ui/tokens.ts, which have no dark variants.
+    userInterfaceStyle: "light",
     newArchEnabled: true,
 
     ios: {
@@ -66,10 +72,13 @@ export default ({ config }: { config: ExpoConfig }) => ({
                 image: "./assets/images/splash-icon.png",
                 imageWidth: 200,
                 resizeMode: "contain",
-                backgroundColor: "#ffffff",
-                dark: {
-                    backgroundColor: "#000000"
-                }
+                // No `dark` variant: a dark splash makes expo-splash-screen
+                // force UIUserInterfaceStyle=Automatic into Info.plist,
+                // silently overriding the `userInterfaceStyle: "light"` above
+                // (prebuild warns "preventing splash screen from working
+                // properly"). Light-only is the decision, so the dark
+                // background goes.
+                backgroundColor: "#ffffff"
             }
         ],
         "expo-secure-store",

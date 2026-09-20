@@ -84,9 +84,9 @@ const styles = StyleSheet.create({
     borderColor: uiColors.borderMuted,
     borderRadius: uiRadius.md,
     backgroundColor: uiColors.surfaceDefault,
-    paddingHorizontal: uiSpace.lg,
+    paddingHorizontal: uiSpace.md,
     paddingVertical: uiSpace.md,
-    gap: uiSpace.xxs,
+    gap: uiSpace.xs,
     minHeight: 48,
   },
   rowTitle: {
@@ -99,7 +99,7 @@ const styles = StyleSheet.create({
     borderColor: uiColors.actionNeutralSubtleBorder,
     borderRadius: uiRadius.full,
     backgroundColor: uiColors.actionNeutralSubtleBg,
-    paddingHorizontal: uiSpace.lg,
+    paddingHorizontal: uiSpace.md,
   },
   toggleActive: {
     borderColor: uiColors.actionPrimary,

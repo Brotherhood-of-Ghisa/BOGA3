@@ -47,6 +47,12 @@ appId: com.dinoderek.mobile
           visible:
             id: "more-screen"
           timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: "more-settings-row"
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
 - tapOn:
     id: "more-settings-row"
 - assertVisible:

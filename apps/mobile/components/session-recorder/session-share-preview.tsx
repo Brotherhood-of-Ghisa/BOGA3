@@ -281,12 +281,12 @@ const styles = StyleSheet.create({
   },
   sheet: {
     maxHeight: '94%',
-    paddingHorizontal: uiSpace.screen,
+    paddingHorizontal: uiSpace.xl,
     paddingTop: uiSpace.sm,
-    paddingBottom: uiSpace.screen,
+    paddingBottom: uiSpace.xl,
     gap: uiSpace.sm,
-    borderTopLeftRadius: uiRadius.xl,
-    borderTopRightRadius: uiRadius.xl,
+    borderTopLeftRadius: uiRadius.md,
+    borderTopRightRadius: uiRadius.md,
     backgroundColor: uiColors.surfaceDefault,
   },
   dragHandle: {
@@ -320,11 +320,11 @@ const styles = StyleSheet.create({
   },
   shareCard: {
     width: '100%',
-    padding: uiSpace.xxl,
+    padding: uiSpace.lg,
     gap: uiSpace.sm,
     borderWidth: 1,
     borderColor: uiColors.actionPrimarySubtleBorder,
-    borderRadius: uiRadius.lg,
+    borderRadius: uiRadius.md,
     backgroundColor: uiColors.surfaceDefault,
   },
   brandRow: {
@@ -359,7 +359,7 @@ const styles = StyleSheet.create({
   },
   shareRecordRow: {
     paddingTop: uiSpace.xs,
-    gap: uiSpace.xxs,
+    gap: uiSpace.xs,
     borderTopWidth: 1,
     borderTopColor: uiColors.borderSuccess,
   },

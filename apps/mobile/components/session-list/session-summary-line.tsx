@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { uiColors } from '@/components/ui';
+import { uiColors, uiSpace, uiTypography } from '@/components/ui';
 
 import { formatCompactDuration, type SessionListItem } from './types';
 
@@ -107,19 +107,19 @@ export function SessionSummaryLine({
 
 const styles = StyleSheet.create({
   summaryLines: {
-    gap: 2,
+    gap: uiSpace.xs,
     minHeight: 34,
   },
   summaryRow: {
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'nowrap',
-    gap: 4,
+    gap: uiSpace.xs,
     minWidth: 0,
   },
   summaryToken: {
     color: uiColors.textPrimary,
-    fontSize: 12,
+    fontSize: uiTypography.size.sm,
     fontWeight: '600',
     fontVariant: ['tabular-nums'],
   },
@@ -127,12 +127,12 @@ const styles = StyleSheet.create({
     color: uiColors.textAccentStrong,
   },
   summaryTokenStrong: {
-    fontSize: 13,
+    fontSize: uiTypography.size.md,
     fontWeight: '700',
   },
   summaryTokenSecondary: {
     color: uiColors.textSecondary,
-    fontSize: 12,
+    fontSize: uiTypography.size.sm,
     fontWeight: '600',
   },
   summaryAtToken: {
@@ -148,6 +148,6 @@ const styles = StyleSheet.create({
   },
   summarySeparator: {
     color: uiColors.textDisabled,
-    fontSize: 11,
+    fontSize: uiTypography.size.xs,
   },
 });

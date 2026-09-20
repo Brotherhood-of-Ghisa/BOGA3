@@ -11,12 +11,13 @@ exports[`UI primitives matches the current top-level tabs snapshot after primiti
       {
         "backgroundColor": "#ffffff",
         "borderColor": "#d0d0d0",
-        "borderRadius": 10,
+        "borderRadius": 12,
       },
+      {},
       {
         "backgroundColor": "#ffffff",
         "borderColor": "#dbe3ef",
-        "borderRadius": 14,
+        "borderRadius": 12,
         "padding": 8,
       },
     ]
@@ -70,8 +71,8 @@ exports[`UI primitives matches the current top-level tabs snapshot after primiti
             "borderRadius": 8,
             "justifyContent": "center",
             "minHeight": 42,
-            "paddingHorizontal": 10,
-            "paddingVertical": 9,
+            "paddingHorizontal": 12,
+            "paddingVertical": 8,
           },
           {
             "backgroundColor": "#f4f7fb",
@@ -84,7 +85,7 @@ exports[`UI primitives matches the current top-level tabs snapshot after primiti
           null,
           {
             "flex": 1,
-            "paddingHorizontal": 2,
+            "paddingHorizontal": 4,
           },
         ]
       }
@@ -156,8 +157,8 @@ exports[`UI primitives matches the current top-level tabs snapshot after primiti
             "borderRadius": 8,
             "justifyContent": "center",
             "minHeight": 42,
-            "paddingHorizontal": 10,
-            "paddingVertical": 9,
+            "paddingHorizontal": 12,
+            "paddingVertical": 8,
           },
           {
             "backgroundColor": "#f4f7fb",
@@ -170,7 +171,7 @@ exports[`UI primitives matches the current top-level tabs snapshot after primiti
           null,
           {
             "flex": 1,
-            "paddingHorizontal": 2,
+            "paddingHorizontal": 4,
           },
         ]
       }
@@ -242,8 +243,8 @@ exports[`UI primitives matches the current top-level tabs snapshot after primiti
             "borderRadius": 8,
             "justifyContent": "center",
             "minHeight": 42,
-            "paddingHorizontal": 10,
-            "paddingVertical": 9,
+            "paddingHorizontal": 12,
+            "paddingVertical": 8,
           },
           {
             "backgroundColor": "#f4f7fb",
@@ -256,7 +257,7 @@ exports[`UI primitives matches the current top-level tabs snapshot after primiti
           null,
           {
             "flex": 1,
-            "paddingHorizontal": 2,
+            "paddingHorizontal": 4,
           },
         ]
       }
@@ -328,8 +329,8 @@ exports[`UI primitives matches the current top-level tabs snapshot after primiti
             "borderRadius": 8,
             "justifyContent": "center",
             "minHeight": 42,
-            "paddingHorizontal": 10,
-            "paddingVertical": 9,
+            "paddingHorizontal": 12,
+            "paddingVertical": 8,
           },
           {
             "backgroundColor": "#f4f7fb",
@@ -342,7 +343,7 @@ exports[`UI primitives matches the current top-level tabs snapshot after primiti
           null,
           {
             "flex": 1,
-            "paddingHorizontal": 2,
+            "paddingHorizontal": 4,
           },
         ]
       }

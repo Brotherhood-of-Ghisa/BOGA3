@@ -133,7 +133,7 @@ export const pickInlineError = (...errors: (GroupApiError | null)[]): GroupApiEr
 
 const styles = StyleSheet.create({
   card: {
-    padding: uiSpace.xxl,
+    padding: uiSpace.lg,
     gap: uiSpace.md,
   },
   emptyActions: {
@@ -142,7 +142,7 @@ const styles = StyleSheet.create({
   loading: {
     alignItems: 'center',
     gap: uiSpace.sm,
-    padding: uiSpace.xxl,
+    padding: uiSpace.lg,
   },
   inlineError: {
     flexDirection: 'row',

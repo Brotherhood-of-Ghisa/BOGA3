@@ -97,6 +97,17 @@ appId: com.dinoderek.mobile
           visible:
             id: "more-screen"
           timeout: 15000
+# Settings is the last row of the last section on More, so it sits below the
+# fold on a 402x874 device (row 766-854; the scroll viewport ends at 752).
+# Scroll it into view rather than tapping blind: before the type scale grew the
+# row heights, the row's centre sat 5pt inside the viewport and a bare tapOn
+# happened to land, which made this step one padding change away from failing.
+- scrollUntilVisible:
+    element:
+      id: "more-settings-row"
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
 - tapOn:
     id: "more-settings-row"
 - extendedWaitUntil:
@@ -111,6 +122,8 @@ appId: com.dinoderek.mobile
     element:
       id: "settings-about-card"
     direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
 - assertVisible:
     id: "settings-about-version"
 - assertVisible:
@@ -126,6 +139,8 @@ appId: com.dinoderek.mobile
     element:
       id: "settings-connected-agents-row"
     direction: UP
+    visibilityPercentage: 100
+    centerElement: true
 - tapOn:
     id: "settings-connected-agents-row"
 - extendedWaitUntil:
@@ -144,6 +159,8 @@ appId: com.dinoderek.mobile
     element:
       id: "settings-profile-row"
     direction: UP
+    visibilityPercentage: 100
+    centerElement: true
 - tapOn:
     id: "settings-profile-row"
 - extendedWaitUntil:
@@ -172,6 +189,8 @@ appId: com.dinoderek.mobile
     element:
       id: "profile-sign-out-button"
     direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
 - tapOn:
     id: "profile-sign-out-button"
 # Signing out drops the session; the route-layer guard returns to the gate.

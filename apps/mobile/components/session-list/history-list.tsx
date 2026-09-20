@@ -12,7 +12,7 @@ import {
   View,
 } from 'react-native';
 
-import { uiColors } from '@/components/ui';
+import { uiColors, uiRadius, uiSpace, uiTypography } from '@/components/ui';
 
 import { SessionSummaryLine } from './session-summary-line';
 import type { SessionListItem } from './types';
@@ -359,44 +359,44 @@ const styles = StyleSheet.create({
   historyRegion: {
     flex: 1,
     minHeight: 0,
-    gap: 8,
+    gap: uiSpace.sm,
   },
   historyScroll: {
     flex: 1,
     minHeight: 0,
   },
   historyScrollContent: {
-    gap: 12,
-    paddingBottom: 16,
+    gap: uiSpace.md,
+    paddingBottom: uiSpace.lg,
   },
   sectionHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 12,
+    gap: uiSpace.md,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: uiTypography.size.xl,
     fontWeight: '700',
     color: uiColors.textPrimary,
   },
   emptyPanel: {
-    borderRadius: 12,
+    borderRadius: uiRadius.md,
     borderWidth: 1,
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfacePage,
-    padding: 12,
+    padding: uiSpace.md,
   },
   sessionRow: {
-    borderRadius: 12,
+    borderRadius: uiRadius.md,
     borderWidth: 1,
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfaceDefault,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    paddingHorizontal: uiSpace.md,
+    paddingVertical: uiSpace.sm,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: uiSpace.sm,
   },
   deletedCompletedRow: {
     borderColor: uiColors.actionDangerSubtleBorder,
@@ -410,7 +410,7 @@ const styles = StyleSheet.create({
   iconActionButton: {
     width: 28,
     height: 28,
-    borderRadius: 8,
+    borderRadius: uiRadius.sm,
     borderWidth: 1,
     paddingHorizontal: 0,
     paddingVertical: 0,
@@ -423,49 +423,49 @@ const styles = StyleSheet.create({
   },
   iconGlyphText: {
     color: uiColors.actionNeutralSubtleText,
-    fontSize: 14,
+    fontSize: uiTypography.size.base,
     fontWeight: '700',
     lineHeight: 16,
   },
   metaText: {
     color: uiColors.textSecondary,
-    fontSize: 13,
+    fontSize: uiTypography.size.md,
   },
   completedList: {
-    gap: 10,
+    gap: uiSpace.md,
   },
   toggleButton: {
-    borderRadius: 999,
+    borderRadius: uiRadius.full,
     borderWidth: 1,
     borderColor: uiColors.actionNeutralSubtleBorder,
     backgroundColor: uiColors.actionNeutralSubtleBg,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingHorizontal: uiSpace.md,
+    paddingVertical: uiSpace.sm,
   },
   toggleButtonText: {
     color: uiColors.actionNeutralSubtleText,
-    fontSize: 12,
+    fontSize: uiTypography.size.sm,
     fontWeight: '600',
   },
   globalEmptyState: {
-    borderRadius: 14,
+    borderRadius: uiRadius.md,
     borderWidth: 1,
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfaceDefault,
-    padding: 16,
-    gap: 6,
+    padding: uiSpace.lg,
+    gap: uiSpace.sm,
     alignItems: 'center',
   },
   globalEmptyTitle: {
     color: uiColors.textPrimary,
-    fontSize: 16,
+    fontSize: uiTypography.size.lg,
     fontWeight: '700',
   },
   modalRoot: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: uiSpace.xl,
   },
   modalOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -474,22 +474,22 @@ const styles = StyleSheet.create({
   modalPanel: {
     width: '100%',
     maxWidth: 360,
-    borderRadius: 14,
+    borderRadius: uiRadius.md,
     borderWidth: 1,
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfaceDefault,
-    padding: 14,
-    gap: 10,
+    padding: uiSpace.lg,
+    gap: uiSpace.md,
   },
   modalActionRow: {
     flexDirection: 'row',
     alignItems: 'stretch',
-    gap: 8,
+    gap: uiSpace.sm,
   },
   modalActionButton: {
-    borderRadius: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 10,
+    borderRadius: uiRadius.md,
+    paddingHorizontal: uiSpace.sm,
+    paddingVertical: uiSpace.md,
     alignItems: 'center',
     justifyContent: 'center',
   },

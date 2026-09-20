@@ -29,7 +29,7 @@ export function GroupSummaryRow({ group, onPress }: { group: GroupSummary; onPre
 
 const styles = StyleSheet.create({
   card: {
-    padding: uiSpace.lg,
+    padding: uiSpace.md,
     gap: uiSpace.xs,
   },
 });

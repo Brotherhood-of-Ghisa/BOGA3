@@ -26,14 +26,7 @@ import {
   type SessionListDataClient,
   type SessionListItem,
 } from '@/components/session-list';
-import {
-  UiButton,
-  UiSurface,
-  UiText,
-  uiColors,
-  uiRadius,
-  uiSpace,
-} from '@/components/ui';
+import { UiButton, UiSurface, UiText, uiColors, uiRadius, uiSpace, uiTypography } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import {
   buildStreamViewModel,
@@ -558,15 +551,15 @@ const styles = StyleSheet.create({
     backgroundColor: uiColors.surfacePage,
   },
   content: {
-    padding: uiSpace.screen,
-    paddingBottom: uiSpace.screen,
-    gap: uiSpace.xxl,
+    padding: uiSpace.xl,
+    paddingBottom: uiSpace.xl,
+    gap: uiSpace.lg,
   },
   intro: {
     gap: uiSpace.sm,
   },
   screenTitle: {
-    fontSize: 24,
+    fontSize: uiTypography.size.xxl,
     lineHeight: 30,
   },
   section: {
@@ -586,11 +579,11 @@ const styles = StyleSheet.create({
     paddingVertical: uiSpace.xs,
   },
   sectionActionText: {
-    fontSize: 12,
+    fontSize: uiTypography.size.sm,
   },
   card: {
-    padding: uiSpace.xxl,
-    gap: uiSpace.lg,
+    padding: uiSpace.lg,
+    gap: uiSpace.md,
   },
   activeCard: {
     borderColor: uiColors.borderSuccess,
@@ -604,7 +597,7 @@ const styles = StyleSheet.create({
   },
   recentCard: {
     minHeight: 62,
-    paddingHorizontal: uiSpace.lg,
+    paddingHorizontal: uiSpace.md,
     paddingVertical: uiSpace.md,
     flexDirection: 'row',
     alignItems: 'center',
@@ -615,7 +608,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   chevron: {
-    fontSize: 22,
+    fontSize: uiTypography.size.xxl,
     lineHeight: 24,
     color: uiColors.textSecondary,
   },

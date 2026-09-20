@@ -224,7 +224,7 @@ const styles = StyleSheet.create({
   },
   summaryPressable: {
     minHeight: 64,
-    paddingHorizontal: uiSpace.lg,
+    paddingHorizontal: uiSpace.md,
     paddingVertical: uiSpace.md,
     flexDirection: 'row',
     alignItems: 'center',
@@ -233,12 +233,12 @@ const styles = StyleSheet.create({
   summaryCopy: {
     flex: 1,
     minWidth: 0,
-    gap: uiSpace.xxs,
+    gap: uiSpace.xs,
   },
   compactRetryButton: {
     alignSelf: 'flex-start',
     marginBottom: uiSpace.md,
-    marginHorizontal: uiSpace.lg,
+    marginHorizontal: uiSpace.md,
     minWidth: 88,
   },
   sheetContainer: {
@@ -253,7 +253,7 @@ const styles = StyleSheet.create({
     maxHeight: '82%',
     borderBottomLeftRadius: 0,
     borderBottomRightRadius: 0,
-    paddingBottom: uiSpace.screen,
+    paddingBottom: uiSpace.xl,
   },
   sheetHandle: {
     alignSelf: 'center',
@@ -265,7 +265,7 @@ const styles = StyleSheet.create({
     backgroundColor: uiColors.borderStrong,
   },
   sheetHeader: {
-    paddingHorizontal: uiSpace.xxl,
+    paddingHorizontal: uiSpace.lg,
     paddingBottom: uiSpace.md,
     flexDirection: 'row',
     alignItems: 'center',
@@ -276,17 +276,17 @@ const styles = StyleSheet.create({
   sheetHeaderCopy: {
     flex: 1,
     minWidth: 0,
-    gap: uiSpace.xxs,
+    gap: uiSpace.xs,
   },
   closeButton: {
     minWidth: 76,
   },
   sheetContent: {
-    padding: uiSpace.xxl,
-    gap: uiSpace.lg,
+    padding: uiSpace.lg,
+    gap: uiSpace.md,
   },
   statePanel: {
-    padding: uiSpace.lg,
+    padding: uiSpace.md,
     gap: uiSpace.sm,
   },
   muscleRow: {

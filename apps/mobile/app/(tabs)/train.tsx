@@ -12,7 +12,7 @@ import {
   type SessionListDataClient,
   type SessionListItem,
 } from '@/components/session-list';
-import { UiButton, UiSurface, UiText, uiColors, uiRadius, uiSpace } from '@/components/ui';
+import { UiButton, UiSurface, UiText, uiColors, uiRadius, uiSpace, uiTypography } from '@/components/ui';
 import {
   DEFAULT_SESSION_ENTRY_COORDINATOR,
   type PlannedSessionMaterializer,
@@ -326,23 +326,23 @@ const styles = StyleSheet.create({
     backgroundColor: uiColors.surfacePage,
   },
   content: {
-    padding: uiSpace.screen,
-    paddingBottom: uiSpace.screen,
-    gap: uiSpace.xxl,
+    padding: uiSpace.xl,
+    paddingBottom: uiSpace.xl,
+    gap: uiSpace.lg,
   },
   intro: {
     gap: uiSpace.sm,
   },
   screenTitle: {
-    fontSize: 24,
+    fontSize: uiTypography.size.xxl,
     lineHeight: 30,
   },
   section: {
     gap: uiSpace.md,
   },
   card: {
-    padding: uiSpace.xxl,
-    gap: uiSpace.lg,
+    padding: uiSpace.lg,
+    gap: uiSpace.md,
   },
   activeCard: {
     borderColor: uiColors.borderSuccess,

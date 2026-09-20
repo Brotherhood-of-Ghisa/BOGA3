@@ -274,17 +274,17 @@ const styles = StyleSheet.create({
   card: {
     maxHeight: '85%',
     gap: uiSpace.md,
-    borderTopLeftRadius: uiRadius.xl,
-    borderTopRightRadius: uiRadius.xl,
+    borderTopLeftRadius: uiRadius.md,
+    borderTopRightRadius: uiRadius.md,
     backgroundColor: uiColors.surfaceDefault,
-    padding: uiSpace.screen,
+    padding: uiSpace.xl,
   },
   list: {
     gap: uiSpace.sm,
   },
   otherList: {
     gap: uiSpace.xs,
-    paddingLeft: uiSpace.lg,
+    paddingLeft: uiSpace.md,
   },
   choice: {
     minHeight: 44,
@@ -292,7 +292,7 @@ const styles = StyleSheet.create({
     borderWidth: uiBorder.width,
     borderColor: uiColors.borderMuted,
     borderRadius: uiRadius.md,
-    paddingHorizontal: uiSpace.lg,
+    paddingHorizontal: uiSpace.md,
     paddingVertical: uiSpace.sm,
   },
   choiceSelected: {

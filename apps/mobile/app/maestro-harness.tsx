@@ -2,7 +2,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
-import { uiColors } from '@/components/ui';
+import { uiColors, uiSpace, uiTypography } from '@/components/ui';
 import {
   coerceMaestroHarnessQueryParam,
   isMaestroHarnessAllowed,
@@ -184,13 +184,13 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 16,
-    paddingHorizontal: 24,
+    gap: uiSpace.lg,
+    paddingHorizontal: uiSpace.xl,
     backgroundColor: uiColors.surfacePage,
   },
   message: {
     color: uiColors.textPrimary,
-    fontSize: 16,
+    fontSize: uiTypography.size.lg,
     lineHeight: 22,
     textAlign: 'center',
   },

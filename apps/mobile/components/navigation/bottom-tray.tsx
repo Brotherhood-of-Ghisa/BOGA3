@@ -252,7 +252,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   content: {
-    paddingHorizontal: uiSpace.xxl,
+    paddingHorizontal: uiSpace.lg,
     paddingBottom: uiSpace.sm,
   },
   handleHitArea: {
@@ -263,7 +263,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: uiSpace.xs,
-    paddingHorizontal: uiSpace.xxl,
+    paddingHorizontal: uiSpace.lg,
     borderRadius: uiRadius.full,
   },
   handleIndicator: {

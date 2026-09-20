@@ -191,8 +191,8 @@ const styles = StyleSheet.create({
   content: {
     flexGrow: 1,
     justifyContent: 'center',
-    padding: uiSpace.screen,
-    gap: uiSpace.xxl,
+    padding: uiSpace.xl,
+    gap: uiSpace.lg,
   },
   header: {
     gap: uiSpace.sm,
@@ -201,11 +201,11 @@ const styles = StyleSheet.create({
     color: uiColors.textSecondary,
   },
   card: {
-    padding: uiSpace.xxl,
-    gap: uiSpace.xxl,
+    padding: uiSpace.lg,
+    gap: uiSpace.lg,
   },
   warningCard: {
-    padding: uiSpace.xxl,
+    padding: uiSpace.lg,
     gap: uiSpace.sm,
     borderColor: uiColors.borderWarning,
     backgroundColor: uiColors.surfaceWarning,
@@ -214,7 +214,7 @@ const styles = StyleSheet.create({
     color: uiColors.textWarning,
   },
   fieldGroup: {
-    gap: uiSpace.xl,
+    gap: uiSpace.lg,
   },
   fieldBlock: {
     gap: uiSpace.sm,
@@ -226,13 +226,13 @@ const styles = StyleSheet.create({
     backgroundColor: uiColors.surfaceDefault,
     color: uiColors.textPrimary,
     minHeight: 48,
-    paddingHorizontal: uiSpace.xxl,
-    paddingVertical: uiSpace.lg,
+    paddingHorizontal: uiSpace.lg,
+    paddingVertical: uiSpace.md,
     fontSize: uiTypography.size.base,
   },
   feedbackCard: {
-    paddingHorizontal: uiSpace.xxl,
-    paddingVertical: uiSpace.xl,
+    paddingHorizontal: uiSpace.lg,
+    paddingVertical: uiSpace.lg,
   },
   errorCard: {
     borderColor: uiColors.actionDangerSubtleBorder,

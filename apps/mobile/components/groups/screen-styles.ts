@@ -9,7 +9,7 @@ export const groupScreenStyles = StyleSheet.create({
     backgroundColor: uiColors.surfacePage,
   },
   content: {
-    padding: uiSpace.screen,
+    padding: uiSpace.xl,
     gap: uiSpace.lg,
   },
   header: {

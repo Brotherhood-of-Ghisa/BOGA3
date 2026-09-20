@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
-import { uiColors } from '@/components/ui/tokens';
+import { uiBorder, uiColors, uiRadius, uiSpace, uiTypography } from '@/components/ui/tokens';
 
 export type SegmentedChipOption<TValue extends string | number> = {
   value: TValue;
@@ -71,28 +71,28 @@ export function SegmentedChips<TValue extends string | number>({
 const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
-    gap: 8,
+    gap: uiSpace.sm,
   },
   rowJoined: {
     gap: 0,
     alignSelf: 'stretch',
     overflow: 'hidden',
-    borderRadius: 12,
-    borderWidth: 1,
+    borderRadius: uiRadius.md,
+    borderWidth: uiBorder.width,
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfaceDefault,
   },
   chip: {
-    borderRadius: 999,
-    borderWidth: 1,
+    borderRadius: uiRadius.full,
+    borderWidth: uiBorder.width,
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfaceDefault,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: uiSpace.lg,
+    paddingVertical: uiSpace.sm,
   },
   chipCompact: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: uiSpace.sm,
+    paddingVertical: uiSpace.xs,
   },
   chipJoined: {
     flex: 1,
@@ -103,7 +103,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   chipJoinedDivider: {
-    borderLeftWidth: 1,
+    borderLeftWidth: uiBorder.width,
     borderLeftColor: uiColors.borderMuted,
   },
   chipSelected: {
@@ -111,12 +111,12 @@ const styles = StyleSheet.create({
     backgroundColor: uiColors.actionPrimarySubtleBg,
   },
   chipText: {
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: uiTypography.size.md,
+    fontWeight: uiTypography.weight.semibold,
     color: uiColors.textSecondary,
   },
   chipTextCompact: {
-    fontSize: 11,
+    fontSize: uiTypography.size.xs,
   },
   chipTextSelected: {
     color: uiColors.actionPrimary,

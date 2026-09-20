@@ -89,7 +89,7 @@ const styles = StyleSheet.create({
     borderRadius: uiRadius.sm,
     minHeight: 42,
     paddingHorizontal: uiSpace.md,
-    paddingVertical: uiSpace.sm + 1,
+    paddingVertical: uiSpace.sm,
     alignItems: 'center',
     justifyContent: 'center',
   },

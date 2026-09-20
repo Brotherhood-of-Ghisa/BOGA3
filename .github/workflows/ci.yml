@@ -67,6 +67,12 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      # Design-token guardrail (`ui-guardrails` lane). Blocks raw color
+      # literals outright, and holds raw fontSize / spacing / radius counts to
+      # the budgets in scripts/ui-guardrails.config.js so they can only fall.
+      - name: UI guardrails
+        run: npm run lint:ui-guardrails
+
       # Hard ceiling on the unit run. A leaked handle that keeps Jest alive
       # AFTER tests pass (the failure mode that once hung this gate silently)
       # is killed here in minutes instead of running to the default 6h job

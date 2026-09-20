@@ -17,7 +17,7 @@ import {
   pickInlineError,
   usePullToRefresh,
 } from '@/components/groups';
-import { SegmentedChips, UiButton, UiText, uiSpace } from '@/components/ui';
+import { SegmentedChips, UiButton, UiText, uiSpace, uiTypography } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import {
   getGroupBoardPodiums,
@@ -214,7 +214,7 @@ const styles = StyleSheet.create({
   },
   title: {
     flex: 1,
-    fontSize: 24,
+    fontSize: uiTypography.size.xxl,
     lineHeight: 30,
   },
 });

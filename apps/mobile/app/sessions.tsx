@@ -12,7 +12,7 @@ import {
   type SessionListDataClient,
   type SessionListItem,
 } from '@/components/session-list';
-import { uiColors } from '@/components/ui';
+import { uiColors, uiSpace, uiTypography } from '@/components/ui';
 import { appendCompletedSessionAsPlanned } from '@/src/data';
 
 export type SessionsScreenProps = {
@@ -174,18 +174,18 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: uiColors.surfacePage,
-    padding: 16,
-    gap: 12,
+    padding: uiSpace.lg,
+    gap: uiSpace.md,
   },
   pinnedTopRegion: {
-    gap: 8,
+    gap: uiSpace.sm,
     flexShrink: 0,
   },
   sectionBlock: {
-    gap: 8,
+    gap: uiSpace.sm,
   },
   activeTitle: {
-    fontSize: 18,
+    fontSize: uiTypography.size.xl,
     fontWeight: '700',
     color: uiColors.textPrimary,
   },

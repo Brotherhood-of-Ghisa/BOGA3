@@ -6,7 +6,7 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { LayoutChangeEvent, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { uiColors } from '@/components/ui';
+import { uiColors, uiRadius, uiSpace, uiTypography } from '@/components/ui';
 
 import { HEAT_RAMP } from './heatmap-metric';
 import type { DayCell, HeatmapData } from './heatmapData';
@@ -155,7 +155,7 @@ export function DailyHeatmap({
                           width: cell,
                           height: cell,
                           marginBottom: r < 6 ? GAP : 0,
-                          borderRadius: 3,
+                          borderRadius: uiRadius.sm,
                           backgroundColor: HEAT_RAMP[d.level],
                           borderWidth: d.isToday || selected ? 1.6 : StyleSheet.hairlineWidth,
                           borderColor: d.isToday
@@ -192,7 +192,7 @@ export function DailyHeatmap({
               style={{
                 width: 14,
                 height: 14,
-                borderRadius: 4,
+                borderRadius: uiRadius.sm,
                 backgroundColor: HEAT_RAMP[selectedDay.level],
                 borderWidth: StyleSheet.hairlineWidth,
                 borderColor: uiColors.heatmapNeutralBorder,
@@ -223,7 +223,7 @@ export function DailyHeatmap({
               style={{
                 width: 12,
                 height: 12,
-                borderRadius: 3,
+                borderRadius: uiRadius.sm,
                 backgroundColor: color,
                 borderWidth: i === 0 ? StyleSheet.hairlineWidth : 0,
                 borderColor: uiColors.heatmapNeutralBorder,
@@ -238,15 +238,15 @@ export function DailyHeatmap({
 }
 
 const styles = StyleSheet.create({
-  wrap: { paddingTop: 4, paddingBottom: 8 },
+  wrap: { paddingTop: uiSpace.xs, paddingBottom: uiSpace.sm },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'baseline',
-    marginBottom: 16,
+    marginBottom: uiSpace.lg,
   },
-  h1: { fontSize: 15, fontWeight: '600', color: uiColors.textPrimary },
-  muted: { fontSize: 12, color: uiColors.textMuted },
+  h1: { fontSize: uiTypography.size.base, fontWeight: '600', color: uiColors.textPrimary },
+  muted: { fontSize: uiTypography.size.sm, color: uiColors.textMuted },
   body: { flexDirection: 'row' },
   scroll: { flex: 1 },
   axis: { height: 18, position: 'relative' },
@@ -254,42 +254,42 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     width: 32,
-    fontSize: 10,
+    fontSize: uiTypography.size.xs,
     lineHeight: 14,
     color: uiColors.textMuted,
     fontWeight: '500',
   },
   grid: { flexDirection: 'row' },
-  wd: { fontSize: 9, color: uiColors.textMuted, textAlign: 'center' },
+  wd: { fontSize: uiTypography.size.xs, color: uiColors.textMuted, textAlign: 'center' },
   detail: {
-    marginTop: 14,
+    marginTop: uiSpace.lg,
     backgroundColor: uiColors.surfaceMuted,
     borderWidth: 1,
     borderColor: uiColors.borderMuted,
-    borderRadius: 10,
-    paddingVertical: 11,
-    paddingHorizontal: 14,
+    borderRadius: uiRadius.md,
+    paddingVertical: uiSpace.md,
+    paddingHorizontal: uiSpace.lg,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
   kicker: {
-    fontSize: 10,
+    fontSize: uiTypography.size.xs,
     fontWeight: '600',
     color: uiColors.textMuted,
     textTransform: 'uppercase',
     letterSpacing: 0.4,
   },
-  detailTitle: { fontSize: 15, fontWeight: '600', color: uiColors.textPrimary, marginTop: 2 },
-  detailRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  detailVal: { fontSize: 14, fontWeight: '600' },
+  detailTitle: { fontSize: uiTypography.size.base, fontWeight: '600', color: uiColors.textPrimary, marginTop: uiSpace.xs },
+  detailRight: { flexDirection: 'row', alignItems: 'center', gap: uiSpace.sm },
+  detailVal: { fontSize: uiTypography.size.base, fontWeight: '600' },
   legend: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 14,
+    marginTop: uiSpace.lg,
   },
-  legendRamp: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  legendRamp: { flexDirection: 'row', alignItems: 'center', gap: uiSpace.sm },
 });
 
 export default DailyHeatmap;

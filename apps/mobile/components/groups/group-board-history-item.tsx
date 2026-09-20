@@ -23,7 +23,7 @@ export function GroupBoardHistoryItem({ item, testID }: { item: BoardHistoryItem
 
 const styles = StyleSheet.create({
   item: {
-    padding: uiSpace.lg,
-    gap: uiSpace.xxs,
+    padding: uiSpace.md,
+    gap: uiSpace.xs,
   },
 });

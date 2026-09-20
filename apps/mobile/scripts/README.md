@@ -10,8 +10,13 @@ This directory contains two kinds of files:
 ### Direct entrypoints
 
 - `check-ui-guardrails.js`
-  - purpose: scans `app/**/*.tsx` and `components/**/*.tsx` for raw color literals.
-  - used by: `npm run lint:ui-guardrails` in `apps/mobile/package.json`.
+  - purpose: scans `app/**/*.tsx` and `components/**/*.tsx` for design-token
+    violations — raw color literals (zero tolerance) plus budgeted raw
+    `fontSize` / spacing / `borderRadius` counts that may only fall. Budgets and
+    allowlists live in `ui-guardrails.config.js`; `--update-budgets` lowers them,
+    `--verbose` lists violations, `--include-allowlisted` audits the colour rule.
+  - used by: `npm run lint:ui-guardrails` in `apps/mobile/package.json`, which is
+    the `ui-guardrails` lane of `boga test fast` and a CI step.
   - status: used and needed.
 - `generate-router-types.js`
   - purpose: writes `.expo/types/router.d.ts` so headless `typecheck` works without starting Expo.

@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { UiButton, UiSurface, UiText, uiColors, uiRadius, uiSpace } from '@/components/ui';
+import { UiButton, UiSurface, UiText, uiColors, uiRadius, uiSpace, uiTypography } from '@/components/ui';
 import type { RecordSetWriteNotice, StreamRecordCardViewModel } from '@/src/groups';
 
 import { GroupWriteNotice } from './write-notice';
@@ -97,8 +97,8 @@ export function GroupStreamRecordCard({
 
 const styles = StyleSheet.create({
   card: {
-    marginLeft: uiSpace.lg,
-    padding: uiSpace.lg,
+    marginLeft: uiSpace.md,
+    padding: uiSpace.md,
     gap: uiSpace.sm,
   },
   summary: {
@@ -117,9 +117,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: uiColors.borderMuted,
     paddingHorizontal: uiSpace.sm,
-    paddingVertical: uiSpace.xxs,
+    paddingVertical: uiSpace.xs,
   },
   group: {
-    fontSize: 12,
+    fontSize: uiTypography.size.sm,
   },
 });
