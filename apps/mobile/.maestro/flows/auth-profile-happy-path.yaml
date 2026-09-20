@@ -122,6 +122,8 @@ appId: com.dinoderek.mobile
     element:
       id: "settings-about-card"
     direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
 - assertVisible:
     id: "settings-about-version"
 - assertVisible:
@@ -137,6 +139,8 @@ appId: com.dinoderek.mobile
     element:
       id: "settings-connected-agents-row"
     direction: UP
+    visibilityPercentage: 100
+    centerElement: true
 - tapOn:
     id: "settings-connected-agents-row"
 - extendedWaitUntil:
@@ -155,6 +159,8 @@ appId: com.dinoderek.mobile
     element:
       id: "settings-profile-row"
     direction: UP
+    visibilityPercentage: 100
+    centerElement: true
 - tapOn:
     id: "settings-profile-row"
 - extendedWaitUntil:
@@ -183,6 +189,8 @@ appId: com.dinoderek.mobile
     element:
       id: "profile-sign-out-button"
     direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
 - tapOn:
     id: "profile-sign-out-button"
 # Signing out drops the session; the route-layer guard returns to the gate.
