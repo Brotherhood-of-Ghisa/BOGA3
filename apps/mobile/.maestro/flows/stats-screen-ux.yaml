@@ -18,6 +18,11 @@ appId: com.dinoderek.mobile
 # Expected counts come from src/maestro/exercise-block-history-fixture.ts, whose
 # sessions are seeded relative to now (daysAgo), so they hold on any run date.
 # Change that fixture ⇒ update the two pinned values below.
+#
+# Those fixture rows go straight into SQLite, bypassing the recorder — so this
+# flow proves the Stats screen READS correctly, never that the recorder WRITES
+# what it reads. The recorder-write → exercise-list read-back is asserted in
+# data-runtime-smoke.yaml instead; keep it there.
 
 # --- 00: empty state, before any data is seeded ---
 - openLink: "boga3://maestro-harness?reset=data&teleport=session-list"
@@ -153,9 +158,11 @@ appId: com.dinoderek.mobile
     id: "stats-card-sessions"
 - assertVisible:
     id: "stats-card-sets"
-# visibilityPercentage + centerElement are mandatory on every scroll-then-assert:
-# a bare scrollUntilVisible treats anything already in the view hierarchy as
-# visible and no-ops, leaving the target under a header or past the fold (PR #308).
+# centerElement is what makes this scroll actually move: without it
+# scrollUntilVisible stops the moment Maestro calls the element visible, which
+# for an element already in the view hierarchy can be immediately -- leaving the
+# target past the fold. (visibilityPercentage: 100 is Maestro's default; it is
+# spelled out for readability and changes nothing on its own.)
 - scrollUntilVisible:
     element:
       id: "stats-family-header-legs"

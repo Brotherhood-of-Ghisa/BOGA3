@@ -1,0 +1,13 @@
+{
+  "lane": "docs-check",
+  "wall_ms": 121,
+  "exit_code": 0,
+  "recorded_at": "20260920T205746Z",
+  "machine_id": "64f1e02c",
+  "hw": "Apple M4 Max",
+  "cores": 16,
+  "os": "macOS 27.0",
+  "slot": "2",
+  "commit": "af7c21b",
+  "source": "gate"
+}

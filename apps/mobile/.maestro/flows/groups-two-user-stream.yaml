@@ -516,10 +516,12 @@ appId: com.dinoderek.mobile
 # Today's Group activity shows the record, read-only (no Certify); it opens
 # the Groups screen on the record's group.
 - openLink: "boga3://today"
-# visibilityPercentage + centerElement are mandatory here: a bare
-# scrollUntilVisible treats anything already in the view hierarchy as visible and
-# no-ops, so the card could stay past the fold — and the assertNotVisible below
-# would then pass vacuously instead of proving the read-only view has no Certify.
+# centerElement is mandatory here: without it scrollUntilVisible stops as soon as
+# Maestro calls the element visible — which for a card already in the view
+# hierarchy can be immediately, leaving it past the fold. The assertNotVisible
+# below would then pass vacuously instead of proving the read-only view has no
+# Certify. (visibilityPercentage: 100 is Maestro's default; it is spelled out for
+# readability and changes nothing on its own.)
 - scrollUntilVisible:
     element:
       id: "group-stream-record-card-${output.groupsRecordKey}-title"

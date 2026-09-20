@@ -86,7 +86,7 @@ codebase areas/changes should trigger it — by path/area). Infrastructure value
 | `npm run db:generate:canary` | Alias of `db:generate`. Intended as a migration-artifact drift canary: re-run it and confirm a clean working tree (no uncommitted diff) to prove the generated SQL/bundle match the schema. NOT wired into any gate or CI. | none | Same triggers as `db:generate`; use when you want to *verify* (rather than write) that the bundle is current. |
 | `npm run check:sync-drift` | `tsx scripts/check-sync-schema-drift.ts`: resets local Postgres, introspects server schema vs the client Drizzle schemas, and asserts no client/server drift (universal index, triggers, permissive/restrictive RLS policy inventory + body hashes, soft-delete + sync columns, topo FK order). `--strict` promotes warn-only (exit 2) to failure. | local Supabase + Docker (it drives a DB reset). | Changes to `apps/mobile/src/data/**` schemas, `supabase/migrations/**`, or sync columns/RLS. Run with `--strict` as the `sync-drift` lane of `boga test backend`; also exercised by `test:sync:infra`. |
 | `npm run test:e2e:ios:smoke` | `scripts/maestro-run-lane.sh smoke` → runs `smoke-launch.yaml` with a `full` reset. Cold-launch + navigation smoke on the freshly-installed dev client (infra-free config). Captures `01-app-launch`, `02-session-recorder-visible`. | iOS simulator + Metro + Maestro dev-client. **No** Supabase. | UI/runtime changes that need fresh real-simulator smoke evidence (see *iOS UI smoke policy*). Part of `boga test frontend`. |
-| `npm run test:e2e:ios:data-smoke` | `scripts/maestro-run-lane.sh data-smoke` → runs `data-runtime-smoke.yaml` with a `data` reset. Validates real `expo-sqlite` migration + smoke write/read, backend-less starter-catalog seeding, and post-submit traversal through the completion presentation's Done action. Captures `03-data-runtime-smoke-start`, `04-data-runtime-smoke-success`. | iOS simulator + Metro + Maestro dev-client. **No** Supabase. | See *iOS simulator data smoke policy* (bootstrap/migrations/drizzle/native-runtime changes). Part of `boga test frontend`. |
+| `npm run test:e2e:ios:data-smoke` | `scripts/maestro-run-lane.sh data-smoke` → runs `data-runtime-smoke.yaml` with a `data` reset. Validates real `expo-sqlite` migration + smoke write/read, backend-less starter-catalog seeding, post-submit traversal through the completion presentation's Done action, and the recorder-write → Stats-exercise-list read-back (the only on-device check of that path: `stats-screen-ux` asserts the same list from fixture rows inserted straight into SQLite, which bypass the recorder). Captures `03-data-runtime-smoke-start`, `04-data-runtime-smoke-success`, `05-data-runtime-smoke-exercise-list`. | iOS simulator + Metro + Maestro dev-client. **No** Supabase. | See *iOS simulator data smoke policy* (bootstrap/migrations/drizzle/native-runtime changes). Part of `boga test frontend`. |
 | `npm run test:e2e:ios:gates` | `scripts/maestro-ios-gates.sh` — convenience: runs smoke + data-runtime-smoke against **one** provisioned sim + Metro (pays the ~55-60s boot/warm overhead once). Reset semantics preserved (provision `full`; data-smoke self-resets in-flow). | iOS simulator + Metro + Maestro dev-client. **No** Supabase. | When you want both infra-free iOS gates faster; the per-flow lanes above remain the canonical individual lanes. |
 | `npm run test:e2e:ios:ui-regression` | `scripts/maestro-run-lane.sh ui-regression` (lane `ios-ui-regression`) — the **infra-free UI regression lane**: `stats-screen-ux` (empty state, exercise table + local sorting, 7→30-day rescale, muscle breakdown, and both history overlays with their metric inventories and Daily/Weekly switching), `session-completion-states-fixture` (one-PR, no-PR catalog-error, unmapped, safe-exit completion, and the completed-edit → historical-summary round trip), `exercise-block-history-fixture` (the current-session insights golden path: live mapped load, PR appearance/reversal, simultaneous multi-PR completion, session/working-set and exercise-volume summaries, image share preview plus retryable native-sheet launch/cancellation, the consolidated muscle-set breakdown, and Done), and `settings-dev-wipe-local` (the developer wipe-local affordance: the card renders on a dev build, the wipe succeeds, and the app re-bootstraps to a usable data screen). All four reset their own data in-flow through the maestro-harness deep link, so they share **one** provisioned sim + Metro via `maestro-ios-run-flows.sh` with a `data` reset. | iOS simulator + Metro + Maestro dev-client. **No** Supabase. | UI/screen changes under `apps/mobile/app/**` or `components/**`; the session-insights, completion-presentation, Stats, or Settings surfaces. Part of `boga test frontend`. |
 | `npm run test:e2e:ios:auth-profile` | `scripts/maestro-run-lane.sh auth-profile` — a Supabase-configured iOS lane. Runs one flow with a `full` reset: `auth-profile-happy-path`. Validates login-on-start enforcement (cold launch → sign-in gate; sign-out → back to gate), opens the signed-in Connected agents screen through its real Supabase grant-list path, and exercises the fixture-backed profile / username-update / sign-out happy path. Captures `05-…-gate-start`, `06-…-signed-in`, `07-…-signed-out-end`. The first-sync gate surfaces (pinned in-progress block + dismissal) are covered by jest `sync-gate-screen.test.tsx`; the real-cycle gate lift and the settings sync-status surface are proven on-device by the sync-e2e round-trip. | iOS simulator + Metro + Maestro dev-client **and** local Supabase + Docker (ensures baseline, exports `EXPO_PUBLIC_SUPABASE_*` from the running stack, signs in as `user_a` — its own fixture, per the one-user-per-flow rule). | See *iOS simulator auth/profile happy-path policy* (profile/Connected-agents route UI/state, auth bootstrap/session restore, local-Supabase auth wiring). Part of `boga test frontend`. |
@@ -170,8 +170,11 @@ one that could no longer reach the screen it tested. They were either wired into
 `ios-ui-regression` or deleted. So: a new flow either earns a lane in
 `scripts/lanes.tsv` or it does not get committed — run it ad hoc from a branch
 instead (`maestro-ios-run-flow.sh --flow …`, see `RUNBOOK.md`) and delete it.
+`scripts/tests/maestro-flow-lanes.test.sh` enforces this in the `meta-tests`
+lane: it fails if any `apps/mobile/.maestro/flows/*.yaml` is named by no
+runner.
 
-Two rules follow, and both are load-bearing for a lane flow:
+Three rules follow, and each is load-bearing for a lane flow:
 
 1. **Assert, don't only screenshot.** A flow whose steps are `takeScreenshot`
    with `optional: true` taps between them goes green while the screen behind it
@@ -183,16 +186,26 @@ Two rules follow, and both are load-bearing for a lane flow:
    (`daysAgo`), so a literal date in a flow is a time bomb. Assert the
    date-independent surface instead (see the week-banner note in
    `stats-screen-ux.yaml`).
-3. **Every scroll-then-tap carries `visibilityPercentage: 100` +
-   `centerElement: true`.** A bare `scrollUntilVisible` no-ops on anything
-   already in the view hierarchy, so it leaves the target past the fold and the
-   following `tapOn` hits nothing (or the following `assertVisible` /
-   `assertNotVisible` passes vacuously). Its limit is worth knowing: Maestro
-   computes visibility from the hierarchy, **not** from occlusion, so an element
-   centred inside a scroll container that a sticky block overlays still counts
-   as 100% visible while the tap lands on the block. When a target sits under
-   fixed chrome, tap something else — see the documented gap at the end of
-   `stats-screen-ux.yaml`.
+3. **Every scroll whose next step taps or asserts the SAME element carries
+   `centerElement: true`.** That is the flag
+   that does the work: it forces the scroll to keep going until the target is
+   centred, instead of stopping the moment Maestro calls it visible. Without it
+   a `scrollUntilVisible` can no-op on an element the hierarchy already reports,
+   leaving it past the fold — the following `tapOn` then hits nothing, or the
+   following `assertVisible` / `assertNotVisible` passes vacuously.
+   `visibilityPercentage: 100` is Maestro's **default** (verified against
+   `YamlScrollUntilVisible` in maestro-orchestra 2.8.0), so spelling it out is
+   readability, not behaviour — do not credit it with the fix. Drop below 100
+   only for a target taller than the viewport, and say why in a comment (see
+   `exercise-block-history-fixture.yaml:91`). Both flags share one limit:
+   Maestro computes visibility from the view hierarchy, **not** from occlusion,
+   so an element centred inside a scroll container that fixed chrome overlays
+   still counts as visible while the tap lands on the chrome. When a target sits
+   under fixed chrome, drive the screen some other way — see the documented gap
+   at the end of `stats-screen-ux.yaml`. A scroll that only positions the screen
+   for a screenshot or for an assertion on a *different* element is outside this
+   rule; centring the wrong element can push the one you care about off-screen
+   (`exercise-block-history-fixture.yaml:157`).
 
 Run the insights flows on the supported small and large phone viewports when
 closing changes to those presentations; their timestamped artifact roots and
