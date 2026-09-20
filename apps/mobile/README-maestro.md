@@ -14,6 +14,7 @@ Run commands from `apps/mobile`.
 - Runtime scripts fail fast if `.maestro/maestro.env.local` is missing.
 - The iOS development-client build is host-local and **shared across every worktree**: a single cache at `$HOME/.cache/boga/maestro/ios-dev-client/` (NOT keyed by worktree slot). A freshly set-up worktree reuses an already-built client instead of rebuilding from scratch. The cache is trusted on existence and rebuilt only via `--force` (see the native-dependency warning below).
 - `npm run test:e2e:ios:smoke` and `npm run test:e2e:ios:data-smoke` use the port and simulator configured for this workspace, provision/install the dev client, launch Metro, run Maestro, then tear down.
+- `npm run test:e2e:ios:ui-regression` runs the four infra-free screen flows against ONE provisioned simulator and ONE Metro instance (`scripts/maestro-ios-run-flows.sh`), for the same reason the combined `gates` lane does: the provision/launch/teardown overhead is paid once, not four times.
 - `npm run test:e2e:ios:gates` runs BOTH the smoke and data-runtime-smoke flows against one provisioned simulator and one Metro instance, so the ~55-60s fixed overhead (sim boot + dev-client warm-up + Metro start + teardown) is paid once instead of per gate (measured ~196s separate -> ~140s combined). The standalone gates above are unchanged; this is an additive convenience path for running both together.
 - Run artifacts are written to `artifacts/maestro/<task-id-or-ad-hoc>/<timestamp>/`. The combined runner namespaces each flow's JUnit/output/debug under a per-flow subdirectory of that root.
 
@@ -138,6 +139,13 @@ Data-runtime smoke lane:
 TASK_ID=T-20260301-05 npm run test:e2e:ios:data-smoke
 ```
 
+Infra-free UI regression lane (Stats screen, session-completion states, exercise
+block history, Settings dev wipe-local — four flows sharing one sim + Metro):
+
+```bash
+TASK_ID=ad-hoc npm run test:e2e:ios:ui-regression
+```
+
 Two-user groups lane (local Supabase; resets its fixtures first):
 
 ```bash
@@ -161,6 +169,9 @@ cd ../..
 
 - `smoke` uses `full reset` plus harness `teleport` to the recorder.
 - `data-smoke` uses harness `data reset` plus `teleport`.
+- `ui-regression` provisions with `data reset`; each of its flows resets what it
+  needs in-flow through `boga3://maestro-harness?reset=data`, which is what makes
+  them safe to share one app install.
 - Use `full reset` only when cold-install/onboarding/permission behavior is part of the objective.
 - Use `data reset` when app-owned persisted state must be cleared without reinstalling the binary.
 - Use `teleport` as the default navigation/setup method when the flow is not explicitly testing setup UI.

@@ -1,0 +1,13 @@
+{
+  "lane": "meta-tests",
+  "wall_ms": 8025,
+  "exit_code": 0,
+  "recorded_at": "20260920T174508Z",
+  "machine_id": "64f1e02c",
+  "hw": "Apple M4 Max",
+  "cores": 16,
+  "os": "macOS 27.0",
+  "slot": "2",
+  "commit": "82da88d",
+  "source": "gate"
+}

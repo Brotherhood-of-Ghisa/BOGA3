@@ -25,7 +25,7 @@ place each under `docs/specs/**`, routed from here.
    ```bash
    ./boga test fast       # mobile + docs/meta + consent/MCP unit + backend fast smoke
    ./boga test backend    # local Supabase: auth/agent/sync contracts + MCP smoke
-   ./boga test frontend   # iOS sim: Maestro smoke + data-smoke + auth-profile + sync e2e + groups e2e
+   ./boga test frontend   # iOS sim: Maestro smoke + data-smoke + ui-regression + auth-profile + sync e2e + groups e2e
    ```
 
    | You changed… | Run |

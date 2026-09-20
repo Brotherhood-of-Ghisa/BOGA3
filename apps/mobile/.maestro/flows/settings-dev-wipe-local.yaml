@@ -57,10 +57,28 @@ appId: com.dinoderek.mobile
     id: "more-settings-row"
 - assertVisible:
     id: "settings-screen"
-- extendedWaitUntil:
-    visible:
+# Developer tools is the LAST section of Settings, below Account / AI coaching /
+# Preferences / Data & sync / About. iOS exposes only the rendered slice of a
+# ScrollView to the accessibility hierarchy, so the card is absent from the tree
+# until scrolled to -- waiting for it from the top of Settings can never succeed
+# (the same trap PR #308 hit on settings-sync-status-card). Scroll to it, and
+# demand real visibility: a bare scrollUntilVisible no-ops on anything already
+# in the hierarchy, leaving the target under a header or past the fold.
+- scrollUntilVisible:
+    element:
       id: "settings-dev-tools-card"
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
     timeout: 30000
+- assertVisible:
+    id: "settings-dev-tools-card"
+- scrollUntilVisible:
+    element:
+      id: "settings-dev-wipe-local-button"
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
 - assertVisible:
     id: "settings-dev-wipe-local-button"
 - takeScreenshot: "02-dev-wipe-local-settings"

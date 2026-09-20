@@ -516,11 +516,17 @@ appId: com.dinoderek.mobile
 # Today's Group activity shows the record, read-only (no Certify); it opens
 # the Groups screen on the record's group.
 - openLink: "boga3://today"
+# visibilityPercentage + centerElement are mandatory here: a bare
+# scrollUntilVisible treats anything already in the view hierarchy as visible and
+# no-ops, so the card could stay past the fold — and the assertNotVisible below
+# would then pass vacuously instead of proving the read-only view has no Certify.
 - scrollUntilVisible:
     element:
       id: "group-stream-record-card-${output.groupsRecordKey}-title"
       text: "${MAESTRO_GROUPS_COUNTERPARTY_USERNAME} — group record"
     direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
     timeout: 20000
 - assertNotVisible:
     id: "group-stream-record-card-${output.groupsRecordKey}-certify"

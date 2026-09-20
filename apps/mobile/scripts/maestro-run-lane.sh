@@ -9,7 +9,7 @@
 # (maestro-ios-gates.sh) keeps its own script — it is a different execution
 # model, not a thin wrapper.
 #
-#   ./scripts/maestro-run-lane.sh smoke|data-smoke|auth-profile|sync-e2e|groups-e2e
+#   ./scripts/maestro-run-lane.sh smoke|data-smoke|ui-regression|auth-profile|sync-e2e|groups-e2e
 #
 # Canonical lane names / gate membership: scripts/lanes.tsv (run via
 # `./boga test ios-smoke` etc.; the npm test:e2e:ios:* scripts also land here).
@@ -21,7 +21,7 @@ APP_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 REPO_ROOT="$(cd -- "$APP_DIR/../.." && pwd)"
 
 lane="${1:-}"
-LANES="smoke|data-smoke|auth-profile|sync-e2e|groups-e2e"
+LANES="smoke|data-smoke|ui-regression|auth-profile|sync-e2e|groups-e2e"
 [[ -n "$lane" ]] || { echo "usage: $0 $LANES" >&2; exit 2; }
 
 run_flow() {
@@ -74,6 +74,26 @@ case "$lane" in
   # build seeds its own starter catalog at boot. No Supabase.
   data-smoke)
     run_flow data "Data runtime smoke" data-runtime-smoke.yaml
+    ;;
+
+  # The infra-free UI regression lane: the screen-level flows that need no
+  # backend and reset their own data in-flow through the maestro-harness deep
+  # link. They share ONE provisioned simulator + Metro (maestro-ios-run-flows.sh)
+  # because four standalone runs would pay the ~55-60s provision/launch/teardown
+  # overhead four times. `data` reset is enough — none of these flows tests
+  # cold-install, permission, or onboarding behaviour.
+  #
+  # Every flow here is asserted UI, not screenshot evidence: a flow that only
+  # captured screenshots would go green while the screens underneath it broke,
+  # which is what happened to the unwired flows this lane replaced.
+  ui-regression)
+    MAESTRO_RESET_STRATEGY=data \
+    "$SCRIPT_DIR/maestro-ios-run-flows.sh" \
+      --session "iOS UI regression" \
+      --scenario "Stats screen" --flow "$APP_DIR/.maestro/flows/stats-screen-ux.yaml" \
+      --scenario "Session completion states" --flow "$APP_DIR/.maestro/flows/session-completion-states-fixture.yaml" \
+      --scenario "Exercise block history" --flow "$APP_DIR/.maestro/flows/exercise-block-history-fixture.yaml" \
+      --scenario "Settings dev wipe-local" --flow "$APP_DIR/.maestro/flows/settings-dev-wipe-local.yaml"
     ;;
 
   # The Supabase-configured auth/profile lane: login-on-start enforcement and the

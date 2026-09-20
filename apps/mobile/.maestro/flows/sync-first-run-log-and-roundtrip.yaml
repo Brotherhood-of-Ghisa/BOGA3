@@ -240,18 +240,24 @@ appId: com.dinoderek.mobile
     element:
       id: "settings-sync-status-last-success"
     direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
 - assertVisible:
     id: "settings-sync-status-last-success"
 - scrollUntilVisible:
     element:
       id: "settings-sync-status-network"
     direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
 - assertVisible:
     id: "settings-sync-status-network"
 - scrollUntilVisible:
     element:
       id: "settings-sync-status-error"
     direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
 - assertVisible:
     id: "settings-sync-status-error"
 # Tap Refresh: fires a real full sync cycle (push the dirty delta + pull).
@@ -271,6 +277,8 @@ appId: com.dinoderek.mobile
     element:
       id: "settings-sync-status-dirty-count"
     direction: UP
+    visibilityPercentage: 100
+    centerElement: true
 - extendedWaitUntil:
     visible:
       id: "settings-sync-status-dirty-count"

@@ -1,0 +1,310 @@
+appId: com.dinoderek.mobile
+---
+# Stats / History screen regression (infra-free, ios-ui-regression lane).
+#
+# Covers the whole screen in one pass: the empty state, the exercise table and
+# its local sorting, the period rescale, the muscle breakdown, and BOTH history
+# overlays (exercise + muscle) with their metric inventories and Daily/Weekly
+# switching. It absorbs what stats-heatmap-ux.yaml and
+# exercise-heatmap-evidence.yaml used to cover; both were deleted because every
+# assertion they still owned was either duplicated here or pinned to a hard-coded
+# calendar date / a removed testID (see the PR that added this lane).
+#
+# NO hard-coded calendar dates. The heatmap cell ids are
+# "<prefix>-heatmap-cell-<weekStartDateKey>", so tapping one pins the flow to the
+# day it was written — that is exactly what rotted the two deleted flows. The
+# week-selection banner is asserted in its unselected (placeholder) form instead.
+#
+# Expected counts come from src/maestro/exercise-block-history-fixture.ts, whose
+# sessions are seeded relative to now (daysAgo), so they hold on any run date.
+# Change that fixture ⇒ update the two pinned values below.
+
+# --- 00: empty state, before any data is seeded ---
+- openLink: "boga3://maestro-harness?reset=data&teleport=session-list"
+# The dev-client "Open in <App>?" trust dialog and expo-dev-client's developer-menu
+# onboarding sheet can sit on top of the freshly-loaded app; each tap is an
+# optional no-op when its target is absent.
+- tapOn:
+    text: "Open"
+    optional: true
+- tapOn:
+    text: "Continue"
+    optional: true
+- tapOn:
+    text: "Close"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "stats-history-screen"
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      id: "stats-exercise-list-empty"
+    timeout: 15000
+- takeScreenshot: "00-stats-empty-state"
+
+# --- Seed exercise history data and land back on Stats/History ---
+- openLink: "boga3://maestro-harness?reset=data&fixture=exercise-block-history&teleport=session-list"
+- tapOn:
+    text: "Open"
+    optional: true
+- tapOn:
+    text: "Continue"
+    optional: true
+- tapOn:
+    text: "Close"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "stats-history-screen"
+    timeout: 30000
+
+# --- 01: Exercise view is shown by default ---
+- assertVisible: "Time range"
+- assertVisible: "Breakdown"
+- assertVisible:
+    id: "stats-period-chip-7"
+- assertVisible:
+    id: "stats-period-chip-30"
+- assertVisible:
+    id: "stats-view-mode-chip-exercise"
+- assertVisible:
+    id: "stats-view-mode-chip-muscle"
+- assertVisible:
+    id: "stats-exercise-list"
+- assertVisible:
+    id: "stats-exercise-table-header"
+- assertVisible:
+    id: "stats-exercise-sort-exercise"
+- assertVisible:
+    id: "stats-exercise-sort-sets"
+- assertVisible:
+    id: "stats-exercise-sort-volume"
+- assertVisible:
+    id: "stats-exercise-header-oneRepMax"
+- assertVisible:
+    id: "stats-exercise-sort-sets-indicator"
+- assertNotVisible:
+    id: "stats-exercise-sort-status"
+- assertVisible:
+    id: "stats-card-sessions"
+- assertVisible:
+    id: "stats-card-sets"
+- assertVisible:
+    text: ".*W/SETS.*"
+# Fixture, last 7 days: sessions at daysAgo 0.2/0.25/0.3/1/2/4 = 6 sessions,
+# 10 sets of which 8 are working sets (warm-up and untyped sets are not working
+# sets). The summary card renders "<sets> (<working sets>)".
+- assertVisible: "10 (8)"
+- takeScreenshot: "01-exercise-view-default"
+
+# --- Exercise table headers drive local sorting without opening a row ---
+- tapOn:
+    id: "stats-exercise-sort-sets"
+- assertVisible:
+    id: "stats-exercise-sort-sets-indicator"
+- tapOn:
+    id: "stats-exercise-sort-sets"
+- assertVisible:
+    id: "stats-exercise-sort-sets-indicator"
+- takeScreenshot: "01a-exercise-table-working-sets"
+
+- tapOn:
+    id: "stats-exercise-sort-exercise"
+- assertVisible: "Recent ↓"
+- takeScreenshot: "01b-exercise-table-most-recent"
+
+- tapOn:
+    id: "stats-exercise-sort-volume"
+- tapOn:
+    id: "stats-exercise-sort-volume"
+- assertVisible:
+    id: "stats-exercise-sort-volume-indicator"
+- takeScreenshot: "01c-exercise-table-volume-ascending"
+
+# --- 02: the period chip re-queries; the same fixture rescales to 30 days ---
+# 30 days adds the sessions at daysAgo 8/9/12/18/26 for 11 sessions and 16 more
+# rows -- but one of them is the fixture's deliberately invalid set
+# (maestro_exercise_block_history_squat_4_a_invalid, weightValue ''), which the
+# stats aggregation must drop: hence 15 (11), not 16 (12). This assertion is
+# therefore two proofs in one -- the period chip re-queries, and an invalid set
+# never reaches a total. If it fails while "10 (8)" above passes, look at the
+# period query or the invalid-set filter, not at the fixture.
+- tapOn:
+    id: "stats-period-chip-30"
+- extendedWaitUntil:
+    visible: "15 (11)"
+    timeout: 10000
+- takeScreenshot: "02-exercise-view-30-days"
+- tapOn:
+    id: "stats-period-chip-7"
+- extendedWaitUntil:
+    visible: "10 (8)"
+    timeout: 10000
+
+# --- 03: Muscle view shows the summary cards and the family breakdown ---
+- tapOn:
+    id: "stats-view-mode-chip-muscle"
+- extendedWaitUntil:
+    visible:
+      id: "stats-scroll"
+    timeout: 10000
+- assertVisible:
+    id: "stats-card-sessions"
+- assertVisible:
+    id: "stats-card-sets"
+# visibilityPercentage + centerElement are mandatory on every scroll-then-assert:
+# a bare scrollUntilVisible treats anything already in the view hierarchy as
+# visible and no-ops, leaving the target under a header or past the fold (PR #308).
+- scrollUntilVisible:
+    element:
+      id: "stats-family-header-legs"
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
+- assertVisible:
+    id: "stats-family-header-legs"
+- assertVisible:
+    id: "stats-family-sets-legs"
+- assertVisible:
+    id: "stats-family-volume-legs"
+- takeScreenshot: "03-muscle-breakdown-7-days"
+
+# --- 04: Back to the exercise view; the seeded row is listed ---
+- scrollUntilVisible:
+    element:
+      id: "stats-view-mode-chip-exercise"
+    direction: UP
+    visibilityPercentage: 100
+    centerElement: true
+- tapOn:
+    id: "stats-view-mode-chip-exercise"
+- extendedWaitUntil:
+    visible:
+      id: "stats-exercise-list"
+    timeout: 10000
+- assertVisible:
+    id: "stats-exercise-row-seed_barbell_back_squat"
+- takeScreenshot: "04-back-to-exercise-view"
+
+# --- 05: Exercise history overlay — metric inventory + Daily/Weekly ---
+- tapOn:
+    id: "stats-exercise-row-seed_barbell_back_squat"
+- extendedWaitUntil:
+    visible:
+      id: "stats-exercise-history-close"
+    timeout: 15000
+- assertVisible: "Weekly training load"
+# The exercise overlay exposes all four entered-load metrics.
+- assertVisible:
+    id: "stats-exercise-history-metric-chip-totalVolume"
+- assertVisible:
+    id: "stats-exercise-history-metric-chip-workingSetCount"
+- assertVisible:
+    id: "stats-exercise-history-metric-chip-estimatedRM1"
+- assertVisible:
+    id: "stats-exercise-history-metric-chip-highestWeight"
+- assertVisible:
+    id: "stats-exercise-history-view-chip-weekly"
+- assertVisible:
+    id: "stats-exercise-history-view-chip-daily"
+- tapOn:
+    id: "stats-exercise-history-view-chip-daily"
+- extendedWaitUntil:
+    visible: "Last 12 months"
+    timeout: 3000
+- takeScreenshot: "05-exercise-heatmap-daily"
+- tapOn:
+    id: "stats-exercise-history-view-chip-weekly"
+- extendedWaitUntil:
+    visible: "Weekly training load"
+    timeout: 3000
+- takeScreenshot: "05b-exercise-heatmap-weekly"
+# Switch metric while staying in Weekly.
+- tapOn:
+    id: "stats-exercise-history-metric-chip-estimatedRM1"
+- assertVisible:
+    id: "stats-exercise-history-heatmap"
+- takeScreenshot: "05c-exercise-heatmap-1rm"
+- tapOn:
+    id: "stats-exercise-history-close"
+- extendedWaitUntil:
+    notVisible:
+      id: "stats-exercise-history-close"
+    timeout: 5000
+
+# --- 06: Muscle history overlay — the muscle-level metric inventory ---
+- tapOn:
+    id: "stats-view-mode-chip-muscle"
+- extendedWaitUntil:
+    visible:
+      id: "stats-scroll"
+    timeout: 10000
+- scrollUntilVisible:
+    element:
+      id: "stats-family-header-button-chest"
+    direction: UP
+    visibilityPercentage: 100
+    centerElement: true
+- tapOn:
+    id: "stats-family-header-button-chest"
+- extendedWaitUntil:
+    visible:
+      id: "stats-muscle-history-close"
+    timeout: 15000
+- assertVisible: "Weekly training load"
+# Muscle history deliberately exposes ONLY the two muscle-level metrics: 1RM and
+# top weight are exercise-level and must not appear here (absorbed from the
+# deleted stats-heatmap-ux.yaml, whose own chip ids had gone stale).
+- assertVisible:
+    id: "stats-muscle-history-metric-chip-totalVolume"
+- assertVisible:
+    id: "stats-muscle-history-metric-chip-workingSetCount"
+- assertNotVisible:
+    id: "stats-muscle-history-metric-chip-estimatedRM1"
+- assertNotVisible:
+    id: "stats-muscle-history-metric-chip-highestWeight"
+# The week-selection banner renders in Weekly view; with no week selected it
+# shows its placeholder. Selecting a week would need a cell id keyed to a real
+# calendar date, which is the rot this flow refuses to reintroduce.
+- assertVisible:
+    id: "stats-muscle-history-week-banner"
+- assertVisible:
+    id: "stats-muscle-history-week-banner-placeholder"
+- takeScreenshot: "06-muscle-heatmap-weekly"
+- tapOn:
+    id: "stats-muscle-history-view-chip-daily"
+- extendedWaitUntil:
+    visible: "Last 12 months"
+    timeout: 3000
+# Daily view replaces the weekly banner rather than stacking with it.
+- assertNotVisible:
+    id: "stats-muscle-history-week-banner"
+- takeScreenshot: "06b-muscle-heatmap-daily"
+- tapOn:
+    id: "stats-muscle-history-view-chip-weekly"
+- extendedWaitUntil:
+    visible: "Weekly training load"
+    timeout: 3000
+- tapOn:
+    id: "stats-muscle-history-close"
+- extendedWaitUntil:
+    notVisible:
+      id: "stats-muscle-history-close"
+    timeout: 5000
+
+# NOT covered here, deliberately: tapping a MULTI-muscle family header
+# ("stats-family-header-<slug>", the toFamilyHistoryTarget branch) to open the
+# same overlay. It cannot be driven reliably from Maestro: the Stats screen's
+# Time range / Breakdown / summary / filter block overlays the top of the scroll
+# container, so scrollUntilVisible centres the row INSIDE that container and
+# leaves it drawn underneath the block. visibilityPercentage: 100 does not catch
+# it — Maestro computes visibility from the view hierarchy, not from occlusion —
+# so the tap lands on the sticky block and nothing happens (verified: the tap
+# command completes, selectedMuscle is never set). The single-muscle branch
+# (toMuscleHistoryTarget) is covered above via the collapsed Chest header.
+
+# --- 07: Overlay dismissed, back to the muscle view ---
+- assertVisible:
+    id: "stats-scroll"
+- takeScreenshot: "07-overlay-dismissed"
