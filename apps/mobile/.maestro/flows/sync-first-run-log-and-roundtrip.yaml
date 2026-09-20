@@ -205,12 +205,29 @@ appId: com.dinoderek.mobile
           visible:
             id: "more-screen"
           timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: "more-settings-row"
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
 - tapOn:
     id: "more-settings-row"
 - extendedWaitUntil:
     visible:
       id: "settings-screen"
     timeout: 15000
+# The sync-status card sits below the Account / AI-coaching / Preferences
+# sections, far enough down the Settings scroll view that it is not in the
+# view hierarchy at all until scrolled to — so wait for it where it lives
+# rather than at the top of the screen.
+- scrollUntilVisible:
+    element:
+      id: "settings-sync-status-card"
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
+    timeout: 30000
 - extendedWaitUntil:
     visible:
       id: "settings-sync-status-card"
@@ -242,6 +259,8 @@ appId: com.dinoderek.mobile
     element:
       id: "settings-sync-status-refresh-button"
     direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
 - tapOn:
     id: "settings-sync-status-refresh-button"
 # Wait until "Pending changes" reads exactly 0 — the logged exercise's local
