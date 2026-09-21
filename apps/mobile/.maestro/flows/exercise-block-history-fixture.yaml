@@ -156,6 +156,10 @@ appId: com.dinoderek.mobile
     visible:
       id: "exercise-collapsed-summary-2-new-pr"
     timeout: 10000
+# No centerElement here on purpose: this scroll positions the screen so BOTH PR
+# summaries are in frame, and the assertion below is on the other one. Centring
+# summary 1 would push summary 2 out of view. The centerElement rule in
+# docs/specs/06 covers scrolls whose next step targets the same element.
 - scrollUntilVisible:
     element:
       id: "exercise-collapsed-summary-1-new-pr"

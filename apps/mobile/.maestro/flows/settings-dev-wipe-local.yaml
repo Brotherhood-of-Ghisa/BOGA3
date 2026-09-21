@@ -57,10 +57,25 @@ appId: com.dinoderek.mobile
     id: "more-settings-row"
 - assertVisible:
     id: "settings-screen"
-- extendedWaitUntil:
-    visible:
-      id: "settings-dev-tools-card"
+# Developer tools is the LAST section of Settings, below Account / AI coaching /
+# Preferences / Data & sync / About. iOS exposes only the rendered slice of a
+# ScrollView to the accessibility hierarchy, so the card is absent from the tree
+# until scrolled to -- waiting for it from the top of Settings can never succeed
+# (the same trap PR #308 hit on settings-sync-status-card). centerElement is the
+# flag that does the work -- without it the scroll stops as soon as Maestro calls
+# the element visible, which for anything already in the hierarchy can be
+# immediately. Scroll to the BUTTON, not to the card: the card holds three
+# paragraphs and three buttons, so on a small phone it can be taller than the
+# viewport and "centre it" would never be satisfiable. Centring the button
+# brings its parent card into the tree, which is what the gate assertion needs.
+- scrollUntilVisible:
+    element:
+      id: "settings-dev-wipe-local-button"
+    direction: DOWN
+    centerElement: true
     timeout: 30000
+- assertVisible:
+    id: "settings-dev-tools-card"
 - assertVisible:
     id: "settings-dev-wipe-local-button"
 - takeScreenshot: "02-dev-wipe-local-settings"

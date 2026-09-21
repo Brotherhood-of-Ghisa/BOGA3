@@ -1,0 +1,13 @@
+{
+  "lane": "lint",
+  "wall_ms": 5401,
+  "exit_code": 0,
+  "recorded_at": "20260920T174103Z",
+  "machine_id": "64f1e02c",
+  "hw": "Apple M4 Max",
+  "cores": 16,
+  "os": "macOS 27.0",
+  "slot": "2",
+  "commit": "82da88d",
+  "source": "gate"
+}

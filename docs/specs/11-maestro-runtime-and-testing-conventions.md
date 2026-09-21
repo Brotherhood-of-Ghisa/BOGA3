@@ -201,6 +201,7 @@ Implemented script surface:
 - `apps/mobile/scripts/maestro-run-lane.sh`
 - `apps/mobile/scripts/maestro-ios-gates.sh`
 - `apps/mobile/scripts/maestro-ios-run-flow.sh`
+- `apps/mobile/scripts/maestro-ios-run-flows.sh`
 
 Responsibility split:
 
@@ -213,10 +214,11 @@ Responsibility split:
 - `maestro-ios-teardown.sh`
   - performs cleanup using the emitted runtime state, including Expo process shutdown, app termination, simulator shutdown by default, and restoring the developer's `.env.local`.
 - `maestro-run-lane.sh`
-  - the high-level per-lane entrypoint (`smoke` / `data-smoke` / `auth-profile` /
-    `sync-e2e` / `groups-e2e`); holds each lane's data (flows, reset strategy,
-    Supabase config, fixture users, pre-run fixture reset) and calls the shared
-    toolkit via `maestro-ios-run-flow.sh`.
+  - the high-level per-lane entrypoint (`smoke` / `data-smoke` / `ui-regression` /
+    `auth-profile` / `sync-e2e` / `groups-e2e`); holds each lane's data (flows,
+    reset strategy, Supabase config, fixture users, pre-run fixture reset) and
+    calls the shared toolkit via `maestro-ios-run-flow.sh` (one flow per
+    provisioned sim) or `maestro-ios-run-flows.sh` (several flows sharing one).
 - `maestro-ios-run-flow.sh`
   - runs one flow from a per-run copy at `<artifact-root>/flows/<flow>.yaml`
     (with the dev client's `appId`), and copies `.maestro/scripts/` to
@@ -224,8 +226,21 @@ Responsibility split:
     (`../scripts/*.js`) resolve identically from the source and the copy.
   - forwards to `maestro test -e` only an explicit allowlist of env vars; a
     lane that adds flow variables must add them there.
+- `maestro-ios-run-flows.sh`
+  - runs SEVERAL flows against ONE provisioned sim + Metro, so the ~55-60s
+    provision/launch/teardown overhead is paid once instead of per flow. Each
+    flow gets its own namespaced JUnit/output/debug subdirectory, every flow runs
+    even after one fails, and any failure fails the run. Use it for flows that
+    reset what they need in-flow (`?reset=data`); a flow whose objective includes
+    cold-install / permission / onboarding behaviour wants its own `full`-reset
+    run through the singular runner. The caller owns `MAESTRO_RESET_STRATEGY`.
 - `maestro-ios-gates.sh`
-  - additive combined entrypoint (`npm run test:e2e:ios:gates`) that provisions/launches/warms once and runs the smoke and data-runtime-smoke flows back-to-back against that single sim + Metro, then tears down once. It composes the same provision/launch/warm/teardown helpers; it does not duplicate runtime orchestration and does not replace the standalone gates. Reset semantics are preserved: provision performs the `full` reset for smoke, and data-runtime-smoke self-resets data in-flow via its `?reset=data` harness deep links.
+  - additive combined entrypoint (`npm run test:e2e:ios:gates`): the smoke +
+    data-runtime-smoke flow list and a `full` reset, handed to
+    `maestro-ios-run-flows.sh`. It does not replace the standalone gates. Reset
+    semantics are preserved: provision performs the `full` reset for smoke, and
+    data-runtime-smoke self-resets data in-flow via its `?reset=data` harness
+    deep links.
 
 ### 6. Runtime state and log expectations
 
@@ -312,7 +327,14 @@ Priority rule:
    - `reset=data` to perform app-owned persisted-data reset;
    - `fixture=exercise-block-history` to seed deterministic local SQLite history for Issue 70 recorder block-history visual QA;
    - `teleport=session-list|session-recorder|exercise-catalog|completed-session` to land on the target screen;
-   - optional `mode`, `intent`, and `sessionId` when the target route needs them.
+   - optional `mode`, `intent`, and `sessionId` when the target route needs them;
+   - `presentation=completion` to open a completed session in its completion
+     presentation rather than the historical summary;
+   - `maestroShare=fail-once` / `maestroCatalog=fail-once` to make the next share
+     or catalog read fail once, so a flow can assert the retryable error surface.
+   The fixture seeds its sessions relative to *now* (`daysAgo`), so a flow built
+   on it must never assert a literal calendar date — see the date rule in
+   `docs/specs/06-testing-strategy.md`.
 4. The route is guarded by `isDevMode() && Constants.executionEnvironment !== storeClient` (see `apps/mobile/src/utils/isDevMode.ts` — `isDevMode()` is `true` for Metro dev bundles **and** for the `com.phano.boga3.dev` build, i.e. TestFlight dev); blocked contexts render an error state instead of executing reset/setup behavior. Never reach for `__DEV__` directly — it is `false` on TestFlight, and the lint rule will reject it.
 5. Harness-driven setup is preferred to visible UI tapping whenever the flow is not explicitly testing that setup UI.
 
@@ -324,8 +346,9 @@ Every lane runs the same dev-client build; whether it behaves as a local-only
 from `apps/mobile/.env.local` at bundle time. Concretely: the `auth-profile`,
 `sync-e2e`, and `groups-e2e` lanes (`test:e2e:ios:auth-profile`,
 `test:e2e:ios:sync`, `test:e2e:ios:groups`) are the Supabase-backed iOS lanes — they provision a local Supabase baseline and export
-those vars; `smoke`, `data-runtime-smoke`, and the combined `gates` lane are
-deliberately **infra-free** (they export none, so the inlined values are empty).
+those vars; `smoke`, `data-runtime-smoke`, `ui-regression`, and the combined
+`gates` lane are deliberately **infra-free** (they export none, so the inlined
+values are empty).
 (Which lanes take which shape, and why, is testing policy — see
 `docs/specs/06-testing-strategy.md`.)
 
