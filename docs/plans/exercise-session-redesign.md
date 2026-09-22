@@ -31,11 +31,18 @@ Three rules make it work:
    `src/session-recorder/` (draft autosave, lifecycle helpers, set semantics)
    and the existing data layer. Two recorders writing the same tables through
    two copies of the rules is how they silently diverge.
-3. **Gate with `isDevMode()`**, never `__DEV__`, so the new screens are usable
-   on the `com.phano.boga3.dev` TestFlight build while production is untouched.
+3. **Gate on a user setting**, not on `isDevMode()`. Every customer is a
+   developer, so the new screens should be opt-in on the *real* build — that is
+   where the real sessions are. Add a preference mirroring
+   `src/exercise-catalog/list-preferences.ts` (SecureStore, versioned storage
+   key, snapshot + subscribe + hook + a test reset), surfaced in the Settings
+   Preferences card beside the date format. The Maestro lanes for the new
+   screens set it before navigating.
 
 **Ready means:** the new screens pass their own Maestro lanes, and they have
-been used for real sessions on device — not that they look finished.
+been used for real sessions on device — not that they look finished. The
+setting is what makes that possible: switch it on, train with it, switch back
+if it gets in the way.
 
 Note both recorders write the same session tables, so a session started in one
 can be finished in the other. Useful for testing; worth knowing before it
@@ -61,9 +68,9 @@ the requirement from `./boga test for`.
 | 1 | Tokens | Add the colour roles **additively**; **revise the type scale** and **resolve the `accent`/`record` collision** (both in the build spec); record the decisions in `design-language.md`. No existing token repointed. |
 | 2 | Fonts + SVG | Add `expo-font` + Archivo / Source Sans 3 / IBM Plex Mono, and `react-native-svg`. Native-affecting: `./boga ios build-client --force` **then** `boga test frontend`. Land early — every later step is blocked behind the rebuild. |
 | 3 | Primitives | `ListRow`, `Stat`, `Sheet`, `Card` only — anatomy in the build spec. New components; nothing existing adopts them yet. Update `components-catalog.md`. |
-| 4 | Exercise page | New route, reachable only under `isDevMode()`. Reuses `src/session-recorder/**`. Its own Maestro lane. |
-| 5 | Session view | New route, same gating. Its own Maestro lane. |
-| 6 | Switch over | Point the Train tab at the new session route; delete the old recorder route, its lanes, and the dev gate. The only user-visible PR. Update `screen-map.md` + `navigation-contract.md`. |
+| 4 | Exercise page | New route behind the setting (added in this step, defaulting off). Reuses `src/session-recorder/**`. Its own Maestro lane, which enables the setting first. |
+| 5 | Session view | New route behind the same setting. Its own Maestro lane. |
+| 6 | Switch over | Flip the setting's default on, then in a follow-up delete the old recorder route, its lanes and the setting itself. Two small reverts rather than one big one. Update `screen-map.md` + `navigation-contract.md`. |
 | 7 | Close out | Delete this plan and the build spec; confirm every durable decision has graduated to `docs/specs/**`. |
 
 ## Decisions already made
