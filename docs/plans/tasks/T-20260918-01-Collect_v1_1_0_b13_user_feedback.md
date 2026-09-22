@@ -5,7 +5,7 @@ status: in_progress
 ui_impact: "no"
 areas: "docs|frontend|cross-stack"
 runtimes: "docs"
-gates_fast: "N/A while this card only records and triages feedback"
+gates_fast: "docs-check while this card only records and triages feedback"
 gates_slow: "N/A while this card only records and triages feedback"
 docs_touched: "none until an accepted action changes a durable contract"
 ---
@@ -75,6 +75,7 @@ and increase its report count.
 | `FB-001` | Session History | Open the read-oriented summary before details/edit | S3 | 1 | Source-confirmed | accept | `ACT-001` |
 | `FB-002` | Active session insights | Match the useful exercise/muscle completion summary instead of relative muscle-load bars | S3 | 1 | Source-confirmed | accept | `ACT-002` |
 | `FB-003` | Train → new empty workout | Restore GPS gym preselection on the canonical session-entry path | S2 | 1 | Source-confirmed | accept | `ACT-003` |
+| `FB-004` | Group exercise links | Make unlinking a personal exercise discoverable from the linked group exercise | S2 | 1 | Source-confirmed | accept | `ACT-004` |
 
 Severity definitions:
 
@@ -359,6 +360,108 @@ or `no_action`.
 - Follow-up owner/task/PR: not yet assigned; create from `ACT-003` before this
   feedback round closes.
 
+### FB-004 — Make personal-to-group exercise links removable where they are shown
+
+- Status: `decided`
+- First reported: `2026-09-22`
+- Source/context: product-owner observation during the build 13 feedback round
+- Report count: `1`
+- Area / screen / flow: Groups → group → Exercises → linked exercise
+- User impact: a member can see that a personal exercise is linked to a group
+  exercise, but that group-facing row offers no way to remove the link. The
+  existing unlink control is reached through `Link to group exercise…` in
+  either the personal Exercise Catalog's overflow menu or the recorder's
+  exercise `•••` menu, so a member may reasonably conclude that links cannot
+  be removed.
+- Frequency: `every time` a member tries to manage an existing link from the
+  group exercise that displays it
+- Severity: `S2`
+- Device and iOS version: not provided
+- Confirmed app version/build: reported during the `1.1.0 (13)` feedback round;
+  current-source comparison completed
+- Network/account/data preconditions: signed-in group member with at least one
+  live personal-exercise link to a group exercise
+- User wording, paraphrased: allow personal exercises to be de-linked from group
+  exercises.
+- Evidence links or local artifact paths:
+  - `apps/mobile/components/groups/group-exercises-page.tsx` shows `Linked: …`
+    on the group exercise row, but only passes an action when the row is
+    unlinked (`Link your exercise`); a linked member row has no link-management
+    action.
+  - `apps/mobile/app/exercise-link.tsx` already supports confirmed, offline
+    unlinking of an individual personal exercise.
+  - `apps/mobile/app/(tabs)/exercise-catalog.tsx` and
+    `apps/mobile/app/(tabs)/session-recorder.tsx` both open that screen from
+    their exercise menus. Both actions remain labelled
+    `Link to group exercise…` even when the exercise has existing links.
+
+#### Reproduction
+
+1. Link one of your personal exercises to a group exercise.
+2. Open that group's Exercises segment and find the row showing
+   `Linked: <personal exercise>`.
+3. Try to remove the displayed link from that row.
+
+- Expected: the linked group-exercise row exposes a clear way to manage its
+  personal links and unlink one after confirmation.
+- Actual: the row exposes neither an unlink nor a manage-links action; unlink
+  is available through the personal catalogue or the recorder's exercise menu,
+  but both entry points are labelled for linking rather than managing or
+  unlinking.
+- Reproduced on tagged build?: `not_yet` on device; reported against the build
+  13 feedback round
+- Reproduced on current `main`?: `not_yet` on device; source-confirmed
+- Existing workaround: open the exercise's overflow menu in the personal
+  Exercise Catalog or its `•••` menu in the recorder, choose
+  `Link to group exercise…`, then use `Unlink` in the Linked section.
+- Suspected component or path:
+  `apps/mobile/components/groups/group-exercises-page.tsx`,
+  `apps/mobile/components/groups/group-exercise-row.tsx`,
+  `apps/mobile/app/exercise-link.tsx`,
+  `apps/mobile/app/(tabs)/exercise-catalog.tsx`
+- Related feedback IDs, issues, tasks, or PRs: `ACT-004`
+
+#### Proposed action
+
+- Decision: `accept`
+- Proposal:
+  1. Give a linked group-exercise row a member-visible `Manage links` action,
+     rather than limiting the row action to the unlinked state.
+  2. Show every one of the member's personal exercises linked to that group
+     exercise and allow each link to be removed independently after a clear
+     destructive confirmation. Preserve support for several personal exercises
+     linking to the same group exercise.
+  3. Reuse the existing local `unlinkExercise` write and link reload path so
+     unlink remains offline-capable, retroactive, and sync-backed; do not add a
+     group RPC or change board semantics.
+  4. Rename the personal catalogue action to `Manage group links…` when links
+     exist (or use wording that covers both link and unlink) so the existing
+     route remains discoverable from the personal side.
+- Why this action: management should be available where link status is visible,
+  while retaining the existing personal-exercise route. Reusing the proven
+  tombstone write avoids creating a second unlink contract.
+- Smallest safe scope: add group-row link management and clarify the catalogue
+  action label; reuse the current confirmation, repository operation, and link
+  status reload rather than changing persistence, sync, evaluator, or boards.
+- Risks and edge cases: several personal exercises linked to one target,
+  archived group exercises, soft-deleted or locally missing personal exercises,
+  an inactive link after leaving a group, offline operation, rapid repeated
+  taps, unlink failure, and status refresh after the tombstone write.
+- Verification needed: component coverage for zero/one/many links, confirmation
+  and cancellation, offline success, failure without stale success UI, archived
+  and missing-name rows, updated catalogue wording, and a Maestro flow that
+  links then unlinks from the group-facing surface.
+- Required gates: `./boga test fast`, `./boga test frontend`, and
+  `./boga test ios-groups-e2e` because the follow-up changes group UI and its
+  two-user interaction flow; confirm exact requirements with `./boga test for`
+  once implementation paths are final.
+- Docs/spec updates needed: `docs/specs/tech/groups-contract.md` and, if the
+  interaction changes the documented screen behavior,
+  `docs/specs/ui/screen-map.md` / `docs/specs/ui/ux-rules.md`.
+- Target: later `1.1.0` build (`14+`)
+- Follow-up owner/task/PR: not yet assigned; create from `ACT-004` before this
+  feedback round closes.
+
 ## UI impact checkpoint
 
 - This feedback card changes documentation only, so its own `ui_impact` remains
@@ -370,6 +473,10 @@ or `no_action`.
 - `ACT-003` restores an existing documented interaction rather than introducing
   a new visual target. Its implementation still needs flow evidence showing the
   automatically selected gym and the non-blocking fallback state.
+- `ACT-004` extends an existing link-management interaction to the group-facing
+  row. Its follow-up needs a compact UX Contract covering zero, one, and many
+  linked personal exercises, confirmation, offline, archived, and failure
+  states before implementation.
 - The proposals above reuse current repository screens as internal design
   references; they do not make those proposals authoritative product behaviour
   until the follow-up is approved and implemented.
@@ -432,6 +539,7 @@ decision.
 | `ACT-001` | `FB-001` | Open History on Summary; expose deterministic Details/Edit actions | High | `1.1.0` build `14+` | Unassigned | proposed | Navigation tests, frontend gate, History-flow screenshots |
 | `ACT-002` | `FB-002` | Reuse completion-style live exercise/muscle summary and retire relative bars | Medium | `1.1.0` build `14+` | Unassigned | proposed | Insight/component tests, frontend gate, live/completion screenshots |
 | `ACT-003` | `FB-003` | Route canonical empty-session creation through the bounded GPS gym detector | High | `1.1.0` build `14+` | Unassigned | proposed | Entry integration tests, frontend gate, GPS-preselection flow evidence |
+| `ACT-004` | `FB-004` | Expose unlink/manage-links on linked group-exercise rows and clarify the catalogue action | High | `1.1.0` build `14+` | Unassigned | proposed | Link-management tests, frontend + groups e2e gates, linked/unlinked screenshots |
 
 Action status values: `proposed`, `approved`, `in_progress`, `shipped`,
 `verified`, `deferred`, or `rejected`.
@@ -467,7 +575,10 @@ Action status values: `proposed`, `approved`, `in_progress`, `shipped`,
 
 ## Testing and verification approach
 
-- Feedback-only edits to this task card require documentation validation only.
+- Feedback-only edits to this task card require `./boga test docs-check`. In the
+  PR gate table, mark the `fast` row ✅ with the required `docs-check` lane
+  evidence because that lane belongs to the fast gate; do not mark the row N/A
+  for a Markdown change.
 - Once an action changes product code, use `./boga test for <changed paths>` to
   determine the required gates and record measured results in the implementing
   PR, not here.
