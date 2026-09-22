@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
-import { StyleSheet, Text } from 'react-native';
+import { StyleSheet, Text, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
 
 import { Card, ListRow, Sheet, Stat, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
 
@@ -7,8 +7,8 @@ import { Card, ListRow, Sheet, Stat, uiGeometry, uiRoles, uiSpace, uiTypography 
 // No shipped screen adopts them yet, so these assertions are their only guard
 // until the exercise page and session view do.
 
-const flatStyle = (node: { props: { style?: unknown } }) =>
-  StyleSheet.flatten(node.props.style as Parameters<typeof StyleSheet.flatten>[0]);
+const flatStyle = (node: { props: { style?: unknown } }): ViewStyle & TextStyle =>
+  StyleSheet.flatten(node.props.style as StyleProp<ViewStyle & TextStyle>) ?? {};
 
 describe('Card', () => {
   it('is a surface on a rule hairline at the card radius, with no shadow', () => {
