@@ -13,13 +13,40 @@ replacing the set-editing surface that lives in
 `apps/mobile/app/(tabs)/session-recorder.tsx` (~5,200 lines). The exercise page
 is a new route; the session view becomes read-only.
 
-## Why this shape
+## Strategy: build beside, switch once
 
-These two screens exercise every unresolved system decision — four colour roles,
-the set row, the sheet pattern, the card pattern, the type scale. Building them
-settles the language against a real device (keyboard over the in-place logger,
-the tick's legibility, set-list performance) in a way more mocks cannot. A third
-mocked screen would add no new system information.
+The new screens are built as **new routes alongside the existing recorder**, not
+by converting it. Nothing user-visible changes until one small switch-over PR.
+This keeps `main` shippable throughout — the recorder is the app's core surface
+and a half-migrated one is expensive.
+
+Three rules make it work:
+
+1. **Additive only until switch-over.** New colour roles and type rungs are
+   *added*; no existing token is repointed. Existing screens keep their current
+   appearance, so their Maestro lanes stay green and untouched for the whole
+   parallel period. Tokens are the one layer that cannot be built in parallel —
+   changing an existing value restyles the old screens too.
+2. **Share the domain, duplicate only the presentation.** The new screens reuse
+   `src/session-recorder/` (draft autosave, lifecycle helpers, set semantics)
+   and the existing data layer. Two recorders writing the same tables through
+   two copies of the rules is how they silently diverge.
+3. **Gate with `isDevMode()`**, never `__DEV__`, so the new screens are usable
+   on the `com.phano.boga3.dev` TestFlight build while production is untouched.
+
+**Ready means:** the new screens pass their own Maestro lanes, and they have
+been used for real sessions on device — not that they look finished.
+
+Note both recorders write the same session tables, so a session started in one
+can be finished in the other. Useful for testing; worth knowing before it
+surprises someone.
+
+## Why these two screens first
+
+They exercise every unresolved system decision — colour roles, the type scale,
+the set row, the sheet pattern, the card pattern. Building them settles the
+language against a real device (keyboard over the in-place logger, the tick's
+legibility, set-list performance) in a way more mocks cannot.
 
 Primitives are extracted **only** as these two screens need them. The rest of
 the pending list in `components-catalog.md` waits for a third screen to ask.
@@ -31,12 +58,13 @@ the requirement from `./boga test for`.
 
 | # | Step | Notes |
 | --- | --- | --- |
-| 1 | Tokens + language | Add the colour roles and type scale to `components/ui/tokens.ts`; **resolve the `accent`/`record` collision** and record the decision. Graduate §2–§4 of the language doc to `Current behavior`. Docs-only parts update `ux-rules.md`. |
-| 2 | Fonts + SVG | Add `expo-font` + Archivo / Source Sans 3 / IBM Plex Mono, and `react-native-svg`. Native-affecting: `./boga ios build-client --force` **then** `boga test frontend`. Retire the `Courier` / `Menlo` literals in `app/dev-logs.tsx` and `app/group/[groupId]/invite.tsx`. |
-| 3 | Primitives | `ListRow`, `Stat`, `Sheet`, `Card` only — anatomy in the build spec. Update `components-catalog.md` in the same PR. |
-| 4 | Exercise page | New route + the set list, records panel, effort sheet, options sheet. Update `screen-map.md` and `navigation-contract.md`. Add a Maestro lane (every flow has one — #309). |
-| 5 | Session view | Read-only cards, summary card, Finish in the top bar. Cut the editing surface out of `session-recorder.tsx`. |
-| 6 | Close out | Delete this plan and the build spec; confirm every durable decision has graduated to `docs/specs/**`. |
+| 1 | Tokens | Add the colour roles **additively**; **revise the type scale** and **resolve the `accent`/`record` collision** (both in the build spec); record the decisions in `design-language.md`. No existing token repointed. |
+| 2 | Fonts + SVG | Add `expo-font` + Archivo / Source Sans 3 / IBM Plex Mono, and `react-native-svg`. Native-affecting: `./boga ios build-client --force` **then** `boga test frontend`. Land early — every later step is blocked behind the rebuild. |
+| 3 | Primitives | `ListRow`, `Stat`, `Sheet`, `Card` only — anatomy in the build spec. New components; nothing existing adopts them yet. Update `components-catalog.md`. |
+| 4 | Exercise page | New route, reachable only under `isDevMode()`. Reuses `src/session-recorder/**`. Its own Maestro lane. |
+| 5 | Session view | New route, same gating. Its own Maestro lane. |
+| 6 | Switch over | Point the Train tab at the new session route; delete the old recorder route, its lanes, and the dev gate. The only user-visible PR. Update `screen-map.md` + `navigation-contract.md`. |
+| 7 | Close out | Delete this plan and the build spec; confirm every durable decision has graduated to `docs/specs/**`. |
 
 ## Decisions already made
 
@@ -53,6 +81,9 @@ the requirement from `./boga test for`.
 ## Open questions
 
 - **`accent` vs `record`** — same hex today. Blocks step 1.
+- **Type scale** — the target uses 12 sizes against the scale's 7, and
+  `rawFontSize` is enforced at budget 0. Blocks step 1; options in the build
+  spec.
 - **Complete with pending planned sets** — do they become `unperformed`, stay
   `planned`, or block? The model supports all three
   (`src/session-recorder/set-semantics.ts`). Needed by step 4.

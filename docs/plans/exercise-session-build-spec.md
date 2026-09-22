@@ -16,6 +16,35 @@ Reference viewport 390×844. Page gutter 14. Card radius 6, sheet top radius 16,
 sheet handle 38×4. Control column 44 wide. Metric value columns are fixed width
 (38 for 1RM, 38 for volume) so figures align down the list.
 
+## The type scale needs revising before step 1
+
+**The accepted target does not fit the shipped type scale.** Measured from the
+governing artboards, they use twelve sizes:
+
+    8 · 9 · 10 · 11 · 12 · 13 · 14 · 15 · 16 · 17 · 18 · 19 · 23
+
+`uiTypography.size` has seven: `11 · 12 · 13 · 14 · 16 · 18 · 24`. So
+`8, 9, 10, 15, 17, 19, 23` have no rung, and `rawFontSize` is at **budget 0,
+enforced in `boga test fast` and CI** — these screens cannot be built as drawn.
+
+Resolve it in step 1, as an explicit scale revision rather than a pile of
+exceptions. The options, in the order they were considered:
+
+1. **Add one rung (`10`) and snap the rest** — `15→16`, `17→18`, `19→18`,
+   `23→24`, and lift the `8`/`9` micro-labels to `10`. Eight rungs total.
+   Preferred: it keeps the scale a scale, and `8px` body-adjacent text was poor
+   for accessibility anyway.
+2. Add two micro rungs (`9` and `10`). Nine rungs; keeps the artboards exact.
+3. Keep seven rungs and redraw the micro-labels at `11` minimum. Materially
+   changes the target and should go back through the design, not the build.
+
+**Option 1 is not free:** the mini legends (`1RM` / `VOL`) are `8px` inside a
+38px metric column. At `10px` that block grows and the set row needs a width
+re-check on device. Do that before committing the rung, not after.
+
+Whichever option wins, the decision belongs in `design-language.md` §3 and the
+budgets in `apps/mobile/scripts/ui-guardrails.config.js` stay at 0.
+
 ## Set row
 
 The unit of the whole feature:
