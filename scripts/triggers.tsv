@@ -31,6 +31,7 @@ apps/agent-auth-web/scripts/**	fast,mcp-smoke	agent OAuth local smoke helper
 apps/agent-auth-web/**	fast	agent OAuth consent web
 services/boga-mcp/**	fast,mcp-smoke	MCP protocol/API translation
 apps/mobile/scripts/maestro*	frontend,meta-tests	Maestro runtime / lane scripts (+ fixture-user rule)
+apps/mobile/scripts/ios-sim-boot.sh	frontend,meta-tests	simulator boot-wait (+ ios-sim-boot meta-test)
 apps/mobile/.maestro/**	frontend,meta-tests	Maestro flows / config (+ fixture-user rule)
 supabase/migrations/**	backend	server schema / RLS / RPCs
 supabase/migrations/*group*	ios-groups-e2e	group schema / RPCs (two-user e2e lane)

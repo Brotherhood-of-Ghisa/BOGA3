@@ -4,8 +4,8 @@
 # (gen-docs.sh, test-for.sh, pr-check.sh), the Supabase container resolver,
 # the Maestro fixture-user and
 # flow-has-a-lane rules, and
-# the worktree lifecycle (temp git repos + stub gh/docker), and Android
-# launchers (stub adb/Expo/JDK).
+# the worktree lifecycle (temp git repos + stub gh/docker), Android
+# launchers (stub adb/Expo/JDK), and the iOS simulator boot-wait (stub xcrun).
 # Runs as the `meta-tests` lane (fast gate, repo half; see scripts/lanes.tsv)
 # and in CI.
 
@@ -24,6 +24,7 @@ TESTS=(
   "supabase-container-resolver.test.sh"
   "worktree-lifecycle.test.sh"
   "android-launcher.test.sh"
+  "ios-sim-boot.test.sh"
 )
 
 failed=0
