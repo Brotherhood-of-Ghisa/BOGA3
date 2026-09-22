@@ -79,8 +79,8 @@ case "$lane" in
   # The infra-free UI regression lane: the screen-level flows that need no
   # backend and reset their own data in-flow through the maestro-harness deep
   # link. They share ONE provisioned simulator + Metro (maestro-ios-run-flows.sh)
-  # because four standalone runs would pay the ~55-60s provision/launch/teardown
-  # overhead four times. `data` reset is enough — none of these flows tests
+  # because standalone runs would each pay the ~55-60s provision/launch/teardown
+  # overhead. `data` reset is enough — none of these flows tests
   # cold-install, permission, or onboarding behaviour.
   #
   # Every flow here is asserted UI, not screenshot evidence: a flow that only
@@ -93,7 +93,8 @@ case "$lane" in
       --scenario "Stats screen" --flow "$APP_DIR/.maestro/flows/stats-screen-ux.yaml" \
       --scenario "Session completion states" --flow "$APP_DIR/.maestro/flows/session-completion-states-fixture.yaml" \
       --scenario "Exercise block history" --flow "$APP_DIR/.maestro/flows/exercise-block-history-fixture.yaml" \
-      --scenario "Settings dev wipe-local" --flow "$APP_DIR/.maestro/flows/settings-dev-wipe-local.yaml"
+      --scenario "Settings dev wipe-local" --flow "$APP_DIR/.maestro/flows/settings-dev-wipe-local.yaml" \
+      --scenario "Settings new-screens toggle" --flow "$APP_DIR/.maestro/flows/settings-new-screens-toggle.yaml"
     ;;
 
   # The Supabase-configured auth/profile lane: login-on-start enforcement and the

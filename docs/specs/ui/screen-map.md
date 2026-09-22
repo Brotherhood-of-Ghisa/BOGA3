@@ -223,6 +223,11 @@ Brief entrypoint map of the current mobile screens.
     sync, About, and development-only Developer tools sections in that order
   - Account routes to `/profile`, showing the signed-in email when available or
     concise signed-out guidance otherwise
+  - Preferences card: date format (`settings-date-format-<format>`), then the
+    `New exercise & session screens` Off/On toggle (`settings-new-screens-off` /
+    `-on`), default Off, device-local and shown on every build (not
+    `isDevMode()`). It opts into the redesigned exercise page and session view;
+    until those routes ship it changes nothing else.
   - AI coaching always offers an external `Connect an AI coach` setup link and
     states the read-only/revocable boundary; browser-launch failure stays inline
     and retryable. The separate Connected agents row is signed-in only.
