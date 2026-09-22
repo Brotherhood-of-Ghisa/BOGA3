@@ -9,11 +9,15 @@ export { UiText, type UiTextVariant } from '@/components/ui/text';
 export {
   uiBorder,
   uiColors,
+  uiElevation,
   uiRadius,
   uiRoles,
   uiSpace,
   uiTokens,
   uiTypography,
   type UiColorToken,
+  type UiElevationToken,
+  type UiRadiusToken,
   type UiRoleToken,
+  type UiSpaceToken,
 } from '@/components/ui/tokens';

@@ -93,30 +93,83 @@ worktree_project_id() {
   awk -F'"' '/^project_id[[:space:]]*=/ {print $2; exit}' "${config_file}" || true
 }
 
-# Docker Compose caps a project name at 40 characters, and the Supabase CLI
-# silently conforms to it ("project_id field in config is invalid. Auto-fixing
-# to ..."). A worktree whose derived project_id is longer therefore runs
-# containers named for a *prefix* of the id in config.toml, and an exact-name
-# lookup finds nothing while the stack sits there perfectly healthy.
+# Read a [section] port from this worktree's config.toml (e.g. `db`, `api`).
+# Echoes the port, or an empty string when config.toml or the key is absent.
+worktree_config_port() {
+  local section="$1"
+  local config_file="${SUPABASE_DIR}/config.toml"
+  [[ -n "${BOGA_SUPABASE_WORKDIR:-}" ]] && config_file="${BOGA_SUPABASE_WORKDIR}/supabase/config.toml"
+  [[ -f "${config_file}" ]] || return 0
+  awk -v section="[${section}]" '
+    $0 == section { in_section = 1; next }
+    /^\[/ { in_section = 0 }
+    in_section && $1 == "port" {
+      value = $0
+      sub(/^[^=]+=[[:space:]]*/, "", value)
+      gsub(/[" ]/, "", value)
+      print value
+      exit
+    }
+  ' "${config_file}" || true
+}
+
+# The Supabase CLI caps `project_id` at SUPABASE_CLI_PROJECT_ID_LIMIT characters
+# (defined in scripts/worktree-lib.sh) and silently rewrites a longer one on
+# every invocation, so a worktree whose derived id is longer runs containers
+# named for a *prefix* of what config.toml says. An exact-name lookup then finds
+# nothing while the stack sits there perfectly healthy.
 #
-# So: try the exact name, then the single truncation the CLI actually applies.
-# Nothing looser. A prefix scan would happily return a FOREIGN worktree's
-# container, which is the exact failure mode the strict matching above exists to
-# prevent. Two worktrees whose ids agree in their first 40 characters share one
-# Docker project outright — `./boga worktree doctor` warns about that.
-DOCKER_COMPOSE_PROJECT_NAME_LIMIT=40
+# Matching the truncation is not enough on its own. The id ends in the slot
+# number, which is exactly what the cut removes, so two worktrees whose names
+# agree in their first 35-odd characters truncate to the SAME container name —
+# and this repo's parallel plans produce sibling worktrees of exactly that
+# shape. Binding a foreign worktree's Postgres is the failure `resolve_db_container`
+# exists to prevent, and it is silent: the suite runs green against another
+# worktree's data.
+#
+# So the truncated candidate must prove it belongs to THIS worktree before it is
+# accepted. Ports are allocated per slot and written into config.toml, so the
+# published host port is a discriminator the truncated name has lost. The exact
+# name needs no such proof — nothing else can carry it.
 
+# Does ${container} publish ${want_port} on the host?
+container_publishes_host_port() {
+  local container="$1" want_port="$2"
+
+  docker inspect "${container}" \
+    --format '{{range $p, $conf := .NetworkSettings.Ports}}{{range $conf}}{{.HostPort}} {{end}}{{end}}' \
+    2>/dev/null | tr ' ' '\n' | grep -Fxq "${want_port}"
+}
+
+# resolve_worktree_container <service> <project_id> <expected_host_port>
+#
+# Echoes the container name for this worktree's <service> and returns 0, or
+# returns 1. <expected_host_port> is this worktree's slot-allocated port for
+# that service, from config.toml.
 resolve_worktree_container() {
-  local service="$1" project_id="$2" candidate
+  local service="$1" project_id="$2" expected_port="$3"
+  local exact truncated
 
-  for candidate in \
-    "supabase_${service}_${project_id}" \
-    "supabase_${service}_${project_id:0:DOCKER_COMPOSE_PROJECT_NAME_LIMIT}"; do
-    if docker ps --format '{{.Names}}' 2>/dev/null | grep -Fxq "${candidate}"; then
-      printf '%s\n' "${candidate}"
+  exact="supabase_${service}_${project_id}"
+  if docker ps --format '{{.Names}}' 2>/dev/null | grep -Fxq "${exact}"; then
+    printf '%s\n' "${exact}"
+    return 0
+  fi
+
+  truncated="supabase_${service}_${project_id:0:SUPABASE_CLI_PROJECT_ID_LIMIT}"
+  if [[ "${truncated}" != "${exact}" ]] &&
+    docker ps --format '{{.Names}}' 2>/dev/null | grep -Fxq "${truncated}"; then
+    if [[ -n "${expected_port}" ]] && container_publishes_host_port "${truncated}" "${expected_port}"; then
+      printf '%s\n' "${truncated}"
       return 0
     fi
-  done
+    echo "[resolve_worktree_container] refusing '${truncated}': it matches this" \
+         "worktree's truncated project_id but does not publish this slot's" \
+         "${service} port ${expected_port:-<unset>}." >&2
+    echo "[resolve_worktree_container] that means it is another worktree's stack, or" \
+         "this worktree's stack is not fully up. Either way, binding it would run" \
+         "against the wrong database. Check \`./boga worktree doctor\`." >&2
+  fi
 
   return 1
 }
@@ -148,7 +201,7 @@ resolve_db_container() {
   fi
 
   local container
-  if ! container="$(resolve_worktree_container db "${project_id}")"; then
+  if ! container="$(resolve_worktree_container db "${project_id}" "$(worktree_config_port db)")"; then
     echo "[resolve_db_container] no running container named 'supabase_db_${project_id}'" \
          "for this worktree (project_id='${project_id}')." >&2
     echo "[resolve_db_container] running supabase db containers:" >&2

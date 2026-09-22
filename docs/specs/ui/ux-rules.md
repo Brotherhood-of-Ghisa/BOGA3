@@ -355,7 +355,8 @@ everything that renders today.
    `18`, and `22`/`26` into `24`. **`xxs` (10) was added 2026-09-22** for
    micro-labels — legends, units, tertiary labels — which the accepted design
    target drew at 8/9px; both lift to 10 rather than earning rungs of their own,
-   since 8px body-adjacent text was poor for accessibility. `9` still folds up.
+   since 8px body-adjacent text was poor for accessibility — so `9` now folds up
+   into `10` rather than into `11`.
    No other rung moved when `xxs` was added, and nothing shipped adopts it yet;
    `apps/mobile/app/__tests__/ui-tokens-additive.test.ts` holds the other seven
    in place. Reasoning: `ui/design-language.md` §3.

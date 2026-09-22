@@ -15,7 +15,7 @@ refresh_edge_proxy_after_reset() {
   # inside Docker, but the public /functions/v1 route then returns 502 forever.
   # Restart only this worktree's proxy and wait for the real public health route.
   if [[ -z "${project_id}" ]] ||
-    ! kong_container="$(resolve_worktree_container kong "${project_id}")"; then
+    ! kong_container="$(resolve_worktree_container kong "${project_id}" "$(worktree_config_port api)")"; then
     echo "[supabase] could not resolve this worktree's Kong container after reset" >&2
     echo "[supabase]   project_id: ${project_id:-<empty>}" >&2
     echo "[supabase]   running kong containers:" >&2

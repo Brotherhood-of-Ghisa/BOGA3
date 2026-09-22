@@ -38,6 +38,13 @@ to brass `#8A6516`**, with `record-wash` / `record-rule` at `#FBF3E2` /
 were drawn at 8px inside a 38px metric column. At 10px that block grows — do the
 width re-check on device before the column width is treated as settled.
 
+This spec originally said to do that check *before* committing the rung. Step 1
+committed the rung first, deliberately: the check needs the three typefaces from
+step 2 and a device, and blocking the token PR on a measurement it cannot yet
+take would have stalled every later step behind step 2's dev-client rebuild. The
+risk this accepts is the column width, not the rung — if 38 proves too narrow,
+that is a metric change here, not another scale revision.
+
 ## Set row
 
 The unit of the whole feature:

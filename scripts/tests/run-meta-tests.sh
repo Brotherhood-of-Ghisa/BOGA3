@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 
 # run-meta-tests.sh — infra-free self-tests for the repo meta-tooling
-# (gen-docs.sh, test-for.sh, pr-check.sh), the Maestro fixture-user and
+# (gen-docs.sh, test-for.sh, pr-check.sh), the Supabase container resolver,
+# the Maestro fixture-user and
 # flow-has-a-lane rules, and
 # the worktree lifecycle (temp git repos + stub gh/docker), and Android
 # launchers (stub adb/Expo/JDK).
@@ -20,6 +21,7 @@ TESTS=(
   "maestro-flow-lanes.test.sh"
   "supabase-cli-version.test.sh"
   "supabase-exit-trap-guard.test.sh"
+  "supabase-container-resolver.test.sh"
   "worktree-lifecycle.test.sh"
   "android-launcher.test.sh"
 )

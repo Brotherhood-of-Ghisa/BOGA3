@@ -1,4 +1,12 @@
-import { uiColors, uiRoles, uiTypography } from '@/components/ui';
+import {
+  uiBorder,
+  uiColors,
+  uiElevation,
+  uiRadius,
+  uiRoles,
+  uiSpace,
+  uiTypography,
+} from '@/components/ui';
 
 // `docs/plans/exercise-session-redesign.md` rule 1: while the new screens are
 // built beside the existing recorder, the token layer is the one layer that
@@ -40,14 +48,99 @@ describe('design tokens stay additive during the exercise/session rebuild', () =
     );
   });
 
-  it('leaves the legacy palette untouched — roles are a separate vocabulary', () => {
-    expect(uiColors).not.toHaveProperty('ink');
-    expect(uiColors).not.toHaveProperty('paper');
-    expect(uiColors).not.toHaveProperty('record');
-    // Spot-check the values the shipped screens actually depend on.
-    expect(uiColors.actionPrimary).toBe('#0f5cc0');
-    expect(uiColors.surfacePage).toBe('#f4f7fb');
-    expect(uiColors.textPrimary).toBe('#122033');
+  // The whole-object assertions below are the real guard. Spot-checking a few
+  // keys would leave `uiSpace`, `uiRadius`, `uiBorder` and `uiElevation`
+  // uncovered, and repointing `uiSpace.lg` restyles every shipped screen just
+  // as surely as repointing a colour does.
+  it('leaves the legacy colour palette untouched — roles are a separate vocabulary', () => {
+    expect(uiColors).toEqual({
+      actionPrimary: '#0f5cc0',
+      actionPrimaryDisabled: '#96afcf',
+      actionPrimarySubtleBg: '#eaf2ff',
+      actionPrimarySubtleBorder: '#cfe1ff',
+      actionDanger: '#b3261e',
+      actionDangerText: '#8a2323',
+      actionDangerSubtleBg: '#fff0f0',
+      actionDangerSubtleBorder: '#f3c5c5',
+      actionNeutralSubtleBg: '#eef2f9',
+      actionNeutralSubtleBorder: '#c7d3e8',
+      actionNeutralSubtleText: '#20324f',
+      borderDefault: '#d0d0d0',
+      borderStrong: '#6f6f6f',
+      borderInputStrong: '#b7c6dd',
+      borderSuccess: '#b9dfc3',
+      borderWarning: '#f0c9a5',
+      borderMuted: '#dbe3ef',
+      overlayScrim: 'rgba(0, 0, 0, 0.35)',
+      overlayScrimSoft: 'rgba(0, 0, 0, 0.28)',
+      surfaceDisabled: '#f4f6fa',
+      surfaceDefault: '#ffffff',
+      surfaceInfo: '#f5f9ff',
+      surfaceMuted: '#fafafa',
+      surfacePage: '#f4f7fb',
+      surfaceReadOnly: '#f4f4f4',
+      surfaceSuccess: '#effcf3',
+      surfaceWarning: '#fff7ee',
+      textPrimary: '#122033',
+      textSuccess: '#125d2f',
+      textSecondary: '#56667f',
+      textDisabled: '#8190a8',
+      textMuted: '#555555',
+      textWarning: '#7f4214',
+      textAccentStrong: '#0f2a46',
+      textAccentMuted: '#37516f',
+      actionSuccess: '#1f8740',
+      heatmapNeutralBg: '#edf2f6',
+      heatmapNeutralBorder: '#cfdae5',
+      heatmapBucket1: '#dff4e5',
+      heatmapBucket2: '#aee4bd',
+      heatmapBucket3: '#68c57f',
+      heatmapBucket4: '#218f46',
+      failureBackgroundFamily1: '#f1faf3',
+      failureBackgroundFamily2: '#e2f5e7',
+      failureBackgroundFamily3: '#ccebd5',
+      failureBackgroundFamily4: '#b5e1c1',
+      failureBackgroundMuscle1: '#fffaf0',
+      failureBackgroundMuscle2: '#fff3d6',
+      failureBackgroundMuscle3: '#ffe7ad',
+      failureBackgroundMuscle4: '#ffd784',
+      heatmapTodayBg: '#e8f4ff',
+      heatmapTodayBorder: '#7bbcf4',
+      heatmapTodayMarker: '#2f8ed8',
+      heatmapSelectedBorder: '#0f5cc0',
+      rowActiveBackground: '#eef5ff',
+      rowActiveBorder: '#a9c7f5',
+      rowPlannedBackground: '#e8eef7',
+      rowPlannedBorder: '#b8c7da',
+      rowSwipeDeleteBackground: '#fff0f0',
+      rowSwipeIcon: '#20324f',
+      rowSwipeText: '#20324f',
+    });
+  });
+
+  it('leaves the spacing, radius, border and elevation scales untouched', () => {
+    expect(uiSpace).toEqual({ xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 });
+    expect(uiRadius).toEqual({ sm: 8, md: 12, full: 999 });
+    expect(uiBorder).toEqual({ width: 1 });
+    expect(uiElevation).toEqual({
+      // `flat` must stay an empty object: it adds no style keys, so the default
+      // render tree is identical to before elevation existed.
+      flat: {},
+      raised: {
+        shadowColor: '#122033',
+        shadowOpacity: 0.08,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 2 },
+        elevation: 2,
+      },
+      overlay: {
+        shadowColor: '#122033',
+        shadowOpacity: 0.18,
+        shadowRadius: 24,
+        shadowOffset: { width: 0, height: 8 },
+        elevation: 12,
+      },
+    });
   });
 
   it('carries every colour role named in design-language.md §2', () => {
@@ -88,6 +181,10 @@ describe('design tokens stay additive during the exercise/session rebuild', () =
     // to a band. Guards against a later "warm it up a bit" losing the floor.
     expect(contrastRatio(uiRoles.record, uiRoles.paper)).toBeGreaterThanOrEqual(4.5);
     expect(contrastRatio(uiRoles.record, uiRoles.surface)).toBeGreaterThanOrEqual(4.5);
+    // `record` figures sit inside the `record-wash` band, so that pairing is a
+    // real reading surface too — and the wash is the value most likely to be
+    // "warmed up" later.
+    expect(contrastRatio(uiRoles.record, uiRoles.recordWash)).toBeGreaterThanOrEqual(4.5);
   });
 });
 

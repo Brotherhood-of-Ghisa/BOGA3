@@ -104,13 +104,15 @@ if [[ -f "$CONFIG_FILE" ]]; then
     && ok "supabase project_id matches slot" \
     || fail "supabase project_id '$project_id' does not match slot $slot; run ./boga worktree start"
 
-  # Docker Compose truncates project names at 40 characters, so a long worktree
-  # name yields containers named for a prefix of project_id. The scripts handle
-  # that truncation, but two worktrees whose ids agree in their first 40
-  # characters would share one Docker project — which is a real collision, not a
-  # cosmetic one. Say so here rather than letting it surface as a reset failure.
-  if (( ${#project_id} > 40 )); then
-    warn "supabase project_id is ${#project_id} chars; Docker truncates to '${project_id:0:40}' — a shorter worktree name avoids any chance of colliding with another slot"
+  # The Supabase CLI caps project_id at 40 characters and silently rewrites a
+  # longer one, so a long worktree name yields containers named for a prefix of
+  # project_id — losing the trailing slot number that makes it unique. The
+  # supabase/scripts resolvers handle that truncation and refuse a container
+  # that does not publish this slot's ports, so it is not silently dangerous;
+  # it is still worth flagging, because two worktrees agreeing in their first
+  # 40 characters cannot both run.
+  if (( ${#project_id} > ${SUPABASE_CLI_PROJECT_ID_LIMIT} )); then
+    warn "supabase project_id is ${#project_id} chars; the Supabase CLI truncates it to '${project_id:0:${SUPABASE_CLI_PROJECT_ID_LIMIT}}' — a shorter worktree name keeps the slot suffix, which is what distinguishes this stack from another slot's"
   fi
   [[ "$api_port" == "$(boga_port_for_slot api "$slot")" ]] \
     && ok "supabase api port matches slot" \

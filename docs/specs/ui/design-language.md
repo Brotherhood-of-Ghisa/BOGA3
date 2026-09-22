@@ -80,13 +80,19 @@ depends on it. Micro-labels are Archivo 700 at **10px** (`uiTypography.size.xxs`
 None of these are installed: the app is system-font only today.
 
 **The type scale, decided 2026-09-22.** The accepted target was drawn across
-twelve sizes (`8 · 9 · 10 · 11 · 12 · 13 · 14 · 15 · 16 · 17 · 18 · 19 · 23`)
+thirteen sizes (`8 · 9 · 10 · 11 · 12 · 13 · 14 · 15 · 16 · 17 · 18 · 19 · 23`)
 against a shipped scale of seven, and `rawFontSize` is enforced at budget 0 — so
 the target could not be built as drawn. Resolved as a scale revision rather than
 a pile of exceptions: **one rung added (`xxs` 10), nothing else moved.** The
 target's other sizes snap onto rungs that already exist — `15→16`, `17→18`,
 `19→18`, `23→24` — and the `8`/`9` micro-labels lift to `10`, which was the
 right call independently: 8px body-adjacent text was poor for accessibility.
+
+These are the *target's drawn sizes* snapping onto the shipped scale, which is a
+different operation from the 2026-09-19 collapse of the old scale recorded in
+`ux-rules.md` §9a.1 (where `15` folded into `14` and `17` into `16`). The two
+lists disagree on purpose: one maps a design onto today's rungs, the other
+records how today's rungs were arrived at.
 
 Eight rungs: `10 · 11 · 12 · 13 · 14 · 16 · 18 · 24`. The guardrail budgets in
 `apps/mobile/scripts/ui-guardrails.config.js` stay at 0 — raising one is never
