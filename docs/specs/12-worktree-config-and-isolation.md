@@ -137,6 +137,24 @@ slot N: BOGA-<worktree-directory-name>-wt<N>
 The directory name is sanitized to letters, numbers, and hyphens. The slot suffix
 keeps labels unique even when two worktree directories share a name.
 
+The Supabase CLI caps `project_id` at 40 characters (`SUPABASE_CLI_PROJECT_ID_LIMIT`)
+and silently cuts a longer one — dropping the `-wt<N>` suffix. So an id that
+would exceed 40 is shortened in the middle, never at the tail
+(`boga_project_id_for_name` in `scripts/worktree-lib.sh`):
+
+```text
+slot N, long name: BOGA-<name cut to fit>-<crc32 of full name, 8 hex>-wt<N>
+e.g. slot 3, exercise-session-redesign-f34616 -> BOGA-exercise-session-redes-cfeeb0d1-wt3
+```
+
+It is deterministic (POSIX `cksum`, no state), and an id that already fits is
+unchanged. A `config.toml` written before the cap still holds an over-long id:
+`./boga worktree doctor` fails on it, `./boga worktree start` rewrites it and
+names the old Docker label, and that old stack is then an unleased stack for the
+[cleanup procedure](../procedures/worktree-cleanup.md).
+`resolve_worktree_container` (`supabase/scripts/_containers.sh`) still accepts
+the CLI-truncated name of such an id only when it publishes this slot's port.
+
 Isolation outcomes:
 
 | Resource | Isolation mechanism |

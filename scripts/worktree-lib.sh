@@ -174,6 +174,52 @@ boga_project_id_fragment() {
   printf '%s\n' "$sanitized"
 }
 
+# boga_project_id_for_name <slot> <worktree-name>: the id for a linked worktree
+# directory named <worktree-name> on <slot>. Pure function of its arguments.
+#
+# Shape: BOGA-<name>-wt<slot>, capped at SUPABASE_CLI_PROJECT_ID_LIMIT. The CLI
+# silently cuts a longer id to its first 40 characters, and the tail it cuts is
+# the slot number — the one component that guarantees uniqueness (two leases
+# never share a slot). So an over-long id is shortened in the MIDDLE, never at
+# the tail:
+#
+#   BOGA-<name cut to fit>-<crc>-wt<slot>
+#
+# - `-wt<slot>` is kept whole, so ids of live leases stay distinct by slot alone.
+# - <crc> is the 8-hex-digit POSIX `cksum` (CRC-32) of the FULL, unsanitized
+#   worktree name. The cut keeps only a prefix of <name>, so without it two
+#   names sharing a long prefix would get the same id on the same slot: a stale
+#   stack left by one would be adopted (volumes and all) by the next worktree to
+#   take that slot. `cksum` is specified by POSIX, so macOS and CI Linux agree.
+# - Deterministic: no clock, no randomness, no state. `worktree doctor` recomputes
+#   this and compares it to config.toml, so it must be.
+#
+# An id that already fits is returned unchanged, so short-named worktrees keep
+# the id (and Docker volumes) they had before the cap existed.
+boga_project_id_for_name() {
+  local slot="$1"
+  local worktree_name="$2"
+  local fragment suffix id crc budget
+
+  fragment="$(boga_project_id_fragment "$worktree_name")"
+  suffix="-wt${slot}"
+  id="BOGA-${fragment}${suffix}"
+  if (( ${#id} <= SUPABASE_CLI_PROJECT_ID_LIMIT )); then
+    printf '%s\n' "$id"
+    return 0
+  fi
+
+  # shellcheck disable=SC2046 # cksum prints "<crc> <bytes>"; split on purpose.
+  set -- $(printf '%s' "$worktree_name" | cksum)
+  crc="$(printf '%08x' "$1")"
+  # What is left of the limit after "BOGA-", "-<crc>" and the suffix.
+  budget=$(( SUPABASE_CLI_PROJECT_ID_LIMIT - 5 - 1 - ${#crc} - ${#suffix} ))
+  fragment="${fragment:0:budget}"
+  # The fragment has no "--" (sanitized), so one trailing hyphen at most.
+  fragment="${fragment%-}"
+  printf 'BOGA-%s-%s%s\n' "$fragment" "$crc" "$suffix"
+}
+
 boga_project_id_for_slot() {
   local slot="$1"
   local repo_root="${2:-}"
@@ -187,7 +233,7 @@ boga_project_id_for_slot() {
     else
       worktree_name="worktree"
     fi
-    printf 'BOGA-%s-wt%s\n' "$(boga_project_id_fragment "$worktree_name")" "$slot"
+    boga_project_id_for_name "$slot" "$worktree_name"
   fi
 }
 

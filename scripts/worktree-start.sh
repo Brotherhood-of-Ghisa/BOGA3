@@ -188,7 +188,33 @@ generate_supabase_config() {
     s/\{\{POOLER_PORT\}\}/$ENV{POOLER_PORT}/g;
     s/\{\{INSPECTOR_PORT\}\}/$ENV{INSPECTOR_PORT}/g;
   ' "$template" >"$tmp_file"
+  warn_if_project_id_changed "$config" "$PROJECT_ID"
   mv "$tmp_file" "$config"
+}
+
+# A re-run that changes project_id (a worktree whose config.toml predates the
+# SUPABASE_CLI_PROJECT_ID_LIMIT cap in boga_project_id_for_name) orphans the
+# stack Docker holds under the old id. Say so and name the cleanup; do not
+# remove it here — an over-long old id was cut by the CLI to a 40-char label
+# that a sibling worktree may share, so removing it is a human-confirmed step.
+warn_if_project_id_changed() {
+  local config="$1"
+  local new_id="$2"
+  local old_id old_label
+
+  [[ -f "$config" ]] || return 0
+  old_id="$(awk -F\" '/^project_id =/ { print $2; exit }' "$config")"
+  [[ -n "$old_id" && "$old_id" != "$new_id" ]] || return 0
+
+  # The label Docker actually carries: the CLI's cut of the old id.
+  old_label="${old_id:0:SUPABASE_CLI_PROJECT_ID_LIMIT}"
+  cat >&2 <<EOF
+[worktree-start] project_id changed: $old_id -> $new_id
+[worktree-start] The stack Docker labels '$old_label' is now unleased (containers
+[worktree-start] and volumes stay; if running it still holds this slot's ports).
+[worktree-start] Clear it before the next stack start: ./boga worktree ls, then
+[worktree-start] docs/procedures/worktree-cleanup.md ("stack with no lease").
+EOF
 }
 
 ensure_symlink() {
