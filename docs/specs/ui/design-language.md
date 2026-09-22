@@ -77,7 +77,21 @@ Figures are monospaced so digits align down a column — any list of measurement
 depends on it. Micro-labels are Archivo 700 at **10px** (`uiTypography.size.xxs`),
 `letter-spacing` 0.06–0.12em, and carry units and legends.
 
-None of these are installed: the app is system-font only today.
+**Embedded in the binary, decided 2026-09-22.** The eight faces ship inside
+the app via the `expo-font` config plugin (`apps/mobile/app.config.ts`), not
+loaded at runtime: the OS registers them before JS runs, so there is no loading
+step, no splash gate and no flash of the system font reflowing a numeric column.
+A screen names a face as `{ fontFamily, fontWeight }` from `uiFonts`
+(`apps/mobile/components/ui/tokens.ts`) — the same pair on iOS and Android,
+because iOS picks among an embedded family by weight and the plugin registers
+an Android XML font family under the same name. Only the weights in the table
+are embedded; any other weight lands on the nearest one that is. Nothing
+shipped adopts them yet.
+
+**Web gets system fonts.** Config-plugin embedding is iOS/Android only, so
+`expo start --web` renders every face in the browser's fallback. That is the
+accepted outcome, not a bug: web is a dev convenience with no gate, and this
+spec does not promise web parity.
 
 **The type scale, decided 2026-09-22.** The accepted target was drawn across
 thirteen sizes (`8 · 9 · 10 · 11 · 12 · 13 · 14 · 15 · 16 · 17 · 18 · 19 · 23`)

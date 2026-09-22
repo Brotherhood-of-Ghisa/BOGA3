@@ -66,8 +66,8 @@ the requirement from `./boga test for`.
 | # | Step | Status | Notes |
 | --- | --- | --- | --- |
 | 1 | Tokens | ✅ shipped | Added `uiRoles` **additively** (`uiColors` untouched); added one type rung `xxs` 10; resolved the `accent`/`record` collision by moving `record` to brass `#8A6516`. Decisions in `design-language.md` §2–§3, scale in `ux-rules.md` §9a. No existing token repointed — held by `app/__tests__/ui-tokens-additive.test.ts`. |
-| 2 | Fonts + SVG | ⬜ ready | Add `expo-font` + Archivo / Source Sans 3 / IBM Plex Mono, and `react-native-svg`. Native-affecting: `./boga ios build-client --force` **then** `boga test frontend`. Land early — every later step is blocked behind the rebuild. |
-| 3 | Primitives | ⬜ blocked by 2 | `ListRow`, `Stat`, `Sheet`, `Card` only — anatomy in the build spec. New components; nothing existing adopts them yet. Update `components-catalog.md`. |
+| 2 | Fonts + SVG | ✅ shipped | Added `react-native-svg` and the eight faces, **embedded** by the `expo-font` config plugin (no runtime load). `uiFonts` in `tokens.ts` names them as `{ fontFamily, fontWeight }`, uniform on iOS and Android, so no PostScript map was needed; guarded by `app/__tests__/ui-fonts-embedded.test.ts`. Web falls back to system fonts (`design-language.md` §3). Nothing adopts them yet. |
+| 3 | Primitives | ⬜ ready | `ListRow`, `Stat`, `Sheet`, `Card` only — anatomy in the build spec. New components; nothing existing adopts them yet. Update `components-catalog.md`. |
 | 4 | Exercise page | ⬜ blocked by 3 | New route behind the setting (added in this step, defaulting off). Reuses `src/session-recorder/**`. Its own Maestro lane, which enables the setting first. |
 | 5 | Session view | ⬜ blocked by 3 | New route behind the same setting. Its own Maestro lane. |
 | 6 | Switch over | ⬜ blocked by 4, 5 | Flip the setting's default on, then in a follow-up delete the old recorder route, its lanes and the setting itself. Two small reverts rather than one big one. Update `screen-map.md` + `navigation-contract.md`. |
@@ -91,20 +91,29 @@ Resolved in step 1 (2026-09-22), kept here only until this plan is deleted:
 `accent` vs `record` — `record` moved to brass `#8A6516`. Type scale — one rung
 added (`xxs` 10), nothing else moved. Both recorded in `design-language.md`.
 
-- **Complete with pending planned sets** — do they become `unperformed`, stay
-  `planned`, or block? The model supports all three
-  (`src/session-recorder/set-semantics.ts`). Needed by step 4.
-- **Session ⋮ has one item** (Abandon session). Menu, or a plain destructive row?
-- **History page** is stale relative to the target and is linked from the
-  exercise page. Accept the mismatch for a few PRs, or fold a pass into step 4.
-- **Icon set** — step 2 brings `react-native-svg` but not a library. The 25
-  improvised Unicode glyphs still need retiring; decide whether that rides along
-  or is its own change.
+Resolved 2026-09-22, recorded with step 2:
+
+- ~~**Complete with pending planned sets**~~ — warn that the planned sets will
+  be discarded; the user cancels or goes ahead. Discarded means marked
+  `unperformed`, not deleted. Recorded in the build spec under the exercise
+  page's Complete exit.
+- ~~**Session ⋮ has one item**~~ — a menu, consistent with the exercise ⋮, even
+  while it holds only Abandon session.
+- ~~**History page**~~ — staleness accepted. History stays as it is; the
+  mismatch with the exercise page that links to it is carried knowingly, not
+  folded into step 4.
+- ~~**Icon set**~~ — its own change after step 2, not bundled with it. The 25
+  improvised Unicode glyphs are retired there.
+- ~~**Font loading**~~ — embedded in the binary by the config plugin; there is
+  no runtime loading strategy. `design-language.md` §3.
+
+None open.
 
 ## Risks
 
 - `session-recorder.tsx` is the largest file in the app and owns behaviour these
   screens inherit (draft autosave, lifecycle, submit). Steps 4–5 must not
   silently drop it — read `src/session-recorder/` before cutting.
-- Step 2 forces a dev-client rebuild for every worktree; land it early so later
-  steps aren't blocked behind it.
+- ~~Step 2 forces a dev-client rebuild for every worktree~~ — landed. A
+  worktree whose shared dev client predates it needs
+  `./boga ios build-client --force` once.

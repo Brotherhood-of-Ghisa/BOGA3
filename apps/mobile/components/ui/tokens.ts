@@ -155,6 +155,26 @@ export const uiTypography = {
   },
 } as const;
 
+// The three typefaces of `docs/specs/ui/design-language.md` §3, and the only
+// weights of each that ship. They are embedded in the binary by the expo-font
+// config plugin (`app.config.ts`), so they are available before JS runs and
+// need no loading step. Nothing adopts these yet.
+//
+// Name a face as `{ fontFamily: uiFonts.x.family, fontWeight: <one of its
+// weights> }` — the same pair on iOS and Android. `family` is the files'
+// typographic family name, not a PostScript name: iOS picks the face from the
+// family by weight, Android from the XML font family the plugin registers under
+// this string. A weight outside `weights` is not embedded and silently lands on
+// the nearest one that is. On web these fall back to system fonts.
+export const uiFonts = {
+  // Headings, control labels, buttons, micro-labels.
+  display: { family: 'Archivo', weights: ['600', '700', '800'] },
+  // Body and prose.
+  body: { family: 'Source Sans 3', weights: ['400', '600'] },
+  // Every number — monospaced so digits align down a column.
+  figure: { family: 'IBM Plex Mono', weights: ['500', '600', '700'] },
+} as const;
+
 export const uiBorder = {
   width: 1,
 } as const;
@@ -186,6 +206,7 @@ export const uiElevation = {
 export const uiTokens = {
   colors: uiColors,
   roles: uiRoles,
+  fonts: uiFonts,
   space: uiSpace,
   radius: uiRadius,
   typography: uiTypography,
@@ -195,6 +216,7 @@ export const uiTokens = {
 
 export type UiColorToken = keyof typeof uiColors;
 export type UiRoleToken = keyof typeof uiRoles;
+export type UiFontToken = keyof typeof uiFonts;
 export type UiSpaceToken = keyof typeof uiSpace;
 export type UiRadiusToken = keyof typeof uiRadius;
 export type UiElevationToken = keyof typeof uiElevation;
