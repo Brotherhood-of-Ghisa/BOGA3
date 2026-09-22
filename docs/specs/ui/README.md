@@ -33,8 +33,8 @@ drifted from the code and predated several UI milestones. Git history has them.)
 - `components-catalog.md`
   - current UI tokens/primitives and specialized shared components, with pending primitives tracked separately
 - `design-language.md`
-  - the visual/interaction language the UI is moving to: colour roles, type,
-    surfaces, patterns and data rules (status `Pending / planned`)
+  - the screen-agnostic visual/interaction language: colour roles, type,
+    surfaces, emphasis and data presentation (status `Pending / planned`)
 - `design-targets/`
   - accepted design target records per `ai-design-policy.md`, one file per
     accepted target

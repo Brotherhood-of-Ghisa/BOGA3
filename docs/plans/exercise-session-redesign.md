@@ -1,7 +1,8 @@
 # Plan — exercise page and session view
 
 Ephemeral working notes (`docs/plans/README.md`). Delete this file in the PR
-that ships the last step. Durable decisions live in
+that ships the last step. Screen-level detail is in
+`exercise-session-build-spec.md`; the screen-agnostic language is
 `docs/specs/ui/design-language.md`; the accepted target is pinned in
 `docs/specs/ui/design-targets/exercise-session-v5.md`.
 
@@ -32,10 +33,10 @@ the requirement from `./boga test for`.
 | --- | --- | --- |
 | 1 | Tokens + language | Add the colour roles and type scale to `components/ui/tokens.ts`; **resolve the `accent`/`record` collision** and record the decision. Graduate §2–§4 of the language doc to `Current behavior`. Docs-only parts update `ux-rules.md`. |
 | 2 | Fonts + SVG | Add `expo-font` + Archivo / Source Sans 3 / IBM Plex Mono, and `react-native-svg`. Native-affecting: `./boga ios build-client --force` **then** `boga test frontend`. Retire the `Courier` / `Menlo` literals in `app/dev-logs.tsx` and `app/group/[groupId]/invite.tsx`. |
-| 3 | Primitives | `ListRow`, `Stat`, `Sheet`, `Card` only. Update `components-catalog.md` in the same PR. |
+| 3 | Primitives | `ListRow`, `Stat`, `Sheet`, `Card` only — anatomy in the build spec. Update `components-catalog.md` in the same PR. |
 | 4 | Exercise page | New route + the set list, records panel, effort sheet, options sheet. Update `screen-map.md` and `navigation-contract.md`. Add a Maestro lane (every flow has one — #309). |
 | 5 | Session view | Read-only cards, summary card, Finish in the top bar. Cut the editing surface out of `session-recorder.tsx`. |
-| 6 | Close out | Delete this plan; confirm every durable decision has graduated to `docs/specs/**`. |
+| 6 | Close out | Delete this plan and the build spec; confirm every durable decision has graduated to `docs/specs/**`. |
 
 ## Decisions already made
 
