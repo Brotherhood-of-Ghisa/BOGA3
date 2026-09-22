@@ -172,8 +172,10 @@ export type StreamRecordCardViewModel = {
   valueLabel: string;
   /** Per listed board, Weight then e1RM: "PR · Weight", then "Group record · Weight" when flagged. */
   badges: string[];
-  /** "Voided · set edited|set deleted", "✓ Certified by …", or "○ Not certified yet". */
+  /** "Voided · set edited|set deleted", "Certified by …", or "Not certified yet". */
   statusLabel: string;
+  /** The state `statusLabel` puts in words, for the glyph drawn beside it. */
+  status: RecordCertificationStatus;
   /** "Session in progress" while provisional and not voided. */
   provisionalLabel: string | null;
   voided: boolean;
@@ -236,7 +238,14 @@ const metricRank = (metric: GroupBoardMetric): number => METRIC_ORDER.indexOf(me
 const metricName = (metric: GroupBoardMetric): string => METRIC_NAMES[metric] ?? String(metric);
 
 export const RECORD_PROVISIONAL_LABEL = 'Session in progress';
-export const RECORD_UNCERTIFIED_LABEL = '○ Not certified yet';
+export const RECORD_UNCERTIFIED_LABEL = 'Not certified yet';
+
+/**
+ * Where a record's certification stands. The label says it in words; the card
+ * draws the matching glyph (check / ring / none) beside it, so the state never
+ * lives in a Unicode character inside the label.
+ */
+export type RecordCertificationStatus = 'certified' | 'uncertified' | 'voided';
 
 const isMyUser = (userId: string, myUserId: string | null): boolean => myUserId !== null && userId === myUserId;
 
@@ -250,12 +259,12 @@ const formatPossessive = (member: GroupMemberRef, myUserId: string | null): stri
 /** "140 kg × 1". */
 export const formatSetValue = (weightKg: number, reps: number): string => `${formatKg(weightKg)} kg × ${reps}`;
 
-/** "✓ Certified by sam" / "✓ Certified by you" / "✓ Certified" (the certifier's account is gone). */
+/** "Certified by sam" / "Certified by you" / "Certified" (the certifier's account is gone). */
 export const formatCertifiedBy = (certifiedBy: GroupMemberRef | null, myUserId: string | null): string => {
-  if (!certifiedBy) return '✓ Certified';
+  if (!certifiedBy) return 'Certified';
   return isMyUser(certifiedBy.user_id, myUserId)
-    ? '✓ Certified by you'
-    : `✓ Certified by ${formatMemberName(certifiedBy.username)}`;
+    ? 'Certified by you'
+    : `Certified by ${formatMemberName(certifiedBy.username)}`;
 };
 
 /** "Voided · set edited" / "Voided · set deleted". */
@@ -282,10 +291,13 @@ const buildRecordCard = (item: StreamRecordItem, myUserId: string | null): Strea
       : setValue;
   const voided = item.voided !== null;
   let statusLabel = RECORD_UNCERTIFIED_LABEL;
+  let status: RecordCertificationStatus = 'uncertified';
   if (item.voided) {
     statusLabel = formatVoidedLabel(item.voided.reason);
+    status = 'voided';
   } else if (item.certified) {
     statusLabel = formatCertifiedBy(item.certification?.certified_by ?? null, myUserId);
+    status = 'certified';
   }
   const provisionalLabel = item.provisional && !voided ? RECORD_PROVISIONAL_LABEL : null;
   const badges = formatRecordBadges(item.boards);
@@ -299,6 +311,7 @@ const buildRecordCard = (item: StreamRecordItem, myUserId: string | null): Strea
     valueLabel,
     badges,
     statusLabel,
+    status,
     provisionalLabel,
     voided,
     canCertify: !voided && !item.certified && myUserId !== null && item.member.user_id !== myUserId,

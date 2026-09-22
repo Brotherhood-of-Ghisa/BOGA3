@@ -1,11 +1,13 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { UiSurface, UiText, uiSpace } from '@/components/ui';
-import type { BoardRowViewModel } from '@/src/groups';
+import { UNCERTIFIED_MARK_LABEL, type BoardRowViewModel } from '@/src/groups';
+
+import { GroupCertificationStatus } from './certification-status';
 
 /**
  * One full-board row (E1.2): rank, member ("You", "(former)"), value, date, and
- * on All the ✓ / ○ uncertified mark. The whole row opens the row detail sheet
+ * on All the certification mark (a check, or a ring and "uncertified"). The whole row opens the row detail sheet
  * (E2, M25-T10).
  */
 export function GroupBoardRow({ row, onPress }: { row: BoardRowViewModel; onPress: (row: BoardRowViewModel) => void }) {
@@ -42,10 +44,15 @@ export function GroupBoardRow({ row, onPress }: { row: BoardRowViewModel; onPres
           <UiText testID={`${testID}-date`} variant="subtitle">
             {row.dateLabel}
           </UiText>
-          {row.certifiedMark ? (
-            <UiText testID={`${testID}-mark`} variant="subtitle">
-              {row.certifiedMark}
-            </UiText>
+          {row.certification ? (
+            <View testID={`${testID}-mark`}>
+              <GroupCertificationStatus
+                iconTestID={`${testID}-mark-${row.certification}`}
+                label={row.certification === 'uncertified' ? UNCERTIFIED_MARK_LABEL : null}
+                status={row.certification}
+                variant="subtitle"
+              />
+            </View>
           ) : null}
         </View>
       </UiSurface>

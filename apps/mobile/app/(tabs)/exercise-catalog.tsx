@@ -8,7 +8,7 @@ import {
   ExerciseListContent,
   ExerciseListPreferenceControls,
 } from '@/components/exercise-catalog/exercise-list-controls';
-import { uiColors, uiRadius, uiSpace, uiTypography } from '@/components/ui';
+import { Icon, uiColors, uiRadius, uiSpace, uiTypography } from '@/components/ui';
 import {
   deleteExerciseCatalogExercise,
   undeleteExerciseCatalogExercise,
@@ -144,9 +144,10 @@ export default function ExerciseCatalogScreen() {
     (exercise: ExerciseListItem) => (
       <Pressable
         accessibilityLabel={`Exercise actions ${exercise.name}`}
+        accessibilityRole="button"
         style={styles.exerciseRowKebabButton}
         onPress={() => handlePressRowActions(exercise)}>
-        <Text style={styles.exerciseRowKebabText}>⋮</Text>
+        <Icon color={uiColors.textSecondary} name="more-vertical" size="sm" />
       </Pressable>
     ),
     [handlePressRowActions]
@@ -302,16 +303,18 @@ export default function ExerciseCatalogScreen() {
           <View style={styles.topActionButtonsCluster}>
             <Pressable
               accessibilityLabel="Create new exercise"
+              accessibilityRole="button"
               style={[styles.iconActionButton, styles.createExerciseButton]}
               onPress={startNewExercise}
               testID="create-new-exercise-button">
-              <Text style={styles.createExerciseButtonText}>+</Text>
+              <Icon color={uiColors.surfaceDefault} name="plus" size="lg" />
             </Pressable>
             <Pressable
               accessibilityLabel="Exercise catalog options"
+              accessibilityRole="button"
               style={styles.iconActionButton}
               onPress={() => setIsCatalogOptionsMenuVisible(true)}>
-              <Text style={styles.iconActionButtonText}>⋮</Text>
+              <Icon color={uiColors.textSecondary} name="more-vertical" />
             </Pressable>
           </View>
         </View>
@@ -612,21 +615,9 @@ const styles = StyleSheet.create({
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfaceDefault,
   },
-  iconActionButtonText: {
-    fontSize: uiTypography.size.lg,
-    lineHeight: 18,
-    fontWeight: '700',
-    color: uiColors.textSecondary,
-  },
   createExerciseButton: {
     backgroundColor: uiColors.actionPrimary,
     borderColor: uiColors.actionPrimary,
-  },
-  createExerciseButtonText: {
-    fontSize: uiTypography.size.xxl,
-    lineHeight: 26,
-    color: uiColors.surfaceDefault,
-    fontWeight: '700',
   },
   activeFilterChipsRow: {
     flexDirection: 'row',
@@ -720,12 +711,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: uiColors.borderMuted,
     backgroundColor: uiColors.surfacePage,
-  },
-  exerciseRowKebabText: {
-    fontSize: uiTypography.size.base,
-    fontWeight: '700',
-    color: uiColors.textSecondary,
-    lineHeight: 16,
   },
   modalRoot: {
     flex: 1,

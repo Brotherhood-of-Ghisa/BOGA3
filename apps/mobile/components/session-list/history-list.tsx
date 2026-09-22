@@ -12,7 +12,7 @@ import {
   View,
 } from 'react-native';
 
-import { uiColors, uiRadius, uiSpace, uiTypography } from '@/components/ui';
+import { Icon, uiColors, uiRadius, uiSpace, uiTypography } from '@/components/ui';
 
 import { SessionSummaryLine } from './session-summary-line';
 import type { SessionListItem } from './types';
@@ -238,7 +238,7 @@ export function HistoryList({
                     onPress={() => openMenu(session)}
                     style={[styles.iconActionButton, styles.menuButton]}
                     testID={`completed-session-menu-button-${session.id}`}>
-                    <Text style={styles.iconGlyphText}>⋮</Text>
+                    <Icon color={uiColors.actionNeutralSubtleText} name="more-vertical" size="sm" />
                   </Pressable>
                 </Animated.View>
               ))}
@@ -420,12 +420,6 @@ const styles = StyleSheet.create({
   menuButton: {
     backgroundColor: uiColors.actionNeutralSubtleBg,
     borderColor: uiColors.actionNeutralSubtleBorder,
-  },
-  iconGlyphText: {
-    color: uiColors.actionNeutralSubtleText,
-    fontSize: uiTypography.size.base,
-    fontWeight: '700',
-    lineHeight: 16,
   },
   metaText: {
     color: uiColors.textSecondary,

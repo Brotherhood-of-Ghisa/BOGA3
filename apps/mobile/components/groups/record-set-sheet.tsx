@@ -20,6 +20,7 @@ import {
   type RecordSetDetail,
 } from '@/src/groups';
 
+import { GroupCertificationStatus } from './certification-status';
 import { GroupWriteNotice } from './write-notice';
 
 type RecordSetSheetProps = {
@@ -124,9 +125,11 @@ export function RecordSetSheet({ detail, userId, myRole, certification, onClose 
                 </UiText>
               ) : null}
               <View style={styles.status}>
-                <UiText testID="group-record-sheet-status" variant="label">
-                  {model.statusLabel}
-                </UiText>
+                <GroupCertificationStatus
+                  label={model.statusLabel}
+                  status={model.status}
+                  testID="group-record-sheet-status"
+                />
                 {model.lifterNote ? (
                   <UiText testID="group-record-sheet-lifter-note" variant="bodyMuted">
                     {model.lifterNote}

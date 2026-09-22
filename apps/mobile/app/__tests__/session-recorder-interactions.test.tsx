@@ -1644,7 +1644,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     fireEvent.press(screen.getByTestId('set-performance-control-1-2'));
 
     expect(screen.getByTestId('exercise-expanded-pr-1')).toHaveTextContent(
-      'New PR★Barbell Squat300 kg × 5 reps · est. 1RM 350 kg'
+      'New PRBarbell Squat300 kg × 5 reps · est. 1RM 350 kg'
     );
     expect(screen.queryByLabelText('Share PR for Barbell Squat')).toBeNull();
 
@@ -1654,7 +1654,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
       '2 sets · 2 w/sets'
     );
     expect(screen.getByTestId('exercise-collapsed-summary-1-new-pr')).toHaveTextContent(
-      'New PR★300 kg × 5 reps · est. 1RM 350 kg'
+      'New PR300 kg × 5 reps · est. 1RM 350 kg'
     );
     expect(screen.queryByLabelText('Share PR for Barbell Squat')).toBeNull();
 

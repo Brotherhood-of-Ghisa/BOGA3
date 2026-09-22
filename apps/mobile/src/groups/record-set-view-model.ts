@@ -14,6 +14,7 @@ import { formatBoardDate } from './board-view-model';
 import {
   RECORD_PROVISIONAL_LABEL,
   RECORD_UNCERTIFIED_LABEL,
+  type RecordCertificationStatus,
   formatCertifiedBy,
   formatKg,
   formatSetValue,
@@ -195,8 +196,10 @@ export type RecordSetSheetViewModel = {
   /** 'Logged as "Bench (comp grip)"'. */
   loggedAsLabel: string | null;
   provisionalLabel: string | null;
-  /** "✓ Certified by sam · 12 Sep", "○ Not certified yet", or "Voided · set edited". */
+  /** "Certified by sam · 12 Sep", "Not certified yet", or "Voided · set edited". */
   statusLabel: string;
+  /** The state `statusLabel` puts in words, for the glyph drawn beside it. */
+  status: RecordCertificationStatus;
   /** For the lifter on their own uncertified, standing set. */
   lifterNote: string | null;
   actions: RecordSetAction[];
@@ -229,9 +232,12 @@ export const buildRecordSetSheet = (
   const gym = session?.gym_name?.trim() || null;
   const loggedAs = detail.exerciseName ?? exerciseNameFromSession(session, detail.setId);
   let statusLabel = RECORD_UNCERTIFIED_LABEL;
+  let status: RecordCertificationStatus = 'uncertified';
   if (detail.voidedReason) {
     statusLabel = formatVoidedLabel(detail.voidedReason);
+    status = 'voided';
   } else if (detail.certification) {
+    status = 'certified';
     statusLabel = `${formatCertifiedBy(detail.certification.certified_by, myUserId)} · ${formatBoardDate(
       detail.certification.certified_at_ms,
       nowMs,
@@ -246,6 +252,7 @@ export const buildRecordSetSheet = (
     loggedAsLabel: loggedAs ? `Logged as "${loggedAs}"` : null,
     provisionalLabel: detail.provisional && detail.voidedReason === null ? RECORD_PROVISIONAL_LABEL : null,
     statusLabel,
+    status,
     lifterNote: isLifter && detail.certification === null && detail.voidedReason === null ? LIFTER_CERTIFY_NOTE : null,
     actions: recordSetActionsFor(detail, myUserId, myRole),
     canViewSession: detail.voidedReason !== 'deleted' && !sessionMissing,

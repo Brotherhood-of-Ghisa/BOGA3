@@ -1707,7 +1707,7 @@ design §7.
   sits in the header and carries the toggles.
   - Rows: rank, `You` / name, ` (former)`, value, date. e1RM rows show the estimate
     with the set behind it (`140 kg × 1`); Weight rows show the set. On All
-    only, `✓` or `○ uncertified`.
+    only, a check icon, or a ring icon and `uncertified`.
   - Empty Certified: `No certified sets yet` with `See all sets` (the board
     payload has no uncertified count). Empty All: `No sets yet`.
   - Rows are not pressable yet: the row detail is M25-T10.
@@ -1747,9 +1747,10 @@ P10–P18, D3–D5, D15, D16, E2, E3; M25 design §4, §6.
     listed board has `group_record`, else `— PR`; `<exercise>  140 kg × 1`,
     plus ` · e1RM 142.5 kg` when an e1RM board is listed; badges per board,
     Weight then e1RM, `PR · <metric>` then `Group record · <metric>`;
-    `Session in progress` while provisional; `○ Not certified yet`, `✓
-    Certified by <name|you>` (`✓ Certified` when the certifier is gone), or
-    `Voided · set edited|deleted` (the voided card on the muted panel, status
+    `Session in progress` while provisional; `Not certified yet` (ring icon),
+    `Certified by <name|you>` (check icon; `Certified` when the certifier is
+    gone), or `Voided · set edited|deleted` (no icon; the voided card on the
+    muted panel, status
     first). `Certify` shows when not voided, not certified, and not mine; the
     group name shows in All.
   - `record_voided` and `link` are light rows (`GroupStreamSentenceItem`),
@@ -2087,7 +2088,7 @@ group screen, and Today details above where they differ. No server change.
 - **As-built (M25-T10, flow extension).** Step 7b first waits for the stream's
   link item (`<user_d> linked Bench Press to Prowler Push — now #1 on Weight
   and e1RM`), then, on All · Weight, opens row 1's detail sheet: `Logged 102.5
-  kg total · counted as 51.25 kg per side`, `Logged as "Bench Press"`, `○ Not
+  kg total · counted as 51.25 kg per side`, `Logged as "Bench Press"`, `Not
   certified yet`, and `Certify` for the owner, closed without certifying. Step
   8b opens the former member's row: no `Certify`. No new fixture user or
   counterparty step; certifying on device followed in M25-T11 (below).
@@ -2105,13 +2106,13 @@ group screen, and Today details above where they differ. No server change.
     `runScript` has no sleep) and fail after 90 s, longer than the 30 s
     `pg_cron` sweep.
   - **Device.** The record card (`group-stream-record-card-<key>`: `—
-    group record`, `Prowler Push  55 kg × 5 · e1RM … kg`, `○ Not certified
+    group record`, `Prowler Push  55 kg × 5 · e1RM … kg`, `Not certified
     yet`) and its session card's `1 record`. Tapping the card's `Certify`
-    shows the notice and `✓ Certified by you`, and hides `Certify`. After
+    shows the notice and `Certified by you`, and hides `Certify`. After
     `await-certified`: the podium's Certified · e1RM row 1, the Certified
     e1RM and Weight boards, the Certified history `… took #1 · 55 kg
     (certified by you)`, and on All · Weight the `certified` row whose sheet
-    reads `✓ Certified by you · …` and offers `Remove my certification`, not
+    reads `Certified by you · …` and offers `Remove my certification`, not
     `Certify`. Step 8b's former row is now the certified 55 kg × 5 set.
   - Withdraw and cancel are not tapped on device; `groups-certification.sh`
     and jest cover them.
@@ -2208,7 +2209,7 @@ contract. The narrative sketches and design trade-offs are in git history
 | E0.3 | Link screen from the catalogue `⋮` / recorder `•••` menus: Linked, Suggested, All | §6.3 M25-T07 |
 | E0.4 | Group page Exercises: my link status per row, `Link your exercise` | §6.3 M25-T08 |
 | E1 / E1.1 | Leaderboards page: podium cards on Certified · e1RM, `You: Nth`, archived last | §6.3 M25-T09 |
-| E1.2 | Full board: Weight/e1RM × Certified/All toggles in place, ✓ / ○ on All, rows open E2 | §6.3 M25-T09, M25-T10 |
+| E1.2 | Full board: Weight/e1RM × Certified/All toggles in place, certified / uncertified mark on All, rows open E2 | §6.3 M25-T09, M25-T10 |
 | E1.3 | History: one sentence per lead change, newest first | §6.3 M25-T09 |
 | E2 | Row detail sheet shared by board rows and record cards: value, as logged, date · gym, logged as, certification line and actions, View full session | §6.3 M25-T10 |
 | E3 | Stream record card with its session: title, value, badges, certification status, inline Certify | §6.3 M25-T10 |

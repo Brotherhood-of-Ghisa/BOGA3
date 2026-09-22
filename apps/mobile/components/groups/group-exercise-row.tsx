@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { UiButton, UiText, uiColors, uiRadius, uiSpace } from '@/components/ui';
+import { Icon, UiButton, UiText, uiColors, uiRadius, uiSpace } from '@/components/ui';
 import type { GroupExerciseRowViewModel } from '@/src/groups';
 
 type GroupExerciseRowProps = {
@@ -41,9 +41,7 @@ export function GroupExerciseRow({ row, onPress, onLink }: GroupExerciseRowProps
         </View>
       ) : null}
       {onPress ? (
-        <UiText style={styles.chevron} variant="label">
-          ›
-        </UiText>
+        <Icon color={uiColors.textSecondary} name="chevron-right" />
       ) : null}
     </>
   );
@@ -101,9 +99,6 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
     gap: uiSpace.xs,
-  },
-  chevron: {
-    color: uiColors.textSecondary,
   },
   badge: {
     borderRadius: uiRadius.full,

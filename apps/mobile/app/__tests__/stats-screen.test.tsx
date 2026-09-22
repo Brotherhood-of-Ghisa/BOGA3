@@ -322,6 +322,15 @@ const buildShellProps = (
   ...overrides,
 });
 
+/** Which arrow a sort header's indicator shows; the icon is decorative, so hidden. */
+const sortArrow = (header: 'exercise' | 'sets' | 'volume'): 'up' | 'down' | null => {
+  const find = (direction: 'up' | 'down') =>
+    screen.queryByTestId(`stats-exercise-sort-${header}-indicator-${direction}`, {
+      includeHiddenElements: true,
+    });
+  return find('up') ? 'up' : find('down') ? 'down' : null;
+};
+
 const renderStatsScreenShell = (overrides: Partial<StatsScreenShellProps> = {}) =>
   render(<StatsScreenShell {...buildShellProps(overrides)} />);
 
@@ -1325,16 +1334,17 @@ describe('StatsScreenShell — view mode toggle', () => {
     expect(screen.getByTestId('stats-exercise-row-missing').props.accessibilityLabel).toContain(
       'Estimated one rep max unavailable'
     );
+    // Inactive headers keep a transparent indicator laid out, so activating a
+    // column never shifts it.
     expect(screen.getByTestId('stats-exercise-sort-exercise-indicator')).toHaveStyle({
       opacity: 0,
-      width: 48,
+      width: 64,
     });
-    expect(screen.getByTestId('stats-exercise-sort-sets-indicator')).toHaveTextContent('↓');
-    expect(screen.getByTestId('stats-exercise-sort-sets-indicator')).toHaveStyle({ width: 10 });
-    expect(screen.getByTestId('stats-exercise-sort-volume-indicator')).toHaveStyle({
-      opacity: 0,
-      width: 10,
-    });
+    expect(sortArrow('exercise')).toBe('down');
+    expect(sortArrow('sets')).toBe('down');
+    expect(screen.getByTestId('stats-exercise-sort-sets-indicator')).not.toHaveStyle({ opacity: 0 });
+    expect(screen.getByTestId('stats-exercise-sort-volume-indicator')).toHaveStyle({ opacity: 0 });
+    expect(sortArrow('volume')).toBe('down');
     expect(screen.getByTestId('stats-exercise-name-missing').props.numberOfLines).toBeUndefined();
   });
 
@@ -1374,12 +1384,12 @@ describe('StatsScreenShell — view mode toggle', () => {
     expect(screen.getByTestId('stats-exercise-sort-sets').props.accessibilityLabel).toContain(
       'Current sort: Sets — low to high'
     );
-    expect(screen.getByTestId('stats-exercise-sort-sets-indicator')).toHaveTextContent('↑');
+    expect(sortArrow('sets')).toBe('up');
     fireEvent.press(screen.getByTestId('stats-exercise-sort-sets'));
     expect(screen.getByTestId('stats-exercise-sort-sets').props.accessibilityLabel).toContain(
       'Current sort: Working sets — high to low'
     );
-    expect(screen.getByTestId('stats-exercise-sort-sets-indicator')).toHaveTextContent('↓');
+    expect(sortArrow('sets')).toBe('down');
     fireEvent.press(screen.getByTestId('stats-exercise-sort-sets'));
     expect(sortedExerciseIds()).toEqual(['alpha', 'gamma', 'beta']);
     expect(screen.getByTestId('stats-exercise-sort-sets').props.accessibilityLabel).toContain(
@@ -1392,21 +1402,18 @@ describe('StatsScreenShell — view mode toggle', () => {
 
     fireEvent.press(screen.getByTestId('stats-exercise-sort-exercise'));
     expect(sortedExerciseIds()).toEqual(['beta', 'gamma', 'alpha']);
-    expect(screen.getByTestId('stats-exercise-sort-exercise-indicator')).toHaveTextContent(
-      'Recent ↓'
-    );
+    expect(screen.getByTestId('stats-exercise-sort-exercise-indicator')).toHaveTextContent('Recent');
+    expect(sortArrow('exercise')).toBe('down');
     fireEvent.press(screen.getByTestId('stats-exercise-sort-exercise'));
     expect(sortedExerciseIds()).toEqual(['alpha', 'gamma', 'beta']);
-    expect(screen.getByTestId('stats-exercise-sort-exercise-indicator')).toHaveTextContent(
-      'Recent ↑'
-    );
+    expect(sortArrow('exercise')).toBe('up');
 
     fireEvent.press(screen.getByTestId('stats-exercise-sort-volume'));
     expect(sortedExerciseIds()).toEqual(['beta', 'gamma', 'alpha']);
     fireEvent.press(screen.getByTestId('stats-exercise-sort-volume'));
     expect(sortedExerciseIds()).toEqual(['alpha', 'gamma', 'beta']);
 
-    expect(screen.getByTestId('stats-exercise-sort-volume-indicator')).toHaveTextContent('↑');
+    expect(sortArrow('volume')).toBe('up');
     expect(screen.getByTestId('stats-exercise-sort-exercise-indicator')).toHaveStyle({ opacity: 0 });
     expect(onPressExerciseHistory).not.toHaveBeenCalled();
     fireEvent.press(screen.getByTestId('stats-exercise-row-gamma'));

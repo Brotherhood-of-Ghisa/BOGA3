@@ -204,6 +204,17 @@ export const uiFonts = {
   figure: { family: 'IBM Plex Mono', weights: ['500', '600', '700'] },
 } as const;
 
+// Icon edge lengths, in points (`components/ui/icon.tsx`). Glyphs are drawn on
+// a 24 grid with a 2-unit stroke, so a smaller size also thins the stroke.
+// `xs` marks a point inside a chart, `sm` sits inline with body text, `md` is
+// the glyph of a control or row indicator, `lg` a destination badge.
+export const uiIconSize = {
+  xs: 12,
+  sm: 16,
+  md: 20,
+  lg: 24,
+} as const;
+
 export const uiBorder = {
   width: 1,
 } as const;
@@ -242,11 +253,13 @@ export const uiTokens = {
   typography: uiTypography,
   border: uiBorder,
   elevation: uiElevation,
+  iconSize: uiIconSize,
 } as const;
 
 export type UiColorToken = keyof typeof uiColors;
 export type UiRoleToken = keyof typeof uiRoles;
 export type UiFontToken = keyof typeof uiFonts;
 export type UiSpaceToken = keyof typeof uiSpace;
+export type UiIconSizeToken = keyof typeof uiIconSize;
 export type UiRadiusToken = keyof typeof uiRadius;
 export type UiElevationToken = keyof typeof uiElevation;

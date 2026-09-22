@@ -1,6 +1,6 @@
 import { StyleSheet, View } from 'react-native';
 
-import { UiSurface, UiText, uiColors, uiSpace, uiTypography } from '@/components/ui';
+import { Icon, UiSurface, UiText, uiColors, uiSpace, uiTypography } from '@/components/ui';
 import type { ExercisePersonalRecord } from '@/src/session-insights';
 
 type ExercisePersonalRecordCelebrationProps = {
@@ -39,9 +39,7 @@ export function ExercisePersonalRecordCelebration({
         <UiText style={styles.celebrationTitle} variant="labelStrong">
           New PR
         </UiText>
-        <UiText accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.spark}>
-          ★
-        </UiText>
+        <Icon color={uiColors.actionSuccess} name="star" size="sm" />
       </View>
       {variant === 'expanded' ? (
         <UiText numberOfLines={2} variant="subtitle">
@@ -83,9 +81,6 @@ const styles = StyleSheet.create({
   },
   celebrationTitle: {
     color: uiColors.textSuccess,
-  },
-  spark: {
-    color: uiColors.actionSuccess,
   },
   fact: {
     color: uiColors.textAccentStrong,

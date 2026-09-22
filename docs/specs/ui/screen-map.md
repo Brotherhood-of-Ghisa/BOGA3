@@ -429,7 +429,7 @@ Brief entrypoint map of the current mobile screens.
 14d. `/group/[groupId]/leaderboards/[exerciseId]` (M25-T09)
 - File: `apps/mobile/app/group/[groupId]/leaderboards/[exerciseId]/index.tsx`
 - Purpose:
-  - a group exercise's full board (E1.2): `Weight | e1RM` and `Certified | All` toggles that switch in place, rows in rank order (rank, `You` / name, `(former)`, value, date; `✓` / `○ uncertified` on All only)
+  - a group exercise's full board (E1.2): `Weight | e1RM` and `Certified | All` toggles that switch in place, rows in rank order (rank, `You` / name, `(former)`, value, date; a check icon, or a ring icon and `uncertified`, on All only)
 - Key states (high level):
   - `Archived · read-only` under the name; empty Certified: "No certified sets yet" with `See all sets`; empty All: "No sets yet"
   - rows read online and paged (never cached): offline with nothing loaded shows the offline empty state, loaded rows stay with the offline marker, a failed next page shows `Retry`

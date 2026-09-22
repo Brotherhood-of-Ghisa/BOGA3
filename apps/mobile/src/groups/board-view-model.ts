@@ -107,8 +107,8 @@ export const formatBoardMemberLabel = (member: GroupMemberRef, former: boolean, 
 
 // ---- Board rows -------------------------------------------------------------------
 
-export const CERTIFIED_MARK = '✓';
-export const UNCERTIFIED_MARK = '○ uncertified';
+/** The word beside an uncertified row's ring; a certified row's check stands alone. */
+export const UNCERTIFIED_MARK_LABEL = 'uncertified';
 
 export type BoardRowViewModel = {
   /** The member id: one row per member per board. */
@@ -123,8 +123,8 @@ export type BoardRowViewModel = {
   /** e1RM only: the set behind the estimate, "140 kg × 1". */
   detailLabel: string | null;
   dateLabel: string;
-  /** On All only: ✓ or ○ uncertified. Null on Certified. */
-  certifiedMark: string | null;
+  /** On All only: the row draws a check, or a ring and "uncertified". Null on Certified. */
+  certification: 'certified' | 'uncertified' | null;
   accessibilityLabel: string;
 };
 
@@ -140,7 +140,7 @@ export const buildBoardRow = (
   const valueLabel = metric === 'e1rm' ? formatBoardKg(row.value_kg) : setLabel;
   const detailLabel = metric === 'e1rm' ? setLabel : null;
   const dateLabel = formatBoardDate(row.achieved_at_ms, nowMs);
-  const certifiedMark = scope === 'all' ? (row.certified ? CERTIFIED_MARK : UNCERTIFIED_MARK) : null;
+  const certification = scope === 'all' ? (row.certified ? 'certified' : 'uncertified') : null;
   const accessibilityLabel = [
     formatOrdinal(row.rank),
     memberLabel,
@@ -161,7 +161,7 @@ export const buildBoardRow = (
     valueLabel,
     detailLabel,
     dateLabel,
-    certifiedMark,
+    certification,
     accessibilityLabel,
   };
 };

@@ -288,9 +288,11 @@ describe('Full board (E1.2)', () => {
 
     expect(screen.getByTestId('group-board-row-1-value')).toHaveTextContent('145 kg');
     expect(screen.getByTestId('group-board-row-1-detail')).toHaveTextContent('135 kg × 2');
-    expect(screen.getByTestId('group-board-row-1-mark')).toHaveTextContent('○ uncertified');
+    expect(screen.getByTestId('group-board-row-1-mark')).toHaveTextContent('uncertified');
+    expect(screen.getByTestId('group-board-row-1-mark-uncertified', { includeHiddenElements: true })).toBeTruthy();
     expect(screen.getByTestId('group-board-row-2-member')).toHaveTextContent('You');
-    expect(screen.getByTestId('group-board-row-2-mark')).toHaveTextContent('✓');
+    expect(screen.getByTestId('group-board-row-2-mark')).toHaveTextContent('');
+    expect(screen.getByTestId('group-board-row-2-mark-certified', { includeHiddenElements: true })).toBeTruthy();
     expect(screen.getByTestId('group-board-row-3-member')).toHaveTextContent('Alex (former)');
   });
 

@@ -13,7 +13,7 @@ import {
   pickInlineError,
   usePullToRefresh,
 } from '@/components/groups';
-import { UiButton, UiText, uiColors, uiSpace } from '@/components/ui';
+import { Icon, UiButton, UiText, uiColors, uiSpace } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import {
   canManageGroup,
@@ -122,9 +122,7 @@ function GroupScreenContent({ userId, groupId }: { userId: string; groupId: stri
           <UiText testID="group-screen-meta" variant="subtitle">
             {memberLine}
           </UiText>
-          <UiText style={styles.chevron} variant="label">
-            ›
-          </UiText>
+          <Icon color={uiColors.textSecondary} name="chevron-right" />
         </Pressable>
         {canManageGroup(summary.my_role) ? (
           <View style={[groupScreenStyles.actionRow, { marginTop: uiSpace.sm }]}>
@@ -181,8 +179,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: uiSpace.xs,
     alignSelf: 'flex-start',
-  },
-  chevron: {
-    color: uiColors.textSecondary,
   },
 });

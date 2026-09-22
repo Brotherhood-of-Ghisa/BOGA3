@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 
 import { DailyHeatmap, WeeklyHeatmap, buildHeatmapData } from '@/components/heatmaps';
-import { SegmentedChips, uiColors, uiRadius, uiSpace, uiTypography } from '@/components/ui';
+import { Icon, SegmentedChips, uiColors, uiRadius, uiSpace, uiTypography } from '@/components/ui';
 import {
   computeSelectedExerciseDailyEffort,
   computeSelectedExerciseWeeklyEffort,
@@ -577,7 +577,7 @@ export function StatsScreenShell({
             onPress={() => onSearchQueryChange('')}
             style={styles.clearSearchButton}
             testID="stats-search-clear-button">
-            <Text style={styles.clearSearchButtonText}>×</Text>
+            <Icon color={uiColors.textSecondary} name="x" size="xs" />
           </Pressable>
         ) : null}
       </View>
@@ -1191,7 +1191,7 @@ function MuscleHistoryOverlay({
               pressed && styles.actionableRowPressed,
             ]}
             testID="stats-muscle-history-close">
-            <Text style={styles.overlayCloseButtonText}>X</Text>
+            <Icon color={uiColors.actionNeutralSubtleText} name="x" size="sm" />
           </Pressable>
         </View>
 
@@ -1387,26 +1387,8 @@ function ExerciseListView({
   );
 }
 
-const exerciseSortIndicator = (mode: ExerciseSortMode): string => {
-  switch (mode) {
-    case 'recency-desc':
-      return 'Recent ↓';
-    case 'recency-asc':
-      return 'Recent ↑';
-    case 'sets-desc':
-      return '↓';
-    case 'sets-asc':
-      return '↑';
-    case 'working-sets-desc':
-      return '↓';
-    case 'working-sets-asc':
-      return '↑';
-    case 'volume-desc':
-      return '↓';
-    case 'volume-asc':
-      return '↑';
-  }
-};
+const exerciseSortDirection = (mode: ExerciseSortMode): 'up' | 'down' =>
+  mode.endsWith('-asc') ? 'up' : 'down';
 
 const exerciseSortHeaderLabel = (header: ExerciseSortHeader): string => {
   switch (header) {
@@ -1436,7 +1418,9 @@ function ExerciseSortHeaderCell({
 }) {
   const isActive = EXERCISE_SORT_HEADER_BY_MODE[sortMode] === header;
   const nextMode = nextExerciseSortMode(sortMode, header);
-  const reservedIndicator = header === 'exercise' ? 'Recent ↓' : '↓';
+  // An inactive header still lays out a (transparent) indicator, so the
+  // column does not shift when it becomes the active sort.
+  const direction = isActive ? exerciseSortDirection(sortMode) : 'down';
   const accessibilityLabel = isActive
     ? `${exerciseSortHeaderLabel(header)}. Current sort: ${describeExerciseSortMode(
         sortMode
@@ -1462,18 +1446,26 @@ function ExerciseSortHeaderCell({
         style={[styles.exerciseHeaderLabel, numeric && styles.exerciseHeaderLabelNumeric]}>
         {label}
       </Text>
-      <Text
+      <View
         accessible={false}
         style={[
           styles.exerciseHeaderIndicator,
-          header === 'exercise'
-            ? styles.exerciseHeaderIndicatorRecency
-            : styles.exerciseHeaderIndicatorArrow,
+          header === 'exercise' && styles.exerciseHeaderIndicatorRecency,
           !isActive && styles.exerciseHeaderIndicatorHidden,
         ]}
         testID={`stats-exercise-sort-${header}-indicator`}>
-        {isActive ? exerciseSortIndicator(sortMode) : reservedIndicator}
-      </Text>
+        {header === 'exercise' ? (
+          <Text accessible={false} style={styles.exerciseHeaderIndicatorText}>
+            Recent
+          </Text>
+        ) : null}
+        <Icon
+          color={uiColors.actionPrimary}
+          name={direction === 'up' ? 'arrow-up' : 'arrow-down'}
+          size="xs"
+          testID={`stats-exercise-sort-${header}-indicator-${direction}`}
+        />
+      </View>
     </Pressable>
   );
 }
@@ -1539,7 +1531,7 @@ function ExerciseHistoryOverlay({
               pressed && styles.actionableRowPressed,
             ]}
             testID="stats-exercise-history-close">
-            <Text style={styles.overlayCloseButtonText}>X</Text>
+            <Icon color={uiColors.actionNeutralSubtleText} name="x" size="sm" />
           </Pressable>
         </View>
 
@@ -2014,16 +2006,17 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   exerciseHeaderIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: uiSpace.xs,
+  },
+  exerciseHeaderIndicatorRecency: {
+    width: 64,
+  },
+  exerciseHeaderIndicatorText: {
     fontSize: uiTypography.size.xs,
     fontWeight: '700',
     color: uiColors.actionPrimary,
-  },
-  exerciseHeaderIndicatorRecency: {
-    width: 48,
-  },
-  exerciseHeaderIndicatorArrow: {
-    width: 10,
-    textAlign: 'center',
   },
   exerciseHeaderIndicatorHidden: {
     opacity: 0,
@@ -2289,11 +2282,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  overlayCloseButtonText: {
-    fontSize: uiTypography.size.md,
-    fontWeight: '700',
-    color: uiColors.actionNeutralSubtleText,
-  },
   overlayMetricSelector: {
     paddingHorizontal: uiSpace.lg,
     paddingVertical: uiSpace.md,
@@ -2378,12 +2366,6 @@ const styles = StyleSheet.create({
     backgroundColor: uiColors.borderMuted,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  clearSearchButtonText: {
-    color: uiColors.textSecondary,
-    fontSize: uiTypography.size.base,
-    fontWeight: 'bold',
-    lineHeight: 16,
   },
   deltaNew: {
     color: uiColors.actionPrimary,

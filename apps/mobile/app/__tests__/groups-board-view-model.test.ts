@@ -1,7 +1,7 @@
 /**
  * M25-T09 board view model (card AC3, AC4, AC8; product E1.1–E1.3, P7): the
  * ordinal and date formats, route params, podium cards ("You: Nth", the empty
- * Certified label, archived), full-board rows (metric values, former, ✓ / ○ on
+ * Certified label, archived), full-board rows (metric values, former, certified / uncertified on
  * All only), and every history sentence.
  */
 
@@ -188,20 +188,20 @@ describe('podium cards (E1.1)', () => {
 describe('full board rows (E1.2)', () => {
   it('e1RM shows the estimate with the set behind it; Weight shows the set', () => {
     const e1rm = buildBoardRow(row(1, 'u1', 'Dave'), 'e1rm', 'certified', ME, NOW);
-    expect([e1rm.valueLabel, e1rm.detailLabel, e1rm.certifiedMark]).toEqual(['142.5 kg', '140 kg × 1', null]);
+    expect([e1rm.valueLabel, e1rm.detailLabel, e1rm.certification]).toEqual(['142.5 kg', '140 kg × 1', null]);
 
     const weight = buildBoardRow(row(1, 'u1', 'Dave', { value_kg: 51.25, weight_kg: 51.25, reps: 5 }), 'weight', 'certified', ME, NOW);
     expect([weight.valueLabel, weight.detailLabel]).toEqual(['51.25 kg × 5', null]);
   });
 
-  it('marks former members, my row, and ✓ / ○ on All only', () => {
+  it('marks former members, my row, and certified / uncertified on All only', () => {
     const former = buildBoardRow(row(4, 'u4', 'Alex', { former: true, certified: true }), 'weight', 'all', ME, NOW);
     expect(former.memberLabel).toBe('Alex (former)');
-    expect(former.certifiedMark).toBe('✓');
+    expect(former.certification).toBe('certified');
     expect(former.accessibilityLabel).toBe('4th, Alex (former), 140 kg × 1, 12 Sep, certified');
 
     const mine = buildBoardRow(row(3, ME, 'dino'), 'e1rm', 'all', ME, NOW);
-    expect([mine.memberLabel, mine.isMe, mine.certifiedMark]).toEqual(['You', true, '○ uncertified']);
+    expect([mine.memberLabel, mine.isMe, mine.certification]).toEqual(['You', true, 'uncertified']);
     expect(mine.accessibilityLabel).toBe('3rd, You, 142.5 kg e1RM, 140 kg × 1, 12 Sep, uncertified');
   });
 });

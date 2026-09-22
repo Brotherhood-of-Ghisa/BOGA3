@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { UiText, uiColors, uiRadius, uiSpace } from '@/components/ui';
+import { Icon, UiText, uiColors, uiRadius, uiSpace } from '@/components/ui';
 import { GROUP_ROLE_LABELS, formatMemberName, type GroupMember } from '@/src/groups';
 
 type GroupMemberRowProps = {
@@ -24,9 +24,7 @@ export function GroupMemberRow({ member, isMe, onPress }: GroupMemberRowProps) {
         </UiText>
       </View>
       {onPress ? (
-        <UiText style={styles.chevron} variant="label">
-          ›
-        </UiText>
+        <Icon color={uiColors.textSecondary} name="chevron-right" />
       ) : null}
     </>
   );
@@ -63,9 +61,6 @@ const styles = StyleSheet.create({
   name: {
     flex: 1,
     minWidth: 0,
-  },
-  chevron: {
-    color: uiColors.textSecondary,
   },
   badge: {
     borderRadius: uiRadius.full,
