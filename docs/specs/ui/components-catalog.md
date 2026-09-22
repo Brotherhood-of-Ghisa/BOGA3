@@ -42,9 +42,11 @@ Brief entrypoint inventory of the current reusable UI component set.
   - carries the collapsed scales the UI guardrail enforces (8 type sizes with a
     matching `lineHeight` per size, 6 spacing steps, 3 radii) plus `uiElevation`
     (`flat` / `raised` / `overlay`); values and rationale: `docs/specs/ui/ux-rules.md` §9a
-  - also carries the design-language vocabularies, not yet adopted: `uiRoles`
-    (colour roles) and `uiFonts` (the three embedded typefaces and their
-    shipped weights); rationale: `docs/specs/ui/design-language.md` §2–§3
+  - also carries the design-language vocabularies, not yet adopted by a shipped
+    screen: `uiRoles` (colour roles), `uiFonts` (the three embedded typefaces
+    and their shipped weights) and `uiGeometry` (card / sheet radii, the 44pt
+    tap target, the 38pt metric column, the sheet handle, micro-label
+    tracking); rationale: `docs/specs/ui/design-language.md` §2–§4
 
 2. `UiText`
 - File: `apps/mobile/components/ui/text.tsx`
@@ -71,7 +73,32 @@ Brief entrypoint inventory of the current reusable UI component set.
   - exposes an opt-in joined, equal-width variant used by the Stats / History
     `Breakdown` control so both choices remain visibly grouped and accessible
 
-6. `ui` barrel exports
+6. Design-language primitives: `Card`, `Stat`, `ListRow`, `Sheet`
+- Files: `apps/mobile/components/ui/card.tsx`, `stat.tsx`, `list-row.tsx`, `sheet.tsx`
+- Purpose:
+  - the building blocks of the exercise page and session view, drawn from
+    `uiRoles` / `uiFonts` / `uiGeometry` only (`docs/specs/ui/design-language.md`);
+    no shipped screen adopts them yet
+  - `Card` — `surface` on `paper`, 1px `rule`, card radius, no shadow, no
+    padding (content owns its insets); with `onPress` the whole card is one
+    labelled `link` target
+  - `Stat` — a micro-label legend with a monospaced value; `stacked` (label
+    above value: summary card, records panel) or `inline` (legend left of the
+    fixed-width right-aligned metric column: the set row, `rank` primary 1RM /
+    secondary VOL); `state="planned"` fades it, `emphasis` `best` (bold `ink`)
+    or `record` (bold `record`); `kind="text"` for a non-figure value
+  - `ListRow` — `[leading][label or children][meta][trailing]`, the trailing
+    control always in a fixed tap-target-wide column so controls share one
+    vertical axis; `density` `sheet` (option rows) or `list` (dense rows in a
+    card, e.g. the set row); `selected` (`accent-wash`), `tone="danger"`,
+    `divider`; pressable as one row only when given `onPress`. The trailing
+    control is a slot, so the row carries no icon dependency
+  - `Sheet` — bottom-anchored panel over a `scrim` backdrop, sheet radius,
+    38×4 handle, optional title; the backdrop tap, Android back and the
+    VoiceOver escape gesture dismiss it — there is no Cancel button
+  - covered by `apps/mobile/app/__tests__/ui-design-primitives.test.tsx`
+
+7. `ui` barrel exports
 - File: `apps/mobile/components/ui/index.ts`
 - Purpose:
   - single import entrypoint for current tokens and UI primitives

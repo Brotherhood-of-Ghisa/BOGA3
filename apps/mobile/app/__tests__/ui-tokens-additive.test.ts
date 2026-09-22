@@ -3,6 +3,7 @@ import {
   uiColors,
   uiElevation,
   uiFonts,
+  uiGeometry,
   uiRadius,
   uiRoles,
   uiSpace,
@@ -175,10 +176,30 @@ describe('design tokens stay additive during the exercise/session rebuild', () =
         'ruleFaint',
         'ruleSoft',
         'ruleStrong',
+        'scrim',
         'surface',
         'surfaceSubtle',
       ].sort(),
     );
+  });
+
+  it('carries the design-language geometry of §4 as its own vocabulary', () => {
+    // Added 2026-09-22 (step 3) beside `uiRadius` / `uiSpace` rather than into
+    // them, so the legacy scales above stay byte-identical and can be retired
+    // wholesale at switch-over.
+    expect(uiGeometry).toEqual({
+      radius: { card: 6, sheet: 16 },
+      tapTarget: 44,
+      metricValueWidth: 38,
+      sheetHandle: { width: 38, height: 4 },
+      microLabelTracking: 0.1,
+    });
+  });
+
+  it('dims a sheet backdrop with ink, not a neutral black', () => {
+    expect(uiRoles.scrim).toBe('rgba(21, 24, 29, 0.42)');
+    // `ink` (#15181D) is rgb(21, 24, 29).
+    expect(uiRoles.ink).toBe('#15181D');
   });
 
   it('carries exactly the typefaces and weights named in design-language.md §3', () => {

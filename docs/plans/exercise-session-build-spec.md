@@ -14,7 +14,8 @@ screens being built; the screen-agnostic rules it obeys live in
 
 Reference viewport 390×844. Page gutter 14. Card radius 6, sheet top radius 16,
 sheet handle 38×4. Control column 44 wide. Metric value columns are fixed width
-(38 for 1RM, 38 for volume) so figures align down the list.
+(38 for 1RM, 38 for volume) so figures align down the list. All of these are in
+`uiGeometry` (step 3); the gutter is a screen's choice from `uiSpace`.
 
 ## The type scale — revised, step 1 (shipped)
 
@@ -34,9 +35,11 @@ to brass `#8A6516`**, with `record-wash` / `record-rule` at `#FBF3E2` /
 `docs/specs/ui/design-language.md` §2–§3; the scale is also in `ux-rules.md`
 §9a. Use the roles from `uiRoles`, never the hexes.
 
-**Still owed by whoever builds the set row:** the mini legends (`1RM` / `VOL`)
-were drawn at 8px inside a 38px metric column. At 10px that block grows — do the
-width re-check on device before the column width is treated as settled.
+**Resolved in step 3 (2026-09-22):** the mini legends (`1RM` / `VOL`) were
+drawn at 8px inside a 38px metric column; at 10px the block grows. Measured on
+device, 38 holds — a 1RM up to `999.9` is 36pt, a five-digit volume 33pt, and
+only an unrealistic four-digit 1RM overflows. The legends are 24–25pt, so the
+block is ~67pt. Figures in `design-language.md` §3.
 
 This spec originally said to do that check *before* committing the rung. Step 1
 committed the rung first, deliberately: the check needs the three typefaces from
@@ -55,7 +58,9 @@ The unit of the whole feature:
 
 - Every row — performed, current, planned — ends in a 44px control column, so
   every control sits on one vertical axis.
-- Metric pairs put a mini legend left of a right-aligned fixed-width value.
+- Metric pairs put a mini legend left of a right-aligned fixed-width value —
+  `ListRow` (`density="list"`) with two inline `Stat`s in `meta` and the glyph
+  in `trailing`.
 - Glyph carries state (language §5): filled check = performed
   (`performanceStatus === null`), `accent` ring = current, dashed ring = planned.
 - Bold `ink` marks the best 1RM / weight / volume *of that exercise today* —

@@ -72,8 +72,10 @@ export const uiRoles = {
   // Text and realised values.
   ink: '#15181D',
   inkMuted: '#6B6358',
+  // Mini legends, tertiary labels, and not-yet-realised values.
   inkFaint: '#9B948A',
-  // Not-yet-realised values (a planned set's projected 1RM / volume).
+  // The legends of not-yet-realised values; the values themselves use
+  // `inkFaint` (`design-language.md` §6).
   planned: '#B3ABA0',
   // Absent values and the faintest labels.
   disabled: '#C4BDB0',
@@ -97,6 +99,33 @@ export const uiRoles = {
   recordRule: '#EEDFBE',
   // Destructive actions only.
   danger: '#A4262C',
+  // The dimmed backdrop behind a sheet: `ink` at 42%, so the page behind reads
+  // as the same warm ground gone dark rather than as a neutral grey.
+  scrim: 'rgba(21, 24, 29, 0.42)',
+} as const;
+
+// The design-language geometry (`docs/specs/ui/design-language.md` §4): the
+// radii, fixed widths and label tracking the accepted target is drawn with
+// that the legacy scales do not carry. Kept apart from `uiRadius` / `uiSpace`
+// for the same reason `uiRoles` is kept apart from `uiColors` — the switch-over
+// step can then retire the legacy scales wholesale. Decided 2026-09-22.
+export const uiGeometry = {
+  radius: {
+    // Cards: `surface` on `paper`, 1px `rule`.
+    card: 6,
+    // A sheet's two top corners.
+    sheet: 16,
+  },
+  // The minimum tap target, and the width of the set row's type and control
+  // columns — every control in a list sits on this one vertical axis.
+  tapTarget: 44,
+  // A metric's fixed-width value column (`1RM` / `VOL`), so figures align down
+  // a list.
+  metricValueWidth: 38,
+  sheetHandle: { width: 38, height: 4 },
+  // Micro-label letter-spacing as a fraction of the font size (em); React
+  // Native takes points, so apply it as `size * microLabelTracking`.
+  microLabelTracking: 0.1,
 } as const;
 
 // Six steps. The previous scale interleaved 2/10/14/20 with the 4/8/12/16
@@ -207,6 +236,7 @@ export const uiTokens = {
   colors: uiColors,
   roles: uiRoles,
   fonts: uiFonts,
+  geometry: uiGeometry,
   space: uiSpace,
   radius: uiRadius,
   typography: uiTypography,

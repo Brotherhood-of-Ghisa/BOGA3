@@ -33,8 +33,8 @@ Semantic roles, not a palette. A screen names the role, never the hex.
 | --- | --- | --- |
 | `ink` | `#15181D` | primary text, chrome, realised values |
 | `ink-muted` | `#6B6358` | secondary text |
-| `ink-faint` | `#9B948A` | mini legends, tertiary labels |
-| `planned` | `#B3ABA0` | not-yet-realised values |
+| `ink-faint` | `#9B948A` | mini legends, tertiary labels, not-yet-realised values |
+| `planned` | `#B3ABA0` | legends of not-yet-realised values |
 | `disabled` | `#C4BDB0` | absent values, faintest labels |
 | `paper` | `#F6F4EF` | page ground |
 | `surface` | `#FFFFFF` | cards, sheets, inputs |
@@ -48,6 +48,7 @@ Semantic roles, not a palette. A screen names the role, never the hex.
 | `record` | `#8A6516` | an all-time best value |
 | `record-wash` / `record-rule` | `#FBF3E2` / `#EEDFBE` | a band announcing a record |
 | `danger` | `#A4262C` | destructive actions only |
+| `scrim` | `rgba(21, 24, 29, 0.42)` | the dimmed backdrop behind a sheet (`ink` at 42%) |
 
 **`accent` vs `record`, decided 2026-09-22:** the two shared `#C2410C`, so "your
 best ever" and "the button that commits" read identically. **`record` moved** —
@@ -112,20 +113,41 @@ Eight rungs: `10 · 11 · 12 · 13 · 14 · 16 · 18 · 24`. The guardrail budge
 `apps/mobile/scripts/ui-guardrails.config.js` stay at 0 — raising one is never
 the fix for a screen the scale cannot express; changing the scale is.
 
-**Still owed on device:** the mini legends (`1RM` / `VOL`) were drawn at 8px
-inside a 38px metric column. At 10px that block grows, so the set row needs a
-width re-check when it is built (build spec, step 3/4) — the rung is committed,
-the column width is not.
+**The 38pt metric column holds, measured on device 2026-09-22** (iOS
+simulator, 390pt): a 1RM up to `999.9` is 36pt in Plex Mono 500 at 12, and a
+five-digit volume (`10240`) is 33pt at 11. Only a four-digit 1RM overflows
+(`1021.5`, 43pt), which no lifter produces. The 10px legends are 25pt (`1RM`)
+and 24pt (`VOL`), so the metric block is ~67pt and the weight × reps column
+still fits `160.0 × 64` at 390pt.
+
+**Weight, decided 2026-09-22 on device:** the target's weights read too heavy
+on iOS, so realised figures and option labels sit one embedded weight lighter
+than drawn, keeping sizes on the scale. Running figures (weight × reps, the
+inline 1RM, VOL) are Plex Mono **500**; `best` is **700**, which now stands out
+from them. Sheet option labels are Archivo **600**, the selected one **700**.
+Headline figures (summary, records) stay Plex Mono 700, micro-labels Archivo
+700, sheet titles Archivo 800.
 
 ## 4. Surfaces
 
 - **No shadows.** Depth is a hairline plus a ground-colour change, never an
   elevation ramp. `uiElevation` stays unused unless a screen proves it needs it.
 - Cards are `surface` on `paper`, 1px `rule`, radius 6.
-- Sheets are bottom-anchored with a dimmed backdrop. **Tapping outside
-  dismisses; sheets carry no Cancel button.**
+- Sheets are bottom-anchored with a dimmed backdrop (`scrim`), top radius 16
+  and a 38×4 `rule-strong` handle. **Tapping outside dismisses; sheets carry no
+  Cancel button.**
 - Tap targets ≥44. The iOS status bar and the tab tray are never redrawn in
   content.
+- **Geometry lives in `uiGeometry`** (`apps/mobile/components/ui/tokens.ts`,
+  added 2026-09-22): the card and sheet radii, the 44pt tap target, the 38pt
+  metric column, the sheet handle, and micro-label tracking (0.1em, one value
+  for the target's 0.06–0.12 range). It sits beside the legacy `uiRadius` /
+  `uiSpace` rather than in them — 6 beside 8 would be two radii with no nameable
+  difference (`ux-rules.md` §9a.5) — so the switch-over can retire the legacy
+  scales wholesale. Spacing the target draws off-scale snaps to `uiSpace`
+  (sheet gutters 20→16, sheet rows ≥60, list rows ≥44).
+- The primitives implementing this are `Card`, `Stat`, `ListRow` and `Sheet`
+  (`components-catalog.md`).
 
 ## 5. Emphasis
 
@@ -138,7 +160,7 @@ band on the containing card.
 
 **State is carried by a control glyph**, not by a word: a filled check means
 done, an `accent` ring means current, a dashed ring means planned. Planned items
-additionally use `planned` text.
+additionally render faded (§6).
 
 ## 6. Presenting data
 
@@ -147,8 +169,9 @@ additionally use `planned` text.
 - **No thousands separators.** `2560`, not `2 560`.
 - **No unit suffix inside an input.** The unit belongs in the field label.
 - **Show a figure wherever it can be computed**, including for values that are
-  not yet realised — a planned set shows its projected 1RM and volume in
-  `planned`.
+  not yet realised — a planned set shows its projected 1RM and volume faded:
+  values in `ink-faint`, legends in `planned` (decided on device 2026-09-22;
+  `planned` for the values themselves read too faint to use).
 - **Warm-ups are presented exactly like working sets**, including a real 1RM.
   They remain excluded from records and working-set statistics by
   `isWorkingSetType` (`src/session-insights/calculations.ts`). This divergence
