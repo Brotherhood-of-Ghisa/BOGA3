@@ -136,6 +136,10 @@ worktree_config_port() {
 container_publishes_host_port() {
   local container="$1" want_port="$2"
 
+  # An empty port must never match: the real --format output contains empty
+  # tokens for unpublished ports, and `grep -Fxq ""` would match one.
+  [[ -n "${want_port}" ]] || return 1
+
   docker inspect "${container}" \
     --format '{{range $p, $conf := .NetworkSettings.Ports}}{{range $conf}}{{.HostPort}} {{end}}{{end}}' \
     2>/dev/null | tr ' ' '\n' | grep -Fxq "${want_port}"
@@ -143,9 +147,11 @@ container_publishes_host_port() {
 
 # resolve_worktree_container <service> <project_id> <expected_host_port>
 #
-# Echoes the container name for this worktree's <service> and returns 0, or
-# returns 1. <expected_host_port> is this worktree's slot-allocated port for
-# that service, from config.toml.
+# Echoes the container name for this worktree's <service> and returns 0.
+# Returns 1 when no candidate is running at all, and 2 when a candidate matched
+# by name but was REFUSED because it is not this slot's — the two need different
+# advice, so callers must not collapse them. <expected_host_port> is this
+# worktree's slot-allocated port for that service, from config.toml.
 resolve_worktree_container() {
   local service="$1" project_id="$2" expected_port="$3"
   local exact truncated
@@ -169,6 +175,7 @@ resolve_worktree_container() {
     echo "[resolve_worktree_container] that means it is another worktree's stack, or" \
          "this worktree's stack is not fully up. Either way, binding it would run" \
          "against the wrong database. Check \`./boga worktree doctor\`." >&2
+    return 2
   fi
 
   return 1
@@ -200,8 +207,17 @@ resolve_db_container() {
     return 1
   fi
 
-  local container
-  if ! container="$(resolve_worktree_container db "${project_id}" "$(worktree_config_port db)")"; then
+  local container rc=0
+  container="$(resolve_worktree_container db "${project_id}" "$(worktree_config_port db)")" || rc=$?
+
+  # Refused (2): a container matched by name but is not this slot's. It already
+  # said so, and telling the operator to "start the stack" would be wrong —
+  # a stack IS up, it just isn't theirs. The fix is a shorter worktree name.
+  if (( rc == 2 )); then
+    return 1
+  fi
+
+  if (( rc != 0 )); then
     echo "[resolve_db_container] no running container named 'supabase_db_${project_id}'" \
          "for this worktree (project_id='${project_id}')." >&2
     echo "[resolve_db_container] running supabase db containers:" >&2

@@ -25,16 +25,48 @@ mkdir -p "${STUB_BIN}"
 export STUB_WORK="${TMP}"
 export PATH="${STUB_BIN}:${PATH}"
 
-# docker stub: $STUB_WORK/containers holds "<name> <hostport>" lines.
-#   docker ps --format '{{.Names}}'  -> the names
-#   docker inspect <name> --format ... -> that name's host port
+# docker stub: $STUB_WORK/containers holds "<name> <hostport>[,<hostport>...]".
+#
+#   docker ps --format '{{.Names}}'          -> the names
+#   docker inspect <name> --format <tmpl>    -> renders <tmpl> over a fake
+#                                               .NetworkSettings.Ports map
+#
+# `inspect` renders the template rather than printing a canned port, because the
+# thing most likely to break `container_publishes_host_port` is its Go template,
+# and a stub that ignores --format would stay green while production refused
+# every container. Ports are emitted the way the real daemon does: one token per
+# published binding, plus an empty token for each unpublished container port
+# (which is what makes the empty-want_port guard necessary).
 cat >"${STUB_BIN}/docker" <<'EOF'
 #!/usr/bin/env bash
+ports_of() { awk -v n="$1" '$1 == n { print $2 }' "$STUB_WORK/containers" 2>/dev/null; }
 case "$1" in
   ps) awk '{print $1}' "$STUB_WORK/containers" 2>/dev/null ;;
   inspect)
     name="$2"
-    awk -v n="$name" '$1 == n { print $2 }' "$STUB_WORK/containers" 2>/dev/null
+    tmpl=""
+    shift 2
+    while [[ $# -gt 0 ]]; do
+      [[ "$1" == "--format" ]] && tmpl="$2"
+      shift
+    done
+    raw="$(ports_of "$name")"
+    [[ -z "$raw" ]] && exit 1
+    # Only the host-port template is understood; anything else is a template the
+    # code under test changed to, and the stub must not silently satisfy it.
+    if [[ "$tmpl" != *".HostPort"* ]]; then
+      echo "stub docker: unsupported inspect --format: $tmpl" >&2
+      exit 1
+    fi
+    out=""
+    IFS=',' read -r -a bindings <<< "$raw"
+    for b in "${bindings[@]}"; do
+      # "-" marks an exposed-but-unpublished port: the real daemon renders it as
+      # an empty token.
+      [[ "$b" == "-" ]] && { out+=" "; continue; }
+      out+="$b "
+    done
+    printf '%s' "$out"
     ;;
 esac
 exit 0
@@ -117,4 +149,33 @@ set_containers "supabase_kong_${SHORT} 55131"
 expect_refuses "wrong service does not match" db "${SHORT}" "55122"
 expect_resolves "right service matches" kong "${SHORT}" "55131" "supabase_kong_${SHORT}"
 
-echo "[supabase-container-resolver.test] 10 assertions passed"
+# 10. Real containers publish several ports and expose others unpublished —
+#     Kong publishes 8000 and leaves 8001/8443/8444 unbound. The wanted port
+#     must be found among them, and the empty tokens must not match anything.
+set_containers "supabase_kong_${LONG_TRUNC} 55731,-,-,-"
+expect_resolves "finds the port among several bindings" kong "${LONG}" "55731" "supabase_kong_${LONG_TRUNC}"
+expect_refuses "an unpublished (empty) binding does not match" kong "${LONG}" ""
+
+# 11. A host port must match whole, not as a substring of a longer one.
+set_containers "supabase_db_${LONG_TRUNC} 55722"
+expect_refuses "5572 does not match 55722" db "${LONG}" "5572"
+
+# 12. container_publishes_host_port directly. The resolver guards the empty case
+#     before calling it, so these assertions are the only thing holding the
+#     function safe for a future second caller.
+set_containers "supabase_db_${LONG_TRUNC} 55722,-"
+container_publishes_host_port "supabase_db_${LONG_TRUNC}" "55722" \
+  || fail "container_publishes_host_port: expected a match for a published port"
+echo "  ok: publishes_host_port matches a published port"
+
+if container_publishes_host_port "supabase_db_${LONG_TRUNC}" ""; then
+  fail "container_publishes_host_port: an empty port must never match, but did"
+fi
+echo "  ok: publishes_host_port rejects an empty port"
+
+if container_publishes_host_port "supabase_db_does-not-exist" "55722"; then
+  fail "container_publishes_host_port: a missing container must not match"
+fi
+echo "  ok: publishes_host_port rejects a missing container"
+
+echo "[supabase-container-resolver.test] 16 assertions passed"
