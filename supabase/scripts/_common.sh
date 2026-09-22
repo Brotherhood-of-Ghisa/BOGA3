@@ -93,14 +93,40 @@ worktree_project_id() {
   awk -F'"' '/^project_id[[:space:]]*=/ {print $2; exit}' "${config_file}" || true
 }
 
+# Read a [section] port from this worktree's config.toml (e.g. `db`, `api`).
+# Echoes the port, or an empty string when config.toml or the key is absent.
+worktree_config_port() {
+  local section="$1"
+  local config_file="${SUPABASE_DIR}/config.toml"
+  [[ -n "${BOGA_SUPABASE_WORKDIR:-}" ]] && config_file="${BOGA_SUPABASE_WORKDIR}/supabase/config.toml"
+  [[ -f "${config_file}" ]] || return 0
+  awk -v section="[${section}]" '
+    $0 == section { in_section = 1; next }
+    /^\[/ { in_section = 0 }
+    in_section && $1 == "port" {
+      value = $0
+      sub(/^[^=]+=[[:space:]]*/, "", value)
+      gsub(/[" ]/, "", value)
+      print value
+      exit
+    }
+  ' "${config_file}" || true
+}
+
+# Container resolution lives in _containers.sh so it can be unit-tested without
+# a slot lease (the meta-tests lane is infra-free and runs in CI).
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/_containers.sh"
+
 # Resolve the Postgres container for THIS worktree's Supabase stack.
 #
 # This host runs multiple worktree Supabase stacks at once, so a name match
 # MUST be scoped to this worktree's project_id. An unscoped
 # `grep '^supabase_db_' | head -n1` can select a FOREIGN worktree's database,
 # producing fixture-owner UUID mismatches and spurious FK errors. We therefore
-# match strictly on `supabase_db_${project_id}` and ERROR (no fallback) if that
-# exact container is not running.
+# resolve strictly through `resolve_worktree_container` — this worktree's
+# project_id, or the one truncation Docker itself applies to it — and ERROR (no
+# fallback) if no such container is running.
 #
 # On success: echoes the container name and returns 0.
 # On failure: prints a clear diagnostic to stderr and returns 1.
@@ -118,17 +144,21 @@ resolve_db_container() {
     return 1
   fi
 
-  local container
-  # Exact, anchored match on this worktree's project_id. The container name is
-  # `supabase_db_<project_id>`; project_id is unique per worktree, so this never
-  # matches a foreign stack. No unscoped head -n1 fallback.
-  container="$(docker ps --format '{{.Names}}' 2>/dev/null \
-    | grep -F "supabase_db_${project_id}" \
-    | head -n1 || true)"
+  local container rc=0
+  container="$(resolve_worktree_container db "${project_id}" "$(worktree_config_port db)")" || rc=$?
 
-  if [[ -z "${container}" ]]; then
+  # Refused (2): a container matched by name but is not this slot's. It already
+  # said so, and telling the operator to "start the stack" would be wrong —
+  # a stack IS up, it just isn't theirs. The fix is a shorter worktree name.
+  if (( rc == 2 )); then
+    return 1
+  fi
+
+  if (( rc != 0 )); then
     echo "[resolve_db_container] no running container named 'supabase_db_${project_id}'" \
          "for this worktree (project_id='${project_id}')." >&2
+    echo "[resolve_db_container] running supabase db containers:" >&2
+    docker ps --format '{{.Names}}' 2>/dev/null | grep '^supabase_db_' >&2 || echo "[resolve_db_container]   (none)" >&2
     echo "[resolve_db_container] this worktree's local Supabase stack is not up." \
          "Start it with ./supabase/scripts/ensure-local-runtime-baseline.sh" \
          "(or local-runtime-up.sh). NOT falling back to a foreign stack." >&2

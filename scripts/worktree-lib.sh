@@ -343,6 +343,15 @@ boga_pr_states() {
 BOGA_SUPABASE_CLI_DEFAULT_VERSION="2.109.1"
 BOGA_SUPABASE_CLI_MIN_VERSION="2.108.0"
 
+# The CLI caps `project_id` at this length and silently rewrites a longer one
+# ("project_id field in config is invalid. Auto-fixing to ..."), so the running
+# containers are named for a prefix of what config.toml says — losing the
+# trailing slot number that makes a worktree's stack unique. Observed on 2.109.1.
+# This is the CLI's own rule, not Docker Compose's: Compose accepts both longer
+# and uppercase project names, and these container names are uppercase. Revisit
+# when BOGA_SUPABASE_CLI_DEFAULT_VERSION moves.
+SUPABASE_CLI_PROJECT_ID_LIMIT=40
+
 boga_supabase_cli_version() {
   local repo_root="$1"
   local env_file="$repo_root/supabase/.env.local"

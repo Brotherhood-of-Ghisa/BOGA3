@@ -63,15 +63,15 @@ the pending list in `components-catalog.md` waits for a third screen to ask.
 Each step is one PR. Gates per `docs/specs/02-quality-and-test-gates.md`; get
 the requirement from `./boga test for`.
 
-| # | Step | Notes |
-| --- | --- | --- |
-| 1 | Tokens | Add the colour roles **additively**; **revise the type scale** and **resolve the `accent`/`record` collision** (both in the build spec); record the decisions in `design-language.md`. No existing token repointed. |
-| 2 | Fonts + SVG | Add `expo-font` + Archivo / Source Sans 3 / IBM Plex Mono, and `react-native-svg`. Native-affecting: `./boga ios build-client --force` **then** `boga test frontend`. Land early — every later step is blocked behind the rebuild. |
-| 3 | Primitives | `ListRow`, `Stat`, `Sheet`, `Card` only — anatomy in the build spec. New components; nothing existing adopts them yet. Update `components-catalog.md`. |
-| 4 | Exercise page | New route behind the setting (added in this step, defaulting off). Reuses `src/session-recorder/**`. Its own Maestro lane, which enables the setting first. |
-| 5 | Session view | New route behind the same setting. Its own Maestro lane. |
-| 6 | Switch over | Flip the setting's default on, then in a follow-up delete the old recorder route, its lanes and the setting itself. Two small reverts rather than one big one. Update `screen-map.md` + `navigation-contract.md`. |
-| 7 | Close out | Delete this plan and the build spec; confirm every durable decision has graduated to `docs/specs/**`. |
+| # | Step | Status | Notes |
+| --- | --- | --- | --- |
+| 1 | Tokens | ✅ shipped | Added `uiRoles` **additively** (`uiColors` untouched); added one type rung `xxs` 10; resolved the `accent`/`record` collision by moving `record` to brass `#8A6516`. Decisions in `design-language.md` §2–§3, scale in `ux-rules.md` §9a. No existing token repointed — held by `app/__tests__/ui-tokens-additive.test.ts`. |
+| 2 | Fonts + SVG | ⬜ ready | Add `expo-font` + Archivo / Source Sans 3 / IBM Plex Mono, and `react-native-svg`. Native-affecting: `./boga ios build-client --force` **then** `boga test frontend`. Land early — every later step is blocked behind the rebuild. |
+| 3 | Primitives | ⬜ blocked by 2 | `ListRow`, `Stat`, `Sheet`, `Card` only — anatomy in the build spec. New components; nothing existing adopts them yet. Update `components-catalog.md`. |
+| 4 | Exercise page | ⬜ blocked by 3 | New route behind the setting (added in this step, defaulting off). Reuses `src/session-recorder/**`. Its own Maestro lane, which enables the setting first. |
+| 5 | Session view | ⬜ blocked by 3 | New route behind the same setting. Its own Maestro lane. |
+| 6 | Switch over | ⬜ blocked by 4, 5 | Flip the setting's default on, then in a follow-up delete the old recorder route, its lanes and the setting itself. Two small reverts rather than one big one. Update `screen-map.md` + `navigation-contract.md`. |
+| 7 | Close out | ⬜ blocked by 6 | Delete this plan and the build spec; confirm every durable decision has graduated to `docs/specs/**`. Includes deleting `ui-tokens-additive.test.ts`, which exists only for the parallel period. |
 
 ## Decisions already made
 
@@ -87,10 +87,10 @@ the requirement from `./boga test for`.
 
 ## Open questions
 
-- **`accent` vs `record`** — same hex today. Blocks step 1.
-- **Type scale** — the target uses 12 sizes against the scale's 7, and
-  `rawFontSize` is enforced at budget 0. Blocks step 1; options in the build
-  spec.
+Resolved in step 1 (2026-09-22), kept here only until this plan is deleted:
+`accent` vs `record` — `record` moved to brass `#8A6516`. Type scale — one rung
+added (`xxs` 10), nothing else moved. Both recorded in `design-language.md`.
+
 - **Complete with pending planned sets** — do they become `unperformed`, stay
   `planned`, or block? The model supports all three
   (`src/session-recorder/set-semantics.ts`). Needed by step 4.

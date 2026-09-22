@@ -45,14 +45,22 @@ Semantic roles, not a palette. A screen names the role, never the hex.
 | `rule-strong` | `#DDD6C8` | control borders, sheet handle |
 | `accent` | `#C2410C` | the one primary action on a screen |
 | `accent-wash` | `#FDF6EE` | the row or field being edited |
-| `record` | `#C2410C` | an all-time best value |
-| `record-wash` / `record-rule` | `#FDF0E6` / `#F6E2D2` | a band announcing a record |
+| `record` | `#8A6516` | an all-time best value |
+| `record-wash` / `record-rule` | `#FBF3E2` / `#EEDFBE` | a band announcing a record |
 | `danger` | `#A4262C` | destructive actions only |
 
-**Unresolved:** `accent` and `record` are the same hex, so "your best ever" and
-"the button that commits" read identically. Either `record` moves, or the
-collision is accepted in writing with a reason. Decide before the tokens PR; do
-not let the build settle it by accident.
+**`accent` vs `record`, decided 2026-09-22:** the two shared `#C2410C`, so "your
+best ever" and "the button that commits" read identically. **`record` moved** —
+`accent` appears on every screen and `record` on few, so moving the rarer role
+is the smaller change. Brass `#8A6516` sits at hue 41° against `accent`'s 17°:
+far enough to read as a different mark, still inside the warm family the ground
+is built from. It clears WCAG AA as text on both grounds it lands on —
+**4.83:1 on `paper`, 5.31:1 on `surface`** — because `record` marks figures, not
+just a band. `record-wash` / `record-rule` moved with it, keeping the same hue
+relationship to `record` that the orange pair had to `accent`.
+
+The floor is a gate, not a note: `apps/mobile/app/__tests__/ui-tokens-additive.test.ts`
+fails if `record` ever equals `accent` again or drops below 4.5:1.
 
 **Light only.** No dark variants; `app.config.ts` pins
 `userInterfaceStyle: "light"`. See `ux-rules.md` §9a.
@@ -66,10 +74,34 @@ not let the build settle it by accident.
 | IBM Plex Mono | 500/600/700 | **every number** |
 
 Figures are monospaced so digits align down a column — any list of measurements
-depends on it. Micro-labels are Archivo 700, 8–10px, `letter-spacing`
-0.06–0.12em, and carry units and legends.
+depends on it. Micro-labels are Archivo 700 at **10px** (`uiTypography.size.xxs`),
+`letter-spacing` 0.06–0.12em, and carry units and legends.
 
 None of these are installed: the app is system-font only today.
+
+**The type scale, decided 2026-09-22.** The accepted target was drawn across
+thirteen sizes (`8 · 9 · 10 · 11 · 12 · 13 · 14 · 15 · 16 · 17 · 18 · 19 · 23`)
+against a shipped scale of seven, and `rawFontSize` is enforced at budget 0 — so
+the target could not be built as drawn. Resolved as a scale revision rather than
+a pile of exceptions: **one rung added (`xxs` 10), nothing else moved.** The
+target's other sizes snap onto rungs that already exist — `15→16`, `17→18`,
+`19→18`, `23→24` — and the `8`/`9` micro-labels lift to `10`, which was the
+right call independently: 8px body-adjacent text was poor for accessibility.
+
+These are the *target's drawn sizes* snapping onto the shipped scale, which is a
+different operation from the 2026-09-19 collapse of the old scale recorded in
+`ux-rules.md` §9a.1 (where `15` folded into `14` and `17` into `16`). The two
+lists disagree on purpose: one maps a design onto today's rungs, the other
+records how today's rungs were arrived at.
+
+Eight rungs: `10 · 11 · 12 · 13 · 14 · 16 · 18 · 24`. The guardrail budgets in
+`apps/mobile/scripts/ui-guardrails.config.js` stay at 0 — raising one is never
+the fix for a screen the scale cannot express; changing the scale is.
+
+**Still owed on device:** the mini legends (`1RM` / `VOL`) were drawn at 8px
+inside a 38px metric column. At 10px that block grows, so the set row needs a
+width re-check when it is built (build spec, step 3/4) — the rung is committed,
+the column width is not.
 
 ## 4. Surfaces
 

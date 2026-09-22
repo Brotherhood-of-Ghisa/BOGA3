@@ -6,4 +6,18 @@ export {
 } from '@/components/ui/segmented-chips';
 export { UiSurface, type UiSurfaceVariant } from '@/components/ui/surface';
 export { UiText, type UiTextVariant } from '@/components/ui/text';
-export { uiBorder, uiColors, uiRadius, uiSpace, uiTokens, uiTypography } from '@/components/ui/tokens';
+export {
+  uiBorder,
+  uiColors,
+  uiElevation,
+  uiRadius,
+  uiRoles,
+  uiSpace,
+  uiTokens,
+  uiTypography,
+  type UiColorToken,
+  type UiElevationToken,
+  type UiRadiusToken,
+  type UiRoleToken,
+  type UiSpaceToken,
+} from '@/components/ui/tokens';

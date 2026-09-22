@@ -47,7 +47,10 @@ ambiguous without them. Runtime comparison captures stay in the gitignored
 
 ## Known conflicts to resolve in build
 
-1. `accent` and `record` share `#C2410C`. Resolve before the tokens PR.
+1. ~~`accent` and `record` share `#C2410C`.~~ **Resolved 2026-09-22:** `record`
+   moved to brass `#8A6516`. See `../design-language.md` §2. The artboards still
+   draw both in orange, so the canvas and the tokens now differ here by
+   decision — the tokens win.
 2. `react-native-svg` and the three typefaces are not installed. Both are
    native-affecting and force a dev-client rebuild.
 3. The History page is stale relative to this target and is linked from the
