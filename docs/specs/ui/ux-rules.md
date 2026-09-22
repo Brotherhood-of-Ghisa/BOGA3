@@ -59,6 +59,13 @@ Document app-specific UI semantics and guardrails for the current mobile app.
      Exercise Catalog and Settings rows carry `source=more` and show an explicit
      `Back to More` action; direct routes and non-More origins do not claim that
      history. Groups looks the same however it is opened.
+   - Settings Preferences holds device-local choices shown as single-select
+     option buttons (`accessibilityRole="button"` + `selected`): the date format,
+     then `New exercise & session screens` (`Off`/`On`, default `Off`). That
+     toggle opts into the redesigned exercise page and session view while they
+     are built beside the recorder; it is **not** `isDevMode()`-gated, is never
+     synced, and is removed when the new screens become the default
+     (`docs/plans/exercise-session-redesign.md`, while that plan lives).
 7. Today is a bounded overview, not a second full feed or history screen.
    - An active draft replaces the planned-session action and exposes Resume.
    - Joined-group activity reuses the group stream session cards, record cards,

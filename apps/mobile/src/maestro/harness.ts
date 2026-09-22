@@ -4,6 +4,10 @@ import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { bootstrapLocalDataLayer, resetLocalAppData } from '@/src/data';
 import { PRIMARY_RUNTIME_STATE_ID } from '@/src/data/clock';
 import { syncRuntimeState } from '@/src/data/schema';
+import {
+  DEFAULT_NEW_SCREENS_ENABLED,
+  setNewScreensEnabled,
+} from '@/src/session-recorder/new-screens-preference';
 import { clearAuthRequired, markAuthRequired } from '@/src/sync/auth-required-signal';
 import type { SyncProgress } from '@/src/sync/progress';
 import {
@@ -33,6 +37,12 @@ export type MaestroHarnessBootstrapAction = 'none' | 'reset' | 'complete';
  * dismiss). A no-op for 'none'.
  */
 export type MaestroHarnessGateAction = 'none' | 'in-progress' | 'clear';
+/**
+ * Sets the new exercise/session screens preference before teleporting, so the
+ * new screens' flows can opt in without tapping through Settings. 'none' leaves
+ * it as is; `reset=data` separately restores it to its default (off).
+ */
+export type MaestroHarnessNewScreensAction = 'none' | 'on' | 'off';
 export type MaestroHarnessTeleportTarget =
   | 'session-list'
   | 'session-recorder'
@@ -72,6 +82,10 @@ export const resolveMaestroHarnessGateAction = (
   value: string | null | undefined
 ): MaestroHarnessGateAction =>
   value === 'in-progress' || value === 'clear' ? value : 'none';
+
+export const resolveMaestroHarnessNewScreensAction = (
+  value: string | null | undefined
+): MaestroHarnessNewScreensAction => (value === 'on' || value === 'off' ? value : 'none');
 
 export const resolveMaestroHarnessTeleportTarget = (
   value: string | null | undefined
@@ -150,10 +164,26 @@ export const resolveMaestroHarnessTeleportHref = ({
   }
 };
 
+/**
+ * `data` also restores the new-screens preference to its default: it lives in
+ * SecureStore (which survives the SQLite wipe, and on iOS even an uninstall), so
+ * without this a flow that switched it on would leak into every later flow.
+ */
 export const runMaestroHarnessReset = async (resetMode: MaestroHarnessResetMode) => {
   if (resetMode === 'data') {
     await resetLocalAppData();
+    await setNewScreensEnabled(DEFAULT_NEW_SCREENS_ENABLED);
   }
+};
+
+export const runMaestroHarnessNewScreensAction = async (
+  action: MaestroHarnessNewScreensAction
+) => {
+  if (action === 'none') {
+    return;
+  }
+
+  await setNewScreensEnabled(action === 'on');
 };
 
 export const runMaestroHarnessFixture = async (fixtureName: MaestroHarnessFixtureName) => {

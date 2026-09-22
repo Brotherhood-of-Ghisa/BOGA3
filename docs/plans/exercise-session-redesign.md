@@ -37,7 +37,10 @@ Three rules make it work:
    `src/exercise-catalog/list-preferences.ts` (SecureStore, versioned storage
    key, snapshot + subscribe + hook + a test reset), surfaced in the Settings
    Preferences card beside the date format. The Maestro lanes for the new
-   screens set it before navigating.
+   screens set it before navigating. Shipped as step 3a:
+   `useNewScreensEnabled()` from `src/session-recorder/new-screens-preference.ts`;
+   flows open `boga3://maestro-harness?reset=data&newScreens=on&teleport=…`
+   (spec `11` §9).
 
 **Ready means:** the new screens pass their own Maestro lanes, and they have
 been used for real sessions on device — not that they look finished. The
@@ -68,8 +71,9 @@ the requirement from `./boga test for`.
 | 1 | Tokens | ✅ shipped | Added `uiRoles` **additively** (`uiColors` untouched); added one type rung `xxs` 10; resolved the `accent`/`record` collision by moving `record` to brass `#8A6516`. Decisions in `design-language.md` §2–§3, scale in `ux-rules.md` §9a. No existing token repointed — held by `app/__tests__/ui-tokens-additive.test.ts`. |
 | 2 | Fonts + SVG | ✅ shipped | Added `react-native-svg` and the eight faces, **embedded** by the `expo-font` config plugin (no runtime load). `uiFonts` in `tokens.ts` names them as `{ fontFamily, fontWeight }`, uniform on iOS and Android, so no PostScript map was needed; guarded by `app/__tests__/ui-fonts-embedded.test.ts`. Web falls back to system fonts (`design-language.md` §3). Nothing adopts them yet. |
 | 3 | Primitives | ⬜ ready | `ListRow`, `Stat`, `Sheet`, `Card` only — anatomy in the build spec. New components; nothing existing adopts them yet. Update `components-catalog.md`. |
-| 4 | Exercise page | ⬜ blocked by 3 | New route behind the setting (added in this step, defaulting off). Reuses `src/session-recorder/**`. Its own Maestro lane, which enables the setting first. |
-| 5 | Session view | ⬜ blocked by 3 | New route behind the same setting. Its own Maestro lane. |
+| 3a | New-screens setting | ✅ shipped | Carved out of step 4 so 4 and 5 can run in parallel. `src/session-recorder/new-screens-preference.ts` (key `boga3.newExerciseSessionScreens.v1`, default off, not dev-gated); `New exercise & session screens` Off/On in the Settings Preferences card; harness `newScreens=on\|off`, and `reset=data` restores it to off. Gates nothing yet. |
+| 4 | Exercise page | ⬜ blocked by 3 | New route behind the setting (3a); read it with `useNewScreensEnabled()`. Reuses `src/session-recorder/**`. Its own Maestro lane, which enables the setting first via the harness. Parallel with 5. |
+| 5 | Session view | ⬜ blocked by 3 | New route behind the same setting (3a). Its own Maestro lane, which enables the setting first via the harness. Parallel with 4. |
 | 6 | Switch over | ⬜ blocked by 4, 5 | Flip the setting's default on, then in a follow-up delete the old recorder route, its lanes and the setting itself. Two small reverts rather than one big one. Update `screen-map.md` + `navigation-contract.md`. |
 | 7 | Close out | ⬜ blocked by 6 | Delete this plan and the build spec; confirm every durable decision has graduated to `docs/specs/**`. Includes deleting `ui-tokens-additive.test.ts`, which exists only for the parallel period. |
 

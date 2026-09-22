@@ -13,6 +13,7 @@ import {
   wipeRemoteForCurrentUser,
 } from '@/src/sync/dev-affordances';
 import { useExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
+import { useNewScreensEnabled } from '@/src/session-recorder/new-screens-preference';
 import { getAgentConnectUrl } from '@/src/utils/agent-connect';
 import { isDevMode } from '@/src/utils/isDevMode';
 import { formatVersionBuild, readAppRuntimeMetadata } from '@/src/utils/runtime-metadata';
@@ -23,6 +24,7 @@ export default function SettingsScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const [listPreferences, setListPreferences] = useExerciseListPreferences();
+  const [newScreensEnabled, setNewScreensEnabled] = useNewScreensEnabled();
   const [connectError, setConnectError] = useState<string | null>(null);
   const runtimeMetadata = readAppRuntimeMetadata();
   const versionBuild = formatVersionBuild(runtimeMetadata);
@@ -258,7 +260,7 @@ export default function SettingsScreen() {
         </UiText>
         <UiSurface style={styles.preferencesCard} testID="settings-preferences-card">
           <UiText selectable variant="bodyMuted">
-            Configure how dates and other details are displayed throughout BoGa.
+            Configure how BoGa displays dates and which screens you use.
           </UiText>
           <View style={styles.preferenceGroup}>
             <UiText selectable variant="labelStrong" style={styles.preferenceLabel}>
@@ -279,6 +281,36 @@ export default function SettingsScreen() {
                     <UiText
                       style={[styles.prefButtonText, selected && styles.prefButtonTextSelected]}>
                       {format}
+                    </UiText>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+          <View style={styles.preferenceGroup} testID="settings-new-screens-group">
+            <UiText selectable variant="labelStrong" style={styles.preferenceLabel}>
+              New exercise &amp; session screens
+            </UiText>
+            <UiText selectable variant="bodyMuted">
+              Try the redesigned exercise page and session view while they’re being built.
+              Switch back any time.
+            </UiText>
+            <View style={styles.preferenceRow}>
+              {([false, true] as const).map((enabled) => {
+                const selected = newScreensEnabled === enabled;
+                const label = enabled ? 'On' : 'Off';
+                return (
+                  <Pressable
+                    key={label}
+                    accessibilityLabel={`Turn new exercise and session screens ${label.toLowerCase()}`}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    style={[styles.prefButton, selected && styles.prefButtonSelected]}
+                    onPress={() => setNewScreensEnabled(enabled)}
+                    testID={`settings-new-screens-${label.toLowerCase()}`}>
+                    <UiText
+                      style={[styles.prefButtonText, selected && styles.prefButtonTextSelected]}>
+                      {label}
                     </UiText>
                   </Pressable>
                 );

@@ -140,7 +140,8 @@ TASK_ID=T-20260301-05 npm run test:e2e:ios:data-smoke
 ```
 
 Infra-free UI regression lane (Stats screen, session-completion states, exercise
-block history, Settings dev wipe-local — four flows sharing one sim + Metro):
+block history, Settings dev wipe-local, Settings new-screens toggle — five flows
+sharing one sim + Metro):
 
 ```bash
 TASK_ID=ad-hoc npm run test:e2e:ios:ui-regression
