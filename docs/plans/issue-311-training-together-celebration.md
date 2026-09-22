@@ -26,15 +26,21 @@ are follow-ups, not requirements for #311.
 
 ## Why this fits the app as built
 
-The group stream already exposes live session status, member identity, start
-time, and the groups through which a session is shared. It refreshes on focus,
-on pull, and while focused. The first release can therefore derive a shared
-moment from stream data already authorized by the group RPC instead of adding a
-second presence system or writing a synthetic event.
+The group stream already exposes session status, member identity, start time,
+and the groups through which a session is shared. Its refresh cadence and
+identity presentation can be reused, but its paginated feed is not a complete
+live snapshot: `useGroupStream` refreshes only the first page and retains older
+loaded rows, and historical shares remain readable after the lifter leaves.
+
+The first release therefore needs a dedicated, authorized active-session read
+over the existing session/share/membership data. It must return a complete
+snapshot for the selected scope and check both the viewer's and the lifter's
+current membership in the same database statement. Derive the shared moment
+from that snapshot on-device; no presence service or synthetic event is needed.
 
 This deliberately means “together” is eventually observed, not real-time
 presence: the moment becomes visible after the athlete's sync and the viewer's
-group refresh. The UI must not promise instant detection.
+active-session refresh. The UI must not promise instant detection.
 
 ## Product rules to settle in the implementation PR
 
@@ -43,16 +49,22 @@ Recommended defaults:
 1. **Who qualifies:** the viewer has one active session and another active
    member shares at least one currently active group with the viewer.
 2. **What “at the same time” means:** both sessions are currently `active` in
-   the latest group-stream snapshot. Do not infer presence from a recent start
-   timestamp, app foreground state, or device connectivity.
+   the latest successful, complete active-session snapshot, and their eligible
+   group lists intersect. Eligibility requires an existing session share plus
+   current membership for both people in that group. Historical stream items
+   and membership events are not proof of current eligibility. Do not infer
+   presence from a recent start timestamp, app foreground state, or connectivity.
 3. **Which group to show:** on a group screen, that group; on Today, the first
    common group in stable name/id order. Collapse the same pair of sessions
    shared through multiple groups into one moment.
 4. **More than two athletes:** show the viewer plus the earliest-started active
    brother and `+N`; the expanded accessible label names all active athletes.
-5. **When it ends:** remove the live card as soon as either qualifying session
-   is no longer active in a successful refresh. Cached offline content may stay
-   visible only with the existing offline marker.
+5. **When it ends:** replace the entire active-session snapshot on each
+   successful refresh, including an empty result. Remove the card when either
+   session completes, is deleted, or loses its qualifying share/membership.
+   Never retain older feed rows as overlap candidates. A selected group's
+   `NOT_FOUND` clears its snapshot; cached offline content may stay visible only
+   with the existing offline marker and initials.
 6. **Celebration frequency:** animate once per `(group, my session, brother
    session)` tuple on a device. Persist a bounded set of seen tuple keys so a
    focus refresh or app restart does not repeatedly celebrate. A new overlap
@@ -92,8 +104,9 @@ captures into the accepted design target before production UI is merged.
 
 #### Flow A — first shared live moment
 
-- **Trigger:** my active session and another member's active session first
-  coexist in a successful group-stream snapshot.
+- **Trigger:** my active session and another current member's active session
+  first coexist in a successful, complete active-session snapshot with an
+  eligible shared group.
 - **Steps:** derive a stable overlap key; render the card; run the one-shot,
   reduced-motion-aware accent; record the key as seen; let the athlete continue
   recording without interruption.
@@ -105,7 +118,7 @@ captures into the accepted design target before production UI is merged.
 #### Flow B — returning to an existing overlap
 
 - **Trigger:** focus, poll, pull-to-refresh, or relaunch returns the same active
-  overlap.
+  overlap from the dedicated active-session read.
 - **Steps:** render the current card from the snapshot and consult the local
   seen-key store.
 - **Success outcome:** the useful live state remains without replaying the
@@ -137,19 +150,25 @@ captures into the accepted design target before production UI is merged.
 
 ## Delivery slices
 
-### Slice 1 — pure overlap model and initials-first UI
+### Slice 1 — authoritative active-session read and initials-first UI
 
-1. Add a pure `training-together` view model under `apps/mobile/src/groups/`.
-   It should accept stream items, viewer id, optional selected group, and seen
-   keys, then return stable presentation models. Keep grouping, deduplication,
-   ordering, and accessible copy out of route components.
-2. Add a reusable card under `apps/mobile/components/groups/` and a small
+1. Add the proposed `group_training_now(p_group_id)` read described below,
+   its typed client in `apps/mobile/src/groups/api.ts`, and a dedicated
+   cache-first resource. Refresh it on focus, focused polling, and pull with
+   the existing cadence, independently of feed pagination. Replace its complete
+   snapshot on success; do not merge it with `useGroupStream.items`.
+2. Add a pure `training-together` view model under `apps/mobile/src/groups/`.
+   It should accept that membership-checked snapshot, viewer id, optional
+   selected group, and seen keys, then return stable presentation models.
+   Keep grouping, deduplication, ordering, and accessible copy out of routes.
+3. Add a reusable card under `apps/mobile/components/groups/` and a small
    avatar/initials primitive in the appropriate shared component layer.
-3. Render it from the selected Groups stream and the Today aggregate stream.
-   Reuse existing navigation and offline semantics.
-4. Add a bounded local seen-key repository. This state is device-local UI
+4. Render it above the selected Groups stream and the Today aggregate stream,
+   using the corresponding active-session resource. Reuse existing navigation
+   and show that resource's own freshness/offline state.
+5. Add a bounded local seen-key repository. This state is device-local UI
    memory, not sync-domain or backend data. Prune ended/old keys and cap storage.
-5. Ship this slice with initials even if avatar backend work is not yet ready.
+6. Ship this slice with initials even if avatar backend work is not yet ready.
    That separates the core delight from storage and permission risk.
 
 Acceptance:
@@ -157,6 +176,10 @@ Acceptance:
 - exactly one card for duplicate shares of the same session pair;
 - no card when my session is absent, either session is completed, or both
   sessions belong to me;
+- active sessions remain discoverable beyond the feed's first page, and a
+  completion/deletion disappears on refresh even if its feed row is older;
+- leaving/removal during an active session removes that group's eligibility on
+  the next refresh; another currently shared group may still qualify the pair;
 - stable `+N` behavior for three or more active athletes;
 - one animation per overlap key, including after focus refresh and relaunch;
 - useful, non-animated output with Reduce Motion enabled;
@@ -178,11 +201,18 @@ Acceptance:
    - denial to unauthenticated users, OAuth agent tokens, former members, and
      unrelated authenticated users.
 3. Return only the avatar object key/revision in authorized group member payloads
-   (`group_get`, `group_stream`, session detail, boards/events where a member is
-   embedded). Do not return a service credential or make the bucket public.
-4. Resolve short-lived signed URLs through the authenticated Storage client and
-   cache them by `(object key, revision)`. Treat expiry or access loss as a
-   normal fallback-to-initials state.
+   (`group_get`, `group_training_now`, `group_stream`, session detail,
+   boards/events where a member is embedded). Do not return a service credential
+   or make the bucket public.
+4. Fetch avatars through authenticated Storage downloads using the viewer's
+   current app JWT. The Storage read policy must check current database
+   membership on every request. Render the downloaded bytes transiently;
+   scope in-memory image state to `(viewer id, object key, revision)` and
+   revalidate before presenting an avatar and on focused resource refresh.
+   Group surfaces use initials when offline or access cannot be confirmed.
+   Clear image state on confirmed access loss, sign-out, or account switch.
+   Do not mint signed download URLs: issued URLs remain usable until expiry
+   and cannot satisfy the revocation requirement.
 5. Add an owner-only upload service in `src/auth/` and Profile UI for select,
    crop/resize, preview, save, replace, and remove. Upload the new object before
    switching the profile reference; clean old objects after success so a failed
@@ -195,9 +225,13 @@ Acceptance:
 
 - owner can add, replace, and remove an image;
 - cancel/denied permission/upload failure preserves the old profile state;
-- authorized group members can display it while unrelated/former members and
-  agent tokens cannot read it;
-- stale signed URLs fail closed to initials after access removal;
+- authorized group members can download it while unrelated/former members and
+  agent tokens cannot; this includes a member removed after a successful read;
+- the next authenticated download after access removal is denied; the next
+  access check clears displayed bytes and shows initials, including a cache hit;
+- no signed URLs or persistent image cache bypass access checks. Already
+  downloaded bytes cannot be recalled; revocation governs subsequent reads and
+  app presentation after revalidation, not copies a recipient already saved;
 - a replaced image visibly refreshes rather than sticking in image cache;
 - account deletion/cascade has an explicit Storage cleanup path.
 
@@ -215,20 +249,38 @@ Acceptance:
 
 ## Data and API contract notes
 
-- Prefer deriving overlaps on-device from the current `group_stream` response.
-  A new `training_together` database event would outlive or duplicate a
-  transient condition and adds write/deduplication complexity without improving
-  the in-app moment.
-- The current session items already contain `member`, `groups`, `status`, and
-  session timestamps. Any stream change for #311 should be limited to extending
-  member references with avatar metadata.
+- Add a proposed `group_training_now(p_group_id uuid default null)` RPC. Null
+  scopes it to the viewer's active groups; a selected group requires current
+  viewer membership or returns `NOT_FOUND`. Follow the existing group RPC
+  guards, pinned `search_path`, and OAuth-agent denial.
+- In one database statement, select nondeleted `active` sessions with existing
+  group shares and require both viewer and lifter to be current members of each
+  nondeleted group returned. Deduplicate by `(member user id, session id)`;
+  `groups` contains only groups satisfying all of these predicates. Reuse the
+  member identity and timestamp shapes: each `TrainingNowSession` contains
+  `member`, `session_id`, `groups`, `status`, and `started_at_ms`; full
+  exercise/set graphs are unnecessary.
+- Return `{ sessions: TrainingNowSession[] }` as a complete snapshot of that
+  scope, including the viewer's eligible sessions. It has no feed cursor or
+  silent row cap. An implementation needing a bound must define an explicit
+  completeness protocol before using the result to create or end overlaps.
+  Empty success is authoritative; failed or incomplete reads cannot create a
+  celebration or overwrite the last successful snapshot.
+- Keep a separate user-scoped cache/resource, for example
+  `training-now:all` / `training-now:<groupId>`, with its own freshness marker
+  and group/account eviction. Every successful refresh replaces it in full.
+  `group_stream` remains the detail feed; only avatar metadata needs to extend
+  its existing member shape. No persistent `training_together` event is needed.
 - Group RPCs are the authorization boundary for member metadata. Every function
   that embeds a member reference must use one canonical helper/shape so avatar
   authorization and null fallback do not drift between stream, member list,
   detail, and leaderboard responses.
-- Do not put signed URLs in persistent group cache: cache the stable object
-  key/revision and mint/refresh URLs at presentation time. Never log URLs or
-  image bytes.
+- Persist only avatar object key/revision in profile/group caches. Download
+  bytes through the authenticated Storage client at presentation/revalidation;
+  do not persist images, JWT-bearing requests, or signed URLs. Never log auth
+  headers, image bytes, or asset URLs. See
+  [Supabase private-bucket access](https://supabase.com/docs/guides/storage/buckets/fundamentals#private-buckets)
+  and [signed-URL lifetime](https://supabase.com/docs/guides/storage/serving/downloads#signing-urls).
 - Define image constraints before migration/UI work (recommended starting
   point: JPEG/WebP output, square crop, maximum 1024 px, maximum 2 MB). Confirm
   actual Expo/iOS library support before choosing the encoded format.
@@ -246,19 +298,31 @@ this Markdown-only change.
 - pure overlap-model matrix: selected/aggregate group, duplicate shares,
   completed sessions, self duplicates, `+N`, ordering, fallback names, and
   stable keys;
+- active-session resource: complete replacement/empty success, separate cache
+  identity, failed/incomplete refresh suppression, and group/account eviction;
 - Today and Groups rendering/navigation tests;
 - celebration seen-key persistence/pruning and Reduce Motion behavior;
 - avatar service upload/replace/remove/error tests with mocked Image Picker,
   manipulation, and Storage clients;
 - Profile UI permission, cancellation, preview, save, removal, and inline
   failure tests;
-- fallback rendering for missing, expired, and failed image URLs.
+- authenticated image fetch and fallback rendering for missing images, denied
+  or failed reads, offline state, cache revalidation, and account switches.
 
 ### Local Supabase contracts
 
+- active-session RPC: selected/aggregate scope, existing share requirement,
+  complete results beyond 20/50 feed items, and completion/deletion of a session
+  outside the feed's first page;
+- leave/remove either participant while their session is active: exclude the
+  ended membership, preserve any other eligible common group, and never infer
+  membership from historical shares/events; cover `AUTH_REQUIRED`,
+  `AGENT_FORBIDDEN`, and selected-group `NOT_FOUND`;
 - migration/schema assertions for profile columns and the private bucket;
 - Storage policy matrix for owner, current group member, former member,
   unrelated user, anonymous request, and OAuth agent token;
+- read an avatar as a co-member, remove their last common membership, then
+  repeat the authenticated download and assert denial before JWT expiry;
 - every affected group RPC returns avatar metadata only to an authorized member
   and preserves `NOT_FOUND` anti-enumeration behavior;
 - replacement/removal and account cleanup leave no unintended readable object.
@@ -269,6 +333,10 @@ this Markdown-only change.
   states;
 - extend the two-user groups lane so user A starts, user B starts, both devices
   observe the same overlap, one session completes, and the card disappears;
+- place a qualifying active session beyond the feed's first page, then complete
+  it and verify the card disappears after active-session refresh;
+- remove a participant during an active overlap; verify the card disappears and
+  the next avatar access check renders initials despite an earlier loaded image;
 - assert the celebration does not replay on refresh/relaunch;
 - capture every accepted state at the target simulator sizes and compare it to
   the accepted design target.
@@ -295,10 +363,11 @@ work adds timers/subscriptions.
 | --- | --- |
 | “Live” feels late | Keep wording honest, reuse refresh/poll behavior, and measure sync-to-visible latency in the two-user lane rather than promising a number. |
 | Celebration becomes noisy | Require the viewer's active session, dedupe by stable tuple, persist bounded seen keys, and use a compact non-modal treatment. |
-| Avatar broadens identity exposure | Private bucket, common-active-group read rule, short-lived URLs, fallback on revocation, and explicit negative auth tests. |
-| Signed URLs leak through cache/logs | Persist only key/revision, never log URLs, use short expiry, and clear in-memory URL cache on sign-out/account switch. |
+| Feed pagination or old shares misstate who is training together | Complete active-session snapshots with current viewer/lifter membership checked in one database statement; test long-running sessions and removal during training. |
+| Avatar broadens identity exposure | Private bucket, authenticated downloads with a current common-group check on every request, fallback on failed revalidation, and explicit negative auth tests. |
+| Image cache bypasses revoked access | Persist only key/revision; revalidate transient images on presentation/refresh, show initials offline, and clear image state on access loss/sign-out/account switch. |
 | Replacing a photo loses the old one | Upload/validate first, atomically switch profile metadata, then best-effort delete the superseded object. |
-| Image payload harms performance | Client normalization, hard byte/dimension caps, thumbnail-sized rendering, and URL/image caching keyed by revision. |
+| Image payload harms performance | Client normalization, hard byte/dimension caps, thumbnail-sized rendering, and bounded transient image state scoped to viewer/key/revision with access revalidation. |
 | Backend shapes drift | One canonical member JSON helper and contract vectors across every affected RPC. |
 
 ## Explicit non-goals
