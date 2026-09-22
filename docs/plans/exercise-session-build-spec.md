@@ -82,9 +82,17 @@ the planned `setType`, so it is only opened when deviating.
 **Two exits:** Back leaves set states untouched. Complete prompts on incomplete
 sets.
 
+**Complete with pending planned sets** (decided 2026-09-22): warn that the
+planned sets will be discarded, and let the user cancel or go ahead. Going ahead
+marks each pending planned set **`unperformed`**
+(`apps/mobile/src/session-recorder/set-semantics.ts:6`); it does **not** delete
+it. The rows keep their planned triple, so "planned 5, did 3" stays answerable.
+
 ## Session view
 
-Top bar: `Session` · ⋮ (Abandon session) · **Finish** in `accent`.
+Top bar: `Session` · ⋮ (Abandon session) · **Finish** in `accent`. The ⋮ is a
+menu, like the exercise ⋮, even while Abandon session is its only item (decided
+2026-09-22).
 
 1. **Summary card**: Time / Gym / Sets / Volume, labels above values.
 2. **One card per exercise, read-only** — the whole card is a link into the

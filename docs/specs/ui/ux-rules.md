@@ -345,7 +345,10 @@ guardrail keeps screens on them.
 `ui/design-language.md` §2, added 2026-09-22 for the exercise/session rebuild.
 It is a second, separate vocabulary from `uiColors`, deliberately not merged
 into it, and **no shipped screen uses it yet**; the rules below still describe
-everything that renders today.
+everything that renders today. Likewise **`uiFonts`** (added 2026-09-22) names
+the three embedded typefaces of `ui/design-language.md` §3 and the weights of
+each that ship; nothing shipped uses it, so every screen still renders in the
+system font.
 
 1. **Type: 8 sizes.**
    `xxs 10 · xs 11 · sm 12 · md 13 · base 14 · lg 16 · xl 18 · xxl 24`.

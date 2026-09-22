@@ -39,9 +39,12 @@ Brief entrypoint inventory of the current reusable UI component set.
   - single source of truth for shared UI token values (colors, spacing, radius, typography, border)
   - includes the shared semantic/status/overlay color palette used by current route screens after the M8 convergence refactor (Task `T-20260226-06`)
   - includes token-backed green family and warm individual-muscle background palettes for Stats / History failure intensity; each row selects one uniform shade from its palette
-  - carries the collapsed scales the UI guardrail enforces (7 type sizes with a
+  - carries the collapsed scales the UI guardrail enforces (8 type sizes with a
     matching `lineHeight` per size, 6 spacing steps, 3 radii) plus `uiElevation`
     (`flat` / `raised` / `overlay`); values and rationale: `docs/specs/ui/ux-rules.md` §9a
+  - also carries the design-language vocabularies, not yet adopted: `uiRoles`
+    (colour roles) and `uiFonts` (the three embedded typefaces and their
+    shipped weights); rationale: `docs/specs/ui/design-language.md` §2–§3
 
 2. `UiText`
 - File: `apps/mobile/components/ui/text.tsx`

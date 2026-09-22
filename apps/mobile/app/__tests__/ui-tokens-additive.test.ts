@@ -2,6 +2,7 @@ import {
   uiBorder,
   uiColors,
   uiElevation,
+  uiFonts,
   uiRadius,
   uiRoles,
   uiSpace,
@@ -33,6 +34,18 @@ describe('design tokens stay additive during the exercise/session rebuild', () =
     expect(uiTypography.lineHeight.lg).toBe(22);
     expect(uiTypography.lineHeight.xl).toBe(24);
     expect(uiTypography.lineHeight.xxl).toBe(30);
+  });
+
+  it('keeps the shipped font weights at their shipped values', () => {
+    // The embedded typefaces bring weights the scale lacks (Archivo 800). They
+    // belong to `uiFonts`, not here: adding or repointing a key in this object
+    // changes what shipped screens resolve to.
+    expect(uiTypography.weight).toEqual({
+      regular: '400',
+      medium: '500',
+      semibold: '600',
+      bold: '700',
+    });
   });
 
   it('adds exactly one rung, for micro-labels, below the shipped floor', () => {
@@ -166,6 +179,14 @@ describe('design tokens stay additive during the exercise/session rebuild', () =
         'surfaceSubtle',
       ].sort(),
     );
+  });
+
+  it('carries exactly the typefaces and weights named in design-language.md §3', () => {
+    expect(uiFonts).toEqual({
+      display: { family: 'Archivo', weights: ['600', '700', '800'] },
+      body: { family: 'Source Sans 3', weights: ['400', '600'] },
+      figure: { family: 'IBM Plex Mono', weights: ['500', '600', '700'] },
+    });
   });
 
   it('keeps `record` a different colour from `accent`', () => {
