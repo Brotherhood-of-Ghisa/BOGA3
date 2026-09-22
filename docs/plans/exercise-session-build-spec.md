@@ -16,34 +16,27 @@ Reference viewport 390×844. Page gutter 14. Card radius 6, sheet top radius 16,
 sheet handle 38×4. Control column 44 wide. Metric value columns are fixed width
 (38 for 1RM, 38 for volume) so figures align down the list.
 
-## The type scale needs revising before step 1
+## The type scale — revised, step 1 (shipped)
 
-**The accepted target does not fit the shipped type scale.** Measured from the
-governing artboards, they use twelve sizes:
+**Resolved 2026-09-22.** The accepted target was drawn across twelve sizes
+against a shipped scale of seven, with `rawFontSize` enforced at budget 0, so
+the screens could not be built as drawn. Settled as a scale revision, not a pile
+of exceptions:
 
-    8 · 9 · 10 · 11 · 12 · 13 · 14 · 15 · 16 · 17 · 18 · 19 · 23
+**One rung added — `uiTypography.size.xxs` (10), line-height 14. Nothing else
+moved.** The target's other sizes snap onto existing rungs (`15→16`, `17→18`,
+`19→18`, `23→24`) and the `8`/`9` micro-labels lift to `10`. Eight rungs:
+`10 · 11 · 12 · 13 · 14 · 16 · 18 · 24`. Budgets stay at 0.
 
-`uiTypography.size` has seven: `11 · 12 · 13 · 14 · 16 · 18 · 24`. So
-`8, 9, 10, 15, 17, 19, 23` have no rung, and `rawFontSize` is at **budget 0,
-enforced in `boga test fast` and CI** — these screens cannot be built as drawn.
+The `accent` / `record` collision was resolved in the same PR: **`record` moved
+to brass `#8A6516`**, with `record-wash` / `record-rule` at `#FBF3E2` /
+`#EEDFBE`. Both decisions and their reasoning are in
+`docs/specs/ui/design-language.md` §2–§3; the scale is also in `ux-rules.md`
+§9a. Use the roles from `uiRoles`, never the hexes.
 
-Resolve it in step 1, as an explicit scale revision rather than a pile of
-exceptions. The options, in the order they were considered:
-
-1. **Add one rung (`10`) and snap the rest** — `15→16`, `17→18`, `19→18`,
-   `23→24`, and lift the `8`/`9` micro-labels to `10`. Eight rungs total.
-   Preferred: it keeps the scale a scale, and `8px` body-adjacent text was poor
-   for accessibility anyway.
-2. Add two micro rungs (`9` and `10`). Nine rungs; keeps the artboards exact.
-3. Keep seven rungs and redraw the micro-labels at `11` minimum. Materially
-   changes the target and should go back through the design, not the build.
-
-**Option 1 is not free:** the mini legends (`1RM` / `VOL`) are `8px` inside a
-38px metric column. At `10px` that block grows and the set row needs a width
-re-check on device. Do that before committing the rung, not after.
-
-Whichever option wins, the decision belongs in `design-language.md` §3 and the
-budgets in `apps/mobile/scripts/ui-guardrails.config.js` stay at 0.
+**Still owed by whoever builds the set row:** the mini legends (`1RM` / `VOL`)
+were drawn at 8px inside a 38px metric column. At 10px that block grows — do the
+width re-check on device before the column width is treated as settled.
 
 ## Set row
 

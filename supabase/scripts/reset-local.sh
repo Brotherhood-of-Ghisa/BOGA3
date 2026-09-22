@@ -9,15 +9,17 @@ source "${SCRIPT_DIR}/_common.sh"
 refresh_edge_proxy_after_reset() {
   local project_id kong_container started_at now
   project_id="$(worktree_project_id)"
-  kong_container="supabase_kong_${project_id}"
 
   # Supabase CLI 2.76 may recreate the Edge Runtime container during db reset
   # without refreshing Kong's cached upstream IP. The functions are healthy
   # inside Docker, but the public /functions/v1 route then returns 502 forever.
   # Restart only this worktree's proxy and wait for the real public health route.
   if [[ -z "${project_id}" ]] ||
-    ! docker ps --format '{{.Names}}' | grep -Fxq "${kong_container}"; then
+    ! kong_container="$(resolve_worktree_container kong "${project_id}")"; then
     echo "[supabase] could not resolve this worktree's Kong container after reset" >&2
+    echo "[supabase]   project_id: ${project_id:-<empty>}" >&2
+    echo "[supabase]   running kong containers:" >&2
+    docker ps --format '{{.Names}}' | grep '^supabase_kong_' >&2 || echo "[supabase]   (none)" >&2
     return 1
   fi
 

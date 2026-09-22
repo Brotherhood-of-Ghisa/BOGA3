@@ -341,21 +341,36 @@ Guardrail commands (run from `apps/mobile/`):
 Every value below is what `apps/mobile/components/ui/tokens.ts` holds, and the
 guardrail keeps screens on them.
 
-1. **Type: 7 sizes.** `xs 11 · sm 12 · md 13 · base 14 · lg 16 · xl 18 · xxl 24`.
+`tokens.ts` also exports **`uiRoles`** — the colour roles of
+`ui/design-language.md` §2, added 2026-09-22 for the exercise/session rebuild.
+It is a second, separate vocabulary from `uiColors`, deliberately not merged
+into it, and **no shipped screen uses it yet**; the rules below still describe
+everything that renders today.
+
+1. **Type: 8 sizes.**
+   `xxs 10 · xs 11 · sm 12 · md 13 · base 14 · lg 16 · xl 18 · xxl 24`.
    Down from the 14 distinct sizes that used to ship. `base` stays at **14px**
    by decision (2026-09-19): density in the recorder was chosen over
-   gym-floor legibility. `9` and `10` folded up into `11`, `15` into `14`,
-   `17` into `16`, `20` into `18`, and `22`/`26` into `24`.
+   gym-floor legibility. `15` folded up into `14`, `17` into `16`, `20` into
+   `18`, and `22`/`26` into `24`. **`xxs` (10) was added 2026-09-22** for
+   micro-labels — legends, units, tertiary labels — which the accepted design
+   target drew at 8/9px; both lift to 10 rather than earning rungs of their own,
+   since 8px body-adjacent text was poor for accessibility. `9` still folds up.
+   No other rung moved when `xxs` was added, and nothing shipped adopts it yet;
+   `apps/mobile/app/__tests__/ui-tokens-additive.test.ts` holds the other seven
+   in place. Reasoning: `ui/design-language.md` §3.
 2. **Every size has a line-height**, in `uiTypography.lineHeight`, keyed to the
-   same names: `15 · 16 · 18 · 20 · 22 · 24 · 30`. `UiText`'s prose variants
-   apply them, so vertical rhythm no longer depends on the platform font's
-   own leading.
-3. **Uppercase is one role.** Reserve `textTransform: 'uppercase'` for 11px
-   micro-labels; do not apply it at other sizes.
+   same names: `14 · 15 · 16 · 18 · 20 · 22 · 24 · 30`. `UiText`'s prose
+   variants apply them, so vertical rhythm no longer depends on the platform
+   font's own leading.
+3. **Uppercase is one role.** Reserve `textTransform: 'uppercase'` for
+   micro-labels — `xxs` (10) on the new surfaces, `xs` (11) on everything
+   shipped before 2026-09-22; do not apply it at other sizes.
 4. **Spacing: 6 steps.** `xs 4 · sm 8 · md 12 · lg 16 · xl 24 · xxl 32`. The
    old scale interleaved `2 / 10 / 14 / 20` with the 4/8/12/16 rhythm, which
    made every value on-scale and the scale non-constraining. The retired
-   `xxs` (2) and `screen` (20) keys are gone — page gutters use `xl`.
+   `xxs` (2) and `screen` (20) keys are gone — page gutters use `xl`. (Spacing
+   has no `xxs`; the `xxs` in rule 1 is a *type* rung and a different scale.)
 5. **Radius: 3 values.** `sm 8` for controls, `md 12` for surfaces,
    `full 999` for pills. Down from 10 distinct radii. If two radii sit side by
    side and the difference cannot be named, there is only one radius.

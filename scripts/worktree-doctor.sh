@@ -103,6 +103,15 @@ if [[ -f "$CONFIG_FILE" ]]; then
   [[ "$project_id" == "$(boga_project_id_for_slot "$slot" "$REPO_ROOT")" ]] \
     && ok "supabase project_id matches slot" \
     || fail "supabase project_id '$project_id' does not match slot $slot; run ./boga worktree start"
+
+  # Docker Compose truncates project names at 40 characters, so a long worktree
+  # name yields containers named for a prefix of project_id. The scripts handle
+  # that truncation, but two worktrees whose ids agree in their first 40
+  # characters would share one Docker project — which is a real collision, not a
+  # cosmetic one. Say so here rather than letting it surface as a reset failure.
+  if (( ${#project_id} > 40 )); then
+    warn "supabase project_id is ${#project_id} chars; Docker truncates to '${project_id:0:40}' — a shorter worktree name avoids any chance of colliding with another slot"
+  fi
   [[ "$api_port" == "$(boga_port_for_slot api "$slot")" ]] \
     && ok "supabase api port matches slot" \
     || fail "supabase api port '$api_port' does not match slot $slot; run ./boga worktree start"

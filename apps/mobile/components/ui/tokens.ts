@@ -62,6 +62,43 @@ export const uiColors = {
   rowSwipeText: '#20324f',
 } as const;
 
+// The design-language colour roles (`docs/specs/ui/design-language.md` §2).
+// Added alongside `uiColors`, not into it: the two vocabularies are meant to
+// stay visibly separate so the switch-over step can delete the legacy palette
+// wholesale instead of untangling one object. Nothing adopts these yet.
+//
+// A screen names the role, never the hex.
+export const uiRoles = {
+  // Text and realised values.
+  ink: '#15181D',
+  inkMuted: '#6B6358',
+  inkFaint: '#9B948A',
+  // Not-yet-realised values (a planned set's projected 1RM / volume).
+  planned: '#B3ABA0',
+  // Absent values and the faintest labels.
+  disabled: '#C4BDB0',
+  // Grounds.
+  paper: '#F6F4EF',
+  surface: '#FFFFFF',
+  surfaceSubtle: '#FBF9F5',
+  // Hairlines. Depth is a rule plus a ground change — never a shadow.
+  rule: '#E2DCD0',
+  ruleSoft: '#EFEAE0',
+  ruleFaint: '#F3EFE6',
+  ruleStrong: '#DDD6C8',
+  // The one primary action on a screen, and the row or field being edited.
+  accent: '#C2410C',
+  accentWash: '#FDF6EE',
+  // An all-time best, and the band that announces one. Brass, deliberately a
+  // different hue from `accent` (41° vs 17°) so "your best ever" and "the
+  // button that commits" do not read as the same mark. Decided 2026-09-22.
+  record: '#8A6516',
+  recordWash: '#FBF3E2',
+  recordRule: '#EEDFBE',
+  // Destructive actions only.
+  danger: '#A4262C',
+} as const;
+
 // Six steps. The previous scale interleaved 2/10/14/20 with the 4/8/12/16
 // rhythm, which made every value on-scale and the scale non-constraining.
 export const uiSpace = {
@@ -81,10 +118,15 @@ export const uiRadius = {
   full: 999,
 } as const;
 
-// Seven sizes, down from the fourteen that used to ship. `base` stays at 14:
-// density in the recorder was chosen over gym-floor legibility.
+// Eight sizes, down from the fourteen that used to ship. `base` stays at 14:
+// density in the recorder was chosen over gym-floor legibility. `xxs` (10) was
+// added 2026-09-22 for micro-labels — legends, units, tertiary labels — which
+// the accepted design target drew at 8/9px; both lift to 10 rather than earning
+// rungs of their own, since 8px body-adjacent text was poor for accessibility.
+// No other rung moved.
 export const uiTypography = {
   size: {
+    xxs: 10,
     xs: 11,
     sm: 12,
     md: 13,
@@ -96,6 +138,7 @@ export const uiTypography = {
   // One line-height per size, so vertical rhythm stops depending on whatever
   // leading the platform font happens to supply. Keyed to `size`.
   lineHeight: {
+    xxs: 14,
     xs: 15,
     sm: 16,
     md: 18,
@@ -142,6 +185,7 @@ export const uiElevation = {
 
 export const uiTokens = {
   colors: uiColors,
+  roles: uiRoles,
   space: uiSpace,
   radius: uiRadius,
   typography: uiTypography,
@@ -150,6 +194,7 @@ export const uiTokens = {
 } as const;
 
 export type UiColorToken = keyof typeof uiColors;
+export type UiRoleToken = keyof typeof uiRoles;
 export type UiSpaceToken = keyof typeof uiSpace;
 export type UiRadiusToken = keyof typeof uiRadius;
 export type UiElevationToken = keyof typeof uiElevation;

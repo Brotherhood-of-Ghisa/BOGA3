@@ -66,3 +66,19 @@
   state transitions, then add local-Supabase + Maestro proof for the full happy
   path with deterministic fixture credentials.
 
+## Design-token coverage policy (temporary — exercise/session rebuild)
+
+- Applies to `apps/mobile/components/ui/tokens.ts` while the exercise page and
+  session view are built *beside* the existing recorder
+  (`docs/plans/exercise-session-redesign.md`, rule 1).
+- The rule being covered: during the parallel period the token layer is
+  **additive only**. New roles and rungs are added; no existing value is
+  repointed, because repointing one restyles every shipped screen and breaks its
+  Maestro lane — silently, since nothing type-checks a colour.
+- `ui-tokens-additive.test.ts` therefore asserts: the seven pre-2026-09-22 type
+  rungs and their line-heights are unchanged; `uiColors` gained no role keys;
+  `uiRoles` carries exactly the roles in `docs/specs/ui/design-language.md` §2;
+  `record !== accent`; and `record` clears 4.5:1 on both `paper` and `surface`.
+- It is a deliberate change-detector with an end date. **The switch-over step
+  (plan step 6/7) deletes it** along with the legacy palette — do not loosen it
+  in the meantime to make an unrelated change pass.
