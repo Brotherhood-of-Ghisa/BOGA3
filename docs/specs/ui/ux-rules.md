@@ -355,7 +355,13 @@ into it, and **no shipped screen uses it yet**; the rules below still describe
 everything that renders today. Likewise **`uiFonts`** (added 2026-09-22) names
 the three embedded typefaces of `ui/design-language.md` §3 and the weights of
 each that ship; nothing shipped uses it, so every screen still renders in the
-system font.
+system font. And **`uiGeometry`** (added 2026-09-22) carries the design
+language's own radii (card 6, sheet 16), the 44pt tap target, the 38pt metric
+column, the sheet handle and micro-label tracking — a separate vocabulary from
+the legacy scales below, which it does not extend, so rule 5's three radii still
+hold for everything shipped. Its only consumers are the design-language
+primitives (`Card`, `Stat`, `ListRow`, `Sheet`), which no shipped screen uses
+yet.
 
 1. **Type: 8 sizes.**
    `xxs 10 · xs 11 · sm 12 · md 13 · base 14 · lg 16 · xl 18 · xxl 24`.
