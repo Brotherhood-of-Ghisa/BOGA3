@@ -369,9 +369,10 @@ or `no_action`.
 - Area / screen / flow: Groups → group → Exercises → linked exercise
 - User impact: a member can see that a personal exercise is linked to a group
   exercise, but that group-facing row offers no way to remove the link. The
-  existing unlink control is hidden behind the personal Exercise Catalog's
-  overflow menu and an action labelled `Link to group exercise…`, so a member
-  may reasonably conclude that links cannot be removed.
+  existing unlink control is reached through `Link to group exercise…` in
+  either the personal Exercise Catalog's overflow menu or the recorder's
+  exercise `•••` menu, so a member may reasonably conclude that links cannot
+  be removed.
 - Frequency: `every time` a member tries to manage an existing link from the
   group exercise that displays it
 - Severity: `S2`
@@ -389,8 +390,9 @@ or `no_action`.
     action.
   - `apps/mobile/app/exercise-link.tsx` already supports confirmed, offline
     unlinking of an individual personal exercise.
-  - `apps/mobile/app/(tabs)/exercise-catalog.tsx` is the only route into that
-    screen from the catalogue, and its action remains labelled
+  - `apps/mobile/app/(tabs)/exercise-catalog.tsx` and
+    `apps/mobile/app/(tabs)/session-recorder.tsx` both open that screen from
+    their exercise menus. Both actions remain labelled
     `Link to group exercise…` even when the exercise has existing links.
 
 #### Reproduction
@@ -403,14 +405,15 @@ or `no_action`.
 - Expected: the linked group-exercise row exposes a clear way to manage its
   personal links and unlink one after confirmation.
 - Actual: the row exposes neither an unlink nor a manage-links action; unlink
-  is available only after navigating from the personal catalogue through an
-  action whose label describes linking, not managing or unlinking.
+  is available through the personal catalogue or the recorder's exercise menu,
+  but both entry points are labelled for linking rather than managing or
+  unlinking.
 - Reproduced on tagged build?: `not_yet` on device; reported against the build
   13 feedback round
 - Reproduced on current `main`?: `not_yet` on device; source-confirmed
-- Existing workaround: open the personal Exercise Catalog, open the exercise's
-  overflow menu, choose `Link to group exercise…`, then use `Unlink` in the
-  Linked section.
+- Existing workaround: open the exercise's overflow menu in the personal
+  Exercise Catalog or its `•••` menu in the recorder, choose
+  `Link to group exercise…`, then use `Unlink` in the Linked section.
 - Suspected component or path:
   `apps/mobile/components/groups/group-exercises-page.tsx`,
   `apps/mobile/components/groups/group-exercise-row.tsx`,
