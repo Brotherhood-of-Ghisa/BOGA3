@@ -42,8 +42,8 @@ This directory contains two kinds of files:
 ### Internal Maestro helpers
 
 - `ios-sim-boot.sh`
-  - purpose: resolves a simulator by `IOS_SIM_UDID` or `IOS_SIM_DEVICE`; when `IOS_SIM_AUTO_CREATE=1` (the default) and the named device is missing, it creates a slot-named simulator from the newest installed iOS runtime + a preferred iPhone device type, boots it, and waits for boot readiness. Existing/booted simulators are reused, never duplicated.
-  - used by: `maestro-ios-provision.sh`.
+  - purpose: resolves a simulator by `IOS_SIM_UDID` or `IOS_SIM_DEVICE`; when `IOS_SIM_AUTO_CREATE=1` (the default) and the named device is missing, it creates a slot-named simulator from the newest installed iOS runtime + a preferred iPhone device type, boots it, and waits for boot readiness. Existing/booted simulators are reused, never duplicated. The boot + wait run under a hard deadline (`IOS_SIM_BOOT_TIMEOUT_SECONDS`, default 120); on timeout it kills the blocked `simctl` and fails with the device state, whether Simulator.app is running, SpringBoard's status and crash reports for that device, and the remediation. Regression test: `scripts/tests/ios-sim-boot.test.sh` (`meta-tests`).
+  - used by: `maestro-ios-provision.sh`, `ios-dev-client-start.sh`.
   - status: used and needed.
 - `maestro-env.sh`
   - purpose: validates `apps/mobile/.maestro/maestro.env.local`, then loads shared/local Maestro environment variables.

@@ -91,6 +91,7 @@ Existing environment names that are already implemented remain canonical:
 - `IOS_SIM_UDID`
 - `IOS_SIM_AUTO_CREATE`
 - `EXPO_START_WAIT_SECONDS`
+- `IOS_SIM_BOOT_TIMEOUT_SECONDS` (hard deadline for `ios-sim-boot.sh`'s boot + boot-ready wait; default 120)
 
 New M10-required environment names are locked as:
 
