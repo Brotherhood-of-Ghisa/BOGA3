@@ -73,12 +73,11 @@ exit 0
 EOF
 chmod +x "${STUB_BIN}/docker"
 
-# _common.sh expects a repo layout; point it at a temp worktree with a config.
-export BOGA_SUPABASE_WORKDIR="${TMP}/wt"
-mkdir -p "${BOGA_SUPABASE_WORKDIR}/supabase"
-
+# Source the library, NOT _common.sh: _common.sh is a runtime entrypoint that
+# requires a slot lease at source time and exits without one, so sourcing it
+# here would pass locally and fail in CI, where this lane runs leaseless.
 # shellcheck disable=SC1091
-source "${REPO_ROOT}/supabase/scripts/_common.sh"
+source "${REPO_ROOT}/supabase/scripts/_containers.sh"
 
 set_containers() { printf '%s\n' "$@" > "${STUB_WORK}/containers"; }
 
