@@ -237,6 +237,10 @@ Acceptance:
 
 Read each test directory's README before editing tests. At minimum:
 
+The planning-only PR that introduces this document requires the `docs-check`
+lane. The broader gates below apply to the future implementation diff, not to
+this Markdown-only change.
+
 ### Infra-free mobile tests
 
 - pure overlap-model matrix: selected/aggregate group, duplicate shares,
@@ -305,4 +309,3 @@ work adds timers/subscriptions.
   groups;
 - camera capture, social reactions, chat, streaks, or permanent overlap history;
 - changing Sync v2 to carry profile pictures or celebration state.
-
