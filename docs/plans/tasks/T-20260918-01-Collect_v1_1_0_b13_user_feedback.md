@@ -5,7 +5,7 @@ status: in_progress
 ui_impact: "no"
 areas: "docs|frontend|cross-stack"
 runtimes: "docs"
-gates_fast: "N/A while this card only records and triages feedback"
+gates_fast: "docs-check while this card only records and triages feedback"
 gates_slow: "N/A while this card only records and triages feedback"
 docs_touched: "none until an accepted action changes a durable contract"
 ---
@@ -572,7 +572,10 @@ Action status values: `proposed`, `approved`, `in_progress`, `shipped`,
 
 ## Testing and verification approach
 
-- Feedback-only edits to this task card require documentation validation only.
+- Feedback-only edits to this task card require `./boga test docs-check`. In the
+  PR gate table, mark the `fast` row ✅ with the required `docs-check` lane
+  evidence because that lane belongs to the fast gate; do not mark the row N/A
+  for a Markdown change.
 - Once an action changes product code, use `./boga test for <changed paths>` to
   determine the required gates and record measured results in the implementing
   PR, not here.
