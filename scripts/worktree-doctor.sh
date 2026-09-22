@@ -100,19 +100,18 @@ if [[ -f "$CONFIG_FILE" ]]; then
   db_port="$(toml_value db port "$CONFIG_FILE")"
   studio_port="$(toml_value studio port "$CONFIG_FILE")"
 
-  [[ "$project_id" == "$(boga_project_id_for_slot "$slot" "$REPO_ROOT")" ]] \
+  expected_project_id="$(boga_project_id_for_slot "$slot" "$REPO_ROOT")"
+  [[ "$project_id" == "$expected_project_id" ]] \
     && ok "supabase project_id matches slot" \
-    || fail "supabase project_id '$project_id' does not match slot $slot; run ./boga worktree start"
+    || fail "supabase project_id '$project_id' does not match '$expected_project_id' (slot $slot); run ./boga worktree start"
 
-  # The Supabase CLI caps project_id at 40 characters and silently rewrites a
-  # longer one, so a long worktree name yields containers named for a prefix of
-  # project_id — losing the trailing slot number that makes it unique. The
-  # supabase/scripts resolvers handle that truncation and refuse a container
-  # that does not publish this slot's ports, so it is not silently dangerous;
-  # it is still worth flagging, because two worktrees agreeing in their first
-  # 40 characters cannot both run.
-  if (( ${#project_id} > ${SUPABASE_CLI_PROJECT_ID_LIMIT} )); then
-    warn "supabase project_id is ${#project_id} chars; the Supabase CLI truncates it to '${project_id:0:${SUPABASE_CLI_PROJECT_ID_LIMIT}}' — a shorter worktree name keeps the slot suffix, which is what distinguishes this stack from another slot's"
+  # boga_project_id_for_name caps generated ids at the CLI's limit, so an
+  # over-length id here can only be a config.toml written before that cap: the
+  # CLI runs it as a 40-char prefix that drops the slot suffix, and a sibling
+  # worktree may share that prefix. The supabase/scripts resolvers still accept
+  # the truncated name only when it publishes this slot's port.
+  if (( ${#project_id} > SUPABASE_CLI_PROJECT_ID_LIMIT )); then
+    warn "supabase/config.toml is stale: project_id is ${#project_id} chars (> $SUPABASE_CLI_PROJECT_ID_LIMIT), written before ids were capped; the CLI runs it as '${project_id:0:SUPABASE_CLI_PROJECT_ID_LIMIT}'. After ./boga worktree start, that stack is unleased: clear it via docs/procedures/worktree-cleanup.md"
   fi
   [[ "$api_port" == "$(boga_port_for_slot api "$slot")" ]] \
     && ok "supabase api port matches slot" \

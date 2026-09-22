@@ -101,7 +101,7 @@ EOF
 printf '.worktree-slot\nsupabase/config.toml\nsupabase/.env.local\nsupabase/.env.hosted\nsupabase/functions/.env.local\napps/mobile/.maestro/maestro.env.local\n' >"$MAIN/.gitignore"
 cp "$SRC_ROOT/boga" "$MAIN/"
 for f in worktree-lib.sh worktree-start.sh worktree-create.sh worktree-release.sh worktree-ls.sh \
-  pr-wait.sh boga-config-init.sh lanes.tsv lane-timing.sh java-env.sh; do
+  worktree-doctor.sh pr-wait.sh boga-config-init.sh lanes.tsv lane-timing.sh java-env.sh; do
   cp "$SRC_ROOT/scripts/$f" "$MAIN/scripts/"
 done
 git -C "$MAIN" add -A
@@ -115,6 +115,41 @@ advance_origin_main() { # a new commit on origin/main, pushed from the main chec
   git -C "$MAIN" commit -qam "$1"
   git -C "$MAIN" push -q origin main
 }
+
+echo "== project_id generation: capped, collision-safe, deterministic"
+# Sourced from the source tree: worktree-lib.sh is side-effect free and needs no
+# lease, so this runs as-is in CI's leaseless meta-tests lane.
+# shellcheck disable=SC1091
+source "$SRC_ROOT/scripts/worktree-lib.sh"
+LONG_A="exercise-session-redesign-step3-set-logging-a1b2c3"
+LONG_B="exercise-session-redesign-step3-set-logging-d4e5f6"
+LONG_C="exercise-session-redesign-step4-history-view-a1b2c3"
+# The shape that motivated the cap: uncapped, these two agree in their first 40
+# characters, so the CLI would run both as one Docker project.
+assert_eq "$(cut -c1-40 <<<"BOGA-$LONG_A-wt3")" "$(cut -c1-40 <<<"BOGA-$LONG_B-wt4")" \
+  "fixture: uncapped ids of LONG_A/LONG_B collide under the CLI's cut"
+ids=()
+over=0 tail_lost=0 unstable=0
+for name in "$LONG_A" "$LONG_B" "$LONG_C" exercise-session-redesign-f34616 \
+  "$(printf 'x%.0s' {1..120})" feat-a; do
+  for slot in 1 3 9 42 99; do
+    id="$(boga_project_id_for_name "$slot" "$name")"
+    (( ${#id} <= SUPABASE_CLI_PROJECT_ID_LIMIT )) || { over=1; echo "      | ${#id}: $id" >&2; }
+    [[ "$id" == *"-wt$slot" ]] || { tail_lost=1; echo "      | no -wt$slot: $id" >&2; }
+    [[ "$id" == "$(boga_project_id_for_name "$slot" "$name")" ]] || unstable=1
+    ids+=("$id")
+  done
+done
+assert_eq "$over" "0" "no id exceeds SUPABASE_CLI_PROJECT_ID_LIMIT ($SUPABASE_CLI_PROJECT_ID_LIMIT)"
+assert_eq "$tail_lost" "0" "every id keeps its whole -wt<slot> suffix"
+assert_eq "$unstable" "0" "repeated calls return the same id"
+assert_eq "$(printf '%s\n' "${ids[@]}" | sort -u | wc -l | tr -d ' ')" "${#ids[@]}" \
+  "names sharing a long prefix get distinct ids, on one slot and across slots"
+# Pinned so a platform whose cksum differed (CI Linux vs macOS) fails here
+# instead of making doctor disagree with config.toml across machines.
+assert_eq "$(boga_project_id_for_name 3 exercise-session-redesign-f34616)" "BOGA-exercise-session-redes-cfeeb0d1-wt3" \
+  "a capped id is pinned (the #313 worktree, slot 3)"
+assert_eq "$(boga_project_id_for_name 1 feat-a)" "BOGA-feat-a-wt1" "an id that fits is unchanged"
 
 echo "== fail hard without a lease"
 run out "$MAIN/boga" test lint --dry-run
@@ -221,6 +256,34 @@ echo "== release --project-id --force removes an unleased stack"
 run out "$MAIN/scripts/worktree-release.sh" --project-id BOGA-ghost-wt9 --force
 assert_eq "$RC" "0" "unleased stack released"
 assert_contains "$(cat "$WORK/docker.log")" "rm x1" "removed its containers"
+
+echo "== long worktree name: capped id in config, lease, and doctor"
+LONG_NAME="exercise-session-redesign-step3-set-logging"
+run out "$MAIN/scripts/worktree-create.sh" "$LONG_NAME"
+assert_eq "$RC" "0" "create a long-named worktree"
+WL="$BOGA_WORKTREE_ROOT/$LONG_NAME"
+WL_SLOT="$(cat "$WL/.worktree-slot")"
+WL_ID="$(awk -F\" '/^project_id =/ { print $2; exit }' "$WL/supabase/config.toml")"
+if (( ${#WL_ID} <= SUPABASE_CLI_PROJECT_ID_LIMIT )); then pass "config.toml project_id fits the CLI limit ($WL_ID)"; else fail "config.toml project_id too long: $WL_ID"; fi
+assert_contains "$(cat "$REG/$WL_SLOT")" "project_id=$WL_ID" "lease records the same capped id"
+run out "$WL/scripts/worktree-doctor.sh"
+assert_contains "$out" "[ok] supabase project_id matches slot" "doctor accepts the capped id"
+
+echo "== migration: a config.toml written before the cap"
+OLD_ID="BOGA-$LONG_NAME-wt$WL_SLOT"
+sed -i.bak "s|^project_id = .*|project_id = \"$OLD_ID\"|" "$WL/supabase/config.toml"
+run out "$WL/scripts/worktree-doctor.sh"
+assert_eq "$RC" "1" "doctor fails on the stale over-length id"
+assert_contains "$out" "does not match '$WL_ID' (slot $WL_SLOT); run ./boga worktree start" "names the expected id and the command"
+assert_contains "$out" "supabase/config.toml is stale" "warns that an over-length id means a stale config"
+run out "$WL/scripts/worktree-start.sh"
+assert_eq "$RC" "0" "re-running start migrates it"
+assert_contains "$out" "project_id changed: $OLD_ID -> $WL_ID" "start reports the rename"
+assert_contains "$out" "labels '${OLD_ID:0:SUPABASE_CLI_PROJECT_ID_LIMIT}' is now unleased" "names the orphaned stack's Docker label"
+assert_contains "$out" "worktree-cleanup.md" "points at the cleanup procedure"
+assert_contains "$(cat "$WL/supabase/config.toml")" "project_id = \"$WL_ID\"" "config rewritten with the capped id"
+run out "$WL/scripts/worktree-start.sh"
+if grep -qF "project_id changed" <<<"$out"; then fail "an unchanged re-run warns about a rename"; else pass "an unchanged re-run does not warn"; fi
 
 echo "== pr wait"
 rm -f "$WORK/gh.called" "$WORK/gh.after"

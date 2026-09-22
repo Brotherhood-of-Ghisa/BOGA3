@@ -47,6 +47,7 @@ PR state), Supabase stacks in Docker with no lease, and prunable git worktrees.
 | Lease, worktree path missing | `./boga worktree release --slot <N> --force` |
 | Lease, PR **OPEN**, no PR, or detached HEAD | **Keep.** List it and ask the human about each one |
 | Supabase stack with no lease (not `BOGA-dev`) | `./boga worktree release --project-id <id> --force` |
+| Unleased stack with a 40-char id cut mid-name (left when `worktree start` capped an over-long id; start printed that label) | Same command, but first check that no lease's worktree still has an id starting with that label in its `supabase/config.toml`: siblings sharing a long name prefix were cut to one label, and the command removes it for both |
 | Worktree with no lease, PR **MERGED** or **CLOSED**, no uncommitted changes | `git worktree remove --force <path>` (and release its stack by `--project-id` if one exists) |
 | Worktree with no lease, anything else (open/no PR, uncommitted changes) | **Keep.** List it and ask the human |
 | Prunable git worktree | `git worktree prune` |
