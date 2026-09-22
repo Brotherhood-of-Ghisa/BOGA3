@@ -116,11 +116,10 @@ appId: com.dinoderek.mobile
 
 - tapOn:
     id: "stats-exercise-sort-exercise"
-# The direction arrow is an SVG icon hidden from accessibility; the header's
-# own label carries the sort for assistive tech, and the jest suite pins the arrow.
+# The indicator's arrow is an SVG icon whose testID names its direction; the
+# header's own accessibility label carries the sort for assistive tech.
 - assertVisible:
-    id: "stats-exercise-sort-exercise-indicator"
-- assertVisible: "Recent"
+    id: "stats-exercise-sort-exercise-indicator-down"
 - takeScreenshot: "01b-exercise-table-most-recent"
 
 - tapOn:

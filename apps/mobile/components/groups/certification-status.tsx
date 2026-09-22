@@ -7,7 +7,12 @@ import type { RecordCertificationStatus } from '@/src/groups';
  * A record's certification state: a check when certified, a ring when not yet,
  * nothing when voided (the label says why). The glyph is decoration — the
  * label, or the row's own accessibility label, states the state in words.
- * `testID` stays on the label text, so a flow can match its id and text at once.
+ *
+ * With a label the line is ONE accessibility element (label + `testID`), so a
+ * flow matches its id and text at once and VoiceOver reads it as one line. It
+ * also keeps XCUITest out of the SVG: inside a `Modal`, a decorative icon with
+ * no accessible ancestor made iOS snapshot the app as empty (groups-e2e, the
+ * record sheet). Without a label the caller's element already speaks for it.
  */
 export function GroupCertificationStatus({
   status,
@@ -23,7 +28,11 @@ export function GroupCertificationStatus({
   variant?: UiTextVariant;
 }) {
   return (
-    <View style={styles.row}>
+    <View
+      accessibilityLabel={label ?? undefined}
+      accessible={label !== null}
+      style={styles.row}
+      testID={testID}>
       {status === 'voided' ? null : (
         <Icon
           color={status === 'certified' ? uiColors.textSuccess : uiColors.textSecondary}
@@ -32,11 +41,7 @@ export function GroupCertificationStatus({
           testID={iconTestID}
         />
       )}
-      {label ? (
-        <UiText testID={testID} variant={variant}>
-          {label}
-        </UiText>
-      ) : null}
+      {label ? <UiText variant={variant}>{label}</UiText> : null}
     </View>
   );
 }

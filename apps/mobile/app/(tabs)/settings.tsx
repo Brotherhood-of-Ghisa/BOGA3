@@ -207,7 +207,11 @@ export default function SettingsScreen() {
                   See setup instructions for your MCP-compatible client.
                 </UiText>
               </View>
-              <Icon color={uiColors.textSecondary} name="arrow-up-right" />
+              <Icon
+                color={uiColors.textSecondary}
+                name="arrow-up-right"
+                style={styles.externalIndicator}
+              />
             </View>
           </UiSurface>
         </Pressable>
@@ -490,6 +494,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: uiSpace.md,
+  },
+  externalIndicator: {
+    alignSelf: 'center',
   },
   iconBadge: {
     width: 44,
