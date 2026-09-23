@@ -1,0 +1,13 @@
+{
+  "lane": "ios-exercise-page",
+  "wall_ms": 75672,
+  "exit_code": 1,
+  "recorded_at": "20260923T090654Z",
+  "machine_id": "64f1e02c",
+  "hw": "Apple M4 Max",
+  "cores": 16,
+  "os": "macOS 27.0",
+  "slot": "2",
+  "commit": "53b5ec8",
+  "source": "gate"
+}
