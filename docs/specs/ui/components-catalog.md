@@ -42,8 +42,8 @@ Brief entrypoint inventory of the current reusable UI component set.
   - carries the collapsed scales the UI guardrail enforces (8 type sizes with a
     matching `lineHeight` per size, 6 spacing steps, 3 radii) plus `uiElevation`
     (`flat` / `raised` / `overlay`); values and rationale: `docs/specs/ui/ux-rules.md` §9a
-  - also carries the design-language vocabularies, not yet adopted by a shipped
-    screen: `uiRoles` (colour roles), `uiFonts` (the three embedded typefaces
+  - also carries the design-language vocabularies, adopted so far only by the exercise
+    page and the session view (behind the new-screens setting): `uiRoles` (colour roles), `uiFonts` (the three embedded typefaces
     and their shipped weights) and `uiGeometry` (card / sheet / control radii,
     the 44pt tap target, the 38pt metric column, the sheet handle, the 50pt
     labelled-field height, micro-label tracking); rationale:
@@ -81,7 +81,8 @@ Brief entrypoint inventory of the current reusable UI component set.
 - Purpose:
   - the building blocks of the exercise page and session view, drawn from
     `uiRoles` / `uiFonts` / `uiGeometry` only (`docs/specs/ui/design-language.md`);
-    adopted by the exercise page (`components/exercise-page/`), behind the new-screens setting
+    adopted by the exercise page (`components/exercise-page/`) and the session view
+    (`components/session-view/`), behind the new-screens setting
   - `Card` — `surface` on `paper`, 1px `rule`, card radius, no shadow, no
     padding (content owns its insets); with `onPress` the whole card is one
     labelled `link` target
@@ -112,6 +113,7 @@ Brief entrypoint inventory of the current reusable UI component set.
   - decorative by default (hidden from assistive tech, never takes touches); a
     `label` makes it an accessible image, for the rare icon no surrounding text
     or control label explains
+  - `delete` (Lucide `trash-2`) marks a destructive menu option
   - geometry is vendored from Lucide 1.47.0 (ISC; notice in `LICENSE.lucide`),
     plus `chevron-left` (back), `pencil` (edit), `swap` (Lucide
     `arrow-left-right`) and `trash` (Lucide `trash-2`) for the exercise page,
@@ -290,6 +292,30 @@ Brief entrypoint inventory of the current reusable UI component set.
   - `ExerciseSwapSheet` — `Sheet` over the shared `ExerciseListContent` / `buildExerciseListModel` and list preferences
   - `pageText` — the page's shared type roles (micro-label, control label, running / detail / headline figures)
   - covered by `app/__tests__/exercise-page-screen.test.tsx`, `exercise-page-model.test.ts`, `exercise-page-persistence.test.ts` and the `ios-exercise-page` lane
+
+17. Exercise picker
+- File: `apps/mobile/components/session-recorder/exercise-picker.tsx`
+- Purpose:
+  - the recorder's exercise picker, extracted so the session view's
+    `+ Add exercise` reuses it: search and shared list options, the add
+    preselection (`Add empty set` / `Append plan`), `From your groups` with its
+    pick sheet, inline create and Manage. It owns its own state and reports a
+    choice (`onSelectExercise` / `onAppendPlan` / `onOpenManage`); the host
+    bumps `openRequestId` for a fresh open and applies the choice
+
+18. Session view components
+- Folder: `apps/mobile/components/session-view/`
+- Purpose:
+  - `SessionTopBar` — `Session` · ⋮ · `Finish` (`accent`), under the status bar
+  - `SessionSummaryCard` — `Card` with stacked `Stat`s Time (ticking) / Gym /
+    Sets / Volume
+  - `SessionExerciseCard` — `Card` link per exercise: name, `n/m`, read-only set
+    rows (type · weight × reps · inline `Stat` 1RM / VOL with legends), and the
+    `record` band. testID `session-view-exercise-<id>` with `-count`, `-set-<n>`,
+    `-record`
+  - `SessionOptionsSheet` — `Sheet` + one danger `ListRow` (`Abandon session`)
+  - `OutlineButton` — the ink-outline secondary action (`+ Add exercise`)
+  - covered by `apps/mobile/app/__tests__/session-view-screen.test.tsx`
 
 ### UI-supporting shared module (non-visual)
 

@@ -351,17 +351,17 @@ guardrail keeps screens on them.
 `tokens.ts` also exports **`uiRoles`** — the colour roles of
 `ui/design-language.md` §2, added 2026-09-22 for the exercise/session rebuild.
 It is a second, separate vocabulary from `uiColors`, deliberately not merged
-into it, and **no shipped screen uses it yet**; the rules below still describe
-everything that renders today. Likewise **`uiFonts`** (added 2026-09-22) names
+into it. Its only user is the session view (`/session/[sessionId]`, §14b),
+reached only with the new-screens setting on; the rules below still describe
+everything else that renders today. Likewise **`uiFonts`** (added 2026-09-22) names
 the three embedded typefaces of `ui/design-language.md` §3 and the weights of
-each that ship; nothing shipped uses it, so every screen still renders in the
-system font. And **`uiGeometry`** (added 2026-09-22) carries the design
+each that ship; only the session view uses it, so every other screen still
+renders in the system font. And **`uiGeometry`** (added 2026-09-22) carries the design
 language's own radii (card 6, sheet 16), the 44pt tap target, the 38pt metric
 column, the sheet handle and micro-label tracking — a separate vocabulary from
 the legacy scales below, which it does not extend, so rule 5's three radii still
 hold for everything shipped. Its only consumers are the design-language
-primitives (`Card`, `Stat`, `ListRow`, `Sheet`), which no shipped screen uses
-yet.
+primitives (`Card`, `Stat`, `ListRow`, `Sheet`) and the session view.
 
 1. **Type: 8 sizes.**
    `xxs 10 · xs 11 · sm 12 · md 13 · base 14 · lg 16 · xl 18 · xxl 24`.
@@ -576,6 +576,33 @@ unchanged. What differs is presentation:
    exercise definition.
 6. **Sheets** are the design-language `Sheet`: backdrop, Android back and the
    VoiceOver escape dismiss; no Cancel.
+
+### 14b. Session view (redesign step 5; new-screens setting only)
+
+1. The session view is read-only and navigational: the whole exercise card is
+   one link to the exercise page, with no controls inside it. Editing happens
+   only on the exercise page; add lives on the session view (`+ Add
+   exercise`), remove in the exercise's own ⋮.
+2. `Finish` (top bar, `accent`) is the screen's one primary. It asks the
+   recorder's cleanup questions with the recorder's copy, in the recorder's
+   order (incomplete sets, entered-but-unconfirmed sets, exercises left with no
+   sets), as native alerts; declining any writes nothing. Invalid set values
+   block it with an alert naming the exercises to fix.
+3. ⋮ is a menu sheet even with one item. `Abandon session` is `danger` and
+   confirms (`Abandon session?` · `Keep session` / `Abandon`) before the same
+   soft delete as the Sessions list's delete; the sheet's backdrop, Android
+   back and the VoiceOver escape dismiss it.
+4. A card row shows every set: done rows in `ink`, everything else faded
+   (values `inkFaint`, legends `planned`), a planned row showing its
+   prescription. Bold marks the best weight, 1RM and volume of that exercise
+   today among done sets, per column; a done set whose 1RM beats the
+   exercise's completed history is shown in `record` and earns the card a
+   `record` band (`New 1RM record · <1RM>`), from the same derivation as the
+   recorder's `New PR`.
+5. The summary counts only confirmed performed sets (warm-ups included) and
+   their entered-load volume; Time is elapsed since the session's start.
+6. The persistent four-tab bar stays at the bottom with Train selected; it is
+   the way back out, and returns to the tab rather than stacking it.
 
 ### 15. Documentation maintenance rule (UI semantics)
 

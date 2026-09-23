@@ -14,6 +14,8 @@ import {
 } from '@/components/session-list';
 import { uiColors, uiSpace, uiTypography } from '@/components/ui';
 import { appendCompletedSessionAsPlanned } from '@/src/data';
+import { sessionViewHref } from '@/src/navigation/active-session-entry';
+import { useNewScreensEnabled } from '@/src/session-recorder/new-screens-preference';
 
 export type SessionsScreenProps = {
   dataClient?: SessionListDataClient;
@@ -27,6 +29,7 @@ export function SessionsScreen({
   isFocused = true,
 }: SessionsScreenProps) {
   const router = useRouter();
+  const [newScreensEnabled] = useNewScreensEnabled();
   const [showDeletedSessions, setShowDeletedSessions] = useState(false);
   const [activeDurationNowMs, setActiveDurationNowMs] = useState(() => Date.now());
 
@@ -68,6 +71,10 @@ export function SessionsScreen({
   }, [activeSession]);
 
   const navigateToSessionRecorder = () => {
+    if (newScreensEnabled && activeSession) {
+      router.push(sessionViewHref(activeSession.id));
+      return;
+    }
     router.dismissTo('/session-recorder');
   };
 

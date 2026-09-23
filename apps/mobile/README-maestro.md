@@ -147,6 +147,13 @@ sharing one sim + Metro):
 TASK_ID=ad-hoc npm run test:e2e:ios:ui-regression
 ```
 
+Session view lane (redesign step 5; infra-free; two flows sharing one sim +
+Metro, each opting in with `newScreens=on` and `fixture=session-view`):
+
+```bash
+TASK_ID=ad-hoc npm run test:e2e:ios:session-view
+```
+
 Two-user groups lane (local Supabase; resets its fixtures first):
 
 ```bash
@@ -173,6 +180,8 @@ cd ../..
 - `ui-regression` provisions with `data reset`; each of its flows resets what it
   needs in-flow through `boga3://maestro-harness?reset=data`, which is what makes
   them safe to share one app install.
+- `session-view` works the same way; its flows also end with a data reset, so
+  the new-screens setting is left off.
 - Use `full reset` only when cold-install/onboarding/permission behavior is part of the objective.
 - Use `data reset` when app-owned persisted state must be cleared without reinstalling the binary.
 - Use `teleport` as the default navigation/setup method when the flow is not explicitly testing setup UI.

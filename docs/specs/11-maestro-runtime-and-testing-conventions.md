@@ -216,7 +216,7 @@ Responsibility split:
   - performs cleanup using the emitted runtime state, including Expo process shutdown, app termination, simulator shutdown by default, and restoring the developer's `.env.local`.
 - `maestro-run-lane.sh`
   - the high-level per-lane entrypoint (`smoke` / `data-smoke` / `ui-regression` /
-    `exercise-page` / `auth-profile` / `sync-e2e` / `groups-e2e`); holds each lane's data (flows,
+    `exercise-page` / `session-view` / `auth-profile` / `sync-e2e` / `groups-e2e`); holds each lane's data (flows,
     reset strategy, Supabase config, fixture users, pre-run fixture reset) and
     calls the shared toolkit via `maestro-ios-run-flow.sh` (one flow per
     provisioned sim) or `maestro-ios-run-flows.sh` (several flows sharing one).
@@ -327,7 +327,9 @@ Priority rule:
 3. Supported harness query parameters are:
    - `reset=data` to perform app-owned persisted-data reset;
    - `fixture=exercise-block-history` to seed deterministic local SQLite history for Issue 70 recorder block-history visual QA;
-   - `teleport=session-list|session-recorder|exercise-catalog|completed-session` to land on the target screen;
+   - `fixture=session-view` to seed that history plus one active session drawn
+     like the accepted `V6-Session` artboard (`src/maestro/session-view-fixture.ts`);
+   - `teleport=session-list|session-recorder|exercise-catalog|completed-session|session-view` to land on the target screen (`session-view` needs `sessionId`);
    - optional `mode`, `intent`, and `sessionId` when the target route needs them;
    - `newScreens=on|off` to set the new exercise/session screens preference
      (`src/session-recorder/new-screens-preference.ts`) before teleporting. It

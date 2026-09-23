@@ -4,6 +4,7 @@ import type {
   SessionDraftSnapshot,
   SessionGraphSnapshot,
 } from '@/src/data';
+import type { SessionInsightExerciseInput } from '@/src/session-insights';
 import { normalizeSessionSetType, type SessionSetType, type SessionSetTypeValue } from '@/src/data/set-types';
 import {
   canonicalizeSetValues,
@@ -549,3 +550,24 @@ export const describeSubmitCleanupPrompt = (
       };
   }
 };
+
+/** The session as `session-insights` reads it (records, muscle load). */
+export const toSessionInsightExercises = (
+  session: Session,
+  currentExerciseNameByDefinitionId: ReadonlyMap<string, string>
+): SessionInsightExerciseInput[] =>
+  session.exercises.map((exercise, exerciseIndex) => ({
+    id: exercise.id,
+    orderIndex: exerciseIndex,
+    exerciseDefinitionId: exercise.exerciseDefinitionId,
+    exerciseName:
+      currentExerciseNameByDefinitionId.get(exercise.exerciseDefinitionId) ?? exercise.name,
+    sets: exercise.sets.map((set, setIndex) => ({
+      id: set.id,
+      orderIndex: setIndex,
+      weightValue: set.weight,
+      repsValue: set.reps,
+      setType: set.setType,
+      performanceStatus: set.performanceStatus,
+    })),
+  }));

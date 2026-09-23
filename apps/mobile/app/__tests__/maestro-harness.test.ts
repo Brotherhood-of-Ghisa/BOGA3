@@ -129,6 +129,7 @@ describe('maestro harness helpers', () => {
     expect(resolveMaestroHarnessFixtureName('exercise-block-history')).toBe(
       'exercise-block-history'
     );
+    expect(resolveMaestroHarnessFixtureName('session-view')).toBe('session-view');
     expect(resolveMaestroHarnessFixtureName('unexpected')).toBe('none');
     expect(resolveMaestroHarnessBootstrapAction('complete')).toBe('complete');
     expect(resolveMaestroHarnessBootstrapAction('reset')).toBe('reset');
@@ -194,6 +195,11 @@ describe('maestro harness helpers', () => {
     expect(
       resolveMaestroHarnessTeleportHref({ target: 'exercise-page', sessionId: 'session-123' })
     ).toBeNull();
+    expect(resolveMaestroHarnessTeleportTarget('session-view')).toBe('session-view');
+    expect(
+      resolveMaestroHarnessTeleportHref({ target: 'session-view', sessionId: 'session-123' })
+    ).toBe('/session/session-123');
+    expect(resolveMaestroHarnessTeleportHref({ target: 'session-view' })).toBeNull();
   });
 
   it('runs a data reset only when requested', async () => {

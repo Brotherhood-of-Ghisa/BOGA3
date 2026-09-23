@@ -10,6 +10,10 @@ jest.mock('expo-router', () => ({
 
 import type { SessionListDataClient, SessionListItem } from '@/components/session-list';
 import type { SessionEntryCoordinator } from '@/src/session-entry';
+import {
+  __resetNewScreensPreferenceForTests,
+  setNewScreensEnabled,
+} from '@/src/session-recorder/new-screens-preference';
 
 import { TrainScreen, type TrainPlanningState } from '../(tabs)/train';
 
@@ -48,6 +52,22 @@ const sessionEntry = (): jest.Mocked<SessionEntryCoordinator> => ({
 describe('Train screen', () => {
   beforeEach(() => {
     mockPush.mockReset();
+    __resetNewScreensPreferenceForTests();
+  });
+
+  it('opens the session view instead of the recorder when the new screens setting is on', async () => {
+    await setNewScreensEnabled(true);
+    const entry = sessionEntry();
+    const { unmount } = render(<TrainScreen dataClient={dataClient([activeSession])} sessionEntry={entry} />);
+
+    fireEvent.press(await screen.findByTestId('train-resume-session-button'));
+    expect(mockPush).toHaveBeenCalledWith('/session/active-session');
+    unmount();
+
+    render(<TrainScreen initialSessions={[]} sessionEntry={entry} />);
+    fireEvent.press(screen.getByTestId('train-start-empty-button'));
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/session/empty-session'));
+    expect(mockPush).not.toHaveBeenCalledWith('/session-recorder');
   });
 
   it('replaces every new-session action with Resume when a draft exists', async () => {

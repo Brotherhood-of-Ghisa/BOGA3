@@ -119,6 +119,7 @@ import {
   sessionHasInvalidSetValues,
   toPersistCompletedExercises,
   toPersistDraftExercises,
+  toSessionInsightExercises,
   WEIGHT_INPUT_PATTERN,
   type PlannedSetRowState,
   type SetFieldName,
@@ -131,7 +132,6 @@ import {
   deriveExercisePersonalRecord,
   summarizeCurrentSessionMuscleLoad,
   type ExercisePersonalRecord,
-  type SessionInsightExerciseInput,
 } from '@/src/session-insights';
 import { isDevMode } from '@/src/utils/isDevMode';
 
@@ -667,26 +667,6 @@ const getCurrentExerciseBlockMetrics = (
     workingSetCount,
   };
 };
-
-const toSessionInsightExercises = (
-  session: Session,
-  currentExerciseNameByDefinitionId: ReadonlyMap<string, string>
-): SessionInsightExerciseInput[] =>
-  session.exercises.map((exercise, exerciseIndex) => ({
-    id: exercise.id,
-    orderIndex: exerciseIndex,
-    exerciseDefinitionId: exercise.exerciseDefinitionId,
-    exerciseName:
-      currentExerciseNameByDefinitionId.get(exercise.exerciseDefinitionId) ?? exercise.name,
-    sets: exercise.sets.map((set, setIndex) => ({
-      id: set.id,
-      orderIndex: setIndex,
-      weightValue: set.weight,
-      repsValue: set.reps,
-      setType: set.setType,
-      performanceStatus: set.performanceStatus,
-    })),
-  }));
 
 const hasSavedGymCoordinates = (location: SessionLocation) =>
   typeof location.latitude === 'number' &&
