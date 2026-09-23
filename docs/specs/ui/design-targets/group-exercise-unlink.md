@@ -41,13 +41,15 @@ Selected rendered examples are retained here to make the accepted interaction an
 
 Intentional changes from the baseline are the separate destructive action beneath linked status, a contextual personal-exercise chooser, the longer native confirmation, and a contextual success notice. The existing page header, card surface, admin chevron, typography and button palette are reused.
 
-Current main places Exercises on the group management page rather than an Exercises segment. The implementation follows that existing layout. Ranking, sharing, certification and schema semantics are unchanged.
+Current main places Exercises on the group management page rather than an Exercises segment. The implementation follows that existing layout. Ranking, sharing, certification and schema semantics are unchanged. Main's later recorder retirement (`482c5e02`, #331) is merged: catalogue/exercise-page wording follows that change, while the unlink rendering code and selected captures remain applicable.
 
 Accessibility checks cover 44 pt minimum unlink/chooser/retry controls; wrapped labels; independently exposed admin row and personal-link actions; contextual chooser accessibility labels; modal accessibility scope; and a focus-restoration callback to the launching row after dismissal. Maestro exercises the independent native controls and native confirmation. This does not claim a full manual VoiceOver audit.
 
 ## Device evidence and method
 
-The permanent groups flow passed in `apps/mobile/artifacts/maestro/unlink-groups-final/20260923-220104-70645/`; its existing Link-screen flow passed in `20260923-220456-72152/`. The preceding full frontend run passed its other seven lanes. Its first groups attempt stopped on an existing native record-sheet accessibility wait even though the failure screenshot showed the sheet; the complete groups lane then passed on rerun.
+After merging #331, fast and handles passed with 157 suites / 1,791 tests. Backend contracts and the atomic unlink data guard are unchanged by that merge, so the backend results below remain applicable. A cold-start smoke attempt missed its first Train-tab tap; the flow now retries that real navigation with a bounded destination assertion. Harness meta-tests pass.
+
+The full merged-main `./boga test frontend` run passed all eight lanes in one invocation (`TASK_ID=unlink-merged-frontend-final`). The existing Link-screen flow passed in `apps/mobile/artifacts/maestro/unlink-merged-frontend-final/20260923-225344-17615/`. The two-user flow passed in `apps/mobile/artifacts/maestro/unlink-merged-frontend-final/20260923-225007-16185/`, including selected-link preservation, both leaderboard modes, the original active certification, and relink. Before the merge, the full frontend run passed seven lanes and the complete groups lane passed on rerun (`unlink-groups-final/20260923-220104-70645/` and `20260923-220456-72152/`); its first attempt had stopped on a native record-sheet accessibility wait despite the sheet being visible in the failure screenshot.
 
 The ad hoc viewport flow uses the same group setup and unlink section. For the outage, the host stops only the leased slot's local Kong proxy after the group is cached. It asserts the offline banner and local success, restarts the proxy, waits for API health, requests normal Settings sync, and reuses the authenticated preservation assertions. No application fault-injection code or server ranking changes are involved. Selected captures above show both entry points and the retained second link.
 
@@ -67,22 +69,21 @@ Compared with the baseline, names wrap within the row on the smaller viewport; t
 | Cancel → unlink → sync → both boards exclude set → same completed record/certification → relink restores eligibility; second mapping retained | `groups-two-user-stream.yaml` §7d and `groups-counterparty.js` authenticated assertions |
 | Existing ranking/certification semantics | `groups-leaderboards` lane: R5 in `groups-boards.sh` and unlink/relink in `groups-certification.sh` |
 
-
 ## Local gate evidence
 
 Each link is the wrapper-written result for that lane. Earlier attempts are retained in the append-only timing dataset; these rows use the latest completed runs.
 
 | Lane | Result | Measured record |
 | --- | --- | --- |
-| `lint` | PASS | [record](../../../testing/timings/records/20260923T212133Z.e277734d.slot3.lint.json) |
-| `typecheck` | PASS | [record](../../../testing/timings/records/20260923T212138Z.e277734d.slot3.typecheck.json) |
-| `jest-full` | PASS | [record](../../../testing/timings/records/20260923T212149Z.e277734d.slot3.jest-full.json) |
-| `ui-guardrails` | PASS | [record](../../../testing/timings/records/20260923T212149Z.e277734d.slot3.ui-guardrails.json) |
-| `docs-check` | PASS | [record](../../../testing/timings/records/20260923T212404Z.e277734d.slot3.docs-check.json) |
-| `meta-tests` | PASS | [record](../../../testing/timings/records/20260923T212240Z.e277734d.slot3.meta-tests.json) |
-| `agent-auth-web` | PASS | [record](../../../testing/timings/records/20260923T212243Z.e277734d.slot3.agent-auth-web.json) |
-| `mcp-unit` | PASS | [record](../../../testing/timings/records/20260923T212248Z.e277734d.slot3.mcp-unit.json) |
-| `backend-fast` | PASS | [record](../../../testing/timings/records/20260923T212220Z.e277734d.slot3.backend-fast.json) |
+| `lint` | PASS | [record](../../../testing/timings/records/20260923T212824Z.e277734d.slot3.lint.json) |
+| `typecheck` | PASS | [record](../../../testing/timings/records/20260923T212828Z.e277734d.slot3.typecheck.json) |
+| `jest-full` | PASS | [record](../../../testing/timings/records/20260923T212837Z.e277734d.slot3.jest-full.json) |
+| `ui-guardrails` | PASS | [record](../../../testing/timings/records/20260923T212837Z.e277734d.slot3.ui-guardrails.json) |
+| `docs-check` | PASS | [record](../../../testing/timings/records/20260923T215605Z.e277734d.slot3.docs-check.json) |
+| `meta-tests` | PASS | [record](../../../testing/timings/records/20260923T213608Z.e277734d.slot3.meta-tests.json) |
+| `agent-auth-web` | PASS | [record](../../../testing/timings/records/20260923T212953Z.e277734d.slot3.agent-auth-web.json) |
+| `mcp-unit` | PASS | [record](../../../testing/timings/records/20260923T212958Z.e277734d.slot3.mcp-unit.json) |
+| `backend-fast` | PASS | [record](../../../testing/timings/records/20260923T212930Z.e277734d.slot3.backend-fast.json) |
 | `auth-authz` | PASS | [record](../../../testing/timings/records/20260923T202529Z.e277734d.slot3.auth-authz.json) |
 | `groups-contract` | PASS | [record](../../../testing/timings/records/20260923T202548Z.e277734d.slot3.groups-contract.json) |
 | `groups-leaderboards` | PASS | [record](../../../testing/timings/records/20260923T202631Z.e277734d.slot3.groups-leaderboards.json) |
@@ -95,14 +96,14 @@ Each link is the wrapper-written result for that lane. Earlier attempts are reta
 | `sync-v2-e2e` | PASS | [record](../../../testing/timings/records/20260923T202914Z.e277734d.slot3.sync-v2-e2e.json) |
 | `sync-infra` | PASS | [record](../../../testing/timings/records/20260923T202928Z.e277734d.slot3.sync-infra.json) |
 | `mcp-smoke` | PASS | [record](../../../testing/timings/records/20260923T202937Z.e277734d.slot3.mcp-smoke.json) |
-| `ios-smoke` | PASS | [record](../../../testing/timings/records/20260923T203743Z.e277734d.slot3.ios-smoke.json) |
-| `ios-data-smoke` | PASS | [record](../../../testing/timings/records/20260923T203926Z.e277734d.slot3.ios-data-smoke.json) |
-| `ios-ui-regression` | PASS | [record](../../../testing/timings/records/20260923T204721Z.e277734d.slot3.ios-ui-regression.json) |
-| `ios-exercise-page` | PASS | [record](../../../testing/timings/records/20260923T204944Z.e277734d.slot3.ios-exercise-page.json) |
-| `ios-session-view` | PASS | [record](../../../testing/timings/records/20260923T205209Z.e277734d.slot3.ios-session-view.json) |
-| `ios-auth-profile` | PASS | [record](../../../testing/timings/records/20260923T205417Z.e277734d.slot3.ios-auth-profile.json) |
-| `ios-sync-e2e` | PASS | [record](../../../testing/timings/records/20260923T205725Z.e277734d.slot3.ios-sync-e2e.json) |
-| `ios-groups-e2e` | PASS | [record](../../../testing/timings/records/20260923T210654Z.e277734d.slot3.ios-groups-e2e.json) |
-| `handles` | PASS | [record](../../../testing/timings/records/20260923T202900Z.e277734d.slot3.handles.json) |
+| `ios-smoke` | PASS | [record](../../../testing/timings/records/20260923T213449Z.e277734d.slot3.ios-smoke.json) |
+| `ios-data-smoke` | PASS | [record](../../../testing/timings/records/20260923T213610Z.e277734d.slot3.ios-data-smoke.json) |
+| `ios-ui-regression` | PASS | [record](../../../testing/timings/records/20260923T214102Z.e277734d.slot3.ios-ui-regression.json) |
+| `ios-exercise-page` | PASS | [record](../../../testing/timings/records/20260923T214312Z.e277734d.slot3.ios-exercise-page.json) |
+| `ios-session-view` | PASS | [record](../../../testing/timings/records/20260923T214530Z.e277734d.slot3.ios-session-view.json) |
+| `ios-auth-profile` | PASS | [record](../../../testing/timings/records/20260923T214736Z.e277734d.slot3.ios-auth-profile.json) |
+| `ios-sync-e2e` | PASS | [record](../../../testing/timings/records/20260923T215001Z.e277734d.slot3.ios-sync-e2e.json) |
+| `ios-groups-e2e` | PASS | [record](../../../testing/timings/records/20260923T215523Z.e277734d.slot3.ios-groups-e2e.json) |
+| `handles` | PASS | [record](../../../testing/timings/records/20260923T213109Z.e277734d.slot3.handles.json) |
 | `ios-gates` | N/A | Optional aggregate; its smoke/data lanes run in `frontend`. No trigger requires this extra lane (`scripts/triggers.tsv`). |
 | `jest-sync` | N/A | Optional focused suite; full Jest and sync-infra cover the applicable code. No trigger requires this extra lane (`scripts/triggers.tsv`). |

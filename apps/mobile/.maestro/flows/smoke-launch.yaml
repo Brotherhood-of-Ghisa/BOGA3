@@ -18,10 +18,17 @@ appId: com.dinoderek.mobile
 - assertVisible:
     id: "main-bottom-tabs"
 - takeScreenshot: "01-m26-today"
-- tapOn:
-    id: "top-level-tab-train"
-- assertVisible:
-    id: "train-screen"
+# The cold dev-client reopen can consume the first tab tap on iOS 26.
+# Retry the real navigation, retaining a bounded destination assertion.
+- retry:
+    maxRetries: 3
+    commands:
+      - tapOn:
+          id: "top-level-tab-train"
+      - extendedWaitUntil:
+          visible:
+            id: "train-screen"
+          timeout: 5000
 - waitForAnimationToEnd:
     timeout: 4000
 - takeScreenshot: "02-m26-train"
