@@ -21,6 +21,8 @@ export type MaestroHarnessResetMode = 'none' | 'data';
 export type MaestroHarnessFixtureName =
   | 'none'
   | 'exercise-block-history'
+  // The block history plus a newest completed session with two PRs.
+  | 'completion-two-prs'
   | 'exercise-page'
   | 'session-view';
 /**
@@ -74,7 +76,10 @@ export const resolveMaestroHarnessResetMode = (
 export const resolveMaestroHarnessFixtureName = (
   value: string | null | undefined
 ): MaestroHarnessFixtureName =>
-  value === 'exercise-block-history' || value === 'exercise-page' || value === 'session-view'
+  value === 'exercise-block-history' ||
+  value === 'completion-two-prs' ||
+  value === 'exercise-page' ||
+  value === 'session-view'
     ? value
     : 'none';
 
@@ -175,6 +180,9 @@ export const runMaestroHarnessReset = async (resetMode: MaestroHarnessResetMode)
 export const runMaestroHarnessFixture = async (fixtureName: MaestroHarnessFixtureName) => {
   if (fixtureName === 'exercise-block-history') {
     await seedExerciseBlockHistoryFixture();
+  }
+  if (fixtureName === 'completion-two-prs') {
+    await seedExerciseBlockHistoryFixture({ includeTwoPrSession: true });
   }
   if (fixtureName === 'exercise-page') {
     await seedExercisePageFixture();

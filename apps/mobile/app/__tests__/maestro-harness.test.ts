@@ -203,12 +203,17 @@ describe('maestro harness helpers', () => {
 
     await runMaestroHarnessFixture('exercise-block-history');
     expect(mockSeedExerciseBlockHistoryFixture).toHaveBeenCalledTimes(1);
+    expect(mockSeedExerciseBlockHistoryFixture).toHaveBeenLastCalledWith();
     expect(jest.mocked(seedExercisePageFixture)).not.toHaveBeenCalled();
+
+    expect(resolveMaestroHarnessFixtureName('completion-two-prs')).toBe('completion-two-prs');
+    await runMaestroHarnessFixture('completion-two-prs');
+    expect(mockSeedExerciseBlockHistoryFixture).toHaveBeenLastCalledWith({ includeTwoPrSession: true });
 
     expect(resolveMaestroHarnessFixtureName('exercise-page')).toBe('exercise-page');
     await runMaestroHarnessFixture('exercise-page');
     expect(jest.mocked(seedExercisePageFixture)).toHaveBeenCalledTimes(1);
-    expect(mockSeedExerciseBlockHistoryFixture).toHaveBeenCalledTimes(1);
+    expect(mockSeedExerciseBlockHistoryFixture).toHaveBeenCalledTimes(2);
   });
 
   describe('bootstrap-flag harness action', () => {
@@ -324,5 +329,29 @@ describe('maestro harness helpers', () => {
     expect(latestPrimaryRows).toHaveLength(2);
     expect(rows.exerciseSets.some((row) => row.setType === 'warm_up')).toBe(true);
     expect(rows.exerciseSets.some((row) => row.setType === 'rir_0')).toBe(true);
+    // The two-PR completion session is opt-in, so the shared history is unchanged.
+    expect(rows.sessions.map((row) => row.id)).not.toContain(
+      EXERCISE_BLOCK_HISTORY_FIXTURE.twoPrCompletionSessionId
+    );
+  });
+
+  it('adds the newest completed session with a squat and a bench PR only when asked', () => {
+    const now = new Date('2026-05-26T12:00:00.000Z');
+    const base = buildExerciseBlockHistoryFixtureRows(now);
+    const rows = buildExerciseBlockHistoryFixtureRows(now, { includeTwoPrSession: true });
+
+    expect(rows.sessions).toHaveLength(base.sessions.length + 1);
+    const twoPr = rows.sessions.find((row) => row.id === EXERCISE_BLOCK_HISTORY_FIXTURE.twoPrCompletionSessionId);
+    expect(twoPr?.completedAt.getTime()).toBe(
+      Math.max(...rows.sessions.map((row) => row.completedAt.getTime()))
+    );
+    expect(
+      rows.sessionExercises
+        .filter((row) => row.sessionId === EXERCISE_BLOCK_HISTORY_FIXTURE.twoPrCompletionSessionId)
+        .map((row) => row.exerciseDefinitionId)
+    ).toEqual([
+      EXERCISE_BLOCK_HISTORY_FIXTURE.primaryExerciseId,
+      EXERCISE_BLOCK_HISTORY_FIXTURE.secondaryExerciseId,
+    ]);
   });
 });

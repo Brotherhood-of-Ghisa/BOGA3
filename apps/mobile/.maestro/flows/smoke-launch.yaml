@@ -47,29 +47,25 @@ appId: com.dinoderek.mobile
     id: "today-screen"
 - waitForAnimationToEnd:
     timeout: 4000
-- openLink: "boga3://maestro-harness?teleport=session-recorder"
+# Train's Start opens the session view on a new, empty session. The tab bar
+# stays on the session view (it is the way out).
+- tapOn:
+    id: "top-level-tab-train"
 - extendedWaitUntil:
     visible:
-      id: "start-session-button"
-    timeout: 30000
+      id: "train-start-empty-button"
+    timeout: 15000
 - retry:
     maxRetries: 3
     commands:
       - tapOn:
-          id: "start-session-button"
+          id: "train-start-empty-button"
       - extendedWaitUntil:
           visible:
-            text: "No exercises logged yet."
+            id: "session-view-screen"
           timeout: 30000
 - assertVisible:
-    id: "bottom-tray-handle"
-- assertVisible: "Expand navigation tray"
-- takeScreenshot: "05-m26-recorder-focused-collapsed"
-- tapOn:
-    id: "bottom-tray-handle"
-- assertVisible: "Collapse navigation tray"
-- extendedWaitUntil:
-    visible:
-      id: "main-bottom-tabs"
-    timeout: 4000
-- takeScreenshot: "06-m26-recorder-navigation-expanded"
+    id: "session-view-add-exercise"
+- assertVisible:
+    id: "main-bottom-tabs"
+- takeScreenshot: "05-m26-session-view-empty"
