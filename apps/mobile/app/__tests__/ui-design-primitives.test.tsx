@@ -1,11 +1,10 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { StyleSheet, Text, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
 
-import { Card, ListRow, Sheet, Stat, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { ActionButton, Card, ListRow, Sheet, Stat, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
 
-// The design-language primitives (`docs/specs/ui/design-language.md` §4–§6).
-// No shipped screen adopts them yet, so these assertions are their only guard
-// until the exercise page and session view do.
+// The design-language primitives (`docs/specs/ui/design-language.md` §4–§6),
+// asserted on their own; the screens that adopt them have their own tests.
 
 const flatStyle = (node: { props: { style?: unknown } }): ViewStyle & TextStyle =>
   StyleSheet.flatten(node.props.style as StyleProp<ViewStyle & TextStyle>) ?? {};
@@ -265,5 +264,47 @@ describe('Sheet', () => {
     );
 
     expect(screen.queryByTestId('sheet')).toBeNull();
+  });
+});
+
+describe('ActionButton', () => {
+  it('draws the one primary on accent, at the control radius and tap-target height', () => {
+    const onPress = jest.fn();
+    render(<ActionButton label="Edit" onPress={onPress} testID="button" variant="primary" />);
+
+    const button = screen.getByTestId('button');
+    expect(flatStyle(button)).toMatchObject({
+      backgroundColor: uiRoles.accent,
+      borderRadius: uiGeometry.radius.control,
+      minHeight: uiGeometry.tapTarget,
+    });
+    expect(button.props.accessibilityRole).toBe('button');
+    expect(flatStyle(screen.getByText('Edit'))).toMatchObject({ color: uiRoles.surface, textTransform: 'uppercase' });
+    fireEvent.press(button);
+    expect(onPress).toHaveBeenCalledTimes(1);
+  });
+
+  it('draws a secondary action as an ink outline, and a danger one in danger', () => {
+    render(
+      <>
+        <ActionButton label="+ Add exercise" onPress={jest.fn()} testID="outline" variant="outline" />
+        <ActionButton label="Archive" onPress={jest.fn()} testID="danger" tone="danger" variant="outline" />
+      </>,
+    );
+
+    expect(flatStyle(screen.getByTestId('outline'))).toMatchObject({ borderColor: uiRoles.ink, borderWidth: 1 });
+    expect(flatStyle(screen.getByTestId('danger')).borderColor).toBe(uiRoles.danger);
+    expect(flatStyle(screen.getByText('Archive')).color).toBe(uiRoles.danger);
+  });
+
+  it('fades when disabled and ignores presses', () => {
+    const onPress = jest.fn();
+    render(<ActionButton disabled label="Done" onPress={onPress} testID="button" variant="primary" />);
+
+    const button = screen.getByTestId('button');
+    expect(flatStyle(button).backgroundColor).toBe(uiRoles.disabled);
+    expect(button.props.accessibilityState).toMatchObject({ disabled: true });
+    fireEvent.press(button);
+    expect(onPress).not.toHaveBeenCalled();
   });
 });

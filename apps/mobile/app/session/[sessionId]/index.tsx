@@ -7,13 +7,13 @@ import { MainTabs } from '@/components/navigation/main-tabs';
 import type { Session } from '@/components/session-recorder/types';
 import { ExercisePicker } from '@/components/session-recorder/exercise-picker';
 import {
-  OutlineButton,
   SessionExerciseCard,
   SessionGymSheet,
   SessionOptionsSheet,
   SessionSummaryCard,
   SessionTopBar,
 } from '@/components/session-view';
+import { ActionButton } from '@/components/ui/action-button';
 import { uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import type { ExerciseBlockHistorySuggestedPlan } from '@/src/data';
 import { sessionExerciseHref } from '@/src/navigation/active-session-entry';
@@ -353,9 +353,14 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
           {state.status === 'error' ? "Couldn't load this session." : 'This session is no longer active.'}
         </Text>
         {state.status === 'error' ? (
-          <OutlineButton label="Retry" onPress={() => void reload()} testID="session-view-retry" />
+          <ActionButton label="Retry" onPress={() => void reload()} testID="session-view-retry" variant="outline" />
         ) : (
-          <OutlineButton label="Back to Train" onPress={() => openTab(TRAIN_ROUTE)} testID="session-view-back" />
+          <ActionButton
+            label="Back to Train"
+            onPress={() => openTab(TRAIN_ROUTE)}
+            testID="session-view-back"
+            variant="outline"
+          />
         )}
       </View>
     );
@@ -390,10 +395,11 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
             onPress={() => router.push(sessionExerciseHref(data.sessionId, card.id))}
           />
         ))}
-        <OutlineButton
+        <ActionButton
           label="+ Add exercise"
           onPress={() => setPicker((current) => ({ visible: true, openRequestId: current.openRequestId + 1 }))}
           testID="session-view-add-exercise"
+          variant="outline"
         />
         {notice ? (
           <Text accessibilityLiveRegion="polite" style={styles.notice} testID="session-view-notice">

@@ -2,15 +2,10 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 
 import type { Session } from '@/components/session-recorder/types';
-import {
-  loadLatestSessionDraftSnapshot,
-  loadLocalGymById,
-  loadRecentExerciseBlocks,
-  loadSessionSnapshotById,
-} from '@/src/data';
+import { loadLatestSessionDraftSnapshot, loadLocalGymById, loadSessionSnapshotById } from '@/src/data';
 
+import { loadHistoricalBestsExcluding } from './historical-bests';
 import { mapDraftSnapshotToSession } from './session-model';
-import { historicalBestOneRepMax } from './session-view-model';
 
 export type SessionViewData = {
   sessionId: string;
@@ -92,22 +87,11 @@ export function useSessionView(sessionId: string | null) {
           : { status: 'ready', data: base }
       );
 
-      const definitionIds = [...new Set(session.exercises.map((exercise) => exercise.exerciseDefinitionId))];
-      const bests = await Promise.all(
-        definitionIds.map(async (exerciseDefinitionId) => {
-          try {
-            const history = await loadRecentExerciseBlocks({ exerciseDefinitionId });
-            const others = history.blocks.filter((block) => block.sessionId !== snapshot.sessionId);
-            return [exerciseDefinitionId, historicalBestOneRepMax(others)] as const;
-          } catch {
-            return null;
-          }
-        })
+      const historicalBestByDefinitionId = await loadHistoricalBestsExcluding(
+        snapshot.sessionId,
+        session.exercises.map((exercise) => exercise.exerciseDefinitionId)
       );
       if (!isCurrent()) return;
-      const historicalBestByDefinitionId = new Map(
-        bests.filter((entry): entry is readonly [string, number | null] => entry !== null)
-      );
       setState({ status: 'ready', data: { ...base, historicalBestByDefinitionId } });
     } catch {
       if (isCurrent()) {

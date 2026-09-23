@@ -1,3 +1,9 @@
+export {
+  ActionButton,
+  type ActionButtonProps,
+  type ActionButtonTone,
+  type ActionButtonVariant,
+} from '@/components/ui/action-button';
 export { UiButton, type UiButtonVariant } from '@/components/ui/button';
 export { Card } from '@/components/ui/card';
 export { Icon, type IconName, type IconProps } from '@/components/ui/icon';

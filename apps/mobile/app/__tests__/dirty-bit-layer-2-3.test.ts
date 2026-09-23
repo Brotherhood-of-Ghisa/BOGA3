@@ -13,8 +13,8 @@
  * Files under test:
  *   - `src/data/session-drafts.ts` — writes `session_exercises` and
  *     `exercise_sets` (and the `sessions` row those transactions share).
- *   - `src/data/exercise-tags.ts` — the `session_exercise_tags` create path
- *     (`createTagAssignment`).
+ *     The app no longer writes `session_exercise_tags` (the tag editor went
+ *     with the old recorder); its rows arrive by sync.
  *
  * Coverage (one test per entity in scope, ≥ 3):
  *   - create / update / softDelete each leave the row `local_dirty = 1`.

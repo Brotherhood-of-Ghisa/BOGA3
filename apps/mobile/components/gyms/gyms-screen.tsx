@@ -3,6 +3,7 @@ import { type ReactNode, useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { MoreHubBackButton } from '@/components/navigation/more-hub-back-button';
+import { ActionButton } from '@/components/ui/action-button';
 import { Card } from '@/components/ui/card';
 import { Icon } from '@/components/ui/icon';
 import { ListRow } from '@/components/ui/list-row';
@@ -10,7 +11,6 @@ import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/component
 import type { ReadForegroundPosition } from '@/src/location/gym-location-reads';
 import { gymHasSavedLocation, listGymDirectory, type GymDirectoryEntry } from '@/src/session-recorder/gym-options';
 
-import { GymButton } from './gym-buttons';
 import { GymEditor } from './gym-editor';
 
 // The open editor: a gym's id, or `new` for the add row.
@@ -104,7 +104,7 @@ export function GymsScreen({ readPosition }: GymsScreenProps) {
     body = (
       <View style={styles.state} testID="gyms-error">
         <Text style={styles.stateText}>{"Couldn't load your gyms."}</Text>
-        <GymButton label="Retry" onPress={() => void reload()} testID="gyms-retry" variant="outline" />
+        <ActionButton label="Retry" onPress={() => void reload()} testID="gyms-retry" variant="outline" />
       </View>
     );
   } else {
@@ -128,10 +128,10 @@ export function GymsScreen({ readPosition }: GymsScreenProps) {
           ) : null}
         </Card>
         {editing !== 'new' ? (
-          <GymButton label="+ Add gym" onPress={() => setEditing('new')} testID="gyms-add" variant="outline" />
+          <ActionButton label="+ Add gym" onPress={() => setEditing('new')} testID="gyms-add" variant="outline" />
         ) : null}
         {archived.length > 0 ? (
-          <GymButton
+          <ActionButton
             label={showArchived ? 'Hide archived' : `Show archived (${archived.length})`}
             onPress={() => setShowArchived((current) => !current)}
             testID="gyms-toggle-archived"

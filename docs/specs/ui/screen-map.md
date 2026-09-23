@@ -343,9 +343,11 @@ Brief entrypoint map of the current mobile screens.
 10. `/completed-session/[sessionId]`
 - File: `apps/mobile/app/completed-session/[sessionId].tsx`
 - Purpose:
-  - completed session detail viewer with edit/delete session actions and per-exercise block append actions
+  - View Session: a finished session, read-only, in the design language
+    (`components/view-session/`, the shared cards in
+    `components/session-detail/`); `Edit` opens it in the session view
 - Key states (high level):
-  - loading / error / not-found / detail
+  - loading / error / not-found (on `paper`, with the top bar's back) / detail
   - `presentation=completion` (after Finish): one labelled totals card with
     informational per-muscle working-set counts, all compact `Personal
     records`, per-exercise current volume versus median and descriptive P5/P95
@@ -357,9 +359,20 @@ Brief entrypoint map of the current mobile screens.
   - completion loading/error/not-found/deleted-target states expose one safe
     Progress exit; the native back affordance/gesture is suppressed and Android
     system back replaces to Progress
-  - read-only exercise cards include a set table with `Set`, `Weight`, `Reps`, and `Effort`
-  - exercise-card titles toggle an expanded/collapsed state; collapsed cards show valid performed-set and working-set counts while keeping `Append` available
-  - each exercise card header exposes `Append` to copy that one historical block as planned target rows into the active session (creating one first when needed)
+  - detail: its own top bar, `back · View Session · ⋮ · Edit` (`Edit` the one
+    `accent` action, no native header); a summary card with `Start` / `End`
+    (`YYYY-MM-DD HH:mm`) then `Duration` / `Gym` / `Sets` / `Volume`; one card
+    per exercise with its confirmed sets as the session view's rows (`type ·
+    weight × reps · 1RM · VOL`, `n sets`), a brass record 1RM and `New 1RM
+    record` band where the session holds the exercise's best 1RM; no tags, no
+    collapse
+  - the session ⋮ opens a `Session` sheet: `Delete session` (danger), or
+    `Undelete session` while deleted; a deleted session shows a `Deleted ·
+    hidden from history` band and no `Edit`
+  - each card's ⋮ opens a sheet with `Append to current session`, which copies
+    that one block as planned target rows into the active session (creating one
+    first when needed)
+  - a failed delete, undelete or append shows inline in `danger`
   - redirect placeholder for `intent=edit`
 - Key exits:
   - `/session/<sessionId>` (the session view, editing) from `Edit`, and by
@@ -367,6 +380,8 @@ Brief entrypoint map of the current mobile screens.
   - `/session/<activeSessionId>` (the session view) after a successful
     per-exercise block append, using the id the append returns
   - `/progress` from completion Done/back
+  - back from the detail's top bar (`router.back()`, or `/progress` with no
+    history)
 
 11. `/exercise-history`
 - File: `apps/mobile/app/exercise-history.tsx`
@@ -585,7 +600,7 @@ Brief entrypoint map of the current mobile screens.
     display mode (no custom back title), preserving normal platform back
     behavior while hiding the previous route-group title; the arrow-only
     button slides in with the screen instead of morphing a label in
-  - completed-session route sets its title inside the route file
+  - completed-session route sets its title inside the route file; the detail hides the native header and draws its own top bar
   - exercise-history route also sets its title inside the route file (resolved exercise name)
 
 2. `apps/mobile/app/(tabs)/_layout.tsx`

@@ -17,6 +17,7 @@ const mockPush = jest.fn();
 const mockDismissTo = jest.fn();
 const mockReplace = jest.fn();
 const mockBack = jest.fn();
+let mockCanGoBack = true;
 let mockLatestFocusCallback: (() => void | (() => void)) | null = null;
 
 jest.mock('expo-router', () => ({
@@ -26,6 +27,7 @@ jest.mock('expo-router', () => ({
     dismissTo: mockDismissTo,
     replace: mockReplace,
     back: mockBack,
+    canGoBack: () => mockCanGoBack,
   }),
   useFocusEffect: (callback: () => void | (() => void)) => {
     mockLatestFocusCallback = callback;
@@ -63,7 +65,7 @@ jest.mock('@/src/data', () => ({
     return `${hours}h ${minutes}m`;
   },
   listSessionListBuckets: jest.fn().mockResolvedValue({ active: null, completed: [] }),
-  listSessionExerciseAssignedTags: jest.fn().mockResolvedValue([]),
+  loadRecentExerciseBlocks: jest.fn().mockResolvedValue({ blocks: [] }),
   loadLocalGymById: jest.fn(),
   loadSessionSnapshotById: jest.fn(),
   appendCompletedSessionExerciseAsPlanned: jest.fn(),
@@ -140,11 +142,6 @@ const COMPLETED_SESSION_DETAIL_FIXTURE: CompletedSessionDetailRecord = {
       id: 'exercise-1',
       exerciseDefinitionId: 'bench-press',
       name: 'Bench Press',
-      machineName: 'Flat Bench',
-      tags: [
-        { tagDefinitionId: 'tag-1', name: 'Paused', deletedAt: null },
-        { tagDefinitionId: 'tag-2', name: 'Tempo', deletedAt: null },
-      ],
       sets: [
         { id: 'set-1', weight: '135', reps: '8', setType: 'warm_up' },
         { id: 'set-2', weight: '185', reps: '8', setType: 'rir_0' },
@@ -156,8 +153,6 @@ const COMPLETED_SESSION_DETAIL_FIXTURE: CompletedSessionDetailRecord = {
       id: 'exercise-2',
       exerciseDefinitionId: 'lat-pulldown',
       name: 'Lat Pulldown',
-      machineName: 'Cable',
-      tags: [],
       sets: [
         { id: 'set-5', weight: '120', reps: '12', setType: null },
       ],
@@ -174,6 +169,7 @@ describe('CompletedSessionDetailScreenShell', () => {
     mockDismissTo.mockReset();
     mockReplace.mockReset();
     mockBack.mockReset();
+    mockCanGoBack = true;
     mockLatestFocusCallback = null;
     mockEnsureExerciseCatalogLoaded.mockClear();
     mockCaptureRef.mockClear();
@@ -615,398 +611,328 @@ describe('CompletedSessionDetailScreenShell', () => {
     expect(mockReplace).toHaveBeenCalledWith('/progress');
   });
 
-  it('renders loading then a recorder-like read-only detail on success', async () => {
-    const dataClient: CompletedSessionDetailDataClient = {
-      loadCompletedSession: jest.fn().mockResolvedValue(COMPLETED_SESSION_DETAIL_FIXTURE),
-      appendCompletedSessionExerciseAsPlanned: jest.fn().mockResolvedValue(undefined),
-      setCompletedSessionDeletedState: jest.fn().mockResolvedValue(undefined),
-    };
+  const detailClient = (
+    overrides: Partial<CompletedSessionDetailDataClient> = {}
+  ): CompletedSessionDetailDataClient => ({
+    loadCompletedSession: jest.fn().mockResolvedValue(COMPLETED_SESSION_DETAIL_FIXTURE),
+    appendCompletedSessionExerciseAsPlanned: jest.fn().mockResolvedValue({ sessionId: 'active-1' }),
+    setCompletedSessionDeletedState: jest.fn().mockResolvedValue(undefined),
+    ...overrides,
+  });
 
+  const renderDetail = async (dataClient: CompletedSessionDetailDataClient) => {
     render(<CompletedSessionDetailScreenShell sessionId="completed-under-test" dataClient={dataClient} />);
+    await screen.findByTestId('completed-session-detail-screen');
+  };
+
+  const openSessionOptions = () => {
+    fireEvent.press(screen.getByTestId('completed-session-detail-options-button'));
+    return screen.getByTestId('completed-session-detail-options-sheet');
+  };
+
+  it('renders loading, then the summary and every performed set in the design language', async () => {
+    render(<CompletedSessionDetailScreenShell sessionId="completed-under-test" dataClient={detailClient()} />);
 
     expect(screen.getByTestId('completed-session-detail-loading')).toBeTruthy();
+    await screen.findByTestId('completed-session-detail-screen');
 
-    await waitFor(() => {
-      expect(screen.getByTestId('completed-session-detail-screen')).toBeTruthy();
+    // The detail draws its own top bar: no native header.
+    expect(mockStackScreen).toHaveBeenLastCalledWith({
+      options: { title: 'View Session', headerShown: false },
     });
+    expect(screen.getByText('View Session')).toBeTruthy();
+    expect(screen.getByTestId('completed-session-detail-edit-button')).toBeTruthy();
 
-    expect(screen.getByText('Start')).toBeTruthy();
-    expect(screen.getByText('End')).toBeTruthy();
-    expect(screen.getByText('Duration')).toBeTruthy();
-    expect(screen.getByText('Location')).toBeTruthy();
-    expect(screen.queryByText('Date and Time')).toBeNull();
-    expect(screen.queryByText('Gym')).toBeNull();
-    expect(screen.getByText('Edit')).toBeTruthy();
-    expect(screen.queryByTestId('completed-session-detail-reopen-button')).toBeNull();
-    expect(screen.getAllByText('Append')).toHaveLength(2);
-    expect(screen.getByText('Delete')).toBeTruthy();
-    expect(screen.getByTestId('completed-session-detail-screen').props.stickyHeaderIndices).toEqual([0]);
-    expect(screen.getByTestId('completed-session-detail-sets-table-header-exercise-1')).toBeTruthy();
-    expect(screen.getAllByText('Weight').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Reps').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Effort').length).toBeGreaterThan(0);
-    expect(screen.getByText('W-Up')).toBeTruthy();
-    expect(screen.getByText('RIR 0')).toBeTruthy();
-    expect(screen.getByText('RIR 1')).toBeTruthy();
-    expect(screen.getByText('RIR 3')).toBeTruthy();
-    expect(screen.getByText('-')).toBeTruthy();
-    expect(screen.getByText('Bench Press')).toBeTruthy();
-    expect(screen.getByText('Flat Bench')).toBeTruthy();
-    expect(screen.getByTestId('completed-session-detail-tags-exercise-1')).toBeTruthy();
-    expect(screen.getByText('Paused')).toBeTruthy();
-    expect(screen.getByText('Tempo')).toBeTruthy();
-    expect(screen.getAllByText('185').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('8').length).toBeGreaterThan(0);
-    expect(screen.getByText('58m')).toBeTruthy();
+    // Start / End as the completed edit's fields show them, then the facts.
+    expect(screen.getByTestId('completed-session-detail-times-start').props.accessibilityLabel).toMatch(
+      /^Start \d{4}-\d{2}-\d{2} \d{2}:\d{2}$/
+    );
+    expect(screen.getByTestId('completed-session-detail-times-end').props.accessibilityLabel).toMatch(
+      /^End \d{4}-\d{2}-\d{2} \d{2}:\d{2}$/
+    );
+    expect(screen.getByTestId('completed-session-detail-duration').props.accessibilityLabel).toBe('Duration 58m');
+    expect(screen.getByTestId('completed-session-detail-gym').props.accessibilityLabel).toBe(
+      'Gym Westside Barbell Club'
+    );
+    expect(screen.getByTestId('completed-session-detail-sets').props.accessibilityLabel).toBe('Sets 5');
+    // 135×8 + 185×8 + 185×6 + 185×5 + 120×12, no thousands separator.
+    expect(screen.getByTestId('completed-session-detail-volume').props.accessibilityLabel).toBe('Volume 6035');
+
+    // The session view's set row: type · weight × reps · 1RM · VOL.
+    const bench = within(screen.getByTestId('completed-session-detail-exercise-exercise-1'));
+    expect(bench.getByText('Bench Press')).toBeTruthy();
+    expect(bench.getByTestId('completed-session-detail-exercise-exercise-1-count')).toHaveTextContent('4 sets');
+    expect(bench.getByText('W-Up')).toBeTruthy();
+    expect(bench.getByText('RIR 0')).toBeTruthy();
+    expect(bench.getByText('RIR 1')).toBeTruthy();
+    expect(bench.getByText('RIR 3')).toBeTruthy();
+    expect(
+      bench.getByTestId('completed-session-detail-exercise-exercise-1-set-1-values')
+    ).toHaveTextContent('135.0 × 8');
+    expect(bench.getByTestId('completed-session-detail-exercise-exercise-1-set-2-vol').props.accessibilityLabel).toBe(
+      'Vol 1480'
+    );
+    const pulldown = within(screen.getByTestId('completed-session-detail-exercise-exercise-2'));
+    expect(pulldown.getByTestId('completed-session-detail-exercise-exercise-2-count')).toHaveTextContent('1 set');
+    // No effort reads as an em dash, not `-`.
+    expect(pulldown.getByText('—')).toBeTruthy();
+
+    // No collapse, no set table, no tags, and Append sits behind each card's ⋮.
+    expect(screen.queryByText('Weight')).toBeNull();
+    expect(screen.queryByText('Append')).toBeNull();
+    expect(screen.queryByTestId('exercise-collapse-toggle-1')).toBeNull();
+    expect(screen.queryByTestId('completed-session-detail-deleted-band')).toBeNull();
   });
 
-  it('does not render tag chips when an exercise has no assigned tags', async () => {
-    const dataClient: CompletedSessionDetailDataClient = {
-      loadCompletedSession: jest.fn().mockResolvedValue({
-        ...COMPLETED_SESSION_DETAIL_FIXTURE,
-        exercises: COMPLETED_SESSION_DETAIL_FIXTURE.exercises.map((exercise) => ({
-          ...exercise,
-          tags: [],
-        })),
-      }),
-      appendCompletedSessionExerciseAsPlanned: jest.fn().mockResolvedValue(undefined),
-      setCompletedSessionDeletedState: jest.fn().mockResolvedValue(undefined),
-    };
-
-    render(<CompletedSessionDetailScreenShell sessionId="completed-under-test" dataClient={dataClient} />);
-
-    await waitFor(() => {
-      expect(screen.getByTestId('completed-session-detail-screen')).toBeTruthy();
-    });
-
-    expect(screen.queryByTestId('completed-session-detail-tags-exercise-1')).toBeNull();
-  });
-
-  it('collapses each exercise to valid performed-set and working-set counts', async () => {
-    const dataClient: CompletedSessionDetailDataClient = {
-      loadCompletedSession: jest.fn().mockResolvedValue({
-        ...COMPLETED_SESSION_DETAIL_FIXTURE,
-        exercises: COMPLETED_SESSION_DETAIL_FIXTURE.exercises.map((exercise, index) =>
-          index === 0
-            ? {
-                ...exercise,
-                sets: [
-                  ...exercise.sets,
-                  { id: 'set-invalid', weight: '', reps: '5', setType: 'rir_0' as const },
-                  {
-                    id: 'set-unconfirmed',
-                    weight: '500',
-                    reps: '10',
-                    setType: 'rir_0' as const,
-                    performanceStatus: 'unperformed' as const,
-                  },
-                ],
-              }
-            : exercise
-        ),
-      }),
-      appendCompletedSessionExerciseAsPlanned: jest.fn().mockResolvedValue(undefined),
-      setCompletedSessionDeletedState: jest.fn().mockResolvedValue(undefined),
-    };
-
-    render(
-      <CompletedSessionDetailScreenShell
-        sessionId="completed-under-test"
-        dataClient={dataClient}
-      />
+  it('shows only confirmed sets with valid values and leaves out an exercise with none', async () => {
+    await renderDetail(
+      detailClient({
+        loadCompletedSession: jest.fn().mockResolvedValue({
+          ...COMPLETED_SESSION_DETAIL_FIXTURE,
+          exercises: [
+            {
+              ...COMPLETED_SESSION_DETAIL_FIXTURE.exercises[0],
+              sets: [
+                ...COMPLETED_SESSION_DETAIL_FIXTURE.exercises[0].sets,
+                { id: 'set-invalid', weight: '', reps: '5', setType: 'rir_0' as const },
+                {
+                  id: 'set-unconfirmed',
+                  weight: '500',
+                  reps: '10',
+                  setType: 'rir_0' as const,
+                  performanceStatus: 'unperformed' as const,
+                },
+              ],
+            },
+            {
+              ...COMPLETED_SESSION_DETAIL_FIXTURE.exercises[1],
+              sets: [{ id: 'set-planned', weight: '120', reps: '12', setType: null, performanceStatus: 'planned' as const }],
+            },
+          ],
+        }),
+      })
     );
 
-    await waitFor(() => {
-      expect(screen.getByTestId('completed-session-detail-screen')).toBeTruthy();
-    });
-
-    const collapseToggle = screen.getByTestId('exercise-collapse-toggle-1');
-    fireEvent.press(collapseToggle);
-
-    expect(collapseToggle.props.accessibilityState.expanded).toBe(false);
-    expect(
-      screen.getByTestId('completed-session-detail-collapsed-summary-exercise-1-counts')
-    ).toHaveTextContent('4 sets · 3 w/sets');
-    expect(
-      screen.queryByTestId('completed-session-detail-collapsed-summary-exercise-1-new-pr')
-    ).toBeNull();
-    expect(screen.queryByTestId('completed-session-detail-sets-table-header-exercise-1')).toBeNull();
-    expect(screen.queryByTestId('completed-session-detail-tags-exercise-1')).toBeNull();
-    expect(screen.queryByText('500kg')).toBeNull();
-    expect(
-      screen.getByTestId('completed-session-detail-append-exercise-button-exercise-1')
-    ).toBeTruthy();
-
-    fireEvent.press(collapseToggle);
-
-    expect(collapseToggle.props.accessibilityState.expanded).toBe(true);
-    expect(screen.getByTestId('completed-session-detail-sets-table-header-exercise-1')).toBeTruthy();
-    expect(screen.getByTestId('completed-session-detail-tags-exercise-1')).toBeTruthy();
+    expect(screen.getByTestId('completed-session-detail-exercise-exercise-1-count')).toHaveTextContent('4 sets');
+    expect(screen.queryByText('500.0 × 10')).toBeNull();
+    expect(screen.queryByTestId('completed-session-detail-exercise-exercise-2')).toBeNull();
+    expect(screen.getByTestId('completed-session-detail-sets').props.accessibilityLabel).toBe('Sets 4');
   });
 
-  it('edit action opens the session view on the completed session', async () => {
-    const dataClient: CompletedSessionDetailDataClient = {
-      loadCompletedSession: jest.fn().mockResolvedValue({
-        ...COMPLETED_SESSION_DETAIL_FIXTURE,
-      }),
-      appendCompletedSessionExerciseAsPlanned: jest.fn().mockResolvedValue(undefined),
-      setCompletedSessionDeletedState: jest.fn().mockResolvedValue(undefined),
-    };
+  it('says so when no exercise was performed', async () => {
+    await renderDetail(
+      detailClient({
+        loadCompletedSession: jest.fn().mockResolvedValue({ ...COMPLETED_SESSION_DETAIL_FIXTURE, exercises: [] }),
+      })
+    );
 
-    render(<CompletedSessionDetailScreenShell sessionId="completed-under-test" dataClient={dataClient} />);
+    expect(screen.getByTestId('completed-session-detail-no-exercises')).toHaveTextContent(
+      'No exercises logged in this session.'
+    );
+  });
 
-    await waitFor(() => {
-      expect(screen.getByTestId('completed-session-detail-screen')).toBeTruthy();
-    });
+  it('marks the set whose 1RM beats every other session with a record band', async () => {
+    const loadHistoricalBests = jest.fn().mockResolvedValue(
+      new Map<string, number | null>([
+        ['bench-press', 200],
+        ['lat-pulldown', 500],
+      ])
+    );
+    await renderDetail(detailClient({ loadHistoricalBests }));
 
-    expect(screen.getByText('Edit')).toBeTruthy();
+    expect(loadHistoricalBests).toHaveBeenCalledWith('completed-under-test', ['bench-press', 'lat-pulldown']);
+    const band = await screen.findByTestId('completed-session-detail-exercise-exercise-1-record');
+    // 185 × 8 is the bench's best 1RM (Mayhew), above the 200 of history.
+    expect(band).toHaveTextContent(/^New 1RM record · \d+\.\d$/);
+    expect(
+      screen.getByTestId('completed-session-detail-exercise-exercise-1').props.accessibilityLabel
+    ).toMatch(/^Bench Press, 4 sets, new 1RM record \d+\.\d$/);
+    // The pulldown did not beat its history.
+    expect(screen.queryByTestId('completed-session-detail-exercise-exercise-2-record')).toBeNull();
+  });
+
+  it('shows no record while history is unavailable, and still renders the session', async () => {
+    await renderDetail(
+      detailClient({ loadHistoricalBests: jest.fn().mockRejectedValue(new Error('history unavailable')) })
+    );
+
+    expect(screen.getByText('Bench Press')).toBeTruthy();
+    expect(screen.queryByTestId('completed-session-detail-exercise-exercise-1-record')).toBeNull();
+  });
+
+  it('Edit opens the session view on the completed session', async () => {
+    await renderDetail(detailClient());
 
     fireEvent.press(screen.getByTestId('completed-session-detail-edit-button'));
 
     expect(mockPush).toHaveBeenCalledWith('/session/completed-under-test');
   });
 
-  it('per-exercise append action calls the data client and opens the active session', async () => {
-    const mockAppendCompletedSessionExercise = jest.fn().mockResolvedValue({ sessionId: 'active-1' });
-    const dataClient: CompletedSessionDetailDataClient = {
-      loadCompletedSession: jest.fn().mockResolvedValue({
-        ...COMPLETED_SESSION_DETAIL_FIXTURE,
-      }),
-      appendCompletedSessionExerciseAsPlanned: mockAppendCompletedSessionExercise,
-      setCompletedSessionDeletedState: jest.fn().mockResolvedValue(undefined),
-    };
+  it('back returns to the previous screen, or to Progress when there is none', async () => {
+    await renderDetail(detailClient());
 
-    render(<CompletedSessionDetailScreenShell sessionId="completed-under-test" dataClient={dataClient} />);
+    fireEvent.press(screen.getByTestId('completed-session-detail-back'));
+    expect(mockBack).toHaveBeenCalledTimes(1);
+
+    mockCanGoBack = false;
+    fireEvent.press(screen.getByTestId('completed-session-detail-back'));
+    expect(mockReplace).toHaveBeenCalledWith('/progress');
+  });
+
+  it("appends an exercise from its ⋮ and opens the active session", async () => {
+    const appendCompletedSessionExerciseAsPlanned = jest.fn().mockResolvedValue({ sessionId: 'active-1' });
+    await renderDetail(detailClient({ appendCompletedSessionExerciseAsPlanned }));
+
+    fireEvent.press(screen.getByTestId('completed-session-detail-exercise-options-exercise-2'));
+    const sheet = screen.getByTestId('completed-session-detail-exercise-sheet');
+    expect(within(sheet).getByText('Lat Pulldown')).toBeTruthy();
+    expect(within(sheet).getByLabelText('Append Lat Pulldown block to current session')).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('completed-session-detail-append-exercise-button-exercise-2'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('completed-session-detail-screen')).toBeTruthy();
-    });
-
-    fireEvent.press(screen.getByTestId('completed-session-detail-append-exercise-button-exercise-1'));
-
-    await waitFor(() => {
-      expect(mockAppendCompletedSessionExercise).toHaveBeenCalledWith('completed-under-test', 'exercise-1');
+      expect(appendCompletedSessionExerciseAsPlanned).toHaveBeenCalledWith('completed-under-test', 'exercise-2');
       expect(mockPush).toHaveBeenCalledWith('/session/active-1');
     });
+    expect(screen.queryByTestId('completed-session-detail-exercise-sheet')).toBeNull();
   });
 
-  it('renders one append action for each exercise block', async () => {
-    const mockAppendCompletedSessionExercise = jest.fn().mockResolvedValue(undefined);
-    const dataClient: CompletedSessionDetailDataClient = {
-      loadCompletedSession: jest.fn().mockResolvedValue(COMPLETED_SESSION_DETAIL_FIXTURE),
-      appendCompletedSessionExerciseAsPlanned: mockAppendCompletedSessionExercise,
-      setCompletedSessionDeletedState: jest.fn().mockResolvedValue(undefined),
-    };
+  it('shows a failed append inline and stays on the session', async () => {
+    await renderDetail(
+      detailClient({
+        appendCompletedSessionExerciseAsPlanned: jest.fn().mockRejectedValue(new Error('Unable to append now')),
+      })
+    );
 
-    render(<CompletedSessionDetailScreenShell sessionId="completed-under-test" dataClient={dataClient} />);
-
-    await waitFor(() => {
-      expect(screen.getByTestId('completed-session-detail-screen')).toBeTruthy();
-    });
-
-    expect(screen.getByTestId('completed-session-detail-append-exercise-button-exercise-1')).toBeTruthy();
-    expect(screen.getByTestId('completed-session-detail-append-exercise-button-exercise-2')).toBeTruthy();
-    expect(screen.getByLabelText('Append Bench Press block to current session')).toBeTruthy();
-    expect(screen.getByLabelText('Append Lat Pulldown block to current session')).toBeTruthy();
-  });
-
-  it('shows non-destructive feedback when append fails', async () => {
-    const dataClient: CompletedSessionDetailDataClient = {
-      loadCompletedSession: jest.fn().mockResolvedValue({
-        ...COMPLETED_SESSION_DETAIL_FIXTURE,
-      }),
-      appendCompletedSessionExerciseAsPlanned: jest.fn().mockRejectedValue(new Error('Unable to append now')),
-      setCompletedSessionDeletedState: jest.fn().mockResolvedValue(undefined),
-    };
-
-    render(<CompletedSessionDetailScreenShell sessionId="completed-under-test" dataClient={dataClient} />);
-
-    await waitFor(() => {
-      expect(screen.getByTestId('completed-session-detail-screen')).toBeTruthy();
-    });
-
+    fireEvent.press(screen.getByTestId('completed-session-detail-exercise-options-exercise-1'));
     fireEvent.press(screen.getByTestId('completed-session-detail-append-exercise-button-exercise-1'));
 
-    await waitFor(() => {
-      expect(screen.getByText('Unable to append now')).toBeTruthy();
-    });
-    expect(mockDismissTo).not.toHaveBeenCalled();
+    expect(await screen.findByTestId('completed-session-detail-error-notice')).toHaveTextContent(
+      'Unable to append now'
+    );
+    expect(mockPush).not.toHaveBeenCalled();
     expect(screen.getByTestId('completed-session-detail-screen')).toBeTruthy();
   });
 
   it('reloads the completed session when the detail screen regains focus', async () => {
-    const dataClient: CompletedSessionDetailDataClient = {
-      loadCompletedSession: jest
-        .fn()
-        .mockResolvedValueOnce(COMPLETED_SESSION_DETAIL_FIXTURE)
-        .mockResolvedValueOnce({
-          ...COMPLETED_SESSION_DETAIL_FIXTURE,
-          gymName: 'Updated Gym',
-        }),
-      appendCompletedSessionExerciseAsPlanned: jest.fn().mockResolvedValue(undefined),
-      setCompletedSessionDeletedState: jest.fn().mockResolvedValue(undefined),
-    };
     const { __triggerFocus: triggerFocus } = jest.requireMock('expo-router') as {
       __triggerFocus: () => void;
     };
-
-    render(<CompletedSessionDetailScreenShell sessionId="completed-under-test" dataClient={dataClient} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Westside Barbell Club')).toBeTruthy();
-    });
+    await renderDetail(
+      detailClient({
+        loadCompletedSession: jest
+          .fn()
+          .mockResolvedValueOnce(COMPLETED_SESSION_DETAIL_FIXTURE)
+          .mockResolvedValueOnce({ ...COMPLETED_SESSION_DETAIL_FIXTURE, gymName: 'Updated Gym' }),
+      })
+    );
+    expect(screen.getByText('Westside Barbell Club')).toBeTruthy();
 
     act(() => {
       triggerFocus();
     });
 
-    await waitFor(() => {
-      expect(screen.getByText('Updated Gym')).toBeTruthy();
-    });
+    expect(await screen.findByText('Updated Gym')).toBeTruthy();
   });
 
-  it('delete and undelete persist through the data client and update the action label', async () => {
-    const mockSetCompletedSessionDeletedState = jest.fn().mockResolvedValue(undefined);
-    const dataClient: CompletedSessionDetailDataClient & {
-      setCompletedSessionDeletedState: jest.Mock;
-    } = {
-      loadCompletedSession: jest.fn().mockResolvedValue({
-        ...COMPLETED_SESSION_DETAIL_FIXTURE,
-        deletedAt: null,
-      }),
-      appendCompletedSessionExerciseAsPlanned: jest.fn().mockResolvedValue(undefined),
-      setCompletedSessionDeletedState: mockSetCompletedSessionDeletedState,
-    };
+  it('deletes and undeletes from the ⋮, with a band and no Edit while deleted', async () => {
+    const setCompletedSessionDeletedState = jest.fn().mockResolvedValue(undefined);
+    await renderDetail(detailClient({ setCompletedSessionDeletedState }));
 
-    render(<CompletedSessionDetailScreenShell sessionId="completed-under-test" dataClient={dataClient} />);
-
-    await waitFor(() => {
-      expect(screen.getByTestId('completed-session-detail-screen')).toBeTruthy();
-    });
-
-    expect(screen.getByText('Delete')).toBeTruthy();
+    const sheet = openSessionOptions();
+    expect(within(sheet).getByText('Delete session')).toBeTruthy();
     fireEvent.press(screen.getByTestId('completed-session-detail-delete-button'));
-    await waitFor(() => {
-      expect(mockSetCompletedSessionDeletedState).toHaveBeenCalledWith('completed-under-test', true);
-    });
-    await waitFor(() => {
-      expect(screen.getByText('Undelete')).toBeTruthy();
-    });
-    expect(screen.queryByText('Deleting...')).toBeNull();
-    expect(screen.queryByText(/viewer-only stub/i)).toBeNull();
-    expect(screen.getByText('Session hidden from default history.')).toBeTruthy();
 
+    expect(await screen.findByTestId('completed-session-detail-deleted-band')).toHaveTextContent(
+      'Deleted · hidden from history'
+    );
+    expect(setCompletedSessionDeletedState).toHaveBeenCalledWith('completed-under-test', true);
+    // The session view only edits a live session, so Edit goes while deleted.
+    expect(screen.queryByTestId('completed-session-detail-edit-button')).toBeNull();
+
+    expect(within(openSessionOptions()).getByText('Undelete session')).toBeTruthy();
     fireEvent.press(screen.getByTestId('completed-session-detail-delete-button'));
-    await waitFor(() => {
-      expect(mockSetCompletedSessionDeletedState).toHaveBeenNthCalledWith(2, 'completed-under-test', false);
-    });
-    expect(screen.getByText('Delete')).toBeTruthy();
-    expect(screen.getByText('Session restored to default history.')).toBeTruthy();
+
+    expect(await screen.findByTestId('completed-session-detail-edit-button')).toBeTruthy();
+    expect(screen.queryByTestId('completed-session-detail-deleted-band')).toBeNull();
+    expect(setCompletedSessionDeletedState).toHaveBeenNthCalledWith(2, 'completed-under-test', false);
   });
 
-  it('disables the delete button while delete state is being persisted', async () => {
-    let resolveDeleteRequest: (() => void) | undefined;
-    const pendingDeleteRequest = new Promise<void>((resolve) => {
-      resolveDeleteRequest = resolve;
-    });
+  it('opens a deleted session with its band and without Edit', async () => {
+    await renderDetail(
+      detailClient({
+        loadCompletedSession: jest.fn().mockResolvedValue({
+          ...COMPLETED_SESSION_DETAIL_FIXTURE,
+          deletedAt: '2026-02-21T08:00:00.000Z',
+        }),
+      })
+    );
 
-    const mockSetCompletedSessionDeletedState = jest
-      .fn()
-      .mockReturnValueOnce(pendingDeleteRequest)
-      .mockResolvedValueOnce(undefined);
-
-    const dataClient: CompletedSessionDetailDataClient = {
-      loadCompletedSession: jest.fn().mockResolvedValue({
-        ...COMPLETED_SESSION_DETAIL_FIXTURE,
-        deletedAt: null,
-      }),
-      appendCompletedSessionExerciseAsPlanned: jest.fn().mockResolvedValue(undefined),
-      setCompletedSessionDeletedState: mockSetCompletedSessionDeletedState,
-    };
-
-    render(<CompletedSessionDetailScreenShell sessionId="completed-under-test" dataClient={dataClient} />);
-
-    await waitFor(() => {
-      expect(screen.getByTestId('completed-session-detail-screen')).toBeTruthy();
-    });
-
-    const deleteButton = screen.getByTestId('completed-session-detail-delete-button');
-    fireEvent.press(deleteButton);
-
-    await waitFor(() => {
-      expect(mockSetCompletedSessionDeletedState).toHaveBeenCalledWith('completed-under-test', true);
-    });
-    expect(screen.getByText('Deleting...')).toBeTruthy();
-
-    fireEvent.press(screen.getByTestId('completed-session-detail-delete-button'));
-    expect(mockSetCompletedSessionDeletedState).toHaveBeenCalledTimes(1);
-
-    if (!resolveDeleteRequest) {
-      throw new Error('Expected delete request resolver to be set');
-    }
-    resolveDeleteRequest();
-
-    await waitFor(() => {
-      expect(screen.getByText('Undelete')).toBeTruthy();
-    });
-    expect(screen.queryByText('Deleting...')).toBeNull();
+    expect(screen.getByTestId('completed-session-detail-deleted-band')).toBeTruthy();
+    expect(screen.queryByTestId('completed-session-detail-edit-button')).toBeNull();
   });
 
-  it('shows feedback and preserves the delete label when delete persistence fails', async () => {
-    const dataClient: CompletedSessionDetailDataClient = {
-      loadCompletedSession: jest.fn().mockResolvedValue({
-        ...COMPLETED_SESSION_DETAIL_FIXTURE,
-        deletedAt: null,
-      }),
-      appendCompletedSessionExerciseAsPlanned: jest.fn().mockResolvedValue(undefined),
-      setCompletedSessionDeletedState: jest.fn().mockRejectedValue(new Error('Unable to update deleted state')),
-    };
+  it('ignores a second delete while the first is being written', async () => {
+    let resolveDelete: (() => void) | undefined;
+    const setCompletedSessionDeletedState = jest.fn().mockReturnValueOnce(
+      new Promise<void>((resolve) => {
+        resolveDelete = resolve;
+      })
+    );
+    await renderDetail(detailClient({ setCompletedSessionDeletedState }));
 
-    render(<CompletedSessionDetailScreenShell sessionId="completed-under-test" dataClient={dataClient} />);
-
-    await waitFor(() => {
-      expect(screen.getByTestId('completed-session-detail-screen')).toBeTruthy();
-    });
-
+    openSessionOptions();
     fireEvent.press(screen.getByTestId('completed-session-detail-delete-button'));
+    openSessionOptions();
+    fireEvent.press(screen.getByTestId('completed-session-detail-delete-button'));
+    expect(setCompletedSessionDeletedState).toHaveBeenCalledTimes(1);
 
-    await waitFor(() => {
-      expect(screen.getByText('Unable to update deleted state')).toBeTruthy();
+    act(() => {
+      resolveDelete?.();
     });
-
-    expect(screen.getByText('Delete')).toBeTruthy();
-    expect(screen.queryByText('Undelete')).toBeNull();
+    expect(await screen.findByTestId('completed-session-detail-deleted-band')).toBeTruthy();
   });
 
-  it('renders a stable empty state when the session is missing', async () => {
-    const dataClient: CompletedSessionDetailDataClient = {
-      loadCompletedSession: jest.fn().mockResolvedValue(null),
-      appendCompletedSessionExerciseAsPlanned: jest.fn().mockResolvedValue(undefined),
-      setCompletedSessionDeletedState: jest.fn().mockResolvedValue(undefined),
-    };
+  it('shows a failed delete inline and keeps the session as it was', async () => {
+    await renderDetail(
+      detailClient({
+        setCompletedSessionDeletedState: jest.fn().mockRejectedValue(new Error('Unable to update deleted state')),
+      })
+    );
 
-    render(<CompletedSessionDetailScreenShell sessionId="missing-session" dataClient={dataClient} />);
+    openSessionOptions();
+    fireEvent.press(screen.getByTestId('completed-session-detail-delete-button'));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('completed-session-detail-empty')).toBeTruthy();
-    });
+    expect(await screen.findByTestId('completed-session-detail-error-notice')).toHaveTextContent(
+      'Unable to update deleted state'
+    );
+    expect(screen.queryByTestId('completed-session-detail-deleted-band')).toBeNull();
+    expect(screen.getByTestId('completed-session-detail-edit-button')).toBeTruthy();
+  });
 
+  it('renders a stable empty state, with a way back, when the session is missing', async () => {
+    render(
+      <CompletedSessionDetailScreenShell
+        sessionId="missing-session"
+        dataClient={detailClient({ loadCompletedSession: jest.fn().mockResolvedValue(null) })}
+      />
+    );
+
+    expect(await screen.findByTestId('completed-session-detail-empty')).toBeTruthy();
     expect(screen.getByText('Session not found')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('completed-session-detail-back'));
+    expect(mockBack).toHaveBeenCalled();
   });
 
   it('renders an error state when loading fails', async () => {
-    const dataClient: CompletedSessionDetailDataClient = {
-      loadCompletedSession: jest.fn().mockRejectedValue(new Error('boom')),
-      appendCompletedSessionExerciseAsPlanned: jest.fn().mockResolvedValue(undefined),
-      setCompletedSessionDeletedState: jest.fn().mockResolvedValue(undefined),
-    };
+    render(
+      <CompletedSessionDetailScreenShell
+        sessionId="broken-session"
+        dataClient={detailClient({ loadCompletedSession: jest.fn().mockRejectedValue(new Error('boom')) })}
+      />
+    );
 
-    render(<CompletedSessionDetailScreenShell sessionId="broken-session" dataClient={dataClient} />);
-
-    await waitFor(() => {
-      expect(screen.getByTestId('completed-session-detail-error')).toBeTruthy();
-    });
-
+    expect(await screen.findByTestId('completed-session-detail-error')).toBeTruthy();
     expect(screen.getByText('boom')).toBeTruthy();
   });
 });

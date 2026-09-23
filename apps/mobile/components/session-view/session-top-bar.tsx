@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ActionButton } from '@/components/ui/action-button';
 import { Icon } from '@/components/ui/icon';
 import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 
@@ -50,16 +51,14 @@ export function SessionTopBar(props: SessionTopBarProps) {
           <Icon color={uiRoles.ink} name="more-vertical" size="md" />
         </Pressable>
       ) : null}
-      <Pressable
+      <ActionButton
         accessibilityLabel={copy.a11y}
-        accessibilityRole="button"
-        accessibilityState={{ disabled }}
         disabled={disabled}
+        label={copy.label}
         onPress={onPrimary}
-        style={[styles.finish, disabled ? styles.finishDisabled : null]}
-        testID={copy.testID}>
-        <Text style={styles.finishLabel}>{copy.label}</Text>
-      </Pressable>
+        testID={copy.testID}
+        variant="primary"
+      />
     </View>
   );
 }
@@ -89,25 +88,5 @@ const styles = StyleSheet.create({
     height: uiGeometry.tapTarget,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  finish: {
-    minHeight: uiGeometry.tapTarget,
-    paddingHorizontal: uiSpace.md,
-    borderRadius: uiGeometry.radius.card,
-    backgroundColor: uiRoles.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  finishDisabled: {
-    backgroundColor: uiRoles.disabled,
-  },
-  finishLabel: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    letterSpacing: uiTypography.size.sm * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
-    color: uiRoles.surface,
   },
 });

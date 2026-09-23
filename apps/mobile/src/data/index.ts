@@ -10,7 +10,6 @@ export {
   type ResetLocalDataAndReseedOptions,
   type ResetLocalDataAndReseedResult,
 } from './dev-reset';
-export { listSessionExerciseAssignedTags, type SessionExerciseAssignedTag } from './exercise-tags';
 export {
   createDrizzleSessionListStore,
   createSessionListRepository,

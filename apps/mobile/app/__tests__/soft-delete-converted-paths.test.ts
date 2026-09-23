@@ -4,11 +4,8 @@
  * Each path that used to hard-delete a syncable row now tombstones it instead:
  * the row stays in the table with `deleted_at` set and `local_dirty = 1`, so it
  * pushes to the server as a deletion and survives a reinstall, while the
- * default reader filters it out (`deleted_at IS NULL`). Covered:
- *   - the tag reader hiding a tombstoned attachment (`session_exercise_tags`;
- *     the app no longer writes tags, so tombstones arrive by sync);
- *   - re-saving an exercise with a muscle link dropped
- *     (`exercise_muscle_mappings`).
+ * default reader filters it out (`deleted_at IS NULL`). Covered: re-saving an
+ * exercise with a muscle link dropped (`exercise_muscle_mappings`).
  *
  * Driver: a real in-memory `better-sqlite3` database with the full migrated
  * schema applied, via the shared `helpers/in-memory-db` fixture.
@@ -18,15 +15,7 @@
 
 import { eq } from 'drizzle-orm';
 
-import {
-  exerciseDefinitions,
-  exerciseMuscleMappings,
-  exerciseTagDefinitions,
-  muscleGroups,
-  sessionExercises,
-  sessionExerciseTags,
-  sessions,
-} from '@/src/data/schema';
+import { exerciseMuscleMappings, muscleGroups } from '@/src/data/schema';
 
 import {
   createInMemoryDatabase,
@@ -48,58 +37,10 @@ jest.mock('@/src/data/bootstrap', () => ({
 }));
 
 // Imported AFTER the mock so the repos pick up the mocked bootstrap.
-import { listSessionExerciseAssignedTags } from '@/src/data/exercise-tags';
 import { createDrizzleExerciseCatalogStore } from '@/src/data/exercise-catalog';
 import { __resetClockForTests } from '@/src/data/clock';
 
 const EXERCISE_DEFINITION_ID = 'exercise-def-1';
-const SESSION_ID = 'session-1';
-const SESSION_EXERCISE_ID = 'session-exercise-1';
-const TAG_DEFINITION_ID = 'tag-def-1';
-
-const seedTagFixture = (database: TestDatabase): void => {
-  database
-    .insert(exerciseDefinitions)
-    .values({ id: EXERCISE_DEFINITION_ID, name: 'Bench Press' })
-    .run();
-  database
-    .insert(sessions)
-    .values({
-      id: SESSION_ID,
-      gymId: null,
-      status: 'active',
-      startedAt: new Date('2026-05-30T10:00:00.000Z'),
-    })
-    .run();
-  database
-    .insert(sessionExercises)
-    .values({
-      id: SESSION_EXERCISE_ID,
-      sessionId: SESSION_ID,
-      exerciseDefinitionId: EXERCISE_DEFINITION_ID,
-      orderIndex: 0,
-      name: 'Bench Press',
-    })
-    .run();
-  database
-    .insert(exerciseTagDefinitions)
-    .values({
-      id: TAG_DEFINITION_ID,
-      exerciseDefinitionId: EXERCISE_DEFINITION_ID,
-      name: 'Wide Grip',
-      normalizedName: 'wide grip',
-    })
-    .run();
-  database
-    .insert(sessionExerciseTags)
-    .values({
-      id: 'assignment-1',
-      sessionExerciseId: SESSION_EXERCISE_ID,
-      exerciseTagDefinitionId: TAG_DEFINITION_ID,
-    })
-    .run();
-};
-
 const seedMuscleGroups = (database: TestDatabase): void => {
   database
     .insert(muscleGroups)
@@ -110,9 +51,6 @@ const seedMuscleGroups = (database: TestDatabase): void => {
     .run();
 };
 
-const readTagRow = (database: TestDatabase, assignmentId: string) =>
-  database.select().from(sessionExerciseTags).where(eq(sessionExerciseTags.id, assignmentId)).get();
-
 const readMappingRows = (database: TestDatabase) =>
   database
     .select()
@@ -122,37 +60,6 @@ const readMappingRows = (database: TestDatabase) =>
 
 beforeEach(() => {
   __resetClockForTests();
-});
-
-describe('soft-delete: a tombstoned tag attachment', () => {
-  let fixture: InMemoryDatabaseFixture;
-
-  beforeEach(() => {
-    fixture = createInMemoryDatabase();
-    mockActiveDatabase = fixture.database;
-    seedTagFixture(fixture.database);
-  });
-
-  afterEach(() => {
-    mockActiveDatabase = null;
-    fixture.close();
-  });
-
-  // The app no longer removes tags (the editor went with the old recorder); a
-  // removal arrives by sync as a tombstone, and the reader must hide it.
-  it('lists a live attachment and hides a tombstoned one', async () => {
-    const live = await listSessionExerciseAssignedTags(SESSION_EXERCISE_ID);
-    expect(live.map((tag) => tag.assignmentId)).toEqual(['assignment-1']);
-
-    fixture.database
-      .update(sessionExerciseTags)
-      .set({ deletedAt: new Date('2026-05-31T12:00:00.000Z') })
-      .where(eq(sessionExerciseTags.id, 'assignment-1'))
-      .run();
-
-    expect(readTagRow(fixture.database, 'assignment-1')).toBeDefined();
-    expect(await listSessionExerciseAssignedTags(SESSION_EXERCISE_ID)).toEqual([]);
-  });
 });
 
 describe('soft-delete: dropping a muscle link on re-save', () => {
