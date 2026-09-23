@@ -568,8 +568,10 @@ unchanged. What differs is presentation:
    once two sets are performed; a performed weight or 1RM beating the all-time
    best before today is `record` (brass) instead. The records panel uses
    History's rules (warm-ups count). `Records` | `Last` chooses what the
-   expanded panel shows and never expands or collapses it; only the chevron
-   does.
+   panel shows and never expands or collapses it; only the chevron does.
+   Collapsed, its `1RM` / `Max` / `Vol` row sums up the chosen view: the
+   all-time records, or the previous session's best 1RM, heaviest weight and
+   volume.
 5. **Two exits.** Back leaves every set as it is. `Complete exercise` asks first
    when sets are waiting: planned sets still waiting are marked `unperformed`
    (never deleted — their plan stays), and ad-hoc sets never ticked are removed;

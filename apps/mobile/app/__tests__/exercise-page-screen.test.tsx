@@ -339,9 +339,15 @@ describe('ExercisePageScreen', () => {
     const { client } = createClient();
     await renderPage(client);
 
-    // Collapsed: choosing a view keeps it collapsed.
+    // Collapsed: the row sums up Records, then Last, and stays collapsed.
+    expect(screen.getByTestId('exercise-records-1rm')).toHaveTextContent('1RM102.1');
+    expect(screen.getByTestId('exercise-records-max')).toHaveTextContent('Max82.5');
+    expect(screen.getByTestId('exercise-records-vol')).toHaveTextContent('Vol2560');
     fireEvent.press(screen.getByTestId('exercise-records-view-last'));
     expect(screen.getByTestId('exercise-records-collapsed')).toBeTruthy();
+    expect(screen.getByTestId('exercise-records-1rm')).toHaveTextContent('1RM102.1');
+    expect(screen.getByTestId('exercise-records-max')).toHaveTextContent('Max82.5');
+    expect(screen.getByTestId('exercise-records-vol')).toHaveTextContent('Vol2375');
     expect(screen.queryByTestId('exercise-records-last')).toBeNull();
     expect(screen.getByTestId('exercise-records-view-last')).toBeSelected();
 
