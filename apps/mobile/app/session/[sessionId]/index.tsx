@@ -17,7 +17,9 @@ import { uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens'
 import type { ExerciseBlockHistorySuggestedPlan } from '@/src/data';
 import { sessionExerciseHref } from '@/src/navigation/active-session-entry';
 import { mainTabHref } from '@/src/navigation/main-tabs';
-import { listSessionGymOptions, type SessionGymOption } from '@/src/session-recorder/gym-options';
+import { GYMS_ROUTE } from '@/src/navigation/routes';
+import { findNearbyGym } from '@/src/location/gym-location-reads';
+import { activeGymOptions, listGymDirectory, type SessionGymOption } from '@/src/session-recorder/gym-options';
 import {
   abandonActiveSession,
   addExerciseToActiveSession,
@@ -66,6 +68,14 @@ const confirmAlert = (input: {
     );
   });
 
+type GymPickerState = {
+  visible: boolean;
+  options: SessionGymOption[] | null;
+  suggestion: SessionGymOption | null;
+};
+
+const CLOSED_GYM_PICKER: GymPickerState = { visible: false, options: null, suggestion: null };
+
 export type SessionViewScreenProps = {
   sessionId: string | null;
 };
@@ -83,10 +93,11 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
   const insets = useSafeAreaInsets();
   const { state, reload } = useSessionView(sessionId);
   const [isOptionsVisible, setIsOptionsVisible] = useState(false);
-  const [gymPicker, setGymPicker] = useState<{ visible: boolean; options: SessionGymOption[] | null }>({
-    visible: false,
-    options: null,
-  });
+  const [gymPicker, setGymPicker] = useState<GymPickerState>(CLOSED_GYM_PICKER);
+  // Bumped on every open and close, so a lookup that resolves after the sheet
+  // has closed (or reopened) is dropped.
+  const gymPickerGenerationRef = useRef(0);
+  const restoreGymPickerOnFocusRef = useRef(false);
   const [picker, setPicker] = useState({ visible: false, openRequestId: 0 });
   const [isFinishing, setIsFinishing] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -100,14 +111,49 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
     [state]
   );
 
+  const openGymPicker = useCallback(() => {
+    const generation = ++gymPickerGenerationRef.current;
+    const isCurrent = () => gymPickerGenerationRef.current === generation;
+    setGymPicker({ visible: true, options: null, suggestion: null });
+    listGymDirectory()
+      .then((directory) => {
+        if (!isCurrent()) return;
+        const options = activeGymOptions(directory);
+        setGymPicker((current) => ({ ...current, options }));
+        // Suggest only: a confident match becomes the sheet's first row and is
+        // never selected for the lifter. The permission prompt, when one is
+        // due, first appears here.
+        const candidates = directory.filter((gym) => !gym.archived);
+        return findNearbyGym(candidates).then((nearby) => {
+          if (!isCurrent() || !nearby) return;
+          setGymPicker((current) => ({ ...current, suggestion: { id: nearby.id, name: nearby.name } }));
+        });
+      })
+      .catch(() => {
+        if (!isCurrent()) return;
+        setGymPicker(CLOSED_GYM_PICKER);
+        setNotice("Couldn't load your gyms. Try again.");
+      });
+  }, []);
+
+  const closeGymPicker = () => {
+    gymPickerGenerationRef.current += 1;
+    setGymPicker(CLOSED_GYM_PICKER);
+  };
+
   // Back from Manage: the picker returns as it was left, like the recorder's.
+  // Back from the Gyms screen: the gym sheet reopens with the list reloaded.
   useFocusEffect(
     useCallback(() => {
       if (restorePickerOnFocusRef.current) {
         restorePickerOnFocusRef.current = false;
         setPicker((current) => ({ ...current, visible: true }));
       }
-    }, [])
+      if (restoreGymPickerOnFocusRef.current) {
+        restoreGymPickerOnFocusRef.current = false;
+        openGymPicker();
+      }
+    }, [openGymPicker])
   );
 
   const openTab = (href: Href) => router.dismissTo(href);
@@ -173,18 +219,14 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
     }
   };
 
-  const openGymPicker = () => {
-    setGymPicker({ visible: true, options: null });
-    listSessionGymOptions()
-      .then((options) => setGymPicker((current) => ({ ...current, options })))
-      .catch(() => {
-        setGymPicker({ visible: false, options: null });
-        setNotice("Couldn't load your gyms. Try again.");
-      });
+  const openGymsScreen = () => {
+    restoreGymPickerOnFocusRef.current = true;
+    closeGymPicker();
+    router.push(GYMS_ROUTE as Href);
   };
 
   const selectGym = async (gym: SessionGymOption | null) => {
-    setGymPicker({ visible: false, options: null });
+    closeGymPicker();
     if (!sessionId) return;
     setNotice(null);
     try {
@@ -302,10 +344,12 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
         visible={isOptionsVisible}
       />
       <SessionGymSheet
-        onDismiss={() => setGymPicker({ visible: false, options: null })}
+        onDismiss={closeGymPicker}
+        onManage={openGymsScreen}
         onSelect={(gym) => void selectGym(gym)}
         options={gymPicker.options}
         selectedGymId={state.status === 'ready' ? state.data.gymId : null}
+        suggestion={gymPicker.suggestion}
         visible={gymPicker.visible}
       />
       <ExercisePicker

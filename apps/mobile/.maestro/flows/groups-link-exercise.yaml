@@ -9,7 +9,9 @@ appId: com.dinoderek.mobile
 #      member's seeded "Barbell Bench Press" is);
 #   2. recorder picker search finds the group exercise under "From your
 #      groups" as "linked: Barbell Bench Press";
-#   3. picking it adds the member's own exercise to the session.
+#   3. picking it adds the member's own exercise to the session;
+#   4. that exercise's page ⋮ "Link to group exercise…" opens the same Link
+#      screen, showing the link made in step 1.
 #
 # Server setup runs as user_e itself over HTTP (../scripts/groups-link-setup.js:
 # group_create + group_exercise_create), the same RPCs an admin's app calls.
@@ -191,3 +193,49 @@ appId: com.dinoderek.mobile
 - assertNotVisible:
     text: ".*Comp Bench.*"
 - takeScreenshot: "groups-link-04-added"
+
+# --- 4. Exercise page ⋮ → Link screen -----------------------------------------
+# The session is the new screens' default: Train's Resume opens the session
+# view, whose card opens the exercise page.
+- openLink: "boga3://maestro-harness?teleport=session-list"
+- extendedWaitUntil:
+    visible:
+      id: "stats-history-screen"
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 4000
+- retry:
+    maxRetries: 3
+    commands:
+      - tapOn:
+          id: "top-level-tab-train"
+      - extendedWaitUntil:
+          visible:
+            id: "train-resume-session-button"
+          timeout: 15000
+- tapOn:
+    id: "train-resume-session-button"
+- extendedWaitUntil:
+    visible:
+      text: "Barbell Bench Press, .*"
+    timeout: 15000
+- tapOn:
+    text: "Barbell Bench Press, .*"
+- extendedWaitUntil:
+    visible:
+      id: "exercise-page-options"
+    timeout: 15000
+- tapOn:
+    id: "exercise-page-options"
+- extendedWaitUntil:
+    visible:
+      id: "exercise-options-link-group"
+    timeout: 10000
+- takeScreenshot: "groups-link-05-exercise-options"
+- tapOn:
+    id: "exercise-options-link-group"
+- extendedWaitUntil:
+    visible:
+      id: "exercise-link-linked-row-${output.linkGroupExerciseId}"
+    timeout: 30000
+- takeScreenshot: "groups-link-06-exercise-page-link-screen"

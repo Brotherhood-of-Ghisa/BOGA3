@@ -164,3 +164,55 @@ export const listLocalGyms = async (): Promise<LocalGymLookupRecord[]> => {
     .orderBy(asc(gyms.name), asc(gyms.id))
     .all();
 };
+
+export type LocalGymDirectoryRecord = LocalGymLookupRecord & {
+  // Archived gyms carry the synced soft-delete stamp.
+  archivedAt: Date | null;
+};
+
+/** Every gym row, archived ones included: the Gyms screen's list. */
+export const listLocalGymsIncludingArchived = async (): Promise<LocalGymDirectoryRecord[]> => {
+  const database = await bootstrapLocalDataLayer();
+  return database
+    .select({
+      id: gyms.id,
+      name: gyms.name,
+      latitude: gyms.latitude,
+      longitude: gyms.longitude,
+      coordinateAccuracyM: gyms.coordinateAccuracyM,
+      coordinatesUpdatedAt: gyms.coordinatesUpdatedAt,
+      archivedAt: gyms.deletedAt,
+    })
+    .from(gyms)
+    .orderBy(asc(gyms.name), asc(gyms.id))
+    .all();
+};
+
+/**
+ * Archives or unarchives a gym. Archive is the synced soft delete
+ * (`gyms.deleted_at`): the row stays, so past sessions keep naming the gym,
+ * and `listLocalGyms` stops offering it. Throws when the gym has no row.
+ */
+export const setLocalGymArchived = async (input: { id: string; archived: boolean; now?: Date }) => {
+  const database = await bootstrapLocalDataLayer();
+  const now = input.now ?? new Date();
+
+  database.transaction((tx) => {
+    const existing = tx.select({ id: gyms.id }).from(gyms).where(eq(gyms.id, input.id)).get();
+    if (!existing) {
+      throw new Error(`gym ${input.id} does not exist`);
+    }
+
+    tx.update(gyms)
+      .set({
+        deletedAt: input.archived ? now : null,
+        updatedAt: now,
+        localDirty: true,
+        localUpdatedAtMs: nowMonotonic(tx),
+      })
+      .where(eq(gyms.id, input.id))
+      .run();
+  });
+
+  notifyLocalWrite();
+};

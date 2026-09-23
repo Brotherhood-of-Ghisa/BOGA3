@@ -97,6 +97,18 @@ export const ICON_GLYPHS = {
   'set-planned': DASHED_RING,
 
   // --- Destinations ---
+  // Lucide `map-pin`: a gym with a saved location, and the nearby suggestion.
+  location: [
+    path(
+      'M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0',
+    ),
+    circle(12, 10, 3),
+  ],
+  // Lucide `link`: linking an exercise to a group exercise.
+  link: [
+    path('M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71'),
+    path('M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71'),
+  ],
   user: [path('M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2'), circle(12, 7, 4)],
   users: [
     path('M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2'),

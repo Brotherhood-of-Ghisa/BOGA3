@@ -369,6 +369,19 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
   - no query params; the records panel, the open set and every sheet are in-route state
   - registered with `headerShown: false`: the page draws its own top bar
 
+21. `/gyms` (exercise/session redesign step 6b)
+- File: `apps/mobile/app/gyms.tsx`
+- Query params:
+  - `source` (optional; `more` shows an explicit `Back to More` action)
+- Behavior:
+  - root-stack screen with the native header `Gyms`; the list, the in-place
+    editor, its confirmations and `Show archived` are in-route state, and the
+    route never navigates on its own except `Back to More`
+  - `Back to More` pops back to the tabs (`router.dismissTo('/more')`), since
+    the screen sits above them on the root stack; the direct route (and the
+    session view's push) remains valid without it
+  - built by `GYMS_ROUTE` (`apps/mobile/src/navigation/routes.ts`)
+
 ## Allowed route transitions (current high-level flows)
 
 1. `/` -> `/today`
@@ -451,8 +464,8 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
    - the invite link
 37. `/exercise-catalog` -> `/exercise-link?exerciseDefinitionId=<id>` (M25-T07)
    - Exercise Actions `⋮` `Link to group exercise…` (`router.push`; signed in only, disabled for a deleted exercise)
-38. `/session-recorder` -> `/exercise-link?exerciseDefinitionId=<id>` (M25-T07)
-   - exercise card `•••` `Link to group exercise…` (`router.push`; signed in only); the open session is untouched
+38. `/session/<sessionId>/exercise/<sessionExerciseId>`, `/session-recorder` -> `/exercise-link?exerciseDefinitionId=<id>` (M25-T07)
+   - the exercise page's ⋮ `Link to group exercise…` (the sheet closes, then `router.push`; signed in only), and until the recorder is deleted its exercise card `•••` item; the open session is untouched
 39. `/exercise-link` -> previous route
    - native back only
 40. `/group/<groupId>` -> `/group/<groupId>/members` (M25-T08)
@@ -481,6 +494,10 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
    - the session view's exercise card (`router.push`). Back, `Complete exercise` and `Remove from session` return with `router.back()`, and the session view reloads the draft on focus; with no history (a deep link) they `router.replace('/train')`
 51. `/session/<sessionId>/exercise/<sessionExerciseId>` -> `/exercise-history?exerciseDefinitionId=<id>`
    - the records panel's `History` link (`router.push`)
+52. `/session/<sessionId>` -> `/gyms`
+   - the gym sheet's `Manage gyms` (the sheet closes, then `router.push`); native back returns, and the sheet reopens with the gyms reloaded
+53. `/more` -> `/gyms?source=more`
+   - the Tools `Gyms` row (`router.push`); native back or `Back to More` returns
 
 Note:
 
@@ -497,12 +514,15 @@ Note:
   The visible shell is `BottomTray` composing `MainTabs`; it is suppressed on
   `/session-recorder`. `exercise-history` keeps its native stack header and
   renders `MainTabs` with Progress selected.
-- Detail screens registered in the root stack (`exercise-history`, `sessions`, `profile`, `connected-agents`, `maestro-harness`, `completed-session/[sessionId]`) keep their native stack header behavior; titles are declared in `apps/mobile/app/_layout.tsx`. The root stack's `screenOptions` give every detail screen an arrow-only back affordance (`headerBackButtonDisplayMode: 'minimal'`, no custom `headerBackTitle`, which react-native-screens would render as a custom item that ignores the display mode and morphs its label in during the push); the system chevron reads "Back" to VoiceOver.
+- Detail screens registered in the root stack (`exercise-history`, `sessions`, `profile`, `connected-agents`, `gyms`, `maestro-harness`, `completed-session/[sessionId]`) keep their native stack header behavior; titles are declared in `apps/mobile/app/_layout.tsx`. The root stack's `screenOptions` give every detail screen an arrow-only back affordance (`headerBackButtonDisplayMode: 'minimal'`, no custom `headerBackTitle`, which react-native-screens would render as a custom item that ignores the display mode and morphs its label in during the push); the system chevron reads "Back" to VoiceOver.
 - `completed-session/[sessionId]` sets its title inside the route file (`View Session`, `Session complete`, or `Session summary`)
 - `exercise-history` sets its title inside the route file to the resolved exercise name (falls back to `Exercise History` when the summary is not yet available)
 - M22 group routes declare `My groups`, `New group`, `Join group`, `Group`, `Edit group`, `Invite`, and `Session` in `apps/mobile/app/_layout.tsx`; the group screen replaces `Group` with the group's name once loaded
 - `session/[sessionId]/index` has no native header (`headerShown: false`); its
-  own top bar reads `Session`. The exercise page likewise draws its own
+  own top bar reads `Session`. The exercise page likewise draws its own. Their
+  stack titles (`Session`, `Exercise`) are only the back label VoiceOver reads
+  on the screens they push (`Gyms`, `Link exercise`)
+- `gyms` declares `Gyms` in `apps/mobile/app/_layout.tsx`
 - `exercise-link` (M25-T07) declares `Link exercise` in `apps/mobile/app/_layout.tsx` and replaces it with `Link "<exercise name>"` once the exercise resolves
 - M25-T08 adds `Members`, `Add exercise`, and `Edit exercise` for the group routes in `apps/mobile/app/_layout.tsx`
 

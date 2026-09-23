@@ -119,6 +119,9 @@ Brief entrypoint inventory of the current reusable UI component set.
   - geometry is vendored from Lucide 1.47.0 (ISC; notice in `LICENSE.lucide`),
     plus `chevron-left` (back), `pencil` (edit), `swap` (Lucide
     `arrow-left-right`) and `trash` (Lucide `trash-2`) for the exercise page,
+    `link` (Lucide `link`) for its ⋮ `Link to group exercise…`, `location`
+    (Lucide `map-pin`) for a gym's saved location and the gym sheet's nearby
+    suggestion,
     plus BoGa glyphs: `caret-down`, `radio-on` / `radio-off`, and the
     design-language §5 set-state glyphs `set-done` (filled `ink` disc, knocked-out
     check), `set-current` (`accent` ring), `set-planned` (dashed `planned` ring),
@@ -290,7 +293,7 @@ Brief entrypoint inventory of the current reusable UI component set.
   - `RecordsPanel` — a `Card` with the `Records` | `Last` selector (control radius), the `History` link, three stacked `Stat`s collapsed, record lines or the previous session's sets expanded
   - `SetRow` — the set-row recipe: `ListRow density="list"`, the effort label in `leading`, weight × reps in `children` (the row-body target that opens the logger), the inline 1RM / Vol `Stat`s in `meta`, the set-state glyph (a checkbox) in `trailing`
   - `SetLogger` — the open set in place: Weight / Reps / Effort fields at `uiGeometry.fieldHeight`, the `accent` commit tick on the control axis; effort tap cycles W-Up → blank → configured maximum RIR down to RIR 0, and long press opens `EffortSheet`
-  - `EffortSheet`, `ExerciseOptionsSheet` — `Sheet` + `ListRow`; effort includes all configured cycle choices with `None` for blank and scrolls for longer ranges
+  - `EffortSheet`, `ExerciseOptionsSheet` — `Sheet` + `ListRow`; effort includes all configured cycle choices with `None` for blank and scrolls for longer ranges; the options sheet shows `Link to group exercise…` only when its host passes `onLink` (signed in)
   - `ExerciseSwapSheet` — `Sheet` over the shared `ExerciseListContent` / `buildExerciseListModel` and list preferences
   - `pageText` — the page's shared type roles (micro-label, control label, running / detail / headline figures)
   - covered by `app/__tests__/exercise-page-screen.test.tsx`, `exercise-page-model.test.ts`, `exercise-page-persistence.test.ts` and the `ios-exercise-page` lane
@@ -317,8 +320,37 @@ Brief entrypoint inventory of the current reusable UI component set.
     `record` band. testID `session-view-exercise-<id>` with `-count`, `-set-<n>`,
     `-record`
   - `SessionOptionsSheet` — `Sheet` + one danger `ListRow` (`Abandon session`)
+  - `SessionGymSheet` — `Sheet` + `ListRow`s: the optional `Nearby · <gym>`
+    suggestion row (its host runs the lookup and passes `suggestion`), `No gym`
+    and the gyms with the current one checked, and a `Manage gyms` footer row.
+    testIDs `session-view-gym-sheet`, `-suggestion`, `-option-<id>` /
+    `-option-none`, `-manage`
   - `OutlineButton` — the ink-outline secondary action (`+ Add exercise`)
   - covered by `apps/mobile/app/__tests__/session-view-screen.test.tsx`
+
+19. Gyms (exercise/session redesign step 6b)
+- Folder: `apps/mobile/components/gyms/`; the gym directory and writes in
+  `apps/mobile/src/session-recorder/gym-options.ts`, the location reads in
+  `apps/mobile/src/location/gym-location-reads.ts`
+- Purpose:
+  - `GymsScreen` — the Gyms screen's composition (route `app/gyms.tsx`): a
+    `Card` of `ListRow density="list"` rows (location glyph, name, `Location
+    saved` / `No location saved`), `+ Add gym`, `Show archived` and the
+    `Archived` card; takes an injectable `readPosition`. testIDs
+    `gyms-screen`, `gyms-list`, `gyms-row-<id>` (`-status`), `gyms-add`,
+    `gyms-toggle-archived`, `gyms-archived-list`
+  - `GymEditor` — one gym's editor in place of its row (lifted from the
+    recorder's gym modal): name field at `uiGeometry.fieldHeight`, the location
+    status and actions with inline Replace / Clear confirmation and feedback,
+    and the `Archive` / `Unarchive` · `Cancel` · `Save` footer. testIDs
+    `gym-editor`, `-name`, `-location-status`, `-location-save` / `-replace` /
+    `-clear` / `-confirm` / `-cancel`, `-feedback`, `-archive` / `-unarchive`,
+    `-cancel`, `-save`
+  - `GymButton` — the screen's `primary` (`accent`), `outline` and caps
+    `text` buttons
+  - covered by `apps/mobile/app/__tests__/gyms-screen.test.tsx`,
+    `gym-directory.test.ts`, `gym-location-reads.test.ts` and the
+    `ios-session-view` lane
 
 ### UI-supporting shared module (non-visual)
 

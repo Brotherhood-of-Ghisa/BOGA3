@@ -87,14 +87,16 @@ Brief entrypoint map of the current mobile screens.
     persistent tab bar
 - Key states (high level):
   - Community links to existing group discovery and administration
-  - Tools links to MCP setup and connected-agent management; connected agents
-    is omitted without a user, developer logs is omitted outside `isDevMode`,
-    and an external-browser failure is shown inline without disabling the hub
+  - Tools links to MCP setup, connected-agent management and Gyms; connected
+    agents is omitted without a user, developer logs is omitted outside
+    `isDevMode`, and an external-browser failure is shown inline without
+    disabling the hub
   - Library & account links to existing exercise-database management and
     Settings/account
 - Key exits:
-  - `/groups`, `/connected-agents`, `/dev-logs`, `/exercise-catalog`, and
-    `/settings`, plus the first-party external MCP setup page
+  - `/groups`, `/connected-agents`, `/gyms?source=more`, `/dev-logs`,
+    `/exercise-catalog`, and `/settings`, plus the first-party external MCP
+    setup page
 
 2. `/sign-in`
 - File: `apps/mobile/app/sign-in.tsx`
@@ -213,7 +215,11 @@ Brief entrypoint map of the current mobile screens.
     persistent four-tab bar sits at the bottom with Train selected
   - summary card: Time (elapsed, ticking) / Gym / Sets (confirmed performed) /
     Volume (their entered-load volume, warm-ups included); the Gym stat opens
-    the `Gym` sheet (`No gym` + the recorder picker's gyms) to change it
+    the `Gym` sheet to change it: opening it starts one foreground location
+    lookup (1.5 s budget), and exactly one confident match shows first as
+    `Nearby · <gym>` (never preselected, and not shown for the session's own
+    gym); then `No gym` and the unarchived gyms (seeded + local), the current
+    one marked; the `Manage gyms` footer row opens `/gyms`
   - one read-only card per exercise, the whole card one link: name, `n/m` done
     count (confirmed of all rows), every row as `type · weight × reps · 1RM ·
     VOL` with mini legends, done rows in ink and planned/unconfirmed rows faded
@@ -238,8 +244,11 @@ Brief entrypoint map of the current mobile screens.
   - `/train` after Abandon, or any tab from the bottom bar (`dismissTo`)
   - `/exercise-catalog?source=session-recorder&intent=manage` from the
     picker's Manage; the picker returns on focus
+  - `/gyms` from the gym sheet's `Manage gyms`; on return the sheet reopens
+    with the gyms reloaded
 - Notes:
   - reloads the draft on every focus, so the exercise page's edits show on return
+  - its stack title `Session` is the back label of the screens it pushes
 
 5. `/exercise-catalog`
 - File: `apps/mobile/app/(tabs)/exercise-catalog.tsx`
@@ -551,7 +560,7 @@ Brief entrypoint map of the current mobile screens.
   - `Link` and `Unlink` are local writes (work offline); a success line repeats the retroactivity note; the load-mode note shows when weight entry differs
   - a deleted exercise shows "Restore this exercise to link it" (links still listed and unlinkable); offline with nothing cached shows "Connect once to load your groups' exercises"; offline marker and pull-to-refresh as on the group screens
 - Key exits:
-  - back to the catalogue or the recorder (native back)
+  - back to the catalogue, the recorder or the exercise page (native back)
 - Notes:
   - sets its stack title to `Link "<exercise name>"` once the exercise resolves
 
@@ -563,12 +572,25 @@ Brief entrypoint map of the current mobile screens.
 - Key states (high level):
   - records panel collapsed (`1RM` / `Max` / `Vol` of the selected view: the records, or the last session), expanded on `Records` (each record's date and set) or on `Last` (the previous completed session's sets); `Records` | `Last` and `History` are present in both, and switching views keeps the panel collapsed or expanded
   - performed, current and planned rows (glyph `set-done` / `set-current` / `set-planned`); the logger (Weight · Reps · Effort · the `accent` tick) on the first set not performed, or on the row tapped
-  - the effort sheet (W-Up / None / descending RIR from the file-configured maximum, default 3) and the ⋮ sheet (Edit exercise / Swap exercise / Remove from session)
+  - the effort sheet (W-Up / None / descending RIR from the file-configured maximum, default 3) and the ⋮ sheet (Edit exercise / Swap exercise / `Link to group exercise…`, signed in only / Remove from session)
   - setting off: a notice with `Open Settings`; a missing session or exercise, or a session not in progress: an inline message
 - Key exits:
-  - back (top bar) → the previous screen; `Complete exercise` → the previous screen after resolving the sets still waiting; `Remove from session` → the previous screen; `History` → `/exercise-history`
+  - back (top bar) → the previous screen; `Complete exercise` → the previous screen after resolving the sets still waiting; `Remove from session` → the previous screen; `History` → `/exercise-history`; ⋮ `Link to group exercise…` → `/exercise-link?exerciseDefinitionId=<id>`
 - Notes:
   - entered from the session view's exercise cards (step 5), or by deep link (Maestro `teleport=exercise-page`); with no screen to go back to, back goes to `/train`
+
+22. `/gyms` (Gyms screen; exercise/session redesign step 6b)
+- File: `apps/mobile/app/gyms.tsx` (composition in `apps/mobile/components/gyms/`)
+- Purpose:
+  - manage the gyms a session can be at, and their private locations; replaces the recorder's gym modal (Manage / Add new / editor)
+- Key states (high level):
+  - native header `Gyms`; one card listing the unarchived gyms (the seeded ones first, then the local ones by name), each with `Location saved` / `No location saved` (presence only, never coordinates); `+ Add gym`; `Show archived (n)` / `Hide archived` when any gym is archived, revealing an `Archived` card
+  - a row opens its editor in place (`accent-wash`, `accent` leading rule): `Name`, the location status, then `Save current location` (no location) or `Replace` / `Clear` (each confirmed inline first), inline success/error feedback, and a footer `Archive` (danger) or `Unarchive` · `Cancel` · `Save` / `Add gym` (the one `accent` primary)
+  - loading; a retryable read error
+- Key exits:
+  - native back → the session view (its gym sheet reopens) or More; from More (`source=more`) also an explicit `Back to More`, which pops back to the tabs (`dismissTo('/more')`)
+- Notes:
+  - reloads the gyms on every focus; name and archive changes close the editor, location changes keep it open
 
 ## Route shell (not a user-facing screen)
 
@@ -578,7 +600,7 @@ Brief entrypoint map of the current mobile screens.
 - Notes:
   - wraps the whole navigator in the route-layer auth guard (`apps/mobile/components/navigation/auth-route-guard.tsx`), which enforces login-on-start for configured signed-out sessions (neutral loading view while restoring, redirect to `/sign-in` when configured-but-signed-out, stand aside when auth is unconfigured, while allowing `/sign-in` and the dev/test-gated `/maestro-harness` route to render through)
   - immediately below the auth guard, wraps the navigator in the first-sync gate (`apps/mobile/src/sync/SyncGate.tsx`), which blocks a signed-in user behind a full-screen "Setting up your data…" block until `sync_runtime_state.bootstrap_completed_at` is set (then dismisses in place), and observes sync runtime state through the single shared scheduler-state accessor
-  - tab roots live inside the `(tabs)` route group (`apps/mobile/app/(tabs)/_layout.tsx`) with `headerShown: false`; the root stack registers the `(tabs)` group itself plus the `sign-in` screen and the detail screens (`exercise-history`, `sessions`, `profile`, `connected-agents`, `maestro-harness`, `completed-session/[sessionId]`, the M22 `group/mine`, `group/[groupId]/index`, `group-session/[memberId]/[sessionId]`, the M25 `exercise-link`, and the header-less redesign screens `session/[sessionId]/index` (session view) and `session/[sessionId]/exercise/[sessionExerciseId]` (exercise page))
+  - tab roots live inside the `(tabs)` route group (`apps/mobile/app/(tabs)/_layout.tsx`) with `headerShown: false`; the root stack registers the `(tabs)` group itself plus the `sign-in` screen and the detail screens (`exercise-history`, `sessions`, `profile`, `connected-agents`, `maestro-harness`, `completed-session/[sessionId]`, the M22 `group/mine`, `group/[groupId]/index`, `group-session/[memberId]/[sessionId]`, the M25 `exercise-link`, the `gyms` screen, and the header-less redesign screens `session/[sessionId]/index` (session view) and `session/[sessionId]/exercise/[sessionExerciseId]` (exercise page))
   - the root stack gives every detail screen the native minimal back-button
     display mode (no custom back title), preserving normal platform back
     behavior while hiding the previous route-group title; the arrow-only

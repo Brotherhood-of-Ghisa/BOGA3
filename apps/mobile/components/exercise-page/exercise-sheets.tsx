@@ -48,17 +48,21 @@ type ExerciseOptionsSheetProps = {
   exerciseName: string;
   onEdit: () => void;
   onSwap: () => void;
+  // Signed in only: opens the Link screen for this exercise (product E0.3).
+  onLink?: () => void;
   onRemove: () => void;
   onDismiss: () => void;
 };
 
-// The exercise's ⋮: Edit / Swap / Remove from session. Removing lives here,
-// not on the session view's card (build spec, "Session view").
+// The exercise's ⋮: Edit / Swap / Link to group exercise… / Remove from
+// session. Removing lives here, not on the session view's card (build spec,
+// "Session view").
 export function ExerciseOptionsSheet({
   visible,
   exerciseName,
   onEdit,
   onSwap,
+  onLink,
   onRemove,
   onDismiss,
 }: ExerciseOptionsSheetProps) {
@@ -81,6 +85,14 @@ export function ExerciseOptionsSheet({
         onPress={onSwap}
         testID="exercise-options-swap"
       />
+      {onLink ? (
+        <ListRow
+          label="Link to group exercise…"
+          leading={<Icon color={uiRoles.ink} name="link" />}
+          onPress={onLink}
+          testID="exercise-options-link-group"
+        />
+      ) : null}
       <ListRow
         label="Remove from session"
         leading={<Icon color={uiRoles.danger} name="trash" />}

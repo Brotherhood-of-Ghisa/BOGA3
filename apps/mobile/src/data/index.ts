@@ -52,8 +52,11 @@ export {
 } from './session-list';
 export {
   listLocalGyms,
+  listLocalGymsIncludingArchived,
   loadLocalGymById,
+  setLocalGymArchived,
   upsertLocalGym,
+  type LocalGymDirectoryRecord,
   type LocalGymLookupRecord,
   type UpsertLocalGymInput,
 } from './local-gyms';

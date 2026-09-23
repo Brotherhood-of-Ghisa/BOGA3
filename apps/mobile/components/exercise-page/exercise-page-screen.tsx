@@ -21,6 +21,8 @@ import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 import { nextSessionSetType, type SessionSetTypeValue } from '@/src/data/set-types';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import { useExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
+import { useGroupLinkingUserId } from '@/src/groups/use-group-exercise-linking';
+import { exerciseLinkHref } from '@/src/navigation/routes';
 import {
   addSet,
   buildSetRows,
@@ -78,6 +80,7 @@ export function ExercisePageScreen({
   loadHistory,
 }: ExercisePageScreenProps) {
   const router = useRouter();
+  const groupLinkingUserId = useGroupLinkingUserId();
   const draft = useSessionExerciseDraft({
     sessionId,
     sessionExerciseId,
@@ -322,6 +325,14 @@ export function ExercisePageScreen({
         exerciseName={exercise.name}
         onDismiss={() => setOpenSheet('none')}
         onEdit={() => setOpenSheet('edit')}
+        onLink={
+          groupLinkingUserId && exercise.exerciseDefinitionId
+            ? () => {
+                setOpenSheet('none');
+                router.push(exerciseLinkHref(exercise.exerciseDefinitionId));
+              }
+            : undefined
+        }
         onRemove={onRemove}
         onSwap={() => setOpenSheet('swap')}
         visible={openSheet === 'options'}
