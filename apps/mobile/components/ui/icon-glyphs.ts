@@ -41,6 +41,7 @@ const DASHED_RING = [
 
 export const ICON_GLYPHS = {
   // --- Direction and disclosure ---
+  'chevron-left': [path('m15 18-6-6 6-6')],
   'chevron-right': [path('m9 18 6-6-6-6')],
   'chevron-down': [path('m6 9 6 6 6-6')],
   'arrow-up': [path('m5 12 7-7 7 7'), path('M12 19V5')],
@@ -56,6 +57,23 @@ export const ICON_GLYPHS = {
   check: [path('M20 6 9 17l-5-5')],
   // Lucide `ellipsis-vertical`: the overflow (kebab) menu.
   'more-vertical': [circle(12, 12, 1), circle(12, 5, 1), circle(12, 19, 1)],
+  // Lucide `pencil`: edit the thing itself (an exercise's definition).
+  pencil: [
+    path(
+      'M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z'
+    ),
+    path('m15 5 4 4'),
+  ],
+  // Lucide `arrow-left-right`: replace one thing with another (swap exercise).
+  swap: [path('M8 3 4 7l4 4'), path('M4 7h16'), path('m16 21 4-4-4-4'), path('M20 17H4')],
+  // Lucide `trash-2`: remove. Coloured `danger` by its caller.
+  trash: [
+    path('M10 11v6'),
+    path('M14 11v6'),
+    path('M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6'),
+    path('M3 6h18'),
+    path('M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2'),
+  ],
 
   // --- Choice and status ---
   // Lucide `circle`: an unfilled ring — "not yet" (not certified, unselected).

@@ -31,7 +31,7 @@ This directory contains two kinds of files:
   - used by: `npm run start:ios:dev-client`.
   - status: used and needed.
 - `maestro-run-lane.sh`
-  - purpose: the single parameterized per-lane Maestro runner (`smoke` / `data-smoke` / `ui-regression` / `auth-profile` / `sync-e2e` / `groups-e2e`). Holds each lane's data — flows, reset strategy, Supabase configuration, fixture user — and delegates to `maestro-ios-run-flow.sh` (one flow, own sim + Metro) or `maestro-ios-run-flows.sh` (several flows sharing one). Canonical lane names: `scripts/lanes.tsv` (run via `./boga test ios-smoke` etc.).
+  - purpose: the single parameterized per-lane Maestro runner (`smoke` / `data-smoke` / `ui-regression` / `exercise-page` / `auth-profile` / `sync-e2e` / `groups-e2e`). Holds each lane's data — flows, reset strategy, Supabase configuration, fixture user — and delegates to `maestro-ios-run-flow.sh` (one flow, own sim + Metro) or `maestro-ios-run-flows.sh` (several flows sharing one). Canonical lane names: `scripts/lanes.tsv` (run via `./boga test ios-smoke` etc.).
   - used by: all `npm run test:e2e:ios:*` scripts except `gates`.
   - status: used and needed. Replaced the one-wrapper-per-lane scripts (`maestro-ios-smoke.sh`, `-data-smoke.sh`, `-auth-profile.sh`, `-sync-e2e.sh`).
 - `maestro-ios-gates.sh`

@@ -187,11 +187,15 @@ describe('design tokens stay additive during the exercise/session rebuild', () =
     // Added 2026-09-22 (step 3) beside `uiRadius` / `uiSpace` rather than into
     // them, so the legacy scales above stay byte-identical and can be retired
     // wholesale at switch-over.
+    // `radius.control` and `fieldHeight` added 2026-09-23 (step 4, the
+    // exercise page): one control radius for the target's 4 and 5, and the
+    // logger's field height.
     expect(uiGeometry).toEqual({
-      radius: { card: 6, sheet: 16 },
+      radius: { card: 6, sheet: 16, control: 4 },
       tapTarget: 44,
       metricValueWidth: 38,
       sheetHandle: { width: 38, height: 4 },
+      fieldHeight: 50,
       microLabelTracking: 0.1,
     });
   });

@@ -14,7 +14,7 @@ don't restate it here.
 ```bash
 ./boga test fast       # mobile quality + docs/meta + consent/MCP unit + backend fast smoke
 ./boga test backend    # local Supabase auth/agent/sync contracts + real MCP smoke
-./boga test frontend   # boots the iOS simulator, runs Maestro smoke + data-smoke + UI regression + auth-profile + sync e2e + two-user groups e2e
+./boga test frontend   # boots the iOS simulator, runs Maestro smoke + data-smoke + UI regression + exercise page + auth-profile + sync e2e + two-user groups e2e
 ./boga test --list     # every lane: name, gate, infra, CI?, command
 ./boga test <lane>     # one lane by name (e.g. ./boga test sync-push-contract)
 ./boga doctor          # verify THIS machine can run every lane
@@ -113,6 +113,7 @@ get from `./boga timings` or a run.
 | ios-smoke | `./boga test ios-smoke` | `boga test frontend` | ❌ | ~50s |
 | ios-data-smoke | `./boga test ios-data-smoke` | `boga test frontend` | ❌ | ~1.2m |
 | ios-ui-regression | `./boga test ios-ui-regression` | `boga test frontend` | ❌ | ~6.2m |
+| ios-exercise-page | `./boga test ios-exercise-page` | `boga test frontend` | ❌ | N/A |
 | ios-gates | `./boga test ios-gates` | — (run by name) | ❌ | ~2.2m |
 | ios-auth-profile *(+ local Supabase)* | `./boga test ios-auth-profile` | `boga test frontend` | ❌ | ~1.5m |
 | ios-sync-e2e *(+ local Supabase)* | `./boga test ios-sync-e2e` | `boga test frontend` | ❌ | ~1.9m |

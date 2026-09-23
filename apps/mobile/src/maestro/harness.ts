@@ -17,9 +17,10 @@ import {
 import { isDevMode } from '@/src/utils/isDevMode';
 
 import { seedExerciseBlockHistoryFixture } from './exercise-block-history-fixture';
+import { seedExercisePageFixture } from './exercise-page-fixture';
 
 export type MaestroHarnessResetMode = 'none' | 'data';
-export type MaestroHarnessFixtureName = 'none' | 'exercise-block-history';
+export type MaestroHarnessFixtureName = 'none' | 'exercise-block-history' | 'exercise-page';
 /**
  * Drives the first-sync gate deterministically in tests without a live cycle:
  * 'reset' clears the bootstrap flag so the gate's full-screen block shows;
@@ -47,7 +48,9 @@ export type MaestroHarnessTeleportTarget =
   | 'session-list'
   | 'session-recorder'
   | 'exercise-catalog'
-  | 'completed-session';
+  | 'completed-session'
+  // The exercise page (redesign step 4); needs `sessionId` and `sessionExerciseId`.
+  | 'exercise-page';
 
 export const coerceMaestroHarnessQueryParam = (value: string | string[] | undefined): string | null => {
   if (Array.isArray(value)) {
@@ -71,7 +74,8 @@ export const resolveMaestroHarnessResetMode = (
 
 export const resolveMaestroHarnessFixtureName = (
   value: string | null | undefined
-): MaestroHarnessFixtureName => (value === 'exercise-block-history' ? value : 'none');
+): MaestroHarnessFixtureName =>
+  value === 'exercise-block-history' || value === 'exercise-page' ? value : 'none';
 
 export const resolveMaestroHarnessBootstrapAction = (
   value: string | null | undefined
@@ -95,6 +99,7 @@ export const resolveMaestroHarnessTeleportTarget = (
     case 'session-recorder':
     case 'exercise-catalog':
     case 'completed-session':
+    case 'exercise-page':
       return value;
     default:
       return null;
@@ -121,6 +126,7 @@ export const resolveMaestroHarnessTeleportHref = ({
   mode,
   intent,
   sessionId,
+  sessionExerciseId,
   maestroShare,
   maestroCatalog,
   presentation,
@@ -129,6 +135,7 @@ export const resolveMaestroHarnessTeleportHref = ({
   mode?: string | null;
   intent?: string | null;
   sessionId?: string | null;
+  sessionExerciseId?: string | null;
   maestroShare?: string | null;
   maestroCatalog?: string | null;
   presentation?: string | null;
@@ -158,6 +165,10 @@ export const resolveMaestroHarnessTeleportHref = ({
             maestroShare: maestroShare === 'fail-once' ? maestroShare : null,
             maestroCatalog: maestroCatalog === 'fail-once' ? maestroCatalog : null,
           }) as Href)
+        : null;
+    case 'exercise-page':
+      return sessionId && sessionExerciseId
+        ? (`/session/${sessionId}/exercise/${sessionExerciseId}` as Href)
         : null;
     default:
       return null;
@@ -189,6 +200,9 @@ export const runMaestroHarnessNewScreensAction = async (
 export const runMaestroHarnessFixture = async (fixtureName: MaestroHarnessFixtureName) => {
   if (fixtureName === 'exercise-block-history') {
     await seedExerciseBlockHistoryFixture();
+  }
+  if (fixtureName === 'exercise-page') {
+    await seedExercisePageFixture();
   }
 };
 

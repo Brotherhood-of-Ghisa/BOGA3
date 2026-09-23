@@ -37,6 +37,7 @@ export default function MaestroHarnessScreen() {
     mode?: string | string[];
     intent?: string | string[];
     sessionId?: string | string[];
+    sessionExerciseId?: string | string[];
     maestroShare?: string | string[];
     maestroCatalog?: string | string[];
     presentation?: string | string[];
@@ -70,6 +71,7 @@ export default function MaestroHarnessScreen() {
   const modeParam = coerceMaestroHarnessQueryParam(params.mode);
   const intentParam = coerceMaestroHarnessQueryParam(params.intent);
   const sessionIdParam = coerceMaestroHarnessQueryParam(params.sessionId);
+  const sessionExerciseIdParam = coerceMaestroHarnessQueryParam(params.sessionExerciseId);
   const maestroShareParam = coerceMaestroHarnessQueryParam(params.maestroShare);
   const maestroCatalogParam = coerceMaestroHarnessQueryParam(params.maestroCatalog);
   const presentationParam = coerceMaestroHarnessQueryParam(params.presentation);
@@ -91,6 +93,7 @@ export default function MaestroHarnessScreen() {
       modeParam,
       intentParam,
       sessionIdParam,
+      sessionExerciseIdParam,
       maestroShareParam,
       maestroCatalogParam,
       presentationParam,
@@ -121,6 +124,7 @@ export default function MaestroHarnessScreen() {
       mode: modeParam,
       intent: intentParam,
       sessionId: sessionIdParam,
+      sessionExerciseId: sessionExerciseIdParam,
       maestroShare: maestroShareParam,
       maestroCatalog: maestroCatalogParam,
       presentation: presentationParam,
@@ -174,7 +178,7 @@ export default function MaestroHarnessScreen() {
     return () => {
       cancelled = true;
     };
-  }, [resetParam, fixtureParam, bootstrapParam, gateParam, newScreensParam, teleportParam, modeParam, intentParam, sessionIdParam, maestroShareParam, maestroCatalogParam, presentationParam, router]);
+  }, [resetParam, fixtureParam, bootstrapParam, gateParam, newScreensParam, teleportParam, modeParam, intentParam, sessionIdParam, sessionExerciseIdParam, maestroShareParam, maestroCatalogParam, presentationParam, router]);
 
   return (
     <View style={styles.screen} testID="maestro-harness-screen">
