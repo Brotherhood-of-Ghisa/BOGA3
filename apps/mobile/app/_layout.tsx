@@ -88,6 +88,7 @@ export default function RootLayout() {
                 />
                 <Stack.Screen name="dev-logs" options={{ title: 'Logs' }} />
                 <Stack.Screen name="exercise-link" options={{ title: 'Link exercise' }} />
+                <Stack.Screen name="gyms" options={{ title: 'Gyms' }} />
                 <Stack.Screen name="group/mine" options={{ title: 'My groups' }} />
                 <Stack.Screen name="group/new" options={{ title: 'New group' }} />
                 <Stack.Screen name="group/join" options={{ title: 'Join group' }} />
@@ -118,11 +119,15 @@ export default function RootLayout() {
                   options={{ title: 'Session' }}
                 />
                 {/* The session view and exercise page (steps 5 and 4 of the exercise/session
-                    redesign) draw their own top bars; reached only with the new-screens setting on. */}
-                <Stack.Screen name="session/[sessionId]/index" options={{ headerShown: false }} />
+                    redesign) draw their own top bars; reached only with the new-screens setting on.
+                    Their titles are the back label of what they push (Gyms, Link exercise). */}
+                <Stack.Screen
+                  name="session/[sessionId]/index"
+                  options={{ headerShown: false, title: 'Session' }}
+                />
                 <Stack.Screen
                   name="session/[sessionId]/exercise/[sessionExerciseId]"
-                  options={{ headerShown: false }}
+                  options={{ headerShown: false, title: 'Exercise' }}
                 />
                 <Stack.Screen name="maestro-harness" options={{ headerShown: false }} />
               </Stack>

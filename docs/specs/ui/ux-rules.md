@@ -56,9 +56,10 @@ Document app-specific UI semantics and guardrails for the current mobile app.
      account; account-bound rows are omitted without a user and
      developer-only rows use `isDevMode()`.
    - Each More row's accessible name includes its visible description. The
-     Exercise Catalog and Settings rows carry `source=more` and show an explicit
-     `Back to More` action; direct routes and non-More origins do not claim that
-     history. Groups looks the same however it is opened.
+     Exercise Catalog, Settings and Gyms rows carry `source=more` and show an
+     explicit `Back to More` action; direct routes and non-More origins do not
+     claim that history. Groups looks the same however it is opened. Gyms sits
+     under Tools; it is also reached from the session view's `Gym` sheet.
    - Settings Preferences holds device-local choices shown as single-select
      option buttons (`accessibilityRole="button"` + `selected`): the date format,
      then `New exercise & session screens` (`Off`/`On`, default `On` since
@@ -194,25 +195,54 @@ Document app-specific UI semantics and guardrails for the current mobile app.
     - catalog/mapping failure is a compact unavailable state with Retry and stays non-blocking for entry, autosave, and submission;
     - confirming, editing, unconfirming, and deleting recompute from current in-memory state; when the final performed set is reversed, both the row and any open sheet vanish immediately.
 13. The shared exercise editor dismisses the text keyboard before opening primary/secondary muscle selectors, and selector lists remain keyboard-aware so all muscle-group options stay reachable on iOS. It exposes a two-choice `Total load` / `Per side` control, preselects the stored value while editing, and defaults new custom exercises to total load.
-14. In `session-recorder`, GPS gym detection is quiet assistance:
-    - the default recorder surface shows only the gym box, with no visible Detect button or persistent GPS suggestion panel,
-    - brand-new active-session creation may run one foreground location read and preselect a gym only when exactly one saved gym confidently matches,
-    - restoring an active draft and completed-edit mode do not run startup GPS detection,
-    - short-pressing the gym box opens the picker, while long-pressing it explicitly retries GPS detection for the current active session,
-    - permission denial, unavailable services, low accuracy, no match, ambiguous match, and read failures leave the current gym unchanged,
-    - manual gym selection and `No gym` are always authoritative unless the user later long-presses to retry GPS detection.
-15. In `session-recorder`, the gym picker includes `No gym` as a null session-gym option:
+14. GPS gym detection is quiet assistance, and it **suggests only** (decided
+    2026-09-23, redesign step 6b):
+    - opening the session view's `Gym` sheet runs one foreground location read
+      (a 1.5 s budget; the permission prompt, when due, first appears here);
+      exactly one confident match against the unarchived gyms with a saved
+      location shows as the sheet's first row, `Nearby · <gym>`, and one tap
+      selects it; the sheet never selects it for the lifter, and it is not
+      shown for the gym the session already has,
+    - starting a session never preselects a gym (every start goes through
+      `src/session-entry/coordinator.ts` with `gymId: null`), and there is no
+      long-press retry,
+    - permission denial, services off, low accuracy, no match, a tie, a read
+      failure and no fix within the budget show no suggestion row and leave the
+      gym unchanged; the list below is usable at once,
+    - manual selection and `No gym` are always authoritative.
+    - Until the recorder is deleted, its own `Start Session` still preselects
+      one confident match and its gym box's long-press retries detection; the
+      rest of this rule's recorder-era wording is retired.
+15. The `Gym` sheet (session view, and the recorder's picker) includes `No gym`
+    as a null session-gym option:
     - it maps to nullable `session.locationId` / persisted `gym_id`,
-    - it is not a `gyms` row and is not editable, archived, synced, or shown in Manage,
-    - active-session null gym state displays as `No gym`, not as an unresolved choose prompt.
-16. In `session-recorder` gym management, private coordinate controls live in the single gym editor:
-    - each managed gym shows only coordinate presence (`GPS saved` / `No GPS coordinates`) rather than latitude/longitude precision,
-    - Manage rows expose list-management actions only (edit, archive/unarchive, archived visibility), not coordinate mutation actions,
-    - `Save current location` in the single gym editor reads foreground location and persists only when accuracy is acceptable,
-    - adding a new gym silently attempts to attach acceptable current coordinates without blocking gym creation or selection,
-    - replacing or clearing existing coordinates remains confirmation-gated in the single gym editor,
-    - permission denial, unavailable services, low accuracy, and persistence failures stay inline in the editor and leave existing coordinates unchanged,
-    - clearing coordinates removes the gym from GPS matching until coordinates are saved again.
+    - it is not a `gyms` row and is not editable, archived, synced, or shown on
+      the Gyms screen,
+    - null gym state displays as `No gym`, not as an unresolved choose prompt,
+    - the sheet lists the unarchived gyms (the seeded gyms, then the local ones
+      by name) with the current one marked, and its `Manage gyms` footer row
+      opens `/gyms`; back on the session view the sheet reopens with the gyms
+      reloaded.
+16. Gym management lives on the Gyms screen (`/gyms`), with private
+    coordinate controls in the gym's own editor:
+    - each gym shows only location presence (`Location saved` / `No location
+      saved`), never latitude/longitude precision,
+    - a row opens its editor in place (like the exercise page's logger); the
+      editor holds the name, the location controls and `Archive` /
+      `Unarchive`; list rows carry no location or archive action,
+    - `Save current location` reads foreground location and saves only a fix
+      accurate enough to match later; a new gym's location is staged and saved
+      with `Add gym`, and adding a gym never reads the location unless asked
+      (the recorder's silent capture on add is dropped: `/gyms` is not
+      necessarily where the gym is),
+    - `Replace` and `Clear` each confirm inline first,
+    - permission denial, services off, low accuracy and write failures stay
+      inline in the editor and leave the saved location unchanged,
+    - clearing a location removes the gym from GPS suggestion until one is
+      saved again,
+    - `Archive` is the synced soft delete (`gyms.deleted_at`): the gym leaves
+      the sheet and GPS suggestion, keeps naming its past sessions, and returns
+      with `Unarchive` from `Show archived`; there is no hard delete.
 17. In `session-recorder`, each logged exercise card loads a volatile `Past Records` comparison panel keyed by `exercise_definition_id`:
     - the panel sits below assigned tag chips and above editable set rows,
     - the panel starts collapsed as a slim `Past Records` bar; tapping the bar expands it, and tapping the expanded header collapses it again without a separate Hide/Show button,
@@ -581,7 +611,9 @@ unchanged. What differs is presentation:
    (never deleted — their plan stays), and ad-hoc sets never ticked are removed;
    the alert names both counts. `Remove from session` (⋮, danger) confirms, then
    removes the exercise; `Swap exercise` keeps the sets and replaces the
-   exercise definition.
+   exercise definition. Signed in, the ⋮ also offers `Link to group
+   exercise…`, which opens the Link screen for the exercise (product E0.3) and
+   leaves the session untouched; signed out it is absent.
 6. **Sheets** are the design-language `Sheet`: backdrop, Android back and the
    VoiceOver escape dismiss; no Cancel.
 
@@ -591,10 +623,11 @@ unchanged. What differs is presentation:
    one link to the exercise page, with no controls inside it. Editing happens
    only on the exercise page; add lives on the session view (`+ Add
    exercise`), remove in the exercise's own ⋮. The one control in the summary
-   card is the Gym stat: tapping it opens a `Gym` sheet (`No gym`, then the
-   recorder picker's gyms, the current one marked) and choosing writes the
-   session's gym. Selection only; adding and managing gyms stay in the
-   recorder.
+   card is the Gym stat: tapping it opens a `Gym` sheet (a `Nearby · <gym>`
+   suggestion when one gym confidently matches, then `No gym` and the gyms, the
+   current one marked; §14–§15) and choosing writes the session's gym. Adding
+   and managing gyms is the Gyms screen's, through the sheet's `Manage gyms`
+   (§16).
 2. `Finish` (top bar, `accent`) is the screen's one primary. It asks the
    recorder's cleanup questions (the one rule set in `session-model.ts`, so the
    recorder asks the same) as native alerts: entered-but-unconfirmed sets

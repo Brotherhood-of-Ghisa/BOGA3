@@ -46,6 +46,7 @@ describe('More screen', () => {
     expect(screen.getByTestId('more-groups-row')).toBeTruthy();
     expect(screen.getByTestId('more-connect-agent-row')).toBeTruthy();
     expect(screen.getByTestId('more-connected-agents-row')).toBeTruthy();
+    expect(screen.getByTestId('more-gyms-row')).toBeTruthy();
     expect(screen.getByTestId('more-exercise-database-row')).toBeTruthy();
     expect(screen.getByTestId('more-settings-row')).toBeTruthy();
     expect(screen.queryByTestId('more-developer-logs-row')).toBeNull();
@@ -54,6 +55,7 @@ describe('More screen', () => {
   it.each([
     ['more-groups-row', '/groups'],
     ['more-connected-agents-row', '/connected-agents'],
+    ['more-gyms-row', '/gyms?source=more'],
     ['more-exercise-database-row', '/exercise-catalog?source=more'],
     ['more-settings-row', '/settings?source=more'],
   ])('opens %s at its existing route', (testID, route) => {

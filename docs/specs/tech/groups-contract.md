@@ -1626,8 +1626,10 @@ E0.1–E0.3).
   permissive (sync contract §A.2.10).
 - **Evidence.** Jest: `groups-link-view-model.test.ts`,
   `groups-exercise-link-screen.test.tsx`, `session-recorder-group-picker.test.tsx`,
-  `exercise-catalog-link-menu.test.tsx`, `exercise-group-links-add-as-new.test.ts`;
-  Maestro `groups-link-exercise.yaml` (§8).
+  `exercise-catalog-link-menu.test.tsx`, `exercise-group-links-add-as-new.test.ts`,
+  and the exercise page's ⋮ Link item in `exercise-page-screen.test.tsx`;
+  Maestro `groups-link-exercise.yaml` (§8), whose last step opens the Link
+  screen from the exercise page's ⋮ (redesign step 6b).
 
 **As-built (M25-T08, group page).** Product D10, D14, and E0.4; M25 design
 §1 and §7.
@@ -2206,7 +2208,7 @@ contract. The narrative sketches and design trade-offs are in git history
 | E0 | Linking, out of the way: every path ends at the Link screen or, while logging, the pick sheet | §6.3 M25-T07 |
 | E0.1 | Picker search: a `From your groups` section after my matches, plus a Groups toggle | §6.3 M25-T07 |
 | E0.2 | Pick sheet for an unlinked group exercise: suggested exercise, choose another, or add as new | §6.3 M25-T07 |
-| E0.3 | Link screen from the catalogue `⋮` / recorder `•••` menus: Linked, Suggested, All | §6.3 M25-T07 |
+| E0.3 | Link screen from the catalogue `⋮` / exercise-page `⋮` menus (and the recorder `•••` until it is deleted): Linked, Suggested, All | §6.3 M25-T07 |
 | E0.4 | Group page Exercises: my link status per row, `Link your exercise` | §6.3 M25-T08 |
 | E1 / E1.1 | Leaderboards page: podium cards on Certified · e1RM, `You: Nth`, archived last | §6.3 M25-T09 |
 | E1.2 | Full board: Weight/e1RM × Certified/All toggles in place, certified / uncertified mark on All, rows open E2 | §6.3 M25-T09, M25-T10 |

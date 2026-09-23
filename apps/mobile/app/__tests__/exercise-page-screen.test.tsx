@@ -24,6 +24,13 @@ jest.mock('expo-router', () => {
   };
 });
 
+// Signed out unless a test signs in: the ⋮ Link item is signed-in only.
+let mockLinkingUserId: string | null = null;
+jest.mock('@/src/groups/use-group-exercise-linking', () => ({
+  ...jest.requireActual('@/src/groups/use-group-exercise-linking'),
+  useGroupLinkingUserId: () => mockLinkingUserId,
+}));
+
 jest.mock('@/src/exercise-catalog/cache', () => ({
   useExerciseCatalog: () => ({
     status: 'ready',
@@ -247,6 +254,7 @@ const pressAlertButton = (label: string) => {
 describe('ExercisePageScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockLinkingUserId = null;
     jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
   });
 
@@ -514,6 +522,26 @@ describe('ExercisePageScreen', () => {
     pressAlertButton('Remove');
     await waitFor(() => expect(mockRouter.back).toHaveBeenCalled());
     expect(stored()?.exercises.map((exercise) => exercise.id)).toEqual(['squat']);
+  });
+
+  it('offers Link to group exercise… in the ⋮ only when signed in, opening the Link screen', async () => {
+    const { client } = createClient();
+    await renderPage(client);
+
+    fireEvent.press(screen.getByTestId('exercise-page-options'));
+    const signedOut = await screen.findByTestId('exercise-options-sheet');
+    expect(within(signedOut).queryByTestId('exercise-options-link-group')).toBeNull();
+    fireEvent.press(screen.getByTestId('exercise-options-sheet-backdrop', { includeHiddenElements: true }));
+    screen.unmount();
+
+    mockLinkingUserId = 'user-1';
+    await renderPage(client);
+    fireEvent.press(screen.getByTestId('exercise-page-options'));
+    const sheet = await screen.findByTestId('exercise-options-sheet');
+    fireEvent.press(within(sheet).getByText('Link to group exercise…'));
+
+    expect(mockRouter.push).toHaveBeenCalledWith('/exercise-link?exerciseDefinitionId=def-bench');
+    expect(screen.queryByTestId('exercise-options-sheet')).toBeNull();
   });
 
   it('swaps the exercise and keeps its sets', async () => {
