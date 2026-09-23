@@ -211,7 +211,8 @@ Brief entrypoint map of the current mobile screens.
   - own top bar: `Session` · ⋮ · `Finish` (the one `accent` primary); the
     persistent four-tab bar sits at the bottom with Train selected
   - summary card: Time (elapsed, ticking) / Gym / Sets (confirmed performed) /
-    Volume (their entered-load volume, warm-ups included)
+    Volume (their entered-load volume, warm-ups included); the Gym stat opens
+    the `Gym` sheet (`No gym` + the recorder picker's gyms) to change it
   - one read-only card per exercise, the whole card one link: name, `n/m` done
     count (confirmed of all rows), every row as `type · weight × reps · 1RM ·
     VOL` with mini legends, done rows in ink and planned/unconfirmed rows faded
@@ -224,8 +225,9 @@ Brief entrypoint map of the current mobile screens.
     exercise (one empty set) or appended plan straight to the draft
   - ⋮ opens the `Session` menu sheet with `Abandon session` (danger), which
     confirms before its soft delete
-  - `Finish` runs the recorder's cleanup prompts (same copy, as alerts) and
-    completion write; invalid set values block it with an alert naming the
+  - `Finish` runs the shared cleanup prompts (unconfirmed sets, then one
+    prompt for incomplete sets and empty exercises, as alerts) and completion
+    write; invalid set values block it with an alert naming the
     exercises
   - loading; `This session is no longer active.` with `Back to Train` when the
     id is not the active draft; retryable read error
@@ -557,7 +559,7 @@ Brief entrypoint map of the current mobile screens.
   - one page per exercise of the active session, in the design language (`design-language.md`; accepted target `design-targets/exercise-session-v5.md`): top bar (back · exercise name · ⋮), the collapsible records panel, one ordered set list whose current set expands in place into the logger, `+ Add set`, and `Complete exercise`
   - behind the `New exercise & session screens` setting (`useNewScreensEnabled()`); built beside the recorder, which it shares its domain with (`src/session-recorder/**`)
 - Key states (high level):
-  - records panel collapsed (`1RM` / `Max` / `Vol`), expanded on `Records` (each record's date and set) or on `Last` (the previous completed session's sets); `Records` | `Last` and `History` are present in both
+  - records panel collapsed (`1RM` / `Max` / `Vol`), expanded on `Records` (each record's date and set) or on `Last` (the previous completed session's sets); `Records` | `Last` and `History` are present in both, and switching views keeps the panel collapsed or expanded
   - performed, current and planned rows (glyph `set-done` / `set-current` / `set-planned`); the logger (Weight · Reps · Effort · the `accent` tick) on the first set not performed, or on the row tapped
   - the effort sheet (W-Up / RIR 2 / RIR 1 / RIR 0) and the ⋮ sheet (Edit exercise / Swap exercise / Remove from session)
   - setting off: a notice with `Open Settings`; a missing session or exercise, or a session not in progress: an inline message

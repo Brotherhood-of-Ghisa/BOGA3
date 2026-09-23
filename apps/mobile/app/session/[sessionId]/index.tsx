@@ -8,6 +8,7 @@ import { ExercisePicker } from '@/components/session-recorder/exercise-picker';
 import {
   OutlineButton,
   SessionExerciseCard,
+  SessionGymSheet,
   SessionOptionsSheet,
   SessionSummaryCard,
   SessionTopBar,
@@ -16,12 +17,14 @@ import { uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens'
 import type { ExerciseBlockHistorySuggestedPlan } from '@/src/data';
 import { sessionExerciseHref } from '@/src/navigation/active-session-entry';
 import { mainTabHref } from '@/src/navigation/main-tabs';
+import { listSessionGymOptions, type SessionGymOption } from '@/src/session-recorder/gym-options';
 import {
   abandonActiveSession,
   addExerciseToActiveSession,
   appendPlanToActiveSession,
   completeActiveSession,
   loadActiveSessionGraph,
+  setActiveSessionGym,
 } from '@/src/session-recorder/session-lifecycle';
 import {
   describeSubmitCleanupPrompt,
@@ -80,6 +83,10 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
   const insets = useSafeAreaInsets();
   const { state, reload } = useSessionView(sessionId);
   const [isOptionsVisible, setIsOptionsVisible] = useState(false);
+  const [gymPicker, setGymPicker] = useState<{ visible: boolean; options: SessionGymOption[] | null }>({
+    visible: false,
+    options: null,
+  });
   const [picker, setPicker] = useState({ visible: false, openRequestId: 0 });
   const [isFinishing, setIsFinishing] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -166,6 +173,28 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
     }
   };
 
+  const openGymPicker = () => {
+    setGymPicker({ visible: true, options: null });
+    listSessionGymOptions()
+      .then((options) => setGymPicker((current) => ({ ...current, options })))
+      .catch(() => {
+        setGymPicker({ visible: false, options: null });
+        setNotice("Couldn't load your gyms. Try again.");
+      });
+  };
+
+  const selectGym = async (gym: SessionGymOption | null) => {
+    setGymPicker({ visible: false, options: null });
+    if (!sessionId) return;
+    setNotice(null);
+    try {
+      await setActiveSessionGym(sessionId, gym);
+    } catch {
+      setNotice("Couldn't change the gym. Try again.");
+    }
+    await reload();
+  };
+
   const hidePicker = () => setPicker((current) => ({ ...current, visible: false }));
 
   const runPickerWrite = async (write: () => Promise<unknown>) => {
@@ -223,6 +252,7 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
       <ScrollView contentContainerStyle={styles.content} style={styles.scroll} testID="session-view-scroll">
         <SessionSummaryCard
           gymName={data.gymName}
+          onPressGym={openGymPicker}
           performedSetCount={model.performedSetCount}
           startedAt={data.startedAt}
           volume={model.volume}
@@ -270,6 +300,13 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
         onAbandon={() => void abandon()}
         onDismiss={() => setIsOptionsVisible(false)}
         visible={isOptionsVisible}
+      />
+      <SessionGymSheet
+        onDismiss={() => setGymPicker({ visible: false, options: null })}
+        onSelect={(gym) => void selectGym(gym)}
+        options={gymPicker.options}
+        selectedGymId={state.status === 'ready' ? state.data.gymId : null}
+        visible={gymPicker.visible}
       />
       <ExercisePicker
         mode="add"

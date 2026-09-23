@@ -82,7 +82,8 @@ Brief entrypoint inventory of the current reusable UI component set.
   - the building blocks of the exercise page and session view, drawn from
     `uiRoles` / `uiFonts` / `uiGeometry` only (`docs/specs/ui/design-language.md`);
     adopted by the exercise page (`components/exercise-page/`) and the session view
-    (`components/session-view/`), behind the new-screens setting
+    (`components/session-view/`, including its `Gym` picker sheet
+    `session-gym-sheet.tsx`), behind the new-screens setting
   - `Card` — `surface` on `paper`, 1px `rule`, card radius, no shadow, no
     padding (content owns its insets); with `onPress` the whole card is one
     labelled `link` target

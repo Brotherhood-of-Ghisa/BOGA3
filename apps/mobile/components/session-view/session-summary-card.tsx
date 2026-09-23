@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Card } from '@/components/ui/card';
 import { Stat } from '@/components/ui/stat';
@@ -11,6 +11,8 @@ type SessionSummaryCardProps = {
   gymName: string | null;
   performedSetCount: number;
   volume: string;
+  // Opens the gym picker; the whole Gym cell is the target.
+  onPressGym: () => void;
   // Injectable clock for tests.
   now?: () => Date;
 };
@@ -34,15 +36,23 @@ export function SessionSummaryCard({
   gymName,
   performedSetCount,
   volume,
+  onPressGym,
   now = systemNow,
 }: SessionSummaryCardProps) {
   return (
     <Card testID="session-view-summary">
       <View style={styles.row}>
         <ElapsedStat now={now} startedAt={startedAt} />
-        <View style={styles.gym}>
+        <Pressable
+          accessibilityHint="Choose the gym for this session"
+          accessibilityLabel={`Gym ${gymName ?? 'No gym'}`}
+          accessibilityRole="button"
+          hitSlop={uiSpace.sm}
+          onPress={onPressGym}
+          style={styles.gym}
+          testID="session-view-summary-gym-button">
           <Stat kind="text" label="Gym" testID="session-view-summary-gym" value={gymName ?? 'No gym'} />
-        </View>
+        </Pressable>
         <Stat label="Sets" testID="session-view-summary-sets" value={String(performedSetCount)} />
         <Stat align="end" label="Volume" testID="session-view-summary-volume" value={volume} />
       </View>

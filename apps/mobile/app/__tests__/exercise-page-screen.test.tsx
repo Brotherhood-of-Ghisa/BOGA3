@@ -314,7 +314,7 @@ describe('ExercisePageScreen', () => {
     expect(screen.getByTestId('exercise-set-logger-effort')).toHaveTextContent('EffortRIR 0');
   });
 
-  it('expands the records panel on Records and on Last', async () => {
+  it('shows Records and Last in the expanded records panel', async () => {
     const { client } = createClient();
     await renderPage(client);
 
@@ -333,6 +333,26 @@ describe('ExercisePageScreen', () => {
       pathname: '/exercise-history',
       params: { exerciseDefinitionId: 'def-bench' },
     });
+  });
+
+  it('leaves the records panel collapsed or expanded when switching Records and Last', async () => {
+    const { client } = createClient();
+    await renderPage(client);
+
+    // Collapsed: choosing a view keeps it collapsed.
+    fireEvent.press(screen.getByTestId('exercise-records-view-last'));
+    expect(screen.getByTestId('exercise-records-collapsed')).toBeTruthy();
+    expect(screen.queryByTestId('exercise-records-last')).toBeNull();
+    expect(screen.getByTestId('exercise-records-view-last')).toBeSelected();
+
+    // Expanded: switching views keeps it expanded.
+    fireEvent.press(screen.getByTestId('exercise-records-toggle'));
+    expect(screen.getByTestId('exercise-records-last')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('exercise-records-view-records'));
+    expect(screen.getByTestId('exercise-records-list')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('exercise-records-view-last'));
+    expect(screen.getByTestId('exercise-records-last')).toBeTruthy();
+    expect(screen.queryByTestId('exercise-records-collapsed')).toBeNull();
   });
 
   it('performs a planned set from its glyph and un-performs it again', async () => {

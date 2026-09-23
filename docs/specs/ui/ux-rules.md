@@ -567,7 +567,9 @@ unchanged. What differs is presentation:
    like any set. Bold `best` marks today's top weight, 1RM and volume per column
    once two sets are performed; a performed weight or 1RM beating the all-time
    best before today is `record` (brass) instead. The records panel uses
-   History's rules (warm-ups count).
+   History's rules (warm-ups count). `Records` | `Last` chooses what the
+   expanded panel shows and never expands or collapses it; only the chevron
+   does.
 5. **Two exits.** Back leaves every set as it is. `Complete exercise` asks first
    when sets are waiting: planned sets still waiting are marked `unperformed`
    (never deleted — their plan stays), and ad-hoc sets never ticked are removed;
@@ -582,11 +584,18 @@ unchanged. What differs is presentation:
 1. The session view is read-only and navigational: the whole exercise card is
    one link to the exercise page, with no controls inside it. Editing happens
    only on the exercise page; add lives on the session view (`+ Add
-   exercise`), remove in the exercise's own ⋮.
+   exercise`), remove in the exercise's own ⋮. The one control in the summary
+   card is the Gym stat: tapping it opens a `Gym` sheet (`No gym`, then the
+   recorder picker's gyms, the current one marked) and choosing writes the
+   session's gym. Selection only; adding and managing gyms stay in the
+   recorder.
 2. `Finish` (top bar, `accent`) is the screen's one primary. It asks the
-   recorder's cleanup questions with the recorder's copy, in the recorder's
-   order (incomplete sets, entered-but-unconfirmed sets, exercises left with no
-   sets), as native alerts; declining any writes nothing. Invalid set values
+   recorder's cleanup questions (the one rule set in `session-model.ts`, so the
+   recorder asks the same) as native alerts: entered-but-unconfirmed sets
+   first, on their own; then **one** prompt that removes the incomplete sets
+   and the exercises left with no sets together (`Remove incomplete sets and
+   empty exercises?` · `Remove and submit`; the recorder's single-kind copy
+   when only one applies). Declining any writes nothing. Invalid set values
    block it with an alert naming the exercises to fix.
 3. ⋮ is a menu sheet even with one item. `Abandon session` is `danger` and
    confirms (`Abandon session?` · `Keep session` / `Abandon`) before the same

@@ -24,7 +24,7 @@ type RecordsPanelProps = {
   expanded: boolean;
   dateFormat: ExerciseDateFormat;
   onToggleExpanded: () => void;
-  // Choosing a view also expands the panel.
+  // Choosing a view leaves the panel expanded or collapsed as it was.
   onSelectView: (view: RecordsView) => void;
   onOpenHistory: () => void;
   now?: Date;

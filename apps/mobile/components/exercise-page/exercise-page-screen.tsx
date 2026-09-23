@@ -241,10 +241,7 @@ export function ExercisePageScreen({
                 params: { exerciseDefinitionId: exercise.exerciseDefinitionId },
               })
             }
-            onSelectView={(view) => {
-              setRecordsView(view);
-              setRecordsExpanded(true);
-            }}
+            onSelectView={setRecordsView}
             onToggleExpanded={() => setRecordsExpanded((current) => !current)}
             state={records}
             view={recordsView}
