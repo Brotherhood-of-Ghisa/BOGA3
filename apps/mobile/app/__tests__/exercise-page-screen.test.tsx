@@ -1,6 +1,6 @@
 /* eslint-disable import/first */
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
-import { Alert, type AlertButton } from 'react-native';
+import { Alert, StyleSheet, type AlertButton } from 'react-native';
 
 const mockRouter = {
   back: jest.fn(),
@@ -67,6 +67,7 @@ jest.mock('@/src/exercise-catalog/stats-cache', () => ({
 
 import ExercisePageRoute from '@/app/session/[sessionId]/exercise/[sessionExerciseId]';
 import { ExercisePageScreen } from '@/components/exercise-page/exercise-page-screen';
+import { uiRoles } from '@/components/ui/tokens';
 import {
   __resetNewScreensPreferenceForTests,
   setNewScreensEnabled,
@@ -260,6 +261,33 @@ describe('ExercisePageScreen', () => {
     expect(screen.getByTestId('exercise-set-logger-effort')).toHaveTextContent('EffortRIR 1');
     expect(screen.getByTestId('exercise-set-logger-preview')).toHaveTextContent('1RM 99.3 · VOL 495');
     expect(screen.getByTestId('exercise-set-4-values')).toHaveTextContent('82.5 × 6');
+  });
+
+  it('highlights only records: today\'s top set stays plain, a record weight and 1RM take `record`', async () => {
+    const { client } = createClient();
+    await renderPage(client);
+
+    const styleOf = (element: ReturnType<typeof screen.getByTestId>) => StyleSheet.flatten(element.props.style);
+    const figure = (row: number, column: '1rm' | 'vol', value: string) =>
+      styleOf(within(screen.getByTestId(`exercise-set-${row}-${column}`)).getByText(value));
+
+    // 80 × 8 is today's top weight, 1RM and volume, and ties the 1RM record: no emphasis.
+    expect(styleOf(screen.getByTestId('exercise-set-2-values'))).toMatchObject({ fontWeight: '500' });
+    expect(styleOf(screen.getByTestId('exercise-set-2-values')).color).not.toBe(uiRoles.record);
+    expect(figure(2, '1rm', '102.1')).toMatchObject({ fontWeight: '500', color: uiRoles.ink });
+    expect(figure(2, 'vol', '640')).toMatchObject({ fontWeight: '500', color: uiRoles.inkMuted });
+
+    // 90 × 6 beats the 82.5 weight and 102.1 1RM records; its volume is never a record.
+    fireEvent.changeText(screen.getByTestId('exercise-set-logger-weight'), '90');
+    fireEvent.press(screen.getByTestId('exercise-set-logger-commit'));
+    await waitFor(() => expect(screen.getByTestId('exercise-set-3-values')).toHaveTextContent('90.0 × 6'));
+
+    expect(styleOf(screen.getByTestId('exercise-set-3-values'))).toMatchObject({
+      fontWeight: '700',
+      color: uiRoles.record,
+    });
+    expect(figure(3, '1rm', '108.3')).toMatchObject({ fontWeight: '700', color: uiRoles.record });
+    expect(figure(3, 'vol', '540')).toMatchObject({ fontWeight: '500', color: uiRoles.inkMuted });
   });
 
   it('logs the current set with the tick and moves the logger to the next one', async () => {

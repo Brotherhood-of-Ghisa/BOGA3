@@ -123,8 +123,8 @@ still fits `160.0 × 64` at 390pt.
 **Weight, decided 2026-09-22 on device:** the target's weights read too heavy
 on iOS, so realised figures and option labels sit one embedded weight lighter
 than drawn, keeping sizes on the scale. Running figures (weight × reps, the
-inline 1RM, VOL) are Plex Mono **500**; `best` is **700**, which now stands out
-from them. Sheet option labels are Archivo **600**, the selected one **700**.
+inline 1RM, VOL) are Plex Mono **500**; a `record` figure is **700**, which
+stands out from them. Sheet option labels are Archivo **600**, the selected one **700**.
 Headline figures (summary, records) stay Plex Mono 700, micro-labels Archivo
 700, sheet titles Archivo 800.
 
@@ -159,9 +159,13 @@ Headline figures (summary, records) stay Plex Mono 700, micro-labels Archivo
 **One primary action per screen**, in `accent`. Everything else is an outline or
 a plain text button. Two saturated buttons on one screen is a bug.
 
-**Superlatives are two-level and must not be mixed:** bold `ink` marks the best
-value *in the current context*; `record` marks an all-time best, and earns a
-band on the containing card.
+**One superlative: `record`.** A figure that beats the lifter's all-time best is
+bold `record`, and earns a band on the containing card where the screen has one
+(the session view's cards). Every other figure takes its row's colour and
+weight — **no screen bolds the best value in the current context.** Decided on
+device 2026-09-23: per-column bold "best today" figures read as noise, first on
+the session view, then aligned on the exercise page; `Stat` no longer offers a
+`best` emphasis (`ux-rules.md` §14a.4, §14b.4).
 
 **State is carried by a control glyph**, not by a word: a filled check means
 done, an `accent` ring means current, a dashed ring means planned. Planned items

@@ -564,9 +564,11 @@ unchanged. What differs is presentation:
    defaulting to the row's planned effort.
 4. **Numbers everywhere.** Every row, planned included, shows its 1RM and
    volume; planned values `ink-faint`, legends `planned`. Warm-ups show a 1RM
-   like any set. Bold `best` marks today's top weight, 1RM and volume per column
-   once two sets are performed; a performed weight or 1RM beating the all-time
-   best before today is `record` (brass) instead. The records panel uses
+   like any set. Every figure in a row shares the row's colour and weight —
+   there is no per-column bold for today's bests, matching the session view
+   (§14b.4; aligned 2026-09-23). The one highlight is a performed weight or 1RM
+   beating the all-time best before today, shown in `record` (brass); volume is
+   never one, since its record is a whole session's. The records panel uses
    History's rules (warm-ups count). `Records` | `Last` chooses what the
    expanded panel shows and never expands or collapses it; only the chevron
    does.

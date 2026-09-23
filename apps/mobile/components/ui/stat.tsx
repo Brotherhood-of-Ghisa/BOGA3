@@ -5,7 +5,7 @@ import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/component
 export type StatLayout = 'stacked' | 'inline';
 export type StatRank = 'primary' | 'secondary';
 export type StatState = 'realised' | 'planned';
-export type StatEmphasis = 'none' | 'best' | 'record';
+export type StatEmphasis = 'none' | 'record';
 export type StatKind = 'figure' | 'text';
 
 export type StatProps = {
@@ -22,9 +22,8 @@ export type StatProps = {
   // A planned value is not yet realised: it is shown, but faded — the value in
   // `ink-faint`, the legend in `planned`.
   state?: StatState;
-  // `best`: bold `ink`, the best in the current context. `record`: bold
-  // `record`, an all-time best. Ignored for planned values, which can be
-  // neither (`design-language.md` §5).
+  // `record`: bold `record`, an all-time best — the one superlative. Ignored
+  // for planned values, which cannot be one (`design-language.md` §5).
   emphasis?: StatEmphasis;
   // `text` sets the value in the body face (a gym name), not the figure face.
   kind?: StatKind;
@@ -131,7 +130,7 @@ const stackedValueStyles = StyleSheet.create({
 });
 
 // Plex Mono ships 500/600/700 only; 500 is its lightest embedded face, and
-// the realised default so that `best` (700) stands out from it.
+// the realised default so that a `record` (700) stands out from it.
 const inlineValueStyles = StyleSheet.create({
   primary: {
     fontFamily: figure,
@@ -151,6 +150,5 @@ const inlineValueStyles = StyleSheet.create({
 
 const emphasisStyles: Record<StatEmphasis, TextStyle | null> = {
   none: null,
-  best: { fontWeight: '700', color: uiRoles.ink },
   record: { fontWeight: '700', color: uiRoles.record },
 };

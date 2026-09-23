@@ -101,15 +101,15 @@ describe('Stat', () => {
     });
   });
 
-  it('marks the contextual best in bold ink and an all-time best in record', () => {
+  it('marks an all-time best in bold record, the only emphasis', () => {
     render(
       <>
-        <Stat emphasis="best" label="Vol" layout="inline" rank="secondary" value="640" />
+        <Stat emphasis="record" label="1RM" layout="inline" value="104.3" />
         <Stat emphasis="record" label="1RM" value="102.1" />
       </>,
     );
 
-    expect(flatStyle(screen.getByText('640'))).toMatchObject({ fontWeight: '700', color: uiRoles.ink });
+    expect(flatStyle(screen.getByText('104.3'))).toMatchObject({ fontWeight: '700', color: uiRoles.record });
     expect(flatStyle(screen.getByText('102.1'))).toMatchObject({
       fontWeight: '700',
       color: uiRoles.record,
