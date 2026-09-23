@@ -153,13 +153,12 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 4. `/session-recorder`
 - File: `apps/mobile/app/(tabs)/session-recorder.tsx`
 - Query params:
-  - `mode` (optional; `completed-edit` enables completed-session edit flow)
+  - `mode` (optional; `completed-edit` enables the old completed-session edit
+    flow, which no screen opens since step 6b-1 — completed sessions are
+    edited at `/session/<sessionId>` — and step 6b-3 deletes)
   - `sessionId` (optional; used by completed-edit flow)
 - Behavior:
   - missing/invalid completed-edit inputs are handled by route UI state (no crash)
-  - completed-edit is the default destination for a completed Session History
-    row; its `Summary` action flushes valid pending edits before pushing
-    `/completed-session/<sessionId>?presentation=summary`
   - active mode rechecks the latest persisted draft whenever the mounted route
     regains focus, but never overwrites in-memory recorder mutations
   - the persistent shell defaults to its collapsed peek handle in active and
@@ -178,8 +177,13 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
     `activeSessionHref(sessionId, enabled)` in
     `apps/mobile/src/navigation/active-session-entry.ts` (Off, or no known id:
     `/session-recorder`, unchanged)
-  - an id that is not the active draft renders an in-route state, never a
-    recorder copy
+  - `sessionId` may also be a completed session (step 6b-1): every completed
+    edit entry opens it through `sessionViewHref(sessionId)`, whatever the
+    setting (transitions 3, 7, 8). It edits in place and `Done` returns with
+    `router.back()` (`router.replace('/completed-session/<sessionId>')` with no
+    history); it never replays completion
+  - an id that is neither the active draft nor a completed, undeleted session
+    renders an in-route state, never a recorder copy
   - leaving by the bottom bar or after Abandon uses `router.dismissTo`, so the
     tab below is reused rather than stacked
   - root-stack screen with `headerShown: false`; it draws its own top bar
@@ -247,24 +251,25 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
   - active Resume and review/complete both use `dismissTo('/session-recorder')`
     to return to the existing recorder; `/sessions` never completes an
     active session directly
+  - a completed row and its Edit push `/session/<sessionId>` (the session
+    view, editing) whatever the new-screens setting (transition 3)
 
 10. `/completed-session/[sessionId]`
 - File: `apps/mobile/app/completed-session/[sessionId].tsx`
 - Path params:
   - `sessionId` (required dynamic segment)
 - Query params:
-  - `intent` (optional; `edit` redirects to `session-recorder` completed-edit mode)
-  - `presentation` (optional; `completion` selects the post-submit summary and
-    `summary` selects the identical content from History; absent/invalid values
-    preserve normal detail)
+  - `intent` (optional; `edit` replaces to `/session/<sessionId>`, the session
+    view editing the session)
+  - `presentation` (optional; `completion` selects the post-submit summary;
+    absent/invalid values — including the removed `summary` — preserve normal
+    detail)
 - Behavior:
   - completion mode hides historical edit/delete/append actions, disables the
     native back affordance/gesture, and gives Done, Android system back, and
     unavailable-target states a replacing exit to `/progress`
-  - historical summary mode uses the same content and Share action without
-    Done; explicit `History` and `Edit` header actions replace to `/sessions`
-    and the still-mounted completed editor, and Android system back replaces to
-    `/sessions`
+  - `Edit` pushes `/session/<sessionId>`; the detail reloads on focus, so the
+    edits show when the session view's `Done` returns
 
 11. `/exercise-history`
 - File: `apps/mobile/app/exercise-history.tsx`
@@ -388,8 +393,10 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
    - root redirect (renders `<Redirect />`)
 2. `/progress` or `/stats-history` -> `/exercise-history?exerciseDefinitionId=<id>`
    - Stats sub-view per-exercise picker opens the per-exercise history view
-3. `/sessions` -> `/session-recorder?mode=completed-edit&sessionId=<sessionId>`
-   - completed Session History row tap (via the shared `HistoryList`)
+3. `/sessions` -> `/session/<sessionId>`
+   - completed Session History row tap (via the shared `HistoryList`) or its
+     Edit action: the session view, editing (step 6b-1); `Done` returns by
+     `router.back()`
 4. `/progress` or `/stats-history` -> `/sessions`
    - Stats Sessions summary card
 5. `/sessions` -> `/session-recorder`
@@ -400,22 +407,23 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
    - canonical switching via the shared bottom tray (`BottomTray` ->
      `MainTabs`); preserved `/stats-history`, `/exercise-catalog`, `/groups`,
      and `/settings` roots select Progress or More without becoming tabs
-7. `/completed-session/<sessionId>` -> `/session-recorder?mode=completed-edit&sessionId=<sessionId>`
-   - edit action
-8. `/completed-session/<sessionId>?intent=edit` -> `/session-recorder?mode=completed-edit&sessionId=<sessionId>`
+7. `/completed-session/<sessionId>` -> `/session/<sessionId>`
+   - edit action (`push`); `Done` returns by `router.back()`
+8. `/completed-session/<sessionId>?intent=edit` -> `/session/<sessionId>`
    - route-side redirect (`replace`)
 9. `/completed-session/<sessionId>` -> `/session-recorder`
    - successful append of one selected historical exercise block as planned target rows in the active recorder (creates an active session first when needed)
 10. `/session-recorder` -> `/completed-session/<sessionId>?presentation=completion`
    - successful active submit after persistence and completion both succeed
-11. `/session-recorder?mode=completed-edit...` -> `/progress`
-   - successful completed-session save; completion is not replayed
+11. `/session/<sessionId>` (completed) -> the previous screen
+   - `Done` after the completed-edit save (`router.back()`, or
+     `router.replace('/completed-session/<sessionId>')` with no history);
+     completion is not replayed. (The recorder's completed-edit save to
+     `/progress` is no longer reachable.)
 12. `/completed-session/<sessionId>?presentation=completion` -> `/progress`
    - Done, safe back, or unavailable-target exit (`replace`)
-13. `/session-recorder?mode=completed-edit...` -> `/completed-session/<sessionId>?presentation=summary`
-   - `Summary` after flushing pending valid edits (`push`)
-14. `/completed-session/<sessionId>?presentation=summary` -> `/session-recorder?mode=completed-edit&sessionId=<sessionId>` or `/sessions`
-   - explicit `Edit` pops to the live editor; `History` replaces to the list
+13. (removed in step 6b-1: the recorder's completed-edit `Summary`)
+14. (removed in step 6b-1: History's `presentation=summary` and its `Edit` / `History` header actions)
 15. `/session-recorder` -> `/exercise-catalog?source=session-recorder&intent=manage`
    - exercise picker `Manage` action
 16. `/exercise-catalog?source=session-recorder...` -> `/session-recorder`
@@ -515,11 +523,11 @@ Note:
   `/session-recorder`. `exercise-history` keeps its native stack header and
   renders `MainTabs` with Progress selected.
 - Detail screens registered in the root stack (`exercise-history`, `sessions`, `profile`, `connected-agents`, `gyms`, `maestro-harness`, `completed-session/[sessionId]`) keep their native stack header behavior; titles are declared in `apps/mobile/app/_layout.tsx`. The root stack's `screenOptions` give every detail screen an arrow-only back affordance (`headerBackButtonDisplayMode: 'minimal'`, no custom `headerBackTitle`, which react-native-screens would render as a custom item that ignores the display mode and morphs its label in during the push); the system chevron reads "Back" to VoiceOver.
-- `completed-session/[sessionId]` sets its title inside the route file (`View Session`, `Session complete`, or `Session summary`)
+- `completed-session/[sessionId]` sets its title inside the route file (`View Session` or `Session complete`)
 - `exercise-history` sets its title inside the route file to the resolved exercise name (falls back to `Exercise History` when the summary is not yet available)
 - M22 group routes declare `My groups`, `New group`, `Join group`, `Group`, `Edit group`, `Invite`, and `Session` in `apps/mobile/app/_layout.tsx`; the group screen replaces `Group` with the group's name once loaded
 - `session/[sessionId]/index` has no native header (`headerShown: false`); its
-  own top bar reads `Session`. The exercise page likewise draws its own. Their
+  own top bar reads `Session`, or `Edit session` for a completed session. The exercise page likewise draws its own. Their
   stack titles (`Session`, `Exercise`) are only the back label VoiceOver reads
   on the screens they push (`Gyms`, `Link exercise`)
 - `gyms` declares `Gyms` in `apps/mobile/app/_layout.tsx`

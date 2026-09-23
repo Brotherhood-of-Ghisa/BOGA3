@@ -171,10 +171,13 @@ Brief entrypoint map of the current mobile screens.
 4. `/session-recorder`
 - File: `apps/mobile/app/(tabs)/session-recorder.tsx`
 - Purpose:
-  - active session recorder and completed-session editor (query-driven mode)
+  - active session recorder (with the new-screens setting Off). Its
+    `mode=completed-edit` still exists but no screen opens it: completed
+    sessions are edited in the session view (4b) since redesign step 6b-1, and
+    step 6b-3 deletes this route
 - Key states (high level):
   - active mode
-  - completed-edit loading/error/content states
+  - completed-edit loading/error/content states (unreachable; see Purpose)
   - in-route picker/editor/action modals (exercise picker uses the shared exercise-list model: text filtering by exercise name + primary muscle display/family terms, local shared list options for grouping/date range/recents, initially collapsed muscle-family groups that preserve collapsed/expanded state while searching, matching catalog row stats, and compact header icon actions for options/manage/add; adding a new recorder exercise opens an in-place preselection panel with `Add empty set` and a disabled-or-enabled completed-history `Append plan`, while replacing an existing exercise remains direct)
   - in-route gym picker includes `No gym` as the null session-gym option; gym Manage focuses on edit/archive/unarchive plus archived visibility
   - in-route single gym editor owns private coordinate controls (`Save current location`, confirmation-gated replace, and confirmation-gated clear)
@@ -193,8 +196,6 @@ Brief entrypoint map of the current mobile screens.
   - active submit replaces to
     `/completed-session/<sessionId>?presentation=completion` only after local
     persistence and completion succeed
-  - completed-edit save replaces directly to `/progress` and does not
-    replay completion
   - active mode rehydrates a newly persisted draft whenever the mounted route
     regains focus, unless in-memory recorder mutations must be preserved
   - the persistent four-tab navigation stays mounted but defaults to its
@@ -210,9 +211,19 @@ Brief entrypoint map of the current mobile screens.
     `V6-Session`). Every active-session entry opens it while Settings' `New
     exercise & session screens` is On (the default); Off keeps every entry on
     `/session-recorder`
+  - also the completed-session editor (step 6b-1, replacing the recorder's
+    `mode=completed-edit`): History's completed rows and `Edit`, and the
+    completed session's `Edit` and `intent=edit`, open it whatever the setting
 - Key states (high level):
   - own top bar: `Session` · ⋮ · `Finish` (the one `accent` primary); the
     persistent four-tab bar sits at the bottom with Train selected
+  - a completed session: `Edit session` · `Done` (no ⋮, nothing to abandon),
+    Progress selected in the tab bar, and the summary card's Time replaced by
+    editable `Start` / `End` fields (`YYYY-MM-DD HH:mm`). A field's error shows
+    once it is left; while either is invalid, autosave pauses and the card says
+    `Autosave paused until Start/End times are valid.` Gym, `+ Add exercise` and
+    the cards work as for an active session, written back to the completed
+    session; records compare against the rest of history, not the session itself
   - summary card: Time (elapsed, ticking) / Gym / Sets (confirmed performed) /
     Volume (their entered-load volume, warm-ups included); the Gym stat opens
     the `Gym` sheet to change it: opening it starts one foreground location
@@ -236,18 +247,28 @@ Brief entrypoint map of the current mobile screens.
     prompt for incomplete sets and empty exercises, as alerts) and completion
     write; invalid set values block it with an alert naming the
     exercises
+  - `Done` (completed): invalid times reveal their errors and write nothing;
+    otherwise it runs the same set-value check and cleanup prompts with
+    completed-edit labels (`… and save changes`), then saves the confirmed rows
+    only and never replays completion
   - loading; `This session is no longer active.` with `Back to Train` when the
-    id is not the active draft; retryable read error
+    id is neither the active draft nor a completed, undeleted session;
+    retryable read error
 - Key exits:
   - `/session/<sessionId>/exercise/<sessionExerciseId>` from a card
   - `/completed-session/<sessionId>?presentation=completion` after Finish
+  - back to where the edit was opened (History, the completed session) after
+    `Done`; `/completed-session/<sessionId>` when there is nothing to go back to
   - `/train` after Abandon, or any tab from the bottom bar (`dismissTo`)
   - `/exercise-catalog?source=session-recorder&intent=manage` from the
     picker's Manage; the picker returns on focus
   - `/gyms` from the gym sheet's `Manage gyms`; on return the sheet reopens
     with the gyms reloaded
 - Notes:
-  - reloads the draft on every focus, so the exercise page's edits show on return
+  - reloads the session on every focus, so the exercise page's edits show on
+    return; edited Start/End are not reloaded over
+  - edits autosave losslessly (every row kept, as the recorder's completed edit
+    did); only `Done` drops unconfirmed rows (`05-data-model.md`)
   - its stack title `Session` is the back label of the screens it pushes
 
 5. `/exercise-catalog`
@@ -355,8 +376,8 @@ Brief entrypoint map of the current mobile screens.
 - Key exits:
   - `/session/<id>` pushed for active Resume or review/complete (with the
     new-screens setting Off, `/session-recorder` via stack dismissal instead)
-  - `/session-recorder?mode=completed-edit&sessionId=<sessionId>` from a
-    completed row or its explicit Edit action
+  - `/session/<sessionId>` (the session view, editing) from a completed row or
+    its explicit Edit action, whatever the new-screens setting
 - Notes:
   - the native stack header centers `Sessions` and uses the platform back arrow
     without a text label, so the internal `(tabs)` group name is never exposed
@@ -367,27 +388,27 @@ Brief entrypoint map of the current mobile screens.
   - completed session detail viewer with edit/delete session actions and per-exercise block append actions
 - Key states (high level):
   - loading / error / not-found / detail
-  - `presentation=completion` and `presentation=summary` reuse the same content:
-    one labelled totals card with informational per-muscle working-set counts,
-    all compact `Personal records`, per-exercise current volume versus median
-    and descriptive P5/P95 range, and previewed PNG session sharing. Neither
-    presentation links to muscle analytics. Optional historical enrichment
-    cannot block either summary, and share output excludes gym/location.
-    Edit/delete/append actions are hidden in both modes; only post-submit
-    completion renders Done
+  - `presentation=completion` (after Finish): one labelled totals card with
+    informational per-muscle working-set counts, all compact `Personal
+    records`, per-exercise current volume versus median and descriptive P5/P95
+    range, and previewed PNG session sharing. It does not link to muscle
+    analytics. Optional historical enrichment cannot block it, and share output
+    excludes gym/location. Edit/delete/append actions are hidden; it renders
+    Done. (History's `presentation=summary` was removed in step 6b-1: the
+    detail itself is the summary.)
   - completion loading/error/not-found/deleted-target states expose one safe
     Progress exit; the native back affordance/gesture is suppressed and Android
     system back replaces to Progress
   - read-only exercise cards include a set table with `Set`, `Weight`, `Reps`, and `Effort`
   - exercise-card titles toggle an expanded/collapsed state; collapsed cards show valid performed-set and working-set counts while keeping `Append` available
   - each exercise card header exposes `Append` to copy that one historical block as planned target rows into the active recorder
-  - temporary redirect placeholder for `intent=edit`
+  - redirect placeholder for `intent=edit`
 - Key exits:
-  - `session-recorder` (edit)
+  - `/session/<sessionId>` (the session view, editing) from `Edit`, and by
+    `replace` for `intent=edit`
   - the session view after successful per-exercise block append
     (`session-recorder` with the new-screens setting Off)
   - `/progress` from completion Done/back
-  - `/sessions` or completed-edit mode from historical-summary header actions
 
 11. `/exercise-history`
 - File: `apps/mobile/app/exercise-history.tsx`
@@ -567,13 +588,14 @@ Brief entrypoint map of the current mobile screens.
 21. `/session/[sessionId]/exercise/[sessionExerciseId]` (exercise/session redesign step 4)
 - File: `apps/mobile/app/session/[sessionId]/exercise/[sessionExerciseId].tsx` (composition in `apps/mobile/components/exercise-page/`)
 - Purpose:
-  - one page per exercise of the active session, in the design language (`design-language.md`; accepted target `design-targets/exercise-session-v5.md`): top bar (back · exercise name · ⋮), the collapsible records panel, one ordered set list whose current set expands in place into the logger, `+ Add set`, and `Complete exercise`
-  - shown while the `New exercise & session screens` setting is On, the default since step 6a (`useNewScreensEnabled()`); built beside the recorder, which it shares its domain with (`src/session-recorder/**`)
+  - one page per exercise of the active session, or of a completed session being edited from the session view (step 6b-1), in the design language (`design-language.md`; accepted target `design-targets/exercise-session-v5.md`): top bar (back · exercise name · ⋮), the collapsible records panel, one ordered set list whose current set expands in place into the logger, `+ Add set`, and `Complete exercise`
+  - reached only from the session view, so it follows no setting of its own (step 6b-1 removed its setting-off notice, so completed edits work with the setting Off); built beside the recorder, which it shares its domain with (`src/session-recorder/**`)
+  - a completed session's exercise is edited with the same rules (logger, ticks, `Complete exercise`) and written back as completed with its times, every row kept; its records panel leaves that session out
 - Key states (high level):
   - records panel collapsed (`1RM` / `Max` / `Vol` of the selected view: the records, or the last session), expanded on `Records` (each record's date and set) or on `Last` (the previous completed session's sets); `Records` | `Last` and `History` are present in both, and switching views keeps the panel collapsed or expanded
   - performed, current and planned rows (glyph `set-done` / `set-current` / `set-planned`); the logger (Weight · Reps · Effort · the `accent` tick) on the first set not performed, or on the row tapped
   - the effort sheet (W-Up / RIR 2 / RIR 1 / RIR 0) and the ⋮ sheet (Edit exercise / Swap exercise / `Link to group exercise…`, signed in only / Remove from session)
-  - setting off: a notice with `Open Settings`; a missing session or exercise, or a session not in progress: an inline message
+  - a missing session or exercise, or a deleted session: an inline message
 - Key exits:
   - back (top bar) → the previous screen; `Complete exercise` → the previous screen after resolving the sets still waiting; `Remove from session` → the previous screen; `History` → `/exercise-history`; ⋮ `Link to group exercise…` → `/exercise-link?exerciseDefinitionId=<id>`
 - Notes:

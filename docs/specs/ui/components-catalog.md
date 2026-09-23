@@ -200,12 +200,12 @@ Brief entrypoint inventory of the current reusable UI component set.
 9. `SessionCompletionPresentation`
 - File: `apps/mobile/components/session-recorder/session-completion-presentation.tsx`
 - Purpose:
-  - shared post-submit and historical-summary composition with one consolidated
+  - the post-submit completion composition (History's summary was removed in
+    redesign step 6b-1) with one consolidated
     totals/muscle-working-set card, every compact PR, every per-exercise volume
     comparison, and the session-image share preview
-  - muscle chips are informational views rather than analytics links; Done is
-    supplied only by the post-submit caller, while historical navigation stays
-    in the route header
+  - muscle chips are informational views rather than analytics links; its
+    caller supplies Done (required)
   - keeps all PRs visible together instead of paging them
 
 10. `ExerciseVolumeComparisonRow`
@@ -311,9 +311,16 @@ Brief entrypoint inventory of the current reusable UI component set.
 18. Session view components
 - Folder: `apps/mobile/components/session-view/`
 - Purpose:
-  - `SessionTopBar` — `Session` · ⋮ · `Finish` (`accent`), under the status bar
+  - `SessionTopBar` — `mode="active"`: `Session` · ⋮ · `Finish` (`accent`);
+    `mode="completed"`: `Edit session` · `Done` (`accent`, testID
+    `session-view-done-button`), no ⋮. Under the status bar
   - `SessionSummaryCard` — `Card` with stacked `Stat`s Time (ticking) / Gym /
-    Sets / Volume
+    Sets / Volume; given `times`, `SessionTimesFields` replace Time
+  - `SessionTimesFields` — a completed session's `Start` / `End` text fields
+    (`YYYY-MM-DD HH:mm`, the logger's field style: `fieldHeight`,
+    `radius.control`, `ruleStrong`, `danger` while invalid), each field's error
+    below it and the autosave-paused notice. testIDs `session-view-start-time`,
+    `session-view-end-time` (`-error`), `session-view-times-notice`
   - `SessionExerciseCard` — `Card` link per exercise: name, `n/m`, read-only set
     rows (type · weight × reps · inline `Stat` 1RM / VOL with legends, all at
     the row's colour and weight; only a record 1RM in `record`), and the

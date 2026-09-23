@@ -21,7 +21,7 @@ import {
 } from '@/src/data';
 import { parseCalculationSet } from '@/src/exercise-calculations';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
-import { activeSessionHref } from '@/src/navigation/active-session-entry';
+import { activeSessionHref, sessionViewHref } from '@/src/navigation/active-session-entry';
 import { loadActiveSessionId } from '@/src/session-entry';
 import { useNewScreensEnabled } from '@/src/session-recorder/new-screens-preference';
 import { isDevMode } from '@/src/utils/isDevMode';
@@ -80,7 +80,7 @@ export type CompletedSessionDetailScreenShellProps = {
   sessionId?: string | null;
   dataClient?: CompletedSessionDetailDataClient;
   initialMode?: 'view' | 'edit';
-  presentation?: 'detail' | 'completion' | 'summary';
+  presentation?: 'detail' | 'completion';
   shouldFailNextMaestroShare?: boolean;
   shouldFailNextMaestroCatalog?: boolean;
 };
@@ -110,10 +110,7 @@ function coerceRouteParam(value: string | string[] | undefined): string | null {
 
 export const resolveCompletedSessionPresentation = (
   value: string | string[] | undefined
-): 'detail' | 'completion' | 'summary' => {
-  const presentation = coerceRouteParam(value);
-  return presentation === 'completion' || presentation === 'summary' ? presentation : 'detail';
-};
+): 'detail' | 'completion' => (coerceRouteParam(value) === 'completion' ? 'completion' : 'detail');
 
 const formatSetEffortLabel = (setType: SessionSetTypeValue): string => {
   switch (setType) {
@@ -471,79 +468,40 @@ export function CompletedSessionDetailScreenShell({
     router.replace('/progress');
   }, [router]);
 
-  const handleSummaryHistoryExit = useCallback(() => {
-    router.replace('/sessions');
-  }, [router]);
-
-  const handleSummaryEdit = useCallback(() => {
-    router.back();
-  }, [router]);
-
   useEffect(() => {
-    if (presentation === 'detail') {
+    if (presentation !== 'completion') {
       return undefined;
     }
 
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (presentation === 'completion') {
-        handleCompletionExit();
-      } else {
-        handleSummaryHistoryExit();
-      }
+      handleCompletionExit();
       return true;
     });
     return () => subscription.remove();
-  }, [handleCompletionExit, handleSummaryHistoryExit, presentation]);
+  }, [handleCompletionExit, presentation]);
 
   const safeExitButton =
-    presentation !== 'detail' ? (
+    presentation === 'completion' ? (
       <UiButton
-        accessibilityLabel={
-          presentation === 'completion' ? 'Back to Stats and History' : 'Back to Session History'
-        }
-        label={presentation === 'completion' ? 'Back to Stats and History' : 'Back to Session History'}
+        accessibilityLabel="Back to Stats and History"
+        label="Back to Stats and History"
         testID="session-completion-safe-exit"
-        onPress={presentation === 'completion' ? handleCompletionExit : handleSummaryHistoryExit}
+        onPress={handleCompletionExit}
       />
     ) : null;
 
   const stackOptions =
     presentation === 'completion'
       ? { title: 'Session complete', headerBackVisible: false, gestureEnabled: false }
-      : presentation === 'summary'
-        ? {
-            title: 'Session summary',
-            headerBackVisible: false,
-            gestureEnabled: false,
-            headerLeft: () => (
-              <Pressable
-                accessibilityLabel="Back to Session History"
-                accessibilityRole="button"
-                hitSlop={8}
-                onPress={handleSummaryHistoryExit}
-                testID="session-summary-history-button">
-                <Text style={styles.headerActionText}>History</Text>
-              </Pressable>
-            ),
-            headerRight: () => (
-              <Pressable
-                accessibilityLabel="Edit session"
-                accessibilityRole="button"
-                hitSlop={8}
-                onPress={handleSummaryEdit}
-                testID="session-summary-edit-button">
-                <Text style={styles.headerActionText}>Edit</Text>
-              </Pressable>
-            ),
-          }
-        : { title: 'View Session' };
+      : { title: 'View Session' };
 
+  // Edited in the session view, whatever the new-screens setting says.
   const handleEdit = () => {
     if (!session) {
       return;
     }
 
-    router.push(`/session-recorder?mode=completed-edit&sessionId=${session.id}`);
+    router.push(sessionViewHref(session.id));
   };
 
   const handleAppendExercise = (sessionExerciseId: string) => {
@@ -638,7 +596,7 @@ export function CompletedSessionDetailScreenShell({
     );
   }
 
-  if (presentation === 'completion' || presentation === 'summary') {
+  if (presentation === 'completion') {
     const personalRecords = completedInsights?.personalRecords ?? [];
     const exerciseVolumeComparisons =
       completedInsights && completedInsights.exerciseVolumeComparisons.length > 0
@@ -661,7 +619,7 @@ export function CompletedSessionDetailScreenShell({
                 : 'loading'
           }
           muscleSummary={shouldFailNextMaestroCatalog ? null : sessionMuscleSummary}
-          onDone={presentation === 'completion' ? handleCompletionExit : undefined}
+          onDone={handleCompletionExit}
           performedSetCount={performedSetCount}
           personalRecords={personalRecords}
           shouldFailNextShare={shouldFailNextMaestroShare}
@@ -949,7 +907,7 @@ export default function CompletedSessionDetailRoute() {
       return;
     }
 
-    router.replace(`/session-recorder?mode=completed-edit&sessionId=${sessionId}`);
+    router.replace(sessionViewHref(sessionId));
   }, [intent, router, sessionId]);
 
   if (intent === 'edit' && sessionId) {
@@ -998,11 +956,6 @@ const styles = StyleSheet.create({
     fontSize: uiTypography.size.md,
     color: uiColors.textSecondary,
     textAlign: 'center',
-  },
-  headerActionText: {
-    fontSize: uiTypography.size.lg,
-    fontWeight: '600',
-    color: uiColors.actionPrimary,
   },
   headerCard: {
     borderRadius: uiRadius.md,
