@@ -622,8 +622,6 @@ describe('ExercisePageScreen', () => {
 });
 
 describe('exercise page route', () => {
-  // It follows no setting: a completed session is edited here whatever the
-  // new-screens setting says.
   it('opens the page for the route params', async () => {
     render(<ExercisePageRoute />);
     // The real repository is not wired in this suite, so the page shows its

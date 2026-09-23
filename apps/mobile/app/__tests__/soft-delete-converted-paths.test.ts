@@ -16,7 +16,7 @@
  * instance so the real write/read paths execute end-to-end.
  */
 
-import { and, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 
 import {
   exerciseDefinitions,

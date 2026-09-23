@@ -307,7 +307,7 @@ M10 locks these exact terms:
    - not the default for ordinary smoke setup.
 2. `data reset`
    - clears app-owned persisted data while keeping the installed binary/runtime in place;
-   - current implementation: the hidden harness route calls `resetLocalAppData()` to close the SQLite handle, delete the local database, and re-bootstrap migrations/seeds, then restores the new exercise/session screens preference to its default (on, since redesign step 6a) — it lives in SecureStore, which survives the SQLite wipe and, on iOS, an uninstall;
+   - current implementation: the hidden harness route calls `resetLocalAppData()` to close the SQLite handle, delete the local database, and re-bootstrap migrations/seeds;
    - preferred when a clean app data state is needed without re-testing install semantics.
 3. `teleport`
    - uses deep links or a hidden harness route to land directly in the target screen/state;
@@ -326,18 +326,12 @@ Priority rule:
 2. The canonical hidden route is `boga3://maestro-harness`.
 3. Supported harness query parameters are:
    - `reset=data` to perform app-owned persisted-data reset;
-   - `fixture=exercise-block-history` to seed deterministic local SQLite history for Issue 70 recorder block-history visual QA;
+   - `fixture=exercise-block-history` to seed deterministic local SQLite history (completed sessions for the completion, Stats and records flows);
+   - `fixture=completion-two-prs` to seed that history plus a newest completed session with a squat and a bench PR (`maestro_m24_completion_two_prs`), kept out of the shared history so the Stats totals do not move;
    - `fixture=session-view` to seed that history plus one active session drawn
      like the accepted `V6-Session` artboard (`src/maestro/session-view-fixture.ts`);
-   - `teleport=session-list|session-recorder|exercise-catalog|completed-session|session-view` to land on the target screen (`session-view` needs `sessionId`);
-   - optional `mode`, `intent`, and `sessionId` when the target route needs them;
-   - `newScreens=on|off` to set the new exercise/session screens preference
-     (`src/session-recorder/new-screens-preference.ts`) before teleporting. It
-     runs after `reset=data`, so `?reset=data&newScreens=off&teleport=…` is the
-     opt-out for a flow that needs the recorder behind an entry; any other flow
-     that data-resets starts with it on (the default). Absent means unchanged;
-     the old-recorder flows need neither, because `teleport=session-recorder`
-     opens the recorder route whatever the setting;
+   - `teleport=session-list|exercise-catalog|completed-session|exercise-page|session-view` to land on the target screen (`session-view` needs `sessionId`, an active draft or a completed session to edit; `exercise-page` also needs `sessionExerciseId`);
+   - optional `intent` and `sessionId` when the target route needs them;
    - `presentation=completion` to open a completed session in its completion
      presentation rather than the historical summary;
    - `maestroShare=fail-once` / `maestroCatalog=fail-once` to make the next share

@@ -136,7 +136,7 @@ describe('session view model', () => {
   });
 });
 
-describe('submit cleanup (shared by the recorder and the session view)', () => {
+describe('submit cleanup', () => {
   it('asks about unconfirmed sets, then removes incomplete sets and empty exercises behind one prompt', () => {
     const unconfirmed = { ...doneSet('u1', '50', '5', 'rir_1'), performanceStatus: 'unperformed' as const };
     const start = session([

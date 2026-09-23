@@ -36,7 +36,7 @@ type GroupExercisePickSheetProps = {
   onAddAsNew: () => void;
 } & (
   | {
-      /** The recorder (default): the confirm reads `Link and add`. */
+      /** The exercise picker (default): the confirm reads `Link and add`. */
       purpose?: 'add-to-session';
       /** Adds an already linked exercise (`choose-linked`). */
       onAddExercise: (exercise: LinkableExercise) => void;

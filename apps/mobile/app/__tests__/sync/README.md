@@ -51,7 +51,7 @@
     by `sync-v2-push-roundtrip.sh` and `sync-v2-pull-drain.sh` inside the e2e
     wrapper.
 - **The device-level proof is its own requirement and is NOT satisfied by the
-  above:** `npm run test:e2e:ios:sync` (real recorder UI + real cycle + real
+  above:** `npm run test:e2e:ios:sync` (real session view / exercise page UI + real cycle + real
   local Supabase) is mandatory for changes to the sync cycle, scheduler, sync
   triggers, auth session handoff, or the first-sync gate. `test:sync:infra` is
   the breadth lane (LWW, multi-device, drift) — it bypasses the UI, NetInfo, and

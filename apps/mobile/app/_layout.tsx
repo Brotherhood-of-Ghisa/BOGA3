@@ -119,7 +119,7 @@ export default function RootLayout() {
                   options={{ title: 'Session' }}
                 />
                 {/* The session view and exercise page (steps 5 and 4 of the exercise/session
-                    redesign) draw their own top bars; reached only with the new-screens setting on.
+                    redesign) draw their own top bars.
                     Their titles are the back label of what they push (Gyms, Link exercise). */}
                 <Stack.Screen
                   name="session/[sessionId]/index"

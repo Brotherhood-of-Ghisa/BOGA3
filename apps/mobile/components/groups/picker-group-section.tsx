@@ -4,7 +4,7 @@ import { UiText, uiBorder, uiColors, uiRadius, uiSpace } from '@/components/ui';
 import type { PickerGroupRow, PickerGroupSection } from '@/src/groups';
 
 /**
- * The recorder picker's "From your groups" section (M25-T07; product E0.1,
+ * The exercise picker's "From your groups" section (M25-T07; product E0.1,
  * D13): group exercises matching the search, listed after my own matches,
  * grouped by group. Status is text ("linked: …" / "not linked"), not color.
  */

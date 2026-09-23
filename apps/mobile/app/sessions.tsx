@@ -107,7 +107,7 @@ export function SessionsScreen({
     );
   };
 
-  // Edited in the session view, whatever the new-screens setting says.
+  // Completed sessions are edited in the session view.
   const openCompletedSessionEdit = (sessionId: string) => {
     router.push(sessionViewHref(sessionId));
   };

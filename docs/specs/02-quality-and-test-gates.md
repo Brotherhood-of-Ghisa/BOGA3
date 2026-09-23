@@ -133,7 +133,7 @@ Two traps this table exists to kill:
   **sync-infra** is a mobile jest body driving the *real* `runSyncCycle` against a
   *real* Supabase endpoint — breadth coverage (LWW, multi-device, drift) with
   emulated storage and no UI; it sits at the end of `boga test backend`.
-  **iOS sync e2e** is the device-level proof — real recorder UI, real cycle, real
+  **iOS sync e2e** is the device-level proof — real session view / exercise page UI, real cycle, real
   local Supabase (log a workout → pending drains to 0 → full wipe → re-sign-in
   restores from the remote DB). Bugs in UI gating, NetInfo, session handoff, and
   trigger wiring only surface in the e2e lane; a green sync-infra is not evidence
