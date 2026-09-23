@@ -1,19 +1,20 @@
 appId: com.dinoderek.mobile
 ---
 # The "New exercise & session screens" preference on the Settings screen, and
-# the harness hook the new screens' own flows use to opt in before navigating.
+# the harness hook a flow uses to opt out of the new screens (the default since
+# step 6a).
 #
 # Proves, on device with the real SecureStore-backed preference:
-#   1. `newScreens=on` on the maestro-harness link switches it on (the row
-#      renders On selected);
+#   1. `newScreens=off` on the maestro-harness link switches it off (the row
+#      renders Off selected);
 #   2. the Settings Off/On row flips it;
-#   3. `reset=data` restores it to its default (Off), so a flow that opted in
+#   3. `reset=data` restores it to its default (On), so a flow that opted out
 #      cannot leak the setting into a later flow on the same simulator.
 #
-# Hermetic: starts from `reset=data` and ends with the setting Off. Infra-free
-# (no sign-in), so it runs in the ui-regression lane.
+# Hermetic: starts from `reset=data` and ends with the setting at its default
+# (On). Infra-free (no sign-in), so it runs in the ui-regression lane.
 
-- openLink: "boga3://maestro-harness?reset=data&newScreens=on&teleport=session-list"
+- openLink: "boga3://maestro-harness?reset=data&newScreens=off&teleport=session-list"
 # The dev-client "Open in <App>?" URL-scheme trust dialog and expo-dev-client's
 # developer-menu onboarding sheet can appear on top of the freshly-loaded app;
 # dismiss them. Each tap is an optional no-op when its target is absent.
@@ -62,26 +63,26 @@ appId: com.dinoderek.mobile
     centerElement: true
     timeout: 30000
 - assertVisible:
-    id: "settings-new-screens-on"
+    id: "settings-new-screens-off"
     selected: true
 - assertVisible:
-    id: "settings-new-screens-off"
+    id: "settings-new-screens-on"
     selected: false
-- takeScreenshot: "01-new-screens-on-via-harness"
+- takeScreenshot: "01-new-screens-off-via-harness"
 
-# The row flips it off, and back on.
+# The row flips it on, and back off.
 - tapOn:
-    id: "settings-new-screens-off"
+    id: "settings-new-screens-on"
 - assertVisible:
-    id: "settings-new-screens-off"
+    id: "settings-new-screens-on"
     selected: true
 - assertVisible:
-    id: "settings-new-screens-on"
+    id: "settings-new-screens-off"
     selected: false
 - tapOn:
-    id: "settings-new-screens-on"
+    id: "settings-new-screens-off"
 - assertVisible:
-    id: "settings-new-screens-on"
+    id: "settings-new-screens-off"
     selected: true
 - takeScreenshot: "02-new-screens-toggled-in-settings"
 
@@ -122,9 +123,9 @@ appId: com.dinoderek.mobile
     centerElement: true
     timeout: 30000
 - assertVisible:
-    id: "settings-new-screens-off"
+    id: "settings-new-screens-on"
     selected: true
 - assertVisible:
-    id: "settings-new-screens-on"
+    id: "settings-new-screens-off"
     selected: false
-- takeScreenshot: "03-new-screens-off-after-data-reset"
+- takeScreenshot: "03-new-screens-on-after-data-reset"

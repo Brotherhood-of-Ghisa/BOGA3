@@ -307,7 +307,7 @@ M10 locks these exact terms:
    - not the default for ordinary smoke setup.
 2. `data reset`
    - clears app-owned persisted data while keeping the installed binary/runtime in place;
-   - current implementation: the hidden harness route calls `resetLocalAppData()` to close the SQLite handle, delete the local database, and re-bootstrap migrations/seeds, then restores the new exercise/session screens preference to its default (off) — it lives in SecureStore, which survives the SQLite wipe and, on iOS, an uninstall;
+   - current implementation: the hidden harness route calls `resetLocalAppData()` to close the SQLite handle, delete the local database, and re-bootstrap migrations/seeds, then restores the new exercise/session screens preference to its default (on, since redesign step 6a) — it lives in SecureStore, which survives the SQLite wipe and, on iOS, an uninstall;
    - preferred when a clean app data state is needed without re-testing install semantics.
 3. `teleport`
    - uses deep links or a hidden harness route to land directly in the target screen/state;
@@ -333,9 +333,11 @@ Priority rule:
    - optional `mode`, `intent`, and `sessionId` when the target route needs them;
    - `newScreens=on|off` to set the new exercise/session screens preference
      (`src/session-recorder/new-screens-preference.ts`) before teleporting. It
-     runs after `reset=data`, so `?reset=data&newScreens=on&teleport=…` is the
-     opt-in for a new-screens flow; any other flow that data-resets starts with
-     it off. Absent means unchanged;
+     runs after `reset=data`, so `?reset=data&newScreens=off&teleport=…` is the
+     opt-out for a flow that needs the recorder behind an entry; any other flow
+     that data-resets starts with it on (the default). Absent means unchanged;
+     the old-recorder flows need neither, because `teleport=session-recorder`
+     opens the recorder route whatever the setting;
    - `presentation=completion` to open a completed session in its completion
      presentation rather than the historical summary;
    - `maestroShare=fail-once` / `maestroCatalog=fail-once` to make the next share

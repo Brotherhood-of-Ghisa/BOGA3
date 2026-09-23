@@ -55,8 +55,7 @@ describe('Train screen', () => {
     __resetNewScreensPreferenceForTests();
   });
 
-  it('opens the session view instead of the recorder when the new screens setting is on', async () => {
-    await setNewScreensEnabled(true);
+  it('opens the session view by default, not the recorder', async () => {
     const entry = sessionEntry();
     const { unmount } = render(<TrainScreen dataClient={dataClient([activeSession])} sessionEntry={entry} />);
 
@@ -68,6 +67,21 @@ describe('Train screen', () => {
     fireEvent.press(screen.getByTestId('train-start-empty-button'));
     await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/session/empty-session'));
     expect(mockPush).not.toHaveBeenCalledWith('/session-recorder');
+  });
+
+  it('opens the recorder when the new screens setting is off', async () => {
+    await setNewScreensEnabled(false);
+    const entry = sessionEntry();
+    const { unmount } = render(<TrainScreen dataClient={dataClient([activeSession])} sessionEntry={entry} />);
+
+    fireEvent.press(await screen.findByTestId('train-resume-session-button'));
+    expect(mockPush).toHaveBeenCalledWith('/session-recorder');
+    unmount();
+
+    render(<TrainScreen initialSessions={[]} sessionEntry={entry} />);
+    fireEvent.press(screen.getByTestId('train-start-empty-button'));
+    await waitFor(() => expect(mockPush).toHaveBeenCalledTimes(2));
+    expect(mockPush).toHaveBeenLastCalledWith('/session-recorder');
   });
 
   it('replaces every new-session action with Resume when a draft exists', async () => {
@@ -92,10 +106,10 @@ describe('Train screen', () => {
     expect(screen.queryByTestId('train-start-empty-button')).toBeNull();
     expect(screen.queryByTestId('train-start-planned-button')).toBeNull();
     expect(entry.startEmptyOrResume).not.toHaveBeenCalled();
-    expect(mockPush).toHaveBeenCalledWith('/session-recorder');
+    expect(mockPush).toHaveBeenCalledWith('/session/active-session');
   });
 
-  it('starts one empty draft and opens the focused recorder', async () => {
+  it('starts one empty draft and opens its session view', async () => {
     let resolveStart!: (value: { kind: 'started'; sessionId: string }) => void;
     const entry = sessionEntry();
     entry.startEmptyOrResume.mockImplementation(
@@ -112,7 +126,7 @@ describe('Train screen', () => {
     expect(entry.startEmptyOrResume).toHaveBeenCalledTimes(1);
     expect(screen.getByText('Starting…')).toBeTruthy();
     resolveStart({ kind: 'started', sessionId: 'empty-session' });
-    await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/session-recorder'));
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/session/empty-session'));
   });
 
   it('disables planned launch without relabeling it while an empty launch is running', () => {
@@ -175,7 +189,7 @@ describe('Train screen', () => {
     );
 
     fireEvent.press(screen.getByTestId('train-start-planned-button'));
-    await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/session-recorder'));
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/session/planned-session'));
     expect(entry.startPlannedOrResume).toHaveBeenCalledWith(materialize);
 
     fireEvent.press(screen.getByTestId('train-manage-planning-button'));

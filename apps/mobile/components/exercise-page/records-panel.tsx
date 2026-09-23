@@ -118,7 +118,19 @@ function PanelBody({
   const { records, last } = state.summary;
   const date = (value: Date) => formatShortDate(value, dateFormat);
 
+  // Collapsed, the row sums up the selected view: the all-time records, or the
+  // previous session's best 1RM, heaviest weight and volume.
   if (!expanded) {
+    if (view === 'last') {
+      const heaviest = last && last.sets.length > 0 ? Math.max(...last.sets.map((set) => set.weight)) : null;
+      return (
+        <CollapsedStats
+          oneRepMax={last?.oneRepMax != null ? formatOneRepMax(last.oneRepMax) : DASH}
+          maxWeight={heaviest !== null ? formatWeight(heaviest) : DASH}
+          volume={last ? formatVolume(last.volume) : DASH}
+        />
+      );
+    }
     return (
       <CollapsedStats
         oneRepMax={records.oneRepMax ? formatOneRepMax(records.oneRepMax.value) : DASH}

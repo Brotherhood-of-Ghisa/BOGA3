@@ -5,12 +5,12 @@ appId: com.dinoderek.mobile
 # uses — Train then offers a new workout instead of Resume.
 #
 # Hermetic: starts from `reset=data` and ends with a data reset, leaving the
-# setting off. Infra-free (no sign-in).
+# setting at its default (On). Infra-free (no sign-in).
 
 - retry:
     maxRetries: 3
     commands:
-      - openLink: "boga3://maestro-harness?reset=data&newScreens=on&fixture=session-view&teleport=session-view&sessionId=maestro_session_view_active"
+      - openLink: "boga3://maestro-harness?reset=data&fixture=session-view&teleport=session-view&sessionId=maestro_session_view_active"
       - tapOn:
           text: "Open"
           optional: true

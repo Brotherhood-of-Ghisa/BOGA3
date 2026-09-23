@@ -43,7 +43,7 @@ Brief entrypoint inventory of the current reusable UI component set.
     matching `lineHeight` per size, 6 spacing steps, 3 radii) plus `uiElevation`
     (`flat` / `raised` / `overlay`); values and rationale: `docs/specs/ui/ux-rules.md` §9a
   - also carries the design-language vocabularies, adopted so far only by the exercise
-    page and the session view (behind the new-screens setting): `uiRoles` (colour roles), `uiFonts` (the three embedded typefaces
+    page and the session view (the default since redesign step 6a): `uiRoles` (colour roles), `uiFonts` (the three embedded typefaces
     and their shipped weights) and `uiGeometry` (card / sheet / control radii,
     the 44pt tap target, the 38pt metric column, the sheet handle, the 50pt
     labelled-field height, micro-label tracking); rationale:
@@ -83,7 +83,7 @@ Brief entrypoint inventory of the current reusable UI component set.
     `uiRoles` / `uiFonts` / `uiGeometry` only (`docs/specs/ui/design-language.md`);
     adopted by the exercise page (`components/exercise-page/`) and the session view
     (`components/session-view/`, including its `Gym` picker sheet
-    `session-gym-sheet.tsx`), behind the new-screens setting
+    `session-gym-sheet.tsx`), the default active-session screens since step 6a
   - `Card` — `surface` on `paper`, 1px `rule`, card radius, no shadow, no
     padding (content owns its insets); with `onPress` the whole card is one
     labelled `link` target

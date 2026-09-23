@@ -339,9 +339,15 @@ describe('ExercisePageScreen', () => {
     const { client } = createClient();
     await renderPage(client);
 
-    // Collapsed: choosing a view keeps it collapsed.
+    // Collapsed: the row sums up Records, then Last, and stays collapsed.
+    expect(screen.getByTestId('exercise-records-1rm')).toHaveTextContent('1RM102.1');
+    expect(screen.getByTestId('exercise-records-max')).toHaveTextContent('Max82.5');
+    expect(screen.getByTestId('exercise-records-vol')).toHaveTextContent('Vol2560');
     fireEvent.press(screen.getByTestId('exercise-records-view-last'));
     expect(screen.getByTestId('exercise-records-collapsed')).toBeTruthy();
+    expect(screen.getByTestId('exercise-records-1rm')).toHaveTextContent('1RM102.1');
+    expect(screen.getByTestId('exercise-records-max')).toHaveTextContent('Max82.5');
+    expect(screen.getByTestId('exercise-records-vol')).toHaveTextContent('Vol2375');
     expect(screen.queryByTestId('exercise-records-last')).toBeNull();
     expect(screen.getByTestId('exercise-records-view-last')).toBeSelected();
 
@@ -476,15 +482,15 @@ describe('ExercisePageScreen', () => {
 describe('exercise page route', () => {
   beforeEach(() => __resetNewScreensPreferenceForTests());
 
-  it('stays behind the new-screens setting', async () => {
+  it('shows the Settings notice when the new-screens setting is off', async () => {
+    await act(() => setNewScreensEnabled(false));
     render(<ExercisePageRoute />);
     expect(await screen.findByTestId('exercise-page-disabled')).toBeTruthy();
     fireEvent.press(screen.getByTestId('exercise-page-open-settings'));
     expect(mockRouter.push).toHaveBeenCalledWith('/settings');
   });
 
-  it('opens the page for the route params once the setting is on', async () => {
-    await act(() => setNewScreensEnabled(true));
+  it('opens the page for the route params by default', async () => {
     render(<ExercisePageRoute />);
     expect(screen.queryByTestId('exercise-page-disabled')).toBeNull();
     // The real repository is not wired in this suite, so the page shows its
