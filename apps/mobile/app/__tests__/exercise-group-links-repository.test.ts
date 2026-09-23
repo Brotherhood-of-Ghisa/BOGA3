@@ -131,6 +131,29 @@ describe('exercise group links repository', () => {
     expect(await listLinks()).toEqual([]);
   });
 
+  it('guards the confirmed target atomically and leaves a moved link clean', async () => {
+    await linkExercise('def-bench', 'grp-1', 'gx-bench', T0);
+    await linkExercise('def-bench', 'grp-1', 'gx-other', T1);
+    db().update(exerciseGroupLinks).set({ localDirty: false }).run();
+    const before = readLink('grp-1:def-bench');
+
+    expect(await unlinkExercise('def-bench', 'grp-1', T2, 'gx-bench')).toBe(false);
+    expect(readLink('grp-1:def-bench')).toEqual(before);
+    expect(await unlinkExercise('def-bench', 'grp-1', T2, 'gx-other')).toBe(true);
+    expect(readLink('grp-1:def-bench')?.deletedAt).toEqual(T2);
+    expect(await unlinkExercise('def-bench', 'grp-1', T2, 'gx-other')).toBe(false);
+    expect(await unlinkExercise('def-squat', 'grp-1', T2, 'gx-other')).toBe(false);
+  });
+
+  it('unlinking one mapping preserves another personal link and the same exercise in another group', async () => {
+    await linkExercise('def-bench', 'grp-1', 'gx-bench', T0);
+    await linkExercise('def-squat', 'grp-1', 'gx-bench', T0);
+    await linkExercise('def-bench', 'grp-2', 'gx-bench', T0);
+    db().update(exerciseDefinitions).set({ deletedAt: T1 }).where(eq(exerciseDefinitions.id, 'def-bench')).run();
+    expect(await unlinkExercise('def-bench', 'grp-1', T2, 'gx-bench')).toBe(true);
+    expect((await listLinks()).map((link) => link.id)).toEqual(['grp-1:def-squat', 'grp-2:def-bench']);
+  });
+
   it('relinking after unlink undeletes the same id rather than creating a new row', async () => {
     await linkExercise('def-bench', 'grp-1', 'gx-bench', T0);
     await unlinkExercise('def-bench', 'grp-1', T1);

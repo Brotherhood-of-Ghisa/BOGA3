@@ -15,6 +15,7 @@ import { canManageGroup, describeGroupWriteError } from './write-view-model';
 
 /** One of my live local links into this group (T03 rows), with my exercise's name when it is on this device. */
 export type MyGroupExerciseLink = {
+  exerciseDefinitionId: string;
   groupExerciseId: string;
   exerciseName: string | null;
 };
@@ -32,7 +33,29 @@ export type GroupExerciseRowViewModel = {
    * for new links, D8).
    */
   linkable: boolean;
+  personalLinks: PersonalExerciseLinkChoice[];
 };
+
+export type PersonalExerciseLinkChoice = {
+  exerciseDefinitionId: string;
+  /** Human-readable identity, including a distinguishing ID for duplicate/missing names. */
+  label: string;
+};
+
+export const buildPersonalLinkChoices = (links: MyGroupExerciseLink[]): PersonalExerciseLinkChoice[] =>
+  links.map((link) => {
+    const name = link.exerciseName?.trim() || 'Unnamed personal exercise';
+    const ambiguous = !link.exerciseName?.trim() || links.some((other) =>
+      other.exerciseDefinitionId !== link.exerciseDefinitionId && other.exerciseName?.trim() === name);
+    let length = 8;
+    while (length < link.exerciseDefinitionId.length && links.some((other) =>
+      other.exerciseDefinitionId !== link.exerciseDefinitionId &&
+      other.exerciseDefinitionId.slice(-length) === link.exerciseDefinitionId.slice(-length))) length++;
+    return {
+      exerciseDefinitionId: link.exerciseDefinitionId,
+      label: ambiguous ? `${name} · ${link.exerciseDefinitionId.slice(-length)}` : name,
+    };
+  }).sort((a, b) => a.label.localeCompare(b.label) || a.exerciseDefinitionId.localeCompare(b.exerciseDefinitionId));
 
 export const NOT_LINKED_STATUS = 'Not linked';
 
@@ -76,6 +99,7 @@ export const buildGroupExerciseRows = (
       archived,
       linkStatus: links === null ? null : formatGroupExerciseLinkStatus(linkedNames),
       linkable: links !== null && !archived && linkedNames.length === 0,
+      personalLinks: buildPersonalLinkChoices((links ?? []).filter((link) => link.groupExerciseId === exercise.group_exercise_id)),
     };
   });
   return [...rows.filter((row) => !row.archived), ...rows.filter((row) => row.archived)];

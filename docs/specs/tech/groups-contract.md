@@ -1684,6 +1684,31 @@ E0.1–E0.3).
   and adds nothing to a session. "Add as new" opens the prefilled editor, and
   `createExerciseWithGroupLink` writes the exercise and its link in one local
   transaction. My links then reload, so the row reads `Linked: …`.
+- **Unlink your exercise** (E0.4). Each linked row has a separate `Unlink…`
+  button for every member role, including archived targets. One mapping opens
+  confirmation directly; several open the scrollable `Your linked exercises`
+  sheet, with a per-personal-ID action. Duplicate and missing names carry a
+  distinguishing short ID; deleted personal exercises remain removable. The
+  chooser dismisses before confirmation, and dismissal restores row focus.
+- **Shared unlink contract** (E0.3/E0.4). `describeUnlinkConfirm` and
+  `useExerciseUnlink` serve both the group page and the catalogue/recorder Link
+  screen. Confirmation names the personal exercise, target exercise and group,
+  explains removal from All and Certified boards after sync, and explicitly
+  preserves past activity and certifications. Archived and inactive targets
+  explain their respective unarchive/rejoin conditions instead. Known archive
+  metadata is retained in memory for an inactive link's wording; evicted
+  server caches remain evicted, and absent metadata uses placeholder names.
+  Unlink stays a local write offline, with a reconnect/sync success notice.
+- **Identity and failure handling.** `unlinkExercise` optionally checks the
+  expected group-exercise ID in its SQLite transaction. A moved, missing or
+  already-unlinked mapping is not mutated; the UI refreshes and explains the
+  change. Pending writes disable repeat submissions. Failed local reads hide
+  link status and actions and offer a separate retry; a read failure after a
+  successful mutation never becomes a failed-write notice. No board cache is
+  edited. The second personal link, completed record activity and original
+  active certification are covered by the two-user `ios-groups-e2e` flow's
+  unlink/cancel/relink extension; R5 and `groups-certification.sh` preserve the
+  existing ranking and certification semantics.
 - **Evidence.** Jest: `groups-exercise-screens.test.tsx`,
   `groups-exercise-view-model.test.ts`, `groups-cache.test.ts`, and the
   member cases moved to the Members route in `groups-write-screens.test.tsx`.
@@ -2209,7 +2234,7 @@ contract. The narrative sketches and design trade-offs are in git history
 | E0.1 | Picker search: a `From your groups` section after my matches, plus a Groups toggle | §6.3 M25-T07 |
 | E0.2 | Pick sheet for an unlinked group exercise: suggested exercise, choose another, or add as new | §6.3 M25-T07 |
 | E0.3 | Link screen from the catalogue `⋮` / exercise-page `⋮` menus (and the recorder `•••` until it is deleted): Linked, Suggested, All | §6.3 M25-T07 |
-| E0.4 | Group page Exercises: my link status per row, `Link your exercise` | §6.3 M25-T08 |
+| E0.4 | Group page Exercises: my link status, `Link your exercise`, `Unlink…` with individual selection and confirmation | §6.3 M25-T08 and shared unlink contract |
 | E1 / E1.1 | Leaderboards page: podium cards on Certified · e1RM, `You: Nth`, archived last | §6.3 M25-T09 |
 | E1.2 | Full board: Weight/e1RM × Certified/All toggles in place, certified / uncertified mark on All, rows open E2 | §6.3 M25-T09, M25-T10 |
 | E1.3 | History: one sentence per lead change, newest first | §6.3 M25-T09 |

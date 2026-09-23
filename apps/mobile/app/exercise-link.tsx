@@ -1,6 +1,6 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Alert, RefreshControl, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
 import {
   GroupInlineError,
@@ -15,17 +15,17 @@ import {
 } from '@/components/groups';
 import { UiButton, UiSurface, UiText, uiColors, uiSpace } from '@/components/ui';
 import { useAuth } from '@/src/auth';
-import { linkExercise, unlinkExercise } from '@/src/data/exercise-group-links';
+import { linkExercise } from '@/src/data/exercise-group-links';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import {
   buildLinkScreenModel,
   describeLinkRetroactivity,
-  describeUnlinkConfirm,
   groupExercisesLoaded,
   type LinkScreenAvailableRow,
   type LinkScreenLinkedRow,
   type LinkableExercise,
 } from '@/src/groups';
+import { useExerciseUnlink } from '@/src/groups/use-exercise-unlink';
 import { useGroupExerciseLinking } from '@/src/groups/use-group-exercise-linking';
 
 const coerceParam = (value: string | string[] | undefined): string | null => {
@@ -60,6 +60,11 @@ function ExerciseLinkContent({ userId }: { userId: string }) {
   const [query, setQuery] = useState('');
   const [notice, setNotice] = useState<Notice | null>(null);
   const [pendingKey, setPendingKey] = useState<string | null>(null);
+  const unlink = useExerciseUnlink({
+    offline: linking.offline, reloadLinks: linking.reloadLinks,
+    onNotice: (next) => setNotice(next ? { tone: next.tone, text: next.message } : null),
+  });
+  const mutationPending = pendingKey !== null || unlink.pending;
 
   const exercise: LinkableExercise | null = useMemo(
     () => catalog.exercises.find((candidate) => candidate.id === exerciseDefinitionId) ?? null,
@@ -67,8 +72,8 @@ function ExerciseLinkContent({ userId }: { userId: string }) {
   );
   const model = useMemo(
     () =>
-      exercise ? buildLinkScreenModel({ exercise, catalogs: linking.catalogs, links: linking.links, query }) : null,
-    [exercise, linking.catalogs, linking.links, query],
+      exercise ? buildLinkScreenModel({ exercise, catalogs: linking.catalogs, linkedCatalogs: linking.linkedCatalogs, links: linking.links, query }) : null,
+    [exercise, linking.catalogs, linking.linkedCatalogs, linking.links, query],
   );
 
   const catalogLoading = catalog.status === 'idle' || catalog.status === 'loading';
@@ -126,25 +131,14 @@ function ExerciseLinkContent({ userId }: { userId: string }) {
     }
   };
 
-  const unlink = async (row: LinkScreenLinkedRow) => {
-    setPendingKey(row.key);
-    setNotice(null);
-    try {
-      await unlinkExercise(exercise.id, row.groupId);
-      await linking.reloadLinks();
-      setNotice({ tone: 'success', text: `Unlinked from ${row.groupExerciseName} · ${row.groupName}.` });
-    } catch (caught) {
-      setNotice({ tone: 'error', text: caught instanceof Error ? caught.message : "Couldn't unlink this exercise." });
-    } finally {
-      setPendingKey(null);
-    }
-  };
-
   const confirmUnlink = (row: LinkScreenLinkedRow) => {
-    Alert.alert('Unlink exercise?', describeUnlinkConfirm(row.groupName), [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Unlink', style: 'destructive', onPress: () => void unlink(row) },
-    ]);
+    if (mutationPending || !linking.linksReady) return;
+    unlink.confirmUnlink({
+      personalExerciseId: exercise.id, personalExerciseName: exercise.name,
+      groupId: row.groupId, groupName: row.groupName,
+      groupExerciseId: row.groupExerciseId, groupExerciseName: row.groupExerciseName,
+      archived: row.archived, inactive: row.inactive,
+    });
   };
 
   const offeredCount = model.suggested.length + model.groups.reduce((total, group) => total + group.rows.length, 0);
@@ -171,12 +165,18 @@ function ExerciseLinkContent({ userId }: { userId: string }) {
         <GroupInlineError error={inlineError} onRetry={onRefresh} testID="exercise-link-inline-error" />
       ) : null}
 
-      {model.linked.length > 0 ? (
+      {linking.linksError ? (
+        <View style={styles.section}>
+          <UiText accessibilityRole="alert" style={styles.errorText} testID="exercise-link-links-error">{linking.linksError}</UiText>
+          <UiButton label="Retry reading links" onPress={() => void linking.reloadLinks()} style={styles.unlinkButton} testID="exercise-link-links-retry" variant="secondary" />
+        </View>
+      ) : !linking.linksReady ? <GroupLoadingState testID="exercise-link-links-loading" /> : null}
+      {linking.linksReady && model.linked.length > 0 ? (
         <Section title="Linked">
           {model.linked.map((row) => (
             <UiSurface key={row.key} style={styles.row} testID={`exercise-link-linked-row-${row.groupExerciseId}`}>
               <View style={styles.rowText}>
-                <UiText numberOfLines={2}>
+                <UiText>
                   {row.groupExerciseName}
                   <UiText variant="bodyMuted"> · {row.groupName}</UiText>
                 </UiText>
@@ -185,8 +185,9 @@ function ExerciseLinkContent({ userId }: { userId: string }) {
               </View>
               <UiButton
                 accessibilityLabel={`Unlink from ${row.groupExerciseName} in ${row.groupName}`}
-                disabled={pendingKey !== null}
-                label="Unlink"
+                disabled={mutationPending}
+                label={unlink.pending ? 'Unlinking…' : 'Unlink'}
+                style={styles.unlinkButton}
                 onPress={() => confirmUnlink(row)}
                 testID={`exercise-link-unlink-${row.groupExerciseId}`}
                 variant="danger"
@@ -229,7 +230,7 @@ function ExerciseLinkContent({ userId }: { userId: string }) {
           {model.suggested.length > 0 ? (
             <Section title="Suggested">
               {model.suggested.map((row) => (
-                <AvailableRow key={row.key} onLink={link} pendingKey={pendingKey} row={row} showGroup />
+                <AvailableRow key={row.key} onLink={link} pendingKey={mutationPending || !linking.linksReady ? 'pending' : null} row={row} showGroup />
               ))}
             </Section>
           ) : null}
@@ -239,7 +240,7 @@ function ExerciseLinkContent({ userId }: { userId: string }) {
                 <View key={group.groupId} style={styles.group}>
                   <UiText variant="label">{group.groupName}</UiText>
                   {group.rows.map((row) => (
-                    <AvailableRow key={row.key} onLink={link} pendingKey={pendingKey} row={row} />
+                    <AvailableRow key={row.key} onLink={link} pendingKey={mutationPending || !linking.linksReady ? 'pending' : null} row={row} />
                   ))}
                 </View>
               ))}
@@ -286,7 +287,7 @@ function AvailableRow({
   return (
     <UiSurface style={styles.row} testID={`exercise-link-row-${row.groupExercise.group_exercise_id}`}>
       <View style={styles.rowText}>
-        <UiText numberOfLines={2}>
+        <UiText>
           {name}
           {showGroup ? <UiText variant="bodyMuted"> · {row.groupName}</UiText> : null}
         </UiText>
@@ -323,6 +324,7 @@ const styles = StyleSheet.create({
     gap: uiSpace.md,
     padding: uiSpace.md,
   },
+  unlinkButton: { minHeight: 44 },
   rowText: {
     flex: 1,
     gap: uiSpace.xs,

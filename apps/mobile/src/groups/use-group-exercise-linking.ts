@@ -45,9 +45,13 @@ const selectLinkingUserId = (): string | null => {
 export type GroupExerciseLinkingState = {
   /** My groups with their cached exercise lists; null until `groups:mine` is known. */
   catalogs: GroupExerciseCatalog[] | null;
+  /** Last known target names/archive state, for inactive-link confirmation only. */
+  linkedCatalogs: GroupExerciseCatalog[];
+  linksReady: boolean;
+  linksError: string | null;
   /** My live links. */
   links: ExerciseGroupLinkRecord[];
-  /** True once the cache and links read for the current user has settled. */
+  /** True once the group-cache read has settled; linksReady tracks local links separately. */
   hydrated: boolean;
   refreshing: boolean;
   /** Offline (NetInfo) or the last refresh failed with `NETWORK`. */
@@ -63,6 +67,7 @@ export type GroupExerciseLinkingState = {
 
 type InternalState = {
   catalogs: GroupExerciseCatalog[] | null;
+  linkedCatalogs: GroupExerciseCatalog[];
   lastUpdatedAtMs: number | null;
   hydrated: boolean;
   refreshing: boolean;
@@ -72,6 +77,7 @@ type InternalState = {
 
 const initialState = (): InternalState => ({
   catalogs: null,
+  linkedCatalogs: [],
   lastUpdatedAtMs: null,
   hydrated: false,
   refreshing: false,
@@ -106,6 +112,9 @@ export function useGroupExerciseLinking({ userId }: { userId: string | null }): 
   const online = useNetworkOnline(userId !== null);
   const [state, setState] = useState<InternalState>(initialState);
   const [links, setLinks] = useState<ExerciseGroupLinkRecord[]>([]);
+  const [linksReady, setLinksReady] = useState(false);
+  const [linksError, setLinksError] = useState<string | null>(null);
+  const linksSequence = useRef(0);
 
   const userRef = useRef<string | null>(userId);
   const onlineRef = useRef(online);
@@ -119,14 +128,19 @@ export function useGroupExerciseLinking({ userId }: { userId: string | null }): 
     if (!userId) {
       return;
     }
+    const sequence = ++linksSequence.current;
+    setLinksReady(false);
+    setLinksError(null);
     try {
       const next = await listLinks();
-      if (userRef.current === userId) {
+      if (userRef.current === userId && sequence === linksSequence.current) {
         setLinks(next);
+        setLinksReady(true);
       }
-    } catch (caught) {
-      if (userRef.current === userId) {
-        setState((previous) => ({ ...previous, error: toGroupApiError(caught) }));
+    } catch {
+      if (userRef.current === userId && sequence === linksSequence.current) {
+        setLinks([]);
+        setLinksError("Couldn't read your links on this device. Retry to see their current status.");
       }
     }
   }, [userId]);
@@ -137,6 +151,9 @@ export function useGroupExerciseLinking({ userId }: { userId: string | null }): 
     inFlightRef.current = null;
     setState(initialState());
     setLinks([]);
+    setLinksReady(false);
+    setLinksError(null);
+    linksSequence.current++;
 
     if (!userId) {
       setState({ ...initialState(), hydrated: true });
@@ -148,16 +165,14 @@ export function useGroupExerciseLinking({ userId }: { userId: string | null }): 
       try {
         const database = await bootstrapLocalDataLayer();
         const cached = readCachedGroupExerciseCatalogs(database, userId);
-        const nextLinks = await listLinks();
         if (cancelled) return;
-        setLinks(nextLinks);
         setState((previous) => {
           // A refresh that already landed is fresher than the cache: keep it.
           const keepFresher =
             cached === null || (previous.lastUpdatedAtMs !== null && previous.lastUpdatedAtMs >= cached.fetchedAtMs);
           return keepFresher
             ? { ...previous, hydrated: true }
-            : { ...previous, hydrated: true, catalogs: cached.catalogs, lastUpdatedAtMs: cached.fetchedAtMs };
+            : { ...previous, hydrated: true, catalogs: cached.catalogs, linkedCatalogs: cached.catalogs, lastUpdatedAtMs: cached.fetchedAtMs };
         });
       } catch (caught) {
         if (cancelled) return;
@@ -167,6 +182,7 @@ export function useGroupExerciseLinking({ userId }: { userId: string | null }): 
 
     return () => {
       cancelled = true;
+      linksSequence.current++;
     };
   }, [userId]);
 
@@ -256,6 +272,9 @@ export function useGroupExerciseLinking({ userId }: { userId: string | null }): 
       setState((previous) => ({
         ...previous,
         catalogs,
+        // Retain only presentation metadata in memory after membership loss;
+        // evictGroup still removes server caches and membership stays authoritative.
+        linkedCatalogs: [...new Map([...previous.linkedCatalogs, ...catalogs].map((catalog) => [catalog.groupId, catalog])).values()],
         lastUpdatedAtMs: fetchedAtMs,
         hydrated: true,
         refreshing: false,
@@ -281,6 +300,9 @@ export function useGroupExerciseLinking({ userId }: { userId: string | null }): 
 
   return {
     catalogs: state.catalogs,
+    linkedCatalogs: state.linkedCatalogs,
+    linksReady,
+    linksError,
     links,
     hydrated: state.hydrated,
     refreshing: state.refreshing,

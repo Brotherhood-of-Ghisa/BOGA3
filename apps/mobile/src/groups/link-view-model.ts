@@ -69,8 +69,31 @@ const matchesQuery = (words: string[], ...texts: string[]): boolean => {
 export const describeLinkRetroactivity = (exerciseName: string, groupName: string): string =>
   `Your past ${exerciseName} sets shared with ${groupName} will count.`;
 
-export const describeUnlinkConfirm = (groupName: string): string =>
-  `Your sets from this exercise will leave ${groupName}'s leaderboards.`;
+export type ExerciseUnlinkContext = {
+  personalExerciseName: string;
+  groupExerciseName: string;
+  groupName: string;
+  archived?: boolean;
+  inactive?: boolean;
+};
+
+export const describeUnlinkConfirm = (context: ExerciseUnlinkContext): { title: string; message: string } => {
+  const { personalExerciseName, groupExerciseName, groupName, archived, inactive } = context;
+  const effects = archived || inactive
+    ? [
+        `Remove its link to “${groupExerciseName}” in “${groupName}”.`,
+        archived ? 'Archived leaderboards stay unchanged; this link change takes effect if the exercise is unarchived.' : null,
+        inactive ? 'Leaderboards stay unchanged while you are not a member; this link change takes effect if you rejoin.' : null,
+      ].filter(Boolean).join(' ')
+    : `Its sets will stop counting towards “${groupExerciseName}” in “${groupName}” on both All and Certified leaderboards.`;
+  return {
+    title: `Unlink “${personalExerciseName}”?`,
+    message: `${effects} Past activity and existing certifications will be kept. Leaderboards update after syncing.`,
+  };
+};
+
+export const describeUnlinkSuccess = (context: ExerciseUnlinkContext, offline: boolean): string =>
+  `Unlinked “${context.personalExerciseName}” from “${context.groupExerciseName}”.${offline ? ' Leaderboards will update after you reconnect and sync.' : ''}`;
 
 export const describeAlreadyLinkedIn = (groupName: string): string => `already linked in ${groupName}`;
 
@@ -311,6 +334,8 @@ export type LinkScreenLinkedRow = {
   groupExerciseId: string;
   groupExerciseName: string;
   status: 'active' | 'archived' | 'inactive';
+  archived: boolean;
+  inactive: boolean;
   /** `archived` / `inactive — not a member`; null while active. */
   statusLabel: string | null;
   loadModeNote: string | null;
@@ -350,11 +375,13 @@ export type LinkScreenModel = {
 export const buildLinkScreenModel = ({
   exercise,
   catalogs,
+  linkedCatalogs = [],
   links,
   query,
 }: {
   exercise: LinkableExercise;
   catalogs: readonly GroupExerciseCatalog[] | null;
+  linkedCatalogs?: readonly GroupExerciseCatalog[];
   links: readonly LinkRef[];
   query: string;
 }): LinkScreenModel => {
@@ -364,17 +391,21 @@ export const buildLinkScreenModel = ({
   const linked = myLinks
     .map((link): LinkScreenLinkedRow => {
       const catalog = catalogById.get(link.groupId);
-      const groupExercise = catalog?.exercises?.find((candidate) => candidate.group_exercise_id === link.groupExerciseId);
-      const status: LinkScreenLinkedRow['status'] =
-        catalogs !== null && !catalog ? 'inactive' : groupExercise?.archived_at_ms ? 'archived' : 'active';
+      const knownCatalog = catalog ?? linkedCatalogs.find((candidate) => candidate.groupId === link.groupId);
+      const groupExercise = knownCatalog?.exercises?.find((candidate) => candidate.group_exercise_id === link.groupExerciseId);
+      const archived = groupExercise?.archived_at_ms != null;
+      const inactive = catalogs !== null && !catalog;
+      const status: LinkScreenLinkedRow['status'] = inactive ? 'inactive' : archived ? 'archived' : 'active';
       return {
         key: `${link.groupId}:${link.groupExerciseId}`,
         groupId: link.groupId,
-        groupName: catalog?.groupName ?? PLACEHOLDER_GROUP_NAME,
+        groupName: knownCatalog?.groupName ?? PLACEHOLDER_GROUP_NAME,
         groupExerciseId: link.groupExerciseId,
         groupExerciseName: groupExercise?.name ?? PLACEHOLDER_GROUP_EXERCISE_NAME,
         status,
-        statusLabel: status === 'inactive' ? INACTIVE_LINK_LABEL : status === 'archived' ? ARCHIVED_LINK_LABEL : null,
+        archived,
+        inactive,
+        statusLabel: [inactive ? INACTIVE_LINK_LABEL : null, archived ? ARCHIVED_LINK_LABEL : null].filter(Boolean).join(' · ') || null,
         loadModeNote: groupExercise ? describeLoadModeNote(exercise.loadInputMode, groupExercise.load_input_mode) : null,
       };
     })

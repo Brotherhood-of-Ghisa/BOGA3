@@ -1,3 +1,4 @@
+import type { Ref } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Icon, UiButton, UiText, uiColors, uiRadius, uiSpace } from '@/components/ui';
@@ -13,15 +14,18 @@ type GroupExerciseRowProps = {
    * element, so a button inside it could not be reached on its own.
    */
   onLink?: () => void;
+  onUnlink?: () => void;
+  unlinkPending?: boolean;
+  focusRef?: Ref<View>;
 };
 
 /** One Exercises-segment row: name, weight entry, my link status, an Archived badge, and "Link your exercise". */
-export function GroupExerciseRow({ row, onPress, onLink }: GroupExerciseRowProps) {
+export function GroupExerciseRow({ row, onPress, onLink, onUnlink, unlinkPending, focusRef }: GroupExerciseRowProps) {
   const id = row.groupExerciseId;
   const content = (
     <>
       <View style={styles.text}>
-        <UiText numberOfLines={2} testID={`group-exercise-name-${id}`} variant="label">
+        <UiText testID={`group-exercise-name-${id}`} variant="label">
           {row.name}
         </UiText>
         <UiText testID={`group-exercise-load-mode-${id}`} variant="subtitle">
@@ -50,6 +54,7 @@ export function GroupExerciseRow({ row, onPress, onLink }: GroupExerciseRowProps
     .join(', ');
   const main = onPress ? (
     <Pressable
+      ref={focusRef}
       accessibilityHint="Opens exercise actions"
       accessibilityLabel={label}
       accessibilityRole="button"
@@ -59,13 +64,24 @@ export function GroupExerciseRow({ row, onPress, onLink }: GroupExerciseRowProps
       {content}
     </Pressable>
   ) : (
-    <View style={styles.row} testID={`group-exercise-row-${id}`}>
+    <View accessible accessibilityLabel={label} ref={focusRef} style={styles.row} testID={`group-exercise-row-${id}`}>
       {content}
     </View>
   );
   return (
     <View style={styles.item} testID={`group-exercise-item-${id}`}>
       {main}
+      {onUnlink ? (
+        <UiButton
+          accessibilityLabel={`Unlink ${row.personalLinks.length === 1 ? row.personalLinks[0].label : 'one of your exercises'} from ${row.name}`}
+          disabled={unlinkPending}
+          label={unlinkPending ? 'Unlinking…' : 'Unlink…'}
+          onPress={onUnlink}
+          style={styles.linkButton}
+          testID={`group-exercise-unlink-button-${id}`}
+          variant="danger"
+        />
+      ) : null}
       {onLink ? (
         <UiButton
           accessibilityHint="Choose which of your exercises this is"
@@ -109,6 +125,7 @@ const styles = StyleSheet.create({
     paddingVertical: uiSpace.xs,
   },
   linkButton: {
+    minHeight: 44,
     alignSelf: 'flex-start',
     marginBottom: uiSpace.xs,
   },

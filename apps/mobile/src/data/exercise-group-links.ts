@@ -195,13 +195,16 @@ export const createExerciseWithGroupLink = async (
 /**
  * Unlinks a personal exercise from its group exercise in a group by
  * tombstoning the row (`deleted_at`), so the unlink syncs under LWW and a later
- * relink undeletes the same id. A missing or already-unlinked row is a no-op.
+ * relink undeletes the same id. Returns whether it wrote. The optional expected
+ * target is checked in the same transaction: an old confirmation must not
+ * tombstone a moved link. Missing, tombstoned, or moved links return false.
  */
 export const unlinkExercise = async (
   exerciseDefinitionId: string,
   groupId: string,
   now: Date = new Date(),
-): Promise<void> => {
+  expectedGroupExerciseId?: string,
+): Promise<boolean> => {
   const id = exerciseGroupLinkId(
     requireId(groupId, 'groupId'),
     requireId(exerciseDefinitionId, 'exerciseDefinitionId'),
@@ -210,11 +213,12 @@ export const unlinkExercise = async (
 
   const wrote = database.transaction((tx) => {
     const existing = tx
-      .select({ deletedAt: exerciseGroupLinks.deletedAt })
+      .select({ deletedAt: exerciseGroupLinks.deletedAt, groupExerciseId: exerciseGroupLinks.groupExerciseId })
       .from(exerciseGroupLinks)
       .where(eq(exerciseGroupLinks.id, id))
       .get();
-    if (!existing || existing.deletedAt !== null) {
+    if (!existing || existing.deletedAt !== null ||
+        (expectedGroupExerciseId !== undefined && existing.groupExerciseId !== expectedGroupExerciseId)) {
       return false;
     }
 
@@ -233,6 +237,7 @@ export const unlinkExercise = async (
   if (wrote) {
     notifyLocalWrite();
   }
+  return wrote;
 };
 
 /** Lists the member's live (not unlinked) links, ordered by group then exercise. */
