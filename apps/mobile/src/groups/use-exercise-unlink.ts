@@ -13,7 +13,7 @@ export type ExerciseUnlinkTarget = ExerciseUnlinkContext & {
 };
 export type ExerciseUnlinkNotice = { tone: 'success' | 'error'; message: string };
 
-/** Local-only unlink shared by the group row and the catalogue/recorder Link screen. */
+/** Local-only unlink shared by the group row and the catalogue/exercise-page Link screen. */
 export function useExerciseUnlink({ offline, reloadLinks, onNotice }: {
   offline: boolean;
   reloadLinks: () => Promise<void>;

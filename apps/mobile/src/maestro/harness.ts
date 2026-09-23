@@ -5,10 +5,6 @@ import { bootstrapLocalDataLayer, resetLocalAppData } from '@/src/data';
 import { PRIMARY_RUNTIME_STATE_ID } from '@/src/data/clock';
 import { sessionViewHref } from '@/src/navigation/active-session-entry';
 import { syncRuntimeState } from '@/src/data/schema';
-import {
-  DEFAULT_NEW_SCREENS_ENABLED,
-  setNewScreensEnabled,
-} from '@/src/session-recorder/new-screens-preference';
 import { clearAuthRequired, markAuthRequired } from '@/src/sync/auth-required-signal';
 import type { SyncProgress } from '@/src/sync/progress';
 import {
@@ -25,6 +21,8 @@ export type MaestroHarnessResetMode = 'none' | 'data';
 export type MaestroHarnessFixtureName =
   | 'none'
   | 'exercise-block-history'
+  // The block history plus a newest completed session with two PRs.
+  | 'completion-two-prs'
   | 'exercise-page'
   | 'session-view';
 /**
@@ -44,15 +42,8 @@ export type MaestroHarnessBootstrapAction = 'none' | 'reset' | 'complete';
  * dismiss). A no-op for 'none'.
  */
 export type MaestroHarnessGateAction = 'none' | 'in-progress' | 'clear';
-/**
- * Sets the new exercise/session screens preference before teleporting, so the
- * new screens' flows can opt in without tapping through Settings. 'none' leaves
- * it as is; `reset=data` separately restores it to its default (on).
- */
-export type MaestroHarnessNewScreensAction = 'none' | 'on' | 'off';
 export type MaestroHarnessTeleportTarget =
   | 'session-list'
-  | 'session-recorder'
   | 'exercise-catalog'
   | 'completed-session'
   // The exercise page (redesign step 4); needs `sessionId` and `sessionExerciseId`.
@@ -85,7 +76,10 @@ export const resolveMaestroHarnessResetMode = (
 export const resolveMaestroHarnessFixtureName = (
   value: string | null | undefined
 ): MaestroHarnessFixtureName =>
-  value === 'exercise-block-history' || value === 'exercise-page' || value === 'session-view'
+  value === 'exercise-block-history' ||
+  value === 'completion-two-prs' ||
+  value === 'exercise-page' ||
+  value === 'session-view'
     ? value
     : 'none';
 
@@ -99,16 +93,11 @@ export const resolveMaestroHarnessGateAction = (
 ): MaestroHarnessGateAction =>
   value === 'in-progress' || value === 'clear' ? value : 'none';
 
-export const resolveMaestroHarnessNewScreensAction = (
-  value: string | null | undefined
-): MaestroHarnessNewScreensAction => (value === 'on' || value === 'off' ? value : 'none');
-
 export const resolveMaestroHarnessTeleportTarget = (
   value: string | null | undefined
 ): MaestroHarnessTeleportTarget | null => {
   switch (value) {
     case 'session-list':
-    case 'session-recorder':
     case 'exercise-catalog':
     case 'completed-session':
     case 'exercise-page':
@@ -136,7 +125,6 @@ const withQuery = (pathname: string, params: Record<string, string | null | unde
 
 export const resolveMaestroHarnessTeleportHref = ({
   target,
-  mode,
   intent,
   sessionId,
   sessionExerciseId,
@@ -145,7 +133,6 @@ export const resolveMaestroHarnessTeleportHref = ({
   presentation,
 }: {
   target: MaestroHarnessTeleportTarget | null;
-  mode?: string | null;
   intent?: string | null;
   sessionId?: string | null;
   sessionExerciseId?: string | null;
@@ -159,12 +146,6 @@ export const resolveMaestroHarnessTeleportHref = ({
       // Stats/History tab is the canonical landing target. Existing Maestro
       // flow YAML keeps `teleport=session-list` so they don't need rewriting.
       return '/stats-history' as Href;
-    case 'session-recorder':
-      return withQuery('/session-recorder', {
-        mode: mode === 'completed-edit' ? mode : null,
-        sessionId,
-        maestroShare: maestroShare === 'fail-once' ? maestroShare : null,
-      });
     case 'exercise-catalog':
       return withQuery('/exercise-catalog', {
         intent,
@@ -190,31 +171,18 @@ export const resolveMaestroHarnessTeleportHref = ({
   }
 };
 
-/**
- * `data` also restores the new-screens preference to its default: it lives in
- * SecureStore (which survives the SQLite wipe, and on iOS even an uninstall), so
- * without this a flow that switched it on would leak into every later flow.
- */
 export const runMaestroHarnessReset = async (resetMode: MaestroHarnessResetMode) => {
   if (resetMode === 'data') {
     await resetLocalAppData();
-    await setNewScreensEnabled(DEFAULT_NEW_SCREENS_ENABLED);
   }
-};
-
-export const runMaestroHarnessNewScreensAction = async (
-  action: MaestroHarnessNewScreensAction
-) => {
-  if (action === 'none') {
-    return;
-  }
-
-  await setNewScreensEnabled(action === 'on');
 };
 
 export const runMaestroHarnessFixture = async (fixtureName: MaestroHarnessFixtureName) => {
   if (fixtureName === 'exercise-block-history') {
     await seedExerciseBlockHistoryFixture();
+  }
+  if (fixtureName === 'completion-two-prs') {
+    await seedExerciseBlockHistoryFixture({ includeTwoPrSession: true });
   }
   if (fixtureName === 'exercise-page') {
     await seedExercisePageFixture();

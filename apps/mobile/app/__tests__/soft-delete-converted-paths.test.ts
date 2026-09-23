@@ -4,8 +4,9 @@
  * Each path that used to hard-delete a syncable row now tombstones it instead:
  * the row stays in the table with `deleted_at` set and `local_dirty = 1`, so it
  * pushes to the server as a deletion and survives a reinstall, while the
- * default reader filters it out (`deleted_at IS NULL`). Paths covered:
- *   - removing a tag attachment (`session_exercise_tags`);
+ * default reader filters it out (`deleted_at IS NULL`). Covered:
+ *   - the tag reader hiding a tombstoned attachment (`session_exercise_tags`;
+ *     the app no longer writes tags, so tombstones arrive by sync);
  *   - re-saving an exercise with a muscle link dropped
  *     (`exercise_muscle_mappings`).
  *
@@ -15,7 +16,7 @@
  * instance so the real write/read paths execute end-to-end.
  */
 
-import { and, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 
 import {
   exerciseDefinitions,
@@ -47,7 +48,7 @@ jest.mock('@/src/data/bootstrap', () => ({
 }));
 
 // Imported AFTER the mock so the repos pick up the mocked bootstrap.
-import { createDrizzleExerciseTagStore } from '@/src/data/exercise-tags';
+import { listSessionExerciseAssignedTags } from '@/src/data/exercise-tags';
 import { createDrizzleExerciseCatalogStore } from '@/src/data/exercise-catalog';
 import { __resetClockForTests } from '@/src/data/clock';
 
@@ -119,23 +120,11 @@ const readMappingRows = (database: TestDatabase) =>
     .where(eq(exerciseMuscleMappings.exerciseDefinitionId, EXERCISE_DEFINITION_ID))
     .all();
 
-const readAllTagRowsForPair = (database: TestDatabase) =>
-  database
-    .select()
-    .from(sessionExerciseTags)
-    .where(
-      and(
-        eq(sessionExerciseTags.sessionExerciseId, SESSION_EXERCISE_ID),
-        eq(sessionExerciseTags.exerciseTagDefinitionId, TAG_DEFINITION_ID)
-      )
-    )
-    .all();
-
 beforeEach(() => {
   __resetClockForTests();
 });
 
-describe('soft-delete: removing a tag attachment', () => {
+describe('soft-delete: a tombstoned tag attachment', () => {
   let fixture: InMemoryDatabaseFixture;
 
   beforeEach(() => {
@@ -149,51 +138,20 @@ describe('soft-delete: removing a tag attachment', () => {
     fixture.close();
   });
 
-  it('tombstones the attachment, marks it dirty, and hides it from the reader', async () => {
-    const store = createDrizzleExerciseTagStore();
-    const now = new Date('2026-05-31T12:00:00.000Z');
+  // The app no longer removes tags (the editor went with the old recorder); a
+  // removal arrives by sync as a tombstone, and the reader must hide it.
+  it('lists a live attachment and hides a tombstoned one', async () => {
+    const live = await listSessionExerciseAssignedTags(SESSION_EXERCISE_ID);
+    expect(live.map((tag) => tag.assignmentId)).toEqual(['assignment-1']);
 
-    await store.removeTagAssignment({
-      sessionExerciseId: SESSION_EXERCISE_ID,
-      tagDefinitionId: TAG_DEFINITION_ID,
-      now,
-    });
+    fixture.database
+      .update(sessionExerciseTags)
+      .set({ deletedAt: new Date('2026-05-31T12:00:00.000Z') })
+      .where(eq(sessionExerciseTags.id, 'assignment-1'))
+      .run();
 
-    const row = readTagRow(fixture.database, 'assignment-1');
-    // The row is tombstoned, not removed.
-    expect(row).toBeDefined();
-    expect(row?.deletedAt).toEqual(now);
-    expect(row?.localDirty).toBe(true);
-    expect(row?.localUpdatedAtMs).toBeGreaterThan(0);
-
-    // The default reader hides the tombstoned attachment.
-    const assigned = await store.listAssignedTags({ sessionExerciseId: SESSION_EXERCISE_ID });
-    expect(assigned).toEqual([]);
-  });
-
-  it('revives the same attachment row on re-attach instead of colliding on the unique pair', async () => {
-    const store = createDrizzleExerciseTagStore();
-
-    await store.removeTagAssignment({
-      sessionExerciseId: SESSION_EXERCISE_ID,
-      tagDefinitionId: TAG_DEFINITION_ID,
-      now: new Date('2026-05-31T12:00:00.000Z'),
-    });
-
-    await store.createTagAssignment({
-      sessionExerciseId: SESSION_EXERCISE_ID,
-      tagDefinitionId: TAG_DEFINITION_ID,
-      now: new Date('2026-05-31T13:00:00.000Z'),
-    });
-
-    // Exactly one row for the pair (the tombstone was revived, not duplicated).
-    const allRows = readAllTagRowsForPair(fixture.database);
-    expect(allRows).toHaveLength(1);
-    expect(allRows[0].deletedAt).toBeNull();
-    expect(allRows[0].localDirty).toBe(true);
-
-    const assigned = await store.listAssignedTags({ sessionExerciseId: SESSION_EXERCISE_ID });
-    expect(assigned).toHaveLength(1);
+    expect(readTagRow(fixture.database, 'assignment-1')).toBeDefined();
+    expect(await listSessionExerciseAssignedTags(SESSION_EXERCISE_ID)).toEqual([]);
   });
 });
 

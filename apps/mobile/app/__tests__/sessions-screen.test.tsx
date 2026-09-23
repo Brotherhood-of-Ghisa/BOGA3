@@ -6,10 +6,6 @@ import {
   type SessionListDataClient,
   type SessionListItem,
 } from '@/components/session-list';
-import {
-  __resetNewScreensPreferenceForTests,
-  setNewScreensEnabled,
-} from '@/src/session-recorder/new-screens-preference';
 
 const mockDismissTo = jest.fn();
 const mockPush = jest.fn();
@@ -77,7 +73,6 @@ describe('SessionsScreen active-session navigation', () => {
   beforeEach(() => {
     mockDismissTo.mockClear();
     mockPush.mockClear();
-    __resetNewScreensPreferenceForTests();
   });
 
   it('opens the session view when resuming an active session', async () => {
@@ -88,17 +83,6 @@ describe('SessionsScreen active-session navigation', () => {
 
     expect(mockPush).toHaveBeenCalledWith('/session/active-session-1');
     expect(mockDismissTo).not.toHaveBeenCalled();
-  });
-
-  it('dismisses back to the existing recorder when the new screens setting is off', async () => {
-    await setNewScreensEnabled(false);
-    const dataClient = buildDataClient();
-    render(<SessionsScreen dataClient={dataClient} />);
-
-    fireEvent.press(await screen.findByTestId('resume-active-session-button'));
-
-    expect(mockDismissTo).toHaveBeenCalledWith('/session-recorder');
-    expect(mockPush).not.toHaveBeenCalled();
   });
 
   it('routes completion through the session cleanup flow instead of completing directly', async () => {

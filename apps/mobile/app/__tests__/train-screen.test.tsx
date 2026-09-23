@@ -10,10 +10,6 @@ jest.mock('expo-router', () => ({
 
 import type { SessionListDataClient, SessionListItem } from '@/components/session-list';
 import type { SessionEntryCoordinator } from '@/src/session-entry';
-import {
-  __resetNewScreensPreferenceForTests,
-  setNewScreensEnabled,
-} from '@/src/session-recorder/new-screens-preference';
 
 import { TrainScreen, type TrainPlanningState } from '../(tabs)/train';
 
@@ -52,10 +48,9 @@ const sessionEntry = (): jest.Mocked<SessionEntryCoordinator> => ({
 describe('Train screen', () => {
   beforeEach(() => {
     mockPush.mockReset();
-    __resetNewScreensPreferenceForTests();
   });
 
-  it('opens the session view by default, not the recorder', async () => {
+  it('opens the session view to resume or start a session', async () => {
     const entry = sessionEntry();
     const { unmount } = render(<TrainScreen dataClient={dataClient([activeSession])} sessionEntry={entry} />);
 
@@ -66,22 +61,6 @@ describe('Train screen', () => {
     render(<TrainScreen initialSessions={[]} sessionEntry={entry} />);
     fireEvent.press(screen.getByTestId('train-start-empty-button'));
     await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/session/empty-session'));
-    expect(mockPush).not.toHaveBeenCalledWith('/session-recorder');
-  });
-
-  it('opens the recorder when the new screens setting is off', async () => {
-    await setNewScreensEnabled(false);
-    const entry = sessionEntry();
-    const { unmount } = render(<TrainScreen dataClient={dataClient([activeSession])} sessionEntry={entry} />);
-
-    fireEvent.press(await screen.findByTestId('train-resume-session-button'));
-    expect(mockPush).toHaveBeenCalledWith('/session-recorder');
-    unmount();
-
-    render(<TrainScreen initialSessions={[]} sessionEntry={entry} />);
-    fireEvent.press(screen.getByTestId('train-start-empty-button'));
-    await waitFor(() => expect(mockPush).toHaveBeenCalledTimes(2));
-    expect(mockPush).toHaveBeenLastCalledWith('/session-recorder');
   });
 
   it('replaces every new-session action with Resume when a draft exists', async () => {

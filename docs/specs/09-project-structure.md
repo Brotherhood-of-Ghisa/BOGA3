@@ -76,9 +76,9 @@ Define the canonical repository structure, path ownership, and placement convent
 - `apps/mobile/src/auth/`
   - owns shared mobile auth integration modules such as the Supabase client bootstrap, auth storage adapter, session service, and React provider/hook surface.
 - `apps/mobile/src/session-insights/`
-  - owns the shared pure calculations for current-session muscle load and strict
+  - owns the shared pure calculations for session muscle load and strict
     exercise PRs, the completed-session repository adapter, and the platform-text
-    share payload/action used by recorder and completion presentation.
+    share payload/action used by the completion presentation.
   - remains derived-only: it owns no schema, durable achievement/share state,
     backend API, or sync envelope.
 - `apps/mobile/.maestro/`

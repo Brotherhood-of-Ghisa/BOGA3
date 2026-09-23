@@ -441,7 +441,7 @@ invisible.
 | --- | --- |
 | `session_id`, `session_exercise_id`, `exercise_definition_id` | Where the set was logged. A null exercise id never counts. |
 | `exercise_order_index`, `set_order_index` | Tie-break order after `achieved_at_ms` (P7) |
-| `performed` | The recorder's rule (§5), run in TS by the evaluator |
+| `performed` | The session screens' rule (§5), run in TS by the evaluator |
 | `live` | Set, exercise, and session all untombstoned |
 | `weight_kg`, `reps`, `e1rm_kg` | Null unless performed. They are in the member's **entered** load mode; conversion to the group exercise's mode is SQL (M25-T05, D6). `e1rm_kg` is Wathan (`estimateOneRepMax`), null at 0 kg. `reps` is `numeric` so that any value the TS parser accepts can be stored; no client text can fail a job on every retry. |
 | `achieved_at_ms` | `sessions.started_at` |
@@ -1281,7 +1281,7 @@ takes the board advisory lock.
 
 Group reads return raw set rows (§4.2). Every set rule runs on the viewing
 device, in `apps/mobile/src/groups/session-metrics.ts`, through the canonical
-TS the recorder uses. Nothing is mirrored in SQL.
+TS the session screens use. Nothing is mirrored in SQL.
 
 - **Performed.** A set is performed when `isConfirmedPerformedSet`
   (`apps/mobile/src/session-recorder/set-semantics.ts`) holds for its raw
@@ -1289,7 +1289,7 @@ TS the recorder uses. Nothing is mirrored in SQL.
   `parseCalculationSet` (`apps/mobile/src/exercise-calculations/index.ts`)
   parses it after `canonicalizeWeightForReps`. So a blank weight with valid
   reps is 0 kg, an unknown status counts as performed, and a value the
-  recorder cannot produce (for example `1e3`) does not.
+  set logger cannot produce (for example `1e3`) does not.
 - **Sets** — the count of performed sets.
 - **Volume** — Σ `computeSetVolume(weight, reps)` over performed sets. Warm-ups
   are included. The value is the entered scalar with no per-side normalization
@@ -1301,7 +1301,7 @@ TS the recorder uses. Nothing is mirrored in SQL.
 **Why the device.** M22 first computed these in SQL helpers that mirrored the
 TS parsers, held in parity by shared test vectors. That duplicated set
 semantics in two languages, and the PR rule had no parity guard at all. The
-device now reuses the recorder's code. The cost: a co-member's device receives
+device now reuses the session screens' code. The cost: a co-member's device receives
 every live set, planned and skipped ones included, although the UI shows
 performed sets only.
 
@@ -1323,7 +1323,7 @@ view model and `FriendSessionContent` use them. Jest:
 | `types.ts` | Wire types (§4) |
 | `api.ts` | One typed wrapper per RPC. It maps PostgREST errors to `GroupApiError { code, message }` by token prefix, and transport failures to `NETWORK`. It is the only code that calls Supabase for groups. |
 | `cache.ts` | Read and write for `group_cache`, `evictGroup(groupId)`, and `wipeGroupCache()` |
-| `session-metrics.ts` | Card metrics and the friend view's performed sets, computed from raw set rows with the recorder's TS (§5) |
+| `session-metrics.ts` | Card metrics and the friend view's performed sets, computed from raw set rows with the session screens' TS (§5) |
 | `stream-view-model.ts` | Pure presentation: status ("Training now" while `active` — indefinite, C7.2 — or "Completed · 1h 05m"), card metrics from `session-metrics.ts` formatted in kg, membership sentences ("X joined", "X left the group", "X was removed" — C7.3), and filter chips |
 | `use-group-resource.ts` | A cache-first hook. It refreshes on focus, every 30 s while focused, and on pull-to-refresh, and returns `{ data, lastUpdatedAtMs, refreshing, offline, error, refresh }`. |
 | `use-group-action.ts` | Runs one write RPC. It fails fast with the offline message when offline and never queues (C3.10.3). |
@@ -1599,7 +1599,7 @@ E0.1–E0.3).
   RPCs, so the online-only write rule (C3.10.3) does not apply to them.
 - **`use-group-exercise-linking.ts`.** `useGroupExerciseLinking({ userId })` is
   the cache-first hook: it reads `groups:mine` and each `group-exercises:<id>`,
-  refreshes them on focus, when the recorder picker opens, and on `refresh()`
+  refreshes them on focus, when the session view's picker opens, and on `refresh()`
   (pull-to-refresh) — no 30 s poll, since these lists change rarely and the
   screens are not live views — with per-group `listGroupExercises`. A group
   whose list returns `NOT_FOUND` is evicted (`evictGroup`) and left out of the
@@ -1607,7 +1607,7 @@ E0.1–E0.3).
   `groups:mine` with no cached list yet reads as not loaded
   (`groupExercisesLoaded`), so offline shows "Connect once…"; NETWORK errors
   are left to the offline marker (`pickInlineError`). `useGroupLinkingUserId()` reads the auth store directly
-  (signed in and configured, else null), so the recorder and catalogue need no
+  (signed in and configured, else null), so the picker, exercise page and catalogue need no
   `AuthProvider`; a null user disables everything, NetInfo included
   (`useNetworkOnline(enabled)`).
 - **`link-view-model.ts`.** The pure rules: the picker's `From your groups`
@@ -1625,7 +1625,8 @@ E0.1–E0.3).
   this exercise to link it" (unlink still works). The repository stays
   permissive (sync contract §A.2.10).
 - **Evidence.** Jest: `groups-link-view-model.test.ts`,
-  `groups-exercise-link-screen.test.tsx`, `session-recorder-group-picker.test.tsx`,
+  `groups-exercise-link-screen.test.tsx`, the picker's group cases in
+  `exercise-picker.test.tsx` (`picker: group exercises (E0.1)`, `pick sheet (E0.2)`, `signed out`),
   `exercise-catalog-link-menu.test.tsx`, `exercise-group-links-add-as-new.test.ts`,
   and the exercise page's ⋮ Link item in `exercise-page-screen.test.tsx`;
   Maestro `groups-link-exercise.yaml` (§8), whose last step opens the Link
@@ -1691,7 +1692,7 @@ E0.1–E0.3).
   distinguishing short ID; deleted personal exercises remain removable. The
   chooser dismisses before confirmation, and dismissal restores row focus.
 - **Shared unlink contract** (E0.3/E0.4). `describeUnlinkConfirm` and
-  `useExerciseUnlink` serve both the group page and the catalogue/recorder Link
+  `useExerciseUnlink` serve both the group page and the catalogue/exercise-page Link
   screen. Confirmation names the personal exercise, target exercise and group,
   explains removal from All and Certified boards after sync, and explicitly
   preserves past activity and certifications. Archived and inactive targets
@@ -2052,8 +2053,9 @@ group screen, and Today details above where they differ. No server change.
   calls `group_create` and `group_exercise_create` (a copy of
   `seed_barbell_bench_press`). The device then links its seeded "Barbell Bench
   Press" from the catalogue `⋮` Link screen (offered under Suggested), finds the
-  group exercise in recorder picker search as "linked: Barbell Bench Press",
-  and adds it to the session (`groups-link-01`…`04`).
+  group exercise in the session view's picker search (Train → Start →
+  `+ Add exercise`) as "linked: Barbell Bench Press", and adds it to the
+  session (`groups-link-01`…`04`).
 - **As-built (M22-T06, Maestro lane).** Lane `ios-groups-e2e`
   (`maestro-run-lane.sh groups-e2e`, gate `slow-frontend`, so part of
   `boga test frontend`); flow `apps/mobile/.maestro/flows/groups-two-user-stream.yaml`.
@@ -2233,7 +2235,7 @@ contract. The narrative sketches and design trade-offs are in git history
 | E0 | Linking, out of the way: every path ends at the Link screen or, while logging, the pick sheet | §6.3 M25-T07 |
 | E0.1 | Picker search: a `From your groups` section after my matches, plus a Groups toggle | §6.3 M25-T07 |
 | E0.2 | Pick sheet for an unlinked group exercise: suggested exercise, choose another, or add as new | §6.3 M25-T07 |
-| E0.3 | Link screen from the catalogue `⋮` / exercise-page `⋮` menus (and the recorder `•••` until it is deleted): Linked, Suggested, All | §6.3 M25-T07 |
+| E0.3 | Link screen from the catalogue `⋮` / exercise-page `⋮` menus: Linked, Suggested, All | §6.3 M25-T07 |
 | E0.4 | Group page Exercises: my link status, `Link your exercise`, `Unlink…` with individual selection and confirmation | §6.3 M25-T08 and shared unlink contract |
 | E1 / E1.1 | Leaderboards page: podium cards on Certified · e1RM, `You: Nth`, archived last | §6.3 M25-T09 |
 | E1.2 | Full board: Weight/e1RM × Certified/All toggles in place, certified / uncertified mark on All, rows open E2 | §6.3 M25-T09, M25-T10 |

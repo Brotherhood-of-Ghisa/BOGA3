@@ -36,7 +36,7 @@ describe('exercise calculations: parsing', () => {
     });
 
     it('rejects scientific notation that the UI input pattern would reject', () => {
-      // WEIGHT_INPUT_PATTERN in session-recorder.tsx accepts only digits
+      // The exercise page's weight input (set-logger.tsx) accepts only digits
       // with an optional decimal point. `Number('1e3')` is 1000, so this
       // pins the parser to reject inputs the UI itself wouldn't allow.
       expect(parseSetWeight('1e3')).toBeNull();

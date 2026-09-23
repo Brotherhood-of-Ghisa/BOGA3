@@ -41,8 +41,7 @@ import {
   type PlannedSessionMaterializer,
   type SessionEntryCoordinator,
 } from '@/src/session-entry';
-import { activeSessionHref } from '@/src/navigation/active-session-entry';
-import { useNewScreensEnabled } from '@/src/session-recorder/new-screens-preference';
+import { sessionViewHref } from '@/src/navigation/active-session-entry';
 
 const RECENT_SESSION_LIMIT = 3;
 const SOCIAL_ACTIVITY_LIMIT = 3;
@@ -105,7 +104,6 @@ export function TodayScreen({
   socialState,
 }: TodayScreenProps) {
   const router = useRouter();
-  const [newScreensEnabled] = useNewScreensEnabled();
   const [planLaunchError, setPlanLaunchError] = useState<string | null>(null);
   const [isStartingPlan, setIsStartingPlan] = useState(false);
   const planLaunchInFlightRef = useRef(false);
@@ -147,7 +145,7 @@ export function TodayScreen({
     setPlanLaunchError(null);
     try {
       const entry = await sessionEntry.startPlannedOrResume(planState.materialize);
-      router.push(activeSessionHref(entry.sessionId, newScreensEnabled));
+      router.push(sessionViewHref(entry.sessionId));
     } catch {
       setPlanLaunchError("Couldn't start this planned session. Try again.");
     } finally {
@@ -188,7 +186,7 @@ export function TodayScreen({
             </View>
             <UiButton
               label="Resume workout"
-              onPress={() => router.push(activeSessionHref(activeSession.id, newScreensEnabled))}
+              onPress={() => router.push(sessionViewHref(activeSession.id))}
               testID="today-resume-session-button"
             />
           </UiSurface>

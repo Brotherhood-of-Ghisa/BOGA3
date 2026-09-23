@@ -2,7 +2,7 @@ appId: com.dinoderek.mobile
 ---
 # maestro-ios-launch.sh has already opened the dev-client URL and blocks until
 # Metro serves the entry bundle. Opening that URL again here races the harness
-# navigation below: the delayed reload can replace an in-progress recorder with
+# navigation below: the delayed reload can replace an in-progress session with
 # the initial Stats route and surface the one-time developer menu. The smoke lane
 # owns explicit dev-client launch coverage; this data lane starts with its
 # app-owned reset + teleport deep link.
@@ -26,22 +26,21 @@ appId: com.dinoderek.mobile
             id: "stats-history-screen"
           timeout: 30000
 - takeScreenshot: "03-data-runtime-smoke-start"
-- openLink: "boga3://maestro-harness?reset=data&teleport=session-recorder"
+# Train's Start opens the session view on a new, empty session.
+- tapOn:
+    id: "top-level-tab-train"
 - extendedWaitUntil:
     visible:
-      id: "start-session-button"
+      id: "train-start-empty-button"
+    timeout: 15000
+- tapOn:
+    id: "train-start-empty-button"
+- extendedWaitUntil:
+    visible:
+      id: "session-view-add-exercise"
     timeout: 30000
 - tapOn:
-    id: "start-session-button"
-- extendedWaitUntil:
-    visible:
-      id: "session-recorder-screen"
-    timeout: 30000
-- extendedWaitUntil:
-    visible:
-      text: "No exercises logged yet."
-    timeout: 30000
-- tapOn: "Log new exercise"
+    id: "session-view-add-exercise"
 - tapOn: "Exercise picker options"
 - tapOn: "Turn grouping off"
 - tapOn: "Exercise picker options"
@@ -51,13 +50,12 @@ appId: com.dinoderek.mobile
     optional: true
 - tapOn: "Select Exercise"
 # Pick the seeded "Barbell Back Squat" exercise by its accessibility label
-# ("Select exercise <name>", session-recorder.tsx) rather than a fragile
-# `point: "50%,26%"` coordinate tap. On a cold sim the picker list can render a
-# beat later than on a warm one, so a coordinate tap raced the row layout and
-# landed on empty space — leaving no exercise selected and failing the later
-# "Weight for exercise 1 set 1" step. Filtering by the exact seeded name yields a
-# deterministic seeded row. This smoke flow turns grouping off explicitly above;
-# grouped collapse/search behavior is covered by focused tests.
+# ("Select exercise <name>", exercise-picker.tsx) rather than a fragile
+# coordinate tap. On a cold sim the picker list can render a beat later than on
+# a warm one, so a coordinate tap raced the row layout and landed on empty
+# space. Filtering by the exact seeded name yields a deterministic seeded row.
+# This smoke flow turns grouping off explicitly above; grouped collapse/search
+# behavior is covered by focused tests.
 - extendedWaitUntil:
     visible:
       text: "Select exercise Barbell Back Squat"
@@ -66,73 +64,52 @@ appId: com.dinoderek.mobile
     text: "Select exercise Barbell Back Squat"
 - tapOn:
     id: "exercise-picker-add-empty-set-button"
-- assertVisible: "Quality for exercise 1 set 1: W-Up"
-- takeScreenshot: "set-performance-normal-invalid"
+- extendedWaitUntil:
+    visible:
+      text: "Barbell Back Squat, 0 of 1 sets done"
+    timeout: 15000
+# The card links to the exercise page, whose logger sits on the empty set.
 - tapOn:
-    id: "set-quality-button-1-1"
-- assertVisible: "Quality for exercise 1 set 1: none"
-- takeScreenshot: "effort-blank"
+    text: "Barbell Back Squat, 0 of 1 sets done"
+- extendedWaitUntil:
+    visible:
+      id: "exercise-set-logger"
+    timeout: 15000
+# A new exercise's first set starts as a warm-up (the effort cycle itself is
+# covered by exercise-page.yaml).
+- assertVisible:
+    id: "exercise-set-logger-effort"
+    text: "Change effort, currently W-Up"
+- takeScreenshot: "set-logger-empty"
 - tapOn:
-    id: "set-quality-button-1-1"
-- assertVisible: "Quality for exercise 1 set 1: RIR 3"
-- takeScreenshot: "effort-rir3"
-- longPressOn:
-    id: "set-quality-button-1-1"
-- tapOn: "Choose W-Up set type"
-
-- tapOn: "Weight for exercise 1 set 1"
+    id: "exercise-set-logger-weight"
 - inputText: "135"
-- tapOn: "Reps for exercise 1 set 1"
+- tapOn:
+    id: "exercise-set-logger-reps"
 - inputText: "8"
 - hideKeyboard:
     optional: true
-- takeScreenshot: "set-performance-normal-unconfirmed"
-- assertNotVisible:
-    id: "session-muscle-load-row"
 - tapOn:
-    id: "set-performance-control-1-1"
-- takeScreenshot: "set-performance-normal-confirmed"
-- scrollUntilVisible:
-    element:
-      id: "session-muscle-load-row"
-    direction: DOWN
-    visibilityPercentage: 100
-    centerElement: true
-- assertVisible: "4 muscles · 1 set (0 working)"
-- takeScreenshot: "session-muscle-load-populated"
-- tapOn:
-    id: "session-muscle-load-row"
+    id: "exercise-set-logger-commit"
 - extendedWaitUntil:
     visible:
-      text: "Close session muscle load"
+      id: "exercise-set-1-toggle"
+      text: "Mark set 1 not performed"
     timeout: 10000
 - assertVisible:
-    id: "session-muscle-load-muscle-quads"
-- takeScreenshot: "session-muscle-load-sheet"
-- tapOn: "Close session muscle load"
-- scrollUntilVisible:
-    element:
-      id: "set-performance-control-1-1"
-    direction: UP
-    visibilityPercentage: 100
-    centerElement: true
+    id: "exercise-set-1-values"
+    text: "135.0 × 8"
+- takeScreenshot: "set-logger-confirmed"
 - tapOn:
-    id: "set-performance-control-1-1"
-- assertNotVisible:
-    id: "session-muscle-load-row"
-- takeScreenshot: "session-muscle-load-reversed"
-- tapOn:
-    id: "set-performance-control-1-1"
-# The session has one explicitly confirmed set, so Submit goes straight through
+    id: "exercise-page-back"
+- extendedWaitUntil:
+    visible:
+      text: "Barbell Back Squat, 1 of 1 sets done"
+    timeout: 15000
+# The session has one explicitly confirmed set, so Finish goes straight through
 # with no incomplete, unconfirmed, or empty-row confirmation dialog.
-- scrollUntilVisible:
-    element:
-      id: "session-recorder-submit-button"
-    direction: DOWN
-    visibilityPercentage: 100
-    centerElement: true
 - tapOn:
-    id: "session-recorder-submit-button"
+    id: "session-view-finish-button"
 - extendedWaitUntil:
     visible:
       id: "session-completion-presentation"
@@ -145,11 +122,11 @@ appId: com.dinoderek.mobile
     visible:
       id: "stats-history-screen"
     timeout: 30000
-# The workout this flow just logged through the recorder must show up in the
-# Stats exercise list. This is the only on-device check of the recorder-write ->
-# exercise-analytics read-back path: stats-screen-ux.yaml covers the same list,
-# but from fixture rows inserted straight into SQLite, which bypass the recorder
-# entirely. A change to how sets or session-exercises are persisted would leave
+# The workout this flow just logged through the session view and exercise page
+# must show up in the Stats exercise list. This is the only on-device check of
+# the session-write -> exercise-analytics read-back path: stats-screen-ux.yaml
+# covers the same list, but from fixture rows inserted straight into SQLite,
+# which bypass the session screens entirely. A change to how sets or session-exercises are persisted would leave
 # that flow green and break this one.
 - extendedWaitUntil:
     visible:

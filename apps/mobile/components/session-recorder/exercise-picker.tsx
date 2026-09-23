@@ -57,9 +57,6 @@ export type ExercisePickerProps = {
   // preselection and Groups toggle and refreshes group links. Re-showing the
   // picker without a bump (returning from Manage) keeps them.
   openRequestId: number;
-  // `replace` swaps an existing exercise directly; `add` offers the
-  // Add empty set / Append plan preselection first.
-  mode: 'add' | 'replace';
   onDismiss: () => void;
   onSelectExercise: (exerciseDefinitionId: string, exerciseName: string) => void;
   onAppendPlan: (
@@ -71,7 +68,7 @@ export type ExercisePickerProps = {
 };
 
 /**
- * The exercise picker shared by the recorder and the session view: a filtered
+ * The session view's exercise picker: a filtered
  * catalogue list with shared list options, the add preselection (Add empty set
  * / Append plan), `From your groups` with its pick sheet (M25-T07), inline
  * create, and a Manage exit. It hides itself while one of its own editors or
@@ -80,7 +77,6 @@ export type ExercisePickerProps = {
 export function ExercisePicker({
   visible,
   openRequestId,
-  mode,
   onDismiss,
   onSelectExercise,
   onAppendPlan,
@@ -194,14 +190,6 @@ export function ExercisePicker({
   };
 
   const selectListItem = (exercise: ExerciseListItem) => {
-    if (mode === 'replace') {
-      const option = exerciseOptions.find((candidate) => candidate.id === exercise.id);
-      if (option) {
-        selectExercise(option.id, option.name);
-      }
-      return;
-    }
-
     const requestKey = `${exercise.id}:${Date.now()}:${Math.random().toString(36).slice(2)}`;
     preselectionRequestKeyRef.current = requestKey;
     setIsOptionsVisible(false);

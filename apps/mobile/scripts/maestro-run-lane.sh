@@ -92,22 +92,19 @@ case "$lane" in
       --session "iOS UI regression" \
       --scenario "Stats screen" --flow "$APP_DIR/.maestro/flows/stats-screen-ux.yaml" \
       --scenario "Session completion states" --flow "$APP_DIR/.maestro/flows/session-completion-states-fixture.yaml" \
-      --scenario "Exercise block history" --flow "$APP_DIR/.maestro/flows/exercise-block-history-fixture.yaml" \
-      --scenario "Settings dev wipe-local" --flow "$APP_DIR/.maestro/flows/settings-dev-wipe-local.yaml" \
-      --scenario "Settings new-screens toggle" --flow "$APP_DIR/.maestro/flows/settings-new-screens-toggle.yaml"
+      --scenario "Settings dev wipe-local" --flow "$APP_DIR/.maestro/flows/settings-dev-wipe-local.yaml"
     ;;
 
-  # The exercise page (exercise/session redesign step 4), the default since
-  # step 6a: its own fixture, seeded and reset in-flow through the
-  # maestro-harness deep link. Infra-free; its own lane so the new screen's
+  # The exercise page (exercise/session redesign step 4): its own fixture,
+  # seeded and reset in-flow through the maestro-harness deep link. Infra-free; its own lane so the new screen's
   # evidence (the V5-* captures) is one run. No Supabase.
   exercise-page)
     run_flow data "Exercise page" exercise-page.yaml
     ;;
 
-  # The session view (redesign step 5), the default since step 6a: two flows
-  # sharing one simulator + Metro, each seeding its session through the
-  # harness (`reset=data&fixture=session-view`, the setting at its default). Infra-free; `data` reset is enough.
+  # The session view (redesign step 5): two flows sharing one simulator +
+  # Metro, each seeding its session through the harness
+  # (`reset=data&fixture=session-view`). Infra-free; `data` reset is enough.
   session-view)
     MAESTRO_RESET_STRATEGY=data \
     "$SCRIPT_DIR/maestro-ios-run-flows.sh" \
@@ -132,11 +129,11 @@ case "$lane" in
     run_flow full "Auth profile happy path" auth-profile-happy-path.yaml
     ;;
 
-  # The UI <-> server sync e2e lane: real recorder UI + real sync cycle + real
+  # The UI <-> server sync e2e lane: real session UI + real sync cycle + real
   # local Supabase. Proves (A) new-user bootstrap lifts the gate, (B) a workout
-  # logged through the recorder, (C) forced sync drains Pending changes to 0 and
-  # the settings sync-status surface renders, (D) full device wipe + re-sign-in
-  # restores the workout from the remote DB.
+  # logged through the session view and exercise page, (C) forced sync drains
+  # Pending changes to 0 and the settings sync-status surface renders, (D) full
+  # device wipe + re-sign-in restores the workout from the remote DB.
   #
   # Signs in as user_b — its own dedicated fixture, per the one-user-per-flow rule
   # (docs/specs/11): every Supabase-backed Maestro flow owns a distinct fixture so

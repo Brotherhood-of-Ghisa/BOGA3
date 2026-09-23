@@ -12,10 +12,6 @@ import type { SessionListDataClient, SessionListItem } from '@/components/sessio
 import { GroupApiError, type StreamItem } from '@/src/groups';
 import { SIGN_IN_ROUTE } from '@/src/navigation/routes';
 import type { SessionEntryCoordinator } from '@/src/session-entry';
-import {
-  __resetNewScreensPreferenceForTests,
-  setNewScreensEnabled,
-} from '@/src/session-recorder/new-screens-preference';
 
 import { recordItem } from './helpers/group-record-fixtures';
 
@@ -121,7 +117,6 @@ const sessionEntry = (): jest.Mocked<
 describe('Today screen', () => {
   beforeEach(() => {
     mockPush.mockReset();
-    __resetNewScreensPreferenceForTests();
   });
 
   it('promotes an active session and replaces the planned-session action', async () => {
@@ -147,21 +142,6 @@ describe('Today screen', () => {
     expect(screen.queryByTestId('today-start-planned-session-button')).toBeNull();
     expect(entry.startPlannedOrResume).not.toHaveBeenCalled();
     expect(mockPush).toHaveBeenCalledWith('/session/active-1');
-  });
-
-  it('resumes into the recorder when the new screens setting is off', async () => {
-    await setNewScreensEnabled(false);
-    render(
-      <TodayScreen
-        dataClient={dataClient([activeSession])}
-        planState={{ status: 'unavailable' }}
-        sessionEntry={sessionEntry()}
-        socialState={socialState()}
-      />,
-    );
-
-    fireEvent.press(await screen.findByTestId('today-resume-session-button'));
-    expect(mockPush).toHaveBeenCalledWith('/session-recorder');
   });
 
   it('starts a ready plan once while its materializer is in flight', async () => {

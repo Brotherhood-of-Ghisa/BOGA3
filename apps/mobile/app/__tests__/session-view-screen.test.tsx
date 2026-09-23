@@ -60,21 +60,28 @@ jest.mock('@/src/location/foreground-location-lazy', () => ({
   getCurrentForegroundPositionLazy: jest.fn(),
 }));
 
-// The picker is the recorder's, covered by the recorder suites; here it only
-// has to hand back a choice.
+// The picker has its own suite (exercise-picker.test.tsx); here it only has
+// to hand back a choice or ask for Manage.
 jest.mock('@/components/session-recorder/exercise-picker', () => ({
   ExercisePicker: ({
     visible,
     onSelectExercise,
+    onOpenManage,
   }: {
     visible: boolean;
     onSelectExercise: (id: string, name: string) => void;
+    onOpenManage: () => void;
   }) => {
-    const { Pressable: MockPressable, Text: MockText } = jest.requireActual('react-native');
+    const { Pressable: MockPressable, Text: MockText, View: MockView } = jest.requireActual('react-native');
     return visible ? (
-      <MockPressable onPress={() => onSelectExercise('def_row', 'Seated Row')} testID="mock-picker-choose">
-        <MockText>Choose</MockText>
-      </MockPressable>
+      <MockView>
+        <MockPressable onPress={() => onSelectExercise('def_row', 'Seated Row')} testID="mock-picker-choose">
+          <MockText>Choose</MockText>
+        </MockPressable>
+        <MockPressable onPress={onOpenManage} testID="mock-picker-manage">
+          <MockText>Manage</MockText>
+        </MockPressable>
+      </MockView>
     ) : null;
   },
 }));
@@ -306,7 +313,22 @@ describe('Session view', () => {
     expect(written.exercises[0].sets.map((row: { id: string }) => row.id)).toEqual(['b1', 'b2', 'b3']);
   });
 
-  it('picks the gym from the recorder picker list by tapping the Gym stat', async () => {
+  it('opens the catalogue from the picker\'s Manage and shows the picker again on return', async () => {
+    await renderReady();
+
+    fireEvent.press(screen.getByTestId('session-view-add-exercise'));
+    fireEvent.press(screen.getByTestId('mock-picker-manage'));
+
+    expect(mockPush).toHaveBeenCalledWith('/exercise-catalog?source=session&intent=manage');
+    expect(screen.queryByTestId('mock-picker-choose')).toBeNull();
+
+    await act(async () => {
+      mockFocusCallbacks.forEach((callback) => callback());
+    });
+    expect(screen.getByTestId('mock-picker-choose')).toBeTruthy();
+  });
+
+  it('picks the gym from the gym sheet by tapping the Gym stat', async () => {
     await renderReady();
 
     await act(async () => {

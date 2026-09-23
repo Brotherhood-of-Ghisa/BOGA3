@@ -48,21 +48,14 @@ import {
   resolveMaestroHarnessBootstrapAction,
   resolveMaestroHarnessFixtureName,
   resolveMaestroHarnessGateAction,
-  resolveMaestroHarnessNewScreensAction,
   resolveMaestroHarnessResetMode,
   resolveMaestroHarnessTeleportHref,
   resolveMaestroHarnessTeleportTarget,
   runMaestroHarnessBootstrapAction,
   runMaestroHarnessFixture,
   runMaestroHarnessGateAction,
-  runMaestroHarnessNewScreensAction,
   runMaestroHarnessReset,
 } from '@/src/maestro/harness';
-import {
-  __resetNewScreensPreferenceForTests,
-  getNewScreensEnabledSnapshot,
-  setNewScreensEnabled,
-} from '@/src/session-recorder/new-screens-preference';
 import {
   __resetSyncGateStateForTests,
   getSyncGateStateSnapshot,
@@ -138,7 +131,8 @@ describe('maestro harness helpers', () => {
   });
 
   it('maps supported teleport targets to route hrefs', () => {
-    expect(resolveMaestroHarnessTeleportTarget('session-recorder')).toBe('session-recorder');
+    // The old recorder route is gone (redesign 6b); its teleport went with it.
+    expect(resolveMaestroHarnessTeleportTarget('session-recorder')).toBeNull();
     expect(resolveMaestroHarnessTeleportTarget('unknown')).toBeNull();
 
     expect(
@@ -146,17 +140,6 @@ describe('maestro harness helpers', () => {
         target: 'session-list',
       })
     ).toBe('/stats-history');
-
-    expect(
-      resolveMaestroHarnessTeleportHref({
-        target: 'session-recorder',
-        mode: 'completed-edit',
-        sessionId: 'session-123',
-        maestroShare: 'fail-once',
-      })
-    ).toBe(
-      '/session-recorder?mode=completed-edit&sessionId=session-123&maestroShare=fail-once'
-    );
 
     expect(
       resolveMaestroHarnessTeleportHref({
@@ -214,56 +197,23 @@ describe('maestro harness helpers', () => {
     expect(mockResetLocalAppData).toHaveBeenCalledTimes(1);
   });
 
-  describe('new exercise/session screens preference', () => {
-    beforeEach(() => {
-      __resetNewScreensPreferenceForTests();
-    });
-
-    afterEach(() => {
-      __resetNewScreensPreferenceForTests();
-    });
-
-    it('resolves only the known newScreens actions', () => {
-      expect(resolveMaestroHarnessNewScreensAction('on')).toBe('on');
-      expect(resolveMaestroHarnessNewScreensAction('off')).toBe('off');
-      expect(resolveMaestroHarnessNewScreensAction('true')).toBe('none');
-      expect(resolveMaestroHarnessNewScreensAction(null)).toBe('none');
-    });
-
-    it('switches the preference on and off, and leaves it alone for none', async () => {
-      await runMaestroHarnessNewScreensAction('on');
-      expect(getNewScreensEnabledSnapshot()).toBe(true);
-
-      await runMaestroHarnessNewScreensAction('none');
-      expect(getNewScreensEnabledSnapshot()).toBe(true);
-
-      await runMaestroHarnessNewScreensAction('off');
-      expect(getNewScreensEnabledSnapshot()).toBe(false);
-    });
-
-    it('restores the default (on) on a data reset so it cannot leak into later flows', async () => {
-      await setNewScreensEnabled(false);
-
-      await runMaestroHarnessReset('none');
-      expect(getNewScreensEnabledSnapshot()).toBe(false);
-
-      await runMaestroHarnessReset('data');
-      expect(getNewScreensEnabledSnapshot()).toBe(true);
-    });
-  });
-
   it('runs the exercise block history fixture only when requested', async () => {
     await runMaestroHarnessFixture('none');
     expect(mockSeedExerciseBlockHistoryFixture).not.toHaveBeenCalled();
 
     await runMaestroHarnessFixture('exercise-block-history');
     expect(mockSeedExerciseBlockHistoryFixture).toHaveBeenCalledTimes(1);
+    expect(mockSeedExerciseBlockHistoryFixture).toHaveBeenLastCalledWith();
     expect(jest.mocked(seedExercisePageFixture)).not.toHaveBeenCalled();
+
+    expect(resolveMaestroHarnessFixtureName('completion-two-prs')).toBe('completion-two-prs');
+    await runMaestroHarnessFixture('completion-two-prs');
+    expect(mockSeedExerciseBlockHistoryFixture).toHaveBeenLastCalledWith({ includeTwoPrSession: true });
 
     expect(resolveMaestroHarnessFixtureName('exercise-page')).toBe('exercise-page');
     await runMaestroHarnessFixture('exercise-page');
     expect(jest.mocked(seedExercisePageFixture)).toHaveBeenCalledTimes(1);
-    expect(mockSeedExerciseBlockHistoryFixture).toHaveBeenCalledTimes(1);
+    expect(mockSeedExerciseBlockHistoryFixture).toHaveBeenCalledTimes(2);
   });
 
   describe('bootstrap-flag harness action', () => {
@@ -379,5 +329,29 @@ describe('maestro harness helpers', () => {
     expect(latestPrimaryRows).toHaveLength(2);
     expect(rows.exerciseSets.some((row) => row.setType === 'warm_up')).toBe(true);
     expect(rows.exerciseSets.some((row) => row.setType === 'rir_0')).toBe(true);
+    // The two-PR completion session is opt-in, so the shared history is unchanged.
+    expect(rows.sessions.map((row) => row.id)).not.toContain(
+      EXERCISE_BLOCK_HISTORY_FIXTURE.twoPrCompletionSessionId
+    );
+  });
+
+  it('adds the newest completed session with a squat and a bench PR only when asked', () => {
+    const now = new Date('2026-05-26T12:00:00.000Z');
+    const base = buildExerciseBlockHistoryFixtureRows(now);
+    const rows = buildExerciseBlockHistoryFixtureRows(now, { includeTwoPrSession: true });
+
+    expect(rows.sessions).toHaveLength(base.sessions.length + 1);
+    const twoPr = rows.sessions.find((row) => row.id === EXERCISE_BLOCK_HISTORY_FIXTURE.twoPrCompletionSessionId);
+    expect(twoPr?.completedAt.getTime()).toBe(
+      Math.max(...rows.sessions.map((row) => row.completedAt.getTime()))
+    );
+    expect(
+      rows.sessionExercises
+        .filter((row) => row.sessionId === EXERCISE_BLOCK_HISTORY_FIXTURE.twoPrCompletionSessionId)
+        .map((row) => row.exerciseDefinitionId)
+    ).toEqual([
+      EXERCISE_BLOCK_HISTORY_FIXTURE.primaryExerciseId,
+      EXERCISE_BLOCK_HISTORY_FIXTURE.secondaryExerciseId,
+    ]);
   });
 });

@@ -61,14 +61,9 @@ Document app-specific UI semantics and guardrails for the current mobile app.
      claim that history. Groups looks the same however it is opened. Gyms sits
      under Tools; it is also reached from the session view's `Gym` sheet.
    - Settings Preferences holds device-local choices shown as single-select
-     option buttons (`accessibilityRole="button"` + `selected`): the date format,
-     then `New exercise & session screens` (`Off`/`On`, default `On` since
-     redesign step 6a). On, every active-session entry opens the redesigned
-     session view and exercise page; Off returns to the previous recorder. A
-     stored choice (including an Off made before the default flipped) wins over
-     the default. It is **not** `isDevMode()`-gated, is never synced, and is
-     removed with the old recorder (step 6b of
-     `docs/plans/exercise-session-redesign.md`, while that plan lives).
+     option buttons (`accessibilityRole="button"` + `selected`): the date format.
+     There is no screen choice: every active-session entry opens the session
+     view (`/session/<id>`).
 7. Today is a bounded overview, not a second full feed or history screen.
    - An active draft replaces the planned-session action and exposes Resume.
    - Joined-group activity reuses the group stream session cards, record cards,
@@ -81,9 +76,8 @@ Document app-specific UI semantics and guardrails for the current mobile app.
    - When the separate planning dependency is absent, Today uses the approved
      `Watch this space 👀` placeholder and offers Train; it never invents a
      scheduled session or metric.
-8. Train is the personal-training entry hub, while the session view (or, with
-   the new-screens setting Off, the recorder) remains focused on performing
-   one workout.
+8. Train is the personal-training entry hub, while the session view remains
+   focused on performing one workout.
    - Active-session detection must succeed before Train exposes any new-session
      action; a detection error is retryable and does not assume that no draft
      exists.
@@ -92,20 +86,16 @@ Document app-specific UI semantics and guardrails for the current mobile app.
    - Today and Train use the same session-entry coordinator. It rechecks the
      active draft at press time and serializes competing requests so an empty
      or planned action cannot create a second concurrent session.
-   - Empty start persists one blank active draft through the existing recorder
-     repository before opening it (the session view, or the recorder with the
-     new-screens setting Off). A failed write stays inline and
-     retryable.
-   - A still-mounted recorder drains any queued autosave and rechecks the
-     persisted active draft on focus so a draft created from Today or Train is
-     rendered immediately; a mutation made while that read is pending blocks
-     only the stale result from replacing live input.
+   - Empty start persists one blank active draft through the session
+     repository (`src/session-recorder/`) before opening it in the session
+     view. A failed write stays inline and retryable.
    - Planning loading/error/empty/ready/unavailable states are explicit. Until
      the planning dependency ships, production shows the approved `Watch this
      space 👀` placeholder while leaving empty training usable; it does not
      guess a management route or plan.
-   - Exercise selection remains contextual inside the recorder. Exercise-
-     database administration remains owned by More, not Train.
+   - Exercise selection remains contextual inside the session view (its
+     exercise picker). Exercise-database administration remains owned by More,
+     not Train.
 
 ### 2. Modal and overlay semantics
 
@@ -113,13 +103,13 @@ Document app-specific UI semantics and guardrails for the current mobile app.
    - Examples:
      - session list action menus
      - exercise catalog editor/action/delete modals
-     - session recorder gym/exercise pickers/action menus and inline exercise creation editor
-2. In the `session-recorder` exercise picker, shared list options, `Manage`, and `Add new` are compact icon actions in the modal header row (same row as the title), replacing the old bottom text-button row.
-3. In the `session-recorder` exercise picker, tapping an exercise while adding a new recorder card opens an in-place preselection panel instead of immediately adding:
-   - `Add empty set` is always available first and preserves the current blank-set add behavior.
+     - the session view's `Gym` sheet, ⋮ menu, exercise picker and the picker's inline exercise creation editor
+2. In the exercise picker (the session view's `+ Add exercise`; `components/session-recorder/exercise-picker.tsx`), shared list options, `Manage`, and `Add new` are compact icon actions in the modal header row (same row as the title).
+3. In the exercise picker, tapping an exercise opens an in-place preselection panel instead of immediately adding:
+   - `Add empty set` is always available first and adds the exercise with one blank set.
    - `Append plan` remains visible but disabled while completed-history suggestion data loads or when no valid completed-history plan exists; the disabled state has no inline error copy.
    - Changing the search text dismisses the preselection panel and returns to the filtered list without changing grouped-list expansion state.
-   - Changing/replacing an existing exercise remains a direct selection with no preselection panel.
+   - The picker only adds; replacing an exercise is the exercise page's `Swap exercise` (§14a.5), which keeps the sets.
 3. Modal open/close is treated as state within the current route and should not be documented as a navigation transition.
 4. Dismiss overlays via backdrop press are common and expected when the flow is not destructive-final.
 
@@ -130,10 +120,9 @@ Document app-specific UI semantics and guardrails for the current mobile app.
 3. Spacing rhythm is already close to 8pt increments (common values cluster around `8/10/12/14/16/20`) and should remain consistent.
 4. Bottom tab navigation (`BottomTray` composing `MainTabs`) remains visible on
    canonical roots (`today`, `train`, `progress`, `more`) and recognized
-   preserved roots. Entering the active/completed-edit recorder collapses the
-   tray to its always-visible peek handle so training stays focused without
-   removing navigation access. `exercise-history` renders the same `MainTabs`
-   directly and selects Progress.
+   preserved roots. No route collapses the tray on entry; the lifter drags it
+   to its always-visible peek handle. `exercise-history` renders the same
+   `MainTabs` directly and selects Progress.
 
 ### 4. List and row interaction conventions
 
@@ -144,13 +133,13 @@ Document app-specific UI semantics and guardrails for the current mobile app.
 3. Deleted/archived visibility is controlled via toggles and state hints, not separate routes.
 4. In `exercise-catalog`, deleted exercises remain in list history when deleted visibility is enabled, show explicit `Deleted` state, and expose `Undelete` from row actions.
 5. `exercise-catalog` top actions use compact icon buttons (`+` create, kebab options), and deleted visibility toggle lives under the top-level options menu.
-6. `exercise-catalog` and the `session-recorder` exercise picker share exercise-list preferences and row semantics:
+6. `exercise-catalog` and the exercise picker share exercise-list preferences and row semantics:
    - local-only shared preferences default to grouped by muscle family, `90d` range, and recents-on-top enabled; options are `7d`, `30d`, `90d`, `1y`, and `All`,
    - grouped mode shows taxonomy-ordered family headers (`Chest`, `Shoulders`, `Back`, `Arms`, `Core`, `Legs`, `Lower Legs`, `Other`) with `Family · count`; all groups remain visible, zero-count groups are disabled/collapsed, non-empty headers toggle expansion without chevrons or show/hide text, and active text search preserves collapsed/expanded state without flattening the list,
    - flat mode renders rows directly without an all-exercises section header,
    - recents-on-top sorts by valid completed-set recency score with a fixed 60-day half-life, includes warm-up sets, ignores active/unperformed/deleted/tombstoned rows, uses the selected finite date window, and caps `All` scoring to the last year; recents-off sorts alphabetically,
-   - recorder picker rows use the same muscle summary and stats line as Exercise Catalog rows but hide catalog edit/delete actions and catalog-only filters.
-7. Recorder picker historical preselection plans are sourced from completed workout history only, independent of the picker/catalog date-range setting. The plan uses the most recent completed session with valid performed set rows for the selected exercise; duplicate same-exercise blocks inside that session are combined in session order, and preview rows are numbered continuously. Valid plan rows require a non-negative numeric weight and a positive integer rep count; `0kg` is valid.
+   - picker rows use the same muscle summary and stats line as Exercise Catalog rows but hide catalog edit/delete actions and catalog-only filters.
+7. Exercise picker historical preselection plans are sourced from completed workout history only, independent of the picker/catalog date-range setting. The plan uses the most recent completed session with valid performed set rows for the selected exercise; duplicate same-exercise blocks inside that session are combined in session order, and preview rows are numbered continuously. Valid plan rows require a non-negative numeric weight and a positive integer rep count; `0kg` is valid.
 
 ### 5. Forms and validation conventions
 
@@ -158,7 +147,7 @@ Document app-specific UI semantics and guardrails for the current mobile app.
 2. Exercise catalog uses explicit field labels + inline validation/error messages and is the strongest current form pattern reference.
 3. Editing a completed session (the session view, §14b.7) validates Start/End (`YYYY-MM-DD HH:mm`, End not before Start) and shows an autosave-paused notice while they are invalid.
 4. Validation/error feedback should remain near the relevant field/control whenever possible.
-5. The `session-recorder` exercise picker and `exercise-catalog` list include a text filter that:
+5. The exercise picker and `exercise-catalog` list include a text filter that:
    - trims and collapses extra whitespace in user input,
    - matches case-insensitively,
    - matches when any typed word appears in either exercise names or linked muscle-group metadata.
@@ -168,32 +157,14 @@ Document app-specific UI semantics and guardrails for the current mobile app.
 8. The M11 profile sign-in form performs basic client-side email-shape validation before attempting the auth request.
 9. The signed-in profile route defaults to a view-only summary with row-based account values and one bottom action row (`Edit` + danger-styled `Sign Out`), with no extra title/help copy.
 10. Entering profile edit mode reveals `username`, `new email`, and `new password` fields plus a single `Update` submit action; update failures stay inline and successful updates return to view mode.
-11. In `session-recorder`, logged sets render as compact in-card text rows once they have displayable values; tapping the compact row turns it into inline editable inputs, and set numeric validation uses visual cues only (no inline validation text):
-    - Every normal and planned execution row reserves a fixed left performance-control slot. The dedicated control uses checkbox semantics and a mobile-sized target: hollow circle means unconfirmed and green tick means valid confirmed actual values. Shape communicates state without color; the tick additionally uses `uiColors.actionSuccess`. The row body remains an independent edit target.
-    - The former `Type` control is presented as right-side set quality in both compact and editable modes (`W-Up`, `•`, `RIR 3`, `RIR 2`, `RIR 1`, `RIR 0`); `•` maps to `null`, tapping cycles quality in that order and wraps to `W-Up` (the RIR range is generated from `EFFORT_LOGGING_POLICY.maxSelectableRir`, default `3`), and long-pressing opens the in-route modal picker with the same order (`None` names the blank option). Untouched planned targets suppress this quality control; confirming or editing reveals actual quality. Quality is persisted separately from performance confirmation and planned volume; planned-row matched/modified classification compares prescribed volume only (`Weight` + `Reps`), not quality, and never controls the left indicator.
-    - Editable set rows keep quality adjacent to the weight/reps text inputs; the quality button has a fixed width sized for `W-Up`, and removable compact/editable rows delete via a right-to-left swipe on the row surface rather than a visible `rm` control.
-    - Set input rows have no `Type` / `Weight` / `Reps` column header; each exercise card communicates `Total load` or `Per side` once in its metadata, while each editable weight field keeps a compact muted `kg` suffix and no placeholder text. The full bordered weight shell, including the suffix area, focuses a numeric input with reserved digit width. Reps uses placeholder text `Reps`. A nonblank weight retains the entered scalar; blank weight with positive integer reps commits and persists as `0`.
-    - Tapping outside set inputs collapses the editable set row back to compact text; moving focus between weight and reps inside a row does not collapse the row. At most one set row is editable at a time. When one row is editable, the first tap on another compact set row only collapses the current row; the tapped row opens on a second tap.
-    - `Weight` accepts decimal numeric input and must be a non-negative number.
-    - `Reps` accepts integer numeric input and must be a positive integer.
+11. Set semantics, shared by the exercise page (§14a) and the session view (§14b) through `src/session-recorder/` (presentation is theirs; set numeric validation uses visual cues only, no inline validation text):
+    - `Weight` accepts decimal numeric input and must be a non-negative number. `Reps` accepts integer numeric input and must be a positive integer. A nonblank weight retains the entered scalar; blank weight with positive integer reps commits and persists as `0`.
+    - Effort (set quality) is `W-Up`, none (`null`), or `RIR n`; the selectable RIR range runs from `EFFORT_LOGGING_POLICY.maxSelectableRir` (`src/config/training.ts`, default `3`) down to `RIR 0`, and a stored RIR outside that range stays valid. It is persisted separately from performance confirmation and planned volume; a planned row's matched/modified classification compares prescribed volume only (`Weight` + `Reps`), not effort.
     - `W-Up` marks a set as warm-up effort; warm-up sets still count toward volume, estimated 1RM, highest/top weight, heatmaps, and other strength/volume statistics, but are not working sets. A working set is a valid confirmed RIR set meeting the file-based `WORKING_SET_POLICY.maxRir` threshold (`src/config/training.ts`, default RIR-3 or harder); the threshold has no Settings control and does not restrict the effort cycle or RIR inheritance. Use `Working set(s)` where space permits and `W/set` / `W/sets` in compact UI.
-    - Compact set rows separate the `Set N` label from the value text with layout spacing rather than an inline dot (`Set 1    60kg · 8 reps`, `Set 2    0kg · 6 reps`); weight, separator dot, and reps are laid out in fixed slots so the dot spacing is consistent across one-line and modified rows. Quality stays in the right-side quality control rather than inside the main text.
-    - The first new ad-hoc set of each exercise defaults to `W-Up`. Adding a set copies the previous set's `Weight` and `Reps`; effort defaults to blank after `W-Up` or blank, and inherits the previous RIR otherwise. Each new row gets its own identity and unconfirmed status. These defaults never rewrite existing sets or prescribed effort. Valid copied values remain unperformed until the hollow control is tapped. Adding after an untouched planned target does not perform it; the planned row remains until explicitly confirmed.
-    - Logging a new exercise focuses its first `Weight` input, and adding a set focuses the new set's `Weight` input. When the new set copies a nonblank weight, the automatically focused field selects the full copied value so the next keystroke replaces it.
-    - Planned workout-execution rows use the same compact/edit and left confirmation control as normal rows. Their plan-derived origin is shown in untouched, confirmed/matched, and modified states through the semantic soft blue-grey planned-row background and border while inactive; selected planned and user-added rows share the same light-blue background and blue border. There is no separate last-added tint and no `Plan` badge beside `Set N`; the hollow/tick shape remains the performance-status channel. An untouched row shows its prescription and hollow control with no `Skip` or `Log` action. Tapping the hollow control performs valid prescribed values directly. Tapping a planned row body hydrates the prescription into unconfirmed actual `Weight`, `Reps`, and quality for editing. Modified rows retain the struck prescription above aligned actual values. Planned rows are never swipe-deletable; user-added rows retain right-to-left swipe delete. Accessibility labels identify planned versus added origin so color is not the only source channel.
-    - Appending a historical plan expands and reveals its target exercise card with one automatic scroll, but all exercise cards retain the same background and border styling. That scroll is consumed after the first successful card layout; later set edits, expansion/collapse, keyboard changes, and card layouts preserve the user's viewport.
-    - Active and completed-edit autosave preserve every set row, including fully blank, partial, valid unconfirmed, and planned rows, with stable identity, values, quality, confirmation status, and order across input blur, tab/route navigation, hydration, sync, and restore. Legacy persisted `skipped` planned rows hydrate as untouched planned rows. Blank or invalid reps remain incomplete; valid unconfirmed rows remain excluded from performed semantics. Completion uses separate explicit cleanup decisions for incomplete rows and entered-but-unconfirmed rows. The `/sessions` active-session completion affordance returns to the recorder so it cannot bypass this cleanup flow.
-    - Exercise cards start expanded and their title region toggles a volatile collapsed state, with a top-aligned circular chevron control that uses the same primary-blue emphasis as the adjacent `#` action; the overflow action remains muted. Collapsing dismisses the keyboard and closes editable rows or set-quality pickers inside that exercise without changing set data; replacing the exercise definition or appending a plan expands its target card.
-    - A collapsed exercise shows `<confirmed performed sets> · <working sets>` (for example `4 sets · 2 w/sets`). Blank, partial, invalid, planned, warm-up, null-quality, and valid-but-unconfirmed rows do not contribute to the working-set count; valid confirmed warm-up or null-quality rows still contribute to the performed-set count.
-    - Active mode shows an exercise-scoped success-surface `New PR` treatment, both expanded and collapsed, only when the shared current-session helper finds that exercise definition's best valid confirmed-set Wathan estimate strictly exceeds its maximum eligible loaded completed-history estimate. It resolves the owning exercise name from current catalog metadata, includes that name in expanded form plus the best entered weight, reps, and rounded estimated 1RM in both forms; multiple exercises qualify independently, while multiple qualifying sets for one exercise produce one best-set treatment.
-    - Expanded cards place `New PR` below the performed-set count and above `Past Records`; both expanded and collapsed treatments are non-interactive because sharing is session-scoped after submission. Collapsed cards place the treatment below the set/working-set summary so the title toggle has no nested action. Editing below the prior best, unconfirming, or deleting the qualifying set removes the treatment immediately. Ties, first-ever exercises with no historical maximum, loading/empty/error history, and completed-edit mode show no PR treatment.
-12. Active `session-recorder` muscle load is progressive and session-scoped:
-    - no row or instructional placeholder appears before the first valid confirmed performed set, and completed-edit mode does not show this current-session signal;
-    - the row sits outside exercise cards above recorder-wide actions, reports physical performed/working-set counts plus leading contributing muscles, and opens an in-route sheet without changing recorder edit or scroll state;
-    - the sheet lists every contributing muscle by weighted volume, with an exact text value and a decorative bar relative only to the largest muscle load in this session; the bars never communicate recovery, readiness, prescription, or targets;
-    - confirmed unmapped work is an explicit `No mapped muscle load` state, distinct from pre-confirmation absence; partial mapping identifies the unmapped physical-set count;
-    - catalog/mapping failure is a compact unavailable state with Retry and stays non-blocking for entry, autosave, and submission;
-    - confirming, editing, unconfirming, and deleting recompute from current in-memory state; when the final performed set is reversed, both the row and any open sheet vanish immediately.
+    - The first new ad-hoc set of each exercise defaults to `W-Up`. Adding a set copies the previous set's `Weight` and `Reps`; effort defaults to blank after `W-Up` or blank, and inherits the previous RIR otherwise. Each new row gets its own identity and unconfirmed status. These defaults never rewrite existing sets or prescribed effort. Valid copied values remain unperformed until ticked. Adding after an untouched planned target does not perform it; the planned row remains until explicitly confirmed. The added set's `Weight` input takes focus and selects a copied value, so the next keystroke replaces it.
+    - Active and completed-edit autosave preserve every set row, including fully blank, partial, valid unconfirmed, and planned rows, with stable identity, values, effort, confirmation status, and order across input blur, tab/route navigation, hydration, sync, and restore. Legacy persisted `skipped` planned rows hydrate as untouched planned rows. Blank or invalid reps remain incomplete; valid unconfirmed rows remain excluded from performed semantics.
+    - Final active-session submit and completed-edit save persist completed workout history as confirmed actual sets only. Completion uses separate explicit cleanup decisions for entered-but-unconfirmed rows (a specific discard prompt) and incomplete rows (§14b.2); untouched planned rows are actual-only omissions, and exercises left empty use the same cleanup prompt. The `/sessions` active-session completion affordance opens the session view, so it cannot bypass this cleanup.
+12. Retired (step 6b-3): there is no live per-session muscle summary while training. The completion screen's per-muscle working-set chips (§7.7) remain.
 13. The shared exercise editor dismisses the text keyboard before opening primary/secondary muscle selectors, and selector lists remain keyboard-aware so all muscle-group options stay reachable on iOS. It exposes a two-choice `Total load` / `Per side` control, preselects the stored value while editing, and defaults new custom exercises to total load.
 14. GPS gym detection is quiet assistance, and it **suggests only** (decided
     2026-09-23, redesign step 6b):
@@ -210,11 +181,8 @@ Document app-specific UI semantics and guardrails for the current mobile app.
       failure and no fix within the budget show no suggestion row and leave the
       gym unchanged; the list below is usable at once,
     - manual selection and `No gym` are always authoritative.
-    - Until the recorder is deleted, its own `Start Session` still preselects
-      one confident match and its gym box's long-press retries detection; the
-      rest of this rule's recorder-era wording is retired.
-15. The `Gym` sheet (session view, and the recorder's picker) includes `No gym`
-    as a null session-gym option:
+15. The session view's `Gym` sheet includes `No gym` as a null session-gym
+    option:
     - it maps to nullable `session.locationId` / persisted `gym_id`,
     - it is not a `gyms` row and is not editable, archived, synced, or shown on
       the Gyms screen,
@@ -233,8 +201,7 @@ Document app-specific UI semantics and guardrails for the current mobile app.
     - `Save current location` reads foreground location and saves only a fix
       accurate enough to match later; a new gym's location is staged and saved
       with `Add gym`, and adding a gym never reads the location unless asked
-      (the recorder's silent capture on add is dropped: `/gyms` is not
-      necessarily where the gym is),
+      (`/gyms` is not necessarily where the gym is),
     - `Replace` and `Clear` each confirm inline first,
     - permission denial, services off, low accuracy and write failures stay
       inline in the editor and leave the saved location unchanged,
@@ -243,21 +210,7 @@ Document app-specific UI semantics and guardrails for the current mobile app.
     - `Archive` is the synced soft delete (`gyms.deleted_at`): the gym leaves
       the sheet and GPS suggestion, keeps naming its past sessions, and returns
       with `Unarchive` from `Show archived`; there is no hard delete.
-17. In `session-recorder`, each logged exercise card loads a volatile `Past Records` comparison panel keyed by `exercise_definition_id`:
-    - the panel sits below assigned tag chips and above editable set rows,
-    - the panel starts collapsed as a slim `Past Records` bar; tapping the bar expands it, and tapping the expanded header collapses it again without a separate Hide/Show button,
-    - if a set row is editable, the first tap on the `Past Records` bar only collapses that row; a second tap opens the panel,
-    - all available completed, non-deleted history for the exercise is loaded by default; optional numeric limits remain a repository/test hook, not the recorder default,
-    - the most recent completed-session block is shown first when expanded; swiping right selects an older record and swiping left selects a newer record,
-    - the expanded comparison uses four table-like rows (`Est. 1RM`, `Volume`, `Highest`, `Working sets`) with columns for metric label, selected record local date (`YYYY-MM-DD`), live `Current`, and `Max`,
-    - `Max` values are computed from the same loaded records the panel can swipe through plus valid current-session metrics; there is no separate all-time query or hidden max scope,
-    - displayed non-empty `Max` values use `uiColors.heatmapBucket4`,
-    - selected historical values use `uiColors.heatmapBucket4` when they equal `Max`; live current values use the same token when they meet or beat `Max`,
-    - current metrics follow the same Phase 0A rules as history metrics: only valid confirmed sets contribute; confirmed warm-up sets count for volume, `1RM`, and highest weight; invalid/blank/unconfirmed set inputs are ignored; `1RM` uses the existing Wathan helper; highest weight comes from eligible parsed sets; and `Working sets` counts only confirmed valid RIR sets meeting the configured effort threshold (§5.11),
-    - left/right swipes on the whole expanded panel surface change the selected historical record, and the header copy reads `swipe for records`,
-    - empty (`No past records`) and error (`Past records unavailable`) messages appear only after expansion; collapsed state remains the same slim `Past Records` bar,
-    - `Past Records` comparison state is volatile UI state only; it does not block set entry, tags, exercise actions, autosave, submit/save, or sync,
-    - planned/unconfirmed rows remain visible and autosavable during active recorder work, but final active-session submit and completed-edit save persist completed workout history as confirmed actual sets only. Entered valid unconfirmed rows require a specific discard prompt; untouched planned rows remain actual-only omissions, and exercises emptied by completed filtering use the existing empty-exercise cleanup flow.
+17. Retired (step 6b-3): the per-card `Past Records` panel is gone. An exercise's history is the exercise page's records panel (§14a.4) and its `History` link.
 
 ### 6. Loading, empty, error, and feedback state handling
 
@@ -290,11 +243,11 @@ Document app-specific UI semantics and guardrails for the current mobile app.
 ### 7. Completed-session detail screen semantics
 
 1. Completed-session detail uses a sticky action bar for session-level edit/delete actions above the detail content.
-2. Historical exercise cards expose their own `Append` action in the card header; append copies that one exercise block as planned target rows into the active recorder.
+2. Historical exercise cards expose their own `Append` action in the card header; append copies that one exercise block as planned target rows into the active session (a new one when none is active) and opens it in the session view.
 3. `intent=edit` on the completed-session route is a redirect behavior, not a separate screen.
 4. Completed-session exercise cards show assigned tags as chips under the exercise title only when one or more tags exist; no tag placeholder is shown when there are none.
 5. Completed-session set tables show historical set effort from `set_type` as `W-Up`, `RIR n` for any valid stored RIR (including outside the current picker range), or `-` for unspecified sets.
-6. Completed-session exercise cards start expanded and use the same title-region collapse affordance. Their collapsed summary shows valid performed-set and working-set counts (the configured effort threshold, §5.11); the header-level `Append` action remains available. Historical cards do not label a workout as a new PR because this viewer does not compute an as-of-session history comparison.
+6. Completed-session exercise cards start expanded and use a title-region collapse affordance (`SessionContentLayout`). Their collapsed summary shows valid performed-set and working-set counts (the configured effort threshold, §5.11); the header-level `Append` action remains available. Historical cards do not label a workout as a new PR because this viewer does not compute an as-of-session history comparison.
 7. `presentation=completion` is a post-submit presentation of the stored
    completed session, not durable celebration state. Its order is `Session
    Summary`, every compact `Personal records` card when present, one `Exercise
@@ -325,7 +278,7 @@ Document app-specific UI semantics and guardrails for the current mobile app.
     the session view to edit it (§14b.7); there is no separate historical
     summary (step 6b-1 removed `presentation=summary` — the completed-session
     detail is the summary). A missing, deleted, or failed target exposes one
-    safe return and never opens a recorder copy.
+    safe return and never opens an editable copy.
 
 ### 8. Navigation/query semantics (UI-facing rule)
 
@@ -333,7 +286,7 @@ Document app-specific UI semantics and guardrails for the current mobile app.
 2. Route alias behavior (`/` -> `/today`) should be treated as a navigation
    entry alias, not a unique screen design. `/stats-history` remains a preserved
    Progress-owned path rather than a second tab.
-3. `exercise-catalog` supports recorder-entry query semantics (`source=session-recorder`, `intent=manage`) for the manage flow, while recorder `Add new` uses the same exercise editor inside the recorder route.
+3. `exercise-catalog` supports session-entry query semantics (`source=session`, `intent=manage`) for the exercise picker's `Manage` flow (back returns to the session view with the picker as it was left), while the picker's `Add new` uses the same exercise editor inside the session view route.
 4. Stats / History accepts validated initial `period=7|30` and
    `breakdown=exercise|muscle` values. Absent or invalid values retain the
    seven-day / By Exercise defaults; in-screen changes remain volatile state.
@@ -350,7 +303,7 @@ tests, snapshots and stories.
 1. Do not add raw color literals (`#hex`, `rgb(...)`, `rgba(...)`) directly in screen/component `.tsx` files.
 2. Use UI tokens from `apps/mobile/components/ui/tokens.ts` directly or through primitives in `apps/mobile/components/ui/`.
 3. Temporary exceptions require an explicit allowlist entry and rationale in `apps/mobile/scripts/ui-guardrails.config.js`.
-4. As of Task `T-20260226-06`, the current route screens (`stats-history`, `session-recorder`, `exercise-catalog`, `completed-session/[sessionId]`) no longer require raw-color allowlist exceptions.
+4. No file holds a raw-color allowlist exception (`allowlistedFiles` is empty for every rule).
 
 **Ratchet rules — all now at budget `0`:**
 
@@ -398,8 +351,7 @@ primitives (`Card`, `Stat`, `ListRow`, `Sheet`) and the session view.
 1. **Type: 8 sizes.**
    `xxs 10 · xs 11 · sm 12 · md 13 · base 14 · lg 16 · xl 18 · xxl 24`.
    Down from the 14 distinct sizes that used to ship. `base` stays at **14px**
-   by decision (2026-09-19): density in the recorder was chosen over
-   gym-floor legibility. `15` folded up into `14`, `17` into `16`, `20` into
+   by decision (2026-09-19): density was chosen over gym-floor legibility. `15` folded up into `14`, `17` into `16`, `20` into
    `18`, and `22`/`26` into `24`. **`xxs` (10) was added 2026-09-22** for
    micro-labels — legends, units, tertiary labels — which the accepted design
    target drew at 8/9px; both lift to 10 rather than earning rungs of their own,
@@ -449,8 +401,8 @@ primitives (`Card`, `Stat`, `ListRow`, `Sheet`) and the session view.
    in `Text`. Chevron `›` → `chevron-right`, kebab `⋮` → `more-vertical`,
    external `↗` → `arrow-up-right`, and so on. Characters that belong to the
    data stay text: `×` in `100 kg × 5`, the minus in `−12%`, `·` and `•`
-   separators. `app/__tests__/ui-icon.test.tsx` fails on a retired glyph outside
-   the recorder, which keeps its glyphs until the rebuild deletes it.
+   separators. `app/__tests__/ui-icon.test.tsx` fails on a retired glyph anywhere
+   in `app/`, `components/` or `src/` outside comments; no file is exempt.
 2. An icon-only control carries an `accessibilityLabel` naming the action; the
    `Icon` inside it stays decorative. An icon never carries state alone: the
    certification marks sit beside words (`Certified by …`, `uncertified`) or
@@ -460,16 +412,11 @@ primitives (`Card`, `Stat`, `ListRow`, `Sheet`) and the session view.
 4. The set-state glyphs (`set-done` / `set-current` / `set-planned`) exist for
    design-language §5; the exercise page (§14a) is their first user.
 
-### 10. Exercise-tag interaction semantics
+### 10. Exercise-tag semantics
 
-1. `session-recorder` exercise cards show assigned tags as compact chips below the exercise header and above set rows.
-2. Chip removal only removes the current logged-exercise assignment; it does not delete the reusable tag definition.
-3. `Add tag` is a direct per-exercise affordance on the card (not hidden in the exercise kebab menu).
-4. Tag add/manage is in-route modal state:
-   - add mode: search/filter active tags, select, or create inline,
-   - manage mode: rename, soft-delete, show/hide deleted, undelete.
-5. Completed sessions are edited in the session view since step 6b-1, which has no tag editing (step 6b-3 retires these tag rules).
-6. Manage-tag row actions are compact icon controls (rename/delete/undelete), while accessibility labels preserve explicit action semantics.
+1. Exercise tags are read-only in the app (step 6b-3 dropped tag editing): there is no `#`, attach, create, rename, delete or manage UI. The synced tag tables and existing assignments stay.
+2. Completed-session exercise cards show assigned tags as chips (§7.4).
+3. Exercise history offers the tags used on that exercise as filter chips (`All tags` plus one chip per tag with its session count; a deleted tag reads `(deleted)`).
 
 ### 11. Calendar heatmap semantics
 
@@ -578,7 +525,7 @@ primitives (`Card`, `Stat`, `ListRow`, `Sheet`) and the session view.
 
 Graduated from the build spec; the page lives at
 `/session/[sessionId]/exercise/[sessionExerciseId]` and edits one exercise of
-the active session (or of a completed session being edited, §14b.7) through the recorder's own repository and autosave
+the active session (or of a completed session being edited, §14b.7) through the session repository and autosave
 (`src/session-recorder/`), so the rules of §5.11 about what a set *is* hold
 unchanged. What differs is presentation:
 
@@ -593,7 +540,7 @@ unchanged. What differs is presentation:
    valid to perform opens in the logger instead.
 3. **The logger is the open row.** It sits on the first set not performed, or on
    the row whose body was tapped; one at a time. Typing is saved as it is typed
-   (the recorder's text debounce); the tick — the screen's one `accent` primary,
+   (the autosave text debounce); the tick — the screen's one `accent` primary,
    disabled until the values are a valid set — performs it and moves the logger
    on. Tapping effort cycles W-Up → blank → RIR 3 → RIR 2 → RIR 1 → RIR 0 → W-Up; long press opens the configured options in a scrolling sheet. The highest selectable RIR comes from `EFFORT_LOGGING_POLICY.maxSelectableRir` (`src/config/training.ts`, default `3`). Untouched planned rows show prescribed effort; choosing blank explicitly clears actual effort. New ad-hoc rows follow §5.11 defaults.
 4. **Numbers everywhere.** Every row, planned included, shows its 1RM and
@@ -631,13 +578,13 @@ unchanged. What differs is presentation:
    and managing gyms is the Gyms screen's, through the sheet's `Manage gyms`
    (§16).
 2. `Finish` (top bar, `accent`) is the screen's one primary. It asks the
-   recorder's cleanup questions (the one rule set in `session-model.ts`, so the
-   recorder asks the same) as native alerts: entered-but-unconfirmed sets
-   first, on their own; then **one** prompt that removes the incomplete sets
-   and the exercises left with no sets together (`Remove incomplete sets and
-   empty exercises?` · `Remove and submit`; the recorder's single-kind copy
-   when only one applies). Declining any writes nothing. Invalid set values
-   block it with an alert naming the exercises to fix.
+   cleanup questions of §5.11 (the one rule set in `session-model.ts`) as
+   native alerts: entered-but-unconfirmed sets first, on their own; then
+   **one** prompt that removes the incomplete sets and the exercises left with
+   no sets together (`Remove incomplete sets and empty exercises?` · `Remove
+   and submit`; single-kind copy when only one applies). Declining any writes
+   nothing. Invalid set values block it with an alert naming the exercises to
+   fix.
 3. ⋮ is a menu sheet even with one item. `Abandon session` is `danger` and
    confirms (`Abandon session?` · `Keep session` / `Abandon`) before the same
    soft delete as the Sessions list's delete; the sheet's backdrop, Android
@@ -648,17 +595,17 @@ unchanged. What differs is presentation:
    there is no per-column bold for today's bests (tried on device 2026-09-23:
    too noisy). The one highlight is a done set whose 1RM beats the exercise's
    completed history: that 1RM is shown in `record` and earns the card a
-   `record` band (`New 1RM record · <1RM>`), from the same derivation as the
-   recorder's `New PR`.
+   `record` band (`New 1RM record · <1RM>`), from the same derivation
+   (`deriveExercisePersonalRecord`) as the completion screen's `New PR` cards
+   (§7.7).
 5. The summary counts only confirmed performed sets (warm-ups included) and
    their entered-load volume; Time is elapsed since the session's start.
 6. The persistent four-tab bar stays at the bottom with Train selected; it is
    the way back out, and returns to the tab rather than stacking it.
-7. **A completed session is edited here** (step 6b-1; it replaced the
-   recorder's completed-edit mode). The top bar reads `Edit session` · `Done`,
-   with no ⋮ (there is nothing to abandon), and Progress is selected in the tab
-   bar. The summary card's Time becomes two fields, `Start` and `End`
-   (`YYYY-MM-DD HH:mm`, End not before Start, the recorder's messages); a
+7. **A completed session is edited here** (step 6b-1). The top bar reads
+   `Edit session` · `Done`, with no ⋮ (there is nothing to abandon), and
+   Progress is selected in the tab bar. The summary card's Time becomes two
+   fields, `Start` and `End` (`YYYY-MM-DD HH:mm`, End not before Start); a
    field's error shows once it is left. Edits autosave losslessly — sets on
    the exercise page (the same rules as §14a, written back as completed), the
    gym, added exercises and valid times — and while either time is invalid

@@ -22,9 +22,7 @@ import {
 } from '@/src/data';
 import { parseCalculationSet } from '@/src/exercise-calculations';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
-import { activeSessionHref, sessionViewHref } from '@/src/navigation/active-session-entry';
-import { loadActiveSessionId } from '@/src/session-entry';
-import { useNewScreensEnabled } from '@/src/session-recorder/new-screens-preference';
+import { sessionViewHref } from '@/src/navigation/active-session-entry';
 import { isDevMode } from '@/src/utils/isDevMode';
 import {
   isConfirmedPerformedSet,
@@ -73,7 +71,10 @@ export type CompletedSessionDetailRecord = {
 export type CompletedSessionDetailDataClient = {
   loadCompletedSession(sessionId: string): Promise<CompletedSessionDetailRecord | null>;
   loadInsights?(sessionId: string): Promise<CompletedSessionInsights | null>;
-  appendCompletedSessionExerciseAsPlanned(sessionId: string, sessionExerciseId: string): Promise<void>;
+  appendCompletedSessionExerciseAsPlanned(
+    sessionId: string,
+    sessionExerciseId: string
+  ): Promise<{ sessionId: string }>;
   setCompletedSessionDeletedState(sessionId: string, isDeleted: boolean): Promise<void>;
 };
 
@@ -242,7 +243,7 @@ export const DEFAULT_COMPLETED_SESSION_DETAIL_DATA_CLIENT: CompletedSessionDetai
     return loadCompletedSessionInsights(sessionId);
   },
   async appendCompletedSessionExerciseAsPlanned(sessionId, sessionExerciseId) {
-    await appendCompletedSessionExerciseAsPlannedDraft(sessionId, sessionExerciseId);
+    return appendCompletedSessionExerciseAsPlannedDraft(sessionId, sessionExerciseId);
   },
   async setCompletedSessionDeletedState(sessionId, isDeleted) {
     await setSessionDeletedState(sessionId, isDeleted);
@@ -258,7 +259,6 @@ export function CompletedSessionDetailScreenShell({
   shouldFailNextMaestroCatalog = false,
 }: CompletedSessionDetailScreenShellProps) {
   const router = useRouter();
-  const [newScreensEnabled] = useNewScreensEnabled();
   const exerciseCatalog = useExerciseCatalog();
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -484,7 +484,7 @@ export function CompletedSessionDetailScreenShell({
       ? { title: 'Session complete', headerBackVisible: false, gestureEnabled: false }
       : { title: 'View Session' };
 
-  // Edited in the session view, whatever the new-screens setting says.
+  // Completed sessions are edited in the session view.
   const handleEdit = () => {
     if (!session) {
       return;
@@ -501,9 +501,8 @@ export function CompletedSessionDetailScreenShell({
     setActionFeedback(null);
     void dataClient
       .appendCompletedSessionExerciseAsPlanned(session.id, sessionExerciseId)
-      .then(async () => {
-        const activeSessionId = newScreensEnabled ? await loadActiveSessionId() : null;
-        router.push(activeSessionHref(activeSessionId, newScreensEnabled));
+      .then(({ sessionId: activeSessionId }) => {
+        router.push(sessionViewHref(activeSessionId));
       })
       .catch((error) => {
         setActionFeedback(error instanceof Error ? error.message : 'Unable to append exercise block');

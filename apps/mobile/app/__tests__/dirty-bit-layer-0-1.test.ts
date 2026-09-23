@@ -11,7 +11,9 @@
  *   - exercise_definitions       (Layer 0) — exercise-catalog.ts
  *   - exercise_muscle_mappings   (Layer 1) — exercise-catalog.ts (cascade leg)
  *   - sessions                   (Layer 1) — session-list.ts (soft-delete/restore)
- *   - exercise_tag_definitions   (Layer 1) — exercise-tags.ts (tag-def paths)
+ *
+ * `exercise_tag_definitions` has no app write path since the tag editor went
+ * with the old recorder (redesign 6b): tags arrive by sync only.
  *
  * The seeder dirty-stamp rule (exercise-catalog-seeds.ts) is asserted in
  * the final describe block: seed rows — muscle_groups, exercise_definitions,
@@ -40,13 +42,11 @@ import {
   SYSTEM_MUSCLE_GROUP_SEEDS,
   seedSystemExerciseCatalog,
 } from '@/src/data/exercise-catalog-seeds';
-import { createDrizzleExerciseTagStore } from '@/src/data/exercise-tags';
 import { upsertLocalGym } from '@/src/data/local-gyms';
 import * as schema from '@/src/data/schema';
 import {
   exerciseDefinitions,
   exerciseMuscleMappings,
-  exerciseTagDefinitions,
   gyms,
   muscleGroups,
   sessions,
@@ -377,87 +377,6 @@ describe('sessions write paths flip the dirty bit', () => {
     expect(restored?.deletedAt).toBeNull();
     expect(restored?.localDirty).toBe(true);
     expect(restored?.localUpdatedAtMs ?? 0).toBeGreaterThan(deleted?.localUpdatedAtMs ?? 0);
-  });
-});
-
-describe('exercise_tag_definitions write paths flip the dirty bit', () => {
-  const store = createDrizzleExerciseTagStore();
-
-  const insertExerciseDefinition = (id: string) => {
-    requireDatabase()
-      .insert(exerciseDefinitions)
-      .values({ id, name: 'Bench Press' })
-      .run();
-  };
-
-  it('marks the tag definition dirty with a positive timestamp on create', async () => {
-    insertExerciseDefinition('def-1');
-
-    const created = await store.createTagDefinition({
-      exerciseDefinitionId: 'def-1',
-      name: 'Heavy',
-      normalizedName: 'heavy',
-      now: new Date('2026-05-29T10:00:00.000Z'),
-    });
-
-    const row = requireDatabase()
-      .select()
-      .from(exerciseTagDefinitions)
-      .where(eq(exerciseTagDefinitions.id, created.id))
-      .get();
-    expect(row?.localDirty).toBe(true);
-    expect(row?.localUpdatedAtMs ?? 0).toBeGreaterThan(0);
-  });
-
-  it('advances the timestamp and keeps the tag definition dirty on rename (update)', async () => {
-    insertExerciseDefinition('def-1');
-    const created = await store.createTagDefinition({
-      exerciseDefinitionId: 'def-1',
-      name: 'Heavy',
-      normalizedName: 'heavy',
-      now: new Date('2026-05-29T10:00:00.000Z'),
-    });
-    const createdRow = requireDatabase()
-      .select()
-      .from(exerciseTagDefinitions)
-      .where(eq(exerciseTagDefinitions.id, created.id))
-      .get();
-
-    await store.renameTagDefinition({
-      id: created.id,
-      name: 'Very Heavy',
-      normalizedName: 'very heavy',
-      now: new Date('2026-05-29T11:00:00.000Z'),
-    });
-    const renamedRow = requireDatabase()
-      .select()
-      .from(exerciseTagDefinitions)
-      .where(eq(exerciseTagDefinitions.id, created.id))
-      .get();
-
-    expect(renamedRow?.localDirty).toBe(true);
-    expect(renamedRow?.localUpdatedAtMs ?? 0).toBeGreaterThan(createdRow?.localUpdatedAtMs ?? 0);
-  });
-
-  it('marks the tag definition dirty and sets deletedAt on soft delete', async () => {
-    insertExerciseDefinition('def-1');
-    const created = await store.createTagDefinition({
-      exerciseDefinitionId: 'def-1',
-      name: 'Heavy',
-      normalizedName: 'heavy',
-      now: new Date('2026-05-29T10:00:00.000Z'),
-    });
-
-    const deletedAt = new Date('2026-05-29T12:00:00.000Z');
-    await store.setTagDefinitionDeletedState({ id: created.id, deletedAt, now: deletedAt });
-
-    const row = requireDatabase()
-      .select()
-      .from(exerciseTagDefinitions)
-      .where(eq(exerciseTagDefinitions.id, created.id))
-      .get();
-    expect(row?.localDirty).toBe(true);
-    expect(row?.deletedAt?.getTime()).toBe(deletedAt.getTime());
   });
 });
 

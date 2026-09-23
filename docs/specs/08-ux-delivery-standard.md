@@ -91,11 +91,11 @@ Use this section as the single source of truth for reusable UX patterns.
    - Rules: clear destructive styling, confirm intent when risk is meaningful, and provide immediate feedback after action.
 4. Collapsible summary card pattern
    - Intent: reduce vertical density while retaining the facts needed to identify and compare repeated content.
-   - Usage: exercise cards in active/completed-edit recording and completed-session detail.
+   - Usage: exercise cards in completed-session detail and a group member's session (`components/groups/friend-session-content.tsx`).
    - Rules: cards start expanded, the title region is a minimum-size accessible toggle, collapse hides detail without changing domain data, and the collapsed state shows only validated summary facts. Actions that require the hidden content to be visible must expand the card.
 5. Explicit row confirmation pattern
    - Intent: keep entered/defaulted values separate from the user's assertion that a repeated item was actually completed.
-   - Usage: normal and prescribed set rows in the active/completed-edit session recorder.
+   - Usage: normal and prescribed set rows on the exercise page, for an active or a completed session (`components/exercise-page/set-row.tsx`).
    - Rules: use a dedicated mobile-sized checkbox-like target independent of row editing; show distinct unchecked and checked shapes so color is supplemental; confirm only valid values; allow confirmation to be undone without clearing values; exclude unchecked items from completion metrics; require an explicit discard decision when valid unchecked work would be removed at submit/save; and keep source identity separate from confirmation status (for example, inactive planned rows use a semantic surface and accessible source wording remains available when the shared selected-row surface temporarily overrides it, while the hollow/tick control communicates performance).
 6. Stream card pattern
    - Intent: scan other people's recent activity at a glance and drill into one item.
@@ -115,7 +115,7 @@ Use this section as the single source of truth for reusable UX patterns.
    - Rules: refuse before any request when offline; show the failure inline next to the action saying nothing changed; keep the screen's data and form input as they were; no queue, no automatic retry; destructive writes confirm first (pattern 3). Wording and scope: `ui/ux-rules.md` §14.
 10. Secondary-source search section pattern
    - Intent: let a search reach items from another source without crowding the default list.
-   - Usage: the recorder exercise picker's `From your groups` section and `Groups` toggle (M25-T07; `components/groups/picker-group-section.tsx`).
+   - Usage: the session view's exercise picker's `From your groups` section and `Groups` toggle (M25-T07; `components/groups/picker-group-section.tsx`).
    - Rules: the default (empty-search) list never shows the secondary source; with search text its matches follow the user's own matches under a labelled section header; a toggle beside the search box narrows the list to the secondary source only (and lists all of it when the search is empty); each row states its relationship to the user's own data in text ("linked: …" / "not linked"), not color alone; picking a row resolves to the user's own item or opens an explicit choice sheet.
 11. Record set detail sheet pattern
    - Intent: one place to read and act on a shared record set, wherever it is shown.

@@ -9,14 +9,12 @@ import {
   resolveMaestroHarnessBootstrapAction,
   resolveMaestroHarnessFixtureName,
   resolveMaestroHarnessGateAction,
-  resolveMaestroHarnessNewScreensAction,
   resolveMaestroHarnessResetMode,
   resolveMaestroHarnessTeleportHref,
   resolveMaestroHarnessTeleportTarget,
   runMaestroHarnessBootstrapAction,
   runMaestroHarnessFixture,
   runMaestroHarnessGateAction,
-  runMaestroHarnessNewScreensAction,
   runMaestroHarnessReset,
 } from '@/src/maestro/harness';
 
@@ -32,9 +30,7 @@ export default function MaestroHarnessScreen() {
     fixture?: string | string[];
     bootstrap?: string | string[];
     gate?: string | string[];
-    newScreens?: string | string[];
     teleport?: string | string[];
-    mode?: string | string[];
     intent?: string | string[];
     sessionId?: string | string[];
     sessionExerciseId?: string | string[];
@@ -66,9 +62,7 @@ export default function MaestroHarnessScreen() {
   const fixtureParam = coerceMaestroHarnessQueryParam(params.fixture);
   const bootstrapParam = coerceMaestroHarnessQueryParam(params.bootstrap);
   const gateParam = coerceMaestroHarnessQueryParam(params.gate);
-  const newScreensParam = coerceMaestroHarnessQueryParam(params.newScreens);
   const teleportParam = coerceMaestroHarnessQueryParam(params.teleport);
-  const modeParam = coerceMaestroHarnessQueryParam(params.mode);
   const intentParam = coerceMaestroHarnessQueryParam(params.intent);
   const sessionIdParam = coerceMaestroHarnessQueryParam(params.sessionId);
   const sessionExerciseIdParam = coerceMaestroHarnessQueryParam(params.sessionExerciseId);
@@ -88,9 +82,7 @@ export default function MaestroHarnessScreen() {
       fixtureParam,
       bootstrapParam,
       gateParam,
-      newScreensParam,
       teleportParam,
-      modeParam,
       intentParam,
       sessionIdParam,
       sessionExerciseIdParam,
@@ -117,11 +109,9 @@ export default function MaestroHarnessScreen() {
     const fixtureName = resolveMaestroHarnessFixtureName(fixtureParam);
     const bootstrapAction = resolveMaestroHarnessBootstrapAction(bootstrapParam);
     const gateAction = resolveMaestroHarnessGateAction(gateParam);
-    const newScreensAction = resolveMaestroHarnessNewScreensAction(newScreensParam);
     const teleportTarget = resolveMaestroHarnessTeleportTarget(teleportParam);
     const teleportHref = resolveMaestroHarnessTeleportHref({
       target: teleportTarget,
-      mode: modeParam,
       intent: intentParam,
       sessionId: sessionIdParam,
       sessionExerciseId: sessionExerciseIdParam,
@@ -133,7 +123,6 @@ export default function MaestroHarnessScreen() {
     void (async () => {
       try {
         await runMaestroHarnessReset(resetMode);
-        await runMaestroHarnessNewScreensAction(newScreensAction);
         await runMaestroHarnessFixture(fixtureName);
         await runMaestroHarnessBootstrapAction(bootstrapAction);
         runMaestroHarnessGateAction(gateAction);
@@ -178,7 +167,7 @@ export default function MaestroHarnessScreen() {
     return () => {
       cancelled = true;
     };
-  }, [resetParam, fixtureParam, bootstrapParam, gateParam, newScreensParam, teleportParam, modeParam, intentParam, sessionIdParam, sessionExerciseIdParam, maestroShareParam, maestroCatalogParam, presentationParam, router]);
+  }, [resetParam, fixtureParam, bootstrapParam, gateParam, teleportParam, intentParam, sessionIdParam, sessionExerciseIdParam, maestroShareParam, maestroCatalogParam, presentationParam, router]);
 
   return (
     <View style={styles.screen} testID="maestro-harness-screen">

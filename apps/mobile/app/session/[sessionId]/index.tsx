@@ -43,7 +43,7 @@ import { useCompletedSessionTimes } from '@/src/session-recorder/use-completed-s
 import { useSessionView } from '@/src/session-recorder/use-session-view';
 
 const TRAIN_ROUTE = mainTabHref('train');
-const EXERCISE_CATALOG_MANAGE_ROUTE = '/exercise-catalog?source=session-recorder&intent=manage' as Href;
+const EXERCISE_CATALOG_MANAGE_ROUTE = '/exercise-catalog?source=session&intent=manage' as Href;
 
 const coerceParam = (value: string | string[] | undefined): string | null =>
   (Array.isArray(value) ? value[0] : value) ?? null;
@@ -115,10 +115,9 @@ export type SessionViewScreenProps = {
 /**
  * The session view (redesign step 5): the active session, read-only and
  * navigational. Each exercise card links to its exercise page, where editing
- * happens; Finish and Abandon run the recorder's own lifecycle
+ * happens; Finish and Abandon run the session lifecycle
  * (`src/session-recorder/session-lifecycle.ts`), and Add exercise the
- * recorder's picker. Reached from the app's active-session entries while the
- * new exercise/session screens setting is on.
+ * exercise picker. Every active-session entry in the app opens it.
  *
  * A completed session opens here to be edited (History, completed-session
  * `Edit`): Start/End replace the elapsed Time, and Done — the recorder's
@@ -188,7 +187,7 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
     setGymPicker(CLOSED_GYM_PICKER);
   };
 
-  // Back from Manage: the picker returns as it was left, like the recorder's.
+  // Back from Manage: the picker returns as it was left.
   // Back from the Gyms screen: the gym sheet reopens with the list reloaded.
   useFocusEffect(
     useCallback(() => {
@@ -444,7 +443,6 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
         visible={gymPicker.visible}
       />
       <ExercisePicker
-        mode="add"
         onAppendPlan={appendPlan}
         onDismiss={hidePicker}
         onOpenManage={openManage}

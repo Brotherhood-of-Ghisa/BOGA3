@@ -4,8 +4,8 @@ appId: com.dinoderek.mobile
 # sheet, the destructive confirmation, then the soft delete the Sessions list
 # uses — Train then offers a new workout instead of Resume.
 #
-# Hermetic: starts from `reset=data` and ends with a data reset, leaving the
-# setting at its default (On). Infra-free (no sign-in).
+# Hermetic: starts from `reset=data` and ends with a data reset. Infra-free
+# (no sign-in).
 
 - retry:
     maxRetries: 3

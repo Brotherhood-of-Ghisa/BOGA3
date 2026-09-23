@@ -37,8 +37,9 @@ export type BestEstimatedOneRepMaxSet = {
 
 /**
  * Weight is stored as text in the local schema but is logically a
- * non-negative number. The accepted shape mirrors the UI's
- * `WEIGHT_INPUT_PATTERN` (digits with an optional decimal point) so the
+ * non-negative number. The accepted shape mirrors the exercise page's
+ * weight input (`components/exercise-page/set-logger.tsx`: digits with an
+ * optional decimal point) so the
  * parser never accepts inputs that the UI itself would reject — for
  * example `1e3` parses as `Number` but is not a legal weight entry here.
  */
@@ -56,7 +57,7 @@ export const parseSetWeight = (value: string | null | undefined): number | null 
 
 /**
  * Reps must be a positive integer to count toward any of these
- * calculations. Matches the UI input contract in `app/session-recorder.tsx`.
+ * calculations. Matches the exercise page's reps input (`components/exercise-page/set-logger.tsx`).
  */
 export const parseSetReps = (value: string | null | undefined): number | null => {
   if (typeof value !== 'string') return null;

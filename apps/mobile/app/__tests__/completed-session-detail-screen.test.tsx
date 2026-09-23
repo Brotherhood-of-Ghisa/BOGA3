@@ -230,7 +230,6 @@ describe('CompletedSessionDetailScreenShell', () => {
     );
     expect(screen.queryByTestId('session-completion-personal-records')).toBeNull();
     expect(screen.getByTestId('session-completion-muscle-chest')).toHaveTextContent('Chest (3)');
-    expect(screen.queryByTestId('session-muscle-load-surface')).toBeNull();
     expect(screen.queryByTestId('session-completion-view-muscle-load')).toBeNull();
     expect(screen.queryByTestId('completed-session-detail-action-bar')).toBeNull();
     expect(screen.queryByText('Append')).toBeNull();
@@ -767,8 +766,8 @@ describe('CompletedSessionDetailScreenShell', () => {
     expect(mockPush).toHaveBeenCalledWith('/session/completed-under-test');
   });
 
-  it('per-exercise append action calls the data client and opens the recorder', async () => {
-    const mockAppendCompletedSessionExercise = jest.fn().mockResolvedValue(undefined);
+  it('per-exercise append action calls the data client and opens the active session', async () => {
+    const mockAppendCompletedSessionExercise = jest.fn().mockResolvedValue({ sessionId: 'active-1' });
     const dataClient: CompletedSessionDetailDataClient = {
       loadCompletedSession: jest.fn().mockResolvedValue({
         ...COMPLETED_SESSION_DETAIL_FIXTURE,
@@ -787,7 +786,7 @@ describe('CompletedSessionDetailScreenShell', () => {
 
     await waitFor(() => {
       expect(mockAppendCompletedSessionExercise).toHaveBeenCalledWith('completed-under-test', 'exercise-1');
-      expect(mockPush).toHaveBeenCalledWith('/session-recorder');
+      expect(mockPush).toHaveBeenCalledWith('/session/active-1');
     });
   });
 
