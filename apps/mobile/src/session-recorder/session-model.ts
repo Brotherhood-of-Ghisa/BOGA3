@@ -462,3 +462,90 @@ export const formatSetRepsLabel = (value: string | null | undefined): string => 
   const trimmed = (value ?? '').trim() || '0';
   return `${trimmed} ${trimmed === '1' ? 'rep' : 'reps'}`;
 };
+
+export type SubmitCleanupStep = 'incomplete-sets' | 'unconfirmed-sets' | 'empty-exercises';
+
+export type SubmitCleanupPrompt = {
+  step: SubmitCleanupStep;
+  affectedCount: number;
+  nextSession: Session;
+};
+
+export type SubmitCleanupResult =
+  | { kind: 'prompt'; prompt: SubmitCleanupPrompt }
+  | { kind: 'ready'; session: Session };
+
+/**
+ * One step of the submit cleanup: the next discard the user must confirm
+ * (incomplete sets, then entered-but-unconfirmed sets, then exercises left
+ * with no sets), or the completed-history session once nothing is left to
+ * confirm. Confirming a prompt runs this again on its `nextSession`.
+ */
+export const nextSubmitCleanup = (candidate: Session): SubmitCleanupResult => {
+  const committedSession = canonicalizeSessionSetWeights(candidate);
+  const { session: withoutIncompleteSets, removedSets } = removeIncompleteSets(committedSession);
+  if (removedSets > 0) {
+    return {
+      kind: 'prompt',
+      prompt: { step: 'incomplete-sets', affectedCount: removedSets, nextSession: withoutIncompleteSets },
+    };
+  }
+
+  const { session: withoutUnconfirmedSets, removedSets: removedUnconfirmedSets } =
+    removeUnconfirmedSets(withoutIncompleteSets);
+  if (removedUnconfirmedSets > 0) {
+    return {
+      kind: 'prompt',
+      prompt: {
+        step: 'unconfirmed-sets',
+        affectedCount: removedUnconfirmedSets,
+        nextSession: withoutUnconfirmedSets,
+      },
+    };
+  }
+
+  const completedHistorySession = toCompletedHistorySession(withoutUnconfirmedSets);
+  const { session: withoutEmptyExercises, removedExercises } = removeExercisesWithNoSets(completedHistorySession);
+  if (removedExercises > 0) {
+    return {
+      kind: 'prompt',
+      prompt: { step: 'empty-exercises', affectedCount: removedExercises, nextSession: withoutEmptyExercises },
+    };
+  }
+
+  return { kind: 'ready', session: completedHistorySession };
+};
+
+export const SUBMIT_CLEANUP_CANCEL_LABEL = 'Go back to edit session';
+
+/** The confirmation copy for a submit cleanup prompt, shared by both recorders. */
+export const describeSubmitCleanupPrompt = (
+  prompt: Pick<SubmitCleanupPrompt, 'step' | 'affectedCount'>,
+  mode: 'active' | 'completed-edit'
+): { title: string; message: string; confirmLabel: string } => {
+  const count = prompt.affectedCount;
+  const plural = count === 1 ? '' : 's';
+  const outcome = mode === 'completed-edit' ? 'save changes' : 'submit';
+  switch (prompt.step) {
+    case 'incomplete-sets':
+      return {
+        title: 'Remove incomplete sets and submit?',
+        message: `${count} incomplete set${plural} missing reps or weight will be removed.`,
+        confirmLabel: `Remove incomplete sets and ${outcome}`,
+      };
+    case 'unconfirmed-sets':
+      return {
+        title: 'Discard unconfirmed sets and submit?',
+        message: `${count} set${plural} with entered values ${
+          count === 1 ? 'is' : 'are'
+        } not confirmed and will be discarded.`,
+        confirmLabel: `Discard unconfirmed sets and ${outcome}`,
+      };
+    case 'empty-exercises':
+      return {
+        title: 'Remove exercises with no sets and submit?',
+        message: `${count} exercise${plural} with no sets will be removed.`,
+        confirmLabel: `Remove empty exercises and ${outcome}`,
+      };
+  }
+};

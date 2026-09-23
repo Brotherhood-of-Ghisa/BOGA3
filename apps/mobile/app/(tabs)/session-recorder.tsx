@@ -48,7 +48,6 @@ import {
   attachExerciseTagToSessionExercise,
   createExerciseTagDefinition,
   deleteExerciseTagDefinition,
-  completeSessionDraft,
   ExerciseTagDomainError,
   listExerciseTagDefinitions,
   listSessionExerciseAssignedTags,
@@ -93,12 +92,14 @@ import {
 import { logEvent } from '@/src/logging';
 import { createDraftAutosaveController, type DraftAutosaveController } from '@/src/session-recorder/draft-autosave';
 import { createSessionRecorderLifecycleHelpers } from '@/src/session-recorder/lifecycle-helpers';
+import { completeActiveSession } from '@/src/session-recorder/session-lifecycle';
 import {
   appendSuggestedPlan,
   canonicalizeSessionSetWeights,
   createExercise,
   createExerciseId,
   createSetFromPrevious,
+  describeSubmitCleanupPrompt,
   formatCurrentDateTime,
   formatSetRepsLabel,
   formatSetWeightLabel,
@@ -109,14 +110,13 @@ import {
   hasSetFieldValidationError,
   mapDraftSnapshotToSession,
   mapSessionGraphSnapshotToSession,
+  nextSubmitCleanup,
   parseSessionDateTime,
-  removeExercisesWithNoSets,
-  removeIncompleteSets,
-  removeUnconfirmedSets,
   REPS_INPUT_PATTERN,
   SET_TYPE_MENU_LABELS,
+  SUBMIT_CLEANUP_CANCEL_LABEL,
+  type SubmitCleanupPrompt,
   sessionHasInvalidSetValues,
-  toCompletedHistorySession,
   toPersistCompletedExercises,
   toPersistDraftExercises,
   WEIGHT_INPUT_PATTERN,
@@ -390,12 +390,6 @@ const getExerciseSetSummary = (sets: SessionSet[]): string => {
   return `${performed} performed`;
 };
 
-
-type SubmitCleanupPrompt = {
-  step: 'incomplete-sets' | 'unconfirmed-sets' | 'empty-exercises';
-  affectedCount: number;
-  nextSession: Session;
-};
 
 type TagModalMode = 'picker' | 'manage';
 type SetTypePickerState = {
@@ -3179,20 +3173,17 @@ export default function SessionRecorderScreen({
         return;
       }
 
-      const persisted = await persistSessionDraftSnapshot({
+      const completedSessionId = await completeActiveSession({
         sessionId: persistedSessionIdRef.current ?? undefined,
         gymId: submittedGym?.id ?? null,
         startedAt: parsedStartedAt,
-        status: 'active',
-        exercises: toPersistCompletedExercises(submittedSession),
+        completedHistorySession: submittedSession,
       });
-
-      await completeSessionDraft(persisted.sessionId);
       persistedSessionIdRef.current = null;
       hasSessionMutationRef.current = false;
       setHasActiveSession(false);
       router.replace(
-        `/completed-session/${persisted.sessionId}?presentation=completion${
+        `/completed-session/${completedSessionId}?presentation=completion${
           shouldFailNextMaestroShare ? '&maestroShare=fail-once' : ''
         }`
       );
@@ -3202,41 +3193,14 @@ export default function SessionRecorderScreen({
   };
 
   const beginSubmitFlow = (sessionCandidate: Session) => {
-    const committedSession = canonicalizeSessionSetWeights(sessionCandidate);
-    const { session: withoutIncompleteSets, removedSets } = removeIncompleteSets(committedSession);
-    if (removedSets > 0) {
-      setSubmitCleanupPrompt({
-        step: 'incomplete-sets',
-        affectedCount: removedSets,
-        nextSession: withoutIncompleteSets,
-      });
-      return;
-    }
-
-    const { session: withoutUnconfirmedSets, removedSets: removedUnconfirmedSets } =
-      removeUnconfirmedSets(withoutIncompleteSets);
-    if (removedUnconfirmedSets > 0) {
-      setSubmitCleanupPrompt({
-        step: 'unconfirmed-sets',
-        affectedCount: removedUnconfirmedSets,
-        nextSession: withoutUnconfirmedSets,
-      });
-      return;
-    }
-
-    const completedHistorySession = toCompletedHistorySession(withoutUnconfirmedSets);
-    const { session: withoutEmptyExercises, removedExercises } = removeExercisesWithNoSets(completedHistorySession);
-    if (removedExercises > 0) {
-      setSubmitCleanupPrompt({
-        step: 'empty-exercises',
-        affectedCount: removedExercises,
-        nextSession: withoutEmptyExercises,
-      });
+    const cleanup = nextSubmitCleanup(sessionCandidate);
+    if (cleanup.kind === 'prompt') {
+      setSubmitCleanupPrompt(cleanup.prompt);
       return;
     }
 
     setSubmitCleanupPrompt(null);
-    finalizeSubmit(completedHistorySession);
+    finalizeSubmit(cleanup.session);
   };
 
   const handleSubmit = () => {
@@ -3328,38 +3292,9 @@ export default function SessionRecorderScreen({
     const activeSet = activeExercise?.sets.find((set) => set.id === activeSetTypePicker.setId);
     return normalizeSessionSetType(activeSet?.setType);
   }, [activeSetTypePicker, state.session.exercises]);
-  const cleanupModalTitle =
-    submitCleanupPrompt?.step === 'incomplete-sets'
-      ? 'Remove incomplete sets and submit?'
-      : submitCleanupPrompt?.step === 'unconfirmed-sets'
-        ? 'Discard unconfirmed sets and submit?'
-        : 'Remove exercises with no sets and submit?';
-  const cleanupModalMessage =
-    submitCleanupPrompt?.step === 'incomplete-sets'
-      ? `${submitCleanupPrompt.affectedCount} incomplete set${
-          submitCleanupPrompt.affectedCount === 1 ? '' : 's'
-        } missing reps or weight will be removed.`
-      : submitCleanupPrompt?.step === 'unconfirmed-sets'
-        ? `${submitCleanupPrompt.affectedCount} set${
-            submitCleanupPrompt.affectedCount === 1 ? '' : 's'
-          } with entered values ${
-            submitCleanupPrompt.affectedCount === 1 ? 'is' : 'are'
-          } not confirmed and will be discarded.`
-        : `${submitCleanupPrompt?.affectedCount ?? 0} exercise${
-            submitCleanupPrompt?.affectedCount === 1 ? '' : 's'
-          } with no sets will be removed.`;
-  const cleanupModalConfirmLabel =
-    submitCleanupPrompt?.step === 'incomplete-sets'
-      ? routeMode === 'completed-edit'
-        ? 'Remove incomplete sets and save changes'
-        : 'Remove incomplete sets and submit'
-      : submitCleanupPrompt?.step === 'unconfirmed-sets'
-        ? routeMode === 'completed-edit'
-          ? 'Discard unconfirmed sets and save changes'
-          : 'Discard unconfirmed sets and submit'
-        : routeMode === 'completed-edit'
-          ? 'Remove empty exercises and save changes'
-          : 'Remove empty exercises and submit';
+  const cleanupModalCopy = submitCleanupPrompt
+    ? describeSubmitCleanupPrompt(submitCleanupPrompt, routeMode)
+    : null;
 
   const completedEditTimeValidationMessage =
     routeMode === 'completed-edit' ? getDateTimeValidationMessage(state.session.dateTime, completedEditEndDateTime) : null;
@@ -4166,14 +4101,14 @@ export default function SessionRecorderScreen({
             onPress={cancelSubmitCleanup}
           />
           <View style={styles.confirmationModalCard}>
-            <Text style={styles.confirmationTitle}>{cleanupModalTitle}</Text>
-            <Text style={styles.confirmationBody}>{cleanupModalMessage}</Text>
+            <Text style={styles.confirmationTitle}>{cleanupModalCopy?.title}</Text>
+            <Text style={styles.confirmationBody}>{cleanupModalCopy?.message}</Text>
             <View style={styles.confirmationButtonStack}>
               <Pressable style={styles.confirmationPrimaryButton} onPress={confirmSubmitCleanup}>
-                <Text style={styles.confirmationPrimaryButtonText}>{cleanupModalConfirmLabel}</Text>
+                <Text style={styles.confirmationPrimaryButtonText}>{cleanupModalCopy?.confirmLabel}</Text>
               </Pressable>
               <Pressable style={styles.confirmationSecondaryButton} onPress={cancelSubmitCleanup}>
-                <Text style={styles.confirmationSecondaryButtonText}>Go back to edit session</Text>
+                <Text style={styles.confirmationSecondaryButtonText}>{SUBMIT_CLEANUP_CANCEL_LABEL}</Text>
               </Pressable>
             </View>
           </View>
