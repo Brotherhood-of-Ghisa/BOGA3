@@ -90,8 +90,9 @@ Brief entrypoint inventory of the current reusable UI component set.
   - `Stat` — a micro-label legend with a monospaced value; `stacked` (label
     above value: summary card, records panel) or `inline` (legend left of the
     fixed-width right-aligned metric column: the set row, `rank` primary 1RM /
-    secondary VOL); `state="planned"` fades it, `emphasis` `best` (bold `ink`)
-    or `record` (bold `record`); `kind="text"` for a non-figure value
+    secondary VOL); `state="planned"` fades it, `emphasis="record"` sets it
+    bold `record` (the only emphasis — `design-language.md` §5);
+    `kind="text"` for a non-figure value
   - `ListRow` — `[leading][label or children][meta][trailing]`, the trailing
     control always in a fixed tap-target-wide column so controls share one
     vertical axis; `density` `sheet` (option rows) or `list` (dense rows in a
