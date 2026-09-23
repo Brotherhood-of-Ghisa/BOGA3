@@ -6,6 +6,7 @@ export type MoreDestinationKey =
   | 'connected-agents'
   | 'developer-logs'
   | 'exercise-database'
+  | 'gyms'
   | 'settings';
 
 export type MoreRoute =
@@ -13,6 +14,7 @@ export type MoreRoute =
   | '/connected-agents'
   | '/dev-logs'
   | '/exercise-catalog?source=more'
+  | '/gyms?source=more'
   | '/settings?source=more';
 
 export type MoreDestination = {
@@ -71,6 +73,15 @@ const MORE_SECTIONS: readonly MoreSection[] = [
         testID: 'more-connected-agents-row',
         action: { type: 'route', href: '/connected-agents' },
         requiresUser: true,
+      },
+      {
+        key: 'gyms',
+        label: 'Gyms',
+        description: 'Add gyms, save their locations, and archive old ones.',
+        icon: 'location',
+        accessibilityHint: 'Opens gym management',
+        testID: 'more-gyms-row',
+        action: { type: 'route', href: '/gyms?source=more' },
       },
       {
         key: 'developer-logs',

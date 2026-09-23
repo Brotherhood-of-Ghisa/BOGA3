@@ -9,7 +9,10 @@ appId: com.dinoderek.mobile
 #      the 1RM record band (fixture: src/maestro/session-view-fixture.ts);
 #   3. a card links to its exercise page (step 4), and its back returns here;
 #   4. the ⋮ menu sheet opens and a backdrop tap dismisses it; tapping the
-#      Gym stat picks a gym;
+#      Gym stat picks a gym; the sheet's Manage gyms opens the Gyms screen,
+#      where a new gym is added, and back on the session view the sheet
+#      reopens with it listed, ready to pick (the GPS suggestion row is jest
+#      only: the simulator cannot fake a location reliably);
 #   5. + Add exercise adds a card through the recorder's picker;
 #   6. Finish asks one cleanup prompt for the empty set and the exercises left
 #      with no sets, and opens the completion screen.
@@ -118,6 +121,61 @@ appId: com.dinoderek.mobile
 - extendedWaitUntil:
     visible:
       text: "Gym Downtown Iron Temple"
+    timeout: 10000
+
+# 4c. Manage gyms -> Gyms screen -> add a gym -> back -> the sheet reopens
+# with it listed -> pick it.
+- tapOn:
+    id: "session-view-summary-gym-button"
+- extendedWaitUntil:
+    visible:
+      id: "session-view-gym-manage"
+    timeout: 10000
+- tapOn:
+    id: "session-view-gym-manage"
+- extendedWaitUntil:
+    visible:
+      id: "gyms-screen"
+    timeout: 15000
+- extendedWaitUntil:
+    visible:
+      id: "gyms-add"
+    timeout: 15000
+- assertNotVisible:
+    id: "back-to-more-button"
+- takeScreenshot: "02c-gyms-screen"
+- tapOn:
+    id: "gyms-add"
+- extendedWaitUntil:
+    visible:
+      id: "gym-editor-name"
+    timeout: 10000
+- tapOn:
+    id: "gym-editor-name"
+- inputText: "Canal Street Gym"
+- hideKeyboard:
+    optional: true
+- takeScreenshot: "02d-gyms-add-editor"
+- tapOn:
+    id: "gym-editor-save"
+- extendedWaitUntil:
+    visible:
+      text: "Edit gym Canal Street Gym"
+    timeout: 10000
+- takeScreenshot: "02e-gyms-added"
+# The native back item is arrow-only; its accessibility label is the session
+# view's stack title, "Session".
+- tapOn: "Session"
+- extendedWaitUntil:
+    visible:
+      text: "Select gym Canal Street Gym"
+    timeout: 15000
+- takeScreenshot: "02f-session-gym-sheet-reloaded"
+- tapOn:
+    text: "Select gym Canal Street Gym"
+- extendedWaitUntil:
+    visible:
+      text: "Gym Canal Street Gym"
     timeout: 10000
 
 # 5. + Add exercise, through the recorder's picker.
