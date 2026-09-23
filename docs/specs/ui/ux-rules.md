@@ -594,9 +594,10 @@ unchanged. What differs is presentation:
    back and the VoiceOver escape dismiss it.
 4. A card row shows every set: done rows in `ink`, everything else faded
    (values `inkFaint`, legends `planned`), a planned row showing its
-   prescription. Bold marks the best weight, 1RM and volume of that exercise
-   today among done sets, per column; a done set whose 1RM beats the
-   exercise's completed history is shown in `record` and earns the card a
+   prescription. Every figure in a row shares the row's colour and weight —
+   there is no per-column bold for today's bests (tried on device 2026-09-23:
+   too noisy). The one highlight is a done set whose 1RM beats the exercise's
+   completed history: that 1RM is shown in `record` and earns the card a
    `record` band (`New 1RM record · <1RM>`), from the same derivation as the
    recorder's `New PR`.
 5. The summary counts only confirmed performed sets (warm-ups included) and

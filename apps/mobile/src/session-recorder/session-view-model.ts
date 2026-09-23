@@ -9,8 +9,8 @@ import { hasValidActualValues, isConfirmedPerformedSet } from './set-semantics';
 
 /**
  * The read-only session view's presentation model (build spec, "Session
- * view"): one card per exercise with its set rows, a done count, per-column
- * bests and a record, plus the summary totals. Pure — the route loads the
+ * view"): one card per exercise with its set rows, a done count and a
+ * record, plus the summary totals. Pure — the route loads the
  * draft and the history and renders what this returns.
  */
 
@@ -25,10 +25,8 @@ export type SessionViewSetRow = {
   volume: string;
   // A confirmed performed set; every other row is shown faded as planned.
   done: boolean;
-  // The best of this exercise today, per column (build spec, "Set row").
-  bestWeight: boolean;
-  bestVolume: boolean;
-  oneRepMaxEmphasis: 'none' | 'best' | 'record';
+  // This set's 1RM is an all-time best — the only figure the card highlights.
+  oneRepMaxRecord: boolean;
 };
 
 export type SessionViewExerciseCard = {
@@ -96,20 +94,6 @@ const toRowFigures = (set: SessionSet): RowFigures => {
   };
 };
 
-// The id of the first done row holding the column's maximum.
-const bestDoneRowId = (rows: RowFigures[], value: (row: RowFigures) => number | null): string | null => {
-  let best: { id: string; value: number } | null = null;
-  for (const row of rows) {
-    if (!row.done) continue;
-    const candidate = value(row);
-    if (candidate === null || !Number.isFinite(candidate)) continue;
-    if (best === null || candidate > best.value) {
-      best = { id: row.set.id, value: candidate };
-    }
-  }
-  return best?.id ?? null;
-};
-
 /** The historical best 1RM the recorder compares against, from completed history. */
 export const historicalBestOneRepMax = (blocks: ExerciseBlockHistoryBlock[]): number | null => {
   const values = blocks
@@ -130,10 +114,6 @@ export const buildSessionViewModel = (
 
   const cards = session.exercises.map((exercise): SessionViewExerciseCard => {
     const figures = exercise.sets.map(toRowFigures);
-    const bestWeightId = bestDoneRowId(figures, (row) => row.shown.weight);
-    const bestOneRepMaxId = bestDoneRowId(figures, (row) => row.oneRepMax);
-    const bestVolumeId = bestDoneRowId(figures, (row) => row.volume);
-
     const historicalBest = historicalBestByDefinitionId.get(exercise.exerciseDefinitionId);
     const record =
       historicalBest === undefined
@@ -160,10 +140,7 @@ export const buildSessionViewModel = (
         oneRepMax: row.oneRepMax === null ? EMPTY_FIGURE : formatOneRepMaxFigure(row.oneRepMax),
         volume: row.volume === null ? EMPTY_FIGURE : formatVolumeFigure(row.volume),
         done: row.done,
-        bestWeight: row.set.id === bestWeightId,
-        bestVolume: row.set.id === bestVolumeId,
-        oneRepMaxEmphasis:
-          row.set.id === recordSetId ? 'record' : row.set.id === bestOneRepMaxId ? 'best' : 'none',
+        oneRepMaxRecord: row.set.id === recordSetId,
       };
     });
 

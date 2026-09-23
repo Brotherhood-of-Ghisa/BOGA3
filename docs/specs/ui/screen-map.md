@@ -215,8 +215,8 @@ Brief entrypoint map of the current mobile screens.
   - one read-only card per exercise, the whole card one link: name, `n/m` done
     count (confirmed of all rows), every row as `type · weight × reps · 1RM ·
     VOL` with mini legends, done rows in ink and planned/unconfirmed rows faded
-    (planned rows show their prescription), the best weight / 1RM / volume of
-    the exercise today in bold per column, and a brass `record` band with the
+    (planned rows show their prescription), every figure in its row's colour
+    and weight, and — the one highlight — a brass record 1RM and `record` band with the
     1RM when a done set beats the exercise's completed history
     (`deriveExercisePersonalRecord`, as the recorder's New PR)
   - `+ Add exercise` opens the recorder's exercise picker

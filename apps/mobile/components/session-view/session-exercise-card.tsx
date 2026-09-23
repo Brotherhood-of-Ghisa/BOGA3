@@ -12,7 +12,9 @@ type SessionExerciseCardProps = {
 };
 
 // One read-only set: type · weight × reps · 1RM · VOL. No control column — the
-// whole card is the one target (build spec, "Session view").
+// whole card is the one target (build spec, "Session view"). Every figure in a
+// row shares the row's colour and weight; only a record 1RM stands out, in
+// `record` (decided on device 2026-09-23: per-column bests read as noise).
 function SetSummaryRow({ row, testID }: { row: SessionViewSetRow; testID: string }) {
   const state = row.done ? 'realised' : 'planned';
   return (
@@ -20,17 +22,11 @@ function SetSummaryRow({ row, testID }: { row: SessionViewSetRow; testID: string
       <Text numberOfLines={1} style={[styles.type, row.done ? null : styles.typePlanned]}>
         {row.typeLabel}
       </Text>
-      <Text
-        numberOfLines={1}
-        style={[
-          styles.weightReps,
-          row.done ? null : styles.valuePlanned,
-          row.done && row.bestWeight ? styles.best : null,
-        ]}>
+      <Text numberOfLines={1} style={[styles.weightReps, row.done ? null : styles.valuePlanned]}>
         {row.weightReps}
       </Text>
       <Stat
-        emphasis={row.done ? row.oneRepMaxEmphasis : 'none'}
+        emphasis={row.done && row.oneRepMaxRecord ? 'record' : 'none'}
         label="1RM"
         layout="inline"
         rank="primary"
@@ -39,10 +35,9 @@ function SetSummaryRow({ row, testID }: { row: SessionViewSetRow; testID: string
         value={row.oneRepMax}
       />
       <Stat
-        emphasis={row.done && row.bestVolume ? 'best' : 'none'}
         label="Vol"
         layout="inline"
-        rank="secondary"
+        rank="primary"
         state={state}
         testID={`${testID}-vol`}
         value={row.volume}
@@ -152,9 +147,6 @@ const styles = StyleSheet.create({
   },
   valuePlanned: {
     color: uiRoles.inkFaint,
-  },
-  best: {
-    fontWeight: '700',
   },
   band: {
     flexDirection: 'row',

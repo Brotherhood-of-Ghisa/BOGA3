@@ -80,23 +80,16 @@ describe('session view model', () => {
     ]);
   });
 
-  it('bolds the best of each column among done sets, per column', () => {
+  it('highlights nothing without a record', () => {
     const [card] = buildSessionViewModel(session([bench]), new Map()).cards;
-    const byId = new Map(card.rows.map((row) => [row.id, row]));
-
-    // Heaviest weight is 162.5; best 1RM and volume are the RIR 2 set. The
-    // planned 165 does not count — it is not realised.
-    expect(byId.get('b3')?.bestWeight).toBe(true);
-    expect(byId.get('b4')?.bestWeight).toBe(false);
-    expect(byId.get('b2')?.oneRepMaxEmphasis).toBe('best');
-    expect(byId.get('b2')?.bestVolume).toBe(true);
+    expect(card.rows.some((row) => row.oneRepMaxRecord)).toBe(false);
     expect(card.recordOneRepMax).toBeNull();
   });
 
   it('marks a record only when today beats the loaded history, and not before it loads', () => {
     const beaten = buildSessionViewModel(session([bench]), new Map([['def_bench', 197.9]])).cards[0];
     expect(beaten.recordOneRepMax).toBe('204.3');
-    expect(beaten.rows.find((row) => row.id === 'b2')?.oneRepMaxEmphasis).toBe('record');
+    expect(beaten.rows.filter((row) => row.oneRepMaxRecord).map((row) => row.id)).toEqual(['b2']);
 
     const notBeaten = buildSessionViewModel(session([bench]), new Map([['def_bench', 210]])).cards[0];
     expect(notBeaten.recordOneRepMax).toBeNull();

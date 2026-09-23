@@ -310,7 +310,8 @@ Brief entrypoint inventory of the current reusable UI component set.
   - `SessionSummaryCard` — `Card` with stacked `Stat`s Time (ticking) / Gym /
     Sets / Volume
   - `SessionExerciseCard` — `Card` link per exercise: name, `n/m`, read-only set
-    rows (type · weight × reps · inline `Stat` 1RM / VOL with legends), and the
+    rows (type · weight × reps · inline `Stat` 1RM / VOL with legends, all at
+    the row's colour and weight; only a record 1RM in `record`), and the
     `record` band. testID `session-view-exercise-<id>` with `-count`, `-set-<n>`,
     `-record`
   - `SessionOptionsSheet` — `Sheet` + one danger `ListRow` (`Abandon session`)
