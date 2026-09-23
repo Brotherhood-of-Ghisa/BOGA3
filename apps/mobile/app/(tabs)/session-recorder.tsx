@@ -65,7 +65,6 @@ import {
   type ExerciseTagDefinitionRecord,
   type ExerciseBlockHistoryBlock,
   type ExerciseBlockHistorySuggestedPlan,
-  type LocalGymLookupRecord,
   type SessionExerciseAssignedTag,
 } from '@/src/data';
 import {
@@ -92,6 +91,7 @@ import {
 import { logEvent } from '@/src/logging';
 import { createDraftAutosaveController, type DraftAutosaveController } from '@/src/session-recorder/draft-autosave';
 import { createSessionRecorderLifecycleHelpers } from '@/src/session-recorder/lifecycle-helpers';
+import { mergeLocalGymsIntoLocations } from '@/src/session-recorder/gym-options';
 import { completeActiveSession } from '@/src/session-recorder/session-lifecycle';
 import {
   appendSuggestedPlan,
@@ -230,62 +230,6 @@ function createInitialState(): SessionRecorderState {
     exerciseActionMenuVisible: false,
     activeExerciseActionId: null,
   };
-}
-
-const SEEDED_LOCATION_NAME_BY_ID = new Map(SEEDED_LOCATIONS.map((location) => [location.id, location.name]));
-
-function mapLocalGymToSessionLocation(gym: LocalGymLookupRecord): SessionLocation {
-  return {
-    id: gym.id,
-    name: gym.name,
-    archived: false,
-    latitude: gym.latitude,
-    longitude: gym.longitude,
-    coordinateAccuracyM: gym.coordinateAccuracyM,
-    coordinatesUpdatedAt: gym.coordinatesUpdatedAt,
-  };
-}
-
-function mergeLocalGymsIntoLocations(
-  currentLocations: SessionLocation[],
-  localGyms: LocalGymLookupRecord[]
-): SessionLocation[] {
-  let didChange = false;
-  const nextLocations = [...currentLocations];
-
-  for (const localGym of localGyms) {
-    const existingIndex = nextLocations.findIndex((location) => location.id === localGym.id);
-
-    if (existingIndex === -1) {
-      nextLocations.push(mapLocalGymToSessionLocation(localGym));
-      didChange = true;
-      continue;
-    }
-
-    const existing = nextLocations[existingIndex];
-    const seededName = SEEDED_LOCATION_NAME_BY_ID.get(existing.id);
-    const mergedLocation: SessionLocation = {
-      ...existing,
-      name: seededName && existing.name === seededName ? localGym.name : existing.name,
-      latitude: localGym.latitude,
-      longitude: localGym.longitude,
-      coordinateAccuracyM: localGym.coordinateAccuracyM,
-      coordinatesUpdatedAt: localGym.coordinatesUpdatedAt,
-    };
-
-    if (
-      mergedLocation.name !== existing.name ||
-      mergedLocation.latitude !== existing.latitude ||
-      mergedLocation.longitude !== existing.longitude ||
-      mergedLocation.coordinateAccuracyM !== existing.coordinateAccuracyM ||
-      mergedLocation.coordinatesUpdatedAt !== existing.coordinatesUpdatedAt
-    ) {
-      nextLocations[existingIndex] = mergedLocation;
-      didChange = true;
-    }
-  }
-
-  return didChange ? nextLocations : currentLocations;
 }
 
 function createLocationId(locationName: string): string {

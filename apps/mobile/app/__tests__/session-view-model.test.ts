@@ -138,7 +138,7 @@ describe('session view model', () => {
 });
 
 describe('submit cleanup (shared by the recorder and the session view)', () => {
-  it('asks about incomplete sets, then unconfirmed ones, then empty exercises, then completes', () => {
+  it('asks about unconfirmed sets, then removes incomplete sets and empty exercises behind one prompt', () => {
     const unconfirmed = { ...doneSet('u1', '50', '5', 'rir_1'), performanceStatus: 'unperformed' as const };
     const start = session([
       { ...bench, sets: [bench.sets[1], blankSet('x1'), unconfirmed] },
@@ -146,25 +146,47 @@ describe('submit cleanup (shared by the recorder and the session view)', () => {
     ]);
 
     const first = nextSubmitCleanup(start);
-    expect(first).toMatchObject({ kind: 'prompt', prompt: { step: 'incomplete-sets', affectedCount: 1 } });
+    expect(first).toMatchObject({ kind: 'prompt', prompt: { step: 'unconfirmed-sets', affectedCount: 1 } });
     if (first.kind !== 'prompt') throw new Error('expected a prompt');
 
     const second = nextSubmitCleanup(first.prompt.nextSession);
-    expect(second).toMatchObject({ kind: 'prompt', prompt: { step: 'unconfirmed-sets', affectedCount: 1 } });
+    expect(second).toMatchObject({
+      kind: 'prompt',
+      prompt: { step: 'empty-sets-and-exercises', incompleteSetCount: 1, emptyExerciseCount: 1 },
+    });
     if (second.kind !== 'prompt') throw new Error('expected a prompt');
 
-    const third = nextSubmitCleanup(second.prompt.nextSession);
-    expect(third).toMatchObject({ kind: 'prompt', prompt: { step: 'empty-exercises', affectedCount: 1 } });
-    if (third.kind !== 'prompt') throw new Error('expected a prompt');
-
-    const done = nextSubmitCleanup(third.prompt.nextSession);
+    const done = nextSubmitCleanup(second.prompt.nextSession);
     expect(done.kind).toBe('ready');
     if (done.kind !== 'ready') throw new Error('expected ready');
     expect(done.session.exercises.map((exercise) => exercise.sets.map((set) => set.id))).toEqual([['b2']]);
   });
 
-  it('keeps the recorder copy for each prompt', () => {
-    expect(describeSubmitCleanupPrompt({ step: 'incomplete-sets', affectedCount: 2 }, 'active')).toEqual({
+  it('asks once for an added exercise whose only set was left empty', () => {
+    const start = session([
+      { ...bench, sets: [bench.sets[1]] },
+      { ...bench, id: 'fly', exerciseDefinitionId: 'def_fly', sets: [blankSet('x1')] },
+    ]);
+
+    const first = nextSubmitCleanup(start);
+    expect(first).toMatchObject({
+      kind: 'prompt',
+      prompt: { step: 'empty-sets-and-exercises', incompleteSetCount: 1, emptyExerciseCount: 1 },
+    });
+    if (first.kind !== 'prompt') throw new Error('expected a prompt');
+    const done = nextSubmitCleanup(first.prompt.nextSession);
+    expect(done.kind).toBe('ready');
+    if (done.kind !== 'ready') throw new Error('expected ready');
+    expect(done.session.exercises.map((exercise) => exercise.id)).toEqual([bench.id]);
+  });
+
+  it('keeps the recorder copy for each prompt, and names both removals when there are two', () => {
+    expect(
+      describeSubmitCleanupPrompt(
+        { step: 'empty-sets-and-exercises', incompleteSetCount: 2, emptyExerciseCount: 0 },
+        'active'
+      )
+    ).toEqual({
       title: 'Remove incomplete sets and submit?',
       message: '2 incomplete sets missing reps or weight will be removed.',
       confirmLabel: 'Remove incomplete sets and submit',
@@ -174,9 +196,22 @@ describe('submit cleanup (shared by the recorder and the session view)', () => {
       message: '1 set with entered values is not confirmed and will be discarded.',
       confirmLabel: 'Discard unconfirmed sets and save changes',
     });
-    expect(describeSubmitCleanupPrompt({ step: 'empty-exercises', affectedCount: 1 }, 'active').confirmLabel).toBe(
-      'Remove empty exercises and submit'
-    );
+    expect(
+      describeSubmitCleanupPrompt(
+        { step: 'empty-sets-and-exercises', incompleteSetCount: 0, emptyExerciseCount: 1 },
+        'active'
+      ).confirmLabel
+    ).toBe('Remove empty exercises and submit');
+    expect(
+      describeSubmitCleanupPrompt(
+        { step: 'empty-sets-and-exercises', incompleteSetCount: 1, emptyExerciseCount: 2 },
+        'active'
+      )
+    ).toEqual({
+      title: 'Remove incomplete sets and empty exercises?',
+      message: '1 incomplete set missing reps or weight and 2 exercises left with no sets will be removed.',
+      confirmLabel: 'Remove and submit',
+    });
   });
 });
 

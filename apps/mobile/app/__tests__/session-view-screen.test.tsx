@@ -20,11 +20,13 @@ jest.mock('expo-router', () => {
 
 jest.mock('@/src/data', () => ({
   completeSessionDraft: jest.fn(),
+  listLocalGyms: jest.fn(),
   loadLatestSessionDraftSnapshot: jest.fn(),
   loadLocalGymById: jest.fn(),
   loadRecentExerciseBlocks: jest.fn(),
   persistSessionDraftSnapshot: jest.fn(),
   setSessionDeletedState: jest.fn(),
+  upsertLocalGym: jest.fn(),
 }));
 
 jest.mock('@/src/logging', () => ({ logEvent: jest.fn().mockResolvedValue(undefined) }));
@@ -119,6 +121,11 @@ describe('Session view', () => {
     mockDismissTo.mockReset();
     data.loadLatestSessionDraftSnapshot.mockReset().mockImplementation(async () => snapshot());
     data.loadLocalGymById.mockReset().mockResolvedValue({ id: 'gym-1', name: 'Iron Works' });
+    data.listLocalGyms.mockReset().mockResolvedValue([
+      { id: 'gym-1', name: 'Iron Works', latitude: null, longitude: null, coordinateAccuracyM: null, coordinatesUpdatedAt: null },
+      { id: 'gym-2', name: 'Harbour Barbell', latitude: null, longitude: null, coordinateAccuracyM: null, coordinatesUpdatedAt: null },
+    ]);
+    data.upsertLocalGym.mockReset().mockResolvedValue(undefined);
     data.loadRecentExerciseBlocks.mockReset().mockImplementation(async ({ exerciseDefinitionId }) => ({
       exerciseDefinitionId,
       limit: null,
@@ -144,7 +151,7 @@ describe('Session view', () => {
   it('shows the summary and one read-only card per exercise, with its record band', async () => {
     await renderReady();
 
-    expect(screen.getByLabelText('Gym Iron Works')).toBeTruthy();
+    expect(screen.getByTestId('session-view-summary-gym-button')).toHaveProp('accessibilityLabel', 'Gym Iron Works');
     expect(screen.getByLabelText('Sets 2')).toBeTruthy();
     expect(screen.getByLabelText('Volume 2280')).toBeTruthy();
     expect(screen.getByTestId('session-view-exercise-bench-record')).toBeTruthy();
@@ -235,6 +242,43 @@ describe('Session view', () => {
     expect(written.exercises[2].sets[0]).toMatchObject({ repsValue: '', weightValue: '', performanceStatus: 'unperformed' });
     // The existing sets go back unchanged.
     expect(written.exercises[0].sets.map((row: { id: string }) => row.id)).toEqual(['b1', 'b2', 'b3']);
+  });
+
+  it('picks the gym from the recorder picker list by tapping the Gym stat', async () => {
+    await renderReady();
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('session-view-summary-gym-button'));
+    });
+    // No gym, the recorder's seeded gyms, then the local ones; the current one marked.
+    expect(screen.getByTestId('session-view-gym-option-none')).toBeTruthy();
+    expect(screen.getByTestId('session-view-gym-option-downtown-iron-temple')).toBeTruthy();
+    expect(screen.getByTestId('session-view-gym-option-gym-1')).toBeSelected();
+
+    data.loadLocalGymById.mockResolvedValue({ id: 'gym-2', name: 'Harbour Barbell' });
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('session-view-gym-option-gym-2'));
+    });
+
+    expect(data.upsertLocalGym).toHaveBeenCalledWith({ id: 'gym-2', name: 'Harbour Barbell' });
+    const written = data.persistSessionDraftSnapshot.mock.calls.at(-1)?.[0];
+    expect(written).toMatchObject({ sessionId: 'session-1', gymId: 'gym-2', status: 'active' });
+    // The sets go back unchanged.
+    expect(written.exercises[0].sets.map((row: { id: string }) => row.id)).toEqual(['b1', 'b2', 'b3']);
+  });
+
+  it('clears the gym with No gym', async () => {
+    await renderReady();
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('session-view-summary-gym-button'));
+    });
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('session-view-gym-option-none'));
+    });
+
+    expect(data.upsertLocalGym).not.toHaveBeenCalled();
+    expect(data.persistSessionDraftSnapshot.mock.calls.at(-1)?.[0]).toMatchObject({ gymId: null });
   });
 
   it('says so when its session is no longer the active draft', async () => {

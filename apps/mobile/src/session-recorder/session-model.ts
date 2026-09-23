@@ -464,36 +464,33 @@ export const formatSetRepsLabel = (value: string | null | undefined): string => 
   return `${trimmed} ${trimmed === '1' ? 'rep' : 'reps'}`;
 };
 
-export type SubmitCleanupStep = 'incomplete-sets' | 'unconfirmed-sets' | 'empty-exercises';
+export type SubmitCleanupStep = 'unconfirmed-sets' | 'empty-sets-and-exercises';
 
-export type SubmitCleanupPrompt = {
-  step: SubmitCleanupStep;
-  affectedCount: number;
-  nextSession: Session;
-};
+/** What one cleanup prompt removes; the copy is chosen from these counts. */
+export type SubmitCleanupCounts =
+  | { step: 'unconfirmed-sets'; affectedCount: number }
+  | { step: 'empty-sets-and-exercises'; incompleteSetCount: number; emptyExerciseCount: number };
+
+export type SubmitCleanupPrompt = SubmitCleanupCounts & { nextSession: Session };
 
 export type SubmitCleanupResult =
   | { kind: 'prompt'; prompt: SubmitCleanupPrompt }
   | { kind: 'ready'; session: Session };
 
 /**
- * One step of the submit cleanup: the next discard the user must confirm
- * (incomplete sets, then entered-but-unconfirmed sets, then exercises left
- * with no sets), or the completed-history session once nothing is left to
- * confirm. Confirming a prompt runs this again on its `nextSession`.
+ * One step of the submit cleanup: the next discard the user must confirm, or
+ * the completed-history session once nothing is left to confirm. Confirming a
+ * prompt runs this again on its `nextSession`.
+ *
+ * Entered-but-unconfirmed sets are asked about first, on their own, because
+ * they discard values the lifter typed. Incomplete sets and the exercises left
+ * with no sets are then removed together behind one prompt (decided
+ * 2026-09-23 on device: one tidy-up, not two).
  */
 export const nextSubmitCleanup = (candidate: Session): SubmitCleanupResult => {
   const committedSession = canonicalizeSessionSetWeights(candidate);
-  const { session: withoutIncompleteSets, removedSets } = removeIncompleteSets(committedSession);
-  if (removedSets > 0) {
-    return {
-      kind: 'prompt',
-      prompt: { step: 'incomplete-sets', affectedCount: removedSets, nextSession: withoutIncompleteSets },
-    };
-  }
-
   const { session: withoutUnconfirmedSets, removedSets: removedUnconfirmedSets } =
-    removeUnconfirmedSets(withoutIncompleteSets);
+    removeUnconfirmedSets(committedSession);
   if (removedUnconfirmedSets > 0) {
     return {
       kind: 'prompt',
@@ -505,12 +502,19 @@ export const nextSubmitCleanup = (candidate: Session): SubmitCleanupResult => {
     };
   }
 
-  const completedHistorySession = toCompletedHistorySession(withoutUnconfirmedSets);
+  const { session: withoutIncompleteSets, removedSets: removedIncompleteSets } =
+    removeIncompleteSets(committedSession);
+  const completedHistorySession = toCompletedHistorySession(withoutIncompleteSets);
   const { session: withoutEmptyExercises, removedExercises } = removeExercisesWithNoSets(completedHistorySession);
-  if (removedExercises > 0) {
+  if (removedIncompleteSets > 0 || removedExercises > 0) {
     return {
       kind: 'prompt',
-      prompt: { step: 'empty-exercises', affectedCount: removedExercises, nextSession: withoutEmptyExercises },
+      prompt: {
+        step: 'empty-sets-and-exercises',
+        incompleteSetCount: removedIncompleteSets,
+        emptyExerciseCount: removedExercises,
+        nextSession: withoutEmptyExercises,
+      },
     };
   }
 
@@ -519,36 +523,48 @@ export const nextSubmitCleanup = (candidate: Session): SubmitCleanupResult => {
 
 export const SUBMIT_CLEANUP_CANCEL_LABEL = 'Go back to edit session';
 
+const countOf = (count: number, noun: string) => `${count} ${noun}${count === 1 ? '' : 's'}`;
+
 /** The confirmation copy for a submit cleanup prompt, shared by both recorders. */
 export const describeSubmitCleanupPrompt = (
-  prompt: Pick<SubmitCleanupPrompt, 'step' | 'affectedCount'>,
+  prompt: SubmitCleanupCounts,
   mode: 'active' | 'completed-edit'
 ): { title: string; message: string; confirmLabel: string } => {
-  const count = prompt.affectedCount;
-  const plural = count === 1 ? '' : 's';
   const outcome = mode === 'completed-edit' ? 'save changes' : 'submit';
-  switch (prompt.step) {
-    case 'incomplete-sets':
-      return {
-        title: 'Remove incomplete sets and submit?',
-        message: `${count} incomplete set${plural} missing reps or weight will be removed.`,
-        confirmLabel: `Remove incomplete sets and ${outcome}`,
-      };
-    case 'unconfirmed-sets':
-      return {
-        title: 'Discard unconfirmed sets and submit?',
-        message: `${count} set${plural} with entered values ${
-          count === 1 ? 'is' : 'are'
-        } not confirmed and will be discarded.`,
-        confirmLabel: `Discard unconfirmed sets and ${outcome}`,
-      };
-    case 'empty-exercises':
-      return {
-        title: 'Remove exercises with no sets and submit?',
-        message: `${count} exercise${plural} with no sets will be removed.`,
-        confirmLabel: `Remove empty exercises and ${outcome}`,
-      };
+  if (prompt.step === 'unconfirmed-sets') {
+    const count = prompt.affectedCount;
+    return {
+      title: 'Discard unconfirmed sets and submit?',
+      message: `${countOf(count, 'set')} with entered values ${
+        count === 1 ? 'is' : 'are'
+      } not confirmed and will be discarded.`,
+      confirmLabel: `Discard unconfirmed sets and ${outcome}`,
+    };
   }
+
+  const { incompleteSetCount, emptyExerciseCount } = prompt;
+  if (emptyExerciseCount === 0) {
+    return {
+      title: 'Remove incomplete sets and submit?',
+      message: `${countOf(incompleteSetCount, 'incomplete set')} missing reps or weight will be removed.`,
+      confirmLabel: `Remove incomplete sets and ${outcome}`,
+    };
+  }
+  if (incompleteSetCount === 0) {
+    return {
+      title: 'Remove exercises with no sets and submit?',
+      message: `${countOf(emptyExerciseCount, 'exercise')} with no sets will be removed.`,
+      confirmLabel: `Remove empty exercises and ${outcome}`,
+    };
+  }
+  return {
+    title: 'Remove incomplete sets and empty exercises?',
+    message: `${countOf(incompleteSetCount, 'incomplete set')} missing reps or weight and ${countOf(
+      emptyExerciseCount,
+      'exercise'
+    )} left with no sets will be removed.`,
+    confirmLabel: `Remove and ${outcome}`,
+  };
 };
 
 /** The session as `session-insights` reads it (records, muscle load). */

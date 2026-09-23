@@ -5,6 +5,7 @@ import {
   loadLatestSessionDraftSnapshot,
   persistSessionDraftSnapshot,
   setSessionDeletedState,
+  upsertLocalGym,
   type ExerciseBlockHistorySuggestedPlan,
 } from '@/src/data';
 import { logEvent } from '@/src/logging';
@@ -73,10 +74,10 @@ export const loadActiveSessionGraph = async (sessionId: string): Promise<ActiveS
   };
 };
 
-const persistActiveSessionGraph = (graph: ActiveSessionGraph, session: Session) =>
+const persistActiveSessionGraph = (graph: ActiveSessionGraph, session: Session, gymId = graph.gymId) =>
   persistSessionDraftSnapshot({
     sessionId: graph.sessionId,
-    gymId: graph.gymId,
+    gymId,
     startedAt: graph.startedAt,
     status: 'active',
     exercises: toPersistDraftExercises(session),
@@ -88,6 +89,22 @@ const requireActiveSessionGraph = async (sessionId: string): Promise<ActiveSessi
     throw new Error('This session is no longer active.');
   }
   return graph;
+};
+
+/**
+ * Sets the active session's gym, or clears it with `null`. A seeded gym is
+ * written to the local `gyms` table first, as the recorder's autosave does, so
+ * the session's `gymId` always names a local row.
+ */
+export const setActiveSessionGym = async (
+  sessionId: string,
+  gym: { id: string; name: string } | null
+): Promise<void> => {
+  const graph = await requireActiveSessionGraph(sessionId);
+  if (gym) {
+    await upsertLocalGym({ id: gym.id, name: gym.name });
+  }
+  await persistActiveSessionGraph(graph, graph.session, gym?.id ?? null);
 };
 
 /**

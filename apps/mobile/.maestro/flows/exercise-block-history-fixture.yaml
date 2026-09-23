@@ -208,14 +208,11 @@ appId: com.dinoderek.mobile
     centerElement: true
 - tapOn:
     id: "session-recorder-submit-button"
+# One prompt removes the incomplete sets and the exercises left with no sets.
 - extendedWaitUntil:
-    visible: "Remove incomplete sets and submit?"
+    visible: "Remove incomplete sets and empty exercises?"
     timeout: 10000
-- tapOn: "Remove incomplete sets and submit"
-- extendedWaitUntil:
-    visible: "Remove exercises with no sets and submit?"
-    timeout: 10000
-- tapOn: "Remove empty exercises and submit"
+- tapOn: "Remove and submit"
 - extendedWaitUntil:
     visible:
       id: "session-completion-presentation"

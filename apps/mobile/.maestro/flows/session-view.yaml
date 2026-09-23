@@ -8,10 +8,11 @@ appId: com.dinoderek.mobile
 #      count and — for the bench, whose RIR 2 set beats its completed history —
 #      the 1RM record band (fixture: src/maestro/session-view-fixture.ts);
 #   3. a card links to its exercise page (step 4), and its back returns here;
-#   4. the ⋮ menu sheet opens and a backdrop tap dismisses it;
+#   4. the ⋮ menu sheet opens and a backdrop tap dismisses it; tapping the
+#      Gym stat picks a gym;
 #   5. + Add exercise adds a card through the recorder's picker;
-#   6. Finish runs the recorder's cleanup prompts and opens the completion
-#      screen.
+#   6. Finish asks one cleanup prompt for the empty set and the exercises left
+#      with no sets, and opens the completion screen.
 #
 # Hermetic: starts from `reset=data` and ends with a data reset, leaving the
 # setting off. Infra-free (no sign-in).
@@ -104,6 +105,21 @@ appId: com.dinoderek.mobile
       id: "session-view-abandon"
     timeout: 10000
 
+# 4b. Tapping the Gym stat opens the gym picker; choosing a gym saves it.
+- tapOn:
+    id: "session-view-summary-gym-button"
+- extendedWaitUntil:
+    visible:
+      id: "session-view-gym-option-downtown-iron-temple"
+    timeout: 10000
+- takeScreenshot: "02b-session-gym-sheet"
+- tapOn:
+    id: "session-view-gym-option-downtown-iron-temple"
+- extendedWaitUntil:
+    visible:
+      text: "Gym Downtown Iron Temple"
+    timeout: 10000
+
 # 5. + Add exercise, through the recorder's picker.
 - scrollUntilVisible:
     element:
@@ -135,21 +151,16 @@ appId: com.dinoderek.mobile
     centerElement: true
 - takeScreenshot: "03-session-view-exercise-added"
 
-# 6. Finish: the recorder's cleanup prompts, then the completion screen.
+# 6. Finish: ONE cleanup prompt removes the added exercise's empty set and the
+# exercises left with no sets together, then the completion screen.
 - tapOn:
     id: "session-view-finish-button"
 - extendedWaitUntil:
     visible:
-      text: "Remove incomplete sets and submit?"
+      text: "Remove incomplete sets and empty exercises?"
     timeout: 10000
 - tapOn:
-    text: "Remove incomplete sets and submit"
-- extendedWaitUntil:
-    visible:
-      text: "Remove exercises with no sets and submit?"
-    timeout: 10000
-- tapOn:
-    text: "Remove empty exercises and submit"
+    text: "Remove and submit"
 - extendedWaitUntil:
     visible:
       id: "session-completion-presentation"
