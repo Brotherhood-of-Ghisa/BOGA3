@@ -87,8 +87,8 @@ the requirement from `./boga test for`.
 - Back and Complete are two distinct exits: Back leaves set states untouched,
   Complete prompts on incomplete sets.
 - Planned vs ad-hoc is not a mode.
-- Warm-ups render like working sets and show a 1RM, while remaining excluded
-  from records.
+- Warm-ups render like working sets and show a 1RM; they count toward 1RM and
+  records, but not toward working sets.
 
 ## Open questions
 

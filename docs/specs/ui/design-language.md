@@ -178,7 +178,7 @@ additionally render faded (§6).
   values in `ink-faint`, legends in `planned` (decided on device 2026-09-22;
   `planned` for the values themselves read too faint to use).
 - **Warm-ups are presented exactly like working sets**, including a real 1RM.
-  They remain excluded from records and working-set statistics by
-  `isWorkingSetType` (`src/session-insights/calculations.ts`). This divergence
-  between what is shown and what counts is deliberate, and must be stated
-  wherever records are explained to a user.
+  They count toward 1RM and records, but not toward working sets (kept as
+  shipped, decided 2026-09-23): `isWorkingSetType`
+  (`src/session-insights/calculations.ts`) feeds only the working-set count.
+  The full rule is `ux-rules.md` §5.11.
