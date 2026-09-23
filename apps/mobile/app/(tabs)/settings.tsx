@@ -5,7 +5,7 @@ import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { SyncStatusPanel } from '@/components/sync-status/sync-status-panel';
 import { MoreHubBackButton } from '@/components/navigation/more-hub-back-button';
-import { UiButton, UiSurface, UiText, uiBorder, uiColors, uiRadius, uiSpace, uiTypography } from '@/components/ui';
+import { Icon, UiButton, UiSurface, UiText, uiBorder, uiColors, uiRadius, uiSpace, uiTypography } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import { resetLocalDataAndReseed } from '@/src/data';
 import {
@@ -163,9 +163,7 @@ export default function SettingsScreen() {
           <UiSurface style={styles.destinationCard}>
             <View style={styles.destinationRow}>
               <View style={styles.iconBadge}>
-                <UiText selectable={false} style={styles.iconGlyph} variant="labelStrong">
-                  👤
-                </UiText>
+                <Icon color={uiColors.actionPrimary} name="user" />
               </View>
               <View style={styles.destinationCopy}>
                 <UiText selectable variant="labelStrong">
@@ -199,18 +197,21 @@ export default function SettingsScreen() {
           <UiSurface style={styles.destinationCard}>
             <View style={styles.destinationRow}>
               <View style={styles.iconBadge}>
-                <UiText selectable={false} style={styles.iconGlyph} variant="labelStrong">
-                  AI
-                </UiText>
+                <Icon color={uiColors.actionPrimary} name="sparkles" />
               </View>
               <View style={styles.destinationCopy}>
                 <UiText selectable variant="labelStrong">
-                  Connect an AI coach ↗
+                  Connect an AI coach
                 </UiText>
                 <UiText selectable variant="bodyMuted">
                   See setup instructions for your MCP-compatible client.
                 </UiText>
               </View>
+              <Icon
+                color={uiColors.textSecondary}
+                name="arrow-up-right"
+                style={styles.externalIndicator}
+              />
             </View>
           </UiSurface>
         </Pressable>
@@ -236,9 +237,7 @@ export default function SettingsScreen() {
             <UiSurface style={styles.destinationCard}>
               <View style={styles.destinationRow}>
                 <View style={styles.iconBadge}>
-                  <UiText selectable={false} style={styles.iconGlyph} variant="labelStrong">
-                    ✓
-                  </UiText>
+                  <Icon color={uiColors.actionPrimary} name="shield-check" />
                 </View>
                 <View style={styles.destinationCopy}>
                   <UiText selectable variant="labelStrong">
@@ -496,6 +495,9 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: uiSpace.md,
   },
+  externalIndicator: {
+    alignSelf: 'center',
+  },
   iconBadge: {
     width: 44,
     height: 44,
@@ -505,10 +507,6 @@ const styles = StyleSheet.create({
     borderColor: uiColors.actionPrimarySubtleBorder,
     borderRadius: uiRadius.full,
     backgroundColor: uiColors.surfaceInfo,
-  },
-  iconGlyph: {
-    fontSize: uiTypography.size.xl,
-    lineHeight: 20,
   },
   destinationCopy: {
     flex: 1,

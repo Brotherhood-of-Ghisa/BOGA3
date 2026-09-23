@@ -171,7 +171,8 @@ describe('the sheet (E2)', () => {
       dateLabel: '12 Sep 2026',
       loggedAsLabel: 'Logged as "Bench Press"',
       provisionalLabel: null,
-      statusLabel: '○ Not certified yet',
+      statusLabel: 'Not certified yet',
+      status: 'uncertified',
       lifterNote: null,
       actions: ['certify'],
       canViewSession: true,
@@ -200,14 +201,19 @@ describe('the sheet (E2)', () => {
       { ...detail, certification: CERT },
       { myUserId: 'me', myRole: 'member', session: null, sessionMissing: false, nowMs: now },
     );
-    expect(certified).toMatchObject({ statusLabel: '✓ Certified by sam · 12 Sep', loggedAsLabel: null, lifterNote: null });
+    expect(certified).toMatchObject({
+      statusLabel: 'Certified by sam · 12 Sep',
+      status: 'certified',
+      loggedAsLabel: null,
+      lifterNote: null,
+    });
   });
 
   it('hides View full session for a deleted set or a missing session; words voided', () => {
     const detail = recordSetFromStreamRecord(recordItem({ voided: { key: 'v', reason: 'deleted', occurred_at_ms: 1 } }));
     expect(
       buildRecordSetSheet(detail, { myUserId: 'me', myRole: 'owner', session: null, sessionMissing: false, nowMs: now }),
-    ).toMatchObject({ statusLabel: 'Voided · set deleted', canViewSession: false, actions: [] });
+    ).toMatchObject({ statusLabel: 'Voided · set deleted', status: 'voided', canViewSession: false, actions: [] });
     expect(
       buildRecordSetSheet(recordSetFromStreamRecord(recordItem()), {
         myUserId: 'me',

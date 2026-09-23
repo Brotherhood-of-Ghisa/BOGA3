@@ -2,6 +2,7 @@ export { FriendSessionContent, formatGroupSetEffort } from './friend-session-con
 export { GroupActionSheet, type GroupActionSheetItem } from './group-action-sheet';
 export { GroupBoardHistoryItem } from './group-board-history-item';
 export { GroupBoardRow } from './group-board-row';
+export { GroupCertificationStatus } from './certification-status';
 export { GroupExerciseForm } from './group-exercise-form';
 export { GroupExercisePickSheet, type GroupExercisePickTarget } from './group-exercise-pick-sheet';
 export { GroupExerciseRow } from './group-exercise-row';

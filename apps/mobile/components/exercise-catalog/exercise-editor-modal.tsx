@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 
 import { ExerciseCoreFields } from '@/components/exercise-core/exercise-core-fields';
-import { uiColors, uiRadius, uiSpace, uiTypography } from '@/components/ui';
+import { Icon, uiColors, uiRadius, uiSpace, uiTypography } from '@/components/ui';
 import { validateExerciseCore } from '@/src/exercise-core';
 import {
   saveExerciseCatalogExercise,
@@ -399,7 +399,7 @@ export function ExerciseEditorModal({
                       ? getMuscleDisplayName(primaryMuscleGroupId, muscleGroupById)
                       : 'Select primary muscle'}
                   </Text>
-                  <Text style={styles.pickerButtonChevron}>▾</Text>
+                  <Icon color={uiColors.textSecondary} name="chevron-down" size="sm" />
                 </Pressable>
                 {validation.primaryMuscleError ? (
                   <Text selectable style={styles.errorText}>
@@ -645,11 +645,6 @@ const styles = StyleSheet.create({
     minWidth: 0,
     color: uiColors.textSecondary,
     fontSize: uiTypography.size.md,
-  },
-  pickerButtonChevron: {
-    color: uiColors.textSecondary,
-    fontSize: uiTypography.size.sm,
-    fontWeight: '700',
   },
   secondaryMuscleRow: {
     borderWidth: 1,

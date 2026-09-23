@@ -487,7 +487,7 @@ appId: com.dinoderek.mobile
     timeout: 15000
 - assertVisible:
     id: "group-record-sheet-status"
-    text: "○ Not certified yet"
+    text: "Not certified yet"
 - assertVisible:
     id: "group-record-sheet-certify"
 - takeScreenshot: "groups-07b-7-row-detail"
@@ -568,7 +568,7 @@ appId: com.dinoderek.mobile
     text: "Prowler Push\\s+55 kg × 5 · e1RM .* kg"
 - assertVisible:
     id: "group-stream-record-card-${output.groupsRecordKey}-status"
-    text: "○ Not certified yet"
+    text: "Not certified yet"
 - assertVisible:
     id: "group-stream-session-card-${output.groupsRecordSessionCardKey}-records"
     text: "1 record"
@@ -586,7 +586,7 @@ appId: com.dinoderek.mobile
 - extendedWaitUntil:
     visible:
       id: "group-stream-record-card-${output.groupsRecordKey}-status"
-      text: "✓ Certified by you"
+      text: "Certified by you"
     timeout: 15000
 - assertNotVisible:
     id: "group-stream-record-card-${output.groupsRecordKey}-certify"
@@ -639,7 +639,7 @@ appId: com.dinoderek.mobile
     timeout: 10000
 - assertVisible:
     id: "group-record-sheet-status"
-    text: "✓ Certified by you · .*"
+    text: "Certified by you · .*"
 - assertVisible:
     id: "group-record-sheet-withdraw"
 - assertNotVisible:
@@ -737,7 +737,7 @@ appId: com.dinoderek.mobile
     timeout: 10000
 - assertVisible:
     id: "group-record-sheet-status"
-    text: "✓ Certified by you · .*"
+    text: "Certified by you · .*"
 - assertNotVisible:
     id: "group-record-sheet-certify"
 - takeScreenshot: "groups-08b-2-row-detail-former"

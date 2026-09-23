@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { UiButton, UiSurface, UiText, uiColors, uiRadius, uiSpace, uiTypography } from '@/components/ui';
 import type { RecordSetWriteNotice, StreamRecordCardViewModel } from '@/src/groups';
 
+import { GroupCertificationStatus } from './certification-status';
 import { GroupWriteNotice } from './write-notice';
 
 type GroupStreamRecordCardProps = {
@@ -48,9 +49,7 @@ export function GroupStreamRecordCard({
         style={({ pressed }) => [styles.summary, pressed ? styles.pressed : null]}
         testID={`${testID}-open`}>
         {card.voided ? (
-          <UiText testID={`${testID}-status`} variant="label">
-            {card.statusLabel}
-          </UiText>
+          <GroupCertificationStatus label={card.statusLabel} status={card.status} testID={`${testID}-status`} />
         ) : null}
         <UiText numberOfLines={1} testID={`${testID}-title`} variant="title">
           {card.title}
@@ -71,9 +70,7 @@ export function GroupStreamRecordCard({
           </UiText>
         ) : null}
         {card.voided ? null : (
-          <UiText testID={`${testID}-status`} variant="label">
-            {card.statusLabel}
-          </UiText>
+          <GroupCertificationStatus label={card.statusLabel} status={card.status} testID={`${testID}-status`} />
         )}
         {showGroupName ? (
           <UiText numberOfLines={1} style={styles.group} testID={`${testID}-group`} variant="bodyMuted">

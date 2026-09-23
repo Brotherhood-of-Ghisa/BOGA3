@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
-import { UiButton, UiText, uiBorder, uiColors, uiRadius, uiSpace } from '@/components/ui';
+import { Icon, UiButton, UiText, uiBorder, uiColors, uiRadius, uiSpace } from '@/components/ui';
 import {
   buildPickSheetModel,
   describeLinkRetroactivity,
@@ -254,10 +254,17 @@ function RadioRow({
       onPress={onPress}
       style={[styles.choice, checked ? styles.choiceSelected : null]}
       testID={testID}>
-      <UiText>
-        {checked ? '●' : '○'} {label}
-      </UiText>
-      {detail ? <UiText variant="bodyMuted">{detail}</UiText> : null}
+      <View style={styles.choiceRow}>
+        <Icon
+          color={checked ? uiColors.actionPrimary : uiColors.textSecondary}
+          name={checked ? 'radio-on' : 'radio-off'}
+          size="sm"
+        />
+        <View style={styles.choiceCopy}>
+          <UiText>{label}</UiText>
+          {detail ? <UiText variant="bodyMuted">{detail}</UiText> : null}
+        </View>
+      </View>
     </Pressable>
   );
 }
@@ -294,6 +301,14 @@ const styles = StyleSheet.create({
     borderRadius: uiRadius.md,
     paddingHorizontal: uiSpace.md,
     paddingVertical: uiSpace.sm,
+  },
+  choiceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: uiSpace.sm,
+  },
+  choiceCopy: {
+    flex: 1,
   },
   choiceSelected: {
     borderColor: uiColors.rowActiveBorder,

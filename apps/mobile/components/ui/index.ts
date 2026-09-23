@@ -1,5 +1,6 @@
 export { UiButton, type UiButtonVariant } from '@/components/ui/button';
 export { Card } from '@/components/ui/card';
+export { Icon, type IconName, type IconProps } from '@/components/ui/icon';
 export {
   ListRow,
   type ListRowDensity,
@@ -29,6 +30,7 @@ export {
   uiElevation,
   uiFonts,
   uiGeometry,
+  uiIconSize,
   uiRadius,
   uiRoles,
   uiSpace,
@@ -37,6 +39,7 @@ export {
   type UiColorToken,
   type UiElevationToken,
   type UiFontToken,
+  type UiIconSizeToken,
   type UiRadiusToken,
   type UiRoleToken,
   type UiSpaceToken,

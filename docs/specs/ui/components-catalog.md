@@ -47,6 +47,8 @@ Brief entrypoint inventory of the current reusable UI component set.
     and their shipped weights) and `uiGeometry` (card / sheet radii, the 44pt
     tap target, the 38pt metric column, the sheet handle, micro-label
     tracking); rationale: `docs/specs/ui/design-language.md` §2–§4
+  - `uiIconSize` (`xs` 12 / `sm` 16 / `md` 20 / `lg` 24), the icon edge lengths
+    `Icon` takes
 
 2. `UiText`
 - File: `apps/mobile/components/ui/text.tsx`
@@ -98,7 +100,29 @@ Brief entrypoint inventory of the current reusable UI component set.
     VoiceOver escape gesture dismiss it — there is no Cancel button
   - covered by `apps/mobile/app/__tests__/ui-design-primitives.test.tsx`
 
-7. `ui` barrel exports
+7. `Icon`
+- Files: `apps/mobile/components/ui/icon.tsx`, `icon-glyphs.ts` (geometry),
+  `LICENSE.lucide`
+- Purpose:
+  - the app's icon set: `<Icon name size color label testID />` over
+    `react-native-svg`. `name` is a closed union (`IconName`); `size` a
+    `uiIconSize` key (default `md`); `color` a token value (default
+    `uiColors.textPrimary`)
+  - decorative by default (hidden from assistive tech, never takes touches); a
+    `label` makes it an accessible image, for the rare icon no surrounding text
+    or control label explains
+  - geometry is vendored from Lucide 1.47.0 (ISC; notice in `LICENSE.lucide`),
+    plus BoGa glyphs: `caret-down`, `radio-on` / `radio-off`, and the
+    design-language §5 set-state glyphs `set-done` (filled `ink` disc, knocked-out
+    check), `set-current` (`accent` ring), `set-planned` (dashed `planned` ring),
+    which carry their role colour by default and are meant for `ListRow`'s
+    trailing slot on the set row (step 4). Add icons from the same Lucide
+    release, named by role
+  - replaced the improvised Unicode glyphs on every shipped screen except the
+    recorder (deleted by the exercise/session rebuild); `app/__tests__/ui-icon.test.tsx`
+    fails if a retired glyph comes back
+
+8. `ui` barrel exports
 - File: `apps/mobile/components/ui/index.ts`
 - Purpose:
   - single import entrypoint for current tokens and UI primitives
@@ -219,7 +243,7 @@ Brief entrypoint inventory of the current reusable UI component set.
   - `GroupStreamMembershipItem` — "X joined / left the group / was removed" row; pressable only where it opens another screen
   - `GroupFilterChips` — one `SegmentedChips` chip per group, exactly one selected (no `All`), wrapping rather than scrolling sideways; the Groups screen's group selector
   - `GroupStreamList` — `FlatList` with `RefreshControl`, online older-page loading, and a Retry footer; (M25-T10) it renders every stream kind and owns the one certification write state (`useRecordSetCertification`) shared by the inline `Certify` buttons and the row detail sheet
-  - `GroupStreamRecordCard` (M25-T10) — a record card under its session card (indented): title (`dave — group record` / `— PR`), group exercise and value, board badges, `Session in progress`, the status (`○ Not certified yet` / `✓ Certified by …` / `Voided · set …`, first and on the muted panel when voided), and its group where names are shown (Today); the summary is one press target (opens the sheet, or on Today the Groups screen via `pressHint`), and `Certify` sits beside it with its inline notice. Without `onCertify` (Today) the card is read-only. testID `group-stream-record-card-<key>` with `-open`, `-title`, `-value`, `-provisional`, `-status`, `-group`, `-certify`, `-notice`
+  - `GroupStreamRecordCard` (M25-T10) — a record card under its session card (indented): title (`dave — group record` / `— PR`), group exercise and value, board badges, `Session in progress`, the status via `GroupCertificationStatus` (`Not certified yet` / `Certified by …` / `Voided · set …`, first and on the muted panel when voided), and its group where names are shown (Today); the summary is one press target (opens the sheet, or on Today the Groups screen via `pressHint`), and `Certify` sits beside it with its inline notice. Without `onCertify` (Today) the card is read-only. testID `group-stream-record-card-<key>` with `-open`, `-title`, `-value`, `-provisional`, `-status`, `-group`, `-certify`, `-notice`
   - `GroupStreamSentenceItem` (M25-T10) — a record-removed or link item: a light row with one sentence, not pressable. testIDs `group-stream-record-removed-<key>` / `group-stream-link-<key>` with `-sentence`
   - `RecordSetSheet` (M25-T10) — the row detail (E2) shared by record cards and board rows: an in-route bottom `Modal` with the value, logged, date · gym, logged-as, provisional and status lines, the lifter note, the write notice, the actions my relationship allows (`Certify` primary; `Remove my certification` / `Cancel certification` danger, confirmed with `Alert.alert`), `View full session`, and `Close`. Gym and logged-as come from the `session:<memberId>:<sessionId>` resource. testIDs `group-record-sheet` with `-overlay`, `-title`, `-value`, `-logged`, `-date`, `-logged-as`, `-provisional`, `-status`, `-lifter-note`, `-notice`, `-certify`, `-withdraw`, `-cancel`, `-view-session`, `-close`
   - `GroupOfflineBanner` — the `Offline · last updated HH:MM` marker
@@ -232,7 +256,8 @@ Brief entrypoint inventory of the current reusable UI component set.
   - `StandardExercisePicker` (M25-T08) — search and list of the bundled standard exercises to copy into a group
   - `GroupLostAccessState` (M25-T08) — the shared "You're no longer a member of this group" panel
   - `GroupLeaderboardsPage`, `GroupPodiumCard` (M25-T09) — the Groups screen's Leaderboards segment: one whole-card press target per group exercise (name, view label, `Archived` tag, up to three podium rows, empty label, `You: …`). testIDs `group-leaderboards-page`, `group-leaderboards-empty`, `group-podium-card-<exerciseId>` with `-name`, `-view`, `-archived`, `-row-<rank>`, `-empty`, `-you`
-  - `GroupBoardRow` (M25-T09) — one full-board row as a single accessibility element (rank, member, value, e1RM detail, date, ✓ / ○ on All); my row on the muted panel; (M25-T10) a press target that opens the row detail sheet. testID `group-board-row-<rank>` with `-member`, `-value`, `-detail`, `-date`, `-mark`
+  - `GroupCertificationStatus` — a record's certification state: a check `Icon` (certified), a ring (not yet) or none (voided) beside its label; the label keeps the caller's testID. Used by `GroupStreamRecordCard`, `RecordSetSheet` and `GroupBoardRow`
+  - `GroupBoardRow` (M25-T09) — one full-board row as a single accessibility element (rank, member, value, e1RM detail, date, the certification mark on All); my row on the muted panel; (M25-T10) a press target that opens the row detail sheet. testID `group-board-row-<rank>` with `-member`, `-value`, `-detail`, `-date`, `-mark` (the icon `-mark-certified` / `-mark-uncertified`)
   - `GroupBoardHistoryItem` (M25-T09) — one lead change: date and sentence. testID `group-board-history-item-<seq>` with `-date`, `-sentence`
   - `GroupPagesFooter` (M25-T09) — the footer of an online paged list: a spinner, or the failure with `Retry` (`<prefix>-loading-more`, `-load-more-error`, `-load-more-retry`)
   - `UsernameGate` + `useUsernameGate(userId)` (M22-T05) — the inline username field shown before create / join when the profile username is blank (`loadUserProfile` / `saveUsername`); errors inline under the field; `require(notice)` re-opens it on a server `USERNAME_REQUIRED`; a profile that fails to load does not block the form

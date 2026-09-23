@@ -275,7 +275,8 @@ describe('board stream items (M25-T10)', () => {
         exerciseLabel: 'Bench Press',
         valueLabel: '140 kg × 1 · e1RM 142.5 kg',
         badges: ['PR · Weight', 'Group record · Weight', 'PR · e1RM'],
-        statusLabel: '○ Not certified yet',
+        statusLabel: 'Not certified yet',
+        status: 'uncertified',
         provisionalLabel: null,
         voided: false,
         canCertify: true,
@@ -303,10 +304,14 @@ describe('board stream items (M25-T10)', () => {
             certification: { certification_id: 'c1', certified_by: certifiedBy, certified_at_ms: 1 },
           }),
         );
-      expect(certified({ user_id: 'u3', username: 'sam' })).toMatchObject({ statusLabel: '✓ Certified by sam', canCertify: false });
-      expect(certified({ user_id: 'me', username: 'me' }).statusLabel).toBe('✓ Certified by you');
-      expect(certified({ user_id: 'u3', username: null }).statusLabel).toBe('✓ Certified by Unnamed member');
-      expect(certified(null).statusLabel).toBe('✓ Certified');
+      expect(certified({ user_id: 'u3', username: 'sam' })).toMatchObject({
+        statusLabel: 'Certified by sam',
+        status: 'certified',
+        canCertify: false,
+      });
+      expect(certified({ user_id: 'me', username: 'me' }).statusLabel).toBe('Certified by you');
+      expect(certified({ user_id: 'u3', username: null }).statusLabel).toBe('Certified by Unnamed member');
+      expect(certified(null).statusLabel).toBe('Certified');
     });
 
     it('marks provisional and voided cards; a voided card is never certifiable', () => {
@@ -314,7 +319,13 @@ describe('board stream items (M25-T10)', () => {
       for (const reason of ['edited', 'deleted'] as const) {
         expect(
           card(recordItem({ provisional: true, voided: { key: 'v1', reason, occurred_at_ms: 2 }, certified: true })),
-        ).toMatchObject({ statusLabel: `Voided · set ${reason}`, voided: true, canCertify: false, provisionalLabel: null });
+        ).toMatchObject({
+          statusLabel: `Voided · set ${reason}`,
+          status: 'voided',
+          voided: true,
+          canCertify: false,
+          provisionalLabel: null,
+        });
       }
     });
   });

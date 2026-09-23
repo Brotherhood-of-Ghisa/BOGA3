@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { uiColors, uiRadius, uiSpace, uiTypography } from '@/components/ui';
+import { Icon, uiColors, uiRadius, uiSpace } from '@/components/ui';
 
 import { SessionSummaryLine } from './session-summary-line';
 import type { SessionListItem } from './types';
@@ -57,7 +57,7 @@ export function ActiveSessionRow({
             onPress={onComplete}
             style={[styles.iconActionButton, styles.completeButton]}
             testID="complete-active-session-button">
-            <Text style={[styles.iconGlyphText, styles.completeGlyphText]}>✓</Text>
+            <Icon color={uiColors.textSuccess} name="check" size="sm" />
           </Pressable>
 
           <Pressable
@@ -66,7 +66,7 @@ export function ActiveSessionRow({
             onPress={() => setMenuVisible(true)}
             style={[styles.iconActionButton, styles.menuButton]}
             testID="active-session-menu-button">
-            <Text style={styles.iconGlyphText}>⋮</Text>
+            <Icon color={uiColors.actionNeutralSubtleText} name="more-vertical" size="sm" />
           </Pressable>
         </View>
       </View>
@@ -141,15 +141,6 @@ const styles = StyleSheet.create({
   menuButton: {
     backgroundColor: uiColors.actionNeutralSubtleBg,
     borderColor: uiColors.actionNeutralSubtleBorder,
-  },
-  iconGlyphText: {
-    color: uiColors.actionNeutralSubtleText,
-    fontSize: uiTypography.size.base,
-    fontWeight: '700',
-    lineHeight: 16,
-  },
-  completeGlyphText: {
-    color: uiColors.textSuccess,
   },
   modalRoot: {
     flex: 1,

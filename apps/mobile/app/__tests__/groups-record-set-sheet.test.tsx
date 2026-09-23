@@ -180,7 +180,7 @@ describe('stream items (E3, D15, P16)', () => {
     expect(screen.getByTestId('group-stream-session-card-u2:s1-records')).toHaveTextContent('1 record');
     expect(screen.getByTestId(`${RECORD_CARD}-title`)).toHaveTextContent('dave — group record');
     expect(screen.getByTestId(`${RECORD_CARD}-value`)).toHaveTextContent('Bench Press  140 kg × 1 · e1RM 142.5 kg');
-    expect(screen.getByTestId(`${RECORD_CARD}-status`)).toHaveTextContent('○ Not certified yet');
+    expect(screen.getByTestId(`${RECORD_CARD}-status`)).toHaveTextContent('Not certified yet');
     expect(screen.getByTestId(`${RECORD_CARD}-certify`)).toBeTruthy();
     expect(screen.getByTestId('group-stream-record-card-ev-old-status')).toHaveTextContent('Voided · set deleted');
     expect(screen.queryByTestId('group-stream-record-card-ev-old-certify')).toBeNull();
@@ -255,7 +255,7 @@ describe('certify from the card (E3)', () => {
     });
     expect(await screen.findByTestId(`${RECORD_CARD}-notice`)).toHaveTextContent(GROUP_OFFLINE_ACTION_MESSAGE);
     expect(api.certifyGroupSet).not.toHaveBeenCalled();
-    expect(screen.getByTestId(`${RECORD_CARD}-status`)).toHaveTextContent('○ Not certified yet');
+    expect(screen.getByTestId(`${RECORD_CARD}-status`)).toHaveTextContent('Not certified yet');
   });
 
   it('success: shows the server state at once, refreshes the stream, and opens no sheet', async () => {
@@ -272,7 +272,7 @@ describe('certify from the card (E3)', () => {
     });
 
     expect(api.certifyGroupSet).toHaveBeenCalledWith({ groupId: GROUP_ID, groupExerciseId: 'ge-bench', memberUserId: 'u2', setId: 'set-1' });
-    await waitFor(() => expect(screen.getByTestId(`${RECORD_CARD}-status`)).toHaveTextContent('✓ Certified by you'));
+    await waitFor(() => expect(screen.getByTestId(`${RECORD_CARD}-status`)).toHaveTextContent('Certified by you'));
     expect(screen.getByTestId(`${RECORD_CARD}-notice`)).toHaveTextContent('Certified. Certified boards update in a few seconds.');
     expect(screen.queryByTestId(`${RECORD_CARD}-certify`)).toBeNull();
     await waitFor(() => expect(api.getGroupStream.mock.calls.length).toBeGreaterThan(streamCalls));
@@ -290,7 +290,7 @@ describe('certify from the card (E3)', () => {
       fireEvent.press(screen.getByTestId(`${RECORD_CARD}-certify`));
     });
     await waitFor(() => expect(api.getGroupStream.mock.calls.length).toBeGreaterThan(streamCalls));
-    await waitFor(() => expect(screen.getByTestId(`${RECORD_CARD}-status`)).toHaveTextContent('✓ Certified by you'));
+    await waitFor(() => expect(screen.getByTestId(`${RECORD_CARD}-status`)).toHaveTextContent('Certified by you'));
     expect(screen.queryByTestId(`${RECORD_CARD}-certify`)).toBeNull();
   });
 
@@ -367,7 +367,7 @@ describe('the row detail sheet (E2)', () => {
       certification: certificationPayload({ ended_at_ms: 2, end_reason: 'withdrawn', ended_by: { user_id: ME, username: 'me' } }),
     });
     await openSheet();
-    expect(screen.getByTestId('group-record-sheet-status')).toHaveTextContent('✓ Certified by you · 12 Sep');
+    expect(screen.getByTestId('group-record-sheet-status')).toHaveTextContent('Certified by you · 12 Sep');
 
     fireEvent.press(screen.getByTestId('group-record-sheet-withdraw'));
     expect(alertSpy).toHaveBeenCalledWith('Remove your certification?', expect.any(String), expect.any(Array));
@@ -378,7 +378,7 @@ describe('the row detail sheet (E2)', () => {
     await confirmAlert();
     expect(api.withdrawGroupCertification).toHaveBeenCalledWith(GROUP_ID, 'cert-1');
     expect(await screen.findByTestId('group-record-sheet-notice')).toHaveTextContent('Your certification was removed.');
-    await waitFor(() => expect(screen.getByTestId('group-record-sheet-status')).toHaveTextContent('○ Not certified yet'));
+    await waitFor(() => expect(screen.getByTestId('group-record-sheet-status')).toHaveTextContent('Not certified yet'));
   });
 
   it('a member sees neither Cancel nor Remove on someone else\'s certification', async () => {
@@ -407,7 +407,7 @@ describe('the row detail sheet (E2)', () => {
     await confirmAlert();
     expect(api.cancelGroupCertification).toHaveBeenCalledWith(GROUP_ID, 'cert-9');
     expect(await screen.findByTestId('group-record-sheet-notice')).toHaveTextContent('Certification cancelled.');
-    expect(screen.getByTestId('group-record-sheet-status')).toHaveTextContent('○ Not certified yet');
+    expect(screen.getByTestId('group-record-sheet-status')).toHaveTextContent('Not certified yet');
   });
 
   it('as admin: Cancel certification confirms, and FORBIDDEN (role changed) refreshes', async () => {
@@ -480,8 +480,8 @@ describe('full-board rows open the sheet (card AC8)', () => {
     expect(api.certifyGroupSet).toHaveBeenCalledWith({ groupId: GROUP_ID, groupExerciseId: 'ge-bench', memberUserId: 'u2', setId: 'set-1' });
     await waitFor(() => expect(api.getGroupBoard.mock.calls.length).toBeGreaterThan(boardCalls));
     expect(api.getGroupBoard).toHaveBeenLastCalledWith(expect.objectContaining({ after: null }));
-    await waitFor(() => expect(screen.getByTestId('group-record-sheet-status')).toHaveTextContent(/^✓ Certified by you · /));
-    expect(screen.getByTestId('group-board-row-1-mark')).toHaveTextContent('✓');
+    await waitFor(() => expect(screen.getByTestId('group-record-sheet-status')).toHaveTextContent(/^Certified by you · /));
+    expect(screen.getByTestId('group-board-row-1-mark-certified', { includeHiddenElements: true })).toBeTruthy();
   });
 
   it('a former member\'s row offers no Certify; an admin sees Cancel on a certified row', async () => {

@@ -5,7 +5,7 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { LayoutChangeEvent, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { uiColors, uiRadius, uiSpace, uiTypography } from '@/components/ui';
+import { Icon, uiColors, uiRadius, uiSpace, uiTypography } from '@/components/ui';
 
 import { HEAT_RAMP } from './heatmap-metric';
 import type { HeatmapData } from './heatmapData';
@@ -163,15 +163,11 @@ export function WeeklyHeatmap({
                     width: 32,
                     alignItems: 'center',
                   }}>
-                  <Text
-                    style={{
-                      fontSize: uiTypography.size.xs,
-                      fontWeight: '700',
-                      color:
-                        weeks[selectedIndex]?.isCurrentWeek ? accent : uiColors.textSecondary,
-                    }}>
-                    ▼
-                  </Text>
+                  <Icon
+                    color={weeks[selectedIndex]?.isCurrentWeek ? accent : uiColors.textSecondary}
+                    name="caret-down"
+                    size="xs"
+                  />
                 </View>
               ) : null}
             </View>

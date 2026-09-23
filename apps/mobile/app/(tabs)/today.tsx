@@ -26,7 +26,7 @@ import {
   type SessionListDataClient,
   type SessionListItem,
 } from '@/components/session-list';
-import { UiButton, UiSurface, UiText, uiColors, uiRadius, uiSpace, uiTypography } from '@/components/ui';
+import { Icon, UiButton, UiSurface, UiText, uiColors, uiRadius, uiSpace, uiTypography } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import {
   buildStreamViewModel,
@@ -271,14 +271,7 @@ export function TodayScreen({
                       testIdPrefix={`today-recent-session-summary-${session.id}`}
                     />
                   </View>
-                  <UiText
-                    accessibilityElementsHidden
-                    importantForAccessibility="no-hide-descendants"
-                    selectable={false}
-                    style={styles.chevron}
-                    variant="labelStrong">
-                    ›
-                  </UiText>
+                  <Icon color={uiColors.textSecondary} name="chevron-right" />
                 </UiSurface>
               </Pressable>
             ))}
@@ -606,11 +599,6 @@ const styles = StyleSheet.create({
   recentSummary: {
     flex: 1,
     minWidth: 0,
-  },
-  chevron: {
-    fontSize: uiTypography.size.xxl,
-    lineHeight: 24,
-    color: uiColors.textSecondary,
   },
   pressed: {
     opacity: 0.92,

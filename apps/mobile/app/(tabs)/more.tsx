@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
-import { UiSurface, UiText, uiBorder, uiColors, uiRadius, uiSpace, uiTypography } from '@/components/ui';
+import { Icon, UiSurface, UiText, uiBorder, uiColors, uiRadius, uiSpace, uiTypography } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import {
   getMoreSections,
@@ -71,9 +71,7 @@ export default function MoreScreen() {
                     testID={destination.testID}>
                     <UiSurface style={styles.destinationCard}>
                       <View style={styles.iconBadge}>
-                        <UiText selectable={false} style={styles.iconGlyph} variant="labelStrong">
-                          {destination.glyph}
-                        </UiText>
+                        <Icon color={uiColors.actionPrimary} name={destination.icon} />
                       </View>
                       <View style={styles.destinationCopy}>
                         <UiText selectable variant="labelStrong">
@@ -83,14 +81,10 @@ export default function MoreScreen() {
                           {destination.description}
                         </UiText>
                       </View>
-                      <UiText
-                        accessibilityElementsHidden
-                        importantForAccessibility="no-hide-descendants"
-                        selectable={false}
-                        style={styles.destinationIndicator}
-                        variant="labelStrong">
-                        {external ? '↗' : '›'}
-                      </UiText>
+                      <Icon
+                        color={uiColors.textSecondary}
+                        name={external ? 'arrow-up-right' : 'chevron-right'}
+                      />
                     </UiSurface>
                   </Pressable>
                   {destination.key === 'connect-agent' && connectError ? (
@@ -163,19 +157,9 @@ const styles = StyleSheet.create({
     borderRadius: uiRadius.full,
     backgroundColor: uiColors.surfaceInfo,
   },
-  iconGlyph: {
-    fontSize: uiTypography.size.base,
-    lineHeight: 18,
-    color: uiColors.actionPrimary,
-  },
   destinationCopy: {
     flex: 1,
     gap: uiSpace.xs,
-  },
-  destinationIndicator: {
-    fontSize: uiTypography.size.xxl,
-    lineHeight: 24,
-    color: uiColors.textSecondary,
   },
   inlineError: {
     color: uiColors.actionDangerText,
