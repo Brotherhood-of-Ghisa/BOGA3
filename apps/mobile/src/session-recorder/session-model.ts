@@ -5,7 +5,7 @@ import type {
   SessionGraphSnapshot,
 } from '@/src/data';
 import type { SessionInsightExerciseInput } from '@/src/session-insights';
-import { defaultSessionSetType, normalizeSessionSetType, type SessionSetType, type SessionSetTypeValue } from '@/src/data/set-types';
+import { defaultSessionSetType, formatSessionSetType, normalizeSessionSetType, type SessionSetTypeValue } from '@/src/data/set-types';
 import {
   canonicalizeSetValues,
   canonicalizeWeightForReps,
@@ -444,16 +444,8 @@ export const appendSuggestedPlan = (
   };
 };
 
-export const SET_TYPE_MENU_LABELS: Record<SessionSetType, string> = {
-  warm_up: 'W-Up',
-  rir_0: 'RIR 0',
-  rir_1: 'RIR 1',
-  rir_2: 'RIR 2',
-  rir_3: 'RIR 3',
-};
-
 export const getSetQualityDisplayLabel = (setType: SessionSetTypeValue): string =>
-  setType === null ? '•' : SET_TYPE_MENU_LABELS[setType];
+  formatSessionSetType(setType) ?? '•';
 
 export const formatSetWeightLabel = (value: string | null | undefined): string => {
   const trimmed = (value ?? '').trim() || '0';

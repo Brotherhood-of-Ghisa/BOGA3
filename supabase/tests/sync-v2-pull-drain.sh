@@ -273,7 +273,7 @@ SEED_PAYLOAD="$(jq -nc \
     # Layer 3
     {type: "exercise_sets", id: ("pd-" + $tag + "-set-1"), client_updated_at_ms: ($b + 140),
      fields: {session_exercise_id: ("pd-" + $tag + "-sx-1"), order_index: 0,
-              weight_value: "100", reps_value: "8", set_type: "rir_3",
+              weight_value: "100", reps_value: "8", set_type: "rir_4",
               planned_weight_value: null, planned_reps_value: null,
               planned_set_type: null, performance_status: null,
               created_at: ($b + 140), updated_at: ($b + 140), deleted_at: null}},

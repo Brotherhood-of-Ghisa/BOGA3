@@ -294,7 +294,7 @@ PAYLOAD="$(jq -nc \
   '{entities: [
     {type: "exercise_sets", id: $set_id, client_updated_at_ms: $now,
      fields: {session_exercise_id: $sx_id, order_index: 0,
-              weight_value: "100", reps_value: "8", set_type: "rir_3",
+              weight_value: "100", reps_value: "8", set_type: "rir_4",
               created_at: $now, updated_at: $now, deleted_at: null}},
     {type: "session_exercises", id: $sx_id, client_updated_at_ms: $now,
      fields: {session_id: $session_id, exercise_definition_id: $exdef_id,
@@ -321,7 +321,7 @@ assert_json_expr 'length == 1' "multi-layer: session landed"
 service_select "session_exercises" "owner_user_id=eq.${USER_A_UUID}&id=eq.${SX_A_ID}&select=id,exercise_definition_id"
 assert_json_expr --arg exdef "${EXDEF_A_ID}" 'length == 1 and .[0].exercise_definition_id == $exdef' "multi-layer: session_exercise landed and resolved exdef FK"
 service_select "exercise_sets" "owner_user_id=eq.${USER_A_UUID}&id=eq.${SET_A_ID}&select=id,weight_value,reps_value,set_type"
-assert_json_expr 'length == 1 and .[0].weight_value == "100" and .[0].reps_value == "8" and .[0].set_type == "rir_3"' "multi-layer: exercise_set landed"
+assert_json_expr 'length == 1 and .[0].weight_value == "100" and .[0].reps_value == "8" and .[0].set_type == "rir_4"' "multi-layer: exercise_set landed"
 
 # ===========================================================================
 # 3. Server-first compatibility for pre-M19 clients. An omitted

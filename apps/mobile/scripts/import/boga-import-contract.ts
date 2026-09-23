@@ -1,3 +1,5 @@
+import { isSessionSetType, type SessionSetTypeValue } from '../../src/data/set-types';
+
 export const BOGA_SESSION_IMPORT_SCHEMA = 'boga.session-import.v1' as const;
 
 export type BogaImportCatalogExercise = {
@@ -53,9 +55,7 @@ export type BogaImportExerciseTarget =
       exerciseName: string;
     };
 
-export const BOGA_IMPORT_SET_TYPES = ['warm_up', 'rir_0', 'rir_1', 'rir_2', 'rir_3'] as const;
-
-export type BogaImportSetType = (typeof BOGA_IMPORT_SET_TYPES)[number] | null;
+export type BogaImportSetType = SessionSetTypeValue;
 
 export type BogaImportSet = {
   orderIndex: number;
@@ -182,7 +182,7 @@ const isNumber = (value: unknown): value is number =>
 const isArray = (value: unknown): value is unknown[] => Array.isArray(value);
 
 export const isValidBogaImportSetType = (value: unknown): value is BogaImportSetType =>
-  value === null || BOGA_IMPORT_SET_TYPES.includes(value as (typeof BOGA_IMPORT_SET_TYPES)[number]);
+  value === null || isSessionSetType(value);
 
 export const validateBogaSessionImportPackage = (
   value: unknown,
@@ -326,7 +326,7 @@ export const validateBogaSessionImportPackage = (
             }
             if (!isValidBogaImportSetType(set.setType)) {
               errors.push(
-                `sessions[${sessionIndex}].exercises[${exerciseIndex}].sets[${setIndex}].setType must be warm_up|rir_0|rir_1|rir_2|rir_3|null`
+                `sessions[${sessionIndex}].exercises[${exerciseIndex}].sets[${setIndex}].setType must be warm_up, rir_<non-negative integer>, or null`
               );
             }
           });

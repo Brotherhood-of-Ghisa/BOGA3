@@ -1,5 +1,5 @@
 import type { SessionDraftSetSnapshot } from '@/src/data/session-drafts';
-import { defaultSessionSetType, SESSION_SET_TYPE_CYCLE, type SessionSetTypeValue } from '@/src/data/set-types';
+import { defaultSessionSetType, formatSessionSetType, SESSION_SET_TYPE_CYCLE, type SessionSetTypeValue } from '@/src/data/set-types';
 import {
   computeSetVolume,
   estimateOneRepMax,
@@ -46,18 +46,10 @@ export type ExerciseRecordBaseline = {
   weight: number | null;
 };
 
-const EFFORT_LABELS: Record<Exclude<SessionSetTypeValue, null>, string> = {
-  warm_up: 'W-Up',
-  rir_3: 'RIR 3',
-  rir_2: 'RIR 2',
-  rir_1: 'RIR 1',
-  rir_0: 'RIR 0',
-};
-
 export const EFFORT_OPTIONS = SESSION_SET_TYPE_CYCLE;
 
 export const formatEffort = (setType: SessionSetTypeValue): string =>
-  setType ? EFFORT_LABELS[setType] : '—';
+  formatSessionSetType(setType) ?? '—';
 
 // `60.0`, `82.5`, `2.25`: one decimal unless the lifter entered more.
 export const formatWeight = (weight: number): string =>

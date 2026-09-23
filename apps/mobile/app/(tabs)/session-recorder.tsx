@@ -70,9 +70,9 @@ import {
 import {
   SESSION_SET_TYPE_CYCLE,
   nextSessionSetType,
+  formatSessionSetType,
   isWorkingSessionSetType,
   normalizeSessionSetType,
-  type SessionSetType,
   type SessionSetTypeValue,
 } from '@/src/data/set-types';
 import {
@@ -114,7 +114,6 @@ import {
   nextSubmitCleanup,
   parseSessionDateTime,
   REPS_INPUT_PATTERN,
-  SET_TYPE_MENU_LABELS,
   SUBMIT_CLEANUP_CANCEL_LABEL,
   type SubmitCleanupPrompt,
   sessionHasInvalidSetValues,
@@ -239,22 +238,14 @@ function createLocationId(locationName: string): string {
 
 
 const SET_TYPE_CYCLE_ORDER = SESSION_SET_TYPE_CYCLE;
-const SET_TYPE_SHORT_LABELS: Record<SessionSetType, string> = {
-  warm_up: 'W-Up',
-  rir_0: 'R0',
-  rir_1: 'R1',
-  rir_2: 'R2',
-  rir_3: 'R3',
-};
-
 const getSetTypeButtonLabel = (setType: SessionSetTypeValue): string =>
-  setType === null ? '•' : SET_TYPE_SHORT_LABELS[setType];
+  formatSessionSetType(setType, 'compact') ?? '•';
 
 const getSetTypeMenuLabel = (setType: SessionSetTypeValue): string =>
-  setType === null ? 'None' : SET_TYPE_MENU_LABELS[setType];
+  formatSessionSetType(setType) ?? 'None';
 
 const getSetTypeAccessibilityLabel = (setType: SessionSetTypeValue): string =>
-  setType === null ? 'none' : SET_TYPE_MENU_LABELS[setType];
+  formatSessionSetType(setType) ?? 'none';
 
 const getNextSetType = nextSessionSetType;
 
@@ -4048,7 +4039,7 @@ export default function SessionRecorderScreen({
             onPress={dismissSetTypePicker}
           />
           <View style={styles.setTypeModalCard}>
-            <View style={styles.modalList}>
+            <ScrollView contentContainerStyle={styles.modalList} style={{ flexGrow: 0 }}>
               {SET_TYPE_CYCLE_ORDER.map((setTypeOption) => {
                 const normalizedOption = normalizeSessionSetType(setTypeOption);
                 const isSelected = selectedSetTypeInPicker === normalizedOption;
@@ -4075,7 +4066,7 @@ export default function SessionRecorderScreen({
                   </Pressable>
                 );
               })}
-            </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -5404,6 +5395,7 @@ const styles = StyleSheet.create({
     height: '80%',
   },
   setTypeModalCard: {
+    maxHeight: '80%',
     borderRadius: uiRadius.md,
     backgroundColor: uiColors.surfaceDefault,
     padding: uiSpace.lg,

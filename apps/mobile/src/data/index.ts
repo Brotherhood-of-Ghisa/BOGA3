@@ -96,6 +96,7 @@ export {
   type SessionPersistenceRecord,
 } from './session-drafts';
 export {
+  formatSessionSetType,
   isWorkingSessionSetType,
   normalizeSessionSetType,
   type SessionSetType,

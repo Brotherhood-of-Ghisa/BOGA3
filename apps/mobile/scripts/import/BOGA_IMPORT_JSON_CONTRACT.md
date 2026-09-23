@@ -118,7 +118,9 @@ Sets use BOGA-ready string values:
 - `repsValue`: source reps as a string.
 - `weightValue`: kg numeric text with the unit stripped. GymBook sets with no
   source weight, including bodyweight/reps-only sets, are imported as `0`.
-- `setType`: `null`, `warm_up`, `rir_3`, `rir_2`, `rir_1`, or `rir_0`. Imported
+- `setType`: `null`, `warm_up`, or canonical `rir_<n>` for a non-negative safe
+  integer (for example `rir_0`, `rir_4`). Stored/imported RIRs remain valid even
+  outside the current picker range in `src/config/training.ts`. Imported
   packages may leave this as `null`, or may classify historical effort when the
   source data is good enough. Source set-type text is preserved under
   `source.type`.
@@ -136,6 +138,8 @@ Non-empty source notes are preserved under set `source.note` and summarized in
 - Default cluster gap is 90 minutes.
 - If raw span is under 30 minutes, output a 60 minute duration and warn.
 - If raw span is over 90 minutes, warn for review.
+- Optional effort enrichment starts with Warm-up, then blank, then descends
+  from `EFFORT_LOGGING_POLICY.maxSelectableRir` to RIR-0 and stays at RIR-0.
 - Effort enrichment leaves endurance swing variants, including
   `Kettlebell Swings` and `Kettlebell One-Arm Swings`, with unregistered set
   effort.

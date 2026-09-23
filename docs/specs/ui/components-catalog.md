@@ -289,8 +289,8 @@ Brief entrypoint inventory of the current reusable UI component set.
   - `ExerciseTopBar` — back · title · ⋮, each control a 44pt target
   - `RecordsPanel` — a `Card` with the `Records` | `Last` selector (control radius), the `History` link, three stacked `Stat`s collapsed, record lines or the previous session's sets expanded
   - `SetRow` — the set-row recipe: `ListRow density="list"`, the effort label in `leading`, weight × reps in `children` (the row-body target that opens the logger), the inline 1RM / Vol `Stat`s in `meta`, the set-state glyph (a checkbox) in `trailing`
-  - `SetLogger` — the open set in place: Weight / Reps / Effort fields at `uiGeometry.fieldHeight`, the `accent` commit tick on the control axis; effort tap cycles W-Up → blank → RIR 3 → RIR 2 → RIR 1 → RIR 0, and long press opens `EffortSheet`
-  - `EffortSheet`, `ExerciseOptionsSheet` — `Sheet` + `ListRow`; effort includes all cycle choices with `None` for blank
+  - `SetLogger` — the open set in place: Weight / Reps / Effort fields at `uiGeometry.fieldHeight`, the `accent` commit tick on the control axis; effort tap cycles W-Up → blank → configured maximum RIR down to RIR 0, and long press opens `EffortSheet`
+  - `EffortSheet`, `ExerciseOptionsSheet` — `Sheet` + `ListRow`; effort includes all configured cycle choices with `None` for blank and scrolls for longer ranges
   - `ExerciseSwapSheet` — `Sheet` over the shared `ExerciseListContent` / `buildExerciseListModel` and list preferences
   - `pageText` — the page's shared type roles (micro-label, control label, running / detail / headline figures)
   - covered by `app/__tests__/exercise-page-screen.test.tsx`, `exercise-page-model.test.ts`, `exercise-page-persistence.test.ts` and the `ios-exercise-page` lane
