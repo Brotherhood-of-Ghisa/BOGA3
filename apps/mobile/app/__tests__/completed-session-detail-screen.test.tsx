@@ -191,8 +191,8 @@ describe('CompletedSessionDetailScreenShell', () => {
   it('validates completion presentation route values', () => {
     expect(resolveCompletedSessionPresentation('completion')).toBe('completion');
     expect(resolveCompletedSessionPresentation(['completion'])).toBe('completion');
-    expect(resolveCompletedSessionPresentation('summary')).toBe('summary');
-    expect(resolveCompletedSessionPresentation(['summary'])).toBe('summary');
+    // History's `summary` is gone: the detail already is the summary.
+    expect(resolveCompletedSessionPresentation('summary')).toBe('detail');
     expect(resolveCompletedSessionPresentation('unexpected')).toBe('detail');
     expect(resolveCompletedSessionPresentation(undefined)).toBe('detail');
   });
@@ -234,72 +234,6 @@ describe('CompletedSessionDetailScreenShell', () => {
     expect(screen.queryByTestId('session-completion-view-muscle-load')).toBeNull();
     expect(screen.queryByTestId('completed-session-detail-action-bar')).toBeNull();
     expect(screen.queryByText('Append')).toBeNull();
-  });
-
-  it('reuses the identical summary content from History with Share and reciprocal navigation', async () => {
-    const exerciseVolumeComparisons = [
-      {
-        exerciseDefinitionId: 'bench-press',
-        exerciseName: 'Bench Press',
-        sessionExerciseIds: ['exercise-1'],
-        sessionExerciseOrderIndex: 0,
-        setCount: 4,
-        workingSetCount: 3,
-        currentVolume: 4950,
-        historicalSessionCount: 5,
-        medianVolume: 4300,
-        percentile5Volume: 3200,
-        percentile95Volume: 5200,
-        state: 'distribution' as const,
-      },
-    ];
-    const dataClient: CompletedSessionDetailDataClient = {
-      loadCompletedSession: jest.fn().mockResolvedValue(COMPLETED_SESSION_DETAIL_FIXTURE),
-      loadInsights: jest.fn().mockResolvedValue({
-        personalRecords: [],
-        exerciseVolumeComparisons,
-      }),
-      appendCompletedSessionExerciseAsPlanned: jest.fn().mockResolvedValue(undefined),
-      setCompletedSessionDeletedState: jest.fn().mockResolvedValue(undefined),
-    };
-
-    render(
-      <CompletedSessionDetailScreenShell
-        dataClient={dataClient}
-        presentation="summary"
-        sessionId="completed-under-test"
-      />
-    );
-
-    await waitFor(() => {
-      expect(screen.getByTestId('session-completion-exercise-exercise-1')).toBeTruthy();
-    });
-    expect(dataClient.loadInsights).toHaveBeenCalledWith('completed-under-test');
-    expect(screen.getByTestId('session-completion-duration')).toHaveTextContent('58 min');
-    expect(screen.getByTestId('session-completion-sets')).toHaveTextContent('5 (3 working)');
-    expect(screen.getByTestId('session-completion-muscle-chest')).toHaveTextContent('Chest (3)');
-    expect(screen.getByTestId('session-completion-share-session')).toBeTruthy();
-    expect(screen.queryByTestId('session-completion-done')).toBeNull();
-    expect(screen.queryByTestId('session-completion-view-muscle-load')).toBeNull();
-
-    const summaryStackCall = mockStackScreen.mock.calls.find(
-      ([props]) => (props as { options?: { title?: string } }).options?.title === 'Session summary'
-    );
-    expect(summaryStackCall).toBeTruthy();
-    const summaryOptions = (
-      summaryStackCall?.[0] as {
-        options: {
-          headerLeft: () => { props: { onPress: () => void } };
-          headerRight: () => { props: { onPress: () => void } };
-        };
-      }
-    ).options;
-
-    act(() => summaryOptions.headerLeft().props.onPress());
-    expect(mockReplace).toHaveBeenCalledWith('/sessions');
-    mockReplace.mockClear();
-    act(() => summaryOptions.headerRight().props.onPress());
-    expect(mockBack).toHaveBeenCalledTimes(1);
   });
 
   it('keeps completion and current exercise rows available when optional insight history fails', async () => {
@@ -811,7 +745,7 @@ describe('CompletedSessionDetailScreenShell', () => {
     expect(screen.getByTestId('completed-session-detail-tags-exercise-1')).toBeTruthy();
   });
 
-  it('edit action navigates to the recorder completed-edit UI', async () => {
+  it('edit action opens the session view on the completed session', async () => {
     const dataClient: CompletedSessionDetailDataClient = {
       loadCompletedSession: jest.fn().mockResolvedValue({
         ...COMPLETED_SESSION_DETAIL_FIXTURE,
@@ -830,7 +764,7 @@ describe('CompletedSessionDetailScreenShell', () => {
 
     fireEvent.press(screen.getByTestId('completed-session-detail-edit-button'));
 
-    expect(mockPush).toHaveBeenCalledWith('/session-recorder?mode=completed-edit&sessionId=completed-under-test');
+    expect(mockPush).toHaveBeenCalledWith('/session/completed-under-test');
   });
 
   it('per-exercise append action calls the data client and opens the recorder', async () => {
@@ -1100,14 +1034,14 @@ describe('CompletedSessionDetailRoute', () => {
     expect(screen.getByTestId('completed-session-detail-screen').props.testID).toBe('completed-session-detail-screen');
   });
 
-  it('redirects route intent=edit to the recorder completed-edit flow', async () => {
+  it('redirects route intent=edit to the session view', async () => {
     mockLocalSearchParams = { sessionId: 'session-completed-1', intent: 'edit' };
 
     render(<CompletedSessionDetailRoute />);
 
     expect(screen.getByTestId('completed-session-detail-edit-redirect')).toBeTruthy();
     await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith('/session-recorder?mode=completed-edit&sessionId=session-completed-1');
+      expect(mockReplace).toHaveBeenCalledWith('/session/session-completed-1');
     });
   });
 

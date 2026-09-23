@@ -75,12 +75,12 @@ jest.mock('@/src/exercise-catalog/stats-cache', () => ({
 import ExercisePageRoute from '@/app/session/[sessionId]/exercise/[sessionExerciseId]';
 import { ExercisePageScreen } from '@/components/exercise-page/exercise-page-screen';
 import { uiRoles } from '@/components/ui/tokens';
-import {
-  __resetNewScreensPreferenceForTests,
-  setNewScreensEnabled,
-} from '@/src/session-recorder/new-screens-preference';
 import type { ExerciseHistorySessionEntry } from '@/src/data/exercise-history';
-import type { SessionDraftSetSnapshot, SessionGraphSnapshot } from '@/src/data/session-drafts';
+import type {
+  SessionDraftExerciseInput,
+  SessionDraftSetSnapshot,
+  SessionGraphSnapshot,
+} from '@/src/data/session-drafts';
 import type { SessionExerciseDraftClient } from '@/src/session-recorder/session-exercise-draft';
 import type { LoadExerciseHistory } from '@/src/session-recorder/use-exercise-records';
 
@@ -140,33 +140,41 @@ const makeSession = (): SessionGraphSnapshot => ({
 
 // A fake repository holding one session graph, so the tests read back exactly
 // what the page persisted.
-const createClient = () => {
-  let stored: SessionGraphSnapshot | null = makeSession();
+const createClient = (initial: SessionGraphSnapshot = makeSession()) => {
+  let stored: SessionGraphSnapshot | null = initial;
+  const store = (input: { exercises: SessionDraftExerciseInput[] }) => {
+    stored = {
+      ...stored!,
+      exercises: input.exercises.map((exercise) => ({
+        id: exercise.id!,
+        exerciseDefinitionId: exercise.exerciseDefinitionId,
+        name: exercise.name,
+        machineName: exercise.machineName ?? null,
+        sets: exercise.sets.map((draftSet) => ({
+          id: draftSet.id!,
+          weightValue: draftSet.weightValue,
+          repsValue: draftSet.repsValue,
+          setType: draftSet.setType ?? null,
+          plannedWeightValue: draftSet.plannedWeightValue,
+          plannedRepsValue: draftSet.plannedRepsValue,
+          plannedSetType: draftSet.plannedSetType,
+          performanceStatus: draftSet.performanceStatus,
+        })),
+      })),
+    };
+  };
   const client: SessionExerciseDraftClient = {
     loadSessionSnapshotById: jest.fn(async (id: string) =>
       stored && stored.sessionId === id ? stored : null
     ),
     persistSessionDraftSnapshot: jest.fn(async (input) => {
-      stored = {
-        ...stored!,
-        exercises: input.exercises.map((exercise) => ({
-          id: exercise.id!,
-          exerciseDefinitionId: exercise.exerciseDefinitionId,
-          name: exercise.name,
-          machineName: exercise.machineName ?? null,
-          sets: exercise.sets.map((draftSet) => ({
-            id: draftSet.id!,
-            weightValue: draftSet.weightValue,
-            repsValue: draftSet.repsValue,
-            setType: draftSet.setType ?? null,
-            plannedWeightValue: draftSet.plannedWeightValue,
-            plannedRepsValue: draftSet.plannedRepsValue,
-            plannedSetType: draftSet.plannedSetType,
-            performanceStatus: draftSet.performanceStatus,
-          })),
-        })),
-      };
+      store(input);
       return { sessionId: input.sessionId! };
+    }),
+    persistCompletedSessionSnapshot: jest.fn(async (input) => {
+      store(input);
+      stored = { ...stored!, startedAt: input.startedAt, completedAt: input.completedAt };
+      return { sessionId: input.sessionId, completedAt: input.completedAt, durationSec: 0 };
     }),
   };
   return { client, stored: () => stored };
@@ -296,6 +304,40 @@ describe('ExercisePageScreen', () => {
     });
     expect(figure(3, '1rm', '108.3')).toMatchObject({ fontWeight: '700', color: uiRoles.record });
     expect(figure(3, 'vol', '540')).toMatchObject({ fontWeight: '500', color: uiRoles.inkMuted });
+  });
+
+  it('edits an exercise of a completed session, writing it back as completed with its times', async () => {
+    const startedAt = new Date('2026-09-11T09:00:00Z');
+    const completedAt = new Date('2026-09-11T10:00:00Z');
+    // The session being edited is `h2` in the lifter's history; its own sets
+    // must not be its records' baseline.
+    const { client, stored } = createClient({
+      ...makeSession(),
+      sessionId: 'h2',
+      status: 'completed',
+      startedAt,
+      completedAt,
+      durationSec: 3600,
+    });
+    render(
+      <ExercisePageScreen draftClient={client} loadHistory={loadHistory} sessionExerciseId="bench" sessionId="h2" />
+    );
+    await screen.findByTestId('exercise-page');
+    // Without h2, the older h1 holds every record: 80 × 7 → 1RM 99.2, max 80.
+    await waitFor(() => expect(screen.getByTestId('exercise-records-1rm')).toHaveTextContent('1RM99.2'));
+    expect(screen.getByTestId('exercise-records-max')).toHaveTextContent('Max80.0');
+
+    fireEvent.changeText(screen.getByTestId('exercise-set-logger-reps'), '5');
+    fireEvent.press(screen.getByTestId('exercise-set-logger-commit'));
+
+    await waitFor(() =>
+      expect(benchSets(stored())[2]).toMatchObject({ weightValue: '82.5', repsValue: '5', performanceStatus: null })
+    );
+    expect(client.persistSessionDraftSnapshot).not.toHaveBeenCalled();
+    expect(client.persistCompletedSessionSnapshot).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionId: 'h2', startedAt, completedAt })
+    );
+    expect(stored()?.status).toBe('completed');
   });
 
   it('logs the current set with the tick and moves the logger to the next one', async () => {
@@ -552,21 +594,12 @@ describe('ExercisePageScreen', () => {
 });
 
 describe('exercise page route', () => {
-  beforeEach(() => __resetNewScreensPreferenceForTests());
-
-  it('shows the Settings notice when the new-screens setting is off', async () => {
-    await act(() => setNewScreensEnabled(false));
+  // It follows no setting: a completed session is edited here whatever the
+  // new-screens setting says.
+  it('opens the page for the route params', async () => {
     render(<ExercisePageRoute />);
-    expect(await screen.findByTestId('exercise-page-disabled')).toBeTruthy();
-    fireEvent.press(screen.getByTestId('exercise-page-open-settings'));
-    expect(mockRouter.push).toHaveBeenCalledWith('/settings');
-  });
-
-  it('opens the page for the route params by default', async () => {
-    render(<ExercisePageRoute />);
-    expect(screen.queryByTestId('exercise-page-disabled')).toBeNull();
     // The real repository is not wired in this suite, so the page shows its
-    // loading or error state for `session-1` / `bench` — not the notice.
+    // loading or error state for `session-1` / `bench`.
     expect(await screen.findByTestId('exercise-page-state')).toBeTruthy();
   });
 });

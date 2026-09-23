@@ -2,7 +2,7 @@ import { useFocusEffect, useNavigation } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 
-import type { SessionDraftExerciseSnapshot } from '@/src/data/session-drafts';
+import type { SessionDraftExerciseSnapshot, SessionGraphSnapshot } from '@/src/data/session-drafts';
 
 import { createDraftAutosaveController, type DraftAutosaveController } from './draft-autosave';
 import { createSessionRecorderLifecycleHelpers } from './lifecycle-helpers';
@@ -24,7 +24,12 @@ import {
 export type SessionExerciseDraftState =
   | { status: 'loading' }
   | { status: 'error'; reason: SessionExerciseDraftLoadError | 'load-failed' }
-  | { status: 'ready'; exercise: SessionDraftExerciseSnapshot };
+  | {
+      status: 'ready';
+      exercise: SessionDraftExerciseSnapshot;
+      // A completed session is edited in place (history, not a draft).
+      sessionStatus: SessionGraphSnapshot['status'];
+    };
 
 // `text`: typing, saved after the debounce. `structural`: a commit, toggle,
 // add, swap or complete, saved at once.
@@ -61,6 +66,7 @@ export const useSessionExerciseDraft = ({
   });
   const [saveError, setSaveError] = useState<string | null>(null);
   const exerciseRef = useRef<SessionDraftExerciseSnapshot | null>(null);
+  const sessionStatusRef = useRef<SessionGraphSnapshot['status']>('active');
   const saveFailedRef = useRef(false);
   const isMountedRef = useRef(true);
   const autosaveRef = useRef<DraftAutosaveController | null>(null);
@@ -71,7 +77,11 @@ export const useSessionExerciseDraft = ({
       persistDraft: async () => {
         const exercise = exerciseRef.current;
         if (!exercise) return;
-        await saveSessionExerciseDraft(sessionId, { sessionExerciseId, exercise }, client);
+        await saveSessionExerciseDraft(
+          sessionId,
+          { sessionExerciseId, exercise, sessionStatus: sessionStatusRef.current },
+          client
+        );
         saveFailedRef.current = false;
         if (isMountedRef.current) setSaveError(null);
       },
@@ -91,7 +101,8 @@ export const useSessionExerciseDraft = ({
         if (cancelled) return;
         if (result.status === 'ready') {
           exerciseRef.current = result.exercise;
-          setState({ status: 'ready', exercise: result.exercise });
+          sessionStatusRef.current = result.sessionStatus;
+          setState({ status: 'ready', exercise: result.exercise, sessionStatus: result.sessionStatus });
         } else {
           setState({ status: 'error', reason: result.status });
         }
@@ -151,7 +162,7 @@ export const useSessionExerciseDraft = ({
       const next = recipe(current);
       if (next === current) return;
       exerciseRef.current = next;
-      setState({ status: 'ready', exercise: next });
+      setState({ status: 'ready', exercise: next, sessionStatus: sessionStatusRef.current });
       if (kind === 'text') {
         autosave.markTextMutation();
       } else {
@@ -168,7 +179,11 @@ export const useSessionExerciseDraft = ({
 
   const remove = useCallback(async () => {
     await autosave.dispose({ flushDirty: false });
-    await saveSessionExerciseDraft(sessionId, { sessionExerciseId, exercise: null }, client);
+    await saveSessionExerciseDraft(
+      sessionId,
+      { sessionExerciseId, exercise: null, sessionStatus: sessionStatusRef.current },
+      client
+    );
   }, [autosave, client, sessionExerciseId, sessionId]);
 
   return { state, saveError, update, flush, remove };

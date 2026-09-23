@@ -114,7 +114,7 @@ describe('SessionsScreen active-session navigation', () => {
     });
   });
 
-  it('opens a completed History row in completed-edit mode by default', async () => {
+  it('opens a completed History row in the session view to edit it', async () => {
     const dataClient = buildDataClient();
     dataClient.loadSessions.mockResolvedValue([completedSession]);
     render(<SessionsScreen dataClient={dataClient} />);
@@ -123,9 +123,7 @@ describe('SessionsScreen active-session navigation', () => {
       await screen.findByTestId(`completed-session-open-button-${completedSession.id}`)
     );
 
-    expect(mockPush).toHaveBeenCalledWith(
-      `/session-recorder?mode=completed-edit&sessionId=${completedSession.id}`
-    );
+    expect(mockPush).toHaveBeenCalledWith(`/session/${completedSession.id}`);
   });
 });
 
