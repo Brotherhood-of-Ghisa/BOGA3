@@ -54,7 +54,9 @@ appId: com.dinoderek.mobile
     text: "Mark set 4 performed"
 - takeScreenshot: "exercise-page-v5-quiet"
 
-# V5-Records, then V5-Last.
+# V5-Records, then V5-Last. Wait for initial route presentation before tapping.
+- waitForAnimationToEnd:
+    timeout: 4000
 - tapOn:
     id: "exercise-records-toggle"
 - extendedWaitUntil:
