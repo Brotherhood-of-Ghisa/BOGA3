@@ -24,29 +24,13 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { ExerciseEditorModal, type ExerciseEditorSaveInput } from '@/components/exercise-catalog/exercise-editor-modal';
-import { GroupExercisePickSheet, type GroupExercisePickTarget } from '@/components/groups/group-exercise-pick-sheet';
-import { PickerGroupSectionList, PickerGroupsToggle } from '@/components/groups/picker-group-section';
-import { createExerciseWithGroupLink, linkExercise } from '@/src/data/exercise-group-links';
-import { buildAddAsNewPrefill } from '@/src/groups/add-as-new';
-import { pickInlineError } from '@/components/groups/group-state-view';
-import {
-  buildPickerGroupSections,
-  groupExercisesLoaded,
-  resolvePickerGroupSelection,
-  type LinkableExercise,
-  type PickerGroupRow,
-} from '@/src/groups/link-view-model';
-import { useGroupExerciseLinking, useGroupLinkingUserId } from '@/src/groups/use-group-exercise-linking';
+import { useGroupLinkingUserId } from '@/src/groups/use-group-exercise-linking';
 import { exerciseLinkHref } from '@/src/navigation/routes';
-import {
-  ExerciseListContent,
-  ExerciseListPreferenceControls,
-} from '@/components/exercise-catalog/exercise-list-controls';
 import {
   ExerciseCardCollapsedSummary,
   SessionContentLayout,
 } from '@/components/session-recorder/session-content-layout';
+import { ExercisePicker } from '@/components/session-recorder/exercise-picker';
 import { ExercisePersonalRecordCelebration } from '@/components/session-recorder/exercise-personal-record-celebration';
 import { SessionMuscleLoad } from '@/components/session-recorder/session-muscle-load';
 import { uiColors, uiRadius, uiSpace, uiTypography } from '@/components/ui';
@@ -64,13 +48,11 @@ import {
   attachExerciseTagToSessionExercise,
   createExerciseTagDefinition,
   deleteExerciseTagDefinition,
-  completeSessionDraft,
   ExerciseTagDomainError,
   listExerciseTagDefinitions,
   listSessionExerciseAssignedTags,
   listLocalGyms,
   loadRecentExerciseBlocks,
-  loadSuggestedExercisePlan,
   loadLocalGymById,
   loadLatestSessionDraftSnapshot,
   loadSessionSnapshotById,
@@ -83,11 +65,8 @@ import {
   type ExerciseTagDefinitionRecord,
   type ExerciseBlockHistoryBlock,
   type ExerciseBlockHistorySuggestedPlan,
-  type ExerciseBlockHistorySuggestedSet,
   type LocalGymLookupRecord,
   type SessionExerciseAssignedTag,
-  type SessionDraftSnapshot,
-  type SessionGraphSnapshot,
 } from '@/src/data';
 import {
   SESSION_SET_TYPES,
@@ -96,7 +75,6 @@ import {
   type SessionSetType,
   type SessionSetTypeValue,
 } from '@/src/data/set-types';
-import { type ExerciseCatalogExercise } from '@/src/data/exercise-catalog';
 import {
   computeExerciseVolume,
   computeMaxRepsByWeight,
@@ -104,7 +82,6 @@ import {
   parseCalculationSet,
 } from '@/src/exercise-calculations';
 import { ensureExerciseCatalogLoaded, useExerciseCatalog } from '@/src/exercise-catalog/cache';
-import { buildExerciseListModel, type ExerciseListItem } from '@/src/exercise-catalog/list-model';
 import { useExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
 import { useExerciseCatalogStats } from '@/src/exercise-catalog/stats-cache';
 import { getCurrentForegroundPositionLazy } from '@/src/location/foreground-location-lazy';
@@ -115,119 +92,51 @@ import {
 import { logEvent } from '@/src/logging';
 import { createDraftAutosaveController, type DraftAutosaveController } from '@/src/session-recorder/draft-autosave';
 import { createSessionRecorderLifecycleHelpers } from '@/src/session-recorder/lifecycle-helpers';
+import { completeActiveSession } from '@/src/session-recorder/session-lifecycle';
 import {
-  canonicalizeSetValues,
+  appendSuggestedPlan,
+  canonicalizeSessionSetWeights,
+  createExercise,
+  createExerciseId,
+  createSetFromPrevious,
+  describeSubmitCleanupPrompt,
+  formatCurrentDateTime,
+  formatSetRepsLabel,
+  formatSetWeightLabel,
+  getSetQualityDisplayLabel,
+  getSetRowState,
+  hasPerformedActual,
+  hasPlannedTarget,
+  hasSetFieldValidationError,
+  mapDraftSnapshotToSession,
+  mapSessionGraphSnapshotToSession,
+  nextSubmitCleanup,
+  parseSessionDateTime,
+  REPS_INPUT_PATTERN,
+  SET_TYPE_MENU_LABELS,
+  SUBMIT_CLEANUP_CANCEL_LABEL,
+  type SubmitCleanupPrompt,
+  sessionHasInvalidSetValues,
+  toPersistCompletedExercises,
+  toPersistDraftExercises,
+  toSessionInsightExercises,
+  WEIGHT_INPUT_PATTERN,
+  type PlannedSetRowState,
+  type SetFieldName,
+} from '@/src/session-recorder/session-model';
+import {
   canonicalizeWeightForReps,
   hasValidActualValues,
-  isConfirmedPerformedSet,
 } from '@/src/session-recorder/set-semantics';
 import {
   deriveExercisePersonalRecord,
   summarizeCurrentSessionMuscleLoad,
   type ExercisePersonalRecord,
-  type SessionInsightExerciseInput,
 } from '@/src/session-insights';
 import { isDevMode } from '@/src/utils/isDevMode';
 
 const START_SESSION_GYM_DETECTION_TIMEOUT_MS = 1500;
 
-function formatCurrentDateTime(date: Date): string {
-  const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, '0');
-  const day = `${date.getDate()}`.padStart(2, '0');
-  const hours = `${date.getHours()}`.padStart(2, '0');
-  const minutes = `${date.getMinutes()}`.padStart(2, '0');
-
-  return `${year}-${month}-${day} ${hours}:${minutes}`;
-}
-
-function parseSessionDateTime(dateTime: string): Date | null {
-  const trimmed = dateTime.trim();
-  const matched = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})$/.exec(trimmed);
-  if (!matched) {
-    return null;
-  }
-
-  const [, yearText, monthText, dayText, hourText, minuteText] = matched;
-  const year = Number(yearText);
-  const month = Number(monthText);
-  const day = Number(dayText);
-  const hour = Number(hourText);
-  const minute = Number(minuteText);
-
-  if ([year, month, day, hour, minute].some((value) => Number.isNaN(value))) {
-    return null;
-  }
-
-  if (month < 1 || month > 12 || day < 1 || day > 31 || hour < 0 || hour > 23 || minute < 0 || minute > 59) {
-    return null;
-  }
-
-  const parsed = new Date(year, month - 1, day, hour, minute, 0, 0);
-  if (Number.isNaN(parsed.getTime())) {
-    return null;
-  }
-
-  if (
-    parsed.getFullYear() !== year ||
-    parsed.getMonth() !== month - 1 ||
-    parsed.getDate() !== day ||
-    parsed.getHours() !== hour ||
-    parsed.getMinutes() !== minute
-  ) {
-    return null;
-  }
-
-  return parsed;
-}
-
-function mapDraftSnapshotToSession(snapshot: SessionDraftSnapshot): Session {
-  return {
-    dateTime: formatCurrentDateTime(snapshot.startedAt),
-    locationId: snapshot.gymId,
-    exercises: snapshot.exercises.map((exercise) => ({
-      id: exercise.id,
-      exerciseDefinitionId: exercise.exerciseDefinitionId,
-      name: exercise.name,
-      machineName: exercise.machineName ?? '',
-      tags: [],
-      sets: exercise.sets.map((set) => ({
-        id: set.id,
-        reps: set.repsValue,
-        weight: set.weightValue,
-        setType: normalizeSessionSetType(set.setType),
-        plannedReps: set.plannedRepsValue ?? null,
-        plannedWeight: set.plannedWeightValue ?? null,
-        plannedSetType: normalizeSessionSetType(set.plannedSetType),
-        performanceStatus: set.performanceStatus ?? null,
-      })),
-    })),
-  };
-}
-
-function mapSessionGraphSnapshotToSession(snapshot: SessionGraphSnapshot): Session {
-  return {
-    dateTime: formatCurrentDateTime(snapshot.startedAt),
-    locationId: snapshot.gymId,
-    exercises: snapshot.exercises.map((exercise) => ({
-      id: exercise.id,
-      exerciseDefinitionId: exercise.exerciseDefinitionId,
-      name: exercise.name,
-      machineName: exercise.machineName ?? '',
-      tags: [],
-      sets: exercise.sets.map((set) => ({
-        id: set.id,
-        reps: set.repsValue,
-        weight: set.weightValue,
-        setType: normalizeSessionSetType(set.setType),
-        plannedReps: set.plannedRepsValue ?? null,
-        plannedWeight: set.plannedWeightValue ?? null,
-        plannedSetType: normalizeSessionSetType(set.plannedSetType),
-        performanceStatus: set.performanceStatus ?? null,
-      })),
-    })),
-  };
-}
 
 const coerceRouteParam = (value: string | string[] | undefined): string | null => {
   if (Array.isArray(value)) {
@@ -300,47 +209,6 @@ function hasPersistableSessionContent(session: Session): boolean {
   return session.locationId !== null || session.exercises.length > 0;
 }
 
-const toPersistDraftExercises = (session: Session) =>
-  session.exercises.map((exercise) => ({
-    id: exercise.id,
-    exerciseDefinitionId: exercise.exerciseDefinitionId,
-    name: exercise.name,
-    machineName: exercise.machineName || null,
-    sets: exercise.sets.map((set) => {
-      const committedSet = canonicalizeSetValues(set);
-      return {
-        id: committedSet.id,
-        repsValue: committedSet.reps,
-        weightValue: committedSet.weight,
-        setType: committedSet.setType,
-        plannedRepsValue: committedSet.plannedReps,
-        plannedWeightValue: committedSet.plannedWeight,
-        plannedSetType: committedSet.plannedSetType,
-        performanceStatus: committedSet.performanceStatus,
-      };
-    }),
-  }));
-
-const canonicalizeSessionSetWeights = (session: Session): Session => {
-  let sessionChanged = false;
-  const exercises = session.exercises.map((exercise) => {
-    let exerciseChanged = false;
-    const sets = exercise.sets.map((set) => {
-      const committedSet = canonicalizeSetValues(set);
-      exerciseChanged = exerciseChanged || committedSet !== set;
-      return committedSet;
-    });
-
-    if (!exerciseChanged) {
-      return exercise;
-    }
-
-    sessionChanged = true;
-    return { ...exercise, sets };
-  });
-
-  return sessionChanged ? { ...session, exercises } : session;
-};
 
 function createInitialState(): SessionRecorderState {
   return {
@@ -424,61 +292,6 @@ function createLocationId(locationName: string): string {
   return `custom-${locationName.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`;
 }
 
-function createExerciseId(): string {
-  return `exercise-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function createSetId(): string {
-  return `set-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-type SetFieldName = keyof Pick<SessionSet, 'reps' | 'weight'>;
-
-const WEIGHT_INPUT_PATTERN = /^\d*\.?\d*$/;
-const REPS_INPUT_PATTERN = /^\d*$/;
-
-function createEmptySet(): SessionSet {
-  return {
-    id: createSetId(),
-    reps: '',
-    weight: '',
-    setType: null,
-    plannedReps: null,
-    plannedWeight: null,
-    plannedSetType: null,
-    performanceStatus: 'unperformed',
-  };
-}
-
-function createSetFromPrevious(previousSet: SessionSet | undefined): SessionSet {
-  if (!previousSet) {
-    return createEmptySet();
-  }
-
-  return {
-    id: createSetId(),
-    reps: previousSet.reps,
-    weight: previousSet.weight,
-    setType: normalizeSessionSetType(previousSet.setType),
-    plannedReps: null,
-    plannedWeight: null,
-    plannedSetType: null,
-    performanceStatus: 'unperformed',
-  };
-}
-
-function createPlannedSetFromSuggestedSet(set: ExerciseBlockHistorySuggestedSet): SessionSet {
-  return {
-    id: createSetId(),
-    reps: '',
-    weight: '',
-    setType: null,
-    plannedReps: set.repsValue,
-    plannedWeight: set.weightValue,
-    plannedSetType: normalizeSessionSetType(set.setType),
-    performanceStatus: 'planned',
-  };
-}
 
 const SET_TYPE_CYCLE_ORDER: SessionSetTypeValue[] = [null, ...SESSION_SET_TYPES];
 const SET_TYPE_SHORT_LABELS: Record<SessionSetType, string> = {
@@ -487,18 +300,9 @@ const SET_TYPE_SHORT_LABELS: Record<SessionSetType, string> = {
   rir_1: 'R1',
   rir_2: 'R2',
 };
-const SET_TYPE_MENU_LABELS: Record<SessionSetType, string> = {
-  warm_up: 'W-Up',
-  rir_0: 'RIR 0',
-  rir_1: 'RIR 1',
-  rir_2: 'RIR 2',
-};
 
 const getSetTypeButtonLabel = (setType: SessionSetTypeValue): string =>
   setType === null ? '•' : SET_TYPE_SHORT_LABELS[setType];
-
-const getSetQualityDisplayLabel = (setType: SessionSetTypeValue): string =>
-  setType === null ? '•' : SET_TYPE_MENU_LABELS[setType];
 
 const getSetTypeMenuLabel = (setType: SessionSetTypeValue): string =>
   setType === null ? 'None' : SET_TYPE_MENU_LABELS[setType];
@@ -521,80 +325,6 @@ const constrainSetFieldInput = (field: SetFieldName, value: string): string | nu
   return REPS_INPUT_PATTERN.test(value) ? value : null;
 };
 
-const isNonNegativeDecimalInput = (value: string): boolean => {
-  const trimmed = value.trim();
-  if (trimmed.length === 0) {
-    return true;
-  }
-
-  const parsed = Number(trimmed);
-  return Number.isFinite(parsed) && parsed >= 0;
-};
-
-const isPositiveIntegerInput = (value: string): boolean => {
-  const trimmed = value.trim();
-  if (trimmed.length === 0) {
-    return true;
-  }
-
-  if (!/^\d+$/.test(trimmed)) {
-    return false;
-  }
-
-  const parsed = Number(trimmed);
-  return Number.isInteger(parsed) && parsed > 0;
-};
-
-const hasSetFieldValidationError = (field: SetFieldName, value: string): boolean =>
-  field === 'weight' ? !isNonNegativeDecimalInput(value) : !isPositiveIntegerInput(value);
-
-type PlannedSetRowState = 'planned' | 'matched' | 'modified' | 'added';
-type PlannedSetMatchMode = 'volume' | 'quality' | 'volume-and-quality';
-
-const PLANNED_SET_MATCH_MODE: PlannedSetMatchMode = 'volume';
-
-const hasPlannedTarget = (set: SessionSet): boolean =>
-  set.plannedReps !== null || set.plannedWeight !== null || set.plannedSetType !== null;
-
-const hasPerformedActual = (set: SessionSet): boolean => isConfirmedPerformedSet(set);
-
-const plannedSetVolumeMatches = (set: SessionSet): boolean =>
-  canonicalizeWeightForReps(set.weight, set.reps).trim() ===
-    canonicalizeWeightForReps(set.plannedWeight ?? '', set.plannedReps ?? '').trim() &&
-  set.reps.trim() === (set.plannedReps ?? '').trim();
-
-const plannedSetQualityMatches = (set: SessionSet): boolean =>
-  normalizeSessionSetType(set.setType) === normalizeSessionSetType(set.plannedSetType);
-
-const plannedSetMatches = (
-  set: SessionSet,
-  matchMode: PlannedSetMatchMode = PLANNED_SET_MATCH_MODE
-): boolean => {
-  switch (matchMode) {
-    case 'quality':
-      return plannedSetQualityMatches(set);
-    case 'volume-and-quality':
-      return plannedSetVolumeMatches(set) && plannedSetQualityMatches(set);
-    case 'volume':
-      return plannedSetVolumeMatches(set);
-  }
-};
-
-const getSetRowState = (set: SessionSet): PlannedSetRowState => {
-  if (!hasPlannedTarget(set)) {
-    return 'added';
-  }
-
-  if (set.performanceStatus === 'planned' || set.performanceStatus === 'skipped') {
-    return 'planned';
-  }
-
-  if (!hasValidActualValues(set)) {
-    return 'planned';
-  }
-
-  return plannedSetMatches(set) ? 'matched' : 'modified';
-};
 
 const hydratePlannedSetForEditing = (set: SessionSet): SessionSet => {
   const isUntouchedPlan =
@@ -620,16 +350,6 @@ const hydratePlannedSetForEditing = (set: SessionSet): SessionSet => {
 
 const getPerformedExerciseSets = (sets: SessionSet[]): SessionSet[] =>
   sets.filter(hasPerformedActual);
-
-const formatSetWeightLabel = (value: string | null | undefined): string => {
-  const trimmed = (value ?? '').trim() || '0';
-  return `${trimmed}kg`;
-};
-
-const formatSetRepsLabel = (value: string | null | undefined): string => {
-  const trimmed = (value ?? '').trim() || '0';
-  return `${trimmed} ${trimmed === '1' ? 'rep' : 'reps'}`;
-};
 
 const getPlannedSetLabel = (set: SessionSet): string =>
   `${formatSetWeightLabel(set.plannedWeight)} · ${formatSetRepsLabel(set.plannedReps)}`;
@@ -670,55 +390,8 @@ const getExerciseSetSummary = (sets: SessionSet[]): string => {
   return `${performed} performed`;
 };
 
-const sessionHasInvalidSetValues = (session: Session): boolean =>
-  session.exercises.some((exercise) =>
-    exercise.sets.some(
-      (set) =>
-        getSetRowState(set) !== 'planned' &&
-        (hasSetFieldValidationError('weight', set.weight) || hasSetFieldValidationError('reps', set.reps))
-    )
-  );
-
-const toCompletedHistorySession = (session: Session): Session => ({
-  ...session,
-  exercises: session.exercises.map((exercise) => ({
-    ...exercise,
-    sets: exercise.sets.filter(hasPerformedActual).map((set) => ({
-      ...set,
-      plannedReps: null,
-      plannedWeight: null,
-      plannedSetType: null,
-      performanceStatus: null,
-    })),
-  })),
-});
-
-const toPersistCompletedExercises = (session: Session) =>
-  toPersistDraftExercises(toCompletedHistorySession(session));
-
-function createExercise(exerciseDefinitionId: string, name: string): SessionExercise {
-  return {
-    id: createExerciseId(),
-    exerciseDefinitionId,
-    name,
-    machineName: '',
-    tags: [],
-    sets: [createEmptySet()],
-  };
-}
-
-type SubmitCleanupPrompt = {
-  step: 'incomplete-sets' | 'unconfirmed-sets' | 'empty-exercises';
-  affectedCount: number;
-  nextSession: Session;
-};
 
 type TagModalMode = 'picker' | 'manage';
-type ExercisePickerPreselectionState = {
-  exercise: ExerciseListItem;
-  status: 'loading' | 'ready' | 'error';
-  suggestion: ExerciseBlockHistorySuggestedPlan | null;
-};
 type SetTypePickerState = {
   exerciseId: string;
   setId: string;
@@ -995,26 +668,6 @@ const getCurrentExerciseBlockMetrics = (
   };
 };
 
-const toSessionInsightExercises = (
-  session: Session,
-  currentExerciseNameByDefinitionId: ReadonlyMap<string, string>
-): SessionInsightExerciseInput[] =>
-  session.exercises.map((exercise, exerciseIndex) => ({
-    id: exercise.id,
-    orderIndex: exerciseIndex,
-    exerciseDefinitionId: exercise.exerciseDefinitionId,
-    exerciseName:
-      currentExerciseNameByDefinitionId.get(exercise.exerciseDefinitionId) ?? exercise.name,
-    sets: exercise.sets.map((set, setIndex) => ({
-      id: set.id,
-      orderIndex: setIndex,
-      weightValue: set.weight,
-      repsValue: set.reps,
-      setType: set.setType,
-      performanceStatus: set.performanceStatus,
-    })),
-  }));
-
 const hasSavedGymCoordinates = (location: SessionLocation) =>
   typeof location.latitude === 'number' &&
   Number.isFinite(location.latitude) &&
@@ -1115,79 +768,6 @@ const getTagErrorMessage = (error: unknown): string => {
   return error instanceof Error && error.message ? error.message : 'Unable to update tags right now.';
 };
 
-function removeIncompleteSets(session: Session): { session: Session; removedSets: number } {
-  let removedSets = 0;
-
-  const exercises = session.exercises.map((exercise) => {
-    const sets = exercise.sets.filter((set) => {
-      if (hasPlannedTarget(set) && !hasValidActualValues(set)) {
-        return true;
-      }
-      const isComplete = hasValidActualValues(set);
-      if (!isComplete) {
-        removedSets += 1;
-      }
-      return isComplete;
-    });
-
-    return {
-      ...exercise,
-      sets,
-    };
-  });
-
-  return {
-    session: {
-      ...session,
-      exercises,
-    },
-    removedSets,
-  };
-}
-
-function removeUnconfirmedSets(session: Session): { session: Session; removedSets: number } {
-  let removedSets = 0;
-
-  const exercises = session.exercises.map((exercise) => ({
-    ...exercise,
-    sets: exercise.sets.filter((set) => {
-      const isEnteredButUnconfirmed =
-        set.performanceStatus === 'unperformed' && hasValidActualValues(set);
-      if (isEnteredButUnconfirmed) {
-        removedSets += 1;
-        return false;
-      }
-      return true;
-    }),
-  }));
-
-  return {
-    session: {
-      ...session,
-      exercises,
-    },
-    removedSets,
-  };
-}
-
-function removeExercisesWithNoSets(session: Session): { session: Session; removedExercises: number } {
-  let removedExercises = 0;
-  const exercises = session.exercises.filter((exercise) => {
-    const hasSets = exercise.sets.length > 0;
-    if (!hasSets) {
-      removedExercises += 1;
-    }
-    return hasSets;
-  });
-
-  return {
-    session: {
-      ...session,
-      exercises,
-    },
-    removedExercises,
-  };
-}
 
 type SessionRecorderScreenProps = {
   requestWeightInputFocus?: (input: TextInput | null) => void;
@@ -1216,14 +796,6 @@ export default function SessionRecorderScreen({
   // M25-T07 linking: signed in only. Links are local synced rows; group
   // exercise names come from `group_cache` (design §7).
   const groupLinkingUserId = useGroupLinkingUserId();
-  const groupLinking = useGroupExerciseLinking({ userId: groupLinkingUserId });
-  const [exercisePickerGroupsOnly, setExercisePickerGroupsOnly] = useState(false);
-  const [groupPickTarget, setGroupPickTarget] = useState<GroupExercisePickTarget | null>(null);
-  const [addAsNewTarget, setAddAsNewTarget] = useState<GroupExercisePickTarget | null>(null);
-  const addAsNewPrefill = useMemo(
-    () => (addAsNewTarget ? buildAddAsNewPrefill(addAsNewTarget.groupExercise) : null),
-    [addAsNewTarget]
-  );
   const navigation = useNavigation<any>();
   const params = useLocalSearchParams<{
     mode?: string | string[];
@@ -1248,23 +820,9 @@ export default function SessionRecorderScreen({
   const [completedEditEndTouched, setCompletedEditEndTouched] = useState(false);
   const [completedEditSubmitAttempted, setCompletedEditSubmitAttempted] = useState(false);
   const [isOpeningCompletedSummary, setIsOpeningCompletedSummary] = useState(false);
-  const [exercisePickerSearchValue, setExercisePickerSearchValue] = useState('');
-  const [exercisePickerPreselection, setExercisePickerPreselection] =
-    useState<ExercisePickerPreselectionState | null>(null);
-  const [isExercisePickerOptionsVisible, setIsExercisePickerOptionsVisible] = useState(false);
-  const [expandedExercisePickerFamilies, setExpandedExercisePickerFamilies] = useState<Set<string>>(() => new Set());
-  const [listPreferences, setListPreferences] = useExerciseListPreferences();
+  const [exercisePickerOpenRequestId, setExercisePickerOpenRequestId] = useState(0);
+  const [listPreferences] = useExerciseListPreferences();
   const exerciseCatalog = useExerciseCatalog();
-  const isExerciseCatalogLoading =
-    exerciseCatalog.status === 'idle' || exerciseCatalog.status === 'loading';
-  const exerciseCatalogLoadError =
-    exerciseCatalog.status === 'error'
-      ? exerciseCatalog.lastError ?? 'Unable to load exercises right now.'
-      : null;
-  const exercisePickerOptions = useMemo(
-    () => exerciseCatalog.exercises.filter((exercise) => !exercise.deletedAt),
-    [exerciseCatalog.exercises]
-  );
   const loadInputModeByExerciseDefinitionId = useMemo(
     () =>
       new Map(
@@ -1276,8 +834,7 @@ export default function SessionRecorderScreen({
     [exerciseCatalog.exercises]
   );
   const exerciseCatalogStatsResult = useExerciseCatalogStats(listPreferences.dateRange);
-  const { stats: exerciseCatalogStats, reload: reloadExerciseCatalogStats } = exerciseCatalogStatsResult;
-  const [isExerciseCreateModalVisible, setIsExerciseCreateModalVisible] = useState(false);
+  const { reload: reloadExerciseCatalogStats } = exerciseCatalogStatsResult;
   const [isTagModalVisible, setIsTagModalVisible] = useState(false);
   const [tagModalMode, setTagModalMode] = useState<TagModalMode>('picker');
   const [activeTagExerciseId, setActiveTagExerciseId] = useState<string | null>(null);
@@ -1316,7 +873,6 @@ export default function SessionRecorderScreen({
   const pendingExercisePickerRestoreTargetRef = useRef<string | null | undefined>(undefined);
   const suppressSetTypeCyclePressRef = useRef(false);
   const exerciseBlockHistoryRequestKeyRef = useRef<Record<string, string>>({});
-  const exercisePickerPreselectionRequestKeyRef = useRef<string | null>(null);
   const focusedSetInputIdRef = useRef<string | null>(null);
   const weightInputBySetIdRef = useRef<Record<string, TextInput | null>>({});
   const recorderScrollViewRef = useRef<ScrollView | null>(null);
@@ -1667,51 +1223,6 @@ export default function SessionRecorderScreen({
         : state.locations.filter((location) => !location.archived),
     [state.locations, state.showArchivedInManager]
   );
-  const exercisePickerListModel = useMemo(
-    () =>
-      buildExerciseListModel({
-        exercises: exercisePickerOptions,
-        muscleGroups: exerciseCatalog.muscleGroups,
-        stats: exerciseCatalogStats,
-        preferences: listPreferences,
-        query: exercisePickerSearchValue,
-        includeDeleted: false,
-        showNeverDone: true,
-      }),
-    [
-      exercisePickerOptions,
-      exerciseCatalog.muscleGroups,
-      exerciseCatalogStats,
-      listPreferences,
-      exercisePickerSearchValue,
-    ]
-  );
-  // "From your groups" (E0.1): only with search text or the Groups toggle on.
-  const exercisePickerGroupSections = useMemo(
-    () =>
-      buildPickerGroupSections({
-        catalogs: groupLinking.catalogs,
-        links: groupLinking.links,
-        exercises: exercisePickerOptions,
-        query: exercisePickerSearchValue,
-        groupsOnly: exercisePickerGroupsOnly,
-      }),
-    [
-      groupLinking.catalogs,
-      groupLinking.links,
-      exercisePickerOptions,
-      exercisePickerSearchValue,
-      exercisePickerGroupsOnly,
-    ]
-  );
-  const exercisePickerGroupEmptyText = !groupExercisesLoaded(groupLinking.catalogs)
-    ? groupLinking.offline
-      ? "Connect once to load your groups' exercises."
-      : pickInlineError(groupLinking.error)
-        ? "Couldn't load your groups' exercises."
-        : 'Loading group exercises...'
-    : 'No group exercises match.';
-
   const exerciseIdsKey = useMemo(
     () => state.session.exercises.map((exercise) => exercise.id).join('|'),
     [state.session.exercises]
@@ -2824,12 +2335,7 @@ export default function SessionRecorderScreen({
       exerciseActionMenuVisible: false,
       activeExerciseActionId: null,
     }));
-    setExercisePickerGroupsOnly(false);
-    void groupLinking.reloadLinks();
-    void groupLinking.refresh();
-    setExercisePickerSearchValue('');
-    setExercisePickerPreselection(null);
-    exercisePickerPreselectionRequestKeyRef.current = null;
+    setExercisePickerOpenRequestId((current) => current + 1);
   };
 
   const dismissExerciseModal = () => {
@@ -2838,21 +2344,6 @@ export default function SessionRecorderScreen({
       exercisePickerVisible: false,
       exerciseSelectionTargetId: null,
     }));
-    setExercisePickerSearchValue('');
-    setExercisePickerPreselection(null);
-    exercisePickerPreselectionRequestKeyRef.current = null;
-    setIsExercisePickerOptionsVisible(false);
-    setExercisePickerGroupsOnly(false);
-  };
-
-  const clearExercisePickerPreselection = () => {
-    setExercisePickerPreselection(null);
-    exercisePickerPreselectionRequestKeyRef.current = null;
-  };
-
-  const updateExercisePickerSearchValue = (value: string) => {
-    clearExercisePickerPreselection();
-    setExercisePickerSearchValue(value);
   };
 
   const consumePendingExerciseCardScroll = useCallback((exerciseId: string) => {
@@ -2931,65 +2422,6 @@ export default function SessionRecorderScreen({
     requestAnimationFrame(() => consumePendingExerciseCardScroll(exerciseId));
   }, [consumePendingExerciseCardScroll, expandExerciseCard]);
 
-  const selectExercisePreset = (exercisePresetId: string) => {
-    const selectedExercisePreset = exercisePickerOptions.find((exercisePreset) => exercisePreset.id === exercisePresetId);
-    if (!selectedExercisePreset) {
-      return;
-    }
-
-    applySelectedExerciseSelection(selectedExercisePreset.id, selectedExercisePreset.name);
-  };
-
-  const selectExerciseListItem = (exercise: ExerciseListItem) => {
-    if (state.exerciseSelectionTargetId) {
-      selectExercisePreset(exercise.id);
-      return;
-    }
-
-    const requestKey = `${exercise.id}:${Date.now()}:${Math.random().toString(36).slice(2)}`;
-    exercisePickerPreselectionRequestKeyRef.current = requestKey;
-    setIsExercisePickerOptionsVisible(false);
-    setExercisePickerPreselection({
-      exercise,
-      status: 'loading',
-      suggestion: null,
-    });
-
-    void loadSuggestedExercisePlan({ exerciseDefinitionId: exercise.id })
-      .then((suggestion) => {
-        if (!isMountedRef.current || exercisePickerPreselectionRequestKeyRef.current !== requestKey) {
-          return;
-        }
-        setExercisePickerPreselection({
-          exercise,
-          status: 'ready',
-          suggestion,
-        });
-      })
-      .catch(() => {
-        if (!isMountedRef.current || exercisePickerPreselectionRequestKeyRef.current !== requestKey) {
-          return;
-        }
-        setExercisePickerPreselection({
-          exercise,
-          status: 'error',
-          suggestion: null,
-        });
-      });
-  };
-
-  const toggleExercisePickerFamily = (familyName: string) => {
-    setExpandedExercisePickerFamilies((current) => {
-      const next = new Set(current);
-      if (next.has(familyName)) {
-        next.delete(familyName);
-      } else {
-        next.add(familyName);
-      }
-      return next;
-    });
-  };
-
   const applySelectedExerciseSelection = (exerciseDefinitionId: string, exerciseName: string) => {
     const selectionTargetId = state.exerciseSelectionTargetId;
     const isNewSessionExercise = !selectionTargetId;
@@ -3014,8 +2446,6 @@ export default function SessionRecorderScreen({
     if (selectionTargetId) {
       expandExerciseCard(selectionTargetId);
     }
-    setExercisePickerPreselection(null);
-    exercisePickerPreselectionRequestKeyRef.current = null;
     clearSubmitFeedback();
     markSessionStructuralMutation();
 
@@ -3034,61 +2464,34 @@ export default function SessionRecorderScreen({
     }
   };
 
-  const appendSuggestedPlanToSession = (suggestionState: ExercisePickerPreselectionState) => {
-    const suggestion = suggestionState.suggestion;
-    if (!suggestion || suggestion.sets.length === 0) {
+  const appendSuggestedPlanToSession = (
+    pickedExercise: { id: string; name: string },
+    suggestion: ExerciseBlockHistorySuggestedPlan
+  ) => {
+    if (suggestion.sets.length === 0) {
       return;
     }
 
-    const plannedSets = suggestion.sets.map(createPlannedSetFromSuggestedSet);
-    const currentLastExercise = stateRef.current.session.exercises[stateRef.current.session.exercises.length - 1];
-    const shouldAppendToLastExercise =
-      currentLastExercise?.exerciseDefinitionId === suggestionState.exercise.id;
-    const createdExerciseId = shouldAppendToLastExercise ? null : createExerciseId();
-    const targetExerciseId = shouldAppendToLastExercise
-      ? currentLastExercise?.id ?? null
-      : createdExerciseId;
+    const createdExerciseId = createExerciseId();
+    const { targetExerciseId } = appendSuggestedPlan(
+      stateRef.current.session,
+      pickedExercise,
+      suggestion.sets,
+      createdExerciseId
+    );
 
-    setState((current) => {
-      const lastExercise = current.session.exercises[current.session.exercises.length - 1];
-      const canAppendToLastExercise =
-        shouldAppendToLastExercise && lastExercise?.id === currentLastExercise?.id;
-      const nextExercises = canAppendToLastExercise && lastExercise
-        ? current.session.exercises.map((exercise) => {
-            if (exercise.id !== lastExercise.id) {
-              return exercise;
-            }
-            return {
-              ...exercise,
-              sets: [...exercise.sets, ...plannedSets],
-            };
-          })
-        : [
-            ...current.session.exercises,
-            {
-              id: createdExerciseId ?? createExerciseId(),
-              exerciseDefinitionId: suggestionState.exercise.id,
-              name: suggestionState.exercise.name,
-              machineName: '',
-              tags: [],
-              sets: plannedSets,
-            },
-          ];
+    setState((current) => ({
+      ...current,
+      session: appendSuggestedPlan(
+        current.session,
+        pickedExercise,
+        suggestion.sets,
+        createdExerciseId
+      ).session,
+      exercisePickerVisible: false,
+      exerciseSelectionTargetId: null,
+    }));
 
-      return {
-        ...current,
-        session: {
-          ...current.session,
-          exercises: nextExercises,
-        },
-        exercisePickerVisible: false,
-        exerciseSelectionTargetId: null,
-      };
-    });
-
-    setExercisePickerSearchValue('');
-    setExercisePickerPreselection(null);
-    exercisePickerPreselectionRequestKeyRef.current = null;
     setPendingFocusedWeightSetId(null);
     revealExerciseCard(targetExerciseId);
     clearSubmitFeedback();
@@ -3101,8 +2504,8 @@ export default function SessionRecorderScreen({
       message: 'A historical exercise plan was appended to the active workout log.',
       userId: getAuthSnapshot().user?.id ?? null,
       context: {
-        exerciseDefinitionId: suggestionState.exercise.id,
-        exerciseName: suggestionState.exercise.name,
+        exerciseDefinitionId: pickedExercise.id,
+        exerciseName: pickedExercise.name,
         sourceSessionId: suggestion.sessionId,
         targetExerciseId,
         setCount: suggestion.sets.length,
@@ -3112,7 +2515,6 @@ export default function SessionRecorderScreen({
 
   const openExerciseCatalogFromRecorder = () => {
     pendingExercisePickerRestoreTargetRef.current = state.exerciseSelectionTargetId;
-    clearExercisePickerPreselection();
     setState((current) => ({
       ...current,
       exercisePickerVisible: false,
@@ -3120,112 +2522,6 @@ export default function SessionRecorderScreen({
       activeExerciseActionId: null,
     }));
     router.push('/exercise-catalog?source=session-recorder&intent=manage');
-  };
-
-  const openInlineExerciseCreate = () => {
-    clearExercisePickerPreselection();
-    setState((current) => ({
-      ...current,
-      exercisePickerVisible: false,
-      exerciseActionMenuVisible: false,
-      activeExerciseActionId: null,
-    }));
-    setIsExerciseCreateModalVisible(true);
-  };
-
-  const closeInlineExerciseCreate = () => {
-    setIsExerciseCreateModalVisible(false);
-    setState((current) => ({
-      ...current,
-      exercisePickerVisible: true,
-      exerciseActionMenuVisible: false,
-      activeExerciseActionId: null,
-    }));
-  };
-
-  const handleInlineExerciseCreated = async (exercise: ExerciseCatalogExercise) => {
-    setIsExerciseCreateModalVisible(false);
-    applySelectedExerciseSelection(exercise.id, exercise.name);
-  };
-
-  // ---- M25-T07: group exercises in the picker (E0.1) and the pick sheet (E0.2).
-
-  const toggleExercisePickerGroupsOnly = () => {
-    clearExercisePickerPreselection();
-    setExercisePickerGroupsOnly((current) => !current);
-  };
-
-  const selectPickerGroupRow = (row: PickerGroupRow) => {
-    const selection = resolvePickerGroupSelection(row);
-    if (selection.kind === 'add') {
-      applySelectedExerciseSelection(selection.exercise.id, selection.exercise.name);
-      return;
-    }
-    // Like the inline create editor: hide the picker while the sheet is open.
-    clearExercisePickerPreselection();
-    setState((current) => ({ ...current, exercisePickerVisible: false }));
-    setGroupPickTarget({
-      groupId: row.groupId,
-      groupName: row.groupName,
-      groupExercise: row.groupExercise,
-      mode: selection.kind === 'choose-linked' ? 'choose-linked' : 'link',
-      linkedExercises: row.linkedExercises,
-    });
-  };
-
-  const returnToExercisePicker = () => {
-    setState((current) => ({ ...current, exercisePickerVisible: true }));
-  };
-
-  const closeGroupPickSheet = () => {
-    setGroupPickTarget(null);
-    returnToExercisePicker();
-  };
-
-  const addExerciseFromGroupPickSheet = (exercise: LinkableExercise) => {
-    setGroupPickTarget(null);
-    applySelectedExerciseSelection(exercise.id, exercise.name);
-  };
-
-  // A local write, so it works offline; a failure rejects into the sheet's inline error.
-  const linkAndAddFromGroupPickSheet = async (exercise: LinkableExercise) => {
-    const target = groupPickTarget;
-    if (!target) {
-      return;
-    }
-    await linkExercise(exercise.id, target.groupId, target.groupExercise.group_exercise_id);
-    void groupLinking.reloadLinks();
-    setGroupPickTarget(null);
-    applySelectedExerciseSelection(exercise.id, exercise.name);
-  };
-
-  const openAddAsNewFromGroupPickSheet = () => {
-    setAddAsNewTarget(groupPickTarget);
-    setGroupPickTarget(null);
-  };
-
-  const closeAddAsNew = () => {
-    setAddAsNewTarget(null);
-    returnToExercisePicker();
-  };
-
-  // "Add as new": the exercise and its link commit in one local transaction.
-  const saveAddAsNewExercise = async (input: ExerciseEditorSaveInput): Promise<ExerciseCatalogExercise> => {
-    const target = addAsNewTarget;
-    if (!target) {
-      throw new Error('No group exercise selected.');
-    }
-    const { exercise } = await createExerciseWithGroupLink(input, {
-      groupId: target.groupId,
-      groupExerciseId: target.groupExercise.group_exercise_id,
-    });
-    return exercise;
-  };
-
-  const handleAddAsNewSaved = (exercise: ExerciseCatalogExercise) => {
-    setAddAsNewTarget(null);
-    void groupLinking.reloadLinks();
-    applySelectedExerciseSelection(exercise.id, exercise.name);
   };
 
   const activeActionExerciseDefinitionId =
@@ -3857,20 +3153,17 @@ export default function SessionRecorderScreen({
         return;
       }
 
-      const persisted = await persistSessionDraftSnapshot({
+      const completedSessionId = await completeActiveSession({
         sessionId: persistedSessionIdRef.current ?? undefined,
         gymId: submittedGym?.id ?? null,
         startedAt: parsedStartedAt,
-        status: 'active',
-        exercises: toPersistCompletedExercises(submittedSession),
+        completedHistorySession: submittedSession,
       });
-
-      await completeSessionDraft(persisted.sessionId);
       persistedSessionIdRef.current = null;
       hasSessionMutationRef.current = false;
       setHasActiveSession(false);
       router.replace(
-        `/completed-session/${persisted.sessionId}?presentation=completion${
+        `/completed-session/${completedSessionId}?presentation=completion${
           shouldFailNextMaestroShare ? '&maestroShare=fail-once' : ''
         }`
       );
@@ -3880,41 +3173,14 @@ export default function SessionRecorderScreen({
   };
 
   const beginSubmitFlow = (sessionCandidate: Session) => {
-    const committedSession = canonicalizeSessionSetWeights(sessionCandidate);
-    const { session: withoutIncompleteSets, removedSets } = removeIncompleteSets(committedSession);
-    if (removedSets > 0) {
-      setSubmitCleanupPrompt({
-        step: 'incomplete-sets',
-        affectedCount: removedSets,
-        nextSession: withoutIncompleteSets,
-      });
-      return;
-    }
-
-    const { session: withoutUnconfirmedSets, removedSets: removedUnconfirmedSets } =
-      removeUnconfirmedSets(withoutIncompleteSets);
-    if (removedUnconfirmedSets > 0) {
-      setSubmitCleanupPrompt({
-        step: 'unconfirmed-sets',
-        affectedCount: removedUnconfirmedSets,
-        nextSession: withoutUnconfirmedSets,
-      });
-      return;
-    }
-
-    const completedHistorySession = toCompletedHistorySession(withoutUnconfirmedSets);
-    const { session: withoutEmptyExercises, removedExercises } = removeExercisesWithNoSets(completedHistorySession);
-    if (removedExercises > 0) {
-      setSubmitCleanupPrompt({
-        step: 'empty-exercises',
-        affectedCount: removedExercises,
-        nextSession: withoutEmptyExercises,
-      });
+    const cleanup = nextSubmitCleanup(sessionCandidate);
+    if (cleanup.kind === 'prompt') {
+      setSubmitCleanupPrompt(cleanup.prompt);
       return;
     }
 
     setSubmitCleanupPrompt(null);
-    finalizeSubmit(completedHistorySession);
+    finalizeSubmit(cleanup.session);
   };
 
   const handleSubmit = () => {
@@ -4006,38 +3272,9 @@ export default function SessionRecorderScreen({
     const activeSet = activeExercise?.sets.find((set) => set.id === activeSetTypePicker.setId);
     return normalizeSessionSetType(activeSet?.setType);
   }, [activeSetTypePicker, state.session.exercises]);
-  const cleanupModalTitle =
-    submitCleanupPrompt?.step === 'incomplete-sets'
-      ? 'Remove incomplete sets and submit?'
-      : submitCleanupPrompt?.step === 'unconfirmed-sets'
-        ? 'Discard unconfirmed sets and submit?'
-        : 'Remove exercises with no sets and submit?';
-  const cleanupModalMessage =
-    submitCleanupPrompt?.step === 'incomplete-sets'
-      ? `${submitCleanupPrompt.affectedCount} incomplete set${
-          submitCleanupPrompt.affectedCount === 1 ? '' : 's'
-        } missing reps or weight will be removed.`
-      : submitCleanupPrompt?.step === 'unconfirmed-sets'
-        ? `${submitCleanupPrompt.affectedCount} set${
-            submitCleanupPrompt.affectedCount === 1 ? '' : 's'
-          } with entered values ${
-            submitCleanupPrompt.affectedCount === 1 ? 'is' : 'are'
-          } not confirmed and will be discarded.`
-        : `${submitCleanupPrompt?.affectedCount ?? 0} exercise${
-            submitCleanupPrompt?.affectedCount === 1 ? '' : 's'
-          } with no sets will be removed.`;
-  const cleanupModalConfirmLabel =
-    submitCleanupPrompt?.step === 'incomplete-sets'
-      ? routeMode === 'completed-edit'
-        ? 'Remove incomplete sets and save changes'
-        : 'Remove incomplete sets and submit'
-      : submitCleanupPrompt?.step === 'unconfirmed-sets'
-        ? routeMode === 'completed-edit'
-          ? 'Discard unconfirmed sets and save changes'
-          : 'Discard unconfirmed sets and submit'
-        : routeMode === 'completed-edit'
-          ? 'Remove empty exercises and save changes'
-          : 'Remove empty exercises and submit';
+  const cleanupModalCopy = submitCleanupPrompt
+    ? describeSubmitCleanupPrompt(submitCleanupPrompt, routeMode)
+    : null;
 
   const completedEditTimeValidationMessage =
     routeMode === 'completed-edit' ? getDateTimeValidationMessage(state.session.dateTime, completedEditEndDateTime) : null;
@@ -4844,14 +4081,14 @@ export default function SessionRecorderScreen({
             onPress={cancelSubmitCleanup}
           />
           <View style={styles.confirmationModalCard}>
-            <Text style={styles.confirmationTitle}>{cleanupModalTitle}</Text>
-            <Text style={styles.confirmationBody}>{cleanupModalMessage}</Text>
+            <Text style={styles.confirmationTitle}>{cleanupModalCopy?.title}</Text>
+            <Text style={styles.confirmationBody}>{cleanupModalCopy?.message}</Text>
             <View style={styles.confirmationButtonStack}>
               <Pressable style={styles.confirmationPrimaryButton} onPress={confirmSubmitCleanup}>
-                <Text style={styles.confirmationPrimaryButtonText}>{cleanupModalConfirmLabel}</Text>
+                <Text style={styles.confirmationPrimaryButtonText}>{cleanupModalCopy?.confirmLabel}</Text>
               </Pressable>
               <Pressable style={styles.confirmationSecondaryButton} onPress={cancelSubmitCleanup}>
-                <Text style={styles.confirmationSecondaryButtonText}>Go back to edit session</Text>
+                <Text style={styles.confirmationSecondaryButtonText}>{SUBMIT_CLEANUP_CANCEL_LABEL}</Text>
               </Pressable>
             </View>
           </View>
@@ -5142,238 +4379,14 @@ export default function SessionRecorderScreen({
         </KeyboardAvoidingView>
       </Modal>
 
-      <Modal
-        animationType="slide"
-        transparent
+      <ExercisePicker
         visible={state.exercisePickerVisible}
-        onRequestClose={dismissExerciseModal}>
-        <KeyboardAvoidingView
-          style={styles.modalContainer}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <Pressable
-            accessibilityLabel="Dismiss exercise modal overlay"
-            style={styles.modalBackdrop}
-            onPress={dismissExerciseModal}
-          />
-
-          <View style={[styles.modalCard, styles.exercisePickerModalCard]}>
-            <View style={styles.exercisePickerHeaderRow}>
-              <Text style={styles.modalTitle}>Select Exercise</Text>
-              <View style={styles.exercisePickerHeaderActionRow}>
-                <Pressable
-                  accessibilityLabel="Exercise picker options"
-                  style={styles.exercisePickerIconButton}
-                  onPress={() => {
-                    clearExercisePickerPreselection();
-                    setIsExercisePickerOptionsVisible((current) => !current);
-                  }}>
-                  <Text style={styles.exercisePickerIconButtonText}>⋮</Text>
-                </Pressable>
-                <Pressable
-                  accessibilityLabel="Open exercise catalog manage flow"
-                  style={styles.exercisePickerIconButton}
-                  onPress={openExerciseCatalogFromRecorder}>
-                  <Text style={styles.exercisePickerIconButtonText}>≡</Text>
-                </Pressable>
-                <Pressable
-                  accessibilityLabel="Open inline exercise create"
-                  style={styles.exercisePickerIconButton}
-                  onPress={openInlineExerciseCreate}>
-                  <Text style={styles.exercisePickerIconButtonText}>+</Text>
-                </Pressable>
-              </View>
-            </View>
-            <View style={styles.exercisePickerSearchRow}>
-              <TextInput
-                accessibilityLabel="Exercise filter input"
-                autoCapitalize="none"
-                autoCorrect={false}
-                placeholder="Filter by exercise or muscle group"
-                style={[styles.input, styles.exercisePickerSearchInput]}
-                value={exercisePickerSearchValue}
-                onChangeText={updateExercisePickerSearchValue}
-              />
-              {groupLinkingUserId ? (
-                <PickerGroupsToggle active={exercisePickerGroupsOnly} onToggle={toggleExercisePickerGroupsOnly} />
-              ) : null}
-            </View>
-            {isExercisePickerOptionsVisible ? (
-              <View style={styles.exercisePickerOptionsPanel}>
-                <ExerciseListPreferenceControls
-                  preferences={listPreferences}
-                  onChangePreferences={setListPreferences}
-                />
-              </View>
-            ) : null}
-            {/*
-              The filter input above keeps focus while the user picks a result.
-              With the ScrollView's default `keyboardShouldPersistTaps="never"`,
-              the first tap on a result row is consumed to dismiss the keyboard
-              instead of firing the row's `onPress`, so the exercise is never
-              selected and the modal stays open. `"handled"` lets the tap reach
-              the row Pressables while still dismissing the keyboard on taps that
-              hit empty list space.
-            */}
-            <ScrollView contentContainerStyle={styles.modalList} keyboardShouldPersistTaps="handled">
-              {isExerciseCatalogLoading ? <Text style={styles.emptyText}>Loading exercises...</Text> : null}
-              {!isExerciseCatalogLoading && exerciseCatalogLoadError ? (
-                <Text style={styles.emptyText}>{exerciseCatalogLoadError}</Text>
-              ) : null}
-              {!isExerciseCatalogLoading && !exerciseCatalogLoadError && exercisePickerPreselection ? (
-                <>
-                  <View
-                    style={styles.exercisePickerPreselectionPanel}
-                    testID="exercise-picker-preselection-panel">
-                    <Text style={styles.exercisePickerPreselectionTitle}>
-                      {exercisePickerPreselection.exercise.name}
-                    </Text>
-                    <View style={styles.exercisePickerPreselectionActions}>
-                      <Pressable
-                        accessibilityLabel={`Add empty set for ${exercisePickerPreselection.exercise.name}`}
-                        accessibilityRole="button"
-                        style={styles.secondaryActionButton}
-                        testID="exercise-picker-add-empty-set-button"
-                        onPress={() =>
-                          applySelectedExerciseSelection(
-                            exercisePickerPreselection.exercise.id,
-                            exercisePickerPreselection.exercise.name
-                          )
-                        }>
-                        <Text style={styles.secondaryActionButtonText}>Add empty set</Text>
-                      </Pressable>
-                      <Pressable
-                        accessibilityLabel={`Append historical plan for ${exercisePickerPreselection.exercise.name}`}
-                        accessibilityRole="button"
-                        accessibilityState={{
-                          disabled:
-                            exercisePickerPreselection.status !== 'ready' ||
-                            !exercisePickerPreselection.suggestion,
-                        }}
-                        disabled={
-                          exercisePickerPreselection.status !== 'ready' ||
-                          !exercisePickerPreselection.suggestion
-                        }
-                        style={[
-                          styles.primaryActionButton,
-                          exercisePickerPreselection.status !== 'ready' ||
-                          !exercisePickerPreselection.suggestion
-                            ? styles.exercisePickerAppendPlanButtonDisabled
-                            : null,
-                        ]}
-                        testID="exercise-picker-append-plan-button"
-                        onPress={() => appendSuggestedPlanToSession(exercisePickerPreselection)}>
-                        <Text style={styles.primaryActionButtonText}>Append plan</Text>
-                      </Pressable>
-                    </View>
-                    {exercisePickerPreselection.suggestion ? (
-                      <View style={styles.exercisePickerPlanPreview}>
-                        <Text
-                          style={styles.exercisePickerPlanPreviewSource}
-                          testID="exercise-picker-plan-source">
-                          From {formatCurrentDateTime(exercisePickerPreselection.suggestion.completedAt)}
-                        </Text>
-                        <ScrollView
-                          nestedScrollEnabled
-                          style={styles.exercisePickerPlanSetList}
-                          contentContainerStyle={styles.exercisePickerPlanSetListContent}>
-                          {exercisePickerPreselection.suggestion.sets.map((set, index) => {
-                            const quality = normalizeSessionSetType(set.setType);
-                            return (
-                              <View
-                                key={set.setId}
-                                style={styles.exercisePickerPlanSetRow}
-                                testID={`exercise-picker-plan-set-row-${index + 1}`}>
-                                <Text style={styles.exercisePickerPlanSetIndex}>Set {index + 1}</Text>
-                                <Text style={styles.exercisePickerPlanSetValue}>
-                                  {formatSetWeightLabel(set.weightValue)} · {formatSetRepsLabel(set.repsValue)}
-                                </Text>
-                                {quality ? (
-                                  <Text style={styles.exercisePickerPlanSetQuality}>
-                                    {getSetQualityDisplayLabel(quality)}
-                                  </Text>
-                                ) : null}
-                              </View>
-                            );
-                          })}
-                        </ScrollView>
-                      </View>
-                    ) : null}
-                  </View>
-                  <Pressable
-                    accessibilityLabel="Dismiss exercise preselection"
-                    style={styles.exercisePickerPreselectionDismissArea}
-                    testID="exercise-picker-preselection-dismiss-area"
-                    onPress={clearExercisePickerPreselection}
-                  />
-                </>
-              ) : null}
-              {!isExerciseCatalogLoading && !exerciseCatalogLoadError && !exercisePickerPreselection ? (
-                exercisePickerGroupsOnly ? (
-                  exercisePickerGroupSections.length > 0 ? (
-                    <PickerGroupSectionList sections={exercisePickerGroupSections} onPressRow={selectPickerGroupRow} />
-                  ) : (
-                    <Text style={styles.emptyText} testID="exercise-picker-group-empty">
-                      {exercisePickerGroupEmptyText}
-                    </Text>
-                  )
-                ) : (
-                  <>
-                    <ExerciseListContent
-                      mode={exercisePickerListModel.mode}
-                      items={exercisePickerListModel.items}
-                      sections={exercisePickerListModel.sections}
-                      expandedFamilies={expandedExercisePickerFamilies}
-                      emptyText={
-                        exercisePickerOptions.length === 0
-                          ? 'No active exercises available.'
-                          : 'No exercises match that filter.'
-                      }
-                      onToggleFamily={toggleExercisePickerFamily}
-                      onPressExercise={selectExerciseListItem}
-                    />
-                    {exercisePickerListModel.items.length === 0 && exercisePickerListModel.mode === 'grouped' ? (
-                      <Text style={styles.emptyText}>
-                        {exercisePickerOptions.length === 0 ? 'No active exercises available.' : 'No exercises match that filter.'}
-                      </Text>
-                    ) : null}
-                    {/* After my own matches (E0.1); empty without search text. */}
-                    <PickerGroupSectionList sections={exercisePickerGroupSections} onPressRow={selectPickerGroupRow} />
-                  </>
-                )
-              ) : null}
-            </ScrollView>
-
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
-
-      <ExerciseEditorModal
-        visible={isExerciseCreateModalVisible}
-        editingExercise={null}
-        onRequestClose={closeInlineExerciseCreate}
-        onSaved={(exercise) => {
-          void handleInlineExerciseCreated(exercise);
-        }}
-      />
-
-      <GroupExercisePickSheet
-        target={groupPickTarget}
-        exercises={exercisePickerOptions}
-        links={groupLinking.links}
-        onRequestClose={closeGroupPickSheet}
-        onAddExercise={addExerciseFromGroupPickSheet}
-        onLinkAndAdd={linkAndAddFromGroupPickSheet}
-        onAddAsNew={openAddAsNewFromGroupPickSheet}
-      />
-
-      <ExerciseEditorModal
-        visible={addAsNewTarget !== null}
-        editingExercise={null}
-        prefill={addAsNewPrefill}
-        title="Add as new exercise"
-        onSave={saveAddAsNewExercise}
-        onRequestClose={closeAddAsNew}
-        onSaved={handleAddAsNewSaved}
+        openRequestId={exercisePickerOpenRequestId}
+        mode={state.exerciseSelectionTargetId ? 'replace' : 'add'}
+        onDismiss={dismissExerciseModal}
+        onSelectExercise={applySelectedExerciseSelection}
+        onAppendPlan={appendSuggestedPlanToSession}
+        onOpenManage={openExerciseCatalogFromRecorder}
       />
 
       <Modal

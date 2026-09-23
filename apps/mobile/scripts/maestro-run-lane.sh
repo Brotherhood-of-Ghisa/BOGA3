@@ -9,7 +9,7 @@
 # (maestro-ios-gates.sh) keeps its own script — it is a different execution
 # model, not a thin wrapper.
 #
-#   ./scripts/maestro-run-lane.sh smoke|data-smoke|ui-regression|exercise-page|auth-profile|sync-e2e|groups-e2e
+#   ./scripts/maestro-run-lane.sh smoke|data-smoke|ui-regression|exercise-page|session-view|auth-profile|sync-e2e|groups-e2e
 #
 # Canonical lane names / gate membership: scripts/lanes.tsv (run via
 # `./boga test ios-smoke` etc.; the npm test:e2e:ios:* scripts also land here).
@@ -21,7 +21,7 @@ APP_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 REPO_ROOT="$(cd -- "$APP_DIR/../.." && pwd)"
 
 lane="${1:-}"
-LANES="smoke|data-smoke|ui-regression|exercise-page|auth-profile|sync-e2e|groups-e2e"
+LANES="smoke|data-smoke|ui-regression|exercise-page|session-view|auth-profile|sync-e2e|groups-e2e"
 [[ -n "$lane" ]] || { echo "usage: $0 $LANES" >&2; exit 2; }
 
 run_flow() {
@@ -103,6 +103,18 @@ case "$lane" in
   # evidence (the V5-* captures) is one run. No Supabase.
   exercise-page)
     run_flow data "Exercise page" exercise-page.yaml
+    ;;
+
+  # The session view (redesign step 5), behind the new exercise/session screens
+  # setting: two flows sharing one simulator + Metro, each opting in and
+  # seeding its session through the harness (`newScreens=on`,
+  # `fixture=session-view`). Infra-free; `data` reset is enough.
+  session-view)
+    MAESTRO_RESET_STRATEGY=data \
+    "$SCRIPT_DIR/maestro-ios-run-flows.sh" \
+      --session "iOS session view" \
+      --scenario "Session view" --flow "$APP_DIR/.maestro/flows/session-view.yaml" \
+      --scenario "Session view abandon" --flow "$APP_DIR/.maestro/flows/session-view-abandon.yaml"
     ;;
 
   # The Supabase-configured auth/profile lane: login-on-start enforcement and the

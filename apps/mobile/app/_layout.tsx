@@ -117,7 +117,9 @@ export default function RootLayout() {
                   name="group-session/[memberId]/[sessionId]"
                   options={{ title: 'Session' }}
                 />
-                {/* The exercise page draws its own top bar (step 4 of the exercise/session redesign). */}
+                {/* The session view and exercise page (steps 5 and 4 of the exercise/session
+                    redesign) draw their own top bars; reached only with the new-screens setting on. */}
+                <Stack.Screen name="session/[sessionId]/index" options={{ headerShown: false }} />
                 <Stack.Screen
                   name="session/[sessionId]/exercise/[sessionExerciseId]"
                   options={{ headerShown: false }}

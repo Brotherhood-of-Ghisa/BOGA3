@@ -1,0 +1,164 @@
+appId: com.dinoderek.mobile
+---
+# The session view (redesign step 5), behind the new exercise/session screens
+# setting. Proves, on device:
+#   1. with the setting on, Train's Resume opens the session view (the entry
+#      switch), not the recorder;
+#   2. the summary card and one read-only card per exercise, with its done
+#      count and — for the bench, whose RIR 2 set beats its completed history —
+#      the 1RM record band (fixture: src/maestro/session-view-fixture.ts);
+#   3. a card links to its exercise page (step 4), and its back returns here;
+#   4. the ⋮ menu sheet opens and a backdrop tap dismisses it;
+#   5. + Add exercise adds a card through the recorder's picker;
+#   6. Finish runs the recorder's cleanup prompts and opens the completion
+#      screen.
+#
+# Hermetic: starts from `reset=data` and ends with a data reset, leaving the
+# setting off. Infra-free (no sign-in).
+
+- retry:
+    maxRetries: 3
+    commands:
+      - openLink: "boga3://maestro-harness?reset=data&newScreens=on&fixture=session-view&teleport=session-list"
+      - tapOn:
+          text: "Open"
+          optional: true
+      - tapOn:
+          text: "Continue"
+          optional: true
+      - tapOn:
+          text: "Close"
+          optional: true
+      - extendedWaitUntil:
+          visible:
+            id: "stats-history-screen"
+          timeout: 30000
+
+# 1. Train -> Resume lands on the session view.
+- waitForAnimationToEnd:
+    timeout: 4000
+- retry:
+    maxRetries: 3
+    commands:
+      - tapOn:
+          id: "top-level-tab-train"
+      - extendedWaitUntil:
+          visible:
+            id: "train-resume-session-button"
+          timeout: 15000
+- tapOn:
+    id: "train-resume-session-button"
+- extendedWaitUntil:
+    visible:
+      id: "session-view-screen"
+    timeout: 15000
+- assertNotVisible:
+    id: "session-recorder-screen"
+
+# 2. Summary and cards (their accessibility labels carry the counts and record).
+- extendedWaitUntil:
+    visible:
+      text: "Barbell Bench Press, 3 of 5 sets done, new 1RM record 204.3"
+    timeout: 15000
+- assertVisible:
+    text: "Gym Maestro Block History Gym"
+- assertVisible:
+    text: "Sets 6"
+- assertVisible:
+    text: "Volume 4200"
+- assertVisible:
+    text: "Incline Dumbbell Press, 3 of 3 sets done"
+- assertVisible:
+    text: "Cable Flys, 0 of 3 sets done"
+- takeScreenshot: "01-session-view"
+
+# 3. A card is a link to its exercise page.
+- tapOn:
+    text: "Incline Dumbbell Press, 3 of 3 sets done"
+- extendedWaitUntil:
+    visible:
+      id: "exercise-page-title"
+      text: "Incline Dumbbell Press"
+    timeout: 15000
+- tapOn:
+    id: "exercise-page-back"
+- extendedWaitUntil:
+    visible:
+      id: "session-view-screen"
+    timeout: 15000
+
+# 4. The ⋮ menu, dismissed by the backdrop.
+- tapOn:
+    id: "session-view-options-button"
+- extendedWaitUntil:
+    visible:
+      id: "session-view-abandon"
+    timeout: 10000
+- takeScreenshot: "02-session-options-sheet"
+# The backdrop is hidden from VoiceOver while the sheet is modal (it dismisses
+# with the escape gesture instead), so tap the dimmed page above the panel.
+- tapOn:
+    point: "50%,20%"
+- extendedWaitUntil:
+    notVisible:
+      id: "session-view-abandon"
+    timeout: 10000
+
+# 5. + Add exercise, through the recorder's picker.
+- scrollUntilVisible:
+    element:
+      id: "session-view-add-exercise"
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: "session-view-add-exercise"
+- tapOn: "Exercise picker options"
+- tapOn: "Turn grouping off"
+- tapOn: "Exercise picker options"
+- tapOn: "Exercise filter input"
+- inputText: "Lat Pulldown"
+- hideKeyboard:
+    optional: true
+- tapOn: "Select Exercise"
+- extendedWaitUntil:
+    visible:
+      text: "Select exercise Lat Pulldown"
+    timeout: 15000
+- tapOn:
+    text: "Select exercise Lat Pulldown"
+- tapOn:
+    id: "exercise-picker-add-empty-set-button"
+- scrollUntilVisible:
+    element:
+      text: "Lat Pulldown, 0 of 1 sets done"
+    direction: DOWN
+    centerElement: true
+- takeScreenshot: "03-session-view-exercise-added"
+
+# 6. Finish: the recorder's cleanup prompts, then the completion screen.
+- tapOn:
+    id: "session-view-finish-button"
+- extendedWaitUntil:
+    visible:
+      text: "Remove incomplete sets and submit?"
+    timeout: 10000
+- tapOn:
+    text: "Remove incomplete sets and submit"
+- extendedWaitUntil:
+    visible:
+      text: "Remove exercises with no sets and submit?"
+    timeout: 10000
+- tapOn:
+    text: "Remove empty exercises and submit"
+- extendedWaitUntil:
+    visible:
+      id: "session-completion-presentation"
+    timeout: 20000
+- takeScreenshot: "04-session-view-finished"
+
+# Leave the simulator as this flow found it: data reset, setting off.
+- openLink: "boga3://maestro-harness?reset=data&teleport=session-list"
+- extendedWaitUntil:
+    visible:
+      id: "stats-history-screen"
+    timeout: 30000

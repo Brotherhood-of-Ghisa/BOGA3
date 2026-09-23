@@ -21,6 +21,9 @@ import {
 } from '@/src/data';
 import { parseCalculationSet } from '@/src/exercise-calculations';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
+import { activeSessionHref } from '@/src/navigation/active-session-entry';
+import { loadActiveSessionId } from '@/src/session-entry';
+import { useNewScreensEnabled } from '@/src/session-recorder/new-screens-preference';
 import { isDevMode } from '@/src/utils/isDevMode';
 import {
   isConfirmedPerformedSet,
@@ -269,6 +272,7 @@ export function CompletedSessionDetailScreenShell({
   shouldFailNextMaestroCatalog = false,
 }: CompletedSessionDetailScreenShellProps) {
   const router = useRouter();
+  const [newScreensEnabled] = useNewScreensEnabled();
   const exerciseCatalog = useExerciseCatalog();
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -550,8 +554,9 @@ export function CompletedSessionDetailScreenShell({
     setActionFeedback(null);
     void dataClient
       .appendCompletedSessionExerciseAsPlanned(session.id, sessionExerciseId)
-      .then(() => {
-        router.push('/session-recorder');
+      .then(async () => {
+        const activeSessionId = newScreensEnabled ? await loadActiveSessionId() : null;
+        router.push(activeSessionHref(activeSessionId, newScreensEnabled));
       })
       .catch((error) => {
         setActionFeedback(error instanceof Error ? error.message : 'Unable to append exercise block');

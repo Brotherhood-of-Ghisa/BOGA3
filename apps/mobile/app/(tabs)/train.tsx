@@ -17,7 +17,10 @@ import {
   DEFAULT_SESSION_ENTRY_COORDINATOR,
   type PlannedSessionMaterializer,
   type SessionEntryCoordinator,
+  type SessionEntryResult,
 } from '@/src/session-entry';
+import { activeSessionHref } from '@/src/navigation/active-session-entry';
+import { useNewScreensEnabled } from '@/src/session-recorder/new-screens-preference';
 
 export type TrainPlanningState =
   | { status: 'unavailable' }
@@ -50,6 +53,7 @@ export function TrainScreen({
   sessionEntry = DEFAULT_SESSION_ENTRY_COORDINATOR,
 }: TrainScreenProps) {
   const router = useRouter();
+  const [newScreensEnabled] = useNewScreensEnabled();
   const launchInFlightRef = useRef(false);
   const [launchKind, setLaunchKind] = useState<LaunchKind | null>(null);
   const [launchError, setLaunchError] = useState<{
@@ -69,7 +73,7 @@ export function TrainScreen({
 
   const openRecorder = async (
     kind: LaunchKind,
-    launch: () => Promise<unknown>,
+    launch: () => Promise<SessionEntryResult>,
   ) => {
     if (launchInFlightRef.current) {
       return;
@@ -79,8 +83,8 @@ export function TrainScreen({
     setLaunchKind(kind);
     setLaunchError(null);
     try {
-      await launch();
-      router.push('/session-recorder');
+      const entry = await launch();
+      router.push(activeSessionHref(entry.sessionId, newScreensEnabled));
     } catch {
       setLaunchError({
         kind,
@@ -148,7 +152,7 @@ export function TrainScreen({
             </View>
             <UiButton
               label="Resume workout"
-              onPress={() => router.push('/session-recorder')}
+              onPress={() => router.push(activeSessionHref(activeSession.id, newScreensEnabled))}
               testID="train-resume-session-button"
             />
           </UiSurface>

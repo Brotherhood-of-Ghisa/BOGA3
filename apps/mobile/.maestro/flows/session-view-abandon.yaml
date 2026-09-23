@@ -1,0 +1,55 @@
+appId: com.dinoderek.mobile
+---
+# Abandon session from the session view's ⋮ (redesign step 5): the menu
+# sheet, the destructive confirmation, then the soft delete the Sessions list
+# uses — Train then offers a new workout instead of Resume.
+#
+# Hermetic: starts from `reset=data` and ends with a data reset, leaving the
+# setting off. Infra-free (no sign-in).
+
+- retry:
+    maxRetries: 3
+    commands:
+      - openLink: "boga3://maestro-harness?reset=data&newScreens=on&fixture=session-view&teleport=session-view&sessionId=maestro_session_view_active"
+      - tapOn:
+          text: "Open"
+          optional: true
+      - tapOn:
+          text: "Continue"
+          optional: true
+      - tapOn:
+          text: "Close"
+          optional: true
+      - extendedWaitUntil:
+          visible:
+            id: "session-view-options-button"
+          timeout: 30000
+
+- tapOn:
+    id: "session-view-options-button"
+- extendedWaitUntil:
+    visible:
+      id: "session-view-abandon"
+    timeout: 10000
+- tapOn:
+    id: "session-view-abandon"
+- extendedWaitUntil:
+    visible:
+      text: "Abandon session?"
+    timeout: 10000
+- takeScreenshot: "01-abandon-confirmation"
+- tapOn:
+    text: "Abandon"
+- extendedWaitUntil:
+    visible:
+      id: "train-start-empty-button"
+    timeout: 15000
+- assertNotVisible:
+    id: "train-resume-session-button"
+- takeScreenshot: "02-abandoned-back-on-train"
+
+- openLink: "boga3://maestro-harness?reset=data&teleport=session-list"
+- extendedWaitUntil:
+    visible:
+      id: "stats-history-screen"
+    timeout: 30000

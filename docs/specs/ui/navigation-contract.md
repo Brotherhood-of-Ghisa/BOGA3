@@ -70,7 +70,8 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
     friend-session route, while a record card or membership row opens
     `/groups?groupId=<groupId>` (records are read-only here, with no Certify)
   - an active session replaces the planned-session action and resumes at
-    `/session-recorder`; any future ready plan is launched through the shared
+    `/session-recorder` (`/session/<id>` with the new-screens setting on, as
+    for every entry below); any future ready plan is launched through the shared
     active-draft coordinator; recent rows open
     `/completed-session/[sessionId]` and the section-level action opens
     `/progress`
@@ -89,7 +90,7 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
     `/session-recorder`
   - with no draft, `Start empty workout` rechecks for an active session,
     persists one empty active draft through the existing recorder repository,
-    and then opens `/session-recorder`; simultaneous entry requests share the
+    and then opens `/session-recorder` (or `/session/<id>`, transition 46); simultaneous entry requests share the
     same in-flight result, and persistence failure is inline and retryable
   - exposes typed loading/error/empty/ready/unavailable planning states; a
     ready plan supplies its own materializer and management callback, while the
@@ -166,6 +167,22 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
     successful active submit opens the completion presentation, while a
     successful completed edit replaces to `/progress`
   - client sync cadence is route-independent: the foreground scheduler (`apps/mobile/src/sync/scheduler.ts`) never reads the active route; recorder writes reach it only through the same post-commit write nudge (`apps/mobile/src/sync/write-nudge.ts`) as every other repo mutation, so renaming this route has no sync impact
+
+4b. `/session/[sessionId]`
+- File: `apps/mobile/app/session/[sessionId]/index.tsx`
+- Params:
+  - `sessionId` (path; the active draft's id)
+- Behavior:
+  - the session view (redesign step 5); every app entry into the active session
+    opens it while the new-screens setting is on, through
+    `activeSessionHref(sessionId, enabled)` in
+    `apps/mobile/src/navigation/active-session-entry.ts` (Off, or no known id:
+    `/session-recorder`, unchanged)
+  - an id that is not the active draft renders an in-route state, never a
+    recorder copy
+  - leaving by the bottom bar or after Abandon uses `router.dismissTo`, so the
+    tab below is reused rather than stacked
+  - root-stack screen with `headerShown: false`; it draws its own top bar
 
 5. `/exercise-catalog`
 - File: `apps/mobile/app/(tabs)/exercise-catalog.tsx`
@@ -450,10 +467,19 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
    - the row detail sheet's `View full session` (the sheet closes, then `router.push`); the sheet itself is in-route state opened from a record card or a full-board row
 45. `/today` -> `/groups?groupId=<groupId>`
    - a Group activity record card or membership row
-
-46. session view (step 5) -> `/session/<sessionId>/exercise/<sessionExerciseId>` (exercise/session redesign)
-   - the session view's exercise card (step 5's entry). Back, `Complete exercise` and `Remove from session` return with `router.back()`; with no history (a deep link) they `router.replace('/train')`
-47. `/session/<sessionId>/exercise/<sessionExerciseId>` -> `/exercise-history?exerciseDefinitionId=<id>`
+46. `/today`, `/train`, `/sessions`, `/completed-session/<sessionId>` (append) -> `/session/<sessionId>`
+   - every active-session entry, only while the new-screens setting is on
+     (`activeSessionHref`); Off keeps each on `/session-recorder` exactly as in
+     transitions 5 and 9 and the Today/Train rows above
+47. `/session/<sessionId>` -> `/completed-session/<sessionId>?presentation=completion`
+   - Finish after its cleanup prompts and the completion write (`router.replace`)
+48. `/session/<sessionId>` -> `/train` or another tab
+   - Abandon session after its confirmation, or the bottom bar (`router.dismissTo`)
+49. `/session/<sessionId>` -> `/exercise-catalog?source=session-recorder&intent=manage`
+   - the picker's Manage; the catalogue's `router.back()` returns and the picker reopens
+50. `/session/<sessionId>` -> `/session/<sessionId>/exercise/<sessionExerciseId>` (exercise/session redesign)
+   - the session view's exercise card (`router.push`). Back, `Complete exercise` and `Remove from session` return with `router.back()`, and the session view reloads the draft on focus; with no history (a deep link) they `router.replace('/train')`
+51. `/session/<sessionId>/exercise/<sessionExerciseId>` -> `/exercise-history?exerciseDefinitionId=<id>`
    - the records panel's `History` link (`router.push`)
 
 Note:
@@ -475,6 +501,8 @@ Note:
 - `completed-session/[sessionId]` sets its title inside the route file (`View Session`, `Session complete`, or `Session summary`)
 - `exercise-history` sets its title inside the route file to the resolved exercise name (falls back to `Exercise History` when the summary is not yet available)
 - M22 group routes declare `My groups`, `New group`, `Join group`, `Group`, `Edit group`, `Invite`, and `Session` in `apps/mobile/app/_layout.tsx`; the group screen replaces `Group` with the group's name once loaded
+- `session/[sessionId]/index` has no native header (`headerShown: false`); its
+  own top bar reads `Session`. The exercise page likewise draws its own
 - `exercise-link` (M25-T07) declares `Link exercise` in `apps/mobile/app/_layout.tsx` and replaces it with `Link "<exercise name>"` once the exercise resolves
 - M25-T08 adds `Members`, `Add exercise`, and `Edit exercise` for the group routes in `apps/mobile/app/_layout.tsx`
 

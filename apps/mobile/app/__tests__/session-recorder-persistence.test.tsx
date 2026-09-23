@@ -8,8 +8,15 @@ import {
 
 let mockSearchParams: Record<string, string | undefined> = {};
 let mockBeforeRemoveListener: ((event: any) => void) | null = null;
-let mockFocusCallback: (() => void | (() => void)) | null = null;
-let mockFocusCleanup: (() => void) | null = null;
+// Every mounted focus effect (the recorder's and its children's), each with its
+// latest cleanup, so a simulated blur/focus reaches all of them as the router would.
+const mockFocusEffects = new Map<() => void | (() => void), (() => void) | null>();
+const blurAllFocusEffects = () => {
+  for (const [callback, cleanup] of mockFocusEffects) {
+    cleanup?.();
+    mockFocusEffects.set(callback, null);
+  }
+};
 const mockNavigationDispatch = jest.fn();
 const mockNavigationAddListener = jest.fn((eventName: string, listener: (event: any) => void) => {
   if (eventName === 'beforeRemove') {
@@ -97,17 +104,12 @@ jest.mock('expo-router', () => ({
   useFocusEffect: (callback: () => void | (() => void)) => {
     const React = jest.requireActual('react');
     React.useEffect(() => {
-      mockFocusCallback = callback;
       const cleanup = callback();
-      mockFocusCleanup = typeof cleanup === 'function' ? cleanup : null;
+      mockFocusEffects.set(callback, typeof cleanup === 'function' ? cleanup : null);
       return () => {
-        if (mockFocusCallback === callback) {
-          mockFocusCallback = null;
-        }
-        if (mockFocusCleanup === cleanup) {
-          mockFocusCleanup = null;
-        }
-        cleanup?.();
+        const latestCleanup = mockFocusEffects.get(callback);
+        mockFocusEffects.delete(callback);
+        latestCleanup?.();
       };
     }, [callback]);
   },
@@ -135,9 +137,11 @@ const flushMicrotasks = async () => {
 
 const refocusRecorder = async () => {
   await act(async () => {
-    mockFocusCleanup?.();
-    const cleanup = mockFocusCallback?.();
-    mockFocusCleanup = typeof cleanup === 'function' ? cleanup : null;
+    blurAllFocusEffects();
+    for (const callback of [...mockFocusEffects.keys()]) {
+      const cleanup = callback();
+      mockFocusEffects.set(callback, typeof cleanup === 'function' ? cleanup : null);
+    }
     await flushMicrotasks();
   });
 };
@@ -209,8 +213,7 @@ describe('SessionRecorderScreen persistence wiring', () => {
     jest.useFakeTimers();
     mockSearchParams = {};
     mockBeforeRemoveListener = null;
-    mockFocusCallback = null;
-    mockFocusCleanup = null;
+    mockFocusEffects.clear();
     __resetExerciseListPreferencesForTests();
     setExerciseListPreferences({ groupByMuscleFamily: false });
     mockNavigationDispatch.mockReset();
@@ -446,7 +449,7 @@ describe('SessionRecorderScreen persistence wiring', () => {
     expect(mockPersistSessionDraftSnapshot).not.toHaveBeenCalled();
 
     await act(async () => {
-      mockFocusCleanup?.();
+      blurAllFocusEffects();
       await flushMicrotasks();
     });
 

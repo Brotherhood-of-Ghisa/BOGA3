@@ -42,7 +42,8 @@ Brief entrypoint map of the current mobile screens.
     interface, the planning slot uses the approved `Watch this space 👀`
     placeholder and links to Train without inventing plan data
 - Key exits:
-  - `/session-recorder`, `/train`, `/groups`, `/group/[groupId]`,
+  - `/session-recorder` (or `/session/<id>` with the new-screens setting
+    on), `/train`, `/groups`, `/group/[groupId]`,
     `/group-session/[memberId]/[sessionId]`,
     `/completed-session/[sessionId]`, `/progress`, and `/sign-in`
 
@@ -61,7 +62,8 @@ Brief entrypoint map of the current mobile screens.
     approved `Watch this space 👀` placeholder until M23 supplies a plan
     read/materialization and management interface
 - Key exits:
-  - `/session-recorder` after guarded empty/planned launch or active resume;
+  - `/session-recorder` after guarded empty/planned launch or active resume
+    (`/session/<id>` instead with the new-screens setting on);
     a future planner exit is supplied by the planning integration rather than
     guessed here
 
@@ -197,6 +199,45 @@ Brief entrypoint map of the current mobile screens.
     collapsed peek handle in active and completed-edit recorder modes
   - `/exercise-link?exerciseDefinitionId=<id>` (`•••` `Link to group exercise…`)
 
+4b. `/session/[sessionId]` (session view; new-screens setting only)
+- File: `apps/mobile/app/session/[sessionId]/index.tsx` (components in
+  `apps/mobile/components/session-view/`)
+- Purpose:
+  - the active session, read-only and navigational (exercise/session redesign
+    step 5; accepted target `design-targets/exercise-session-v5.md`,
+    `V6-Session`). Reached only while Settings' `New exercise & session
+    screens` is On; Off keeps every entry on `/session-recorder`
+- Key states (high level):
+  - own top bar: `Session` · ⋮ · `Finish` (the one `accent` primary); the
+    persistent four-tab bar sits at the bottom with Train selected
+  - summary card: Time (elapsed, ticking) / Gym / Sets (confirmed performed) /
+    Volume (their entered-load volume, warm-ups included)
+  - one read-only card per exercise, the whole card one link: name, `n/m` done
+    count (confirmed of all rows), every row as `type · weight × reps · 1RM ·
+    VOL` with mini legends, done rows in ink and planned/unconfirmed rows faded
+    (planned rows show their prescription), every figure in its row's colour
+    and weight, and — the one highlight — a brass record 1RM and `record` band with the
+    1RM when a done set beats the exercise's completed history
+    (`deriveExercisePersonalRecord`, as the recorder's New PR)
+  - `+ Add exercise` opens the recorder's exercise picker
+    (`components/session-recorder/exercise-picker.tsx`) and writes the new
+    exercise (one empty set) or appended plan straight to the draft
+  - ⋮ opens the `Session` menu sheet with `Abandon session` (danger), which
+    confirms before its soft delete
+  - `Finish` runs the recorder's cleanup prompts (same copy, as alerts) and
+    completion write; invalid set values block it with an alert naming the
+    exercises
+  - loading; `This session is no longer active.` with `Back to Train` when the
+    id is not the active draft; retryable read error
+- Key exits:
+  - `/session/<sessionId>/exercise/<sessionExerciseId>` from a card
+  - `/completed-session/<sessionId>?presentation=completion` after Finish
+  - `/train` after Abandon, or any tab from the bottom bar (`dismissTo`)
+  - `/exercise-catalog?source=session-recorder&intent=manage` from the
+    picker's Manage; the picker returns on focus
+- Notes:
+  - reloads the draft on every focus, so the exercise page's edits show on return
+
 5. `/exercise-catalog`
 - File: `apps/mobile/app/(tabs)/exercise-catalog.tsx`
 - Purpose:
@@ -300,6 +341,7 @@ Brief entrypoint map of the current mobile screens.
     recorder so draft state and recorder cleanup rules remain authoritative
 - Key exits:
   - `/session-recorder` via stack dismissal for active Resume or review/complete
+    (with the new-screens setting on, `/session/<id>` is pushed instead)
   - `/session-recorder?mode=completed-edit&sessionId=<sessionId>` from a
     completed row or its explicit Edit action
 - Notes:
@@ -329,7 +371,8 @@ Brief entrypoint map of the current mobile screens.
   - temporary redirect placeholder for `intent=edit`
 - Key exits:
   - `session-recorder` (edit)
-  - `session-recorder` after successful per-exercise block append
+  - `session-recorder` after successful per-exercise block append (the
+    session view with the new-screens setting on)
   - `/progress` from completion Done/back
   - `/sessions` or completed-edit mode from historical-summary header actions
 
@@ -521,7 +564,7 @@ Brief entrypoint map of the current mobile screens.
 - Key exits:
   - back (top bar) → the previous screen; `Complete exercise` → the previous screen after resolving the sets still waiting; `Remove from session` → the previous screen; `History` → `/exercise-history`
 - Notes:
-  - until the session view (step 5) is the entry point it is reached by deep link (Maestro `teleport=exercise-page`); with no screen to go back to, back goes to `/train`
+  - entered from the session view's exercise cards (step 5), or by deep link (Maestro `teleport=exercise-page`); with no screen to go back to, back goes to `/train`
 
 ## Route shell (not a user-facing screen)
 
@@ -531,7 +574,7 @@ Brief entrypoint map of the current mobile screens.
 - Notes:
   - wraps the whole navigator in the route-layer auth guard (`apps/mobile/components/navigation/auth-route-guard.tsx`), which enforces login-on-start for configured signed-out sessions (neutral loading view while restoring, redirect to `/sign-in` when configured-but-signed-out, stand aside when auth is unconfigured, while allowing `/sign-in` and the dev/test-gated `/maestro-harness` route to render through)
   - immediately below the auth guard, wraps the navigator in the first-sync gate (`apps/mobile/src/sync/SyncGate.tsx`), which blocks a signed-in user behind a full-screen "Setting up your data…" block until `sync_runtime_state.bootstrap_completed_at` is set (then dismisses in place), and observes sync runtime state through the single shared scheduler-state accessor
-  - tab roots live inside the `(tabs)` route group (`apps/mobile/app/(tabs)/_layout.tsx`) with `headerShown: false`; the root stack registers the `(tabs)` group itself plus the `sign-in` screen and the detail screens (`exercise-history`, `sessions`, `profile`, `connected-agents`, `maestro-harness`, `completed-session/[sessionId]`, the M22 `group/mine`, `group/[groupId]/index`, `group-session/[memberId]/[sessionId]`, the M25 `exercise-link`, and the header-less exercise page `session/[sessionId]/exercise/[sessionExerciseId]`)
+  - tab roots live inside the `(tabs)` route group (`apps/mobile/app/(tabs)/_layout.tsx`) with `headerShown: false`; the root stack registers the `(tabs)` group itself plus the `sign-in` screen and the detail screens (`exercise-history`, `sessions`, `profile`, `connected-agents`, `maestro-harness`, `completed-session/[sessionId]`, the M22 `group/mine`, `group/[groupId]/index`, `group-session/[memberId]/[sessionId]`, the M25 `exercise-link`, and the header-less redesign screens `session/[sessionId]/index` (session view) and `session/[sessionId]/exercise/[sessionExerciseId]` (exercise page))
   - the root stack gives every detail screen the native minimal back-button
     display mode (no custom back title), preserving normal platform back
     behavior while hiding the previous route-group title; the arrow-only

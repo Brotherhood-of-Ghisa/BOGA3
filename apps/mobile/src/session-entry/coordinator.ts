@@ -62,11 +62,14 @@ export function createSessionEntryCoordinator(
   };
 }
 
+/** The id of the one active (non-deleted) session, if there is one. */
+export const loadActiveSessionId = async (): Promise<string | null> => {
+  const buckets = await listSessionListBuckets();
+  return buckets.active?.id ?? null;
+};
+
 export const DEFAULT_SESSION_ENTRY_COORDINATOR = createSessionEntryCoordinator({
-  async loadActiveSessionId() {
-    const buckets = await listSessionListBuckets();
-    return buckets.active?.id ?? null;
-  },
+  loadActiveSessionId,
   async createEmptySession() {
     return persistSessionDraftSnapshot({
       gymId: null,
