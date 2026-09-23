@@ -229,8 +229,14 @@ appId: com.dinoderek.mobile
       id: "exercise-page-title"
       text: "Barbell Back Squat"
     timeout: 15000
+- waitForAnimationToEnd:
+    timeout: 4000
 - tapOn:
     id: "exercise-add-set"
+- extendedWaitUntil:
+    visible:
+      id: "exercise-set-logger"
+    timeout: 10000
 - hideKeyboard:
     optional: true
 - longPressOn:
