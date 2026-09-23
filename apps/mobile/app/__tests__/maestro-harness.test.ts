@@ -200,6 +200,10 @@ describe('maestro harness helpers', () => {
       resolveMaestroHarnessTeleportHref({ target: 'session-view', sessionId: 'session-123' })
     ).toBe('/session/session-123');
     expect(resolveMaestroHarnessTeleportHref({ target: 'session-view' })).toBeNull();
+    // A completed session opens the same route, to edit it.
+    expect(
+      resolveMaestroHarnessTeleportHref({ target: 'session-view', sessionId: 'maestro_m24_completion_one_pr' })
+    ).toBe('/session/maestro_m24_completion_one_pr');
   });
 
   it('runs a data reset only when requested', async () => {

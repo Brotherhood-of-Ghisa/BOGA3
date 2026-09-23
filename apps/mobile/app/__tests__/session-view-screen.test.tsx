@@ -6,6 +6,12 @@ import { Alert } from 'react-native';
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
 const mockDismissTo = jest.fn();
+const mockBack = jest.fn();
+const mockCanGoBack = jest.fn(() => true);
+const mockNavigation = {
+  addListener: jest.fn((_event: string, _listener: (event: unknown) => void) => () => undefined),
+  dispatch: jest.fn(),
+};
 
 jest.mock('expo-router', () => {
   const React = jest.requireActual('react');
@@ -14,7 +20,14 @@ jest.mock('expo-router', () => {
       React.useEffect(() => callback(), [callback]);
     },
     useLocalSearchParams: () => ({}),
-    useRouter: () => ({ push: mockPush, replace: mockReplace, dismissTo: mockDismissTo }),
+    useNavigation: () => mockNavigation,
+    useRouter: () => ({
+      push: mockPush,
+      replace: mockReplace,
+      dismissTo: mockDismissTo,
+      back: mockBack,
+      canGoBack: mockCanGoBack,
+    }),
   };
 });
 
@@ -24,6 +37,8 @@ jest.mock('@/src/data', () => ({
   loadLatestSessionDraftSnapshot: jest.fn(),
   loadLocalGymById: jest.fn(),
   loadRecentExerciseBlocks: jest.fn(),
+  loadSessionSnapshotById: jest.fn(),
+  persistCompletedSessionSnapshot: jest.fn(),
   persistSessionDraftSnapshot: jest.fn(),
   setSessionDeletedState: jest.fn(),
   upsertLocalGym: jest.fn(),
@@ -135,6 +150,12 @@ describe('Session view', () => {
           : [],
     }));
     data.persistSessionDraftSnapshot.mockReset().mockResolvedValue({ sessionId: 'session-1' });
+    data.loadSessionSnapshotById.mockReset().mockResolvedValue(null);
+    data.persistCompletedSessionSnapshot.mockReset().mockResolvedValue({ sessionId: 'done-1' });
+    mockBack.mockReset();
+    mockCanGoBack.mockReset().mockReturnValue(true);
+    mockNavigation.addListener.mockClear();
+    mockNavigation.dispatch.mockReset();
     data.completeSessionDraft.mockReset().mockResolvedValue({ sessionId: 'session-1' });
     data.setSessionDeletedState.mockReset().mockResolvedValue(undefined);
   });
@@ -296,5 +317,341 @@ describe('Session view', () => {
 
     fireEvent.press(await screen.findByTestId('session-view-retry'));
     expect(await screen.findByLabelText('Cable Flys, 0 of 1 sets done')).toBeTruthy();
+  });
+});
+
+// The recorder's completed edit (`?mode=completed-edit`), moved to the session
+// view: these port its load, validation, autosave, save and leave cases.
+describe('Session view: editing a completed session', () => {
+  // Stored to the second, so Done can prove it keeps untouched instants.
+  const STARTED_AT = new Date(2026, 1, 25, 10, 0, 30);
+  const COMPLETED_AT = new Date(2026, 1, 25, 10, 45, 10);
+
+  const completed = (
+    exercises = [
+      {
+        id: 'bench',
+        exerciseDefinitionId: 'def_bench',
+        name: 'Barbell Bench Press',
+        machineName: null,
+        sets: [set('c1', '160', '8', 'rir_1'), set('c2', '150', '8', 'rir_2', 'unperformed')],
+      },
+    ],
+    overrides: Record<string, unknown> = {}
+  ) => ({
+    sessionId: 'done-1',
+    gymId: 'gym-1',
+    status: 'completed' as const,
+    startedAt: STARTED_AT,
+    completedAt: COMPLETED_AT,
+    durationSec: 2680,
+    deletedAt: null,
+    createdAt: STARTED_AT,
+    updatedAt: COMPLETED_AT,
+    exercises,
+    ...overrides,
+  });
+
+  let stored: ReturnType<typeof completed>;
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+    jest.restoreAllMocks();
+    mockPush.mockReset();
+    mockReplace.mockReset();
+    mockDismissTo.mockReset();
+    mockBack.mockReset();
+    mockCanGoBack.mockReset().mockReturnValue(true);
+    mockNavigation.addListener.mockClear();
+    mockNavigation.dispatch.mockReset();
+    stored = completed();
+    // Another session is the active draft; this one is history.
+    data.loadLatestSessionDraftSnapshot.mockReset().mockImplementation(async () => snapshot());
+    data.loadSessionSnapshotById.mockReset().mockImplementation(async (id: string) =>
+      id === stored.sessionId ? stored : null
+    );
+    data.loadLocalGymById.mockReset().mockResolvedValue({ id: 'gym-1', name: 'Iron Works' });
+    data.listLocalGyms.mockReset().mockResolvedValue([
+      { id: 'gym-2', name: 'Harbour Barbell', latitude: null, longitude: null, coordinateAccuracyM: null, coordinatesUpdatedAt: null },
+    ]);
+    data.upsertLocalGym.mockReset().mockResolvedValue(undefined);
+    data.loadRecentExerciseBlocks.mockReset().mockResolvedValue({ exerciseDefinitionId: null, limit: null, blocks: [] });
+    data.persistSessionDraftSnapshot.mockReset().mockResolvedValue({ sessionId: 'session-1' });
+    data.persistCompletedSessionSnapshot.mockReset().mockResolvedValue({ sessionId: 'done-1' });
+    data.completeSessionDraft.mockReset();
+    data.setSessionDeletedState.mockReset();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  const renderCompleted = async () => {
+    render(<SessionViewScreen sessionId="done-1" />);
+    await screen.findByTestId('session-view-done-button');
+  };
+
+  const lastCompletedWrite = () => data.persistCompletedSessionSnapshot.mock.calls.at(-1)?.[0];
+
+  const pressDone = async () => {
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('session-view-done-button'));
+    });
+  };
+
+  it('opens with Start/End in place of Time, and Done in place of Finish and Abandon', async () => {
+    await renderCompleted();
+
+    expect(screen.getByText('Edit session')).toBeTruthy();
+    expect(screen.queryByTestId('session-view-finish-button')).toBeNull();
+    expect(screen.queryByTestId('session-view-options-button')).toBeNull();
+    expect(screen.queryByTestId('session-view-summary-time')).toBeNull();
+    expect(screen.getByTestId('session-view-start-time')).toHaveProp('value', '2026-02-25 10:00');
+    expect(screen.getByTestId('session-view-end-time')).toHaveProp('value', '2026-02-25 10:45');
+    expect(screen.getByTestId('session-view-summary-gym-button')).toHaveProp('accessibilityLabel', 'Gym Iron Works');
+    expect(screen.getByLabelText('Barbell Bench Press, 1 of 2 sets done')).toBeTruthy();
+    expect(screen.queryByTestId('session-view-times-notice')).toBeNull();
+  });
+
+  it('validates Start/End as the recorder did, and Done writes nothing until they are valid', async () => {
+    await renderCompleted();
+    const start = screen.getByTestId('session-view-start-time');
+    const end = screen.getByTestId('session-view-end-time');
+
+    fireEvent.changeText(start, '2026-02-30 10:00');
+    fireEvent.changeText(end, '2026-02-30 10:50');
+    await act(async () => {
+      fireEvent(start, 'blur');
+      fireEvent(end, 'blur');
+    });
+    expect(screen.getByTestId('session-view-start-time-error')).toHaveTextContent(
+      'Enter a valid Start time in YYYY-MM-DD HH:mm format.'
+    );
+    expect(screen.getByTestId('session-view-end-time-error')).toHaveTextContent(
+      'Enter a valid End time in YYYY-MM-DD HH:mm format.'
+    );
+    expect(screen.getByTestId('session-view-times-notice')).toHaveTextContent(
+      'Autosave paused until Start/End times are valid.'
+    );
+    await pressDone();
+    expect(data.persistCompletedSessionSnapshot).not.toHaveBeenCalled();
+
+    fireEvent.changeText(start, '2026-02-25 10:00');
+    fireEvent.changeText(end, '2026-02-25 09:55');
+    expect(screen.queryByTestId('session-view-start-time-error')).toBeNull();
+    expect(screen.getByTestId('session-view-end-time-error')).toHaveTextContent(
+      'End time must be later than or equal to Start time.'
+    );
+    await pressDone();
+    expect(data.persistCompletedSessionSnapshot).not.toHaveBeenCalled();
+
+    fireEvent.changeText(end, '2026-02-25 10:50');
+    expect(screen.queryByTestId('session-view-times-notice')).toBeNull();
+    answerAlerts((title) => (title.startsWith('Discard unconfirmed') ? 'Discard unconfirmed sets and save changes' : 'x'));
+    await pressDone();
+
+    await waitFor(() => expect(mockBack).toHaveBeenCalled());
+    // Start still shows its stored minute, so it keeps the stored instant.
+    expect(lastCompletedWrite()).toMatchObject({
+      sessionId: 'done-1',
+      gymId: 'gym-1',
+      startedAt: STARTED_AT,
+      completedAt: new Date(2026, 1, 25, 10, 50, 0, 0),
+    });
+    expect(data.completeSessionDraft).not.toHaveBeenCalled();
+    expect(data.persistSessionDraftSnapshot).not.toHaveBeenCalled();
+  });
+
+  it('pauses autosave while the times are invalid and resumes, keeping every row, when they are valid', async () => {
+    await renderCompleted();
+
+    fireEvent.changeText(screen.getByTestId('session-view-end-time'), '2026-02-25 09:50');
+    await act(async () => {
+      jest.advanceTimersByTime(3_000);
+    });
+    expect(data.persistCompletedSessionSnapshot).not.toHaveBeenCalled();
+    expect(screen.getByTestId('session-view-times-notice')).toBeTruthy();
+
+    fireEvent.changeText(screen.getByTestId('session-view-end-time'), '2026-02-25 10:50');
+    await act(async () => {
+      jest.advanceTimersByTime(3_000);
+    });
+
+    expect(data.persistCompletedSessionSnapshot).toHaveBeenCalledTimes(1);
+    const written = lastCompletedWrite();
+    expect(written).toMatchObject({ startedAt: STARTED_AT, completedAt: new Date(2026, 1, 25, 10, 50) });
+    // Autosave is lossless: the unconfirmed row stays until Done.
+    expect(written.exercises[0].sets.map((row: { id: string; performanceStatus: string | null }) => [row.id, row.performanceStatus])).toEqual([
+      ['c1', null],
+      ['c2', 'unperformed'],
+    ]);
+    expect(screen.queryByTestId('session-view-times-notice')).toBeNull();
+  });
+
+  it('saves confirmed rows only on Done: planned and skipped rows drop out, zero-weight sets stay', async () => {
+    stored = completed([
+      {
+        id: 'bench',
+        exerciseDefinitionId: 'def_bench',
+        name: 'Barbell Bench Press',
+        machineName: null,
+        sets: [
+          { ...set('s-skipped', '', '', null), plannedWeightValue: '225', plannedRepsValue: '5', plannedSetType: 'rir_2', performanceStatus: 'skipped' },
+          set('s-planned', '', '', null, 'planned', { weight: '245', reps: '3', setType: 'rir_1' }),
+          set('s-performed', '185', '8', 'rir_1', null, { weight: '185', reps: '8', setType: 'rir_2' }),
+          set('s-zero', '0', '5', null),
+        ],
+      },
+    ] as never);
+    const titles = answerAlerts(() => 'unexpected');
+    await renderCompleted();
+
+    await pressDone();
+
+    await waitFor(() => expect(mockBack).toHaveBeenCalled());
+    expect(titles).toEqual([]);
+    const written = lastCompletedWrite();
+    expect(written.exercises).toHaveLength(1);
+    expect(written.exercises[0].sets).toEqual([
+      expect.objectContaining({
+        id: 's-performed',
+        weightValue: '185',
+        repsValue: '8',
+        setType: 'rir_1',
+        plannedWeightValue: null,
+        plannedRepsValue: null,
+        plannedSetType: null,
+        performanceStatus: null,
+      }),
+      expect.objectContaining({ id: 's-zero', weightValue: '0', repsValue: '5' }),
+    ]);
+    expect(data.completeSessionDraft).not.toHaveBeenCalled();
+  });
+
+  it('asks before discarding with the completed-edit copy, and writes nothing when declined', async () => {
+    stored = completed([
+      {
+        id: 'bench',
+        exerciseDefinitionId: 'def_bench',
+        name: 'Barbell Bench Press',
+        machineName: null,
+        sets: [set('c1', '225', '5', null), set('c2', '205', '', null, 'unperformed')],
+      },
+      { id: 'fly', exerciseDefinitionId: 'def_fly', name: 'Cable Flys', machineName: null, sets: [] },
+    ] as never);
+    let answer = 'Go back to edit session';
+    const titles = answerAlerts(() => answer);
+    await renderCompleted();
+
+    await pressDone();
+    expect(titles).toEqual(['Remove incomplete sets and empty exercises?']);
+    expect(data.persistCompletedSessionSnapshot).not.toHaveBeenCalled();
+    expect(mockBack).not.toHaveBeenCalled();
+
+    answer = 'Remove and save changes';
+    await pressDone();
+    await waitFor(() => expect(mockBack).toHaveBeenCalled());
+    const written = lastCompletedWrite();
+    expect(written.exercises.map((exercise: { id: string }) => exercise.id)).toEqual(['bench']);
+    expect(written.exercises[0].sets.map((row: { id: string }) => row.id)).toEqual(['c1']);
+  });
+
+  it('labels each cleanup prompt for saving changes', async () => {
+    const buttons: string[] = [];
+    jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, alertButtons) => {
+      const confirm = alertButtons?.find((button) => button.style !== 'cancel');
+      buttons.push(confirm?.text ?? '');
+      confirm?.onPress?.();
+    });
+    await renderCompleted();
+
+    await pressDone();
+    await waitFor(() => expect(mockBack).toHaveBeenCalled());
+    expect(buttons).toEqual(['Discard unconfirmed sets and save changes']);
+  });
+
+  it('goes to the completed session when there is nothing to go back to', async () => {
+    mockCanGoBack.mockReturnValue(false);
+    answerAlerts(() => 'Discard unconfirmed sets and save changes');
+    await renderCompleted();
+
+    await pressDone();
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/completed-session/done-1'));
+  });
+
+  it('writes pending valid times before the screen is removed', async () => {
+    await renderCompleted();
+    const listener = mockNavigation.addListener.mock.calls.find(([event]) => event === 'beforeRemove')?.[1];
+    expect(listener).toBeTruthy();
+
+    fireEvent.changeText(screen.getByTestId('session-view-end-time'), '2026-02-25 10:50');
+    const preventDefault = jest.fn();
+    const action = { type: 'GO_BACK' };
+    await act(async () => {
+      listener?.({ preventDefault, data: { action } });
+    });
+
+    expect(preventDefault).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(mockNavigation.dispatch).toHaveBeenCalledWith(action));
+    expect(lastCompletedWrite()).toMatchObject({ sessionId: 'done-1', completedAt: new Date(2026, 1, 25, 10, 50) });
+  });
+
+  it('changes the gym in place, keeping the session completed and its times', async () => {
+    await renderCompleted();
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('session-view-summary-gym-button'));
+    });
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('session-view-gym-option-gym-2'));
+    });
+
+    expect(data.upsertLocalGym).toHaveBeenCalledWith({ id: 'gym-2', name: 'Harbour Barbell' });
+    expect(lastCompletedWrite()).toMatchObject({
+      sessionId: 'done-1',
+      gymId: 'gym-2',
+      startedAt: STARTED_AT,
+      completedAt: COMPLETED_AT,
+    });
+    expect(lastCompletedWrite().exercises[0].sets.map((row: { id: string }) => row.id)).toEqual(['c1', 'c2']);
+    expect(data.persistSessionDraftSnapshot).not.toHaveBeenCalled();
+  });
+
+  it('adds an exercise to the completed session', async () => {
+    await renderCompleted();
+
+    fireEvent.press(screen.getByTestId('session-view-add-exercise'));
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('mock-picker-choose'));
+    });
+
+    const written = lastCompletedWrite();
+    expect(written.exercises.map((exercise: { name: string }) => exercise.name)).toEqual([
+      'Barbell Bench Press',
+      'Seated Row',
+    ]);
+    expect(written.completedAt).toEqual(COMPLETED_AT);
+    expect(data.persistSessionDraftSnapshot).not.toHaveBeenCalled();
+  });
+
+  it('measures its records against the rest of history, not against itself', async () => {
+    data.loadRecentExerciseBlocks.mockResolvedValue({
+      exerciseDefinitionId: 'def_bench',
+      limit: null,
+      blocks: [
+        { sessionId: 'done-1', completedAt: COMPLETED_AT, daysAgo: 0, sessionExerciseIds: ['bench'], estimatedOneRepMax: 204.3, totalVolume: 1280, highestWeight: 160, workingSetCount: 1 },
+        { sessionId: 'older', completedAt: new Date(0), daysAgo: 30, sessionExerciseIds: [], estimatedOneRepMax: 190, totalVolume: 0, highestWeight: 150, workingSetCount: 1 },
+      ],
+    });
+    render(<SessionViewScreen sessionId="done-1" />);
+
+    expect(await screen.findByLabelText('Barbell Bench Press, 1 of 2 sets done, new 1RM record 204.3')).toBeTruthy();
+  });
+
+  it('says so when the completed session was deleted', async () => {
+    stored = completed(undefined, { deletedAt: new Date(2026, 1, 26) });
+    render(<SessionViewScreen sessionId="done-1" />);
+
+    expect(await screen.findByTestId('session-view-missing')).toBeTruthy();
   });
 });

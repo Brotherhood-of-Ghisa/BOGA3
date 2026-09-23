@@ -4,41 +4,61 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/ui/icon';
 import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 
-type SessionTopBarProps = {
-  onOpenOptions: () => void;
-  onFinish: () => void;
-  // While a Finish is being written, so a second tap cannot start another.
-  finishDisabled?: boolean;
-};
+type SessionTopBarProps =
+  | {
+      // The active session: ⋮ opens the session options, Finish ends it.
+      mode: 'active';
+      onOpenOptions: () => void;
+      onFinish: () => void;
+      // While a Finish is being written, so a second tap cannot start another.
+      finishDisabled?: boolean;
+    }
+  | {
+      // A completed session being edited: no options (nothing to abandon),
+      // and Done saves the edit instead of Finish.
+      mode: 'completed';
+      onDone: () => void;
+      doneDisabled?: boolean;
+    };
 
-// `Session` · ⋮ · Finish (build spec, "Session view"). Finish is the screen's
-// one `accent` primary; ⋮ opens the session options sheet.
-export function SessionTopBar({ onOpenOptions, onFinish, finishDisabled = false }: SessionTopBarProps) {
+const PRIMARY = {
+  active: { title: 'Session', label: 'Finish', a11y: 'Finish session', testID: 'session-view-finish-button' },
+  completed: { title: 'Edit session', label: 'Done', a11y: 'Done editing session', testID: 'session-view-done-button' },
+} as const;
+
+// `Session` · ⋮ · Finish (build spec, "Session view"); `Edit session` · Done
+// for a completed session. The primary is the screen's one `accent` action.
+export function SessionTopBar(props: SessionTopBarProps) {
   const insets = useSafeAreaInsets();
+  const copy = PRIMARY[props.mode];
+  const onPrimary = props.mode === 'active' ? props.onFinish : props.onDone;
+  const disabled = (props.mode === 'active' ? props.finishDisabled : props.doneDisabled) ?? false;
 
   return (
     <View style={[styles.bar, { paddingTop: insets.top }]} testID="session-view-top-bar">
       <Text accessibilityRole="header" numberOfLines={1} style={styles.title}>
-        Session
+        {copy.title}
       </Text>
+      {props.mode === 'active' ? (
+        <Pressable
+          accessibilityLabel="Session options"
+          accessibilityRole="button"
+          hitSlop={uiSpace.xs}
+          onPress={props.onOpenOptions}
+          style={styles.iconButton}
+          testID="session-view-options-button">
+          <Icon color={uiRoles.ink} name="more-vertical" size="md" />
+        </Pressable>
+      ) : null}
       <Pressable
-        accessibilityLabel="Session options"
+        accessibilityLabel={copy.a11y}
         accessibilityRole="button"
-        hitSlop={uiSpace.xs}
-        onPress={onOpenOptions}
-        style={styles.iconButton}
-        testID="session-view-options-button">
-        <Icon color={uiRoles.ink} name="more-vertical" size="md" />
-      </Pressable>
-      <Pressable
-        accessibilityLabel="Finish session"
-        accessibilityRole="button"
-        accessibilityState={{ disabled: finishDisabled }}
-        disabled={finishDisabled}
-        onPress={onFinish}
-        style={[styles.finish, finishDisabled ? styles.finishDisabled : null]}
-        testID="session-view-finish-button">
-        <Text style={styles.finishLabel}>Finish</Text>
+        accessibilityState={{ disabled }}
+        disabled={disabled}
+        onPress={onPrimary}
+        style={[styles.finish, disabled ? styles.finishDisabled : null]}
+        testID={copy.testID}>
+        <Text style={styles.finishLabel}>{copy.label}</Text>
       </Pressable>
     </View>
   );

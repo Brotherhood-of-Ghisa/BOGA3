@@ -6,6 +6,8 @@ import { Stat } from '@/components/ui/stat';
 import { uiSpace } from '@/components/ui/tokens';
 import { formatElapsed } from '@/src/session-recorder/session-view-model';
 
+import { SessionTimesFields, type SessionTimesFieldsProps } from './session-times-fields';
+
 type SessionSummaryCardProps = {
   startedAt: Date;
   gymName: string | null;
@@ -13,6 +15,9 @@ type SessionSummaryCardProps = {
   volume: string;
   // Opens the gym picker; the whole Gym cell is the target.
   onPressGym: () => void;
+  // A completed session being edited: its Start/End fields replace the
+  // elapsed Time.
+  times?: SessionTimesFieldsProps;
   // Injectable clock for tests.
   now?: () => Date;
 };
@@ -31,18 +36,21 @@ function ElapsedStat({ startedAt, now }: { startedAt: Date; now: () => Date }) {
 const systemNow = () => new Date();
 
 // Time / Gym / Sets / Volume, labels above values (build spec, "Session view").
+// Editing a completed session, Start and End take Time's place, above the row.
 export function SessionSummaryCard({
   startedAt,
   gymName,
   performedSetCount,
   volume,
   onPressGym,
+  times,
   now = systemNow,
 }: SessionSummaryCardProps) {
   return (
     <Card testID="session-view-summary">
+      {times ? <SessionTimesFields {...times} /> : null}
       <View style={styles.row}>
-        <ElapsedStat now={now} startedAt={startedAt} />
+        {times ? null : <ElapsedStat now={now} startedAt={startedAt} />}
         <Pressable
           accessibilityHint="Choose the gym for this session"
           accessibilityLabel={`Gym ${gymName ?? 'No gym'}`}

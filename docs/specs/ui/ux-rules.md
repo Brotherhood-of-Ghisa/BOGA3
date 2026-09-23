@@ -155,7 +155,7 @@ Document app-specific UI semantics and guardrails for the current mobile app.
 
 1. Text inputs, picker triggers, and read-only fields are visually similar but currently implemented in multiple screen-local styles.
 2. Exercise catalog uses explicit field labels + inline validation/error messages and is the strongest current form pattern reference.
-3. `session-recorder` completed-edit mode includes start/end validation and an autosave-paused notice when timestamps are invalid.
+3. Editing a completed session (the session view, §14b.7) validates Start/End (`YYYY-MM-DD HH:mm`, End not before Start) and shows an autosave-paused notice while they are invalid.
 4. Validation/error feedback should remain near the relevant field/control whenever possible.
 5. The `session-recorder` exercise picker and `exercise-catalog` list include a text filter that:
    - trims and collapses extra whitespace in user input,
@@ -291,17 +291,15 @@ Document app-specific UI semantics and guardrails for the current mobile app.
    silent, capture/launch failure is inline and retryable, and temporary image
    cleanup cannot turn a completed share into an error.
 10. Completion hides edit/delete/append. Done and safe back replace to Progress.
-    A completed row in Session History opens completed-edit mode by
-    default; its `Summary` action saves pending valid edits before pushing
-    `presentation=summary`, whose `History` action replaces to the list and
-    whose `Edit` action pops to the live editor. The historical summary omits Done; all summary
-    content and Share behavior remain identical to post-submit completion. A
-    missing, deleted, or failed target exposes one safe return and never opens a
-    recorder copy.
+    A completed row in Session History, and a completed session's `Edit`, open
+    the session view to edit it (§14b.7); there is no separate historical
+    summary (step 6b-1 removed `presentation=summary` — the completed-session
+    detail is the summary). A missing, deleted, or failed target exposes one
+    safe return and never opens a recorder copy.
 
 ### 8. Navigation/query semantics (UI-facing rule)
 
-1. Route mode/state changes that affect screen behavior (for example `session-recorder` completed-edit mode) must be documented in `docs/specs/ui/navigation-contract.md`.
+1. Route mode/state changes that affect screen behavior (for example the session view editing a completed session) must be documented in `docs/specs/ui/navigation-contract.md`.
 2. Route alias behavior (`/` -> `/today`) should be treated as a navigation
    entry alias, not a unique screen design. `/stats-history` remains a preserved
    Progress-owned path rather than a second tab.
@@ -440,7 +438,7 @@ primitives (`Card`, `Stat`, `ListRow`, `Sheet`) and the session view.
 4. Tag add/manage is in-route modal state:
    - add mode: search/filter active tags, select, or create inline,
    - manage mode: rename, soft-delete, show/hide deleted, undelete.
-5. Completed-session edit mode (`/session-recorder?mode=completed-edit`) uses the same add/remove tag interactions as active mode.
+5. Completed sessions are edited in the session view since step 6b-1, which has no tag editing (step 6b-3 retires these tag rules).
 6. Manage-tag row actions are compact icon controls (rename/delete/undelete), while accessibility labels preserve explicit action semantics.
 
 ### 11. Calendar heatmap semantics
@@ -547,7 +545,7 @@ primitives (`Card`, `Stat`, `ListRow`, `Sheet`) and the session view.
 
 Graduated from the build spec; the page lives at
 `/session/[sessionId]/exercise/[sessionExerciseId]` and edits one exercise of
-the active session through the recorder's own repository and autosave
+the active session (or of a completed session being edited, §14b.7) through the recorder's own repository and autosave
 (`src/session-recorder/`), so the rules of §5.11 about what a set *is* hold
 unchanged. What differs is presentation:
 
@@ -621,6 +619,21 @@ unchanged. What differs is presentation:
    their entered-load volume; Time is elapsed since the session's start.
 6. The persistent four-tab bar stays at the bottom with Train selected; it is
    the way back out, and returns to the tab rather than stacking it.
+7. **A completed session is edited here** (step 6b-1; it replaced the
+   recorder's completed-edit mode). The top bar reads `Edit session` · `Done`,
+   with no ⋮ (there is nothing to abandon), and Progress is selected in the tab
+   bar. The summary card's Time becomes two fields, `Start` and `End`
+   (`YYYY-MM-DD HH:mm`, End not before Start, the recorder's messages); a
+   field's error shows once it is left. Edits autosave losslessly — sets on
+   the exercise page (the same rules as §14a, written back as completed), the
+   gym, added exercises and valid times — and while either time is invalid
+   autosave pauses with `Autosave paused until Start/End times are valid.`
+   A field still showing its stored minute keeps its stored instant. `Done`
+   reveals invalid times and writes nothing; otherwise it asks §14b.2's
+   questions with completed-edit labels (`… and save changes`), saves the
+   confirmed rows only, and goes back where the edit was opened. It never
+   replays completion. Records compare against the rest of history, not the
+   session itself.
 
 ### 15. Documentation maintenance rule (UI semantics)
 

@@ -57,7 +57,7 @@ type OpenSheet = 'none' | 'effort' | 'options' | 'swap' | 'edit';
 
 const LOAD_ERROR_MESSAGES = {
   'missing-session': 'This session no longer exists.',
-  'not-active': 'This session is not in progress, so its sets cannot be edited here.',
+  'not-editable': 'This session was deleted, so its sets cannot be edited here.',
   'missing-exercise': 'This exercise is no longer in the session.',
   'load-failed': 'The exercise could not be loaded.',
 } as const;
@@ -70,6 +70,8 @@ const FALLBACK_BACK_ROUTE = '/train' as Href;
  * The exercise page (build spec, "Exercise page"): one page per session
  * exercise, the set list with the in-place logger, and two exits — Back leaves
  * set states untouched, `Complete exercise` resolves the sets still waiting.
+ * The same page edits an exercise of a completed session (opened from the
+ * session view's completed edit); its records then leave that session out.
  */
 export function ExercisePageScreen({
   sessionId,
@@ -84,7 +86,12 @@ export function ExercisePageScreen({
     client: draftClient,
   });
   const exercise = draft.state.status === 'ready' ? draft.state.exercise : null;
-  const records = useExerciseRecords(exercise?.exerciseDefinitionId ?? null, loadHistory);
+  const isCompletedSession = draft.state.status === 'ready' && draft.state.sessionStatus === 'completed';
+  const records = useExerciseRecords(
+    exercise?.exerciseDefinitionId ?? null,
+    loadHistory,
+    isCompletedSession ? sessionId : null
+  );
   const [listPreferences] = useExerciseListPreferences();
   const catalog = useExerciseCatalog();
 

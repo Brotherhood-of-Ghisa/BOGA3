@@ -71,7 +71,10 @@ export function parseSessionDateTime(dateTime: string): Date | null {
   return parsed;
 }
 
-export function mapDraftSnapshotToSession(snapshot: SessionDraftSnapshot): Session {
+// Reads an active draft or a completed session graph alike.
+export function mapDraftSnapshotToSession(
+  snapshot: Pick<SessionDraftSnapshot, 'startedAt' | 'gymId' | 'exercises'>
+): Session {
   return {
     dateTime: formatCurrentDateTime(snapshot.startedAt),
     locationId: snapshot.gymId,

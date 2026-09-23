@@ -4,6 +4,7 @@ import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 're
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MainTabs } from '@/components/navigation/main-tabs';
+import type { Session } from '@/components/session-recorder/types';
 import { ExercisePicker } from '@/components/session-recorder/exercise-picker';
 import {
   OutlineButton,
@@ -20,19 +21,23 @@ import { mainTabHref } from '@/src/navigation/main-tabs';
 import { listSessionGymOptions, type SessionGymOption } from '@/src/session-recorder/gym-options';
 import {
   abandonActiveSession,
-  addExerciseToActiveSession,
-  appendPlanToActiveSession,
+  addExerciseToSession,
+  appendPlanToSession,
   completeActiveSession,
   loadActiveSessionGraph,
-  setActiveSessionGym,
+  loadEditableSessionGraph,
+  saveCompletedSessionEdit,
+  setSessionGym,
 } from '@/src/session-recorder/session-lifecycle';
 import {
   describeSubmitCleanupPrompt,
   nextSubmitCleanup,
   sessionHasInvalidSetValues,
   SUBMIT_CLEANUP_CANCEL_LABEL,
+  type SubmitCleanupResult,
 } from '@/src/session-recorder/session-model';
 import { buildSessionViewModel } from '@/src/session-recorder/session-view-model';
+import { useCompletedSessionTimes } from '@/src/session-recorder/use-completed-session-times';
 import { useSessionView } from '@/src/session-recorder/use-session-view';
 
 const TRAIN_ROUTE = mainTabHref('train');
@@ -66,6 +71,33 @@ const confirmAlert = (input: {
     );
   });
 
+// Blocks on invalid set values, then walks the recorder's cleanup prompts.
+// Resolves the completed-history session, or `null` when the user stops.
+const confirmSubmitCleanup = async (
+  session: Session,
+  mode: 'active' | 'completed-edit'
+): Promise<Session | null> => {
+  if (sessionHasInvalidSetValues(session)) {
+    const names = session.exercises
+      .filter((exercise) => sessionHasInvalidSetValues({ ...session, exercises: [exercise] }))
+      .map((exercise) => exercise.name);
+    Alert.alert(
+      mode === 'active' ? "Can't finish yet" : "Can't save yet",
+      `Fix the set values in ${names.join(', ')} first.`
+    );
+    return null;
+  }
+
+  let cleanup: SubmitCleanupResult = nextSubmitCleanup(session);
+  while (cleanup.kind === 'prompt') {
+    const copy = describeSubmitCleanupPrompt(cleanup.prompt, mode);
+    const confirmed = await confirmAlert({ ...copy, cancelLabel: SUBMIT_CLEANUP_CANCEL_LABEL });
+    if (!confirmed) return null;
+    cleanup = nextSubmitCleanup(cleanup.prompt.nextSession);
+  }
+  return cleanup.session;
+};
+
 export type SessionViewScreenProps = {
   sessionId: string | null;
 };
@@ -77,6 +109,11 @@ export type SessionViewScreenProps = {
  * (`src/session-recorder/session-lifecycle.ts`), and Add exercise the
  * recorder's picker. Reached from the app's active-session entries while the
  * new exercise/session screens setting is on.
+ *
+ * A completed session opens here to be edited (History, completed-session
+ * `Edit`): Start/End replace the elapsed Time, and Done — the recorder's
+ * completed-edit save — replaces Finish and Abandon. It never replays
+ * completion.
  */
 export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
   const router = useRouter();
@@ -89,8 +126,18 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
   });
   const [picker, setPicker] = useState({ visible: false, openRequestId: 0 });
   const [isFinishing, setIsFinishing] = useState(false);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const restorePickerOnFocusRef = useRef(false);
+
+  const completedTimes = useMemo(
+    () =>
+      state.status === 'ready' && state.data.status === 'completed' && state.data.completedAt
+        ? { startedAt: state.data.startedAt, completedAt: state.data.completedAt }
+        : null,
+    [state]
+  );
+  const times = useCompletedSessionTimes({ sessionId, persisted: completedTimes });
 
   const model = useMemo(
     () =>
@@ -123,33 +170,58 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
         await reload();
         return;
       }
-      if (sessionHasInvalidSetValues(graph.session)) {
-        const names = graph.session.exercises
-          .filter((exercise) => sessionHasInvalidSetValues({ ...graph.session, exercises: [exercise] }))
-          .map((exercise) => exercise.name);
-        Alert.alert("Can't finish yet", `Fix the set values in ${names.join(', ')} first.`);
-        return;
-      }
-
-      let cleanup = nextSubmitCleanup(graph.session);
-      while (cleanup.kind === 'prompt') {
-        const copy = describeSubmitCleanupPrompt(cleanup.prompt, 'active');
-        const confirmed = await confirmAlert({ ...copy, cancelLabel: SUBMIT_CLEANUP_CANCEL_LABEL });
-        if (!confirmed) return;
-        cleanup = nextSubmitCleanup(cleanup.prompt.nextSession);
-      }
+      const completedHistorySession = await confirmSubmitCleanup(graph.session, 'active');
+      if (!completedHistorySession) return;
 
       const completedSessionId = await completeActiveSession({
         sessionId: graph.sessionId,
         gymId: graph.gymId,
         startedAt: graph.startedAt,
-        completedHistorySession: cleanup.session,
+        completedHistorySession,
       });
       router.replace(`/completed-session/${completedSessionId}?presentation=completion` as Href);
     } catch {
       setNotice("Couldn't finish this session. Try again.");
     } finally {
       setIsFinishing(false);
+    }
+  };
+
+  // Done on a completed session: the recorder's completed-edit save (valid
+  // times, set values and cleanup prompts, confirmed rows only), then back to
+  // where the edit was opened from.
+  const saveEdit = async () => {
+    if (!sessionId || isSavingEdit) return;
+    setNotice(null);
+    const editedTimes = times.submit();
+    if (!editedTimes) return;
+    setIsSavingEdit(true);
+    try {
+      if (!(await times.flush())) {
+        setNotice("Couldn't save the times. Try again.");
+        return;
+      }
+      // Read at press time, so the last write from the exercise page counts.
+      const graph = await loadEditableSessionGraph(sessionId);
+      if (!graph || graph.status !== 'completed') {
+        await reload();
+        return;
+      }
+      const completedHistorySession = await confirmSubmitCleanup(graph.session, 'completed-edit');
+      if (!completedHistorySession) return;
+
+      await saveCompletedSessionEdit({
+        sessionId: graph.sessionId,
+        gymId: graph.gymId,
+        times: editedTimes,
+        completedHistorySession,
+      });
+      if (router.canGoBack()) router.back();
+      else router.replace(`/completed-session/${encodeURIComponent(graph.sessionId)}` as Href);
+    } catch {
+      setNotice("Couldn't save this session. Try again.");
+    } finally {
+      setIsSavingEdit(false);
     }
   };
 
@@ -188,7 +260,7 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
     if (!sessionId) return;
     setNotice(null);
     try {
-      await setActiveSessionGym(sessionId, gym);
+      await setSessionGym(sessionId, gym);
     } catch {
       setNotice("Couldn't change the gym. Try again.");
     }
@@ -211,13 +283,13 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
   const addExercise = (exerciseDefinitionId: string, exerciseName: string) => {
     if (!sessionId) return;
     void runPickerWrite(() =>
-      addExerciseToActiveSession(sessionId, { id: exerciseDefinitionId, name: exerciseName })
+      addExerciseToSession(sessionId, { id: exerciseDefinitionId, name: exerciseName })
     );
   };
 
   const appendPlan = (exercise: { id: string; name: string }, suggestion: ExerciseBlockHistorySuggestedPlan) => {
     if (!sessionId) return;
-    void runPickerWrite(() => appendPlanToActiveSession(sessionId, exercise, suggestion));
+    void runPickerWrite(() => appendPlanToSession(sessionId, exercise, suggestion));
   };
 
   const openManage = () => {
@@ -255,6 +327,19 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
           onPressGym={openGymPicker}
           performedSetCount={model.performedSetCount}
           startedAt={data.startedAt}
+          times={
+            data.status === 'completed'
+              ? {
+                  text: times.text,
+                  errors: times.errors,
+                  notice: times.notice ?? (times.saveError ? `Not saved: ${times.saveError}` : null),
+                  onChangeStart: times.setStart,
+                  onChangeEnd: times.setEnd,
+                  onCommitStart: times.commitStart,
+                  onCommitEnd: times.commitEnd,
+                }
+              : undefined
+          }
           volume={model.volume}
         />
         {model.cards.map((card) => (
@@ -278,22 +363,28 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
     );
   }
 
-  const isReady = state.status === 'ready';
+  const isCompleted = state.status === 'ready' && state.data.status === 'completed';
 
   return (
     <View style={styles.screen} testID="session-view-screen">
-      {isReady ? (
-        <SessionTopBar
-          finishDisabled={isFinishing}
-          onFinish={() => void finish()}
-          onOpenOptions={() => setIsOptionsVisible(true)}
-        />
+      {state.status === 'ready' ? (
+        isCompleted ? (
+          <SessionTopBar doneDisabled={isSavingEdit} mode="completed" onDone={() => void saveEdit()} />
+        ) : (
+          <SessionTopBar
+            finishDisabled={isFinishing}
+            mode="active"
+            onFinish={() => void finish()}
+            onOpenOptions={() => setIsOptionsVisible(true)}
+          />
+        )
       ) : (
         <View style={[styles.statusSpacer, { paddingTop: insets.top }]} />
       )}
       {body}
       <View style={[styles.tabs, { paddingBottom: Math.max(uiSpace.sm, insets.bottom) }]}>
-        <MainTabs activeTab="train" onSelect={(tab) => openTab(mainTabHref(tab))} />
+        {/* A completed session is history, which lives under Progress. */}
+        <MainTabs activeTab={isCompleted ? 'progress' : 'train'} onSelect={(tab) => openTab(mainTabHref(tab))} />
       </View>
 
       <SessionOptionsSheet

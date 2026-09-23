@@ -84,42 +84,110 @@ appId: com.dinoderek.mobile
     id: "session-completion-view-muscle-load"
 - takeScreenshot: "session-completion-unmapped"
 
-- openLink: "boga3://maestro-harness?fixture=exercise-block-history&teleport=session-recorder&mode=completed-edit&sessionId=maestro_m24_completion_one_pr"
+# Completed edit (redesign step 6b-1): a completed session's `Edit` opens the
+# session view on it — Start/End in place of Time, `Done` in place of Finish.
+# A set changes on the exercise page, an invalid Start pauses autosave with a
+# notice, a valid one clears it, and Done returns to the completed session,
+# which reads the edits back without replaying completion.
+- openLink: "boga3://maestro-harness?fixture=exercise-block-history&teleport=completed-session&sessionId=maestro_m24_completion_one_pr"
 - tapOn:
     text: "Open"
     optional: true
 - extendedWaitUntil:
     visible:
-      id: "completed-edit-navigation-bar"
+      id: "completed-session-detail-screen"
+    timeout: 30000
+- tapOn:
+    id: "completed-session-detail-edit-button"
+- extendedWaitUntil:
+    visible:
+      id: "session-view-done-button"
     timeout: 30000
 - assertVisible: "Edit session"
+- assertVisible:
+    id: "session-view-start-time"
+- assertVisible:
+    id: "session-view-end-time"
+- assertNotVisible:
+    id: "session-view-finish-button"
+- assertNotVisible:
+    id: "session-view-options-button"
+- takeScreenshot: "completed-edit-session-view"
+
+# Change the set on the exercise page: 275 × 5 becomes 275 × 6.
 - tapOn:
-    id: "completed-edit-summary-button"
+    id: "session-view-exercise-maestro_m24_completion_one_pr_squat"
 - extendedWaitUntil:
     visible:
-      id: "session-completion-presentation"
-    timeout: 30000
-- assertVisible: "Session summary"
-- assertVisible:
-    id: "session-completion-exercise-maestro_m24_completion_one_pr_squat"
-- assertNotVisible:
-    id: "session-completion-done"
-- assertNotVisible:
-    id: "session-completion-view-muscle-load"
-- takeScreenshot: "session-summary-from-history-top"
-- scrollUntilVisible:
-    element:
-      id: "session-completion-share-session"
-    direction: DOWN
-    visibilityPercentage: 100
-    centerElement: true
-- assertVisible:
-    id: "session-completion-share-session"
-- takeScreenshot: "session-summary-from-history"
+      id: "exercise-page"
+    timeout: 15000
 - tapOn:
-    id: "session-summary-edit-button"
+    id: "exercise-set-1-open"
 - extendedWaitUntil:
     visible:
-      id: "completed-edit-navigation-bar"
+      id: "exercise-set-logger"
+    timeout: 5000
+- tapOn:
+    id: "exercise-set-logger-reps"
+- eraseText: 3
+- inputText: "6"
+- hideKeyboard:
+    optional: true
+- tapOn:
+    id: "exercise-set-logger-commit"
+- extendedWaitUntil:
+    visible:
+      id: "exercise-set-1-values"
+      text: "275.0 × 6"
+    timeout: 5000
+- takeScreenshot: "completed-edit-exercise-page"
+- tapOn:
+    id: "exercise-page-back"
+- extendedWaitUntil:
+    visible:
+      id: "session-view-done-button"
+    timeout: 15000
+- assertVisible:
+    id: "session-view-exercise-maestro_m24_completion_one_pr_squat-set-1"
+
+# An invalid Start: its error and the autosave-paused notice.
+- tapOn:
+    id: "session-view-start-time"
+- eraseText: 20
+- inputText: "2026-02-30 10:00"
+- pressKey: Enter
+- extendedWaitUntil:
+    visible:
+      id: "session-view-start-time-error"
+    timeout: 5000
+- assertVisible:
+    id: "session-view-times-notice"
+    text: "Autosave paused until Start/End times are valid."
+- takeScreenshot: "completed-edit-times-invalid"
+
+# A valid Start clears both; Done saves and goes back to the completed session.
+- tapOn:
+    id: "session-view-start-time"
+- eraseText: 20
+- inputText: "2026-01-05 07:30"
+- pressKey: Enter
+- assertNotVisible:
+    id: "session-view-start-time-error"
+- assertNotVisible:
+    id: "session-view-times-notice"
+- takeScreenshot: "completed-edit-times-valid"
+- tapOn:
+    id: "session-view-done-button"
+- extendedWaitUntil:
+    visible:
+      id: "completed-session-detail-screen"
     timeout: 30000
-- takeScreenshot: "session-summary-back-to-edit"
+- assertVisible: "2026-01-05 07:30"
+# The set table's reps cell: 6 now, the fixture's 5 gone (exact-text matches).
+- assertVisible:
+    id: "completed-session-detail-set-row-maestro_m24_completion_one_pr_squat_set"
+- assertVisible: "6"
+- assertNotVisible: "5"
+- assertNotVisible:
+    id: "session-completion-presentation"
+- takeScreenshot: "completed-edit-read-back"

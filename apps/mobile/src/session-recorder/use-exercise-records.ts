@@ -9,10 +9,15 @@ export type ExerciseRecordsState =
 
 export type LoadExerciseHistory = typeof loadExercisePerformanceHistory;
 
-/** All-time records and the previous session for one exercise definition. */
+/**
+ * All-time records and the previous session for one exercise definition.
+ * `excludeSessionId` leaves out a completed session being edited, so it is
+ * measured against the rest of history rather than against itself.
+ */
 export const useExerciseRecords = (
   exerciseDefinitionId: string | null,
-  load: LoadExerciseHistory = loadExercisePerformanceHistory
+  load: LoadExerciseHistory = loadExercisePerformanceHistory,
+  excludeSessionId: string | null = null
 ): ExerciseRecordsState => {
   const [state, setState] = useState<ExerciseRecordsState>({
     status: 'loading',
@@ -27,7 +32,9 @@ export const useExerciseRecords = (
         if (cancelled) return;
         setState({
           status: 'ready',
-          summary: deriveExerciseRecords(history?.sessions ?? []),
+          summary: deriveExerciseRecords(
+            (history?.sessions ?? []).filter((entry) => entry.sessionId !== excludeSessionId)
+          ),
         });
       })
       .catch(() => {
@@ -36,7 +43,7 @@ export const useExerciseRecords = (
     return () => {
       cancelled = true;
     };
-  }, [exerciseDefinitionId, load]);
+  }, [excludeSessionId, exerciseDefinitionId, load]);
 
   return state;
 };

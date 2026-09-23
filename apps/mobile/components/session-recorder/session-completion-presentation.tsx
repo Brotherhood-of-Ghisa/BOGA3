@@ -34,7 +34,7 @@ type SessionCompletionPresentationProps = {
   muscleSummary: CurrentSessionMuscleSummary | null;
   muscleCatalogState: SessionMuscleLoadCatalogState;
   shouldFailNextShare?: boolean;
-  onDone?: () => void;
+  onDone: () => void;
 };
 
 const formatCount = (count: number, singular: string): string =>
@@ -195,16 +195,14 @@ export function SessionCompletionPresentation({
             testID="session-completion-share-session"
             onPress={() => setIsSharePreviewOpen(true)}
           />
-          {onDone ? (
-            <UiButton
-              accessibilityHint="Returns to Stats and History."
-              accessibilityLabel="Done with session completion"
-              label="Done"
-              testID="session-completion-done"
-              variant="secondary"
-              onPress={onDone}
-            />
-          ) : null}
+          <UiButton
+            accessibilityHint="Returns to Stats and History."
+            accessibilityLabel="Done with session completion"
+            label="Done"
+            testID="session-completion-done"
+            variant="secondary"
+            onPress={onDone}
+          />
         </View>
       </ScrollView>
 

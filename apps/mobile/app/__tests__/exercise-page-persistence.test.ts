@@ -25,6 +25,7 @@ import { __resetClockForTests } from '@/src/data/clock';
 import { loadExercisePerformanceHistory } from '@/src/data/exercise-history';
 import { exerciseDefinitions } from '@/src/data/schema';
 import { completeSessionDraft, loadSessionSnapshotById } from '@/src/data/session-drafts';
+import { setSessionDeletedState } from '@/src/data/session-list';
 import { EXERCISE_PAGE_FIXTURE, seedExercisePageFixture } from '@/src/maestro/exercise-page-fixture';
 import { commitSet, planCompleteExercise } from '@/src/session-recorder/exercise-page-model';
 import { deriveExerciseRecords } from '@/src/session-recorder/exercise-records';
@@ -36,6 +37,9 @@ import {
 
 const NOW = new Date('2026-09-23T10:00:00Z');
 const { activeSessionId, benchSessionExerciseId, squatSessionExerciseId } = EXERCISE_PAGE_FIXTURE;
+// The fixture's newer completed Bench Press session.
+const HISTORY_SESSION_ID = 'maestro_exercise_page_history_2';
+const HISTORY_BENCH_ID = `${HISTORY_SESSION_ID}_bench`;
 
 describe('exercise page persistence', () => {
   let fixture: InMemoryDatabaseFixture;
@@ -83,9 +87,50 @@ describe('exercise page persistence', () => {
     expect(await loadSessionExerciseDraft('nope', benchSessionExerciseId)).toEqual({
       status: 'missing-session',
     });
-    expect(await loadSessionExerciseDraft('maestro_exercise_page_history_2', 'x')).toEqual({
-      status: 'not-active',
+    await setSessionDeletedState(HISTORY_SESSION_ID, true);
+    expect(await loadSessionExerciseDraft(HISTORY_SESSION_ID, HISTORY_BENCH_ID)).toEqual({
+      status: 'not-editable',
     });
+  });
+
+  it('edits an exercise of a completed session in place: still completed, same times, every row kept', async () => {
+    const before = await loadSessionSnapshotById(HISTORY_SESSION_ID);
+    const loaded = await loadSessionExerciseDraft(HISTORY_SESSION_ID, HISTORY_BENCH_ID);
+    expect(loaded).toMatchObject({ status: 'ready', sessionStatus: 'completed' });
+    if (loaded.status !== 'ready') return;
+
+    // Untick the last set: autosave keeps it, unconfirmed, until the session view's Done.
+    const sets = loaded.exercise.sets.map((set, index) =>
+      index === 3 ? { ...set, weightValue: '85', performanceStatus: 'unperformed' as const } : set
+    );
+    await saveSessionExerciseDraft(HISTORY_SESSION_ID, {
+      sessionExerciseId: HISTORY_BENCH_ID,
+      exercise: { ...loaded.exercise, sets },
+      sessionStatus: 'completed',
+    });
+
+    const after = await loadSessionSnapshotById(HISTORY_SESSION_ID);
+    expect(after).toMatchObject({
+      status: 'completed',
+      startedAt: before?.startedAt,
+      completedAt: before?.completedAt,
+      durationSec: before?.durationSec,
+    });
+    expect(after?.exercises[0]?.sets.map((set) => [set.weightValue, set.performanceStatus ?? null])).toEqual([
+      ['60', null],
+      ['80', null],
+      ['80', null],
+      ['85', 'unperformed'],
+    ]);
+
+    // A completed session is not written back as a draft.
+    await expect(
+      saveSessionExerciseDraft(HISTORY_SESSION_ID, {
+        sessionExerciseId: HISTORY_BENCH_ID,
+        exercise: null,
+        sessionStatus: 'active',
+      })
+    ).rejects.toEqual(new SessionExerciseDraftError('not-editable'));
   });
 
   it('saves only its own exercise and keeps the rest of the session as persisted', async () => {
@@ -101,6 +146,7 @@ describe('exercise page persistence', () => {
     await saveSessionExerciseDraft(activeSessionId, {
       sessionExerciseId: benchSessionExerciseId,
       exercise: { ...loaded.exercise, sets },
+      sessionStatus: 'active',
     });
 
     const session = await loadSessionSnapshotById(activeSessionId);
@@ -127,6 +173,7 @@ describe('exercise page persistence', () => {
     await saveSessionExerciseDraft(activeSessionId, {
       sessionExerciseId: benchSessionExerciseId,
       exercise: { ...loaded.exercise, sets: plan.nextSets },
+      sessionStatus: 'active',
     });
 
     const reloaded = await loadSessionExerciseDraft(activeSessionId, benchSessionExerciseId);
@@ -146,6 +193,7 @@ describe('exercise page persistence', () => {
     await saveSessionExerciseDraft(activeSessionId, {
       sessionExerciseId: benchSessionExerciseId,
       exercise: null,
+      sessionStatus: 'active',
     });
     const session = await loadSessionSnapshotById(activeSessionId);
     expect(session?.exercises.map((exercise) => exercise.id)).toEqual([squatSessionExerciseId]);
@@ -155,11 +203,13 @@ describe('exercise page persistence', () => {
     await saveSessionExerciseDraft(activeSessionId, {
       sessionExerciseId: benchSessionExerciseId,
       exercise: null,
+      sessionStatus: 'active',
     });
     await expect(
       saveSessionExerciseDraft(activeSessionId, {
         sessionExerciseId: benchSessionExerciseId,
         exercise: null,
+        sessionStatus: 'active',
       })
     ).rejects.toEqual(new SessionExerciseDraftError('missing-exercise'));
 
@@ -168,8 +218,9 @@ describe('exercise page persistence', () => {
       saveSessionExerciseDraft(activeSessionId, {
         sessionExerciseId: squatSessionExerciseId,
         exercise: null,
+        sessionStatus: 'active',
       })
-    ).rejects.toEqual(new SessionExerciseDraftError('not-active'));
+    ).rejects.toEqual(new SessionExerciseDraftError('not-editable'));
   });
 
   it('derives the records panel from completed history, the active session excluded', async () => {

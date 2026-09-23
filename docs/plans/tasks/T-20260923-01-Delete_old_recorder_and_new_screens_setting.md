@@ -245,6 +245,7 @@ Each PR stays under the ~2,000 added/modified-line budget (deleted lines don't c
 ## Step 7 (close out): what's left after 6b
 
 - Delete `docs/plans/exercise-session-redesign.md` and `exercise-session-build-spec.md` once every "Decisions already made" bullet is confirmed in `docs/specs/**`. Most are already in §14a/§14b, `design-language.md` and screen-map 4b/21. Check that "Back vs Complete are distinct exits" and "planned vs ad-hoc is not a mode" are in `ux-rules.md`.
+- Restyle View Session (`/completed-session/[sessionId]`: detail and completion presentation) to the design language, in its own task card started after 6b-1 (user, 2026-09-23), so it builds on the session view's styling and components. It is the old-styled screen closest to the redesign (the completed edit's `Edit`/`Done` loop crosses it), and step 7 cannot retire the legacy styling while it still uses `uiColors`.
 - Delete `app/__tests__/ui-tokens-additive.test.ts` and its mentions in `design-language` and `ux-rules`. Decide whether `uiColors` now merges into `uiRoles`, since the additive rule protects nothing once the old screens are gone.
 - Strip the "redesign step N" and "default since step 6a" wording from `screen-map.md`, `navigation-contract.md`, `ux-rules.md` §14a/§14b and `components-catalog.md`.
 - Optional: rename `src/session-recorder/` and `components/session-recorder/` (e.g. to `session/`), since "recorder" no longer names a screen. This is mechanical but wide; `scripts/triggers.tsv:26` cites `src/session-recorder/set-semantics.ts`.
