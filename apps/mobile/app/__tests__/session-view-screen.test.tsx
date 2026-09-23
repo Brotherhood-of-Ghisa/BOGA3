@@ -6,12 +6,21 @@ import { Alert } from 'react-native';
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
 const mockDismissTo = jest.fn();
+// Every mounted focus callback, so a test can play "the screen came back".
+const mockFocusCallbacks = new Set<() => void | (() => void)>();
 
 jest.mock('expo-router', () => {
   const React = jest.requireActual('react');
   return {
     useFocusEffect: (callback: () => void | (() => void)) => {
-      React.useEffect(() => callback(), [callback]);
+      React.useEffect(() => {
+        mockFocusCallbacks.add(callback);
+        const cleanup = callback();
+        return () => {
+          mockFocusCallbacks.delete(callback);
+          if (typeof cleanup === 'function') cleanup();
+        };
+      }, [callback]);
     },
     useLocalSearchParams: () => ({}),
     useRouter: () => ({ push: mockPush, replace: mockReplace, dismissTo: mockDismissTo }),
@@ -20,7 +29,7 @@ jest.mock('expo-router', () => {
 
 jest.mock('@/src/data', () => ({
   completeSessionDraft: jest.fn(),
-  listLocalGyms: jest.fn(),
+  listLocalGymsIncludingArchived: jest.fn(),
   loadLatestSessionDraftSnapshot: jest.fn(),
   loadLocalGymById: jest.fn(),
   loadRecentExerciseBlocks: jest.fn(),
@@ -30,6 +39,11 @@ jest.mock('@/src/data', () => ({
 }));
 
 jest.mock('@/src/logging', () => ({ logEvent: jest.fn().mockResolvedValue(undefined) }));
+
+// The injected location service: quiet (denied) unless a test says otherwise.
+jest.mock('@/src/location/foreground-location-lazy', () => ({
+  getCurrentForegroundPositionLazy: jest.fn(),
+}));
 
 // The picker is the recorder's, covered by the recorder suites; here it only
 // has to hand back a choice.
@@ -53,6 +67,31 @@ jest.mock('@/components/session-recorder/exercise-picker', () => ({
 import { SessionViewScreen } from '../session/[sessionId]/index';
 
 const data = jest.requireMock('@/src/data') as Record<string, jest.Mock>;
+const location = jest.requireMock('@/src/location/foreground-location-lazy') as {
+  getCurrentForegroundPositionLazy: jest.Mock;
+};
+
+const gymRow = (
+  id: string,
+  name: string,
+  coordinates: { latitude: number; longitude: number } | null = null,
+  archivedAt: Date | null = null
+) => ({
+  id,
+  name,
+  latitude: coordinates?.latitude ?? null,
+  longitude: coordinates?.longitude ?? null,
+  coordinateAccuracyM: coordinates ? 10 : null,
+  coordinatesUpdatedAt: coordinates ? new Date('2026-09-01T10:00:00Z') : null,
+  archivedAt,
+});
+
+const HARBOUR = { latitude: 51.5, longitude: -0.12 };
+
+const positionAt = (coordinates: { latitude: number; longitude: number }, accuracyM = 20) => ({
+  status: 'success',
+  position: { ...coordinates, accuracyM, capturedAt: new Date('2026-09-23T09:05:00Z') },
+});
 
 const set = (
   id: string,
@@ -121,10 +160,12 @@ describe('Session view', () => {
     mockDismissTo.mockReset();
     data.loadLatestSessionDraftSnapshot.mockReset().mockImplementation(async () => snapshot());
     data.loadLocalGymById.mockReset().mockResolvedValue({ id: 'gym-1', name: 'Iron Works' });
-    data.listLocalGyms.mockReset().mockResolvedValue([
-      { id: 'gym-1', name: 'Iron Works', latitude: null, longitude: null, coordinateAccuracyM: null, coordinatesUpdatedAt: null },
-      { id: 'gym-2', name: 'Harbour Barbell', latitude: null, longitude: null, coordinateAccuracyM: null, coordinatesUpdatedAt: null },
-    ]);
+    data.listLocalGymsIncludingArchived
+      .mockReset()
+      .mockResolvedValue([gymRow('gym-1', 'Iron Works'), gymRow('gym-2', 'Harbour Barbell', HARBOUR)]);
+    location.getCurrentForegroundPositionLazy
+      .mockReset()
+      .mockResolvedValue({ status: 'permission_denied', canAskAgain: true });
     data.upsertLocalGym.mockReset().mockResolvedValue(undefined);
     data.loadRecentExerciseBlocks.mockReset().mockImplementation(async ({ exerciseDefinitionId }) => ({
       exerciseDefinitionId,
@@ -279,6 +320,151 @@ describe('Session view', () => {
 
     expect(data.upsertLocalGym).not.toHaveBeenCalled();
     expect(data.persistSessionDraftSnapshot.mock.calls.at(-1)?.[0]).toMatchObject({ gymId: null });
+  });
+
+  const openGymSheet = async () => {
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('session-view-summary-gym-button'));
+    });
+  };
+
+  it('suggests the one nearby gym as the first row, and selects it only when tapped', async () => {
+    location.getCurrentForegroundPositionLazy.mockResolvedValue(positionAt(HARBOUR));
+    await renderReady();
+
+    await openGymSheet();
+
+    const suggestion = await screen.findByTestId('session-view-gym-suggestion');
+    expect(screen.getByText('Nearby · Harbour Barbell')).toBeTruthy();
+    // Suggest only: nothing is written until the lifter taps it.
+    expect(data.persistSessionDraftSnapshot).not.toHaveBeenCalled();
+    expect(screen.getByTestId('session-view-gym-option-gym-1')).toBeSelected();
+
+    data.loadLocalGymById.mockResolvedValue({ id: 'gym-2', name: 'Harbour Barbell' });
+    await act(async () => {
+      fireEvent.press(suggestion);
+    });
+
+    expect(data.upsertLocalGym).toHaveBeenCalledWith({ id: 'gym-2', name: 'Harbour Barbell' });
+    expect(data.persistSessionDraftSnapshot.mock.calls.at(-1)?.[0]).toMatchObject({ gymId: 'gym-2' });
+    expect(screen.queryByTestId('session-view-gym-sheet')).toBeNull();
+  });
+
+  it.each([
+    ['permission denial', () => ({ status: 'permission_denied', canAskAgain: false })],
+    ['services off', () => ({ status: 'unavailable', reason: 'services_disabled' })],
+    ['a read failure', () => ({ status: 'read_failure', error: new Error('gps') })],
+    ['low accuracy', () => positionAt(HARBOUR, 140)],
+    ['no gym in range', () => positionAt({ latitude: 48.85, longitude: 2.35 })],
+  ])('shows no suggestion row on %s', async (_case, result) => {
+    location.getCurrentForegroundPositionLazy.mockResolvedValue(result());
+    await renderReady();
+
+    await openGymSheet();
+    await act(async () => {});
+
+    expect(location.getCurrentForegroundPositionLazy).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('session-view-gym-option-gym-2')).toBeTruthy();
+    expect(screen.queryByTestId('session-view-gym-suggestion')).toBeNull();
+  });
+
+  it('shows no suggestion row when two gyms tie, or when no gym has a location', async () => {
+    location.getCurrentForegroundPositionLazy.mockResolvedValue(positionAt(HARBOUR));
+    data.listLocalGymsIncludingArchived.mockResolvedValue([
+      gymRow('gym-1', 'Iron Works', { latitude: 51.5001, longitude: -0.12 }),
+      gymRow('gym-2', 'Harbour Barbell', HARBOUR),
+    ]);
+    await renderReady();
+
+    await openGymSheet();
+    await act(async () => {});
+    expect(screen.queryByTestId('session-view-gym-suggestion')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('session-view-gym-sheet-backdrop', { includeHiddenElements: true }));
+    data.listLocalGymsIncludingArchived.mockResolvedValue([gymRow('gym-1', 'Iron Works'), gymRow('gym-2', 'Harbour Barbell')]);
+    await openGymSheet();
+    await act(async () => {});
+    expect(screen.getByTestId('session-view-gym-option-gym-2')).toBeTruthy();
+    expect(screen.queryByTestId('session-view-gym-suggestion')).toBeNull();
+  });
+
+  it('gives up on the suggestion after 1.5 s without a fix, leaving the list usable', async () => {
+    let resolveFix: (value: unknown) => void = () => undefined;
+    location.getCurrentForegroundPositionLazy.mockReturnValue(new Promise((resolve) => (resolveFix = resolve)));
+    await renderReady();
+
+    await openGymSheet();
+    expect(screen.getByTestId('session-view-gym-option-gym-2')).toBeTruthy();
+    await act(async () => {
+      jest.advanceTimersByTime(1500);
+    });
+    // A fix arriving after the budget is dropped.
+    await act(async () => {
+      resolveFix(positionAt(HARBOUR));
+    });
+
+    expect(screen.queryByTestId('session-view-gym-suggestion')).toBeNull();
+  });
+
+  it('does not suggest the gym the session already has', async () => {
+    location.getCurrentForegroundPositionLazy.mockResolvedValue(positionAt(HARBOUR));
+    data.loadLocalGymById.mockResolvedValue({ id: 'gym-2', name: 'Harbour Barbell' });
+    data.loadLatestSessionDraftSnapshot.mockImplementation(async () => ({ ...snapshot(), gymId: 'gym-2' }));
+    await renderReady();
+
+    await openGymSheet();
+    await act(async () => {});
+
+    expect(screen.getByTestId('session-view-gym-option-gym-2')).toBeSelected();
+    expect(screen.queryByTestId('session-view-gym-suggestion')).toBeNull();
+  });
+
+  it('leaves archived gyms out of the sheet, seeded ones included', async () => {
+    data.listLocalGymsIncludingArchived.mockResolvedValue([
+      gymRow('downtown-iron-temple', 'Downtown Iron Temple', null, new Date('2026-09-20T10:00:00Z')),
+      gymRow('gym-1', 'Iron Works'),
+      gymRow('gym-3', 'Old Garage', HARBOUR, new Date('2026-09-20T10:00:00Z')),
+    ]);
+    location.getCurrentForegroundPositionLazy.mockResolvedValue(positionAt(HARBOUR));
+    await renderReady();
+
+    await openGymSheet();
+    await act(async () => {});
+
+    expect(screen.getByTestId('session-view-gym-option-westside-barbell-club')).toBeTruthy();
+    expect(screen.queryByTestId('session-view-gym-option-downtown-iron-temple')).toBeNull();
+    expect(screen.queryByTestId('session-view-gym-option-gym-3')).toBeNull();
+    // An archived gym is never suggested either.
+    expect(screen.queryByTestId('session-view-gym-suggestion')).toBeNull();
+  });
+
+  it('opens the Gyms screen from Manage gyms and reopens the sheet, reloaded, on return', async () => {
+    await renderReady();
+
+    await openGymSheet();
+    fireEvent.press(screen.getByTestId('session-view-gym-manage'));
+
+    expect(mockPush).toHaveBeenCalledWith('/gyms');
+    expect(screen.queryByTestId('session-view-gym-sheet')).toBeNull();
+
+    data.listLocalGymsIncludingArchived.mockResolvedValue([
+      gymRow('gym-1', 'Iron Works'),
+      gymRow('gym-2', 'Harbour Barbell', HARBOUR),
+      gymRow('gym-4', 'Canal Street Gym'),
+    ]);
+    await act(async () => {
+      mockFocusCallbacks.forEach((callback) => callback());
+    });
+
+    expect(screen.getByTestId('session-view-gym-sheet')).toBeTruthy();
+    expect(await screen.findByTestId('session-view-gym-option-gym-4')).toBeTruthy();
+
+    // A later return with the sheet closed leaves it closed.
+    fireEvent.press(screen.getByTestId('session-view-gym-sheet-backdrop', { includeHiddenElements: true }));
+    await act(async () => {
+      mockFocusCallbacks.forEach((callback) => callback());
+    });
+    expect(screen.queryByTestId('session-view-gym-sheet')).toBeNull();
   });
 
   it('says so when its session is no longer the active draft', async () => {

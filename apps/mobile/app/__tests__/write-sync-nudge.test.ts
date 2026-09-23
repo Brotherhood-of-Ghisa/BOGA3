@@ -65,7 +65,13 @@ jest.mock('@/src/sync/write-nudge', () => ({
 
 // Imported AFTER the mocks so the repos bind to them.
 import { __resetClockForTests } from '@/src/data/clock';
-import { listLocalGyms, upsertLocalGym, loadLocalGymById } from '@/src/data/local-gyms';
+import {
+  listLocalGyms,
+  listLocalGymsIncludingArchived,
+  loadLocalGymById,
+  setLocalGymArchived,
+  upsertLocalGym,
+} from '@/src/data/local-gyms';
 import { createDrizzleExerciseCatalogStore } from '@/src/data/exercise-catalog';
 import { createDrizzleExerciseTagStore } from '@/src/data/exercise-tags';
 import { createDrizzleSessionDraftStore } from '@/src/data/session-drafts';
@@ -143,6 +149,63 @@ describe('repo write paths nudge the scheduler exactly once, post-commit', () =>
     const rows = await listLocalGyms();
 
     expect(rows.map((row) => row.id)).toEqual(['gym-live']);
+    expect(mockNotifyLocalWrite).not.toHaveBeenCalled();
+  });
+
+  it('gyms archive: soft-deletes through deleted_at, dirties the row AND nudges once after commit', async () => {
+    await upsertLocalGym({ id: 'gym-1', name: 'Iron Temple', now: new Date('2026-09-01T10:00:00.000Z') });
+    requireDatabase().update(gyms).set({ localDirty: false }).where(eq(gyms.id, 'gym-1')).run();
+    const before = requireDatabase().select().from(gyms).where(eq(gyms.id, 'gym-1')).get();
+    let rowAtNudgeTime: { deletedAt: Date | null; localDirty: boolean } | undefined;
+    mockNotifyLocalWrite.mockClear().mockImplementation(() => {
+      rowAtNudgeTime = requireDatabase().select().from(gyms).where(eq(gyms.id, 'gym-1')).get();
+    });
+
+    const archivedAt = new Date('2026-09-23T10:00:00.000Z');
+    await setLocalGymArchived({ id: 'gym-1', archived: true, now: archivedAt });
+
+    const row = requireDatabase().select().from(gyms).where(eq(gyms.id, 'gym-1')).get();
+    expect(row?.deletedAt).toEqual(archivedAt);
+    expect(row?.updatedAt).toEqual(archivedAt);
+    expect(row?.localDirty).toBe(true);
+    expect(row?.localUpdatedAtMs).toBeGreaterThan(before?.localUpdatedAtMs ?? 0);
+    expect(mockNotifyLocalWrite).toHaveBeenCalledTimes(1);
+    expect(rowAtNudgeTime).toMatchObject({ deletedAt: archivedAt, localDirty: true });
+    // Archived gyms leave the picker list but keep their row (past sessions name them).
+    expect(await listLocalGyms()).toEqual([]);
+    expect(await loadLocalGymById('gym-1')).toMatchObject({ id: 'gym-1', name: 'Iron Temple' });
+    expect(await listLocalGymsIncludingArchived()).toEqual([
+      expect.objectContaining({ id: 'gym-1', name: 'Iron Temple', archivedAt }),
+    ]);
+  });
+
+  it('gyms unarchive: clears deleted_at, dirties the row AND nudges once', async () => {
+    await upsertLocalGym({ id: 'gym-1', name: 'Iron Temple' });
+    await setLocalGymArchived({ id: 'gym-1', archived: true });
+    requireDatabase().update(gyms).set({ localDirty: false }).where(eq(gyms.id, 'gym-1')).run();
+    mockNotifyLocalWrite.mockClear();
+
+    await setLocalGymArchived({ id: 'gym-1', archived: false });
+
+    const row = requireDatabase().select().from(gyms).where(eq(gyms.id, 'gym-1')).get();
+    expect(row?.deletedAt).toBeNull();
+    expect(row?.localDirty).toBe(true);
+    expect(mockNotifyLocalWrite).toHaveBeenCalledTimes(1);
+    expect((await listLocalGyms()).map((gym) => gym.id)).toEqual(['gym-1']);
+  });
+
+  it('gyms archive: refuses a gym with no row, writing and nudging nothing', async () => {
+    await expect(setLocalGymArchived({ id: 'missing', archived: true })).rejects.toThrow('gym missing does not exist');
+    expect(requireDatabase().select().from(gyms).all()).toEqual([]);
+    expect(mockNotifyLocalWrite).not.toHaveBeenCalled();
+  });
+
+  it('gyms read path (listLocalGymsIncludingArchived) never nudges', async () => {
+    await upsertLocalGym({ id: 'gym-1', name: 'Iron Temple' });
+    mockNotifyLocalWrite.mockClear();
+
+    await listLocalGymsIncludingArchived();
+
     expect(mockNotifyLocalWrite).not.toHaveBeenCalled();
   });
 
