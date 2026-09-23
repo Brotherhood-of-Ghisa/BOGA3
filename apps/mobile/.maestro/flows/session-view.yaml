@@ -1,9 +1,7 @@
 appId: com.dinoderek.mobile
 ---
-# The session view (redesign step 5), the default since step 6a. Proves, on
-# device:
-#   1. with the setting at its default (no `newScreens` on the harness link),
-#      Train's Resume opens the session view, not the recorder;
+# The session view (redesign step 5). Proves, on device:
+#   1. Train's Resume opens the session view;
 #   2. the summary card and one read-only card per exercise, with its done
 #      count and — for the bench, whose RIR 2 set beats its completed history —
 #      the 1RM record band (fixture: src/maestro/session-view-fixture.ts);
@@ -13,12 +11,12 @@ appId: com.dinoderek.mobile
 #      where a new gym is added, and back on the session view the sheet
 #      reopens with it listed, ready to pick (the GPS suggestion row is jest
 #      only: the simulator cannot fake a location reliably);
-#   5. + Add exercise adds a card through the recorder's picker;
+#   5. + Add exercise adds a card through the exercise picker;
 #   6. Finish asks one cleanup prompt for the empty set and the exercises left
 #      with no sets, and opens the completion screen.
 #
-# Hermetic: starts from `reset=data` and ends with a data reset, leaving the
-# setting at its default (On). Infra-free (no sign-in).
+# Hermetic: starts from `reset=data` and ends with a data reset. Infra-free
+# (no sign-in).
 
 - retry:
     maxRetries: 3
@@ -56,8 +54,6 @@ appId: com.dinoderek.mobile
     visible:
       id: "session-view-screen"
     timeout: 15000
-- assertNotVisible:
-    id: "session-recorder-screen"
 
 # 2. Summary and cards (their accessibility labels carry the counts and record).
 - extendedWaitUntil:
@@ -178,7 +174,7 @@ appId: com.dinoderek.mobile
       text: "Gym Canal Street Gym"
     timeout: 10000
 
-# 5. + Add exercise, through the recorder's picker.
+# 5. + Add exercise, through the exercise picker.
 - scrollUntilVisible:
     element:
       id: "session-view-add-exercise"
@@ -225,7 +221,7 @@ appId: com.dinoderek.mobile
     timeout: 20000
 - takeScreenshot: "04-session-view-finished"
 
-# Leave the simulator as this flow found it: data reset, setting at its default.
+# Leave the simulator as this flow found it: data reset.
 - openLink: "boga3://maestro-harness?reset=data&teleport=session-list"
 - extendedWaitUntil:
     visible:

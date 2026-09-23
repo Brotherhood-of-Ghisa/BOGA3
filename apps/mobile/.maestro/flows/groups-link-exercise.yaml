@@ -7,8 +7,9 @@ appId: com.dinoderek.mobile
 #   1. catalogue ⋮ "Link to group exercise…" → Link screen → Link (the group
 #      exercise is suggested: it was copied from the standard exercise the
 #      member's seeded "Barbell Bench Press" is);
-#   2. recorder picker search finds the group exercise under "From your
-#      groups" as "linked: Barbell Bench Press";
+#   2. the session view's picker (Train → Start → + Add exercise) search finds
+#      the group exercise under "From your groups" as "linked: Barbell Bench
+#      Press";
 #   3. picking it adds the member's own exercise to the session;
 #   4. that exercise's page ⋮ "Link to group exercise…" opens the same Link
 #      screen, showing the link made in step 1.
@@ -155,19 +156,32 @@ appId: com.dinoderek.mobile
     text: "Your past Barbell Bench Press sets shared with Link Crew will count."
 - takeScreenshot: "groups-link-02-linked"
 
-# --- 2. Recorder picker search → From your groups → add -----------------------
-- openLink: "boga3://maestro-harness?teleport=session-recorder"
+# --- 2. Session view picker search → From your groups → add ------------------
+# Train's Start opens the session view; `+ Add exercise` opens the picker.
+- openLink: "boga3://maestro-harness?teleport=session-list"
 - extendedWaitUntil:
     visible:
-      id: "start-session-button"
+      id: "stats-history-screen"
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 4000
+- retry:
+    maxRetries: 3
+    commands:
+      - tapOn:
+          id: "top-level-tab-train"
+      - extendedWaitUntil:
+          visible:
+            id: "train-start-empty-button"
+          timeout: 15000
+- tapOn:
+    id: "train-start-empty-button"
+- extendedWaitUntil:
+    visible:
+      id: "session-view-add-exercise"
     timeout: 30000
 - tapOn:
-    id: "start-session-button"
-- extendedWaitUntil:
-    visible:
-      id: "session-recorder-screen"
-    timeout: 30000
-- tapOn: "Log new exercise"
+    id: "session-view-add-exercise"
 - tapOn: "Exercise filter input"
 - inputText: "Comp Bench"
 - hideKeyboard:
@@ -183,42 +197,17 @@ appId: com.dinoderek.mobile
 - takeScreenshot: "groups-link-03-picker-search"
 - tapOn:
     id: "exercise-picker-group-row-${output.linkGroupExerciseId}"
+# My own exercise (not the group exercise's name) was added to the session.
 - extendedWaitUntil:
     visible:
-      text: "Exercise options 1"
+      text: "Barbell Bench Press, 0 of 1 sets done"
     timeout: 15000
-# My own exercise (not the group exercise's name) was added to the session.
-- assertVisible:
-    text: ".*Barbell Bench Press.*"
 - assertNotVisible:
     text: ".*Comp Bench.*"
 - takeScreenshot: "groups-link-04-added"
 
 # --- 4. Exercise page ⋮ → Link screen -----------------------------------------
-# The session is the new screens' default: Train's Resume opens the session
-# view, whose card opens the exercise page.
-- openLink: "boga3://maestro-harness?teleport=session-list"
-- extendedWaitUntil:
-    visible:
-      id: "stats-history-screen"
-    timeout: 30000
-- waitForAnimationToEnd:
-    timeout: 4000
-- retry:
-    maxRetries: 3
-    commands:
-      - tapOn:
-          id: "top-level-tab-train"
-      - extendedWaitUntil:
-          visible:
-            id: "train-resume-session-button"
-          timeout: 15000
-- tapOn:
-    id: "train-resume-session-button"
-- extendedWaitUntil:
-    visible:
-      text: "Barbell Bench Press, .*"
-    timeout: 15000
+# The session view's card opens the exercise page.
 - tapOn:
     text: "Barbell Bench Press, .*"
 - extendedWaitUntil:

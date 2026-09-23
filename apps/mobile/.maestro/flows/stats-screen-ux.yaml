@@ -19,10 +19,10 @@ appId: com.dinoderek.mobile
 # sessions are seeded relative to now (daysAgo), so they hold on any run date.
 # Change that fixture ⇒ update the two pinned values below.
 #
-# Those fixture rows go straight into SQLite, bypassing the recorder — so this
-# flow proves the Stats screen READS correctly, never that the recorder WRITES
-# what it reads. The recorder-write → exercise-list read-back is asserted in
-# data-runtime-smoke.yaml instead; keep it there.
+# Those fixture rows go straight into SQLite, bypassing the session screens — so
+# this flow proves the Stats screen READS correctly, never that the session
+# screens WRITE what it reads. The session-write → exercise-list read-back is
+# asserted in data-runtime-smoke.yaml instead; keep it there.
 
 # --- 00: empty state, before any data is seeded ---
 - openLink: "boga3://maestro-harness?reset=data&teleport=session-list"

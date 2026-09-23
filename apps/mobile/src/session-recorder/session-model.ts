@@ -1,9 +1,5 @@
 import type { Session, SessionExercise, SessionSet } from '@/components/session-recorder/types';
-import type {
-  ExerciseBlockHistorySuggestedSet,
-  SessionDraftSnapshot,
-  SessionGraphSnapshot,
-} from '@/src/data';
+import type { ExerciseBlockHistorySuggestedSet, SessionDraftSnapshot } from '@/src/data';
 import type { SessionInsightExerciseInput } from '@/src/session-insights';
 import { defaultSessionSetType, formatSessionSetType, normalizeSessionSetType, type SessionSetTypeValue } from '@/src/data/set-types';
 import {
@@ -14,11 +10,9 @@ import {
 } from '@/src/session-recorder/set-semantics';
 
 /**
- * The recorder's session model: the in-memory `Session` shape, its mapping to
- * and from the persisted draft, set/exercise factories, and the submit-time
- * cleanup rules. Pure, and shared by the recorder route and the session view
- * (docs/plans/exercise-session-redesign.md, rule 2) so both write the session
- * tables through one copy of the rules.
+ * The session model: the in-memory `Session` shape, its mapping to and from the
+ * persisted draft, set/exercise factories, and the submit-time cleanup rules.
+ * Pure; the session view writes the session tables through it.
  */
 
 export function formatCurrentDateTime(date: Date): string {
@@ -83,31 +77,6 @@ export function mapDraftSnapshotToSession(
       exerciseDefinitionId: exercise.exerciseDefinitionId,
       name: exercise.name,
       machineName: exercise.machineName ?? '',
-      tags: [],
-      sets: exercise.sets.map((set) => ({
-        id: set.id,
-        reps: set.repsValue,
-        weight: set.weightValue,
-        setType: normalizeSessionSetType(set.setType),
-        plannedReps: set.plannedRepsValue ?? null,
-        plannedWeight: set.plannedWeightValue ?? null,
-        plannedSetType: normalizeSessionSetType(set.plannedSetType),
-        performanceStatus: set.performanceStatus ?? null,
-      })),
-    })),
-  };
-}
-
-export function mapSessionGraphSnapshotToSession(snapshot: SessionGraphSnapshot): Session {
-  return {
-    dateTime: formatCurrentDateTime(snapshot.startedAt),
-    locationId: snapshot.gymId,
-    exercises: snapshot.exercises.map((exercise) => ({
-      id: exercise.id,
-      exerciseDefinitionId: exercise.exerciseDefinitionId,
-      name: exercise.name,
-      machineName: exercise.machineName ?? '',
-      tags: [],
       sets: exercise.sets.map((set) => ({
         id: set.id,
         reps: set.repsValue,
@@ -143,7 +112,7 @@ export const toPersistDraftExercises = (session: Session) =>
     }),
   }));
 
-export const canonicalizeSessionSetWeights = (session: Session): Session => {
+const canonicalizeSessionSetWeights = (session: Session): Session => {
   let sessionChanged = false;
   const exercises = session.exercises.map((exercise) => {
     let exerciseChanged = false;
@@ -164,20 +133,17 @@ export const canonicalizeSessionSetWeights = (session: Session): Session => {
   return sessionChanged ? { ...session, exercises } : session;
 };
 
-export function createExerciseId(): string {
+function createExerciseId(): string {
   return `exercise-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export function createSetId(): string {
+function createSetId(): string {
   return `set-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export type SetFieldName = keyof Pick<SessionSet, 'reps' | 'weight'>;
+type SetFieldName = keyof Pick<SessionSet, 'reps' | 'weight'>;
 
-export const WEIGHT_INPUT_PATTERN = /^\d*\.?\d*$/;
-export const REPS_INPUT_PATTERN = /^\d*$/;
-
-export function createEmptySet(): SessionSet {
+function createEmptySet(): SessionSet {
   return {
     id: createSetId(),
     reps: '',
@@ -190,24 +156,7 @@ export function createEmptySet(): SessionSet {
   };
 }
 
-export function createSetFromPrevious(previousSet: SessionSet | undefined): SessionSet {
-  if (!previousSet) {
-    return createEmptySet();
-  }
-
-  return {
-    id: createSetId(),
-    reps: previousSet.reps,
-    weight: previousSet.weight,
-    setType: defaultSessionSetType(normalizeSessionSetType(previousSet.setType)),
-    plannedReps: null,
-    plannedWeight: null,
-    plannedSetType: null,
-    performanceStatus: 'unperformed',
-  };
-}
-
-export function createPlannedSetFromSuggestedSet(set: ExerciseBlockHistorySuggestedSet): SessionSet {
+function createPlannedSetFromSuggestedSet(set: ExerciseBlockHistorySuggestedSet): SessionSet {
   return {
     id: createSetId(),
     reps: '',
@@ -220,7 +169,7 @@ export function createPlannedSetFromSuggestedSet(set: ExerciseBlockHistorySugges
   };
 }
 
-export const isNonNegativeDecimalInput = (value: string): boolean => {
+const isNonNegativeDecimalInput = (value: string): boolean => {
   const trimmed = value.trim();
   if (trimmed.length === 0) {
     return true;
@@ -230,7 +179,7 @@ export const isNonNegativeDecimalInput = (value: string): boolean => {
   return Number.isFinite(parsed) && parsed >= 0;
 };
 
-export const isPositiveIntegerInput = (value: string): boolean => {
+const isPositiveIntegerInput = (value: string): boolean => {
   const trimmed = value.trim();
   if (trimmed.length === 0) {
     return true;
@@ -244,10 +193,10 @@ export const isPositiveIntegerInput = (value: string): boolean => {
   return Number.isInteger(parsed) && parsed > 0;
 };
 
-export const hasSetFieldValidationError = (field: SetFieldName, value: string): boolean =>
+const hasSetFieldValidationError = (field: SetFieldName, value: string): boolean =>
   field === 'weight' ? !isNonNegativeDecimalInput(value) : !isPositiveIntegerInput(value);
 
-export type PlannedSetRowState = 'planned' | 'matched' | 'modified' | 'added';
+type PlannedSetRowState = 'planned' | 'matched' | 'modified' | 'added';
 type PlannedSetMatchMode = 'volume' | 'quality' | 'volume-and-quality';
 
 const PLANNED_SET_MATCH_MODE: PlannedSetMatchMode = 'volume';
@@ -255,7 +204,7 @@ const PLANNED_SET_MATCH_MODE: PlannedSetMatchMode = 'volume';
 export const hasPlannedTarget = (set: SessionSet): boolean =>
   set.plannedReps !== null || set.plannedWeight !== null || set.plannedSetType !== null;
 
-export const hasPerformedActual = (set: SessionSet): boolean => isConfirmedPerformedSet(set);
+const hasPerformedActual = (set: SessionSet): boolean => isConfirmedPerformedSet(set);
 
 const plannedSetVolumeMatches = (set: SessionSet): boolean =>
   canonicalizeWeightForReps(set.weight, set.reps).trim() ===
@@ -279,7 +228,7 @@ const plannedSetMatches = (
   }
 };
 
-export const getSetRowState = (set: SessionSet): PlannedSetRowState => {
+const getSetRowState = (set: SessionSet): PlannedSetRowState => {
   if (!hasPlannedTarget(set)) {
     return 'added';
   }
@@ -304,7 +253,7 @@ export const sessionHasInvalidSetValues = (session: Session): boolean =>
     )
   );
 
-export const toCompletedHistorySession = (session: Session): Session => ({
+const toCompletedHistorySession = (session: Session): Session => ({
   ...session,
   exercises: session.exercises.map((exercise) => ({
     ...exercise,
@@ -327,12 +276,11 @@ export function createExercise(exerciseDefinitionId: string, name: string): Sess
     exerciseDefinitionId,
     name,
     machineName: '',
-    tags: [],
     sets: [createEmptySet()],
   };
 }
 
-export function removeIncompleteSets(session: Session): { session: Session; removedSets: number } {
+function removeIncompleteSets(session: Session): { session: Session; removedSets: number } {
   let removedSets = 0;
 
   const exercises = session.exercises.map((exercise) => {
@@ -362,7 +310,7 @@ export function removeIncompleteSets(session: Session): { session: Session; remo
   };
 }
 
-export function removeUnconfirmedSets(session: Session): { session: Session; removedSets: number } {
+function removeUnconfirmedSets(session: Session): { session: Session; removedSets: number } {
   let removedSets = 0;
 
   const exercises = session.exercises.map((exercise) => ({
@@ -387,7 +335,7 @@ export function removeUnconfirmedSets(session: Session): { session: Session; rem
   };
 }
 
-export function removeExercisesWithNoSets(session: Session): { session: Session; removedExercises: number } {
+function removeExercisesWithNoSets(session: Session): { session: Session; removedExercises: number } {
   let removedExercises = 0;
   const exercises = session.exercises.filter((exercise) => {
     const hasSets = exercise.sets.length > 0;
@@ -438,7 +386,6 @@ export const appendSuggestedPlan = (
     exerciseDefinitionId: exercise.id,
     name: exercise.name,
     machineName: '',
-    tags: [],
     sets: plannedSets,
   };
   return {
@@ -460,14 +407,12 @@ export const formatSetRepsLabel = (value: string | null | undefined): string => 
   return `${trimmed} ${trimmed === '1' ? 'rep' : 'reps'}`;
 };
 
-export type SubmitCleanupStep = 'unconfirmed-sets' | 'empty-sets-and-exercises';
-
 /** What one cleanup prompt removes; the copy is chosen from these counts. */
-export type SubmitCleanupCounts =
+type SubmitCleanupCounts =
   | { step: 'unconfirmed-sets'; affectedCount: number }
   | { step: 'empty-sets-and-exercises'; incompleteSetCount: number; emptyExerciseCount: number };
 
-export type SubmitCleanupPrompt = SubmitCleanupCounts & { nextSession: Session };
+type SubmitCleanupPrompt = SubmitCleanupCounts & { nextSession: Session };
 
 export type SubmitCleanupResult =
   | { kind: 'prompt'; prompt: SubmitCleanupPrompt }

@@ -5,16 +5,15 @@ import type { ExercisePersonalRecord } from '@/src/session-insights';
 
 type ExercisePersonalRecordCelebrationProps = {
   personalRecord: ExercisePersonalRecord;
-  variant: 'expanded' | 'collapsed' | 'compact';
   testID: string;
 };
 
 const formatLoad = (value: number): string =>
   Number.isInteger(value) ? `${value}` : `${Number(value.toFixed(2))}`;
 
+/** One exercise's new PR on the completion screen: the exercise and its set. */
 export function ExercisePersonalRecordCelebration({
   personalRecord,
-  variant,
   testID,
 }: ExercisePersonalRecordCelebrationProps) {
   const fact = `${formatLoad(personalRecord.weight)} kg × ${personalRecord.reps} reps · est. 1RM ${Math.round(
@@ -23,17 +22,9 @@ export function ExercisePersonalRecordCelebration({
 
   return (
     <UiSurface
-      accessibilityLabel={
-        variant === 'collapsed' || variant === 'compact'
-          ? `New PR for ${personalRecord.exerciseName}. ${fact}`
-          : undefined
-      }
-      accessible={variant === 'collapsed' || variant === 'compact'}
-      style={[
-        styles.surface,
-        variant === 'collapsed' ? styles.collapsedSurface : null,
-        variant === 'compact' ? styles.compactSurface : null,
-      ]}
+      accessibilityLabel={`New PR for ${personalRecord.exerciseName}. ${fact}`}
+      accessible
+      style={styles.surface}
       testID={testID}>
       <View style={styles.headingRow}>
         <UiText style={styles.celebrationTitle} variant="labelStrong">
@@ -41,16 +32,9 @@ export function ExercisePersonalRecordCelebration({
         </UiText>
         <Icon color={uiColors.actionSuccess} name="star" size="sm" />
       </View>
-      {variant === 'expanded' ? (
-        <UiText numberOfLines={2} variant="subtitle">
-          {personalRecord.exerciseName}
-        </UiText>
-      ) : null}
-      {variant === 'compact' ? (
-        <UiText numberOfLines={2} style={styles.compactExerciseName} variant="labelStrong">
-          {personalRecord.exerciseName}
-        </UiText>
-      ) : null}
+      <UiText numberOfLines={2} style={styles.exerciseName} variant="labelStrong">
+        {personalRecord.exerciseName}
+      </UiText>
       <UiText numberOfLines={2} style={styles.fact} variant="label">
         {fact}
       </UiText>
@@ -60,19 +44,11 @@ export function ExercisePersonalRecordCelebration({
 
 const styles = StyleSheet.create({
   surface: {
-    padding: uiSpace.md,
-    gap: uiSpace.xs,
-    borderColor: uiColors.borderSuccess,
-    backgroundColor: uiColors.surfaceSuccess,
-  },
-  collapsedSurface: {
-    marginTop: uiSpace.xs,
-    padding: uiSpace.sm,
-  },
-  compactSurface: {
     paddingHorizontal: uiSpace.md,
     paddingVertical: uiSpace.sm,
     gap: uiSpace.xs,
+    borderColor: uiColors.borderSuccess,
+    backgroundColor: uiColors.surfaceSuccess,
   },
   headingRow: {
     flexDirection: 'row',
@@ -85,7 +61,7 @@ const styles = StyleSheet.create({
   fact: {
     color: uiColors.textAccentStrong,
   },
-  compactExerciseName: {
+  exerciseName: {
     fontSize: uiTypography.size.base,
   },
 });

@@ -1,8 +1,7 @@
 appId: com.dinoderek.mobile
 ---
-# The exercise page (docs/plans/exercise-session-redesign.md step 4), with the
-# `New exercise & session screens` setting at its default (On), on its own
-# `exercise-page` fixture:
+# The exercise page (docs/plans/exercise-session-redesign.md step 4), on its
+# own `exercise-page` fixture:
 # an active session whose Barbell Bench Press has two performed sets and three
 # planned ones, plus two completed Bench Press sessions for the records panel.
 #
@@ -16,8 +15,8 @@ appId: com.dinoderek.mobile
 #   4. re-opening the page shows those planned sets as not performed — kept,
 #      not deleted — and the logged sets as performed.
 #
-# Hermetic: starts from `reset=data` (which also restores the setting to its
-# default, On) and ends with `reset=data`. Infra-free (no sign-in).
+# Hermetic: starts from `reset=data` and ends with `reset=data`. Infra-free
+# (no sign-in).
 
 - openLink: "boga3://maestro-harness?reset=data&fixture=exercise-page&teleport=exercise-page&sessionId=maestro_exercise_page_session&sessionExerciseId=maestro_exercise_page_bench"
 # The dev-client "Open in <App>?" URL-scheme trust dialog and expo-dev-client's
@@ -267,7 +266,7 @@ appId: com.dinoderek.mobile
 - assertVisible: "Change effort, currently RIR 3"
 - takeScreenshot: "effort-inherited-rir3"
 
-# Leave the simulator as found: data wiped and the setting at its default.
+# Leave the simulator as found: data wiped.
 - openLink: "boga3://maestro-harness?reset=data"
 - tapOn:
     text: "Open"

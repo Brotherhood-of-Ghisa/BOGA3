@@ -1,28 +1,27 @@
-import { createEmptySet, createSetFromPrevious, createPlannedSetFromSuggestedSet } from '@/src/session-recorder/session-model';
+import { appendSuggestedPlan, createExercise } from '@/src/session-recorder/session-model';
 import { isWorkingSessionSetType, normalizeSessionSetType } from '@/src/data/set-types';
 
-describe('new recorder set effort defaults', () => {
-  it('starts each exercise with an unconfirmed warm-up', () => {
-    expect(createEmptySet()).toMatchObject({ setType: 'warm_up', performanceStatus: 'unperformed' });
-    expect(createSetFromPrevious(undefined).setType).toBe('warm_up');
+// The session view's set factories. Copying the previous set's effort when a
+// set is added is the exercise page's `addSet` (exercise-page-model.test.ts).
+describe('new session set effort defaults', () => {
+  it('starts each added exercise with an unconfirmed warm-up', () => {
+    expect(createExercise('def_bench', 'Bench Press').sets).toEqual([
+      expect.objectContaining({ setType: 'warm_up', performanceStatus: 'unperformed' }),
+    ]);
   });
 
-  it.each(['warm_up', null, 'rir_3', 'rir_2', 'rir_1', 'rir_0'] as const)(
-    'copies values and only inherits RIR after %s', (setType) => {
-      const previous = { ...createEmptySet(), weight: '80', reps: '8', setType };
-      const next = createSetFromPrevious(previous);
-      expect(next).toMatchObject({
-        weight: '80', reps: '8', performanceStatus: 'unperformed',
-        setType: setType === 'warm_up' ? null : setType,
-      });
-      expect(next.id).not.toBe(previous.id);
-      expect(previous.setType).toBe(setType);
-    }
-  );
-
   it('keeps prescribed RIR 3 separate from unentered actual effort', () => {
-    expect(createPlannedSetFromSuggestedSet({ setId: 'source-set', sessionExerciseId: 'source-exercise', weightValue: '80', repsValue: '8', setType: 'rir_3' }))
-      .toMatchObject({ setType: null, plannedSetType: 'rir_3', performanceStatus: 'planned' });
+    const { session } = appendSuggestedPlan(
+      { dateTime: '2026-09-23 10:00', locationId: null, exercises: [] },
+      { id: 'def_bench', name: 'Bench Press' },
+      [{ setId: 'source-set', sessionExerciseId: 'source-exercise', weightValue: '80', repsValue: '8', setType: 'rir_3' }],
+      'planned-exercise'
+    );
+    expect(session.exercises[0].sets[0]).toMatchObject({
+      setType: null,
+      plannedSetType: 'rir_3',
+      performanceStatus: 'planned',
+    });
   });
 
   it('recognizes RIR 3 while preserving blank and rejecting unknown effort', () => {

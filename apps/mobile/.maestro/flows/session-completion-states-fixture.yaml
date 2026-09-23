@@ -191,3 +191,101 @@ appId: com.dinoderek.mobile
 - assertNotVisible:
     id: "session-completion-presentation"
 - takeScreenshot: "completed-edit-read-back"
+
+# Two PRs, the share preview and the share-image failure (moved here from the
+# deleted exercise-block-history flow, redesign 6b-3). The fixture's
+# newest completed session beats both the squat and the bench history, so the
+# completion screen lists two PRs side by side. `maestroShare=fail-once` makes
+# the first share-image render fail, so the preview shows its inline error; the
+# second opens the native share sheet, which is dismissed without a target.
+- openLink: "boga3://maestro-harness?fixture=completion-two-prs&teleport=completed-session&sessionId=maestro_m24_completion_two_prs&presentation=completion&maestroShare=fail-once"
+- tapOn:
+    text: "Open"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "session-completion-presentation"
+    timeout: 30000
+- assertVisible: "Session complete"
+- assertVisible: "Personal records"
+- assertVisible:
+    id: "session-completion-pr-seed_barbell_back_squat"
+- assertVisible:
+    id: "session-completion-pr-seed_barbell_bench_press"
+- assertNotVisible:
+    id: "session-completion-pr-pager"
+- takeScreenshot: "session-completion-multiple-prs-all"
+- scrollUntilVisible:
+    element:
+      id: "session-completion-context"
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
+- assertVisible:
+    id: "session-completion-sets"
+- scrollUntilVisible:
+    element:
+      id: "session-completion-exercise-volume"
+    direction: DOWN
+    visibilityPercentage: 80
+    centerElement: true
+- assertVisible: "Exercise volume"
+- scrollUntilVisible:
+    element:
+      id: "session-completion-share-session"
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
+- tapOn:
+    id: "session-completion-share-session"
+- waitForAnimationToEnd
+- takeScreenshot: "session-share-preview-all-prs"
+- tapOn:
+    point: "50%,89%"
+- waitForAnimationToEnd
+- takeScreenshot: "session-share-image-error"
+- tapOn:
+    point: "50%,89%"
+- extendedWaitUntil:
+    visible: "Copy"
+    timeout: 10000
+- takeScreenshot: "session-share-platform-share-sheet"
+# Dismiss without selecting a destination; this proves image launch/cancel only.
+- swipe:
+    start: "50%,55%"
+    end: "50%,95%"
+    duration: 500
+- extendedWaitUntil:
+    notVisible: "Copy"
+    timeout: 10000
+- tapOn:
+    point: "50%,95%"
+- extendedWaitUntil:
+    visible:
+      id: "session-completion-share-session"
+    timeout: 10000
+- scrollUntilVisible:
+    element:
+      id: "session-completion-context"
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
+- assertVisible:
+    id: "session-completion-muscle-breakdown"
+- assertVisible: "No mapped working sets for this session."
+- assertNotVisible:
+    id: "session-completion-view-muscle-load"
+- takeScreenshot: "session-completion-consolidated-summary"
+- scrollUntilVisible:
+    element:
+      id: "session-completion-done"
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
+- tapOn:
+    id: "session-completion-done"
+- extendedWaitUntil:
+    visible:
+      id: "stats-history-screen"
+    timeout: 30000
+- takeScreenshot: "session-completion-done"

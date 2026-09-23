@@ -360,6 +360,34 @@ describe('ExercisePageScreen', () => {
     expect(within(screen.getByTestId('exercise-set-logger')).getByText('Set 4')).toBeTruthy();
   });
 
+  // Ported from the old recorder's persistence tests: typing waits for the
+  // 3 s debounce, and leaving the page writes what is still pending.
+  it('saves typed values after the debounce, and flushes pending typing when the page goes', async () => {
+    const { client, stored } = createClient();
+    await renderPage(client);
+    jest.useFakeTimers();
+    try {
+      fireEvent.changeText(screen.getByTestId('exercise-set-logger-reps'), '4');
+      await act(async () => {
+        jest.advanceTimersByTime(2_900);
+      });
+      expect(client.persistSessionDraftSnapshot).not.toHaveBeenCalled();
+      await act(async () => {
+        jest.advanceTimersByTime(200);
+      });
+      expect(benchSets(stored())[2]).toMatchObject({ repsValue: '4', performanceStatus: 'planned' });
+
+      fireEvent.changeText(screen.getByTestId('exercise-set-logger-reps'), '3');
+      screen.unmount();
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(benchSets(stored())[2]).toMatchObject({ repsValue: '3', performanceStatus: 'planned' });
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('keeps the tick disabled until the values are a valid set', async () => {
     const { client } = createClient();
     await renderPage(client);
@@ -594,8 +622,6 @@ describe('ExercisePageScreen', () => {
 });
 
 describe('exercise page route', () => {
-  // It follows no setting: a completed session is edited here whatever the
-  // new-screens setting says.
   it('opens the page for the route params', async () => {
     render(<ExercisePageRoute />);
     // The real repository is not wired in this suite, so the page shows its

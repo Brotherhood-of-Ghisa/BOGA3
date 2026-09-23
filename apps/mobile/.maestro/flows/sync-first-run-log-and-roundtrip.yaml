@@ -123,29 +123,29 @@ appId: com.dinoderek.mobile
 - takeScreenshot: "17-first-run-roundtrip-bootstrapped"
 
 # === Phase B: log exactly one exercise in a session ===
-# Teleport to the recorder WITHOUT a data reset — the just-bootstrapped local DB
-# (seeded catalog + bootstrap flag) must be preserved; we only need to navigate.
-# No dev-menu/trust dismissal taps: this teleport runs in the already-loaded,
-# signed-in app (no clearState since Phase A), so no dialog renders.
-- openLink: "boga3://maestro-harness?teleport=session-recorder"
-# Depending on persisted draft restoration, teleporting to the recorder can land
-# either on the empty Start CTA or directly in an active empty recorder. Keep the
-# postcondition strict while accepting both entry states.
+# Through the real session UI, WITHOUT a data reset — the just-bootstrapped local
+# DB (seeded catalog + bootstrap flag) must be preserved: Train's Start opens the
+# session view, `+ Add exercise` the picker, the card the exercise page, whose
+# logger confirms the set; back on the session view, Finish completes it.
+- waitForAnimationToEnd:
+    timeout: 4000
 - retry:
     maxRetries: 3
     commands:
       - tapOn:
-          id: "start-session-button"
-          optional: true
+          id: "top-level-tab-train"
       - extendedWaitUntil:
           visible:
-            text: "No exercises logged yet."
-          timeout: 30000
+            id: "train-start-empty-button"
+          timeout: 15000
+- tapOn:
+    id: "train-start-empty-button"
 - extendedWaitUntil:
     visible:
-      text: "No exercises logged yet."
+      id: "session-view-add-exercise"
     timeout: 30000
-- tapOn: "Log new exercise"
+- tapOn:
+    id: "session-view-add-exercise"
 - tapOn: "Exercise picker options"
 - tapOn: "Turn grouping off"
 - tapOn: "Exercise picker options"
@@ -166,16 +166,40 @@ appId: com.dinoderek.mobile
     text: "Select exercise Barbell Back Squat"
 - tapOn:
     id: "exercise-picker-add-empty-set-button"
-- tapOn: "Weight for exercise 1 set 1"
+- extendedWaitUntil:
+    visible:
+      text: "Barbell Back Squat, 0 of 1 sets done"
+    timeout: 15000
+- tapOn:
+    text: "Barbell Back Squat, 0 of 1 sets done"
+- extendedWaitUntil:
+    visible:
+      id: "exercise-set-logger"
+    timeout: 15000
+- tapOn:
+    id: "exercise-set-logger-weight"
 - inputText: "135"
-- tapOn: "Reps for exercise 1 set 1"
+- tapOn:
+    id: "exercise-set-logger-reps"
 - inputText: "8"
 - hideKeyboard:
     optional: true
 - tapOn:
-    id: "set-performance-control-1-1"
-# One explicitly confirmed set submits straight through with no cleanup dialog.
-- tapOn: "Submit Session"
+    id: "exercise-set-logger-commit"
+- extendedWaitUntil:
+    visible:
+      id: "exercise-set-1-toggle"
+      text: "Mark set 1 not performed"
+    timeout: 10000
+- tapOn:
+    id: "exercise-page-back"
+- extendedWaitUntil:
+    visible:
+      text: "Barbell Back Squat, 1 of 1 sets done"
+    timeout: 15000
+# One explicitly confirmed set finishes straight through with no cleanup dialog.
+- tapOn:
+    id: "session-view-finish-button"
 - extendedWaitUntil:
     visible:
       id: "session-completion-presentation"

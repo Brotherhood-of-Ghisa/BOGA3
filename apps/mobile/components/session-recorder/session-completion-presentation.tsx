@@ -19,8 +19,10 @@ import type {
 
 import { ExercisePersonalRecordCelebration } from './exercise-personal-record-celebration';
 import { ExerciseVolumeComparisonRow } from './exercise-volume-comparison';
-import type { SessionMuscleLoadCatalogState } from './session-muscle-load';
 import { SessionSharePreview } from './session-share-preview';
+
+// The exercise catalogue's load state, which the muscle breakdown depends on.
+type MuscleCatalogState = 'loading' | 'ready' | 'error';
 
 type SessionCompletionPresentationProps = {
   completedAt: string;
@@ -32,7 +34,7 @@ type SessionCompletionPresentationProps = {
   personalRecords: ExercisePersonalRecord[];
   exerciseVolumeComparisons: ExerciseVolumeComparison[];
   muscleSummary: CurrentSessionMuscleSummary | null;
-  muscleCatalogState: SessionMuscleLoadCatalogState;
+  muscleCatalogState: MuscleCatalogState;
   shouldFailNextShare?: boolean;
   onDone: () => void;
 };
@@ -160,7 +162,6 @@ export function SessionCompletionPresentation({
                   key={personalRecord.setId}
                   personalRecord={personalRecord}
                   testID={`session-completion-pr-${personalRecord.exerciseDefinitionId}`}
-                  variant="compact"
                 />
               ))}
             </View>

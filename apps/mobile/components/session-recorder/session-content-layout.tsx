@@ -1,9 +1,7 @@
-import { Fragment, type ComponentProps, type ReactNode } from 'react';
+import { Fragment, type ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { UiSurface, UiText, uiColors, uiRadius, uiSpace } from '@/components/ui';
-import { ExercisePersonalRecordCelebration } from '@/components/session-recorder/exercise-personal-record-celebration';
-import type { ExercisePersonalRecord } from '@/src/session-insights';
 
 export type SessionContentSetValue = {
   id: string;
@@ -19,14 +17,12 @@ export type SessionContentExerciseValue<TSet extends SessionContentSetValue = Se
 type ExerciseCardCollapsedSummaryProps = {
   setCount: number;
   workingSetCount: number;
-  newPersonalRecord?: ExercisePersonalRecord | null;
   testID: string;
 };
 
 export function ExerciseCardCollapsedSummary({
   setCount,
   workingSetCount,
-  newPersonalRecord,
   testID,
 }: ExerciseCardCollapsedSummaryProps) {
   const setLabel = `${setCount} ${setCount === 1 ? 'set' : 'sets'}`;
@@ -37,18 +33,9 @@ export function ExerciseCardCollapsedSummary({
       <UiText variant="subtitle" testID={`${testID}-counts`}>
         {`${setLabel} · ${workingSetLabel}`}
       </UiText>
-      {newPersonalRecord ? (
-        <ExercisePersonalRecordCelebration
-          personalRecord={newPersonalRecord}
-          testID={`${testID}-new-pr`}
-          variant="collapsed"
-        />
-      ) : null}
     </View>
   );
 }
-
-type ExerciseCardProps = Omit<ComponentProps<typeof UiSurface>, 'children'>;
 
 type SessionContentLayoutProps<
   TSet extends SessionContentSetValue,
@@ -83,15 +70,6 @@ type SessionContentLayoutProps<
     exercise: TExercise;
     exerciseIndex: number;
   }) => ReactNode;
-  getExerciseCardProps?: (input: {
-    exercise: TExercise;
-    exerciseIndex: number;
-  }) => ExerciseCardProps;
-  renderExerciseFooter?: (input: {
-    exercise: TExercise;
-    exerciseIndex: number;
-  }) => ReactNode;
-  renderEmptyState?: (text: string) => ReactNode;
 };
 
 export function SessionContentLayout<
@@ -110,9 +88,6 @@ export function SessionContentLayout<
   renderSetHeader,
   renderExerciseHeaderAction,
   renderExerciseMeta,
-  getExerciseCardProps,
-  renderExerciseFooter,
-  renderEmptyState,
 }: SessionContentLayoutProps<TSet, TExercise>) {
   return (
     <>
@@ -134,7 +109,6 @@ export function SessionContentLayout<
 
       <View style={styles.exerciseList}>
         {exercises.map((exercise, exerciseIndex) => {
-          const exerciseCardProps = getExerciseCardProps?.({ exercise, exerciseIndex });
           const isCollapsed = collapsedExerciseIds?.has(exercise.id) ?? false;
           const exerciseDisplayName = exercise.name || `Exercise ${exerciseIndex + 1}`;
           const headerText = (
@@ -177,10 +151,7 @@ export function SessionContentLayout<
           );
 
           return (
-            <UiSurface
-              key={exercise.id}
-              {...exerciseCardProps}
-              style={[styles.exerciseCard, exerciseCardProps?.style]}>
+            <UiSurface key={exercise.id} style={styles.exerciseCard}>
               <View style={styles.exerciseCardHeader}>
                 {onToggleExerciseCollapse ? (
                   <Pressable
@@ -216,19 +187,11 @@ export function SessionContentLayout<
                   ))}
                 </View>
               ) : null}
-
-              {!isCollapsed && renderExerciseFooter ? renderExerciseFooter({ exercise, exerciseIndex }) : null}
             </UiSurface>
           );
         })}
 
-        {exercises.length === 0
-          ? renderEmptyState
-            ? renderEmptyState(emptyExercisesText)
-            : (
-              <UiText variant="bodyMuted">{emptyExercisesText}</UiText>
-            )
-          : null}
+        {exercises.length === 0 ? <UiText variant="bodyMuted">{emptyExercisesText}</UiText> : null}
       </View>
     </>
   );

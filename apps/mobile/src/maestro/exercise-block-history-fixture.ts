@@ -24,6 +24,9 @@ export const EXERCISE_BLOCK_HISTORY_FIXTURE = {
   onePrCompletionSessionId: 'maestro_m24_completion_one_pr',
   noPrCompletionSessionId: 'maestro_m24_completion_no_pr',
   unmappedCompletionSessionId: 'maestro_m24_completion_unmapped',
+  // Seeded only by the `completion-two-prs` fixture, so the shared history
+  // (and the Stats totals flows assert on it) stays as it is.
+  twoPrCompletionSessionId: 'maestro_m24_completion_two_prs',
   unmappedExerciseId: 'maestro_m24_unmapped_exercise',
   unmappedExerciseName: 'Unmapped Carry',
 } as const;
@@ -330,7 +333,53 @@ const sessionInputs: FixtureSessionInput[] = [
   },
 ];
 
-export const buildExerciseBlockHistoryFixtureRows = (now: Date = new Date()) => {
+// The newest completed session: a squat and a bench set that both beat their
+// history, so its completion screen shows two PRs. Neither set has an effort,
+// so no set is a working set and the muscle breakdown has nothing mapped.
+const twoPrSessionInputs: FixtureSessionInput[] = [
+  {
+    id: EXERCISE_BLOCK_HISTORY_FIXTURE.twoPrCompletionSessionId,
+    daysAgo: 0.1,
+    exerciseBlocks: [
+      {
+        id: 'maestro_m24_completion_two_prs_squat',
+        exerciseDefinitionId: EXERCISE_BLOCK_HISTORY_FIXTURE.primaryExerciseId,
+        name: EXERCISE_BLOCK_HISTORY_FIXTURE.primaryExerciseName,
+        orderIndex: 0,
+        sets: [
+          {
+            id: 'maestro_m24_completion_two_prs_squat_set',
+            orderIndex: 0,
+            weightValue: '300',
+            repsValue: '5',
+            setType: null,
+          },
+        ],
+      },
+      {
+        id: 'maestro_m24_completion_two_prs_bench',
+        exerciseDefinitionId: EXERCISE_BLOCK_HISTORY_FIXTURE.secondaryExerciseId,
+        name: EXERCISE_BLOCK_HISTORY_FIXTURE.secondaryExerciseName,
+        orderIndex: 1,
+        sets: [
+          {
+            id: 'maestro_m24_completion_two_prs_bench_set',
+            orderIndex: 0,
+            weightValue: '300',
+            repsValue: '5',
+            setType: null,
+          },
+        ],
+      },
+    ],
+  },
+];
+
+export const buildExerciseBlockHistoryFixtureRows = (
+  now: Date = new Date(),
+  { includeTwoPrSession = false }: { includeTwoPrSession?: boolean } = {}
+) => {
+  const inputs = includeTwoPrSession ? [...sessionInputs, ...twoPrSessionInputs] : sessionInputs;
   const gym = {
     id: EXERCISE_BLOCK_HISTORY_FIXTURE.gymId,
     name: 'Maestro Block History Gym',
@@ -342,7 +391,7 @@ export const buildExerciseBlockHistoryFixtureRows = (now: Date = new Date()) => 
     updatedAt: now,
   };
 
-  const sessionRows = sessionInputs.map((session) => {
+  const sessionRows = inputs.map((session) => {
     const completedAt = completedAtForDaysAgo(now, session.daysAgo);
     return {
       id: session.id,
@@ -357,7 +406,7 @@ export const buildExerciseBlockHistoryFixtureRows = (now: Date = new Date()) => 
     };
   });
 
-  const sessionExerciseRows = sessionInputs.flatMap((session) => {
+  const sessionExerciseRows = inputs.flatMap((session) => {
     const completedAt = completedAtForDaysAgo(now, session.daysAgo);
     return session.exerciseBlocks.map((block) => ({
       id: block.id,
@@ -371,7 +420,7 @@ export const buildExerciseBlockHistoryFixtureRows = (now: Date = new Date()) => 
     }));
   });
 
-  const setRows = sessionInputs.flatMap((session) => {
+  const setRows = inputs.flatMap((session) => {
     const completedAt = completedAtForDaysAgo(now, session.daysAgo);
     return session.exerciseBlocks.flatMap((block) =>
       block.sets.map((set) => ({
@@ -410,12 +459,14 @@ export const buildExerciseBlockHistoryFixtureRows = (now: Date = new Date()) => 
 export const seedExerciseBlockHistoryFixture = async ({
   database,
   now = new Date(),
+  includeTwoPrSession = false,
 }: {
   database?: LocalDatabase;
   now?: Date;
+  includeTwoPrSession?: boolean;
 } = {}) => {
   const targetDatabase = database ?? (await bootstrapLocalDataLayer());
-  const rows = buildExerciseBlockHistoryFixtureRows(now);
+  const rows = buildExerciseBlockHistoryFixtureRows(now, { includeTwoPrSession });
   const sessionIds = rows.sessions.map((row) => row.id);
   const sessionExerciseIds = rows.sessionExercises.map((row) => row.id);
   const setIds = rows.exerciseSets.map((row) => row.id);

@@ -31,19 +31,18 @@
 
 ## Exercise-tag coverage policy
 
-- Applies to exercise-tag schema/repository/UI work in the mobile local runtime.
+- Applies to exercise-tag schema/sync/read work in the mobile local runtime.
+  Tags are read-only in the app since redesign 6b (the tag editor went with the
+  old recorder): they arrive by sync, and completed sessions and exercise
+  history show them.
 - Required coverage should include:
   - schema/migration assertions for `exercise_tag_definitions`,
     `session_exercise_tags`, and durable
     `session_exercises.exercise_definition_id` linkage,
-  - repository/domain assertions for normalized duplicate prevention, scoped
-    attach validation, and assignment uniqueness,
-  - assignment-history semantics (soft-deleted tag definitions hidden from default
-    suggestions but existing assignments remain queryable),
-  - recorder interaction assertions (add/select/create/manage rename/delete/
-    undelete, chip removal) and completed-edit parity.
-- Use targeted Jest coverage; require `./boga test frontend` when
-  runtime-sensitive recorder tag behavior changes.
+  - the reader (`listSessionExerciseAssignedTags`) hiding tombstoned
+    assignments,
+  - session-graph rebuilds re-dirtying a preserved assignment and tombstoning
+    one whose exercise changed.
 
 ## Mobile auth bootstrap coverage policy
 

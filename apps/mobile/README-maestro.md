@@ -139,17 +139,15 @@ Data-runtime smoke lane:
 TASK_ID=T-20260301-05 npm run test:e2e:ios:data-smoke
 ```
 
-Infra-free UI regression lane (Stats screen, session-completion states, exercise
-block history, Settings dev wipe-local, Settings new-screens toggle — five flows
-sharing one sim + Metro):
+Infra-free UI regression lane (Stats screen, session-completion states,
+Settings dev wipe-local — three flows sharing one sim + Metro):
 
 ```bash
 TASK_ID=ad-hoc npm run test:e2e:ios:ui-regression
 ```
 
 Session view lane (redesign step 5; infra-free; two flows sharing one sim +
-Metro, each seeding with `reset=data&fixture=session-view`, the new-screens
-setting at its default, On):
+Metro, each seeding with `reset=data&fixture=session-view`):
 
 ```bash
 TASK_ID=ad-hoc npm run test:e2e:ios:session-view
@@ -176,13 +174,12 @@ cd ../..
 
 ## Reset rules
 
-- `smoke` uses `full reset` plus harness `teleport` to the recorder.
-- `data-smoke` uses harness `data reset` plus `teleport`.
+- `smoke` uses `full reset` and navigates through the real tabs (Train's Start opens the session view).
+- `data-smoke` uses harness `data reset` plus `teleport` to Stats, then logs a workout through Train, the session view and the exercise page.
 - `ui-regression` provisions with `data reset`; each of its flows resets what it
   needs in-flow through `boga3://maestro-harness?reset=data`, which is what makes
   them safe to share one app install.
-- `session-view` works the same way; its flows also end with a data reset, so
-  the new-screens setting is left at its default (On).
+- `session-view` works the same way; its flows also end with a data reset.
 - Use `full reset` only when cold-install/onboarding/permission behavior is part of the objective.
 - Use `data reset` when app-owned persisted state must be cleared without reinstalling the binary.
 - Use `teleport` as the default navigation/setup method when the flow is not explicitly testing setup UI.

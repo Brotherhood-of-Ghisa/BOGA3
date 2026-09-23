@@ -56,7 +56,6 @@ const SEGMENT_TO_MAIN_TAB: Readonly<Record<string, MainTabKey>> = {
   progress: 'progress',
   more: 'more',
   // Preserved legacy roots keep an explicit canonical owner.
-  'session-recorder': 'train',
   'stats-history': 'progress',
   'exercise-catalog': 'more',
   groups: 'more',
@@ -83,11 +82,6 @@ export function resolveMainTab(segments: readonly string[]): MainTabKey | null {
   }
 
   return null;
-}
-
-/** Focused recorder work defaults the persistent tray to its collapsed peek state. */
-export function shouldCollapseMainNavigation(segments: readonly string[]): boolean {
-  return normalizedRouteSegments(segments).includes('session-recorder');
 }
 
 /**

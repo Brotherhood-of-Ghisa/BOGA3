@@ -6,13 +6,16 @@
  *
  * The push side of sync only ships rows whose dirty bit is set; a write path
  * that forgets to flip the bit silently drops the user's edit from sync. This
- * file asserts the contract once per entity table (all ten), exercising the
- * canonical create / update / soft-delete path the app actually uses and then
- * asserting the persisted row has `local_dirty = 1` and a positive monotonic
- * `local_updated_at_ms`. The ten per-entity checks together cover the whole
- * entity surface. `muscle_groups` has no user-facing write path this iteration
- * (it is system-seeded only), so its write path is the starter-catalog seeder —
- * which must land its rows dirty just like the rest of the catalog.
+ * file asserts the contract once per entity table the app writes, exercising
+ * the canonical create / update / soft-delete path the app actually uses and
+ * then asserting the persisted row has `local_dirty = 1` and a positive
+ * monotonic `local_updated_at_ms`. `muscle_groups` has no user-facing write
+ * path this iteration (it is system-seeded only), so its write path is the
+ * starter-catalog seeder — which must land its rows dirty just like the rest of
+ * the catalog. `exercise_tag_definitions` has no app write path at all since
+ * the tag editor went with the old recorder (redesign 6b): tags arrive by sync
+ * only. Their `session_exercise_tags` join rows are still rewritten when a
+ * session graph is re-saved, so that is their write path here.
  *
  * One case is called out explicitly: reordering two sibling exercise sets must
  * dirty BOTH rows in the same transaction, otherwise a half-applied reorder
@@ -57,7 +60,6 @@ import {
   seedSystemExerciseCatalog,
 } from '@/src/data/exercise-catalog-seeds';
 import { linkExercise, unlinkExercise } from '@/src/data/exercise-group-links';
-import { createDrizzleExerciseTagStore } from '@/src/data/exercise-tags';
 import { upsertLocalGym } from '@/src/data/local-gyms';
 import {
   exerciseDefinitions,
@@ -191,26 +193,6 @@ describe('every entity write path flips the dirty bit in the write transaction',
       expect(row.localDirty).toBe(true);
       expect(row.localUpdatedAtMs ?? 0).toBeGreaterThan(0);
     }
-  });
-
-  it('exercise_tag_definitions — create flips local_dirty and stamps a positive timestamp', async () => {
-    seedExerciseDefinition();
-    const store = createDrizzleExerciseTagStore();
-
-    const created = await store.createTagDefinition({
-      exerciseDefinitionId: EXERCISE_DEFINITION_ID,
-      name: 'Heavy',
-      normalizedName: 'heavy',
-      now: new Date('2026-05-30T10:00:00.000Z'),
-    });
-
-    const row = db()
-      .select()
-      .from(exerciseTagDefinitions)
-      .where(eq(exerciseTagDefinitions.id, created.id))
-      .get();
-    expect(row?.localDirty).toBe(true);
-    expect(row?.localUpdatedAtMs ?? 0).toBeGreaterThan(0);
   });
 
   it('exercise_group_links — link and unlink each flip local_dirty and stamp a newer timestamp', async () => {
@@ -370,7 +352,7 @@ describe('every entity write path flips the dirty bit in the write transaction',
     expect(byId.get('set-a')?.localDirty).toBe(true);
   });
 
-  it('session_exercise_tags — creating a tag assignment dirties the join row', async () => {
+  it('session_exercise_tags — re-saving the session graph re-dirties a synced tag assignment', async () => {
     // FK parents: a persisted session_exercise and a tag definition.
     seedSession();
     seedExerciseDefinition();
@@ -394,10 +376,23 @@ describe('every entity write path flips the dirty bit in the write transaction',
       })
       .run();
 
-    const store = createDrizzleExerciseTagStore();
-    await store.createTagAssignment({
-      sessionExerciseId: 'sx-with-tag',
-      tagDefinitionId: 'tag-def-1',
+    // A synced, clean assignment.
+    db()
+      .insert(sessionExerciseTags)
+      .values({
+        id: 'tag-assignment-1',
+        sessionExerciseId: 'sx-with-tag',
+        exerciseTagDefinitionId: 'tag-def-1',
+        localDirty: false,
+      })
+      .run();
+
+    await createDrizzleSessionDraftStore().saveDraftGraph({
+      sessionId: SESSION_ID,
+      gymId: null,
+      status: 'active',
+      startedAt: new Date('2026-05-30T10:00:00.000Z'),
+      exercises: [draftExercise('sx-with-tag', 'Bench Press')],
       now: new Date('2026-05-30T10:03:00.000Z'),
     });
 

@@ -47,7 +47,6 @@ jest.mock('@/src/data/bootstrap', () => ({
 
 // Imported AFTER the mock so the store picks up the mocked bootstrap.
 import { createDrizzleSessionDraftStore } from '@/src/data/session-drafts';
-import { createDrizzleExerciseTagStore } from '@/src/data/exercise-tags';
 import { __resetClockForTests } from '@/src/data/clock';
 
 const SESSION_ID = 'session-reconcile';
@@ -256,9 +255,8 @@ describe('session-graph rebuild reconcile + tombstone', () => {
     expect(liveExercises(mockActiveDatabase!).map((row) => row.id)).toEqual(['exercise-drop', 'exercise-keep']);
   });
 
-  it('tombstones and revives a session-exercise tag across a rebuild', async () => {
+  it('tombstones a synced session-exercise tag when a rebuild changes its exercise', async () => {
     const draftStore = createDrizzleSessionDraftStore();
-    const tagStore = createDrizzleExerciseTagStore();
     await draftStore.saveDraftGraph({
       sessionId: SESSION_ID,
       gymId: null,
@@ -267,11 +265,11 @@ describe('session-graph rebuild reconcile + tombstone', () => {
       exercises: [draftExercise({ id: 'exercise-keep', name: 'Bench Press' })],
       now: new Date('2026-05-30T10:01:00.000Z'),
     });
-    await tagStore.createTagAssignment({
-      sessionExerciseId: 'exercise-keep',
-      tagDefinitionId: TAG_DEFINITION_ID,
-      now: new Date('2026-05-30T10:01:30.000Z'),
-    });
+    // Tags arrive by sync only (the app's tag editor went with the old recorder).
+    mockActiveDatabase!
+      .insert(sessionExerciseTags)
+      .values({ id: 'tag-assignment-1', sessionExerciseId: 'exercise-keep', exerciseTagDefinitionId: TAG_DEFINITION_ID })
+      .run();
     expect(tagFor(mockActiveDatabase!, 'exercise-keep')?.deletedAt).toBeNull();
 
     // Change the exercise definition on the same row id: the tag no longer
@@ -289,18 +287,7 @@ describe('session-graph rebuild reconcile + tombstone', () => {
     const tombstoned = tagFor(mockActiveDatabase!, 'exercise-keep');
     expect(tombstoned?.deletedAt).not.toBeNull();
     expect(tombstoned?.localDirty).toBe(true);
-    const tombstonedId = tombstoned?.id;
-
-    // Re-attach via the tag repo: the unique slot is revived in place.
-    await tagStore.createTagAssignment({
-      sessionExerciseId: 'exercise-keep',
-      tagDefinitionId: TAG_DEFINITION_ID,
-      now: new Date('2026-05-30T10:03:00.000Z'),
-    });
-    const revived = tagFor(mockActiveDatabase!, 'exercise-keep');
-    expect(revived?.id).toBe(tombstonedId);
-    expect(revived?.deletedAt).toBeNull();
-    expect(revived?.localDirty).toBe(true);
+    expect(tombstoned?.id).toBe('tag-assignment-1');
   });
 
   it('reorders survivors while a tombstone is parked, holding the unique (parent, order_index) invariant', async () => {
