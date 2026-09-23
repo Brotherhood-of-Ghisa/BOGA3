@@ -125,6 +125,8 @@ const formatSetEffortLabel = (setType: SessionSetTypeValue): string => {
       return 'RIR 1';
     case 'rir_2':
       return 'RIR 2';
+    case 'rir_3':
+      return 'RIR 3';
     default:
       return '-';
   }

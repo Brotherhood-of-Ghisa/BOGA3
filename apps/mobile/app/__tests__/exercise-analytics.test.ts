@@ -189,18 +189,19 @@ describe('aggregateExerciseWeeklyEffort', () => {
     }
   });
 
-  it('counts workingSetCount for rir_0, rir_1, rir_2 only', () => {
+  it('counts all RIR efforts, including RIR 3, as working sets', () => {
     const sessions = [
       makeSession('2026-05-18T10:00:00Z', [
         { setType: 'rir_0', weight: 100, reps: 5 },
         { setType: 'rir_1', weight: 100, reps: 5 },
         { setType: 'rir_2', weight: 100, reps: 5 },
+        { setType: 'rir_3', weight: 100, reps: 5 },
         { setType: null, weight: 100, reps: 5 },
         { setType: 'warm_up', weight: 60, reps: 10 },
       ]),
     ];
     const result = aggregateExerciseWeeklyEffort(sessions, TZ);
-    expect(result[0].workingSetCount).toBe(3);
+    expect(result[0].workingSetCount).toBe(4);
   });
 
   it('excludes unconfirmed sets from weekly and daily effort', () => {

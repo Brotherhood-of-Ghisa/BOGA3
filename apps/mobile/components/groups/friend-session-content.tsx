@@ -19,7 +19,7 @@ import {
 type FriendSet = { id: string; weightLabel: string; reps: number; effortLabel: string; working: boolean };
 type FriendExercise = { id: string; name: string; machineName: string | null; sets: FriendSet[] };
 
-const EFFORT_LABELS: Record<string, string> = { warm_up: 'W-Up', rir_0: 'RIR 0', rir_1: 'RIR 1', rir_2: 'RIR 2' };
+const EFFORT_LABELS: Record<string, string> = { warm_up: 'W-Up', rir_0: 'RIR 0', rir_1: 'RIR 1', rir_2: 'RIR 2', rir_3: 'RIR 3' };
 
 /** View Session's effort column wording. */
 export const formatGroupSetEffort = (setType: string | null): string =>

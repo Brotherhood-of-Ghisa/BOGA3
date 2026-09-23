@@ -53,7 +53,7 @@ export type BogaImportExerciseTarget =
       exerciseName: string;
     };
 
-export const BOGA_IMPORT_SET_TYPES = ['warm_up', 'rir_0', 'rir_1', 'rir_2'] as const;
+export const BOGA_IMPORT_SET_TYPES = ['warm_up', 'rir_0', 'rir_1', 'rir_2', 'rir_3'] as const;
 
 export type BogaImportSetType = (typeof BOGA_IMPORT_SET_TYPES)[number] | null;
 
@@ -326,7 +326,7 @@ export const validateBogaSessionImportPackage = (
             }
             if (!isValidBogaImportSetType(set.setType)) {
               errors.push(
-                `sessions[${sessionIndex}].exercises[${exerciseIndex}].sets[${setIndex}].setType must be warm_up|rir_0|rir_1|rir_2|null`
+                `sessions[${sessionIndex}].exercises[${exerciseIndex}].sets[${setIndex}].setType must be warm_up|rir_0|rir_1|rir_2|rir_3|null`
               );
             }
           });

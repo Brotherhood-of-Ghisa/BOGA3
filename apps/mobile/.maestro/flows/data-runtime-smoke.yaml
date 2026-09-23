@@ -66,7 +66,20 @@ appId: com.dinoderek.mobile
     text: "Select exercise Barbell Back Squat"
 - tapOn:
     id: "exercise-picker-add-empty-set-button"
+- assertVisible: "Quality for exercise 1 set 1: W-Up"
 - takeScreenshot: "set-performance-normal-invalid"
+- tapOn:
+    id: "set-quality-button-1-1"
+- assertVisible: "Quality for exercise 1 set 1: none"
+- takeScreenshot: "effort-blank"
+- tapOn:
+    id: "set-quality-button-1-1"
+- assertVisible: "Quality for exercise 1 set 1: RIR 3"
+- takeScreenshot: "effort-rir3"
+- longPressOn:
+    id: "set-quality-button-1-1"
+- tapOn: "Choose W-Up set type"
+
 - tapOn: "Weight for exercise 1 set 1"
 - inputText: "135"
 - tapOn: "Reps for exercise 1 set 1"

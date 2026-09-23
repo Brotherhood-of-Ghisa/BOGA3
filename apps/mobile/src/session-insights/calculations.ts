@@ -1,3 +1,4 @@
+import { isWorkingSessionSetType } from '@/src/data/set-types';
 import {
   collectMuscleSetContributions,
   countMuscleAnalyticsPerformedSets,
@@ -171,8 +172,7 @@ const isEligiblePerformedSet = (set: SessionInsightSetInput): boolean =>
   parseSetWeight(set.weightValue) !== null &&
   parseSetReps(set.repsValue) !== null;
 
-const isWorkingSetType = (setType: string | null): boolean =>
-  setType === 'rir_0' || setType === 'rir_1' || setType === 'rir_2';
+const isWorkingSetType = isWorkingSessionSetType;
 
 export const calculateLinearPercentile = (sortedValues: number[], percentile: number): number => {
   if (sortedValues.length === 0) {

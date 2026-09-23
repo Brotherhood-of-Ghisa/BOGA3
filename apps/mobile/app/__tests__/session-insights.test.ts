@@ -247,7 +247,7 @@ describe('summarizeCurrentSessionMuscleLoad', () => {
               insightSet('zero-load-working', {
                 weightValue: '0',
                 repsValue: '10',
-                setType: 'rir_2',
+                setType: 'rir_3',
               }),
             ],
           }),
@@ -393,7 +393,7 @@ describe('deriveSessionExerciseVolumeComparisons', () => {
           exerciseDefinitionId: 'bench',
           exerciseName: 'Bench Press',
           sets: [
-            insightSet('working', { weightValue: '120', repsValue: '5', setType: 'rir_1' }),
+            insightSet('working', { weightValue: '120', repsValue: '5', setType: 'rir_3' }),
             insightSet('deleted', { weightValue: '500', repsValue: '5', deletedAt: AT }),
           ],
         }),

@@ -65,8 +65,10 @@ appId: com.dinoderek.mobile
 - tapOn: "Reps for exercise 1 set 1"
 - eraseText
 - inputText: "5"
-- tapOn:
+# This scenario proves warm-ups still qualify for PRs, not a particular cycle position.
+- longPressOn:
     id: "set-quality-button-1-1"
+- tapOn: "Choose W-Up set type"
 - hideKeyboard:
     optional: true
 - tapOn:

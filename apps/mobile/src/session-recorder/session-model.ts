@@ -5,7 +5,7 @@ import type {
   SessionGraphSnapshot,
 } from '@/src/data';
 import type { SessionInsightExerciseInput } from '@/src/session-insights';
-import { normalizeSessionSetType, type SessionSetType, type SessionSetTypeValue } from '@/src/data/set-types';
+import { defaultSessionSetType, normalizeSessionSetType, type SessionSetType, type SessionSetTypeValue } from '@/src/data/set-types';
 import {
   canonicalizeSetValues,
   canonicalizeWeightForReps,
@@ -179,7 +179,7 @@ export function createEmptySet(): SessionSet {
     id: createSetId(),
     reps: '',
     weight: '',
-    setType: null,
+    setType: defaultSessionSetType(undefined),
     plannedReps: null,
     plannedWeight: null,
     plannedSetType: null,
@@ -196,7 +196,7 @@ export function createSetFromPrevious(previousSet: SessionSet | undefined): Sess
     id: createSetId(),
     reps: previousSet.reps,
     weight: previousSet.weight,
-    setType: normalizeSessionSetType(previousSet.setType),
+    setType: defaultSessionSetType(normalizeSessionSetType(previousSet.setType)),
     plannedReps: null,
     plannedWeight: null,
     plannedSetType: null,
@@ -449,6 +449,7 @@ export const SET_TYPE_MENU_LABELS: Record<SessionSetType, string> = {
   rir_0: 'RIR 0',
   rir_1: 'RIR 1',
   rir_2: 'RIR 2',
+  rir_3: 'RIR 3',
 };
 
 export const getSetQualityDisplayLabel = (setType: SessionSetTypeValue): string =>

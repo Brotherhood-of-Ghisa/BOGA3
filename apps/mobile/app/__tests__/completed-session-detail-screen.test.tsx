@@ -67,10 +67,7 @@ jest.mock('@/src/data', () => ({
   loadLocalGymById: jest.fn(),
   loadSessionSnapshotById: jest.fn(),
   appendCompletedSessionExerciseAsPlanned: jest.fn(),
-  isWorkingSessionSetType: (value: unknown) =>
-    value === 'rir_0' || value === 'rir_1' || value === 'rir_2',
-  normalizeSessionSetType: (value: unknown) =>
-    value === 'warm_up' || value === 'rir_0' || value === 'rir_1' || value === 'rir_2' ? value : null,
+  ...jest.requireActual('@/src/data/set-types'),
   setSessionDeletedState: jest.fn(),
 }));
 
@@ -152,7 +149,7 @@ const COMPLETED_SESSION_DETAIL_FIXTURE: CompletedSessionDetailRecord = {
         { id: 'set-1', weight: '135', reps: '8', setType: 'warm_up' },
         { id: 'set-2', weight: '185', reps: '8', setType: 'rir_0' },
         { id: 'set-3', weight: '185', reps: '6', setType: 'rir_1' },
-        { id: 'set-4', weight: '185', reps: '5', setType: 'rir_2' },
+        { id: 'set-4', weight: '185', reps: '5', setType: 'rir_3' },
       ],
     },
     {
@@ -718,7 +715,7 @@ describe('CompletedSessionDetailScreenShell', () => {
     expect(screen.getByText('W-Up')).toBeTruthy();
     expect(screen.getByText('RIR 0')).toBeTruthy();
     expect(screen.getByText('RIR 1')).toBeTruthy();
-    expect(screen.getByText('RIR 2')).toBeTruthy();
+    expect(screen.getByText('RIR 3')).toBeTruthy();
     expect(screen.getByText('-')).toBeTruthy();
     expect(screen.getByText('Bench Press')).toBeTruthy();
     expect(screen.getByText('Flat Bench')).toBeTruthy();

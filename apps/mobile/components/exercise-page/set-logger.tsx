@@ -29,6 +29,7 @@ type SetLoggerProps = {
   setType: SessionSetTypeValue;
   onChangeWeight: (value: string) => void;
   onChangeReps: (value: string) => void;
+  onCycleEffort: () => void;
   onOpenEffort: () => void;
   onCommit: () => void;
 };
@@ -46,7 +47,7 @@ const DASH = '—';
  * values are a valid set.
  */
 export const SetLogger = forwardRef<TextInput, SetLoggerProps>(function SetLogger(
-  { number, weightValue, repsValue, setType, onChangeWeight, onChangeReps, onOpenEffort, onCommit },
+  { number, weightValue, repsValue, setType, onChangeWeight, onChangeReps, onCycleEffort, onOpenEffort, onCommit },
   weightInputRef
 ) {
   const { oneRepMax, volume } = previewMetrics(weightValue, repsValue);
@@ -94,7 +95,9 @@ export const SetLogger = forwardRef<TextInput, SetLoggerProps>(function SetLogge
         <Pressable
           accessibilityLabel={`Change effort, currently ${effort === DASH ? 'none' : effort}`}
           accessibilityRole="button"
-          onPress={onOpenEffort}
+          accessibilityHint="Double tap to cycle effort. Long press to choose from all options."
+          onPress={onCycleEffort}
+          onLongPress={onOpenEffort}
           style={[styles.field, styles.effortField]}
           testID="exercise-set-logger-effort">
           <Text style={pageText.microLabel}>Effort</Text>

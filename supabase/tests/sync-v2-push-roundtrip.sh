@@ -260,7 +260,7 @@ BATCH_PAYLOAD="$(jq -nc \
     # Layer 3.
     {type: "exercise_sets", id: $set, client_updated_at_ms: $ts,
      fields: {session_exercise_id: $sx, order_index: 0,
-              weight_value: "100", reps_value: "8", set_type: "rir_2",
+              weight_value: "100", reps_value: "8", set_type: "rir_3",
               created_at: $ts, updated_at: $ts, deleted_at: null}},
     {type: "session_exercise_tags", id: $sxtag, client_updated_at_ms: $ts,
      fields: {session_exercise_id: $sx, exercise_tag_definition_id: $etd,

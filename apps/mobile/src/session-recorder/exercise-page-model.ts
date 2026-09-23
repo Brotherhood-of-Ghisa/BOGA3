@@ -1,5 +1,5 @@
 import type { SessionDraftSetSnapshot } from '@/src/data/session-drafts';
-import type { SessionSetTypeValue } from '@/src/data/set-types';
+import { defaultSessionSetType, SESSION_SET_TYPE_CYCLE, type SessionSetTypeValue } from '@/src/data/set-types';
 import {
   computeSetVolume,
   estimateOneRepMax,
@@ -49,13 +49,13 @@ export type ExerciseRecordBaseline = {
 
 const EFFORT_LABELS: Record<Exclude<SessionSetTypeValue, null>, string> = {
   warm_up: 'W-Up',
+  rir_3: 'RIR 3',
   rir_2: 'RIR 2',
   rir_1: 'RIR 1',
   rir_0: 'RIR 0',
 };
 
-// Picker order: easiest to hardest, as drawn.
-export const EFFORT_OPTIONS = ['warm_up', 'rir_2', 'rir_1', 'rir_0'] as const;
+export const EFFORT_OPTIONS = SESSION_SET_TYPE_CYCLE;
 
 export const formatEffort = (setType: SessionSetTypeValue): string =>
   setType ? EFFORT_LABELS[setType] : '—';
@@ -95,7 +95,7 @@ export const displayedValues = (
     return {
       weightValue: set.weightValue,
       repsValue: set.repsValue,
-      setType: set.setType ?? set.plannedSetType ?? null,
+      setType: set.setType,
     };
   }
   return {
@@ -276,7 +276,7 @@ export const createLocalSetId = () =>
   `set-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 
 /**
- * `+ Add set`: a new ad-hoc row copying the last row's values and effort, not
+ * `+ Add set`: copies the last row's values and applies effort defaults, not
  * performed until ticked (`ux-rules.md` §5.11).
  */
 export const addSet = (sets: ExercisePageSet[], id: string = createLocalSetId()): ExercisePageSet[] => {
@@ -288,7 +288,7 @@ export const addSet = (sets: ExercisePageSet[], id: string = createLocalSetId())
       id,
       weightValue: copied.weightValue,
       repsValue: copied.repsValue,
-      setType: copied.setType,
+      setType: defaultSessionSetType(last ? copied.setType : undefined),
       plannedWeightValue: null,
       plannedRepsValue: null,
       plannedSetType: null,

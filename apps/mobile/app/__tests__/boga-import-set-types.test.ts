@@ -168,8 +168,9 @@ describe('BOGA import set type enrichment', () => {
   it('validates enriched set types and rejects unsupported values', () => {
     const validPackage = enrichBogaImportSetTypes(makePackage([{ orderIndex: 0, setType: null }]));
     expect(validateBogaSessionImportPackage(validPackage).ok).toBe(true);
+    expect(validateBogaSessionImportPackage(makePackage([{ orderIndex: 0, setType: 'rir_3' }])).ok).toBe(true);
     expect(validateBogaSessionImportPackage(makePackage([{ orderIndex: 0, setType: 'drop_set' }])).errors).toContain(
-      'sessions[0].exercises[0].sets[0].setType must be warm_up|rir_0|rir_1|rir_2|null'
+      'sessions[0].exercises[0].sets[0].setType must be warm_up|rir_0|rir_1|rir_2|rir_3|null'
     );
   });
 });

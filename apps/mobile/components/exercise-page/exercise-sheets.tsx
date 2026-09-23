@@ -12,8 +12,7 @@ type EffortSheetProps = {
   onDismiss: () => void;
 };
 
-// Four efforts, the current one marked. Only opened when deviating from the
-// planned effort the logger already defaults to (build spec, "Sheets").
+// Long-press alternative to cycling, including an explicit blank effort.
 export function EffortSheet({ visible, selected, onSelect, onDismiss }: EffortSheetProps) {
   return (
     <Sheet
@@ -26,11 +25,11 @@ export function EffortSheet({ visible, selected, onSelect, onDismiss }: EffortSh
         const isSelected = option === selected;
         return (
           <ListRow
-            key={option}
-            label={formatEffort(option)}
+            key={option ?? 'none'}
+            label={option === null ? 'None' : formatEffort(option)}
             onPress={() => onSelect(option)}
             selected={isSelected}
-            testID={`exercise-effort-option-${option}`}
+            testID={`exercise-effort-option-${option ?? 'none'}`}
             trailing={isSelected ? <Icon color={uiRoles.accent} name="check" /> : undefined}
           />
         );

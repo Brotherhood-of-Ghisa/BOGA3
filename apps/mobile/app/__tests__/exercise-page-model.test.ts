@@ -214,8 +214,30 @@ describe('exercise page model', () => {
     expect(addSet([], 'first')[0]).toMatchObject({
       weightValue: '',
       repsValue: '',
-      setType: null,
+      setType: 'warm_up',
     });
+  });
+
+  it.each(['warm_up', null, 'rir_3', 'rir_2', 'rir_1', 'rir_0'] as const)(
+    'defaults the next effort after %s without changing the previous row', (previous) => {
+      const first = performedSet('first', '50', '8', previous);
+      const result = addSet([first], 'next');
+      expect(result[0]).toBe(first);
+      expect(result[1]).toMatchObject({
+        weightValue: '50', repsValue: '8', performanceStatus: 'unperformed',
+        setType: previous === 'warm_up' ? null : previous,
+      });
+    }
+  );
+
+  it('keeps an explicitly cleared planned effort blank through edits and confirmation', () => {
+    const sets = [plannedSet('p', '80', '6', 'rir_3')];
+    const cleared = updateLoggerValues(sets, 'p', { setType: null });
+    expect(displayedValues(cleared[0]).setType).toBeNull();
+    const typed = updateLoggerValues(cleared, 'p', { repsValue: '5' });
+    const confirmed = commitSet(typed, 'p', displayedValues(typed[0]));
+    expect(displayedValues(confirmed[0]).setType).toBeNull();
+    expect(confirmed[0].plannedSetType).toBe('rir_3');
   });
 
   it('completes by discarding pending planned sets as unperformed, never deleting them', () => {

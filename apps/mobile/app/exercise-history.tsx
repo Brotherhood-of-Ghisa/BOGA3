@@ -70,6 +70,8 @@ const formatSetTypeBadge = (setType: ExerciseHistorySessionEntry['sets'][number]
       return 'R1';
     case 'rir_2':
       return 'R2';
+    case 'rir_3':
+      return 'R3';
     default:
       return '';
   }

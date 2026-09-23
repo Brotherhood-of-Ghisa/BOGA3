@@ -1056,18 +1056,11 @@ describe('SessionRecorderScreen exercise interactions', () => {
     await selectExerciseFromPicker('Barbell Squat');
 
     const setTypeButton = screen.getByTestId('set-quality-button-1-1');
-    expect(setTypeButton.findByType('Text').props.children).toBe('•');
-
-    fireEvent.press(setTypeButton);
-    expect(screen.getByText('W-Up')).toBeTruthy();
-    fireEvent.press(setTypeButton);
-    expect(screen.getByText('RIR 0')).toBeTruthy();
-    fireEvent.press(setTypeButton);
-    expect(screen.getByText('RIR 1')).toBeTruthy();
-    fireEvent.press(setTypeButton);
-    expect(screen.getByText('RIR 2')).toBeTruthy();
-    fireEvent.press(setTypeButton);
-    expect(screen.getByLabelText('Quality for exercise 1 set 1: none')).toBeTruthy();
+    expect(setTypeButton.findByType('Text').props.children).toBe('W-Up');
+    for (const label of ['none', 'RIR 3', 'RIR 2', 'RIR 1', 'RIR 0', 'W-Up']) {
+      fireEvent.press(setTypeButton);
+      expect(screen.getByLabelText(`Quality for exercise 1 set 1: ${label}`)).toBeTruthy();
+    }
 
     fireEvent(setTypeButton, 'onLongPress');
     expect(screen.getByLabelText('Choose W-Up set type')).toBeTruthy();
@@ -1138,7 +1131,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     expect(copiedWeightInput.props.selection).toBeUndefined();
     expect(copiedWeightInput.props.value).toBe('135.5');
     expect(screen.getByLabelText('Reps for exercise 1 set 2').props.value).toBe('8');
-    expect(screen.getAllByText('RIR 0')).toHaveLength(2);
+    expect(screen.getAllByText('RIR 3')).toHaveLength(2);
     expect(
       StyleSheet.flatten(screen.getByTestId('set-row-surface-1-2').props.style)
     ).toMatchObject({
@@ -1520,7 +1513,7 @@ describe('SessionRecorderScreen exercise interactions', () => {
     const setTypeButton = screen.getByTestId('set-quality-button-1-1');
 
     fireEvent.press(setTypeButton);
-    expect(screen.getByText('W-Up')).toBeTruthy();
+    expect(screen.getByText('RIR 3')).toBeTruthy();
 
     fireEvent(setTypeButton, 'onLongPress');
     expect(screen.getByLabelText('Choose None set type')).toBeTruthy();

@@ -466,6 +466,12 @@ describe('SessionRecorderScreen', () => {
     expect(screen.getByText('30kg')).toBeTruthy();
     expect(screen.getByText('8 reps')).toBeTruthy();
     expect(screen.queryByText('Set 1 · 30kg · 8 reps -> 30kg · 8 reps')).toBeNull();
+
+    fireEvent(screen.getByTestId('set-quality-button-1-1'), 'longPress');
+    fireEvent.press(screen.getByLabelText('Choose None set type'));
+    fireEvent.press(screen.getByTestId('set-row-pressable-1-1'));
+    expect(screen.getByLabelText('Quality for exercise 1 set 1: none')).toBeTruthy();
+
   });
 
   it('uses compact editable rows for normal logged sets', async () => {

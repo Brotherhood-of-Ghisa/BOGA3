@@ -68,7 +68,8 @@ import {
   type SessionExerciseAssignedTag,
 } from '@/src/data';
 import {
-  SESSION_SET_TYPES,
+  SESSION_SET_TYPE_CYCLE,
+  nextSessionSetType,
   isWorkingSessionSetType,
   normalizeSessionSetType,
   type SessionSetType,
@@ -237,12 +238,13 @@ function createLocationId(locationName: string): string {
 }
 
 
-const SET_TYPE_CYCLE_ORDER: SessionSetTypeValue[] = [null, ...SESSION_SET_TYPES];
+const SET_TYPE_CYCLE_ORDER = SESSION_SET_TYPE_CYCLE;
 const SET_TYPE_SHORT_LABELS: Record<SessionSetType, string> = {
   warm_up: 'W-Up',
   rir_0: 'R0',
   rir_1: 'R1',
   rir_2: 'R2',
+  rir_3: 'R3',
 };
 
 const getSetTypeButtonLabel = (setType: SessionSetTypeValue): string =>
@@ -254,12 +256,7 @@ const getSetTypeMenuLabel = (setType: SessionSetTypeValue): string =>
 const getSetTypeAccessibilityLabel = (setType: SessionSetTypeValue): string =>
   setType === null ? 'none' : SET_TYPE_MENU_LABELS[setType];
 
-const getNextSetType = (setType: SessionSetTypeValue): SessionSetTypeValue => {
-  const currentType = normalizeSessionSetType(setType);
-  const currentIndex = SET_TYPE_CYCLE_ORDER.findIndex((value) => value === currentType);
-  const nextIndex = currentIndex < 0 ? 0 : (currentIndex + 1) % SET_TYPE_CYCLE_ORDER.length;
-  return SET_TYPE_CYCLE_ORDER[nextIndex] ?? null;
-};
+const getNextSetType = nextSessionSetType;
 
 const constrainSetFieldInput = (field: SetFieldName, value: string): string | null => {
   if (field === 'weight') {
@@ -285,7 +282,7 @@ const hydratePlannedSetForEditing = (set: SessionSet): SessionSet => {
         ? set.plannedWeight ?? set.weight
         : set.weight,
     setType:
-      !isUntouchedPlan && set.setType !== null
+      !isUntouchedPlan
         ? set.setType
         : normalizeSessionSetType(set.plannedSetType),
     performanceStatus: 'unperformed',

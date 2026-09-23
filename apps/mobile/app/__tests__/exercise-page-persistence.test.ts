@@ -95,7 +95,7 @@ describe('exercise page persistence', () => {
     const sets = commitSet(loaded.exercise.sets, third!.id, {
       weightValue: '82.5',
       repsValue: '5',
-      setType: 'rir_0',
+      setType: 'rir_3',
     });
 
     await saveSessionExerciseDraft(activeSessionId, {
@@ -112,7 +112,7 @@ describe('exercise page persistence', () => {
     expect(session?.exercises[0]?.sets[2]).toMatchObject({
       weightValue: '82.5',
       repsValue: '5',
-      setType: 'rir_0',
+      setType: 'rir_3',
       performanceStatus: null,
       plannedRepsValue: '6',
     });
