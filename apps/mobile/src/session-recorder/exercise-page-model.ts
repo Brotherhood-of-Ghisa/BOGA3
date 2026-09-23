@@ -13,15 +13,13 @@ import { canonicalizeSetValues, hasValidActualValues, isConfirmedPerformedSet } 
  * Pure rules of the exercise page (docs/plans/exercise-session-build-spec.md,
  * "Exercise page"). The page edits one session exercise's set rows; every rule
  * about what a row *is* comes from `set-semantics.ts`, so this module only
- * decides presentation (the cursor, emphasis, displayed values) and the edits
+ * decides presentation (the cursor, records, displayed values) and the edits
  * the page's controls make.
  */
 
 export type ExercisePageSet = SessionDraftSetSnapshot;
 
 export type SetRowKind = 'performed' | 'pending';
-
-export type SetRowEmphasis = 'none' | 'best' | 'record';
 
 export type SetRowView = {
   id: string;
@@ -35,9 +33,10 @@ export type SetRowView = {
   reps: number | null;
   oneRepMax: number | null;
   volume: number | null;
-  weightEmphasis: SetRowEmphasis;
-  oneRepMaxEmphasis: SetRowEmphasis;
-  volumeEmphasis: SetRowEmphasis;
+  // A performed weight or 1RM beating the all-time best before today — the
+  // only figures the row highlights (`design-language.md` §5).
+  weightRecord: boolean;
+  oneRepMaxRecord: boolean;
 };
 
 // The lifter's all-time bests before today, from completed history. A value
@@ -129,64 +128,34 @@ export const previewMetrics = (weightValue: string, repsValue: string) => {
   return { oneRepMax, volume };
 };
 
-const maxOf = (values: (number | null)[]): number | null =>
-  values.reduce<number | null>(
-    (best, value) => (value !== null && (best === null || value > best) ? value : best),
-    null
-  );
-
 /**
- * Builds the rows. Bold `best` marks the top 1RM, weight and volume among
- * today's performed sets, per column — so three different sets can each be
- * bold — and only once there are two sets to compare. A performed value that
- * beats the lifter's all-time best before today is a `record` instead.
+ * Builds the rows. Every figure takes its row's colour and weight; the one
+ * highlight is a performed weight or 1RM that beats the lifter's all-time best
+ * before today, shown as a `record`. Volume is never one here: its record is a
+ * whole session's, so no single set can beat it.
  */
 export const buildSetRows = (
   sets: ExercisePageSet[],
   baseline: ExerciseRecordBaseline | null = null
 ): SetRowView[] => {
   const cursorIndex = findCursorIndex(sets);
-  const rows = sets.map((set, index) => {
+  const beats = (value: number | null, record: number | null) =>
+    value !== null && record !== null && value > record;
+  return sets.map((set, index): SetRowView => {
     const values = displayedValues(set);
     const metrics = metricsOf(values.weightValue, values.repsValue);
+    const performed = isPerformed(set);
     return {
       id: set.id,
       number: index + 1,
-      kind: (isPerformed(set) ? 'performed' : 'pending') as SetRowKind,
+      kind: performed ? 'performed' : 'pending',
       isCursor: index === cursorIndex,
       setType: values.setType,
       ...metrics,
-      weightEmphasis: 'none' as SetRowEmphasis,
-      oneRepMaxEmphasis: 'none' as SetRowEmphasis,
-      volumeEmphasis: 'none' as SetRowEmphasis,
+      weightRecord: performed && beats(metrics.weight, baseline?.weight ?? null),
+      oneRepMaxRecord: performed && beats(metrics.oneRepMax, baseline?.oneRepMax ?? null),
     };
   });
-
-  const performed = rows.filter((row) => row.kind === 'performed');
-  const compare = performed.length >= 2;
-  const best = {
-    weight: maxOf(performed.map((row) => row.weight)),
-    oneRepMax: maxOf(performed.map((row) => row.oneRepMax)),
-    volume: maxOf(performed.map((row) => row.volume)),
-  };
-  const emphasisFor = (value: number | null, top: number | null, record: number | null): SetRowEmphasis => {
-    if (value === null) return 'none';
-    if (record !== null && value > record) return 'record';
-    return compare && value === top ? 'best' : 'none';
-  };
-
-  return rows.map((row) =>
-    row.kind === 'performed'
-      ? {
-          ...row,
-          weightEmphasis: emphasisFor(row.weight, best.weight, baseline?.weight ?? null),
-          oneRepMaxEmphasis: emphasisFor(row.oneRepMax, best.oneRepMax, baseline?.oneRepMax ?? null),
-          // Records are per set for 1RM and weight; the volume record is a
-          // whole session's, so no single set can beat it.
-          volumeEmphasis: emphasisFor(row.volume, best.volume, null),
-        }
-      : row
-  );
 };
 
 /** The values the logger opens with: the row as displayed. */

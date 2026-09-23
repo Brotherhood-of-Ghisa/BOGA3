@@ -2,14 +2,13 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Icon } from '@/components/ui/icon';
 import { ListRow } from '@/components/ui/list-row';
-import { Stat, type StatEmphasis } from '@/components/ui/stat';
+import { Stat } from '@/components/ui/stat';
 import { uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 import {
   formatEffort,
   formatOneRepMax,
   formatVolume,
   formatWeight,
-  type SetRowEmphasis,
   type SetRowView,
 } from '@/src/session-recorder/exercise-page-model';
 
@@ -29,14 +28,12 @@ const describeValues = (row: SetRowView) =>
     ? 'no values'
     : `${row.weight !== null ? formatWeight(row.weight) : DASH} × ${row.reps ?? DASH}`;
 
-const figureEmphasisStyle = (emphasis: SetRowEmphasis) =>
-  emphasis === 'record' ? styles.figureRecord : emphasis === 'best' ? styles.figureBest : null;
-
 /**
  * The set row (build spec, "Set row"): `[type 44][weight × reps][1RM / VOL][control 44]`.
  * Performed rows are realised; rows not yet performed show their values faded.
- * The glyph carries the state (`design-language.md` §5). The row body opens the
- * row in the logger; the glyph performs or un-performs it.
+ * The glyph carries the state (`design-language.md` §5). Every figure takes the
+ * row's colour and weight; only a record weight or 1RM stands out, in `record`.
+ * The row body opens the row in the logger; the glyph performs or un-performs it.
  */
 export function SetRow({ row, divider, onOpen, onToggle }: SetRowProps) {
   const performed = row.kind === 'performed';
@@ -57,7 +54,7 @@ export function SetRow({ row, divider, onOpen, onToggle }: SetRowProps) {
       meta={
         <View>
           <Stat
-            emphasis={row.oneRepMaxEmphasis as StatEmphasis}
+            emphasis={row.oneRepMaxRecord ? 'record' : 'none'}
             label="1RM"
             layout="inline"
             state={statState}
@@ -65,7 +62,6 @@ export function SetRow({ row, divider, onOpen, onToggle }: SetRowProps) {
             value={row.oneRepMax !== null ? formatOneRepMax(row.oneRepMax) : DASH}
           />
           <Stat
-            emphasis={row.volumeEmphasis as StatEmphasis}
             label="Vol"
             layout="inline"
             rank="secondary"
@@ -100,7 +96,7 @@ export function SetRow({ row, divider, onOpen, onToggle }: SetRowProps) {
           numberOfLines={1}
           style={[
             pageText.runningFigure,
-            performed ? figureEmphasisStyle(row.weightEmphasis) : styles.figurePlanned,
+            performed ? (row.weightRecord ? styles.figureRecord : null) : styles.figurePlanned,
           ]}
           testID={`exercise-set-${row.number}-values`}>
           {row.weight === null && row.reps === null
@@ -125,9 +121,6 @@ const styles = StyleSheet.create({
   },
   figurePlanned: {
     color: uiRoles.inkFaint,
-  },
-  figureBest: {
-    fontWeight: '700',
   },
   figureRecord: {
     fontWeight: '700',

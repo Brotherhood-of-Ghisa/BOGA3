@@ -12,6 +12,10 @@ import type { SessionListDataClient, SessionListItem } from '@/components/sessio
 import { GroupApiError, type StreamItem } from '@/src/groups';
 import { SIGN_IN_ROUTE } from '@/src/navigation/routes';
 import type { SessionEntryCoordinator } from '@/src/session-entry';
+import {
+  __resetNewScreensPreferenceForTests,
+  setNewScreensEnabled,
+} from '@/src/session-recorder/new-screens-preference';
 
 import { recordItem } from './helpers/group-record-fixtures';
 
@@ -117,6 +121,7 @@ const sessionEntry = (): jest.Mocked<
 describe('Today screen', () => {
   beforeEach(() => {
     mockPush.mockReset();
+    __resetNewScreensPreferenceForTests();
   });
 
   it('promotes an active session and replaces the planned-session action', async () => {
@@ -141,6 +146,21 @@ describe('Today screen', () => {
     expect(screen.getByTestId('today-active-session-card')).toBeTruthy();
     expect(screen.queryByTestId('today-start-planned-session-button')).toBeNull();
     expect(entry.startPlannedOrResume).not.toHaveBeenCalled();
+    expect(mockPush).toHaveBeenCalledWith('/session/active-1');
+  });
+
+  it('resumes into the recorder when the new screens setting is off', async () => {
+    await setNewScreensEnabled(false);
+    render(
+      <TodayScreen
+        dataClient={dataClient([activeSession])}
+        planState={{ status: 'unavailable' }}
+        sessionEntry={sessionEntry()}
+        socialState={socialState()}
+      />,
+    );
+
+    fireEvent.press(await screen.findByTestId('today-resume-session-button'));
     expect(mockPush).toHaveBeenCalledWith('/session-recorder');
   });
 
@@ -177,7 +197,7 @@ describe('Today screen', () => {
     expect(screen.getByText('Starting…')).toBeTruthy();
     resolveStart({ kind: 'started', sessionId: 'planned-session' });
     await waitFor(() => expect(screen.getByText('Start planned workout')).toBeTruthy());
-    expect(mockPush).toHaveBeenCalledWith('/session-recorder');
+    expect(mockPush).toHaveBeenCalledWith('/session/planned-session');
   });
 
   it('keeps a failed planned launch retryable and inline', async () => {

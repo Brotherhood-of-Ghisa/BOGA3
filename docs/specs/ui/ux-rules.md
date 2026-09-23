@@ -61,11 +61,13 @@ Document app-specific UI semantics and guardrails for the current mobile app.
      history. Groups looks the same however it is opened.
    - Settings Preferences holds device-local choices shown as single-select
      option buttons (`accessibilityRole="button"` + `selected`): the date format,
-     then `New exercise & session screens` (`Off`/`On`, default `Off`). That
-     toggle opts into the redesigned exercise page and session view while they
-     are built beside the recorder; it is **not** `isDevMode()`-gated, is never
-     synced, and is removed when the new screens become the default
-     (`docs/plans/exercise-session-redesign.md`, while that plan lives).
+     then `New exercise & session screens` (`Off`/`On`, default `On` since
+     redesign step 6a). On, every active-session entry opens the redesigned
+     session view and exercise page; Off returns to the previous recorder. A
+     stored choice (including an Off made before the default flipped) wins over
+     the default. It is **not** `isDevMode()`-gated, is never synced, and is
+     removed with the old recorder (step 6b of
+     `docs/plans/exercise-session-redesign.md`, while that plan lives).
 7. Today is a bounded overview, not a second full feed or history screen.
    - An active draft replaces the planned-session action and exposes Resume.
    - Joined-group activity reuses the group stream session cards, record cards,
@@ -78,8 +80,9 @@ Document app-specific UI semantics and guardrails for the current mobile app.
    - When the separate planning dependency is absent, Today uses the approved
      `Watch this space 👀` placeholder and offers Train; it never invents a
      scheduled session or metric.
-8. Train is the personal-training entry hub, while the recorder remains focused
-   on performing one workout.
+8. Train is the personal-training entry hub, while the session view (or, with
+   the new-screens setting Off, the recorder) remains focused on performing
+   one workout.
    - Active-session detection must succeed before Train exposes any new-session
      action; a detection error is retryable and does not assume that no draft
      exists.
@@ -89,7 +92,8 @@ Document app-specific UI semantics and guardrails for the current mobile app.
      active draft at press time and serializes competing requests so an empty
      or planned action cannot create a second concurrent session.
    - Empty start persists one blank active draft through the existing recorder
-     repository before opening the recorder. A failed write stays inline and
+     repository before opening it (the session view, or the recorder with the
+     new-screens setting Off). A failed write stays inline and
      retryable.
    - A still-mounted recorder drains any queued autosave and rechecks the
      persisted active draft on focus so a draft created from Today or Train is
@@ -351,8 +355,8 @@ guardrail keeps screens on them.
 `tokens.ts` also exports **`uiRoles`** — the colour roles of
 `ui/design-language.md` §2, added 2026-09-22 for the exercise/session rebuild.
 It is a second, separate vocabulary from `uiColors`, deliberately not merged
-into it. Its only user is the session view (`/session/[sessionId]`, §14b),
-reached only with the new-screens setting on; the rules below still describe
+into it. Its only users are the session view and exercise page (§14a/§14b),
+the default active-session screens since redesign step 6a; the rules below still describe
 everything else that renders today. Likewise **`uiFonts`** (added 2026-09-22) names
 the three embedded typefaces of `ui/design-language.md` §3 and the weights of
 each that ship; only the session view uses it, so every other screen still
@@ -539,7 +543,7 @@ primitives (`Card`, `Stat`, `ListRow`, `Sheet`) and the session view.
 13. Full boards and their history are online-only reads: never cached, no 30 s poll (they refresh on open, a toggle change, focus, and pull), paged on end-of-list with a `Retry` footer after a failed page. With nothing loaded offline they show the offline empty state; rows already loaded stay with the offline marker. A missing group exercise reads "This exercise isn't in this group" and is not lost access.
 14. Certification (M25-T10). A record card and a full-board row open the same row detail sheet (08 pattern 11). `Certify` shows for any member but the lifter on a standing, uncertified record set of an active exercise whose lifter is still a member; `Remove my certification` for the certifier; `Cancel certification` for the owner or an admin who is not the certifier. Certify does not confirm; Remove and Cancel confirm first (`Alert.alert`, destructive style). The writes follow rule 7 (offline refused before any request, nothing queued); their outcome shows inline in the sheet or on the card. `CONFLICT`, a set that is no longer a record, a certification or lifter that is gone, `FORBIDDEN`, and `VALIDATION` say nothing changed and re-read the board or stream; a group `NOT_FOUND` evicts and shows lost access. After a certify the sheet reads `Certified. Certified boards update in a few seconds.`
 
-### 14a. Exercise page (redesign step 4, behind the new-screens setting)
+### 14a. Exercise page (redesign step 4; the default since step 6a)
 
 Graduated from the build spec; the page lives at
 `/session/[sessionId]/exercise/[sessionExerciseId]` and edits one exercise of
@@ -563,12 +567,16 @@ unchanged. What differs is presentation:
    on. Tapping effort cycles W-Up → blank → RIR 3 → RIR 2 → RIR 1 → RIR 0 → W-Up; long press opens those six options in a sheet. Untouched planned rows show prescribed effort; choosing blank explicitly clears actual effort. New ad-hoc rows follow §5.11 defaults.
 4. **Numbers everywhere.** Every row, planned included, shows its 1RM and
    volume; planned values `ink-faint`, legends `planned`. Warm-ups show a 1RM
-   like any set. Bold `best` marks today's top weight, 1RM and volume per column
-   once two sets are performed; a performed weight or 1RM beating the all-time
-   best before today is `record` (brass) instead. The records panel uses
+   like any set. Every figure in a row shares the row's colour and weight —
+   there is no per-column bold for today's bests, matching the session view
+   (§14b.4; aligned 2026-09-23). The one highlight is a performed weight or 1RM
+   beating the all-time best before today, shown in `record` (brass); volume is
+   never one, since its record is a whole session's. The records panel uses
    History's rules (warm-ups count). `Records` | `Last` chooses what the
-   expanded panel shows and never expands or collapses it; only the chevron
-   does.
+   panel shows and never expands or collapses it; only the chevron does.
+   Collapsed, its `1RM` / `Max` / `Vol` row sums up the chosen view: the
+   all-time records, or the previous session's best 1RM, heaviest weight and
+   volume.
 5. **Two exits.** Back leaves every set as it is. `Complete exercise` asks first
    when sets are waiting: planned sets still waiting are marked `unperformed`
    (never deleted — their plan stays), and ad-hoc sets never ticked are removed;
@@ -578,7 +586,7 @@ unchanged. What differs is presentation:
 6. **Sheets** are the design-language `Sheet`: backdrop, Android back and the
    VoiceOver escape dismiss; no Cancel.
 
-### 14b. Session view (redesign step 5; new-screens setting only)
+### 14b. Session view (redesign step 5; the default since step 6a)
 
 1. The session view is read-only and navigational: the whole exercise card is
    one link to the exercise page, with no controls inside it. Editing happens

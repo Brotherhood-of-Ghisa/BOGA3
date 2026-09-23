@@ -1,9 +1,9 @@
 appId: com.dinoderek.mobile
 ---
-# The session view (redesign step 5), behind the new exercise/session screens
-# setting. Proves, on device:
-#   1. with the setting on, Train's Resume opens the session view (the entry
-#      switch), not the recorder;
+# The session view (redesign step 5), the default since step 6a. Proves, on
+# device:
+#   1. with the setting at its default (no `newScreens` on the harness link),
+#      Train's Resume opens the session view, not the recorder;
 #   2. the summary card and one read-only card per exercise, with its done
 #      count and — for the bench, whose RIR 2 set beats its completed history —
 #      the 1RM record band (fixture: src/maestro/session-view-fixture.ts);
@@ -15,12 +15,12 @@ appId: com.dinoderek.mobile
 #      with no sets, and opens the completion screen.
 #
 # Hermetic: starts from `reset=data` and ends with a data reset, leaving the
-# setting off. Infra-free (no sign-in).
+# setting at its default (On). Infra-free (no sign-in).
 
 - retry:
     maxRetries: 3
     commands:
-      - openLink: "boga3://maestro-harness?reset=data&newScreens=on&fixture=session-view&teleport=session-list"
+      - openLink: "boga3://maestro-harness?reset=data&fixture=session-view&teleport=session-list"
       - tapOn:
           text: "Open"
           optional: true
@@ -167,7 +167,7 @@ appId: com.dinoderek.mobile
     timeout: 20000
 - takeScreenshot: "04-session-view-finished"
 
-# Leave the simulator as this flow found it: data reset, setting off.
+# Leave the simulator as this flow found it: data reset, setting at its default.
 - openLink: "boga3://maestro-harness?reset=data&teleport=session-list"
 - extendedWaitUntil:
     visible:

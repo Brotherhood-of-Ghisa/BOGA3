@@ -97,18 +97,17 @@ case "$lane" in
       --scenario "Settings new-screens toggle" --flow "$APP_DIR/.maestro/flows/settings-new-screens-toggle.yaml"
     ;;
 
-  # The exercise page (exercise/session redesign step 4), behind the new-screens
-  # setting: its own fixture, opted in and reset in-flow through the
+  # The exercise page (exercise/session redesign step 4), the default since
+  # step 6a: its own fixture, seeded and reset in-flow through the
   # maestro-harness deep link. Infra-free; its own lane so the new screen's
   # evidence (the V5-* captures) is one run. No Supabase.
   exercise-page)
     run_flow data "Exercise page" exercise-page.yaml
     ;;
 
-  # The session view (redesign step 5), behind the new exercise/session screens
-  # setting: two flows sharing one simulator + Metro, each opting in and
-  # seeding its session through the harness (`newScreens=on`,
-  # `fixture=session-view`). Infra-free; `data` reset is enough.
+  # The session view (redesign step 5), the default since step 6a: two flows
+  # sharing one simulator + Metro, each seeding its session through the
+  # harness (`reset=data&fixture=session-view`, the setting at its default). Infra-free; `data` reset is enough.
   session-view)
     MAESTRO_RESET_STRATEGY=data \
     "$SCRIPT_DIR/maestro-ios-run-flows.sh" \

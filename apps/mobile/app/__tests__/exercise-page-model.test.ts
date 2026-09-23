@@ -81,47 +81,38 @@ describe('exercise page model', () => {
     expect(rows[3]?.isCursor).toBe(false);
   });
 
-  it('marks the best of today per column, only once there are two sets to compare', () => {
+  it('highlights no per-column best: without a record every figure is plain', () => {
     const rows = buildSetRows([
       performedSet('a', '100', '3', 'rir_1'),
       performedSet('b', '90', '8', 'rir_1'),
     ]);
-    // The heavier set is the best weight; the other the best 1RM and volume.
-    expect(rows[0]).toMatchObject({
-      weightEmphasis: 'best',
-      oneRepMaxEmphasis: 'none',
-      volumeEmphasis: 'none',
-    });
-    expect(rows[1]).toMatchObject({
-      weightEmphasis: 'none',
-      oneRepMaxEmphasis: 'best',
-      volumeEmphasis: 'best',
-    });
-
-    const single = buildSetRows([performedSet('a', '100', '3', 'rir_1')]);
-    expect(single[0]).toMatchObject({
-      weightEmphasis: 'none',
-      oneRepMaxEmphasis: 'none',
-      volumeEmphasis: 'none',
-    });
+    // Today's top weight (a) and top 1RM and volume (b) are not marked.
+    expect(rows.map(({ weightRecord, oneRepMaxRecord }) => ({ weightRecord, oneRepMaxRecord }))).toEqual([
+      { weightRecord: false, oneRepMaxRecord: false },
+      { weightRecord: false, oneRepMaxRecord: false },
+    ]);
+    expect(rows[0]).not.toHaveProperty('volumeEmphasis');
   });
 
-  it('marks a value beating the all-time best as a record, and never a planned row', () => {
+  it('marks a weight or 1RM beating the all-time best as a record, and never a planned row', () => {
     const rows = buildSetRows([...quietSets(), performedSet('s6', '90', '6', 'rir_0')], {
-      oneRepMax: 102.1,
+      oneRepMax: 102.2,
       weight: 85,
     });
-    const last = rows[5];
-    // 90 × 6 (540) is not today's top volume: 80 × 8 (640) is.
-    expect(last).toMatchObject({
-      weightEmphasis: 'record',
-      oneRepMaxEmphasis: 'record',
-      volumeEmphasis: 'none',
-    });
-    expect(rows[1]?.volumeEmphasis).toBe('best');
-    expect(rows[4]).toMatchObject({
-      weightEmphasis: 'none',
-      oneRepMaxEmphasis: 'none',
+    expect(rows[5]).toMatchObject({ weightRecord: true, oneRepMaxRecord: true });
+    // 80 × 8 (1RM 102.14) is today's top volume and 1RM, but beats neither record.
+    expect(rows[1]).toMatchObject({ weightRecord: false, oneRepMaxRecord: false });
+    // Planned 85 × 5 would equal the weight record; a planned row is never one.
+    expect(rows[4]).toMatchObject({ weightRecord: false, oneRepMaxRecord: false });
+
+    // A weight record without a 1RM record is marked on its own.
+    const heavy = buildSetRows([performedSet('h', '87.5', '1', 'rir_0')], { oneRepMax: 102.2, weight: 85 });
+    expect(heavy[0]).toMatchObject({ weightRecord: true, oneRepMaxRecord: false });
+
+    // No history, no records.
+    expect(buildSetRows([performedSet('x', '200', '5', 'rir_0')])[0]).toMatchObject({
+      weightRecord: false,
+      oneRepMaxRecord: false,
     });
   });
 

@@ -43,31 +43,39 @@ describe('new exercise/session screens preference', () => {
     (process.env as Record<string, string | undefined>).NODE_ENV = originalNodeEnv;
   });
 
-  it('defaults off, before and after loading an empty store', async () => {
-    expect(DEFAULT_NEW_SCREENS_ENABLED).toBe(false);
-    expect(getNewScreensEnabledSnapshot()).toBe(false);
+  it('defaults on, before and after loading an empty store', async () => {
+    expect(DEFAULT_NEW_SCREENS_ENABLED).toBe(true);
+    expect(getNewScreensEnabledSnapshot()).toBe(true);
 
     await ensureNewScreensEnabledLoaded();
 
     expect(mockGetItemAsync).toHaveBeenCalledWith(STORAGE_KEY);
+    expect(getNewScreensEnabledSnapshot()).toBe(true);
+  });
+
+  it('keeps an Off chosen before the default flipped (the same v1 key)', async () => {
+    mockKeychain.set('boga3.newExerciseSessionScreens.v1', JSON.stringify({ enabled: false }));
+
+    await ensureNewScreensEnabledLoaded();
+
     expect(getNewScreensEnabledSnapshot()).toBe(false);
   });
 
   it('persists under the versioned key and reads it back after a reload', async () => {
-    await setNewScreensEnabled(true);
+    await setNewScreensEnabled(false);
 
-    expect(mockSetItemAsync).toHaveBeenCalledWith(STORAGE_KEY, JSON.stringify({ enabled: true }));
+    expect(mockSetItemAsync).toHaveBeenCalledWith(STORAGE_KEY, JSON.stringify({ enabled: false }));
 
     // A fresh process: module state gone, the device keychain kept.
     __resetNewScreensPreferenceForTests();
-    expect(getNewScreensEnabledSnapshot()).toBe(false);
-    await ensureNewScreensEnabledLoaded();
     expect(getNewScreensEnabledSnapshot()).toBe(true);
+    await ensureNewScreensEnabledLoaded();
+    expect(getNewScreensEnabledSnapshot()).toBe(false);
 
-    await setNewScreensEnabled(false);
+    await setNewScreensEnabled(true);
     __resetNewScreensPreferenceForTests();
     await ensureNewScreensEnabledLoaded();
-    expect(getNewScreensEnabledSnapshot()).toBe(false);
+    expect(getNewScreensEnabledSnapshot()).toBe(true);
   });
 
   it('loads the store once', async () => {
@@ -116,7 +124,7 @@ describe('new exercise/session screens preference', () => {
 
     await ensureNewScreensEnabledLoaded();
 
-    expect(getNewScreensEnabledSnapshot()).toBe(false);
+    expect(getNewScreensEnabledSnapshot()).toBe(true);
   });
 
   it('keeps the chosen value in memory when the device store cannot be written', async () => {
@@ -140,15 +148,15 @@ describe('new exercise/session screens preference', () => {
   it('test reset restores the default and drops listeners', async () => {
     const listener = jest.fn();
     subscribeToNewScreensEnabled(listener);
-    await setNewScreensEnabled(true);
+    await setNewScreensEnabled(false);
     listener.mockClear();
 
     __resetNewScreensPreferenceForTests();
-    await setNewScreensEnabled(true);
+    await setNewScreensEnabled(false);
 
     expect(listener).not.toHaveBeenCalled();
     __resetNewScreensPreferenceForTests();
-    expect(getNewScreensEnabledSnapshot()).toBe(false);
+    expect(getNewScreensEnabledSnapshot()).toBe(true);
   });
 
   it('uses only the in-memory store under the test runtime', async () => {
