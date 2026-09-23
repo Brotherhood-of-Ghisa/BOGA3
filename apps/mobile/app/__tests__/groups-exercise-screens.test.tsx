@@ -161,7 +161,9 @@ const pressAlertButton = async (spy: jest.SpyInstance, text: string) => {
 const openGroupAs = async (role: GroupRole) => {
   api.getGroup.mockResolvedValue(detailFor(role));
   render(<GroupScreenRoute />);
-  await screen.findByText(META[role]);
+  // Without a jest cache, CI runs this file first, so its first render also
+  // pays the process's cold start; the 1 s default can expire before it lands.
+  await screen.findByText(META[role], {}, { timeout: 10_000 });
 };
 
 const openExercisesAs = async (role: GroupRole) => {
