@@ -426,7 +426,7 @@ yet.
 3. Icon colour is a token (`uiColors` on shipped screens, `uiRoles` on
    design-language surfaces); size is a `uiIconSize` key.
 4. The set-state glyphs (`set-done` / `set-current` / `set-planned`) exist for
-   design-language §5 and are not used by a shipped screen yet.
+   design-language §5; the exercise page (§14a) is their first user.
 
 ### 10. Exercise-tag interaction semantics
 
@@ -538,6 +538,44 @@ yet.
 12. Leaderboards (M25-T09). The segment shows one podium card per group exercise on `Certified · e1RM`, cached like the other group screens (rule 2); the whole card opens the full board. State is text, never color alone: my rows read `You`, a former member `(former)`, archived exercises `Archived`, and on All each row a check icon (certified) or a ring icon with `uncertified`; the row's accessibility label says `certified` / `uncertified`. An empty Certified podium reads `No certified sets yet · N uncertified`; an empty Certified board offers `See all sets`.
 13. Full boards and their history are online-only reads: never cached, no 30 s poll (they refresh on open, a toggle change, focus, and pull), paged on end-of-list with a `Retry` footer after a failed page. With nothing loaded offline they show the offline empty state; rows already loaded stay with the offline marker. A missing group exercise reads "This exercise isn't in this group" and is not lost access.
 14. Certification (M25-T10). A record card and a full-board row open the same row detail sheet (08 pattern 11). `Certify` shows for any member but the lifter on a standing, uncertified record set of an active exercise whose lifter is still a member; `Remove my certification` for the certifier; `Cancel certification` for the owner or an admin who is not the certifier. Certify does not confirm; Remove and Cancel confirm first (`Alert.alert`, destructive style). The writes follow rule 7 (offline refused before any request, nothing queued); their outcome shows inline in the sheet or on the card. `CONFLICT`, a set that is no longer a record, a certification or lifter that is gone, `FORBIDDEN`, and `VALIDATION` say nothing changed and re-read the board or stream; a group `NOT_FOUND` evicts and shows lost access. After a certify the sheet reads `Certified. Certified boards update in a few seconds.`
+
+### 14a. Exercise page (redesign step 4, behind the new-screens setting)
+
+Graduated from the build spec; the page lives at
+`/session/[sessionId]/exercise/[sessionExerciseId]` and edits one exercise of
+the active session through the recorder's own repository and autosave
+(`src/session-recorder/`), so the rules of §5.11 about what a set *is* hold
+unchanged. What differs is presentation:
+
+1. **One ordered list, no mode.** Performed, current and planned rows share one
+   list; a row carries its planned triple and its actuals, and
+   `performanceStatus` decides which is real. The row shows its actuals once
+   performed or once the lifter has typed, and its plan otherwise.
+2. **State is the glyph** (`set-done` / `set-current` / `set-planned`), a
+   checkbox in the row's 44pt control column. Tapping it performs a row with
+   valid values (typed, else planned) or un-performs a performed row — back to
+   `planned` when it came from a plan, else `unperformed`. A row with nothing
+   valid to perform opens in the logger instead.
+3. **The logger is the open row.** It sits on the first set not performed, or on
+   the row whose body was tapped; one at a time. Typing is saved as it is typed
+   (the recorder's text debounce); the tick — the screen's one `accent` primary,
+   disabled until the values are a valid set — performs it and moves the logger
+   on. Effort opens a four-option sheet (W-Up / RIR 2 / RIR 1 / RIR 0),
+   defaulting to the row's planned effort.
+4. **Numbers everywhere.** Every row, planned included, shows its 1RM and
+   volume; planned values `ink-faint`, legends `planned`. Warm-ups show a 1RM
+   like any set. Bold `best` marks today's top weight, 1RM and volume per column
+   once two sets are performed; a performed weight or 1RM beating the all-time
+   best before today is `record` (brass) instead. The records panel uses
+   History's rules (warm-ups count).
+5. **Two exits.** Back leaves every set as it is. `Complete exercise` asks first
+   when sets are waiting: planned sets still waiting are marked `unperformed`
+   (never deleted — their plan stays), and ad-hoc sets never ticked are removed;
+   the alert names both counts. `Remove from session` (⋮, danger) confirms, then
+   removes the exercise; `Swap exercise` keeps the sets and replaces the
+   exercise definition.
+6. **Sheets** are the design-language `Sheet`: backdrop, Android back and the
+   VoiceOver escape dismiss; no Cancel.
 
 ### 15. Documentation maintenance rule (UI semantics)
 

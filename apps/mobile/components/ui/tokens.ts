@@ -115,6 +115,10 @@ export const uiGeometry = {
     card: 6,
     // A sheet's two top corners.
     sheet: 16,
+    // Controls inside a screen: input fields, a segmented selector, an outline
+    // button. The target drew 4 and 5, a difference with no name, so one value.
+    // Added 2026-09-23 (exercise page).
+    control: 4,
   },
   // The minimum tap target, and the width of the set row's type and control
   // columns — every control in a list sits on this one vertical axis.
@@ -123,6 +127,10 @@ export const uiGeometry = {
   // a list.
   metricValueWidth: 38,
   sheetHandle: { width: 38, height: 4 },
+  // A labelled input field (micro-label above a large figure): the exercise
+  // page's logger, whose Weight / Reps / Effort fields share this height. Added
+  // 2026-09-23.
+  fieldHeight: 50,
   // Micro-label letter-spacing as a fraction of the font size (em); React
   // Native takes points, so apply it as `size * microLabelTracking`.
   microLabelTracking: 0.1,

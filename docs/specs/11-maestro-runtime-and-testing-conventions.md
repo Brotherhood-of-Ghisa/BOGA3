@@ -216,7 +216,7 @@ Responsibility split:
   - performs cleanup using the emitted runtime state, including Expo process shutdown, app termination, simulator shutdown by default, and restoring the developer's `.env.local`.
 - `maestro-run-lane.sh`
   - the high-level per-lane entrypoint (`smoke` / `data-smoke` / `ui-regression` /
-    `auth-profile` / `sync-e2e` / `groups-e2e`); holds each lane's data (flows,
+    `exercise-page` / `auth-profile` / `sync-e2e` / `groups-e2e`); holds each lane's data (flows,
     reset strategy, Supabase config, fixture users, pre-run fixture reset) and
     calls the shared toolkit via `maestro-ios-run-flow.sh` (one flow per
     provisioned sim) or `maestro-ios-run-flows.sh` (several flows sharing one).

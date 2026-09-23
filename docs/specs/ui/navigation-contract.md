@@ -343,6 +343,15 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
   - signed out or auth-unconfigured renders the group sign-in-required card
   - search, Link, Unlink (confirmed), and pull-to-refresh are in-route state; the route never navigates on its own
 
+20. `/session/[sessionId]/exercise/[sessionExerciseId]` (exercise/session redesign step 4)
+- File: `apps/mobile/app/session/[sessionId]/exercise/[sessionExerciseId].tsx`
+- Path params:
+  - `sessionId` (an active session) and `sessionExerciseId` (one of its exercises); both required. A missing session, a session not in progress, or an exercise no longer in it renders an inline message instead of the page
+- Behavior:
+  - renders only while `New exercise & session screens` is on; otherwise a notice whose `Open Settings` pushes `/settings`
+  - no query params; the records panel, the open set and every sheet are in-route state
+  - registered with `headerShown: false`: the page draws its own top bar
+
 ## Allowed route transitions (current high-level flows)
 
 1. `/` -> `/today`
@@ -442,11 +451,17 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 45. `/today` -> `/groups?groupId=<groupId>`
    - a Group activity record card or membership row
 
+46. session view (step 5) -> `/session/<sessionId>/exercise/<sessionExerciseId>` (exercise/session redesign)
+   - the session view's exercise card (step 5's entry). Back, `Complete exercise` and `Remove from session` return with `router.back()`; with no history (a deep link) they `router.replace('/train')`
+47. `/session/<sessionId>/exercise/<sessionExerciseId>` -> `/exercise-history?exerciseDefinitionId=<id>`
+   - the records panel's `History` link (`router.push`)
+
 Note:
 
 - Modal opens/closes are in-route UI state transitions, not route transitions.
 - `session-recorder` exercise picker `Add new` now opens an in-route exercise editor modal rather than navigating to `/exercise-catalog`.
 - The recorder's group pick sheet (M25-T07) and its `Add as new` editor are in-route modals too: the picker hides while either is open and returns on cancel.
+- The exercise page's effort, options and swap sheets, the shared exercise editor it opens from `Edit exercise`, and its Complete / Remove confirmations (`Alert`) are in-route state.
 - The record set row detail sheet (M25-T10) is an in-route modal on the Groups screen's Stream and the full board; certification writes and their confirmation `Alert`s stay on the same route.
 
 ## Header titles (current, high level)

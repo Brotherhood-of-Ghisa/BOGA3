@@ -508,6 +508,21 @@ Brief entrypoint map of the current mobile screens.
 - Notes:
   - sets its stack title to `Link "<exercise name>"` once the exercise resolves
 
+21. `/session/[sessionId]/exercise/[sessionExerciseId]` (exercise/session redesign step 4)
+- File: `apps/mobile/app/session/[sessionId]/exercise/[sessionExerciseId].tsx` (composition in `apps/mobile/components/exercise-page/`)
+- Purpose:
+  - one page per exercise of the active session, in the design language (`design-language.md`; accepted target `design-targets/exercise-session-v5.md`): top bar (back · exercise name · ⋮), the collapsible records panel, one ordered set list whose current set expands in place into the logger, `+ Add set`, and `Complete exercise`
+  - behind the `New exercise & session screens` setting (`useNewScreensEnabled()`); built beside the recorder, which it shares its domain with (`src/session-recorder/**`)
+- Key states (high level):
+  - records panel collapsed (`1RM` / `Max` / `Vol`), expanded on `Records` (each record's date and set) or on `Last` (the previous completed session's sets); `Records` | `Last` and `History` are present in both
+  - performed, current and planned rows (glyph `set-done` / `set-current` / `set-planned`); the logger (Weight · Reps · Effort · the `accent` tick) on the first set not performed, or on the row tapped
+  - the effort sheet (W-Up / RIR 2 / RIR 1 / RIR 0) and the ⋮ sheet (Edit exercise / Swap exercise / Remove from session)
+  - setting off: a notice with `Open Settings`; a missing session or exercise, or a session not in progress: an inline message
+- Key exits:
+  - back (top bar) → the previous screen; `Complete exercise` → the previous screen after resolving the sets still waiting; `Remove from session` → the previous screen; `History` → `/exercise-history`
+- Notes:
+  - until the session view (step 5) is the entry point it is reached by deep link (Maestro `teleport=exercise-page`); with no screen to go back to, back goes to `/train`
+
 ## Route shell (not a user-facing screen)
 
 1. `apps/mobile/app/_layout.tsx`
@@ -516,7 +531,7 @@ Brief entrypoint map of the current mobile screens.
 - Notes:
   - wraps the whole navigator in the route-layer auth guard (`apps/mobile/components/navigation/auth-route-guard.tsx`), which enforces login-on-start for configured signed-out sessions (neutral loading view while restoring, redirect to `/sign-in` when configured-but-signed-out, stand aside when auth is unconfigured, while allowing `/sign-in` and the dev/test-gated `/maestro-harness` route to render through)
   - immediately below the auth guard, wraps the navigator in the first-sync gate (`apps/mobile/src/sync/SyncGate.tsx`), which blocks a signed-in user behind a full-screen "Setting up your data…" block until `sync_runtime_state.bootstrap_completed_at` is set (then dismisses in place), and observes sync runtime state through the single shared scheduler-state accessor
-  - tab roots live inside the `(tabs)` route group (`apps/mobile/app/(tabs)/_layout.tsx`) with `headerShown: false`; the root stack registers the `(tabs)` group itself plus the `sign-in` screen and the detail screens (`exercise-history`, `sessions`, `profile`, `connected-agents`, `maestro-harness`, `completed-session/[sessionId]`, the M22 `group/mine`, `group/[groupId]/index`, `group-session/[memberId]/[sessionId]`, and the M25 `exercise-link`)
+  - tab roots live inside the `(tabs)` route group (`apps/mobile/app/(tabs)/_layout.tsx`) with `headerShown: false`; the root stack registers the `(tabs)` group itself plus the `sign-in` screen and the detail screens (`exercise-history`, `sessions`, `profile`, `connected-agents`, `maestro-harness`, `completed-session/[sessionId]`, the M22 `group/mine`, `group/[groupId]/index`, `group-session/[memberId]/[sessionId]`, the M25 `exercise-link`, and the header-less exercise page `session/[sessionId]/exercise/[sessionExerciseId]`)
   - the root stack gives every detail screen the native minimal back-button
     display mode (no custom back title), preserving normal platform back
     behavior while hiding the previous route-group title; the arrow-only

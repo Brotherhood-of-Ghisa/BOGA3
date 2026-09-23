@@ -44,9 +44,10 @@ Brief entrypoint inventory of the current reusable UI component set.
     (`flat` / `raised` / `overlay`); values and rationale: `docs/specs/ui/ux-rules.md` §9a
   - also carries the design-language vocabularies, not yet adopted by a shipped
     screen: `uiRoles` (colour roles), `uiFonts` (the three embedded typefaces
-    and their shipped weights) and `uiGeometry` (card / sheet radii, the 44pt
-    tap target, the 38pt metric column, the sheet handle, micro-label
-    tracking); rationale: `docs/specs/ui/design-language.md` §2–§4
+    and their shipped weights) and `uiGeometry` (card / sheet / control radii,
+    the 44pt tap target, the 38pt metric column, the sheet handle, the 50pt
+    labelled-field height, micro-label tracking); rationale:
+    `docs/specs/ui/design-language.md` §2–§4
   - `uiIconSize` (`xs` 12 / `sm` 16 / `md` 20 / `lg` 24), the icon edge lengths
     `Icon` takes
 
@@ -80,7 +81,7 @@ Brief entrypoint inventory of the current reusable UI component set.
 - Purpose:
   - the building blocks of the exercise page and session view, drawn from
     `uiRoles` / `uiFonts` / `uiGeometry` only (`docs/specs/ui/design-language.md`);
-    no shipped screen adopts them yet
+    adopted by the exercise page (`components/exercise-page/`), behind the new-screens setting
   - `Card` — `surface` on `paper`, 1px `rule`, card radius, no shadow, no
     padding (content owns its insets); with `onPress` the whole card is one
     labelled `link` target
@@ -112,6 +113,8 @@ Brief entrypoint inventory of the current reusable UI component set.
     `label` makes it an accessible image, for the rare icon no surrounding text
     or control label explains
   - geometry is vendored from Lucide 1.47.0 (ISC; notice in `LICENSE.lucide`),
+    plus `chevron-left` (back), `pencil` (edit), `swap` (Lucide
+    `arrow-left-right`) and `trash` (Lucide `trash-2`) for the exercise page,
     plus BoGa glyphs: `caret-down`, `radio-on` / `radio-off`, and the
     design-language §5 set-state glyphs `set-done` (filled `ink` disc, knocked-out
     check), `set-current` (`accent` ring), `set-planned` (dashed `planned` ring),
@@ -274,6 +277,19 @@ Brief entrypoint inventory of the current reusable UI component set.
 - File: `apps/mobile/components/exercise-core/exercise-core-fields.tsx`
 - Purpose:
   - `ExerciseCoreFields` — the exercise-name input and the `Total load` / `Per side` weight-entry control (labels from `LOAD_INPUT_MODE_LABELS`), shared by the personal exercise editor (`exercise-catalog/exercise-editor-modal.tsx`) and the group exercise form; both validate with `validateExerciseCore`. testIDs `<prefix>-name-input`, `<prefix>-name-error`, `<prefix>-load-mode-<mode>` (the editor keeps `exercise-editor-*`)
+
+16. Exercise page (exercise/session redesign step 4)
+- Folder: `apps/mobile/components/exercise-page/`; rules in `apps/mobile/src/session-recorder/exercise-page-model.ts`, records in `exercise-records.ts`, persistence in `session-exercise-draft.ts` + `use-session-exercise-draft.ts`
+- Purpose:
+  - `ExercisePageScreen` — the page's composition (route: `app/session/[sessionId]/exercise/[sessionExerciseId].tsx`)
+  - `ExerciseTopBar` — back · title · ⋮, each control a 44pt target
+  - `RecordsPanel` — a `Card` with the `Records` | `Last` selector (control radius), the `History` link, three stacked `Stat`s collapsed, record lines or the previous session's sets expanded
+  - `SetRow` — the set-row recipe: `ListRow density="list"`, the effort label in `leading`, weight × reps in `children` (the row-body target that opens the logger), the inline 1RM / Vol `Stat`s in `meta`, the set-state glyph (a checkbox) in `trailing`
+  - `SetLogger` — the open set in place: Weight / Reps / Effort fields at `uiGeometry.fieldHeight`, the `accent` commit tick on the control axis
+  - `EffortSheet`, `ExerciseOptionsSheet` — `Sheet` + `ListRow`
+  - `ExerciseSwapSheet` — `Sheet` over the shared `ExerciseListContent` / `buildExerciseListModel` and list preferences
+  - `pageText` — the page's shared type roles (micro-label, control label, running / detail / headline figures)
+  - covered by `app/__tests__/exercise-page-screen.test.tsx`, `exercise-page-model.test.ts`, `exercise-page-persistence.test.ts` and the `ios-exercise-page` lane
 
 ### UI-supporting shared module (non-visual)
 

@@ -20,6 +20,10 @@ jest.mock('@/src/maestro/exercise-block-history-fixture', () => ({
   seedExerciseBlockHistoryFixture: jest.fn(),
 }));
 
+jest.mock('@/src/maestro/exercise-page-fixture', () => ({
+  seedExercisePageFixture: jest.fn(),
+}));
+
 const mockIsDevMode = jest.fn<boolean, []>();
 jest.mock('@/src/utils/isDevMode', () => ({
   isDevMode: () => mockIsDevMode(),
@@ -37,6 +41,7 @@ import {
   EXERCISE_BLOCK_HISTORY_FIXTURE,
   seedExerciseBlockHistoryFixture,
 } from '@/src/maestro/exercise-block-history-fixture';
+import { seedExercisePageFixture } from '@/src/maestro/exercise-page-fixture';
 import {
   coerceMaestroHarnessQueryParam,
   isMaestroHarnessAllowed,
@@ -177,6 +182,18 @@ describe('maestro harness helpers', () => {
         target: 'completed-session',
       })
     ).toBeNull();
+
+    expect(resolveMaestroHarnessTeleportTarget('exercise-page')).toBe('exercise-page');
+    expect(
+      resolveMaestroHarnessTeleportHref({
+        target: 'exercise-page',
+        sessionId: 'session-123',
+        sessionExerciseId: 'exercise-456',
+      })
+    ).toBe('/session/session-123/exercise/exercise-456');
+    expect(
+      resolveMaestroHarnessTeleportHref({ target: 'exercise-page', sessionId: 'session-123' })
+    ).toBeNull();
   });
 
   it('runs a data reset only when requested', async () => {
@@ -230,6 +247,12 @@ describe('maestro harness helpers', () => {
     expect(mockSeedExerciseBlockHistoryFixture).not.toHaveBeenCalled();
 
     await runMaestroHarnessFixture('exercise-block-history');
+    expect(mockSeedExerciseBlockHistoryFixture).toHaveBeenCalledTimes(1);
+    expect(jest.mocked(seedExercisePageFixture)).not.toHaveBeenCalled();
+
+    expect(resolveMaestroHarnessFixtureName('exercise-page')).toBe('exercise-page');
+    await runMaestroHarnessFixture('exercise-page');
+    expect(jest.mocked(seedExercisePageFixture)).toHaveBeenCalledTimes(1);
     expect(mockSeedExerciseBlockHistoryFixture).toHaveBeenCalledTimes(1);
   });
 

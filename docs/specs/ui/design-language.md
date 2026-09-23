@@ -141,7 +141,12 @@ Headline figures (summary, records) stay Plex Mono 700, micro-labels Archivo
 - **Geometry lives in `uiGeometry`** (`apps/mobile/components/ui/tokens.ts`,
   added 2026-09-22): the card and sheet radii, the 44pt tap target, the 38pt
   metric column, the sheet handle, and micro-label tracking (0.1em, one value
-  for the target's 0.06–0.12 range). It sits beside the legacy `uiRadius` /
+  for the target's 0.06–0.12 range). Step 4 (2026-09-23) added a **control
+  radius 4** — input fields, a segmented selector and an outline button; the
+  target drew 4 and 5, a difference with no name — and a **labelled-field
+  height 50** (micro-label above a large figure: the logger's Weight / Reps /
+  Effort). The logger's other widths derive from these: Reps is one field
+  height wide, Effort two tap targets, the tick one tap target. It sits beside the legacy `uiRadius` /
   `uiSpace` rather than in them — 6 beside 8 would be two radii with no nameable
   difference (`ux-rules.md` §9a.5) — so the switch-over can retire the legacy
   scales wholesale. Spacing the target draws off-scale snaps to `uiSpace`

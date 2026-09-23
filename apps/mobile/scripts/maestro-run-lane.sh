@@ -9,7 +9,7 @@
 # (maestro-ios-gates.sh) keeps its own script — it is a different execution
 # model, not a thin wrapper.
 #
-#   ./scripts/maestro-run-lane.sh smoke|data-smoke|ui-regression|auth-profile|sync-e2e|groups-e2e
+#   ./scripts/maestro-run-lane.sh smoke|data-smoke|ui-regression|exercise-page|auth-profile|sync-e2e|groups-e2e
 #
 # Canonical lane names / gate membership: scripts/lanes.tsv (run via
 # `./boga test ios-smoke` etc.; the npm test:e2e:ios:* scripts also land here).
@@ -21,7 +21,7 @@ APP_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 REPO_ROOT="$(cd -- "$APP_DIR/../.." && pwd)"
 
 lane="${1:-}"
-LANES="smoke|data-smoke|ui-regression|auth-profile|sync-e2e|groups-e2e"
+LANES="smoke|data-smoke|ui-regression|exercise-page|auth-profile|sync-e2e|groups-e2e"
 [[ -n "$lane" ]] || { echo "usage: $0 $LANES" >&2; exit 2; }
 
 run_flow() {
@@ -95,6 +95,14 @@ case "$lane" in
       --scenario "Exercise block history" --flow "$APP_DIR/.maestro/flows/exercise-block-history-fixture.yaml" \
       --scenario "Settings dev wipe-local" --flow "$APP_DIR/.maestro/flows/settings-dev-wipe-local.yaml" \
       --scenario "Settings new-screens toggle" --flow "$APP_DIR/.maestro/flows/settings-new-screens-toggle.yaml"
+    ;;
+
+  # The exercise page (exercise/session redesign step 4), behind the new-screens
+  # setting: its own fixture, opted in and reset in-flow through the
+  # maestro-harness deep link. Infra-free; its own lane so the new screen's
+  # evidence (the V5-* captures) is one run. No Supabase.
+  exercise-page)
+    run_flow data "Exercise page" exercise-page.yaml
     ;;
 
   # The Supabase-configured auth/profile lane: login-on-start enforcement and the

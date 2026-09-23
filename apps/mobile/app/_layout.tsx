@@ -117,6 +117,11 @@ export default function RootLayout() {
                   name="group-session/[memberId]/[sessionId]"
                   options={{ title: 'Session' }}
                 />
+                {/* The exercise page draws its own top bar (step 4 of the exercise/session redesign). */}
+                <Stack.Screen
+                  name="session/[sessionId]/exercise/[sessionExerciseId]"
+                  options={{ headerShown: false }}
+                />
                 <Stack.Screen name="maestro-harness" options={{ headerShown: false }} />
               </Stack>
             </SyncGate>
