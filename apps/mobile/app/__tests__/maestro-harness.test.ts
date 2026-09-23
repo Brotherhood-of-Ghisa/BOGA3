@@ -48,21 +48,14 @@ import {
   resolveMaestroHarnessBootstrapAction,
   resolveMaestroHarnessFixtureName,
   resolveMaestroHarnessGateAction,
-  resolveMaestroHarnessNewScreensAction,
   resolveMaestroHarnessResetMode,
   resolveMaestroHarnessTeleportHref,
   resolveMaestroHarnessTeleportTarget,
   runMaestroHarnessBootstrapAction,
   runMaestroHarnessFixture,
   runMaestroHarnessGateAction,
-  runMaestroHarnessNewScreensAction,
   runMaestroHarnessReset,
 } from '@/src/maestro/harness';
-import {
-  __resetNewScreensPreferenceForTests,
-  getNewScreensEnabledSnapshot,
-  setNewScreensEnabled,
-} from '@/src/session-recorder/new-screens-preference';
 import {
   __resetSyncGateStateForTests,
   getSyncGateStateSnapshot,
@@ -138,7 +131,8 @@ describe('maestro harness helpers', () => {
   });
 
   it('maps supported teleport targets to route hrefs', () => {
-    expect(resolveMaestroHarnessTeleportTarget('session-recorder')).toBe('session-recorder');
+    // The old recorder route is gone (redesign 6b); its teleport went with it.
+    expect(resolveMaestroHarnessTeleportTarget('session-recorder')).toBeNull();
     expect(resolveMaestroHarnessTeleportTarget('unknown')).toBeNull();
 
     expect(
@@ -146,17 +140,6 @@ describe('maestro harness helpers', () => {
         target: 'session-list',
       })
     ).toBe('/stats-history');
-
-    expect(
-      resolveMaestroHarnessTeleportHref({
-        target: 'session-recorder',
-        mode: 'completed-edit',
-        sessionId: 'session-123',
-        maestroShare: 'fail-once',
-      })
-    ).toBe(
-      '/session-recorder?mode=completed-edit&sessionId=session-123&maestroShare=fail-once'
-    );
 
     expect(
       resolveMaestroHarnessTeleportHref({
@@ -212,44 +195,6 @@ describe('maestro harness helpers', () => {
 
     await runMaestroHarnessReset('data');
     expect(mockResetLocalAppData).toHaveBeenCalledTimes(1);
-  });
-
-  describe('new exercise/session screens preference', () => {
-    beforeEach(() => {
-      __resetNewScreensPreferenceForTests();
-    });
-
-    afterEach(() => {
-      __resetNewScreensPreferenceForTests();
-    });
-
-    it('resolves only the known newScreens actions', () => {
-      expect(resolveMaestroHarnessNewScreensAction('on')).toBe('on');
-      expect(resolveMaestroHarnessNewScreensAction('off')).toBe('off');
-      expect(resolveMaestroHarnessNewScreensAction('true')).toBe('none');
-      expect(resolveMaestroHarnessNewScreensAction(null)).toBe('none');
-    });
-
-    it('switches the preference on and off, and leaves it alone for none', async () => {
-      await runMaestroHarnessNewScreensAction('on');
-      expect(getNewScreensEnabledSnapshot()).toBe(true);
-
-      await runMaestroHarnessNewScreensAction('none');
-      expect(getNewScreensEnabledSnapshot()).toBe(true);
-
-      await runMaestroHarnessNewScreensAction('off');
-      expect(getNewScreensEnabledSnapshot()).toBe(false);
-    });
-
-    it('restores the default (on) on a data reset so it cannot leak into later flows', async () => {
-      await setNewScreensEnabled(false);
-
-      await runMaestroHarnessReset('none');
-      expect(getNewScreensEnabledSnapshot()).toBe(false);
-
-      await runMaestroHarnessReset('data');
-      expect(getNewScreensEnabledSnapshot()).toBe(true);
-    });
   });
 
   it('runs the exercise block history fixture only when requested', async () => {

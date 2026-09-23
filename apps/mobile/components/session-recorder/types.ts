@@ -14,20 +14,11 @@ export type SessionSet = {
   performanceStatus: SessionSetPerformanceStatus;
 };
 
-export type SessionExerciseTag = {
-  assignmentId: string;
-  tagDefinitionId: string;
-  name: string;
-  deletedAt: Date | null;
-  assignedAt: Date;
-};
-
 export type SessionExercise = {
   id: string;
   exerciseDefinitionId: string;
   name: string;
   machineName: string;
-  tags: SessionExerciseTag[];
   sets: SessionSet[];
 };
 
@@ -45,25 +36,6 @@ export type SessionLocation = {
   longitude?: number | null;
   coordinateAccuracyM?: number | null;
   coordinatesUpdatedAt?: Date | null;
-};
-
-export type GymModalMode = 'picker' | 'manage' | 'editor';
-export type GymEditorReturnMode = 'picker' | 'manage';
-
-export type SessionRecorderState = {
-  session: Session;
-  locations: SessionLocation[];
-  pendingLocationName: string;
-  gymPickerVisible: boolean;
-  gymModalMode: GymModalMode;
-  editorReturnMode: GymEditorReturnMode;
-  showArchivedInManager: boolean;
-  editingLocationId: string | null;
-  editingLocationName: string;
-  exercisePickerVisible: boolean;
-  exerciseSelectionTargetId: string | null;
-  exerciseActionMenuVisible: boolean;
-  activeExerciseActionId: string | null;
 };
 
 export const SEEDED_LOCATIONS: SessionLocation[] = [

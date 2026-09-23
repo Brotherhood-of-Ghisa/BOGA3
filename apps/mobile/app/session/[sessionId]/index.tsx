@@ -43,7 +43,7 @@ import { useCompletedSessionTimes } from '@/src/session-recorder/use-completed-s
 import { useSessionView } from '@/src/session-recorder/use-session-view';
 
 const TRAIN_ROUTE = mainTabHref('train');
-const EXERCISE_CATALOG_MANAGE_ROUTE = '/exercise-catalog?source=session-recorder&intent=manage' as Href;
+const EXERCISE_CATALOG_MANAGE_ROUTE = '/exercise-catalog?source=session&intent=manage' as Href;
 
 const coerceParam = (value: string | string[] | undefined): string | null =>
   (Array.isArray(value) ? value[0] : value) ?? null;
@@ -444,7 +444,6 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
         visible={gymPicker.visible}
       />
       <ExercisePicker
-        mode="add"
         onAppendPlan={appendPlan}
         onDismiss={hidePicker}
         onOpenManage={openManage}

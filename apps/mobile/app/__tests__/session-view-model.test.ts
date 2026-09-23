@@ -1,5 +1,5 @@
 import type { Session, SessionSet } from '@/components/session-recorder/types';
-import { activeSessionHref, sessionExerciseHref } from '@/src/navigation/active-session-entry';
+import { sessionExerciseHref, sessionViewHref } from '@/src/navigation/active-session-entry';
 import {
   appendSuggestedPlan,
   describeSubmitCleanupPrompt,
@@ -55,7 +55,6 @@ const bench = {
   exerciseDefinitionId: 'def_bench',
   name: 'Barbell Bench Press',
   machineName: '',
-  tags: [],
   sets: [
     doneSet('b1', '100', '10', 'warm_up'),
     doneSet('b2', '160', '8', 'rir_2'),
@@ -248,10 +247,8 @@ describe('appendSuggestedPlan', () => {
 });
 
 describe('active session entry', () => {
-  it('opens the session view only with the setting on and a known session', () => {
-    expect(activeSessionHref('s1', true)).toBe('/session/s1');
-    expect(activeSessionHref('s1', false)).toBe('/session-recorder');
-    expect(activeSessionHref(null, true)).toBe('/session-recorder');
+  it('builds the session view and exercise page hrefs', () => {
+    expect(sessionViewHref('s1')).toBe('/session/s1');
     expect(sessionExerciseHref('s1', 'e 1')).toBe('/session/s1/exercise/e%201');
   });
 });

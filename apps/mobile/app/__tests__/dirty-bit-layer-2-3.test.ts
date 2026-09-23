@@ -63,7 +63,6 @@ jest.mock('@/src/data/bootstrap', () => ({
 
 // Imported AFTER the mock so the repos pick up the mocked bootstrap.
 import { createDrizzleSessionDraftStore } from '@/src/data/session-drafts';
-import { createDrizzleExerciseTagStore } from '@/src/data/exercise-tags';
 import { __resetClockForTests } from '@/src/data/clock';
 
 const SESSION_ID = 'session-l23';
@@ -495,35 +494,21 @@ describe('Layer 2 / 3 write-path dirty-bit contract', () => {
         )
         .get();
 
-    it('create: createTagAssignment leaves the session_exercise_tag row local_dirty = 1 with a bumped timestamp', async () => {
-      seedTagFixtures(mockActiveDatabase!);
-      const store = createDrizzleExerciseTagStore();
-
-      await store.createTagAssignment({
-        sessionExerciseId: SESSION_EXERCISE_ID,
-        tagDefinitionId: TAG_DEFINITION_ID,
-        now: new Date('2026-05-30T10:03:00.000Z'),
-      });
-
-      const tag = readTag(mockActiveDatabase!, SESSION_EXERCISE_ID, TAG_DEFINITION_ID);
-      expect(tag).toBeDefined();
-      expect(tag?.localDirty).toBe(true);
-      expect(tag?.localUpdatedAtMs).toBeGreaterThan(0);
-    });
-
     it('cascade via graph rebuild: re-saving the draft re-writes the preserved tag and keeps it local_dirty = 1', async () => {
       seedTagFixtures(mockActiveDatabase!);
-      const tagStore = createDrizzleExerciseTagStore();
       const draftStore = createDrizzleSessionDraftStore();
 
-      await tagStore.createTagAssignment({
-        sessionExerciseId: SESSION_EXERCISE_ID,
-        tagDefinitionId: TAG_DEFINITION_ID,
-        now: new Date('2026-05-30T10:03:00.000Z'),
-      });
-
-      // Model a clean post-push state.
-      mockActiveDatabase!.update(sessionExerciseTags).set({ localDirty: false }).run();
+      // A synced tag assignment in a clean post-push state (the app no longer
+      // writes tags; they arrive by sync).
+      mockActiveDatabase!
+        .insert(sessionExerciseTags)
+        .values({
+          id: 'tag-assignment-1',
+          sessionExerciseId: SESSION_EXERCISE_ID,
+          exerciseTagDefinitionId: TAG_DEFINITION_ID,
+          localDirty: false,
+        })
+        .run();
       expect(readTag(mockActiveDatabase!, SESSION_EXERCISE_ID, TAG_DEFINITION_ID)?.localDirty).toBe(false);
 
       // Re-save the same session-exercise. `replaceSessionExerciseGraph`

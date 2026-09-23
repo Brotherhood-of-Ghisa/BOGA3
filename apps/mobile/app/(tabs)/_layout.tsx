@@ -8,7 +8,6 @@ import { MainTabs } from '@/components/navigation/main-tabs';
 import {
   mainTabHref,
   resolveMainTab,
-  shouldCollapseMainNavigation,
   shouldShowMainNavigation,
 } from '@/src/navigation/main-tabs';
 
@@ -21,17 +20,13 @@ function TabsBottomTray() {
     () => shouldShowMainNavigation(routeSegments),
     [routeSegments],
   );
-  const collapseOnEntry = useMemo(
-    () => shouldCollapseMainNavigation(routeSegments),
-    [routeSegments],
-  );
 
   if (!activeTab || !isVisible) {
     return null;
   }
 
   return (
-    <BottomTray collapseOnEntry={collapseOnEntry}>
+    <BottomTray>
       <MainTabs
         activeTab={activeTab}
         onSelect={(tab) => router.push(mainTabHref(tab))}
@@ -54,7 +49,6 @@ export default function TabsLayout() {
           {/* Preserved compatibility roots remain directly addressable but are
               owned by the four canonical destinations rather than visible. */}
           <Tabs.Screen name="stats-history" options={{ title: 'History', href: null }} />
-          <Tabs.Screen name="session-recorder" options={{ title: 'Session Recorder', href: null }} />
           <Tabs.Screen name="exercise-catalog" options={{ title: 'Exercise Catalog', href: null }} />
           <Tabs.Screen name="groups" options={{ title: 'Groups', href: null }} />
           <Tabs.Screen name="settings" options={{ title: 'Settings', href: null }} />

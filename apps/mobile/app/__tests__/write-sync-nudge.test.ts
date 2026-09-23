@@ -29,7 +29,6 @@ import { eq } from 'drizzle-orm';
 
 import {
   exerciseDefinitions,
-  exerciseTagDefinitions,
   gyms,
   muscleGroups,
   sessionExercises,
@@ -73,7 +72,6 @@ import {
   upsertLocalGym,
 } from '@/src/data/local-gyms';
 import { createDrizzleExerciseCatalogStore } from '@/src/data/exercise-catalog';
-import { createDrizzleExerciseTagStore } from '@/src/data/exercise-tags';
 import { createDrizzleSessionDraftStore } from '@/src/data/session-drafts';
 import { createDrizzleSessionListStore } from '@/src/data/session-list';
 
@@ -311,38 +309,5 @@ describe('repo write paths nudge the scheduler exactly once, post-commit', () =>
     // The whole session + exercise + set graph is one logical mutation: exactly
     // one nudge, NOT one per dirtied row.
     expect(mockNotifyLocalWrite).toHaveBeenCalledTimes(1);
-  });
-
-  it('exercise-tags createTagDefinition: dirties the row AND nudges once', async () => {
-    requireDatabase()
-      .insert(exerciseDefinitions)
-      .values({ id: 'def-1', name: 'Bench Press' })
-      .run();
-    const store = createDrizzleExerciseTagStore();
-
-    const created = await store.createTagDefinition({
-      exerciseDefinitionId: 'def-1',
-      name: 'Heavy',
-      normalizedName: 'heavy',
-      now: new Date('2026-05-29T10:00:00.000Z'),
-    });
-
-    const row = requireDatabase()
-      .select()
-      .from(exerciseTagDefinitions)
-      .where(eq(exerciseTagDefinitions.id, created.id))
-      .get();
-    expect(row?.localDirty).toBe(true);
-    expect(mockNotifyLocalWrite).toHaveBeenCalledTimes(1);
-  });
-
-  it('exercise-tags listTagDefinitions (read) never nudges', async () => {
-    requireDatabase()
-      .insert(exerciseDefinitions)
-      .values({ id: 'def-1', name: 'Bench Press' })
-      .run();
-    const store = createDrizzleExerciseTagStore();
-    await store.listTagDefinitions({ exerciseDefinitionId: 'def-1', includeDeleted: true });
-    expect(mockNotifyLocalWrite).not.toHaveBeenCalled();
   });
 });

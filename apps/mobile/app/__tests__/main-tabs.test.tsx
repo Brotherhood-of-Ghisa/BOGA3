@@ -11,7 +11,6 @@ import {
   MAIN_TAB_KEYS,
   mainTabHref,
   resolveMainTab,
-  shouldCollapseMainNavigation,
   shouldShowMainNavigation,
 } from '@/src/navigation/main-tabs';
 
@@ -40,7 +39,6 @@ describe('M26 main tab model', () => {
     expect(resolveMainTab(['(tabs)', 'progress', 'history'])).toBe('progress');
     expect(resolveMainTab(['(tabs)', 'more', 'groups'])).toBe('more');
 
-    expect(resolveMainTab(['(tabs)', 'session-recorder'])).toBe('train');
     expect(resolveMainTab(['(tabs)', 'stats-history'])).toBe('progress');
     expect(resolveMainTab(['(tabs)', 'exercise-catalog'])).toBe('more');
     expect(resolveMainTab(['(tabs)', 'groups'])).toBe('more');
@@ -53,42 +51,33 @@ describe('M26 main tab model', () => {
     expect(shouldShowMainNavigation(['group', 'group-1'])).toBe(false);
   });
 
-  it('keeps recorder navigation mounted while requesting its collapsed peek state', () => {
-    expect(shouldCollapseMainNavigation(['(tabs)', 'session-recorder'])).toBe(true);
-    expect(shouldCollapseMainNavigation(['(tabs)', 'session-recorder', 'completed-edit'])).toBe(true);
-    expect(shouldShowMainNavigation(['(tabs)', 'session-recorder'])).toBe(true);
+  it('shows the tab bar on tab-owned routes', () => {
     expect(shouldShowMainNavigation(['(tabs)', 'today'])).toBe(true);
+    expect(shouldShowMainNavigation(['(tabs)', 'session-recorder'])).toBe(false);
   });
 });
 
-describe('BottomTray route entry', () => {
-  it('collapses to the accessible peek handle when recorder work gains focus', () => {
+describe('BottomTray', () => {
+  it('collapses to the accessible peek handle and expands again from it', () => {
     jest.useFakeTimers();
     const view = render(
       <TrayVisibilityProvider>
-        <BottomTray collapseOnEntry={false}>
+        <BottomTray>
           <Text>Tabs</Text>
         </BottomTray>
       </TrayVisibilityProvider>,
     );
+
+    fireEvent.press(screen.getByLabelText('Collapse navigation tray'));
+    act(() => {
+      jest.runOnlyPendingTimers();
+    });
+    fireEvent.press(screen.getByLabelText('Expand navigation tray'));
     act(() => {
       jest.runOnlyPendingTimers();
     });
 
     expect(screen.getByLabelText('Collapse navigation tray')).toBeTruthy();
-
-    view.rerender(
-      <TrayVisibilityProvider>
-        <BottomTray collapseOnEntry>
-          <Text>Tabs</Text>
-        </BottomTray>
-      </TrayVisibilityProvider>,
-    );
-    act(() => {
-      jest.runOnlyPendingTimers();
-    });
-
-    expect(screen.getByLabelText('Expand navigation tray')).toBeTruthy();
     view.unmount();
     jest.useRealTimers();
   });

@@ -63,7 +63,7 @@ export default function ExerciseCatalogScreen() {
   const params = useLocalSearchParams<{ source?: string | string[]; intent?: string | string[] }>();
   const routeSource = coerceRouteParam(params.source);
   const routeIntent = coerceRouteParam(params.intent);
-  const isFromSessionRecorder = routeSource === 'session-recorder';
+  const isFromSession = routeSource === 'session';
 
   const [isEditorModalVisible, setIsEditorModalVisible] = useState(false);
   const [isCatalogOptionsMenuVisible, setIsCatalogOptionsMenuVisible] = useState(false);
@@ -198,7 +198,7 @@ export default function ExerciseCatalogScreen() {
     setEditorExerciseTarget(null);
     setExerciseActionMenuTarget(null);
 
-    if (isFromSessionRecorder) {
+    if (isFromSession) {
       router.back();
     }
   };

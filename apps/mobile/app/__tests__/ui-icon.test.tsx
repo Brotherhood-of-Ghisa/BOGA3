@@ -72,13 +72,6 @@ describe('Icon', () => {
 // inside figures ("100 kg × 5", "−12%"), not icons. Comments are skipped.
 describe('retired Unicode glyphs stay retired', () => {
   const RETIRED = /[›⋮▾▼★●○↗↑↓⚙✓]|👤/u;
-  // The recorder is deleted by the exercise/session rebuild (plan step 6), and
-  // the muscle-load row is rendered only by it; both keep their glyphs until
-  // then rather than being retrofitted twice.
-  const ALLOWLIST = new Set([
-    'app/(tabs)/session-recorder.tsx',
-    'components/session-recorder/session-muscle-load.tsx',
-  ]);
   const APP_ROOT = join(__dirname, '..', '..');
 
   const sourceFiles = (dir: string): string[] =>
@@ -93,7 +86,6 @@ describe('retired Unicode glyphs stay retired', () => {
   it('finds no retired glyph outside comments in app, components or src', () => {
     const offenders = ['app', 'components', 'src']
       .flatMap((dir) => sourceFiles(join(APP_ROOT, dir)))
-      .filter((file) => !ALLOWLIST.has(relative(APP_ROOT, file)))
       .flatMap((file) =>
         readFileSync(file, 'utf8')
           .split('\n')

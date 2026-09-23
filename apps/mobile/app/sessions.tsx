@@ -15,7 +15,6 @@ import {
 import { uiColors, uiSpace, uiTypography } from '@/components/ui';
 import { appendCompletedSessionAsPlanned } from '@/src/data';
 import { sessionViewHref } from '@/src/navigation/active-session-entry';
-import { useNewScreensEnabled } from '@/src/session-recorder/new-screens-preference';
 
 export type SessionsScreenProps = {
   dataClient?: SessionListDataClient;
@@ -29,7 +28,6 @@ export function SessionsScreen({
   isFocused = true,
 }: SessionsScreenProps) {
   const router = useRouter();
-  const [newScreensEnabled] = useNewScreensEnabled();
   const [showDeletedSessions, setShowDeletedSessions] = useState(false);
   const [activeDurationNowMs, setActiveDurationNowMs] = useState(() => Date.now());
 
@@ -70,12 +68,8 @@ export function SessionsScreen({
     };
   }, [activeSession]);
 
-  const navigateToSessionRecorder = () => {
-    if (newScreensEnabled && activeSession) {
-      router.push(sessionViewHref(activeSession.id));
-      return;
-    }
-    router.dismissTo('/session-recorder');
+  const openActiveSession = (sessionId: string) => {
+    router.push(sessionViewHref(sessionId));
   };
 
   const discardActiveSession = () => {
@@ -142,8 +136,8 @@ export function SessionsScreen({
             <ActiveSessionRow
               session={activeSession}
               nowMs={activeDurationNowMs}
-              onResume={navigateToSessionRecorder}
-              onComplete={navigateToSessionRecorder}
+              onResume={() => openActiveSession(activeSession.id)}
+              onComplete={() => openActiveSession(activeSession.id)}
               onDelete={() => {
                 void discardActiveSession();
               }}
