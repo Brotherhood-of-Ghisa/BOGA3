@@ -58,7 +58,7 @@ describe('settings new exercise/session screens row', () => {
     __resetNewScreensPreferenceForTests();
   });
 
-  it('sits in the Preferences card after the date format, defaulting to Off', async () => {
+  it('sits in the Preferences card after the date format, defaulting to On', async () => {
     const result = render(<SettingsRoute />);
     await act(async () => {});
 
@@ -73,29 +73,32 @@ describe('settings new exercise/session screens row', () => {
     expect([...ordered].sort((a, b) => a - b)).toEqual(ordered);
 
     expect(screen.getByText('New exercise & session screens')).toBeTruthy();
-    expect(screen.getByTestId('settings-new-screens-off').props.accessibilityState).toEqual({
+    expect(
+      screen.getByText('The redesigned exercise page and session view. Turn off to use the previous recorder for now.')
+    ).toBeTruthy();
+    expect(screen.getByTestId('settings-new-screens-on').props.accessibilityState).toEqual({
       selected: true,
     });
-    expect(screen.getByTestId('settings-new-screens-on').props.accessibilityState).toEqual({
+    expect(screen.getByTestId('settings-new-screens-off').props.accessibilityState).toEqual({
       selected: false,
     });
   });
 
-  it('turns the preference on and back off', async () => {
+  it('turns the preference off and back on', async () => {
     render(<SettingsRoute />);
     await act(async () => {});
-
-    fireEvent.press(screen.getByTestId('settings-new-screens-on'));
-    await act(async () => {});
-    expect(getNewScreensEnabledSnapshot()).toBe(true);
-    expect(screen.getByTestId('settings-new-screens-on').props.accessibilityState).toEqual({
-      selected: true,
-    });
 
     fireEvent.press(screen.getByTestId('settings-new-screens-off'));
     await act(async () => {});
     expect(getNewScreensEnabledSnapshot()).toBe(false);
     expect(screen.getByTestId('settings-new-screens-off').props.accessibilityState).toEqual({
+      selected: true,
+    });
+
+    fireEvent.press(screen.getByTestId('settings-new-screens-on'));
+    await act(async () => {});
+    expect(getNewScreensEnabledSnapshot()).toBe(true);
+    expect(screen.getByTestId('settings-new-screens-on').props.accessibilityState).toEqual({
       selected: true,
     });
   });
@@ -105,10 +108,10 @@ describe('settings new exercise/session screens row', () => {
     await act(async () => {});
 
     await act(async () => {
-      await setNewScreensEnabled(true);
+      await setNewScreensEnabled(false);
     });
 
-    expect(screen.getByTestId('settings-new-screens-on').props.accessibilityState).toEqual({
+    expect(screen.getByTestId('settings-new-screens-off').props.accessibilityState).toEqual({
       selected: true,
     });
   });

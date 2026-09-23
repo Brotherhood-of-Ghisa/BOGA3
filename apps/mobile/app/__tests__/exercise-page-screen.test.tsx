@@ -482,15 +482,15 @@ describe('ExercisePageScreen', () => {
 describe('exercise page route', () => {
   beforeEach(() => __resetNewScreensPreferenceForTests());
 
-  it('stays behind the new-screens setting', async () => {
+  it('shows the Settings notice when the new-screens setting is off', async () => {
+    await act(() => setNewScreensEnabled(false));
     render(<ExercisePageRoute />);
     expect(await screen.findByTestId('exercise-page-disabled')).toBeTruthy();
     fireEvent.press(screen.getByTestId('exercise-page-open-settings'));
     expect(mockRouter.push).toHaveBeenCalledWith('/settings');
   });
 
-  it('opens the page for the route params once the setting is on', async () => {
-    await act(() => setNewScreensEnabled(true));
+  it('opens the page for the route params by default', async () => {
     render(<ExercisePageRoute />);
     expect(screen.queryByTestId('exercise-page-disabled')).toBeNull();
     // The real repository is not wired in this suite, so the page shows its

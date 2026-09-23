@@ -237,14 +237,14 @@ describe('maestro harness helpers', () => {
       expect(getNewScreensEnabledSnapshot()).toBe(false);
     });
 
-    it('restores the default (off) on a data reset so it cannot leak into later flows', async () => {
-      await setNewScreensEnabled(true);
+    it('restores the default (on) on a data reset so it cannot leak into later flows', async () => {
+      await setNewScreensEnabled(false);
 
       await runMaestroHarnessReset('none');
-      expect(getNewScreensEnabledSnapshot()).toBe(true);
+      expect(getNewScreensEnabledSnapshot()).toBe(false);
 
       await runMaestroHarnessReset('data');
-      expect(getNewScreensEnabledSnapshot()).toBe(false);
+      expect(getNewScreensEnabledSnapshot()).toBe(true);
     });
   });
 

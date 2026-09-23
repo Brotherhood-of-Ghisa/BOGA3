@@ -70,7 +70,7 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
     friend-session route, while a record card or membership row opens
     `/groups?groupId=<groupId>` (records are read-only here, with no Certify)
   - an active session replaces the planned-session action and resumes at
-    `/session-recorder` (`/session/<id>` with the new-screens setting on, as
+    `/session/<id>` (`/session-recorder` with the new-screens setting Off, as
     for every entry below); any future ready plan is launched through the shared
     active-draft coordinator; recent rows open
     `/completed-session/[sessionId]` and the section-level action opens
@@ -174,7 +174,7 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
   - `sessionId` (path; the active draft's id)
 - Behavior:
   - the session view (redesign step 5); every app entry into the active session
-    opens it while the new-screens setting is on, through
+    opens it while the new-screens setting is On (the default), through
     `activeSessionHref(sessionId, enabled)` in
     `apps/mobile/src/navigation/active-session-entry.ts` (Off, or no known id:
     `/session-recorder`, unchanged)
@@ -365,7 +365,7 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 - Path params:
   - `sessionId` (an active session) and `sessionExerciseId` (one of its exercises); both required. A missing session, a session not in progress, or an exercise no longer in it renders an inline message instead of the page
 - Behavior:
-  - renders only while `New exercise & session screens` is on; otherwise a notice whose `Open Settings` pushes `/settings`
+  - renders while `New exercise & session screens` is On (the default); Off shows a notice whose `Open Settings` pushes `/settings`
   - no query params; the records panel, the open set and every sheet are in-route state
   - registered with `headerShown: false`: the page draws its own top bar
 
@@ -468,8 +468,8 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 45. `/today` -> `/groups?groupId=<groupId>`
    - a Group activity record card or membership row
 46. `/today`, `/train`, `/sessions`, `/completed-session/<sessionId>` (append) -> `/session/<sessionId>`
-   - every active-session entry, only while the new-screens setting is on
-     (`activeSessionHref`); Off keeps each on `/session-recorder` exactly as in
+   - every active-session entry while the new-screens setting is On, the
+     default (`activeSessionHref`); Off keeps each on `/session-recorder` exactly as in
      transitions 5 and 9 and the Today/Train rows above
 47. `/session/<sessionId>` -> `/completed-session/<sessionId>?presentation=completion`
    - Finish after its cleanup prompts and the completion write (`router.replace`)

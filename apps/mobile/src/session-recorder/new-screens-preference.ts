@@ -2,14 +2,15 @@ import { useEffect, useSyncExternalStore } from 'react';
 import * as SecureStore from 'expo-secure-store';
 
 /**
- * Opt-in for the redesigned exercise page and session view, which are built as
- * new routes beside the existing recorder (docs/plans/exercise-session-redesign.md,
- * rule 3). A user setting rather than `isDevMode()`, so it works on the real build.
- * Device-local, never synced. Defaults off; deleted at switch-over.
+ * The redesigned exercise page and session view, built as new routes beside the
+ * existing recorder (docs/plans/exercise-session-redesign.md, rule 3). A user
+ * setting rather than `isDevMode()`, so it works on the real build. Device-local,
+ * never synced. On by default since step 6a; a stored choice, including an
+ * explicit Off, wins over the default. Deleted with the old recorder (step 6b).
  */
 const STORAGE_KEY = 'boga3.newExerciseSessionScreens.v1';
 
-export const DEFAULT_NEW_SCREENS_ENABLED = false;
+export const DEFAULT_NEW_SCREENS_ENABLED = true;
 
 type Listener = () => void;
 

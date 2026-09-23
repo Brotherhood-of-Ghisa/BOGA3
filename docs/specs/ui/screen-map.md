@@ -42,8 +42,8 @@ Brief entrypoint map of the current mobile screens.
     interface, the planning slot uses the approved `Watch this space 👀`
     placeholder and links to Train without inventing plan data
 - Key exits:
-  - `/session-recorder` (or `/session/<id>` with the new-screens setting
-    on), `/train`, `/groups`, `/group/[groupId]`,
+  - `/session/<id>` (or `/session-recorder` with the new-screens setting
+    Off), `/train`, `/groups`, `/group/[groupId]`,
     `/group-session/[memberId]/[sessionId]`,
     `/completed-session/[sessionId]`, `/progress`, and `/sign-in`
 
@@ -62,8 +62,8 @@ Brief entrypoint map of the current mobile screens.
     approved `Watch this space 👀` placeholder until M23 supplies a plan
     read/materialization and management interface
 - Key exits:
-  - `/session-recorder` after guarded empty/planned launch or active resume
-    (`/session/<id>` instead with the new-screens setting on);
+  - `/session/<id>` after guarded empty/planned launch or active resume
+    (`/session-recorder` instead with the new-screens setting Off);
     a future planner exit is supplied by the planning integration rather than
     guessed here
 
@@ -199,14 +199,15 @@ Brief entrypoint map of the current mobile screens.
     collapsed peek handle in active and completed-edit recorder modes
   - `/exercise-link?exerciseDefinitionId=<id>` (`•••` `Link to group exercise…`)
 
-4b. `/session/[sessionId]` (session view; new-screens setting only)
+4b. `/session/[sessionId]` (session view; the default since redesign step 6a)
 - File: `apps/mobile/app/session/[sessionId]/index.tsx` (components in
   `apps/mobile/components/session-view/`)
 - Purpose:
   - the active session, read-only and navigational (exercise/session redesign
     step 5; accepted target `design-targets/exercise-session-v5.md`,
-    `V6-Session`). Reached only while Settings' `New exercise & session
-    screens` is On; Off keeps every entry on `/session-recorder`
+    `V6-Session`). Every active-session entry opens it while Settings' `New
+    exercise & session screens` is On (the default); Off keeps every entry on
+    `/session-recorder`
 - Key states (high level):
   - own top bar: `Session` · ⋮ · `Finish` (the one `accent` primary); the
     persistent four-tab bar sits at the bottom with Train selected
@@ -268,9 +269,9 @@ Brief entrypoint map of the current mobile screens.
     concise signed-out guidance otherwise
   - Preferences card: date format (`settings-date-format-<format>`), then the
     `New exercise & session screens` Off/On toggle (`settings-new-screens-off` /
-    `-on`), default Off, device-local and shown on every build (not
-    `isDevMode()`). It opts into the redesigned exercise page and session view;
-    until those routes ship it changes nothing else.
+    `-on`), default On, device-local and shown on every build (not
+    `isDevMode()`). On, active-session entries open the session view and
+    exercise page; Off returns them to the previous recorder.
   - AI coaching always offers an external `Connect an AI coach` setup link and
     states the read-only/revocable boundary; browser-launch failure stays inline
     and retryable. The separate Connected agents row is signed-in only.
@@ -339,11 +340,12 @@ Brief entrypoint map of the current mobile screens.
   - one focus-aware automatic history load on first presentation and on each
     later focus reacquisition; filter and mutation refreshes remain explicit
   - deleted-session visibility toggle and completed-session row actions
-  - active Resume and review/complete affordances both return to the existing
-    recorder so draft state and recorder cleanup rules remain authoritative
+  - active Resume and review/complete affordances both open the active session
+    (the session view, or the recorder with the setting Off) so draft state and
+    the shared cleanup rules remain authoritative
 - Key exits:
-  - `/session-recorder` via stack dismissal for active Resume or review/complete
-    (with the new-screens setting on, `/session/<id>` is pushed instead)
+  - `/session/<id>` pushed for active Resume or review/complete (with the
+    new-screens setting Off, `/session-recorder` via stack dismissal instead)
   - `/session-recorder?mode=completed-edit&sessionId=<sessionId>` from a
     completed row or its explicit Edit action
 - Notes:
@@ -373,8 +375,8 @@ Brief entrypoint map of the current mobile screens.
   - temporary redirect placeholder for `intent=edit`
 - Key exits:
   - `session-recorder` (edit)
-  - `session-recorder` after successful per-exercise block append (the
-    session view with the new-screens setting on)
+  - the session view after successful per-exercise block append
+    (`session-recorder` with the new-screens setting Off)
   - `/progress` from completion Done/back
   - `/sessions` or completed-edit mode from historical-summary header actions
 
@@ -557,7 +559,7 @@ Brief entrypoint map of the current mobile screens.
 - File: `apps/mobile/app/session/[sessionId]/exercise/[sessionExerciseId].tsx` (composition in `apps/mobile/components/exercise-page/`)
 - Purpose:
   - one page per exercise of the active session, in the design language (`design-language.md`; accepted target `design-targets/exercise-session-v5.md`): top bar (back · exercise name · ⋮), the collapsible records panel, one ordered set list whose current set expands in place into the logger, `+ Add set`, and `Complete exercise`
-  - behind the `New exercise & session screens` setting (`useNewScreensEnabled()`); built beside the recorder, which it shares its domain with (`src/session-recorder/**`)
+  - shown while the `New exercise & session screens` setting is On, the default since step 6a (`useNewScreensEnabled()`); built beside the recorder, which it shares its domain with (`src/session-recorder/**`)
 - Key states (high level):
   - records panel collapsed (`1RM` / `Max` / `Vol` of the selected view: the records, or the last session), expanded on `Records` (each record's date and set) or on `Last` (the previous completed session's sets); `Records` | `Last` and `History` are present in both, and switching views keeps the panel collapsed or expanded
   - performed, current and planned rows (glyph `set-done` / `set-current` / `set-planned`); the logger (Weight · Reps · Effort · the `accent` tick) on the first set not performed, or on the row tapped

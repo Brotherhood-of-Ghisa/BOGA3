@@ -291,8 +291,8 @@ export default function SettingsScreen() {
               New exercise &amp; session screens
             </UiText>
             <UiText selectable variant="bodyMuted">
-              Try the redesigned exercise page and session view while they’re being built.
-              Switch back any time.
+              The redesigned exercise page and session view. Turn off to use the previous
+              recorder for now.
             </UiText>
             <View style={styles.preferenceRow}>
               {([false, true] as const).map((enabled) => {

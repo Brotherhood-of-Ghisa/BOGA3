@@ -47,7 +47,7 @@ export type MaestroHarnessGateAction = 'none' | 'in-progress' | 'clear';
 /**
  * Sets the new exercise/session screens preference before teleporting, so the
  * new screens' flows can opt in without tapping through Settings. 'none' leaves
- * it as is; `reset=data` separately restores it to its default (off).
+ * it as is; `reset=data` separately restores it to its default (on).
  */
 export type MaestroHarnessNewScreensAction = 'none' | 'on' | 'off';
 export type MaestroHarnessTeleportTarget =
