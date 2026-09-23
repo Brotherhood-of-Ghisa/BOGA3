@@ -375,7 +375,7 @@ describe('ExercisePageScreen', () => {
     const { client, stored } = createClient();
     await renderPage(client);
 
-    fireEvent.press(screen.getByTestId('exercise-set-logger-effort'));
+    fireEvent(screen.getByTestId('exercise-set-logger-effort'), 'longPress');
     const sheet = await screen.findByTestId('exercise-effort-sheet');
     expect(within(sheet).getByTestId('exercise-effort-option-rir_1')).toHaveProp('accessibilityState', {
       selected: true,
@@ -390,6 +390,22 @@ describe('ExercisePageScreen', () => {
       })
     );
     expect(screen.getByTestId('exercise-set-logger-effort')).toHaveTextContent('EffortRIR 0');
+  });
+
+  it('cycles effort in descending RIR order, including blank, and persists the selection', async () => {
+    const { client, stored } = createClient();
+    await renderPage(client);
+    for (const label of ['RIR 0', 'W-Up', 'none', 'RIR 3', 'RIR 2', 'RIR 1']) {
+      fireEvent.press(screen.getByTestId('exercise-set-logger-effort'));
+      expect(screen.getByLabelText(`Change effort, currently ${label}`)).toBeTruthy();
+    }
+    fireEvent(screen.getByTestId('exercise-set-logger-effort'), 'longPress');
+    fireEvent.press(await screen.findByTestId('exercise-effort-option-rir_3'));
+    await waitFor(() => expect(benchSets(stored())[2].setType).toBe('rir_3'));
+    fireEvent(screen.getByTestId('exercise-set-logger-effort'), 'longPress');
+    fireEvent.press(await screen.findByTestId('exercise-effort-option-none'));
+    expect(screen.getByLabelText('Change effort, currently none')).toBeTruthy();
+    await waitFor(() => expect(benchSets(stored())[2].setType).toBeNull());
   });
 
   it('shows Records and Last in the expanded records panel', async () => {

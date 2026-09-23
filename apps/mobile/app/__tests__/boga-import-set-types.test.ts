@@ -105,9 +105,9 @@ describe('BOGA import set type enrichment', () => {
     expect([0, 1, 2, 3, 4, 5].map((rank) => setTypeForRank(rank, 6))).toEqual([
       'warm_up',
       null,
+      'rir_3',
       'rir_2',
       'rir_1',
-      'rir_0',
       'rir_0',
     ]);
     expect(setTypeForRank(0, 1)).toBe('warm_up');
@@ -124,7 +124,7 @@ describe('BOGA import set type enrichment', () => {
     );
     const sets = enriched.sessions[0].exercises[0].sets;
     expect(sets.map((set) => set.orderIndex)).toEqual([2, 0, 1]);
-    expect(sets.map((set) => set.setType)).toEqual(['rir_2', 'warm_up', null]);
+    expect(sets.map((set) => set.setType)).toEqual(['rir_3', 'warm_up', null]);
   });
 
   it('leaves kettlebell swings without registered effort', () => {
@@ -168,8 +168,10 @@ describe('BOGA import set type enrichment', () => {
   it('validates enriched set types and rejects unsupported values', () => {
     const validPackage = enrichBogaImportSetTypes(makePackage([{ orderIndex: 0, setType: null }]));
     expect(validateBogaSessionImportPackage(validPackage).ok).toBe(true);
+    expect(validateBogaSessionImportPackage(makePackage([{ orderIndex: 0, setType: 'rir_3' }])).ok).toBe(true);
+    expect(validateBogaSessionImportPackage(makePackage([{ orderIndex: 0, setType: 'rir_4' }])).ok).toBe(true);
     expect(validateBogaSessionImportPackage(makePackage([{ orderIndex: 0, setType: 'drop_set' }])).errors).toContain(
-      'sessions[0].exercises[0].sets[0].setType must be warm_up|rir_0|rir_1|rir_2|null'
+      'sessions[0].exercises[0].sets[0].setType must be warm_up, rir_<non-negative integer>, or null'
     );
   });
 });

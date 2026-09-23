@@ -54,7 +54,9 @@ appId: com.dinoderek.mobile
     text: "Mark set 4 performed"
 - takeScreenshot: "exercise-page-v5-quiet"
 
-# V5-Records, then V5-Last.
+# V5-Records, then V5-Last. Wait for initial route presentation before tapping.
+- waitForAnimationToEnd:
+    timeout: 4000
 - tapOn:
     id: "exercise-records-toggle"
 - extendedWaitUntil:
@@ -76,8 +78,44 @@ appId: com.dinoderek.mobile
       id: "exercise-records-collapsed"
     timeout: 5000
 
-# V5-Effort: change the planned RIR 1 to RIR 0; the backdrop is the only exit.
+# Effort cycles from prescribed RIR 1, through warm-up and blank, then RIR 3 downward.
 - tapOn:
+    id: "exercise-set-logger-effort"
+- assertVisible:
+    id: "exercise-set-logger-effort"
+    text: "Change effort, currently RIR 0"
+- takeScreenshot: "effort-cycle-0"
+- tapOn:
+    id: "exercise-set-logger-effort"
+- assertVisible:
+    id: "exercise-set-logger-effort"
+    text: "Change effort, currently W-Up"
+- takeScreenshot: "effort-cycle-1"
+- tapOn:
+    id: "exercise-set-logger-effort"
+- assertVisible:
+    id: "exercise-set-logger-effort"
+    text: "Change effort, currently none"
+- takeScreenshot: "effort-cycle-2"
+- tapOn:
+    id: "exercise-set-logger-effort"
+- assertVisible:
+    id: "exercise-set-logger-effort"
+    text: "Change effort, currently RIR 3"
+- takeScreenshot: "effort-cycle-3"
+- tapOn:
+    id: "exercise-set-logger-effort"
+- assertVisible:
+    id: "exercise-set-logger-effort"
+    text: "Change effort, currently RIR 2"
+- takeScreenshot: "effort-cycle-4"
+- tapOn:
+    id: "exercise-set-logger-effort"
+- assertVisible:
+    id: "exercise-set-logger-effort"
+    text: "Change effort, currently RIR 1"
+- takeScreenshot: "effort-cycle-5"
+- longPressOn:
     id: "exercise-set-logger-effort"
 - extendedWaitUntil:
     visible:
@@ -184,6 +222,50 @@ appId: com.dinoderek.mobile
 - assertVisible:
     id: "exercise-set-logger"
 - takeScreenshot: "exercise-page-after-complete"
+
+# Use the session's short squat list for default inheritance so Add stays clear
+# of the fixed footer while the logger's keyboard animates.
+- openLink: "boga3://maestro-harness?teleport=exercise-page&sessionId=maestro_exercise_page_session&sessionExerciseId=maestro_exercise_page_squat"
+- extendedWaitUntil:
+    visible:
+      id: "exercise-page-title"
+      text: "Barbell Back Squat"
+    timeout: 15000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "exercise-add-set"
+- extendedWaitUntil:
+    visible:
+      id: "exercise-set-logger"
+    timeout: 10000
+- hideKeyboard:
+    optional: true
+- longPressOn:
+    id: "exercise-set-logger-effort"
+- tapOn:
+    id: "exercise-effort-option-warm_up"
+- extendedWaitUntil:
+    notVisible:
+      id: "exercise-effort-sheet"
+    timeout: 5000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "exercise-add-set"
+- hideKeyboard:
+    optional: true
+- assertVisible: "Change effort, currently none"
+- takeScreenshot: "effort-after-warmup-blank"
+- tapOn:
+    id: "exercise-set-logger-effort"
+- assertVisible: "Change effort, currently RIR 3"
+- tapOn:
+    id: "exercise-add-set"
+- hideKeyboard:
+    optional: true
+- assertVisible: "Change effort, currently RIR 3"
+- takeScreenshot: "effort-inherited-rir3"
 
 # Leave the simulator as found: data wiped and the setting at its default.
 - openLink: "boga3://maestro-harness?reset=data"

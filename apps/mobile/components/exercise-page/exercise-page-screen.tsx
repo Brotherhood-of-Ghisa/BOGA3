@@ -18,7 +18,7 @@ import { ExerciseEditorModal } from '@/components/exercise-catalog/exercise-edit
 import { Card } from '@/components/ui/card';
 import { Icon } from '@/components/ui/icon';
 import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
-import type { SessionSetTypeValue } from '@/src/data/set-types';
+import { nextSessionSetType, type SessionSetTypeValue } from '@/src/data/set-types';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import { useExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
 import { useGroupLinkingUserId } from '@/src/groups/use-group-exercise-linking';
@@ -268,6 +268,7 @@ export function ExercisePageScreen({
                     onChangeReps={(repsValue) => onChangeLogger({ repsValue })}
                     onChangeWeight={(weightValue) => onChangeLogger({ weightValue })}
                     onCommit={onCommit}
+                    onCycleEffort={() => onSelectEffort(nextSessionSetType(loggerValues.setType))}
                     onOpenEffort={() => setOpenSheet('effort')}
                     ref={weightInputRef}
                     repsValue={loggerValues.repsValue}

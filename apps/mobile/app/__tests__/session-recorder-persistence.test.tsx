@@ -327,7 +327,7 @@ describe('SessionRecorderScreen persistence wiring', () => {
         exercises: [
           expect.objectContaining({
             name: 'Barbell Squat',
-            sets: [expect.objectContaining({ repsValue: '', weightValue: '', setType: null })],
+            sets: [expect.objectContaining({ repsValue: '', weightValue: '', setType: 'warm_up' })],
           }),
         ],
       })
@@ -354,7 +354,7 @@ describe('SessionRecorderScreen persistence wiring', () => {
         sessionId: 'persisted-session-1',
         exercises: [
           expect.objectContaining({
-            sets: [expect.objectContaining({ weightValue: '225', setType: null })],
+            sets: [expect.objectContaining({ weightValue: '225', setType: 'warm_up' })],
           }),
         ],
       })
@@ -375,7 +375,7 @@ describe('SessionRecorderScreen persistence wiring', () => {
         sessionId: 'persisted-session-1',
         exercises: [
           expect.objectContaining({
-            sets: [expect.objectContaining({ setType: 'warm_up' })],
+            sets: [expect.objectContaining({ setType: null })],
           }),
         ],
       })
@@ -418,7 +418,7 @@ describe('SessionRecorderScreen persistence wiring', () => {
         sessionId: 'persisted-session-1',
         exercises: [
           expect.objectContaining({
-            sets: [expect.objectContaining({ repsValue: '5', setType: null })],
+            sets: [expect.objectContaining({ repsValue: '5', setType: 'warm_up' })],
           }),
         ],
       })
@@ -508,7 +508,7 @@ describe('SessionRecorderScreen persistence wiring', () => {
       })
     );
     expect(
-      screen.getByLabelText('unconfirmed set 1 for exercise 1: 0kg · 5 reps; quality none')
+      screen.getByLabelText('unconfirmed set 1 for exercise 1: 0kg · 5 reps; quality W-Up')
     ).toBeTruthy();
     expect(mockPersistSessionDraftSnapshot).toHaveBeenLastCalledWith(
       expect.objectContaining({

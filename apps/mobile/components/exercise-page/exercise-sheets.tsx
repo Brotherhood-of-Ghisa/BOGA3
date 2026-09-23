@@ -1,3 +1,5 @@
+import { ScrollView, useWindowDimensions } from 'react-native';
+
 import { Icon } from '@/components/ui/icon';
 import { ListRow } from '@/components/ui/list-row';
 import { Sheet } from '@/components/ui/sheet';
@@ -12,9 +14,9 @@ type EffortSheetProps = {
   onDismiss: () => void;
 };
 
-// Four efforts, the current one marked. Only opened when deviating from the
-// planned effort the logger already defaults to (build spec, "Sheets").
+// Long-press alternative to cycling, including an explicit blank effort.
 export function EffortSheet({ visible, selected, onSelect, onDismiss }: EffortSheetProps) {
+  const { height } = useWindowDimensions();
   return (
     <Sheet
       dismissLabel="Dismiss effort picker"
@@ -22,19 +24,21 @@ export function EffortSheet({ visible, selected, onSelect, onDismiss }: EffortSh
       testID="exercise-effort-sheet"
       title="Effort"
       visible={visible}>
-      {EFFORT_OPTIONS.map((option) => {
-        const isSelected = option === selected;
-        return (
-          <ListRow
-            key={option}
-            label={formatEffort(option)}
-            onPress={() => onSelect(option)}
-            selected={isSelected}
-            testID={`exercise-effort-option-${option}`}
-            trailing={isSelected ? <Icon color={uiRoles.accent} name="check" /> : undefined}
-          />
-        );
-      })}
+      <ScrollView style={{ maxHeight: height * 0.65, flexGrow: 0 }}>
+        {EFFORT_OPTIONS.map((option) => {
+          const isSelected = option === selected;
+          return (
+            <ListRow
+              key={option ?? 'none'}
+              label={option === null ? 'None' : formatEffort(option)}
+              onPress={() => onSelect(option)}
+              selected={isSelected}
+              testID={`exercise-effort-option-${option ?? 'none'}`}
+              trailing={isSelected ? <Icon color={uiRoles.accent} name="check" /> : undefined}
+            />
+          );
+        })}
+      </ScrollView>
     </Sheet>
   );
 }

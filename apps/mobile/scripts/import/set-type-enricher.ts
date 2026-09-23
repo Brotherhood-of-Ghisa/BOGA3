@@ -1,6 +1,7 @@
+import { RIR_SESSION_SET_TYPES } from '../../src/data/set-types';
 import type { BogaImportSet, BogaImportSetType, BogaSessionImportPackage } from './boga-import-contract';
 
-const SET_TYPE_SEQUENCE_AFTER_UNCLASSIFIED: BogaImportSetType[] = ['rir_2', 'rir_1', 'rir_0'];
+const SET_TYPE_SEQUENCE_AFTER_UNCLASSIFIED = [...RIR_SESSION_SET_TYPES].reverse();
 const UNREGISTERED_EFFORT_EXERCISE_NAMES = new Set([
   'kettlebell one arm swing',
   'kettlebell one arm swings',

@@ -1,10 +1,10 @@
 import type { Session, SessionSet } from '@/components/session-recorder/types';
 import type { ExerciseBlockHistoryBlock } from '@/src/data';
-import { normalizeSessionSetType } from '@/src/data/set-types';
+import { formatSessionSetType, normalizeSessionSetType } from '@/src/data/set-types';
 import { computeSetVolume, estimateOneRepMax, parseSetReps, parseSetWeight } from '@/src/exercise-calculations';
 import { deriveExercisePersonalRecord } from '@/src/session-insights';
 
-import { hasPlannedTarget, SET_TYPE_MENU_LABELS, toSessionInsightExercises } from './session-model';
+import { hasPlannedTarget, toSessionInsightExercises } from './session-model';
 import { hasValidActualValues, isConfirmedPerformedSet } from './set-semantics';
 
 /**
@@ -133,7 +133,7 @@ export const buildSessionViewModel = (
       const { weight, reps, setType } = row.shown;
       return {
         id: row.set.id,
-        typeLabel: setType ? SET_TYPE_MENU_LABELS[setType as keyof typeof SET_TYPE_MENU_LABELS] : EMPTY_FIGURE,
+        typeLabel: formatSessionSetType(setType) ?? EMPTY_FIGURE,
         weightReps: `${weight === null ? EMPTY_FIGURE : formatWeightFigure(weight)} × ${
           reps === null ? EMPTY_FIGURE : reps
         }`,

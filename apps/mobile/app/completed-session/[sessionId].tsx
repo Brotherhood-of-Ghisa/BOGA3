@@ -14,6 +14,7 @@ import {
   loadLocalGymById,
   loadSessionSnapshotById,
   appendCompletedSessionExerciseAsPlanned as appendCompletedSessionExerciseAsPlannedDraft,
+  formatSessionSetType,
   isWorkingSessionSetType,
   normalizeSessionSetType,
   setSessionDeletedState,
@@ -112,20 +113,8 @@ export const resolveCompletedSessionPresentation = (
   value: string | string[] | undefined
 ): 'detail' | 'completion' => (coerceRouteParam(value) === 'completion' ? 'completion' : 'detail');
 
-const formatSetEffortLabel = (setType: SessionSetTypeValue): string => {
-  switch (setType) {
-    case 'warm_up':
-      return 'W-Up';
-    case 'rir_0':
-      return 'RIR 0';
-    case 'rir_1':
-      return 'RIR 1';
-    case 'rir_2':
-      return 'RIR 2';
-    default:
-      return '-';
-  }
-};
+const formatSetEffortLabel = (setType: SessionSetTypeValue): string =>
+  formatSessionSetType(setType) ?? '-';
 
 const getCompletedPerformedSets = (
   sets: CompletedSessionDetailSet[]

@@ -2,6 +2,7 @@ import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-rou
 import { useCallback, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { formatSessionSetType } from '@/src/data/set-types';
 import { MainTabs } from '@/components/navigation/main-tabs';
 import { uiColors, uiRadius, uiSpace, uiTypography } from '@/components/ui';
 import {
@@ -60,20 +61,8 @@ const formatVolume = (value: number) => (value > 0 ? formatNumeric(value, 1) : '
 const formatEstOneRm = (value: number | null) =>
   value === null ? '—' : formatNumeric(value, 1);
 
-const formatSetTypeBadge = (setType: ExerciseHistorySessionEntry['sets'][number]['setType']) => {
-  switch (setType) {
-    case 'warm_up':
-      return 'W-Up';
-    case 'rir_0':
-      return 'R0';
-    case 'rir_1':
-      return 'R1';
-    case 'rir_2':
-      return 'R2';
-    default:
-      return '';
-  }
-};
+const formatSetTypeBadge = (setType: ExerciseHistorySessionEntry['sets'][number]['setType']) =>
+  formatSessionSetType(setType, 'compact') ?? '';
 
 export type ExerciseHistoryScreenShellProps = {
   summary: ExerciseHistorySummary | null;
