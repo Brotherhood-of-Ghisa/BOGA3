@@ -10,6 +10,7 @@ import {
   NOT_LINKED_STATUS,
   STANDARD_EXERCISE_RESULT_LIMIT,
   buildGroupExerciseRows,
+  buildPersonalLinkChoices,
   describeGroupExerciseWriteError,
   formatGroupExerciseLinkStatus,
   groupExerciseActionSuccessMessage,
@@ -62,8 +63,8 @@ describe('buildGroupExerciseRows', () => {
     const rows = buildGroupExerciseRows(
       [bench, row],
       [
-        { groupExerciseId: 'ge-bench', exerciseName: 'Bench (comp grip)' },
-        { groupExerciseId: 'ge-bench', exerciseName: 'Bench (hotel gym)' },
+        { exerciseDefinitionId: 'def-comp', groupExerciseId: 'ge-bench', exerciseName: 'Bench (comp grip)' },
+        { exerciseDefinitionId: 'def-hotel', groupExerciseId: 'ge-bench', exerciseName: 'Bench (hotel gym)' },
       ],
     );
     expect(rows).toEqual([
@@ -74,6 +75,7 @@ describe('buildGroupExerciseRows', () => {
         archived: false,
         linkStatus: 'Linked: Bench (comp grip), Bench (hotel gym)',
         linkable: false,
+        personalLinks: [{ exerciseDefinitionId: 'def-comp', label: 'Bench (comp grip)' }, { exerciseDefinitionId: 'def-hotel', label: 'Bench (hotel gym)' }],
       },
       {
         groupExerciseId: 'ge-row',
@@ -82,6 +84,7 @@ describe('buildGroupExerciseRows', () => {
         archived: false,
         linkStatus: 'Not linked',
         linkable: true,
+        personalLinks: [],
       },
     ]);
   });
@@ -92,7 +95,7 @@ describe('buildGroupExerciseRows', () => {
 
   it('offers "Link your exercise" only on active rows none of mine is linked to, once links have loaded (E0.4, D8)', () => {
     expect(buildGroupExerciseRows([bench, old], []).map((r) => r.linkable)).toEqual([true, false]);
-    expect(buildGroupExerciseRows([bench], [{ groupExerciseId: 'ge-bench', exerciseName: null }])[0].linkable).toBe(false);
+    expect(buildGroupExerciseRows([bench], [{ exerciseDefinitionId: 'missing', groupExerciseId: 'ge-bench', exerciseName: null }])[0].linkable).toBe(false);
     expect(buildGroupExerciseRows([bench], null)[0].linkable).toBe(false);
   });
 });
@@ -164,5 +167,19 @@ describe('searchStandardExercises', () => {
 
   it('returns nothing for an unmatched query', () => {
     expect(searchStandardExercises('zzz-no-such-lift')).toEqual({ options: [], total: 0 });
+  });
+});
+
+
+describe('personal link identity', () => {
+  it('retains every ID and disambiguates duplicate or missing names even when short suffixes collide', () => {
+    const choices = buildPersonalLinkChoices([
+      { exerciseDefinitionId: 'first-12345678', groupExerciseId: 'ge', exerciseName: 'Same' },
+      { exerciseDefinitionId: 'second-12345678', groupExerciseId: 'ge', exerciseName: 'Same' },
+      { exerciseDefinitionId: 'missing', groupExerciseId: 'ge', exerciseName: null },
+    ]);
+    expect(new Set(choices.map((choice) => choice.label)).size).toBe(3);
+    expect(choices.find((choice) => choice.exerciseDefinitionId === 'missing')?.label).toBe('Unnamed personal exercise · missing');
+    expect(choices.map((choice) => choice.exerciseDefinitionId).sort()).toEqual(['first-12345678', 'missing', 'second-12345678']);
   });
 });

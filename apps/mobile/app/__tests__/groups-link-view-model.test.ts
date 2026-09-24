@@ -18,6 +18,7 @@ import {
   describeLinkRetroactivity,
   describeLoadModeNote,
   describeUnlinkConfirm,
+  describeUnlinkSuccess,
   filterPickSheetChoices,
   groupExercisesLoaded,
   nameMatchScore,
@@ -96,9 +97,10 @@ describe('notes', () => {
     expect(describeLinkRetroactivity('Bench (comp grip)', 'Tuesday Crew')).toBe(
       'Your past Bench (comp grip) sets shared with Tuesday Crew will count.',
     );
-    expect(describeUnlinkConfirm('Iron Brotherhood')).toBe(
-      "Your sets from this exercise will leave Iron Brotherhood's leaderboards.",
-    );
+    expect(describeUnlinkConfirm({ personalExerciseName: 'My Bench', groupExerciseName: 'Bench', groupName: 'Iron Brotherhood' })).toEqual({
+      title: 'Unlink “My Bench”?',
+      message: 'Its sets will stop counting towards “Bench” in “Iron Brotherhood” on both All and Certified leaderboards. Past activity and existing certifications will be kept. Leaderboards update after syncing.',
+    });
   });
 });
 
@@ -346,5 +348,26 @@ describe('Link screen (E0.3)', () => {
     });
     expect(model.linked[0]).toMatchObject({ groupName: 'Iron Brotherhood', groupExerciseName: PLACEHOLDER_GROUP_EXERCISE_NAME });
     expect(model.groups).toEqual([]);
+  });
+});
+
+
+describe('unlink preservation and frozen targets', () => {
+  const context = { personalExerciseName: 'Bench', groupExerciseName: 'Competition Bench', groupName: 'Crew' };
+  it.each([
+    [true, false, 'Archived leaderboards stay unchanged; this link change takes effect if the exercise is unarchived.'],
+    [false, true, 'Leaderboards stay unchanged while you are not a member; this link change takes effect if you rejoin.'],
+    [true, true, 'Archived leaderboards stay unchanged; this link change takes effect if the exercise is unarchived. Leaderboards stay unchanged while you are not a member; this link change takes effect if you rejoin.'],
+  ])('archived=%s inactive=%s explains every freeze', (archived, inactive, effects) => {
+    const result = describeUnlinkConfirm({ ...context, archived, inactive });
+    expect(result.message).toContain(effects);
+    expect(result.message).toContain('Past activity and existing certifications will be kept.');
+    expect(result.message).not.toContain('Its sets will stop counting');
+    expect(result.message).toContain('Competition Bench');
+    expect(result.message).toContain('Crew');
+  });
+  it('success is contextual and offline success explains reconnecting', () => {
+    expect(describeUnlinkSuccess(context, false)).toBe('Unlinked “Bench” from “Competition Bench”.');
+    expect(describeUnlinkSuccess(context, true)).toBe('Unlinked “Bench” from “Competition Bench”. Leaderboards will update after you reconnect and sync.');
   });
 });

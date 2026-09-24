@@ -55,6 +55,7 @@ jest.mock('@/src/groups/api', () => ({
 
 import { exerciseDefinitions, exerciseGroupLinks } from '@/src/data/schema';
 import { linkExercise } from '@/src/data/exercise-group-links';
+import * as linksRepo from '@/src/data/exercise-group-links';
 import { __resetExerciseCatalogCacheForTests } from '@/src/exercise-catalog/cache';
 import {
   GroupApiError,
@@ -193,9 +194,10 @@ describe('Link screen', () => {
     fireEvent.press(screen.getByTestId('exercise-link-unlink-gx-bench'));
 
     expect(alertSpy).toHaveBeenCalledWith(
-      'Unlink exercise?',
-      "Your sets from this exercise will leave Iron Brotherhood's leaderboards.",
+      'Unlink “Barbell Bench Press”?',
+      'Its sets will stop counting towards “Bench Press” in “Iron Brotherhood” on both All and Certified leaderboards. Past activity and existing certifications will be kept. Leaderboards update after syncing.',
       expect.any(Array),
+      expect.objectContaining({ cancelable: true }),
     );
     expect(liveLinks()).toHaveLength(1);
 
@@ -325,4 +327,65 @@ describe('Link screen', () => {
     const row = await screen.findByTestId('exercise-link-linked-row-gx-tue-bench');
     await waitFor(() => expect(within(row).getByText('inactive — not a member')).toBeTruthy());
   });
+
+  it('cancelling unlink writes nothing; a stale confirmation preserves the new target', async () => {
+    await linkExercise('seed_barbell_bench_press', 'g-iron', 'gx-bench');
+    const spy = jest.spyOn(Alert, 'alert');
+    await renderScreen();
+    const button = await screen.findByTestId('exercise-link-unlink-gx-bench');
+    fireEvent.press(button);
+    await act(async () => spy.mock.calls.at(-1)?.[2]?.find((action) => action.text === 'Cancel')?.onPress?.());
+    expect(liveLinks()).toHaveLength(1);
+    fireEvent.press(button);
+    await linkExercise('seed_barbell_bench_press', 'g-iron', 'gx-deadlift');
+    await act(async () => spy.mock.calls.at(-1)?.[2]?.find((action) => action.text === 'Unlink')?.onPress?.());
+    expect(liveLinks()[0].groupExerciseId).toBe('gx-deadlift');
+    expect(screen.getByTestId('exercise-link-notice')).toHaveTextContent(/link changed.*Nothing was unlinked/);
+    expect(screen.getByTestId('exercise-link-linked-row-gx-deadlift')).toBeTruthy();
+  });
+
+  it('a failed local read hides unlink and retries independently of server reads', async () => {
+    await linkExercise('seed_barbell_bench_press', 'g-iron', 'gx-bench');
+    jest.spyOn(linksRepo, 'listLinks').mockRejectedValueOnce(new Error('Read failed'));
+    await renderScreen();
+    expect(await screen.findByTestId('exercise-link-links-error')).toBeTruthy();
+    expect(screen.queryByTestId('exercise-link-unlink-gx-bench')).toBeNull();
+    fireEvent.press(screen.getByTestId('exercise-link-links-retry'));
+    expect(await screen.findByTestId('exercise-link-unlink-gx-bench')).toBeTruthy();
+  });
+
+  it('a committed unlink still reports success when reloading its links fails', async () => {
+    await linkExercise('seed_barbell_bench_press', 'g-iron', 'gx-bench');
+    const spy = jest.spyOn(Alert, 'alert');
+    await renderScreen();
+    fireEvent.press(await screen.findByTestId('exercise-link-unlink-gx-bench'));
+    jest.spyOn(linksRepo, 'listLinks').mockRejectedValueOnce(new Error('Read failed'));
+    await act(async () => spy.mock.calls.at(-1)?.[2]?.find((action) => action.text === 'Unlink')?.onPress?.());
+    expect(liveLinks()).toEqual([]);
+    expect(screen.getByTestId('exercise-link-notice')).toHaveTextContent('Unlinked “Barbell Bench Press” from “Bench Press”.');
+    expect(screen.getByTestId('exercise-link-links-error')).toBeTruthy();
+    expect(screen.queryByTestId('exercise-link-unlink-gx-bench')).toBeNull();
+  });
+
+  it('archived plus inactive targets explain both freezes and remain removable', async () => {
+    const old = { exercises: [{ ...GX_BENCH, archived_at_ms: 1 }] };
+    warmCache();
+    writeGroupCache(fixture.database, { cacheKey: groupCacheKeys.groupExercises('g-iron'), userId: USER_ID, payload: old, fetchedAtMs: 1 });
+    await linkExercise('seed_barbell_bench_press', 'g-iron', 'gx-bench');
+    api.listGroupExercises.mockImplementation(async (id) => {
+      if (id === 'g-iron') throw new GroupApiError('NOT_FOUND', 'group not found');
+      return TUESDAY_EXERCISES;
+    });
+    const spy = jest.spyOn(Alert, 'alert');
+    await renderScreen();
+    await screen.findByText('inactive — not a member · archived');
+    fireEvent.press(screen.getByTestId('exercise-link-unlink-gx-bench'));
+    expect(spy.mock.calls[0][1]).toContain('Archived leaderboards stay unchanged');
+    expect(spy.mock.calls[0][1]).toContain('Leaderboards stay unchanged while you are not a member');
+    expect(spy.mock.calls[0][1]).toContain('Past activity and existing certifications will be kept.');
+    await act(async () => spy.mock.calls.at(-1)?.[2]?.find((action) => action.text === 'Unlink')?.onPress?.());
+    expect(liveLinks()).toEqual([]);
+    expect(screen.queryByTestId('exercise-link-link-gx-bench')).toBeNull();
+  });
+
 });

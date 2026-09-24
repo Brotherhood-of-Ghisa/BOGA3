@@ -650,6 +650,161 @@ appId: com.dinoderek.mobile
 - assertNotVisible:
     id: "group-record-sheet"
 
+# --- 7d. Unlink my certified exercise: cancel, unlink, preserve, relink ---------
+# Both mappings are the DEVICE user's; the counterparty attests its completed
+# set. Only the actual unlink/relink happens through UI + normal device sync.
+- runScript:
+    file: ../scripts/groups-counterparty.js
+    env:
+      STEP: prepare-device-unlink
+      EMAIL: ${MAESTRO_GROUPS_DEVICE_EMAIL}
+      PASSWORD: ${MAESTRO_GROUPS_DEVICE_PASSWORD}
+# Pull the fixture through real sync. A focus retry accommodates a cycle
+# already in flight when Refresh is tapped; local link reads happen on focus.
+- retry:
+    maxRetries: 3
+    commands:
+      - openLink: "boga3://settings"
+      - extendedWaitUntil:
+          visible:
+            id: "settings-screen"
+          timeout: 15000
+      - scrollUntilVisible:
+          element:
+            id: "settings-sync-status-refresh-button"
+          direction: DOWN
+          centerElement: true
+      - tapOn:
+          id: "settings-sync-status-refresh-button"
+      - openLink: "boga3://group/${output.groupsGroupId}"
+      - extendedWaitUntil:
+          visible:
+            id: "group-screen-name"
+          timeout: 15000
+      - scrollUntilVisible:
+          element:
+            id: "group-exercise-unlink-button-${output.unlinkGroupExerciseId}"
+          direction: DOWN
+          centerElement: true
+          timeout: 15000
+      - assertVisible: "Unlink Bench, Total load, Linked: Bench \\(competition\\), Bench \\(training\\)"
+- takeScreenshot: "groups-unlink-01-linked-row"
+- tapOn:
+    id: "group-exercise-unlink-button-${output.unlinkGroupExerciseId}"
+- extendedWaitUntil:
+    visible:
+      id: "group-unlink-chooser"
+    timeout: 10000
+- assertVisible: "Your linked exercises"
+- assertVisible: "Unlink Bench · Maestro Groups E2E"
+- takeScreenshot: "groups-unlink-02-chooser"
+- tapOn:
+    id: "group-unlink-choice-${output.unlinkPrimaryId}"
+- extendedWaitUntil:
+    visible: "Unlink “Bench \\(competition\\)”\\?"
+    timeout: 10000
+- assertVisible: ".*both All and Certified leaderboards.*Past activity and existing certifications will be kept.*"
+- takeScreenshot: "groups-unlink-03-confirmation"
+- tapOn: "Cancel"
+- assertVisible:
+    id: "group-exercise-unlink-button-${output.unlinkGroupExerciseId}"
+- runScript:
+    file: ../scripts/groups-counterparty.js
+    env:
+      STEP: assert-unlink-cancelled
+# Confirm exactly one mapping, then prove the second still appears locally.
+- tapOn:
+    id: "group-exercise-unlink-button-${output.unlinkGroupExerciseId}"
+- tapOn:
+    id: "group-unlink-choice-${output.unlinkPrimaryId}"
+- extendedWaitUntil:
+    visible: "Unlink “Bench \\(competition\\)”\\?"
+    timeout: 10000
+- tapOn: "Unlink"
+- extendedWaitUntil:
+    visible:
+      text: "Unlink Bench, Total load, Linked: Bench \\(training\\)"
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: "group-exercises-action-feedback"
+    direction: UP
+    centerElement: true
+- assertVisible: "Unlinked “Bench \\(competition\\)” from “Unlink Bench”\\."
+- takeScreenshot: "groups-unlink-04-success"
+- openLink: "boga3://settings"
+- scrollUntilVisible:
+    element:
+      id: "settings-sync-status-refresh-button"
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: "settings-sync-status-refresh-button"
+- runScript:
+    file: ../scripts/groups-counterparty.js
+    env:
+      STEP: assert-device-unlinked
+# The same completed record card remains certified and opens its detail.
+- openLink: "boga3://groups?groupId=${output.groupsGroupId}"
+- tapOn:
+    id: "groups-segment-stream"
+- extendedWaitUntil:
+    visible:
+      id: "group-stream-record-card-${output.unlinkRecordKey}-open"
+    timeout: 15000
+- assertVisible:
+    id: "group-stream-record-card-${output.unlinkRecordKey}-status"
+    text: "Certified by ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME}"
+- takeScreenshot: "groups-unlink-05-preserved-record"
+- tapOn:
+    id: "group-stream-record-card-${output.unlinkRecordKey}-open"
+- assertVisible:
+    id: "group-record-sheet-status"
+    text: "Certified by ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME} · .*"
+- tapOn:
+    id: "group-record-sheet-close"
+# Both All and Certified have lost this exercise's contribution.
+- openLink: "boga3://group/${output.groupsGroupId}/leaderboards/${output.unlinkGroupExerciseId}?metric=weight&scope=all"
+- extendedWaitUntil:
+    visible: "No sets yet"
+    timeout: 15000
+- tapOn:
+    id: "group-board-scope-certified"
+- assertVisible: "No certified sets yet"
+- takeScreenshot: "groups-unlink-06-certified-empty"
+# Relink the same personal exercise through the existing Link screen. The
+# group's other mapping stays intact, so its row correctly never says Not linked.
+- openLink: "boga3://exercise-link?exerciseDefinitionId=${output.unlinkPrimaryId}"
+- extendedWaitUntil:
+    visible:
+      id: "exercise-link-link-${output.unlinkGroupExerciseId}"
+    timeout: 15000
+- tapOn:
+    id: "exercise-link-link-${output.unlinkGroupExerciseId}"
+- extendedWaitUntil:
+    visible:
+      id: "exercise-link-unlink-${output.unlinkGroupExerciseId}"
+    timeout: 15000
+- openLink: "boga3://settings"
+- scrollUntilVisible:
+    element:
+      id: "settings-sync-status-refresh-button"
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: "settings-sync-status-refresh-button"
+- runScript:
+    file: ../scripts/groups-counterparty.js
+    env:
+      STEP: assert-device-relinked
+- openLink: "boga3://group/${output.groupsGroupId}/leaderboards/${output.unlinkGroupExerciseId}?metric=weight&scope=certified"
+- extendedWaitUntil:
+    visible:
+      id: "group-board-row-1"
+      text: "1st, You, 80 kg × 5, .*"
+    timeout: 15000
+- takeScreenshot: "groups-unlink-07-restored-certified"
+
 # --- 8. The device removes the counterparty -> "was removed" -------------------
 - openLink: "boga3://group/${output.groupsGroupId}"
 # Members live behind the header's member count (D14, M25-T08).
@@ -716,6 +871,11 @@ appId: com.dinoderek.mobile
       text: "${MAESTRO_GROUPS_COUNTERPARTY_USERNAME} was removed"
     timeout: 15000
 # What the removed member shared stays in the group record (decision #4).
+- scrollUntilVisible:
+    element:
+      id: "group-stream-session-card-${output.groupsCardKey}"
+    direction: DOWN
+    timeout: 15000
 - assertVisible:
     id: "group-stream-session-card-${output.groupsCardKey}"
 - takeScreenshot: "groups-08-counterparty-removed"

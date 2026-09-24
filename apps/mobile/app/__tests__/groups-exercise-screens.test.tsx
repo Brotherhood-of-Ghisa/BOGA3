@@ -11,7 +11,7 @@
 
 import * as mockReact from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
-import { Alert, type AlertButton } from 'react-native';
+import { Alert, Modal, type AlertButton } from 'react-native';
 
 import { createInMemoryDatabase, type InMemoryDatabaseFixture } from './helpers/in-memory-db';
 
@@ -76,6 +76,7 @@ jest.mock('@/src/data/exercise-group-links', () => ({
 }));
 
 import { SYSTEM_EXERCISE_DEFINITION_SEEDS } from '@/src/data/exercise-catalog-seeds';
+import * as exerciseCatalogRepo from '@/src/data/exercise-catalog';
 import * as linksRepo from '@/src/data/exercise-group-links';
 import { createExerciseWithGroupLink } from '@/src/data/exercise-group-links';
 import { exerciseDefinitions, exerciseGroupLinks, sessions } from '@/src/data/schema';
@@ -844,5 +845,200 @@ describe('Add / edit exercise: stale prefill and late navigation (review follow-
       pending.resolve({ exercise: ROW });
     });
     expect(mockRouter.back).not.toHaveBeenCalled();
+  });
+});
+
+describe('Unlink from the group exercise list', () => {
+  const deferred = <T,>() => {
+    let resolve!: (value: T) => void;
+    let reject!: (reason: Error) => void;
+    const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej; });
+    return { promise, resolve, reject };
+  };
+  const prepare = () => {
+    addMyExercise('def-a', 'My Bench');
+    addLink(GROUP_ID, 'def-a', 'ge-bench');
+  };
+  const unlinkButton = () => screen.getByTestId('group-exercise-unlink-button-ge-bench');
+  const openConfirmation = async () => {
+    const spy = alertSpy();
+    fireEvent.press(unlinkButton());
+    return spy;
+  };
+  const dismissChooser = () => screen.UNSAFE_getAllByType(Modal).find((node) => node.props.testID === 'group-unlink-modal')!.props.onDismiss;
+  const choose = (id: string) => {
+    const dismiss = dismissChooser();
+    fireEvent.press(screen.getByTestId(`group-unlink-choice-${id}`));
+    // iOS presents the alert only once the native chooser has dismissed.
+    act(() => dismiss());
+  };
+
+  it.each<GroupRole>(['member', 'admin', 'owner'])('%s can cancel, then remove exactly their link without navigating', async (role) => {
+    prepare();
+    addLink('another-group', 'def-a', 'ge-bench');
+    await openExercisesAs(role);
+    await screen.findByTestId('group-exercise-unlink-button-ge-bench');
+    const spy = await openConfirmation();
+    expect(spy.mock.calls[0][0]).toBe('Unlink “My Bench”?');
+    expect(spy.mock.calls[0][1]).toContain('both All and Certified leaderboards');
+    expect(spy.mock.calls[0][1]).toContain('Past activity and existing certifications will be kept.');
+    await pressAlertButton(spy, 'Cancel');
+    expect(await linksRepo.listLinks()).toHaveLength(2);
+    fireEvent.press(unlinkButton());
+    await pressAlertButton(spy, 'Unlink');
+    await waitFor(() => expect(screen.getByTestId('group-exercise-link-status-ge-bench')).toHaveTextContent('Not linked'));
+    expect(screen.getByTestId('group-exercise-link-button-ge-bench')).toBeTruthy();
+    expect(screen.getByTestId('group-exercises-action-feedback')).toHaveTextContent('Unlinked “My Bench” from “Bench Press”.');
+    expect((await linksRepo.listLinks()).map((link) => link.groupId)).toEqual(['another-group']);
+    expect(mockRouter.push).not.toHaveBeenCalled();
+  });
+
+  it('chooses by stable ID among duplicate, missing, and deleted names; cancel and reopen use refreshed links', async () => {
+    addMyExercise('def-a', 'Same name');
+    addMyExercise('def-b', 'Same name');
+    addLink(GROUP_ID, 'def-a', 'ge-bench');
+    addLink(GROUP_ID, 'def-b', 'ge-bench');
+    addMyExercise('missing-id', 'Unavailable');
+    const listCatalog = exerciseCatalogRepo.listExerciseCatalogExercises;
+    jest.spyOn(exerciseCatalogRepo, 'listExerciseCatalogExercises').mockImplementation(async (options) =>
+      (await listCatalog(options)).filter((exercise) => exercise.id !== 'missing-id'));
+    addLink(GROUP_ID, 'missing-id', 'ge-bench');
+    fixture.database.update(exerciseDefinitions).set({ deletedAt: new Date(T0) }).run();
+    await openExercisesAs('member');
+    await screen.findByTestId('group-exercise-unlink-button-ge-bench');
+    const spy = alertSpy();
+    fireEvent.press(unlinkButton());
+    expect(screen.getByText('Your linked exercises')).toBeTruthy();
+    expect(screen.getByText('Bench Press · Garage Gym')).toBeTruthy();
+    expect(screen.getByText(/Unnamed personal exercise/)).toBeTruthy();
+    expect(screen.getByTestId('group-unlink-choice-def-a').props.accessibilityLabel).toContain('def-a');
+    expect(screen.getByTestId('group-unlink-choice-def-b').props.accessibilityLabel).toContain('def-b');
+    choose('def-b');
+    await pressAlertButton(spy, 'Cancel');
+    expect(await linksRepo.listLinks()).toHaveLength(3);
+    fireEvent.press(unlinkButton());
+    choose('def-b');
+    await pressAlertButton(spy, 'Unlink');
+    expect((await linksRepo.listLinks()).map((link) => link.exerciseDefinitionId)).toEqual(['def-a', 'missing-id']);
+    fireEvent.press(unlinkButton());
+    expect(screen.queryByTestId('group-unlink-choice-def-b')).toBeNull();
+    choose('missing-id');
+    expect(spy.mock.calls.at(-1)?.[0]).toMatch(/Unnamed personal exercise/);
+    await pressAlertButton(spy, 'Unlink');
+    expect((await linksRepo.listLinks()).map((link) => link.exerciseDefinitionId)).toEqual(['def-a']);
+  });
+
+  it('dismissing the chooser does not open a confirmation or write', async () => {
+    prepare();
+    addMyExercise('def-b', 'Other');
+    addLink(GROUP_ID, 'def-b', 'ge-bench');
+    await openExercisesAs('owner');
+    await screen.findByTestId('group-exercise-unlink-button-ge-bench');
+    const spy = alertSpy();
+    fireEvent.press(unlinkButton());
+    const dismiss = dismissChooser();
+    fireEvent.press(screen.getByTestId('group-unlink-cancel'));
+    act(() => dismiss());
+    expect(spy).not.toHaveBeenCalled();
+    expect(await linksRepo.listLinks()).toHaveLength(2);
+  });
+
+  it('stale confirmation cannot remove a retargeted mapping', async () => {
+    prepare();
+    await openExercisesAs('member');
+    await screen.findByTestId('group-exercise-unlink-button-ge-bench');
+    const spy = await openConfirmation();
+    await linksRepo.linkExercise('def-a', GROUP_ID, 'ge-row');
+    await pressAlertButton(spy, 'Unlink');
+    expect(await linksRepo.listLinks()).toEqual([expect.objectContaining({ groupExerciseId: 'ge-row' })]);
+    expect(screen.getByTestId('group-exercises-action-feedback')).toHaveTextContent(/link changed.*Nothing was unlinked/i);
+    expect(screen.getByTestId('group-exercise-link-status-ge-row')).toHaveTextContent('Linked: My Bench');
+  });
+
+  it('a failed write leaves the link visible and can be retried from its control', async () => {
+    prepare();
+    await openExercisesAs('member');
+    await screen.findByTestId('group-exercise-unlink-button-ge-bench');
+    const write = jest.spyOn(linksRepo, 'unlinkExercise').mockRejectedValueOnce(new Error('Disk unavailable'));
+    const spy = await openConfirmation();
+    await pressAlertButton(spy, 'Unlink');
+    expect(screen.getByTestId('group-exercises-action-feedback')).toHaveTextContent(/Couldn't unlink.*Try again/);
+    expect(await linksRepo.listLinks()).toHaveLength(1);
+    fireEvent.press(unlinkButton());
+    await pressAlertButton(spy, 'Unlink');
+    expect(write).toHaveBeenCalledTimes(2);
+    expect(await linksRepo.listLinks()).toEqual([]);
+  });
+
+  it('pending submission disables repeat taps, including a duplicate native alert callback', async () => {
+    prepare();
+    await openExercisesAs('member');
+    await screen.findByTestId('group-exercise-unlink-button-ge-bench');
+    const pending = deferred<boolean>();
+    const write = jest.spyOn(linksRepo, 'unlinkExercise').mockReturnValue(pending.promise);
+    const spy = await openConfirmation();
+    await pressAlertButton(spy, 'Unlink');
+    expect(unlinkButton()).toBeDisabled();
+    await pressAlertButton(spy, 'Unlink');
+    fireEvent.press(unlinkButton());
+    expect(write).toHaveBeenCalledTimes(1);
+    await act(async () => pending.resolve(true));
+  });
+
+  it('does not offer link or unlink while the local read is loading; read errors have a retry', async () => {
+    prepare();
+    const pending = deferred<Awaited<ReturnType<typeof linksRepo.listLinks>>>();
+    const read = jest.spyOn(linksRepo, 'listLinks').mockReturnValueOnce(pending.promise);
+    await openExercisesAs('member');
+    expect(screen.queryByTestId('group-exercise-unlink-button-ge-bench')).toBeNull();
+    expect(screen.queryByTestId('group-exercise-link-button-ge-bench')).toBeNull();
+    await act(async () => pending.reject(new Error('Read failed')));
+    expect(screen.getByTestId('group-exercises-links-error')).toBeTruthy();
+    expect(screen.queryByTestId('group-exercise-link-status-ge-bench')).toBeNull();
+    await act(async () => fireEvent.press(screen.getByTestId('group-exercises-links-retry')));
+    expect(await screen.findByTestId('group-exercise-unlink-button-ge-bench')).toBeTruthy();
+    expect(read).toHaveBeenCalledTimes(2);
+  });
+
+  it('a read failure after a committed unlink keeps success and a separate unknown-status error', async () => {
+    prepare();
+    await openExercisesAs('member');
+    await screen.findByTestId('group-exercise-unlink-button-ge-bench');
+    const spy = await openConfirmation();
+    jest.spyOn(linksRepo, 'listLinks').mockRejectedValueOnce(new Error('Read failed'));
+    await pressAlertButton(spy, 'Unlink');
+    expect(screen.getByTestId('group-exercises-action-feedback')).toHaveTextContent(/Unlinked “My Bench”/);
+    expect(screen.getByTestId('group-exercises-links-error')).toBeTruthy();
+    expect(screen.queryByTestId('group-exercise-link-status-ge-bench')).toBeNull();
+    expect(await linksRepo.listLinks()).toEqual([]);
+  });
+
+  it('unlinks offline and keeps the marker and reconnect notice', async () => {
+    prepare();
+    seedCache(groupCacheKeys.group(GROUP_ID), detailFor('member'));
+    seedCache(groupCacheKeys.groupExercises(GROUP_ID), LIST);
+    mockInitialOnline = false;
+    api.getGroup.mockRejectedValue(new GroupApiError('NETWORK', 'offline'));
+    api.listGroupExercises.mockRejectedValue(new GroupApiError('NETWORK', 'offline'));
+    await openExercisesAs('member');
+    await screen.findByTestId('group-exercise-unlink-button-ge-bench');
+    const spy = await openConfirmation();
+    await pressAlertButton(spy, 'Unlink');
+    expect(await linksRepo.listLinks()).toEqual([]);
+    expect(screen.getByTestId('groups-offline-banner')).toBeTruthy();
+    expect(screen.getByTestId('group-exercises-action-feedback')).toHaveTextContent(/Leaderboards will update after you reconnect and sync/);
+  });
+
+  it('archived links remain removable and the confirmation explains the frozen board', async () => {
+    addMyExercise('def-a', 'My Squat');
+    addLink(GROUP_ID, 'def-a', 'ge-old');
+    await openExercisesAs('member');
+    const button = await screen.findByTestId('group-exercise-unlink-button-ge-old');
+    const spy = alertSpy();
+    fireEvent.press(button);
+    expect(spy.mock.calls[0][1]).toContain('Archived leaderboards stay unchanged');
+    await pressAlertButton(spy, 'Unlink');
+    expect(await linksRepo.listLinks()).toEqual([]);
+    expect(screen.queryByTestId('group-exercise-link-button-ge-old')).toBeNull();
   });
 });

@@ -44,6 +44,7 @@ export function useMyGroupExerciseLinks(groupId: string): MyGroupExerciseLinksSt
   const reload = useCallback(async () => {
     // Only the latest read may land: an older one finishing last would show pre-link state.
     const seq = ++seqRef.current;
+    setState((current) => ({ ...current, links: null, failed: false }));
     try {
       const [links, exercises] = await Promise.all([listLinks(), listExerciseCatalogExercises({ includeDeleted: true })]);
       if (!mountedRef.current || seq !== seqRef.current) return;
@@ -52,6 +53,7 @@ export function useMyGroupExerciseLinks(groupId: string): MyGroupExerciseLinksSt
         links: links
           .filter((link) => link.groupId === groupId)
           .map((link) => ({
+            exerciseDefinitionId: link.exerciseDefinitionId,
             groupExerciseId: link.groupExerciseId,
             exerciseName: names.get(link.exerciseDefinitionId) ?? null,
           })),

@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { Alert, View } from 'react-native';
+import { useMemo, useRef, useState } from 'react';
+import { AccessibilityInfo, Alert, findNodeHandle, View } from 'react-native';
 
 import {
   ExerciseEditorModal,
@@ -32,10 +32,13 @@ import {
   type LinkableExercise,
 } from '@/src/groups';
 import { buildAddAsNewPrefill } from '@/src/groups/add-as-new';
+import type { PersonalExerciseLinkChoice } from '@/src/groups/exercise-view-model';
+import { useExerciseUnlink, type ExerciseUnlinkTarget } from '@/src/groups/use-exercise-unlink';
 
 import { GroupActionSheet } from './group-action-sheet';
 import { GroupExercisePickSheet, type GroupExercisePickTarget } from './group-exercise-pick-sheet';
 import { GroupExerciseRow } from './group-exercise-row';
+import { GroupExerciseUnlinkSheet } from './group-exercise-unlink-sheet';
 import { GroupMissingDataState, GroupStateView } from './group-state-view';
 import { GroupWriteNotice } from './write-notice';
 
@@ -58,7 +61,7 @@ const runArchiveWrite = (groupId: string, action: 'archive' | 'unarchive', group
   action === 'archive' ? archiveGroupExercise(groupId, groupExerciseId) : unarchiveGroupExercise(groupId, groupExerciseId);
 
 /**
- * The group page's Exercises segment (product E0.4; contract §4.4): the
+ * The group management page's Exercises list (product E0.4; contract §4.4): the
  * group's exercises with my local link status and, on an active row none of
  * mine is linked to, "Link your exercise" for every member — the M25-T07 pick
  * sheet in link-only mode (a local write, so it works offline; nothing is
@@ -82,6 +85,40 @@ export function GroupExercisesPage({
   const [pickTarget, setPickTarget] = useState<GroupExercisePickTarget | null>(null);
   const [addAsNewTarget, setAddAsNewTarget] = useState<GroupExercise | null>(null);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const unlink = useExerciseUnlink({ offline, reloadLinks: links.reload, onNotice: setFeedback });
+  const [unlinkExercise, setUnlinkExercise] = useState<GroupExercise | null>(null);
+  const [chooserVisible, setChooserVisible] = useState(false);
+  const selectedUnlink = useRef<ExerciseUnlinkTarget | null>(null);
+  const focusGroupExerciseId = useRef<string | null>(null);
+  const rowRefs = useRef(new Map<string, View>());
+  const restoreRowFocus = () => {
+    const row = rowRefs.current.get(focusGroupExerciseId.current ?? '');
+    const handle = row ? findNodeHandle(row) : null;
+    if (handle !== null) AccessibilityInfo.setAccessibilityFocus(handle);
+  };
+  const unlinkTarget = (exercise: GroupExercise, choice: PersonalExerciseLinkChoice): ExerciseUnlinkTarget => ({
+    personalExerciseId: choice.exerciseDefinitionId, personalExerciseName: choice.label,
+    groupId, groupName, groupExerciseId: exercise.group_exercise_id, groupExerciseName: exercise.name,
+    archived: exercise.archived_at_ms !== null, inactive: false,
+  });
+  const openUnlink = (exercise: GroupExercise, choices: PersonalExerciseLinkChoice[]) => {
+    if (unlink.pending || links.links === null) return;
+    focusGroupExerciseId.current = exercise.group_exercise_id;
+    if (choices.length === 1) {
+      unlink.confirmUnlink(unlinkTarget(exercise, choices[0]), restoreRowFocus);
+    } else if (choices.length > 1) {
+      selectedUnlink.current = null;
+      setUnlinkExercise(exercise);
+      setChooserVisible(true);
+    }
+  };
+  const finishChooser = () => {
+    const target = selectedUnlink.current;
+    selectedUnlink.current = null;
+    setUnlinkExercise(null);
+    if (target) unlink.confirmUnlink(target, restoreRowFocus);
+    else restoreRowFocus();
+  };
   const archiveWrite = useGroupAction(runArchiveWrite);
   const canManage = canManageGroup(myRole);
   const addAsNewPrefill = useMemo(() => (addAsNewTarget ? buildAddAsNewPrefill(addAsNewTarget) : null), [addAsNewTarget]);
@@ -178,11 +215,14 @@ export function GroupExercisesPage({
     <View style={{ gap: uiSpace.md }} testID="group-screen-exercises">
       {feedback ? <GroupWriteNotice message={feedback.message} testID="group-exercises-action-feedback" tone={feedback.tone} /> : null}
       {links.failed ? (
-        <GroupWriteNotice
-          message="Couldn't read your links on this device, so link status isn't shown."
-          testID="group-exercises-links-error"
-          tone="error"
-        />
+        <View style={{ gap: uiSpace.sm }}>
+          <GroupWriteNotice
+            message="Couldn't read your links on this device, so link status isn't shown."
+            testID="group-exercises-links-error"
+            tone="error"
+          />
+          <UiButton label="Retry reading links" onPress={() => void links.reload()} style={{ minHeight: 44 }} testID="group-exercises-links-retry" variant="secondary" />
+        </View>
       ) : null}
       {rows.length === 0 ? (
         <GroupStateView
@@ -200,7 +240,10 @@ export function GroupExercisesPage({
               return (
                 <GroupExerciseRow
                   key={row.groupExerciseId}
-                  onLink={row.linkable && exercise ? () => openLink(exercise) : undefined}
+                  focusRef={(node) => { if (node) rowRefs.current.set(row.groupExerciseId, node); else rowRefs.current.delete(row.groupExerciseId); }}
+                  onUnlink={row.personalLinks.length > 0 && exercise ? () => openUnlink(exercise, row.personalLinks) : undefined}
+                  unlinkPending={unlink.pending}
+                  onLink={row.linkable && exercise && !unlink.pending ? () => openLink(exercise) : undefined}
                   onPress={canManage && !archiveWrite.pending ? () => setSheetExercise(exercise) : undefined}
                   row={row}
                 />
@@ -209,6 +252,19 @@ export function GroupExercisesPage({
           </UiSurface>
         </>
       )}
+      <GroupExerciseUnlinkSheet
+        choices={rows.find((row) => row.groupExerciseId === unlinkExercise?.group_exercise_id)?.personalLinks ?? []}
+        groupExerciseName={unlinkExercise?.name ?? ''}
+        groupName={groupName}
+        onClose={() => { selectedUnlink.current = null; setChooserVisible(false); }}
+        onDismiss={finishChooser}
+        onSelect={(choice) => {
+          if (!unlinkExercise) return;
+          selectedUnlink.current = unlinkTarget(unlinkExercise, choice);
+          setChooserVisible(false);
+        }}
+        visible={chooserVisible}
+      />
       <GroupActionSheet
         actionTestIDPrefix="group-exercise-action"
         actions={sheetActions.map((action) => ({

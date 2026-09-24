@@ -1,0 +1,13 @@
+{
+  "lane": "agent-auth-web",
+  "wall_ms": 3559,
+  "exit_code": 0,
+  "recorded_at": "20260923T212243Z",
+  "machine_id": "e277734d",
+  "hw": "Apple M4",
+  "cores": 10,
+  "os": "macOS 26.6.2",
+  "slot": "3",
+  "commit": "53b2a0f1",
+  "source": "gate"
+}

@@ -164,6 +164,54 @@ function benchSet1(weight, cuam) {
   return setEntity(liveSet(1), output.groupsSessionId + '-bench', 0, weight, '5', cuam);
 }
 
+// Unlink acceptance uses the device's OWN mappings. The counterparty certifies
+// its completed set; all assertions read the public RPCs and owner-scoped rows.
+function unlinkBoard(certified) {
+  return rpcOk(output.groupsToken, 'group_board', {
+    p_group_id: output.groupsGroupId, p_group_exercise_id: output.unlinkGroupExerciseId,
+    p_metric: 'weight', p_certified: certified, p_after: null, p_limit: 10,
+  });
+}
+
+function awaitUnlinkBoard(linked) {
+  var deadline = Date.now() + POLL_DEADLINE_MS;
+  for (;;) {
+    var all = unlinkBoard(false).rows || [];
+    var certified = unlinkBoard(true).rows || [];
+    var ready = linked
+      ? all.length === 1 && all[0].set_id === output.unlinkSetId && certified.length === 1 &&
+        certified[0].set_id === output.unlinkSetId && certified[0].certification.certification_id === output.unlinkCertificationId
+      : all.length === 0 && certified.length === 0;
+    if (ready) return;
+    if (Date.now() > deadline) fail('unlink boards did not converge; linked=' + linked + ' all=' + JSON.stringify(all) + ' certified=' + JSON.stringify(certified));
+    pause(POLL_INTERVAL_MS);
+  }
+}
+
+function assertUnlinkPreserved(linked) {
+  awaitUnlinkBoard(linked);
+  var stream = rpcOk(output.groupsToken, 'group_stream', { p_group_id: output.groupsGroupId, p_before: null, p_limit: 50 });
+  var record = (stream.items || []).filter(function (item) { return item.key === output.unlinkRecordKey; })[0];
+  if (!record || record.voided !== null || record.provisional !== false || !record.certified ||
+      !record.certification || record.certification.certification_id !== output.unlinkCertificationId) {
+    fail('completed record / original active certification changed: ' + JSON.stringify(record));
+  }
+  var detail = rpcOk(output.groupsToken, 'group_session_detail', {
+    p_member_user_id: output.unlinkDeviceUserId, p_session_id: output.unlinkSessionId,
+  });
+  if (!detail.session || detail.session.status !== 'completed') fail('shared completed session disappeared');
+  var response = http.get(output.groupsSupabaseUrl + '/rest/v1/exercise_group_links?group_id=eq.' + output.groupsGroupId + '&select=exercise_definition_id,group_exercise_id,deleted_at', {
+    headers: { apikey: output.groupsAnonKey, Authorization: 'Bearer ' + output.unlinkDeviceToken, 'Accept-Profile': 'app_public' },
+  });
+  var links = parse(response);
+  if (response.status !== 200 || !Array.isArray(links)) fail('could not read own link rows');
+  var primary = links.filter(function (link) { return link.exercise_definition_id === output.unlinkPrimaryId; })[0];
+  var secondary = links.filter(function (link) { return link.exercise_definition_id === output.unlinkSecondaryId; })[0];
+  if (!primary || (primary.deleted_at === null) !== linked || !secondary || secondary.deleted_at !== null ||
+      secondary.group_exercise_id !== output.unlinkGroupExerciseId) fail('the selected mapping or untouched second mapping is wrong: ' + JSON.stringify(links));
+  console.log(TAG + ' UNLINK_PRESERVATION linked=' + linked + ' record=' + output.unlinkRecordKey + ' certification=' + output.unlinkCertificationId + ' second-link=preserved');
+}
+
 var steps = {
   'sign-in': function () {
     output.groupsSupabaseUrl = SUPABASE_URL;
@@ -458,6 +506,60 @@ var steps = {
         ' polls)',
     );
   },
+
+  'prepare-device-unlink': function () {
+    var device = signIn(); // EMAIL/PASSWORD are the device fixture for this step only.
+    output.unlinkDeviceToken = device.token;
+    output.unlinkDeviceUserId = device.userId;
+    var created = rpcOk(device.token, 'group_exercise_create', {
+      p_group_id: output.groupsGroupId, p_name: 'Unlink Bench', p_load_input_mode: 'total_load', p_source_exercise_id: null,
+    });
+    output.unlinkGroupExerciseId = created.exercise.group_exercise_id;
+    output.unlinkPrimaryId = 'maestro-unlink-bench-a';
+    output.unlinkSecondaryId = 'maestro-unlink-bench-b';
+    var stamp = nextClientUpdatedAt();
+    var definitions = [output.unlinkPrimaryId, output.unlinkSecondaryId];
+    var names = ['Bench (competition)', 'Bench (training)'];
+    var entities = [];
+    for (var i = 0; i < definitions.length; i++) {
+      entities.push(entity('exercise_definitions', definitions[i], stamp, {
+        name: names[i], load_input_mode: 'total_load', created_at: stamp, updated_at: stamp, deleted_at: null,
+      }));
+      entities.push(entity('exercise_group_links', output.groupsGroupId + ':' + definitions[i], stamp, {
+        exercise_definition_id: definitions[i], group_id: output.groupsGroupId, group_exercise_id: output.unlinkGroupExerciseId,
+        created_at: stamp, updated_at: stamp, deleted_at: null,
+      }));
+    }
+    if (!rpcOk(device.token, 'sync_push', { entities: entities }).ok) fail('could not seed device links');
+    // Later created_at than the link: this is a logged record, not retroactive linking.
+    stamp = nextClientUpdatedAt();
+    output.unlinkSessionId = 'maestro-unlink-session';
+    output.unlinkSetId = 'maestro-unlink-set';
+    if (!rpcOk(device.token, 'sync_push', { entities: [
+      sessionEntity(output.unlinkSessionId, stamp, stamp, stamp + 60000),
+      sessionExerciseEntity('maestro-unlink-session-exercise', output.unlinkSessionId, output.unlinkPrimaryId, 0, names[0], stamp),
+      setEntity(output.unlinkSetId, 'maestro-unlink-session-exercise', 0, '80', '5', stamp),
+    ] }).ok) fail('could not seed the completed set');
+    var deadline = Date.now() + POLL_DEADLINE_MS;
+    for (;;) {
+      var stream = rpcOk(output.groupsToken, 'group_stream', { p_group_id: output.groupsGroupId, p_before: null, p_limit: 50 });
+      var record = (stream.items || []).filter(function (item) {
+        return item.kind === 'record' && item.set_id === output.unlinkSetId && item.provisional === false;
+      })[0];
+      if (record) { output.unlinkRecordKey = record.key; break; }
+      if (Date.now() > deadline) fail('device set did not create a completed record');
+      pause(POLL_INTERVAL_MS);
+    }
+    var certified = rpcOk(output.groupsToken, 'group_certify', {
+      p_group_id: output.groupsGroupId, p_group_exercise_id: output.unlinkGroupExerciseId,
+      p_member_user_id: device.userId, p_set_id: output.unlinkSetId,
+    });
+    output.unlinkCertificationId = certified.certification.certification_id;
+    assertUnlinkPreserved(true);
+  },
+  'assert-unlink-cancelled': function () { assertUnlinkPreserved(true); },
+  'assert-device-unlinked': function () { assertUnlinkPreserved(false); },
+  'assert-device-relinked': function () { assertUnlinkPreserved(true); },
 
   // AC11: once removed, the counterparty's next read of the group is NOT_FOUND.
   'assert-removed': function () {
