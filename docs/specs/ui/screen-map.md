@@ -170,12 +170,11 @@ Brief entrypoint map of the current mobile screens.
 - File: `apps/mobile/app/session/[sessionId]/index.tsx` (components in
   `apps/mobile/components/session-view/`)
 - Purpose:
-  - the active session, read-only and navigational (exercise/session redesign
-    step 5; accepted target `design-targets/exercise-session-v5.md`,
-    `V6-Session`). Every active-session entry opens it: Today, Train, Sessions'
+  - the active session, read-only and navigational (accepted target
+    `design-targets/exercise-session-v5.md`, `V6-Session`). Every active-session entry opens it: Today, Train, Sessions'
     Resume and review/complete, and the completed session's per-exercise
     `Append`
-  - also the completed-session editor (step 6b-1): History's completed rows and
+  - also the completed-session editor: History's completed rows and
     `Edit`, and the completed session's `Edit` and `intent=edit`, open it
 - Key states (high level):
   - own top bar: `Session` · ⋮ · `Finish` (the one `accent` primary); the
@@ -357,8 +356,7 @@ Brief entrypoint map of the current mobile screens.
     `Sheet` previewing the PNG. It does not link to muscle analytics. Optional
     historical enrichment cannot block it, and share output excludes
     gym/location. Edit/delete/append actions are hidden. (History's
-    `presentation=summary` was removed in step 6b-1: the detail itself is the
-    summary.)
+    `presentation=summary` was removed: the detail itself is the summary.)
   - completion loading/error/not-found/deleted-target states show the top bar
     without Done and one safe exit, `Back to Progress`; the back gesture is
     off and Android system back replaces to Progress
@@ -561,10 +559,10 @@ Brief entrypoint map of the current mobile screens.
 - Notes:
   - sets its stack title to `Link "<exercise name>"` once the exercise resolves
 
-21. `/session/[sessionId]/exercise/[sessionExerciseId]` (exercise/session redesign step 4)
+21. `/session/[sessionId]/exercise/[sessionExerciseId]`
 - File: `apps/mobile/app/session/[sessionId]/exercise/[sessionExerciseId].tsx` (composition in `apps/mobile/components/exercise-page/`)
 - Purpose:
-  - one page per exercise of the active session, or of a completed session being edited from the session view (step 6b-1), in the design language (`design-language.md`; accepted target `design-targets/exercise-session-v5.md`): top bar (back · exercise name · ⋮), the collapsible records panel, one ordered set list whose current set expands in place into the logger, `+ Add set`, and `Complete exercise`
+  - one page per exercise of the active session, or of a completed session being edited from the session view, in the design language (`design-language.md`; accepted target `design-targets/exercise-session-v5.md`): top bar (back · exercise name · ⋮), the collapsible records panel, one ordered set list whose current set expands in place into the logger, `+ Add set`, and `Complete exercise`
   - reached only from the session view; its domain lives in `src/session-recorder/**`
   - a completed session's exercise is edited with the same rules (logger, ticks, `Complete exercise`) and written back as completed with its times, every row kept; its records panel leaves that session out
 - Key states (high level):
@@ -575,9 +573,9 @@ Brief entrypoint map of the current mobile screens.
 - Key exits:
   - back (top bar) → the previous screen; `Complete exercise` → the previous screen after resolving the sets still waiting; `Remove from session` → the previous screen; `History` → `/exercise-history`; ⋮ `Link to group exercise…` → `/exercise-link?exerciseDefinitionId=<id>`
 - Notes:
-  - entered from the session view's exercise cards (step 5), or by deep link (Maestro `teleport=exercise-page`); with no screen to go back to, back goes to `/train`
+  - entered from the session view's exercise cards, or by deep link (Maestro `teleport=exercise-page`); with no screen to go back to, back goes to `/train`
 
-22. `/gyms` (Gyms screen; exercise/session redesign step 6b)
+22. `/gyms` (Gyms screen)
 - File: `apps/mobile/app/gyms.tsx` (composition in `apps/mobile/components/gyms/`)
 - Purpose:
   - manage the gyms a session can be at, and their private locations

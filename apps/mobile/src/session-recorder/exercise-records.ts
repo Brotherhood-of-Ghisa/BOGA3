@@ -10,7 +10,7 @@ import {
 import type { ExerciseRecordBaseline } from './exercise-page-model';
 
 /**
- * The exercise page's records panel (build spec, "Exercise page" §1): the
+ * The exercise page's records panel (`ux-rules` §14a.4): the
  * lifter's all-time 1RM, heaviest weight and best session volume for one
  * exercise, each with where it was set, and the sets of the previous session.
  * Derived from the completed history `loadExercisePerformanceHistory` returns

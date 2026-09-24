@@ -50,7 +50,7 @@ import { pageText } from './text-styles';
 type ExercisePageScreenProps = {
   sessionId: string;
   sessionExerciseId: string;
-  // Injected by tests; production uses the recorder's repositories.
+  // Injected by tests; production uses the session repositories.
   draftClient?: SessionExerciseDraftClient;
   loadHistory?: LoadExerciseHistory;
 };
@@ -69,7 +69,7 @@ const LOAD_ERROR_MESSAGES = {
 const FALLBACK_BACK_ROUTE = '/train' as Href;
 
 /**
- * The exercise page (build spec, "Exercise page"): one page per session
+ * The exercise page (`ux-rules` §14a): one page per session
  * exercise, the set list with the in-place logger, and two exits — Back leaves
  * set states untouched, `Complete exercise` resolves the sets still waiting.
  * The same page edits an exercise of a completed session (opened from the

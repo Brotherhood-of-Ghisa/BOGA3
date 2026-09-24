@@ -13,7 +13,7 @@
  * path this iteration (it is system-seeded only), so its write path is the
  * starter-catalog seeder — which must land its rows dirty just like the rest of
  * the catalog. `exercise_tag_definitions` has no app write path at all since
- * the tag editor went with the old recorder (redesign 6b): tags arrive by sync
+ * the tag editor went with the old recorder: tags arrive by sync
  * only. Their `session_exercise_tags` join rows are still rewritten when a
  * session graph is re-saved, so that is their write path here.
  *

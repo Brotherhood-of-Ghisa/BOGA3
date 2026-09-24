@@ -35,7 +35,7 @@ export type GymEditorProps = {
 
 /**
  * One gym's editor, open in place of its row on the Gyms screen (lifted from
- * the recorder's gym modal). The name saves with Save; the private location
+ * the old recorder's gym modal). The name saves with Save; the private location
  * saves at once from the current position, and replacing or clearing one asks
  * first. Archive is the synced soft delete.
  */

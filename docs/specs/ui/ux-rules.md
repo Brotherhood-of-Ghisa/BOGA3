@@ -164,10 +164,10 @@ Document app-specific UI semantics and guardrails for the current mobile app.
     - The first new ad-hoc set of each exercise defaults to `W-Up`. Adding a set copies the previous set's `Weight` and `Reps`; effort defaults to blank after `W-Up` or blank, and inherits the previous RIR otherwise. Each new row gets its own identity and unconfirmed status. These defaults never rewrite existing sets or prescribed effort. Valid copied values remain unperformed until ticked. Adding after an untouched planned target does not perform it; the planned row remains until explicitly confirmed. The added set's `Weight` input takes focus and selects a copied value, so the next keystroke replaces it.
     - Active and completed-edit autosave preserve every set row, including fully blank, partial, valid unconfirmed, and planned rows, with stable identity, values, effort, confirmation status, and order across input blur, tab/route navigation, hydration, sync, and restore. Legacy persisted `skipped` planned rows hydrate as untouched planned rows. Blank or invalid reps remain incomplete; valid unconfirmed rows remain excluded from performed semantics.
     - Final active-session submit and completed-edit save persist completed workout history as confirmed actual sets only. Completion uses separate explicit cleanup decisions for entered-but-unconfirmed rows (a specific discard prompt) and incomplete rows (§14b.2); untouched planned rows are actual-only omissions, and exercises left empty use the same cleanup prompt. The `/sessions` active-session completion affordance opens the session view, so it cannot bypass this cleanup.
-12. Retired (step 6b-3): there is no live per-session muscle summary while training. The completion screen's per-muscle working-set pills (§7.7) remain.
+12. Retired (2026-09-23): there is no live per-session muscle summary while training. The completion screen's per-muscle working-set pills (§7.7) remain.
 13. The shared exercise editor dismisses the text keyboard before opening primary/secondary muscle selectors, and selector lists remain keyboard-aware so all muscle-group options stay reachable on iOS. It exposes a two-choice `Total load` / `Per side` control, preselects the stored value while editing, and defaults new custom exercises to total load.
 14. GPS gym detection is quiet assistance, and it **suggests only** (decided
-    2026-09-23, redesign step 6b):
+    2026-09-23):
     - opening the session view's `Gym` sheet runs one foreground location read
       (a 1.5 s budget; the permission prompt, when due, first appears here);
       exactly one confident match against the unarchived gyms with a saved
@@ -210,7 +210,7 @@ Document app-specific UI semantics and guardrails for the current mobile app.
     - `Archive` is the synced soft delete (`gyms.deleted_at`): the gym leaves
       the sheet and GPS suggestion, keeps naming its past sessions, and returns
       with `Unarchive` from `Show archived`; there is no hard delete.
-17. Retired (step 6b-3): the per-card `Past Records` panel is gone. An exercise's history is the exercise page's records panel (§14a.4) and its `History` link.
+17. Retired (2026-09-23): the per-card `Past Records` panel is gone. An exercise's history is the exercise page's records panel (§14a.4) and its `History` link.
 
 ### 6. Loading, empty, error, and feedback state handling
 
@@ -303,8 +303,8 @@ Document app-specific UI semantics and guardrails for the current mobile app.
 10. Completion hides edit/delete/append. Done and Android back replace to
     Progress, and the back gesture is off. A completed row in Session History,
     and a completed session's `Edit`, open the session view to edit it
-    (§14b.7); there is no separate historical summary (step 6b-1 removed
-    `presentation=summary` — the completed-session detail is the summary). A
+    (§14b.7); there is no separate historical summary (`presentation=summary` was
+    removed — the completed-session detail is the summary). A
     missing, deleted, or failed target shows the top bar without Done and one
     safe exit, `Back to Progress`, and never opens an editable copy.
 
@@ -385,9 +385,10 @@ primitives (`Card`, `Stat`, `ListRow`, `Sheet`, `ActionButton`) and those screen
    target drew at 8/9px; both lift to 10 rather than earning rungs of their own,
    since 8px body-adjacent text was poor for accessibility — so `9` now folds up
    into `10` rather than into `11`.
-   No other rung moved when `xxs` was added, and nothing shipped adopts it yet;
-   `apps/mobile/app/__tests__/ui-tokens-additive.test.ts` holds the other seven
-   in place. Reasoning: `ui/design-language.md` §3.
+   No other rung moved when `xxs` was added; the design-language screens use it
+   for micro-labels, and `apps/mobile/app/__tests__/ui-design-tokens.test.ts`
+   holds all eight rungs and their line-heights. Reasoning:
+   `ui/design-language.md` §3.
 2. **Every size has a line-height**, in `uiTypography.lineHeight`, keyed to the
    same names: `14 · 15 · 16 · 18 · 20 · 22 · 24 · 30`. `UiText`'s prose
    variants apply them, so vertical rhythm no longer depends on the platform
@@ -442,7 +443,7 @@ primitives (`Card`, `Stat`, `ListRow`, `Sheet`, `ActionButton`) and those screen
 
 ### 10. Exercise-tag semantics
 
-1. Exercise tags are read-only in the app (step 6b-3 dropped tag editing): there is no `#`, attach, create, rename, delete or manage UI. The synced tag tables and existing assignments stay.
+1. Exercise tags are read-only in the app (tag editing was dropped 2026-09-23): there is no `#`, attach, create, rename, delete or manage UI. The synced tag tables and existing assignments stay.
 2. Exercise history offers the tags used on that exercise as filter chips (`All tags` plus one chip per tag with its session count; a deleted tag reads `(deleted)`).
 
 ### 11. Calendar heatmap semantics
@@ -548,9 +549,9 @@ primitives (`Card`, `Stat`, `ListRow`, `Sheet`, `ActionButton`) and those screen
 13. Full boards and their history are online-only reads: never cached, no 30 s poll (they refresh on open, a toggle change, focus, and pull), paged on end-of-list with a `Retry` footer after a failed page. With nothing loaded offline they show the offline empty state; rows already loaded stay with the offline marker. A missing group exercise reads "This exercise isn't in this group" and is not lost access.
 14. Certification (M25-T10). A record card and a full-board row open the same row detail sheet (08 pattern 11). `Certify` shows for any member but the lifter on a standing, uncertified record set of an active exercise whose lifter is still a member; `Remove my certification` for the certifier; `Cancel certification` for the owner or an admin who is not the certifier. Certify does not confirm; Remove and Cancel confirm first (`Alert.alert`, destructive style). The writes follow rule 7 (offline refused before any request, nothing queued); their outcome shows inline in the sheet or on the card. `CONFLICT`, a set that is no longer a record, a certification or lifter that is gone, `FORBIDDEN`, and `VALIDATION` say nothing changed and re-read the board or stream; a group `NOT_FOUND` evicts and shows lost access. After a certify the sheet reads `Certified. Certified boards update in a few seconds.`
 
-### 14a. Exercise page (redesign step 4; the default since step 6a)
+### 14a. Exercise page
 
-Graduated from the build spec; the page lives at
+The page lives at
 `/session/[sessionId]/exercise/[sessionExerciseId]` and edits one exercise of
 the active session (or of a completed session being edited, §14b.7) through the session repository and autosave
 (`src/session-recorder/`), so the rules of §5.11 about what a set *is* hold
@@ -559,7 +560,9 @@ unchanged. What differs is presentation:
 1. **One ordered list, no mode.** Performed, current and planned rows share one
    list; a row carries its planned triple and its actuals, and
    `performanceStatus` decides which is real. The row shows its actuals once
-   performed or once the lifter has typed, and its plan otherwise.
+   performed or once the lifter has typed, and its plan otherwise. Planned vs
+   ad hoc is not a mode either: following a plan and logging ad hoc mix freely
+   in one session, and `Append plan` adds planned rows in both cases.
 2. **State is the glyph** (`set-done` / `set-current` / `set-planned`), a
    checkbox in the row's 44pt control column. Tapping it performs a row with
    valid values (typed, else planned) or un-performs a performed row — back to
@@ -593,7 +596,7 @@ unchanged. What differs is presentation:
 6. **Sheets** are the design-language `Sheet`: backdrop, Android back and the
    VoiceOver escape dismiss; no Cancel.
 
-### 14b. Session view (redesign step 5; the default since step 6a)
+### 14b. Session view
 
 1. The session view is read-only and navigational: the whole exercise card is
    one link to the exercise page, with no controls inside it. Editing happens
@@ -629,7 +632,7 @@ unchanged. What differs is presentation:
    their entered-load volume; Time is elapsed since the session's start.
 6. The persistent four-tab bar stays at the bottom with Train selected; it is
    the way back out, and returns to the tab rather than stacking it.
-7. **A completed session is edited here** (step 6b-1). The top bar reads
+7. **A completed session is edited here**. The top bar reads
    `Edit session` · `Done`, with no ⋮ (there is nothing to abandon), and
    Progress is selected in the tab bar. The summary card's Time becomes two
    fields, `Start` and `End` (`YYYY-MM-DD HH:mm`, End not before Start); a

@@ -153,10 +153,10 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 - Params:
   - `sessionId` (path; the active draft's id, or a completed session's)
 - Behavior:
-  - the session view (redesign step 5); every app entry into the active session
+  - the session view; every app entry into the active session
     opens it through `sessionViewHref(sessionId)` in
     `apps/mobile/src/navigation/active-session-entry.ts` (transitions 9, 46)
-  - a completed session (step 6b-1) opens it the same way from every
+  - a completed session opens it the same way from every
     completed-edit entry (transitions 3, 7, 8). It edits in place and `Done` returns with
     `router.back()` (`router.replace('/completed-session/<sessionId>')` with no
     history); it never replays completion
@@ -351,7 +351,7 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
   - signed out or auth-unconfigured renders the group sign-in-required card
   - search, Link, Unlink (confirmed), and pull-to-refresh are in-route state; the route never navigates on its own
 
-20. `/session/[sessionId]/exercise/[sessionExerciseId]` (exercise/session redesign step 4)
+20. `/session/[sessionId]/exercise/[sessionExerciseId]`
 - File: `apps/mobile/app/session/[sessionId]/exercise/[sessionExerciseId].tsx`
 - Path params:
   - `sessionId` (an active session, or a completed one being edited from the session view) and `sessionExerciseId` (one of its exercises); both required. A missing or deleted session, or an exercise no longer in it, renders an inline message instead of the page
@@ -359,7 +359,7 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
   - no query params; the records panel, the open set and every sheet are in-route state
   - registered with `headerShown: false`: the page draws its own top bar
 
-21. `/gyms` (exercise/session redesign step 6b)
+21. `/gyms`
 - File: `apps/mobile/app/gyms.tsx`
 - Query params:
   - `source` (optional; `more` shows an explicit `Back to More` action)
@@ -380,11 +380,11 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
    - Stats sub-view per-exercise picker opens the per-exercise history view
 3. `/sessions` -> `/session/<sessionId>`
    - completed Session History row tap (via the shared `HistoryList`) or its
-     Edit action: the session view, editing (step 6b-1); `Done` returns by
+     Edit action: the session view, editing; `Done` returns by
      `router.back()`
 4. `/progress` or `/stats-history` -> `/sessions`
    - Stats Sessions summary card
-5. (removed in step 6b-3: Sessions' active Resume to the recorder; see 46)
+5. (removed: Sessions' active Resume to the recorder; see 46)
 6. `/today` <-> `/train` <-> `/progress` <-> `/more`
    - canonical switching via the shared bottom tray (`BottomTray` ->
      `MainTabs`); preserved `/stats-history`, `/exercise-catalog`, `/groups`,
@@ -395,17 +395,17 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
    - route-side redirect (`replace`)
 9. `/completed-session/<sessionId>` -> `/session/<activeSessionId>`
    - `Append to current session` in an exercise card's ⋮ sheet: a successful append of that historical block as planned target rows in the active session (creates an active session first when needed); pushes the id the append returns
-10. (removed in step 6b-3: the recorder's active submit; see 47)
+10. (removed: the recorder's active submit; see 47)
 11. `/session/<sessionId>` (completed) -> the previous screen
    - `Done` after the completed-edit save (`router.back()`, or
      `router.replace('/completed-session/<sessionId>')` with no history);
      completion is not replayed
 12. `/completed-session/<sessionId>?presentation=completion` -> `/progress`
    - Done, safe back, or unavailable-target exit (`replace`)
-13. (removed in step 6b-1: the recorder's completed-edit `Summary`)
-14. (removed in step 6b-1: History's `presentation=summary` and its `Edit` / `History` header actions)
-15. (removed in step 6b-3: the recorder picker's `Manage`; see 49)
-16. (removed in step 6b-3: the catalogue's return to the recorder; see 49)
+13. (removed: the recorder's completed-edit `Summary`)
+14. (removed: History's `presentation=summary` and its `Edit` / `History` header actions)
+15. (removed: the recorder picker's `Manage`; see 49)
+16. (removed: the catalogue's return to the recorder; see 49)
 17. `/more` -> `/settings?source=more`, `/exercise-catalog?source=more`, or `/groups`
    - Settings and Exercise Catalog rows carry their hub origin and expose
      `Back to More`; each unmarked direct route remains addressable
@@ -475,7 +475,7 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
    - Abandon session after its confirmation, or the bottom bar (`router.dismissTo`)
 49. `/session/<sessionId>` -> `/exercise-catalog?source=session&intent=manage`
    - the picker's Manage; native back or the catalogue's post-save `router.back()` returns, and the picker reopens
-50. `/session/<sessionId>` -> `/session/<sessionId>/exercise/<sessionExerciseId>` (exercise/session redesign)
+50. `/session/<sessionId>` -> `/session/<sessionId>/exercise/<sessionExerciseId>`
    - the session view's exercise card (`router.push`). Back, `Complete exercise` and `Remove from session` return with `router.back()`, and the session view reloads the draft on focus; with no history (a deep link) they `router.replace('/train')`
 51. `/session/<sessionId>/exercise/<sessionExerciseId>` -> `/exercise-history?exerciseDefinitionId=<id>`
    - the records panel's `History` link (`router.push`)

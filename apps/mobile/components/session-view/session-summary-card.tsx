@@ -35,7 +35,7 @@ function ElapsedStat({ startedAt, now }: { startedAt: Date; now: () => Date }) {
 
 const systemNow = () => new Date();
 
-// Time / Gym / Sets / Volume, labels above values (build spec, "Session view").
+// Time / Gym / Sets / Volume, labels above values (`ux-rules` §14b.5).
 // Editing a completed session, Start and End take Time's place, above the row.
 export function SessionSummaryCard({
   startedAt,

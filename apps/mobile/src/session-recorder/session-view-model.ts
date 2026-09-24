@@ -8,8 +8,8 @@ import { hasPlannedTarget, toSessionInsightExercises } from './session-model';
 import { hasValidActualValues, isConfirmedPerformedSet } from './set-semantics';
 
 /**
- * The read-only session view's presentation model (build spec, "Session
- * view"): one card per exercise with its set rows, a done count and a
+ * The read-only session view's presentation model (`ux-rules` §14b): one
+ * card per exercise with its set rows, a done count and a
  * record, plus the summary totals. Pure — the route loads the
  * draft and the history and renders what this returns.
  */

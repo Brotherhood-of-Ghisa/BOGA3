@@ -236,7 +236,7 @@ describe('Session view', () => {
     expect(mockPush).toHaveBeenCalledWith('/session/session-1/exercise/fly');
   });
 
-  it('finishes through the recorder prompts and completion write, then opens the completion screen', async () => {
+  it('finishes through the cleanup prompts and completion write, then opens the completion screen', async () => {
     const titles = answerAlerts((title) =>
       title.startsWith('Remove exercises') ? 'Remove empty exercises and submit' : 'unexpected'
     );
@@ -250,7 +250,7 @@ describe('Session view', () => {
       expect(mockReplace).toHaveBeenCalledWith('/completed-session/session-1?presentation=completion')
     );
     expect(titles).toEqual(['Remove exercises with no sets and submit?']);
-    // Confirmed sets only, planned columns cleared — the recorder's completed-history graph.
+    // Confirmed sets only, planned columns cleared — the completed-history graph.
     const written = data.persistSessionDraftSnapshot.mock.calls.at(-1)?.[0];
     expect(written).toMatchObject({ sessionId: 'session-1', gymId: 'gym-1', status: 'active' });
     expect(written.startedAt).toEqual(new Date('2026-09-23T09:00:00'));
@@ -334,7 +334,7 @@ describe('Session view', () => {
     await act(async () => {
       fireEvent.press(screen.getByTestId('session-view-summary-gym-button'));
     });
-    // No gym, the recorder's seeded gyms, then the local ones; the current one marked.
+    // No gym, the seeded gyms, then the local ones; the current one marked.
     expect(screen.getByTestId('session-view-gym-option-none')).toBeTruthy();
     expect(screen.getByTestId('session-view-gym-option-downtown-iron-temple')).toBeTruthy();
     expect(screen.getByTestId('session-view-gym-option-gym-1')).toBeSelected();
@@ -528,7 +528,7 @@ describe('Session view', () => {
   });
 });
 
-// The recorder's completed edit (`?mode=completed-edit`), moved to the session
+// The completed edit (once the old recorder's `?mode=completed-edit`), on the session
 // view: these port its load, validation, autosave, save and leave cases.
 describe('Session view: editing a completed session', () => {
   // Stored to the second, so Done can prove it keeps untouched instants.
@@ -622,7 +622,7 @@ describe('Session view: editing a completed session', () => {
     expect(screen.queryByTestId('session-view-times-notice')).toBeNull();
   });
 
-  it('validates Start/End as the recorder did, and Done writes nothing until they are valid', async () => {
+  it('validates Start/End, and Done writes nothing until they are valid', async () => {
     await renderCompleted();
     const start = screen.getByTestId('session-view-start-time');
     const end = screen.getByTestId('session-view-end-time');

@@ -46,9 +46,9 @@ export type MaestroHarnessTeleportTarget =
   | 'session-list'
   | 'exercise-catalog'
   | 'completed-session'
-  // The exercise page (redesign step 4); needs `sessionId` and `sessionExerciseId`.
+  // The exercise page; needs `sessionId` and `sessionExerciseId`.
   | 'exercise-page'
-  // The session view (redesign step 5); needs `sessionId`: the active draft,
+  // The session view; needs `sessionId`: the active draft,
   // or a completed session to edit it (e.g. `maestro_m24_completion_one_pr`
   // from the `exercise-block-history` fixture).
   | 'session-view';

@@ -33,7 +33,7 @@ type RecordsPanelProps = {
 const DASH = '—';
 
 // The collapsible records panel: the `Records` | `Last` selector and the
-// `History` link are present in both states (build spec, "Exercise page" §1).
+// `History` link are present in both states (`ux-rules` §14a.4).
 export function RecordsPanel({
   state,
   view,

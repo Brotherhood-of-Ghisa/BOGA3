@@ -73,7 +73,7 @@ const confirmAlert = (input: {
     );
   });
 
-// Blocks on invalid set values, then walks the recorder's cleanup prompts.
+// Blocks on invalid set values, then walks the submit cleanup prompts (`session-model.ts`).
 // Resolves the completed-history session, or `null` when the user stops.
 const confirmSubmitCleanup = async (
   session: Session,
@@ -113,14 +113,14 @@ export type SessionViewScreenProps = {
 };
 
 /**
- * The session view (redesign step 5): the active session, read-only and
+ * The session view (`ux-rules` §14b): the active session, read-only and
  * navigational. Each exercise card links to its exercise page, where editing
  * happens; Finish and Abandon run the session lifecycle
  * (`src/session-recorder/session-lifecycle.ts`), and Add exercise the
  * exercise picker. Every active-session entry in the app opens it.
  *
  * A completed session opens here to be edited (History, completed-session
- * `Edit`): Start/End replace the elapsed Time, and Done — the recorder's
+ * `Edit`): Start/End replace the elapsed Time, and Done — the
  * completed-edit save — replaces Finish and Abandon. It never replays
  * completion.
  */
@@ -232,7 +232,7 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
     }
   };
 
-  // Done on a completed session: the recorder's completed-edit save (valid
+  // Done on a completed session: the completed-edit save (valid
   // times, set values and cleanup prompts, confirmed rows only), then back to
   // where the edit was opened from.
   const saveEdit = async () => {

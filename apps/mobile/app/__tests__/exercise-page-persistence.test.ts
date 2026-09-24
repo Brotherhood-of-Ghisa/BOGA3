@@ -1,6 +1,6 @@
 /**
  * The exercise page's persistence against the real repository and a real
- * migrated in-memory SQLite: the lane fixture seeds through the recorder's own
+ * migrated in-memory SQLite: the lane fixture seeds through the session's own
  * write path, a save replaces only the page's exercise, a removal leaves the
  * others, and the records panel reads what History reads.
  */

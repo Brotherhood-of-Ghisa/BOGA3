@@ -131,7 +131,7 @@ describe('maestro harness helpers', () => {
   });
 
   it('maps supported teleport targets to route hrefs', () => {
-    // The old recorder route is gone (redesign 6b); its teleport went with it.
+    // The old recorder route is gone; its teleport went with it.
     expect(resolveMaestroHarnessTeleportTarget('session-recorder')).toBeNull();
     expect(resolveMaestroHarnessTeleportTarget('unknown')).toBeNull();
 

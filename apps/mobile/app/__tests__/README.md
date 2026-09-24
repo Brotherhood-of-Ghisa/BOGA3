@@ -72,24 +72,18 @@
   state transitions, then add local-Supabase + Maestro proof for the full happy
   path with deterministic fixture credentials.
 
-## Design-token coverage policy (temporary — exercise/session rebuild)
+## Design-token coverage policy
 
-- Applies to `apps/mobile/components/ui/tokens.ts` while the exercise page and
-  session view are built *beside* the existing recorder
-  (`docs/plans/exercise-session-redesign.md`, rule 1).
-- The rule being covered: during the parallel period the token layer is
-  **additive only**. New roles and rungs are added; no existing value is
-  repointed, because repointing one restyles every shipped screen and breaks its
-  Maestro lane — silently, since nothing type-checks a colour.
-- `ui-tokens-additive.test.ts` therefore asserts, by whole-object equality
-  against an inline snapshot rather than spot-checks: `uiColors`, `uiSpace`,
-  `uiRadius`, `uiBorder` and `uiElevation` are byte-for-byte what shipped, and
-  the seven pre-2026-09-22 type rungs and line-heights are unchanged. Repointing
-  `uiSpace.lg` restyles every screen exactly as repointing a colour does, so
-  partial coverage would miss half the hazard. It also asserts `uiRoles` carries
-  exactly the roles in `docs/specs/ui/design-language.md` §2, that
-  `record !== accent`, and that `record` clears 4.5:1 on `paper`, `surface` and
-  `record-wash`.
-- It is a deliberate change-detector with an end date. **The switch-over step
-  (plan step 6/7) deletes it** along with the legacy palette — do not loosen it
-  in the meantime to make an unrelated change pass.
+- Applies to the design-language vocabularies in
+  `apps/mobile/components/ui/tokens.ts` (`uiRoles`, `uiFonts`, `uiGeometry`) and
+  the type scale (`docs/specs/ui/design-language.md` §2–§4, `ux-rules.md` §9a).
+- `ui-design-tokens.test.ts` asserts, by whole-object equality: the eight type
+  rungs and their line-heights, the colour roles named in §2, the geometry of
+  §4 and the embedded faces of §3; and that `record !== accent` and `record`
+  clears 4.5:1 on `paper`, `surface` and `record-wash`. Change a value there
+  and in the spec together — never loosen the test to make an unrelated change
+  pass.
+- The redesign's temporary "additive only" snapshots of the legacy scales
+  (`uiColors`, `uiSpace`, `uiRadius`, `uiBorder`, `uiElevation`) were retired
+  with the redesign's close-out: the legacy scales may now change as screens
+  move to the design language.

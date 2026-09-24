@@ -121,12 +121,12 @@ Use this section as the single source of truth for reusable UX patterns.
    - Rules: every surface showing a record set opens the same in-route sheet; the sheet shows the ranked value, the as-logged value when converted, when and where, and the certification state in text; its actions come from one pure rule over my role and my relationship to the set (`recordSetActionsFor`), never from the surface; a surface may offer the sheet's non-destructive primary action inline, sharing the same write state; writes follow pattern 9 and removals confirm (pattern 3); after a write the host re-reads, and the sheet shows the server's returned state meanwhile.
 12. In-place row logger pattern
    - Intent: log the next item of a list without leaving it, one-handed, mid-set.
-   - Usage: the exercise page's set list (redesign step 4; `components/exercise-page/set-logger.tsx`, `ui/ux-rules.md` §14a).
+   - Usage: the exercise page's set list (`components/exercise-page/set-logger.tsx`, `ui/ux-rules.md` §14a).
    - Rules: the open row expands in place into its editor (labelled fields of one height, the commit control on the list's control axis); it opens on the first unfinished row by default, or on a row the user taps, one at a time; entered values are kept as typed (autosave) and stay unconfirmed until the commit control, which is the screen's one primary and is disabled until the values are valid; committing moves the editor to the next unfinished row; a row's state stays in its glyph, which the user can also toggle directly without opening the editor.
 
 13. Read-only link card pattern
    - Intent: summarise one item of a working set (an exercise in the session) and open it, without editing in place.
-   - Usage: the session view's exercise cards (redesign step 5; `components/session-view/session-exercise-card.tsx`).
+   - Usage: the session view's exercise cards (`components/session-view/session-exercise-card.tsx`).
    - Rules: the whole card is one `Card` link with an accessibility label that states the summary (name, done count, record); no controls inside it; editing and removal live on the destination; what is not yet realised renders faded, never hidden; a record earns a band on the card, not a badge on the row.
 
 ## Default appearance baseline (MVP)
