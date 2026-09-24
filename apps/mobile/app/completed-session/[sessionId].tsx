@@ -2,7 +2,8 @@ import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-rou
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, BackHandler, StyleSheet, Text, View } from 'react-native';
 
-import { SessionCompletionPresentation } from '@/components/session-recorder/session-completion-presentation';
+import { SessionCompletionScreen } from '@/components/session-complete';
+import { SessionTopBar } from '@/components/session-view';
 import { ActionButton } from '@/components/ui/action-button';
 import { uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import { ViewSessionScreen, ViewSessionTopBar } from '@/components/view-session';
@@ -432,18 +433,19 @@ export function CompletedSessionDetailScreenShell({
   const safeExitButton =
     presentation === 'completion' ? (
       <ActionButton
-        label="Back to Stats and History"
+        label="Back to Progress"
         onPress={handleCompletionExit}
         testID="session-completion-safe-exit"
         variant="outline"
       />
     ) : null;
 
-  // The detail draws its own top bar, like the session view it opens; its
-  // stack title is the back label of what it pushes.
+  // Both presentations draw their own top bar, like the session view they sit
+  // beside; completion also blocks the back gesture (its exits replace to
+  // Progress). The stack title is the back label of what the detail pushes.
   const stackOptions =
     presentation === 'completion'
-      ? { title: 'Session complete', headerBackVisible: false, gestureEnabled: false }
+      ? { title: 'Session complete', headerShown: false, gestureEnabled: false }
       : { title: 'View Session', headerShown: false };
 
   const handleBack = () => {
@@ -514,12 +516,12 @@ export function CompletedSessionDetailScreenShell({
   };
 
   // Loading, error and not-found keep the route's frame: the detail's top bar
-  // (back only), or the completion's native header and its one safe exit.
+  // (back only), or the completion's (no Done) and its one safe exit.
   const renderState = (testID: string, title: string, body?: string) => (
     <>
       <Stack.Screen options={stackOptions} />
       <View style={styles.frame}>
-        {presentation === 'detail' ? <ViewSessionTopBar onBack={handleBack} /> : null}
+        {presentation === 'detail' ? <ViewSessionTopBar onBack={handleBack} /> : <SessionTopBar mode="complete" />}
         <View style={styles.centerState} testID={testID}>
           {testID === 'completed-session-detail-loading' ? <ActivityIndicator color={uiRoles.inkMuted} /> : null}
           <Text style={styles.stateTitle}>{title}</Text>
@@ -555,7 +557,7 @@ export function CompletedSessionDetailScreenShell({
     return (
       <>
         <Stack.Screen options={stackOptions} />
-        <SessionCompletionPresentation
+        <SessionCompletionScreen
           completedAt={session.completedAt}
           durationDisplay={session.durationDisplay}
           exerciseCount={performedExercises.length}

@@ -164,7 +164,7 @@ Document app-specific UI semantics and guardrails for the current mobile app.
     - The first new ad-hoc set of each exercise defaults to `W-Up`. Adding a set copies the previous set's `Weight` and `Reps`; effort defaults to blank after `W-Up` or blank, and inherits the previous RIR otherwise. Each new row gets its own identity and unconfirmed status. These defaults never rewrite existing sets or prescribed effort. Valid copied values remain unperformed until ticked. Adding after an untouched planned target does not perform it; the planned row remains until explicitly confirmed. The added set's `Weight` input takes focus and selects a copied value, so the next keystroke replaces it.
     - Active and completed-edit autosave preserve every set row, including fully blank, partial, valid unconfirmed, and planned rows, with stable identity, values, effort, confirmation status, and order across input blur, tab/route navigation, hydration, sync, and restore. Legacy persisted `skipped` planned rows hydrate as untouched planned rows. Blank or invalid reps remain incomplete; valid unconfirmed rows remain excluded from performed semantics.
     - Final active-session submit and completed-edit save persist completed workout history as confirmed actual sets only. Completion uses separate explicit cleanup decisions for entered-but-unconfirmed rows (a specific discard prompt) and incomplete rows (§14b.2); untouched planned rows are actual-only omissions, and exercises left empty use the same cleanup prompt. The `/sessions` active-session completion affordance opens the session view, so it cannot bypass this cleanup.
-12. Retired (step 6b-3): there is no live per-session muscle summary while training. The completion screen's per-muscle working-set chips (§7.7) remain.
+12. Retired (step 6b-3): there is no live per-session muscle summary while training. The completion screen's per-muscle working-set pills (§7.7) remain.
 13. The shared exercise editor dismisses the text keyboard before opening primary/secondary muscle selectors, and selector lists remain keyboard-aware so all muscle-group options stay reachable on iOS. It exposes a two-choice `Total load` / `Per side` control, preselects the stored value while editing, and defaults new custom exercises to total load.
 14. GPS gym detection is quiet assistance, and it **suggests only** (decided
     2026-09-23, redesign step 6b):
@@ -272,36 +272,41 @@ Document app-specific UI semantics and guardrails for the current mobile app.
    History is optional enrichment: while it loads, or if it fails, no record
    shows.
 7. `presentation=completion` is a post-submit presentation of the stored
-   completed session, not durable celebration state. Its order is `Session
-   Summary`, every compact `Personal records` card when present, one `Exercise
-   volume` card per performed exercise, session sharing, then Done. The single
-   summary card contains explicitly labelled duration, exercise, performed-set,
-   working-set, and gym values plus non-interactive per-muscle chips whose
-   bracketed value is the number of physical working sets mapped to that muscle.
-   It never links to muscle analytics. Personal-record/comparison history is
-   optional enrichment: its loading or failure never blocks stored context or
-   exits, and current exercise rows still render with an explicit no-history
-   state.
-8. Completion and `presentation=summary` from completed-session History reuse
-   the same summary presentation, PR calculation, muscle calculation,
-   exercise-volume rows, and Share action. Exercise-volume
-   cards show the exercise name with smaller performed/working-set counts,
-   current raw volume versus historical median, and a horizontal P5–P95 range
-   with median/current markers when a distribution exists. Single/equal
-   baselines and no-history rows use explicit non-distribution states; range
-   bars are descriptive context, never targets or readiness guidance.
-9. `Share session` opens a preview of the exact session-summary image before
-   sharing. The captured PNG contains session/date/count totals, working sets,
-   every PR, and every exercise comparison; it excludes gym/location data.
-   Nothing is uploaded or published by BOGA. Native-sheet cancellation is
-   silent, capture/launch failure is inline and retryable, and temporary image
-   cleanup cannot turn a completed share into an error.
-10. Completion hides edit/delete/append. Done and safe back replace to Progress.
-    A completed row in Session History, and a completed session's `Edit`, open
-    the session view to edit it (§14b.7); there is no separate historical
-    summary (step 6b-1 removed `presentation=summary` — the completed-session
-    detail is the summary). A missing, deleted, or failed target exposes one
-    safe return and never opens an editable copy.
+   completed session, not durable celebration state, in the design language
+   (`components/session-complete/`). Its own top bar reads `Session complete` ·
+   `Done` (`accent`, where the session view's Finish sat); then the summary
+   card, every `Personal records` card when present, one `Exercise volume` card
+   per performed exercise, and `Share session` (an outline). The summary card
+   shows `Duration`, `Exercises`, `Sets`, `Working` and `Gym` as stacked
+   figures, then non-interactive per-muscle pills (name and the number of
+   physical working sets mapped to that muscle). It never links to muscle
+   analytics. Personal-record/comparison history is optional enrichment: its
+   loading or failure never blocks stored context or exits, and current
+   exercise rows still render with an explicit no-history state.
+8. A personal record is shown in the language's one superlative: a `record`
+   band (`New 1RM record · <1RM>`), the exercise and its set (`185.0 × 8`), the
+   1RM bold `record` — no `kg`, no "est.". Exercise-volume cards show the
+   exercise name with smaller performed/working-set counts, the session's `Vol`
+   figure (no separator, no unit) versus the historical median, and a
+   horizontal P5–P95 range with median/current markers when a distribution
+   exists. Single/equal baselines and no-history rows use explicit
+   non-distribution states; range bars are descriptive context, never targets
+   or readiness guidance, so they use no `accent`.
+9. `Share session` opens a `Sheet` previewing the exact session-summary image;
+   `Share image` is its one action, and the backdrop closes it (there is no
+   Cancel; it cannot close while an image is being prepared). The captured PNG
+   contains session/date/count totals, working sets, every PR, and every
+   exercise comparison; it excludes gym/location data. Nothing is uploaded or
+   published by BOGA. Native-sheet cancellation is silent, capture/launch
+   failure is inline and retryable, and temporary image cleanup cannot turn a
+   completed share into an error.
+10. Completion hides edit/delete/append. Done and Android back replace to
+    Progress, and the back gesture is off. A completed row in Session History,
+    and a completed session's `Edit`, open the session view to edit it
+    (§14b.7); there is no separate historical summary (step 6b-1 removed
+    `presentation=summary` — the completed-session detail is the summary). A
+    missing, deleted, or failed target shows the top bar without Done and one
+    safe exit, `Back to Progress`, and never opens an editable copy.
 
 ### 8. Navigation/query semantics (UI-facing rule)
 

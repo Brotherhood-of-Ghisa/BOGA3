@@ -27,7 +27,7 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
   - on a non-`AUTH_REQUIRED` cycle error it shows the error message and a single Retry that fires exactly one cycle; when the latest cycle outcome is `AUTH_REQUIRED` it redirects to `/sign-in` and renders no Retry;
   - it stands aside (renders through) when there is no session or auth is unconfigured, so an unconfigured/local build is never trapped behind a block nothing will lift; the `/sign-in` and `/maestro-harness` routes are exempt so redirects and harness setup cannot loop.
 - Tab roots live inside the `(tabs)` route group at `apps/mobile/app/(tabs)/` and share a tab layout at `apps/mobile/app/(tabs)/_layout.tsx`. The group name is parenthesised so it does not appear in URLs (e.g. `/stats-history` resolves to `app/(tabs)/stats-history.tsx`).
-- Tab roots have `headerShown: false`; detail screens (`exercise-history`, `profile`, `completed-session/[sessionId]`, `maestro-harness`, and the M22 group routes `group/mine`, `group/new`, `group/join`, `group/[groupId]`, `group/[groupId]/edit`, `group/[groupId]/invite`, `group-session/[memberId]/[sessionId]`, the M25 `exercise-link`, the M25-T08 routes `group/[groupId]/members`, `group/[groupId]/exercises/new`, `group/[groupId]/exercises/[exerciseId]/edit`, and the M25-T09 `group/[groupId]/leaderboards/[exerciseId]` and `…/history`) remain outside `(tabs)/` and keep their existing native header behavior (except the `completed-session/[sessionId]` detail, which draws its own top bar).
+- Tab roots have `headerShown: false`; detail screens (`exercise-history`, `profile`, `completed-session/[sessionId]`, `maestro-harness`, and the M22 group routes `group/mine`, `group/new`, `group/join`, `group/[groupId]`, `group/[groupId]/edit`, `group/[groupId]/invite`, `group-session/[memberId]/[sessionId]`, the M25 `exercise-link`, the M25-T08 routes `group/[groupId]/members`, `group/[groupId]/exercises/new`, `group/[groupId]/exercises/[exerciseId]/edit`, and the M25-T09 `group/[groupId]/leaderboards/[exerciseId]` and `…/history`) remain outside `(tabs)/` and keep their existing native header behavior (except `completed-session/[sessionId]`, which draws its own top bar).
 - Navigation is mostly string-path based; `apps/mobile/src/navigation/routes.ts` holds a few route constants and builders (`SIGN_IN_ROUTE`, `MAESTRO_HARNESS_ROUTE`, and the M25 `exerciseLinkHref(id)`), not a full typed route layer.
 - The production shell is the typed four-tab model in
   `apps/mobile/src/navigation/main-tabs.ts`: `Today / Train / Progress / More`.
@@ -246,9 +246,10 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
     absent/invalid values — including the removed `summary` — preserve normal
     detail)
 - Behavior:
-  - completion mode hides historical edit/delete/append actions, disables the
-    native back affordance/gesture, and gives Done, Android system back, and
-    unavailable-target states a replacing exit to `/progress`
+  - completion mode hides historical edit/delete/append actions, is header-less
+    (`headerShown: false`, `gestureEnabled: false`; its own top bar carries
+    Done), and gives Done, Android system back, and unavailable-target states a
+    replacing exit to `/progress`
   - `Edit` pushes `/session/<sessionId>`; the detail reloads on focus, so the
     edits show when the session view's `Done` returns. A deleted session
     offers no `Edit` (the session view edits only a live session)
@@ -497,8 +498,8 @@ Note:
   titles in `apps/mobile/app/(tabs)/_layout.tsx` are declared for completeness.
   The visible shell is `BottomTray` composing `MainTabs`. `exercise-history` keeps its native stack header and
   renders `MainTabs` with Progress selected.
-- Detail screens registered in the root stack (`exercise-history`, `sessions`, `profile`, `connected-agents`, `gyms`, `maestro-harness`, `completed-session/[sessionId]`'s completion) keep their native stack header behavior; titles are declared in `apps/mobile/app/_layout.tsx`. The root stack's `screenOptions` give every detail screen an arrow-only back affordance (`headerBackButtonDisplayMode: 'minimal'`, no custom `headerBackTitle`, which react-native-screens would render as a custom item that ignores the display mode and morphs its label in during the push); the system chevron reads "Back" to VoiceOver.
-- `completed-session/[sessionId]` sets its title inside the route file (`View Session` or `Session complete`); the detail hides the native header and draws its own top bar (`back · View Session · ⋮ · Edit`), so `View Session` is only the back label of what it pushes
+- Detail screens registered in the root stack (`exercise-history`, `sessions`, `profile`, `connected-agents`, `gyms`, `maestro-harness`) keep their native stack header behavior; titles are declared in `apps/mobile/app/_layout.tsx`. The root stack's `screenOptions` give every detail screen an arrow-only back affordance (`headerBackButtonDisplayMode: 'minimal'`, no custom `headerBackTitle`, which react-native-screens would render as a custom item that ignores the display mode and morphs its label in during the push); the system chevron reads "Back" to VoiceOver.
+- `completed-session/[sessionId]` sets its title inside the route file (`View Session` or `Session complete`); both presentations hide the native header and draw their own top bar (`back · View Session · ⋮ · Edit`, or `Session complete · Done`), so the title is only the back label of what the detail pushes
 - `exercise-history` sets its title inside the route file to the resolved exercise name (falls back to `Exercise History` when the summary is not yet available)
 - M22 group routes declare `My groups`, `New group`, `Join group`, `Group`, `Edit group`, `Invite`, and `Session` in `apps/mobile/app/_layout.tsx`; the group screen replaces `Group` with the group's name once loaded
 - `session/[sessionId]/index` has no native header (`headerShown: false`); its

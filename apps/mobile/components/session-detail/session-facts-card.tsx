@@ -21,13 +21,17 @@ type SessionFactsCardProps = {
   // A finished session's Start and End, as `YYYY-MM-DD HH:mm`: the layout of the
   // completed edit's Start/End fields (`session-times-fields.tsx`), read-only.
   times?: { start: string; end: string; testID?: string };
-  facts: SessionFact[];
+  // One row of facts, or several (the completion card's two).
+  facts: SessionFact[] | SessionFact[][];
+  // Below the facts: the completion's muscle breakdown.
+  children?: ReactNode;
   testID?: string;
 };
 
 // A session's facts as stacked `Stat`s in one `Card` (Duration / Gym / Sets /
 // Volume), shared by View Session and the group session view.
-export function SessionFactsCard({ header, times, facts, testID }: SessionFactsCardProps) {
+export function SessionFactsCard({ header, times, facts, children, testID }: SessionFactsCardProps) {
+  const rows = (Array.isArray(facts[0]) ? facts : [facts]) as SessionFact[][];
   return (
     <Card testID={testID}>
       {header}
@@ -37,13 +41,16 @@ export function SessionFactsCard({ header, times, facts, testID }: SessionFactsC
           <TimeReadout label="End" testID={times.testID ? `${times.testID}-end` : undefined} value={times.end} />
         </View>
       ) : null}
-      <View style={styles.row}>
-        {facts.map((fact) => (
-          <View key={fact.label} style={fact.kind === 'text' ? styles.flexible : null}>
-            <Stat align={fact.align} kind={fact.kind} label={fact.label} testID={fact.testID} value={fact.value} />
-          </View>
-        ))}
-      </View>
+      {rows.map((row) => (
+        <View key={row.map((fact) => fact.label).join('|')} style={styles.row}>
+          {row.map((fact) => (
+            <View key={fact.label} style={fact.kind === 'text' ? styles.flexible : null}>
+              <Stat align={fact.align} kind={fact.kind} label={fact.label} testID={fact.testID} value={fact.value} />
+            </View>
+          ))}
+        </View>
+      ))}
+      {children}
     </Card>
   );
 }

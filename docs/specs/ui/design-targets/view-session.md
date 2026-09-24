@@ -40,5 +40,18 @@ Device: iPhone simulator at 390pt width, light. Captured by the
 | `view-session-not-found` | not found, with the top bar's back |
 | `completed-edit-read-back` | the detail after the session view's `Done` |
 
+Completion (PR B, pending acceptance), same lane and flow:
+
+| Screenshot | State |
+| --- | --- |
+| `session-completion-one-pr` | top bar, summary card with muscle pills, one record card |
+| `session-completion-multiple-prs-all` | two record cards |
+| `session-completion-exercise-volume` | volume cards: distribution and no-history |
+| `session-completion-catalog-error` | muscle breakdown unavailable |
+| `session-completion-unmapped` | no mapped working sets |
+| `session-share-preview-all-prs` | the share sheet and image |
+| `session-share-image-error` | the share sheet's inline failure |
+| `session-completion-unavailable` | not found: top bar without Done, `Back to Progress` |
+
 No target screenshots are committed; runtime captures stay in the gitignored
 `apps/mobile/artifacts/maestro/` tree and are linked as PR evidence.

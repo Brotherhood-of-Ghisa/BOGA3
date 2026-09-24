@@ -84,6 +84,20 @@ appId: com.dinoderek.mobile
     id: "session-completion-view-muscle-load"
 - takeScreenshot: "session-completion-unmapped"
 
+# A completion target that does not exist: the top bar without Done, and one
+# safe exit back to Progress.
+- openLink: "boga3://maestro-harness?fixture=exercise-block-history&teleport=completed-session&sessionId=maestro_missing_session&presentation=completion"
+- tapOn:
+    text: "Open"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "session-completion-safe-exit"
+    timeout: 30000
+- assertNotVisible:
+    id: "session-completion-done"
+- takeScreenshot: "session-completion-unavailable"
+
 # Completed edit (redesign step 6b-1): a completed session's `Edit` opens the
 # session view on it — Start/End in place of Time, `Done` in place of Finish.
 # A set changes on the exercise page, an invalid Start pauses autosave with a
@@ -297,6 +311,7 @@ appId: com.dinoderek.mobile
     visibilityPercentage: 80
     centerElement: true
 - assertVisible: "Exercise volume"
+- takeScreenshot: "session-completion-exercise-volume"
 - scrollUntilVisible:
     element:
       id: "session-completion-share-session"
@@ -308,11 +323,14 @@ appId: com.dinoderek.mobile
 - waitForAnimationToEnd
 - takeScreenshot: "session-share-preview-all-prs"
 - tapOn:
-    point: "50%,89%"
-- waitForAnimationToEnd
+    id: "session-share-image"
+- extendedWaitUntil:
+    visible:
+      id: "session-share-error"
+    timeout: 10000
 - takeScreenshot: "session-share-image-error"
 - tapOn:
-    point: "50%,89%"
+    id: "session-share-image"
 - extendedWaitUntil:
     visible: "Copy"
     timeout: 10000
@@ -325,11 +343,12 @@ appId: com.dinoderek.mobile
 - extendedWaitUntil:
     notVisible: "Copy"
     timeout: 10000
+# The share sheet has no Cancel: tap the backdrop above it.
 - tapOn:
-    point: "50%,95%"
+    point: "50%,8%"
 - extendedWaitUntil:
-    visible:
-      id: "session-completion-share-session"
+    notVisible:
+      id: "session-share-preview"
     timeout: 10000
 - scrollUntilVisible:
     element:
