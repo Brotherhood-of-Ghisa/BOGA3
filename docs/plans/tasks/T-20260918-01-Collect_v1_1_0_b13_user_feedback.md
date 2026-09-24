@@ -175,8 +175,9 @@ or `no_action`.
 - Docs/spec updates needed: `docs/specs/ui/navigation-contract.md`,
   `docs/specs/ui/screen-map.md`, and `docs/specs/ui/ux-rules.md`.
 - Target: later `1.1.0` build (`14+`)
-- Follow-up owner/task/PR: not yet assigned; create from `ACT-001` before this
-  feedback round closes.
+- Follow-up owner/task/PR:
+  `docs/plans/tasks/T-20260924-01-Implement_session_summary_feedback.md`
+  (shared with `ACT-002`).
 
 ### FB-002 — Align live and completed session insights
 
@@ -292,8 +293,9 @@ or `no_action`.
   `docs/specs/ui/ux-rules.md`, and `docs/specs/ui/components-catalog.md` if a
   reusable insight-summary component is introduced.
 - Target: later `1.1.0` build (`14+`)
-- Follow-up owner/task/PR: not yet assigned; create from `ACT-002` before this
-  feedback round closes.
+- Follow-up owner/task/PR:
+  `docs/plans/tasks/T-20260924-01-Implement_session_summary_feedback.md`
+  (shared with `ACT-001`).
 
 ### FB-003 — Restore GPS gym preselection through Train
 
@@ -565,8 +567,8 @@ decision.
 
 | Action ID | Feedback IDs | Proposed action | Priority | Target build/version | Owner | Status | Verification |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `ACT-001` | `FB-001` | Open History on Summary; expose deterministic individual-sets/Edit actions | High | `1.1.0` build `14+` | Unassigned | proposed | Navigation tests, frontend gate, History-flow screenshots |
-| `ACT-002` | `FB-002` | Share one live/completed Summary with exercise/muscle percentile toggle; export exercise only | Medium | `1.1.0` build `14+` | Unassigned | proposed | Calculation/component/share tests, frontend gate, live/completion/history screenshots |
+| `ACT-001` | `FB-001` | Open History on Summary; expose deterministic individual-sets/Edit actions | High | `1.1.0` build `14+` | `T-20260924-01-Implement_session_summary_feedback` | approved | Navigation tests, frontend gate, History-flow screenshots |
+| `ACT-002` | `FB-002` | Share one live/completed Summary with exercise/muscle percentile toggle; export exercise only | Medium | `1.1.0` build `14+` | `T-20260924-01-Implement_session_summary_feedback` | approved | Calculation/component/share tests, frontend gate, live/completion/history screenshots |
 | `ACT-003` | `FB-003` | Route canonical empty-session creation through the bounded GPS gym detector | High | `1.1.0` build `14+` | Unassigned | proposed | Entry integration tests, frontend gate, GPS-preselection flow evidence |
 | `ACT-004` | `FB-004` | Expose unlink/manage-links on linked group-exercise rows and clarify the catalogue action | High | `1.1.0` build `14+` | Unassigned | proposed | Link-management tests, frontend + groups e2e gates, linked/unlinked screenshots |
 
