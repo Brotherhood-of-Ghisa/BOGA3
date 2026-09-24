@@ -7,6 +7,7 @@ import { StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AuthRouteGuard } from '@/components/navigation/auth-route-guard';
+import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
 import { AuthProvider, bootstrapAuthState } from '@/src/auth';
 import { bootstrapLocalDataLayer } from '@/src/data';
 import { ensureExerciseCatalogLoaded } from '@/src/exercise-catalog/cache';
@@ -23,7 +24,20 @@ import { SyncGate } from '@/src/sync/SyncGate';
  * hidden back label (still read by VoiceOver) is the previous screen's title,
  * so the headerless `(tabs)` group is titled "Back" rather than "(tabs)".
  */
-const ROOT_STACK_SCREEN_OPTIONS = { headerBackButtonDisplayMode: 'minimal' } as const;
+const ROOT_STACK_SCREEN_OPTIONS = {
+  headerBackButtonDisplayMode: 'minimal',
+  // One header style on every stack route, as the design-language top bars
+  // draw it (`ux-rules` §8, `navigation-contract.md` "Header titles"):
+  // `surface` over the page, an Archivo 700 `ink` title, an `ink` back arrow.
+  headerStyle: { backgroundColor: uiRoles.surface },
+  headerTitleStyle: {
+    fontFamily: uiFonts.display.family,
+    fontWeight: '700',
+    fontSize: uiTypography.size.xl,
+    color: uiRoles.ink,
+  },
+  headerTintColor: uiRoles.ink,
+} as const;
 
 export default function RootLayout() {
   useEffect(() => {

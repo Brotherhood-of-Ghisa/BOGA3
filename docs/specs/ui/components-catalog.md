@@ -201,6 +201,7 @@ Brief entrypoint inventory of the current reusable UI component set.
 - Purpose:
   - collapsible bottom navigation tray that wraps `MainTabs`; exposes a drag handle (React Native `PanResponder` + `Animated`) to collapse to a peek strip and `useTrayVisibility()` hook plus `TrayVisibilityProvider` so screens can imperatively expand/collapse
   - snap math lives in the pure helper `apps/mobile/src/navigation/tray-snap.ts` so it can be unit-tested without gesture plumbing
+  - the handle is the sheet handle's recipe (38×4, `rule-strong`, `radius.pill`; DLM-T02)
 
 2. `MainTabs`
 - File: `apps/mobile/components/navigation/main-tabs.tsx`
@@ -209,7 +210,11 @@ Brief entrypoint inventory of the current reusable UI component set.
     `Progress`, and `More`, driven by the single declarative model in
     `apps/mobile/src/navigation/main-tabs.ts`
   - production navigation body inside `BottomTray` and the matching direct
-    navigation strip on the `exercise-history` detail screen
+    navigation strip on the session view and the `exercise-history` detail screen
+  - design language (DLM-T02): one `Card`-recipe strip (`surface`, `rule`,
+    card radius) of plain Archivo labels; the active tab is `ink` 700 over a
+    2pt `ink` underline (`<tab testID>-indicator`), the others `ink-muted` 600;
+    never `accent`
   - the non-visual model owns canonical order, labels, routes, test IDs,
     canonical/legacy ownership resolution, and unknown-route null fallback
 
@@ -218,7 +223,8 @@ Brief entrypoint inventory of the current reusable UI component set.
 - Purpose:
   - source-aware `Back to More` action shared by the tab-owned Exercise
     Catalog and Settings destinations; renders only for `source=more` and
-    replaces to the hub (Groups does not use it)
+    replaces to the hub (Groups does not use it); a caps text `ActionButton`
+    (`back-to-more-button`) at the top left
 
 4. `ExerciseEditorModal`
 - File: `apps/mobile/components/exercise-catalog/exercise-editor-modal.tsx`

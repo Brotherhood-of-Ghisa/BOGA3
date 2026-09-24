@@ -41,6 +41,8 @@ Document app-specific UI semantics and guardrails for the current mobile app.
 4. Tab actions (`MainTabs`) are navigation controls, not generic primary actions.
    - They use tab semantics (`accessibilityRole="tab"` / tablist), active-state
      visuals, and equal-width flex targets across the available tray width.
+   - The active tab is marked by weight and an `ink` underline, never by
+     colour alone and never in `accent` (which is the screen's one primary).
 5. Persistent navigation contains exactly Today, Train, Progress, and More.
    - Settings is an internal row under More, not a fifth tab or utility button.
    - More and Settings remain available while logged out so account access never

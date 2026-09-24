@@ -18,7 +18,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { uiColors, uiRadius, uiSpace } from '@/components/ui';
+import { uiGeometry, uiRoles, uiSpace } from '@/components/ui';
 import { resolveTraySnap, type TraySnapState } from '@/src/navigation/tray-snap';
 
 /**
@@ -255,13 +255,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: uiSpace.xs,
     paddingHorizontal: uiSpace.lg,
-    borderRadius: uiRadius.full,
+    borderRadius: uiGeometry.radius.pill,
   },
+  // The sheet handle's recipe (`design-language.md` §4).
   handleIndicator: {
-    width: 44,
-    height: 4,
-    borderRadius: uiRadius.full,
-    backgroundColor: uiColors.borderInputStrong,
+    width: uiGeometry.sheetHandle.width,
+    height: uiGeometry.sheetHandle.height,
+    borderRadius: uiGeometry.radius.pill,
+    backgroundColor: uiRoles.ruleStrong,
   },
   body: {
     // Leaves the inner MainTabs / tab bar to manage its own surface.

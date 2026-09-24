@@ -1,5 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
-import { Text } from 'react-native';
+import { StyleSheet, Text } from 'react-native';
+
+import { uiRoles } from '@/components/ui/tokens';
 
 import {
   BottomTray,
@@ -105,5 +107,38 @@ describe('MainTabs', () => {
     expect(screen.getByTestId('main-bottom-tabs')).toBeTruthy();
     expect(screen.getAllByRole('tab')).toHaveLength(4);
     expect(screen.queryByLabelText('Open Settings')).toBeNull();
+  });
+});
+
+describe('MainTabs presentation', () => {
+  it('is a tab list whose tabs report selection and navigate on press', () => {
+    const onSelect = jest.fn();
+    render(<MainTabs activeTab="today" onSelect={onSelect} />);
+
+    expect(screen.getByTestId('main-bottom-tabs').props.accessibilityRole).toBe('tablist');
+    expect(screen.getByLabelText('Open Today').props.accessibilityState.selected).toBe(true);
+    for (const label of ['Open Train', 'Open Progress', 'Open More']) {
+      expect(screen.getByLabelText(label).props.accessibilityState.selected).toBe(false);
+    }
+
+    fireEvent.press(screen.getByLabelText('Open Train'));
+    fireEvent.press(screen.getByLabelText('Open Progress'));
+    fireEvent.press(screen.getByLabelText('Open More'));
+    expect(onSelect.mock.calls.map(([tab]) => tab)).toEqual(['train', 'progress', 'more']);
+  });
+
+  it('marks the active tab in ink by weight and an underline, never accent', () => {
+    render(<MainTabs activeTab="progress" onSelect={jest.fn()} />);
+
+    const active = StyleSheet.flatten(screen.getByText('Progress').props.style);
+    const idle = StyleSheet.flatten(screen.getByText('Today').props.style);
+    expect(active).toMatchObject({ color: uiRoles.ink, fontWeight: '700', fontFamily: 'Archivo' });
+    expect(idle).toMatchObject({ color: uiRoles.inkMuted, fontWeight: '600' });
+
+    const underlines = MAIN_TAB_DEFINITIONS.map(
+      (tab) => StyleSheet.flatten(screen.getByTestId(`${tab.testID}-indicator`).props.style).backgroundColor,
+    );
+    expect(underlines).toEqual(['transparent', 'transparent', uiRoles.ink, 'transparent']);
+    expect(JSON.stringify(screen.toJSON())).not.toContain(uiRoles.accent);
   });
 });
