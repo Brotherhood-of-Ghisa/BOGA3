@@ -1630,7 +1630,7 @@ E0.1–E0.3).
   `exercise-catalog-link-menu.test.tsx`, `exercise-group-links-add-as-new.test.ts`,
   and the exercise page's ⋮ Link item in `exercise-page-screen.test.tsx`;
   Maestro `groups-link-exercise.yaml` (§8), whose last step opens the Link
-  screen from the exercise page's ⋮ (redesign step 6b).
+  screen from the exercise page's ⋮.
 
 **As-built (M25-T08, group page).** Product D10, D14, and E0.4; M25 design
 §1 and §7.

@@ -13,7 +13,7 @@
  *   - sessions                   (Layer 1) — session-list.ts (soft-delete/restore)
  *
  * `exercise_tag_definitions` has no app write path since the tag editor went
- * with the old recorder (redesign 6b): tags arrive by sync only.
+ * with the old recorder: tags arrive by sync only.
  *
  * The seeder dirty-stamp rule (exercise-catalog-seeds.ts) is asserted in
  * the final describe block: seed rows — muscle_groups, exercise_definitions,

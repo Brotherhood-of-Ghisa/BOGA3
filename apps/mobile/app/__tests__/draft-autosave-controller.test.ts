@@ -110,7 +110,7 @@ describe('draft autosave controller', () => {
   });
 });
 
-describe('session recorder lifecycle helpers', () => {
+describe('session lifecycle helpers', () => {
   it('maps RN-like lifecycle events to autosave flush helpers', async () => {
     const flushForLifecycle = jest.fn().mockResolvedValue(undefined);
     const lifecycle = createSessionRecorderLifecycleHelpers({ flushForLifecycle });

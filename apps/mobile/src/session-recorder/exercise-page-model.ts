@@ -10,9 +10,9 @@ import {
 import { canonicalizeSetValues, hasValidActualValues, isConfirmedPerformedSet } from './set-semantics';
 
 /**
- * Pure rules of the exercise page (docs/plans/exercise-session-build-spec.md,
- * "Exercise page"). The page edits one session exercise's set rows; every rule
- * about what a row *is* comes from `set-semantics.ts`, so this module only
+ * Pure rules of the exercise page (`docs/specs/ui/ux-rules.md` §14a). The
+ * page edits one session exercise's set rows; every rule about what a row
+ * *is* comes from `set-semantics.ts`, so this module only
  * decides presentation (the cursor, records, displayed values) and the edits
  * the page's controls make.
  */

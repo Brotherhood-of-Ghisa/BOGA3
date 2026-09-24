@@ -41,8 +41,8 @@ const REPS_PATTERN = /^\d{0,2}$/;
 const DASH = '—';
 
 /**
- * The open set, expanded in place into the logger (build spec, "Exercise
- * page" §2): Weight · Reps · Effort · the commit tick, all fields one height.
+ * The open set, expanded in place into the logger (`ux-rules` §14a.3):
+ * Weight · Reps · Effort · the commit tick, all fields one height.
  * The tick is the screen's one `accent` primary; it is disabled until the
  * values are a valid set.
  */

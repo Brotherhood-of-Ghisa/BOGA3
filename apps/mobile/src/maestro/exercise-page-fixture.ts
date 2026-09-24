@@ -12,7 +12,7 @@ const MINUTE_MS = 60 * 1000;
  * The exercise page lane's data (`.maestro/flows/exercise-page.yaml`): two
  * completed Bench Press sessions for the records panel, and an active session
  * whose Bench Press has two performed sets and three planned ones — the states
- * of the accepted target (`V5-Quiet`). Seeded through the recorder's own
+ * of the accepted target (`V5-Quiet`). Seeded through the session's own
  * repository, so the rows are exactly what the app writes.
  */
 export const EXERCISE_PAGE_FIXTURE = {

@@ -1,6 +1,6 @@
 appId: com.dinoderek.mobile
 ---
-# The exercise page (docs/plans/exercise-session-redesign.md step 4), on its
+# The exercise page (`docs/specs/ui/ux-rules.md` §14a), on its
 # own `exercise-page` fixture:
 # an active session whose Barbell Bench Press has two performed sets and three
 # planned ones, plus two completed Bench Press sessions for the records panel.

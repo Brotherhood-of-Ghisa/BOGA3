@@ -10,7 +10,7 @@ type SessionOptionsSheetProps = {
 };
 
 // The session ⋮: a menu even while Abandon session is its only item, like the
-// exercise ⋮ (build spec, decided 2026-09-22).
+// exercise ⋮ (`ux-rules` §14b.3).
 export function SessionOptionsSheet({ visible, onDismiss, onAbandon }: SessionOptionsSheetProps) {
   return (
     <Sheet

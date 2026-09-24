@@ -5,7 +5,7 @@ import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/component
 import type { SessionViewSetRow } from '@/src/session-recorder/session-view-model';
 
 // One read-only set: type · weight × reps · 1RM · VOL. No control column — a
-// card of these rows is read, not edited (build spec, "Session view"). Every
+// card of these rows is read, not edited (`ux-rules` §14b.4). Every
 // figure in a row shares the row's colour and weight; only a record 1RM stands
 // out, in `record` (decided on device 2026-09-23: per-column bests read as noise).
 export function SetSummaryRow({ row, testID }: { row: SessionViewSetRow; testID: string }) {

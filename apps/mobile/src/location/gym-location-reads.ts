@@ -15,7 +15,7 @@ import {
 export type ReadForegroundPosition = () => Promise<CurrentForegroundPositionResult>;
 
 // How long the gym sheet waits for a fix before giving up on the suggestion;
-// the recorder's start-time detection used the same budget.
+// the old recorder's start-time detection used the same budget.
 export const NEARBY_GYM_TIMEOUT_MS = 1500;
 
 const resolveWithTimeout = async <T>(promise: Promise<T>, timeoutMs: number, fallback: T): Promise<T> => {

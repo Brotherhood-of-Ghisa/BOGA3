@@ -143,7 +143,7 @@ Brief entrypoint inventory of the current reusable UI component set.
     design-language §5 set-state glyphs `set-done` (filled `ink` disc, knocked-out
     check), `set-current` (`accent` ring), `set-planned` (dashed `planned` ring),
     which carry their role colour by default and are meant for `ListRow`'s
-    trailing slot on the set row (step 4). Add icons from the same Lucide
+    trailing slot on the set row. Add icons from the same Lucide
     release, named by role
   - replaced the improvised Unicode glyphs on every screen;
     `app/__tests__/ui-icon.test.tsx` fails if a retired glyph comes back
@@ -282,7 +282,7 @@ Brief entrypoint inventory of the current reusable UI component set.
 - Purpose:
   - `ExerciseCoreFields` — the exercise-name input and the `Total load` / `Per side` weight-entry control (labels from `LOAD_INPUT_MODE_LABELS`), shared by the personal exercise editor (`exercise-catalog/exercise-editor-modal.tsx`) and the group exercise form; both validate with `validateExerciseCore`. testIDs `<prefix>-name-input`, `<prefix>-name-error`, `<prefix>-load-mode-<mode>` (the editor keeps `exercise-editor-*`)
 
-13. Exercise page (exercise/session redesign step 4)
+13. Exercise page
 - Folder: `apps/mobile/components/exercise-page/`; rules in `apps/mobile/src/session-recorder/exercise-page-model.ts`, records in `exercise-records.ts`, persistence in `session-exercise-draft.ts` + `use-session-exercise-draft.ts`
 - Purpose:
   - `ExercisePageScreen` — the page's composition (route: `app/session/[sessionId]/exercise/[sessionExerciseId].tsx`)
@@ -378,7 +378,7 @@ Brief entrypoint inventory of the current reusable UI component set.
   - covered by `apps/mobile/app/__tests__/completed-session-detail-screen.test.tsx`
     and the `ios-ui-regression` lane (`session-completion-states-fixture`)
 
-18. Gyms (exercise/session redesign step 6b)
+18. Gyms
 - Folder: `apps/mobile/components/gyms/`; the gym directory and writes in
   `apps/mobile/src/session-recorder/gym-options.ts`, the location reads in
   `apps/mobile/src/location/gym-location-reads.ts`
@@ -429,16 +429,23 @@ Brief entrypoint inventory of the current reusable UI component set.
 
 ## Pending / planned (not current components)
 
-Audit-approved candidates that are not yet implemented/finalized:
+Audit-approved candidates (the M8 UI pattern audit, deleted 2026-06-10; in git
+history), revisited 2026-09-24 when the exercise/session redesign closed. Build
+one only when a screen being moved to the design language asks for it, in the
+design-language vocabulary (`uiRoles` / `uiFonts` / `uiGeometry`):
 
-- `ScreenContainer` / `ScreenScrollContainer`
-- `EmptyState` / state panels
-- `ModalSurface` / `ModalBackdrop`
-- `FormField`
-- `PressableRowCard`
-- `IconActionButton`
-
-Reference: the M8 UI pattern audit (deleted 2026-06-10; in git history)
+- `IconActionButton` — **next candidate.** The 44pt icon control (⋮, back) is
+  written out in each design-language top bar and card (`session-top-bar`,
+  `exercise-top-bar`, `view-session-top-bar`, `view-session-screen`).
+- `EmptyState` / state panels — the loading / error / not-found states of the
+  session view, exercise page and View Session repeat one centred pattern; the
+  group screens have their own panels (`components/groups/`).
+- `ScreenContainer` / `ScreenScrollContainer` — the `paper` ground and `lg`
+  gutter are repeated per screen.
+- `FormField` — the labelled field (`uiGeometry.fieldHeight`) exists twice
+  (`set-logger`, `session-times-fields`).
+- Covered, no longer pending: `ModalSurface` / `ModalBackdrop` → `Sheet`;
+  `PressableRowCard` → `Card` with `onPress`, or `ListRow` with `onPress`.
 
 ## Refactor convergence notes (Task `T-20260226-06`)
 

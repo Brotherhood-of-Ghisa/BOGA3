@@ -6,22 +6,17 @@
  * This is the concrete bug behind the M13 sync-restore/FK-hardening series
  * (task cards T-20260606-01..05): a reinstalled or fresh device starts with no
  * local rows, signs in, and must end up holding the user's remote gyms locally
- * — otherwise the recorder can never surface them.
+ * — otherwise the gym sheet and Gyms screen can never surface them.
  *
  * Scope of THIS test (the data/sync layer): prove the authenticated sync cycle
  * drains the remote layer-0 gyms into local SQLite, clean, with the data shape
- * the gym picker will read (id + name, non-deleted). The cycle's only outbound
+ * the gym sheet reads (id + name, non-deleted). The cycle's only outbound
  * dependency is the Supabase RPC, stubbed here exactly as the rest of the
  * stubbed-cycle suite does, so this runs in the fast lane with no live endpoint.
  *
- * Explicitly OUT of scope here (deferred to T-20260517-01-personal-gym-list-sync):
- * the recorder gym picker today seeds its list from the hardcoded
- * `SEEDED_LOCATIONS` constant and never lists the local `gyms` table, so even a
- * correctly-restored gym is not yet displayed. Wiring the picker to read this
- * table (a `listLocalGyms` repository surface + recorder hydration) is the whole
- * deliverable of that still-planned card. This test asserts the data is present
- * and queryable for that wiring; the picker-visibility assertion lands with
- * T-20260517-01. See docs/tasks/T-20260606-06-...-final-verification.md.
+ * Out of scope here: the display. The session view's `Gym` sheet and the
+ * Gyms screen list this table (`listGymDirectory`); their rendering is covered
+ * by `session-view-screen.test.tsx` and `gyms-screen.test.tsx`.
  */
 
 import { asc, eq, isNull } from 'drizzle-orm';

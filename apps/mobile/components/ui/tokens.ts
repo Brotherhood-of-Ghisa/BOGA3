@@ -156,7 +156,7 @@ export const uiRadius = {
 } as const;
 
 // Eight sizes, down from the fourteen that used to ship. `base` stays at 14:
-// density in the recorder was chosen over gym-floor legibility. `xxs` (10) was
+// density while logging was chosen over gym-floor legibility. `xxs` (10) was
 // added 2026-09-22 for micro-labels — legends, units, tertiary labels — which
 // the accepted design target drew at 8/9px; both lift to 10 rather than earning
 // rungs of their own, since 8px body-adjacent text was poor for accessibility.

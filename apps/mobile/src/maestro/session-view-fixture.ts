@@ -5,7 +5,7 @@ import { EXERCISE_BLOCK_HISTORY_FIXTURE, seedExerciseBlockHistoryFixture } from 
 const MINUTE_MS = 60 * 1000;
 
 /**
- * The session view's fixture (redesign step 5): the block-history fixture's
+ * The session view's fixture: the block-history fixture's
  * completed history (Bench best 1RM ≈ 197.9 from 155 × 8), plus one active
  * session at its gym drawn like the accepted `V6-Session` artboard:
  *
@@ -14,7 +14,7 @@ const MINUTE_MS = 60 * 1000;
  * - Incline Dumbbell Press: three done sets, no history, so no record (3/3).
  * - Cable Flys: three planned rows (0/3).
  *
- * Written through the recorder's own repository, so the rows are exactly what
+ * Written through the session's own repository, so the rows are exactly what
  * the app would have written.
  */
 export const SESSION_VIEW_FIXTURE = {

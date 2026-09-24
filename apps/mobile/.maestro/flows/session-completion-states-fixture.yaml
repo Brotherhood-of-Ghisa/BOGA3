@@ -98,7 +98,7 @@ appId: com.dinoderek.mobile
     id: "session-completion-done"
 - takeScreenshot: "session-completion-unavailable"
 
-# Completed edit (redesign step 6b-1): a completed session's `Edit` opens the
+# Completed edit (`ux-rules` §14b.7): a completed session's `Edit` opens the
 # session view on it — Start/End in place of Time, `Done` in place of Finish.
 # A set changes on the exercise page, an invalid Start pauses autosave with a
 # notice, a valid one clears it, and Done returns to the completed session,

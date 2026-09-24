@@ -1,6 +1,6 @@
 appId: com.dinoderek.mobile
 ---
-# The session view (redesign step 5). Proves, on device:
+# The session view (`ux-rules` §14b). Proves, on device:
 #   1. Train's Resume opens the session view;
 #   2. the summary card and one read-only card per exercise, with its done
 #      count and — for the bench, whose RIR 2 set beats its completed history —

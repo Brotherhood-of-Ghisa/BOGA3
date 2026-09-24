@@ -22,7 +22,7 @@ type ExerciseSwapSheetProps = {
 const LIST_SHARE_OF_SCREEN = 0.6;
 
 /**
- * Swap exercise: the same exercise list the recorder's picker and the catalog
+ * Swap exercise: the same exercise list the session's exercise picker and the catalog
  * render (`ExerciseListContent` over `buildExerciseListModel`, with the shared
  * list preferences), in a sheet. Picking one replaces the exercise and keeps
  * its sets.

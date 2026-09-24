@@ -457,7 +457,7 @@ describe('picker: list, preselection, create, Manage and dismiss', () => {
   beforeEach(() => {
     mockCatalogExercises = INTERACTION_FIXTURE_EXERCISES;
     mockMuscleGroups = INTERACTION_FIXTURE_MUSCLE_GROUPS;
-    // As in the recorder's interaction tests: group linking is off.
+    // As in the old recorder's interaction tests: group linking is off.
     mockLinkingUserId = null;
     mockLinkingState = { ...linkingState([]), catalogs: null };
   });

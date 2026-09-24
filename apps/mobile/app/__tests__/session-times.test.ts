@@ -18,7 +18,7 @@ describe('completed-session times', () => {
     expect(formatSessionTimes(persisted)).toEqual({ start: '2026-02-25 10:00', end: '2026-02-25 10:45' });
   });
 
-  it('validates each field with the recorder completed edit messages', () => {
+  it('validates each field with the completed-edit messages', () => {
     expect(validateSessionTimes({ start: '2026-02-25 10:00', end: '2026-02-25 10:45' })).toEqual({
       start: null,
       end: null,

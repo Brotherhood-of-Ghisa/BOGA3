@@ -158,7 +158,7 @@ describe('exercise page model', () => {
     expect(findCursorIndex(next)).toBe(3);
   });
 
-  it('commits a blank weight with valid reps as 0, like the recorder', () => {
+  it('commits a blank weight with valid reps as 0, like every set entry', () => {
     const next = commitSet([plannedSet('p', '', '10', null)], 'p', {
       weightValue: '',
       repsValue: '10',

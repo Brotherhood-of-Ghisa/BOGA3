@@ -62,7 +62,7 @@ function TimeField({ label, value, error, onChange, onCommit, testID }: FieldPro
 
 /**
  * A completed session's Start and End in the summary card, in place of the
- * elapsed Time (the recorder's completed edit, moved to the session view).
+ * elapsed Time (the completed edit, `ux-rules` §14b.7).
  */
 export function SessionTimesFields({
   text,

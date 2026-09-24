@@ -3,7 +3,7 @@
 /**
  * M25-T07: the linking hook is inert while signed out. With a null user it
  * never subscribes to NetInfo, never opens the local database, never reads
- * links, and never calls a group RPC — so the recorder and the catalogue can
+ * links, and never calls a group RPC — so the exercise page and the catalogue can
  * host it unconditionally. `useGroupLinkingUserId` is signed-in-and-configured
  * only.
  */

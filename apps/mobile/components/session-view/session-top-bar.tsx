@@ -35,7 +35,7 @@ const PRIMARY = {
   complete: { title: 'Session complete', label: 'Done', a11y: 'Done with session completion', testID: 'session-completion-done' },
 } as const;
 
-// `Session` · ⋮ · Finish (build spec, "Session view"); `Edit session` · Done
+// `Session` · ⋮ · Finish (`ux-rules` §14b.2); `Edit session` · Done
 // for a completed session; `Session complete` · Done after Finish. The primary
 // is the screen's one `accent` action.
 export function SessionTopBar(props: SessionTopBarProps) {

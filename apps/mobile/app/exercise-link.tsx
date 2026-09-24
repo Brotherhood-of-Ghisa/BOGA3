@@ -36,7 +36,7 @@ const coerceParam = (value: string | string[] | undefined): string | null => {
 
 /**
  * Link screen (M25-T07; product E0.3): link one of my exercises to my groups'
- * exercises, or unlink it. Opened from the catalogue ⋮ and recorder •••
+ * exercises, or unlink it. Opened from the catalogue ⋮ and the exercise page's ⋮
  * menus. Link and Unlink are local writes to the synced
  * `exercise_group_links`, so they work offline; group-exercise names come from
  * `group_cache` (design §7).

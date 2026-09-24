@@ -1,6 +1,6 @@
 appId: com.dinoderek.mobile
 ---
-# Abandon session from the session view's ⋮ (redesign step 5): the menu
+# Abandon session from the session view's ⋮ (`ux-rules` §14b.3): the menu
 # sheet, the destructive confirmation, then the soft delete the Sessions list
 # uses — Train then offers a new workout instead of Resume.
 #

@@ -55,8 +55,8 @@ type ExerciseOptionsSheetProps = {
 };
 
 // The exercise's ⋮: Edit / Swap / Link to group exercise… / Remove from
-// session. Removing lives here, not on the session view's card (build spec,
-// "Session view").
+// session. Removing lives here, not on the session view's card
+// (`ux-rules` §14b.1).
 export function ExerciseOptionsSheet({
   visible,
   exerciseName,

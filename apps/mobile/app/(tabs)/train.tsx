@@ -108,7 +108,7 @@ export function TrainScreen({
           Train
         </UiText>
         <UiText selectable variant="bodyMuted">
-          Start or resume personal training, then keep the recorder focused on the workout.
+          Start or resume personal training; the session keeps the workout in one place.
         </UiText>
       </View>
 
@@ -167,7 +167,7 @@ export function TrainScreen({
                   Empty workout
                 </UiText>
                 <UiText selectable variant="bodyMuted">
-                  Start with a blank session and choose exercises in the recorder.
+                  Start with a blank session and add exercises as you go.
                 </UiText>
                 {launchError?.kind === 'empty' ? (
                   <UiText
