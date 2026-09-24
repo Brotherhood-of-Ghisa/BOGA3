@@ -139,6 +139,8 @@ describe('Today screen', () => {
     fireEvent.press(await screen.findByTestId('today-resume-session-button'));
 
     expect(screen.getByTestId('today-active-session-card')).toBeTruthy();
+    // "Current" rides the ring glyph and the words, not a success colour (G3).
+    expect(screen.getByTestId('today-active-session-glyph', { includeHiddenElements: true })).toBeTruthy();
     expect(screen.queryByTestId('today-start-planned-session-button')).toBeNull();
     expect(entry.startPlannedOrResume).not.toHaveBeenCalled();
     expect(mockPush).toHaveBeenCalledWith('/session/active-1');

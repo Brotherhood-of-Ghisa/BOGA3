@@ -38,6 +38,13 @@ Brief entrypoint map of the current mobile screens.
     cached/offline, missing-data, empty, and inline-error behavior
   - recent activity is bounded to the three newest non-deleted completed
     sessions and preserves repository loading/error/empty behavior
+- Presentation (design language, DLM-T03): `paper` ground, a `PageHeader`
+  and one `SectionHeader` per section (its `View groups` / `View progress`
+  link a caps text button). An active workout is a `Card` marked by the
+  `set-current` ring and "Active session", with `Resume workout` as the one
+  `accent`. The recent sessions are one `Card` of `ListRow`s. State panels are
+  `StatePanel`s. The group activity items keep the groups screens' styling
+  until DLM-T11
   - until the separate planning milestone supplies its read/materialization
     interface, the planning slot uses the approved `Watch this space 👀`
     placeholder and links to Train without inventing plan data
@@ -60,6 +67,9 @@ Brief entrypoint map of the current mobile screens.
   - planning loading/error/empty/ready/unavailable states; production uses the
     approved `Watch this space 👀` placeholder until M23 supplies a plan
     read/materialization and management interface
+- Presentation (design language, DLM-T03): as Today. One `accent` at a time:
+  `Resume workout`, or `Start planned workout` when a plan is ready (with
+  `Start empty workout` as an outline), else `Start empty workout`
 - Key exits:
   - `/session/<id>` after guarded empty/planned launch or active resume;
     a future planner exit is supplied by the planning integration rather than

@@ -25,9 +25,12 @@ Document app-specific UI semantics and guardrails for the current mobile app.
 
 1. Primary actions are filled/high-emphasis actions used for the main next step in a section/screen.
    - Examples:
-     - `Start Session`
-     - `Submit Session` / `Save Changes`
+     - `Resume workout`, `Start empty workout` / `Start planned workout`
+     - `Finish` / `Done` / `Save Changes`
      - `New Exercise`
+   - In the design language a primary is the screen's one `accent` button
+     (`ui/design-language.md` §5). Train shows both starts when a plan is
+     ready: the planned start is the primary and the empty start is an outline.
 2. Secondary actions are neutral/outline actions used for non-destructive alternatives or dismiss/close flows.
    - Examples:
      - `Cancel`

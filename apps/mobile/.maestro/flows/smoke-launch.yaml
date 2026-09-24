@@ -91,3 +91,24 @@ appId: com.dinoderek.mobile
 - assertVisible:
     id: "main-bottom-tabs"
 - takeScreenshot: "05-m26-session-view-empty"
+# With a workout running, Today and Train both lead with it (DLM-T03 captures).
+- tapOn:
+    id: "top-level-tab-today"
+- extendedWaitUntil:
+    visible:
+      id: "today-active-session-card"
+    timeout: 15000
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: "today-active-workout"
+- tapOn:
+    id: "top-level-tab-train"
+- extendedWaitUntil:
+    visible:
+      id: "train-active-session-card"
+    timeout: 15000
+- assertVisible:
+    id: "train-resume-session-button"
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: "train-active-workout"

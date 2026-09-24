@@ -1,13 +1,12 @@
 import { useIsFocused } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import {
   GroupInlineError,
   GroupMissingDataState,
   GroupOfflineBanner,
-  GroupStateView,
   GroupStreamMembershipItem,
   GroupStreamRecordCard,
   GroupStreamSessionCard,
@@ -26,7 +25,20 @@ import {
   type SessionListDataClient,
   type SessionListItem,
 } from '@/components/session-list';
-import { Icon, UiButton, UiSurface, UiText, uiColors, uiRadius, uiSpace, uiTypography } from '@/components/ui';
+import {
+  ActionButton,
+  Card,
+  Icon,
+  ListRow,
+  PageHeader,
+  ScreenScroll,
+  SectionHeader,
+  StatePanel,
+  uiFonts,
+  uiRoles,
+  uiSpace,
+  uiTypography,
+} from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import {
   buildStreamViewModel,
@@ -155,41 +167,34 @@ export function TodayScreen({
   };
 
   return (
-    <ScrollView
+    <ScreenScroll
       contentContainerStyle={styles.content}
       contentInsetAdjustmentBehavior="automatic"
-      style={styles.screen}
       testID="today-screen">
-      <View style={styles.intro}>
-        <UiText accessibilityRole="header" selectable style={styles.screenTitle} variant="title">
-          Today
-        </UiText>
-        <UiText selectable variant="bodyMuted">
-          Your next workout, group activity, and recent training at a glance.
-        </UiText>
-      </View>
+      <PageHeader intro="Your next workout, group activity, and recent training at a glance." title="Today" />
 
       <View style={styles.section} testID="today-training-section">
-        <UiText accessibilityRole="header" selectable variant="title">
-          {activeSession ? 'Workout in progress' : 'Next workout'}
-        </UiText>
+        <SectionHeader title={activeSession ? 'Workout in progress' : 'Next workout'} />
         {activeSession ? (
-          <UiSurface style={[styles.card, styles.activeCard]} testID="today-active-session-card">
+          <Card style={styles.card} testID="today-active-session-card">
             <View style={styles.cardCopy}>
-              <UiText selectable variant="labelStrong">
-                Active session
-              </UiText>
+              {/* "Current" is the ring glyph and the words, never a colour (G3). */}
+              <View style={styles.statusRow}>
+                <Icon name="set-current" size="sm" testID="today-active-session-glyph" />
+                <Text style={styles.cardTitle}>Active session</Text>
+              </View>
               <SessionSummaryLine
                 session={activeSession}
                 testIdPrefix={`today-active-session-${activeSession.id}`}
               />
             </View>
-            <UiButton
+            <ActionButton
               label="Resume workout"
               onPress={() => router.push(sessionViewHref(activeSession.id))}
               testID="today-resume-session-button"
+              variant="primary"
             />
-          </UiSurface>
+          </Card>
         ) : (
           <TodayPlanCard
             errorMessage={planLaunchError}
@@ -205,9 +210,7 @@ export function TodayScreen({
 
       <View style={styles.section} testID="today-social-section">
         <SectionHeader
-          actionLabel="View groups"
-          onAction={() => router.push('/groups')}
-          testID="today-view-groups-button"
+          action={{ label: 'View groups', onPress: () => router.push('/groups'), testID: 'today-view-groups-button' }}
           title="Group activity"
         />
         <TodaySocialSnapshot
@@ -222,64 +225,62 @@ export function TodayScreen({
 
       <View style={styles.section} testID="today-recents-section">
         <SectionHeader
-          actionLabel="View progress"
-          onAction={() => router.push('/progress')}
-          testID="today-view-progress-button"
+          action={{ label: 'View progress', onPress: () => router.push('/progress'), testID: 'today-view-progress-button' }}
           title="Recent sessions"
         />
         {isLoadingSessions ? (
-          <View style={styles.loading} testID="today-recents-loading">
-            <ActivityIndicator color={uiColors.textSecondary} />
-            <UiText selectable variant="bodyMuted">
-              Loading sessions…
-            </UiText>
-          </View>
+          <StatePanel fill={false} kind="loading" testID="today-recents-loading" title="Loading sessions…" />
         ) : loadErrorMessage ? (
-          <GroupStateView
-            actionLabel="Retry"
-            actionTestID="today-recents-error-retry"
-            body={loadErrorMessage}
-            onAction={() => {
-              void reloadSessions();
-            }}
-            testID="today-recents-error"
-            title="Couldn't load recent sessions"
-          />
+          <Card>
+            <StatePanel
+              action={{
+                label: 'Retry',
+                onPress: () => {
+                  void reloadSessions();
+                },
+                testID: 'today-recents-error-retry',
+              }}
+              body={loadErrorMessage}
+              fill={false}
+              kind="error"
+              testID="today-recents-error"
+              title="Couldn't load recent sessions"
+            />
+          </Card>
         ) : recentSessions.length === 0 ? (
-          <GroupStateView
-            body="Completed workouts will appear here. Start from Train when you're ready."
-            actionLabel="Open Train"
-            actionTestID="today-empty-open-train"
-            onAction={() => router.push('/train')}
-            testID="today-recents-empty"
-            title="No sessions yet"
-          />
+          <Card>
+            <StatePanel
+              action={{ label: 'Open Train', onPress: () => router.push('/train'), testID: 'today-empty-open-train' }}
+              body="Completed workouts will appear here. Start from Train when you're ready."
+              fill={false}
+              testID="today-recents-empty"
+              title="No sessions yet"
+            />
+          </Card>
         ) : (
-          <View style={styles.list}>
-            {recentSessions.map((session) => (
-              <Pressable
+          <Card>
+            {recentSessions.map((session, index) => (
+              <ListRow
                 accessibilityHint="Opens the completed session"
                 accessibilityLabel={completedSessionAccessibilityLabel(session)}
-                accessibilityRole="button"
+                density="list"
+                divider={index > 0}
                 key={session.id}
                 onPress={() => router.push(`/completed-session/${session.id}`)}
-                style={({ pressed }) => (pressed ? styles.pressed : null)}
-                testID={`today-recent-session-${session.id}`}>
-                <UiSurface style={styles.recentCard}>
-                  <View style={styles.recentSummary}>
-                    <SessionSummaryLine
-                      session={session}
-                      testIdPrefix={`today-recent-session-summary-${session.id}`}
-                    />
-                  </View>
-                  <Icon color={uiColors.textSecondary} name="chevron-right" />
-                </UiSurface>
-              </Pressable>
+                testID={`today-recent-session-${session.id}`}
+                trailing={<Icon color={uiRoles.inkFaint} name="chevron-right" size="sm" />}>
+                <View style={styles.recentSummary}>
+                  <SessionSummaryLine
+                    session={session}
+                    testIdPrefix={`today-recent-session-summary-${session.id}`}
+                  />
+                </View>
+              </ListRow>
             ))}
-          </View>
+          </Card>
         )}
       </View>
-    </ScrollView>
+    </ScreenScroll>
   );
 }
 
@@ -297,74 +298,66 @@ function TodayPlanCard({
   planState: TodayPlanState;
 }) {
   if (planState.status === 'loading') {
-    return (
-      <View style={styles.loading} testID="today-plan-loading">
-        <ActivityIndicator color={uiColors.textSecondary} />
-        <UiText selectable variant="bodyMuted">
-          Loading your plan…
-        </UiText>
-      </View>
-    );
+    return <StatePanel fill={false} kind="loading" testID="today-plan-loading" title="Loading your plan…" />;
   }
 
   if (planState.status === 'error') {
     return (
-      <GroupStateView
-        actionLabel={planState.retry ? 'Retry' : 'Open Train'}
-        actionTestID="today-plan-error-action"
-        body={planState.message}
-        onAction={planState.retry ?? onOpenTrain}
-        testID="today-plan-error"
-        title="Couldn't load your plan"
-      />
+      <Card>
+        <StatePanel
+          action={{
+            label: planState.retry ? 'Retry' : 'Open Train',
+            onPress: planState.retry ?? onOpenTrain,
+            testID: 'today-plan-error-action',
+          }}
+          body={planState.message}
+          fill={false}
+          kind="error"
+          testID="today-plan-error"
+          title="Couldn't load your plan"
+        />
+      </Card>
     );
   }
 
   if (planState.status === 'ready') {
     return (
-      <UiSurface style={styles.card} testID="today-planned-session-card">
+      <Card style={styles.card} testID="today-planned-session-card">
         <View style={styles.cardCopy}>
-          <UiText selectable variant="labelStrong">
-            {planState.title}
-          </UiText>
-          <UiText selectable variant="bodyMuted">
-            {planState.detail}
-          </UiText>
+          <Text style={styles.cardTitle}>{planState.title}</Text>
+          <Text style={styles.cardBody}>{planState.detail}</Text>
           {errorMessage ? (
-            <UiText
-              accessibilityLiveRegion="polite"
-              selectable
-              style={styles.errorText}
-              testID="today-plan-launch-error"
-              variant="bodyMuted">
+            <Text accessibilityLiveRegion="polite" style={styles.errorText} testID="today-plan-launch-error">
               {errorMessage}
-            </UiText>
+            </Text>
           ) : null}
         </View>
-        <UiButton
+        <ActionButton
           disabled={isStarting}
           label={isStarting ? 'Starting…' : 'Start planned workout'}
           onPress={onStart}
           testID="today-start-planned-session-button"
+          variant="primary"
         />
-      </UiSurface>
+      </Card>
     );
   }
 
   const unavailable = planState.status === 'unavailable';
   return (
-    <GroupStateView
-      actionLabel="Open Train"
-      actionTestID="today-open-train-button"
-      body={
-        unavailable
-          ? 'Personal planning is warming up. Empty workouts are ready now in Train.'
-          : 'Nothing is scheduled. Open Train to start an empty workout or manage your plan.'
-      }
-      onAction={onOpenTrain}
-      testID={unavailable ? 'today-plan-unavailable' : 'today-plan-empty'}
-      title={unavailable ? 'Watch this space 👀' : 'No workout planned'}
-    />
+    <Card>
+      <StatePanel
+        action={{ label: 'Open Train', onPress: onOpenTrain, testID: 'today-open-train-button' }}
+        body={
+          unavailable
+            ? 'Personal planning is warming up. Empty workouts are ready now in Train.'
+            : 'Nothing is scheduled. Open Train to start an empty workout or manage your plan.'
+        }
+        fill={false}
+        testID={unavailable ? 'today-plan-unavailable' : 'today-plan-empty'}
+        title={unavailable ? 'Watch this space 👀' : 'No workout planned'}
+      />
+    </Card>
   );
 }
 
@@ -381,24 +374,28 @@ function TodaySocialSnapshot({
 }) {
   if (socialState.status === 'auth-unavailable') {
     return (
-      <GroupStateView
-        body="Groups need an account, and sign-in is not available in this build."
-        testID="today-social-auth-unavailable"
-        title="Group activity needs an account"
-      />
+      <Card>
+        <StatePanel
+          body="Groups need an account, and sign-in is not available in this build."
+          fill={false}
+          testID="today-social-auth-unavailable"
+          title="Group activity needs an account"
+        />
+      </Card>
     );
   }
 
   if (socialState.status === 'signed-out') {
     return (
-      <GroupStateView
-        actionLabel="Sign in"
-        actionTestID="today-social-sign-in"
-        body="Sign in to see activity from groups you've joined."
-        onAction={onSignIn}
-        testID="today-social-signed-out"
-        title="Group activity needs an account"
-      />
+      <Card>
+        <StatePanel
+          action={{ label: 'Sign in', onPress: onSignIn, testID: 'today-social-sign-in' }}
+          body="Sign in to see activity from groups you've joined."
+          fill={false}
+          testID="today-social-signed-out"
+          title="Group activity needs an account"
+        />
+      </Card>
     );
   }
 
@@ -435,11 +432,14 @@ function TodaySocialSnapshot({
           testIDPrefix="today-social"
         />
       ) : viewModels.length === 0 ? (
-        <GroupStateView
-          body="Sessions, records and membership updates from groups you've joined will appear here."
-          testID="today-social-empty"
-          title="No group activity yet"
-        />
+        <Card>
+          <StatePanel
+            body="Sessions, records and membership updates from groups you've joined will appear here."
+            fill={false}
+            testID="today-social-empty"
+            title="No group activity yet"
+          />
+        </Card>
       ) : (
         viewModels.map((item) => {
           if (item.kind === 'session') {
@@ -480,34 +480,6 @@ function TodaySocialSnapshot({
   );
 }
 
-function SectionHeader({
-  actionLabel,
-  onAction,
-  testID,
-  title,
-}: {
-  actionLabel: string;
-  onAction: () => void;
-  testID: string;
-  title: string;
-}) {
-  return (
-    <View style={styles.sectionHeader}>
-      <UiText accessibilityRole="header" selectable style={styles.sectionTitle} variant="title">
-        {title}
-      </UiText>
-      <UiButton
-        label={actionLabel}
-        onPress={onAction}
-        style={styles.sectionAction}
-        testID={testID}
-        textStyle={styles.sectionActionText}
-        variant="secondary"
-      />
-    </View>
-  );
-}
-
 export default function TodayRoute() {
   const isFocused = useIsFocused();
   const { isConfigured, user } = useAuth();
@@ -540,78 +512,50 @@ export default function TodayRoute() {
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: uiColors.surfacePage,
-  },
+  // Sections sit a step further apart than the cards inside them.
   content: {
-    padding: uiSpace.xl,
-    paddingBottom: uiSpace.xl,
-    gap: uiSpace.lg,
-  },
-  intro: {
-    gap: uiSpace.sm,
-  },
-  screenTitle: {
-    fontSize: uiTypography.size.xxl,
-    lineHeight: 30,
+    gap: uiSpace.xl,
   },
   section: {
     gap: uiSpace.md,
   },
-  sectionHeader: {
-    minHeight: 42,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiSpace.sm,
-  },
-  sectionTitle: {
-    flex: 1,
-  },
-  sectionAction: {
-    minHeight: 36,
-    paddingVertical: uiSpace.xs,
-  },
-  sectionActionText: {
-    fontSize: uiTypography.size.sm,
-  },
   card: {
-    padding: uiSpace.lg,
+    padding: uiSpace.md,
     gap: uiSpace.md,
-  },
-  activeCard: {
-    borderColor: uiColors.borderSuccess,
-    backgroundColor: uiColors.surfaceSuccess,
   },
   cardCopy: {
     gap: uiSpace.sm,
   },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: uiSpace.sm,
+  },
+  cardTitle: {
+    fontFamily: uiFonts.display.family,
+    fontWeight: '700',
+    fontSize: uiTypography.size.lg,
+    lineHeight: uiTypography.lineHeight.lg,
+    color: uiRoles.ink,
+  },
+  cardBody: {
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
+    fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
+    color: uiRoles.inkMuted,
+  },
   list: {
     gap: uiSpace.sm,
   },
-  recentCard: {
-    minHeight: 62,
-    paddingHorizontal: uiSpace.md,
-    paddingVertical: uiSpace.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiSpace.md,
-  },
   recentSummary: {
-    flex: 1,
-    minWidth: 0,
-  },
-  pressed: {
-    opacity: 0.92,
-  },
-  loading: {
-    minHeight: 80,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: uiSpace.sm,
-    borderRadius: uiRadius.md,
+    paddingVertical: uiSpace.sm,
   },
   errorText: {
-    color: uiColors.actionDangerText,
+    fontFamily: uiFonts.body.family,
+    fontWeight: '600',
+    fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
+    color: uiRoles.danger,
   },
 });

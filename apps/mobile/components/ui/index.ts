@@ -26,6 +26,7 @@ export {
   type SegmentedChipsProps,
 } from '@/components/ui/segmented-chips';
 export { Notice, type NoticeProps, type NoticeTone } from '@/components/ui/notice';
+export { PageHeader, SectionHeader } from '@/components/ui/page-header';
 export { Screen, ScreenScroll, type ScreenGutter } from '@/components/ui/screen';
 export { SearchField, type SearchFieldProps } from '@/components/ui/search-field';
 export {

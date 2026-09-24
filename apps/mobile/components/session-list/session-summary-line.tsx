@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { uiColors, uiSpace, uiTypography } from '@/components/ui';
+import { uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 
 import { formatCompactDuration, type SessionListItem } from './types';
 
@@ -55,7 +55,7 @@ export function SessionSummaryLine({
           {formatDateTimeStamp(session.startedAt)}
         </Text>
         <Text selectable style={styles.summarySeparator}>
-          •
+          ·
         </Text>
         <Text
           selectable
@@ -90,7 +90,7 @@ export function SessionSummaryLine({
           {formatSetCount(session.setCount)}
         </Text>
         <Text selectable style={styles.summarySeparator}>
-          •
+          ·
         </Text>
         <Text
           selectable
@@ -105,10 +105,11 @@ export function SessionSummaryLine({
   );
 }
 
+// Figures (the start stamp, the duration, the counts) are Plex Mono so they
+// align down a list (`design-language.md` §3); the gym is words.
 const styles = StyleSheet.create({
   summaryLines: {
     gap: uiSpace.xs,
-    minHeight: 34,
   },
   summaryRow: {
     flexDirection: 'row',
@@ -118,36 +119,41 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   summaryToken: {
-    color: uiColors.textPrimary,
+    fontFamily: uiFonts.figure.family,
+    fontWeight: '500',
     fontSize: uiTypography.size.sm,
-    fontWeight: '600',
-    fontVariant: ['tabular-nums'],
+    lineHeight: uiTypography.lineHeight.sm,
+    color: uiRoles.inkMuted,
   },
   summaryTokenPrimary: {
-    color: uiColors.textAccentStrong,
+    color: uiRoles.ink,
   },
   summaryTokenStrong: {
     fontSize: uiTypography.size.md,
-    fontWeight: '700',
+    lineHeight: uiTypography.lineHeight.md,
+    color: uiRoles.ink,
   },
   summaryTokenSecondary: {
-    color: uiColors.textSecondary,
-    fontSize: uiTypography.size.sm,
-    fontWeight: '600',
+    color: uiRoles.inkMuted,
   },
   summaryAtToken: {
-    color: uiColors.textSecondary,
+    fontFamily: uiFonts.body.family,
+    color: uiRoles.inkFaint,
   },
+  // A gym name is words, not a figure.
   summaryLocationToken: {
     flexShrink: 1,
     minWidth: 0,
+    fontFamily: uiFonts.body.family,
+    fontWeight: '600',
   },
   summaryFlexibleToken: {
     flexShrink: 1,
     minWidth: 0,
   },
   summarySeparator: {
-    color: uiColors.textDisabled,
-    fontSize: uiTypography.size.xs,
+    fontFamily: uiFonts.body.family,
+    fontSize: uiTypography.size.sm,
+    color: uiRoles.inkFaint,
   },
 });

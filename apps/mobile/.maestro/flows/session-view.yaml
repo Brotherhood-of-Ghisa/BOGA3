@@ -221,6 +221,31 @@ appId: com.dinoderek.mobile
     timeout: 20000
 - takeScreenshot: "04-session-view-finished"
 
+# 7. Today lists the finished session under Recent sessions (DLM-T03 capture).
+- tapOn:
+    id: "session-completion-done"
+- extendedWaitUntil:
+    visible:
+      id: "stats-history-screen"
+    timeout: 20000
+- tapOn:
+    id: "top-level-tab-today"
+- extendedWaitUntil:
+    visible:
+      id: "today-screen"
+    timeout: 10000
+- scrollUntilVisible:
+    element:
+      id: "today-recents-section"
+    direction: DOWN
+- assertNotVisible:
+    id: "today-recents-empty"
+- assertVisible:
+    id: "today-recent-session-summary-.*-start"
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: "today-recents"
+
 # Leave the simulator as this flow found it: data reset.
 - openLink: "boga3://maestro-harness?reset=data&teleport=session-list"
 - extendedWaitUntil:
