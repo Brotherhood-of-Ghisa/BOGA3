@@ -73,7 +73,7 @@ and increase its report count.
 | ID | Area / flow | Summary | Severity | Reports | Reproduced? | Decision | Follow-up |
 | --- | --- | --- | --- | ---: | --- | --- | --- |
 | `FB-001` | Session History | Open the read-oriented summary before details/edit | S3 | 1 | Source-confirmed | accept | `ACT-001` |
-| `FB-002` | Active session insights | Match the useful exercise/muscle completion summary instead of relative muscle-load bars | S3 | 1 | Source-confirmed | accept | `ACT-002` |
+| `FB-002` | Session insights | Align live and completed summaries; toggle exercise/muscle percentile load | S3 | 1 | Source-confirmed | accept | `ACT-002` |
 | `FB-003` | Train → new empty workout | Restore GPS gym preselection on the canonical session-entry path | S2 | 1 | Source-confirmed | accept | `ACT-003` |
 | `FB-004` | Group exercise links | Make unlinking a personal exercise discoverable from the linked group exercise | S2 | 1 | Source-confirmed | accept | `ACT-004` |
 
@@ -110,11 +110,14 @@ or `no_action`.
 - User wording, paraphrased: show Summary first from History; make details and
   editing explicit follow-up actions or place them after the summary.
 - Evidence links or local artifact paths:
-  - `apps/mobile/app/sessions.tsx` routes both a completed-row tap and the
-    explicit Edit action to completed-edit mode.
-  - `apps/mobile/app/completed-session/[sessionId].tsx` already supports a
-    read-only `presentation=summary`, but its Edit action assumes the summary
-    was opened from the editor and calls `router.back()`.
+  - `apps/mobile/app/sessions.tsx` currently routes both a completed-row tap
+    and the explicit Edit action directly to the completed session view's edit
+    mode.
+  - `apps/mobile/app/completed-session/[sessionId].tsx` still owns the
+    read-only set-detail and completion-summary presentations. The historical
+    `presentation=summary` entry was removed during the session-view redesign,
+    so it must be restored deliberately rather than relying on old stack
+    behavior.
 
 #### Reproduction
 
@@ -142,10 +145,14 @@ or `no_action`.
   1. Route a completed History row to
      `/completed-session/<sessionId>?presentation=summary`.
   2. Keep Edit in the row's overflow menu for direct expert access.
-  3. Add explicit bottom actions to historical Summary: `View details` opens
-     the existing read-only detail presentation, and `Edit session` opens
-     completed-edit by session ID. Do not rely on stack history for Edit.
-  4. Keep back/History deterministic: it returns to `/sessions` without
+  3. Make historical Summary the same read-only summary surface used after
+     completion, including the exercise/muscle insight toggle defined by
+     `ACT-002`.
+  4. Add explicit actions to historical Summary: `View individual sets` opens
+     the existing read-only set-detail presentation, and `Edit session` opens
+     the session view's completed-edit mode by session ID. Do not rely on
+     stack history for either action.
+  5. Keep back/History deterministic: it returns to `/sessions` without
      creating an editor copy.
 - Why this action: it follows progressive disclosure, makes the common review
   path one tap, and separates reading from mutation while retaining fast access
@@ -171,54 +178,63 @@ or `no_action`.
 - Follow-up owner/task/PR: not yet assigned; create from `ACT-001` before this
   feedback round closes.
 
-### FB-002 — Align live session insights with the completion summary
+### FB-002 — Align live and completed session insights
 
 - Status: `decided`
 - First reported: `2026-09-18`
 - Source/context: build 13 feedback relayed by the product owner
 - Report count: `1`
-- Area / screen / flow: active session recorder → Session muscle load
-- User impact: the relative bar chart and `weighted kg·reps` values require
-  interpretation but do not clearly answer what has been trained or how the
-  current exercises are going; users receive a clearer model only after ending
-  the session.
+- Area / screen / flow: active session view → in-line session summary; session
+  completion and historical Summary
+- User impact: users value the per-exercise P5–P95 comparison but cannot use
+  the same model to understand muscle load. The live and completed views also
+  diverge, forcing users to learn different presentations for the same session.
 - Frequency: `every time` an active session has mapped performed sets
 - Severity: `S3`
 - Device and iOS version: not provided
 - Confirmed app version/build: `1.1.0 (13)` feedback round
 - Network/account/data preconditions: an active session with at least one valid
   confirmed set and available exercise/muscle mappings
-- User wording, paraphrased: the in-session muscle graphic and data are not very
-  informative; simplify by matching the end-of-session exercise and muscle
-  group summary.
+- User wording, paraphrased: bring the live and completed session summaries in
+  line; retain the useful exercise percentile bar; offer the same kind of load
+  view by muscle behind a toggle; when sharing, always share the exercise view.
 - Evidence links or local artifact paths:
-  - `apps/mobile/components/session-recorder/session-muscle-load.tsx` presents
-    exact weighted volume and bars normalised only against the largest muscle
-    value in the current session.
   - `apps/mobile/components/session-recorder/session-completion-presentation.tsx`
-    instead presents working sets by muscle and per-exercise volume comparisons.
-  - `CurrentSessionMuscleSummary.workingSetsByMuscle` already supplies the same
-    muscle-count model used by completion.
+    presents muscle working-set chips and per-exercise historical volume
+    comparisons, including descriptive P5–P95 bars.
+  - `apps/mobile/components/session-recorder/exercise-volume-comparison.tsx`
+    owns the useful exercise distribution/baseline/no-history states that the
+    aligned presentation should preserve.
+  - `CurrentSessionMuscleSummary.muscles` already calculates mapped weighted
+    muscle volume, but no current calculation derives a muscle's historical
+    P5/median/P95 distribution.
+  - The old recorder muscle-load sheet was removed during the session-view
+    redesign; the implementation must attach the live summary affordance to
+    the current `/session/<sessionId>` surface, not restore the retired route.
 
 #### Reproduction
 
 1. Start a session and confirm valid sets for mapped exercises.
-2. Open Session muscle load.
-3. Observe session-relative bars and weighted-volume units that do not match
-   the end-of-session exercise/muscle summary.
+2. Open the in-line session summary from the current session view.
+3. Complete the session and compare the completion summary.
+4. Observe that the views do not offer one consistent, toggleable exercise and
+   muscle load model.
 
-- Expected: a concise `Session so far` view using the same muscle and exercise
-  summary language as completion, updated as confirmed sets change.
-- Actual: a separate muscle-only sheet uses relative bars and technical
-  weighted-volume values.
+- Expected: live, completion, and historical summaries share the same load
+  presentation; `By exercise` and `By muscle` switch the grouping while
+  retaining descriptive history comparisons.
+- Actual: completion has the useful per-exercise percentile comparison while
+  the live flow does not expose an aligned summary or equivalent muscle
+  comparison.
 - Reproduced on tagged build?: `not_yet` on device; confirmed in the exact
   tagged source.
 - Reproduced on current `main`?: `not_yet` on device; confirmed in source.
 - Existing workaround: finish the session and review the completion summary.
 - Suspected component or path:
-  `apps/mobile/components/session-recorder/session-muscle-load.tsx`,
   `apps/mobile/components/session-recorder/session-completion-presentation.tsx`,
-  `apps/mobile/app/(tabs)/session-recorder.tsx`,
+  `apps/mobile/components/session-recorder/exercise-volume-comparison.tsx`,
+  `apps/mobile/components/session-view/`,
+  `apps/mobile/app/session/[sessionId]/index.tsx`,
   `apps/mobile/src/session-insights/`
 - Related feedback IDs, issues, tasks, or PRs: `ACT-002`
 
@@ -226,36 +242,49 @@ or `no_action`.
 
 - Decision: `accept`
 - Proposal:
-  1. Replace the live weighted-volume bar presentation with a `Session so far`
-     summary that shares the completion presentation's core content and visual
-     language.
-  2. Show physical performed/working-set totals, `Working sets by muscle`
-     chips, and current per-exercise volume rows. Add historical comparison
-     markers only when their data is ready; loading or failure must never block
-     logging.
-  3. Extract shared muscle and exercise summary sections rather than maintaining
-     visually similar copies. Live mode updates from confirmed sets and omits
-     final-only Share/Done behaviour.
-  4. Remove session-relative weighted-volume bars and `weighted kg·reps` from
-     the user-facing live view. Keep or remove the pure calculation only after
-     checking whether another analytics consumer needs it.
-- Why this action: one vocabulary before and after submission reduces cognitive
-  load, makes the live view actionable, and prevents two presentations of the
-  same session from drifting.
+  1. Create one shared session-insight presentation used by live `Session so
+     far`, post-completion Summary, and historical Summary. Keep context-specific
+     actions outside it: live has no Share/Done, completion has Share/Done, and
+     history has Share plus `View individual sets` / `Edit session`.
+  2. Default the presentation to `By exercise`. Preserve each exercise's raw
+     session volume, median comparison, and P5–P95 percentile bar (with the
+     existing baseline and no-history states).
+  3. Add a two-option `By exercise` / `By muscle` toggle. `By muscle` groups
+     mapped weighted session volume by muscle and compares each muscle against
+     that same muscle's weighted volume in prior eligible completed sessions,
+     using equivalent P5/median/P95, single/equal-baseline, and no-history
+     states. It is not a bar normalised to the largest muscle in this session.
+  4. Define historical eligibility identically for both groupings: earlier,
+     non-deleted completed sessions and confirmed performed sets only. Preserve
+     the canonical exercise-to-muscle contribution weights and load-input-mode
+     handling; do not reinterpret a compound exercise as one full set for every
+     mapped muscle.
+  5. Treat the toggle as local presentation state, defaulting to `By exercise`
+     whenever a summary opens. Live results update from confirmed sets without
+     blocking logging; stale async reads cannot overwrite a newer set state.
+  6. Sharing is intentionally invariant: `Share session` always previews and
+     exports the `By exercise` summary, regardless of the visible toggle. The
+     share image never includes the muscle view or stores the toggle choice.
+- Why this action: one component and one comparison vocabulary before and after
+  submission prevent drift; the toggle adds the requested muscle perspective
+  without sacrificing the exercise percentile view users already understand.
 - Accepted design target for the implementation follow-up: a repo-native brief
   using the build 13 completion Summary as the internal visual reference, with
   explicit live loading, partial-mapping, empty, and error states.
-- Smallest safe scope: reuse/extract the existing completion muscle chips and
-  exercise-volume rows for active-session data; do not change persistence,
-  sync, or the underlying confirmed-set semantics.
+- Smallest safe scope: extract the existing exercise comparison UI, add the
+  analogous pure muscle-history calculation and grouped rows, and host that
+  shared view in the current session view plus both completed-summary modes.
+  Do not change persistence, sync, or confirmed-set semantics.
 - Risks and edge cases: repeated history reads while sets change, stale async
   comparisons, unconfirmed/planned sets leaking into metrics, exercises without
   history or mappings, partial catalog failure, vertical density, and regressions
   in completion/share rendering.
-- Verification needed: pure calculation coverage, live-update and reversal
-  component tests, loading/error/unmapped states, completion regression tests,
-  a Maestro active-session interaction, and before/after screenshots on the
-  supported small/large phone targets.
+- Verification needed: pure calculation coverage for mapped/unmapped,
+  contribution weights, distributions, equal/single baselines and no history;
+  toggle/default/live-update and reversal component tests; loading/error states;
+  an assertion that Share stays exercise-only after selecting `By muscle`;
+  History → Summary → individual sets/Edit navigation tests; a Maestro live and
+  historical interaction; and screenshots on supported small/large phones.
 - Required gates: `./boga test fast` and `./boga test frontend` because this
   changes recorder UI/components; derive any additional lane from
   `./boga test for` if implementation touches data, sync, or backend paths.
@@ -536,8 +565,8 @@ decision.
 
 | Action ID | Feedback IDs | Proposed action | Priority | Target build/version | Owner | Status | Verification |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `ACT-001` | `FB-001` | Open History on Summary; expose deterministic Details/Edit actions | High | `1.1.0` build `14+` | Unassigned | proposed | Navigation tests, frontend gate, History-flow screenshots |
-| `ACT-002` | `FB-002` | Reuse completion-style live exercise/muscle summary and retire relative bars | Medium | `1.1.0` build `14+` | Unassigned | proposed | Insight/component tests, frontend gate, live/completion screenshots |
+| `ACT-001` | `FB-001` | Open History on Summary; expose deterministic individual-sets/Edit actions | High | `1.1.0` build `14+` | Unassigned | proposed | Navigation tests, frontend gate, History-flow screenshots |
+| `ACT-002` | `FB-002` | Share one live/completed Summary with exercise/muscle percentile toggle; export exercise only | Medium | `1.1.0` build `14+` | Unassigned | proposed | Calculation/component/share tests, frontend gate, live/completion/history screenshots |
 | `ACT-003` | `FB-003` | Route canonical empty-session creation through the bounded GPS gym detector | High | `1.1.0` build `14+` | Unassigned | proposed | Entry integration tests, frontend gate, GPS-preselection flow evidence |
 | `ACT-004` | `FB-004` | Expose unlink/manage-links on linked group-exercise rows and clarify the catalogue action | High | `1.1.0` build `14+` | Unassigned | proposed | Link-management tests, frontend + groups e2e gates, linked/unlinked screenshots |
 
