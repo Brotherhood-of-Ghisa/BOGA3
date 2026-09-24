@@ -1,8 +1,7 @@
 import { Redirect, usePathname } from 'expo-router';
 import type { PropsWithChildren } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
-
-import { UiText, uiColors, uiSpace } from '@/components/ui';
+import { Screen } from '@/components/ui/screen';
+import { StatePanel } from '@/components/ui/state-panel';
 import { useAuth } from '@/src/auth';
 import { SIGN_IN_ROUTE, isMaestroHarnessRoutePathname, isSignInRoutePathname } from '@/src/navigation/routes';
 import { useShouldRouteToSignIn } from '@/src/sync/use-auth-required-redirect';
@@ -39,12 +38,9 @@ export function AuthRouteGuard({ children }: PropsWithChildren) {
   // could be wrong and would flash the moment auth resolves.
   if (status === 'restoring') {
     return (
-      <View style={styles.loadingContainer} testID="auth-guard-loading">
-        <ActivityIndicator color={uiColors.textPrimary} size="large" />
-        <UiText style={styles.loadingLabel} variant="bodyMuted">
-          Loading…
-        </UiText>
-      </View>
+      <Screen>
+        <StatePanel kind="loading" testID="auth-guard-loading" title="Loading…" />
+      </Screen>
     );
   }
 
@@ -58,15 +54,3 @@ export function AuthRouteGuard({ children }: PropsWithChildren) {
   return <>{children}</>;
 }
 
-const styles = StyleSheet.create({
-  loadingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: uiSpace.md,
-    backgroundColor: uiColors.surfacePage,
-  },
-  loadingLabel: {
-    color: uiColors.textSecondary,
-  },
-});

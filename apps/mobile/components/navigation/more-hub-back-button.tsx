@@ -1,7 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
-import { UiButton } from '@/components/ui';
+import { ActionButton } from '@/components/ui/action-button';
 
 const firstRouteParam = (value: string | string[] | undefined): string | undefined =>
   Array.isArray(value) ? value[0] : value;
@@ -22,15 +22,17 @@ export function MoreHubBackButton({ returnBy = 'replace' }: MoreHubBackButtonPro
     return null;
   }
 
+  // A caps text button at the top left: a way back, never the screen's primary.
   return (
-    <UiButton
-      accessibilityLabel="Back to More"
-      label="Back to More"
-      onPress={() => (returnBy === 'dismiss' ? router.dismissTo('/more') : router.replace('/more'))}
-      style={styles.button}
-      testID="back-to-more-button"
-      variant="secondary"
-    />
+    <View style={styles.button}>
+      <ActionButton
+        accessibilityLabel="Back to More"
+        label="Back to More"
+        onPress={() => (returnBy === 'dismiss' ? router.dismissTo('/more') : router.replace('/more'))}
+        testID="back-to-more-button"
+        variant="text"
+      />
+    </View>
   );
 }
 
