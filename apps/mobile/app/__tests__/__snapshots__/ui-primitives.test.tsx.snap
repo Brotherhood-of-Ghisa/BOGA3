@@ -13,7 +13,6 @@ exports[`UI primitives matches the current top-level tabs snapshot after primiti
         "borderColor": "#d0d0d0",
         "borderRadius": 12,
       },
-      {},
       {
         "backgroundColor": "#ffffff",
         "borderColor": "#dbe3ef",

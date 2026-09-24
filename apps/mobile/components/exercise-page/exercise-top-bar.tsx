@@ -1,6 +1,6 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
-import { Icon } from '@/components/ui/icon';
+import { IconButton } from '@/components/ui/icon-button';
 import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 
 type ExerciseTopBarProps = {
@@ -14,28 +14,19 @@ type ExerciseTopBarProps = {
 export function ExerciseTopBar({ title, onBack, onOpenOptions }: ExerciseTopBarProps) {
   return (
     <View style={styles.bar}>
-      <Pressable
-        accessibilityLabel="Back to session"
-        accessibilityRole="button"
-        onPress={onBack}
-        style={styles.control}
-        testID="exercise-page-back">
-        <Icon color={uiRoles.ink} name="chevron-left" />
-      </Pressable>
+      <IconButton accessibilityLabel="Back to session" name="chevron-left" onPress={onBack} testID="exercise-page-back" />
       <Text accessibilityRole="header" numberOfLines={1} style={styles.title} testID="exercise-page-title">
         {title}
       </Text>
       {onOpenOptions ? (
-        <Pressable
+        <IconButton
           accessibilityLabel="Exercise options"
-          accessibilityRole="button"
+          name="more-vertical"
           onPress={onOpenOptions}
-          style={styles.control}
-          testID="exercise-page-options">
-          <Icon color={uiRoles.ink} name="more-vertical" />
-        </Pressable>
+          testID="exercise-page-options"
+        />
       ) : (
-        <View style={styles.control} />
+        <View style={styles.spacer} />
       )}
     </View>
   );
@@ -51,11 +42,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: uiBorder.width,
     borderBottomColor: uiRoles.rule,
   },
-  control: {
+  spacer: {
     width: uiGeometry.tapTarget,
     height: uiGeometry.tapTarget,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   title: {
     flex: 1,

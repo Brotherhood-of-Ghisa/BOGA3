@@ -6,7 +6,6 @@ import {
   uiBorder,
   uiFonts,
   uiGeometry,
-  uiRadius,
   uiRoles,
   uiSpace,
   uiTypography,
@@ -205,7 +204,7 @@ const styles = StyleSheet.create({
   tick: {
     width: uiGeometry.tapTarget,
     height: uiGeometry.tapTarget,
-    borderRadius: uiRadius.full,
+    borderRadius: uiGeometry.radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: uiRoles.accent,

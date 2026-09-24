@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import { ExerciseListContent } from '@/components/exercise-catalog/exercise-list-controls';
+import { SearchField } from '@/components/ui/search-field';
 import { Sheet } from '@/components/ui/sheet';
-import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiSpace } from '@/components/ui/tokens';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import { useExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
 import { buildExerciseListModel, type ExerciseListItem } from '@/src/exercise-catalog/list-model';
@@ -79,13 +80,10 @@ export function ExerciseSwapSheet({
       title="Swap exercise"
       visible={visible}>
       <View style={styles.search}>
-        <TextInput
+        <SearchField
           accessibilityLabel="Search exercises"
-          autoCorrect={false}
           onChangeText={setQuery}
           placeholder="Search exercises"
-          placeholderTextColor={uiRoles.inkFaint}
-          style={styles.searchInput}
           testID="exercise-swap-search"
           value={query}
         />
@@ -128,17 +126,6 @@ const styles = StyleSheet.create({
   search: {
     paddingHorizontal: uiSpace.lg,
     paddingBottom: uiSpace.sm,
-  },
-  searchInput: {
-    minHeight: uiGeometry.tapTarget,
-    paddingHorizontal: uiSpace.md,
-    backgroundColor: uiRoles.surface,
-    borderWidth: uiBorder.width,
-    borderColor: uiRoles.rule,
-    borderRadius: uiGeometry.radius.control,
-    fontFamily: uiFonts.body.family,
-    fontSize: uiTypography.size.lg,
-    color: uiRoles.ink,
   },
   list: {
     paddingHorizontal: uiSpace.lg,

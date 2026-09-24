@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { ExerciseSetsCard, SessionFactsCard } from '@/components/session-detail';
 import { Icon } from '@/components/ui/icon';
+import { IconButton } from '@/components/ui/icon-button';
+import { Screen, ScreenScroll } from '@/components/ui/screen';
 import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import type { CompletedSessionDetailModel } from '@/src/session-recorder/completed-session-detail-model';
 
@@ -50,13 +52,13 @@ export function ViewSessionScreen({
   const [exerciseSheet, setExerciseSheet] = useState<{ id: string; name: string } | null>(null);
 
   return (
-    <View style={styles.screen}>
+    <Screen>
       <ViewSessionTopBar
         onBack={onBack}
         onEdit={summary.deleted ? undefined : onEdit}
         onOpenOptions={() => setIsOptionsVisible(true)}
       />
-      <ScrollView contentContainerStyle={styles.content} testID="completed-session-detail-screen">
+      <ScreenScroll testID="completed-session-detail-screen">
         {summary.deleted ? (
           <View style={styles.band} testID="completed-session-detail-deleted-band">
             <Icon color={uiRoles.inkMuted} name="trash" size="xs" />
@@ -98,14 +100,14 @@ export function ViewSessionScreen({
                 .filter(Boolean)
                 .join(', ')}
               control={
-                <Pressable
+                <IconButton
                   accessibilityLabel={`Options for ${card.name}`}
-                  accessibilityRole="button"
+                  name="more-vertical"
                   onPress={() => setExerciseSheet({ id: card.id, name: card.name })}
-                  style={styles.control}
-                  testID={`completed-session-detail-exercise-options-${card.id}`}>
-                  <Icon color={uiRoles.inkMuted} name="more-vertical" size="sm" />
-                </Pressable>
+                  size="sm"
+                  testID={`completed-session-detail-exercise-options-${card.id}`}
+                  tone="muted"
+                />
               }
               count={formatSetCount(card.setCount)}
               key={card.id}
@@ -116,7 +118,7 @@ export function ViewSessionScreen({
             />
           ))
         )}
-      </ScrollView>
+      </ScreenScroll>
 
       <ViewSessionOptionsSheet
         deleted={summary.deleted}
@@ -135,19 +137,11 @@ export function ViewSessionScreen({
         }}
         onDismiss={() => setExerciseSheet(null)}
       />
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: uiRoles.paper,
-  },
-  content: {
-    padding: uiSpace.lg,
-    gap: uiSpace.md,
-  },
   band: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -181,11 +175,5 @@ const styles = StyleSheet.create({
     fontSize: uiTypography.size.base,
     lineHeight: uiTypography.lineHeight.base,
     color: uiRoles.inkMuted,
-  },
-  control: {
-    width: uiGeometry.tapTarget,
-    height: uiGeometry.tapTarget,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 });

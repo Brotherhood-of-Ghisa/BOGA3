@@ -119,6 +119,9 @@ export const uiGeometry = {
     // button. The target drew 4 and 5, a difference with no name, so one value.
     // Added 2026-09-23 (exercise page).
     control: 4,
+    // Fully rounded ends: pills, tags and handles. Replaces the legacy
+    // `uiRadius.full` on design-language surfaces (2026-09-24).
+    pill: 999,
   },
   // The minimum tap target, and the width of the set row's type and control
   // columns — every control in a list sits on this one vertical axis.
@@ -227,30 +230,6 @@ export const uiBorder = {
   width: 1,
 } as const;
 
-// The layering vocabulary the app had none of: every surface — page card,
-// modal, sheet, action menu, tab tray — was a 1px border on white, which is
-// why they all read as one flat layer. Opt-in via `UiSurface`'s `elevation`
-// prop; `flat` is the default and matches previous rendering exactly.
-export const uiElevation = {
-  // Deliberately empty: `flat` must add no style keys at all, so the default
-  // render tree is byte-identical to before elevation existed.
-  flat: {},
-  raised: {
-    shadowColor: '#122033',
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
-  },
-  overlay: {
-    shadowColor: '#122033',
-    shadowOpacity: 0.18,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 12,
-  },
-} as const;
-
 export const uiTokens = {
   colors: uiColors,
   roles: uiRoles,
@@ -260,7 +239,6 @@ export const uiTokens = {
   radius: uiRadius,
   typography: uiTypography,
   border: uiBorder,
-  elevation: uiElevation,
   iconSize: uiIconSize,
 } as const;
 
@@ -270,4 +248,3 @@ export type UiFontToken = keyof typeof uiFonts;
 export type UiSpaceToken = keyof typeof uiSpace;
 export type UiIconSizeToken = keyof typeof uiIconSize;
 export type UiRadiusToken = keyof typeof uiRadius;
-export type UiElevationToken = keyof typeof uiElevation;

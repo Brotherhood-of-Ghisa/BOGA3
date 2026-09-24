@@ -1,6 +1,6 @@
 import { useFocusEffect, useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MainTabs } from '@/components/navigation/main-tabs';
@@ -14,6 +14,8 @@ import {
   SessionTopBar,
 } from '@/components/session-view';
 import { ActionButton } from '@/components/ui/action-button';
+import { Screen, ScreenScroll } from '@/components/ui/screen';
+import { StatePanel } from '@/components/ui/state-panel';
 import { uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import type { ExerciseBlockHistorySuggestedPlan } from '@/src/data';
 import { sessionExerciseHref } from '@/src/navigation/active-session-entry';
@@ -341,33 +343,27 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
 
   let body: ReactNode;
   if (state.status === 'loading') {
-    body = (
-      <View style={styles.state} testID="session-view-loading">
-        <ActivityIndicator color={uiRoles.inkMuted} />
-      </View>
-    );
+    body = <StatePanel kind="loading" testID="session-view-loading" />;
   } else if (state.status === 'missing' || state.status === 'error' || !sessionId) {
-    body = (
-      <View style={styles.state} testID={state.status === 'error' ? 'session-view-error' : 'session-view-missing'}>
-        <Text style={styles.stateText}>
-          {state.status === 'error' ? "Couldn't load this session." : 'This session is no longer active.'}
-        </Text>
-        {state.status === 'error' ? (
-          <ActionButton label="Retry" onPress={() => void reload()} testID="session-view-retry" variant="outline" />
-        ) : (
-          <ActionButton
-            label="Back to Train"
-            onPress={() => openTab(TRAIN_ROUTE)}
-            testID="session-view-back"
-            variant="outline"
-          />
-        )}
-      </View>
-    );
+    body =
+      state.status === 'error' ? (
+        <StatePanel
+          action={{ label: 'Retry', onPress: () => void reload(), testID: 'session-view-retry' }}
+          kind="error"
+          testID="session-view-error"
+          title="Couldn't load this session."
+        />
+      ) : (
+        <StatePanel
+          action={{ label: 'Back to Train', onPress: () => openTab(TRAIN_ROUTE), testID: 'session-view-back' }}
+          testID="session-view-missing"
+          title="This session is no longer active."
+        />
+      );
   } else if (model) {
     const data = state.data;
     body = (
-      <ScrollView contentContainerStyle={styles.content} style={styles.scroll} testID="session-view-scroll">
+      <ScreenScroll testID="session-view-scroll">
         <SessionSummaryCard
           gymName={data.gymName}
           onPressGym={openGymPicker}
@@ -406,14 +402,14 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
             {notice}
           </Text>
         ) : null}
-      </ScrollView>
+      </ScreenScroll>
     );
   }
 
   const isCompleted = state.status === 'ready' && state.data.status === 'completed';
 
   return (
-    <View style={styles.screen} testID="session-view-screen">
+    <Screen testID="session-view-screen">
       {state.status === 'ready' ? (
         isCompleted ? (
           <SessionTopBar doneDisabled={isSavingEdit} mode="completed" onDone={() => void saveEdit()} />
@@ -456,7 +452,7 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
         openRequestId={picker.openRequestId}
         visible={picker.visible}
       />
-    </View>
+    </Screen>
   );
 }
 
@@ -466,34 +462,8 @@ export default function SessionViewRoute() {
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: uiRoles.paper,
-  },
   statusSpacer: {
     backgroundColor: uiRoles.surface,
-  },
-  scroll: {
-    flex: 1,
-  },
-  content: {
-    padding: uiSpace.lg,
-    gap: uiSpace.md,
-  },
-  state: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: uiSpace.md,
-    padding: uiSpace.lg,
-  },
-  stateText: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.lg,
-    lineHeight: uiTypography.lineHeight.lg,
-    color: uiRoles.inkMuted,
-    textAlign: 'center',
   },
   notice: {
     fontFamily: uiFonts.body.family,

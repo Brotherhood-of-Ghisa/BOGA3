@@ -1,4 +1,5 @@
 import { uiFonts, uiGeometry, uiRoles, uiTypography } from '@/components/ui';
+import * as tokens from '@/components/ui/tokens';
 
 // The design-language token rules that stay true for good
 // (`docs/specs/ui/design-language.md` §2–§4, `ux-rules.md` §9a): the type
@@ -50,13 +51,19 @@ describe('design-language tokens', () => {
     // Kept beside `uiRadius` / `uiSpace` rather than in them: the legacy scales
     // still serve every screen not yet in the design language.
     expect(uiGeometry).toEqual({
-      radius: { card: 6, sheet: 16, control: 4 },
+      radius: { card: 6, sheet: 16, control: 4, pill: 999 },
       tapTarget: 44,
       metricValueWidth: 38,
       sheetHandle: { width: 38, height: 4 },
       fieldHeight: 50,
       microLabelTracking: 0.1,
     });
+  });
+
+  it('has no elevation scale: depth is a hairline and a ground change (§4)', () => {
+    // `uiElevation` was retired 2026-09-24 with no user; shadows do not return.
+    expect(Object.keys(tokens)).not.toContain('uiElevation');
+    expect(Object.keys(tokens.uiTokens)).not.toContain('elevation');
   });
 
   it('dims a sheet backdrop with ink, not a neutral black', () => {

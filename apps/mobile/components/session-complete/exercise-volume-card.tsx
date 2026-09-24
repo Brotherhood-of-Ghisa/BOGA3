@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { Card } from '@/components/ui/card';
-import { uiBorder, uiFonts, uiGeometry, uiRadius, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import type { ExerciseVolumeComparison } from '@/src/session-insights';
 
 type ExerciseVolumeCardProps = {
@@ -250,7 +250,7 @@ const styles = StyleSheet.create({
   },
   track: {
     height: uiSpace.xs,
-    borderRadius: uiRadius.full,
+    borderRadius: uiGeometry.radius.pill,
     backgroundColor: uiRoles.ruleStrong,
   },
   endpoint: {
@@ -258,7 +258,7 @@ const styles = StyleSheet.create({
     width: uiSpace.sm,
     height: uiSpace.sm,
     marginLeft: -uiSpace.xs,
-    borderRadius: uiRadius.full,
+    borderRadius: uiGeometry.radius.pill,
     backgroundColor: uiRoles.ruleStrong,
   },
   leftEndpoint: {
@@ -273,7 +273,7 @@ const styles = StyleSheet.create({
     width: uiBorder.width * 2,
     height: uiSpace.md,
     marginLeft: -uiBorder.width,
-    borderRadius: uiRadius.full,
+    borderRadius: uiGeometry.radius.pill,
     backgroundColor: uiRoles.inkMuted,
   },
   currentMarker: {
@@ -281,7 +281,7 @@ const styles = StyleSheet.create({
     width: MARKER,
     height: MARKER,
     marginLeft: -MARKER / 2,
-    borderRadius: uiRadius.full,
+    borderRadius: uiGeometry.radius.pill,
     borderWidth: uiBorder.width * 2,
     borderColor: uiRoles.surface,
     backgroundColor: uiRoles.ink,
@@ -309,7 +309,7 @@ const styles = StyleSheet.create({
   },
   baselineTrack: {
     height: uiBorder.width * 2,
-    borderRadius: uiRadius.full,
+    borderRadius: uiGeometry.radius.pill,
     backgroundColor: uiRoles.ruleStrong,
   },
 });
