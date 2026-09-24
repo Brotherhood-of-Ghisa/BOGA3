@@ -215,17 +215,20 @@ describe('CompletedSessionDetailScreenShell', () => {
     await waitFor(() => {
       expect(screen.getByTestId('session-completion-presentation')).toBeTruthy();
     });
-    expect(mockStackScreen).toHaveBeenCalledWith(
-      expect.objectContaining({ options: expect.objectContaining({ title: 'Session complete' }) })
-    );
-    expect(screen.getByTestId('session-completion-duration')).toHaveTextContent('58 min');
-    expect(screen.getByTestId('session-completion-exercises')).toHaveTextContent('2');
-    expect(screen.getByTestId('session-completion-sets')).toHaveTextContent('5 (3 working)');
-    expect(screen.getByTestId('session-completion-gym')).toHaveTextContent(
-      'Westside Barbell Club'
-    );
+    // Its own top bar, `Session complete` · Done, and no back gesture.
+    expect(mockStackScreen).toHaveBeenLastCalledWith({
+      options: { title: 'Session complete', headerShown: false, gestureEnabled: false },
+    });
+    expect(within(screen.getByTestId('session-completion-top-bar')).getByText('Session complete')).toBeTruthy();
+    const label = (testID: string) => screen.getByTestId(testID).props.accessibilityLabel;
+    expect(label('session-completion-duration')).toBe('Duration 58m');
+    expect(label('session-completion-exercises')).toBe('Exercises 2');
+    expect(label('session-completion-sets')).toBe('Sets 5');
+    expect(label('session-completion-working-sets')).toBe('Working 3');
+    expect(label('session-completion-gym')).toBe('Gym Westside Barbell Club');
     expect(screen.queryByTestId('session-completion-personal-records')).toBeNull();
-    expect(screen.getByTestId('session-completion-muscle-chest')).toHaveTextContent('Chest (3)');
+    expect(label('session-completion-muscle-chest')).toBe('Chest, 3 working sets');
+    expect(screen.queryByText('Numbers in brackets are working sets.')).toBeNull();
     expect(screen.queryByTestId('session-completion-view-muscle-load')).toBeNull();
     expect(screen.queryByTestId('completed-session-detail-action-bar')).toBeNull();
     expect(screen.queryByText('Append')).toBeNull();
@@ -280,7 +283,7 @@ describe('CompletedSessionDetailScreenShell', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId('session-completion-sets')).toHaveTextContent('0 (0 working)');
+      expect(screen.getByTestId('session-completion-sets').props.accessibilityLabel).toBe('Sets 0');
     });
     expect(screen.queryByTestId('session-completion-muscle-breakdown')).toBeNull();
     expect(screen.queryByTestId('session-completion-view-muscle-load')).toBeNull();
@@ -397,8 +400,16 @@ describe('CompletedSessionDetailScreenShell', () => {
     });
     expect(screen.queryByTestId('session-completion-pr-pager')).toBeNull();
     expect(screen.queryByText('Share PR')).toBeNull();
-    expect(screen.getByTestId('session-completion-sets')).toHaveTextContent('5 (3 working)');
+    // Records in the language's one superlative, without `kg` or "est.".
+    expect(
+      within(screen.getByTestId('session-completion-pr-bench-press')).getByLabelText(
+        'New 1RM record for Bench Press: 185.0 × 8, 1RM 234.3'
+      )
+    ).toBeTruthy();
     expect(screen.getByTestId('session-completion-exercise-exercise-1')).toBeTruthy();
+    // Volume as a figure: no thousands separator, no unit.
+    expect(within(screen.getByTestId('session-completion-exercise-exercise-1')).getByText('4950')).toBeTruthy();
+    expect(screen.getByText('15% above median')).toBeTruthy();
     expect(screen.getByTestId('session-completion-exercise-exercise-2')).toBeTruthy();
     expect(screen.getByText('4 sets · 3 working')).toBeTruthy();
     expect(screen.getByText('1 set · 0 working')).toBeTruthy();
@@ -459,7 +470,9 @@ describe('CompletedSessionDetailScreenShell', () => {
     expect(mockReleaseCapture).toHaveBeenCalledWith('file:///tmp/boga-session.png');
     expect(screen.queryByTestId('session-share-error')).toBeNull();
 
-    fireEvent.press(screen.getByTestId('session-share-cancel'));
+    // A design-language sheet: no Cancel, the backdrop closes it.
+    expect(screen.queryByTestId('session-share-cancel')).toBeNull();
+    fireEvent.press(screen.getByTestId('session-share-preview-backdrop', { includeHiddenElements: true }));
     expect(screen.queryByTestId('session-share-preview')).toBeNull();
   });
 

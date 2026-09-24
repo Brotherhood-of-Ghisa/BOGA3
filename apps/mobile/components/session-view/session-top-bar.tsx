@@ -20,15 +20,24 @@ type SessionTopBarProps =
       mode: 'completed';
       onDone: () => void;
       doneDisabled?: boolean;
+    }
+  | {
+      // The completion screen after Finish: Done sits where Finish sat. Omitted
+      // on its loading and unavailable states, which offer their own one exit.
+      mode: 'complete';
+      onDone?: () => void;
+      doneDisabled?: boolean;
     };
 
 const PRIMARY = {
   active: { title: 'Session', label: 'Finish', a11y: 'Finish session', testID: 'session-view-finish-button' },
   completed: { title: 'Edit session', label: 'Done', a11y: 'Done editing session', testID: 'session-view-done-button' },
+  complete: { title: 'Session complete', label: 'Done', a11y: 'Done with session completion', testID: 'session-completion-done' },
 } as const;
 
 // `Session` · ⋮ · Finish (build spec, "Session view"); `Edit session` · Done
-// for a completed session. The primary is the screen's one `accent` action.
+// for a completed session; `Session complete` · Done after Finish. The primary
+// is the screen's one `accent` action.
 export function SessionTopBar(props: SessionTopBarProps) {
   const insets = useSafeAreaInsets();
   const copy = PRIMARY[props.mode];
@@ -36,7 +45,9 @@ export function SessionTopBar(props: SessionTopBarProps) {
   const disabled = (props.mode === 'active' ? props.finishDisabled : props.doneDisabled) ?? false;
 
   return (
-    <View style={[styles.bar, { paddingTop: insets.top }]} testID="session-view-top-bar">
+    <View
+      style={[styles.bar, { paddingTop: insets.top }]}
+      testID={props.mode === 'complete' ? 'session-completion-top-bar' : 'session-view-top-bar'}>
       <Text accessibilityRole="header" numberOfLines={1} style={styles.title}>
         {copy.title}
       </Text>
@@ -51,14 +62,19 @@ export function SessionTopBar(props: SessionTopBarProps) {
           <Icon color={uiRoles.ink} name="more-vertical" size="md" />
         </Pressable>
       ) : null}
-      <ActionButton
-        accessibilityLabel={copy.a11y}
-        disabled={disabled}
-        label={copy.label}
-        onPress={onPrimary}
-        testID={copy.testID}
-        variant="primary"
-      />
+      {onPrimary ? (
+        <ActionButton
+          accessibilityLabel={copy.a11y}
+          disabled={disabled}
+          label={copy.label}
+          onPress={onPrimary}
+          testID={copy.testID}
+          variant="primary"
+        />
+      ) : (
+        // Keeps the bar's height when there is no Done.
+        <View style={styles.iconButton} />
+      )}
     </View>
   );
 }

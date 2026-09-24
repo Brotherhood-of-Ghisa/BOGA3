@@ -348,17 +348,20 @@ Brief entrypoint map of the current mobile screens.
     `components/session-detail/`); `Edit` opens it in the session view
 - Key states (high level):
   - loading / error / not-found (on `paper`, with the top bar's back) / detail
-  - `presentation=completion` (after Finish): one labelled totals card with
-    informational per-muscle working-set counts, all compact `Personal
-    records`, per-exercise current volume versus median and descriptive P5/P95
-    range, and previewed PNG session sharing. It does not link to muscle
-    analytics. Optional historical enrichment cannot block it, and share output
-    excludes gym/location. Edit/delete/append actions are hidden; it renders
-    Done. (History's `presentation=summary` was removed in step 6b-1: the
-    detail itself is the summary.)
-  - completion loading/error/not-found/deleted-target states expose one safe
-    Progress exit; the native back affordance/gesture is suppressed and Android
-    system back replaces to Progress
+  - `presentation=completion` (after Finish), in the design language
+    (`components/session-complete/`): its own top bar `Session complete` ·
+    `Done` (`accent`); a summary card (Duration / Exercises / Sets / Working,
+    then Gym) with informational per-muscle working-set pills; every new 1RM
+    record as a `record`-band card; per-exercise volume versus median with a
+    descriptive P5/P95 range; and `Share session` (outline), which opens a
+    `Sheet` previewing the PNG. It does not link to muscle analytics. Optional
+    historical enrichment cannot block it, and share output excludes
+    gym/location. Edit/delete/append actions are hidden. (History's
+    `presentation=summary` was removed in step 6b-1: the detail itself is the
+    summary.)
+  - completion loading/error/not-found/deleted-target states show the top bar
+    without Done and one safe exit, `Back to Progress`; the back gesture is
+    off and Android system back replaces to Progress
   - detail: its own top bar, `back · View Session · ⋮ · Edit` (`Edit` the one
     `accent` action, no native header); a summary card with `Start` / `End`
     (`YYYY-MM-DD HH:mm`) then `Duration` / `Gym` / `Sets` / `Volume`; one card
@@ -600,7 +603,7 @@ Brief entrypoint map of the current mobile screens.
     display mode (no custom back title), preserving normal platform back
     behavior while hiding the previous route-group title; the arrow-only
     button slides in with the screen instead of morphing a label in
-  - completed-session route sets its title inside the route file; the detail hides the native header and draws its own top bar
+  - completed-session route sets its title inside the route file; both presentations hide the native header and draw their own top bar
   - exercise-history route also sets its title inside the route file (resolved exercise name)
 
 2. `apps/mobile/app/(tabs)/_layout.tsx`
