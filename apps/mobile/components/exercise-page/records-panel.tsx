@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Card } from '@/components/ui/card';
+import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Icon } from '@/components/ui/icon';
 import { Stat } from '@/components/ui/stat';
 import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
@@ -17,6 +18,11 @@ import type { ExerciseRecordsState } from '@/src/session-recorder/use-exercise-r
 import { pageText } from './text-styles';
 
 export type RecordsView = 'records' | 'last';
+
+const VIEW_OPTIONS = [
+  { value: 'records', label: 'Records' },
+  { value: 'last', label: 'Last' },
+] as const;
 
 type RecordsPanelProps = {
   state: ExerciseRecordsState;
@@ -56,30 +62,14 @@ export function RecordsPanel({
           testID="exercise-records-toggle">
           <Icon color={uiRoles.ink} name={expanded ? 'chevron-down' : 'chevron-right'} size="sm" />
         </Pressable>
-        <View accessibilityRole="tablist" style={styles.selector}>
-          {(['records', 'last'] as const).map((option, index) => {
-            const selected = option === view;
-            return (
-              <Pressable
-                accessibilityRole="tab"
-                accessibilityState={{ selected }}
-                hitSlop={uiSpace.sm}
-                key={option}
-                onPress={() => onSelectView(option)}
-                style={[
-                  styles.segment,
-                  index > 0 ? styles.segmentDivider : null,
-                  selected ? styles.segmentSelected : null,
-                ]}
-                testID={`exercise-records-view-${option}`}>
-                <Text
-                  style={[pageText.microLabel, selected ? styles.segmentLabelSelected : styles.segmentLabel]}>
-                  {option === 'records' ? 'Records' : 'Last'}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
+        <SegmentedControl
+          hitSlop={uiSpace.sm}
+          layout="inline"
+          onChange={onSelectView}
+          options={VIEW_OPTIONS}
+          testIDPrefix="exercise-records-view"
+          value={view}
+        />
         <View style={styles.spacer} />
         <Pressable
           accessibilityLabel="Open exercise history"
@@ -293,32 +283,6 @@ const styles = StyleSheet.create({
     height: uiGeometry.tapTarget,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  selector: {
-    flexDirection: 'row',
-    overflow: 'hidden',
-    borderWidth: uiBorder.width,
-    borderColor: uiRoles.ruleStrong,
-    borderRadius: uiGeometry.radius.control,
-  },
-  segment: {
-    justifyContent: 'center',
-    paddingHorizontal: uiSpace.md,
-    paddingVertical: uiSpace.xs,
-    backgroundColor: uiRoles.surface,
-  },
-  segmentDivider: {
-    borderLeftWidth: uiBorder.width,
-    borderLeftColor: uiRoles.ruleStrong,
-  },
-  segmentSelected: {
-    backgroundColor: uiRoles.ink,
-  },
-  segmentLabel: {
-    color: uiRoles.inkMuted,
-  },
-  segmentLabelSelected: {
-    color: uiRoles.surface,
   },
   spacer: {
     flex: 1,

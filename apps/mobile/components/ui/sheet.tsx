@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { uiFonts, uiGeometry, uiRadius, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 
 export type SheetProps = {
   visible: boolean;
@@ -78,7 +78,7 @@ const styles = StyleSheet.create({
   handle: {
     width: uiGeometry.sheetHandle.width,
     height: uiGeometry.sheetHandle.height,
-    borderRadius: uiRadius.full,
+    borderRadius: uiGeometry.radius.pill,
     backgroundColor: uiRoles.ruleStrong,
   },
   title: {

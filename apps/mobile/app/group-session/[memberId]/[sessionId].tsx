@@ -1,6 +1,6 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useCallback } from 'react';
-import { RefreshControl, ScrollView, StyleSheet } from 'react-native';
+import { RefreshControl } from 'react-native';
 
 import {
   FriendSessionContent,
@@ -9,11 +9,10 @@ import {
   GroupOfflineBanner,
   GroupStateView,
   GroupsSignInRequired,
-  groupScreenStyles,
   pickInlineError,
   usePullToRefresh,
 } from '@/components/groups';
-import { uiRoles, uiSpace } from '@/components/ui/tokens';
+import { ScreenScroll } from '@/components/ui/screen';
 import { useAuth } from '@/src/auth';
 import {
   getGroupSessionDetail,
@@ -67,10 +66,8 @@ function GroupSessionContent({ userId, memberId, sessionId }: { userId: string; 
   const inlineError = pickInlineError(detail.error);
 
   return (
-    <ScrollView
-      contentContainerStyle={styles.content}
+    <ScreenScroll
       refreshControl={<RefreshControl onRefresh={onRefresh} refreshing={pulling} />}
-      style={[groupScreenStyles.screen, styles.paper]}
       testID="group-session-screen">
       {detail.lostAccess ? (
         <UnavailableState />
@@ -87,18 +84,6 @@ function GroupSessionContent({ userId, memberId, sessionId }: { userId: string; 
           )}
         </>
       )}
-    </ScrollView>
+    </ScreenScroll>
   );
 }
-
-// The design language's ground and gutter, as on View Session. The group state
-// panels inside keep the groups screens' styling.
-const styles = StyleSheet.create({
-  paper: {
-    backgroundColor: uiRoles.paper,
-  },
-  content: {
-    padding: uiSpace.lg,
-    gap: uiSpace.md,
-  },
-});

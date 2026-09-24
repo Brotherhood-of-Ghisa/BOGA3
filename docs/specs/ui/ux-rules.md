@@ -374,7 +374,7 @@ language's own radii (card 6, sheet 16), the 44pt tap target, the 38pt metric
 column, the sheet handle and micro-label tracking — a separate vocabulary from
 the legacy scales below, which it does not extend, so rule 5's three radii still
 hold for everything shipped. Its only consumers are the design-language
-primitives (`Card`, `Stat`, `ListRow`, `Sheet`, `ActionButton`) and those screens.
+primitives (`components-catalog.md` 6 and 6a) and those screens.
 
 1. **Type: 8 sizes.**
    `xxs 10 · xs 11 · sm 12 · md 13 · base 14 · lg 16 · xl 18 · xxl 24`.
@@ -404,13 +404,9 @@ primitives (`Card`, `Stat`, `ListRow`, `Sheet`, `ActionButton`) and those screen
 5. **Radius: 3 values.** `sm 8` for controls, `md 12` for surfaces,
    `full 999` for pills. Down from 10 distinct radii. If two radii sit side by
    side and the difference cannot be named, there is only one radius.
-6. **Elevation: 3 levels**, in `uiElevation` — `flat` (border only, and
-   deliberately an empty object so it adds no style keys), `raised` (cards
-   above the page), `overlay` (sheets and modals). Opt in through
-   `UiSurface`'s `elevation` prop; the default is `flat`, so nothing changed
-   by adding it. **Applying `raised` / `overlay` to specific surfaces is still
-   open** — it is the fix for page cards, modals, sheets and the tab tray all
-   reading as one flat layer, and it wants a look on device before it lands.
+6. **No elevation.** `uiElevation` and `UiSurface`'s `elevation` prop were
+   deleted on 2026-09-24 with no user: depth is a hairline plus a ground change
+   (`ui/design-language.md` §4), and no screen draws a shadow.
 
 ### 9b. Appearance: light only
 
@@ -437,7 +433,8 @@ primitives (`Card`, `Stat`, `ListRow`, `Sheet`, `ActionButton`) and those screen
    certification marks sit beside words (`Certified by …`, `uncertified`) or
    inside a row whose accessibility label says them.
 3. Icon colour is a token (`uiColors` on shipped screens, `uiRoles` on
-   design-language surfaces); size is a `uiIconSize` key.
+   design-language surfaces; `ink` when omitted); size is a `uiIconSize` key.
+   An icon-only control is an `IconButton` (44pt, labelled).
 4. The set-state glyphs (`set-done` / `set-current` / `set-planned`) exist for
    design-language §5; the exercise page (§14a) is their first user.
 

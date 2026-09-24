@@ -4,7 +4,7 @@ import { join, relative } from 'path';
 import { Circle, Path } from 'react-native-svg';
 
 import { ICON_GLYPHS } from '@/components/ui/icon-glyphs';
-import { Icon, type IconName, uiColors, uiIconSize, uiRoles } from '@/components/ui';
+import { Icon, type IconName, uiIconSize, uiRoles } from '@/components/ui';
 
 const ICON_NAMES = Object.keys(ICON_GLYPHS) as IconName[];
 
@@ -30,18 +30,12 @@ describe('Icon', () => {
     expect(screen.getByRole('image', { name: 'Certified' })).toBeTruthy();
   });
 
-  it('paints in the given token colour, defaulting to shipped ink', () => {
+  it('paints in the given role colour, defaulting to ink', () => {
     const { UNSAFE_getAllByType, rerender } = render(<Icon name="x" />);
-    expect(UNSAFE_getAllByType(Path).map((path) => path.props.stroke)).toEqual([
-      uiColors.textPrimary,
-      uiColors.textPrimary,
-    ]);
+    expect(UNSAFE_getAllByType(Path).map((path) => path.props.stroke)).toEqual([uiRoles.ink, uiRoles.ink]);
 
-    rerender(<Icon color={uiColors.actionPrimary} name="x" />);
-    expect(UNSAFE_getAllByType(Path).map((path) => path.props.stroke)).toEqual([
-      uiColors.actionPrimary,
-      uiColors.actionPrimary,
-    ]);
+    rerender(<Icon color={uiRoles.danger} name="x" />);
+    expect(UNSAFE_getAllByType(Path).map((path) => path.props.stroke)).toEqual([uiRoles.danger, uiRoles.danger]);
   });
 
   // design-language §5: filled check = done, accent ring = current, dashed

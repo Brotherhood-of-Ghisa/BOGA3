@@ -134,7 +134,7 @@ Headline figures (summary, records) stay Plex Mono 700, micro-labels Archivo
 ## 4. Surfaces
 
 - **No shadows.** Depth is a hairline plus a ground-colour change, never an
-  elevation ramp. `uiElevation` stays unused unless a screen proves it needs it.
+  elevation ramp. The legacy `uiElevation` was deleted (2026-09-24) unused.
 - Cards are `surface` on `paper`, 1px `rule`, radius 6.
 - Sheets are bottom-anchored with a dimmed backdrop (`scrim`), top radius 16
   and a 38×4 `rule-strong` handle. **Tapping outside dismisses; sheets carry no
@@ -149,13 +149,17 @@ Headline figures (summary, records) stay Plex Mono 700, micro-labels Archivo
   target drew 4 and 5, a difference with no name — and a **labelled-field
   height 50** (micro-label above a large figure: the logger's Weight / Reps /
   Effort). The logger's other widths derive from these: Reps is one field
-  height wide, Effort two tap targets, the tick one tap target. It sits beside the legacy `uiRadius` /
+  height wide, Effort two tap targets, the tick one tap target. A **pill
+  radius** (`radius.pill`, 999) was added 2026-09-24 for handles, tags and
+  chips, replacing the legacy `uiRadius.full` on these surfaces. It sits beside the legacy `uiRadius` /
   `uiSpace` rather than in them — 6 beside 8 would be two radii with no nameable
   difference (`ux-rules.md` §9a.5) — so the legacy scales can be retired
   wholesale once no screen uses them. Spacing the target draws off-scale snaps to `uiSpace`
   (sheet gutters 20→16, sheet rows ≥60, list rows ≥44).
-- The primitives implementing this are `Card`, `Stat`, `ListRow`, `Sheet` and
-  `ActionButton` (`components-catalog.md`).
+- The primitives implementing this are `Card`, `Stat`, `ListRow`, `Sheet`,
+  `ActionButton`, `IconButton`, `StatePanel`, `Screen` / `ScreenScroll`,
+  `FormField`, `SearchField`, `SegmentedControl`, `ChipGroup`, `Tag` and
+  `Notice` (`components-catalog.md`).
 
 ## 5. Emphasis
 

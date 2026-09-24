@@ -1,12 +1,13 @@
 import { useFocusEffect } from 'expo-router';
 import { type ReactNode, useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { MoreHubBackButton } from '@/components/navigation/more-hub-back-button';
 import { ActionButton } from '@/components/ui/action-button';
 import { Card } from '@/components/ui/card';
 import { Icon } from '@/components/ui/icon';
 import { ListRow } from '@/components/ui/list-row';
+import { ScreenScroll } from '@/components/ui/screen';
 import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import type { ReadForegroundPosition } from '@/src/location/gym-location-reads';
 import { gymHasSavedLocation, listGymDirectory, type GymDirectoryEntry } from '@/src/session-recorder/gym-options';
@@ -149,28 +150,18 @@ export function GymsScreen({ readPosition }: GymsScreenProps) {
   }
 
   return (
-    <ScrollView
+    <ScreenScroll
       automaticallyAdjustKeyboardInsets
-      contentContainerStyle={styles.content}
       contentInsetAdjustmentBehavior="automatic"
       keyboardShouldPersistTaps="handled"
-      style={styles.screen}
       testID="gyms-screen">
       <MoreHubBackButton returnBy="dismiss" />
       {body}
-    </ScrollView>
+    </ScreenScroll>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: uiRoles.paper,
-  },
-  content: {
-    padding: uiSpace.lg,
-    gap: uiSpace.md,
-  },
   rowName: {
     fontFamily: uiFonts.display.family,
     fontWeight: '600',

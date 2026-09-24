@@ -50,11 +50,12 @@ Brief entrypoint inventory of the current reusable UI component set.
   - includes the shared semantic/status/overlay color palette used by current route screens after the M8 convergence refactor (Task `T-20260226-06`)
   - includes token-backed green family and warm individual-muscle background palettes for Stats / History failure intensity; each row selects one uniform shade from its palette
   - carries the collapsed scales the UI guardrail enforces (8 type sizes with a
-    matching `lineHeight` per size, 6 spacing steps, 3 radii) plus `uiElevation`
-    (`flat` / `raised` / `overlay`); values and rationale: `docs/specs/ui/ux-rules.md` §9a
+    matching `lineHeight` per size, 6 spacing steps, 3 radii); values and
+    rationale: `docs/specs/ui/ux-rules.md` §9a. (`uiElevation` was deleted
+    2026-09-24 with no user.)
   - also carries the design-language vocabularies, adopted so far by the exercise
     page, the session view, the Gyms screen and View Session: `uiRoles` (colour roles), `uiFonts` (the three embedded typefaces
-    and their shipped weights) and `uiGeometry` (card / sheet / control radii,
+    and their shipped weights) and `uiGeometry` (card / sheet / control / pill radii,
     the 44pt tap target, the 38pt metric column, the sheet handle, the 50pt
     labelled-field height, micro-label tracking); rationale:
     `docs/specs/ui/design-language.md` §2–§4
@@ -70,8 +71,6 @@ Brief entrypoint inventory of the current reusable UI component set.
 - File: `apps/mobile/components/ui/surface.tsx`
 - Purpose:
   - shared surface/card/panel wrapper for bordered rounded containers
-  - optional `elevation` prop (`flat` default / `raised` / `overlay`) over
-    `uiElevation`; `flat` adds no style keys, so existing callers are unchanged
 
 4. `UiButton`
 - File: `apps/mobile/components/ui/button.tsx`
@@ -121,6 +120,44 @@ Brief entrypoint inventory of the current reusable UI component set.
     `GymButton` (View Session was its third consumer)
   - covered by `apps/mobile/app/__tests__/ui-design-primitives.test.tsx`
 
+6a. Design-language primitives for the remaining screens (DLM-T01, 2026-09-24)
+- Files: `apps/mobile/components/ui/icon-button.tsx`, `state-panel.tsx`,
+  `screen.tsx`, `form-field.tsx`, `search-field.tsx`, `segmented-control.tsx`,
+  `chip-group.tsx`, `tag.tsx`, `notice.tsx`
+- Purpose: what the screens still on the legacy vocabulary need to move over;
+  each has two or more consumers. `uiRoles` / `uiFonts` / `uiGeometry` only
+  - `IconButton` — a labelled 44pt icon-only control; `tone` `default` (`ink`),
+    `muted`, `danger`, or `accent` (a filled square: the screen's one primary as
+    an icon). Every top bar's back and ⋮, and View Session's card ⋮
+  - `StatePanel` — a loading / message / error state: optional spinner, title
+    (Archivo), body (`ink-muted`), one outline action and optional children;
+    `fill` (centred in its space, the default) or inline. The session view's,
+    exercise page's and View Session's non-content states
+  - `Screen` / `ScreenScroll` — the `paper` ground; the scroll body with the page
+    gutter (`lg`, or `md` for the exercise page) and the `md` card gap, passing
+    other `ScrollView` props through (refresh, keyboard insets). Used by the
+    session view, exercise page, View Session, Gyms and the group session view
+  - `FormField` — a micro-label inside a field one `fieldHeight` tall, `rule-strong`
+    turning `danger` while invalid, the error below (`<testID>-error` or
+    `errorTestID`), an optional hint or counter; `face` `figure` (Plex Mono) or
+    `text`. The completed edit's Start / End (`session-times-fields`)
+  - `SearchField` — search glyph, text, and a clear control while there is text;
+    `accessibilityLabel` required. The swap sheet's search
+  - `SegmentedControl` — one choice from a few, joined in a `rule-strong` frame,
+    the selected segment solid `ink`; `layout` `fill` (equal width) or `inline`;
+    `tablist` / `tab` / `selected` and the `<prefix>-row` / `<prefix>-<value>`
+    testIDs of the legacy `SegmentedChips`. The records panel's `Records` | `Last`
+  - `ChipGroup` — wrapping pills, `single` (a tab list, `selected`) or `multi`
+    (checkboxes, `checked`), the same testID contract, per-chip accessibility
+    labels. No consumer yet (built ahead of the legacy chip rows it replaces)
+  - `Tag` — a static micro-label pill naming a state (`Archived`, `Deleted`, a
+    role); `neutral` or `faint`. No consumer yet
+  - `Notice` — a `surface-subtle` band on a `rule` hairline: optional glyph, words,
+    optional action; `neutral` or `danger` (`alert`); `live` announces it. There
+    is no success or warning hue: the glyph and words carry the state. No
+    consumer yet
+  - covered by `apps/mobile/app/__tests__/ui-design-primitives.test.tsx`
+
 7. `Icon`
 - Files: `apps/mobile/components/ui/icon.tsx`, `icon-glyphs.ts` (geometry),
   `LICENSE.lucide`
@@ -128,7 +165,7 @@ Brief entrypoint inventory of the current reusable UI component set.
   - the app's icon set: `<Icon name size color label testID />` over
     `react-native-svg`. `name` is a closed union (`IconName`); `size` a
     `uiIconSize` key (default `md`); `color` a token value (default
-    `uiColors.textPrimary`)
+    `uiRoles.ink`)
   - decorative by default (hidden from assistive tech, never takes touches); a
     `label` makes it an accessible image, for the rare icon no surrounding text
     or control label explains
@@ -138,7 +175,10 @@ Brief entrypoint inventory of the current reusable UI component set.
     `arrow-left-right`) and `trash` (Lucide `trash-2`) for the exercise page,
     `link` (Lucide `link`) for its ⋮ `Link to group exercise…`, `location`
     (Lucide `map-pin`) for a gym's saved location and the gym sheet's nearby
-    suggestion,
+    suggestion, `search` and `list` (Lucide `search`, `list`), and the status
+    glyphs `offline` (Lucide `wifi-off`), `success` (`circle-check`) and
+    `warning` (`triangle-alert`), which stay `ink` — the design language has no
+    success or warning hue,
     plus BoGa glyphs: `caret-down`, `radio-on` / `radio-off`, and the
     design-language §5 set-state glyphs `set-done` (filled `ink` disc, knocked-out
     check), `set-current` (`accent` ring), `set-planned` (dashed `planned` ring),
@@ -434,16 +474,11 @@ history), revisited 2026-09-24 when the exercise/session redesign closed. Build
 one only when a screen being moved to the design language asks for it, in the
 design-language vocabulary (`uiRoles` / `uiFonts` / `uiGeometry`):
 
-- `IconActionButton` — **next candidate.** The 44pt icon control (⋮, back) is
-  written out in each design-language top bar and card (`session-top-bar`,
-  `exercise-top-bar`, `view-session-top-bar`, `view-session-screen`).
-- `EmptyState` / state panels — the loading / error / not-found states of the
-  session view, exercise page and View Session repeat one centred pattern; the
-  group screens have their own panels (`components/groups/`).
-- `ScreenContainer` / `ScreenScrollContainer` — the `paper` ground and `lg`
-  gutter are repeated per screen.
-- `FormField` — the labelled field (`uiGeometry.fieldHeight`) exists twice
-  (`set-logger`, `session-times-fields`).
+- `IconActionButton` → built as `IconButton`; `EmptyState` / state panels →
+  `StatePanel`; `ScreenContainer` / `ScreenScrollContainer` → `Screen` /
+  `ScreenScroll`; `FormField` → `FormField` (DLM-T01, 2026-09-24). The group
+  state panels (`components/groups/`) move onto `StatePanel` with the groups
+  screens.
 - Covered, no longer pending: `ModalSurface` / `ModalBackdrop` → `Sheet`;
   `PressableRowCard` → `Card` with `onPress`, or `ListRow` with `onPress`.
 

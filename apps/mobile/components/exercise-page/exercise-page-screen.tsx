@@ -6,7 +6,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -17,6 +16,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ExerciseEditorModal } from '@/components/exercise-catalog/exercise-editor-modal';
 import { Card } from '@/components/ui/card';
 import { Icon } from '@/components/ui/icon';
+import { ScreenScroll } from '@/components/ui/screen';
+import { StatePanel } from '@/components/ui/state-panel';
 import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 import { nextSessionSetType, type SessionSetTypeValue } from '@/src/data/set-types';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
@@ -225,11 +226,11 @@ export function ExercisePageScreen({
     return (
       <SafeAreaView edges={['top']} style={styles.screen}>
         <ExerciseTopBar onBack={goBack} title="" />
-        <View style={styles.state} testID="exercise-page-state">
-          <Text style={pageText.body}>
-            {draft.state.status === 'error' ? LOAD_ERROR_MESSAGES[draft.state.reason] : 'Loading…'}
-          </Text>
-        </View>
+        {draft.state.status === 'error' ? (
+          <StatePanel kind="error" testID="exercise-page-state" title={LOAD_ERROR_MESSAGES[draft.state.reason]} />
+        ) : (
+          <StatePanel kind="loading" testID="exercise-page-state" title="Loading…" />
+        )}
       </SafeAreaView>
     );
   }
@@ -238,10 +239,9 @@ export function ExercisePageScreen({
     <SafeAreaView edges={['top', 'bottom']} style={styles.screen} testID="exercise-page">
       <ExerciseTopBar onBack={goBack} onOpenOptions={() => setOpenSheet('options')} title={exercise.name} />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.body}>
-        <ScrollView
-          contentContainerStyle={styles.content}
-          keyboardShouldPersistTaps="handled"
-          testID="exercise-page-scroll">
+        {/* Page gutter: the target's 14 snaps to `md` 12, the same inset as a
+            card's content, so page and card share one rhythm. */}
+        <ScreenScroll gutter="md" keyboardShouldPersistTaps="handled" testID="exercise-page-scroll">
           <RecordsPanel
             dateFormat={listPreferences.dateFormat}
             expanded={recordsExpanded}
@@ -308,7 +308,7 @@ export function ExercisePageScreen({
               {`Not saved: ${draft.saveError}`}
             </Text>
           ) : null}
-        </ScrollView>
+        </ScreenScroll>
         <View style={styles.footer}>
           <Pressable
             accessibilityRole="button"
@@ -380,15 +380,6 @@ const styles = StyleSheet.create({
   },
   body: {
     flex: 1,
-  },
-  // Page gutter: the target's 14 snaps to `md` 12, the same inset as a card's
-  // content, so page and card share one rhythm.
-  content: {
-    gap: uiSpace.md,
-    padding: uiSpace.md,
-  },
-  state: {
-    padding: uiSpace.lg,
   },
   addSet: {
     flexDirection: 'row',

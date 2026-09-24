@@ -1,11 +1,12 @@
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, BackHandler, StyleSheet, Text, View } from 'react-native';
+import { BackHandler, StyleSheet, View } from 'react-native';
 
 import { SessionCompletionScreen } from '@/components/session-complete';
 import { SessionTopBar } from '@/components/session-view';
 import { ActionButton } from '@/components/ui/action-button';
-import { uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { StatePanel, type StatePanelKind } from '@/components/ui/state-panel';
+import { uiRoles } from '@/components/ui/tokens';
 import { ViewSessionScreen, ViewSessionTopBar } from '@/components/view-session';
 import {
   formatSessionListCompactDuration,
@@ -33,6 +34,14 @@ import {
   summarizeCurrentSessionMuscleLoad,
   type CompletedSessionInsights,
 } from '@/src/session-insights';
+
+// The route's three non-content states; each keeps its testID for the flows.
+type StateTestID = 'completed-session-detail-loading' | 'completed-session-detail-error' | 'completed-session-detail-empty';
+const STATE_KIND: Record<StateTestID, StatePanelKind> = {
+  'completed-session-detail-loading': 'loading',
+  'completed-session-detail-error': 'error',
+  'completed-session-detail-empty': 'message',
+};
 
 export type CompletedSessionDetailSet = {
   id: string;
@@ -517,17 +526,18 @@ export function CompletedSessionDetailScreenShell({
 
   // Loading, error and not-found keep the route's frame: the detail's top bar
   // (back only), or the completion's (no Done) and its one safe exit.
-  const renderState = (testID: string, title: string, body?: string) => (
+  const renderState = (testID: StateTestID, title: string, body?: string) => (
     <>
       <Stack.Screen options={stackOptions} />
       <View style={styles.frame}>
         {presentation === 'detail' ? <ViewSessionTopBar onBack={handleBack} /> : <SessionTopBar mode="complete" />}
-        <View style={styles.centerState} testID={testID}>
-          {testID === 'completed-session-detail-loading' ? <ActivityIndicator color={uiRoles.inkMuted} /> : null}
-          <Text style={styles.stateTitle}>{title}</Text>
-          {body ? <Text style={styles.stateBody}>{body}</Text> : null}
+        <StatePanel
+          body={body}
+          kind={STATE_KIND[testID]}
+          testID={testID}
+          title={title}>
           {safeExitButton}
-        </View>
+        </StatePanel>
       </View>
     </>
   );
@@ -630,8 +640,8 @@ export default function CompletedSessionDetailRoute() {
 
   if (intent === 'edit' && sessionId) {
     return (
-      <View style={[styles.frame, styles.centerState]} testID="completed-session-detail-edit-redirect">
-        <Text style={styles.stateTitle}>Opening editor...</Text>
+      <View style={styles.frame}>
+        <StatePanel testID="completed-session-detail-edit-redirect" title="Opening editor..." />
       </View>
     );
   }
@@ -650,28 +660,5 @@ const styles = StyleSheet.create({
   frame: {
     flex: 1,
     backgroundColor: uiRoles.paper,
-  },
-  centerState: {
-    flex: 1,
-    padding: uiSpace.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: uiSpace.md,
-  },
-  stateTitle: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.lg,
-    lineHeight: uiTypography.lineHeight.lg,
-    color: uiRoles.ink,
-    textAlign: 'center',
-  },
-  stateBody: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.inkMuted,
-    textAlign: 'center',
   },
 });

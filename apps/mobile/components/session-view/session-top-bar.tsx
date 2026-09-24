@@ -1,8 +1,8 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ActionButton } from '@/components/ui/action-button';
-import { Icon } from '@/components/ui/icon';
+import { IconButton } from '@/components/ui/icon-button';
 import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 
 type SessionTopBarProps =
@@ -52,15 +52,13 @@ export function SessionTopBar(props: SessionTopBarProps) {
         {copy.title}
       </Text>
       {props.mode === 'active' ? (
-        <Pressable
+        <IconButton
           accessibilityLabel="Session options"
-          accessibilityRole="button"
           hitSlop={uiSpace.xs}
+          name="more-vertical"
           onPress={props.onOpenOptions}
-          style={styles.iconButton}
-          testID="session-view-options-button">
-          <Icon color={uiRoles.ink} name="more-vertical" size="md" />
-        </Pressable>
+          testID="session-view-options-button"
+        />
       ) : null}
       {onPrimary ? (
         <ActionButton
@@ -73,7 +71,7 @@ export function SessionTopBar(props: SessionTopBarProps) {
         />
       ) : (
         // Keeps the bar's height when there is no Done.
-        <View style={styles.iconButton} />
+        <View style={styles.spacer} />
       )}
     </View>
   );
@@ -99,10 +97,8 @@ const styles = StyleSheet.create({
     lineHeight: uiTypography.lineHeight.xl,
     color: uiRoles.ink,
   },
-  iconButton: {
+  spacer: {
     width: uiGeometry.tapTarget,
     height: uiGeometry.tapTarget,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 });

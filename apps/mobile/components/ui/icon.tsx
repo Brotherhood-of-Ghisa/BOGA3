@@ -2,14 +2,14 @@ import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import Svg, { Circle, Ellipse, Path } from 'react-native-svg';
 
 import { ICON_GLYPHS, type IconName, type IconPaint, type IconShape } from '@/components/ui/icon-glyphs';
-import { uiColors, uiIconSize, uiRoles, type UiIconSizeToken } from '@/components/ui/tokens';
+import { uiIconSize, uiRoles, type UiIconSizeToken } from '@/components/ui/tokens';
 
 export type { IconName } from '@/components/ui/icon-glyphs';
 
 export type IconProps = {
   name: IconName;
   size?: UiIconSizeToken;
-  /** A token value (`uiColors.*` on shipped screens, `uiRoles.*` on new ones). */
+  /** A `uiRoles` value; `ink` when omitted. */
   color?: string;
   /**
    * Set only when the icon itself carries meaning no surrounding text or
@@ -23,7 +23,7 @@ export type IconProps = {
 };
 
 // The set-state glyphs carry their design-language §5 colour unless told
-// otherwise; everything else is ink on the shipped palette.
+// otherwise; everything else is `ink`.
 const DEFAULT_COLORS: Partial<Record<IconName, string>> = {
   'set-done': uiRoles.ink,
   'set-current': uiRoles.accent,
@@ -61,7 +61,7 @@ const renderShape = (shape: IconShape, index: number, color: string) => {
 // `Text` as improvised icons. Never takes touches — wrap it in the control.
 export function Icon({ name, size = 'md', color, label, testID, style }: IconProps) {
   const edge = uiIconSize[size];
-  const ink = color ?? DEFAULT_COLORS[name] ?? uiColors.textPrimary;
+  const ink = color ?? DEFAULT_COLORS[name] ?? uiRoles.ink;
   const accessibility = label
     ? { accessible: true, accessibilityRole: 'image' as const, accessibilityLabel: label }
     : {

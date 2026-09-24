@@ -1,9 +1,9 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ActionButton } from '@/components/ui/action-button';
-import { Icon } from '@/components/ui/icon';
-import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { IconButton } from '@/components/ui/icon-button';
+import { uiBorder, uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 
 type ViewSessionTopBarProps = {
   onBack: () => void;
@@ -21,26 +21,17 @@ export function ViewSessionTopBar({ onBack, onOpenOptions, onEdit }: ViewSession
   const insets = useSafeAreaInsets();
   return (
     <View style={[styles.bar, { paddingTop: insets.top }]} testID="completed-session-detail-top-bar">
-      <Pressable
-        accessibilityLabel="Back"
-        accessibilityRole="button"
-        onPress={onBack}
-        style={styles.control}
-        testID="completed-session-detail-back">
-        <Icon color={uiRoles.ink} name="chevron-left" />
-      </Pressable>
+      <IconButton accessibilityLabel="Back" name="chevron-left" onPress={onBack} testID="completed-session-detail-back" />
       <Text accessibilityRole="header" numberOfLines={1} style={styles.title}>
         View Session
       </Text>
       {onOpenOptions ? (
-        <Pressable
+        <IconButton
           accessibilityLabel="Session options"
-          accessibilityRole="button"
+          name="more-vertical"
           onPress={onOpenOptions}
-          style={styles.control}
-          testID="completed-session-detail-options-button">
-          <Icon color={uiRoles.ink} name="more-vertical" />
-        </Pressable>
+          testID="completed-session-detail-options-button"
+        />
       ) : null}
       {onEdit ? (
         <ActionButton
@@ -66,12 +57,6 @@ const styles = StyleSheet.create({
     backgroundColor: uiRoles.surface,
     borderBottomWidth: uiBorder.width,
     borderBottomColor: uiRoles.rule,
-  },
-  control: {
-    width: uiGeometry.tapTarget,
-    height: uiGeometry.tapTarget,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   title: {
     flex: 1,

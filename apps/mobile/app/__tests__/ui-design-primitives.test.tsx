@@ -1,7 +1,26 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
-import { StyleSheet, Text, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
 
-import { ActionButton, Card, ListRow, Sheet, Stat, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import {
+  ActionButton,
+  Card,
+  ChipGroup,
+  FormField,
+  IconButton,
+  ListRow,
+  Notice,
+  ScreenScroll,
+  SearchField,
+  SegmentedControl,
+  Sheet,
+  Stat,
+  StatePanel,
+  Tag,
+  uiGeometry,
+  uiRoles,
+  uiSpace,
+  uiTypography,
+} from '@/components/ui';
 
 // The design-language primitives (`docs/specs/ui/design-language.md` §4–§6),
 // asserted on their own; the screens that adopt them have their own tests.
@@ -306,5 +325,221 @@ describe('ActionButton', () => {
     expect(button.props.accessibilityState).toMatchObject({ disabled: true });
     fireEvent.press(button);
     expect(onPress).not.toHaveBeenCalled();
+  });
+});
+
+describe('IconButton', () => {
+  it('is one labelled 44pt button whose glyph is decoration', () => {
+    const onPress = jest.fn();
+    render(<IconButton accessibilityLabel="Session options" name="more-vertical" onPress={onPress} testID="more" />);
+
+    const button = screen.getByRole('button', { name: 'Session options' });
+    expect(flatStyle(button)).toMatchObject({ width: uiGeometry.tapTarget, height: uiGeometry.tapTarget });
+    expect(screen.queryByRole('image')).toBeNull();
+    fireEvent.press(button);
+    expect(onPress).toHaveBeenCalledTimes(1);
+  });
+
+  it('draws the accent tone as the one primary, and ignores presses when disabled', () => {
+    const onPress = jest.fn();
+    const { rerender } = render(
+      <IconButton accessibilityLabel="New exercise" name="plus" onPress={onPress} testID="add" tone="accent" />,
+    );
+    expect(flatStyle(screen.getByTestId('add')).backgroundColor).toBe(uiRoles.accent);
+
+    rerender(<IconButton accessibilityLabel="New exercise" disabled name="plus" onPress={onPress} testID="add" tone="accent" />);
+    fireEvent.press(screen.getByTestId('add'));
+    expect(onPress).not.toHaveBeenCalled();
+    expect(screen.getByTestId('add').props.accessibilityState).toMatchObject({ disabled: true });
+  });
+});
+
+describe('StatePanel', () => {
+  it('centres a title, body and one outline action', () => {
+    const onRetry = jest.fn();
+    render(
+      <StatePanel
+        action={{ label: 'Retry', onPress: onRetry, testID: 'retry' }}
+        body="Check your connection."
+        kind="error"
+        testID="panel"
+        title="Couldn't load this"
+      />,
+    );
+
+    expect(flatStyle(screen.getByTestId('panel'))).toMatchObject({ flex: 1, alignItems: 'center' });
+    expect(screen.getByTestId('panel').props.accessibilityLiveRegion).toBe('polite');
+    expect(flatStyle(screen.getByText("Couldn't load this"))).toMatchObject({ fontFamily: 'Archivo', color: uiRoles.ink });
+    expect(flatStyle(screen.getByText('Check your connection.')).color).toBe(uiRoles.inkMuted);
+    // An outline, never the screen's primary.
+    expect(flatStyle(screen.getByTestId('retry')).borderColor).toBe(uiRoles.ink);
+    fireEvent.press(screen.getByTestId('retry'));
+    expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it('sits inline when not filling, and shows a spinner while loading', () => {
+    render(<StatePanel fill={false} kind="loading" testID="panel" title="Loading…" />);
+    expect(flatStyle(screen.getByTestId('panel')).flex).toBeUndefined();
+    expect(screen.UNSAFE_getByType(ActivityIndicator)).toBeTruthy();
+  });
+});
+
+describe('ScreenScroll', () => {
+  it('lays content on paper at the page gutter, or the md gutter when asked', () => {
+    const { rerender } = render(
+      <ScreenScroll testID="scroll">
+        <Text>Body</Text>
+      </ScreenScroll>,
+    );
+    const scroll = screen.getByTestId('scroll');
+    expect(flatStyle(scroll).backgroundColor).toBe(uiRoles.paper);
+    expect(StyleSheet.flatten(scroll.props.contentContainerStyle)).toMatchObject({ padding: uiSpace.lg, gap: uiSpace.md });
+
+    rerender(
+      <ScreenScroll gutter="md" testID="scroll">
+        <Text>Body</Text>
+      </ScreenScroll>,
+    );
+    expect(StyleSheet.flatten(screen.getByTestId('scroll').props.contentContainerStyle).padding).toBe(uiSpace.md);
+  });
+});
+
+describe('FormField', () => {
+  it('labels a field one field-height tall and shows its error below in danger', () => {
+    const { rerender } = render(<FormField label="Start" onChangeText={jest.fn()} testID="start" value="" />);
+    expect(flatStyle(screen.getByText('Start'))).toMatchObject({ textTransform: 'uppercase', color: uiRoles.inkFaint });
+    expect(screen.getByTestId('start').props.placeholderTextColor).toBe(uiRoles.disabled);
+    expect(flatStyle(screen.getByTestId('start')).fontFamily).toBe('IBM Plex Mono');
+    expect(screen.queryByTestId('start-error')).toBeNull();
+
+    rerender(<FormField error="Use YYYY-MM-DD HH:mm" face="text" label="Start" onChangeText={jest.fn()} testID="start" value="x" />);
+    expect(flatStyle(screen.getByTestId('start-error')).color).toBe(uiRoles.danger);
+    expect(flatStyle(screen.getByTestId('start')).fontFamily).toBe('Source Sans 3');
+    const field = screen.getByTestId('start').parent?.parent;
+    expect(field && flatStyle(field)).toMatchObject({
+      height: uiGeometry.fieldHeight,
+      borderColor: uiRoles.danger,
+      borderRadius: uiGeometry.radius.control,
+    });
+  });
+
+  it('takes an explicit error testID and a hint', () => {
+    render(
+      <FormField
+        error="Name is required."
+        errorTestID="editor-name-error"
+        hint="12/280"
+        label="Name"
+        onChangeText={jest.fn()}
+        testID="editor-name-input"
+        value=""
+      />,
+    );
+    expect(screen.getByTestId('editor-name-error')).toBeTruthy();
+    expect(screen.getByText('12/280')).toBeTruthy();
+  });
+});
+
+describe('SearchField', () => {
+  it('keeps its accessibility label and clears through its own control', () => {
+    const onChangeText = jest.fn();
+    const { rerender } = render(
+      <SearchField accessibilityLabel="Exercise filter input" onChangeText={onChangeText} testID="search" value="" />,
+    );
+    expect(screen.getByLabelText('Exercise filter input')).toBeTruthy();
+    expect(screen.queryByTestId('search-clear')).toBeNull();
+
+    rerender(<SearchField accessibilityLabel="Exercise filter input" onChangeText={onChangeText} testID="search" value="bench" />);
+    fireEvent.press(screen.getByRole('button', { name: 'Clear search' }));
+    expect(onChangeText).toHaveBeenCalledWith('');
+  });
+});
+
+describe('SegmentedControl', () => {
+  const OPTIONS = [
+    { value: 'records', label: 'Records' },
+    { value: 'last', label: 'Last' },
+  ] as const;
+
+  it('is a tab list with the segmented-chips testID contract; the selected segment is ink', () => {
+    const onChange = jest.fn();
+    render(<SegmentedControl onChange={onChange} options={OPTIONS} testIDPrefix="view" value="records" />);
+
+    expect(screen.getByTestId('view-row').props.accessibilityRole).toBe('tablist');
+    expect(screen.getByTestId('view-records').props.accessibilityState).toEqual({ selected: true });
+    expect(flatStyle(screen.getByTestId('view-records')).backgroundColor).toBe(uiRoles.ink);
+    expect(flatStyle(screen.getByTestId('view-last')).backgroundColor).toBe(uiRoles.surface);
+
+    fireEvent.press(screen.getByTestId('view-records'));
+    expect(onChange).not.toHaveBeenCalled();
+    fireEvent.press(screen.getByTestId('view-last'));
+    expect(onChange).toHaveBeenCalledWith('last');
+  });
+
+  it('fills the row with equal segments unless inline', () => {
+    const { rerender } = render(<SegmentedControl onChange={jest.fn()} options={OPTIONS} testIDPrefix="view" value="last" />);
+    expect(flatStyle(screen.getByTestId('view-last')).flex).toBe(1);
+
+    rerender(<SegmentedControl layout="inline" onChange={jest.fn()} options={OPTIONS} testIDPrefix="view" value="last" />);
+    expect(flatStyle(screen.getByTestId('view-last')).flex).toBeUndefined();
+  });
+});
+
+describe('ChipGroup', () => {
+  const OPTIONS = [
+    { value: 'a', label: 'Alpha' },
+    { value: 'b', label: 'Bravo', accessibilityLabel: 'Turn bravo on' },
+  ] as const;
+
+  it('wraps pills and selects exactly one in single mode', () => {
+    const onChange = jest.fn();
+    render(<ChipGroup mode="single" onChange={onChange} options={OPTIONS} testIDPrefix="filter" value="a" />);
+
+    expect(flatStyle(screen.getByTestId('filter-row'))).toMatchObject({ flexWrap: 'wrap' });
+    expect(screen.getByTestId('filter-a').props.accessibilityState).toEqual({ selected: true });
+    expect(flatStyle(screen.getByTestId('filter-a'))).toMatchObject({
+      backgroundColor: uiRoles.ink,
+      borderRadius: uiGeometry.radius.pill,
+    });
+    fireEvent.press(screen.getByTestId('filter-a'));
+    expect(onChange).not.toHaveBeenCalled();
+    fireEvent.press(screen.getByLabelText('Turn bravo on'));
+    expect(onChange).toHaveBeenCalledWith('b');
+  });
+
+  it('toggles each chip on its own in multi mode, as checkboxes', () => {
+    const onToggle = jest.fn();
+    render(<ChipGroup mode="multi" onToggle={onToggle} options={OPTIONS} testIDPrefix="muscles" values={['b']} />);
+
+    expect(screen.getByTestId('muscles-a').props.accessibilityState).toEqual({ checked: false });
+    expect(screen.getByTestId('muscles-b').props.accessibilityState).toEqual({ checked: true });
+    fireEvent.press(screen.getByTestId('muscles-b'));
+    expect(onToggle).toHaveBeenCalledWith('b');
+  });
+});
+
+describe('Tag', () => {
+  it('names a state in a micro-label pill', () => {
+    render(<Tag label="Archived" testID="tag" />);
+    expect(flatStyle(screen.getByTestId('tag'))).toMatchObject({ borderRadius: uiGeometry.radius.pill, borderColor: uiRoles.rule });
+    expect(flatStyle(screen.getByText('Archived'))).toMatchObject({ textTransform: 'uppercase', color: uiRoles.inkMuted });
+  });
+});
+
+describe('Notice', () => {
+  it('states information on the subtle ground with no success or warning hue', () => {
+    render(<Notice icon="offline" live message="Offline · last updated 09:41" testID="notice" />);
+
+    const band = screen.getByTestId('notice');
+    expect(flatStyle(band)).toMatchObject({ backgroundColor: uiRoles.surfaceSubtle, borderColor: uiRoles.rule });
+    expect(band.props.accessibilityLiveRegion).toBe('polite');
+    expect(band.props.accessibilityRole).toBeUndefined();
+    expect(flatStyle(screen.getByText('Offline · last updated 09:41')).color).toBe(uiRoles.ink);
+  });
+
+  it('announces a failure as an alert in danger', () => {
+    render(<Notice message="Nothing was changed." testID="notice" tone="danger" />);
+    expect(screen.getByTestId('notice').props.accessibilityRole).toBe('alert');
+    expect(flatStyle(screen.getByText('Nothing was changed.')).color).toBe(uiRoles.danger);
   });
 });

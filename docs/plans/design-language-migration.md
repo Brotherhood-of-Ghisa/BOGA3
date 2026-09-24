@@ -198,7 +198,7 @@ shippable.
 
 | Card | Title | Estimate (added + modified) | Gates (`./boga test for`) |
 | --- | --- | --- | --- |
-| T01 | Foundation primitives and tokens | ~1,400 | `fast` + `frontend` |
+| T01 | Foundation primitives and tokens — **shipped** (card deleted) | ~1,400 | `fast` + `frontend` |
 | T02 | App frame: tray, tabs, stack headers | ~500 | `fast` + `frontend` |
 | T03 | Today and Train | ~1,100 | `fast` + `frontend` |
 | T04 | More, Settings, Logs | ~1,100 | `fast` + `frontend` |
