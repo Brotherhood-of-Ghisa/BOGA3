@@ -1,4 +1,4 @@
-export { FriendSessionContent, formatGroupSetEffort } from './friend-session-content';
+export { FriendSessionContent } from './friend-session-content';
 export { GroupActionSheet, type GroupActionSheetItem } from './group-action-sheet';
 export { GroupBoardHistoryItem } from './group-board-history-item';
 export { GroupBoardRow } from './group-board-row';

@@ -540,12 +540,12 @@ Brief entrypoint map of the current mobile screens.
 19. `/group-session/[memberId]/[sessionId]`
 - File: `apps/mobile/app/group-session/[memberId]/[sessionId].tsx`
 - Purpose:
-  - read-only friend's session view composing `SessionContentLayout`: member, status, start/end, location, and exercise cards with performed sets (`Set`, `Weight`, `Reps`, `Effort`)
+  - read-only friend's session view on `paper`, drawn with View Session's cards (`components/session-detail/`): a facts card with the member, the status (`In progress` beside the `set-current` ring, or `Completed · <duration>`), Start / End, Gym, Sets and Volume, then one card per exercise with its performed sets as `type · weight × reps · 1RM · VOL`; no collapse and no record band (the friend's history is not on this device)
 - Key states (high level):
-  - `In progress` for an active session; cache-first with the offline marker; pull-to-refresh
+  - `In progress` for an active session; cache-first with the offline marker; pull-to-refresh (the offline marker, errors and empty states keep the groups screens' styling)
   - `NOT_FOUND`: "This session is no longer available", and the cached detail is evicted
 - Notes:
-  - no edit, delete, or append; `completed-session/[sessionId]` is neither reused nor modified
+  - no edit, delete, or append; `completed-session/[sessionId]` is not reused, only its cards
 
 20. `/exercise-link` (M25-T07)
 - File: `apps/mobile/app/exercise-link.tsx`
