@@ -395,7 +395,7 @@ appId: com.dinoderek.mobile
 - assertVisible:
     id: "group-session-set-row-${output.groupsFirstSetId}"
 - assertNotVisible:
-    id: "completed-session-detail-action-bar"
+    id: "completed-session-detail-options-button"
 - assertNotVisible:
     id: "completed-session-detail-edit-button"
 - assertNotVisible:

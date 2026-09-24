@@ -216,9 +216,9 @@ Document app-specific UI semantics and guardrails for the current mobile app.
 
 1. Whole-screen loading/error states are used when route data cannot render meaningful content yet.
    - `exercise-catalog`: centered state + More-selected bottom tabs remain visible
-   - `completed-session/[sessionId]`: centered state variants with route title preserved
+   - `completed-session/[sessionId]`: centered state variants on `paper`; the detail keeps its top bar's back, the completion its one safe exit
 2. In-section state panels are used inside the shared `HistoryList` (loading/error/empty) consumed by the `stats-history` History sub-view.
-3. Inline helper/success/error text is used for form feedback and post-action feedback (`exercise-catalog`, completed-session action bar).
+3. Inline helper/success/error text is used for form feedback and post-action feedback (`exercise-catalog`, a failed write on the completed-session detail).
 4. State presentation style varies by screen today; refactors may unify visuals, but the semantic distinction (whole-screen vs in-section vs inline) should remain explicit.
 5. The profile route uses:
    - an inline restoring banner during auth bootstrap,
@@ -242,12 +242,35 @@ Document app-specific UI semantics and guardrails for the current mobile app.
 
 ### 7. Completed-session detail screen semantics
 
-1. Completed-session detail uses a sticky action bar for session-level edit/delete actions above the detail content.
-2. Historical exercise cards expose their own `Append` action in the card header; append copies that one exercise block as planned target rows into the active session (a new one when none is active) and opens it in the session view.
+1. The detail (View Session) is in the design language, like the session view
+   it opens: `paper` ground, its own top bar `back · View Session · ⋮ · Edit`,
+   with `Edit` the screen's one `accent` action (it pushes the session view on
+   the session, §14b.7, whose `Done` sits in the same place). The session ⋮
+   opens a `Session` sheet with `Delete session` (danger), or `Undelete session`
+   while the session is deleted; neither confirms, since each undoes the other.
+   A deleted session shows a `Deleted · hidden from history` band and no `Edit`,
+   because the session view edits only a live session. A failed write shows
+   inline in `danger` and changes nothing.
+2. Appending is rare, so it sits behind each exercise card's ⋮: `Append to
+   current session` copies that one exercise block as planned target rows into
+   the active session (a new one when none is active) and opens it in the
+   session view. The cards themselves are not links.
 3. `intent=edit` on the completed-session route is a redirect behavior, not a separate screen.
-4. Completed-session exercise cards show assigned tags as chips under the exercise title only when one or more tags exist; no tag placeholder is shown when there are none.
-5. Completed-session set tables show historical set effort from `set_type` as `W-Up`, `RIR n` for any valid stored RIR (including outside the current picker range), or `-` for unspecified sets.
-6. Completed-session exercise cards start expanded and use a title-region collapse affordance (`SessionContentLayout`). Their collapsed summary shows valid performed-set and working-set counts (the configured effort threshold, §5.11); the header-level `Append` action remains available. Historical cards do not label a workout as a new PR because this viewer does not compute an as-of-session history comparison.
+4. The summary card shows `Start` and `End` as `YYYY-MM-DD HH:mm` (the layout of
+   the completed edit's fields, read-only), then `Duration`, `Gym`, `Sets` and
+   `Volume` (the confirmed sets with valid values, and their entered-load
+   volume, no thousands separator).
+5. Each exercise card shows its name, `n sets` and one row per confirmed set
+   with valid values — the session view's row, `type · weight × reps · 1RM ·
+   VOL` (`W-Up`, `RIR n` for any valid stored RIR, `—` for none). An exercise
+   with no such set is left out. There are no tags, no collapse and no set
+   numbers.
+6. A card whose set has the exercise's best 1RM against every other completed
+   session shows that 1RM in `record` and a `New 1RM record` band — the same
+   derivation, and the same card, as the session view's completed edit
+   (§14b.4, §14b.7), so the `Edit`/`Done` loop shows one card on both sides.
+   History is optional enrichment: while it loads, or if it fails, no record
+   shows.
 7. `presentation=completion` is a post-submit presentation of the stored
    completed session, not durable celebration state. Its order is `Session
    Summary`, every compact `Personal records` card when present, one `Exercise
@@ -336,17 +359,17 @@ guardrail keeps screens on them.
 `tokens.ts` also exports **`uiRoles`** — the colour roles of
 `ui/design-language.md` §2, added 2026-09-22 for the exercise/session rebuild.
 It is a second, separate vocabulary from `uiColors`, deliberately not merged
-into it. Its only users are the session view and exercise page (§14a/§14b),
-the default active-session screens since redesign step 6a; the rules below still describe
+into it. Its users are the session view and exercise page (§14a/§14b), the
+Gyms screen and the completed-session detail (§7); the rules below still describe
 everything else that renders today. Likewise **`uiFonts`** (added 2026-09-22) names
 the three embedded typefaces of `ui/design-language.md` §3 and the weights of
-each that ship; only the session view uses it, so every other screen still
+each that ship; only those screens use it, so every other screen still
 renders in the system font. And **`uiGeometry`** (added 2026-09-22) carries the design
 language's own radii (card 6, sheet 16), the 44pt tap target, the 38pt metric
 column, the sheet handle and micro-label tracking — a separate vocabulary from
 the legacy scales below, which it does not extend, so rule 5's three radii still
 hold for everything shipped. Its only consumers are the design-language
-primitives (`Card`, `Stat`, `ListRow`, `Sheet`) and the session view.
+primitives (`Card`, `Stat`, `ListRow`, `Sheet`, `ActionButton`) and those screens.
 
 1. **Type: 8 sizes.**
    `xxs 10 · xs 11 · sm 12 · md 13 · base 14 · lg 16 · xl 18 · xxl 24`.
@@ -415,8 +438,7 @@ primitives (`Card`, `Stat`, `ListRow`, `Sheet`) and the session view.
 ### 10. Exercise-tag semantics
 
 1. Exercise tags are read-only in the app (step 6b-3 dropped tag editing): there is no `#`, attach, create, rename, delete or manage UI. The synced tag tables and existing assignments stay.
-2. Completed-session exercise cards show assigned tags as chips (§7.4).
-3. Exercise history offers the tags used on that exercise as filter chips (`All tags` plus one chip per tag with its session count; a deleted tag reads `(deleted)`).
+2. Exercise history offers the tags used on that exercise as filter chips (`All tags` plus one chip per tag with its session count; a deleted tag reads `(deleted)`).
 
 ### 11. Calendar heatmap semantics
 

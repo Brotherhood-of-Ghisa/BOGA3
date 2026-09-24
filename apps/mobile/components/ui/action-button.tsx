@@ -2,32 +2,41 @@ import { Pressable, StyleSheet, Text } from 'react-native';
 
 import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 
-type GymButtonProps = {
+export type ActionButtonVariant = 'primary' | 'outline' | 'text';
+export type ActionButtonTone = 'default' | 'danger';
+
+export type ActionButtonProps = {
   label: string;
   onPress: () => void;
-  // `primary`: the one `accent` action (Save / Add). `outline`: a secondary
-  // action. `text`: a plain caps label (Cancel, Archive, Show archived).
-  variant: 'primary' | 'outline' | 'text';
-  tone?: 'default' | 'danger';
+  // `primary`: the screen's one `accent` action (Finish, Edit, Save). `outline`:
+  // a secondary action (`+ Add exercise`, Retry). `text`: a plain caps label
+  // (Cancel, Archive, Show archived).
+  variant: ActionButtonVariant;
+  // `danger` recolours an outline or text button; a primary is never danger.
+  tone?: ActionButtonTone;
   disabled?: boolean;
   accessibilityLabel?: string;
+  accessibilityHint?: string;
   testID?: string;
 };
 
-// The Gyms screen's buttons, in the design language: one `accent` primary,
-// outlines and caps text for everything else (`design-language.md` §5).
-export function GymButton({
+// A design-language button (`design-language.md` §5): one `accent` primary per
+// screen, outlines and caps text for everything else. Control radius, 44pt
+// tall, Archivo caps label.
+export function ActionButton({
   label,
   onPress,
   variant,
   tone = 'default',
   disabled = false,
   accessibilityLabel,
+  accessibilityHint,
   testID,
-}: GymButtonProps) {
-  const danger = tone === 'danger';
+}: ActionButtonProps) {
+  const danger = tone === 'danger' && variant !== 'primary';
   return (
     <Pressable
+      accessibilityHint={accessibilityHint}
       accessibilityLabel={accessibilityLabel ?? label}
       accessibilityRole="button"
       accessibilityState={{ disabled }}
@@ -38,6 +47,7 @@ export function GymButton({
         variant === 'primary' ? styles.primary : null,
         variant === 'outline' ? [styles.outline, danger ? styles.outlineDanger : null] : null,
         disabled && variant === 'primary' ? styles.primaryDisabled : null,
+        disabled && variant === 'outline' ? styles.outlineDisabled : null,
         pressed && !disabled ? (variant === 'primary' ? styles.primaryPressed : styles.pressed) : null,
       ]}
       testID={testID}>
@@ -71,23 +81,28 @@ const styles = StyleSheet.create({
   primaryPressed: {
     opacity: 0.85,
   },
+  // The accepted session view draws `+ Add exercise` in an ink outline.
   outline: {
     borderWidth: uiBorder.width,
-    borderColor: uiRoles.ruleStrong,
+    borderColor: uiRoles.ink,
     backgroundColor: uiRoles.surface,
   },
   outlineDanger: {
     borderColor: uiRoles.danger,
   },
+  outlineDisabled: {
+    borderColor: uiRoles.disabled,
+  },
+  // Depth is a ground change, never an elevation.
   pressed: {
     backgroundColor: uiRoles.surfaceSubtle,
   },
   label: {
     fontFamily: uiFonts.display.family,
     fontWeight: '700',
-    fontSize: uiTypography.size.xs,
-    lineHeight: uiTypography.lineHeight.xs,
-    letterSpacing: uiTypography.size.xs * uiGeometry.microLabelTracking,
+    fontSize: uiTypography.size.sm,
+    lineHeight: uiTypography.lineHeight.sm,
+    letterSpacing: uiTypography.size.sm * uiGeometry.microLabelTracking,
     textTransform: 'uppercase',
     color: uiRoles.ink,
   },

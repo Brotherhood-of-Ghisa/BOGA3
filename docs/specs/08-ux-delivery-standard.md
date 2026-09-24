@@ -91,7 +91,7 @@ Use this section as the single source of truth for reusable UX patterns.
    - Rules: clear destructive styling, confirm intent when risk is meaningful, and provide immediate feedback after action.
 4. Collapsible summary card pattern
    - Intent: reduce vertical density while retaining the facts needed to identify and compare repeated content.
-   - Usage: exercise cards in completed-session detail and a group member's session (`components/groups/friend-session-content.tsx`).
+   - Usage: exercise cards in a group member's session (`components/groups/friend-session-content.tsx`); View Session's cards dropped it with the design-language restyle.
    - Rules: cards start expanded, the title region is a minimum-size accessible toggle, collapse hides detail without changing domain data, and the collapsed state shows only validated summary facts. Actions that require the hidden content to be visible must expand the card.
 5. Explicit row confirmation pattern
    - Intent: keep entered/defaulted values separate from the user's assertion that a repeated item was actually completed.

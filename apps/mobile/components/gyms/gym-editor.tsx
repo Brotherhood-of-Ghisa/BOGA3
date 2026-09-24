@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { ActionButton } from '@/components/ui/action-button';
 import { Icon } from '@/components/ui/icon';
 import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import {
@@ -15,8 +16,6 @@ import {
   setGymArchived,
   type GymDirectoryEntry,
 } from '@/src/session-recorder/gym-options';
-
-import { GymButton } from './gym-buttons';
 
 type Feedback = { tone: 'success' | 'error'; message: string };
 type Busy = 'location' | 'save' | 'archive' | null;
@@ -138,14 +137,14 @@ export function GymEditor({ gym, onDone, onLocationChanged, onCancel, readPositi
             : "Clear the saved location? This gym won't be suggested nearby."}
         </Text>
         <View style={styles.buttonRow}>
-          <GymButton
+          <ActionButton
             accessibilityLabel={`Cancel location change for ${label}`}
             label="Cancel"
             onPress={() => setPending(null)}
             testID="gym-editor-location-cancel"
             variant="outline"
           />
-          <GymButton
+          <ActionButton
             accessibilityLabel={
               pending === 'replace' ? `Confirm replace location for ${label}` : `Confirm clear location for ${label}`
             }
@@ -162,7 +161,7 @@ export function GymEditor({ gym, onDone, onLocationChanged, onCancel, readPositi
   } else if (gym && hasLocation) {
     locationActions = (
       <View style={styles.buttonRow}>
-        <GymButton
+        <ActionButton
           accessibilityLabel={`Replace location for ${label}`}
           disabled={isBusy}
           label={busy === 'location' ? 'Saving…' : 'Replace'}
@@ -173,7 +172,7 @@ export function GymEditor({ gym, onDone, onLocationChanged, onCancel, readPositi
           testID="gym-editor-location-replace"
           variant="outline"
         />
-        <GymButton
+        <ActionButton
           accessibilityLabel={`Clear location for ${label}`}
           disabled={isBusy}
           label="Clear"
@@ -190,7 +189,7 @@ export function GymEditor({ gym, onDone, onLocationChanged, onCancel, readPositi
   } else {
     locationActions = (
       <View style={styles.buttonRow}>
-        <GymButton
+        <ActionButton
           accessibilityLabel={`Save current location for ${label}`}
           disabled={isBusy}
           label={busy === 'location' ? 'Reading location…' : 'Save current location'}
@@ -239,7 +238,7 @@ export function GymEditor({ gym, onDone, onLocationChanged, onCancel, readPositi
 
       <View style={styles.footer}>
         {gym ? (
-          <GymButton
+          <ActionButton
             accessibilityLabel={`${gym.archived ? 'Unarchive' : 'Archive'} ${label}`}
             disabled={isBusy}
             label={gym.archived ? 'Unarchive' : 'Archive'}
@@ -250,8 +249,8 @@ export function GymEditor({ gym, onDone, onLocationChanged, onCancel, readPositi
           />
         ) : null}
         <View style={styles.footerEnd}>
-          <GymButton label="Cancel" onPress={onCancel} testID="gym-editor-cancel" variant="text" />
-          <GymButton
+          <ActionButton label="Cancel" onPress={onCancel} testID="gym-editor-cancel" variant="text" />
+          <ActionButton
             disabled={isBusy || !trimmedName}
             label={gym ? 'Save' : 'Add gym'}
             onPress={() => void save()}
