@@ -1,6 +1,6 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useCallback } from 'react';
-import { RefreshControl, ScrollView } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet } from 'react-native';
 
 import {
   FriendSessionContent,
@@ -13,6 +13,7 @@ import {
   pickInlineError,
   usePullToRefresh,
 } from '@/components/groups';
+import { uiRoles, uiSpace } from '@/components/ui/tokens';
 import { useAuth } from '@/src/auth';
 import {
   getGroupSessionDetail,
@@ -26,8 +27,8 @@ const firstParam = (value: string | string[] | undefined): string | null =>
 
 /**
  * The friend's session view (groups contract §6.3, C3.8): read-only, cache
- * first. `completed-session/[sessionId].tsx` is deliberately not reused or
- * modified; both compose `SessionContentLayout`.
+ * first. `completed-session/[sessionId].tsx` is deliberately not reused; both
+ * draw their exercises with `components/session-detail/`.
  */
 export default function GroupSessionRoute() {
   const params = useLocalSearchParams<{ memberId?: string | string[]; sessionId?: string | string[] }>();
@@ -67,9 +68,9 @@ function GroupSessionContent({ userId, memberId, sessionId }: { userId: string; 
 
   return (
     <ScrollView
-      contentContainerStyle={groupScreenStyles.content}
+      contentContainerStyle={styles.content}
       refreshControl={<RefreshControl onRefresh={onRefresh} refreshing={pulling} />}
-      style={groupScreenStyles.screen}
+      style={[groupScreenStyles.screen, styles.paper]}
       testID="group-session-screen">
       {detail.lostAccess ? (
         <UnavailableState />
@@ -89,3 +90,15 @@ function GroupSessionContent({ userId, memberId, sessionId }: { userId: string; 
     </ScrollView>
   );
 }
+
+// The design language's ground and gutter, as on View Session. The group state
+// panels inside keep the groups screens' styling.
+const styles = StyleSheet.create({
+  paper: {
+    backgroundColor: uiRoles.paper,
+  },
+  content: {
+    padding: uiSpace.lg,
+    gap: uiSpace.md,
+  },
+});

@@ -24,6 +24,9 @@ type ExerciseSetsCardBaseProps = {
   control?: ReactNode;
   // `<testID>-count`, `-set-<n>` and `-record` hang off it.
   testID: string;
+  // A row's testID, when a caller has its own (the group view keeps
+  // `group-session-set-row-<setId>`); default `<testID>-set-<n>`.
+  rowTestID?: (row: SessionViewSetRow, index: number) => string;
 };
 
 // A card that is a link must say where it goes (`Card`).
@@ -45,6 +48,7 @@ export function ExerciseSetsCard({
   accessory,
   control,
   testID,
+  rowTestID,
   onPress,
   accessibilityLabel,
 }: ExerciseSetsCardProps) {
@@ -63,7 +67,11 @@ export function ExerciseSetsCard({
       {rows.length > 0 ? (
         <View style={styles.rows}>
           {rows.map((row, index) => (
-            <SetSummaryRow key={row.id} row={row} testID={`${testID}-set-${index + 1}`} />
+            <SetSummaryRow
+              key={row.id}
+              row={row}
+              testID={rowTestID ? rowTestID(row, index) : `${testID}-set-${index + 1}`}
+            />
           ))}
         </View>
       ) : null}

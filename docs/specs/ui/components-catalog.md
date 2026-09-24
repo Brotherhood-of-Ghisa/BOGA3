@@ -22,8 +22,8 @@ Brief entrypoint inventory of the current reusable UI component set.
   - shared exercise-catalog editing and list UI reused by the catalogue route,
     the session view's exercise picker and the exercise page's swap sheet
 - `apps/mobile/components/session-recorder/`
-  - shared session UI (the exercise picker, the friend session layout) and
-    supporting UI modules; the folder name predates the session view
+  - the exercise picker and supporting UI modules; the folder name predates
+    the session view
 - `apps/mobile/components/session-complete/`
   - the completion presentation: summary, PR and volume cards, share sheet and
     share image
@@ -192,15 +192,7 @@ Brief entrypoint inventory of the current reusable UI component set.
   - shared exercise list row/header rendering and shared grouping/date-range/recents controls for `exercise-catalog`, the exercise picker and the exercise page's `ExerciseSwapSheet`
   - composes the non-visual list model/preference modules under `apps/mobile/src/exercise-catalog/` so both surfaces share grouping, filtering, sorting, row stats, collapsed-group state behavior, and local-only preference behavior while each route keeps its surface-specific actions
 
-6. `SessionContentLayout`
-- File: `apps/mobile/components/session-recorder/session-content-layout.tsx`
-- Purpose:
-  - shared layout scaffold for read-only session exercise/set content, used only by the friend's session view (`FriendSessionContent`) since View Session moved to `components/session-detail/`
-  - supports optional per-exercise metadata injection (`renderExerciseMeta`) and a header action slot (`renderExerciseHeaderAction`) without duplicating card structure
-  - supports optional per-exercise collapse state and a caller-provided collapsed-summary renderer while preserving header actions outside the hidden body
-  - exports `ExerciseCardCollapsedSummary` for the shared performed-set/working-set presentation
-
-7. Session completion (the completion presentation of `/completed-session/<id>`)
+6. Session completion (the completion presentation of `/completed-session/<id>`)
 - Folder: `apps/mobile/components/session-complete/`
 - Purpose:
   - `SessionCompletionScreen` — the post-submit composition on `paper`:
@@ -226,31 +218,31 @@ Brief entrypoint inventory of the current reusable UI component set.
   - covered by `apps/mobile/app/__tests__/completed-session-detail-screen.test.tsx`
     and the `ios-ui-regression` lane (`session-completion-states-fixture`)
 
-8. `SessionSummaryLine`
+7. `SessionSummaryLine`
 - File: `apps/mobile/components/session-list/session-summary-line.tsx`
 - Purpose:
   - shared two-line summary row (date/duration/gym + sets/exercises) reused by
     `ActiveSessionRow`, `HistoryList`, Today recents, and Progress history
 
-9. `ActiveSessionRow`
+8. `ActiveSessionRow`
 - File: `apps/mobile/components/session-list/active-session-row.tsx`
 - Purpose:
   - active-session row plus its overflow menu (resume / complete / delete) used
     by session-list consumers
 
-10. `HistoryList`
+9. `HistoryList`
 - File: `apps/mobile/components/session-list/history-list.tsx`
 - Purpose:
   - completed-session history list with delete/undelete modal and deleted-visibility toggle, consumed by the `stats-history` History sub-view
 
-11. `DailyHeatmap` / `WeeklyHeatmap`
+10. `DailyHeatmap` / `WeeklyHeatmap`
 - Files: `apps/mobile/components/heatmaps/DailyHeatmap.tsx`, `apps/mobile/components/heatmaps/WeeklyHeatmap.tsx`
 - Purpose:
   - reusable daily-cell and weekly-bar views over the same `HeatmapData`, used by both muscle- and exercise-history overlays
   - renders horizontally scrollable one-year history with token-backed zero/green/today/selected states and tappable accessible cells
   - the Stats overlay integration keeps both views mounted, with the inactive view transparent, non-interactive, and accessibility-hidden, so toggling does not rebuild the chart tree
 
-12. Group components (M22)
+11. Group components (M22)
 - Folder: `apps/mobile/components/groups/` (barrel `index.ts`); data comes from `@/src/groups` hooks and the pure view model
 - Purpose:
   - `GroupStreamSessionCard` — the stream card (member, status pill, start · gym, sets · kg · exercises computed on the device, the `N records` label (M25-T10, `-records`), group names in All); one press target
@@ -279,18 +271,18 @@ Brief entrypoint inventory of the current reusable UI component set.
   - `GroupDetailsForm` (M22-T05) — the shared create / edit form: name (1–50) and optional description (≤280, counter) with inline validation, the write's failure above the submit button
   - `GroupWriteNotice` (M22-T05) — inline error / success outcome of a group write
   - `GroupsEmptyActions` (M22-T05) — the empty state's `Create group` / `Join with a code` buttons
-  - `FriendSessionContent` — the friend's session body composing `SessionContentLayout` read-only
+  - `FriendSessionContent` — the friend's session body on View Session's cards (`components/session-detail/`): a `SessionFactsCard` headed by the member and status, then an `ExerciseSetsCard` per exercise (rows `group-session-set-row-<setId>`), read-only, no record band
   - `PickerGroupSectionList`, `PickerGroupsToggle` (M25-T07) — the exercise picker's `From your groups` section (rows `exercise-picker-group-row-<groupExerciseId>`, status text "linked: …" / "not linked") and the `Groups` switch beside the filter (`exercise-picker-groups-toggle`); 08 pattern 10
   - `GroupExercisePickSheet` (M25-T07) — in-route bottom `Modal` for an unlinked group exercise: suggestion, `Choose another of your exercises…` (search; exercises already linked in the group are disabled with the reason), `Add "<name>" as a new exercise`, the retroactivity and weight-entry notes, `Link and add` with an inline error; in `choose-linked` mode it lists my linked exercises to add. testIDs `group-pick-sheet`, `group-pick-sheet-option-*`, `group-pick-sheet-choice-<id>`, `group-pick-sheet-confirm`; `purpose="link-only"` (M25-T08 group page) confirms with `Link` and adds nothing to a session
   - `GroupStateView`, `GroupsEmptyState` (children slot for `GroupsEmptyActions`), `GroupMissingDataState`, `GroupInlineError`, `GroupsSignInRequired` — feature-scoped state panels (not the pending generic `EmptyState`)
   - `usePullToRefresh`, `groupScreenStyles`, `groupFormStyles` — pull spinner state, the shared page shell and action row, and the write-form field styles
 
-13. Exercise core fields (M25)
+12. Exercise core fields (M25)
 - File: `apps/mobile/components/exercise-core/exercise-core-fields.tsx`
 - Purpose:
   - `ExerciseCoreFields` — the exercise-name input and the `Total load` / `Per side` weight-entry control (labels from `LOAD_INPUT_MODE_LABELS`), shared by the personal exercise editor (`exercise-catalog/exercise-editor-modal.tsx`) and the group exercise form; both validate with `validateExerciseCore`. testIDs `<prefix>-name-input`, `<prefix>-name-error`, `<prefix>-load-mode-<mode>` (the editor keeps `exercise-editor-*`)
 
-14. Exercise page (exercise/session redesign step 4)
+13. Exercise page (exercise/session redesign step 4)
 - Folder: `apps/mobile/components/exercise-page/`; rules in `apps/mobile/src/session-recorder/exercise-page-model.ts`, records in `exercise-records.ts`, persistence in `session-exercise-draft.ts` + `use-session-exercise-draft.ts`
 - Purpose:
   - `ExercisePageScreen` — the page's composition (route: `app/session/[sessionId]/exercise/[sessionExerciseId].tsx`)
@@ -303,7 +295,7 @@ Brief entrypoint inventory of the current reusable UI component set.
   - `pageText` — the page's shared type roles (micro-label, control label, running / detail / headline figures)
   - covered by `app/__tests__/exercise-page-screen.test.tsx`, `exercise-page-model.test.ts`, `exercise-page-persistence.test.ts` and the `ios-exercise-page` lane
 
-15. Exercise picker
+14. Exercise picker
 - File: `apps/mobile/components/session-recorder/exercise-picker.tsx`
 - Purpose:
   - the session view's exercise picker (`+ Add exercise`), its only consumer:
@@ -316,7 +308,7 @@ Brief entrypoint inventory of the current reusable UI component set.
     `openRequestId` for a fresh open and applies the choice
   - covered by `apps/mobile/app/__tests__/exercise-picker.test.tsx`
 
-16. Session view components
+15. Session view components
 - Folder: `apps/mobile/components/session-view/`
 - Purpose:
   - `SessionTopBar` — `mode="active"`: `Session` · ⋮ · `Finish` (`accent`);
@@ -344,7 +336,7 @@ Brief entrypoint inventory of the current reusable UI component set.
     `-option-none`, `-manage`
   - covered by `apps/mobile/app/__tests__/session-view-screen.test.tsx`
 
-17. Session detail (shared by the session view, View Session and the group session view)
+16. Session detail (shared by the session view, View Session and the group session view)
 - Folder: `apps/mobile/components/session-detail/`; the row and card models in
   `apps/mobile/src/session-recorder/session-view-model.ts` (`formatSetRow`, one
   set as plain values) and `completed-session-detail-model.ts`
@@ -355,8 +347,8 @@ Brief entrypoint inventory of the current reusable UI component set.
   - `ExerciseSetsCard` — `Card` per exercise: name, a count, an inline
     `accessory` (the session view's chevron) or a 44pt `control` (View Session's
     ⋮), the set rows and the `record` band (`New 1RM record · <1RM>`). Given
-    `onPress` the whole card is one link. testID `<prefix>-count`, `-set-<n>`,
-    `-record`
+    `onPress` the whole card is one link. testID `<prefix>-count`, `-set-<n>`
+    (or the caller's `rowTestID`), `-record`
   - `SessionFactsCard` — `Card` with an optional header slot, a finished
     session's `Start` / `End` read-only (the completed edit's field layout),
     one or more rows of stacked `Stat`s (a `text` fact takes the spare width)
@@ -364,7 +356,7 @@ Brief entrypoint inventory of the current reusable UI component set.
   - covered by `completed-session-detail-screen.test.tsx`,
     `session-view-screen.test.tsx` and `completed-session-detail-model.test.ts`
 
-18. View Session (the completed-session detail)
+17. View Session (the completed-session detail)
 - Folder: `apps/mobile/components/view-session/` (route
   `app/completed-session/[sessionId].tsx`)
 - Purpose:
@@ -386,7 +378,7 @@ Brief entrypoint inventory of the current reusable UI component set.
   - covered by `apps/mobile/app/__tests__/completed-session-detail-screen.test.tsx`
     and the `ios-ui-regression` lane (`session-completion-states-fixture`)
 
-19. Gyms (exercise/session redesign step 6b)
+18. Gyms (exercise/session redesign step 6b)
 - Folder: `apps/mobile/components/gyms/`; the gym directory and writes in
   `apps/mobile/src/session-recorder/gym-options.ts`, the location reads in
   `apps/mobile/src/location/gym-location-reads.ts`
@@ -453,7 +445,7 @@ Reference: the M8 UI pattern audit (deleted 2026-06-10; in git history)
 1. Current user-facing route screens now consume `uiTokens.colors` for route-level screen styles (including modal scrims and status surfaces) instead of screen-local raw color literals.
 2. The later M26 navigation cutover replaced the retired `TopLevelTabs` with
    `MainTabs`; current shared primitives/components (`UiButton`, `UiText`,
-   `UiSurface`, `MainTabs`, `BottomTray`, `SessionContentLayout`) remain the
+   `UiSurface`, `MainTabs`, `BottomTray`) remain the
    canonical reuse surface.
 3. Some repeated button/row/modal patterns remain route-local one-offs to avoid behavioral churn; they stay tracked as candidate primitives in the pending list above.
 
