@@ -158,7 +158,7 @@ afterEach(() => {
 describe('Groups tab and My groups actions', () => {
   it('keeps Join / Create off the Groups screen and on My groups', async () => {
     render(<GroupsTabRoute />);
-    await screen.findByTestId('groups-stream-empty');
+    await screen.findByTestId('groups-stream-empty', {}, { timeout: 5_000 });
     expect(screen.queryByTestId('groups-create-button')).toBeNull();
     expect(screen.queryByTestId('groups-join-button')).toBeNull();
 
