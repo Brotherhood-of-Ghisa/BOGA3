@@ -346,14 +346,15 @@ Brief entrypoint map of the current mobile screens.
   - completed session detail viewer with edit/delete session actions and per-exercise block append actions
 - Key states (high level):
   - loading / error / not-found / detail
-  - `presentation=completion` (after Finish): one labelled totals card with
+  - `presentation=completion` (after Finish) and `presentation=summary` (from
+    Sessions History): one labelled totals card with
     informational per-muscle working-set counts, all compact `Personal
     records`, per-exercise current volume versus median and descriptive P5/P95
     range, and previewed PNG session sharing. It does not link to muscle
     analytics. Optional historical enrichment cannot block it, and share output
     excludes gym/location. Edit/delete/append actions are hidden; it renders
-    Done. (History's `presentation=summary` was removed in step 6b-1: the
-    detail itself is the summary.)
+    Done after completion; historical Summary instead exposes deterministic
+    Share, `View individual sets`, `Edit session`, and History-return actions.
   - completion loading/error/not-found/deleted-target states expose one safe
     Progress exit; the native back affordance/gesture is suppressed and Android
     system back replaces to Progress
@@ -367,6 +368,7 @@ Brief entrypoint map of the current mobile screens.
   - `/session/<activeSessionId>` (the session view) after a successful
     per-exercise block append, using the id the append returns
   - `/progress` from completion Done/back
+  - `/sessions` from the historical Summary exit
 
 11. `/exercise-history`
 - File: `apps/mobile/app/exercise-history.tsx`

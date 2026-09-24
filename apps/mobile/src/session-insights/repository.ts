@@ -1,13 +1,15 @@
-import { and, asc, eq, inArray, isNotNull, isNull, lt, or } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNotNull, isNull, lt, or } from "drizzle-orm";
 
-import { bootstrapLocalDataLayer } from '@/src/data/bootstrap';
+import { bootstrapLocalDataLayer } from "@/src/data/bootstrap";
 import {
   exerciseDefinitions,
+  exerciseMuscleMappings,
   exerciseSets,
   sessionExercises,
   sessions,
-} from '@/src/data/schema';
-import { normalizeSessionSetPerformanceStatus } from '@/src/session-recorder/set-semantics';
+  muscleGroups,
+} from "@/src/data/schema";
+import { normalizeSessionSetPerformanceStatus } from "@/src/session-recorder/set-semantics";
 
 import {
   deriveCompletedSessionInsights,
@@ -15,10 +17,16 @@ import {
   type PersonalRecordSessionInput,
   type SessionInsightExerciseInput,
   type SessionInsightSetInput,
-} from './calculations';
+} from "./calculations";
 
-export type SessionInsightSessionRow = Omit<PersonalRecordSessionInput, 'exercises'>;
-export type SessionInsightExerciseRow = Omit<SessionInsightExerciseInput, 'sets'> & {
+export type SessionInsightSessionRow = Omit<
+  PersonalRecordSessionInput,
+  "exercises"
+>;
+export type SessionInsightExerciseRow = Omit<
+  SessionInsightExerciseInput,
+  "sets"
+> & {
   sessionId: string;
 };
 export type SessionInsightSetRow = SessionInsightSetInput & {
@@ -26,30 +34,91 @@ export type SessionInsightSetRow = SessionInsightSetInput & {
 };
 
 export type SessionInsightsStore = {
-  loadTargetSession(sessionId: string): Promise<SessionInsightSessionRow | null>;
+  loadTargetSession(
+    sessionId: string,
+  ): Promise<SessionInsightSessionRow | null>;
   loadEarlierCompletedSessions(input: {
     completedAt: Date;
     targetSessionId: string;
   }): Promise<SessionInsightSessionRow[]>;
-  loadSessionExercises(sessionIds: string[]): Promise<SessionInsightExerciseRow[]>;
-  loadExerciseSets(sessionExerciseIds: string[]): Promise<SessionInsightSetRow[]>;
+  loadSessionExercises(
+    sessionIds: string[],
+  ): Promise<SessionInsightExerciseRow[]>;
+  loadExerciseSets(
+    sessionExerciseIds: string[],
+  ): Promise<SessionInsightSetRow[]>;
+  loadMuscleCatalog?(): Promise<{
+    definitions: {
+      id: string;
+      loadInputMode: "total_load" | "per_side_load";
+    }[];
+    mappings: {
+      exerciseDefinitionId: string;
+      muscleGroupId: string;
+      role: "primary" | "secondary" | "stabilizer" | null;
+      weight?: number;
+    }[];
+    groups: {
+      id: string;
+      displayName: string;
+      familyName: string;
+      sortOrder: number;
+    }[];
+  }>;
 };
 
 export type CompletedSessionInsightsRepository = {
   loadInsights(sessionId: string): Promise<CompletedSessionInsights | null>;
 };
 
-const toSessionRow = (row: typeof sessions.$inferSelect): SessionInsightSessionRow => ({
+const toSessionRow = (
+  row: typeof sessions.$inferSelect,
+): SessionInsightSessionRow => ({
   sessionId: row.id,
-  status: row.status === 'completed' ? 'completed' : 'active',
+  status: row.status === "completed" ? "completed" : "active",
   completedAt: row.completedAt,
   deletedAt: row.deletedAt,
 });
 
 export const createDrizzleSessionInsightsStore = (): SessionInsightsStore => ({
+  async loadMuscleCatalog() {
+    const database = await bootstrapLocalDataLayer();
+    return {
+      definitions: database
+        .select({
+          id: exerciseDefinitions.id,
+          loadInputMode: exerciseDefinitions.loadInputMode,
+        })
+        .from(exerciseDefinitions)
+        .all(),
+      mappings: database
+        .select({
+          exerciseDefinitionId: exerciseMuscleMappings.exerciseDefinitionId,
+          muscleGroupId: exerciseMuscleMappings.muscleGroupId,
+          role: exerciseMuscleMappings.role,
+          weight: exerciseMuscleMappings.weight,
+        })
+        .from(exerciseMuscleMappings)
+        .where(isNull(exerciseMuscleMappings.deletedAt))
+        .all(),
+      groups: database
+        .select({
+          id: muscleGroups.id,
+          displayName: muscleGroups.displayName,
+          familyName: muscleGroups.familyName,
+          sortOrder: muscleGroups.sortOrder,
+        })
+        .from(muscleGroups)
+        .all(),
+    };
+  },
   async loadTargetSession(sessionId) {
     const database = await bootstrapLocalDataLayer();
-    const row = database.select().from(sessions).where(eq(sessions.id, sessionId)).get();
+    const row = database
+      .select()
+      .from(sessions)
+      .where(eq(sessions.id, sessionId))
+      .get();
     return row ? toSessionRow(row) : null;
   },
 
@@ -60,14 +129,17 @@ export const createDrizzleSessionInsightsStore = (): SessionInsightsStore => ({
       .from(sessions)
       .where(
         and(
-          eq(sessions.status, 'completed'),
+          eq(sessions.status, "completed"),
           isNull(sessions.deletedAt),
           isNotNull(sessions.completedAt),
           or(
             lt(sessions.completedAt, completedAt),
-            and(eq(sessions.completedAt, completedAt), lt(sessions.id, targetSessionId))
-          )
-        )
+            and(
+              eq(sessions.completedAt, completedAt),
+              lt(sessions.id, targetSessionId),
+            ),
+          ),
+        ),
       )
       .orderBy(asc(sessions.completedAt), asc(sessions.id))
       .all()
@@ -90,9 +162,14 @@ export const createDrizzleSessionInsightsStore = (): SessionInsightsStore => ({
       .from(sessionExercises)
       .leftJoin(
         exerciseDefinitions,
-        eq(sessionExercises.exerciseDefinitionId, exerciseDefinitions.id)
+        eq(sessionExercises.exerciseDefinitionId, exerciseDefinitions.id),
       )
-      .where(and(inArray(sessionExercises.sessionId, sessionIds), isNull(sessionExercises.deletedAt)))
+      .where(
+        and(
+          inArray(sessionExercises.sessionId, sessionIds),
+          isNull(sessionExercises.deletedAt),
+        ),
+      )
       .orderBy(asc(sessionExercises.orderIndex), asc(sessionExercises.id))
       .all()
       .map(({ capturedExerciseName, currentExerciseName, ...row }) => ({
@@ -119,14 +196,16 @@ export const createDrizzleSessionInsightsStore = (): SessionInsightsStore => ({
       .where(
         and(
           inArray(exerciseSets.sessionExerciseId, sessionExerciseIds),
-          isNull(exerciseSets.deletedAt)
-        )
+          isNull(exerciseSets.deletedAt),
+        ),
       )
       .orderBy(asc(exerciseSets.orderIndex), asc(exerciseSets.id))
       .all()
       .map((row) => ({
         ...row,
-        performanceStatus: normalizeSessionSetPerformanceStatus(row.performanceStatus),
+        performanceStatus: normalizeSessionSetPerformanceStatus(
+          row.performanceStatus,
+        ),
       }));
   },
 });
@@ -134,7 +213,7 @@ export const createDrizzleSessionInsightsStore = (): SessionInsightsStore => ({
 const buildSessionGraphs = (
   sessionRows: SessionInsightSessionRow[],
   exerciseRows: SessionInsightExerciseRow[],
-  setRows: SessionInsightSetRow[]
+  setRows: SessionInsightSetRow[],
 ): PersonalRecordSessionInput[] => {
   const setsByExerciseId = new Map<string, SessionInsightSetInput[]>();
   for (const set of setRows) {
@@ -162,13 +241,13 @@ const buildSessionGraphs = (
 };
 
 export const createCompletedSessionInsightsRepository = (
-  store: SessionInsightsStore = createDrizzleSessionInsightsStore()
+  store: SessionInsightsStore = createDrizzleSessionInsightsStore(),
 ): CompletedSessionInsightsRepository => ({
   async loadInsights(sessionId) {
     const target = await store.loadTargetSession(sessionId);
     if (
       !target ||
-      target.status !== 'completed' ||
+      target.status !== "completed" ||
       target.completedAt === null ||
       (target.deletedAt ?? null) !== null
     ) {
@@ -181,20 +260,32 @@ export const createCompletedSessionInsightsRepository = (
     });
     const sessionRows = [target, ...history];
     const exerciseRows = await store.loadSessionExercises(
-      sessionRows.map((session) => session.sessionId)
+      sessionRows.map((session) => session.sessionId),
     );
-    const setRows = await store.loadExerciseSets(exerciseRows.map((exercise) => exercise.id));
+    const setRows = await store.loadExerciseSets(
+      exerciseRows.map((exercise) => exercise.id),
+    );
     const graphs = buildSessionGraphs(sessionRows, exerciseRows, setRows);
-    const targetGraph = graphs.find((session) => session.sessionId === target.sessionId);
+    const targetGraph = graphs.find(
+      (session) => session.sessionId === target.sessionId,
+    );
     if (!targetGraph) return null;
+    const catalog = await store.loadMuscleCatalog?.();
 
     return deriveCompletedSessionInsights({
       targetSession: targetGraph,
-      historicalSessions: graphs.filter((session) => session.sessionId !== target.sessionId),
+      historicalSessions: graphs.filter(
+        (session) => session.sessionId !== target.sessionId,
+      ),
+      exerciseDefinitions: catalog?.definitions,
+      muscleMappings: catalog?.mappings,
+      muscleGroups: catalog?.groups,
     });
   },
 });
 
-const defaultCompletedSessionInsightsRepository = createCompletedSessionInsightsRepository();
+const defaultCompletedSessionInsightsRepository =
+  createCompletedSessionInsightsRepository();
 
-export const loadCompletedSessionInsights = defaultCompletedSessionInsightsRepository.loadInsights;
+export const loadCompletedSessionInsights =
+  defaultCompletedSessionInsightsRepository.loadInsights;

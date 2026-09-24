@@ -194,22 +194,27 @@ Brief entrypoint inventory of the current reusable UI component set.
 8. `SessionCompletionPresentation`
 - File: `apps/mobile/components/session-recorder/session-completion-presentation.tsx`
 - Purpose:
-  - the post-submit completion composition (History's summary was removed in
-    redesign step 6b-1) with one consolidated
+  - the shared post-submit and historical-summary composition with one consolidated
     totals/muscle-working-set card, every compact PR, every per-exercise volume
     comparison, and the session-image share preview
   - muscle chips are informational views rather than analytics links; its
     caller supplies Done (required)
   - keeps all PRs visible together instead of paging them
 
-9. `ExerciseVolumeComparisonRow`
+9. `SessionInsightPresentation`
+- File: `apps/mobile/components/session-recorder/session-insight-presentation.tsx`
+- Purpose:
+  - shared, locally toggleable exercise/muscle historical comparison body;
+    defaults to exercise on mount and leaves context actions to its caller
+
+10. `ExerciseVolumeComparisonRow`
 - File: `apps/mobile/components/session-recorder/exercise-volume-comparison.tsx`
 - Purpose:
   - presents exercise name, performed/working-set counts, current entered volume
     versus median, and descriptive P5/P95 range or explicit sparse-history state
   - reused by in-app completion and the captured share card
 
-10. `SessionSharePreview` / `SessionShareCard`
+11. `SessionSharePreview` / `SessionShareCard`
 - File: `apps/mobile/components/session-recorder/session-share-preview.tsx`
 - Purpose:
   - previews the exact privacy-limited session card captured to PNG and opens the

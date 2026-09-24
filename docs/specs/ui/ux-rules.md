@@ -266,7 +266,11 @@ Document app-specific UI semantics and guardrails for the current mobile app.
    current raw volume versus historical median, and a horizontal P5–P95 range
    with median/current markers when a distribution exists. Single/equal
    baselines and no-history rows use explicit non-distribution states; range
-   bars are descriptive context, never targets or readiness guidance.
+   bars are descriptive context, never targets or readiness guidance. A local,
+   accessible `By exercise` / `By muscle` control defaults to exercise whenever
+   a summary opens. Muscle rows use canonical load-input handling and weighted
+   primary/secondary contributions, comparing each muscle only with itself in
+   eligible earlier completed sessions. Missing mappings remain explicit.
 9. `Share session` opens a preview of the exact session-summary image before
    sharing. The captured PNG contains session/date/count totals, working sets,
    every PR, and every exercise comparison; it excludes gym/location data.
@@ -274,11 +278,11 @@ Document app-specific UI semantics and guardrails for the current mobile app.
    silent, capture/launch failure is inline and retryable, and temporary image
    cleanup cannot turn a completed share into an error.
 10. Completion hides edit/delete/append. Done and safe back replace to Progress.
-    A completed row in Session History, and a completed session's `Edit`, open
-    the session view to edit it (§14b.7); there is no separate historical
-    summary (step 6b-1 removed `presentation=summary` — the completed-session
-    detail is the summary). A missing, deleted, or failed target exposes one
-    safe return and never opens an editable copy.
+    A completed row in Session History opens `presentation=summary`; its
+    overflow Edit remains a direct session-view shortcut. Historical Summary
+    keeps mutation explicit with `View individual sets` and `Edit session`,
+    both addressed by session ID, and replaces back to Sessions History. Share
+    always captures the exercise comparison regardless of the visible toggle.
 
 ### 8. Navigation/query semantics (UI-facing rule)
 

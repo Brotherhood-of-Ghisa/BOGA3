@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { useState } from "react";
+import { ScrollView, StyleSheet, View } from "react-native";
 
 import {
   UiButton,
@@ -10,19 +10,19 @@ import {
   uiRadius,
   uiSpace,
   uiTypography,
-} from '@/components/ui';
+} from "@/components/ui";
 import type {
   CurrentSessionMuscleSummary,
   ExercisePersonalRecord,
   ExerciseVolumeComparison,
-} from '@/src/session-insights';
+} from "@/src/session-insights";
 
-import { ExercisePersonalRecordCelebration } from './exercise-personal-record-celebration';
-import { ExerciseVolumeComparisonRow } from './exercise-volume-comparison';
-import { SessionSharePreview } from './session-share-preview';
+import { ExercisePersonalRecordCelebration } from "./exercise-personal-record-celebration";
+import { SessionSharePreview } from "./session-share-preview";
+import { SessionInsightPresentation } from "./session-insight-presentation";
 
 // The exercise catalogue's load state, which the muscle breakdown depends on.
-type MuscleCatalogState = 'loading' | 'ready' | 'error';
+type MuscleCatalogState = "loading" | "ready" | "error";
 
 type SessionCompletionPresentationProps = {
   completedAt: string;
@@ -33,19 +33,21 @@ type SessionCompletionPresentationProps = {
   workingSetCount: number;
   personalRecords: ExercisePersonalRecord[];
   exerciseVolumeComparisons: ExerciseVolumeComparison[];
+  muscleVolumeComparisons?: ExerciseVolumeComparison[];
   muscleSummary: CurrentSessionMuscleSummary | null;
   muscleCatalogState: MuscleCatalogState;
   shouldFailNextShare?: boolean;
   onDone: () => void;
+  onEdit?: () => void;
+  onViewSets?: () => void;
+  doneLabel?: string;
 };
 
 const formatCount = (count: number, singular: string): string =>
   `${count} ${count === 1 ? singular : `${singular}s`}`;
 
 const formatExplicitDuration = (durationDisplay: string): string =>
-  durationDisplay
-    .replace(/(\d+)h/g, '$1 hr')
-    .replace(/(\d+)m/g, '$1 min');
+  durationDisplay.replace(/(\d+)h/g, "$1 hr").replace(/(\d+)m/g, "$1 min");
 
 type SummaryMetricProps = {
   label: string;
@@ -75,10 +77,14 @@ export function SessionCompletionPresentation({
   workingSetCount,
   personalRecords,
   exerciseVolumeComparisons,
+  muscleVolumeComparisons = [],
   muscleSummary,
   muscleCatalogState,
   shouldFailNextShare = false,
   onDone,
+  onEdit,
+  onViewSets,
+  doneLabel = "Done",
 }: SessionCompletionPresentationProps) {
   const [isSharePreviewOpen, setIsSharePreviewOpen] = useState(false);
   const hasPerformedSets = performedSetCount > 0;
@@ -89,10 +95,14 @@ export function SessionCompletionPresentation({
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
-        testID="session-completion-presentation">
+        testID="session-completion-presentation"
+      >
         <View style={styles.section}>
           <UiText variant="title">Session Summary</UiText>
-          <UiSurface style={styles.completeSurface} testID="session-completion-context">
+          <UiSurface
+            style={styles.completeSurface}
+            testID="session-completion-context"
+          >
             <View style={styles.summaryGrid}>
               <SummaryMetric
                 label="DURATION"
@@ -112,12 +122,15 @@ export function SessionCompletionPresentation({
               <SummaryMetric
                 label="GYM"
                 testID="session-completion-gym"
-                value={gymName?.trim() || 'No gym'}
+                value={gymName?.trim() || "No gym"}
               />
             </View>
 
             {hasPerformedSets ? (
-              <View style={styles.muscleBreakdown} testID="session-completion-muscle-breakdown">
+              <View
+                style={styles.muscleBreakdown}
+                testID="session-completion-muscle-breakdown"
+              >
                 <UiText variant="labelStrong">Working sets by muscle</UiText>
                 {workingSetsByMuscle.length > 0 ? (
                   <View style={styles.muscleChipWrap}>
@@ -125,24 +138,31 @@ export function SessionCompletionPresentation({
                       <View
                         accessibilityLabel={`${muscle.displayName}, ${formatCount(
                           muscle.workingSetCount,
-                          'working set'
+                          "working set",
                         )}`}
                         key={muscle.id}
                         style={styles.muscleChip}
-                        testID={`session-completion-muscle-${muscle.id}`}>
-                        <UiText style={styles.muscleChipText} variant="labelStrong">
+                        testID={`session-completion-muscle-${muscle.id}`}
+                      >
+                        <UiText
+                          style={styles.muscleChipText}
+                          variant="labelStrong"
+                        >
                           {`${muscle.displayName} (${muscle.workingSetCount})`}
                         </UiText>
                       </View>
                     ))}
                   </View>
                 ) : (
-                  <UiText variant="bodyMuted" testID="session-completion-muscle-empty-state">
-                    {muscleCatalogState === 'loading'
-                      ? 'Loading muscle breakdown…'
-                      : muscleCatalogState === 'error'
-                        ? 'Muscle breakdown unavailable.'
-                        : 'No mapped working sets for this session.'}
+                  <UiText
+                    variant="bodyMuted"
+                    testID="session-completion-muscle-empty-state"
+                  >
+                    {muscleCatalogState === "loading"
+                      ? "Loading muscle breakdown…"
+                      : muscleCatalogState === "error"
+                        ? "Muscle breakdown unavailable."
+                        : "No mapped working sets for this session."}
                   </UiText>
                 )}
                 <UiText style={styles.muscleHint} variant="bodyMuted">
@@ -154,7 +174,10 @@ export function SessionCompletionPresentation({
         </View>
 
         {personalRecords.length > 0 ? (
-          <View style={styles.section} testID="session-completion-personal-records">
+          <View
+            style={styles.section}
+            testID="session-completion-personal-records"
+          >
             <UiText variant="title">Personal records</UiText>
             <View style={styles.personalRecordStack}>
               {personalRecords.map((personalRecord) => (
@@ -168,25 +191,11 @@ export function SessionCompletionPresentation({
           </View>
         ) : null}
 
-        {exerciseVolumeComparisons.length > 0 ? (
-          <View style={styles.section} testID="session-completion-exercise-volume">
-            <View style={styles.sectionHeadingRow}>
-              <UiText variant="title">Exercise volume</UiText>
-              <UiText style={styles.sectionHint} variant="bodyMuted">
-                Session vs history
-              </UiText>
-            </View>
-            <View style={styles.exerciseStack}>
-              {exerciseVolumeComparisons.map((comparison) => (
-                <ExerciseVolumeComparisonRow
-                  key={`${comparison.exerciseDefinitionId ?? 'legacy'}-${comparison.sessionExerciseIds.join('-')}`}
-                  comparison={comparison}
-                  testID={`session-completion-exercise-${comparison.sessionExerciseIds[0]}`}
-                />
-              ))}
-            </View>
-          </View>
-        ) : null}
+        <SessionInsightPresentation
+          exerciseComparisons={exerciseVolumeComparisons}
+          muscleComparisons={muscleVolumeComparisons}
+          testIdPrefix="session-completion"
+        />
 
         <View style={styles.actions}>
           <UiButton
@@ -196,10 +205,26 @@ export function SessionCompletionPresentation({
             testID="session-completion-share-session"
             onPress={() => setIsSharePreviewOpen(true)}
           />
+          {onViewSets ? (
+            <UiButton
+              label="View individual sets"
+              testID="session-summary-view-sets"
+              variant="secondary"
+              onPress={onViewSets}
+            />
+          ) : null}
+          {onEdit ? (
+            <UiButton
+              label="Edit session"
+              testID="session-summary-edit"
+              variant="secondary"
+              onPress={onEdit}
+            />
+          ) : null}
           <UiButton
             accessibilityHint="Returns to Stats and History."
             accessibilityLabel="Done with session completion"
-            label="Done"
+            label={doneLabel}
             testID="session-completion-done"
             variant="secondary"
             onPress={onDone}
@@ -239,13 +264,13 @@ const styles = StyleSheet.create({
     backgroundColor: uiColors.surfaceDefault,
   },
   summaryGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     columnGap: uiSpace.lg,
     rowGap: uiSpace.lg,
   },
   summaryMetric: {
-    width: '45%',
+    width: "45%",
     minWidth: 120,
     gap: uiSpace.xs,
   },
@@ -263,8 +288,8 @@ const styles = StyleSheet.create({
     gap: uiSpace.sm,
   },
   muscleChipWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: uiSpace.sm,
   },
   muscleChip: {
@@ -292,14 +317,14 @@ const styles = StyleSheet.create({
     gap: uiSpace.sm,
   },
   sectionHeadingRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "space-between",
     gap: uiSpace.md,
   },
   sectionHint: {
     flexShrink: 1,
-    textAlign: 'right',
+    textAlign: "right",
     fontSize: uiTypography.size.xs,
     color: uiColors.textSecondary,
   },

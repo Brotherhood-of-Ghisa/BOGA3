@@ -242,13 +242,15 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 - Query params:
   - `intent` (optional; `edit` replaces to `/session/<sessionId>`, the session
     view editing the session)
-  - `presentation` (optional; `completion` selects the post-submit summary;
-    absent/invalid values — including the removed `summary` — preserve normal
-    detail)
+  - `presentation` (optional; `completion` selects the post-submit summary and
+    `summary` selects the read-first historical summary; absent/invalid values
+    preserve individual-set detail)
 - Behavior:
   - completion mode hides historical edit/delete/append actions, disables the
     native back affordance/gesture, and gives Done, Android system back, and
     unavailable-target states a replacing exit to `/progress`
+  - historical summary exposes Share, `View individual sets`, and `Edit
+    session`; its explicit exit replaces to `/sessions`
   - `Edit` pushes `/session/<sessionId>`; the detail reloads on focus, so the
     edits show when the session view's `Done` returns
 

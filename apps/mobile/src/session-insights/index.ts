@@ -4,6 +4,7 @@ export {
   deriveCompletedSessionInsights,
   deriveExercisePersonalRecord,
   deriveSessionExerciseVolumeComparisons,
+  deriveSessionMuscleVolumeComparisons,
   deriveSessionPersonalRecords,
   summarizeCurrentSessionMuscleLoad,
   type CompletedSessionInsights,
@@ -23,7 +24,8 @@ export {
   type SessionMuscleLoadEntry,
   type SessionMuscleWorkingSetEntry,
   type SessionPersonalRecordsInput,
-} from './calculations';
+  type SessionMuscleVolumeComparisonsInput,
+} from "./calculations";
 export {
   createCompletedSessionInsightsRepository,
   createDrizzleSessionInsightsStore,
@@ -33,11 +35,11 @@ export {
   type SessionInsightSessionRow,
   type SessionInsightsStore,
   type SessionInsightSetRow,
-} from './repository';
+} from "./repository";
 export {
   captureSessionShareImage,
   releaseSessionShareImage,
   shareSessionImage,
   type SessionShareCaptureDimensions,
   type SessionShareImageClient,
-} from './sharing';
+} from "./sharing";

@@ -1,13 +1,31 @@
-import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { BackHandler, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  Stack,
+  useFocusEffect,
+  useLocalSearchParams,
+  useRouter,
+} from "expo-router";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  BackHandler,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
-import { SessionCompletionPresentation } from '@/components/session-recorder/session-completion-presentation';
+import { SessionCompletionPresentation } from "@/components/session-recorder/session-completion-presentation";
 import {
   ExerciseCardCollapsedSummary,
   SessionContentLayout,
-} from '@/components/session-recorder/session-content-layout';
-import { UiButton, uiColors, uiRadius, uiSpace, uiTypography } from '@/components/ui';
+} from "@/components/session-recorder/session-content-layout";
+import {
+  UiButton,
+  uiColors,
+  uiRadius,
+  uiSpace,
+  uiTypography,
+} from "@/components/ui";
 import {
   formatSessionListCompactDuration,
   listSessionExerciseAssignedTags,
@@ -19,21 +37,21 @@ import {
   normalizeSessionSetType,
   setSessionDeletedState,
   type SessionSetTypeValue,
-} from '@/src/data';
-import { parseCalculationSet } from '@/src/exercise-calculations';
-import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
-import { sessionViewHref } from '@/src/navigation/active-session-entry';
-import { isDevMode } from '@/src/utils/isDevMode';
+} from "@/src/data";
+import { parseCalculationSet } from "@/src/exercise-calculations";
+import { useExerciseCatalog } from "@/src/exercise-catalog/cache";
+import { sessionViewHref } from "@/src/navigation/active-session-entry";
+import { isDevMode } from "@/src/utils/isDevMode";
 import {
   isConfirmedPerformedSet,
   type SessionSetPerformanceStatus,
-} from '@/src/session-recorder/set-semantics';
+} from "@/src/session-recorder/set-semantics";
 import {
   deriveSessionExerciseVolumeComparisons,
   loadCompletedSessionInsights,
   summarizeCurrentSessionMuscleLoad,
   type CompletedSessionInsights,
-} from '@/src/session-insights';
+} from "@/src/session-insights";
 
 export type CompletedSessionDetailSet = {
   id: string;
@@ -69,20 +87,25 @@ export type CompletedSessionDetailRecord = {
 };
 
 export type CompletedSessionDetailDataClient = {
-  loadCompletedSession(sessionId: string): Promise<CompletedSessionDetailRecord | null>;
+  loadCompletedSession(
+    sessionId: string,
+  ): Promise<CompletedSessionDetailRecord | null>;
   loadInsights?(sessionId: string): Promise<CompletedSessionInsights | null>;
   appendCompletedSessionExerciseAsPlanned(
     sessionId: string,
-    sessionExerciseId: string
+    sessionExerciseId: string,
   ): Promise<{ sessionId: string }>;
-  setCompletedSessionDeletedState(sessionId: string, isDeleted: boolean): Promise<void>;
+  setCompletedSessionDeletedState(
+    sessionId: string,
+    isDeleted: boolean,
+  ): Promise<void>;
 };
 
 export type CompletedSessionDetailScreenShellProps = {
   sessionId?: string | null;
   dataClient?: CompletedSessionDetailDataClient;
-  initialMode?: 'view' | 'edit';
-  presentation?: 'detail' | 'completion';
+  initialMode?: "view" | "edit";
+  presentation?: "detail" | "completion" | "summary";
   shouldFailNextMaestroShare?: boolean;
   shouldFailNextMaestroCatalog?: boolean;
 };
@@ -93,11 +116,11 @@ function formatDateTimeStamp(isoTimestamp: string): string {
     return isoTimestamp;
   }
 
-  const month = `${parsed.getMonth() + 1}`.padStart(2, '0');
-  const day = `${parsed.getDate()}`.padStart(2, '0');
+  const month = `${parsed.getMonth() + 1}`.padStart(2, "0");
+  const day = `${parsed.getDate()}`.padStart(2, "0");
   const year = parsed.getFullYear();
-  const hours = `${parsed.getHours()}`.padStart(2, '0');
-  const minutes = `${parsed.getMinutes()}`.padStart(2, '0');
+  const hours = `${parsed.getHours()}`.padStart(2, "0");
+  const minutes = `${parsed.getMinutes()}`.padStart(2, "0");
 
   return `${year}-${month}-${day} ${hours}:${minutes}`;
 }
@@ -111,14 +134,19 @@ function coerceRouteParam(value: string | string[] | undefined): string | null {
 }
 
 export const resolveCompletedSessionPresentation = (
-  value: string | string[] | undefined
-): 'detail' | 'completion' => (coerceRouteParam(value) === 'completion' ? 'completion' : 'detail');
+  value: string | string[] | undefined,
+): "detail" | "completion" | "summary" => {
+  const presentation = coerceRouteParam(value);
+  return presentation === "completion" || presentation === "summary"
+    ? presentation
+    : "detail";
+};
 
 const formatSetEffortLabel = (setType: SessionSetTypeValue): string =>
-  formatSessionSetType(setType) ?? '-';
+  formatSessionSetType(setType) ?? "-";
 
 const getCompletedPerformedSets = (
-  sets: CompletedSessionDetailSet[]
+  sets: CompletedSessionDetailSet[],
 ): CompletedSessionDetailSet[] =>
   sets.filter(
     (set) =>
@@ -127,134 +155,160 @@ const getCompletedPerformedSets = (
         weightValue: set.weight,
         repsValue: set.reps,
         setType: set.setType,
-      }) !== null
+      }) !== null,
   );
 
-const DEFAULT_COMPLETED_SESSION_DETAILS: Record<string, CompletedSessionDetailRecord> = {
-  'session-completed-1': {
-    id: 'session-completed-1',
-    startedAt: '2026-02-19T16:00:00.000Z',
-    completedAt: '2026-02-19T16:58:00.000Z',
-    durationDisplay: '58m',
-    gymName: 'Westside Barbell Club',
+const DEFAULT_COMPLETED_SESSION_DETAILS: Record<
+  string,
+  CompletedSessionDetailRecord
+> = {
+  "session-completed-1": {
+    id: "session-completed-1",
+    startedAt: "2026-02-19T16:00:00.000Z",
+    completedAt: "2026-02-19T16:58:00.000Z",
+    durationDisplay: "58m",
+    gymName: "Westside Barbell Club",
     deletedAt: null,
     exercises: [
       {
-        id: 'm7-detail-ex-1',
+        id: "m7-detail-ex-1",
         exerciseDefinitionId: null,
-        name: 'Bench Press',
-        machineName: 'Flat Bench',
+        name: "Bench Press",
+        machineName: "Flat Bench",
         tags: [],
         sets: [
-          { id: 'm7-detail-set-1', weight: '185', reps: '8', setType: null },
-          { id: 'm7-detail-set-2', weight: '185', reps: '6', setType: null },
+          { id: "m7-detail-set-1", weight: "185", reps: "8", setType: null },
+          { id: "m7-detail-set-2", weight: "185", reps: "6", setType: null },
         ],
       },
       {
-        id: 'm7-detail-ex-2',
+        id: "m7-detail-ex-2",
         exerciseDefinitionId: null,
-        name: 'Lat Pulldown',
-        machineName: 'Cable',
+        name: "Lat Pulldown",
+        machineName: "Cable",
         tags: [],
         sets: [
-          { id: 'm7-detail-set-3', weight: '120', reps: '12', setType: null },
-          { id: 'm7-detail-set-4', weight: '120', reps: '12', setType: null },
+          { id: "m7-detail-set-3", weight: "120", reps: "12", setType: null },
+          { id: "m7-detail-set-4", weight: "120", reps: "12", setType: null },
         ],
       },
     ],
   },
-  'session-completed-2': {
-    id: 'session-completed-2',
-    startedAt: '2026-02-17T18:10:00.000Z',
-    completedAt: '2026-02-17T19:15:00.000Z',
-    durationDisplay: '1h 5m',
-    gymName: 'Downtown Fitness',
-    deletedAt: '2026-02-18T08:00:00.000Z',
+  "session-completed-2": {
+    id: "session-completed-2",
+    startedAt: "2026-02-17T18:10:00.000Z",
+    completedAt: "2026-02-17T19:15:00.000Z",
+    durationDisplay: "1h 5m",
+    gymName: "Downtown Fitness",
+    deletedAt: "2026-02-18T08:00:00.000Z",
     exercises: [
       {
-        id: 'm7-detail-ex-3',
+        id: "m7-detail-ex-3",
         exerciseDefinitionId: null,
-        name: 'Leg Press',
-        machineName: 'Hammer Strength',
+        name: "Leg Press",
+        machineName: "Hammer Strength",
         tags: [],
         sets: [
-          { id: 'm7-detail-set-5', weight: '360', reps: '10', setType: null },
-          { id: 'm7-detail-set-6', weight: '360', reps: '10', setType: null },
+          { id: "m7-detail-set-5", weight: "360", reps: "10", setType: null },
+          { id: "m7-detail-set-6", weight: "360", reps: "10", setType: null },
         ],
       },
     ],
   },
 };
 
-export const DEFAULT_COMPLETED_SESSION_DETAIL_DATA_CLIENT: CompletedSessionDetailDataClient = {
-  async loadCompletedSession(sessionId) {
-    const sessionGraph = await loadSessionSnapshotById(sessionId);
+export const DEFAULT_COMPLETED_SESSION_DETAIL_DATA_CLIENT: CompletedSessionDetailDataClient =
+  {
+    async loadCompletedSession(sessionId) {
+      const sessionGraph = await loadSessionSnapshotById(sessionId);
 
-    if (sessionGraph && sessionGraph.status === 'completed') {
-      const gymRecord = sessionGraph.gymId ? await loadLocalGymById(sessionGraph.gymId) : null;
-      const completedAt = sessionGraph.completedAt ?? sessionGraph.startedAt;
-      const tagsBySessionExerciseId = new Map<string, CompletedSessionDetailExerciseTag[]>(
-        await Promise.all(
-          sessionGraph.exercises.map(async (exercise) => {
-            try {
-              const assignedTags = await listSessionExerciseAssignedTags(exercise.id);
-              return [
-                exercise.id,
-                assignedTags.map((tag) => ({
-                  tagDefinitionId: tag.tagDefinitionId,
-                  name: tag.name,
-                  deletedAt: tag.deletedAt ? tag.deletedAt.toISOString() : null,
-                })),
-              ] as const;
-            } catch {
-              return [exercise.id, [] as CompletedSessionDetailExerciseTag[]] as const;
-            }
-          })
-        )
-      );
+      if (sessionGraph && sessionGraph.status === "completed") {
+        const gymRecord = sessionGraph.gymId
+          ? await loadLocalGymById(sessionGraph.gymId)
+          : null;
+        const completedAt = sessionGraph.completedAt ?? sessionGraph.startedAt;
+        const tagsBySessionExerciseId = new Map<
+          string,
+          CompletedSessionDetailExerciseTag[]
+        >(
+          await Promise.all(
+            sessionGraph.exercises.map(async (exercise) => {
+              try {
+                const assignedTags = await listSessionExerciseAssignedTags(
+                  exercise.id,
+                );
+                return [
+                  exercise.id,
+                  assignedTags.map((tag) => ({
+                    tagDefinitionId: tag.tagDefinitionId,
+                    name: tag.name,
+                    deletedAt: tag.deletedAt
+                      ? tag.deletedAt.toISOString()
+                      : null,
+                  })),
+                ] as const;
+              } catch {
+                return [
+                  exercise.id,
+                  [] as CompletedSessionDetailExerciseTag[],
+                ] as const;
+              }
+            }),
+          ),
+        );
 
-      return {
-        id: sessionGraph.sessionId,
-        startedAt: sessionGraph.startedAt.toISOString(),
-        completedAt: completedAt.toISOString(),
-        durationDisplay: formatSessionListCompactDuration(sessionGraph.durationSec),
-        gymName: gymRecord?.name ?? null,
-        deletedAt: sessionGraph.deletedAt ? sessionGraph.deletedAt.toISOString() : null,
-        exercises: sessionGraph.exercises.map((exercise) => ({
-          id: exercise.id,
-          exerciseDefinitionId: exercise.exerciseDefinitionId,
-          name: exercise.name,
-          machineName: exercise.machineName,
-          tags: tagsBySessionExerciseId.get(exercise.id) ?? [],
-          sets: exercise.sets.map((set) => ({
-            id: set.id,
-            weight: set.weightValue,
-            reps: set.repsValue,
-            setType: normalizeSessionSetType(set.setType),
-            performanceStatus: set.performanceStatus,
+        return {
+          id: sessionGraph.sessionId,
+          startedAt: sessionGraph.startedAt.toISOString(),
+          completedAt: completedAt.toISOString(),
+          durationDisplay: formatSessionListCompactDuration(
+            sessionGraph.durationSec,
+          ),
+          gymName: gymRecord?.name ?? null,
+          deletedAt: sessionGraph.deletedAt
+            ? sessionGraph.deletedAt.toISOString()
+            : null,
+          exercises: sessionGraph.exercises.map((exercise) => ({
+            id: exercise.id,
+            exerciseDefinitionId: exercise.exerciseDefinitionId,
+            name: exercise.name,
+            machineName: exercise.machineName,
+            tags: tagsBySessionExerciseId.get(exercise.id) ?? [],
+            sets: exercise.sets.map((set) => ({
+              id: set.id,
+              weight: set.weightValue,
+              reps: set.repsValue,
+              setType: normalizeSessionSetType(set.setType),
+              performanceStatus: set.performanceStatus,
+            })),
           })),
-        })),
-      };
-    }
+        };
+      }
 
-    return DEFAULT_COMPLETED_SESSION_DETAILS[sessionId] ?? null;
-  },
-  async loadInsights(sessionId) {
-    return loadCompletedSessionInsights(sessionId);
-  },
-  async appendCompletedSessionExerciseAsPlanned(sessionId, sessionExerciseId) {
-    return appendCompletedSessionExerciseAsPlannedDraft(sessionId, sessionExerciseId);
-  },
-  async setCompletedSessionDeletedState(sessionId, isDeleted) {
-    await setSessionDeletedState(sessionId, isDeleted);
-  },
-};
+      return DEFAULT_COMPLETED_SESSION_DETAILS[sessionId] ?? null;
+    },
+    async loadInsights(sessionId) {
+      return loadCompletedSessionInsights(sessionId);
+    },
+    async appendCompletedSessionExerciseAsPlanned(
+      sessionId,
+      sessionExerciseId,
+    ) {
+      return appendCompletedSessionExerciseAsPlannedDraft(
+        sessionId,
+        sessionExerciseId,
+      );
+    },
+    async setCompletedSessionDeletedState(sessionId, isDeleted) {
+      await setSessionDeletedState(sessionId, isDeleted);
+    },
+  };
 
 export function CompletedSessionDetailScreenShell({
   sessionId,
   dataClient = DEFAULT_COMPLETED_SESSION_DETAIL_DATA_CLIENT,
-  initialMode = 'view',
-  presentation = 'detail',
+  initialMode = "view",
+  presentation = "detail",
   shouldFailNextMaestroShare = false,
   shouldFailNextMaestroCatalog = false,
 }: CompletedSessionDetailScreenShellProps) {
@@ -262,9 +316,14 @@ export function CompletedSessionDetailScreenShell({
   const exerciseCatalog = useExerciseCatalog();
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [session, setSession] = useState<CompletedSessionDetailRecord | null>(null);
-  const [completedInsights, setCompletedInsights] = useState<CompletedSessionInsights | null>(null);
-  const [collapsedExerciseIds, setCollapsedExerciseIds] = useState<Set<string>>(() => new Set());
+  const [session, setSession] = useState<CompletedSessionDetailRecord | null>(
+    null,
+  );
+  const [completedInsights, setCompletedInsights] =
+    useState<CompletedSessionInsights | null>(null);
+  const [collapsedExerciseIds, setCollapsedExerciseIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
 
   const toggleExerciseCollapsed = useCallback((exerciseId: string) => {
@@ -310,7 +369,9 @@ export function CompletedSessionDetailScreenShell({
         if (cancelled) {
           return;
         }
-        setErrorMessage(error instanceof Error ? error.message : 'Unable to load session');
+        setErrorMessage(
+          error instanceof Error ? error.message : "Unable to load session",
+        );
       })
       .finally(() => {
         if (cancelled) {
@@ -319,7 +380,7 @@ export function CompletedSessionDetailScreenShell({
         setIsLoading(false);
       });
 
-    if (presentation !== 'detail' && dataClient.loadInsights) {
+    if (presentation !== "detail" && dataClient.loadInsights) {
       void dataClient
         .loadInsights(sessionId)
         .then((loadedInsights) => {
@@ -345,25 +406,25 @@ export function CompletedSessionDetailScreenShell({
       return () => {
         cleanup?.();
       };
-    }, [reloadSession])
+    }, [reloadSession]),
   );
 
   const deleteLabel = isTogglingDeletedState
     ? session?.deletedAt
-      ? 'Undeleting...'
-      : 'Deleting...'
+      ? "Undeleting..."
+      : "Deleting..."
     : session?.deletedAt
-      ? 'Undelete'
-      : 'Delete';
-  const editLabel = 'Edit';
+      ? "Undelete"
+      : "Delete";
+  const editLabel = "Edit";
 
   const formattedStartedAt = useMemo(
-    () => (session ? formatDateTimeStamp(session.startedAt) : '—'),
-    [session]
+    () => (session ? formatDateTimeStamp(session.startedAt) : "—"),
+    [session],
   );
   const formattedCompletedAt = useMemo(
-    () => (session ? formatDateTimeStamp(session.completedAt) : '—'),
-    [session]
+    () => (session ? formatDateTimeStamp(session.completedAt) : "—"),
+    [session],
   );
   const performedExercises = useMemo(
     () =>
@@ -373,23 +434,29 @@ export function CompletedSessionDetailScreenShell({
           sets: getCompletedPerformedSets(exercise.sets),
         }))
         .filter((exercise) => exercise.sets.length > 0) ?? [],
-    [session]
+    [session],
   );
   const performedSetCount = useMemo(
-    () => performedExercises.reduce((count, exercise) => count + exercise.sets.length, 0),
-    [performedExercises]
+    () =>
+      performedExercises.reduce(
+        (count, exercise) => count + exercise.sets.length,
+        0,
+      ),
+    [performedExercises],
   );
   const workingSetCount = useMemo(
     () =>
       performedExercises.reduce(
         (count, exercise) =>
-          count + exercise.sets.filter((set) => isWorkingSessionSetType(set.setType)).length,
-        0
+          count +
+          exercise.sets.filter((set) => isWorkingSessionSetType(set.setType))
+            .length,
+        0,
       ),
-    [performedExercises]
+    [performedExercises],
   );
   const sessionMuscleSummary = useMemo(() => {
-    if (!session || exerciseCatalog.status !== 'ready') {
+    if (!session || exerciseCatalog.status !== "ready") {
       return null;
     }
 
@@ -412,7 +479,7 @@ export function CompletedSessionDetailScreenShell({
       })),
       exerciseDefinitions: exerciseCatalog.exercises.map((exercise) => ({
         id: exercise.id,
-        loadInputMode: exercise.loadInputMode ?? 'total_load',
+        loadInputMode: exercise.loadInputMode ?? "total_load",
       })),
       muscleMappings: exerciseCatalog.exercises.flatMap((exercise) =>
         exercise.mappings.map((mapping) => ({
@@ -420,18 +487,23 @@ export function CompletedSessionDetailScreenShell({
           muscleGroupId: mapping.muscleGroupId,
           role: mapping.role,
           weight: mapping.weight,
-        }))
+        })),
       ),
       muscleGroups: exerciseCatalog.muscleGroups,
     });
-  }, [exerciseCatalog.exercises, exerciseCatalog.muscleGroups, exerciseCatalog.status, session]);
+  }, [
+    exerciseCatalog.exercises,
+    exerciseCatalog.muscleGroups,
+    exerciseCatalog.status,
+    session,
+  ]);
 
   const fallbackExerciseVolumeComparisons = useMemo(() => {
     if (!session) return [];
     return deriveSessionExerciseVolumeComparisons({
       targetSession: {
         sessionId: session.id,
-        status: 'completed',
+        status: "completed",
         completedAt: new Date(session.completedAt),
         deletedAt: session.deletedAt ? new Date(session.deletedAt) : null,
         exercises: session.exercises.map((exercise, exerciseIndex) => ({
@@ -454,23 +526,26 @@ export function CompletedSessionDetailScreenShell({
   }, [session]);
 
   const handleCompletionExit = useCallback(() => {
-    router.replace('/progress');
-  }, [router]);
+    router.replace(presentation === "summary" ? "/sessions" : "/progress");
+  }, [presentation, router]);
 
   useEffect(() => {
-    if (presentation !== 'completion') {
+    if (presentation !== "completion") {
       return undefined;
     }
 
-    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-      handleCompletionExit();
-      return true;
-    });
+    const subscription = BackHandler.addEventListener(
+      "hardwareBackPress",
+      () => {
+        handleCompletionExit();
+        return true;
+      },
+    );
     return () => subscription.remove();
   }, [handleCompletionExit, presentation]);
 
   const safeExitButton =
-    presentation === 'completion' ? (
+    presentation === "completion" ? (
       <UiButton
         accessibilityLabel="Back to Stats and History"
         label="Back to Stats and History"
@@ -480,9 +555,13 @@ export function CompletedSessionDetailScreenShell({
     ) : null;
 
   const stackOptions =
-    presentation === 'completion'
-      ? { title: 'Session complete', headerBackVisible: false, gestureEnabled: false }
-      : { title: 'View Session' };
+    presentation === "completion"
+      ? {
+          title: "Session complete",
+          headerBackVisible: false,
+          gestureEnabled: false,
+        }
+      : { title: "View Session" };
 
   // Completed sessions are edited in the session view.
   const handleEdit = () => {
@@ -505,7 +584,11 @@ export function CompletedSessionDetailScreenShell({
         router.push(sessionViewHref(activeSessionId));
       })
       .catch((error) => {
-        setActionFeedback(error instanceof Error ? error.message : 'Unable to append exercise block');
+        setActionFeedback(
+          error instanceof Error
+            ? error.message
+            : "Unable to append exercise block",
+        );
       });
   };
 
@@ -533,12 +616,16 @@ export function CompletedSessionDetailScreenShell({
           };
         });
         setActionFeedback(
-          nextIsDeleted ? 'Session hidden from default history.' : 'Session restored to default history.'
+          nextIsDeleted
+            ? "Session hidden from default history."
+            : "Session restored to default history.",
         );
       })
       .catch((error) => {
         setActionFeedback(
-          error instanceof Error ? error.message : 'Unable to update deleted state for this session.'
+          error instanceof Error
+            ? error.message
+            : "Unable to update deleted state for this session.",
         );
       })
       .finally(() => {
@@ -550,7 +637,10 @@ export function CompletedSessionDetailScreenShell({
     return (
       <>
         <Stack.Screen options={stackOptions} />
-        <View style={styles.centerState} testID="completed-session-detail-loading">
+        <View
+          style={styles.centerState}
+          testID="completed-session-detail-loading"
+        >
           <Text style={styles.stateTitle}>Loading session...</Text>
           {safeExitButton}
         </View>
@@ -562,7 +652,10 @@ export function CompletedSessionDetailScreenShell({
     return (
       <>
         <Stack.Screen options={stackOptions} />
-        <View style={styles.centerState} testID="completed-session-detail-error">
+        <View
+          style={styles.centerState}
+          testID="completed-session-detail-error"
+        >
           <Text style={styles.stateTitle}>Unable to load session</Text>
           <Text style={styles.stateBody}>{errorMessage}</Text>
           {safeExitButton}
@@ -571,23 +664,33 @@ export function CompletedSessionDetailScreenShell({
     );
   }
 
-  if (!sessionId || !session || (presentation === 'completion' && session.deletedAt !== null)) {
+  if (
+    !sessionId ||
+    !session ||
+    (presentation === "completion" && session.deletedAt !== null)
+  ) {
     return (
       <>
         <Stack.Screen options={stackOptions} />
-        <View style={styles.centerState} testID="completed-session-detail-empty">
+        <View
+          style={styles.centerState}
+          testID="completed-session-detail-empty"
+        >
           <Text style={styles.stateTitle}>Session not found</Text>
-          <Text style={styles.stateBody}>This completed session could not be loaded.</Text>
+          <Text style={styles.stateBody}>
+            This completed session could not be loaded.
+          </Text>
           {safeExitButton}
         </View>
       </>
     );
   }
 
-  if (presentation === 'completion') {
+  if (presentation === "completion" || presentation === "summary") {
     const personalRecords = completedInsights?.personalRecords ?? [];
     const exerciseVolumeComparisons =
-      completedInsights && completedInsights.exerciseVolumeComparisons.length > 0
+      completedInsights &&
+      completedInsights.exerciseVolumeComparisons.length > 0
         ? completedInsights.exerciseVolumeComparisons
         : fallbackExerciseVolumeComparisons;
     return (
@@ -598,16 +701,33 @@ export function CompletedSessionDetailScreenShell({
           durationDisplay={session.durationDisplay}
           exerciseCount={performedExercises.length}
           exerciseVolumeComparisons={exerciseVolumeComparisons}
+          muscleVolumeComparisons={
+            completedInsights?.muscleVolumeComparisons ?? []
+          }
           gymName={session.gymName}
           muscleCatalogState={
-            shouldFailNextMaestroCatalog || exerciseCatalog.status === 'error'
-              ? 'error'
-              : exerciseCatalog.status === 'ready'
-                ? 'ready'
-                : 'loading'
+            shouldFailNextMaestroCatalog || exerciseCatalog.status === "error"
+              ? "error"
+              : exerciseCatalog.status === "ready"
+                ? "ready"
+                : "loading"
           }
-          muscleSummary={shouldFailNextMaestroCatalog ? null : sessionMuscleSummary}
+          muscleSummary={
+            shouldFailNextMaestroCatalog ? null : sessionMuscleSummary
+          }
           onDone={handleCompletionExit}
+          doneLabel={
+            presentation === "summary" ? "Back to Sessions History" : "Done"
+          }
+          onEdit={presentation === "summary" ? handleEdit : undefined}
+          onViewSets={
+            presentation === "summary"
+              ? () =>
+                  router.push(
+                    `/completed-session/${encodeURIComponent(session.id)}`,
+                  )
+              : undefined
+          }
           performedSetCount={performedSetCount}
           personalRecords={personalRecords}
           shouldFailNextShare={shouldFailNextMaestroShare}
@@ -619,25 +739,31 @@ export function CompletedSessionDetailScreenShell({
 
   return (
     <>
-      <Stack.Screen options={{ title: 'View Session' }} />
+      <Stack.Screen options={{ title: "View Session" }} />
       <ScrollView
         contentContainerStyle={styles.content}
         stickyHeaderIndices={[0]}
-        testID="completed-session-detail-screen">
+        testID="completed-session-detail-screen"
+      >
         <View style={styles.stickyActionBarWrap}>
           <View style={styles.actionBarCard}>
-            <View style={styles.actionBar} testID="completed-session-detail-action-bar">
+            <View
+              style={styles.actionBar}
+              testID="completed-session-detail-action-bar"
+            >
               <Pressable
                 accessibilityRole="button"
                 onPress={handleEdit}
                 style={[styles.actionBarButton, styles.actionBarPrimaryButton]}
-                testID="completed-session-detail-edit-button">
+                testID="completed-session-detail-edit-button"
+              >
                 <Text
                   adjustsFontSizeToFit
                   ellipsizeMode="clip"
                   minimumFontScale={0.75}
                   numberOfLines={1}
-                  style={styles.actionBarPrimaryButtonText}>
+                  style={styles.actionBarPrimaryButtonText}
+                >
                   {editLabel}
                 </Text>
               </Pressable>
@@ -651,7 +777,8 @@ export function CompletedSessionDetailScreenShell({
                   styles.actionBarDangerButton,
                   isTogglingDeletedState ? styles.disabledActionButton : null,
                 ]}
-                testID="completed-session-detail-delete-button">
+                testID="completed-session-detail-delete-button"
+              >
                 <Text
                   adjustsFontSizeToFit
                   ellipsizeMode="clip"
@@ -659,14 +786,19 @@ export function CompletedSessionDetailScreenShell({
                   numberOfLines={1}
                   style={[
                     styles.actionBarDangerButtonText,
-                    isTogglingDeletedState ? styles.disabledActionButtonText : null,
-                  ]}>
+                    isTogglingDeletedState
+                      ? styles.disabledActionButtonText
+                      : null,
+                  ]}
+                >
                   {deleteLabel}
                 </Text>
               </Pressable>
             </View>
 
-            {actionFeedback ? <Text style={styles.actionFeedbackText}>{actionFeedback}</Text> : null}
+            {actionFeedback ? (
+              <Text style={styles.actionFeedbackText}>{actionFeedback}</Text>
+            ) : null}
           </View>
         </View>
 
@@ -678,7 +810,8 @@ export function CompletedSessionDetailScreenShell({
                 ellipsizeMode="clip"
                 minimumFontScale={0.75}
                 numberOfLines={1}
-                style={styles.metricLabel}>
+                style={styles.metricLabel}
+              >
                 Start
               </Text>
               <Text style={styles.metricValue}>{formattedStartedAt}</Text>
@@ -689,7 +822,8 @@ export function CompletedSessionDetailScreenShell({
                 ellipsizeMode="clip"
                 minimumFontScale={0.75}
                 numberOfLines={1}
-                style={styles.metricLabel}>
+                style={styles.metricLabel}
+              >
                 End
               </Text>
               <Text style={styles.metricValue}>{formattedCompletedAt}</Text>
@@ -700,7 +834,8 @@ export function CompletedSessionDetailScreenShell({
                 ellipsizeMode="clip"
                 minimumFontScale={0.75}
                 numberOfLines={1}
-                style={styles.metricLabel}>
+                style={styles.metricLabel}
+              >
                 Duration
               </Text>
               <Text style={styles.metricValue}>{session.durationDisplay}</Text>
@@ -711,27 +846,29 @@ export function CompletedSessionDetailScreenShell({
                 ellipsizeMode="clip"
                 minimumFontScale={0.75}
                 numberOfLines={1}
-                style={styles.metricLabel}>
+                style={styles.metricLabel}
+              >
                 Location
               </Text>
               <Text numberOfLines={1} style={styles.metricValue}>
-                {session.gymName?.trim() ? session.gymName : 'No gym'}
+                {session.gymName?.trim() ? session.gymName : "No gym"}
               </Text>
             </View>
           </View>
         </View>
 
-        <SessionContentLayout<CompletedSessionDetailSet, CompletedSessionDetailExercise>
+        <SessionContentLayout<
+          CompletedSessionDetailSet,
+          CompletedSessionDetailExercise
+        >
           collapsedExerciseIds={collapsedExerciseIds}
           onToggleExerciseCollapse={toggleExerciseCollapsed}
           renderCollapsedExerciseSummary={({ exercise }) => {
             const performedSets = getCompletedPerformedSets(exercise.sets);
-            const workingSetCount = performedSets.filter(
-              (set) => {
-                const setType = normalizeSessionSetType(set.setType);
-                return isWorkingSessionSetType(setType);
-              }
-            ).length;
+            const workingSetCount = performedSets.filter((set) => {
+              const setType = normalizeSessionSetType(set.setType);
+              return isWorkingSessionSetType(setType);
+            }).length;
 
             return (
               <ExerciseCardCollapsedSummary
@@ -750,7 +887,7 @@ export function CompletedSessionDetailScreenShell({
           gymValue={
             <View style={styles.readOnlyField}>
               <Text numberOfLines={1} style={styles.readOnlyFieldText}>
-                {session.gymName?.trim() ? session.gymName : 'No gym'}
+                {session.gymName?.trim() ? session.gymName : "No gym"}
               </Text>
             </View>
           }
@@ -758,17 +895,22 @@ export function CompletedSessionDetailScreenShell({
           emptyExercisesText="No exercises logged in this session."
           renderExerciseHeaderAction={({ exercise }) => (
             <Pressable
-              accessibilityLabel={`Append ${exercise.name || 'exercise'} block to current session`}
+              accessibilityLabel={`Append ${exercise.name || "exercise"} block to current session`}
               accessibilityRole="button"
               onPress={() => handleAppendExercise(exercise.id)}
-              style={[styles.exerciseAppendButton, styles.actionBarSecondaryButton]}
-              testID={`completed-session-detail-append-exercise-button-${exercise.id}`}>
+              style={[
+                styles.exerciseAppendButton,
+                styles.actionBarSecondaryButton,
+              ]}
+              testID={`completed-session-detail-append-exercise-button-${exercise.id}`}
+            >
               <Text
                 adjustsFontSizeToFit
                 ellipsizeMode="clip"
                 minimumFontScale={0.75}
                 numberOfLines={1}
-                style={styles.actionBarSecondaryButtonText}>
+                style={styles.actionBarSecondaryButtonText}
+              >
                 Append
               </Text>
             </Pressable>
@@ -778,13 +920,18 @@ export function CompletedSessionDetailScreenShell({
               {setIndex === 0 ? (
                 <View
                   style={styles.setTableHeaderRow}
-                  testID={`completed-session-detail-sets-table-header-${exercise.id}`}>
+                  testID={`completed-session-detail-sets-table-header-${exercise.id}`}
+                >
                   <Text
                     adjustsFontSizeToFit
                     ellipsizeMode="clip"
                     minimumFontScale={0.75}
                     numberOfLines={1}
-                    style={[styles.setTableHeaderCell, styles.setTableIndexCell]}>
+                    style={[
+                      styles.setTableHeaderCell,
+                      styles.setTableIndexCell,
+                    ]}
+                  >
                     Set
                   </Text>
                   <Text
@@ -792,7 +939,11 @@ export function CompletedSessionDetailScreenShell({
                     ellipsizeMode="clip"
                     minimumFontScale={0.75}
                     numberOfLines={1}
-                    style={[styles.setTableHeaderCell, styles.setTableValueCell]}>
+                    style={[
+                      styles.setTableHeaderCell,
+                      styles.setTableValueCell,
+                    ]}
+                  >
                     Weight
                   </Text>
                   <Text
@@ -800,7 +951,11 @@ export function CompletedSessionDetailScreenShell({
                     ellipsizeMode="clip"
                     minimumFontScale={0.75}
                     numberOfLines={1}
-                    style={[styles.setTableHeaderCell, styles.setTableValueCell]}>
+                    style={[
+                      styles.setTableHeaderCell,
+                      styles.setTableValueCell,
+                    ]}
+                  >
                     Reps
                   </Text>
                   <Text
@@ -808,18 +963,26 @@ export function CompletedSessionDetailScreenShell({
                     ellipsizeMode="clip"
                     minimumFontScale={0.75}
                     numberOfLines={1}
-                    style={[styles.setTableHeaderCell, styles.setTableEffortCell]}>
+                    style={[
+                      styles.setTableHeaderCell,
+                      styles.setTableEffortCell,
+                    ]}
+                  >
                     Effort
                   </Text>
                 </View>
               ) : null}
-              <View style={styles.setTableRow} testID={`completed-session-detail-set-row-${set.id}`}>
+              <View
+                style={styles.setTableRow}
+                testID={`completed-session-detail-set-row-${set.id}`}
+              >
                 <Text
                   adjustsFontSizeToFit
                   ellipsizeMode="clip"
                   minimumFontScale={0.75}
                   numberOfLines={1}
-                  style={[styles.setTableCell, styles.setTableIndexCell]}>
+                  style={[styles.setTableCell, styles.setTableIndexCell]}
+                >
                   {setIndex + 1}
                 </Text>
                 <Text
@@ -827,23 +990,26 @@ export function CompletedSessionDetailScreenShell({
                   ellipsizeMode="clip"
                   minimumFontScale={0.75}
                   numberOfLines={1}
-                  style={[styles.setTableCell, styles.setTableValueCell]}>
-                  {set.weight || '—'}
+                  style={[styles.setTableCell, styles.setTableValueCell]}
+                >
+                  {set.weight || "—"}
                 </Text>
                 <Text
                   adjustsFontSizeToFit
                   ellipsizeMode="clip"
                   minimumFontScale={0.75}
                   numberOfLines={1}
-                  style={[styles.setTableCell, styles.setTableValueCell]}>
-                  {set.reps || '—'}
+                  style={[styles.setTableCell, styles.setTableValueCell]}
+                >
+                  {set.reps || "—"}
                 </Text>
                 <Text
                   adjustsFontSizeToFit
                   ellipsizeMode="clip"
                   minimumFontScale={0.75}
                   numberOfLines={1}
-                  style={[styles.setTableCell, styles.setTableEffortCell]}>
+                  style={[styles.setTableCell, styles.setTableEffortCell]}
+                >
                   {formatSetEffortLabel(set.setType)}
                 </Text>
               </View>
@@ -851,13 +1017,23 @@ export function CompletedSessionDetailScreenShell({
           )}
           renderExerciseMeta={({ exercise }) =>
             exercise.tags.length > 0 ? (
-              <View style={styles.exerciseTagSection} testID={`completed-session-detail-tags-${exercise.id}`}>
+              <View
+                style={styles.exerciseTagSection}
+                testID={`completed-session-detail-tags-${exercise.id}`}
+              >
                 <View style={styles.exerciseTagChipWrap}>
                   {exercise.tags.map((tag) => (
                     <View
                       key={`${exercise.id}-${tag.tagDefinitionId}`}
-                      style={[styles.exerciseTagChip, tag.deletedAt ? styles.exerciseTagChipDeleted : null]}>
-                      <Text numberOfLines={1} style={styles.exerciseTagChipText}>
+                      style={[
+                        styles.exerciseTagChip,
+                        tag.deletedAt ? styles.exerciseTagChipDeleted : null,
+                      ]}
+                    >
+                      <Text
+                        numberOfLines={1}
+                        style={styles.exerciseTagChipText}
+                      >
                         {tag.deletedAt ? `${tag.name} (deleted)` : tag.name}
                       </Text>
                     </View>
@@ -885,22 +1061,25 @@ export default function CompletedSessionDetailRoute() {
   const intent = coerceRouteParam(params.intent);
   const presentation = resolveCompletedSessionPresentation(params.presentation);
   const shouldFailNextMaestroShare =
-    isDevMode() && coerceRouteParam(params.maestroShare) === 'fail-once';
+    isDevMode() && coerceRouteParam(params.maestroShare) === "fail-once";
   const shouldFailNextMaestroCatalog =
-    isDevMode() && coerceRouteParam(params.maestroCatalog) === 'fail-once';
-  const initialMode = 'view';
+    isDevMode() && coerceRouteParam(params.maestroCatalog) === "fail-once";
+  const initialMode = "view";
 
   useEffect(() => {
-    if (intent !== 'edit' || !sessionId) {
+    if (intent !== "edit" || !sessionId) {
       return;
     }
 
     router.replace(sessionViewHref(sessionId));
   }, [intent, router, sessionId]);
 
-  if (intent === 'edit' && sessionId) {
+  if (intent === "edit" && sessionId) {
     return (
-      <View style={styles.centerState} testID="completed-session-detail-edit-redirect">
+      <View
+        style={styles.centerState}
+        testID="completed-session-detail-edit-redirect"
+      >
         <Text style={styles.stateTitle}>Opening editor...</Text>
       </View>
     );
@@ -930,20 +1109,20 @@ const styles = StyleSheet.create({
   centerState: {
     flex: 1,
     padding: uiSpace.xl,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     gap: uiSpace.sm,
     backgroundColor: uiColors.surfacePage,
   },
   stateTitle: {
     fontSize: uiTypography.size.lg,
-    fontWeight: '700',
+    fontWeight: "700",
     color: uiColors.textPrimary,
   },
   stateBody: {
     fontSize: uiTypography.size.md,
     color: uiColors.textSecondary,
-    textAlign: 'center',
+    textAlign: "center",
   },
   headerCard: {
     borderRadius: uiRadius.md,
@@ -954,23 +1133,23 @@ const styles = StyleSheet.create({
     gap: uiSpace.md,
   },
   metricGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: uiSpace.md,
   },
   metricCell: {
-    width: '48%',
+    width: "48%",
     gap: uiSpace.xs,
   },
   metricLabel: {
     color: uiColors.textSecondary,
     fontSize: uiTypography.size.sm,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   metricValue: {
     color: uiColors.textPrimary,
     fontSize: uiTypography.size.base,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   actionBarCard: {
     borderRadius: uiRadius.md,
@@ -981,8 +1160,8 @@ const styles = StyleSheet.create({
     gap: uiSpace.sm,
   },
   actionBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: uiSpace.sm,
   },
   actionBarButton: {
@@ -990,8 +1169,8 @@ const styles = StyleSheet.create({
     borderRadius: uiRadius.md,
     paddingHorizontal: uiSpace.sm,
     paddingVertical: uiSpace.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     borderWidth: 1,
     minHeight: 36,
   },
@@ -1001,7 +1180,7 @@ const styles = StyleSheet.create({
   },
   actionBarPrimaryButtonText: {
     color: uiColors.surfaceDefault,
-    fontWeight: '700',
+    fontWeight: "700",
     fontSize: uiTypography.size.sm,
   },
   actionBarSecondaryButton: {
@@ -1010,7 +1189,7 @@ const styles = StyleSheet.create({
   },
   actionBarSecondaryButtonText: {
     color: uiColors.actionNeutralSubtleText,
-    fontWeight: '700',
+    fontWeight: "700",
     fontSize: uiTypography.size.sm,
   },
   disabledActionButton: {
@@ -1030,15 +1209,15 @@ const styles = StyleSheet.create({
   },
   actionBarDangerButtonText: {
     color: uiColors.actionDangerText,
-    fontWeight: '700',
+    fontWeight: "700",
     fontSize: uiTypography.size.sm,
   },
   exerciseAppendButton: {
     borderRadius: uiRadius.md,
     paddingHorizontal: uiSpace.md,
     paddingVertical: uiSpace.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     borderWidth: 1,
     minHeight: 34,
     maxWidth: 96,
@@ -1046,7 +1225,7 @@ const styles = StyleSheet.create({
   actionFeedbackText: {
     color: uiColors.actionNeutralSubtleText,
     fontSize: uiTypography.size.sm,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   editModeBanner: {
     borderRadius: uiRadius.md,
@@ -1059,7 +1238,7 @@ const styles = StyleSheet.create({
   editModeBannerTitle: {
     color: uiColors.textAccentStrong,
     fontSize: uiTypography.size.md,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   editModeBannerBody: {
     color: uiColors.textAccentMuted,
@@ -1075,7 +1254,7 @@ const styles = StyleSheet.create({
   },
   readOnlyFieldText: {
     color: uiColors.actionNeutralSubtleText,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   editFieldInput: {
     borderWidth: 1,
@@ -1085,11 +1264,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: uiSpace.md,
     paddingVertical: uiSpace.sm,
     color: uiColors.textPrimary,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   setRowEdit: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: uiSpace.sm,
     borderWidth: 1,
     borderColor: uiColors.actionPrimarySubtleBorder,
@@ -1099,7 +1278,7 @@ const styles = StyleSheet.create({
   },
   setIndexText: {
     color: uiColors.textPrimary,
-    fontWeight: '700',
+    fontWeight: "700",
     fontSize: uiTypography.size.sm,
   },
   editSetInput: {
@@ -1112,11 +1291,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: uiSpace.sm,
     paddingVertical: uiSpace.sm,
     color: uiColors.textPrimary,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   setTableHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     borderTopLeftRadius: uiRadius.sm,
     borderTopRightRadius: uiRadius.sm,
     borderWidth: 1,
@@ -1128,8 +1307,8 @@ const styles = StyleSheet.create({
     gap: uiSpace.sm,
   },
   setTableRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     borderWidth: 1,
     borderColor: uiColors.borderMuted,
     borderTopWidth: 0,
@@ -1141,13 +1320,13 @@ const styles = StyleSheet.create({
   setTableCell: {
     color: uiColors.actionNeutralSubtleText,
     fontSize: uiTypography.size.sm,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   setTableHeaderCell: {
     color: uiColors.textSecondary,
     fontSize: uiTypography.size.xs,
-    fontWeight: '700',
-    textTransform: 'uppercase',
+    fontWeight: "700",
+    textTransform: "uppercase",
   },
   setTableIndexCell: {
     width: 36,
@@ -1162,14 +1341,14 @@ const styles = StyleSheet.create({
     gap: uiSpace.sm,
   },
   exerciseTagChipWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: uiSpace.sm,
-    alignItems: 'center',
+    alignItems: "center",
   },
   exerciseTagChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: uiSpace.xs,
     borderWidth: 1,
     borderColor: uiColors.actionPrimarySubtleBorder,
@@ -1177,7 +1356,7 @@ const styles = StyleSheet.create({
     borderRadius: uiRadius.full,
     paddingVertical: uiSpace.xs,
     paddingHorizontal: uiSpace.sm,
-    maxWidth: '100%',
+    maxWidth: "100%",
   },
   exerciseTagChipDeleted: {
     borderColor: uiColors.actionNeutralSubtleBorder,
@@ -1186,7 +1365,7 @@ const styles = StyleSheet.create({
   exerciseTagChipText: {
     fontSize: uiTypography.size.sm,
     color: uiColors.textAccentStrong,
-    fontWeight: '600',
+    fontWeight: "600",
     maxWidth: 180,
   },
 });
