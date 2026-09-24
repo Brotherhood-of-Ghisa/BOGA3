@@ -53,5 +53,10 @@ Completion (PR B, pending acceptance), same lane and flow:
 | `session-share-image-error` | the share sheet's inline failure |
 | `session-completion-unavailable` | not found: top bar without Done, `Back to Progress` |
 
+Group session view (PR C, pending acceptance): `groups-07-friend-view-read-only`
+(`ios-groups-e2e`, `groups-two-user-stream.yaml`) — the member, status and
+facts card, then the exercise cards; the group state panels keep the groups
+screens' styling.
+
 No target screenshots are committed; runtime captures stay in the gitignored
 `apps/mobile/artifacts/maestro/` tree and are linked as PR evidence.
