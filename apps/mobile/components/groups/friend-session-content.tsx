@@ -1,180 +1,133 @@
-import { useCallback, useMemo, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { useMemo } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 
-import {
-  ExerciseCardCollapsedSummary,
-  SessionContentLayout,
-} from '@/components/session-recorder/session-content-layout';
-import { UiSurface, UiText, uiColors, uiSpace } from '@/components/ui';
-import { formatSessionSetType, isWorkingSessionSetType, normalizeSessionSetType } from '@/src/data/set-types';
+import { ExerciseSetsCard, SessionFactsCard } from '@/components/session-detail';
+import { Icon } from '@/components/ui/icon';
+import { uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { computeSetVolume } from '@/src/exercise-calculations';
 import {
   formatGroupDateTime,
-  formatKg,
   formatMemberName,
   formatSessionStatusLabel,
   selectGroupPerformedExercises,
   type GroupSessionDetail,
 } from '@/src/groups';
-
-type FriendSet = { id: string; weightLabel: string; reps: number; effortLabel: string; working: boolean };
-type FriendExercise = { id: string; name: string; machineName: string | null; sets: FriendSet[] };
-
-/** View Session's effort column wording. */
-export const formatGroupSetEffort = (setType: string | null): string =>
-  formatSessionSetType(setType) ?? '-';
+import { formatSetRow, formatVolumeFigure } from '@/src/session-recorder/session-view-model';
 
 const IN_PROGRESS_LABEL = 'In progress';
 
+const formatSetCount = (count: number): string => `${count} ${count === 1 ? 'set' : 'sets'}`;
+
 /**
- * The friend's session body (C3.8): the View Session layout
- * (`SessionContentLayout`) with read-only rows and NO owner actions — no
- * edit, delete, or append. Performed sets only: the server returns every live
- * set raw, and the device selects the performed ones (contract §5).
+ * The friend's session body (C3.8), in the design language and on the cards
+ * View Session uses (`components/session-detail/`): the member, the session's
+ * facts, then one card per exercise with its performed sets as `type · weight
+ * × reps · 1RM · VOL`. Read-only — NO owner actions (no edit, delete, append)
+ * and no record band, since the friend's history is not on this device.
+ * Performed sets only: the server returns every live set raw, and the device
+ * selects the performed ones (contract §5).
  */
 export function FriendSessionContent({ session }: { session: GroupSessionDetail }) {
-  const [collapsedIds, setCollapsedIds] = useState<Set<string>>(() => new Set());
-  const toggleCollapsed = useCallback((exerciseId: string) => {
-    setCollapsedIds((current) => {
-      const next = new Set(current);
-      if (!next.delete(exerciseId)) next.add(exerciseId);
-      return next;
-    });
-  }, []);
-
-  const exercises = useMemo<FriendExercise[]>(
-    () =>
-      selectGroupPerformedExercises(session.exercises).map((exercise) => ({
+  const model = useMemo(() => {
+    let setCount = 0;
+    let volume = 0;
+    const cards = selectGroupPerformedExercises(session.exercises).map((exercise) => {
+      setCount += exercise.sets.length;
+      for (const set of exercise.sets) volume += computeSetVolume(set.weightKg, set.reps);
+      return {
         id: exercise.sessionExerciseId,
         name: exercise.name,
-        machineName: exercise.machineName,
-        sets: exercise.sets.map((set) => ({
-          id: set.setId,
-          weightLabel: `${formatKg(set.weightKg)} kg`,
-          reps: set.reps,
-          effortLabel: formatGroupSetEffort(set.setType),
-          working: isWorkingSessionSetType(normalizeSessionSetType(set.setType)),
-        })),
-      })),
-    [session],
-  );
+        rows: exercise.sets.map((set) =>
+          formatSetRow({ id: set.setId, weight: set.weightKg, reps: set.reps, setType: set.setType, done: true })
+        ),
+      };
+    });
+    return { cards, setCount, volume: formatVolumeFigure(volume) };
+  }, [session]);
 
   const isActive = session.status === 'active';
-  const metrics = [
-    { label: 'Start', value: formatGroupDateTime(session.started_at_ms) },
-    { label: 'End', value: session.completed_at_ms === null ? '—' : formatGroupDateTime(session.completed_at_ms) },
-    { label: 'Location', value: session.gym_name?.trim() || 'No gym' },
-  ];
 
   return (
     <>
-      <UiSurface style={styles.headerCard} testID="group-session-header">
-        <View style={styles.headerRow}>
-          <UiText numberOfLines={1} style={styles.flex} testID="group-session-member" variant="title">
-            {formatMemberName(session.member.username)}
-          </UiText>
-          <UiText style={isActive ? styles.liveText : null} testID="group-session-status" variant="subtitle">
-            {isActive ? IN_PROGRESS_LABEL : formatSessionStatusLabel(session)}
-          </UiText>
-        </View>
-        <View style={styles.metricGrid}>
-          {metrics.map((metric) => (
-            <View key={metric.label} style={styles.metricCell}>
-              <UiText variant="subtitle">{metric.label}</UiText>
-              <UiText numberOfLines={1} variant="labelStrong">
-                {metric.value}
-              </UiText>
+      <SessionFactsCard
+        facts={[
+          { label: 'Gym', value: session.gym_name?.trim() || 'No gym', kind: 'text', testID: 'group-session-gym' },
+          { label: 'Sets', value: String(model.setCount), testID: 'group-session-sets' },
+          { label: 'Volume', value: model.volume, align: 'end', testID: 'group-session-volume' },
+        ]}
+        header={
+          <View style={styles.header} testID="group-session-header">
+            <Text numberOfLines={1} style={styles.member} testID="group-session-member">
+              {formatMemberName(session.member.username)}
+            </Text>
+            <View style={styles.status}>
+              {/* A ring marks "current" in the design language (§5). */}
+              {isActive ? <Icon color={uiRoles.accent} name="set-current" size="xs" /> : null}
+              <Text style={styles.statusText} testID="group-session-status">
+                {isActive ? IN_PROGRESS_LABEL : formatSessionStatusLabel(session)}
+              </Text>
             </View>
-          ))}
-        </View>
-      </UiSurface>
-
-      <SessionContentLayout<FriendSet, FriendExercise>
-        collapsedExerciseIds={collapsedIds}
-        dateTimeValue={null}
-        emptyExercisesText="No performed sets yet."
-        exercises={exercises}
-        gymValue={null}
-        onToggleExerciseCollapse={toggleCollapsed}
-        renderCollapsedExerciseSummary={({ exercise }) => (
-          <ExerciseCardCollapsedSummary
-            setCount={exercise.sets.length}
-            testID={`group-session-collapsed-summary-${exercise.id}`}
-            workingSetCount={exercise.sets.filter((set) => set.working).length}
-          />
-        )}
-        renderSetHeader={() => (
-          <View style={[styles.setRow, styles.setHeaderRow]}>
-            {['Set', 'Weight', 'Reps', 'Effort'].map((label, index) => (
-              <UiText key={label} style={[styles.headerCell, CELL_STYLES[index]]} variant="subtitle">
-                {label}
-              </UiText>
-            ))}
           </View>
-        )}
-        renderSetRow={({ set, setIndex }) => (
-          <View style={styles.setRow} testID={`group-session-set-row-${set.id}`}>
-            {[`${setIndex + 1}`, set.weightLabel, `${set.reps}`, set.effortLabel].map((value, index) => (
-              <UiText key={index} numberOfLines={1} style={CELL_STYLES[index]} variant="label">
-                {value}
-              </UiText>
-            ))}
-          </View>
-        )}
-        showMetadataSection={false}
+        }
+        testID="group-session-summary"
+        times={{
+          start: formatGroupDateTime(session.started_at_ms),
+          end: session.completed_at_ms === null ? '—' : formatGroupDateTime(session.completed_at_ms),
+          testID: 'group-session-times',
+        }}
       />
+      {model.cards.length === 0 ? (
+        <Text style={styles.empty} testID="group-session-no-sets">
+          No performed sets yet.
+        </Text>
+      ) : (
+        model.cards.map((card) => (
+          <ExerciseSetsCard
+            accessibilityLabel={`${card.name}, ${formatSetCount(card.rows.length)}`}
+            count={formatSetCount(card.rows.length)}
+            key={card.id}
+            name={card.name}
+            recordOneRepMax={null}
+            rowTestID={(row) => `group-session-set-row-${row.id}`}
+            rows={card.rows}
+            testID={`group-session-exercise-${card.id}`}
+          />
+        ))
+      )}
     </>
   );
 }
 
 const styles = StyleSheet.create({
-  headerCard: {
-    padding: uiSpace.lg,
-    gap: uiSpace.md,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiSpace.sm,
-  },
-  flex: {
-    flex: 1,
-    minWidth: 0,
-  },
-  liveText: {
-    color: uiColors.textSuccess,
-  },
-  metricGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: uiSpace.md,
-  },
-  metricCell: {
-    width: '46%',
+  header: {
+    paddingHorizontal: uiSpace.md,
+    paddingTop: uiSpace.md,
     gap: uiSpace.xs,
   },
-  setRow: {
+  member: {
+    fontFamily: uiFonts.display.family,
+    fontWeight: '700',
+    fontSize: uiTypography.size.xl,
+    lineHeight: uiTypography.lineHeight.xl,
+    color: uiRoles.ink,
+  },
+  status: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: uiSpace.sm,
-    paddingHorizontal: uiSpace.sm,
-    paddingVertical: uiSpace.xs,
+    gap: uiSpace.xs,
   },
-  setHeaderRow: {
-    borderBottomWidth: 1,
-    borderBottomColor: uiColors.borderMuted,
+  statusText: {
+    fontFamily: uiFonts.body.family,
+    fontWeight: '600',
+    fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
+    color: uiRoles.inkMuted,
   },
-  headerCell: {
-    textTransform: 'uppercase',
-  },
-  indexCell: {
-    width: 36,
-  },
-  valueCell: {
-    flex: 1,
-  },
-  effortCell: {
-    width: 56,
+  empty: {
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
+    fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
+    color: uiRoles.inkMuted,
   },
 });
-
-const CELL_STYLES = [styles.indexCell, styles.valueCell, styles.valueCell, styles.effortCell];

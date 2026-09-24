@@ -89,10 +89,8 @@ Use this section as the single source of truth for reusable UX patterns.
    - Intent: prevent accidental data loss in edit flows.
    - Usage: delete location/exercise/set actions.
    - Rules: clear destructive styling, confirm intent when risk is meaningful, and provide immediate feedback after action.
-4. Collapsible summary card pattern
-   - Intent: reduce vertical density while retaining the facts needed to identify and compare repeated content.
-   - Usage: exercise cards in a group member's session (`components/groups/friend-session-content.tsx`); View Session's cards dropped it with the design-language restyle.
-   - Rules: cards start expanded, the title region is a minimum-size accessible toggle, collapse hides detail without changing domain data, and the collapsed state shows only validated summary facts. Actions that require the hidden content to be visible must expand the card.
+4. Collapsible summary card pattern (retired)
+   - Retired with the View Session restyle: completed-session detail and a group member's session now draw read-only exercise cards (`components/session-detail/`, the cards of pattern 13 without the link) and nothing collapses a card. Kept as a numbered slot so later patterns keep their numbers.
 5. Explicit row confirmation pattern
    - Intent: keep entered/defaulted values separate from the user's assertion that a repeated item was actually completed.
    - Usage: normal and prescribed set rows on the exercise page, for an active or a completed session (`components/exercise-page/set-row.tsx`).
@@ -100,7 +98,7 @@ Use this section as the single source of truth for reusable UX patterns.
 6. Stream card pattern
    - Intent: scan other people's recent activity at a glance and drill into one item.
    - Usage: group stream session cards (`components/groups/stream-session-card.tsx`).
-   - Rules: a collapsed summary card (pattern 4) with no expand; the whole card is one accessible press target that navigates to the detail; show who, a status pill (text, not color alone — "Training now" or "Completed · duration"), when/where, and the validated summary metrics; newest first; secondary events (joined / left) are lighter rows, not cards.
+   - Rules: a summary card that never expands; the whole card is one accessible press target that navigates to the detail; show who, a status pill (text, not color alone — "Training now" or "Completed · duration"), when/where, and the validated summary metrics; newest first; secondary events (joined / left) are lighter rows, not cards.
 7. Offline marker pattern
    - Intent: keep cached server data usable offline without hiding that it may be stale.
    - Usage: every group read screen (`components/groups/offline-banner.tsx`).
@@ -126,7 +124,7 @@ Use this section as the single source of truth for reusable UX patterns.
    - Usage: the exercise page's set list (redesign step 4; `components/exercise-page/set-logger.tsx`, `ui/ux-rules.md` §14a).
    - Rules: the open row expands in place into its editor (labelled fields of one height, the commit control on the list's control axis); it opens on the first unfinished row by default, or on a row the user taps, one at a time; entered values are kept as typed (autosave) and stay unconfirmed until the commit control, which is the screen's one primary and is disabled until the values are valid; committing moves the editor to the next unfinished row; a row's state stays in its glyph, which the user can also toggle directly without opening the editor.
 
-12. Read-only link card pattern
+13. Read-only link card pattern
    - Intent: summarise one item of a working set (an exercise in the session) and open it, without editing in place.
    - Usage: the session view's exercise cards (redesign step 5; `components/session-view/session-exercise-card.tsx`).
    - Rules: the whole card is one `Card` link with an accessibility label that states the summary (name, done count, record); no controls inside it; editing and removal live on the destination; what is not yet realised renders faded, never hidden; a record earns a band on the card, not a badge on the row.

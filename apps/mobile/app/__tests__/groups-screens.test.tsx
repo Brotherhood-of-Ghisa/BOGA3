@@ -521,25 +521,28 @@ describe('Group screen', () => {
 
 describe("Friend's session view", () => {
   const OWNER_ACTION_TEST_IDS = [
-    'completed-session-detail-action-bar',
+    'completed-session-detail-options-button',
     'completed-session-detail-edit-button',
     'completed-session-detail-delete-button',
-    'completed-session-detail-append-exercise-button-ex-1',
+    'completed-session-detail-exercise-options-ex-1',
   ];
 
   beforeEach(() => {
     mockParams = { memberId: 'friend-1', sessionId: 's-1' };
   });
 
-  it('renders exercises with performed sets (kg, reps, effort) and no owner actions (AC6)', async () => {
+  it('renders exercises with performed sets (weight × reps, effort, 1RM, volume) and no owner actions (AC6)', async () => {
     render(<GroupSessionRoute />);
+    // The session view's row, from the shared session-detail cards.
     const warmUp = within(await screen.findByTestId('group-session-set-row-set-1'));
-    expect(warmUp.getByText('60 kg')).toBeTruthy();
-    expect(warmUp.getByText('10')).toBeTruthy();
+    expect(warmUp.getByText('60.0 × 10')).toBeTruthy();
     expect(warmUp.getByText('W-Up')).toBeTruthy();
+    expect(warmUp.getByLabelText('Vol 600')).toBeTruthy();
     const working = within(screen.getByTestId('group-session-set-row-set-2'));
-    expect(working.getByText('102.5 kg')).toBeTruthy();
+    expect(working.getByText(/^102\.5 × \d+$/)).toBeTruthy();
     expect(working.getByText('RIR 1')).toBeTruthy();
+    // No record band: the friend's history is not on this device.
+    expect(screen.queryByText(/New 1RM record/)).toBeNull();
     // The server sends the planned set too; the device shows performed sets only.
     expect(screen.queryByTestId('group-session-set-row-set-3')).toBeNull();
     expect(screen.getByText('Bench Press')).toBeTruthy();
@@ -562,7 +565,7 @@ describe("Friend's session view", () => {
       .mockResolvedValue(sessionDetail());
     render(<GroupSessionRoute />);
     expect(await screen.findByText('In progress')).toBeTruthy();
-    expect(screen.getByText('—')).toBeTruthy();
+    expect(screen.getByTestId('group-session-times-end').props.accessibilityLabel).toBe('End —');
 
     await pullToRefresh('group-session-screen');
     expect(await screen.findByText('Completed · 1h 5m')).toBeTruthy();
