@@ -17,7 +17,8 @@ Link CI runs / artifacts / prior threads — do not paste them.
 | Gate | Ran? | Result |
 | --- | --- | --- |
 | fast — `./boga test fast` (lint/typecheck/jest + backend smoke) | ⬜ | |
-| slow frontend — `./boga test frontend` (Maestro smoke/data-smoke/auth-profile/sync-e2e) | ⬜ | |
+| slow frontend — `./boga test frontend` (every iOS lane; root layout / harness / Maestro runtime changes) | ⬜ | |
+| slow frontend UI tier — `./boga test frontend-ui` (backend-free iOS lanes; any screen/component change) | ⬜ | |
 | slow backend — `./boga test backend` (auth/RLS + sync-v2 + sync-infra) | ⬜ | |
 | iOS sync e2e — `./boga test ios-sync-e2e` (UI↔server; mandatory for sync/scheduler/auth-session changes) | ⬜ | |
 

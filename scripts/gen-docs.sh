@@ -49,7 +49,7 @@ with open(os.path.join(root, "scripts/lanes.tsv")) as f:
             continue
         lanes.append(parts)
 lane_names = {l[0] for l in lanes}
-GATE_ALIASES = {"fast", "backend", "frontend", "slow", "all",
+GATE_ALIASES = {"fast", "backend", "frontend", "frontend-ui", "slow", "all",
                 "fast-frontend", "fast-backend", "fast-repo",
                 "for"}  # `boga test for` — the trigger-matcher subcommand
 
@@ -119,7 +119,10 @@ def matrix_lines():
             med = fmt(medians[name]) if name in medians else "N/A"
             ci_mark = "✅" if ci == "yes" else "❌"
             suffix = " *(+ local Supabase)*" if infra == "ios+supabase" else ""
-            out.append(f"| {name}{suffix} | `./boga test {name}` | {GATE_DISPLAY.get(gate, gate)} | {ci_mark} | {med} |")
+            gate_cell = GATE_DISPLAY.get(gate, gate)
+            if gate == "slow-frontend" and infra == "ios":
+                gate_cell += " + `frontend-ui`"
+            out.append(f"| {name}{suffix} | `./boga test {name}` | {gate_cell} | {ci_mark} | {med} |")
     out.append("")
     out.append("† All-machine median of the recorded green runs "
                "(`docs/testing/timings/records/`); `N/A` = no measured data yet, **not** \"instant\" — "
