@@ -149,10 +149,16 @@ appId: com.dinoderek.mobile
     visible:
       id: "exercise-editor-secondary-muscle-trigger"
     timeout: 10000
-# Selecting the primary returns to a shorter sheet. Wait for its resize so the
-# secondary-muscle tap cannot land on Save while the controls are still moving.
+# Bring the secondary action into the scroll viewport above the fixed footer.
+- scrollUntilVisible:
+    element:
+      id: "exercise-editor-secondary-muscle-trigger"
+    direction: DOWN
+    centerElement: true
+    timeout: 10000
 - waitForAnimationToEnd:
     timeout: 4000
+- takeScreenshot: "editor-primary-selected"
 - tapOn:
     id: "exercise-editor-secondary-muscle-trigger"
 - extendedWaitUntil:
