@@ -57,7 +57,7 @@ panels, and the `Groups`-only list.
 
 ## The catalogue and the exercise editor (DLM-T07)
 
-**Pending acceptance** in the DLM-T07 gallery.
+**Accepted** by the user in the DLM-T07 gallery on 2026-09-25.
 
 ### Brief
 
