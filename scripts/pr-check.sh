@@ -60,7 +60,7 @@ else
   "${REPO_ROOT}/scripts/test-for.sh" --tsv ${DIFF_RANGE:+--diff "${DIFF_RANGE}"} > "${REQ_TMP}" 2>/dev/null || : > "${REQ_TMP}"
 fi
 
-BODY_TMP="${BODY_TMP}" REQ_TMP="${REQ_TMP}" STRICT="${STRICT}" python3 - <<'PY'
+REPO_ROOT="${REPO_ROOT}" BODY_TMP="${BODY_TMP}" REQ_TMP="${REQ_TMP}" STRICT="${STRICT}" python3 - <<'PY'
 import os, re, sys
 
 body = open(os.environ["BODY_TMP"]).read()
@@ -121,11 +121,36 @@ collapsed = {}
 for req, rule in required.items():
     collapsed.setdefault(ALIAS.get(req, req), []).append(rule)
 
+# A required lane or narrower alias is satisfied by the row of a gate that runs
+# it (e.g. a `boga test frontend` row covers frontend-ui and ios-groups-e2e).
+covers = {"frontend": {"frontend-ui"}}
+with open(os.path.join(os.environ["REPO_ROOT"], "scripts/lanes.tsv")) as f:
+    for line in f:
+        parts = line.rstrip("\n").split("\t")
+        if line.lstrip().startswith("#") or len(parts) != 6:
+            continue
+        name, lane_gate, infra = parts[0], parts[1], parts[2]
+        if lane_gate == "slow-frontend":
+            covers["frontend"].add(name)
+            if infra == "ios":
+                covers.setdefault("frontend-ui", set()).add(name)
+        elif lane_gate == "slow-backend":
+            covers.setdefault("backend", set()).add(name)
+        elif lane_gate.startswith("fast-"):
+            covers.setdefault("fast", set()).add(name)
+
+def row_for(gate):
+    if gate in row_state:
+        return row_state[gate]
+    covering = [row_state[g] for g, lanes in covers.items() if gate in lanes and g in row_state]
+    # prefer a covering row that ran; otherwise report the N/A one
+    return next((st for st in covering if st[0] != "na"), covering[0] if covering else None)
+
 if not required:
     warnings.append("trigger cross-check skipped: no changed paths resolved (shallow clone or empty diff)")
 else:
     for gate, rules in sorted(collapsed.items()):
-        state = row_state.get(gate)
+        state = row_for(gate)
         if state is None:
             warnings.append(f'change requires "{gate}" but the Tests table has no `boga test {gate}` row')
         elif state[0] == "na":

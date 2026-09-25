@@ -7,10 +7,12 @@
 # recorded under docs/testing/timings/records/ (read back with `boga timings`).
 #
 #   boga test fast|backend|frontend|slow|all   # gate aggregates
+#   boga test frontend-ui                      # frontend minus the Supabase-backed e2e lanes
 #   boga test <lane>                           # one lane by registry name
 #   boga test --list                           # what exists, where it runs
 #   boga test <lane> --dry-run                 # print the command, don't run
 #   boga test for [--diff <range>] [paths...]  # which gates does a change require?
+#   boga sweep [--dry-run]                     # every lane on origin/main, in its own worktree (scheduled backstop)
 #   boga pr check --body <file|->              # validate a PR body's Tests table
 #   boga pr wait [--interval <s>]              # block until this branch's PR merges/closes
 #   boga doctor [--android]                    # can THIS machine run every lane (or Android dev)?
@@ -99,16 +101,21 @@ run_lane_row() {
   boga_time_lane "${name}" lane_body
 }
 
+# Each gate argument is a registry gate, optionally narrowed to one infra
+# class as <gate>:<infra> (e.g. slow-frontend:ios = the backend-free iOS lanes).
 run_gate() {
   local dry="$1"
   shift
   local gates=("$@")
-  local row matched=0
-  for gate in "${gates[@]}"; do
+  local row matched=0 gate infra
+  for spec in "${gates[@]}"; do
+    gate="${spec%%:*}"
+    infra=""
+    [[ "${spec}" == *:* ]] && infra="${spec#*:}"
     while IFS= read -r row; do
       matched=1
       run_lane_row "${row}" "${dry}"
-    done < <(lanes_rows | awk -F'\t' -v g="${gate}" '$2 == g')
+    done < <(lanes_rows | awk -F'\t' -v g="${gate}" -v i="${infra}" '$2 == g && (i == "" || $3 == i)')
   done
   [[ "${matched}" == "1" ]] || fail "no lanes found for gate(s): ${gates[*]}"
 }
@@ -132,7 +139,7 @@ cmd_test() {
 
   case "${target}" in
     --list)
-      echo "Lanes (scripts/lanes.tsv). Gates: fast | backend | frontend | slow | all."
+      echo "Lanes (scripts/lanes.tsv). Gates: fast | backend | frontend | frontend-ui | slow | all."
       echo "Durations: ./boga timings   Capability: ./boga doctor"
       echo
       printf '%-20s %-15s %-13s %-4s %-12s %s\n' "LANE" "GATE" "INFRA" "CI" "CWD" "COMMAND"
@@ -144,6 +151,7 @@ cmd_test() {
     fast-repo)     run_gate "${dry}" fast-repo ;;
     backend)       run_gate "${dry}" slow-backend ;;
     frontend)      run_gate "${dry}" slow-frontend ;;
+    frontend-ui)   run_gate "${dry}" slow-frontend:ios ;;
     slow)          run_gate "${dry}" slow-frontend slow-backend ;;
     all)           run_gate "${dry}" fast-frontend fast-backend fast-repo slow-frontend slow-backend ;;
     *)
@@ -324,6 +332,7 @@ case "${cmd}" in
     esac
     ;;
   timings)  dispatch_script "${REPO_ROOT}/scripts/test-timings.sh" "$@" ;;
+  sweep)    dispatch_script "${REPO_ROOT}/scripts/full-sweep.sh" "$@" ;;
   worktree)
     sub="${1:-}"; shift || true
     case "${sub}" in
