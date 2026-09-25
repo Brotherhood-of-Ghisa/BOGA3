@@ -1,19 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
-import {
-  Keyboard,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Keyboard, Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import { ExerciseCoreFields } from '@/components/exercise-core/exercise-core-fields';
-import { Icon, uiColors, uiRadius, uiSpace, uiTypography } from '@/components/ui';
+import { ActionButton } from '@/components/ui/action-button';
+import { Card } from '@/components/ui/card';
+import { Icon } from '@/components/ui/icon';
+import { IconButton } from '@/components/ui/icon-button';
+import { ListRow } from '@/components/ui/list-row';
+import { Notice } from '@/components/ui/notice';
+import { Sheet } from '@/components/ui/sheet';
+import { StatePanel } from '@/components/ui/state-panel';
+import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import { validateExerciseCore } from '@/src/exercise-core';
 import {
   saveExerciseCatalogExercise,
@@ -59,6 +57,10 @@ type ExerciseEditorModalProps = {
   onSave?: (input: ExerciseEditorSaveInput) => Promise<ExerciseCatalogExercise>;
   title?: string;
 };
+
+// The editor is a tall sheet: its body keeps this share of the window, and
+// shrinks with the sheet when the keyboard is up (as the exercise picker's).
+const EDITOR_SHARE_OF_SCREEN = 0.8;
 
 const PRIMARY_MUSCLE_WEIGHT = 1;
 const SECONDARY_MUSCLE_WEIGHT = 0.5;
@@ -127,6 +129,7 @@ export function ExerciseEditorModal({
   const [validation, setValidation] = useState<EditorValidationState>(createBlankValidationState);
   const [saveError, setSaveError] = useState<string | null>(null);
 
+  const { height } = useWindowDimensions();
   const catalog = useExerciseCatalog();
   const muscleGroups = catalog.muscleGroups;
   const isLoadingMuscleGroups = catalog.status === 'idle' || catalog.status === 'loading';
@@ -331,42 +334,42 @@ export function ExerciseEditorModal({
     }
   };
 
+  const isSelectorOpen = muscleSelectorMode !== null;
+
   return (
-    <Modal animationType="slide" transparent visible={visible} onRequestClose={closeEditorModal}>
-      <KeyboardAvoidingView
-        style={styles.modalRoot}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <Pressable
-          accessibilityLabel="Dismiss exercise editor overlay"
-          style={styles.modalOverlay}
-          onPress={closeEditorModal}
-        />
-        <View style={styles.modalCard}>
-          <View style={styles.modalHeaderRow}>
-            <Text allowFontScaling={false} selectable style={styles.modalTitle}>
-              {editorTitle}
-            </Text>
-          </View>
+    <Sheet
+      dismissLabel="Dismiss exercise editor overlay"
+      headerLeading={
+        isSelectorOpen ? (
+          <IconButton
+            accessibilityLabel="Back to exercise"
+            name="chevron-left"
+            onPress={() => setMuscleSelectorMode(null)}
+            testID="exercise-editor-muscle-selector-back"
+          />
+        ) : undefined
+      }
+      keyboardAvoiding
+      onDismiss={closeEditorModal}
+      testID="exercise-editor"
+      title={isSelectorOpen ? selectorTitle : editorTitle}
+      visible={visible}>
+      <View style={[styles.body, { height: height * EDITOR_SHARE_OF_SCREEN }]}>
+        {isLoadingMuscleGroups ? <StatePanel body="Loading muscle groups…" kind="loading" /> : null}
 
-          {isLoadingMuscleGroups ? (
-            <View style={styles.centeredBodyState}>
-              <Text allowFontScaling={false} style={styles.helperText}>Loading muscle groups...</Text>
-            </View>
-          ) : null}
+        {!isLoadingMuscleGroups && muscleGroupLoadError ? (
+          <StatePanel body={muscleGroupLoadError} kind="error" />
+        ) : null}
 
-          {!isLoadingMuscleGroups && muscleGroupLoadError ? (
-            <View style={styles.centeredBodyState}>
-              <Text allowFontScaling={false} style={styles.errorText}>{muscleGroupLoadError}</Text>
-            </View>
-          ) : null}
-
-          {!isLoadingMuscleGroups && !muscleGroupLoadError ? (
-            <>
+        {!isLoadingMuscleGroups && !muscleGroupLoadError ? (
+          <>
+            {/* Hidden, not unmounted, while the selector panel shows: the name
+                field keeps its value and does not autofocus again on return. */}
+            <View style={isSelectorOpen ? styles.hidden : styles.panel}>
               <ScrollView
-                style={styles.modalScroll}
-                contentInsetAdjustmentBehavior="automatic"
-                contentContainerStyle={styles.modalScrollContent}
-                keyboardShouldPersistTaps="handled">
+                contentContainerStyle={styles.formContent}
+                keyboardShouldPersistTaps="handled"
+                style={styles.panel}>
                 <ExerciseCoreFields
                   autoFocus
                   loadInputMode={loadInputMode}
@@ -383,419 +386,251 @@ export function ExerciseEditorModal({
                   testIDPrefix="exercise-editor"
                 />
 
-                <Text allowFontScaling={false} style={styles.fieldLabel}>Primary muscle</Text>
-                <Pressable
-                  accessibilityLabel="Open primary muscle selector"
-                  testID="exercise-editor-primary-muscle-trigger"
-                  style={[styles.pickerButton, validation.primaryMuscleError ? styles.inputError : null]}
-                  onPress={() => openMuscleSelector('primary')}>
-                  <Text
-                    allowFontScaling={false}
-                    adjustsFontSizeToFit
-                    ellipsizeMode="clip"
-                    minimumFontScale={0.82}
-                    numberOfLines={2}
-                    style={primaryMuscleGroupId ? styles.pickerButtonText : styles.pickerButtonPlaceholder}>
-                    {primaryMuscleGroupId
-                      ? getMuscleDisplayName(primaryMuscleGroupId, muscleGroupById)
-                      : 'Select primary muscle'}
+                <View style={styles.group}>
+                  <Text allowFontScaling={false} accessibilityRole="header" style={styles.sectionLabel}>
+                    Primary muscle
                   </Text>
-                  <Icon color={uiColors.textSecondary} name="chevron-down" size="sm" />
-                </Pressable>
-                {validation.primaryMuscleError ? (
-                  <Text allowFontScaling={false} selectable style={styles.errorText}>
-                    {validation.primaryMuscleError}
-                  </Text>
-                ) : null}
-
-                <Text allowFontScaling={false} style={styles.fieldLabel}>Secondary muscles</Text>
-                <View style={styles.list}>
-                  {secondaryMuscleRows.map((row) => {
-                    const muscleGroup = muscleGroupById.get(row.muscleGroupId);
-                    return (
-                      <View key={row.rowId} style={styles.secondaryMuscleRow}>
-                        <View style={styles.secondaryMuscleRowControls}>
-                          <View style={styles.secondaryMuscleLabelCell}>
-                            <Text
-                              allowFontScaling={false}
-                              adjustsFontSizeToFit
-                              ellipsizeMode="clip"
-                              minimumFontScale={0.82}
-                              numberOfLines={2}
-                              style={styles.secondaryMuscleRowTitle}>
-                              {muscleGroup?.displayName ?? row.muscleGroupId}
-                            </Text>
-                            <Text allowFontScaling={false} numberOfLines={1} style={styles.secondaryMuscleRowFamily}>
-                              {muscleGroup?.familyName ?? 'Unknown'}
-                            </Text>
-                          </View>
-                          <Pressable
-                            accessibilityLabel={`Remove secondary muscle ${muscleGroup?.displayName ?? row.muscleGroupId}`}
-                            style={styles.removeButton}
-                            onPress={() => removeSecondaryMuscle(row.rowId)}>
-                            <Text allowFontScaling={false} style={styles.removeButtonText}>Remove</Text>
-                          </Pressable>
-                        </View>
-                      </View>
-                    );
-                  })}
-
-                  {secondaryMuscleRows.length === 0 ? (
-                    <Text allowFontScaling={false} selectable style={styles.helperText}>
-                      No secondary muscles selected.
+                  <View style={[styles.triggerFrame, validation.primaryMuscleError ? styles.triggerFrameInvalid : null]}>
+                    <ListRow
+                      accessibilityLabel="Open primary muscle selector"
+                      density="list"
+                      divider={false}
+                      label={primaryMuscleGroupId ? getMuscleDisplayName(primaryMuscleGroupId, muscleGroupById) : undefined}
+                      meta={
+                        primaryMuscleGroupId ? (
+                          <Text allowFontScaling={false} numberOfLines={1} style={styles.metaText}>
+                            {muscleGroupById.get(primaryMuscleGroupId)?.familyName ?? ''}
+                          </Text>
+                        ) : undefined
+                      }
+                      onPress={() => openMuscleSelector('primary')}
+                      testID="exercise-editor-primary-muscle-trigger"
+                      trailing={<Icon color={uiRoles.inkMuted} name="chevron-right" size="sm" />}>
+                      {primaryMuscleGroupId ? null : (
+                        // Faint until chosen, as a field's placeholder is.
+                        <Text allowFontScaling={false} numberOfLines={1} style={styles.triggerPlaceholder}>
+                          Select primary muscle
+                        </Text>
+                      )}
+                    </ListRow>
+                  </View>
+                  {validation.primaryMuscleError ? (
+                    <Text allowFontScaling={false} accessibilityLiveRegion="polite" selectable style={styles.errorText}>
+                      {validation.primaryMuscleError}
                     </Text>
                   ) : null}
                 </View>
-                {validation.secondaryMusclesError ? (
-                  <Text allowFontScaling={false} selectable style={styles.errorText}>
-                    {validation.secondaryMusclesError}
+
+                <View style={styles.group}>
+                  <Text allowFontScaling={false} accessibilityRole="header" style={styles.sectionLabel}>
+                    Secondary muscles
                   </Text>
-                ) : null}
-
-                <View style={styles.addMuscleLinkRow}>
-                  <Pressable
-                    accessibilityLabel="Open secondary muscle selector"
-                    testID="exercise-editor-secondary-muscle-trigger"
-                    style={styles.addMuscleLinkButton}
-                    onPress={() => openMuscleSelector('secondary')}>
-                    <Text allowFontScaling={false} style={styles.addMuscleLinkButtonText}>Add secondary muscle</Text>
-                  </Pressable>
-                </View>
-
-                {saveError ? (
-                  <Text allowFontScaling={false} selectable style={styles.errorText}>
-                    {saveError}
-                  </Text>
-                ) : null}
-              </ScrollView>
-
-              <View style={styles.modalFooterRow}>
-                <Pressable
-                  accessibilityLabel="Save exercise definition"
-                  style={styles.primaryButton}
-                  disabled={isSaving}
-                  onPress={saveEditor}>
-                  <Text allowFontScaling={false} style={styles.primaryButtonText}>{isSaving ? 'Saving…' : 'Save Exercise'}</Text>
-                </Pressable>
-              </View>
-            </>
-          ) : null}
-        </View>
-        {muscleSelectorMode !== null ? (
-          <View style={styles.selectorOverlayLayer}>
-            <Pressable
-              accessibilityLabel="Dismiss muscle link selector overlay"
-              style={styles.selectorOverlayBackdrop}
-              onPress={() => setMuscleSelectorMode(null)}
-            />
-            <View style={styles.selectorOverlayCard}>
-              <View style={styles.modalHeaderRow}>
-                <Text allowFontScaling={false} selectable style={styles.modalTitle}>
-                  {selectorTitle}
-                </Text>
-              </View>
-
-              <ScrollView
-                testID="exercise-editor-muscle-selector-list"
-                automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
-                contentInsetAdjustmentBehavior="automatic"
-                contentContainerStyle={styles.selectorList}
-                keyboardDismissMode="on-drag"
-                keyboardShouldPersistTaps="handled">
-                {selectorOptions.map((muscleGroup) => (
-                  <Pressable
-                    key={muscleGroup.id}
-                    testID={`exercise-editor-muscle-option-${muscleGroup.id}`}
-                    accessibilityLabel={`${
-                      muscleSelectorMode === 'primary' ? 'Select primary muscle' : 'Select secondary muscle'
-                    } ${muscleGroup.displayName}`}
-                    style={styles.selectorListRow}
-                    onPress={() => {
-                      if (muscleSelectorMode === 'primary') {
-                        selectPrimaryMuscle(muscleGroup.id);
-                        return;
-                      }
-
-                      addSecondaryMuscle(muscleGroup.id);
-                    }}>
-                    <View style={styles.selectorListRowTextStack}>
-                      <Text
-                        allowFontScaling={false}
-                        adjustsFontSizeToFit
-                        ellipsizeMode="clip"
-                        minimumFontScale={0.82}
-                        numberOfLines={2}
-                        style={styles.selectorListRowTitle}>
-                        {muscleGroup.displayName}
-                      </Text>
-                      <Text allowFontScaling={false} numberOfLines={1} style={styles.selectorListRowMeta}>
-                        {muscleGroup.familyName}
-                      </Text>
-                    </View>
-                    <Text allowFontScaling={false} style={styles.selectorListRowAction}>
-                      {muscleSelectorMode === 'primary' ? 'Select' : 'Add'}
+                  {secondaryMuscleRows.length > 0 ? (
+                    <Card>
+                      {secondaryMuscleRows.map((row, index) => {
+                        const muscleGroup = muscleGroupById.get(row.muscleGroupId);
+                        const displayName = muscleGroup?.displayName ?? row.muscleGroupId;
+                        return (
+                          <ListRow
+                            density="list"
+                            divider={index > 0}
+                            key={row.rowId}
+                            label={displayName}
+                            meta={
+                              <Text allowFontScaling={false} numberOfLines={1} style={styles.metaText}>
+                                {muscleGroup?.familyName ?? 'Unknown'}
+                              </Text>
+                            }
+                            trailing={
+                              <IconButton
+                                accessibilityLabel={`Remove secondary muscle ${displayName}`}
+                                name="x"
+                                onPress={() => removeSecondaryMuscle(row.rowId)}
+                                size="sm"
+                                tone="danger"
+                              />
+                            }
+                          />
+                        );
+                      })}
+                    </Card>
+                  ) : (
+                    <Text allowFontScaling={false} selectable style={styles.helperText}>
+                      No secondary muscles selected.
                     </Text>
-                  </Pressable>
-                ))}
-                {selectorOptions.length === 0 ? (
-                  <Text allowFontScaling={false} selectable style={styles.helperText}>
-                    {muscleSelectorMode === 'primary'
-                      ? 'No primary muscle options available.'
-                      : 'All available muscle groups are already selected as primary or secondary.'}
-                  </Text>
-                ) : null}
+                  )}
+                  {validation.secondaryMusclesError ? (
+                    <Text allowFontScaling={false} accessibilityLiveRegion="polite" selectable style={styles.errorText}>
+                      {validation.secondaryMusclesError}
+                    </Text>
+                  ) : null}
+                  <View style={styles.addSecondary}>
+                    <ActionButton
+                      accessibilityLabel="Open secondary muscle selector"
+                      label="Add secondary muscle"
+                      onPress={() => openMuscleSelector('secondary')}
+                      testID="exercise-editor-secondary-muscle-trigger"
+                      variant="outline"
+                    />
+                  </View>
+                </View>
               </ScrollView>
 
-              <Pressable
-                accessibilityLabel="Close muscle link selector"
-                style={styles.secondaryButton}
-                onPress={() => setMuscleSelectorMode(null)}>
-                <Text allowFontScaling={false} style={styles.secondaryButtonText}>Done</Text>
-              </Pressable>
+              <View style={styles.footer}>
+                <ActionButton
+                  accessibilityLabel="Save exercise definition"
+                  disabled={isSaving}
+                  label={isSaving ? 'Saving…' : 'Save Exercise'}
+                  onPress={saveEditor}
+                  variant="primary"
+                />
+                {saveError ? <Notice live message={saveError} testID="exercise-editor-save-error" tone="danger" /> : null}
+              </View>
             </View>
-          </View>
+
+            {isSelectorOpen ? (
+              <ScrollView
+                automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
+                contentContainerStyle={styles.selectorContent}
+                contentInsetAdjustmentBehavior="automatic"
+                keyboardDismissMode="on-drag"
+                keyboardShouldPersistTaps="handled"
+                style={styles.panel}
+                testID="exercise-editor-muscle-selector-list">
+                {selectorOptions.map((muscleGroup, index) => {
+                  const isCurrent = muscleSelectorMode === 'primary' && muscleGroup.id === primaryMuscleGroupId;
+                  return (
+                    <ListRow
+                      accessibilityLabel={`${
+                        muscleSelectorMode === 'primary' ? 'Select primary muscle' : 'Select secondary muscle'
+                      } ${muscleGroup.displayName}`}
+                      divider={index > 0}
+                      key={muscleGroup.id}
+                      label={muscleGroup.displayName}
+                      leading={
+                        <Icon
+                          color={isCurrent ? uiRoles.accent : uiRoles.inkMuted}
+                          name={muscleSelectorMode === 'primary' ? (isCurrent ? 'radio-on' : 'radio-off') : 'plus'}
+                          size="md"
+                        />
+                      }
+                      meta={
+                        <Text allowFontScaling={false} numberOfLines={1} style={styles.metaText}>
+                          {muscleGroup.familyName}
+                        </Text>
+                      }
+                      onPress={() => {
+                        if (muscleSelectorMode === 'primary') {
+                          selectPrimaryMuscle(muscleGroup.id);
+                          return;
+                        }
+
+                        addSecondaryMuscle(muscleGroup.id);
+                      }}
+                      selected={isCurrent}
+                      testID={`exercise-editor-muscle-option-${muscleGroup.id}`}
+                    />
+                  );
+                })}
+                {selectorOptions.length === 0 ? (
+                  <StatePanel
+                    body={
+                      muscleSelectorMode === 'primary'
+                        ? 'No primary muscle options available.'
+                        : 'All available muscle groups are already selected as primary or secondary.'
+                    }
+                    fill={false}
+                  />
+                ) : null}
+              </ScrollView>
+            ) : null}
+          </>
         ) : null}
-      </KeyboardAvoidingView>
-    </Modal>
+      </View>
+    </Sheet>
   );
 }
 
 const styles = StyleSheet.create({
-  modalRoot: {
+  // A tall body that shrinks with the sheet when the keyboard is up.
+  body: {
+    flexShrink: 1,
+  },
+  panel: {
     flex: 1,
-    justifyContent: 'center',
-    padding: uiSpace.lg,
   },
-  modalOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: uiColors.overlayScrim,
+  hidden: {
+    display: 'none',
   },
-  modalCard: {
-    height: '80%',
-    borderRadius: uiRadius.md,
-    borderWidth: 1,
-    borderColor: uiColors.borderMuted,
-    backgroundColor: uiColors.surfaceDefault,
-    padding: uiSpace.lg,
-    gap: uiSpace.md,
+  formContent: {
+    gap: uiSpace.lg,
+    paddingHorizontal: uiSpace.lg,
+    paddingBottom: uiSpace.lg,
   },
-  modalHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  group: {
     gap: uiSpace.sm,
   },
-  modalTitle: {
-    flex: 1,
-    fontSize: uiTypography.size.xl,
+  sectionLabel: {
+    fontFamily: uiFonts.display.family,
     fontWeight: '700',
-    color: uiColors.textPrimary,
+    fontSize: uiTypography.size.xxs,
+    lineHeight: uiTypography.lineHeight.xxs,
+    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
+    textTransform: 'uppercase',
+    color: uiRoles.inkMuted,
   },
-  centeredBodyState: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: uiSpace.xl,
+  // The primary-muscle trigger is framed like a field (`FormField`): a
+  // `rule-strong` hairline at the control radius that turns `danger` when
+  // the choice is missing.
+  triggerFrame: {
+    overflow: 'hidden',
+    borderWidth: uiBorder.width,
+    borderColor: uiRoles.ruleStrong,
+    borderRadius: uiGeometry.radius.control,
+    backgroundColor: uiRoles.surface,
   },
-  modalScroll: {
-    flex: 1,
+  triggerFrameInvalid: {
+    borderColor: uiRoles.danger,
   },
-  modalScrollContent: {
-    gap: uiSpace.md,
-    paddingBottom: uiSpace.sm,
-  },
-  fieldLabel: {
-    fontSize: uiTypography.size.sm,
+  triggerPlaceholder: {
+    fontFamily: uiFonts.display.family,
     fontWeight: '600',
-    color: uiColors.textSecondary,
+    fontSize: uiTypography.size.lg,
+    lineHeight: uiTypography.lineHeight.lg,
+    color: uiRoles.inkFaint,
   },
-  inputError: {
-    borderColor: uiColors.actionDanger,
+  metaText: {
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
+    fontSize: uiTypography.size.sm,
+    lineHeight: uiTypography.lineHeight.sm,
+    color: uiRoles.inkMuted,
   },
-  list: {
-    gap: uiSpace.sm,
+  addSecondary: {
+    alignSelf: 'flex-start',
   },
   helperText: {
-    fontSize: uiTypography.size.md,
-    color: uiColors.textSecondary,
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
+    fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
+    color: uiRoles.inkMuted,
   },
   errorText: {
-    fontSize: uiTypography.size.md,
-    color: uiColors.actionDanger,
-    fontWeight: '500',
-  },
-  pickerButton: {
-    borderWidth: 1,
-    borderColor: uiColors.borderDefault,
-    borderRadius: uiRadius.sm,
-    backgroundColor: uiColors.surfaceDefault,
-    minHeight: 42,
-    paddingHorizontal: uiSpace.md,
-    paddingVertical: uiSpace.sm,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiSpace.sm,
-  },
-  pickerButtonText: {
-    flex: 1,
-    minWidth: 0,
-    color: uiColors.textPrimary,
-    fontWeight: '600',
-    fontSize: uiTypography.size.md,
-  },
-  pickerButtonPlaceholder: {
-    flex: 1,
-    minWidth: 0,
-    color: uiColors.textSecondary,
-    fontSize: uiTypography.size.md,
-  },
-  secondaryMuscleRow: {
-    borderWidth: 1,
-    borderColor: uiColors.borderMuted,
-    borderRadius: uiRadius.md,
-    backgroundColor: uiColors.surfaceMuted,
-    paddingHorizontal: uiSpace.sm,
-    paddingVertical: uiSpace.sm,
-    gap: uiSpace.sm,
-  },
-  secondaryMuscleRowControls: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiSpace.sm,
-  },
-  secondaryMuscleLabelCell: {
-    flex: 1,
-    minWidth: 0,
-    gap: uiSpace.xs,
-  },
-  secondaryMuscleRowTitle: {
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
     fontSize: uiTypography.size.sm,
-    fontWeight: '700',
-    color: uiColors.textPrimary,
+    lineHeight: uiTypography.lineHeight.sm,
+    color: uiRoles.danger,
   },
-  secondaryMuscleRowFamily: {
-    fontSize: uiTypography.size.xs,
-    color: uiColors.textSecondary,
-  },
-  removeButton: {
-    borderRadius: uiRadius.sm,
-    backgroundColor: uiColors.actionDanger,
-    paddingHorizontal: uiSpace.md,
-    paddingVertical: uiSpace.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 38,
-  },
-  removeButtonText: {
-    color: uiColors.surfaceDefault,
-    fontWeight: '700',
-    fontSize: uiTypography.size.sm,
-  },
-  addMuscleLinkRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  footer: {
     gap: uiSpace.sm,
+    paddingHorizontal: uiSpace.lg,
+    paddingTop: uiSpace.md,
+    borderTopWidth: uiBorder.width,
+    borderTopColor: uiRoles.ruleSoft,
   },
-  addMuscleLinkButton: {
-    borderRadius: uiRadius.sm,
-    borderWidth: 1,
-    borderColor: uiColors.actionPrimary,
-    backgroundColor: uiColors.surfaceDefault,
-    paddingHorizontal: uiSpace.md,
-    paddingVertical: uiSpace.sm,
-    minHeight: 38,
-    justifyContent: 'center',
-  },
-  addMuscleLinkButtonText: {
-    color: uiColors.actionPrimary,
-    fontWeight: '700',
-    fontSize: uiTypography.size.sm,
-  },
-  modalFooterRow: {
-    flexDirection: 'row',
-    gap: uiSpace.sm,
-  },
-  primaryButton: {
-    width: '100%',
-    borderRadius: uiRadius.sm,
-    backgroundColor: uiColors.actionPrimary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: uiSpace.md,
-    paddingHorizontal: uiSpace.md,
-    minHeight: 42,
-  },
-  primaryButtonText: {
-    color: uiColors.surfaceDefault,
-    fontWeight: '700',
-  },
-  selectorOverlayLayer: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
-    padding: uiSpace.md,
-  },
-  selectorOverlayBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: uiColors.overlayScrimSoft,
-    borderRadius: uiRadius.md,
-  },
-  selectorOverlayCard: {
-    height: '80%',
-    borderRadius: uiRadius.md,
-    borderWidth: 1,
-    borderColor: uiColors.borderMuted,
-    backgroundColor: uiColors.surfaceDefault,
-    padding: uiSpace.lg,
-    gap: uiSpace.md,
-  },
-  selectorList: {
-    gap: uiSpace.sm,
-    paddingBottom: uiSpace.xl,
-  },
-  selectorListRow: {
-    borderWidth: 1,
-    borderColor: uiColors.borderMuted,
-    borderRadius: uiRadius.sm,
-    backgroundColor: uiColors.surfaceDefault,
-    paddingHorizontal: uiSpace.md,
-    paddingVertical: uiSpace.sm,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiSpace.sm,
-  },
-  selectorListRowTextStack: {
-    flex: 1,
-    minWidth: 0,
-    gap: uiSpace.xs,
-  },
-  selectorListRowTitle: {
-    fontSize: uiTypography.size.md,
-    fontWeight: '600',
-    color: uiColors.textPrimary,
-  },
-  selectorListRowMeta: {
-    fontSize: uiTypography.size.xs,
-    color: uiColors.textSecondary,
-  },
-  selectorListRowAction: {
-    fontSize: uiTypography.size.sm,
-    fontWeight: '700',
-    color: uiColors.actionPrimary,
-  },
-  secondaryButton: {
-    borderRadius: uiRadius.sm,
-    borderWidth: 1,
-    borderColor: uiColors.textSecondary,
-    backgroundColor: uiColors.surfaceDefault,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: uiSpace.md,
-    paddingHorizontal: uiSpace.md,
-    minHeight: 42,
-    flex: 1,
-  },
-  secondaryButtonText: {
-    color: uiColors.textSecondary,
-    fontWeight: '600',
+  selectorContent: {
+    paddingBottom: uiSpace.lg,
   },
 });

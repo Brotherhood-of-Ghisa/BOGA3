@@ -92,7 +92,8 @@ case "$lane" in
       --session "iOS UI regression" \
       --scenario "Stats screen" --flow "$APP_DIR/.maestro/flows/stats-screen-ux.yaml" \
       --scenario "Session completion states" --flow "$APP_DIR/.maestro/flows/session-completion-states-fixture.yaml" \
-      --scenario "Settings dev wipe-local" --flow "$APP_DIR/.maestro/flows/settings-dev-wipe-local.yaml"
+      --scenario "Settings dev wipe-local" --flow "$APP_DIR/.maestro/flows/settings-dev-wipe-local.yaml" \
+      --scenario "Exercise catalogue" --flow "$APP_DIR/.maestro/flows/exercise-catalogue.yaml"
     ;;
 
   # The exercise page (exercise/session redesign step 4): its own fixture,

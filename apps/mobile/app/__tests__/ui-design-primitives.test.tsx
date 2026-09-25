@@ -353,6 +353,28 @@ describe('Sheet', () => {
     expect(onOptions).toHaveBeenCalledTimes(1);
   });
 
+  it('puts a leading control before the title (a panel inside the sheet goes back with it)', () => {
+    const onBack = jest.fn();
+    render(
+      <Sheet
+        dismissLabel="Dismiss"
+        headerLeading={<IconButton accessibilityLabel="Back to exercise" name="chevron-left" onPress={onBack} testID="back" />}
+        onDismiss={jest.fn()}
+        testID="sheet"
+        title="Select primary muscle"
+        visible>
+        <Text>Body</Text>
+      </Sheet>,
+    );
+
+    const headerNode = screen.getByTestId('sheet-header');
+    const [first] = headerNode.children;
+    expect(typeof first === 'string' ? first : first.props.testID).toBe('back');
+    expect(within(headerNode).getByRole('header', { name: 'Select primary muscle' })).toBeTruthy();
+    fireEvent.press(screen.getByLabelText('Back to exercise'));
+    expect(onBack).toHaveBeenCalledTimes(1);
+  });
+
   it('avoids the keyboard only when asked', () => {
     const { rerender, UNSAFE_queryByType } = render(
       <Sheet dismissLabel="Dismiss" onDismiss={jest.fn()} testID="sheet" visible>
@@ -578,6 +600,17 @@ describe('SegmentedControl', () => {
 
     rerender(<SegmentedControl layout="inline" onChange={jest.fn()} options={OPTIONS} testIDPrefix="view" value="last" />);
     expect(flatStyle(screen.getByTestId('view-last')).flex).toBeUndefined();
+  });
+
+  it('ignores presses and fades while disabled', () => {
+    const onChange = jest.fn();
+    render(<SegmentedControl disabled onChange={onChange} options={OPTIONS} testIDPrefix="view" value="records" />);
+
+    expect(screen.getByTestId('view-records').props.accessibilityState).toEqual({ selected: true, disabled: true });
+    expect(screen.getByTestId('view-last').props.accessibilityState).toEqual({ selected: false, disabled: true });
+    expect(flatStyle(screen.getByTestId('view-records')).backgroundColor).toBe(uiRoles.disabled);
+    fireEvent.press(screen.getByTestId('view-last'));
+    expect(onChange).not.toHaveBeenCalled();
   });
 });
 

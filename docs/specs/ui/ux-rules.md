@@ -107,17 +107,19 @@ Document app-specific UI semantics and guardrails for the current mobile app.
 1. Most secondary workflows in current screens use in-route modal/overlay UI state instead of route changes.
    - Examples:
      - session list action menus
-     - exercise catalog editor/action/delete modals
+     - the exercise catalogue's Filters and row Actions sheets and the exercise editor
      - the session view's `Gym` sheet, ⋮ menu, exercise picker and the picker's inline exercise creation editor
 2. The exercise picker (the session view's `+ Add exercise`; `components/session-recorder/exercise-picker.tsx`) is a tall design-language `Sheet` (DLM-T06): it lifts above the keyboard, the backdrop dismisses it, and it has no Cancel. Shared list options (⋮), `Manage` and `Add new` are `IconButton`s on the title's row. It hides itself while its inline editor or the group pick sheet is open, and returns when that closes.
-3. In the exercise picker, tapping an exercise opens an in-place preselection panel instead of immediately adding:
+3. The exercise catalogue (DLM-T07) puts its options in design-language `Sheet`s with no Cancel or Done; the backdrop dismisses them. ⋮ or any filter `Tag` opens `Filters` (the shared list options, then `Muscle groups` with a text `Clear`, then `Visibility`, both multi `ChipGroup`s; changes apply live). A row's ⋮ opens a sheet titled with the exercise's name: `Edit`, `Link to group exercise…` (signed in only), and `Delete` in `danger`, or `Undelete` for a deleted exercise. Delete does not confirm: it is a soft delete, undone from the same sheet (T07-D4). Opening either sheet dismisses the filter's keyboard first, so a sheet never opens under it.
+4. The shared exercise editor (`ExerciseEditorModal`: the catalogue, the picker's `Add new` and group `Add as new`, the exercise page and the group exercises page) is a tall `Sheet` that lifts above the keyboard; the backdrop dismisses it except while it saves, and it has no Cancel. `Save Exercise` is its one `accent`. Choosing a primary or secondary muscle swaps the sheet's body for the muscle list in the same sheet (T07-D3): the title names the choice, and a `chevron-left` `Back to exercise` returns without choosing. A second, stacked sheet is not used.
+5. In the exercise picker, tapping an exercise opens an in-place preselection panel instead of immediately adding:
    - `Add empty set` (an outline) is always available and adds the exercise with one blank set.
    - `Append plan` is the sheet's one primary; its plan's sets preview as the set row, faded as planned.
    - `Append plan` remains visible but disabled while completed-history suggestion data loads or when no valid completed-history plan exists; the disabled state has no inline error copy.
    - Changing the search text dismisses the preselection panel and returns to the filtered list without changing grouped-list expansion state.
    - The picker only adds; replacing an exercise is the exercise page's `Swap exercise` (§14a.5), which keeps the sets.
-3. Modal open/close is treated as state within the current route and should not be documented as a navigation transition.
-4. Dismiss overlays via backdrop press are common and expected when the flow is not destructive-final.
+6. Modal open/close is treated as state within the current route and should not be documented as a navigation transition.
+7. Dismiss overlays via backdrop press are common and expected when the flow is not destructive-final.
 
 ### 3. Screen layout and spacing conventions (current app behavior)
 
@@ -138,7 +140,7 @@ Document app-specific UI semantics and guardrails for the current mobile app.
 2. This split interaction pattern is used in `exercise-catalog` and in the shared `HistoryList` / `ActiveSessionRow` building blocks (consumed by Progress/`stats-history` and session-list flows), and should be preserved during refactors unless behavior intentionally changes.
 3. Deleted/archived visibility is controlled via toggles and state hints, not separate routes.
 4. In `exercise-catalog`, deleted exercises remain in list history when deleted visibility is enabled, show explicit `Deleted` state, and expose `Undelete` from row actions.
-5. `exercise-catalog` top actions use compact icon buttons (`+` create, kebab options), and deleted visibility toggle lives under the top-level options menu.
+5. `exercise-catalog` is titled `Exercises` (T07-D1). Its top row is the filter field, then `+` (create, an `accent` `IconButton`: the screen's one primary, T07-D2), then ⋮ (options); the active filters show as `Tag`s under it, and the deleted visibility toggle lives in the Filters sheet.
 6. `exercise-catalog` and the exercise picker share exercise-list preferences and row semantics:
    - local-only shared preferences default to grouped by muscle family, `90d` range, and recents-on-top enabled; options are `7d`, `30d`, `90d`, `1y`, and `All`,
    - grouped mode shows taxonomy-ordered family headers (`Chest`, `Shoulders`, `Back`, `Arms`, `Core`, `Legs`, `Lower Legs`, `Other`) with the family and its count; all groups remain visible, zero-count groups are disabled/collapsed, non-empty headers toggle expansion and show it with a `chevron-right` / `chevron-down` glyph and the expanded state (DLM-T06), and active text search preserves collapsed/expanded state without flattening the list,
@@ -150,7 +152,7 @@ Document app-specific UI semantics and guardrails for the current mobile app.
 ### 5. Forms and validation conventions
 
 1. Text inputs, picker triggers, and read-only fields are visually similar but currently implemented in multiple screen-local styles.
-2. Exercise catalog uses explicit field labels + inline validation/error messages and is the strongest current form pattern reference.
+2. The exercise editor uses explicit field labels and inline validation: a `FormField` for the name (error below it), a field-framed `Primary muscle` row that turns `danger` when the choice is missing, a duplicate-secondary message under the secondary list, and a save failure as a `danger` `Notice` under `Save Exercise`.
 3. Editing a completed session (the session view, §14b.7) validates Start/End (`YYYY-MM-DD HH:mm`, End not before Start) and shows an autosave-paused notice while they are invalid.
 4. Validation/error feedback should remain near the relevant field/control whenever possible.
 5. The exercise picker and `exercise-catalog` list include a text filter that:
@@ -171,7 +173,7 @@ Document app-specific UI semantics and guardrails for the current mobile app.
     - Active and completed-edit autosave preserve every set row, including fully blank, partial, valid unconfirmed, and planned rows, with stable identity, values, effort, confirmation status, and order across input blur, tab/route navigation, hydration, sync, and restore. Legacy persisted `skipped` planned rows hydrate as untouched planned rows. Blank or invalid reps remain incomplete; valid unconfirmed rows remain excluded from performed semantics.
     - Final active-session submit and completed-edit save persist completed workout history as confirmed actual sets only. Completion uses separate explicit cleanup decisions for entered-but-unconfirmed rows (a specific discard prompt) and incomplete rows (§14b.2); untouched planned rows are actual-only omissions, and exercises left empty use the same cleanup prompt. The `/sessions` active-session completion affordance opens the session view, so it cannot bypass this cleanup.
 12. Session comparisons are shared across live, completion and historical Summary. The live comparison body follows the exercise cards and Add exercise; logging stays usable while history loads or fails.
-13. The shared exercise editor dismisses the text keyboard before opening primary/secondary muscle selectors, and selector lists remain keyboard-aware so all muscle-group options stay reachable on iOS. It exposes a two-choice `Total load` / `Per side` control, preselects the stored value while editing, and defaults new custom exercises to total load.
+13. The shared exercise editor dismisses the text keyboard before opening primary/secondary muscle selectors, and selector lists remain keyboard-aware so all muscle-group options stay reachable on iOS. The primary list marks the current choice with `radio-on`; the secondary list offers only muscles not already chosen, each with `plus`. Secondary muscles are `ListRow`s in a `Card`, each removed by a `danger` `x`. It exposes a two-choice `Total load` / `Per side` `SegmentedControl`, preselects the stored value while editing, and defaults new custom exercises to total load.
 14. GPS gym detection is quiet assistance, and it **suggests only** (decided
     2026-09-23):
     - opening the session view's `Gym` sheet runs one foreground location read
@@ -221,10 +223,10 @@ Document app-specific UI semantics and guardrails for the current mobile app.
 ### 6. Loading, empty, error, and feedback state handling
 
 1. Whole-screen loading/error states are used when route data cannot render meaningful content yet.
-   - `exercise-catalog`: centered state + More-selected bottom tabs remain visible
+   - `exercise-catalog`: a `StatePanel` (loading or error) + More-selected bottom tabs remain visible
    - `completed-session/[sessionId]`: centered state variants on `paper`; the detail keeps its top bar's back, the completion its one safe exit
 2. In-section state panels are used inside the shared `HistoryList` (loading/error/empty) consumed by the `stats-history` History sub-view.
-3. Inline helper/success/error text is used for form feedback and post-action feedback (`exercise-catalog`, a failed write on the completed-session detail).
+3. Inline helper/success/error text is used for form feedback and post-action feedback (a failed write on the completed-session detail). `exercise-catalog` reports an action's outcome as a `Notice` above the list: `Exercise created.` / `updated.` / `deleted.` / `restored.` with the `success` glyph, a failure in `danger`.
 4. State presentation style varies by screen today; refactors may unify visuals, but the semantic distinction (whole-screen vs in-section vs inline) should remain explicit.
 5. The profile route uses:
    - an inline loading state panel during auth bootstrap,
