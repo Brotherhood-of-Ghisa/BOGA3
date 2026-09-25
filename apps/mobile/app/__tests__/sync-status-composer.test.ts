@@ -56,6 +56,7 @@ const currentDatabase = () => fixture.database;
 const cleanStatus = {
   state: { name: 'LONG_TIMEOUT' as const, deadlineMs: 0 },
   online: true,
+  network: 'online' as 'unknown' | 'online' | 'offline',
   lastCycleError: null as string | null,
   lastSuccessAtMs: 1_700_000_000_000 as number | null,
   progress: { phase: 'done' as const, layersCompleted: 4, rowsApplied: 10, offline: false },
@@ -183,12 +184,27 @@ describe('snapshot composition', () => {
     mockGetSchedulerStatus.mockReturnValue({
       ...cleanStatus,
       online: false,
+      network: 'offline',
       lastCycleError: 'server unreachable',
     });
 
     const status = await getSyncStatus();
     expect(status.networkState).toBe('offline');
     expect(status.errorMessage).toBe('server unreachable');
+  });
+
+  it('reports an unreported network as unknown, not offline', async () => {
+    // Before NetInfo's first determined report (or while `isConnected` is
+    // null) the scheduler is not online, but it has not seen the device go
+    // offline either: the snapshot carries the projection, not the boolean.
+    mockGetSchedulerStatus.mockReturnValue({
+      ...cleanStatus,
+      online: false,
+      network: 'unknown',
+      progress: { ...cleanStatus.progress, offline: false },
+    });
+
+    expect((await getSyncStatus()).networkState).toBe('unknown');
   });
 
   it('reports auth-required when the cycle reported no signed-in user', async () => {

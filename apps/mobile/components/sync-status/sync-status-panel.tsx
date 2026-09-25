@@ -15,7 +15,11 @@ import {
   uiTypography,
 } from '@/components/ui';
 import { requestSync } from '@/src/sync/scheduler';
-import { getSyncStatus, type SyncStatusSnapshot } from '@/src/sync/sync-status';
+import {
+  getSyncStatus,
+  type SyncNetworkState,
+  type SyncStatusSnapshot,
+} from '@/src/sync/sync-status';
 
 // How often the panel re-reads the status snapshot while the Settings screen is
 // focused. Refresh triggers, in order of how a user sees fresh values:
@@ -33,6 +37,17 @@ const formatLastSuccess = (lastSuccessAtMs: number | null): string => {
     return 'Never';
   }
   return new Date(lastSuccessAtMs).toLocaleString();
+};
+
+/**
+ * The Network row's word per state. An unknown network (NetInfo has not
+ * reported yet, or no snapshot has loaded) is "Checking…": never "Offline",
+ * which it may not be, and never "Online", which it may not be either.
+ */
+const NETWORK_LABELS: Record<SyncNetworkState, string> = {
+  unknown: 'Checking…',
+  online: 'Online',
+  offline: 'Offline',
 };
 
 /**
@@ -99,7 +114,8 @@ export function SyncStatusPanel({
   }, [onRequestSync, refresh]);
 
   const errorText = resolveErrorText(status);
-  const offline = status?.networkState === 'offline';
+  const networkState: SyncNetworkState = status?.networkState ?? 'unknown';
+  const offline = networkState === 'offline';
 
   return (
     <Card testID="settings-sync-status-card">
@@ -137,7 +153,7 @@ export function SyncStatusPanel({
               <Icon name="offline" size="sm" testID="settings-sync-status-network-offline-glyph" />
             ) : null}
             <Text allowFontScaling={false} style={styles.value} testID="settings-sync-status-network">
-              {offline ? 'Offline' : 'Online'}
+              {NETWORK_LABELS[networkState]}
             </Text>
           </View>
         }
