@@ -16,7 +16,7 @@ don't restate it here.
 ./boga test backend    # local Supabase auth/agent/sync contracts + real MCP smoke
 ./boga test frontend   # boots the iOS simulator, runs Maestro smoke + data-smoke + UI regression + exercise page + session view + auth-profile + sync e2e + two-user groups e2e
 ./boga test frontend-ui  # the frontend lanes that need no backend (smoke, data-smoke, UI regression, exercise page, session view)
-./boga sweep           # every gate lane on origin/main in a dedicated worktree (the scheduled backstop)
+./boga sweep [--ref <ref>]  # every gate lane on origin/main (or <ref>) in a dedicated worktree — the backstop
 ./boga test --list     # every lane: name, gate, infra, CI?, command
 ./boga test <lane>     # one lane by name (e.g. ./boga test sync-push-contract)
 ./boga doctor          # verify THIS machine can run every lane
@@ -182,13 +182,22 @@ controls cover that instead:
    Maestro `id:` selector must still exist in app source. Chip/segment ids
    built through a generic `${prefix}-${value}` join are only loosely checked
    (see the script header).
-2. **The scheduled full sweep** — `./boga sweep` (`scripts/full-sweep.sh`) runs
-   every gate lane on `origin/main` in its own long-lived worktree
-   (`$(boga_worktree_root)/full-sweep`, own slot) and writes a summary under
-   `~/.config/boga/sweep/latest/`. It is scheduled daily on the dev machine; a
-   RED sweep means main has a regression the PR gates did not select — bisect
-   with `./boga test <lane>`. It needs the machine awake (a lid-closed Mac
-   pauses Docker).
+2. **The full sweep, run opportunistically** — `./boga sweep [--ref <ref>]`
+   (`scripts/full-sweep.sh`) runs every gate lane on `origin/main` (or a pushed
+   branch) in its own long-lived worktree (`$(boga_worktree_root)/full-sweep`,
+   own slot) and writes a summary under `~/.config/boga/sweep/latest/`. It is
+   not scheduled. Run it:
+   - on the `main` commit you are about to ship as an iOS build (TestFlight /
+     preview), before building;
+   - on a large or shared-UI PR before merge (`--ref origin/<branch>`) —
+     `./boga test for` prints a *RECOMMENDED* sweep line for a diff touching
+     shared UI chrome (`components/ui/**`, `components/navigation/**`, the tab
+     layout) or 15+ screen/component files. Advisory, not required: the
+     PR Tests table lists it only if you ran it.
+
+   A RED sweep means the ref has a regression the PR gates did not select —
+   bisect with `./boga test <lane>`. It needs the machine awake (a lid-closed
+   Mac pauses Docker).
 
 Any UI change may still run `./boga test frontend` — it covers `frontend-ui`
 and every lane in the PR Tests table.

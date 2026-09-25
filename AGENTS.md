@@ -42,8 +42,9 @@ place each under `docs/specs/**`, routed from here.
    | Native iOS dependency / config-plugin change | `./boga ios build-client --force` first, then `boga test frontend` (see `02`) |
 
    Gate selection is path-based and selective (`./boga test for` is the
-   authority); the scheduled `./boga sweep` runs every lane on `origin/main`
-   as the backstop (spec `02`).
+   authority). The backstop is `./boga sweep --ref <ref>` — every lane, in its
+   own worktree — run before an iOS build and on large or shared-UI PRs
+   (`boga test for` flags those; spec `02`).
 
    Once the worktree holds a slot lease (rule 5), the gates bootstrap deps and
    the local Supabase stack themselves; Docker must be running for the slow lanes. Full lane matrix, CI posture, and the dev-client

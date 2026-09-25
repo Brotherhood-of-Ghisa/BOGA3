@@ -5,7 +5,7 @@
 #
 # Why this exists: a screen/component change runs only the backend-free iOS
 # lanes (`boga test frontend-ui`); the Supabase-backed e2e lanes run for their
-# own areas and in the scheduled full sweep (spec 02). The commonest way a
+# own areas and in the full sweep (`boga sweep`, spec 02). The commonest way a
 # restyle breaks a flow it did not run is renaming or dropping a testID the
 # flow taps. This check catches that in about a second, on every PR (meta-tests
 # lane, fast gate + CI), for every flow — including the e2e ones.
@@ -24,7 +24,7 @@
 # no longer rendered on that screen passes. Ids built by a text-free join
 # (chip/segment rows: `${testIDPrefix}-${option.value}`, ~12% of selectors)
 # are only loosely checked, since any known prefix can absorb the rest. The
-# lanes — and the scheduled full sweep — are what catch those.
+# lanes — and the full sweep — are what catch those.
 #
 # Infra-free. Part of the `meta-tests` lane (and CI). Self-tests the rule on
 # synthetic trees first, then checks the real repo.

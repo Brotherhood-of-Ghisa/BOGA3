@@ -101,6 +101,19 @@ requires frontend-ui   apps/mobile/components/Button.tsx supabase/tests/x.sh
 out="$("${TF}" --tsv some/random/file.xyz)"
 [[ -z "${out}" ]] || fail "expected no requirements for unmatched path, got: ${out}"
 
+# Advisory sweep hint: shown for shared UI chrome or 15+ UI files, never in
+# --tsv (so pr-check can't turn it into a requirement), not for one screen.
+"${TF}" apps/mobile/components/ui/card.tsx | grep -q 'boga sweep' \
+  || fail "expected a sweep recommendation for a components/ui change"
+many=(); for i in $(seq 1 15); do many+=("apps/mobile/components/session-view/f${i}.tsx"); done
+"${TF}" "${many[@]}" | grep -q 'boga sweep' || fail "expected a sweep recommendation for 15 UI files"
+if "${TF}" --tsv apps/mobile/components/ui/card.tsx | grep -q sweep; then
+  fail "the sweep recommendation must not appear in --tsv output"
+fi
+if "${TF}" apps/mobile/components/session-view/x.tsx | grep -q 'boga sweep'; then
+  fail "did not expect a sweep recommendation for one screen component"
+fi
+
 # Registry integrity: every requirement names a real lane or gate alias, and
 # every committed flow's row names the lane whose runner arm runs that flow
 # (so moving a flow between lanes can't leave its trigger pointing at the old one).
