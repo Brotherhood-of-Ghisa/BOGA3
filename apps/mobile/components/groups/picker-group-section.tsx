@@ -1,12 +1,14 @@
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { UiText, uiBorder, uiColors, uiRadius, uiSpace } from '@/components/ui';
+import { Card } from '@/components/ui/card';
+import { ListRow } from '@/components/ui/list-row';
+import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import type { PickerGroupRow, PickerGroupSection } from '@/src/groups';
 
 /**
  * The exercise picker's "From your groups" section (M25-T07; product E0.1,
  * D13): group exercises matching the search, listed after my own matches,
- * grouped by group. Status is text ("linked: …" / "not linked"), not color.
+ * one card per group. Status is text ("linked: …" / "not linked"), not color.
  */
 export function PickerGroupSectionList({
   sections,
@@ -20,35 +22,41 @@ export function PickerGroupSectionList({
   }
   return (
     <View style={styles.section} testID="exercise-picker-group-section">
-      <UiText accessibilityRole="header" style={styles.sectionHeader} variant="label">
+      <Text allowFontScaling={false} accessibilityRole="header" style={styles.sectionLabel}>
         From your groups
-      </UiText>
+      </Text>
       {sections.map((section) => (
-        <View key={section.groupId} style={styles.group}>
-          {section.rows.map((row) => (
-            <Pressable
+        <Card key={section.groupId}>
+          {section.rows.map((row, index) => (
+            <ListRow
               accessibilityLabel={`Group exercise ${row.groupExercise.name} in ${row.groupName}, ${row.statusLabel}`}
-              accessibilityRole="button"
+              density="list"
+              divider={index > 0}
               key={row.key}
               onPress={() => onPressRow(row)}
-              style={styles.row}
               testID={`exercise-picker-group-row-${row.groupExercise.group_exercise_id}`}>
-              <UiText numberOfLines={2} style={styles.rowTitle}>
-                {row.groupExercise.name}
-                <UiText variant="bodyMuted"> · {row.groupName}</UiText>
-              </UiText>
-              <UiText numberOfLines={1} variant="bodyMuted">
-                {row.statusLabel}
-              </UiText>
-            </Pressable>
+              <View style={styles.rowText}>
+                <Text allowFontScaling={false} numberOfLines={2} style={styles.name}>
+                  {row.groupExercise.name}
+                  <Text allowFontScaling={false} style={styles.groupName}> · {row.groupName}</Text>
+                </Text>
+                <Text allowFontScaling={false} numberOfLines={1} style={styles.status}>
+                  {row.statusLabel}
+                </Text>
+              </View>
+            </ListRow>
           ))}
-        </View>
+        </Card>
       ))}
     </View>
   );
 }
 
-/** The Groups toggle beside the picker search: narrows the list to group exercises only (D13). */
+/**
+ * The Groups toggle beside the picker search: narrows the list to group
+ * exercises only (D13). A chip, solid `ink` while on, as `ChipGroup` draws one;
+ * a switch to assistive tech.
+ */
 export function PickerGroupsToggle({ active, onToggle }: { active: boolean; onToggle: () => void }) {
   return (
     <Pressable
@@ -56,11 +64,9 @@ export function PickerGroupsToggle({ active, onToggle }: { active: boolean; onTo
       accessibilityRole="switch"
       accessibilityState={{ checked: active }}
       onPress={onToggle}
-      style={[styles.toggle, active ? styles.toggleActive : null]}
+      style={({ pressed }) => [styles.toggle, active ? styles.toggleOn : null, pressed && !active ? styles.pressed : null]}
       testID="exercise-picker-groups-toggle">
-      <UiText style={active ? styles.toggleTextActive : styles.toggleText} variant="label">
-        Groups
-      </UiText>
+      <Text allowFontScaling={false} style={[styles.toggleLabel, active ? styles.toggleLabelOn : null]}>Groups</Text>
     </Pressable>
   );
 }
@@ -68,47 +74,62 @@ export function PickerGroupsToggle({ active, onToggle }: { active: boolean; onTo
 const styles = StyleSheet.create({
   section: {
     gap: uiSpace.sm,
-    marginTop: uiSpace.md,
   },
-  sectionHeader: {
-    color: uiColors.textSecondary,
-    borderBottomWidth: uiBorder.width,
-    borderBottomColor: uiColors.borderMuted,
-    paddingBottom: uiSpace.xs,
+  sectionLabel: {
+    fontFamily: uiFonts.display.family,
+    fontWeight: '700',
+    fontSize: uiTypography.size.xxs,
+    lineHeight: uiTypography.lineHeight.xxs,
+    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
+    textTransform: 'uppercase',
+    color: uiRoles.inkMuted,
   },
-  group: {
-    gap: uiSpace.xs,
+  rowText: {
+    paddingVertical: uiSpace.sm,
   },
-  row: {
-    borderWidth: uiBorder.width,
-    borderColor: uiColors.borderMuted,
-    borderRadius: uiRadius.md,
-    backgroundColor: uiColors.surfaceDefault,
-    paddingHorizontal: uiSpace.md,
-    paddingVertical: uiSpace.md,
-    gap: uiSpace.xs,
-    minHeight: 48,
+  name: {
+    fontFamily: uiFonts.display.family,
+    fontWeight: '600',
+    fontSize: uiTypography.size.lg,
+    lineHeight: uiTypography.lineHeight.lg,
+    color: uiRoles.ink,
   },
-  rowTitle: {
-    color: uiColors.textPrimary,
+  groupName: {
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
+    color: uiRoles.inkMuted,
+  },
+  status: {
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
+    fontSize: uiTypography.size.md,
+    lineHeight: uiTypography.lineHeight.md,
+    color: uiRoles.inkMuted,
   },
   toggle: {
-    minHeight: 44,
+    minHeight: uiGeometry.tapTarget,
     justifyContent: 'center',
-    borderWidth: uiBorder.width,
-    borderColor: uiColors.actionNeutralSubtleBorder,
-    borderRadius: uiRadius.full,
-    backgroundColor: uiColors.actionNeutralSubtleBg,
     paddingHorizontal: uiSpace.md,
+    backgroundColor: uiRoles.surface,
+    borderWidth: uiBorder.width,
+    borderColor: uiRoles.ruleStrong,
+    borderRadius: uiGeometry.radius.pill,
   },
-  toggleActive: {
-    borderColor: uiColors.actionPrimary,
-    backgroundColor: uiColors.actionPrimary,
+  toggleOn: {
+    backgroundColor: uiRoles.ink,
+    borderColor: uiRoles.ink,
   },
-  toggleText: {
-    color: uiColors.actionNeutralSubtleText,
+  pressed: {
+    backgroundColor: uiRoles.surfaceSubtle,
   },
-  toggleTextActive: {
-    color: uiColors.surfaceDefault,
+  toggleLabel: {
+    fontFamily: uiFonts.display.family,
+    fontWeight: '600',
+    fontSize: uiTypography.size.sm,
+    lineHeight: uiTypography.lineHeight.sm,
+    color: uiRoles.ink,
+  },
+  toggleLabelOn: {
+    color: uiRoles.surface,
   },
 });

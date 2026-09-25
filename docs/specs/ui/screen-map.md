@@ -223,9 +223,10 @@ Brief entrypoint map of the current mobile screens.
     and weight, and — the one highlight — a brass record 1RM and `record` band with the
     1RM when a done set beats the exercise's completed history
     (`deriveExercisePersonalRecord`)
-  - `+ Add exercise` opens the shared exercise picker
-    (`components/session-recorder/exercise-picker.tsx`) and writes the new
-    exercise (one empty set) or appended plan straight to the draft
+  - `+ Add exercise` opens the shared exercise picker, a tall `Sheet`
+    (`components/session-recorder/exercise-picker.tsx`), and writes the new
+    exercise (one empty set) or appended plan straight to the draft. Design
+    target: `design-targets/exercise-catalogue.md`
   - ⋮ opens the `Session` menu sheet with `Abandon session` (danger), which
     confirms before its soft delete
   - `Finish` runs the shared cleanup prompts (unconfirmed sets, then one

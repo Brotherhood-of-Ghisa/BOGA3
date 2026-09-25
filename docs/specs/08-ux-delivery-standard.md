@@ -114,7 +114,7 @@ Use this section as the single source of truth for reusable UX patterns.
 10. Secondary-source search section pattern
    - Intent: let a search reach items from another source without crowding the default list.
    - Usage: the session view's exercise picker's `From your groups` section and `Groups` toggle (M25-T07; `components/groups/picker-group-section.tsx`).
-   - Rules: the default (empty-search) list never shows the secondary source; with search text its matches follow the user's own matches under a labelled section header; a toggle beside the search box narrows the list to the secondary source only (and lists all of it when the search is empty); each row states its relationship to the user's own data in text ("linked: …" / "not linked"), not color alone; picking a row resolves to the user's own item or opens an explicit choice sheet.
+   - Rules: the default (empty-search) list never shows the secondary source; with search text its matches follow the user's own matches under a labelled section header; a toggle beside the search box (a chip, solid `ink` while on — never the screen's `accent`) narrows the list to the secondary source only (and lists all of it when the search is empty); each row states its relationship to the user's own data in text ("linked: …" / "not linked"), not color alone; picking a row resolves to the user's own item or opens an explicit choice sheet.
 11. Record set detail sheet pattern
    - Intent: one place to read and act on a shared record set, wherever it is shown.
    - Usage: stream record cards and full-board rows (M25-T10; `components/groups/record-set-sheet.tsx`).

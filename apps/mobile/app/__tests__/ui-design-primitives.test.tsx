@@ -1,5 +1,13 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
-import { ActivityIndicator, StyleSheet, Text, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
+import { fireEvent, render, screen, within } from '@testing-library/react-native';
+import {
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  StyleSheet,
+  Text,
+  type StyleProp,
+  type TextStyle,
+  type ViewStyle,
+} from 'react-native';
 
 import {
   ActionButton,
@@ -237,6 +245,20 @@ describe('ListRow', () => {
 
     expect(screen.getByLabelText('Connect an AI coach').props.accessibilityRole).toBe('link');
   });
+  it('announces a disclosure row as expanded or collapsed only when it is one', () => {
+    const { rerender } = render(<ListRow expanded={false} label="Chest" onPress={jest.fn()} testID="row" />);
+    expect(screen.getByTestId('row').props.accessibilityState).toEqual({
+      selected: false,
+      disabled: false,
+      expanded: false,
+    });
+
+    rerender(<ListRow expanded label="Chest" onPress={jest.fn()} testID="row" />);
+    expect(screen.getByTestId('row').props.accessibilityState.expanded).toBe(true);
+
+    rerender(<ListRow label="Chest" onPress={jest.fn()} testID="row" />);
+    expect(screen.getByTestId('row').props.accessibilityState).toEqual({ selected: false, disabled: false });
+  });
 });
 
 describe('Sheet', () => {
@@ -291,6 +313,45 @@ describe('Sheet', () => {
     expect(flatStyle(screen.getByTestId('sheet')).paddingBottom).toBe(uiSpace.xl);
 
     spy.mockRestore();
+  });
+
+  it('puts header actions on the title row, after the title', () => {
+    const onOptions = jest.fn();
+    render(
+      <Sheet
+        dismissLabel="Dismiss"
+        headerActions={<IconButton accessibilityLabel="Options" name="more-vertical" onPress={onOptions} />}
+        onDismiss={jest.fn()}
+        testID="sheet"
+        title="Select Exercise"
+        visible>
+        <Text>Body</Text>
+      </Sheet>,
+    );
+
+    const header = within(screen.getByTestId('sheet-header'));
+    expect(header.getByRole('header', { name: 'Select Exercise' })).toBeTruthy();
+    expect(flatStyle(screen.getByTestId('sheet-header')).flexDirection).toBe('row');
+    fireEvent.press(header.getByLabelText('Options'));
+    expect(onOptions).toHaveBeenCalledTimes(1);
+  });
+
+  it('avoids the keyboard only when asked', () => {
+    const { rerender, UNSAFE_queryByType } = render(
+      <Sheet dismissLabel="Dismiss" onDismiss={jest.fn()} testID="sheet" visible>
+        <Text>Body</Text>
+      </Sheet>,
+    );
+    expect(UNSAFE_queryByType(KeyboardAvoidingView)).toBeNull();
+
+    rerender(
+      <Sheet dismissLabel="Dismiss" keyboardAvoiding onDismiss={jest.fn()} testID="sheet" visible>
+        <Text>Body</Text>
+      </Sheet>,
+    );
+    expect(UNSAFE_queryByType(KeyboardAvoidingView)).not.toBeNull();
+    // Still one panel that shrinks rather than growing past the screen.
+    expect(flatStyle(screen.getByTestId('sheet')).flexShrink).toBe(1);
   });
 
   it('renders nothing while hidden', () => {

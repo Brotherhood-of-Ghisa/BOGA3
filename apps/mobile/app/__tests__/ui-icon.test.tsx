@@ -65,7 +65,7 @@ describe('Icon', () => {
 // icons. `×` and `−` are not here: they are the multiplication and minus signs
 // inside figures ("100 kg × 5", "−12%"), not icons. Comments are skipped.
 describe('retired Unicode glyphs stay retired', () => {
-  const RETIRED = /[›⋮▾▼★●○↗↑↓⚙✓]|👤/u;
+  const RETIRED = /[›⋮▾▼★●○↗↑↓⚙✓≡]|👤/u;
   const APP_ROOT = join(__dirname, '..', '..');
 
   const sourceFiles = (dir: string): string[] =>
