@@ -105,7 +105,9 @@ Brief entrypoint inventory of the current reusable UI component set.
     fixed-width right-aligned metric column: the set row, `rank` primary 1RM /
     secondary VOL); `state="planned"` fades it, `emphasis="record"` sets it
     bold `record` (the only emphasis — `design-language.md` §5);
-    `kind="text"` for a non-figure value
+    `kind="text"` for a non-figure value; a stacked `rank="secondary"` is a
+    figure in a list row (Plex Mono 600 `base`, Progress muscle rows), and
+    `ground="viz"` turns the legend `ink` on a data-viz ground (DLM-T08)
   - `ListRow` — `[leading][label or children][meta][trailing]`, the trailing
     control always in a fixed tap-target-wide column so controls share one
     vertical axis; `density` `sheet` (option rows) or `list` (dense rows in a
@@ -152,14 +154,15 @@ Brief entrypoint inventory of the current reusable UI component set.
     `text`. The completed edit's Start / End (`session-times-fields`), and the
     credential and profile fields of Sign in and Profile (DLM-T05)
   - `SearchField` — search glyph, text, and a clear control while there is text;
-    `accessibilityLabel` required. The swap sheet's search and the exercise
-    picker's filter (DLM-T06)
+    `accessibilityLabel` required. The swap sheet's search, the exercise
+    picker's filter (DLM-T06) and the Progress filter (DLM-T08)
   - `SegmentedControl` — one choice from a few, joined in a `rule-strong` frame,
     the selected segment solid `ink`; `layout` `fill` (equal width) or `inline`;
     `tablist` / `tab` / `selected` and the `<prefix>-row` / `<prefix>-<value>`
     testIDs of the legacy `SegmentedChips`. The records panel's `Records` | `Last`,
-    Settings' date format (DLM-T04), and the exercise list's date range
-    (`exercise-list-date-range-*`, DLM-T06)
+    Settings' date format (DLM-T04), the exercise list's date range
+    (`exercise-list-date-range-*`, DLM-T06), and Progress's Time range and
+    Breakdown (DLM-T08)
   - `ChipGroup` — wrapping pills, `single` (a tab list, `selected`) or `multi`
     (checkboxes, `checked`), the same testID contract, per-chip accessibility
     labels. Logs' level filter (DLM-T04), and the exercise list's `Group by

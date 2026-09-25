@@ -154,13 +154,14 @@ Brief entrypoint map of the current mobile screens.
   - `period` (optional; `7` or `30`; absent/invalid values default to `7`)
   - `breakdown` (optional; `exercise` or `muscle`; absent/invalid values default to `exercise`)
 - Key states (high level):
-  - Stats summary loading/error/content states with separate labelled control
-    rows: `Time range` keeps the 7-/30-day pills, and `Breakdown` keeps both
-    joined `By Exercise` / `By Muscle` choices visible with one selected
+  - one `ScreenScroll` on `paper`: two micro-labelled `SegmentedControl` rows
+    (`Time range` 7/30 days, `Breakdown` `By Exercise` / `By Muscle`), the two
+    summary `Card`s, the `SearchField` filter, then the table or the family
+    cards; loading, error and empty states are `StatePanel`s in a `Card`
   - valid query values set the initial controls, including the completion
     handoff at `?period=7&breakdown=muscle`; later control changes remain
     in-route state and do not rewrite the query string
-  - top summary cards show `Sessions` and `Sets (W/Sets)` as absolute counts; their previous-period deltas never include percentages
+  - top summary cards show `Sessions` (a link `Card` with a chevron) and `Sets (W/Sets)` as stacked `Stat`s; their previous-period deltas are signed, in `ink-muted`, and never include percentages
   - per-exercise history is a viewport-fitting table with compact, single-line
     `Exercise`, `Sets`, `Vol`, and `1RM` headers; rows show aligned values, keep
     the working-set count in parentheses, use `—` for unavailable 1RM, allow
@@ -178,7 +179,7 @@ Brief entrypoint map of the current mobile screens.
     wording retains the complete sort mode and next action. Mounted sort choice
     survives time-range, search, and Breakdown changes.
   - per-muscle family and nested rows show the same set/near-failure count grammar plus per-side, role-weighted `Volume`; set comparisons are signed absolute pairs while volume comparisons are percentage-only with explicit zero-baseline states
-  - per-muscle family rows use uniform green failure-intensity backgrounds and visible nested-muscle rows use uniform warm backgrounds, selecting one shade per row and scaling to eight near-failure sets per seven days; exact counts remain readable/accessibly labelled and the threshold is not a training target
+  - per-muscle family rows and visible nested-muscle rows use one failure-intensity ramp (`viz1`–`viz4`), selecting one uniform shade per row and scaling to eight near-failure sets per seven days; exact counts remain readable/accessibly labelled and the threshold is not a training target
   - actionable muscle rows in Stats summary; expanded muscle rows and collapsed single-muscle family headers open an in-route muscle-history overlay
   - muscle-history overlay states for loading, error, no-history, populated heatmap with selectable `Volume` / `W/sets` metrics, selected positive-effort date with contributing exercise/set detail, and selected zero-effort date empty detail; daily and weekly charts stay warm-mounted so switching is immediate and preserves chart-local state
   - **By Exercise mode** (M17): the view-mode chip switches the body to the sortable exercise table; tapping an exercise data row opens an in-route `ExerciseHistoryOverlay`
@@ -188,6 +189,9 @@ Brief entrypoint map of the current mobile screens.
     is also exposed canonically at `/progress`. `BottomTray` composes
     `MainTabs`, maps this route to Progress, and is supplied via the `tabBar`
     prop in `(tabs)/_layout.tsx`.
+  - the screen body is in the design language (DLM-T08); the history overlays
+    and heatmaps are not yet (DLM-T09). Design target:
+    `design-targets/progress.md`
 
 4b. `/session/[sessionId]` (session view)
 - File: `apps/mobile/app/session/[sessionId]/index.tsx` (components in

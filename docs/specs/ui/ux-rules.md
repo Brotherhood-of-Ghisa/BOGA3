@@ -485,10 +485,13 @@ primitives (`components-catalog.md` 6 and 6a) and those screens.
 ### 13. Stats exercise/muscle history semantics
 
 1. The `Stats / History` screen separates its dimensions into two labelled
-   rows: `Time range` contains the existing `Last 7 days` / `Last 30 days`
-   pills, while `Breakdown` contains a joined, equal-width `By Exercise` / `By
-   Muscle` toggle. Both breakdown choices remain visible, exactly one exposes
-   selected state, and `By Exercise` remains the default.
+   rows: `Time range` holds `Last 7 days` / `Last 30 days` and `Breakdown`
+   holds `By Exercise` / `By Muscle`. Both are the same joined, equal-width
+   `SegmentedControl` (a `tablist`), each under its own micro-label; the labels,
+   not two different shapes, separate the dimensions (DLM-T08-D1). Every choice
+   stays visible, exactly one per row exposes selected state, and `Last 7 days`
+   / `By Exercise` remain the defaults. The controls, the summary, the filter
+   and the list share one scroll.
 2. The summary keeps the actionable `Sessions` card and shows a second `Sets (W/Sets)` card as `<all valid performed sets> (<working sets>)`. Sessions use a signed absolute delta, and the set card uses a signed absolute pair; neither count card shows percentage change. Percentages are reserved for Volume comparisons.
 3. In per-exercise mode, exercises with at least one valid performed set in the
    selected 7-/30-day window render in one compact, viewport-fitting table with
@@ -515,8 +518,8 @@ primitives (`components-catalog.md` 6 and 6a) and those screens.
    ascending.
 5. There is no separate sort-status label above the table. Each sortable header
    reserves a fixed inline indicator slot so its label never moves when another
-   header becomes active. Only the active slot is visible in blue on the same
-   line: `Recent` plus an arrow for Exercise, or an arrow alone for Sets and Vol.
+   header becomes active. Only the active slot is visible, on the same line,
+   with the active label in `ink`: `Recent` plus an arrow for Exercise, or an arrow alone for Sets and Vol.
    Each sortable header exposes button semantics, a mobile-sized touch target,
    selected state when active, the complete current sort wording (including
    Sets versus Working sets), and the next activation's outcome to assistive
@@ -526,13 +529,16 @@ primitives (`components-catalog.md` 6 and 6a) and those screens.
    synchronously without data queries or mutation.
 6. Tapping an exercise row in per-exercise mode opens an in-route `ExerciseHistoryOverlay` — the same overlay card structure as the muscle-history overlay (occupies ~75% screen height, backdrop-dismissible).
 7. The `ExerciseHistoryOverlay` renders the reusable daily/weekly heatmaps over a 365-day window for the selected exercise. It keeps the four metric chips (Volume / W/sets / 1RM / Top weight) plus the week-selection banner; unlike muscle-history, it remains a multi-metric exercise-specific view.
-8. The Breakdown toggle uses the shared action, border, and surface tokens and
-   is visually distinct from the Time range pills; no raw color literals.
+8. Both controls use the design-language `SegmentedControl` (selected segment
+   solid `ink`); neither is styled locally, and there are no raw colour
+   literals. Summary deltas keep their sign (`+`, `−`, `±0`) in Plex Mono
+   `ink-muted`, with `new` in `ink`; they carry no green or red (G3). Volumes
+   and 1RMs are full integers, never `2.5k` (`design-language.md` §6).
 9. Dismissing the exercise overlay returns to the exercise list in per-exercise mode. It clears only transient selected-exercise/week UI state and does not mutate any data.
 10. Volume for exercise analytics is raw `weight × reps` (no muscle-role weighting). This differs from the muscle-history overlay where volume is role-weighted.
 11. In the per-muscle mode every family and visible nested-muscle row shows `Sets` in the same `<set count> (<near-failure count>)` form plus `Volume`. Family set counts union physical source-set identities across contributing primary/secondary muscles, so one set mapped to two muscles in one family counts once. Family volume still sums member-muscle contributions.
 12. Per-muscle previous-period set comparisons use signed absolute pairs (`+4 (+1)`, `−2 (−1)`, `±0 (−1)`) and never percentages. Volume comparisons use percentage only (`+17%`, `−100%`, `±0%`), with `—` for zero-to-zero and `new` for positive volume over a zero baseline. Muscle/family volume remains the shared per-side, role-weighted calculation.
-13. Per-muscle family rows use a token-backed green failure-intensity background; visible nested-muscle rows use the semantic warm background palette. Each row receives one uniform shade selected from four levels using `clamp(nearFailureCount / (8 × periodDays / 7), 0, 1)`; there is no partial-width band or gradient. Rows with no near-failure sets keep the default surface. The background is decorative and supplements the readable near-failure count. Its strongest-shade threshold is a display scale only—not a goal, recommendation, limit, or warning. Row accessibility copy states the exact near-failure count and selected-period threshold.
+13. Per-muscle family rows and visible nested-muscle rows share one failure-intensity ramp, the data-viz roles `viz1`–`viz4` (`design-language.md` §2); nesting and indentation, not colour, tell a family from a muscle. On a shaded row every text is `ink`, legends and deltas included. Each row receives one uniform shade selected from four levels using `clamp(nearFailureCount / (8 × periodDays / 7), 0, 1)`; there is no partial-width band or gradient. Rows with no near-failure sets keep the default surface. The background is decorative and supplements the readable near-failure count. Its strongest-shade threshold is a display scale only—not a goal, recommendation, limit, or warning. Row accessibility copy states the exact near-failure count and selected-period threshold.
 
 ### 14. Group screens: freshness, pull-to-refresh, and the offline marker (M22)
 

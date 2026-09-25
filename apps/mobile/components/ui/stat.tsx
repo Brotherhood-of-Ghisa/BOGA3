@@ -7,6 +7,7 @@ export type StatRank = 'primary' | 'secondary';
 export type StatState = 'realised' | 'planned';
 export type StatEmphasis = 'none' | 'record';
 export type StatKind = 'figure' | 'text';
+export type StatGround = 'plain' | 'viz';
 
 export type StatProps = {
   // The legend, as written (`1RM`, `Vol`); rendered uppercase.
@@ -17,7 +18,9 @@ export type StatProps = {
   // `stacked`: label above value (summary card, records panel). `inline`: a
   // mini legend left of a fixed-width, right-aligned value (the set row).
   layout?: StatLayout;
-  // Inline only: `primary` is the 1RM line, `secondary` the quieter VOL line.
+  // Inline: `primary` is the 1RM line, `secondary` the quieter VOL line.
+  // Stacked: `primary` is a headline figure (a summary card), `secondary` a
+  // figure in a row of a list (a Progress muscle row).
   rank?: StatRank;
   // A planned value is not yet realised: it is shown, but faded — the value in
   // `ink-faint`, the legend in `planned`.
@@ -29,6 +32,9 @@ export type StatProps = {
   kind?: StatKind;
   // Stacked only: `end` right-aligns label and value (a trailing column).
   align?: 'start' | 'end';
+  // `viz`: the stat sits on a data-viz ground (`viz1`–`viz4`), where
+  // `ink-faint` is illegible, so the legend is `ink` (`design-language.md` §2).
+  ground?: StatGround;
   testID?: string;
 };
 
@@ -43,12 +49,21 @@ export function Stat({
   emphasis = 'none',
   kind = 'figure',
   align = 'start',
+  ground = 'plain',
   testID,
 }: StatProps) {
   const planned = state === 'planned';
-  const legendStyle = [styles.legend, planned ? styles.legendPlanned : null];
+  const legendStyle = [
+    styles.legend,
+    planned ? styles.legendPlanned : null,
+    ground === 'viz' ? styles.legendOnViz : null,
+  ];
   const valueStyle = [
-    layout === 'inline' ? inlineValueStyles[rank] : stackedValueStyles[kind],
+    layout === 'inline'
+      ? inlineValueStyles[rank]
+      : kind === 'figure' && rank === 'secondary'
+        ? stackedValueStyles.rowFigure
+        : stackedValueStyles[kind],
     planned ? styles.valuePlanned : emphasisStyles[emphasis],
   ];
 
@@ -90,6 +105,9 @@ const styles = StyleSheet.create({
   legendPlanned: {
     color: uiRoles.planned,
   },
+  legendOnViz: {
+    color: uiRoles.ink,
+  },
   valuePlanned: {
     color: uiRoles.inkFaint,
   },
@@ -116,6 +134,14 @@ const stackedValueStyles = StyleSheet.create({
     fontWeight: '700',
     fontSize: uiTypography.size.xl,
     lineHeight: uiTypography.lineHeight.xl,
+    color: uiRoles.ink,
+  },
+  // A figure in a list row: one rung above body, lighter than a headline.
+  rowFigure: {
+    fontFamily: figure,
+    fontWeight: '600',
+    fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
     color: uiRoles.ink,
   },
   text: {

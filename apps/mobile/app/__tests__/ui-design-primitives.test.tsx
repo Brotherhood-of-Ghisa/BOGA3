@@ -129,6 +129,23 @@ describe('Stat', () => {
     });
   });
 
+  it('sets a secondary stacked figure at the row size, lighter than a headline', () => {
+    render(<Stat align="end" label="Sets" rank="secondary" value="10 (8)" />);
+
+    expect(flatStyle(screen.getByText('10 (8)'))).toMatchObject({
+      fontFamily: 'IBM Plex Mono',
+      fontWeight: '600',
+      fontSize: uiTypography.size.base,
+      color: uiRoles.ink,
+    });
+  });
+
+  it('turns the legend ink on a data-viz ground, where ink-faint is illegible', () => {
+    render(<Stat ground="viz" label="Sets" rank="secondary" value="10 (8)" />);
+
+    expect(flatStyle(screen.getByText('Sets')).color).toBe(uiRoles.ink);
+  });
+
   it('marks an all-time best in bold record, the only emphasis', () => {
     render(
       <>

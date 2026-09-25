@@ -41,14 +41,6 @@ export const uiColors = {
   heatmapBucket2: '#aee4bd',
   heatmapBucket3: '#68c57f',
   heatmapBucket4: '#218f46',
-  failureBackgroundFamily1: '#f1faf3',
-  failureBackgroundFamily2: '#e2f5e7',
-  failureBackgroundFamily3: '#ccebd5',
-  failureBackgroundFamily4: '#b5e1c1',
-  failureBackgroundMuscle1: '#fffaf0',
-  failureBackgroundMuscle2: '#fff3d6',
-  failureBackgroundMuscle3: '#ffe7ad',
-  failureBackgroundMuscle4: '#ffd784',
   heatmapTodayBg: '#e8f4ff',
   heatmapTodayBorder: '#7bbcf4',
   heatmapTodayMarker: '#2f8ed8',
@@ -99,6 +91,17 @@ export const uiRoles = {
   recordRule: '#EEDFBE',
   // Destructive actions only.
   danger: '#A4262C',
+  // Data visualisation: one sequential ramp, one meaning ("more"). `viz0` is
+  // empty / rest; `viz1`…`viz4` darken in even lightness steps (L* 94, 87, 78,
+  // 68, 58) in a bronze taupe that is neither `accent` nor `record`. Text on a
+  // `viz` ground is `ink`: `ink-muted` and `ink-faint` fail from `viz2` up.
+  // Picked on device 2026-09-25 (DLM-T08, "B2"); gated by
+  // `ui-design-tokens.test.ts`.
+  viz0: '#F0ECE7',
+  viz1: '#E7D7CA',
+  viz2: '#D3BDAB',
+  viz3: '#BCA18A',
+  viz4: '#A4866B',
   // The dimmed backdrop behind a sheet: `ink` at 42%, so the page behind reads
   // as the same warm ground gone dark rather than as a neutral grey.
   scrim: 'rgba(21, 24, 29, 0.42)',
