@@ -191,7 +191,7 @@ export default function SettingsScreen() {
 
       <View style={styles.section} testID="settings-section-ai-coaching">
         <SectionLabel title="AI coaching" />
-        <Text style={styles.sectionIntro}>
+        <Text allowFontScaling={false} style={styles.sectionIntro}>
           Coaches get read-only training access that you can revoke at any time.
         </Text>
         <Card>
@@ -212,6 +212,7 @@ export default function SettingsScreen() {
           />
           {connectError ? (
             <Text
+              allowFontScaling={false}
               accessibilityLiveRegion="polite"
               style={styles.inlineError}
               testID="settings-connect-agent-error">
@@ -237,11 +238,11 @@ export default function SettingsScreen() {
       <View style={styles.section} testID="settings-section-preferences">
         <SectionLabel title="Preferences" />
         <Card style={styles.cardBody} testID="settings-preferences-card">
-          <Text style={styles.bodyMuted}>
+          <Text allowFontScaling={false} style={styles.bodyMuted}>
             Configure how dates and other details are displayed throughout BoGa.
           </Text>
           <View style={styles.preference}>
-            <Text style={styles.fieldLabel}>Date format</Text>
+            <Text allowFontScaling={false} style={styles.fieldLabel}>Date format</Text>
             <SegmentedControl
               accessibilityLabel="Date format"
               onChange={(format) => setListPreferences({ dateFormat: format })}
@@ -270,14 +271,14 @@ export default function SettingsScreen() {
           {aboutLines.length > 0 ? (
             aboutLines.map((line, index) => (
               <ListRow density="list" divider={index > 0} key={line.testID}>
-                <Text style={styles.body} testID={line.testID}>
+                <Text allowFontScaling={false} style={styles.body} testID={line.testID}>
                   {line.text}
                 </Text>
               </ListRow>
             ))
           ) : (
             <ListRow density="list" divider={false}>
-              <Text style={styles.bodyMuted}>Release information unavailable</Text>
+              <Text allowFontScaling={false} style={styles.bodyMuted}>Release information unavailable</Text>
             </ListRow>
           )}
         </Card>
@@ -289,12 +290,12 @@ export default function SettingsScreen() {
           <Card style={styles.cardBody} testID="settings-dev-tools-card">
             <View style={styles.devHeader}>
               <Icon color={uiRoles.inkMuted} name="warning" size="sm" />
-              <Text accessibilityRole="header" style={styles.microLabel}>
+              <Text allowFontScaling={false} accessibilityRole="header" style={styles.microLabel}>
                 Developer tools
               </Text>
             </View>
 
-            <Text style={styles.bodyMuted}>
+            <Text allowFontScaling={false} style={styles.bodyMuted}>
               View the in-app logs captured this session (all levels). Errors and warnings also
               sync to the backend once signed in.
             </Text>
@@ -306,7 +307,7 @@ export default function SettingsScreen() {
               variant="outline"
             />
 
-            <Text style={styles.bodyMuted}>
+            <Text allowFontScaling={false} style={styles.bodyMuted}>
               Wipe every local table and re-run the exercise catalog seeder. Available only in
               development builds — does nothing in release.
             </Text>
@@ -320,7 +321,7 @@ export default function SettingsScreen() {
             />
             <DevFeedbackNotice feedback={resetFeedback} testID="settings-dev-reset-feedback" />
 
-            <Text style={styles.bodyMuted}>
+            <Text allowFontScaling={false} style={styles.bodyMuted}>
               Drop the local database and re-bootstrap. Sync re-pulls your server state into a
               clean local store.
             </Text>
@@ -336,7 +337,7 @@ export default function SettingsScreen() {
             />
             <DevFeedbackNotice feedback={wipeLocalFeedback} testID="settings-dev-wipe-local-feedback" />
 
-            <Text style={styles.bodyMuted}>
+            <Text allowFontScaling={false} style={styles.bodyMuted}>
               Delete every row on the server owned by your account, then wipe local. Useful for
               testing the bootstrap flow against an empty server.
             </Text>
@@ -366,7 +367,7 @@ const DATE_FORMAT_OPTIONS = (['DD-MM-YYYY', 'MM-DD-YYYY', 'YYYY-MM-DD'] as const
 // A section's name: a micro-label over its card, as on More.
 function SectionLabel({ title }: { title: string }) {
   return (
-    <Text accessibilityRole="header" style={styles.microLabel}>
+    <Text allowFontScaling={false} accessibilityRole="header" style={styles.microLabel}>
       {title}
     </Text>
   );

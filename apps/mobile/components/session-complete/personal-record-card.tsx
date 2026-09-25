@@ -28,14 +28,14 @@ export function PersonalRecordCard({ personalRecord, testID }: PersonalRecordCar
         accessible>
         <View style={styles.band}>
           <Icon color={uiRoles.record} name="arrow-up" size="xs" />
-          <Text style={styles.bandLabel}>{`New 1RM record · ${oneRepMax}`}</Text>
+          <Text allowFontScaling={false} style={styles.bandLabel}>{`New 1RM record · ${oneRepMax}`}</Text>
         </View>
         <View style={styles.body}>
-          <Text numberOfLines={2} style={styles.name}>
+          <Text allowFontScaling={false} numberOfLines={2} style={styles.name}>
             {personalRecord.exerciseName}
           </Text>
           <View style={styles.row}>
-            <Text style={styles.set}>{set}</Text>
+            <Text allowFontScaling={false} style={styles.set}>{set}</Text>
             <Stat emphasis="record" label="1RM" layout="inline" value={oneRepMax} />
           </View>
         </View>

@@ -170,7 +170,7 @@ export function HistoryList({
     <>
       <View style={styles.historyRegion}>
         <View style={styles.sectionHeaderRow}>
-          <Text selectable style={styles.sectionTitle}>
+          <Text allowFontScaling={false} selectable style={styles.sectionTitle}>
             History
           </Text>
           <Pressable
@@ -179,7 +179,7 @@ export function HistoryList({
             onPress={onToggleShowDeletedSessions}
             style={styles.toggleButton}
             testID="toggle-deleted-sessions-button">
-            <Text style={styles.toggleButtonText}>
+            <Text allowFontScaling={false} style={styles.toggleButtonText}>
               {showDeletedSessions ? 'Hide deleted' : 'Show deleted'}
             </Text>
           </Pressable>
@@ -193,19 +193,19 @@ export function HistoryList({
           testID="completed-history-scroll">
           {isLoading ? (
             <View style={styles.emptyPanel} testID="session-list-loading-state">
-              <Text selectable style={styles.metaText}>
+              <Text allowFontScaling={false} selectable style={styles.metaText}>
                 Loading sessions...
               </Text>
             </View>
           ) : loadErrorMessage ? (
             <View style={styles.emptyPanel} testID="session-list-load-error">
-              <Text selectable style={styles.metaText}>
+              <Text allowFontScaling={false} selectable style={styles.metaText}>
                 {loadErrorMessage}
               </Text>
             </View>
           ) : visibleSessions.length === 0 ? (
             <View style={styles.emptyPanel}>
-              <Text selectable style={styles.metaText}>
+              <Text allowFontScaling={false} selectable style={styles.metaText}>
                 No completed sessions
               </Text>
             </View>
@@ -247,10 +247,10 @@ export function HistoryList({
 
           {showGlobalEmptyState ? (
             <View style={styles.globalEmptyState} testID="session-list-empty-state">
-              <Text selectable style={styles.globalEmptyTitle}>
+              <Text allowFontScaling={false} selectable style={styles.globalEmptyTitle}>
                 No sessions yet
               </Text>
-              <Text selectable style={styles.metaText}>
+              <Text allowFontScaling={false} selectable style={styles.metaText}>
                 Start your first workout session to see it here.
               </Text>
             </View>
@@ -280,7 +280,7 @@ export function HistoryList({
                   onPress={handleEdit}
                   style={[styles.modalActionButton, styles.modalActionRowButton, styles.modalNeutralButton]}
                   testID="completed-session-edit-menu-action-button">
-                  <Text style={styles.modalNeutralButtonText}>Edit</Text>
+                  <Text allowFontScaling={false} style={styles.modalNeutralButtonText}>Edit</Text>
                 </Pressable>
 
                 <Pressable
@@ -294,6 +294,7 @@ export function HistoryList({
                   ]}
                   testID="completed-session-reopen-menu-action-button">
                   <Text
+                    allowFontScaling={false}
                     style={[
                       styles.modalNeutralButtonText,
                     ]}>Append</Text>
@@ -305,7 +306,7 @@ export function HistoryList({
                   onPress={applyMenuAction}
                   style={[styles.modalActionButton, styles.modalActionRowButton, styles.modalDangerButton]}
                   testID="completed-session-modal-action-button">
-                  <Text style={styles.modalDangerButtonText}>Delete</Text>
+                  <Text allowFontScaling={false} style={styles.modalDangerButtonText}>Delete</Text>
                 </Pressable>
               </View>
             </View>
@@ -319,7 +320,7 @@ export function HistoryList({
                   onPress={handleEdit}
                   style={[styles.modalActionButton, styles.modalActionRowButton, styles.modalNeutralButton]}
                   testID="completed-session-edit-menu-action-button">
-                  <Text style={styles.modalNeutralButtonText}>Edit</Text>
+                  <Text allowFontScaling={false} style={styles.modalNeutralButtonText}>Edit</Text>
                 </Pressable>
 
                 <Pressable
@@ -333,6 +334,7 @@ export function HistoryList({
                   ]}
                   testID="completed-session-reopen-menu-action-button">
                   <Text
+                    allowFontScaling={false}
                     style={[
                       styles.modalNeutralButtonText,
                     ]}>Append</Text>
@@ -344,7 +346,7 @@ export function HistoryList({
                   onPress={applyMenuAction}
                   style={[styles.modalActionButton, styles.modalActionRowButton, styles.modalNeutralButton]}
                   testID="completed-session-modal-action-button">
-                  <Text style={styles.modalNeutralButtonText}>Undelete</Text>
+                  <Text allowFontScaling={false} style={styles.modalNeutralButtonText}>Undelete</Text>
                 </Pressable>
               </View>
             </View>

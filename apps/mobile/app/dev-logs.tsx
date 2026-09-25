@@ -61,24 +61,24 @@ function LogRow({ record, divider }: { record: LogRecord; divider: boolean }) {
       <View style={styles.rowHeader}>
         <View style={styles.levelMark}>
           {record.level === 'warn' ? <Icon name="warning" size="xs" /> : null}
-          <Text style={[styles.level, { color: LEVEL_COLOR[record.level] }]}>{record.level.toUpperCase()}</Text>
+          <Text allowFontScaling={false} style={[styles.level, { color: LEVEL_COLOR[record.level] }]}>{record.level.toUpperCase()}</Text>
         </View>
-        <Text style={styles.time}>{formatTime(record.createdAt)}</Text>
+        <Text allowFontScaling={false} style={styles.time}>{formatTime(record.createdAt)}</Text>
       </View>
-      <Text selectable style={styles.event}>
+      <Text allowFontScaling={false} selectable style={styles.event}>
         {record.source} · {record.event}
       </Text>
       {record.message ? (
-        <Text selectable style={styles.message}>
+        <Text allowFontScaling={false} selectable style={styles.message}>
           {record.message}
         </Text>
       ) : null}
       {hasContext && expanded ? (
-        <Text selectable style={styles.context}>
+        <Text allowFontScaling={false} selectable style={styles.context}>
           {JSON.stringify(record.context, null, 2)}
         </Text>
       ) : null}
-      {hasContext && !expanded ? <Text style={styles.contextHint}>Tap to show context</Text> : null}
+      {hasContext && !expanded ? <Text allowFontScaling={false} style={styles.contextHint}>Tap to show context</Text> : null}
     </Pressable>
   );
 }

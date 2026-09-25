@@ -336,6 +336,7 @@ export default function ProfileScreen() {
                 Email
               </UiText>
               <TextInput
+                allowFontScaling={false}
                 accessibilityLabel="Email"
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -355,6 +356,7 @@ export default function ProfileScreen() {
                 Password
               </UiText>
               <TextInput
+                allowFontScaling={false}
                 accessibilityLabel="Password"
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -398,6 +400,7 @@ export default function ProfileScreen() {
                     Username
                   </UiText>
                   <TextInput
+                    allowFontScaling={false}
                     accessibilityLabel="Username"
                     autoCapitalize="none"
                     autoCorrect={false}
@@ -414,6 +417,7 @@ export default function ProfileScreen() {
                     New email
                   </UiText>
                   <TextInput
+                    allowFontScaling={false}
                     accessibilityLabel="New email"
                     autoCapitalize="none"
                     autoCorrect={false}
@@ -432,6 +436,7 @@ export default function ProfileScreen() {
                     New password
                   </UiText>
                   <TextInput
+                    allowFontScaling={false}
                     accessibilityLabel="New password"
                     autoCapitalize="none"
                     autoCorrect={false}

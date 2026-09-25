@@ -65,7 +65,7 @@ export function ChipGroup<TValue extends string | number>(props: ChipGroupProps<
             }}
             style={({ pressed }) => [styles.chip, on ? styles.chipOn : null, pressed && !on ? styles.pressed : null]}
             testID={`${testIDPrefix}-${option.value}`}>
-            <Text numberOfLines={1} style={[styles.label, on ? styles.labelOn : null]}>
+            <Text allowFontScaling={false} numberOfLines={1} style={[styles.label, on ? styles.labelOn : null]}>
               {option.label}
             </Text>
           </Pressable>

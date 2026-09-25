@@ -106,7 +106,7 @@ export function ExerciseHistoryScreenShell({
                 onPress={() => onSelectPeriod(option.value)}
                 style={[styles.periodChip, selected && styles.periodChipSelected]}
                 testID={`exercise-history-period-chip-${option.value}`}>
-                <Text style={[styles.periodChipText, selected && styles.periodChipTextSelected]}>
+                <Text allowFontScaling={false} style={[styles.periodChipText, selected && styles.periodChipTextSelected]}>
                   {formatPeriodChipLabel(option.value, option.label)}
                 </Text>
               </Pressable>
@@ -151,14 +151,14 @@ export function ExerciseHistoryScreenShell({
           testID="exercise-history-scroll">
           {errorMessage ? (
             <View style={styles.statePanel} testID="exercise-history-error-state">
-              <Text style={styles.stateTitle}>Could not load history</Text>
-              <Text style={styles.stateBody}>{errorMessage}</Text>
+              <Text allowFontScaling={false} style={styles.stateTitle}>Could not load history</Text>
+              <Text allowFontScaling={false} style={styles.stateBody}>{errorMessage}</Text>
             </View>
           ) : null}
 
           {!errorMessage && isLoading && !summary ? (
             <View style={styles.statePanel} testID="exercise-history-loading-state">
-              <Text style={styles.stateBody}>Loading exercise history…</Text>
+              <Text allowFontScaling={false} style={styles.stateBody}>Loading exercise history…</Text>
             </View>
           ) : null}
 
@@ -166,7 +166,7 @@ export function ExerciseHistoryScreenShell({
             <>
               {summary.exerciseDeletedAt ? (
                 <View style={styles.deletedExerciseBanner} testID="exercise-history-deleted-banner">
-                  <Text style={styles.deletedExerciseBannerText}>
+                  <Text allowFontScaling={false} style={styles.deletedExerciseBannerText}>
                     This exercise has been deleted. Historical data remains available.
                   </Text>
                 </View>
@@ -179,8 +179,8 @@ export function ExerciseHistoryScreenShell({
 
               {summary.sessions.length === 0 ? (
                 <View style={styles.statePanel} testID="exercise-history-empty-state">
-                  <Text style={styles.stateTitle}>No sessions in this view</Text>
-                  <Text style={styles.stateBody}>
+                  <Text allowFontScaling={false} style={styles.stateTitle}>No sessions in this view</Text>
+                  <Text allowFontScaling={false} style={styles.stateBody}>
                     {appliedTagDefinitionId
                       ? 'No sessions in this period have the selected tag. Pick another tag or widen the period.'
                       : 'No completed sessions for this exercise in this period.'}
@@ -217,7 +217,7 @@ function BestCard({
   const topWeight = best.topWeight;
   return (
     <View style={styles.bestCard} testID="exercise-history-best-card">
-      <Text style={styles.bestCardTitle}>All-time bests</Text>
+      <Text allowFontScaling={false} style={styles.bestCardTitle}>All-time bests</Text>
       <BestRow
         testID="exercise-history-best-est-1rm"
         label="Est. 1RM"
@@ -263,7 +263,7 @@ function TagChip({
         deleted && !selected && styles.tagChipDeleted,
       ]}
       testID={testID}>
-      <Text style={[styles.tagChipText, selected && styles.tagChipTextSelected]} numberOfLines={1}>
+      <Text allowFontScaling={false} style={[styles.tagChipText, selected && styles.tagChipTextSelected]} numberOfLines={1}>
         {label}
       </Text>
     </Pressable>
@@ -285,9 +285,9 @@ function BestRow({
 }) {
   const inner = (
     <View style={styles.bestRowInner}>
-      <Text style={styles.bestRowLabel}>{label}</Text>
-      <Text style={styles.bestRowPrimary}>{primary}</Text>
-      {secondary ? <Text style={styles.bestRowSecondary}>{secondary}</Text> : null}
+      <Text allowFontScaling={false} style={styles.bestRowLabel}>{label}</Text>
+      <Text allowFontScaling={false} style={styles.bestRowPrimary}>{primary}</Text>
+      {secondary ? <Text allowFontScaling={false} style={styles.bestRowSecondary}>{secondary}</Text> : null}
     </View>
   );
 
@@ -333,8 +333,8 @@ function SessionCard({
       style={styles.sessionCard}
       testID={`exercise-history-session-card-${entry.sessionExerciseId}`}>
       <View style={styles.sessionCardHeader}>
-        <Text style={styles.sessionCardDate}>{formatSessionDate(entry.completedAt)}</Text>
-        <Text style={styles.sessionCardGym} numberOfLines={1}>
+        <Text allowFontScaling={false} style={styles.sessionCardDate}>{formatSessionDate(entry.completedAt)}</Text>
+        <Text allowFontScaling={false} style={styles.sessionCardGym} numberOfLines={1}>
           {entry.gymName?.trim() ? entry.gymName : 'No gym'}
         </Text>
       </View>
@@ -348,7 +348,7 @@ function SessionCard({
               <View
                 key={id}
                 style={[styles.sessionTagChip, tag.deletedAt ? styles.sessionTagChipDeleted : null]}>
-                <Text numberOfLines={1} style={styles.sessionTagChipText}>
+                <Text allowFontScaling={false} numberOfLines={1} style={styles.sessionTagChipText}>
                   {tag.deletedAt ? `${tag.name} (deleted)` : tag.name}
                 </Text>
               </View>
@@ -365,10 +365,10 @@ function SessionCard({
       </View>
 
       <View style={styles.setTableHeaderRow}>
-        <Text style={[styles.setTableHeaderCell, styles.setTableTypeCell]}>Type</Text>
-        <Text style={[styles.setTableHeaderCell, styles.setTableIndexCell]}>Set</Text>
-        <Text style={[styles.setTableHeaderCell, styles.setTableValueCell]}>Weight</Text>
-        <Text style={[styles.setTableHeaderCell, styles.setTableValueCell]}>Reps</Text>
+        <Text allowFontScaling={false} style={[styles.setTableHeaderCell, styles.setTableTypeCell]}>Type</Text>
+        <Text allowFontScaling={false} style={[styles.setTableHeaderCell, styles.setTableIndexCell]}>Set</Text>
+        <Text allowFontScaling={false} style={[styles.setTableHeaderCell, styles.setTableValueCell]}>Weight</Text>
+        <Text allowFontScaling={false} style={[styles.setTableHeaderCell, styles.setTableValueCell]}>Reps</Text>
       </View>
       {entry.sets.map((set, index) => (
         <View
@@ -378,6 +378,7 @@ function SessionCard({
           <View style={[styles.setTableTypeCell, styles.setTableTypeBadgeWrap]}>
             {formatSetTypeBadge(set.setType) ? (
               <Text
+                allowFontScaling={false}
                 style={[
                   styles.setTableTypeBadge,
                   !set.isWorking && styles.setTableTypeBadgeWarmUp,
@@ -385,12 +386,12 @@ function SessionCard({
                 {formatSetTypeBadge(set.setType)}
               </Text>
             ) : (
-              <Text style={styles.setTableTypeBadgeEmpty}>—</Text>
+              <Text allowFontScaling={false} style={styles.setTableTypeBadgeEmpty}>—</Text>
             )}
           </View>
-          <Text style={[styles.setTableCell, styles.setTableIndexCell]}>{index + 1}</Text>
-          <Text style={[styles.setTableCell, styles.setTableValueCell]}>{set.weightValue || '—'}</Text>
-          <Text style={[styles.setTableCell, styles.setTableValueCell]}>{set.repsValue || '—'}</Text>
+          <Text allowFontScaling={false} style={[styles.setTableCell, styles.setTableIndexCell]}>{index + 1}</Text>
+          <Text allowFontScaling={false} style={[styles.setTableCell, styles.setTableValueCell]}>{set.weightValue || '—'}</Text>
+          <Text allowFontScaling={false} style={[styles.setTableCell, styles.setTableValueCell]}>{set.repsValue || '—'}</Text>
         </View>
       ))}
     </Pressable>
@@ -400,8 +401,8 @@ function SessionCard({
 function SessionMetric({ label, value }: { label: string; value: string }) {
   return (
     <View style={styles.sessionMetric}>
-      <Text style={styles.sessionMetricLabel}>{label}</Text>
-      <Text style={styles.sessionMetricValue}>{value}</Text>
+      <Text allowFontScaling={false} style={styles.sessionMetricLabel}>{label}</Text>
+      <Text allowFontScaling={false} style={styles.sessionMetricValue}>{value}</Text>
     </View>
   );
 }

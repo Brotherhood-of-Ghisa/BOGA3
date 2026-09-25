@@ -30,7 +30,7 @@ export function MainTabs({ activeTab, onSelect }: MainTabsProps) {
             onPress={() => onSelect(tab.key)}
             style={({ pressed }) => [styles.tab, pressed && !active ? styles.pressed : null]}
             testID={tab.testID}>
-            <Text numberOfLines={1} style={[styles.label, active ? styles.labelActive : null]}>
+            <Text allowFontScaling={false} numberOfLines={1} style={[styles.label, active ? styles.labelActive : null]}>
               {tab.label}
             </Text>
             <View

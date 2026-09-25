@@ -123,6 +123,7 @@ export default function SignInScreen() {
                 <View style={styles.fieldBlock}>
                   <UiText variant="subtitle">Email</UiText>
                   <TextInput
+                    allowFontScaling={false}
                     accessibilityLabel="Email"
                     autoCapitalize="none"
                     autoCorrect={false}
@@ -140,6 +141,7 @@ export default function SignInScreen() {
                 <View style={styles.fieldBlock}>
                   <UiText variant="subtitle">Password</UiText>
                   <TextInput
+                    allowFontScaling={false}
                     accessibilityLabel="Password"
                     autoCapitalize="none"
                     autoCorrect={false}

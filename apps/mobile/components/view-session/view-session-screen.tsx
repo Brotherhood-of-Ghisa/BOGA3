@@ -62,11 +62,11 @@ export function ViewSessionScreen({
         {summary.deleted ? (
           <View style={styles.band} testID="completed-session-detail-deleted-band">
             <Icon color={uiRoles.inkMuted} name="trash" size="xs" />
-            <Text style={styles.bandLabel}>Deleted · hidden from history</Text>
+            <Text allowFontScaling={false} style={styles.bandLabel}>Deleted · hidden from history</Text>
           </View>
         ) : null}
         {error ? (
-          <Text accessibilityLiveRegion="polite" style={styles.error} testID="completed-session-detail-error-notice">
+          <Text allowFontScaling={false} accessibilityLiveRegion="polite" style={styles.error} testID="completed-session-detail-error-notice">
             {error}
           </Text>
         ) : null}
@@ -86,7 +86,7 @@ export function ViewSessionScreen({
           times={{ start: summary.start, end: summary.end, testID: 'completed-session-detail-times' }}
         />
         {model.cards.length === 0 ? (
-          <Text style={styles.empty} testID="completed-session-detail-no-exercises">
+          <Text allowFontScaling={false} style={styles.empty} testID="completed-session-detail-no-exercises">
             No exercises logged in this session.
           </Text>
         ) : (

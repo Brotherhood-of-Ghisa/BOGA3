@@ -52,6 +52,7 @@ export function ActionButton({
       ]}
       testID={testID}>
       <Text
+        allowFontScaling={false}
         style={[
           styles.label,
           variant === 'primary' ? styles.labelPrimary : null,

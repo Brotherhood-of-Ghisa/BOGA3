@@ -90,7 +90,7 @@ export function ActiveSessionRow({
               onPress={handleDelete}
               style={[styles.modalActionButton, styles.modalDangerButton]}
               testID="discard-active-session-button">
-              <Text style={styles.modalDangerButtonText}>Delete</Text>
+              <Text allowFontScaling={false} style={styles.modalDangerButtonText}>Delete</Text>
             </Pressable>
           </View>
         </View>

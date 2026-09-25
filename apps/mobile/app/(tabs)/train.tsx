@@ -145,13 +145,13 @@ export function TrainScreen({
               {/* "Current" is the ring glyph and the words, never a colour (G3). */}
               <View style={styles.statusRow}>
                 <Icon name="set-current" size="sm" testID="train-active-session-glyph" />
-                <Text style={styles.cardTitle}>Continue your active session</Text>
+                <Text allowFontScaling={false} style={styles.cardTitle}>Continue your active session</Text>
               </View>
               <SessionSummaryLine
                 session={activeSession}
                 testIdPrefix={`train-active-session-${activeSession.id}`}
               />
-              <Text style={styles.cardBody}>Finish or discard this workout before starting another one.</Text>
+              <Text allowFontScaling={false} style={styles.cardBody}>Finish or discard this workout before starting another one.</Text>
             </View>
             <ActionButton
               label="Resume workout"
@@ -167,10 +167,10 @@ export function TrainScreen({
             <SectionHeader title="Start training" />
             <Card style={styles.card} testID="train-empty-session-card">
               <View style={styles.cardCopy}>
-                <Text style={styles.cardTitle}>Empty workout</Text>
-                <Text style={styles.cardBody}>Start with a blank session and add exercises as you go.</Text>
+                <Text allowFontScaling={false} style={styles.cardTitle}>Empty workout</Text>
+                <Text allowFontScaling={false} style={styles.cardBody}>Start with a blank session and add exercises as you go.</Text>
                 {launchError?.kind === 'empty' ? (
-                  <Text accessibilityLiveRegion="polite" style={styles.errorText} testID="train-empty-launch-error">
+                  <Text allowFontScaling={false} accessibilityLiveRegion="polite" style={styles.errorText} testID="train-empty-launch-error">
                     {launchError.message}
                   </Text>
                 ) : null}
@@ -274,10 +274,10 @@ function TrainPlanningCard({
   return (
     <Card style={styles.card} testID="train-planned-session-card">
       <View style={styles.cardCopy}>
-        <Text style={styles.cardTitle}>{planningState.title}</Text>
-        <Text style={styles.cardBody}>{planningState.detail}</Text>
+        <Text allowFontScaling={false} style={styles.cardTitle}>{planningState.title}</Text>
+        <Text allowFontScaling={false} style={styles.cardBody}>{planningState.detail}</Text>
         {launchError ? (
-          <Text accessibilityLiveRegion="polite" style={styles.errorText} testID="train-planned-launch-error">
+          <Text allowFontScaling={false} accessibilityLiveRegion="polite" style={styles.errorText} testID="train-planned-launch-error">
             {launchError}
           </Text>
         ) : null}

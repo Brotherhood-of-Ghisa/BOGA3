@@ -66,6 +66,8 @@ Brief entrypoint inventory of the current reusable UI component set.
 - File: `apps/mobile/components/ui/text.tsx`
 - Purpose:
   - shared text primitive for semantic text roles used across reusable UI components
+  - enforces fixed font sizes, including when callers spread props; app-wide
+    text/input policy: `ux-rules.md` §9a
 
 3. `UiSurface`
 - File: `apps/mobile/components/ui/surface.tsx`

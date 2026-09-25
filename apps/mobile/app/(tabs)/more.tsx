@@ -55,7 +55,7 @@ export default function MoreScreen() {
 
       {sections.map((section) => (
         <View key={section.key} style={styles.section} testID={`more-section-${section.key}`}>
-          <Text accessibilityRole="header" style={styles.sectionLabel}>
+          <Text allowFontScaling={false} accessibilityRole="header" style={styles.sectionLabel}>
             {section.title}
           </Text>
           <Card>
@@ -86,6 +86,7 @@ export default function MoreScreen() {
                   />
                   {destination.key === 'connect-agent' && connectError ? (
                     <Text
+                      allowFontScaling={false}
                       accessibilityLiveRegion="polite"
                       style={styles.inlineError}
                       testID="more-connect-agent-error">

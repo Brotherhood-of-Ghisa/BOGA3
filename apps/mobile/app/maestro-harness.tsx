@@ -173,7 +173,7 @@ export default function MaestroHarnessScreen() {
   return (
     <Screen style={styles.screen} testID="maestro-harness-screen">
       {status.kind === 'running' ? <ActivityIndicator color={uiRoles.inkMuted} size="small" /> : null}
-      <Text selectable style={[styles.message, status.kind === 'error' ? styles.errorMessage : null]} testID="maestro-harness-status">
+      <Text allowFontScaling={false} selectable style={[styles.message, status.kind === 'error' ? styles.errorMessage : null]} testID="maestro-harness-status">
         {status.message}
       </Text>
     </Screen>

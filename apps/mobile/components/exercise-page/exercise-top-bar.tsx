@@ -15,7 +15,7 @@ export function ExerciseTopBar({ title, onBack, onOpenOptions }: ExerciseTopBarP
   return (
     <View style={styles.bar}>
       <IconButton accessibilityLabel="Back to session" name="chevron-left" onPress={onBack} testID="exercise-page-back" />
-      <Text accessibilityRole="header" numberOfLines={1} style={styles.title} testID="exercise-page-title">
+      <Text allowFontScaling={false} accessibilityRole="header" numberOfLines={1} style={styles.title} testID="exercise-page-title">
         {title}
       </Text>
       {onOpenOptions ? (

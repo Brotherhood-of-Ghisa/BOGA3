@@ -501,7 +501,7 @@ export function StatsScreenShell({
     <View style={styles.screen} testID="stats-history-screen">
       <View style={styles.controlGroups}>
         <View style={styles.controlGroup} testID="stats-time-range-controls">
-          <Text style={styles.controlLabel}>Time range</Text>
+          <Text allowFontScaling={false} style={styles.controlLabel}>Time range</Text>
           <SegmentedChips
             accessibilityLabel="Select stats time range"
             options={PERIOD_OPTIONS}
@@ -511,7 +511,7 @@ export function StatsScreenShell({
           />
         </View>
         <View style={styles.controlGroup} testID="stats-breakdown-controls">
-          <Text style={styles.controlLabel}>Breakdown</Text>
+          <Text allowFontScaling={false} style={styles.controlLabel}>Breakdown</Text>
           <SegmentedChips
             accessibilityLabel="Select stats breakdown"
             options={VIEW_MODE_OPTIONS}
@@ -531,27 +531,27 @@ export function StatsScreenShell({
             onPress={onPressSessionsCard}
             style={({ pressed }) => [styles.summaryCard, pressed && styles.summaryCardPressed]}
             testID="stats-card-sessions">
-            <Text style={styles.summaryLabel}>Sessions</Text>
-            <Text style={styles.summaryValue}>
+            <Text allowFontScaling={false} style={styles.summaryLabel}>Sessions</Text>
+            <Text allowFontScaling={false} style={styles.summaryValue}>
               {formatNumber(summary.current.totals.sessionCount)}
             </Text>
             {sessionDelta ? (
-              <Text style={[styles.summaryDelta, deltaToneStyle(sessionDelta.tone)]}>
+              <Text allowFontScaling={false} style={[styles.summaryDelta, deltaToneStyle(sessionDelta.tone)]}>
                 {sessionDelta.text}
               </Text>
             ) : null}
           </Pressable>
 
           <View style={styles.summaryCard} testID="stats-card-sets">
-            <Text style={styles.summaryLabel}>Sets (W/Sets)</Text>
-            <Text style={styles.summaryValue}>
+            <Text allowFontScaling={false} style={styles.summaryLabel}>Sets (W/Sets)</Text>
+            <Text allowFontScaling={false} style={styles.summaryValue}>
               {formatSetCountPair(
                 summary.current.totals.setCount,
                 summary.current.totals.workingSetCount
               )}
             </Text>
             {setsDelta ? (
-              <Text style={[styles.summaryDelta, deltaToneStyle(setsDelta.tone)]}>
+              <Text allowFontScaling={false} style={[styles.summaryDelta, deltaToneStyle(setsDelta.tone)]}>
                 {setsDelta.text}
               </Text>
             ) : null}
@@ -561,6 +561,7 @@ export function StatsScreenShell({
 
       <View style={styles.searchContainer}>
         <TextInput
+          allowFontScaling={false}
           accessibilityLabel={viewMode === 'exercise' ? 'Exercise filter input' : 'Muscle filter input'}
           autoCapitalize="none"
           autoCorrect={false}
@@ -597,21 +598,21 @@ export function StatsScreenShell({
           testID="stats-scroll">
           {errorMessage ? (
             <View style={styles.statePanel} testID="stats-error-state">
-              <Text style={styles.stateTitle}>Could not load stats</Text>
-              <Text style={styles.stateBody}>{errorMessage}</Text>
+              <Text allowFontScaling={false} style={styles.stateTitle}>Could not load stats</Text>
+              <Text allowFontScaling={false} style={styles.stateBody}>{errorMessage}</Text>
             </View>
           ) : null}
 
           {!errorMessage && isLoading && !summary ? (
             <View style={styles.statePanel} testID="stats-loading-state">
-              <Text style={styles.stateBody}>Loading stats…</Text>
+              <Text allowFontScaling={false} style={styles.stateBody}>Loading stats…</Text>
             </View>
           ) : null}
 
           {summary ? (
             filteredFamilies.length === 0 ? (
               <View style={styles.statePanel} testID="stats-muscle-empty">
-                <Text style={styles.stateBody}>
+                <Text allowFontScaling={false} style={styles.stateBody}>
                   {searchQuery.trim()
                     ? 'No muscle groups match the search query.'
                     : 'No muscle taxonomy loaded yet. Add some exercises to see this section.'}
@@ -702,6 +703,7 @@ function SummaryNameCell({
   return (
     <View style={styles.summaryNameCell}>
       <Text
+        allowFontScaling={false}
         adjustsFontSizeToFit
         ellipsizeMode="clip"
         minimumFontScale={0.82}
@@ -728,7 +730,7 @@ function MuscleFamilyList({
   if (families.length === 0) {
     return (
       <View style={styles.statePanel} testID="stats-muscle-empty">
-        <Text style={styles.stateBody}>
+        <Text allowFontScaling={false} style={styles.stateBody}>
           No muscle taxonomy loaded yet. Add some exercises to see this section.
         </Text>
       </View>
@@ -1033,15 +1035,15 @@ function WeekSelectionBanner({
     <View style={styles.weekBanner} testID="stats-muscle-history-week-banner">
       {dateRange !== null ? (
         <>
-          <Text style={styles.weekBannerRange} testID="stats-muscle-history-week-banner-range">
+          <Text allowFontScaling={false} style={styles.weekBannerRange} testID="stats-muscle-history-week-banner-range">
             {dateRange}
           </Text>
-          <Text style={styles.weekBannerValue} testID="stats-muscle-history-week-banner-value">
+          <Text allowFontScaling={false} style={styles.weekBannerValue} testID="stats-muscle-history-week-banner-value">
             {METRIC_LABELS[metric]}: {value ?? '—'}
           </Text>
         </>
       ) : (
-        <Text style={styles.weekBannerPlaceholder} testID="stats-muscle-history-week-banner-placeholder">
+        <Text allowFontScaling={false} style={styles.weekBannerPlaceholder} testID="stats-muscle-history-week-banner-placeholder">
           Tap a week to see details
         </Text>
       )}
@@ -1169,10 +1171,11 @@ function MuscleHistoryOverlay({
       <View style={styles.overlayCard}>
         <View style={styles.overlayHeader}>
           <View style={styles.overlayTitleGroup}>
-            <Text style={styles.overlayEyebrow}>
+            <Text allowFontScaling={false} style={styles.overlayEyebrow}>
               {muscle.muscleGroupIds.length > 1 ? 'Muscle Group History' : 'Muscle History'}
             </Text>
             <Text
+              allowFontScaling={false}
               adjustsFontSizeToFit
               ellipsizeMode="clip"
               minimumFontScale={0.82}
@@ -1231,14 +1234,14 @@ function MuscleHistoryOverlay({
           testID="stats-muscle-history-scroll">
           {isLoading ? (
             <View style={styles.overlayStatePanel} testID="stats-muscle-history-loading">
-              <Text style={styles.stateBody}>Loading {muscle.displayName} history...</Text>
+              <Text allowFontScaling={false} style={styles.stateBody}>Loading {muscle.displayName} history...</Text>
             </View>
           ) : null}
 
           {!isLoading && errorMessage ? (
             <View style={styles.overlayStatePanel} testID="stats-muscle-history-error">
-              <Text style={styles.stateTitle}>Could not load muscle history</Text>
-              <Text style={styles.stateBody}>{errorMessage}</Text>
+              <Text allowFontScaling={false} style={styles.stateTitle}>Could not load muscle history</Text>
+              <Text allowFontScaling={false} style={styles.stateBody}>{errorMessage}</Text>
             </View>
           ) : null}
 
@@ -1246,8 +1249,8 @@ function MuscleHistoryOverlay({
             <>
               {weeklyEffort.length === 0 ? (
                 <View style={styles.overlayStatePanel} testID="stats-muscle-history-empty">
-                  <Text style={styles.stateTitle}>No history yet</Text>
-                  <Text style={styles.stateBody}>
+                  <Text allowFontScaling={false} style={styles.stateTitle}>No history yet</Text>
+                  <Text allowFontScaling={false} style={styles.stateBody}>
                     No {muscle.displayName} training was found in the last{' '}
                     {MUSCLE_HISTORY_WINDOW_DAYS} days.
                   </Text>
@@ -1288,7 +1291,7 @@ function ExerciseListView({
   if (items.length === 0) {
     return (
       <View style={styles.statePanel} testID="stats-exercise-list-empty">
-        <Text style={styles.stateBody}>
+        <Text allowFontScaling={false} style={styles.stateBody}>
           {isFiltered
             ? 'No exercises match the search query.'
             : 'No exercises with recorded history yet.'}
@@ -1335,7 +1338,7 @@ function ExerciseListView({
               styles.exerciseOneRepMaxCell,
             ]}
             testID="stats-exercise-header-oneRepMax">
-            <Text numberOfLines={1} style={styles.exerciseHeaderLabel}>
+            <Text allowFontScaling={false} numberOfLines={1} style={styles.exerciseHeaderLabel}>
               1RM
             </Text>
           </View>
@@ -1359,21 +1362,25 @@ function ExerciseListView({
             style={({ pressed }) => [styles.exerciseRow, pressed && styles.actionableRowPressed]}
             testID={`stats-exercise-row-${item.id}`}>
             <Text
+              allowFontScaling={false}
               style={[styles.exerciseName, styles.exerciseNameCell]}
               testID={`stats-exercise-name-${item.id}`}>
               {item.name}
             </Text>
             <Text
+              allowFontScaling={false}
               style={[styles.exerciseNumericCell, styles.exerciseSetsCell]}
               testID={`stats-exercise-sets-${item.id}`}>
               {formatSetCountPair(item.setCount, item.nearFailureCount)}
             </Text>
             <Text
+              allowFontScaling={false}
               style={[styles.exerciseNumericCell, styles.exerciseVolumeCell]}
               testID={`stats-exercise-volume-${item.id}`}>
               {formatTotalWeight(item.totalVolume)}
             </Text>
             <Text
+              allowFontScaling={false}
               style={[styles.exerciseNumericCell, styles.exerciseOneRepMaxCell]}
               testID={`stats-exercise-1rm-${item.id}`}>
               {item.estimatedOneRepMax === null
@@ -1442,6 +1449,7 @@ function ExerciseSortHeaderCell({
       ]}
       testID={`stats-exercise-sort-${header}`}>
       <Text
+        allowFontScaling={false}
         numberOfLines={1}
         style={[styles.exerciseHeaderLabel, numeric && styles.exerciseHeaderLabelNumeric]}>
         {label}
@@ -1455,7 +1463,7 @@ function ExerciseSortHeaderCell({
         ]}
         testID={`stats-exercise-sort-${header}-indicator`}>
         {header === 'exercise' ? (
-          <Text accessible={false} style={styles.exerciseHeaderIndicatorText}>
+          <Text allowFontScaling={false} accessible={false} style={styles.exerciseHeaderIndicatorText}>
             Recent
           </Text>
         ) : null}
@@ -1511,8 +1519,9 @@ function ExerciseHistoryOverlay({
       <View style={styles.overlayCard}>
         <View style={styles.overlayHeader}>
           <View style={styles.overlayTitleGroup}>
-            <Text style={styles.overlayEyebrow}>Exercise History</Text>
+            <Text allowFontScaling={false} style={styles.overlayEyebrow}>Exercise History</Text>
             <Text
+              allowFontScaling={false}
               adjustsFontSizeToFit
               ellipsizeMode="clip"
               minimumFontScale={0.82}
@@ -1571,14 +1580,14 @@ function ExerciseHistoryOverlay({
           testID="stats-exercise-history-scroll">
           {isLoading ? (
             <View style={styles.overlayStatePanel} testID="stats-exercise-history-loading">
-              <Text style={styles.stateBody}>Loading {exercise.displayName} history...</Text>
+              <Text allowFontScaling={false} style={styles.stateBody}>Loading {exercise.displayName} history...</Text>
             </View>
           ) : null}
 
           {!isLoading && errorMessage ? (
             <View style={styles.overlayStatePanel} testID="stats-exercise-history-error">
-              <Text style={styles.stateTitle}>Could not load exercise history</Text>
-              <Text style={styles.stateBody}>{errorMessage}</Text>
+              <Text allowFontScaling={false} style={styles.stateTitle}>Could not load exercise history</Text>
+              <Text allowFontScaling={false} style={styles.stateBody}>{errorMessage}</Text>
             </View>
           ) : null}
 
@@ -1586,8 +1595,8 @@ function ExerciseHistoryOverlay({
             <>
               {weeklyEffort.length === 0 ? (
                 <View style={styles.overlayStatePanel} testID="stats-exercise-history-empty">
-                  <Text style={styles.stateTitle}>No history yet</Text>
-                  <Text style={styles.stateBody}>
+                  <Text allowFontScaling={false} style={styles.stateTitle}>No history yet</Text>
+                  <Text allowFontScaling={false} style={styles.stateBody}>
                     No {exercise.displayName} training was found in the last{' '}
                     {EXERCISE_HISTORY_WINDOW_DAYS} days.
                   </Text>
@@ -1628,14 +1637,14 @@ function Metric({
 }) {
   return (
     <View style={styles.metric} testID={testID}>
-      <Text style={[small ? styles.metricLabelSmall : styles.metricLabel, muted && styles.metricLabelMuted]}>
+      <Text allowFontScaling={false} style={[small ? styles.metricLabelSmall : styles.metricLabel, muted && styles.metricLabelMuted]}>
         {label}
       </Text>
-      <Text style={[small ? styles.metricValueSmall : styles.metricValue, muted && styles.metricValueMuted]}>
+      <Text allowFontScaling={false} style={[small ? styles.metricValueSmall : styles.metricValue, muted && styles.metricValueMuted]}>
         {value}
       </Text>
       {delta ? (
-        <Text style={[small ? styles.metricDeltaSmall : styles.metricDelta, deltaToneStyle(delta.tone)]}>
+        <Text allowFontScaling={false} style={[small ? styles.metricDeltaSmall : styles.metricDelta, deltaToneStyle(delta.tone)]}>
           {delta.text}
         </Text>
       ) : null}

@@ -58,8 +58,8 @@ export function SessionFactsCard({ header, times, facts, children, testID }: Ses
 function TimeReadout({ label, value, testID }: { label: string; value: string; testID?: string }) {
   return (
     <View accessibilityLabel={`${label} ${value}`} accessible style={styles.time} testID={testID}>
-      <Text style={styles.timeLabel}>{label}</Text>
-      <Text numberOfLines={1} style={styles.timeValue}>
+      <Text allowFontScaling={false} style={styles.timeLabel}>{label}</Text>
+      <Text allowFontScaling={false} numberOfLines={1} style={styles.timeValue}>
         {value}
       </Text>
     </View>

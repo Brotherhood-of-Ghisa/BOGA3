@@ -20,7 +20,7 @@ export function ExerciseListPreferenceControls({
 }: PreferenceControlsProps) {
   return (
     <View style={styles.controlsRoot}>
-      <Text selectable style={styles.sectionLabel}>
+      <Text allowFontScaling={false} selectable style={styles.sectionLabel}>
         Date range
       </Text>
       <View style={styles.pillRow}>
@@ -32,7 +32,7 @@ export function ExerciseListPreferenceControls({
               accessibilityLabel={`Date range ${option.label}`}
               style={[styles.filterPill, selected && styles.filterPillSelected]}
               onPress={() => onChangePreferences({ dateRange: option.value })}>
-              <Text style={[styles.filterPillText, selected && styles.filterPillTextSelected]}>
+              <Text allowFontScaling={false} style={[styles.filterPillText, selected && styles.filterPillTextSelected]}>
                 {option.label}
               </Text>
             </Pressable>
@@ -40,7 +40,7 @@ export function ExerciseListPreferenceControls({
         })}
       </View>
 
-      <Text selectable style={styles.sectionLabel}>
+      <Text allowFontScaling={false} selectable style={styles.sectionLabel}>
         List
       </Text>
       <View style={styles.pillRow}>
@@ -58,6 +58,7 @@ export function ExerciseListPreferenceControls({
             onChangePreferences({ groupByMuscleFamily: !preferences.groupByMuscleFamily })
           }>
           <Text
+            allowFontScaling={false}
             style={[
               styles.filterPillText,
               preferences.groupByMuscleFamily && styles.filterPillTextSelected,
@@ -74,6 +75,7 @@ export function ExerciseListPreferenceControls({
           style={[styles.filterPill, preferences.recentsOnTop && styles.filterPillSelected]}
           onPress={() => onChangePreferences({ recentsOnTop: !preferences.recentsOnTop })}>
           <Text
+            allowFontScaling={false}
             style={[
               styles.filterPillText,
               preferences.recentsOnTop && styles.filterPillTextSelected,
@@ -111,7 +113,7 @@ export function ExerciseListContent({
 }: ExerciseListContentProps) {
   if (items.length === 0 && mode === 'flat') {
     return (
-      <Text selectable style={styles.helperText}>
+      <Text allowFontScaling={false} selectable style={styles.helperText}>
         {emptyText}
       </Text>
     );
@@ -151,6 +153,7 @@ export function ExerciseListContent({
               ]}
               onPress={() => onToggleFamily(section.familyName)}>
               <Text
+                allowFontScaling={false}
                 adjustsFontSizeToFit
                 minimumFontScale={0.82}
                 numberOfLines={1}
@@ -201,6 +204,7 @@ const ExerciseListRow = memo(function ExerciseListRow({
         <View style={styles.exerciseListRowTextStack}>
           <View style={styles.exerciseListRowTitleRow}>
             <Text
+              allowFontScaling={false}
               adjustsFontSizeToFit
               ellipsizeMode="clip"
               minimumFontScale={0.82}
@@ -209,12 +213,13 @@ const ExerciseListRow = memo(function ExerciseListRow({
               {exercise.name}
             </Text>
             {exercise.deletedAt ? (
-              <Text selectable style={styles.deletedExerciseChip}>
+              <Text allowFontScaling={false} selectable style={styles.deletedExerciseChip}>
                 Deleted
               </Text>
             ) : null}
           </View>
           <Text
+            allowFontScaling={false}
             adjustsFontSizeToFit
             ellipsizeMode="clip"
             minimumFontScale={0.82}
@@ -222,7 +227,7 @@ const ExerciseListRow = memo(function ExerciseListRow({
             style={styles.exerciseListRowMuscleSummary}>
             {exercise.muscleSummary}
           </Text>
-          <Text numberOfLines={1} style={styles.exerciseListRowStats}>
+          <Text allowFontScaling={false} numberOfLines={1} style={styles.exerciseListRowStats}>
             {exercise.statsSummary}
           </Text>
         </View>

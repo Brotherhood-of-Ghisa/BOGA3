@@ -45,7 +45,7 @@ export function Sheet({ visible, onDismiss, dismissLabel, title, children, testI
             <View style={styles.handle} />
           </View>
           {title ? (
-            <Text accessibilityRole="header" numberOfLines={1} style={styles.title}>
+            <Text allowFontScaling={false} accessibilityRole="header" numberOfLines={1} style={styles.title}>
               {title}
             </Text>
           ) : null}

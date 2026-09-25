@@ -328,7 +328,7 @@ export function ExercisePicker({
 
           <View style={[styles.modalCard, styles.exercisePickerModalCard]}>
             <View style={styles.exercisePickerHeaderRow}>
-              <Text style={styles.modalTitle}>Select Exercise</Text>
+              <Text allowFontScaling={false} style={styles.modalTitle}>Select Exercise</Text>
               <View style={styles.exercisePickerHeaderActionRow}>
                 <Pressable
                   accessibilityLabel="Exercise picker options"
@@ -343,18 +343,19 @@ export function ExercisePicker({
                   accessibilityLabel="Open exercise catalog manage flow"
                   style={styles.exercisePickerIconButton}
                   onPress={openManage}>
-                  <Text style={styles.exercisePickerIconButtonText}>≡</Text>
+                  <Text allowFontScaling={false} style={styles.exercisePickerIconButtonText}>≡</Text>
                 </Pressable>
                 <Pressable
                   accessibilityLabel="Open inline exercise create"
                   style={styles.exercisePickerIconButton}
                   onPress={openInlineCreate}>
-                  <Text style={styles.exercisePickerIconButtonText}>+</Text>
+                  <Text allowFontScaling={false} style={styles.exercisePickerIconButtonText}>+</Text>
                 </Pressable>
               </View>
             </View>
             <View style={styles.exercisePickerSearchRow}>
               <TextInput
+                allowFontScaling={false}
                 accessibilityLabel="Exercise filter input"
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -380,12 +381,12 @@ export function ExercisePicker({
               hit empty list space.
             */}
             <ScrollView contentContainerStyle={styles.modalList} keyboardShouldPersistTaps="handled">
-              {isCatalogLoading ? <Text style={styles.emptyText}>Loading exercises...</Text> : null}
-              {!isCatalogLoading && catalogLoadError ? <Text style={styles.emptyText}>{catalogLoadError}</Text> : null}
+              {isCatalogLoading ? <Text allowFontScaling={false} style={styles.emptyText}>Loading exercises...</Text> : null}
+              {!isCatalogLoading && catalogLoadError ? <Text allowFontScaling={false} style={styles.emptyText}>{catalogLoadError}</Text> : null}
               {!isCatalogLoading && !catalogLoadError && preselection ? (
                 <>
                   <View style={styles.exercisePickerPreselectionPanel} testID="exercise-picker-preselection-panel">
-                    <Text style={styles.exercisePickerPreselectionTitle}>{preselection.exercise.name}</Text>
+                    <Text allowFontScaling={false} style={styles.exercisePickerPreselectionTitle}>{preselection.exercise.name}</Text>
                     <View style={styles.exercisePickerPreselectionActions}>
                       <Pressable
                         accessibilityLabel={`Add empty set for ${preselection.exercise.name}`}
@@ -393,7 +394,7 @@ export function ExercisePicker({
                         style={styles.secondaryActionButton}
                         testID="exercise-picker-add-empty-set-button"
                         onPress={() => selectExercise(preselection.exercise.id, preselection.exercise.name)}>
-                        <Text style={styles.secondaryActionButtonText}>Add empty set</Text>
+                        <Text allowFontScaling={false} style={styles.secondaryActionButtonText}>Add empty set</Text>
                       </Pressable>
                       <Pressable
                         accessibilityLabel={`Append historical plan for ${preselection.exercise.name}`}
@@ -410,12 +411,12 @@ export function ExercisePicker({
                         ]}
                         testID="exercise-picker-append-plan-button"
                         onPress={() => appendPlan(preselection)}>
-                        <Text style={styles.primaryActionButtonText}>Append plan</Text>
+                        <Text allowFontScaling={false} style={styles.primaryActionButtonText}>Append plan</Text>
                       </Pressable>
                     </View>
                     {preselection.suggestion ? (
                       <View style={styles.exercisePickerPlanPreview}>
-                        <Text style={styles.exercisePickerPlanPreviewSource} testID="exercise-picker-plan-source">
+                        <Text allowFontScaling={false} style={styles.exercisePickerPlanPreviewSource} testID="exercise-picker-plan-source">
                           From {formatCurrentDateTime(preselection.suggestion.completedAt)}
                         </Text>
                         <ScrollView
@@ -429,12 +430,12 @@ export function ExercisePicker({
                                 key={set.setId}
                                 style={styles.exercisePickerPlanSetRow}
                                 testID={`exercise-picker-plan-set-row-${index + 1}`}>
-                                <Text style={styles.exercisePickerPlanSetIndex}>Set {index + 1}</Text>
-                                <Text style={styles.exercisePickerPlanSetValue}>
+                                <Text allowFontScaling={false} style={styles.exercisePickerPlanSetIndex}>Set {index + 1}</Text>
+                                <Text allowFontScaling={false} style={styles.exercisePickerPlanSetValue}>
                                   {formatSetWeightLabel(set.weightValue)} · {formatSetRepsLabel(set.repsValue)}
                                 </Text>
                                 {quality ? (
-                                  <Text style={styles.exercisePickerPlanSetQuality}>
+                                  <Text allowFontScaling={false} style={styles.exercisePickerPlanSetQuality}>
                                     {getSetQualityDisplayLabel(quality)}
                                   </Text>
                                 ) : null}
@@ -458,7 +459,7 @@ export function ExercisePicker({
                   groupSections.length > 0 ? (
                     <PickerGroupSectionList sections={groupSections} onPressRow={selectGroupRow} />
                   ) : (
-                    <Text style={styles.emptyText} testID="exercise-picker-group-empty">
+                    <Text allowFontScaling={false} style={styles.emptyText} testID="exercise-picker-group-empty">
                       {groupEmptyText}
                     </Text>
                   )
@@ -476,7 +477,7 @@ export function ExercisePicker({
                       onPressExercise={selectListItem}
                     />
                     {listModel.items.length === 0 && listModel.mode === 'grouped' ? (
-                      <Text style={styles.emptyText}>
+                      <Text allowFontScaling={false} style={styles.emptyText}>
                         {exerciseOptions.length === 0 ? 'No active exercises available.' : 'No exercises match that filter.'}
                       </Text>
                     ) : null}

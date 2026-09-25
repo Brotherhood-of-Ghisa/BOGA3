@@ -30,6 +30,7 @@ export function SearchField({
       <TextInput
         autoCorrect={false}
         {...inputProps}
+        allowFontScaling={false}
         accessibilityLabel={accessibilityLabel}
         onChangeText={onChangeText}
         placeholderTextColor={uiRoles.inkFaint}

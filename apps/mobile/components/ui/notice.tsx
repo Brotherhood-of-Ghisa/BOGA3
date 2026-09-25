@@ -32,7 +32,7 @@ export function Notice({ message, tone = 'neutral', icon, live = false, action, 
       style={[styles.band, danger ? styles.bandDanger : null]}
       testID={testID}>
       {icon ? <Icon color={danger ? uiRoles.danger : uiRoles.inkMuted} name={icon} size="sm" /> : null}
-      <Text style={[styles.message, danger ? styles.messageDanger : null]}>{message}</Text>
+      <Text allowFontScaling={false} style={[styles.message, danger ? styles.messageDanger : null]}>{message}</Text>
       {action}
     </View>
   );

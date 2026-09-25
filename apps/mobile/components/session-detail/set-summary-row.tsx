@@ -12,10 +12,11 @@ export function SetSummaryRow({ row, testID }: { row: SessionViewSetRow; testID:
   const state = row.done ? 'realised' : 'planned';
   return (
     <View style={styles.setRow} testID={testID}>
-      <Text numberOfLines={1} style={[styles.type, row.done ? null : styles.typePlanned]}>
+      <Text allowFontScaling={false} numberOfLines={1} style={[styles.type, row.done ? null : styles.typePlanned]}>
         {row.typeLabel}
       </Text>
       <Text
+        allowFontScaling={false}
         numberOfLines={1}
         style={[styles.weightReps, row.done ? null : styles.valuePlanned]}
         testID={`${testID}-values`}>

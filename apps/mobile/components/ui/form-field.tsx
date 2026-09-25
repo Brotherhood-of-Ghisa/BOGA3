@@ -38,9 +38,10 @@ export function FormField({
   return (
     <View style={[styles.column, containerStyle]}>
       <View style={[styles.field, multiline ? styles.fieldMultiline : null, error ? styles.fieldInvalid : null]}>
-        <Text style={styles.label}>{label}</Text>
+        <Text allowFontScaling={false} style={styles.label}>{label}</Text>
         <TextInput
           {...inputProps}
+          allowFontScaling={false}
           multiline={multiline}
           placeholderTextColor={uiRoles.disabled}
           style={[styles.input, face === 'text' ? styles.inputText : null]}
@@ -49,13 +50,14 @@ export function FormField({
       </View>
       {error ? (
         <Text
+          allowFontScaling={false}
           accessibilityLiveRegion="polite"
           style={styles.error}
           testID={errorTestID ?? (testID ? `${testID}-error` : undefined)}>
           {error}
         </Text>
       ) : null}
-      {hint ? <Text style={styles.hint}>{hint}</Text> : null}
+      {hint ? <Text allowFontScaling={false} style={styles.hint}>{hint}</Text> : null}
     </View>
   );
 }

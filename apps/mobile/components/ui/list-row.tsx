@@ -66,6 +66,7 @@ export function ListRow({
       <View style={[styles.content, description !== undefined ? styles.contentTwoLine : null]}>
         {label !== undefined ? (
           <Text
+            allowFontScaling={false}
             numberOfLines={1}
             style={[
               labelStyles[density],
@@ -76,7 +77,7 @@ export function ListRow({
             {label}
           </Text>
         ) : null}
-        {description !== undefined ? <Text style={styles.description}>{description}</Text> : null}
+        {description !== undefined ? <Text allowFontScaling={false} style={styles.description}>{description}</Text> : null}
         {children}
       </View>
       {meta}

@@ -63,17 +63,17 @@ export function SessionShareCard({ snapshot }: { snapshot: SessionShareSnapshot 
   return (
     <View style={styles.shareCard} testID="session-share-card">
       <View style={styles.brandRow}>
-        <Text style={styles.brand}>BOGA</Text>
-        <Text style={styles.tagline}>Progress builds you</Text>
+        <Text allowFontScaling={false} style={styles.brand}>BOGA</Text>
+        <Text allowFontScaling={false} style={styles.tagline}>Progress builds you</Text>
       </View>
-      <Text style={styles.shareTitle}>Workout complete</Text>
-      <Text style={styles.totals}>
+      <Text allowFontScaling={false} style={styles.shareTitle}>Workout complete</Text>
+      <Text allowFontScaling={false} style={styles.totals}>
         {`${snapshot.durationDisplay} · ${formatCount(snapshot.exerciseCount, 'exercise')} · ${formatCount(
           snapshot.performedSetCount,
           'set'
         )}`}
       </Text>
-      <Text style={styles.meta}>
+      <Text allowFontScaling={false} style={styles.meta}>
         {`${formatCount(snapshot.workingSetCount, 'working set')} · ${formatSessionDate(snapshot.completedAt)}`}
       </Text>
 
@@ -81,7 +81,7 @@ export function SessionShareCard({ snapshot }: { snapshot: SessionShareSnapshot 
         <View style={styles.records} testID="session-share-card-personal-records">
           <View style={styles.recordsHeading}>
             <Icon color={uiRoles.record} name="arrow-up" size="xs" />
-            <Text style={styles.recordsTitle}>
+            <Text allowFontScaling={false} style={styles.recordsTitle}>
               {`${snapshot.personalRecords.length} new 1RM ${
                 snapshot.personalRecords.length === 1 ? 'record' : 'records'
               }`}
@@ -92,12 +92,12 @@ export function SessionShareCard({ snapshot }: { snapshot: SessionShareSnapshot 
               key={record.setId}
               style={styles.recordRow}
               testID={`session-share-card-pr-${record.exerciseDefinitionId}`}>
-              <Text numberOfLines={2} style={styles.recordName}>
+              <Text allowFontScaling={false} numberOfLines={2} style={styles.recordName}>
                 {record.exerciseName}
               </Text>
-              <Text style={styles.recordFact}>
+              <Text allowFontScaling={false} style={styles.recordFact}>
                 {`${formatWeightFigure(record.weight)} × ${record.reps}`}
-                <Text style={styles.recordOneRepMax}>{`  1RM ${formatOneRepMaxFigure(
+                <Text allowFontScaling={false} style={styles.recordOneRepMax}>{`  1RM ${formatOneRepMaxFigure(
                   record.estimatedOneRepMax
                 )}`}</Text>
               </Text>
@@ -107,7 +107,7 @@ export function SessionShareCard({ snapshot }: { snapshot: SessionShareSnapshot 
       ) : null}
 
       <View style={styles.exercises} testID="session-share-card-exercises">
-        <Text style={styles.sectionTitle}>Exercise volume</Text>
+        <Text allowFontScaling={false} style={styles.sectionTitle}>Exercise volume</Text>
         {snapshot.exerciseVolumeComparisons.map((comparison) => (
           <ExerciseVolumeCard
             key={`${comparison.exerciseDefinitionId ?? 'legacy'}-${comparison.sessionExerciseIds.join('-')}`}
@@ -117,7 +117,7 @@ export function SessionShareCard({ snapshot }: { snapshot: SessionShareSnapshot 
           />
         ))}
       </View>
-      <Text style={styles.madeWith}>Made with BOGA</Text>
+      <Text allowFontScaling={false} style={styles.madeWith}>Made with BOGA</Text>
     </View>
   );
 }
@@ -207,9 +207,9 @@ export function SessionShareSheet({
         </View>
       </ScrollView>
       <View style={styles.footer}>
-        <Text style={styles.privacy}>Nothing is shared until you choose an app.</Text>
+        <Text allowFontScaling={false} style={styles.privacy}>Nothing is shared until you choose an app.</Text>
         {shareError ? (
-          <Text accessibilityLiveRegion="polite" style={styles.error} testID="session-share-error">
+          <Text allowFontScaling={false} accessibilityLiveRegion="polite" style={styles.error} testID="session-share-error">
             {shareError}
           </Text>
         ) : null}

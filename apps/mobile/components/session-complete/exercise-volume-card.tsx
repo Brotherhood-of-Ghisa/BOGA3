@@ -64,8 +64,8 @@ const markerPosition = (comparison: ExerciseVolumeComparison): number => {
 function Legend({ label, value }: { label: string; value: string }) {
   return (
     <View style={styles.legend}>
-      <Text style={styles.microLabel}>{label}</Text>
-      <Text style={styles.legendValue}>{value}</Text>
+      <Text allowFontScaling={false} style={styles.microLabel}>{label}</Text>
+      <Text allowFontScaling={false} style={styles.legendValue}>{value}</Text>
     </View>
   );
 }
@@ -95,17 +95,17 @@ export function ExerciseVolumeCard({ comparison, variant = 'app', testID }: Exer
     <Card style={variant === 'share' ? styles.shareCard : null} testID={testID}>
       <View accessibilityLabel={buildAccessibilityLabel(comparison)} accessible style={styles.body}>
         <View style={styles.headingRow}>
-          <Text numberOfLines={2} style={styles.name}>
+          <Text allowFontScaling={false} numberOfLines={2} style={styles.name}>
             {comparison.exerciseName}
           </Text>
-          <Text style={styles.counts}>{formatExerciseSetCounts(comparison.setCount, comparison.workingSetCount)}</Text>
+          <Text allowFontScaling={false} style={styles.counts}>{formatExerciseSetCounts(comparison.setCount, comparison.workingSetCount)}</Text>
         </View>
         <View style={styles.valueRow}>
           <View style={styles.legend}>
-            <Text style={styles.microLabel}>Vol</Text>
-            <Text style={styles.volume}>{formatVolumeFigure(comparison.currentVolume)}</Text>
+            <Text allowFontScaling={false} style={styles.microLabel}>Vol</Text>
+            <Text allowFontScaling={false} style={styles.volume}>{formatVolumeFigure(comparison.currentVolume)}</Text>
           </View>
-          <Text style={comparison.medianVolume === null ? styles.deltaMuted : styles.delta}>
+          <Text allowFontScaling={false} style={comparison.medianVolume === null ? styles.deltaMuted : styles.delta}>
             {formatExerciseVolumeComparison(comparison)}
           </Text>
         </View>
@@ -125,9 +125,9 @@ export function ExerciseVolumeCard({ comparison, variant = 'app', testID }: Exer
               <View style={[styles.currentMarker, { left: `${position * 100}%` }]} />
             </View>
             <View style={styles.historyRow}>
-              <Text style={styles.history}>{`${comparison.historicalSessionCount} prior sessions`}</Text>
+              <Text allowFontScaling={false} style={styles.history}>{`${comparison.historicalSessionCount} prior sessions`}</Text>
               {outsideRange ? (
-                <Text style={styles.microLabel}>
+                <Text allowFontScaling={false} style={styles.microLabel}>
                   {comparison.currentVolume < (comparison.percentile5Volume as number) ? 'Below P5' : 'Above P95'}
                 </Text>
               ) : null}
@@ -139,7 +139,7 @@ export function ExerciseVolumeCard({ comparison, variant = 'app', testID }: Exer
               <View style={styles.baselineTrack} />
               <View style={styles.medianMarker} />
             </View>
-            <Text style={styles.history}>
+            <Text allowFontScaling={false} style={styles.history}>
               {`${
                 comparison.state === 'single-baseline'
                   ? '1 prior session'
@@ -148,7 +148,7 @@ export function ExerciseVolumeCard({ comparison, variant = 'app', testID }: Exer
             </Text>
           </View>
         ) : (
-          <Text style={styles.history}>This is the first comparable completed session.</Text>
+          <Text allowFontScaling={false} style={styles.history}>This is the first comparable completed session.</Text>
         )}
       </View>
     </Card>

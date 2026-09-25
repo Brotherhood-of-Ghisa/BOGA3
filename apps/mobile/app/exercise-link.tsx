@@ -218,6 +218,7 @@ function ExerciseLinkContent({ userId }: { userId: string }) {
       ) : (
         <>
           <TextInput
+            allowFontScaling={false}
             accessibilityLabel="Search group exercises"
             autoCapitalize="none"
             autoCorrect={false}

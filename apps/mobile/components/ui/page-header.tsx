@@ -14,10 +14,10 @@ type PageHeaderProps = {
 export function PageHeader({ title, intro }: PageHeaderProps) {
   return (
     <View style={styles.page}>
-      <Text accessibilityRole="header" style={styles.pageTitle}>
+      <Text allowFontScaling={false} accessibilityRole="header" style={styles.pageTitle}>
         {title}
       </Text>
-      {intro ? <Text style={styles.intro}>{intro}</Text> : null}
+      {intro ? <Text allowFontScaling={false} style={styles.intro}>{intro}</Text> : null}
     </View>
   );
 }
@@ -34,7 +34,7 @@ type SectionHeaderProps = {
 export function SectionHeader({ title, action }: SectionHeaderProps) {
   return (
     <View style={styles.section}>
-      <Text accessibilityRole="header" style={styles.sectionTitle}>
+      <Text allowFontScaling={false} accessibilityRole="header" style={styles.sectionTitle}>
         {title}
       </Text>
       {action ? (
