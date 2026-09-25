@@ -460,7 +460,7 @@ export default function ExerciseCatalogScreen() {
         </ScrollView>
       </Sheet>
 
-      {/* A row's ⋮. Delete does not confirm (T07-D4): it is a soft delete,
+      {/* A row's actions. Delete does not confirm (T07-D4): it is a soft delete,
           undone from this same sheet with Undelete once Show deleted is on. */}
       <Sheet
         dismissLabel="Dismiss exercise action menu overlay"
