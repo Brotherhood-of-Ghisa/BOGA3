@@ -75,15 +75,30 @@ const assertNever = (value: never): never => {
 // -----------------------------------------------------------------------------
 // Module-scoped machine state
 //
-// There is exactly one timer handle in the system at a time. The online
-// projection is the latest boolean derived from NetInfo; it is consulted at
-// cycle-end to decide whether to re-arm the backstop or fall back to OFFLINE.
+// There is exactly one timer handle in the system at a time. The network
+// projection is the latest NetInfo `isConnected` report, kept three-valued so
+// "not reported yet" is never confused with "reported offline"; the machine
+// only ever asks whether it is 'online' (consulted at cycle-end to decide
+// whether to re-arm the backstop or fall back to OFFLINE).
 // -----------------------------------------------------------------------------
+
+/**
+ * The latest NetInfo `isConnected` report: 'unknown' until NetInfo has reported
+ * a determined value (the listener's first event lands asynchronously after
+ * start, and `isConnected` itself is `null` while NetInfo is still
+ * undetermined), then 'online' / 'offline'. The machine treats anything but
+ * 'online' as not-online, so it still starts OFFLINE; the surfacing layer shows
+ * the offline state only for a real 'offline' report.
+ */
+export type NetworkProjection = 'unknown' | 'online' | 'offline';
 
 let state: SchedulerState = { name: 'OFFLINE' };
 let timerHandle: ReturnType<typeof setTimeout> | null = null;
 
-let onlineProjection = false;
+let networkProjection: NetworkProjection = 'unknown';
+
+/** Whether the machine may consider itself online: only a real `isConnected === true`. */
+const isOnline = (): boolean => networkProjection === 'online';
 
 // The most recent cycle's failure, or null if the latest cycle succeeded. A
 // thrown (structural) cycle records its message here; a returned retryable
@@ -310,7 +325,7 @@ const handleInternal = (event: InternalEvent): void => {
 
     case 'RUNNING':
       if (event === 'cycle ends') {
-        if (onlineProjection) {
+        if (isOnline()) {
           const deadlineMs = armTimer(LONG_INTERVAL);
           transitionTo(event, { name: 'LONG_TIMEOUT', deadlineMs });
         } else {
@@ -391,8 +406,9 @@ const handleExternal = (input: ExternalInput): void => {
 // -----------------------------------------------------------------------------
 // NetInfo wiring
 //
-// A single listener projects NetInfo `isConnected === true` to a boolean and
-// emits "go online" / "go offline" only when that projection CHANGES. We key off
+// A single listener projects NetInfo `isConnected` to the three-valued network
+// projection and emits "go online" / "go offline" only when the machine's view
+// of it — online iff `isConnected === true` — CHANGES. We key off
 // `isConnected` (a usable link) rather than `isInternetReachable` (a probe to a
 // connectivity-check host): the probe is `null` on the iOS simulator and `false`
 // behind a captive portal or where the probe host is blocked, so keying off it
@@ -400,21 +416,37 @@ const handleExternal = (input: ExternalInput): void => {
 // offline branch forever. The sync cycle's own success/failure is the authority
 // on whether the backend is reachable — a cycle that fails on a dead link is
 // caught and retried on the long backstop, not treated as "online" forever. The
-// initial projection is false, so the machine starts OFFLINE and waits for the
-// first `isConnected === true` before considering itself online.
+// initial projection is 'unknown', so the machine starts OFFLINE and waits for
+// the first `isConnected === true` before considering itself online — but the
+// surfacing layer does not claim "offline" until NetInfo actually reports
+// `isConnected === false`.
 // -----------------------------------------------------------------------------
 
+const projectNetInfoState = (netState: NetInfoState): NetworkProjection => {
+  if (netState.isConnected === true) {
+    return 'online';
+  }
+  if (netState.isConnected === false) {
+    return 'offline';
+  }
+  // `null`: NetInfo has not determined the link state yet.
+  return 'unknown';
+};
+
 const handleNetInfoState = (netState: NetInfoState): void => {
-  const nextProjection = netState.isConnected === true;
-  if (nextProjection === onlineProjection) {
-    // No change in the boolean projection: a reachability-probe flip, a VPN
-    // handoff, or a still-null/false reachability while the link stays up all
-    // collapse to nothing here.
+  const wasOnline = isOnline();
+  networkProjection = projectNetInfoState(netState);
+  const nowOnline = isOnline();
+  if (nowOnline === wasOnline) {
+    // No change in the machine's online view: a reachability-probe flip, a VPN
+    // handoff, a still-null/false reachability while the link stays up, or an
+    // unknown -> offline report (already OFFLINE) all collapse to nothing here.
+    // The projection itself is still recorded so the surfacing layer can tell
+    // "not reported yet" from "reported offline".
     return;
   }
 
-  onlineProjection = nextProjection;
-  handleExternal(nextProjection ? 'go online' : 'go offline');
+  handleExternal(nowOnline ? 'go online' : 'go offline');
 };
 
 // -----------------------------------------------------------------------------
@@ -488,7 +520,7 @@ export const startSyncScheduler = (): void => {
   }
 
   state = { name: 'OFFLINE' };
-  onlineProjection = false;
+  networkProjection = 'unknown';
   lastCycleError = null;
   lastSuccessAtMs = null;
   previousAppState = AppState.currentState;
@@ -552,17 +584,23 @@ export const stopSyncScheduler = (): void => {
  *
  * It returns:
  *  - `state`: the current four-state machine state (with any armed deadline).
- *  - `online`: the latest NetInfo `isConnected` projection.
+ *  - `online`: whether the latest NetInfo report was `isConnected === true`.
+ *  - `network`: the three-valued projection ('unknown' until NetInfo reports a
+ *    determined `isConnected`), for surfaces that must not present an
+ *    unreported network as offline.
  *  - `lastCycleError`: the most recent cycle's failure message, or null when
  *    the latest cycle ended cleanly (or none has run yet).
  *  - `lastSuccessAtMs`: epoch-ms of the most recent clean cycle, or null.
  *  - `progress`: the first-sync progress snapshot (phase + monotonic counters),
- *    with `offline` overridden from the live online projection so a stale
- *    producer snapshot can never report the wrong network state.
+ *    with `offline` overridden from the live network projection so a stale
+ *    producer snapshot can never report the wrong network state. `offline` is
+ *    true only once NetInfo has reported `isConnected === false`; an unknown
+ *    network (before NetInfo's first determined report) is not offline.
  */
 export const getSchedulerStatus = (): {
   state: SchedulerState;
   online: boolean;
+  network: NetworkProjection;
   lastCycleError: string | null;
   lastSuccessAtMs: number | null;
   progress: SyncProgress;
@@ -570,16 +608,17 @@ export const getSchedulerStatus = (): {
   const progress = getSyncProgress();
   return {
     state,
-    online: onlineProjection,
+    online: isOnline(),
+    network: networkProjection,
     lastCycleError,
     lastSuccessAtMs,
-    progress: { ...progress, offline: !onlineProjection },
+    progress: { ...progress, offline: networkProjection === 'offline' },
   };
 };
 
 /**
  * Test-only inspector exposing the current state (and any armed deadline) plus
- * the latest online projection. Lets the unit suite walk the transition tables
+ * whether the machine considers itself online. Lets the unit suite walk the transition tables
  * cell-by-cell without reaching into module internals.
  */
 export const __getSchedulerStateForTests = (): {
@@ -588,6 +627,6 @@ export const __getSchedulerStateForTests = (): {
   timerArmed: boolean;
 } => ({
   state,
-  online: onlineProjection,
+  online: isOnline(),
   timerArmed: timerHandle !== null,
 });
