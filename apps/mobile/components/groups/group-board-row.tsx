@@ -49,8 +49,8 @@ export function GroupBoardRow({ row, onPress }: { row: BoardRowViewModel; onPres
               <GroupCertificationStatus
                 iconTestID={`${testID}-mark-${row.certification}`}
                 label={row.certification === 'uncertified' ? UNCERTIFIED_MARK_LABEL : null}
+                size="meta"
                 status={row.certification}
-                variant="subtitle"
               />
             </View>
           ) : null}

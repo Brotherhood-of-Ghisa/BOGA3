@@ -1,12 +1,16 @@
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
-import { Icon, UiText, uiColors, uiSpace, type UiTextVariant } from '@/components/ui';
+import { Icon, uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui';
 import type { RecordCertificationStatus } from '@/src/groups';
 
+/** `body`: a card's or sheet's status line. `meta`: the small mark beside a board row's date. */
+export type GroupCertificationStatusSize = 'body' | 'meta';
+
 /**
- * A record's certification state: a check when certified, a ring when not yet,
- * nothing when voided (the label says why). The glyph is decoration — the
- * label, or the row's own accessibility label, states the state in words.
+ * A record's certification state: a check in `ink` when certified, a ring in
+ * `ink-muted` when not yet, nothing when voided (the label says why). No
+ * success hue (G3): the glyph is decoration and the label, or the row's own
+ * accessibility label, states the state in words.
  *
  * With a label the line is ONE accessibility element (label + `testID`), so a
  * flow matches its id and text at once and VoiceOver reads it as one line. It
@@ -19,14 +23,15 @@ export function GroupCertificationStatus({
   label,
   testID,
   iconTestID,
-  variant = 'label',
+  size = 'body',
 }: {
   status: RecordCertificationStatus;
   label: string | null;
   testID?: string;
   iconTestID?: string;
-  variant?: UiTextVariant;
+  size?: GroupCertificationStatusSize;
 }) {
+  const certified = status === 'certified';
   return (
     <View
       accessibilityLabel={label ?? undefined}
@@ -35,13 +40,17 @@ export function GroupCertificationStatus({
       testID={testID}>
       {status === 'voided' ? null : (
         <Icon
-          color={status === 'certified' ? uiColors.textSuccess : uiColors.textSecondary}
-          name={status === 'certified' ? 'check' : 'circle'}
-          size="sm"
+          color={certified ? uiRoles.ink : uiRoles.inkMuted}
+          name={certified ? 'check' : 'circle'}
+          size={size === 'meta' ? 'xs' : 'sm'}
           testID={iconTestID}
         />
       )}
-      {label ? <UiText variant={variant}>{label}</UiText> : null}
+      {label ? (
+        <Text allowFontScaling={false} style={[labelStyles[size], certified ? styles.labelCertified : null]}>
+          {label}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -51,5 +60,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: uiSpace.xs,
+  },
+  labelCertified: {
+    color: uiRoles.ink,
+  },
+});
+
+const labelStyles = StyleSheet.create({
+  body: {
+    fontFamily: uiFonts.body.family,
+    fontWeight: '600',
+    fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
+    color: uiRoles.inkMuted,
+  },
+  meta: {
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
+    fontSize: uiTypography.size.sm,
+    lineHeight: uiTypography.lineHeight.sm,
+    color: uiRoles.inkMuted,
   },
 });

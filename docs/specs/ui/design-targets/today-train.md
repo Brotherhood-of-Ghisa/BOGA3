@@ -24,7 +24,8 @@ gallery.
   session summary line (figures in Plex Mono) with a chevron.
 - Loading, empty, error and unavailable states are `StatePanel`s inside cards,
   with their copy kept, including "Watch this space 👀".
-- Today's group-activity items keep the groups styling until DLM-T11.
+- Today's group-activity items are the Groups stream's cards and panels,
+  restyled with the Groups tab (DLM-T11, `groups.md`).
 
 ## States
 

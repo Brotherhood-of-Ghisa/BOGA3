@@ -1,6 +1,6 @@
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
-import { UiSurface, UiText, uiColors, uiRadius, uiSpace, uiTypography } from '@/components/ui';
+import { Card, Icon, uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui';
 import type { StreamSessionCardViewModel } from '@/src/groups';
 
 type GroupStreamSessionCardProps = {
@@ -12,61 +12,60 @@ type GroupStreamSessionCardProps = {
 
 /**
  * Stream session card (08 UX pattern "Stream card"): a collapsed summary with
- * no expand; a tap opens the friend's session view.
+ * no expand; a tap opens the friend's session view. "Training now" is the
+ * `set-current` ring and the words, never a colour (G3).
  */
 export function GroupStreamSessionCard({ card, showGroupNames, onPress }: GroupStreamSessionCardProps) {
   const testID = `group-stream-session-card-${card.key}`;
   const context = [card.startedAtLabel, card.gymName?.trim() || null].filter(Boolean).join(' · ');
 
   return (
-    <Pressable
-      accessibilityHint="Opens the session"
+    <Card
       accessibilityLabel={[card.memberName, card.statusLabel, context, card.recordsLabel].filter(Boolean).join(', ')}
-      accessibilityRole="button"
       onPress={() => onPress(card)}
-      style={({ pressed }) => (pressed ? styles.pressed : null)}
+      style={styles.card}
       testID={testID}>
-      <UiSurface style={styles.card}>
-        <View style={styles.headerRow}>
-          <UiText numberOfLines={1} style={styles.name} testID={`${testID}-member`} variant="title">
-            {card.memberName}
-          </UiText>
-          <View style={[styles.statusPill, card.isTrainingNow ? styles.statusLive : styles.statusDone]}>
-            <UiText
-              style={card.isTrainingNow ? styles.statusLiveText : null}
-              testID={`${testID}-status`}
-              variant="subtitle">
-              {card.statusLabel}
-            </UiText>
-          </View>
+      <View style={styles.headerRow}>
+        <Text allowFontScaling={false} numberOfLines={1} style={styles.member} testID={`${testID}-member`}>
+          {card.memberName}
+        </Text>
+        <View style={styles.status}>
+          {card.isTrainingNow ? <Icon name="set-current" size="xs" /> : null}
+          <Text
+            allowFontScaling={false}
+            style={[styles.statusText, card.isTrainingNow ? styles.statusLive : null]}
+            testID={`${testID}-status`}>
+            {card.statusLabel}
+          </Text>
         </View>
-        <UiText numberOfLines={1} testID={`${testID}-context`} variant="subtitle">
-          {context}
-        </UiText>
-        <UiText testID={`${testID}-metrics`} variant="label">
-          {`${card.setsLabel} · ${card.volumeLabel} · ${card.exercisesLabel}`}
-        </UiText>
-        {card.recordsLabel ? (
-          <UiText testID={`${testID}-records`} variant="label">
+      </View>
+      <Text allowFontScaling={false} numberOfLines={1} style={styles.muted} testID={`${testID}-context`}>
+        {context}
+      </Text>
+      <Text allowFontScaling={false} style={styles.metrics} testID={`${testID}-metrics`}>
+        {`${card.setsLabel} · ${card.volumeLabel} · ${card.exercisesLabel}`}
+      </Text>
+      {card.recordsLabel ? (
+        <View style={styles.records}>
+          <Icon color={uiRoles.record} name="arrow-up" size="xs" />
+          <Text allowFontScaling={false} style={styles.recordsText} testID={`${testID}-records`}>
             {card.recordsLabel}
-          </UiText>
-        ) : null}
-        {showGroupNames && card.groupNames.length > 0 ? (
-          <UiText numberOfLines={1} style={styles.groups} testID={`${testID}-groups`} variant="bodyMuted">
-            {card.groupNames.join(', ')}
-          </UiText>
-        ) : null}
-      </UiSurface>
-    </Pressable>
+          </Text>
+        </View>
+      ) : null}
+      {showGroupNames && card.groupNames.length > 0 ? (
+        <Text allowFontScaling={false} numberOfLines={1} style={styles.muted} testID={`${testID}-groups`}>
+          {card.groupNames.join(', ')}
+        </Text>
+      ) : null}
+    </Card>
   );
 }
 
 const styles = StyleSheet.create({
-  pressed: {
-    opacity: 0.92,
-  },
   card: {
-    padding: uiSpace.md,
+    paddingHorizontal: uiSpace.md,
+    paddingVertical: uiSpace.sm,
     gap: uiSpace.xs,
   },
   headerRow: {
@@ -74,28 +73,55 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: uiSpace.sm,
   },
-  name: {
+  member: {
     flex: 1,
     minWidth: 0,
+    fontFamily: uiFonts.display.family,
+    fontWeight: '700',
+    fontSize: uiTypography.size.lg,
+    lineHeight: uiTypography.lineHeight.lg,
+    color: uiRoles.ink,
   },
-  statusPill: {
-    borderRadius: uiRadius.full,
-    borderWidth: 1,
-    paddingHorizontal: uiSpace.sm,
-    paddingVertical: uiSpace.xs,
+  status: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: uiSpace.xs,
+  },
+  statusText: {
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
+    fontSize: uiTypography.size.sm,
+    lineHeight: uiTypography.lineHeight.sm,
+    color: uiRoles.inkMuted,
   },
   statusLive: {
-    borderColor: uiColors.borderSuccess,
-    backgroundColor: uiColors.surfaceSuccess,
+    fontWeight: '600',
+    color: uiRoles.ink,
   },
-  statusDone: {
-    borderColor: uiColors.borderMuted,
-    backgroundColor: uiColors.surfacePage,
-  },
-  statusLiveText: {
-    color: uiColors.textSuccess,
-  },
-  groups: {
+  muted: {
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
     fontSize: uiTypography.size.sm,
+    lineHeight: uiTypography.lineHeight.sm,
+    color: uiRoles.inkMuted,
+  },
+  metrics: {
+    fontFamily: uiFonts.figure.family,
+    fontWeight: '500',
+    fontSize: uiTypography.size.sm,
+    lineHeight: uiTypography.lineHeight.sm,
+    color: uiRoles.ink,
+  },
+  records: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: uiSpace.xs,
+  },
+  recordsText: {
+    fontFamily: uiFonts.display.family,
+    fontWeight: '700',
+    fontSize: uiTypography.size.sm,
+    lineHeight: uiTypography.lineHeight.sm,
+    color: uiRoles.record,
   },
 });

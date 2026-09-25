@@ -268,13 +268,13 @@ describe('board stream items (M25-T10)', () => {
     (buildStreamItemViewModel(item, me) as { sentence: string }).sentence;
 
   describe('record cards (E3, P14, P15)', () => {
-    it('titles a group record, lists badges Weight then e1RM, and shows the e1RM value', () => {
+    it('titles a group record, lists badges Weight then 1RM, and shows the 1RM figure', () => {
       expect(card(recordItem())).toMatchObject({
         kind: 'record',
         title: 'dave — group record',
         exerciseLabel: 'Bench Press',
-        valueLabel: '140 kg × 1 · e1RM 142.5 kg',
-        badges: ['PR · Weight', 'Group record · Weight', 'PR · e1RM'],
+        valueLabel: '140.0 × 1 · 1RM 142.5',
+        badges: ['PR · Weight', 'Group record · Weight', 'PR · 1RM'],
         statusLabel: 'Not certified yet',
         status: 'uncertified',
         provisionalLabel: null,
@@ -285,14 +285,14 @@ describe('board stream items (M25-T10)', () => {
       });
     });
 
-    it('a PR without an e1RM board shows the set only; my own record reads You and offers no Certify', () => {
+    it('a PR without a 1RM board shows the set only; my own record reads You and offers no Certify', () => {
       const mine = card(
         recordItem({
           member: { user_id: 'me', username: 'me' },
           boards: [{ metric: 'weight', value_kg: 140, previous_value_kg: null, group_record: false }],
         }),
       );
-      expect(mine).toMatchObject({ title: 'You — PR', valueLabel: '140 kg × 1', badges: ['PR · Weight'], canCertify: false });
+      expect(mine).toMatchObject({ title: 'You — PR', valueLabel: '140.0 × 1', badges: ['PR · Weight'], canCertify: false });
       expect(card(recordItem(), null).canCertify).toBe(false);
     });
 
@@ -333,7 +333,7 @@ describe('board stream items (M25-T10)', () => {
   describe('record-removed sentences (D15)', () => {
     it('names each board\'s new holder, Weight first, or nobody', () => {
       expect(sentence(voidedItem())).toBe(
-        "dave's Bench Press record removed (140 kg × 1) — set edited · Now #1 on Weight: sam 138 kg · No one holds #1 on e1RM",
+        "dave's Bench Press record removed (140 kg × 1) — set edited · Now #1 on Weight: sam 138 kg · No one holds #1 on 1RM",
       );
     });
 
@@ -346,13 +346,13 @@ describe('board stream items (M25-T10)', () => {
             leaders: [{ metric: 'e1rm', leader: holder('me', 'me', 120.25) }],
           }),
         ),
-      ).toBe('Your Bench Press record removed (140 kg × 1) — set deleted · Now #1 on e1RM: You 120.25 kg');
+      ).toBe('Your Bench Press record removed (140 kg × 1) — set deleted · Now #1 on 1RM: You 120.25 kg');
     });
   });
 
   describe('link sentences (P16)', () => {
     it('merges a shared rank across both metrics', () => {
-      expect(sentence(linkItem())).toBe('dave linked Bench (comp grip) to Bench Press — now #1 on Weight and e1RM');
+      expect(sentence(linkItem())).toBe('dave linked Bench (comp grip) to Bench Press — now #1 on Weight and 1RM');
     });
 
     it('lists mixed ranks and boards left, and words an unlink', () => {
@@ -369,7 +369,7 @@ describe('board stream items (M25-T10)', () => {
             ],
           }),
         ),
-      ).toBe('dave linked Bench, an exercise to Bench Press — now #2 on Weight, #1 on e1RM');
+      ).toBe('dave linked Bench, an exercise to Bench Press — now #2 on Weight, #1 on 1RM');
       expect(
         sentence(
           linkItem({
@@ -382,7 +382,7 @@ describe('board stream items (M25-T10)', () => {
             ],
           }),
         ),
-      ).toBe('You unlinked an exercise from Bench Press — now #3 on e1RM, off the Weight board');
+      ).toBe('You unlinked an exercise from Bench Press — now #3 on 1RM, off the Weight board');
       expect(sentence(linkItem({ effects: [] }))).toBe('dave linked Bench (comp grip) to Bench Press');
     });
 

@@ -1,29 +1,10 @@
-import { StyleSheet, View } from 'react-native';
-
-import { UiText, uiColors, uiRadius, uiSpace } from '@/components/ui';
+import { Notice } from '@/components/ui';
 import { formatOfflineMarker } from '@/src/groups';
 
-/** Contract §7 offline marker. Cached data stays visible below it. */
+/**
+ * Contract §7 offline marker (08 pattern 7): a neutral `Notice` with the
+ * `offline` glyph, announced when it appears. Cached data stays visible below it.
+ */
 export function GroupOfflineBanner({ lastUpdatedAtMs }: { lastUpdatedAtMs: number | null }) {
-  return (
-    <View accessibilityLiveRegion="polite" style={styles.banner} testID="groups-offline-banner">
-      <UiText style={styles.text} variant="label">
-        {formatOfflineMarker(lastUpdatedAtMs)}
-      </UiText>
-    </View>
-  );
+  return <Notice icon="offline" live message={formatOfflineMarker(lastUpdatedAtMs)} testID="groups-offline-banner" />;
 }
-
-const styles = StyleSheet.create({
-  banner: {
-    borderRadius: uiRadius.md,
-    borderWidth: 1,
-    borderColor: uiColors.borderWarning,
-    backgroundColor: uiColors.surfaceWarning,
-    paddingHorizontal: uiSpace.md,
-    paddingVertical: uiSpace.sm,
-  },
-  text: {
-    color: uiColors.textWarning,
-  },
-});

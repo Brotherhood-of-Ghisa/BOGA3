@@ -10,6 +10,8 @@ import {
   isRecordSetNotFound,
   type GroupApiError,
 } from './api';
+import { formatOneRepMaxFigure } from '@/src/session-recorder/session-view-model';
+
 import { formatBoardDate } from './board-view-model';
 import {
   RECORD_PROVISIONAL_LABEL,
@@ -17,6 +19,7 @@ import {
   type RecordCertificationStatus,
   formatCertifiedBy,
   formatKg,
+  formatSetFigure,
   formatSetValue,
   formatStreamPersonName,
   formatVoidedLabel,
@@ -188,8 +191,12 @@ export const LIFTER_CERTIFY_NOTE = 'Other members can certify this set.';
 
 export type RecordSetSheetViewModel = {
   title: string;
-  /** "140 kg × 1 (e1RM 142.5 kg)". */
+  /** "140.0 × 1 · 1RM 142.5": the two figures below, in words for screen readers. */
   valueLabel: string;
+  /** "140.0 × 1" (figures: no unit, design-language §6). */
+  setFigure: string;
+  /** "142.5"; null when the set has no estimate. */
+  oneRepMaxFigure: string | null;
   loggedLabel: string | null;
   /** "12 Sep 2026 · Iron Temple". */
   dateLabel: string;
@@ -228,7 +235,8 @@ export const buildRecordSetSheet = (
     nowMs?: number;
   },
 ): RecordSetSheetViewModel => {
-  const setValue = formatSetValue(detail.weightKg, detail.reps);
+  const setFigure = formatSetFigure(detail.weightKg, detail.reps);
+  const oneRepMaxFigure = detail.e1rmKg === null ? null : formatOneRepMaxFigure(detail.e1rmKg);
   const gym = session?.gym_name?.trim() || null;
   const loggedAs = detail.exerciseName ?? exerciseNameFromSession(session, detail.setId);
   let statusLabel = RECORD_UNCERTIFIED_LABEL;
@@ -246,7 +254,9 @@ export const buildRecordSetSheet = (
   const isLifter = myUserId !== null && detail.member.user_id === myUserId;
   return {
     title: `${formatStreamPersonName(detail.member, myUserId)} · ${detail.groupExerciseName}`,
-    valueLabel: detail.e1rmKg === null ? setValue : `${setValue} (e1RM ${formatKg(detail.e1rmKg)} kg)`,
+    valueLabel: oneRepMaxFigure === null ? setFigure : `${setFigure} · 1RM ${oneRepMaxFigure}`,
+    setFigure,
+    oneRepMaxFigure,
     loggedLabel: formatLoggedValue(detail),
     dateLabel: gym ? `${formatRecordSetDate(detail.achievedAtMs)} · ${gym}` : formatRecordSetDate(detail.achievedAtMs),
     loggedAsLabel: loggedAs ? `Logged as "${loggedAs}"` : null,

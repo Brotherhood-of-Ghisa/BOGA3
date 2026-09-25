@@ -98,11 +98,11 @@ Use this section as the single source of truth for reusable UX patterns.
 6. Stream card pattern
    - Intent: scan other people's recent activity at a glance and drill into one item.
    - Usage: group stream session cards (`components/groups/stream-session-card.tsx`).
-   - Rules: a summary card that never expands; the whole card is one accessible press target that navigates to the detail; show who, a status pill (text, not color alone — "Training now" or "Completed · duration"), when/where, and the validated summary metrics; newest first; secondary events (joined / left) are lighter rows, not cards.
+   - Rules: a summary `Card` link that never expands; the whole card is one accessible press target that navigates to the detail; show who, the status in text plus a glyph, never a colour ("Training now" beside the `set-current` ring, or "Completed · duration" in `ink-muted`), when/where, and the validated summary metrics in Plex Mono; newest first; a record card (`stream-record-card.tsx`) sits under its session card with the `record` band, and loses the band and fades once voided; secondary events (joined / left, link, record removed) are lighter rows behind a `rule` hairline, not cards.
 7. Offline marker pattern
    - Intent: keep cached server data usable offline without hiding that it may be stale.
    - Usage: every group read screen (`components/groups/offline-banner.tsx`).
-   - Rules: a warning-surface banner above the content reads `Offline · last updated HH:MM` (local time of the cached payload); cached data stays visible; with no cache, show an offline empty state instead of a spinner; the marker clears on the next successful refresh.
+   - Rules: a neutral `Notice` with the `offline` glyph above the content, announced when it appears, reads `Offline · last updated HH:MM` (local time of the cached payload); no warning hue (the glyph and the words carry it); cached data stays visible; with no cache, show an offline empty state (`StatePanel`) instead of a spinner; the marker clears on the next successful refresh.
 8. Pull-to-refresh pattern
    - Intent: an explicit, familiar refresh for server-backed lists that also refresh automatically.
    - Usage: group lists and screens (`RefreshControl`).
@@ -110,7 +110,7 @@ Use this section as the single source of truth for reusable UX patterns.
 9. Online-only write pattern
    - Intent: writes to shared server data either happen now or visibly do not happen — never silently queued.
    - Usage: every group write (`src/groups/use-group-action.ts`, `components/groups/write-notice.tsx`).
-   - Rules: refuse before any request when offline; show the failure inline next to the action saying nothing changed; keep the screen's data and form input as they were; no queue, no automatic retry; destructive writes confirm first (pattern 3). Wording and scope: `ui/ux-rules.md` §14.
+   - Rules: refuse before any request when offline; show the failure inline next to the action saying nothing changed, as a `danger` `Notice`; a success is a neutral `Notice` with the `success` glyph (e.g. "Certified. Certified boards update in a few seconds."), never a success hue; keep the screen's data and form input as they were; no queue, no automatic retry; destructive writes confirm first (pattern 3). Wording and scope: `ui/ux-rules.md` §14.
 10. Secondary-source search section pattern
    - Intent: let a search reach items from another source without crowding the default list.
    - Usage: the session view's exercise picker's `From your groups` section and `Groups` toggle (M25-T07; `components/groups/picker-group-section.tsx`).
@@ -118,7 +118,7 @@ Use this section as the single source of truth for reusable UX patterns.
 11. Record set detail sheet pattern
    - Intent: one place to read and act on a shared record set, wherever it is shown.
    - Usage: stream record cards and full-board rows (M25-T10; `components/groups/record-set-sheet.tsx`).
-   - Rules: every surface showing a record set opens the same in-route sheet; the sheet shows the ranked value, the as-logged value when converted, when and where, and the certification state in text; its actions come from one pure rule over my role and my relationship to the set (`recordSetActionsFor`), never from the surface; a surface may offer the sheet's non-destructive primary action inline, sharing the same write state; writes follow pattern 9 and removals confirm (pattern 3); after a write the host re-reads, and the sheet shows the server's returned state meanwhile.
+   - Rules: every surface showing a record set opens the same in-route `Sheet`, with no Close: the backdrop, Android back and the VoiceOver escape dismiss it (G5); the sheet shows the ranked value (Plex Mono, `record`), the as-logged value when converted, when and where, and the certification state in text; its actions come from one pure rule over my role and my relationship to the set (`recordSetActionsFor`), never from the surface; a surface may offer the sheet's non-destructive primary action inline, sharing the same write state; writes follow pattern 9 and removals confirm (pattern 3); after a write the host re-reads, and the sheet shows the server's returned state meanwhile. `Certify` is the sheet's one primary; a removal is a `danger` row, and "View full session" a row with a chevron.
 12. In-place row logger pattern
    - Intent: log the next item of a list without leaving it, one-handed, mid-set.
    - Usage: the exercise page's set list (`components/exercise-page/set-logger.tsx`, `ui/ux-rules.md` §14a).

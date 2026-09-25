@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
-import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { FlatList, RefreshControl, type StyleProp, type ViewStyle } from 'react-native';
 
-import { UiButton, UiText, uiColors, uiSpace } from '@/components/ui';
+import { StatePanel } from '@/components/ui';
 import {
   buildStreamItemViewModel,
   buildStreamViewModel,
@@ -116,13 +116,15 @@ export function GroupStreamList({
 
   let footer: ReactElement | null = null;
   if (loadingMore) {
-    footer = <ActivityIndicator color={uiColors.textSecondary} testID={`${testID}-loading-more`} />;
+    footer = <StatePanel fill={false} kind="loading" testID={`${testID}-loading-more`} />;
   } else if (loadMoreError) {
     footer = (
-      <View style={styles.footer}>
-        <UiText variant="bodyMuted">{`Couldn't load older items. ${loadMoreError.message}`}</UiText>
-        <UiButton label="Retry" onPress={() => void loadMore()} testID={`${testID}-load-more-retry`} variant="secondary" />
-      </View>
+      <StatePanel
+        action={{ label: 'Retry', onPress: () => void loadMore(), testID: `${testID}-load-more-retry` }}
+        body={`Couldn't load older items. ${loadMoreError.message}`}
+        fill={false}
+        kind="error"
+      />
     );
   }
 
@@ -177,9 +179,3 @@ export function GroupStreamList({
     </>
   );
 }
-
-const styles = StyleSheet.create({
-  footer: {
-    gap: uiSpace.sm,
-  },
-});

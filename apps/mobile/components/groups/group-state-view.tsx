@@ -1,8 +1,8 @@
 import { useRouter } from 'expo-router';
 import type { ReactNode } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
-import { UiButton, UiSurface, UiText, uiColors, uiSpace } from '@/components/ui';
+import { ActionButton, Notice, StatePanel, uiSpace } from '@/components/ui';
 import type { GroupApiError } from '@/src/groups';
 
 type GroupStateViewProps = {
@@ -12,21 +12,36 @@ type GroupStateViewProps = {
   actionLabel?: string;
   onAction?: () => void;
   actionTestID?: string;
+  /** `error` announces the words when they appear. */
+  kind?: 'message' | 'error';
   /** Extra content, e.g. the empty state's Create / Join actions (M22-T05). */
   children?: ReactNode;
 };
 
-/** A whole-area state card: signed out, empty, offline with no cache, lost access, error. */
-export function GroupStateView({ testID, title, body, actionLabel, onAction, actionTestID, children }: GroupStateViewProps) {
+/**
+ * A whole-area state: signed out, empty, offline with no cache, lost access,
+ * error. A `StatePanel` inline on the page ground; its action is an outline.
+ */
+export function GroupStateView({
+  testID,
+  title,
+  body,
+  actionLabel,
+  onAction,
+  actionTestID,
+  kind = 'message',
+  children,
+}: GroupStateViewProps) {
   return (
-    <UiSurface style={styles.card} testID={testID}>
-      <UiText variant="title">{title}</UiText>
-      {body ? <UiText variant="bodyMuted">{body}</UiText> : null}
-      {actionLabel && onAction ? (
-        <UiButton label={actionLabel} onPress={onAction} testID={actionTestID} variant="secondary" />
-      ) : null}
+    <StatePanel
+      action={actionLabel && onAction ? { label: actionLabel, onPress: onAction, testID: actionTestID } : undefined}
+      body={body}
+      fill={false}
+      kind={kind}
+      testID={testID}
+      title={title}>
       {children}
-    </UiSurface>
+    </StatePanel>
   );
 }
 
@@ -42,23 +57,19 @@ export function GroupLostAccessState({ testID }: { testID: string }) {
 }
 
 export function GroupLoadingState({ testID }: { testID: string }) {
-  return (
-    <View style={styles.loading} testID={testID}>
-      <ActivityIndicator color={uiColors.textSecondary} />
-      <UiText variant="bodyMuted">Loading…</UiText>
-    </View>
-  );
+  return <StatePanel body="Loading…" fill={false} kind="loading" testID={testID} />;
 }
 
-/** A non-network failure beside data that is still shown: the message plus Retry. */
+/** A non-network failure beside data that is still shown: the message plus an outline Retry. */
 export function GroupInlineError({ error, onRetry, testID }: { error: GroupApiError; onRetry: () => void; testID: string }) {
   return (
-    <View accessibilityRole="alert" style={styles.inlineError} testID={testID}>
-      <UiText style={styles.inlineErrorText} variant="body">
-        {error.message}
-      </UiText>
-      <UiButton label="Retry" onPress={onRetry} testID={`${testID}-retry`} variant="danger" />
-    </View>
+    <Notice
+      action={<ActionButton label="Retry" onPress={onRetry} testID={`${testID}-retry`} variant="outline" />}
+      live
+      message={error.message}
+      testID={testID}
+      tone="danger"
+    />
   );
 }
 
@@ -74,17 +85,25 @@ export function GroupsEmptyState({ testID, children }: { testID: string; childre
   );
 }
 
-/** The empty state's primary actions: Create group, then Join group. testIDs `<prefix>-create-button` / `-join-button`. */
+/**
+ * The empty state's actions: Create group (the screen's one primary), then Join
+ * with a code (outline). testIDs `<prefix>-create-button` / `-join-button`.
+ */
 export function GroupsEmptyActions({ testIDPrefix }: { testIDPrefix: string }) {
   const router = useRouter();
   return (
     <View style={styles.emptyActions}>
-      <UiButton label="Create group" onPress={() => router.push('/group/new')} testID={`${testIDPrefix}-create-button`} />
-      <UiButton
+      <ActionButton
+        label="Create group"
+        onPress={() => router.push('/group/new')}
+        testID={`${testIDPrefix}-create-button`}
+        variant="primary"
+      />
+      <ActionButton
         label="Join with a code"
         onPress={() => router.push('/group/join')}
         testID={`${testIDPrefix}-join-button`}
-        variant="secondary"
+        variant="outline"
       />
     </View>
   );
@@ -118,6 +137,7 @@ export function GroupMissingDataState({ offline, error, onRetry, testIDPrefix }:
         actionLabel="Retry"
         actionTestID={`${testIDPrefix}-error-state-retry`}
         body={error.message}
+        kind="error"
         onAction={onRetry}
         testID={`${testIDPrefix}-error-state`}
         title="Couldn't load this"
@@ -132,30 +152,9 @@ export const pickInlineError = (...errors: (GroupApiError | null)[]): GroupApiEr
   errors.find((error) => error !== null && error.code !== 'NETWORK' && error.code !== 'NOT_FOUND') ?? null;
 
 const styles = StyleSheet.create({
-  card: {
-    padding: uiSpace.lg,
-    gap: uiSpace.md,
-  },
+  // The panel centres its content; the actions span it, primary first.
   emptyActions: {
+    alignSelf: 'stretch',
     gap: uiSpace.sm,
-  },
-  loading: {
-    alignItems: 'center',
-    gap: uiSpace.sm,
-    padding: uiSpace.lg,
-  },
-  inlineError: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiSpace.md,
-    padding: uiSpace.md,
-    borderRadius: uiSpace.md,
-    borderWidth: 1,
-    borderColor: uiColors.actionDangerSubtleBorder,
-    backgroundColor: uiColors.actionDangerSubtleBg,
-  },
-  inlineErrorText: {
-    flex: 1,
-    color: uiColors.actionDangerText,
   },
 });

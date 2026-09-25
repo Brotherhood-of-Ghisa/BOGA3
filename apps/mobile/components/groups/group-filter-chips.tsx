@@ -1,6 +1,4 @@
-import { StyleSheet } from 'react-native';
-
-import { SegmentedChips } from '@/components/ui';
+import { ChipGroup } from '@/components/ui';
 import { buildStreamFilterChips, type GroupSummary } from '@/src/groups';
 
 type GroupFilterChipsProps = {
@@ -19,20 +17,13 @@ export function GroupFilterChips({ groups, selectedGroupId, onChange }: GroupFil
   const selectedKey = chips.find((chip) => chip.selected)?.key ?? '';
 
   return (
-    <SegmentedChips
+    <ChipGroup
       accessibilityLabel="Choose a group"
-      compact
+      mode="single"
       onChange={onChange}
       options={chips.map((chip) => ({ value: chip.key, label: chip.label }))}
-      style={styles.row}
       testIDPrefix="groups-stream-filter"
       value={selectedKey}
     />
   );
 }
-
-const styles = StyleSheet.create({
-  row: {
-    flexWrap: 'wrap',
-  },
-});
