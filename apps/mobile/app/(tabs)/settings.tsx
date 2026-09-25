@@ -1,11 +1,26 @@
 import { useRouter } from 'expo-router';
 import * as Linking from 'expo-linking';
 import { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 
 import { SyncStatusPanel } from '@/components/sync-status/sync-status-panel';
 import { MoreHubBackButton } from '@/components/navigation/more-hub-back-button';
-import { Icon, UiButton, UiSurface, UiText, uiBorder, uiColors, uiRadius, uiSpace, uiTypography } from '@/components/ui';
+import {
+  ActionButton,
+  Card,
+  Icon,
+  ListRow,
+  Notice,
+  PageHeader,
+  ScreenScroll,
+  SegmentedControl,
+  StatePanel,
+  uiFonts,
+  uiGeometry,
+  uiRoles,
+  uiSpace,
+  uiTypography,
+} from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import { resetLocalDataAndReseed } from '@/src/data';
 import {
@@ -26,6 +41,18 @@ export default function SettingsScreen() {
   const [connectError, setConnectError] = useState<string | null>(null);
   const runtimeMetadata = readAppRuntimeMetadata();
   const versionBuild = formatVersionBuild(runtimeMetadata);
+  const aboutLines = [
+    versionBuild ? { testID: 'settings-about-version', text: versionBuild } : null,
+    runtimeMetadata.releaseCodename
+      ? { testID: 'settings-about-release', text: `Release ${runtimeMetadata.releaseCodename}` }
+      : null,
+    runtimeMetadata.displayFlavor
+      ? {
+          testID: 'settings-about-flavor',
+          text: `Flavor ${runtimeMetadata.displayFlavor === 'preview' ? 'Preview' : 'Local'}`,
+        }
+      : null,
+  ].filter((line): line is { testID: string; text: string } => line !== null);
 
   const [isResetting, setIsResetting] = useState(false);
   const [resetFeedback, setResetFeedback] = useState<DevFeedback>(null);
@@ -136,247 +163,168 @@ export default function SettingsScreen() {
   };
 
   return (
-    <ScrollView
+    <ScreenScroll
       contentContainerStyle={styles.content}
       contentInsetAdjustmentBehavior="automatic"
       keyboardShouldPersistTaps="handled"
-      style={styles.screen}
       testID="settings-screen">
       <MoreHubBackButton />
-      <UiText accessibilityRole="header" selectable style={styles.screenTitle} variant="title">
-        Settings
-      </UiText>
+      <PageHeader title="Settings" />
 
       <View style={styles.section} testID="settings-section-account">
-        <UiText accessibilityRole="header" selectable variant="title">
-          Account
-        </UiText>
-        <Pressable
-          accessibilityHint="Opens your account screen"
-          accessibilityLabel="Open Account"
-          accessibilityRole="button"
-          onPress={() => router.push('/profile')}
-          style={({ pressed }) => [styles.cardPressable, pressed ? styles.cardPressed : null]}
-          testID="settings-profile-row">
-          <UiSurface style={styles.destinationCard}>
-            <View style={styles.destinationRow}>
-              <View style={styles.iconBadge}>
-                <Icon color={uiColors.actionPrimary} name="user" />
-              </View>
-              <View style={styles.destinationCopy}>
-                <UiText selectable variant="labelStrong">
-                  Account
-                </UiText>
-                <UiText selectable variant="bodyMuted">
-                  {user?.email?.trim() || 'Sign in and manage your account.'}
-                </UiText>
-              </View>
-            </View>
-          </UiSurface>
-        </Pressable>
+        <SectionLabel title="Account" />
+        <Card>
+          <ListRow
+            accessibilityHint="Opens your account screen"
+            accessibilityLabel="Open Account"
+            density="list"
+            description={user?.email?.trim() || 'Sign in and manage your account.'}
+            divider={false}
+            label="Account"
+            leading={<Icon color={uiRoles.inkMuted} name="user" />}
+            onPress={() => router.push('/profile')}
+            testID="settings-profile-row"
+            trailing={<RowChevron />}
+          />
+        </Card>
       </View>
 
       <View style={styles.section} testID="settings-section-ai-coaching">
-        <UiText accessibilityRole="header" selectable variant="title">
-          AI coaching
-        </UiText>
-        <UiText selectable variant="bodyMuted">
+        <SectionLabel title="AI coaching" />
+        <Text style={styles.sectionIntro}>
           Coaches get read-only training access that you can revoke at any time.
-        </UiText>
-        <Pressable
-          accessibilityHint="Opens setup instructions in your system browser"
-          accessibilityLabel="Connect an AI coach, opens in browser"
-          accessibilityRole="link"
-          onPress={() => {
-            void handleConnectAgent();
-          }}
-          style={({ pressed }) => [styles.cardPressable, pressed ? styles.cardPressed : null]}
-          testID="settings-connect-agent-row">
-          <UiSurface style={styles.destinationCard}>
-            <View style={styles.destinationRow}>
-              <View style={styles.iconBadge}>
-                <Icon color={uiColors.actionPrimary} name="sparkles" />
-              </View>
-              <View style={styles.destinationCopy}>
-                <UiText selectable variant="labelStrong">
-                  Connect an AI coach
-                </UiText>
-                <UiText selectable variant="bodyMuted">
-                  See setup instructions for your MCP-compatible client.
-                </UiText>
-              </View>
-              <Icon
-                color={uiColors.textSecondary}
-                name="arrow-up-right"
-                style={styles.externalIndicator}
-              />
-            </View>
-          </UiSurface>
-        </Pressable>
-        {connectError ? (
-          <UiText
-            accessibilityLiveRegion="polite"
-            selectable
-            style={styles.inlineErrorText}
-            testID="settings-connect-agent-error"
-            variant="bodyMuted">
-            {connectError}
-          </UiText>
-        ) : null}
-
-        {user ? (
-          <Pressable
-            accessibilityHint="Opens the list of authorized coaching agents"
-            accessibilityLabel="Open Connected Agents"
-            accessibilityRole="button"
-            onPress={() => router.push('/connected-agents')}
-            style={({ pressed }) => [styles.cardPressable, pressed ? styles.cardPressed : null]}
-            testID="settings-connected-agents-row">
-            <UiSurface style={styles.destinationCard}>
-              <View style={styles.destinationRow}>
-                <View style={styles.iconBadge}>
-                  <Icon color={uiColors.actionPrimary} name="shield-check" />
-                </View>
-                <View style={styles.destinationCopy}>
-                  <UiText selectable variant="labelStrong">
-                    Connected agents
-                  </UiText>
-                  <UiText selectable variant="bodyMuted">
-                    Review access and revoke existing connections.
-                  </UiText>
-                </View>
-              </View>
-            </UiSurface>
-          </Pressable>
-        ) : null}
+        </Text>
+        <Card>
+          <ListRow
+            accessibilityHint="Opens setup instructions in your system browser"
+            accessibilityLabel="Connect an AI coach, opens in browser"
+            accessibilityRole="link"
+            density="list"
+            description="See setup instructions for your MCP-compatible client."
+            divider={false}
+            label="Connect an AI coach"
+            leading={<Icon color={uiRoles.inkMuted} name="sparkles" />}
+            onPress={() => {
+              void handleConnectAgent();
+            }}
+            testID="settings-connect-agent-row"
+            trailing={<RowChevron external />}
+          />
+          {connectError ? (
+            <Text
+              accessibilityLiveRegion="polite"
+              style={styles.inlineError}
+              testID="settings-connect-agent-error">
+              {connectError}
+            </Text>
+          ) : null}
+          {user ? (
+            <ListRow
+              accessibilityHint="Opens the list of authorized coaching agents"
+              accessibilityLabel="Open Connected Agents"
+              density="list"
+              description="Review access and revoke existing connections."
+              label="Connected agents"
+              leading={<Icon color={uiRoles.inkMuted} name="shield-check" />}
+              onPress={() => router.push('/connected-agents')}
+              testID="settings-connected-agents-row"
+              trailing={<RowChevron />}
+            />
+          ) : null}
+        </Card>
       </View>
 
       <View style={styles.section} testID="settings-section-preferences">
-        <UiText accessibilityRole="header" selectable variant="title">
-          Preferences
-        </UiText>
-        <UiSurface style={styles.preferencesCard} testID="settings-preferences-card">
-          <UiText selectable variant="bodyMuted">
+        <SectionLabel title="Preferences" />
+        <Card style={styles.cardBody} testID="settings-preferences-card">
+          <Text style={styles.bodyMuted}>
             Configure how dates and other details are displayed throughout BoGa.
-          </UiText>
-          <View style={styles.preferenceGroup}>
-            <UiText selectable variant="labelStrong" style={styles.preferenceLabel}>
-              Date format
-            </UiText>
-            <View style={styles.preferenceRow}>
-              {(['DD-MM-YYYY', 'MM-DD-YYYY', 'YYYY-MM-DD'] as const).map((format) => {
-                const selected = listPreferences.dateFormat === format;
-                return (
-                  <Pressable
-                    key={format}
-                    accessibilityLabel={`Set date format to ${format}`}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected }}
-                    style={[styles.prefButton, selected && styles.prefButtonSelected]}
-                    onPress={() => setListPreferences({ dateFormat: format })}
-                    testID={`settings-date-format-${format}`}>
-                    <UiText
-                      style={[styles.prefButtonText, selected && styles.prefButtonTextSelected]}>
-                      {format}
-                    </UiText>
-                  </Pressable>
-                );
-              })}
-            </View>
+          </Text>
+          <View style={styles.preference}>
+            <Text style={styles.fieldLabel}>Date format</Text>
+            <SegmentedControl
+              accessibilityLabel="Date format"
+              onChange={(format) => setListPreferences({ dateFormat: format })}
+              options={DATE_FORMAT_OPTIONS}
+              testIDPrefix="settings-date-format"
+              value={listPreferences.dateFormat}
+            />
           </View>
-        </UiSurface>
+        </Card>
       </View>
 
       <View style={styles.section} testID="settings-section-data-sync">
-        <UiText accessibilityRole="header" selectable variant="title">
-          Data &amp; sync
-        </UiText>
+        <SectionLabel title="Data & sync" />
         {user ? (
           <SyncStatusPanel />
         ) : (
-          <UiSurface style={styles.quietCard} testID="settings-sync-signed-out-card">
-            <UiText selectable variant="bodyMuted">
-              Sign in through Account to sync your training data.
-            </UiText>
-          </UiSurface>
+          <Card testID="settings-sync-signed-out-card">
+            <StatePanel body="Sign in through Account to sync your training data." fill={false} />
+          </Card>
         )}
       </View>
 
       <View style={styles.section} testID="settings-section-about">
-        <UiText accessibilityRole="header" selectable variant="title">
-          About
-        </UiText>
-        <UiSurface style={styles.aboutCard} testID="settings-about-card">
-          {versionBuild ? (
-            <UiText selectable testID="settings-about-version" variant="bodyMuted">
-              {versionBuild}
-            </UiText>
-          ) : null}
-          {runtimeMetadata.releaseCodename ? (
-            <UiText selectable testID="settings-about-release" variant="bodyMuted">
-              Release {runtimeMetadata.releaseCodename}
-            </UiText>
-          ) : null}
-          {runtimeMetadata.displayFlavor ? (
-            <UiText selectable testID="settings-about-flavor" variant="bodyMuted">
-              Flavor {runtimeMetadata.displayFlavor === 'preview' ? 'Preview' : 'Local'}
-            </UiText>
-          ) : null}
-          {!versionBuild && !runtimeMetadata.releaseCodename && !runtimeMetadata.displayFlavor ? (
-            <UiText selectable variant="bodyMuted">
-              Release information unavailable
-            </UiText>
-          ) : null}
-        </UiSurface>
+        <SectionLabel title="About" />
+        <Card testID="settings-about-card">
+          {aboutLines.length > 0 ? (
+            aboutLines.map((line, index) => (
+              <ListRow density="list" divider={index > 0} key={line.testID}>
+                <Text style={styles.body} testID={line.testID}>
+                  {line.text}
+                </Text>
+              </ListRow>
+            ))
+          ) : (
+            <ListRow density="list" divider={false}>
+              <Text style={styles.bodyMuted}>Release information unavailable</Text>
+            </ListRow>
+          )}
+        </Card>
       </View>
 
       {isDevMode() ? (
         <View style={styles.section} testID="settings-section-developer-tools">
-          <UiText accessibilityRole="header" selectable variant="title">
-            Developer tools
-          </UiText>
-          <UiSurface style={styles.devCard} testID="settings-dev-tools-card">
-            <UiText selectable variant="bodyMuted">
+          {/* Dev-only (plan G8): a mechanical restyle. The warning is the glyph, not a hue. */}
+          <Card style={styles.cardBody} testID="settings-dev-tools-card">
+            <View style={styles.devHeader}>
+              <Icon color={uiRoles.inkMuted} name="warning" size="sm" />
+              <Text accessibilityRole="header" style={styles.microLabel}>
+                Developer tools
+              </Text>
+            </View>
+
+            <Text style={styles.bodyMuted}>
               View the in-app logs captured this session (all levels). Errors and warnings also
               sync to the backend once signed in.
-            </UiText>
-            <UiButton
+            </Text>
+            <ActionButton
               accessibilityLabel="Open the in-app log viewer"
               label="View logs"
               onPress={() => router.push('/dev-logs')}
               testID="settings-dev-logs-button"
-              variant="secondary"
+              variant="outline"
             />
 
-            <UiText selectable variant="bodyMuted">
+            <Text style={styles.bodyMuted}>
               Wipe every local table and re-run the exercise catalog seeder. Available only in
               development builds — does nothing in release.
-            </UiText>
-            <UiButton
+            </Text>
+            <ActionButton
               accessibilityLabel="Reset local data and re-seed exercise catalog"
               disabled={isResetting}
               label={isResetting ? 'Resetting…' : 'Reset local data and re-seed'}
               onPress={confirmDevReset}
               testID="settings-dev-reset-button"
-              variant="secondary"
+              variant="outline"
             />
-            {resetFeedback ? (
-              <UiText
-                selectable
-                style={
-                  resetFeedback.tone === 'success' ? styles.devSuccessText : styles.devErrorText
-                }
-                testID="settings-dev-reset-feedback"
-                variant="bodyMuted">
-                {resetFeedback.message}
-              </UiText>
-            ) : null}
+            <DevFeedbackNotice feedback={resetFeedback} testID="settings-dev-reset-feedback" />
 
-            <UiText selectable variant="bodyMuted">
+            <Text style={styles.bodyMuted}>
               Drop the local database and re-bootstrap. Sync re-pulls your server state into a
               clean local store.
-            </UiText>
-            <UiButton
+            </Text>
+            <ActionButton
               accessibilityLabel="Wipe local database and re-bootstrap"
               disabled={isWipingLocal}
               label={isWipingLocal ? 'Wiping…' : 'Wipe local & re-bootstrap'}
@@ -384,160 +332,128 @@ export default function SettingsScreen() {
                 void handleWipeLocal();
               }}
               testID="settings-dev-wipe-local-button"
-              variant="secondary"
+              variant="outline"
             />
-            {wipeLocalFeedback ? (
-              <UiText
-                selectable
-                style={
-                  wipeLocalFeedback.tone === 'success'
-                    ? styles.devSuccessText
-                    : styles.devErrorText
-                }
-                testID="settings-dev-wipe-local-feedback"
-                variant="bodyMuted">
-                {wipeLocalFeedback.message}
-              </UiText>
-            ) : null}
+            <DevFeedbackNotice feedback={wipeLocalFeedback} testID="settings-dev-wipe-local-feedback" />
 
-            <UiText selectable variant="bodyMuted">
+            <Text style={styles.bodyMuted}>
               Delete every row on the server owned by your account, then wipe local. Useful for
               testing the bootstrap flow against an empty server.
-            </UiText>
-            <UiButton
+            </Text>
+            <ActionButton
               accessibilityLabel="Wipe remote data owned by my account"
               disabled={isWipingRemote}
               label={isWipingRemote ? 'Wiping…' : 'Wipe remote (my data)'}
               onPress={confirmWipeRemote}
               testID="settings-dev-wipe-remote-button"
-              variant="danger"
+              tone="danger"
+              variant="outline"
             />
-            {wipeRemoteFeedback ? (
-              <UiText
-                selectable
-                style={
-                  wipeRemoteFeedback.tone === 'success'
-                    ? styles.devSuccessText
-                    : styles.devErrorText
-                }
-                testID="settings-dev-wipe-remote-feedback"
-                variant="bodyMuted">
-                {wipeRemoteFeedback.message}
-              </UiText>
-            ) : null}
-          </UiSurface>
+            <DevFeedbackNotice feedback={wipeRemoteFeedback} testID="settings-dev-wipe-remote-feedback" />
+          </Card>
         </View>
       ) : null}
-    </ScrollView>
+    </ScreenScroll>
+  );
+}
+
+const DATE_FORMAT_OPTIONS = (['DD-MM-YYYY', 'MM-DD-YYYY', 'YYYY-MM-DD'] as const).map((format) => ({
+  value: format,
+  label: format,
+  accessibilityLabel: `Set date format to ${format}`,
+}));
+
+// A section's name: a micro-label over its card, as on More.
+function SectionLabel({ title }: { title: string }) {
+  return (
+    <Text accessibilityRole="header" style={styles.microLabel}>
+      {title}
+    </Text>
+  );
+}
+
+function RowChevron({ external = false }: { external?: boolean }) {
+  return <Icon color={uiRoles.inkFaint} name={external ? 'arrow-up-right' : 'chevron-right'} size="sm" />;
+}
+
+// A dev action's outcome: words plus a glyph, `danger` only when it failed (G3).
+function DevFeedbackNotice({ feedback, testID }: { feedback: DevFeedback; testID: string }) {
+  if (!feedback) {
+    return null;
+  }
+  return feedback.tone === 'success' ? (
+    <Notice icon="success" live message={feedback.message} testID={testID} />
+  ) : (
+    <Notice icon="warning" live message={feedback.message} testID={testID} tone="danger" />
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: uiColors.surfacePage,
-  },
+  // Sections sit a step further apart than a label and its card.
   content: {
-    padding: uiSpace.xl,
-    gap: uiSpace.lg,
-  },
-  screenTitle: {
-    fontSize: uiTypography.size.xxl,
-    lineHeight: 30,
+    gap: uiSpace.xl,
   },
   section: {
-    gap: uiSpace.md,
-  },
-  cardPressable: {
-    width: '100%',
-  },
-  cardPressed: {
-    opacity: 0.94,
-  },
-  destinationCard: {
-    padding: uiSpace.lg,
-    gap: uiSpace.md,
-  },
-  destinationRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: uiSpace.md,
-  },
-  externalIndicator: {
-    alignSelf: 'center',
-  },
-  iconBadge: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: uiBorder.width,
-    borderColor: uiColors.actionPrimarySubtleBorder,
-    borderRadius: uiRadius.full,
-    backgroundColor: uiColors.surfaceInfo,
-  },
-  destinationCopy: {
-    flex: 1,
     gap: uiSpace.sm,
   },
-  devCard: {
-    padding: uiSpace.lg,
-    gap: uiSpace.md,
-    borderColor: uiColors.borderWarning,
-    backgroundColor: uiColors.surfaceWarning,
-  },
-  devSuccessText: {
-    color: uiColors.textAccentMuted,
-  },
-  devErrorText: {
-    color: uiColors.actionDangerText,
-  },
-  inlineErrorText: {
-    color: uiColors.actionDangerText,
-  },
-  preferencesCard: {
-    padding: uiSpace.lg,
-    gap: uiSpace.md,
-  },
-  preferenceGroup: {
-    gap: uiSpace.sm,
-    marginTop: uiSpace.sm,
-  },
-  preferenceLabel: {
-    fontSize: uiTypography.size.md,
-  },
-  preferenceRow: {
-    flexDirection: 'row',
-    gap: uiSpace.sm,
-    flexWrap: 'wrap',
-  },
-  prefButton: {
-    borderRadius: uiRadius.md,
-    borderWidth: uiBorder.width,
-    borderColor: uiColors.borderMuted,
-    backgroundColor: uiColors.surfaceDefault,
-    paddingHorizontal: uiSpace.md,
-    paddingVertical: uiSpace.sm,
-  },
-  prefButtonSelected: {
-    backgroundColor: uiColors.actionPrimarySubtleBg,
-    borderColor: uiColors.actionPrimary,
-  },
-  prefButtonText: {
-    fontSize: uiTypography.size.sm,
-    fontWeight: '600',
-    color: uiColors.textPrimary,
-  },
-  prefButtonTextSelected: {
-    color: uiColors.actionPrimary,
+  microLabel: {
+    fontFamily: uiFonts.display.family,
     fontWeight: '700',
+    fontSize: uiTypography.size.xxs,
+    lineHeight: uiTypography.lineHeight.xxs,
+    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
+    textTransform: 'uppercase',
+    color: uiRoles.inkMuted,
   },
-  quietCard: {
-    padding: uiSpace.lg,
+  sectionIntro: {
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
+    fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
+    color: uiRoles.inkMuted,
   },
-  aboutCard: {
-    padding: uiSpace.lg,
+  // A card holding prose and controls rather than rows.
+  cardBody: {
+    padding: uiSpace.md,
+    gap: uiSpace.md,
+  },
+  body: {
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
+    fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
+    color: uiRoles.ink,
+  },
+  bodyMuted: {
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
+    fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
+    color: uiRoles.inkMuted,
+  },
+  preference: {
     gap: uiSpace.sm,
-    backgroundColor: uiColors.surfaceMuted,
+  },
+  fieldLabel: {
+    fontFamily: uiFonts.display.family,
+    fontWeight: '600',
+    fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
+    color: uiRoles.ink,
+  },
+  // Under the row it belongs to, inset to the row's text.
+  inlineError: {
+    paddingHorizontal: uiSpace.md,
+    paddingBottom: uiSpace.md,
+    fontFamily: uiFonts.body.family,
+    fontWeight: '600',
+    fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
+    color: uiRoles.danger,
+  },
+  devHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: uiSpace.sm,
   },
 });

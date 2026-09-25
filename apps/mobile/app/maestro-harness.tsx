@@ -1,8 +1,8 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text } from 'react-native';
 
-import { uiColors, uiSpace, uiTypography } from '@/components/ui';
+import { Screen, uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui';
 import {
   coerceMaestroHarnessQueryParam,
   isMaestroHarnessAllowed,
@@ -169,32 +169,34 @@ export default function MaestroHarnessScreen() {
     };
   }, [resetParam, fixtureParam, bootstrapParam, gateParam, teleportParam, intentParam, sessionIdParam, sessionExerciseIdParam, maestroShareParam, maestroCatalogParam, presentationParam, router]);
 
+  // Dev/test-only (plan G8). Flows wait on the status copy, so it never changes.
   return (
-    <View style={styles.screen} testID="maestro-harness-screen">
-      {status.kind === 'running' ? <ActivityIndicator color={uiColors.actionPrimary} size="small" /> : null}
+    <Screen style={styles.screen} testID="maestro-harness-screen">
+      {status.kind === 'running' ? <ActivityIndicator color={uiRoles.inkMuted} size="small" /> : null}
       <Text selectable style={[styles.message, status.kind === 'error' ? styles.errorMessage : null]} testID="maestro-harness-status">
         {status.message}
       </Text>
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   screen: {
-    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     gap: uiSpace.lg,
     paddingHorizontal: uiSpace.xl,
-    backgroundColor: uiColors.surfacePage,
   },
   message: {
-    color: uiColors.textPrimary,
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
     fontSize: uiTypography.size.lg,
-    lineHeight: 22,
+    lineHeight: uiTypography.lineHeight.lg,
+    color: uiRoles.ink,
     textAlign: 'center',
   },
   errorMessage: {
-    color: uiColors.actionDanger,
+    fontWeight: '600',
+    color: uiRoles.danger,
   },
 });

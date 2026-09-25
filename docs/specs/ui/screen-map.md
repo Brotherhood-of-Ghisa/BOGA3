@@ -101,6 +101,11 @@ Brief entrypoint map of the current mobile screens.
     disabling the hub
   - Library & account links to existing exercise-database management and
     Settings/account
+- Presentation (design language, DLM-T04): `paper` ground under a
+  `PageHeader`. Each section is an `ink-muted` micro-label over one `Card` of
+  `ListRow`s: a leading `ink-muted` glyph (no badge), the label and its
+  description, and a trailing chevron, or `arrow-up-right` for the external
+  setup link. The inline error is `danger` text under its row. No `accent`
 - Key exits:
   - `/groups`, `/connected-agents`, `/gyms?source=more`, `/dev-logs`,
     `/exercise-catalog`, and `/settings`, plus the first-party external MCP
@@ -290,6 +295,16 @@ Brief entrypoint map of the current mobile screens.
   - available from the Settings row under More regardless of auth state; the
     row adds `source=more` and an explicit `Back to More`; the direct
     `/settings` path remains valid without it
+- Presentation (design language, DLM-T04): as More, under `Back to More` and a
+  `PageHeader`. The date format is a `SegmentedControl`; the signed-out sync
+  guidance a `StatePanel` in a `Card`; About a `Card` of text rows. The sync
+  panel is a `Card` of `ListRow`s with Plex Mono values: offline is the
+  `offline` glyph plus "Offline" in `ink`, an error is `danger`, and `Refresh`
+  is an outline. Developer tools is one `Card` headed by the `warning` glyph;
+  outline buttons (`Wipe remote` in `danger`) and a `Notice` per outcome. No
+  `accent`. Logs (`/dev-logs`, dev only) filters with a single-select
+  `ChipGroup` and lists its rows in one `Card` (error `danger`, warning `ink` +
+  `warning` glyph). Design target: `design-targets/more-settings.md`
 - Key exits:
   - `more` via the source-aware explicit return action
   - `profile`

@@ -57,6 +57,17 @@ appId: com.dinoderek.mobile
     id: "more-settings-row"
 - assertVisible:
     id: "settings-screen"
+# Preferences: the date format is a segmented control (DLM-T04 gallery state).
+- scrollUntilVisible:
+    element:
+      id: "settings-date-format-row"
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
+    timeout: 30000
+- assertVisible:
+    id: "settings-date-format-row"
+- takeScreenshot: "settings-preferences"
 # Developer tools is the LAST section of Settings, below Account / AI coaching /
 # Preferences / Data & sync / About. iOS exposes only the rendered slice of a
 # ScrollView to the accessibility hierarchy, so the card is absent from the tree
@@ -91,6 +102,28 @@ appId: com.dinoderek.mobile
 - assertVisible:
     text: "Local database wiped and re-bootstrapped. Sync will re-pull from the server."
 - takeScreenshot: "03-dev-wipe-local-feedback"
+
+# Logs (dev-only; captured for information, DLM-T04): open the viewer from
+# Developer tools, assert its level filter, then return by the native back
+# arrow (its accessibility label is "Back").
+- scrollUntilVisible:
+    element:
+      id: "settings-dev-logs-button"
+    direction: UP
+    centerElement: true
+    timeout: 30000
+- tapOn:
+    id: "settings-dev-logs-button"
+- extendedWaitUntil:
+    visible:
+      id: "dev-logs-filter-row"
+    timeout: 15000
+- takeScreenshot: "dev-logs"
+- tapOn: "Back"
+- extendedWaitUntil:
+    visible:
+      id: "settings-screen"
+    timeout: 15000
 
 # After the wipe the data layer is re-bootstrapped, so navigating back to a data
 # screen must still render against the fresh local store (a broken re-bootstrap

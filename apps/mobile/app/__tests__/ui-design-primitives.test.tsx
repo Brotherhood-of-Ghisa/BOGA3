@@ -221,6 +221,22 @@ describe('ListRow', () => {
     fireEvent.press(row);
     expect(onPress).not.toHaveBeenCalled();
   });
+
+  it('sets a description under the label in ink-muted body text', () => {
+    render(<ListRow density="list" description="Search, create, edit." label="Exercise database" />);
+
+    expect(flatStyle(screen.getByText('Search, create, edit.'))).toMatchObject({
+      fontFamily: 'Source Sans 3',
+      fontWeight: '400',
+      color: uiRoles.inkMuted,
+    });
+  });
+
+  it('exposes a row that leaves the app as a link', () => {
+    render(<ListRow accessibilityRole="link" label="Connect an AI coach" onPress={jest.fn()} />);
+
+    expect(screen.getByLabelText('Connect an AI coach').props.accessibilityRole).toBe('link');
+  });
 });
 
 describe('Sheet', () => {
