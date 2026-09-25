@@ -65,8 +65,9 @@ appId: com.dinoderek.mobile
     timeout: 30000
 
 # --- 01: Exercise view is shown by default ---
-- assertVisible: "Time range"
-- assertVisible: "Breakdown"
+# The two control labels are micro-labels, rendered uppercase.
+- assertVisible: "TIME RANGE"
+- assertVisible: "BREAKDOWN"
 - assertVisible:
     id: "stats-period-chip-7"
 - assertVisible:
@@ -95,12 +96,12 @@ appId: com.dinoderek.mobile
     id: "stats-card-sessions"
 - assertVisible:
     id: "stats-card-sets"
-- assertVisible:
-    text: ".*W/SETS.*"
 # Fixture, last 7 days: sessions at daysAgo 0.2/0.25/0.3/1/2/4 = 6 sessions,
 # 10 sets of which 8 are working sets (warm-up and untyped sets are not working
-# sets). The summary card renders "<sets> (<working sets>)".
-- assertVisible: "10 (8)"
+# sets). The summary card renders "<sets> (<working sets>)" under a "Sets
+# (W/Sets)" legend. The card's Stat is one accessible element whose label is
+# "<legend> <value>", so the legend and the pair are asserted together.
+- assertVisible: "Sets \\(W/Sets\\) 10 \\(8\\)"
 - takeScreenshot: "01-exercise-view-default"
 
 # --- Exercise table headers drive local sorting without opening a row ---
@@ -141,13 +142,13 @@ appId: com.dinoderek.mobile
 - tapOn:
     id: "stats-period-chip-30"
 - extendedWaitUntil:
-    visible: "15 (11)"
+    visible: "Sets \\(W/Sets\\) 15 \\(11\\)"
     timeout: 10000
 - takeScreenshot: "02-exercise-view-30-days"
 - tapOn:
     id: "stats-period-chip-7"
 - extendedWaitUntil:
-    visible: "10 (8)"
+    visible: "Sets \\(W/Sets\\) 10 \\(8\\)"
     timeout: 10000
 
 # --- 03: Muscle view shows the summary cards and the family breakdown ---
@@ -303,16 +304,13 @@ appId: com.dinoderek.mobile
       id: "stats-muscle-history-close"
     timeout: 5000
 
-# NOT covered here, deliberately: tapping a MULTI-muscle family header
-# ("stats-family-header-<slug>", the toFamilyHistoryTarget branch) to open the
-# same overlay. It cannot be driven reliably from Maestro: the Stats screen's
-# Time range / Breakdown / summary / filter block overlays the top of the scroll
-# container, so scrollUntilVisible centres the row INSIDE that container and
-# leaves it drawn underneath the block. visibilityPercentage: 100 does not catch
-# it — Maestro computes visibility from the view hierarchy, not from occlusion —
-# so the tap lands on the sticky block and nothing happens (verified: the tap
-# command completes, selectedMuscle is never set). The single-muscle branch
-# (toMuscleHistoryTarget) is covered above via the collapsed Chest header.
+# NOT covered here: tapping a MULTI-muscle family header
+# ("stats-family-header-<slug>", the toFamilyHistoryTarget branch). Until DLM-T08
+# it could not be driven: the controls and summary sat on top of a nested scroll
+# and hid the row from the tap. The screen is now one scroll, so that cause is
+# gone; the step belongs with the overlay's restyle (DLM-T09). Jest covers the
+# branch today. The single-muscle branch (toMuscleHistoryTarget) is covered
+# above via the collapsed Chest header.
 
 # --- 07: Overlay dismissed, back to the muscle view ---
 - assertVisible:

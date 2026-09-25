@@ -5,15 +5,31 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
   type StyleProp,
-  type TextStyle,
   type ViewStyle,
 } from 'react-native';
 
 import { DailyHeatmap, WeeklyHeatmap, buildHeatmapData } from '@/components/heatmaps';
-import { Icon, SegmentedChips, uiColors, uiRadius, uiSpace, uiTypography } from '@/components/ui';
+import {
+  Card,
+  Icon,
+  ListRow,
+  Screen,
+  ScreenScroll,
+  SearchField,
+  SegmentedChips,
+  SegmentedControl,
+  Stat,
+  StatePanel,
+  uiColors,
+  uiFonts,
+  uiGeometry,
+  uiRadius,
+  uiRoles,
+  uiSpace,
+  uiTypography,
+} from '@/components/ui';
 import {
   computeSelectedExerciseDailyEffort,
   computeSelectedExerciseWeeklyEffort,
@@ -335,28 +351,9 @@ const formatNumber = (value: number): string => {
   return value.toFixed(1).replace(/\.0$/, '');
 };
 
-const formatTotalWeight = (value: number): string => {
-  if (value === 0) return '0';
-  if (value >= 1000) {
-    const inK = value / 1000;
-    return `${inK.toFixed(inK >= 100 ? 0 : 1).replace(/\.0$/, '')}k`;
-  }
-  return formatNumber(Math.round(value));
-};
-
-const deltaToneStyle = (tone: DeltaDisplay['tone']) => {
-  switch (tone) {
-    case 'positive':
-      return styles.deltaPositive;
-    case 'negative':
-      return styles.deltaNegative;
-    case 'new':
-      return styles.deltaNew;
-    case 'neutral':
-    default:
-      return styles.deltaNeutral;
-  }
-};
+// Full integers in Plex Mono, never `2.5k`: the numbers are the point
+// (`design-language.md` §6, DLM-T08-D2).
+const formatTotalWeight = (value: number): string => String(Math.round(value));
 
 export type StatsScreenShellProps = {
   summary: StatsSummary | null;
@@ -497,12 +494,16 @@ export function StatsScreenShell({
     setExerciseSortMode((activeMode) => nextExerciseSortMode(activeMode, header));
   }, []);
 
+  // One scroll for the whole screen, so the controls and the summary travel
+  // with the list instead of sitting on top of it.
+  const scrollTestID = viewMode === 'exercise' ? 'stats-exercise-list-scroll' : 'stats-scroll';
+
   return (
-    <View style={styles.screen} testID="stats-history-screen">
-      <View style={styles.controlGroups}>
+    <Screen testID="stats-history-screen">
+      <ScreenScroll keyboardShouldPersistTaps="handled" testID={scrollTestID}>
         <View style={styles.controlGroup} testID="stats-time-range-controls">
-          <Text allowFontScaling={false} style={styles.controlLabel}>Time range</Text>
-          <SegmentedChips
+          <Text allowFontScaling={false} style={styles.microLabel}>Time range</Text>
+          <SegmentedControl
             accessibilityLabel="Select stats time range"
             options={PERIOD_OPTIONS}
             value={periodDays}
@@ -511,124 +512,112 @@ export function StatsScreenShell({
           />
         </View>
         <View style={styles.controlGroup} testID="stats-breakdown-controls">
-          <Text allowFontScaling={false} style={styles.controlLabel}>Breakdown</Text>
-          <SegmentedChips
+          <Text allowFontScaling={false} style={styles.microLabel}>Breakdown</Text>
+          <SegmentedControl
             accessibilityLabel="Select stats breakdown"
             options={VIEW_MODE_OPTIONS}
             value={viewMode}
             onChange={onSelectViewMode}
             testIDPrefix="stats-view-mode-chip"
-            variant="joined"
           />
         </View>
-      </View>
 
-      {summary ? (
-        <View style={styles.summaryGrid}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Open sessions list"
-            onPress={onPressSessionsCard}
-            style={({ pressed }) => [styles.summaryCard, pressed && styles.summaryCardPressed]}
-            testID="stats-card-sessions">
-            <Text allowFontScaling={false} style={styles.summaryLabel}>Sessions</Text>
-            <Text allowFontScaling={false} style={styles.summaryValue}>
-              {formatNumber(summary.current.totals.sessionCount)}
-            </Text>
-            {sessionDelta ? (
-              <Text allowFontScaling={false} style={[styles.summaryDelta, deltaToneStyle(sessionDelta.tone)]}>
-                {sessionDelta.text}
-              </Text>
-            ) : null}
-          </Pressable>
+        {summary ? (
+          <View style={styles.summaryGrid}>
+            <Card
+              accessibilityLabel="Open sessions list"
+              onPress={onPressSessionsCard}
+              style={styles.summaryCard}
+              testID="stats-card-sessions">
+              <View style={styles.summaryCardBody}>
+                <View style={styles.summaryFigures}>
+                  <Stat label="Sessions" value={formatNumber(summary.current.totals.sessionCount)} />
+                  {sessionDelta ? <Delta delta={sessionDelta} /> : null}
+                </View>
+                <Icon color={uiRoles.inkMuted} name="chevron-right" size="sm" />
+              </View>
+            </Card>
 
-          <View style={styles.summaryCard} testID="stats-card-sets">
-            <Text allowFontScaling={false} style={styles.summaryLabel}>Sets (W/Sets)</Text>
-            <Text allowFontScaling={false} style={styles.summaryValue}>
-              {formatSetCountPair(
-                summary.current.totals.setCount,
-                summary.current.totals.workingSetCount
-              )}
-            </Text>
-            {setsDelta ? (
-              <Text allowFontScaling={false} style={[styles.summaryDelta, deltaToneStyle(setsDelta.tone)]}>
-                {setsDelta.text}
-              </Text>
-            ) : null}
+            <Card style={styles.summaryCard} testID="stats-card-sets">
+              <View style={styles.summaryCardBody}>
+                <View style={styles.summaryFigures}>
+                  <Stat
+                    label="Sets (W/Sets)"
+                    value={formatSetCountPair(
+                      summary.current.totals.setCount,
+                      summary.current.totals.workingSetCount
+                    )}
+                  />
+                  {setsDelta ? <Delta delta={setsDelta} /> : null}
+                </View>
+              </View>
+            </Card>
           </View>
-        </View>
-      ) : null}
+        ) : null}
 
-      <View style={styles.searchContainer}>
-        <TextInput
-          allowFontScaling={false}
+        <SearchField
           accessibilityLabel={viewMode === 'exercise' ? 'Exercise filter input' : 'Muscle filter input'}
           autoCapitalize="none"
-          autoCorrect={false}
+          clearLabel="Clear search input"
           onChangeText={onSearchQueryChange}
           placeholder={viewMode === 'exercise' ? 'Filter by exercise...' : 'Filter by muscle...'}
-          style={styles.filterInput}
-          value={searchQuery}
           testID="stats-search-input"
+          value={searchQuery}
         />
-        {searchQuery ? (
-          <Pressable
-            accessibilityLabel="Clear search input"
-            accessibilityRole="button"
-            onPress={() => onSearchQueryChange('')}
-            style={styles.clearSearchButton}
-            testID="stats-search-clear-button">
-            <Icon color={uiColors.textSecondary} name="x" size="xs" />
-          </Pressable>
-        ) : null}
-      </View>
 
-      {viewMode === 'exercise' ? (
-        <ExerciseListView
-          items={filteredExerciseListItems}
-          onPressExercise={onPressExerciseHistory}
-          isFiltered={Boolean(searchQuery.trim())}
-          sortMode={exerciseSortMode}
-          onPressSortHeader={handlePressExerciseSortHeader}
-        />
-      ) : (
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={styles.scrollContent}
-          testID="stats-scroll">
-          {errorMessage ? (
-            <View style={styles.statePanel} testID="stats-error-state">
-              <Text allowFontScaling={false} style={styles.stateTitle}>Could not load stats</Text>
-              <Text allowFontScaling={false} style={styles.stateBody}>{errorMessage}</Text>
-            </View>
-          ) : null}
+        {viewMode === 'exercise' ? (
+          <ExerciseListView
+            items={filteredExerciseListItems}
+            onPressExercise={onPressExerciseHistory}
+            isFiltered={Boolean(searchQuery.trim())}
+            sortMode={exerciseSortMode}
+            onPressSortHeader={handlePressExerciseSortHeader}
+          />
+        ) : (
+          <>
+            {errorMessage ? (
+              <Card>
+                <StatePanel
+                  body={errorMessage}
+                  fill={false}
+                  kind="error"
+                  testID="stats-error-state"
+                  title="Could not load stats"
+                />
+              </Card>
+            ) : null}
 
-          {!errorMessage && isLoading && !summary ? (
-            <View style={styles.statePanel} testID="stats-loading-state">
-              <Text allowFontScaling={false} style={styles.stateBody}>Loading stats…</Text>
-            </View>
-          ) : null}
+            {!errorMessage && isLoading && !summary ? (
+              <Card>
+                <StatePanel body="Loading stats…" fill={false} kind="loading" testID="stats-loading-state" />
+              </Card>
+            ) : null}
 
-          {summary ? (
-            filteredFamilies.length === 0 ? (
-              <View style={styles.statePanel} testID="stats-muscle-empty">
-                <Text allowFontScaling={false} style={styles.stateBody}>
-                  {searchQuery.trim()
-                    ? 'No muscle groups match the search query.'
-                    : 'No muscle taxonomy loaded yet. Add some exercises to see this section.'}
-                </Text>
-              </View>
-            ) : (
-              <MuscleFamilyList
-                families={filteredFamilies}
-                previousFamilies={summary.previous.totals.muscleFamilies}
-                periodDays={periodDays}
-                onPressMuscleHistory={onPressMuscleHistory}
-              />
-            )
-          ) : null}
-        </ScrollView>
-      )}
+            {summary ? (
+              filteredFamilies.length === 0 ? (
+                <Card>
+                  <StatePanel
+                    body={
+                      searchQuery.trim()
+                        ? 'No muscle groups match the search query.'
+                        : 'No muscle taxonomy loaded yet. Add some exercises to see this section.'
+                    }
+                    fill={false}
+                    testID="stats-muscle-empty"
+                  />
+                </Card>
+              ) : (
+                <MuscleFamilyList
+                  families={filteredFamilies}
+                  previousFamilies={summary.previous.totals.muscleFamilies}
+                  periodDays={periodDays}
+                  onPressMuscleHistory={onPressMuscleHistory}
+                />
+              )
+            ) : null}
+          </>
+        )}
+      </ScreenScroll>
 
       {selectedMuscle ? (
         <MuscleHistoryOverlay
@@ -664,54 +653,116 @@ export function StatsScreenShell({
           todayDateKey={historyTodayDateKey}
         />
       ) : null}
+    </Screen>
+  );
+}
+
+// One ramp for every failure-intensity row, family or muscle (`ux-rules.md`
+// §13.13): the shade says only "how much"; nesting tells family from muscle.
+const FAILURE_SHADES = [uiRoles.viz1, uiRoles.viz2, uiRoles.viz3, uiRoles.viz4] as const;
+
+const selectFailureShade = (progress: number): string | null => {
+  if (progress <= 0) return null;
+  const index = Math.min(FAILURE_SHADES.length - 1, Math.ceil(progress * FAILURE_SHADES.length) - 1);
+  return FAILURE_SHADES[index];
+};
+
+function Delta({ delta, onViz = false }: { delta: DeltaDisplay; onViz?: boolean }) {
+  // The sign carries the direction (G3); "new" is the one delta set in `ink`.
+  // On a `viz` ground every text is `ink`.
+  return (
+    <Text
+      allowFontScaling={false}
+      numberOfLines={1}
+      style={[styles.delta, (delta.tone === 'new' || onViz) && styles.deltaInk]}>
+      {delta.text}
+    </Text>
+  );
+}
+
+function RowMetric({
+  label,
+  value,
+  delta,
+  onViz,
+  testID,
+}: {
+  label: string;
+  value: string;
+  delta: DeltaDisplay;
+  onViz: boolean;
+  testID: string;
+}) {
+  return (
+    <View style={styles.rowMetric} testID={testID}>
+      <Stat align="end" ground={onViz ? 'viz' : 'plain'} label={label} rank="secondary" value={value} />
+      <Delta delta={delta} onViz={onViz} />
     </View>
   );
 }
 
-const FAMILY_FAILURE_BACKGROUND_COLORS = [
-  uiColors.failureBackgroundFamily1,
-  uiColors.failureBackgroundFamily2,
-  uiColors.failureBackgroundFamily3,
-  uiColors.failureBackgroundFamily4,
-] as const;
-
-const MUSCLE_FAILURE_BACKGROUND_COLORS = [
-  uiColors.failureBackgroundMuscle1,
-  uiColors.failureBackgroundMuscle2,
-  uiColors.failureBackgroundMuscle3,
-  uiColors.failureBackgroundMuscle4,
-] as const;
-
-const selectFailureBackgroundColor = (
-  progress: number,
-  colors: readonly [string, string, string, string]
-): string | undefined => {
-  if (progress <= 0) return undefined;
-  const colorIndex = Math.min(colors.length - 1, Math.ceil(progress * colors.length) - 1);
-  return colors[colorIndex];
-};
-
-function SummaryNameCell({
+function MuscleRow({
+  level,
   name,
-  textStyle,
-  textTestID,
+  nameTestID,
+  untrained,
+  shade,
+  sets,
+  setsDelta,
+  setsTestID,
+  volume,
+  volumeDelta,
+  volumeTestID,
+  accessibilityLabel,
+  onPress,
+  divider,
+  testID,
 }: {
+  level: 'family' | 'muscle';
   name: string;
-  textStyle: StyleProp<TextStyle>;
-  textTestID?: string;
+  nameTestID?: string;
+  untrained: boolean;
+  shade: string | null;
+  sets: string;
+  setsDelta: DeltaDisplay;
+  setsTestID: string;
+  volume: string;
+  volumeDelta: DeltaDisplay;
+  volumeTestID: string;
+  accessibilityLabel: string;
+  onPress: () => void;
+  divider: boolean;
+  testID: string;
 }) {
+  const onViz = shade !== null;
   return (
-    <View style={styles.summaryNameCell}>
-      <Text
-        allowFontScaling={false}
-        adjustsFontSizeToFit
-        ellipsizeMode="clip"
-        minimumFontScale={0.82}
-        numberOfLines={2}
-        style={textStyle}
-        testID={textTestID}>
-        {name}
-      </Text>
+    // The shade is one uniform ground for the whole row; the row itself stays
+    // the pressable, so its testID and accessibility are unchanged.
+    <View style={shade !== null ? { backgroundColor: shade } : null} testID={`${testID}-shade`}>
+      <ListRow
+        accessibilityLabel={accessibilityLabel}
+        density="list"
+        divider={divider}
+        leading={level === 'muscle' ? <View style={styles.nestIndent} /> : undefined}
+        meta={
+          <View style={styles.rowMetrics}>
+            <RowMetric delta={setsDelta} label="Sets" onViz={onViz} testID={setsTestID} value={sets} />
+            <RowMetric delta={volumeDelta} label="Volume" onViz={onViz} testID={volumeTestID} value={volume} />
+          </View>
+        }
+        onPress={onPress}
+        testID={testID}>
+        <Text
+          allowFontScaling={false}
+          adjustsFontSizeToFit
+          ellipsizeMode="clip"
+          minimumFontScale={0.82}
+          numberOfLines={2}
+          style={[level === 'family' ? styles.familyName : styles.muscleName, untrained && styles.nameUntrained]}
+          testID={nameTestID}>
+          {name}
+        </Text>
+      </ListRow>
     </View>
   );
 }
@@ -727,16 +778,6 @@ function MuscleFamilyList({
   periodDays: StatsPeriodDays;
   onPressMuscleHistory: (muscle: MuscleHistoryTarget) => void;
 }) {
-  if (families.length === 0) {
-    return (
-      <View style={styles.statePanel} testID="stats-muscle-empty">
-        <Text allowFontScaling={false} style={styles.stateBody}>
-          No muscle taxonomy loaded yet. Add some exercises to see this section.
-        </Text>
-      </View>
-    );
-  }
-
   const previousByFamilyName = new Map(previousFamilies.map((family) => [family.familyName, family]));
   const previousMusclesById = new Map<string, StatsMusclePerformance>();
   for (const family of previousFamilies) {
@@ -782,167 +823,97 @@ function MuscleFamilyCard({
   periodDays: StatsPeriodDays;
   onPressMuscleHistory: (muscle: MuscleHistoryTarget) => void;
 }) {
-  const familyUntrained = family.setCount === 0 && family.totalVolume === 0;
   const testIdSlug = family.familyName.toLowerCase().replace(/\s+/g, '-');
-  const setCountDelta = formatSetCountPairDelta(
-    family.setCount,
-    family.nearFailureCount,
-    previousFamily?.setCount ?? 0,
-    previousFamily?.nearFailureCount ?? 0
-  );
-  const volumeDelta = formatVolumeDelta(
-    family.totalVolume,
-    previousFamily?.totalVolume ?? 0
-  );
+  const volumeDelta = formatVolumeDelta(family.totalVolume, previousFamily?.totalVolume ?? 0);
   const collapsed = isFamilyCollapsible(family);
   const collapsedMuscle = collapsed ? family.muscles[0] : null;
-  const familyFailureBackgroundColor = selectFailureBackgroundColor(
-    computeFailureIntensityProgress(family.nearFailureCount, periodDays),
-    FAMILY_FAILURE_BACKGROUND_COLORS
-  );
-  const familyAccessibilityLabel = buildMuscleRowAccessibilityLabel({
-    actionLabel: `Open ${family.familyName} history`,
-    setCount: family.setCount,
-    nearFailureCount: family.nearFailureCount,
-    previousSetCount: previousFamily?.setCount ?? 0,
-    previousNearFailureCount: previousFamily?.nearFailureCount ?? 0,
-    volume: family.totalVolume,
-    volumeDelta,
-    periodDays,
-  });
-  const headerContent = (
-    <>
-      <SummaryNameCell
-        name={family.familyName}
-        textStyle={[styles.familyName, familyUntrained && styles.muscleTextUntrained]}
-        textTestID={`stats-family-name-${testIdSlug}`}
-      />
-      <View style={styles.familyMetrics}>
-        <Metric
-          label="Sets"
-          value={formatSetCountPair(family.setCount, family.nearFailureCount)}
-          delta={setCountDelta}
-          testID={`stats-family-sets-${testIdSlug}`}
-          muted={familyUntrained}
-        />
-        <Metric
-          label="Volume"
-          value={formatTotalWeight(family.totalVolume)}
-          delta={volumeDelta}
-          testID={`stats-family-volume-${testIdSlug}`}
-          muted={familyUntrained}
-        />
-      </View>
-    </>
-  );
 
   return (
-    <View style={styles.familyCard} testID={`stats-family-card-${testIdSlug}`}>
-      {collapsedMuscle ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={familyAccessibilityLabel}
-          onPress={() => onPressMuscleHistory(toMuscleHistoryTarget(collapsedMuscle))}
-          style={({ pressed }) => [
-            styles.familyHeader,
-            familyFailureBackgroundColor !== undefined && {
-              backgroundColor: familyFailureBackgroundColor,
-            },
-            pressed && styles.actionableRowPressed,
-          ]}
-          testID={`stats-family-header-button-${collapsedMuscle.muscleGroupId}`}>
-          {headerContent}
-        </Pressable>
-      ) : (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={familyAccessibilityLabel}
-          onPress={() => onPressMuscleHistory(toFamilyHistoryTarget(family))}
-          style={({ pressed }) => [
-            styles.familyHeader,
-            familyFailureBackgroundColor !== undefined && {
-              backgroundColor: familyFailureBackgroundColor,
-            },
-            pressed && styles.actionableRowPressed,
-          ]}
-          testID={`stats-family-header-${testIdSlug}`}>
-          {headerContent}
-        </Pressable>
-      )}
-      {collapsed ? null : (
-        <View style={styles.muscleList}>
-          {visibleMuscles.map((muscle) => {
-            const muscleUntrained = muscle.setCount === 0 && muscle.totalVolume === 0;
+    <Card testID={`stats-family-card-${testIdSlug}`}>
+      <MuscleRow
+        accessibilityLabel={buildMuscleRowAccessibilityLabel({
+          actionLabel: `Open ${family.familyName} history`,
+          setCount: family.setCount,
+          nearFailureCount: family.nearFailureCount,
+          previousSetCount: previousFamily?.setCount ?? 0,
+          previousNearFailureCount: previousFamily?.nearFailureCount ?? 0,
+          volume: family.totalVolume,
+          volumeDelta,
+          periodDays,
+        })}
+        divider={false}
+        level="family"
+        name={family.familyName}
+        nameTestID={`stats-family-name-${testIdSlug}`}
+        onPress={() =>
+          onPressMuscleHistory(
+            collapsedMuscle ? toMuscleHistoryTarget(collapsedMuscle) : toFamilyHistoryTarget(family)
+          )
+        }
+        sets={formatSetCountPair(family.setCount, family.nearFailureCount)}
+        setsDelta={formatSetCountPairDelta(
+          family.setCount,
+          family.nearFailureCount,
+          previousFamily?.setCount ?? 0,
+          previousFamily?.nearFailureCount ?? 0
+        )}
+        setsTestID={`stats-family-sets-${testIdSlug}`}
+        shade={selectFailureShade(computeFailureIntensityProgress(family.nearFailureCount, periodDays))}
+        testID={
+          collapsedMuscle
+            ? `stats-family-header-button-${collapsedMuscle.muscleGroupId}`
+            : `stats-family-header-${testIdSlug}`
+        }
+        untrained={family.setCount === 0 && family.totalVolume === 0}
+        volume={formatTotalWeight(family.totalVolume)}
+        volumeDelta={volumeDelta}
+        volumeTestID={`stats-family-volume-${testIdSlug}`}
+      />
+      {collapsed
+        ? null
+        : visibleMuscles.map((muscle) => {
             const previousMuscle = previousMusclesById.get(muscle.muscleGroupId) ?? null;
-            const muscleSetCountDelta = formatSetCountPairDelta(
-              muscle.setCount,
-              muscle.nearFailureCount,
-              previousMuscle?.setCount ?? 0,
-              previousMuscle?.nearFailureCount ?? 0
-            );
             const muscleVolumeDelta = formatVolumeDelta(
               muscle.totalVolume,
               previousMuscle?.totalVolume ?? 0
             );
-            const muscleFailureBackgroundColor = selectFailureBackgroundColor(
-              computeFailureIntensityProgress(muscle.nearFailureCount, periodDays),
-              MUSCLE_FAILURE_BACKGROUND_COLORS
-            );
-            const muscleAccessibilityLabel = buildMuscleRowAccessibilityLabel({
-              actionLabel: `Open ${muscle.displayName} history`,
-              setCount: muscle.setCount,
-              nearFailureCount: muscle.nearFailureCount,
-              previousSetCount: previousMuscle?.setCount ?? 0,
-              previousNearFailureCount: previousMuscle?.nearFailureCount ?? 0,
-              volume: muscle.totalVolume,
-              volumeDelta: muscleVolumeDelta,
-              periodDays,
-            });
             return (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={muscleAccessibilityLabel}
+              <MuscleRow
+                accessibilityLabel={buildMuscleRowAccessibilityLabel({
+                  actionLabel: `Open ${muscle.displayName} history`,
+                  setCount: muscle.setCount,
+                  nearFailureCount: muscle.nearFailureCount,
+                  previousSetCount: previousMuscle?.setCount ?? 0,
+                  previousNearFailureCount: previousMuscle?.nearFailureCount ?? 0,
+                  volume: muscle.totalVolume,
+                  volumeDelta: muscleVolumeDelta,
+                  periodDays,
+                })}
+                divider
                 key={muscle.muscleGroupId}
+                level="muscle"
+                name={muscle.displayName}
                 onPress={() => onPressMuscleHistory(toMuscleHistoryTarget(muscle))}
-                style={({ pressed }) => [
-                  styles.muscleRow,
-                  muscleFailureBackgroundColor !== undefined && {
-                    backgroundColor: muscleFailureBackgroundColor,
-                  },
-                  pressed && styles.actionableRowPressed,
-                ]}
-                testID={`stats-muscle-row-${muscle.muscleGroupId}`}>
-                <SummaryNameCell
-                  name={muscle.displayName}
-                  textStyle={[
-                    styles.muscleName,
-                    muscleUntrained && styles.muscleTextUntrained,
-                  ]}
-                />
-                <View style={styles.muscleMetrics}>
-                  <Metric
-                    label="Sets"
-                    value={formatSetCountPair(muscle.setCount, muscle.nearFailureCount)}
-                    delta={muscleSetCountDelta}
-                    testID={`stats-muscle-sets-${muscle.muscleGroupId}`}
-                    muted={muscleUntrained}
-                    small
-                  />
-                  <Metric
-                    label="Volume"
-                    value={formatTotalWeight(muscle.totalVolume)}
-                    delta={muscleVolumeDelta}
-                    testID={`stats-muscle-volume-${muscle.muscleGroupId}`}
-                    muted={muscleUntrained}
-                    small
-                  />
-                </View>
-              </Pressable>
+                sets={formatSetCountPair(muscle.setCount, muscle.nearFailureCount)}
+                setsDelta={formatSetCountPairDelta(
+                  muscle.setCount,
+                  muscle.nearFailureCount,
+                  previousMuscle?.setCount ?? 0,
+                  previousMuscle?.nearFailureCount ?? 0
+                )}
+                setsTestID={`stats-muscle-sets-${muscle.muscleGroupId}`}
+                shade={selectFailureShade(
+                  computeFailureIntensityProgress(muscle.nearFailureCount, periodDays)
+                )}
+                testID={`stats-muscle-row-${muscle.muscleGroupId}`}
+                untrained={muscle.setCount === 0 && muscle.totalVolume === 0}
+                volume={formatTotalWeight(muscle.totalVolume)}
+                volumeDelta={muscleVolumeDelta}
+                volumeTestID={`stats-muscle-volume-${muscle.muscleGroupId}`}
+              />
             );
           })}
-        </View>
-      )}
-    </View>
+    </Card>
   );
 }
 
@@ -1032,18 +1003,18 @@ function WeekSelectionBanner({
   const value = week !== null ? formatMetricValue(week, metric) : null;
 
   return (
-    <View style={styles.weekBanner} testID="stats-muscle-history-week-banner">
+    <View style={overlayStyles.weekBanner} testID="stats-muscle-history-week-banner">
       {dateRange !== null ? (
         <>
-          <Text allowFontScaling={false} style={styles.weekBannerRange} testID="stats-muscle-history-week-banner-range">
+          <Text allowFontScaling={false} style={overlayStyles.weekBannerRange} testID="stats-muscle-history-week-banner-range">
             {dateRange}
           </Text>
-          <Text allowFontScaling={false} style={styles.weekBannerValue} testID="stats-muscle-history-week-banner-value">
+          <Text allowFontScaling={false} style={overlayStyles.weekBannerValue} testID="stats-muscle-history-week-banner-value">
             {METRIC_LABELS[metric]}: {value ?? '—'}
           </Text>
         </>
       ) : (
-        <Text allowFontScaling={false} style={styles.weekBannerPlaceholder} testID="stats-muscle-history-week-banner-placeholder">
+        <Text allowFontScaling={false} style={overlayStyles.weekBannerPlaceholder} testID="stats-muscle-history-week-banner-placeholder">
           Tap a week to see details
         </Text>
       )}
@@ -1103,14 +1074,14 @@ function HistoryHeatmap({
   const dailyVisible = view === 'daily';
 
   return (
-    <View style={styles.heatmapTransition}>
+    <View style={overlayStyles.heatmapTransition}>
       <View
         accessibilityElementsHidden={!dailyVisible}
         importantForAccessibility={dailyVisible ? 'auto' : 'no-hide-descendants'}
         pointerEvents={dailyVisible ? 'auto' : 'none'}
         style={[
-          styles.heatmapLayer,
-          dailyVisible ? styles.heatmapLayerActive : styles.heatmapLayerInactive,
+          overlayStyles.heatmapLayer,
+          dailyVisible ? overlayStyles.heatmapLayerActive : overlayStyles.heatmapLayerInactive,
         ]}
         testID={`${testIDPrefix}-heatmap-panel-daily`}>
         {dailyHeatmap}
@@ -1120,8 +1091,8 @@ function HistoryHeatmap({
         importantForAccessibility={dailyVisible ? 'no-hide-descendants' : 'auto'}
         pointerEvents={dailyVisible ? 'none' : 'auto'}
         style={[
-          styles.heatmapLayer,
-          dailyVisible ? styles.heatmapLayerInactive : styles.heatmapLayerActive,
+          overlayStyles.heatmapLayer,
+          dailyVisible ? overlayStyles.heatmapLayerInactive : overlayStyles.heatmapLayerActive,
         ]}
         testID={`${testIDPrefix}-heatmap-panel-weekly`}>
         {weeklyHeatmap}
@@ -1160,18 +1131,18 @@ function MuscleHistoryOverlay({
   todayDateKey?: string;
 }) {
   return (
-    <View style={styles.overlayRoot} testID="stats-muscle-history-overlay">
+    <View style={overlayStyles.overlayRoot} testID="stats-muscle-history-overlay">
       <Pressable
         accessibilityLabel="Dismiss muscle history"
         accessibilityRole="button"
         onPress={onDismiss}
-        style={styles.overlayBackdrop}
+        style={overlayStyles.overlayBackdrop}
         testID="stats-muscle-history-backdrop"
       />
-      <View style={styles.overlayCard}>
-        <View style={styles.overlayHeader}>
-          <View style={styles.overlayTitleGroup}>
-            <Text allowFontScaling={false} style={styles.overlayEyebrow}>
+      <View style={overlayStyles.overlayCard}>
+        <View style={overlayStyles.overlayHeader}>
+          <View style={overlayStyles.overlayTitleGroup}>
+            <Text allowFontScaling={false} style={overlayStyles.overlayEyebrow}>
               {muscle.muscleGroupIds.length > 1 ? 'Muscle Group History' : 'Muscle History'}
             </Text>
             <Text
@@ -1180,7 +1151,7 @@ function MuscleHistoryOverlay({
               ellipsizeMode="clip"
               minimumFontScale={0.82}
               numberOfLines={2}
-              style={styles.overlayTitle}
+              style={overlayStyles.overlayTitle}
               testID="stats-muscle-history-title">
               {muscle.displayName}
             </Text>
@@ -1190,15 +1161,15 @@ function MuscleHistoryOverlay({
             accessibilityRole="button"
             onPress={onDismiss}
             style={({ pressed }) => [
-              styles.overlayCloseButton,
-              pressed && styles.actionableRowPressed,
+              overlayStyles.overlayCloseButton,
+              pressed && overlayStyles.actionableRowPressed,
             ]}
             testID="stats-muscle-history-close">
             <Icon color={uiColors.actionNeutralSubtleText} name="x" size="sm" />
           </Pressable>
         </View>
 
-        <View style={styles.overlayMetricSelector}>
+        <View style={overlayStyles.overlayMetricSelector}>
           <SegmentedChips
             accessibilityLabel="Select effort metric"
             options={MUSCLE_HISTORY_METRIC_OPTIONS}
@@ -1209,7 +1180,7 @@ function MuscleHistoryOverlay({
           />
         </View>
 
-        <View style={styles.overlayViewSelector}>
+        <View style={overlayStyles.overlayViewSelector}>
           <SegmentedChips
             accessibilityLabel="Select heatmap view"
             options={HEATMAP_VIEW_OPTIONS}
@@ -1229,28 +1200,28 @@ function MuscleHistoryOverlay({
         ) : null}
 
         <ScrollView
-          contentContainerStyle={styles.overlayContent}
+          contentContainerStyle={overlayStyles.overlayContent}
           showsVerticalScrollIndicator={false}
           testID="stats-muscle-history-scroll">
           {isLoading ? (
-            <View style={styles.overlayStatePanel} testID="stats-muscle-history-loading">
-              <Text allowFontScaling={false} style={styles.stateBody}>Loading {muscle.displayName} history...</Text>
+            <View style={overlayStyles.overlayStatePanel} testID="stats-muscle-history-loading">
+              <Text allowFontScaling={false} style={overlayStyles.stateBody}>Loading {muscle.displayName} history...</Text>
             </View>
           ) : null}
 
           {!isLoading && errorMessage ? (
-            <View style={styles.overlayStatePanel} testID="stats-muscle-history-error">
-              <Text allowFontScaling={false} style={styles.stateTitle}>Could not load muscle history</Text>
-              <Text allowFontScaling={false} style={styles.stateBody}>{errorMessage}</Text>
+            <View style={overlayStyles.overlayStatePanel} testID="stats-muscle-history-error">
+              <Text allowFontScaling={false} style={overlayStyles.stateTitle}>Could not load muscle history</Text>
+              <Text allowFontScaling={false} style={overlayStyles.stateBody}>{errorMessage}</Text>
             </View>
           ) : null}
 
           {!isLoading && !errorMessage ? (
             <>
               {weeklyEffort.length === 0 ? (
-                <View style={styles.overlayStatePanel} testID="stats-muscle-history-empty">
-                  <Text allowFontScaling={false} style={styles.stateTitle}>No history yet</Text>
-                  <Text allowFontScaling={false} style={styles.stateBody}>
+                <View style={overlayStyles.overlayStatePanel} testID="stats-muscle-history-empty">
+                  <Text allowFontScaling={false} style={overlayStyles.stateTitle}>No history yet</Text>
+                  <Text allowFontScaling={false} style={overlayStyles.stateBody}>
                     No {muscle.displayName} training was found in the last{' '}
                     {MUSCLE_HISTORY_WINDOW_DAYS} days.
                   </Text>
@@ -1290,36 +1261,33 @@ function ExerciseListView({
 }) {
   if (items.length === 0) {
     return (
-      <View style={styles.statePanel} testID="stats-exercise-list-empty">
-        <Text allowFontScaling={false} style={styles.stateBody}>
-          {isFiltered
-            ? 'No exercises match the search query.'
-            : 'No exercises with recorded history yet.'}
-        </Text>
-      </View>
+      <Card>
+        <StatePanel
+          body={isFiltered ? 'No exercises match the search query.' : 'No exercises with recorded history yet.'}
+          fill={false}
+          testID="stats-exercise-list-empty"
+        />
+      </Card>
     );
   }
 
   return (
-    <ScrollView
-      style={styles.scroll}
-      contentContainerStyle={styles.scrollContent}
-      testID="stats-exercise-list-scroll">
-      <View style={styles.exerciseTable} testID="stats-exercise-list">
-        <View style={styles.exerciseTableHeader} testID="stats-exercise-table-header">
-          <ExerciseSortHeaderCell
-            header="exercise"
-            label="Exercise"
-            sortMode={sortMode}
-            onPress={onPressSortHeader}
-            style={styles.exerciseNameCell}
-          />
+    <Card testID="stats-exercise-list">
+      <View style={styles.tableHeader} testID="stats-exercise-table-header">
+        <ExerciseSortHeaderCell
+          header="exercise"
+          label="Exercise"
+          sortMode={sortMode}
+          onPress={onPressSortHeader}
+          style={styles.nameColumn}
+        />
+        <View style={styles.tableColumns}>
           <ExerciseSortHeaderCell
             header="sets"
             label="Sets"
             sortMode={sortMode}
             onPress={onPressSortHeader}
-            style={styles.exerciseSetsCell}
+            style={styles.setsColumn}
             numeric
           />
           <ExerciseSortHeaderCell
@@ -1327,70 +1295,62 @@ function ExerciseListView({
             label="Vol"
             sortMode={sortMode}
             onPress={onPressSortHeader}
-            style={styles.exerciseVolumeCell}
+            style={styles.volumeColumn}
             numeric
           />
           <View
             accessibilityRole="header"
-            style={[
-              styles.exerciseHeaderCell,
-              styles.exerciseHeaderCellNumeric,
-              styles.exerciseOneRepMaxCell,
-            ]}
+            style={[styles.headerCell, styles.headerCellNumeric, styles.oneRepMaxColumn]}
             testID="stats-exercise-header-oneRepMax">
-            <Text allowFontScaling={false} numberOfLines={1} style={styles.exerciseHeaderLabel}>
+            <Text allowFontScaling={false} numberOfLines={1} style={styles.headerLabel}>
               1RM
             </Text>
           </View>
         </View>
-        {items.map((item) => (
-          <Pressable
-            key={item.id}
-            accessibilityRole="button"
-            accessibilityLabel={`Open ${item.name} heatmap. ${formatNumber(
-              item.setCount
-            )} sets, ${formatNumber(item.nearFailureCount)} working sets. Volume ${formatTotalWeight(
-              item.totalVolume
-            )}${
-              item.estimatedOneRepMax === null
-                ? '. Estimated one rep max unavailable'
-                : `. Estimated one rep max ${formatTotalWeight(item.estimatedOneRepMax)}`
-            }`}
-            onPress={() =>
-              onPressExercise({ exerciseDefinitionId: item.id, displayName: item.name })
-            }
-            style={({ pressed }) => [styles.exerciseRow, pressed && styles.actionableRowPressed]}
-            testID={`stats-exercise-row-${item.id}`}>
-            <Text
-              allowFontScaling={false}
-              style={[styles.exerciseName, styles.exerciseNameCell]}
-              testID={`stats-exercise-name-${item.id}`}>
-              {item.name}
-            </Text>
-            <Text
-              allowFontScaling={false}
-              style={[styles.exerciseNumericCell, styles.exerciseSetsCell]}
-              testID={`stats-exercise-sets-${item.id}`}>
-              {formatSetCountPair(item.setCount, item.nearFailureCount)}
-            </Text>
-            <Text
-              allowFontScaling={false}
-              style={[styles.exerciseNumericCell, styles.exerciseVolumeCell]}
-              testID={`stats-exercise-volume-${item.id}`}>
-              {formatTotalWeight(item.totalVolume)}
-            </Text>
-            <Text
-              allowFontScaling={false}
-              style={[styles.exerciseNumericCell, styles.exerciseOneRepMaxCell]}
-              testID={`stats-exercise-1rm-${item.id}`}>
-              {item.estimatedOneRepMax === null
-                ? '—'
-                : formatTotalWeight(item.estimatedOneRepMax)}
-            </Text>
-          </Pressable>
-        ))}
       </View>
-    </ScrollView>
+      {items.map((item) => (
+        <ListRow
+          key={item.id}
+          accessibilityLabel={`Open ${item.name} heatmap. ${formatNumber(
+            item.setCount
+          )} sets, ${formatNumber(item.nearFailureCount)} working sets. Volume ${formatTotalWeight(
+            item.totalVolume
+          )}${
+            item.estimatedOneRepMax === null
+              ? '. Estimated one rep max unavailable'
+              : `. Estimated one rep max ${formatTotalWeight(item.estimatedOneRepMax)}`
+          }`}
+          density="list"
+          meta={
+            <View style={styles.tableColumns}>
+              <Text
+                allowFontScaling={false}
+                style={[styles.tableFigure, styles.setsColumn]}
+                testID={`stats-exercise-sets-${item.id}`}>
+                {formatSetCountPair(item.setCount, item.nearFailureCount)}
+              </Text>
+              <Text
+                allowFontScaling={false}
+                style={[styles.tableFigure, styles.volumeColumn]}
+                testID={`stats-exercise-volume-${item.id}`}>
+                {formatTotalWeight(item.totalVolume)}
+              </Text>
+              <Text
+                allowFontScaling={false}
+                style={[styles.tableFigure, styles.oneRepMaxColumn]}
+                testID={`stats-exercise-1rm-${item.id}`}>
+                {item.estimatedOneRepMax === null ? '—' : formatTotalWeight(item.estimatedOneRepMax)}
+              </Text>
+            </View>
+          }
+          onPress={() => onPressExercise({ exerciseDefinitionId: item.id, displayName: item.name })}
+          testID={`stats-exercise-row-${item.id}`}>
+          <Text allowFontScaling={false} style={styles.exerciseName} testID={`stats-exercise-name-${item.id}`}>
+            {item.name}
+          </Text>
+        </ListRow>
+      ))}
+    </Card>
   );
 }
 
@@ -1441,34 +1401,33 @@ function ExerciseSortHeaderCell({
       accessibilityState={{ selected: isActive }}
       onPress={() => onPress(header)}
       style={({ pressed }) => [
-        styles.exerciseHeaderCell,
+        styles.headerCell,
         style,
-        numeric && styles.exerciseHeaderCellNumeric,
-        isActive && styles.exerciseHeaderCellActive,
-        pressed && styles.actionableRowPressed,
+        numeric && styles.headerCellNumeric,
+        pressed && styles.headerCellPressed,
       ]}
       testID={`stats-exercise-sort-${header}`}>
       <Text
         allowFontScaling={false}
         numberOfLines={1}
-        style={[styles.exerciseHeaderLabel, numeric && styles.exerciseHeaderLabelNumeric]}>
+        style={[styles.headerLabel, isActive && styles.headerLabelActive]}>
         {label}
       </Text>
       <View
         accessible={false}
         style={[
-          styles.exerciseHeaderIndicator,
-          header === 'exercise' && styles.exerciseHeaderIndicatorRecency,
-          !isActive && styles.exerciseHeaderIndicatorHidden,
+          styles.headerIndicator,
+          header === 'exercise' && styles.headerIndicatorRecency,
+          !isActive && styles.headerIndicatorHidden,
         ]}
         testID={`stats-exercise-sort-${header}-indicator`}>
         {header === 'exercise' ? (
-          <Text allowFontScaling={false} accessible={false} style={styles.exerciseHeaderIndicatorText}>
+          <Text allowFontScaling={false} accessible={false} style={styles.headerLabel}>
             Recent
           </Text>
         ) : null}
         <Icon
-          color={uiColors.actionPrimary}
+          color={uiRoles.ink}
           name={direction === 'up' ? 'arrow-up' : 'arrow-down'}
           size="xs"
           testID={`stats-exercise-sort-${header}-indicator-${direction}`}
@@ -1508,25 +1467,25 @@ function ExerciseHistoryOverlay({
   todayDateKey?: string;
 }) {
   return (
-    <View style={styles.overlayRoot} testID="stats-exercise-history-overlay">
+    <View style={overlayStyles.overlayRoot} testID="stats-exercise-history-overlay">
       <Pressable
         accessibilityLabel="Dismiss exercise history"
         accessibilityRole="button"
         onPress={onDismiss}
-        style={styles.overlayBackdrop}
+        style={overlayStyles.overlayBackdrop}
         testID="stats-exercise-history-backdrop"
       />
-      <View style={styles.overlayCard}>
-        <View style={styles.overlayHeader}>
-          <View style={styles.overlayTitleGroup}>
-            <Text allowFontScaling={false} style={styles.overlayEyebrow}>Exercise History</Text>
+      <View style={overlayStyles.overlayCard}>
+        <View style={overlayStyles.overlayHeader}>
+          <View style={overlayStyles.overlayTitleGroup}>
+            <Text allowFontScaling={false} style={overlayStyles.overlayEyebrow}>Exercise History</Text>
             <Text
               allowFontScaling={false}
               adjustsFontSizeToFit
               ellipsizeMode="clip"
               minimumFontScale={0.82}
               numberOfLines={2}
-              style={styles.overlayTitle}
+              style={overlayStyles.overlayTitle}
               testID="stats-exercise-history-title">
               {exercise.displayName}
             </Text>
@@ -1536,15 +1495,15 @@ function ExerciseHistoryOverlay({
             accessibilityRole="button"
             onPress={onDismiss}
             style={({ pressed }) => [
-              styles.overlayCloseButton,
-              pressed && styles.actionableRowPressed,
+              overlayStyles.overlayCloseButton,
+              pressed && overlayStyles.actionableRowPressed,
             ]}
             testID="stats-exercise-history-close">
             <Icon color={uiColors.actionNeutralSubtleText} name="x" size="sm" />
           </Pressable>
         </View>
 
-        <View style={styles.overlayMetricSelector}>
+        <View style={overlayStyles.overlayMetricSelector}>
           <SegmentedChips
             accessibilityLabel="Select effort metric"
             options={EXERCISE_HISTORY_METRIC_OPTIONS}
@@ -1555,7 +1514,7 @@ function ExerciseHistoryOverlay({
           />
         </View>
 
-        <View style={styles.overlayViewSelector}>
+        <View style={overlayStyles.overlayViewSelector}>
           <SegmentedChips
             accessibilityLabel="Select heatmap view"
             options={HEATMAP_VIEW_OPTIONS}
@@ -1575,28 +1534,28 @@ function ExerciseHistoryOverlay({
         ) : null}
 
         <ScrollView
-          contentContainerStyle={styles.overlayContent}
+          contentContainerStyle={overlayStyles.overlayContent}
           showsVerticalScrollIndicator={false}
           testID="stats-exercise-history-scroll">
           {isLoading ? (
-            <View style={styles.overlayStatePanel} testID="stats-exercise-history-loading">
-              <Text allowFontScaling={false} style={styles.stateBody}>Loading {exercise.displayName} history...</Text>
+            <View style={overlayStyles.overlayStatePanel} testID="stats-exercise-history-loading">
+              <Text allowFontScaling={false} style={overlayStyles.stateBody}>Loading {exercise.displayName} history...</Text>
             </View>
           ) : null}
 
           {!isLoading && errorMessage ? (
-            <View style={styles.overlayStatePanel} testID="stats-exercise-history-error">
-              <Text allowFontScaling={false} style={styles.stateTitle}>Could not load exercise history</Text>
-              <Text allowFontScaling={false} style={styles.stateBody}>{errorMessage}</Text>
+            <View style={overlayStyles.overlayStatePanel} testID="stats-exercise-history-error">
+              <Text allowFontScaling={false} style={overlayStyles.stateTitle}>Could not load exercise history</Text>
+              <Text allowFontScaling={false} style={overlayStyles.stateBody}>{errorMessage}</Text>
             </View>
           ) : null}
 
           {!isLoading && !errorMessage ? (
             <>
               {weeklyEffort.length === 0 ? (
-                <View style={styles.overlayStatePanel} testID="stats-exercise-history-empty">
-                  <Text allowFontScaling={false} style={styles.stateTitle}>No history yet</Text>
-                  <Text allowFontScaling={false} style={styles.stateBody}>
+                <View style={overlayStyles.overlayStatePanel} testID="stats-exercise-history-empty">
+                  <Text allowFontScaling={false} style={overlayStyles.stateTitle}>No history yet</Text>
+                  <Text allowFontScaling={false} style={overlayStyles.stateBody}>
                     No {exercise.displayName} training was found in the last{' '}
                     {EXERCISE_HISTORY_WINDOW_DAYS} days.
                   </Text>
@@ -1616,38 +1575,6 @@ function ExerciseHistoryOverlay({
           ) : null}
         </ScrollView>
       </View>
-    </View>
-  );
-}
-
-function Metric({
-  label,
-  value,
-  delta,
-  testID,
-  muted,
-  small,
-}: {
-  label: string;
-  value: string;
-  delta?: DeltaDisplay;
-  testID: string;
-  muted: boolean;
-  small?: boolean;
-}) {
-  return (
-    <View style={styles.metric} testID={testID}>
-      <Text allowFontScaling={false} style={[small ? styles.metricLabelSmall : styles.metricLabel, muted && styles.metricLabelMuted]}>
-        {label}
-      </Text>
-      <Text allowFontScaling={false} style={[small ? styles.metricValueSmall : styles.metricValue, muted && styles.metricValueMuted]}>
-        {value}
-      </Text>
-      {delta ? (
-        <Text allowFontScaling={false} style={[small ? styles.metricDeltaSmall : styles.metricDelta, deltaToneStyle(delta.tone)]}>
-          {delta.text}
-        </Text>
-      ) : null}
     </View>
   );
 }
@@ -1941,190 +1868,160 @@ export default function StatsRoute() {
   return <StatsScreenShell {...shellProps} />;
 }
 
+// The width the Exercise header reserves for its `Recent` + arrow indicator,
+// visible or not, so the label never moves when the sort changes.
+const RECENCY_INDICATOR_WIDTH = 64;
+
+const microLabel = {
+  fontFamily: uiFonts.display.family,
+  fontWeight: '700',
+  fontSize: uiTypography.size.xxs,
+  lineHeight: uiTypography.lineHeight.xxs,
+  letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
+  textTransform: 'uppercase',
+  color: uiRoles.inkMuted,
+} as const;
+
+// The screen body, in the design language (DLM-T08).
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: uiColors.surfacePage,
-    padding: uiSpace.lg,
-    gap: uiSpace.md,
-    position: 'relative',
-  },
-  controlGroups: {
-    gap: uiSpace.md,
-  },
   controlGroup: {
     gap: uiSpace.sm,
   },
-  controlLabel: {
-    fontSize: uiTypography.size.md,
-    fontWeight: '700',
-    color: uiColors.textPrimary,
-  },
-  exerciseRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    minHeight: 52,
-    paddingHorizontal: uiSpace.sm,
-    paddingVertical: uiSpace.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: uiColors.borderMuted,
-  },
-  exerciseName: {
-    fontSize: uiTypography.size.base,
-    fontWeight: '500',
-    color: uiColors.textPrimary,
-  },
-  exerciseTable: {
-    borderRadius: uiRadius.md,
-    borderWidth: 1,
-    borderColor: uiColors.borderMuted,
-    backgroundColor: uiColors.surfaceDefault,
-    overflow: 'hidden',
-  },
-  exerciseTableHeader: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-    paddingHorizontal: uiSpace.sm,
-    backgroundColor: uiColors.surfaceMuted,
-    borderBottomWidth: 1,
-    borderBottomColor: uiColors.borderMuted,
-  },
-  exerciseHeaderCell: {
-    minHeight: 52,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiSpace.xs,
-    justifyContent: 'flex-start',
-    paddingHorizontal: uiSpace.xs,
-    paddingVertical: uiSpace.xs,
-  },
-  exerciseHeaderCellNumeric: {
-    justifyContent: 'flex-end',
-  },
-  exerciseHeaderCellActive: {
-    backgroundColor: uiColors.actionPrimarySubtleBg,
-  },
-  exerciseHeaderLabel: {
-    fontSize: uiTypography.size.xs,
-    fontWeight: '700',
-    color: uiColors.textPrimary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.25,
-  },
-  exerciseHeaderLabelNumeric: {
-    textAlign: 'right',
-  },
-  exerciseHeaderIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiSpace.xs,
-  },
-  exerciseHeaderIndicatorRecency: {
-    width: 64,
-  },
-  exerciseHeaderIndicatorText: {
-    fontSize: uiTypography.size.xs,
-    fontWeight: '700',
-    color: uiColors.actionPrimary,
-  },
-  exerciseHeaderIndicatorHidden: {
-    opacity: 0,
-  },
-  exerciseNameCell: {
-    flex: 1,
-    minWidth: 0,
-    paddingHorizontal: uiSpace.xs,
-  },
-  exerciseSetsCell: {
-    width: 70,
-    paddingHorizontal: uiSpace.xs,
-  },
-  exerciseVolumeCell: {
-    width: 52,
-    paddingHorizontal: uiSpace.xs,
-  },
-  exerciseOneRepMaxCell: {
-    width: 42,
-    paddingHorizontal: uiSpace.xs,
-  },
-  exerciseNumericCell: {
-    fontSize: uiTypography.size.md,
-    fontWeight: '600',
-    color: uiColors.textPrimary,
-    textAlign: 'right',
-    fontVariant: ['tabular-nums'],
-  },
-  scroll: {
-    flex: 1,
-    minHeight: 0,
-  },
-  scrollContent: {
-    gap: uiSpace.lg,
-    paddingBottom: uiSpace.lg,
-  },
+  microLabel,
   summaryGrid: {
     flexDirection: 'row',
     gap: uiSpace.md,
   },
   summaryCard: {
     flex: 1,
-    borderRadius: uiRadius.md,
-    borderWidth: 1,
-    borderColor: uiColors.borderMuted,
-    backgroundColor: uiColors.surfaceDefault,
+  },
+  summaryCardBody: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: uiSpace.sm,
     padding: uiSpace.md,
+  },
+  summaryFigures: {
+    flex: 1,
     gap: uiSpace.xs,
   },
-  summaryCardPressed: {
-    opacity: 0.7,
+  delta: {
+    fontFamily: uiFonts.figure.family,
+    fontWeight: '500',
+    fontSize: uiTypography.size.xs,
+    lineHeight: uiTypography.lineHeight.xs,
+    color: uiRoles.inkMuted,
   },
-  summaryLabel: {
-    fontSize: uiTypography.size.sm,
-    fontWeight: '600',
-    color: uiColors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  summaryValue: {
-    fontSize: uiTypography.size.xxl,
-    fontWeight: '700',
-    color: uiColors.textPrimary,
-  },
-  summaryDelta: {
-    fontSize: uiTypography.size.sm,
-    fontWeight: '600',
+  deltaInk: {
+    color: uiRoles.ink,
   },
   familyList: {
     gap: uiSpace.md,
   },
-  familyCard: {
-    borderRadius: uiRadius.md,
-    borderWidth: 1,
-    borderColor: uiColors.borderMuted,
-    backgroundColor: uiColors.surfaceDefault,
-    overflow: 'hidden',
+  familyName: {
+    fontFamily: uiFonts.display.family,
+    fontWeight: '700',
+    fontSize: uiTypography.size.lg,
+    lineHeight: uiTypography.lineHeight.lg,
+    color: uiRoles.ink,
   },
-  familyHeader: {
+  muscleName: {
+    fontFamily: uiFonts.display.family,
+    fontWeight: '600',
+    fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
+    color: uiRoles.ink,
+  },
+  nameUntrained: {
+    color: uiRoles.inkMuted,
+  },
+  // A nested muscle row starts one step in from its family.
+  nestIndent: {
+    width: uiSpace.sm,
+  },
+  rowMetrics: {
+    flexDirection: 'row',
+    gap: uiSpace.md,
+    paddingVertical: uiSpace.xs,
+  },
+  rowMetric: {
+    alignItems: 'flex-end',
+    minWidth: uiSpace.xxl * 2,
+  },
+  tableHeader: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: uiSpace.md,
+    paddingHorizontal: uiSpace.md,
+  },
+  tableColumns: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: uiSpace.md,
-    paddingVertical: uiSpace.md,
-    gap: uiSpace.md,
-    borderBottomWidth: 1,
-    borderBottomColor: uiColors.borderMuted,
+    gap: uiSpace.sm,
   },
-  familyName: {
-    fontSize: uiTypography.size.lg,
-    fontWeight: '700',
-    color: uiColors.textPrimary,
+  headerCell: {
+    minHeight: uiGeometry.tapTarget,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: uiSpace.xs,
   },
-  summaryNameCell: {
+  headerCellNumeric: {
+    justifyContent: 'flex-end',
+  },
+  headerCellPressed: {
+    backgroundColor: uiRoles.surfaceSubtle,
+  },
+  headerLabel: microLabel,
+  headerLabelActive: {
+    color: uiRoles.ink,
+  },
+  headerIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: uiSpace.xs,
+  },
+  headerIndicatorRecency: {
+    width: RECENCY_INDICATOR_WIDTH,
+  },
+  headerIndicatorHidden: {
+    opacity: 0,
+  },
+  // The table's columns: the name takes the rest; the figures sit in fixed,
+  // right-aligned columns so digits align down the list. `Vol` fits a
+  // six-digit volume (`123456`) in Plex Mono.
+  nameColumn: {
     flex: 1,
     minWidth: 0,
-    alignSelf: 'stretch',
-    justifyContent: 'center',
   },
+  setsColumn: {
+    width: 60,
+  },
+  volumeColumn: {
+    width: 52,
+  },
+  oneRepMaxColumn: {
+    width: 40,
+  },
+  exerciseName: {
+    fontFamily: uiFonts.display.family,
+    fontWeight: '600',
+    fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
+    color: uiRoles.ink,
+    paddingVertical: uiSpace.xs,
+  },
+  tableFigure: {
+    fontFamily: uiFonts.figure.family,
+    fontWeight: '500',
+    fontSize: uiTypography.size.md,
+    lineHeight: uiTypography.lineHeight.md,
+    color: uiRoles.ink,
+    textAlign: 'right',
+  },
+});
+
+// The history overlays and their heatmaps: legacy until DLM-T09 restyles them.
+const overlayStyles = StyleSheet.create({
   heatmapTransition: {
     position: 'relative',
   },
@@ -2143,90 +2040,8 @@ const styles = StyleSheet.create({
     opacity: 0,
     zIndex: 0,
   },
-  familyMetrics: {
-    flexDirection: 'row',
-    gap: uiSpace.lg,
-  },
-  muscleList: {
-    paddingHorizontal: uiSpace.md,
-    paddingVertical: uiSpace.xs,
-  },
-  muscleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: uiSpace.sm,
-    paddingHorizontal: uiSpace.xs,
-    gap: uiSpace.md,
-  },
   actionableRowPressed: {
     opacity: 0.7,
-  },
-  muscleName: {
-    fontSize: uiTypography.size.base,
-    fontWeight: '500',
-    color: uiColors.textPrimary,
-  },
-  muscleMetrics: {
-    flexDirection: 'row',
-    gap: uiSpace.md,
-  },
-  muscleTextUntrained: {
-    color: uiColors.textSecondary,
-  },
-  metric: {
-    alignItems: 'flex-end',
-    minWidth: 60,
-  },
-  metricLabel: {
-    fontSize: uiTypography.size.xs,
-    fontWeight: '600',
-    color: uiColors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-  },
-  metricLabelSmall: {
-    fontSize: uiTypography.size.xs,
-    fontWeight: '600',
-    color: uiColors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-  },
-  metricLabelMuted: {
-    color: uiColors.textSecondary,
-  },
-  metricValue: {
-    fontSize: uiTypography.size.base,
-    fontWeight: '700',
-    color: uiColors.textPrimary,
-    marginTop: uiSpace.xs,
-  },
-  metricValueSmall: {
-    fontSize: uiTypography.size.md,
-    fontWeight: '600',
-    color: uiColors.textPrimary,
-    marginTop: uiSpace.xs,
-  },
-  metricValueMuted: {
-    color: uiColors.textSecondary,
-  },
-  metricDelta: {
-    fontSize: uiTypography.size.xs,
-    fontWeight: '600',
-    marginTop: uiSpace.xs,
-  },
-  metricDeltaSmall: {
-    fontSize: uiTypography.size.xs,
-    fontWeight: '600',
-    marginTop: uiSpace.xs,
-  },
-  statePanel: {
-    borderRadius: uiRadius.md,
-    borderWidth: 1,
-    borderColor: uiColors.borderMuted,
-    backgroundColor: uiColors.surfaceDefault,
-    padding: uiSpace.lg,
-    gap: uiSpace.sm,
   },
   stateTitle: {
     fontSize: uiTypography.size.base,
@@ -2340,43 +2155,5 @@ const styles = StyleSheet.create({
     backgroundColor: uiColors.surfaceInfo,
     padding: uiSpace.md,
     gap: uiSpace.sm,
-  },
-  deltaPositive: {
-    color: uiColors.textSuccess,
-  },
-  deltaNegative: {
-    color: uiColors.actionDangerText,
-  },
-  deltaNeutral: {
-    color: uiColors.textSecondary,
-  },
-  searchContainer: {
-    position: 'relative',
-    justifyContent: 'center',
-  },
-  filterInput: {
-    borderWidth: 1,
-    borderColor: uiColors.borderMuted,
-    borderRadius: uiRadius.sm,
-    backgroundColor: uiColors.surfaceDefault,
-    color: uiColors.textPrimary,
-    paddingLeft: uiSpace.md,
-    paddingRight: uiSpace.xxl,
-    paddingVertical: uiSpace.sm,
-    minHeight: 42,
-    fontSize: uiTypography.size.base,
-  },
-  clearSearchButton: {
-    position: 'absolute',
-    right: 10,
-    width: 20,
-    height: 20,
-    borderRadius: uiRadius.md,
-    backgroundColor: uiColors.borderMuted,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  deltaNew: {
-    color: uiColors.actionPrimary,
   },
 });

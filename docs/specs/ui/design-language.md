@@ -66,6 +66,40 @@ relationship to `record` that the orange pair had to `accent`.
 The floor is a gate, not a note: `apps/mobile/app/__tests__/ui-design-tokens.test.ts`
 fails if `record` ever equals `accent` again or drops below 4.5:1.
 
+### Data visualisation
+
+One sequential ramp, one meaning: **more**. Heatmap cells and bars, and the
+Progress failure-intensity rows, all use it.
+
+| Role | Value | L* | Use |
+| --- | --- | --- | --- |
+| `viz0` | `#F0ECE7` | 94 | empty / rest (a heatmap day with no training) |
+| `viz1` | `#E7D7CA` | 87 | the lightest intensity |
+| `viz2` | `#D3BDAB` | 78 | |
+| `viz3` | `#BCA18A` | 68 | |
+| `viz4` | `#A4866B` | 58 | the strongest intensity |
+
+**Picked on device 2026-09-25** (DLM-T08, "B2", from a gallery of a teal, a
+warm monochrome and a green, then three warmer takes on the monochrome): a
+bronze taupe at LCh hue 68, chroma 9–20. It sits between `accent` (hue 47,
+chroma 73) and `record` (hue 81, chroma 47) but at a fraction of their chroma
+and far lighter, and `record` is only ever a text colour, never a ground. The
+steps are even in lightness (L* 87 / 78 / 68 / 58) so each bucket reads as
+"more" without relying on hue.
+
+- **Text on a `viz` ground is `ink`**, legends and deltas included: `ink-muted`
+  is 3.3:1 on `viz2` and 1.7:1 on `viz4`, while `ink` clears 5.2:1 on `viz4`.
+  `Stat` takes `ground="viz"` for this.
+- Colour is never the only channel: counts and accessibility labels still say
+  how much.
+- Marks on a `viz` cell are `ink`: today a 1px ring, selected a 2px border
+  (G2; built with the heatmaps in DLM-T09).
+
+Gated by `ui-design-tokens.test.ts`: the steps darken monotonically with
+ΔL* ≥ 6 between neighbours, `viz1` sits ≥ 10 L* below `surface`, `ink` on
+`viz4` ≥ 4.5:1, `ink` on `viz1` ≥ 3:1, and no step equals `accent` or
+`record`.
+
 **Light only.** No dark variants; `app.config.ts` pins
 `userInterfaceStyle: "light"`. See `ux-rules.md` §9a.
 
@@ -183,6 +217,8 @@ additionally render faded (§6).
 - **`1RM` everywhere**, never `e1RM`. Computed by `estimateOneRepMax` (Mayhew)
   in `apps/mobile/src/exercise-calculations/index.ts`.
 - **No thousands separators.** `2560`, not `2 560`.
+- **No `k` compaction.** `123456`, not `123k`: a six-digit volume fits a Plex
+  Mono column (decided for Progress, DLM-T08-D2).
 - **No unit suffix inside an input.** The unit belongs in the field label.
 - **Show a figure wherever it can be computed**, including for values that are
   not yet realised — a planned set shows its projected 1RM and volume faded:

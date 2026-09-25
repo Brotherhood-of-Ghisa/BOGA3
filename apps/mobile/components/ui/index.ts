@@ -39,6 +39,7 @@ export { Sheet, type SheetProps } from '@/components/ui/sheet';
 export {
   Stat,
   type StatEmphasis,
+  type StatGround,
   type StatKind,
   type StatLayout,
   type StatProps,

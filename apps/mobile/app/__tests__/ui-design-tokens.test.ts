@@ -43,6 +43,11 @@ describe('design-language tokens', () => {
         'scrim',
         'surface',
         'surfaceSubtle',
+        'viz0',
+        'viz1',
+        'viz2',
+        'viz3',
+        'viz4',
       ].sort(),
     );
   });
@@ -98,7 +103,43 @@ describe('design-language tokens', () => {
     // "warmed up" later.
     expect(contrastRatio(uiRoles.record, uiRoles.recordWash)).toBeGreaterThanOrEqual(4.5);
   });
+
+  describe('data-visualisation ramp (design-language.md §2)', () => {
+    const ramp = [uiRoles.viz0, uiRoles.viz1, uiRoles.viz2, uiRoles.viz3, uiRoles.viz4];
+
+    it('darkens step by step, each step distinct from the next', () => {
+      // "More" must always read darker, and two neighbouring buckets must not
+      // collapse into one colour on a heatmap or a failure row.
+      for (let step = 1; step < ramp.length; step += 1) {
+        expect(lightness(ramp[step])).toBeLessThan(lightness(ramp[step - 1]));
+        expect(lightness(ramp[step - 1]) - lightness(ramp[step])).toBeGreaterThanOrEqual(6);
+      }
+    });
+
+    it('keeps `ink` legible on every step, and its marks visible on the lightest', () => {
+      // Text on a `viz` ground is `ink` (WCAG AA, normal text) — the darkest
+      // step is the binding case.
+      expect(contrastRatio(uiRoles.ink, uiRoles.viz4)).toBeGreaterThanOrEqual(4.5);
+      // The today ring and selected border are `ink` hairlines (non-text, 3:1).
+      expect(contrastRatio(uiRoles.ink, uiRoles.viz1)).toBeGreaterThanOrEqual(3);
+      // The first step must read as shaded against a card's `surface`.
+      expect(lightness(uiRoles.surface) - lightness(uiRoles.viz1)).toBeGreaterThanOrEqual(10);
+    });
+
+    it('is never the primary action or a record', () => {
+      for (const step of ramp) {
+        expect(step).not.toBe(uiRoles.accent);
+        expect(step).not.toBe(uiRoles.record);
+      }
+    });
+  });
 });
+
+// CIE L* (0–100), the perceptual lightness the ramp is stepped in.
+function lightness(hex: string): number {
+  const y = relativeLuminance(hex);
+  return y > 216 / 24389 ? 116 * Math.cbrt(y) - 16 : (y * 24389) / 27;
+}
 
 function contrastRatio(foreground: string, background: string): number {
   const a = relativeLuminance(foreground);

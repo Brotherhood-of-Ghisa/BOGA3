@@ -1,7 +1,8 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
 
 import {
   default as StatsRoute,
@@ -19,7 +20,7 @@ import {
   resolveStatsInitialPeriod,
 } from '../(tabs)/stats-history';
 import ProgressRoute from '../(tabs)/progress';
-import { uiColors } from '@/components/ui';
+import { uiGeometry, uiRoles } from '@/components/ui';
 import type { SelectedMuscleWeeklyEffort, StatsSummary } from '@/src/data';
 
 jest.mock('@/src/data', () => ({
@@ -565,12 +566,19 @@ describe('StatsScreenShell', () => {
       <StatsScreenShell {...buildShellProps({ periodDays: 7, viewMode: 'muscle' })} />
     );
 
-    expect(screen.getByTestId('stats-family-header-shoulders')).toHaveStyle({
-      backgroundColor: uiColors.failureBackgroundFamily2,
+    // One ramp for families and muscles alike (DLM-T08-D3): the shade is the
+    // row's ground, a band around the pressable row.
+    expect(screen.getByTestId('stats-family-header-shoulders-shade')).toHaveStyle({
+      backgroundColor: uiRoles.viz2,
     });
-    expect(screen.getByTestId('stats-muscle-row-front_delts')).toHaveStyle({
-      backgroundColor: uiColors.failureBackgroundMuscle2,
+    expect(screen.getByTestId('stats-muscle-row-front_delts-shade')).toHaveStyle({
+      backgroundColor: uiRoles.viz2,
     });
+    // On a `viz` ground the legends and deltas turn `ink`: `ink-faint` and
+    // `ink-muted` are illegible there.
+    const shadedSets = within(screen.getByTestId('stats-family-sets-shoulders'));
+    expect(StyleSheet.flatten(shadedSets.getByText('Sets').props.style).color).toBe(uiRoles.ink);
+    expect(StyleSheet.flatten(shadedSets.getByText('+2 (+1)').props.style).color).toBe(uiRoles.ink);
     expect(
       screen.queryByTestId(/failure-bar/, { includeHiddenElements: true })
     ).toBeNull();
@@ -578,8 +586,8 @@ describe('StatsScreenShell', () => {
     rerender(
       <StatsScreenShell {...buildShellProps({ periodDays: 30, viewMode: 'muscle' })} />
     );
-    expect(screen.getByTestId('stats-family-header-shoulders')).toHaveStyle({
-      backgroundColor: uiColors.failureBackgroundFamily1,
+    expect(screen.getByTestId('stats-family-header-shoulders-shade')).toHaveStyle({
+      backgroundColor: uiRoles.viz1,
     });
 
     rerender(
@@ -936,7 +944,7 @@ describe('StatsScreenShell', () => {
       'May 13, 2026'
     );
     expect(screen.getByTestId('stats-muscle-history-heatmap-day-detail-value')).toHaveTextContent(
-      /Volume: 1\.2k/
+      /Volume: 1200/
     );
     expect(screen.getByText('Volume per day')).toBeTruthy();
 
@@ -978,7 +986,7 @@ describe('StatsScreenShell', () => {
     expect(banner).toBeTruthy();
     expect(screen.getByTestId('stats-muscle-history-week-banner-range')).toHaveTextContent(/May/);
     expect(screen.getByTestId('stats-muscle-history-week-banner-value')).toHaveTextContent(
-      /Volume: 1\.1k/
+      /Volume: 1100/
     );
 
     rerender(
@@ -1260,22 +1268,35 @@ describe('StatsScreenShell — view mode toggle', () => {
     expect(onSelectViewMode).toHaveBeenLastCalledWith('exercise');
   });
 
-  it('keeps period chips pill-shaped while Breakdown opts into the joined equal-width variant', () => {
+  it('makes each control a tab list under its own label (DLM-T08-D1)', () => {
     renderStatsScreenShell({ viewMode: 'exercise' });
 
-    expect(screen.getByTestId('stats-period-chip-7')).toHaveStyle({ borderRadius: 999 });
-    expect(screen.getByTestId('stats-view-mode-chip-row')).toHaveStyle({
-      borderWidth: 1,
-      overflow: 'hidden',
-    });
-    expect(screen.getByTestId('stats-view-mode-chip-exercise')).toHaveStyle({
-      flex: 1,
-      borderRadius: 0,
-    });
-    expect(screen.getByTestId('stats-view-mode-chip-muscle')).toHaveStyle({
-      flex: 1,
-      borderRadius: 0,
-    });
+    // Both are the same joined control now; the labels, not two shapes, tell
+    // Time range from Breakdown (`ux-rules.md` §13.1, §13.8).
+    for (const [group, row, label] of [
+      ['stats-time-range-controls', 'stats-period-chip-row', 'Select stats time range'],
+      ['stats-breakdown-controls', 'stats-view-mode-chip-row', 'Select stats breakdown'],
+    ] as const) {
+      const control = within(screen.getByTestId(group)).getByTestId(row);
+      expect(control.props.accessibilityRole).toBe('tablist');
+      expect(control.props.accessibilityLabel).toBe(label);
+    }
+    for (const segment of ['stats-period-chip-7', 'stats-view-mode-chip-exercise']) {
+      expect(screen.getByTestId(segment).props.accessibilityRole).toBe('tab');
+      expect(screen.getByTestId(segment)).toHaveStyle({ flex: 1 });
+    }
+  });
+
+  it('keeps delta signs and drops their green and red (G3, DLM-T08-D4)', () => {
+    renderStatsScreenShell({ viewMode: 'exercise' });
+
+    const sessions = within(screen.getByTestId('stats-card-sessions'));
+    const sets = within(screen.getByTestId('stats-card-sets'));
+    for (const node of [sessions.getByText('+1'), sets.getByText('+10 (+8)')]) {
+      expect(StyleSheet.flatten(node.props.style).color).toBe(uiRoles.inkMuted);
+    }
+    // The Sessions card is a link to the list, marked by a chevron.
+    expect(screen.getByTestId('stats-card-sessions').props.accessibilityRole).toBe('link');
   });
 
   it('shows the exercise list when viewMode is exercise', () => {
@@ -1287,7 +1308,7 @@ describe('StatsScreenShell — view mode toggle', () => {
     expect(screen.getByTestId('stats-exercise-row-ex1')).toBeTruthy();
     expect(screen.getByTestId('stats-exercise-name-ex1')).toHaveTextContent('Bench Press');
     expect(screen.getByTestId('stats-exercise-sets-ex1')).toHaveTextContent(/5 \(2\)/);
-    expect(screen.getByTestId('stats-exercise-volume-ex1')).toHaveTextContent('2.5k');
+    expect(screen.getByTestId('stats-exercise-volume-ex1')).toHaveTextContent('2500');
     expect(screen.getByTestId('stats-exercise-1rm-ex1')).toHaveTextContent('110');
     expect(screen.queryByTestId('stats-exercise-sessions-ex1')).toBeNull();
     expect(screen.getByTestId('stats-exercise-row-ex1').props.accessibilityLabel).toContain(
@@ -1327,7 +1348,7 @@ describe('StatsScreenShell — view mode toggle', () => {
     );
     expect(screen.getByTestId('stats-exercise-sort-sets')).toHaveStyle({
       flexDirection: 'row',
-      minHeight: 52,
+      minHeight: uiGeometry.tapTarget,
     });
     expect(screen.getByText('Sets').props.numberOfLines).toBe(1);
     expect(screen.getByTestId('stats-exercise-1rm-missing')).toHaveTextContent('—');
@@ -1778,7 +1799,7 @@ describe('StatsScreenShell — search & filtering', () => {
     fireEvent.changeText(input, 'Bench');
     expect(onSearchQueryChange).toHaveBeenCalledWith('Bench');
 
-    expect(screen.queryByTestId('stats-search-clear-button')).toBeNull();
+    expect(screen.queryByTestId('stats-search-input-clear')).toBeNull();
 
     rerender(
       <StatsScreenShell
@@ -1788,8 +1809,10 @@ describe('StatsScreenShell — search & filtering', () => {
         })}
       />
     );
-    expect(screen.getByTestId('stats-search-clear-button')).toBeTruthy();
-    fireEvent.press(screen.getByTestId('stats-search-clear-button'));
+    expect(screen.getByTestId('stats-search-input-clear').props.accessibilityLabel).toBe(
+      'Clear search input'
+    );
+    fireEvent.press(screen.getByTestId('stats-search-input-clear'));
     expect(onSearchQueryChange).toHaveBeenLastCalledWith('');
   });
 
