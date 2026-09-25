@@ -9,9 +9,11 @@
 # Why: PR gates are selective (scripts/triggers.tsv). A screen/component change
 # runs `boga test frontend-ui`, not the Supabase-backed e2e lanes, so a
 # cross-screen regression those lanes would catch can land on main. The sweep
-# is the backstop: it runs the fast, backend, and frontend lanes on main so such
-# a regression surfaces within a day instead of at the next unrelated PR that
-# happens to trigger the lane. Scheduled on the dev machine (spec 02).
+# is the backstop: it runs the fast, backend, and frontend lanes on a ref, so
+# such a regression surfaces before it ships instead of at the next unrelated PR
+# that happens to trigger the lane. Run opportunistically, not on a schedule:
+# on the main commit about to become an iOS build, and on large or shared-UI
+# PRs (`boga test for` recommends it) — spec 02.
 #
 # It owns a dedicated, long-lived, detached worktree (default
 # $(boga_worktree_root)/full-sweep, override with BOGA_SWEEP_DIR) with its own

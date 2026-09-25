@@ -21,8 +21,8 @@
 # change runs `frontend-ui` — every simulator lane that needs no backend. The
 # Supabase-backed e2e lanes (ios-auth-profile, ios-sync-e2e, ios-groups-e2e)
 # run only for their own screens (rows below) and for the src/sync, src/auth,
-# src/groups, and migration rows; the scheduled full sweep
-# (scripts/full-sweep.sh) runs everything on origin/main.
+# src/groups, and migration rows; the full sweep (`boga sweep`, run before iOS
+# builds and on large PRs — test-for recommends it) runs everything.
 apps/mobile/app/**	fast,frontend-ui	UI screens / routes
 apps/mobile/components/**	fast,frontend-ui	UI components
 apps/mobile/app/__tests__/**	-frontend-ui	jest suites (fast gate; no simulator)
@@ -87,7 +87,7 @@ scripts/lanes.tsv	docs-check	lane registry (regenerate the matrix: ./boga docs g
 scripts/triggers.tsv	docs-check,meta-tests	trigger registry
 scripts/gen-docs.sh	docs-check,meta-tests	docs generator/checker
 scripts/test-for.sh	meta-tests	trigger matcher
-scripts/full-sweep.sh	meta-tests	scheduled full sweep (full-sweep meta-test)
+scripts/full-sweep.sh	meta-tests	full sweep (full-sweep meta-test)
 scripts/pr-check.sh	meta-tests	PR Tests-table checker
 scripts/worktree-*	meta-tests	worktree lifecycle scripts (lifecycle meta-test)
 scripts/worktree-lib.sh	fast,backend,frontend	slot-lease / placement guard sourced by every runtime entrypoint

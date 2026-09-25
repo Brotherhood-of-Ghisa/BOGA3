@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# full-sweep.test.sh — the scheduled sweep (scripts/full-sweep.sh) is the
+# full-sweep.test.sh — the full sweep (scripts/full-sweep.sh) is the
 # backstop for the selective PR triggers, so it must run EVERY gate lane in
 # scripts/lanes.tsv (fast-*, slow-backend, slow-frontend), backend before
 # frontend. Infra-free: checks `--dry-run` output only.

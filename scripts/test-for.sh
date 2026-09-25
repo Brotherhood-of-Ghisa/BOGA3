@@ -148,4 +148,18 @@ for r in ordered:
     print(f"  ./boga test {r:<14} — {'; '.join(sorted(required[r]))}")
 if not ordered:
     print("  none — but run ./boga test fast if any code changed.")
+
+# Advisory only (never in --tsv, so pr-check never requires it): a diff that
+# touches shared UI chrome or many screens is where the selective UI tier is
+# most likely to miss a cross-screen break the e2e lanes would catch.
+SHARED_UI = re.compile(r"^apps/mobile/(components/(ui|navigation)/|app/\(tabs\)/_layout\.tsx$)")
+ui_paths = [p for p in paths if re.match(r"^apps/mobile/(app|components)/", p)
+            and not p.startswith("apps/mobile/app/__tests__/")]
+shared = [p for p in ui_paths if SHARED_UI.match(p)]
+if shared or len(ui_paths) >= 15:
+    why = (f"touches shared UI chrome ({shared[0]}{' …' if len(shared) > 1 else ''})" if shared
+           else f"{len(ui_paths)} screen/component files")
+    print()
+    print("RECOMMENDED (advisory, spec 02):")
+    print(f"  ./boga sweep --ref origin/<branch> — {why}; runs every lane, incl. the e2e lanes this tier skips")
 PY
