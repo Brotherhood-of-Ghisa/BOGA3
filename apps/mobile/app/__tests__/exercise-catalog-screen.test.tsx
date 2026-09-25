@@ -369,10 +369,10 @@ describe('ExerciseCatalogScreen', () => {
     expect(screen.queryByText('Old Fly')).toBeNull();
 
     fireEvent.press(screen.getByLabelText('Exercise catalog options'));
-    await screen.findByText('Filters');
+    await screen.findByText('Manage exercises');
     fireEvent.press(screen.getByLabelText('Show deleted exercises'));
     // The Filters sheet's backdrop, hidden from VoiceOver while the sheet is modal.
-    fireEvent.press(screen.getByLabelText('Close filters', { includeHiddenElements: true }));
+    fireEvent.press(screen.getByLabelText('Close exercise management', { includeHiddenElements: true }));
 
     await screen.findByText('Old Fly');
 
@@ -395,7 +395,7 @@ describe('ExerciseCatalogScreen', () => {
       mappings: [{ id: 'map-chest', muscleGroupId: 'chest', weight: 1, role: 'primary' }],
     };
 
-    it('titles the screen Exercises, with + as its one accent and the active filters as tags', async () => {
+    it('titles the screen Exercises, with + as its one accent and visible shared controls', async () => {
       mockListExercises.mockResolvedValue([BENCH]);
       render(<ExerciseCatalogScreen />);
 
@@ -405,36 +405,36 @@ describe('ExerciseCatalogScreen', () => {
       expect(accents).toHaveLength(1);
       expect(accents[0].props.testID).toBe('create-new-exercise-button');
 
-      // Each tag names an active filter and opens the Filters sheet.
-      expect(screen.getByText('Range: 90d')).toBeTruthy();
-      fireEvent.press(screen.getByLabelText('Open filters (Grouped)'));
-      expect(await screen.findByTestId('exercise-catalog-filters-sheet')).toBeTruthy();
-      expect(screen.getByRole('header', { name: 'Filters' })).toBeTruthy();
-      expect(screen.queryByText('Done')).toBeNull();
+      expect(screen.getByLabelText('Favourite')).toHaveProp('accessibilityState', { selected: true });
+      expect(screen.getByLabelText('Show never-done')).toHaveProp('accessibilityState', { checked: true });
+      fireEvent.press(screen.getByLabelText('Exercise catalog options'));
+      expect(await screen.findByTestId('exercise-catalog-management-sheet')).toBeTruthy();
+      expect(screen.getByRole('header', { name: 'Manage exercises' })).toBeTruthy();
+      expect(screen.queryByText('Date range')).toBeNull();
     });
 
-    it('filters by muscle group in the Filters sheet, and Clear resets it', async () => {
-      mockListExercises.mockResolvedValue([
-        BENCH,
-        {
-          id: 'seed_squat',
-          name: 'Back Squat',
-          loadInputMode: 'total_load',
-          deletedAt: null,
-          mappings: [{ id: 'map-quads', muscleGroupId: 'quads', weight: 1, role: 'primary' }],
-        },
-      ]);
+    it('search expands matching families and clearing restores the prior expansion', async () => {
+      mockListExercises.mockResolvedValue([BENCH, { ...BENCH, id: 'squat', name: 'Back Squat', mappings: [{ id: 'm2', muscleGroupId: 'quads', role: 'primary', weight: 1 }] }]);
       render(<ExerciseCatalogScreen />);
+      await expandFamily('Chest', 1);
+      fireEvent.changeText(screen.getByLabelText('Exercise filter input'), 'squat');
+      expect(await screen.findByLabelText('Edit exercise definition Back Squat')).toBeTruthy();
+      expect(screen.queryByTestId('exercise-family-group-chest')).toBeNull();
+      fireEvent.changeText(screen.getByLabelText('Exercise filter input'), '');
+      expect(await screen.findByLabelText('Edit exercise definition Barbell Bench Press')).toBeTruthy();
+      expect(screen.queryByLabelText('Edit exercise definition Back Squat')).toBeNull();
+    });
 
-      fireEvent.press(await screen.findByLabelText('Exercise catalog options'));
-      fireEvent.press(await screen.findByLabelText('Toggle muscle group Quads'));
-      expect(screen.getByLabelText('Toggle muscle group Quads').props.accessibilityState).toMatchObject({ checked: true });
-      expect(screen.getByText('Muscles: 1')).toBeTruthy();
-      expect(await screen.findByLabelText('Chest exercises 0')).toBeTruthy();
-
-      fireEvent.press(screen.getByLabelText('Clear muscle group selection'));
-      expect(screen.getByLabelText('Toggle muscle group Quads').props.accessibilityState).toMatchObject({ checked: false });
-      expect(screen.queryByLabelText('Clear muscle group selection')).toBeNull();
+    it('does not label failed history as Never done and can retry with never-done off', async () => {
+      mockListExercises.mockResolvedValue([BENCH]);
+      mockLoadRawHistory.mockRejectedValueOnce(new Error('history unavailable'));
+      render(<ExerciseCatalogScreen />);
+      expect(await screen.findByText('Unable to load exercise history.')).toBeTruthy();
+      expect(screen.queryByText('Never done')).toBeNull();
+      fireEvent.press(screen.getByLabelText('Show never-done'));
+      fireEvent.press(screen.getByLabelText('Retry exercise history'));
+      expect(await screen.findByText('No exercises match the current filters.')).toBeTruthy();
+      expect(screen.getByLabelText('Show never-done')).toHaveProp('accessibilityState', { checked: false });
     });
 
     it('titles the actions sheet with the name; Delete is the danger row and a deleted exercise cannot be edited', async () => {
@@ -454,7 +454,7 @@ describe('ExerciseCatalogScreen', () => {
 
       fireEvent.press(screen.getByLabelText('Exercise catalog options'));
       fireEvent.press(await screen.findByLabelText('Show deleted exercises'));
-      fireEvent.press(screen.getByLabelText('Close filters', { includeHiddenElements: true }));
+      fireEvent.press(screen.getByLabelText('Close exercise management', { includeHiddenElements: true }));
       fireEvent.press(await screen.findByLabelText('Exercise actions Old Fly'));
       await screen.findByTestId('exercise-catalog-actions-sheet');
       expect(screen.getByLabelText('Edit exercise from actions')).toBeDisabled();
@@ -474,14 +474,12 @@ describe('ExerciseCatalogScreen', () => {
       expect(dismissKeyboard).toHaveBeenCalledTimes(2);
     });
 
-    it('says why the list is empty, once, grouped or flat', async () => {
+    it('says why the list is empty once and leaves controls available', async () => {
       mockListExercises.mockResolvedValue([]);
       render(<ExerciseCatalogScreen />);
 
       expect(await screen.findAllByText('No active exercises yet. Create one with the button above.')).toHaveLength(1);
-      fireEvent.press(screen.getByLabelText('Exercise catalog options'));
-      fireEvent.press(await screen.findByLabelText('Turn grouping off'));
-      fireEvent.press(screen.getByLabelText('Close filters', { includeHiddenElements: true }));
+      fireEvent.press(screen.getByLabelText('Show never-done'));
       expect(await screen.findAllByText('No active exercises yet. Create one with the button above.')).toHaveLength(1);
     });
 

@@ -146,17 +146,12 @@ appId: com.dinoderek.mobile
     timeout: 30000
 - tapOn:
     id: "session-view-add-exercise"
-- tapOn: "Exercise picker options"
-- tapOn: "Turn grouping off"
-- tapOn: "Exercise picker options"
 - tapOn: "Exercise filter input"
 - inputText: "Barbell Back Squat"
-- hideKeyboard:
-    optional: true
-- tapOn: "Select Exercise"
+- pressKey: Enter
 # Selecting the seeded "Barbell Back Squat" here also implicitly proves the
 # catalog bootstrapped in Phase A: the row only exists if the seed landed. The
-# flow turns grouping off explicitly above; grouped collapse/search behavior is
+# search expands matching families; collapse/search behavior is
 # covered by focused tests.
 - extendedWaitUntil:
     visible:

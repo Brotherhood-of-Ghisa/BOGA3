@@ -2,197 +2,98 @@ import { aggregateExerciseCatalogStats, type ExerciseCatalogStatsRawHistory } fr
 import {
   DEFAULT_EXERCISE_LIST_PREFERENCES,
   buildExerciseListModel,
+  formatExerciseListStatsSummary,
   type ExerciseListPreferences,
 } from '@/src/exercise-catalog/list-model';
 import type { IndexedExerciseCatalogExercise } from '@/src/exercise-catalog/search';
 
-const NOW = new Date('2026-06-24T12:00:00.000Z');
-const DAY_MS = 24 * 60 * 60 * 1000;
-
+const NOW = new Date(2026, 8, 25, 12);
+const DAY_MS = 86_400_000;
 const daysBefore = (days: number) => new Date(NOW.getTime() - days * DAY_MS);
-
 const rawHistory = (): ExerciseCatalogStatsRawHistory => ({
-  sessions: [
-    { id: 's-recent', completedAt: daysBefore(2) },
-    { id: 's-mid', completedAt: daysBefore(45) },
-    { id: 's-old', completedAt: daysBefore(120) },
-    { id: 's-over-year', completedAt: daysBefore(380) },
-  ],
+  sessions: [{ id: 'recent', completedAt: daysBefore(2) }, { id: 'old', completedAt: daysBefore(380) }],
   sessionExercises: [
-    { id: 'se-bench-recent', sessionId: 's-recent', exerciseDefinitionId: 'bench' },
-    { id: 'se-row-mid', sessionId: 's-mid', exerciseDefinitionId: 'row' },
-    { id: 'se-curl-old', sessionId: 's-old', exerciseDefinitionId: 'curl' },
-    { id: 'se-squat-over-year', sessionId: 's-over-year', exerciseDefinitionId: 'squat' },
+    { id: 'bench-1', sessionId: 'recent', exerciseDefinitionId: 'bench' },
+    { id: 'bench-2', sessionId: 'recent', exerciseDefinitionId: 'bench' },
+    { id: 'old', sessionId: 'old', exerciseDefinitionId: 'old' },
   ],
-  exerciseSets: [
-    { sessionExerciseId: 'se-bench-recent', weightValue: '20', repsValue: '10', setType: 'warm_up' },
-    { sessionExerciseId: 'se-bench-recent', weightValue: '100', repsValue: '5', setType: null },
-    { sessionExerciseId: 'se-row-mid', weightValue: '80', repsValue: '8', setType: null },
-    { sessionExerciseId: 'se-row-mid', weightValue: '', repsValue: '8', setType: null },
-    { sessionExerciseId: 'se-curl-old', weightValue: '20', repsValue: '12', setType: null },
-    { sessionExerciseId: 'se-squat-over-year', weightValue: '140', repsValue: '5', setType: null },
-  ],
+  exerciseSets: ['bench-1', 'bench-1', 'bench-2', 'old'].map((sessionExerciseId) => ({
+    sessionExerciseId, weightValue: '20', repsValue: '10', setType: 'warm_up',
+  })),
+});
+const muscleGroups = [{ id: 'chest', displayName: 'Chest', familyName: 'Chest', sortOrder: 10 }];
+const exercises: IndexedExerciseCatalogExercise[] = [
+  { id: 'bench', name: 'Bench Press', deletedAt: null, mappings: [{ id: 'm1', muscleGroupId: 'chest', weight: 1, role: 'primary' }], searchText: 'bench press chest' },
+  { id: 'old', name: 'Ancient Press', deletedAt: null, mappings: [{ id: 'm2', muscleGroupId: 'chest', weight: 1, role: 'secondary' }], searchText: 'ancient press' },
+  { id: 'never', name: 'Cable Fly', deletedAt: null, mappings: [{ id: 'm3', muscleGroupId: 'chest', weight: 1, role: 'primary' }], searchText: 'cable fly chest' },
+  { id: 'unmapped', name: 'Carry', deletedAt: null, mappings: [], searchText: 'carry' },
+  { id: 'deleted', name: 'Deleted Fly', deletedAt: NOW, mappings: [], searchText: 'deleted fly' },
+];
+const buildModel = (preferences: Partial<ExerciseListPreferences> = {}, query = '') => buildExerciseListModel({
+  exercises, muscleGroups,
+  stats: aggregateExerciseCatalogStats(rawHistory(), 'all', NOW),
+  preferences: { ...DEFAULT_EXERCISE_LIST_PREFERENCES, ...preferences },
+  query, includeDeleted: false, now: NOW,
 });
 
-const exercises: IndexedExerciseCatalogExercise[] = [
-  {
-    id: 'bench',
-    name: 'Bench Press',
-    deletedAt: null,
-    mappings: [{ id: 'm-bench', muscleGroupId: 'chest', weight: 1, role: 'primary' }],
-    searchText: 'bench press chest chest',
-  },
-  {
-    id: 'row',
-    name: 'Cable Row',
-    deletedAt: null,
-    mappings: [{ id: 'm-row', muscleGroupId: 'back', weight: 1, role: 'primary' }],
-    searchText: 'cable row lats back',
-  },
-  {
-    id: 'curl',
-    name: 'Curl',
-    deletedAt: null,
-    mappings: [{ id: 'm-curl', muscleGroupId: 'biceps', weight: 1, role: 'primary' }],
-    searchText: 'curl biceps arms',
-  },
-  {
-    id: 'never',
-    name: 'Z Press',
-    deletedAt: null,
-    mappings: [{ id: 'm-never', muscleGroupId: 'delts', weight: 1, role: 'primary' }],
-    searchText: 'z press delts shoulders',
-  },
-  {
-    id: 'unmapped',
-    name: 'Carry',
-    deletedAt: null,
-    mappings: [],
-    searchText: 'carry',
-  },
-];
-
-const muscleGroups = [
-  { id: 'chest', displayName: 'Chest', familyName: 'Chest', sortOrder: 10 },
-  { id: 'delts', displayName: 'Delts', familyName: 'Shoulders', sortOrder: 20 },
-  { id: 'back', displayName: 'Lats', familyName: 'Back', sortOrder: 30 },
-  { id: 'biceps', displayName: 'Biceps', familyName: 'Arms', sortOrder: 40 },
-];
-
-const buildModel = (preferences: Partial<ExerciseListPreferences> = {}) =>
-  buildExerciseListModel({
-    exercises,
-    muscleGroups,
-    stats: aggregateExerciseCatalogStats(rawHistory(), preferences.dateRange ?? 90, NOW),
-    preferences: { ...DEFAULT_EXERCISE_LIST_PREFERENCES, ...preferences },
-    query: '',
-    includeDeleted: false,
-    showNeverDone: true,
-  });
-
-describe('exercise list model', () => {
-  it('sorts recents by valid completed set score, then most recent use, then name', () => {
-    const model = buildModel({ groupByMuscleFamily: false, dateRange: 90, recentsOnTop: true });
-
-    expect(model.items.map((item) => item.id)).toEqual([
-      'bench',
-      'row',
-      'unmapped',
-      'curl',
-      'never',
-    ]);
-    expect(model.items.find((item) => item.id === 'bench')?.recency?.completedSetCount).toBe(2);
-    expect(model.items.find((item) => item.id === 'row')?.recency?.completedSetCount).toBe(1);
-  });
-
-  it('uses the selected finite scoring window and caps All recents at one year', () => {
-    const sevenDay = buildModel({ groupByMuscleFamily: false, dateRange: 7, recentsOnTop: true });
-    expect(sevenDay.items.map((item) => item.id)).toEqual([
-      'bench',
-      'row',
-      'unmapped',
-      'curl',
-      'never',
-    ]);
-
-    const all = buildModel({ groupByMuscleFamily: false, dateRange: 'all', recentsOnTop: true });
-    expect(all.items.map((item) => item.id)).toEqual([
-      'bench',
-      'row',
-      'curl',
-      'unmapped',
-      'never',
-    ]);
-    expect(all.items.find((item) => item.id === 'squat')).toBeUndefined();
-  });
-
-  it('renders taxonomy-ordered family sections with zero-count groups and Other last', () => {
-    const model = buildModel({ groupByMuscleFamily: true, recentsOnTop: false });
-
+describe('exercise browser model', () => {
+  it('always keeps taxonomy order and the existing fallback mapping, with Other last', () => {
+    const model = buildModel();
     expect(model.sections.map((section) => `${section.familyName}:${section.count}`)).toEqual([
-      'Chest:1',
-      'Shoulders:1',
-      'Back:1',
-      'Arms:1',
-      'Core:0',
-      'Legs:0',
-      'Lower Legs:0',
-      'Other:1',
+      'Chest:3', 'Shoulders:0', 'Back:0', 'Arms:0', 'Core:0', 'Legs:0', 'Lower Legs:0', 'Other:1',
     ]);
+    expect(model.sections[0].exercises.map((item) => item.id)).toEqual(['bench', 'old', 'never']);
+    const alphabetical = buildModel({ sort: 'name' });
+    expect(alphabetical.sections.map((section) => section.familyName)).toEqual(model.sections.map((section) => section.familyName));
+    expect(alphabetical.sections[0].exercises.map((item) => item.id)).toEqual(['old', 'bench', 'never']);
   });
 
-  it('keeps grouped mode while search filtering and counts after filtering', () => {
-    const stats = aggregateExerciseCatalogStats(rawHistory(), 90, NOW);
-    const model = buildExerciseListModel({
-      exercises,
-      muscleGroups,
-      stats,
-      preferences: DEFAULT_EXERCISE_LIST_PREFERENCES,
-      query: 'press',
-      includeDeleted: false,
-      showNeverDone: true,
+  it('breaks equal Favourite scores by latest scoring-window use, then name', () => {
+    const stats = aggregateExerciseCatalogStats(rawHistory(), 'all', NOW);
+    for (const id of ['bench', 'old', 'never']) stats.recencyScoresById.set(id, {
+      exerciseDefinitionId: id, score: 1, completedSetCount: 2,
+      lastCompletedAt: daysBefore(id === 'old' ? 10 : 2),
     });
-
-    expect(model.mode).toBe('grouped');
-    expect(model.sections.map((section) => `${section.familyName}:${section.count}`)).toEqual([
-      'Chest:1',
-      'Shoulders:1',
-      'Back:0',
-      'Arms:0',
-      'Core:0',
-      'Legs:0',
-      'Lower Legs:0',
-      'Other:0',
-    ]);
+    const model = buildExerciseListModel({ exercises, muscleGroups, stats, preferences: DEFAULT_EXERCISE_LIST_PREFERENCES, query: '', includeDeleted: false, now: NOW });
+    expect(model.sections[0].exercises.map((item) => item.id)).toEqual(['bench', 'never', 'old']);
   });
 
-  it('correctly maps lastDoneDate and appends it to statsSummary in different custom formats', () => {
-    // 1. Default (DD-MM-YYYY)
-    const modelDD = buildModel({ groupByMuscleFamily: false, dateRange: 90, dateFormat: 'DD-MM-YYYY' });
-    const benchDD = modelDD.items.find((item) => item.id === 'bench');
-    const expectedBenchDateDD = `${String(daysBefore(2).getDate()).padStart(2, '0')}-${String(daysBefore(2).getMonth() + 1).padStart(2, '0')}-${daysBefore(2).getFullYear()}`;
-    expect(benchDD?.statsSummary).toContain(`Last: ${expectedBenchDateDD}`);
+  it('keeps old history visible with never-done off and shows all-time deduplicated sessions', () => {
+    const model = buildModel({ showNeverDone: false });
+    expect(model.items.map((item) => item.id)).toEqual(['bench', 'old']);
+    expect(model.items[0].statsSummary).toBe('Last: 23 Sep · 1 session');
+    expect(model.items[1].recency).toBeUndefined();
+    expect(model.items[1].statsSummary).toBe('Last: 10 Sep 2025 · 1 session');
+    expect(buildModel().items.find((item) => item.id === 'never')?.statsSummary).toBe('Never done');
+  });
 
-    // 2. MM-DD-YYYY
-    const modelMM = buildModel({ groupByMuscleFamily: false, dateRange: 90, dateFormat: 'MM-DD-YYYY' });
-    const benchMM = modelMM.items.find((item) => item.id === 'bench');
-    const expectedBenchDateMM = `${String(daysBefore(2).getMonth() + 1).padStart(2, '0')}-${String(daysBefore(2).getDate()).padStart(2, '0')}-${daysBefore(2).getFullYear()}`;
-    expect(benchMM?.statsSummary).toContain(`Last: ${expectedBenchDateMM}`);
+  it('searches existing name/primary-muscle terms and omits empty families only during search', () => {
+    const model = buildModel({}, ' chest ');
+    expect(model.isSearching).toBe(true);
+    expect(model.sections.map((section) => section.familyName)).toEqual(['Chest']);
+    expect(model.items.map((item) => item.id)).toEqual(['bench', 'never']);
+    expect(buildModel({}, 'no-match').sections).toEqual([]);
+    expect(buildModel({}, '  ').sections).toHaveLength(8);
+  });
 
-    // 3. YYYY-MM-DD
-    const modelYYYY = buildModel({ groupByMuscleFamily: false, dateRange: 90, dateFormat: 'YYYY-MM-DD' });
-    const benchYYYY = modelYYYY.items.find((item) => item.id === 'bench');
-    const expectedBenchDateYYYY = `${daysBefore(2).getFullYear()}-${String(daysBefore(2).getMonth() + 1).padStart(2, '0')}-${String(daysBefore(2).getDate()).padStart(2, '0')}`;
-    expect(benchYYYY?.statsSummary).toContain(`Last: ${expectedBenchDateYYYY}`);
+  it('includes deleted rows only for the management view', () => {
+    const model = buildExerciseListModel({ exercises, muscleGroups, stats: aggregateExerciseCatalogStats(rawHistory(), 'all', NOW), preferences: DEFAULT_EXERCISE_LIST_PREFERENCES, query: '', includeDeleted: true });
+    expect(model.items.some((item) => item.id === 'deleted')).toBe(true);
+  });
+});
 
-    // Check lastDoneDate mapping and empty / never done behavior
-    expect(benchDD?.lastDoneDate).toEqual(daysBefore(2));
-    const curl = modelDD.items.find((item) => item.id === 'curl');
-    expect(curl?.lastDoneDate).toEqual(daysBefore(120));
-    expect(curl?.statsSummary).toBe(`No sets in range · Last: ${String(daysBefore(120).getDate()).padStart(2, '0')}-${String(daysBefore(120).getMonth() + 1).padStart(2, '0')}-${daysBefore(120).getFullYear()}`);
-
-    const never = modelDD.items.find((item) => item.id === 'never');
-    expect(never?.lastDoneDate).toBeNull();
-    expect(never?.statsSummary).toBe('Never done');
+describe('browser last-performed date', () => {
+  const aggregate = { exerciseDefinitionId: 'e', sessionCount: 18, setCount: 40, nearFailureCount: 0, totalVolume: 300, estimatedOneRepMax: 50 };
+  afterEach(() => jest.useRealTimers());
+  it('uses local dates and refreshes the year at display time across local New Year', () => {
+    jest.useFakeTimers();
+    const last = new Date(2026, 11, 31, 23, 30);
+    jest.setSystemTime(new Date(2026, 11, 31, 23, 59));
+    expect(formatExerciseListStatsSummary(aggregate, true, last)).toBe('Last: 31 Dec · 18 sessions');
+    jest.setSystemTime(new Date(2027, 0, 1, 0, 1));
+    expect(formatExerciseListStatsSummary(aggregate, true, last)).toBe('Last: 31 Dec 2026 · 18 sessions');
+  });
+  it('never invents a date for an unused exercise', () => {
+    expect(formatExerciseListStatsSummary(undefined, false, null, NOW)).toBe('Never done');
   });
 });

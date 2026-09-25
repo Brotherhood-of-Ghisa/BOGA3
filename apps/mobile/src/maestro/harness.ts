@@ -15,6 +15,7 @@ import { isDevMode } from '@/src/utils/isDevMode';
 
 import { seedExerciseBlockHistoryFixture } from './exercise-block-history-fixture';
 import { seedExercisePageFixture } from './exercise-page-fixture';
+import { seedExerciseBrowserFixture } from './exercise-browser-fixture';
 import { seedSessionViewFixture } from './session-view-fixture';
 
 export type MaestroHarnessResetMode = 'none' | 'data';
@@ -24,7 +25,8 @@ export type MaestroHarnessFixtureName =
   // The block history plus a newest completed session with two PRs.
   | 'completion-two-prs'
   | 'exercise-page'
-  | 'session-view';
+  | 'session-view'
+  | 'exercise-browser';
 /**
  * Drives the first-sync gate deterministically in tests without a live cycle:
  * 'reset' clears the bootstrap flag so the gate's full-screen block shows;
@@ -79,7 +81,8 @@ export const resolveMaestroHarnessFixtureName = (
   value === 'exercise-block-history' ||
   value === 'completion-two-prs' ||
   value === 'exercise-page' ||
-  value === 'session-view'
+  value === 'session-view' ||
+  value === 'exercise-browser'
     ? value
     : 'none';
 
@@ -186,6 +189,9 @@ export const runMaestroHarnessFixture = async (fixtureName: MaestroHarnessFixtur
   }
   if (fixtureName === 'exercise-page') {
     await seedExercisePageFixture();
+  }
+  if (fixtureName === 'exercise-browser') {
+    await seedExerciseBrowserFixture();
   }
   if (fixtureName === 'session-view') {
     await seedSessionViewFixture();

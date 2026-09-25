@@ -165,20 +165,18 @@ Brief entrypoint inventory of the current reusable UI component set.
     the selected segment solid `ink`; `layout` `fill` (equal width) or `inline`;
     `tablist` / `tab` / `selected` and the `<prefix>-row` / `<prefix>-<value>`
     testIDs of the legacy `SegmentedChips`. The records panel's `Records` | `Last`,
-    Settings' date format (DLM-T04), the exercise list's date range
-    (`exercise-list-date-range-*`, DLM-T06), Progress's Time range and
+    Settings' date format (DLM-T04), the exercise list's Favourite/Name A–Z
+    (`exercise-list-sort-*`), Progress's Time range and
     Breakdown (DLM-T08), and `ExerciseCoreFields`' weight entry
     (`<prefix>-load-mode-*`, DLM-T07, which added `disabled` for the group
     exercise form's pending state)
   - `ChipGroup` — wrapping pills, `single` (a tab list, `selected`) or `multi`
     (checkboxes, `checked`), the same testID contract, per-chip accessibility
-    labels. Logs' level filter (DLM-T04), the exercise list's `Group by
-    muscle` / `Recents on top` (`multi`, `exercise-list-options-*`, DLM-T06),
-    and the catalogue's muscle and visibility filters (`multi`, DLM-T07)
+    labels. Logs' level filter (DLM-T04), the exercise list's `Show never-done` (`multi`, `exercise-list-visibility-*`),
+    and the catalogue's Show deleted control (`multi`)
   - `Tag` — a static micro-label pill naming a state (`Archived`, `Deleted`, a
     role); `neutral` or `faint`. Connected agents' `AI` tag (DLM-T05), the
-    exercise list's `Deleted` (`faint`, DLM-T06), and the catalogue's active
-    filters (DLM-T07)
+    exercise list's `Deleted` (`faint`, DLM-T06)
   - `Notice` — a `surface-subtle` band on a `rule` hairline: optional glyph, words,
     optional action; `neutral` or `danger` (`alert`); `live` announces it. There
     is no success or warning hue: the glyph and words carry the state. An
@@ -275,10 +273,10 @@ Brief entrypoint inventory of the current reusable UI component set.
 5. `ExerciseListContent` / `ExerciseListPreferenceControls`
 - File: `apps/mobile/components/exercise-catalog/exercise-list-controls.tsx`
 - Purpose:
-  - shared exercise list row/header rendering and shared grouping/date-range/recents controls for `exercise-catalog`, the exercise picker and the exercise page's `ExerciseSwapSheet`
-  - in the design language (DLM-T06): hairline `ListRow`s in one `Card` (flat) or one `Card` per muscle family, headed by a disclosure row (count in Plex Mono, `chevron-right` / `chevron-down`, `expanded`, testID `exercise-family-group-<slug>`); a row is the name, the muscles and the Plex Mono stats line, a deleted one a faint `Deleted` `Tag` with faint text; `renderActions` fills the trailing slot beside the row's own target. The options are a `SegmentedControl` and a multi `ChipGroup` whose chips keep the labels `Turn grouping off/on` and `Turn recents on top off/on`. Target: `design-targets/exercise-catalogue.md`
+  - shared exercise list row/header rendering and shared Favourite/Name A–Z and Show never-done controls for `exercise-catalog`, the exercise picker and the exercise page's `ExerciseSwapSheet`
+  - in the design language (DLM-T06): hairline `ListRow`s in one `Card` per muscle family, headed by a disclosure row (count in Plex Mono, `chevron-right` / `chevron-down`, `expanded`, testID `exercise-family-group-<slug>`); a row is the name, the muscles and the Plex Mono stats line, a deleted one a faint `Deleted` `Tag` with faint text; `renderActions` fills the trailing slot beside the row's own target. The visible controls are a Sort `SegmentedControl` (Favourite/Name A–Z) and a checked Show never-done `ChipGroup`. The compact history line shows Last performed plus all-time session count (or Never done). Search expands nonempty matching families without mutating saved expansion; initial history loading/failure replaces personal rows with a `StatePanel` and Retry on failure. Target: `design-targets/exercise-catalogue.md`
   - covered by `apps/mobile/app/__tests__/exercise-list-controls.test.tsx`
-  - composes the non-visual list model/preference modules under `apps/mobile/src/exercise-catalog/` so both surfaces share grouping, filtering, sorting, row stats, collapsed-group state behavior, and local-only preference behavior while each route keeps its surface-specific actions
+  - composes the non-visual list model/preference modules under `apps/mobile/src/exercise-catalog/` so all three surfaces share grouping, filtering, sorting, row stats, collapsed-group state behavior, and local-only preference behavior while each route keeps its surface-specific actions
 
 6. Session completion (the completion presentation of `/completed-session/<id>`)
 - Folder: `apps/mobile/components/session-complete/`
@@ -401,9 +399,9 @@ Brief entrypoint inventory of the current reusable UI component set.
 - Purpose:
   - the session view's exercise picker (`+ Add exercise`), its only consumer:
     a tall `Sheet` (`exercise-picker`, keyboard-avoiding; backdrop label
-    `Dismiss exercise modal overlay`) titled `Select Exercise` with ⋮ / Manage /
+    `Dismiss exercise modal overlay`) titled `Select Exercise` with Manage /
     Add new `IconButton`s,
-    search and shared list options, the add preselection (`Add empty set`
+    search and visible shared Sort/Show never-done controls, the add preselection (`Add empty set`
     outline / `Append plan`, the sheet's one `accent`; the plan's sets as
     planned `SetSummaryRow`s), `From your groups` with its pick sheet, inline create and
     Manage (`/exercise-catalog?source=session&intent=manage`). It only adds —

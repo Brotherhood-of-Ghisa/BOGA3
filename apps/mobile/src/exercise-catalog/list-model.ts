@@ -2,40 +2,24 @@ import type { ExerciseCatalogExercise, ExerciseCatalogMuscleGroup } from '@/src/
 import type {
   ExerciseAggregate,
   ExerciseCatalogStats,
-  ExerciseCatalogStatsPeriod,
   ExerciseRecencyScore,
 } from '@/src/data/exercise-catalog-stats';
 
 import { filterIndexedExerciseCatalogExercises, type IndexedExerciseCatalogExercise } from './search';
 
-export type ExerciseListDateRange = ExerciseCatalogStatsPeriod;
-
 export type ExerciseDateFormat = 'DD-MM-YYYY' | 'MM-DD-YYYY' | 'YYYY-MM-DD';
+export type ExerciseListSort = 'favourite' | 'name';
 
 export type ExerciseListPreferences = {
-  groupByMuscleFamily: boolean;
-  dateRange: ExerciseListDateRange;
-  recentsOnTop: boolean;
+  sort: ExerciseListSort;
+  showNeverDone: boolean;
+  // Used by the exercise detail records panel, independently of browser dates.
   dateFormat: ExerciseDateFormat;
 };
 
-export type ExerciseListDateRangeOption = {
-  value: ExerciseListDateRange;
-  label: string;
-};
-
-export const EXERCISE_LIST_DATE_RANGE_OPTIONS: ExerciseListDateRangeOption[] = [
-  { value: 7, label: '7d' },
-  { value: 30, label: '30d' },
-  { value: 90, label: '90d' },
-  { value: 365, label: '1y' },
-  { value: 'all', label: 'All' },
-];
-
 export const DEFAULT_EXERCISE_LIST_PREFERENCES: ExerciseListPreferences = {
-  groupByMuscleFamily: true,
-  dateRange: 90,
-  recentsOnTop: true,
+  sort: 'favourite',
+  showNeverDone: true,
   dateFormat: 'DD-MM-YYYY',
 };
 
@@ -75,18 +59,14 @@ export type BuildExerciseListModelInput = {
   preferences: ExerciseListPreferences;
   query: string;
   includeDeleted: boolean;
-  showNeverDone: boolean;
-  selectedMuscleGroupIds?: ReadonlySet<string>;
+  now?: Date;
 };
 
 export type ExerciseListModel = {
-  mode: 'grouped' | 'flat';
+  isSearching: boolean;
   items: ExerciseListItem[];
   sections: ExerciseListSection[];
 };
-
-export const getExerciseListDateRangeLabel = (range: ExerciseListDateRange): string =>
-  EXERCISE_LIST_DATE_RANGE_OPTIONS.find((option) => option.value === range)?.label ?? '90d';
 
 export const pickPrimaryExerciseMapping = (exercise: ExerciseCatalogExercise) =>
   exercise.mappings.find((mapping) => mapping.role === 'primary') ??
@@ -136,12 +116,6 @@ export const formatExerciseMuscleSummary = (
   return `${primaryLabel} · ${secondaryMappings.length} secondaries`;
 };
 
-export const formatExerciseListVolume = (volume: number): string => {
-  if (volume <= 0) return '0';
-  if (volume >= 1000) return `${(volume / 1000).toFixed(1)}k`;
-  return `${Math.round(volume)}`;
-};
-
 export const formatShortDate = (date: Date, dateFormat: ExerciseDateFormat): string => {
   const month = `${date.getMonth() + 1}`.padStart(2, '0');
   const day = `${date.getDate()}`.padStart(2, '0');
@@ -155,29 +129,20 @@ export const formatShortDate = (date: Date, dateFormat: ExerciseDateFormat): str
   return `${day}-${month}-${year}`;
 };
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
 export const formatExerciseListStatsSummary = (
   aggregate: ExerciseAggregate | undefined,
   hasAllTimeHistory: boolean,
   lastDoneDate?: Date | null,
-  dateFormat: ExerciseDateFormat = DEFAULT_EXERCISE_LIST_PREFERENCES.dateFormat
+  now: Date = new Date()
 ): string => {
   if (!hasAllTimeHistory) return 'Never done';
-  const lastDoneStr = lastDoneDate ? `Last: ${formatShortDate(lastDoneDate, dateFormat)}` : '';
-
-  if (!aggregate) {
-    return lastDoneStr ? `No sets in range · ${lastDoneStr}` : 'No sets in range';
-  }
-  const parts: string[] = [`${aggregate.sessionCount} sessions`];
-  parts.push(`${formatExerciseListVolume(aggregate.totalVolume)} vol`);
-  parts.push(
-    aggregate.estimatedOneRepMax !== null
-      ? `${Math.round(aggregate.estimatedOneRepMax)} 1RM`
-      : '- 1RM'
-  );
-  if (lastDoneStr) {
-    parts.push(lastDoneStr);
-  }
-  return parts.join(' · ');
+  const count = aggregate?.sessionCount ?? 0;
+  const sessions = `${count} ${count === 1 ? 'session' : 'sessions'}`;
+  if (!lastDoneDate) return sessions;
+  const year = lastDoneDate.getFullYear() === now.getFullYear() ? '' : ` ${lastDoneDate.getFullYear()}`;
+  return `Last: ${lastDoneDate.getDate()} ${MONTHS[lastDoneDate.getMonth()]}${year} · ${sessions}`;
 };
 
 const compareExerciseNames = (left: ExerciseCatalogExercise, right: ExerciseCatalogExercise): number =>
@@ -219,19 +184,14 @@ export const buildExerciseListModel = ({
   preferences,
   query,
   includeDeleted,
-  showNeverDone,
-  selectedMuscleGroupIds = new Set<string>(),
+  now = new Date(),
 }: BuildExerciseListModelInput): ExerciseListModel => {
   const muscleGroupById = new Map(muscleGroups.map((muscleGroup) => [muscleGroup.id, muscleGroup]));
-  const filterByMuscle = selectedMuscleGroupIds.size > 0;
+  const isSearching = query.trim().length > 0;
 
   const visible = exercises.filter((exercise) => {
     if (!includeDeleted && exercise.deletedAt) return false;
-    if (!showNeverDone && !stats.everDoneIds.has(exercise.id)) return false;
-    if (filterByMuscle) {
-      const primary = pickPrimaryExerciseMapping(exercise);
-      if (!primary || !selectedMuscleGroupIds.has(primary.muscleGroupId)) return false;
-    }
+    if (!preferences.showNeverDone && !stats.everDoneIds.has(exercise.id)) return false;
     return true;
   });
 
@@ -248,21 +208,13 @@ export const buildExerciseListModel = ({
       lastDoneDate,
       primaryFamilyName: getExercisePrimaryFamilyName(exercise, muscleGroupById),
       muscleSummary: formatExerciseMuscleSummary(exercise, muscleGroupById),
-      statsSummary: formatExerciseListStatsSummary(aggregate, hasAllTimeHistory, lastDoneDate, preferences.dateFormat),
+      statsSummary: formatExerciseListStatsSummary(aggregate, hasAllTimeHistory, lastDoneDate, now),
     };
   });
 
   const sortedItems = [...items].sort(
-    preferences.recentsOnTop ? compareByRecency : compareExerciseNames
+    preferences.sort === 'favourite' ? compareByRecency : compareExerciseNames
   );
-
-  if (!preferences.groupByMuscleFamily) {
-    return {
-      mode: 'flat',
-      items: sortedItems,
-      sections: [],
-    };
-  }
 
   const familyOrder = buildFamilyOrder(muscleGroups);
   const itemBuckets = new Map<string, ExerciseListItem[]>();
@@ -282,8 +234,8 @@ export const buildExerciseListModel = ({
   });
 
   return {
-    mode: 'grouped',
+    isSearching,
     items: sortedItems,
-    sections,
+    sections: isSearching ? sections.filter((section) => section.count > 0) : sections,
   };
 };

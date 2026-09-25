@@ -132,7 +132,7 @@ export const createDrizzleExerciseCatalogStatsStore = (): ExerciseCatalogStatsSt
 type PeriodWindow = { start: Date | null; end: Date | null };
 
 const RECENCY_HALF_LIFE_DAYS = 60;
-const ALL_RECENCY_SCORE_CAP_DAYS = 365;
+const FAVOURITE_WINDOW_DAYS = 180;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 const resolvePeriodWindow = (
@@ -148,20 +148,6 @@ const isInWindow = (completedAt: Date, window: PeriodWindow): boolean => {
   if (window.start && completedAt < window.start) return false;
   if (window.end && completedAt >= window.end) return false;
   return true;
-};
-
-const resolveRecencyScoringWindow = (
-  period: ExerciseCatalogStatsPeriod,
-  now: Date
-): PeriodWindow => {
-  if (period === 'all') {
-    return {
-      start: new Date(now.getTime() - ALL_RECENCY_SCORE_CAP_DAYS * MS_PER_DAY),
-      end: new Date(now.getTime()),
-    };
-  }
-
-  return resolvePeriodWindow(period, now);
 };
 
 const computeSetRecencyScore = (completedAt: Date, now: Date): number => {
@@ -197,7 +183,7 @@ export const aggregateExerciseCatalogStats = (
   const recencyScoresById = new Map<string, ExerciseRecencyScore>();
   const lastCompletedAtById = new Map<string, Date>();
   const sessionsSeenByDef = new Map<string, Set<string>>();
-  const recencyWindow = resolveRecencyScoringWindow(period, now);
+  const favouriteStart = now.getTime() - FAVOURITE_WINDOW_DAYS * MS_PER_DAY;
 
   for (const set of raw.exerciseSets) {
     if (
@@ -214,18 +200,8 @@ export const aggregateExerciseCatalogStats = (
     if (!link || link.exerciseDefinitionId === null) continue;
 
     const defId = link.exerciseDefinitionId;
-    everDoneIds.add(defId);
-
-    const completedAt = sessionCompletedAt.get(link.sessionId) ?? null;
-    if (completedAt) {
-      const existing = lastCompletedAtById.get(defId);
-      if (!existing || completedAt > existing) {
-        lastCompletedAtById.set(defId, completedAt);
-      }
-    }
-
-    if (!sessionInWindow.get(link.sessionId)) continue;
-
+    const completedAt = sessionCompletedAt.get(link.sessionId);
+    if (!completedAt) continue;
     const parsed = parseCalculationSet({
       weightValue: set.weightValue,
       repsValue: set.repsValue,
@@ -233,7 +209,15 @@ export const aggregateExerciseCatalogStats = (
     });
     if (parsed === null) continue;
 
-    if (completedAt && isInWindow(completedAt, recencyWindow)) {
+    // All browser history uses the same eligible sets as Favourite and counts.
+    everDoneIds.add(defId);
+    const previousUse = lastCompletedAtById.get(defId);
+    if (!previousUse || completedAt > previousUse) {
+      lastCompletedAtById.set(defId, completedAt);
+    }
+
+    // Favourite is independent of the Stats screen's selected metric period.
+    if (completedAt.getTime() >= favouriteStart && completedAt <= now) {
       let recency = recencyScoresById.get(defId);
       if (!recency) {
         recency = {
@@ -250,6 +234,8 @@ export const aggregateExerciseCatalogStats = (
         recency.lastCompletedAt = completedAt;
       }
     }
+
+    if (!sessionInWindow.get(link.sessionId)) continue;
 
     let aggregate = aggregatesById.get(defId);
     if (!aggregate) {

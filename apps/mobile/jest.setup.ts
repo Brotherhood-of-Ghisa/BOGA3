@@ -1,12 +1,10 @@
 import { cleanup } from '@testing-library/react-native';
 import {
   __resetExerciseListPreferencesForTests,
-  setExerciseListPreferences,
 } from '@/src/exercise-catalog/list-preferences';
 
 beforeEach(() => {
   __resetExerciseListPreferencesForTests();
-  setExerciseListPreferences({ groupByMuscleFamily: false });
 });
 
 afterEach(() => {

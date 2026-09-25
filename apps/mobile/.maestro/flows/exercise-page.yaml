@@ -180,8 +180,9 @@ appId: com.dinoderek.mobile
       id: "exercise-swap-list"
     timeout: 10000
 - takeScreenshot: "exercise-swap-sheet"
+# The shared browser is taller; dismiss in the remaining backdrop above it.
 - tapOn:
-    point: "50%,15%"
+    point: "5%,7%"
 - extendedWaitUntil:
     notVisible:
       id: "exercise-swap-list"

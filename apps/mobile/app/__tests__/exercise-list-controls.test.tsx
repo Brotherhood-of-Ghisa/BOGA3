@@ -37,10 +37,9 @@ const renderList = (props: Partial<Parameters<typeof ExerciseListContent>[0]> = 
   render(
     <ExerciseListContent
       emptyText="No exercises match that filter."
-      expandedFamilies={new Set()}
+      expandedFamilies={new Set(['Chest'])}
       items={[bench, fly]}
-      mode="flat"
-      sections={[]}
+      sections={[{ familyName: 'Chest', count: 2, exercises: [bench, fly] }]}
       {...handlers}
       {...props}
     />,
@@ -55,6 +54,7 @@ describe('ExerciseListContent rows', () => {
   it('makes each row one target labelled for the pick, with the stats line in Plex Mono', () => {
     const { onPressExercise } = renderList();
 
+    expect(screen.getByLabelText('Select exercise Bench Press')).toHaveProp('accessibilityHint', `${bench.muscleSummary}. ${bench.statsSummary}.`);
     fireEvent.press(screen.getByLabelText('Select exercise Bench Press'));
     expect(onPressExercise).toHaveBeenCalledWith(bench);
     const stats = screen.getAllByText('Never done')[0];
@@ -92,7 +92,7 @@ describe('ExerciseListContent rows', () => {
     expect(onPressExercise).toHaveBeenCalledWith(bench);
   });
 
-  it('shows the empty copy when a flat list has nothing', () => {
+  it('shows the empty copy when no exercise matches', () => {
     renderList({ items: [] });
     expect(screen.getByText('No exercises match that filter.')).toBeTruthy();
   });
@@ -105,7 +105,7 @@ describe('ExerciseListContent grouped', () => {
   ];
 
   it('heads each family with a disclosure row: count, chevron, expanded state', () => {
-    const { onToggleFamily } = renderList({ mode: 'grouped', sections });
+    const { onToggleFamily } = renderList({ sections, expandedFamilies: new Set() });
 
     const chest = screen.getByTestId('exercise-family-group-chest');
     expect(chest.props.accessibilityLabel).toBe('Chest exercises 1');
@@ -120,7 +120,7 @@ describe('ExerciseListContent grouped', () => {
   });
 
   it('lists an expanded family under its header', () => {
-    renderList({ expandedFamilies: new Set(['Chest']), mode: 'grouped', sections });
+    renderList({ expandedFamilies: new Set(['Chest']), sections });
 
     expect(screen.getByTestId('exercise-family-group-chest').props.accessibilityState).toMatchObject({
       expanded: true,
@@ -130,36 +130,46 @@ describe('ExerciseListContent grouped', () => {
 });
 
 describe('ExerciseListPreferenceControls', () => {
-  it('picks the stats window from a segmented control and toggles the list options by what they do', () => {
+  it('offers exactly two sorts with selected state and an accessible never-done toggle', () => {
     const onChangePreferences = jest.fn();
-    render(
-      <ExerciseListPreferenceControls
-        onChangePreferences={onChangePreferences}
-        preferences={DEFAULT_EXERCISE_LIST_PREFERENCES}
-      />,
-    );
-
-    expect(screen.getByTestId('exercise-list-date-range-90').props.accessibilityState).toEqual({ selected: true });
-    fireEvent.press(screen.getByLabelText('Date range 30d'));
-    expect(onChangePreferences).toHaveBeenLastCalledWith({ dateRange: 30 });
-
-    // Grouping and recents are on by default, so each chip offers to turn off.
-    expect(screen.getByLabelText('Turn grouping off').props.accessibilityState).toEqual({ checked: true });
-    fireEvent.press(screen.getByLabelText('Turn grouping off'));
-    expect(onChangePreferences).toHaveBeenLastCalledWith({ groupByMuscleFamily: false });
-    fireEvent.press(screen.getByLabelText('Turn recents on top off'));
-    expect(onChangePreferences).toHaveBeenLastCalledWith({ recentsOnTop: false });
+    const view = render(<ExerciseListPreferenceControls onChangePreferences={onChangePreferences} preferences={DEFAULT_EXERCISE_LIST_PREFERENCES} />);
+    expect(screen.getByLabelText('Favourite').props.accessibilityState).toEqual({ selected: true });
+    fireEvent.press(screen.getByLabelText('Name A–Z'));
+    expect(onChangePreferences).toHaveBeenLastCalledWith({ sort: 'name' });
+    expect(screen.getByLabelText('Show never-done').props.accessibilityState).toEqual({ checked: true });
+    fireEvent.press(screen.getByLabelText('Show never-done'));
+    expect(onChangePreferences).toHaveBeenLastCalledWith({ showNeverDone: false });
+    view.rerender(<ExerciseListPreferenceControls onChangePreferences={onChangePreferences} preferences={{ ...DEFAULT_EXERCISE_LIST_PREFERENCES, sort: 'name', showNeverDone: false }} />);
+    expect(screen.getByLabelText('Name A–Z').props.accessibilityState).toEqual({ selected: true });
+    expect(screen.getByLabelText('Show never-done').props.accessibilityState).toEqual({ checked: false });
+    expect(screen.queryByText('Date range')).toBeNull();
   });
+});
 
-  it('offers to turn each option back on', () => {
-    render(
-      <ExerciseListPreferenceControls
-        onChangePreferences={jest.fn()}
-        preferences={{ ...DEFAULT_EXERCISE_LIST_PREFERENCES, groupByMuscleFamily: false, recentsOnTop: false }}
-      />,
-    );
+it('reveals search matches without changing ordinary expansion and restores collapse on clear', () => {
+  const onToggleFamily = jest.fn();
+  const props = { items: [bench], sections: [{ familyName: 'Chest', count: 1, exercises: [bench] }], expandedFamilies: new Set<string>(), emptyText: 'No matches', onToggleFamily, onPressExercise: jest.fn() };
+  const view = render(<ExerciseListContent {...props} isSearching />);
+  expect(screen.getByLabelText('Select exercise Bench Press')).toBeTruthy();
+  fireEvent.press(screen.getByTestId('exercise-family-group-chest'));
+  expect(onToggleFamily).not.toHaveBeenCalled();
+  view.rerender(<ExerciseListContent {...props} isSearching={false} />);
+  expect(screen.queryByLabelText('Select exercise Bench Press')).toBeNull();
+});
 
-    expect(screen.getByLabelText('Turn grouping on').props.accessibilityState).toEqual({ checked: false });
-    expect(screen.getByLabelText('Turn recents on top on')).toBeTruthy();
-  });
+it('keeps empty families collapsed and disabled even when previously expanded', () => {
+  renderList({ items: [], sections: [{ familyName: 'Chest', count: 0, exercises: [] }], expandedFamilies: new Set(['Chest']) });
+  expect(screen.getByTestId('exercise-family-group-chest').props.accessibilityState).toMatchObject({ expanded: false, disabled: true });
+});
+
+it('replaces unknown history with loading or a retryable error, never Never done', () => {
+  const onRetryHistory = jest.fn();
+  const props = { items: [bench], sections: [{ familyName: 'Chest', count: 1, exercises: [bench] }], expandedFamilies: new Set(['Chest']), emptyText: 'No matches', onToggleFamily: jest.fn(), onPressExercise: jest.fn(), onRetryHistory };
+  const view = render(<ExerciseListContent {...props} historyStatus="loading" />);
+  expect(screen.getByText('Loading exercise history…')).toBeTruthy();
+  expect(screen.queryByText('Never done')).toBeNull();
+  view.rerender(<ExerciseListContent {...props} historyStatus="error" />);
+  expect(screen.getByText('Unable to load exercise history.')).toBeTruthy();
+  fireEvent.press(screen.getByLabelText('Retry exercise history'));
+  expect(onRetryHistory).toHaveBeenCalledTimes(1);
 });

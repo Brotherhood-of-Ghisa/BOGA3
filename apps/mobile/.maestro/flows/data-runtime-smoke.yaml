@@ -41,20 +41,15 @@ appId: com.dinoderek.mobile
     timeout: 30000
 - tapOn:
     id: "session-view-add-exercise"
-- tapOn: "Exercise picker options"
-- tapOn: "Turn grouping off"
-- tapOn: "Exercise picker options"
 - tapOn: "Exercise filter input"
 - inputText: "Barbell Back Squat"
-- hideKeyboard:
-    optional: true
-- tapOn: "Select Exercise"
+- pressKey: Enter
 # Pick the seeded "Barbell Back Squat" exercise by its accessibility label
 # ("Select exercise <name>", exercise-picker.tsx) rather than a fragile
 # coordinate tap. On a cold sim the picker list can render a beat later than on
 # a warm one, so a coordinate tap raced the row layout and landed on empty
 # space. Filtering by the exact seeded name yields a deterministic seeded row.
-# This smoke flow turns grouping off explicitly above; grouped collapse/search
+# Search expands matching families automatically; collapse/search
 # behavior is covered by focused tests.
 - extendedWaitUntil:
     visible:

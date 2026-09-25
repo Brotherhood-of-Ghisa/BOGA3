@@ -20,6 +20,8 @@ jest.mock('@/src/maestro/exercise-block-history-fixture', () => ({
   seedExerciseBlockHistoryFixture: jest.fn(),
 }));
 
+jest.mock('@/src/maestro/exercise-browser-fixture', () => ({ seedExerciseBrowserFixture: jest.fn() }));
+
 jest.mock('@/src/maestro/exercise-page-fixture', () => ({
   seedExercisePageFixture: jest.fn(),
 }));
@@ -41,6 +43,7 @@ import {
   EXERCISE_BLOCK_HISTORY_FIXTURE,
   seedExerciseBlockHistoryFixture,
 } from '@/src/maestro/exercise-block-history-fixture';
+import { seedExerciseBrowserFixture } from '@/src/maestro/exercise-browser-fixture';
 import { seedExercisePageFixture } from '@/src/maestro/exercise-page-fixture';
 import {
   coerceMaestroHarnessQueryParam,
@@ -362,4 +365,11 @@ describe('maestro harness helpers', () => {
       EXERCISE_BLOCK_HISTORY_FIXTURE.secondaryExerciseId,
     ]);
   });
+});
+
+
+it('routes the browser fixture without altering the existing fixture contracts', async () => {
+  expect(resolveMaestroHarnessFixtureName('exercise-browser')).toBe('exercise-browser');
+  await runMaestroHarnessFixture('exercise-browser');
+  expect(seedExerciseBrowserFixture).toHaveBeenCalledTimes(1);
 });

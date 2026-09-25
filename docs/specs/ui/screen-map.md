@@ -230,7 +230,7 @@ Brief entrypoint map of the current mobile screens.
     and weight, and — the one highlight — a brass record 1RM and `record` band with the
     1RM when a done set beats the exercise's completed history
     (`deriveExercisePersonalRecord`)
-  - `+ Add exercise` opens the shared exercise picker, a tall `Sheet`
+  - `+ Add exercise` opens the shared exercise picker with Search, Favourite/Name A–Z and Show never-done, a tall `Sheet`
     (`components/session-recorder/exercise-picker.tsx`), and writes the new
     exercise (one empty set) or appended plan straight to the draft. Design
     target: `design-targets/exercise-catalogue.md`
@@ -271,11 +271,11 @@ Brief entrypoint map of the current mobile screens.
 - Key states (high level):
   - in the design language (DLM-T07; target `design-targets/exercise-catalogue.md`):
     the in-content title `Exercises`, then the filter field, the `accent` `+`
-    (the screen's one primary) and ⋮ on one row, the active filters as `Tag`s
-    (each opens Filters), and an outcome `Notice` (`Exercise created.` …)
+    (the screen's one primary) and management ⋮ on one row, Sort and Show never-done
+    below it, and an outcome `Notice` (`Exercise created.` …)
   - loading / error as a `StatePanel`, or the content
-  - shared exercise-list content with local shared preferences for grouping/date range/recents, default grouped `90d` recents-on-top behavior, taxonomy-ordered collapsible muscle-family headers, text filtering across exercise names + primary muscle display/family terms that preserves collapsed/expanded group state, and per-row stats for the selected range
-  - the `Filters` sheet (⋮): the shared list options, then catalog-only muscle, deleted visibility (`Show deleted` / `Hide deleted`) and never-done visibility filters
+  - shared exercise browser with mandatory taxonomy-ordered muscle families, visible Favourite/Name A–Z and Show never-done controls (shared local preferences); search expands matching families and clearing restores prior expansion. Rows show last performed and all-time session count; history loading/error states never imply Never done
+  - the management sheet (⋮): catalogue-only deleted visibility (`Show deleted` / `Hide deleted`); everyday browsing controls stay on the page
   - the row `⋮` actions sheet, titled with the exercise's name, offers `Edit`, `Link to group exercise…` (M25-T07; signed in only, disabled for a deleted exercise), and `Delete` (`danger`, no confirmation) / `Undelete`
   - the exercise editor sheet (create / edit), with its muscle list shown in the same sheet
 - Key exits:
@@ -630,6 +630,7 @@ Brief entrypoint map of the current mobile screens.
   - records panel collapsed (`1RM` / `Max` / `Vol` of the selected view: the records, or the last session), expanded on `Records` (each record's date and set) or on `Last` (the previous completed session's sets); `Records` | `Last` and `History` are present in both, and switching views keeps the panel collapsed or expanded
   - performed, current and planned rows (glyph `set-done` / `set-current` / `set-planned`); the logger (Weight · Reps · Effort · the `accent` tick) on the first set not performed, or on the row tapped
   - the effort sheet (W-Up / None / descending RIR from the file-configured maximum, default 3) and the ⋮ sheet (Edit exercise / Swap exercise / `Link to group exercise…`, signed in only / Remove from session)
+  - Swap exercise: the same Search, Favourite/Name A–Z and Show never-done controls and family list as the catalogue; excludes the current/deleted exercise, reveals search matches, and handles loading/error/empty history explicitly
   - a missing session or exercise, or a deleted session: an inline message
 - Key exits:
   - back (top bar) → the previous screen; `Complete exercise` → the previous screen after resolving the sets still waiting; `Remove from session` → the previous screen; `History` → `/exercise-history`; ⋮ `Link to group exercise…` → `/exercise-link?exerciseDefinitionId=<id>`

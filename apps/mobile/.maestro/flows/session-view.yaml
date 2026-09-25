@@ -187,20 +187,13 @@ appId: com.dinoderek.mobile
       id: "exercise-family-group-chest"
     timeout: 15000
 - takeScreenshot: "picker-default"
-- tapOn: "Exercise picker options"
-- extendedWaitUntil:
-    visible:
-      id: "exercise-picker-options-panel"
-    timeout: 10000
+- assertVisible: "Favourite"
+- assertVisible: "Name A–Z"
+- assertVisible: "Show never-done"
 - takeScreenshot: "picker-options"
-- tapOn: "Turn grouping off"
-- tapOn: "Exercise picker options"
-# The preselection with a plan: the bench has completed history in the fixture.
 - tapOn: "Exercise filter input"
 - inputText: "Barbell Bench Press"
-- hideKeyboard:
-    optional: true
-- tapOn: "Select Exercise"
+- pressKey: Enter
 - extendedWaitUntil:
     visible:
       text: "Select exercise Barbell Bench Press"
@@ -218,9 +211,7 @@ appId: com.dinoderek.mobile
 - tapOn: "Exercise filter input"
 - eraseText: 40
 - inputText: "Lat Pulldown"
-- hideKeyboard:
-    optional: true
-- tapOn: "Select Exercise"
+- pressKey: Enter
 - extendedWaitUntil:
     visible:
       text: "Select exercise Lat Pulldown"

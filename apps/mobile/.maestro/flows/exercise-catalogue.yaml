@@ -6,13 +6,11 @@ appId: com.dinoderek.mobile
 # a stats line) and teleports to /exercise-catalog. No sign-in, no Supabase.
 #
 #   1. the catalogue, grouped, with the Chest family expanded;
-#   2. ⋮ → the Filters sheet; grouping off; the backdrop closes it (flat list);
+#   2. visible sorting/never-done controls and separate management sheet;
 #   3. a row's ⋮ → the Actions sheet; the backdrop closes it;
 #   4. + → the editor: empty, Save with no name (inline errors), the primary
 #      muscle selector panel, filled (a primary and a secondary muscle);
 #   5. Save → the "Exercise created." notice and the new row;
-#   6. grouping back on, so the stored list preference is left as found (it
-#      lives in SecureStore, which the data reset does not touch).
 #
 # The Sheet backdrop is hidden from VoiceOver while the sheet is modal, so the
 # flow taps the dimmed page above the panel by point.
@@ -50,48 +48,27 @@ appId: com.dinoderek.mobile
           timeout: 5000
 - takeScreenshot: "catalogue-list-grouped"
 
-# --- 2. Filters ----------------------------------------------------------------
-- retry:
-    maxRetries: 3
-    commands:
-      - runFlow:
-          when:
-            notVisible:
-              id: "exercise-list-date-range-row"
-          commands:
-            - tapOn: "Exercise catalog options"
-      - extendedWaitUntil:
-          visible:
-            id: "exercise-list-date-range-row"
-          timeout: 5000
-- assertVisible:
-    id: "exercise-catalog-filters-sheet"
-- waitForAnimationToEnd:
-    timeout: 4000
-- takeScreenshot: "catalogue-filters-sheet"
-- retry:
-    maxRetries: 3
-    commands:
-      - runFlow:
-          when:
-            visible: "Turn grouping off"
-          commands:
-            - tapOn: "Turn grouping off"
-      - extendedWaitUntil:
-          visible:
-            text: "Turn grouping on"
-          timeout: 5000
+# --- 2. Shared controls and management ----------------------------------------
+- assertVisible: "Favourite"
+- assertVisible: "Name A–Z"
+- assertVisible: "Show never-done"
+- tapOn: "Name A–Z"
+- takeScreenshot: "catalogue-name-sort"
+- tapOn: "Favourite"
+- tapOn: "Show never-done"
+- takeScreenshot: "catalogue-never-done-off"
+- tapOn: "Show never-done"
+- tapOn: "Exercise catalog options"
+- extendedWaitUntil:
+    visible: "Manage exercises"
+    timeout: 10000
+- assertVisible: "Show deleted exercises"
+- takeScreenshot: "catalogue-management-sheet"
 - tapOn:
     point: "50%,12%"
 - extendedWaitUntil:
-    notVisible:
-      id: "exercise-list-date-range-row"
+    notVisible: "Manage exercises"
     timeout: 10000
-- extendedWaitUntil:
-    visible:
-      text: "Exercise actions Barbell Bench Press"
-    timeout: 10000
-- takeScreenshot: "catalogue-list-flat"
 
 # --- 3. Row actions ------------------------------------------------------------
 - tapOn: "Exercise actions Barbell Bench Press"
@@ -150,6 +127,10 @@ appId: com.dinoderek.mobile
       id: "exercise-editor-secondary-muscle-trigger"
     timeout: 10000
 # Bring the secondary action into the scroll viewport above the fixed footer.
+- swipe:
+    start: "50%,40%"
+    end: "50%,25%"
+    duration: 500
 - scrollUntilVisible:
     element:
       id: "exercise-editor-secondary-muscle-trigger"
@@ -194,27 +175,132 @@ appId: com.dinoderek.mobile
     text: "Exercise created."
 - takeScreenshot: "catalogue-created-notice"
 
-# --- 6. Leave the list preference as found (grouping on) -----------------------
-- tapOn: "Exercise catalog options"
+# Browser contract: all-time history, visible matches, shared preferences,
+# keyboard-safe selection, old plan suggestions and a retryable history error.
+- openLink: "boga3://maestro-harness?reset=data&fixture=exercise-browser&teleport=exercise-catalog"
+# Wait for the new fixture's catalogue, not the previous route's search field.
+- extendedWaitUntil:
+    visible: "Chest exercises 25"
+    timeout: 15000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn: "Exercise filter input"
+- inputText: "bench"
+- extendedWaitUntil:
+    visible: "Exercise actions Barbell Bench Press"
+    timeout: 10000
+# History text is nested in a labelled row; verify its date/count in the capture.
+- takeScreenshot: "browser-search-expanded"
+- tapOn: "Show never-done"
+- assertNotVisible: "Exercise actions Decline Barbell Bench Press"
+- assertVisible: "Exercise actions Cable Bench Press"
+- takeScreenshot: "browser-prior-year-never-off"
+- tapOn: "Name A–Z"
+- takeScreenshot: "browser-name-sort"
+- tapOn: "Clear search"
+- tapOn: "Exercise filter input"
+- inputText: "NoSuchExercise"
+- extendedWaitUntil:
+    visible: "No exercises match the current filters."
+    timeout: 10000
+- takeScreenshot: "browser-no-matches"
+- tapOn: "Clear search"
+- tapOn: "Exercise filter input"
+- inputText: "Incline Dumbbell Press"
+- extendedWaitUntil:
+    visible: "Exercise actions Incline Dumbbell Press"
+    timeout: 10000
+- takeScreenshot: "browser-old-history"
+
+# The add browser shares Name A–Z / never-done off, but starts its own search.
+- openLink: "boga3://maestro-harness?teleport=session-view&sessionId=maestro_session_view_active"
 - extendedWaitUntil:
     visible:
-      id: "exercise-list-date-range-row"
-    timeout: 10000
-- retry:
-    maxRetries: 3
-    commands:
-      - runFlow:
-          when:
-            visible: "Turn grouping on"
-          commands:
-            - tapOn: "Turn grouping on"
-      - extendedWaitUntil:
-          visible:
-            text: "Turn grouping off"
-          timeout: 5000
+      id: "session-view-add-exercise"
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: "session-view-add-exercise"
+    direction: DOWN
+    centerElement: true
 - tapOn:
-    point: "50%,12%"
+    id: "session-view-add-exercise"
+- extendedWaitUntil:
+    visible: "Select Exercise"
+    timeout: 10000
+- takeScreenshot: "browser-picker-shared-preferences"
+- tapOn: "Exercise filter input"
+- inputText: "Incline Dumbbell Press"
+- extendedWaitUntil:
+    visible: "Select exercise Incline Dumbbell Press"
+    timeout: 10000
+- takeScreenshot: "browser-picker-search-keyboard"
+- tapOn: "Select exercise Incline Dumbbell Press"
+- pressKey: Enter
+- scrollUntilVisible:
+    element:
+      id: "exercise-picker-append-plan-button"
+    direction: DOWN
+    centerElement: true
+- extendedWaitUntil:
+    visible:
+      id: "exercise-picker-plan-set-row-2"
+    timeout: 10000
+- takeScreenshot: "browser-old-plan"
+- tapOn:
+    id: "exercise-picker-append-plan-button"
 - extendedWaitUntil:
     notVisible:
-      id: "exercise-list-date-range-row"
+      id: "exercise-picker"
     timeout: 10000
+
+# Swap uses the same controls and history, excluding the current exercise.
+- openLink: "boga3://maestro-harness?teleport=exercise-page&sessionId=maestro_session_view_active&sessionExerciseId=maestro_session_view_bench"
+- extendedWaitUntil:
+    visible:
+      id: "exercise-page-options"
+    timeout: 15000
+- tapOn:
+    id: "exercise-page-options"
+- tapOn:
+    id: "exercise-options-swap"
+- extendedWaitUntil:
+    visible:
+      id: "exercise-swap-list"
+    timeout: 10000
+- takeScreenshot: "browser-swap-shared-preferences"
+- tapOn: "Search exercises"
+- inputText: "Incline Dumbbell Press"
+- extendedWaitUntil:
+    visible: "Select exercise Incline Dumbbell Press"
+    timeout: 10000
+- takeScreenshot: "browser-swap-search-keyboard"
+- tapOn: "Select exercise Incline Dumbbell Press"
+- extendedWaitUntil:
+    visible:
+      id: "exercise-page-title"
+      text: "Incline Dumbbell Press"
+    timeout: 10000
+
+# A real failed read must not turn into authoritative Never done rows.
+- openLink: "boga3://maestro-harness?teleport=exercise-catalog&maestroHistory=fail-once"
+- extendedWaitUntil:
+    visible: "Loading exercise history…"
+    timeout: 10000
+- waitForAnimationToEnd:
+    timeout: 500
+- takeScreenshot: "browser-history-loading"
+- extendedWaitUntil:
+    visible: "Unable to load exercise history."
+    timeout: 10000
+- assertNotVisible: "Never done"
+- takeScreenshot: "browser-history-error"
+- tapOn: "Retry exercise history"
+- extendedWaitUntil:
+    visible:
+      id: "exercise-family-group-chest"
+    timeout: 10000
+- takeScreenshot: "browser-history-recovered"
+# Restore defaults: data reset does not clear the local SecureStore preferences.
+- tapOn: "Favourite"
+- tapOn: "Show never-done"
