@@ -201,7 +201,7 @@ shippable.
 | T01 | Foundation primitives and tokens — **shipped** (card deleted) | ~1,400 | `fast` + `frontend` |
 | T02 | App frame: tray, tabs, stack headers — **shipped** (card deleted) | ~500 | `fast` + `frontend` |
 | T03 | Today and Train — **shipped** (card deleted) | ~1,100 | `fast` + `frontend` |
-| T04 | More, Settings, Logs | ~1,100 | `fast` + `frontend` |
+| T04 | More, Settings, Logs — **shipped** (card deleted) | ~1,100 | `fast` + `frontend` |
 | T05 | Sign-in, sync gate, Profile, Connected agents | ~1,200 | `fast` + `frontend` + **`backend` + `ios-sync-e2e`** (`src/sync/SyncGate.tsx` = "sync runtime") |
 | T06 | Exercise list and the session picker | ~1,000 | `fast` + `frontend` |
 | T07 | Exercise catalogue and editor | ~1,400 | `fast` + `frontend` |

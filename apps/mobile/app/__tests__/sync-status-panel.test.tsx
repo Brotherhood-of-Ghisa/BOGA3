@@ -25,7 +25,10 @@ jest.mock('expo-router', () => {
 
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
+import { StyleSheet } from 'react-native';
+
 import { SyncStatusPanel } from '@/components/sync-status/sync-status-panel';
+import { uiRoles } from '@/components/ui';
 import type { SyncStatusSnapshot } from '@/src/sync/sync-status';
 
 const baseStatus: SyncStatusSnapshot = {
@@ -78,18 +81,34 @@ describe('Settings sync-status panel', () => {
     });
   });
 
-  it('renders the offline network state', async () => {
+  it('renders the offline network state as the wifi-off glyph and the word, in ink', async () => {
     renderPanel({ networkState: 'offline' });
     await waitFor(() => {
       expect(screen.getByTestId('settings-sync-status-network')).toHaveTextContent('Offline');
     });
+    expect(screen.getByTestId('settings-sync-status-network-offline-glyph', { includeHiddenElements: true })).toBeTruthy();
+    expect(StyleSheet.flatten(screen.getByTestId('settings-sync-status-network').props.style).color).toBe(
+      uiRoles.ink,
+    );
   });
 
-  it('renders the latest cycle error', async () => {
+  it('shows no offline glyph while online', async () => {
+    const { readStatus } = renderPanel({ networkState: 'online' });
+    await waitFor(() => {
+      expect(readStatus).toHaveBeenCalled();
+    });
+    expect(screen.getByTestId('settings-sync-status-network')).toHaveTextContent('Online');
+    expect(screen.queryByTestId('settings-sync-status-network-offline-glyph', { includeHiddenElements: true })).toBeNull();
+  });
+
+  it('renders the latest cycle error in danger', async () => {
     renderPanel({ errorMessage: 'server unreachable' });
     await waitFor(() => {
       expect(screen.getByTestId('settings-sync-status-error')).toHaveTextContent('server unreachable');
     });
+    expect(StyleSheet.flatten(screen.getByTestId('settings-sync-status-error').props.style).color).toBe(
+      uiRoles.danger,
+    );
   });
 
   it('shows a sign-in-required error when the cycle reported no signed-in user', async () => {

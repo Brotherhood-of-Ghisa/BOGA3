@@ -65,8 +65,8 @@ Document app-specific UI semantics and guardrails for the current mobile app.
      explicit `Back to More` action; direct routes and non-More origins do not
      claim that history. Groups looks the same however it is opened. Gyms sits
      under Tools; it is also reached from the session view's `Gym` sheet.
-   - Settings Preferences holds device-local choices shown as single-select
-     option buttons (`accessibilityRole="button"` + `selected`): the date format.
+   - Settings Preferences holds device-local choices shown as a single-select
+     `SegmentedControl` (`tablist` / `tab` + `selected`): the date format.
      There is no screen choice: every active-session entry opens the session
      view (`/session/<id>`).
 7. Today is a bounded overview, not a second full feed or history screen.

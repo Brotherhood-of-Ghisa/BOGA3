@@ -1,9 +1,20 @@
 import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
-import { Icon, UiSurface, UiText, uiBorder, uiColors, uiRadius, uiSpace, uiTypography } from '@/components/ui';
+import {
+  Card,
+  Icon,
+  ListRow,
+  PageHeader,
+  ScreenScroll,
+  uiFonts,
+  uiGeometry,
+  uiRoles,
+  uiSpace,
+  uiTypography,
+} from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import {
   getMoreSections,
@@ -33,136 +44,89 @@ export default function MoreScreen() {
   };
 
   return (
-    <ScrollView
+    <ScreenScroll
       contentContainerStyle={styles.content}
       contentInsetAdjustmentBehavior="automatic"
-      style={styles.screen}
       testID="more-screen">
-      <View style={styles.intro}>
-        <UiText accessibilityRole="header" selectable style={styles.screenTitle} variant="title">
-          More
-        </UiText>
-        <UiText selectable variant="bodyMuted">
-          Community, coaching tools, and library management stay close without crowding your daily training.
-        </UiText>
-      </View>
+      <PageHeader
+        intro="Community, coaching tools, and library management stay close without crowding your daily training."
+        title="More"
+      />
 
       {sections.map((section) => (
         <View key={section.key} style={styles.section} testID={`more-section-${section.key}`}>
-          <UiText accessibilityRole="header" selectable variant="title">
+          <Text accessibilityRole="header" style={styles.sectionLabel}>
             {section.title}
-          </UiText>
-          <View style={styles.destinationList}>
-            {section.destinations.map((destination) => {
+          </Text>
+          <Card>
+            {section.destinations.map((destination, index) => {
               const external = destination.action.type === 'connect-agent';
               return (
-                <View key={destination.key} style={styles.destinationItem}>
-                  <Pressable
+                <View key={destination.key}>
+                  <ListRow
                     accessibilityHint={destination.accessibilityHint}
                     accessibilityLabel={`${destination.label}. ${destination.description}`}
                     accessibilityRole={external ? 'link' : 'button'}
+                    density="list"
+                    description={destination.description}
+                    divider={index > 0}
+                    label={destination.label}
+                    leading={<Icon color={uiRoles.inkMuted} name={destination.icon} />}
                     onPress={() => {
                       void openDestination(destination);
                     }}
-                    style={({ pressed }) => [
-                      styles.destinationPressable,
-                      pressed ? styles.destinationPressed : null,
-                    ]}
-                    testID={destination.testID}>
-                    <UiSurface style={styles.destinationCard}>
-                      <View style={styles.iconBadge}>
-                        <Icon color={uiColors.actionPrimary} name={destination.icon} />
-                      </View>
-                      <View style={styles.destinationCopy}>
-                        <UiText selectable variant="labelStrong">
-                          {destination.label}
-                        </UiText>
-                        <UiText selectable variant="bodyMuted">
-                          {destination.description}
-                        </UiText>
-                      </View>
+                    testID={destination.testID}
+                    trailing={
                       <Icon
-                        color={uiColors.textSecondary}
+                        color={uiRoles.inkFaint}
                         name={external ? 'arrow-up-right' : 'chevron-right'}
+                        size="sm"
                       />
-                    </UiSurface>
-                  </Pressable>
+                    }
+                  />
                   {destination.key === 'connect-agent' && connectError ? (
-                    <UiText
+                    <Text
                       accessibilityLiveRegion="polite"
-                      selectable
                       style={styles.inlineError}
-                      testID="more-connect-agent-error"
-                      variant="bodyMuted">
+                      testID="more-connect-agent-error">
                       {connectError}
-                    </UiText>
+                    </Text>
                   ) : null}
                 </View>
               );
             })}
-          </View>
+          </Card>
         </View>
       ))}
-    </ScrollView>
+    </ScreenScroll>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: uiColors.surfacePage,
-  },
+  // Sections sit a step further apart than a label and its card.
   content: {
-    padding: uiSpace.xl,
-    paddingBottom: uiSpace.xl,
-    gap: uiSpace.lg,
-  },
-  intro: {
-    gap: uiSpace.sm,
-  },
-  screenTitle: {
-    fontSize: uiTypography.size.xxl,
-    lineHeight: 30,
+    gap: uiSpace.xl,
   },
   section: {
-    gap: uiSpace.md,
-  },
-  destinationList: {
     gap: uiSpace.sm,
   },
-  destinationItem: {
-    gap: uiSpace.sm,
+  sectionLabel: {
+    fontFamily: uiFonts.display.family,
+    fontWeight: '700',
+    fontSize: uiTypography.size.xxs,
+    lineHeight: uiTypography.lineHeight.xxs,
+    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
+    textTransform: 'uppercase',
+    color: uiRoles.inkMuted,
   },
-  destinationPressable: {
-    width: '100%',
-  },
-  destinationPressed: {
-    opacity: 0.92,
-  },
-  destinationCard: {
-    minHeight: 76,
-    paddingHorizontal: uiSpace.lg,
-    paddingVertical: uiSpace.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiSpace.md,
-  },
-  iconBadge: {
-    width: 42,
-    height: 42,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: uiBorder.width,
-    borderColor: uiColors.actionPrimarySubtleBorder,
-    borderRadius: uiRadius.full,
-    backgroundColor: uiColors.surfaceInfo,
-  },
-  destinationCopy: {
-    flex: 1,
-    gap: uiSpace.xs,
-  },
+  // Under the row it belongs to, inset to the row's text.
   inlineError: {
-    color: uiColors.actionDangerText,
-    paddingHorizontal: uiSpace.sm,
+    paddingHorizontal: uiSpace.md,
+    paddingBottom: uiSpace.md,
+    fontFamily: uiFonts.body.family,
+    fontWeight: '600',
+    fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
+    color: uiRoles.danger,
   },
 });

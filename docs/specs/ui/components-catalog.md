@@ -146,21 +146,25 @@ Brief entrypoint inventory of the current reusable UI component set.
   - `SegmentedControl` — one choice from a few, joined in a `rule-strong` frame,
     the selected segment solid `ink`; `layout` `fill` (equal width) or `inline`;
     `tablist` / `tab` / `selected` and the `<prefix>-row` / `<prefix>-<value>`
-    testIDs of the legacy `SegmentedChips`. The records panel's `Records` | `Last`
+    testIDs of the legacy `SegmentedChips`. The records panel's `Records` | `Last`,
+    and Settings' date format (DLM-T04)
   - `ChipGroup` — wrapping pills, `single` (a tab list, `selected`) or `multi`
     (checkboxes, `checked`), the same testID contract, per-chip accessibility
-    labels. No consumer yet (built ahead of the legacy chip rows it replaces)
+    labels. Logs' level filter (DLM-T04)
   - `Tag` — a static micro-label pill naming a state (`Archived`, `Deleted`, a
     role); `neutral` or `faint`. No consumer yet
   - `Notice` — a `surface-subtle` band on a `rule` hairline: optional glyph, words,
     optional action; `neutral` or `danger` (`alert`); `live` announces it. There
-    is no success or warning hue: the glyph and words carry the state. No
-    consumer yet
+    is no success or warning hue: the glyph and words carry the state.
+    Settings' developer-tool outcomes (DLM-T04)
   - `PageHeader` / `SectionHeader` (`page-header.tsx`, DLM-T03) — a tab
     screen's in-content title (Archivo 800 `xxl`) and optional `ink-muted`
     intro; a section's heading (Archivo 700 `lg`) with an optional caps text
-    action. Today and Train
-  - `ListRow` also takes an `accessibilityHint` for a pressable row (DLM-T03)
+    action. Today and Train; `PageHeader` also More and Settings (DLM-T04)
+  - `ListRow` also takes an `accessibilityHint` for a pressable row (DLM-T03),
+    and a `description` (a wrapping `ink-muted` second line) and
+    `accessibilityRole="link"` for a row that opens the browser (DLM-T04: the
+    More and Settings destinations)
   - covered by `apps/mobile/app/__tests__/ui-design-primitives.test.tsx`
 
 7. `Icon`

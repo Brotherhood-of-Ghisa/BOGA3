@@ -10,6 +10,9 @@ export type ListRowProps = {
   // The row's text. Pass `children` instead for composed content (a set row's
   // weight × reps).
   label?: string;
+  // A second line under the label in `ink-muted` body text (what a More or
+  // Settings destination is for). It wraps; the label stays one line.
+  description?: string;
   children?: ReactNode;
   // Before the content: an icon, or a fixed-width column (a set row's type).
   leading?: ReactNode;
@@ -33,12 +36,15 @@ export type ListRowProps = {
   // What pressing the row does, when the label does not say (`Opens the
   // completed session`).
   accessibilityHint?: string;
+  // `link` for a row that leaves the app (it opens the system browser).
+  accessibilityRole?: 'button' | 'link';
   testID?: string;
 };
 
 // A design-language row: `[leading][content, flex][meta][trailing control]`.
 export function ListRow({
   label,
+  description,
   children,
   leading,
   meta,
@@ -51,12 +57,13 @@ export function ListRow({
   disabled = false,
   accessibilityLabel,
   accessibilityHint,
+  accessibilityRole = 'button',
   testID,
 }: ListRowProps) {
   const body = (
     <>
       {leading}
-      <View style={styles.content}>
+      <View style={[styles.content, description !== undefined ? styles.contentTwoLine : null]}>
         {label !== undefined ? (
           <Text
             numberOfLines={1}
@@ -69,6 +76,7 @@ export function ListRow({
             {label}
           </Text>
         ) : null}
+        {description !== undefined ? <Text style={styles.description}>{description}</Text> : null}
         {children}
       </View>
       {meta}
@@ -95,7 +103,7 @@ export function ListRow({
     <Pressable
       accessibilityHint={accessibilityHint}
       accessibilityLabel={accessibilityLabel ?? label}
-      accessibilityRole="button"
+      accessibilityRole={accessibilityRole}
       accessibilityState={{ selected, disabled }}
       disabled={disabled}
       onPress={onPress}
@@ -125,6 +133,17 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     minWidth: 0,
+  },
+  // Two lines need room above and below, beyond the row's own padding.
+  contentTwoLine: {
+    paddingVertical: uiSpace.sm,
+  },
+  description: {
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
+    fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
+    color: uiRoles.inkMuted,
   },
   // Width only: the row's own minimum height already makes the column a full
   // tap target, and a second minimum here would stack on the row's padding.
