@@ -21,6 +21,8 @@ docs_touched: "none until an accepted action changes a durable contract"
 - iOS identity: `com.phano.boga3`, version `1.1.0`, build `13`
 - Release artifact at tagging time: `artifacts/builds/boga3-prod.ipa`
 - Opened: `2026-09-18`
+- Last reviewed: `2026-09-25`
+- Reviewed main: `e5e3736e9b49b5b81f79344dac6b44074e13ff95`
 
 ## Objective
 
@@ -70,12 +72,33 @@ fix.
 Use one stable ID per distinct finding. Merge duplicates into the original ID
 and increase its report count.
 
-| ID | Area / flow | Summary | Severity | Reports | Reproduced? | Decision | Follow-up |
-| --- | --- | --- | --- | ---: | --- | --- | --- |
-| `FB-001` | Session History | Open the read-oriented summary before details/edit | S3 | 1 | Source-confirmed | accept | `ACT-001` |
-| `FB-002` | Session insights | Align live and completed summaries; toggle exercise/muscle percentile load | S3 | 1 | Source-confirmed | accept | `ACT-002` |
-| `FB-003` | Train → new empty workout | Restore GPS gym preselection on the canonical session-entry path | S2 | 1 | Source-confirmed | accept | `ACT-003` |
-| `FB-004` | Group exercise links | Make unlinking a personal exercise discoverable from the linked group exercise | S2 | 1 | Source-confirmed | accept | `ACT-004` |
+| ID | Area / flow | Summary | Severity | Reports | Original reproduction | Decision | Implementation at review | Follow-up / evidence |
+| --- | --- | --- | --- | ---: | --- | --- | --- | --- |
+| `FB-001` | Session History | Open the read-oriented summary before details/edit | S3 | 1 | Source-confirmed | accept | Outstanding on main; PR open | `ACT-001`, [#336][pr-336] |
+| `FB-002` | Session insights | Align live and completed summaries; toggle exercise/muscle percentile load | S3 | 1 | Source-confirmed | accept | Outstanding on main; PR open | `ACT-002`, [#336][pr-336] |
+| `FB-003` | Train → new empty workout | Restore GPS gym preselection on the canonical session-entry path | S2 | 1 | Source-confirmed | no_action | Original proposal superseded by suggestion-only contract | `ACT-003`, [#329][pr-329] |
+| `FB-004` | Group exercise links | Make unlinking a personal exercise discoverable from the linked group exercise | S2 | 1 | Source-confirmed | accept | Group-row fix merged; catalogue wording outstanding | `ACT-004`, [#332][pr-332], [evidence][unlink-evidence] |
+
+### Implementation and release checkpoint — 2026-09-25
+
+- This is a source/PR review at the main commit above, not a new device test.
+  Original reports remain below; current behavior is identified separately.
+- [PR #336][pr-336] implements `ACT-001` and `ACT-002` on its branch, but is
+  still open at `76ed66d4d2eae78a29a0d6596adb9853b4dd2578` with merge conflicts.
+  Reconcile it with the completion redesign in `components/session-complete/`.
+  The [failing CI run][summary-ci] stopped at PR-body validation because the
+  required `## Tests` section was missing; this is not an application-test
+  failure. Full local `fast` (including backend-fast) and `frontend` evidence,
+  plus the requested visual/flow evidence, remain outstanding before merge.
+  The PR reports passing typecheck, focused Jest and docs checks on its branch;
+  retain and revalidate that coverage when reconciling the implementation.
+- [PR #332][pr-332] merged the group-row unlink flow and records local gates,
+  two-user e2e, offline/reconnect checks, and small/large-phone screenshots in
+  the [accepted target and evidence][unlink-evidence]. The catalogue label
+  change in `ACT-004` remains unimplemented.
+- Remote production tags still contain only `prod-ios-v1.1.0-b13`. No
+  replacement build/tag or replacement-build verification was established by
+  this review. A merged fix is not yet `shipped` or `verified` for this card.
 
 Severity definitions:
 
@@ -118,13 +141,15 @@ or `no_action`.
     `presentation=summary` entry was removed during the session-view redesign,
     so it must be restored deliberately rather than relying on old stack
     behavior.
+- Implementation at review: outstanding on main; [PR #336][pr-336] is open.
+  Merge/verification blockers are recorded in the implementation checkpoint.
 
 #### Reproduction
 
 1. Open Progress, then the Sessions History list.
 2. Tap a completed-session row.
-3. Observe that completed-edit opens first; Summary is a secondary action from
-   that editor.
+3. Observe that completed-edit opens first. On reviewed main, the former
+   editor → Summary action is also retired.
 
 - Expected: the row opens a read-oriented summary first, with unambiguous
   `View details` and `Edit session` actions available from that summary.
@@ -132,7 +157,8 @@ or `no_action`.
 - Reproduced on tagged build?: `not_yet` on device; confirmed in the exact
   tagged source.
 - Reproduced on current `main`?: `not_yet` on device; confirmed in source.
-- Existing workaround: open Summary from the completed-session editor.
+- Existing workaround: none for Summary-first review on current main; do not
+  use the retired editor → Summary action as a current workaround.
 - Suspected component or path: `apps/mobile/app/sessions.tsx`,
   `apps/mobile/components/session-list/history-list.tsx`,
   `apps/mobile/app/completed-session/[sessionId].tsx`
@@ -177,7 +203,7 @@ or `no_action`.
 - Target: later `1.1.0` build (`14+`)
 - Follow-up owner/task/PR:
   `docs/plans/tasks/T-20260924-01-Implement_session_summary_feedback.md`
-  (shared with `ACT-002`).
+  (shared with `ACT-002`); implementation [PR #336][pr-336], open at review.
 
 ### FB-002 — Align live and completed session insights
 
@@ -200,10 +226,10 @@ or `no_action`.
   line; retain the useful exercise percentile bar; offer the same kind of load
   view by muscle behind a toggle; when sharing, always share the exercise view.
 - Evidence links or local artifact paths:
-  - `apps/mobile/components/session-recorder/session-completion-presentation.tsx`
+  - `apps/mobile/components/session-complete/session-completion-screen.tsx`
     presents muscle working-set chips and per-exercise historical volume
     comparisons, including descriptive P5–P95 bars.
-  - `apps/mobile/components/session-recorder/exercise-volume-comparison.tsx`
+  - `apps/mobile/components/session-complete/exercise-volume-card.tsx`
     owns the useful exercise distribution/baseline/no-history states that the
     aligned presentation should preserve.
   - `CurrentSessionMuscleSummary.muscles` already calculates mapped weighted
@@ -212,11 +238,16 @@ or `no_action`.
   - The old recorder muscle-load sheet was removed during the session-view
     redesign; the implementation must attach the live summary affordance to
     the current `/session/<sessionId>` surface, not restore the retired route.
+- Implementation at review: outstanding on main; [PR #336][pr-336] contains
+  the shared presentation and muscle comparisons, but has not merged. Its
+  older recorder-component integration must be reconciled with the current
+  completion components.
 
 #### Reproduction
 
 1. Start a session and confirm valid sets for mapped exercises.
-2. Open the in-line session summary from the current session view.
+2. Inspect the current session view: it has no aligned live insight summary
+   or exercise/muscle comparison toggle.
 3. Complete the session and compare the completion summary.
 4. Observe that the views do not offer one consistent, toggleable exercise and
    muscle load model.
@@ -232,8 +263,8 @@ or `no_action`.
 - Reproduced on current `main`?: `not_yet` on device; confirmed in source.
 - Existing workaround: finish the session and review the completion summary.
 - Suspected component or path:
-  `apps/mobile/components/session-recorder/session-completion-presentation.tsx`,
-  `apps/mobile/components/session-recorder/exercise-volume-comparison.tsx`,
+  `apps/mobile/components/session-complete/session-completion-screen.tsx`,
+  `apps/mobile/components/session-complete/exercise-volume-card.tsx`,
   `apps/mobile/components/session-view/`,
   `apps/mobile/app/session/[sessionId]/index.tsx`,
   `apps/mobile/src/session-insights/`
@@ -287,7 +318,7 @@ or `no_action`.
   History → Summary → individual sets/Edit navigation tests; a Maestro live and
   historical interaction; and screenshots on supported small/large phones.
 - Required gates: `./boga test fast` and `./boga test frontend` because this
-  changes recorder UI/components; derive any additional lane from
+  changes session UI/components; derive any additional lane from
   `./boga test for` if implementation touches data, sync, or backend paths.
 - Docs/spec updates needed: `docs/specs/ui/screen-map.md`,
   `docs/specs/ui/ux-rules.md`, and `docs/specs/ui/components-catalog.md` if a
@@ -295,17 +326,20 @@ or `no_action`.
 - Target: later `1.1.0` build (`14+`)
 - Follow-up owner/task/PR:
   `docs/plans/tasks/T-20260924-01-Implement_session_summary_feedback.md`
-  (shared with `ACT-001`).
+  (shared with `ACT-001`); implementation [PR #336][pr-336], open at review.
 
 ### FB-003 — Restore GPS gym preselection through Train
 
 - Status: `decided`
+- Implementation at review: the original automatic-selection proposal is
+  superseded, not implemented as requested. [PR #329][pr-329] deliberately
+  introduced suggestion-only GPS assistance on `2026-09-23`.
 - First reported: `2026-09-19`
 - Source/context: post-merge review of the build 13 navigation changes
 - Report count: `1`
 - Area / screen / flow: Today → Train → Start empty workout → recorder
-- User impact: a new workout opens with no gym even when foreground location
-  permission, a confident saved-gym coordinate match, and the existing automatic
+- Original user impact: a new workout opens with no gym even when foreground
+  location permission, a confident saved-gym coordinate match, and the existing automatic
   detector are all available. The workout remains usable, but the user must
   retry detection or select the gym manually.
 - Frequency: `every time` a brand-new empty workout starts through Train
@@ -319,18 +353,18 @@ or `no_action`.
   position
 - User wording, paraphrased: post-merge review requested a check that recent
   merges had not broken the GPS gym detector.
-- Evidence links or local artifact paths:
+- Original evidence (`2026-09-19`, before the recorder was retired):
   - PR `#295` made Train the canonical new-session entry and its coordinator
     persists an empty draft with `gymId: null` before opening the recorder.
-  - `apps/mobile/app/(tabs)/session-recorder.tsx` still performs the bounded GPS
+  - `apps/mobile/app/(tabs)/session-recorder.tsx` performed the bounded GPS
     match only in its legacy empty-state `Start Session` handler. Hydrating the
     draft created by Train intentionally skips that startup detector.
   - The matcher, foreground-location service, permission configuration, and
-    manual long-press retry remain present. Five focused suites covering those
-    units and both screens passed on current `main` (56 tests); the missing
-    coverage is the canonical Train → coordinator → recorder integration.
+    manual long-press retry were present. The original review recorded five
+    focused suites passing (56 tests) at `b1a175e7`; these are historical
+    results, not verification of reviewed main.
 
-#### Reproduction
+#### Original build-13 reproduction
 
 1. Save coordinates for a gym and use a matching device or simulator location.
 2. Ensure no active workout draft exists, then open Today → Train.
@@ -342,65 +376,53 @@ or `no_action`.
   recorder restores that draft and therefore never runs startup detection.
 - Reproduced on tagged build?: `not_yet` on device; confirmed in the exact
   tagged source because PR `#295` is an ancestor of `prod-ios-v1.1.0-b13`.
-- Reproduced on current `main`?: `not_yet` on device; confirmed in source at
-  `b1a175e7`.
-- Existing workaround: long-press the gym field to retry GPS detection, or
-  select the gym manually.
-- Suspected component or path:
+- Source reproduction at intake: confirmed at `b1a175e7`; not device-tested.
+- Original workaround: long-press the recorder gym field to retry detection,
+  or select manually. The recorder and long-press retry are now retired.
+- Original suspected component or path:
   `apps/mobile/src/session-entry/coordinator.ts`,
   `apps/mobile/app/(tabs)/train.tsx`,
   `apps/mobile/app/(tabs)/session-recorder.tsx`
-- Related feedback IDs, issues, tasks, or PRs: PR `#295`, PR `#303`, `ACT-003`
+- Related feedback IDs, issues, tasks, or PRs: PR `#295`, PR `#303`,
+  [PR #329][pr-329], `ACT-003`
 
-#### Proposed action
+#### Current behavior and disposition
 
-- Decision: `accept`
-- Proposal:
-  1. Move GPS-aware blank-draft creation behind one shared session-entry
-     operation used by the canonical Train path and any retained legacy start
-     affordance.
-  2. Preserve the existing contract: one foreground read, a `1,500 ms` bound,
-     pure saved-gym matching, best-effort coordinate refresh, and immediate
-     fallback to `gymId: null` on permission denial, timeout, no match, or
-     location failure.
-  3. Preserve the one-active-draft lock so location work cannot create a second
-     session or overwrite an active one.
-  4. Keep resume and planned-workout materialisation behaviour unchanged unless
-     their gym-selection contract is separately reviewed.
-- Why this action: it restores the documented automatic gym-selection behaviour
-  at the point that now owns new-session creation, while avoiding duplicate GPS
-  implementations and keeping workout start non-blocking.
-- Smallest safe scope: centralise GPS-aware creation for brand-new empty drafts
-  and route Train through it; do not change matching thresholds, permission
-  configuration, gym-coordinate management, sync, or planned workouts.
-- Risks and edge cases: permission prompts, slow or stale fixes, no match,
-  multiple nearby matches, archived gyms, coordinate-refresh failure, duplicate
-  location reads, and races with an existing active draft.
-- Verification needed: coordinator coverage for matched and every fallback
-  result; a Train integration test that does not mock the detection behaviour
-  away; retained recorder-start regression coverage; and a production-navigation
-  Maestro flow using a saved gym plus simulator location to assert preselection.
-- Required gates: `./boga test fast` and `./boga test frontend` because the fix
-  changes mobile session-entry logic and the canonical UI flow; derive any
-  additional lane from `./boga test for` when the implementation paths are
-  final.
-- Docs/spec updates needed: none if the implementation only restores the
-  existing contract in `docs/specs/ui/ux-rules.md`; update ownership wording if
-  the shared session-entry boundary changes the durable architecture.
-- Target: later `1.1.0` build (`14+`)
-- Follow-up owner/task/PR: not yet assigned; create from `ACT-003` before this
-  feedback round closes.
+- Decision: `no_action`; `ACT-003` is `rejected` because the original proposal
+  was superseded by the explicit `2026-09-23` product decision, not because
+  automatic preselection was restored.
+- Original accepted proposal: centralise bounded GPS-aware blank-draft
+  creation behind the session-entry coordinator, preserving the one-active-draft
+  lock and null-gym fallbacks. Do not implement that proposal under this card:
+  it now conflicts with the [authoritative suggestion-only contract][gps-contract].
+- Current main: `src/session-entry/coordinator.ts` still starts with
+  `gymId: null`. Opening the session view's `Gym` sheet performs one bounded
+  foreground read and offers `Nearby · <gym>` for a single confident match.
+  Only a user tap selects it; no startup selection or long-press retry exists.
+- Current path: Today → Train → Start empty workout → session view → Gym →
+  tap the nearby suggestion or select a gym manually.
+- Current evidence: [PR #329][pr-329], `apps/mobile/app/session/[sessionId]/index.tsx`,
+  `apps/mobile/components/session-view/session-gym-sheet.tsx`, and
+  `apps/mobile/src/session-entry/coordinator.ts`. Source-reviewed only in this
+  checkpoint; no replacement-build device verification is claimed.
+- Follow-up: none for the superseded proposal. Restoring automatic selection
+  would require a new product decision and a corresponding contract update.
+- Target: `none` for `ACT-003`.
 
 ### FB-004 — Make personal-to-group exercise links removable where they are shown
 
 - Status: `decided`
+- Implementation at review: partially implemented. [PR #332][pr-332] merged
+  group-row unlinking on `2026-09-24`; the catalogue wording in proposal item 4
+  remains outstanding. Keep `ACT-004` in progress until that remainder is
+  completed or explicitly deferred.
 - First reported: `2026-09-22`
 - Source/context: product-owner observation during the build 13 feedback round
 - Report count: `1`
 - Area / screen / flow: Groups → group → Exercises → linked exercise
-- User impact: a member can see that a personal exercise is linked to a group
-  exercise, but that group-facing row offers no way to remove the link. The
-  existing unlink control is reached through `Link to group exercise…` in
+- Original user impact: a member can see that a personal exercise is linked to
+  a group exercise, but that group-facing row offers no way to remove the link.
+  The existing unlink control is reached through `Link to group exercise…` in
   either the personal Exercise Catalog's overflow menu or the recorder's
   exercise `•••` menu, so a member may reasonably conclude that links cannot
   be removed.
@@ -414,19 +436,31 @@ or `no_action`.
   live personal-exercise link to a group exercise
 - User wording, paraphrased: allow personal exercises to be de-linked from group
   exercises.
-- Evidence links or local artifact paths:
-  - `apps/mobile/components/groups/group-exercises-page.tsx` shows `Linked: …`
-    on the group exercise row, but only passes an action when the row is
-    unlinked (`Link your exercise`); a linked member row has no link-management
+- Original evidence at intake:
+  - `apps/mobile/components/groups/group-exercises-page.tsx` showed `Linked: …`
+    on the group exercise row, but only passed an action when the row was
+    unlinked (`Link your exercise`); a linked member row had no link-management
     action.
-  - `apps/mobile/app/exercise-link.tsx` already supports confirmed, offline
+  - `apps/mobile/app/exercise-link.tsx` already supported confirmed, offline
     unlinking of an individual personal exercise.
   - `apps/mobile/app/(tabs)/exercise-catalog.tsx` and
-    `apps/mobile/app/(tabs)/session-recorder.tsx` both open that screen from
-    their exercise menus. Both actions remain labelled
+    `apps/mobile/app/(tabs)/session-recorder.tsx` both opened that screen from
+    their exercise menus. Both actions were labelled
     `Link to group exercise…` even when the exercise has existing links.
+- Current evidence:
+  - [PR #332][pr-332] added a separate `Unlink…` control to linked group rows.
+    One link opens confirmation directly; several links open a chooser for
+    one personal exercise, then confirmation. Local writes and status reload
+    use the shared unlink hook, including offline and failure handling.
+  - The [accepted target and evidence][unlink-evidence] records local fast,
+    backend, frontend and groups-e2e gates, offline/reconnect checks and
+    small/large-phone screenshots. These are implementation evidence, not
+    replacement-production-build verification.
+  - The catalogue menu still says `Link to group exercise…` on reviewed main.
+    The replacement exercise-page menu uses the same wording; the recorder
+    menu no longer exists.
 
-#### Reproduction
+#### Original reproduction and current result
 
 1. Link one of your personal exercises to a group exercise.
 2. Open that group's Exercises segment and find the row showing
@@ -435,79 +469,75 @@ or `no_action`.
 
 - Expected: the linked group-exercise row exposes a clear way to manage its
   personal links and unlink one after confirmation.
-- Actual: the row exposes neither an unlink nor a manage-links action; unlink
-  is available through the personal catalogue or the recorder's exercise menu,
-  but both entry points are labelled for linking rather than managing or
-  unlinking.
+- Actual at intake: the row exposed neither an unlink nor a manage-links
+  action; unlink was available through the personal catalogue or the recorder's
+  exercise menu, but both entry points were labelled for linking rather than
+  managing or unlinking.
 - Reproduced on tagged build?: `not_yet` on device; reported against the build
   13 feedback round
-- Reproduced on current `main`?: `not_yet` on device; source-confirmed
-- Existing workaround: open the exercise's overflow menu in the personal
-  Exercise Catalog or its `•••` menu in the recorder, choose
-  `Link to group exercise…`, then use `Unlink` in the Linked section.
+- Current main: the missing group-row action is fixed in source and covered
+  by #332's device evidence; catalogue wording is still source-confirmed.
+  Current Exercises lives on the group management page, not an Exercises
+  segment. This review did not rerun device tests.
+- Current alternate entry: the personal Exercise Catalog or exercise-page
+  overflow → `Link to group exercise…` → `Unlink` in the Linked section.
+  Group-row unlinking no longer requires this detour.
 - Suspected component or path:
   `apps/mobile/components/groups/group-exercises-page.tsx`,
   `apps/mobile/components/groups/group-exercise-row.tsx`,
   `apps/mobile/app/exercise-link.tsx`,
   `apps/mobile/app/(tabs)/exercise-catalog.tsx`
-- Related feedback IDs, issues, tasks, or PRs: `ACT-004`
+- Related feedback IDs, issues, tasks, or PRs: `ACT-004`, [PR #332][pr-332]
 
-#### Proposed action
+#### Delivered scope and remaining action
 
 - Decision: `accept`
 - Proposal:
-  1. Give a linked group-exercise row a member-visible `Manage links` action,
-     rather than limiting the row action to the unlinked state.
-  2. Show every one of the member's personal exercises linked to that group
-     exercise and allow each link to be removed independently after a clear
-     destructive confirmation. Preserve support for several personal exercises
-     linking to the same group exercise.
-  3. Reuse the existing local `unlinkExercise` write and link reload path so
-     unlink remains offline-capable, retroactive, and sync-backed; do not add a
-     group RPC or change board semantics.
-  4. Rename the personal catalogue action to `Manage group links…` when links
-     exist (or use wording that covers both link and unlink) so the existing
-     route remains discoverable from the personal side.
+  1. Delivered: linked group-exercise rows expose `Unlink…`, the accepted
+     implementation of the originally proposed `Manage links` affordance.
+  2. Delivered: remove one personal link after confirmation, with an individual
+     chooser when several personal exercises link to the same group exercise.
+  3. Delivered: reuse the local tombstone write and shared link reload/error
+     handling; unlink remains offline-capable, retroactive, and sync-backed.
+  4. Outstanding: rename the personal catalogue action to `Manage group links…`
+     when links exist (or use wording that covers both link and unlink) so the
+     existing route remains discoverable from the personal side.
 - Why this action: management should be available where link status is visible,
   while retaining the existing personal-exercise route. Reusing the proven
   tombstone write avoids creating a second unlink contract.
-- Smallest safe scope: add group-row link management and clarify the catalogue
-  action label; reuse the current confirmation, repository operation, and link
-  status reload rather than changing persistence, sync, evaluator, or boards.
+- Remaining scope: clarify the catalogue action label and its accessible name;
+  retain the merged group-row interaction and existing persistence semantics.
 - Risks and edge cases: several personal exercises linked to one target,
   archived group exercises, soft-deleted or locally missing personal exercises,
   an inactive link after leaving a group, offline operation, rapid repeated
   taps, unlink failure, and status refresh after the tombstone write.
-- Verification needed: component coverage for zero/one/many links, confirmation
-  and cancellation, offline success, failure without stale success UI, archived
-  and missing-name rows, updated catalogue wording, and a Maestro flow that
-  links then unlinks from the group-facing surface.
-- Required gates: `./boga test fast`, `./boga test frontend`, and
-  `./boga test ios-groups-e2e` because the follow-up changes group UI and its
-  two-user interaction flow; confirm exact requirements with `./boga test for`
-  once implementation paths are final.
-- Docs/spec updates needed: `docs/specs/tech/groups-contract.md` and, if the
-  interaction changes the documented screen behavior,
-  `docs/specs/ui/screen-map.md` / `docs/specs/ui/ux-rules.md`.
+- Verification completed for the merged scope: see the [flow-to-test mapping
+  and local gate evidence][unlink-evidence].
+- Verification remaining: catalogue wording and navigation assertions after
+  the label change; verify the reported flow on the replacement production
+  build before marking the finding `verified`.
+- Required gates for remaining catalogue UI work: `./boga test fast` and
+  `./boga test frontend`; derive any additional requirements with
+  `./boga test for` once its implementation paths are final.
+- Docs/spec updates: #332 updated the groups contract and UI docs; update
+  documented catalogue wording with the remaining label change.
 - Target: later `1.1.0` build (`14+`)
-- Follow-up owner/task/PR: not yet assigned; create from `ACT-004` before this
-  feedback round closes.
+- Follow-up owner/task/PR: [PR #332][pr-332] for the merged group-row fix;
+  catalogue wording follow-up remains unassigned.
 
 ## UI impact checkpoint
 
 - This feedback card changes documentation only, so its own `ui_impact` remains
   `no`.
-- `ACT-001` and `ACT-002` are significant UI follow-ups. Before implementation,
-  each needs a UX Contract, a pinned accepted target, and the visual evidence
+- `ACT-001` and `ACT-002` are significant UI follow-ups. Their open PR still
+  needs to satisfy the UX Contract, accepted-target, and visual-evidence rules
   required by `docs/specs/08-ux-delivery-standard.md` and
   `docs/specs/ui/ai-design-policy.md`.
-- `ACT-003` restores an existing documented interaction rather than introducing
-  a new visual target. Its implementation still needs flow evidence showing the
-  automatically selected gym and the non-blocking fallback state.
-- `ACT-004` extends an existing link-management interaction to the group-facing
-  row. Its follow-up needs a compact UX Contract covering zero, one, and many
-  linked personal exercises, confirmation, offline, archived, and failure
-  states before implementation.
+- `ACT-003` is superseded by the suggestion-only contract; it is not an
+  outstanding automatic-selection UI fix.
+- `ACT-004`'s merged group-row scope has an [accepted brief and visual
+  evidence][unlink-evidence]. Only its catalogue wording follow-up remains;
+  retain the existing unlink interaction and verify the revised label.
 - The proposals above reuse current repository screens as internal design
   references; they do not make those proposals authoritative product behaviour
   until the follow-up is approved and implemented.
@@ -567,13 +597,17 @@ decision.
 
 | Action ID | Feedback IDs | Proposed action | Priority | Target build/version | Owner | Status | Verification |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `ACT-001` | `FB-001` | Open History on Summary; expose deterministic individual-sets/Edit actions | High | `1.1.0` build `14+` | `T-20260924-01-Implement_session_summary_feedback` | approved | Navigation tests, frontend gate, History-flow screenshots |
-| `ACT-002` | `FB-002` | Share one live/completed Summary with exercise/muscle percentile toggle; export exercise only | Medium | `1.1.0` build `14+` | `T-20260924-01-Implement_session_summary_feedback` | approved | Calculation/component/share tests, frontend gate, live/completion/history screenshots |
-| `ACT-003` | `FB-003` | Route canonical empty-session creation through the bounded GPS gym detector | High | `1.1.0` build `14+` | Unassigned | proposed | Entry integration tests, frontend gate, GPS-preselection flow evidence |
-| `ACT-004` | `FB-004` | Expose unlink/manage-links on linked group-exercise rows and clarify the catalogue action | High | `1.1.0` build `14+` | Unassigned | proposed | Link-management tests, frontend + groups e2e gates, linked/unlinked screenshots |
+| `ACT-001` | `FB-001` | Open History on Summary; expose deterministic individual-sets/Edit actions | High | `1.1.0` build `14+` | `T-20260924-01-Implement_session_summary_feedback`; [PR #336][pr-336] | in_progress | Resolve conflicts and PR-body CI failure; full local fast/frontend and History-flow screenshots outstanding |
+| `ACT-002` | `FB-002` | Share one live/completed Summary with exercise/muscle percentile toggle; export exercise only | Medium | `1.1.0` build `14+` | Same task; [PR #336][pr-336] | in_progress | Reconcile completion redesign and revalidate calculation/component/share coverage; full local fast/frontend and live/completion/history screenshots outstanding |
+| `ACT-003` | `FB-003` | Original automatic GPS preselection proposal, superseded by suggestion-only behavior | — | none | [PR #329][pr-329]; [current contract][gps-contract] | rejected | No restoration claimed; startup remains null-gym by design; no implementation follow-up |
+| `ACT-004` | `FB-004` | Group-row `Unlink…` delivered; clarify catalogue action wording | High | `1.1.0` build `14+` | [PR #332][pr-332] merged; label follow-up unassigned | in_progress | [Merged-scope gate and visual evidence][unlink-evidence]; catalogue wording and replacement-build verification outstanding |
 
 Action status values: `proposed`, `approved`, `in_progress`, `shipped`,
 `verified`, `deferred`, or `rejected`.
+
+`in_progress` includes an open implementation PR or a partly merged action.
+Record merged scope separately from `shipped` (replacement build/tag recorded)
+and `verified` (reported flow checked on that replacement build).
 
 ## Triage rules
 
@@ -618,12 +652,26 @@ Action status values: `proposed`, `approved`, `in_progress`, `shipped`,
 
 ## Completion note
 
-- What feedback was collected:
-- Decisions made:
-- Follow-up tasks/PRs created:
-- Replacement build/tag, if any:
-- What remains:
+- What feedback was collected: four distinct reports, `FB-001` through `FB-004`.
+- Decisions made: retain the summary improvements and catalogue wording;
+  record the delivered group-row unlink fix; reject automatic gym preselection
+  as superseded by the documented suggestion-only decision.
+- Follow-up tasks/PRs: summary implementation [#336][pr-336] remains open;
+  group-row unlink [#332][pr-332] merged; suggestion-only GPS [#329][pr-329]
+  merged. Catalogue wording still needs an owner/follow-up.
+- Replacement build/tag: none established by this review; only build 13 is
+  production-tagged. No finding is marked replacement-build verified.
+- What remains: resolve and validate #336 against current main, complete or
+  explicitly defer catalogue wording, then record the replacement build/tag
+  and verify the accepted fixes on that build.
 
 This card remains `in_progress` while build `13` feedback is being collected.
 Delete it when the feedback round is closed and all accepted actions have been
 handed off or completed; git history retains the record.
+
+[pr-329]: https://github.com/Brotherhood-of-Ghisa/BOGA3/pull/329
+[pr-332]: https://github.com/Brotherhood-of-Ghisa/BOGA3/pull/332
+[pr-336]: https://github.com/Brotherhood-of-Ghisa/BOGA3/pull/336
+[summary-ci]: https://github.com/Brotherhood-of-Ghisa/BOGA3/actions/runs/35990888717/job/107604424807
+[gps-contract]: https://github.com/Brotherhood-of-Ghisa/BOGA3/blob/e5e3736e9b49b5b81f79344dac6b44074e13ff95/docs/specs/ui/ux-rules.md#L175-L189
+[unlink-evidence]: https://github.com/Brotherhood-of-Ghisa/BOGA3/blob/ca80b99ed5b08002c88ce1c0faae252ad84e533c/docs/specs/ui/design-targets/group-exercise-unlink.md
