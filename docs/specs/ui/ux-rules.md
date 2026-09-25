@@ -109,9 +109,10 @@ Document app-specific UI semantics and guardrails for the current mobile app.
      - session list action menus
      - exercise catalog editor/action/delete modals
      - the session view's `Gym` sheet, ⋮ menu, exercise picker and the picker's inline exercise creation editor
-2. In the exercise picker (the session view's `+ Add exercise`; `components/session-recorder/exercise-picker.tsx`), shared list options, `Manage`, and `Add new` are compact icon actions in the modal header row (same row as the title).
+2. The exercise picker (the session view's `+ Add exercise`; `components/session-recorder/exercise-picker.tsx`) is a tall design-language `Sheet` (DLM-T06): it lifts above the keyboard, the backdrop dismisses it, and it has no Cancel. Shared list options (⋮), `Manage` and `Add new` are `IconButton`s on the title's row. It hides itself while its inline editor or the group pick sheet is open, and returns when that closes.
 3. In the exercise picker, tapping an exercise opens an in-place preselection panel instead of immediately adding:
-   - `Add empty set` is always available first and adds the exercise with one blank set.
+   - `Add empty set` (an outline) is always available and adds the exercise with one blank set.
+   - `Append plan` is the sheet's one primary; its plan's sets preview as the set row, faded as planned.
    - `Append plan` remains visible but disabled while completed-history suggestion data loads or when no valid completed-history plan exists; the disabled state has no inline error copy.
    - Changing the search text dismisses the preselection panel and returns to the filtered list without changing grouped-list expansion state.
    - The picker only adds; replacing an exercise is the exercise page's `Swap exercise` (§14a.5), which keeps the sets.
@@ -140,7 +141,7 @@ Document app-specific UI semantics and guardrails for the current mobile app.
 5. `exercise-catalog` top actions use compact icon buttons (`+` create, kebab options), and deleted visibility toggle lives under the top-level options menu.
 6. `exercise-catalog` and the exercise picker share exercise-list preferences and row semantics:
    - local-only shared preferences default to grouped by muscle family, `90d` range, and recents-on-top enabled; options are `7d`, `30d`, `90d`, `1y`, and `All`,
-   - grouped mode shows taxonomy-ordered family headers (`Chest`, `Shoulders`, `Back`, `Arms`, `Core`, `Legs`, `Lower Legs`, `Other`) with `Family · count`; all groups remain visible, zero-count groups are disabled/collapsed, non-empty headers toggle expansion without chevrons or show/hide text, and active text search preserves collapsed/expanded state without flattening the list,
+   - grouped mode shows taxonomy-ordered family headers (`Chest`, `Shoulders`, `Back`, `Arms`, `Core`, `Legs`, `Lower Legs`, `Other`) with the family and its count; all groups remain visible, zero-count groups are disabled/collapsed, non-empty headers toggle expansion and show it with a `chevron-right` / `chevron-down` glyph and the expanded state (DLM-T06), and active text search preserves collapsed/expanded state without flattening the list,
    - flat mode renders rows directly without an all-exercises section header,
    - recents-on-top sorts by valid completed-set recency score with a fixed 60-day half-life, includes warm-up sets, ignores active/unperformed/deleted/tombstoned rows, uses the selected finite date window, and caps `All` scoring to the last year; recents-off sorts alphabetically,
    - picker rows use the same muscle summary and stats line as Exercise Catalog rows but hide catalog edit/delete actions and catalog-only filters.

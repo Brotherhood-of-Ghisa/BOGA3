@@ -28,6 +28,9 @@ export type ListRowProps = {
   selected?: boolean;
   // A `rule-soft` hairline above the row.
   divider?: boolean;
+  // A disclosure row's state (a collapsible section's header): announced as
+  // expanded or collapsed. The glyph that shows it is the caller's `trailing`.
+  expanded?: boolean;
   // Makes the whole row one target (sheet options). Leave unset when the
   // trailing control owns the action (set rows).
   onPress?: () => void;
@@ -53,6 +56,7 @@ export function ListRow({
   tone = 'default',
   selected = false,
   divider = true,
+  expanded,
   onPress,
   disabled = false,
   accessibilityLabel,
@@ -105,7 +109,7 @@ export function ListRow({
       accessibilityHint={accessibilityHint}
       accessibilityLabel={accessibilityLabel ?? label}
       accessibilityRole={accessibilityRole}
-      accessibilityState={{ selected, disabled }}
+      accessibilityState={expanded === undefined ? { selected, disabled } : { selected, disabled, expanded }}
       disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [rowStyle, pressed && !disabled ? styles.pressed : null]}

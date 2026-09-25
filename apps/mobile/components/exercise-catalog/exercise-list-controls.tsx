@@ -1,7 +1,14 @@
 import { memo, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { uiColors, uiRadius, uiSpace, uiTypography } from '@/components/ui';
+import { Card } from '@/components/ui/card';
+import { ChipGroup } from '@/components/ui/chip-group';
+import { Icon } from '@/components/ui/icon';
+import { ListRow } from '@/components/ui/list-row';
+import { SegmentedControl } from '@/components/ui/segmented-control';
+import { StatePanel } from '@/components/ui/state-panel';
+import { Tag } from '@/components/ui/tag';
+import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import {
   EXERCISE_LIST_DATE_RANGE_OPTIONS,
   type ExerciseListItem,
@@ -14,76 +21,62 @@ type PreferenceControlsProps = {
   onChangePreferences: (patch: Partial<ExerciseListPreferences>) => void;
 };
 
+type ListOption = 'group' | 'recents';
+
+// The shared list options: the stats window as a segmented control, and the two
+// list toggles as chips. Each toggle's label says what tapping it does, which
+// Maestro taps ("Turn grouping off").
 export function ExerciseListPreferenceControls({
   preferences,
   onChangePreferences,
 }: PreferenceControlsProps) {
+  const listValues: ListOption[] = [
+    ...(preferences.groupByMuscleFamily ? (['group'] as const) : []),
+    ...(preferences.recentsOnTop ? (['recents'] as const) : []),
+  ];
   return (
     <View style={styles.controlsRoot}>
-      <Text allowFontScaling={false} selectable style={styles.sectionLabel}>
+      <Text allowFontScaling={false} accessibilityRole="header" style={styles.sectionLabel}>
         Date range
       </Text>
-      <View style={styles.pillRow}>
-        {EXERCISE_LIST_DATE_RANGE_OPTIONS.map((option) => {
-          const selected = preferences.dateRange === option.value;
-          return (
-            <Pressable
-              key={String(option.value)}
-              accessibilityLabel={`Date range ${option.label}`}
-              style={[styles.filterPill, selected && styles.filterPillSelected]}
-              onPress={() => onChangePreferences({ dateRange: option.value })}>
-              <Text allowFontScaling={false} style={[styles.filterPillText, selected && styles.filterPillTextSelected]}>
-                {option.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
+      <SegmentedControl
+        onChange={(dateRange) => onChangePreferences({ dateRange })}
+        options={EXERCISE_LIST_DATE_RANGE_OPTIONS.map((option) => ({
+          value: option.value,
+          label: option.label,
+          accessibilityLabel: `Date range ${option.label}`,
+        }))}
+        testIDPrefix="exercise-list-date-range"
+        value={preferences.dateRange}
+      />
 
-      <Text allowFontScaling={false} selectable style={styles.sectionLabel}>
+      <Text allowFontScaling={false} accessibilityRole="header" style={styles.sectionLabel}>
         List
       </Text>
-      <View style={styles.pillRow}>
-        <Pressable
-          accessibilityLabel={
-            preferences.groupByMuscleFamily
-              ? 'Turn grouping off'
-              : 'Turn grouping on'
-          }
-          style={[
-            styles.filterPill,
-            preferences.groupByMuscleFamily && styles.filterPillSelected,
-          ]}
-          onPress={() =>
-            onChangePreferences({ groupByMuscleFamily: !preferences.groupByMuscleFamily })
-          }>
-          <Text
-            allowFontScaling={false}
-            style={[
-              styles.filterPillText,
-              preferences.groupByMuscleFamily && styles.filterPillTextSelected,
-            ]}>
-            Group by muscle
-          </Text>
-        </Pressable>
-        <Pressable
-          accessibilityLabel={
-            preferences.recentsOnTop
-              ? 'Turn recents on top off'
-              : 'Turn recents on top on'
-          }
-          style={[styles.filterPill, preferences.recentsOnTop && styles.filterPillSelected]}
-          onPress={() => onChangePreferences({ recentsOnTop: !preferences.recentsOnTop })}>
-          <Text
-            allowFontScaling={false}
-            style={[
-              styles.filterPillText,
-              preferences.recentsOnTop && styles.filterPillTextSelected,
-            ]}>
-            Recents on top
-          </Text>
-        </Pressable>
-      </View>
+      <ChipGroup
+        mode="multi"
+        onToggle={(option) =>
+          onChangePreferences(
+            option === 'group'
+              ? { groupByMuscleFamily: !preferences.groupByMuscleFamily }
+              : { recentsOnTop: !preferences.recentsOnTop }
+          )
+        }
+        options={[
+          {
+            value: 'group',
+            label: 'Group by muscle',
+            accessibilityLabel: preferences.groupByMuscleFamily ? 'Turn grouping off' : 'Turn grouping on',
+          },
+          {
+            value: 'recents',
+            label: 'Recents on top',
+            accessibilityLabel: preferences.recentsOnTop ? 'Turn recents on top off' : 'Turn recents on top on',
+          },
+        ]}
+        testIDPrefix="exercise-list-options"
+        values={listValues}
+      />
     </View>
   );
 }
@@ -100,6 +93,9 @@ type ExerciseListContentProps = {
   renderActions?: (exercise: ExerciseListItem) => ReactNode;
 };
 
+// The exercise list the catalogue, the session view's picker and the exercise
+// page's swap sheet share: hairline rows in one `Card` (flat), or one `Card` per
+// muscle family headed by a disclosure row (grouped).
 export function ExerciseListContent({
   mode,
   items,
@@ -112,128 +108,122 @@ export function ExerciseListContent({
   renderActions,
 }: ExerciseListContentProps) {
   if (items.length === 0 && mode === 'flat') {
-    return (
-      <Text allowFontScaling={false} selectable style={styles.helperText}>
-        {emptyText}
-      </Text>
-    );
+    return <StatePanel body={emptyText} fill={false} />;
   }
 
+  const renderRow = (exercise: ExerciseListItem, index: number) => (
+    <ExerciseListRow
+      key={exercise.id}
+      divider={index > 0}
+      exercise={exercise}
+      onPressExercise={onPressExercise}
+      getAccessibilityLabel={getExerciseAccessibilityLabel}
+      renderActions={renderActions}
+    />
+  );
+
   if (mode === 'flat') {
-    return (
-      <>
-        {items.map((exercise) => (
-          <ExerciseListRow
-            key={exercise.id}
-            exercise={exercise}
-            onPressExercise={onPressExercise}
-            getAccessibilityLabel={getExerciseAccessibilityLabel}
-            renderActions={renderActions}
-          />
-        ))}
-      </>
-    );
+    return <Card>{items.map(renderRow)}</Card>;
   }
 
   return (
-    <>
+    <View style={styles.sections}>
       {sections.map((section) => {
         const isExpanded = expandedFamilies.has(section.familyName);
+        const empty = section.count === 0;
         return (
-          <View key={section.familyName} style={styles.groupSection}>
-            <Pressable
-              accessibilityRole="button"
+          <Card key={section.familyName}>
+            <ListRow
               accessibilityLabel={`${section.familyName} exercises ${section.count}`}
-              accessibilityState={{ disabled: section.count === 0, expanded: isExpanded }}
-              disabled={section.count === 0}
+              density="list"
+              disabled={empty}
+              divider={false}
+              expanded={isExpanded}
+              label={section.familyName}
+              meta={<Text allowFontScaling={false} style={[styles.familyCount, empty ? styles.familyCountEmpty : null]}>{section.count}</Text>}
+              onPress={() => onToggleFamily(section.familyName)}
               testID={getFamilyGroupTestId(section.familyName)}
-              style={[
-                styles.groupHeader,
-                section.count === 0 ? styles.groupHeaderDisabled : null,
-              ]}
-              onPress={() => onToggleFamily(section.familyName)}>
-              <Text
-                allowFontScaling={false}
-                adjustsFontSizeToFit
-                minimumFontScale={0.82}
-                numberOfLines={1}
-                style={[
-                  styles.groupHeaderText,
-                  section.count === 0 ? styles.groupHeaderTextDisabled : null,
-                ]}>
-                {section.familyName} · {section.count}
-              </Text>
-            </Pressable>
-            {isExpanded
-              ? section.exercises.map((exercise) => (
-                  <ExerciseListRow
-                    key={exercise.id}
-                    exercise={exercise}
-                    onPressExercise={onPressExercise}
-                    getAccessibilityLabel={getExerciseAccessibilityLabel}
-                    renderActions={renderActions}
-                  />
-                ))
-              : null}
-          </View>
+              trailing={
+                <Icon
+                  color={empty ? uiRoles.disabled : uiRoles.inkMuted}
+                  name={isExpanded ? 'chevron-down' : 'chevron-right'}
+                  size="sm"
+                />
+              }
+            />
+            {isExpanded ? section.exercises.map((exercise) => renderRow(exercise, 1)) : null}
+          </Card>
         );
       })}
-    </>
+    </View>
   );
 }
 
 type ExerciseListRowProps = {
   exercise: ExerciseListItem;
+  divider: boolean;
   onPressExercise: (exercise: ExerciseListItem) => void;
   getAccessibilityLabel?: (exercise: ExerciseListItem) => string;
   renderActions?: (exercise: ExerciseListItem) => ReactNode;
 };
 
+// Name, muscles and the stats line. A deleted exercise steps back: a faint
+// `Deleted` tag and faint text, never a warning hue.
 const ExerciseListRow = memo(function ExerciseListRow({
   exercise,
+  divider,
   onPressExercise,
   getAccessibilityLabel,
   renderActions,
 }: ExerciseListRowProps) {
-  return (
-    <View style={styles.exerciseListRow}>
-      <Pressable
-        accessibilityLabel={getAccessibilityLabel?.(exercise) ?? `Select exercise ${exercise.name}`}
-        style={styles.exerciseListRowMainPressable}
-        onPress={() => onPressExercise(exercise)}>
-        <View style={styles.exerciseListRowTextStack}>
-          <View style={styles.exerciseListRowTitleRow}>
-            <Text
-              allowFontScaling={false}
-              adjustsFontSizeToFit
-              ellipsizeMode="clip"
-              minimumFontScale={0.82}
-              numberOfLines={2}
-              style={styles.exerciseListRowTitle}>
-              {exercise.name}
-            </Text>
-            {exercise.deletedAt ? (
-              <Text allowFontScaling={false} selectable style={styles.deletedExerciseChip}>
-                Deleted
-              </Text>
-            ) : null}
-          </View>
-          <Text
-            allowFontScaling={false}
-            adjustsFontSizeToFit
-            ellipsizeMode="clip"
-            minimumFontScale={0.82}
-            numberOfLines={1}
-            style={styles.exerciseListRowMuscleSummary}>
-            {exercise.muscleSummary}
-          </Text>
-          <Text allowFontScaling={false} numberOfLines={1} style={styles.exerciseListRowStats}>
-            {exercise.statsSummary}
-          </Text>
-        </View>
-      </Pressable>
-      {renderActions ? renderActions(exercise) : null}
+  const deleted = Boolean(exercise.deletedAt);
+  const accessibilityLabel = getAccessibilityLabel?.(exercise) ?? `Select exercise ${exercise.name}`;
+  const text = (
+    <View style={styles.rowText}>
+      <View style={styles.titleRow}>
+        <Text allowFontScaling={false}
+          adjustsFontSizeToFit
+          ellipsizeMode="clip"
+          minimumFontScale={0.82}
+          numberOfLines={2}
+          style={[styles.name, deleted ? styles.faded : null]}>
+          {exercise.name}
+        </Text>
+        {deleted ? <Tag label="Deleted" tone="faint" /> : null}
+      </View>
+      <Text allowFontScaling={false}
+        adjustsFontSizeToFit
+        ellipsizeMode="clip"
+        minimumFontScale={0.82}
+        numberOfLines={1}
+        style={[styles.muscles, deleted ? styles.faded : null]}>
+        {exercise.muscleSummary}
+      </Text>
+      <Text allowFontScaling={false} numberOfLines={1} style={[styles.stats, deleted ? styles.faded : null]}>
+        {exercise.statsSummary}
+      </Text>
     </View>
+  );
+
+  // With row actions (the catalogue's ⋮) the text is its own target beside
+  // them, so both stay reachable to VoiceOver; otherwise the row is one target.
+  if (renderActions) {
+    return (
+      <ListRow density="list" divider={divider} trailing={renderActions(exercise)}>
+        <Pressable accessibilityLabel={accessibilityLabel} onPress={() => onPressExercise(exercise)}>
+          {text}
+        </Pressable>
+      </ListRow>
+    );
+  }
+  return (
+    <ListRow
+      accessibilityLabel={accessibilityLabel}
+      density="list"
+      divider={divider}
+      onPress={() => onPressExercise(exercise)}>
+      {text}
+    </ListRow>
   );
 });
 
@@ -246,116 +236,59 @@ const styles = StyleSheet.create({
     gap: uiSpace.sm,
   },
   sectionLabel: {
-    fontSize: uiTypography.size.sm,
+    fontFamily: uiFonts.display.family,
     fontWeight: '700',
-    color: uiColors.textSecondary,
+    fontSize: uiTypography.size.xxs,
+    lineHeight: uiTypography.lineHeight.xxs,
+    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
     textTransform: 'uppercase',
-    letterSpacing: 0.4,
-    marginTop: uiSpace.sm,
+    color: uiRoles.inkMuted,
   },
-  pillRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  sections: {
     gap: uiSpace.sm,
   },
-  filterPill: {
-    borderRadius: uiRadius.full,
-    borderWidth: 1,
-    borderColor: uiColors.borderMuted,
-    backgroundColor: uiColors.surfaceDefault,
-    paddingHorizontal: uiSpace.md,
-    paddingVertical: uiSpace.xs,
-  },
-  filterPillSelected: {
-    backgroundColor: uiColors.actionPrimarySubtleBg,
-    borderColor: uiColors.actionPrimary,
-  },
-  filterPillText: {
+  familyCount: {
+    fontFamily: uiFonts.figure.family,
+    fontWeight: '500',
     fontSize: uiTypography.size.sm,
-    fontWeight: '600',
-    color: uiColors.textPrimary,
+    lineHeight: uiTypography.lineHeight.sm,
+    color: uiRoles.inkMuted,
   },
-  filterPillTextSelected: {
-    color: uiColors.actionPrimary,
-    fontWeight: '700',
+  familyCountEmpty: {
+    color: uiRoles.disabled,
   },
-  helperText: {
-    fontSize: uiTypography.size.md,
-    color: uiColors.textSecondary,
-  },
-  groupSection: {
-    gap: uiSpace.sm,
-  },
-  groupHeader: {
-    minHeight: 34,
-    borderRadius: uiRadius.sm,
-    borderWidth: 1,
-    borderColor: uiColors.borderMuted,
-    backgroundColor: uiColors.surfaceMuted,
-    paddingHorizontal: uiSpace.md,
-    justifyContent: 'center',
-  },
-  groupHeaderDisabled: {
-    opacity: 0.62,
-  },
-  groupHeaderText: {
-    fontSize: uiTypography.size.sm,
-    fontWeight: '700',
-    color: uiColors.textPrimary,
-  },
-  groupHeaderTextDisabled: {
-    color: uiColors.textSecondary,
-  },
-  exerciseListRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiSpace.sm,
-    borderWidth: 1,
-    borderColor: uiColors.borderMuted,
-    borderRadius: uiRadius.sm,
-    paddingHorizontal: uiSpace.sm,
+  rowText: {
     paddingVertical: uiSpace.sm,
-    backgroundColor: uiColors.surfaceDefault,
   },
-  exerciseListRowMainPressable: {
-    flex: 1,
-  },
-  exerciseListRowTextStack: {
-    flex: 1,
-    gap: uiSpace.xs,
-  },
-  exerciseListRowTitleRow: {
+  titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: uiSpace.sm,
   },
-  exerciseListRowTitle: {
+  name: {
     flexShrink: 1,
     minWidth: 0,
+    fontFamily: uiFonts.display.family,
+    fontWeight: '600',
+    fontSize: uiTypography.size.lg,
+    lineHeight: uiTypography.lineHeight.lg,
+    color: uiRoles.ink,
+  },
+  muscles: {
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
     fontSize: uiTypography.size.md,
-    fontWeight: '600',
-    color: uiColors.textPrimary,
+    lineHeight: uiTypography.lineHeight.md,
+    color: uiRoles.inkMuted,
   },
-  exerciseListRowMuscleSummary: {
+  stats: {
+    fontFamily: uiFonts.figure.family,
+    fontWeight: '500',
     fontSize: uiTypography.size.xs,
-    color: uiColors.textSecondary,
-    fontWeight: '600',
+    lineHeight: uiTypography.lineHeight.xs,
+    color: uiRoles.inkMuted,
   },
-  exerciseListRowStats: {
-    fontSize: uiTypography.size.xs,
-    color: uiColors.textAccentMuted,
-    fontWeight: '600',
-    marginTop: uiSpace.xs,
-  },
-  deletedExerciseChip: {
-    fontSize: uiTypography.size.xs,
-    fontWeight: '700',
-    color: uiColors.textWarning,
-    borderWidth: 1,
-    borderColor: uiColors.borderWarning,
-    backgroundColor: uiColors.surfaceWarning,
-    borderRadius: uiRadius.full,
-    paddingHorizontal: uiSpace.sm,
-    paddingVertical: uiSpace.xs,
+  faded: {
+    color: uiRoles.inkFaint,
   },
 });
