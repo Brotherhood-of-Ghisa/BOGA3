@@ -74,7 +74,9 @@ export function GroupStreamRecordCard({
           <Text allowFontScaling={false} style={[styles.exercise, voided ? styles.faint : null]} testID={`${testID}-value`}>
             {card.exerciseLabel}
             {'\n'}
-            <Text style={[styles.value, voided ? styles.faint : null]}>{card.valueLabel}</Text>
+            <Text allowFontScaling={false} style={[styles.value, voided ? styles.faint : null]}>
+              {card.valueLabel}
+            </Text>
           </Text>
           {card.badges.length > 0 ? (
             <View style={styles.tags}>
