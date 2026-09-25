@@ -88,7 +88,7 @@ export function SessionCompletionScreen({
           testID="session-completion-context">
           {performedSetCount > 0 ? (
             <View style={styles.muscles} testID="session-completion-muscle-breakdown">
-              <Text style={styles.microLabel}>Working sets by muscle</Text>
+              <Text allowFontScaling={false} style={styles.microLabel}>Working sets by muscle</Text>
               {workingSetsByMuscle.length > 0 ? (
                 <View style={styles.pills}>
                   {workingSetsByMuscle.map((muscle) => (
@@ -98,13 +98,13 @@ export function SessionCompletionScreen({
                       key={muscle.id}
                       style={styles.pill}
                       testID={`session-completion-muscle-${muscle.id}`}>
-                      <Text style={styles.pillName}>{muscle.displayName}</Text>
-                      <Text style={styles.pillCount}>{muscle.workingSetCount}</Text>
+                      <Text allowFontScaling={false} style={styles.pillName}>{muscle.displayName}</Text>
+                      <Text allowFontScaling={false} style={styles.pillCount}>{muscle.workingSetCount}</Text>
                     </View>
                   ))}
                 </View>
               ) : (
-                <Text style={styles.muted} testID="session-completion-muscle-empty-state">
+                <Text allowFontScaling={false} style={styles.muted} testID="session-completion-muscle-empty-state">
                   {muscleCatalogState === 'loading'
                     ? 'Loading muscle breakdown…'
                     : muscleCatalogState === 'error'
@@ -118,7 +118,7 @@ export function SessionCompletionScreen({
 
         {personalRecords.length > 0 ? (
           <View style={styles.section} testID="session-completion-personal-records">
-            <Text accessibilityRole="header" style={styles.heading}>
+            <Text allowFontScaling={false} accessibilityRole="header" style={styles.heading}>
               Personal records
             </Text>
             {personalRecords.map((personalRecord) => (
@@ -134,10 +134,10 @@ export function SessionCompletionScreen({
         {exerciseVolumeComparisons.length > 0 ? (
           <View style={styles.section} testID="session-completion-exercise-volume">
             <View style={styles.headingRow}>
-              <Text accessibilityRole="header" style={styles.heading}>
+              <Text allowFontScaling={false} accessibilityRole="header" style={styles.heading}>
                 Exercise volume
               </Text>
-              <Text style={styles.microLabel}>Session vs history</Text>
+              <Text allowFontScaling={false} style={styles.microLabel}>Session vs history</Text>
             </View>
             {exerciseVolumeComparisons.map((comparison) => (
               <ExerciseVolumeCard

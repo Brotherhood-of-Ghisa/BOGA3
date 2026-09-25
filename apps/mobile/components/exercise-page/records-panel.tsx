@@ -78,7 +78,7 @@ export function RecordsPanel({
           onPress={onOpenHistory}
           style={styles.historyLink}
           testID="exercise-records-history">
-          <Text style={[pageText.microLabel, styles.historyLabel]}>History</Text>
+          <Text allowFontScaling={false} style={[pageText.microLabel, styles.historyLabel]}>History</Text>
           <Icon color={uiRoles.accent} name="chevron-right" size="xs" />
         </Pressable>
       </View>
@@ -99,7 +99,7 @@ function PanelBody({
       return <CollapsedStats oneRepMax={DASH} maxWeight={DASH} volume={DASH} />;
     }
     return (
-      <Text style={[pageText.body, styles.message]} testID="exercise-records-message">
+      <Text allowFontScaling={false} style={[pageText.body, styles.message]} testID="exercise-records-message">
         {state.status === 'loading' ? 'Loading records…' : 'Records unavailable.'}
       </Text>
     );
@@ -175,10 +175,10 @@ function PanelBody({
   return (
     <View style={styles.last} testID="exercise-records-last">
       <View style={styles.lastSummary}>
-        <Text style={pageText.detailFigure}>
+        <Text allowFontScaling={false} style={pageText.detailFigure}>
           {`${date(last.completedAt)} · ${formatDaysAgo(last.completedAt, now)}`}
         </Text>
-        <Text style={pageText.detailFigure}>
+        <Text allowFontScaling={false} style={pageText.detailFigure}>
           {`1RM ${last.oneRepMax !== null ? formatOneRepMax(last.oneRepMax) : DASH} · VOL ${formatVolume(last.volume)}`}
         </Text>
       </View>
@@ -232,11 +232,11 @@ function RecordLine({
       accessible
       style={[styles.recordLine, divider ? styles.recordDivider : null]}
       testID={testID}>
-      <Text style={[pageText.microLabel, styles.recordLabel]}>{label}</Text>
-      <Text numberOfLines={1} style={[pageText.headlineFigure, styles.recordValue]}>
+      <Text allowFontScaling={false} style={[pageText.microLabel, styles.recordLabel]}>{label}</Text>
+      <Text allowFontScaling={false} numberOfLines={1} style={[pageText.headlineFigure, styles.recordValue]}>
         {value}
       </Text>
-      <Text numberOfLines={1} style={[pageText.detailFigure, styles.recordDetail]}>
+      <Text allowFontScaling={false} numberOfLines={1} style={[pageText.detailFigure, styles.recordDetail]}>
         {detail}
       </Text>
     </View>
@@ -246,8 +246,8 @@ function RecordLine({
 function LastSetLine({ set, index }: { set: RecordSet; index: number }) {
   return (
     <View style={styles.lastSet} testID={`exercise-records-last-set-${index}`}>
-      <Text style={[pageText.microLabel, styles.typeLabel]}>{formatEffort(set.setType)}</Text>
-      <Text numberOfLines={1} style={[pageText.runningFigure, styles.lastSetFigure]}>
+      <Text allowFontScaling={false} style={[pageText.microLabel, styles.typeLabel]}>{formatEffort(set.setType)}</Text>
+      <Text allowFontScaling={false} numberOfLines={1} style={[pageText.runningFigure, styles.lastSetFigure]}>
         {`${formatWeight(set.weight)} × ${set.reps}`}
       </Text>
       <Stat
@@ -262,7 +262,7 @@ function LastSetLine({ set, index }: { set: RecordSet; index: number }) {
 
 function Empty() {
   return (
-    <Text style={[pageText.body, styles.message]} testID="exercise-records-empty">
+    <Text allowFontScaling={false} style={[pageText.body, styles.message]} testID="exercise-records-empty">
       No completed sessions with this exercise yet.
     </Text>
   );

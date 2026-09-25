@@ -48,16 +48,18 @@ export function SessionSummaryLine({
     <View style={styles.summaryLines}>
       <View style={styles.summaryRow}>
         <Text
+          allowFontScaling={false}
           selectable
           numberOfLines={1}
           style={[styles.summaryToken, styles.summaryTokenPrimary, styles.summaryTokenStrong]}
           testID={`${testIdPrefix}-start`}>
           {formatDateTimeStamp(session.startedAt)}
         </Text>
-        <Text selectable style={styles.summarySeparator}>
+        <Text allowFontScaling={false} selectable style={styles.summarySeparator}>
           ·
         </Text>
         <Text
+          allowFontScaling={false}
           selectable
           numberOfLines={1}
           style={[styles.summaryToken, styles.summaryTokenStrong]}
@@ -66,10 +68,11 @@ export function SessionSummaryLine({
         </Text>
         {locationLabel ? (
           <>
-            <Text selectable style={[styles.summaryToken, styles.summaryAtToken, styles.summaryTokenStrong]}>
+            <Text allowFontScaling={false} selectable style={[styles.summaryToken, styles.summaryAtToken, styles.summaryTokenStrong]}>
               @
             </Text>
             <Text
+              allowFontScaling={false}
               selectable
               numberOfLines={1}
               ellipsizeMode="tail"
@@ -83,16 +86,18 @@ export function SessionSummaryLine({
 
       <View style={styles.summaryRow}>
         <Text
+          allowFontScaling={false}
           selectable
           numberOfLines={1}
           style={[styles.summaryToken, styles.summaryTokenSecondary]}
           testID={`${testIdPrefix}-sets`}>
           {formatSetCount(session.setCount)}
         </Text>
-        <Text selectable style={styles.summarySeparator}>
+        <Text allowFontScaling={false} selectable style={styles.summarySeparator}>
           ·
         </Text>
         <Text
+          allowFontScaling={false}
           selectable
           numberOfLines={1}
           ellipsizeMode="tail"

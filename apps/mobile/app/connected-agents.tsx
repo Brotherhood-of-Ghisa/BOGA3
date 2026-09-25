@@ -103,7 +103,7 @@ export default function ConnectedAgentsScreen() {
   // The native header carries the title (G4, T05-D1); the intro stays.
   return (
     <ScreenScroll contentInsetAdjustmentBehavior="automatic" testID="connected-agents-screen">
-      <Text style={styles.intro}>
+      <Text allowFontScaling={false} style={styles.intro}>
         Agents can read training data only. They cannot create, edit, or delete exercises,
         workouts, or sets.
       </Text>
@@ -145,28 +145,28 @@ export default function ConnectedAgentsScreen() {
         <Card key={agent.clientId} testID={`connected-agent-${agent.clientId}`}>
           <View style={styles.agentHeader}>
             <View style={styles.agentTitle}>
-              <Text style={styles.agentName}>{agent.name}</Text>
-              <Text style={styles.agentScope}>Read training data</Text>
+              <Text allowFontScaling={false} style={styles.agentName}>{agent.name}</Text>
+              <Text allowFontScaling={false} style={styles.agentScope}>Read training data</Text>
             </View>
             <Tag label="AI" />
           </View>
           <ListRow
             density="list"
             meta={
-              <Text style={styles.date} testID={`connected-agent-granted-${agent.clientId}`}>
+              <Text allowFontScaling={false} style={styles.date} testID={`connected-agent-granted-${agent.clientId}`}>
                 {formatTimestamp(agent.grantedAt)}
               </Text>
             }>
-            <Text style={styles.rowLabel}>Access granted</Text>
+            <Text allowFontScaling={false} style={styles.rowLabel}>Access granted</Text>
           </ListRow>
           <ListRow
             density="list"
             meta={
-              <Text style={styles.date} testID={`connected-agent-last-access-${agent.clientId}`}>
+              <Text allowFontScaling={false} style={styles.date} testID={`connected-agent-last-access-${agent.clientId}`}>
                 {formatTimestamp(agent.lastAccessAt)}
               </Text>
             }>
-            <Text style={styles.rowLabel}>Last access</Text>
+            <Text allowFontScaling={false} style={styles.rowLabel}>Last access</Text>
           </ListRow>
           {/* An outline in `danger`, behind the unchanged Alert confirm. */}
           <View style={styles.agentActions}>

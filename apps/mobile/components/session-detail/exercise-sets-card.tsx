@@ -55,10 +55,10 @@ export function ExerciseSetsCard({
   const content = (
     <>
       <View style={[styles.header, control ? styles.headerWithControl : null]}>
-        <Text numberOfLines={1} style={styles.name}>
+        <Text allowFontScaling={false} numberOfLines={1} style={styles.name}>
           {name}
         </Text>
-        <Text style={[styles.count, countMuted ? styles.countMuted : null]} testID={`${testID}-count`}>
+        <Text allowFontScaling={false} style={[styles.count, countMuted ? styles.countMuted : null]} testID={`${testID}-count`}>
           {count}
         </Text>
         {accessory}
@@ -78,7 +78,7 @@ export function ExerciseSetsCard({
       {recordOneRepMax ? (
         <View style={styles.band} testID={`${testID}-record`}>
           <Icon color={uiRoles.record} name="arrow-up" size="xs" />
-          <Text style={styles.bandLabel}>{`New 1RM record · ${recordOneRepMax}`}</Text>
+          <Text allowFontScaling={false} style={styles.bandLabel}>{`New 1RM record · ${recordOneRepMax}`}</Text>
         </View>
       ) : null}
     </>

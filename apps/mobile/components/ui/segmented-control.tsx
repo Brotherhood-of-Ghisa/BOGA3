@@ -65,7 +65,7 @@ export function SegmentedControl<TValue extends string | number>({
               selected ? styles.segmentSelected : null,
             ]}
             testID={`${testIDPrefix}-${option.value}`}>
-            <Text numberOfLines={1} style={[styles.label, selected ? styles.labelSelected : null]}>
+            <Text allowFontScaling={false} numberOfLines={1} style={[styles.label, selected ? styles.labelSelected : null]}>
               {option.label}
             </Text>
           </Pressable>

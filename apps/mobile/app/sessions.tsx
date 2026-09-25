@@ -130,7 +130,7 @@ export function SessionsScreen({
       <View style={styles.pinnedTopRegion}>
         {activeSession ? (
           <View style={styles.sectionBlock}>
-            <Text selectable style={styles.activeTitle}>
+            <Text allowFontScaling={false} selectable style={styles.activeTitle}>
               Active
             </Text>
             <ActiveSessionRow

@@ -22,7 +22,7 @@ export function ViewSessionTopBar({ onBack, onOpenOptions, onEdit }: ViewSession
   return (
     <View style={[styles.bar, { paddingTop: insets.top }]} testID="completed-session-detail-top-bar">
       <IconButton accessibilityLabel="Back" name="chevron-left" onPress={onBack} testID="completed-session-detail-back" />
-      <Text accessibilityRole="header" numberOfLines={1} style={styles.title}>
+      <Text allowFontScaling={false} accessibilityRole="header" numberOfLines={1} style={styles.title}>
         View Session
       </Text>
       {onOpenOptions ? (

@@ -181,7 +181,7 @@ export function TodayScreen({
               {/* "Current" is the ring glyph and the words, never a colour (G3). */}
               <View style={styles.statusRow}>
                 <Icon name="set-current" size="sm" testID="today-active-session-glyph" />
-                <Text style={styles.cardTitle}>Active session</Text>
+                <Text allowFontScaling={false} style={styles.cardTitle}>Active session</Text>
               </View>
               <SessionSummaryLine
                 session={activeSession}
@@ -324,10 +324,10 @@ function TodayPlanCard({
     return (
       <Card style={styles.card} testID="today-planned-session-card">
         <View style={styles.cardCopy}>
-          <Text style={styles.cardTitle}>{planState.title}</Text>
-          <Text style={styles.cardBody}>{planState.detail}</Text>
+          <Text allowFontScaling={false} style={styles.cardTitle}>{planState.title}</Text>
+          <Text allowFontScaling={false} style={styles.cardBody}>{planState.detail}</Text>
           {errorMessage ? (
-            <Text accessibilityLiveRegion="polite" style={styles.errorText} testID="today-plan-launch-error">
+            <Text allowFontScaling={false} accessibilityLiveRegion="polite" style={styles.errorText} testID="today-plan-launch-error">
               {errorMessage}
             </Text>
           ) : null}

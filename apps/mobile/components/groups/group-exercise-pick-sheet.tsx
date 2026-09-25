@@ -166,6 +166,7 @@ export function GroupExercisePickSheet(props: GroupExercisePickSheetProps) {
                 {option.kind === 'other' && model ? (
                   <View style={styles.otherList}>
                     <TextInput
+                      allowFontScaling={false}
                       accessibilityLabel="Search your exercises"
                       autoCapitalize="none"
                       autoCorrect={false}

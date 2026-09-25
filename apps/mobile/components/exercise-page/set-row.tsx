@@ -47,7 +47,7 @@ export function SetRow({ row, divider, onOpen, onToggle }: SetRowProps) {
       density="list"
       divider={divider}
       leading={
-        <Text style={[pageText.microLabel, styles.type, performed ? styles.typePerformed : null]}>
+        <Text allowFontScaling={false} style={[pageText.microLabel, styles.type, performed ? styles.typePerformed : null]}>
           {effort}
         </Text>
       }
@@ -93,6 +93,7 @@ export function SetRow({ row, divider, onOpen, onToggle }: SetRowProps) {
         style={styles.body}
         testID={`exercise-set-${row.number}-open`}>
         <Text
+          allowFontScaling={false}
           numberOfLines={1}
           style={[
             pageText.runningFigure,

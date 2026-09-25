@@ -102,7 +102,7 @@ export function SyncGate({ children }: PropsWithChildren) {
   return (
     <Screen style={styles.container} testID={SYNC_GATE_TEST_IDS.block}>
       <Card style={styles.card}>
-        <Text accessibilityRole="header" style={styles.heading}>
+        <Text allowFontScaling={false} accessibilityRole="header" style={styles.heading}>
           Setting up your data…
         </Text>
 
@@ -120,7 +120,7 @@ export function SyncGate({ children }: PropsWithChildren) {
 function GateProgress({ progress }: { progress: SyncProgress }) {
   return (
     <View style={styles.body}>
-      <Text style={styles.phaseLabel} testID={SYNC_GATE_TEST_IDS.phaseLabel}>
+      <Text allowFontScaling={false} style={styles.phaseLabel} testID={SYNC_GATE_TEST_IDS.phaseLabel}>
         {PHASE_LABELS[progress.phase]}
       </Text>
 
@@ -142,7 +142,7 @@ function GateProgress({ progress }: { progress: SyncProgress }) {
           <View testID={SYNC_GATE_TEST_IDS.activityIndicator}>
             <ActivityIndicator color={uiRoles.inkMuted} size="large" />
           </View>
-          <Text style={styles.activityDetail} testID={SYNC_GATE_TEST_IDS.activityDetail}>
+          <Text allowFontScaling={false} style={styles.activityDetail} testID={SYNC_GATE_TEST_IDS.activityDetail}>
             {describeActivity(progress)}
           </Text>
         </View>
@@ -155,7 +155,7 @@ function GateProgress({ progress }: { progress: SyncProgress }) {
 function GateError({ errorCode }: { errorCode: 'FK_VIOLATION' | 'LOCAL_FK_VIOLATION' | 'INTERNAL' }) {
   return (
     <View style={styles.body}>
-      <Text accessibilityRole="alert" style={styles.errorMessage} testID={SYNC_GATE_TEST_IDS.errorMessage}>
+      <Text allowFontScaling={false} accessibilityRole="alert" style={styles.errorMessage} testID={SYNC_GATE_TEST_IDS.errorMessage}>
         {ERROR_MESSAGES[errorCode]}
       </Text>
       <ActionButton

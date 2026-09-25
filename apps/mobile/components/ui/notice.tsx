@@ -29,7 +29,7 @@ export type NoticeProps = {
 export function Notice({ message, title, tone = 'neutral', icon, live = false, action, testID }: NoticeProps) {
   const danger = tone === 'danger';
   const words = (
-    <Text style={[styles.message, title ? null : styles.fill, danger ? styles.messageDanger : null]}>{message}</Text>
+    <Text allowFontScaling={false} style={[styles.message, title ? null : styles.fill, danger ? styles.messageDanger : null]}>{message}</Text>
   );
   return (
     <View
@@ -40,7 +40,7 @@ export function Notice({ message, title, tone = 'neutral', icon, live = false, a
       {icon ? <Icon color={danger ? uiRoles.danger : uiRoles.inkMuted} name={icon} size="sm" /> : null}
       {title ? (
         <View style={styles.words}>
-          <Text accessibilityRole="header" style={[styles.title, danger ? styles.messageDanger : null]}>
+          <Text allowFontScaling={false} accessibilityRole="header" style={[styles.title, danger ? styles.messageDanger : null]}>
             {title}
           </Text>
           {words}

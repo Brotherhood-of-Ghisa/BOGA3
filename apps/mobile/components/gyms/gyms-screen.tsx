@@ -84,10 +84,10 @@ export function GymsScreen({ readPosition }: GymsScreenProps) {
         onPress={() => setEditing(gym.id)}
         testID={`gyms-row-${gym.id}`}
         trailing={<Icon color={uiRoles.inkMuted} name="chevron-right" />}>
-        <Text numberOfLines={1} style={styles.rowName}>
+        <Text allowFontScaling={false} numberOfLines={1} style={styles.rowName}>
           {gym.name}
         </Text>
-        <Text style={styles.rowDetail} testID={`gyms-row-${gym.id}-status`}>
+        <Text allowFontScaling={false} style={styles.rowDetail} testID={`gyms-row-${gym.id}-status`}>
           {gym.archived ? 'Archived' : located ? 'Location saved' : 'No location saved'}
         </Text>
       </ListRow>
@@ -104,7 +104,7 @@ export function GymsScreen({ readPosition }: GymsScreenProps) {
   } else if (directory.status === 'error') {
     body = (
       <View style={styles.state} testID="gyms-error">
-        <Text style={styles.stateText}>{"Couldn't load your gyms."}</Text>
+        <Text allowFontScaling={false} style={styles.stateText}>{"Couldn't load your gyms."}</Text>
         <ActionButton label="Retry" onPress={() => void reload()} testID="gyms-retry" variant="outline" />
       </View>
     );
@@ -115,7 +115,7 @@ export function GymsScreen({ readPosition }: GymsScreenProps) {
       <>
         <Card testID="gyms-list">
           {active.length === 0 && editing !== 'new' ? (
-            <Text style={styles.empty}>No gyms yet.</Text>
+            <Text allowFontScaling={false} style={styles.empty}>No gyms yet.</Text>
           ) : null}
           {active.map(gymRow)}
           {editing === 'new' ? (
@@ -141,7 +141,7 @@ export function GymsScreen({ readPosition }: GymsScreenProps) {
         ) : null}
         {showArchived && archived.length > 0 ? (
           <View style={styles.section}>
-            <Text style={styles.microLabel}>Archived</Text>
+            <Text allowFontScaling={false} style={styles.microLabel}>Archived</Text>
             <Card testID="gyms-archived-list">{archived.map(gymRow)}</Card>
           </View>
         ) : null}

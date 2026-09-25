@@ -343,20 +343,20 @@ export function ExerciseEditorModal({
         />
         <View style={styles.modalCard}>
           <View style={styles.modalHeaderRow}>
-            <Text selectable style={styles.modalTitle}>
+            <Text allowFontScaling={false} selectable style={styles.modalTitle}>
               {editorTitle}
             </Text>
           </View>
 
           {isLoadingMuscleGroups ? (
             <View style={styles.centeredBodyState}>
-              <Text style={styles.helperText}>Loading muscle groups...</Text>
+              <Text allowFontScaling={false} style={styles.helperText}>Loading muscle groups...</Text>
             </View>
           ) : null}
 
           {!isLoadingMuscleGroups && muscleGroupLoadError ? (
             <View style={styles.centeredBodyState}>
-              <Text style={styles.errorText}>{muscleGroupLoadError}</Text>
+              <Text allowFontScaling={false} style={styles.errorText}>{muscleGroupLoadError}</Text>
             </View>
           ) : null}
 
@@ -383,13 +383,14 @@ export function ExerciseEditorModal({
                   testIDPrefix="exercise-editor"
                 />
 
-                <Text style={styles.fieldLabel}>Primary muscle</Text>
+                <Text allowFontScaling={false} style={styles.fieldLabel}>Primary muscle</Text>
                 <Pressable
                   accessibilityLabel="Open primary muscle selector"
                   testID="exercise-editor-primary-muscle-trigger"
                   style={[styles.pickerButton, validation.primaryMuscleError ? styles.inputError : null]}
                   onPress={() => openMuscleSelector('primary')}>
                   <Text
+                    allowFontScaling={false}
                     adjustsFontSizeToFit
                     ellipsizeMode="clip"
                     minimumFontScale={0.82}
@@ -402,12 +403,12 @@ export function ExerciseEditorModal({
                   <Icon color={uiColors.textSecondary} name="chevron-down" size="sm" />
                 </Pressable>
                 {validation.primaryMuscleError ? (
-                  <Text selectable style={styles.errorText}>
+                  <Text allowFontScaling={false} selectable style={styles.errorText}>
                     {validation.primaryMuscleError}
                   </Text>
                 ) : null}
 
-                <Text style={styles.fieldLabel}>Secondary muscles</Text>
+                <Text allowFontScaling={false} style={styles.fieldLabel}>Secondary muscles</Text>
                 <View style={styles.list}>
                   {secondaryMuscleRows.map((row) => {
                     const muscleGroup = muscleGroupById.get(row.muscleGroupId);
@@ -416,6 +417,7 @@ export function ExerciseEditorModal({
                         <View style={styles.secondaryMuscleRowControls}>
                           <View style={styles.secondaryMuscleLabelCell}>
                             <Text
+                              allowFontScaling={false}
                               adjustsFontSizeToFit
                               ellipsizeMode="clip"
                               minimumFontScale={0.82}
@@ -423,7 +425,7 @@ export function ExerciseEditorModal({
                               style={styles.secondaryMuscleRowTitle}>
                               {muscleGroup?.displayName ?? row.muscleGroupId}
                             </Text>
-                            <Text numberOfLines={1} style={styles.secondaryMuscleRowFamily}>
+                            <Text allowFontScaling={false} numberOfLines={1} style={styles.secondaryMuscleRowFamily}>
                               {muscleGroup?.familyName ?? 'Unknown'}
                             </Text>
                           </View>
@@ -431,7 +433,7 @@ export function ExerciseEditorModal({
                             accessibilityLabel={`Remove secondary muscle ${muscleGroup?.displayName ?? row.muscleGroupId}`}
                             style={styles.removeButton}
                             onPress={() => removeSecondaryMuscle(row.rowId)}>
-                            <Text style={styles.removeButtonText}>Remove</Text>
+                            <Text allowFontScaling={false} style={styles.removeButtonText}>Remove</Text>
                           </Pressable>
                         </View>
                       </View>
@@ -439,13 +441,13 @@ export function ExerciseEditorModal({
                   })}
 
                   {secondaryMuscleRows.length === 0 ? (
-                    <Text selectable style={styles.helperText}>
+                    <Text allowFontScaling={false} selectable style={styles.helperText}>
                       No secondary muscles selected.
                     </Text>
                   ) : null}
                 </View>
                 {validation.secondaryMusclesError ? (
-                  <Text selectable style={styles.errorText}>
+                  <Text allowFontScaling={false} selectable style={styles.errorText}>
                     {validation.secondaryMusclesError}
                   </Text>
                 ) : null}
@@ -456,12 +458,12 @@ export function ExerciseEditorModal({
                     testID="exercise-editor-secondary-muscle-trigger"
                     style={styles.addMuscleLinkButton}
                     onPress={() => openMuscleSelector('secondary')}>
-                    <Text style={styles.addMuscleLinkButtonText}>Add secondary muscle</Text>
+                    <Text allowFontScaling={false} style={styles.addMuscleLinkButtonText}>Add secondary muscle</Text>
                   </Pressable>
                 </View>
 
                 {saveError ? (
-                  <Text selectable style={styles.errorText}>
+                  <Text allowFontScaling={false} selectable style={styles.errorText}>
                     {saveError}
                   </Text>
                 ) : null}
@@ -473,7 +475,7 @@ export function ExerciseEditorModal({
                   style={styles.primaryButton}
                   disabled={isSaving}
                   onPress={saveEditor}>
-                  <Text style={styles.primaryButtonText}>{isSaving ? 'Saving…' : 'Save Exercise'}</Text>
+                  <Text allowFontScaling={false} style={styles.primaryButtonText}>{isSaving ? 'Saving…' : 'Save Exercise'}</Text>
                 </Pressable>
               </View>
             </>
@@ -488,7 +490,7 @@ export function ExerciseEditorModal({
             />
             <View style={styles.selectorOverlayCard}>
               <View style={styles.modalHeaderRow}>
-                <Text selectable style={styles.modalTitle}>
+                <Text allowFontScaling={false} selectable style={styles.modalTitle}>
                   {selectorTitle}
                 </Text>
               </View>
@@ -518,6 +520,7 @@ export function ExerciseEditorModal({
                     }}>
                     <View style={styles.selectorListRowTextStack}>
                       <Text
+                        allowFontScaling={false}
                         adjustsFontSizeToFit
                         ellipsizeMode="clip"
                         minimumFontScale={0.82}
@@ -525,17 +528,17 @@ export function ExerciseEditorModal({
                         style={styles.selectorListRowTitle}>
                         {muscleGroup.displayName}
                       </Text>
-                      <Text numberOfLines={1} style={styles.selectorListRowMeta}>
+                      <Text allowFontScaling={false} numberOfLines={1} style={styles.selectorListRowMeta}>
                         {muscleGroup.familyName}
                       </Text>
                     </View>
-                    <Text style={styles.selectorListRowAction}>
+                    <Text allowFontScaling={false} style={styles.selectorListRowAction}>
                       {muscleSelectorMode === 'primary' ? 'Select' : 'Add'}
                     </Text>
                   </Pressable>
                 ))}
                 {selectorOptions.length === 0 ? (
-                  <Text selectable style={styles.helperText}>
+                  <Text allowFontScaling={false} selectable style={styles.helperText}>
                     {muscleSelectorMode === 'primary'
                       ? 'No primary muscle options available.'
                       : 'All available muscle groups are already selected as primary or secondary.'}
@@ -547,7 +550,7 @@ export function ExerciseEditorModal({
                 accessibilityLabel="Close muscle link selector"
                 style={styles.secondaryButton}
                 onPress={() => setMuscleSelectorMode(null)}>
-                <Text style={styles.secondaryButtonText}>Done</Text>
+                <Text allowFontScaling={false} style={styles.secondaryButtonText}>Done</Text>
               </Pressable>
             </View>
           </View>

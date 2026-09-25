@@ -398,7 +398,7 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
           variant="outline"
         />
         {notice ? (
-          <Text accessibilityLiveRegion="polite" style={styles.notice} testID="session-view-notice">
+          <Text allowFontScaling={false} accessibilityLiveRegion="polite" style={styles.notice} testID="session-view-notice">
             {notice}
           </Text>
         ) : null}

@@ -48,7 +48,7 @@ export function SessionTopBar(props: SessionTopBarProps) {
     <View
       style={[styles.bar, { paddingTop: insets.top }]}
       testID={props.mode === 'complete' ? 'session-completion-top-bar' : 'session-view-top-bar'}>
-      <Text accessibilityRole="header" numberOfLines={1} style={styles.title}>
+      <Text allowFontScaling={false} accessibilityRole="header" numberOfLines={1} style={styles.title}>
         {copy.title}
       </Text>
       {props.mode === 'active' ? (

@@ -58,7 +58,7 @@ export function SessionGymSheet({
     <Sheet dismissLabel="Dismiss gym picker" onDismiss={onDismiss} testID="session-view-gym-sheet" title="Gym" visible={visible}>
       <ScrollView style={{ maxHeight: height * LIST_SHARE_OF_SCREEN }} testID="session-view-gym-list">
         {options === null ? (
-          <Text style={styles.message}>Loading gyms…</Text>
+          <Text allowFontScaling={false} style={styles.message}>Loading gyms…</Text>
         ) : (
           <>
             {nearby ? (
@@ -82,7 +82,7 @@ export function SessionGymSheet({
         onPress={onManage}
         testID="session-view-gym-manage"
         trailing={<Icon color={uiRoles.inkMuted} name="chevron-right" />}>
-        <Text style={styles.manage}>Manage gyms</Text>
+        <Text allowFontScaling={false} style={styles.manage}>Manage gyms</Text>
       </ListRow>
     </Sheet>
   );

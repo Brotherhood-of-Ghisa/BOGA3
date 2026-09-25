@@ -93,7 +93,7 @@ export function ExerciseSwapSheet({
         style={[styles.list, { maxHeight: height * LIST_SHARE_OF_SCREEN }]}
         testID="exercise-swap-list">
         {loading || !model ? (
-          <Text style={[pageText.body, styles.message]}>Loading exercises…</Text>
+          <Text allowFontScaling={false} style={[pageText.body, styles.message]}>Loading exercises…</Text>
         ) : (
           <ExerciseListContent
             emptyText={

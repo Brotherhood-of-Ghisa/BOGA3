@@ -57,13 +57,13 @@ export function FriendSessionContent({ session }: { session: GroupSessionDetail 
         ]}
         header={
           <View style={styles.header} testID="group-session-header">
-            <Text numberOfLines={1} style={styles.member} testID="group-session-member">
+            <Text allowFontScaling={false} numberOfLines={1} style={styles.member} testID="group-session-member">
               {formatMemberName(session.member.username)}
             </Text>
             <View style={styles.status}>
               {/* A ring marks "current" in the design language (§5). */}
               {isActive ? <Icon color={uiRoles.accent} name="set-current" size="xs" /> : null}
-              <Text style={styles.statusText} testID="group-session-status">
+              <Text allowFontScaling={false} style={styles.statusText} testID="group-session-status">
                 {isActive ? IN_PROGRESS_LABEL : formatSessionStatusLabel(session)}
               </Text>
             </View>
@@ -77,7 +77,7 @@ export function FriendSessionContent({ session }: { session: GroupSessionDetail 
         }}
       />
       {model.cards.length === 0 ? (
-        <Text style={styles.empty} testID="group-session-no-sets">
+        <Text allowFontScaling={false} style={styles.empty} testID="group-session-no-sets">
           No performed sets yet.
         </Text>
       ) : (

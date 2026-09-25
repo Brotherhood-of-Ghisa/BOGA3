@@ -86,7 +86,7 @@ export function SessionTimesFields({
         />
       </View>
       {notice ? (
-        <Text accessibilityLiveRegion="polite" style={styles.notice} testID="session-view-times-notice">
+        <Text allowFontScaling={false} accessibilityLiveRegion="polite" style={styles.notice} testID="session-view-times-notice">
           {notice}
         </Text>
       ) : null}

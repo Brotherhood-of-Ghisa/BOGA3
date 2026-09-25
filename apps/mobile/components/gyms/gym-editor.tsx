@@ -131,7 +131,7 @@ export function GymEditor({ gym, onDone, onLocationChanged, onCancel, readPositi
   if (pending) {
     locationActions = (
       <View style={styles.confirm} testID="gym-editor-confirm">
-        <Text style={styles.confirmText}>
+        <Text allowFontScaling={false} style={styles.confirmText}>
           {pending === 'replace'
             ? 'Replace the saved location with where you are now?'
             : "Clear the saved location? This gym won't be suggested nearby."}
@@ -203,8 +203,9 @@ export function GymEditor({ gym, onDone, onLocationChanged, onCancel, readPositi
 
   return (
     <View style={styles.editor} testID="gym-editor">
-      <Text style={styles.microLabel}>Name</Text>
+      <Text allowFontScaling={false} style={styles.microLabel}>Name</Text>
       <TextInput
+        allowFontScaling={false}
         accessibilityLabel="Gym name"
         autoFocus={gym === null}
         onChangeText={setName}
@@ -216,18 +217,19 @@ export function GymEditor({ gym, onDone, onLocationChanged, onCancel, readPositi
         value={name}
       />
 
-      <Text style={styles.microLabel}>Location</Text>
+      <Text allowFontScaling={false} style={styles.microLabel}>Location</Text>
       <View style={styles.status}>
         <Icon color={hasLocation ? uiRoles.ink : uiRoles.disabled} name="location" size="sm" />
-        <Text style={styles.statusText} testID="gym-editor-location-status">
+        <Text allowFontScaling={false} style={styles.statusText} testID="gym-editor-location-status">
           {hasLocation ? (gym ? 'Location saved' : 'Location ready') : 'No location saved'}
         </Text>
       </View>
-      <Text style={styles.hint}>
+      <Text allowFontScaling={false} style={styles.hint}>
         Private to you. A saved location lets the gym sheet suggest this gym when you are here.
       </Text>
       {feedback ? (
         <Text
+          allowFontScaling={false}
           accessibilityLiveRegion="polite"
           style={[styles.feedback, feedback.tone === 'error' ? styles.feedbackError : null]}
           testID="gym-editor-feedback">

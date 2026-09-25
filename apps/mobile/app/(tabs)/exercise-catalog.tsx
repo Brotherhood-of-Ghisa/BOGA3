@@ -266,7 +266,7 @@ export default function ExerciseCatalogScreen() {
     return (
       <View style={styles.screen}>
         <View style={styles.centeredState}>
-          <Text selectable style={styles.stateText}>
+          <Text allowFontScaling={false} selectable style={styles.stateText}>
             Loading exercise catalog…
           </Text>
         </View>
@@ -278,7 +278,7 @@ export default function ExerciseCatalogScreen() {
     return (
       <View style={styles.screen}>
         <View style={styles.centeredState}>
-          <Text selectable style={styles.errorText}>
+          <Text allowFontScaling={false} selectable style={styles.errorText}>
             {loadError}
           </Text>
         </View>
@@ -292,6 +292,7 @@ export default function ExerciseCatalogScreen() {
         <MoreHubBackButton />
         <View style={styles.topActionRow}>
           <TextInput
+            allowFontScaling={false}
             accessibilityLabel="Exercise filter input"
             autoCapitalize="none"
             autoCorrect={false}
@@ -325,7 +326,7 @@ export default function ExerciseCatalogScreen() {
                 key={chip.key}
                 accessibilityLabel={`Open filters (${chip.label})`}
                 onPress={() => setIsCatalogOptionsMenuVisible(true)}>
-                <Text selectable style={styles.activeFilterChip}>
+                <Text allowFontScaling={false} selectable style={styles.activeFilterChip}>
                   {chip.label}
                 </Text>
               </Pressable>
@@ -334,14 +335,14 @@ export default function ExerciseCatalogScreen() {
         ) : null}
         {saveFeedback ? (
           <View style={styles.feedbackCard}>
-            <Text selectable style={styles.successText}>
+            <Text allowFontScaling={false} selectable style={styles.successText}>
               {saveFeedback}
             </Text>
           </View>
         ) : null}
         {saveError ? (
           <View style={styles.errorCard}>
-            <Text selectable style={styles.errorText}>
+            <Text allowFontScaling={false} selectable style={styles.errorText}>
               {saveError}
             </Text>
           </View>
@@ -369,7 +370,7 @@ export default function ExerciseCatalogScreen() {
           renderActions={renderExerciseActions}
         />
         {exerciseListModel.items.length === 0 && exerciseListModel.mode === 'grouped' ? (
-          <Text selectable style={styles.helperText}>
+          <Text allowFontScaling={false} selectable style={styles.helperText}>
             {exercises.length === 0
               ? 'No active exercises yet. Create one with the button above.'
               : 'No exercises match the current filters.'}
@@ -397,14 +398,14 @@ export default function ExerciseCatalogScreen() {
           />
           <View style={styles.filtersModalCard}>
             <View style={styles.filtersModalHeader}>
-              <Text selectable style={styles.modalTitle}>
+              <Text allowFontScaling={false} selectable style={styles.modalTitle}>
                 Filters
               </Text>
               <Pressable
                 accessibilityLabel="Close filters"
                 style={styles.filtersCloseButton}
                 onPress={() => setIsCatalogOptionsMenuVisible(false)}>
-                <Text style={styles.filtersCloseButtonText}>Done</Text>
+                <Text allowFontScaling={false} style={styles.filtersCloseButtonText}>Done</Text>
               </Pressable>
             </View>
 
@@ -418,20 +419,20 @@ export default function ExerciseCatalogScreen() {
               />
 
               <View style={styles.filtersSectionHeaderRow}>
-                <Text selectable style={styles.filtersSectionLabel}>
+                <Text allowFontScaling={false} selectable style={styles.filtersSectionLabel}>
                   Muscle groups
                 </Text>
                 {filters.muscleGroupIds.size > 0 ? (
                   <Pressable
                     accessibilityLabel="Clear muscle group selection"
                     onPress={clearFilterMuscleGroups}>
-                    <Text style={styles.filtersClearLink}>Clear</Text>
+                    <Text allowFontScaling={false} style={styles.filtersClearLink}>Clear</Text>
                   </Pressable>
                 ) : null}
               </View>
               <View style={styles.filtersPillRow}>
                 {muscleGroups.length === 0 ? (
-                  <Text style={styles.helperText}>No muscle groups defined.</Text>
+                  <Text allowFontScaling={false} style={styles.helperText}>No muscle groups defined.</Text>
                 ) : (
                   muscleGroups.map((group) => {
                     const selected = filters.muscleGroupIds.has(group.id);
@@ -442,6 +443,7 @@ export default function ExerciseCatalogScreen() {
                         style={[styles.filterPill, selected && styles.filterPillSelected]}
                         onPress={() => toggleFilterMuscleGroup(group.id)}>
                         <Text
+                          allowFontScaling={false}
                           style={[
                             styles.filterPillText,
                             selected && styles.filterPillTextSelected,
@@ -454,7 +456,7 @@ export default function ExerciseCatalogScreen() {
                 )}
               </View>
 
-              <Text selectable style={styles.filtersSectionLabel}>
+              <Text allowFontScaling={false} selectable style={styles.filtersSectionLabel}>
                 Visibility
               </Text>
               <View style={styles.filtersPillRow}>
@@ -465,6 +467,7 @@ export default function ExerciseCatalogScreen() {
                   style={[styles.filterPill, filters.showDeleted && styles.filterPillSelected]}
                   onPress={toggleFilterShowDeleted}>
                   <Text
+                    allowFontScaling={false}
                     style={[
                       styles.filterPillText,
                       filters.showDeleted && styles.filterPillTextSelected,
@@ -481,6 +484,7 @@ export default function ExerciseCatalogScreen() {
                   style={[styles.filterPill, filters.showNeverDone && styles.filterPillSelected]}
                   onPress={toggleFilterShowNeverDone}>
                   <Text
+                    allowFontScaling={false}
                     style={[
                       styles.filterPillText,
                       filters.showNeverDone && styles.filterPillTextSelected,
@@ -506,10 +510,10 @@ export default function ExerciseCatalogScreen() {
             onPress={() => setExerciseActionMenuTarget(null)}
           />
           <View style={styles.actionMenuCard}>
-            <Text selectable style={styles.modalTitle}>
+            <Text allowFontScaling={false} selectable style={styles.modalTitle}>
               Exercise Actions
             </Text>
-            <Text selectable style={styles.helperText}>
+            <Text allowFontScaling={false} selectable style={styles.helperText}>
               {exerciseActionMenuTarget?.name ?? 'Exercise'}
             </Text>
             <Pressable
@@ -523,7 +527,7 @@ export default function ExerciseCatalogScreen() {
                   openEditorForExercise(target);
                 }
               }}>
-              <Text style={styles.actionMenuButtonText}>Edit</Text>
+              <Text allowFontScaling={false} style={styles.actionMenuButtonText}>Edit</Text>
             </Pressable>
             {groupLinkingUserId ? (
               <Pressable
@@ -540,7 +544,7 @@ export default function ExerciseCatalogScreen() {
                     router.push(exerciseLinkHref(target.id));
                   }
                 }}>
-                <Text style={styles.actionMenuButtonText}>Link to group exercise…</Text>
+                <Text allowFontScaling={false} style={styles.actionMenuButtonText}>Link to group exercise…</Text>
               </Pressable>
             ) : null}
             {exerciseActionMenuTarget?.deletedAt ? (
@@ -553,7 +557,7 @@ export default function ExerciseCatalogScreen() {
                     void undeleteExercise(target);
                   }
                 }}>
-                <Text style={styles.actionMenuButtonText}>Undelete</Text>
+                <Text allowFontScaling={false} style={styles.actionMenuButtonText}>Undelete</Text>
               </Pressable>
             ) : (
               <Pressable
@@ -566,7 +570,7 @@ export default function ExerciseCatalogScreen() {
                     void deleteExercise(target);
                   }
                 }}>
-                <Text style={styles.actionMenuDeleteButtonText}>Delete</Text>
+                <Text allowFontScaling={false} style={styles.actionMenuDeleteButtonText}>Delete</Text>
               </Pressable>
             )}
           </View>

@@ -103,29 +103,29 @@ export function SyncStatusPanel({
 
   return (
     <Card testID="settings-sync-status-card">
-      <Text style={styles.cardLabel}>Sync status</Text>
+      <Text allowFontScaling={false} style={styles.cardLabel}>Sync status</Text>
 
       <ListRow
         density="list"
         divider={false}
         meta={
-          <Text style={styles.value} testID="settings-sync-status-last-success">
+          <Text allowFontScaling={false} style={styles.value} testID="settings-sync-status-last-success">
             {formatLastSuccess(status?.lastSuccessAtMs ?? null)}
           </Text>
         }
         testID="settings-sync-status-last-success-row">
-        <Text style={styles.label}>Last successful sync</Text>
+        <Text allowFontScaling={false} style={styles.label}>Last successful sync</Text>
       </ListRow>
 
       <ListRow
         density="list"
         meta={
-          <Text style={styles.value} testID="settings-sync-status-dirty-count">
+          <Text allowFontScaling={false} style={styles.value} testID="settings-sync-status-dirty-count">
             {String(status?.dirtyCount ?? 0)}
           </Text>
         }
         testID="settings-sync-status-dirty-count-row">
-        <Text style={styles.label}>Pending changes</Text>
+        <Text allowFontScaling={false} style={styles.label}>Pending changes</Text>
       </ListRow>
 
       {/* Offline is the glyph and the word, never a warning hue (G3). */}
@@ -136,26 +136,27 @@ export function SyncStatusPanel({
             {offline ? (
               <Icon name="offline" size="sm" testID="settings-sync-status-network-offline-glyph" />
             ) : null}
-            <Text style={styles.value} testID="settings-sync-status-network">
+            <Text allowFontScaling={false} style={styles.value} testID="settings-sync-status-network">
               {offline ? 'Offline' : 'Online'}
             </Text>
           </View>
         }
         testID="settings-sync-status-network-row">
-        <Text style={styles.label}>Network</Text>
+        <Text allowFontScaling={false} style={styles.label}>Network</Text>
       </ListRow>
 
       <ListRow
         density="list"
         meta={
           <Text
+            allowFontScaling={false}
             style={[styles.value, styles.errorValue, errorText === 'None' ? null : styles.danger]}
             testID="settings-sync-status-error">
             {errorText}
           </Text>
         }
         testID="settings-sync-status-error-row">
-        <Text style={styles.label}>Error</Text>
+        <Text allowFontScaling={false} style={styles.label}>Error</Text>
       </ListRow>
 
       <View style={styles.actions}>

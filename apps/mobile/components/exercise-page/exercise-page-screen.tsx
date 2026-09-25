@@ -297,11 +297,12 @@ export function ExercisePageScreen({
               ]}
               testID="exercise-add-set">
               <Icon color={uiRoles.ink} name="plus" size="xs" />
-              <Text style={pageText.controlLabel}>Add set</Text>
+              <Text allowFontScaling={false} style={pageText.controlLabel}>Add set</Text>
             </Pressable>
           </Card>
           {draft.saveError ? (
             <Text
+              allowFontScaling={false}
               accessibilityLiveRegion="polite"
               style={[pageText.body, styles.saveError]}
               testID="exercise-save-error">
@@ -317,7 +318,7 @@ export function ExercisePageScreen({
             onPress={onComplete}
             style={({ pressed }) => [styles.complete, pressed ? styles.pressed : null]}
             testID="exercise-complete">
-            <Text style={pageText.controlLabel}>Complete exercise</Text>
+            <Text allowFontScaling={false} style={pageText.controlLabel}>Complete exercise</Text>
           </Pressable>
         </View>
       </KeyboardAvoidingView>

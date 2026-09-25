@@ -55,8 +55,8 @@ export function Stat({
   if (layout === 'inline') {
     return (
       <View accessibilityLabel={`${label} ${value}`} accessible style={styles.inline} testID={testID}>
-        <Text style={legendStyle}>{label}</Text>
-        <Text numberOfLines={1} style={[valueStyle, styles.inlineValue]}>
+        <Text allowFontScaling={false} style={legendStyle}>{label}</Text>
+        <Text allowFontScaling={false} numberOfLines={1} style={[valueStyle, styles.inlineValue]}>
           {value}
         </Text>
       </View>
@@ -69,8 +69,8 @@ export function Stat({
       accessible
       style={align === 'end' ? styles.stackedEnd : null}
       testID={testID}>
-      <Text style={legendStyle}>{label}</Text>
-      <Text numberOfLines={1} style={valueStyle}>
+      <Text allowFontScaling={false} style={legendStyle}>{label}</Text>
+      <Text allowFontScaling={false} numberOfLines={1} style={valueStyle}>
         {value}
       </Text>
     </View>

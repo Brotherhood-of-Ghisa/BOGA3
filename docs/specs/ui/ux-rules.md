@@ -406,6 +406,15 @@ primitives (`components-catalog.md` 6 and 6a) and those screens.
    deleted on 2026-09-24 with no user: depth is a hairline plus a ground change
    (`ui/design-language.md` §4), and no screen draws a shadow.
 
+7. **Fixed font sizes.** App-owned text and inputs do not follow the device's
+   text-size setting (decided 2026-09-25). Every React Native `Text` and
+   `TextInput` sets `allowFontScaling={false}` after any spread props;
+   `UiText`, `FormField` and `SearchField` enforce this for their callers.
+   Existing fit-to-width behaviour is preserved. Native system dialogs remain
+   OS-controlled. `app/__tests__/ui-font-scaling.test.tsx` guards coverage and
+   prop precedence; the visual target is the existing default-size layout at
+   both default and accessibility text sizes.
+
 ### 9b. Appearance: light only
 
 1. The app ships **one light theme**. Dark mode is explicitly not a product

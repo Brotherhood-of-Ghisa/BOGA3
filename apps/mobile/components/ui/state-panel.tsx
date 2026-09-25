@@ -47,8 +47,8 @@ export function StatePanel({
       style={[styles.panel, fill ? styles.fill : null]}
       testID={testID}>
       {kind === 'loading' ? <ActivityIndicator color={uiRoles.inkMuted} /> : null}
-      {title ? <Text style={styles.title}>{title}</Text> : null}
-      {body ? <Text style={styles.body}>{body}</Text> : null}
+      {title ? <Text allowFontScaling={false} style={styles.title}>{title}</Text> : null}
+      {body ? <Text allowFontScaling={false} style={styles.body}>{body}</Text> : null}
       {action ? (
         <ActionButton
           accessibilityLabel={action.accessibilityLabel}

@@ -34,8 +34,9 @@ export function ExerciseCoreFields({
 }: ExerciseCoreFieldsProps) {
   return (
     <View style={styles.root}>
-      <Text style={styles.fieldLabel}>Exercise name</Text>
+      <Text allowFontScaling={false} style={styles.fieldLabel}>Exercise name</Text>
       <TextInput
+        allowFontScaling={false}
         accessibilityLabel="Exercise definition name"
         testID={`${testIDPrefix}-name-input`}
         autoFocus={autoFocus}
@@ -50,12 +51,12 @@ export function ExerciseCoreFields({
         onChangeText={onChangeName}
       />
       {nameError ? (
-        <Text selectable style={styles.errorText} testID={`${testIDPrefix}-name-error`}>
+        <Text allowFontScaling={false} selectable style={styles.errorText} testID={`${testIDPrefix}-name-error`}>
           {nameError}
         </Text>
       ) : null}
 
-      <Text style={styles.fieldLabel}>Weight entry</Text>
+      <Text allowFontScaling={false} style={styles.fieldLabel}>Weight entry</Text>
       <View style={styles.loadModeRow}>
         {LOAD_INPUT_MODES.map((mode) => {
           const label = LOAD_INPUT_MODE_LABELS[mode];
@@ -70,12 +71,12 @@ export function ExerciseCoreFields({
               testID={`${testIDPrefix}-load-mode-${mode}`}
               style={[styles.loadModeButton, selected ? styles.loadModeButtonSelected : null]}
               onPress={() => onChangeLoadInputMode(mode)}>
-              <Text style={[styles.loadModeButtonText, selected ? styles.loadModeButtonTextSelected : null]}>{label}</Text>
+              <Text allowFontScaling={false} style={[styles.loadModeButtonText, selected ? styles.loadModeButtonTextSelected : null]}>{label}</Text>
             </Pressable>
           );
         })}
       </View>
-      <Text style={styles.helperText}>
+      <Text allowFontScaling={false} style={styles.helperText}>
         Choose whether the weight you enter is shared across both sides or already represents one side.
       </Text>
     </View>

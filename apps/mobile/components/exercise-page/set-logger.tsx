@@ -56,15 +56,16 @@ export const SetLogger = forwardRef<TextInput, SetLoggerProps>(function SetLogge
   return (
     <View style={styles.logger} testID="exercise-set-logger">
       <View style={styles.header}>
-        <Text style={[pageText.microLabel, styles.setLabel]}>{`Set ${number}`}</Text>
-        <Text style={pageText.detailFigure} testID="exercise-set-logger-preview">
+        <Text allowFontScaling={false} style={[pageText.microLabel, styles.setLabel]}>{`Set ${number}`}</Text>
+        <Text allowFontScaling={false} style={pageText.detailFigure} testID="exercise-set-logger-preview">
           {`1RM ${oneRepMax !== null ? formatOneRepMax(oneRepMax) : DASH} · VOL ${volume !== null ? formatVolume(volume) : DASH}`}
         </Text>
       </View>
       <View style={styles.fields}>
         <View style={[styles.field, styles.weightField]}>
-          <Text style={pageText.microLabel}>Weight</Text>
+          <Text allowFontScaling={false} style={pageText.microLabel}>Weight</Text>
           <TextInput
+            allowFontScaling={false}
             accessibilityLabel={`Set ${number} weight`}
             keyboardType="decimal-pad"
             onChangeText={(text) => {
@@ -78,8 +79,9 @@ export const SetLogger = forwardRef<TextInput, SetLoggerProps>(function SetLogge
           />
         </View>
         <View style={[styles.field, styles.repsField]}>
-          <Text style={pageText.microLabel}>Reps</Text>
+          <Text allowFontScaling={false} style={pageText.microLabel}>Reps</Text>
           <TextInput
+            allowFontScaling={false}
             accessibilityLabel={`Set ${number} reps`}
             keyboardType="number-pad"
             onChangeText={(text) => {
@@ -99,9 +101,9 @@ export const SetLogger = forwardRef<TextInput, SetLoggerProps>(function SetLogge
           onLongPress={onOpenEffort}
           style={[styles.field, styles.effortField]}
           testID="exercise-set-logger-effort">
-          <Text style={pageText.microLabel}>Effort</Text>
+          <Text allowFontScaling={false} style={pageText.microLabel}>Effort</Text>
           <View style={styles.effortValue}>
-            <Text numberOfLines={1} style={styles.effortText}>
+            <Text allowFontScaling={false} numberOfLines={1} style={styles.effortText}>
               {effort}
             </Text>
             <Icon color={uiRoles.inkFaint} name="chevron-down" size="xs" />

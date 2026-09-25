@@ -17,7 +17,7 @@ export type TagProps = {
 export function Tag({ label, tone = 'neutral', testID }: TagProps) {
   return (
     <View style={[styles.tag, tone === 'faint' ? styles.tagFaint : null]} testID={testID}>
-      <Text style={[styles.label, tone === 'faint' ? styles.labelFaint : null]}>{label}</Text>
+      <Text allowFontScaling={false} style={[styles.label, tone === 'faint' ? styles.labelFaint : null]}>{label}</Text>
     </View>
   );
 }

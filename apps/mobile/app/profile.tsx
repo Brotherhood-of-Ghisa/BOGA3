@@ -335,7 +335,7 @@ export default function ProfileScreen() {
 
       {!user ? (
         <Card style={styles.formCard} testID="profile-signed-out-card">
-          <Text accessibilityRole="header" style={styles.cardTitle}>
+          <Text allowFontScaling={false} accessibilityRole="header" style={styles.cardTitle}>
             Sign in
           </Text>
 
