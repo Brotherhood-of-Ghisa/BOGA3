@@ -149,6 +149,10 @@ appId: com.dinoderek.mobile
     visible:
       id: "exercise-editor-secondary-muscle-trigger"
     timeout: 10000
+# Selecting the primary returns to a shorter sheet. Wait for its resize so the
+# secondary-muscle tap cannot land on Save while the controls are still moving.
+- waitForAnimationToEnd:
+    timeout: 4000
 - tapOn:
     id: "exercise-editor-secondary-muscle-trigger"
 - extendedWaitUntil:
