@@ -555,6 +555,17 @@ describe('Notice', () => {
     expect(flatStyle(screen.getByText('Offline · last updated 09:41')).color).toBe(uiRoles.ink);
   });
 
+  it('names its message with an optional title, the glyph level with it', () => {
+    render(<Notice icon="warning" message="Missing EXPO_PUBLIC_SUPABASE_URL." testID="notice" title="Sign-in unavailable" />);
+    expect(flatStyle(screen.getByTestId('notice')).alignItems).toBe('flex-start');
+    expect(flatStyle(screen.getByRole('header', { name: 'Sign-in unavailable' }))).toMatchObject({
+      fontFamily: 'Archivo',
+      fontWeight: '700',
+      color: uiRoles.ink,
+    });
+    expect(flatStyle(screen.getByText('Missing EXPO_PUBLIC_SUPABASE_URL.')).color).toBe(uiRoles.ink);
+  });
+
   it('announces a failure as an alert in danger', () => {
     render(<Notice message="Nothing was changed." testID="notice" tone="danger" />);
     expect(screen.getByTestId('notice').props.accessibilityRole).toBe('alert');

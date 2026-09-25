@@ -119,6 +119,10 @@ Brief entrypoint map of the current mobile screens.
   - configured signed-out email/password form with inline auth error feedback (reuses the `/profile` signed-out credential pattern)
   - auth-unconfigured disabled-reason message instead of a form
   - already-signed-in redirect to `/`
+- Presentation (design language, DLM-T05): `paper`, centred, no header. A
+  `PageHeader` over one `Card` of `FormField`s with `Sign in` as the one
+  `accent`; a failure is a `danger` `Notice`, and an auth-unconfigured build a
+  `Notice` with the `warning` glyph ("Sign-in unavailable") instead of the form
 - Key exits:
   - app proceeds to the normal route once a session exists (guard stops redirecting); no explicit navigation on success
 
@@ -130,6 +134,10 @@ Brief entrypoint map of the current mobile screens.
   - in-progress: a phase label plus an advancing activity/progress indicator ("layer K of N", "N items") that visibly moves while work happens
   - offline: an offline message instead of an indefinite spinner when the device is network-unreachable
   - error: a single error message and a single Retry button (fires exactly one cycle) on a non-`AUTH_REQUIRED` cycle error
+- Presentation (design language, DLM-T05): one `Card` centred on `paper`; the
+  phase in `ink`, an `ink-muted` spinner, the activity line in Plex Mono
+  `ink-muted`; offline is a `Notice` with the `offline` glyph; the error is
+  `danger` text above `Retry`, the gate's one `accent`
 - Key exits:
   - dismisses in place once `bootstrap_completed_at` is set, and the normal route renders
   - redirects to `/sign-in` (no Retry) when the latest cycle outcome is `AUTH_REQUIRED`
@@ -323,24 +331,33 @@ Brief entrypoint map of the current mobile screens.
   - inline load/revoke error with Retry; grant revocation remains usable if
     optional last-access metadata cannot be loaded
   - destructive confirmation before revocation and an in-flight disabled state
+- Presentation (design language, DLM-T05): the native header carries the
+  title (no in-content title) above the `ink-muted` intro. Signed-out, loading,
+  empty and error states are `StatePanel`s in a `Card`. Each grant is a `Card`
+  with an `AI` `Tag`, `ListRow`s for the two dates (Plex Mono) and `Revoke
+  access` as an outline in `danger`. No `accent`
 - Key exits:
   - back to `settings` (or previous route) via stack navigation
 
 8. `/profile`
 - File: `apps/mobile/app/profile.tsx`
 - Purpose:
-  - auth-aware account route for sign-in, signed-in username/email/password management, and M13 sync controls/status
+  - auth-aware account route for sign-in and signed-in username/email/password management (sync status lives on Settings)
 - Key states (high level):
   - restoring/auth-bootstrap banner
   - auth-disabled warning when client config is missing
   - signed-out email/password form with inline auth error feedback
-  - signed-in view mode with row-based account values (username/email plus optional pending-email row) and bottom actions (`Edit`, danger `Sign Out`)
+  - signed-in view mode with row-based account values (username/email plus optional pending-email row) and bottom actions (`Edit`, `Sign out` in `danger`)
   - signed-in edit mode with `username`/`new email`/`new password` fields and one `Update` action
-  - signed-in sync section with enable/disable control, current sync status, last successful sync (`Never` when no success yet), optional pending-count and next-retry rows
-  - sync retry/error handling remains inline (backend free-text message + retry/action-required hint)
   - lazy profile load/provision state for `username`
   - inline unified profile-update success/failure (including pending email-confirmation messaging)
   - sign-out failure feedback that stays on the same route
+- Presentation (design language, DLM-T05): `paper`. View mode is one `Card`
+  of `Stat kind="text"` rows in `ink` over `Edit` (outline) and `Sign out`
+  (outline in `danger`), with no `accent`. Edit stays inline: a `Card` of
+  `FormField`s with `Cancel` (text) and `Update` (the `accent`). Outcomes are
+  `Notice`s (`success` glyph, or `danger`); restoring is a loading
+  `StatePanel`; auth-unconfigured is the `warning` `Notice`
 - Key exits:
   - in-place rerender between signed-out and signed-in states
   - back to `settings` (or previous route) via stack navigation

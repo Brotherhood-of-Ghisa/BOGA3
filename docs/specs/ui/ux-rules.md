@@ -158,10 +158,10 @@ Document app-specific UI semantics and guardrails for the current mobile app.
    - matches when any typed word appears in either exercise names or linked muscle-group metadata.
    - preserves the current grouped/flat layout mode instead of flattening grouped results; grouped search results keep section headers and preserve collapsed/expanded state.
 6. The M11 profile sign-in form keeps auth failure messaging inline inside the same card as the email/password inputs.
-7. When auth config is unavailable, the profile route shows a warning state and disables sign-in rather than failing only after submit.
+7. When auth config is unavailable, the profile route shows an unavailable notice (the `warning` glyph and words, no warning hue) and disables sign-in rather than failing only after submit.
 8. The M11 profile sign-in form performs basic client-side email-shape validation before attempting the auth request.
-9. The signed-in profile route defaults to a view-only summary with row-based account values and one bottom action row (`Edit` + danger-styled `Sign Out`), with no extra title/help copy.
-10. Entering profile edit mode reveals `username`, `new email`, and `new password` fields plus a single `Update` submit action; update failures stay inline and successful updates return to view mode.
+9. The signed-in profile route defaults to a view-only summary with row-based account values and one bottom action row (`Edit` + `Sign out`, both outlines, `Sign out` in `danger`), with no extra title/help copy. `Sign out` has no confirmation: it loses no data (DLM-T05-D4).
+10. Entering profile edit mode reveals `username`, `new email`, and `new password` fields in place (not a sheet), plus `Cancel` (text) and a single `Update` submit action, the screen's one `accent`; update failures stay inline and successful updates return to view mode.
 11. Set semantics, shared by the exercise page (§14a) and the session view (§14b) through `src/session-recorder/` (presentation is theirs; set numeric validation uses visual cues only, no inline validation text):
     - `Weight` accepts decimal numeric input and must be a non-negative number. `Reps` accepts integer numeric input and must be a positive integer. A nonblank weight retains the entered scalar; blank weight with positive integer reps commits and persists as `0`.
     - Effort (set quality) is `W-Up`, none (`null`), or `RIR n`; the selectable RIR range runs from `EFFORT_LOGGING_POLICY.maxSelectableRir` (`src/config/training.ts`, default `3`) down to `RIR 0`, and a stored RIR outside that range stays valid. It is persisted separately from performance confirmation and planned volume; a planned row's matched/modified classification compares prescribed volume only (`Weight` + `Reps`), not effort.
@@ -226,17 +226,10 @@ Document app-specific UI semantics and guardrails for the current mobile app.
 3. Inline helper/success/error text is used for form feedback and post-action feedback (`exercise-catalog`, a failed write on the completed-session detail).
 4. State presentation style varies by screen today; refactors may unify visuals, but the semantic distinction (whole-screen vs in-section vs inline) should remain explicit.
 5. The profile route uses:
-   - an inline restoring banner during auth bootstrap,
-   - inline warning messaging when auth config is missing,
-   - inline error cards for sign-in/sign-out failures,
-   - inline success/error card handling for unified profile update submits,
-   - a signed-in sync section with:
-     - sync enable/disable control,
-     - one current state line (`Disabled`, `Enabled`, `Syncing initial data`, `Syncing`, `Waiting for network`, `Retry scheduled`, `Sync blocked`),
-     - `Last successful sync` value (`Never` before first success),
-     - optional `Pending changes` and `Next retry` rows,
-     - inline backend free-text failure message and retry/action-required hint when present,
-   - sync work as background/non-blocking behavior (the route stays usable while sync runs or retries),
+   - an inline loading state panel during auth bootstrap,
+   - an inline unavailable notice when auth config is missing,
+   - inline `danger` notices for sign-in/sign-out failures,
+   - inline success (`success` glyph, no success hue) / `danger` notices for unified profile update submits,
    - explicit email-change pending-confirmation messaging instead of assuming immediate completion,
    - password field clearing after each authenticated password submit,
    - in-place signed-out/signed-in rerendering instead of a redirect loop.

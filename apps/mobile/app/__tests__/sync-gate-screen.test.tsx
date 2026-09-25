@@ -36,8 +36,9 @@ jest.mock('expo-router', () => {
 });
 
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
-import { Text } from 'react-native';
+import { StyleSheet, Text } from 'react-native';
 
+import { uiRoles } from '@/components/ui';
 import { INITIAL_SYNC_PROGRESS, type SyncProgress } from '@/src/sync/progress';
 import { SyncGate, SYNC_GATE_TEST_IDS } from '@/src/sync/SyncGate';
 import {
@@ -198,6 +199,16 @@ describe('SyncGate', () => {
 
     expect(screen.getByTestId(SYNC_GATE_TEST_IDS.errorMessage)).toBeTruthy();
     expect(screen.getByTestId(SYNC_GATE_TEST_IDS.retryButton)).toBeTruthy();
+  });
+
+  it('shows the cycle error in danger, not as muted text (T05-D3)', () => {
+    renderGate();
+
+    publish({ lastCycleErrorCode: 'INTERNAL' });
+
+    expect(StyleSheet.flatten(screen.getByTestId(SYNC_GATE_TEST_IDS.errorMessage).props.style).color).toBe(
+      uiRoles.danger
+    );
   });
 
   it('fires exactly one cycle when Retry is pressed', () => {

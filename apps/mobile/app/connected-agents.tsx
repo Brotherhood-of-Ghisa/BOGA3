@@ -1,14 +1,17 @@
 import { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 
 import {
-  UiButton,
-  UiSurface,
-  UiText,
-  uiBorder,
-  uiColors,
-  uiRadius,
+  ActionButton,
+  Card,
+  ListRow,
+  ScreenScroll,
+  StatePanel,
+  Tag,
+  uiFonts,
+  uiRoles,
   uiSpace,
+  uiTypography,
 } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import {
@@ -97,176 +100,158 @@ export default function ConnectedAgentsScreen() {
     );
   };
 
+  // The native header carries the title (G4, T05-D1); the intro stays.
   return (
-    <ScrollView
-      contentContainerStyle={styles.content}
-      contentInsetAdjustmentBehavior="automatic"
-      style={styles.screen}
-      testID="connected-agents-screen">
-      <View style={styles.intro}>
-        <UiText selectable variant="title">
-          Connected agents
-        </UiText>
-        <UiText selectable variant="bodyMuted">
-          Agents can read training data only. They cannot create, edit, or delete exercises,
-          workouts, or sets.
-        </UiText>
-      </View>
+    <ScreenScroll contentInsetAdjustmentBehavior="automatic" testID="connected-agents-screen">
+      <Text style={styles.intro}>
+        Agents can read training data only. They cannot create, edit, or delete exercises,
+        workouts, or sets.
+      </Text>
 
       {!user ? (
-        <UiSurface style={styles.card} testID="connected-agents-signed-out">
-          <UiText selectable variant="labelStrong">
-            Sign in required
-          </UiText>
-          <UiText selectable variant="bodyMuted">
-            Sign in to review and revoke connected agents.
-          </UiText>
-        </UiSurface>
+        <Card>
+          <StatePanel
+            body="Sign in to review and revoke connected agents."
+            fill={false}
+            testID="connected-agents-signed-out"
+            title="Sign in required"
+          />
+        </Card>
       ) : null}
 
       {user && isLoading && agents.length === 0 ? (
-        <UiSurface style={styles.card} testID="connected-agents-loading">
-          <UiText selectable variant="bodyMuted">
-            Loading connected agents…
-          </UiText>
-        </UiSurface>
+        <Card>
+          <StatePanel
+            body="Loading connected agents…"
+            fill={false}
+            kind="loading"
+            testID="connected-agents-loading"
+          />
+        </Card>
       ) : null}
 
       {user && !isLoading && agents.length === 0 && !error ? (
-        <UiSurface style={styles.card} testID="connected-agents-empty">
-          <UiText selectable variant="labelStrong">
-            No agents connected
-          </UiText>
-          <UiText selectable variant="bodyMuted">
-            Connections you authorize will appear here.
-          </UiText>
-        </UiSurface>
+        <Card>
+          <StatePanel
+            body="Connections you authorize will appear here."
+            fill={false}
+            testID="connected-agents-empty"
+            title="No agents connected"
+          />
+        </Card>
       ) : null}
 
       {agents.map((agent) => (
-        <UiSurface
-          key={agent.clientId}
-          style={styles.agentCard}
-          testID={`connected-agent-${agent.clientId}`}>
+        <Card key={agent.clientId} testID={`connected-agent-${agent.clientId}`}>
           <View style={styles.agentHeader}>
-            <View style={styles.agentBadge}>
-              <UiText selectable={false} variant="labelStrong">
-                AI
-              </UiText>
-            </View>
             <View style={styles.agentTitle}>
-              <UiText selectable variant="labelStrong">
-                {agent.name}
-              </UiText>
-              <UiText selectable variant="bodyMuted">
-                Read training data
-              </UiText>
+              <Text style={styles.agentName}>{agent.name}</Text>
+              <Text style={styles.agentScope}>Read training data</Text>
             </View>
+            <Tag label="AI" />
           </View>
-          <View style={styles.metadata}>
-            <View style={styles.metadataRow}>
-              <UiText selectable variant="bodyMuted">Access granted</UiText>
-              <UiText selectable testID={`connected-agent-granted-${agent.clientId}`}>
+          <ListRow
+            density="list"
+            meta={
+              <Text style={styles.date} testID={`connected-agent-granted-${agent.clientId}`}>
                 {formatTimestamp(agent.grantedAt)}
-              </UiText>
-            </View>
-            <View style={styles.metadataRow}>
-              <UiText selectable variant="bodyMuted">Last access</UiText>
-              <UiText selectable testID={`connected-agent-last-access-${agent.clientId}`}>
+              </Text>
+            }>
+            <Text style={styles.rowLabel}>Access granted</Text>
+          </ListRow>
+          <ListRow
+            density="list"
+            meta={
+              <Text style={styles.date} testID={`connected-agent-last-access-${agent.clientId}`}>
                 {formatTimestamp(agent.lastAccessAt)}
-              </UiText>
-            </View>
+              </Text>
+            }>
+            <Text style={styles.rowLabel}>Last access</Text>
+          </ListRow>
+          {/* An outline in `danger`, behind the unchanged Alert confirm. */}
+          <View style={styles.agentActions}>
+            <ActionButton
+              accessibilityLabel={`Revoke access for ${agent.name}`}
+              disabled={revokingClientId !== null}
+              label={revokingClientId === agent.clientId ? 'Revoking…' : 'Revoke access'}
+              onPress={() => confirmRevoke(agent)}
+              testID={`connected-agent-revoke-${agent.clientId}`}
+              tone="danger"
+              variant="outline"
+            />
           </View>
-          <UiButton
-            accessibilityLabel={`Revoke access for ${agent.name}`}
-            disabled={revokingClientId !== null}
-            label={revokingClientId === agent.clientId ? 'Revoking…' : 'Revoke access'}
-            onPress={() => confirmRevoke(agent)}
-            testID={`connected-agent-revoke-${agent.clientId}`}
-            variant="danger"
-          />
-        </UiSurface>
+        </Card>
       ))}
 
       {error ? (
-        <UiSurface style={styles.errorCard} testID="connected-agents-error">
-          <UiText selectable style={styles.errorText} variant="bodyMuted">
-            {error}
-          </UiText>
-          <UiButton
-            accessibilityLabel="Retry loading connected agents"
-            disabled={isLoading}
-            label={isLoading ? 'Retrying…' : 'Retry'}
-            onPress={() => {
-              void loadAgents();
-            }}
-            variant="secondary"
-          />
-        </UiSurface>
+        <Card>
+          <StatePanel body={error} fill={false} kind="error" testID="connected-agents-error">
+            <ActionButton
+              accessibilityLabel="Retry loading connected agents"
+              disabled={isLoading}
+              label={isLoading ? 'Retrying…' : 'Retry'}
+              onPress={() => {
+                void loadAgents();
+              }}
+              variant="outline"
+            />
+          </StatePanel>
+        </Card>
       ) : null}
-    </ScrollView>
+    </ScreenScroll>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: uiColors.surfacePage,
-  },
-  content: {
-    padding: uiSpace.xl,
-    gap: uiSpace.md,
-  },
   intro: {
-    gap: uiSpace.sm,
-    marginBottom: uiSpace.sm,
-  },
-  card: {
-    padding: uiSpace.lg,
-    gap: uiSpace.sm,
-  },
-  agentCard: {
-    padding: uiSpace.lg,
-    gap: uiSpace.md,
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
+    fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
+    color: uiRoles.inkMuted,
   },
   agentHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: uiSpace.md,
-  },
-  agentBadge: {
-    width: 42,
-    height: 42,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: uiBorder.width,
-    borderColor: uiColors.actionPrimarySubtleBorder,
-    borderRadius: uiRadius.full,
-    backgroundColor: uiColors.actionPrimarySubtleBg,
+    paddingHorizontal: uiSpace.lg,
+    paddingTop: uiSpace.md,
+    paddingBottom: uiSpace.sm,
   },
   agentTitle: {
     flex: 1,
     gap: uiSpace.xs,
   },
-  metadata: {
-    borderTopWidth: uiBorder.width,
-    borderTopColor: uiColors.borderMuted,
-    paddingTop: uiSpace.md,
-    gap: uiSpace.sm,
+  agentName: {
+    fontFamily: uiFonts.display.family,
+    fontWeight: '700',
+    fontSize: uiTypography.size.lg,
+    lineHeight: uiTypography.lineHeight.lg,
+    color: uiRoles.ink,
   },
-  metadataRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    gap: uiSpace.md,
+  agentScope: {
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
+    fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
+    color: uiRoles.inkMuted,
   },
-  errorCard: {
+  rowLabel: {
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
+    fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
+    color: uiRoles.ink,
+  },
+  date: {
+    fontFamily: uiFonts.figure.family,
+    fontWeight: '500',
+    fontSize: uiTypography.size.sm,
+    lineHeight: uiTypography.lineHeight.sm,
+    color: uiRoles.ink,
+  },
+  agentActions: {
     padding: uiSpace.lg,
-    gap: uiSpace.md,
-    borderColor: uiColors.actionDangerSubtleBorder,
-    backgroundColor: uiColors.actionDangerSubtleBg,
-  },
-  errorText: {
-    color: uiColors.actionDangerText,
+    paddingTop: uiSpace.sm,
   },
 });
