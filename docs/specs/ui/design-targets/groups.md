@@ -6,7 +6,8 @@ design-language migration. DLM-T12 (Leaderboards), DLM-T13 (group management)
 and DLM-T14 (group exercises) extend it with their own sections. Chosen by the
 user on 2026-09-24 (plan decision G1 (a)): a brief plus the gallery states the
 user accepts. It supersedes `group-exercise-unlink.md` for appearance only; that
-record's behaviour brief stays. **Pending acceptance** in the DLM-T11 gallery.
+record's behaviour brief stays. **Accepted** by the user in the DLM-T11 gallery on
+2026-09-25.
 
 ## Target
 
