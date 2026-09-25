@@ -132,9 +132,8 @@ appId: com.dinoderek.mobile
     id: "settings-about-flavor"
 - takeScreenshot: "07-settings-about-metadata"
 # Connected agents is a signed-in-only Settings destination. Opening it against
-# real local Supabase proves the SDK grant-list path renders on-device; the
-# content assertion is independent of whether this fixture currently has zero
-# or more grants.
+# real local Supabase proves the SDK grant-list path renders on-device. This
+# flow's fixture user never authorizes an agent, so the list loads empty.
 - scrollUntilVisible:
     element:
       id: "settings-connected-agents-row"
@@ -149,6 +148,11 @@ appId: com.dinoderek.mobile
     timeout: 15000
 - assertVisible:
     text: "Agents can read training data only.*"
+- extendedWaitUntil:
+    visible:
+      id: "connected-agents-empty"
+    timeout: 15000
+- takeScreenshot: "connected-agents-empty"
 # The native back item is arrow-only; its accessibility label is "Back".
 - tapOn: "Back"
 - extendedWaitUntil:
@@ -167,13 +171,20 @@ appId: com.dinoderek.mobile
     visible:
       id: "profile-signed-in-card"
     timeout: 15000
+# Each account value is one accessible Stat ("Username Loading..."), so match
+# the loading value inside its label rather than as the whole text.
 - extendedWaitUntil:
     notVisible:
-      text: "Loading..."
+      text: ".*Loading\\.\\.\\..*"
     timeout: 10000
 - takeScreenshot: "06-auth-profile-signed-in"
 - tapOn:
     id: "profile-edit-button"
+- extendedWaitUntil:
+    visible:
+      id: "profile-username-input"
+    timeout: 10000
+- takeScreenshot: "profile-editing"
 - tapOn:
     id: "profile-username-input"
 - eraseText: 120
@@ -185,6 +196,7 @@ appId: com.dinoderek.mobile
 - assertVisible:
     id: "profile-update-feedback"
 - assertVisible: "Profile updated."
+- takeScreenshot: "profile-updated"
 - scrollUntilVisible:
     element:
       id: "profile-sign-out-button"

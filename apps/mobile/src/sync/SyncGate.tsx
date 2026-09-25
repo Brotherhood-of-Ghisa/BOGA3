@@ -1,8 +1,17 @@
 import { Redirect, usePathname } from 'expo-router';
 import type { PropsWithChildren } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
-import { UiButton, UiSurface, UiText, uiColors, uiSpace } from '@/components/ui';
+import {
+  ActionButton,
+  Card,
+  Notice,
+  Screen,
+  uiFonts,
+  uiRoles,
+  uiSpace,
+  uiTypography,
+} from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import { SIGN_IN_ROUTE, isMaestroHarnessRoutePathname, isSignInRoutePathname } from '@/src/navigation/routes';
 import { PULL_LAYER_COUNT, type SyncPhase, type SyncProgress } from '@/src/sync/progress';
@@ -91,19 +100,19 @@ export function SyncGate({ children }: PropsWithChildren) {
   }
 
   return (
-    <View style={styles.container} testID={SYNC_GATE_TEST_IDS.block}>
-      <UiSurface style={styles.card} variant="panelMuted">
-        <UiText style={styles.heading} variant="title">
+    <Screen style={styles.container} testID={SYNC_GATE_TEST_IDS.block}>
+      <Card style={styles.card}>
+        <Text accessibilityRole="header" style={styles.heading}>
           Setting up your data…
-        </UiText>
+        </Text>
 
         {mode.kind === 'error' ? (
           <GateError errorCode={mode.errorCode} />
         ) : (
           <GateProgress progress={snapshot.progress} />
         )}
-      </UiSurface>
-    </View>
+      </Card>
+    </Screen>
   );
 }
 
@@ -111,17 +120,18 @@ export function SyncGate({ children }: PropsWithChildren) {
 function GateProgress({ progress }: { progress: SyncProgress }) {
   return (
     <View style={styles.body}>
-      <UiText style={styles.phaseLabel} testID={SYNC_GATE_TEST_IDS.phaseLabel} variant="label">
+      <Text style={styles.phaseLabel} testID={SYNC_GATE_TEST_IDS.phaseLabel}>
         {PHASE_LABELS[progress.phase]}
-      </UiText>
+      </Text>
 
+      {/* Offline is the glyph and the words, never a warning hue (G3). */}
       {progress.offline ? (
-        <UiText
-          style={styles.offlineMessage}
+        <Notice
+          icon="offline"
+          live
+          message="You are offline. We will keep setting up your data as soon as you are back online."
           testID={SYNC_GATE_TEST_IDS.offlineMessage}
-          variant="bodyMuted">
-          You are offline. We will keep setting up your data as soon as you are back online.
-        </UiText>
+        />
       ) : (
         <View style={styles.activityRow}>
           {/* The testID lives on a wrapping View, not the ActivityIndicator
@@ -130,14 +140,11 @@ function GateProgress({ progress }: { progress: SyncProgress }) {
               the indicator would never see it. A plain View wrapper is reliably
               queryable by both Maestro and React Native Testing Library. */}
           <View testID={SYNC_GATE_TEST_IDS.activityIndicator}>
-            <ActivityIndicator color={uiColors.actionPrimary} size="large" />
+            <ActivityIndicator color={uiRoles.inkMuted} size="large" />
           </View>
-          <UiText
-            style={styles.activityDetail}
-            testID={SYNC_GATE_TEST_IDS.activityDetail}
-            variant="bodyMuted">
+          <Text style={styles.activityDetail} testID={SYNC_GATE_TEST_IDS.activityDetail}>
             {describeActivity(progress)}
-          </UiText>
+          </Text>
         </View>
       )}
     </View>
@@ -148,13 +155,10 @@ function GateProgress({ progress }: { progress: SyncProgress }) {
 function GateError({ errorCode }: { errorCode: 'FK_VIOLATION' | 'LOCAL_FK_VIOLATION' | 'INTERNAL' }) {
   return (
     <View style={styles.body}>
-      <UiText
-        style={styles.errorMessage}
-        testID={SYNC_GATE_TEST_IDS.errorMessage}
-        variant="bodyMuted">
+      <Text accessibilityRole="alert" style={styles.errorMessage} testID={SYNC_GATE_TEST_IDS.errorMessage}>
         {ERROR_MESSAGES[errorCode]}
-      </UiText>
-      <UiButton
+      </Text>
+      <ActionButton
         accessibilityLabel="Retry"
         label="Retry"
         onPress={() => {
@@ -163,6 +167,7 @@ function GateError({ errorCode }: { errorCode: 'FK_VIOLATION' | 'LOCAL_FK_VIOLAT
           requestSync();
         }}
         testID={SYNC_GATE_TEST_IDS.retryButton}
+        variant="primary"
       />
     </View>
   );
@@ -195,42 +200,56 @@ const describeActivity = (progress: SyncProgress): string => {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: uiSpace.xl,
-    backgroundColor: uiColors.surfacePage,
+    padding: uiSpace.lg,
   },
   card: {
     width: '100%',
     maxWidth: 420,
-    padding: uiSpace.xxl,
+    padding: uiSpace.xl,
     gap: uiSpace.xl,
   },
   heading: {
+    fontFamily: uiFonts.display.family,
+    fontWeight: '700',
+    fontSize: uiTypography.size.xl,
+    lineHeight: uiTypography.lineHeight.xl,
+    color: uiRoles.ink,
     textAlign: 'center',
   },
   body: {
     gap: uiSpace.xl,
-    alignItems: 'center',
+    alignItems: 'stretch',
   },
   phaseLabel: {
+    fontFamily: uiFonts.body.family,
+    fontWeight: '600',
+    fontSize: uiTypography.size.lg,
+    lineHeight: uiTypography.lineHeight.lg,
+    color: uiRoles.ink,
     textAlign: 'center',
   },
   activityRow: {
     alignItems: 'center',
     gap: uiSpace.lg,
   },
+  // `Layer K of N · M items`: counters, so Plex Mono.
   activityDetail: {
+    fontFamily: uiFonts.figure.family,
+    fontWeight: '500',
+    fontSize: uiTypography.size.sm,
+    lineHeight: uiTypography.lineHeight.sm,
+    color: uiRoles.inkMuted,
     textAlign: 'center',
-    color: uiColors.textSecondary,
   },
-  offlineMessage: {
-    textAlign: 'center',
-    color: uiColors.textSecondary,
-  },
+  // An error, so `danger` (T05-D3), beside the one `accent` Retry.
   errorMessage: {
+    fontFamily: uiFonts.body.family,
+    fontWeight: '600',
+    fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
+    color: uiRoles.danger,
     textAlign: 'center',
-    color: uiColors.textSecondary,
   },
 });
