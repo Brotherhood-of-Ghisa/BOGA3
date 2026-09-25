@@ -89,10 +89,8 @@ Use this section as the single source of truth for reusable UX patterns.
    - Intent: prevent accidental data loss in edit flows.
    - Usage: delete location/exercise/set actions.
    - Rules: clear destructive styling, confirm intent when risk is meaningful, and provide immediate feedback after action.
-4. Collapsible summary card pattern
-   - Intent: reduce vertical density while retaining the facts needed to identify and compare repeated content.
-   - Usage: exercise cards in completed-session detail and a group member's session (`components/groups/friend-session-content.tsx`).
-   - Rules: cards start expanded, the title region is a minimum-size accessible toggle, collapse hides detail without changing domain data, and the collapsed state shows only validated summary facts. Actions that require the hidden content to be visible must expand the card.
+4. Collapsible summary card pattern (retired)
+   - Retired with the View Session restyle: completed-session detail and a group member's session now draw read-only exercise cards (`components/session-detail/`, the cards of pattern 13 without the link) and nothing collapses a card. Kept as a numbered slot so later patterns keep their numbers.
 5. Explicit row confirmation pattern
    - Intent: keep entered/defaulted values separate from the user's assertion that a repeated item was actually completed.
    - Usage: normal and prescribed set rows on the exercise page, for an active or a completed session (`components/exercise-page/set-row.tsx`).
@@ -100,7 +98,7 @@ Use this section as the single source of truth for reusable UX patterns.
 6. Stream card pattern
    - Intent: scan other people's recent activity at a glance and drill into one item.
    - Usage: group stream session cards (`components/groups/stream-session-card.tsx`).
-   - Rules: a collapsed summary card (pattern 4) with no expand; the whole card is one accessible press target that navigates to the detail; show who, a status pill (text, not color alone — "Training now" or "Completed · duration"), when/where, and the validated summary metrics; newest first; secondary events (joined / left) are lighter rows, not cards.
+   - Rules: a summary card that never expands; the whole card is one accessible press target that navigates to the detail; show who, a status pill (text, not color alone — "Training now" or "Completed · duration"), when/where, and the validated summary metrics; newest first; secondary events (joined / left) are lighter rows, not cards.
 7. Offline marker pattern
    - Intent: keep cached server data usable offline without hiding that it may be stale.
    - Usage: every group read screen (`components/groups/offline-banner.tsx`).
@@ -116,19 +114,19 @@ Use this section as the single source of truth for reusable UX patterns.
 10. Secondary-source search section pattern
    - Intent: let a search reach items from another source without crowding the default list.
    - Usage: the session view's exercise picker's `From your groups` section and `Groups` toggle (M25-T07; `components/groups/picker-group-section.tsx`).
-   - Rules: the default (empty-search) list never shows the secondary source; with search text its matches follow the user's own matches under a labelled section header; a toggle beside the search box narrows the list to the secondary source only (and lists all of it when the search is empty); each row states its relationship to the user's own data in text ("linked: …" / "not linked"), not color alone; picking a row resolves to the user's own item or opens an explicit choice sheet.
+   - Rules: the default (empty-search) list never shows the secondary source; with search text its matches follow the user's own matches under a labelled section header; a toggle beside the search box (a chip, solid `ink` while on — never the screen's `accent`) narrows the list to the secondary source only (and lists all of it when the search is empty); each row states its relationship to the user's own data in text ("linked: …" / "not linked"), not color alone; picking a row resolves to the user's own item or opens an explicit choice sheet.
 11. Record set detail sheet pattern
    - Intent: one place to read and act on a shared record set, wherever it is shown.
    - Usage: stream record cards and full-board rows (M25-T10; `components/groups/record-set-sheet.tsx`).
    - Rules: every surface showing a record set opens the same in-route sheet; the sheet shows the ranked value, the as-logged value when converted, when and where, and the certification state in text; its actions come from one pure rule over my role and my relationship to the set (`recordSetActionsFor`), never from the surface; a surface may offer the sheet's non-destructive primary action inline, sharing the same write state; writes follow pattern 9 and removals confirm (pattern 3); after a write the host re-reads, and the sheet shows the server's returned state meanwhile.
 12. In-place row logger pattern
    - Intent: log the next item of a list without leaving it, one-handed, mid-set.
-   - Usage: the exercise page's set list (redesign step 4; `components/exercise-page/set-logger.tsx`, `ui/ux-rules.md` §14a).
+   - Usage: the exercise page's set list (`components/exercise-page/set-logger.tsx`, `ui/ux-rules.md` §14a).
    - Rules: the open row expands in place into its editor (labelled fields of one height, the commit control on the list's control axis); it opens on the first unfinished row by default, or on a row the user taps, one at a time; entered values are kept as typed (autosave) and stay unconfirmed until the commit control, which is the screen's one primary and is disabled until the values are valid; committing moves the editor to the next unfinished row; a row's state stays in its glyph, which the user can also toggle directly without opening the editor.
 
-12. Read-only link card pattern
+13. Read-only link card pattern
    - Intent: summarise one item of a working set (an exercise in the session) and open it, without editing in place.
-   - Usage: the session view's exercise cards (redesign step 5; `components/session-view/session-exercise-card.tsx`).
+   - Usage: the session view's exercise cards (`components/session-view/session-exercise-card.tsx`).
    - Rules: the whole card is one `Card` link with an accessibility label that states the summary (name, done count, record); no controls inside it; editing and removal live on the destination; what is not yet realised renders faded, never hidden; a record earns a band on the card, not a badge on the row.
 
 ## Default appearance baseline (MVP)

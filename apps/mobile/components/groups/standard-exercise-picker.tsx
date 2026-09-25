@@ -21,6 +21,7 @@ export function StandardExercisePicker({ selectedId, onPick }: StandardExerciseP
     <View style={groupFormStyles.field} testID="group-standard-exercise-picker">
       <UiText variant="subtitle">Standard exercise</UiText>
       <TextInput
+        allowFontScaling={false}
         accessibilityLabel="Search standard exercises"
         autoCorrect={false}
         onChangeText={setQuery}

@@ -53,6 +53,18 @@ jest.mock('@/src/data', () => ({
   upsertLocalGym: jest.fn(),
 }));
 
+jest.mock('@/src/session-insights/repository', () => ({
+  ...jest.requireActual('@/src/session-insights/repository'),
+  loadSessionInsightHistory: jest.fn(),
+}));
+jest.mock('@/src/exercise-catalog/cache', () => ({
+  useExerciseCatalog: () => ({
+    status: 'ready',
+    exercises: [{ id: 'def_bench', loadInputMode: 'total_load', mappings: [{ muscleGroupId: 'chest', role: 'primary' }] }],
+    muscleGroups: [{ id: 'chest', displayName: 'Chest', familyName: 'Torso', sortOrder: 0 }],
+  }),
+}));
+
 jest.mock('@/src/logging', () => ({ logEvent: jest.fn().mockResolvedValue(undefined) }));
 
 // The injected location service: quiet (denied) unless a test says otherwise.
@@ -88,6 +100,7 @@ jest.mock('@/components/session-recorder/exercise-picker', () => ({
 
 import { SessionViewScreen } from '../session/[sessionId]/index';
 
+const insightHistory = jest.requireMock('@/src/session-insights/repository').loadSessionInsightHistory as jest.Mock;
 const data = jest.requireMock('@/src/data') as Record<string, jest.Mock>;
 const location = jest.requireMock('@/src/location/foreground-location-lazy') as {
   getCurrentForegroundPositionLazy: jest.Mock;
@@ -176,6 +189,7 @@ const answerAlerts = (answer: (title: string) => string) => {
 describe('Session view', () => {
   beforeEach(() => {
     jest.useFakeTimers();
+    insightHistory.mockReset().mockResolvedValue([]);
     jest.restoreAllMocks();
     mockPush.mockReset();
     mockReplace.mockReset();
@@ -230,13 +244,44 @@ describe('Session view', () => {
     expect(screen.getAllByText('1RM').length).toBeGreaterThan(0);
   });
 
+  it('loads real exercise and muscle baselines for the active session', async () => {
+    insightHistory.mockResolvedValue([{
+      sessionId: 'prior', status: 'completed', completedAt: new Date('2026-01-01'),
+      exercises: [{ id: 'prior-bench', exerciseDefinitionId: 'def_bench', exerciseName: 'Bench', orderIndex: 0,
+        sets: [{ id: 'prior-set', orderIndex: 0, weightValue: '100', repsValue: '10', setType: 'rir_2', performanceStatus: null }] }],
+    }]);
+    await renderReady();
+    await screen.findByText('128% above median');
+    expect(insightHistory).toHaveBeenCalledWith({ targetSessionId: 'session-1', completedAt: expect.any(Date) });
+    expect(screen.getByLabelText(/Barbell Bench Press, 2 sets · 1 working.*Historical median 1000/)).toBeTruthy();
+    fireEvent.press(screen.getByTestId('session-insight-mode-muscle'));
+    expect(screen.getByLabelText(/Chest, 2 sets · 1 working.*Historical median 500/)).toBeTruthy();
+  });
+
+  it('uses the persisted completion boundary when editing history', async () => {
+    const completedAt = new Date('2026-09-01T12:00:00Z');
+    data.loadLatestSessionDraftSnapshot.mockResolvedValue(null);
+    data.loadSessionSnapshotById.mockResolvedValue({ ...snapshot(), status: 'completed', completedAt, deletedAt: null });
+    await renderReady();
+    expect(insightHistory).toHaveBeenCalledWith({ targetSessionId: 'session-1', completedAt });
+  });
+
+  it('keeps logging usable when comparison history fails', async () => {
+    insightHistory.mockRejectedValue(new Error('History read failed'));
+    await renderReady();
+    await screen.findByText('Comparisons unavailable. Return to this session to retry.');
+    fireEvent.press(screen.getByLabelText('Cable Flys, 0 of 1 sets done'));
+    expect(mockPush).toHaveBeenCalledWith('/session/session-1/exercise/fly');
+    expect(screen.queryByText('No comparison history yet')).toBeNull();
+  });
+
   it('links each card to its exercise page', async () => {
     await renderReady();
     fireEvent.press(screen.getByLabelText('Cable Flys, 0 of 1 sets done'));
     expect(mockPush).toHaveBeenCalledWith('/session/session-1/exercise/fly');
   });
 
-  it('finishes through the recorder prompts and completion write, then opens the completion screen', async () => {
+  it('finishes through the cleanup prompts and completion write, then opens the completion screen', async () => {
     const titles = answerAlerts((title) =>
       title.startsWith('Remove exercises') ? 'Remove empty exercises and submit' : 'unexpected'
     );
@@ -250,7 +295,7 @@ describe('Session view', () => {
       expect(mockReplace).toHaveBeenCalledWith('/completed-session/session-1?presentation=completion')
     );
     expect(titles).toEqual(['Remove exercises with no sets and submit?']);
-    // Confirmed sets only, planned columns cleared — the recorder's completed-history graph.
+    // Confirmed sets only, planned columns cleared — the completed-history graph.
     const written = data.persistSessionDraftSnapshot.mock.calls.at(-1)?.[0];
     expect(written).toMatchObject({ sessionId: 'session-1', gymId: 'gym-1', status: 'active' });
     expect(written.startedAt).toEqual(new Date('2026-09-23T09:00:00'));
@@ -334,7 +379,7 @@ describe('Session view', () => {
     await act(async () => {
       fireEvent.press(screen.getByTestId('session-view-summary-gym-button'));
     });
-    // No gym, the recorder's seeded gyms, then the local ones; the current one marked.
+    // No gym, the seeded gyms, then the local ones; the current one marked.
     expect(screen.getByTestId('session-view-gym-option-none')).toBeTruthy();
     expect(screen.getByTestId('session-view-gym-option-downtown-iron-temple')).toBeTruthy();
     expect(screen.getByTestId('session-view-gym-option-gym-1')).toBeSelected();
@@ -528,7 +573,7 @@ describe('Session view', () => {
   });
 });
 
-// The recorder's completed edit (`?mode=completed-edit`), moved to the session
+// The completed edit (once the old recorder's `?mode=completed-edit`), on the session
 // view: these port its load, validation, autosave, save and leave cases.
 describe('Session view: editing a completed session', () => {
   // Stored to the second, so Done can prove it keeps untouched instants.
@@ -564,6 +609,7 @@ describe('Session view: editing a completed session', () => {
 
   beforeEach(() => {
     jest.useFakeTimers();
+    insightHistory.mockReset().mockResolvedValue([]);
     jest.restoreAllMocks();
     mockPush.mockReset();
     mockReplace.mockReset();
@@ -622,7 +668,7 @@ describe('Session view: editing a completed session', () => {
     expect(screen.queryByTestId('session-view-times-notice')).toBeNull();
   });
 
-  it('validates Start/End as the recorder did, and Done writes nothing until they are valid', async () => {
+  it('validates Start/End, and Done writes nothing until they are valid', async () => {
     await renderCompleted();
     const start = screen.getByTestId('session-view-start-time');
     const end = screen.getByTestId('session-view-end-time');

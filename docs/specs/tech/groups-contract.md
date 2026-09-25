@@ -1487,9 +1487,9 @@ migration via `npm run db:generate`.
   `top-level-tab-groups`, mapped in `resolveActiveTab`
   (`app/(tabs)/_layout.tsx`). Its fit is verified on small phones with a
   screenshot (brainstorm C8).
-- **Friend's session view** composes `SessionContentLayout` (the layout behind
-  View Session) with read-only row renderers. `completed-session/[sessionId].tsx`
-  is not modified (C3.8.3).
+- **Friend's session view** draws its exercises with View Session's cards
+  (`components/session-detail/`), read-only. `completed-session/[sessionId].tsx`
+  itself is not reused (C3.8.3).
 - **Username gate (C3.1).** The create and join screens load the profile
   (`loadUserProfile`). If the username is blank they show an inline username
   field, call `saveUsername`, then continue. The server enforces
@@ -1533,8 +1533,8 @@ join, edit, and invite routes, and every action, are M22-T05.
   do not navigate. `NOT_FOUND` from `group_get` or `group_stream` shows the
   lost-access state, and both hooks evict (`evictGroupIdOnNotFound`).
 - **Friend's session view.** `FriendSessionContent` composes
-  `SessionContentLayout` and `ExerciseCardCollapsedSummary`.
-  - Rows are `Set / Weight (kg) / Reps / Effort`. Status reads `In progress`
+  `SessionFactsCard` and `ExerciseSetsCard` (`components/session-detail/`).
+  - Rows are the session view's `type · weight × reps · 1RM · VOL` (kg, no unit shown). Status reads `In progress`
     or `Completed · <duration>`.
   - No `completed-session-detail-*` owner testID renders, which jest asserts.
 - **Signed out or unconfigured.** `GroupsSignInRequired` renders on every
@@ -1630,7 +1630,7 @@ E0.1–E0.3).
   `exercise-catalog-link-menu.test.tsx`, `exercise-group-links-add-as-new.test.ts`,
   and the exercise page's ⋮ Link item in `exercise-page-screen.test.tsx`;
   Maestro `groups-link-exercise.yaml` (§8), whose last step opens the Link
-  screen from the exercise page's ⋮ (redesign step 6b).
+  screen from the exercise page's ⋮.
 
 **As-built (M25-T08, group page).** Product D10, D14, and E0.4; M25 design
 §1 and §7.

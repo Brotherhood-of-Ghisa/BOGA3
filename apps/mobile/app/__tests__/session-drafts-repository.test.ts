@@ -59,7 +59,7 @@ describe('session draft repository', () => {
     );
   });
 
-  it('loads latest draft snapshots for recorder restoration', async () => {
+  it('loads latest draft snapshots for session restoration', async () => {
     const store = createMockStore();
     const repository = createSessionDraftRepository(store);
 

@@ -38,6 +38,56 @@ appId: com.dinoderek.mobile
     centerElement: true
 - takeScreenshot: "session-completion-one-pr"
 
+# Historical Summary uses the same comparison cards and keeps explicit detail/edit routes.
+- openLink: "boga3://maestro-harness?fixture=exercise-block-history&teleport=completed-session&sessionId=maestro_m24_completion_one_pr&presentation=summary"
+- tapOn:
+    text: "Open"
+    optional: true
+- extendedWaitUntil:
+    visible: "Session Summary"
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: "session-insight-mode-muscle"
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: "session-insight-mode-muscle"
+- scrollUntilVisible:
+    element:
+      id: "session-completion-muscle-comparison-quads"
+    direction: DOWN
+    centerElement: true
+- takeScreenshot: "session-summary-muscle"
+- scrollUntilVisible:
+    element:
+      id: "session-insight-mode-exercise"
+    direction: UP
+    centerElement: true
+- tapOn:
+    id: "session-insight-mode-exercise"
+- scrollUntilVisible:
+    element:
+      id: "session-completion-exercise-maestro_m24_completion_one_pr_squat"
+    direction: DOWN
+    centerElement: true
+- takeScreenshot: "session-summary-exercise"
+- scrollUntilVisible:
+    element:
+      id: "session-summary-view-sets"
+    direction: DOWN
+    centerElement: true
+- assertVisible:
+    id: "session-summary-edit"
+- tapOn:
+    id: "session-summary-view-sets"
+- extendedWaitUntil:
+    visible:
+      id: "completed-session-detail-screen"
+    timeout: 15000
+- assertVisible: "View Session"
+
+
 - openLink: "boga3://maestro-harness?fixture=exercise-block-history&teleport=completed-session&sessionId=maestro_m24_completion_no_pr&presentation=completion&maestroCatalog=fail-once"
 - tapOn:
     text: "Open"
@@ -84,7 +134,21 @@ appId: com.dinoderek.mobile
     id: "session-completion-view-muscle-load"
 - takeScreenshot: "session-completion-unmapped"
 
-# Completed edit (redesign step 6b-1): a completed session's `Edit` opens the
+# A completion target that does not exist: the top bar without Done, and one
+# safe exit back to Progress.
+- openLink: "boga3://maestro-harness?fixture=exercise-block-history&teleport=completed-session&sessionId=maestro_missing_session&presentation=completion"
+- tapOn:
+    text: "Open"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "session-completion-safe-exit"
+    timeout: 30000
+- assertNotVisible:
+    id: "session-completion-done"
+- takeScreenshot: "session-completion-unavailable"
+
+# Completed edit (`ux-rules` §14b.7): a completed session's `Edit` opens the
 # session view on it — Start/End in place of Time, `Done` in place of Finish.
 # A set changes on the exercise page, an invalid Start pauses autosave with a
 # notice, a valid one clears it, and Done returns to the completed session,
@@ -182,15 +246,82 @@ appId: com.dinoderek.mobile
     visible:
       id: "completed-session-detail-screen"
     timeout: 30000
-- assertVisible: "2026-01-05 07:30"
-# The set table's reps cell: 6 now, the fixture's 5 gone (exact-text matches).
 - assertVisible:
-    id: "completed-session-detail-set-row-maestro_m24_completion_one_pr_squat_set"
-- assertVisible: "6"
-- assertNotVisible: "5"
+    id: "completed-session-detail-times-start"
+    text: "Start 2026-01-05 07:30"
+# The squat's first row reads the edit back: 275.0 × 6, not the fixture's × 5.
+- assertVisible:
+    id: "completed-session-detail-exercise-maestro_m24_completion_one_pr_squat-set-1-values"
+    text: "275.0 × 6"
 - assertNotVisible:
     id: "session-completion-presentation"
 - takeScreenshot: "completed-edit-read-back"
+
+# View Session in the design language (View Session restyle): the summary card,
+# the squat's record band (its 1RM beats every other session), the exercise ⋮
+# with Append, and the session ⋮ deleting and undeleting — a band while
+# deleted, and no Edit (the session view only edits a live session).
+- assertVisible:
+    id: "completed-session-detail-summary"
+- assertVisible:
+    id: "completed-session-detail-exercise-maestro_m24_completion_one_pr_squat-record"
+- takeScreenshot: "view-session-detail"
+- tapOn:
+    id: "completed-session-detail-exercise-options-maestro_m24_completion_one_pr_squat"
+- extendedWaitUntil:
+    visible:
+      id: "completed-session-detail-append-exercise-button-maestro_m24_completion_one_pr_squat"
+    timeout: 5000
+- takeScreenshot: "view-session-exercise-options"
+# The design-language sheet has no Cancel: tap the backdrop above it.
+- tapOn:
+    point: "50%,20%"
+- extendedWaitUntil:
+    notVisible:
+      id: "completed-session-detail-exercise-sheet"
+    timeout: 5000
+- tapOn:
+    id: "completed-session-detail-options-button"
+- extendedWaitUntil:
+    visible:
+      id: "completed-session-detail-options-sheet"
+    timeout: 5000
+- takeScreenshot: "view-session-options"
+- tapOn:
+    id: "completed-session-detail-delete-button"
+- extendedWaitUntil:
+    visible:
+      id: "completed-session-detail-deleted-band"
+    timeout: 10000
+- assertNotVisible:
+    id: "completed-session-detail-edit-button"
+- takeScreenshot: "view-session-deleted"
+- tapOn:
+    id: "completed-session-detail-options-button"
+- extendedWaitUntil:
+    visible: "Undelete session"
+    timeout: 5000
+- tapOn:
+    id: "completed-session-detail-delete-button"
+- extendedWaitUntil:
+    notVisible:
+      id: "completed-session-detail-deleted-band"
+    timeout: 10000
+- assertVisible:
+    id: "completed-session-detail-edit-button"
+
+# A session that does not exist: the in-route state, with the top bar's back.
+- openLink: "boga3://maestro-harness?fixture=exercise-block-history&teleport=completed-session&sessionId=maestro_missing_session"
+- tapOn:
+    text: "Open"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "completed-session-detail-empty"
+    timeout: 30000
+- assertVisible:
+    id: "completed-session-detail-back"
+- takeScreenshot: "view-session-not-found"
 
 # Two PRs, the share preview and the share-image failure (moved here from the
 # deleted exercise-block-history flow, redesign 6b-3). The fixture's
@@ -230,6 +361,7 @@ appId: com.dinoderek.mobile
     visibilityPercentage: 80
     centerElement: true
 - assertVisible: "Exercise volume"
+- takeScreenshot: "session-completion-exercise-volume"
 - scrollUntilVisible:
     element:
       id: "session-completion-share-session"
@@ -241,11 +373,14 @@ appId: com.dinoderek.mobile
 - waitForAnimationToEnd
 - takeScreenshot: "session-share-preview-all-prs"
 - tapOn:
-    point: "50%,89%"
-- waitForAnimationToEnd
+    id: "session-share-image"
+- extendedWaitUntil:
+    visible:
+      id: "session-share-error"
+    timeout: 10000
 - takeScreenshot: "session-share-image-error"
 - tapOn:
-    point: "50%,89%"
+    id: "session-share-image"
 - extendedWaitUntil:
     visible: "Copy"
     timeout: 10000
@@ -258,11 +393,12 @@ appId: com.dinoderek.mobile
 - extendedWaitUntil:
     notVisible: "Copy"
     timeout: 10000
+# The share sheet has no Cancel: tap the backdrop above it.
 - tapOn:
-    point: "50%,95%"
+    point: "50%,8%"
 - extendedWaitUntil:
-    visible:
-      id: "session-completion-share-session"
+    notVisible:
+      id: "session-share-preview"
     timeout: 10000
 - scrollUntilVisible:
     element:

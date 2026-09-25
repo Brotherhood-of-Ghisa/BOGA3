@@ -58,7 +58,7 @@ export function SegmentedChips<TValue extends string | number>({
               selected && styles.chipSelected,
             ]}
             testID={`${testIDPrefix}-${option.value}`}>
-            <Text style={[styles.chipText, compact && styles.chipTextCompact, selected && styles.chipTextSelected]}>
+            <Text allowFontScaling={false} style={[styles.chipText, compact && styles.chipTextCompact, selected && styles.chipTextSelected]}>
               {option.label}
             </Text>
           </Pressable>

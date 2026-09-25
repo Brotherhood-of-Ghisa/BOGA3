@@ -122,6 +122,7 @@ function JoinGroupContent({ userId, initialCode }: { userId: string; initialCode
             <View style={groupFormStyles.field}>
               <UiText variant="subtitle">Invite code</UiText>
               <TextInput
+                allowFontScaling={false}
                 accessibilityLabel="Invite code"
                 autoCapitalize="characters"
                 autoCorrect={false}

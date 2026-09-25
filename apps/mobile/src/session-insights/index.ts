@@ -30,6 +30,8 @@ export {
   createCompletedSessionInsightsRepository,
   createDrizzleSessionInsightsStore,
   loadCompletedSessionInsights,
+  loadSessionInsightHistory,
+  type SessionInsightHistoryQuery,
   type CompletedSessionInsightsRepository,
   type SessionInsightExerciseRow,
   type SessionInsightSessionRow,

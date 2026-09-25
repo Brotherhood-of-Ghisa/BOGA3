@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Card } from '@/components/ui/card';
+import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Icon } from '@/components/ui/icon';
 import { Stat } from '@/components/ui/stat';
 import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
@@ -18,6 +19,11 @@ import { pageText } from './text-styles';
 
 export type RecordsView = 'records' | 'last';
 
+const VIEW_OPTIONS = [
+  { value: 'records', label: 'Records' },
+  { value: 'last', label: 'Last' },
+] as const;
+
 type RecordsPanelProps = {
   state: ExerciseRecordsState;
   view: RecordsView;
@@ -33,7 +39,7 @@ type RecordsPanelProps = {
 const DASH = '—';
 
 // The collapsible records panel: the `Records` | `Last` selector and the
-// `History` link are present in both states (build spec, "Exercise page" §1).
+// `History` link are present in both states (`ux-rules` §14a.4).
 export function RecordsPanel({
   state,
   view,
@@ -56,30 +62,14 @@ export function RecordsPanel({
           testID="exercise-records-toggle">
           <Icon color={uiRoles.ink} name={expanded ? 'chevron-down' : 'chevron-right'} size="sm" />
         </Pressable>
-        <View accessibilityRole="tablist" style={styles.selector}>
-          {(['records', 'last'] as const).map((option, index) => {
-            const selected = option === view;
-            return (
-              <Pressable
-                accessibilityRole="tab"
-                accessibilityState={{ selected }}
-                hitSlop={uiSpace.sm}
-                key={option}
-                onPress={() => onSelectView(option)}
-                style={[
-                  styles.segment,
-                  index > 0 ? styles.segmentDivider : null,
-                  selected ? styles.segmentSelected : null,
-                ]}
-                testID={`exercise-records-view-${option}`}>
-                <Text
-                  style={[pageText.microLabel, selected ? styles.segmentLabelSelected : styles.segmentLabel]}>
-                  {option === 'records' ? 'Records' : 'Last'}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
+        <SegmentedControl
+          hitSlop={uiSpace.sm}
+          layout="inline"
+          onChange={onSelectView}
+          options={VIEW_OPTIONS}
+          testIDPrefix="exercise-records-view"
+          value={view}
+        />
         <View style={styles.spacer} />
         <Pressable
           accessibilityLabel="Open exercise history"
@@ -88,7 +78,7 @@ export function RecordsPanel({
           onPress={onOpenHistory}
           style={styles.historyLink}
           testID="exercise-records-history">
-          <Text style={[pageText.microLabel, styles.historyLabel]}>History</Text>
+          <Text allowFontScaling={false} style={[pageText.microLabel, styles.historyLabel]}>History</Text>
           <Icon color={uiRoles.accent} name="chevron-right" size="xs" />
         </Pressable>
       </View>
@@ -109,7 +99,7 @@ function PanelBody({
       return <CollapsedStats oneRepMax={DASH} maxWeight={DASH} volume={DASH} />;
     }
     return (
-      <Text style={[pageText.body, styles.message]} testID="exercise-records-message">
+      <Text allowFontScaling={false} style={[pageText.body, styles.message]} testID="exercise-records-message">
         {state.status === 'loading' ? 'Loading records…' : 'Records unavailable.'}
       </Text>
     );
@@ -185,10 +175,10 @@ function PanelBody({
   return (
     <View style={styles.last} testID="exercise-records-last">
       <View style={styles.lastSummary}>
-        <Text style={pageText.detailFigure}>
+        <Text allowFontScaling={false} style={pageText.detailFigure}>
           {`${date(last.completedAt)} · ${formatDaysAgo(last.completedAt, now)}`}
         </Text>
-        <Text style={pageText.detailFigure}>
+        <Text allowFontScaling={false} style={pageText.detailFigure}>
           {`1RM ${last.oneRepMax !== null ? formatOneRepMax(last.oneRepMax) : DASH} · VOL ${formatVolume(last.volume)}`}
         </Text>
       </View>
@@ -242,11 +232,11 @@ function RecordLine({
       accessible
       style={[styles.recordLine, divider ? styles.recordDivider : null]}
       testID={testID}>
-      <Text style={[pageText.microLabel, styles.recordLabel]}>{label}</Text>
-      <Text numberOfLines={1} style={[pageText.headlineFigure, styles.recordValue]}>
+      <Text allowFontScaling={false} style={[pageText.microLabel, styles.recordLabel]}>{label}</Text>
+      <Text allowFontScaling={false} numberOfLines={1} style={[pageText.headlineFigure, styles.recordValue]}>
         {value}
       </Text>
-      <Text numberOfLines={1} style={[pageText.detailFigure, styles.recordDetail]}>
+      <Text allowFontScaling={false} numberOfLines={1} style={[pageText.detailFigure, styles.recordDetail]}>
         {detail}
       </Text>
     </View>
@@ -256,8 +246,8 @@ function RecordLine({
 function LastSetLine({ set, index }: { set: RecordSet; index: number }) {
   return (
     <View style={styles.lastSet} testID={`exercise-records-last-set-${index}`}>
-      <Text style={[pageText.microLabel, styles.typeLabel]}>{formatEffort(set.setType)}</Text>
-      <Text numberOfLines={1} style={[pageText.runningFigure, styles.lastSetFigure]}>
+      <Text allowFontScaling={false} style={[pageText.microLabel, styles.typeLabel]}>{formatEffort(set.setType)}</Text>
+      <Text allowFontScaling={false} numberOfLines={1} style={[pageText.runningFigure, styles.lastSetFigure]}>
         {`${formatWeight(set.weight)} × ${set.reps}`}
       </Text>
       <Stat
@@ -272,7 +262,7 @@ function LastSetLine({ set, index }: { set: RecordSet; index: number }) {
 
 function Empty() {
   return (
-    <Text style={[pageText.body, styles.message]} testID="exercise-records-empty">
+    <Text allowFontScaling={false} style={[pageText.body, styles.message]} testID="exercise-records-empty">
       No completed sessions with this exercise yet.
     </Text>
   );
@@ -293,32 +283,6 @@ const styles = StyleSheet.create({
     height: uiGeometry.tapTarget,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  selector: {
-    flexDirection: 'row',
-    overflow: 'hidden',
-    borderWidth: uiBorder.width,
-    borderColor: uiRoles.ruleStrong,
-    borderRadius: uiGeometry.radius.control,
-  },
-  segment: {
-    justifyContent: 'center',
-    paddingHorizontal: uiSpace.md,
-    paddingVertical: uiSpace.xs,
-    backgroundColor: uiRoles.surface,
-  },
-  segmentDivider: {
-    borderLeftWidth: uiBorder.width,
-    borderLeftColor: uiRoles.ruleStrong,
-  },
-  segmentSelected: {
-    backgroundColor: uiRoles.ink,
-  },
-  segmentLabel: {
-    color: uiRoles.inkMuted,
-  },
-  segmentLabelSelected: {
-    color: uiRoles.surface,
   },
   spacer: {
     flex: 1,

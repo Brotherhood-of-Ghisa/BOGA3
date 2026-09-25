@@ -179,7 +179,7 @@ describe('submit cleanup', () => {
     expect(done.session.exercises.map((exercise) => exercise.id)).toEqual([bench.id]);
   });
 
-  it('keeps the recorder copy for each prompt, and names both removals when there are two', () => {
+  it('keeps the cleanup copy for each prompt, and names both removals when there are two', () => {
     expect(
       describeSubmitCleanupPrompt(
         { step: 'empty-sets-and-exercises', incompleteSetCount: 2, emptyExerciseCount: 0 },

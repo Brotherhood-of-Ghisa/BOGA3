@@ -98,6 +98,7 @@ jest.mock('expo-router', () => {
 import { render, screen, waitFor } from '@testing-library/react-native';
 
 import RootLayout from '../_layout';
+import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
 
 describe('RootLayout auth bootstrap wiring', () => {
   beforeEach(() => {
@@ -137,7 +138,18 @@ describe('RootLayout auth bootstrap wiring', () => {
     render(<RootLayout />);
 
     expect(mockStack).toHaveBeenCalledWith({
-      screenOptions: { headerBackButtonDisplayMode: 'minimal' },
+      screenOptions: {
+        headerBackButtonDisplayMode: 'minimal',
+        // One design-language header style on every stack route.
+        headerStyle: { backgroundColor: uiRoles.surface },
+        headerTitleStyle: {
+          fontFamily: uiFonts.display.family,
+          fontWeight: '700',
+          fontSize: uiTypography.size.xl,
+          color: uiRoles.ink,
+        },
+        headerTintColor: uiRoles.ink,
+      },
     });
     // The back item's hidden label (read by VoiceOver) is the previous title: never "(tabs)".
     expect(mockStackScreen).toHaveBeenCalledWith({ name: '(tabs)', options: { headerShown: false, title: 'Back' } });

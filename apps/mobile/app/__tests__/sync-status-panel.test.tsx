@@ -2,7 +2,8 @@
 
 /**
  * The Settings sync-status panel: renders the four signed-in fields — last
- * successful sync time, pending (dirty) change count, network state, and error
+ * successful sync time, pending (dirty) change count, network state (with an
+ * unknown network shown as "Checking…", never as offline or online), and error
  * state — from an injected status source, refreshes on focus, and nudges a sync
  * cycle on the manual refresh press. Each field carries a stable testID so the
  * Maestro flow and these unit tests can pin it.
@@ -25,7 +26,10 @@ jest.mock('expo-router', () => {
 
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
+import { StyleSheet } from 'react-native';
+
 import { SyncStatusPanel } from '@/components/sync-status/sync-status-panel';
+import { uiRoles } from '@/components/ui';
 import type { SyncStatusSnapshot } from '@/src/sync/sync-status';
 
 const baseStatus: SyncStatusSnapshot = {
@@ -78,18 +82,52 @@ describe('Settings sync-status panel', () => {
     });
   });
 
-  it('renders the offline network state', async () => {
+  it('renders the offline network state as the wifi-off glyph and the word, in ink', async () => {
     renderPanel({ networkState: 'offline' });
     await waitFor(() => {
       expect(screen.getByTestId('settings-sync-status-network')).toHaveTextContent('Offline');
     });
+    expect(screen.getByTestId('settings-sync-status-network-offline-glyph', { includeHiddenElements: true })).toBeTruthy();
+    expect(StyleSheet.flatten(screen.getByTestId('settings-sync-status-network').props.style).color).toBe(
+      uiRoles.ink,
+    );
   });
 
-  it('renders the latest cycle error', async () => {
+  it('shows no offline glyph while online', async () => {
+    renderPanel({ networkState: 'online' });
+    await waitFor(() => {
+      expect(screen.getByTestId('settings-sync-status-network')).toHaveTextContent('Online');
+    });
+    expect(screen.queryByTestId('settings-sync-status-network-offline-glyph', { includeHiddenElements: true })).toBeNull();
+  });
+
+  it('shows an unknown network as "Checking…", neither offline nor online', async () => {
+    // Gate on the dirty count: "Checking…" is also the pre-resolution value,
+    // so waiting on it alone would not prove the unknown snapshot rendered.
+    renderPanel({ networkState: 'unknown', dirtyCount: 2 });
+    await waitFor(() => {
+      expect(screen.getByTestId('settings-sync-status-dirty-count')).toHaveTextContent('2');
+    });
+    expect(screen.getByTestId('settings-sync-status-network')).toHaveTextContent('Checking…');
+    expect(screen.queryByTestId('settings-sync-status-network-offline-glyph', { includeHiddenElements: true })).toBeNull();
+  });
+
+  it('shows "Checking…" rather than "Online" before the first snapshot loads', () => {
+    const readStatus = jest.fn(() => new Promise<SyncStatusSnapshot>(() => {}));
+    render(<SyncStatusPanel onRequestSync={jest.fn()} readStatus={readStatus} />);
+    expect(readStatus).toHaveBeenCalled();
+    expect(screen.getByTestId('settings-sync-status-network')).toHaveTextContent('Checking…');
+    expect(screen.queryByTestId('settings-sync-status-network-offline-glyph', { includeHiddenElements: true })).toBeNull();
+  });
+
+  it('renders the latest cycle error in danger', async () => {
     renderPanel({ errorMessage: 'server unreachable' });
     await waitFor(() => {
       expect(screen.getByTestId('settings-sync-status-error')).toHaveTextContent('server unreachable');
     });
+    expect(StyleSheet.flatten(screen.getByTestId('settings-sync-status-error').props.style).color).toBe(
+      uiRoles.danger,
+    );
   });
 
   it('shows a sign-in-required error when the cycle reported no signed-in user', async () => {

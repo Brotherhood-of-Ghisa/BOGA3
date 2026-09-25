@@ -52,6 +52,17 @@ export const ICON_GLYPHS = {
   'caret-down': [path('M6 8h12l-6 8z', 'solid')],
 
   // --- Actions ---
+  // Lucide `search`: a filter or search field's leading mark.
+  search: [path('m21 21-4.34-4.34'), circle(11, 11, 8)],
+  // Lucide `list`: open the full list (the exercise catalogue from the picker).
+  list: [
+    path('M3 5h.01'),
+    path('M3 12h.01'),
+    path('M3 19h.01'),
+    path('M8 5h13'),
+    path('M8 12h13'),
+    path('M8 19h13'),
+  ],
   x: [path('M18 6 6 18'), path('m6 6 12 12')],
   plus: [path('M5 12h14'), path('M12 5v14')],
   check: [path('M20 6 9 17l-5-5')],
@@ -76,6 +87,25 @@ export const ICON_GLYPHS = {
   ],
 
   // --- Choice and status ---
+  // Lucide `wifi-off`: no connection; the data shown may be stale.
+  offline: [
+    path('M12 20h.01'),
+    path('M8.5 16.429a5 5 0 0 1 7 0'),
+    path('M5 12.859a10 10 0 0 1 5.17-2.69'),
+    path('M19 12.859a10 10 0 0 0-2.007-1.523'),
+    path('M2 8.82a15 15 0 0 1 4.177-2.643'),
+    path('M22 8.82a15 15 0 0 0-11.288-3.764'),
+    path('m2 2 20 20'),
+  ],
+  // Lucide `circle-check`: a write that succeeded. Colour stays `ink`: the
+  // design language has no success hue (state rides a glyph and words).
+  success: [circle(12, 12, 10), path('m16 9-5.5 5.5L8 12')],
+  // Lucide `triangle-alert`: a caution the words explain (unavailable, dev-only).
+  warning: [
+    path('m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3'),
+    path('M12 9v4'),
+    path('M12 17h.01'),
+  ],
   // Lucide `circle`: an unfilled ring — "not yet" (not certified, unselected).
   circle: [circle(12, 12, 10)],
   // BoGa: radio pair, a ring with and without a solid centre.

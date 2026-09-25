@@ -146,7 +146,7 @@ Settings dev wipe-local — three flows sharing one sim + Metro):
 TASK_ID=ad-hoc npm run test:e2e:ios:ui-regression
 ```
 
-Session view lane (redesign step 5; infra-free; two flows sharing one sim +
+Session view lane (infra-free; two flows sharing one sim +
 Metro, each seeding with `reset=data&fixture=session-view`):
 
 ```bash

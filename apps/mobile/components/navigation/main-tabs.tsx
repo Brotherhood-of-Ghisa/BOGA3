@@ -1,6 +1,6 @@
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { UiButton, UiSurface, uiColors, uiRadius, uiSpace, uiTypography } from '@/components/ui';
+import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import {
   MAIN_TAB_DEFINITIONS,
   type MainTabKey,
@@ -11,48 +11,79 @@ type MainTabsProps = {
   onSelect: (tab: MainTabKey) => void;
 };
 
-/** Production four-tab presentation for the M26 ownership model. */
+/**
+ * The four main tabs (M26 ownership model) in the design language: one card
+ * of plain labels. The active tab is `ink` at a heavier weight over an `ink`
+ * underline — navigation, not an action, so never `accent` (`ux-rules` §1.4).
+ */
 export function MainTabs({ activeTab, onSelect }: MainTabsProps) {
   return (
-    <UiSurface accessibilityRole="tablist" style={styles.shell} testID="main-bottom-tabs">
-      <View style={styles.tabsRow}>
-        {MAIN_TAB_DEFINITIONS.map((tab) => (
-          <UiButton
+    <View accessibilityRole="tablist" style={styles.shell} testID="main-bottom-tabs">
+      {MAIN_TAB_DEFINITIONS.map((tab) => {
+        const active = activeTab === tab.key;
+        return (
+          <Pressable
             accessibilityLabel={tab.accessibilityLabel}
             accessibilityRole="tab"
-            active={activeTab === tab.key}
+            accessibilityState={{ selected: active }}
             key={tab.key}
-            label={tab.label}
             onPress={() => onSelect(tab.key)}
-            style={styles.tabButton}
-            testID={tab.testID}
-            textStyle={styles.tabLabel}
-            variant="tab"
-          />
-        ))}
-      </View>
-    </UiSurface>
+            style={({ pressed }) => [styles.tab, pressed && !active ? styles.pressed : null]}
+            testID={tab.testID}>
+            <Text allowFontScaling={false} numberOfLines={1} style={[styles.label, active ? styles.labelActive : null]}>
+              {tab.label}
+            </Text>
+            <View
+              style={[styles.indicator, active ? styles.indicatorActive : null]}
+              testID={`${tab.testID}-indicator`}
+            />
+          </Pressable>
+        );
+      })}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   shell: {
-    borderColor: uiColors.borderMuted,
-    borderRadius: uiRadius.md,
-    backgroundColor: uiColors.surfaceDefault,
-    padding: uiSpace.sm,
-  },
-  tabsRow: {
     flexDirection: 'row',
-    gap: uiSpace.xs,
+    overflow: 'hidden',
+    borderWidth: uiBorder.width,
+    borderColor: uiRoles.rule,
+    borderRadius: uiGeometry.radius.card,
+    backgroundColor: uiRoles.surface,
   },
-  tabButton: {
+  tab: {
     flex: 1,
-    paddingHorizontal: uiSpace.xs,
+    minHeight: uiGeometry.tapTarget,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: uiSpace.xs,
+    paddingTop: uiSpace.sm,
   },
-  tabLabel: {
+  // Depth is a ground change, never an elevation.
+  pressed: {
+    backgroundColor: uiRoles.surfaceSubtle,
+  },
+  label: {
+    fontFamily: uiFonts.display.family,
+    fontWeight: '600',
+    fontSize: uiTypography.size.md,
+    lineHeight: uiTypography.lineHeight.md,
+    color: uiRoles.inkMuted,
+  },
+  labelActive: {
+    fontWeight: '700',
+    color: uiRoles.ink,
+  },
+  // Always laid out, so the labels do not shift when the active tab changes.
+  indicator: {
     alignSelf: 'stretch',
-    textAlign: 'center',
-    fontSize: uiTypography.size.sm,
+    marginHorizontal: uiSpace.lg,
+    height: uiBorder.width * 2,
+    backgroundColor: 'transparent',
+  },
+  indicatorActive: {
+    backgroundColor: uiRoles.ink,
   },
 });

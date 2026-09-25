@@ -90,6 +90,7 @@ export function UsernameGate({ userId, notice, onSaved }: UsernameGateProps) {
       <View style={groupFormStyles.field}>
         <UiText variant="subtitle">Username</UiText>
         <TextInput
+          allowFontScaling={false}
           accessibilityLabel="Username"
           autoCapitalize="none"
           autoCorrect={false}

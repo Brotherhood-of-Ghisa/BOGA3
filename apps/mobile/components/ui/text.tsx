@@ -22,7 +22,7 @@ type UiTextProps = ComponentProps<typeof Text> & {
 };
 
 export function UiText({ variant = 'body', style, ...props }: UiTextProps) {
-  return <Text {...props} style={[styles.base, variantStyles[variant], style]} />;
+  return <Text {...props} allowFontScaling={false} style={[styles.base, variantStyles[variant], style]} />;
 }
 
 const styles = StyleSheet.create({

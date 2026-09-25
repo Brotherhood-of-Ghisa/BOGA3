@@ -29,7 +29,7 @@ const describeValues = (row: SetRowView) =>
     : `${row.weight !== null ? formatWeight(row.weight) : DASH} × ${row.reps ?? DASH}`;
 
 /**
- * The set row (build spec, "Set row"): `[type 44][weight × reps][1RM / VOL][control 44]`.
+ * The set row (`ux-rules` §14a.1–§14a.4): `[type 44][weight × reps][1RM / VOL][control 44]`.
  * Performed rows are realised; rows not yet performed show their values faded.
  * The glyph carries the state (`design-language.md` §5). Every figure takes the
  * row's colour and weight; only a record weight or 1RM stands out, in `record`.
@@ -47,7 +47,7 @@ export function SetRow({ row, divider, onOpen, onToggle }: SetRowProps) {
       density="list"
       divider={divider}
       leading={
-        <Text style={[pageText.microLabel, styles.type, performed ? styles.typePerformed : null]}>
+        <Text allowFontScaling={false} style={[pageText.microLabel, styles.type, performed ? styles.typePerformed : null]}>
           {effort}
         </Text>
       }
@@ -93,6 +93,7 @@ export function SetRow({ row, divider, onOpen, onToggle }: SetRowProps) {
         style={styles.body}
         testID={`exercise-set-${row.number}-open`}>
         <Text
+          allowFontScaling={false}
           numberOfLines={1}
           style={[
             pageText.runningFigure,

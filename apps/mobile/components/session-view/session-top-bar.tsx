@@ -1,7 +1,8 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Icon } from '@/components/ui/icon';
+import { ActionButton } from '@/components/ui/action-button';
+import { IconButton } from '@/components/ui/icon-button';
 import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 
 type SessionTopBarProps =
@@ -19,15 +20,24 @@ type SessionTopBarProps =
       mode: 'completed';
       onDone: () => void;
       doneDisabled?: boolean;
+    }
+  | {
+      // The completion screen after Finish: Done sits where Finish sat. Omitted
+      // on its loading and unavailable states, which offer their own one exit.
+      mode: 'complete';
+      onDone?: () => void;
+      doneDisabled?: boolean;
     };
 
 const PRIMARY = {
   active: { title: 'Session', label: 'Finish', a11y: 'Finish session', testID: 'session-view-finish-button' },
   completed: { title: 'Edit session', label: 'Done', a11y: 'Done editing session', testID: 'session-view-done-button' },
+  complete: { title: 'Session complete', label: 'Done', a11y: 'Done with session completion', testID: 'session-completion-done' },
 } as const;
 
-// `Session` · ⋮ · Finish (build spec, "Session view"); `Edit session` · Done
-// for a completed session. The primary is the screen's one `accent` action.
+// `Session` · ⋮ · Finish (`ux-rules` §14b.2); `Edit session` · Done
+// for a completed session; `Session complete` · Done after Finish. The primary
+// is the screen's one `accent` action.
 export function SessionTopBar(props: SessionTopBarProps) {
   const insets = useSafeAreaInsets();
   const copy = PRIMARY[props.mode];
@@ -35,31 +45,34 @@ export function SessionTopBar(props: SessionTopBarProps) {
   const disabled = (props.mode === 'active' ? props.finishDisabled : props.doneDisabled) ?? false;
 
   return (
-    <View style={[styles.bar, { paddingTop: insets.top }]} testID="session-view-top-bar">
-      <Text accessibilityRole="header" numberOfLines={1} style={styles.title}>
+    <View
+      style={[styles.bar, { paddingTop: insets.top }]}
+      testID={props.mode === 'complete' ? 'session-completion-top-bar' : 'session-view-top-bar'}>
+      <Text allowFontScaling={false} accessibilityRole="header" numberOfLines={1} style={styles.title}>
         {copy.title}
       </Text>
       {props.mode === 'active' ? (
-        <Pressable
+        <IconButton
           accessibilityLabel="Session options"
-          accessibilityRole="button"
           hitSlop={uiSpace.xs}
+          name="more-vertical"
           onPress={props.onOpenOptions}
-          style={styles.iconButton}
-          testID="session-view-options-button">
-          <Icon color={uiRoles.ink} name="more-vertical" size="md" />
-        </Pressable>
+          testID="session-view-options-button"
+        />
       ) : null}
-      <Pressable
-        accessibilityLabel={copy.a11y}
-        accessibilityRole="button"
-        accessibilityState={{ disabled }}
-        disabled={disabled}
-        onPress={onPrimary}
-        style={[styles.finish, disabled ? styles.finishDisabled : null]}
-        testID={copy.testID}>
-        <Text style={styles.finishLabel}>{copy.label}</Text>
-      </Pressable>
+      {onPrimary ? (
+        <ActionButton
+          accessibilityLabel={copy.a11y}
+          disabled={disabled}
+          label={copy.label}
+          onPress={onPrimary}
+          testID={copy.testID}
+          variant="primary"
+        />
+      ) : (
+        // Keeps the bar's height when there is no Done.
+        <View style={styles.spacer} />
+      )}
     </View>
   );
 }
@@ -84,30 +97,8 @@ const styles = StyleSheet.create({
     lineHeight: uiTypography.lineHeight.xl,
     color: uiRoles.ink,
   },
-  iconButton: {
+  spacer: {
     width: uiGeometry.tapTarget,
     height: uiGeometry.tapTarget,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  finish: {
-    minHeight: uiGeometry.tapTarget,
-    paddingHorizontal: uiSpace.md,
-    borderRadius: uiGeometry.radius.card,
-    backgroundColor: uiRoles.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  finishDisabled: {
-    backgroundColor: uiRoles.disabled,
-  },
-  finishLabel: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    letterSpacing: uiTypography.size.sm * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
-    color: uiRoles.surface,
   },
 });

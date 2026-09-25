@@ -384,18 +384,14 @@ appId: com.dinoderek.mobile
 - assertVisible:
     id: "group-session-status"
     text: "Completed · 45m"
-# Exercise titles sit inside the shared layout's collapse toggle, whose
-# accessibility label is what iOS exposes.
-- assertVisible:
-    id: "exercise-collapse-toggle-1"
-    text: "Collapse exercise Bench Press"
-- assertVisible:
-    id: "exercise-collapse-toggle-2"
-    text: "Collapse exercise Barbell Row"
+# Each exercise is a session-detail card (the View Session restyle, PR C):
+# its name, set count and performed sets.
+- assertVisible: "Bench Press"
+- assertVisible: "Barbell Row"
 - assertVisible:
     id: "group-session-set-row-${output.groupsFirstSetId}"
 - assertNotVisible:
-    id: "completed-session-detail-action-bar"
+    id: "completed-session-detail-options-button"
 - assertNotVisible:
     id: "completed-session-detail-edit-button"
 - assertNotVisible:

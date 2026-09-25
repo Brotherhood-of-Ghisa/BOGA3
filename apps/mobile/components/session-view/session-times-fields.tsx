@@ -1,6 +1,7 @@
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
-import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { FormField } from '@/components/ui/form-field';
+import { uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import type { SessionTimesText, SessionTimesValidation } from '@/src/session-recorder/session-times';
 
 export type SessionTimesFieldsProps = {
@@ -16,7 +17,7 @@ export type SessionTimesFieldsProps = {
 
 const PLACEHOLDER = 'YYYY-MM-DD HH:mm';
 
-type FieldProps = {
+type TimeFieldProps = {
   label: string;
   value: string;
   error: string | null;
@@ -25,44 +26,35 @@ type FieldProps = {
   testID: string;
 };
 
-// A labelled time field in the logger's field style (`set-logger.tsx`): label
-// above, one field height, a `danger` rule while its value is invalid.
-function TimeField({ label, value, error, onChange, onCommit, testID }: FieldProps) {
+// A labelled time field: a `FormField` (the logger's field style) whose
+// figure `base` fits the 16 characters of a time in half the card's width.
+function TimeField({ label, value, error, onChange, onCommit, testID }: TimeFieldProps) {
   return (
-    <View style={styles.column}>
-      <View style={[styles.field, error ? styles.fieldInvalid : null]}>
-        <Text style={styles.label}>{label}</Text>
-        <TextInput
-          accessibilityHint={PLACEHOLDER}
-          accessibilityLabel={`Session ${label.toLowerCase()} time`}
-          autoCapitalize="none"
-          autoCorrect={false}
-          keyboardType="numbers-and-punctuation"
-          onBlur={onCommit}
-          onChangeText={onChange}
-          onSubmitEditing={onCommit}
-          placeholder={PLACEHOLDER}
-          placeholderTextColor={uiRoles.disabled}
-          returnKeyType="done"
-          // Typing replaces the whole time, as the logger's fields do.
-          selectTextOnFocus
-          style={styles.input}
-          testID={testID}
-          value={value}
-        />
-      </View>
-      {error ? (
-        <Text accessibilityLiveRegion="polite" style={styles.error} testID={`${testID}-error`}>
-          {error}
-        </Text>
-      ) : null}
-    </View>
+    <FormField
+      accessibilityHint={PLACEHOLDER}
+      accessibilityLabel={`Session ${label.toLowerCase()} time`}
+      autoCapitalize="none"
+      autoCorrect={false}
+      containerStyle={styles.column}
+      error={error}
+      keyboardType="numbers-and-punctuation"
+      label={label}
+      onBlur={onCommit}
+      onChangeText={onChange}
+      onSubmitEditing={onCommit}
+      placeholder={PLACEHOLDER}
+      returnKeyType="done"
+      // Typing replaces the whole time, as the logger's fields do.
+      selectTextOnFocus
+      testID={testID}
+      value={value}
+    />
   );
 }
 
 /**
  * A completed session's Start and End in the summary card, in place of the
- * elapsed Time (the recorder's completed edit, moved to the session view).
+ * elapsed Time (the completed edit, `ux-rules` §14b.7).
  */
 export function SessionTimesFields({
   text,
@@ -94,7 +86,7 @@ export function SessionTimesFields({
         />
       </View>
       {notice ? (
-        <Text accessibilityLiveRegion="polite" style={styles.notice} testID="session-view-times-notice">
+        <Text allowFontScaling={false} accessibilityLiveRegion="polite" style={styles.notice} testID="session-view-times-notice">
           {notice}
         </Text>
       ) : null}
@@ -116,45 +108,6 @@ const styles = StyleSheet.create({
   column: {
     flex: 1,
     minWidth: 0,
-    gap: uiSpace.xs,
-  },
-  field: {
-    height: uiGeometry.fieldHeight,
-    paddingHorizontal: uiSpace.sm,
-    paddingTop: uiSpace.xs,
-    backgroundColor: uiRoles.surface,
-    borderWidth: uiBorder.width,
-    borderColor: uiRoles.ruleStrong,
-    borderRadius: uiGeometry.radius.control,
-  },
-  fieldInvalid: {
-    borderColor: uiRoles.danger,
-  },
-  label: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
-    color: uiRoles.inkFaint,
-  },
-  // Every number is Plex Mono (`design-language.md` §3); `base` fits the 16
-  // characters of a time in half the card's width.
-  input: {
-    flex: 1,
-    padding: 0,
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '500',
-    fontSize: uiTypography.size.base,
-    color: uiRoles.ink,
-  },
-  error: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.danger,
   },
   notice: {
     fontFamily: uiFonts.body.family,

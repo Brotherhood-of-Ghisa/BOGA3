@@ -10,6 +10,9 @@ export type ListRowProps = {
   // The row's text. Pass `children` instead for composed content (a set row's
   // weight × reps).
   label?: string;
+  // A second line under the label in `ink-muted` body text (what a More or
+  // Settings destination is for). It wraps; the label stays one line.
+  description?: string;
   children?: ReactNode;
   // Before the content: an icon, or a fixed-width column (a set row's type).
   leading?: ReactNode;
@@ -25,17 +28,26 @@ export type ListRowProps = {
   selected?: boolean;
   // A `rule-soft` hairline above the row.
   divider?: boolean;
+  // A disclosure row's state (a collapsible section's header): announced as
+  // expanded or collapsed. The glyph that shows it is the caller's `trailing`.
+  expanded?: boolean;
   // Makes the whole row one target (sheet options). Leave unset when the
   // trailing control owns the action (set rows).
   onPress?: () => void;
   disabled?: boolean;
   accessibilityLabel?: string;
+  // What pressing the row does, when the label does not say (`Opens the
+  // completed session`).
+  accessibilityHint?: string;
+  // `link` for a row that leaves the app (it opens the system browser).
+  accessibilityRole?: 'button' | 'link';
   testID?: string;
 };
 
 // A design-language row: `[leading][content, flex][meta][trailing control]`.
 export function ListRow({
   label,
+  description,
   children,
   leading,
   meta,
@@ -44,17 +56,21 @@ export function ListRow({
   tone = 'default',
   selected = false,
   divider = true,
+  expanded,
   onPress,
   disabled = false,
   accessibilityLabel,
+  accessibilityHint,
+  accessibilityRole = 'button',
   testID,
 }: ListRowProps) {
   const body = (
     <>
       {leading}
-      <View style={styles.content}>
+      <View style={[styles.content, description !== undefined ? styles.contentTwoLine : null]}>
         {label !== undefined ? (
           <Text
+            allowFontScaling={false}
             numberOfLines={1}
             style={[
               labelStyles[density],
@@ -65,6 +81,7 @@ export function ListRow({
             {label}
           </Text>
         ) : null}
+        {description !== undefined ? <Text allowFontScaling={false} style={styles.description}>{description}</Text> : null}
         {children}
       </View>
       {meta}
@@ -89,9 +106,10 @@ export function ListRow({
 
   return (
     <Pressable
+      accessibilityHint={accessibilityHint}
       accessibilityLabel={accessibilityLabel ?? label}
-      accessibilityRole="button"
-      accessibilityState={{ selected, disabled }}
+      accessibilityRole={accessibilityRole}
+      accessibilityState={expanded === undefined ? { selected, disabled } : { selected, disabled, expanded }}
       disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [rowStyle, pressed && !disabled ? styles.pressed : null]}
@@ -120,6 +138,17 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     minWidth: 0,
+  },
+  // Two lines need room above and below, beyond the row's own padding.
+  contentTwoLine: {
+    paddingVertical: uiSpace.sm,
+  },
+  description: {
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
+    fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
+    color: uiRoles.inkMuted,
   },
   // Width only: the row's own minimum height already makes the column a full
   // tap target, and a second minimum here would stack on the row's padding.

@@ -55,6 +55,7 @@ export function GroupDetailsForm({
       <View style={groupFormStyles.field}>
         <UiText variant="subtitle">{`Name (up to ${GROUP_NAME_MAX_LENGTH} characters)`}</UiText>
         <TextInput
+          allowFontScaling={false}
           accessibilityLabel="Group name"
           editable={!pending}
           onChangeText={setName}
@@ -73,6 +74,7 @@ export function GroupDetailsForm({
       <View style={groupFormStyles.field}>
         <UiText variant="subtitle">Description (optional)</UiText>
         <TextInput
+          allowFontScaling={false}
           accessibilityLabel="Group description"
           editable={!pending}
           multiline

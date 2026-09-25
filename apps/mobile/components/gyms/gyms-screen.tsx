@@ -1,16 +1,17 @@
 import { useFocusEffect } from 'expo-router';
 import { type ReactNode, useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { MoreHubBackButton } from '@/components/navigation/more-hub-back-button';
+import { ActionButton } from '@/components/ui/action-button';
 import { Card } from '@/components/ui/card';
 import { Icon } from '@/components/ui/icon';
 import { ListRow } from '@/components/ui/list-row';
+import { ScreenScroll } from '@/components/ui/screen';
 import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import type { ReadForegroundPosition } from '@/src/location/gym-location-reads';
 import { gymHasSavedLocation, listGymDirectory, type GymDirectoryEntry } from '@/src/session-recorder/gym-options';
 
-import { GymButton } from './gym-buttons';
 import { GymEditor } from './gym-editor';
 
 // The open editor: a gym's id, or `new` for the add row.
@@ -83,10 +84,10 @@ export function GymsScreen({ readPosition }: GymsScreenProps) {
         onPress={() => setEditing(gym.id)}
         testID={`gyms-row-${gym.id}`}
         trailing={<Icon color={uiRoles.inkMuted} name="chevron-right" />}>
-        <Text numberOfLines={1} style={styles.rowName}>
+        <Text allowFontScaling={false} numberOfLines={1} style={styles.rowName}>
           {gym.name}
         </Text>
-        <Text style={styles.rowDetail} testID={`gyms-row-${gym.id}-status`}>
+        <Text allowFontScaling={false} style={styles.rowDetail} testID={`gyms-row-${gym.id}-status`}>
           {gym.archived ? 'Archived' : located ? 'Location saved' : 'No location saved'}
         </Text>
       </ListRow>
@@ -103,8 +104,8 @@ export function GymsScreen({ readPosition }: GymsScreenProps) {
   } else if (directory.status === 'error') {
     body = (
       <View style={styles.state} testID="gyms-error">
-        <Text style={styles.stateText}>{"Couldn't load your gyms."}</Text>
-        <GymButton label="Retry" onPress={() => void reload()} testID="gyms-retry" variant="outline" />
+        <Text allowFontScaling={false} style={styles.stateText}>{"Couldn't load your gyms."}</Text>
+        <ActionButton label="Retry" onPress={() => void reload()} testID="gyms-retry" variant="outline" />
       </View>
     );
   } else {
@@ -114,7 +115,7 @@ export function GymsScreen({ readPosition }: GymsScreenProps) {
       <>
         <Card testID="gyms-list">
           {active.length === 0 && editing !== 'new' ? (
-            <Text style={styles.empty}>No gyms yet.</Text>
+            <Text allowFontScaling={false} style={styles.empty}>No gyms yet.</Text>
           ) : null}
           {active.map(gymRow)}
           {editing === 'new' ? (
@@ -128,10 +129,10 @@ export function GymsScreen({ readPosition }: GymsScreenProps) {
           ) : null}
         </Card>
         {editing !== 'new' ? (
-          <GymButton label="+ Add gym" onPress={() => setEditing('new')} testID="gyms-add" variant="outline" />
+          <ActionButton label="+ Add gym" onPress={() => setEditing('new')} testID="gyms-add" variant="outline" />
         ) : null}
         {archived.length > 0 ? (
-          <GymButton
+          <ActionButton
             label={showArchived ? 'Hide archived' : `Show archived (${archived.length})`}
             onPress={() => setShowArchived((current) => !current)}
             testID="gyms-toggle-archived"
@@ -140,7 +141,7 @@ export function GymsScreen({ readPosition }: GymsScreenProps) {
         ) : null}
         {showArchived && archived.length > 0 ? (
           <View style={styles.section}>
-            <Text style={styles.microLabel}>Archived</Text>
+            <Text allowFontScaling={false} style={styles.microLabel}>Archived</Text>
             <Card testID="gyms-archived-list">{archived.map(gymRow)}</Card>
           </View>
         ) : null}
@@ -149,28 +150,18 @@ export function GymsScreen({ readPosition }: GymsScreenProps) {
   }
 
   return (
-    <ScrollView
+    <ScreenScroll
       automaticallyAdjustKeyboardInsets
-      contentContainerStyle={styles.content}
       contentInsetAdjustmentBehavior="automatic"
       keyboardShouldPersistTaps="handled"
-      style={styles.screen}
       testID="gyms-screen">
       <MoreHubBackButton returnBy="dismiss" />
       {body}
-    </ScrollView>
+    </ScreenScroll>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: uiRoles.paper,
-  },
-  content: {
-    padding: uiSpace.lg,
-    gap: uiSpace.md,
-  },
   rowName: {
     fontFamily: uiFonts.display.family,
     fontWeight: '600',

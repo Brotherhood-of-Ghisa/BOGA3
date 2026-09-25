@@ -1,6 +1,6 @@
 appId: com.dinoderek.mobile
 ---
-# The session view (redesign step 5). Proves, on device:
+# The session view (`ux-rules` §14b). Proves, on device:
 #   1. Train's Resume opens the session view;
 #   2. the summary card and one read-only card per exercise, with its done
 #      count and — for the bench, whose RIR 2 set beats its completed history —
@@ -182,10 +182,41 @@ appId: com.dinoderek.mobile
     centerElement: true
 - tapOn:
     id: "session-view-add-exercise"
+- extendedWaitUntil:
+    visible:
+      id: "exercise-family-group-chest"
+    timeout: 15000
+- takeScreenshot: "picker-default"
 - tapOn: "Exercise picker options"
+- extendedWaitUntil:
+    visible:
+      id: "exercise-picker-options-panel"
+    timeout: 10000
+- takeScreenshot: "picker-options"
 - tapOn: "Turn grouping off"
 - tapOn: "Exercise picker options"
+# The preselection with a plan: the bench has completed history in the fixture.
 - tapOn: "Exercise filter input"
+- inputText: "Barbell Bench Press"
+- hideKeyboard:
+    optional: true
+- tapOn: "Select Exercise"
+- extendedWaitUntil:
+    visible:
+      text: "Select exercise Barbell Bench Press"
+    timeout: 15000
+- tapOn:
+    text: "Select exercise Barbell Bench Press"
+- extendedWaitUntil:
+    visible:
+      id: "exercise-picker-plan-set-row-1"
+    timeout: 15000
+- assertVisible:
+    id: "exercise-picker-append-plan-button"
+- takeScreenshot: "picker-preselection"
+# A new search clears the preselection.
+- tapOn: "Exercise filter input"
+- eraseText: 40
 - inputText: "Lat Pulldown"
 - hideKeyboard:
     optional: true
@@ -205,6 +236,23 @@ appId: com.dinoderek.mobile
     centerElement: true
 - takeScreenshot: "03-session-view-exercise-added"
 
+# The live comparison reads completed history and switches grouping without leaving the session.
+- scrollUntilVisible:
+    element:
+      id: "session-insight-mode-muscle"
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: "session-insight-mode-muscle"
+- scrollUntilVisible:
+    element:
+      id: "session-insight-muscle-comparison-chest"
+    direction: DOWN
+    centerElement: true
+- assertVisible:
+    id: "session-insight-muscle-comparison-chest-distribution"
+- takeScreenshot: "session-live-muscle-comparison"
+
 # 6. Finish: ONE cleanup prompt removes the added exercise's empty set and the
 # exercises left with no sets together, then the completion screen.
 - tapOn:
@@ -220,6 +268,31 @@ appId: com.dinoderek.mobile
       id: "session-completion-presentation"
     timeout: 20000
 - takeScreenshot: "04-session-view-finished"
+
+# 7. Today lists the finished session under Recent sessions (DLM-T03 capture).
+- tapOn:
+    id: "session-completion-done"
+- extendedWaitUntil:
+    visible:
+      id: "stats-history-screen"
+    timeout: 20000
+- tapOn:
+    id: "top-level-tab-today"
+- extendedWaitUntil:
+    visible:
+      id: "today-screen"
+    timeout: 10000
+- scrollUntilVisible:
+    element:
+      id: "today-recents-section"
+    direction: DOWN
+- assertNotVisible:
+    id: "today-recents-empty"
+- assertVisible:
+    id: "today-recent-session-summary-.*-start"
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: "today-recents"
 
 # Leave the simulator as this flow found it: data reset.
 - openLink: "boga3://maestro-harness?reset=data&teleport=session-list"

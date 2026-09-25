@@ -85,7 +85,7 @@ export function WeeklyHeatmap({
   return (
     <View style={styles.wrap} testID={heatmapTestID}>
       <View style={styles.headerRow}>
-        <Text style={styles.h1}>Weekly training load</Text>
+        <Text allowFontScaling={false} style={styles.h1}>Weekly training load</Text>
       </View>
 
       {/* horizontally scrollable chart + month axis */}
@@ -144,6 +144,7 @@ export function WeeklyHeatmap({
                     ))}
                   </View>
                   <Text
+                    allowFontScaling={false}
                     style={[
                       styles.baseLabel,
                       { top: avgY < 14 ? Math.round(avgY) + 2 : Math.round(avgY) - 14 },
@@ -176,7 +177,7 @@ export function WeeklyHeatmap({
             <View style={[styles.axis, { width: contentW }]}>
               {monthMarks.map((m, i) =>
                 m ? (
-                  <Text key={i} numberOfLines={1} style={[styles.axisLabel, { left: i * colW }]}>
+                  <Text allowFontScaling={false} key={i} numberOfLines={1} style={[styles.axisLabel, { left: i * colW }]}>
                     {m}
                   </Text>
                 ) : null
@@ -188,9 +189,9 @@ export function WeeklyHeatmap({
 
       {/* legend */}
       <View style={styles.legend}>
-        <Text style={styles.muted}>{legendLabel}</Text>
+        <Text allowFontScaling={false} style={styles.muted}>{legendLabel}</Text>
         <View style={styles.legendRamp}>
-          <Text style={styles.muted}>Less</Text>
+          <Text allowFontScaling={false} style={styles.muted}>Less</Text>
           {HEAT_RAMP.map((color, i) => (
             <View
               key={i}
@@ -204,7 +205,7 @@ export function WeeklyHeatmap({
               }}
             />
           ))}
-          <Text style={styles.muted}>More</Text>
+          <Text allowFontScaling={false} style={styles.muted}>More</Text>
         </View>
       </View>
     </View>

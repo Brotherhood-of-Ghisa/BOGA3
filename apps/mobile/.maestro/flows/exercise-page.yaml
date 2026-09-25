@@ -1,6 +1,6 @@
 appId: com.dinoderek.mobile
 ---
-# The exercise page (docs/plans/exercise-session-redesign.md step 4), on its
+# The exercise page (`docs/specs/ui/ux-rules.md` §14a), on its
 # own `exercise-page` fixture:
 # an active session whose Barbell Bench Press has two performed sets and three
 # planned ones, plus two completed Bench Press sessions for the records panel.
@@ -164,6 +164,31 @@ appId: com.dinoderek.mobile
     notVisible:
       id: "exercise-options-sheet"
     timeout: 5000
+
+# ⋮ → Swap exercise: the shared exercise list in the swap sheet, dismissed by
+# the backdrop (tapped by point, as above) without swapping.
+- tapOn:
+    id: "exercise-page-options"
+- extendedWaitUntil:
+    visible:
+      id: "exercise-options-swap"
+    timeout: 5000
+- tapOn:
+    id: "exercise-options-swap"
+- extendedWaitUntil:
+    visible:
+      id: "exercise-swap-list"
+    timeout: 10000
+- takeScreenshot: "exercise-swap-sheet"
+- tapOn:
+    point: "50%,15%"
+- extendedWaitUntil:
+    notVisible:
+      id: "exercise-swap-list"
+    timeout: 5000
+- assertVisible:
+    id: "exercise-page-title"
+    text: "Barbell Bench Press"
 
 # `+ Add set` copies set 5 (85 × 5) into a new set 6; log it.
 - tapOn:

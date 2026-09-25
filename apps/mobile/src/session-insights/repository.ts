@@ -67,7 +67,13 @@ export type SessionInsightsStore = {
   }>;
 };
 
+export type SessionInsightHistoryQuery = {
+  completedAt: Date;
+  targetSessionId: string;
+};
+
 export type CompletedSessionInsightsRepository = {
+  loadHistory(input: SessionInsightHistoryQuery): Promise<PersonalRecordSessionInput[]>;
   loadInsights(sessionId: string): Promise<CompletedSessionInsights | null>;
 };
 
@@ -243,6 +249,13 @@ const buildSessionGraphs = (
 export const createCompletedSessionInsightsRepository = (
   store: SessionInsightsStore = createDrizzleSessionInsightsStore(),
 ): CompletedSessionInsightsRepository => ({
+  async loadHistory(input) {
+    const history = (await store.loadEarlierCompletedSessions(input))
+      .filter((session) => session.sessionId !== input.targetSessionId);
+    const exercises = await store.loadSessionExercises(history.map((session) => session.sessionId));
+    const sets = await store.loadExerciseSets(exercises.map((exercise) => exercise.id));
+    return buildSessionGraphs(history, exercises, sets);
+  },
   async loadInsights(sessionId) {
     const target = await store.loadTargetSession(sessionId);
     if (
@@ -289,3 +302,5 @@ const defaultCompletedSessionInsightsRepository =
 
 export const loadCompletedSessionInsights =
   defaultCompletedSessionInsightsRepository.loadInsights;
+
+export const loadSessionInsightHistory = defaultCompletedSessionInsightsRepository.loadHistory;

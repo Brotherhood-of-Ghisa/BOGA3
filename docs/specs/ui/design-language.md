@@ -1,16 +1,19 @@
-# Design Language (Pending / planned)
+# Design Language
 
 > **Owns:** the visual and interaction language of the mobile UI — colour roles,
 > type, surface rules, emphasis, and how data is presented. Screen-agnostic.
-> **Not here:** how a particular screen is laid out → the owning build spec,
-> then `screen-map.md` / `ux-rules.md` once shipped; component inventory →
+> **Not here:** how a particular screen is laid out → `screen-map.md` /
+> `ux-rules.md` (§14a/§14b for the session screens); component inventory →
 > `components-catalog.md`; design-source policy → `ai-design-policy.md`.
 > **Load when:** building or reviewing any screen.
 
-**Status: `Pending / planned`.** Approved direction, accepted 2026-09-21, not
-yet implemented. The shipped app still uses the scales in
-`apps/mobile/components/ui/tokens.ts` and the semantics in `ux-rules.md`. Each
-build PR graduates part of this doc to `Current behavior`.
+**Status: `Current behavior` for the screens that use it; the direction for
+the rest.** Accepted 2026-09-21. The session view, exercise page, Gyms screen,
+View Session (detail and completion) and the group session view are built in
+it (`uiRoles` / `uiFonts` / `uiGeometry` and the primitives in
+`components-catalog.md`). Every other screen still uses the legacy scales in
+`apps/mobile/components/ui/tokens.ts` (`uiColors`, `uiRadius`) and the semantics
+in `ux-rules.md`; moving them is an app-wide migration, screen by screen.
 
 First accepted target: `design-targets/exercise-session-v5.md`.
 
@@ -60,7 +63,7 @@ is built from. It clears WCAG AA as text on both grounds it lands on —
 just a band. `record-wash` / `record-rule` moved with it, keeping the same hue
 relationship to `record` that the orange pair had to `accent`.
 
-The floor is a gate, not a note: `apps/mobile/app/__tests__/ui-tokens-additive.test.ts`
+The floor is a gate, not a note: `apps/mobile/app/__tests__/ui-design-tokens.test.ts`
 fails if `record` ever equals `accent` again or drops below 4.5:1.
 
 **Light only.** No dark variants; `app.config.ts` pins
@@ -86,8 +89,8 @@ A screen names a face as `{ fontFamily, fontWeight }` from `uiFonts`
 (`apps/mobile/components/ui/tokens.ts`) — the same pair on iOS and Android,
 because iOS picks among an embedded family by weight and the plugin registers
 an Android XML font family under the same name. Only the weights in the table
-are embedded; any other weight lands on the nearest one that is. Nothing
-shipped adopts them yet.
+are embedded; any other weight lands on the nearest one that is. Screens not
+yet in the design language still render in the system font.
 
 **Web gets system fonts.** Config-plugin embedding is iOS/Android only, so
 `expo start --web` renders every face in the browser's fallback. That is the
@@ -131,7 +134,7 @@ Headline figures (summary, records) stay Plex Mono 700, micro-labels Archivo
 ## 4. Surfaces
 
 - **No shadows.** Depth is a hairline plus a ground-colour change, never an
-  elevation ramp. `uiElevation` stays unused unless a screen proves it needs it.
+  elevation ramp. The legacy `uiElevation` was deleted (2026-09-24) unused.
 - Cards are `surface` on `paper`, 1px `rule`, radius 6.
 - Sheets are bottom-anchored with a dimmed backdrop (`scrim`), top radius 16
   and a 38×4 `rule-strong` handle. **Tapping outside dismisses; sheets carry no
@@ -146,13 +149,17 @@ Headline figures (summary, records) stay Plex Mono 700, micro-labels Archivo
   target drew 4 and 5, a difference with no name — and a **labelled-field
   height 50** (micro-label above a large figure: the logger's Weight / Reps /
   Effort). The logger's other widths derive from these: Reps is one field
-  height wide, Effort two tap targets, the tick one tap target. It sits beside the legacy `uiRadius` /
+  height wide, Effort two tap targets, the tick one tap target. A **pill
+  radius** (`radius.pill`, 999) was added 2026-09-24 for handles, tags and
+  chips, replacing the legacy `uiRadius.full` on these surfaces. It sits beside the legacy `uiRadius` /
   `uiSpace` rather than in them — 6 beside 8 would be two radii with no nameable
-  difference (`ux-rules.md` §9a.5) — so the switch-over can retire the legacy
-  scales wholesale. Spacing the target draws off-scale snaps to `uiSpace`
+  difference (`ux-rules.md` §9a.5) — so the legacy scales can be retired
+  wholesale once no screen uses them. Spacing the target draws off-scale snaps to `uiSpace`
   (sheet gutters 20→16, sheet rows ≥60, list rows ≥44).
-- The primitives implementing this are `Card`, `Stat`, `ListRow` and `Sheet`
-  (`components-catalog.md`).
+- The primitives implementing this are `Card`, `Stat`, `ListRow`, `Sheet`,
+  `ActionButton`, `IconButton`, `StatePanel`, `Screen` / `ScreenScroll`,
+  `FormField`, `SearchField`, `SegmentedControl`, `ChipGroup`, `Tag` and
+  `Notice` (`components-catalog.md`).
 
 ## 5. Emphasis
 

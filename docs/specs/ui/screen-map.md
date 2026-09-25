@@ -38,6 +38,13 @@ Brief entrypoint map of the current mobile screens.
     cached/offline, missing-data, empty, and inline-error behavior
   - recent activity is bounded to the three newest non-deleted completed
     sessions and preserves repository loading/error/empty behavior
+- Presentation (design language, DLM-T03): `paper` ground, a `PageHeader`
+  and one `SectionHeader` per section (its `View groups` / `View progress`
+  link a caps text button). An active workout is a `Card` marked by the
+  `set-current` ring and "Active session", with `Resume workout` as the one
+  `accent`. The recent sessions are one `Card` of `ListRow`s. State panels are
+  `StatePanel`s. The group activity items keep the groups screens' styling
+  until DLM-T11
   - until the separate planning milestone supplies its read/materialization
     interface, the planning slot uses the approved `Watch this space 👀`
     placeholder and links to Train without inventing plan data
@@ -60,6 +67,9 @@ Brief entrypoint map of the current mobile screens.
   - planning loading/error/empty/ready/unavailable states; production uses the
     approved `Watch this space 👀` placeholder until M23 supplies a plan
     read/materialization and management interface
+- Presentation (design language, DLM-T03): as Today. One `accent` at a time:
+  `Resume workout`, or `Start planned workout` when a plan is ready (with
+  `Start empty workout` as an outline), else `Start empty workout`
 - Key exits:
   - `/session/<id>` after guarded empty/planned launch or active resume;
     a future planner exit is supplied by the planning integration rather than
@@ -91,6 +101,11 @@ Brief entrypoint map of the current mobile screens.
     disabling the hub
   - Library & account links to existing exercise-database management and
     Settings/account
+- Presentation (design language, DLM-T04): `paper` ground under a
+  `PageHeader`. Each section is an `ink-muted` micro-label over one `Card` of
+  `ListRow`s: a leading `ink-muted` glyph (no badge), the label and its
+  description, and a trailing chevron, or `arrow-up-right` for the external
+  setup link. The inline error is `danger` text under its row. No `accent`
 - Key exits:
   - `/groups`, `/connected-agents`, `/gyms?source=more`, `/dev-logs`,
     `/exercise-catalog`, and `/settings`, plus the first-party external MCP
@@ -104,6 +119,10 @@ Brief entrypoint map of the current mobile screens.
   - configured signed-out email/password form with inline auth error feedback (reuses the `/profile` signed-out credential pattern)
   - auth-unconfigured disabled-reason message instead of a form
   - already-signed-in redirect to `/`
+- Presentation (design language, DLM-T05): `paper`, centred, no header. A
+  `PageHeader` over one `Card` of `FormField`s with `Sign in` as the one
+  `accent`; a failure is a `danger` `Notice`, and an auth-unconfigured build a
+  `Notice` with the `warning` glyph ("Sign-in unavailable") instead of the form
 - Key exits:
   - app proceeds to the normal route once a session exists (guard stops redirecting); no explicit navigation on success
 
@@ -113,8 +132,12 @@ Brief entrypoint map of the current mobile screens.
   - the device-recovery waiting room a signed-in user sees while the first sync cycle drains; renders a full-screen "Setting up your data…" block in place of the navigator until `sync_runtime_state.bootstrap_completed_at` is set, so no data screen is reachable before the user's data is restored
 - Key states (high level):
   - in-progress: a phase label plus an advancing activity/progress indicator ("layer K of N", "N items") that visibly moves while work happens
-  - offline: an offline message instead of an indefinite spinner when the device is network-unreachable
+  - offline: an offline message instead of an indefinite spinner, shown only once NetInfo has reported `isConnected === false`; before NetInfo's first determined report the network is unknown and the block shows the in-progress state, never the offline copy
   - error: a single error message and a single Retry button (fires exactly one cycle) on a non-`AUTH_REQUIRED` cycle error
+- Presentation (design language, DLM-T05): one `Card` centred on `paper`; the
+  phase in `ink`, an `ink-muted` spinner, the activity line in Plex Mono
+  `ink-muted`; offline is a `Notice` with the `offline` glyph; the error is
+  `danger` text above `Retry`, the gate's one `accent`
 - Key exits:
   - dismisses in place once `bootstrap_completed_at` is set, and the normal route renders
   - redirects to `/sign-in` (no Retry) when the latest cycle outcome is `AUTH_REQUIRED`
@@ -170,13 +193,13 @@ Brief entrypoint map of the current mobile screens.
 - File: `apps/mobile/app/session/[sessionId]/index.tsx` (components in
   `apps/mobile/components/session-view/`)
 - Purpose:
-  - the active session, read-only and navigational (exercise/session redesign
-    step 5; accepted target `design-targets/exercise-session-v5.md`,
-    `V6-Session`). Every active-session entry opens it: Today, Train, Sessions'
+  - the active session, read-only and navigational (accepted target
+    `design-targets/exercise-session-v5.md`, `V6-Session`). Every active-session entry opens it: Today, Train, Sessions'
     Resume and review/complete, and the completed session's per-exercise
     `Append`
-  - also the completed-session editor (step 6b-1): History's completed rows and
-    `Edit`, and the completed session's `Edit` and `intent=edit`, open it
+  - also the completed-session editor: History's overflow `Edit`,
+    the Summary's `Edit session`, and the completed session's `Edit` and
+    `intent=edit` open it
 - Key states (high level):
   - own top bar: `Session` · ⋮ · `Finish` (the one `accent` primary); the
     persistent four-tab bar sits at the bottom with Train selected
@@ -187,6 +210,8 @@ Brief entrypoint map of the current mobile screens.
     `Autosave paused until Start/End times are valid.` Gym, `+ Add exercise` and
     the cards work as for an active session, written back to the completed
     session; records compare against the rest of history, not the session itself
+  - shared live exercise/muscle comparisons after the exercise cards, using
+    confirmed sets and earlier completed history (loading/error is nonblocking)
   - summary card: Time (elapsed, ticking) / Gym / Sets (confirmed performed) /
     Volume (their entered-load volume, warm-ups included); the Gym stat opens
     the `Gym` sheet to change it: opening it starts one foreground location
@@ -201,9 +226,10 @@ Brief entrypoint map of the current mobile screens.
     and weight, and — the one highlight — a brass record 1RM and `record` band with the
     1RM when a done set beats the exercise's completed history
     (`deriveExercisePersonalRecord`)
-  - `+ Add exercise` opens the shared exercise picker
-    (`components/session-recorder/exercise-picker.tsx`) and writes the new
-    exercise (one empty set) or appended plan straight to the draft
+  - `+ Add exercise` opens the shared exercise picker, a tall `Sheet`
+    (`components/session-recorder/exercise-picker.tsx`), and writes the new
+    exercise (one empty set) or appended plan straight to the draft. Design
+    target: `design-targets/exercise-catalogue.md`
   - ⋮ opens the `Session` menu sheet with `Abandon session` (danger), which
     confirms before its soft delete
   - `Finish` runs the shared cleanup prompts (unconfirmed sets, then one
@@ -267,7 +293,9 @@ Brief entrypoint map of the current mobile screens.
     and retryable. The separate Connected agents row is signed-in only.
   - a sync-status card (signed-in only) showing last successful sync time
     (`Never` until the first success), pending-change count (rows still waiting
-    to push across the user-owned tables), network state (online/offline), and
+    to push across the user-owned tables), network state (online/offline, or
+    `Checking…` until NetInfo reports a determined `isConnected` — never shown
+    as offline or online before then), and
     the latest sync error (or a sign-in-required hint); a Refresh action nudges a
     sync cycle. The card refreshes on screen focus and on a short interval while
     focused. Card/fields carry stable testIDs (`settings-sync-status-card`,
@@ -281,6 +309,16 @@ Brief entrypoint map of the current mobile screens.
   - available from the Settings row under More regardless of auth state; the
     row adds `source=more` and an explicit `Back to More`; the direct
     `/settings` path remains valid without it
+- Presentation (design language, DLM-T04): as More, under `Back to More` and a
+  `PageHeader`. The date format is a `SegmentedControl`; the signed-out sync
+  guidance a `StatePanel` in a `Card`; About a `Card` of text rows. The sync
+  panel is a `Card` of `ListRow`s with Plex Mono values: offline is the
+  `offline` glyph plus "Offline" in `ink`, an error is `danger`, and `Refresh`
+  is an outline. Developer tools is one `Card` headed by the `warning` glyph;
+  outline buttons (`Wipe remote` in `danger`) and a `Notice` per outcome. No
+  `accent`. Logs (`/dev-logs`, dev only) filters with a single-select
+  `ChipGroup` and lists its rows in one `Card` (error `danger`, warning `ink` +
+  `warning` glyph). Design target: `design-targets/more-settings.md`
 - Key exits:
   - `more` via the source-aware explicit return action
   - `profile`
@@ -299,24 +337,33 @@ Brief entrypoint map of the current mobile screens.
   - inline load/revoke error with Retry; grant revocation remains usable if
     optional last-access metadata cannot be loaded
   - destructive confirmation before revocation and an in-flight disabled state
+- Presentation (design language, DLM-T05): the native header carries the
+  title (no in-content title) above the `ink-muted` intro. Signed-out, loading,
+  empty and error states are `StatePanel`s in a `Card`. Each grant is a `Card`
+  with an `AI` `Tag`, `ListRow`s for the two dates (Plex Mono) and `Revoke
+  access` as an outline in `danger`. No `accent`
 - Key exits:
   - back to `settings` (or previous route) via stack navigation
 
 8. `/profile`
 - File: `apps/mobile/app/profile.tsx`
 - Purpose:
-  - auth-aware account route for sign-in, signed-in username/email/password management, and M13 sync controls/status
+  - auth-aware account route for sign-in and signed-in username/email/password management (sync status lives on Settings)
 - Key states (high level):
   - restoring/auth-bootstrap banner
   - auth-disabled warning when client config is missing
   - signed-out email/password form with inline auth error feedback
-  - signed-in view mode with row-based account values (username/email plus optional pending-email row) and bottom actions (`Edit`, danger `Sign Out`)
+  - signed-in view mode with row-based account values (username/email plus optional pending-email row) and bottom actions (`Edit`, `Sign out` in `danger`)
   - signed-in edit mode with `username`/`new email`/`new password` fields and one `Update` action
-  - signed-in sync section with enable/disable control, current sync status, last successful sync (`Never` when no success yet), optional pending-count and next-retry rows
-  - sync retry/error handling remains inline (backend free-text message + retry/action-required hint)
   - lazy profile load/provision state for `username`
   - inline unified profile-update success/failure (including pending email-confirmation messaging)
   - sign-out failure feedback that stays on the same route
+- Presentation (design language, DLM-T05): `paper`. View mode is one `Card`
+  of `Stat kind="text"` rows in `ink` over `Edit` (outline) and `Sign out`
+  (outline in `danger`), with no `accent`. Edit stays inline: a `Card` of
+  `FormField`s with `Cancel` (text) and `Update` (the `accent`). Outcomes are
+  `Notice`s (`success` glyph, or `danger`); restoring is a loading
+  `StatePanel`; auth-unconfigured is the `warning` `Notice`
 - Key exits:
   - in-place rerender between signed-out and signed-in states
   - back to `settings` (or previous route) via stack navigation
@@ -334,8 +381,8 @@ Brief entrypoint map of the current mobile screens.
     so draft state and the shared cleanup rules remain authoritative
 - Key exits:
   - `/session/<id>` pushed for active Resume or review/complete
-  - `/session/<sessionId>` (the session view, editing) from a completed row or
-    its explicit Edit action
+  - `/completed-session/<sessionId>?presentation=summary` from a completed row
+  - `/session/<sessionId>` from its explicit Edit action
 - Notes:
   - the native stack header centers `Sessions` and uses the platform back arrow
     without a text label, so the internal `(tabs)` group name is never exposed
@@ -343,24 +390,40 @@ Brief entrypoint map of the current mobile screens.
 10. `/completed-session/[sessionId]`
 - File: `apps/mobile/app/completed-session/[sessionId].tsx`
 - Purpose:
-  - completed session detail viewer with edit/delete session actions and per-exercise block append actions
+  - View Session: a finished session, read-only, in the design language
+    (`components/view-session/`, the shared cards in
+    `components/session-detail/`); `Edit` opens it in the session view
 - Key states (high level):
-  - loading / error / not-found / detail
-  - `presentation=completion` (after Finish) and `presentation=summary` (from
-    Sessions History): one labelled totals card with
-    informational per-muscle working-set counts, all compact `Personal
-    records`, per-exercise current volume versus median and descriptive P5/P95
-    range, and previewed PNG session sharing. It does not link to muscle
-    analytics. Optional historical enrichment cannot block it, and share output
-    excludes gym/location. Edit/delete/append actions are hidden; it renders
-    Done after completion; historical Summary instead exposes deterministic
-    Share, `View individual sets`, `Edit session`, and History-return actions.
-  - completion loading/error/not-found/deleted-target states expose one safe
-    Progress exit; the native back affordance/gesture is suppressed and Android
-    system back replaces to Progress
-  - read-only exercise cards include a set table with `Set`, `Weight`, `Reps`, and `Effort`
-  - exercise-card titles toggle an expanded/collapsed state; collapsed cards show valid performed-set and working-set counts while keeping `Append` available
-  - each exercise card header exposes `Append` to copy that one historical block as planned target rows into the active session (creating one first when needed)
+  - loading / error / not-found (on `paper`, with the top bar's back) / detail
+  - `presentation=completion` (after Finish), in the design language
+    (`components/session-complete/`): its own top bar `Session complete` ·
+    `Done` (`accent`); a summary card (Duration / Exercises / Sets / Working,
+    then Gym) with informational per-muscle working-set pills; every new 1RM
+    record as a `record`-band card; per-exercise volume versus median with a
+    descriptive P5/P95 range; and `Share session` (outline), which opens a
+    `Sheet` previewing the PNG. It does not link to muscle analytics. Optional
+    historical enrichment cannot block it, and share output excludes
+    gym/location. Edit/delete/append actions are hidden.
+  - `presentation=summary` reuses these cards with By exercise / By muscle, a
+    Session Summary top bar returning to `/sessions`, Share, View individual
+    sets and Edit session. Deleted targets use the detail's deleted state.
+  - completion loading/error/not-found/deleted-target states show the top bar
+    without Done and one safe exit, `Back to Progress`; the back gesture is
+    off and Android system back replaces to Progress
+  - detail: its own top bar, `back · View Session · ⋮ · Edit` (`Edit` the one
+    `accent` action, no native header); a summary card with `Start` / `End`
+    (`YYYY-MM-DD HH:mm`) then `Duration` / `Gym` / `Sets` / `Volume`; one card
+    per exercise with its confirmed sets as the session view's rows (`type ·
+    weight × reps · 1RM · VOL`, `n sets`), a brass record 1RM and `New 1RM
+    record` band where the session holds the exercise's best 1RM; no tags, no
+    collapse
+  - the session ⋮ opens a `Session` sheet: `Delete session` (danger), or
+    `Undelete session` while deleted; a deleted session shows a `Deleted ·
+    hidden from history` band and no `Edit`
+  - each card's ⋮ opens a sheet with `Append to current session`, which copies
+    that one block as planned target rows into the active session (creating one
+    first when needed)
+  - a failed delete, undelete or append shows inline in `danger`
   - redirect placeholder for `intent=edit`
 - Key exits:
   - `/session/<sessionId>` (the session view, editing) from `Edit`, and by
@@ -368,7 +431,8 @@ Brief entrypoint map of the current mobile screens.
   - `/session/<activeSessionId>` (the session view) after a successful
     per-exercise block append, using the id the append returns
   - `/progress` from completion Done/back
-  - `/sessions` from the historical Summary exit
+  - back from the detail's top bar (`router.back()`, or `/progress` with no
+    history)
 
 11. `/exercise-history`
 - File: `apps/mobile/app/exercise-history.tsx`
@@ -524,12 +588,12 @@ Brief entrypoint map of the current mobile screens.
 19. `/group-session/[memberId]/[sessionId]`
 - File: `apps/mobile/app/group-session/[memberId]/[sessionId].tsx`
 - Purpose:
-  - read-only friend's session view composing `SessionContentLayout`: member, status, start/end, location, and exercise cards with performed sets (`Set`, `Weight`, `Reps`, `Effort`)
+  - read-only friend's session view on `paper`, drawn with View Session's cards (`components/session-detail/`): a facts card with the member, the status (`In progress` beside the `set-current` ring, or `Completed · <duration>`), Start / End, Gym, Sets and Volume, then one card per exercise with its performed sets as `type · weight × reps · 1RM · VOL`; no collapse and no record band (the friend's history is not on this device)
 - Key states (high level):
-  - `In progress` for an active session; cache-first with the offline marker; pull-to-refresh
+  - `In progress` for an active session; cache-first with the offline marker; pull-to-refresh (the offline marker, errors and empty states keep the groups screens' styling)
   - `NOT_FOUND`: "This session is no longer available", and the cached detail is evicted
 - Notes:
-  - no edit, delete, or append; `completed-session/[sessionId]` is neither reused nor modified
+  - no edit, delete, or append; `completed-session/[sessionId]` is not reused, only its cards
 
 20. `/exercise-link` (M25-T07)
 - File: `apps/mobile/app/exercise-link.tsx`
@@ -545,10 +609,10 @@ Brief entrypoint map of the current mobile screens.
 - Notes:
   - sets its stack title to `Link "<exercise name>"` once the exercise resolves
 
-21. `/session/[sessionId]/exercise/[sessionExerciseId]` (exercise/session redesign step 4)
+21. `/session/[sessionId]/exercise/[sessionExerciseId]`
 - File: `apps/mobile/app/session/[sessionId]/exercise/[sessionExerciseId].tsx` (composition in `apps/mobile/components/exercise-page/`)
 - Purpose:
-  - one page per exercise of the active session, or of a completed session being edited from the session view (step 6b-1), in the design language (`design-language.md`; accepted target `design-targets/exercise-session-v5.md`): top bar (back · exercise name · ⋮), the collapsible records panel, one ordered set list whose current set expands in place into the logger, `+ Add set`, and `Complete exercise`
+  - one page per exercise of the active session, or of a completed session being edited from the session view, in the design language (`design-language.md`; accepted target `design-targets/exercise-session-v5.md`): top bar (back · exercise name · ⋮), the collapsible records panel, one ordered set list whose current set expands in place into the logger, `+ Add set`, and `Complete exercise`
   - reached only from the session view; its domain lives in `src/session-recorder/**`
   - a completed session's exercise is edited with the same rules (logger, ticks, `Complete exercise`) and written back as completed with its times, every row kept; its records panel leaves that session out
 - Key states (high level):
@@ -559,9 +623,9 @@ Brief entrypoint map of the current mobile screens.
 - Key exits:
   - back (top bar) → the previous screen; `Complete exercise` → the previous screen after resolving the sets still waiting; `Remove from session` → the previous screen; `History` → `/exercise-history`; ⋮ `Link to group exercise…` → `/exercise-link?exerciseDefinitionId=<id>`
 - Notes:
-  - entered from the session view's exercise cards (step 5), or by deep link (Maestro `teleport=exercise-page`); with no screen to go back to, back goes to `/train`
+  - entered from the session view's exercise cards, or by deep link (Maestro `teleport=exercise-page`); with no screen to go back to, back goes to `/train`
 
-22. `/gyms` (Gyms screen; exercise/session redesign step 6b)
+22. `/gyms` (Gyms screen)
 - File: `apps/mobile/app/gyms.tsx` (composition in `apps/mobile/components/gyms/`)
 - Purpose:
   - manage the gyms a session can be at, and their private locations
@@ -587,7 +651,7 @@ Brief entrypoint map of the current mobile screens.
     display mode (no custom back title), preserving normal platform back
     behavior while hiding the previous route-group title; the arrow-only
     button slides in with the screen instead of morphing a label in
-  - completed-session route sets its title inside the route file
+  - completed-session route sets its title inside the route file; all presentations hide the native header and draw their own top bar
   - exercise-history route also sets its title inside the route file (resolved exercise name)
 
 2. `apps/mobile/app/(tabs)/_layout.tsx`

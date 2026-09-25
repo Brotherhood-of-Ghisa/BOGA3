@@ -15,6 +15,7 @@
  */
 
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
+import { StyleSheet, type ViewStyle } from 'react-native';
 
 jest.mock('@/src/data', () => ({
   loadSuggestedExercisePlan: jest.fn().mockResolvedValue(null),
@@ -86,6 +87,7 @@ jest.mock('@/src/data/exercise-group-links', () => ({
 }));
 
 import { ExercisePicker } from '@/components/session-recorder/exercise-picker';
+import { uiRoles } from '@/components/ui/tokens';
 import { loadSuggestedExercisePlan } from '@/src/data';
 import { saveExerciseCatalogExercise } from '@/src/data/exercise-catalog';
 import { createExerciseWithGroupLink, linkExercise } from '@/src/data/exercise-group-links';
@@ -269,6 +271,9 @@ describe('picker: group exercises (E0.1)', () => {
     toggleGroups();
 
     expect(screen.getByTestId('exercise-picker-groups-toggle')).toHaveProp('accessibilityState', { checked: true });
+    expect(StyleSheet.flatten(screen.getByTestId('exercise-picker-groups-toggle').props.style)).toMatchObject({
+      backgroundColor: uiRoles.ink,
+    });
     expect(screen.queryByLabelText('Select exercise Barbell Squat')).toBeNull();
     expect(screen.getByLabelText('Group exercise Back Squat in Tuesday Crew, linked: Barbell Squat')).toBeTruthy();
     expect(screen.getByTestId('exercise-picker-group-row-gx-row')).toBeTruthy();
@@ -457,7 +462,7 @@ describe('picker: list, preselection, create, Manage and dismiss', () => {
   beforeEach(() => {
     mockCatalogExercises = INTERACTION_FIXTURE_EXERCISES;
     mockMuscleGroups = INTERACTION_FIXTURE_MUSCLE_GROUPS;
-    // As in the recorder's interaction tests: group linking is off.
+    // As in the old recorder's interaction tests: group linking is off.
     mockLinkingUserId = null;
     mockLinkingState = { ...linkingState([]), catalogs: null };
   });
@@ -528,15 +533,26 @@ describe('picker: list, preselection, create, Manage and dismiss', () => {
       exerciseDefinitionId: 'seed_barbell_back_squat',
     });
     expect(await screen.findByTestId('exercise-picker-plan-source')).toHaveTextContent('From 2026-06-10 18:42');
-    expect(screen.getByTestId('exercise-picker-plan-set-row-1')).toHaveTextContent(/0kg/);
-    expect(screen.getByTestId('exercise-picker-plan-set-row-1')).toHaveTextContent(/10 reps/);
+    // The set row (T06-D2): type · weight × reps · 1RM · VOL, faded as planned.
     expect(screen.getByTestId('exercise-picker-plan-set-row-1')).toHaveTextContent(/W-Up/);
-    expect(screen.getByTestId('exercise-picker-plan-set-row-2')).toHaveTextContent(/120kg/);
-    expect(screen.getByTestId('exercise-picker-plan-set-row-2')).toHaveTextContent(/5 reps/);
+    expect(screen.getByTestId('exercise-picker-plan-set-row-1-values')).toHaveTextContent('0.0 × 10');
     expect(screen.getByTestId('exercise-picker-plan-set-row-2')).toHaveTextContent(/RIR 1/);
+    expect(screen.getByTestId('exercise-picker-plan-set-row-2-values')).toHaveTextContent('120.0 × 5');
+    expect(screen.getByTestId('exercise-picker-plan-set-row-2-vol')).toHaveTextContent(/600/);
+    expect(StyleSheet.flatten(screen.getByTestId('exercise-picker-plan-set-row-2-values').props.style).color).toBe(
+      uiRoles.inkFaint,
+    );
 
     const appendButton = screen.getByTestId('exercise-picker-append-plan-button');
     expect(appendButton.props.accessibilityState?.disabled).toBe(false);
+    // Append plan is the sheet's one accent (G6); Add empty set is an outline.
+    type Node = typeof screen.UNSAFE_root;
+    const accentNodes = screen.UNSAFE_root.findAll(
+      (node: Node) =>
+        typeof node.type === 'string' &&
+        (StyleSheet.flatten(node.props.style as ViewStyle) ?? {}).backgroundColor === uiRoles.accent,
+    );
+    expect(accentNodes.map((node: Node) => node.props.testID)).toEqual(['exercise-picker-append-plan-button']);
     fireEvent.press(appendButton);
 
     expect(onAppendPlan).toHaveBeenCalledTimes(1);
@@ -638,6 +654,23 @@ describe('picker: list, preselection, create, Manage and dismiss', () => {
     expect(onSelectExercise).toHaveBeenCalledTimes(1);
   });
 
+  it('heads the sheet with Select Exercise and three labelled icon buttons; ⋮ toggles the list options', async () => {
+    await renderPicker();
+    await screen.findByLabelText('Select exercise Barbell Squat');
+
+    const header = within(screen.getByTestId('exercise-picker-header'));
+    expect(header.getByRole('header', { name: 'Select Exercise' })).toBeTruthy();
+    for (const label of ['Exercise picker options', 'Open exercise catalog manage flow', 'Open inline exercise create']) {
+      expect(header.getByRole('button', { name: label })).toBeTruthy();
+    }
+
+    expect(screen.queryByTestId('exercise-picker-options-panel')).toBeNull();
+    fireEvent.press(screen.getByLabelText('Exercise picker options'));
+    expect(within(screen.getByTestId('exercise-picker-options-panel')).getByLabelText(/^Turn grouping (on|off)$/)).toBeTruthy();
+    fireEvent.press(screen.getByLabelText('Exercise picker options'));
+    expect(screen.queryByTestId('exercise-picker-options-panel')).toBeNull();
+  });
+
   it('routes Manage to exercise catalog', async () => {
     const { onOpenManage, onSelectExercise, onDismiss } = await renderPicker();
     expect(await screen.findByLabelText('Select exercise Barbell Squat')).toBeTruthy();
@@ -656,7 +689,7 @@ describe('picker: list, preselection, create, Manage and dismiss', () => {
     fireEvent.press(await screen.findByLabelText('Select exercise Barbell Squat'));
     expect(await screen.findByTestId('exercise-picker-preselection-panel')).toBeTruthy();
 
-    fireEvent.press(screen.getByLabelText('Dismiss exercise modal overlay'));
+    fireEvent.press(screen.getByLabelText('Dismiss exercise modal overlay', { includeHiddenElements: true }));
 
     expect(onDismiss).toHaveBeenCalledTimes(1);
     expect(onSelectExercise).not.toHaveBeenCalled();

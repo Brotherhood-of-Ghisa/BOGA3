@@ -1,6 +1,6 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useCallback } from 'react';
-import { RefreshControl, ScrollView } from 'react-native';
+import { RefreshControl } from 'react-native';
 
 import {
   FriendSessionContent,
@@ -9,10 +9,10 @@ import {
   GroupOfflineBanner,
   GroupStateView,
   GroupsSignInRequired,
-  groupScreenStyles,
   pickInlineError,
   usePullToRefresh,
 } from '@/components/groups';
+import { ScreenScroll } from '@/components/ui/screen';
 import { useAuth } from '@/src/auth';
 import {
   getGroupSessionDetail,
@@ -26,8 +26,8 @@ const firstParam = (value: string | string[] | undefined): string | null =>
 
 /**
  * The friend's session view (groups contract §6.3, C3.8): read-only, cache
- * first. `completed-session/[sessionId].tsx` is deliberately not reused or
- * modified; both compose `SessionContentLayout`.
+ * first. `completed-session/[sessionId].tsx` is deliberately not reused; both
+ * draw their exercises with `components/session-detail/`.
  */
 export default function GroupSessionRoute() {
   const params = useLocalSearchParams<{ memberId?: string | string[]; sessionId?: string | string[] }>();
@@ -66,10 +66,8 @@ function GroupSessionContent({ userId, memberId, sessionId }: { userId: string; 
   const inlineError = pickInlineError(detail.error);
 
   return (
-    <ScrollView
-      contentContainerStyle={groupScreenStyles.content}
+    <ScreenScroll
       refreshControl={<RefreshControl onRefresh={onRefresh} refreshing={pulling} />}
-      style={groupScreenStyles.screen}
       testID="group-session-screen">
       {detail.lostAccess ? (
         <UnavailableState />
@@ -86,6 +84,6 @@ function GroupSessionContent({ userId, memberId, sessionId }: { userId: string; 
           )}
         </>
       )}
-    </ScrollView>
+    </ScreenScroll>
   );
 }

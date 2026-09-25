@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import { ExerciseListContent } from '@/components/exercise-catalog/exercise-list-controls';
+import { SearchField } from '@/components/ui/search-field';
 import { Sheet } from '@/components/ui/sheet';
-import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiSpace } from '@/components/ui/tokens';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import { useExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
 import { buildExerciseListModel, type ExerciseListItem } from '@/src/exercise-catalog/list-model';
@@ -22,7 +23,7 @@ type ExerciseSwapSheetProps = {
 const LIST_SHARE_OF_SCREEN = 0.6;
 
 /**
- * Swap exercise: the same exercise list the recorder's picker and the catalog
+ * Swap exercise: the same exercise list the session's exercise picker and the catalog
  * render (`ExerciseListContent` over `buildExerciseListModel`, with the shared
  * list preferences), in a sheet. Picking one replaces the exercise and keeps
  * its sets.
@@ -79,13 +80,10 @@ export function ExerciseSwapSheet({
       title="Swap exercise"
       visible={visible}>
       <View style={styles.search}>
-        <TextInput
+        <SearchField
           accessibilityLabel="Search exercises"
-          autoCorrect={false}
           onChangeText={setQuery}
           placeholder="Search exercises"
-          placeholderTextColor={uiRoles.inkFaint}
-          style={styles.searchInput}
           testID="exercise-swap-search"
           value={query}
         />
@@ -95,7 +93,7 @@ export function ExerciseSwapSheet({
         style={[styles.list, { maxHeight: height * LIST_SHARE_OF_SCREEN }]}
         testID="exercise-swap-list">
         {loading || !model ? (
-          <Text style={[pageText.body, styles.message]}>Loading exercises…</Text>
+          <Text allowFontScaling={false} style={[pageText.body, styles.message]}>Loading exercises…</Text>
         ) : (
           <ExerciseListContent
             emptyText={
@@ -128,17 +126,6 @@ const styles = StyleSheet.create({
   search: {
     paddingHorizontal: uiSpace.lg,
     paddingBottom: uiSpace.sm,
-  },
-  searchInput: {
-    minHeight: uiGeometry.tapTarget,
-    paddingHorizontal: uiSpace.md,
-    backgroundColor: uiRoles.surface,
-    borderWidth: uiBorder.width,
-    borderColor: uiRoles.rule,
-    borderRadius: uiGeometry.radius.control,
-    fontFamily: uiFonts.body.family,
-    fontSize: uiTypography.size.lg,
-    color: uiRoles.ink,
   },
   list: {
     paddingHorizontal: uiSpace.lg,

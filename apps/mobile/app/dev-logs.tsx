@@ -1,17 +1,20 @@
 import { useEffect, useMemo, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import {
-  SegmentedChips,
-  UiButton,
-  UiSurface,
-  UiText,
+  ActionButton,
+  Card,
+  ChipGroup,
+  Icon,
+  Screen,
+  StatePanel,
   uiBorder,
-  uiColors,
-  uiRadius,
+  uiFonts,
+  uiGeometry,
+  uiRoles,
   uiSpace,
   uiTypography,
-  type SegmentedChipOption,
+  type ChipOption,
 } from '@/components/ui';
 import {
   clearRecentLogs,
@@ -24,7 +27,7 @@ import { isDevMode } from '@/src/utils/isDevMode';
 
 type LevelFilter = LogLevel | 'all';
 
-const FILTER_OPTIONS: readonly SegmentedChipOption<LevelFilter>[] = [
+const FILTER_OPTIONS: readonly ChipOption<LevelFilter>[] = [
   { value: 'all', label: 'All' },
   { value: 'error', label: 'Error' },
   { value: 'warn', label: 'Warn' },
@@ -32,11 +35,12 @@ const FILTER_OPTIONS: readonly SegmentedChipOption<LevelFilter>[] = [
   { value: 'debug', label: 'Debug' },
 ];
 
+// Only an error takes a hue; a warning is `ink` plus the warning glyph (G3).
 const LEVEL_COLOR: Record<LogLevel, string> = {
-  error: uiColors.actionDangerText,
-  warn: uiColors.textWarning,
-  info: uiColors.textSecondary,
-  debug: uiColors.textMuted,
+  error: uiRoles.danger,
+  warn: uiRoles.ink,
+  info: uiRoles.inkMuted,
+  debug: uiRoles.inkFaint,
 };
 
 const formatTime = (iso: string): string => {
@@ -44,7 +48,7 @@ const formatTime = (iso: string): string => {
   return Number.isNaN(date.getTime()) ? iso : date.toLocaleTimeString();
 };
 
-function LogRow({ record }: { record: LogRecord }) {
+function LogRow({ record, divider }: { record: LogRecord; divider: boolean }) {
   const [expanded, setExpanded] = useState(false);
   const hasContext = record.context != null && Object.keys(record.context).length > 0;
 
@@ -52,34 +56,29 @@ function LogRow({ record }: { record: LogRecord }) {
     <Pressable
       disabled={!hasContext}
       onPress={() => setExpanded((value) => !value)}
-      style={styles.row}
+      style={({ pressed }) => [styles.row, divider ? styles.rowDivider : null, pressed ? styles.rowPressed : null]}
       testID={`dev-logs-row-${record.seq}`}>
       <View style={styles.rowHeader}>
-        <UiText selectable={false} style={[styles.level, { color: LEVEL_COLOR[record.level] }]}>
-          {record.level.toUpperCase()}
-        </UiText>
-        <UiText selectable={false} variant="bodyMuted" style={styles.time}>
-          {formatTime(record.createdAt)}
-        </UiText>
+        <View style={styles.levelMark}>
+          {record.level === 'warn' ? <Icon name="warning" size="xs" /> : null}
+          <Text allowFontScaling={false} style={[styles.level, { color: LEVEL_COLOR[record.level] }]}>{record.level.toUpperCase()}</Text>
+        </View>
+        <Text allowFontScaling={false} style={styles.time}>{formatTime(record.createdAt)}</Text>
       </View>
-      <UiText selectable variant="labelStrong">
+      <Text allowFontScaling={false} selectable style={styles.event}>
         {record.source} · {record.event}
-      </UiText>
+      </Text>
       {record.message ? (
-        <UiText selectable variant="bodyMuted">
+        <Text allowFontScaling={false} selectable style={styles.message}>
           {record.message}
-        </UiText>
+        </Text>
       ) : null}
       {hasContext && expanded ? (
-        <UiText selectable style={styles.context}>
+        <Text allowFontScaling={false} selectable style={styles.context}>
           {JSON.stringify(record.context, null, 2)}
-        </UiText>
+        </Text>
       ) : null}
-      {hasContext && !expanded ? (
-        <UiText selectable={false} variant="bodyMuted" style={styles.contextHint}>
-          Tap to show context
-        </UiText>
-      ) : null}
+      {hasContext && !expanded ? <Text allowFontScaling={false} style={styles.contextHint}>Tap to show context</Text> : null}
     </Pressable>
   );
 }
@@ -98,108 +97,125 @@ export default function DevLogsScreen() {
 
   if (!isDevMode()) {
     return (
-      <View style={styles.empty} testID="dev-logs-screen">
-        <UiText variant="bodyMuted">Log viewer is available in developer builds only.</UiText>
-      </View>
+      <Screen testID="dev-logs-screen">
+        <StatePanel body="Log viewer is available in developer builds only." />
+      </Screen>
     );
   }
 
   return (
-    <View style={styles.screen} testID="dev-logs-screen">
+    <Screen testID="dev-logs-screen">
       <View style={styles.toolbar}>
-        <SegmentedChips
+        <ChipGroup
           accessibilityLabel="Filter logs by level"
-          compact
+          mode="single"
           onChange={setFilter}
           options={FILTER_OPTIONS}
+          style={styles.filters}
           testIDPrefix="dev-logs-filter"
           value={filter}
         />
-        <UiButton
+        <ActionButton
           accessibilityLabel="Clear the on-device log view"
           label="Clear"
           onPress={clearRecentLogs}
           testID="dev-logs-clear-button"
-          variant="secondary"
+          variant="text"
         />
       </View>
-      <FlatList
-        contentContainerStyle={styles.listContent}
-        data={visible}
-        keyExtractor={(entry) => String(entry.seq)}
-        ListEmptyComponent={
-          <UiText style={styles.emptyText} variant="bodyMuted">
-            No log entries captured yet.
-          </UiText>
-        }
-        renderItem={({ item }) => (
-          <UiSurface style={styles.rowCard}>
-            <LogRow record={item} />
-          </UiSurface>
-        )}
-        testID="dev-logs-list"
-      />
-    </View>
+      {/* The rows share one card, which scrolls inside the page gutter. */}
+      <Card style={styles.listCard}>
+        <FlatList
+          data={visible}
+          keyExtractor={(entry) => String(entry.seq)}
+          ListEmptyComponent={<StatePanel body="No log entries captured yet." fill={false} />}
+          renderItem={({ item, index }) => <LogRow divider={index > 0} record={item} />}
+          testID="dev-logs-list"
+        />
+      </Card>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: uiColors.surfacePage,
-  },
   toolbar: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     gap: uiSpace.md,
-    padding: uiSpace.xl,
+    padding: uiSpace.lg,
   },
-  listContent: {
-    paddingHorizontal: uiSpace.xl,
-    paddingBottom: uiSpace.lg,
-    gap: uiSpace.md,
+  filters: {
+    flex: 1,
   },
-  rowCard: {
-    padding: uiSpace.md,
+  listCard: {
+    flexShrink: 1,
+    marginHorizontal: uiSpace.lg,
+    marginBottom: uiSpace.lg,
   },
   row: {
-    gap: uiSpace.sm,
+    gap: uiSpace.xs,
+    padding: uiSpace.md,
+  },
+  rowDivider: {
+    borderTopWidth: uiBorder.width,
+    borderTopColor: uiRoles.ruleSoft,
+  },
+  rowPressed: {
+    backgroundColor: uiRoles.surfaceSubtle,
   },
   rowHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  levelMark: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: uiSpace.xs,
+  },
   level: {
-    fontSize: uiTypography.size.sm,
+    fontFamily: uiFonts.display.family,
     fontWeight: '700',
-    letterSpacing: 0.5,
+    fontSize: uiTypography.size.xxs,
+    lineHeight: uiTypography.lineHeight.xxs,
+    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
   },
   time: {
+    fontFamily: uiFonts.figure.family,
+    fontWeight: '500',
     fontSize: uiTypography.size.sm,
+    lineHeight: uiTypography.lineHeight.sm,
+    color: uiRoles.inkMuted,
+  },
+  event: {
+    fontFamily: uiFonts.display.family,
+    fontWeight: '600',
+    fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
+    color: uiRoles.ink,
+  },
+  message: {
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
+    fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
+    color: uiRoles.inkMuted,
   },
   context: {
-    fontFamily: 'Courier',
-    fontSize: uiTypography.size.sm,
-    color: uiColors.textSecondary,
-    borderTopWidth: uiBorder.width,
-    borderTopColor: uiColors.borderMuted,
     paddingTop: uiSpace.sm,
-    borderRadius: uiRadius.sm,
+    borderTopWidth: uiBorder.width,
+    borderTopColor: uiRoles.ruleFaint,
+    fontFamily: uiFonts.figure.family,
+    fontWeight: '500',
+    fontSize: uiTypography.size.sm,
+    lineHeight: uiTypography.lineHeight.sm,
+    color: uiRoles.inkMuted,
   },
   contextHint: {
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
     fontSize: uiTypography.size.sm,
-  },
-  empty: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: uiSpace.xl,
-    backgroundColor: uiColors.surfacePage,
-  },
-  emptyText: {
-    textAlign: 'center',
-    paddingVertical: uiSpace.lg,
+    lineHeight: uiTypography.lineHeight.sm,
+    color: uiRoles.inkMuted,
   },
 });

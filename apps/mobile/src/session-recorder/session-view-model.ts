@@ -8,8 +8,8 @@ import { hasPlannedTarget, toSessionInsightExercises } from './session-model';
 import { hasValidActualValues, isConfirmedPerformedSet } from './set-semantics';
 
 /**
- * The read-only session view's presentation model (build spec, "Session
- * view"): one card per exercise with its set rows, a done count and a
+ * The read-only session view's presentation model (`ux-rules` §14b): one
+ * card per exercise with its set rows, a done count and a
  * record, plus the summary totals. Pure — the route loads the
  * draft and the history and renders what this returns.
  */
@@ -55,6 +55,40 @@ export const formatOneRepMaxFigure = (value: number): string => value.toFixed(1)
 // No thousands separators (design-language §6).
 export const formatVolumeFigure = (value: number): string => String(Math.round(value));
 
+export type SetRowInput = {
+  id: string;
+  weight: number | null;
+  reps: number | null;
+  setType: unknown;
+  done: boolean;
+  oneRepMaxRecord?: boolean;
+};
+
+/**
+ * One set as the design language shows it (`type · weight × reps · 1RM · VOL`),
+ * from plain values: the session view, View Session and the group session view
+ * all format a row here, so a set reads the same on each.
+ */
+export const formatSetRow = ({ id, weight, reps, setType, done, oneRepMaxRecord = false }: SetRowInput): SessionViewSetRow => {
+  let oneRepMax = EMPTY_FIGURE;
+  let volume = EMPTY_FIGURE;
+  if (weight !== null && reps !== null) {
+    // A zero-weight set has a volume but no 1RM.
+    const estimate = estimateOneRepMax(weight, reps);
+    oneRepMax = estimate === null ? EMPTY_FIGURE : formatOneRepMaxFigure(estimate);
+    volume = formatVolumeFigure(computeSetVolume(weight, reps));
+  }
+  return {
+    id,
+    typeLabel: formatSessionSetType(setType) ?? EMPTY_FIGURE,
+    weightReps: `${weight === null ? EMPTY_FIGURE : formatWeightFigure(weight)} × ${reps === null ? EMPTY_FIGURE : reps}`,
+    oneRepMax,
+    volume,
+    done,
+    oneRepMaxRecord,
+  };
+};
+
 type ShownValues = { weight: number | null; reps: number | null; setType: string | null };
 
 // A done or entered row shows what was lifted; an untouched planned row its
@@ -78,7 +112,6 @@ type RowFigures = {
   set: SessionSet;
   done: boolean;
   shown: ShownValues;
-  oneRepMax: number | null;
   volume: number | null;
 };
 
@@ -89,7 +122,6 @@ const toRowFigures = (set: SessionSet): RowFigures => {
     set,
     done: isConfirmedPerformedSet(set),
     shown,
-    oneRepMax: computable ? estimateOneRepMax(shown.weight as number, shown.reps as number) : null,
     volume: computable ? computeSetVolume(shown.weight as number, shown.reps as number) : null,
   };
 };
@@ -130,18 +162,12 @@ export const buildSessionViewModel = (
         performedSetCount += 1;
         volume += row.volume ?? 0;
       }
-      const { weight, reps, setType } = row.shown;
-      return {
+      return formatSetRow({
         id: row.set.id,
-        typeLabel: formatSessionSetType(setType) ?? EMPTY_FIGURE,
-        weightReps: `${weight === null ? EMPTY_FIGURE : formatWeightFigure(weight)} × ${
-          reps === null ? EMPTY_FIGURE : reps
-        }`,
-        oneRepMax: row.oneRepMax === null ? EMPTY_FIGURE : formatOneRepMaxFigure(row.oneRepMax),
-        volume: row.volume === null ? EMPTY_FIGURE : formatVolumeFigure(row.volume),
+        ...row.shown,
         done: row.done,
         oneRepMaxRecord: row.set.id === recordSetId,
-      };
+      });
     });
 
     return {

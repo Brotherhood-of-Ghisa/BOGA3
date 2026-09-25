@@ -2,15 +2,11 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 
 import type { Session } from '@/components/session-recorder/types';
-import {
-  loadLatestSessionDraftSnapshot,
-  loadLocalGymById,
-  loadRecentExerciseBlocks,
-  loadSessionSnapshotById,
-} from '@/src/data';
+import { loadSessionInsightHistory, type PersonalRecordSessionInput } from '@/src/session-insights';
+import { loadLatestSessionDraftSnapshot, loadLocalGymById, loadSessionSnapshotById } from '@/src/data';
 
+import { loadHistoricalBestsExcluding } from './historical-bests';
 import { mapDraftSnapshotToSession } from './session-model';
-import { historicalBestOneRepMax } from './session-view-model';
 
 export type SessionViewData = {
   sessionId: string;
@@ -22,6 +18,9 @@ export type SessionViewData = {
   startedAt: Date;
   completedAt: Date | null;
   session: Session;
+  comparisonAt: Date;
+  insightHistory: PersonalRecordSessionInput[];
+  insightHistoryState: 'loading' | 'ready' | 'error';
   // Keyed by exercise definition; filled once each history read settles.
   historicalBestByDefinitionId: ReadonlyMap<string, number | null>;
 };
@@ -83,6 +82,9 @@ export function useSessionView(sessionId: string | null) {
         startedAt: snapshot.startedAt,
         completedAt: snapshot.completedAt,
         session,
+        comparisonAt: snapshot.completedAt ?? new Date(),
+        insightHistory: [],
+        insightHistoryState: 'loading',
         historicalBestByDefinitionId: new Map(),
       };
       setState((current) =>
@@ -92,23 +94,33 @@ export function useSessionView(sessionId: string | null) {
           : { status: 'ready', data: base }
       );
 
-      const definitionIds = [...new Set(session.exercises.map((exercise) => exercise.exerciseDefinitionId))];
-      const bests = await Promise.all(
-        definitionIds.map(async (exerciseDefinitionId) => {
-          try {
-            const history = await loadRecentExerciseBlocks({ exerciseDefinitionId });
-            const others = history.blocks.filter((block) => block.sessionId !== snapshot.sessionId);
-            return [exerciseDefinitionId, historicalBestOneRepMax(others)] as const;
-          } catch {
-            return null;
-          }
-        })
-      );
-      if (!isCurrent()) return;
-      const historicalBestByDefinitionId = new Map(
-        bests.filter((entry): entry is readonly [string, number | null] => entry !== null)
-      );
-      setState({ status: 'ready', data: { ...base, historicalBestByDefinitionId } });
+      // Independent optional enrichments: a failed comparison read must not
+      // block logging or hide a record, and a blurred generation cannot land.
+      await Promise.all([
+        loadHistoricalBestsExcluding(
+          snapshot.sessionId,
+          session.exercises.map((exercise) => exercise.exerciseDefinitionId)
+        ).then((historicalBestByDefinitionId) => {
+          if (!isCurrent()) return;
+          setState((current) => current.status === 'ready'
+            ? { status: 'ready', data: { ...current.data, historicalBestByDefinitionId } }
+            : current);
+        }),
+        loadSessionInsightHistory({
+          targetSessionId: snapshot.sessionId,
+          completedAt: base.comparisonAt,
+        }).then((insightHistory) => {
+          if (!isCurrent()) return;
+          setState((current) => current.status === 'ready'
+            ? { status: 'ready', data: { ...current.data, insightHistory, insightHistoryState: 'ready' } }
+            : current);
+        }).catch(() => {
+          if (!isCurrent()) return;
+          setState((current) => current.status === 'ready'
+            ? { status: 'ready', data: { ...current.data, insightHistoryState: 'error' } }
+            : current);
+        }),
+      ]);
     } catch {
       if (isCurrent()) {
         setState({ status: 'error' });

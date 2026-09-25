@@ -1,5 +1,5 @@
 /**
- * Device-side group metrics (groups contract §5): the recorder's performed-set
+ * Device-side group metrics (groups contract §5): the session's performed-set
  * rule and parsers applied to the raw set rows the group reads return.
  */
 
@@ -57,7 +57,7 @@ describe('group session metrics', () => {
       expect(toGroupPerformedSet(rawSet('s1', '100', '5', { performance_status: 'future_status' }))).not.toBeNull();
     });
 
-    it('excludes values the recorder would not accept', () => {
+    it('excludes values the set logger would not accept', () => {
       const rejected = [
         ['100', ''],
         ['100', '0'],

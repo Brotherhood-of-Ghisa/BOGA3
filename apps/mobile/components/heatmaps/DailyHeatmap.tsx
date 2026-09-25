@@ -93,8 +93,8 @@ export function DailyHeatmap({
   return (
     <View style={styles.wrap} testID={heatmapTestID}>
       <View style={styles.headerRow}>
-        <Text style={styles.h1}>Last 12 months</Text>
-        <Text style={styles.muted}>each square = one day</Text>
+        <Text allowFontScaling={false} style={styles.h1}>Last 12 months</Text>
+        <Text allowFontScaling={false} style={styles.muted}>each square = one day</Text>
       </View>
 
       {/* fixed weekday column + horizontally scrollable (month axis + grid) */}
@@ -103,7 +103,7 @@ export function DailyHeatmap({
           {/* spacer aligns the weekday labels with the grid rows (below the month axis) */}
           <View style={{ height: AXIS_H }} />
           {['M', '', 'W', '', 'F', '', ''].map((w, r) => (
-            <Text key={r} style={[styles.wd, { height: rowH, lineHeight: rowH }]}>
+            <Text allowFontScaling={false} key={r} style={[styles.wd, { height: rowH, lineHeight: rowH }]}>
               {w}
             </Text>
           ))}
@@ -121,6 +121,7 @@ export function DailyHeatmap({
               {monthMarks.map((m, i) =>
                 m ? (
                   <Text
+                    allowFontScaling={false}
                     key={i}
                     numberOfLines={1}
                     style={[styles.axisLabel, { left: i * colW }]}>
@@ -180,10 +181,10 @@ export function DailyHeatmap({
       {selectedDay ? (
         <View style={styles.detail} testID={`${heatmapTestID}-day-detail`}>
           <View>
-            <Text style={styles.kicker}>
+            <Text allowFontScaling={false} style={styles.kicker}>
               {selectedDay.isToday ? 'Today' : DOW[selectedDay.dow]}
             </Text>
-            <Text style={styles.detailTitle} testID={`${heatmapTestID}-day-detail-date`}>
+            <Text allowFontScaling={false} style={styles.detailTitle} testID={`${heatmapTestID}-day-detail-date`}>
               {formatDayTitle(selectedDay.dateKey)}
             </Text>
           </View>
@@ -199,6 +200,7 @@ export function DailyHeatmap({
               }}
             />
             <Text
+              allowFontScaling={false}
               style={[
                 styles.detailVal,
                 { color: selectedDay.level ? uiColors.textPrimary : uiColors.textMuted },
@@ -214,9 +216,9 @@ export function DailyHeatmap({
 
       {/* legend */}
       <View style={styles.legend}>
-        <Text style={styles.muted}>{legendLabel}</Text>
+        <Text allowFontScaling={false} style={styles.muted}>{legendLabel}</Text>
         <View style={styles.legendRamp}>
-          <Text style={styles.muted}>Less</Text>
+          <Text allowFontScaling={false} style={styles.muted}>Less</Text>
           {HEAT_RAMP.map((color, i) => (
             <View
               key={i}
@@ -230,7 +232,7 @@ export function DailyHeatmap({
               }}
             />
           ))}
-          <Text style={styles.muted}>More</Text>
+          <Text allowFontScaling={false} style={styles.muted}>More</Text>
         </View>
       </View>
     </View>

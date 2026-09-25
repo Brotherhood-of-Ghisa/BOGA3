@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { ActionButton } from '@/components/ui/action-button';
 import { Icon } from '@/components/ui/icon';
 import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import {
@@ -15,8 +16,6 @@ import {
   setGymArchived,
   type GymDirectoryEntry,
 } from '@/src/session-recorder/gym-options';
-
-import { GymButton } from './gym-buttons';
 
 type Feedback = { tone: 'success' | 'error'; message: string };
 type Busy = 'location' | 'save' | 'archive' | null;
@@ -36,7 +35,7 @@ export type GymEditorProps = {
 
 /**
  * One gym's editor, open in place of its row on the Gyms screen (lifted from
- * the recorder's gym modal). The name saves with Save; the private location
+ * the old recorder's gym modal). The name saves with Save; the private location
  * saves at once from the current position, and replacing or clearing one asks
  * first. Archive is the synced soft delete.
  */
@@ -132,20 +131,20 @@ export function GymEditor({ gym, onDone, onLocationChanged, onCancel, readPositi
   if (pending) {
     locationActions = (
       <View style={styles.confirm} testID="gym-editor-confirm">
-        <Text style={styles.confirmText}>
+        <Text allowFontScaling={false} style={styles.confirmText}>
           {pending === 'replace'
             ? 'Replace the saved location with where you are now?'
             : "Clear the saved location? This gym won't be suggested nearby."}
         </Text>
         <View style={styles.buttonRow}>
-          <GymButton
+          <ActionButton
             accessibilityLabel={`Cancel location change for ${label}`}
             label="Cancel"
             onPress={() => setPending(null)}
             testID="gym-editor-location-cancel"
             variant="outline"
           />
-          <GymButton
+          <ActionButton
             accessibilityLabel={
               pending === 'replace' ? `Confirm replace location for ${label}` : `Confirm clear location for ${label}`
             }
@@ -162,7 +161,7 @@ export function GymEditor({ gym, onDone, onLocationChanged, onCancel, readPositi
   } else if (gym && hasLocation) {
     locationActions = (
       <View style={styles.buttonRow}>
-        <GymButton
+        <ActionButton
           accessibilityLabel={`Replace location for ${label}`}
           disabled={isBusy}
           label={busy === 'location' ? 'Saving…' : 'Replace'}
@@ -173,7 +172,7 @@ export function GymEditor({ gym, onDone, onLocationChanged, onCancel, readPositi
           testID="gym-editor-location-replace"
           variant="outline"
         />
-        <GymButton
+        <ActionButton
           accessibilityLabel={`Clear location for ${label}`}
           disabled={isBusy}
           label="Clear"
@@ -190,7 +189,7 @@ export function GymEditor({ gym, onDone, onLocationChanged, onCancel, readPositi
   } else {
     locationActions = (
       <View style={styles.buttonRow}>
-        <GymButton
+        <ActionButton
           accessibilityLabel={`Save current location for ${label}`}
           disabled={isBusy}
           label={busy === 'location' ? 'Reading location…' : 'Save current location'}
@@ -204,8 +203,9 @@ export function GymEditor({ gym, onDone, onLocationChanged, onCancel, readPositi
 
   return (
     <View style={styles.editor} testID="gym-editor">
-      <Text style={styles.microLabel}>Name</Text>
+      <Text allowFontScaling={false} style={styles.microLabel}>Name</Text>
       <TextInput
+        allowFontScaling={false}
         accessibilityLabel="Gym name"
         autoFocus={gym === null}
         onChangeText={setName}
@@ -217,18 +217,19 @@ export function GymEditor({ gym, onDone, onLocationChanged, onCancel, readPositi
         value={name}
       />
 
-      <Text style={styles.microLabel}>Location</Text>
+      <Text allowFontScaling={false} style={styles.microLabel}>Location</Text>
       <View style={styles.status}>
         <Icon color={hasLocation ? uiRoles.ink : uiRoles.disabled} name="location" size="sm" />
-        <Text style={styles.statusText} testID="gym-editor-location-status">
+        <Text allowFontScaling={false} style={styles.statusText} testID="gym-editor-location-status">
           {hasLocation ? (gym ? 'Location saved' : 'Location ready') : 'No location saved'}
         </Text>
       </View>
-      <Text style={styles.hint}>
+      <Text allowFontScaling={false} style={styles.hint}>
         Private to you. A saved location lets the gym sheet suggest this gym when you are here.
       </Text>
       {feedback ? (
         <Text
+          allowFontScaling={false}
           accessibilityLiveRegion="polite"
           style={[styles.feedback, feedback.tone === 'error' ? styles.feedbackError : null]}
           testID="gym-editor-feedback">
@@ -239,7 +240,7 @@ export function GymEditor({ gym, onDone, onLocationChanged, onCancel, readPositi
 
       <View style={styles.footer}>
         {gym ? (
-          <GymButton
+          <ActionButton
             accessibilityLabel={`${gym.archived ? 'Unarchive' : 'Archive'} ${label}`}
             disabled={isBusy}
             label={gym.archived ? 'Unarchive' : 'Archive'}
@@ -250,8 +251,8 @@ export function GymEditor({ gym, onDone, onLocationChanged, onCancel, readPositi
           />
         ) : null}
         <View style={styles.footerEnd}>
-          <GymButton label="Cancel" onPress={onCancel} testID="gym-editor-cancel" variant="text" />
-          <GymButton
+          <ActionButton label="Cancel" onPress={onCancel} testID="gym-editor-cancel" variant="text" />
+          <ActionButton
             disabled={isBusy || !trimmedName}
             label={gym ? 'Save' : 'Add gym'}
             onPress={() => void save()}

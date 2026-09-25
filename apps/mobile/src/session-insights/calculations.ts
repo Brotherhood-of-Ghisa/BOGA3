@@ -711,15 +711,52 @@ export const deriveSessionMuscleVolumeComparisons = (
   if (target.completedAt === null || (target.deletedAt ?? null) !== null)
     return [];
 
-  const summarize = (session: PersonalRecordSessionInput) =>
-    summarizeCurrentSessionMuscleLoad({
-      sessionId: session.sessionId,
-      sessionAt: session.completedAt ?? (target.completedAt as Date),
-      exercises: session.exercises,
-      exerciseDefinitions,
-      muscleMappings,
-      muscleGroups,
-    });
+  const groupById = new Map(muscleGroups.map((group) => [group.id, group]));
+  // Comparison observations include every valid mapped performed set, even
+  // when its volume is zero. The positive-only muscle-load bars are a separate
+  // presentation and cannot supply a distribution's observations or counts.
+  const observe = (session: PersonalRecordSessionInput) => {
+    const contributions = collectMuscleSetContributions(
+      adaptCurrentSessionToMuscleAnalyticsInput({
+        sessionId: session.sessionId,
+        sessionAt: session.completedAt ?? (target.completedAt as Date),
+        exercises: session.exercises,
+        exerciseDefinitions,
+        muscleMappings,
+        muscleGroups,
+      }),
+    );
+    const byMuscle = new Map<string, {
+      weightedVolume: number;
+      setIds: Set<string>;
+      workingSetIds: Set<string>;
+    }>();
+    for (const contribution of contributions) {
+      if (!groupById.has(contribution.muscleGroupId)) continue;
+      const observation = byMuscle.get(contribution.muscleGroupId) ?? {
+        weightedVolume: 0,
+        setIds: new Set<string>(),
+        workingSetIds: new Set<string>(),
+      };
+      observation.weightedVolume += contribution.weightedVolume;
+      observation.setIds.add(contribution.setIdentity);
+      if (isMuscleAnalyticsWorkingSet(contribution.setType)) {
+        observation.workingSetIds.add(contribution.setIdentity);
+      }
+      byMuscle.set(contribution.muscleGroupId, observation);
+    }
+    return Array.from(byMuscle, ([id, observation]) => ({
+      ...groupById.get(id)!,
+      weightedVolume: observation.weightedVolume,
+      setCount: observation.setIds.size,
+      workingSetCount: observation.workingSetIds.size,
+    })).sort((left, right) =>
+      right.weightedVolume - left.weightedVolume ||
+      left.sortOrder - right.sortOrder ||
+      left.displayName.localeCompare(right.displayName) ||
+      left.id.localeCompare(right.id),
+    );
+  };
   const historyByMuscle = new Map<string, number[]>();
   for (const session of input.historicalSessions) {
     if (
@@ -729,14 +766,14 @@ export const deriveSessionMuscleVolumeComparisons = (
       compareSessionOrder(session, target) >= 0
     )
       continue;
-    for (const muscle of summarize(session).muscles) {
+    for (const muscle of observe(session)) {
       const values = historyByMuscle.get(muscle.id) ?? [];
       values.push(muscle.weightedVolume);
       historyByMuscle.set(muscle.id, values);
     }
   }
 
-  return summarize(target).muscles.map((muscle, index) => {
+  return observe(target).map((muscle, index) => {
     const history = [...(historyByMuscle.get(muscle.id) ?? [])].sort(
       (a, b) => a - b,
     );
@@ -754,7 +791,7 @@ export const deriveSessionMuscleVolumeComparisons = (
       exerciseName: muscle.displayName,
       sessionExerciseIds: [muscle.id],
       sessionExerciseOrderIndex: index,
-      setCount: muscle.workingSetCount,
+      setCount: muscle.setCount,
       workingSetCount: muscle.workingSetCount,
       currentVolume: muscle.weightedVolume,
       historicalSessionCount: history.length,
