@@ -457,7 +457,7 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
           testID="session-view-add-exercise"
           variant="outline"
         />
-        {liveInsights ? (
+        {data.status !== 'completed' && liveInsights ? (
           <SessionInsightPresentation
             exerciseComparisons={liveInsights.exercise}
             muscleComparisons={liveInsights.muscle}

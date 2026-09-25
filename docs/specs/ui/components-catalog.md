@@ -290,11 +290,17 @@ Brief entrypoint inventory of the current reusable UI component set.
     `PersonalRecordCard`, shared exercise/muscle comparisons and the
     `Share session` outline `ActionButton`. Muscle pills are informational,
     never analytics links; all PRs stay visible together
+  - `SessionMuscleBreakdown` / `SessionSummaryContent` (`session-summary-content.tsx`)
+    share muscle pills, records, comparisons and Share between completion and
+    historical review. Hosts own their facts/top bar; completion keeps its
+    post-Finish composition and share-image content.
   - `SessionInsightPresentation` (`components/session-recorder/`) — shared by
     live, completion and historical Summary; `SegmentedControl` selects exercise
     or muscle `ExerciseVolumeCard`s, defaulting to exercise. Keeps the completion
     flow's `session-completion-exercise-volume` selector and explicit empty states.
-    Historical Summary supplies its own back header and explicit detail/edit actions.
+    Historical View Session controls grouping across local section changes and
+    uses its shared top-bar Edit action. Separate history/catalog states isolate
+    optional enrichment failures; active sessions keep uncontrolled grouping.
   - `PersonalRecordCard` — a `Card` with a `record` band (`New 1RM record ·
     <1RM>`), the exercise and its set (`185.0 × 8`), the 1RM bold `record`;
     read as one accessibility element
@@ -460,8 +466,12 @@ Brief entrypoint inventory of the current reusable UI component set.
   `app/completed-session/[sessionId].tsx`)
 - Purpose:
   - `ViewSessionScreen` — the detail's composition on `paper`: top bar, the
-    deleted band, an inline write error, `SessionFactsCard` and one
-    `ExerciseSetsCard` per exercise with a ⋮ `control`. testIDs
+    deleted band, an inline write error, `SessionFactsCard`, then the shared
+    `SegmentedControl` (`view-session-section-summary` / `-sets`). Summary
+    composes `SessionMuscleBreakdown` and `SessionSummaryContent` from
+    `components/session-complete/session-summary-content.tsx`; Sets shows one
+    `ExerciseSetsCard` per exercise with a ⋮ `control`. The route owns section
+    and chart grouping so refocus and section switches retain them. testIDs
     `completed-session-detail-screen`, `-summary`, `-times` (`-start` /
     `-end`), `-duration`, `-gym`, `-sets`, `-volume`, `-deleted-band`,
     `-error-notice`, `-no-exercises`, `-exercise-<id>` (and its `-count`,

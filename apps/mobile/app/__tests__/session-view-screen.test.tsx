@@ -258,12 +258,14 @@ describe('Session view', () => {
     expect(screen.getByLabelText(/Chest, 2 sets · 1 working.*Historical median 500/)).toBeTruthy();
   });
 
-  it('uses the persisted completion boundary when editing history', async () => {
+  it('hides comparisons when editing history while keeping editing available', async () => {
     const completedAt = new Date('2026-09-01T12:00:00Z');
     data.loadLatestSessionDraftSnapshot.mockResolvedValue(null);
     data.loadSessionSnapshotById.mockResolvedValue({ ...snapshot(), status: 'completed', completedAt, deletedAt: null });
     await renderReady();
-    expect(insightHistory).toHaveBeenCalledWith({ targetSessionId: 'session-1', completedAt });
+    expect(screen.queryByTestId('session-insight-presentation')).toBeNull();
+    expect(screen.getByTestId('session-view-add-exercise')).toBeTruthy();
+    expect(screen.getByTestId('session-view-done-button')).toBeTruthy();
   });
 
   it('keeps logging usable when comparison history fails', async () => {

@@ -2,6 +2,10 @@ import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-rou
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { BackHandler, StyleSheet, View } from 'react-native';
 
+import { SessionMuscleBreakdown, SessionSummaryContent, type MuscleCatalogState } from '@/components/session-complete/session-summary-content';
+import type { SessionComparisonMode } from '@/components/session-recorder/session-insight-presentation';
+import type { ViewSessionSection } from '@/components/view-session/view-session-screen';
+import { Card } from '@/components/ui/card';
 import { SessionCompletionScreen } from '@/components/session-complete';
 import { SessionTopBar } from '@/components/session-view';
 import { ActionButton } from '@/components/ui/action-button';
@@ -90,6 +94,7 @@ export type CompletedSessionDetailScreenShellProps = {
   presentation?: 'detail' | 'completion' | 'summary';
   shouldFailNextMaestroShare?: boolean;
   shouldFailNextMaestroCatalog?: boolean;
+  maestroInsights?: 'loading' | 'error';
 };
 
 function formatDateTimeStamp(isoTimestamp: string): string {
@@ -236,6 +241,7 @@ export function CompletedSessionDetailScreenShell({
   presentation = 'detail',
   shouldFailNextMaestroShare = false,
   shouldFailNextMaestroCatalog = false,
+  maestroInsights,
 }: CompletedSessionDetailScreenShellProps) {
   const router = useRouter();
   const exerciseCatalog = useExerciseCatalog();
@@ -243,6 +249,14 @@ export function CompletedSessionDetailScreenShell({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [session, setSession] = useState<CompletedSessionDetailRecord | null>(null);
   const [completedInsights, setCompletedInsights] = useState<CompletedSessionInsights | null>(null);
+  const [insightState, setInsightState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [section, setSection] = useState<ViewSessionSection>('summary');
+  const [comparisonMode, setComparisonMode] = useState<SessionComparisonMode>('exercise');
+  const isDeleted = session?.deletedAt != null;
+  useEffect(() => {
+    setSection('summary');
+    setComparisonMode('exercise');
+  }, [sessionId]);
   const [historicalBests, setHistoricalBests] = useState<ReadonlyMap<string, number | null>>(
     () => new Map()
   );
@@ -264,7 +278,7 @@ export function CompletedSessionDetailScreenShell({
     setIsLoading(true);
     setErrorMessage(null);
     setActionFeedback(null);
-    setCompletedInsights(null);
+    setHistoricalBests(new Map());
 
     void dataClient
       .loadCompletedSession(sessionId)
@@ -273,7 +287,7 @@ export function CompletedSessionDetailScreenShell({
           return;
         }
         setSession(loadedSession);
-        if (presentation !== 'detail' || !loadedSession || !dataClient.loadHistoricalBests) {
+        if (presentation === 'completion' || !loadedSession || !dataClient.loadHistoricalBests) {
           return;
         }
         // Records are optional enrichment: while history loads, or if it
@@ -301,21 +315,6 @@ export function CompletedSessionDetailScreenShell({
         setIsLoading(false);
       });
 
-    if (presentation !== 'detail' && dataClient.loadInsights) {
-      void dataClient
-        .loadInsights(sessionId)
-        .then((loadedInsights) => {
-          if (!cancelled) {
-            setCompletedInsights(loadedInsights);
-          }
-        })
-        .catch(() => {
-          if (!cancelled) {
-            setCompletedInsights(null);
-          }
-        });
-    }
-
     return () => {
       cancelled = true;
     };
@@ -328,6 +327,41 @@ export function CompletedSessionDetailScreenShell({
         cleanup?.();
       };
     }, [reloadSession])
+  );
+
+  // Enrichment has its own focus lifecycle: a slow/failed history read never
+  // prevents reviewing sets or using session actions. Delete/undelete refreshes
+  // just these projections, preserving the review section and facts.
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      setCompletedInsights(null);
+      setInsightState(dataClient.loadInsights ? 'loading' : 'error');
+      if (!sessionId || isDeleted) {
+        setInsightState('error');
+        return;
+      }
+      if (maestroInsights) {
+        setInsightState(maestroInsights);
+      } else if (dataClient.loadInsights) {
+        void dataClient
+          .loadInsights(sessionId)
+          .then((loadedInsights) => {
+            if (!cancelled) {
+              setCompletedInsights(loadedInsights);
+              setInsightState(loadedInsights ? 'ready' : 'error');
+            }
+          })
+          .catch(() => {
+            if (!cancelled) {
+              setCompletedInsights(null);
+              setInsightState('error');
+            }
+          });
+      }
+
+      return () => { cancelled = true; };
+    }, [dataClient, sessionId, isDeleted, maestroInsights])
   );
 
   const formattedStartedAt = useMemo(
@@ -427,8 +461,8 @@ export function CompletedSessionDetailScreenShell({
   }, [session]);
 
   const handleCompletionExit = useCallback(() => {
-    router.replace(presentation === 'summary' ? '/sessions' : '/progress');
-  }, [presentation, router]);
+    router.replace('/progress');
+  }, [router]);
 
   useEffect(() => {
     if (presentation !== 'completion') {
@@ -458,7 +492,7 @@ export function CompletedSessionDetailScreenShell({
   const stackOptions =
     presentation === 'completion'
       ? { title: 'Session complete', headerShown: false, gestureEnabled: false }
-      : { title: presentation === 'summary' ? 'Session Summary' : 'View Session', headerShown: false };
+      : { title: 'View Session', headerShown: false };
 
   const handleBack = () => {
     if (router.canGoBack()) {
@@ -533,7 +567,7 @@ export function CompletedSessionDetailScreenShell({
     <>
       <Stack.Screen options={stackOptions} />
       <View style={styles.frame}>
-        {presentation !== 'completion' ? <ViewSessionTopBar onBack={presentation === 'summary' ? handleCompletionExit : handleBack} title={presentation === 'summary' ? 'Session Summary' : undefined} /> : <SessionTopBar mode="complete" />}
+        {presentation !== 'completion' ? <ViewSessionTopBar onBack={handleBack} /> : <SessionTopBar mode="complete" />}
         <StatePanel
           body={body}
           kind={STATE_KIND[testID]}
@@ -561,7 +595,12 @@ export function CompletedSessionDetailScreenShell({
     );
   }
 
-  if (presentation === 'completion' || (presentation === 'summary' && session.deletedAt === null)) {
+  const muscleCatalogState: MuscleCatalogState =
+    shouldFailNextMaestroCatalog || exerciseCatalog.status === 'error'
+      ? 'error'
+      : exerciseCatalog.status === 'ready' ? 'ready' : 'loading';
+
+  if (presentation === 'completion') {
     const personalRecords = completedInsights?.personalRecords ?? [];
     const exerciseVolumeComparisons =
       completedInsights && completedInsights.exerciseVolumeComparisons.length > 0
@@ -576,18 +615,9 @@ export function CompletedSessionDetailScreenShell({
           exerciseCount={performedExercises.length}
           exerciseVolumeComparisons={exerciseVolumeComparisons}
           gymName={session.gymName}
-          muscleCatalogState={
-            shouldFailNextMaestroCatalog || exerciseCatalog.status === 'error'
-              ? 'error'
-              : exerciseCatalog.status === 'ready'
-                ? 'ready'
-                : 'loading'
-          }
+          muscleCatalogState={muscleCatalogState}
           muscleSummary={shouldFailNextMaestroCatalog ? null : sessionMuscleSummary}
           muscleVolumeComparisons={completedInsights?.muscleVolumeComparisons ?? []}
-          header={presentation === 'summary' ? <ViewSessionTopBar title="Session Summary" onBack={handleCompletionExit} /> : undefined}
-          onEdit={presentation === 'summary' ? handleEdit : undefined}
-          onViewSets={presentation === 'summary' ? () => router.push(`/completed-session/${encodeURIComponent(session.id)}`) : undefined}
           onDone={handleCompletionExit}
           performedSetCount={performedSetCount}
           personalRecords={personalRecords}
@@ -602,6 +632,38 @@ export function CompletedSessionDetailScreenShell({
     <>
       <Stack.Screen options={stackOptions} />
       <ViewSessionScreen
+        section={section}
+        onSectionChange={setSection}
+        summaryContent={
+          <>
+            {performedSetCount > 0 ? (
+              <Card>
+                <SessionMuscleBreakdown
+                  standalone
+                  performedSetCount={performedSetCount}
+                  muscleSummary={shouldFailNextMaestroCatalog ? null : sessionMuscleSummary}
+                  muscleCatalogState={muscleCatalogState}
+                />
+              </Card>
+            ) : null}
+            <SessionSummaryContent
+              completedAt={session.completedAt}
+              durationDisplay={session.durationDisplay}
+              exerciseCount={performedExercises.length}
+              performedSetCount={performedSetCount}
+              workingSetCount={workingSetCount}
+              personalRecords={completedInsights?.personalRecords ?? []}
+              exerciseVolumeComparisons={completedInsights?.exerciseVolumeComparisons ?? []}
+              muscleVolumeComparisons={completedInsights?.muscleVolumeComparisons ?? []}
+              historyState={insightState}
+              unavailableMessage={isDeleted ? 'Comparisons unavailable for deleted sessions.' : undefined}
+              muscleCatalogState={muscleCatalogState}
+              comparisonMode={comparisonMode}
+              onComparisonModeChange={setComparisonMode}
+              shouldFailNextShare={shouldFailNextMaestroShare}
+            />
+          </>
+        }
         error={actionFeedback}
         model={buildCompletedSessionDetailModel(session.exercises, historicalBests)}
         onAppend={handleAppendExercise}
@@ -628,7 +690,10 @@ export default function CompletedSessionDetailRoute() {
     presentation?: string | string[];
     maestroShare?: string | string[];
     maestroCatalog?: string | string[];
+    maestroInsights?: string | string[];
   }>();
+  const maestroInsightsParam = coerceRouteParam(params.maestroInsights);
+  const maestroInsights = isDevMode() && (maestroInsightsParam === 'loading' || maestroInsightsParam === 'error') ? maestroInsightsParam : undefined;
   const sessionId = coerceRouteParam(params.sessionId);
   const intent = coerceRouteParam(params.intent);
   const presentation = resolveCompletedSessionPresentation(params.presentation);
@@ -655,6 +720,7 @@ export default function CompletedSessionDetailRoute() {
 
   return (
     <CompletedSessionDetailScreenShell
+      maestroInsights={maestroInsights}
       presentation={presentation}
       sessionId={sessionId}
       shouldFailNextMaestroCatalog={shouldFailNextMaestroCatalog}

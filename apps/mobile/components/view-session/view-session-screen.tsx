@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { ExerciseSetsCard, SessionFactsCard } from '@/components/session-detail';
 import { Icon } from '@/components/ui/icon';
 import { IconButton } from '@/components/ui/icon-button';
+import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Screen, ScreenScroll } from '@/components/ui/screen';
 import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import type { CompletedSessionDetailModel } from '@/src/session-recorder/completed-session-detail-model';
@@ -20,7 +21,12 @@ export type ViewSessionSummary = {
   deleted: boolean;
 };
 
+export type ViewSessionSection = 'summary' | 'sets';
+
 type ViewSessionScreenProps = {
+  section: ViewSessionSection;
+  onSectionChange: (section: ViewSessionSection) => void;
+  summaryContent: ReactNode;
   summary: ViewSessionSummary;
   model: CompletedSessionDetailModel;
   // A failed write (delete, undelete, append), shown until the next action.
@@ -35,12 +41,15 @@ const formatSetCount = (count: number): string => `${count} ${count === 1 ? 'set
 
 /**
  * View Session: a finished session, read-only (redesign, View Session restyle).
- * Summary card, then one card per exercise with every performed set. Editing
+ * Facts, then local Summary / Sets sections. Editing
  * happens on the session view (`Edit`); the ⋮s hold what is rare: delete or
  * undelete the session, append an exercise to the current session.
  */
 export function ViewSessionScreen({
   summary,
+  section,
+  onSectionChange,
+  summaryContent,
   model,
   error,
   onBack,
@@ -85,7 +94,14 @@ export function ViewSessionScreen({
           testID="completed-session-detail-summary"
           times={{ start: summary.start, end: summary.end, testID: 'completed-session-detail-times' }}
         />
-        {model.cards.length === 0 ? (
+        <SegmentedControl
+          accessibilityLabel="Session review section"
+          options={[{ value: 'summary', label: 'Summary' }, { value: 'sets', label: 'Sets' }]}
+          value={section}
+          onChange={onSectionChange}
+          testIDPrefix="view-session-section"
+        />
+        {section === 'summary' ? summaryContent : model.cards.length === 0 ? (
           <Text allowFontScaling={false} style={styles.empty} testID="completed-session-detail-no-exercises">
             No exercises logged in this session.
           </Text>

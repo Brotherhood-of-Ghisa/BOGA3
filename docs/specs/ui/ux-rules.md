@@ -172,7 +172,7 @@ Document app-specific UI semantics and guardrails for the current mobile app.
     - The first new ad-hoc set of each exercise defaults to `W-Up`. Adding a set copies the previous set's `Weight` and `Reps`; effort defaults to blank after `W-Up` or blank, and inherits the previous RIR otherwise. Each new row gets its own identity and unconfirmed status. These defaults never rewrite existing sets or prescribed effort. Valid copied values remain unperformed until ticked. Adding after an untouched planned target does not perform it; the planned row remains until explicitly confirmed. The added set's `Weight` input takes focus and selects a copied value, so the next keystroke replaces it.
     - Active and completed-edit autosave preserve every set row, including fully blank, partial, valid unconfirmed, and planned rows, with stable identity, values, effort, confirmation status, and order across input blur, tab/route navigation, hydration, sync, and restore. Legacy persisted `skipped` planned rows hydrate as untouched planned rows. Blank or invalid reps remain incomplete; valid unconfirmed rows remain excluded from performed semantics.
     - Final active-session submit and completed-edit save persist completed workout history as confirmed actual sets only. Completion uses separate explicit cleanup decisions for entered-but-unconfirmed rows (a specific discard prompt) and incomplete rows (§14b.2); untouched planned rows are actual-only omissions, and exercises left empty use the same cleanup prompt. The `/sessions` active-session completion affordance opens the session view, so it cannot bypass this cleanup.
-12. Session comparisons are shared across live, completion and historical Summary. The live comparison body follows the exercise cards and Add exercise; logging stays usable while history loads or fails.
+12. Session comparisons are shared across active sessions, completion and View Session Summary. The live comparison body follows the exercise cards and Add exercise; logging stays usable while history loads or fails.
 13. The shared exercise editor dismisses the text keyboard before opening primary/secondary muscle selectors, and selector lists remain keyboard-aware so all muscle-group options stay reachable on iOS. The primary list marks the current choice with `radio-on`; the secondary list offers only muscles not already chosen, each with `plus`. Secondary muscles are `ListRow`s in a `Card`, each removed by a `danger` `x`. It exposes a two-choice `Total load` / `Per side` `SegmentedControl`, preselects the stored value while editing, and defaults new custom exercises to total load.
 14. GPS gym detection is quiet assistance, and it **suggests only** (decided
     2026-09-23):
@@ -260,8 +260,11 @@ Document app-specific UI semantics and guardrails for the current mobile app.
 4. The summary card shows `Start` and `End` as `YYYY-MM-DD HH:mm` (the layout of
    the completed edit's fields, read-only), then `Duration`, `Gym`, `Sets` and
    `Volume` (the confirmed sets with valid values, and their entered-load
-   volume, no thousands separator).
-5. Each exercise card shows its name, `n sets` and one row per confirmed set
+   volume, no thousands separator). Below it, `Summary | Sets` defaults to
+   Summary for every historical entry. Switching stays in place and retains the
+   chart grouping; Edit → Done retains both selections while reloading facts,
+   sets and insights. A different session starts at Summary / By exercise.
+5. Each exercise card in Sets shows its name, `n sets` and one row per confirmed set
    with valid values — the session view's row, `type · weight × reps · 1RM ·
    VOL` (`W-Up`, `RIR n` for any valid stored RIR, `—` for none). An exercise
    with no such set is left out. There are no tags, no collapse and no set
@@ -297,8 +300,11 @@ Document app-specific UI semantics and guardrails for the current mobile app.
    use per-side role-weighted volume, count all valid mapped performed sets
    separately from working sets, and retain zero-load observations. Each row
    compares only with the same muscle in eligible earlier completed sessions;
-   a completed edit uses its persisted completion time. Unmapped work and
-   failed/loading live history have explicit states.
+   historical review uses its persisted completion time. Unmapped work and
+   failed/loading history have explicit states. Historical comparison failure
+   is never labelled as absent history and does not fabricate zero values;
+   facts, Sets and actions remain available. Completed Edit has no comparison
+   charts; active-session charts remain below Add exercise.
 9. `Share session` opens a `Sheet` previewing the exact session-summary image;
    `Share image` is its one action, and the backdrop closes it (there is no
    Cancel; it cannot close while an image is being prepared). The captured PNG
@@ -309,13 +315,13 @@ Document app-specific UI semantics and guardrails for the current mobile app.
    completed share into an error.
 10. Completion hides edit/delete/append. Done and Android back replace to
     Progress, and the back gesture is off. Its missing, deleted or failed target
-    keeps one safe Progress exit. A completed row in Sessions History opens
-    `presentation=summary`; overflow Edit still opens the session editor.
-    Historical Summary shares the comparison body, offers Share, View individual
-    sets and Edit session, and its top-bar Back replaces to Sessions History.
-    Deleted historical targets show the detail's deleted band and Undelete,
-    without Edit. Share always captures exercise comparisons regardless of the
-    visible grouping.
+    keeps one safe Progress exit. Every personal historical entry (History,
+    Today, exercise history and legacy `presentation=summary` links) opens View
+    Session's Summary. Back returns to its origin, or Progress with no history.
+    Summary shares the existing comparison body, working-set breakdown, records
+    and Share; top-bar Edit and local Sets replace the former bottom navigation
+    buttons. Deleted targets retain the band and Undelete without Edit in both
+    sections. Share always captures exercise comparisons regardless of grouping.
 
 ### 8. Navigation/query semantics (UI-facing rule)
 

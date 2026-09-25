@@ -7,22 +7,32 @@ import { SectionHeader } from '@/components/ui/page-header';
 import { uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import type { ExerciseVolumeComparison } from '@/src/session-insights';
 
+export type SessionComparisonMode = 'exercise' | 'muscle';
+
 type Props = {
+  mode?: SessionComparisonMode;
+  onModeChange?: (mode: SessionComparisonMode) => void;
   exerciseComparisons: ExerciseVolumeComparison[];
   muscleComparisons?: ExerciseVolumeComparison[];
   historyState?: 'loading' | 'ready' | 'error';
+  unavailableMessage?: string;
   muscleCatalogState?: 'loading' | 'ready' | 'error';
   testIdPrefix?: string;
 };
 
 export function SessionInsightPresentation({
+  mode: selectedMode,
+  onModeChange,
   exerciseComparisons,
   muscleComparisons = [],
   historyState = 'ready',
+  unavailableMessage = 'Comparisons unavailable. Return to this session to retry.',
   muscleCatalogState = 'ready',
   testIdPrefix = 'session-insight',
 }: Props) {
-  const [mode, setMode] = useState<'exercise' | 'muscle'>('exercise');
+  const [localMode, setLocalMode] = useState<SessionComparisonMode>('exercise');
+  const mode = selectedMode ?? localMode;
+  const setMode = onModeChange ?? setLocalMode;
   const comparisons = mode === 'exercise' ? exerciseComparisons : muscleComparisons;
   const state = historyState !== 'ready' ? historyState : mode === 'muscle' ? muscleCatalogState : 'ready';
   return (
@@ -46,7 +56,7 @@ export function SessionInsightPresentation({
         )) : (
           <Text allowFontScaling={false} style={styles.muted} testID="session-insight-empty">
             {state === 'loading' ? 'Loading comparisons…'
-              : state === 'error' ? 'Comparisons unavailable. Return to this session to retry.'
+              : state === 'error' ? unavailableMessage
                 : mode === 'muscle' ? 'No mapped performed sets for this session.' : 'No performed sets to compare.'}
           </Text>
         )}

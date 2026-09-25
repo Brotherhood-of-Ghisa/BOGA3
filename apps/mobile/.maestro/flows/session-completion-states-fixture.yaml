@@ -38,13 +38,13 @@ appId: com.dinoderek.mobile
     centerElement: true
 - takeScreenshot: "session-completion-one-pr"
 
-# Historical Summary uses the same comparison cards and keeps explicit detail/edit routes.
+# Legacy Summary links open View Session; both review sections switch locally.
 - openLink: "boga3://maestro-harness?fixture=exercise-block-history&teleport=completed-session&sessionId=maestro_m24_completion_one_pr&presentation=summary"
 - tapOn:
     text: "Open"
     optional: true
 - extendedWaitUntil:
-    visible: "Session Summary"
+    visible: "View Session"
     timeout: 30000
 - scrollUntilVisible:
     element:
@@ -74,18 +74,23 @@ appId: com.dinoderek.mobile
 - takeScreenshot: "session-summary-exercise"
 - scrollUntilVisible:
     element:
-      id: "session-summary-view-sets"
-    direction: DOWN
+      id: "view-session-section-sets"
+    direction: UP
     centerElement: true
-- assertVisible:
-    id: "session-summary-edit"
 - tapOn:
+    id: "view-session-section-sets"
+- assertVisible:
+    id: "completed-session-detail-exercise-maestro_m24_completion_one_pr_squat"
+- takeScreenshot: "view-session-sets"
+- assertNotVisible:
+    id: "session-summary-edit"
+- assertNotVisible:
     id: "session-summary-view-sets"
-- extendedWaitUntil:
-    visible:
-      id: "completed-session-detail-screen"
-    timeout: 15000
-- assertVisible: "View Session"
+- tapOn:
+    id: "view-session-section-summary"
+- assertVisible:
+    id: "session-insight-mode-exercise"
+- takeScreenshot: "view-session-summary-top"
 
 
 - openLink: "boga3://maestro-harness?fixture=exercise-block-history&teleport=completed-session&sessionId=maestro_m24_completion_no_pr&presentation=completion&maestroCatalog=fail-once"
@@ -161,6 +166,20 @@ appId: com.dinoderek.mobile
     visible:
       id: "completed-session-detail-screen"
     timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: "session-insight-mode-muscle"
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: "session-insight-mode-muscle"
+- scrollUntilVisible:
+    element:
+      id: "view-session-section-sets"
+    direction: UP
+    centerElement: true
+- tapOn:
+    id: "view-session-section-sets"
 - tapOn:
     id: "completed-session-detail-edit-button"
 - extendedWaitUntil:
@@ -176,7 +195,19 @@ appId: com.dinoderek.mobile
     id: "session-view-finish-button"
 - assertNotVisible:
     id: "session-view-options-button"
+- scrollUntilVisible:
+    element:
+      id: "session-view-add-exercise"
+    direction: DOWN
+    centerElement: true
+- assertNotVisible:
+    id: "session-insight-presentation"
 - takeScreenshot: "completed-edit-session-view"
+- scrollUntilVisible:
+    element:
+      id: "session-view-start-time"
+    direction: UP
+    centerElement: true
 
 # Change the set on the exercise page: 275 × 5 becomes 275 × 6.
 - tapOn:
@@ -257,6 +288,24 @@ appId: com.dinoderek.mobile
     id: "session-completion-presentation"
 - takeScreenshot: "completed-edit-read-back"
 
+# Summary remembers muscle grouping and re-reads the edited workout.
+- tapOn:
+    id: "view-session-section-summary"
+- scrollUntilVisible:
+    element:
+      id: "session-completion-muscle-comparison-quads"
+    direction: DOWN
+    centerElement: true
+- assertVisible: "Muscle volume"
+- takeScreenshot: "view-session-summary-after-edit"
+- scrollUntilVisible:
+    element:
+      id: "view-session-section-sets"
+    direction: UP
+    centerElement: true
+- tapOn:
+    id: "view-session-section-sets"
+
 # View Session in the design language (View Session restyle): the summary card,
 # the squat's record band (its 1RM beats every other session), the exercise ⋮
 # with Append, and the session ⋮ deleting and undeleting — a band while
@@ -297,6 +346,13 @@ appId: com.dinoderek.mobile
     id: "completed-session-detail-edit-button"
 - takeScreenshot: "view-session-deleted"
 - tapOn:
+    id: "view-session-section-summary"
+- assertVisible:
+    id: "completed-session-detail-deleted-band"
+- assertNotVisible:
+    id: "completed-session-detail-edit-button"
+- takeScreenshot: "view-session-deleted-summary"
+- tapOn:
     id: "completed-session-detail-options-button"
 - extendedWaitUntil:
     visible: "Undelete session"
@@ -309,6 +365,56 @@ appId: com.dinoderek.mobile
     timeout: 10000
 - assertVisible:
     id: "completed-session-detail-edit-button"
+
+# Insight enrichment never blocks facts, Sets, Share or session controls.
+- openLink: "boga3://completed-session/maestro_m24_completion_one_pr?maestroInsights=loading"
+- tapOn:
+    text: "Open"
+    optional: true
+- tapOn:
+    id: "view-session-section-summary"
+- extendedWaitUntil:
+    visible: "Loading comparisons…"
+    timeout: 30000
+- takeScreenshot: "view-session-insights-loading"
+- tapOn:
+    id: "view-session-section-sets"
+- assertVisible:
+    id: "completed-session-detail-exercise-maestro_m24_completion_one_pr_squat"
+- openLink: "boga3://completed-session/maestro_m24_completion_one_pr?maestroInsights=error"
+- tapOn:
+    text: "Open"
+    optional: true
+- tapOn:
+    id: "view-session-section-summary"
+- extendedWaitUntil:
+    visible: "Comparisons unavailable. Return to this session to retry."
+    timeout: 30000
+- assertVisible:
+    id: "completed-session-detail-edit-button"
+- takeScreenshot: "view-session-insights-error"
+- tapOn:
+    id: "view-session-section-sets"
+- assertVisible:
+    id: "completed-session-detail-exercise-maestro_m24_completion_one_pr_squat"
+- openLink: "boga3://maestro-harness?fixture=exercise-block-history&teleport=completed-session&sessionId=maestro_m24_completion_unmapped"
+- tapOn:
+    text: "Open"
+    optional: true
+- extendedWaitUntil:
+    visible: "No mapped working sets for this session."
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: "session-completion-exercise-maestro_m24_completion_unmapped_exercise"
+    direction: DOWN
+    centerElement: true
+- assertVisible: ".*No comparison history yet.*"
+- takeScreenshot: "view-session-no-history"
+- tapOn:
+    id: "session-insight-mode-muscle"
+- assertVisible: "No mapped performed sets for this session."
+- takeScreenshot: "view-session-unmapped"
 
 # A session that does not exist: the in-route state, with the top bar's back.
 - openLink: "boga3://maestro-harness?fixture=exercise-block-history&teleport=completed-session&sessionId=maestro_missing_session"

@@ -113,7 +113,7 @@ export function SessionsScreen({
   };
 
   const openCompletedSessionSummary = (sessionId: string) => {
-    router.push(`/completed-session/${encodeURIComponent(sessionId)}?presentation=summary`);
+    router.push(`/completed-session/${encodeURIComponent(sessionId)}`);
   };
 
   const appendCompletedSession = (sessionId: string) => {

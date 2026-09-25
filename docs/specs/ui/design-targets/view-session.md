@@ -67,7 +67,33 @@ The existing card/type/colour target above governs this integration; PR #336's
 read-first History entry and local exercise/muscle switch govern its behavior.
 The shared body uses the canonical `SegmentedControl` and volume cards. In the
 live view it follows the logging cards and Add exercise, preserving their
-hierarchy. Historical Summary keeps the same cards with a Back header, explicit
-View individual sets and Edit session actions. Share remains exercise-only.
+hierarchy. Historical View Session consolidates the review sections as specified below.
+Share remains exercise-only.
 Verification states: `session-summary-muscle`, `session-summary-exercise`,
 `session-live-muscle-comparison`, plus the completion/share captures above.
+
+## Historical Summary / Sets (2026-09-25)
+
+Accepted source: the user-invoked `historical-session-summary-in-view` repo-native
+brief, extending this target with the captured pre-change Summary and Sets.
+The existing cards, tokens and chart styling remain the visual authority.
+
+- One `back · View Session · ⋮ · Edit` bar and one facts card (Start/End,
+  Duration/Gym/Sets/Volume), followed by `Summary | Sets`, initially Summary.
+- Summary: existing working-set breakdown, records, `By exercise | By muscle`
+  comparisons and Share. Sets: existing read-only exercise cards and ⋮ actions.
+- Section/grouping choices remain local across Edit → Done; facts, sets and
+  comparisons refresh. No historical View individual sets or bottom Edit button.
+- Historical Back returns once to its origin. Default and legacy Summary links
+  use this view. Completed Edit has no charts; active and post-Finish flows keep
+  their existing charts and completion exit behavior.
+- Loading/failed comparisons stay explicit while facts, Sets and actions work.
+  No-history/baseline, unmapped, empty/missing and deleted controls are retained.
+
+Runtime comparison states (`ios-ui-regression`, `session-completion-states-fixture`):
+`view-session-summary-top`, `session-summary-exercise`, `session-summary-muscle`,
+`view-session-sets`, `completed-edit-session-view`, `completed-edit-read-back`,
+`view-session-summary-after-edit`, `view-session-insights-loading`,
+`view-session-insights-error`, `view-session-no-history`, `view-session-unmapped`,
+`view-session-deleted-summary`, `view-session-deleted` and `view-session-not-found`. Reference/after captures
+stay under `apps/mobile/artifacts/maestro/`; the PR records viewport and comparison.
