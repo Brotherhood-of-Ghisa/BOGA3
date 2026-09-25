@@ -2,7 +2,8 @@
 
 /**
  * The Settings sync-status panel: renders the four signed-in fields — last
- * successful sync time, pending (dirty) change count, network state, and error
+ * successful sync time, pending (dirty) change count, network state (with an
+ * unknown network shown as "Checking…", never as offline or online), and error
  * state — from an injected status source, refreshes on focus, and nudges a sync
  * cycle on the manual refresh press. Each field carries a stable testID so the
  * Maestro flow and these unit tests can pin it.
@@ -93,11 +94,29 @@ describe('Settings sync-status panel', () => {
   });
 
   it('shows no offline glyph while online', async () => {
-    const { readStatus } = renderPanel({ networkState: 'online' });
+    renderPanel({ networkState: 'online' });
     await waitFor(() => {
-      expect(readStatus).toHaveBeenCalled();
+      expect(screen.getByTestId('settings-sync-status-network')).toHaveTextContent('Online');
     });
-    expect(screen.getByTestId('settings-sync-status-network')).toHaveTextContent('Online');
+    expect(screen.queryByTestId('settings-sync-status-network-offline-glyph', { includeHiddenElements: true })).toBeNull();
+  });
+
+  it('shows an unknown network as "Checking…", neither offline nor online', async () => {
+    // Gate on the dirty count: "Checking…" is also the pre-resolution value,
+    // so waiting on it alone would not prove the unknown snapshot rendered.
+    renderPanel({ networkState: 'unknown', dirtyCount: 2 });
+    await waitFor(() => {
+      expect(screen.getByTestId('settings-sync-status-dirty-count')).toHaveTextContent('2');
+    });
+    expect(screen.getByTestId('settings-sync-status-network')).toHaveTextContent('Checking…');
+    expect(screen.queryByTestId('settings-sync-status-network-offline-glyph', { includeHiddenElements: true })).toBeNull();
+  });
+
+  it('shows "Checking…" rather than "Online" before the first snapshot loads', () => {
+    const readStatus = jest.fn(() => new Promise<SyncStatusSnapshot>(() => {}));
+    render(<SyncStatusPanel onRequestSync={jest.fn()} readStatus={readStatus} />);
+    expect(readStatus).toHaveBeenCalled();
+    expect(screen.getByTestId('settings-sync-status-network')).toHaveTextContent('Checking…');
     expect(screen.queryByTestId('settings-sync-status-network-offline-glyph', { includeHiddenElements: true })).toBeNull();
   });
 

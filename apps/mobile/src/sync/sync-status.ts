@@ -3,7 +3,7 @@
 // sources into one immutable shape — no server round-trip:
 //
 //   1. The scheduler's production status accessor: the last successful sync
-//      time, the latest cycle error, and the live online/offline projection.
+//      time, the latest cycle error, and the live network projection.
 //   2. The local `sync_runtime_state` row: whether the first-sync bootstrap has
 //      completed.
 //   3. A dirty-row count: how many local edits are still waiting to be pushed,
@@ -39,8 +39,12 @@ const DIRTY_COUNTED_TABLES = [
   schema.sessionExerciseTags,
 ] as const;
 
-/** The network state a user sees: connected and syncing, or offline. */
-export type SyncNetworkState = 'online' | 'offline';
+/**
+ * The network state a user sees: 'unknown' until NetInfo has reported a
+ * determined `isConnected` (so an unreported network is never shown as
+ * offline), then connected ('online') or 'offline'.
+ */
+export type SyncNetworkState = 'unknown' | 'online' | 'offline';
 
 /**
  * The composed sync-status snapshot the Settings surface renders. Every field
@@ -57,7 +61,7 @@ export interface SyncStatusSnapshot {
   errorMessage: string | null;
   /** True when the latest cycle reported that no user is signed in. */
   authRequired: boolean;
-  /** Online/offline from the scheduler's live network projection. */
+  /** The scheduler's live three-valued network projection. */
   networkState: SyncNetworkState;
   /** Whether the first-sync bootstrap has completed for this device-account. */
   bootstrapCompleted: boolean;
@@ -129,7 +133,7 @@ export const getSyncStatus = async (): Promise<SyncStatusSnapshot> => {
     dirtyCount,
     errorMessage: schedulerStatus.lastCycleError,
     authRequired: getAuthRequiredSignal(),
-    networkState: schedulerStatus.online ? 'online' : 'offline',
+    networkState: schedulerStatus.network,
     bootstrapCompleted,
     blockedRowCount,
   };

@@ -289,7 +289,9 @@ Brief entrypoint map of the current mobile screens.
     and retryable. The separate Connected agents row is signed-in only.
   - a sync-status card (signed-in only) showing last successful sync time
     (`Never` until the first success), pending-change count (rows still waiting
-    to push across the user-owned tables), network state (online/offline), and
+    to push across the user-owned tables), network state (online/offline, or
+    `Checking…` until NetInfo reports a determined `isConnected` — never shown
+    as offline or online before then), and
     the latest sync error (or a sign-in-required hint); a Refresh action nudges a
     sync cycle. The card refreshes on screen focus and on a short interval while
     focused. Card/fields carry stable testIDs (`settings-sync-status-card`,

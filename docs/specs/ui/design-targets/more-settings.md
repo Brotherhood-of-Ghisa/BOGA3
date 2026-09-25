@@ -23,7 +23,8 @@ information only. **Accepted** by the user in the DLM-T04 gallery on 2026-09-25.
 - The sync-status panel is a `Card` of `ListRow`s: the labels in body text,
   the values in Plex Mono.
   Offline is the `offline` (wifi-off) glyph plus "Offline" in `ink`, never a
-  warning hue (G3); a cycle error is `danger`. `Refresh` is an outline.
+  warning hue (G3); an unknown network (before NetInfo reports) is "Checking…"
+  with no glyph; a cycle error is `danger`. `Refresh` is an outline.
 - Neither screen has an `accent` button.
 - Developer tools (dev builds only) is one `Card` headed by the `warning` glyph
   and a micro-label. Its buttons are outlines, `Wipe remote` an outline in
@@ -47,8 +48,9 @@ Device: iPhone simulator at 390pt width, light.
 | `02-dev-wipe-local-settings`, `03-dev-wipe-local-feedback` (`ios-ui-regression`) | Developer tools, and a success `Notice` (information only) |
 | `dev-logs` (`ios-ui-regression`) | Logs (information only) |
 
-Jest only (no flow reaches them): the signed-out sync card, the offline and
-error sync panel, a failed dev action, and the external-link error.
+Jest only (no flow reaches them): the signed-out sync card, the offline,
+unknown-network and error sync panel, a failed dev action, and the
+external-link error.
 
 No target screenshots are committed; runtime captures stay in the gitignored
 `apps/mobile/artifacts/maestro/` tree and are linked as PR evidence.
