@@ -95,5 +95,5 @@ Runtime comparison states (`ios-ui-regression`, `session-completion-states-fixtu
 `view-session-sets`, `completed-edit-session-view`, `completed-edit-read-back`,
 `view-session-summary-after-edit`, `view-session-insights-loading`,
 `view-session-insights-error`, `view-session-no-history`, `view-session-unmapped`,
-`view-session-deleted` and `view-session-not-found`. Reference/after captures
+`view-session-deleted-summary`, `view-session-deleted` and `view-session-not-found`. Reference/after captures
 stay under `apps/mobile/artifacts/maestro/`; the PR records viewport and comparison.

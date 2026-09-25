@@ -290,12 +290,17 @@ Brief entrypoint inventory of the current reusable UI component set.
     `PersonalRecordCard`, shared exercise/muscle comparisons and the
     `Share session` outline `ActionButton`. Muscle pills are informational,
     never analytics links; all PRs stay visible together
+  - `SessionMuscleBreakdown` / `SessionSummaryContent` (`session-summary-content.tsx`)
+    share muscle pills, records, comparisons and Share between completion and
+    historical review. Hosts own their facts/top bar; completion keeps its
+    post-Finish composition and share-image content.
   - `SessionInsightPresentation` (`components/session-recorder/`) — shared by
     live, completion and historical Summary; `SegmentedControl` selects exercise
     or muscle `ExerciseVolumeCard`s, defaulting to exercise. Keeps the completion
     flow's `session-completion-exercise-volume` selector and explicit empty states.
     Historical View Session controls grouping across local section changes and
-    uses its shared top-bar Edit action.
+    uses its shared top-bar Edit action. Separate history/catalog states isolate
+    optional enrichment failures; active sessions keep uncontrolled grouping.
   - `PersonalRecordCard` — a `Card` with a `record` band (`New 1RM record ·
     <1RM>`), the exercise and its set (`185.0 × 8`), the 1RM bold `record`;
     read as one accessibility element
@@ -558,10 +563,3 @@ design-language vocabulary (`uiRoles` / `uiFonts` / `uiGeometry`):
 ## Maintenance rule
 
 If a task adds/removes/renames reusable UI components or changes their role, update this doc in the same session.
-
-Shared summary composition: `components/session-complete/session-summary-content.tsx`
-contains the muscle breakdown and the records/comparisons/Share body used by
-completion and historical review. Hosts supply their own facts and top bar;
-`SessionInsightPresentation` accepts optional controlled grouping plus separate
-history/catalog load states. Completion retains its post-Finish composition
-and share-image content; active sessions retain uncontrolled live grouping.
