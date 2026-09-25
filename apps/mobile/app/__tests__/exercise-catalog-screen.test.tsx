@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
-import { Keyboard, Platform } from 'react-native';
+import { Keyboard, Platform, StyleSheet, type ViewStyle } from 'react-native';
 
 import ExerciseCatalogScreen from '../(tabs)/exercise-catalog';
 
@@ -11,6 +11,7 @@ import {
   undeleteExerciseCatalogExercise,
   type ExerciseCatalogExercise,
 } from '@/src/data/exercise-catalog';
+import { uiRoles } from '@/components/ui';
 import { __resetExerciseCatalogCacheForTests } from '@/src/exercise-catalog/cache';
 import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidation';
 import { __resetExerciseListPreferencesForTests } from '@/src/exercise-catalog/list-preferences';
@@ -59,6 +60,14 @@ const setExerciseListAndInvalidate = (next: ExerciseCatalogExercise[]) => {
   mockListExercises.mockResolvedValue(next);
   invalidateExerciseCatalogCache();
 };
+
+type TestNode = typeof screen.UNSAFE_root;
+
+// Host nodes drawn on the `accent` ground under `root`: its primaries.
+const accentGrounds = (root: TestNode = screen.UNSAFE_root) =>
+  root
+    .findAll((node: TestNode) => typeof node.type === 'string')
+    .filter((node: TestNode) => (StyleSheet.flatten(node.props.style) as ViewStyle | undefined)?.backgroundColor === uiRoles.accent);
 
 const expandFamily = async (familyName: string, count: number) => {
   fireEvent.press(await screen.findByLabelText(`${familyName} exercises ${count}`));
@@ -192,7 +201,7 @@ describe('ExerciseCatalogScreen', () => {
     expect(screen.getByText('Chest · Triceps (s)')).toBeTruthy();
 
     fireEvent.press(screen.getByLabelText('Exercise actions Barbell Bench Press'));
-    await screen.findByText('Exercise Actions');
+    await screen.findByTestId('exercise-catalog-actions-sheet');
     fireEvent.press(screen.getByLabelText('Edit exercise from actions'));
     await screen.findByText('Edit Exercise');
     expect(screen.getByLabelText('Total load weight entry').props.accessibilityState.selected).toBe(true);
@@ -326,7 +335,8 @@ describe('ExerciseCatalogScreen', () => {
     await expandFamily('Chest', 1);
     await screen.findByText('Incline Press');
     fireEvent.press(screen.getByLabelText('Exercise actions Incline Press'));
-    await screen.findByText('Exercise Actions');
+    // Titled with the exercise's name (DLM-T07).
+    expect(await screen.findByRole('header', { name: 'Incline Press' })).toBeTruthy();
     fireEvent.press(screen.getByLabelText('Delete exercise from actions'));
 
     await waitFor(() => expect(mockDeleteExercise).toHaveBeenCalledWith('custom-ex-1'));
@@ -361,12 +371,13 @@ describe('ExerciseCatalogScreen', () => {
     fireEvent.press(screen.getByLabelText('Exercise catalog options'));
     await screen.findByText('Filters');
     fireEvent.press(screen.getByLabelText('Show deleted exercises'));
-    fireEvent.press(screen.getByLabelText('Close filters'));
+    // The Filters sheet's backdrop, hidden from VoiceOver while the sheet is modal.
+    fireEvent.press(screen.getByLabelText('Close filters', { includeHiddenElements: true }));
 
     await screen.findByText('Old Fly');
 
     fireEvent.press(screen.getByLabelText('Exercise actions Old Fly'));
-    await screen.findByText('Exercise Actions');
+    await screen.findByTestId('exercise-catalog-actions-sheet');
     fireEvent.press(screen.getByLabelText('Undelete exercise from actions'));
 
     await waitFor(() => {
@@ -375,4 +386,164 @@ describe('ExerciseCatalogScreen', () => {
     });
   });
 
+  describe('design language (DLM-T07)', () => {
+    const BENCH: ExerciseCatalogExercise = {
+      id: 'seed_barbell_bench_press',
+      name: 'Barbell Bench Press',
+      loadInputMode: 'total_load',
+      deletedAt: null,
+      mappings: [{ id: 'map-chest', muscleGroupId: 'chest', weight: 1, role: 'primary' }],
+    };
+
+    it('titles the screen Exercises, with + as its one accent and the active filters as tags', async () => {
+      mockListExercises.mockResolvedValue([BENCH]);
+      render(<ExerciseCatalogScreen />);
+
+      expect(await screen.findByRole('header', { name: 'Exercises' })).toBeTruthy();
+      expect(screen.getByTestId('exercise-catalog-title')).toBeTruthy();
+      const accents = accentGrounds();
+      expect(accents).toHaveLength(1);
+      expect(accents[0].props.testID).toBe('create-new-exercise-button');
+
+      // Each tag names an active filter and opens the Filters sheet.
+      expect(screen.getByText('Range: 90d')).toBeTruthy();
+      fireEvent.press(screen.getByLabelText('Open filters (Grouped)'));
+      expect(await screen.findByTestId('exercise-catalog-filters-sheet')).toBeTruthy();
+      expect(screen.getByRole('header', { name: 'Filters' })).toBeTruthy();
+      expect(screen.queryByText('Done')).toBeNull();
+    });
+
+    it('filters by muscle group in the Filters sheet, and Clear resets it', async () => {
+      mockListExercises.mockResolvedValue([
+        BENCH,
+        {
+          id: 'seed_squat',
+          name: 'Back Squat',
+          loadInputMode: 'total_load',
+          deletedAt: null,
+          mappings: [{ id: 'map-quads', muscleGroupId: 'quads', weight: 1, role: 'primary' }],
+        },
+      ]);
+      render(<ExerciseCatalogScreen />);
+
+      fireEvent.press(await screen.findByLabelText('Exercise catalog options'));
+      fireEvent.press(await screen.findByLabelText('Toggle muscle group Quads'));
+      expect(screen.getByLabelText('Toggle muscle group Quads').props.accessibilityState).toMatchObject({ checked: true });
+      expect(screen.getByText('Muscles: 1')).toBeTruthy();
+      expect(await screen.findByLabelText('Chest exercises 0')).toBeTruthy();
+
+      fireEvent.press(screen.getByLabelText('Clear muscle group selection'));
+      expect(screen.getByLabelText('Toggle muscle group Quads').props.accessibilityState).toMatchObject({ checked: false });
+      expect(screen.queryByLabelText('Clear muscle group selection')).toBeNull();
+    });
+
+    it('titles the actions sheet with the name; Delete is the danger row and a deleted exercise cannot be edited', async () => {
+      const deleted: ExerciseCatalogExercise = { ...BENCH, id: 'old-fly', name: 'Old Fly', deletedAt: new Date('2026-02-27T10:00:00.000Z') };
+      mockListExercises.mockResolvedValue([BENCH, deleted]);
+      render(<ExerciseCatalogScreen />);
+
+      await expandFamily('Chest', 1);
+      fireEvent.press(await screen.findByLabelText('Exercise actions Barbell Bench Press'));
+      const sheet = await screen.findByTestId('exercise-catalog-actions-sheet');
+      expect(screen.getByRole('header', { name: 'Barbell Bench Press' })).toBeTruthy();
+      expect(sheet).toBeTruthy();
+      expect(screen.getByTestId('exercise-action-delete')).toBeTruthy();
+      expect(screen.getByText('Delete')).toHaveStyle({ color: uiRoles.danger });
+      fireEvent.press(screen.getByLabelText('Dismiss exercise action menu overlay', { includeHiddenElements: true }));
+      expect(screen.queryByTestId('exercise-catalog-actions-sheet')).toBeNull();
+
+      fireEvent.press(screen.getByLabelText('Exercise catalog options'));
+      fireEvent.press(await screen.findByLabelText('Show deleted exercises'));
+      fireEvent.press(screen.getByLabelText('Close filters', { includeHiddenElements: true }));
+      fireEvent.press(await screen.findByLabelText('Exercise actions Old Fly'));
+      await screen.findByTestId('exercise-catalog-actions-sheet');
+      expect(screen.getByLabelText('Edit exercise from actions')).toBeDisabled();
+      expect(screen.getByTestId('exercise-action-undelete')).toBeTruthy();
+      expect(screen.queryByTestId('exercise-action-delete')).toBeNull();
+    });
+
+    it('dismisses the filter keyboard before opening a sheet over it', async () => {
+      const dismissKeyboard = jest.spyOn(Keyboard, 'dismiss').mockImplementation(jest.fn());
+      mockListExercises.mockResolvedValue([BENCH]);
+      render(<ExerciseCatalogScreen />);
+
+      await expandFamily('Chest', 1);
+      fireEvent.press(await screen.findByLabelText('Exercise actions Barbell Bench Press'));
+      expect(dismissKeyboard).toHaveBeenCalledTimes(1);
+      fireEvent.press(screen.getByLabelText('Exercise catalog options'));
+      expect(dismissKeyboard).toHaveBeenCalledTimes(2);
+    });
+
+    it('says why the list is empty, once, grouped or flat', async () => {
+      mockListExercises.mockResolvedValue([]);
+      render(<ExerciseCatalogScreen />);
+
+      expect(await screen.findAllByText('No active exercises yet. Create one with the button above.')).toHaveLength(1);
+      fireEvent.press(screen.getByLabelText('Exercise catalog options'));
+      fireEvent.press(await screen.findByLabelText('Turn grouping off'));
+      fireEvent.press(screen.getByLabelText('Close filters', { includeHiddenElements: true }));
+      expect(await screen.findAllByText('No active exercises yet. Create one with the button above.')).toHaveLength(1);
+    });
+
+    it('opens the editor as a sheet with Save as its one accent, dismissed by the backdrop', async () => {
+      mockListExercises.mockResolvedValue([]);
+      render(<ExerciseCatalogScreen />);
+
+      fireEvent.press(await screen.findByLabelText('Create new exercise'));
+      expect(await screen.findByTestId('exercise-editor')).toBeTruthy();
+      expect(screen.getByRole('header', { name: 'Create Exercise' })).toBeTruthy();
+      expect(screen.getByTestId('exercise-editor-load-mode-row').props.accessibilityRole).toBe('tablist');
+      const editorAccents = accentGrounds(screen.getByTestId('exercise-editor'));
+      expect(editorAccents).toHaveLength(1);
+      expect(editorAccents[0].props.accessibilityLabel).toBe('Save exercise definition');
+
+      fireEvent.press(screen.getByLabelText('Dismiss exercise editor overlay', { includeHiddenElements: true }));
+      expect(screen.queryByTestId('exercise-editor')).toBeNull();
+    });
+
+    it('swaps the editor for the muscle list in the same sheet, and Back to exercise returns without choosing', async () => {
+      mockListExercises.mockResolvedValue([]);
+      render(<ExerciseCatalogScreen />);
+
+      fireEvent.press(await screen.findByLabelText('Create new exercise'));
+      await screen.findByTestId('exercise-editor');
+      fireEvent.changeText(screen.getByLabelText('Exercise definition name'), 'Cable Fly');
+      fireEvent.press(screen.getByLabelText('Open primary muscle selector'));
+
+      expect(screen.getByRole('header', { name: 'Select primary muscle' })).toBeTruthy();
+      expect(screen.getByTestId('exercise-editor-muscle-selector-list')).toBeTruthy();
+      // The form is hidden, not a second sheet over it.
+      expect(screen.queryByLabelText('Save exercise definition')).toBeNull();
+      expect(screen.getAllByTestId('exercise-editor')).toHaveLength(1);
+
+      fireEvent.press(screen.getByLabelText('Back to exercise'));
+      expect(screen.getByRole('header', { name: 'Create Exercise' })).toBeTruthy();
+      expect(screen.getByDisplayValue('Cable Fly')).toBeTruthy();
+      expect(screen.getByText('Select primary muscle')).toBeTruthy();
+
+      // The chosen primary is marked in the list when it opens again.
+      fireEvent.press(screen.getByLabelText('Open primary muscle selector'));
+      fireEvent.press(screen.getByLabelText('Select primary muscle Chest'));
+      fireEvent.press(screen.getByLabelText('Open primary muscle selector'));
+      expect(screen.getByTestId('exercise-editor-muscle-option-chest').props.accessibilityState).toMatchObject({ selected: true });
+    });
+
+    it('shows a save failure as a danger notice under Save', async () => {
+      mockListExercises.mockResolvedValue([]);
+      mockSaveExercise.mockRejectedValue(new Error('Disk full.'));
+      render(<ExerciseCatalogScreen />);
+
+      fireEvent.press(await screen.findByLabelText('Create new exercise'));
+      await screen.findByTestId('exercise-editor');
+      fireEvent.changeText(screen.getByLabelText('Exercise definition name'), 'Cable Fly');
+      fireEvent.press(screen.getByLabelText('Open primary muscle selector'));
+      fireEvent.press(screen.getByLabelText('Select primary muscle Chest'));
+      fireEvent.press(screen.getByLabelText('Save exercise definition'));
+
+      const notice = await screen.findByTestId('exercise-editor-save-error');
+      expect(notice.props.accessibilityRole).toBe('alert');
+      expect(notice).toHaveTextContent('Disk full.');
+      expect(screen.getByTestId('exercise-editor')).toBeTruthy();
+    });
+  });
 });

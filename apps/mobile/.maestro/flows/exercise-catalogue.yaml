@@ -1,0 +1,210 @@
+appId: com.dinoderek.mobile
+---
+# The exercise catalogue and the exercise editor (DLM-T07; lane
+# ios-ui-regression). Infra-free: the maestro-harness deep link resets local
+# data, seeds the block-history fixture (so Barbell Bench Press has history and
+# a stats line) and teleports to /exercise-catalog. No sign-in, no Supabase.
+#
+#   1. the catalogue, grouped, with the Chest family expanded;
+#   2. ⋮ → the Filters sheet; grouping off; the backdrop closes it (flat list);
+#   3. a row's ⋮ → the Actions sheet; the backdrop closes it;
+#   4. + → the editor: empty, Save with no name (inline errors), the primary
+#      muscle selector panel, filled (a primary and a secondary muscle);
+#   5. Save → the "Exercise created." notice and the new row;
+#   6. grouping back on, so the stored list preference is left as found (it
+#      lives in SecureStore, which the data reset does not touch).
+#
+# The Sheet backdrop is hidden from VoiceOver while the sheet is modal, so the
+# flow taps the dimmed page above the panel by point.
+
+- openLink: "boga3://maestro-harness?reset=data&fixture=exercise-block-history&teleport=exercise-catalog"
+- tapOn:
+    text: "Open"
+    optional: true
+- tapOn:
+    text: "Continue"
+    optional: true
+- tapOn:
+    text: "Close"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "exercise-catalog-title"
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      text: "Exercise filter input"
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 4000
+
+# --- 1. Grouped, one family open -----------------------------------------------
+- retry:
+    maxRetries: 3
+    commands:
+      - tapOn:
+          id: "exercise-family-group-chest"
+      - extendedWaitUntil:
+          visible:
+            text: "Exercise actions Barbell Bench Press"
+          timeout: 5000
+- takeScreenshot: "catalogue-list-grouped"
+
+# --- 2. Filters ----------------------------------------------------------------
+- retry:
+    maxRetries: 3
+    commands:
+      - runFlow:
+          when:
+            notVisible:
+              id: "exercise-list-date-range-row"
+          commands:
+            - tapOn: "Exercise catalog options"
+      - extendedWaitUntil:
+          visible:
+            id: "exercise-list-date-range-row"
+          timeout: 5000
+- assertVisible:
+    id: "exercise-catalog-filters-sheet"
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: "catalogue-filters-sheet"
+- retry:
+    maxRetries: 3
+    commands:
+      - runFlow:
+          when:
+            visible: "Turn grouping off"
+          commands:
+            - tapOn: "Turn grouping off"
+      - extendedWaitUntil:
+          visible:
+            text: "Turn grouping on"
+          timeout: 5000
+- tapOn:
+    point: "50%,12%"
+- extendedWaitUntil:
+    notVisible:
+      id: "exercise-list-date-range-row"
+    timeout: 10000
+- extendedWaitUntil:
+    visible:
+      text: "Exercise actions Barbell Bench Press"
+    timeout: 10000
+- takeScreenshot: "catalogue-list-flat"
+
+# --- 3. Row actions ------------------------------------------------------------
+- tapOn: "Exercise actions Barbell Bench Press"
+- extendedWaitUntil:
+    visible:
+      text: "Edit exercise from actions"
+    timeout: 10000
+- assertVisible:
+    text: "Delete exercise from actions"
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: "catalogue-row-actions-sheet"
+- tapOn:
+    point: "50%,20%"
+- extendedWaitUntil:
+    notVisible:
+      text: "Edit exercise from actions"
+    timeout: 10000
+
+# --- 4. The editor -------------------------------------------------------------
+- tapOn:
+    id: "create-new-exercise-button"
+- extendedWaitUntil:
+    visible:
+      id: "exercise-editor-name-input"
+    timeout: 10000
+- pressKey: Enter
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: "editor-create-empty"
+- tapOn: "Save exercise definition"
+- extendedWaitUntil:
+    visible:
+      id: "exercise-editor-name-error"
+    timeout: 10000
+- assertVisible:
+    text: "Select a primary muscle before saving."
+- takeScreenshot: "editor-validation-errors"
+- tapOn:
+    id: "exercise-editor-name-input"
+- inputText: "Maestro Catalogue Press"
+- pressKey: Enter
+- tapOn:
+    id: "exercise-editor-primary-muscle-trigger"
+- extendedWaitUntil:
+    visible:
+      id: "exercise-editor-muscle-selector-list"
+    timeout: 10000
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: "editor-muscle-selector"
+- tapOn:
+    id: "exercise-editor-muscle-option-chest"
+- extendedWaitUntil:
+    visible:
+      id: "exercise-editor-secondary-muscle-trigger"
+    timeout: 10000
+- tapOn:
+    id: "exercise-editor-secondary-muscle-trigger"
+- extendedWaitUntil:
+    visible:
+      id: "exercise-editor-muscle-option-delts_front"
+    timeout: 10000
+- tapOn:
+    id: "exercise-editor-muscle-option-delts_front"
+- extendedWaitUntil:
+    visible:
+      text: "Remove secondary muscle Front Delts"
+    timeout: 10000
+- tapOn:
+    id: "exercise-editor-load-mode-per_side_load"
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: "editor-filled"
+
+# --- 5. Save -------------------------------------------------------------------
+- tapOn: "Save exercise definition"
+- extendedWaitUntil:
+    visible:
+      text: "Exercise created."
+    timeout: 10000
+- tapOn: "Exercise filter input"
+- inputText: "Maestro Catalogue"
+- pressKey: Enter
+- extendedWaitUntil:
+    visible:
+      text: "Exercise actions Maestro Catalogue Press"
+    timeout: 10000
+- assertVisible:
+    text: "Exercise created."
+- takeScreenshot: "catalogue-created-notice"
+
+# --- 6. Leave the list preference as found (grouping on) -----------------------
+- tapOn: "Exercise catalog options"
+- extendedWaitUntil:
+    visible:
+      id: "exercise-list-date-range-row"
+    timeout: 10000
+- retry:
+    maxRetries: 3
+    commands:
+      - runFlow:
+          when:
+            visible: "Turn grouping on"
+          commands:
+            - tapOn: "Turn grouping on"
+      - extendedWaitUntil:
+          visible:
+            text: "Turn grouping off"
+          timeout: 5000
+- tapOn:
+    point: "50%,12%"
+- extendedWaitUntil:
+    notVisible:
+      id: "exercise-list-date-range-row"
+    timeout: 10000

@@ -122,7 +122,8 @@ Brief entrypoint inventory of the current reusable UI component set.
     grows past the top of the screen (a taller body shrinks to fit). DLM-T06
     added `headerActions` (controls on the title's row, `<testID>-header`) and
     `keyboardAvoiding` (lifts the panel above the keyboard), for the exercise
-    picker
+    picker. DLM-T07 added `headerLeading` (one control before the title): the
+    exercise editor's `chevron-left` `Back to exercise` from its muscle list
   - `ActionButton` — `primary` (`accent` ground: the screen's one primary),
     `outline` (`ink` hairline) or `text` (caps label); `tone="danger"` recolours
     an outline or text button. Control radius, 44pt tall, Archivo caps label.
@@ -139,11 +140,13 @@ Brief entrypoint inventory of the current reusable UI component set.
   - `IconButton` — a labelled 44pt icon-only control; `tone` `default` (`ink`),
     `muted`, `danger`, or `accent` (a filled square: the screen's one primary as
     an icon). Every top bar's back and ⋮, View Session's card ⋮, and the
-    exercise picker's ⋮ / Manage / Add new (DLM-T06)
+    exercise picker's ⋮ / Manage / Add new (DLM-T06), and the catalogue's `accent`
+    `+`, ⋮ and row ⋮ and the editor's back and remove controls (DLM-T07)
   - `StatePanel` — a loading / message / error state: optional spinner, title
     (Archivo), body (`ink-muted`), one outline action and optional children;
     `fill` (centred in its space, the default) or inline. The session view's,
-    exercise page's and View Session's non-content states
+    exercise page's and View Session's non-content states; the catalogue's
+    and the exercise editor's loading and error (DLM-T07)
   - `Screen` / `ScreenScroll` — the `paper` ground; the scroll body with the page
     gutter (`lg`, or `md` for the exercise page) and the `md` card gap, passing
     other `ScrollView` props through (refresh, keyboard insets). Used by the
@@ -152,30 +155,37 @@ Brief entrypoint inventory of the current reusable UI component set.
     turning `danger` while invalid, the error below (`<testID>-error` or
     `errorTestID`), an optional hint or counter; `face` `figure` (Plex Mono) or
     `text`. The completed edit's Start / End (`session-times-fields`), and the
-    credential and profile fields of Sign in and Profile (DLM-T05)
+    credential and profile fields of Sign in and Profile (DLM-T05), and the
+    exercise name in `ExerciseCoreFields` (DLM-T07)
   - `SearchField` — search glyph, text, and a clear control while there is text;
     `accessibilityLabel` required. The swap sheet's search, the exercise
-    picker's filter (DLM-T06) and the Progress filter (DLM-T08)
+    picker's filter (DLM-T06), the Progress filter (DLM-T08) and the
+    catalogue's filter (DLM-T07)
   - `SegmentedControl` — one choice from a few, joined in a `rule-strong` frame,
     the selected segment solid `ink`; `layout` `fill` (equal width) or `inline`;
     `tablist` / `tab` / `selected` and the `<prefix>-row` / `<prefix>-<value>`
     testIDs of the legacy `SegmentedChips`. The records panel's `Records` | `Last`,
     Settings' date format (DLM-T04), the exercise list's date range
-    (`exercise-list-date-range-*`, DLM-T06), and Progress's Time range and
-    Breakdown (DLM-T08)
+    (`exercise-list-date-range-*`, DLM-T06), Progress's Time range and
+    Breakdown (DLM-T08), and `ExerciseCoreFields`' weight entry
+    (`<prefix>-load-mode-*`, DLM-T07, which added `disabled` for the group
+    exercise form's pending state)
   - `ChipGroup` — wrapping pills, `single` (a tab list, `selected`) or `multi`
     (checkboxes, `checked`), the same testID contract, per-chip accessibility
-    labels. Logs' level filter (DLM-T04), and the exercise list's `Group by
-    muscle` / `Recents on top` (`multi`, `exercise-list-options-*`, DLM-T06)
+    labels. Logs' level filter (DLM-T04), the exercise list's `Group by
+    muscle` / `Recents on top` (`multi`, `exercise-list-options-*`, DLM-T06),
+    and the catalogue's muscle and visibility filters (`multi`, DLM-T07)
   - `Tag` — a static micro-label pill naming a state (`Archived`, `Deleted`, a
-    role); `neutral` or `faint`. Connected agents' `AI` tag (DLM-T05), and the
-    exercise list's `Deleted` (`faint`, DLM-T06)
+    role); `neutral` or `faint`. Connected agents' `AI` tag (DLM-T05), the
+    exercise list's `Deleted` (`faint`, DLM-T06), and the catalogue's active
+    filters (DLM-T07)
   - `Notice` — a `surface-subtle` band on a `rule` hairline: optional glyph, words,
     optional action; `neutral` or `danger` (`alert`); `live` announces it. There
     is no success or warning hue: the glyph and words carry the state. An
     optional `title` (Archivo 700, a `header`) names a message that is a reason
     ("Sign-in unavailable"). Settings' developer-tool outcomes (DLM-T04);
-    Sign-in, the first-sync gate and Profile (DLM-T05)
+    Sign-in, the first-sync gate and Profile (DLM-T05); the catalogue's outcome
+    and the exercise editor's save failure (DLM-T07)
   - `PageHeader` / `SectionHeader` (`page-header.tsx`, DLM-T03) — a tab
     screen's in-content title (Archivo 800 `xxl`) and optional `ink-muted`
     intro; a section's heading (Archivo 700 `lg`) with an optional caps text
@@ -258,8 +268,9 @@ Brief entrypoint inventory of the current reusable UI component set.
 4. `ExerciseEditorModal`
 - File: `apps/mobile/components/exercise-catalog/exercise-editor-modal.tsx`
 - Purpose:
-  - shared create/edit exercise editor modal reused by `exercise-catalog` and the exercise picker's `Add new`
+  - shared create/edit exercise editor reused by `exercise-catalog`, the exercise picker's `Add new` and group `Add as new`, the exercise page and the group exercises page
   - optional `prefill` (name, weight entry, muscles for a new exercise), `onSave` (replaces the default save; a rejection shows inline), and `title` (M25-T07: the picker's group `Add as new` prefills from the group exercise and saves through `createExerciseWithGroupLink`); the fields are unchanged
+  - in the design language (DLM-T07): a tall `Sheet` (`keyboardAvoiding`, testID `exercise-editor`, backdrop `Dismiss exercise editor overlay`, no Cancel) holding `ExerciseCoreFields`, a field-framed `ListRow` for the primary muscle (`exercise-editor-primary-muscle-trigger`), the secondary muscles as `ListRow`s in a `Card` with a `danger` `x` each, an outline `Add secondary muscle` (`exercise-editor-secondary-muscle-trigger`), and `Save Exercise`, the sheet's one `accent`. The muscle list is a panel swap in the same sheet (T07-D3): the title changes, `headerLeading` is a `chevron-left` `Back to exercise` (`exercise-editor-muscle-selector-back`), and the rows are `ListRow`s (`exercise-editor-muscle-option-<id>`, `radio-on` / `radio-off` for the primary, `plus` for a secondary) in `exercise-editor-muscle-selector-list`. Target: `design-targets/exercise-catalogue.md`
 
 5. `ExerciseListContent` / `ExerciseListPreferenceControls`
 - File: `apps/mobile/components/exercise-catalog/exercise-list-controls.tsx`
@@ -364,7 +375,7 @@ Brief entrypoint inventory of the current reusable UI component set.
 12. Exercise core fields (M25)
 - File: `apps/mobile/components/exercise-core/exercise-core-fields.tsx`
 - Purpose:
-  - `ExerciseCoreFields` — the exercise-name input and the `Total load` / `Per side` weight-entry control (labels from `LOAD_INPUT_MODE_LABELS`), shared by the personal exercise editor (`exercise-catalog/exercise-editor-modal.tsx`) and the group exercise form; both validate with `validateExerciseCore`. testIDs `<prefix>-name-input`, `<prefix>-name-error`, `<prefix>-load-mode-<mode>` (the editor keeps `exercise-editor-*`)
+  - `ExerciseCoreFields` — the exercise-name input and the `Total load` / `Per side` weight-entry control (labels from `LOAD_INPUT_MODE_LABELS`), shared by the personal exercise editor (`exercise-catalog/exercise-editor-modal.tsx`) and the group exercise form; both validate with `validateExerciseCore`. testIDs `<prefix>-name-input`, `<prefix>-name-error`, `<prefix>-load-mode-<mode>` (the editor keeps `exercise-editor-*`). In the design language (DLM-T07): a `FormField` (`face="text"`) for the name and a micro-labelled `SegmentedControl` (`<prefix>-load-mode`, `disabled` while not editable) for the weight entry, each segment labelled `<label> weight entry`
 
 13. Exercise page
 - Folder: `apps/mobile/components/exercise-page/`; rules in `apps/mobile/src/session-recorder/exercise-page-model.ts`, records in `exercise-records.ts`, persistence in `session-exercise-draft.ts` + `use-session-exercise-draft.ts`

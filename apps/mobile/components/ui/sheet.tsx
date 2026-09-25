@@ -13,6 +13,10 @@ export type SheetProps = {
   // Accessibility label of the backdrop, e.g. `Dismiss options`.
   dismissLabel: string;
   title?: string;
+  // One control before the title, usually a `chevron-left` `IconButton` that
+  // returns from a panel shown inside the sheet (the exercise editor's muscle
+  // selector).
+  headerLeading?: ReactNode;
   // Controls on the title's row, right-aligned: usually `IconButton`s (the
   // exercise picker's ⋮, Manage and Add new).
   headerActions?: ReactNode;
@@ -33,6 +37,7 @@ export function Sheet({
   onDismiss,
   dismissLabel,
   title,
+  headerLeading,
   headerActions,
   keyboardAvoiding = false,
   children,
@@ -59,10 +64,15 @@ export function Sheet({
         <View style={styles.handleArea}>
           <View style={styles.handle} />
         </View>
-        {title || headerActions ? (
+        {title || headerLeading || headerActions ? (
           <View
-            style={[styles.header, headerActions ? styles.headerWithActions : null]}
+            style={[
+              styles.header,
+              headerActions ? styles.headerWithActions : null,
+              headerLeading ? styles.headerWithLeading : null,
+            ]}
             testID={testID ? `${testID}-header` : undefined}>
+            {headerLeading}
             {title ? (
               <Text allowFontScaling={false} accessibilityRole="header" numberOfLines={1} style={styles.title}>
                 {title}
@@ -126,6 +136,10 @@ const styles = StyleSheet.create({
   // The controls bring their own 44pt target, so the row ends at their edge.
   headerWithActions: {
     paddingRight: uiSpace.sm,
+    paddingBottom: uiSpace.sm,
+  },
+  headerWithLeading: {
+    paddingLeft: uiSpace.xs,
     paddingBottom: uiSpace.sm,
   },
   headerActions: {

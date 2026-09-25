@@ -1,5 +1,5 @@
 /**
- * M25-T07 AC5 (catalogue half): the Exercise Catalog ⋮ Exercise Actions menu
+ * M25-T07 AC5 (catalogue half): the Exercise Catalog row ⋮ actions sheet
  * gains "Link to group exercise…", which pushes the Link screen for that
  * exercise. It is signed-in only, and disabled for a soft-deleted exercise
  * (card decision (b)). The data layer is mocked like
@@ -76,7 +76,8 @@ beforeEach(() => {
 
 const openActions = async (name: string) => {
   fireEvent.press(await screen.findByLabelText(`Exercise actions ${name}`));
-  await screen.findByText('Exercise Actions');
+  // The actions sheet is titled with the exercise's name (DLM-T07).
+  await screen.findByTestId('exercise-catalog-actions-sheet');
 };
 
 describe('catalogue ⋮ Link to group exercise…', () => {
@@ -88,7 +89,7 @@ describe('catalogue ⋮ Link to group exercise…', () => {
     fireEvent.press(screen.getByLabelText('Link to group exercise from actions'));
 
     expect(mockPush).toHaveBeenCalledWith('/exercise-link?exerciseDefinitionId=seed_barbell_bench_press');
-    expect(screen.queryByText('Exercise Actions')).toBeNull();
+    expect(screen.queryByTestId('exercise-catalog-actions-sheet')).toBeNull();
   });
 
   it('is disabled for a soft-deleted exercise', async () => {
@@ -96,7 +97,8 @@ describe('catalogue ⋮ Link to group exercise…', () => {
     fireEvent.press(await screen.findByLabelText('Exercise catalog options'));
     await screen.findByText('Filters');
     fireEvent.press(screen.getByLabelText('Show deleted exercises'));
-    fireEvent.press(screen.getByLabelText('Close filters'));
+    // The Filters sheet's backdrop, hidden from VoiceOver while the sheet is modal.
+    fireEvent.press(screen.getByLabelText('Close filters', { includeHiddenElements: true }));
     fireEvent.press(await screen.findByLabelText('Chest exercises 2'));
     await screen.findByText('Old Fly');
     await openActions('Old Fly');

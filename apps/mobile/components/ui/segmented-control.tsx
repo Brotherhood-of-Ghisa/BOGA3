@@ -21,6 +21,8 @@ export type SegmentedControlProps<TValue extends string | number> = {
   accessibilityLabel?: string;
   layout?: SegmentedControlLayout;
   hitSlop?: number;
+  // Every segment inert and faded, e.g. while the form it belongs to saves.
+  disabled?: boolean;
   style?: StyleProp<ViewStyle>;
 };
 
@@ -35,6 +37,7 @@ export function SegmentedControl<TValue extends string | number>({
   accessibilityLabel,
   layout = 'fill',
   hitSlop,
+  disabled = false,
   style,
 }: SegmentedControlProps<TValue>) {
   const fill = layout === 'fill';
@@ -50,7 +53,9 @@ export function SegmentedControl<TValue extends string | number>({
           <Pressable
             accessibilityLabel={option.accessibilityLabel ?? option.label}
             accessibilityRole="tab"
-            accessibilityState={{ selected }}
+            accessibilityState={disabled ? { selected, disabled } : { selected }}
+            // Only when set: Pressable folds an explicit `false` into the state.
+            disabled={disabled || undefined}
             hitSlop={hitSlop}
             key={String(option.value)}
             onPress={() => {
@@ -63,9 +68,13 @@ export function SegmentedControl<TValue extends string | number>({
               fill ? styles.segmentFill : null,
               index > 0 ? styles.segmentDivider : null,
               selected ? styles.segmentSelected : null,
+              disabled && selected ? styles.segmentSelectedDisabled : null,
             ]}
             testID={`${testIDPrefix}-${option.value}`}>
-            <Text allowFontScaling={false} numberOfLines={1} style={[styles.label, selected ? styles.labelSelected : null]}>
+            <Text
+              allowFontScaling={false}
+              numberOfLines={1}
+              style={[styles.label, selected ? styles.labelSelected : null, disabled && !selected ? styles.labelDisabled : null]}>
               {option.label}
             </Text>
           </Pressable>
@@ -103,6 +112,9 @@ const styles = StyleSheet.create({
   segmentSelected: {
     backgroundColor: uiRoles.ink,
   },
+  segmentSelectedDisabled: {
+    backgroundColor: uiRoles.disabled,
+  },
   label: {
     fontFamily: uiFonts.display.family,
     fontWeight: '700',
@@ -114,5 +126,8 @@ const styles = StyleSheet.create({
   },
   labelSelected: {
     color: uiRoles.surface,
+  },
+  labelDisabled: {
+    color: uiRoles.disabled,
   },
 });

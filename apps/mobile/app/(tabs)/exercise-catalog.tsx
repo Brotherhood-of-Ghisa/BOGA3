@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Keyboard, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { ExerciseEditorModal } from '@/components/exercise-catalog/exercise-editor-modal';
 import { MoreHubBackButton } from '@/components/navigation/more-hub-back-button';
@@ -8,7 +8,19 @@ import {
   ExerciseListContent,
   ExerciseListPreferenceControls,
 } from '@/components/exercise-catalog/exercise-list-controls';
-import { Icon, uiColors, uiRadius, uiSpace, uiTypography } from '@/components/ui';
+import { ActionButton } from '@/components/ui/action-button';
+import { ChipGroup } from '@/components/ui/chip-group';
+import { Icon } from '@/components/ui/icon';
+import { IconButton } from '@/components/ui/icon-button';
+import { ListRow } from '@/components/ui/list-row';
+import { Notice } from '@/components/ui/notice';
+import { PageHeader } from '@/components/ui/page-header';
+import { Screen } from '@/components/ui/screen';
+import { SearchField } from '@/components/ui/search-field';
+import { Sheet } from '@/components/ui/sheet';
+import { StatePanel } from '@/components/ui/state-panel';
+import { Tag } from '@/components/ui/tag';
+import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import {
   deleteExerciseCatalogExercise,
   undeleteExerciseCatalogExercise,
@@ -136,19 +148,26 @@ export default function ExerciseCatalogScreen() {
     [openEditorForExercise]
   );
 
+  // A sheet never opens under the filter's keyboard.
   const handlePressRowActions = useCallback((exercise: ExerciseCatalogExercise) => {
+    Keyboard.dismiss();
     setExerciseActionMenuTarget(exercise);
+  }, []);
+
+  const openFilters = useCallback(() => {
+    Keyboard.dismiss();
+    setIsCatalogOptionsMenuVisible(true);
   }, []);
 
   const renderExerciseActions = useCallback(
     (exercise: ExerciseListItem) => (
-      <Pressable
+      <IconButton
         accessibilityLabel={`Exercise actions ${exercise.name}`}
-        accessibilityRole="button"
-        style={styles.exerciseRowKebabButton}
-        onPress={() => handlePressRowActions(exercise)}>
-        <Icon color={uiColors.textSecondary} name="more-vertical" size="sm" />
-      </Pressable>
+        name="more-vertical"
+        onPress={() => handlePressRowActions(exercise)}
+        size="sm"
+        tone="muted"
+      />
     ),
     [handlePressRowActions]
   );
@@ -262,62 +281,59 @@ export default function ExerciseCatalogScreen() {
     return chips;
   }, [filters, listPreferences]);
 
+  const emptyListText =
+    exercises.length === 0
+      ? 'No active exercises yet. Create one with the button above.'
+      : 'No exercises match the current filters.';
+  const actionTarget = exerciseActionMenuTarget;
+  const isActionTargetDeleted = Boolean(actionTarget?.deletedAt);
+
   if (isLoading) {
     return (
-      <View style={styles.screen}>
-        <View style={styles.centeredState}>
-          <Text allowFontScaling={false} selectable style={styles.stateText}>
-            Loading exercise catalog…
-          </Text>
-        </View>
-      </View>
+      <Screen testID="exercise-catalog-screen">
+        <StatePanel body="Loading exercise catalog…" kind="loading" />
+      </Screen>
     );
   }
 
   if (loadError) {
     return (
-      <View style={styles.screen}>
-        <View style={styles.centeredState}>
-          <Text allowFontScaling={false} selectable style={styles.errorText}>
-            {loadError}
-          </Text>
-        </View>
-      </View>
+      <Screen testID="exercise-catalog-screen">
+        <StatePanel body={loadError} kind="error" />
+      </Screen>
     );
   }
 
   return (
-    <View style={styles.screen}>
+    <Screen style={styles.screen} testID="exercise-catalog-screen">
       <View style={styles.pinnedTopRegion}>
         <MoreHubBackButton />
+        <View testID="exercise-catalog-title">
+          <PageHeader title="Exercises" />
+        </View>
         <View style={styles.topActionRow}>
-          <TextInput
-            allowFontScaling={false}
-            accessibilityLabel="Exercise filter input"
-            autoCapitalize="none"
-            autoCorrect={false}
-            onChangeText={setExerciseSearchValue}
-            placeholder="Filter by exercise or muscle group"
-            style={[styles.filterInput, styles.filterInputInline]}
-            value={exerciseSearchValue}
-          />
-          <View style={styles.topActionButtonsCluster}>
-            <Pressable
-              accessibilityLabel="Create new exercise"
-              accessibilityRole="button"
-              style={[styles.iconActionButton, styles.createExerciseButton]}
-              onPress={startNewExercise}
-              testID="create-new-exercise-button">
-              <Icon color={uiColors.surfaceDefault} name="plus" size="lg" />
-            </Pressable>
-            <Pressable
-              accessibilityLabel="Exercise catalog options"
-              accessibilityRole="button"
-              style={styles.iconActionButton}
-              onPress={() => setIsCatalogOptionsMenuVisible(true)}>
-              <Icon color={uiColors.textSecondary} name="more-vertical" />
-            </Pressable>
+          <View style={styles.search}>
+            <SearchField
+              accessibilityLabel="Exercise filter input"
+              autoCapitalize="none"
+              onChangeText={setExerciseSearchValue}
+              placeholder="Filter by exercise or muscle group"
+              value={exerciseSearchValue}
+            />
           </View>
+          <IconButton
+            accessibilityLabel="Create new exercise"
+            name="plus"
+            onPress={startNewExercise}
+            testID="create-new-exercise-button"
+            tone="accent"
+          />
+          <IconButton
+            accessibilityLabel="Exercise catalog options"
+            name="more-vertical"
+            onPress={openFilters}
+            testID="exercise-catalog-options-button"
+          />
         </View>
         {activeFilterChips.length > 0 ? (
           <View style={styles.activeFilterChipsRow}>
@@ -325,28 +341,16 @@ export default function ExerciseCatalogScreen() {
               <Pressable
                 key={chip.key}
                 accessibilityLabel={`Open filters (${chip.label})`}
-                onPress={() => setIsCatalogOptionsMenuVisible(true)}>
-                <Text allowFontScaling={false} selectable style={styles.activeFilterChip}>
-                  {chip.label}
-                </Text>
+                accessibilityRole="button"
+                hitSlop={uiSpace.xs}
+                onPress={openFilters}>
+                <Tag label={chip.label} />
               </Pressable>
             ))}
           </View>
         ) : null}
-        {saveFeedback ? (
-          <View style={styles.feedbackCard}>
-            <Text allowFontScaling={false} selectable style={styles.successText}>
-              {saveFeedback}
-            </Text>
-          </View>
-        ) : null}
-        {saveError ? (
-          <View style={styles.errorCard}>
-            <Text allowFontScaling={false} selectable style={styles.errorText}>
-              {saveError}
-            </Text>
-          </View>
-        ) : null}
+        {saveFeedback ? <Notice icon="success" live message={saveFeedback} testID="exercise-catalog-feedback" /> : null}
+        {saveError ? <Notice live message={saveError} testID="exercise-catalog-error" tone="danger" /> : null}
       </View>
 
       <ScrollView
@@ -359,22 +363,16 @@ export default function ExerciseCatalogScreen() {
           items={exerciseListModel.items}
           sections={exerciseListModel.sections}
           expandedFamilies={expandedExerciseFamilies}
-          emptyText={
-            exercises.length === 0
-              ? 'No active exercises yet. Create one with the button above.'
-              : 'No exercises match the current filters.'
-          }
+          emptyText={emptyListText}
           onToggleFamily={toggleExerciseFamily}
           onPressExercise={handlePressEditRow}
           getExerciseAccessibilityLabel={(exercise) => `Edit exercise definition ${exercise.name}`}
           renderActions={renderExerciseActions}
         />
+        {/* Grouped, the shared list draws only the family cards (all empty), so
+            the catalogue says why beneath them, as the flat list does. */}
         {exerciseListModel.items.length === 0 && exerciseListModel.mode === 'grouped' ? (
-          <Text allowFontScaling={false} selectable style={styles.helperText}>
-            {exercises.length === 0
-              ? 'No active exercises yet. Create one with the button above.'
-              : 'No exercises match the current filters.'}
-          </Text>
+          <StatePanel body={emptyListText} fill={false} />
         ) : null}
       </ScrollView>
 
@@ -385,205 +383,154 @@ export default function ExerciseCatalogScreen() {
         onSaved={handleEditorSaved}
       />
 
-      <Modal
-        animationType="fade"
-        transparent
-        visible={isCatalogOptionsMenuVisible}
-        onRequestClose={() => setIsCatalogOptionsMenuVisible(false)}>
-        <View style={styles.modalRoot}>
-          <Pressable
-            accessibilityLabel="Dismiss exercise catalog options overlay"
-            style={styles.modalOverlay}
-            onPress={() => setIsCatalogOptionsMenuVisible(false)}
+      <Sheet
+        dismissLabel="Close filters"
+        onDismiss={() => setIsCatalogOptionsMenuVisible(false)}
+        testID="exercise-catalog-filters-sheet"
+        title="Filters"
+        visible={isCatalogOptionsMenuVisible}>
+        <ScrollView
+          style={styles.filtersScroll}
+          contentContainerStyle={styles.filtersScrollContent}
+          keyboardShouldPersistTaps="handled">
+          <ExerciseListPreferenceControls
+            preferences={listPreferences}
+            onChangePreferences={setListPreferences}
           />
-          <View style={styles.filtersModalCard}>
-            <View style={styles.filtersModalHeader}>
-              <Text allowFontScaling={false} selectable style={styles.modalTitle}>
-                Filters
+
+          <View style={styles.filtersGroup}>
+            <View style={styles.filtersSectionHeaderRow}>
+              <Text allowFontScaling={false} accessibilityRole="header" style={styles.sectionLabel}>
+                Muscle groups
               </Text>
-              <Pressable
-                accessibilityLabel="Close filters"
-                style={styles.filtersCloseButton}
-                onPress={() => setIsCatalogOptionsMenuVisible(false)}>
-                <Text allowFontScaling={false} style={styles.filtersCloseButtonText}>Done</Text>
-              </Pressable>
-            </View>
-
-            <ScrollView
-              style={styles.filtersScroll}
-              contentContainerStyle={styles.filtersScrollContent}
-              keyboardShouldPersistTaps="handled">
-              <ExerciseListPreferenceControls
-                preferences={listPreferences}
-                onChangePreferences={setListPreferences}
-              />
-
-              <View style={styles.filtersSectionHeaderRow}>
-                <Text allowFontScaling={false} selectable style={styles.filtersSectionLabel}>
-                  Muscle groups
-                </Text>
-                {filters.muscleGroupIds.size > 0 ? (
-                  <Pressable
+              {filters.muscleGroupIds.size > 0 ? (
+                <View style={styles.clearAction}>
+                  <ActionButton
                     accessibilityLabel="Clear muscle group selection"
-                    onPress={clearFilterMuscleGroups}>
-                    <Text allowFontScaling={false} style={styles.filtersClearLink}>Clear</Text>
-                  </Pressable>
-                ) : null}
-              </View>
-              <View style={styles.filtersPillRow}>
-                {muscleGroups.length === 0 ? (
-                  <Text allowFontScaling={false} style={styles.helperText}>No muscle groups defined.</Text>
-                ) : (
-                  muscleGroups.map((group) => {
-                    const selected = filters.muscleGroupIds.has(group.id);
-                    return (
-                      <Pressable
-                        key={group.id}
-                        accessibilityLabel={`Toggle muscle group ${group.displayName}`}
-                        style={[styles.filterPill, selected && styles.filterPillSelected]}
-                        onPress={() => toggleFilterMuscleGroup(group.id)}>
-                        <Text
-                          allowFontScaling={false}
-                          style={[
-                            styles.filterPillText,
-                            selected && styles.filterPillTextSelected,
-                          ]}>
-                          {group.displayName}
-                        </Text>
-                      </Pressable>
-                    );
-                  })
-                )}
-              </View>
-
-              <Text allowFontScaling={false} selectable style={styles.filtersSectionLabel}>
-                Visibility
-              </Text>
-              <View style={styles.filtersPillRow}>
-                <Pressable
-                  accessibilityLabel={
-                    filters.showDeleted ? 'Hide deleted exercises' : 'Show deleted exercises'
-                  }
-                  style={[styles.filterPill, filters.showDeleted && styles.filterPillSelected]}
-                  onPress={toggleFilterShowDeleted}>
-                  <Text
-                    allowFontScaling={false}
-                    style={[
-                      styles.filterPillText,
-                      filters.showDeleted && styles.filterPillTextSelected,
-                    ]}>
-                    Show deleted
-                  </Text>
-                </Pressable>
-                <Pressable
-                  accessibilityLabel={
-                    filters.showNeverDone
-                      ? 'Hide exercises never done'
-                      : 'Show exercises never done'
-                  }
-                  style={[styles.filterPill, filters.showNeverDone && styles.filterPillSelected]}
-                  onPress={toggleFilterShowNeverDone}>
-                  <Text
-                    allowFontScaling={false}
-                    style={[
-                      styles.filterPillText,
-                      filters.showNeverDone && styles.filterPillTextSelected,
-                    ]}>
-                    Show never-done
-                  </Text>
-                </Pressable>
-              </View>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      <Modal
-        animationType="fade"
-        transparent
-        visible={exerciseActionMenuTarget !== null}
-        onRequestClose={() => setExerciseActionMenuTarget(null)}>
-        <View style={styles.modalRoot}>
-          <Pressable
-            accessibilityLabel="Dismiss exercise action menu overlay"
-            style={styles.modalOverlay}
-            onPress={() => setExerciseActionMenuTarget(null)}
-          />
-          <View style={styles.actionMenuCard}>
-            <Text allowFontScaling={false} selectable style={styles.modalTitle}>
-              Exercise Actions
-            </Text>
-            <Text allowFontScaling={false} selectable style={styles.helperText}>
-              {exerciseActionMenuTarget?.name ?? 'Exercise'}
-            </Text>
-            <Pressable
-              accessibilityLabel="Edit exercise from actions"
-              style={styles.actionMenuButton}
-              disabled={Boolean(exerciseActionMenuTarget?.deletedAt)}
-              onPress={() => {
-                const target = exerciseActionMenuTarget;
-                setExerciseActionMenuTarget(null);
-                if (target && !target.deletedAt) {
-                  openEditorForExercise(target);
-                }
-              }}>
-              <Text allowFontScaling={false} style={styles.actionMenuButtonText}>Edit</Text>
-            </Pressable>
-            {groupLinkingUserId ? (
-              <Pressable
-                accessibilityLabel="Link to group exercise from actions"
-                accessibilityState={{ disabled: Boolean(exerciseActionMenuTarget?.deletedAt) }}
-                style={styles.actionMenuButton}
-                testID="exercise-action-link-group"
-                // A soft-deleted exercise is never linked from the UI (M25-T07 (b)).
-                disabled={Boolean(exerciseActionMenuTarget?.deletedAt)}
-                onPress={() => {
-                  const target = exerciseActionMenuTarget;
-                  setExerciseActionMenuTarget(null);
-                  if (target && !target.deletedAt) {
-                    router.push(exerciseLinkHref(target.id));
-                  }
-                }}>
-                <Text allowFontScaling={false} style={styles.actionMenuButtonText}>Link to group exercise…</Text>
-              </Pressable>
-            ) : null}
-            {exerciseActionMenuTarget?.deletedAt ? (
-              <Pressable
-                accessibilityLabel="Undelete exercise from actions"
-                style={styles.actionMenuButton}
-                onPress={() => {
-                  const target = exerciseActionMenuTarget;
-                  if (target) {
-                    void undeleteExercise(target);
-                  }
-                }}>
-                <Text allowFontScaling={false} style={styles.actionMenuButtonText}>Undelete</Text>
-              </Pressable>
+                    label="Clear"
+                    onPress={clearFilterMuscleGroups}
+                    variant="text"
+                  />
+                </View>
+              ) : null}
+            </View>
+            {muscleGroups.length === 0 ? (
+              <Text allowFontScaling={false} style={styles.helperText}>No muscle groups defined.</Text>
             ) : (
-              <Pressable
-                accessibilityLabel="Delete exercise from actions"
-                style={[styles.actionMenuButton, styles.actionMenuDeleteButton]}
-                onPress={() => {
-                  const target = exerciseActionMenuTarget;
-                  setExerciseActionMenuTarget(null);
-                  if (target) {
-                    void deleteExercise(target);
-                  }
-                }}>
-                <Text allowFontScaling={false} style={styles.actionMenuDeleteButtonText}>Delete</Text>
-              </Pressable>
+              <ChipGroup
+                mode="multi"
+                onToggle={toggleFilterMuscleGroup}
+                options={muscleGroups.map((group) => ({
+                  value: group.id,
+                  label: group.displayName,
+                  accessibilityLabel: `Toggle muscle group ${group.displayName}`,
+                }))}
+                testIDPrefix="exercise-catalog-filter-muscle"
+                values={[...filters.muscleGroupIds]}
+              />
             )}
           </View>
-        </View>
-      </Modal>
-    </View>
+
+          <View style={styles.filtersGroup}>
+            <Text allowFontScaling={false} accessibilityRole="header" style={styles.sectionLabel}>
+              Visibility
+            </Text>
+            <ChipGroup
+              mode="multi"
+              onToggle={(option) => (option === 'deleted' ? toggleFilterShowDeleted() : toggleFilterShowNeverDone())}
+              options={[
+                {
+                  value: 'deleted',
+                  label: 'Show deleted',
+                  accessibilityLabel: filters.showDeleted ? 'Hide deleted exercises' : 'Show deleted exercises',
+                },
+                {
+                  value: 'never-done',
+                  label: 'Show never-done',
+                  accessibilityLabel: filters.showNeverDone ? 'Hide exercises never done' : 'Show exercises never done',
+                },
+              ]}
+              testIDPrefix="exercise-catalog-filter-visibility"
+              values={[
+                ...(filters.showDeleted ? (['deleted'] as const) : []),
+                ...(filters.showNeverDone ? (['never-done'] as const) : []),
+              ]}
+            />
+          </View>
+        </ScrollView>
+      </Sheet>
+
+      {/* A row's ⋮. Delete does not confirm (T07-D4): it is a soft delete,
+          undone from this same sheet with Undelete once Show deleted is on. */}
+      <Sheet
+        dismissLabel="Dismiss exercise action menu overlay"
+        onDismiss={() => setExerciseActionMenuTarget(null)}
+        testID="exercise-catalog-actions-sheet"
+        title={actionTarget?.name}
+        visible={actionTarget !== null}>
+        <ListRow
+          accessibilityLabel="Edit exercise from actions"
+          disabled={isActionTargetDeleted}
+          label="Edit"
+          leading={<Icon color={isActionTargetDeleted ? uiRoles.disabled : uiRoles.ink} name="pencil" size="md" />}
+          onPress={() => {
+            setExerciseActionMenuTarget(null);
+            if (actionTarget && !actionTarget.deletedAt) {
+              openEditorForExercise(actionTarget);
+            }
+          }}
+          testID="exercise-action-edit"
+        />
+        {groupLinkingUserId ? (
+          <ListRow
+            accessibilityLabel="Link to group exercise from actions"
+            // A soft-deleted exercise is never linked from the UI (M25-T07 (b)).
+            disabled={isActionTargetDeleted}
+            label="Link to group exercise…"
+            leading={<Icon color={isActionTargetDeleted ? uiRoles.disabled : uiRoles.ink} name="link" size="md" />}
+            onPress={() => {
+              setExerciseActionMenuTarget(null);
+              if (actionTarget && !actionTarget.deletedAt) {
+                router.push(exerciseLinkHref(actionTarget.id));
+              }
+            }}
+            testID="exercise-action-link-group"
+          />
+        ) : null}
+        {isActionTargetDeleted ? (
+          <ListRow
+            accessibilityLabel="Undelete exercise from actions"
+            label="Undelete"
+            leading={<Icon color={uiRoles.ink} name="swap" size="md" />}
+            onPress={() => {
+              if (actionTarget) {
+                void undeleteExercise(actionTarget);
+              }
+            }}
+            testID="exercise-action-undelete"
+          />
+        ) : (
+          <ListRow
+            accessibilityLabel="Delete exercise from actions"
+            label="Delete"
+            leading={<Icon color={uiRoles.danger} name="trash" size="md" />}
+            onPress={() => {
+              setExerciseActionMenuTarget(null);
+              if (actionTarget) {
+                void deleteExercise(actionTarget);
+              }
+            }}
+            testID="exercise-action-delete"
+            tone="danger"
+          />
+        )}
+      </Sheet>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   screen: {
-    flex: 1,
-    backgroundColor: uiColors.surfacePage,
     padding: uiSpace.lg,
     gap: uiSpace.md,
   },
@@ -595,249 +542,60 @@ const styles = StyleSheet.create({
     paddingBottom: uiSpace.md,
   },
   pinnedTopRegion: {
-    gap: uiSpace.sm,
+    gap: uiSpace.md,
     flexShrink: 0,
   },
   topActionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: uiSpace.sm,
+    gap: uiSpace.xs,
   },
-  topActionButtonsCluster: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiSpace.sm,
-    marginLeft: 'auto',
-  },
-  iconActionButton: {
-    width: 42,
-    minHeight: 42,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: uiRadius.sm,
-    borderWidth: 1,
-    borderColor: uiColors.borderMuted,
-    backgroundColor: uiColors.surfaceDefault,
-  },
-  createExerciseButton: {
-    backgroundColor: uiColors.actionPrimary,
-    borderColor: uiColors.actionPrimary,
+  search: {
+    flex: 1,
+    minWidth: 0,
+    marginRight: uiSpace.xs,
   },
   activeFilterChipsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: uiSpace.sm,
   },
-  activeFilterChip: {
-    fontSize: uiTypography.size.xs,
-    fontWeight: '700',
-    color: uiColors.textAccentStrong,
-    borderWidth: 1,
-    borderColor: uiColors.actionPrimarySubtleBorder,
-    backgroundColor: uiColors.actionPrimarySubtleBg,
-    borderRadius: uiRadius.full,
-    paddingHorizontal: uiSpace.sm,
-    paddingVertical: uiSpace.xs,
-    overflow: 'hidden',
-  },
-  filterInput: {
-    borderWidth: 1,
-    borderColor: uiColors.borderMuted,
-    borderRadius: uiRadius.sm,
-    backgroundColor: uiColors.surfaceDefault,
-    color: uiColors.textPrimary,
-    paddingHorizontal: uiSpace.md,
-    paddingVertical: uiSpace.sm,
-    minHeight: 42,
-  },
-  filterInputInline: {
-    flex: 1,
-    minWidth: 0,
-  },
-  centeredState: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: uiSpace.xl,
-    borderRadius: uiRadius.md,
-    borderWidth: 1,
-    borderColor: uiColors.borderMuted,
-    backgroundColor: uiColors.surfaceDefault,
-  },
-  stateText: {
-    fontSize: uiTypography.size.base,
-    color: uiColors.textPrimary,
-  },
-  section: {
-    borderRadius: uiRadius.md,
-    borderWidth: 1,
-    borderColor: uiColors.borderMuted,
-    backgroundColor: uiColors.surfaceDefault,
-    padding: uiSpace.lg,
-    gap: uiSpace.md,
-  },
-  feedbackCard: {
-    borderRadius: uiRadius.md,
-    borderWidth: 1,
-    borderColor: uiColors.borderSuccess,
-    backgroundColor: uiColors.surfaceSuccess,
-    paddingHorizontal: uiSpace.md,
-    paddingVertical: uiSpace.sm,
-  },
-  errorCard: {
-    borderRadius: uiRadius.md,
-    borderWidth: 1,
-    borderColor: uiColors.actionDangerSubtleBorder,
-    backgroundColor: uiColors.actionDangerSubtleBg,
-    paddingHorizontal: uiSpace.md,
-    paddingVertical: uiSpace.sm,
-  },
   helperText: {
-    fontSize: uiTypography.size.md,
-    color: uiColors.textSecondary,
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
+    fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
+    color: uiRoles.inkMuted,
   },
-  errorText: {
-    fontSize: uiTypography.size.md,
-    color: uiColors.actionDanger,
-    fontWeight: '500',
-  },
-  successText: {
-    fontSize: uiTypography.size.md,
-    color: uiColors.textSuccess,
-    fontWeight: '600',
-  },
-  exerciseRowKebabButton: {
-    width: 30,
-    height: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: uiRadius.sm,
-    borderWidth: 1,
-    borderColor: uiColors.borderMuted,
-    backgroundColor: uiColors.surfacePage,
-  },
-  modalRoot: {
-    flex: 1,
-    justifyContent: 'center',
-    padding: uiSpace.lg,
-  },
-  modalOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: uiColors.overlayScrim,
-  },
-  actionMenuCard: {
-    borderRadius: uiRadius.md,
-    borderWidth: 1,
-    borderColor: uiColors.borderMuted,
-    backgroundColor: uiColors.surfaceDefault,
-    padding: uiSpace.lg,
-    gap: uiSpace.sm,
-  },
-  actionMenuButton: {
-    borderRadius: uiRadius.sm,
-    borderWidth: 1,
-    borderColor: uiColors.borderMuted,
-    backgroundColor: uiColors.surfaceDefault,
-    paddingVertical: uiSpace.md,
-    paddingHorizontal: uiSpace.md,
-    minHeight: 42,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  actionMenuButtonText: {
-    color: uiColors.textPrimary,
+  sectionLabel: {
+    fontFamily: uiFonts.display.family,
     fontWeight: '700',
+    fontSize: uiTypography.size.xxs,
+    lineHeight: uiTypography.lineHeight.xxs,
+    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
+    textTransform: 'uppercase',
+    color: uiRoles.inkMuted,
   },
-  actionMenuDeleteButton: {
-    borderColor: uiColors.actionDangerSubtleBorder,
-    backgroundColor: uiColors.actionDangerSubtleBg,
-  },
-  actionMenuDeleteButtonText: {
-    color: uiColors.actionDangerText,
-    fontWeight: '700',
-  },
-  modalTitle: {
-    flex: 1,
-    fontSize: uiTypography.size.xl,
-    fontWeight: '700',
-    color: uiColors.textPrimary,
-  },
-  filtersModalCard: {
-    borderRadius: uiRadius.md,
-    borderWidth: 1,
-    borderColor: uiColors.borderMuted,
-    backgroundColor: uiColors.surfaceDefault,
-    padding: uiSpace.lg,
-    gap: uiSpace.sm,
-    maxHeight: '85%',
-  },
-  filtersModalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiSpace.sm,
-  },
-  filtersCloseButton: {
-    borderRadius: uiRadius.sm,
-    borderWidth: 1,
-    borderColor: uiColors.borderMuted,
-    backgroundColor: uiColors.surfaceDefault,
-    paddingHorizontal: uiSpace.md,
-    paddingVertical: uiSpace.sm,
-  },
-  filtersCloseButtonText: {
-    color: uiColors.textPrimary,
-    fontWeight: '700',
-  },
+  // Sized to its content; shrinks and scrolls when the sheet reaches the top.
   filtersScroll: {
-    flexGrow: 0,
+    flexShrink: 1,
   },
   filtersScrollContent: {
-    gap: uiSpace.sm,
-    paddingBottom: uiSpace.xs,
+    gap: uiSpace.lg,
+    paddingHorizontal: uiSpace.lg,
+    paddingBottom: uiSpace.sm,
   },
-  filtersSectionLabel: {
-    fontSize: uiTypography.size.sm,
-    fontWeight: '700',
-    color: uiColors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-    marginTop: uiSpace.sm,
+  filtersGroup: {
+    gap: uiSpace.sm,
   },
   filtersSectionHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: uiSpace.sm,
   },
-  filtersClearLink: {
-    fontSize: uiTypography.size.sm,
-    fontWeight: '700',
-    color: uiColors.actionPrimary,
-  },
-  filtersPillRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: uiSpace.sm,
-  },
-  filterPill: {
-    borderRadius: uiRadius.full,
-    borderWidth: 1,
-    borderColor: uiColors.borderMuted,
-    backgroundColor: uiColors.surfaceDefault,
-    paddingHorizontal: uiSpace.md,
-    paddingVertical: uiSpace.xs,
-  },
-  filterPillSelected: {
-    backgroundColor: uiColors.actionPrimarySubtleBg,
-    borderColor: uiColors.actionPrimary,
-  },
-  filterPillText: {
-    fontSize: uiTypography.size.sm,
-    fontWeight: '600',
-    color: uiColors.textPrimary,
-  },
-  filterPillTextSelected: {
-    color: uiColors.actionPrimary,
-    fontWeight: '700',
+  // The text `Clear` keeps its 44pt target without making the label's row
+  // taller than the label, so the row does not jump when it appears.
+  clearAction: {
+    marginVertical: -uiSpace.lg,
   },
 });

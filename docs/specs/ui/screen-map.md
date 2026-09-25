@@ -269,11 +269,15 @@ Brief entrypoint map of the current mobile screens.
 - Purpose:
   - exercise catalog management (create/edit/soft-delete/undelete exercises, load-entry mode, and muscle mappings)
 - Key states (high level):
-  - loading / error / content
+  - in the design language (DLM-T07; target `design-targets/exercise-catalogue.md`):
+    the in-content title `Exercises`, then the filter field, the `accent` `+`
+    (the screen's one primary) and ⋮ on one row, the active filters as `Tag`s
+    (each opens Filters), and an outcome `Notice` (`Exercise created.` …)
+  - loading / error as a `StatePanel`, or the content
   - shared exercise-list content with local shared preferences for grouping/date range/recents, default grouped `90d` recents-on-top behavior, taxonomy-ordered collapsible muscle-family headers, text filtering across exercise names + primary muscle display/family terms that preserves collapsed/expanded group state, and per-row stats for the selected range
-  - in-route editor/action/delete modals
-  - catalog-only muscle, deleted visibility (`Show deleted` / `Hide deleted`), and never-done visibility filters via top-level options kebab menu
-  - the row `⋮` Exercise Actions menu offers `Edit`, `Link to group exercise…` (M25-T07; signed in only, disabled for a deleted exercise), and `Delete` / `Undelete`
+  - the `Filters` sheet (⋮): the shared list options, then catalog-only muscle, deleted visibility (`Show deleted` / `Hide deleted`) and never-done visibility filters
+  - the row `⋮` actions sheet, titled with the exercise's name, offers `Edit`, `Link to group exercise…` (M25-T07; signed in only, disabled for a deleted exercise), and `Delete` (`danger`, no confirmation) / `Undelete`
+  - the exercise editor sheet (create / edit), with its muscle list shown in the same sheet
 - Key exits:
   - back to the session view (`router.back()`) after save when opened with
     `source=session` (the session view picker's Manage)

@@ -1,6 +1,8 @@
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
-import { uiColors, uiRadius, uiSpace, uiTypography } from '@/components/ui';
+import { FormField } from '@/components/ui/form-field';
+import { SegmentedControl } from '@/components/ui/segmented-control';
+import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import { LOAD_INPUT_MODES, LOAD_INPUT_MODE_LABELS, type LoadInputMode } from '@/src/exercise-core';
 
 type ExerciseCoreFieldsProps = {
@@ -16,11 +18,18 @@ type ExerciseCoreFieldsProps = {
   autoFocus?: boolean;
 };
 
+const LOAD_MODE_OPTIONS = LOAD_INPUT_MODES.map((mode) => ({
+  value: mode,
+  label: LOAD_INPUT_MODE_LABELS[mode],
+  accessibilityLabel: `${LOAD_INPUT_MODE_LABELS[mode]} weight entry`,
+}));
+
 /**
  * The `ExerciseCore` fields (M25 design T1): the exercise name and the
  * `Total load` / `Per side` weight entry. The personal exercise editor and the
  * group exercise form render these same fields and validate them with
- * `validateExerciseCore` (`src/exercise-core`).
+ * `validateExerciseCore` (`src/exercise-core`). A `FormField` for the name and
+ * a `SegmentedControl` for the weight entry (DLM-T07).
  */
 export function ExerciseCoreFields({
   name,
@@ -34,112 +43,66 @@ export function ExerciseCoreFields({
 }: ExerciseCoreFieldsProps) {
   return (
     <View style={styles.root}>
-      <Text allowFontScaling={false} style={styles.fieldLabel}>Exercise name</Text>
-      <TextInput
-        allowFontScaling={false}
+      <FormField
         accessibilityLabel="Exercise definition name"
-        testID={`${testIDPrefix}-name-input`}
-        autoFocus={autoFocus}
         autoCorrect={false}
+        autoFocus={autoFocus}
         editable={editable}
-        multiline={false}
-        numberOfLines={1}
-        placeholder="Exercise name"
-        scrollEnabled
-        style={[styles.input, styles.nameInput, nameError ? styles.inputError : null]}
-        value={name}
+        error={nameError}
+        errorTestID={`${testIDPrefix}-name-error`}
+        face="text"
+        label="Exercise name"
         onChangeText={onChangeName}
+        placeholder="Exercise name"
+        testID={`${testIDPrefix}-name-input`}
+        value={name}
       />
-      {nameError ? (
-        <Text allowFontScaling={false} selectable style={styles.errorText} testID={`${testIDPrefix}-name-error`}>
-          {nameError}
-        </Text>
-      ) : null}
 
-      <Text allowFontScaling={false} style={styles.fieldLabel}>Weight entry</Text>
-      <View style={styles.loadModeRow}>
-        {LOAD_INPUT_MODES.map((mode) => {
-          const label = LOAD_INPUT_MODE_LABELS[mode];
-          const selected = loadInputMode === mode;
-          return (
-            <Pressable
-              key={mode}
-              accessibilityLabel={`${label} weight entry`}
-              accessibilityRole="button"
-              accessibilityState={{ selected }}
-              disabled={!editable}
-              testID={`${testIDPrefix}-load-mode-${mode}`}
-              style={[styles.loadModeButton, selected ? styles.loadModeButtonSelected : null]}
-              onPress={() => onChangeLoadInputMode(mode)}>
-              <Text allowFontScaling={false} style={[styles.loadModeButtonText, selected ? styles.loadModeButtonTextSelected : null]}>{label}</Text>
-            </Pressable>
-          );
-        })}
+      <View style={styles.group}>
+        <Text allowFontScaling={false} accessibilityRole="header" style={styles.sectionLabel}>
+          Weight entry
+        </Text>
+        <SegmentedControl
+          disabled={!editable}
+          onChange={onChangeLoadInputMode}
+          options={LOAD_MODE_OPTIONS}
+          style={styles.loadMode}
+          testIDPrefix={`${testIDPrefix}-load-mode`}
+          value={loadInputMode}
+        />
+        <Text allowFontScaling={false} style={styles.helperText}>
+          Choose whether the weight you enter is shared across both sides or already represents one side.
+        </Text>
       </View>
-      <Text allowFontScaling={false} style={styles.helperText}>
-        Choose whether the weight you enter is shared across both sides or already represents one side.
-      </Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: {
-    gap: uiSpace.md,
+    gap: uiSpace.lg,
   },
-  fieldLabel: {
-    fontSize: uiTypography.size.sm,
-    fontWeight: '600',
-    color: uiColors.textSecondary,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: uiColors.borderDefault,
-    borderRadius: uiRadius.sm,
-    backgroundColor: uiColors.surfaceDefault,
-    paddingHorizontal: uiSpace.md,
-    paddingVertical: uiSpace.sm,
-  },
-  nameInput: {
-    height: 42,
-    overflow: 'hidden',
-  },
-  inputError: {
-    borderColor: uiColors.actionDanger,
-  },
-  helperText: {
-    fontSize: uiTypography.size.md,
-    color: uiColors.textSecondary,
-  },
-  errorText: {
-    fontSize: uiTypography.size.md,
-    color: uiColors.actionDanger,
-    fontWeight: '500',
-  },
-  loadModeRow: {
-    flexDirection: 'row',
+  group: {
     gap: uiSpace.sm,
   },
-  loadModeButton: {
-    flex: 1,
-    minHeight: 42,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: uiColors.borderDefault,
-    borderRadius: uiRadius.sm,
-    backgroundColor: uiColors.surfaceDefault,
-    paddingHorizontal: uiSpace.md,
+  sectionLabel: {
+    fontFamily: uiFonts.display.family,
+    fontWeight: '700',
+    fontSize: uiTypography.size.xxs,
+    lineHeight: uiTypography.lineHeight.xxs,
+    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
+    textTransform: 'uppercase',
+    color: uiRoles.inkMuted,
   },
-  loadModeButtonSelected: {
-    borderColor: uiColors.actionPrimary,
-    backgroundColor: uiColors.actionPrimarySubtleBg,
+  // The segments carry micro-labels, so the frame sets a field-like height.
+  loadMode: {
+    minHeight: uiGeometry.tapTarget,
   },
-  loadModeButtonText: {
-    color: uiColors.textSecondary,
-    fontWeight: '600',
-  },
-  loadModeButtonTextSelected: {
-    color: uiColors.actionPrimary,
+  helperText: {
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
+    fontSize: uiTypography.size.sm,
+    lineHeight: uiTypography.lineHeight.sm,
+    color: uiRoles.inkMuted,
   },
 });
