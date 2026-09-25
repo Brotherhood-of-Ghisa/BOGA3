@@ -12,7 +12,7 @@
  */
 
 import * as mockReact from 'react';
-import { Alert, StyleSheet } from 'react-native';
+import { Alert, StyleSheet, type ViewStyle } from 'react-native';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 
 import { createInMemoryDatabase, type InMemoryDatabaseFixture } from './helpers/in-memory-db';
@@ -157,11 +157,12 @@ afterEach(() => {
 });
 
 /** testIDs of the host components under `root` painted `accent` (G6: one primary per sheet). */
-const accentGrounds = (root: typeof screen.UNSAFE_root): string[] =>
+type TestNode = typeof screen.UNSAFE_root;
+const accentGrounds = (root: TestNode): string[] =>
   root
-    .findAll((node) => typeof node.type === 'string')
-    .filter((node) => StyleSheet.flatten(node.props.style)?.backgroundColor === uiRoles.accent)
-    .map((node) => String(node.props.testID));
+    .findAll((node: TestNode) => typeof node.type === 'string')
+    .filter((node: TestNode) => (StyleSheet.flatten(node.props.style) as ViewStyle | undefined)?.backgroundColor === uiRoles.accent)
+    .map((node: TestNode) => String(node.props.testID));
 
 const openGroupStream = async () => {
   mockParams = { groupId: GROUP_ID };
