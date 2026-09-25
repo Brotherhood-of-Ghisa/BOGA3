@@ -236,6 +236,23 @@ appId: com.dinoderek.mobile
     centerElement: true
 - takeScreenshot: "03-session-view-exercise-added"
 
+# The live comparison reads completed history and switches grouping without leaving the session.
+- scrollUntilVisible:
+    element:
+      id: "session-insight-mode-muscle"
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: "session-insight-mode-muscle"
+- scrollUntilVisible:
+    element:
+      id: "session-insight-muscle-comparison-chest"
+    direction: DOWN
+    centerElement: true
+- assertVisible:
+    id: "session-insight-muscle-comparison-chest-distribution"
+- takeScreenshot: "session-live-muscle-comparison"
+
 # 6. Finish: ONE cleanup prompt removes the added exercise's empty set and the
 # exercises left with no sets together, then the completion screen.
 - tapOn:

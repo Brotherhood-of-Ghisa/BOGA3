@@ -112,6 +112,10 @@ export function SessionsScreen({
     router.push(sessionViewHref(sessionId));
   };
 
+  const openCompletedSessionSummary = (sessionId: string) => {
+    router.push(`/completed-session/${encodeURIComponent(sessionId)}?presentation=summary`);
+  };
+
   const appendCompletedSession = (sessionId: string) => {
     if (dataClient) {
       return (async () => {
@@ -153,7 +157,7 @@ export function SessionsScreen({
         showDeletedSessions={showDeletedSessions}
         onToggleShowDeletedSessions={() => setShowDeletedSessions((current) => !current)}
         showGlobalEmptyState={showGlobalEmptyState}
-        onOpenCompletedSession={openCompletedSessionEdit}
+        onOpenCompletedSession={openCompletedSessionSummary}
         onSetCompletedSessionDeleted={setCompletedSessionDeleted}
         onEditCompletedSession={openCompletedSessionEdit}
         onAppendCompletedSession={appendCompletedSession}

@@ -167,6 +167,14 @@ describe('maestro harness helpers', () => {
       })
     ).toBeNull();
 
+    expect(
+      resolveMaestroHarnessTeleportHref({
+        target: 'completed-session',
+        sessionId: 'session-123',
+        presentation: 'summary',
+      })
+    ).toBe('/completed-session/session-123?presentation=summary');
+
     expect(resolveMaestroHarnessTeleportTarget('exercise-page')).toBe('exercise-page');
     expect(
       resolveMaestroHarnessTeleportHref({

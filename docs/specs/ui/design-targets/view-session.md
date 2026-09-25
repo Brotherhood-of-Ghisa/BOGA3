@@ -60,3 +60,14 @@ screens' styling.
 
 No target screenshots are committed; runtime captures stay in the gitignored
 `apps/mobile/artifacts/maestro/` tree and are linked as PR evidence.
+
+## Session Summary integration (PR #336)
+
+The existing card/type/colour target above governs this integration; PR #336's
+read-first History entry and local exercise/muscle switch govern its behavior.
+The shared body uses the canonical `SegmentedControl` and volume cards. In the
+live view it follows the logging cards and Add exercise, preserving their
+hierarchy. Historical Summary keeps the same cards with a Back header, explicit
+View individual sets and Edit session actions. Share remains exercise-only.
+Verification states: `session-summary-muscle`, `session-summary-exercise`,
+`session-live-muscle-comparison`, plus the completion/share captures above.

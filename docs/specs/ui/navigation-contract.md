@@ -232,8 +232,8 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
   - active Resume and review/complete both push `/session/<sessionId>` (the
     session view, transition 46); `/sessions` never completes an active session
     directly
-  - a completed row and its Edit push `/session/<sessionId>` (the session
-    view, editing; transition 3)
+  - a completed row pushes `/completed-session/<sessionId>?presentation=summary`;
+    its overflow Edit pushes `/session/<sessionId>` (transition 3)
 
 10. `/completed-session/[sessionId]`
 - File: `apps/mobile/app/completed-session/[sessionId].tsx`
@@ -242,14 +242,15 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 - Query params:
   - `intent` (optional; `edit` replaces to `/session/<sessionId>`, the session
     view editing the session)
-  - `presentation` (optional; `completion` selects the post-submit summary;
-    absent/invalid values — including the removed `summary` — preserve normal
-    detail)
+  - `presentation` (optional; `completion` selects the post-submit summary,
+    `summary` the read-first historical Summary; absent/invalid values select detail)
 - Behavior:
   - completion mode hides historical edit/delete/append actions, is header-less
     (`headerShown: false`, `gestureEnabled: false`; its own top bar carries
     Done), and gives Done, Android system back, and unavailable-target states a
     replacing exit to `/progress`
+  - historical Summary offers Share, View individual sets (the same route without
+    `presentation`) and Edit session; its own Back replaces to `/sessions`
   - `Edit` pushes `/session/<sessionId>`; the detail reloads on focus, so the
     edits show when the session view's `Done` returns. A deleted session
     offers no `Edit` (the session view edits only a live session)
@@ -379,9 +380,9 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 2. `/progress` or `/stats-history` -> `/exercise-history?exerciseDefinitionId=<id>`
    - Stats sub-view per-exercise picker opens the per-exercise history view
 3. `/sessions` -> `/session/<sessionId>`
-   - completed Session History row tap (via the shared `HistoryList`) or its
-     Edit action: the session view, editing; `Done` returns by
-     `router.back()`
+   - completed Session History row overflow Edit action: the session view,
+     editing; `Done` returns by `router.back()`. The row tap opens
+     `/completed-session/<sessionId>?presentation=summary`.
 4. `/progress` or `/stats-history` -> `/sessions`
    - Stats Sessions summary card
 5. (removed: Sessions' active Resume to the recorder; see 46)
@@ -403,7 +404,9 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 12. `/completed-session/<sessionId>?presentation=completion` -> `/progress`
    - Done, safe back, or unavailable-target exit (`replace`)
 13. (removed: the recorder's completed-edit `Summary`)
-14. (removed: History's `presentation=summary` and its `Edit` / `History` header actions)
+14. `/completed-session/<sessionId>?presentation=summary` -> `/sessions`
+    - the historical Summary top-bar Back (`replace`); View individual sets
+      and Edit session push the same session ID to detail or the editor
 15. (removed: the recorder picker's `Manage`; see 49)
 16. (removed: the catalogue's return to the recorder; see 49)
 17. `/more` -> `/settings?source=more`, `/exercise-catalog?source=more`, or `/groups`
@@ -499,7 +502,7 @@ Note:
   The visible shell is `BottomTray` composing `MainTabs`. `exercise-history` keeps its native stack header and
   renders `MainTabs` with Progress selected.
 - Detail screens registered in the root stack (`exercise-history`, `sessions`, `profile`, `connected-agents`, `gyms`, `maestro-harness`) keep their native stack header behavior; titles are declared in `apps/mobile/app/_layout.tsx`. The root stack's `screenOptions` give every detail screen an arrow-only back affordance (`headerBackButtonDisplayMode: 'minimal'`, no custom `headerBackTitle`, which react-native-screens would render as a custom item that ignores the display mode and morphs its label in during the push); the system chevron reads "Back" to VoiceOver. The same `screenOptions` give every native header one design-language style (DLM-T02): a `surface` background, an Archivo 700 `ink` title at `xl`, and an `ink` back arrow (`headerTintColor`).
-- `completed-session/[sessionId]` sets its title inside the route file (`View Session` or `Session complete`); both presentations hide the native header and draw their own top bar (`back · View Session · ⋮ · Edit`, or `Session complete · Done`), so the title is only the back label of what the detail pushes
+- `completed-session/[sessionId]` sets its title inside the route file (`View Session`, `Session Summary`, or `Session complete`); all presentations hide the native header and draw their own top bar (`back · View Session · ⋮ · Edit`, `back · Session Summary`, or `Session complete · Done`), so the title is only the back label of what the detail pushes
 - `exercise-history` sets its title inside the route file to the resolved exercise name (falls back to `Exercise History` when the summary is not yet available)
 - M22 group routes declare `My groups`, `New group`, `Join group`, `Group`, `Edit group`, `Invite`, and `Session` in `apps/mobile/app/_layout.tsx`; the group screen replaces `Group` with the group's name once loaded
 - `session/[sessionId]/index` has no native header (`headerShown: false`); its

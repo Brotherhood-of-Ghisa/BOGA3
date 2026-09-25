@@ -87,7 +87,7 @@ export type CompletedSessionDetailDataClient = {
 export type CompletedSessionDetailScreenShellProps = {
   sessionId?: string | null;
   dataClient?: CompletedSessionDetailDataClient;
-  presentation?: 'detail' | 'completion';
+  presentation?: 'detail' | 'completion' | 'summary';
   shouldFailNextMaestroShare?: boolean;
   shouldFailNextMaestroCatalog?: boolean;
 };
@@ -117,7 +117,10 @@ function coerceRouteParam(value: string | string[] | undefined): string | null {
 
 export const resolveCompletedSessionPresentation = (
   value: string | string[] | undefined
-): 'detail' | 'completion' => (coerceRouteParam(value) === 'completion' ? 'completion' : 'detail');
+): 'detail' | 'completion' | 'summary' => {
+  const presentation = coerceRouteParam(value);
+  return presentation === 'completion' || presentation === 'summary' ? presentation : 'detail';
+};
 
 const getCompletedPerformedSets = (
   sets: CompletedSessionDetailSet[]
@@ -424,8 +427,8 @@ export function CompletedSessionDetailScreenShell({
   }, [session]);
 
   const handleCompletionExit = useCallback(() => {
-    router.replace('/progress');
-  }, [router]);
+    router.replace(presentation === 'summary' ? '/sessions' : '/progress');
+  }, [presentation, router]);
 
   useEffect(() => {
     if (presentation !== 'completion') {
@@ -449,13 +452,13 @@ export function CompletedSessionDetailScreenShell({
       />
     ) : null;
 
-  // Both presentations draw their own top bar, like the session view they sit
+  // All presentations draw their own top bar, like the session view they sit
   // beside; completion also blocks the back gesture (its exits replace to
   // Progress). The stack title is the back label of what the detail pushes.
   const stackOptions =
     presentation === 'completion'
       ? { title: 'Session complete', headerShown: false, gestureEnabled: false }
-      : { title: 'View Session', headerShown: false };
+      : { title: presentation === 'summary' ? 'Session Summary' : 'View Session', headerShown: false };
 
   const handleBack = () => {
     if (router.canGoBack()) {
@@ -530,7 +533,7 @@ export function CompletedSessionDetailScreenShell({
     <>
       <Stack.Screen options={stackOptions} />
       <View style={styles.frame}>
-        {presentation === 'detail' ? <ViewSessionTopBar onBack={handleBack} /> : <SessionTopBar mode="complete" />}
+        {presentation !== 'completion' ? <ViewSessionTopBar onBack={presentation === 'summary' ? handleCompletionExit : handleBack} title={presentation === 'summary' ? 'Session Summary' : undefined} /> : <SessionTopBar mode="complete" />}
         <StatePanel
           body={body}
           kind={STATE_KIND[testID]}
@@ -558,7 +561,7 @@ export function CompletedSessionDetailScreenShell({
     );
   }
 
-  if (presentation === 'completion') {
+  if (presentation === 'completion' || (presentation === 'summary' && session.deletedAt === null)) {
     const personalRecords = completedInsights?.personalRecords ?? [];
     const exerciseVolumeComparisons =
       completedInsights && completedInsights.exerciseVolumeComparisons.length > 0
@@ -581,6 +584,10 @@ export function CompletedSessionDetailScreenShell({
                 : 'loading'
           }
           muscleSummary={shouldFailNextMaestroCatalog ? null : sessionMuscleSummary}
+          muscleVolumeComparisons={completedInsights?.muscleVolumeComparisons ?? []}
+          header={presentation === 'summary' ? <ViewSessionTopBar title="Session Summary" onBack={handleCompletionExit} /> : undefined}
+          onEdit={presentation === 'summary' ? handleEdit : undefined}
+          onViewSets={presentation === 'summary' ? () => router.push(`/completed-session/${encodeURIComponent(session.id)}`) : undefined}
           onDone={handleCompletionExit}
           performedSetCount={performedSetCount}
           personalRecords={personalRecords}

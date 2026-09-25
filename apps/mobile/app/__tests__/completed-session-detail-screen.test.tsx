@@ -187,16 +187,49 @@ describe('CompletedSessionDetailScreenShell', () => {
   it('validates completion presentation route values', () => {
     expect(resolveCompletedSessionPresentation('completion')).toBe('completion');
     expect(resolveCompletedSessionPresentation(['completion'])).toBe('completion');
-    // History's `summary` is gone: the detail already is the summary.
-    expect(resolveCompletedSessionPresentation('summary')).toBe('detail');
+    expect(resolveCompletedSessionPresentation('summary')).toBe('summary');
     expect(resolveCompletedSessionPresentation('unexpected')).toBe('detail');
     expect(resolveCompletedSessionPresentation(undefined)).toBe('detail');
+  });
+
+  it('opens historical Summary with both modes, exercise-only sharing and explicit destinations', async () => {
+    const comparison = {
+      exerciseDefinitionId: 'bench-press', exerciseName: 'Bench Press', sessionExerciseIds: ['exercise-1'],
+      sessionExerciseOrderIndex: 0, setCount: 4, workingSetCount: 3, currentVolume: 4595,
+      historicalSessionCount: 1, medianVolume: 4000, percentile5Volume: 4000, percentile95Volume: 4000,
+      state: 'single-baseline',
+    };
+    const dataClient: CompletedSessionDetailDataClient = {
+      loadCompletedSession: jest.fn().mockResolvedValue(COMPLETED_SESSION_DETAIL_FIXTURE),
+      loadInsights: jest.fn().mockResolvedValue({
+        personalRecords: [], exerciseVolumeComparisons: [comparison],
+        muscleVolumeComparisons: [{ ...comparison, exerciseDefinitionId: 'chest', exerciseName: 'Chest', sessionExerciseIds: ['chest'] }],
+      }),
+      appendCompletedSessionExerciseAsPlanned: jest.fn(), setCompletedSessionDeletedState: jest.fn(),
+    };
+    render(<CompletedSessionDetailScreenShell dataClient={dataClient} presentation="summary" sessionId="completed-under-test" />);
+    await screen.findByTestId('session-completion-exercise-exercise-1-baseline');
+    expect(screen.getByText('Session Summary')).toBeTruthy();
+    expect(screen.getByTestId('session-insight-mode-exercise')).toHaveProp('accessibilityState', { selected: true });
+    fireEvent.press(screen.getByTestId('session-insight-mode-muscle'));
+    expect(screen.getByTestId('session-completion-muscle-comparison-chest-baseline')).toBeTruthy();
+    expect(screen.queryByTestId('session-completion-exercise-exercise-1')).toBeNull();
+    fireEvent.press(screen.getByTestId('session-completion-share-session'));
+    expect(screen.getByTestId('session-share-exercise-exercise-1')).toBeTruthy();
+    expect(screen.queryByTestId('session-share-exercise-chest')).toBeNull();
+    fireEvent.press(screen.getByTestId('session-summary-view-sets'));
+    expect(mockPush).toHaveBeenLastCalledWith('/completed-session/completed-under-test');
+    fireEvent.press(screen.getByTestId('session-summary-edit'));
+    expect(mockPush).toHaveBeenLastCalledWith('/session/completed-under-test');
+    fireEvent.press(screen.getByTestId('completed-session-detail-back'));
+    expect(mockReplace).toHaveBeenLastCalledWith('/sessions');
   });
 
   it('renders the no-PR completion hierarchy and hides ordinary detail actions', async () => {
     const dataClient: CompletedSessionDetailDataClient = {
       loadCompletedSession: jest.fn().mockResolvedValue(COMPLETED_SESSION_DETAIL_FIXTURE),
       loadInsights: jest.fn().mockResolvedValue({
+        muscleVolumeComparisons: [],
         personalRecords: [],
         exerciseVolumeComparisons: [],
       }),
@@ -267,6 +300,7 @@ describe('CompletedSessionDetailScreenShell', () => {
         exercises: [],
       }),
       loadInsights: jest.fn().mockResolvedValue({
+        muscleVolumeComparisons: [],
         personalRecords: [],
         exerciseVolumeComparisons: [],
       }),
@@ -294,6 +328,7 @@ describe('CompletedSessionDetailScreenShell', () => {
     const dataClient: CompletedSessionDetailDataClient = {
       loadCompletedSession: jest.fn().mockResolvedValue(COMPLETED_SESSION_DETAIL_FIXTURE),
       loadInsights: jest.fn().mockResolvedValue({
+        muscleVolumeComparisons: [],
         personalRecords: [],
         exerciseVolumeComparisons: [],
       }),
@@ -428,6 +463,7 @@ describe('CompletedSessionDetailScreenShell', () => {
     const dataClient: CompletedSessionDetailDataClient = {
       loadCompletedSession: jest.fn().mockResolvedValue(COMPLETED_SESSION_DETAIL_FIXTURE),
       loadInsights: jest.fn().mockResolvedValue({
+        muscleVolumeComparisons: [],
         personalRecords: [],
         exerciseVolumeComparisons: [],
       }),
@@ -480,6 +516,7 @@ describe('CompletedSessionDetailScreenShell', () => {
     const dataClient: CompletedSessionDetailDataClient = {
       loadCompletedSession: jest.fn().mockResolvedValue(COMPLETED_SESSION_DETAIL_FIXTURE),
       loadInsights: jest.fn().mockResolvedValue({
+        muscleVolumeComparisons: [],
         personalRecords: [],
         exerciseVolumeComparisons: [],
       }),
@@ -512,6 +549,7 @@ describe('CompletedSessionDetailScreenShell', () => {
     const dataClient: CompletedSessionDetailDataClient = {
       loadCompletedSession: jest.fn().mockResolvedValue(COMPLETED_SESSION_DETAIL_FIXTURE),
       loadInsights: jest.fn().mockResolvedValue({
+        muscleVolumeComparisons: [],
         personalRecords: [],
         exerciseVolumeComparisons: [],
       }),
@@ -548,6 +586,7 @@ describe('CompletedSessionDetailScreenShell', () => {
     const dataClient: CompletedSessionDetailDataClient = {
       loadCompletedSession: jest.fn().mockResolvedValue(COMPLETED_SESSION_DETAIL_FIXTURE),
       loadInsights: jest.fn().mockResolvedValue({
+        muscleVolumeComparisons: [],
         personalRecords: [],
         exerciseVolumeComparisons: [],
       }),
@@ -603,6 +642,7 @@ describe('CompletedSessionDetailScreenShell', () => {
     const dataClient: CompletedSessionDetailDataClient = {
       loadCompletedSession: jest.fn().mockRejectedValue(new Error('Storage unavailable')),
       loadInsights: jest.fn().mockResolvedValue({
+        muscleVolumeComparisons: [],
         personalRecords: [],
         exerciseVolumeComparisons: [],
       }),

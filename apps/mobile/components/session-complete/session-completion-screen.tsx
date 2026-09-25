@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { SessionFactsCard } from '@/components/session-detail';
@@ -11,7 +11,7 @@ import type {
   ExerciseVolumeComparison,
 } from '@/src/session-insights';
 
-import { ExerciseVolumeCard } from './exercise-volume-card';
+import { SessionInsightPresentation } from '@/components/session-recorder/session-insight-presentation';
 import { PersonalRecordCard } from './personal-record-card';
 import { SessionShareSheet } from './session-share-sheet';
 
@@ -27,6 +27,10 @@ type SessionCompletionScreenProps = {
   workingSetCount: number;
   personalRecords: ExercisePersonalRecord[];
   exerciseVolumeComparisons: ExerciseVolumeComparison[];
+  muscleVolumeComparisons?: ExerciseVolumeComparison[];
+  header?: ReactNode;
+  onEdit?: () => void;
+  onViewSets?: () => void;
   muscleSummary: CurrentSessionMuscleSummary | null;
   muscleCatalogState: MuscleCatalogState;
   shouldFailNextShare?: boolean;
@@ -51,6 +55,10 @@ export function SessionCompletionScreen({
   workingSetCount,
   personalRecords,
   exerciseVolumeComparisons,
+  muscleVolumeComparisons = [],
+  header,
+  onEdit,
+  onViewSets,
   muscleSummary,
   muscleCatalogState,
   shouldFailNextShare = false,
@@ -61,7 +69,7 @@ export function SessionCompletionScreen({
 
   return (
     <View style={styles.screen}>
-      <SessionTopBar mode="complete" onDone={onDone} />
+      {header ?? <SessionTopBar mode="complete" onDone={onDone} />}
       <ScrollView contentContainerStyle={styles.content} testID="session-completion-presentation">
         <SessionFactsCard
           facts={[
@@ -131,23 +139,11 @@ export function SessionCompletionScreen({
           </View>
         ) : null}
 
-        {exerciseVolumeComparisons.length > 0 ? (
-          <View style={styles.section} testID="session-completion-exercise-volume">
-            <View style={styles.headingRow}>
-              <Text allowFontScaling={false} accessibilityRole="header" style={styles.heading}>
-                Exercise volume
-              </Text>
-              <Text allowFontScaling={false} style={styles.microLabel}>Session vs history</Text>
-            </View>
-            {exerciseVolumeComparisons.map((comparison) => (
-              <ExerciseVolumeCard
-                key={`${comparison.exerciseDefinitionId ?? 'legacy'}-${comparison.sessionExerciseIds.join('-')}`}
-                comparison={comparison}
-                testID={`session-completion-exercise-${comparison.sessionExerciseIds[0]}`}
-              />
-            ))}
-          </View>
-        ) : null}
+        <SessionInsightPresentation
+          exerciseComparisons={exerciseVolumeComparisons}
+          muscleComparisons={muscleVolumeComparisons}
+          testIdPrefix="session-completion"
+        />
 
         <ActionButton
           accessibilityHint="Opens a preview of the complete session image."
@@ -156,6 +152,8 @@ export function SessionCompletionScreen({
           testID="session-completion-share-session"
           variant="outline"
         />
+        {onViewSets ? <ActionButton label="View individual sets" onPress={onViewSets} testID="session-summary-view-sets" variant="outline" /> : null}
+        {onEdit ? <ActionButton label="Edit session" onPress={onEdit} testID="session-summary-edit" variant="primary" /> : null}
       </ScrollView>
 
       <SessionShareSheet

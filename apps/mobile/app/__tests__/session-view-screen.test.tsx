@@ -53,6 +53,18 @@ jest.mock('@/src/data', () => ({
   upsertLocalGym: jest.fn(),
 }));
 
+jest.mock('@/src/session-insights/repository', () => ({
+  ...jest.requireActual('@/src/session-insights/repository'),
+  loadSessionInsightHistory: jest.fn(),
+}));
+jest.mock('@/src/exercise-catalog/cache', () => ({
+  useExerciseCatalog: () => ({
+    status: 'ready',
+    exercises: [{ id: 'def_bench', loadInputMode: 'total_load', mappings: [{ muscleGroupId: 'chest', role: 'primary' }] }],
+    muscleGroups: [{ id: 'chest', displayName: 'Chest', familyName: 'Torso', sortOrder: 0 }],
+  }),
+}));
+
 jest.mock('@/src/logging', () => ({ logEvent: jest.fn().mockResolvedValue(undefined) }));
 
 // The injected location service: quiet (denied) unless a test says otherwise.
@@ -88,6 +100,7 @@ jest.mock('@/components/session-recorder/exercise-picker', () => ({
 
 import { SessionViewScreen } from '../session/[sessionId]/index';
 
+const insightHistory = jest.requireMock('@/src/session-insights/repository').loadSessionInsightHistory as jest.Mock;
 const data = jest.requireMock('@/src/data') as Record<string, jest.Mock>;
 const location = jest.requireMock('@/src/location/foreground-location-lazy') as {
   getCurrentForegroundPositionLazy: jest.Mock;
@@ -176,6 +189,7 @@ const answerAlerts = (answer: (title: string) => string) => {
 describe('Session view', () => {
   beforeEach(() => {
     jest.useFakeTimers();
+    insightHistory.mockReset().mockResolvedValue([]);
     jest.restoreAllMocks();
     mockPush.mockReset();
     mockReplace.mockReset();
@@ -228,6 +242,37 @@ describe('Session view', () => {
     expect(screen.queryByTestId('session-view-exercise-fly-record')).toBeNull();
     // Mini legends label every metric column.
     expect(screen.getAllByText('1RM').length).toBeGreaterThan(0);
+  });
+
+  it('loads real exercise and muscle baselines for the active session', async () => {
+    insightHistory.mockResolvedValue([{
+      sessionId: 'prior', status: 'completed', completedAt: new Date('2026-01-01'),
+      exercises: [{ id: 'prior-bench', exerciseDefinitionId: 'def_bench', exerciseName: 'Bench', orderIndex: 0,
+        sets: [{ id: 'prior-set', orderIndex: 0, weightValue: '100', repsValue: '10', setType: 'rir_2', performanceStatus: null }] }],
+    }]);
+    await renderReady();
+    await screen.findByText('128% above median');
+    expect(insightHistory).toHaveBeenCalledWith({ targetSessionId: 'session-1', completedAt: expect.any(Date) });
+    expect(screen.getByLabelText(/Barbell Bench Press, 2 sets · 1 working.*Historical median 1000/)).toBeTruthy();
+    fireEvent.press(screen.getByTestId('session-insight-mode-muscle'));
+    expect(screen.getByLabelText(/Chest, 2 sets · 1 working.*Historical median 500/)).toBeTruthy();
+  });
+
+  it('uses the persisted completion boundary when editing history', async () => {
+    const completedAt = new Date('2026-09-01T12:00:00Z');
+    data.loadLatestSessionDraftSnapshot.mockResolvedValue(null);
+    data.loadSessionSnapshotById.mockResolvedValue({ ...snapshot(), status: 'completed', completedAt, deletedAt: null });
+    await renderReady();
+    expect(insightHistory).toHaveBeenCalledWith({ targetSessionId: 'session-1', completedAt });
+  });
+
+  it('keeps logging usable when comparison history fails', async () => {
+    insightHistory.mockRejectedValue(new Error('History read failed'));
+    await renderReady();
+    await screen.findByText('Comparisons unavailable. Return to this session to retry.');
+    fireEvent.press(screen.getByLabelText('Cable Flys, 0 of 1 sets done'));
+    expect(mockPush).toHaveBeenCalledWith('/session/session-1/exercise/fly');
+    expect(screen.queryByText('No comparison history yet')).toBeNull();
   });
 
   it('links each card to its exercise page', async () => {
@@ -564,6 +609,7 @@ describe('Session view: editing a completed session', () => {
 
   beforeEach(() => {
     jest.useFakeTimers();
+    insightHistory.mockReset().mockResolvedValue([]);
     jest.restoreAllMocks();
     mockPush.mockReset();
     mockReplace.mockReset();

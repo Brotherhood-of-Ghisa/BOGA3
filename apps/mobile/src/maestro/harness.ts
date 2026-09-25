@@ -155,7 +155,7 @@ export const resolveMaestroHarnessTeleportHref = ({
       return sessionId
         ? (withQuery(`/completed-session/${sessionId}`, {
             intent,
-            presentation: presentation === 'completion' ? presentation : null,
+            presentation: presentation === 'completion' || presentation === 'summary' ? presentation : null,
             maestroShare: maestroShare === 'fail-once' ? maestroShare : null,
             maestroCatalog: maestroCatalog === 'fail-once' ? maestroCatalog : null,
           }) as Href)

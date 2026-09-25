@@ -273,9 +273,14 @@ Brief entrypoint inventory of the current reusable UI component set.
     `SessionTopBar mode="complete"` (`Session complete` · Done), a
     `SessionFactsCard` (Duration / Exercises / Sets / Working, then Gym) with
     the working-sets-by-muscle pills under a `rule-soft` divider, every
-    `PersonalRecordCard`, one `ExerciseVolumeCard` per exercise and the
+    `PersonalRecordCard`, shared exercise/muscle comparisons and the
     `Share session` outline `ActionButton`. Muscle pills are informational,
     never analytics links; all PRs stay visible together
+  - `SessionInsightPresentation` (`components/session-recorder/`) — shared by
+    live, completion and historical Summary; `SegmentedControl` selects exercise
+    or muscle `ExerciseVolumeCard`s, defaulting to exercise. Keeps the completion
+    flow's `session-completion-exercise-volume` selector and explicit empty states.
+    Historical Summary supplies its own back header and explicit detail/edit actions.
   - `PersonalRecordCard` — a `Card` with a `record` band (`New 1RM record ·
     <1RM>`), the exercise and its set (`185.0 × 8`), the 1RM bold `record`;
     read as one accessibility element

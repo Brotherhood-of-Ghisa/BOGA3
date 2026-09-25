@@ -197,8 +197,9 @@ Brief entrypoint map of the current mobile screens.
     `design-targets/exercise-session-v5.md`, `V6-Session`). Every active-session entry opens it: Today, Train, Sessions'
     Resume and review/complete, and the completed session's per-exercise
     `Append`
-  - also the completed-session editor: History's completed rows and
-    `Edit`, and the completed session's `Edit` and `intent=edit`, open it
+  - also the completed-session editor: History's overflow `Edit`,
+    the Summary's `Edit session`, and the completed session's `Edit` and
+    `intent=edit` open it
 - Key states (high level):
   - own top bar: `Session` · ⋮ · `Finish` (the one `accent` primary); the
     persistent four-tab bar sits at the bottom with Train selected
@@ -209,6 +210,8 @@ Brief entrypoint map of the current mobile screens.
     `Autosave paused until Start/End times are valid.` Gym, `+ Add exercise` and
     the cards work as for an active session, written back to the completed
     session; records compare against the rest of history, not the session itself
+  - shared live exercise/muscle comparisons after the exercise cards, using
+    confirmed sets and earlier completed history (loading/error is nonblocking)
   - summary card: Time (elapsed, ticking) / Gym / Sets (confirmed performed) /
     Volume (their entered-load volume, warm-ups included); the Gym stat opens
     the `Gym` sheet to change it: opening it starts one foreground location
@@ -378,8 +381,8 @@ Brief entrypoint map of the current mobile screens.
     so draft state and the shared cleanup rules remain authoritative
 - Key exits:
   - `/session/<id>` pushed for active Resume or review/complete
-  - `/session/<sessionId>` (the session view, editing) from a completed row or
-    its explicit Edit action
+  - `/completed-session/<sessionId>?presentation=summary` from a completed row
+  - `/session/<sessionId>` from its explicit Edit action
 - Notes:
   - the native stack header centers `Sessions` and uses the platform back arrow
     without a text label, so the internal `(tabs)` group name is never exposed
@@ -400,8 +403,10 @@ Brief entrypoint map of the current mobile screens.
     descriptive P5/P95 range; and `Share session` (outline), which opens a
     `Sheet` previewing the PNG. It does not link to muscle analytics. Optional
     historical enrichment cannot block it, and share output excludes
-    gym/location. Edit/delete/append actions are hidden. (History's
-    `presentation=summary` was removed: the detail itself is the summary.)
+    gym/location. Edit/delete/append actions are hidden.
+  - `presentation=summary` reuses these cards with By exercise / By muscle, a
+    Session Summary top bar returning to `/sessions`, Share, View individual
+    sets and Edit session. Deleted targets use the detail's deleted state.
   - completion loading/error/not-found/deleted-target states show the top bar
     without Done and one safe exit, `Back to Progress`; the back gesture is
     off and Android system back replaces to Progress
@@ -646,7 +651,7 @@ Brief entrypoint map of the current mobile screens.
     display mode (no custom back title), preserving normal platform back
     behavior while hiding the previous route-group title; the arrow-only
     button slides in with the screen instead of morphing a label in
-  - completed-session route sets its title inside the route file; both presentations hide the native header and draw their own top bar
+  - completed-session route sets its title inside the route file; all presentations hide the native header and draw their own top bar
   - exercise-history route also sets its title inside the route file (resolved exercise name)
 
 2. `apps/mobile/app/(tabs)/_layout.tsx`

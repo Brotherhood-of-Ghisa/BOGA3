@@ -38,6 +38,56 @@ appId: com.dinoderek.mobile
     centerElement: true
 - takeScreenshot: "session-completion-one-pr"
 
+# Historical Summary uses the same comparison cards and keeps explicit detail/edit routes.
+- openLink: "boga3://maestro-harness?fixture=exercise-block-history&teleport=completed-session&sessionId=maestro_m24_completion_one_pr&presentation=summary"
+- tapOn:
+    text: "Open"
+    optional: true
+- extendedWaitUntil:
+    visible: "Session Summary"
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: "session-insight-mode-muscle"
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: "session-insight-mode-muscle"
+- scrollUntilVisible:
+    element:
+      id: "session-completion-muscle-comparison-quads"
+    direction: DOWN
+    centerElement: true
+- takeScreenshot: "session-summary-muscle"
+- scrollUntilVisible:
+    element:
+      id: "session-insight-mode-exercise"
+    direction: UP
+    centerElement: true
+- tapOn:
+    id: "session-insight-mode-exercise"
+- scrollUntilVisible:
+    element:
+      id: "session-completion-exercise-maestro_m24_completion_one_pr_squat"
+    direction: DOWN
+    centerElement: true
+- takeScreenshot: "session-summary-exercise"
+- scrollUntilVisible:
+    element:
+      id: "session-summary-view-sets"
+    direction: DOWN
+    centerElement: true
+- assertVisible:
+    id: "session-summary-edit"
+- tapOn:
+    id: "session-summary-view-sets"
+- extendedWaitUntil:
+    visible:
+      id: "completed-session-detail-screen"
+    timeout: 15000
+- assertVisible: "View Session"
+
+
 - openLink: "boga3://maestro-harness?fixture=exercise-block-history&teleport=completed-session&sessionId=maestro_m24_completion_no_pr&presentation=completion&maestroCatalog=fail-once"
 - tapOn:
     text: "Open"

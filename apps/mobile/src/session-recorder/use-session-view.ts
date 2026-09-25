@@ -2,6 +2,7 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 
 import type { Session } from '@/components/session-recorder/types';
+import { loadSessionInsightHistory, type PersonalRecordSessionInput } from '@/src/session-insights';
 import { loadLatestSessionDraftSnapshot, loadLocalGymById, loadSessionSnapshotById } from '@/src/data';
 
 import { loadHistoricalBestsExcluding } from './historical-bests';
@@ -17,6 +18,9 @@ export type SessionViewData = {
   startedAt: Date;
   completedAt: Date | null;
   session: Session;
+  comparisonAt: Date;
+  insightHistory: PersonalRecordSessionInput[];
+  insightHistoryState: 'loading' | 'ready' | 'error';
   // Keyed by exercise definition; filled once each history read settles.
   historicalBestByDefinitionId: ReadonlyMap<string, number | null>;
 };
@@ -78,6 +82,9 @@ export function useSessionView(sessionId: string | null) {
         startedAt: snapshot.startedAt,
         completedAt: snapshot.completedAt,
         session,
+        comparisonAt: snapshot.completedAt ?? new Date(),
+        insightHistory: [],
+        insightHistoryState: 'loading',
         historicalBestByDefinitionId: new Map(),
       };
       setState((current) =>
@@ -87,12 +94,33 @@ export function useSessionView(sessionId: string | null) {
           : { status: 'ready', data: base }
       );
 
-      const historicalBestByDefinitionId = await loadHistoricalBestsExcluding(
-        snapshot.sessionId,
-        session.exercises.map((exercise) => exercise.exerciseDefinitionId)
-      );
-      if (!isCurrent()) return;
-      setState({ status: 'ready', data: { ...base, historicalBestByDefinitionId } });
+      // Independent optional enrichments: a failed comparison read must not
+      // block logging or hide a record, and a blurred generation cannot land.
+      await Promise.all([
+        loadHistoricalBestsExcluding(
+          snapshot.sessionId,
+          session.exercises.map((exercise) => exercise.exerciseDefinitionId)
+        ).then((historicalBestByDefinitionId) => {
+          if (!isCurrent()) return;
+          setState((current) => current.status === 'ready'
+            ? { status: 'ready', data: { ...current.data, historicalBestByDefinitionId } }
+            : current);
+        }),
+        loadSessionInsightHistory({
+          targetSessionId: snapshot.sessionId,
+          completedAt: base.comparisonAt,
+        }).then((insightHistory) => {
+          if (!isCurrent()) return;
+          setState((current) => current.status === 'ready'
+            ? { status: 'ready', data: { ...current.data, insightHistory, insightHistoryState: 'ready' } }
+            : current);
+        }).catch(() => {
+          if (!isCurrent()) return;
+          setState((current) => current.status === 'ready'
+            ? { status: 'ready', data: { ...current.data, insightHistoryState: 'error' } }
+            : current);
+        }),
+      ]);
     } catch {
       if (isCurrent()) {
         setState({ status: 'error' });

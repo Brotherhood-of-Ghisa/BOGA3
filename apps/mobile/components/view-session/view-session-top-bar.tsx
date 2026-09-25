@@ -7,6 +7,7 @@ import { uiBorder, uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/
 
 type ViewSessionTopBarProps = {
   onBack: () => void;
+  title?: string;
   // Both omitted while there is no session to act on (loading, error).
   onOpenOptions?: () => void;
   // Omitted while the session is deleted: the session view edits only a live
@@ -17,13 +18,13 @@ type ViewSessionTopBarProps = {
 // Back · `View Session` · ⋮ · Edit. Edit is the screen's one `accent` action and
 // sits where the session view's Done sits, so the Edit → Done loop reads as one
 // place.
-export function ViewSessionTopBar({ onBack, onOpenOptions, onEdit }: ViewSessionTopBarProps) {
+export function ViewSessionTopBar({ onBack, onOpenOptions, onEdit, title = 'View Session' }: ViewSessionTopBarProps) {
   const insets = useSafeAreaInsets();
   return (
     <View style={[styles.bar, { paddingTop: insets.top }]} testID="completed-session-detail-top-bar">
       <IconButton accessibilityLabel="Back" name="chevron-left" onPress={onBack} testID="completed-session-detail-back" />
       <Text allowFontScaling={false} accessibilityRole="header" numberOfLines={1} style={styles.title}>
-        View Session
+        {title}
       </Text>
       {onOpenOptions ? (
         <IconButton

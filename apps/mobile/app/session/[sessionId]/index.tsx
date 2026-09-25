@@ -4,6 +4,9 @@ import { Alert, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MainTabs } from '@/components/navigation/main-tabs';
+import { SessionInsightPresentation } from '@/components/session-recorder/session-insight-presentation';
+import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
+import { deriveSessionExerciseVolumeComparisons, deriveSessionMuscleVolumeComparisons } from '@/src/session-insights';
 import type { Session } from '@/components/session-recorder/types';
 import { ExercisePicker } from '@/components/session-recorder/exercise-picker';
 import {
@@ -130,6 +133,7 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { state, reload } = useSessionView(sessionId);
+  const exerciseCatalog = useExerciseCatalog();
   const [isOptionsVisible, setIsOptionsVisible] = useState(false);
   const [gymPicker, setGymPicker] = useState<GymPickerState>(CLOSED_GYM_PICKER);
   // Bumped on every open and close, so a lookup that resolves after the sheet
@@ -158,6 +162,62 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
         : null,
     [state]
   );
+
+  const liveInsights = useMemo(() => {
+    if (state.status !== "ready" || !sessionId) return null;
+    const targetSession = {
+      sessionId,
+      status: "completed" as const,
+      completedAt: state.data.comparisonAt,
+      exercises: state.data.session.exercises.map(
+        (exercise, exerciseIndex) => ({
+          id: exercise.id,
+          orderIndex: exerciseIndex,
+          exerciseDefinitionId: exercise.exerciseDefinitionId,
+          exerciseName: exercise.name,
+          sets: exercise.sets.map((set, setIndex) => ({
+            id: set.id,
+            orderIndex: setIndex,
+            weightValue: set.weight,
+            repsValue: set.reps,
+            setType: set.setType,
+            performanceStatus: set.performanceStatus,
+          })),
+        }),
+      ),
+    };
+    const base = { targetSession, historicalSessions: state.data.insightHistory };
+    return {
+      exercise: deriveSessionExerciseVolumeComparisons(base),
+      muscle:
+        exerciseCatalog.status === "ready"
+          ? deriveSessionMuscleVolumeComparisons({
+              ...base,
+              exerciseDefinitions: exerciseCatalog.exercises.map(
+                (exercise) => ({
+                  id: exercise.id,
+                  loadInputMode: exercise.loadInputMode ?? "total_load",
+                }),
+              ),
+              muscleMappings: exerciseCatalog.exercises.flatMap((exercise) =>
+                exercise.mappings.map((mapping) => ({
+                  exerciseDefinitionId: exercise.id,
+                  muscleGroupId: mapping.muscleGroupId,
+                  role: mapping.role,
+                  weight: mapping.weight,
+                })),
+              ),
+              muscleGroups: exerciseCatalog.muscleGroups,
+            })
+          : [],
+    };
+  }, [
+    exerciseCatalog.exercises,
+    exerciseCatalog.muscleGroups,
+    exerciseCatalog.status,
+    sessionId,
+    state,
+  ]);
 
   const openGymPicker = useCallback(() => {
     const generation = ++gymPickerGenerationRef.current;
@@ -397,6 +457,14 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
           testID="session-view-add-exercise"
           variant="outline"
         />
+        {liveInsights ? (
+          <SessionInsightPresentation
+            exerciseComparisons={liveInsights.exercise}
+            muscleComparisons={liveInsights.muscle}
+            historyState={data.insightHistoryState}
+            muscleCatalogState={exerciseCatalog.status === 'idle' ? 'loading' : exerciseCatalog.status}
+          />
+        ) : null}
         {notice ? (
           <Text allowFontScaling={false} accessibilityLiveRegion="polite" style={styles.notice} testID="session-view-notice">
             {notice}

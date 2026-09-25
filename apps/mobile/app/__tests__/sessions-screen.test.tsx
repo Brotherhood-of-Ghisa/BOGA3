@@ -98,7 +98,7 @@ describe('SessionsScreen active-session navigation', () => {
     });
   });
 
-  it('opens a completed History row in the session view to edit it', async () => {
+  it('opens a completed History row in Summary', async () => {
     const dataClient = buildDataClient();
     dataClient.loadSessions.mockResolvedValue([completedSession]);
     render(<SessionsScreen dataClient={dataClient} />);
@@ -107,7 +107,7 @@ describe('SessionsScreen active-session navigation', () => {
       await screen.findByTestId(`completed-session-open-button-${completedSession.id}`)
     );
 
-    expect(mockPush).toHaveBeenCalledWith(`/session/${completedSession.id}`);
+    expect(mockPush).toHaveBeenCalledWith(`/completed-session/${completedSession.id}?presentation=summary`);
   });
 });
 
