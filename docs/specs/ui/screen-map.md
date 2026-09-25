@@ -202,7 +202,7 @@ Brief entrypoint map of the current mobile screens.
     Resume and review/complete, and the completed session's per-exercise
     `Append`
   - also the completed-session editor: History's overflow `Edit`,
-    the Summary's `Edit session`, and the completed session's `Edit` and
+    View Session's top-bar `Edit` and
     `intent=edit` open it
 - Key states (high level):
   - own top bar: `Session` · ⋮ · `Finish` (the one `accent` primary); the
@@ -389,7 +389,7 @@ Brief entrypoint map of the current mobile screens.
     so draft state and the shared cleanup rules remain authoritative
 - Key exits:
   - `/session/<id>` pushed for active Resume or review/complete
-  - `/completed-session/<sessionId>?presentation=summary` from a completed row
+  - `/completed-session/<sessionId>` from a completed row
   - `/session/<sessionId>` from its explicit Edit action
 - Notes:
   - the native stack header centers `Sessions` and uses the platform back arrow
@@ -412,15 +412,18 @@ Brief entrypoint map of the current mobile screens.
     `Sheet` previewing the PNG. It does not link to muscle analytics. Optional
     historical enrichment cannot block it, and share output excludes
     gym/location. Edit/delete/append actions are hidden.
-  - `presentation=summary` reuses these cards with By exercise / By muscle, a
-    Session Summary top bar returning to `/sessions`, Share, View individual
-    sets and Edit session. Deleted targets use the detail's deleted state.
+  - all historical links (including `presentation=summary`) open View Session:
+    shared facts, then local `Summary | Sets` (Summary by default). Summary
+    reuses the working-set breakdown, records, comparison grouping and Share;
+    Sets contains the read-only exercise cards. A comparison loading/error
+    state leaves facts, Sets and actions usable. No additional detail route.
+    Edit → Done preserves section/grouping and refreshes all projections.
   - completion loading/error/not-found/deleted-target states show the top bar
     without Done and one safe exit, `Back to Progress`; the back gesture is
     off and Android system back replaces to Progress
   - detail: its own top bar, `back · View Session · ⋮ · Edit` (`Edit` the one
     `accent` action, no native header); a summary card with `Start` / `End`
-    (`YYYY-MM-DD HH:mm`) then `Duration` / `Gym` / `Sets` / `Volume`; one card
+    (`YYYY-MM-DD HH:mm`) then `Duration` / `Gym` / `Sets` / `Volume`; Sets has one card
     per exercise with its confirmed sets as the session view's rows (`type ·
     weight × reps · 1RM · VOL`, `n sets`), a brass record 1RM and `New 1RM
     record` band where the session holds the exercise's best 1RM; no tags, no

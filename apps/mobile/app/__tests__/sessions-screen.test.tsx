@@ -107,7 +107,7 @@ describe('SessionsScreen active-session navigation', () => {
       await screen.findByTestId(`completed-session-open-button-${completedSession.id}`)
     );
 
-    expect(mockPush).toHaveBeenCalledWith(`/completed-session/${completedSession.id}?presentation=summary`);
+    expect(mockPush).toHaveBeenCalledWith(`/completed-session/${completedSession.id}`);
   });
 });
 

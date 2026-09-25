@@ -336,6 +336,9 @@ Priority rule:
      presentation rather than the historical summary;
    - `maestroShare=fail-once` / `maestroCatalog=fail-once` to make the next share
      or catalog read fail once, so a flow can assert the retryable error surface.
+   The completed-session route also accepts dev-only `maestroInsights=loading`
+   or `error` to hold an enrichment state for deterministic historical-review
+   captures (direct `boga3://completed-session/<id>` links after seeding).
    The fixture seeds its sessions relative to *now* (`daysAgo`), so a flow built
    on it must never assert a literal calendar date — see the date rule in
    `docs/specs/06-testing-strategy.md`.
