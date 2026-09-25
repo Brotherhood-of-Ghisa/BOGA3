@@ -132,7 +132,7 @@ Brief entrypoint map of the current mobile screens.
   - the device-recovery waiting room a signed-in user sees while the first sync cycle drains; renders a full-screen "Setting up your data…" block in place of the navigator until `sync_runtime_state.bootstrap_completed_at` is set, so no data screen is reachable before the user's data is restored
 - Key states (high level):
   - in-progress: a phase label plus an advancing activity/progress indicator ("layer K of N", "N items") that visibly moves while work happens
-  - offline: an offline message instead of an indefinite spinner when the device is network-unreachable
+  - offline: an offline message instead of an indefinite spinner, shown only once NetInfo has reported `isConnected === false`; before NetInfo's first determined report the network is unknown and the block shows the in-progress state, never the offline copy
   - error: a single error message and a single Retry button (fires exactly one cycle) on a non-`AUTH_REQUIRED` cycle error
 - Presentation (design language, DLM-T05): one `Card` centred on `paper`; the
   phase in `ink`, an `ink-muted` spinner, the activity line in Plex Mono

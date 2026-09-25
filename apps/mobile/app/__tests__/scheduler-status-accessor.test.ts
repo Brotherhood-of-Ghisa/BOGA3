@@ -107,20 +107,49 @@ afterEach(() => {
 });
 
 describe('production scheduler status accessor', () => {
-  it('starts OFFLINE with no error, no success time, and offline progress', () => {
+  it('starts OFFLINE with no error, no success time, and an unknown (not offline) network', () => {
+    // Before NetInfo's first report the machine is OFFLINE (it never syncs on an
+    // unconfirmed link), but the network is unknown, not offline: the surfacing
+    // layer must not tell an online user they are offline.
     const status = getSchedulerStatus();
     expect(status.state.name).toBe('OFFLINE');
     expect(status.online).toBe(false);
+    expect(status.network).toBe('unknown');
     expect(status.lastCycleError).toBeNull();
     expect(status.lastSuccessAtMs).toBeNull();
-    expect(status.progress.offline).toBe(true);
+    expect(status.progress.offline).toBe(false);
   });
 
   it('reports the online projection once the link is connected', () => {
     goOnline();
     const status = getSchedulerStatus();
     expect(status.online).toBe(true);
+    expect(status.network).toBe('online');
     expect(status.progress.offline).toBe(false);
+  });
+
+  it('reports offline only once NetInfo says isConnected === false', () => {
+    mockNetInfoState.listener?.({ isConnected: null });
+    expect(getSchedulerStatus().network).toBe('unknown');
+    expect(getSchedulerStatus().progress.offline).toBe(false);
+
+    mockNetInfoState.listener?.({ isConnected: false });
+    const status = getSchedulerStatus();
+    expect(status.state.name).toBe('OFFLINE');
+    expect(status.online).toBe(false);
+    expect(status.network).toBe('offline');
+    expect(status.progress.offline).toBe(true);
+  });
+
+  it('restarts from an unknown network, not the previous session\'s report', () => {
+    mockNetInfoState.listener?.({ isConnected: false });
+    expect(getSchedulerStatus().network).toBe('offline');
+
+    stopSyncScheduler();
+    startSyncScheduler();
+
+    expect(getSchedulerStatus().network).toBe('unknown');
+    expect(getSchedulerStatus().progress.offline).toBe(false);
   });
 
   it('records the last successful sync time and clears the error on a converged cycle', async () => {
@@ -261,7 +290,8 @@ describe('production scheduler status accessor', () => {
   });
 
   it('overrides progress.offline from the live projection, not the stale snapshot', () => {
-    // Producer wrote offline=false, but the live machine is OFFLINE.
+    // Producer wrote offline=false, but NetInfo reported the link down.
+    mockNetInfoState.listener?.({ isConnected: false });
     setSyncProgress({ phase: 'pull', layersCompleted: 1, rowsApplied: 4, offline: false });
     expect(getSchedulerStatus().online).toBe(false);
     expect(getSchedulerStatus().progress.offline).toBe(true);

@@ -18,9 +18,44 @@ let mockProgress: SyncProgress = {
   offline: false,
 };
 
-jest.mock('@/src/sync/scheduler', () => ({
-  requestSync: (...args: unknown[]) => mockRequestSync(...args),
-  getSchedulerStatus: () => ({ progress: mockProgress }),
+// `mockUseLiveScheduler` switches the accessor to the REAL scheduler (driven by
+// the NetInfo stub below) for the suite that proves the gate renders what the
+// live network projection reports, end to end through `useSyncGateState`.
+let mockUseLiveScheduler = false;
+
+jest.mock('@/src/sync/scheduler', () => {
+  const actual = jest.requireActual<typeof import('@/src/sync/scheduler')>('@/src/sync/scheduler');
+  return {
+    ...actual,
+    requestSync: (...args: unknown[]) => mockRequestSync(...args),
+    getSchedulerStatus: () =>
+      mockUseLiveScheduler ? actual.getSchedulerStatus() : { progress: mockProgress },
+  };
+});
+
+// The real scheduler's collaborators: no cycle ever runs to completion here, and
+// the NetInfo listener is captured so a test controls whether (and what) the
+// network has reported.
+jest.mock('@/src/sync/cycle', () => ({
+  runSyncCycle: () => new Promise(() => {}),
+}));
+
+type NetInfoSnapshot = { isConnected: boolean | null };
+const mockNetInfo: { listener: ((state: NetInfoSnapshot) => void) | null } = { listener: null };
+jest.mock('@react-native-community/netinfo', () => ({
+  __esModule: true,
+  default: {
+    addEventListener: (listener: (state: NetInfoSnapshot) => void) => {
+      mockNetInfo.listener = listener;
+      return () => {
+        mockNetInfo.listener = null;
+      };
+    },
+  },
+}));
+
+jest.mock('@/src/logging/logEvent', () => ({
+  logEvent: () => Promise.resolve(),
 }));
 
 jest.mock('expo-router', () => {
@@ -40,6 +75,7 @@ import { StyleSheet, Text } from 'react-native';
 
 import { uiRoles } from '@/components/ui';
 import { INITIAL_SYNC_PROGRESS, type SyncProgress } from '@/src/sync/progress';
+import { startSyncScheduler, stopSyncScheduler } from '@/src/sync/scheduler';
 import { SyncGate, SYNC_GATE_TEST_IDS } from '@/src/sync/SyncGate';
 import {
   __resetSyncGateStateForTests,
@@ -264,5 +300,82 @@ describe('SyncGate', () => {
     expect(screen.queryByTestId(SYNC_GATE_TEST_IDS.block)).toBeNull();
     expect(screen.queryByTestId(redirectTestId)).toBeNull();
     expect(screen.getByTestId(childTestId)).toBeTruthy();
+  });
+});
+
+describe('SyncGate on the live scheduler network projection', () => {
+  const reportNetwork = (isConnected: boolean | null) => {
+    if (mockNetInfo.listener === null) {
+      throw new Error('the scheduler did not register a NetInfo listener');
+    }
+    mockNetInfo.listener({ isConnected });
+    // The bridge's poll republishes the gate holder, which re-renders the gate
+    // and re-reads the live scheduler status; publish once to stand in for it.
+    publish({});
+  };
+
+  const expectProgressNotOffline = () => {
+    expect(screen.getByTestId(SYNC_GATE_TEST_IDS.activityIndicator)).toBeTruthy();
+    expect(screen.getByTestId(SYNC_GATE_TEST_IDS.activityDetail)).toBeTruthy();
+    expect(screen.queryByTestId(SYNC_GATE_TEST_IDS.offlineMessage)).toBeNull();
+  };
+
+  const expectOffline = () => {
+    expect(screen.getByTestId(SYNC_GATE_TEST_IDS.offlineMessage)).toBeTruthy();
+    expect(screen.queryByTestId(SYNC_GATE_TEST_IDS.activityIndicator)).toBeNull();
+  };
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+    mockUseAuth.mockReset();
+    mockUseAuth.mockReturnValue(signedInAuth);
+    mockPathname = '/stats-history';
+    __resetSyncGateStateForTests();
+    mockUseLiveScheduler = true;
+    startSyncScheduler();
+  });
+
+  afterEach(() => {
+    stopSyncScheduler();
+    mockUseLiveScheduler = false;
+    jest.useRealTimers();
+  });
+
+  it('shows the normal progress, not the offline copy, before NetInfo has reported (online device, first sign-in)', () => {
+    // The observed ios-sync-e2e capture: the gate mounts right after sign-in,
+    // before NetInfo's first event reaches the scheduler. The network state is
+    // unknown, not offline, so the gate must not claim the device is offline.
+    renderGate();
+
+    expect(screen.getByTestId(SYNC_GATE_TEST_IDS.block)).toBeTruthy();
+    expectProgressNotOffline();
+
+    // A poll-tick republish with NetInfo still silent keeps the progress body.
+    publish({});
+    expectProgressNotOffline();
+  });
+
+  it('shows the offline copy only once NetInfo reports isConnected === false', () => {
+    renderGate();
+    expectProgressNotOffline();
+
+    reportNetwork(false);
+    expectOffline();
+
+    reportNetwork(true);
+    expectProgressNotOffline();
+
+    reportNetwork(false);
+    expectOffline();
+  });
+
+  it('treats a still-undetermined NetInfo report (isConnected null) as unknown, not offline', () => {
+    renderGate();
+
+    reportNetwork(null);
+    expectProgressNotOffline();
+
+    reportNetwork(true);
+    expectProgressNotOffline();
   });
 });
