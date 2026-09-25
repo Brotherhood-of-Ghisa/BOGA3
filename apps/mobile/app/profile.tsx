@@ -1,7 +1,20 @@
 import { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
-import { UiButton, UiSurface, UiText, uiBorder, uiColors, uiRadius, uiSpace, uiTypography } from '@/components/ui';
+import {
+  ActionButton,
+  Card,
+  FormField,
+  Notice,
+  ScreenScroll,
+  StatePanel,
+  Stat,
+  uiBorder,
+  uiFonts,
+  uiRoles,
+  uiSpace,
+  uiTypography,
+} from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import { loadUserProfile, saveUsername, type UserProfileRecord } from '@/src/auth/profile';
 
@@ -277,392 +290,251 @@ export default function ProfileScreen() {
     }
   };
 
-  const renderFeedbackCard = (feedback: InlineFeedback | null, testID: string) => {
+  // A success is the `success` glyph and the words on the neutral band (G3); a
+  // failure is the `danger` notice.
+  const renderFeedback = (feedback: InlineFeedback | null, testID: string) => {
     if (!feedback) {
       return null;
     }
 
-    const isError = feedback.tone === 'error';
-
-    return (
-      <UiSurface style={[styles.feedbackCard, isError ? styles.errorCard : styles.successCard]} testID={testID}>
-        <UiText selectable style={isError ? styles.errorText : styles.successText} variant="body">
-          {feedback.message}
-        </UiText>
-      </UiSurface>
+    return feedback.tone === 'error' ? (
+      <Notice live message={feedback.message} testID={testID} tone="danger" />
+    ) : (
+      <Notice icon="success" live message={feedback.message} testID={testID} />
     );
   };
 
+  const renderInlineError = () =>
+    inlineError ? <Notice live message={inlineError} testID="profile-inline-error" tone="danger" /> : null;
+
   return (
-    <ScrollView
-      contentContainerStyle={styles.content}
+    <ScreenScroll
       contentInsetAdjustmentBehavior="automatic"
       keyboardShouldPersistTaps="handled"
-      style={styles.screen}
       testID="profile-screen">
       {status === 'restoring' ? (
-        <UiSurface style={styles.infoCard} testID="profile-restoring-state">
-          <UiText selectable variant="label">
-            Restoring account session...
-          </UiText>
-          <UiText selectable variant="bodyMuted">
-            The profile route will switch to the correct signed-in state as soon as auth bootstrap completes.
-          </UiText>
-        </UiSurface>
+        <Card>
+          <StatePanel
+            body="The profile route will switch to the correct signed-in state as soon as auth bootstrap completes."
+            fill={false}
+            kind="loading"
+            testID="profile-restoring-state"
+            title="Restoring account session..."
+          />
+        </Card>
       ) : null}
 
       {authDisabledMessage ? (
-        <UiSurface style={styles.warningCard} testID="profile-auth-disabled-card" variant="panelMuted">
-          <UiText selectable variant="label">
-            Auth setup required
-          </UiText>
-          <UiText selectable style={styles.warningText} variant="body">
-            {authDisabledMessage}
-          </UiText>
-        </UiSurface>
+        <Notice
+          icon="warning"
+          message={authDisabledMessage}
+          testID="profile-auth-disabled-card"
+          title="Auth setup required"
+        />
       ) : null}
 
       {!user ? (
-        <UiSurface style={styles.card} testID="profile-signed-out-card">
-          <View style={styles.sectionHeader}>
-            <UiText selectable variant="labelStrong">
-              Sign in
-            </UiText>
-          </View>
+        <Card style={styles.formCard} testID="profile-signed-out-card">
+          <Text allowFontScaling={false} accessibilityRole="header" style={styles.cardTitle}>
+            Sign in
+          </Text>
 
-          <View style={styles.fieldGroup}>
-            <View style={styles.fieldBlock}>
-              <UiText selectable variant="subtitle">
-                Email
-              </UiText>
-              <TextInput
-                allowFontScaling={false}
-                accessibilityLabel="Email"
-                autoCapitalize="none"
-                autoCorrect={false}
-                keyboardType="email-address"
-                onChangeText={handleEmailChange}
-                placeholder="you@example.com"
-                placeholderTextColor={uiColors.textDisabled}
-                style={styles.input}
-                testID="profile-email-input"
-                textContentType="emailAddress"
-                value={email}
-              />
-            </View>
+          <FormField
+            accessibilityLabel="Email"
+            autoCapitalize="none"
+            autoCorrect={false}
+            face="text"
+            keyboardType="email-address"
+            label="Email"
+            onChangeText={handleEmailChange}
+            placeholder="you@example.com"
+            testID="profile-email-input"
+            textContentType="emailAddress"
+            value={email}
+          />
 
-            <View style={styles.fieldBlock}>
-              <UiText selectable variant="subtitle">
-                Password
-              </UiText>
-              <TextInput
-                allowFontScaling={false}
-                accessibilityLabel="Password"
-                autoCapitalize="none"
-                autoCorrect={false}
-                onChangeText={handlePasswordChange}
-                placeholder="Enter password"
-                placeholderTextColor={uiColors.textDisabled}
-                secureTextEntry
-                style={styles.input}
-                testID="profile-password-input"
-                textContentType="password"
-                value={password}
-              />
-            </View>
-          </View>
+          <FormField
+            accessibilityLabel="Password"
+            autoCapitalize="none"
+            autoCorrect={false}
+            face="text"
+            label="Password"
+            onChangeText={handlePasswordChange}
+            placeholder="Enter password"
+            secureTextEntry
+            testID="profile-password-input"
+            textContentType="password"
+            value={password}
+          />
 
-          {inlineError ? (
-            <UiSurface style={[styles.feedbackCard, styles.errorCard]} testID="profile-inline-error">
-              <UiText selectable style={styles.errorText} variant="body">
-                {inlineError}
-              </UiText>
-            </UiSurface>
-          ) : null}
+          {renderInlineError()}
 
-          <UiButton
+          <ActionButton
             accessibilityLabel="Sign in to profile"
             disabled={!isConfigured || isBusy}
-            label={isSubmitting ? 'Signing In...' : 'Sign In'}
+            label={isSubmitting ? 'Signing in…' : 'Sign in'}
             onPress={() => {
               void handleSignIn();
             }}
             testID="profile-sign-in-button"
+            variant="primary"
           />
-        </UiSurface>
+        </Card>
       ) : (
         <View style={styles.profilePanel} testID="profile-signed-in-card">
           {isEditingProfile ? (
-            <>
-              <View style={styles.editFields}>
-                <View style={styles.fieldBlock}>
-                  <UiText selectable variant="subtitle">
-                    Username
-                  </UiText>
-                  <TextInput
-                    allowFontScaling={false}
-                    accessibilityLabel="Username"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    onChangeText={handleUsernameChange}
-                    placeholder="Add a username"
-                    placeholderTextColor={uiColors.textDisabled}
-                    style={styles.input}
-                    testID="profile-username-input"
-                    value={username}
-                  />
-                </View>
-                <View style={styles.fieldBlock}>
-                  <UiText selectable variant="subtitle">
-                    New email
-                  </UiText>
-                  <TextInput
-                    allowFontScaling={false}
-                    accessibilityLabel="New email"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    keyboardType="email-address"
-                    onChangeText={handleEmailUpdateChange}
-                    placeholder="you@example.com"
-                    placeholderTextColor={uiColors.textDisabled}
-                    style={styles.input}
-                    testID="profile-email-update-input"
-                    textContentType="emailAddress"
-                    value={newEmail}
-                  />
-                </View>
-                <View style={styles.fieldBlock}>
-                  <UiText selectable variant="subtitle">
-                    New password
-                  </UiText>
-                  <TextInput
-                    allowFontScaling={false}
-                    accessibilityLabel="New password"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    onChangeText={handlePasswordUpdateChange}
-                    placeholder="Enter a new password"
-                    placeholderTextColor={uiColors.textDisabled}
-                    secureTextEntry
-                    style={styles.input}
-                    testID="profile-password-update-input"
-                    textContentType="newPassword"
-                    value={newPassword}
-                  />
-                </View>
-              </View>
-              <View style={styles.editActionRow}>
-                <UiButton
+            <Card style={styles.formCard}>
+              <FormField
+                accessibilityLabel="Username"
+                autoCapitalize="none"
+                autoCorrect={false}
+                face="text"
+                label="Username"
+                onChangeText={handleUsernameChange}
+                placeholder="Add a username"
+                testID="profile-username-input"
+                value={username}
+              />
+              <FormField
+                accessibilityLabel="New email"
+                autoCapitalize="none"
+                autoCorrect={false}
+                face="text"
+                keyboardType="email-address"
+                label="New email"
+                onChangeText={handleEmailUpdateChange}
+                placeholder="you@example.com"
+                testID="profile-email-update-input"
+                textContentType="emailAddress"
+                value={newEmail}
+              />
+              <FormField
+                accessibilityLabel="New password"
+                autoCapitalize="none"
+                autoCorrect={false}
+                face="text"
+                label="New password"
+                onChangeText={handlePasswordUpdateChange}
+                placeholder="Enter a new password"
+                secureTextEntry
+                testID="profile-password-update-input"
+                textContentType="newPassword"
+                value={newPassword}
+              />
+
+              {/* Inline edit stays in place (T05-D2): Cancel steps back, Update
+                  is the screen's one primary. */}
+              <View style={styles.actionRow}>
+                <ActionButton
                   accessibilityLabel="Cancel profile editing"
                   disabled={isUpdatingProfile}
                   label="Cancel"
                   onPress={handleCancelProfileEdit}
-                  style={styles.profileActionButton}
                   testID="profile-cancel-edit-button"
-                  variant="secondary"
+                  variant="text"
                 />
-                <UiButton
-                  accessibilityLabel="Update profile"
-                  disabled={isLoadingProfile || isUpdatingProfile}
-                  label={isUpdatingProfile ? 'Updating...' : 'Update'}
-                  onPress={() => {
-                    void handleUpdateProfile();
-                  }}
-                  style={styles.profileActionButton}
-                  testID="profile-update-button"
-                />
+                <View style={styles.actionFill}>
+                  <ActionButton
+                    accessibilityLabel="Update profile"
+                    disabled={isLoadingProfile || isUpdatingProfile}
+                    label={isUpdatingProfile ? 'Updating…' : 'Update'}
+                    onPress={() => {
+                      void handleUpdateProfile();
+                    }}
+                    testID="profile-update-button"
+                    variant="primary"
+                  />
+                </View>
               </View>
-            </>
+            </Card>
           ) : (
             <>
-              <View style={styles.valueList}>
+              <Card>
                 <View style={styles.valueRow}>
-                  <UiText selectable style={styles.valueLabel} variant="subtitle">
-                    Username
-                  </UiText>
-                  <UiText selectable style={styles.valueText} variant="label">
-                    {isLoadingProfile ? 'Loading...' : profileUsernameValue}
-                  </UiText>
+                  <Stat kind="text" label="Username" value={isLoadingProfile ? 'Loading...' : profileUsernameValue} />
                 </View>
-                <View style={[styles.valueRow, pendingEmail ? null : styles.valueRowLast]}>
-                  <UiText selectable style={styles.valueLabel} variant="subtitle">
-                    Email
-                  </UiText>
-                  <UiText selectable style={styles.valueText} variant="label">
-                    {userEmail}
-                  </UiText>
+                <View style={[styles.valueRow, styles.valueRowDivider]}>
+                  <Stat kind="text" label="Email" value={userEmail} />
                 </View>
                 {pendingEmail ? (
-                  <View style={[styles.valueRow, styles.valueRowLast]}>
-                    <UiText selectable style={styles.valueLabel} variant="subtitle">
-                      Pending email
-                    </UiText>
-                    <UiText selectable style={styles.valueText} variant="label">
-                      {pendingEmail}
-                    </UiText>
+                  <View style={[styles.valueRow, styles.valueRowDivider]}>
+                    <Stat kind="text" label="Pending email" value={pendingEmail} />
                   </View>
                 ) : null}
-              </View>
+              </Card>
 
-              <View style={styles.profileActionRow}>
-                <UiButton
-                  accessibilityLabel="Edit profile"
-                  disabled={isSigningOut || isUpdatingProfile || isLoadingProfile}
-                  label="Edit"
-                  onPress={() => {
-                    setIsEditingProfile(true);
-                  }}
-                  style={styles.profileActionButton}
-                  testID="profile-edit-button"
-                  variant="secondary"
-                />
-                <UiButton
-                  accessibilityLabel="Sign out of profile"
-                  disabled={isBusy || isUpdatingProfile}
-                  label={isSigningOut ? 'Signing Out...' : 'Sign Out'}
-                  onPress={() => {
-                    void handleSignOut();
-                  }}
-                  style={styles.profileActionButton}
-                  testID="profile-sign-out-button"
-                  variant="danger"
-                />
+              {/* Neither is the primary: Edit opens the form, and Sign out is an
+                  outline in `danger` with no confirmation (T05-D4). */}
+              <View style={styles.actionRow}>
+                <View style={styles.actionFill}>
+                  <ActionButton
+                    accessibilityLabel="Edit profile"
+                    disabled={isSigningOut || isUpdatingProfile || isLoadingProfile}
+                    label="Edit"
+                    onPress={() => {
+                      setIsEditingProfile(true);
+                    }}
+                    testID="profile-edit-button"
+                    variant="outline"
+                  />
+                </View>
+                <View style={styles.actionFill}>
+                  <ActionButton
+                    accessibilityLabel="Sign out of profile"
+                    disabled={isBusy || isUpdatingProfile}
+                    label={isSigningOut ? 'Signing out…' : 'Sign out'}
+                    onPress={() => {
+                      void handleSignOut();
+                    }}
+                    testID="profile-sign-out-button"
+                    tone="danger"
+                    variant="outline"
+                  />
+                </View>
               </View>
             </>
           )}
 
-          {profileError ? (
-            <UiSurface style={[styles.feedbackCard, styles.errorCard]} testID="profile-load-error">
-              <UiText selectable style={styles.errorText} variant="body">
-                {profileError}
-              </UiText>
-            </UiSurface>
-          ) : null}
+          {profileError ? <Notice live message={profileError} testID="profile-load-error" tone="danger" /> : null}
 
-          {renderFeedbackCard(profileUpdateFeedback, 'profile-update-feedback')}
+          {renderFeedback(profileUpdateFeedback, 'profile-update-feedback')}
 
-          {inlineError ? (
-            <UiSurface style={[styles.feedbackCard, styles.errorCard]} testID="profile-inline-error">
-              <UiText selectable style={styles.errorText} variant="body">
-                {inlineError}
-              </UiText>
-            </UiSurface>
-          ) : null}
+          {renderInlineError()}
         </View>
       )}
-    </ScrollView>
+    </ScreenScroll>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: uiColors.surfacePage,
-  },
-  content: {
-    padding: uiSpace.xl,
-    gap: uiSpace.lg,
-  },
-  card: {
+  formCard: {
     padding: uiSpace.lg,
-    gap: uiSpace.lg,
+    gap: uiSpace.md,
   },
-  infoCard: {
-    padding: uiSpace.lg,
-    gap: uiSpace.sm,
-    backgroundColor: uiColors.surfaceInfo,
-    borderColor: uiColors.actionPrimarySubtleBorder,
-  },
-  warningCard: {
-    padding: uiSpace.lg,
-    gap: uiSpace.sm,
-    borderColor: uiColors.borderWarning,
-    backgroundColor: uiColors.surfaceWarning,
-  },
-  warningText: {
-    color: uiColors.textWarning,
-  },
-  sectionHeader: {
-    gap: uiSpace.sm,
+  cardTitle: {
+    fontFamily: uiFonts.display.family,
+    fontWeight: '700',
+    fontSize: uiTypography.size.lg,
+    lineHeight: uiTypography.lineHeight.lg,
+    color: uiRoles.ink,
   },
   profilePanel: {
-    gap: uiSpace.lg,
-  },
-  profileActionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiSpace.sm,
-  },
-  profileActionButton: {
-    flex: 1,
-  },
-  valueList: {
-    borderWidth: uiBorder.width,
-    borderColor: uiColors.borderMuted,
-    borderRadius: uiRadius.md,
-    backgroundColor: uiColors.surfaceDefault,
-    overflow: 'hidden',
+    gap: uiSpace.md,
   },
   valueRow: {
-    alignItems: 'flex-start',
     paddingHorizontal: uiSpace.lg,
     paddingVertical: uiSpace.md,
-    borderBottomWidth: uiBorder.width,
-    borderBottomColor: uiColors.borderMuted,
-    gap: uiSpace.xs,
   },
-  valueRowLast: {
-    borderBottomWidth: 0,
+  valueRowDivider: {
+    borderTopWidth: uiBorder.width,
+    borderTopColor: uiRoles.ruleSoft,
   },
-  valueLabel: {
-    color: uiColors.textSecondary,
-  },
-  valueText: {
-    color: uiColors.textAccentStrong,
-    flexShrink: 1,
-    textAlign: 'left',
-  },
-  editFields: {
-    gap: uiSpace.lg,
-  },
-  editActionRow: {
+  actionRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: uiSpace.sm,
   },
-  fieldGroup: {
-    gap: uiSpace.lg,
-  },
-  fieldBlock: {
-    gap: uiSpace.sm,
-  },
-  input: {
-    borderWidth: uiBorder.width,
-    borderColor: uiColors.borderInputStrong,
-    borderRadius: uiRadius.md,
-    backgroundColor: uiColors.surfaceDefault,
-    color: uiColors.textPrimary,
-    minHeight: 48,
-    paddingHorizontal: uiSpace.lg,
-    paddingVertical: uiSpace.md,
-    fontSize: uiTypography.size.base,
-  },
-  feedbackCard: {
-    paddingHorizontal: uiSpace.lg,
-    paddingVertical: uiSpace.lg,
-  },
-  errorCard: {
-    borderColor: uiColors.actionDangerSubtleBorder,
-    backgroundColor: uiColors.actionDangerSubtleBg,
-  },
-  successCard: {
-    borderColor: uiColors.borderSuccess,
-    backgroundColor: uiColors.surfaceSuccess,
-  },
-  errorText: {
-    color: uiColors.actionDangerText,
-  },
-  successText: {
-    color: uiColors.textSuccess,
+  actionFill: {
+    flex: 1,
   },
 });

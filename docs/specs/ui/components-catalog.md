@@ -142,7 +142,8 @@ Brief entrypoint inventory of the current reusable UI component set.
   - `FormField` — a micro-label inside a field one `fieldHeight` tall, `rule-strong`
     turning `danger` while invalid, the error below (`<testID>-error` or
     `errorTestID`), an optional hint or counter; `face` `figure` (Plex Mono) or
-    `text`. The completed edit's Start / End (`session-times-fields`)
+    `text`. The completed edit's Start / End (`session-times-fields`), and the
+    credential and profile fields of Sign in and Profile (DLM-T05)
   - `SearchField` — search glyph, text, and a clear control while there is text;
     `accessibilityLabel` required. The swap sheet's search
   - `SegmentedControl` — one choice from a few, joined in a `rule-strong` frame,
@@ -154,15 +155,18 @@ Brief entrypoint inventory of the current reusable UI component set.
     (checkboxes, `checked`), the same testID contract, per-chip accessibility
     labels. Logs' level filter (DLM-T04)
   - `Tag` — a static micro-label pill naming a state (`Archived`, `Deleted`, a
-    role); `neutral` or `faint`. No consumer yet
+    role); `neutral` or `faint`. Connected agents' `AI` tag (DLM-T05)
   - `Notice` — a `surface-subtle` band on a `rule` hairline: optional glyph, words,
     optional action; `neutral` or `danger` (`alert`); `live` announces it. There
-    is no success or warning hue: the glyph and words carry the state.
-    Settings' developer-tool outcomes (DLM-T04)
+    is no success or warning hue: the glyph and words carry the state. An
+    optional `title` (Archivo 700, a `header`) names a message that is a reason
+    ("Sign-in unavailable"). Settings' developer-tool outcomes (DLM-T04);
+    Sign-in, the first-sync gate and Profile (DLM-T05)
   - `PageHeader` / `SectionHeader` (`page-header.tsx`, DLM-T03) — a tab
     screen's in-content title (Archivo 800 `xxl`) and optional `ink-muted`
     intro; a section's heading (Archivo 700 `lg`) with an optional caps text
-    action. Today and Train; `PageHeader` also More and Settings (DLM-T04)
+    action. Today and Train; `PageHeader` also More and Settings (DLM-T04) and
+    Sign in (DLM-T05)
   - `ListRow` also takes an `accessibilityHint` for a pressable row (DLM-T03),
     and a `description` (a wrapping `ink-muted` second line) and
     `accessibilityRole="link"` for a row that opens the browser (DLM-T04: the

@@ -1,9 +1,9 @@
 import { Redirect, Stack } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { UiButton, UiSurface, UiText, uiBorder, uiColors, uiRadius, uiSpace, uiTypography } from '@/components/ui';
+import { ActionButton, Card, FormField, Notice, PageHeader, uiRoles, uiSpace } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import { clearAuthRequired } from '@/src/sync/auth-required-signal';
 
@@ -103,78 +103,58 @@ export default function SignInScreen() {
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
           style={styles.flex}>
-          <View style={styles.header}>
-            <UiText variant="title">Sign in</UiText>
-            <UiText style={styles.subtitle} variant="bodyMuted">
-              Sign in to load your data and keep it in sync.
-            </UiText>
-          </View>
+          <PageHeader intro="Sign in to load your data and keep it in sync." title="Sign in" />
 
           {authDisabledMessage ? (
-            <UiSurface style={styles.warningCard} testID="sign-in-auth-disabled-card" variant="panelMuted">
-              <UiText variant="label">Sign-in unavailable</UiText>
-              <UiText style={styles.warningText} variant="body">
-                {authDisabledMessage}
-              </UiText>
-            </UiSurface>
+            <Notice
+              icon="warning"
+              message={authDisabledMessage}
+              testID="sign-in-auth-disabled-card"
+              title="Sign-in unavailable"
+            />
           ) : (
-            <UiSurface style={styles.card} testID="sign-in-card">
-              <View style={styles.fieldGroup}>
-                <View style={styles.fieldBlock}>
-                  <UiText variant="subtitle">Email</UiText>
-                  <TextInput
-                    allowFontScaling={false}
-                    accessibilityLabel="Email"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    keyboardType="email-address"
-                    onChangeText={handleEmailChange}
-                    placeholder="you@example.com"
-                    placeholderTextColor={uiColors.textDisabled}
-                    style={styles.input}
-                    testID="sign-in-email-input"
-                    textContentType="emailAddress"
-                    value={email}
-                  />
-                </View>
+            <Card style={styles.card} testID="sign-in-card">
+              <FormField
+                accessibilityLabel="Email"
+                autoCapitalize="none"
+                autoCorrect={false}
+                face="text"
+                keyboardType="email-address"
+                label="Email"
+                onChangeText={handleEmailChange}
+                placeholder="you@example.com"
+                testID="sign-in-email-input"
+                textContentType="emailAddress"
+                value={email}
+              />
 
-                <View style={styles.fieldBlock}>
-                  <UiText variant="subtitle">Password</UiText>
-                  <TextInput
-                    allowFontScaling={false}
-                    accessibilityLabel="Password"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    onChangeText={handlePasswordChange}
-                    placeholder="Enter password"
-                    placeholderTextColor={uiColors.textDisabled}
-                    secureTextEntry
-                    style={styles.input}
-                    testID="sign-in-password-input"
-                    textContentType="password"
-                    value={password}
-                  />
-                </View>
-              </View>
+              <FormField
+                accessibilityLabel="Password"
+                autoCapitalize="none"
+                autoCorrect={false}
+                face="text"
+                label="Password"
+                onChangeText={handlePasswordChange}
+                placeholder="Enter password"
+                secureTextEntry
+                testID="sign-in-password-input"
+                textContentType="password"
+                value={password}
+              />
 
-              {inlineError ? (
-                <UiSurface style={[styles.feedbackCard, styles.errorCard]} testID="sign-in-inline-error">
-                  <UiText style={styles.errorText} variant="body">
-                    {inlineError}
-                  </UiText>
-                </UiSurface>
-              ) : null}
+              {inlineError ? <Notice live message={inlineError} testID="sign-in-inline-error" tone="danger" /> : null}
 
-              <UiButton
+              <ActionButton
                 accessibilityLabel="Sign in"
                 disabled={!isConfigured || isBusy}
-                label={isSubmitting ? 'Signing In...' : 'Sign In'}
+                label={isSubmitting ? 'Signing in…' : 'Sign in'}
                 onPress={() => {
                   void handleSignIn();
                 }}
                 testID="sign-in-submit-button"
+                variant="primary"
               />
-            </UiSurface>
+            </Card>
           )}
         </ScrollView>
       </KeyboardAvoidingView>
@@ -185,62 +165,20 @@ export default function SignInScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: uiColors.surfacePage,
+    backgroundColor: uiRoles.paper,
   },
   flex: {
     flex: 1,
   },
+  // Centred on the page, so the form sits where the thumb is.
   content: {
     flexGrow: 1,
     justifyContent: 'center',
-    padding: uiSpace.xl,
+    padding: uiSpace.lg,
     gap: uiSpace.lg,
-  },
-  header: {
-    gap: uiSpace.sm,
-  },
-  subtitle: {
-    color: uiColors.textSecondary,
   },
   card: {
     padding: uiSpace.lg,
-    gap: uiSpace.lg,
-  },
-  warningCard: {
-    padding: uiSpace.lg,
-    gap: uiSpace.sm,
-    borderColor: uiColors.borderWarning,
-    backgroundColor: uiColors.surfaceWarning,
-  },
-  warningText: {
-    color: uiColors.textWarning,
-  },
-  fieldGroup: {
-    gap: uiSpace.lg,
-  },
-  fieldBlock: {
-    gap: uiSpace.sm,
-  },
-  input: {
-    borderWidth: uiBorder.width,
-    borderColor: uiColors.borderInputStrong,
-    borderRadius: uiRadius.md,
-    backgroundColor: uiColors.surfaceDefault,
-    color: uiColors.textPrimary,
-    minHeight: 48,
-    paddingHorizontal: uiSpace.lg,
-    paddingVertical: uiSpace.md,
-    fontSize: uiTypography.size.base,
-  },
-  feedbackCard: {
-    paddingHorizontal: uiSpace.lg,
-    paddingVertical: uiSpace.lg,
-  },
-  errorCard: {
-    borderColor: uiColors.actionDangerSubtleBorder,
-    backgroundColor: uiColors.actionDangerSubtleBg,
-  },
-  errorText: {
-    color: uiColors.actionDangerText,
+    gap: uiSpace.md,
   },
 });

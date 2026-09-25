@@ -11,6 +11,9 @@ export type NoticeTone = 'neutral' | 'danger';
 
 export type NoticeProps = {
   message: string;
+  // A short heading above the message ("Sign-in unavailable"), when the
+  // message is a reason that needs naming.
+  title?: string;
   tone?: NoticeTone;
   // `offline`, `success`, `warning`… Omit for words alone.
   icon?: IconName;
@@ -23,16 +26,28 @@ export type NoticeProps = {
 
 // A band that states something about the screen: `surface-subtle` on a `rule`
 // hairline at the card radius, an optional leading glyph and the words.
-export function Notice({ message, tone = 'neutral', icon, live = false, action, testID }: NoticeProps) {
+export function Notice({ message, title, tone = 'neutral', icon, live = false, action, testID }: NoticeProps) {
   const danger = tone === 'danger';
+  const words = (
+    <Text allowFontScaling={false} style={[styles.message, title ? null : styles.fill, danger ? styles.messageDanger : null]}>{message}</Text>
+  );
   return (
     <View
       accessibilityLiveRegion={live ? 'polite' : undefined}
       accessibilityRole={danger ? 'alert' : undefined}
-      style={[styles.band, danger ? styles.bandDanger : null]}
+      style={[styles.band, title ? styles.bandTitled : null, danger ? styles.bandDanger : null]}
       testID={testID}>
       {icon ? <Icon color={danger ? uiRoles.danger : uiRoles.inkMuted} name={icon} size="sm" /> : null}
-      <Text allowFontScaling={false} style={[styles.message, danger ? styles.messageDanger : null]}>{message}</Text>
+      {title ? (
+        <View style={styles.words}>
+          <Text allowFontScaling={false} accessibilityRole="header" style={[styles.title, danger ? styles.messageDanger : null]}>
+            {title}
+          </Text>
+          {words}
+        </View>
+      ) : (
+        words
+      )}
       {action}
     </View>
   );
@@ -50,11 +65,28 @@ const styles = StyleSheet.create({
     borderColor: uiRoles.rule,
     borderRadius: uiGeometry.radius.card,
   },
+  // A titled notice reads top-down: the glyph sits level with the title.
+  bandTitled: {
+    alignItems: 'flex-start',
+  },
   bandDanger: {
     borderColor: uiRoles.danger,
   },
-  message: {
+  words: {
     flex: 1,
+    gap: uiSpace.xs,
+  },
+  title: {
+    fontFamily: uiFonts.display.family,
+    fontWeight: '700',
+    fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
+    color: uiRoles.ink,
+  },
+  fill: {
+    flex: 1,
+  },
+  message: {
     fontFamily: uiFonts.body.family,
     fontWeight: '400',
     fontSize: uiTypography.size.base,

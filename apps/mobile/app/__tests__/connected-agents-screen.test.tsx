@@ -47,6 +47,14 @@ describe('Connected agents screen', () => {
     expect(screen.queryByText(/email|billing/i)).toBeNull();
   });
 
+  it('leaves the title to the native header and keeps the intro (T05-D1)', async () => {
+    render(<ConnectedAgentsScreen />);
+
+    await screen.findByTestId('connected-agent-client-a');
+    expect(screen.queryByText('Connected agents')).toBeNull();
+    expect(screen.getByText(/^Agents can read training data only\./)).toBeTruthy();
+  });
+
   it('confirms and revokes a grant, then removes it from the list', async () => {
     render(<ConnectedAgentsScreen />);
     await screen.findByTestId('connected-agent-client-a');
