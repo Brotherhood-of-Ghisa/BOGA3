@@ -406,9 +406,10 @@ appId: com.dinoderek.mobile
     timeout: 30000
 - scrollUntilVisible:
     element:
-      text: "No comparison history yet"
+      id: "session-completion-exercise-maestro_m24_completion_unmapped_exercise"
     direction: DOWN
     centerElement: true
+- assertVisible: ".*No comparison history yet.*"
 - takeScreenshot: "view-session-no-history"
 - tapOn:
     id: "session-insight-mode-muscle"
