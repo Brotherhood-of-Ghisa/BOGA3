@@ -156,6 +156,11 @@ Brief entrypoint inventory of the current reusable UI component set.
     optional action; `neutral` or `danger` (`alert`); `live` announces it. There
     is no success or warning hue: the glyph and words carry the state. No
     consumer yet
+  - `PageHeader` / `SectionHeader` (`page-header.tsx`, DLM-T03) — a tab
+    screen's in-content title (Archivo 800 `xxl`) and optional `ink-muted`
+    intro; a section's heading (Archivo 700 `lg`) with an optional caps text
+    action. Today and Train
+  - `ListRow` also takes an `accessibilityHint` for a pressable row (DLM-T03)
   - covered by `apps/mobile/app/__tests__/ui-design-primitives.test.tsx`
 
 7. `Icon`
@@ -269,6 +274,8 @@ Brief entrypoint inventory of the current reusable UI component set.
 - Purpose:
   - shared two-line summary row (date/duration/gym + sets/exercises) reused by
     `ActiveSessionRow`, `HistoryList`, Today recents, and Progress history
+  - figures in Plex Mono (`ink` for the start and duration, `ink-muted` for the
+    counts), the gym in Source Sans, `·` separators in `ink-faint` (DLM-T03)
 
 8. `ActiveSessionRow`
 - File: `apps/mobile/components/session-list/active-session-row.tsx`

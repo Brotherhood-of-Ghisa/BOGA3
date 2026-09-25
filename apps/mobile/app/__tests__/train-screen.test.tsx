@@ -8,7 +8,10 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush }),
 }));
 
+import { StyleSheet } from 'react-native';
+
 import type { SessionListDataClient, SessionListItem } from '@/components/session-list';
+import { uiRoles } from '@/components/ui/tokens';
 import type { SessionEntryCoordinator } from '@/src/session-entry';
 
 import { TrainScreen, type TrainPlanningState } from '../(tabs)/train';
@@ -173,6 +176,42 @@ describe('Train screen', () => {
 
     fireEvent.press(screen.getByTestId('train-manage-planning-button'));
     expect(openManager).toHaveBeenCalledTimes(1);
+  });
+
+  it('draws exactly one accent primary: the plan when one is ready, else the empty start (T03-D1)', () => {
+    const accentButtons = () =>
+      ['train-start-empty-button', 'train-start-planned-button', 'train-manage-planning-button']
+        .map((testID) => screen.queryByTestId(testID))
+        .filter((node) => node && StyleSheet.flatten(node.props.style).backgroundColor === uiRoles.accent)
+        .map((node) => node?.props.testID);
+
+    const { unmount } = render(
+      <TrainScreen
+        initialSessions={[]}
+        planningState={{
+          status: 'ready',
+          title: 'Upper body',
+          detail: 'Bench press',
+          materialize: jest.fn(),
+          openManager: jest.fn(),
+        }}
+        sessionEntry={sessionEntry()}
+      />,
+    );
+    expect(accentButtons()).toEqual(['train-start-planned-button']);
+    unmount();
+
+    render(<TrainScreen initialSessions={[]} sessionEntry={sessionEntry()} />);
+    expect(accentButtons()).toEqual(['train-start-empty-button']);
+  });
+
+  it('marks the active workout with the current-ring glyph, not a colour', async () => {
+    render(<TrainScreen dataClient={dataClient([activeSession])} sessionEntry={sessionEntry()} />);
+    await screen.findByTestId('train-active-session-card');
+    expect(screen.getByTestId('train-active-session-glyph', { includeHiddenElements: true })).toBeTruthy();
+    expect(StyleSheet.flatten(screen.getByTestId('train-active-session-card').props.style).backgroundColor).toBe(
+      uiRoles.surface,
+    );
   });
 
   it('keeps planned-launch failure inline without disabling empty training', async () => {

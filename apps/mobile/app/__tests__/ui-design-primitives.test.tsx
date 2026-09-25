@@ -9,8 +9,10 @@ import {
   IconButton,
   ListRow,
   Notice,
+  PageHeader,
   ScreenScroll,
   SearchField,
+  SectionHeader,
   SegmentedControl,
   Sheet,
   Stat,
@@ -541,5 +543,26 @@ describe('Notice', () => {
     render(<Notice message="Nothing was changed." testID="notice" tone="danger" />);
     expect(screen.getByTestId('notice').props.accessibilityRole).toBe('alert');
     expect(flatStyle(screen.getByText('Nothing was changed.')).color).toBe(uiRoles.danger);
+  });
+});
+
+describe('PageHeader / SectionHeader', () => {
+  it('titles a tab screen in Archivo 800 with a muted intro', () => {
+    render(<PageHeader intro="At a glance." title="Today" />);
+    expect(flatStyle(screen.getByRole('header', { name: 'Today' }))).toMatchObject({
+      fontFamily: 'Archivo',
+      fontWeight: '800',
+      fontSize: uiTypography.size.xxl,
+    });
+    expect(flatStyle(screen.getByText('At a glance.')).color).toBe(uiRoles.inkMuted);
+  });
+
+  it('heads a section with an optional caps text action, never a primary', () => {
+    const onPress = jest.fn();
+    render(<SectionHeader action={{ label: 'View groups', onPress, testID: 'view' }} title="Group activity" />);
+    expect(screen.getByRole('header', { name: 'Group activity' })).toBeTruthy();
+    expect(flatStyle(screen.getByTestId('view')).backgroundColor).toBeUndefined();
+    fireEvent.press(screen.getByTestId('view'));
+    expect(onPress).toHaveBeenCalledTimes(1);
   });
 });

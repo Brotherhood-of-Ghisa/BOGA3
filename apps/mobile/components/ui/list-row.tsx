@@ -30,6 +30,9 @@ export type ListRowProps = {
   onPress?: () => void;
   disabled?: boolean;
   accessibilityLabel?: string;
+  // What pressing the row does, when the label does not say (`Opens the
+  // completed session`).
+  accessibilityHint?: string;
   testID?: string;
 };
 
@@ -47,6 +50,7 @@ export function ListRow({
   onPress,
   disabled = false,
   accessibilityLabel,
+  accessibilityHint,
   testID,
 }: ListRowProps) {
   const body = (
@@ -89,6 +93,7 @@ export function ListRow({
 
   return (
     <Pressable
+      accessibilityHint={accessibilityHint}
       accessibilityLabel={accessibilityLabel ?? label}
       accessibilityRole="button"
       accessibilityState={{ selected, disabled }}
