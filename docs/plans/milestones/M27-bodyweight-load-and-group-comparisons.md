@@ -320,9 +320,13 @@ is complete merely because a downstream closeout card lists its tests.
   reinstall and old-reader metadata recovery. Drift: zero errors/warnings.
   Logs: `/tmp/boga-m27-data-{fast,backend,backend-tail}.log`; measured runs are
   in the normal timings records. `./boga timings` and `./boga test for` ran.
-- Fresh frontend verification is pending for T02. No implementation PR opened.
-- Next: finish T02 device evidence, then Settings readings and snapshot entry
-  (T04); its repository draft is prepared outside the tested checkout.
+- Full T02 `frontend` passed at `29ff94f` (`TASK_ID=M27-data`), including
+  sign-in/profile, UI/server sync, two-user groups and exercise linking.
+  Artifacts: `apps/mobile/artifacts/maestro/M27-data/`; log:
+  `/tmp/boga-m27-data-frontend.log`. `./boga timings` recorded the measured runs.
+  No implementation PR opened.
+- Next: integrate and verify Settings readings and snapshot entry (T04),
+  prepared separately while the T02 device gate ran.
 
 ## Milestone acceptance
 
