@@ -21,10 +21,10 @@ This document is project-level source of truth for what data exists and how it i
 
 ## Current model layers
 
-Planned extension: [M27 bodyweight contract](tech/bodyweight-load-contract.md)
-defines private measurements, frozen session snapshots and explicit external
-load metadata. These additions are not part of the current inventory until
-the paired schema/sync implementation ships.
+The [M27 bodyweight contract](tech/bodyweight-load-contract.md) defines private
+measurements, frozen session snapshots and explicit external load metadata.
+Their paired SQLite/server schema and sync transport are implemented; entry,
+backfill and calculation-consumer activation are separate rollout work.
 
 1. Mobile local data layer (`SQLite` via Drizzle)
 - primary runtime store for app behavior.
@@ -47,15 +47,35 @@ the paired schema/sync implementation ships.
   `sync_push` RPC and read by the `sync_pull` RPC under per-row last-write-wins.
 - there is no projection function and no event log: the data is the event.
 
+Server-first compatibility: M27 fields omitted by an older LWW writer preserve
+stored values; explicit JSON null clears nullable fields. New clients request
+reading-only layer 4 with `capabilities: ["bodyweight_v1"]` and a fresh cursor;
+legacy layer meanings remain unchanged. Upgrading locally replays affected
+layers 0, 1 and 3 once to recover metadata an older reader could have ignored;
+layer 2 and existing row clocks/dirty bits are preserved. The schema migration must deploy
+before the upgraded sync client. Group projections and calculated metrics are
+outside the mirror; no derived volume/1RM columns are stored.
+
 ## Local schema inventory (current)
 
 ### User-owned domain data (sync/backups expected)
 
 - `gyms` (user-owned personal gym rows; nullable private coordinate metadata is in sync scope)
-- `sessions`
+- `body_weight_measurements` (owner-private dated readings; raw `weight_value`,
+  explicit `weight_unit`, normalized `weight_kg`, `measured_at`, timestamps and
+  tombstone; no group access to reading history)
+- `sessions` (nullable frozen `body_weight_kg`, `body_weight_source`,
+  `body_weight_measurement_id`, `body_weight_measured_at`; source id is plain
+  provenance with no FK, so reading edits/deletion cannot rewrite a snapshot)
 - `session_exercises`
 - `exercise_sets` (actual entered `weight_value` / `reps_value` / `set_type`, plus optional planned target fields `planned_weight_value` / `planned_reps_value` / `planned_set_type` and `performance_status` for explicit planned/unperformed execution state; legacy `skipped` values remain readable)
-- `exercise_definitions`
+- `exercise_sets` also stores actual `weight_unit` (legacy default `kg`),
+  nullable `external_load_mode`, `planned_weight_unit` and
+  `planned_external_load_mode`; raw entered amounts remain unchanged. Null
+  mode is unresolved for bodyweight history, never guessed as added load.
+- `exercise_definitions` adds `bodyweight_coefficient` (default 0), nullable
+  `movement_standard` and `loading_method`; no heuristic activation of legacy
+  exercises is performed by the schema migration.
   - `load_input_mode` is required metadata with values `total_load` and
     `per_side_load`. It describes whether the entered scalar is a shared load
     or already one-side load; it is not inferred from equipment names.
@@ -87,7 +107,7 @@ the paired schema/sync implementation ships.
 ### Sign-out / account-switch wipe
 
 `wipeLocalTables` (`apps/mobile/src/sync/account-wipe.ts`) deletes, in one
-transaction, the ten user-owned entity tables (child before parent) and
+transaction, the eleven user-owned entity tables (child before parent) and
 `group_cache`, then resets `bootstrap_completed_at`, `pull_cursor`, and
 `applied_seed_migration_app_version` on the `sync_runtime_state` row. It keeps
 `last_emitted_ms` and issues no server delete.
@@ -95,10 +115,13 @@ transaction, the ten user-owned entity tables (child before parent) and
 ### Local sync bookkeeping (Sync v2)
 
 v2 keeps no separate outbox/delivery tables. Per-row sync state is two local-only
-columns on each of the ten user-owned entity tables:
+columns on each of the eleven user-owned entity tables:
 `local_dirty` (1 iff the row needs pushing) and `local_updated_at_ms` (the
 monotonic client timestamp, sent as `client_updated_at_ms`). Neither crosses the
-wire. Device-global sync state lives on the `sync_runtime_state` singleton row:
+wire. M27 additionally tracks `local_bodyweight_metadata_known` on sessions,
+exercise definitions and sets to restore fields an older reader could have
+ignored, without pushing unknown defaults or discarding newer local edits.
+It is local-only and never an independent conflict clock. Device-global sync state lives on the `sync_runtime_state` singleton row:
 `pull_cursor` (per-layer JSON cursor map), `last_emitted_ms` (the monotonic-clock
 high-water mark), and `bootstrap_completed_at`. Deep detail:
 `docs/specs/tech/sync-v2-server-contract.md` §B.9.
@@ -163,7 +186,7 @@ to deduplicate per device, so idempotency falls out of per-row LWW.
 - `app_public.user_profiles.training_unit` and `time_zone`
   - training-relevant API preferences in the auth/profile layer;
   - sync impact decision: `out of sync scope` because `user_profiles` is
-    explicitly outside the ten-table Sync v2 mirror.
+    explicitly outside the eleven-table Sync v2 mirror.
 
 ### Group domain (M22)
 
@@ -242,7 +265,7 @@ to deduplicate per device, so idempotency falls out of per-row LWW.
    to a newer stored value (including the undelete-loses case in
    `docs/specs/tech/sync-v2-server-contract.md` §A.1.1.2 Scenario A).
 5. Diagnostic log rows are write-only from authenticated clients and are manually inspected through backend operator tooling.
-6. All ten sync-domain mirror tables use composite primary key
+6. All eleven sync-domain mirror tables use composite primary key
    `(owner_user_id, id)` — **owner-first**. The column order is load-bearing: the
    canonical pull query (`where owner_user_id = … order by server_received_at`)
    leads with the PK column, and the per-layer pull cursor depends on it (contract
@@ -287,7 +310,7 @@ to deduplicate per device, so idempotency falls out of per-row LWW.
 Deep wire/RPC detail lives in `docs/specs/tech/sync-v2-server-contract.md`; this
 section states only the data-model-level invariants.
 
-1. The ten user-owned entity tables are mirrored 1:1 on the backend as typed
+1. The eleven user-owned entity tables are mirrored 1:1 on the backend as typed
    `app_public.<entity>` tables. The client marks a mutated row dirty
    (`local_dirty = 1`, `local_updated_at_ms = nowMonotonic()`) and pushes the full
    typed row — not a granular event. There is no outbox, no projection, no event
@@ -367,7 +390,7 @@ is no event log. Field-by-field detail: contract §B.2.
 
 ### Entity coverage (Sync v2)
 
-There are no per-entity event types. Every one of the ten entities moves through
+There are no per-entity event types. Every one of the eleven entities moves through
 the same LWW upsert path. A delete is a row whose `deleted_at` is non-null; an
 undelete is that same row with `deleted_at` back to null. A reorder or complete is
 an ordinary field change (`order_index` / `status`); an attach is the join-table
@@ -386,7 +409,7 @@ link follows the same shape: link inserts or undeletes the deterministic-id
   §B.3).
 - `sync_pull` downloads rows newer than a per-layer cursor, draining the four
   topological layers in order so a child page never lands before its parents
-  (contract §B.4). The four per-layer cursors persist in
+  (contract §B.4). The five per-layer cursors persist in
   `sync_runtime_state.pull_cursor`.
 
 ## Maintenance rule (mandatory)
@@ -408,10 +431,11 @@ Sync impact gate (mandatory for every data-model change):
 
 ## Client schema drift rule (Sync v2)
 
-Modifying any file under `apps/mobile/src/data/schema/` for the ten user-owned
+Modifying any file under `apps/mobile/src/data/schema/` for the eleven user-owned
 entities (`gyms`, `sessions`, `session_exercises`, `exercise_sets`,
 `exercise_definitions`, `exercise_muscle_mappings`, `exercise_tag_definitions`,
-`session_exercise_tags`, `muscle_groups`, `exercise_group_links`) to add a
+`session_exercise_tags`, `muscle_groups`, `exercise_group_links`,
+`body_weight_measurements`) to add a
 domain column requires a
 paired server migration under `supabase/migrations/` that adds the matching
 `app_public.<entity>` column with a compatible Postgres type, **and the server
@@ -419,8 +443,10 @@ migration must be deployed to production before the client change ships**.
 
 Why "server first": a client that depends on a typed server column not yet
 deployed will fail to round-trip that column; the server has nowhere typed to
-store it. Server-ahead-of-client is always safe (the column sits unwritten
-until the client catches up).
+store it. Server-first additions must also preserve old writers that omit new
+fields and keep unknown entity types out of old-reader pulls. M27 additionally
+replays ignored projections on local upgrade (Sync v2 §B.4.1). Adding columns
+alone is not a complete mixed-version compatibility policy.
 
 The drift checker (`apps/mobile/scripts/check-sync-schema-drift.ts`, invoked via
 `npm run check:sync-drift` and gated by `./scripts/quality-slow.sh backend`)
@@ -435,10 +461,10 @@ This rule does NOT apply to: `smoke_records`, `sync_runtime_state`,
 `sync_quarantine`, or `group_cache` (test/runtime scaffolding, local sync
 bookkeeping, and the disposable group cache) — these
 have no server counterpart and are out of the checker's scope, which introspects
-only the ten `app_public.<entity>` mirror tables. Nor does it apply to the two
+only the eleven `app_public.<entity>` mirror tables. Nor does it apply to the two
 local-only sync-bookkeeping columns (`local_dirty`, `local_updated_at_ms`) on
 each entity table: those are listed under `exemptions.local_only_columns` in
-`sync-extras.json`. (`muscle_groups` is no longer exempt — it is one of the ten
+`sync-extras.json`. (`muscle_groups` is no longer exempt — it is one of the eleven
 synced entities, and `exercise_muscle_mappings.muscleGroupId` is a typed,
 FK-checked column like any other.)
 

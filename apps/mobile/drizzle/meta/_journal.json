@@ -50,6 +50,20 @@
       "when": 1789313685360,
       "tag": "0006_misty_firebird",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1790446284269,
+      "tag": "0007_tranquil_kate_bishop",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1790446570177,
+      "tag": "0008_ordinary_bill_hollister",
+      "breakpoints": true
     }
   ]
 }

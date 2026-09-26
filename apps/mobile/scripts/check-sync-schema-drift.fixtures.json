@@ -2,6 +2,28 @@
   "$description": "SHA-256 hashes (whitespace-collapsed, comments-stripped, lowercased) of the v2 owner_user_id-immutable trigger body and per-entity RLS policy expressions. Regenerate via `npm run check:sync-drift -- --write-fixtures` when policy/trigger text intentionally changes.",
   "enforce_owner_user_id_immutable_sha256": "a6f1c08210df939ddbd077508d77464dd202263bf87f7d6c6754c83bc37b718d",
   "policies_sha256": {
+    "body_weight_measurements": {
+      "owner_select": {
+        "qual": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186",
+        "with_check": null
+      },
+      "owner_insert": {
+        "qual": null,
+        "with_check": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186"
+      },
+      "owner_update": {
+        "qual": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186",
+        "with_check": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186"
+      },
+      "owner_delete": {
+        "qual": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186",
+        "with_check": null
+      },
+      "direct_app_only": {
+        "qual": "9cd3efb159268fa52203986eada98c92c3de5a1319c11486dfec73ab0a29f7a8",
+        "with_check": "9cd3efb159268fa52203986eada98c92c3de5a1319c11486dfec73ab0a29f7a8"
+      }
+    },
     "exercise_definitions": {
       "owner_select": {
         "qual": "9be42eb3252ea7ed6530eb7c415b577417991b18933e2b08f826b8979de5e186",

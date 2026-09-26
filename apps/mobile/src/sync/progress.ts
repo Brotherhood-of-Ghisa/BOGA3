@@ -16,11 +16,13 @@
 // projection), never derived from a phase or a cycle error, so a transient
 // error can never masquerade as "offline".
 
+import { TOPO_LAYERS } from './topo-order';
+
 /** The genuinely-distinct, observable phases of a first sync. */
 export type SyncPhase = 'idle' | 'pull' | 'push' | 'seed' | 'done';
 
 /** The number of topological pull layers — the ONLY known progress denominator. */
-export const PULL_LAYER_COUNT = 4;
+export const PULL_LAYER_COUNT = TOPO_LAYERS.length;
 
 /**
  * An immutable progress snapshot. `layersCompleted` runs 0..PULL_LAYER_COUNT

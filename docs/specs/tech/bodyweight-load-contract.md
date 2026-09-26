@@ -9,7 +9,8 @@
 
 Baseline reviewed: `a34708c0d6622e2d842771bdfbf2038a38f9aaed`, containing
 `origin/main` on 2026-09-26. The existing calculation is **Wathan**, and raw
-set weights currently have no unit or added/assisted interpretation column.
+set weights had no unit or added/assisted interpretation column at that baseline.
+T02 implements the paired schema, transport and compatibility replay below.
 The implementation order is storage/read compatibility, explicit load entry
 and legacy review, consumer adoption, then server-first feature rollout.
 
@@ -244,8 +245,14 @@ Weight measurements use owner-first PK/RLS plus OAuth direct-access denial,
 like every synced entity. Include topology/cursors, bootstrap, serializers,
 drift, wipe and export/import. Adding a root entity also requires old-client
 pull compatibility: an old reader must never encounter an unknown entity.
-T02 defines the negotiated reader capability/version and a separate cursor
-start for the new root, so upgrading cannot skip historical measurements.
+The implemented reader requests layer 4 with `capabilities: ["bodyweight_v1"]`
+and starts its independent cursor at null. Layer meanings 0–3 are unchanged;
+the local upgrade replays 0, 1 and 3 once, because an old reader may have
+advanced past metadata it ignored. A local known-metadata marker prevents
+placeholder defaults from being pushed and permits one-time hydration without
+overwriting newer unrelated local edits. Known metadata continues ordinary LWW.
+Older readers never receive this entity; upgraded readers do not skip historic
+readings. The new client requires the server migration first.
 
 Server writers distinguish absent new fields (preserve stored value) from
 explicit null (clear by newer-client intent). Snapshot and metadata tuples

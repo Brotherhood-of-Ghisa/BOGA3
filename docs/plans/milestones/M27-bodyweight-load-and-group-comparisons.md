@@ -279,7 +279,7 @@ captures to its PR. Reuse `components/ui` tokens, fields, sheets, lists and noti
 | Task | Deliverable | Depends on | Status |
 | --- | --- | --- | --- |
 | [M27-T01 — Contracts and design target](../tasks/M27-T01-Define_bodyweight_contracts_and_design_target.md) | Exact domain types, compatibility and UX target | — | in_progress |
-| [M27-T02 — Synced data](../tasks/M27-T02-Add_bodyweight_schema_and_sync.md) | Measurements, snapshots, personal metadata and load mode | T01 | planned |
+| [M27-T02 — Synced data](../tasks/M27-T02-Add_bodyweight_schema_and_sync.md) | Measurements, snapshots, personal metadata and load mode | T01 | in_progress |
 | [M27-T03 — Shared calculations](../tasks/M27-T03-Implement_effective_load_and_RM_calculations.md) | Resolver, volume, forward/inverse RM and completeness | T01 | in_progress |
 | [M27-T04 — Settings and snapshots](../tasks/M27-T04-Add_Settings_weight_and_session_snapshots.md) | Weight entry/history and stable new-session defaults | T02, T03 | planned |
 | [M27-T05 — Exercise setup and logging](../tasks/M27-T05-Configure_exercises_and_bodyweight_logging.md) | Coefficients, reviewed seeds/legacy values, added/assisted entry | T02, T03 | planned |
@@ -309,8 +309,20 @@ is complete merely because a downstream closeout card lists its tests.
   including the UI-regression repeat after the baseline XCTest hierarchy HTTP
   500. Artifacts: `apps/mobile/artifacts/maestro/M27-foundation/`; local lane
   logs `/tmp/boga-m27-{fast,groups,frontend}.log`. No gate was waived.
-- Next: T02 paired schema/sync changes, including old-reader and old-writer
-  compatibility; the separate preparation draft is ready to apply.
+- T02 schema/transport implementation is in progress: private readings, frozen
+  snapshots and load metadata; guarded server compatibility, a separate reading
+  cursor, and one-time metadata hydration for upgraded old clients. Normal
+  autosave and source deletion preserve snapshots. Paired migrations are
+  `20260926181114_m27_bodyweight_sync.sql` and SQLite `0007`/`0008`.
+- T02 fast passed (166 suites, 1,994 tests); every backend lane passed. Backend
+  reruns updated legacy full-field fixtures and the expected entity count, while
+  preserving their assertions. Real sync: 6 suites / 15 tests, including
+  reinstall and old-reader metadata recovery. Drift: zero errors/warnings.
+  Logs: `/tmp/boga-m27-data-{fast,backend,backend-tail}.log`; measured runs are
+  in the normal timings records. `./boga timings` and `./boga test for` ran.
+- Fresh frontend verification is pending for T02. No implementation PR opened.
+- Next: finish T02 device evidence, then Settings readings and snapshot entry
+  (T04); its repository draft is prepared outside the tested checkout.
 
 ## Milestone acceptance
 

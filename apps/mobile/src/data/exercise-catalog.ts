@@ -22,6 +22,9 @@ export type ExerciseCatalogExerciseMuscleMapping = {
 };
 
 export type ExerciseCatalogExercise = {
+  bodyweightCoefficient?: number;
+  movementStandard?: string | null;
+  loadingMethod?: string | null;
   id: string;
   name: string;
   loadInputMode?: LoadInputMode;
@@ -52,6 +55,9 @@ export type SetExerciseCatalogExerciseDeletedStateInput = {
 };
 
 type DrizzleExerciseRow = {
+  bodyweightCoefficient?: number;
+  movementStandard?: string | null;
+  loadingMethod?: string | null;
   id: string;
   name: string;
   loadInputMode: LoadInputMode;
@@ -100,6 +106,9 @@ const mapExerciseGraph = (
     id: exerciseRow.id,
     name: exerciseRow.name,
     loadInputMode: exerciseRow.loadInputMode,
+    bodyweightCoefficient: exerciseRow.bodyweightCoefficient ?? 0,
+    movementStandard: exerciseRow.movementStandard ?? null,
+    loadingMethod: exerciseRow.loadingMethod ?? null,
     deletedAt: exerciseRow.deletedAt,
     mappings: mappingRows
       .filter((mapping) => mapping.exerciseDefinitionId === exerciseRow.id)
@@ -121,6 +130,9 @@ const listExerciseGraphs = async (
       id: exerciseDefinitions.id,
       name: exerciseDefinitions.name,
       loadInputMode: exerciseDefinitions.loadInputMode,
+      bodyweightCoefficient: exerciseDefinitions.bodyweightCoefficient,
+      movementStandard: exerciseDefinitions.movementStandard,
+      loadingMethod: exerciseDefinitions.loadingMethod,
       deletedAt: exerciseDefinitions.deletedAt,
     })
     .from(exerciseDefinitions);
@@ -292,6 +304,9 @@ export const readExerciseGraph = (database: LocalDatabase, exerciseId: string): 
       id: exerciseDefinitions.id,
       name: exerciseDefinitions.name,
       loadInputMode: exerciseDefinitions.loadInputMode,
+      bodyweightCoefficient: exerciseDefinitions.bodyweightCoefficient,
+      movementStandard: exerciseDefinitions.movementStandard,
+      loadingMethod: exerciseDefinitions.loadingMethod,
       deletedAt: exerciseDefinitions.deletedAt,
     })
     .from(exerciseDefinitions)

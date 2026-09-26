@@ -1,4 +1,4 @@
-// Topological FK layering for the ten v2 user-owned entity tables.
+// Topological FK layering for the eleven v2 user-owned entity tables.
 //
 // Each layer must satisfy two properties (asserted by the schema drift checker):
 //
@@ -41,6 +41,10 @@ export const TOPO_LAYERS: readonly (readonly string[])[] = [
   ['sessions', 'exercise_muscle_mappings', 'exercise_tag_definitions', 'exercise_group_links'], // Layer 1
   ['session_exercises'], // Layer 2
   ['exercise_sets', 'session_exercise_tags'], // Layer 3
+  // Independent root deliberately has its own cursor. Older clients drain only
+  // layers 0–3; an upgrade starts this new layer from null without losing old
+  // measurements behind an already-advanced layer-0 cursor. No source-id FK.
+  ['body_weight_measurements'], // Layer 4, capability bodyweight_v1
 ] as const;
 
 export type EntityTableName = (typeof TOPO_LAYERS)[number][number];
