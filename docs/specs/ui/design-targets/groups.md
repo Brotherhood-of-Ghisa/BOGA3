@@ -75,3 +75,58 @@ card, and a failed certification.
 
 No target screenshots are committed; runtime captures stay in the gitignored
 `apps/mobile/artifacts/maestro/` tree and are linked as PR evidence.
+
+## Leaderboards (DLM-T12)
+
+**Pending** the user's acceptance in the DLM-T12 gallery.
+
+### Brief
+
+- **Podium cards** (the `Leaderboards` segment) are `Card` links: the exercise
+  in Archivo 700, an `Archived` `Tag` beside it, and the view
+  (`Certified · 1RM`) as a micro-label. Up to three rows follow behind
+  `rule-soft` hairlines: rank, value and date in Plex Mono, the member in
+  Source Sans, and my row reading `You` in bold. The empty label and the
+  `You: 5th` / `You: not ranked` line close the card.
+- **The full board.** The exercise is the native header title only.
+  `Archived · read-only` sits in `ink-muted` beside `History`, a text button.
+  Then one row with two `SegmentedControl`s, `Weight` | `1RM` and
+  `Certified` | `All` (solid `ink` when on). The rows are one `Card` of dense
+  `ListRow`s behind `rule-soft` hairlines: rank and value in Plex Mono, the
+  member in Source Sans with the 1RM's set under it in `ink-muted`, and the
+  date with the certification mark on All (T11's check in `ink`, ring and
+  `uncertified` in `ink-muted`). My row sits on `surface-subtle` and reads
+  `You` (T12-D1). Empty, missing-data and lost-access are T11's `StatePanel`s;
+  `See all sets` is their outline.
+- **History** is the view's micro-label over one `Card` of rows: the date in
+  small Plex Mono, then the sentence in Source Sans.
+- **Numbers (G7, T12-D2).** The metric reads `1RM`, never `e1RM`. A value is
+  a figure with no unit: a 1RM to one decimal (`64.1`) and a set in the app's
+  weight figure (`55.0 × 5`, `51.25 × 5`). History sentences are prose and
+  keep `kg`. No figure groups thousands, so the session card's volume reads
+  `1500 kg`. The `e1rm` key, `metric=e1rm`, RPC fields and testIDs are
+  unchanged.
+- **No `accent`** on any leaderboard screen: none has a primary action.
+
+### States
+
+Device: iPhone simulator at 390pt width, light. All from `groups-two-user-stream`
+(`ios-groups-e2e`).
+
+| Screenshot | State |
+| --- | --- |
+| `groups-07b-1-podiums` | podiums: an empty Certified card with the uncertified count, and an archived card |
+| `groups-07b-2-board-certified-empty` | the board on Certified, empty: `See all sets` |
+| `groups-07b-3-board-all-e1rm` | All · 1RM: the value, the set under the member, `uncertified` |
+| `groups-07b-4-board-all-weight` | All · Weight: the set as the value |
+| `groups-07b-5-history-link` | History: a link lead change |
+| `groups-07c-3-podium-certified` | a podium with a certified row 1 and `You: not ranked` |
+| `groups-07c-4-board-certified-weight` | Certified · Weight after the certify |
+| `groups-07c-5-history-certified` | History: `(certified by you)` |
+| `groups-unlink-06-certified-empty` | Certified empty after an unlink |
+| `groups-unlink-07-restored-certified` | my own row: `surface-subtle` and `You` |
+| `groups-08b-board-former-member` | a former member's row, certified |
+
+Jest only: the podium row with `You` in bold, the offline marker over loaded
+rows, the offline and error panels, the exercise-missing state, and the
+older-page footer.

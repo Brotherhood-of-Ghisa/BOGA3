@@ -144,10 +144,10 @@ describe('group stream view model', () => {
   });
 
   describe('kg formatting', () => {
-    it('formats volume in kg with grouping and at most two decimals', () => {
-      expect(formatVolumeKg(5230.5)).toBe('5,230.5 kg');
+    it('formats volume in kg with no thousands separators and at most two decimals', () => {
+      expect(formatVolumeKg(5230.5)).toBe('5230.5 kg');
       expect(formatVolumeKg(0)).toBe('0 kg');
-      expect(formatVolumeKg(1_234_567.891)).toBe('1,234,567.89 kg');
+      expect(formatVolumeKg(1_234_567.891)).toBe('1234567.89 kg');
       expect(formatVolumeKg(999)).toBe('999 kg');
       expect(formatKg(62.25)).toBe('62.25');
       expect(formatKg(Number.NaN)).toBe('-');
@@ -168,7 +168,7 @@ describe('group stream view model', () => {
         gymName: 'Iron Temple',
         groupNames: ['Crew', 'Gym pals'],
         setsLabel: '3 sets',
-        volumeLabel: '1,752.5 kg',
+        volumeLabel: '1752.5 kg',
         exercisesLabel: '2 exercises',
         recordsLabel: null,
       });

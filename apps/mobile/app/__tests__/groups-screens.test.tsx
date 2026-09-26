@@ -281,7 +281,7 @@ describe('Groups tab', () => {
     expect(completed.getByText('alex')).toBeTruthy();
     expect(completed.getByText('Completed · 1h 5m')).toBeTruthy();
     expect(completed.getByText('9/11 09:05 · Iron Temple')).toBeTruthy();
-    expect(completed.getByText('3 sets · 1,612.5 kg · 2 exercises')).toBeTruthy();
+    expect(completed.getByText('3 sets · 1612.5 kg · 2 exercises')).toBeTruthy();
     // One group's stream does not repeat the group name on each card.
     expect(completed.queryByText('Garage Gym')).toBeNull();
     expect(within(screen.getByTestId(cardID('friend-2:s-2'))).getByText('Training now')).toBeTruthy();

@@ -59,9 +59,7 @@ export const formatSessionStatusLabel = (
   return durationSec === null ? 'Completed' : `Completed · ${formatCompactDuration(durationSec)}`;
 };
 
-const groupThousands = (integerDigits: string): string => integerDigits.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-
-/** A kg number: integers as-is, otherwise at most 2 decimals, thousands grouped with commas. */
+/** A kg number: integers as-is, otherwise at most 2 decimals; no thousands separators (design-language §6). */
 export const formatKg = (value: number): string => {
   if (!Number.isFinite(value)) {
     return '-';
@@ -69,8 +67,7 @@ export const formatKg = (value: number): string => {
   const rounded = Number(value.toFixed(2));
   const [integerPart, fractionPart] = Math.abs(rounded).toString().split('.');
   const sign = rounded < 0 ? '-' : '';
-  const grouped = groupThousands(integerPart);
-  return fractionPart ? `${sign}${grouped}.${fractionPart}` : `${sign}${grouped}`;
+  return fractionPart ? `${sign}${integerPart}.${fractionPart}` : `${sign}${integerPart}`;
 };
 
 export const formatVolumeKg = (totalVolumeKg: number): string => `${formatKg(totalVolumeKg)} kg`;

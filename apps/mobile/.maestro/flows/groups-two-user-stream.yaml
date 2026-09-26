@@ -334,7 +334,7 @@ appId: com.dinoderek.mobile
     text: "${MAESTRO_GROUPS_COUNTERPARTY_USERNAME}"
 - assertVisible:
     id: "group-stream-session-card-${output.groupsCardKey}-metrics"
-    text: "3 sets · 1,500 kg · 2 exercises"
+    text: "3 sets · 1500 kg · 2 exercises"
 # The pre-join session (started a day before joining) is never shared.
 - assertNotVisible:
     id: "group-stream-session-card-${output.groupsHistoryCardKey}"
@@ -359,7 +359,7 @@ appId: com.dinoderek.mobile
 - extendedWaitUntil:
     visible:
       id: "group-stream-session-card-${output.groupsCardKey}-metrics"
-      text: "3 sets · 1,512.5 kg · 2 exercises"
+      text: "3 sets · 1512.5 kg · 2 exercises"
     timeout: 15000
 - runScript:
     file: ../scripts/groups-counterparty.js
@@ -435,14 +435,14 @@ appId: com.dinoderek.mobile
 # Certified boards are empty until M25-T06: the uncertified count shows instead.
 - extendedWaitUntil:
     visible:
-      text: "Prowler Push, Certified · e1RM, No certified sets yet · 1 uncertified"
+      text: "Prowler Push, Certified · 1RM, No certified sets yet · 1 uncertified"
     timeout: 20000
 # The archived copy sits last; nothing is shared under it.
 - assertVisible:
-    text: "Barbell Bench Press, archived, Certified · e1RM, No sets yet"
+    text: "Barbell Bench Press, archived, Certified · 1RM, No sets yet"
 - takeScreenshot: "groups-07b-1-podiums"
 - tapOn:
-    text: "Prowler Push, Certified · e1RM, No certified sets yet · 1 uncertified"
+    text: "Prowler Push, Certified · 1RM, No certified sets yet · 1 uncertified"
 - extendedWaitUntil:
     visible:
       id: "group-board-see-all-button"
@@ -453,7 +453,7 @@ appId: com.dinoderek.mobile
     id: "group-board-see-all-button"
 - extendedWaitUntil:
     visible:
-      text: "1st, ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME}, .* e1RM, 51\\.25 kg × 5, .*, uncertified"
+      text: "1st, ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME}, 1RM [0-9.]+, 51\\.25 × 5, .*, uncertified"
     timeout: 15000
 - takeScreenshot: "groups-07b-3-board-all-e1rm"
 # Weight: 102.5 kg total logged, converted to 51.25 kg per side (D6).
@@ -461,14 +461,14 @@ appId: com.dinoderek.mobile
     id: "group-board-metric-weight"
 - extendedWaitUntil:
     visible:
-      text: "1st, ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME}, 51\\.25 kg × 5, .*, uncertified"
+      text: "1st, ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME}, 51\\.25 × 5, .*, uncertified"
     timeout: 15000
 - takeScreenshot: "groups-07b-4-board-all-weight"
 # The row detail (E2, M25-T10): the converted value with the as-logged one, the
 # lifter's exercise, and Certify for the owner (not the lifter). Certifying is
 # step 7c (M25-T11).
 - tapOn:
-    text: "1st, ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME}, 51\\.25 kg × 5, .*, uncertified"
+    text: "1st, ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME}, 51\\.25 × 5, .*, uncertified"
 - extendedWaitUntil:
     visible:
       id: "group-record-sheet"
@@ -599,20 +599,20 @@ appId: com.dinoderek.mobile
     id: "groups-segment-leaderboards"
 - extendedWaitUntil:
     visible:
-      text: "Prowler Push, Certified · e1RM, 1st ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME} .* kg .*"
+      text: "Prowler Push, Certified · 1RM, 1st ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME} [0-9.]+ .*"
     timeout: 20000
 - takeScreenshot: "groups-07c-3-podium-certified"
 - tapOn:
-    text: "Prowler Push, Certified · e1RM, 1st ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME} .* kg .*"
+    text: "Prowler Push, Certified · 1RM, 1st ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME} [0-9.]+ .*"
 - extendedWaitUntil:
     visible:
-      text: "1st, ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME}, .* kg e1RM, 55 kg × 5, .*"
+      text: "1st, ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME}, 1RM [0-9.]+, 55\\.0 × 5, .*"
     timeout: 15000
 - tapOn:
     id: "group-board-metric-weight"
 - extendedWaitUntil:
     visible:
-      text: "1st, ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME}, 55 kg × 5, .*"
+      text: "1st, ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME}, 55\\.0 × 5, .*"
     timeout: 15000
 - takeScreenshot: "groups-07c-4-board-certified-weight"
 - tapOn:
@@ -627,10 +627,10 @@ appId: com.dinoderek.mobile
 - openLink: "boga3://group/${output.groupsGroupId}/leaderboards/${output.groupsBoardExerciseId}?metric=weight&scope=all"
 - extendedWaitUntil:
     visible:
-      text: "1st, ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME}, 55 kg × 5, .*, certified"
+      text: "1st, ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME}, 55\\.0 × 5, .*, certified"
     timeout: 15000
 - tapOn:
-    text: "1st, ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME}, 55 kg × 5, .*, certified"
+    text: "1st, ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME}, 55\\.0 × 5, .*, certified"
 - extendedWaitUntil:
     visible:
       id: "group-record-sheet"
@@ -805,7 +805,7 @@ appId: com.dinoderek.mobile
 - extendedWaitUntil:
     visible:
       id: "group-board-row-1"
-      text: "1st, You, 80 kg × 5, .*"
+      text: "1st, You, 80\\.0 × 5, .*"
     timeout: 15000
 - takeScreenshot: "groups-unlink-07-restored-certified"
 
@@ -888,13 +888,13 @@ appId: com.dinoderek.mobile
 - openLink: "boga3://group/${output.groupsGroupId}/leaderboards/${output.groupsBoardExerciseId}?metric=weight&scope=all"
 - extendedWaitUntil:
     visible:
-      text: "1st, ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME} \\(former\\), 55 kg × 5, .*, certified"
+      text: "1st, ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME} \\(former\\), 55\\.0 × 5, .*, certified"
     timeout: 15000
 - takeScreenshot: "groups-08b-board-former-member"
 # A former member's set can't be certified (§4.6 step 5): the sheet offers no
 # Certify. The certification given in 7c still stands (P7: former entries stay).
 - tapOn:
-    text: "1st, ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME} \\(former\\), 55 kg × 5, .*, certified"
+    text: "1st, ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME} \\(former\\), 55\\.0 × 5, .*, certified"
 - extendedWaitUntil:
     visible:
       id: "group-record-sheet"

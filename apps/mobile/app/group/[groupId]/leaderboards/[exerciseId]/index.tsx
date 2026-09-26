@@ -1,6 +1,6 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
-import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
+import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import {
   GroupBoardRow,
@@ -16,7 +16,7 @@ import {
   pickInlineError,
   usePullToRefresh,
 } from '@/components/groups';
-import { SegmentedChips, UiButton, UiText, uiSpace } from '@/components/ui';
+import { ActionButton, SegmentedControl, uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import {
   BOARD_METRIC_LABELS,
@@ -66,9 +66,10 @@ type BoardParams = {
 
 /**
  * A group exercise's full board (product E1.2, P6, P7; contract §4.5): the
- * Weight / e1RM × Certified / All toggles switch in place; rows are read online
- * and paged, never cached (M25 design §7). Opens on `?metric=&scope=`, else
- * e1RM · Certified.
+ * Weight / 1RM × Certified / All toggles switch in place; rows are read online
+ * and paged, never cached (M25 design §7), and drawn as one card. Opens on
+ * `?metric=&scope=`, else 1RM · Certified. The exercise's name is the native
+ * header title.
  */
 export default function GroupBoardRoute() {
   const { isConfigured, user } = useAuth();
@@ -210,40 +211,37 @@ function GroupBoardContent({ userId, groupId, exerciseId, initialMetric, initial
       {exercise ? <Stack.Screen options={{ title: exercise.name }} /> : null}
       <View style={styles.titleRow}>
         <View style={styles.titleText}>
-          {exercise ? (
-            <UiText testID="group-board-name" variant="title">
-              {exercise.name}
-            </UiText>
-          ) : null}
           {exercise && exercise.archived_at_ms !== null ? (
-            <UiText testID="group-board-archived" variant="subtitle">
+            <Text allowFontScaling={false} style={styles.archived} testID="group-board-archived">
               Archived · read-only
-            </UiText>
+            </Text>
           ) : null}
         </View>
-        <UiButton
+        <ActionButton
           label="History"
           onPress={() => router.push(groupBoardHistoryPath(groupId, exerciseId, { metric, scope }))}
           testID="group-board-history-button"
-          variant="secondary"
+          variant="text"
         />
       </View>
-      <SegmentedChips
-        accessibilityLabel="Metric"
-        onChange={setMetric}
-        options={METRIC_OPTIONS}
-        testIDPrefix="group-board-metric"
-        value={metric}
-        variant="joined"
-      />
-      <SegmentedChips
-        accessibilityLabel="Sets"
-        onChange={setScope}
-        options={SCOPE_OPTIONS}
-        testIDPrefix="group-board-scope"
-        value={scope}
-        variant="joined"
-      />
+      <View style={styles.toggles}>
+        <SegmentedControl
+          accessibilityLabel="Metric"
+          onChange={setMetric}
+          options={METRIC_OPTIONS}
+          style={styles.toggle}
+          testIDPrefix="group-board-metric"
+          value={metric}
+        />
+        <SegmentedControl
+          accessibilityLabel="Sets"
+          onChange={setScope}
+          options={SCOPE_OPTIONS}
+          style={styles.toggle}
+          testIDPrefix="group-board-scope"
+          value={scope}
+        />
+      </View>
       {board.offline ? <GroupOfflineBanner lastUpdatedAtMs={board.loadedAtMs} /> : null}
       {inlineError && board.firstPage ? (
         <GroupInlineError error={inlineError} onRetry={onRefresh} testID="group-board-inline-error" />
@@ -284,14 +282,18 @@ function GroupBoardContent({ userId, groupId, exerciseId, initialMetric, initial
             testIDPrefix="group-board"
           />
         }
+        ListFooterComponentStyle={groupScreenStyles.cardListFooter}
         ListHeaderComponent={header}
-        contentContainerStyle={groupScreenStyles.content}
+        ListHeaderComponentStyle={groupScreenStyles.cardListHeader}
+        contentContainerStyle={groupScreenStyles.cardListContent}
         data={rows}
         keyExtractor={(row) => row.key}
         onEndReached={() => void board.loadMore()}
         onEndReachedThreshold={0.5}
         refreshControl={<RefreshControl onRefresh={onRefresh} refreshing={pulling} />}
-        renderItem={({ item }) => <GroupBoardRow onPress={(row) => openRow(row.key)} row={item} />}
+        renderItem={({ item, index }) => (
+          <GroupBoardRow count={rows.length} index={index} onPress={(row) => openRow(row.key)} row={item} />
+        )}
         style={groupScreenStyles.screen}
         testID="group-board-list"
       />
@@ -315,6 +317,19 @@ const styles = StyleSheet.create({
   titleText: {
     flex: 1,
     minWidth: 0,
-    gap: uiSpace.xs,
+  },
+  archived: {
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
+    fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
+    color: uiRoles.inkMuted,
+  },
+  toggles: {
+    flexDirection: 'row',
+    gap: uiSpace.sm,
+  },
+  toggle: {
+    flex: 1,
   },
 });

@@ -1,6 +1,6 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useMemo } from 'react';
-import { FlatList, RefreshControl, View } from 'react-native';
+import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import {
   GroupBoardHistoryItem,
@@ -15,7 +15,7 @@ import {
   pickInlineError,
   usePullToRefresh,
 } from '@/components/groups';
-import { UiText } from '@/components/ui';
+import { uiFonts, uiGeometry, uiRoles, uiTypography } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import {
   buildHistoryItem,
@@ -44,7 +44,7 @@ type HistoryParams = {
 /**
  * A board's lead-change history (product E1.3, P9, D12; contract §4.5) for the
  * toggles the board had open (`?metric=&scope=`): newest first, read online and
- * paged, never cached.
+ * paged, never cached, and drawn as one card.
  */
 export default function GroupBoardHistoryRoute() {
   const { isConfigured, user } = useAuth();
@@ -129,9 +129,9 @@ function GroupBoardHistoryContent({ userId, groupId, exerciseId, metric, scope }
   const inlineError = pickInlineError(history.error);
   const header = (
     <View style={groupScreenStyles.header}>
-      <UiText testID="group-board-history-view" variant="subtitle">
+      <Text allowFontScaling={false} style={styles.view} testID="group-board-history-view">
         {formatBoardViewLabel(metric, scope)}
-      </UiText>
+      </Text>
       {history.offline ? <GroupOfflineBanner lastUpdatedAtMs={history.loadedAtMs} /> : null}
       {inlineError && history.firstPage ? (
         <GroupInlineError error={inlineError} onRetry={onRefresh} testID="group-board-history-inline-error" />
@@ -162,18 +162,38 @@ function GroupBoardHistoryContent({ userId, groupId, exerciseId, metric, scope }
           testIDPrefix="group-board-history"
         />
       }
+      ListFooterComponentStyle={groupScreenStyles.cardListFooter}
       ListHeaderComponent={header}
-      contentContainerStyle={groupScreenStyles.content}
+      ListHeaderComponentStyle={groupScreenStyles.cardListHeader}
+      contentContainerStyle={groupScreenStyles.cardListContent}
       data={items}
       keyExtractor={(item) => item.view.key}
       onEndReached={() => void history.loadMore()}
       onEndReachedThreshold={0.5}
       refreshControl={<RefreshControl onRefresh={onRefresh} refreshing={pulling} />}
-      renderItem={({ item }) => (
-        <GroupBoardHistoryItem item={item.view} testID={`group-board-history-item-${item.seq}`} />
+      renderItem={({ item, index }) => (
+        <GroupBoardHistoryItem
+          count={items.length}
+          index={index}
+          item={item.view}
+          testID={`group-board-history-item-${item.seq}`}
+        />
       )}
       style={groupScreenStyles.screen}
       testID="group-board-history-list"
     />
   );
 }
+
+const styles = StyleSheet.create({
+  // The board's view as a micro-label: `Certified · 1RM`.
+  view: {
+    fontFamily: uiFonts.display.family,
+    fontWeight: '700',
+    fontSize: uiTypography.size.xxs,
+    lineHeight: uiTypography.lineHeight.xxs,
+    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
+    textTransform: 'uppercase',
+    color: uiRoles.inkMuted,
+  },
+});

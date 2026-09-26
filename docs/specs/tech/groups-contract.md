@@ -1401,8 +1401,8 @@ RPC failure is caught in this module (C3.10.5, AC13).
 - **View model.** Completed status uses `formatCompactDuration` from the
   session list, so the example renders "Completed · 1h 5m" rather than
   "1h 05m". A completed item with a null `duration_sec` derives it from the
-  timestamps, else reads "Completed". Volume is `5,230.5 kg`, with at most two
-  decimals.
+  timestamps, else reads "Completed". Volume is `5230.5 kg`, with at most two
+  decimals and no thousands separators (design-language §6; DLM-T12).
 
 ### 6.2 Local cache — `group_cache` (local-only SQLite)
 
@@ -1411,7 +1411,7 @@ migration via `npm run db:generate`.
 
 | Column | Type | Notes |
 | --- | --- | --- |
-| `cache_key` | `text` PK | `groups:mine`, `group:<id>`, `stream:all`, `stream:<groupId>`, `session:<memberId>:<sessionId>`, `group-exercises:<groupId>` (M25-T07; the Exercises segment reads it too, M25-T08), `boards:<groupId>` (M25-T09: the podium page on Certified · e1RM; full boards and history are never cached) |
+| `cache_key` | `text` PK | `groups:mine`, `group:<id>`, `stream:all`, `stream:<groupId>`, `session:<memberId>:<sessionId>`, `group-exercises:<groupId>` (M25-T07; the Exercises segment reads it too, M25-T08), `boards:<groupId>` (M25-T09: the podium page on Certified · 1RM; full boards and history are never cached) |
 | `user_id` | `text not null` | The account the payload belongs to. Reads require a match with `useAuth().user.id`. |
 | `payload_json` | `text not null` | The last successful RPC result |
 | `fetched_at_ms` | `integer not null` | Drives "last updated" |
@@ -1471,7 +1471,7 @@ migration via `npm run db:generate`.
 | `/group/[groupId]/exercises/[exerciseId]/edit` | `app/group/[groupId]/exercises/[exerciseId]/edit.tsx` | (M25-T08) Rename a group exercise or change its weight entry |
 | `/group-session/[memberId]/[sessionId]` | `app/group-session/[memberId]/[sessionId].tsx` | Friend's session view |
 | `/exercise-link?exerciseDefinitionId=` | `app/exercise-link.tsx` | Link screen (M25-T07): link one of my exercises to my groups' exercises |
-| `/group/[groupId]/leaderboards/[exerciseId]?metric=&scope=` | `app/group/[groupId]/leaderboards/[exerciseId]/index.tsx` | (M25-T09) Full board with the Weight / e1RM × Certified / All toggles |
+| `/group/[groupId]/leaderboards/[exerciseId]?metric=&scope=` | `app/group/[groupId]/leaderboards/[exerciseId]/index.tsx` | (M25-T09) Full board with the Weight / 1RM × Certified / All toggles |
 | `/group/[groupId]/leaderboards/[exerciseId]/history?metric=&scope=` | `app/group/[groupId]/leaderboards/[exerciseId]/history.tsx` | (M25-T09) The board's lead-change history |
 
 - **Groups tab.** It shows the stream with **All** and per-group chips, header
@@ -1722,8 +1722,10 @@ design §7.
   `group_board_podiums` runs through `useGroupResource` under
   `boards:<groupId>`, enabled only while the segment is open, like Exercises.
   One card per group exercise in server order (archived last, tagged
-  `Archived`), labelled `Certified · e1RM`, with up to three rows (rank, name,
-  value, date; my row reads `You`).
+  `Archived`), labelled `Certified · 1RM`, with up to three rows (rank, name,
+  value, date; my row reads `You`). The metric reads `1RM` and values are
+  figures with no unit (`142.5`) since DLM-T12-D2: display copy only, the
+  `e1rm` key and `metric=e1rm` param stay.
   - `You: Nth` shows only below 3rd, and `You: not ranked` only on a non-empty
     board I am not on.
   - An empty podium reads `No certified sets yet · N uncertified` (N =
@@ -1731,10 +1733,12 @@ design §7.
   - A card opens `/group/<id>/leaderboards/<exerciseId>`. No exercises:
     `No group exercises yet`.
 - **Full board.** `?metric=weight|e1rm&scope=certified|all`; anything else
-  opens e1RM · Certified. The two joined toggles switch in place; `History`
-  sits in the header and carries the toggles.
-  - Rows: rank, `You` / name, ` (former)`, value, date. e1RM rows show the estimate
-    with the set behind it (`140 kg × 1`); Weight rows show the set. On All
+  opens 1RM · Certified. The two toggles (`Weight` | `1RM`, `Certified` |
+  `All`) switch in place; `History` sits in the header and carries the toggles.
+  - Rows: rank, `You` / name, ` (former)`, value, date. 1RM rows show the
+    estimate (`142.5`) with the set behind it (`140.0 × 1`); Weight rows show
+    the set (figures, no unit, since DLM-T12-D2). A row's accessibility label
+    reads `1st, sam, 1RM 142.5, 140.0 × 1, 12 Sep[, certified|uncertified]`. On All
     only, a check icon, or a ring icon and `uncertified`.
   - Empty Certified: `No certified sets yet` with `See all sets` (the board
     payload has no uncertified count). Empty All: `No sets yet`.
@@ -1745,7 +1749,7 @@ design §7.
   (…)`, `… (certified by C)` and, for an ended certification (M25-T06 `related`),
   `L now #1 · v (P's pv certification withdrawn|cancelled|voided)`; an unknown reason reads `L took #1 · v`. A void reads
   "now #1": an item does not say whether L held #1 before. Values are kg
-  on both metrics (no reps).
+  on both metrics (no reps): a sentence is prose and keeps its unit.
 - **Online pages** (`useGroupOnlinePages`). The board and history are never
   cached. The first page loads on mount, on a toggle change, on focus, and on
   pull-to-refresh, with no 30 s poll; a refresh discards older pages.
@@ -2067,12 +2071,12 @@ group screen, and Today details above where they differ. No server change.
     proved workable, so the card's split-flow fallback was not needed.
   - **Data.** `push-active` sends one `sync_push`: a Bench definition, a
     completed history session started a day before the join, and the live
-    session (Bench 100×5 ×2, Row 50×10: `3 sets · 1,500 kg · 2 exercises`).
+    session (Bench 100×5 ×2, Row 50×10: `3 sets · 1500 kg · 2 exercises`).
     The live session starts at `max(now, joined_at + 1 s)`, reading `joined_at`
     back from the counterparty's own "joined" stream item, so host/VM clock
     skew cannot push it before the join. `push-complete-edit` completes it
     (45 min), then edits the first set to 102.5 kg in a later push. The card
-    then shows `Completed · 45m` and `1,512.5 kg`, computed on the device (§5).
+    then shows `Completed · 45m` and `1512.5 kg`, computed on the device (§5).
     The flow also
     asserts that the history session has no card (§2.5) and that the card
     stays after removal (#4).
@@ -2110,7 +2114,7 @@ group screen, and Today details above where they differ. No server change.
   `link-board` step pushes an `exercise_group_links` row linking its Bench
   Press (total load) to the active custom `Prowler Push` (per side), then polls
   `group_board` until the evaluator has written the row (51.25 kg × 5, factor
-  0.5, uncertified) and logs the push → board latency. The device opens
+  0.5, uncertified; the row reads `51.25 × 5` since DLM-T12) and logs the push → board latency. The device opens
   Leaderboards (`No certified sets yet · 1 uncertified`, the archived copy's
   `No sets yet`), the board (Certified empty → `See all sets`), toggles Weight,
   and opens History (`… took #1 · 51.25 kg (linked Bench Press)`). New step 8b,
@@ -2141,8 +2145,8 @@ group screen, and Today details above where they differ. No server change.
     group record`, `Prowler Push` then `55.0 × 5 · 1RM …` (DLM-T11), `Not certified
     yet`) and its session card's `1 record`. Tapping the card's `Certify`
     shows the notice and `Certified by you`, and hides `Certify`. After
-    `await-certified`: the podium's Certified · e1RM row 1, the Certified
-    e1RM and Weight boards, the Certified history `… took #1 · 55 kg
+    `await-certified`: the podium's Certified · 1RM row 1, the Certified
+    1RM and Weight boards (`55.0 × 5` since DLM-T12), the Certified history `… took #1 · 55 kg
     (certified by you)`, and on All · Weight the `certified` row whose sheet
     reads `Certified by you · …` and offers `Remove my certification`, not
     `Certify`. Step 8b's former row is now the certified 55 kg × 5 set.
