@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { ReactNode, Ref } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
@@ -31,6 +31,9 @@ export type ListRowProps = {
   // A disclosure row's state (a collapsible section's header): announced as
   // expanded or collapsed. The glyph that shows it is the caller's `trailing`.
   expanded?: boolean;
+  // Makes the row a radio: announced as checked or not, with no ground change.
+  // The glyph that shows it (`radio-on` / `radio-off`) is the caller's `leading`.
+  checked?: boolean;
   // Makes the whole row one target (sheet options). Leave unset when the
   // trailing control owns the action (set rows).
   onPress?: () => void;
@@ -41,6 +44,11 @@ export type ListRowProps = {
   accessibilityHint?: string;
   // `link` for a row that leaves the app (it opens the system browser).
   accessibilityRole?: 'button' | 'link';
+  // A row with no `onPress` read as one element (its `accessibilityLabel`),
+  // like a pressable row. Leave unset when a control inside must stay reachable.
+  accessible?: boolean;
+  // The row's host view, e.g. to move accessibility focus back to it.
+  ref?: Ref<View>;
   testID?: string;
 };
 
@@ -57,11 +65,14 @@ export function ListRow({
   selected = false,
   divider = true,
   expanded,
+  checked,
   onPress,
   disabled = false,
   accessibilityLabel,
   accessibilityHint,
   accessibilityRole = 'button',
+  accessible,
+  ref,
   testID,
 }: ListRowProps) {
   const body = (
@@ -98,7 +109,7 @@ export function ListRow({
 
   if (!onPress) {
     return (
-      <View accessibilityLabel={accessibilityLabel} style={rowStyle} testID={testID}>
+      <View accessibilityLabel={accessibilityLabel} accessible={accessible} ref={ref} style={rowStyle} testID={testID}>
         {body}
       </View>
     );
@@ -108,10 +119,20 @@ export function ListRow({
     <Pressable
       accessibilityHint={accessibilityHint}
       accessibilityLabel={accessibilityLabel ?? label}
-      accessibilityRole={accessibilityRole}
-      accessibilityState={expanded === undefined ? { selected, disabled } : { selected, disabled, expanded }}
-      disabled={disabled}
+      accessibilityRole={checked === undefined ? accessibilityRole : 'radio'}
+      accessibilityState={
+        checked !== undefined
+          ? disabled
+            ? { checked, disabled }
+            : { checked }
+          : expanded === undefined
+            ? { selected, disabled }
+            : { selected, disabled, expanded }
+      }
+      // Only when set: Pressable folds an explicit `false` into the state.
+      disabled={disabled || undefined}
       onPress={onPress}
+      ref={ref}
       style={({ pressed }) => [rowStyle, pressed && !disabled ? styles.pressed : null]}
       testID={testID}>
       {body}

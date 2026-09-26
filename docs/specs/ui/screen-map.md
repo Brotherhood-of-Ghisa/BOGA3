@@ -520,7 +520,7 @@ Brief entrypoint map of the current mobile screens.
   - the group screen, for managing the group: the header `Card` (name, description, and a `Members` row with the member count · my role, which opens Members), owner/admin `Invite` (the screen's one `accent`, DLM-T13-D1) + `Edit` (outline), then the group's `Exercises` under a micro-label, whose `Add exercise` is an outline (product D14). The stream and leaderboards moved to the Groups screen
 - Key states (high level):
   - loading / offline / error
-  - Exercises: active exercises, then archived ones marked `Archived`, each with its weight entry and my local link status (`Linked: …` / `Not linked`); an active row none of mine is linked to offers `Link your exercise` to every member (the M25-T07 pick sheet, link-only); a linked row offers `Unlink…` independently of role, selecting one personal ID through `Your linked exercises` when several exist, then confirming; local read failures hide actions/status and offer retry; owner/admin `Add exercise` and a row sheet (`Rename`, `Archive` with confirmation, or `Unarchive`), which members never see; "No group exercises yet" when empty; each write's outcome as an inline notice
+  - Exercises: active exercises, then archived ones marked `Archived`, each with its weight entry and my local link status (`Linked: …` / `Not linked`); an active row none of mine is linked to offers `Link your exercise` to every member (the M25-T07 pick sheet, link-only); a linked row offers `Unlink…` independently of role, selecting one personal ID through `Your linked exercises` when several exist, then confirming; local read failures hide actions/status and offer retry; owner/admin `Add exercise` (an outline beside the `Exercises` micro-label, DLM-T14) and a row sheet (`Rename`, `Archive` with confirmation, or `Unarchive`), which members never see; the rows are one `Card`, and the pick sheet and the unlink chooser are `Sheet`s with no Cancel; "No group exercises yet" when empty; each write's outcome as an inline notice
   - Leaderboards podium states (M25-T09, now on the Groups screen): one podium card per group exercise on `Certified · 1RM` (top 3 with `You` on my row, `You: Nth` below the podium, `You: not ranked`, `No certified sets yet · N uncertified` / `No sets yet`), archived exercises last marked `Archived`; "No group exercises yet" when empty; cached, so it shows offline
   - lost access after `NOT_FOUND` on the group or its exercises: "You're no longer a member of this group", with cached data hidden
 - Key exits:
@@ -544,7 +544,7 @@ Brief entrypoint map of the current mobile screens.
 14b. `/group/[groupId]/exercises/new` (M25-T08)
 - File: `apps/mobile/app/group/[groupId]/exercises/new.tsx`
 - Purpose:
-  - owner/admin add a group exercise: `From catalogue` (search the bundled standard exercises and pick one, which prefills the form) or `Custom`, through the shared name + weight-entry fields
+  - owner/admin add a group exercise: `From catalogue` (search the bundled standard exercises and pick one, which prefills the form) or `Custom` (a `SegmentedControl`), through the shared name + weight-entry fields in a `Card` whose submit is the screen's one primary; the picked standard exercise is the `radio-on` row (DLM-T14)
 - Key states (high level):
   - inline "Exercise name is required"; the write's failure above `Add exercise`, nothing created, draft kept; members see "You can't add exercises"
 - Key exits:
@@ -636,6 +636,7 @@ Brief entrypoint map of the current mobile screens.
   - `Linked` (my links, from the local synced table: `Unlink` confirms first; a link into a group I left reads `inactive — not a member`, one to an archived group exercise `archived`; missing cache entries show `Group exercise` / `A group`), then a search over group exercises only, `Suggested` (same standard exercise, then name matches), and `All group exercises` by group; one link per group, so the rest of that group shows `already linked in <group>`; archived group exercises are never offered
   - `Link` and `Unlink` are local writes (work offline); link success repeats the retroactivity note; unlink uses the same contextual confirmation and preservation wording as the group row, then names the removed mapping (plus reconnect/sync wording offline); failed local reads have a separate retry and never imply a write failed; the load-mode note shows when weight entry differs
   - a deleted exercise shows "Restore this exercise to link it" (links still listed and unlinkable); offline with nothing cached shows "Connect once to load your groups' exercises"; offline marker and pull-to-refresh as on the group screens
+  - in the design language (DLM-T14): outcomes are `Notice`s (neutral with the `success` glyph, or `danger`); `Linked`, `Suggested` and `All group exercises` are micro-labels over `Card`s of rows, `Unlink` a `danger` text button and `Link` an outline; a `SearchField`; no primary
 - Key exits:
   - back to the catalogue or the exercise page (native back)
 - Notes:
