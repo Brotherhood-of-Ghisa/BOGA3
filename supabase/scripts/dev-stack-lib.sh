@@ -4,7 +4,7 @@
 #
 # A second local Supabase, isolated from the slot-0 "BOGA" stack the gates use, so
 # a gate run (which truncates/resets slot-0) never touches a human dev session's
-# data. See docs/plans/dev-test-supabase-split.md and docs/specs/12.
+# data. Contract: docs/specs/12 ("Dedicated dev stack (BOGA-dev)").
 #
 # The stack runs from a gitignored workdir (.supabase-dev/) whose supabase/ holds
 # a port/project-rewritten config.toml plus SYMLINKS to the repo's migrations,

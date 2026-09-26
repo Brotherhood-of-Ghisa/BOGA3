@@ -28,7 +28,8 @@ Constraints:
 Planning (optional — pick one):
 - No plan: go straight to a PR.
 - A single plan doc under docs/plans/.
-- A milestone + task cards (docs/plans/templates/) for large, multi-PR work.
+- A milestone + task cards (docs/plans/templates/) for large, multi-PR work,
+  run with the task protocol (/task-protocol).
 - If this affects shared behavior, update the relevant project-level specs too.
 
 Verification:

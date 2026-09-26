@@ -1,69 +1,43 @@
-# Milestone Spec Template
+# <M#> — <title>
 
-> Optional starter for the milestone + task-card workflow
-> (`docs/plans/README.md`). Drop any section that doesn't help. A milestone is
-> ephemeral: it is deleted, with its task cards, when its work ships.
+<!--
+Starter for a milestone (docs/plans/README.md). Drop any section that doesn't
+help. Planned and executed with the task protocol
+(.claude/skills/task-protocol). Delete this file and its task cards when the
+work ships; durable decisions move into docs/specs/** in the PRs that ship
+them, and evidence lives in the PRs.
+-->
 
-## Milestone metadata
+- Status: `planned | in_progress | blocked`
+- Created: <YYYY-MM-DD>, planning baseline `<sha>` on `origin/main`
 
-- Milestone ID: `M#`
-- Title:
-- Status: `planned | in_progress | completed | blocked | outdated`
+## Objective
 
-## Parent references
+The outcome this milestone must achieve.
 
-- Project directives: `docs/specs/README.md`
-- Product overview: `docs/specs/00-product.md`
-- Architecture: `docs/specs/03-technical-architecture.md`
-- Data model: `docs/specs/05-data-model.md`
-- Testing strategy: `docs/specs/06-testing-strategy.md`
-- Project structure: `docs/specs/09-project-structure.md`
+## Scope
 
-## Milestone objective
+- In:
+- Out:
 
-Describe the outcome this milestone must achieve.
+## Agreed design direction
 
-## In scope
+High-level design and decisions agreed while planning. Number them (D1, D2, …)
+so task cards can cite them.
 
-- 
-
-## Out of scope
-
-- 
-
-## Deliverables
-
-1. 
-2. 
-3. 
-
-Rule (when applicable): if the milestone introduces a new runtime, deployment surface, or test layer, include a deliverable/task to update `docs/specs/06-testing-strategy.md` and relevant template(s) and name the owner of hosted/deployed smoke validation if it is deferred.
-
-## Acceptance criteria
-
-1. 
-2. 
-3. 
+### D1. <decision>
 
 ## Task breakdown
 
-List planned task cards for this milestone.
+One line per card; the PR that completes a card deletes it and marks it
+`completed` here. The next session starts from the cards whose dependencies are
+all `completed`.
 
-1. `docs/plans/tasks/<task-id>.md` - short description
-2. `docs/plans/tasks/<task-id>.md` - short description
-
-Rule:
-- use `docs/plans/tasks/<task-id>.md` for active/planned/blocked cards
-- mark a task's entry `completed` when its card is deleted at closeout (git history keeps the card)
+| Task | Summary | Depends on | Status |
+| --- | --- | --- | --- |
+| `<M#>-T01-<Short_name>` | | none | planned |
+| `<M#>-T02-<Short_name>` | | T01 | planned |
 
 ## Risks / dependencies
 
-- 
-
-## Closeout
-
-- Keep milestone `Status` and the task breakdown current while work is in flight.
-- Before closing, move every durable decision into its owning `docs/specs/**`
-  doc (product, architecture, data model, auth, technical contract).
-- Put final verification evidence in the closing PR body.
-- Delete this spec and its task cards in the closing PR (git history keeps them).
+-

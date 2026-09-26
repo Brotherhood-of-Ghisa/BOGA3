@@ -252,16 +252,18 @@ lease. The stack starts on first use (`./boga db up` or a gate that needs it).
 
 1. `./boga db down` — stops this slot's containers and keeps the volumes. A
    stopped stack is not restarted when Docker/OrbStack restarts.
-2. `./boga pr wait` — run it in the background with your harness's facility. It
-   polls the PR for the current branch via `gh` every 60 s (`--interval <s>`),
-   printing nothing until it exits: `0` MERGED, `3` CLOSED without merge, `2` no
-   PR for this branch, `1` `gh` error. It costs no tokens while waiting.
+2. Optional: `./boga pr wait` — run it in the background with your harness's
+   facility to notice the merge without asking. It polls the PR for the current
+   branch via `gh` every 60 s (`--interval <s>`), printing nothing until it
+   exits: `0` MERGED, `3` CLOSED without merge, `2` no PR for this branch, `1`
+   `gh` error. It costs no tokens while waiting.
 3. Review feedback: resume work (`./boga db up` or any gate restarts the stack),
-   push, `./boga db down` again, and restart `./boga pr wait`.
+   push, `./boga db down` again (and restart `./boga pr wait` if used).
 
 ### 4. Merged or closed
 
-`./boga worktree release [--force] [--keep-worktree]`, run by the owner:
+`./boga worktree release [--force] [--keep-worktree]`, run by the owning agent
+in the same session once the merge is confirmed (by the human or by `pr wait`):
 
 1. Asks `gh` for the PR state of the worktree's branch and refuses unless it is
    MERGED or CLOSED (`--force` overrides: no PR, open PR, or detached HEAD).
@@ -295,7 +297,7 @@ is the procedure any agent follows to clear them with the human's confirmation.
 | `./boga worktree release` | PR must be merged/closed; delete stack, lease, worktree | — |
 | `./boga worktree doctor` | Read-only diagnostics: placement, lease, ports, config, symlinks, deps | — |
 | `./boga db down` | Stop this slot's stack (volumes kept) | ✅ |
-| `./boga pr wait` | Block until this branch's PR merges or closes | — |
+| `./boga pr wait` | Optional: block until this branch's PR merges or closes | — |
 
 Scripts behind them: `scripts/worktree-{create,start,ls,release,doctor}.sh`,
 `scripts/pr-wait.sh`, and the shared library `scripts/worktree-lib.sh` (slot and

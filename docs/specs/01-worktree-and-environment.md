@@ -19,11 +19,11 @@ nested.**
 # 2. Work: every ./boga test|db|ios command fails hard without the lease
 ./boga test fast
 
-# 3. PR opened: stop the stack, then wait for the PR in the background
+# 3. PR opened: stop the stack
 ./boga db down
-./boga pr wait                # exits 0 merged, 3 closed, 2 no PR
+./boga pr wait                # optional, in the background: exits 0 merged, 3 closed, 2 no PR
 
-# 4. Merged or closed: delete stack + lease + worktree
+# 4. Merged: the owning agent deletes stack + lease + worktree in the same session
 ./boga worktree release
 ```
 
@@ -32,7 +32,10 @@ nested.**
   only when told to branch from something else. Re-running `start` keeps the slot
   and regenerates config.
 - Review feedback after step 3: work again (any gate restarts the stack), push,
-  `./boga db down`, restart `./boga pr wait`.
+  `./boga db down` (and restart `./boga pr wait` if you use it).
+- Step 4 is the owning agent's job once the human confirms the merge (or
+  `pr wait` exits 0); `pr wait` only saves asking. Closed without merge: ask
+  the human, then `release --force`.
 - `release` refuses an open PR unless `--force`; `--keep-worktree` keeps the
   checkout.
 - A session that died before step 4 leaves leftovers. `./boga worktree ls` shows

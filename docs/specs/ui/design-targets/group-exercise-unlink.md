@@ -2,7 +2,7 @@
 
 ## Target
 
-The repository-native [task brief](https://github.com/Brotherhood-of-Ghisa/BOGA3/blob/11a5dd768a32c18c88758aa105a4d2c8cbcdbe11/docs/plans/tasks/T-20260923-01-Group_exercise_unlink_UX.md#ux-contract) governs the behaviour. **Appearance** is governed by [`groups.md`](groups.md), section "Group exercises and linking (DLM-T14)": the rows, the chooser `Sheet`, the notices and the Link screen in the design language. The native confirmation `Alert` is OS chrome. No external design artifact or new route.
+The groups contract governs the behaviour: [§6.3](../../tech/groups-contract.md#63-routes), *Unlink your exercise* and *Shared unlink contract* (E0.4). **Appearance** is governed by [`groups.md`](groups.md), section "Group exercises and linking (DLM-T14)": the rows, the chooser `Sheet`, the notices and the Link screen in the design language. The native confirmation `Alert` is OS chrome. No external design artifact or new route.
 
 The captures this record once held (baseline, chooser, confirmation, success and offline, on a small and a large iPhone) showed the retired styling and were deleted by DLM-T14 (T14-D4); they remain in git history before that change. The accepted captures are listed in `groups.md`.
 
