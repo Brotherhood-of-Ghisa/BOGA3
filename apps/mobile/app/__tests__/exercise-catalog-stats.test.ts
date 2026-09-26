@@ -229,3 +229,53 @@ describe('aggregateExerciseCatalogStats', () => {
     expect(result.lastCompletedAtById.get('ex-squat')).toEqual(daysBefore(NOW, 200));
   });
 });
+
+describe('Favourite and all-time browser history', () => {
+  it('uses the fixed 180-day cutoff and 60-day half-life regardless of metric period', () => {
+    const ages = [0, 60, 120, 180, 180 + 1 / DAY_MS, 380];
+    const raw: ExerciseCatalogStatsRawHistory = {
+      sessions: ages.map((age, i) => ({ id: `s${i}`, completedAt: daysBefore(NOW, age) })),
+      sessionExercises: ages.map((_, i) => ({ id: `e${i}`, sessionId: `s${i}`, exerciseDefinitionId: `def${i}` })),
+      exerciseSets: ages.map((_, i) => ({ sessionExerciseId: `e${i}`, weightValue: '0', repsValue: '5', setType: 'warm_up' })),
+    };
+    const all = aggregateExerciseCatalogStats(raw, 'all', NOW);
+    const short = aggregateExerciseCatalogStats(raw, 7, NOW);
+    expect(short.recencyScoresById).toEqual(all.recencyScoresById);
+    for (const [i, score] of [1, 0.5, 0.25, 0.125].entries()) {
+      expect(all.recencyScoresById.get(`def${i}`)?.score).toBeCloseTo(score);
+    }
+    expect(all.recencyScoresById.has('def4')).toBe(false);
+    expect(all.recencyScoresById.has('def5')).toBe(false);
+    expect(all.lastCompletedAtById.get('def5')).toEqual(daysBefore(NOW, 380));
+    expect(all.aggregatesById.get('def5')?.sessionCount).toBe(1);
+    expect(all.everDoneIds.has('def5')).toBe(true);
+  });
+
+  it('deduplicates repeated blocks/sets per session and rejects unperformed, invalid and orphan history', () => {
+    const raw: ExerciseCatalogStatsRawHistory = {
+      sessions: [{ id: 's1', completedAt: daysBefore(NOW, 1) }, { id: 's2', completedAt: daysBefore(NOW, 400) }],
+      sessionExercises: [
+        { id: 'block1', sessionId: 's1', exerciseDefinitionId: 'valid' },
+        { id: 'block2', sessionId: 's1', exerciseDefinitionId: 'valid' },
+        { id: 'block3', sessionId: 's2', exerciseDefinitionId: 'valid' },
+        { id: 'invalid', sessionId: 's1', exerciseDefinitionId: 'invalid' },
+        { id: 'orphan', sessionId: 'missing', exerciseDefinitionId: 'orphan' },
+      ],
+      exerciseSets: [
+        ...['block1', 'block1', 'block2', 'block3'].map((sessionExerciseId) => ({ sessionExerciseId, weightValue: '20', repsValue: '8', setType: 'warm_up' })),
+        { sessionExerciseId: 'invalid', weightValue: '-1', repsValue: '8', setType: null },
+        { sessionExerciseId: 'invalid', weightValue: '1e3', repsValue: '8', setType: null },
+        { sessionExerciseId: 'invalid', weightValue: '', repsValue: '8', setType: null },
+        { sessionExerciseId: 'invalid', weightValue: '20', repsValue: '0', setType: null },
+        { sessionExerciseId: 'invalid', weightValue: '20', repsValue: '1.5', setType: null },
+        { sessionExerciseId: 'invalid', weightValue: '20', repsValue: '8', setType: null, performanceStatus: 'unperformed' },
+        { sessionExerciseId: 'orphan', weightValue: '20', repsValue: '8', setType: null },
+      ],
+    };
+    const stats = aggregateExerciseCatalogStats(raw, 'all', NOW);
+    expect(stats.aggregatesById.get('valid')).toMatchObject({ sessionCount: 2, setCount: 4 });
+    expect(stats.recencyScoresById.get('valid')?.completedSetCount).toBe(3);
+    expect([...stats.everDoneIds]).toEqual(['valid']);
+    expect([...stats.lastCompletedAtById.keys()]).toEqual(['valid']);
+  });
+});

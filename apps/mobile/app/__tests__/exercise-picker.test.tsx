@@ -86,6 +86,7 @@ jest.mock('@/src/data/exercise-group-links', () => ({
   createExerciseWithGroupLink: jest.fn(),
 }));
 
+import { ExerciseSwapSheet } from '@/components/exercise-page/exercise-swap-sheet';
 import { ExercisePicker } from '@/components/session-recorder/exercise-picker';
 import { uiRoles } from '@/components/ui/tokens';
 import { loadSuggestedExercisePlan } from '@/src/data';
@@ -94,7 +95,6 @@ import { createExerciseWithGroupLink, linkExercise } from '@/src/data/exercise-g
 import { __resetExerciseCatalogCacheForTests } from '@/src/exercise-catalog/cache';
 import {
   __resetExerciseListPreferencesForTests,
-  setExerciseListPreferences,
 } from '@/src/exercise-catalog/list-preferences';
 import type { GroupExercise, GroupExerciseCatalog, LinkRef } from '@/src/groups';
 
@@ -205,7 +205,7 @@ type PickerCallbacks = {
 let callbacks: PickerCallbacks;
 let unmountPicker: (() => void) | null = null;
 
-const renderPicker = async () => {
+const renderPicker = async (expandFamilies = true) => {
   callbacks = {
     onDismiss: jest.fn(),
     onSelectExercise: jest.fn(),
@@ -215,6 +215,12 @@ const renderPicker = async () => {
   const result = render(<ExercisePicker visible openRequestId={1} {...callbacks} />);
   unmountPicker = result.unmount;
   await act(async () => {});
+  if (expandFamilies) {
+    await screen.findByLabelText(/Chest exercises/);
+    for (const family of screen.getAllByTestId(/^exercise-family-group-/)) {
+      if (!family.props.accessibilityState.disabled) fireEvent.press(family);
+    }
+  }
   return callbacks;
 };
 
@@ -228,7 +234,6 @@ const toggleGroups = () => fireEvent.press(screen.getByTestId('exercise-picker-g
 beforeEach(() => {
   __resetExerciseCatalogCacheForTests();
   __resetExerciseListPreferencesForTests();
-  setExerciseListPreferences({ groupByMuscleFamily: false });
   mockPush.mockReset();
   mockLoadSuggestedExercisePlan.mockReset();
   mockLoadSuggestedExercisePlan.mockResolvedValue(null);
@@ -613,10 +618,10 @@ describe('picker: list, preselection, create, Manage and dismiss', () => {
     });
   }, 30000);
 
-  it('uses grouped picker rows with shared stats when grouping is enabled', async () => {
+  it('starts with family rows collapsed and shared history', async () => {
     __resetExerciseListPreferencesForTests();
 
-    await renderPicker();
+    await renderPicker(false);
     expect(await screen.findByLabelText('Chest exercises 2')).toBeTruthy();
     expect(screen.getByLabelText('Core exercises 0')).toBeTruthy();
     expect(screen.queryByLabelText('Select exercise Bench Press')).toBeNull();
@@ -654,21 +659,18 @@ describe('picker: list, preselection, create, Manage and dismiss', () => {
     expect(onSelectExercise).toHaveBeenCalledTimes(1);
   });
 
-  it('heads the sheet with Select Exercise and three labelled icon buttons; ⋮ toggles the list options', async () => {
+  it('keeps shared sort and visibility controls visible below search', async () => {
     await renderPicker();
-    await screen.findByLabelText('Select exercise Barbell Squat');
-
     const header = within(screen.getByTestId('exercise-picker-header'));
     expect(header.getByRole('header', { name: 'Select Exercise' })).toBeTruthy();
-    for (const label of ['Exercise picker options', 'Open exercise catalog manage flow', 'Open inline exercise create']) {
+    for (const label of ['Open exercise catalog manage flow', 'Open inline exercise create']) {
       expect(header.getByRole('button', { name: label })).toBeTruthy();
     }
-
-    expect(screen.queryByTestId('exercise-picker-options-panel')).toBeNull();
-    fireEvent.press(screen.getByLabelText('Exercise picker options'));
-    expect(within(screen.getByTestId('exercise-picker-options-panel')).getByLabelText(/^Turn grouping (on|off)$/)).toBeTruthy();
-    fireEvent.press(screen.getByLabelText('Exercise picker options'));
-    expect(screen.queryByTestId('exercise-picker-options-panel')).toBeNull();
+    expect(screen.getByLabelText('Favourite')).toHaveProp('accessibilityState', { selected: true });
+    fireEvent.press(screen.getByLabelText('Name A–Z'));
+    expect(screen.getByLabelText('Name A–Z')).toHaveProp('accessibilityState', { selected: true });
+    fireEvent.press(screen.getByLabelText('Show never-done'));
+    expect(screen.getByText('No exercises match that filter.')).toBeTruthy();
   });
 
   it('routes Manage to exercise catalog', async () => {
@@ -696,4 +698,25 @@ describe('picker: list, preselection, create, Manage and dismiss', () => {
     // Dismiss clears the preselection, so a re-show starts on the list.
     expect(screen.queryByTestId('exercise-picker-preselection-panel')).toBeNull();
   });
+});
+
+
+it('shares sort/never-done edits across Add and Swap while retaining independent search', async () => {
+  await renderPicker();
+  const picker = within(screen.getByTestId('exercise-picker'));
+  fireEvent.changeText(picker.getByLabelText('Exercise filter input'), 'bench');
+  fireEvent.press(picker.getByLabelText('Name A–Z'));
+  fireEvent.press(picker.getByLabelText('Show never-done'));
+  const swap = render(<ExerciseSwapSheet visible currentExerciseDefinitionId="seed_barbell_bench_press" onSelect={jest.fn()} onDismiss={jest.fn()} />);
+  const swapUI = within(swap.getByTestId('exercise-swap-sheet'));
+  await waitFor(() => expect(swapUI.getByText('No exercises match the current filters.')).toBeTruthy());
+  expect(swapUI.getByLabelText('Name A–Z')).toHaveProp('accessibilityState', { selected: true });
+  expect(swapUI.getByLabelText('Show never-done')).toHaveProp('accessibilityState', { checked: false });
+  expect(swapUI.getByLabelText('Search exercises')).toHaveProp('value', '');
+  fireEvent.press(swapUI.getByLabelText('Show never-done'));
+  expect(picker.getByLabelText('Show never-done')).toHaveProp('accessibilityState', { checked: true });
+  expect(picker.getByLabelText('Exercise filter input')).toHaveProp('value', 'bench');
+  fireEvent.changeText(swapUI.getByLabelText('Search exercises'), 'bench');
+  expect(swapUI.queryByLabelText('Select exercise Bench Press')).toBeNull();
+  swap.unmount();
 });

@@ -77,63 +77,12 @@ appId: com.dinoderek.mobile
     visible:
       text: "Exercise catalog options"
     timeout: 30000
-# The grouping preference is shared by the catalogue and the picker; a flat list
-# makes every search result a direct row (grouped sections start collapsed).
-#
-# Every step below retries until its effect is visible, not merely until the tap
-# lands: right after the teleport the screen is still settling (iOS 26 AX churn),
-# and a tap Maestro reports as done can be swallowed — the sheet never opens and
-# the flow fails later. Each tap is guarded by `when` so a retry never re-taps
-# once the effect happened (a second ⋮ tap would hit the Filters sheet's
-# backdrop; a second grouping tap would turn grouping back on). The Filters
-# sheet (DLM-T07) is present while its date-range control is.
+# Search reveals personal matches immediately inside their families.
 - extendedWaitUntil:
-    visible:
-      text: "Exercise filter input"
+    visible: "Exercise filter input"
     timeout: 30000
 - waitForAnimationToEnd:
     timeout: 4000
-- retry:
-    maxRetries: 3
-    commands:
-      - runFlow:
-          when:
-            notVisible:
-              id: "exercise-list-date-range-row"
-          commands:
-            - tapOn: "Exercise catalog options"
-      - extendedWaitUntil:
-          visible:
-            id: "exercise-list-date-range-row"
-          timeout: 5000
-- retry:
-    maxRetries: 3
-    commands:
-      - runFlow:
-          when:
-            visible: "Turn grouping off"
-          commands:
-            - tapOn: "Turn grouping off"
-      - extendedWaitUntil:
-          visible:
-            text: "Turn grouping on"
-          timeout: 5000
-# The sheet has no Done (G5): tap the dimmed page above it. Its backdrop is
-# hidden from VoiceOver while the sheet is modal, so it is tapped by point.
-- retry:
-    maxRetries: 3
-    commands:
-      - runFlow:
-          when:
-            visible:
-              id: "exercise-list-date-range-row"
-          commands:
-            - tapOn:
-                point: "50%,12%"
-      - extendedWaitUntil:
-          notVisible:
-            id: "exercise-list-date-range-row"
-          timeout: 5000
 - tapOn: "Exercise filter input"
 - inputText: "Barbell Bench Press"
 - pressKey: Enter

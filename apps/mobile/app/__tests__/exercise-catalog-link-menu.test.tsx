@@ -95,10 +95,10 @@ describe('catalogue ⋮ Link to group exercise…', () => {
   it('is disabled for a soft-deleted exercise', async () => {
     render(<ExerciseCatalogScreen />);
     fireEvent.press(await screen.findByLabelText('Exercise catalog options'));
-    await screen.findByText('Filters');
+    await screen.findByText('Manage exercises');
     fireEvent.press(screen.getByLabelText('Show deleted exercises'));
     // The Filters sheet's backdrop, hidden from VoiceOver while the sheet is modal.
-    fireEvent.press(screen.getByLabelText('Close filters', { includeHiddenElements: true }));
+    fireEvent.press(screen.getByLabelText('Close exercise management', { includeHiddenElements: true }));
     fireEvent.press(await screen.findByLabelText('Chest exercises 2'));
     await screen.findByText('Old Fly');
     await openActions('Old Fly');

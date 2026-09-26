@@ -328,6 +328,8 @@ Priority rule:
    - `reset=data` to perform app-owned persisted-data reset;
    - `fixture=exercise-block-history` to seed deterministic local SQLite history (completed sessions for the completion, Stats and records flows);
    - `fixture=completion-two-prs` to seed that history plus a newest completed session with a squat and a bench PR (`maestro_m24_completion_two_prs`), kept out of the shared history so the Stats totals do not move;
+   - `fixture=exercise-browser` adds old/prior-year completed history and repeated blocks to the session-view fixture for browser comparisons;
+   - `maestroHistory=fail-once|slow-once` delays the next exercise-history read, optionally failing it, for browser loading/error/Retry evidence (development only);
    - `fixture=session-view` to seed that history plus one active session drawn
      like the accepted `V6-Session` artboard (`src/maestro/session-view-fixture.ts`);
    - `teleport=session-list|exercise-catalog|completed-session|exercise-page|session-view` to land on the target screen (`session-view` needs `sessionId`, an active draft or a completed session to edit; `exercise-page` also needs `sessionExerciseId`);

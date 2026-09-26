@@ -7,6 +7,8 @@ the exercise editor. Chosen by the user on 2026-09-24 (plan decision G1 (a)): a
 brief plus the gallery states the user accepts. **Accepted** by the user in
 the DLM-T06 gallery on 2026-09-25.
 
+Behavior simplified by the user-agreed repo-native brief on 2026-09-25: mandatory families, two sorts and all-time row history. This intentionally replaces the earlier optional grouping, periods and Recents controls; typography, surfaces, row and disclosure styling are retained.
+
 ## Target
 
 - Vocabulary: `../design-language.md` and the app frame (`app-frame.md`).
@@ -14,21 +16,26 @@ the DLM-T06 gallery on 2026-09-25.
 
 ## Brief
 
-- The exercise list is hairline `ListRow`s (density `list`) in one `Card`, or
-  one `Card` per muscle family when grouped. A family is headed by a disclosure
+- The exercise list is hairline `ListRow`s (density `list`) in one `Card` per muscle family. A family is headed by a disclosure
   row: its name, the count in Plex Mono, a `chevron-right` / `chevron-down`
   glyph and the expanded state; an empty family is disabled. A row is the name
   (Archivo 600 `ink`), the muscles (`ink-muted`) and the stats line (Plex Mono
   `ink-muted`). A deleted exercise gets a faint `Deleted` `Tag` and faint text,
   never a warning hue (G3). The catalogue's row actions sit in the trailing slot.
-- The list options are a micro-label over a `SegmentedControl` (the stats
-  window) and a micro-label over a multi `ChipGroup` (`Group by muscle`,
-  `Recents on top`), each chip labelled by what tapping it does.
-- The picker is a tall `Sheet` (T06-D1) that lifts above the keyboard: the
-  title `Select Exercise` with ⋮, Manage (`list`) and Add new (`plus`)
-  `IconButton`s on its row, a `SearchField`, and the `Groups` toggle chip
-  (solid `ink` while on, never `accent`). ⋮ opens the list options on a
-  `surface-subtle` band. The backdrop dismisses it; there is no Cancel.
+- Search is followed by a visible Sort `SegmentedControl` (`Favourite`,
+  `Name A–Z`) and checked `Show never-done` chip. No range, muscle filter,
+  grouping toggle or redundant status chips. Both preferences are local,
+  persistent and shared by catalogue, add and swap. Semantics: `ux-rules.md` §4.
+- The row history line is `Last: 23 Sep · 18 sessions`; include the year for
+  prior-year dates, use singular `1 session`, and `Never done` without history.
+  Favourite uses a fixed 180-day scoring window; history stays all-time.
+- Search expands matching families and hides empty ones; clearing restores
+  pre-search expansion. Empty results and history loading/failure have explicit
+  `StatePanel`s; failures offer Retry and never claim Never done.
+- The picker is a tall keyboard-aware `Sheet`: `Select Exercise` with Manage
+  (`list`) and Add new (`plus`) actions, Search and the separate `Groups` toggle
+  (solid `ink` while on), then the common browsing controls. The backdrop
+  dismisses it. Catalogue ⋮ contains management-only deleted visibility.
 - Tapping an exercise opens its preselection `Card`: the name in Archivo 700,
   the plan's `From <date>` as a micro-label over its sets as set rows, faded as
   planned (T06-D2), and an action strip with `Add empty set` (outline) and
@@ -45,13 +52,17 @@ Device: iPhone simulator at 390pt width, light.
 | Screenshot (lane) | State |
 | --- | --- |
 | `picker-default` (`ios-session-view`) | the picker as it opens: grouped, every family collapsed |
-| `picker-options` (`ios-session-view`) | ⋮: the list options |
+| `picker-options` (`ios-session-view`) | visible sort and never-done controls |
 | `picker-preselection` (`ios-session-view`) | a picked exercise with a plan from history |
 | `03-session-view-exercise-added` (`ios-session-view`) | the session view after `Add empty set` |
 | `exercise-swap-sheet` (`ios-exercise-page`) | ⋮ → Swap exercise: the shared list in the swap sheet |
 | `groups-link-03-picker-search` (`ios-groups-e2e`) | a search with `From your groups` |
 
-Jest only (no flow reaches them): a deleted row (the picker and swap sheet hide
+Additional browser comparison states: Favourite and A–Z, never-done on/off,
+expanded search and no matches, current/prior-year dates, history older than
+180 days and loading/error, at 390pt plus smaller/larger phone widths.
+
+Jest coverage also includes a deleted row (the picker and swap sheet hide
 deleted exercises; the catalogue shows them from T07), the loading and error
 panels, and the `Groups`-only list.
 
@@ -63,15 +74,13 @@ panels, and the `Groups`-only list.
 
 - The catalogue (`/exercise-catalog`) has the in-content title `Exercises`
   (T07-D1), then one row: a `SearchField`, `+` as an `accent` `IconButton` (the
-  screen's one primary, T07-D2) and ⋮. The active filters are `Tag`s beneath
-  it, and each one opens Filters. An outcome is a `Notice` above the list:
+  screen's one primary, T07-D2) and ⋮. The shared Sort and Show never-done
+  controls stay beneath it. An outcome is a `Notice` above the list:
   `Exercise created.` / `updated.` / `deleted.` / `restored.` with the
   `success` glyph (G3), and a failure in `danger`. Loading and error are
-  `StatePanel`s. A grouped list with nothing in it says why beneath the
-  family cards.
-- **Filters** is a `Sheet` with no Done (G5): the shared list options (T06),
-  then `Muscle groups` with a text `Clear`, then `Visibility`. Both are multi
-  `ChipGroup`s, solid `ink` while on. Changes apply live.
+  `StatePanel`s. An empty list says why above its disabled family cards.
+- **Manage exercises** is a `Sheet` with no Done (G5), containing only
+  Show deleted, a multi `ChipGroup` solid `ink` while on. Changes apply live.
 - **A row's ⋮** opens a `Sheet` titled with the exercise's name: `Edit`
   (`pencil`), `Link to group exercise…` (`link`, signed in only) and `Delete` in
   `danger` (`trash`). A deleted exercise gets `Undelete` instead of `Delete`,
@@ -93,8 +102,8 @@ panels, and the `Groups`-only list.
 | Screenshot (lane) | State |
 | --- | --- |
 | `catalogue-list-grouped` (`ios-ui-regression`) | grouped, one family open |
-| `catalogue-filters-sheet` (`ios-ui-regression`) | ⋮: Filters |
-| `catalogue-list-flat` (`ios-ui-regression`) | grouping off, the sheet closed by its backdrop |
+| `catalogue-management-sheet` (`ios-ui-regression`) | ⋮: Manage exercises |
+| `catalogue-name-sort` (`ios-ui-regression`) | Name A–Z within families |
 | `catalogue-row-actions-sheet` (`ios-ui-regression`) | a row's ⋮, signed out |
 | `editor-create-empty` (`ios-ui-regression`) | `+`: the editor, empty |
 | `editor-validation-errors` (`ios-ui-regression`) | Save with no name or primary muscle |
@@ -103,9 +112,10 @@ panels, and the `Groups`-only list.
 | `catalogue-created-notice` (`ios-ui-regression`) | saved: the notice and the new row |
 | `groups-link-01-link-screen` (`ios-groups-e2e`) | reached through a row's ⋮ `Link to group exercise…` |
 
-Jest only (no flow reaches them, or they last under a second): the loading and
-error panels, a deleted exercise's actions, the muscle filter with `Clear`, the
-save failure, and the `Back to exercise` return.
+The `browser-*` captures in `ios-ui-regression` cover search, no matches,
+prior-year/old history, shared preferences, old plan suggestions and real
+history loading/error/Retry. Jest additionally covers deleted actions,
+save failure and `Back to exercise`.
 
 No target screenshots are committed; runtime captures stay in the gitignored
 `apps/mobile/artifacts/maestro/` tree and are linked as PR evidence.

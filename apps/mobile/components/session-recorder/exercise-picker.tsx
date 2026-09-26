@@ -37,10 +37,9 @@ import { useGroupExerciseLinking, useGroupLinkingUserId } from '@/src/groups/use
 import { formatCurrentDateTime } from '@/src/session-recorder/session-model';
 import { formatSetRow } from '@/src/session-recorder/session-view-model';
 
-// The picker is a tall sheet, so opening the options or a preselection does not
+// The picker is a tall sheet, so opening a preselection does not
 // resize it; with the keyboard up it shrinks to what is left.
 const PICKER_SHARE_OF_SCREEN = 0.8;
-
 
 export type ExercisePickerPreselectionState = {
   exercise: ExerciseListItem;
@@ -83,7 +82,6 @@ export function ExercisePicker({
   const groupLinking = useGroupExerciseLinking({ userId: groupLinkingUserId });
   const [searchValue, setSearchValue] = useState('');
   const [preselection, setPreselection] = useState<ExercisePickerPreselectionState | null>(null);
-  const [isOptionsVisible, setIsOptionsVisible] = useState(false);
   const [expandedFamilies, setExpandedFamilies] = useState<Set<string>>(() => new Set());
   const [groupsOnly, setGroupsOnly] = useState(false);
   const [isCreateModalVisible, setIsCreateModalVisible] = useState(false);
@@ -94,7 +92,9 @@ export function ExercisePicker({
   const [listPreferences, setListPreferences] = useExerciseListPreferences();
   const exerciseCatalog = useExerciseCatalog();
   const { height } = useWindowDimensions();
-  const { stats: exerciseCatalogStats } = useExerciseCatalogStats(listPreferences.dateRange);
+  const history = useExerciseCatalogStats('all');
+  const { stats: exerciseCatalogStats, reload: reloadHistory } = history;
+  useEffect(() => { if (visible) reloadHistory(); }, [visible, reloadHistory]);
 
   const isCatalogLoading = exerciseCatalog.status === 'idle' || exerciseCatalog.status === 'loading';
   const catalogLoadError =
@@ -118,7 +118,6 @@ export function ExercisePicker({
         preferences: listPreferences,
         query: searchValue,
         includeDeleted: false,
-        showNeverDone: true,
       }),
     [exerciseOptions, exerciseCatalog.muscleGroups, exerciseCatalogStats, listPreferences, searchValue]
   );
@@ -172,7 +171,6 @@ export function ExercisePicker({
   const dismiss = () => {
     setSearchValue('');
     clearPreselection();
-    setIsOptionsVisible(false);
     setGroupsOnly(false);
     onDismiss();
   };
@@ -190,7 +188,6 @@ export function ExercisePicker({
   const selectListItem = (exercise: ExerciseListItem) => {
     const requestKey = `${exercise.id}:${Date.now()}:${Math.random().toString(36).slice(2)}`;
     preselectionRequestKeyRef.current = requestKey;
-    setIsOptionsVisible(false);
     setPreselection({ exercise, status: 'loading', suggestion: null });
 
     void loadSuggestedExercisePlan({ exerciseDefinitionId: exercise.id })
@@ -323,15 +320,6 @@ export function ExercisePicker({
         headerActions={
           <>
             <IconButton
-              accessibilityLabel="Exercise picker options"
-              name="more-vertical"
-              onPress={() => {
-                clearPreselection();
-                setIsOptionsVisible((current) => !current);
-              }}
-              testID="exercise-picker-options-button"
-            />
-            <IconButton
               accessibilityLabel="Open exercise catalog manage flow"
               name="list"
               onPress={openManage}
@@ -357,18 +345,16 @@ export function ExercisePicker({
                 accessibilityLabel="Exercise filter input"
                 autoCapitalize="none"
                 onChangeText={updateSearchValue}
-                placeholder="Filter by exercise or muscle group"
+                placeholder="Search exercises or muscles"
                 testID="exercise-picker-search"
                 value={searchValue}
               />
             </View>
             {groupLinkingUserId ? <PickerGroupsToggle active={groupsOnly} onToggle={toggleGroupsOnly} /> : null}
           </View>
-          {isOptionsVisible ? (
-            <View style={styles.optionsPanel} testID="exercise-picker-options-panel">
-              <ExerciseListPreferenceControls preferences={listPreferences} onChangePreferences={setListPreferences} />
-            </View>
-          ) : null}
+          <View style={styles.optionsPanel}>
+            <ExerciseListPreferenceControls preferences={listPreferences} onChangePreferences={setListPreferences} />
+          </View>
           {/*
             The filter input above keeps focus while the user picks a result.
             With the ScrollView's default `keyboardShouldPersistTaps="never"`,
@@ -457,7 +443,9 @@ export function ExercisePicker({
               ) : (
                 <>
                   <ExerciseListContent
-                    mode={listModel.mode}
+                    isSearching={listModel.isSearching}
+                    historyStatus={history.status}
+                    onRetryHistory={history.reload}
                     items={listModel.items}
                     sections={listModel.sections}
                     expandedFamilies={expandedFamilies}
@@ -465,9 +453,6 @@ export function ExercisePicker({
                     onToggleFamily={toggleFamily}
                     onPressExercise={selectListItem}
                   />
-                  {listModel.items.length === 0 && listModel.mode === 'grouped' ? (
-                    <StatePanel body={noExercisesText} fill={false} />
-                  ) : null}
                   {/* After my own matches (E0.1); empty without search text. */}
                   <PickerGroupSectionList sections={groupSections} onPressRow={selectGroupRow} />
                 </>
@@ -525,11 +510,6 @@ const styles = StyleSheet.create({
   optionsPanel: {
     marginBottom: uiSpace.md,
     paddingHorizontal: uiSpace.lg,
-    paddingVertical: uiSpace.md,
-    backgroundColor: uiRoles.surfaceSubtle,
-    borderTopWidth: uiBorder.width,
-    borderBottomWidth: uiBorder.width,
-    borderColor: uiRoles.ruleSoft,
   },
   list: {
     flex: 1,

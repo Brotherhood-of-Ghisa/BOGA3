@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { Keyboard, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Keyboard, ScrollView, StyleSheet, View } from 'react-native';
 
 import { ExerciseEditorModal } from '@/components/exercise-catalog/exercise-editor-modal';
 import { MoreHubBackButton } from '@/components/navigation/more-hub-back-button';
@@ -8,7 +8,6 @@ import {
   ExerciseListContent,
   ExerciseListPreferenceControls,
 } from '@/components/exercise-catalog/exercise-list-controls';
-import { ActionButton } from '@/components/ui/action-button';
 import { ChipGroup } from '@/components/ui/chip-group';
 import { Icon } from '@/components/ui/icon';
 import { IconButton } from '@/components/ui/icon-button';
@@ -19,8 +18,7 @@ import { Screen } from '@/components/ui/screen';
 import { SearchField } from '@/components/ui/search-field';
 import { Sheet } from '@/components/ui/sheet';
 import { StatePanel } from '@/components/ui/state-panel';
-import { Tag } from '@/components/ui/tag';
-import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiRoles, uiSpace } from '@/components/ui/tokens';
 import {
   deleteExerciseCatalogExercise,
   undeleteExerciseCatalogExercise,
@@ -29,7 +27,6 @@ import {
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import {
   buildExerciseListModel,
-  getExerciseListDateRangeLabel,
   type ExerciseListItem,
 } from '@/src/exercise-catalog/list-model';
 import { useExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
@@ -43,18 +40,6 @@ const coerceRouteParam = (value: string | string[] | undefined): string | null =
   }
 
   return value ?? null;
-};
-
-type CatalogFilters = {
-  muscleGroupIds: ReadonlySet<string>;
-  showDeleted: boolean;
-  showNeverDone: boolean;
-};
-
-const DEFAULT_FILTERS: CatalogFilters = {
-  muscleGroupIds: new Set<string>(),
-  showDeleted: false,
-  showNeverDone: true,
 };
 
 const SEARCH_DEBOUNCE_MS = 150;
@@ -79,7 +64,7 @@ export default function ExerciseCatalogScreen() {
 
   const [isEditorModalVisible, setIsEditorModalVisible] = useState(false);
   const [isCatalogOptionsMenuVisible, setIsCatalogOptionsMenuVisible] = useState(false);
-  const [filters, setFilters] = useState<CatalogFilters>(DEFAULT_FILTERS);
+  const [showDeleted, setShowDeleted] = useState(false);
   const [didHandleInitialIntent, setDidHandleInitialIntent] = useState(false);
   const [exerciseActionMenuTarget, setExerciseActionMenuTarget] = useState<ExerciseCatalogExercise | null>(null);
   const [editorExerciseTarget, setEditorExerciseTarget] = useState<ExerciseCatalogExercise | null>(null);
@@ -97,7 +82,7 @@ export default function ExerciseCatalogScreen() {
   const exercises = catalog.exercises;
   const muscleGroups = catalog.muscleGroups;
 
-  const statsResult = useExerciseCatalogStats(listPreferences.dateRange);
+  const statsResult = useExerciseCatalogStats('all');
   const { stats, reload: reloadStats } = statsResult;
 
   useFocusEffect(
@@ -116,9 +101,7 @@ export default function ExerciseCatalogScreen() {
         stats,
         preferences: listPreferences,
         query: debouncedExerciseSearchValue,
-        includeDeleted: filters.showDeleted,
-        showNeverDone: filters.showNeverDone,
-        selectedMuscleGroupIds: filters.muscleGroupIds,
+        includeDeleted: showDeleted,
       }),
     [
       exercises,
@@ -126,9 +109,7 @@ export default function ExerciseCatalogScreen() {
       stats,
       listPreferences,
       debouncedExerciseSearchValue,
-      filters.showDeleted,
-      filters.showNeverDone,
-      filters.muscleGroupIds,
+      showDeleted,
     ]
   );
 
@@ -245,41 +226,11 @@ export default function ExerciseCatalogScreen() {
     }
   };
 
-  const toggleFilterMuscleGroup = (muscleGroupId: string) => {
-    setFilters((current) => {
-      const next = new Set(current.muscleGroupIds);
-      if (next.has(muscleGroupId)) {
-        next.delete(muscleGroupId);
-      } else {
-        next.add(muscleGroupId);
-      }
-      return { ...current, muscleGroupIds: next };
-    });
-  };
-  const clearFilterMuscleGroups = () => {
-    setFilters((current) => ({ ...current, muscleGroupIds: new Set<string>() }));
-  };
-  const toggleFilterShowDeleted = () => {
-    setFilters((current) => ({ ...current, showDeleted: !current.showDeleted }));
+  const toggleShowDeleted = () => {
+    setShowDeleted((current) => !current);
     setSaveError(null);
     setSaveFeedback(null);
   };
-  const toggleFilterShowNeverDone = () => {
-    setFilters((current) => ({ ...current, showNeverDone: !current.showNeverDone }));
-  };
-
-  const activeFilterChips = useMemo(() => {
-    const chips: { key: string; label: string }[] = [];
-    chips.push({ key: 'period', label: `Range: ${getExerciseListDateRangeLabel(listPreferences.dateRange)}` });
-    chips.push({ key: 'grouping', label: listPreferences.groupByMuscleFamily ? 'Grouped' : 'Flat' });
-    chips.push({ key: 'recents', label: listPreferences.recentsOnTop ? 'Recents: On' : 'A-Z' });
-    if (filters.muscleGroupIds.size > 0) {
-      chips.push({ key: 'muscles', label: `Muscles: ${filters.muscleGroupIds.size}` });
-    }
-    if (!filters.showNeverDone) chips.push({ key: 'never-done', label: 'Hide never-done' });
-    if (filters.showDeleted) chips.push({ key: 'deleted', label: 'Deleted: On' });
-    return chips;
-  }, [filters, listPreferences]);
 
   const emptyListText =
     exercises.length === 0
@@ -317,7 +268,7 @@ export default function ExerciseCatalogScreen() {
               accessibilityLabel="Exercise filter input"
               autoCapitalize="none"
               onChangeText={setExerciseSearchValue}
-              placeholder="Filter by exercise or muscle group"
+              placeholder="Search exercises or muscles"
               value={exerciseSearchValue}
             />
           </View>
@@ -335,20 +286,7 @@ export default function ExerciseCatalogScreen() {
             testID="exercise-catalog-options-button"
           />
         </View>
-        {activeFilterChips.length > 0 ? (
-          <View style={styles.activeFilterChipsRow}>
-            {activeFilterChips.map((chip) => (
-              <Pressable
-                key={chip.key}
-                accessibilityLabel={`Open filters (${chip.label})`}
-                accessibilityRole="button"
-                hitSlop={uiSpace.xs}
-                onPress={openFilters}>
-                <Tag label={chip.label} />
-              </Pressable>
-            ))}
-          </View>
-        ) : null}
+        <ExerciseListPreferenceControls preferences={listPreferences} onChangePreferences={setListPreferences} />
         {saveFeedback ? <Notice icon="success" live message={saveFeedback} testID="exercise-catalog-feedback" /> : null}
         {saveError ? <Notice live message={saveError} testID="exercise-catalog-error" tone="danger" /> : null}
       </View>
@@ -356,10 +294,13 @@ export default function ExerciseCatalogScreen() {
       <ScrollView
         style={styles.scroll}
         contentInsetAdjustmentBehavior="automatic"
+        automaticallyAdjustKeyboardInsets
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled">
         <ExerciseListContent
-          mode={exerciseListModel.mode}
+          isSearching={exerciseListModel.isSearching}
+          historyStatus={statsResult.status}
+          onRetryHistory={reloadStats}
           items={exerciseListModel.items}
           sections={exerciseListModel.sections}
           expandedFamilies={expandedExerciseFamilies}
@@ -369,11 +310,6 @@ export default function ExerciseCatalogScreen() {
           getExerciseAccessibilityLabel={(exercise) => `Edit exercise definition ${exercise.name}`}
           renderActions={renderExerciseActions}
         />
-        {/* Grouped, the shared list draws only the family cards (all empty), so
-            the catalogue says why beneath them, as the flat list does. */}
-        {exerciseListModel.items.length === 0 && exerciseListModel.mode === 'grouped' ? (
-          <StatePanel body={emptyListText} fill={false} />
-        ) : null}
       </ScrollView>
 
       <ExerciseEditorModal
@@ -384,80 +320,20 @@ export default function ExerciseCatalogScreen() {
       />
 
       <Sheet
-        dismissLabel="Close filters"
+        dismissLabel="Close exercise management"
         onDismiss={() => setIsCatalogOptionsMenuVisible(false)}
-        testID="exercise-catalog-filters-sheet"
-        title="Filters"
+        testID="exercise-catalog-management-sheet"
+        title="Manage exercises"
         visible={isCatalogOptionsMenuVisible}>
-        <ScrollView
-          style={styles.filtersScroll}
-          contentContainerStyle={styles.filtersScrollContent}
-          keyboardShouldPersistTaps="handled">
-          <ExerciseListPreferenceControls
-            preferences={listPreferences}
-            onChangePreferences={setListPreferences}
+        <View style={styles.management}>
+          <ChipGroup
+            mode="multi"
+            onToggle={toggleShowDeleted}
+            options={[{ value: 'deleted', label: 'Show deleted', accessibilityLabel: showDeleted ? 'Hide deleted exercises' : 'Show deleted exercises' }]}
+            testIDPrefix="exercise-catalog-filter-visibility"
+            values={showDeleted ? ['deleted'] : []}
           />
-
-          <View style={styles.filtersGroup}>
-            <View style={styles.filtersSectionHeaderRow}>
-              <Text allowFontScaling={false} accessibilityRole="header" style={styles.sectionLabel}>
-                Muscle groups
-              </Text>
-              {filters.muscleGroupIds.size > 0 ? (
-                <View style={styles.clearAction}>
-                  <ActionButton
-                    accessibilityLabel="Clear muscle group selection"
-                    label="Clear"
-                    onPress={clearFilterMuscleGroups}
-                    variant="text"
-                  />
-                </View>
-              ) : null}
-            </View>
-            {muscleGroups.length === 0 ? (
-              <Text allowFontScaling={false} style={styles.helperText}>No muscle groups defined.</Text>
-            ) : (
-              <ChipGroup
-                mode="multi"
-                onToggle={toggleFilterMuscleGroup}
-                options={muscleGroups.map((group) => ({
-                  value: group.id,
-                  label: group.displayName,
-                  accessibilityLabel: `Toggle muscle group ${group.displayName}`,
-                }))}
-                testIDPrefix="exercise-catalog-filter-muscle"
-                values={[...filters.muscleGroupIds]}
-              />
-            )}
-          </View>
-
-          <View style={styles.filtersGroup}>
-            <Text allowFontScaling={false} accessibilityRole="header" style={styles.sectionLabel}>
-              Visibility
-            </Text>
-            <ChipGroup
-              mode="multi"
-              onToggle={(option) => (option === 'deleted' ? toggleFilterShowDeleted() : toggleFilterShowNeverDone())}
-              options={[
-                {
-                  value: 'deleted',
-                  label: 'Show deleted',
-                  accessibilityLabel: filters.showDeleted ? 'Hide deleted exercises' : 'Show deleted exercises',
-                },
-                {
-                  value: 'never-done',
-                  label: 'Show never-done',
-                  accessibilityLabel: filters.showNeverDone ? 'Hide exercises never done' : 'Show exercises never done',
-                },
-              ]}
-              testIDPrefix="exercise-catalog-filter-visibility"
-              values={[
-                ...(filters.showDeleted ? (['deleted'] as const) : []),
-                ...(filters.showNeverDone ? (['never-done'] as const) : []),
-              ]}
-            />
-          </View>
-        </ScrollView>
+        </View>
       </Sheet>
 
       {/* A row's actions. Delete does not confirm (T07-D4): it is a soft delete,
@@ -555,47 +431,8 @@ const styles = StyleSheet.create({
     minWidth: 0,
     marginRight: uiSpace.xs,
   },
-  activeFilterChipsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: uiSpace.sm,
-  },
-  helperText: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.inkMuted,
-  },
-  sectionLabel: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
-    color: uiRoles.inkMuted,
-  },
-  // Sized to its content; shrinks and scrolls when the sheet reaches the top.
-  filtersScroll: {
-    flexShrink: 1,
-  },
-  filtersScrollContent: {
-    gap: uiSpace.lg,
+  management: {
     paddingHorizontal: uiSpace.lg,
     paddingBottom: uiSpace.sm,
-  },
-  filtersGroup: {
-    gap: uiSpace.sm,
-  },
-  filtersSectionHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  // The text `Clear` keeps its 44pt target without making the label's row
-  // taller than the label, so the row does not jump when it appears.
-  clearAction: {
-    marginVertical: -uiSpace.lg,
   },
 });

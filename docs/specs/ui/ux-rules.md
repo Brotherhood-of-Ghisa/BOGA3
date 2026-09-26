@@ -107,10 +107,10 @@ Document app-specific UI semantics and guardrails for the current mobile app.
 1. Most secondary workflows in current screens use in-route modal/overlay UI state instead of route changes.
    - Examples:
      - session list action menus
-     - the exercise catalogue's Filters and row Actions sheets and the exercise editor
+     - the exercise catalogue's management and row Actions sheets and the exercise editor
      - the session view's `Gym` sheet, ⋮ menu, exercise picker and the picker's inline exercise creation editor
-2. The exercise picker (the session view's `+ Add exercise`; `components/session-recorder/exercise-picker.tsx`) is a tall design-language `Sheet` (DLM-T06): it lifts above the keyboard, the backdrop dismisses it, and it has no Cancel. Shared list options (⋮), `Manage` and `Add new` are `IconButton`s on the title's row. It hides itself while its inline editor or the group pick sheet is open, and returns when that closes.
-3. The exercise catalogue (DLM-T07) puts its options in design-language `Sheet`s with no Cancel or Done; the backdrop dismisses them. ⋮ or any filter `Tag` opens `Filters` (the shared list options, then `Muscle groups` with a text `Clear`, then `Visibility`, both multi `ChipGroup`s; changes apply live). A row's ⋮ opens a sheet titled with the exercise's name: `Edit`, `Link to group exercise…` (signed in only), and `Delete` in `danger`, or `Undelete` for a deleted exercise. Delete does not confirm: it is a soft delete, undone from the same sheet (T07-D4). Opening either sheet dismisses the filter's keyboard first, so a sheet never opens under it.
+2. The exercise picker (the session view's `+ Add exercise`; `components/session-recorder/exercise-picker.tsx`) is a tall design-language `Sheet` (DLM-T06): it lifts above the keyboard, the backdrop dismisses it, and it has no Cancel. `Manage` and `Add new` are `IconButton`s on the title's row; Sort and Show never-done stay below search. It hides itself while its inline editor or the group pick sheet is open, and returns when that closes.
+3. The exercise catalogue (DLM-T07) puts its options in design-language `Sheet`s with no Cancel or Done; the backdrop dismisses them. ⋮ opens `Manage exercises` with the catalogue-only Show deleted control; shared browsing controls remain on the page. A row's ⋮ opens a sheet titled with the exercise's name: `Edit`, `Link to group exercise…` (signed in only), and `Delete` in `danger`, or `Undelete` for a deleted exercise. Delete does not confirm: it is a soft delete, undone from the same sheet (T07-D4). Opening either sheet dismisses the filter's keyboard first, so a sheet never opens under it.
 4. The shared exercise editor (`ExerciseEditorModal`: the catalogue, the picker's `Add new` and group `Add as new`, the exercise page and the group exercises page) is a tall `Sheet` that lifts above the keyboard; the backdrop dismisses it except while it saves, and it has no Cancel. `Save Exercise` is its one `accent`. Choosing a primary or secondary muscle swaps the sheet's body for the muscle list in the same sheet (T07-D3): the title names the choice, and a `chevron-left` `Back to exercise` returns without choosing. A second, stacked sheet is not used.
 5. In the exercise picker, tapping an exercise opens an in-place preselection panel instead of immediately adding:
    - `Add empty set` (an outline) is always available and adds the exercise with one blank set.
@@ -140,14 +140,17 @@ Document app-specific UI semantics and guardrails for the current mobile app.
 2. This split interaction pattern is used in `exercise-catalog` and in the shared `HistoryList` / `ActiveSessionRow` building blocks (consumed by Progress/`stats-history` and session-list flows), and should be preserved during refactors unless behavior intentionally changes.
 3. Deleted/archived visibility is controlled via toggles and state hints, not separate routes.
 4. In `exercise-catalog`, deleted exercises remain in list history when deleted visibility is enabled, show explicit `Deleted` state, and expose `Undelete` from row actions.
-5. `exercise-catalog` is titled `Exercises` (T07-D1). Its top row is the filter field, then `+` (create, an `accent` `IconButton`: the screen's one primary, T07-D2), then ⋮ (options); the active filters show as `Tag`s under it, and the deleted visibility toggle lives in the Filters sheet.
-6. `exercise-catalog` and the exercise picker share exercise-list preferences and row semantics:
-   - local-only shared preferences default to grouped by muscle family, `90d` range, and recents-on-top enabled; options are `7d`, `30d`, `90d`, `1y`, and `All`,
-   - grouped mode shows taxonomy-ordered family headers (`Chest`, `Shoulders`, `Back`, `Arms`, `Core`, `Legs`, `Lower Legs`, `Other`) with the family and its count; all groups remain visible, zero-count groups are disabled/collapsed, non-empty headers toggle expansion and show it with a `chevron-right` / `chevron-down` glyph and the expanded state (DLM-T06), and active text search preserves collapsed/expanded state without flattening the list,
-   - flat mode renders rows directly without an all-exercises section header,
-   - recents-on-top sorts by valid completed-set recency score with a fixed 60-day half-life, includes warm-up sets, ignores active/unperformed/deleted/tombstoned rows, uses the selected finite date window, and caps `All` scoring to the last year; recents-off sorts alphabetically,
-   - picker rows use the same muscle summary and stats line as Exercise Catalog rows but hide catalog edit/delete actions and catalog-only filters.
-7. Exercise picker historical preselection plans are sourced from completed workout history only, independent of the picker/catalog date-range setting. The plan uses the most recent completed session with valid performed set rows for the selected exercise; duplicate same-exercise blocks inside that session are combined in session order, and preview rows are numbered continuously. Valid plan rows require a non-negative numeric weight and a positive integer rep count; `0kg` is valid.
+5. `exercise-catalog` is titled `Exercises`. Its top row is Search, `+` (create, the one `accent` action) and ⋮ (management); Sort and Show never-done remain visible below search. Deleted visibility lives in the management sheet.
+6. The catalogue, add picker and swap picker share one personal exercise browser:
+   - always group by primary-muscle family in taxonomy order (`Chest`, `Shoulders`, `Back`, `Arms`, `Core`, `Legs`, `Lower Legs`, `Other`), preserving the primary-mapping fallback; without search, empty families remain disabled/collapsed,
+   - Sort offers exactly `Favourite` (default) and `Name A–Z`, within each family; family order never changes,
+   - Favourite sums valid performed sets from completed sessions in the last 180 days with the existing 60-day half-life, including warm-ups; ties use latest qualifying use inside that window, then name. Active, unperformed, invalid and tombstoned rows do not score. The window never filters visibility,
+   - row history is all-time: `Last: 23 Sep · 18 sessions` (singular `1 session`); include the year outside the device's current local calendar year, e.g. `Last: 23 Sep 2025`. Count a completed session once even across multiple sets or repeated exercise blocks. No history reads `Never done`; history failures show a retryable error, never a fabricated never-done result,
+   - locally persist and share Sort and `Show never-done` (default on) across all three browsers and launches. Off hides only exercises never performed across all history. Migrate legacy `recentsOnTop` true/false to Favourite/Name A–Z; ignore obsolete grouping/period settings and retain the separate detail date-format preference,
+   - search reveals matching families expanded and omits zero-match families; clearing restores each surface's pre-search expansion state. Search and ordinary expansion are surface-local. Empty results have an explicit message with controls still available,
+   - refresh/reopen recomputes ranking and date labels against current time, without polling. Volume and 1RM remain on detail/history surfaces,
+   - add/swap hide deleted exercises; swap excludes the current exercise. The add picker's separate `Groups` toggle and `From your groups` linking flow remain independent of personal never-done filtering.
+7. Exercise picker historical preselection plans are sourced from completed workout history only, independent of Favourite's window. The plan uses the most recent completed session with valid performed set rows for the selected exercise; duplicate same-exercise blocks inside that session are combined in session order, and preview rows are numbered continuously. Valid plan rows require a non-negative numeric weight and a positive integer rep count; `0kg` is valid.
 
 ### 5. Forms and validation conventions
 
@@ -158,8 +161,8 @@ Document app-specific UI semantics and guardrails for the current mobile app.
 5. The exercise picker and `exercise-catalog` list include a text filter that:
    - trims and collapses extra whitespace in user input,
    - matches case-insensitively,
-   - matches when any typed word appears in either exercise names or linked muscle-group metadata.
-   - preserves the current grouped/flat layout mode instead of flattening grouped results; grouped search results keep section headers and preserve collapsed/expanded state.
+   - matches when every typed word appears in the exercise name or primary muscle display/family terms.
+   - keeps family headers, expands matches during search and omits empty families; clearing restores the pre-search expansion state.
 6. The M11 profile sign-in form keeps auth failure messaging inline inside the same card as the email/password inputs.
 7. When auth config is unavailable, the profile route shows an unavailable notice (the `warning` glyph and words, no warning hue) and disables sign-in rather than failing only after submit.
 8. The M11 profile sign-in form performs basic client-side email-shape validation before attempting the auth request.

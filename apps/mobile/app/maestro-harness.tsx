@@ -18,6 +18,8 @@ import {
   runMaestroHarnessReset,
 } from '@/src/maestro/harness';
 
+import { prepareExerciseHistoryReadForMaestro } from '@/src/exercise-catalog/stats-cache';
+
 type HarnessStatus =
   | { kind: 'running'; message: string }
   | { kind: 'success'; message: string }
@@ -36,6 +38,7 @@ export default function MaestroHarnessScreen() {
     sessionExerciseId?: string | string[];
     maestroShare?: string | string[];
     maestroCatalog?: string | string[];
+    maestroHistory?: string | string[];
     presentation?: string | string[];
   }>();
   const [status, setStatus] = useState<HarnessStatus>({
@@ -68,6 +71,7 @@ export default function MaestroHarnessScreen() {
   const sessionExerciseIdParam = coerceMaestroHarnessQueryParam(params.sessionExerciseId);
   const maestroShareParam = coerceMaestroHarnessQueryParam(params.maestroShare);
   const maestroCatalogParam = coerceMaestroHarnessQueryParam(params.maestroCatalog);
+  const maestroHistoryParam = coerceMaestroHarnessQueryParam(params.maestroHistory);
   const presentationParam = coerceMaestroHarnessQueryParam(params.presentation);
 
   useEffect(() => {
@@ -88,6 +92,7 @@ export default function MaestroHarnessScreen() {
       sessionExerciseIdParam,
       maestroShareParam,
       maestroCatalogParam,
+      maestroHistoryParam,
       presentationParam,
     ]);
     if (lastRunKeyRef.current === runKey) {
@@ -124,6 +129,7 @@ export default function MaestroHarnessScreen() {
       try {
         await runMaestroHarnessReset(resetMode);
         await runMaestroHarnessFixture(fixtureName);
+        await prepareExerciseHistoryReadForMaestro(maestroHistoryParam);
         await runMaestroHarnessBootstrapAction(bootstrapAction);
         runMaestroHarnessGateAction(gateAction);
 
@@ -167,7 +173,7 @@ export default function MaestroHarnessScreen() {
     return () => {
       cancelled = true;
     };
-  }, [resetParam, fixtureParam, bootstrapParam, gateParam, teleportParam, intentParam, sessionIdParam, sessionExerciseIdParam, maestroShareParam, maestroCatalogParam, presentationParam, router]);
+  }, [resetParam, fixtureParam, bootstrapParam, gateParam, teleportParam, intentParam, sessionIdParam, sessionExerciseIdParam, maestroShareParam, maestroCatalogParam, maestroHistoryParam, presentationParam, router]);
 
   // Dev/test-only (plan G8). Flows wait on the status copy, so it never changes.
   return (

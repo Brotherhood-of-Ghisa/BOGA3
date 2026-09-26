@@ -595,6 +595,7 @@ describe('ExercisePageScreen', () => {
     fireEvent.press(screen.getByTestId('exercise-page-options'));
     fireEvent.press(await screen.findByTestId('exercise-options-swap'));
     const swap = await screen.findByTestId('exercise-swap-sheet');
+    fireEvent.changeText(within(swap).getByLabelText('Search exercises'), 'Incline');
     fireEvent.press(within(swap).getByText('Incline Bench Press'));
 
     await waitFor(() =>

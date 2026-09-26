@@ -8,6 +8,8 @@ import {
   type ExerciseCatalogStatsRawHistory,
 } from '@/src/data/exercise-catalog-stats';
 
+import { isDevMode } from '@/src/utils/isDevMode';
+
 import { subscribeToExerciseCatalogInvalidation } from './invalidation';
 
 export type ExerciseCatalogStatsCacheStatus = 'idle' | 'loading' | 'ready' | 'error';
@@ -39,6 +41,14 @@ let snapshot: ExerciseCatalogStatsCacheSnapshot = EMPTY_SNAPSHOT;
 let inFlightReload: Promise<void> | null = null;
 let pendingReload = false;
 let drainPromise: Promise<void> | null = null;
+let maestroNextRead: 'fail-once' | 'slow-once' | null = null;
+
+// Dev-only fault injection for real-browser loading/error screenshots and Retry.
+export const prepareExerciseHistoryReadForMaestro = async (mode: string | null): Promise<void> => {
+  if (!isDevMode()) return;
+  if (drainPromise) await drainPromise;
+  maestroNextRead = mode === 'fail-once' || mode === 'slow-once' ? mode : null;
+};
 
 const emit = () => {
   for (const listener of listeners) {
@@ -54,6 +64,12 @@ const setSnapshot = (next: ExerciseCatalogStatsCacheSnapshot) => {
 const reload = async (): Promise<void> => {
   setSnapshot({ ...snapshot, status: 'loading', lastError: null });
   try {
+    const fault = maestroNextRead;
+    maestroNextRead = null;
+    if (fault) {
+      await new Promise((resolve) => setTimeout(resolve, 2500));
+      if (fault === 'fail-once') throw new Error('Maestro exercise history read failure');
+    }
     const rawHistory = await loadExerciseCatalogStatsRawHistory();
     setSnapshot({
       status: 'ready',
@@ -106,8 +122,14 @@ export const subscribeToExerciseCatalogStats = (listener: Listener): (() => void
 
 export const ensureExerciseCatalogStatsLoaded = async (): Promise<void> => {
   if (snapshot.status === 'ready') return;
+  if (inFlightReload) { await ensureDrain(); return; }
   pendingReload = true;
   await ensureDrain();
+};
+
+const refreshExerciseCatalogStats = (): void => {
+  // Mount and focus/visible can request the same read in one render cycle.
+  if (!inFlightReload) invalidateExerciseCatalogStatsCache();
 };
 
 export const invalidateExerciseCatalogStatsCache = (): void => {
@@ -126,6 +148,7 @@ export const __resetExerciseCatalogStatsCacheForTests = (): void => {
   inFlightReload = null;
   pendingReload = false;
   drainPromise = null;
+  maestroNextRead = null;
 };
 
 export type UseExerciseCatalogStatsResult = {
@@ -151,8 +174,8 @@ export const useExerciseCatalogStats = (
 
   const stats = useMemo(
     () =>
-      aggregateExerciseCatalogStats(current.rawHistory ?? EMPTY_RAW_HISTORY, period),
-    [current.rawHistory, period]
+      aggregateExerciseCatalogStats(current.rawHistory ?? EMPTY_RAW_HISTORY, period, new Date(current.loadedAt || Date.now())),
+    [current.rawHistory, current.loadedAt, period]
   );
 
   return {
@@ -160,6 +183,6 @@ export const useExerciseCatalogStats = (
     stats,
     rawHistory: current.rawHistory,
     lastError: current.lastError,
-    reload: invalidateExerciseCatalogStatsCache,
+    reload: refreshExerciseCatalogStats,
   };
 };

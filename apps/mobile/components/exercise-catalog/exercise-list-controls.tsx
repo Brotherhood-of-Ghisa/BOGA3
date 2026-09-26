@@ -8,81 +8,47 @@ import { ListRow } from '@/components/ui/list-row';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { StatePanel } from '@/components/ui/state-panel';
 import { Tag } from '@/components/ui/tag';
-import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import {
-  EXERCISE_LIST_DATE_RANGE_OPTIONS,
   type ExerciseListItem,
   type ExerciseListPreferences,
   type ExerciseListSection,
 } from '@/src/exercise-catalog/list-model';
+import type { ExerciseCatalogStatsCacheStatus } from '@/src/exercise-catalog/stats-cache';
 
 type PreferenceControlsProps = {
   preferences: ExerciseListPreferences;
   onChangePreferences: (patch: Partial<ExerciseListPreferences>) => void;
 };
 
-type ListOption = 'group' | 'recents';
-
-// The shared list options: the stats window as a segmented control, and the two
-// list toggles as chips. Each toggle's label says what tapping it does, which
-// Maestro taps ("Turn grouping off").
-export function ExerciseListPreferenceControls({
-  preferences,
-  onChangePreferences,
-}: PreferenceControlsProps) {
-  const listValues: ListOption[] = [
-    ...(preferences.groupByMuscleFamily ? (['group'] as const) : []),
-    ...(preferences.recentsOnTop ? (['recents'] as const) : []),
-  ];
+// One visible set of everyday controls on all three personal browsers.
+export function ExerciseListPreferenceControls({ preferences, onChangePreferences }: PreferenceControlsProps) {
   return (
     <View style={styles.controlsRoot}>
-      <Text allowFontScaling={false} accessibilityRole="header" style={styles.sectionLabel}>
-        Date range
-      </Text>
+      <Text allowFontScaling={false} accessibilityRole="header" style={styles.sectionLabel}>Sort</Text>
       <SegmentedControl
-        onChange={(dateRange) => onChangePreferences({ dateRange })}
-        options={EXERCISE_LIST_DATE_RANGE_OPTIONS.map((option) => ({
-          value: option.value,
-          label: option.label,
-          accessibilityLabel: `Date range ${option.label}`,
-        }))}
-        testIDPrefix="exercise-list-date-range"
-        value={preferences.dateRange}
+        onChange={(sort) => onChangePreferences({ sort })}
+        options={[{ value: 'favourite', label: 'Favourite' }, { value: 'name', label: 'Name A–Z' }]}
+        style={styles.preferenceControl}
+        testIDPrefix="exercise-list-sort"
+        value={preferences.sort}
       />
-
-      <Text allowFontScaling={false} accessibilityRole="header" style={styles.sectionLabel}>
-        List
-      </Text>
       <ChipGroup
         mode="multi"
-        onToggle={(option) =>
-          onChangePreferences(
-            option === 'group'
-              ? { groupByMuscleFamily: !preferences.groupByMuscleFamily }
-              : { recentsOnTop: !preferences.recentsOnTop }
-          )
-        }
-        options={[
-          {
-            value: 'group',
-            label: 'Group by muscle',
-            accessibilityLabel: preferences.groupByMuscleFamily ? 'Turn grouping off' : 'Turn grouping on',
-          },
-          {
-            value: 'recents',
-            label: 'Recents on top',
-            accessibilityLabel: preferences.recentsOnTop ? 'Turn recents on top off' : 'Turn recents on top on',
-          },
-        ]}
-        testIDPrefix="exercise-list-options"
-        values={listValues}
+        onToggle={() => onChangePreferences({ showNeverDone: !preferences.showNeverDone })}
+        options={[{ value: 'never-done', label: 'Show never-done' }]}
+        style={styles.visibilityControl}
+        testIDPrefix="exercise-list-visibility"
+        values={preferences.showNeverDone ? ['never-done'] : []}
       />
     </View>
   );
 }
 
 type ExerciseListContentProps = {
-  mode: 'grouped' | 'flat';
+  isSearching?: boolean;
+  historyStatus?: ExerciseCatalogStatsCacheStatus;
+  onRetryHistory?: () => void;
   items: ExerciseListItem[];
   sections: ExerciseListSection[];
   expandedFamilies: ReadonlySet<string>;
@@ -94,10 +60,11 @@ type ExerciseListContentProps = {
 };
 
 // The exercise list the catalogue, the session view's picker and the exercise
-// page's swap sheet share: hairline rows in one `Card` (flat), or one `Card` per
-// muscle family headed by a disclosure row (grouped).
+// page's swap sheet share: one Card per muscle family with a disclosure row.
 export function ExerciseListContent({
-  mode,
+  isSearching = false,
+  historyStatus = 'ready',
+  onRetryHistory,
   items,
   sections,
   expandedFamilies,
@@ -107,8 +74,12 @@ export function ExerciseListContent({
   getExerciseAccessibilityLabel,
   renderActions,
 }: ExerciseListContentProps) {
-  if (items.length === 0 && mode === 'flat') {
-    return <StatePanel body={emptyText} fill={false} />;
+  if (historyStatus === 'error') {
+    return <StatePanel body="Unable to load exercise history." fill={false} kind="error"
+      action={onRetryHistory ? { label: 'Retry', accessibilityLabel: 'Retry exercise history', onPress: onRetryHistory } : undefined} />;
+  }
+  if (historyStatus !== 'ready') {
+    return <StatePanel body="Loading exercise history…" fill={false} kind="loading" />;
   }
 
   const renderRow = (exercise: ExerciseListItem, index: number) => (
@@ -122,15 +93,12 @@ export function ExerciseListContent({
     />
   );
 
-  if (mode === 'flat') {
-    return <Card>{items.map(renderRow)}</Card>;
-  }
-
   return (
     <View style={styles.sections}>
+      {items.length === 0 ? <StatePanel body={emptyText} fill={false} /> : null}
       {sections.map((section) => {
-        const isExpanded = expandedFamilies.has(section.familyName);
         const empty = section.count === 0;
+        const isExpanded = !empty && (isSearching || expandedFamilies.has(section.familyName));
         return (
           <Card key={section.familyName}>
             <ListRow
@@ -141,7 +109,7 @@ export function ExerciseListContent({
               expanded={isExpanded}
               label={section.familyName}
               meta={<Text allowFontScaling={false} style={[styles.familyCount, empty ? styles.familyCountEmpty : null]}>{section.count}</Text>}
-              onPress={() => onToggleFamily(section.familyName)}
+              onPress={() => { if (!isSearching) onToggleFamily(section.familyName); }}
               testID={getFamilyGroupTestId(section.familyName)}
               trailing={
                 <Icon
@@ -178,6 +146,7 @@ const ExerciseListRow = memo(function ExerciseListRow({
 }: ExerciseListRowProps) {
   const deleted = Boolean(exercise.deletedAt);
   const accessibilityLabel = getAccessibilityLabel?.(exercise) ?? `Select exercise ${exercise.name}`;
+  const accessibilityHint = `${exercise.muscleSummary}. ${exercise.statsSummary}.`;
   const text = (
     <View style={styles.rowText}>
       <View style={styles.titleRow}>
@@ -210,7 +179,7 @@ const ExerciseListRow = memo(function ExerciseListRow({
   if (renderActions) {
     return (
       <ListRow density="list" divider={divider} trailing={renderActions(exercise)}>
-        <Pressable accessibilityLabel={accessibilityLabel} onPress={() => onPressExercise(exercise)}>
+        <Pressable accessibilityLabel={accessibilityLabel} accessibilityHint={accessibilityHint} accessibilityRole="button" onPress={() => onPressExercise(exercise)}>
           {text}
         </Pressable>
       </ListRow>
@@ -219,6 +188,7 @@ const ExerciseListRow = memo(function ExerciseListRow({
   return (
     <ListRow
       accessibilityLabel={accessibilityLabel}
+      accessibilityHint={accessibilityHint}
       density="list"
       divider={divider}
       onPress={() => onPressExercise(exercise)}>
@@ -234,6 +204,13 @@ function getFamilyGroupTestId(familyName: string): string {
 const styles = StyleSheet.create({
   controlsRoot: {
     gap: uiSpace.sm,
+  },
+  preferenceControl: {
+    minHeight: uiGeometry.tapTarget + uiBorder.width * 2,
+  },
+  visibilityControl: {
+    minHeight: uiGeometry.tapTarget,
+    flexWrap: 'nowrap',
   },
   sectionLabel: {
     fontFamily: uiFonts.display.family,
