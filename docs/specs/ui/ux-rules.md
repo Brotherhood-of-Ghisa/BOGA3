@@ -348,22 +348,32 @@ Document app-specific UI semantics and guardrails for the current mobile app.
 ### 9. UI guardrail enforcement (current enforced rules)
 
 Enforced by `apps/mobile/scripts/check-ui-guardrails.js`, which runs as the
-`ui-guardrails` lane of `boga test fast` and as a CI step. It scans
-`apps/mobile/app/**/*.tsx` and `apps/mobile/components/**/*.tsx`, excluding
-tests, snapshots and stories.
+`ui-guardrails` lane of `boga test fast` and as a CI step. The colour and
+ratchet rules scan `apps/mobile/app/**/*.tsx` and
+`apps/mobile/components/**/*.tsx`; the legacy-vocabulary rule scans wider
+(below). All exclude tests, snapshots and stories.
 
-**Zero-tolerance rule (blocks on sight):**
+**Zero-tolerance rules (block on sight):**
 
 1. Do not add raw color literals (`#hex`, `rgb(...)`, `rgba(...)`) directly in screen/component `.tsx` files.
 2. Use UI tokens from `apps/mobile/components/ui/tokens.ts` directly or through primitives in `apps/mobile/components/ui/`.
 3. Temporary exceptions require an explicit allowlist entry and rationale in `apps/mobile/scripts/ui-guardrails.config.js`.
 4. No file holds a raw-color allowlist exception (`allowlistedFiles` is empty for every rule).
 
+**Legacy-vocabulary rule (`legacyVocabulary`, blocks on sight):** the styling
+vocabulary retired on 2026-09-26 — `uiColors`, `uiRadius`, `uiElevation`,
+`UiText`, `UiSurface`, `UiButton`, `SegmentedChips`, their types, and
+`uiTokens.colors|radius|elevation` — fails the check as a whole word anywhere
+in `apps/mobile/{app,components,src}` (`.ts` and `.tsx`). It has no budget and
+no allowlist. Use `uiRoles`, `uiGeometry.radius` and `Card` / `Stat` /
+`ListRow` / `ActionButton` / `SegmentedControl` / `ChipGroup` instead. The
+identifier list lives in `ui-guardrails.config.js` and only grows.
+
 **Ratchet rules — all now at budget `0`:**
 
 5. `rawFontSize`, `rawSpacing` and `rawRadius` flag numeric literals for
    `fontSize`, the `padding`/`margin`/`gap` family, and the `borderRadius`
-   family. Use `uiTypography.size.*`, `uiSpace.*` and `uiRadius.*` instead.
+   family. Use `uiTypography.size.*`, `uiSpace.*` and `uiGeometry.radius.*` instead.
 6. Each carries a `budget` in `apps/mobile/scripts/ui-guardrails.config.js`.
    They started at 196 / 416 / 130 and reached **0**, so in practice all four
    rules are now zero-tolerance. The mechanism stays: the check fails when a
@@ -385,22 +395,18 @@ Guardrail commands (run from `apps/mobile/`):
 ### 9a. The token scales (current, enforced)
 
 Every value below is what `apps/mobile/components/ui/tokens.ts` holds, and the
-guardrail keeps screens on them.
+guardrail keeps screens on them. It is the app's one styling vocabulary
+(`ui/design-language.md`); every screen uses it:
 
-`tokens.ts` also exports **`uiRoles`** — the colour roles of
-`ui/design-language.md` §2, added 2026-09-22 for the exercise/session rebuild.
-It is a second, separate vocabulary from `uiColors`, deliberately not merged
-into it. Its users are the session view and exercise page (§14a/§14b), the
-Gyms screen and the completed-session detail (§7); the rules below still describe
-everything else that renders today. Likewise **`uiFonts`** (added 2026-09-22) names
-the three embedded typefaces of `ui/design-language.md` §3 and the weights of
-each that ship; only those screens use it, so every other screen still
-renders in the system font. And **`uiGeometry`** (added 2026-09-22) carries the design
-language's own radii (card 6, sheet 16), the 44pt tap target, the 38pt metric
-column, the sheet handle and micro-label tracking — a separate vocabulary from
-the legacy scales below, which it does not extend, so rule 5's three radii still
-hold for everything shipped. Its only consumers are the design-language
-primitives (`components-catalog.md` 6 and 6a) and those screens.
+- **`uiRoles`** — the colour roles of `ui/design-language.md` §2, including the
+  data-visualisation ramp `viz0`…`viz4`.
+- **`uiFonts`** — the three embedded typefaces of `ui/design-language.md` §3
+  and the weights of each that ship.
+- **`uiGeometry`** — the radii (`card 6 · sheet 16 · control 4 · pill 999`),
+  the 44pt tap target, the 38pt metric column, the sheet handle, the 50pt
+  labelled-field height and micro-label tracking (`ui/design-language.md` §4).
+- **`uiSpace`**, **`uiTypography`**, **`uiIconSize`** and **`uiBorder`** —
+  rules 1–4 below, and §9c.
 
 1. **Type: 8 sizes.**
    `xxs 10 · xs 11 · sm 12 · md 13 · base 14 · lg 16 · xl 18 · xxl 24`.
@@ -416,28 +422,28 @@ primitives (`components-catalog.md` 6 and 6a) and those screens.
    holds all eight rungs and their line-heights. Reasoning:
    `ui/design-language.md` §3.
 2. **Every size has a line-height**, in `uiTypography.lineHeight`, keyed to the
-   same names: `14 · 15 · 16 · 18 · 20 · 22 · 24 · 30`. `UiText`'s prose
-   variants apply them, so vertical rhythm no longer depends on the platform
-   font's own leading.
-3. **Uppercase is one role.** Reserve `textTransform: 'uppercase'` for
-   micro-labels — `xxs` (10) on the new surfaces, `xs` (11) on everything
-   shipped before 2026-09-22; do not apply it at other sizes.
+   same names: `14 · 15 · 16 · 18 · 20 · 22 · 24 · 30`. Text styles set the
+   pair together, so vertical rhythm does not depend on the platform font's own
+   leading.
+3. **Uppercase is two roles.** Reserve `textTransform: 'uppercase'` for
+   micro-labels (`xxs`, 10) and for control labels (Archivo 700 at `xs` or
+   `sm`: `ActionButton`, the exercise page's selector); do not apply it to
+   body or figure text.
 4. **Spacing: 6 steps.** `xs 4 · sm 8 · md 12 · lg 16 · xl 24 · xxl 32`. The
    old scale interleaved `2 / 10 / 14 / 20` with the 4/8/12/16 rhythm, which
    made every value on-scale and the scale non-constraining. The retired
    `xxs` (2) and `screen` (20) keys are gone — page gutters use `xl`. (Spacing
    has no `xxs`; the `xxs` in rule 1 is a *type* rung and a different scale.)
-5. **Radius: 3 values.** `sm 8` for controls, `md 12` for surfaces,
-   `full 999` for pills. Down from 10 distinct radii. If two radii sit side by
-   side and the difference cannot be named, there is only one radius.
-6. **No elevation.** `uiElevation` and `UiSurface`'s `elevation` prop were
-   deleted on 2026-09-24 with no user: depth is a hairline plus a ground change
-   (`ui/design-language.md` §4), and no screen draws a shadow.
+5. **Radius: 4 values**, in `uiGeometry.radius`: `card 6`, `sheet 16`,
+   `control 4`, `pill 999`. If two radii sit side by side and the difference
+   cannot be named, there is only one radius.
+6. **No elevation.** There is no elevation token: depth is a hairline plus a
+   ground change (`ui/design-language.md` §4), and no screen draws a shadow.
 
 7. **Fixed font sizes.** App-owned text and inputs do not follow the device's
    text-size setting (decided 2026-09-25). Every React Native `Text` and
    `TextInput` sets `allowFontScaling={false}` after any spread props;
-   `UiText`, `FormField` and `SearchField` enforce this for their callers.
+   `FormField` and `SearchField` enforce this for their callers.
    Existing fit-to-width behaviour is preserved. Native system dialogs remain
    OS-controlled. `app/__tests__/ui-font-scaling.test.tsx` guards coverage and
    prop precedence; the visual target is the existing default-size layout at
@@ -446,7 +452,7 @@ primitives (`components-catalog.md` 6 and 6a) and those screens.
 ### 9b. Appearance: light only
 
 1. The app ships **one light theme**. Dark mode is explicitly not a product
-   goal (decided 2026-09-19), and `uiColors` carries no dark variants.
+   goal (decided 2026-09-19), and `uiRoles` carries no dark variants.
 2. `app.config.ts` therefore pins `userInterfaceStyle: "light"`. It must not be
    set back to `"automatic"` while the tokens are single-theme: `"automatic"`
    hands the OS-owned chrome — `Alert.alert` dialogs, the keyboard, native
@@ -467,8 +473,8 @@ primitives (`components-catalog.md` 6 and 6a) and those screens.
    `Icon` inside it stays decorative. An icon never carries state alone: the
    certification marks sit beside words (`Certified by …`, `uncertified`) or
    inside a row whose accessibility label says them.
-3. Icon colour is a token (`uiColors` on shipped screens, `uiRoles` on
-   design-language surfaces; `ink` when omitted); size is a `uiIconSize` key.
+3. Icon colour is a `uiRoles` role (`ink` when omitted); size is a
+   `uiIconSize` key.
    An icon-only control is an `IconButton` (44pt, labelled).
 4. The set-state glyphs (`set-done` / `set-current` / `set-planned`) exist for
    design-language §5; the exercise page (§14a) is their first user.
@@ -757,6 +763,5 @@ unchanged. What differs is presentation:
 
 ## Pending / planned (not current behavior)
 
-1. Additional primitive extraction (for example state panels, modal surfaces, row cards, form fields) remains pending to reduce route-local style duplication beyond the token convergence completed in Task `T-20260226-06`.
-2. Additional primitives from the audit (for example `ScreenContainer`, `EmptyState`, `ModalSurface`) are candidates, not current required APIs.
-3. Temporary raw-color guardrail allowlist entries remain available only for future exceptional migrations; current route-screen exceptions were cleared in Task `T-20260226-06`.
+None. (The primitive extraction these items tracked shipped as `StatePanel`,
+`Sheet`, `ListRow`, `FormField` and `Screen`; `components-catalog.md`.)
