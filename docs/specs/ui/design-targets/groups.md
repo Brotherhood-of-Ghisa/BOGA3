@@ -78,15 +78,17 @@ No target screenshots are committed; runtime captures stay in the gitignored
 
 ## Leaderboards (DLM-T12)
 
-**Pending** the user's acceptance in the DLM-T12 gallery.
+**Accepted** by the user in the DLM-T12 gallery on 2026-09-26, with the
+session card's `1500 kg` (no separator) and `You` at Source Sans 600 (the
+face ships no 700) confirmed.
 
 ### Brief
 
 - **Podium cards** (the `Leaderboards` segment) are `Card` links: the exercise
-  in Archivo 700, an `Archived` `Tag` beside it, and the view
+  in Archivo 700, an `Archived` `Tag` beside it (centred on the name), and the view
   (`Certified · 1RM`) as a micro-label. Up to three rows follow behind
   `rule-soft` hairlines: rank, value and date in Plex Mono, the member in
-  Source Sans, and my row reading `You` in bold. The empty label and the
+  Source Sans, and my row reading `You` in Source Sans 600. The empty label and the
   `You: 5th` / `You: not ranked` line close the card.
 - **The full board.** The exercise is the native header title only.
   `Archived · read-only` sits in `ink-muted` beside `History`, a text button.
