@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import { TextInput, View } from 'react-native';
+import { StyleSheet, Text } from 'react-native';
 
-import { UiButton, UiSurface, UiText, uiColors } from '@/components/ui';
+import { ActionButton, Card, FormField, uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui';
 import { loadUserProfile, saveUsername } from '@/src/auth/profile';
 import { describeGroupWriteError, useGroupAction } from '@/src/groups';
 
-import { groupFormStyles } from './screen-styles';
 import { GroupWriteNotice } from './write-notice';
 
 export type UsernameGateStatus = 'checking' | 'required' | 'ready';
@@ -63,7 +62,11 @@ type UsernameGateProps = {
   onSaved: () => void;
 };
 
-/** The inline username field shown before create / join when the username is blank. */
+/**
+ * The inline username field shown before create / join when the username is
+ * blank: a `Card` with the reason, a `FormField` and `Save username`, the
+ * screen's one `accent`.
+ */
 export function UsernameGate({ userId, notice, onSaved }: UsernameGateProps) {
   const [username, setUsername] = useState('');
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -83,40 +86,60 @@ export function UsernameGate({ userId, notice, onSaved }: UsernameGateProps) {
   const fieldError = validationError ?? (save.error ? describeGroupWriteError(save.error) : null);
 
   return (
-    <UiSurface style={groupFormStyles.card} testID="group-username-gate">
-      <UiText variant="title">Choose a username</UiText>
-      <UiText variant="bodyMuted">Group members see you by your username. You can change it later in Profile.</UiText>
+    <Card style={styles.card} testID="group-username-gate">
+      <Text allowFontScaling={false} accessibilityRole="header" style={styles.title}>
+        Choose a username
+      </Text>
+      <Text allowFontScaling={false} style={styles.body}>
+        Group members see you by your username. You can change it later in Profile.
+      </Text>
       {notice ? <GroupWriteNotice message={notice} testID="group-username-gate-notice" tone="error" /> : null}
-      <View style={groupFormStyles.field}>
-        <UiText variant="subtitle">Username</UiText>
-        <TextInput
-          allowFontScaling={false}
-          accessibilityLabel="Username"
-          autoCapitalize="none"
-          autoCorrect={false}
-          editable={!save.pending}
-          onChangeText={setUsername}
-          onSubmitEditing={() => void onSave()}
-          placeholder="e.g. alex"
-          placeholderTextColor={uiColors.textDisabled}
-          returnKeyType="done"
-          style={groupFormStyles.input}
-          testID="group-username-input"
-          textContentType="username"
-          value={username}
-        />
-        {fieldError ? (
-          <UiText accessibilityRole="alert" style={groupFormStyles.fieldError} testID="group-username-error" variant="label">
-            {fieldError}
-          </UiText>
-        ) : null}
-      </View>
-      <UiButton
+      <FormField
+        accessibilityLabel="Username"
+        autoCapitalize="none"
+        autoCorrect={false}
+        editable={!save.pending}
+        error={fieldError}
+        errorTestID="group-username-error"
+        face="text"
+        label="Username"
+        onChangeText={setUsername}
+        onSubmitEditing={() => void onSave()}
+        placeholder="e.g. alex"
+        returnKeyType="done"
+        testID="group-username-input"
+        textContentType="username"
+        value={username}
+      />
+      <ActionButton
         disabled={save.pending}
         label={save.pending ? 'Saving…' : 'Save username'}
         onPress={() => void onSave()}
         testID="group-username-save"
+        variant="primary"
       />
-    </UiSurface>
+    </Card>
   );
 }
+
+const styles = StyleSheet.create({
+  card: {
+    padding: uiSpace.md,
+    gap: uiSpace.md,
+  },
+  title: {
+    fontFamily: uiFonts.display.family,
+    fontWeight: '700',
+    fontSize: uiTypography.size.lg,
+    lineHeight: uiTypography.lineHeight.lg,
+    color: uiRoles.ink,
+  },
+  body: {
+    marginTop: -uiSpace.sm,
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
+    fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
+    color: uiRoles.inkMuted,
+  },
+});

@@ -1,8 +1,9 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Alert, RefreshControl, ScrollView, View } from 'react-native';
+import { Alert, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import {
+  GroupHeaderCard,
   GroupInlineError,
   GroupLostAccessState,
   GroupMemberActionSheet,
@@ -15,7 +16,7 @@ import {
   pickInlineError,
   usePullToRefresh,
 } from '@/components/groups';
-import { UiButton, UiSurface, UiText, uiSpace } from '@/components/ui';
+import { ActionButton, Card, uiFonts, uiRoles, uiTypography } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import {
   OWNER_LEAVE_NOTICE,
@@ -61,8 +62,9 @@ const runMemberWrite = (groupId: string, action: GroupMemberAction, userId: stri
 
 /**
  * The Members screen (product D14; groups contract §6.3), opened from the
- * group header's member count: members in server order, the per-member action
- * sheet (§4.3 role matrix), and Leave (or the owner's transfer notice).
+ * group header's member count: the header card, members in server order as
+ * one `Card` of rows, the per-member action sheet (§4.3 role matrix), and Leave
+ * (an outline in `danger`) or the owner's transfer notice.
  */
 export default function GroupMembersRoute() {
   const { isConfigured, user } = useAuth();
@@ -170,19 +172,19 @@ function GroupMembersContent({ userId, groupId }: { userId: string; groupId: str
       refreshControl={refreshControl}
       style={groupScreenStyles.screen}
       testID="group-members-screen">
-      <View style={{ gap: uiSpace.xs }}>
-        <UiText variant="title">{summary.name}</UiText>
-        <UiText testID="group-members-meta" variant="subtitle">
-          {`${formatMemberCount(summary.member_count)} · ${formatMyRole(summary.my_role)}`}
-        </UiText>
-      </View>
+      <GroupHeaderCard
+        meta={`${formatMemberCount(summary.member_count)} · ${formatMyRole(summary.my_role)}`}
+        metaTestID="group-members-meta"
+        name={summary.name}
+      />
       {feedback ? <GroupWriteNotice message={feedback.message} testID="group-members-action-feedback" tone={feedback.tone} /> : null}
       {group.offline ? <GroupOfflineBanner lastUpdatedAtMs={group.lastUpdatedAtMs} /> : null}
       {inlineError ? <GroupInlineError error={inlineError} onRetry={onRefresh} testID="group-members-inline-error" /> : null}
-      <UiSurface style={{ paddingHorizontal: uiSpace.md }} testID="group-members-list">
+      <Card testID="group-members-list">
         {/* Server order: owner, admins, members, then username (contract §4.2). */}
-        {data.members.map((member) => (
+        {data.members.map((member, index) => (
           <GroupMemberRow
+            divider={index > 0}
             isMe={member.user_id === userId}
             key={member.user_id}
             member={member}
@@ -193,19 +195,20 @@ function GroupMembersContent({ userId, groupId }: { userId: string; groupId: str
             }
           />
         ))}
-      </UiSurface>
+      </Card>
       {canLeaveGroup(summary.my_role) ? (
-        <UiButton
+        <ActionButton
           disabled={leave.pending}
           label={leave.pending ? 'Leaving…' : 'Leave group'}
           onPress={confirmLeave}
           testID="group-members-leave-button"
-          variant="danger"
+          tone="danger"
+          variant="outline"
         />
       ) : (
-        <UiText testID="group-members-owner-leave-notice" variant="bodyMuted">
+        <Text allowFontScaling={false} style={styles.note} testID="group-members-owner-leave-notice">
           {`${OWNER_LEAVE_NOTICE}. Open a member to make them the owner.`}
-        </UiText>
+        </Text>
       )}
       <GroupMemberActionSheet
         actions={sheetActions}
@@ -216,3 +219,13 @@ function GroupMembersContent({ userId, groupId }: { userId: string; groupId: str
     </ScrollView>
   );
 }
+
+const styles = StyleSheet.create({
+  note: {
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
+    fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
+    color: uiRoles.inkMuted,
+  },
+});

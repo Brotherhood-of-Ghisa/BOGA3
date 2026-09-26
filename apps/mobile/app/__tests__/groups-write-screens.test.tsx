@@ -501,6 +501,9 @@ describe('Members screen: role-gated member actions and leave (flows 4–5)', ()
       .map((node) => (node.props.testID as string).replace('group-member-action-', ''));
 
   const openSheet = (userId: string) => fireEvent.press(screen.getByTestId(`group-member-row-${userId}`));
+  // No Cancel (G5, T13-D2): the backdrop dismisses the sheet.
+  const dismissSheet = () =>
+    fireEvent.press(screen.getByTestId('group-member-actions-sheet-backdrop', { includeHiddenElements: true }));
 
   it('owner: no Leave but the transfer notice; each other member offers exactly the §4.3 actions', async () => {
     await renderAs('owner');
@@ -509,10 +512,10 @@ describe('Members screen: role-gated member actions and leave (flows 4–5)', ()
 
     openSheet('u-admin');
     expect(sheetActions()).toEqual(['remove-admin', 'transfer-ownership', 'remove']);
-    fireEvent.press(screen.getByTestId('group-member-actions-cancel'));
+    dismissSheet();
     openSheet('u-member');
     expect(sheetActions()).toEqual(['make-admin', 'transfer-ownership', 'remove']);
-    fireEvent.press(screen.getByTestId('group-member-actions-cancel'));
+    dismissSheet();
     openSheet(USER_ID);
     expect(screen.queryByTestId('group-member-actions-sheet')).toBeNull();
   });
@@ -522,7 +525,7 @@ describe('Members screen: role-gated member actions and leave (flows 4–5)', ()
     expect(screen.getByTestId('group-members-leave-button')).toBeTruthy();
     openSheet('u-member');
     expect(sheetActions()).toEqual(['remove']);
-    fireEvent.press(screen.getByTestId('group-member-actions-cancel'));
+    dismissSheet();
     for (const userId of ['u-owner', USER_ID]) {
       openSheet(userId);
       expect(screen.queryByTestId('group-member-actions-sheet')).toBeNull();

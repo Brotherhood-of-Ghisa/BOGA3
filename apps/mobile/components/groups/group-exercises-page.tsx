@@ -6,7 +6,7 @@ import {
   ExerciseEditorModal,
   type ExerciseEditorSaveInput,
 } from '@/components/exercise-catalog/exercise-editor-modal';
-import { UiButton, UiSurface, uiSpace } from '@/components/ui';
+import { ActionButton, UiButton, UiSurface, uiSpace } from '@/components/ui';
 import type { ExerciseCatalogExercise } from '@/src/data/exercise-catalog';
 import { createExerciseWithGroupLink, linkExercise } from '@/src/data/exercise-group-links';
 import { LOAD_INPUT_MODE_LABELS } from '@/src/exercise-core';
@@ -203,10 +203,11 @@ export function GroupExercisesPage({
   const byId = new Map(exercises.data.exercises.map((exercise) => [exercise.group_exercise_id, exercise]));
   const rows = buildGroupExerciseRows(exercises.data.exercises, links.links);
   const addButton = canManage ? (
-    <UiButton
+    <ActionButton
       label="Add exercise"
       onPress={() => router.push(`/group/${groupId}/exercises/new`)}
       testID="group-exercises-add-button"
+      variant="outline"
     />
   ) : null;
   const sheetActions = sheetExercise ? groupExerciseActionsFor(myRole, sheetExercise) : [];

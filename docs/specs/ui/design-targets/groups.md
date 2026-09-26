@@ -132,3 +132,61 @@ Device: iPhone simulator at 390pt width, light. All from `groups-two-user-stream
 Jest only: the podium row with `You` in bold, the offline marker over loaded
 rows, the offline and error panels, the exercise-missing state, and the
 older-page footer.
+
+## Group management (DLM-T13)
+
+**Accepted** by the user in the DLM-T13 gallery on 2026-09-26.
+
+### Brief
+
+- **My groups.** `Join group` (outline) and `Create group` (the screen's one
+  `accent`) share a row. The groups are one `Card` of dense `ListRow`s behind
+  `rule-soft` hairlines: the name in Archivo 600, the description (two lines)
+  in `ink-muted`, `N members · You're the owner` as a micro-label, and a
+  `chevron-right`.
+- **The group screen.** A header `Card`: the name in Archivo 700, the
+  description in `ink-muted`, then a `Members` row with the count · role in
+  `ink-muted` and a chevron (it opens Members). For owners and admins `Invite`
+  is the screen's one `accent` beside an outline `Edit` (T13-D1). `Exercises`
+  is a section micro-label, and its `Add exercise` is an outline.
+- **Members.** The same header `Card` (name, count · role), the outcome
+  `Notice`s, then one `Card` of dense rows: the name (+ `(you)`), the role as a
+  `Tag`, and a chevron only on a row my role can act on (the control column
+  stays empty otherwise, so the tags align). `Leave group` is an outline in
+  `danger`; the owner reads the transfer note in `ink-muted` instead.
+- **The action sheets** (members, and the group exercises' sheet, which shares
+  `GroupActionSheet`) are `Sheet`s titled with the item, an `ink-muted`
+  subtitle (the member's role), then one `ListRow` per action, `danger` when
+  destructive. No Cancel: the backdrop dismisses them (G5, T13-D2). The native
+  confirmations after `Remove` / `Transfer` are unchanged.
+- **Invite.** A `Card`: the title in Archivo 700, the body in `ink-muted`, the
+  code in Plex Mono 700 at `xxl`, letter-spaced (T13-D3), and the link in
+  `ink-muted`. `Share invite` is the one `accent`; `Regenerate code` an outline
+  in `danger`. "New code ready…" is a neutral `Notice` with the `success`
+  glyph (G3).
+- **Forms.** The username gate is a `Card` with its reason, a `FormField` and
+  `Save username` (`accent`). Create / edit is two `FormField`s on the page,
+  the description's `n/280` counter in Plex Mono under it, a `danger` `Notice`
+  for the write's failure and the submit as the `accent`. Join is a Plex Mono
+  `Invite code` field and an outline `Find group`, then a preview `Card` whose
+  `Join group` is the `accent`.
+
+### States
+
+Device: iPhone simulator at 390pt width, light. All from `groups-two-user-stream`
+(`ios-groups-e2e`).
+
+| Screenshot | State |
+| --- | --- |
+| `groups-01-username-prompt` | the username gate before create |
+| `groups-02-group-created` | the group screen as owner: header card, `Invite` + `Edit`, Exercises empty with an outline `Add exercise` |
+| `groups-03-invite-code` | the invite: the code in Plex Mono, `Share invite`, `Regenerate code` |
+| `groups-mine-list` | My groups: the action row over one card of rows |
+| `groups-members-list` | Members as owner: header card, two rows with role `Tag`s, the transfer note |
+| `groups-member-actions-sheet` | the member action sheet: `Make admin`, `Transfer ownership` and `Remove from group` in `danger`, no Cancel |
+| `groups-members-removed` | Members after the removal: the neutral notice with the `success` glyph, one row |
+
+Jest only (no flow reaches them): Join (the counterparty joins by script), the
+empty create form, Edit, a regenerated code's notice, and the offline and
+error states of each screen. `groups-08` (the stream) and `groups-09` (a
+board) end the same flow but show no T13 screen.

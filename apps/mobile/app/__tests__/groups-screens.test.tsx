@@ -497,7 +497,7 @@ describe('Group screen', () => {
     const rows = screen.getAllByTestId(/^group-member-row-/).map((node) => node.props.testID as string);
     expect(rows).toEqual(['group-member-row-user-me', 'group-member-row-u-admin', 'group-member-row-friend-1', 'group-member-row-u-anon']);
     expect(screen.getByText('me (you)')).toBeTruthy();
-    expect(screen.getByTestId('group-member-role-u-admin').props.children).toBe('Admin');
+    expect(screen.getByTestId('group-member-role-u-admin')).toHaveTextContent('Admin');
     expect(screen.getByText('Unnamed member')).toBeTruthy();
   });
 

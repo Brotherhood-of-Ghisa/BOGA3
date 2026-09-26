@@ -1,9 +1,10 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback } from 'react';
-import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import {
   GroupExercisesPage,
+  GroupHeaderCard,
   GroupInlineError,
   GroupLostAccessState,
   GroupMissingDataState,
@@ -13,7 +14,16 @@ import {
   pickInlineError,
   usePullToRefresh,
 } from '@/components/groups';
-import { Icon, UiButton, UiText, uiColors, uiSpace } from '@/components/ui';
+import {
+  ActionButton,
+  Icon,
+  ListRow,
+  uiFonts,
+  uiGeometry,
+  uiRoles,
+  uiSpace,
+  uiTypography,
+} from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import {
   canManageGroup,
@@ -32,9 +42,10 @@ const firstParam = (value: string | string[] | undefined): string | null =>
 
 /**
  * The group screen (groups contract §6.3; product D10, D14), for managing the
- * group: header with the role-gated Invite / Edit actions and the member
- * count, which opens the Members screen; then the group's Exercises. The
- * stream and leaderboards live on the Groups screen.
+ * group: the header card with the member count, which opens the Members
+ * screen; the role-gated Invite (the screen's one `accent`, T13-D1) and Edit;
+ * then the group's Exercises. The stream and leaderboards live on the Groups
+ * screen.
  */
 export default function GroupScreenRoute() {
   const { isConfigured, user } = useAuth();
@@ -106,48 +117,49 @@ function GroupScreenContent({ userId, groupId }: { userId: string; groupId: stri
   const header = (
     <View style={groupScreenStyles.header}>
       <Stack.Screen options={{ title: summary.name }} />
-      <View style={{ gap: uiSpace.xs }} testID="group-screen-header">
-        <UiText testID="group-screen-name" variant="title">
-          {summary.name}
-        </UiText>
-        {summary.description ? <UiText variant="bodyMuted">{summary.description}</UiText> : null}
+      <GroupHeaderCard description={summary.description} name={summary.name} nameTestID="group-screen-name" testID="group-screen-header">
         {/* D14: members live behind the member count. */}
-        <Pressable
+        <ListRow
           accessibilityHint="Opens the member list"
           accessibilityLabel={`Members, ${memberLine}`}
-          accessibilityRole="button"
+          density="list"
+          label="Members"
+          meta={
+            <Text allowFontScaling={false} numberOfLines={1} style={styles.memberLine} testID="group-screen-meta">
+              {memberLine}
+            </Text>
+          }
           onPress={() => router.push(`/group/${groupId}/members`)}
-          style={styles.membersLink}
-          testID="group-screen-members-link">
-          <UiText testID="group-screen-meta" variant="subtitle">
-            {memberLine}
-          </UiText>
-          <Icon color={uiColors.textSecondary} name="chevron-right" />
-        </Pressable>
-        {canManageGroup(summary.my_role) ? (
-          <View style={[groupScreenStyles.actionRow, { marginTop: uiSpace.sm }]}>
-            {/* Invite is the prominent action for owners and admins (C3.3.2); members never see it (C7.4). */}
-            <UiButton
+          testID="group-screen-members-link"
+          trailing={<Icon color={uiRoles.inkMuted} name="chevron-right" />}
+        />
+      </GroupHeaderCard>
+      {canManageGroup(summary.my_role) ? (
+        <View style={groupScreenStyles.actionRow}>
+          {/* Invite is the prominent action for owners and admins (C3.3.2); members never see it (C7.4). */}
+          <View style={groupScreenStyles.actionRowItem}>
+            <ActionButton
               label="Invite"
               onPress={() => router.push(`/group/${groupId}/invite`)}
-              style={groupScreenStyles.actionRowItem}
               testID="group-screen-invite-button"
-            />
-            <UiButton
-              label="Edit"
-              onPress={() => router.push(`/group/${groupId}/edit`)}
-              style={groupScreenStyles.actionRowItem}
-              testID="group-screen-edit-button"
-              variant="secondary"
+              variant="primary"
             />
           </View>
-        ) : null}
-      </View>
+          <View style={groupScreenStyles.actionRowItem}>
+            <ActionButton
+              label="Edit"
+              onPress={() => router.push(`/group/${groupId}/edit`)}
+              testID="group-screen-edit-button"
+              variant="outline"
+            />
+          </View>
+        </View>
+      ) : null}
       {offline ? <GroupOfflineBanner lastUpdatedAtMs={lastUpdatedAtMs} /> : null}
       {inlineError ? <GroupInlineError error={inlineError} onRetry={onRefresh} testID="group-screen-inline-error" /> : null}
-      <UiText accessibilityRole="header" testID="group-screen-exercises-title" variant="title">
+      <Text allowFontScaling={false} accessibilityRole="header" style={styles.sectionLabel} testID="group-screen-exercises-title">
         Exercises
-      </UiText>
+      </Text>
     </View>
   );
 
@@ -173,11 +185,23 @@ function GroupScreenContent({ userId, groupId }: { userId: string; groupId: stri
 }
 
 const styles = StyleSheet.create({
-  membersLink: {
-    minHeight: 44,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiSpace.xs,
-    alignSelf: 'flex-start',
+  memberLine: {
+    flexShrink: 1,
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
+    fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
+    color: uiRoles.inkMuted,
+  },
+  // A section micro-label, spaced from the header above it.
+  sectionLabel: {
+    marginTop: uiSpace.sm,
+    fontFamily: uiFonts.display.family,
+    fontWeight: '700',
+    fontSize: uiTypography.size.xxs,
+    lineHeight: uiTypography.lineHeight.xxs,
+    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
+    textTransform: 'uppercase',
+    color: uiRoles.inkMuted,
   },
 });
