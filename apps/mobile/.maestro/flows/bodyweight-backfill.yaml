@@ -285,11 +285,11 @@ appId: com.dinoderek.mobile
       id: "bodyweight-backfill-result"
     timeout: 30000
 - takeScreenshot: "BWF03-partial-selection-result"
-- scrollUntilVisible:
-    element:
+# The compact result already shows Done. A centering swipe can begin on its
+# backdrop and dismiss the native sheet before the intended tap.
+- extendedWaitUntil:
+    visible:
       id: "bodyweight-backfill-done"
-    direction: DOWN
-    centerElement: true
     timeout: 20000
 - waitForAnimationToEnd:
     timeout: 4000
@@ -383,11 +383,11 @@ appId: com.dinoderek.mobile
     visible:
       id: "bodyweight-backfill-result"
     timeout: 30000
-- scrollUntilVisible:
-    element:
+# The compact result already shows Done. A centering swipe can begin on its
+# backdrop and dismiss the native sheet before the intended tap.
+- extendedWaitUntil:
+    visible:
       id: "bodyweight-backfill-done"
-    direction: DOWN
-    centerElement: true
     timeout: 20000
 - waitForAnimationToEnd:
     timeout: 4000
