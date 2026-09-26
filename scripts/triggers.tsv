@@ -88,6 +88,8 @@ scripts/triggers.tsv	docs-check,meta-tests	trigger registry
 scripts/gen-docs.sh	docs-check,meta-tests	docs generator/checker
 scripts/test-for.sh	meta-tests	trigger matcher
 scripts/full-sweep.sh	meta-tests	full sweep (full-sweep meta-test)
+scripts/lane-timing.sh	meta-tests	lane-timing recorder (lane-timing meta-test)
+scripts/test-timings.sh	meta-tests	timings reader / import (lane-timing meta-test)
 scripts/pr-check.sh	meta-tests	PR Tests-table checker
 scripts/worktree-*	meta-tests	worktree lifecycle scripts (lifecycle meta-test)
 scripts/worktree-lib.sh	fast,backend,frontend	slot-lease / placement guard sourced by every runtime entrypoint

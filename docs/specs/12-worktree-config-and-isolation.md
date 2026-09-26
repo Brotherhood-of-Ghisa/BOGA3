@@ -49,7 +49,7 @@ excludes — the layout is the bug.
 
 | Tier | Location | Lifecycle | Contents |
 | --- | --- | --- | --- |
-| Machine-global | `~/.config/boga/` | Seeded once per machine by `scripts/boga-config-init.sh` (run by `start`) | Hosted Supabase credentials, optional Supabase CLI version override, shared Edge Function identity defaults, slot registry |
+| Machine-global | `~/.config/boga/` | Seeded once per machine by `scripts/boga-config-init.sh` (run by `start`) | Hosted Supabase credentials, optional Supabase CLI version override, shared Edge Function identity defaults, slot registry, lane-timing store, sweep logs |
 | Per-worktree | Gitignored files inside each worktree | Written by `./boga worktree start` | `.worktree-slot`, `supabase/config.toml`, `apps/mobile/.env.local`, `apps/mobile/.maestro/maestro.env.local` |
 | Checked-in | Tracked in git | Committed | `supabase/config.toml.template`, example env files, lifecycle scripts |
 
@@ -64,6 +64,10 @@ excludes — the layout is the bug.
     slots/
       <slot>                 # the lease: slot, project_id, path, common_git_dir, updated_at
     slot-allocation.lock/    # held only while `start` picks a slot
+  timings/
+    records/                 # one JSON per `./boga test` lane run, from every worktree (scripts/lane-timing.sh)
+  sweep/
+    <utc>/                   # `./boga sweep` per-lane logs + summary.txt
 ```
 
 | Worktree path | Backing target | Notes |
