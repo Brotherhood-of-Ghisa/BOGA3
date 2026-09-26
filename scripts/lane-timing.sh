@@ -2,11 +2,14 @@
 
 # Lane-timing recorder — sourced by the quality gate wrappers.
 #
-# Every lane run is timed and written as ONE NEW JSON FILE under
-# docs/testing/timings/records/ (append-only: parallel agents, parallel
-# worktrees, and branch merges can never conflict because no file is ever
-# edited). The reader is ./scripts/test-timings.sh — cite IT for durations,
-# never an estimate.
+# Every lane run is timed and written as ONE NEW JSON FILE in this machine's
+# timing store, $(boga_config_root)/timings/records/ (~/.config/boga by
+# default; BOGA_TIMINGS_DIR overrides). The store is machine-global, OUTSIDE
+# any worktree: every worktree, the sweep worktree, and the main checkout
+# write to and read from the same place, and releasing a worktree loses
+# nothing. Append-only: parallel lanes never edit a file, so they can never
+# conflict. The reader is ./scripts/test-timings.sh (`./boga timings`) — cite
+# IT for durations, never an estimate.
 #
 # Contract:
 #   - recording must NEVER fail or slow a lane: every recording error is
@@ -19,6 +22,15 @@
 # Usage (from a gate wrapper that has REPO_ROOT set):
 #   source "${REPO_ROOT}/scripts/lane-timing.sh"
 #   boga_time_lane <lane-name> <command> [args...]
+
+# The machine's timing store.
+boga_timing_records_dir() {
+  if [[ -n "${BOGA_TIMINGS_DIR:-}" ]]; then
+    printf '%s\n' "${BOGA_TIMINGS_DIR}"
+  else
+    printf '%s\n' "${BOGA_CONFIG_ROOT:-$HOME/.config/boga}/timings/records"
+  fi
+}
 
 boga_timing_now_ms() {
   perl -MTime::HiRes=time -e 'printf("%d", time()*1000)' 2>/dev/null \
@@ -47,13 +59,27 @@ boga_timing_machine_fields() {
   printf '%s|%s|%s' "${hw}" "${cores}" "${os}"
 }
 
+# The OS name without its version ("macOS 27.0" -> "macOS", "Ubuntu 24.04.4
+# LTS" -> "Ubuntu"): an OS update must not orphan a machine's history.
+boga_timing_os_family() {
+  printf '%s' "${1%% *}"
+}
+
+# The machine fingerprint: sha1 of "hw|cores|os-family", first 8 chars.
+# scripts/test-timings.sh matches records on those same fields (keep the two
+# in sync), not on the stored machine_id, so records written under an older
+# fingerprint (which hashed the full OS version) still count as this machine's.
 boga_timing_machine_id() {
-  local fields
+  local fields hw cores os key
   fields="$(boga_timing_machine_fields)"
+  hw="${fields%%|*}"
+  cores="$(printf '%s' "${fields}" | cut -d'|' -f2)"
+  os="${fields##*|}"
+  key="${hw}|${cores}|$(boga_timing_os_family "${os}")"
   if command -v shasum >/dev/null 2>&1; then
-    printf '%s' "${fields}" | shasum -a 1 | cut -c1-8
+    printf '%s' "${key}" | shasum -a 1 | cut -c1-8
   elif command -v sha1sum >/dev/null 2>&1; then
-    printf '%s' "${fields}" | sha1sum | cut -c1-8
+    printf '%s' "${key}" | sha1sum | cut -c1-8
   else
     printf 'nohash00'
   fi
@@ -66,8 +92,8 @@ boga_record_lane_timing() {
     set +e
     local lane="$1" wall_ms="$2" exit_code="$3"
     local root="${REPO_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null)}"
-    [[ -n "${root}" && -d "${root}" ]] || exit 0
-    local dir="${root}/docs/testing/timings/records"
+    local dir
+    dir="$(boga_timing_records_dir)"
     mkdir -p "${dir}" 2>/dev/null || exit 0
 
     local fields hw cores os machine_id slot commit stamp safe_lane

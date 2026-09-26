@@ -4,7 +4,8 @@
 #
 # Runnable from anywhere inside the repo; it resolves its own root. Lanes are
 # defined in scripts/lanes.tsv (the lane registry); every lane run is timed and
-# recorded under docs/testing/timings/records/ (read back with `boga timings`).
+# recorded in this machine's store, ~/.config/boga/timings/records/ (read back
+# with `boga timings`).
 #
 #   boga test fast|backend|frontend|slow|all   # gate aggregates
 #   boga test frontend-ui                      # frontend minus the Supabase-backed e2e lanes
@@ -19,6 +20,7 @@
 #   boga android doctor|run|start              # verify Android environment or run dev client
 #   boga docs gen|check                        # (re)generate / drift-check derived doc blocks
 #   boga timings [lane]                        # measured durations (never guess)
+#   boga timings import <dir>...|--git <ref>   # copy records into this machine's store
 #   boga worktree create|start|ls|release|doctor   # agent-owned lifecycle (spec 01)
 #   boga db up|down|reset|baseline             # this slot's stack (gates)
 #   boga db dev|dev-up|dev-down|dev-reset       # dedicated dev stack (BOGA-dev), isolated from gates
