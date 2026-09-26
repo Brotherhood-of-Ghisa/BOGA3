@@ -1,7 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { Icon, UiButton, UiText, uiBorder, uiColors, uiRadius, uiSpace } from '@/components/ui';
+import {
+  ActionButton,
+  Icon,
+  ListRow,
+  Notice,
+  SearchField,
+  Sheet,
+  uiFonts,
+  uiRoles,
+  uiSpace,
+  uiTypography,
+} from '@/components/ui';
 import {
   buildPickSheetModel,
   describeLinkRetroactivity,
@@ -11,8 +22,6 @@ import {
   type LinkRef,
   type LinkableExercise,
 } from '@/src/groups';
-
-import { groupFormStyles } from './screen-styles';
 
 export type GroupExercisePickTarget = {
   groupId: string;
@@ -52,7 +61,8 @@ type GroupExercisePickSheetProps = {
  * The pick sheet (M25-T07; product E0.2): picking an unlinked group exercise
  * while logging asks which of my exercises it is — the suggestion, another of
  * my live exercises, or a new one — then links (a local write, so it works
- * offline) and adds my exercise to the session. An in-route `Modal`.
+ * offline) and adds my exercise to the session. A `Sheet` with no Cancel
+ * (G5): the backdrop dismisses it. Its confirm is the sheet's one `accent`.
  *
  * `purpose="link-only"` (M25-T08; product E0.4, the group page's "Link your
  * exercise") confirms with `Link`: the caller only links, and nothing is added
@@ -120,205 +130,219 @@ export function GroupExercisePickSheet(props: GroupExercisePickSheetProps) {
   };
 
   return (
-    <Modal animationType="slide" onRequestClose={onRequestClose} transparent visible>
-      <View style={styles.root}>
-        <Pressable accessibilityLabel="Dismiss group exercise pick sheet" onPress={onRequestClose} style={styles.scrim} />
-        <View style={styles.card} testID="group-pick-sheet">
-          <UiText accessibilityRole="header" numberOfLines={2} variant="title">
-            {title}
-          </UiText>
-          {target.mode === 'choose-linked' ? (
-            <>
-              <UiText variant="bodyMuted">Which of your linked exercises?</UiText>
-              <ScrollView contentContainerStyle={styles.list} keyboardShouldPersistTaps="handled">
-                {target.linkedExercises.map((exercise) => (
-                  <UiButton
-                    key={exercise.id}
-                    label={exercise.name}
-                    onPress={() => {
-                      if (props.purpose !== 'link-only') props.onAddExercise(exercise);
-                    }}
-                    testID={`group-pick-sheet-linked-${exercise.id}`}
-                    variant="secondary"
-                  />
-                ))}
-              </ScrollView>
-            </>
-          ) : (
-            <>
-              <UiText variant="bodyMuted">Which of your exercises is this?</UiText>
-              <ScrollView contentContainerStyle={styles.list} keyboardShouldPersistTaps="handled">
-                {model?.suggestion ? (
-                  <RadioRow
-                    checked={option.kind === 'suggested'}
-                    detail="your exercise · suggested"
-                    label={model.suggestion.name}
-                    onPress={() => setOption({ kind: 'suggested' })}
-                    testID="group-pick-sheet-option-suggested"
-                  />
-                ) : null}
-                <RadioRow
-                  checked={option.kind === 'other'}
-                  label="Choose another of your exercises…"
-                  onPress={() => setOption({ kind: 'other', exerciseId: null })}
-                  testID="group-pick-sheet-option-other"
-                />
-                {option.kind === 'other' && model ? (
-                  <View style={styles.otherList}>
-                    <TextInput
-                      allowFontScaling={false}
-                      accessibilityLabel="Search your exercises"
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      onChangeText={setSearch}
-                      placeholder="Search your exercises"
-                      style={groupFormStyles.input}
-                      testID="group-pick-sheet-search"
-                      value={search}
-                    />
-                    {filterPickSheetChoices(model.choices, search).map(({ exercise, unavailableReason }) => (
-                      <Pressable
-                        accessibilityLabel={
-                          unavailableReason ? `${exercise.name}, ${unavailableReason}` : `Choose ${exercise.name}`
-                        }
-                        accessibilityRole="radio"
-                        accessibilityState={{
-                          checked: option.exerciseId === exercise.id,
-                          disabled: unavailableReason !== null,
-                        }}
-                        disabled={unavailableReason !== null}
-                        key={exercise.id}
-                        onPress={() => setOption({ kind: 'other', exerciseId: exercise.id })}
-                        style={[styles.choice, option.exerciseId === exercise.id ? styles.choiceSelected : null]}
-                        testID={`group-pick-sheet-choice-${exercise.id}`}>
-                        <UiText style={unavailableReason ? styles.disabledText : undefined}>{exercise.name}</UiText>
-                        {unavailableReason ? <UiText variant="bodyMuted">{unavailableReason}</UiText> : null}
-                      </Pressable>
-                    ))}
-                  </View>
-                ) : null}
-                <RadioRow
-                  checked={option.kind === 'add-new'}
-                  label={`Add "${target.groupExercise.name}" as a new exercise`}
-                  onPress={() => setOption({ kind: 'add-new' })}
-                  testID="group-pick-sheet-option-add-new"
-                />
-              </ScrollView>
-              {chosen ? (
-                <UiText testID="group-pick-sheet-retroactivity" variant="bodyMuted">
-                  {describeLinkRetroactivity(chosen.name, target.groupName)}
-                </UiText>
-              ) : null}
-              {loadModeNote ? (
-                <UiText testID="group-pick-sheet-load-mode-note" variant="bodyMuted">
-                  {loadModeNote}
-                </UiText>
-              ) : null}
-              {error ? (
-                <UiText accessibilityRole="alert" style={styles.error} testID="group-pick-sheet-error">
-                  {error}
-                </UiText>
-              ) : null}
-              <UiButton
-                disabled={pending || (option.kind !== 'add-new' && !chosen)}
-                label={option.kind === 'add-new' ? 'Create exercise…' : purpose === 'link-only' ? 'Link' : 'Link and add'}
-                onPress={() => void confirm()}
-                testID="group-pick-sheet-confirm"
+    <Sheet
+      dismissLabel="Dismiss group exercise pick sheet"
+      keyboardAvoiding
+      onDismiss={onRequestClose}
+      testID="group-pick-sheet"
+      title={title}
+      visible>
+      {target.mode === 'choose-linked' ? (
+        <>
+          <Text allowFontScaling={false} style={[styles.note, styles.prompt]}>Which of your linked exercises?</Text>
+          <ScrollView keyboardShouldPersistTaps="handled" style={styles.list}>
+            {target.linkedExercises.map((exercise, index) => (
+              <ListRow
+                divider={index > 0}
+                key={exercise.id}
+                label={exercise.name}
+                onPress={() => {
+                  if (props.purpose !== 'link-only') props.onAddExercise(exercise);
+                }}
+                testID={`group-pick-sheet-linked-${exercise.id}`}
               />
-            </>
-          )}
-          <UiButton label="Cancel" onPress={onRequestClose} testID="group-pick-sheet-cancel" variant="secondary" />
-        </View>
-      </View>
-    </Modal>
+            ))}
+          </ScrollView>
+        </>
+      ) : (
+        <>
+          <Text allowFontScaling={false} style={[styles.note, styles.prompt]}>Which of your exercises is this?</Text>
+          <ScrollView keyboardShouldPersistTaps="handled" style={styles.list}>
+            {model?.suggestion ? (
+              <RadioRow
+                checked={option.kind === 'suggested'}
+                detail="your exercise · suggested"
+                divider={false}
+                label={model.suggestion.name}
+                onPress={() => setOption({ kind: 'suggested' })}
+                testID="group-pick-sheet-option-suggested"
+              />
+            ) : null}
+            <RadioRow
+              checked={option.kind === 'other'}
+              divider={Boolean(model?.suggestion)}
+              label="Choose another of your exercises…"
+              onPress={() => setOption({ kind: 'other', exerciseId: null })}
+              testID="group-pick-sheet-option-other"
+            />
+            {option.kind === 'other' && model ? (
+              <View style={styles.otherList}>
+                <View style={styles.search}>
+                  <SearchField
+                    accessibilityLabel="Search your exercises"
+                    autoCapitalize="none"
+                    onChangeText={setSearch}
+                    placeholder="Search your exercises"
+                    testID="group-pick-sheet-search"
+                    value={search}
+                  />
+                </View>
+                {filterPickSheetChoices(model.choices, search).map(({ exercise, unavailableReason }) => (
+                  <ListRow
+                    accessibilityLabel={
+                      unavailableReason ? `${exercise.name}, ${unavailableReason}` : `Choose ${exercise.name}`
+                    }
+                    checked={option.exerciseId === exercise.id}
+                    density="list"
+                    disabled={unavailableReason !== null}
+                    key={exercise.id}
+                    leading={<RadioGlyph checked={option.exerciseId === exercise.id} faint={unavailableReason !== null} />}
+                    onPress={() => setOption({ kind: 'other', exerciseId: exercise.id })}
+                    testID={`group-pick-sheet-choice-${exercise.id}`}>
+                    <View style={styles.choiceText}>
+                      <Text allowFontScaling={false} style={[styles.choiceName, unavailableReason ? styles.faint : null]}>
+                        {exercise.name}
+                      </Text>
+                      {unavailableReason ? (
+                        <Text allowFontScaling={false} style={[styles.detail, styles.faint]}>
+                          {unavailableReason}
+                        </Text>
+                      ) : null}
+                    </View>
+                  </ListRow>
+                ))}
+              </View>
+            ) : null}
+            <RadioRow
+              checked={option.kind === 'add-new'}
+              divider
+              label={`Add "${target.groupExercise.name}" as a new exercise`}
+              onPress={() => setOption({ kind: 'add-new' })}
+              testID="group-pick-sheet-option-add-new"
+            />
+          </ScrollView>
+          <View style={styles.footer}>
+            {chosen ? (
+              <Text allowFontScaling={false} style={styles.note} testID="group-pick-sheet-retroactivity">
+                {describeLinkRetroactivity(chosen.name, target.groupName)}
+              </Text>
+            ) : null}
+            {loadModeNote ? (
+              <Text allowFontScaling={false} style={styles.note} testID="group-pick-sheet-load-mode-note">
+                {loadModeNote}
+              </Text>
+            ) : null}
+            {error ? <Notice message={error} testID="group-pick-sheet-error" tone="danger" /> : null}
+            {/* The sheet's one `accent` (G6, T14-D3). */}
+            <ActionButton
+              disabled={pending || (option.kind !== 'add-new' && !chosen)}
+              label={option.kind === 'add-new' ? 'Create exercise…' : purpose === 'link-only' ? 'Link' : 'Link and add'}
+              onPress={() => void confirm()}
+              testID="group-pick-sheet-confirm"
+              variant="primary"
+            />
+          </View>
+        </>
+      )}
+    </Sheet>
   );
+}
+
+function RadioGlyph({ checked, faint = false }: { checked: boolean; faint?: boolean }) {
+  return <Icon color={faint ? uiRoles.inkFaint : uiRoles.ink} name={checked ? 'radio-on' : 'radio-off'} />;
 }
 
 function RadioRow({
   checked,
   label,
   detail,
+  divider,
   onPress,
   testID,
 }: {
   checked: boolean;
   label: string;
   detail?: string;
+  divider: boolean;
   onPress: () => void;
   testID: string;
 }) {
   return (
-    <Pressable
+    <ListRow
       accessibilityLabel={detail ? `${label}, ${detail}` : label}
-      accessibilityRole="radio"
-      accessibilityState={{ checked }}
+      checked={checked}
+      divider={divider}
+      leading={<RadioGlyph checked={checked} />}
       onPress={onPress}
-      style={[styles.choice, checked ? styles.choiceSelected : null]}
       testID={testID}>
-      <View style={styles.choiceRow}>
-        <Icon
-          color={checked ? uiColors.actionPrimary : uiColors.textSecondary}
-          name={checked ? 'radio-on' : 'radio-off'}
-          size="sm"
-        />
-        <View style={styles.choiceCopy}>
-          <UiText>{label}</UiText>
-          {detail ? <UiText variant="bodyMuted">{detail}</UiText> : null}
-        </View>
+      <View style={styles.choiceText}>
+        <Text allowFontScaling={false} style={styles.optionLabel}>
+          {label}
+        </Text>
+        {detail ? (
+          <Text allowFontScaling={false} style={styles.detail}>
+            {detail}
+          </Text>
+        ) : null}
       </View>
-    </Pressable>
+    </ListRow>
   );
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  scrim: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: uiColors.overlayScrim,
-  },
-  card: {
-    maxHeight: '85%',
-    gap: uiSpace.md,
-    borderTopLeftRadius: uiRadius.md,
-    borderTopRightRadius: uiRadius.md,
-    backgroundColor: uiColors.surfaceDefault,
-    padding: uiSpace.xl,
+  prompt: {
+    paddingHorizontal: uiSpace.lg,
+    paddingBottom: uiSpace.sm,
   },
   list: {
-    gap: uiSpace.sm,
+    flexShrink: 1,
   },
+  // The choices sit under "Choose another…", indented to its label.
   otherList: {
-    gap: uiSpace.xs,
-    paddingLeft: uiSpace.md,
+    paddingLeft: uiSpace.xl,
+    paddingRight: uiSpace.lg,
+    paddingBottom: uiSpace.sm,
   },
-  choice: {
-    minHeight: 44,
-    justifyContent: 'center',
-    borderWidth: uiBorder.width,
-    borderColor: uiColors.borderMuted,
-    borderRadius: uiRadius.md,
-    paddingHorizontal: uiSpace.md,
+  search: {
     paddingVertical: uiSpace.sm,
   },
-  choiceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  choiceText: {
+    paddingVertical: uiSpace.sm,
+  },
+  optionLabel: {
+    fontFamily: uiFonts.display.family,
+    fontWeight: '600',
+    fontSize: uiTypography.size.lg,
+    lineHeight: uiTypography.lineHeight.lg,
+    color: uiRoles.ink,
+  },
+  choiceName: {
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
+    fontSize: uiTypography.size.lg,
+    lineHeight: uiTypography.lineHeight.lg,
+    color: uiRoles.ink,
+  },
+  detail: {
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
+    fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
+    color: uiRoles.inkMuted,
+  },
+  faint: {
+    color: uiRoles.inkFaint,
+  },
+  footer: {
     gap: uiSpace.sm,
+    paddingHorizontal: uiSpace.lg,
+    paddingTop: uiSpace.md,
   },
-  choiceCopy: {
-    flex: 1,
-  },
-  choiceSelected: {
-    borderColor: uiColors.rowActiveBorder,
-    backgroundColor: uiColors.rowActiveBackground,
-  },
-  disabledText: {
-    color: uiColors.textDisabled,
-  },
-  error: {
-    color: uiColors.actionDangerText,
+  note: {
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
+    fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
+    color: uiRoles.inkMuted,
   },
 });

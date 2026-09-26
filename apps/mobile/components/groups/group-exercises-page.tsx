@@ -1,12 +1,21 @@
 import { useRouter } from 'expo-router';
 import { useMemo, useRef, useState } from 'react';
-import { AccessibilityInfo, Alert, findNodeHandle, View } from 'react-native';
+import { AccessibilityInfo, Alert, findNodeHandle, StyleSheet, Text, View } from 'react-native';
 
 import {
   ExerciseEditorModal,
   type ExerciseEditorSaveInput,
 } from '@/components/exercise-catalog/exercise-editor-modal';
-import { ActionButton, UiButton, UiSurface, uiSpace } from '@/components/ui';
+import {
+  ActionButton,
+  Card,
+  Notice,
+  uiFonts,
+  uiGeometry,
+  uiRoles,
+  uiSpace,
+  uiTypography,
+} from '@/components/ui';
 import type { ExerciseCatalogExercise } from '@/src/data/exercise-catalog';
 import { createExerciseWithGroupLink, linkExercise } from '@/src/data/exercise-group-links';
 import { LOAD_INPUT_MODE_LABELS } from '@/src/exercise-core';
@@ -67,7 +76,8 @@ const runArchiveWrite = (groupId: string, action: 'archive' | 'unarchive', group
  * sheet in link-only mode (a local write, so it works offline; nothing is
  * added to a session). The owner and admins also get Add exercise and a
  * per-row sheet (Rename, Archive / Unarchive): online-only writes (08
- * pattern 9); Archive confirms first.
+ * pattern 9); Archive confirms first. `Add exercise` is an outline beside the
+ * section's micro-label: `Invite` is the group screen's one `accent` (T13-D1).
  */
 export function GroupExercisesPage({
   groupId,
@@ -196,69 +206,88 @@ export function GroupExercisesPage({
     }
   };
 
+  const header = (
+    <View style={styles.header}>
+      <Text allowFontScaling={false} accessibilityRole="header" style={styles.microLabel} testID="group-screen-exercises-title">
+        Exercises
+      </Text>
+      {canManage ? (
+        <ActionButton
+          accessibilityLabel="Add exercise"
+          label="Add exercise"
+          onPress={() => router.push(`/group/${groupId}/exercises/new`)}
+          testID="group-exercises-add-button"
+          variant="outline"
+        />
+      ) : null}
+    </View>
+  );
+
   if (!exercises.data) {
-    return <GroupMissingDataState error={error} offline={offline} onRetry={onRetry} testIDPrefix="group-screen-exercises" />;
+    return (
+      <View style={styles.page}>
+        {header}
+        <GroupMissingDataState error={error} offline={offline} onRetry={onRetry} testIDPrefix="group-screen-exercises" />
+      </View>
+    );
   }
 
   const byId = new Map(exercises.data.exercises.map((exercise) => [exercise.group_exercise_id, exercise]));
   const rows = buildGroupExerciseRows(exercises.data.exercises, links.links);
-  const addButton = canManage ? (
-    <ActionButton
-      label="Add exercise"
-      onPress={() => router.push(`/group/${groupId}/exercises/new`)}
-      testID="group-exercises-add-button"
-      variant="outline"
-    />
-  ) : null;
   const sheetActions = sheetExercise ? groupExerciseActionsFor(myRole, sheetExercise) : [];
 
   return (
-    <View style={{ gap: uiSpace.md }} testID="group-screen-exercises">
+    <View style={styles.page} testID="group-screen-exercises">
+      {header}
       {feedback ? <GroupWriteNotice message={feedback.message} testID="group-exercises-action-feedback" tone={feedback.tone} /> : null}
       {links.failed ? (
-        <View style={{ gap: uiSpace.sm }}>
-          <GroupWriteNotice
-            message="Couldn't read your links on this device, so link status isn't shown."
-            testID="group-exercises-links-error"
-            tone="error"
-          />
-          <UiButton label="Retry reading links" onPress={() => void links.reload()} style={{ minHeight: 44 }} testID="group-exercises-links-retry" variant="secondary" />
-        </View>
+        <Notice
+          action={
+            <ActionButton
+              accessibilityLabel="Retry reading links"
+              label="Retry"
+              onPress={() => void links.reload()}
+              testID="group-exercises-links-retry"
+              variant="outline"
+            />
+          }
+          live
+          message="Couldn't read your links on this device, so link status isn't shown."
+          testID="group-exercises-links-error"
+          tone="danger"
+        />
       ) : null}
       {rows.length === 0 ? (
         <GroupStateView
           body={canManage ? 'Add an exercise so members can link theirs and compare.' : 'Admins add exercises here.'}
           testID="group-exercises-empty"
-          title="No group exercises yet">
-          {addButton}
-        </GroupStateView>
+          title="No group exercises yet"
+        />
       ) : (
-        <>
-          {addButton}
-          <UiSurface style={{ paddingHorizontal: uiSpace.md }} testID="group-exercises-list">
-            {rows.map((row) => {
-              const exercise = byId.get(row.groupExerciseId) ?? null;
-              return (
-                <GroupExerciseRow
-                  key={row.groupExerciseId}
-                  focusRef={(node) => { if (node) rowRefs.current.set(row.groupExerciseId, node); else rowRefs.current.delete(row.groupExerciseId); }}
-                  onUnlink={row.personalLinks.length > 0 && exercise ? () => openUnlink(exercise, row.personalLinks) : undefined}
-                  unlinkPending={unlink.pending}
-                  onLink={row.linkable && exercise && !unlink.pending ? () => openLink(exercise) : undefined}
-                  onPress={canManage && !archiveWrite.pending ? () => setSheetExercise(exercise) : undefined}
-                  row={row}
-                />
-              );
-            })}
-          </UiSurface>
-        </>
+        <Card testID="group-exercises-list">
+          {rows.map((row, index) => {
+            const exercise = byId.get(row.groupExerciseId) ?? null;
+            return (
+              <GroupExerciseRow
+                divider={index > 0}
+                key={row.groupExerciseId}
+                focusRef={(node) => { if (node) rowRefs.current.set(row.groupExerciseId, node); else rowRefs.current.delete(row.groupExerciseId); }}
+                onUnlink={row.personalLinks.length > 0 && exercise ? () => openUnlink(exercise, row.personalLinks) : undefined}
+                unlinkPending={unlink.pending}
+                onLink={row.linkable && exercise && !unlink.pending ? () => openLink(exercise) : undefined}
+                onPress={canManage && !archiveWrite.pending ? () => setSheetExercise(exercise) : undefined}
+                row={row}
+              />
+            );
+          })}
+        </Card>
       )}
       <GroupExerciseUnlinkSheet
         choices={rows.find((row) => row.groupExerciseId === unlinkExercise?.group_exercise_id)?.personalLinks ?? []}
         groupExerciseName={unlinkExercise?.name ?? ''}
         groupName={groupName}
         onClose={() => { selectedUnlink.current = null; setChooserVisible(false); }}
-        onDismiss={finishChooser}
+        onDismissed={finishChooser}
         onSelect={(choice) => {
           if (!unlinkExercise) return;
           selectedUnlink.current = unlinkTarget(unlinkExercise, choice);
@@ -308,3 +337,26 @@ export function GroupExercisesPage({
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  page: {
+    gap: uiSpace.md,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: uiSpace.sm,
+    minHeight: uiGeometry.tapTarget,
+  },
+  microLabel: {
+    flex: 1,
+    fontFamily: uiFonts.display.family,
+    fontWeight: '700',
+    fontSize: uiTypography.size.xxs,
+    lineHeight: uiTypography.lineHeight.xxs,
+    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
+    textTransform: 'uppercase',
+    color: uiRoles.inkMuted,
+  },
+});

@@ -395,7 +395,7 @@ describe('pick sheet (E0.2)', () => {
     expect(screen.queryByTestId('group-pick-sheet-load-mode-note')).toBeNull();
   });
 
-  it('with no suggestion, Add as new is preselected; cancel returns to the picker', async () => {
+  it('with no suggestion, Add as new is preselected; dismissing returns to the picker', async () => {
     const { onSelectExercise, onDismiss } = await renderPicker();
     await screen.findByLabelText('Select exercise Bench Press');
     toggleGroups();
@@ -406,7 +406,8 @@ describe('pick sheet (E0.2)', () => {
     // The picker hides while its sheet is open.
     expect(screen.queryByTestId('exercise-picker-groups-toggle')).toBeNull();
 
-    fireEvent.press(screen.getByTestId('group-pick-sheet-cancel'));
+    // No Cancel (G5): the backdrop dismisses the sheet.
+    fireEvent.press(screen.getByTestId('group-pick-sheet-backdrop', { includeHiddenElements: true }));
     expect(screen.queryByTestId('group-pick-sheet')).toBeNull();
     expect(screen.getByTestId('exercise-picker-groups-toggle')).toBeTruthy();
     expect(onSelectExercise).not.toHaveBeenCalled();

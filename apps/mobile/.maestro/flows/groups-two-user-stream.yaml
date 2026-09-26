@@ -199,6 +199,12 @@ appId: com.dinoderek.mobile
     visible:
       id: "group-exercise-form-note"
     timeout: 10000
+# The picked row stays listed above the prefilled form and its submit.
+- assertVisible:
+    id: "group-standard-exercise-seed_barbell_bench_press"
+- assertVisible:
+    id: "group-exercise-form-submit"
+- takeScreenshot: "groups-add-exercise-catalogue"
 - tapOn:
     id: "group-exercise-form-submit"
 - extendedWaitUntil:
@@ -213,6 +219,14 @@ appId: com.dinoderek.mobile
     timeout: 15000
 - tapOn:
     id: "group-exercise-source-custom"
+- extendedWaitUntil:
+    visible:
+      id: "group-exercise-form-name-input"
+    timeout: 10000
+- assertVisible:
+    id: "group-exercise-source-custom"
+    selected: true
+- takeScreenshot: "groups-add-exercise-custom"
 # Pick the weight entry before typing: on iOS, dismissing the keyboard can submit the form.
 - tapOn:
     id: "group-exercise-form-load-mode-per_side_load"

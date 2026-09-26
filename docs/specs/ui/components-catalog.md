@@ -115,7 +115,10 @@ Brief entrypoint inventory of the current reusable UI component set.
     `divider`; pressable as one row only when given `onPress`. The trailing
     control is a slot, so the row carries no icon dependency. `expanded`
     (DLM-T06) announces a disclosure row's state: the exercise list's family
-    headers
+    headers. DLM-T14 added `checked` (a radio row, announced checked with no
+    ground change; the caller's `leading` glyph shows it), `accessible` (a row
+    with no `onPress` read as one element) and `ref` (the host view, to move
+    focus back to it)
   - `Sheet` — bottom-anchored panel over a `scrim` backdrop, sheet radius,
     38×4 handle, optional title; the backdrop tap, Android back and the
     VoiceOver escape gesture dismiss it — there is no Cancel button. It never
@@ -123,7 +126,11 @@ Brief entrypoint inventory of the current reusable UI component set.
     added `headerActions` (controls on the title's row, `<testID>-header`) and
     `keyboardAvoiding` (lifts the panel above the keyboard), for the exercise
     picker. DLM-T07 added `headerLeading` (one control before the title): the
-    exercise editor's `chevron-left` `Back to exercise` from its muscle list
+    exercise editor's `chevron-left` `Back to exercise` from its muscle list.
+    DLM-T14 added `onDismissed`, called once the sheet has gone (the iOS
+    modal's `onDismiss`, or at once on Android), so a native `Alert` can follow
+    a choice made in the sheet (the unlink chooser); `<testID>-modal` is on the
+    native modal
   - `ActionButton` — `primary` (`accent` ground: the screen's one primary),
     `outline` (`ink` hairline) or `text` (caps label); `tone="danger"` recolours
     an outline or text button. Control radius, 44pt tall, Archivo caps label.
@@ -405,11 +412,11 @@ Brief entrypoint inventory of the current reusable UI component set.
   - `GroupHeaderCard` (DLM-T13) — the group and Members screens' header: one `Card` with the name in Archivo 700, the description and an optional meta line in `ink-muted`, then its children (the group screen's `Members` `ListRow`)
   - `GroupMemberActionSheet` (M22-T05) — `GroupActionSheet` for one member offering exactly `groupMemberActionsFor(myRole, me, member)` (contract §4.3): `Make admin` / `Remove admin`, `Transfer ownership` / `Remove from group` (`danger`; the caller confirms with `Alert.alert`). testIDs `group-member-actions-sheet` (+ `-backdrop`), `group-member-action-<action>`
   - `GroupActionSheet` (M25-T08; a `Sheet` since DLM-T13) — behind both action sheets (members, group exercises): the title, an optional `ink-muted` subtitle, one `ListRow` per action (`tone="danger"` when destructive). No Cancel: the backdrop dismisses it (G5, DLM-T13-D2). testIDs `<prefix>-sheet`, `<prefix>-sheet-backdrop` and `<actionPrefix>-<key>`
-  - `GroupExercisesPage` (M25-T08) — the group screen's Exercises section: rows, empty and missing-data states, owner/admin `Add exercise` (an outline: `Invite` is the group screen's one `accent`, DLM-T13-D1), and the exercise sheet (`Rename` / `Archive` / `Unarchive`)
-  - `GroupExerciseRow` (M25-T08) — name, weight entry, my link status (`Linked: …` / `Not linked`), and an `Archived` badge; pressable with a chevron for owner/admin only; optional `Link your exercise` and `Unlink…` buttons (`group-exercise-link-button-<id>` / `group-exercise-unlink-button-<id>`) sit outside that press target; `personalLinks` retains stable IDs and labels, and unlink pending disables repeat taps
-  - `GroupExerciseUnlinkSheet` — scrollable in-route chooser for multiple personal links, showing target/group context and stable-ID `Unlink` actions, with duplicate/missing-name identifiers; the host waits for native dismissal before the shared confirmation, then restores focus to the row
-  - `GroupExerciseForm` (M25-T08) — the add / edit group-exercise form over `ExerciseCoreFields`, validated by `validateExerciseCore`, with the write's failure above the submit button
-  - `StandardExercisePicker` (M25-T08) — search and list of the bundled standard exercises to copy into a group
+  - `GroupExercisesPage` (M25-T08) — the group screen's Exercises section: the `Exercises` micro-label (`group-screen-exercises-title`) with owner/admin `Add exercise` as an outline beside it (T13-D1), outcome `Notice`s, a failed links read as a `danger` `Notice` with an outline `Retry` (`group-exercises-links-retry`), the rows as one `Card` (`group-exercises-list`), empty and missing-data `StatePanel`s, and the exercise sheet (`Rename` / `Archive` / `Unarchive`). Target: `design-targets/groups.md` (DLM-T14)
+  - `GroupExerciseRow` (M25-T08) — a dense `ListRow` slice of the section's `Card`: the name (Archivo 600), weight entry and my link status (`Linked: …` / `Not linked`) in `ink-muted`, and an `Archived` `Tag`; pressable with a chevron for owner/admin only; optional `Link your exercise` (outline) and `Unlink…` (`danger` text) buttons (`group-exercise-link-button-<id>` / `group-exercise-unlink-button-<id>`) sit outside that press target; `personalLinks` retains stable IDs and labels, and unlink pending disables repeat taps
+  - `GroupExerciseUnlinkSheet` — a `Sheet` (`Your linked exercises`, testID `group-unlink-chooser`, backdrop `Dismiss your linked exercises`, no Cancel) for multiple personal links: the target/group context in `ink-muted`, then a `ListRow` per link with a `danger` text `Unlink` (`group-unlink-choice-<id>`), duplicate/missing names identified; the host confirms from `Sheet.onDismissed`, once the sheet has gone, then restores focus to the row
+  - `GroupExerciseForm` (M25-T08) — the add / edit group-exercise form: a `Card` over `ExerciseCoreFields`, validated by `validateExerciseCore`, with the copy note in `ink-muted`, the write's failure as a `danger` `Notice` above the submit, and the submit as the screen's one `accent`
+  - `StandardExercisePicker` (M25-T08) — a micro-label, a `SearchField` and one `Card` of radio `ListRow`s (`radio-on` in `ink` on the pick, no ground change; the weight entry as `meta`) over the bundled standard exercises to copy into a group, and `Showing N of M`
   - `GroupLostAccessState` (M25-T08) — the shared "You're no longer a member of this group" panel
   - `GroupLeaderboardsPage`, `GroupPodiumCard` (M25-T09; design language DLM-T12) — the Groups screen's Leaderboards segment: one link `Card` per group exercise (the name in Archivo 700, the view label as a micro-label, an `Archived` `Tag`, up to three podium rows with rank, value and date in Plex Mono and my row's `You` in bold, the empty label, `You: …`). testIDs `group-leaderboards-page`, `group-leaderboards-empty`, `group-podium-card-<exerciseId>` with `-name`, `-view`, `-archived`, `-row-<rank>`, `-empty`, `-you`
   - `GroupCertificationStatus` — a record's certification state: a check `Icon` in `ink` (certified), a ring in `ink-muted` (not yet) or none (voided) beside its label, no success hue; `size` `body` (cards, sheet) or `meta` (a board row's mark); the label keeps the caller's testID. Used by `GroupStreamRecordCard`, `RecordSetSheet` and `GroupBoardRow`
@@ -422,10 +429,10 @@ Brief entrypoint inventory of the current reusable UI component set.
   - `GroupsEmptyActions` (M22-T05) — the empty state's `Create group` (the screen's one primary) / `Join with a code` (outline) buttons
   - `FriendSessionContent` — the friend's session body on View Session's cards (`components/session-detail/`): a `SessionFactsCard` headed by the member and status, then an `ExerciseSetsCard` per exercise (rows `group-session-set-row-<setId>`), read-only, no record band
   - `PickerGroupSectionList`, `PickerGroupsToggle` (M25-T07; design language DLM-T06) — the exercise picker's `From your groups` section, a micro-label over one `Card` of `ListRow`s per group (rows `exercise-picker-group-row-<groupExerciseId>`, status text "linked: …" / "not linked"), and the `Groups` switch beside the filter, a chip solid `ink` while on (`exercise-picker-groups-toggle`); 08 pattern 10
-  - `GroupExercisePickSheet` (M25-T07) — in-route bottom `Modal` for an unlinked group exercise: suggestion, `Choose another of your exercises…` (search; exercises already linked in the group are disabled with the reason), `Add "<name>" as a new exercise`, the retroactivity and weight-entry notes, `Link and add` with an inline error; in `choose-linked` mode it lists my linked exercises to add. testIDs `group-pick-sheet`, `group-pick-sheet-option-*`, `group-pick-sheet-choice-<id>`, `group-pick-sheet-confirm`; `purpose="link-only"` (M25-T08 group page) confirms with `Link` and adds nothing to a session
+  - `GroupExercisePickSheet` (M25-T07) — a `Sheet` (DLM-T14; keyboard-avoiding, backdrop `Dismiss group exercise pick sheet`, no Cancel) for an unlinked group exercise, its options radio `ListRow`s (`radio-on` / `radio-off` in `ink`, unavailable choices `ink-faint`) and its confirm the sheet's one `accent`: suggestion, `Choose another of your exercises…` (search; exercises already linked in the group are disabled with the reason), `Add "<name>" as a new exercise`, the retroactivity and weight-entry notes, `Link and add` with an inline error; in `choose-linked` mode it lists my linked exercises to add. testIDs `group-pick-sheet`, `group-pick-sheet-option-*`, `group-pick-sheet-choice-<id>`, `group-pick-sheet-confirm`; `purpose="link-only"` (M25-T08 group page) confirms with `Link` and adds nothing to a session
   - `GroupStateView`, `GroupLoadingState`, `GroupsEmptyState` (children slot for `GroupsEmptyActions`), `GroupMissingDataState`, `GroupInlineError`, `GroupsSignInRequired` — feature-scoped state panels, thin wrappers over `StatePanel` (inline; the sign-in panel centres on the page) since DLM-T11, so their call sites did not change; `GroupInlineError` is a `danger` `Notice` with an outline `Retry`
-  - `groupScreenStyles` (`screen-styles.ts`) — the group routes' page shell: `paper`, the `lg` gutter and `md` between blocks, as `Screen` / `ScreenScroll`, for the `FlatList`s and the routes not yet on `ScreenScroll` (DLM-T11). `groupFormStyles` in the same file is still legacy (DLM-T13)
-  - `usePullToRefresh`, `groupScreenStyles`, `groupFormStyles` — pull spinner state, the shared page shell and action row, and the write-form field styles
+  - `groupScreenStyles` (`screen-styles.ts`) — the group routes' page shell: `paper`, the `lg` gutter and `md` between blocks, as `Screen` / `ScreenScroll`, for the `FlatList`s and the routes not yet on `ScreenScroll` (DLM-T11).
+  - `usePullToRefresh`, `groupScreenStyles` — pull spinner state, and the shared page shell and action row (`groupFormStyles` was deleted in DLM-T14, once nothing used it)
 
 12. Exercise core fields (M25)
 - File: `apps/mobile/components/exercise-core/exercise-core-fields.tsx`

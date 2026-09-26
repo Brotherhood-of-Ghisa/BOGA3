@@ -1,7 +1,6 @@
-import { useEffect, useRef } from 'react';
-import { Platform, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, Text } from 'react-native';
 
-import { UiButton, UiText, uiColors, uiRadius, uiSpace } from '@/components/ui';
+import { ActionButton, ListRow, Sheet, uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui';
 import type { PersonalExerciseLinkChoice } from '@/src/groups/exercise-view-model';
 
 type Props = {
@@ -10,57 +9,74 @@ type Props = {
   groupExerciseName: string;
   choices: PersonalExerciseLinkChoice[];
   onSelect: (choice: PersonalExerciseLinkChoice) => void;
+  /** The backdrop, Android back or the VoiceOver escape: nothing chosen. */
   onClose: () => void;
-  onDismiss: () => void;
+  /** The sheet has gone (`Sheet.onDismissed`): the host confirms the choice now. */
+  onDismissed: () => void;
 };
 
-/** The chooser only selects one stable personal ID; its host confirms after native dismissal. */
-export function GroupExerciseUnlinkSheet({ visible, groupName, groupExerciseName, choices, onSelect, onClose, onDismiss }: Props) {
-  const wasVisible = useRef(false);
-  useEffect(() => {
-    // Android has no Modal.onDismiss. With no animation its native view has
-    // been removed by this commit before the host presents the confirmation.
-    if (Platform.OS !== 'ios' && wasVisible.current && !visible) onDismiss();
-    wasVisible.current = visible;
-  }, [visible, onDismiss]);
+/**
+ * `Your linked exercises`: one row per personal exercise linked to this group
+ * exercise, each with its own `Unlink`. The chooser only selects one stable
+ * personal ID; its host confirms once the sheet has gone. No Cancel (G5).
+ */
+export function GroupExerciseUnlinkSheet({ visible, groupName, groupExerciseName, choices, onSelect, onClose, onDismissed }: Props) {
   return (
-    <Modal animationType={Platform.OS === 'ios' ? 'fade' : 'none'} onDismiss={onDismiss} onRequestClose={onClose} testID="group-unlink-modal" transparent visible={visible}>
-      <View style={styles.root}>
-        <Pressable accessibilityLabel="Dismiss your linked exercises" onPress={onClose} style={styles.scrim} />
-        <View accessibilityViewIsModal style={styles.panel} testID="group-unlink-chooser">
-          <UiText accessibilityRole="header" variant="title">Your linked exercises</UiText>
-          <UiText variant="bodyMuted">{groupExerciseName} · {groupName}</UiText>
-          <ScrollView contentContainerStyle={styles.list}>
-            {choices.map((choice) => (
-              <View key={choice.exerciseDefinitionId} style={styles.choice}>
-                <UiText style={styles.name}>{choice.label}</UiText>
-                <UiButton
-                  accessibilityLabel={`Unlink ${choice.label} from ${groupExerciseName} in ${groupName}`}
-                  label="Unlink"
-                  onPress={() => onSelect(choice)}
-                  style={styles.button}
-                  testID={`group-unlink-choice-${choice.exerciseDefinitionId}`}
-                  variant="danger"
-                />
-              </View>
-            ))}
-          </ScrollView>
-          <UiButton label="Cancel" onPress={onClose} style={styles.button} testID="group-unlink-cancel" variant="secondary" />
-        </View>
-      </View>
-    </Modal>
+    <Sheet
+      dismissLabel="Dismiss your linked exercises"
+      onDismiss={onClose}
+      onDismissed={onDismissed}
+      testID="group-unlink-chooser"
+      title="Your linked exercises"
+      visible={visible}>
+      <Text allowFontScaling={false} style={styles.context}>
+        {groupExerciseName} · {groupName}
+      </Text>
+      <ScrollView style={styles.list}>
+        {choices.map((choice, index) => (
+          <ListRow
+            divider={index > 0}
+            key={choice.exerciseDefinitionId}
+            meta={
+              <ActionButton
+                accessibilityLabel={`Unlink ${choice.label} from ${groupExerciseName} in ${groupName}`}
+                label="Unlink"
+                onPress={() => onSelect(choice)}
+                testID={`group-unlink-choice-${choice.exerciseDefinitionId}`}
+                tone="danger"
+                variant="text"
+              />
+            }>
+            <Text allowFontScaling={false} style={styles.name}>
+              {choice.label}
+            </Text>
+          </ListRow>
+        ))}
+      </ScrollView>
+    </Sheet>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, justifyContent: 'flex-end' },
-  scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: uiColors.overlayScrim },
-  panel: {
-    maxHeight: '85%', gap: uiSpace.md, padding: uiSpace.xl, paddingBottom: uiSpace.xl * 2,
-    borderTopLeftRadius: uiRadius.md, borderTopRightRadius: uiRadius.md, backgroundColor: uiColors.surfaceDefault,
+  context: {
+    paddingHorizontal: uiSpace.lg,
+    paddingBottom: uiSpace.sm,
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
+    fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
+    color: uiRoles.inkMuted,
   },
-  list: { gap: uiSpace.md },
-  choice: { flexDirection: 'row', alignItems: 'center', gap: uiSpace.md },
-  name: { flex: 1, minWidth: 0 },
-  button: { minHeight: 44 },
+  list: {
+    flexShrink: 1,
+  },
+  // Long names wrap rather than truncate.
+  name: {
+    paddingVertical: uiSpace.sm,
+    fontFamily: uiFonts.display.family,
+    fontWeight: '600',
+    fontSize: uiTypography.size.lg,
+    lineHeight: uiTypography.lineHeight.lg,
+    color: uiRoles.ink,
+  },
 });

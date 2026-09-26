@@ -157,9 +157,6 @@ function GroupScreenContent({ userId, groupId }: { userId: string; groupId: stri
       ) : null}
       {offline ? <GroupOfflineBanner lastUpdatedAtMs={lastUpdatedAtMs} /> : null}
       {inlineError ? <GroupInlineError error={inlineError} onRetry={onRefresh} testID="group-screen-inline-error" /> : null}
-      <Text allowFontScaling={false} accessibilityRole="header" style={styles.sectionLabel} testID="group-screen-exercises-title">
-        Exercises
-      </Text>
     </View>
   );
 
@@ -191,17 +188,6 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     fontSize: uiTypography.size.base,
     lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.inkMuted,
-  },
-  // A section micro-label, spaced from the header above it.
-  sectionLabel: {
-    marginTop: uiSpace.sm,
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
     color: uiRoles.inkMuted,
   },
 });

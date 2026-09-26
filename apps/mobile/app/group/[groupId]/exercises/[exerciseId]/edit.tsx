@@ -1,6 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback } from 'react';
-import { ScrollView } from 'react-native';
 
 import {
   GroupExerciseForm,
@@ -8,9 +7,9 @@ import {
   GroupMissingDataState,
   GroupStateView,
   GroupsSignInRequired,
-  groupScreenStyles,
   pickInlineError,
 } from '@/components/groups';
+import { ScreenScroll } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import type { ExerciseCore } from '@/src/exercise-core';
 import {
@@ -133,12 +132,8 @@ function EditGroupExerciseContent({ userId, groupId, exerciseId }: { userId: str
   }
 
   return (
-    <ScrollView
-      contentContainerStyle={groupScreenStyles.content}
-      keyboardShouldPersistTaps="handled"
-      style={groupScreenStyles.screen}
-      testID="group-exercise-edit-screen">
+    <ScreenScroll keyboardShouldPersistTaps="handled" testID="group-exercise-edit-screen">
       {body}
-    </ScrollView>
+    </ScreenScroll>
   );
 }
