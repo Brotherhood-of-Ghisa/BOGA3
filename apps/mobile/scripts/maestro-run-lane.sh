@@ -9,7 +9,7 @@
 # (maestro-ios-gates.sh) keeps its own script — it is a different execution
 # model, not a thin wrapper.
 #
-#   ./scripts/maestro-run-lane.sh smoke|data-smoke|ui-regression|exercise-page|session-view|auth-profile|sync-e2e|groups-e2e
+#   ./scripts/maestro-run-lane.sh smoke|data-smoke|ui-regression|exercise-page|session-view|bodyweight|auth-profile|sync-e2e|groups-e2e
 #
 # Canonical lane names / gate membership: scripts/lanes.tsv (run via
 # `./boga test ios-smoke` etc.; the npm test:e2e:ios:* scripts also land here).
@@ -21,7 +21,7 @@ APP_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 REPO_ROOT="$(cd -- "$APP_DIR/../.." && pwd)"
 
 lane="${1:-}"
-LANES="smoke|data-smoke|ui-regression|exercise-page|session-view|auth-profile|sync-e2e|groups-e2e"
+LANES="smoke|data-smoke|ui-regression|exercise-page|session-view|bodyweight|auth-profile|sync-e2e|groups-e2e"
 [[ -n "$lane" ]] || { echo "usage: $0 $LANES" >&2; exit 2; }
 
 run_flow() {
@@ -94,6 +94,12 @@ case "$lane" in
       --scenario "Session completion states" --flow "$APP_DIR/.maestro/flows/session-completion-states-fixture.yaml" \
       --scenario "Settings dev wipe-local" --flow "$APP_DIR/.maestro/flows/settings-dev-wipe-local.yaml" \
       --scenario "Exercise catalogue" --flow "$APP_DIR/.maestro/flows/exercise-catalogue.yaml"
+    ;;
+
+  # Bodyweight entry and frozen snapshots: a dedicated local-only lane so
+  # the same asserted flow can be checked on small and large phone layouts.
+  bodyweight)
+    run_flow data "Bodyweight entry and snapshots" bodyweight-entry.yaml
     ;;
 
   # The exercise page (exercise/session redesign step 4): its own fixture,

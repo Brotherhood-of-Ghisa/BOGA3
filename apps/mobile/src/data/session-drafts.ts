@@ -2,6 +2,7 @@ import { and, asc, desc, eq, inArray, isNull } from 'drizzle-orm';
 
 import { bootstrapLocalDataLayer, type LocalDatabase } from './bootstrap';
 import { nowMonotonic } from './clock';
+import { captureSessionWeight } from './bodyweight';
 import { exerciseSets, sessionExercises, sessionExerciseTags, sessions } from './schema';
 import { normalizeSessionSetType, type SessionSetTypeValue } from './set-types';
 import {
@@ -17,6 +18,7 @@ export type SessionDraftStatus = 'active';
 // Optional at the repository boundary for older callers; hydrated rows always
 // include these fields. A source id is provenance, never a live relationship.
 export type SessionBodyWeightSnapshot = {
+  localBodyweightMetadataKnown?: boolean;
   bodyWeightKg?: number | null;
   bodyWeightSource?: string | null;
   bodyWeightMeasurementId?: string | null;
@@ -320,6 +322,7 @@ const mapSessionRow = (row: typeof sessions.$inferSelect): SessionPersistenceRec
   return {
     id: row.id,
     gymId: row.gymId,
+    localBodyweightMetadataKnown: row.localBodyweightMetadataKnown,
     bodyWeightKg: row.bodyWeightKg,
     bodyWeightSource: row.bodyWeightSource,
     bodyWeightMeasurementId: row.bodyWeightMeasurementId,
@@ -337,6 +340,7 @@ const mapSessionRow = (row: typeof sessions.$inferSelect): SessionPersistenceRec
 const mapDraftSnapshot = (graph: StoredDraftGraph): SessionDraftSnapshot => ({
   sessionId: graph.session.id,
   gymId: graph.session.gymId,
+  localBodyweightMetadataKnown: graph.session.localBodyweightMetadataKnown,
   bodyWeightKg: graph.session.bodyWeightKg ?? null,
   bodyWeightSource: graph.session.bodyWeightSource ?? null,
   bodyWeightMeasurementId: graph.session.bodyWeightMeasurementId ?? null,
@@ -373,6 +377,7 @@ const mapDraftSnapshot = (graph: StoredDraftGraph): SessionDraftSnapshot => ({
 const mapSessionGraphSnapshot = (graph: StoredDraftGraph): SessionGraphSnapshot => ({
   sessionId: graph.session.id,
   gymId: graph.session.gymId,
+  localBodyweightMetadataKnown: graph.session.localBodyweightMetadataKnown,
   bodyWeightKg: graph.session.bodyWeightKg ?? null,
   bodyWeightSource: graph.session.bodyWeightSource ?? null,
   bodyWeightMeasurementId: graph.session.bodyWeightMeasurementId ?? null,
@@ -859,6 +864,7 @@ export const createDrizzleSessionDraftStore = (): SessionDraftStore => ({
         tx.insert(sessions)
           .values({
             id: sessionId,
+            ...captureSessionWeight(tx, input.startedAt),
             gymId: input.gymId,
             status: input.status,
             startedAt: input.startedAt,
@@ -1383,6 +1389,7 @@ export const createSessionDraftRepository = (store: SessionDraftStore = createDr
       .map((session) => ({
         sessionId: session.id,
         gymId: session.gymId,
+        localBodyweightMetadataKnown: session.localBodyweightMetadataKnown,
         bodyWeightKg: session.bodyWeightKg ?? null,
         bodyWeightSource: session.bodyWeightSource ?? null,
         bodyWeightMeasurementId: session.bodyWeightMeasurementId ?? null,

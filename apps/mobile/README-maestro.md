@@ -16,6 +16,7 @@ Run commands from `apps/mobile`.
 - `npm run test:e2e:ios:smoke` and `npm run test:e2e:ios:data-smoke` use the port and simulator configured for this workspace, provision/install the dev client, launch Metro, run Maestro, then tear down.
 - `npm run test:e2e:ios:ui-regression` runs its infra-free screen flows (Stats, session completion, the Settings wipe-local and the exercise catalogue) against ONE provisioned simulator and ONE Metro instance (`scripts/maestro-ios-run-flows.sh`), for the same reason the combined `gates` lane does: the provision/launch/teardown overhead is paid once, not once per flow.
 - `npm run test:e2e:ios:gates` runs BOTH the smoke and data-runtime-smoke flows against one provisioned simulator and one Metro instance, so the ~55-60s fixed overhead (sim boot + dev-client warm-up + Metro start + teardown) is paid once instead of per gate (measured ~196s separate -> ~140s combined). The standalone gates above are unchanged; this is an additive convenience path for running both together.
+- `./boga test ios-bodyweight` (also in `frontend`) proves local weight entry, invalid/future-date feedback, frozen snapshots after later readings/source deletion, explicit correction and next-session defaults. Its screenshots support small/large phone review using dedicated simulator overrides.
 - Run artifacts are written to `artifacts/maestro/<task-id-or-ad-hoc>/<timestamp>/`. The combined runner namespaces each flow's JUnit/output/debug under a per-flow subdirectory of that root.
 
 ## First-time setup

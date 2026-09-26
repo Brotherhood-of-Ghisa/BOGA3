@@ -21,6 +21,26 @@ Document app-specific UI semantics and guardrails for the current mobile app.
 
 ## Current behavior (authoritative)
 
+### Bodyweight entry and frozen context (M27-T04)
+
+Settings → Body weight shows the latest nondeleted reading at/before now,
+with its entered unit and measurement time. Add/edit accepts a positive finite
+decimal in kg or lb and rejects future dates. Unchanged date text preserves its
+full stored timestamp. Read errors are retryable; failed local writes keep all
+input. The interface never requires a network response to save.
+
+A new session captures the latest valid reading at/before its start exactly
+once, including a new session built from a historical plan. Missing or invalid
+context stays unknown. A changed start, reopening, later readings and source
+correction/deletion never replace it. The session's Body weight row shows kg
+and source/date; historical estimates keep their estimated label. Explicit
+correction opens a sheet explaining personal/group score and certification
+impact and saves a manual session-only tuple. Settings readings stay unchanged.
+Deleted sessions expose the fact without a correction action.
+
+The visual target is `design-targets/bodyweight.md`. Historical fill and
+load-dependent consumer adoption are separate M27 tasks, not implied by entry.
+
 ### 1. Action semantics
 
 1. Primary actions are filled/high-emphasis actions used for the main next step in a section/screen.

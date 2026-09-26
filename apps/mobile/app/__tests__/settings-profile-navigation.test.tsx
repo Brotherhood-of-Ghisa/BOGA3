@@ -9,6 +9,9 @@ const mockSaveUsername = jest.fn();
 const mockResetLocalDataAndReseed = jest.fn();
 const mockAlert = jest.fn();
 
+// Reading entry/navigation is covered by bodyweight-screen.test.tsx.
+jest.mock('@/components/bodyweight/settings-row', () => ({ BodyWeightSettingsRow: () => null }));
+
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockSearchParams,
   useRouter: () => ({

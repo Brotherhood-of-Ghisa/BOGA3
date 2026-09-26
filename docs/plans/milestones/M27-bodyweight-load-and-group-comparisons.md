@@ -281,7 +281,7 @@ captures to its PR. Reuse `components/ui` tokens, fields, sheets, lists and noti
 | [M27-T01 — Contracts and design target](../tasks/M27-T01-Define_bodyweight_contracts_and_design_target.md) | Exact domain types, compatibility and UX target | — | in_progress |
 | [M27-T02 — Synced data](../tasks/M27-T02-Add_bodyweight_schema_and_sync.md) | Measurements, snapshots, personal metadata and load mode | T01 | in_progress |
 | [M27-T03 — Shared calculations](../tasks/M27-T03-Implement_effective_load_and_RM_calculations.md) | Resolver, volume, forward/inverse RM and completeness | T01 | in_progress |
-| [M27-T04 — Settings and snapshots](../tasks/M27-T04-Add_Settings_weight_and_session_snapshots.md) | Weight entry/history and stable new-session defaults | T02, T03 | planned |
+| [M27-T04 — Settings and snapshots](../tasks/M27-T04-Add_Settings_weight_and_session_snapshots.md) | Weight entry/history and stable new-session defaults | T02, T03 | in_progress |
 | [M27-T05 — Exercise setup and logging](../tasks/M27-T05-Configure_exercises_and_bodyweight_logging.md) | Coefficients, reviewed seeds/legacy values, added/assisted entry | T02, T03 | planned |
 | [M27-T06 — Historical backfill](../tasks/M27-T06-Backfill_and_correct_historical_session_weight.md) | Preview, earliest-reading fallback and explicit corrections | T04, T05 | planned |
 | [M27-T07 — Personal analytics](../tasks/M27-T07-Integrate_bodyweight_analytics_and_loading_estimates.md) | Consistent metrics, records, history and loading calculator | T03–T06 | planned |
@@ -300,7 +300,7 @@ is complete merely because a downstream closeout card lists its tests.
   when work started); isolated slot 1. `./boga doctor` passed.
 - T01 contract and repo-native brief are written under `docs/specs/tech/` and
   `docs/specs/ui/design-targets/`; selected current-screen references are real
-  402×874pt simulator captures. New M27 UI states remain unimplemented.
+  402×874pt simulator captures. New M27 UI captures are tracked below.
 - T03 pure resolver, coverage, group-reps eligibility and named Wathan
   projection conventions are implemented with shared numerical vectors.
   Existing consumers are intentionally awaiting T07/T09/T11 adoption.
@@ -325,8 +325,30 @@ is complete merely because a downstream closeout card lists its tests.
   Artifacts: `apps/mobile/artifacts/maestro/M27-data/`; log:
   `/tmp/boga-m27-data-frontend.log`. `./boga timings` recorded the measured runs.
   No implementation PR opened.
-- Next: integrate and verify Settings readings and snapshot entry (T04),
-  prepared separately while the T02 device gate ran.
+- T04 local readings/history, creation-time capture and explicit session
+  correction are implemented. Fast passed (168 suites / 2,016 tests), all
+  backend lanes passed, and `handles` passed. Logs:
+  `/tmp/boga-m27-entry-fast-final.log`, `/tmp/boga-m27-entry-backend.log` and
+  `/tmp/boga-m27-entry-fast-tail.log`.
+- The default-device `ios-bodyweight` flow passed with real local writes,
+  validation, source deletion, stable active weight, manual correction,
+  next-session defaults, process restart and unknown-weight entry. Evidence:
+  `apps/mobile/artifacts/maestro/M27-entry/20260926-211346-10105/`.
+  Device checks found and fixed a native Back item that stopped dispatching
+  on repeat visits, and an outer scroll view consuming the correction Save tap
+  to dismiss the keyboard. The shared header arrow dispatches explicitly;
+  session scroll views pass handled keyboard taps through to the editor.
+- The bodyweight flow also passed on iPhone SE 3 (375×667pt) and iPhone 17
+  Pro Max (440×956pt), both iOS 26.4. Evidence under `apps/mobile/artifacts/maestro/`:
+  `M27-entry-small/20260926-212207-22348/` and
+  `M27-entry-large/20260926-213103-26283/`. Existing readings open without
+  autofocus so inspection/delete does not immediately raise the keyboard.
+  Forms, Settings rows and snapshot facts were compared with T01's target;
+  the large run includes clean restart/unknown captures after waiting for
+  development-client loading to finish. The final `fast-frontend` rerun passed
+  all 2,016 tests; log `/tmp/boga-m27-entry-fast-frontend.log`.
+- Full T04 `frontend` is the next gate. Next implementation: T05 exercise setup,
+  explicit added/assisted logging and review of ambiguous legacy loads.
 
 ## Milestone acceptance
 

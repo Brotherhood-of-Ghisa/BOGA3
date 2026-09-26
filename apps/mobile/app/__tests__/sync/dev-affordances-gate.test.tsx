@@ -27,6 +27,9 @@ const mockPush = jest.fn();
 const mockIsDevMode = jest.fn();
 const mockUseAuth = jest.fn();
 
+// Weight entry has its own feature suite; keep this suite on dev visibility.
+jest.mock('@/components/bodyweight/settings-row', () => ({ BodyWeightSettingsRow: () => null }));
+
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => ({}),
   useRouter: () => ({ push: mockPush }),

@@ -115,6 +115,7 @@ get from `./boga timings` or a run.
 | ios-ui-regression | `./boga test ios-ui-regression` | `boga test frontend` | ❌ | ~6.2m |
 | ios-exercise-page | `./boga test ios-exercise-page` | `boga test frontend` | ❌ | ~1.4m |
 | ios-session-view | `./boga test ios-session-view` | `boga test frontend` | ❌ | ~1.8m |
+| ios-bodyweight | `./boga test ios-bodyweight` | `boga test frontend` | ❌ | ~3.3m |
 | ios-gates | `./boga test ios-gates` | — (run by name) | ❌ | ~2.2m |
 | ios-auth-profile *(+ local Supabase)* | `./boga test ios-auth-profile` | `boga test frontend` | ❌ | ~1.6m |
 | ios-sync-e2e *(+ local Supabase)* | `./boga test ios-sync-e2e` | `boga test frontend` | ❌ | ~2.0m |

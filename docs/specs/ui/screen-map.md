@@ -671,6 +671,18 @@ Brief entrypoint map of the current mobile screens.
 - Notes:
   - reloads the gyms on every focus; name and archive changes close the editor, location changes keep it open
 
+23. `/body-weight`
+- File: `apps/mobile/app/body-weight.tsx`; composition: `components/bodyweight/`
+- Purpose: private weight readings and their history, reached from Settings.
+- States: current value with explicit unit and measurement date; empty history;
+  loading/retryable error; Add/Edit sheet with positive weight, kg/lb and local
+  date/time; inline invalid/future date or save failure retaining input; delete
+  confirmation that saved sessions stay unchanged. Saves are local/offline.
+- Native back returns to Settings. History orders by measurement time, then id,
+  not last edit. Session detail/edit shows the frozen kg and source date through
+  `SessionBodyWeight`; its correction sheet changes only that session. Deleted
+  session detail is read-only. Historical filling remains M27-T06 work.
+
 ## Route shell (not a user-facing screen)
 
 1. `apps/mobile/app/_layout.tsx`

@@ -1,7 +1,7 @@
 ---
 task_id: M27-T04-Add_Settings_weight_and_session_snapshots
 milestone_id: M27
-status: planned
+status: in_progress
 ui_impact: "yes"
 areas: "frontend|cross-stack"
 runtimes: "node|expo|maestro|supabase"
@@ -12,7 +12,7 @@ docs_touched: "docs/specs/05-data-model.md, docs/specs/tech/bodyweight-load-cont
 
 # M27-T04 — Add Settings weight and session snapshots
 
-- Status: `planned`
+- Status: `in_progress`
 - Depends on: M27-T02, M27-T03.
 - Milestone spec: `docs/plans/milestones/M27-bodyweight-load-and-group-comparisons.md`
 - Governing decisions: D3, D5, D10.
@@ -67,3 +67,21 @@ Run `./boga test fast`, `./boga test backend`, `./boga test frontend` and resolv
 the actual diff with `./boga test for`; frontend includes `ios-sync-e2e`.
 Graduate session/UX rules, attach evidence, mark the milestone entry complete
 and delete this card when shipped.
+
+## Implementation checkpoint (2026-09-26)
+
+Implemented local kg/lb readings, history edit/delete, stable creation-time
+snapshots and session-only correction. Fast: 168 suites / 2,016 tests. All
+backend lanes and handles passed. `ios-bodyweight` passed at 402×874pt,
+375×667pt and 440×956pt on iOS 26.4; the milestone checkpoint records artifact
+folders and gate logs. Full frontend validation remains pending.
+
+The captures use the target's paper/Card/ListRow/Stat hierarchy, explicit unit
+and source labels, and shared fields/sheets. The unit control has a 44pt frame.
+Device findings fixed during verification: the header Back action now uses the
+shared arrow with explicit router dispatch; scroll ancestors preserve handled
+keyboard taps for session correction; history inspection does not autofocus.
+The flow proves local-only writes, source deletion without snapshot loss,
+manual correction without changing readings, next-session defaults, restart
+persistence and unknown-weight entry. This is implementation evidence, not a
+claim of user acceptance of new visuals or production rollout.

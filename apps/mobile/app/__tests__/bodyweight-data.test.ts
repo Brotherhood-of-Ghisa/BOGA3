@@ -115,9 +115,12 @@ it('never refreshes a saved snapshot after its source is changed, tombstoned or 
 it('copies source actual units and mode into a plan without copying the old session weight', async () => {
   const { repository, sessionId } = await seedGraph();
   await repository.completeSession(sessionId, { completedAt: new Date(62000) });
+  mockFixture.database.insert(bodyWeightMeasurements).values({
+    id: 'current-reading', weightValue: '85', weightUnit: 'kg', weightKg: 85, measuredAt: new Date(90000),
+  }).run();
   const target = await repository.appendCompletedSessionAsPlanned(sessionId, { now: new Date(100000) });
   const snapshot = await repository.loadSessionSnapshotById(target.sessionId);
-  expect(snapshot?.bodyWeightKg).toBeNull();
+  expect(snapshot).toMatchObject({ bodyWeightKg: 85, bodyWeightMeasurementId: 'current-reading' });
   expect(snapshot?.exercises[0].sets[0]).toMatchObject({ weightValue: '', repsValue: '',
     plannedWeightValue: '20', plannedWeightUnit: 'lb', plannedExternalLoadMode: 'assistance',
     externalLoadMode: null, performanceStatus: 'planned',

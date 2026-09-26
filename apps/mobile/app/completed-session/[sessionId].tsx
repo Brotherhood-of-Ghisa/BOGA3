@@ -1,3 +1,5 @@
+import { SessionBodyWeight } from '@/components/bodyweight/session-body-weight';
+import type { SessionBodyWeightSnapshot } from '@/src/data/session-drafts';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { BackHandler, StyleSheet, View } from 'react-native';
@@ -62,7 +64,7 @@ export type CompletedSessionDetailExercise = {
   sets: CompletedSessionDetailSet[];
 };
 
-export type CompletedSessionDetailRecord = {
+export type CompletedSessionDetailRecord = SessionBodyWeightSnapshot & {
   id: string;
   startedAt: string;
   completedAt: string;
@@ -199,6 +201,11 @@ export const DEFAULT_COMPLETED_SESSION_DETAIL_DATA_CLIENT: CompletedSessionDetai
       const completedAt = sessionGraph.completedAt ?? sessionGraph.startedAt;
       return {
         id: sessionGraph.sessionId,
+        bodyWeightKg: sessionGraph.bodyWeightKg,
+        bodyWeightSource: sessionGraph.bodyWeightSource,
+        bodyWeightMeasurementId: sessionGraph.bodyWeightMeasurementId,
+        bodyWeightMeasuredAt: sessionGraph.bodyWeightMeasuredAt,
+        localBodyweightMetadataKnown: sessionGraph.localBodyweightMetadataKnown,
         startedAt: sessionGraph.startedAt.toISOString(),
         completedAt: completedAt.toISOString(),
         durationDisplay: formatSessionListCompactDuration(sessionGraph.durationSec),
@@ -247,6 +254,7 @@ export function CompletedSessionDetailScreenShell({
   const exerciseCatalog = useExerciseCatalog();
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [weightRevision, setWeightRevision] = useState(0);
   const [session, setSession] = useState<CompletedSessionDetailRecord | null>(null);
   const [completedInsights, setCompletedInsights] = useState<CompletedSessionInsights | null>(null);
   const [insightState, setInsightState] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -318,7 +326,9 @@ export function CompletedSessionDetailScreenShell({
     return () => {
       cancelled = true;
     };
-  }, [dataClient, presentation, sessionId]);
+  // A saved weight invalidates this read without changing the route.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dataClient, presentation, sessionId, weightRevision]);
 
   useFocusEffect(
     useCallback(() => {
@@ -361,7 +371,9 @@ export function CompletedSessionDetailScreenShell({
       }
 
       return () => { cancelled = true; };
-    }, [dataClient, sessionId, isDeleted, maestroInsights])
+    // Weight corrections invalidate the derived comparisons too.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [dataClient, sessionId, isDeleted, maestroInsights, weightRevision])
   );
 
   const formattedStartedAt = useMemo(
@@ -632,6 +644,9 @@ export function CompletedSessionDetailScreenShell({
     <>
       <Stack.Screen options={stackOptions} />
       <ViewSessionScreen
+        bodyWeightContent={<SessionBodyWeight sessionId={session.id} snapshot={session}
+          metadataKnown={session.localBodyweightMetadataKnown} editable={!isDeleted}
+          onSaved={() => setWeightRevision(value => value + 1)} />}
         section={section}
         onSectionChange={setSection}
         summaryContent={

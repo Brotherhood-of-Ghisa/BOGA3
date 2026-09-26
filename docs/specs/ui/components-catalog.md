@@ -559,6 +559,32 @@ Brief entrypoint inventory of the current reusable UI component set.
     `gym-directory.test.ts`, `gym-location-reads.test.ts` and the
     `ios-session-view` lane
 
+### Bodyweight reading and snapshot controls (M27-T04)
+
+- `components/bodyweight/weight-entry-sheet.tsx`: `WeightEntrySheet` uses a
+  keyboard-avoiding, scrollable `Sheet`, `FormField` and kg/lb
+  `SegmentedControl`. `initial` supplies raw value/unit; optional `measuredAt`
+  adds the local date field. `onSave` and optional `onDelete` are async; failure
+  retains input, in-flight writes block dismissal and duplicate submission.
+  Delete confirms with an Alert. `onDismiss` closes after success or cancellation;
+  the controlled `visible` flag keeps the native modal mounted while dismissing.
+  Reopening resets cancelled input to the chosen reading. The unit control has
+  a 44pt minimum height.
+  TestIDs: `weight-entry-sheet`, `weight-entry-value`, `weight-entry-unit-*`,
+  `weight-entry-date`, `weight-entry-save`, `weight-entry-delete`.
+- `SessionBodyWeight`: session id, snapshot, optional metadata-known/read-only
+  flags and `onSaved`; a `Card`/`ListRow`/`Stat` shows kg and source date, and
+  opens an explicit session-only correction. A restored incomplete tuple is
+  unknown; estimated provenance is visible. No measurement lookup is needed.
+  A containing scroll view must use `keyboardShouldPersistTaps="handled"` so
+  the modal's Save receives the first tap while its keyboard is open.
+- `BodyWeightSettingsRow` reloads current value/unit/date on focus and navigates
+  to `/body-weight`; no primary accent on the Settings overview.
+- `BodyWeightScreen` composes current reading, Add and history with edit/delete;
+  history and saves stay in the owner-private local/sync domain. Covered by
+  `bodyweight-entry.test.ts`, `bodyweight-screen.test.tsx` and the bodyweight
+  flow in `ios-bodyweight`.
+
 ### UI-supporting shared module (non-visual)
 
 1. `session-recorder/types.ts`

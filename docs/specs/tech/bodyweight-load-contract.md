@@ -139,6 +139,14 @@ release convention, not a claim of full mass borne through the hands.
 
 ## 4. Readings, snapshots and historical fill
 
+T04 implements Settings reading entry/history and explicit session correction
+in `src/data/bodyweight.ts`, with positive finite kg/lb validation, no future
+readings, dirty/monotonic writes and post-commit sync nudges. New-session
+`saveDraftGraph` captures the tuple inside its creation transaction; ordinary
+updates leave it alone. Intentional correction writes the whole manual tuple
+and marks metadata known. UI consumers validate the complete tuple and show
+unknown for malformed context. Historical fill below remains T06 work.
+
 Settings shows latest nondeleted reading at/before now, with value/unit/date;
 history includes all readings. Equal dates resolve by ascending id (for both
 latest-prior and earliest-later selection).

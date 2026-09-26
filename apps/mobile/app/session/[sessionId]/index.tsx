@@ -1,3 +1,4 @@
+import { SessionBodyWeight } from '@/components/bodyweight/session-body-weight';
 import { useFocusEffect, useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
@@ -423,7 +424,7 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
   } else if (model) {
     const data = state.data;
     body = (
-      <ScreenScroll testID="session-view-scroll">
+      <ScreenScroll keyboardShouldPersistTaps="handled" testID="session-view-scroll">
         <SessionSummaryCard
           gymName={data.gymName}
           onPressGym={openGymPicker}
@@ -444,6 +445,8 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
           }
           volume={model.volume}
         />
+        <SessionBodyWeight sessionId={data.sessionId} snapshot={data}
+          metadataKnown={data.localBodyweightMetadataKnown} onSaved={() => void reload()} />
         {model.cards.map((card) => (
           <SessionExerciseCard
             card={card}

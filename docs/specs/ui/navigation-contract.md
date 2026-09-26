@@ -382,6 +382,18 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
     session view's push) remains valid without it
   - built by `GYMS_ROUTE` (`apps/mobile/src/navigation/routes.ts`)
 
+22. `/body-weight`
+- File: `apps/mobile/app/body-weight.tsx`
+- Params: none
+- Behavior: native-header `Body weight` screen reached from Settings through
+  `BODY_WEIGHT_ROUTE`; current reading and history reload on focus. Add/edit,
+  delete confirmation and validation are in-route sheets/state. The header's
+  shared `IconButton` arrow calls `router.back()` and returns to Settings, which
+  reloads the current reading. This explicit action replaces the native back
+  item, which stopped dispatching on repeated visits from an active session in
+  the iOS 26.4 device flow; the native title/header and 44pt target remain.
+  A direct entry without a back stack replaces with `/settings`.
+
 ## Allowed route transitions (current high-level flows)
 
 1. `/` -> `/today`
@@ -495,6 +507,10 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
    - the gym sheet's `Manage gyms` (the sheet closes, then `router.push`); native back returns, and the sheet reopens with the gyms reloaded
 53. `/more` -> `/gyms?source=more`
    - the Tools `Gyms` row (`router.push`); native back or `Back to More` returns
+54. `/settings` -> `/body-weight`
+   - the Training `Body weight` row (`router.push`); header Back returns
+   - session snapshot corrections are sheets on the owning session route,
+     with no navigation to or mutation of Settings readings
 
 Note:
 
@@ -518,6 +534,7 @@ Note:
   own top bar reads `Session`, or `Edit session` for a completed session. The exercise page likewise draws its own. Their
   stack titles (`Session`, `Exercise`) are only the back label VoiceOver reads
   on the screens they push (`Gyms`, `Link exercise`)
+- `body-weight` declares `Body weight` in `apps/mobile/app/_layout.tsx`
 - `gyms` declares `Gyms` in `apps/mobile/app/_layout.tsx`
 - `exercise-link` (M25-T07) declares `Link exercise` in `apps/mobile/app/_layout.tsx` and replaces it with `Link "<exercise name>"` once the exercise resolves
 - M25-T08 adds `Members`, `Add exercise`, and `Edit exercise` for the group routes in `apps/mobile/app/_layout.tsx`
