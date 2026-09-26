@@ -347,8 +347,20 @@ is complete merely because a downstream closeout card lists its tests.
   the large run includes clean restart/unknown captures after waiting for
   development-client loading to finish. The final `fast-frontend` rerun passed
   all 2,016 tests; log `/tmp/boga-m27-entry-fast-frontend.log`.
-- Full T04 `frontend` is the next gate. Next implementation: T05 exercise setup,
-  explicit added/assisted logging and review of ambiguous legacy loads.
+- Every T04 frontend lane passed at `62f73ea`. The aggregate passed smoke,
+  data, UI regression, exercise, session and bodyweight flows; resumed runs passed
+  auth/profile, UI/server sync and both group flows. Logs:
+  `/tmp/boga-m27-entry-frontend.log`, `/tmp/boga-m27-entry-frontend-tail.log`,
+  `/tmp/boga-m27-entry-frontend-tail2.log`,
+  `/tmp/boga-m27-entry-groups-final.log`. Groups evidence:
+  `apps/mobile/artifacts/maestro/M27-entry/20260926-222458-63377/` and
+  `20260926-223027-65331/`. The interrupted attempts were simulator storage
+  exhaustion and an XCTest accessibility failure; doctor passed, and closing
+  the test Simulator app plus erasing only this task's disposable simulator
+  data restored space. No assertion was weakened. `./boga timings` and
+  `./boga test for` ran. No implementation PR opened.
+- Next implementation: T05 exercise setup, explicit added/assisted logging and
+  review of ambiguous legacy loads.
 
 ## Milestone acceptance
 

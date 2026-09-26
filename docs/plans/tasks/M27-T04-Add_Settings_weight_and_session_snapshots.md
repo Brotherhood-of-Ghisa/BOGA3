@@ -74,7 +74,9 @@ Implemented local kg/lb readings, history edit/delete, stable creation-time
 snapshots and session-only correction. Fast: 168 suites / 2,016 tests. All
 backend lanes and handles passed. `ios-bodyweight` passed at 402×874pt,
 375×667pt and 440×956pt on iOS 26.4; the milestone checkpoint records artifact
-folders and gate logs. Full frontend validation remains pending.
+folders and gate logs. Every frontend lane also passed at `62f73ea`; the
+milestone records the aggregate and resumed-run evidence after repairing
+simulator storage and XCTest bootstrap failures.
 
 The captures use the target's paper/Card/ListRow/Stat hierarchy, explicit unit
 and source labels, and shared fields/sheets. The unit control has a 44pt frame.
