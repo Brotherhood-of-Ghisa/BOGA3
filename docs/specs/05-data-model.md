@@ -21,6 +21,11 @@ This document is project-level source of truth for what data exists and how it i
 
 ## Current model layers
 
+Planned extension: [M27 bodyweight contract](tech/bodyweight-load-contract.md)
+defines private measurements, frozen session snapshots and explicit external
+load metadata. These additions are not part of the current inventory until
+the paired schema/sync implementation ships.
+
 1. Mobile local data layer (`SQLite` via Drizzle)
 - primary runtime store for app behavior.
 - holds user-owned domain data; the seeded taxonomies (`exercise_definitions`,

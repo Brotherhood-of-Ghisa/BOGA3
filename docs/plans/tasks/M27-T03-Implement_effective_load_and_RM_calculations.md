@@ -1,7 +1,7 @@
 ---
 task_id: M27-T03-Implement_effective_load_and_RM_calculations
 milestone_id: M27
-status: planned
+status: in_progress
 ui_impact: "no"
 areas: "cross-stack"
 runtimes: "node|deno"
@@ -12,7 +12,7 @@ docs_touched: "docs/specs/03-technical-architecture.md, docs/specs/tech/bodyweig
 
 # M27-T03 — Implement effective load and RM calculations
 
-- Status: `planned`
+- Status: `in_progress`
 - Depends on: M27-T01.
 - Milestone spec: `docs/plans/milestones/M27-bodyweight-load-and-group-comparisons.md`
 - Governing decisions: D1, D2, D5, D6, D8.

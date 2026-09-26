@@ -1,5 +1,10 @@
 # Groups Contract
 
+Planned extension: [M27 bodyweight contract](bodyweight-load-contract.md)
+specifies group-owned coefficients, unit-aware bodyweight boards, revision
+publication and metric-specific certification dependencies. Current behavior
+below remains in force until its implementation is explicitly graduated.
+
 > **Status: As-built (M22 and M25 shipped).**
 >
 > - §2–§5, the server half: the membership/invite RPCs (M22-T01,

@@ -215,7 +215,7 @@ additionally render faded (§6).
 
 ## 6. Presenting data
 
-- **`1RM` everywhere**, never `e1RM`. Computed by `estimateOneRepMax` (Mayhew)
+- **`1RM` everywhere**, never `e1RM`. Computed by `estimateOneRepMax` (Wathan)
   in `apps/mobile/src/exercise-calculations/index.ts`.
 - **No thousands separators.** `2560`, not `2 560`.
 - **No `k` compaction.** `123456`, not `123k`: a six-digit volume fits a Plex

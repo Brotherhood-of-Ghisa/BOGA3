@@ -1,7 +1,7 @@
 ---
 task_id: M27-T01-Define_bodyweight_contracts_and_design_target
 milestone_id: M27
-status: planned
+status: in_progress
 ui_impact: "yes"
 areas: "docs|cross-stack"
 runtimes: "docs|expo|maestro"
@@ -12,7 +12,7 @@ docs_touched: "docs/specs/tech/bodyweight-load-contract.md, docs/specs/ui/design
 
 # M27-T01 — Define bodyweight contracts and the design target
 
-- Status: `planned`
+- Status: `in_progress`
 - Depends on: none.
 - Milestone spec: `docs/plans/milestones/M27-bodyweight-load-and-group-comparisons.md`
 - Governing decisions: D1–D10; this task resolves representation, not the already accepted product choices.

@@ -1,7 +1,7 @@
 # M27 — Bodyweight load and group comparisons
 
 - Milestone ID: `M27`
-- Status: `planned`
+- Status: `in_progress`
 - Created: 2026-09-25
 - Planning baseline: `c1104b65` on `origin/main`
 - Source: the bodyweight exercise design discussion and the user's request for Settings weight entry and historical backfill.
@@ -278,9 +278,9 @@ captures to its PR. Reuse `components/ui` tokens, fields, sheets, lists and noti
 
 | Task | Deliverable | Depends on | Status |
 | --- | --- | --- | --- |
-| [M27-T01 — Contracts and design target](../tasks/M27-T01-Define_bodyweight_contracts_and_design_target.md) | Exact domain types, compatibility and UX target | — | planned |
+| [M27-T01 — Contracts and design target](../tasks/M27-T01-Define_bodyweight_contracts_and_design_target.md) | Exact domain types, compatibility and UX target | — | in_progress |
 | [M27-T02 — Synced data](../tasks/M27-T02-Add_bodyweight_schema_and_sync.md) | Measurements, snapshots, personal metadata and load mode | T01 | planned |
-| [M27-T03 — Shared calculations](../tasks/M27-T03-Implement_effective_load_and_RM_calculations.md) | Resolver, volume, forward/inverse RM and completeness | T01 | planned |
+| [M27-T03 — Shared calculations](../tasks/M27-T03-Implement_effective_load_and_RM_calculations.md) | Resolver, volume, forward/inverse RM and completeness | T01 | in_progress |
 | [M27-T04 — Settings and snapshots](../tasks/M27-T04-Add_Settings_weight_and_session_snapshots.md) | Weight entry/history and stable new-session defaults | T02, T03 | planned |
 | [M27-T05 — Exercise setup and logging](../tasks/M27-T05-Configure_exercises_and_bodyweight_logging.md) | Coefficients, reviewed seeds/legacy values, added/assisted entry | T02, T03 | planned |
 | [M27-T06 — Historical backfill](../tasks/M27-T06-Backfill_and_correct_historical_session_weight.md) | Preview, earliest-reading fallback and explicit corrections | T04, T05 | planned |
@@ -293,6 +293,22 @@ captures to its PR. Reuse `components/ui` tokens, fields, sheets, lists and noti
 
 Dependencies describe delivery order, not a request to spawn agents. No task
 is complete merely because a downstream closeout card lists its tests.
+
+### Execution checkpoint (2026-09-26)
+
+- Worktree: `codex/m27-bodyweight`, based on `a34708c0` (latest `origin/main`
+  when work started); isolated slot 1. `./boga doctor` passed.
+- T01 contract and repo-native brief are written under `docs/specs/tech/` and
+  `docs/specs/ui/design-targets/`; selected current-screen references are real
+  402×874pt simulator captures. New M27 UI states remain unimplemented.
+- T03 pure resolver, coverage, group-reps eligibility and named Wathan
+  projection conventions are implemented with shared numerical vectors.
+  Existing consumers are intentionally awaiting T07/T09/T11 adoption.
+- `./boga test fast` passed (165 suites, 1,984 tests); `groups-leaderboards`
+  passed. Full `frontend` is in progress, including a repeat of UI regression
+  after its baseline run hit an XCTest hierarchy HTTP 500. No gate is waived.
+- Next: finish foundation gate evidence and reference captures, then T02's
+  paired schema/sync changes, including old-reader and old-writer compatibility.
 
 ## Milestone acceptance
 

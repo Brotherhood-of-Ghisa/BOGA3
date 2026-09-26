@@ -1,5 +1,10 @@
 # Sync v2 Server Contract
 
+Planned extension: [M27 bodyweight contract](bodyweight-load-contract.md)
+specifies new owner-private measurements and snapshot/load fields, including
+older-reader capability and older-writer field-preservation requirements.
+The mappings below describe the current implementation, not that extension.
+
 > **Promoted from the sync-v2 plan; this is the authoritative sync-v2 server
 > contract.** It merges the two former design docs (`t1` — server schema &
 > drift control; `t2` — push/pull RPC protocol) into one normative reference
