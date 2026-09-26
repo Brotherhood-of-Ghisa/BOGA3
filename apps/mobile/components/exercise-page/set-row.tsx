@@ -39,6 +39,9 @@ export function SetRow({ row, divider, onOpen, onToggle }: SetRowProps) {
   const performed = row.kind === 'performed';
   const values = describeValues(row);
   const effort = formatEffort(row.setType);
+  const meaning = !row.bodyweight ? `Weight · ${row.weightUnit ?? 'kg'}` : row.externalLoadMode === 'unquantified_assistance' ? 'Unquantified assistance' :
+    row.externalLoadMode === 'assistance' ? `Assistance · ${row.weightUnit ?? 'kg'}` :
+    row.externalLoadMode === 'added' ? `Added · ${row.weightUnit ?? 'kg'}` : `Original load · ${row.weightUnit ?? 'kg'}`;
   const glyph = performed ? 'set-done' : row.isCursor ? 'set-current' : 'set-planned';
   const statState = performed ? 'realised' : 'planned';
 
@@ -87,7 +90,7 @@ export function SetRow({ row, divider, onOpen, onToggle }: SetRowProps) {
       }>
       <Pressable
         accessibilityHint="Opens the set for editing"
-        accessibilityLabel={`Set ${row.number}, ${effort}, ${values}, ${performed ? 'performed' : 'not performed'}`}
+        accessibilityLabel={`Set ${row.number}, ${effort}, ${meaning}, ${values}, ${performed ? 'performed' : 'not performed'}`}
         accessibilityRole="button"
         onPress={() => onOpen(row.id)}
         style={styles.body}
@@ -100,10 +103,11 @@ export function SetRow({ row, divider, onOpen, onToggle }: SetRowProps) {
             performed ? (row.weightRecord ? styles.figureRecord : null) : styles.figurePlanned,
           ]}
           testID={`exercise-set-${row.number}-values`}>
-          {row.weight === null && row.reps === null
+          {row.externalLoadMode === 'unquantified_assistance' ? `${row.reps ?? DASH} reps` : row.weight === null && row.reps === null
             ? DASH
             : `${row.weight !== null ? formatWeight(row.weight) : DASH} × ${row.reps ?? DASH}`}
         </Text>
+        <Text allowFontScaling={false} style={pageText.microLabel}>{meaning}</Text>
       </Pressable>
     </ListRow>
   );

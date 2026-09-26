@@ -99,7 +99,11 @@ case "$lane" in
   # Bodyweight entry and frozen snapshots: a dedicated local-only lane so
   # the same asserted flow can be checked on small and large phone layouts.
   bodyweight)
-    run_flow data "Bodyweight entry and snapshots" bodyweight-entry.yaml
+    MAESTRO_RESET_STRATEGY=data \
+    "$SCRIPT_DIR/maestro-ios-run-flows.sh" \
+      --session "Bodyweight entry and logging" \
+      --scenario "Bodyweight entry and snapshots" --flow "$APP_DIR/.maestro/flows/bodyweight-entry.yaml" \
+      --scenario "Bodyweight setup, review and logging" --flow "$APP_DIR/.maestro/flows/bodyweight-logging.yaml"
     ;;
 
   # The exercise page (exercise/session redesign step 4): its own fixture,

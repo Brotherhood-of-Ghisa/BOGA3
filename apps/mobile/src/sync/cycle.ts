@@ -1229,6 +1229,8 @@ export const runSyncCycle = async (): Promise<SyncCycleOutcome> => {
     // nothing. Anything else is real work the next round must follow.
     for (;;) {
       const pulledBefore = await runPullLeg(database);
+      // A replay can make deferred old-client metadata safe to seed in this round.
+      runBundleMigrations(database);
       const pushed = await runPushLeg(database);
       const pulledAfter = await runPullLeg(database);
 

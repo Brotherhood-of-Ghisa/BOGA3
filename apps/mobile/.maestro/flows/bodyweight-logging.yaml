@@ -1,0 +1,485 @@
+appId: com.dinoderek.mobile
+---
+# M27 T05: real editing/review, explicit positive external loads and persisted modes.
+# Uses a deliberately ambiguous historical fixture; no operation preconverts it.
+- openLink: "boga3://maestro-harness?reset=data&fixture=bodyweight-load&teleport=exercise-page&sessionId=maestro_bw_active&sessionExerciseId=maestro_bw_exercise"
+- tapOn:
+    text: "Open"
+    optional: true
+- tapOn:
+    text: "Continue"
+    optional: true
+- tapOn:
+    text: "Close"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "exercise-page"
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "exercise-page-options"
+- extendedWaitUntil:
+    visible:
+      id: "exercise-options-sheet"
+    timeout: 30000
+- tapOn:
+    id: "exercise-options-edit"
+- extendedWaitUntil:
+    visible:
+      id: "exercise-editor-name-input"
+    timeout: 30000
+- hideKeyboard:
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 4000
+- scrollUntilVisible:
+    element:
+      id: "exercise-editor-bodyweight-percentage"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "exercise-editor-bodyweight-percentage"
+- eraseText: 100
+- inputText: "101"
+- hideKeyboard:
+    optional: true
+- tapOn: "Save exercise definition"
+- extendedWaitUntil:
+    visible:
+      id: "exercise-editor-bodyweight-error"
+    timeout: 30000
+- takeScreenshot: "BWL00-invalid-coefficient"
+- scrollUntilVisible:
+    element:
+      id: "exercise-editor-bodyweight-percentage"
+    direction: UP
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "exercise-editor-bodyweight-percentage"
+- eraseText: 100
+- inputText: "100"
+# iOS decimal-pad has no Return key. Drag the form to dismiss it before
+# querying the next field; offscreen AX bounds can overlap the keyboard.
+- swipe:
+    start: "50%,40%"
+    end: "50%,25%"
+    duration: 500
+- waitForAnimationToEnd:
+    timeout: 4000
+- scrollUntilVisible:
+    element:
+      id: "exercise-editor-movement-standard"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "exercise-editor-movement-standard"
+- waitForAnimationToEnd:
+    timeout: 4000
+- eraseText: 100
+- inputText: "Strict pull-up"
+- assertVisible:
+    id: "exercise-editor-movement-standard"
+    text: "Strict pull-up"
+- pressKey: Enter
+- waitForAnimationToEnd:
+    timeout: 4000
+- scrollUntilVisible:
+    element:
+      id: "exercise-editor-loading-method"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "exercise-editor-loading-method"
+- waitForAnimationToEnd:
+    timeout: 4000
+- eraseText: 100
+- inputText: "Belt"
+- assertVisible:
+    id: "exercise-editor-loading-method"
+    text: "Belt"
+- pressKey: Enter
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: "BWL01-exercise-rules"
+- tapOn: "Save exercise definition"
+- extendedWaitUntil:
+    visible:
+      id: "legacy-load-review"
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: "BWL02-original-loads"
+- scrollUntilVisible:
+    element:
+      id: "legacy-load-meaning-total"
+    direction: UP
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "legacy-load-meaning-total"
+- assertVisible:
+    id: "legacy-load-meaning-total"
+    selected: true
+- scrollUntilVisible:
+    element:
+      id: "legacy-load-unit-kg"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "legacy-load-unit-kg"
+- assertVisible:
+    id: "legacy-load-unit-kg"
+    selected: true
+- scrollUntilVisible:
+    element:
+      id: "legacy-load-select-maestro_bw_legacy:actual"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "legacy-load-select-maestro_bw_legacy:actual"
+- assertVisible:
+    id: "legacy-load-select-maestro_bw_legacy:actual"
+    selected: true
+- scrollUntilVisible:
+    element:
+      id: "legacy-load-select-maestro_bw_plan:planned"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "legacy-load-select-maestro_bw_plan:planned"
+- assertVisible:
+    id: "legacy-load-select-maestro_bw_plan:planned"
+    selected: true
+- scrollUntilVisible:
+    element:
+      id: "legacy-load-preview"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "legacy-load-preview"
+- scrollUntilVisible:
+    element:
+      id: "legacy-load-preview-maestro_bw_legacy:actual"
+    direction: UP
+    centerElement: true
+    timeout: 20000
+- assertVisible:
+    id: "legacy-load-preview-maestro_bw_legacy:actual"
+    text: "Added: 0 kg \u00b7 Effective load 80 kg"
+- takeScreenshot: "BWL03-conversion-preview"
+- scrollUntilVisible:
+    element:
+      id: "legacy-load-preview-maestro_bw_plan:planned"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible:
+    id: "legacy-load-preview-maestro_bw_plan:planned"
+    text: "Added: 20 kg \u00b7 Effective load 100 kg"
+- scrollUntilVisible:
+    element:
+      id: "legacy-load-apply"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "legacy-load-apply"
+- extendedWaitUntil:
+    visible:
+      id: "legacy-load-result"
+    timeout: 30000
+- tapOn: "Done"
+- extendedWaitUntil:
+    visible:
+      id: "exercise-page"
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 4000
+- scrollUntilVisible:
+    element:
+      id: "exercise-set-logger-preview"
+    direction: UP
+    centerElement: true
+    timeout: 20000
+- assertVisible:
+    id: "exercise-set-logger-preview"
+    text: "1RM 102.1 \u00b7 VOL 640"
+- takeScreenshot: "BWL04-bodyweight-only"
+- scrollUntilVisible:
+    element:
+      id: "exercise-set-logger-commit"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "exercise-set-logger-commit"
+- waitForAnimationToEnd:
+    timeout: 4000
+- scrollUntilVisible:
+    element:
+      id: "exercise-set-logger-preview"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible:
+    id: "exercise-set-logger-preview"
+    text: "1RM 127.7 \u00b7 VOL 800"
+- takeScreenshot: "BWL05-planned-added"
+- scrollUntilVisible:
+    element:
+      id: "exercise-set-logger-commit"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "exercise-set-logger-commit"
+- waitForAnimationToEnd:
+    timeout: 4000
+- scrollUntilVisible:
+    element:
+      id: "exercise-add-set"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "exercise-add-set"
+- hideKeyboard:
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 4000
+- scrollUntilVisible:
+    element:
+      id: "exercise-set-load-mode-assistance"
+    direction: UP
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "exercise-set-load-mode-assistance"
+- assertVisible:
+    id: "exercise-set-logger-preview"
+    text: "1RM 76.6 \u00b7 VOL 480"
+- takeScreenshot: "BWL06-quantified-assistance"
+- scrollUntilVisible:
+    element:
+      id: "exercise-set-logger-commit"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "exercise-set-logger-commit"
+- waitForAnimationToEnd:
+    timeout: 4000
+- scrollUntilVisible:
+    element:
+      id: "exercise-add-set"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "exercise-add-set"
+- hideKeyboard:
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 4000
+- scrollUntilVisible:
+    element:
+      id: "exercise-set-load-mode-unquantified_assistance"
+    direction: UP
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "exercise-set-load-mode-unquantified_assistance"
+- assertVisible:
+    id: "exercise-set-logger-preview"
+    text: "1RM \u2014 \u00b7 VOL \u2014"
+- takeScreenshot: "BWL07-unquantified"
+- scrollUntilVisible:
+    element:
+      id: "exercise-set-logger-commit"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "exercise-set-logger-commit"
+- waitForAnimationToEnd:
+    timeout: 4000
+- stopApp
+- openLink: "${MAESTRO_IOS_DEV_CLIENT_URL}"
+- extendedWaitUntil:
+    visible:
+      id: "today-screen"
+    timeout: 30000
+- extendedWaitUntil:
+    notVisible: "(Loading from Metro|Downloading|Bundling).*"
+    timeout: 30000
+- openLink: "boga3://session/maestro_bw_active/exercise/maestro_bw_exercise"
+- extendedWaitUntil:
+    visible:
+      id: "exercise-page"
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 4000
+- scrollUntilVisible:
+    element:
+      id: "exercise-set-2-vol"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible:
+    id: "exercise-set-2-vol"
+    text: "Vol 800"
+- scrollUntilVisible:
+    element:
+      id: "exercise-set-3-vol"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible:
+    id: "exercise-set-3-vol"
+    text: "Vol 480"
+- takeScreenshot: "BWL08-restored-modes"
+- openLink: "boga3://maestro-harness?reset=data&fixture=bodyweight-load-missing&teleport=exercise-page&sessionId=maestro_bw_active&sessionExerciseId=maestro_bw_exercise"
+- tapOn:
+    text: "Open"
+    optional: true
+- tapOn:
+    text: "Continue"
+    optional: true
+- tapOn:
+    text: "Close"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "exercise-page"
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 4000
+- scrollUntilVisible:
+    element:
+      id: "exercise-set-load-unavailable"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible:
+    id: "exercise-set-load-unavailable"
+    text: "Unavailable \u00b7 session weight missing."
+- takeScreenshot: "BWL09-missing-session-weight"
+- scrollUntilVisible:
+    element:
+      id: "exercise-set-logger-commit"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "exercise-set-logger-commit"
+- waitForAnimationToEnd:
+    timeout: 4000
+- scrollUntilVisible:
+    element:
+      id: "session-body-weight"
+    direction: UP
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "session-body-weight"
+- extendedWaitUntil:
+    visible:
+      id: "weight-entry-value"
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: "weight-entry-value"
+    direction: UP
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "weight-entry-value"
+- eraseText: 100
+- inputText: "82"
+- hideKeyboard:
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 4000
+- scrollUntilVisible:
+    element:
+      id: "weight-entry-save"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "weight-entry-save"
+- extendedWaitUntil:
+    notVisible:
+      id: "weight-entry-sheet"
+    timeout: 15000
+- waitForAnimationToEnd:
+    timeout: 4000
+- scrollUntilVisible:
+    element:
+      id: "exercise-set-1-vol"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible:
+    id: "exercise-set-1-vol"
+    text: "Vol 656"
+- takeScreenshot: "BWL10-corrected-session-context"
+- openLink: "boga3://maestro-harness?reset=data&teleport=session-list"
+- extendedWaitUntil:
+    visible:
+      id: "stats-history-screen"
+    timeout: 30000

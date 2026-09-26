@@ -5,6 +5,7 @@ import { nowMonotonic, type Transaction } from './clock';
 import { exerciseDefinitions, exerciseMuscleMappings, muscleGroups } from './schema';
 import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidation';
 import { validateExerciseCore, type LoadInputMode } from '@/src/exercise-core';
+import { validateExerciseLoadRules, type ExerciseLoadRules } from '@/src/exercise-core/load-rules';
 import { notifyLocalWrite } from '@/src/sync/write-nudge';
 
 export type ExerciseCatalogMuscleGroup = {
@@ -22,6 +23,7 @@ export type ExerciseCatalogExerciseMuscleMapping = {
 };
 
 export type ExerciseCatalogExercise = {
+  localBodyweightMetadataKnown?: boolean;
   bodyweightCoefficient?: number;
   movementStandard?: string | null;
   loadingMethod?: string | null;
@@ -37,6 +39,8 @@ export type ListExerciseCatalogExercisesOptions = {
 };
 
 export type SaveExerciseCatalogExerciseInput = {
+  /** Omission preserves existing metadata; an intentional edit supplies the whole tuple. */
+  loadRules?: ExerciseLoadRules;
   id?: string;
   name: string;
   loadInputMode?: LoadInputMode;
@@ -55,6 +59,7 @@ export type SetExerciseCatalogExerciseDeletedStateInput = {
 };
 
 type DrizzleExerciseRow = {
+  localBodyweightMetadataKnown?: boolean;
   bodyweightCoefficient?: number;
   movementStandard?: string | null;
   loadingMethod?: string | null;
@@ -68,6 +73,7 @@ export type ExerciseCatalogStore = {
   listMuscleGroups(): Promise<ExerciseCatalogMuscleGroup[]>;
   listExercises(input: { includeDeleted: boolean }): Promise<ExerciseCatalogExercise[]>;
   saveExercise(input: {
+    loadRules?: ExerciseLoadRules;
     id?: string;
     name: string;
     loadInputMode?: LoadInputMode;
@@ -106,6 +112,7 @@ const mapExerciseGraph = (
     id: exerciseRow.id,
     name: exerciseRow.name,
     loadInputMode: exerciseRow.loadInputMode,
+    localBodyweightMetadataKnown: exerciseRow.localBodyweightMetadataKnown ?? true,
     bodyweightCoefficient: exerciseRow.bodyweightCoefficient ?? 0,
     movementStandard: exerciseRow.movementStandard ?? null,
     loadingMethod: exerciseRow.loadingMethod ?? null,
@@ -130,6 +137,7 @@ const listExerciseGraphs = async (
       id: exerciseDefinitions.id,
       name: exerciseDefinitions.name,
       loadInputMode: exerciseDefinitions.loadInputMode,
+      localBodyweightMetadataKnown: exerciseDefinitions.localBodyweightMetadataKnown,
       bodyweightCoefficient: exerciseDefinitions.bodyweightCoefficient,
       movementStandard: exerciseDefinitions.movementStandard,
       loadingMethod: exerciseDefinitions.loadingMethod,
@@ -173,6 +181,7 @@ const listExerciseGraphs = async (
 };
 
 export type ExerciseGraphWrite = {
+  loadRules?: ExerciseLoadRules;
   id: string;
   name: string;
   loadInputMode: LoadInputMode;
@@ -195,6 +204,9 @@ export const createLocalExerciseId = (): string => createLocalId('exercise-defin
  */
 export const writeExerciseGraph = (tx: Transaction, input: ExerciseGraphWrite): void => {
   const exerciseId = input.id;
+  const checkedRules = input.loadRules === undefined ? null : validateExerciseLoadRules(input.loadRules);
+  if (checkedRules && !checkedRules.ok) throw new Error(checkedRules.message);
+  const metadata = checkedRules?.ok ? { ...checkedRules.value, localBodyweightMetadataKnown: true } : {};
   const existing = tx
     .select({ id: exerciseDefinitions.id })
     .from(exerciseDefinitions)
@@ -204,6 +216,7 @@ export const writeExerciseGraph = (tx: Transaction, input: ExerciseGraphWrite): 
   if (existing) {
     tx.update(exerciseDefinitions)
       .set({
+        ...metadata,
         name: input.name,
         loadInputMode: input.loadInputMode,
         deletedAt: null,
@@ -217,6 +230,7 @@ export const writeExerciseGraph = (tx: Transaction, input: ExerciseGraphWrite): 
     tx.insert(exerciseDefinitions)
       .values({
         id: exerciseId,
+        ...metadata,
         name: input.name,
         loadInputMode: input.loadInputMode,
         deletedAt: null,
@@ -304,6 +318,7 @@ export const readExerciseGraph = (database: LocalDatabase, exerciseId: string): 
       id: exerciseDefinitions.id,
       name: exerciseDefinitions.name,
       loadInputMode: exerciseDefinitions.loadInputMode,
+      localBodyweightMetadataKnown: exerciseDefinitions.localBodyweightMetadataKnown,
       bodyweightCoefficient: exerciseDefinitions.bodyweightCoefficient,
       movementStandard: exerciseDefinitions.movementStandard,
       loadingMethod: exerciseDefinitions.loadingMethod,
@@ -362,6 +377,7 @@ export const createDrizzleExerciseCatalogStore = (): ExerciseCatalogStore => ({
         id: exerciseId,
         name: input.name,
         loadInputMode: input.loadInputMode ?? 'total_load',
+        loadRules: input.loadRules,
         mappings: input.mappings,
         now: input.now,
       });
@@ -453,7 +469,9 @@ export const normalizeExerciseGraphInput = (
     };
   });
 
-  return { name, loadInputMode, mappings, now };
+  const rules = input.loadRules === undefined ? null : validateExerciseLoadRules(input.loadRules);
+  if (rules && !rules.ok) throw new Error(rules.message);
+  return { name, loadInputMode, mappings, now, ...(rules?.ok ? { loadRules: rules.value } : {}) };
 };
 
 export const createExerciseCatalogRepository = (store: ExerciseCatalogStore = createDrizzleExerciseCatalogStore()) => {

@@ -195,14 +195,51 @@ versions carry the new meaning/context fields; old packages remain unresolved.
 
 Only reviewed exact canonical ids receive defaults: `seed_pull_up` (1),
 `seed_chin-ups` (1), `seed_parallel_bar_dips` (1), `seed_push_up` (.7).
-T05 must verify which aliases survive current seed migration before adding an
-alias to that list. Machine/bench/ball dips and incline/decline/knee/other
+The T05 inventory confirms those four identities survive the M19 starter filter;
+no alias is added. Their initial standards/methods are `Strict pull-up` / `Belt`,
+`Strict chin-up` / `Belt`, `Parallel-bar dip` / `Belt`, and
+`Standard floor push-up` / `Vest`. These are editable explicit descriptions,
+trimmed single lines of at most 120 characters. A positive coefficient requires
+both descriptions. There is no name-based classification. Machine/bench/ball dips and incline/decline/knee/other
 push-up variants never inherit by substring. Preserve customized metadata.
 Movement standard and loading method identify the movement, independent of c.
 Links require explicitly matching standards/methods (or reviewed compatible
 conventional identities); unequal c alone does not make a link incompatible.
 A different movement needs a different exercise. Linking never copies rules
 over personal metadata. Two groups can evaluate one set with different c.
+
+T05 implementation: the catalogue's generation 3 patch changes only live, exact
+canonical identities whose names still match the bundle and whose known metadata
+remains 0/null/null. Renames, custom rules and deleted seeds are preserved.
+Unknown old-client metadata defers the generation marker until sync replay has
+hydrated it; the cycle checks again after its first pull. Omitted repository
+`loadRules` preserves the stored tuple; an explicit valid tuple marks it known.
+
+The logger carries actual/planned units and modes through typing, confirmation,
+copy and graph autosave. A stale page whose metadata was unknown omits its
+placeholders at the write boundary, preserving a replay completed meanwhile.
+New empty rows start with explicit added kg. Copies preserve their source's
+meaning, including unresolved legacy rows. Session-only correction is available
+on the exercise page. Logger previews resolve the frozen context; broader
+records/analytics adoption remains T07.
+
+`src/data/legacy-load-review.ts` inventories actual and planned unresolved values,
+previews selected interpretations, and rechecks the complete source membership
+and versions in one local transaction. Originals and estimated source dates stay
+visible in the preview. Unit choice is always explicit, including old `kg`
+placeholders; a legacy zero is unresolved too. Known transport metadata is
+required before review. Changes in sync dirty bookkeeping alone do not invalidate
+a preview. Apply recomputes from current source rows and never confirms a set.
+The result is ordinary dirty Sync v2 data, with no global compare-and-set claim.
+
+Session-import v2 adds explicit actual/planned meaning, frozen context, personal
+rules for newly created exercises and optional owner-private reading content
+(an explicit empty array is allowed). The versioned serializer preserves these
+fields; local and sync-RPC import paths agree. v1 imports omit new wire fields
+and keep old loads unresolved. Both versions use the original import identity
+namespace, preventing duplicate sessions just because the schema was upgraded.
+Reimport is not a legacy conversion workflow. See the owning
+[import contract](../../../apps/mobile/scripts/import/BOGA_IMPORT_JSON_CONTRACT.md).
 
 ## 6. Group metrics, revisions and certification
 

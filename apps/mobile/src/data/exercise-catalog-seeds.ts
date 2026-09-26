@@ -1,5 +1,7 @@
 import { asc, eq, inArray } from 'drizzle-orm';
 
+import { BODYWEIGHT_SEED_RULES, CONVENTIONAL_LOAD_RULES, type ExerciseLoadRules } from '@/src/exercise-core/load-rules';
+
 import { nowMonotonic } from './clock';
 import { exerciseDefinitions, exerciseMuscleMappings, muscleGroups, syncRuntimeState } from './schema';
 import type { LocalDatabase } from './bootstrap';
@@ -31,7 +33,7 @@ const SEED_RUNTIME_STATE_ID = 'primary';
  * is not monotone in a way the marker can compare). Bump this by one whenever
  * a catalog change needs to reach already-seeded devices.
  */
-export const CURRENT_APP_VERSION = 2;
+export const CURRENT_APP_VERSION = 3;
 
 /**
  * Catalog seed bundle version stamped by the first-install seeder. Aliased to
@@ -48,7 +50,7 @@ export type MuscleGroupSeed = {
   isEditable: 0;
 };
 
-export type SystemExerciseDefinitionSeed = {
+export type SystemExerciseDefinitionSeed = Partial<ExerciseLoadRules> & {
   id: string;
   name: string;
   loadInputMode: 'total_load' | 'per_side_load';
@@ -858,6 +860,7 @@ export const SYSTEM_EXERCISE_DEFINITION_SEEDS: SystemExerciseDefinitionSeed[] =
   SYSTEM_EXERCISE_DEFINITION_INPUTS.filter((exercise) => M19_STARTER_EXERCISE_KEEP_IDS.has(exercise.id)).map(
     (exercise) => ({
       ...exercise,
+      ...(BODYWEIGHT_SEED_RULES[exercise.id] ?? CONVENTIONAL_LOAD_RULES),
       name: M19_STARTER_EXERCISE_NAME_OVERRIDES[exercise.id] ?? exercise.name,
       loadInputMode: PER_SIDE_LOAD_SEED_IDS.has(exercise.id) ? 'per_side_load' : 'total_load',
     })

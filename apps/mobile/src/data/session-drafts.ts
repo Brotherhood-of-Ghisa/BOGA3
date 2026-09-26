@@ -26,6 +26,7 @@ export type SessionBodyWeightSnapshot = {
 };
 
 export type SessionSetLoadMetadata = {
+  localBodyweightMetadataKnown?: boolean;
   weightUnit?: string;
   externalLoadMode?: string | null;
   plannedWeightUnit?: string | null;
@@ -358,6 +359,7 @@ const mapDraftSnapshot = (graph: StoredDraftGraph): SessionDraftSnapshot => ({
       id: set.id,
       repsValue: set.repsValue,
       weightValue: set.weightValue,
+      localBodyweightMetadataKnown: set.localBodyweightMetadataKnown,
       weightUnit: set.weightUnit ?? 'kg',
       externalLoadMode: set.externalLoadMode ?? null,
       plannedWeightUnit: set.plannedWeightUnit ?? null,
@@ -398,6 +400,7 @@ const mapSessionGraphSnapshot = (graph: StoredDraftGraph): SessionGraphSnapshot 
       id: set.id,
       repsValue: set.repsValue,
       weightValue: set.weightValue,
+      localBodyweightMetadataKnown: set.localBodyweightMetadataKnown,
       weightUnit: set.weightUnit ?? 'kg',
       externalLoadMode: set.externalLoadMode ?? null,
       plannedWeightUnit: set.plannedWeightUnit ?? null,
@@ -458,6 +461,7 @@ const loadDraftGraphBySessionId = (database: LocalDatabase, sessionId: string): 
       orderIndex: row.orderIndex,
       repsValue: row.repsValue,
       weightValue: row.weightValue,
+      localBodyweightMetadataKnown: row.localBodyweightMetadataKnown,
       weightUnit: row.weightUnit ?? 'kg',
       externalLoadMode: row.externalLoadMode ?? null,
       plannedWeightUnit: row.plannedWeightUnit ?? null,
@@ -690,7 +694,16 @@ const replaceSessionExerciseGraph = (
     }
 
     const keptSetIds = keptSetIdsByExerciseId.get(sessionExerciseId) ?? new Set<string>();
-    exercise.sets.forEach((set, setIndex) => {
+    exercise.sets.forEach((sourceSet, setIndex) => {
+      // A page loaded before metadata replay must not write its placeholders
+      // over values hydrated since it opened. Ordinary amount edits still save.
+      const set = sourceSet.localBodyweightMetadataKnown === false ? { ...sourceSet,
+        weightUnit: undefined, externalLoadMode: undefined,
+        plannedWeightUnit: undefined, plannedExternalLoadMode: undefined } : sourceSet;
+      const knownMetadata = set.localBodyweightMetadataKnown === true &&
+        set.weightUnit !== undefined && set.externalLoadMode !== undefined &&
+        set.plannedWeightUnit !== undefined && set.plannedExternalLoadMode !== undefined
+        ? { localBodyweightMetadataKnown: true } : {};
       const requestedSetId = set.id?.trim();
       const existingSet = requestedSetId ? existingSetsById.get(requestedSetId) : undefined;
       // Only reuse a set row that already belongs to THIS exercise; otherwise a
@@ -726,6 +739,7 @@ const replaceSessionExerciseGraph = (
           .set({
             sessionExerciseId,
             orderIndex: setIndex,
+            ...knownMetadata,
             repsValue: set.repsValue,
             weightValue: set.weightValue,
             weightUnit: set.weightUnit === undefined ? (reuseSet ? existingSet?.weightUnit : undefined) ?? 'kg' : set.weightUnit,
@@ -752,6 +766,7 @@ const replaceSessionExerciseGraph = (
             id: setId,
             sessionExerciseId,
             orderIndex: setIndex,
+            ...knownMetadata,
             repsValue: set.repsValue,
             weightValue: set.weightValue,
             weightUnit: set.weightUnit === undefined ? (reuseSet ? existingSet?.weightUnit : undefined) ?? 'kg' : set.weightUnit,
@@ -1153,7 +1168,8 @@ export const createSessionDraftRepository = (store: SessionDraftStore = createDr
         id: set.id,
         repsValue: set.repsValue,
         weightValue: set.weightValue,
-        weightUnit: set.weightUnit ?? 'kg',
+        localBodyweightMetadataKnown: set.localBodyweightMetadataKnown,
+      weightUnit: set.weightUnit ?? 'kg',
         externalLoadMode: set.externalLoadMode ?? null,
         plannedWeightUnit: set.plannedWeightUnit ?? null,
         plannedExternalLoadMode: set.plannedExternalLoadMode ?? null,
@@ -1266,7 +1282,8 @@ export const createSessionDraftRepository = (store: SessionDraftStore = createDr
           id: set.id,
           repsValue: set.repsValue,
           weightValue: set.weightValue,
-          weightUnit: set.weightUnit ?? 'kg',
+          localBodyweightMetadataKnown: set.localBodyweightMetadataKnown,
+      weightUnit: set.weightUnit ?? 'kg',
           externalLoadMode: set.externalLoadMode ?? null,
           plannedWeightUnit: set.plannedWeightUnit ?? null,
           plannedExternalLoadMode: set.plannedExternalLoadMode ?? null,

@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Keyboard, Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
-import { ExerciseCoreFields } from '@/components/exercise-core/exercise-core-fields';
+import { LegacyLoadReviewContent } from '@/components/bodyweight/legacy-load-review-sheet';
+import { listLegacyLoads } from '@/src/data/legacy-load-review';
+import { ExerciseCoreFields, type ExerciseLoadFieldsValue } from '@/components/exercise-core/exercise-core-fields';
 import { ActionButton } from '@/components/ui/action-button';
 import { Card } from '@/components/ui/card';
 import { Icon } from '@/components/ui/icon';
@@ -13,6 +15,7 @@ import { StatePanel } from '@/components/ui/state-panel';
 import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import { validateExerciseCore } from '@/src/exercise-core';
+import { validateExerciseLoadRules, type ExerciseLoadRules } from '@/src/exercise-core/load-rules';
 import {
   saveExerciseCatalogExercise,
   type ExerciseCatalogExercise,
@@ -35,12 +38,14 @@ type MuscleSelectorMode = 'primary' | 'secondary' | null;
 
 /** Initial values for a new exercise (M25-T07 "Add as new" from a group exercise). */
 export type ExerciseEditorPrefill = {
+  loadRules?: ExerciseLoadRules;
   name: string;
   loadInputMode: 'total_load' | 'per_side_load';
   mappings: Pick<ExerciseCatalogExerciseMuscleMapping, 'muscleGroupId' | 'weight' | 'role'>[];
 };
 
 export type ExerciseEditorSaveInput = {
+  loadRules?: ExerciseLoadRules;
   name: string;
   loadInputMode: 'total_load' | 'per_side_load';
   mappings: { muscleGroupId: string; weight: number; role: ExerciseCatalogExerciseMuscleMapping['role'] }[];
@@ -120,9 +125,14 @@ export function ExerciseEditorModal({
   onSave,
   title,
 }: ExerciseEditorModalProps) {
+  const [reviewExercise, setReviewExercise] = useState<ExerciseCatalogExercise | null>(null);
+  const reviewBusy = useRef(false);
   const [isSaving, setIsSaving] = useState(false);
   const [muscleSelectorMode, setMuscleSelectorMode] = useState<MuscleSelectorMode>(null);
   const [exerciseName, setExerciseName] = useState('');
+  const [loadFields, setLoadFields] = useState<ExerciseLoadFieldsValue>({ percentage: '0', movementStandard: '', loadingMethod: '' });
+  const [loadFieldsTouched, setLoadFieldsTouched] = useState(false);
+  const [loadRulesError, setLoadRulesError] = useState<string | null>(null);
   const [loadInputMode, setLoadInputMode] = useState<'total_load' | 'per_side_load'>('total_load');
   const [primaryMuscleGroupId, setPrimaryMuscleGroupId] = useState<string | null>(null);
   const [secondaryMuscleRows, setSecondaryMuscleRows] = useState<EditableSecondaryMuscleRow[]>([]);
@@ -144,6 +154,7 @@ export function ExerciseEditorModal({
 
   useEffect(() => {
     if (!visible) {
+      setReviewExercise(null);
       return;
     }
 
@@ -172,6 +183,11 @@ export function ExerciseEditorModal({
       setSecondaryMuscleRows([]);
     }
 
+    const rules = editingExercise ?? prefill?.loadRules;
+    setLoadFields({ percentage: `${(rules?.bodyweightCoefficient ?? 0) * 100}`,
+      movementStandard: rules?.movementStandard ?? '', loadingMethod: rules?.loadingMethod ?? '' });
+    setLoadFieldsTouched(false);
+    setLoadRulesError(null);
     setMuscleSelectorMode(null);
     setValidation(createBlankValidationState());
     setSaveError(null);
@@ -320,12 +336,27 @@ export function ExerciseEditorModal({
       return;
     }
 
+    let loadRules: ExerciseLoadRules | undefined;
+    if (!editingExercise || editingExercise.localBodyweightMetadataKnown !== false || loadFieldsTouched) {
+      const percentage = /^(?:\d+(?:\.\d*)?|\.\d+)$/.test(loadFields.percentage.trim())
+        ? Number(loadFields.percentage) : NaN;
+      const checked = validateExerciseLoadRules({ bodyweightCoefficient: percentage / 100,
+        movementStandard: loadFields.movementStandard, loadingMethod: loadFields.loadingMethod });
+      if (!checked.ok) { setLoadRulesError(checked.message); return; }
+      loadRules = checked.value;
+    }
+    setLoadRulesError(null);
+    Keyboard.dismiss();
     setIsSaving(true);
     try {
-      const input = { name: exerciseName, loadInputMode, mappings: result.parsedMappings };
+      const input = { loadRules, name: exerciseName, loadInputMode, mappings: result.parsedMappings };
       const savedExercise = onSave
         ? await onSave(input)
         : await saveExerciseCatalogExercise({ id: editingExercise?.id ?? undefined, ...input });
+      if (editingExercise && (savedExercise.bodyweightCoefficient ?? 0) > 0) {
+        const unresolved = await listLegacyLoads(savedExercise.id).then(data => data.candidates.length > 0).catch(() => true);
+        if (unresolved) { setReviewExercise(savedExercise); return; }
+      }
       onSaved(savedExercise);
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : 'Unable to save exercise.');
@@ -336,11 +367,15 @@ export function ExerciseEditorModal({
 
   const isSelectorOpen = muscleSelectorMode !== null;
 
+  const finishReview = () => {
+    if (reviewExercise && !reviewBusy.current) onSaved(reviewExercise);
+  };
+
   return (
     <Sheet
-      dismissLabel="Dismiss exercise editor overlay"
+      dismissLabel={reviewExercise ? "Leave old loads unresolved" : "Dismiss exercise editor overlay"}
       headerLeading={
-        isSelectorOpen ? (
+        !reviewExercise && isSelectorOpen ? (
           <IconButton
             accessibilityLabel="Back to exercise"
             name="chevron-left"
@@ -350,10 +385,12 @@ export function ExerciseEditorModal({
         ) : undefined
       }
       keyboardAvoiding
-      onDismiss={closeEditorModal}
-      testID="exercise-editor"
-      title={isSelectorOpen ? selectorTitle : editorTitle}
+      onDismiss={reviewExercise ? finishReview : closeEditorModal}
+      testID={reviewExercise ? "legacy-load-review" : "exercise-editor"}
+      title={reviewExercise ? "Review original loads" : isSelectorOpen ? selectorTitle : editorTitle}
       visible={visible}>
+      {reviewExercise ? <LegacyLoadReviewContent visible={visible} exerciseId={reviewExercise.id}
+        onBusyChange={value => { reviewBusy.current = value; }} onDismiss={finishReview} /> :
       <View style={[styles.body, { height: height * EDITOR_SHARE_OF_SCREEN }]}>
         {isLoadingMuscleGroups ? <StatePanel body="Loading muscle groups…" kind="loading" /> : null}
 
@@ -368,11 +405,15 @@ export function ExerciseEditorModal({
             <View style={isSelectorOpen ? styles.hidden : styles.panel}>
               <ScrollView
                 contentContainerStyle={styles.formContent}
+                keyboardDismissMode="on-drag"
                 keyboardShouldPersistTaps="handled"
                 style={styles.panel}>
                 <ExerciseCoreFields
                   autoFocus
                   loadInputMode={loadInputMode}
+                  loadRules={{ value: loadFields, error: loadRulesError,
+                    metadataKnown: editingExercise?.localBodyweightMetadataKnown,
+                    onChange: (value) => { setLoadFields(value); setLoadFieldsTouched(true); setLoadRulesError(null); } }}
                   name={exerciseName}
                   nameError={validation.nameError}
                   onChangeLoadInputMode={setLoadInputMode}
@@ -546,7 +587,7 @@ export function ExerciseEditorModal({
             ) : null}
           </>
         ) : null}
-      </View>
+      </View>}
     </Sheet>
   );
 }

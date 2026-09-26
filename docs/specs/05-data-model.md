@@ -25,8 +25,11 @@ The [M27 bodyweight contract](tech/bodyweight-load-contract.md) defines private
 measurements, frozen session snapshots and explicit external load metadata.
 Their paired SQLite/server schema and sync transport are implemented. Reading
 entry/history and explicit session correction use the local repository; new
-sessions freeze context in their creation transaction. Backfill and
-calculation-consumer activation are separate rollout work.
+sessions freeze context in their creation transaction. Personal exercise setup,
+explicit actual/planned load meaning and transactional legacy review use these
+same fields. Backfill and broader calculation-consumer activation are separate
+rollout work. The import contract defines v2 preservation of readings, frozen
+context and load meaning; v1 writes omit new fields rather than clearing them.
 
 1. Mobile local data layer (`SQLite` via Drizzle)
 - primary runtime store for app behavior.

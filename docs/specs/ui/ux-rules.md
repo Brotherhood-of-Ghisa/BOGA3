@@ -41,6 +41,30 @@ Deleted sessions expose the fact without a correction action.
 The visual target is `design-targets/bodyweight.md`. Historical fill and
 load-dependent consumer adoption are separate M27 tasks, not implied by entry.
 
+### Bodyweight exercise setup and load review (M27-T05)
+
+The shared exercise fields accept contribution from 0–100%; positive values
+require a movement standard and loading method. Help text explains the
+approximation, retroactive personal effect and separate group authority. The
+per-side choice scales only equal external inputs, never the session weight.
+An editor whose saved metadata has not arrived preserves it unless the user
+explicitly configures these fields.
+
+The in-place logger keeps its confirmation tick. Added/Assisted/Unquantified
+choices and kg/lb controls preserve positive input. It shows effective resistance
+and the session kg, or an explicit unavailable reason. Unquantified assistance
+hides the numeric amount without inventing kg. A legacy row offers Review;
+choosing a new meaning does not silently promote an old amount. The exercise
+page exposes the same session correction control as View Session.
+
+Saving bodyweight settings on an exercise with unresolved logs opens the review
+sheet; it is also available from exercise options. Select only rows sharing the
+chosen interpretation and source unit, then Preview. Original raw values, actual
+versus planned status, proposed values and session source dates remain visible.
+Only Apply writes. Missing B blocks old-total conversion; invalid input and stale
+previews remain editable. Leave unresolved makes no set changes. Confirmation
+status is preserved even when the reviewed row has usable values.
+
 ### 1. Action semantics
 
 1. Primary actions are filled/high-emphasis actions used for the main next step in a section/screen.

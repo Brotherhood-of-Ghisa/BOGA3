@@ -585,6 +585,23 @@ Brief entrypoint inventory of the current reusable UI component set.
   `bodyweight-entry.test.ts`, `bodyweight-screen.test.tsx` and the bodyweight
   flow in `ios-bodyweight`.
 
+### Bodyweight load controls (M27-T05)
+
+- `ExerciseCoreFields.loadRules` is optional so conventional group callers can
+  retain their current contract until group rule adoption. It contains percentage,
+  movement and loading text, a change callback, known-metadata status and inline
+  error. The personal editor validates the complete tuple before saving.
+- `SetLogger` accepts frozen `loadContext`, unit/mode, metadata-known status,
+  explicit review state and callbacks. Unit/mode segments have 44pt minimum
+  height. A legacy row opens review before its load meaning becomes eligible.
+- `LegacyLoadReviewSheet` composes Sheet, Card/ListRow selection, unit segments,
+  preview and one primary Apply action. No unit or interpretation is preselected.
+  It guards duplicate writes and retains a failed preview. Source date and
+  estimated provenance are human-readable. Test IDs use `legacy-load-*`.
+- Pure/data coverage: `bodyweight-load-review.test.ts`, `bodyweight-import.test.ts`;
+  interaction coverage: `bodyweight-logging-ui.test.tsx`. New rendered evidence
+  is required by `design-targets/bodyweight.md` before UI closeout.
+
 ### UI-supporting shared module (non-visual)
 
 1. `session-recorder/types.ts`

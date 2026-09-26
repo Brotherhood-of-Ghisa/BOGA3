@@ -1,3 +1,4 @@
+import { calculateEffectiveSetMetrics, type LoadContext } from '@/src/exercise-calculations/effective-load';
 import type { SessionDraftSetSnapshot } from '@/src/data/session-drafts';
 import { defaultSessionSetType, formatSessionSetType, SESSION_SET_TYPE_CYCLE, type SessionSetTypeValue } from '@/src/data/set-types';
 import {
@@ -30,6 +31,9 @@ export type SetRowView = {
   isCursor: boolean;
   setType: SessionSetTypeValue;
   weight: number | null;
+  weightUnit?: string;
+  externalLoadMode?: string | null;
+  bodyweight?: boolean;
   reps: number | null;
   oneRepMax: number | null;
   volume: number | null;
@@ -81,15 +85,19 @@ export const isPerformed = (set: ExercisePageSet): boolean =>
  */
 export const displayedValues = (
   set: ExercisePageSet
-): { weightValue: string; repsValue: string; setType: SessionSetTypeValue } => {
+): LoggerValues => {
   if (isPerformed(set) || hasEnteredValues(set) || !hasPlannedValues(set)) {
     return {
+      weightUnit: set.weightUnit ?? 'kg',
+      externalLoadMode: set.externalLoadMode ?? null,
       weightValue: set.weightValue,
       repsValue: set.repsValue,
       setType: set.setType,
     };
   }
   return {
+    weightUnit: set.plannedWeightUnit ?? 'kg',
+    externalLoadMode: set.plannedExternalLoadMode ?? null,
     weightValue: set.plannedWeightValue ?? '',
     repsValue: set.plannedRepsValue ?? '',
     setType: set.plannedSetType ?? set.setType ?? null,
@@ -101,11 +109,23 @@ export const findCursorIndex = (sets: ExercisePageSet[]): number | null => {
   return index === -1 ? null : index;
 };
 
-const metricsOf = (weightValue: string, repsValue: string) => {
+export type LoggerValues = {
+  weightValue: string;
+  repsValue: string;
+  setType: SessionSetTypeValue;
+  weightUnit?: string;
+  externalLoadMode?: string | null;
+};
+
+const metricsOf = (weightValue: string, repsValue: string, context?: LoadContext, metadata?: Pick<LoggerValues, 'weightUnit' | 'externalLoadMode'>) => {
   const weight = parseSetWeight(weightValue);
   const reps = parseSetReps(repsValue);
   if (weight === null || reps === null) {
     return { weight, reps, oneRepMax: null, volume: null };
+  }
+  if (context) {
+    const resolved = calculateEffectiveSetMetrics({ ...context, ...metadata, weightValue, repsValue, performanceStatus: null });
+    return { weight, reps, oneRepMax: resolved.estimatedOneRepMaxKg, volume: resolved.volumeKgReps };
   }
   return {
     weight,
@@ -115,8 +135,8 @@ const metricsOf = (weightValue: string, repsValue: string) => {
   };
 };
 
-export const previewMetrics = (weightValue: string, repsValue: string) => {
-  const { oneRepMax, volume } = metricsOf(weightValue, repsValue);
+export const previewMetrics = (weightValue: string, repsValue: string, context?: LoadContext, metadata?: Pick<LoggerValues, 'weightUnit' | 'externalLoadMode'>) => {
+  const { oneRepMax, volume } = metricsOf(weightValue, repsValue, context, metadata);
   return { oneRepMax, volume };
 };
 
@@ -128,14 +148,15 @@ export const previewMetrics = (weightValue: string, repsValue: string) => {
  */
 export const buildSetRows = (
   sets: ExercisePageSet[],
-  baseline: ExerciseRecordBaseline | null = null
+  baseline: ExerciseRecordBaseline | null = null,
+  context?: LoadContext
 ): SetRowView[] => {
   const cursorIndex = findCursorIndex(sets);
   const beats = (value: number | null, record: number | null) =>
     value !== null && record !== null && value > record;
   return sets.map((set, index): SetRowView => {
     const values = displayedValues(set);
-    const metrics = metricsOf(values.weightValue, values.repsValue);
+    const metrics = metricsOf(values.weightValue, values.repsValue, set.localBodyweightMetadataKnown === false ? { ...context, bodyweightCoefficient: NaN, loadInputMode: context?.loadInputMode ?? 'total_load' } : context, values);
     const performed = isPerformed(set);
     return {
       id: set.id,
@@ -143,6 +164,9 @@ export const buildSetRows = (
       kind: performed ? 'performed' : 'pending',
       isCursor: index === cursorIndex,
       setType: values.setType,
+      weightUnit: values.weightUnit,
+      externalLoadMode: values.externalLoadMode,
+      bodyweight: (context?.bodyweightCoefficient ?? 0) > 0,
       ...metrics,
       weightRecord: performed && beats(metrics.weight, baseline?.weight ?? null),
       oneRepMaxRecord: performed && beats(metrics.oneRepMax, baseline?.oneRepMax ?? null),
@@ -174,6 +198,8 @@ export const updateLoggerValues = (
     weightValue?: string;
     repsValue?: string;
     setType?: SessionSetTypeValue;
+    weightUnit?: string;
+    externalLoadMode?: string | null;
   }
 ): ExercisePageSet[] =>
   replaceSet(sets, setId, (set) => {
@@ -181,6 +207,8 @@ export const updateLoggerValues = (
     return {
       ...set,
       weightValue: values.weightValue ?? current.weightValue,
+      weightUnit: values.weightUnit ?? current.weightUnit,
+      externalLoadMode: values.externalLoadMode === undefined ? current.externalLoadMode : values.externalLoadMode,
       repsValue: values.repsValue ?? current.repsValue,
       setType: values.setType !== undefined ? values.setType : current.setType,
     };
@@ -190,11 +218,7 @@ export const updateLoggerValues = (
 export const commitSet = (
   sets: ExercisePageSet[],
   setId: string,
-  values: {
-    weightValue: string;
-    repsValue: string;
-    setType: SessionSetTypeValue;
-  }
+  values: LoggerValues
 ): ExercisePageSet[] => {
   if (!canCommitLogger(values)) return sets;
   const canonical = canonicalizeSetValues({
@@ -204,6 +228,8 @@ export const commitSet = (
   return replaceSet(sets, setId, (set) => ({
     ...set,
     weightValue: canonical.weight.trim(),
+    weightUnit: values.weightUnit ?? set.weightUnit ?? 'kg',
+    externalLoadMode: values.externalLoadMode === undefined ? set.externalLoadMode : values.externalLoadMode,
     repsValue: canonical.reps.trim(),
     setType: values.setType,
     performanceStatus: null,
@@ -242,12 +268,15 @@ export const createLocalSetId = () =>
  */
 export const addSet = (sets: ExercisePageSet[], id: string = createLocalSetId()): ExercisePageSet[] => {
   const last = sets[sets.length - 1];
-  const copied = last ? displayedValues(last) : { weightValue: '', repsValue: '', setType: null };
+  const copied = last ? displayedValues(last) : { weightValue: '', repsValue: '', setType: null, weightUnit: 'kg', externalLoadMode: 'added' };
   return [
     ...sets,
     {
       id,
       weightValue: copied.weightValue,
+      weightUnit: copied.weightUnit ?? 'kg',
+      externalLoadMode: copied.externalLoadMode ?? null,
+      plannedWeightUnit: null, plannedExternalLoadMode: null, localBodyweightMetadataKnown: true,
       repsValue: copied.repsValue,
       setType: defaultSessionSetType(last ? copied.setType : undefined),
       plannedWeightValue: null,

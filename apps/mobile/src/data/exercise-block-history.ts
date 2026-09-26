@@ -36,6 +36,8 @@ export type ExerciseBlockHistorySetRow = {
   sessionExerciseId: string;
   orderIndex: number;
   weightValue: string;
+  weightUnit?: string;
+  externalLoadMode?: string | null;
   repsValue: string;
   setType: string | null;
   performanceStatus?: SessionSetPerformanceStatus;
@@ -62,6 +64,8 @@ export type ExerciseBlockHistorySuggestedSet = {
   setId: string;
   sessionExerciseId: string;
   weightValue: string;
+  weightUnit?: string;
+  externalLoadMode?: string | null;
   repsValue: string;
   setType: string | null;
 };
@@ -219,6 +223,8 @@ export const aggregateExerciseBlockHistory = (
 
     const calculationSets = setRows.map((row) => ({
       weightValue: row.weightValue,
+      weightUnit: row.weightUnit ?? 'kg',
+      externalLoadMode: row.externalLoadMode ?? null,
       repsValue: row.repsValue,
       setType: row.setType,
     }));
@@ -266,6 +272,8 @@ export const selectSuggestedExercisePlanFromHistory = (input: {
           setId: set.setId,
           sessionExerciseId: set.sessionExerciseId,
           weightValue: set.weightValue,
+          weightUnit: set.weightUnit ?? 'kg',
+          externalLoadMode: set.externalLoadMode ?? null,
           repsValue: set.repsValue,
           setType: normalizeSessionSetType(set.setType),
         }))
@@ -369,6 +377,8 @@ export const createDrizzleExerciseBlockHistoryStore = (): ExerciseBlockHistorySt
         sessionExerciseId: exerciseSets.sessionExerciseId,
         orderIndex: exerciseSets.orderIndex,
         weightValue: exerciseSets.weightValue,
+        weightUnit: exerciseSets.weightUnit,
+        externalLoadMode: exerciseSets.externalLoadMode,
         repsValue: exerciseSets.repsValue,
         setType: exerciseSets.setType,
         performanceStatus: exerciseSets.performanceStatus,
@@ -389,6 +399,8 @@ export const createDrizzleExerciseBlockHistoryStore = (): ExerciseBlockHistorySt
       sessionExerciseId: row.sessionExerciseId,
       orderIndex: row.orderIndex,
       weightValue: row.weightValue,
+      weightUnit: row.weightUnit ?? 'kg',
+      externalLoadMode: row.externalLoadMode ?? null,
       repsValue: row.repsValue,
       setType: row.setType ?? null,
       performanceStatus: normalizeSessionSetPerformanceStatus(row.performanceStatus),

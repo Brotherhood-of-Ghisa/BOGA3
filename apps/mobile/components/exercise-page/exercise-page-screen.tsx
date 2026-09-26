@@ -13,6 +13,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { LegacyLoadReviewSheet } from '@/components/bodyweight/legacy-load-review-sheet';
+import { SessionBodyWeight } from '@/components/bodyweight/session-body-weight';
+import { isValidSessionWeight } from '@/src/bodyweight/weight-entry';
+import type { LoadContext } from '@/src/exercise-calculations/effective-load';
 import { ExerciseEditorModal } from '@/components/exercise-catalog/exercise-editor-modal';
 import { Card } from '@/components/ui/card';
 import { Icon } from '@/components/ui/icon';
@@ -56,7 +60,7 @@ type ExercisePageScreenProps = {
   loadHistory?: LoadExerciseHistory;
 };
 
-type OpenSheet = 'none' | 'effort' | 'options' | 'swap' | 'edit';
+type OpenSheet = 'none' | 'effort' | 'options' | 'swap' | 'edit' | 'review';
 
 const LOAD_ERROR_MESSAGES = {
   'missing-session': 'This session no longer exists.',
@@ -113,8 +117,19 @@ export function ExercisePageScreen({
   }, [router]);
 
   const sets = useMemo(() => exercise?.sets ?? [], [exercise]);
-  const baseline = records.status === 'ready' ? recordBaselineOf(records.summary.records) : null;
-  const rows = useMemo(() => buildSetRows(sets, baseline), [baseline, sets]);
+  const editingExercise = exercise
+    ? (catalog.exercises.find((candidate) => candidate.id === exercise.exerciseDefinitionId) ?? null)
+    : null;
+  const bodyWeight = draft.state.status === 'ready' ? draft.state.bodyWeight : {};
+  const loadContext: LoadContext = {
+    bodyweightCoefficient: !editingExercise || editingExercise.localBodyweightMetadataKnown === false ? NaN : editingExercise.bodyweightCoefficient ?? 0,
+    loadInputMode: editingExercise?.loadInputMode ?? 'total_load',
+    bodyWeightKg: bodyWeight?.localBodyweightMetadataKnown !== false && isValidSessionWeight(bodyWeight ?? {}) ? bodyWeight?.bodyWeightKg : null,
+  };
+  // Bodyweight record baselines are integrated with the history resolver in T07.
+  const baseline = loadContext.bodyweightCoefficient === 0 && records.status === 'ready'
+    ? recordBaselineOf(records.summary.records) : null;
+  const rows = buildSetRows(sets, baseline, loadContext);
   const cursorIndex = findCursorIndex(sets);
   const openSet =
     sets.find((set) => set.id === openSetId) ?? (cursorIndex !== null ? sets[cursorIndex] : undefined);
@@ -129,7 +144,7 @@ export function ExercisePageScreen({
     [draft]
   );
 
-  const onChangeLogger = (values: { weightValue?: string; repsValue?: string }) => {
+  const onChangeLogger = (values: { weightValue?: string; repsValue?: string; weightUnit?: string; externalLoadMode?: string }) => {
     if (!openSet) return;
     updateSets((current) => updateLoggerValues(current, openSet.id, values), 'text');
   };
@@ -143,11 +158,15 @@ export function ExercisePageScreen({
   const onCommit = () => {
     if (!openSet || !loggerValues) return;
     Keyboard.dismiss();
-    updateSets((current) => commitSet(current, openSet.id, loggerValues), 'structural');
+    updateSets((current) => commitSet(current, openSet.id, { ...loggerValues, externalLoadMode: loggerValues.externalLoadMode ?? (loadContext.bodyweightCoefficient === 0 ? 'added' : null) }), 'structural');
     setOpenSetId(null);
   };
 
   const onToggle = (setId: string) => {
+    const set = sets.find(candidate => candidate.id === setId);
+    if (set && loadContext.bodyweightCoefficient > 0 && loggerValuesFor(set).externalLoadMode == null) {
+      setOpenSetId(setId); return;
+    }
     const next = toggleSetPerformed(sets, setId);
     if (next === null) {
       setOpenSetId(setId);
@@ -218,10 +237,6 @@ export function ExercisePageScreen({
     );
   };
 
-  const editingExercise = exercise
-    ? (catalog.exercises.find((candidate) => candidate.id === exercise.exerciseDefinitionId) ?? null)
-    : null;
-
   if (draft.state.status !== 'ready' || !exercise) {
     return (
       <SafeAreaView edges={['top']} style={styles.screen}>
@@ -256,6 +271,9 @@ export function ExercisePageScreen({
             state={records}
             view={recordsView}
           />
+          {loadContext.bodyweightCoefficient > 0 ? <SessionBodyWeight sessionId={sessionId}
+            snapshot={draft.state.bodyWeight} metadataKnown={draft.state.bodyWeight?.localBodyweightMetadataKnown}
+            onSaved={snapshot => draft.setBodyWeight({ ...snapshot, localBodyweightMetadataKnown: true })} /> : null}
           <Card testID="exercise-set-list">
             {rows.map((row, index) => {
               const isOpen = row.id === openSet?.id;
@@ -264,6 +282,13 @@ export function ExercisePageScreen({
                 return (
                   <SetLogger
                     key={row.id}
+                    loadContext={loadContext}
+                    weightUnit={loggerValues.weightUnit}
+                    externalLoadMode={loggerValues.externalLoadMode}
+                    metadataKnown={openSet?.localBodyweightMetadataKnown !== false && editingExercise?.localBodyweightMetadataKnown !== false}
+                    requiresReview={loadContext.bodyweightCoefficient > 0 && loggerValues.externalLoadMode == null}
+                    onChangeLoad={onChangeLogger}
+                    onReview={() => { void draft.flush().then(saved => { if (saved) setOpenSheet('review'); }); }}
                     number={row.number}
                     onChangeReps={(repsValue) => onChangeLogger({ repsValue })}
                     onChangeWeight={(weightValue) => onChangeLogger({ weightValue })}
@@ -329,10 +354,13 @@ export function ExercisePageScreen({
         selected={loggerValues?.setType ?? null}
         visible={openSheet === 'effort'}
       />
+      <LegacyLoadReviewSheet visible={openSheet === 'review'} exerciseId={exercise.exerciseDefinitionId}
+        onDismiss={() => setOpenSheet('none')} onApplied={() => { void draft.reload(); }} />
       <ExerciseOptionsSheet
+        onReview={loadContext.bodyweightCoefficient > 0 ? () => { void draft.flush().then(saved => { if (saved) setOpenSheet('review'); }); } : undefined}
         exerciseName={exercise.name}
         onDismiss={() => setOpenSheet('none')}
-        onEdit={() => setOpenSheet('edit')}
+        onEdit={() => { void draft.flush().then(saved => { if (saved) setOpenSheet('edit'); }); }}
         onLink={
           groupLinkingUserId && exercise.exerciseDefinitionId
             ? () => {
@@ -365,8 +393,12 @@ export function ExercisePageScreen({
         editingExercise={editingExercise}
         onRequestClose={() => setOpenSheet('none')}
         onSaved={(saved) => {
-          setOpenSheet('none');
-          draft.update((current) => ({ ...current, name: saved.name }), 'structural');
+          // Review may have converted sets outside this page's draft. Reload
+          // them before any graph autosave can write the older values back.
+          void draft.reload().then(loaded => {
+            if (loaded) draft.update((current) => ({ ...current, name: saved.name }), 'structural');
+            setOpenSheet('none');
+          });
         }}
         visible={openSheet === 'edit' && editingExercise !== null}
       />

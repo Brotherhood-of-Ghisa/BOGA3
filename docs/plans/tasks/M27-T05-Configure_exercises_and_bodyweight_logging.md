@@ -1,7 +1,7 @@
 ---
 task_id: M27-T05-Configure_exercises_and_bodyweight_logging
 milestone_id: M27
-status: planned
+status: in_progress
 ui_impact: "yes"
 areas: "cross-stack"
 runtimes: "node|expo|maestro|supabase"
@@ -12,7 +12,7 @@ docs_touched: "docs/specs/00-product.md, docs/specs/05-data-model.md, docs/specs
 
 # M27-T05 — Configure exercises and bodyweight logging
 
-- Status: `planned`
+- Status: `in_progress`
 - Depends on: M27-T02, M27-T03.
 - Milestone spec: `docs/plans/milestones/M27-bodyweight-load-and-group-comparisons.md`
 - Governing decisions: D1, D2, D5, D7.
@@ -67,3 +67,34 @@ Run `./boga test fast`, `./boga test backend`, `./boga test frontend`; derive
 additional lanes with `./boga test for` (including group paths/shared helpers).
 Graduate product/load/UX semantics as delivered, attach evidence, mark the
 milestone entry complete and delete this card when shipped.
+
+
+## Local implementation checkpoint
+
+Exercise rules, guarded seed generation, explicit logger metadata, transactionally
+revalidated legacy review and versioned import context are implemented locally.
+`./boga test fast` passed (171 suites / 2043 mobile tests), as did the backend
+aggregate and open-handle lane. Latest sheet accessibility/layout repair also
+passed `fast-frontend` (171 / 2043). Evidence:
+`/tmp/boga-m27-load-fast.log`, `/tmp/boga-m27-load-backend.log`,
+`/tmp/boga-m27-load-fast-frontend-fit.log`.
+
+The default 402×874pt phone passed both `ios-bodyweight` flows. Captures are in
+`apps/mobile/artifacts/maestro/M27-load/20260926-225742-11336/` (BWL00–BWL10):
+invalid coefficient, clear source interpretation, conversions, BW-only/added/
+assisted/unquantified logging, restart restoration and missing-B correction.
+The review remains inside one native sheet: this fixes the observed loss of
+accessibility controls on return to the workout. Short option labels plus
+wrapping descriptions fix the observed truncation in the review choices.
+
+The 375×667pt phone also passed both flows on the final logger layout:
+`/tmp/boga-m27-load-small-fit.log`, captures in
+`apps/mobile/artifacts/maestro/M27-load-small/20260926-233954-24889/`.
+BWL03 and BWL07 were inspected: conversion values/source descriptions wrap and
+all three logger mode labels fit. The editor dismisses its keyboard on drag;
+the flow waits for scrolling to settle and asserts selected review options.
+Restart opens the dev-client URL once from a stopped app. Redundant launch/open
+and immediate optional dialog probes caused observed native/AX failures.
+
+Larger phone proof and the full frontend aggregate are still pending.
+This checkpoint does not claim broad analytics adoption; that remains T07.

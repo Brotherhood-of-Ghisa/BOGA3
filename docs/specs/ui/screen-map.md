@@ -719,3 +719,14 @@ Brief entrypoint map of the current mobile screens.
 - Keep this doc brief and route-oriented.
 - Do not duplicate detailed section breakdowns, component trees, or render logic from route files.
 - If route purpose or screen-level state set changes materially, update this doc in the same task.
+
+
+### Bodyweight load overlays on existing exercise routes
+
+The exercise editor adds contribution, movement standard and loading method.
+The session exercise page adds explicit added/assisted/unquantified meaning and
+units, effective-load context and the session-only weight correction control.
+`LegacyLoadReviewSheet` is reached after saving an exercise with unresolved loads
+or from its exercise options/logger. It selects actual/planned originals,
+requires a source unit and interpretation, previews, then applies or leaves them
+unresolved. These are overlays on existing routes, not additional destinations.

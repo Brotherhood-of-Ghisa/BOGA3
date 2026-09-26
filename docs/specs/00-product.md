@@ -33,3 +33,19 @@ A Gym Tracking application with a delightful interface, advanced analytics, AI p
   - muscle load is a session-wide summary using the same current-metadata, per-side, role-weighted semantics as history analytics,
   - successful submission opens a one-time completion presentation on the existing completed-session route; the presentation is not a persisted award or a historical-detail mode,
   - the share action previews and generates a session-summary PNG containing all PRs and exercise comparisons, then opens the platform share sheet; the app does not upload media, publish directly, include private gym/location data, or store a share record.
+
+
+- Date: `2026-09-26`
+- Decision: Bodyweight contribution is an explicit, editable accounting rule,
+  independent of external total/per-side entry and muscle mapping. A positive
+  contribution requires a movement standard and loading method. A different
+  movement gets its own exercise. Personal rule edits reinterpret personal
+  history using its frozen session weights and do not edit group rules.
+- Entry and review: external weight remains positive raw input with added,
+  quantified assistance or unquantified assistance meaning. No band kilogram
+  equivalent is invented. Old loads, including zero, require explicit review
+  before bodyweight scoring; total-to-external conversion is previewed using
+  each session's saved context. Missing context does not prevent logging reps.
+- The complete calculation and rollout boundary is owned by
+  `tech/bodyweight-load-contract.md`; broader analytics/group adoption is
+  tracked separately from the setup/logger implementation.

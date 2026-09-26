@@ -153,6 +153,7 @@ describe('ExerciseCatalogScreen', () => {
         id: undefined,
         name: 'Incline Press',
         loadInputMode: 'per_side_load',
+        loadRules: { bodyweightCoefficient: 0, movementStandard: null, loadingMethod: null },
         mappings: [
           { muscleGroupId: 'chest', weight: 1, role: 'primary' },
           { muscleGroupId: 'triceps', weight: 0.5, role: 'secondary' },
@@ -219,6 +220,7 @@ describe('ExerciseCatalogScreen', () => {
         id: 'seed_barbell_bench_press',
         name: 'Bench Press',
         loadInputMode: 'per_side_load',
+        loadRules: { bodyweightCoefficient: 0, movementStandard: null, loadingMethod: null },
         mappings: [
           { muscleGroupId: 'chest', weight: 1, role: 'primary' },
           { muscleGroupId: 'delts_front', weight: 0.5, role: 'secondary' },

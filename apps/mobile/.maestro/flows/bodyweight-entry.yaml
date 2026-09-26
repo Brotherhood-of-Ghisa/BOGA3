@@ -466,8 +466,9 @@ appId: com.dinoderek.mobile
     text: "Session body weight, 85 kg, .*"
 - takeScreenshot: "BW09-next-session"
 # A cold process restart keeps both private history and the frozen session.
-- launchApp:
-    clearState: false
+# Open the dev-client URL once from a stopped process. Launching and then
+# reopening that URL can tear down the bridge while its WebSocket opens.
+- stopApp
 - openLink: "${MAESTRO_IOS_DEV_CLIENT_URL}"
 - extendedWaitUntil:
     visible:
