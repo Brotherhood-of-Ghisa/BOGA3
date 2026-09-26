@@ -305,10 +305,12 @@ is complete merely because a downstream closeout card lists its tests.
   projection conventions are implemented with shared numerical vectors.
   Existing consumers are intentionally awaiting T07/T09/T11 adoption.
 - `./boga test fast` passed (165 suites, 1,984 tests); `groups-leaderboards`
-  passed. Full `frontend` is in progress, including a repeat of UI regression
-  after its baseline run hit an XCTest hierarchy HTTP 500. No gate is waived.
-- Next: finish foundation gate evidence and reference captures, then T02's
-  paired schema/sync changes, including old-reader and old-writer compatibility.
+  passed. Full `frontend` passed at `0f0ec368` with `TASK_ID=M27-foundation`,
+  including the UI-regression repeat after the baseline XCTest hierarchy HTTP
+  500. Artifacts: `apps/mobile/artifacts/maestro/M27-foundation/`; local lane
+  logs `/tmp/boga-m27-{fast,groups,frontend}.log`. No gate was waived.
+- Next: T02 paired schema/sync changes, including old-reader and old-writer
+  compatibility; the separate preparation draft is ready to apply.
 
 ## Milestone acceptance
 

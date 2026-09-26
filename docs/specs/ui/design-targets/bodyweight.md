@@ -70,13 +70,18 @@ The selected captures are from `M27-baseline/20260926-182813-13085`, BOGA wt1,
 iOS 26.4, 402×874pt (1206×2622 pixels, 3×), light. Settings and editor flows
 passed. The session capture was taken before the same flow later encountered
 an XCTest `viewHierarchy` HTTP 500; it is valid visual reference, not evidence
-of a green session flow. The full lane must be green before implementation PR.
+of a green session flow. The full `TASK_ID=M27-foundation ./boga test frontend`
+rerun subsequently passed at `0f0ec368`, including that completion flow, on the
+same device. Logger and board references below come from this green run
+(`20260926-185543-38596` and `20260926-190504-46947` respectively).
 
 | Reference | Existing state / source |
 | --- | --- |
 | [Settings](bodyweight/settings-reference.png) | Settings preferences; `ios-ui-regression` |
 | [View Session](bodyweight/session-reference.png) | View Session facts/Summary; `ios-ui-regression` |
 | [Exercise editor](bodyweight/editor-reference.png) | Exercise editor; `ios-ui-regression` |
+| [Logger](bodyweight/logger-reference.png) | Confirmed and planned set rows with active editing; `ios-exercise-page` |
+| [Group board](bodyweight/board-reference.png) | Existing All / 1RM board; `ios-groups-e2e` |
 | [Group exercise reference](group-exercise-unlink/baseline-group.png) | Existing group exercise list; accepted group-link target |
 
 T04–T10 capture every relevant flow above in the running app, at baseline phone
