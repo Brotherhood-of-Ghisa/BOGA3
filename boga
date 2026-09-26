@@ -15,7 +15,7 @@
 #   boga test for [--diff <range>] [paths...]  # which gates does a change require?
 #   boga sweep [--dry-run]                     # every lane on origin/main, in its own worktree (scheduled backstop)
 #   boga pr check --body <file|->              # validate a PR body's Tests table
-#   boga pr wait [--interval <s>]              # block until this branch's PR merges/closes
+#   boga pr wait [--interval <s>]              # optional: block until this branch's PR merges/closes
 #   boga doctor [--android]                    # can THIS machine run every lane (or Android dev)?
 #   boga android doctor|run|start              # verify Android environment or run dev client
 #   boga docs gen|check                        # (re)generate / drift-check derived doc blocks
@@ -26,7 +26,6 @@
 #   boga db dev|dev-up|dev-down|dev-reset       # dedicated dev stack (BOGA-dev), isolated from gates
 #   boga ios build-client|start
 #   boga env dev|lan|hosted|tailscale
-#   boga task bootstrap|closeout
 #
 # `test` (except --list / for), `db`, `ios`, and `env` fail hard without this
 # worktree's slot lease: run `boga worktree start` first.
@@ -375,14 +374,6 @@ case "${cmd}" in
       hosted)    dispatch_script "${REPO_ROOT}/scripts/dev/use-hosted-mobile-env.sh" "$@" ;;
       tailscale) dispatch_script "${REPO_ROOT}/scripts/dev/use-local-mobile-tailscale-env.sh" "$@" ;;
       *) fail "usage: boga env dev|lan|hosted|tailscale   (full phone sessions: scripts/dev/dev-lan.sh on-LAN, scripts/dev/dev-remote.sh over Tailscale)" ;;
-    esac
-    ;;
-  task)
-    sub="${1:-}"; shift || true
-    case "${sub}" in
-      bootstrap) dispatch_script "${REPO_ROOT}/scripts/task-bootstrap.sh" "$@" ;;
-      closeout)  dispatch_script "${REPO_ROOT}/scripts/task-closeout-check.sh" "$@" ;;
-      *) fail "usage: boga task bootstrap|closeout" ;;
     esac
     ;;
   help|--help|-h) usage ;;

@@ -15,10 +15,18 @@ they are **optional**: the user chooses how each piece of work is planned.
 The templates in `templates/` are starting points, not requirements. Drop any
 section that doesn't help.
 
+Milestones and task cards are planned and executed with the task protocol:
+[`.claude/skills/task-protocol/SKILL.md`](../../.claude/skills/task-protocol/SKILL.md)
+(Claude Code: `/task-protocol`).
+
 ## Lifecycle
 
 - **Ephemeral.** Delete a plan, milestone, or task card in the change that
   ships or abandons its work. There is no archive; git history keeps it.
+- **Never referenced.** Code, tests, flows, migrations, specs, and other docs
+  never cite a plan path or a task/milestone ID. Commit messages and PR bodies
+  may. `docs-check` fails on `docs/plans/<file>` paths outside `docs/plans/**`
+  and `docs/brainstorms/**`.
 - **Graduate durable decisions.** Anything that must stay true after the plan
   is gone goes into the owning `docs/specs/**` doc, such as a product decision,
   an architecture choice, the data model, an auth rule, or a technical contract.
@@ -31,9 +39,3 @@ section that doesn't help.
 
 Agents read a plan only when the user points them at it (`AGENTS.md`).
 Everything else here may be stale.
-
-## Optional helpers
-
-- `./scripts/task-bootstrap.sh <card>` prints a context-freshness report for
-  a task card.
-- `./scripts/task-closeout-check.sh <card>` checks a card's closeout fields.

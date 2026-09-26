@@ -75,7 +75,7 @@ PATH="/opt/homebrew/opt/openjdk/bin:$HOME/.maestro/bin:$PATH" JAVA_HOME="/opt/ho
 ## Worktree setup and isolation
 
 The worktree lifecycle — open (`./boga worktree create` / `start`), PR opened
-(`./boga db down`, `./boga pr wait`), and merged (`./boga worktree release`) — is
+(`./boga db down`, optionally `./boga pr wait`), and merged (`./boga worktree release`) — is
 in `docs/specs/01-worktree-and-environment.md`. The slot-lease and isolation
 contract is `docs/specs/12-worktree-config-and-isolation.md`; clearing leftovers
 from dead sessions is `docs/procedures/worktree-cleanup.md`.

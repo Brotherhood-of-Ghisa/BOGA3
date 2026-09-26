@@ -17,7 +17,9 @@
 #      - every `boga test <name>` citation in the always-load docs + PR
 #        template names a real lane or gate alias,
 #      - every relative .md link in curated docs resolves,
-#      - every numbered spec carries the Owns/Not here/Load when header.
+#      - every numbered spec carries the Owns/Not here/Load when header,
+#      - no file outside docs/plans/** and docs/brainstorms/** references a
+#        plan file (plans are ephemeral; AGENTS.md "Planning").
 
 set -euo pipefail
 
@@ -33,7 +35,7 @@ case "${MODE}" in
 esac
 
 REPO_ROOT="${REPO_ROOT}" MODE="${MODE}" RECORDS_DIR="${RECORDS_DIR}" python3 - <<'PY'
-import json, os, re, statistics, sys
+import json, os, re, statistics, subprocess, sys
 
 root = os.environ["REPO_ROOT"]
 mode = os.environ["MODE"]
@@ -207,6 +209,37 @@ for fname in sorted(os.listdir(os.path.join(root, "docs/specs"))):
         head = open(os.path.join(root, "docs/specs", fname)).read(800)
         if "**Owns:**" not in head:
             problems.append(f"docs/specs/{fname}: missing the '> **Owns:** … / **Not here:** … / **Load when:** …' header")
+
+# 4. plans are never referenced: no concrete plan file path (other than the
+#    README and templates) in any tracked or new file outside the working-notes
+#    trees. Matches docs/plans/…, ../plans/…, ./plans/… and plans/… (relative
+#    from docs/); placeholders like docs/plans/tasks/<task-id>.md pass.
+PLAN_REF = re.compile(r"(?<![A-Za-z0-9_-])plans/((?:[A-Za-z0-9_-][A-Za-z0-9_.-]*/)*[A-Za-z0-9_-][A-Za-z0-9_.-]*\.[A-Za-z0-9]+)\b")
+try:
+    listed = subprocess.run(
+        ["git", "-C", root, "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+        capture_output=True, check=True).stdout.decode().split("\0")
+except (OSError, subprocess.CalledProcessError) as exc:
+    listed = []
+    problems.append(f"plan-reference check needs a git work tree ({exc})")
+for rel in listed:
+    if not rel or rel.startswith(("docs/plans/", "docs/brainstorms/")):
+        continue
+    path = os.path.join(root, rel)
+    if os.path.islink(path) or not os.path.isfile(path) or os.path.getsize(path) > 2_000_000:
+        continue
+    try:
+        text = open(path, encoding="utf-8").read()
+    except (UnicodeDecodeError, OSError):
+        continue
+    if "plans/" not in text:
+        continue
+    for ln, line in enumerate(text.splitlines(), 1):
+        for m in PLAN_REF.finditer(line):
+            target = m.group(1)
+            if target == "README.md" or target.startswith("templates/"):
+                continue
+            problems.append(f"{rel}:{ln}: references plan file {m.group(0)} — plans are ephemeral; cite the owning spec instead")
 
 if problems:
     print(f"[gen-docs] {len(problems)} problem(s):", file=sys.stderr)

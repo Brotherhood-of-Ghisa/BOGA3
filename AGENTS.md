@@ -57,14 +57,18 @@ place each under `docs/specs/**`, routed from here.
    no remote-only test lane in this repo.
 
 5. **You own your worktree from open to merge.** Nothing cleans up after you
-   (spec `01`; contract `12`):
+   (spec `01`; contract `12`). Work always happens in a local worktree unless
+   the user says otherwise (cloud containers have no iOS simulator).
    - **Open:** `./boga worktree create <branch>` (new worktree from the latest
      `origin/main`), or `./boga worktree start` inside a worktree your harness
      made. It fails unless the worktree contains the latest `origin/main`; pass
      `--base`/`--from <ref>` only when told to. Every `./boga test|db|ios|env`
      command, Supabase script, and Maestro run fails hard without this slot lease.
-   - **PR opened:** `./boga db down`, then run `./boga pr wait` in the background.
-   - **PR merged or closed** (`pr wait` exits): `./boga worktree release`.
+   - **PR opened:** `./boga db down`. Optional: `./boga pr wait` in the
+     background to notice the merge.
+   - **PR merged:** you clean up in the same session — `./boga worktree release`
+     removes the slot's Supabase containers/volumes, the lease, and the
+     worktree. PR closed unmerged: ask the human first.
    - **Leftovers from dead sessions:** follow
      `docs/procedures/worktree-cleanup.md` — it asks the human before removing
      anything.
@@ -117,6 +121,18 @@ optional workflow (`docs/plans/README.md`). Every planning doc lives under
 `docs/plans/**` and is deleted once its work ships; git history keeps it.
 Durable decisions belong in `docs/specs/**`, and a PR updates the owning spec
 when it ships the decision.
+
+**Never reference a plan from code or docs**: no `docs/plans/...` path and no
+task/milestone ID (`M<n>-T<nn>`, `T-<YYYYMMDD>-<nn>`) in code, tests, flows,
+migrations, specs, or other docs — state the rule itself in the owning spec.
+Commit messages and PR bodies may cite them. `docs-check` enforces the path half.
+
+**Task protocol.** When the user wants to plan multi-PR work together, or hands
+you a task card to execute, offer the protocol in
+[`.claude/skills/task-protocol/SKILL.md`](.claude/skills/task-protocol/SKILL.md)
+(Claude Code: `/task-protocol`): plan together → one session per task → task-level
+design → build → review agent → PR → user review → merge → offer next cards →
+clean up the worktree and its stack.
 
 `docs/plans/**` and `docs/brainstorms/**` are working notes, not
 source-of-truth, and may be stale. **Do not read them, and do not let them
