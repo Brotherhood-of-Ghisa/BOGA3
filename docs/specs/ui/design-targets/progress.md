@@ -1,12 +1,13 @@
 # Accepted target — Progress (brief + data-viz palette)
 
-Target record per `../ai-design-policy.md`, for DLM-T08 and DLM-T09 of the
-design-language migration (DLM-T10 extends it). Chosen by the user on 2026-09-24
+Target record per `../ai-design-policy.md`, for DLM-T08, DLM-T09 and DLM-T10
+of the design-language migration. Chosen by the user on 2026-09-24
 (plan decision G1 (c)): a brief for the tables and controls, plus a data-viz
 palette picked from on-device renders. **Palette accepted** by the user on
 2026-09-25 (`B2`). **Accepted** by the user in the DLM-T08 screen gallery on
 2026-09-25; the history sheets and heatmaps **accepted** in the DLM-T09 gallery
-on 2026-09-26.
+on 2026-09-26; exercise history and Sessions **accepted** in the DLM-T10
+gallery on 2026-09-26.
 
 ## Target
 
@@ -66,6 +67,29 @@ rule that comes with it: text on a `viz` ground is `ink`.
 - The day detail is a `Card`: a `Today` / weekday kicker, the date, a `viz`
   swatch and `<metric>: <value>` in Plex Mono `ink`, or `Rest day`.
 
+### Exercise history and Sessions (DLM-T10)
+
+- Exercise history is one `ScreenScroll` over `MainTabs`: the period
+  `SegmentedControl`, the tag `ChipGroup` on one sideways-scrolling line (a
+  deleted tag a faint `<name> (deleted)` chip), a deleted exercise's `Notice`
+  (`warning` glyph), then the cards.
+- `All-time bests` is a `Card` of two `ListRow` links, `1RM` and `Top weight`:
+  the figure in bold Plex Mono `record` (brass, T10-D2) over its date in Plex
+  Mono `ink-muted`. `1RM`, never `Est. 1RM` (G7).
+- Each session is View Session's `ExerciseSetsCard` as a link (T10-D1): the
+  completion stamp in Plex Mono and `<n> sets`; the gym, `Tag`s and stacked
+  `Stat`s (`1RM`, `Top set`, `Vol`, `W/sets`); then `SetSummaryRow`s
+  (`type · weight × reps · 1RM · VOL`), warm-ups like working sets.
+- Sessions is one `ScreenScroll`: `Active` and `History` micro-labels; the
+  active session a `Card` with the `set-current` glyph and 44pt `check` and ⋮;
+  completed sessions `ListRow`s in one `Card`, a deleted one faded with a
+  `Deleted` `Tag`; `Show deleted` / `Hide deleted` a text button (`checked`).
+- Row menus are `Sheet`s dismissed by the backdrop: completed `Edit` /
+  `Append` / `Delete` (`danger`) or `Undelete`, titled with the start stamp;
+  active `Delete`, which confirms in an `Alert` (T10-D4).
+- Loading, error (`Retry` on Sessions, T10-D6) and empty states are
+  `StatePanel`s in a `Card`, with `…` for the ellipsis.
+
 ## States
 
 Device: iPhone simulator at 390pt width, light.
@@ -86,11 +110,20 @@ Device: iPhone simulator at 390pt width, light.
 | `07-overlay-dismissed` (`ios-ui-regression`) | the sheet dismissed from its backdrop, back on By Muscle |
 | `03-m26-progress` (`ios-smoke`) | Progress from the tab bar, no data |
 | `05-data-runtime-smoke-exercise-list` (`ios-data-smoke`) | a workout just logged through the session screens |
+| `exercise-history-default` (`ios-exercise-page`) | exercise history from the exercise page's `History`: last 30 days, the bests and one session card with a warm-up |
+| `exercise-history-all-time` (`ios-exercise-page`) | All time: both fixture sessions |
+| `04-data-runtime-smoke-success` (`ios-data-smoke`) | Sessions after a workout is logged: one completed row |
+| `sessions-row-menu` (`ios-data-smoke`) | a completed row's ⋮ sheet: Edit / Append / Delete |
+| `20-first-run-roundtrip-restored-from-remote` (`ios-sync-e2e`) | Sessions after a restore from the server |
 
 Jest only (no flow reaches them): the loading and error states (the screen's
 and the history sheets'), a filtered list with no match, the shade and delta
 colours (`app/__tests__/stats-screen.test.tsx`), and the today and selected
-marks on every cell kind (`app/__tests__/heatmap-marks.test.tsx`).
+marks on every cell kind (`app/__tests__/heatmap-marks.test.tsx`). For
+DLM-T10: the bests in `record`, the tag chips, the deleted-exercise notice and
+exercise history's states (`app/__tests__/exercise-history-screen.test.tsx`);
+the active session, the `Deleted` tag, the discard confirm and the `Retry`
+(`app/__tests__/sessions-screen.test.tsx`).
 
 No target screenshots are committed; runtime captures stay in the gitignored
 `apps/mobile/artifacts/maestro/` tree and are linked as PR evidence.

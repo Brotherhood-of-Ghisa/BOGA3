@@ -1,20 +1,22 @@
 import { useEffect, useRef, useState } from 'react';
+import { Animated, LayoutAnimation, Platform, Pressable, StyleSheet, Text, UIManager, View } from 'react-native';
+
 import {
-  Animated,
-  LayoutAnimation,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  UIManager,
-  View,
-} from 'react-native';
+  ActionButton,
+  Card,
+  IconButton,
+  ListRow,
+  Sheet,
+  StatePanel,
+  Tag,
+  uiFonts,
+  uiGeometry,
+  uiRoles,
+  uiSpace,
+  uiTypography,
+} from '@/components/ui';
 
-import { Icon, uiColors, uiRadius, uiSpace, uiTypography } from '@/components/ui';
-
-import { SessionSummaryLine } from './session-summary-line';
+import { formatDateTimeStamp, SessionSummaryLine } from './session-summary-line';
 import type { SessionListItem } from './types';
 
 export type CompletedSessionMenuAction = 'delete' | 'undelete';
@@ -22,6 +24,8 @@ export type CompletedSessionMenuAction = 'delete' | 'undelete';
 export type CompletedSessionMenuState = {
   action: CompletedSessionMenuAction;
   sessionId: string;
+  // The sheet's title: the session's start stamp, as on its row.
+  title: string;
 };
 
 export type HistoryListProps = {
@@ -29,13 +33,15 @@ export type HistoryListProps = {
   sessions: SessionListItem[];
   isLoading: boolean;
   loadErrorMessage: string | null;
+  /** Reloads the list after a load error (the same load as a focus refresh). */
+  onRetryLoad: () => void;
   showDeletedSessions: boolean;
   onToggleShowDeletedSessions: () => void;
   /** Whether the global empty-state panel should render (no active + no completed). */
   showGlobalEmptyState: boolean;
   onOpenCompletedSession: (sessionId: string) => void;
   /**
-   * Invoked when the user confirms the menu's primary toggle action.
+   * Invoked when the user picks the menu's delete or undelete action.
    * `isDeleted` is the desired post-action state (true = delete, false = undelete).
    * Should return a Promise so the row can settle once the toggle resolves.
    */
@@ -47,13 +53,16 @@ export type HistoryListProps = {
 const COMPLETED_ROW_DELETE_EXIT_MS = 350;
 
 /**
- * Renders the completed-session history list, the deleted-visibility toggle,
- * the global empty-state panel, and the per-row delete/undelete confirmation modal.
+ * The completed-session history: a `History` micro-label with the Show/Hide
+ * deleted toggle, the rows in one card, their loading/error/empty states, and
+ * each row's actions sheet (Edit / Append / Delete or Undelete). It renders
+ * inside its host's scroll.
  */
 export function HistoryList({
   sessions,
   isLoading,
   loadErrorMessage,
+  onRetryLoad,
   showDeletedSessions,
   onToggleShowDeletedSessions,
   showGlobalEmptyState,
@@ -63,6 +72,7 @@ export function HistoryList({
   onAppendCompletedSession,
 }: HistoryListProps) {
   const [menuVisible, setMenuVisible] = useState(false);
+  // Kept after the sheet closes so its rows do not vanish during the fade.
   const [menuState, setMenuState] = useState<CompletedSessionMenuState | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [hiddenIds, setHiddenIds] = useState<string[]>([]);
@@ -86,6 +96,7 @@ export function HistoryList({
     setMenuState({
       sessionId: session.id,
       action: session.deletedAt ? 'undelete' : 'delete',
+      title: formatDateTimeStamp(session.startedAt),
     });
     setMenuVisible(true);
   };
@@ -168,353 +179,155 @@ export function HistoryList({
 
   return (
     <>
-      <View style={styles.historyRegion}>
-        <View style={styles.sectionHeaderRow}>
-          <Text allowFontScaling={false} selectable style={styles.sectionTitle}>
-            History
-          </Text>
-          <Pressable
-            accessibilityLabel={showDeletedSessions ? 'Hide deleted sessions' : 'Show deleted sessions'}
-            accessibilityRole="button"
-            onPress={onToggleShowDeletedSessions}
-            style={styles.toggleButton}
-            testID="toggle-deleted-sessions-button">
-            <Text allowFontScaling={false} style={styles.toggleButtonText}>
-              {showDeletedSessions ? 'Hide deleted' : 'Show deleted'}
-            </Text>
-          </Pressable>
-        </View>
+      <View style={styles.header}>
+        <Text allowFontScaling={false} accessibilityRole="header" style={styles.microLabel}>
+          History
+        </Text>
+        {/* A view toggle, not a filter group: its on state is `checked` (T10-D5). */}
+        <ActionButton
+          accessibilityLabel={showDeletedSessions ? 'Hide deleted sessions' : 'Show deleted sessions'}
+          checked={showDeletedSessions}
+          label={showDeletedSessions ? 'Hide deleted' : 'Show deleted'}
+          onPress={onToggleShowDeletedSessions}
+          testID="toggle-deleted-sessions-button"
+          variant="text"
+        />
+      </View>
 
-        <ScrollView
-          style={styles.historyScroll}
-          contentContainerStyle={styles.historyScrollContent}
-          contentInsetAdjustmentBehavior="automatic"
-          keyboardShouldPersistTaps="handled"
-          testID="completed-history-scroll">
-          {isLoading ? (
-            <View style={styles.emptyPanel} testID="session-list-loading-state">
-              <Text allowFontScaling={false} selectable style={styles.metaText}>
-                Loading sessions...
-              </Text>
-            </View>
-          ) : loadErrorMessage ? (
-            <View style={styles.emptyPanel} testID="session-list-load-error">
-              <Text allowFontScaling={false} selectable style={styles.metaText}>
-                {loadErrorMessage}
-              </Text>
-            </View>
-          ) : visibleSessions.length === 0 ? (
-            <View style={styles.emptyPanel}>
-              <Text allowFontScaling={false} selectable style={styles.metaText}>
-                No completed sessions
-              </Text>
-            </View>
-          ) : (
-            <View style={styles.completedList}>
-              {visibleSessions.map((session) => (
-                <Animated.View
-                  key={session.id}
-                  style={[
-                    styles.sessionRow,
-                    session.deletedAt ? styles.deletedCompletedRow : null,
-                    deletingId === session.id ? { opacity: deletingRowOpacity } : null,
-                  ]}
-                  testID={`completed-session-row-${session.id}`}>
+      {isLoading ? (
+        <Card>
+          <StatePanel body="Loading sessions…" fill={false} kind="loading" testID="session-list-loading-state" />
+        </Card>
+      ) : loadErrorMessage ? (
+        <Card>
+          <StatePanel
+            action={{ label: 'Retry', onPress: onRetryLoad, testID: 'session-list-load-error-retry' }}
+            body={loadErrorMessage}
+            fill={false}
+            kind="error"
+            testID="session-list-load-error"
+            title="Could not load sessions"
+          />
+        </Card>
+      ) : visibleSessions.length === 0 ? (
+        <Card>
+          <StatePanel body="No completed sessions" fill={false} />
+        </Card>
+      ) : (
+        <Card testID="completed-session-list">
+          {visibleSessions.map((session, index) => {
+            const deleted = session.deletedAt !== null;
+            return (
+              <Animated.View
+                key={session.id}
+                style={[
+                  deleted ? styles.deletedRow : null,
+                  deletingId === session.id ? { opacity: deletingRowOpacity } : null,
+                ]}
+                testID={`completed-session-row-${session.id}`}>
+                <ListRow
+                  density="list"
+                  divider={index > 0}
+                  trailing={
+                    <IconButton
+                      accessibilityLabel={`Open completed session actions ${session.id}`}
+                      name="more-vertical"
+                      onPress={() => openMenu(session)}
+                      testID={`completed-session-menu-button-${session.id}`}
+                      tone="muted"
+                    />
+                  }>
                   <Pressable
                     accessibilityLabel={`Open completed session ${session.id}`}
                     accessibilityRole="button"
                     onPress={() => onOpenCompletedSession(session.id)}
-                    style={styles.sessionRowMainPressable}
+                    style={styles.rowMain}
                     testID={`completed-session-open-button-${session.id}`}>
-                    <SessionSummaryLine
-                      session={session}
-                      testIdPrefix={`session-summary-${session.id}`}
-                    />
+                    <SessionSummaryLine session={session} testIdPrefix={`session-summary-${session.id}`} />
+                    {/* Deleted is said in words, not only by the fade (`08` baseline 5). */}
+                    {deleted ? <Tag label="Deleted" testID={`completed-session-deleted-tag-${session.id}`} tone="faint" /> : null}
                   </Pressable>
+                </ListRow>
+              </Animated.View>
+            );
+          })}
+        </Card>
+      )}
 
-                  <Pressable
-                    accessibilityLabel={`Open completed session actions ${session.id}`}
-                    accessibilityRole="button"
-                    onPress={() => openMenu(session)}
-                    style={[styles.iconActionButton, styles.menuButton]}
-                    testID={`completed-session-menu-button-${session.id}`}>
-                    <Icon color={uiColors.actionNeutralSubtleText} name="more-vertical" size="sm" />
-                  </Pressable>
-                </Animated.View>
-              ))}
-            </View>
-          )}
-
-          {showGlobalEmptyState ? (
-            <View style={styles.globalEmptyState} testID="session-list-empty-state">
-              <Text allowFontScaling={false} selectable style={styles.globalEmptyTitle}>
-                No sessions yet
-              </Text>
-              <Text allowFontScaling={false} selectable style={styles.metaText}>
-                Start your first workout session to see it here.
-              </Text>
-            </View>
-          ) : null}
-        </ScrollView>
-      </View>
-
-      <Modal
-        animationType="fade"
-        transparent
-        visible={menuVisible}
-        onDismiss={() => setMenuState(null)}
-        onRequestClose={closeMenu}>
-        <View style={styles.modalRoot}>
-          <Pressable
-            accessibilityLabel="Dismiss completed session menu overlay"
-            onPress={closeMenu}
-            style={styles.modalOverlay}
-            testID="completed-session-menu-overlay"
+      {showGlobalEmptyState ? (
+        <Card>
+          <StatePanel
+            body="Start your first workout session to see it here."
+            fill={false}
+            testID="session-list-empty-state"
+            title="No sessions yet"
           />
-          {menuState?.action === 'delete' ? (
-            <View style={styles.modalPanel} testID="completed-session-delete-modal-card">
-              <View style={styles.modalActionRow} testID="completed-session-menu-action-row">
-                <Pressable
-                  accessibilityLabel="Edit completed session"
-                  accessibilityRole="button"
-                  onPress={handleEdit}
-                  style={[styles.modalActionButton, styles.modalActionRowButton, styles.modalNeutralButton]}
-                  testID="completed-session-edit-menu-action-button">
-                  <Text allowFontScaling={false} style={styles.modalNeutralButtonText}>Edit</Text>
-                </Pressable>
+        </Card>
+      ) : null}
 
-                <Pressable
-                  accessibilityLabel="Append completed session to workout log"
-                  accessibilityRole="button"
-                  onPress={handleAppend}
-                  style={[
-                    styles.modalActionButton,
-                    styles.modalActionRowButton,
-                    styles.modalNeutralButton,
-                  ]}
-                  testID="completed-session-reopen-menu-action-button">
-                  <Text
-                    allowFontScaling={false}
-                    style={[
-                      styles.modalNeutralButtonText,
-                    ]}>Append</Text>
-                </Pressable>
-
-                <Pressable
-                  accessibilityLabel="Delete completed session"
-                  accessibilityRole="button"
-                  onPress={applyMenuAction}
-                  style={[styles.modalActionButton, styles.modalActionRowButton, styles.modalDangerButton]}
-                  testID="completed-session-modal-action-button">
-                  <Text allowFontScaling={false} style={styles.modalDangerButtonText}>Delete</Text>
-                </Pressable>
-              </View>
-            </View>
-          ) : null}
+      <Sheet
+        dismissLabel="Dismiss completed session actions"
+        onDismiss={closeMenu}
+        testID="completed-session-menu"
+        title={menuState?.title}
+        visible={menuVisible}>
+        <View testID="completed-session-menu-action-row">
+          <ListRow
+            accessibilityLabel="Edit completed session"
+            label="Edit"
+            onPress={handleEdit}
+            testID="completed-session-edit-menu-action-button"
+          />
+          <ListRow
+            accessibilityLabel="Append completed session to workout log"
+            label="Append"
+            onPress={handleAppend}
+            testID="completed-session-reopen-menu-action-button"
+          />
           {menuState?.action === 'undelete' ? (
-            <View style={styles.modalPanel} testID="completed-session-undelete-modal-card">
-              <View style={styles.modalActionRow} testID="completed-session-menu-action-row">
-                <Pressable
-                  accessibilityLabel="Edit completed session"
-                  accessibilityRole="button"
-                  onPress={handleEdit}
-                  style={[styles.modalActionButton, styles.modalActionRowButton, styles.modalNeutralButton]}
-                  testID="completed-session-edit-menu-action-button">
-                  <Text allowFontScaling={false} style={styles.modalNeutralButtonText}>Edit</Text>
-                </Pressable>
-
-                <Pressable
-                  accessibilityLabel="Append completed session to workout log"
-                  accessibilityRole="button"
-                  onPress={handleAppend}
-                  style={[
-                    styles.modalActionButton,
-                    styles.modalActionRowButton,
-                    styles.modalNeutralButton,
-                  ]}
-                  testID="completed-session-reopen-menu-action-button">
-                  <Text
-                    allowFontScaling={false}
-                    style={[
-                      styles.modalNeutralButtonText,
-                    ]}>Append</Text>
-                </Pressable>
-
-                <Pressable
-                  accessibilityLabel="Undelete completed session"
-                  accessibilityRole="button"
-                  onPress={applyMenuAction}
-                  style={[styles.modalActionButton, styles.modalActionRowButton, styles.modalNeutralButton]}
-                  testID="completed-session-modal-action-button">
-                  <Text allowFontScaling={false} style={styles.modalNeutralButtonText}>Undelete</Text>
-                </Pressable>
-              </View>
-            </View>
-          ) : null}
+            <ListRow
+              accessibilityLabel="Undelete completed session"
+              label="Undelete"
+              onPress={applyMenuAction}
+              testID="completed-session-modal-action-button"
+            />
+          ) : (
+            <ListRow
+              accessibilityLabel="Delete completed session"
+              label="Delete"
+              onPress={applyMenuAction}
+              testID="completed-session-modal-action-button"
+              tone="danger"
+            />
+          )}
         </View>
-      </Modal>
+      </Sheet>
     </>
   );
 }
 
 const styles = StyleSheet.create({
-  historyRegion: {
-    flex: 1,
-    minHeight: 0,
-    gap: uiSpace.sm,
-  },
-  historyScroll: {
-    flex: 1,
-    minHeight: 0,
-  },
-  historyScrollContent: {
-    gap: uiSpace.md,
-    paddingBottom: uiSpace.lg,
-  },
-  sectionHeaderRow: {
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: uiSpace.md,
-  },
-  sectionTitle: {
-    fontSize: uiTypography.size.xl,
-    fontWeight: '700',
-    color: uiColors.textPrimary,
-  },
-  emptyPanel: {
-    borderRadius: uiRadius.md,
-    borderWidth: 1,
-    borderColor: uiColors.borderMuted,
-    backgroundColor: uiColors.surfacePage,
-    padding: uiSpace.md,
-  },
-  sessionRow: {
-    borderRadius: uiRadius.md,
-    borderWidth: 1,
-    borderColor: uiColors.borderMuted,
-    backgroundColor: uiColors.surfaceDefault,
-    paddingHorizontal: uiSpace.md,
-    paddingVertical: uiSpace.sm,
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: uiSpace.sm,
   },
-  deletedCompletedRow: {
-    borderColor: uiColors.actionDangerSubtleBorder,
-    backgroundColor: uiColors.actionDangerSubtleBg,
-    opacity: 0.9,
+  microLabel: {
+    fontFamily: uiFonts.display.family,
+    fontWeight: '700',
+    fontSize: uiTypography.size.xxs,
+    lineHeight: uiTypography.lineHeight.xxs,
+    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
+    textTransform: 'uppercase',
+    color: uiRoles.inkFaint,
   },
-  sessionRowMainPressable: {
-    flex: 1,
-    minWidth: 0,
-  },
-  iconActionButton: {
-    width: 28,
-    height: 28,
-    borderRadius: uiRadius.sm,
-    borderWidth: 1,
-    paddingHorizontal: 0,
-    paddingVertical: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  menuButton: {
-    backgroundColor: uiColors.actionNeutralSubtleBg,
-    borderColor: uiColors.actionNeutralSubtleBorder,
-  },
-  metaText: {
-    color: uiColors.textSecondary,
-    fontSize: uiTypography.size.md,
-  },
-  completedList: {
-    gap: uiSpace.md,
-  },
-  toggleButton: {
-    borderRadius: uiRadius.full,
-    borderWidth: 1,
-    borderColor: uiColors.actionNeutralSubtleBorder,
-    backgroundColor: uiColors.actionNeutralSubtleBg,
-    paddingHorizontal: uiSpace.md,
+  rowMain: {
+    gap: uiSpace.xs,
     paddingVertical: uiSpace.sm,
   },
-  toggleButtonText: {
-    color: uiColors.actionNeutralSubtleText,
-    fontSize: uiTypography.size.sm,
-    fontWeight: '600',
-  },
-  globalEmptyState: {
-    borderRadius: uiRadius.md,
-    borderWidth: 1,
-    borderColor: uiColors.borderMuted,
-    backgroundColor: uiColors.surfaceDefault,
-    padding: uiSpace.lg,
-    gap: uiSpace.sm,
-    alignItems: 'center',
-  },
-  globalEmptyTitle: {
-    color: uiColors.textPrimary,
-    fontSize: uiTypography.size.lg,
-    fontWeight: '700',
-  },
-  modalRoot: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: uiSpace.xl,
-  },
-  modalOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: uiColors.overlayScrim,
-  },
-  modalPanel: {
-    width: '100%',
-    maxWidth: 360,
-    borderRadius: uiRadius.md,
-    borderWidth: 1,
-    borderColor: uiColors.borderMuted,
-    backgroundColor: uiColors.surfaceDefault,
-    padding: uiSpace.lg,
-    gap: uiSpace.md,
-  },
-  modalActionRow: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-    gap: uiSpace.sm,
-  },
-  modalActionButton: {
-    borderRadius: uiRadius.md,
-    paddingHorizontal: uiSpace.sm,
-    paddingVertical: uiSpace.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  modalActionRowButton: {
-    flex: 1,
-  },
-  modalDangerButton: {
-    backgroundColor: uiColors.actionDangerSubtleBg,
-    borderWidth: 1,
-    borderColor: uiColors.actionDangerSubtleBorder,
-  },
-  modalDangerButtonText: {
-    color: uiColors.actionDangerText,
-    fontWeight: '700',
-  },
-  modalNeutralButton: {
-    backgroundColor: uiColors.actionNeutralSubtleBg,
-    borderWidth: 1,
-    borderColor: uiColors.actionNeutralSubtleBorder,
-  },
-  modalDisabledButton: {
-    backgroundColor: uiColors.surfaceDisabled,
-    borderColor: uiColors.borderMuted,
-  },
-  modalNeutralButtonText: {
-    color: uiColors.actionNeutralSubtleText,
-    fontWeight: '700',
-  },
-  modalDisabledButtonText: {
-    color: uiColors.textDisabled,
+  // A deleted row has stepped back; the `Deleted` tag names it.
+  deletedRow: {
+    opacity: 0.6,
   },
 });

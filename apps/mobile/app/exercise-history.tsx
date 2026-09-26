@@ -1,10 +1,28 @@
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { formatSessionSetType } from '@/src/data/set-types';
+import { ExerciseSetsCard } from '@/components/session-detail';
 import { MainTabs } from '@/components/navigation/main-tabs';
-import { uiColors, uiRadius, uiSpace, uiTypography } from '@/components/ui';
+import {
+  Card,
+  ChipGroup,
+  Icon,
+  ListRow,
+  Notice,
+  Screen,
+  ScreenScroll,
+  SegmentedControl,
+  Stat,
+  StatePanel,
+  Tag,
+  uiFonts,
+  uiGeometry,
+  uiRoles,
+  uiSpace,
+  uiTypography,
+  type ChipOption,
+} from '@/components/ui';
 import {
   loadExercisePerformanceHistory,
   type ExerciseHistoryPeriod,
@@ -12,13 +30,24 @@ import {
   type ExerciseHistorySummary,
   type ExerciseHistoryTagOption,
 } from '@/src/data';
+import { parseSetReps, parseSetWeight } from '@/src/exercise-calculations';
 import { mainTabHref, type MainTabKey } from '@/src/navigation/main-tabs';
+import {
+  EMPTY_FIGURE,
+  formatOneRepMaxFigure,
+  formatSetRow,
+  formatVolumeFigure,
+  formatWeightFigure,
+} from '@/src/session-recorder/session-view-model';
 
-const PERIOD_OPTIONS: { value: ExerciseHistoryPeriod; label: string }[] = [
-  { value: 7, label: '7 days' },
-  { value: 30, label: '30 days' },
-  { value: 'all', label: 'All time' },
+const PERIOD_OPTIONS: { value: ExerciseHistoryPeriod; label: string; accessibilityLabel: string }[] = [
+  { value: 7, label: 'Last 7 days', accessibilityLabel: 'Show history for Last 7 days' },
+  { value: 30, label: 'Last 30 days', accessibilityLabel: 'Show history for Last 30 days' },
+  { value: 'all', label: 'All time', accessibilityLabel: 'Show history for All time' },
 ];
+
+// The tag filter's "no filter" chip. Tag ids are generated, never this.
+const ALL_TAGS = 'all';
 
 const coerceRouteParam = (value: string | string[] | undefined): string | null => {
   if (Array.isArray(value)) {
@@ -34,11 +63,8 @@ const parsePeriodParam = (raw: string | null): ExerciseHistoryPeriod => {
   return 30;
 };
 
-const formatPeriodChipLabel = (value: ExerciseHistoryPeriod, label: string) =>
-  value === 'all' ? label : `Last ${label}`;
-
 const formatSessionDate = (value: Date): string => {
-  if (Number.isNaN(value.getTime())) return '—';
+  if (Number.isNaN(value.getTime())) return EMPTY_FIGURE;
   const month = `${value.getMonth() + 1}`.padStart(2, '0');
   const day = `${value.getDate()}`.padStart(2, '0');
   const year = value.getFullYear();
@@ -47,22 +73,18 @@ const formatSessionDate = (value: Date): string => {
   return `${year}-${month}-${day} ${hours}:${minutes}`;
 };
 
-const formatNumeric = (value: number, fractionDigits = 0): string => {
-  if (!Number.isFinite(value)) return '—';
-  const fixed = value.toFixed(fractionDigits);
-  return fractionDigits > 0 ? fixed.replace(/\.0+$/, '') : fixed;
-};
+// Figures read as they do on the session view (`design-language.md` §6).
+const formatTopSet = (set: { weight: number; reps: number } | null) =>
+  set ? `${formatWeightFigure(set.weight)} × ${set.reps}` : EMPTY_FIGURE;
 
-const formatTopWeight = (set: { weight: number; reps: number } | null) =>
-  set ? `${formatNumeric(set.weight, 1)} × ${set.reps}` : '—';
+const formatOneRepMax = (value: number | null) =>
+  value === null ? EMPTY_FIGURE : formatOneRepMaxFigure(value);
 
-const formatVolume = (value: number) => (value > 0 ? formatNumeric(value, 1) : '—');
+const formatVolume = (value: number) => (value > 0 ? formatVolumeFigure(value) : EMPTY_FIGURE);
 
-const formatEstOneRm = (value: number | null) =>
-  value === null ? '—' : formatNumeric(value, 1);
-
-const formatSetTypeBadge = (setType: ExerciseHistorySessionEntry['sets'][number]['setType']) =>
-  formatSessionSetType(setType, 'compact') ?? '';
+// `ux-rules` §10.2: a deleted tag still filters, and says so in words.
+const formatTagName = (tag: ExerciseHistoryTagOption) =>
+  tag.deletedAt ? `${tag.name} (deleted)` : tag.name;
 
 export type ExerciseHistoryScreenShellProps = {
   summary: ExerciseHistorySummary | null;
@@ -89,123 +111,119 @@ export function ExerciseHistoryScreenShell({
   activeMainTab = 'progress',
   onSelectMainTab,
 }: ExerciseHistoryScreenShellProps) {
-  const tagOptions = summary?.tagOptions ?? [];
+  const tagOptions = useMemo(() => summary?.tagOptions ?? [], [summary]);
+  const tagChips = useMemo<ChipOption<string>[]>(
+    () => [
+      { value: ALL_TAGS, label: 'All tags' },
+      ...tagOptions.map((option) => ({
+        value: option.tagDefinitionId,
+        label: `${formatTagName(option)} · ${option.occurrenceCount}`,
+        accessibilityLabel: `Filter by tag ${formatTagName(option)}, ${option.occurrenceCount} sessions`,
+        faint: Boolean(option.deletedAt),
+      })),
+    ],
+    [tagOptions]
+  );
 
   return (
-    <View style={styles.screen}>
-      <View style={styles.contentRegion}>
-        <View style={styles.periodChipsRow} accessibilityRole="tablist">
-          {PERIOD_OPTIONS.map((option) => {
-            const selected = option.value === period;
-            return (
-              <Pressable
-                key={String(option.value)}
-                accessibilityRole="tab"
-                accessibilityState={{ selected }}
-                accessibilityLabel={`Show history for ${formatPeriodChipLabel(option.value, option.label)}`}
-                onPress={() => onSelectPeriod(option.value)}
-                style={[styles.periodChip, selected && styles.periodChipSelected]}
-                testID={`exercise-history-period-chip-${option.value}`}>
-                <Text allowFontScaling={false} style={[styles.periodChipText, selected && styles.periodChipTextSelected]}>
-                  {formatPeriodChipLabel(option.value, option.label)}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
+    <Screen testID="exercise-history-screen">
+      <ScreenScroll testID="exercise-history-scroll">
+        <SegmentedControl
+          accessibilityLabel="Time range"
+          onChange={onSelectPeriod}
+          options={PERIOD_OPTIONS}
+          testIDPrefix="exercise-history-period-chip"
+          value={period}
+        />
 
         {summary && tagOptions.length > 0 ? (
           <ScrollView
+            contentContainerStyle={styles.tagRowContent}
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.tagChipsRow}
             testID="exercise-history-tag-row">
-            <TagChip
-              testID="exercise-history-tag-chip-all"
-              label="All tags"
-              selected={appliedTagDefinitionId === null}
-              onPress={() => onSelectTag(null)}
+            <ChipGroup
+              accessibilityLabel="Filter by tag"
+              clearValue={ALL_TAGS}
+              mode="single"
+              onChange={(next) => onSelectTag(next === ALL_TAGS ? null : next)}
+              options={tagChips}
+              style={styles.tagChips}
+              testIDPrefix="exercise-history-tag-chip"
+              value={appliedTagDefinitionId ?? ALL_TAGS}
             />
-            {tagOptions.map((option) => {
-              const baseName = option.deletedAt ? `${option.name} (deleted)` : option.name;
-              return (
-                <TagChip
-                  key={option.tagDefinitionId}
-                  testID={`exercise-history-tag-chip-${option.tagDefinitionId}`}
-                  label={`${baseName} · ${option.occurrenceCount}`}
-                  accessibilityLabel={`Filter by tag ${baseName}, ${option.occurrenceCount} sessions`}
-                  selected={appliedTagDefinitionId === option.tagDefinitionId}
-                  onPress={() =>
-                    onSelectTag(appliedTagDefinitionId === option.tagDefinitionId ? null : option.tagDefinitionId)
-                  }
-                  deleted={Boolean(option.deletedAt)}
-                />
-              );
-            })}
           </ScrollView>
         ) : null}
 
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={styles.scrollContent}
-          testID="exercise-history-scroll">
-          {errorMessage ? (
-            <View style={styles.statePanel} testID="exercise-history-error-state">
-              <Text allowFontScaling={false} style={styles.stateTitle}>Could not load history</Text>
-              <Text allowFontScaling={false} style={styles.stateBody}>{errorMessage}</Text>
-            </View>
-          ) : null}
+        {errorMessage ? (
+          <Card>
+            <StatePanel
+              body={errorMessage}
+              fill={false}
+              kind="error"
+              testID="exercise-history-error-state"
+              title="Could not load history"
+            />
+          </Card>
+        ) : null}
 
-          {!errorMessage && isLoading && !summary ? (
-            <View style={styles.statePanel} testID="exercise-history-loading-state">
-              <Text allowFontScaling={false} style={styles.stateBody}>Loading exercise history…</Text>
-            </View>
-          ) : null}
+        {!errorMessage && isLoading && !summary ? (
+          <Card>
+            <StatePanel
+              body="Loading exercise history…"
+              fill={false}
+              kind="loading"
+              testID="exercise-history-loading-state"
+            />
+          </Card>
+        ) : null}
 
-          {summary ? (
-            <>
-              {summary.exerciseDeletedAt ? (
-                <View style={styles.deletedExerciseBanner} testID="exercise-history-deleted-banner">
-                  <Text allowFontScaling={false} style={styles.deletedExerciseBannerText}>
-                    This exercise has been deleted. Historical data remains available.
-                  </Text>
-                </View>
-              ) : null}
-
-              <BestCard
-                best={summary.allTimeBest}
-                onPressSession={onPressSession}
+        {summary ? (
+          <>
+            {summary.exerciseDeletedAt ? (
+              <Notice
+                icon="warning"
+                message="This exercise has been deleted. Historical data remains available."
+                testID="exercise-history-deleted-banner"
               />
+            ) : null}
 
-              {summary.sessions.length === 0 ? (
-                <View style={styles.statePanel} testID="exercise-history-empty-state">
-                  <Text allowFontScaling={false} style={styles.stateTitle}>No sessions in this view</Text>
-                  <Text allowFontScaling={false} style={styles.stateBody}>
-                    {appliedTagDefinitionId
+            <BestCard best={summary.allTimeBest} onPressSession={onPressSession} />
+
+            {summary.sessions.length === 0 ? (
+              <Card>
+                <StatePanel
+                  body={
+                    appliedTagDefinitionId
                       ? 'No sessions in this period have the selected tag. Pick another tag or widen the period.'
-                      : 'No completed sessions for this exercise in this period.'}
-                  </Text>
-                </View>
-              ) : (
-                summary.sessions.map((entry) => (
-                  <SessionCard
-                    key={entry.sessionExerciseId}
-                    entry={entry}
-                    tagLookup={tagOptions}
-                    onPress={() => onPressSession(entry.sessionId)}
-                  />
-                ))
-              )}
-            </>
-          ) : null}
-        </ScrollView>
-      </View>
+                      : 'No completed sessions for this exercise in this period.'
+                  }
+                  fill={false}
+                  testID="exercise-history-empty-state"
+                  title="No sessions in this view"
+                />
+              </Card>
+            ) : (
+              summary.sessions.map((entry) => (
+                <SessionCard
+                  entry={entry}
+                  key={entry.sessionExerciseId}
+                  onPress={() => onPressSession(entry.sessionId)}
+                  tagOptions={tagOptions}
+                />
+              ))
+            )}
+          </>
+        ) : null}
+      </ScreenScroll>
 
       <MainTabs activeTab={activeMainTab} onSelect={onSelectMainTab} />
-    </View>
+    </Screen>
   );
 }
 
+// The exercise's all-time bests: two rows that open the session holding each.
+// The figures are in `record`, the one superlative (T10-D2).
 function BestCard({
   best,
   onPressSession,
@@ -216,194 +234,126 @@ function BestCard({
   const oneRm = best.estimatedOneRepMax;
   const topWeight = best.topWeight;
   return (
-    <View style={styles.bestCard} testID="exercise-history-best-card">
-      <Text allowFontScaling={false} style={styles.bestCardTitle}>All-time bests</Text>
+    <Card testID="exercise-history-best-card">
+      <Text allowFontScaling={false} style={styles.cardLabel}>All-time bests</Text>
       <BestRow
-        testID="exercise-history-best-est-1rm"
-        label="Est. 1RM"
-        primary={formatEstOneRm(oneRm?.value ?? null)}
-        secondary={oneRm ? formatSessionDate(oneRm.completedAt) : null}
+        date={oneRm ? formatSessionDate(oneRm.completedAt) : null}
+        divider={false}
+        label="1RM"
         onPress={oneRm ? () => onPressSession(oneRm.sessionId) : undefined}
+        testID="exercise-history-best-est-1rm"
+        value={formatOneRepMax(oneRm?.value ?? null)}
       />
       <BestRow
-        testID="exercise-history-best-top-weight"
+        date={topWeight ? formatSessionDate(topWeight.completedAt) : null}
         label="Top weight"
-        primary={formatTopWeight(topWeight)}
-        secondary={topWeight ? formatSessionDate(topWeight.completedAt) : null}
         onPress={topWeight ? () => onPressSession(topWeight.sessionId) : undefined}
+        testID="exercise-history-best-top-weight"
+        value={formatTopSet(topWeight)}
       />
-    </View>
-  );
-}
-
-function TagChip({
-  testID,
-  label,
-  accessibilityLabel,
-  selected,
-  deleted = false,
-  onPress,
-}: {
-  testID: string;
-  label: string;
-  accessibilityLabel?: string;
-  selected: boolean;
-  deleted?: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
-      accessibilityState={{ selected }}
-      onPress={onPress}
-      style={[
-        styles.tagChip,
-        selected && styles.tagChipSelected,
-        deleted && !selected && styles.tagChipDeleted,
-      ]}
-      testID={testID}>
-      <Text allowFontScaling={false} style={[styles.tagChipText, selected && styles.tagChipTextSelected]} numberOfLines={1}>
-        {label}
-      </Text>
-    </Pressable>
+    </Card>
   );
 }
 
 function BestRow({
   testID,
   label,
-  primary,
-  secondary,
+  value,
+  date,
+  divider = true,
   onPress,
 }: {
   testID: string;
   label: string;
-  primary: string;
-  secondary: string | null;
+  value: string;
+  date: string | null;
+  divider?: boolean;
   onPress?: () => void;
 }) {
-  const inner = (
-    <View style={styles.bestRowInner}>
-      <Text allowFontScaling={false} style={styles.bestRowLabel}>{label}</Text>
-      <Text allowFontScaling={false} style={styles.bestRowPrimary}>{primary}</Text>
-      {secondary ? <Text allowFontScaling={false} style={styles.bestRowSecondary}>{secondary}</Text> : null}
-    </View>
-  );
-
-  if (!onPress) {
-    return (
-      <View style={styles.bestRow} testID={testID}>
-        {inner}
-      </View>
-    );
-  }
-
   return (
-    <Pressable
-      accessibilityRole="button"
+    <ListRow
+      accessibilityHint={onPress ? 'Opens the session' : undefined}
+      accessibilityLabel={date ? `${label} ${value}, ${date}` : `${label} ${value}`}
+      density="list"
+      divider={divider}
+      label={label}
+      meta={
+        <View style={styles.bestFigures}>
+          <Text
+            allowFontScaling={false}
+            style={[styles.bestValue, date ? null : styles.bestValueEmpty]}
+            testID={`${testID}-value`}>
+            {value}
+          </Text>
+          {date ? <Text allowFontScaling={false} style={styles.bestDate}>{date}</Text> : null}
+        </View>
+      }
       onPress={onPress}
-      style={styles.bestRow}
-      testID={testID}>
-      {inner}
-    </Pressable>
+      testID={testID}
+      trailing={onPress ? <Icon color={uiRoles.inkMuted} name="chevron-right" size="sm" /> : null}
+    />
   );
 }
 
+// One session's sets of this exercise: View Session's card and rows (T10-D1),
+// with the session's summary figures above the rows. The card opens View
+// Session.
 function SessionCard({
   entry,
-  tagLookup,
+  tagOptions,
   onPress,
 }: {
   entry: ExerciseHistorySessionEntry;
-  tagLookup: ExerciseHistoryTagOption[];
+  tagOptions: ExerciseHistoryTagOption[];
   onPress: () => void;
 }) {
-  const tagById = useMemo(() => {
-    const map = new Map<string, ExerciseHistoryTagOption>();
-    for (const tag of tagLookup) map.set(tag.tagDefinitionId, tag);
-    return map;
-  }, [tagLookup]);
-
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`Open session from ${formatSessionDate(entry.completedAt)}`}
-      onPress={onPress}
-      style={styles.sessionCard}
-      testID={`exercise-history-session-card-${entry.sessionExerciseId}`}>
-      <View style={styles.sessionCardHeader}>
-        <Text allowFontScaling={false} style={styles.sessionCardDate}>{formatSessionDate(entry.completedAt)}</Text>
-        <Text allowFontScaling={false} style={styles.sessionCardGym} numberOfLines={1}>
-          {entry.gymName?.trim() ? entry.gymName : 'No gym'}
-        </Text>
-      </View>
-
-      {entry.tagIds.length > 0 ? (
-        <View style={styles.sessionTagWrap}>
-          {entry.tagIds.map((id) => {
-            const tag = tagById.get(id);
-            if (!tag) return null;
-            return (
-              <View
-                key={id}
-                style={[styles.sessionTagChip, tag.deletedAt ? styles.sessionTagChipDeleted : null]}>
-                <Text allowFontScaling={false} numberOfLines={1} style={styles.sessionTagChipText}>
-                  {tag.deletedAt ? `${tag.name} (deleted)` : tag.name}
-                </Text>
-              </View>
-            );
-          })}
-        </View>
-      ) : null}
-
-      <View style={styles.sessionMetricsRow}>
-        <SessionMetric label="Est 1RM" value={formatEstOneRm(entry.estimatedOneRepMax)} />
-        <SessionMetric label="Top set" value={formatTopWeight(entry.topWeightSet)} />
-        <SessionMetric label="Volume" value={formatVolume(entry.totalVolume)} />
-        <SessionMetric label="W/sets" value={String(entry.workingSetCount)} />
-      </View>
-
-      <View style={styles.setTableHeaderRow}>
-        <Text allowFontScaling={false} style={[styles.setTableHeaderCell, styles.setTableTypeCell]}>Type</Text>
-        <Text allowFontScaling={false} style={[styles.setTableHeaderCell, styles.setTableIndexCell]}>Set</Text>
-        <Text allowFontScaling={false} style={[styles.setTableHeaderCell, styles.setTableValueCell]}>Weight</Text>
-        <Text allowFontScaling={false} style={[styles.setTableHeaderCell, styles.setTableValueCell]}>Reps</Text>
-      </View>
-      {entry.sets.map((set, index) => (
-        <View
-          key={set.setId}
-          style={[styles.setTableRow, !set.isWorking && styles.setTableRowNonWorking]}
-          testID={`exercise-history-set-row-${set.setId}`}>
-          <View style={[styles.setTableTypeCell, styles.setTableTypeBadgeWrap]}>
-            {formatSetTypeBadge(set.setType) ? (
-              <Text
-                allowFontScaling={false}
-                style={[
-                  styles.setTableTypeBadge,
-                  !set.isWorking && styles.setTableTypeBadgeWarmUp,
-                ]}>
-                {formatSetTypeBadge(set.setType)}
-              </Text>
-            ) : (
-              <Text allowFontScaling={false} style={styles.setTableTypeBadgeEmpty}>—</Text>
-            )}
-          </View>
-          <Text allowFontScaling={false} style={[styles.setTableCell, styles.setTableIndexCell]}>{index + 1}</Text>
-          <Text allowFontScaling={false} style={[styles.setTableCell, styles.setTableValueCell]}>{set.weightValue || '—'}</Text>
-          <Text allowFontScaling={false} style={[styles.setTableCell, styles.setTableValueCell]}>{set.repsValue || '—'}</Text>
-        </View>
-      ))}
-    </Pressable>
+  const date = formatSessionDate(entry.completedAt);
+  const tags = entry.tagIds
+    .map((id) => tagOptions.find((tag) => tag.tagDefinitionId === id))
+    .filter((tag): tag is ExerciseHistoryTagOption => tag !== undefined);
+  // Warm-ups read like working sets: the type column names them.
+  const rows = entry.sets.map((set) =>
+    formatSetRow({
+      id: set.setId,
+      weight: parseSetWeight(set.weightValue),
+      reps: parseSetReps(set.repsValue),
+      setType: set.setType,
+      done: true,
+    })
   );
-}
 
-function SessionMetric({ label, value }: { label: string; value: string }) {
   return (
-    <View style={styles.sessionMetric}>
-      <Text allowFontScaling={false} style={styles.sessionMetricLabel}>{label}</Text>
-      <Text allowFontScaling={false} style={styles.sessionMetricValue}>{value}</Text>
-    </View>
+    <ExerciseSetsCard
+      accessibilityLabel={`Open session from ${date}`}
+      count={`${rows.length} ${rows.length === 1 ? 'set' : 'sets'}`}
+      name={date}
+      nameFace="figure"
+      onPress={onPress}
+      recordOneRepMax={null}
+      rowTestID={(row) => `exercise-history-set-row-${row.id}`}
+      rows={rows}
+      summary={
+        <View style={styles.sessionSummary}>
+          <Text allowFontScaling={false} numberOfLines={1} style={styles.gym}>
+            {entry.gymName?.trim() ? entry.gymName : 'No gym'}
+          </Text>
+          {tags.length > 0 ? (
+            <View style={styles.tags}>
+              {tags.map((tag) => (
+                <Tag key={tag.tagDefinitionId} label={formatTagName(tag)} tone={tag.deletedAt ? 'faint' : 'neutral'} />
+              ))}
+            </View>
+          ) : null}
+          <View style={styles.stats}>
+            <Stat label="1RM" rank="secondary" value={formatOneRepMax(entry.estimatedOneRepMax)} />
+            <Stat label="Top set" rank="secondary" value={formatTopSet(entry.topWeightSet)} />
+            <Stat label="Vol" rank="secondary" value={formatVolume(entry.totalVolume)} />
+            <Stat label="W/sets" rank="secondary" value={String(entry.workingSetCount)} />
+          </View>
+        </View>
+      }
+      testID={`exercise-history-session-card-${entry.sessionExerciseId}`}
+    />
   );
 }
 
@@ -500,292 +450,66 @@ export default function ExerciseHistoryRoute() {
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: uiColors.surfacePage,
-    padding: uiSpace.lg,
-    gap: uiSpace.lg,
-  },
-  contentRegion: {
-    flex: 1,
-    minHeight: 0,
-    gap: uiSpace.md,
-  },
-  periodChipsRow: {
-    flexDirection: 'row',
-    gap: uiSpace.sm,
-    flexWrap: 'wrap',
-  },
-  periodChip: {
-    borderRadius: uiRadius.full,
-    borderWidth: 1,
-    borderColor: uiColors.borderMuted,
-    backgroundColor: uiColors.surfaceDefault,
-    paddingHorizontal: uiSpace.md,
-    paddingVertical: uiSpace.sm,
-  },
-  periodChipSelected: {
-    borderColor: uiColors.actionPrimary,
-    backgroundColor: uiColors.actionPrimarySubtleBg,
-  },
-  periodChipText: {
-    fontSize: uiTypography.size.md,
-    fontWeight: '600',
-    color: uiColors.textSecondary,
-  },
-  periodChipTextSelected: {
-    color: uiColors.actionPrimary,
-  },
-  tagChipsRow: {
-    gap: uiSpace.sm,
+  tagRowContent: {
     paddingRight: uiSpace.sm,
   },
-  tagChip: {
-    borderRadius: uiRadius.full,
-    borderWidth: 1,
-    borderColor: uiColors.borderMuted,
-    backgroundColor: uiColors.surfaceDefault,
+  // One line that scrolls sideways, not the group's usual wrap.
+  tagChips: {
+    flexWrap: 'nowrap',
+  },
+  cardLabel: {
     paddingHorizontal: uiSpace.md,
-    paddingVertical: uiSpace.xs,
-    maxWidth: 220,
-  },
-  tagChipSelected: {
-    borderColor: uiColors.actionPrimary,
-    backgroundColor: uiColors.actionPrimarySubtleBg,
-  },
-  tagChipDeleted: {
-    borderColor: uiColors.borderWarning,
-    backgroundColor: uiColors.surfaceWarning,
-  },
-  tagChipText: {
-    fontSize: uiTypography.size.sm,
-    fontWeight: '600',
-    color: uiColors.textSecondary,
-  },
-  tagChipTextSelected: {
-    color: uiColors.actionPrimary,
-  },
-  scroll: {
-    flex: 1,
-    minHeight: 0,
-  },
-  scrollContent: {
-    gap: uiSpace.md,
-    paddingBottom: uiSpace.lg,
-  },
-  statePanel: {
-    borderRadius: uiRadius.md,
-    borderWidth: 1,
-    borderColor: uiColors.borderMuted,
-    backgroundColor: uiColors.surfaceDefault,
-    padding: uiSpace.lg,
-    gap: uiSpace.sm,
-  },
-  stateTitle: {
-    fontSize: uiTypography.size.base,
+    paddingTop: uiSpace.sm,
+    paddingBottom: uiSpace.xs,
+    fontFamily: uiFonts.display.family,
     fontWeight: '700',
-    color: uiColors.textPrimary,
-  },
-  stateBody: {
-    fontSize: uiTypography.size.md,
-    color: uiColors.textSecondary,
-  },
-  deletedExerciseBanner: {
-    borderRadius: uiRadius.md,
-    borderWidth: 1,
-    borderColor: uiColors.borderWarning,
-    backgroundColor: uiColors.surfaceWarning,
-    padding: uiSpace.md,
-  },
-  deletedExerciseBannerText: {
-    color: uiColors.textWarning,
-    fontSize: uiTypography.size.sm,
-    fontWeight: '600',
-  },
-  bestCard: {
-    borderRadius: uiRadius.md,
-    borderWidth: 1,
-    borderColor: uiColors.borderMuted,
-    backgroundColor: uiColors.surfaceDefault,
-    padding: uiSpace.md,
-    gap: uiSpace.sm,
-  },
-  bestCardTitle: {
-    fontSize: uiTypography.size.sm,
-    fontWeight: '700',
-    color: uiColors.textSecondary,
+    fontSize: uiTypography.size.xxs,
+    lineHeight: uiTypography.lineHeight.xxs,
+    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    color: uiRoles.inkFaint,
   },
-  bestRow: {
-    borderRadius: uiRadius.md,
-    borderWidth: 1,
-    borderColor: uiColors.borderMuted,
-    backgroundColor: uiColors.surfacePage,
+  bestFigures: {
+    alignItems: 'flex-end',
+  },
+  bestValue: {
+    fontFamily: uiFonts.figure.family,
+    fontWeight: '700',
+    fontSize: uiTypography.size.lg,
+    lineHeight: uiTypography.lineHeight.lg,
+    color: uiRoles.record,
+  },
+  bestValueEmpty: {
+    fontWeight: '500',
+    color: uiRoles.inkFaint,
+  },
+  bestDate: {
+    fontFamily: uiFonts.figure.family,
+    fontWeight: '500',
+    fontSize: uiTypography.size.xs,
+    lineHeight: uiTypography.lineHeight.xs,
+    color: uiRoles.inkMuted,
+  },
+  sessionSummary: {
+    gap: uiSpace.sm,
     paddingHorizontal: uiSpace.md,
-    paddingVertical: uiSpace.md,
+    paddingBottom: uiSpace.sm,
   },
-  bestRowInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiSpace.md,
-  },
-  bestRowLabel: {
-    flex: 1,
-    fontSize: uiTypography.size.md,
+  gym: {
+    fontFamily: uiFonts.body.family,
     fontWeight: '600',
-    color: uiColors.textSecondary,
-  },
-  bestRowPrimary: {
-    fontSize: uiTypography.size.base,
-    fontWeight: '700',
-    color: uiColors.textPrimary,
-  },
-  bestRowSecondary: {
-    fontSize: uiTypography.size.xs,
-    fontWeight: '600',
-    color: uiColors.textSecondary,
-  },
-  sessionCard: {
-    borderRadius: uiRadius.md,
-    borderWidth: 1,
-    borderColor: uiColors.borderMuted,
-    backgroundColor: uiColors.surfaceDefault,
-    padding: uiSpace.md,
-    gap: uiSpace.md,
-  },
-  sessionCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: uiSpace.sm,
-  },
-  sessionCardDate: {
-    fontSize: uiTypography.size.base,
-    fontWeight: '700',
-    color: uiColors.textPrimary,
-  },
-  sessionCardGym: {
     fontSize: uiTypography.size.sm,
-    fontWeight: '600',
-    color: uiColors.textSecondary,
-    flex: 1,
-    textAlign: 'right',
+    lineHeight: uiTypography.lineHeight.sm,
+    color: uiRoles.inkMuted,
   },
-  sessionTagWrap: {
+  tags: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: uiSpace.sm,
-  },
-  sessionTagChip: {
-    borderWidth: 1,
-    borderColor: uiColors.actionPrimarySubtleBorder,
-    backgroundColor: uiColors.actionPrimarySubtleBg,
-    borderRadius: uiRadius.full,
-    paddingVertical: uiSpace.xs,
-    paddingHorizontal: uiSpace.sm,
-    maxWidth: '100%',
-  },
-  sessionTagChipDeleted: {
-    borderColor: uiColors.borderWarning,
-    backgroundColor: uiColors.surfaceWarning,
-  },
-  sessionTagChipText: {
-    fontSize: uiTypography.size.xs,
-    color: uiColors.textAccentStrong,
-    fontWeight: '600',
-    maxWidth: 180,
-  },
-  sessionMetricsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: uiSpace.md,
-  },
-  sessionMetric: {
-    minWidth: 90,
     gap: uiSpace.xs,
   },
-  sessionMetricLabel: {
-    fontSize: uiTypography.size.xs,
-    color: uiColors.textSecondary,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  sessionMetricValue: {
-    fontSize: uiTypography.size.base,
-    fontWeight: '700',
-    color: uiColors.textPrimary,
-  },
-  setTableHeaderRow: {
+  stats: {
     flexDirection: 'row',
-    alignItems: 'center',
-    borderTopLeftRadius: uiRadius.sm,
-    borderTopRightRadius: uiRadius.sm,
-    borderWidth: 1,
-    borderBottomWidth: 0,
-    borderColor: uiColors.borderMuted,
-    backgroundColor: uiColors.surfacePage,
-    paddingHorizontal: uiSpace.sm,
-    paddingVertical: uiSpace.sm,
+    justifyContent: 'space-between',
     gap: uiSpace.sm,
-  },
-  setTableHeaderCell: {
-    color: uiColors.textSecondary,
-    fontSize: uiTypography.size.xs,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-  },
-  setTableRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: uiColors.borderMuted,
-    borderTopWidth: 0,
-    paddingHorizontal: uiSpace.sm,
-    paddingVertical: uiSpace.sm,
-    gap: uiSpace.sm,
-    backgroundColor: uiColors.surfaceDefault,
-  },
-  setTableRowNonWorking: {
-    backgroundColor: uiColors.surfaceMuted,
-  },
-  setTableCell: {
-    color: uiColors.textPrimary,
-    fontSize: uiTypography.size.sm,
-    fontWeight: '600',
-  },
-  setTableTypeCell: {
-    width: 38,
-  },
-  setTableIndexCell: {
-    width: 36,
-  },
-  setTableValueCell: {
-    flex: 1,
-  },
-  setTableTypeBadgeWrap: {
-    alignItems: 'flex-start',
-  },
-  setTableTypeBadge: {
-    fontSize: uiTypography.size.xs,
-    fontWeight: '700',
-    color: uiColors.actionPrimary,
-    borderWidth: 1,
-    borderColor: uiColors.actionPrimarySubtleBorder,
-    backgroundColor: uiColors.actionPrimarySubtleBg,
-    borderRadius: uiRadius.sm,
-    paddingHorizontal: uiSpace.xs,
-    paddingVertical: uiSpace.xs,
-  },
-  setTableTypeBadgeWarmUp: {
-    color: uiColors.textWarning,
-    backgroundColor: uiColors.surfaceWarning,
-    borderColor: uiColors.borderWarning,
-  },
-  setTableTypeBadgeEmpty: {
-    fontSize: uiTypography.size.xs,
-    fontWeight: '600',
-    color: uiColors.textSecondary,
   },
 });

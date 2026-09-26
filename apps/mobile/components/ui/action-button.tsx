@@ -15,6 +15,9 @@ export type ActionButtonProps = {
   // `danger` recolours an outline or text button; a primary is never danger.
   tone?: ActionButtonTone;
   disabled?: boolean;
+  // A text button that toggles a view on and off (Sessions' `Show deleted`):
+  // announced as checked, so the state never rides the label alone.
+  checked?: boolean;
   accessibilityLabel?: string;
   accessibilityHint?: string;
   testID?: string;
@@ -29,6 +32,7 @@ export function ActionButton({
   variant,
   tone = 'default',
   disabled = false,
+  checked,
   accessibilityLabel,
   accessibilityHint,
   testID,
@@ -39,7 +43,7 @@ export function ActionButton({
       accessibilityHint={accessibilityHint}
       accessibilityLabel={accessibilityLabel ?? label}
       accessibilityRole="button"
-      accessibilityState={{ disabled }}
+      accessibilityState={checked === undefined ? { disabled } : { disabled, checked }}
       disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [

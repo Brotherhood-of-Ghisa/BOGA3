@@ -7,6 +7,9 @@ export type ChipOption<TValue extends string | number> = {
   label: string;
   // What VoiceOver (and Maestro) read and tap, e.g. `Turn grouping off`.
   accessibilityLabel?: string;
+  // A choice that has stepped back (a deleted tag): its label is faint while
+  // off. The label's words say why.
+  faint?: boolean;
 };
 
 type ChipGroupBaseProps<TValue extends string | number> = {
@@ -24,6 +27,10 @@ export type ChipGroupProps<TValue extends string | number> = ChipGroupBaseProps<
         mode: 'single';
         value: TValue;
         onChange: (next: TValue) => void;
+        // The "no filter" chip: pressing the selected chip selects it, so a
+        // filter turns off where it was turned on. Unset, pressing the
+        // selected chip does nothing.
+        clearValue?: TValue;
       }
     | {
         // Each chip toggles on its own (muscle filters, list options).
@@ -61,11 +68,16 @@ export function ChipGroup<TValue extends string | number>(props: ChipGroupProps<
                 props.onToggle(option.value);
               } else if (!on) {
                 props.onChange(option.value);
+              } else if (props.clearValue !== undefined && option.value !== props.clearValue) {
+                props.onChange(props.clearValue);
               }
             }}
             style={({ pressed }) => [styles.chip, on ? styles.chipOn : null, pressed && !on ? styles.pressed : null]}
             testID={`${testIDPrefix}-${option.value}`}>
-            <Text allowFontScaling={false} numberOfLines={1} style={[styles.label, on ? styles.labelOn : null]}>
+            <Text
+              allowFontScaling={false}
+              numberOfLines={1}
+              style={[styles.label, on ? styles.labelOn : option.faint ? styles.labelFaint : null]}>
               {option.label}
             </Text>
           </Pressable>
@@ -106,5 +118,8 @@ const styles = StyleSheet.create({
   },
   labelOn: {
     color: uiRoles.surface,
+  },
+  labelFaint: {
+    color: uiRoles.inkFaint,
   },
 });

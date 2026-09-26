@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { Alert, type AlertButton } from 'react-native';
 
 import SessionsRoute, { SessionsScreen } from '../sessions';
 import {
@@ -185,8 +186,14 @@ describe('SessionsScreen focus-aware loading', () => {
       .mockResolvedValueOnce([]);
     render(<SessionsScreen dataClient={dataClient} isFocused />);
 
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     fireEvent.press(await screen.findByTestId('active-session-menu-button'));
     fireEvent.press(screen.getByTestId('discard-active-session-button'));
+    const buttons = alertSpy.mock.calls[0][2] as AlertButton[];
+    await act(async () => {
+      buttons.find((button) => button.text === 'Discard')?.onPress?.();
+    });
+    alertSpy.mockRestore();
 
     await waitFor(() => {
       expect(dataClient.discardActiveSession).toHaveBeenCalledWith(activeSession.id);
@@ -241,5 +248,108 @@ describe('SessionsScreen focus-aware loading', () => {
       await lateLoad.promise;
     });
     expect(dataClient.loadSessions).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('SessionsScreen design-language states (DLM-T10)', () => {
+  let alertSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    mockPush.mockReset();
+    alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    alertSpy.mockRestore();
+  });
+
+  const alertButton = (text: string): AlertButton => {
+    const buttons = alertSpy.mock.calls.at(-1)?.[2] as AlertButton[];
+    const button = buttons.find((candidate) => candidate.text === text);
+    if (!button) {
+      throw new Error(`No alert button ${text}`);
+    }
+    return button;
+  };
+
+  it('marks a deleted completed row with a Deleted tag once deleted sessions are shown', async () => {
+    const deletedSession: SessionListItem = {
+      ...completedSession,
+      deletedAt: '2026-07-26T12:00:00.000Z',
+    };
+    const dataClient = buildDataClient();
+    dataClient.loadSessions.mockResolvedValue([deletedSession]);
+    render(<SessionsScreen dataClient={dataClient} isFocused />);
+
+    const toggle = await screen.findByTestId('toggle-deleted-sessions-button');
+    expect(toggle).toHaveProp('accessibilityState', { disabled: false, checked: false });
+    expect(screen.queryByTestId(`completed-session-row-${deletedSession.id}`)).toBeNull();
+
+    fireEvent.press(toggle);
+
+    expect(
+      await screen.findByTestId(`completed-session-deleted-tag-${deletedSession.id}`)
+    ).toHaveTextContent('Deleted');
+    expect(screen.getByTestId('toggle-deleted-sessions-button')).toHaveProp('accessibilityState', {
+      disabled: false,
+      checked: true,
+    });
+    expect(screen.getByTestId('toggle-deleted-sessions-button')).toHaveTextContent('Hide deleted');
+  });
+
+  it('confirms before discarding the active session, and Cancel keeps it', async () => {
+    const dataClient = buildDataClient();
+    render(<SessionsScreen dataClient={dataClient} isFocused />);
+
+    fireEvent.press(await screen.findByTestId('active-session-menu-button'));
+    fireEvent.press(screen.getByTestId('discard-active-session-button'));
+
+    expect(alertSpy).toHaveBeenCalledTimes(1);
+    expect(alertButton('Discard').style).toBe('destructive');
+    expect(alertButton('Cancel').style).toBe('cancel');
+
+    act(() => {
+      alertButton('Cancel').onPress?.();
+    });
+    expect(dataClient.discardActiveSession).not.toHaveBeenCalled();
+    expect(screen.getByTestId(`active-session-row-${activeSession.id}`)).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('active-session-menu-button'));
+    fireEvent.press(screen.getByTestId('discard-active-session-button'));
+    await act(async () => {
+      alertButton('Discard').onPress?.();
+    });
+    expect(dataClient.discardActiveSession).toHaveBeenCalledWith(activeSession.id);
+  });
+
+  it('reloads from the load error through Retry', async () => {
+    const dataClient = buildDataClient();
+    dataClient.loadSessions
+      .mockRejectedValueOnce(new Error('Database unavailable'))
+      .mockResolvedValueOnce([completedSession]);
+    render(<SessionsScreen dataClient={dataClient} isFocused />);
+
+    const error = await screen.findByTestId('session-list-load-error');
+    expect(error).toHaveTextContent(/Could not load sessions/);
+    expect(error).toHaveTextContent(/Database unavailable/);
+
+    fireEvent.press(screen.getByTestId('session-list-load-error-retry'));
+
+    expect(await screen.findByTestId(`completed-session-row-${completedSession.id}`)).toBeTruthy();
+    expect(dataClient.loadSessions).toHaveBeenCalledTimes(2);
+    expect(screen.queryByTestId('session-list-load-error')).toBeNull();
+  });
+
+  it('opens a completed row menu as a sheet the backdrop dismisses', async () => {
+    const dataClient = buildDataClient();
+    dataClient.loadSessions.mockResolvedValue([completedSession]);
+    render(<SessionsScreen dataClient={dataClient} isFocused />);
+
+    fireEvent.press(await screen.findByTestId(`completed-session-menu-button-${completedSession.id}`));
+    expect(screen.getByTestId('completed-session-edit-menu-action-button')).toBeTruthy();
+    expect(screen.getByTestId('completed-session-modal-action-button')).toHaveTextContent('Delete');
+
+    fireEvent.press(screen.getByTestId('completed-session-menu-backdrop', { includeHiddenElements: true }));
+    expect(screen.queryByTestId('completed-session-edit-menu-action-button')).toBeNull();
   });
 });

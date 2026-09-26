@@ -77,6 +77,43 @@ appId: com.dinoderek.mobile
       id: "exercise-records-collapsed"
     timeout: 5000
 
+# Exercise history (`ux-rules` §13), opened by the records panel's `History`:
+# the default period (last 30 days) holds the newer fixture session; All time
+# adds the older one. Both carry a warm-up. Then back to the page.
+- tapOn:
+    id: "exercise-records-history"
+- extendedWaitUntil:
+    visible:
+      id: "exercise-history-screen"
+    timeout: 10000
+- extendedWaitUntil:
+    visible:
+      id: "exercise-history-session-card-maestro_exercise_page_history_2_bench"
+    timeout: 10000
+- assertVisible:
+    id: "exercise-history-best-card"
+- assertNotVisible:
+    id: "exercise-history-session-card-maestro_exercise_page_history_1_bench"
+- assertVisible:
+    id: "exercise-history-set-row-maestro_exercise_page_history_2_bench_set_1-values"
+    text: "60.0 × 10"
+- takeScreenshot: "exercise-history-default"
+- tapOn:
+    id: "exercise-history-period-chip-all"
+- extendedWaitUntil:
+    visible:
+      id: "exercise-history-session-card-maestro_exercise_page_history_1_bench"
+    timeout: 10000
+- takeScreenshot: "exercise-history-all-time"
+# The native back item is arrow-only; it reads the previous route's title.
+- tapOn: "Exercise"
+- extendedWaitUntil:
+    visible:
+      id: "exercise-page"
+    timeout: 10000
+- waitForAnimationToEnd:
+    timeout: 4000
+
 # Effort cycles from prescribed RIR 1, through warm-up and blank, then RIR 3 downward.
 - tapOn:
     id: "exercise-set-logger-effort"

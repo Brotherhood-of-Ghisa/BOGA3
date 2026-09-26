@@ -444,6 +444,14 @@ describe('ActionButton', () => {
     fireEvent.press(button);
     expect(onPress).not.toHaveBeenCalled();
   });
+
+  it('announces a view toggle as checked only when asked', () => {
+    const { rerender } = render(<ActionButton label="Show deleted" onPress={jest.fn()} testID="toggle" variant="text" />);
+    expect(screen.getByTestId('toggle').props.accessibilityState).toEqual({ disabled: false });
+
+    rerender(<ActionButton checked label="Hide deleted" onPress={jest.fn()} testID="toggle" variant="text" />);
+    expect(screen.getByTestId('toggle').props.accessibilityState).toEqual({ disabled: false, checked: true });
+  });
 });
 
 describe('IconButton', () => {
@@ -651,6 +659,31 @@ describe('ChipGroup', () => {
     expect(screen.getByTestId('muscles-b').props.accessibilityState).toEqual({ checked: true });
     fireEvent.press(screen.getByTestId('muscles-b'));
     expect(onToggle).toHaveBeenCalledWith('b');
+  });
+
+  it('returns to the clear value when the selected chip is pressed again', () => {
+    const onChange = jest.fn();
+    const options = [{ value: 'all', label: 'All' }, ...OPTIONS];
+    const { rerender } = render(
+      <ChipGroup clearValue="all" mode="single" onChange={onChange} options={options} testIDPrefix="tags" value="b" />
+    );
+
+    fireEvent.press(screen.getByTestId('tags-b'));
+    expect(onChange).toHaveBeenLastCalledWith('all');
+
+    onChange.mockClear();
+    rerender(<ChipGroup clearValue="all" mode="single" onChange={onChange} options={options} testIDPrefix="tags" value="all" />);
+    fireEvent.press(screen.getByTestId('tags-all'));
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('draws a faint option in ink-faint until it is on', () => {
+    const options = [{ value: 'a', label: 'Alpha' }, { value: 'old', label: 'Old (deleted)', faint: true }];
+    const { rerender } = render(<ChipGroup mode="single" onChange={jest.fn()} options={options} testIDPrefix="tags" value="a" />);
+    expect(flatStyle(within(screen.getByTestId('tags-old')).getByText('Old (deleted)')).color).toBe(uiRoles.inkFaint);
+
+    rerender(<ChipGroup mode="single" onChange={jest.fn()} options={options} testIDPrefix="tags" value="old" />);
+    expect(flatStyle(within(screen.getByTestId('tags-old')).getByText('Old (deleted)')).color).toBe(uiRoles.surface);
   });
 });
 

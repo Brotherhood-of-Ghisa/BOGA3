@@ -147,3 +147,24 @@ appId: com.dinoderek.mobile
 - assertVisible:
     id: "completed-history-scroll"
 - takeScreenshot: "04-data-runtime-smoke-success"
+# A completed row's ⋮ opens its menu sheet (Edit / Append / Delete); the
+# backdrop dismisses it. The sheet is modal to VoiceOver, which hides the
+# backdrop from the accessibility tree Maestro reads, so tap a point above it.
+- tapOn:
+    id: "completed-session-menu-button-.*"
+    index: 0
+- extendedWaitUntil:
+    visible:
+      id: "completed-session-edit-menu-action-button"
+    timeout: 5000
+- assertVisible:
+    id: "completed-session-reopen-menu-action-button"
+- assertVisible:
+    id: "completed-session-modal-action-button"
+- takeScreenshot: "sessions-row-menu"
+- tapOn:
+    point: "50%,10%"
+- extendedWaitUntil:
+    notVisible:
+      id: "completed-session-edit-menu-action-button"
+    timeout: 5000
