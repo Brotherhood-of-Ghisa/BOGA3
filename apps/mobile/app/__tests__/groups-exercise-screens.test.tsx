@@ -95,7 +95,6 @@ import {
   type GroupRole,
 } from '@/src/groups';
 import * as groupsApi from '@/src/groups/api';
-import { uiRoles } from '@/components/ui';
 
 import EditGroupExerciseRoute from '../group/[groupId]/exercises/[exerciseId]/edit';
 import NewGroupExerciseRoute from '../group/[groupId]/exercises/new';
