@@ -29,6 +29,7 @@ type RecordsPanelProps = {
   view: RecordsView;
   expanded: boolean;
   dateFormat: ExerciseDateFormat;
+  isFilteredByGym?: boolean;
   onToggleExpanded: () => void;
   // Choosing a view leaves the panel expanded or collapsed as it was.
   onSelectView: (view: RecordsView) => void;
@@ -45,6 +46,7 @@ export function RecordsPanel({
   view,
   expanded,
   dateFormat,
+  isFilteredByGym = false,
   onToggleExpanded,
   onSelectView,
   onOpenHistory,
@@ -82,7 +84,14 @@ export function RecordsPanel({
           <Icon color={uiRoles.accent} name="chevron-right" size="xs" />
         </Pressable>
       </View>
-      <PanelBody dateFormat={dateFormat} expanded={expanded} now={now} state={state} view={view} />
+      <PanelBody
+        dateFormat={dateFormat}
+        expanded={expanded}
+        isFilteredByGym={isFilteredByGym}
+        now={now}
+        state={state}
+        view={view}
+      />
     </Card>
   );
 }
@@ -92,8 +101,9 @@ function PanelBody({
   view,
   expanded,
   dateFormat,
+  isFilteredByGym = false,
   now,
-}: Pick<RecordsPanelProps, 'state' | 'view' | 'expanded' | 'dateFormat' | 'now'>) {
+}: Pick<RecordsPanelProps, 'state' | 'view' | 'expanded' | 'dateFormat' | 'isFilteredByGym' | 'now'>) {
   if (state.status !== 'ready') {
     if (!expanded && state.status === 'loading') {
       return <CollapsedStats oneRepMax={DASH} maxWeight={DASH} volume={DASH} />;
@@ -132,14 +142,14 @@ function PanelBody({
 
   if (view === 'records') {
     if (!records.oneRepMax && !records.maxWeight && !records.volume) {
-      return <Empty />;
+      return <Empty isFilteredByGym={isFilteredByGym} />;
     }
     return (
       <View testID="exercise-records-list">
         <RecordLine
           detail={
             records.oneRepMax
-              ? `${date(records.oneRepMax.completedAt)} · ${formatWeight(records.oneRepMax.weight)} × ${records.oneRepMax.reps}`
+              ? `${date(records.oneRepMax.completedAt)}${records.oneRepMax.gymName ? ` · ${records.oneRepMax.gymName}` : ''} · ${formatWeight(records.oneRepMax.weight)} × ${records.oneRepMax.reps}`
               : ''
           }
           label="1RM"
@@ -148,7 +158,9 @@ function PanelBody({
         />
         <RecordLine
           detail={
-            records.maxWeight ? `${date(records.maxWeight.completedAt)} · ${records.maxWeight.reps} reps` : ''
+            records.maxWeight
+              ? `${date(records.maxWeight.completedAt)}${records.maxWeight.gymName ? ` · ${records.maxWeight.gymName}` : ''} · ${records.maxWeight.reps} reps`
+              : ''
           }
           divider
           label="Max"
@@ -157,7 +169,9 @@ function PanelBody({
         />
         <RecordLine
           detail={
-            records.volume ? `${date(records.volume.completedAt)} · ${records.volume.setCount} sets` : ''
+            records.volume
+              ? `${date(records.volume.completedAt)}${records.volume.gymName ? ` · ${records.volume.gymName}` : ''} · ${records.volume.setCount} sets`
+              : ''
           }
           divider
           label="Vol"
@@ -169,14 +183,14 @@ function PanelBody({
   }
 
   if (!last) {
-    return <Empty />;
+    return <Empty isFilteredByGym={isFilteredByGym} />;
   }
 
   return (
     <View style={styles.last} testID="exercise-records-last">
       <View style={styles.lastSummary}>
         <Text allowFontScaling={false} style={pageText.detailFigure}>
-          {`${date(last.completedAt)} · ${formatDaysAgo(last.completedAt, now)}`}
+          {`${date(last.completedAt)}${last.gymName ? ` · ${last.gymName}` : ''} · ${formatDaysAgo(last.completedAt, now)}`}
         </Text>
         <Text allowFontScaling={false} style={pageText.detailFigure}>
           {`1RM ${last.oneRepMax !== null ? formatOneRepMax(last.oneRepMax) : DASH} · VOL ${formatVolume(last.volume)}`}
@@ -260,10 +274,12 @@ function LastSetLine({ set, index }: { set: RecordSet; index: number }) {
   );
 }
 
-function Empty() {
+function Empty({ isFilteredByGym }: { isFilteredByGym?: boolean }) {
   return (
     <Text allowFontScaling={false} style={[pageText.body, styles.message]} testID="exercise-records-empty">
-      No completed sessions with this exercise yet.
+      {isFilteredByGym
+        ? 'No completed sessions for this gym yet.'
+        : 'No completed sessions with this exercise yet.'}
     </Text>
   );
 }

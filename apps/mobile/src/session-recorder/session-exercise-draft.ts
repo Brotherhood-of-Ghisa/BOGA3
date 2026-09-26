@@ -37,6 +37,7 @@ export type SessionExerciseDraftLoad =
       status: 'ready';
       exercise: SessionDraftExerciseSnapshot;
       sessionStatus: SessionGraphSnapshot['status'];
+      gymId: string | null;
     }
   | { status: SessionExerciseDraftLoadError };
 
@@ -59,7 +60,9 @@ export const loadSessionExerciseDraft = async (
   if (!session) return { status: 'missing-session' };
   if (!isEditable(session)) return { status: 'not-editable' };
   const exercise = session.exercises.find((candidate) => candidate.id === sessionExerciseId);
-  return exercise ? { status: 'ready', exercise, sessionStatus: session.status } : { status: 'missing-exercise' };
+  return exercise
+    ? { status: 'ready', exercise, sessionStatus: session.status, gymId: session.gymId }
+    : { status: 'missing-exercise' };
 };
 
 export const toSessionExerciseInput = (exercise: SessionDraftExerciseSnapshot): SessionDraftExerciseInput => ({

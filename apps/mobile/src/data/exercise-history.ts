@@ -43,6 +43,7 @@ export type ExerciseHistorySessionEntry = {
   sessionId: string;
   sessionExerciseId: string;
   completedAt: Date;
+  gymId?: string | null;
   gymName: string | null;
   tagIds: string[];
   sets: ExerciseHistorySetEntry[];
@@ -56,6 +57,12 @@ export type ExerciseHistoryTagOption = {
   tagDefinitionId: string;
   name: string;
   deletedAt: Date | null;
+  occurrenceCount: number;
+};
+
+export type ExerciseHistoryGymOption = {
+  gymId: string;
+  name: string;
   occurrenceCount: number;
 };
 
@@ -79,7 +86,9 @@ export type ExerciseHistorySummary = {
   exerciseDeletedAt: Date | null;
   period: ExerciseHistoryPeriod;
   appliedTagDefinitionId: string | null;
+  appliedGymId: string | null;
   tagOptions: ExerciseHistoryTagOption[];
+  gymOptions: ExerciseHistoryGymOption[];
   sessions: ExerciseHistorySessionEntry[];
   allTimeBest: ExerciseHistoryBest;
 };
@@ -88,6 +97,7 @@ export type ExerciseHistorySessionRow = {
   sessionId: string;
   sessionExerciseId: string;
   completedAt: Date;
+  gymId?: string | null;
   gymName: string | null;
 };
 
@@ -118,6 +128,7 @@ export type ExerciseHistoryAggregationInput = {
   exerciseDefinition: ExerciseHistoryDefinitionRow;
   period: ExerciseHistoryPeriod;
   appliedTagDefinitionId: string | null;
+  appliedGymId?: string | null;
   sessionsInPeriod: ExerciseHistorySessionRow[];
   sessionsAllTime: ExerciseHistorySessionRow[];
   setsBySessionExerciseId: Record<string, ExerciseHistorySetRow[]>;
@@ -146,6 +157,7 @@ export type LoadExercisePerformanceHistoryOptions = {
   /** Period window. Defaults to 30 days when omitted. */
   period?: ExerciseHistoryPeriod;
   tagDefinitionId?: string | null;
+  gymId?: string | null;
   now?: Date;
 };
 
@@ -229,6 +241,7 @@ const buildSessionEntry = (
     sessionId: sessionRow.sessionId,
     sessionExerciseId: sessionRow.sessionExerciseId,
     completedAt: sessionRow.completedAt,
+    gymId: sessionRow.gymId,
     gymName: sessionRow.gymName,
     tagIds,
     sets,
@@ -307,18 +320,53 @@ const buildTagOptions = (
   });
 };
 
+const buildGymOptions = (
+  sessionsInPeriod: ExerciseHistorySessionRow[]
+): ExerciseHistoryGymOption[] => {
+  const optionByGymId = new Map<string, ExerciseHistoryGymOption>();
+  for (const sessionRow of sessionsInPeriod) {
+    const gymId = sessionRow.gymId ?? 'no-gym';
+    const name = sessionRow.gymName?.trim() ? sessionRow.gymName : 'No gym';
+    const existing = optionByGymId.get(gymId);
+    if (existing) {
+      existing.occurrenceCount += 1;
+    } else {
+      optionByGymId.set(gymId, {
+        gymId,
+        name,
+        occurrenceCount: 1,
+      });
+    }
+  }
+
+  return Array.from(optionByGymId.values()).sort((left, right) => {
+    if (right.occurrenceCount !== left.occurrenceCount) {
+      return right.occurrenceCount - left.occurrenceCount;
+    }
+    return left.name.localeCompare(right.name);
+  });
+};
+
 export const aggregateExerciseHistory = (
   input: ExerciseHistoryAggregationInput
 ): ExerciseHistorySummary => {
+  const appliedGymId = input.appliedGymId ?? null;
   const tagOptions = buildTagOptions(input.sessionsInPeriod, input.tagsBySessionExerciseId);
+  const gymOptions = buildGymOptions(input.sessionsInPeriod);
 
-  const filteredSessionRows = input.appliedTagDefinitionId
+  let filteredSessionRows = input.appliedTagDefinitionId
     ? input.sessionsInPeriod.filter((row) =>
         (input.tagsBySessionExerciseId[row.sessionExerciseId] ?? []).some(
           (tag) => tag.tagDefinitionId === input.appliedTagDefinitionId
         )
       )
     : input.sessionsInPeriod;
+
+  if (appliedGymId) {
+    filteredSessionRows = filteredSessionRows.filter((row) =>
+      appliedGymId === 'no-gym' ? (!row.gymId || row.gymId === null) : row.gymId === appliedGymId
+    );
+  }
 
   const orderedSessionRows = [...filteredSessionRows].sort(compareCompletedDesc);
   const sessions = orderedSessionRows
@@ -331,7 +379,13 @@ export const aggregateExerciseHistory = (
     )
     .filter((entry) => entry.sets.length > 0);
 
-  const allTimeEntries = input.sessionsAllTime
+  const filteredAllTimeRows = appliedGymId
+    ? input.sessionsAllTime.filter((row) =>
+        appliedGymId === 'no-gym' ? (!row.gymId || row.gymId === null) : row.gymId === appliedGymId
+      )
+    : input.sessionsAllTime;
+
+  const allTimeEntries = filteredAllTimeRows
     .map((row) =>
       buildSessionEntry(
         row,
@@ -347,7 +401,9 @@ export const aggregateExerciseHistory = (
     exerciseDeletedAt: input.exerciseDefinition.deletedAt,
     period: input.period,
     appliedTagDefinitionId: input.appliedTagDefinitionId,
+    appliedGymId,
     tagOptions,
+    gymOptions,
     sessions,
     allTimeBest: computeBest(allTimeEntries),
   };
@@ -391,6 +447,7 @@ export const createDrizzleExerciseHistoryStore = (): ExerciseHistoryStore => ({
         sessionId: sessions.id,
         sessionExerciseId: sessionExercises.id,
         completedAt: sessions.completedAt,
+        gymId: sessions.gymId,
         gymName: gyms.name,
       })
       .from(sessionExercises)
@@ -402,13 +459,19 @@ export const createDrizzleExerciseHistoryStore = (): ExerciseHistoryStore => ({
 
     return rows
       .filter(
-        (row): row is { sessionId: string; sessionExerciseId: string; completedAt: Date; gymName: string | null } =>
-          row.completedAt !== null
+        (row): row is {
+          sessionId: string;
+          sessionExerciseId: string;
+          completedAt: Date;
+          gymId: string | null;
+          gymName: string | null;
+        } => row.completedAt !== null
       )
       .map((row) => ({
         sessionId: row.sessionId,
         sessionExerciseId: row.sessionExerciseId,
         completedAt: row.completedAt,
+        gymId: row.gymId ?? null,
         gymName: row.gymName ?? null,
       }));
   },
@@ -483,6 +546,7 @@ export const createExerciseHistoryRepository = (
   async load(options: LoadExercisePerformanceHistoryOptions): Promise<ExerciseHistorySummary | null> {
     const period: ExerciseHistoryPeriod = options.period ?? 30;
     const appliedTagDefinitionId = options.tagDefinitionId ?? null;
+    const appliedGymId = options.gymId ?? null;
     const now = options.now ?? new Date();
     ensureValidDate(now, 'now');
 
@@ -530,6 +594,7 @@ export const createExerciseHistoryRepository = (
       exerciseDefinition,
       period,
       appliedTagDefinitionId,
+      appliedGymId,
       sessionsInPeriod,
       sessionsAllTime: allTimeRows,
       setsBySessionExerciseId: groupBySessionExerciseId(setRows),

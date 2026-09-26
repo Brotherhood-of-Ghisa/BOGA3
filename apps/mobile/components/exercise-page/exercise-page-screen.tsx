@@ -91,12 +91,18 @@ export function ExercisePageScreen({
   });
   const exercise = draft.state.status === 'ready' ? draft.state.exercise : null;
   const isCompletedSession = draft.state.status === 'ready' && draft.state.sessionStatus === 'completed';
+  const currentGymId = draft.state.status === 'ready' ? draft.state.gymId : null;
+  const [listPreferences] = useExerciseListPreferences();
+  const isFilteredByGym = listPreferences.pastRecordsGymScope === 'current-gym' && Boolean(currentGymId);
   const records = useExerciseRecords(
     exercise?.exerciseDefinitionId ?? null,
     loadHistory,
-    isCompletedSession ? sessionId : null
+    isCompletedSession ? sessionId : null,
+    {
+      scope: listPreferences.pastRecordsGymScope,
+      currentGymId,
+    }
   );
-  const [listPreferences] = useExerciseListPreferences();
   const catalog = useExerciseCatalog();
 
   const [recordsExpanded, setRecordsExpanded] = useState(false);
@@ -245,10 +251,14 @@ export function ExercisePageScreen({
           <RecordsPanel
             dateFormat={listPreferences.dateFormat}
             expanded={recordsExpanded}
+            isFilteredByGym={isFilteredByGym}
             onOpenHistory={() =>
               router.push({
                 pathname: '/exercise-history',
-                params: { exerciseDefinitionId: exercise.exerciseDefinitionId },
+                params: {
+                  exerciseDefinitionId: exercise.exerciseDefinitionId,
+                  ...(currentGymId ? { currentGymId } : {}),
+                },
               })
             }
             onSelectView={setRecordsView}
