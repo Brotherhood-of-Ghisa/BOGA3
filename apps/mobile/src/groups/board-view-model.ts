@@ -4,7 +4,9 @@
 // ordinal / date / value formatting they share. Values arrive converted to the
 // group exercise's weight entry (D6); nothing here re-ranks or re-sorts.
 
-import { formatKg, formatMemberName } from './stream-view-model';
+import { formatOneRepMaxFigure, formatWeightFigure } from '@/src/session-recorder/session-view-model';
+
+import { formatKg, formatMemberName, formatSetFigure } from './stream-view-model';
 import type {
   BoardHolder,
   BoardRow,
@@ -18,7 +20,8 @@ import type {
 
 export type GroupBoardScope = 'certified' | 'all';
 
-export const BOARD_METRIC_LABELS: Record<GroupBoardMetric, string> = { weight: 'Weight', e1rm: 'e1RM' };
+/** Display copy only: the `e1rm` key, the `metric=e1rm` param and testIDs stay (G7, DLM-T12-D2). */
+export const BOARD_METRIC_LABELS: Record<GroupBoardMetric, string> = { weight: 'Weight', e1rm: '1RM' };
 export const BOARD_SCOPE_LABELS: Record<GroupBoardScope, string> = { certified: 'Certified', all: 'All' };
 
 /** The podium page's and a card's default view (P8, D11). */
@@ -28,7 +31,7 @@ export const DEFAULT_BOARD_SCOPE: GroupBoardScope = 'certified';
 const firstValue = (value: string | string[] | undefined | null): string | null =>
   (Array.isArray(value) ? value[0] : value) ?? null;
 
-/** The `metric` query param; anything else is the default (e1RM). */
+/** The `metric` query param; anything else is the default (1RM). */
 export const parseBoardMetricParam = (value: string | string[] | undefined | null): GroupBoardMetric => {
   const raw = firstValue(value);
   return raw === 'weight' || raw === 'e1rm' ? raw : DEFAULT_BOARD_METRIC;
@@ -40,7 +43,7 @@ export const parseBoardScopeParam = (value: string | string[] | undefined | null
   return raw === 'certified' || raw === 'all' ? raw : DEFAULT_BOARD_SCOPE;
 };
 
-/** "Certified · e1RM", "All · Weight". */
+/** "Certified · 1RM", "All · Weight". */
 export const formatBoardViewLabel = (metric: GroupBoardMetric, scope: GroupBoardScope): string =>
   `${BOARD_SCOPE_LABELS[scope]} · ${BOARD_METRIC_LABELS[metric]}`;
 
@@ -89,11 +92,12 @@ export const formatBoardDate = (epochMs: number, nowMs: number = Date.now()): st
   return date.getFullYear() === new Date(nowMs).getFullYear() ? label : `${label} ${date.getFullYear()}`;
 };
 
-/** "142.5 kg". */
+/** "142.5 kg", for sentences (prose keeps its unit). */
 export const formatBoardKg = (valueKg: number): string => `${formatKg(valueKg)} kg`;
 
-/** "140 kg × 1". */
-export const formatBoardSet = (weightKg: number, reps: number): string => `${formatBoardKg(weightKg)} × ${reps}`;
+/** A board value in a figure slot, no unit (design-language §6): 1RM "142.5", Weight "140.0". */
+export const formatBoardFigure = (metric: GroupBoardMetric, valueKg: number): string =>
+  metric === 'e1rm' ? formatOneRepMaxFigure(valueKg) : formatWeightFigure(valueKg);
 
 export const YOU_LABEL = 'You';
 
@@ -118,9 +122,9 @@ export type BoardRowViewModel = {
   memberLabel: string;
   isMe: boolean;
   former: boolean;
-  /** e1RM: "142.5 kg"; Weight: "140 kg × 1". */
+  /** 1RM: "142.5"; Weight: "140.0 × 1" (figures, no unit). */
   valueLabel: string;
-  /** e1RM only: the set behind the estimate, "140 kg × 1". */
+  /** 1RM only: the set behind the estimate, "140.0 × 1". */
   detailLabel: string | null;
   dateLabel: string;
   /** On All only: the row draws a check, or a ring and "uncertified". Null on Certified. */
@@ -136,15 +140,15 @@ export const buildBoardRow = (
   nowMs: number = Date.now(),
 ): BoardRowViewModel => {
   const memberLabel = formatBoardMemberLabel(row.member, row.former, myUserId);
-  const setLabel = formatBoardSet(row.weight_kg, row.reps);
-  const valueLabel = metric === 'e1rm' ? formatBoardKg(row.value_kg) : setLabel;
+  const setLabel = formatSetFigure(row.weight_kg, row.reps);
+  const valueLabel = metric === 'e1rm' ? formatBoardFigure(metric, row.value_kg) : setLabel;
   const detailLabel = metric === 'e1rm' ? setLabel : null;
   const dateLabel = formatBoardDate(row.achieved_at_ms, nowMs);
   const certification = scope === 'all' ? (row.certified ? 'certified' : 'uncertified') : null;
   const accessibilityLabel = [
     formatOrdinal(row.rank),
     memberLabel,
-    metric === 'e1rm' ? `${valueLabel} e1RM` : valueLabel,
+    metric === 'e1rm' ? `${BOARD_METRIC_LABELS.e1rm} ${valueLabel}` : valueLabel,
     detailLabel,
     dateLabel,
     scope === 'all' ? (row.certified ? 'certified' : 'uncertified') : null,
@@ -213,7 +217,7 @@ export const buildPodiumCards = (
       rank: row.rank,
       memberLabel: formatBoardMemberLabel(row.member, row.former, myUserId),
       isMe: isMe(row.member.user_id, myUserId),
-      valueLabel: formatBoardKg(row.value_kg),
+      valueLabel: formatBoardFigure(payload.metric, row.value_kg),
       dateLabel: formatBoardDate(row.achieved_at_ms, nowMs),
     }));
     const empty = entry_count === 0 && rows.length === 0;

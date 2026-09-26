@@ -11,6 +11,7 @@
 
 import * as mockReact from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { StyleSheet, type ViewStyle } from 'react-native';
 
 import { createInMemoryDatabase, type InMemoryDatabaseFixture } from './helpers/in-memory-db';
 
@@ -46,8 +47,14 @@ jest.mock('expo-router', () => ({
   useFocusEffect: (callback: () => void | (() => void)) => {
     mockReact.useEffect(() => callback(), [callback]);
   },
-  Stack: { Screen: () => null },
+  Stack: {
+    Screen: ({ options }: { options?: { title?: string } }) => {
+      mockScreenTitle = options?.title ?? null;
+      return null;
+    },
+  },
 }));
+let mockScreenTitle: string | null = null;
 
 const mockUseAuth = jest.fn();
 jest.mock('@/src/auth', () => ({ useAuth: () => mockUseAuth() }));
@@ -79,12 +86,24 @@ import {
   type GroupGetResult,
 } from '@/src/groups';
 import * as groupsApi from '@/src/groups/api';
+import { uiRoles } from '@/components/ui';
 
 import GroupsTabRoute from '../(tabs)/groups';
 import GroupBoardRoute from '../group/[groupId]/leaderboards/[exerciseId]/index';
 import GroupBoardHistoryRoute from '../group/[groupId]/leaderboards/[exerciseId]/history';
 
 const api = groupsApi as jest.Mocked<typeof groupsApi>;
+
+type TestNode = typeof screen.UNSAFE_root;
+
+/** The nearest ground behind a node: its own or an ancestor's `backgroundColor`. */
+const groundOf = (node: TestNode): unknown => {
+  for (let current: TestNode | null = node; current; current = current.parent) {
+    const ground = (StyleSheet.flatten(current.props.style) as ViewStyle | undefined)?.backgroundColor;
+    if (ground !== undefined) return ground;
+  }
+  return undefined;
+};
 
 const USER_ID = 'user-me';
 const GROUP_ID = 'group-a';
@@ -177,6 +196,7 @@ beforeEach(() => {
   fixture = createInMemoryDatabase();
   mockNetInfoListeners.clear();
   mockInitialOnline = null;
+  mockScreenTitle = null;
   mockUseAuth.mockReturnValue({ isConfigured: true, user: { id: USER_ID } });
   setLastViewedGroupId(null);
   api.getGroup.mockResolvedValue(detail);
@@ -209,8 +229,8 @@ describe('Groups screen Leaderboards segment (E1.1)', () => {
     const bench = await screen.findByTestId(`group-podium-card-${EXERCISE_ID}`);
     expect(api.getGroupBoardPodiums).toHaveBeenCalledWith(GROUP_ID);
 
-    expect(screen.getByTestId(`group-podium-card-${EXERCISE_ID}-view`)).toHaveTextContent('Certified · e1RM');
-    expect(screen.getByTestId(`group-podium-card-${EXERCISE_ID}-row-1`)).toHaveTextContent(/Dave.*145 kg.*10 Sep/);
+    expect(screen.getByTestId(`group-podium-card-${EXERCISE_ID}-view`)).toHaveTextContent('Certified · 1RM');
+    expect(screen.getByTestId(`group-podium-card-${EXERCISE_ID}-row-1`)).toHaveTextContent(/Dave.*145\.0.*10 Sep/);
     expect(screen.getByTestId(`group-podium-card-${EXERCISE_ID}-you`)).toHaveTextContent('You: 5th');
     expect(screen.getByTestId('group-podium-card-ge-old-archived')).toHaveTextContent('Archived');
     expect(screen.getByTestId('group-podium-card-ge-old-empty')).toHaveTextContent('No certified sets yet · 2 uncertified');
@@ -266,7 +286,7 @@ describe('Full board (E1.2)', () => {
     render(<GroupBoardRoute />);
   };
 
-  it('opens on e1RM · Certified; empty Certified offers "See all sets", which reloads All', async () => {
+  it('opens on 1RM · Certified with the name as the header title; empty Certified offers "See all sets", which reloads All', async () => {
     api.getGroupBoard.mockImplementation(async ({ certified }) =>
       certified
         ? boardPage([])
@@ -280,17 +300,20 @@ describe('Full board (E1.2)', () => {
     expect(api.getGroupBoard).toHaveBeenCalledWith(
       expect.objectContaining({ groupId: GROUP_ID, groupExerciseId: EXERCISE_ID, metric: 'e1rm', certified: true, after: null }),
     );
-    expect(screen.getByTestId('group-board-name')).toHaveTextContent('Bench Press');
+    expect(mockScreenTitle).toBe('Bench Press');
 
     fireEvent.press(screen.getByTestId('group-board-see-all-button'));
     expect(await screen.findByTestId('group-board-row-1')).toBeTruthy();
     expect(api.getGroupBoard).toHaveBeenLastCalledWith(expect.objectContaining({ metric: 'e1rm', certified: false, after: null }));
 
-    expect(screen.getByTestId('group-board-row-1-value')).toHaveTextContent('145 kg');
-    expect(screen.getByTestId('group-board-row-1-detail')).toHaveTextContent('135 kg × 2');
+    expect(screen.getByTestId('group-board-row-1-value')).toHaveTextContent('145.0');
+    expect(screen.getByTestId('group-board-row-1-detail')).toHaveTextContent('135.0 × 2');
     expect(screen.getByTestId('group-board-row-1-mark')).toHaveTextContent('uncertified');
     expect(screen.getByTestId('group-board-row-1-mark-uncertified', { includeHiddenElements: true })).toBeTruthy();
     expect(screen.getByTestId('group-board-row-2-member')).toHaveTextContent('You');
+    // My row sits on surface-subtle, the others on the card's surface (DLM-T12-D1).
+    expect(groundOf(screen.getByTestId('group-board-row-2'))).toBe(uiRoles.surfaceSubtle);
+    expect(groundOf(screen.getByTestId('group-board-row-1'))).toBe(uiRoles.surface);
     expect(screen.getByTestId('group-board-row-2-mark')).toHaveTextContent('');
     expect(screen.getByTestId('group-board-row-2-mark-certified', { includeHiddenElements: true })).toBeTruthy();
     expect(screen.getByTestId('group-board-row-3-member')).toHaveTextContent('Alex (former)');
@@ -306,7 +329,7 @@ describe('Full board (E1.2)', () => {
     await waitFor(() =>
       expect(api.getGroupBoard).toHaveBeenLastCalledWith(expect.objectContaining({ metric: 'weight', certified: false, after: null })),
     );
-    expect(await screen.findByTestId('group-board-row-1-value')).toHaveTextContent('135 kg × 2');
+    expect(await screen.findByTestId('group-board-row-1-value')).toHaveTextContent('135.0 × 2');
     expect(screen.queryByTestId('group-board-row-1-detail')).toBeNull();
 
     fireEvent.press(screen.getByTestId('group-board-history-button'));
@@ -315,7 +338,7 @@ describe('Full board (E1.2)', () => {
     );
   });
 
-  it('invalid params fall back to e1RM · Certified; Certified rows carry no mark', async () => {
+  it('invalid params fall back to 1RM · Certified; Certified rows carry no mark', async () => {
     api.getGroupBoard.mockResolvedValue(boardPage([row(1, 'u1', 'Dave', { certified: true })]));
     openBoard({ metric: 'reps', scope: 'mine' });
     await screen.findByTestId('group-board-row-1');

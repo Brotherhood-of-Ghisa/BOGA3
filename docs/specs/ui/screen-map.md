@@ -521,7 +521,7 @@ Brief entrypoint map of the current mobile screens.
 - Key states (high level):
   - loading / offline / error
   - Exercises: active exercises, then archived ones marked `Archived`, each with its weight entry and my local link status (`Linked: …` / `Not linked`); an active row none of mine is linked to offers `Link your exercise` to every member (the M25-T07 pick sheet, link-only); a linked row offers `Unlink…` independently of role, selecting one personal ID through `Your linked exercises` when several exist, then confirming; local read failures hide actions/status and offer retry; owner/admin `Add exercise` and a row sheet (`Rename`, `Archive` with confirmation, or `Unarchive`), which members never see; "No group exercises yet" when empty; each write's outcome as an inline notice
-  - Leaderboards podium states (M25-T09, now on the Groups screen): one podium card per group exercise on `Certified · e1RM` (top 3 with `You` on my row, `You: Nth` below the podium, `You: not ranked`, `No certified sets yet · N uncertified` / `No sets yet`), archived exercises last marked `Archived`; "No group exercises yet" when empty; cached, so it shows offline
+  - Leaderboards podium states (M25-T09, now on the Groups screen): one podium card per group exercise on `Certified · 1RM` (top 3 with `You` on my row, `You: Nth` below the podium, `You: not ranked`, `No certified sets yet · N uncertified` / `No sets yet`), archived exercises last marked `Archived`; "No group exercises yet" when empty; cached, so it shows offline
   - lost access after `NOT_FOUND` on the group or its exercises: "You're no longer a member of this group", with cached data hidden
 - Key exits:
   - `/group/<groupId>/members` (member count), `/group/<groupId>/invite`, `/group/<groupId>/edit`
@@ -562,12 +562,12 @@ Brief entrypoint map of the current mobile screens.
 14d. `/group/[groupId]/leaderboards/[exerciseId]` (M25-T09)
 - File: `apps/mobile/app/group/[groupId]/leaderboards/[exerciseId]/index.tsx`
 - Purpose:
-  - a group exercise's full board (E1.2): `Weight | e1RM` and `Certified | All` toggles that switch in place, rows in rank order (rank, `You` / name, `(former)`, value, date; a check icon, or a ring icon and `uncertified`, on All only)
+  - a group exercise's full board (E1.2): `Weight | 1RM` and `Certified | All` toggles that switch in place, rows in rank order in one card (rank, `You` / name, `(former)`, value, date; a check icon, or a ring icon and `uncertified`, on All only)
 - Key states (high level):
-  - `Archived · read-only` under the name; empty Certified: "No certified sets yet" with `See all sets`; empty All: "No sets yet"
+  - `Archived · read-only` above the toggles (the name is the header title); empty Certified: "No certified sets yet" with `See all sets`; empty All: "No sets yet"
   - rows read online and paged (never cached): offline with nothing loaded shows the offline empty state, loaded rows stay with the offline marker, a failed next page shows `Retry`
   - lost access (group `NOT_FOUND`); "This exercise isn't in this group" (exercise `NOT_FOUND`)
-  - (M25-T10) a row opens the row detail sheet: value (with e1RM), the as-logged value when converted, date and gym, `Logged as "…"`, the certification line, and `Certify` / `Remove my certification` / `Cancel certification` as my relationship allows; a write refetches the first page
+  - (M25-T10) a row opens the row detail sheet: value (with the 1RM), the as-logged value when converted, date and gym, `Logged as "…"`, the certification line, and `Certify` / `Remove my certification` / `Cancel certification` as my relationship allows; a write refetches the first page
 - Key exits:
   - `History` → `/group/<groupId>/leaderboards/<exerciseId>/history`; back to the group screen
   - the sheet's `View full session` → `/group-session/<memberId>/<sessionId>`

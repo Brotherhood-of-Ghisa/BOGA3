@@ -10,6 +10,7 @@ import {
   buildPodiumCards,
   describeHistorySentence,
   formatBoardDate,
+  formatBoardFigure,
   formatBoardViewLabel,
   formatOrdinal,
   groupBoardHistoryPath,
@@ -87,13 +88,20 @@ describe('formatting', () => {
     expect(formatOrdinal(value)).toBe(expected);
   });
 
+  it('board figures carry no unit: 1RM to one decimal, Weight as the app\'s weight figure', () => {
+    expect(formatBoardFigure('e1rm', 64.119)).toBe('64.1');
+    expect(formatBoardFigure('e1rm', 138)).toBe('138.0');
+    expect(formatBoardFigure('weight', 55)).toBe('55.0');
+    expect(formatBoardFigure('weight', 51.25)).toBe('51.25');
+  });
+
   it('dates read "12 Sep", with the year only outside the current year', () => {
     expect(formatBoardDate(SEP_12, NOW)).toBe('12 Sep');
     expect(formatBoardDate(new Date(2025, 6, 2, 9).getTime(), NOW)).toBe('2 Jul 2025');
   });
 
-  it('view labels and route params, with invalid params falling back to e1RM · Certified', () => {
-    expect(formatBoardViewLabel('e1rm', 'certified')).toBe('Certified · e1RM');
+  it('view labels read 1RM (display copy only), and invalid params fall back to e1rm · Certified', () => {
+    expect(formatBoardViewLabel('e1rm', 'certified')).toBe('Certified · 1RM');
     expect(formatBoardViewLabel('weight', 'all')).toBe('All · Weight');
     expect(parseBoardMetricParam('weight')).toBe('weight');
     expect(parseBoardMetricParam(['e1rm'])).toBe('e1rm');
@@ -120,8 +128,8 @@ describe('podium cards (E1.1)', () => {
       NOW,
     );
     expect(cards.map((card) => [card.name, card.archived, card.viewLabel])).toEqual([
-      ['Bench Press', false, 'Certified · e1RM'],
-      ['Old Squat', true, 'Certified · e1RM'],
+      ['Bench Press', false, 'Certified · 1RM'],
+      ['Old Squat', true, 'Certified · 1RM'],
     ]);
   });
 
@@ -136,9 +144,9 @@ describe('podium cards (E1.1)', () => {
       }),
     );
     expect(card.rows.map((r) => `${r.rank} ${r.memberLabel} ${r.valueLabel} ${r.dateLabel}`)).toEqual([
-      '1 Dave 142.5 kg 12 Sep',
-      '2 Unnamed member 138 kg 12 Sep',
-      '3 You 131 kg 12 Sep',
+      '1 Dave 142.5 12 Sep',
+      '2 Unnamed member 138.0 12 Sep',
+      '3 You 131.0 12 Sep',
     ]);
     expect(card.rows[2].isMe).toBe(true);
     expect(card.youLabel).toBeNull();
@@ -181,28 +189,28 @@ describe('podium cards (E1.1)', () => {
       ME,
       NOW,
     )[0];
-    expect(card.accessibilityLabel).toBe('Prowler Push, archived, Certified · e1RM, No certified sets yet · 1 uncertified');
+    expect(card.accessibilityLabel).toBe('Prowler Push, archived, Certified · 1RM, No certified sets yet · 1 uncertified');
   });
 });
 
 describe('full board rows (E1.2)', () => {
-  it('e1RM shows the estimate with the set behind it; Weight shows the set', () => {
+  it('1RM shows the estimate with the set behind it; Weight shows the set; figures carry no unit', () => {
     const e1rm = buildBoardRow(row(1, 'u1', 'Dave'), 'e1rm', 'certified', ME, NOW);
-    expect([e1rm.valueLabel, e1rm.detailLabel, e1rm.certification]).toEqual(['142.5 kg', '140 kg × 1', null]);
+    expect([e1rm.valueLabel, e1rm.detailLabel, e1rm.certification]).toEqual(['142.5', '140.0 × 1', null]);
 
     const weight = buildBoardRow(row(1, 'u1', 'Dave', { value_kg: 51.25, weight_kg: 51.25, reps: 5 }), 'weight', 'certified', ME, NOW);
-    expect([weight.valueLabel, weight.detailLabel]).toEqual(['51.25 kg × 5', null]);
+    expect([weight.valueLabel, weight.detailLabel]).toEqual(['51.25 × 5', null]);
   });
 
   it('marks former members, my row, and certified / uncertified on All only', () => {
     const former = buildBoardRow(row(4, 'u4', 'Alex', { former: true, certified: true }), 'weight', 'all', ME, NOW);
     expect(former.memberLabel).toBe('Alex (former)');
     expect(former.certification).toBe('certified');
-    expect(former.accessibilityLabel).toBe('4th, Alex (former), 140 kg × 1, 12 Sep, certified');
+    expect(former.accessibilityLabel).toBe('4th, Alex (former), 140.0 × 1, 12 Sep, certified');
 
     const mine = buildBoardRow(row(3, ME, 'dino'), 'e1rm', 'all', ME, NOW);
     expect([mine.memberLabel, mine.isMe, mine.certification]).toEqual(['You', true, 'uncertified']);
-    expect(mine.accessibilityLabel).toBe('3rd, You, 142.5 kg e1RM, 140 kg × 1, 12 Sep, uncertified');
+    expect(mine.accessibilityLabel).toBe('3rd, You, 1RM 142.5, 140.0 × 1, 12 Sep, uncertified');
   });
 });
 

@@ -1,6 +1,6 @@
 import { StyleSheet } from 'react-native';
 
-import { uiBorder, uiColors, uiRadius, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { uiBorder, uiColors, uiGeometry, uiRadius, uiRoles, uiSpace, uiTypography } from '@/components/ui';
 
 /**
  * Shared page shell for the group routes: the `Screen` / `ScreenScroll` ground
@@ -27,7 +27,45 @@ export const groupScreenStyles = StyleSheet.create({
   actionRowItem: {
     flex: 1,
   },
+  /**
+   * A paged `FlatList` whose rows read as one `Card` (the board, its history):
+   * no gap between cells, the header and footer spaced by their own styles,
+   * and each cell a slice of the card (`cardListItem`, plus `-First` / `-Last`).
+   */
+  cardListContent: {
+    padding: uiSpace.lg,
+  },
+  cardListHeader: {
+    paddingBottom: uiSpace.md,
+  },
+  cardListFooter: {
+    paddingTop: uiSpace.md,
+  },
+  cardListItem: {
+    overflow: 'hidden',
+    borderLeftWidth: uiBorder.width,
+    borderRightWidth: uiBorder.width,
+    borderColor: uiRoles.rule,
+    backgroundColor: uiRoles.surface,
+  },
+  cardListItemFirst: {
+    borderTopWidth: uiBorder.width,
+    borderTopLeftRadius: uiGeometry.radius.card,
+    borderTopRightRadius: uiGeometry.radius.card,
+  },
+  cardListItemLast: {
+    borderBottomWidth: uiBorder.width,
+    borderBottomLeftRadius: uiGeometry.radius.card,
+    borderBottomRightRadius: uiGeometry.radius.card,
+  },
 });
+
+/** The styles for one cell of a `cardList` (`index` of `count`). */
+export const cardListItemStyles = (index: number, count: number) => [
+  groupScreenStyles.cardListItem,
+  index === 0 ? groupScreenStyles.cardListItemFirst : null,
+  index === count - 1 ? groupScreenStyles.cardListItemLast : null,
+];
 
 /** Field styles for the group write forms (same input treatment as the profile form). */
 export const groupFormStyles = StyleSheet.create({
