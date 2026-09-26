@@ -8,10 +8,13 @@
 #   ... [--tsv]                              # machine-readable: one `lane<TAB>rule` per line
 #
 # Matches changed paths against scripts/triggers.tsv (the machine-readable
-# trigger registry; the human tables live in AGENTS.md / spec 02). The
-# requirement is the UNION of every matching row, and each requirement is
+# trigger registry; the human tables live in AGENTS.md / spec 02). Per path,
+# the requirement is the UNION of every matching row minus any `-name`
+# removals those rows carry (so a narrower row can drop what a broader one
+# added, e.g. jest suites under app/__tests__ drop the simulator lanes). The
+# change's requirement is the union over its paths, and each requirement is
 # printed with the rule that demanded it — cite that rule when marking a gate
-# ⛔ N/A in the PR Tests table.
+# ⛔ N/A in the PR Tests table. `frontend` subsumes `frontend-ui`.
 #
 # Exit code is 0 unless the registry is unreadable; this tool informs, the PR
 # checker (pr-check.sh) enforces.
@@ -113,11 +116,17 @@ for p in paths:
     if not hits:
         unmatched.append(p)
     per_path.append((p, hits))
+    removed = {r[1:] for _pat, reqs, _rule in hits for r in reqs if r.startswith("-")}
     for _pat, reqs, rule in hits:
         for r in reqs:
-            required.setdefault(r, set()).add(rule)
+            if not r.startswith("-") and r not in removed:
+                required.setdefault(r, set()).add(rule)
 
-GATE_ORDER = ["fast", "backend", "frontend"]
+# The full frontend gate already runs every frontend-ui lane.
+if "frontend" in required and "frontend-ui" in required:
+    required["frontend"] |= required.pop("frontend-ui")
+
+GATE_ORDER = ["fast", "backend", "frontend", "frontend-ui"]
 ordered = [g for g in GATE_ORDER if g in required] + sorted(r for r in required if r not in GATE_ORDER)
 
 if tsv_mode:
@@ -139,4 +148,18 @@ for r in ordered:
     print(f"  ./boga test {r:<14} — {'; '.join(sorted(required[r]))}")
 if not ordered:
     print("  none — but run ./boga test fast if any code changed.")
+
+# Advisory only (never in --tsv, so pr-check never requires it): a diff that
+# touches shared UI chrome or many screens is where the selective UI tier is
+# most likely to miss a cross-screen break the e2e lanes would catch.
+SHARED_UI = re.compile(r"^apps/mobile/(components/(ui|navigation)/|app/\(tabs\)/_layout\.tsx$)")
+ui_paths = [p for p in paths if re.match(r"^apps/mobile/(app|components)/", p)
+            and not p.startswith("apps/mobile/app/__tests__/")]
+shared = [p for p in ui_paths if SHARED_UI.match(p)]
+if shared or len(ui_paths) >= 15:
+    why = (f"touches shared UI chrome ({shared[0]}{' …' if len(shared) > 1 else ''})" if shared
+           else f"{len(ui_paths)} screen/component files")
+    print()
+    print("RECOMMENDED (advisory, spec 02):")
+    print(f"  ./boga sweep --ref origin/<branch> — {why}; runs every lane, incl. the e2e lanes this tier skips")
 PY

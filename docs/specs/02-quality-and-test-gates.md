@@ -14,7 +14,9 @@ don't restate it here.
 ```bash
 ./boga test fast       # mobile quality + docs/meta + consent/MCP unit + backend fast smoke
 ./boga test backend    # local Supabase auth/agent/sync contracts + real MCP smoke
-./boga test frontend   # boots the iOS simulator, runs Maestro smoke + data-smoke + UI regression + exercise page + auth-profile + sync e2e + two-user groups e2e
+./boga test frontend   # boots the iOS simulator, runs Maestro smoke + data-smoke + UI regression + exercise page + session view + auth-profile + sync e2e + two-user groups e2e
+./boga test frontend-ui  # the frontend lanes that need no backend (smoke, data-smoke, UI regression, exercise page, session view)
+./boga sweep [--ref <ref>]  # every gate lane on origin/main (or <ref>) in a dedicated worktree — the backstop
 ./boga test --list     # every lane: name, gate, infra, CI?, command
 ./boga test <lane>     # one lane by name (e.g. ./boga test sync-push-contract)
 ./boga doctor          # verify THIS machine can run every lane
@@ -85,40 +87,40 @@ get from `./boga timings` or a run.
 | Lane | Run via | In which gate | CI? | Measured median† |
 | --- | --- | --- | :--: | --- |
 | *Infra: none — CI runs these* | | | | |
-| lint | `./boga test lint` | `boga test fast` (frontend half) | ✅ | ~1.6s |
-| typecheck | `./boga test typecheck` | `boga test fast` (frontend half) | ✅ | ~3.0s |
-| jest-full | `./boga test jest-full` | `boga test fast` (frontend half) | ✅ | ~7.5s |
+| lint | `./boga test lint` | `boga test fast` (frontend half) | ✅ | ~1.7s |
+| typecheck | `./boga test typecheck` | `boga test fast` (frontend half) | ✅ | ~3.1s |
+| jest-full | `./boga test jest-full` | `boga test fast` (frontend half) | ✅ | ~8.8s |
 | ui-guardrails | `./boga test ui-guardrails` | `boga test fast` (frontend half) | ✅ | ~0.2s |
 | docs-check | `./boga test docs-check` | `boga test fast` (repo half) | ✅ | ~0.1s |
-| meta-tests | `./boga test meta-tests` | `boga test fast` (repo half) | ✅ | ~1.3s |
-| agent-auth-web | `./boga test agent-auth-web` | `boga test fast` (repo half) | ✅ | ~2.5s |
-| mcp-unit | `./boga test mcp-unit` | `boga test fast` (repo half) | ✅ | ~3.4s |
-| handles | `./boga test handles` | — (run by name) | ✅ | ~48s |
+| meta-tests | `./boga test meta-tests` | `boga test fast` (repo half) | ✅ | ~1.4s |
+| agent-auth-web | `./boga test agent-auth-web` | `boga test fast` (repo half) | ✅ | ~3.6s |
+| mcp-unit | `./boga test mcp-unit` | `boga test fast` (repo half) | ✅ | ~4.4s |
+| handles | `./boga test handles` | — (run by name) | ✅ | ~51s |
 | jest-sync | `./boga test jest-sync` | — (run by name) | ❌ | ~3.6s |
 | *Infra: local Supabase + Docker — CI-able, local-only today* | | | | |
-| backend-fast | `./boga test backend-fast` | `boga test fast` (backend half) | ❌ | ~33s |
-| auth-authz | `./boga test auth-authz` | `boga test backend` | ❌ | ~3.9s |
+| backend-fast | `./boga test backend-fast` | `boga test fast` (backend half) | ❌ | ~34s |
+| auth-authz | `./boga test auth-authz` | `boga test backend` | ❌ | ~4.1s |
 | groups-contract | `./boga test groups-contract` | `boga test backend` | ❌ | ~21s |
-| groups-leaderboards | `./boga test groups-leaderboards` | `boga test backend` | ❌ | ~49s |
+| groups-leaderboards | `./boga test groups-leaderboards` | `boga test backend` | ❌ | ~46s |
 | agent-api | `./boga test agent-api` | `boga test backend` | ❌ | ~7.3s |
-| sync-v2-schema | `./boga test sync-v2-schema` | `boga test backend` | ❌ | ~7.8s |
-| sync-push-contract | `./boga test sync-push-contract` | `boga test backend` | ❌ | ~4.1s |
-| sync-pull-contract | `./boga test sync-pull-contract` | `boga test backend` | ❌ | ~4.6s |
-| dev-wipe-my-data | `./boga test dev-wipe-my-data` | `boga test backend` | ❌ | ~3.6s |
+| sync-v2-schema | `./boga test sync-v2-schema` | `boga test backend` | ❌ | ~8.0s |
+| sync-push-contract | `./boga test sync-push-contract` | `boga test backend` | ❌ | ~4.3s |
+| sync-pull-contract | `./boga test sync-pull-contract` | `boga test backend` | ❌ | ~5.0s |
+| dev-wipe-my-data | `./boga test dev-wipe-my-data` | `boga test backend` | ❌ | ~4.2s |
 | sync-drift | `./boga test sync-drift` | `boga test backend` | ❌ | ~27s |
-| sync-v2-e2e | `./boga test sync-v2-e2e` | `boga test backend` | ❌ | ~2.0m |
-| sync-infra | `./boga test sync-infra` | `boga test backend` | ❌ | ~8.1s |
-| mcp-smoke | `./boga test mcp-smoke` | `boga test backend` | ❌ | ~9.4s |
+| sync-v2-e2e | `./boga test sync-v2-e2e` | `boga test backend` | ❌ | ~1.8m |
+| sync-infra | `./boga test sync-infra` | `boga test backend` | ❌ | ~8.6s |
+| mcp-smoke | `./boga test mcp-smoke` | `boga test backend` | ❌ | ~10s |
 | *Infra: iOS simulator + Metro — never CI-able (+ local Supabase where noted)* | | | | |
-| ios-smoke | `./boga test ios-smoke` | `boga test frontend` | ❌ | ~50s |
-| ios-data-smoke | `./boga test ios-data-smoke` | `boga test frontend` | ❌ | ~1.2m |
-| ios-ui-regression | `./boga test ios-ui-regression` | `boga test frontend` | ❌ | ~6.2m |
-| ios-exercise-page | `./boga test ios-exercise-page` | `boga test frontend` | ❌ | ~1.4m |
-| ios-session-view | `./boga test ios-session-view` | `boga test frontend` | ❌ | ~1.8m |
+| ios-smoke | `./boga test ios-smoke` | `boga test frontend` + `frontend-ui` | ❌ | ~52s |
+| ios-data-smoke | `./boga test ios-data-smoke` | `boga test frontend` + `frontend-ui` | ❌ | ~1.2m |
+| ios-ui-regression | `./boga test ios-ui-regression` | `boga test frontend` + `frontend-ui` | ❌ | ~6.2m |
+| ios-exercise-page | `./boga test ios-exercise-page` | `boga test frontend` + `frontend-ui` | ❌ | ~2.3m |
+| ios-session-view | `./boga test ios-session-view` | `boga test frontend` + `frontend-ui` | ❌ | ~2.3m |
 | ios-gates | `./boga test ios-gates` | — (run by name) | ❌ | ~2.2m |
 | ios-auth-profile *(+ local Supabase)* | `./boga test ios-auth-profile` | `boga test frontend` | ❌ | ~1.6m |
 | ios-sync-e2e *(+ local Supabase)* | `./boga test ios-sync-e2e` | `boga test frontend` | ❌ | ~2.0m |
-| ios-groups-e2e *(+ local Supabase)* | `./boga test ios-groups-e2e` | `boga test frontend` | ❌ | ~3.8m |
+| ios-groups-e2e *(+ local Supabase)* | `./boga test ios-groups-e2e` | `boga test frontend` | ❌ | ~4.7m |
 
 † All-machine median of the recorded green runs (`docs/testing/timings/records/`); `N/A` = no measured data yet, **not** "instant" — run the lane to record it. Per-machine numbers: `./boga timings`.
 <!-- /boga:gen:lane-matrix -->
@@ -150,7 +152,13 @@ it on every PR). The table below is the human summary; keep both in sync.
 | You changed… | Run |
 | --- | --- |
 | Any `apps/mobile` TS/JS logic | `./boga test fast` |
-| `apps/mobile` UI screens / components / navigation (`app/**`, `components/**`) | `./boga test fast` **+** `./boga test frontend` |
+| `apps/mobile` UI screens / components / navigation (`app/**`, `components/**`) | `./boga test fast` **+** `./boga test frontend-ui` (**+** the area e2e lane below, if any) |
+| …the root layout (`app/_layout.tsx`) or the Maestro harness (`app/maestro-harness.tsx`) | `./boga test fast` **+** `./boga test frontend` (every lane boots / resets through them) |
+| …sign-in, profile, or connected-agents screens | the UI row **+** `./boga test ios-auth-profile` |
+| …the sync-status surface (`components/sync-status/**`) | the UI row **+** `./boga test ios-sync-e2e` |
+| …only group screens (`app/group/**`, `app/group-session/**`, `app/(tabs)/groups.tsx`, `app/exercise-link.tsx`, `components/groups/**`) | `./boga test fast` **+** `./boga test ios-smoke` **+** `./boga test ios-groups-e2e` |
+| Only jest suites (`apps/mobile/app/__tests__/**`) | `./boga test fast` (no simulator; `__tests__/sync/**` also `backend`) |
+| One Maestro flow (`apps/mobile/.maestro/flows/<flow>.yaml`) | the lane that runs that flow **+** `meta-tests` (runner / config changes: `./boga test frontend`) |
 | Sync / boot / auth (`apps/mobile/src/sync/**`, `src/auth/**`, scheduler, data bootstrap/migrations, `drizzle/**`, sync RPCs) | `./boga test fast` **+** `./boga test backend` **+** `./boga test ios-sync-e2e` (the UI↔server e2e lane) |
 | Backend (`supabase/migrations/**`, `functions/**`, RLS/policies, sync RPCs) | `./boga test backend` |
 | Groups (`apps/mobile/src/groups/**`, group migrations `supabase/migrations/*group*`, `groups-fixture-reset.sh`) | the rows above **+** `./boga test ios-groups-e2e` (the two-user UI↔server e2e lane) |
@@ -158,6 +166,41 @@ it on every PR). The table below is the human summary; keep both in sync.
 | Agent consent web (`apps/agent-auth-web/**`) | `./boga test fast` |
 | MCP server (`services/boga-mcp/**`) | `./boga test fast` **+** `./boga test mcp-smoke` |
 | Added/removed/upgraded a **native iOS** dependency (iOS pod, native Expo module, or an iOS-affecting native field / config plugin in `apps/mobile/app.config.ts`) | **First** `./boga ios build-client --force`, then `./boga test frontend` |
+
+### Why UI changes run `frontend-ui`, not the whole frontend gate
+
+Gate selection is by path, and it is deliberately **selective for UI**: a
+screen/component change runs the backend-free simulator lanes, while the three
+Supabase-backed e2e lanes (`ios-auth-profile`, `ios-sync-e2e`,
+`ios-groups-e2e`) run for their own screens and for the sync / auth / groups /
+migration rows. Those lanes prove server round-trips, which a restyle rarely
+touches, and they are the slowest part of the gate (`./boga timings`). What a UI
+change *can* do to them is rename or drop an element id a flow taps; two
+controls cover that instead:
+
+1. **`maestro-testids`** (in `meta-tests`, so the fast gate and CI): every
+   Maestro `id:` selector must still exist in app source. Chip/segment ids
+   built through a generic `${prefix}-${value}` join are only loosely checked
+   (see the script header).
+2. **The full sweep, run opportunistically** — `./boga sweep [--ref <ref>]`
+   (`scripts/full-sweep.sh`) runs every gate lane on `origin/main` (or a pushed
+   branch) in its own long-lived worktree (`$(boga_worktree_root)/full-sweep`,
+   own slot) and writes a summary under `~/.config/boga/sweep/latest/`. It is
+   not scheduled. Run it:
+   - on the `main` commit you are about to ship as an iOS build (TestFlight /
+     preview), before building;
+   - on a large or shared-UI PR before merge (`--ref origin/<branch>`) —
+     `./boga test for` prints a *RECOMMENDED* sweep line for a diff touching
+     shared UI chrome (`components/ui/**`, `components/navigation/**`, the tab
+     layout) or 15+ screen/component files. Advisory, not required: the
+     PR Tests table lists it only if you ran it.
+
+   A RED sweep means the ref has a regression the PR gates did not select —
+   bisect with `./boga test <lane>`. It needs the machine awake (a lid-closed
+   Mac pauses Docker).
+
+Any UI change may still run `./boga test frontend` — it covers `frontend-ui`
+and every lane in the PR Tests table.
 
 Run the gate(s) for your change **to green before opening the PR**, and put the
 evidence (command output / Maestro artifact path) in the PR. A pure-JS or
@@ -191,7 +234,9 @@ Update this doc — **including the lane matrix above** — in the same change
 whenever you alter a gate or lane: `scripts/lanes.tsv` (the registry `./boga`
 runs from), `scripts/triggers.tsv` (the path-trigger registry behind
 `boga test for` / `boga pr check`), `supabase/scripts/run-suite.sh` / `test-*.sh`,
-`apps/mobile/scripts/maestro-run-lane.sh`, an `apps/mobile/package.json`
+`apps/mobile/scripts/maestro-run-lane.sh` (moving a flow between lanes means
+updating its `triggers.tsv` row — `test-for.test.sh` enforces it),
+`scripts/full-sweep.sh`, an `apps/mobile/package.json`
 `test*`/`lint`/`typecheck` script, or `.github/workflows/ci.yml`. If a fact here
 ever disagrees with `scripts/lanes.tsv` or the scripts, the registry/scripts
 win — fix the doc.
